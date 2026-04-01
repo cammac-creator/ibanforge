@@ -17,7 +17,11 @@ ensureWalletConfigured();
 const app = new Hono();
 
 // Global middleware
-app.use('*', cors());
+app.use('*', cors({
+  origin: process.env.CORS_ORIGIN || '*',
+  allowMethods: ['GET', 'POST', 'OPTIONS'],
+  allowHeaders: ['Content-Type', 'Authorization', 'X-Payment'],
+}));
 app.use('*', logger());
 
 // x402 payment middleware (only on paid routes)
