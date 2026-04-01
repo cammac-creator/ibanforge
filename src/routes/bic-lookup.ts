@@ -12,15 +12,25 @@ bicLookup.get('/v1/bic/:code', (c) => {
   const start = performance.now();
   const code = c.req.param('code');
 
+  if (!/^[A-Za-z0-9]{8}([A-Za-z0-9]{3})?$/.test(code)) {
+    return c.json(
+      {
+        error: 'invalid_bic_format',
+        message: 'BIC code must be 8 or 11 alphanumeric characters',
+      },
+      400,
+    );
+  }
+
   const validation = validateBIC(code);
 
   if (!validation.valid) {
     return c.json(
       {
-        bic: validation.bic,
+        error: 'invalid_bic_format',
+        message: 'BIC code must be 8 or 11 alphanumeric characters',
         valid_format: false,
         found: false,
-        error: validation.error,
         cost_usdc: COST_USDC,
       },
       400,

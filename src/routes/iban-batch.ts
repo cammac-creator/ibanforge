@@ -8,17 +8,48 @@ const ibanBatch = new Hono();
 
 ibanBatch.post('/v1/iban/batch', async (c) => {
   const start = performance.now();
-  const body = await c.req.json<{ ibans?: string[] }>();
 
-  if (!body.ibans || !Array.isArray(body.ibans)) {
-    return c.json({ error: 'Missing or invalid "ibans" array' }, 400);
+  let body: { ibans?: unknown };
+  try {
+    body = await c.req.json<{ ibans?: unknown }>();
+  } catch {
+    return c.json(
+      { error: 'invalid_json', message: 'Request body must be valid JSON' },
+      400,
+    );
   }
 
-  if (body.ibans.length > 10) {
-    return c.json({ error: 'Maximum 10 IBANs per batch request' }, 400);
+  if (
+    !body.ibans ||
+    !Array.isArray(body.ibans) ||
+    !body.ibans.every((item) => typeof item === 'string')
+  ) {
+    return c.json(
+      {
+        error: 'invalid_request',
+        message: "Request body must include an 'ibans' array of strings (1-10 items)",
+      },
+      400,
+    );
   }
 
-  const results: IBANValidationResult[] = body.ibans.map((iban) => {
+  const ibans = body.ibans as string[];
+
+  if (ibans.length === 0) {
+    return c.json(
+      { error: 'empty_batch', message: 'At least 1 IBAN is required' },
+      400,
+    );
+  }
+
+  if (ibans.length > 10) {
+    return c.json(
+      { error: 'batch_too_large', message: 'Maximum 10 IBANs per batch request' },
+      400,
+    );
+  }
+
+  const results: IBANValidationResult[] = ibans.map((iban) => {
     const result = validateIBAN(iban);
     if (result.valid && result.bban?.bank_code) {
       result.bic = lookupByCountryBank(result.country!.code, result.bban.bank_code);

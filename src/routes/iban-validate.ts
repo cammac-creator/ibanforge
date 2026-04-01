@@ -8,13 +8,28 @@ const ibanValidate = new Hono();
 
 ibanValidate.post('/v1/iban/validate', async (c) => {
   const start = performance.now();
-  const body = await c.req.json<{ iban?: string }>();
 
-  if (!body.iban || typeof body.iban !== 'string') {
-    return c.json({ error: 'Missing or invalid "iban" field' }, 400);
+  let body: { iban?: unknown };
+  try {
+    body = await c.req.json<{ iban?: unknown }>();
+  } catch {
+    return c.json(
+      { error: 'invalid_json', message: 'Request body must be valid JSON' },
+      400,
+    );
   }
 
-  const result: IBANValidationResult = validateIBAN(body.iban);
+  if (!body.iban || typeof body.iban !== 'string' || body.iban.trim() === '') {
+    return c.json(
+      {
+        error: 'invalid_request',
+        message: "Request body must include an 'iban' field (string)",
+      },
+      400,
+    );
+  }
+
+  const result: IBANValidationResult = validateIBAN(body.iban as string);
 
   // Lookup BIC if IBAN is valid and bank code is available
   if (result.valid && result.bban?.bank_code) {
