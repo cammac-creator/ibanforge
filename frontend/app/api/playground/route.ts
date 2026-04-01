@@ -24,12 +24,16 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    const url = `${API_URL}${apiPath}`;
+    console.log(`[playground proxy] Fetching: ${url}`);
     const start = Date.now();
-    const res = await fetch(`${API_URL}${apiPath}`, options);
+    const res = await fetch(url, options);
     const ms = Date.now() - start;
     const data = await res.json();
     return NextResponse.json({ ...data, _playground_ms: ms });
   } catch (err) {
-    return NextResponse.json({ error: 'API unreachable' }, { status: 502 });
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`[playground proxy] Error fetching ${API_URL}${apiPath}:`, message);
+    return NextResponse.json({ error: 'API unreachable', debug_url: API_URL, detail: message }, { status: 502 });
   }
 }
