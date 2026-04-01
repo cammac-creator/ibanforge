@@ -1,0 +1,20 @@
+{
+  "name": "ibanforge",
+  "version": "1.0.0",
+  "description": "Official TypeScript SDK for the IBANforge API — IBAN validation & BIC/SWIFT lookup",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": ["iban", "bic", "swift", "validation", "banking", "api", "mcp", "x402"],
+  "license": "MIT",
+  "repository": { "type": "git", "url": "https://github.com/cammac-creator/ibanforge" },
+  "homepage": "https://ibanforge.com",
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  }
+}

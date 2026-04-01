@@ -1,0 +1,18 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.backends"
+
+[project]
+name = "ibanforge"
+version = "1.0.0"
+description = "Official Python SDK for the IBANforge API — IBAN validation & BIC/SWIFT lookup"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.8"
+dependencies = ["httpx>=0.24.0"]
+keywords = ["iban", "bic", "swift", "validation", "banking", "api"]
+
+[project.urls]
+Homepage = "https://ibanforge.com"
+Documentation = "https://ibanforge.com/docs"
+Repository = "https://github.com/cammac-creator/ibanforge"
