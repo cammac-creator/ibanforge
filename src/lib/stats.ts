@@ -111,6 +111,38 @@ export function getStats(): StatsOverview {
 }
 
 /**
+ * Historical daily stats for dashboard charts
+ */
+export function getStatsHistory(days: number = 7): Array<{
+  date: string;
+  iban_validate: number;
+  iban_batch: number;
+  bic_lookup: number;
+  revenue_usdc: number;
+}> {
+  const db = getStatsDB();
+  const rows = db.prepare(`
+    SELECT
+      date,
+      SUM(CASE WHEN operation_type = 'iban_validate' THEN total ELSE 0 END) as iban_validate,
+      SUM(CASE WHEN operation_type = 'iban_batch' THEN total ELSE 0 END) as iban_batch,
+      SUM(CASE WHEN operation_type = 'bic_lookup' THEN total ELSE 0 END) as bic_lookup,
+      SUM(revenue_usdc) as revenue_usdc
+    FROM daily_stats
+    WHERE date >= date('now', '-' || ? || ' days')
+    GROUP BY date
+    ORDER BY date ASC
+  `).all(days) as Array<{
+    date: string;
+    iban_validate: number;
+    iban_batch: number;
+    bic_lookup: number;
+    revenue_usdc: number;
+  }>;
+  return rows;
+}
+
+/**
  * Quick counts for health endpoint
  */
 export function getQuickStats(): { total_operations: number; iban_validations: number; bic_lookups: number; success_rate: number } {
