@@ -1,0 +1,73 @@
+---
+title: "Introducing IBANforge"
+description: "A new IBAN validation and BIC/SWIFT lookup API built for AI agents and developers"
+date: "2026-04-01"
+---
+
+Financial infrastructure is boring until it breaks. A mistyped IBAN delays a supplier payment by three days. A stale BIC code causes a wire transfer to bounce. A batch of onboarding forms skips validation entirely because calling a third-party service costs too much per request. These are not edge cases — they happen every day, in every fintech, in every back-office.
+
+IBANforge is our answer to that problem.
+
+## What is IBANforge?
+
+IBANforge is a developer API for IBAN validation and BIC/SWIFT lookup. It covers **75+ countries**, validates structure and checksum (mod-97), parses bank and branch codes from the BBAN, and resolves BIC codes against the **39,000+ entry GLEIF dataset** — the same authoritative source used by central banks.
+
+You send a POST request. You get back a clean, structured JSON response. That's it.
+
+```json
+{
+  "valid": true,
+  "country": "Switzerland",
+  "bank_code": "00784",
+  "account_number": "009876543210",
+  "bic": {
+    "bic": "POFICHBEXXX",
+    "institution": "PostFinance AG",
+    "country": "CH"
+  }
+}
+```
+
+## Why we built it
+
+Two things converged to make this the right moment.
+
+First, AI agents are now real. Workflows that used to require a human clicking through a banking portal now run autonomously — but only if the underlying tools are trustworthy. An agent that submits invalid IBANs to a payment processor creates real financial errors. Validation needs to happen at the tool level, before any API call to a bank.
+
+Second, **x402 micropayments** make pay-per-call economics viable. Instead of a monthly subscription that creates friction for small projects and over-charges for occasional use, IBANforge charges fractions of a cent per call in USDC, settled on-chain via the x402 protocol. No signup, no credit card, no rate limits. You pay for what you use, when you use it.
+
+Together, these two shifts — agentic workflows + on-chain micropayments — make a new class of API possible. IBANforge is built for that world.
+
+## Key features
+
+**IBAN validation across 75+ countries.** Full mod-97 checksum verification, country-specific length and format rules, and BBAN parsing to extract bank/branch codes where applicable.
+
+**39,000+ BIC entries from GLEIF.** The Global LEI Foundation publishes the authoritative mapping of BIC codes to financial institutions. We import it, index it, and serve it with sub-millisecond lookups. Combined IBAN + BIC validation is available in a single request.
+
+**MCP integration for AI agents.** IBANforge ships with a Model Context Protocol server, meaning any MCP-compatible AI agent can call `validate_iban`, `batch_validate_iban`, and `lookup_bic` as native tools — no custom wrappers needed. Claude, GPT, and open-source agents all speak MCP.
+
+**x402 pay-per-call.** Single validation: $0.002 USDC. Batch of 10: $0.015. BIC lookup: $0.001. No account required. Works with any USDC-capable wallet.
+
+**Batch validation.** Submit up to 10 IBANs in a single request for bulk onboarding, import flows, or reconciliation jobs.
+
+## How to get started
+
+The fastest path is the [Playground](/playground) — paste any IBAN, see the full validation response live, no API key needed.
+
+For integration, the [documentation](/docs) covers every endpoint, request format, response schema, and error code. There is also a free `/v1/demo` endpoint that returns example responses for a handful of countries so you can test your parser before spending a cent.
+
+```bash
+# Free demo — no payment required
+curl https://api.ibanforge.com/v1/demo
+```
+
+## What's next
+
+IBANforge is live and production-ready today. Here is what we are building toward:
+
+- **Stripe credits** — buy a bundle of credits with a card for teams that prefer traditional billing
+- **Expanded BIC coverage** — enriching entries with institution type, LEI, and correspondent bank data
+- **Webhook validation** — validate IBANs inline during form submission via a lightweight embed
+- **More MCP tools** — currency conversion, SEPA reachability checks, and more financial primitives agents need
+
+If you build something with IBANforge, we want to hear about it. The API is open — no waitlist, no approval process. Start validating.
