@@ -1,0 +1,163 @@
+---
+title: "Validate IBAN"
+description: "POST /v1/iban/validate — Validate a single IBAN with checksum verification, BBAN parsing, and optional BIC lookup."
+order: 1
+---
+
+# Validate IBAN
+
+Validate a single IBAN with full checksum verification, country-specific BBAN structure parsing, and automatic BIC/institution lookup when available.
+
+## Endpoint
+
+```
+POST https://api.ibanforge.com/v1/iban/validate
+```
+
+**Cost:** $0.002 USDC per request
+
+## Request
+
+### Headers
+
+| Header | Value | Required |
+|---|---|---|
+| `Content-Type` | `application/json` | Yes |
+| `X-PAYMENT` | x402 payment token | Yes |
+
+### Body
+
+```json
+{
+  "iban": "CH93 0076 2011 6238 5295 7"
+}
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `iban` | `string` | The IBAN to validate. Spaces are stripped automatically. Case-insensitive. |
+
+## Response
+
+### Success (200)
+
+```json
+{
+  "valid": true,
+  "iban": {
+    "formatted": "CH93 0076 2011 6238 5295 7",
+    "compact": "CH9300762011623852957",
+    "country": "Switzerland",
+    "countryCode": "CH",
+    "checkDigits": "93",
+    "bban": "00762011623852957",
+    "bankCode": "00762",
+    "accountNumber": "011623852957"
+  },
+  "bic": {
+    "code": "UBSWCHZH80A",
+    "institution": "UBS SWITZERLAND AG",
+    "city": "ZURICH",
+    "country": "Switzerland",
+    "lei": "BFM8T61CT2L1QCEMIK50"
+  }
+}
+```
+
+### Response fields
+
+**`iban` object:**
+
+| Field | Type | Description |
+|---|---|---|
+| `formatted` | `string` | IBAN with spaces every 4 characters |
+| `compact` | `string` | IBAN without spaces, uppercase |
+| `country` | `string` | Full country name in English |
+| `countryCode` | `string` | ISO 3166-1 alpha-2 country code |
+| `checkDigits` | `string` | The two-digit check number |
+| `bban` | `string` | Basic Bank Account Number (country-specific portion) |
+| `bankCode` | `string` | Bank/institution identifier extracted from BBAN |
+| `accountNumber` | `string` | Account number extracted from BBAN |
+
+**`bic` object** (present when a matching BIC is found):
+
+| Field | Type | Description |
+|---|---|---|
+| `code` | `string` | BIC/SWIFT code (8 or 11 characters) |
+| `institution` | `string` | Financial institution name |
+| `city` | `string` | City of the institution |
+| `country` | `string` | Country name |
+| `lei` | `string \| null` | Legal Entity Identifier (20 characters) if available |
+
+### Invalid IBAN (200)
+
+When the IBAN is invalid, the response still returns 200 but with `valid: false` and an error description:
+
+```json
+{
+  "valid": false,
+  "error": {
+    "code": "checksum_failed",
+    "message": "IBAN checksum verification failed (expected 93, got 42)"
+  }
+}
+```
+
+### Error codes
+
+| Code | Description |
+|---|---|
+| `invalid_format` | IBAN contains invalid characters or is empty |
+| `unsupported_country` | Country code is not recognized |
+| `wrong_length` | IBAN length does not match expected length for this country |
+| `checksum_failed` | MOD-97 checksum verification failed |
+
+## Code examples
+
+### cURL
+
+```bash
+curl -X POST https://api.ibanforge.com/v1/iban/validate \
+  -H "Content-Type: application/json" \
+  -d '{"iban": "DE89 3704 0044 0532 0130 00"}'
+```
+
+### Python
+
+```python
+import requests
+
+response = requests.post(
+    "https://api.ibanforge.com/v1/iban/validate",
+    json={"iban": "DE89370400440532013000"},
+)
+
+data = response.json()
+if data["valid"]:
+    print(f"Bank: {data['bic']['institution']}")
+    print(f"Country: {data['iban']['country']}")
+else:
+    print(f"Invalid: {data['error']['message']}")
+```
+
+### TypeScript
+
+```typescript
+const response = await fetch(
+  "https://api.ibanforge.com/v1/iban/validate",
+  {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ iban: "DE89370400440532013000" }),
+  }
+);
+
+const data = await response.json();
+
+if (data.valid) {
+  console.log(`Bank: ${data.bic.institution}`);
+  console.log(`Country: ${data.iban.country}`);
+} else {
+  console.log(`Invalid: ${data.error.message}`);
+}
+```

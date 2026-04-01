@@ -1,0 +1,127 @@
+---
+title: "x402 Payments"
+description: "How x402 micropayments work — pay-per-request with USDC, no API keys needed."
+order: 4
+---
+
+# x402 Micropayments
+
+IBANforge uses the **x402 protocol** for authentication and billing. Instead of API keys and monthly subscriptions, you pay a tiny amount of USDC per request — automatically.
+
+## How it works
+
+Think of it like a toll road: each API call costs a fraction of a cent, and the payment happens inline with your HTTP request.
+
+1. **Your client** sends an API request with a `X-PAYMENT` header containing a signed USDC payment
+2. **IBANforge** verifies the payment through the x402 facilitator
+3. **If valid**, the request is processed and the response is returned
+4. **If missing or invalid**, you receive a `402 Payment Required` response with pricing details
+
+No signup. No API keys. No rate limits. You only pay for what you use.
+
+## Pricing
+
+| Endpoint | Cost per request |
+|---|---|
+| `POST /v1/iban/validate` | $0.002 USDC |
+| `POST /v1/iban/batch` | $0.015 USDC |
+| `GET /v1/bic/:code` | $0.001 USDC |
+
+## The 402 response
+
+When you call a paid endpoint without a valid payment header, you receive:
+
+```
+HTTP/1.1 402 Payment Required
+```
+
+```json
+{
+  "error": "Payment Required",
+  "accepts": {
+    "scheme": "exact",
+    "network": "base",
+    "maxAmountRequired": "2000",
+    "resource": "https://api.ibanforge.com/v1/iban/validate",
+    "description": "IBAN validation — $0.002 USDC",
+    "mimeType": "application/json",
+    "payTo": "0x...",
+    "maxTimeoutSeconds": 300,
+    "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+  }
+}
+```
+
+This response tells your client exactly what to pay, where, and on which network (Base L2).
+
+## Supported clients
+
+Any HTTP client that implements the x402 protocol can pay automatically. The protocol is an open standard — here are some options:
+
+### x402 SDK (recommended)
+
+The official x402 TypeScript SDK handles payment automatically:
+
+```typescript
+import { paymentMiddleware } from "x402/client";
+
+const client = paymentMiddleware(fetch, {
+  walletPrivateKey: process.env.WALLET_PRIVATE_KEY,
+});
+
+// Payments happen automatically — just use fetch as usual
+const response = await client(
+  "https://api.ibanforge.com/v1/iban/validate",
+  {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ iban: "CH9300762011623852957" }),
+  }
+);
+```
+
+### Manual integration
+
+If you prefer to handle payments yourself, the flow is:
+
+1. Make a request to the API endpoint
+2. If you get a `402`, parse the `accepts` object from the response
+3. Create and sign a USDC transfer on Base for the specified amount
+4. Retry your request with the `X-PAYMENT` header containing the signed payment
+
+## Free testing
+
+You do not need any USDC to try the API. Use the demo endpoint:
+
+```bash
+curl https://api.ibanforge.com/v1/demo
+```
+
+This returns example validations for free, so you can explore the response format before setting up payments.
+
+## Network
+
+All payments happen on **Base** (Coinbase L2), which means:
+
+- Transaction fees are under $0.01
+- Settlement is near-instant (2 seconds)
+- USDC is the native stablecoin — no price volatility
+
+## FAQ
+
+**Do I need to create an account?**
+No. The payment itself is your authentication.
+
+**What if I run out of USDC?**
+The API returns `402 Payment Required`. Your existing data and results are not affected.
+
+**Is there a minimum balance?**
+No minimum. You need enough USDC on Base to cover one request (as low as $0.001).
+
+**Can I use this from a backend without exposing my wallet?**
+Yes. Keep your private key in environment variables on your server. The x402 SDK handles signing without broadcasting transactions on-chain for every request.
+
+## Learn more
+
+- [x402 Protocol Specification](https://www.x402.org/) — the open standard
+- [x402 TypeScript SDK](https://github.com/coinbase/x402) — official client library

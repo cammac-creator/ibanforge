@@ -1,0 +1,218 @@
+---
+title: "Batch Validate"
+description: "POST /v1/iban/batch — Validate up to 10 IBANs in a single request."
+order: 2
+---
+
+# Batch Validate
+
+Validate up to 10 IBANs in a single API call. Each IBAN is processed independently — one invalid IBAN does not affect the others.
+
+## Endpoint
+
+```
+POST https://api.ibanforge.com/v1/iban/batch
+```
+
+**Cost:** $0.015 USDC per request (flat fee regardless of how many IBANs)
+
+## Request
+
+### Headers
+
+| Header | Value | Required |
+|---|---|---|
+| `Content-Type` | `application/json` | Yes |
+| `X-PAYMENT` | x402 payment token | Yes |
+
+### Body
+
+```json
+{
+  "ibans": [
+    "CH93 0076 2011 6238 5295 7",
+    "DE89 3704 0044 0532 0130 00",
+    "GB29 NWBK 6016 1331 9268 19",
+    "INVALID123"
+  ]
+}
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `ibans` | `string[]` | Array of IBANs to validate. Maximum 10 items. |
+
+## Response
+
+### Success (200)
+
+```json
+{
+  "results": [
+    {
+      "valid": true,
+      "iban": {
+        "formatted": "CH93 0076 2011 6238 5295 7",
+        "compact": "CH9300762011623852957",
+        "country": "Switzerland",
+        "countryCode": "CH",
+        "checkDigits": "93",
+        "bban": "00762011623852957",
+        "bankCode": "00762",
+        "accountNumber": "011623852957"
+      },
+      "bic": {
+        "code": "UBSWCHZH80A",
+        "institution": "UBS SWITZERLAND AG",
+        "city": "ZURICH",
+        "country": "Switzerland",
+        "lei": "BFM8T61CT2L1QCEMIK50"
+      }
+    },
+    {
+      "valid": true,
+      "iban": {
+        "formatted": "DE89 3704 0044 0532 0130 00",
+        "compact": "DE89370400440532013000",
+        "country": "Germany",
+        "countryCode": "DE",
+        "checkDigits": "89",
+        "bban": "370400440532013000",
+        "bankCode": "37040044",
+        "accountNumber": "0532013000"
+      },
+      "bic": {
+        "code": "COBADEFFXXX",
+        "institution": "COMMERZBANK AG",
+        "city": "FRANKFURT AM MAIN",
+        "country": "Germany",
+        "lei": "851WYGNLUQLFZBSBER43"
+      }
+    },
+    {
+      "valid": true,
+      "iban": {
+        "formatted": "GB29 NWBK 6016 1331 9268 19",
+        "compact": "GB29NWBK60161331926819",
+        "country": "United Kingdom",
+        "countryCode": "GB",
+        "checkDigits": "29",
+        "bban": "NWBK60161331926819",
+        "bankCode": "NWBK",
+        "accountNumber": "31926819"
+      },
+      "bic": {
+        "code": "NWBKGB2L",
+        "institution": "NATIONAL WESTMINSTER BANK PLC",
+        "city": "LONDON",
+        "country": "United Kingdom",
+        "lei": "RR3QWICWWIPCS8A4S074"
+      }
+    },
+    {
+      "valid": false,
+      "error": {
+        "code": "invalid_format",
+        "message": "IBAN contains invalid characters or is not properly formatted"
+      }
+    }
+  ],
+  "summary": {
+    "total": 4,
+    "valid": 3,
+    "invalid": 1
+  }
+}
+```
+
+### Response fields
+
+**`results` array:** Each item has the same structure as the [single validation response](/docs/iban-validate). The order matches the input array.
+
+**`summary` object:**
+
+| Field | Type | Description |
+|---|---|---|
+| `total` | `number` | Number of IBANs submitted |
+| `valid` | `number` | Count of valid IBANs |
+| `invalid` | `number` | Count of invalid IBANs |
+
+### Errors
+
+| Status | Code | Description |
+|---|---|---|
+| 400 | `empty_array` | The `ibans` array is empty |
+| 400 | `too_many_ibans` | More than 10 IBANs submitted |
+| 400 | `invalid_body` | Request body is not valid JSON or missing `ibans` field |
+
+## Code examples
+
+### cURL
+
+```bash
+curl -X POST https://api.ibanforge.com/v1/iban/batch \
+  -H "Content-Type: application/json" \
+  -d '{
+    "ibans": [
+      "CH9300762011623852957",
+      "DE89370400440532013000",
+      "FR7630006000011234567890189"
+    ]
+  }'
+```
+
+### Python
+
+```python
+import requests
+
+response = requests.post(
+    "https://api.ibanforge.com/v1/iban/batch",
+    json={
+        "ibans": [
+            "CH9300762011623852957",
+            "DE89370400440532013000",
+            "FR7630006000011234567890189",
+        ]
+    },
+)
+
+data = response.json()
+print(f"Valid: {data['summary']['valid']}/{data['summary']['total']}")
+
+for result in data["results"]:
+    if result["valid"]:
+        print(f"  {result['iban']['compact']} — {result['iban']['country']}")
+    else:
+        print(f"  INVALID — {result['error']['message']}")
+```
+
+### TypeScript
+
+```typescript
+const response = await fetch(
+  "https://api.ibanforge.com/v1/iban/batch",
+  {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      ibans: [
+        "CH9300762011623852957",
+        "DE89370400440532013000",
+        "FR7630006000011234567890189",
+      ],
+    }),
+  }
+);
+
+const data = await response.json();
+console.log(`Valid: ${data.summary.valid}/${data.summary.total}`);
+
+for (const result of data.results) {
+  if (result.valid) {
+    console.log(`  ${result.iban.compact} — ${result.iban.country}`);
+  } else {
+    console.log(`  INVALID — ${result.error.message}`);
+  }
+}
+```

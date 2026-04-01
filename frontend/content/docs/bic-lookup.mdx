@@ -1,0 +1,129 @@
+---
+title: "BIC Lookup"
+description: "GET /v1/bic/:code — Look up institution data by BIC/SWIFT code."
+order: 3
+---
+
+# BIC Lookup
+
+Look up detailed institution information by BIC/SWIFT code. The database contains 39,000+ entries enriched with LEI data from GLEIF.
+
+## Endpoint
+
+```
+GET https://api.ibanforge.com/v1/bic/:code
+```
+
+**Cost:** $0.001 USDC per request
+
+## Parameters
+
+| Parameter | Location | Type | Description |
+|---|---|---|---|
+| `code` | URL path | `string` | BIC/SWIFT code — 8 or 11 characters. Case-insensitive. |
+
+A BIC code follows the ISO 9362 format:
+
+```
+AAAA BB CC DDD
+│    │  │  └── Branch code (optional, 3 chars — XXX = head office)
+│    │  └──── Location code (2 chars)
+│    └─────── Country code (ISO 3166-1 alpha-2)
+└──────────── Institution code (4 chars)
+```
+
+## Response
+
+### Success (200)
+
+```json
+{
+  "bic": "UBSWCHZH80A",
+  "institution": "UBS SWITZERLAND AG",
+  "country": "Switzerland",
+  "countryCode": "CH",
+  "city": "ZURICH",
+  "branch": "WEALTH MANAGEMENT",
+  "lei": "BFM8T61CT2L1QCEMIK50"
+}
+```
+
+### Response fields
+
+| Field | Type | Description |
+|---|---|---|
+| `bic` | `string` | Normalized BIC code (uppercase, 8 or 11 chars) |
+| `institution` | `string` | Official institution name |
+| `country` | `string` | Full country name |
+| `countryCode` | `string` | ISO 3166-1 alpha-2 country code |
+| `city` | `string` | City where the branch is located |
+| `branch` | `string \| null` | Branch name, if applicable |
+| `lei` | `string \| null` | Legal Entity Identifier (20 chars), if available in GLEIF data |
+
+### Not Found (404)
+
+```json
+{
+  "error": {
+    "code": "bic_not_found",
+    "message": "No institution found for BIC code XXXXCHZZXXX"
+  }
+}
+```
+
+### Errors
+
+| Status | Code | Description |
+|---|---|---|
+| 400 | `invalid_bic_format` | BIC code is not 8 or 11 characters, or contains invalid characters |
+| 404 | `bic_not_found` | No matching institution in the database |
+
+## Code examples
+
+### cURL
+
+```bash
+curl https://api.ibanforge.com/v1/bic/UBSWCHZH80A
+```
+
+### 8-character BIC (head office)
+
+```bash
+curl https://api.ibanforge.com/v1/bic/COBADEFF
+```
+
+When you pass an 8-character BIC, the API looks up the head office entry (equivalent to appending `XXX`).
+
+### Python
+
+```python
+import requests
+
+response = requests.get(
+    "https://api.ibanforge.com/v1/bic/UBSWCHZH80A"
+)
+
+data = response.json()
+print(f"Institution: {data['institution']}")
+print(f"Location: {data['city']}, {data['country']}")
+if data.get("lei"):
+    print(f"LEI: {data['lei']}")
+```
+
+### TypeScript
+
+```typescript
+const code = "UBSWCHZH80A";
+const response = await fetch(
+  `https://api.ibanforge.com/v1/bic/${code}`
+);
+
+if (!response.ok) {
+  const error = await response.json();
+  console.error(error.error.message);
+} else {
+  const data = await response.json();
+  console.log(`Institution: ${data.institution}`);
+  console.log(`Location: ${data.city}, ${data.country}`);
+}
+```

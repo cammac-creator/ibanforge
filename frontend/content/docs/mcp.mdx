@@ -1,0 +1,125 @@
+---
+title: "MCP Integration"
+description: "Connect IBANforge to AI agents using the Model Context Protocol (MCP)."
+order: 5
+---
+
+# MCP Integration
+
+IBANforge includes a built-in **MCP server** (Model Context Protocol) that lets AI agents validate IBANs and look up BIC codes as tool calls. This means Claude, GPT, or any MCP-compatible agent can use IBANforge directly.
+
+## What is MCP?
+
+The [Model Context Protocol](https://modelcontextprotocol.io/) is an open standard that allows AI assistants to use external tools. Instead of asking the user to copy-paste API results, the agent calls the tool directly and gets structured data back.
+
+## Setup for Claude Desktop
+
+Add IBANforge to your Claude Desktop configuration file:
+
+**macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
+
+**Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
+
+```json
+{
+  "mcpServers": {
+    "ibanforge": {
+      "command": "npx",
+      "args": ["tsx", "src/mcp/server.ts"],
+      "cwd": "/path/to/ibanforge"
+    }
+  }
+}
+```
+
+Replace `/path/to/ibanforge` with the actual path to your local IBANforge repository.
+
+After saving, restart Claude Desktop. You should see the IBANforge tools in the tools menu.
+
+## Available tools
+
+### validate_iban
+
+Validate a single IBAN and return detailed information.
+
+**Input:**
+```json
+{
+  "iban": "CH9300762011623852957"
+}
+```
+
+**Output:** Full validation result including country, bank code, account number, and BIC institution data (same as the `/v1/iban/validate` endpoint).
+
+### batch_validate_iban
+
+Validate multiple IBANs at once.
+
+**Input:**
+```json
+{
+  "ibans": [
+    "CH9300762011623852957",
+    "DE89370400440532013000"
+  ]
+}
+```
+
+**Output:** Array of validation results with a summary count (same as `/v1/iban/batch`).
+
+### lookup_bic
+
+Look up institution details by BIC/SWIFT code.
+
+**Input:**
+```json
+{
+  "code": "UBSWCHZH80A"
+}
+```
+
+**Output:** Institution name, country, city, branch, and LEI data (same as `/v1/bic/:code`).
+
+## Example agent conversation
+
+Once configured, you can ask Claude naturally:
+
+> **You:** Is this IBAN valid? CH93 0076 2011 6238 5295 7
+>
+> **Claude:** Let me validate that IBAN for you.
+> *[calls validate_iban]*
+>
+> Yes, that IBAN is valid. It belongs to **UBS Switzerland AG** in Zurich, Switzerland. The account number is 011623852957 and the bank's LEI is BFM8T61CT2L1QCEMIK50.
+
+> **You:** Can you check these 3 IBANs from our supplier invoice?
+>
+> **Claude:** I'll validate all three at once.
+> *[calls batch_validate_iban]*
+>
+> 2 out of 3 are valid. The third one (FR76...) has a checksum error — it looks like a digit was transposed.
+
+## Running the MCP server standalone
+
+You can also run the MCP server directly:
+
+```bash
+cd /path/to/ibanforge
+npm run mcp
+```
+
+This starts the server using **stdio transport**, which is the standard for local MCP integrations. The server reads JSON-RPC messages from stdin and writes responses to stdout.
+
+## Supported clients
+
+Any MCP-compatible client can use IBANforge tools:
+
+- **Claude Desktop** — native MCP support
+- **Claude Code** — CLI with MCP support
+- **Continue.dev** — VS Code AI extension
+- **Custom agents** — any app using the MCP SDK
+
+## Notes
+
+- The MCP server runs **locally** and accesses the BIC database directly — no API calls or payments needed
+- All three tools return the same structured data as the REST API
+- The server uses the stdio transport protocol (no HTTP server involved)

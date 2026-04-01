@@ -1,0 +1,85 @@
+---
+title: "Introduction"
+description: "Overview of the IBANforge API — IBAN validation, BIC/SWIFT lookup, and x402 micropayments."
+order: 0
+---
+
+# IBANforge API
+
+IBANforge is a fast, reliable API for **IBAN validation** and **BIC/SWIFT lookup**. It covers 80+ countries with real-time checksum verification, BBAN structure parsing, and enriched institution data from GLEIF.
+
+## Base URL
+
+```
+https://api.ibanforge.com
+```
+
+All endpoints are served over HTTPS. HTTP requests are redirected automatically.
+
+## Authentication
+
+IBANforge uses **x402 micropayments** instead of traditional API keys. Each request costs a fraction of a cent, paid automatically in USDC. No signup, no subscription, no rate limits.
+
+Your HTTP client attaches a payment header, and the API verifies it before processing. See the [x402 micropayments guide](/docs/x402) for details.
+
+## Endpoints at a glance
+
+| Endpoint | Method | Cost | Description |
+|---|---|---|---|
+| `/v1/iban/validate` | POST | $0.002 | Validate a single IBAN |
+| `/v1/iban/batch` | POST | $0.015 | Validate up to 10 IBANs |
+| `/v1/bic/:code` | GET | $0.001 | Look up a BIC/SWIFT code |
+| `/v1/demo` | GET | Free | Example validations (no payment needed) |
+| `/health` | GET | Free | Service health check |
+
+## Quick example
+
+```bash
+curl -X POST https://api.ibanforge.com/v1/iban/validate \
+  -H "Content-Type: application/json" \
+  -d '{"iban": "CH93 0076 2011 6238 5295 7"}'
+```
+
+Response:
+
+```json
+{
+  "valid": true,
+  "iban": {
+    "formatted": "CH93 0076 2011 6238 5295 7",
+    "compact": "CH9300762011623852957",
+    "country": "Switzerland",
+    "countryCode": "CH",
+    "checkDigits": "93",
+    "bban": "00762011623852957",
+    "bankCode": "00762",
+    "accountNumber": "011623852957"
+  },
+  "bic": {
+    "code": "UBSWCHZH80A",
+    "institution": "UBS SWITZERLAND AG",
+    "city": "ZURICH",
+    "country": "Switzerland",
+    "lei": "BFM8T61CT2L1QCEMIK50"
+  }
+}
+```
+
+## Free testing
+
+Use the `/v1/demo` endpoint to test the API without any payment setup:
+
+```bash
+curl https://api.ibanforge.com/v1/demo
+```
+
+This returns pre-validated example IBANs from multiple countries so you can explore the response format.
+
+## Next steps
+
+- [Validate a single IBAN](/docs/iban-validate) — full endpoint reference
+- [Batch validation](/docs/iban-batch) — validate up to 10 IBANs at once
+- [BIC/SWIFT lookup](/docs/bic-lookup) — search institution data by BIC code
+- [x402 micropayments](/docs/x402) — how payment works
+- [MCP integration](/docs/mcp) — connect IBANforge to AI agents
+- [Error reference](/docs/errors) — all error codes and troubleshooting

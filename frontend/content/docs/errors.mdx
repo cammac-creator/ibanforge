@@ -1,0 +1,145 @@
+---
+title: "Error Reference"
+description: "All error codes, HTTP statuses, and troubleshooting guide for the IBANforge API."
+order: 6
+---
+
+# Error Reference
+
+IBANforge uses standard HTTP status codes and returns structured error responses in JSON. This page covers every error you might encounter.
+
+## HTTP status codes
+
+| Status | Meaning | When it happens |
+|---|---|---|
+| `200` | OK | Request succeeded (note: invalid IBANs still return 200 with `valid: false`) |
+| `400` | Bad Request | Malformed request body, missing fields, or invalid parameters |
+| `402` | Payment Required | No payment header or insufficient/invalid payment |
+| `404` | Not Found | BIC code not found in the database, or unknown endpoint |
+| `500` | Internal Server Error | Unexpected server error (please report these) |
+
+## Validation error codes
+
+These appear in the response body when an IBAN is invalid. The HTTP status is still `200` — the request itself succeeded, but the IBAN did not pass validation.
+
+| Code | Description | Example cause |
+|---|---|---|
+| `invalid_format` | IBAN contains invalid characters or is empty | Special characters, too short, empty string |
+| `unsupported_country` | Country code is not in our registry | `XX12345678` — "XX" is not a valid country |
+| `wrong_length` | IBAN length does not match expected length for the country | Swiss IBAN should be 21 chars, but 19 were provided |
+| `checksum_failed` | MOD-97 checksum verification failed | A digit was changed or transposed |
+
+### Example: validation error
+
+```json
+{
+  "valid": false,
+  "error": {
+    "code": "wrong_length",
+    "message": "Expected 21 characters for CH (Switzerland), got 19"
+  }
+}
+```
+
+## Request error codes
+
+These return non-200 HTTP status codes.
+
+### 400 Bad Request
+
+| Code | Description |
+|---|---|
+| `invalid_body` | Request body is not valid JSON |
+| `missing_iban` | The `iban` field is missing from the request body |
+| `missing_ibans` | The `ibans` field is missing from the batch request body |
+| `empty_array` | The `ibans` array is empty |
+| `too_many_ibans` | More than 10 IBANs in a batch request |
+| `invalid_bic_format` | BIC code is not 8 or 11 characters |
+
+### Example: bad request
+
+```json
+{
+  "error": {
+    "code": "too_many_ibans",
+    "message": "Maximum 10 IBANs per batch request, got 15"
+  }
+}
+```
+
+### 402 Payment Required
+
+Returned when the `X-PAYMENT` header is missing, expired, or invalid. The response includes payment instructions:
+
+```json
+{
+  "error": "Payment Required",
+  "accepts": {
+    "scheme": "exact",
+    "network": "base",
+    "maxAmountRequired": "2000",
+    "resource": "https://api.ibanforge.com/v1/iban/validate",
+    "payTo": "0x...",
+    "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+  }
+}
+```
+
+See [x402 Payments](/docs/x402) for how to handle this.
+
+### 404 Not Found
+
+| Code | Description |
+|---|---|
+| `bic_not_found` | No institution found matching the provided BIC code |
+| `not_found` | The requested endpoint does not exist |
+
+### 500 Internal Server Error
+
+If you receive a 500 error, something unexpected happened on our side. The response will contain:
+
+```json
+{
+  "error": {
+    "code": "internal_error",
+    "message": "An unexpected error occurred"
+  }
+}
+```
+
+## Troubleshooting
+
+### "Payment Required" on every request
+
+- Make sure you have USDC on the **Base** network (not Ethereum mainnet)
+- Check that your wallet private key is correctly set in the `WALLET_PRIVATE_KEY` environment variable
+- Verify you are using a compatible x402 client SDK
+
+### "Invalid IBAN format" but the IBAN looks correct
+
+- Remove any leading/trailing whitespace
+- Make sure there are no non-ASCII characters (curly quotes, em-dashes, etc.)
+- The IBAN should only contain letters A-Z and digits 0-9 (spaces are stripped automatically)
+
+### "Unsupported country" for a valid country
+
+- IBANforge supports 80+ countries. Some territories and microstates may not be included yet
+- Double-check the two-letter country code at the start of the IBAN
+
+### "BIC not found" but the code is real
+
+- The BIC database contains 39,000+ entries from GLEIF but may not cover every branch
+- Try the 8-character version (without branch code) — e.g., `UBSWCHZH` instead of `UBSWCHZH80A`
+- Some financial institutions use BIC codes that are not registered with SWIFT/GLEIF
+
+### Batch request returns fewer results than expected
+
+- Check that your `ibans` array does not exceed 10 items
+- Ensure each item is a string — numbers and objects are rejected
+- The results array always matches the order and count of the input array
+
+### Timeout or no response
+
+- The API has a 30-second timeout. If you are sending complex batch requests, they should complete well within this limit
+- Check your network connection and firewall rules
+- Try the `/health` endpoint to verify the service is running
