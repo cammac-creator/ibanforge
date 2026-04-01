@@ -7,7 +7,7 @@
 - **IBAN Validation** — Full mod-97 checksum verification, BBAN structure parsing, 80+ countries
 - **BIC/SWIFT Lookup** — 39,000+ entries from GLEIF with LEI enrichment
 - **Batch Processing** — Validate up to 10 IBANs in one call
-- **x402 Micropayments** — Pay-per-call with USDC (from $0.001/request)
+- **x402 Micropayments** — Pay-per-call with USDC (from $0.003/request)
 - **MCP Server** — Native AI agent integration via Model Context Protocol
 - **Self-hosted** — Docker deployment, SQLite database, no external dependencies
 
@@ -25,9 +25,9 @@ npm run dev
 
 | Method | Path | Cost | Description |
 |--------|------|------|-------------|
-| `POST` | `/v1/iban/validate` | $0.002 | Validate a single IBAN |
-| `POST` | `/v1/iban/batch` | $0.015 | Validate up to 10 IBANs |
-| `GET` | `/v1/bic/:code` | $0.001 | Lookup BIC/SWIFT code |
+| `POST` | `/v1/iban/validate` | $0.005 | Validate a single IBAN |
+| `POST` | `/v1/iban/batch` | $0.020 | Validate up to 10 IBANs |
+| `GET` | `/v1/bic/:code` | $0.003 | Lookup BIC/SWIFT code |
 | `GET` | `/v1/demo` | Free | Example validations |
 | `GET` | `/health` | Free | Health check |
 | `GET` | `/stats` | Free | Usage statistics |

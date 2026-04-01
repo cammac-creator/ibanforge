@@ -50,19 +50,19 @@ const ENDPOINTS = [
   {
     method: "POST",
     path: "/v1/iban/validate",
-    cost: "$0.002",
+    cost: "$0.005",
     description: "Validate a single IBAN",
   },
   {
     method: "POST",
     path: "/v1/iban/batch",
-    cost: "$0.015",
+    cost: "$0.020",
     description: "Validate up to 10 IBANs",
   },
   {
     method: "GET",
     path: "/v1/bic/:code",
-    cost: "$0.001",
+    cost: "$0.003",
     description: "Lookup BIC/SWIFT code",
   },
 ]

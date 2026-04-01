@@ -69,7 +69,7 @@ export function validateIBAN(input: string): IBANValidationResult {
       valid: false,
       error: 'invalid_format',
       error_detail: 'IBAN contains invalid characters. Only letters and digits are allowed.',
-      cost_usdc: 0.002,
+      cost_usdc: 0.005,
     };
   }
 
@@ -79,7 +79,7 @@ export function validateIBAN(input: string): IBANValidationResult {
       valid: false,
       error: 'invalid_format',
       error_detail: 'IBAN is too short.',
-      cost_usdc: 0.002,
+      cost_usdc: 0.005,
     };
   }
 
@@ -93,7 +93,7 @@ export function validateIBAN(input: string): IBANValidationResult {
       valid: false,
       error: 'unsupported_country',
       error_detail: `Country code '${countryCode}' is not a recognized IBAN country.`,
-      cost_usdc: 0.002,
+      cost_usdc: 0.005,
     };
   }
 
@@ -103,7 +103,7 @@ export function validateIBAN(input: string): IBANValidationResult {
       valid: false,
       error: 'wrong_length',
       error_detail: `Expected ${expectedLength} characters for ${countryCode}, got ${cleaned.length}.`,
-      cost_usdc: 0.002,
+      cost_usdc: 0.005,
     };
   }
 
@@ -115,7 +115,7 @@ export function validateIBAN(input: string): IBANValidationResult {
       valid: false,
       error: 'checksum_failed',
       error_detail: `Modulo 97 check returned ${remainder}, expected 1.`,
-      cost_usdc: 0.002,
+      cost_usdc: 0.005,
     };
   }
 
@@ -135,6 +135,6 @@ export function validateIBAN(input: string): IBANValidationResult {
     check_digits: checkDigits,
     bban: bbanParsed,
     formatted: formatIBAN(cleaned),
-    cost_usdc: 0.002,
+    cost_usdc: 0.005,
   };
 }

@@ -96,7 +96,7 @@ export default async function ApiStatsPage({
       color: 'text-amber-400',
       total: totalByType.iban_validate,
       periodCount: periodTotal.iban_validate,
-      price: '$0.002',
+      price: '$0.005',
     },
     {
       name: 'POST /v1/iban/batch',
@@ -104,7 +104,7 @@ export default async function ApiStatsPage({
       color: 'text-blue-400',
       total: totalByType.iban_batch,
       periodCount: periodTotal.iban_batch,
-      price: '$0.015',
+      price: '$0.020',
     },
     {
       name: 'GET /v1/bic/:code',
@@ -112,7 +112,7 @@ export default async function ApiStatsPage({
       color: 'text-green-400',
       total: totalByType.bic_lookup,
       periodCount: periodTotal.bic_lookup,
-      price: '$0.001',
+      price: '$0.003',
     },
   ];
 

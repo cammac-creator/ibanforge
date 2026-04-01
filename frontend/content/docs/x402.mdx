@@ -23,9 +23,9 @@ No signup. No API keys. No rate limits. You only pay for what you use.
 
 | Endpoint | Cost per request |
 |---|---|
-| `POST /v1/iban/validate` | $0.002 USDC |
-| `POST /v1/iban/batch` | $0.015 USDC |
-| `GET /v1/bic/:code` | $0.001 USDC |
+| `POST /v1/iban/validate` | $0.005 USDC |
+| `POST /v1/iban/batch` | $0.020 USDC |
+| `GET /v1/bic/:code` | $0.003 USDC |
 
 ## The 402 response
 
@@ -41,9 +41,9 @@ HTTP/1.1 402 Payment Required
   "accepts": {
     "scheme": "exact",
     "network": "base",
-    "maxAmountRequired": "2000",
+    "maxAmountRequired": "5000",
     "resource": "https://api.ibanforge.com/v1/iban/validate",
-    "description": "IBAN validation — $0.002 USDC",
+    "description": "IBAN validation — $0.005 USDC",
     "mimeType": "application/json",
     "payTo": "0x...",
     "maxTimeoutSeconds": 300,
@@ -116,7 +116,7 @@ No. The payment itself is your authentication.
 The API returns `402 Payment Required`. Your existing data and results are not affected.
 
 **Is there a minimum balance?**
-No minimum. You need enough USDC on Base to cover one request (as low as $0.001).
+No minimum. You need enough USDC on Base to cover one request (as low as $0.003).
 
 **Can I use this from a backend without exposing my wallet?**
 Yes. Keep your private key in environment variables on your server. The x402 SDK handles signing without broadcasting transactions on-chain for every request.

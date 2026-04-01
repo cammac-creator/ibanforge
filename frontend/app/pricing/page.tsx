@@ -15,19 +15,19 @@ const ENDPOINTS = [
   {
     method: "POST",
     path: "/v1/iban/validate",
-    cost: "$0.002",
+    cost: "$0.005",
     description: "Validate a single IBAN with full BBAN parsing",
   },
   {
     method: "POST",
     path: "/v1/iban/batch",
-    cost: "$0.015",
+    cost: "$0.020",
     description: "Validate up to 10 IBANs in one request",
   },
   {
     method: "GET",
     path: "/v1/bic/:code",
-    cost: "$0.001",
+    cost: "$0.003",
     description: "Lookup BIC/SWIFT code from GLEIF database",
   },
 ]

@@ -66,7 +66,7 @@ landing.get('/', (c) => {
           <div class="path">/v1/iban/validate</div>
           <div class="desc">Validate a single IBAN + automatic BIC lookup</div>
         </div>
-        <span class="price">$0.002</span>
+        <span class="price">$0.005</span>
       </div>
       <div class="endpoint">
         <span class="method method-post">POST</span>
@@ -74,7 +74,7 @@ landing.get('/', (c) => {
           <div class="path">/v1/iban/batch</div>
           <div class="desc">Validate up to 10 IBANs in one call</div>
         </div>
-        <span class="price">$0.015</span>
+        <span class="price">$0.020</span>
       </div>
       <div class="endpoint">
         <span class="method method-get">GET</span>
@@ -82,7 +82,7 @@ landing.get('/', (c) => {
           <div class="path">/v1/bic/:code</div>
           <div class="desc">Lookup BIC/SWIFT code with LEI enrichment</div>
         </div>
-        <span class="price">$0.001</span>
+        <span class="price">$0.003</span>
       </div>
       <div class="endpoint">
         <span class="method method-get">GET</span>

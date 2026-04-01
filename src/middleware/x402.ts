@@ -52,7 +52,7 @@ export function createX402Middleware(): MiddlewareHandler {
           accepts: {
             scheme: 'exact',
             network: 'eip155:8453' as const,
-            price: { amount: '2000', asset: USDC_BASE },
+            price: { amount: '5000', asset: USDC_BASE },
             payTo: walletAddress,
             maxTimeoutSeconds: 60,
           },
@@ -62,7 +62,7 @@ export function createX402Middleware(): MiddlewareHandler {
           accepts: {
             scheme: 'exact',
             network: 'eip155:8453' as const,
-            price: { amount: '15000', asset: USDC_BASE },
+            price: { amount: '20000', asset: USDC_BASE },
             payTo: walletAddress,
             maxTimeoutSeconds: 60,
           },
@@ -72,7 +72,7 @@ export function createX402Middleware(): MiddlewareHandler {
           accepts: {
             scheme: 'exact',
             network: 'eip155:8453' as const,
-            price: { amount: '1000', asset: USDC_BASE },
+            price: { amount: '3000', asset: USDC_BASE },
             payTo: walletAddress,
             maxTimeoutSeconds: 60,
           },

@@ -4,7 +4,7 @@ import { lookup } from '../lib/bic-lookup.js';
 import { recordOperation } from '../lib/stats.js';
 import type { BICLookupResult } from '../types.js';
 
-const COST_USDC = 0.001;
+const COST_USDC = 0.003;
 
 const bicLookup = new Hono();
 

@@ -26,7 +26,7 @@ ibanBatch.post('/v1/iban/batch', async (c) => {
     return result;
   });
 
-  const totalCost = 0.015;
+  const totalCost = 0.020;
   const processingMs = Math.round((performance.now() - start) * 100) / 100;
   const validCount = results.filter((r) => r.valid).length;
 

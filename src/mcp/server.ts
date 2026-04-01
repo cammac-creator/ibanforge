@@ -16,7 +16,7 @@ server.tool(
   `Validate an IBAN number and retrieve the associated BIC/SWIFT code and bank information.
 Returns: validity status, country, bank code, BIC, bank name.
 Supports 75+ countries including all SEPA countries.
-Cost: $0.002 USDC per call via x402 micropayment on Base L2.`,
+Cost: $0.005 USDC per call via x402 micropayment on Base L2.`,
   {
     iban: z
       .string()
@@ -38,7 +38,7 @@ Cost: $0.002 USDC per call via x402 micropayment on Base L2.`,
 // --- Tool: batch_validate_iban ---
 server.tool(
   'batch_validate_iban',
-  `Validate up to 10 IBANs in a single call. More economical than individual calls ($0.015 vs $0.020).
+  `Validate up to 10 IBANs in a single call. More economical than individual calls ($0.020 vs $0.050).
 Useful for validating supplier lists, payment batches, or KYC workflows.`,
   {
     ibans: z.array(z.string()).max(10).describe('Array of IBANs to validate (max 10)'),
@@ -63,7 +63,7 @@ server.tool(
   `Look up a BIC/SWIFT code and return institution details, country, city, and LEI data.
 Returns: validity, institution name, country, city, branch info, LEI identifier.
 Supports BIC8 (UBSWCHZH) and BIC11 (UBSWCHZH80A) formats.
-Cost: $0.001 USDC per call via x402 micropayment on Base L2.`,
+Cost: $0.003 USDC per call via x402 micropayment on Base L2.`,
   {
     bic: z
       .string()

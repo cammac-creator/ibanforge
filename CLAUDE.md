@@ -62,9 +62,9 @@ data/
 
 | Method | Path | Cost (USDC) | Description |
 |--------|------|-------------|-------------|
-| POST | /v1/iban/validate | 0.002 | Validate single IBAN + optional BIC lookup |
-| POST | /v1/iban/batch | 0.015 | Validate up to 10 IBANs |
-| GET | /v1/bic/:code | 0.001 | Lookup BIC/SWIFT code |
+| POST | /v1/iban/validate | 0.005 | Validate single IBAN + optional BIC lookup |
+| POST | /v1/iban/batch | 0.020 | Validate up to 10 IBANs |
+| GET | /v1/bic/:code | 0.003 | Lookup BIC/SWIFT code |
 | GET | /v1/demo | free | Example validations |
 | GET | /health | free | Health check + stats |
 | GET | /stats | free | Detailed statistics |
