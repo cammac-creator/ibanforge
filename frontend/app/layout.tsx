@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import { ThemeProvider } from "next-themes";
+import { SiteHeader } from "@/components/site-header";
+import { SiteFooter } from "@/components/site-footer";
 import "./globals.css";
 
 const inter = Inter({
@@ -31,7 +33,11 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col antialiased">
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
-          {children}
+          <SiteHeader />
+          <main className="flex-1">
+            {children}
+          </main>
+          <SiteFooter />
         </ThemeProvider>
       </body>
     </html>
