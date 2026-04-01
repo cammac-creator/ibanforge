@@ -1,0 +1,69 @@
+{
+  "info": {
+    "name": "IBANforge API",
+    "_postman_id": "ibanforge-v1",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "IBAN validation & BIC/SWIFT lookup API"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "https://api.ibanforge.com" }
+  ],
+  "item": [
+    {
+      "name": "IBAN Validation",
+      "item": [
+        {
+          "name": "Validate IBAN",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/v1/iban/validate",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"iban\": \"CH93 0076 2011 6238 5295 7\"}" }
+          }
+        },
+        {
+          "name": "Batch Validate",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/v1/iban/batch",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"ibans\": [\"CH93 0076 2011 6238 5295 7\", \"DE89 3704 0044 0532 0130 00\"]}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "BIC Lookup",
+      "item": [
+        {
+          "name": "Lookup BIC",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/v1/bic/UBSWCHZH80A"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Free Endpoints",
+      "item": [
+        {
+          "name": "Demo",
+          "request": { "method": "GET", "url": "{{baseUrl}}/v1/demo" }
+        },
+        {
+          "name": "Health",
+          "request": { "method": "GET", "url": "{{baseUrl}}/health" }
+        },
+        {
+          "name": "Stats",
+          "request": { "method": "GET", "url": "{{baseUrl}}/stats" }
+        },
+        {
+          "name": "Stats History",
+          "request": { "method": "GET", "url": "{{baseUrl}}/stats/history?period=30" }
+        }
+      ]
+    }
+  ]
+}
