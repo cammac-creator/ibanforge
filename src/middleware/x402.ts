@@ -5,20 +5,14 @@ const USDC_BASE = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
 /**
  * x402 payment middleware for IBANforge.
  *
- * SECURITY: In production, if WALLET_ADDRESS is not set, the server refuses
- * to start. This middleware must NEVER fail-open — serving paid routes for
- * free is not acceptable.
- *
- * Dev bypass: set NODE_ENV=development and send X-Dev-Skip: true header.
+ * To enable payments: set X402_ENABLED=true + WALLET_ADDRESS in env.
+ * When disabled (default), all endpoints are free — useful for launch phase.
  */
 export function ensureWalletConfigured(): void {
-  if (
-    process.env.NODE_ENV === 'production' &&
-    !process.env.WALLET_ADDRESS
-  ) {
+  if (process.env.X402_ENABLED === 'true' && !process.env.WALLET_ADDRESS) {
     throw new Error(
-      'WALLET_ADDRESS environment variable is required in production. ' +
-        'IBANforge cannot start without it — paid routes would be served for free.',
+      'WALLET_ADDRESS is required when X402_ENABLED=true. ' +
+        'Either set WALLET_ADDRESS or remove X402_ENABLED to run in free mode.',
     );
   }
 }
@@ -34,9 +28,14 @@ export function createX402Middleware(): MiddlewareHandler {
       return;
     }
 
+    // x402 disabled — all endpoints are free
+    if (process.env.X402_ENABLED !== 'true') {
+      await next();
+      return;
+    }
+
     const walletAddress = process.env.WALLET_ADDRESS;
     if (!walletAddress) {
-      // No wallet in non-production (dev/test) — pass through
       await next();
       return;
     }
