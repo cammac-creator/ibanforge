@@ -1,0 +1,34 @@
+import { NextRequest, NextResponse } from 'next/server';
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
+export async function POST(req: NextRequest) {
+  const { type, value } = await req.json();
+
+  let apiPath: string;
+  let options: RequestInit;
+
+  if (type === 'iban') {
+    apiPath = '/v1/iban/validate';
+    options = {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ iban: value }),
+    };
+  } else if (type === 'bic') {
+    apiPath = `/v1/bic/${encodeURIComponent(value)}`;
+    options = { method: 'GET' };
+  } else {
+    return NextResponse.json({ error: 'Invalid type' }, { status: 400 });
+  }
+
+  try {
+    const start = Date.now();
+    const res = await fetch(`${API_URL}${apiPath}`, options);
+    const ms = Date.now() - start;
+    const data = await res.json();
+    return NextResponse.json({ ...data, _playground_ms: ms });
+  } catch (err) {
+    return NextResponse.json({ error: 'API unreachable' }, { status: 502 });
+  }
+}
