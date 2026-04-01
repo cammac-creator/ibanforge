@@ -1,5 +1,31 @@
+import { createRequire } from 'node:module';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { getBicDB } from './db.js';
 import type Database from 'better-sqlite3';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
+// ---------------------------------------------------------------------------
+// bic_data.json — static bank_code → BIC mapping (6907 entries, 40+ countries)
+// Format: { "COUNTRY:bank_code": { bic, bank_name?, city? } }
+// ---------------------------------------------------------------------------
+
+interface BicDataEntry {
+  bic: string;
+  bank_name?: string;
+  city?: string;
+}
+
+let bicDataCache: Record<string, BicDataEntry> | null = null;
+
+function getBicData(): Record<string, BicDataEntry> {
+  if (!bicDataCache) {
+    const require = createRequire(import.meta.url);
+    bicDataCache = require(resolve(__dirname, '../db/bic_data.json')) as Record<string, BicDataEntry>;
+  }
+  return bicDataCache;
+}
 
 export interface BICRow {
   bic8: string;
@@ -53,14 +79,33 @@ export function getEntryCount(): number {
 
 /**
  * Look up a BIC by country code and BBAN bank code.
- * Heuristic: searches for BIC entries matching the country where the BIC8
- * institution code starts with the bank code (many countries use this mapping).
+ *
+ * Strategy:
+ * 1. Direct key lookup in bic_data.json using "COUNTRY:bank_code" (O(1), most accurate)
+ * 2. Fallback: SQLite query on bic_entries WHERE bic8 LIKE bank_code% (covers GLEIF-only entries)
+ *
  * Returns a simplified object suitable for IBAN validation enrichment, or null.
  */
 export function lookupByCountryBank(
   countryCode: string,
   bankCode: string,
 ): { code: string; bank_name: string | null; city: string | null } | null {
+  // Strategy 1: exact key lookup in bic_data.json
+  const data = getBicData();
+  const key = `${countryCode}:${bankCode}`;
+  const entry = data[key];
+
+  if (entry) {
+    // Normalize BIC to 8 chars (strip branch suffix if present)
+    const bic8 = entry.bic.length > 8 ? entry.bic.substring(0, 8) : entry.bic;
+    return {
+      code: bic8,
+      bank_name: entry.bank_name ?? null,
+      city: entry.city ?? null,
+    };
+  }
+
+  // Strategy 2: SQLite fallback — bic8 starts with bank code (works for some countries)
   const db = getBicDB();
   const row = db
     .prepare(

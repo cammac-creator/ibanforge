@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc",
+    "build": "tsc && cp src/db/bic_data.json dist/db/bic_data.json",
     "start": "node dist/index.js",
     "test": "vitest run",
     "test:watch": "vitest",
