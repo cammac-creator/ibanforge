@@ -2,6 +2,7 @@ import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { getBicDB } from './db.js';
+import { LRUCache } from './cache.js';
 import type Database from 'better-sqlite3';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -42,6 +43,8 @@ export interface BICRow {
   source: string;
 }
 
+const bicCache = new LRUCache<BICRow | null>(2000);
+
 let stmtByBic11: Database.Statement | null = null;
 let stmtByBic8: Database.Statement | null = null;
 
@@ -60,17 +63,25 @@ export function lookupByBic8(bic8: string): BICRow[] {
 }
 
 export function lookup(bic: string): BICRow | null {
+  const cached = bicCache.get(bic);
+  if (cached !== undefined) return cached;
+
+  let result: BICRow | null = null;
   if (bic.length === 11) {
-    return lookupByBic11(bic);
-  }
-  if (bic.length === 8) {
+    result = lookupByBic11(bic);
+  } else if (bic.length === 8) {
     // Try XXX branch first (head office), then any match
     const hq = lookupByBic11(bic + 'XXX');
-    if (hq) return hq;
-    const rows = lookupByBic8(bic);
-    return rows[0] ?? null;
+    if (hq) {
+      result = hq;
+    } else {
+      const rows = lookupByBic8(bic);
+      result = rows[0] ?? null;
+    }
   }
-  return null;
+
+  bicCache.set(bic, result);
+  return result;
 }
 
 export function getEntryCount(): number {
@@ -120,9 +131,10 @@ export function lookupByCountryBank(
 }
 
 /**
- * Reset cached prepared statements (call when closing DB)
+ * Reset cached prepared statements and LRU cache (call when closing DB)
  */
 export function resetStatements(): void {
   stmtByBic11 = null;
   stmtByBic8 = null;
+  bicCache.clear();
 }
