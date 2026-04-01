@@ -27,7 +27,7 @@ ibanBatch.post('/v1/iban/batch', async (c) => {
     return c.json(
       {
         error: 'invalid_request',
-        message: "Request body must include an 'ibans' array of strings (1-10 items)",
+        message: "Request body must include an 'ibans' array of strings (1-100 items)",
       },
       400,
     );
@@ -42,9 +42,9 @@ ibanBatch.post('/v1/iban/batch', async (c) => {
     );
   }
 
-  if (ibans.length > 10) {
+  if (ibans.length > 100) {
     return c.json(
-      { error: 'batch_too_large', message: 'Maximum 10 IBANs per batch request' },
+      { error: 'batch_too_large', message: 'Maximum 100 IBANs per batch request' },
       400,
     );
   }
@@ -57,7 +57,9 @@ ibanBatch.post('/v1/iban/batch', async (c) => {
     return result;
   });
 
-  const totalCost = 0.020;
+  // Proportional cost: $0.002 per IBAN (discount vs individual $0.005)
+  // e.g. 10 IBANs = $0.020, 100 IBANs = $0.200
+  const totalCost = Math.round(ibans.length * 0.002 * 1000) / 1000;
   const processingMs = Math.round((performance.now() - start) * 100) / 100;
   const validCount = results.filter((r) => r.valid).length;
 

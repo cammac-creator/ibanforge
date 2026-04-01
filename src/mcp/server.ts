@@ -13,15 +13,23 @@ const server = new McpServer({
 // --- Tool: validate_iban ---
 server.tool(
   'validate_iban',
-  `Validate an IBAN number and retrieve the associated BIC/SWIFT code and bank information.
-Returns: validity status, country, bank code, BIC, bank name.
-Supports 75+ countries including all SEPA countries.
-Cost: $0.005 USDC per call via x402 micropayment on Base L2.`,
+  `Validate a single IBAN number and retrieve the associated BIC/SWIFT code and bank information.
+
+Use this tool when you need to validate one IBAN at a time — for example, verifying a payment recipient before a wire transfer, checking a bank account provided by a user, or confirming IBAN format during onboarding.
+
+Returns: validity status, country, bank code, BIC/SWIFT, bank name, BBAN structure.
+Supports 75+ countries including all SEPA countries (EU, Switzerland, UK, Norway, etc.).
+
+Example input: 'CH56 0483 5012 3456 7800 9' (spaces are stripped automatically)
+Example output: { valid: true, country: { code: 'CH', name: 'Switzerland' }, bic: 'CRESCHZZ80A', ... }
+
+Cost: $0.005 USDC per call via x402 micropayment on Base L2.
+For multiple IBANs, prefer batch_validate_iban (60% cheaper per IBAN).`,
   {
     iban: z
       .string()
       .describe(
-        "IBAN to validate. Spaces and hyphens are accepted and stripped automatically. Example: 'CH56 0483 5012 3456 7800 9'",
+        "IBAN to validate. Spaces and hyphens are accepted and stripped automatically. Example: 'CH56 0483 5012 3456 7800 9' or 'DE89370400440532013000'",
       ),
   },
   async ({ iban }) => {
@@ -38,10 +46,18 @@ Cost: $0.005 USDC per call via x402 micropayment on Base L2.`,
 // --- Tool: batch_validate_iban ---
 server.tool(
   'batch_validate_iban',
-  `Validate up to 10 IBANs in a single call. More economical than individual calls ($0.020 vs $0.050).
-Useful for validating supplier lists, payment batches, or KYC workflows.`,
+  `Validate up to 100 IBANs in a single call. Much more economical than individual calls ($0.002/IBAN vs $0.005/IBAN — 60% cheaper).
+
+Use this tool when you need to validate multiple IBANs at once — for example, processing a CSV of supplier accounts, validating a payment batch before submission, running KYC checks on a list of customers, or auditing an accounts-payable file.
+
+Returns an array of results in the same order as the input, each containing: validity, country, BIC, bank name.
+
+Example input: ['CH56 0483 5012 3456 7800 9', 'DE89370400440532013000', 'FR7630006000011234567890189']
+Cost: $0.002 USDC per IBAN (e.g. 10 IBANs = $0.020, 50 IBANs = $0.100, 100 IBANs = $0.200)
+
+For a single IBAN, use validate_iban instead.`,
   {
-    ibans: z.array(z.string()).max(10).describe('Array of IBANs to validate (max 10)'),
+    ibans: z.array(z.string()).min(1).max(100).describe('Array of IBANs to validate (1–100 items). Spaces and hyphens are stripped automatically.'),
   },
   async ({ ibans }) => {
     const results = ibans.map((iban) => {
@@ -60,15 +76,24 @@ Useful for validating supplier lists, payment batches, or KYC workflows.`,
 // --- Tool: lookup_bic ---
 server.tool(
   'lookup_bic',
-  `Look up a BIC/SWIFT code and return institution details, country, city, and LEI data.
-Returns: validity, institution name, country, city, branch info, LEI identifier.
-Supports BIC8 (UBSWCHZH) and BIC11 (UBSWCHZH80A) formats.
-Cost: $0.003 USDC per call via x402 micropayment on Base L2.`,
+  `Look up a BIC/SWIFT code and return full institution details, country, city, and LEI regulatory data.
+
+Use this tool when you have a BIC/SWIFT code and need to identify the bank behind it — for compliance checks, payment routing validation, correspondent banking lookups, or KYC enrichment.
+
+Returns: validity, institution name, country, city, branch info, LEI identifier, LEI status.
+Supports BIC8 (e.g. 'UBSWCHZH') and BIC11 (e.g. 'UBSWCHZH80A') formats.
+Database: 39,000+ institutions from GLEIF with LEI enrichment.
+
+Example input: 'BNPAFRPP' → BNP Paribas, France, Paris
+Example input: 'UBSWCHZH80A' → UBS AG, Switzerland, Zurich (branch 80A)
+
+Cost: $0.003 USDC per call via x402 micropayment on Base L2.
+Tip: if you already have an IBAN, use validate_iban instead — it resolves the BIC automatically.`,
   {
     bic: z
       .string()
       .describe(
-        "BIC/SWIFT code to look up. 8 or 11 characters. Example: 'UBSWCHZH' or 'BNPAFRPPXXX'",
+        "BIC/SWIFT code to look up. 8 or 11 characters. Examples: 'UBSWCHZH', 'BNPAFRPP', 'UBSWCHZH80A', 'BNPAFRPPXXX'",
       ),
   },
   async ({ bic }) => {
