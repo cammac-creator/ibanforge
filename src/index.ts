@@ -9,7 +9,10 @@ import { health } from './routes/health.js';
 import { stats } from './routes/stats.js';
 import { demo } from './routes/demo.js';
 import { landing } from './routes/landing.js';
+import { openapi } from './routes/openapi.js';
+import { discovery } from './routes/discovery.js';
 import { createX402Middleware, ensureWalletConfigured } from './middleware/x402.js';
+import { rateLimitMiddleware } from './middleware/rate-limit.js';
 
 // Fail-fast: refuse to start in production without wallet config
 ensureWalletConfigured();
@@ -23,6 +26,7 @@ app.use('*', cors({
   allowHeaders: ['Content-Type', 'Authorization', 'X-Payment'],
 }));
 app.use('*', logger());
+app.use('*', rateLimitMiddleware());
 
 // x402 payment middleware (only on paid routes)
 app.use('/v1/*', createX402Middleware());
@@ -36,6 +40,8 @@ app.route('/', bicLookup);
 app.route('/', health);
 app.route('/', stats);
 app.route('/', demo);
+app.route('/', openapi);
+app.route('/', discovery);
 
 // Landing page (must be last — catches GET /)
 app.route('/', landing);
