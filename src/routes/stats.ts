@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { getStats } from '../lib/stats.js';
-import { getEntryCount } from '../lib/db.js';
+import { getEntryCount } from '../lib/bic-lookup.js';
 
 const stats = new Hono();
 

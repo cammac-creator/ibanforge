@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { validateIBAN } from '../lib/iban.js';
-import { lookupBIC } from '../lib/bic-lookup.js';
-import { recordOperation } from '../lib/stats.js';
+import { lookupByCountryBank } from '../lib/bic-lookup.js';
+import { recordBatch } from '../lib/stats.js';
 import type { IBANValidationResult } from '../types.js';
 
 const ibanBatch = new Hono();
@@ -21,7 +21,7 @@ ibanBatch.post('/v1/iban/batch', async (c) => {
   const results: IBANValidationResult[] = body.ibans.map((iban) => {
     const result = validateIBAN(iban);
     if (result.valid && result.bban?.bank_code) {
-      result.bic = lookupBIC(result.country!.code, result.bban.bank_code);
+      result.bic = lookupByCountryBank(result.country!.code, result.bban.bank_code);
     }
     return result;
   });
@@ -30,13 +30,7 @@ ibanBatch.post('/v1/iban/batch', async (c) => {
   const processingMs = Math.round((performance.now() - start) * 100) / 100;
   const validCount = results.filter((r) => r.valid).length;
 
-  recordOperation('iban_batch', {
-    country: null,
-    valid: validCount > 0,
-    count: results.length,
-    validCount,
-    cost: totalCost,
-  });
+  recordBatch(results.length, validCount, totalCost);
 
   return c.json({
     results,

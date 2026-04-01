@@ -52,6 +52,29 @@ export function getEntryCount(): number {
 }
 
 /**
+ * Look up a BIC by country code and BBAN bank code.
+ * Heuristic: searches for BIC entries matching the country where the BIC8
+ * institution code starts with the bank code (many countries use this mapping).
+ * Returns a simplified object suitable for IBAN validation enrichment, or null.
+ */
+export function lookupByCountryBank(
+  countryCode: string,
+  bankCode: string,
+): { code: string; bank_name: string | null; city: string | null } | null {
+  const db = getBicDB();
+  const row = db
+    .prepare(
+      'SELECT bic8, institution, city FROM bic_entries WHERE country_code = ? AND bic8 LIKE ? LIMIT 1',
+    )
+    .get(countryCode, bankCode + '%') as
+    | { bic8: string; institution: string | null; city: string | null }
+    | undefined;
+
+  if (!row) return null;
+  return { code: row.bic8, bank_name: row.institution, city: row.city };
+}
+
+/**
  * Reset cached prepared statements (call when closing DB)
  */
 export function resetStatements(): void {

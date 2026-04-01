@@ -2,9 +2,8 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 import { validateIBAN } from '../lib/iban.js';
-import { lookupBIC } from '../lib/bic-lookup.js';
+import { lookup, lookupByCountryBank } from '../lib/bic-lookup.js';
 import { validateBIC } from '../lib/bic-validator.js';
-import { lookup } from '../lib/db.js';
 
 const server = new McpServer({
   name: 'ibanforge',
@@ -28,7 +27,7 @@ Cost: $0.002 USDC per call via x402 micropayment on Base L2.`,
   async ({ iban }) => {
     const result = validateIBAN(iban);
     if (result.valid && result.bban?.bank_code) {
-      result.bic = lookupBIC(result.country!.code, result.bban.bank_code);
+      result.bic = lookupByCountryBank(result.country!.code, result.bban.bank_code);
     }
     return {
       content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
@@ -48,7 +47,7 @@ Useful for validating supplier lists, payment batches, or KYC workflows.`,
     const results = ibans.map((iban) => {
       const result = validateIBAN(iban);
       if (result.valid && result.bban?.bank_code) {
-        result.bic = lookupBIC(result.country!.code, result.bban.bank_code);
+        result.bic = lookupByCountryBank(result.country!.code, result.bban.bank_code);
       }
       return result;
     });

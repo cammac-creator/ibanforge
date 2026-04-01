@@ -43,6 +43,7 @@ export function createX402Middleware(): MiddlewareHandler {
 
     try {
       const { paymentMiddlewareFromConfig } = await import('@x402/hono');
+      const { HTTPFacilitatorClient } = await import('@x402/core/server');
 
       const facilitatorUrl = process.env.FACILITATOR_URL;
 
@@ -79,13 +80,13 @@ export function createX402Middleware(): MiddlewareHandler {
         },
       };
 
-      const config = facilitatorUrl
-        ? { routes, facilitatorUrl }
-        : { routes };
+      const facilitatorClient = facilitatorUrl
+        ? new HTTPFacilitatorClient({ url: facilitatorUrl })
+        : undefined;
 
       const middleware = paymentMiddlewareFromConfig(
-        config.routes as Parameters<typeof paymentMiddlewareFromConfig>[0],
-        ...(facilitatorUrl ? [facilitatorUrl] : []),
+        routes as Parameters<typeof paymentMiddlewareFromConfig>[0],
+        facilitatorClient,
       );
       return middleware(c, next);
     } catch {
