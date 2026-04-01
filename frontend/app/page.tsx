@@ -1,7 +1,19 @@
+import type { Metadata } from "next"
 import Link from "next/link"
 import { CodeBlock } from "@/components/code-block"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+
+export const metadata: Metadata = {
+  title: "IBANforge — IBAN Validation & BIC/SWIFT Lookup API",
+  description:
+    "IBAN validation and BIC/SWIFT lookup API for developers and AI agents. Pay per call with x402 micropayments. MCP integration for autonomous agents.",
+  openGraph: {
+    title: "IBANforge",
+    description: "IBAN validation & BIC/SWIFT lookup API",
+    url: "https://ibanforge.com",
+  },
+};
 
 const CURL_EXAMPLE = `curl -X POST https://api.ibanforge.com/v1/iban/validate \\
   -H "Content-Type: application/json" \\

@@ -6,9 +6,9 @@ import { CostCalculator } from "./calculator"
 import { Faq } from "./faq"
 
 export const metadata: Metadata = {
-  title: "Pricing — IBANforge",
+  title: "Pricing",
   description:
-    "Simple, transparent pay-per-call pricing. No subscriptions. No API keys. Pay with USDC via x402.",
+    "Simple, transparent pay-per-call pricing. No subscriptions. No API keys. Pay with USDC via x402 micropayments.",
 }
 
 const ENDPOINTS = [

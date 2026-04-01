@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { getAllPosts } from "@/lib/blog";
 
-export const metadata = {
-  title: "Blog | IBANforge",
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Blog",
   description:
     "Updates, guides, and changelog from the IBANforge team.",
 };

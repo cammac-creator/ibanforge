@@ -15,8 +15,15 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "IBANforge",
-  description: "IBAN validation & BIC/SWIFT lookup API",
+  title: { default: "IBANforge", template: "%s | IBANforge" },
+  description: "IBAN validation & BIC/SWIFT lookup API for developers and AI agents",
+  metadataBase: new URL("https://ibanforge.com"),
+  openGraph: {
+    type: "website",
+    locale: "en_US",
+    url: "https://ibanforge.com",
+    siteName: "IBANforge",
+  },
 };
 
 export default function RootLayout({
