@@ -1,0 +1,125 @@
+---
+title: "How to Validate IBANs and Look Up BIC Codes with a Single API"
+description: "A developer guide to IBAN validation and BIC/SWIFT lookup using the IBANforge API — with examples in curl, Python, and TypeScript"
+date: "2026-04-02"
+---
+
+# How to Validate IBANs and Look Up BIC Codes with a Single API
+
+International bank transfers live and die on two pieces of data: the IBAN that identifies the account, and the BIC that routes the payment to the right bank. Get either wrong and your transaction is delayed, bounced, or rejected by the receiving institution — sometimes without a useful error message. For any application that touches cross-border payments, compliance workflows, or customer onboarding, validating both fields before submitting is not optional.
+
+## The problem with IBAN validation
+
+A naive implementation checks whether the string looks like an IBAN. That is not enough.
+
+Real IBAN validation requires three things: the correct **length for the specific country** (which varies from 15 digits for Norway to 34 for Malta), a passing **mod-97 checksum** on the rearranged number string, and correct **BBAN structure** — the bank code, branch code, and account number sub-fields that are embedded in the IBAN according to each country's own banking format.
+
+Then there is the BIC problem. Even if an IBAN is structurally valid, you often need to know which bank it belongs to — for display purposes, for compliance screening, or for routing decisions. The bank code embedded in the BBAN tells you *something*, but mapping it to an actual BIC and institution name requires a separate database. Most teams either skip this step entirely or pay for a second API call.
+
+## IBANforge: one API for both
+
+[IBANforge](https://ibanforge.com) is a REST API that handles full IBAN validation — checksum, country rules, BBAN parsing — and resolves the BIC code in the same response, against the 39,000+ entry GLEIF dataset used by central banks. One POST request, one structured JSON response.
+
+There is a free `/v1/demo` endpoint to test your parser without touching the paid endpoints, and an [interactive playground](https://ibanforge.com/playground) if you want to paste an IBAN and see what comes back before writing a line of code.
+
+## Example 1: Validate an IBAN with curl
+
+```bash
+curl -X POST https://ibanforge-production.up.railway.app/v1/iban/validate \
+  -H "Content-Type: application/json" \
+  -d '{"iban": "CH93 0076 2011 6238 5295 7"}'
+```
+
+Response:
+
+```json
+{
+  "valid": true,
+  "iban": "CH9300762011623852957",
+  "iban_formatted": "CH93 0076 2011 6238 5295 7",
+  "country": "Switzerland",
+  "country_code": "CH",
+  "bank_code": "00762",
+  "account_number": "011623852957",
+  "bic": {
+    "bic": "UBSWCHZH80A",
+    "institution": "UBS Switzerland AG",
+    "city": "Zurich",
+    "country": "CH",
+    "lei": "BFM8T61CT2L1QCEMIK50"
+  }
+}
+```
+
+A few things worth noting in this response:
+
+- `valid: true` confirms both the mod-97 checksum and the country-specific length and format rules passed.
+- `iban` returns the compact form (no spaces); `iban_formatted` adds spaces in the standard 4-character grouping.
+- `bank_code` is extracted from the BBAN according to Switzerland's specific format — not just a substring operation.
+- The `bic` object comes from the GLEIF dataset and includes the LEI (`lei` field), which is useful for AML/KYC workflows that need to link the bank to its legal entity.
+
+If validation fails, the response includes a `reason` field with a machine-readable error code (`INVALID_CHECKSUM`, `INVALID_LENGTH`, `UNKNOWN_COUNTRY`, etc.) so you can distinguish a typo from an unsupported country code.
+
+## Example 2: Python
+
+```python
+from ibanforge import IBANforge
+
+client = IBANforge()
+result = client.validate_iban("DE89 3704 0044 0532 0130 00")
+print(f"Valid: {result['valid']}, Bank: {result['bic']['institution']}")
+# Valid: True, Bank: Commerzbank AG
+```
+
+The Python SDK wraps the REST API and handles authentication, retries, and response parsing. If you prefer to call the API directly with `requests` or `httpx`, the raw endpoint works exactly as shown in the curl example above — the SDK is a convenience layer, not a requirement.
+
+## Example 3: TypeScript
+
+```typescript
+import IBANforge from 'ibanforge';
+
+const client = new IBANforge();
+const result = await client.validateIBAN('GB29 NWBK 6016 1331 9268 19');
+console.log(result.bic?.institution); // "NATIONAL WESTMINSTER BANK PLC"
+```
+
+The TypeScript SDK is fully typed — `result` is a `ValidationResult` interface so your IDE can autocomplete every field. The `bic` field is optional (`bic?`) because BIC lookup is not available for every country, and the type system forces you to handle that case.
+
+For Next.js API routes, edge functions, or any environment where you want to keep the dependency footprint small, calling the REST endpoint directly with `fetch` is also a clean approach:
+
+```typescript
+const res = await fetch('https://ibanforge-production.up.railway.app/v1/iban/validate', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ iban: 'GB29 NWBK 6016 1331 9268 19' }),
+});
+const data = await res.json();
+```
+
+## Batch validation
+
+If you are processing a CSV import, validating a list of creditors during onboarding, or running a nightly reconciliation job, the `/v1/iban/batch` endpoint accepts up to 100 IBANs in a single request and returns per-IBAN results at a flat rate of $0.020 USDC — not per-item billing. Each result in the array has the same structure as a single validation response, including BIC enrichment where available.
+
+```bash
+curl -X POST https://ibanforge-production.up.railway.app/v1/iban/batch \
+  -H "Content-Type: application/json" \
+  -d '{
+    "ibans": [
+      "CH93 0076 2011 6238 5295 7",
+      "DE89 3704 0044 0532 0130 00",
+      "GB29 NWBK 6016 1331 9268 19"
+    ]
+  }'
+```
+
+## For AI agents: MCP integration
+
+IBANforge ships with a built-in [Model Context Protocol](https://modelcontextprotocol.io) server, exposing `validate_iban`, `batch_validate_iban`, and `lookup_bic` as native tools. Any MCP-compatible agent — Claude, Cursor, or an open-source model — can call these tools directly without custom wrappers. If you are building an agentic workflow that touches payment data, this lets validation happen at the tool level rather than relying on the model to get IBAN formats right.
+
+## Get started
+
+- **Playground** — [ibanforge.com/playground](https://ibanforge.com/playground): paste any IBAN, see the full response live, no setup required.
+- **Free demo endpoint** — `GET https://ibanforge-production.up.railway.app/v1/demo`: returns example validations for a handful of countries, no payment needed.
+- **Documentation** — [ibanforge.com/docs](https://ibanforge.com/docs): full endpoint reference, request/response schemas, error codes, and integration guides.
+
+Payments use the x402 protocol — fractions of a cent in USDC per request, no API key, no subscription. The demo endpoint and playground are always free.
