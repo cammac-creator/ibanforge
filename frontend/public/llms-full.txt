@@ -1,0 +1,326 @@
+# IBANforge — Full API Documentation for AI Agents
+
+> IBAN validation & BIC/SWIFT lookup API with x402 micropayments and MCP support
+
+## API Base URL
+https://ibanforge-production.up.railway.app
+
+---
+
+## POST /v1/iban/validate
+
+Validates a single IBAN and optionally resolves the associated BIC/SWIFT code.
+
+Cost: $0.005 USDC (free during launch)
+
+### Request
+```json
+{
+  "iban": "CH93 0076 2011 6238 5295 7"
+}
+```
+
+### Response (success)
+```json
+{
+  "valid": true,
+  "iban": "CH9300762011623852957",
+  "formatted": "CH93 0076 2011 6238 5295 7",
+  "country": "CH",
+  "countryName": "Switzerland",
+  "checkDigits": "93",
+  "bban": "00762011623852957",
+  "bankCode": "00762",
+  "accountNumber": "011623852957",
+  "bic": {
+    "bic": "UBSWCHZH80A",
+    "bankName": "UBS Switzerland AG",
+    "country": "CH",
+    "city": "Zurich",
+    "lei": "BFM8T61CT2L1QCEMIK50"
+  }
+}
+```
+
+### Response (invalid IBAN)
+```json
+{
+  "valid": false,
+  "iban": "GB00BARC20201555555555",
+  "error": "Invalid check digits"
+}
+```
+
+### Error Codes
+- 400 — Missing or malformed request body
+- 402 — Payment required (x402)
+- 422 — IBAN structurally invalid (bad country, wrong length, etc.)
+
+---
+
+## POST /v1/iban/batch
+
+Validates up to 10 IBANs in a single request.
+
+Cost: $0.002 per IBAN (free during launch)
+
+### Request
+```json
+{
+  "ibans": [
+    "CH93 0076 2011 6238 5295 7",
+    "DE89 3704 0044 0532 0130 00",
+    "GB29 NWBK 6016 1331 9268 19"
+  ]
+}
+```
+
+### Response
+```json
+{
+  "results": [
+    {
+      "valid": true,
+      "iban": "CH9300762011623852957",
+      "formatted": "CH93 0076 2011 6238 5295 7",
+      "country": "CH",
+      "countryName": "Switzerland",
+      "checkDigits": "93",
+      "bban": "00762011623852957"
+    },
+    {
+      "valid": true,
+      "iban": "DE89370400440532013000",
+      "formatted": "DE89 3704 0044 0532 0130 00",
+      "country": "DE",
+      "countryName": "Germany",
+      "checkDigits": "89",
+      "bban": "370400440532013000"
+    },
+    {
+      "valid": true,
+      "iban": "GB29NWBK60161331926819",
+      "formatted": "GB29 NWBK 6016 1331 9268 19",
+      "country": "GB",
+      "countryName": "United Kingdom",
+      "checkDigits": "29",
+      "bban": "NWBK60161331926819"
+    }
+  ],
+  "summary": {
+    "total": 3,
+    "valid": 3,
+    "invalid": 0
+  }
+}
+```
+
+### Error Codes
+- 400 — Missing body or `ibans` not an array
+- 402 — Payment required (x402)
+- 422 — Too many IBANs (max 10 per request)
+
+---
+
+## GET /v1/bic/{code}
+
+Looks up a BIC/SWIFT code against the GLEIF database (39,000+ entries with LEI enrichment).
+
+Cost: $0.003 USDC (free during launch)
+
+### Example Request
+```
+GET /v1/bic/UBSWCHZH80A
+```
+
+### Response (found)
+```json
+{
+  "found": true,
+  "bic": "UBSWCHZH80A",
+  "bankName": "UBS Switzerland AG",
+  "country": "CH",
+  "countryName": "Switzerland",
+  "city": "Zurich",
+  "lei": "BFM8T61CT2L1QCEMIK50",
+  "address": "Bahnhofstrasse 45, 8001 Zurich"
+}
+```
+
+### Response (not found)
+```json
+{
+  "found": false,
+  "bic": "UNKNOWNXX",
+  "error": "BIC code not found in database"
+}
+```
+
+### BIC Format
+A BIC (ISO 9362) has the structure: BBBB CC LL BBB
+- BBBB — Institution code (4 chars)
+- CC   — Country code ISO 3166-1 alpha-2
+- LL   — Location code (2 chars)
+- BBB  — Branch code (3 chars, optional — 'XXX' for primary office)
+
+### Error Codes
+- 400 — BIC format invalid (not 8 or 11 characters, invalid characters)
+- 402 — Payment required (x402)
+- 404 — BIC not found in database
+
+---
+
+## GET /v1/demo
+
+Returns example API results for CH, DE, and GB IBANs. Always free, no authentication needed.
+
+### Response
+```json
+{
+  "examples": [
+    {
+      "iban": "CH9300762011623852957",
+      "valid": true,
+      "country": "CH",
+      "countryName": "Switzerland"
+    },
+    {
+      "iban": "DE89370400440532013000",
+      "valid": true,
+      "country": "DE",
+      "countryName": "Germany"
+    },
+    {
+      "iban": "GB29NWBK60161331926819",
+      "valid": true,
+      "country": "GB",
+      "countryName": "United Kingdom"
+    }
+  ]
+}
+```
+
+---
+
+## GET /health
+
+Health check endpoint. Always free.
+
+### Response
+```json
+{
+  "status": "ok",
+  "uptime": 3600,
+  "database": "connected",
+  "bicEntries": 39243,
+  "timestamp": "2025-01-01T00:00:00.000Z"
+}
+```
+
+---
+
+## GET /stats
+
+Detailed usage statistics. Always free.
+
+### Response
+```json
+{
+  "total_requests": 12543,
+  "requests_today": 87,
+  "endpoints": {
+    "/v1/iban/validate": 8200,
+    "/v1/iban/batch": 1800,
+    "/v1/bic": 2543
+  },
+  "top_countries": ["CH", "DE", "GB", "FR", "NL"]
+}
+```
+
+---
+
+## GET /openapi.json
+
+Returns the full OpenAPI 3.1 specification for this API.
+
+---
+
+## GET /.well-known/x402
+
+x402 agent discovery endpoint. Returns payment configuration for AI agents implementing the x402 protocol.
+
+### Response
+```json
+{
+  "version": "1.0",
+  "accepts": ["USDC"],
+  "network": "base",
+  "wallet": "0x..."
+}
+```
+
+---
+
+## x402 Payment Protocol
+
+IBANforge uses the x402 micropayment protocol for pay-per-call billing. AI agents can pay autonomously using USDC on the Base network.
+
+Flow:
+1. Agent calls endpoint → receives HTTP 402 with payment details
+2. Agent sends USDC payment to the wallet address
+3. Agent retries request with payment proof header
+4. Server verifies and returns result
+
+Header: `X-Payment: <base64-encoded-payment-proof>`
+
+---
+
+## MCP Integration
+
+IBANforge exposes a Model Context Protocol (MCP) server for native AI agent integration.
+
+### Available Tools
+- `validate_iban` — Validate a single IBAN
+- `batch_validate_iban` — Validate up to 10 IBANs
+- `lookup_bic` — Look up a BIC/SWIFT code
+
+### Claude Desktop Config
+```json
+{
+  "mcpServers": {
+    "ibanforge": {
+      "command": "npx",
+      "args": ["tsx", "src/mcp/server.ts"]
+    }
+  }
+}
+```
+
+### Example MCP Tool Call
+```json
+{
+  "tool": "validate_iban",
+  "arguments": {
+    "iban": "CH93 0076 2011 6238 5295 7"
+  }
+}
+```
+
+---
+
+## Supported Countries
+
+IBANforge validates IBANs for all 77 countries with standardized IBAN formats, including:
+CH (Switzerland), DE (Germany), GB (United Kingdom), FR (France), NL (Netherlands),
+AT (Austria), BE (Belgium), ES (Spain), IT (Italy), PT (Portugal), SE (Sweden),
+NO (Norway), DK (Denmark), FI (Finland), PL (Poland), and more.
+
+---
+
+## Links
+- Documentation: https://ibanforge.vercel.app/docs
+- Playground: https://ibanforge.vercel.app/playground
+- Pricing: https://ibanforge.vercel.app/pricing
+- GitHub: https://github.com/cammac-creator/ibanforge
+- OpenAPI Spec: https://ibanforge-production.up.railway.app/openapi.json
+- x402 Discovery: https://ibanforge-production.up.railway.app/.well-known/x402

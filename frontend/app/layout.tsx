@@ -26,6 +26,26 @@ export const metadata: Metadata = {
   },
 };
 
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "WebAPI",
+  name: "IBANforge",
+  description:
+    "IBAN validation & BIC/SWIFT lookup API for developers and AI agents",
+  url: "https://ibanforge.vercel.app",
+  documentation: "https://ibanforge.vercel.app/docs",
+  provider: {
+    "@type": "Organization",
+    name: "IBANforge",
+  },
+  offers: {
+    "@type": "Offer",
+    price: "0.003",
+    priceCurrency: "USD",
+    description: "Pay per call — from $0.003/request",
+  },
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -37,6 +57,12 @@ export default function RootLayout({
       className={`${inter.variable} ${jetbrainsMono.variable} h-full`}
       suppressHydrationWarning
     >
+      <head>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
+      </head>
       <body className="min-h-full flex flex-col antialiased">
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
           <ConditionalShell>{children}</ConditionalShell>

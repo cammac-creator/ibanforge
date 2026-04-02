@@ -1,0 +1,46 @@
+# IBANforge
+
+> IBAN validation & BIC/SWIFT lookup API for developers and AI agents
+
+## API Base URL
+https://ibanforge-production.up.railway.app
+
+## Endpoints
+
+### Validate IBAN
+POST /v1/iban/validate
+Content-Type: application/json
+Body: {"iban": "CH93 0076 2011 6238 5295 7"}
+Cost: $0.005 USDC (free during launch)
+
+### Batch Validate
+POST /v1/iban/batch
+Content-Type: application/json
+Body: {"ibans": ["CH93...", "DE89..."]}
+Cost: $0.002/IBAN (free during launch)
+
+### Lookup BIC/SWIFT
+GET /v1/bic/{code}
+Example: GET /v1/bic/UBSWCHZH80A
+Cost: $0.003 USDC (free during launch)
+
+### Free Endpoints
+GET /v1/demo — Example results, always free
+GET /health — API health check
+GET /stats — Usage statistics
+GET /openapi.json — OpenAPI 3.1 specification
+GET /.well-known/x402 — x402 agent discovery
+
+## MCP Integration
+Tools: validate_iban, batch_validate_iban, lookup_bic
+Config: {"command": "npx", "args": ["tsx", "src/mcp/server.ts"]}
+
+## SDKs
+TypeScript: npm install ibanforge
+Python: pip install ibanforge
+
+## Links
+Documentation: https://ibanforge.vercel.app/docs
+Playground: https://ibanforge.vercel.app/playground
+Pricing: https://ibanforge.vercel.app/pricing
+GitHub: https://github.com/cammac-creator/ibanforge
