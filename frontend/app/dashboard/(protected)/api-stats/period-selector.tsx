@@ -3,9 +3,9 @@
 import { useRouter, usePathname } from 'next/navigation';
 
 const PERIODS = [
-  { label: '7d', value: 7 },
-  { label: '30d', value: 30 },
-  { label: '90d', value: 90 },
+  { label: '7 jours', shortLabel: '7j', value: 7 },
+  { label: '30 jours', shortLabel: '30j', value: 30 },
+  { label: '90 jours', shortLabel: '90j', value: 90 },
 ];
 
 interface PeriodSelectorProps {
@@ -21,18 +21,20 @@ export function PeriodSelector({ current }: PeriodSelectorProps) {
   }
 
   return (
-    <div className="flex gap-1 rounded-lg border border-zinc-800 bg-zinc-900 p-1">
-      {PERIODS.map(({ label, value }) => (
+    <div className="flex gap-1 rounded-xl border border-zinc-700 bg-zinc-900 p-1">
+      {PERIODS.map(({ label, shortLabel, value }) => (
         <button
           key={value}
           onClick={() => handleSelect(value)}
-          className={
+          className={[
+            'rounded-lg px-4 py-1.5 text-sm font-medium transition-all',
             current === value
-              ? 'rounded-md px-3 py-1 text-xs font-medium bg-amber-500 text-zinc-950'
-              : 'rounded-md px-3 py-1 text-xs font-medium text-zinc-400 hover:text-white transition'
-          }
+              ? 'bg-amber-500 text-zinc-950 shadow-lg shadow-amber-500/20'
+              : 'text-zinc-400 hover:text-white hover:bg-zinc-800',
+          ].join(' ')}
         >
-          {label}
+          <span className="hidden sm:inline">{label}</span>
+          <span className="sm:hidden">{shortLabel}</span>
         </button>
       ))}
     </div>

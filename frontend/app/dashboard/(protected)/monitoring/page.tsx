@@ -37,15 +37,12 @@ function loadChecks(): UptimeCheck[] {
 
 function saveChecks(checks: UptimeCheck[]): void {
   try {
-    // Keep only the last 30 days
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - 30);
-    const filtered = checks.filter(
-      (c) => new Date(c.date) >= cutoff,
-    );
+    const filtered = checks.filter((c) => new Date(c.date) >= cutoff);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
   } catch {
-    // SSR safety — localStorage unavailable
+    // SSR safety
   }
 }
 
@@ -53,11 +50,30 @@ function formatUptime(seconds: number): string {
   const days = Math.floor(seconds / 86400);
   const hours = Math.floor((seconds % 86400) / 3600);
   const mins = Math.floor((seconds % 3600) / 60);
-  const parts: string[] = [];
-  if (days > 0) parts.push(`${days}j`);
-  if (hours > 0) parts.push(`${hours}h`);
-  if (mins > 0 || parts.length === 0) parts.push(`${mins}m`);
-  return parts.join(' ');
+
+  if (days > 0) {
+    return `${days} jour${days > 1 ? 's' : ''}, ${hours} heure${hours > 1 ? 's' : ''}`;
+  }
+  if (hours > 0) {
+    return `${hours} heure${hours > 1 ? 's' : ''}, ${mins} min`;
+  }
+  return `${mins} minute${mins > 1 ? 's' : ''}`;
+}
+
+function responseTimeColor(ms: number): string {
+  if (ms < 100) return 'text-green-400';
+  if (ms < 500) return 'text-yellow-400';
+  return 'text-red-400';
+}
+
+function responseTimeBg(ms: number): string {
+  if (ms < 100) return 'bg-green-500/10 border-green-500/20';
+  if (ms < 500) return 'bg-yellow-500/10 border-yellow-500/20';
+  return 'bg-red-500/10 border-red-500/20';
+}
+
+function fmt(n: number): string {
+  return n.toLocaleString('fr-CH');
 }
 
 export default function MonitoringPage() {
@@ -105,97 +121,162 @@ export default function MonitoringPage() {
   }, []);
 
   useEffect(() => {
-    // Load history from localStorage on mount
     const stored = loadChecks();
     setChecks(stored);
-
-    // First check immediately
     runCheck();
-
-    // Auto-refresh every 60 seconds
     const interval = setInterval(runCheck, 60_000);
     return () => clearInterval(interval);
   }, [runCheck]);
 
   const isLoading = online === null;
 
-  return (
-    <div className="max-w-2xl">
-      <h1 className="text-2xl font-semibold text-white mb-6">Monitoring</h1>
+  // Calculate uptime percentage from stored checks
+  const uptimePercent =
+    checks.length > 0
+      ? ((checks.filter((c) => c.status === 'up').length / checks.length) * 100).toFixed(1)
+      : '—';
 
-      {/* Status card */}
-      <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 mb-4">
-        <div className="flex items-center gap-4 mb-6">
-          {/* Status circle */}
-          <div
-            className={[
-              'w-5 h-5 rounded-full flex-shrink-0',
-              isLoading
-                ? 'bg-zinc-600 animate-pulse'
-                : online
-                  ? 'bg-green-500 shadow-[0_0_12px_2px_rgba(34,197,94,0.5)]'
-                  : 'bg-red-500 shadow-[0_0_12px_2px_rgba(239,68,68,0.5)]',
-            ].join(' ')}
-          />
-          <span className="text-xl font-semibold text-white">
-            {isLoading ? 'Vérification…' : online ? 'API Online' : 'API Offline'}
-          </span>
+  // Average response time
+  const avgResponseMs =
+    checks.length > 0
+      ? Math.round(
+          checks.filter((c) => c.status === 'up').reduce((s, c) => s + c.response_ms, 0) /
+            Math.max(1, checks.filter((c) => c.status === 'up').length),
+        )
+      : 0;
+
+  return (
+    <div className="max-w-3xl flex flex-col gap-6">
+      <div>
+        <h1 className="text-2xl font-semibold text-white">Monitoring</h1>
+        <p className="text-sm text-zinc-500 mt-1">Santé et disponibilité de l&apos;API</p>
+      </div>
+
+      {/* Big status indicator */}
+      <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-8">
+        <div className="flex flex-col items-center text-center mb-8">
+          {/* Pulsing circle */}
+          <div className="relative mb-4">
+            {!isLoading && online && (
+              <div className="absolute inset-0 w-20 h-20 rounded-full bg-green-500/20 animate-ping" />
+            )}
+            <div
+              className={[
+                'relative w-20 h-20 rounded-full flex items-center justify-center',
+                isLoading
+                  ? 'bg-zinc-700 animate-pulse'
+                  : online
+                    ? 'bg-green-500 shadow-[0_0_40px_8px_rgba(34,197,94,0.3)]'
+                    : 'bg-red-500 shadow-[0_0_40px_8px_rgba(239,68,68,0.3)]',
+              ].join(' ')}
+            >
+              <span className="text-3xl text-white">
+                {isLoading ? '?' : online ? '✓' : '✕'}
+              </span>
+            </div>
+          </div>
+          <h2 className="text-xl font-semibold text-white">
+            {isLoading ? 'Vérification...' : online ? 'API en ligne' : 'API hors ligne'}
+          </h2>
+          <p className="text-sm text-zinc-500 mt-1">
+            {isLoading
+              ? 'Test de connexion en cours'
+              : online
+                ? 'Tous les systèmes fonctionnent normalement'
+                : 'Le serveur ne répond pas'}
+          </p>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        {/* Info grid */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {/* Response time */}
-          <div className="bg-zinc-800/60 rounded-lg p-4">
-            <p className="text-xs text-zinc-500 uppercase tracking-wider mb-1">
+          <div className={`rounded-lg border p-4 ${isLoading ? 'bg-zinc-800/60 border-zinc-700' : responseTimeBg(responseMs)}`}>
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-1">
               Temps de réponse
             </p>
-            <p className="text-2xl font-mono font-semibold text-white">
-              {isLoading ? '—' : `${responseMs} ms`}
+            <p className={`text-2xl font-mono font-bold ${isLoading ? 'text-zinc-500' : responseTimeColor(responseMs)}`}>
+              {isLoading ? '—' : `${responseMs}`}
             </p>
+            {!isLoading && <p className="text-xs text-zinc-600 mt-0.5">ms</p>}
           </div>
 
-          {/* API version */}
-          <div className="bg-zinc-800/60 rounded-lg p-4">
-            <p className="text-xs text-zinc-500 uppercase tracking-wider mb-1">
-              Version API
+          {/* Version */}
+          <div className="rounded-lg border border-zinc-700/50 bg-zinc-800/40 p-4">
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-1">
+              Version
             </p>
-            <p className="text-2xl font-mono font-semibold text-white">
+            <p className="text-2xl font-mono font-bold text-white">
               {isLoading ? '—' : health ? `v${health.version}` : '—'}
             </p>
           </div>
 
-          {/* Uptime since */}
-          <div className="bg-zinc-800/60 rounded-lg p-4 col-span-2">
-            <p className="text-xs text-zinc-500 uppercase tracking-wider mb-1">
-              Uptime actuel
+          {/* Uptime */}
+          <div className="rounded-lg border border-zinc-700/50 bg-zinc-800/40 p-4">
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-1">
+              Uptime
             </p>
-            <p className="text-2xl font-mono font-semibold text-white">
-              {isLoading
-                ? '—'
-                : health
-                  ? formatUptime(health.uptime_seconds)
-                  : '—'}
+            <p className="text-lg font-mono font-bold text-white leading-tight">
+              {isLoading ? '—' : health ? formatUptime(health.uptime_seconds) : '—'}
             </p>
+          </div>
+
+          {/* BIC entries */}
+          <div className="rounded-lg border border-zinc-700/50 bg-zinc-800/40 p-4">
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-1">
+              Base BIC
+            </p>
+            <p className="text-2xl font-mono font-bold text-white">
+              {isLoading ? '—' : health ? fmt(health.bic_database_entries) : '—'}
+            </p>
+            {!isLoading && health && (
+              <p className="text-xs text-zinc-600 mt-0.5">entrées</p>
+            )}
           </div>
         </div>
       </div>
 
+      {/* Stats summary if online */}
+      {health?.stats && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4 text-center">
+            <p className="text-xs text-zinc-500 uppercase tracking-wider mb-1">Opérations totales</p>
+            <p className="text-xl font-mono font-bold text-amber-400">{fmt(health.stats.total_operations)}</p>
+          </div>
+          <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4 text-center">
+            <p className="text-xs text-zinc-500 uppercase tracking-wider mb-1">Validations IBAN</p>
+            <p className="text-xl font-mono font-bold text-white">{fmt(health.stats.iban_validations)}</p>
+          </div>
+          <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4 text-center">
+            <p className="text-xs text-zinc-500 uppercase tracking-wider mb-1">Lookups BIC</p>
+            <p className="text-xl font-mono font-bold text-white">{fmt(health.stats.bic_lookups)}</p>
+          </div>
+        </div>
+      )}
+
       {/* Uptime bar — 30 days */}
       <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-medium text-zinc-300">
-            Historique 30 jours
-          </h2>
-          {lastChecked && (
-            <span className="text-xs text-zinc-500">
-              Mis à jour{' '}
-              {lastChecked.toLocaleTimeString('fr-CH', {
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
-              })}
-            </span>
-          )}
+        <div className="flex items-center justify-between mb-1">
+          <h2 className="text-sm font-medium text-zinc-300">Disponibilité — 30 jours</h2>
+          <div className="flex items-center gap-3">
+            {uptimePercent !== '—' && (
+              <span className="text-xs font-mono text-green-400">{uptimePercent}% uptime</span>
+            )}
+            {lastChecked && (
+              <span className="text-xs text-zinc-600">
+                {lastChecked.toLocaleTimeString('fr-CH', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  second: '2-digit',
+                })}
+              </span>
+            )}
+          </div>
         </div>
+        {avgResponseMs > 0 && (
+          <p className="text-xs text-zinc-600 mb-4">
+            Temps moyen : <span className={`font-mono ${responseTimeColor(avgResponseMs)}`}>{avgResponseMs} ms</span>
+          </p>
+        )}
 
         <UptimeBar checks={checks} />
 
@@ -212,6 +293,7 @@ export default function MonitoringPage() {
             <span className="inline-block w-2.5 h-2.5 rounded-sm bg-zinc-700" />
             Aucune donnée
           </span>
+          <span className="ml-auto text-zinc-600">Auto-refresh: 60s</span>
         </div>
       </div>
     </div>
