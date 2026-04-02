@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { UptimeBar } from '@/components/uptime-bar';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://ibanforge-production.up.railway.app';
 const STORAGE_KEY = 'ibanforge_uptime_checks';
 
 interface HealthData {
