@@ -1,0 +1,42 @@
+# Smithery configuration — https://smithery.ai
+name: ibanforge
+description: "IBAN validation & BIC/SWIFT lookup API — 75+ countries, 39K+ BIC entries with LEI enrichment"
+icon: "🏦"
+version: "1.0.0"
+
+# MCP server configuration
+startCommand:
+  type: stdio
+  configSchema:
+    type: object
+    properties: {}
+  commandFunction: |-
+    (config) => ({
+      command: "npx",
+      args: ["tsx", "src/mcp/server.ts"],
+    })
+
+# Tools provided
+tools:
+  - name: validate_iban
+    description: "Validate a single IBAN — returns country, bank code, BIC, and formatting"
+  - name: batch_validate_iban
+    description: "Validate up to 100 IBANs in one call"
+  - name: lookup_bic
+    description: "Look up a BIC/SWIFT code — returns institution, country, city, LEI"
+
+# Metadata
+tags:
+  - finance
+  - banking
+  - iban
+  - bic
+  - swift
+  - validation
+  - compliance
+  - x402
+
+homepage: "https://ibanforge.vercel.app"
+repository: "https://github.com/cammac-creator/ibanforge"
+license: MIT
+author: "IBANforge"

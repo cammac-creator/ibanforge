@@ -1,0 +1,48 @@
+{
+  "name": "ibanforge",
+  "description": "IBAN validation & BIC/SWIFT lookup API for AI agents",
+  "version": "1.0.0",
+  "tools": [
+    {
+      "name": "validate_iban",
+      "description": "Validate a single IBAN and look up the associated BIC/bank",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "iban": { "type": "string", "description": "The IBAN to validate (e.g., CH93 0076 2011 6238 5295 7)" }
+        },
+        "required": ["iban"]
+      }
+    },
+    {
+      "name": "batch_validate_iban",
+      "description": "Validate up to 100 IBANs in one call",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "ibans": { "type": "array", "items": { "type": "string" }, "description": "Array of IBANs to validate (max 100)" }
+        },
+        "required": ["ibans"]
+      }
+    },
+    {
+      "name": "lookup_bic",
+      "description": "Look up a BIC/SWIFT code for institution details and LEI",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "bic": { "type": "string", "description": "BIC code (8 or 11 characters, e.g., UBSWCHZH80A)" }
+        },
+        "required": ["bic"]
+      }
+    }
+  ],
+  "server": {
+    "command": "npx",
+    "args": ["tsx", "src/mcp/server.ts"],
+    "cwd": "."
+  },
+  "homepage": "https://ibanforge.vercel.app",
+  "documentation": "https://ibanforge.vercel.app/docs",
+  "repository": "https://github.com/cammac-creator/ibanforge"
+}
