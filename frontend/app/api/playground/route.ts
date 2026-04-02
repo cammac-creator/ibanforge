@@ -25,7 +25,6 @@ export async function POST(req: NextRequest) {
 
   try {
     const url = `${API_URL}${apiPath}`;
-    console.log(`[playground proxy] Fetching: ${url}`);
     const start = Date.now();
     const res = await fetch(url, options);
     const ms = Date.now() - start;

@@ -8,6 +8,6 @@ export default function robots(): MetadataRoute.Robots {
       { userAgent: "ClaudeBot", allow: "/" },
       { userAgent: "ChatGPT-User", allow: "/" },
     ],
-    sitemap: "https://ibanforge.vercel.app/sitemap.xml",
+    sitemap: "https://ibanforge.com/sitemap.xml",
   };
 }

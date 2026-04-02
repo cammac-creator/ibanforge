@@ -32,8 +32,8 @@ const jsonLd = {
   name: "IBANforge",
   description:
     "IBAN validation & BIC/SWIFT lookup API for developers and AI agents",
-  url: "https://ibanforge.vercel.app",
-  documentation: "https://ibanforge.vercel.app/docs",
+  url: "https://ibanforge.com",
+  documentation: "https://ibanforge.com/docs",
   provider: {
     "@type": "Organization",
     name: "IBANforge",

@@ -2,18 +2,19 @@ import { LineChart } from '@/components/line-chart';
 import { StatCard } from '@/components/stat-card';
 import { PeriodSelector } from './period-selector';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 interface StatsResponse {
   total_operations: number;
   by_type: {
-    iban_validate: number;
-    iban_batch: number;
-    bic_lookup: number;
+    iban_validate: { total: number; valid_count: number; success_rate: number };
+    iban_batch: { total: number; valid_count: number; success_rate: number };
+    bic_lookup: { total: number; found_count: number; hit_rate: number };
   };
   total_revenue_usdc: number;
   top_countries: Array<{ country: string; count: number }>;
-  last_7_days: number;
+  last_7_days: Array<{ date: string; total: number; revenue: number }>;
+  bic_database_entries: number;
 }
 
 interface HistoryEntry {
@@ -67,9 +68,9 @@ export default async function ApiStatsPage({
   }
 
   const totalByType = {
-    iban_validate: stats.by_type.iban_validate ?? 0,
-    iban_batch: stats.by_type.iban_batch ?? 0,
-    bic_lookup: stats.by_type.bic_lookup ?? 0,
+    iban_validate: stats.by_type.iban_validate?.total ?? 0,
+    iban_batch: stats.by_type.iban_batch?.total ?? 0,
+    bic_lookup: stats.by_type.bic_lookup?.total ?? 0,
   };
   const grandTotal = totalByType.iban_validate + totalByType.iban_batch + totalByType.bic_lookup;
 

@@ -3,7 +3,7 @@
 > IBAN validation & BIC/SWIFT lookup API with x402 micropayments and MCP support
 
 ## API Base URL
-https://ibanforge-production.up.railway.app
+https://api.ibanforge.com
 
 ---
 
@@ -60,7 +60,7 @@ Cost: $0.005 USDC (free during launch)
 
 ## POST /v1/iban/batch
 
-Validates up to 10 IBANs in a single request.
+Validates up to 100 IBANs in a single request.
 
 Cost: $0.002 per IBAN (free during launch)
 
@@ -118,7 +118,7 @@ Cost: $0.002 per IBAN (free during launch)
 ### Error Codes
 - 400 — Missing body or `ibans` not an array
 - 402 — Payment required (x402)
-- 422 — Too many IBANs (max 10 per request)
+- 422 — Too many IBANs (max 100 per request)
 
 ---
 
@@ -281,7 +281,7 @@ IBANforge exposes a Model Context Protocol (MCP) server for native AI agent inte
 
 ### Available Tools
 - `validate_iban` — Validate a single IBAN
-- `batch_validate_iban` — Validate up to 10 IBANs
+- `batch_validate_iban` — Validate up to 100 IBANs
 - `lookup_bic` — Look up a BIC/SWIFT code
 
 ### Claude Desktop Config
@@ -318,9 +318,9 @@ NO (Norway), DK (Denmark), FI (Finland), PL (Poland), and more.
 ---
 
 ## Links
-- Documentation: https://ibanforge.vercel.app/docs
-- Playground: https://ibanforge.vercel.app/playground
-- Pricing: https://ibanforge.vercel.app/pricing
+- Documentation: https://ibanforge.com/docs
+- Playground: https://ibanforge.com/playground
+- Pricing: https://ibanforge.com/pricing
 - GitHub: https://github.com/cammac-creator/ibanforge
-- OpenAPI Spec: https://ibanforge-production.up.railway.app/openapi.json
-- x402 Discovery: https://ibanforge-production.up.railway.app/.well-known/x402
+- OpenAPI Spec: https://api.ibanforge.com/openapi.json
+- x402 Discovery: https://api.ibanforge.com/.well-known/x402

@@ -23,7 +23,7 @@ const FAQS = [
   {
     question: "What about high volume?",
     answer:
-      "The per-call pricing scales linearly with no rate limits. For very high volumes (millions of calls/month), reach out via the contact page — we can discuss custom pricing or a bulk arrangement that makes more sense for your use case.",
+      "The per-call pricing scales linearly with no rate limits. For very high volumes (millions of calls/month), open an issue on our GitHub repository (github.com/cammac-creator/ibanforge) — we can discuss custom pricing or a bulk arrangement that makes more sense for your use case.",
   },
 ]
 

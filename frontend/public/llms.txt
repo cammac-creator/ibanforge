@@ -3,7 +3,7 @@
 > IBAN validation & BIC/SWIFT lookup API for developers and AI agents
 
 ## API Base URL
-https://ibanforge-production.up.railway.app
+https://api.ibanforge.com
 
 ## Endpoints
 
@@ -40,7 +40,7 @@ TypeScript: npm install ibanforge
 Python: pip install ibanforge
 
 ## Links
-Documentation: https://ibanforge.vercel.app/docs
-Playground: https://ibanforge.vercel.app/playground
-Pricing: https://ibanforge.vercel.app/pricing
+Documentation: https://ibanforge.com/docs
+Playground: https://ibanforge.com/playground
+Pricing: https://ibanforge.com/pricing
 GitHub: https://github.com/cammac-creator/ibanforge

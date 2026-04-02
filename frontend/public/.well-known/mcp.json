@@ -42,7 +42,7 @@
     "args": ["tsx", "src/mcp/server.ts"],
     "cwd": "."
   },
-  "homepage": "https://ibanforge.vercel.app",
-  "documentation": "https://ibanforge.vercel.app/docs",
+  "homepage": "https://ibanforge.com",
+  "documentation": "https://ibanforge.com/docs",
   "repository": "https://github.com/cammac-creator/ibanforge"
 }

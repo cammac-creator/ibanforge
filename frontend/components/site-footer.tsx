@@ -15,7 +15,7 @@ const columns = [
     links: [
       { href: "https://github.com/cammac-creator/ibanforge", label: "GitHub", external: true },
       { href: "/docs/mcp", label: "MCP" },
-      { href: "/status", label: "API Status" },
+      { href: "/dashboard/monitoring", label: "API Status" },
     ],
   },
   {

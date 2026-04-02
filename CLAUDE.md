@@ -20,7 +20,7 @@ src/
   types.ts              # Shared TypeScript types
   routes/
     iban-validate.ts    # POST /v1/iban/validate (single IBAN)
-    iban-batch.ts       # POST /v1/iban/batch (up to 10)
+    iban-batch.ts       # POST /v1/iban/batch (up to 100)
     bic-lookup.ts       # GET /v1/bic/:code (BIC/SWIFT lookup)
     health.ts           # GET /health
     stats.ts            # GET /stats
@@ -63,7 +63,7 @@ data/
 | Method | Path | Cost (USDC) | Description |
 |--------|------|-------------|-------------|
 | POST | /v1/iban/validate | 0.005 | Validate single IBAN + optional BIC lookup |
-| POST | /v1/iban/batch | 0.020 | Validate up to 10 IBANs |
+| POST | /v1/iban/batch | 0.020 | Validate up to 100 IBANs |
 | GET | /v1/bic/:code | 0.003 | Lookup BIC/SWIFT code |
 | GET | /v1/demo | free | Example validations |
 | GET | /health | free | Health check + stats |

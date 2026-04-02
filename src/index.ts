@@ -1,4 +1,5 @@
 import { serve } from '@hono/node-server';
+import { closeAll } from './lib/db.js';
 import { Hono } from 'hono';
 import { compress } from 'hono/compress';
 import { cors } from 'hono/cors';
@@ -66,3 +67,13 @@ const port = parseInt(process.env.PORT ?? '3000', 10);
 serve({ fetch: app.fetch, port }, () => {
   console.log(`IBANforge running on http://localhost:${port}`);
 });
+
+// Graceful shutdown
+function gracefulShutdown(signal: string) {
+  console.log(`\n${signal} received. Closing database connections...`);
+  closeAll();
+  process.exit(0);
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));

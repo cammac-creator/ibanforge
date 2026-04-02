@@ -4,7 +4,6 @@ export default function NotFound() {
   return (
     <div className="min-h-screen bg-background flex items-center justify-center">
       <div className="text-center space-y-6">
-        <p className="text-8xl font-bold text-muted-foreground/30">404</p>
         <div className="space-y-2">
           <h1 className="text-2xl font-semibold tracking-tight">
             404 — Page not found

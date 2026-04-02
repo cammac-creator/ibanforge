@@ -21,10 +21,10 @@ const CURL_EXAMPLE = `curl -X POST https://api.ibanforge.com/v1/iban/validate \\
 
 const FEATURES = [
   {
-    badge: "75+ Countries",
+    badge: "80+ Countries",
     title: "IBAN Validation",
     description:
-      "Full IBAN validation with BBAN structure parsing. Supports 75+ countries with mod97 checksum verification and detailed field breakdown.",
+      "Full IBAN validation with BBAN structure parsing. Supports 80+ countries with mod97 checksum verification and detailed field breakdown.",
   },
   {
     badge: "39,000+ BIC Entries",
@@ -57,7 +57,7 @@ const ENDPOINTS = [
     method: "POST",
     path: "/v1/iban/batch",
     cost: "$0.020",
-    description: "Validate up to 10 IBANs",
+    description: "Validate up to 100 IBANs",
   },
   {
     method: "GET",

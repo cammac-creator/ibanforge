@@ -1,22 +1,40 @@
+import Database from 'better-sqlite3';
 import { getStatsDB } from './db.js';
 import type { OperationType, StatsOverview } from '../types.js';
 
 // ---------------------------------------------------------------------------
-// Record helpers
+// Cached prepared statements
 // ---------------------------------------------------------------------------
 
-const insertOp = () => getStatsDB().prepare(
-  'INSERT INTO operations (operation_type, country_code, success) VALUES (?, ?, ?)'
-);
+let _insertOp: Database.Statement | null = null;
+let _upsertDaily: Database.Statement | null = null;
 
-const upsertDaily = () => getStatsDB().prepare(`
-  INSERT INTO daily_stats (date, operation_type, total, success_count, revenue_usdc)
-  VALUES (date('now'), ?, 1, ?, ?)
-  ON CONFLICT(date, operation_type) DO UPDATE SET
-    total = total + 1,
-    success_count = success_count + excluded.success_count,
-    revenue_usdc = revenue_usdc + excluded.revenue_usdc
-`);
+function insertOp() {
+  if (!_insertOp) {
+    _insertOp = getStatsDB().prepare(
+      'INSERT INTO operations (operation_type, country_code, success) VALUES (?, ?, ?)',
+    );
+  }
+  return _insertOp;
+}
+
+function upsertDaily() {
+  if (!_upsertDaily) {
+    _upsertDaily = getStatsDB().prepare(`
+      INSERT INTO daily_stats (date, operation_type, total, success_count, revenue_usdc)
+      VALUES (date('now'), ?, 1, ?, ?)
+      ON CONFLICT(date, operation_type) DO UPDATE SET
+        total = total + 1,
+        success_count = success_count + excluded.success_count,
+        revenue_usdc = revenue_usdc + excluded.revenue_usdc
+    `);
+  }
+  return _upsertDaily;
+}
+
+// ---------------------------------------------------------------------------
+// Record helpers
+// ---------------------------------------------------------------------------
 
 /**
  * Record a single operation (IBAN validation, BIC lookup, etc.)
@@ -40,10 +58,19 @@ export function recordOperation(
  */
 export function recordBatch(count: number, validCount: number, costUsdc: number) {
   try {
+    insertOp().run('iban_batch', null, validCount);
     upsertDaily().run('iban_batch', validCount, costUsdc);
   } catch {
     // Non-critical
   }
+}
+
+/**
+ * Reset cached statements (called when DB is closed)
+ */
+export function resetStatsStatements() {
+  _insertOp = null;
+  _upsertDaily = null;
 }
 
 // ---------------------------------------------------------------------------

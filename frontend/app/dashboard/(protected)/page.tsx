@@ -2,18 +2,19 @@ import { StatCard } from '@/components/stat-card';
 import { LineChart } from '@/components/line-chart';
 import { DonutChart } from '@/components/donut-chart';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 interface StatsResponse {
   total_operations: number;
   by_type: {
-    iban_validate: number;
-    iban_batch: number;
-    bic_lookup: number;
+    iban_validate: { total: number; valid_count: number; success_rate: number };
+    iban_batch: { total: number; valid_count: number; success_rate: number };
+    bic_lookup: { total: number; found_count: number; hit_rate: number };
   };
   total_revenue_usdc: number;
   top_countries: Array<{ country: string; count: number }>;
-  last_7_days: number;
+  last_7_days: Array<{ date: string; total: number; revenue: number }>;
+  bic_database_entries: number;
 }
 
 interface HistoryEntry {
@@ -65,12 +66,14 @@ export default async function DashboardPage() {
         (history[history.length - 1].bic_lookup ?? 0)
       : 0;
 
-  const weekCalls = stats.last_7_days ?? 0;
+  const weekCalls = Array.isArray(stats.last_7_days)
+    ? stats.last_7_days.reduce((sum, day) => sum + (day.total ?? 0), 0)
+    : 0;
 
   const donutData = [
-    { name: 'IBAN validate', value: stats.by_type.iban_validate ?? 0, color: '#f59e0b' },
-    { name: 'IBAN batch', value: stats.by_type.iban_batch ?? 0, color: '#3b82f6' },
-    { name: 'BIC lookup', value: stats.by_type.bic_lookup ?? 0, color: '#22c55e' },
+    { name: 'IBAN validate', value: stats.by_type.iban_validate?.total ?? 0, color: '#f59e0b' },
+    { name: 'IBAN batch', value: stats.by_type.iban_batch?.total ?? 0, color: '#3b82f6' },
+    { name: 'BIC lookup', value: stats.by_type.bic_lookup?.total ?? 0, color: '#22c55e' },
   ];
 
   const lineConfig = [

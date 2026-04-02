@@ -2,6 +2,7 @@ import Database from 'better-sqlite3';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { resetStatements } from './bic-lookup.js';
+import { resetStatsStatements } from './stats.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -65,5 +66,6 @@ export function closeAll(): void {
   if (statsDB) {
     statsDB.close();
     statsDB = null;
+    resetStatsStatements();
   }
 }

@@ -7,55 +7,6 @@ interface JsonViewerProps {
   className?: string
 }
 
-function colorizeJson(json: string): React.ReactNode[] {
-  // Tokenize JSON string into colored segments
-  const tokens: React.ReactNode[] = []
-  const keyPattern = /"([^"\\]|\\.)*"\s*:/g
-  const stringPattern = /:\s*"([^"\\]|\\.)*"/g
-  const numberPattern = /:\s*-?\d+(\.\d+)?([eE][+-]?\d+)?/g
-  const nullPattern = /:\s*null/g
-  const boolPattern = /:\s*(true|false)/g
-
-  // Segment index tracking
-  let lastIndex = 0
-  const segments: { start: number; end: number; type: string; text: string }[] =
-    []
-
-  // Find all keys
-  let m: RegExpExecArray | null
-  const keyRe = /"([^"\\]|\\.)*"\s*:/g
-  while ((m = keyRe.exec(json)) !== null) {
-    segments.push({ start: m.index, end: m.index + m[0].length, type: "key", text: m[0] })
-  }
-
-  // Find string values (": "...")
-  const strRe = /:\s*"([^"\\]|\\.)*"/g
-  while ((m = strRe.exec(json)) !== null) {
-    // Only if not already a key-colon area — check if this is a value
-    segments.push({ start: m.index, end: m.index + m[0].length, type: "string-value", text: m[0] })
-  }
-
-  // Find number values
-  const numRe = /:\s*-?\d+(\.\d+)?([eE][+-]?\d+)?/g
-  while ((m = numRe.exec(json)) !== null) {
-    segments.push({ start: m.index, end: m.index + m[0].length, type: "number", text: m[0] })
-  }
-
-  // Find null values
-  const nullRe = /:\s*null/g
-  while ((m = nullRe.exec(json)) !== null) {
-    segments.push({ start: m.index, end: m.index + m[0].length, type: "null", text: m[0] })
-  }
-
-  // Find boolean values
-  const boolRe = /:\s*(true|false)/g
-  while ((m = boolRe.exec(json)) !== null) {
-    segments.push({ start: m.index, end: m.index + m[0].length, type: "boolean", text: m[0] })
-  }
-
-  return tokens
-}
-
 export function JsonViewer({ data, className }: JsonViewerProps) {
   const raw = JSON.stringify(data, null, 2)
 

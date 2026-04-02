@@ -10,21 +10,21 @@ IBANforge is our answer to that problem.
 
 ## What is IBANforge?
 
-IBANforge is a developer API for IBAN validation and BIC/SWIFT lookup. It covers **75+ countries**, validates structure and checksum (mod-97), parses bank and branch codes from the BBAN, and resolves BIC codes against the **39,000+ entry GLEIF dataset** — the same authoritative source used by central banks.
+IBANforge is a developer API for IBAN validation and BIC/SWIFT lookup. It covers **80+ countries**, validates structure and checksum (mod-97), parses bank and branch codes from the BBAN, and resolves BIC codes against the **39,000+ entry GLEIF dataset** — the same authoritative source used by central banks.
 
 You send a POST request. You get back a clean, structured JSON response. That's it.
 
 ```json
 {
+  "iban": "CH9300762011623852957",
   "valid": true,
-  "country": "Switzerland",
-  "bank_code": "00784",
-  "account_number": "009876543210",
-  "bic": {
-    "bic": "POFICHBEXXX",
-    "institution": "PostFinance AG",
-    "country": "CH"
-  }
+  "country": { "code": "CH", "name": "Switzerland" },
+  "check_digits": "93",
+  "bban": { "bank_code": "00762", "account_number": "011623852957" },
+  "formatted": "CH93 0076 2011 6238 5295 7",
+  "cost_usdc": 0.005,
+  "bic": { "code": "UBSWCHZH", "bank_name": "UBS Switzerland AG", "city": "Zurich" },
+  "processing_ms": 9.11
 }
 ```
 
@@ -40,15 +40,15 @@ Together, these two shifts — agentic workflows + on-chain micropayments — ma
 
 ## Key features
 
-**IBAN validation across 75+ countries.** Full mod-97 checksum verification, country-specific length and format rules, and BBAN parsing to extract bank/branch codes where applicable.
+**IBAN validation across 80+ countries.** Full mod-97 checksum verification, country-specific length and format rules, and BBAN parsing to extract bank/branch codes where applicable.
 
 **39,000+ BIC entries from GLEIF.** The Global LEI Foundation publishes the authoritative mapping of BIC codes to financial institutions. We import it, index it, and serve it with sub-millisecond lookups. Combined IBAN + BIC validation is available in a single request.
 
 **MCP integration for AI agents.** IBANforge ships with a Model Context Protocol server, meaning any MCP-compatible AI agent can call `validate_iban`, `batch_validate_iban`, and `lookup_bic` as native tools — no custom wrappers needed. Claude, GPT, and open-source agents all speak MCP.
 
-**x402 pay-per-call.** Single validation: $0.005 USDC. Batch of 10: $0.020. BIC lookup: $0.003. No account required. Works with any USDC-capable wallet.
+**x402 pay-per-call.** Single validation: $0.005 USDC. Batch (up to 100): $0.020. BIC lookup: $0.003. No account required. Works with any USDC-capable wallet.
 
-**Batch validation.** Submit up to 10 IBANs in a single request for bulk onboarding, import flows, or reconciliation jobs.
+**Batch validation.** Submit up to 100 IBANs in a single request for bulk onboarding, import flows, or reconciliation jobs.
 
 ## How to get started
 
