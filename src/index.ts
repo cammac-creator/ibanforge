@@ -1,5 +1,6 @@
 import { serve } from '@hono/node-server';
 import { Hono } from 'hono';
+import { compress } from 'hono/compress';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
 import { ibanValidate } from './routes/iban-validate.js';
@@ -20,13 +21,27 @@ ensureWalletConfigured();
 const app = new Hono();
 
 // Global middleware
+const allowedOrigins = (process.env.CORS_ORIGIN || '*').split(',').map(s => s.trim());
+
 app.use('*', cors({
-  origin: process.env.CORS_ORIGIN || '*',
+  origin: (origin) => {
+    if (allowedOrigins.includes('*')) return '*';
+    return allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
+  },
   allowMethods: ['GET', 'POST', 'OPTIONS'],
   allowHeaders: ['Content-Type', 'Authorization', 'X-Payment'],
 }));
 app.use('*', logger());
+app.use('*', async (c, next) => {
+  await next();
+  c.header('X-Powered-By', 'IBANforge');
+  c.header('X-API-Version', '1.0.0');
+});
 app.use('*', rateLimitMiddleware());
+app.use('*', compress());
+
+// /ping — ultra-lightweight endpoint for latency testing and uptime monitoring
+app.get('/ping', (c) => c.text('pong'));
 
 // x402 payment middleware (only on paid routes)
 app.use('/v1/*', createX402Middleware());
