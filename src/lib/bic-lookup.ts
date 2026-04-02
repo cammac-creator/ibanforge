@@ -109,10 +109,22 @@ export function lookupByCountryBank(
   if (entry) {
     // Normalize BIC to 8 chars (strip branch suffix if present)
     const bic8 = entry.bic.length > 8 ? entry.bic.substring(0, 8) : entry.bic;
+    let bankName = entry.bank_name ?? null;
+    let cityName = entry.city ?? null;
+
+    // Enrich from SQLite if bic_data.json has incomplete details
+    if (!bankName || !cityName) {
+      const dbRow = lookup(bic8);
+      if (dbRow) {
+        bankName = bankName || dbRow.institution;
+        cityName = cityName || dbRow.city;
+      }
+    }
+
     return {
       code: bic8,
-      bank_name: entry.bank_name ?? null,
-      city: entry.city ?? null,
+      bank_name: bankName,
+      city: cityName,
     };
   }
 
