@@ -24,6 +24,11 @@ export const metadata: Metadata = {
     url: "https://ibanforge.com",
     siteName: "IBANforge",
   },
+  twitter: {
+    card: "summary_large_image",
+    title: "IBANforge",
+    description: "IBAN validation & BIC/SWIFT lookup API",
+  },
 };
 
 const jsonLd = {

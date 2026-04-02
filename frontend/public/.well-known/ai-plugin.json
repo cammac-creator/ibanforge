@@ -1,0 +1,15 @@
+{
+  "schema_version": "v1",
+  "name_for_human": "IBANforge",
+  "name_for_model": "ibanforge",
+  "description_for_human": "Validate IBANs and look up BIC/SWIFT codes instantly",
+  "description_for_model": "Use this plugin to validate International Bank Account Numbers (IBANs) and look up BIC/SWIFT codes. Returns bank name, country, city, LEI, and validation details. Supports 80+ countries and 39,000+ BIC entries.",
+  "auth": { "type": "none" },
+  "api": {
+    "type": "openapi",
+    "url": "https://api.ibanforge.com/openapi.json"
+  },
+  "logo_url": "https://ibanforge.com/icon.png",
+  "contact_email": "hello@ibanforge.com",
+  "legal_info_url": "https://ibanforge.com/pricing"
+}

@@ -1,0 +1,149 @@
+---
+title: "5 Use Cases for IBAN Validation APIs in 2026"
+description: "From payment processing to compliance automation — how businesses use IBAN validation APIs"
+date: "2026-04-02"
+---
+
+IBAN validation has quietly become a critical building block for financial applications. Whether you're processing cross-border payments, automating compliance workflows, or building AI-powered finance agents, validating IBANs before you use them saves time, money, and embarrassment. Here are five real-world use cases where a fast, lightweight IBAN validation API makes a measurable difference.
+
+---
+
+## 1. Payment Processing — Validate Before You Wire
+
+**The problem:** Wire transfers fail when IBANs are malformed, contain typos, or belong to inactive accounts. A failed transfer can freeze funds for days and incur bank fees.
+
+**The solution:** Call the validation API at input time — not at settlement time. IBANs follow strict structural rules (country code, check digits, BBAN format), which means a large class of errors can be caught instantly, before any money moves.
+
+```typescript
+import { wrapFetch } from "x402-fetch"
+
+const fetch = wrapFetch()
+
+const res = await fetch("https://api.ibanforge.com/v1/iban/validate", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ iban: "CH9300762011623852957" }),
+})
+
+const data = await res.json()
+// { valid: true, country: "CH", bank_code: "00762", ... }
+```
+
+Catch the error before it becomes a failed transaction. At $0.005 per call, it costs less than 0.01% of a typical wire fee.
+
+---
+
+## 2. KYC / Compliance — Verify Bank Account Ownership
+
+**The problem:** KYC (Know Your Customer) workflows need to confirm that a submitted bank account belongs to the declared jurisdiction and institution. Fraudulent onboarding often involves IBANs from unexpected countries or with manipulated check digits.
+
+**The solution:** Use IBAN validation combined with BIC/SWIFT lookup to cross-reference the declared country, bank name, and LEI (Legal Entity Identifier). Discrepancies flag accounts for manual review.
+
+```typescript
+// Step 1: validate the IBAN structure
+const ibanRes = await fetch("https://api.ibanforge.com/v1/iban/validate", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ iban: userSubmittedIban }),
+})
+
+const { valid, bic, country } = await ibanRes.json()
+
+// Step 2: cross-check the BIC for institution details
+if (valid && bic) {
+  const bicRes = await fetch(`https://api.ibanforge.com/v1/bic/${bic}`)
+  const bank = await bicRes.json()
+  // bank.institution_name, bank.lei, bank.country
+}
+```
+
+The BIC lookup returns the institution name, city, LEI, and country — all verifiable against the customer's declared data.
+
+---
+
+## 3. Invoice Automation — Extract and Validate IBANs from Documents
+
+**The problem:** Finance teams processing supplier invoices often deal with PDF or email-extracted bank details. These are error-prone: OCR mistakes, copy-paste errors, and formatting differences (spaces, dashes) introduce silent corruption.
+
+**The solution:** After extracting candidate IBANs from documents, run them through the batch validation endpoint. The API normalises the format, validates the check digit, and confirms the BBAN structure — all in one call.
+
+```typescript
+const extractedIbans = ["DE89 3704 0044 0532 0130 00", "FR76 3000 6000 0112 3456 7890 189"]
+
+const res = await fetch("https://api.ibanforge.com/v1/iban/batch", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ ibans: extractedIbans }),
+})
+
+const results = await res.json()
+// Each entry: { iban, valid, normalised, country, bank_code, ... }
+```
+
+The batch endpoint validates up to 10 IBANs per call at $0.020, making it cost-effective even for high-volume document pipelines.
+
+---
+
+## 4. AI Agent Workflows — Autonomous Financial Agents Validating Accounts
+
+**The problem:** AI agents handling financial tasks — booking payments, reconciling accounts, filling forms — need to validate bank details without human review in the loop. Hallucinated or misread IBANs are a real risk.
+
+**The solution:** IBANforge exposes a native MCP (Model Context Protocol) server. Claude, GPT-4, and other agents with tool-use capabilities can call `validate_iban` and `lookup_bic` as structured tools — getting back structured JSON without any prompt engineering.
+
+```json
+// MCP tool call from an AI agent
+{
+  "tool": "validate_iban",
+  "input": { "iban": "GB29NWBK60161331926819" }
+}
+
+// Structured response
+{
+  "valid": true,
+  "country": "GB",
+  "bank_code": "NWBK",
+  "bic": "NWBKGB2L",
+  "institution_name": "NatWest"
+}
+```
+
+The MCP integration means agents can validate IBANs natively as part of a reasoning chain — no custom wrappers needed. See the [MCP documentation](/docs/mcp) for setup.
+
+---
+
+## 5. E-commerce Checkout — Validate Customer Bank Details
+
+**The problem:** European e-commerce platforms increasingly offer direct bank payment (SEPA) at checkout. Customers enter IBANs manually — and typos are common. Discovering an invalid IBAN after order confirmation degrades the experience and delays fulfilment.
+
+**The solution:** Validate the IBAN client-side (or server-side at form submission) before confirming the order. Instant feedback reduces cart abandonment and eliminates downstream payment failures.
+
+```typescript
+// In a form submit handler or server action
+async function validateBankDetails(iban: string) {
+  const res = await fetch("https://api.ibanforge.com/v1/iban/validate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ iban }),
+  })
+
+  const { valid, country, formatted } = await res.json()
+
+  if (!valid) {
+    return { error: "Invalid IBAN. Please check the account number." }
+  }
+
+  return { success: true, country, formatted }
+}
+```
+
+At $0.005 per validation, this adds a fraction of a cent to each checkout — far less than the cost of a failed payment.
+
+---
+
+## Getting Started
+
+All five use cases above work today with IBANforge. The API is pay-per-call via x402 micropayments — no subscription, no API key, no account required to start.
+
+- [Try the playground](/playground) — validate IBANs and look up BIC codes live
+- [Read the docs](/docs) — full API reference and integration guides
+- [x402 protocol](/docs/x402) — how the payment protocol works

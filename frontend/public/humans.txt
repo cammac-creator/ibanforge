@@ -1,0 +1,11 @@
+/* TEAM */
+Developer: IBANforge Team
+Site: https://ibanforge.com
+GitHub: https://github.com/cammac-creator/ibanforge
+Location: Switzerland
+
+/* TECHNOLOGY */
+API: Hono, TypeScript, SQLite, x402
+Frontend: Next.js, shadcn/ui, Tailwind CSS
+Deployment: Railway (API), Vercel (Frontend)
+Data: GLEIF BIC-LEI mapping (CC0)

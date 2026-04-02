@@ -1,0 +1,4 @@
+Contact: https://github.com/cammac-creator/ibanforge/issues
+Expires: 2027-04-01T00:00:00.000Z
+Preferred-Languages: en, fr
+Canonical: https://ibanforge.com/.well-known/security.txt

@@ -32,6 +32,45 @@ const ENDPOINTS = [
   },
 ]
 
+const faqJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "What is x402?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "x402 is an open micropayment protocol that uses HTTP status code 402 (Payment Required). When you call a paid endpoint, the server responds with a 402 containing payment details. Your client automatically sends a signed USDC payment on Base, and the server re-processes your request — all within a single HTTP round-trip.",
+      },
+    },
+    {
+      "@type": "Question",
+      "name": "How do I pay?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Payments are made in USDC on the Base network. Your HTTP client (or SDK) handles it automatically by attaching payment headers to each request. No wallet UI, no manual confirmation — just fractions of a cent deducted per call. Check the docs for integration examples.",
+      },
+    },
+    {
+      "@type": "Question",
+      "name": "Is there a free tier?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes. The /v1/demo endpoint returns pre-computed example validations at no cost, perfect for testing your integration. The /playground on this site lets you try live calls for free too. No signup or payment method required to get started.",
+      },
+    },
+    {
+      "@type": "Question",
+      "name": "What about high volume?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "The per-call pricing scales linearly with no rate limits. For very high volumes (millions of calls/month), open an issue on our GitHub repository (github.com/cammac-creator/ibanforge) — we can discuss custom pricing or a bulk arrangement that makes more sense for your use case.",
+      },
+    },
+  ],
+}
+
 export default function PricingPage() {
   return (
     <div className="flex flex-col">
@@ -214,6 +253,10 @@ export default function PricingPage() {
 
       {/* ── FAQ ───────────────────────────────────────────────────────────── */}
       <section className="px-4 py-16 max-w-3xl mx-auto w-full">
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
+        />
         <h2 className="text-2xl font-semibold tracking-tight mb-10 text-center">
           Frequently asked questions
         </h2>
