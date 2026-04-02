@@ -1,5 +1,10 @@
 # IBANforge
 
+[![API Status](https://img.shields.io/badge/API-live-brightgreen)](https://ibanforge-production.up.railway.app/health)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.7-blue)](https://www.typescriptlang.org/)
+[![MCP](https://img.shields.io/badge/MCP-3_tools-purple)](https://ibanforge.vercel.app/docs/mcp)
+
 **IBAN validation & BIC/SWIFT lookup API** with x402 micropayments and MCP integration for AI agents.
 
 ## Features
