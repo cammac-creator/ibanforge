@@ -19,7 +19,7 @@ Le differenciateur n'est pas la donnee (GLEIF est public) mais l'accessibilite :
 | Endpoint | Methode | Prix x402 | Notes |
 |----------|---------|-----------|-------|
 | /v1/iban/validate | POST | $0.005 | Validation IBAN + BIC lookup |
-| /v1/iban/batch | POST | $0.020 | Jusqu'a 10 IBANs |
+| /v1/iban/batch | POST | $0.020 | Jusqu'a 100 IBANs |
 | /v1/bic/:code | GET | $0.003 | Lookup BIC/SWIFT + LEI |
 | /v1/demo | GET | Gratuit | Exemples, playground |
 | /health, /stats | GET | Gratuit | Monitoring |
@@ -61,16 +61,16 @@ Le differenciateur n'est pas la donnee (GLEIF est public) mais l'accessibilite :
 - [x] API fonctionnelle (Hono + SQLite + x402)
 - [x] 39K entrees BIC avec LEI enrichment
 - [x] MCP server (3 outils)
-- [ ] Frontend ibanforge.com (landing, playground, docs, dashboard)
-- [ ] Deploy Railway + Vercel + DNS
-- [ ] Ajuster les prix a $0.005/$0.003/$0.020
+- [x] Frontend ibanforge.com (landing, playground, docs, dashboard)
+- [x] Deploy Railway + Vercel + DNS
+- [x] Ajuster les prix a $0.005/$0.003/$0.020
 
 ### Phase 2 — Distribution (semaines 5-8)
 - [ ] Publier comme MCP server sur Smithery + GitHub MCP Registry
 - [ ] Lister sur RapidAPI (acces passif a 4M+ devs)
 - [ ] Publier librairies client (Python, TypeScript) sur PyPI/npm
 - [ ] Show HN + Product Hunt + IndieHackers launch
-- [ ] Premier article blog technique (SEO)
+- [x] Premier article blog technique (SEO)
 
 ### Phase 3 — Monetisation elargie (mois 3-4)
 - [ ] Systeme de cles API + tier gratuit (200 appels/mois)
