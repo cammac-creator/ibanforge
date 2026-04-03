@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { validateIBAN } from '../lib/iban.js';
-import { lookupByCountryBank } from '../lib/bic-lookup.js';
+import { enrichResult } from '../lib/enrich.js';
 
 const demo = new Hono();
 
@@ -19,9 +19,7 @@ const DEMO_BICS = [
 demo.get('/v1/demo', (c) => {
   const ibanResults = DEMO_IBANS.map(({ iban, label }) => {
     const result = validateIBAN(iban);
-    if (result.valid && result.bban?.bank_code) {
-      result.bic = lookupByCountryBank(result.country!.code, result.bban.bank_code);
-    }
+    enrichResult(result);
     return { label, ...result };
   });
 
