@@ -13,6 +13,8 @@ import { demo } from './routes/demo.js';
 import { landing } from './routes/landing.js';
 import { openapi } from './routes/openapi.js';
 import { discovery } from './routes/discovery.js';
+import { mcpHttp } from './routes/mcp-http.js';
+import { mcpCard } from './routes/mcp-card.js';
 import { createX402Middleware, ensureWalletConfigured } from './middleware/x402.js';
 import { rateLimitMiddleware } from './middleware/rate-limit.js';
 
@@ -61,6 +63,8 @@ app.route('/', stats);
 app.route('/', demo);
 app.route('/', openapi);
 app.route('/', discovery);
+app.route('/', mcpHttp);
+app.route('/', mcpCard);
 
 // Landing page (must be last — catches GET /)
 app.route('/', landing);
