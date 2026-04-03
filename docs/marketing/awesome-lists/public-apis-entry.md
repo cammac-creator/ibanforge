@@ -26,14 +26,14 @@ API | Description | Auth | HTTPS | CORS |
 **Entry to insert (alphabetical order — after entries starting with 'H', before 'J'):**
 
 ```
-| [IBANforge](https://api.ibanforge.com) | IBAN validation and BIC/SWIFT lookup for 80+ countries with 39K+ bank entries | No | Yes | Yes |
+| [IBANforge](https://api.ibanforge.com) | IBAN validation and BIC/SWIFT lookup for 75+ countries with 39K+ bank entries | No | Yes | Yes |
 ```
 
 ## Full Context (surrounding entries for reference)
 
 ```markdown
 | [Glean](https://developer.glean.com/docs/browser_api/overview/) | Company productivity platform search and assistant API | `apiKey` | Yes | Unknown |
-| [IBANforge](https://api.ibanforge.com) | IBAN validation and BIC/SWIFT lookup for 80+ countries with 39K+ bank entries | No | Yes | Yes |
+| [IBANforge](https://api.ibanforge.com) | IBAN validation and BIC/SWIFT lookup for 75+ countries with 39K+ bank entries | No | Yes | Yes |
 | [IEX Cloud](https://iexcloud.io/docs/api/) | Realtime & Historical Stock and Market Data | `apiKey` | Yes | Yes |
 ```
 

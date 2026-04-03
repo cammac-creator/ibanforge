@@ -34,7 +34,7 @@ The Finance & Fintech section format is:
 **Entry to insert (alphabetical order — after 'h' entries, before other 'i' entries):**
 
 ```markdown
-- [cammac-creator/ibanforge](https://github.com/cammac-creator/ibanforge) 📇 ☁️ 🏠 🍎 🪟 🐧 - IBAN validation and BIC/SWIFT lookup MCP server with 3 tools: `validate_iban`, `lookup_bic`, `batch_validate`. Covers 80+ countries, 39K+ bank entries from GLEIF. Pay-per-call via x402 micropayments (USDC) or self-host with Docker. [ibanforge.com](https://ibanforge.com)
+- [cammac-creator/ibanforge](https://github.com/cammac-creator/ibanforge) 📇 ☁️ 🏠 🍎 🪟 🐧 - IBAN validation and BIC/SWIFT lookup MCP server with 3 tools: `validate_iban`, `lookup_bic`, `batch_validate`. Covers 75+ countries, 39K+ bank entries from GLEIF. Pay-per-call via x402 micropayments (USDC) or self-host with Docker. [ibanforge.com](https://ibanforge.com)
 ```
 
 ## Alternative entry (shorter format)
@@ -42,7 +42,7 @@ The Finance & Fintech section format is:
 Some entries in the list are more concise:
 
 ```markdown
-- [cammac-creator/ibanforge](https://github.com/cammac-creator/ibanforge) 📇 ☁️ - IBAN validation & BIC/SWIFT lookup for 80+ countries. 3 MCP tools, 39K+ bank entries, x402 micropayments.
+- [cammac-creator/ibanforge](https://github.com/cammac-creator/ibanforge) 📇 ☁️ - IBAN validation & BIC/SWIFT lookup for 75+ countries. 3 MCP tools, 39K+ bank entries, x402 micropayments.
 ```
 
 ## Notes

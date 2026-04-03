@@ -17,7 +17,7 @@
 ```markdown
 ## Account & IBAN Validation
 
-* [IBANforge](https://ibanforge.com) - REST API for IBAN validation (80+ countries, mod-97 checksum, BBAN parsing) and BIC/SWIFT lookup (39K+ entries from GLEIF). Free tier, x402 micropayments, MCP server for AI agents, self-hostable via Docker. [GitHub](https://github.com/cammac-creator/ibanforge)
+* [IBANforge](https://ibanforge.com) - REST API for IBAN validation (75+ countries, mod-97 checksum, BBAN parsing) and BIC/SWIFT lookup (39K+ entries from GLEIF). Free tier, x402 micropayments, MCP server for AI agents, self-hostable via Docker. [GitHub](https://github.com/cammac-creator/ibanforge)
 ```
 
 ## Alternative: Add under API Aggregators
@@ -25,7 +25,7 @@
 ```markdown
 ## API Aggregators
 
-* [IBANforge](https://ibanforge.com) - IBAN validation and BIC/SWIFT lookup API. 80+ countries, 39K+ GLEIF bank entries, x402 micropayments from $0.003/request.
+* [IBANforge](https://ibanforge.com) - IBAN validation and BIC/SWIFT lookup API. 75+ countries, 39K+ GLEIF bank entries, x402 micropayments from $0.003/request.
 ```
 
 ## Notes

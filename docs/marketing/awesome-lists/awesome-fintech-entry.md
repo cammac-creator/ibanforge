@@ -21,7 +21,7 @@ The repo covers financial libraries and tools. IBANforge fits best under a new s
 **Option A — Under existing relevant section (Banking / Compliance):**
 
 ```markdown
-- [IBANforge](https://github.com/cammac-creator/ibanforge) - REST API and MCP server for IBAN validation (80+ countries, mod-97 checksum) and BIC/SWIFT lookup (39K+ entries from GLEIF). x402 micropayments, self-hostable via Docker.
+- [IBANforge](https://github.com/cammac-creator/ibanforge) - REST API and MCP server for IBAN validation (75+ countries, mod-97 checksum) and BIC/SWIFT lookup (39K+ entries from GLEIF). x402 micropayments, self-hostable via Docker.
 ```
 
 **Option B — Propose a new subsection:**
@@ -29,7 +29,7 @@ The repo covers financial libraries and tools. IBANforge fits best under a new s
 ```markdown
 ## Account Validation
 
-- [IBANforge](https://github.com/cammac-creator/ibanforge) - REST API and MCP server for IBAN validation (80+ countries, mod-97 checksum) and BIC/SWIFT lookup (39K+ entries from GLEIF). x402 micropayments, self-hostable via Docker.
+- [IBANforge](https://github.com/cammac-creator/ibanforge) - REST API and MCP server for IBAN validation (75+ countries, mod-97 checksum) and BIC/SWIFT lookup (39K+ entries from GLEIF). x402 micropayments, self-hostable via Docker.
 ```
 
 ---
@@ -55,7 +55,7 @@ The repo uses a `* [Name](url) - description` format with language subsections. 
 ## APIs
 
 ### Banking & Account Validation
-* [IBANforge](https://ibanforge.com) - IBAN validation API and MCP server for 80+ countries with BIC/SWIFT lookup (39K+ entries). Pay-per-call x402 micropayments or self-host.
+* [IBANforge](https://ibanforge.com) - IBAN validation API and MCP server for 75+ countries with BIC/SWIFT lookup (39K+ entries). Pay-per-call x402 micropayments or self-host.
 ```
 
 ---

@@ -16,13 +16,13 @@
 ### Entry for "🌟 Ecosystem Projects" section
 
 ```markdown
-- [IBANforge](https://ibanforge.com) - IBAN validation & BIC/SWIFT lookup API with x402 micropayments. Validate IBANs for 80+ countries, look up 39K+ bank BIC codes from GLEIF. Pay-per-call from $0.003 in USDC on Base. Also exposes an MCP server for AI agent integration. [GitHub](https://github.com/cammac-creator/ibanforge)
+- [IBANforge](https://ibanforge.com) - IBAN validation & BIC/SWIFT lookup API with x402 micropayments. Validate IBANs for 75+ countries, look up 39K+ bank BIC codes from GLEIF. Pay-per-call from $0.003 in USDC on Base. Also exposes an MCP server for AI agent integration. [GitHub](https://github.com/cammac-creator/ibanforge)
 ```
 
 ### Entry for "🏭 Production Implementations" section
 
 ```markdown
-- [IBANforge](https://ibanforge.com) - Production IBAN validation and BIC/SWIFT lookup API. x402 pay-per-call micropayments from $0.003/request in USDC. 80+ countries, 39K+ GLEIF entries, MCP server included. Self-hostable via Docker.
+- [IBANforge](https://ibanforge.com) - Production IBAN validation and BIC/SWIFT lookup API. x402 pay-per-call micropayments from $0.003/request in USDC. 75+ countries, 39K+ GLEIF entries, MCP server included. Self-hostable via Docker.
 ```
 
 ### Entry for "🤖 AI Agent Integration" section
@@ -49,7 +49,7 @@
 ### Entry to Add
 
 ```markdown
-- [IBANforge](https://github.com/cammac-creator/ibanforge) - IBAN validation and BIC/SWIFT lookup REST API + MCP server with x402 micropayments. $0.003–$0.020/request in USDC on Base. 80+ countries, 39K+ GLEIF BIC entries.
+- [IBANforge](https://github.com/cammac-creator/ibanforge) - IBAN validation and BIC/SWIFT lookup REST API + MCP server with x402 micropayments. $0.002–$0.005/request in USDC on Base. 75+ countries, 39K+ GLEIF BIC entries.
 ```
 
 ---
@@ -57,7 +57,7 @@
 ## Notes
 
 - x402 integration: uses `x402-express` middleware with Coinbase facilitator
-- Payment amounts: $0.003 (BIC lookup), $0.005 (IBAN validate), $0.020 (batch)
+- Payment amounts: $0.003 (BIC lookup), $0.005 (IBAN validate), $0.002/IBAN (batch)
 - Network: Base mainnet (USDC)
 - API: https://api.ibanforge.com
 - Docs: https://ibanforge.com/docs
