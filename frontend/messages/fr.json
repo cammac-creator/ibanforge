@@ -173,7 +173,7 @@
     },
     "free": {
       "title": "Endpoints gratuits",
-      "description": "{demo} et {health} sont toujours gratuits — aucun paiement requis.",
+      "description": "<demo>GET /v1/demo</demo> et <health>GET /health</health> sont toujours gratuits — aucun paiement requis.",
       "demo": "GET /v1/demo",
       "health": "GET /health",
       "playgroundLink": "Essayer dans le playground →"

@@ -128,14 +128,14 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
             <p className="text-sm font-medium text-foreground">{t('free.title')}</p>
             <p className="text-sm text-muted-foreground mt-0.5">
               {t.rich('free.description', {
-                demo: () => (
+                demo: (chunks) => (
                   <code className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded">
-                    {t('free.demo')}
+                    {chunks}
                   </code>
                 ),
-                health: () => (
+                health: (chunks) => (
                   <code className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded">
-                    {t('free.health')}
+                    {chunks}
                   </code>
                 ),
               })}
