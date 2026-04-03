@@ -6,7 +6,9 @@ import { SiteFooter } from '@/components/site-footer';
 
 export function ConditionalShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const isDashboard = pathname?.startsWith('/dashboard');
+  // pathname now includes locale prefix: /en/dashboard, /fr/dashboard, etc.
+  const segments = pathname?.split('/') ?? [];
+  const isDashboard = segments.length >= 3 && segments[2] === 'dashboard';
 
   if (isDashboard) {
     return <>{children}</>;
