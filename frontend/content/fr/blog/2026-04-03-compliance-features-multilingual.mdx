@@ -1,0 +1,119 @@
+---
+title: "Nouveau : conformite SEPA, detection vIBAN, indicateurs de risque et support multilingue"
+description: "IBANforge retourne desormais l'adhesion SEPA, la classification de l'emetteur, les indicateurs de risque et les donnees VoP avec chaque validation d'IBAN — plus un support complet en francais et en allemand."
+date: "2026-04-03"
+---
+
+Aujourd'hui, nous livrons la plus grande mise a jour depuis le lancement : **un enrichissement de niveau conformite** sur chaque reponse de validation d'IBAN, et un **support multilingue complet** en anglais, francais et allemand.
+
+Ce ne sont pas des ameliorations incrementales — elles changent la nature meme d'IBANforge. Nous sommes passes de "un validateur d'IBAN propre" a **la seule API abordable qui aide les agents IA a naviguer dans la conformite des paiements europeens**.
+
+---
+
+## Ce qui change dans la reponse API
+
+Chaque appel a `/v1/iban/validate` retourne desormais trois nouveaux objets en complement des donnees IBAN, BIC et BBAN existantes :
+
+### Donnees de conformite SEPA
+
+```json
+"sepa": {
+  "member": true,
+  "schemes": ["SCT", "SDD", "SCT_INST"],
+  "vop_required": true
+}
+```
+
+Pour chaque IBAN, vous savez desormais :
+- Si le pays est **membre SEPA** (36 pays)
+- Quels **schemas de paiement** sont disponibles : SCT (virement), SDD (prelevement), SCT_INST (instantane)
+- Si la **Verification of Payee (VoP)** est obligatoire — la reglementation europeenne qui impose aux PSP de verifier la correspondance entre le nom du beneficiaire et l'IBAN avant d'executer un virement (obligatoire dans la zone euro depuis octobre 2025)
+
+Cela compte parce que le support des schemas SEPA determine quels rails de paiement vous pouvez utiliser, et la couverture VoP indique a votre agent de conformite si la verification du nom est legalement requise avant d'envoyer des fonds.
+
+### Classification de l'emetteur
+
+```json
+"issuer": {
+  "type": "digital_bank",
+  "name": "Revolut"
+}
+```
+
+IBANforge classe desormais l'institution derriere chaque IBAN en quatre categories :
+- `bank` — Banque traditionnelle avec agences physiques
+- `digital_bank` — Neobanque / banque challenger (N26, Monzo, Revolut, Starling, bunq, Qonto...)
+- `emi` — Etablissement de monnaie electronique (Wise, Adyen, Paysera, Banking Circle...)
+- `payment_institution` — Etablissement de paiement agree / fournisseur BaaS (Solarisbank, Stripe, Swan...)
+
+**Pourquoi c'est important :** les IBAN virtuels (vIBAN) sont massivement emis par les EMI et les banques numeriques, pas par les banques traditionnelles. Le nouveau reglement europeen anti-blanchiment (AMLR, applicable en juillet 2027) cible specifiquement l'opacite des vIBAN. Si votre workflow de conformite doit signaler les vIBAN potentiels, le champ `issuer.type` fournit un signal structurel sans avoir a maintenir votre propre base de donnees d'EMI.
+
+Nous cartographions actuellement plus de 30 codes BIC connus d'EMI et de neobanques. La liste s'enrichit a chaque actualisation de la base GLEIF.
+
+### Indicateurs de risque
+
+```json
+"risk_indicators": {
+  "issuer_type": "digital_bank",
+  "country_risk": "standard",
+  "test_bic": false,
+  "sepa_reachable": true,
+  "vop_coverage": true
+}
+```
+
+Un signal de risque composite dans un seul objet. Cinq champs, cinq questions auxquelles il est repondu :
+- **issuer_type** — S'agit-il d'une banque traditionnelle ou d'une fintech ? (reprend `issuer.type`)
+- **country_risk** — Le pays figure-t-il sur les listes grises/noires du FATF ou sur les listes europeennes de pays tiers a haut risque ? (`standard`, `elevated` ou `high`)
+- **test_bic** — S'agit-il d'un code BIC de test/sandbox ?
+- **sepa_reachable** — Peut-on envoyer un virement SEPA vers ce compte ?
+- **vop_coverage** — La Verification of Payee est-elle obligatoire pour ce pays ?
+
+Un agent IA de conformite peut lire cet objet et prendre une decision de routage en quelques millisecondes — sans recherche externe, sans appel API supplementaire.
+
+---
+
+## Support multilingue
+
+IBANforge est desormais disponible en **anglais, francais et allemand**. Le middleware detecte automatiquement l'en-tete `Accept-Language` de votre navigateur et redirige vers la langue appropriee :
+
+- `ibanforge.com/en/` — Anglais
+- `ibanforge.com/fr/` — Francais
+- `ibanforge.com/de/` — Allemand
+
+Tout est traduit : page d'accueil, documentation (7 pages), articles de blog (5 articles), tarifs, tableau comparatif et playground interactif. Vous pouvez changer de langue manuellement via le selecteur dans l'en-tete.
+
+L'API elle-meme reste en anglais — les champs de reponse, codes d'erreur et descriptions d'outils MCP ne changent pas selon la langue. C'est un choix delibere : les developpeurs et les agents IA travaillent en anglais quelle que soit la langue de l'utilisateur final.
+
+---
+
+## Pourquoi nous avons construit cela
+
+Deux echeances reglementaires ont dicte le calendrier :
+
+1. **La VoP est devenue obligatoire** pour les PSP de la zone euro le 9 octobre 2025. Chaque prestataire de paiement dans l'UE doit desormais verifier le nom du beneficiaire avant d'executer un virement SEPA. Les agents qui traitent des paiements doivent savoir si la VoP s'applique a un IBAN donne — notre champ `sepa.vop_required` repond instantanement a cette question.
+
+2. **L'AMLR cible les vIBAN** a partir de juillet 2027. L'Autorite bancaire europeenne a identifie les IBAN virtuels comme un risque systemique de blanchiment en 2024. Notre classification des emetteurs fournit aux equipes de conformite un signal structurel sans avoir a construire leur propre base de donnees d'EMI.
+
+Le lancement multilingue cible le marche suisse et DACH — IBANforge est construit en Suisse, et notre documentation doit etre accessible dans les langues que parlent nos utilisateurs principaux.
+
+---
+
+## Pas de changement de prix
+
+Tous les nouveaux champs sont inclus dans la reponse existante au meme tarif :
+- IBAN unitaire : **$0.005** USDC
+- Lot (jusqu'a 100) : **$0.002/IBAN**
+- Recherche BIC : **$0.003** USDC
+
+Actuellement gratuit pendant la beta — pas de cle API, pas d'abonnement.
+
+---
+
+## Et ensuite
+
+- **Base d'EMI etendue** — Davantage de correspondances d'emetteurs a partir des registres nationaux d'EMI
+- **Cles API + offre gratuite** — 200 appels gratuits/mois en complement du paiement a l'appel x402
+- **Distribution** — Referencement sur MCP Registry, Smithery, RapidAPI et les annuaires de developpeurs
+
+Testez les nouvelles fonctionnalites dans le [Playground](/fr/playground), ou consultez la [documentation mise a jour](/fr/docs/iban-validate) pour la reference complete champ par champ.

@@ -1,0 +1,119 @@
+---
+title: "New: SEPA Compliance, vIBAN Detection, Risk Indicators & Multilingual Support"
+description: "IBANforge now returns SEPA membership, issuer classification, risk indicators, and VoP data with every IBAN validation — plus full French and German language support."
+date: "2026-04-03"
+---
+
+Today we're shipping the biggest update since launch: **compliance-grade enrichment** on every IBAN validation response, and **full multilingual support** in English, French, and German.
+
+These aren't incremental improvements — they change what IBANforge is. We went from "a clean IBAN validator" to **the only affordable API that helps AI agents navigate European payment compliance**.
+
+---
+
+## What's new in the API response
+
+Every call to `/v1/iban/validate` now returns three new objects alongside the existing IBAN, BIC, and BBAN data:
+
+### SEPA compliance data
+
+```json
+"sepa": {
+  "member": true,
+  "schemes": ["SCT", "SDD", "SCT_INST"],
+  "vop_required": true
+}
+```
+
+For each IBAN, you now know:
+- Whether the country is a **SEPA member** (36 countries)
+- Which **payment schemes** are available: SCT (Credit Transfer), SDD (Direct Debit), SCT_INST (Instant)
+- Whether **Verification of Payee (VoP)** is mandatory — the EU regulation that requires PSPs to match payee name to IBAN before executing transfers (mandatory for eurozone since October 2025)
+
+This matters because SEPA scheme support determines which payment rails you can use, and VoP coverage tells your compliance agent whether name-matching is legally required before sending funds.
+
+### Issuer classification
+
+```json
+"issuer": {
+  "type": "digital_bank",
+  "name": "Revolut"
+}
+```
+
+IBANforge now classifies the institution behind every IBAN into four categories:
+- `bank` — Traditional bank with physical branches
+- `digital_bank` — Neobank / challenger bank (N26, Monzo, Revolut, Starling, bunq, Qonto...)
+- `emi` — Electronic Money Institution (Wise, Adyen, Paysera, Banking Circle...)
+- `payment_institution` — Licensed PI / BaaS provider (Solarisbank, Stripe, Swan...)
+
+**Why this matters:** Virtual IBANs (vIBANs) are overwhelmingly issued by EMIs and digital banks, not traditional banks. The EU's new Anti-Money Laundering Regulation (AMLR, effective July 2027) specifically targets vIBAN opacity. If your compliance workflow needs to flag potential vIBANs, the `issuer.type` field gives you a structural signal without needing to maintain your own EMI database.
+
+We currently map 30+ known EMI and neobank BIC codes. The list grows with each GLEIF database refresh.
+
+### Risk indicators
+
+```json
+"risk_indicators": {
+  "issuer_type": "digital_bank",
+  "country_risk": "standard",
+  "test_bic": false,
+  "sepa_reachable": true,
+  "vop_coverage": true
+}
+```
+
+A composite risk signal in one object. Five fields, five questions answered:
+- **issuer_type** — Is this a traditional bank or a fintech? (mirrors `issuer.type`)
+- **country_risk** — Is the country on FATF grey/black lists or EU high-risk third country lists? (`standard`, `elevated`, or `high`)
+- **test_bic** — Is this a sandbox/test BIC code?
+- **sepa_reachable** — Can you send a SEPA transfer to this account?
+- **vop_coverage** — Is Verification of Payee mandatory for this country?
+
+An AI compliance agent can read this object and make a routing decision in milliseconds — no external lookups, no additional API calls.
+
+---
+
+## Multilingual support
+
+IBANforge is now available in **English, French, and German**. The middleware automatically detects your browser's `Accept-Language` header and redirects to the appropriate locale:
+
+- `ibanforge.com/en/` — English
+- `ibanforge.com/fr/` — French
+- `ibanforge.com/de/` — German
+
+Everything is translated: landing page, documentation (7 pages), blog posts (5 articles), pricing, comparison table, and the interactive playground. You can switch languages manually using the dropdown in the header.
+
+The API itself remains in English — response fields, error codes, and MCP tool descriptions don't change with locale. This is deliberate: developers and AI agents work in English regardless of the end user's language.
+
+---
+
+## Why we built this
+
+Two regulatory deadlines drove the timing:
+
+1. **VoP became mandatory** for eurozone PSPs on October 9, 2025. Every payment provider in the EU now needs to verify payee names before executing SEPA transfers. Agents processing payments need to know whether VoP applies to a given IBAN — our `sepa.vop_required` field answers that instantly.
+
+2. **AMLR targets vIBANs** starting July 2027. The European Banking Authority flagged virtual IBANs as a systemic money laundering risk in 2024. Our issuer classification gives compliance teams a structural signal without building their own EMI database.
+
+The multilingual launch targets the Swiss and DACH market — IBANforge is built in Switzerland, and our documentation should be accessible in the languages our primary users speak.
+
+---
+
+## No price change
+
+All new fields are included in the existing response at the same cost:
+- Single IBAN: **$0.005** USDC
+- Batch (up to 100): **$0.002/IBAN**
+- BIC lookup: **$0.003** USDC
+
+Currently free during beta — no API key, no subscription.
+
+---
+
+## What's next
+
+- **Expanded EMI database** — More issuer mappings from national EMI registers
+- **API keys + free tier** — 200 free calls/month alongside x402 pay-per-call
+- **Distribution** — Listings on MCP Registry, Smithery, RapidAPI, and developer directories
+
+Try the new features in the [Playground](/en/playground), or read the [updated documentation](/en/docs/iban-validate) for full field-by-field reference.
