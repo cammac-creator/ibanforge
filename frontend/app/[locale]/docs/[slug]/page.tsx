@@ -2,11 +2,7 @@ import { MDXRemote } from "next-mdx-remote/rsc";
 import { getDoc, getAllDocs } from "@/lib/mdx";
 import { notFound } from "next/navigation";
 
-export function generateStaticParams() {
-  return getAllDocs('en')
-    .filter((doc) => doc.slug !== "index")
-    .map((doc) => ({ slug: doc.slug }));
-}
+export const dynamicParams = true;
 
 export async function generateMetadata({
   params,
