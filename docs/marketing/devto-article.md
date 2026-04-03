@@ -49,13 +49,8 @@ ibanValidate.post('/v1/iban/validate', async (c) => {
 
   const result = validateIBAN(body.iban as string);
 
-  // Auto-lookup BIC if IBAN is valid
-  if (result.valid && result.bban?.bank_code) {
-    result.bic = lookupByCountryBank(
-      result.country!.code,
-      result.bban.bank_code
-    );
-  }
+  // Enrich with BIC, SEPA info, issuer classification, and risk indicators
+  enrichResult(result);
 
   result.processing_ms = Math.round(
     (performance.now() - start) * 100

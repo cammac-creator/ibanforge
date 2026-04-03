@@ -1,6 +1,6 @@
 ---
 title: "Introduction"
-description: "Overview of the IBANforge API — IBAN validation, BIC/SWIFT lookup, and x402 micropayments."
+description: "Overview of the IBANforge API — IBAN validation, BIC/SWIFT lookup, SEPA compliance, issuer classification, and risk indicators."
 order: 0
 ---
 
@@ -8,7 +8,7 @@ order: 0
 
 [Download Postman Collection](/ibanforge-postman.json)
 
-IBANforge is a fast, reliable API for **IBAN validation** and **BIC/SWIFT lookup**. It covers 80+ countries with real-time checksum verification, BBAN structure parsing, and enriched institution data from GLEIF.
+IBANforge is a fast, reliable API for **IBAN validation** and **BIC/SWIFT lookup**. It covers 80+ countries with real-time checksum verification, BBAN structure parsing, enriched institution data from GLEIF, **SEPA compliance info**, **issuer classification** (bank vs. EMI/neobank), and **risk indicators** for compliance agents.
 
 ## Base URL
 
@@ -29,7 +29,7 @@ Your HTTP client attaches a payment header, and the API verifies it before proce
 | Endpoint | Method | Cost | Description |
 |---|---|---|---|
 | `/v1/iban/validate` | POST | $0.005 | Validate a single IBAN |
-| `/v1/iban/batch` | POST | $0.020 | Validate up to 10 IBANs |
+| `/v1/iban/batch` | POST | $0.002/IBAN | Validate up to 100 IBANs |
 | `/v1/bic/:code` | GET | $0.003 | Look up a BIC/SWIFT code |
 | `/v1/demo` | GET | Free | Example validations (no payment needed) |
 | `/health` | GET | Free | Service health check |
@@ -46,24 +46,40 @@ Response:
 
 ```json
 {
+  "iban": "CH9300762011623852957",
   "valid": true,
-  "iban": {
-    "formatted": "CH93 0076 2011 6238 5295 7",
-    "compact": "CH9300762011623852957",
-    "country": "Switzerland",
-    "countryCode": "CH",
-    "checkDigits": "93",
-    "bban": "00762011623852957",
-    "bankCode": "00762",
-    "accountNumber": "011623852957"
+  "country": {
+    "code": "CH",
+    "name": "Switzerland"
+  },
+  "check_digits": "93",
+  "bban": {
+    "bank_code": "00762",
+    "account_number": "011623852957"
   },
   "bic": {
-    "code": "UBSWCHZH80A",
-    "institution": "UBS SWITZERLAND AG",
-    "city": "ZURICH",
-    "country": "Switzerland",
-    "lei": "BFM8T61CT2L1QCEMIK50"
-  }
+    "code": "UBSWCHZH",
+    "bank_name": "UBS SWITZERLAND AG",
+    "city": "ZURICH"
+  },
+  "sepa": {
+    "member": true,
+    "schemes": ["SCT", "SDD"],
+    "vop_required": false
+  },
+  "issuer": {
+    "type": "bank",
+    "name": "UBS SWITZERLAND AG"
+  },
+  "risk_indicators": {
+    "issuer_type": "bank",
+    "country_risk": "standard",
+    "test_bic": false,
+    "sepa_reachable": true,
+    "vop_coverage": false
+  },
+  "formatted": "CH93 0076 2011 6238 5295 7",
+  "cost_usdc": 0.005
 }
 ```
 
@@ -80,7 +96,7 @@ This returns pre-validated example IBANs from multiple countries so you can expl
 ## Next steps
 
 - [Validate a single IBAN](/docs/iban-validate) — full endpoint reference
-- [Batch validation](/docs/iban-batch) — validate up to 10 IBANs at once
+- [Batch validation](/docs/iban-batch) — validate up to 100 IBANs at once
 - [BIC/SWIFT lookup](/docs/bic-lookup) — search institution data by BIC code
 - [x402 micropayments](/docs/x402) — how payment works
 - [MCP integration](/docs/mcp) — connect IBANforge to AI agents

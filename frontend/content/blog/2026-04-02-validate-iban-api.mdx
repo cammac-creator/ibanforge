@@ -39,10 +39,19 @@ Response:
   "country": { "code": "CH", "name": "Switzerland" },
   "check_digits": "93",
   "bban": { "bank_code": "00762", "account_number": "011623852957" },
+  "bic": { "code": "UBSWCHZH", "bank_name": "UBS Switzerland AG", "city": "Zurich" },
+  "sepa": { "member": true, "schemes": ["SCT", "SDD"], "vop_required": false },
+  "issuer": { "type": "bank", "name": "UBS Switzerland AG" },
+  "risk_indicators": {
+    "issuer_type": "bank",
+    "country_risk": "standard",
+    "test_bic": false,
+    "sepa_reachable": true,
+    "vop_coverage": false
+  },
   "formatted": "CH93 0076 2011 6238 5295 7",
   "cost_usdc": 0.005,
-  "bic": { "code": "UBSWCHZH", "bank_name": "UBS Switzerland AG", "city": "Zurich" },
-  "processing_ms": 9.11
+  "processing_ms": 1.23
 }
 ```
 
@@ -52,8 +61,11 @@ A few things worth noting in this response:
 - `iban` returns the compact form (no spaces); `formatted` adds spaces in the standard 4-character grouping.
 - `bban.bank_code` is extracted from the BBAN according to Switzerland's specific format — not just a substring operation.
 - The `bic` object includes the bank name and city, resolved from the GLEIF dataset.
+- `sepa` tells you if this account is SEPA-reachable, which payment schemes apply, and whether Verification of Payee (VoP) is required by EU regulation.
+- `issuer` classifies the institution — `bank`, `digital_bank`, `emi`, or `payment_institution` — helping detect virtual IBANs.
+- `risk_indicators` provides a composite risk signal for compliance agents: country risk, SEPA coverage, and VoP status in one object.
 
-If validation fails, the response includes an `error` field with a machine-readable error code (`checksum_failed`, `wrong_length`, `unsupported_country`, etc.) so you can distinguish a typo from an unsupported country code.
+If validation fails, the response includes an `error` field with a machine-readable error code (`checksum_failed`, `wrong_length`, `unsupported_country`, etc.) and an `error_detail` with a human-readable explanation.
 
 ## Example 2: Python
 

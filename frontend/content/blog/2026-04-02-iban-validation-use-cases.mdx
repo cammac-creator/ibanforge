@@ -26,7 +26,7 @@ const res = await fetch("https://api.ibanforge.com/v1/iban/validate", {
 })
 
 const data = await res.json()
-// { valid: true, country: "CH", bank_code: "00762", ... }
+// { valid: true, country: { code: "CH", name: "Switzerland" }, issuer: { type: "bank", ... }, ... }
 ```
 
 Catch the error before it becomes a failed transaction. At $0.005 per call, it costs less than 0.01% of a typical wire fee.
@@ -37,7 +37,7 @@ Catch the error before it becomes a failed transaction. At $0.005 per call, it c
 
 **The problem:** KYC (Know Your Customer) workflows need to confirm that a submitted bank account belongs to the declared jurisdiction and institution. Fraudulent onboarding often involves IBANs from unexpected countries or with manipulated check digits.
 
-**The solution:** Use IBAN validation combined with BIC/SWIFT lookup to cross-reference the declared country, bank name, and LEI (Legal Entity Identifier). Discrepancies flag accounts for manual review.
+**The solution:** Use IBAN validation to get institution classification, risk indicators, and BIC data in a single call. The `issuer.type` field flags EMIs and neobanks (potential vIBANs), while `risk_indicators.country_risk` surfaces FATF-listed jurisdictions. Discrepancies flag accounts for manual review.
 
 ```typescript
 // Step 1: validate the IBAN structure
@@ -47,13 +47,13 @@ const ibanRes = await fetch("https://api.ibanforge.com/v1/iban/validate", {
   body: JSON.stringify({ iban: userSubmittedIban }),
 })
 
-const { valid, bic, country } = await ibanRes.json()
+const result = await ibanRes.json()
 
-// Step 2: cross-check the BIC for institution details
-if (valid && bic) {
-  const bicRes = await fetch(`https://api.ibanforge.com/v1/bic/${bic}`)
-  const bank = await bicRes.json()
-  // bank.institution_name, bank.lei, bank.country
+// The response already includes issuer classification and risk data
+if (result.valid) {
+  console.log(result.issuer?.type)              // "bank", "emi", "digital_bank", etc.
+  console.log(result.risk_indicators?.country_risk) // "standard", "elevated", "high"
+  console.log(result.bic?.bank_name)             // Institution name from GLEIF
 }
 ```
 
@@ -76,11 +76,12 @@ const res = await fetch("https://api.ibanforge.com/v1/iban/batch", {
   body: JSON.stringify({ ibans: extractedIbans }),
 })
 
-const results = await res.json()
-// Each entry: { iban, valid, normalised, country, bank_code, ... }
+const data = await res.json()
+// data.results: array of { iban, valid, country, bic, sepa, issuer, risk_indicators, ... }
+// data.valid_count: number of valid IBANs
 ```
 
-The batch endpoint validates up to 10 IBANs per call at $0.020, making it cost-effective even for high-volume document pipelines.
+The batch endpoint validates up to 100 IBANs per call at $0.002 per IBAN, making it cost-effective even for high-volume document pipelines. Each result includes SEPA info, issuer classification, and risk indicators.
 
 ---
 
@@ -100,10 +101,11 @@ The batch endpoint validates up to 10 IBANs per call at $0.020, making it cost-e
 // Structured response
 {
   "valid": true,
-  "country": "GB",
-  "bank_code": "NWBK",
-  "bic": "NWBKGB2L",
-  "institution_name": "NatWest"
+  "country": { "code": "GB", "name": "United Kingdom" },
+  "bic": { "code": "NWBKGB2L", "bank_name": "NATIONAL WESTMINSTER BANK PLC", "city": "LONDON" },
+  "sepa": { "member": true, "schemes": ["SCT", "SDD"], "vop_required": false },
+  "issuer": { "type": "bank", "name": "NATIONAL WESTMINSTER BANK PLC" },
+  "risk_indicators": { "issuer_type": "bank", "country_risk": "standard", "sepa_reachable": true }
 }
 ```
 
@@ -126,13 +128,13 @@ async function validateBankDetails(iban: string) {
     body: JSON.stringify({ iban }),
   })
 
-  const { valid, country, formatted } = await res.json()
+  const data = await res.json()
 
-  if (!valid) {
+  if (!data.valid) {
     return { error: "Invalid IBAN. Please check the account number." }
   }
 
-  return { success: true, country, formatted }
+  return { success: true, country: data.country?.name, formatted: data.formatted, sepa: data.sepa?.member }
 }
 ```
 

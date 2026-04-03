@@ -1,6 +1,6 @@
 # IBANforge
 
-API de validation IBAN et lookup BIC/SWIFT avec micropaiements x402 et interface MCP pour agents AI.
+API de validation IBAN et lookup BIC/SWIFT avec micropaiements x402, interface MCP pour agents AI, données SEPA/VoP, classification émetteur (vIBAN detection), et indicateurs de risque compliance.
 
 ## Stack
 
@@ -28,9 +28,11 @@ src/
     demo.ts             # GET /v1/demo (free examples)
   lib/
     iban.ts             # IBAN validation logic (mod97, BBAN parsing)
+    enrich.ts           # Post-validation enrichment (BIC, issuer, SEPA, risk)
+    issuers.ts          # EMI/neobank classification (30+ known BIC8 mappings)
     bic-validator.ts    # BIC format validation (ISO 9362)
     bic-lookup.ts       # BIC database queries
-    countries.ts        # ISO country data (IBAN lengths, BBAN structures, Intl names)
+    countries.ts        # ISO country data (IBAN lengths, BBAN structures, SEPA zones, VoP, country risk)
     stats.ts            # Stats recording and queries
     db.ts               # Database connections
   middleware/

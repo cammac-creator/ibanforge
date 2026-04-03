@@ -1,12 +1,12 @@
 ---
 title: "Validate IBAN"
-description: "POST /v1/iban/validate — Validate a single IBAN with checksum verification, BBAN parsing, and optional BIC lookup."
+description: "POST /v1/iban/validate — Validate a single IBAN with checksum verification, BBAN parsing, BIC lookup, SEPA info, issuer classification, and risk indicators."
 order: 1
 ---
 
 # Validate IBAN
 
-Validate a single IBAN with full checksum verification, country-specific BBAN structure parsing, and automatic BIC/institution lookup when available.
+Validate a single IBAN with full checksum verification, country-specific BBAN structure parsing, automatic BIC/institution lookup, SEPA compliance data, issuer classification (bank vs. EMI/neobank), and risk indicators for compliance agents.
 
 ## Endpoint
 
@@ -35,7 +35,7 @@ POST https://api.ibanforge.com/v1/iban/validate
 
 | Field | Type | Description |
 |---|---|---|
-| `iban` | `string` | The IBAN to validate. Spaces are stripped automatically. Case-insensitive. |
+| `iban` | `string` | The IBAN to validate. Spaces and hyphens are stripped automatically. Case-insensitive. |
 
 ## Response
 
@@ -43,63 +43,126 @@ POST https://api.ibanforge.com/v1/iban/validate
 
 ```json
 {
+  "iban": "CH9300762011623852957",
   "valid": true,
-  "iban": {
-    "formatted": "CH93 0076 2011 6238 5295 7",
-    "compact": "CH9300762011623852957",
-    "country": "Switzerland",
-    "countryCode": "CH",
-    "checkDigits": "93",
-    "bban": "00762011623852957",
-    "bankCode": "00762",
-    "accountNumber": "011623852957"
+  "country": {
+    "code": "CH",
+    "name": "Switzerland"
+  },
+  "check_digits": "93",
+  "bban": {
+    "bank_code": "00762",
+    "account_number": "011623852957"
   },
   "bic": {
-    "code": "UBSWCHZH80A",
-    "institution": "UBS SWITZERLAND AG",
-    "city": "ZURICH",
-    "country": "Switzerland",
-    "lei": "BFM8T61CT2L1QCEMIK50"
-  }
+    "code": "UBSWCHZH",
+    "bank_name": "UBS SWITZERLAND AG",
+    "city": "ZURICH"
+  },
+  "sepa": {
+    "member": true,
+    "schemes": ["SCT", "SDD"],
+    "vop_required": false
+  },
+  "issuer": {
+    "type": "bank",
+    "name": "UBS SWITZERLAND AG"
+  },
+  "risk_indicators": {
+    "issuer_type": "bank",
+    "country_risk": "standard",
+    "test_bic": false,
+    "sepa_reachable": true,
+    "vop_coverage": false
+  },
+  "formatted": "CH93 0076 2011 6238 5295 7",
+  "cost_usdc": 0.005,
+  "processing_ms": 1.23
 }
 ```
 
 ### Response fields
 
-**`iban` object:**
+**Top-level fields:**
+
+| Field | Type | Present | Description |
+|---|---|---|---|
+| `iban` | `string` | Always | Cleaned IBAN (uppercase, no spaces) |
+| `valid` | `boolean` | Always | Whether the IBAN passed all validation checks |
+| `country` | `object` | Valid IBANs | Country code and name |
+| `check_digits` | `string` | Valid IBANs | The two-digit check number |
+| `bban` | `object` | Valid IBANs | Parsed BBAN components |
+| `bic` | `object \| null` | Valid IBANs | BIC/SWIFT code and institution data (null if no match found) |
+| `sepa` | `object` | Valid IBANs | SEPA membership, schemes, and VoP requirement |
+| `issuer` | `object` | Valid IBANs with BIC | Institution classification |
+| `risk_indicators` | `object` | Valid IBANs | Composite risk signal for compliance |
+| `formatted` | `string` | Valid IBANs | IBAN with spaces every 4 characters |
+| `error` | `string` | Invalid IBANs | Error code |
+| `error_detail` | `string` | Invalid IBANs | Human-readable error description |
+| `cost_usdc` | `number` | Always | Cost of this request in USDC |
+| `processing_ms` | `number` | Always | Processing time in milliseconds |
+
+**`country` object:**
 
 | Field | Type | Description |
 |---|---|---|
-| `formatted` | `string` | IBAN with spaces every 4 characters |
-| `compact` | `string` | IBAN without spaces, uppercase |
-| `country` | `string` | Full country name in English |
-| `countryCode` | `string` | ISO 3166-1 alpha-2 country code |
-| `checkDigits` | `string` | The two-digit check number |
-| `bban` | `string` | Basic Bank Account Number (country-specific portion) |
-| `bankCode` | `string` | Bank/institution identifier extracted from BBAN |
-| `accountNumber` | `string` | Account number extracted from BBAN |
+| `code` | `string` | ISO 3166-1 alpha-2 country code |
+| `name` | `string` | Full country name in English |
+
+**`bban` object:**
+
+| Field | Type | Description |
+|---|---|---|
+| `bank_code` | `string` | Bank/institution identifier extracted from BBAN |
+| `branch_code` | `string?` | Branch code (present for countries like FR, GB, ES, IT) |
+| `account_number` | `string` | Account number extracted from BBAN |
 
 **`bic` object** (present when a matching BIC is found):
 
 | Field | Type | Description |
 |---|---|---|
-| `code` | `string` | BIC/SWIFT code (8 or 11 characters) |
-| `institution` | `string` | Financial institution name |
-| `city` | `string` | City of the institution |
-| `country` | `string` | Country name |
-| `lei` | `string \| null` | Legal Entity Identifier (20 characters) if available |
+| `code` | `string` | BIC/SWIFT code (8 characters) |
+| `bank_name` | `string \| null` | Financial institution name |
+| `city` | `string \| null` | City of the institution |
+
+**`sepa` object:**
+
+| Field | Type | Description |
+|---|---|---|
+| `member` | `boolean` | Whether this country is in the SEPA zone |
+| `schemes` | `string[]` | Available SEPA schemes: `SCT` (Credit Transfer), `SDD` (Direct Debit), `SCT_INST` (Instant) |
+| `vop_required` | `boolean` | Whether Verification of Payee is mandatory (EU regulation, since Oct 2025 for eurozone) |
+
+**`issuer` object** (present when BIC is resolved):
+
+| Field | Type | Description |
+|---|---|---|
+| `type` | `string` | `bank` (traditional), `digital_bank` (neobank), `emi` (Electronic Money Institution), or `payment_institution` |
+| `name` | `string` | Institution name |
+
+> **vIBAN detection:** If `issuer.type` is `emi`, `digital_bank`, or `payment_institution`, the IBAN is more likely to be a virtual IBAN (vIBAN). This is useful for AML/CFT compliance under the EU AMLR regulation (July 2027).
+
+**`risk_indicators` object:**
+
+| Field | Type | Description |
+|---|---|---|
+| `issuer_type` | `string` | Same as `issuer.type` — `bank`, `digital_bank`, `emi`, or `payment_institution` |
+| `country_risk` | `string` | `standard`, `elevated` (FATF grey list), or `high` (FATF black list / EU high-risk) |
+| `test_bic` | `boolean` | Whether the BIC is a test/sandbox code |
+| `sepa_reachable` | `boolean` | Whether the account is in the SEPA zone |
+| `vop_coverage` | `boolean` | Whether VoP is mandatory for this country |
 
 ### Invalid IBAN (200)
 
-When the IBAN is invalid, the response still returns 200 but with `valid: false` and an error description:
+When the IBAN is invalid, the response still returns 200 but with `valid: false`:
 
 ```json
 {
+  "iban": "CH5604835012345678000",
   "valid": false,
-  "error": {
-    "code": "checksum_failed",
-    "message": "IBAN checksum verification failed (expected 93, got 42)"
-  }
+  "error": "checksum_failed",
+  "error_detail": "Modulo 97 check returned 42, expected 1.",
+  "cost_usdc": 0.005
 }
 ```
 
@@ -107,7 +170,7 @@ When the IBAN is invalid, the response still returns 200 but with `valid: false`
 
 | Code | Description |
 |---|---|
-| `invalid_format` | IBAN contains invalid characters or is empty |
+| `invalid_format` | IBAN contains invalid characters or is too short |
 | `unsupported_country` | Country code is not recognized |
 | `wrong_length` | IBAN length does not match expected length for this country |
 | `checksum_failed` | MOD-97 checksum verification failed |
@@ -134,10 +197,13 @@ response = requests.post(
 
 data = response.json()
 if data["valid"]:
-    print(f"Bank: {data['bic']['institution']}")
-    print(f"Country: {data['iban']['country']}")
+    print(f"Bank: {data['bic']['bank_name']}")
+    print(f"Country: {data['country']['name']}")
+    print(f"SEPA: {data['sepa']['member']}")
+    print(f"Issuer type: {data['issuer']['type']}")
+    print(f"Risk: {data['risk_indicators']['country_risk']}")
 else:
-    print(f"Invalid: {data['error']['message']}")
+    print(f"Invalid: {data['error_detail']}")
 ```
 
 ### TypeScript
@@ -155,9 +221,11 @@ const response = await fetch(
 const data = await response.json();
 
 if (data.valid) {
-  console.log(`Bank: ${data.bic.institution}`);
-  console.log(`Country: ${data.iban.country}`);
+  console.log(`Bank: ${data.bic.bank_name}`);
+  console.log(`SEPA: ${data.sepa.member}, VoP: ${data.sepa.vop_required}`);
+  console.log(`Issuer: ${data.issuer.type} — ${data.issuer.name}`);
+  console.log(`Country risk: ${data.risk_indicators.country_risk}`);
 } else {
-  console.log(`Invalid: ${data.error.message}`);
+  console.log(`Invalid: ${data.error_detail}`);
 }
 ```

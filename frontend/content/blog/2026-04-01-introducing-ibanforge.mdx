@@ -21,10 +21,19 @@ You send a POST request. You get back a clean, structured JSON response. That's 
   "country": { "code": "CH", "name": "Switzerland" },
   "check_digits": "93",
   "bban": { "bank_code": "00762", "account_number": "011623852957" },
+  "bic": { "code": "UBSWCHZH", "bank_name": "UBS Switzerland AG", "city": "Zurich" },
+  "sepa": { "member": true, "schemes": ["SCT", "SDD"], "vop_required": false },
+  "issuer": { "type": "bank", "name": "UBS Switzerland AG" },
+  "risk_indicators": {
+    "issuer_type": "bank",
+    "country_risk": "standard",
+    "test_bic": false,
+    "sepa_reachable": true,
+    "vop_coverage": false
+  },
   "formatted": "CH93 0076 2011 6238 5295 7",
   "cost_usdc": 0.005,
-  "bic": { "code": "UBSWCHZH", "bank_name": "UBS Switzerland AG", "city": "Zurich" },
-  "processing_ms": 9.11
+  "processing_ms": 1.23
 }
 ```
 
@@ -44,9 +53,15 @@ Together, these two shifts — agentic workflows + on-chain micropayments — ma
 
 **39,000+ BIC entries from GLEIF.** The Global LEI Foundation publishes the authoritative mapping of BIC codes to financial institutions. We import it, index it, and serve it with sub-millisecond lookups. Combined IBAN + BIC validation is available in a single request.
 
+**SEPA compliance data.** Every response includes SEPA membership status, available payment schemes (SCT, SDD, SCT_INST), and whether Verification of Payee (VoP) is mandatory — essential for agents navigating EU payment regulations.
+
+**Issuer classification & vIBAN detection.** IBANforge identifies whether the issuing institution is a traditional bank, digital bank (N26, Monzo), EMI (Wise, Revolut), or payment institution. This helps compliance teams detect virtual IBANs (vIBANs) flagged by EU AML regulations.
+
+**Risk indicators.** A composite risk block in every response: issuer type, country risk level (FATF-based), test BIC detection, SEPA reachability, and VoP coverage. One object, five signals — built for AI compliance agents.
+
 **MCP integration for AI agents.** IBANforge ships with a Model Context Protocol server, meaning any MCP-compatible AI agent can call `validate_iban`, `batch_validate_iban`, and `lookup_bic` as native tools — no custom wrappers needed. Claude, GPT, and open-source agents all speak MCP.
 
-**x402 pay-per-call.** Single validation: $0.005 USDC. Batch (up to 100): $0.020. BIC lookup: $0.003. No account required. Works with any USDC-capable wallet.
+**x402 pay-per-call.** Single validation: $0.005 USDC. Batch (up to 100): $0.002/IBAN. BIC lookup: $0.003. No account required. Works with any USDC-capable wallet.
 
 **Batch validation.** Submit up to 100 IBANs in a single request for bulk onboarding, import flows, or reconciliation jobs.
 
@@ -65,9 +80,9 @@ curl https://api.ibanforge.com/v1/demo
 
 IBANforge is live and production-ready today. Here is what we are building toward:
 
-- **Stripe credits** — buy a bundle of credits with a card for teams that prefer traditional billing
-- **Expanded BIC coverage** — enriching entries with institution type, LEI, and correspondent bank data
+- **API keys + free tier** — 200 free calls/month for developers, alongside x402 pay-per-call
+- **Expanded issuer database** — more EMI and neobank mappings for even better vIBAN detection
 - **Webhook validation** — validate IBANs inline during form submission via a lightweight embed
-- **More MCP tools** — currency conversion, SEPA reachability checks, and more financial primitives agents need
+- **Multi-language landing** — FR/DE versions for the European market
 
 If you build something with IBANforge, we want to hear about it. The API is open — no waitlist, no approval process. Start validating.

@@ -1,12 +1,12 @@
 ---
 title: "Batch Validate"
-description: "POST /v1/iban/batch — Validate up to 10 IBANs in a single request."
+description: "POST /v1/iban/batch — Validate up to 100 IBANs in a single request with SEPA, issuer, and risk data."
 order: 2
 ---
 
 # Batch Validate
 
-Validate up to 10 IBANs in a single API call. Each IBAN is processed independently — one invalid IBAN does not affect the others.
+Validate up to 100 IBANs in a single API call. Each IBAN is processed independently — one invalid IBAN does not affect the others. 60% cheaper than individual calls.
 
 ## Endpoint
 
@@ -14,7 +14,7 @@ Validate up to 10 IBANs in a single API call. Each IBAN is processed independent
 POST https://api.ibanforge.com/v1/iban/batch
 ```
 
-**Cost:** $0.020 USDC per request (flat fee regardless of how many IBANs)
+**Cost:** $0.002 USDC per IBAN (e.g. 10 IBANs = $0.020, 100 IBANs = $0.200)
 
 ## Request
 
@@ -40,7 +40,7 @@ POST https://api.ibanforge.com/v1/iban/batch
 
 | Field | Type | Description |
 |---|---|---|
-| `ibans` | `string[]` | Array of IBANs to validate. Maximum 10 items. |
+| `ibans` | `string[]` | Array of IBANs to validate. 1 to 100 items. |
 
 ## Response
 
@@ -50,100 +50,79 @@ POST https://api.ibanforge.com/v1/iban/batch
 {
   "results": [
     {
+      "iban": "CH9300762011623852957",
       "valid": true,
-      "iban": {
-        "formatted": "CH93 0076 2011 6238 5295 7",
-        "compact": "CH9300762011623852957",
-        "country": "Switzerland",
-        "countryCode": "CH",
-        "checkDigits": "93",
-        "bban": "00762011623852957",
-        "bankCode": "00762",
-        "accountNumber": "011623852957"
+      "country": { "code": "CH", "name": "Switzerland" },
+      "check_digits": "93",
+      "bban": { "bank_code": "00762", "account_number": "011623852957" },
+      "bic": { "code": "UBSWCHZH", "bank_name": "UBS SWITZERLAND AG", "city": "ZURICH" },
+      "sepa": { "member": true, "schemes": ["SCT", "SDD"], "vop_required": false },
+      "issuer": { "type": "bank", "name": "UBS SWITZERLAND AG" },
+      "risk_indicators": {
+        "issuer_type": "bank",
+        "country_risk": "standard",
+        "test_bic": false,
+        "sepa_reachable": true,
+        "vop_coverage": false
       },
-      "bic": {
-        "code": "UBSWCHZH80A",
-        "institution": "UBS SWITZERLAND AG",
-        "city": "ZURICH",
-        "country": "Switzerland",
-        "lei": "BFM8T61CT2L1QCEMIK50"
-      }
+      "formatted": "CH93 0076 2011 6238 5295 7",
+      "cost_usdc": 0.005
     },
     {
+      "iban": "DE89370400440532013000",
       "valid": true,
-      "iban": {
-        "formatted": "DE89 3704 0044 0532 0130 00",
-        "compact": "DE89370400440532013000",
-        "country": "Germany",
-        "countryCode": "DE",
-        "checkDigits": "89",
-        "bban": "370400440532013000",
-        "bankCode": "37040044",
-        "accountNumber": "0532013000"
+      "country": { "code": "DE", "name": "Germany" },
+      "check_digits": "89",
+      "bban": { "bank_code": "37040044", "account_number": "0532013000" },
+      "bic": { "code": "COBADEFF", "bank_name": "COMMERZBANK AG", "city": "FRANKFURT AM MAIN" },
+      "sepa": { "member": true, "schemes": ["SCT", "SDD", "SCT_INST"], "vop_required": true },
+      "issuer": { "type": "bank", "name": "COMMERZBANK AG" },
+      "risk_indicators": {
+        "issuer_type": "bank",
+        "country_risk": "standard",
+        "test_bic": false,
+        "sepa_reachable": true,
+        "vop_coverage": true
       },
-      "bic": {
-        "code": "COBADEFFXXX",
-        "institution": "COMMERZBANK AG",
-        "city": "FRANKFURT AM MAIN",
-        "country": "Germany",
-        "lei": "851WYGNLUQLFZBSBER43"
-      }
+      "formatted": "DE89 3704 0044 0532 0130 00",
+      "cost_usdc": 0.005
     },
     {
-      "valid": true,
-      "iban": {
-        "formatted": "GB29 NWBK 6016 1331 9268 19",
-        "compact": "GB29NWBK60161331926819",
-        "country": "United Kingdom",
-        "countryCode": "GB",
-        "checkDigits": "29",
-        "bban": "NWBK60161331926819",
-        "bankCode": "NWBK",
-        "accountNumber": "31926819"
-      },
-      "bic": {
-        "code": "NWBKGB2L",
-        "institution": "NATIONAL WESTMINSTER BANK PLC",
-        "city": "LONDON",
-        "country": "United Kingdom",
-        "lei": "RR3QWICWWIPCS8A4S074"
-      }
-    },
-    {
+      "iban": "INVALID123",
       "valid": false,
-      "error": {
-        "code": "invalid_format",
-        "message": "IBAN contains invalid characters or is not properly formatted"
-      }
+      "error": "invalid_format",
+      "error_detail": "IBAN contains invalid characters. Only letters and digits are allowed.",
+      "cost_usdc": 0.005
     }
   ],
-  "summary": {
-    "total": 4,
-    "valid": 3,
-    "invalid": 1
-  }
+  "count": 3,
+  "valid_count": 2,
+  "cost_usdc": 0.006,
+  "processing_ms": 2.45
 }
 ```
 
 ### Response fields
 
-**`results` array:** Each item has the same structure as the [single validation response](/docs/iban-validate). The order matches the input array.
-
-**`summary` object:**
+**Top-level:**
 
 | Field | Type | Description |
 |---|---|---|
-| `total` | `number` | Number of IBANs submitted |
-| `valid` | `number` | Count of valid IBANs |
-| `invalid` | `number` | Count of invalid IBANs |
+| `results` | `array` | Array of validation results, same order as input |
+| `count` | `number` | Total IBANs processed |
+| `valid_count` | `number` | Count of valid IBANs |
+| `cost_usdc` | `number` | Total cost for this batch |
+| `processing_ms` | `number` | Total processing time |
+
+**Each item in `results`** has the same structure as the [single validation response](/docs/iban-validate), including `sepa`, `issuer`, and `risk_indicators` for valid IBANs.
 
 ### Errors
 
 | Status | Code | Description |
 |---|---|---|
-| 400 | `empty_array` | The `ibans` array is empty |
-| 400 | `too_many_ibans` | More than 10 IBANs submitted |
-| 400 | `invalid_body` | Request body is not valid JSON or missing `ibans` field |
+| 400 | `empty_batch` | The `ibans` array is empty |
+| 400 | `batch_too_large` | More than 100 IBANs submitted |
+| 400 | `invalid_request` | Request body is not valid JSON or missing `ibans` field |
 
 ## Code examples
 
@@ -178,13 +157,15 @@ response = requests.post(
 )
 
 data = response.json()
-print(f"Valid: {data['summary']['valid']}/{data['summary']['total']}")
+print(f"Valid: {data['valid_count']}/{data['count']}")
 
 for result in data["results"]:
     if result["valid"]:
-        print(f"  {result['iban']['compact']} — {result['iban']['country']}")
+        risk = result["risk_indicators"]["country_risk"]
+        issuer = result["issuer"]["type"]
+        print(f"  {result['iban']} — {result['country']['name']} ({issuer}, risk: {risk})")
     else:
-        print(f"  INVALID — {result['error']['message']}")
+        print(f"  INVALID — {result['error_detail']}")
 ```
 
 ### TypeScript
@@ -206,13 +187,13 @@ const response = await fetch(
 );
 
 const data = await response.json();
-console.log(`Valid: ${data.summary.valid}/${data.summary.total}`);
+console.log(`Valid: ${data.valid_count}/${data.count}`);
 
 for (const result of data.results) {
   if (result.valid) {
-    console.log(`  ${result.iban.compact} — ${result.iban.country}`);
+    console.log(`  ${result.iban} — ${result.issuer.type}, risk: ${result.risk_indicators.country_risk}`);
   } else {
-    console.log(`  INVALID — ${result.error.message}`);
+    console.log(`  INVALID — ${result.error_detail}`);
   }
 }
 ```
