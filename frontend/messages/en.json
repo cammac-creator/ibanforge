@@ -1,395 +1,595 @@
 {
   "header": {
     "logo": "IBANforge",
-    "nav.docs": "Docs",
-    "nav.playground": "Playground",
-    "nav.pricing": "Pricing",
-    "nav.blog": "Blog",
-    "nav.dashboard": "Dashboard",
+    "nav": {
+      "docs": "Docs",
+      "playground": "Playground",
+      "pricing": "Pricing",
+      "blog": "Blog",
+      "dashboard": "Dashboard"
+    },
     "toggleMenu": "Toggle menu"
   },
   "footer": {
     "logo": "IBANforge",
     "tagline": "IBAN validation & BIC/SWIFT lookup API with x402 micropayments.",
-    "column.product": "Product",
-    "column.developers": "Developers",
-    "column.legal": "Legal",
-    "link.docs": "Docs",
-    "link.playground": "Playground",
-    "link.pricing": "Pricing",
-    "link.compare": "Compare",
-    "link.github": "GitHub",
-    "link.mcp": "MCP",
-    "link.apiStatus": "API Status",
-    "link.mitLicense": "MIT License",
-    "copyright": "\u00a9 {year} IBANforge. Released under the MIT License.",
+    "column": {
+      "product": "Product",
+      "developers": "Developers",
+      "legal": "Legal"
+    },
+    "link": {
+      "docs": "Docs",
+      "playground": "Playground",
+      "pricing": "Pricing",
+      "compare": "Compare",
+      "github": "GitHub",
+      "mcp": "MCP",
+      "apiStatus": "API Status",
+      "mitLicense": "MIT License"
+    },
+    "copyright": "© {year} IBANforge. Released under the MIT License.",
     "builtWith": "Built with",
-    "tech.nextjs": "Next.js",
-    "tech.shadcn": "shadcn/ui"
+    "tech": {
+      "nextjs": "Next.js",
+      "shadcn": "shadcn/ui"
+    }
   },
   "home": {
-    "metadata.title": "IBANforge \u2014 IBAN Validation & BIC/SWIFT Lookup API",
-    "metadata.description": "IBAN validation, BIC/SWIFT lookup, SEPA compliance, issuer classification, and risk indicators for developers and AI agents. Free during beta.",
-    "metadata.og.title": "IBANforge",
-    "metadata.og.description": "IBAN validation & BIC/SWIFT lookup API with compliance data for AI agents",
+    "metadata": {
+      "title": "IBANforge — IBAN Validation & BIC/SWIFT Lookup API",
+      "description": "IBAN validation, BIC/SWIFT lookup, SEPA compliance, issuer classification, and risk indicators for developers and AI agents. Free during beta.",
+      "og": {
+        "title": "IBANforge",
+        "description": "IBAN validation & BIC/SWIFT lookup API with compliance data for AI agents"
+      }
+    },
     "badge": "Free during beta",
-    "hero.title.prefix": "IBAN",
-    "hero.title.highlight": "forge",
-    "hero.description": "IBAN validation, BIC/SWIFT lookup, SEPA compliance & risk indicators for developers and AI agents",
-    "hero.cta.tryFree": "Try it free",
-    "hero.cta.readDocs": "Read the docs",
-    "features.heading": "Everything you need",
-    "features.0.badge": "75+ Countries",
-    "features.0.title": "IBAN Validation",
-    "features.0.description": "Full IBAN validation with BBAN structure parsing. Supports 75+ countries with mod97 checksum verification and detailed field breakdown.",
-    "features.1.badge": "39,000+ BIC Entries",
-    "features.1.title": "BIC/SWIFT Lookup",
-    "features.1.description": "Complete BIC/SWIFT database sourced from GLEIF, enriched with LEI (Legal Entity Identifier) data for financial institution identification.",
-    "features.2.badge": "SEPA + VoP",
-    "features.2.title": "Compliance Ready",
-    "features.2.description": "SEPA membership, payment schemes (SCT/SDD/SCT_INST), and Verification of Payee (VoP) requirement per country. Built for EU regulatory compliance.",
-    "features.3.badge": "vIBAN Detection",
-    "features.3.title": "Issuer Classification",
-    "features.3.description": "Identifies if the issuer is a traditional bank, neobank, EMI, or payment institution. Detects virtual IBANs for AML/CFT compliance workflows.",
-    "features.4.badge": "Risk Scoring",
-    "features.4.title": "Risk Indicators",
-    "features.4.description": "Composite risk signal per IBAN: issuer type, country risk (FATF-based), test BIC detection, SEPA reachability, and VoP coverage in one object.",
-    "features.5.badge": "MCP Integration",
-    "features.5.title": "AI Agent Ready",
-    "features.5.description": "Native Model Context Protocol support. AI agents can validate IBANs and look up BIC codes directly \u2014 no custom tooling required.",
-    "endpoints.heading": "Endpoints & pricing",
-    "endpoints.subtitle": "Currently free during beta. Prices below will apply when x402 micropayments are activated.",
-    "endpoints.table.method": "Method",
-    "endpoints.table.path": "Path",
-    "endpoints.table.cost": "Cost",
-    "endpoints.table.description": "Description",
-    "endpoints.0.method": "POST",
-    "endpoints.0.path": "/v1/iban/validate",
-    "endpoints.0.cost": "$0.005",
-    "endpoints.0.description": "Validate a single IBAN",
-    "endpoints.1.method": "POST",
-    "endpoints.1.path": "/v1/iban/batch",
-    "endpoints.1.cost": "$0.002/IBAN",
-    "endpoints.1.description": "Validate up to 100 IBANs",
-    "endpoints.2.method": "GET",
-    "endpoints.2.path": "/v1/bic/:code",
-    "endpoints.2.cost": "$0.003",
-    "endpoints.2.description": "Lookup BIC/SWIFT code",
-    "quickStart.heading": "Quick start",
-    "quickStart.subtitle": "No API key required \u2014 just send a request. Free during beta.",
-    "cta.heading": "Ready to build?",
-    "cta.description": "Integrate in minutes. Free during beta \u2014 no API key, no subscription.",
-    "cta.button": "Start building"
+    "hero": {
+      "title": {
+        "prefix": "IBAN",
+        "highlight": "forge"
+      },
+      "description": "IBAN validation, BIC/SWIFT lookup, SEPA compliance & risk indicators for developers and AI agents",
+      "cta": {
+        "tryFree": "Try it free",
+        "readDocs": "Read the docs"
+      }
+    },
+    "features": {
+      "0": {
+        "badge": "75+ Countries",
+        "title": "IBAN Validation",
+        "description": "Full IBAN validation with BBAN structure parsing. Supports 75+ countries with mod97 checksum verification and detailed field breakdown."
+      },
+      "1": {
+        "badge": "39,000+ BIC Entries",
+        "title": "BIC/SWIFT Lookup",
+        "description": "Complete BIC/SWIFT database sourced from GLEIF, enriched with LEI (Legal Entity Identifier) data for financial institution identification."
+      },
+      "2": {
+        "badge": "SEPA + VoP",
+        "title": "Compliance Ready",
+        "description": "SEPA membership, payment schemes (SCT/SDD/SCT_INST), and Verification of Payee (VoP) requirement per country. Built for EU regulatory compliance."
+      },
+      "3": {
+        "badge": "vIBAN Detection",
+        "title": "Issuer Classification",
+        "description": "Identifies if the issuer is a traditional bank, neobank, EMI, or payment institution. Detects virtual IBANs for AML/CFT compliance workflows."
+      },
+      "4": {
+        "badge": "Risk Scoring",
+        "title": "Risk Indicators",
+        "description": "Composite risk signal per IBAN: issuer type, country risk (FATF-based), test BIC detection, SEPA reachability, and VoP coverage in one object."
+      },
+      "5": {
+        "badge": "MCP Integration",
+        "title": "AI Agent Ready",
+        "description": "Native Model Context Protocol support. AI agents can validate IBANs and look up BIC codes directly — no custom tooling required."
+      },
+      "heading": "Everything you need"
+    },
+    "endpoints": {
+      "0": {
+        "method": "POST",
+        "path": "/v1/iban/validate",
+        "cost": "$0.005",
+        "description": "Validate a single IBAN"
+      },
+      "1": {
+        "method": "POST",
+        "path": "/v1/iban/batch",
+        "cost": "$0.002/IBAN",
+        "description": "Validate up to 100 IBANs"
+      },
+      "2": {
+        "method": "GET",
+        "path": "/v1/bic/:code",
+        "cost": "$0.003",
+        "description": "Lookup BIC/SWIFT code"
+      },
+      "heading": "Endpoints & pricing",
+      "subtitle": "Currently free during beta. Prices below will apply when x402 micropayments are activated.",
+      "table": {
+        "method": "Method",
+        "path": "Path",
+        "cost": "Cost",
+        "description": "Description"
+      }
+    },
+    "quickStart": {
+      "heading": "Quick start",
+      "subtitle": "No API key required — just send a request. Free during beta."
+    },
+    "cta": {
+      "heading": "Ready to build?",
+      "description": "Integrate in minutes. Free during beta — no API key, no subscription.",
+      "button": "Start building"
+    }
   },
   "pricing": {
-    "metadata.title": "Pricing",
-    "metadata.description": "Simple, transparent pay-per-call pricing. No subscriptions. No API keys. Pay with USDC via x402 micropayments.",
+    "metadata": {
+      "title": "Pricing",
+      "description": "Simple, transparent pay-per-call pricing. No subscriptions. No API keys. Pay with USDC via x402 micropayments."
+    },
     "badge": "Transparent pricing",
-    "hero.title.prefix": "Pay per",
-    "hero.title.highlight": "call",
-    "hero.description": "No subscription. No API key. Fractions of a cent per request \u2014 billed on-chain with USDC via the x402 protocol.",
-    "hero.cta.tryFree": "Try it free",
-    "hero.cta.x402Explained": "x402 explained \u2192",
-    "table.heading": "Endpoint pricing",
-    "table.subtitle": "Currently free during beta. Prices below will apply when x402 payments are activated.",
-    "endpoints.0.method": "POST",
-    "endpoints.0.path": "/v1/iban/validate",
-    "endpoints.0.cost": "$0.005",
-    "endpoints.0.costLabel": "per call",
-    "endpoints.0.description": "Validate a single IBAN with SEPA, issuer, and risk data",
-    "endpoints.1.method": "POST",
-    "endpoints.1.path": "/v1/iban/batch",
-    "endpoints.1.cost": "$0.002",
-    "endpoints.1.costLabel": "per IBAN (up to 100)",
-    "endpoints.1.description": "Batch validation with full enrichment per IBAN",
-    "endpoints.2.method": "GET",
-    "endpoints.2.path": "/v1/bic/:code",
-    "endpoints.2.cost": "$0.003",
-    "endpoints.2.costLabel": "per call",
-    "endpoints.2.description": "Lookup BIC/SWIFT code from GLEIF database",
-    "free.title": "Free endpoints",
-    "free.description": "{demo} and {health} are always free \u2014 no payment required.",
-    "free.demo": "GET /v1/demo",
-    "free.health": "GET /health",
-    "free.playgroundLink": "Try in playground \u2192",
-    "calculator.heading": "Estimate your costs",
-    "calculator.subtitle": "Adjust the slider to see what you would pay each month.",
-    "calculator.callsPerMonth": "Calls per month",
-    "calculator.callsUnit": "calls / month",
-    "calculator.costBreakdown": "Cost breakdown",
-    "calculator.table.endpoint": "Endpoint",
-    "calculator.table.rate": "Rate",
-    "calculator.table.monthlyCost": "Monthly cost",
-    "calculator.endpoints.0.label": "IBAN Validate",
-    "calculator.endpoints.0.description": "Validate a single IBAN",
-    "calculator.endpoints.1.label": "IBAN Batch (per IBAN)",
-    "calculator.endpoints.1.description": "Validate up to 100 IBANs",
-    "calculator.endpoints.2.label": "BIC Lookup",
-    "calculator.endpoints.2.description": "Lookup BIC/SWIFT code",
-    "calculator.summary.at": "At",
-    "calculator.summary.callsPerEndpoint": "calls/month per endpoint",
-    "calculator.summary.payForWhat": "You only pay for what you actually call",
-    "calculator.summary.forValidate": "for /v1/iban/validate",
-    "x402.badge": "x402 Protocol",
-    "x402.heading": "How payments work",
-    "x402.items.0": "No subscription. No API key. Pay per call with USDC.",
-    "x402.items.1": "Your HTTP client sends a tiny payment with each request \u2014 automatically, via standard headers.",
-    "x402.items.2": "Payments settle on Base (Ethereum L2) \u2014 fast, cheap, and verifiable on-chain.",
-    "x402.items.3": "Free testing available via the /v1/demo endpoint and the /playground.",
-    "x402.docsLink": "Full x402 documentation \u2192",
-    "x402.codeExample.title": "Example \u2014 automatic payment",
-    "x402.codeExample.install": "# Install the x402 HTTP client",
-    "x402.codeExample.call": "# Then call the API normally",
-    "x402.codeExample.comment": "// Payment handled automatically",
-    "faq.heading": "Frequently asked questions",
-    "faq.0.question": "What is x402?",
-    "faq.0.answer": "x402 is an open micropayment protocol that uses HTTP status code 402 (Payment Required). When you call a paid endpoint, the server responds with a 402 containing payment details. Your client automatically sends a signed USDC payment on Base, and the server re-processes your request \u2014 all within a single HTTP round-trip.",
-    "faq.1.question": "How do I pay?",
-    "faq.1.answer": "Payments are made in USDC on the Base network. Your HTTP client (or SDK) handles it automatically by attaching payment headers to each request. No wallet UI, no manual confirmation \u2014 just fractions of a cent deducted per call. Check the docs for integration examples.",
-    "faq.2.question": "Is there a free tier?",
-    "faq.2.answer": "Yes. The /v1/demo endpoint returns pre-computed example validations at no cost, perfect for testing your integration. The /playground on this site lets you try live calls for free too. No signup or payment method required to get started.",
-    "faq.3.question": "What about high volume?",
-    "faq.3.answer": "The per-call pricing scales linearly with no rate limits. For very high volumes (millions of calls/month), open an issue on our GitHub repository (github.com/cammac-creator/ibanforge) \u2014 we can discuss custom pricing or a bulk arrangement that makes more sense for your use case.",
-    "cta.heading": "Start building for free",
-    "cta.description": "No credit card, no account. Hit the playground, read the docs, ship when you are ready.",
-    "cta.openPlayground": "Open playground",
-    "cta.readDocs": "Read the docs"
+    "hero": {
+      "title": {
+        "prefix": "Pay per",
+        "highlight": "call"
+      },
+      "description": "No subscription. No API key. Fractions of a cent per request — billed on-chain with USDC via the x402 protocol.",
+      "cta": {
+        "tryFree": "Try it free",
+        "x402Explained": "x402 explained →"
+      }
+    },
+    "table": {
+      "heading": "Endpoint pricing",
+      "subtitle": "Currently free during beta. Prices below will apply when x402 payments are activated."
+    },
+    "endpoints": {
+      "0": {
+        "method": "POST",
+        "path": "/v1/iban/validate",
+        "cost": "$0.005",
+        "costLabel": "per call",
+        "description": "Validate a single IBAN with SEPA, issuer, and risk data"
+      },
+      "1": {
+        "method": "POST",
+        "path": "/v1/iban/batch",
+        "cost": "$0.002",
+        "costLabel": "per IBAN (up to 100)",
+        "description": "Batch validation with full enrichment per IBAN"
+      },
+      "2": {
+        "method": "GET",
+        "path": "/v1/bic/:code",
+        "cost": "$0.003",
+        "costLabel": "per call",
+        "description": "Lookup BIC/SWIFT code from GLEIF database"
+      }
+    },
+    "free": {
+      "title": "Free endpoints",
+      "description": "{demo} and {health} are always free — no payment required.",
+      "demo": "GET /v1/demo",
+      "health": "GET /health",
+      "playgroundLink": "Try in playground →"
+    },
+    "calculator": {
+      "heading": "Estimate your costs",
+      "subtitle": "Adjust the slider to see what you would pay each month.",
+      "callsPerMonth": "Calls per month",
+      "callsUnit": "calls / month",
+      "costBreakdown": "Cost breakdown",
+      "table": {
+        "endpoint": "Endpoint",
+        "rate": "Rate",
+        "monthlyCost": "Monthly cost"
+      },
+      "endpoints": {
+        "0": {
+          "label": "IBAN Validate",
+          "description": "Validate a single IBAN"
+        },
+        "1": {
+          "label": "IBAN Batch (per IBAN)",
+          "description": "Validate up to 100 IBANs"
+        },
+        "2": {
+          "label": "BIC Lookup",
+          "description": "Lookup BIC/SWIFT code"
+        }
+      },
+      "summary": {
+        "at": "At",
+        "callsPerEndpoint": "calls/month per endpoint",
+        "payForWhat": "You only pay for what you actually call",
+        "forValidate": "for /v1/iban/validate"
+      }
+    },
+    "x402": {
+      "badge": "x402 Protocol",
+      "heading": "How payments work",
+      "items": {
+        "0": "No subscription. No API key. Pay per call with USDC.",
+        "1": "Your HTTP client sends a tiny payment with each request — automatically, via standard headers.",
+        "2": "Payments settle on Base (Ethereum L2) — fast, cheap, and verifiable on-chain.",
+        "3": "Free testing available via the /v1/demo endpoint and the /playground."
+      },
+      "docsLink": "Full x402 documentation →",
+      "codeExample": {
+        "title": "Example — automatic payment",
+        "install": "# Install the x402 HTTP client",
+        "call": "# Then call the API normally",
+        "comment": "// Payment handled automatically"
+      }
+    },
+    "faq": {
+      "0": {
+        "question": "What is x402?",
+        "answer": "x402 is an open micropayment protocol that uses HTTP status code 402 (Payment Required). When you call a paid endpoint, the server responds with a 402 containing payment details. Your client automatically sends a signed USDC payment on Base, and the server re-processes your request — all within a single HTTP round-trip."
+      },
+      "1": {
+        "question": "How do I pay?",
+        "answer": "Payments are made in USDC on the Base network. Your HTTP client (or SDK) handles it automatically by attaching payment headers to each request. No wallet UI, no manual confirmation — just fractions of a cent deducted per call. Check the docs for integration examples."
+      },
+      "2": {
+        "question": "Is there a free tier?",
+        "answer": "Yes. The /v1/demo endpoint returns pre-computed example validations at no cost, perfect for testing your integration. The /playground on this site lets you try live calls for free too. No signup or payment method required to get started."
+      },
+      "3": {
+        "question": "What about high volume?",
+        "answer": "The per-call pricing scales linearly with no rate limits. For very high volumes (millions of calls/month), open an issue on our GitHub repository (github.com/cammac-creator/ibanforge) — we can discuss custom pricing or a bulk arrangement that makes more sense for your use case."
+      },
+      "heading": "Frequently asked questions"
+    },
+    "cta": {
+      "heading": "Start building for free",
+      "description": "No credit card, no account. Hit the playground, read the docs, ship when you are ready.",
+      "openPlayground": "Open playground",
+      "readDocs": "Read the docs"
+    }
   },
   "compare": {
-    "metadata.title": "Compare IBAN Validation APIs",
-    "metadata.description": "Compare IBANforge with iban.com, IBANAPI, and AbstractAPI. Pricing, features, AI agent support, and self-hosting options.",
+    "metadata": {
+      "title": "Compare IBAN Validation APIs",
+      "description": "Compare IBANforge with iban.com, IBANAPI, and AbstractAPI. Pricing, features, AI agent support, and self-hosting options."
+    },
     "badge": "Comparison",
-    "hero.title.prefix": "IBANforge vs",
-    "hero.title.highlight": "alternatives",
-    "hero.description": "How IBANforge compares to other IBAN validation APIs \u2014 on pricing, features, and AI-native capabilities.",
-    "hero.cta.tryFree": "Try IBANforge free",
-    "hero.cta.seePricing": "See pricing \u2192",
-    "table.header.feature": "Feature",
-    "table.header.ibanforge": "IBANforge",
-    "table.header.ibancom": "iban.com",
-    "table.header.ibanapi": "IBANAPI",
-    "table.header.abstractapi": "AbstractAPI",
-    "features.0.label": "Price per call",
-    "features.0.ibanforge": "$0.005",
-    "features.0.ibancom": "$0.047+",
-    "features.0.ibanapi": "$0.023+",
-    "features.0.abstract": "$0.002",
-    "features.1.label": "BIC lookup included",
-    "features.1.ibanforge": "Yes",
-    "features.1.ibancom": "Separate",
-    "features.1.ibanapi": "No",
-    "features.1.abstract": "No",
-    "features.2.label": "SEPA compliance data",
-    "features.2.ibanforge": "Yes",
-    "features.2.ibancom": "Partial",
-    "features.2.ibanapi": "No",
-    "features.2.abstract": "No",
-    "features.3.label": "Issuer classification",
-    "features.3.ibanforge": "Yes",
-    "features.3.ibancom": "No",
-    "features.3.ibanapi": "No",
-    "features.3.abstract": "No",
-    "features.4.label": "vIBAN detection",
-    "features.4.ibanforge": "Yes",
-    "features.4.ibancom": "No",
-    "features.4.ibanapi": "No",
-    "features.4.abstract": "No",
-    "features.5.label": "Risk indicators",
-    "features.5.ibanforge": "Yes",
-    "features.5.ibancom": "No",
-    "features.5.ibanapi": "No",
-    "features.5.abstract": "No",
-    "features.6.label": "AI agent support (MCP)",
-    "features.6.ibanforge": "Yes",
-    "features.6.ibancom": "No",
-    "features.6.ibanapi": "No",
-    "features.6.abstract": "No",
-    "features.7.label": "x402 micropayments",
-    "features.7.ibanforge": "Yes",
-    "features.7.ibancom": "No",
-    "features.7.ibanapi": "No",
-    "features.7.abstract": "No",
-    "features.8.label": "No API key required",
-    "features.8.ibanforge": "Yes",
-    "features.8.ibancom": "No",
-    "features.8.ibanapi": "No",
-    "features.8.abstract": "No",
-    "features.9.label": "Free playground",
-    "features.9.ibanforge": "Yes",
-    "features.9.ibancom": "No",
-    "features.9.ibanapi": "Limited",
-    "features.9.abstract": "No",
-    "features.10.label": "Countries supported",
-    "features.10.ibanforge": "75+",
-    "features.10.ibancom": "95+",
-    "features.10.ibanapi": "80+",
-    "features.10.abstract": "70+",
-    "features.11.label": "LEI / GLEIF data",
-    "features.11.ibanforge": "Yes",
-    "features.11.ibancom": "No",
-    "features.11.ibanapi": "No",
-    "features.11.abstract": "No",
-    "features.12.label": "Batch validation",
-    "features.12.ibanforge": "Yes (100/call)",
-    "features.12.ibancom": "No",
-    "features.12.ibanapi": "Yes",
-    "features.12.abstract": "No",
-    "features.13.label": "Self-hostable",
-    "features.13.ibanforge": "Yes (MIT)",
-    "features.13.ibancom": "No",
-    "features.13.ibanapi": "No",
-    "features.13.abstract": "No",
-    "features.14.label": "Open source",
-    "features.14.ibanforge": "Yes",
-    "features.14.ibancom": "No",
-    "features.14.ibanapi": "No",
-    "features.14.abstract": "No",
-    "disclaimer": "Pricing as of April 2026 \u2014 may have changed. Always verify on each provider's website before making a decision.",
-    "differentiators.heading": "What makes IBANforge different",
-    "differentiators.0.title": "No API key, no subscription",
-    "differentiators.0.body": "x402 micropayments mean you pay per call in USDC \u2014 no credit card, no account, no monthly bill. Start using the API in minutes.",
-    "differentiators.1.title": "Built for AI agents",
-    "differentiators.1.body": "Native MCP (Model Context Protocol) server lets Claude, GPT-4, and other LLM agents call validate_iban and lookup_bic as structured tools \u2014 no prompt engineering needed.",
-    "differentiators.2.title": "Open source (MIT)",
-    "differentiators.2.body": "The full source is on GitHub. Audit the code, self-host for free, or contribute improvements. No vendor lock-in.",
-    "cta.heading": "Ready to try?",
-    "cta.description": "No account, no credit card. Open the playground and validate your first IBAN in under a minute.",
-    "cta.openPlayground": "Open playground",
-    "cta.readDocs": "Read the docs"
+    "hero": {
+      "title": {
+        "prefix": "IBANforge vs",
+        "highlight": "alternatives"
+      },
+      "description": "How IBANforge compares to other IBAN validation APIs — on pricing, features, and AI-native capabilities.",
+      "cta": {
+        "tryFree": "Try IBANforge free",
+        "seePricing": "See pricing →"
+      }
+    },
+    "table": {
+      "header": {
+        "feature": "Feature",
+        "ibanforge": "IBANforge",
+        "ibancom": "iban.com",
+        "ibanapi": "IBANAPI",
+        "abstractapi": "AbstractAPI"
+      }
+    },
+    "features": {
+      "0": {
+        "label": "Price per call",
+        "ibanforge": "$0.005",
+        "ibancom": "$0.047+",
+        "ibanapi": "$0.023+",
+        "abstract": "$0.002"
+      },
+      "1": {
+        "label": "BIC lookup included",
+        "ibanforge": "Yes",
+        "ibancom": "Separate",
+        "ibanapi": "No",
+        "abstract": "No"
+      },
+      "2": {
+        "label": "SEPA compliance data",
+        "ibanforge": "Yes",
+        "ibancom": "Partial",
+        "ibanapi": "No",
+        "abstract": "No"
+      },
+      "3": {
+        "label": "Issuer classification",
+        "ibanforge": "Yes",
+        "ibancom": "No",
+        "ibanapi": "No",
+        "abstract": "No"
+      },
+      "4": {
+        "label": "vIBAN detection",
+        "ibanforge": "Yes",
+        "ibancom": "No",
+        "ibanapi": "No",
+        "abstract": "No"
+      },
+      "5": {
+        "label": "Risk indicators",
+        "ibanforge": "Yes",
+        "ibancom": "No",
+        "ibanapi": "No",
+        "abstract": "No"
+      },
+      "6": {
+        "label": "AI agent support (MCP)",
+        "ibanforge": "Yes",
+        "ibancom": "No",
+        "ibanapi": "No",
+        "abstract": "No"
+      },
+      "7": {
+        "label": "x402 micropayments",
+        "ibanforge": "Yes",
+        "ibancom": "No",
+        "ibanapi": "No",
+        "abstract": "No"
+      },
+      "8": {
+        "label": "No API key required",
+        "ibanforge": "Yes",
+        "ibancom": "No",
+        "ibanapi": "No",
+        "abstract": "No"
+      },
+      "9": {
+        "label": "Free playground",
+        "ibanforge": "Yes",
+        "ibancom": "No",
+        "ibanapi": "Limited",
+        "abstract": "No"
+      },
+      "10": {
+        "label": "Countries supported",
+        "ibanforge": "75+",
+        "ibancom": "95+",
+        "ibanapi": "80+",
+        "abstract": "70+"
+      },
+      "11": {
+        "label": "LEI / GLEIF data",
+        "ibanforge": "Yes",
+        "ibancom": "No",
+        "ibanapi": "No",
+        "abstract": "No"
+      },
+      "12": {
+        "label": "Batch validation",
+        "ibanforge": "Yes (100/call)",
+        "ibancom": "No",
+        "ibanapi": "Yes",
+        "abstract": "No"
+      },
+      "13": {
+        "label": "Self-hostable",
+        "ibanforge": "Yes (MIT)",
+        "ibancom": "No",
+        "ibanapi": "No",
+        "abstract": "No"
+      },
+      "14": {
+        "label": "Open source",
+        "ibanforge": "Yes",
+        "ibancom": "No",
+        "ibanapi": "No",
+        "abstract": "No"
+      }
+    },
+    "disclaimer": "Pricing as of April 2026 — may have changed. Always verify on each provider's website before making a decision.",
+    "differentiators": {
+      "0": {
+        "title": "No API key, no subscription",
+        "body": "x402 micropayments mean you pay per call in USDC — no credit card, no account, no monthly bill. Start using the API in minutes."
+      },
+      "1": {
+        "title": "Built for AI agents",
+        "body": "Native MCP (Model Context Protocol) server lets Claude, GPT-4, and other LLM agents call validate_iban and lookup_bic as structured tools — no prompt engineering needed."
+      },
+      "2": {
+        "title": "Open source (MIT)",
+        "body": "The full source is on GitHub. Audit the code, self-host for free, or contribute improvements. No vendor lock-in."
+      },
+      "heading": "What makes IBANforge different"
+    },
+    "cta": {
+      "heading": "Ready to try?",
+      "description": "No account, no credit card. Open the playground and validate your first IBAN in under a minute.",
+      "openPlayground": "Open playground",
+      "readDocs": "Read the docs"
+    }
   },
   "playground": {
-    "title.prefix": "Play",
-    "title.highlight": "ground",
-    "subtitle": "Test the API for free \u2014 no payment, no signup",
-    "tabs.iban": "Validate IBAN",
-    "tabs.bic": "Lookup BIC",
-    "placeholder.iban": "CH93 0076 2011 6238 5295 7",
-    "placeholder.bic": "UBSWCHZH80A",
-    "button.validate": "Validate",
-    "button.lookup": "Lookup",
-    "error.unexpected": "Unexpected error from the API.",
-    "error.network": "Could not reach the API. Please check your connection or try again later.",
-    "result.label": "Response",
+    "title": {
+      "prefix": "Play",
+      "highlight": "ground"
+    },
+    "subtitle": "Test the API for free — no payment, no signup",
+    "tabs": {
+      "iban": "Validate IBAN",
+      "bic": "Lookup BIC"
+    },
+    "placeholder": {
+      "iban": "CH93 0076 2011 6238 5295 7",
+      "bic": "UBSWCHZH80A"
+    },
+    "button": {
+      "validate": "Validate",
+      "lookup": "Lookup"
+    },
+    "error": {
+      "unexpected": "Unexpected error from the API.",
+      "network": "Could not reach the API. Please check your connection or try again later."
+    },
+    "result": {
+      "label": "Response"
+    },
     "docsPrompt": "Want to use this in your code?",
-    "docsLink": "See the docs \u2192"
+    "docsLink": "See the docs →"
   },
   "dashboard": {
-    "header.title": "IBANforge Dashboard",
-    "error.apiUnavailable": "API unavailable",
-    "error.apiUnavailableDescription": "The backend is unreachable. Start the API server and refresh.",
-    "stats.today": "Today",
-    "stats.apiCalls": "API calls",
-    "stats.vsYesterday": "{percent} vs yesterday",
-    "stats.thisWeek": "This week",
-    "stats.last7Days": "Last 7 days",
-    "stats.totalRevenue": "Total revenue",
-    "stats.usdcCollected": "USDC collected",
-    "stats.bicDatabase": "BIC database",
-    "stats.gleifEntries": "GLEIF entries",
-    "chart.apiCalls30d": "API calls \u2014 last 30 days",
-    "chart.viewDetails": "View details \u2192",
-    "chart.noHistoryData": "No historical data available",
-    "chart.endpointBreakdown": "Breakdown by endpoint",
-    "chart.noData": "No data",
-    "chart.top10Countries": "Top 10 countries",
-    "chart.noCountryData": "No country data",
-    "chart.legends.ibanValidate": "IBAN validate",
-    "chart.legends.ibanBatch": "IBAN batch",
-    "chart.legends.bicLookup": "BIC lookup",
-    "countries.CH": "Switzerland",
-    "countries.DE": "Germany",
-    "countries.FR": "France",
-    "countries.IT": "Italy",
-    "countries.AT": "Austria",
-    "countries.GB": "United Kingdom",
-    "countries.ES": "Spain",
-    "countries.NL": "Netherlands",
-    "countries.BE": "Belgium",
-    "countries.LU": "Luxembourg",
-    "countries.PT": "Portugal",
-    "countries.IE": "Ireland",
-    "countries.SE": "Sweden",
-    "countries.DK": "Denmark",
-    "countries.NO": "Norway",
-    "countries.FI": "Finland",
-    "countries.PL": "Poland",
-    "countries.CZ": "Czech Republic",
-    "countries.HU": "Hungary",
-    "countries.GR": "Greece",
-    "countries.RO": "Romania",
-    "countries.BG": "Bulgaria",
-    "countries.HR": "Croatia",
-    "countries.SK": "Slovakia",
-    "countries.SI": "Slovenia",
-    "countries.EE": "Estonia",
-    "countries.LV": "Latvia",
-    "countries.LT": "Lithuania",
-    "countries.CY": "Cyprus",
-    "countries.MT": "Malta",
-    "countries.US": "United States",
-    "countries.CA": "Canada",
-    "countries.AU": "Australia",
-    "countries.JP": "Japan",
-    "countries.CN": "China",
-    "countries.BR": "Brazil",
-    "countries.MX": "Mexico",
-    "countries.IN": "India",
-    "countries.RU": "Russia",
-    "countries.TR": "Turkey",
-    "countries.SA": "Saudi Arabia",
-    "countries.AE": "United Arab Emirates",
-    "countries.IL": "Israel",
-    "countries.ZA": "South Africa",
-    "countries.SG": "Singapore",
-    "countries.HK": "Hong Kong",
-    "countries.KR": "South Korea",
-    "countries.TW": "Taiwan",
-    "countries.MA": "Morocco",
-    "countries.TN": "Tunisia",
-    "countries.EG": "Egypt",
-    "countries.NG": "Nigeria",
-    "countries.LI": "Liechtenstein",
-    "countries.MC": "Monaco",
-    "countries.SM": "San Marino",
-    "countries.AD": "Andorra",
-    "sidebar.label": "Navigation",
-    "sidebar.overview": "Overview",
-    "sidebar.apiStats": "API Stats",
-    "sidebar.monitoring": "Monitoring",
-    "quickActions.title": "Quick actions",
-    "quickActions.apiStats.label": "View API Stats",
-    "quickActions.apiStats.desc": "Detailed breakdown per endpoint",
-    "quickActions.monitoring.label": "Monitoring",
-    "quickActions.monitoring.desc": "API status and health",
-    "quickActions.playground.label": "Playground",
-    "quickActions.playground.desc": "Test endpoints live",
-    "quickActions.docs.label": "Documentation",
-    "quickActions.docs.desc": "Guides and API reference",
-    "login.title": "Dashboard Login",
-    "login.subtitle": "Enter your password to access the dashboard.",
-    "login.passwordLabel": "Password",
-    "login.placeholder": "••••••••",
-    "login.button": "Login",
-    "login.loading": "Logging in\u2026",
-    "login.error.wrongPassword": "Wrong password",
-    "login.error.network": "Network error, please try again",
-    "logout.label": "Log out"
+    "header": {
+      "title": "IBANforge Dashboard"
+    },
+    "error": {
+      "apiUnavailable": "API unavailable",
+      "apiUnavailableDescription": "The backend is unreachable. Start the API server and refresh."
+    },
+    "stats": {
+      "today": "Today",
+      "apiCalls": "API calls",
+      "vsYesterday": "{percent} vs yesterday",
+      "thisWeek": "This week",
+      "last7Days": "Last 7 days",
+      "totalRevenue": "Total revenue",
+      "usdcCollected": "USDC collected",
+      "bicDatabase": "BIC database",
+      "gleifEntries": "GLEIF entries"
+    },
+    "chart": {
+      "apiCalls30d": "API calls — last 30 days",
+      "viewDetails": "View details →",
+      "noHistoryData": "No historical data available",
+      "endpointBreakdown": "Breakdown by endpoint",
+      "noData": "No data",
+      "top10Countries": "Top 10 countries",
+      "noCountryData": "No country data",
+      "legends": {
+        "ibanValidate": "IBAN validate",
+        "ibanBatch": "IBAN batch",
+        "bicLookup": "BIC lookup"
+      }
+    },
+    "countries": {
+      "CH": "Switzerland",
+      "DE": "Germany",
+      "FR": "France",
+      "IT": "Italy",
+      "AT": "Austria",
+      "GB": "United Kingdom",
+      "ES": "Spain",
+      "NL": "Netherlands",
+      "BE": "Belgium",
+      "LU": "Luxembourg",
+      "PT": "Portugal",
+      "IE": "Ireland",
+      "SE": "Sweden",
+      "DK": "Denmark",
+      "NO": "Norway",
+      "FI": "Finland",
+      "PL": "Poland",
+      "CZ": "Czech Republic",
+      "HU": "Hungary",
+      "GR": "Greece",
+      "RO": "Romania",
+      "BG": "Bulgaria",
+      "HR": "Croatia",
+      "SK": "Slovakia",
+      "SI": "Slovenia",
+      "EE": "Estonia",
+      "LV": "Latvia",
+      "LT": "Lithuania",
+      "CY": "Cyprus",
+      "MT": "Malta",
+      "US": "United States",
+      "CA": "Canada",
+      "AU": "Australia",
+      "JP": "Japan",
+      "CN": "China",
+      "BR": "Brazil",
+      "MX": "Mexico",
+      "IN": "India",
+      "RU": "Russia",
+      "TR": "Turkey",
+      "SA": "Saudi Arabia",
+      "AE": "United Arab Emirates",
+      "IL": "Israel",
+      "ZA": "South Africa",
+      "SG": "Singapore",
+      "HK": "Hong Kong",
+      "KR": "South Korea",
+      "TW": "Taiwan",
+      "MA": "Morocco",
+      "TN": "Tunisia",
+      "EG": "Egypt",
+      "NG": "Nigeria",
+      "LI": "Liechtenstein",
+      "MC": "Monaco",
+      "SM": "San Marino",
+      "AD": "Andorra"
+    },
+    "sidebar": {
+      "label": "Navigation",
+      "overview": "Overview",
+      "apiStats": "API Stats",
+      "monitoring": "Monitoring"
+    },
+    "quickActions": {
+      "title": "Quick actions",
+      "apiStats": {
+        "label": "View API Stats",
+        "desc": "Detailed breakdown per endpoint"
+      },
+      "monitoring": {
+        "label": "Monitoring",
+        "desc": "API status and health"
+      },
+      "playground": {
+        "label": "Playground",
+        "desc": "Test endpoints live"
+      },
+      "docs": {
+        "label": "Documentation",
+        "desc": "Guides and API reference"
+      }
+    },
+    "login": {
+      "title": "Dashboard Login",
+      "subtitle": "Enter your password to access the dashboard.",
+      "passwordLabel": "Password",
+      "placeholder": "••••••••",
+      "button": "Login",
+      "loading": "Logging in…",
+      "error": {
+        "wrongPassword": "Wrong password",
+        "network": "Network error, please try again"
+      }
+    },
+    "logout": {
+      "label": "Log out"
+    }
   },
   "docs": {
-    "sidebar.label": "Documentation",
-    "sidebar.toggleNav": "Toggle docs navigation",
-    "groups.gettingStarted": "Getting Started",
-    "groups.endpoints": "Endpoints",
-    "groups.advanced": "Advanced"
+    "sidebar": {
+      "label": "Documentation",
+      "toggleNav": "Toggle docs navigation"
+    },
+    "groups": {
+      "gettingStarted": "Getting Started",
+      "endpoints": "Endpoints",
+      "advanced": "Advanced"
+    }
   },
   "blog": {
-    "metadata.title": "Blog",
-    "metadata.description": "Updates, guides, and changelog from the IBANforge team.",
+    "metadata": {
+      "title": "Blog",
+      "description": "Updates, guides, and changelog from the IBANforge team."
+    },
     "title": "Blog",
     "subtitle": "Updates, guides, and changelog",
     "noPosts": "No posts yet.",
-    "readMore": "Read more \u2192",
-    "backToBlog": "\u2190 Back to blog",
+    "readMore": "Read more →",
+    "backToBlog": "← Back to blog",
     "readingTime": "{time}"
   },
   "common": {
@@ -400,18 +600,22 @@
     "seePricing": "See pricing",
     "goHome": "Go home",
     "tryAgain": "Try again",
-    "loading": "Loading\u2026",
+    "loading": "Loading…",
     "yes": "Yes",
     "no": "No",
     "free": "Free",
     "and": "and"
   },
   "errors": {
-    "notFound.title": "404 \u2014 Page not found",
-    "notFound.description": "The page you're looking for doesn't exist.",
-    "notFound.button": "Go home",
-    "generic.title": "Something went wrong",
-    "generic.fallback": "An unexpected error occurred",
-    "generic.button": "Try again"
+    "notFound": {
+      "title": "404 — Page not found",
+      "description": "The page you're looking for doesn't exist.",
+      "button": "Go home"
+    },
+    "generic": {
+      "title": "Something went wrong",
+      "fallback": "An unexpected error occurred",
+      "button": "Try again"
+    }
   }
 }

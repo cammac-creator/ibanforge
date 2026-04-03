@@ -1,5 +1,5 @@
 import { MDXRemote } from "next-mdx-remote/rsc";
-import { useTranslations } from "next-intl";
+import { getTranslations } from "next-intl/server";
 import { getPost, getAllPosts } from "@/lib/blog";
 import { notFound } from "next/navigation";
 import Link from "next/link";
@@ -31,7 +31,7 @@ export default async function BlogPostPage({
   params: Promise<{ locale: string; slug: string }>;
 }) {
   const { locale, slug } = await params;
-  const t = useTranslations('blog');
+  const t = await getTranslations('blog');
 
   let post;
   try {

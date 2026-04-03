@@ -1,6 +1,6 @@
 import type { Metadata } from "next"
 import Link from "next/link"
-import { useTranslations } from "next-intl"
+import { getTranslations } from "next-intl/server"
 import { CodeBlock } from "@/components/code-block"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -25,7 +25,7 @@ const ENDPOINT_COUNT = 3
 
 export default async function Home({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
-  const t = useTranslations('home');
+  const t = await getTranslations('home');
 
   const FEATURES = Array.from({ length: FEATURE_COUNT }, (_, i) => ({
     badge: t(`features.${i}.badge`),

@@ -1,6 +1,6 @@
 import type { Metadata } from "next"
 import Link from "next/link"
-import { useTranslations } from "next-intl"
+import { getTranslations } from "next-intl/server"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { CostCalculator } from "./calculator"
@@ -16,7 +16,7 @@ const ENDPOINT_COUNT = 3
 
 export default async function PricingPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
-  const t = useTranslations('pricing');
+  const t = await getTranslations('pricing');
 
   const ENDPOINTS = Array.from({ length: ENDPOINT_COUNT }, (_, i) => ({
     method: t(`endpoints.${i}.method`),

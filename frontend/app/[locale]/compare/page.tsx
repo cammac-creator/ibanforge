@@ -1,6 +1,6 @@
 import type { Metadata } from "next"
 import Link from "next/link"
-import { useTranslations } from "next-intl"
+import { getTranslations } from "next-intl/server"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 
@@ -47,7 +47,7 @@ const compareJsonLd = {
 
 export default async function ComparePage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
-  const t = useTranslations('compare');
+  const t = await getTranslations('compare');
 
   const FEATURES = Array.from({ length: FEATURE_COUNT }, (_, i) => ({
     label: t(`features.${i}.label`),

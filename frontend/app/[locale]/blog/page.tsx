@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { useTranslations } from "next-intl";
+import { getTranslations } from "next-intl/server";
 import { getAllPosts } from "@/lib/blog";
 
 import type { Metadata } from "next";
@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 
 export default async function BlogPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
-  const t = useTranslations('blog');
+  const t = await getTranslations('blog');
   const posts = getAllPosts(locale);
 
   return (
