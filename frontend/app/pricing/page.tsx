@@ -16,18 +16,21 @@ const ENDPOINTS = [
     method: "POST",
     path: "/v1/iban/validate",
     cost: "$0.005",
-    description: "Validate a single IBAN with full BBAN parsing",
+    costLabel: "per call",
+    description: "Validate a single IBAN with SEPA, issuer, and risk data",
   },
   {
     method: "POST",
     path: "/v1/iban/batch",
-    cost: "$0.020",
-    description: "Validate up to 10 IBANs in one request",
+    cost: "$0.002",
+    costLabel: "per IBAN (up to 100)",
+    description: "Batch validation with full enrichment per IBAN",
   },
   {
     method: "GET",
     path: "/v1/bic/:code",
     cost: "$0.003",
+    costLabel: "per call",
     description: "Lookup BIC/SWIFT code from GLEIF database",
   },
 ]
@@ -117,7 +120,7 @@ export default function PricingPage() {
           Endpoint pricing
         </h2>
         <p className="text-center text-muted-foreground mb-10 text-sm">
-          All prices in USD, paid in USDC on Base.
+          Currently free during beta. Prices below will apply when x402 payments are activated.
         </p>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -139,7 +142,7 @@ export default function PricingPage() {
                 <p className="text-4xl font-bold font-mono text-amber-500">
                   {ep.cost}
                 </p>
-                <p className="text-xs text-muted-foreground mt-1">per call</p>
+                <p className="text-xs text-muted-foreground mt-1">{ep.costLabel}</p>
               </div>
 
               <p className="text-sm text-muted-foreground leading-relaxed border-t border-border pt-3">

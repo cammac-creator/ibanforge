@@ -35,14 +35,14 @@ function getClientIp(req: Request): string {
  * - Default: 100 req/min per IP (configurable via RATE_LIMIT_PER_MIN)
  * - Adds X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset headers
  * - Returns 429 when limit exceeded
- * - Exempt paths: /health, /openapi.json
+ * - Exempt paths: /health, /openapi.json, /ping, /stats, /v1/demo
  */
 export function rateLimitMiddleware(): MiddlewareHandler {
   return async (c, next) => {
     const path = new URL(c.req.url).pathname;
 
-    // Exempt free monitoring routes
-    if (path === '/health' || path === '/openapi.json') {
+    // Exempt free/monitoring routes from rate limiting
+    if (path === '/health' || path === '/openapi.json' || path === '/ping' || path === '/stats' || path === '/v1/demo') {
       await next();
       return;
     }

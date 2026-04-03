@@ -14,9 +14,9 @@ const ENDPOINTS = [
   {
     path: "/v1/iban/batch",
     method: "POST",
-    cost: 0.020,
-    label: "IBAN Batch",
-    description: "Validate up to 10 IBANs",
+    cost: 0.002,
+    label: "IBAN Batch (per IBAN)",
+    description: "Validate up to 100 IBANs",
   },
   {
     path: "/v1/bic/:code",

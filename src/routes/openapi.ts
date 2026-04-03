@@ -63,7 +63,7 @@ const spec = {
         operationId: 'batchValidateIBAN',
         summary: 'Validate up to 100 IBANs in one request',
         description:
-          'Validates a list of IBANs and returns results for each. Costs 0.020 USDC via x402.',
+          'Validates a list of IBANs and returns results for each. Costs $0.002 USDC per IBAN (e.g. 10 IBANs = $0.020, 100 IBANs = $0.200).',
         tags: ['IBAN'],
         security: [{ x402Payment: [] }],
         requestBody: {

@@ -5,14 +5,19 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.7-blue)](https://www.typescriptlang.org/)
 [![MCP](https://img.shields.io/badge/MCP-3_tools-purple)](https://ibanforge.vercel.app/docs/mcp)
 
-**IBAN validation & BIC/SWIFT lookup API** with x402 micropayments and MCP integration for AI agents.
+**IBAN validation & BIC/SWIFT lookup API** with SEPA compliance data, issuer classification, risk indicators, x402 micropayments, and MCP integration for AI agents.
+
+> **Free during beta** — all endpoints are currently free. Prices shown below will apply when x402 micropayments are activated.
 
 ## Features
 
-- **IBAN Validation** — Full mod-97 checksum verification, BBAN structure parsing, 80+ countries
+- **IBAN Validation** — Full mod-97 checksum verification, BBAN structure parsing, 75+ countries
 - **BIC/SWIFT Lookup** — 39,000+ entries from GLEIF with LEI enrichment
-- **Batch Processing** — Validate up to 10 IBANs in one call
-- **x402 Micropayments** — Pay-per-call with USDC (from $0.003/request)
+- **SEPA Compliance** — Membership status, payment schemes (SCT/SDD/SCT_INST), VoP requirement per country
+- **Issuer Classification** — Detects traditional banks, neobanks, EMIs (Wise, Revolut, N26...), and payment institutions for vIBAN detection
+- **Risk Indicators** — Composite risk signal: issuer type, country risk (FATF-based), test BIC, SEPA reachability, VoP coverage
+- **Batch Processing** — Validate up to 100 IBANs in one call
+- **x402 Micropayments** — Pay-per-call with USDC (from $0.002/request)
 - **MCP Server** — Native AI agent integration via Model Context Protocol
 - **Self-hosted** — Docker deployment, SQLite database, no external dependencies
 
@@ -31,7 +36,7 @@ npm run dev
 | Method | Path | Cost | Description |
 |--------|------|------|-------------|
 | `POST` | `/v1/iban/validate` | $0.005 | Validate a single IBAN |
-| `POST` | `/v1/iban/batch` | $0.020 | Validate up to 10 IBANs |
+| `POST` | `/v1/iban/batch` | $0.002/IBAN | Validate up to 100 IBANs |
 | `GET` | `/v1/bic/:code` | $0.003 | Lookup BIC/SWIFT code |
 | `GET` | `/v1/demo` | Free | Example validations |
 | `GET` | `/health` | Free | Health check |

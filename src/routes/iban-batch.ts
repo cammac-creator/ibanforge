@@ -52,6 +52,7 @@ ibanBatch.post('/v1/iban/batch', async (c) => {
   const results: IBANValidationResult[] = ibans.map((iban) => {
     const result = validateIBAN(iban);
     enrichResult(result);
+    result.cost_usdc = 0.002; // Batch rate (vs $0.005 single)
     return result;
   });
 

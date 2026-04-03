@@ -7,10 +7,10 @@ import { Badge } from "@/components/ui/badge"
 export const metadata: Metadata = {
   title: "IBANforge — IBAN Validation & BIC/SWIFT Lookup API",
   description:
-    "IBAN validation and BIC/SWIFT lookup API for developers and AI agents. Pay per call with x402 micropayments. MCP integration for autonomous agents.",
+    "IBAN validation, BIC/SWIFT lookup, SEPA compliance, issuer classification, and risk indicators for developers and AI agents. Free during beta.",
   openGraph: {
     title: "IBANforge",
-    description: "IBAN validation & BIC/SWIFT lookup API",
+    description: "IBAN validation & BIC/SWIFT lookup API with compliance data for AI agents",
     url: "https://ibanforge.com",
   },
 };
@@ -21,10 +21,10 @@ const CURL_EXAMPLE = `curl -X POST https://api.ibanforge.com/v1/iban/validate \\
 
 const FEATURES = [
   {
-    badge: "80+ Countries",
+    badge: "75+ Countries",
     title: "IBAN Validation",
     description:
-      "Full IBAN validation with BBAN structure parsing. Supports 80+ countries with mod97 checksum verification and detailed field breakdown.",
+      "Full IBAN validation with BBAN structure parsing. Supports 75+ countries with mod97 checksum verification and detailed field breakdown.",
   },
   {
     badge: "39,000+ BIC Entries",
@@ -33,16 +33,28 @@ const FEATURES = [
       "Complete BIC/SWIFT database sourced from GLEIF, enriched with LEI (Legal Entity Identifier) data for financial institution identification.",
   },
   {
+    badge: "SEPA + VoP",
+    title: "Compliance Ready",
+    description:
+      "SEPA membership, payment schemes (SCT/SDD/SCT_INST), and Verification of Payee (VoP) requirement per country. Built for EU regulatory compliance.",
+  },
+  {
+    badge: "vIBAN Detection",
+    title: "Issuer Classification",
+    description:
+      "Identifies if the issuer is a traditional bank, neobank, EMI, or payment institution. Detects virtual IBANs for AML/CFT compliance workflows.",
+  },
+  {
+    badge: "Risk Scoring",
+    title: "Risk Indicators",
+    description:
+      "Composite risk signal per IBAN: issuer type, country risk (FATF-based), test BIC detection, SEPA reachability, and VoP coverage in one object.",
+  },
+  {
     badge: "MCP Integration",
     title: "AI Agent Ready",
     description:
       "Native Model Context Protocol support. AI agents can validate IBANs and look up BIC codes directly — no custom tooling required.",
-  },
-  {
-    badge: "x402 Micropayments",
-    title: "Pay Per Call",
-    description:
-      "No API key, no subscription. Pay per call with USDC via the x402 protocol. Fractions of a cent per request, billed on-chain.",
   },
 ]
 
@@ -56,7 +68,7 @@ const ENDPOINTS = [
   {
     method: "POST",
     path: "/v1/iban/batch",
-    cost: "$0.020",
+    cost: "$0.002/IBAN",
     description: "Validate up to 100 IBANs",
   },
   {
@@ -73,15 +85,17 @@ export default function Home() {
       {/* ── Hero ──────────────────────────────────────────────────────────── */}
       <section className="flex flex-col items-center justify-center text-center px-4 py-28 gap-6">
         <Badge variant="outline" className="text-amber-500 border-amber-500/40 bg-amber-500/5 px-3 py-1 text-xs tracking-widest uppercase">
-          v1 · Now live
+          Free during beta
         </Badge>
 
         <h1 className="text-5xl sm:text-6xl md:text-7xl font-bold tracking-tight font-mono text-foreground">
           IBAN<span className="text-amber-500">forge</span>
         </h1>
 
-        <p className="max-w-xl text-lg text-muted-foreground leading-relaxed">
-          IBAN validation &amp; BIC/SWIFT lookup API for developers and AI agents
+        <p className="max-w-2xl text-lg text-muted-foreground leading-relaxed">
+          IBAN validation, BIC/SWIFT lookup, SEPA compliance &amp; risk indicators
+          <br className="hidden sm:block" />
+          for developers and AI agents
         </p>
 
         <div className="flex flex-col sm:flex-row gap-3 mt-2">
@@ -109,7 +123,7 @@ export default function Home() {
           Everything you need
         </h2>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {FEATURES.map((feature) => (
             <div
               key={feature.badge}
@@ -132,9 +146,12 @@ export default function Home() {
 
       {/* ── Endpoints table ───────────────────────────────────────────────── */}
       <section className="px-4 py-20 max-w-5xl mx-auto w-full">
-        <h2 className="text-2xl font-semibold tracking-tight mb-10 text-center">
-          Paid endpoints
+        <h2 className="text-2xl font-semibold tracking-tight mb-4 text-center">
+          Endpoints &amp; pricing
         </h2>
+        <p className="text-center text-muted-foreground mb-10 text-sm">
+          Currently free during beta. Prices below will apply when x402 micropayments are activated.
+        </p>
 
         <div className="rounded-xl border border-border overflow-hidden">
           <table className="w-full text-sm">
@@ -189,7 +206,7 @@ export default function Home() {
           Quick start
         </h2>
         <p className="text-center text-muted-foreground mb-10 text-sm">
-          No API key required — just send a request.
+          No API key required — just send a request. Free during beta.
         </p>
 
         <CodeBlock code={CURL_EXAMPLE} language="bash" className="max-w-2xl mx-auto" />
@@ -201,7 +218,7 @@ export default function Home() {
           Ready to build?
         </h2>
         <p className="text-muted-foreground max-w-md">
-          Integrate in minutes. Pay only for what you use — no subscriptions, no rate limits.
+          Integrate in minutes. Free during beta — no API key, no subscription.
         </p>
         <Button
           size="lg"

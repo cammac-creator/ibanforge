@@ -57,15 +57,20 @@ export function createX402Middleware(): MiddlewareHandler {
           },
           description: 'IBAN validation + BIC lookup',
         },
+        // TODO: Dynamic pricing — x402 'exact' scheme requires a fixed price,
+        // but batch cost should be $0.002 * IBAN count. Current workaround:
+        // charge for max batch size (100 * 2000 = 200000). Overpayment is
+        // the user's choice — they can send fewer IBANs. Needs x402 'range'
+        // scheme or custom middleware to inspect body before pricing.
         'POST /v1/iban/batch': {
           accepts: {
             scheme: 'exact',
             network: 'eip155:8453' as const,
-            price: { amount: '20000', asset: USDC_BASE },
+            price: { amount: '200000', asset: USDC_BASE },
             payTo: walletAddress,
             maxTimeoutSeconds: 60,
           },
-          description: 'Batch IBAN validation (up to 10)',
+          description: 'Batch IBAN validation (up to 100 IBANs, $0.002/IBAN)',
         },
         'GET /v1/bic/:code': {
           accepts: {
