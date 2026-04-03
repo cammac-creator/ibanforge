@@ -314,6 +314,82 @@ const spec = {
           error_detail: { type: 'string' },
           cost_usdc: { type: 'number', example: 0.005 },
           processing_ms: { type: 'number' },
+          sepa: {
+            type: 'object',
+            description:
+              'SEPA compliance details. Only present when the IBAN is valid and the country participates in SEPA.',
+            properties: {
+              member: {
+                type: 'boolean',
+                description: 'Whether the IBAN country is a SEPA member',
+              },
+              schemes: {
+                type: 'array',
+                description:
+                  'SEPA schemes the institution supports (SCT = Credit Transfer, SDD = Direct Debit, SCT_INST = Instant Credit Transfer)',
+                items: {
+                  type: 'string',
+                  enum: ['SCT', 'SDD', 'SCT_INST'],
+                },
+              },
+              vop_required: {
+                type: 'boolean',
+                description:
+                  'Whether Verification of Payee (VoP) is required under EU Instant Payments Regulation for this institution',
+              },
+            },
+            required: ['member', 'schemes', 'vop_required'],
+          },
+          issuer: {
+            type: 'object',
+            description:
+              'Issuer classification for the institution behind the IBAN. Useful for vIBAN detection and KYC enrichment. Only present when the IBAN is valid and the BIC is resolved.',
+            properties: {
+              type: {
+                type: 'string',
+                enum: ['bank', 'digital_bank', 'emi', 'payment_institution'],
+                description:
+                  'Type of financial institution (bank = traditional bank, digital_bank = neobank/challenger, emi = Electronic Money Institution, payment_institution = licensed PI)',
+              },
+              name: {
+                type: 'string',
+                description: 'Name of the issuing institution',
+              },
+            },
+            required: ['type', 'name'],
+          },
+          risk_indicators: {
+            type: 'object',
+            description:
+              'AML/CFT risk indicators derived from the IBAN structure, issuer type, and country. Designed for compliance pre-screening and fraud prevention workflows. Only present when the IBAN is valid.',
+            properties: {
+              issuer_type: {
+                type: 'string',
+                enum: ['bank', 'digital_bank', 'emi', 'payment_institution'],
+                description: 'Type of the issuing institution (mirrors issuer.type for convenience)',
+              },
+              country_risk: {
+                type: 'string',
+                enum: ['standard', 'elevated', 'high'],
+                description:
+                  'Country-level risk classification based on FATF grey/black lists and EU high-risk third countries',
+              },
+              test_bic: {
+                type: 'boolean',
+                description: 'Whether the resolved BIC is a test/sandbox code (position 8 = 0)',
+              },
+              sepa_reachable: {
+                type: 'boolean',
+                description: 'Whether the IBAN can receive SEPA Credit Transfers',
+              },
+              vop_coverage: {
+                type: 'boolean',
+                description:
+                  'Whether the institution is covered by Verification of Payee, reducing payee impersonation risk',
+              },
+            },
+            required: ['issuer_type', 'country_risk', 'test_bic', 'sepa_reachable', 'vop_coverage'],
+          },
         },
       },
       BICLookupResult: {
