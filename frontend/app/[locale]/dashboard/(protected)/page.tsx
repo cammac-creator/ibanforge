@@ -6,6 +6,8 @@ import { QuickActions } from '@/components/dashboard/quick-actions';
 import Link from 'next/link';
 
 const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const STATS_TOKEN = process.env.STATS_TOKEN || '';
+const statsHeaders: HeadersInit = STATS_TOKEN ? { Authorization: `Bearer ${STATS_TOKEN}` } : {};
 
 /** ISO country code -> full country name */
 const COUNTRY_NAMES: Record<string, string> = {
@@ -54,7 +56,7 @@ interface HistoryEntry {
 
 async function fetchStats(): Promise<StatsResponse | null> {
   try {
-    const res = await fetch(`${API_URL}/stats`, { cache: 'no-store' });
+    const res = await fetch(`${API_URL}/stats`, { cache: 'no-store', headers: statsHeaders });
     if (!res.ok) return null;
     return res.json();
   } catch {
@@ -64,7 +66,7 @@ async function fetchStats(): Promise<StatsResponse | null> {
 
 async function fetchHistory(): Promise<HistoryEntry[]> {
   try {
-    const res = await fetch(`${API_URL}/stats/history?period=30`, { cache: 'no-store' });
+    const res = await fetch(`${API_URL}/stats/history?period=30`, { cache: 'no-store', headers: statsHeaders });
     if (!res.ok) return [];
     return res.json();
   } catch {

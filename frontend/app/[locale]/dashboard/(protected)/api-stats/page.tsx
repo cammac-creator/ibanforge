@@ -3,6 +3,8 @@ import { StatCard } from '@/components/stat-card';
 import { PeriodSelector } from './period-selector';
 
 const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const STATS_TOKEN = process.env.STATS_TOKEN || '';
+const statsHeaders: HeadersInit = STATS_TOKEN ? { Authorization: `Bearer ${STATS_TOKEN}` } : {};
 
 function fmt(n: number): string {
   return n.toLocaleString('fr-CH');
@@ -43,7 +45,7 @@ interface HistoryEntry {
 
 async function fetchStats(): Promise<StatsResponse | null> {
   try {
-    const res = await fetch(`${API_URL}/stats`, { cache: 'no-store' });
+    const res = await fetch(`${API_URL}/stats`, { cache: 'no-store', headers: statsHeaders });
     if (!res.ok) return null;
     return res.json();
   } catch {
@@ -53,7 +55,7 @@ async function fetchStats(): Promise<StatsResponse | null> {
 
 async function fetchHistory(period: number): Promise<HistoryEntry[]> {
   try {
-    const res = await fetch(`${API_URL}/stats/history?period=${period}`, { cache: 'no-store' });
+    const res = await fetch(`${API_URL}/stats/history?period=${period}`, { cache: 'no-store', headers: statsHeaders });
     if (!res.ok) return [];
     return res.json();
   } catch {
