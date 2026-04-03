@@ -3,64 +3,67 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
+import { useLocale, useTranslations } from "next-intl";
 import { ChevronRight, Menu, X, BookOpen, Zap, Server } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { DocMeta } from "@/lib/mdx";
 
 interface DocGroup {
-  label: string;
+  labelKey: string;
   icon: React.ReactNode;
   slugs: string[];
 }
 
 const groups: DocGroup[] = [
   {
-    label: "Getting Started",
+    labelKey: "gettingStarted",
     icon: <BookOpen className="size-4" />,
     slugs: ["index", "x402"],
   },
   {
-    label: "Endpoints",
+    labelKey: "endpoints",
     icon: <Zap className="size-4" />,
     slugs: ["iban-validate", "iban-batch", "bic-lookup"],
   },
   {
-    label: "Advanced",
+    labelKey: "advanced",
     icon: <Server className="size-4" />,
     slugs: ["mcp", "errors"],
   },
 ];
 
-function getHref(slug: string) {
-  return slug === "index" ? "/docs" : `/docs/${slug}`;
-}
-
-function isActive(pathname: string, slug: string) {
-  if (slug === "index") {
-    return pathname === "/docs" || pathname === "/docs/";
-  }
-  return pathname === `/docs/${slug}`;
-}
-
 export function DocsSidebar({ docs }: { docs: DocMeta[] }) {
   const pathname = usePathname();
+  const locale = useLocale();
+  const t = useTranslations("docs");
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  function getHref(slug: string) {
+    return slug === "index" ? `/${locale}/docs` : `/${locale}/docs/${slug}`;
+  }
+
+  function isActive(slug: string) {
+    if (slug === "index") {
+      return pathname === `/${locale}/docs` || pathname === `/${locale}/docs/`;
+    }
+    return pathname === `/${locale}/docs/${slug}`;
+  }
 
   const docsBySlug = new Map(docs.map((d) => [d.slug, d]));
 
   const sidebarContent = (
     <nav className="space-y-6">
       {groups.map((group) => (
-        <div key={group.label}>
+        <div key={group.labelKey}>
           <div className="flex items-center gap-2 px-3 mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             {group.icon}
-            {group.label}
+            {t(`groups.${group.labelKey}`)}
           </div>
           <ul className="space-y-0.5">
             {group.slugs.map((slug) => {
               const doc = docsBySlug.get(slug);
               if (!doc) return null;
-              const active = isActive(pathname, slug);
+              const active = isActive(slug);
               return (
                 <li key={slug}>
                   <Link
@@ -92,16 +95,14 @@ export function DocsSidebar({ docs }: { docs: DocMeta[] }) {
 
   return (
     <>
-      {/* Mobile toggle */}
       <button
         className="lg:hidden fixed bottom-4 right-4 z-50 flex items-center justify-center size-12 rounded-full bg-primary text-primary-foreground shadow-lg"
         onClick={() => setMobileOpen((v) => !v)}
-        aria-label="Toggle docs navigation"
+        aria-label={t("sidebar.toggleNav")}
       >
         {mobileOpen ? <X className="size-5" /> : <Menu className="size-5" />}
       </button>
 
-      {/* Mobile overlay */}
       {mobileOpen && (
         <div
           className="lg:hidden fixed inset-0 z-40 bg-background/80 backdrop-blur-sm"
@@ -109,7 +110,6 @@ export function DocsSidebar({ docs }: { docs: DocMeta[] }) {
         />
       )}
 
-      {/* Mobile sidebar */}
       <aside
         className={cn(
           "lg:hidden fixed inset-y-0 left-0 z-40 w-72 bg-background border-r border-border p-6 pt-20 transition-transform duration-200",
@@ -119,7 +119,6 @@ export function DocsSidebar({ docs }: { docs: DocMeta[] }) {
         {sidebarContent}
       </aside>
 
-      {/* Desktop sidebar */}
       <aside className="hidden lg:block w-64 shrink-0 border-r border-border">
         <div className="sticky top-14 p-6 max-h-[calc(100vh-3.5rem)] overflow-y-auto">
           {sidebarContent}
