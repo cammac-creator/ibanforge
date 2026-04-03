@@ -89,6 +89,119 @@ export const COUNTRY_NAMES: Record<string, string> = {
 };
 
 // ---------------------------------------------------------------------------
+// SEPA zone data
+// ---------------------------------------------------------------------------
+
+/** Eurozone countries — SCT_INST mandatory since IPR Oct 2025 */
+const EUROZONE = new Set([
+  'AT', 'BE', 'CY', 'DE', 'EE', 'ES', 'FI', 'FR', 'GR', 'HR',
+  'IE', 'IT', 'LT', 'LU', 'LV', 'MT', 'NL', 'PT', 'SI', 'SK',
+  // Microstates using EUR through monetary agreements
+  'AD', 'MC', 'SM', 'VA',
+]);
+
+/** All SEPA member countries (EU27 + EEA + CH/GB + microstates + territories) */
+const SEPA_MEMBERS = new Set([
+  ...EUROZONE,
+  // EU non-eurozone
+  'BG', 'CZ', 'DK', 'HU', 'PL', 'RO', 'SE',
+  // EEA non-EU
+  'IS', 'LI', 'NO',
+  // Other SEPA participants
+  'CH', 'GB', 'GI',
+  // Associated territories (through DK)
+  'FO', 'GL',
+]);
+
+/** Non-eurozone EEA/EU states — VoP mandatory from July 2027 */
+const VOP_DEFERRED = new Set([
+  'BG', 'CZ', 'DK', 'HU', 'PL', 'RO', 'SE',
+  'IS', 'LI', 'NO',
+]);
+
+export type SepaScheme = 'SCT' | 'SDD' | 'SCT_INST';
+
+export interface SepaInfo {
+  member: boolean;
+  schemes: SepaScheme[];
+  vop_required: boolean;
+}
+
+/**
+ * Get SEPA membership, available schemes, and VoP status for a country code.
+ *
+ * VoP (Verification of Payee) timeline:
+ * - Eurozone PSPs: mandatory since 9 Oct 2025
+ * - Non-eurozone EEA: mandatory from July 2027
+ * - Non-SEPA: not applicable
+ * - CH, GB, GI: not covered by EU VoP regulation
+ */
+export function getSepaInfo(countryCode: string): SepaInfo {
+  if (!SEPA_MEMBERS.has(countryCode)) {
+    return { member: false, schemes: [], vop_required: false };
+  }
+
+  // CH, GB, GI are SEPA participants but not subject to EU VoP regulation
+  const nonEuSepa = new Set(['CH', 'GB', 'GI']);
+
+  if (EUROZONE.has(countryCode)) {
+    return { member: true, schemes: ['SCT', 'SDD', 'SCT_INST'], vop_required: true };
+  }
+  if (VOP_DEFERRED.has(countryCode)) {
+    // VoP mandatory from July 2027 for these — flag as required (regulation adopted)
+    return { member: true, schemes: ['SCT', 'SDD'], vop_required: true };
+  }
+  // CH, GB, GI, FO, GL — SEPA but no EU VoP obligation
+  return { member: true, schemes: ['SCT', 'SDD'], vop_required: !nonEuSepa.has(countryCode) };
+}
+
+// ---------------------------------------------------------------------------
+// Country risk classification (AML/CFT perspective)
+// Based on FATF grey/black lists and EU high-risk third countries.
+// Conservative: only flags countries with known AML concerns.
+// ---------------------------------------------------------------------------
+
+export type CountryRisk = 'standard' | 'elevated' | 'high';
+
+/** FATF black list / EU high-risk third countries (updated periodically) */
+const HIGH_RISK = new Set([
+  'RU', // Russia — FATF countermeasures
+  'BY', // Belarus — FATF countermeasures
+  'LY', // Libya
+  'SO', // Somalia
+  'SD', // Sudan
+]);
+
+/**
+ * FATF grey list (increased monitoring) and jurisdictions with
+ * elevated AML risk per EBA opinions.
+ */
+const ELEVATED_RISK = new Set([
+  'AL', // Albania
+  'BA', // Bosnia and Herzegovina
+  'EG', // Egypt
+  'IQ', // Iraq
+  'JO', // Jordan
+  'KZ', // Kazakhstan
+  'LB', // Lebanon
+  'MR', // Mauritania
+  'MU', // Mauritius
+  'PK', // Pakistan
+  'PS', // Palestine
+  'SC', // Seychelles
+  'TN', // Tunisia
+  'TR', // Turkey
+  'UA', // Ukraine (conflict zone)
+  'VG', // British Virgin Islands
+]);
+
+export function getCountryRisk(countryCode: string): CountryRisk {
+  if (HIGH_RISK.has(countryCode)) return 'high';
+  if (ELEVATED_RISK.has(countryCode)) return 'elevated';
+  return 'standard';
+}
+
+// ---------------------------------------------------------------------------
 // Dynamic country name resolution via Intl API (for BIC lookups with any code)
 // ---------------------------------------------------------------------------
 

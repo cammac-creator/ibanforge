@@ -2,7 +2,8 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 import { validateIBAN } from '../lib/iban.js';
-import { lookup, lookupByCountryBank } from '../lib/bic-lookup.js';
+import { enrichResult } from '../lib/enrich.js';
+import { lookup } from '../lib/bic-lookup.js';
 import { validateBIC } from '../lib/bic-validator.js';
 
 const server = new McpServer({
@@ -34,9 +35,7 @@ For multiple IBANs, prefer batch_validate_iban (60% cheaper per IBAN).`,
   },
   async ({ iban }) => {
     const result = validateIBAN(iban);
-    if (result.valid && result.bban?.bank_code) {
-      result.bic = lookupByCountryBank(result.country!.code, result.bban.bank_code);
-    }
+    enrichResult(result);
     return {
       content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
     };
@@ -62,9 +61,7 @@ For a single IBAN, use validate_iban instead.`,
   async ({ ibans }) => {
     const results = ibans.map((iban) => {
       const result = validateIBAN(iban);
-      if (result.valid && result.bban?.bank_code) {
-        result.bic = lookupByCountryBank(result.country!.code, result.bban.bank_code);
-      }
+      enrichResult(result);
       return result;
     });
     return {

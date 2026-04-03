@@ -1,4 +1,4 @@
-import { IBAN_LENGTHS, BBAN_STRUCTURE, COUNTRY_NAMES } from './countries.js';
+import { IBAN_LENGTHS, BBAN_STRUCTURE, COUNTRY_NAMES, getSepaInfo } from './countries.js';
 import type { IBANValidationResult } from '../types.js';
 
 /**
@@ -134,6 +134,7 @@ export function validateIBAN(input: string): IBANValidationResult {
     },
     check_digits: checkDigits,
     bban: bbanParsed,
+    sepa: getSepaInfo(countryCode),
     formatted: formatIBAN(cleaned),
     cost_usdc: 0.005,
   };

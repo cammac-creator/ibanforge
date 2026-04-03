@@ -86,6 +86,40 @@ describe('IBAN Validation', () => {
     });
   });
 
+  describe('SEPA enrichment', () => {
+    it('CH is SEPA non-eurozone, no VoP (not EU)', () => {
+      const r = validateIBAN('CH5604835012345678009');
+      expect(r.sepa).toEqual({ member: true, schemes: ['SCT', 'SDD'], vop_required: false });
+    });
+
+    it('DE is eurozone with VoP mandatory', () => {
+      const r = validateIBAN('DE89370400440532013000');
+      expect(r.sepa).toEqual({ member: true, schemes: ['SCT', 'SDD', 'SCT_INST'], vop_required: true });
+    });
+
+    it('FR is eurozone with SCT_INST and VoP', () => {
+      const r = validateIBAN('FR7630006000011234567890189');
+      expect(r.sepa?.member).toBe(true);
+      expect(r.sepa?.schemes).toContain('SCT_INST');
+      expect(r.sepa?.vop_required).toBe(true);
+    });
+
+    it('GB is SEPA but no VoP (not EU)', () => {
+      const r = validateIBAN('GB29NWBK60161331926819');
+      expect(r.sepa).toEqual({ member: true, schemes: ['SCT', 'SDD'], vop_required: false });
+    });
+
+    it('BR is not a SEPA member', () => {
+      const r = validateIBAN('BR1800360305000010009795493C1');
+      expect(r.sepa).toEqual({ member: false, schemes: [], vop_required: false });
+    });
+
+    it('sepa is absent on invalid IBANs', () => {
+      const r = validateIBAN('ZZ123456789');
+      expect(r.sepa).toBeUndefined();
+    });
+  });
+
   describe('Edge cases', () => {
     it('empty string', () => {
       const r = validateIBAN('');

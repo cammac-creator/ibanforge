@@ -26,6 +26,22 @@ export interface IBANValidationResult {
     bank_name: string | null;
     city: string | null;
   } | null;
+  sepa?: {
+    member: boolean;
+    schemes: Array<'SCT' | 'SDD' | 'SCT_INST'>;
+    vop_required: boolean;
+  };
+  issuer?: {
+    type: 'bank' | 'digital_bank' | 'emi' | 'payment_institution';
+    name: string;
+  };
+  risk_indicators?: {
+    issuer_type: 'bank' | 'digital_bank' | 'emi' | 'payment_institution';
+    country_risk: 'standard' | 'elevated' | 'high';
+    test_bic: boolean;
+    sepa_reachable: boolean;
+    vop_coverage: boolean;
+  };
   formatted?: string;
   error?: 'invalid_format' | 'unsupported_country' | 'wrong_length' | 'checksum_failed';
   error_detail?: string;

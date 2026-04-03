@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { validateIBAN } from '../lib/iban.js';
-import { lookupByCountryBank } from '../lib/bic-lookup.js';
+import { enrichResult } from '../lib/enrich.js';
 import { recordOperation } from '../lib/stats.js';
 import type { IBANValidationResult } from '../types.js';
 
@@ -31,10 +31,7 @@ ibanValidate.post('/v1/iban/validate', async (c) => {
 
   const result: IBANValidationResult = validateIBAN(body.iban as string);
 
-  // Lookup BIC if IBAN is valid and bank code is available
-  if (result.valid && result.bban?.bank_code) {
-    result.bic = lookupByCountryBank(result.country!.code, result.bban.bank_code);
-  }
+  enrichResult(result);
 
   result.processing_ms = Math.round((performance.now() - start) * 100) / 100;
 

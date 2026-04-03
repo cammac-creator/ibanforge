@@ -22,9 +22,9 @@ function upsertDaily() {
   if (!_upsertDaily) {
     _upsertDaily = getStatsDB().prepare(`
       INSERT INTO daily_stats (date, operation_type, total, success_count, revenue_usdc)
-      VALUES (date('now'), ?, 1, ?, ?)
+      VALUES (date('now'), ?, ?, ?, ?)
       ON CONFLICT(date, operation_type) DO UPDATE SET
-        total = total + 1,
+        total = total + excluded.total,
         success_count = success_count + excluded.success_count,
         revenue_usdc = revenue_usdc + excluded.revenue_usdc
     `);
@@ -47,7 +47,7 @@ export function recordOperation(
 ) {
   try {
     insertOp().run(type, countryCode, success ? 1 : 0);
-    upsertDaily().run(type, success ? 1 : 0, costUsdc);
+    upsertDaily().run(type, 1, success ? 1 : 0, costUsdc);
   } catch {
     // Stats are non-critical — never crash the API
   }
@@ -58,8 +58,14 @@ export function recordOperation(
  */
 export function recordBatch(count: number, validCount: number, costUsdc: number) {
   try {
-    insertOp().run('iban_batch', null, validCount);
-    upsertDaily().run('iban_batch', validCount, costUsdc);
+    const db = getStatsDB();
+    const tx = db.transaction(() => {
+      const stmt = insertOp();
+      for (let i = 0; i < validCount; i++) stmt.run('iban_batch', null, 1);
+      for (let i = 0; i < count - validCount; i++) stmt.run('iban_batch', null, 0);
+      upsertDaily().run('iban_batch', count, validCount, costUsdc);
+    });
+    tx();
   } catch {
     // Non-critical
   }

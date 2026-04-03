@@ -88,6 +88,11 @@ export function getEntryCount(): number {
   return (getBicDB().prepare('SELECT COUNT(*) as cnt FROM bic_entries').get() as { cnt: number }).cnt;
 }
 
+export function getLastUpdated(): string | null {
+  const row = getBicDB().prepare('SELECT MAX(updated_at) as last_updated FROM bic_entries').get() as { last_updated: string | null };
+  return row.last_updated;
+}
+
 /**
  * Look up a BIC by country code and BBAN bank code.
  *
