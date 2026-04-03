@@ -1,0 +1,127 @@
+---
+title: "Paiements x402"
+description: "Fonctionnement des micropaiements x402 — paiement a la requete en USDC, sans cle API."
+order: 4
+---
+
+# Micropaiements x402
+
+IBANforge utilise le **protocole x402** pour l'authentification et la facturation. Au lieu de cles API et d'abonnements mensuels, vous payez un montant infime en USDC par requete — automatiquement.
+
+## Fonctionnement
+
+Imaginez un peage routier : chaque appel API coute une fraction de centime, et le paiement s'effectue directement dans votre requete HTTP.
+
+1. **Votre client** envoie une requete API avec un en-tete `X-PAYMENT` contenant un paiement USDC signe
+2. **IBANforge** verifie le paiement aupres du facilitateur x402
+3. **Si le paiement est valide**, la requete est traitee et la reponse est renvoyee
+4. **S'il est manquant ou invalide**, vous recevez une reponse `402 Payment Required` avec les details de tarification
+
+Pas d'inscription. Pas de cle API. Pas de limites de debit. Vous ne payez que ce que vous utilisez.
+
+## Tarification
+
+| Endpoint | Cout par requete |
+|---|---|
+| `POST /v1/iban/validate` | $0.005 USDC |
+| `POST /v1/iban/batch` | $0.020 USDC |
+| `GET /v1/bic/:code` | $0.003 USDC |
+
+## La reponse 402
+
+Lorsque vous appelez un endpoint payant sans en-tete de paiement valide, vous recevez :
+
+```
+HTTP/1.1 402 Payment Required
+```
+
+```json
+{
+  "error": "Payment Required",
+  "accepts": {
+    "scheme": "exact",
+    "network": "base",
+    "maxAmountRequired": "5000",
+    "resource": "https://api.ibanforge.com/v1/iban/validate",
+    "description": "IBAN validation — $0.005 USDC",
+    "mimeType": "application/json",
+    "payTo": "0x...",
+    "maxTimeoutSeconds": 300,
+    "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+  }
+}
+```
+
+Cette reponse indique a votre client exactement quoi payer, ou, et sur quel reseau (Base L2).
+
+## Clients compatibles
+
+Tout client HTTP implementant le protocole x402 peut payer automatiquement. Le protocole est un standard ouvert — voici quelques options :
+
+### SDK x402 (recommande)
+
+Le SDK TypeScript officiel x402 gere le paiement automatiquement :
+
+```typescript
+import { paymentMiddleware } from "x402/client";
+
+const client = paymentMiddleware(fetch, {
+  walletPrivateKey: process.env.WALLET_PRIVATE_KEY,
+});
+
+// Les paiements se font automatiquement — utilisez fetch normalement
+const response = await client(
+  "https://api.ibanforge.com/v1/iban/validate",
+  {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ iban: "CH9300762011623852957" }),
+  }
+);
+```
+
+### Integration manuelle
+
+Si vous preferez gerer les paiements vous-meme, le flux est le suivant :
+
+1. Envoyez une requete au endpoint de l'API
+2. Si vous recevez une reponse `402`, analysez l'objet `accepts` de la reponse
+3. Creez et signez un transfert USDC sur Base pour le montant specifie
+4. Renvoyez votre requete avec l'en-tete `X-PAYMENT` contenant le paiement signe
+
+## Test gratuit
+
+Vous n'avez pas besoin d'USDC pour essayer l'API. Utilisez le endpoint de demonstration :
+
+```bash
+curl https://api.ibanforge.com/v1/demo
+```
+
+Cela renvoie des exemples de validation gratuitement, afin que vous puissiez explorer le format de reponse avant de configurer les paiements.
+
+## Reseau
+
+Tous les paiements s'effectuent sur **Base** (L2 de Coinbase), ce qui signifie :
+
+- Les frais de transaction sont inferieurs a $0.01
+- Le reglement est quasi instantane (2 secondes)
+- USDC est le stablecoin natif — pas de volatilite des prix
+
+## FAQ
+
+**Dois-je creer un compte ?**
+Non. Le paiement lui-meme constitue votre authentification.
+
+**Que se passe-t-il si je n'ai plus d'USDC ?**
+L'API renvoie `402 Payment Required`. Vos donnees et resultats existants ne sont pas affectes.
+
+**Y a-t-il un solde minimum ?**
+Aucun minimum. Vous avez besoin de suffisamment d'USDC sur Base pour couvrir une requete (aussi peu que $0.003).
+
+**Puis-je utiliser ceci depuis un backend sans exposer mon portefeuille ?**
+Oui. Conservez votre cle privee dans les variables d'environnement de votre serveur. Le SDK x402 gere la signature sans diffuser de transactions on-chain pour chaque requete.
+
+## En savoir plus
+
+- [Specification du protocole x402](https://www.x402.org/) — le standard ouvert
+- [SDK TypeScript x402](https://github.com/coinbase/x402) — bibliotheque client officielle

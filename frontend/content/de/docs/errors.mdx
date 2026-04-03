@@ -1,0 +1,145 @@
+---
+title: "Fehlerreferenz"
+description: "Alle Fehlercodes, HTTP-Statuscodes und Fehlerbehebungsanleitung für die IBANforge API."
+order: 6
+---
+
+# Fehlerreferenz
+
+IBANforge verwendet standardmäßige HTTP-Statuscodes und gibt strukturierte Fehlerantworten im JSON-Format zurück. Diese Seite behandelt jeden Fehler, der auftreten kann.
+
+## HTTP-Statuscodes
+
+| Status | Bedeutung | Wann er auftritt |
+|---|---|---|
+| `200` | OK | Anfrage erfolgreich (Hinweis: Ungültige IBANs geben dennoch 200 mit `valid: false` zurück) |
+| `400` | Bad Request | Fehlerhafter Anfrage-Body, fehlende Felder oder ungültige Parameter |
+| `402` | Payment Required | Fehlender Zahlungs-Header oder unzureichende/ungültige Zahlung |
+| `404` | Not Found | BIC-Code nicht in der Datenbank gefunden oder unbekannter Endpunkt |
+| `500` | Internal Server Error | Unerwarteter Serverfehler (bitte melden Sie diese) |
+
+## Validierungsfehlercodes
+
+Diese erscheinen im Antwort-Body, wenn eine IBAN ungültig ist. Der HTTP-Status ist weiterhin `200` — die Anfrage selbst war erfolgreich, aber die IBAN hat die Validierung nicht bestanden.
+
+| Code | Beschreibung | Beispielursache |
+|---|---|---|
+| `invalid_format` | IBAN enthält ungültige Zeichen oder ist leer | Sonderzeichen, zu kurz, leerer String |
+| `unsupported_country` | Ländercode ist nicht in unserem Register | `XX12345678` — „XX" ist kein gültiger Ländercode |
+| `wrong_length` | IBAN-Länge stimmt nicht mit der erwarteten Länge für das Land überein | Schweizer IBAN sollte 21 Zeichen haben, aber es wurden 19 angegeben |
+| `checksum_failed` | MOD-97-Prüfsummenverifizierung fehlgeschlagen | Eine Ziffer wurde geändert oder vertauscht |
+
+### Beispiel: Validierungsfehler
+
+```json
+{
+  "valid": false,
+  "error": {
+    "code": "wrong_length",
+    "message": "Expected 21 characters for CH (Switzerland), got 19"
+  }
+}
+```
+
+## Anfragefehlercodes
+
+Diese geben HTTP-Statuscodes ungleich 200 zurück.
+
+### 400 Bad Request
+
+| Code | Beschreibung |
+|---|---|
+| `invalid_body` | Anfrage-Body ist kein gültiges JSON |
+| `missing_iban` | Das Feld `iban` fehlt im Anfrage-Body |
+| `missing_ibans` | Das Feld `ibans` fehlt im Stapel-Anfrage-Body |
+| `empty_array` | Das `ibans`-Array ist leer |
+| `too_many_ibans` | Mehr als 10 IBANs in einer Stapelanfrage |
+| `invalid_bic_format` | BIC-Code ist nicht 8 oder 11 Zeichen lang |
+
+### Beispiel: Fehlerhafte Anfrage
+
+```json
+{
+  "error": {
+    "code": "too_many_ibans",
+    "message": "Maximum 10 IBANs per batch request, got 15"
+  }
+}
+```
+
+### 402 Payment Required
+
+Wird zurückgegeben, wenn der `X-PAYMENT`-Header fehlt, abgelaufen oder ungültig ist. Die Antwort enthält Zahlungsanweisungen:
+
+```json
+{
+  "error": "Payment Required",
+  "accepts": {
+    "scheme": "exact",
+    "network": "base",
+    "maxAmountRequired": "2000",
+    "resource": "https://api.ibanforge.com/v1/iban/validate",
+    "payTo": "0x...",
+    "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+  }
+}
+```
+
+Siehe [x402-Zahlungen](/docs/x402) für den Umgang damit.
+
+### 404 Not Found
+
+| Code | Beschreibung |
+|---|---|
+| `bic_not_found` | Kein Institut gefunden, das dem angegebenen BIC-Code entspricht |
+| `not_found` | Der angeforderte Endpunkt existiert nicht |
+
+### 500 Internal Server Error
+
+Wenn Sie einen 500-Fehler erhalten, ist auf unserer Seite etwas Unerwartetes passiert. Die Antwort enthält:
+
+```json
+{
+  "error": {
+    "code": "internal_error",
+    "message": "An unexpected error occurred"
+  }
+}
+```
+
+## Fehlerbehebung
+
+### „Payment Required" bei jeder Anfrage
+
+- Stellen Sie sicher, dass Sie USDC auf dem **Base**-Netzwerk haben (nicht Ethereum Mainnet)
+- Überprüfen Sie, ob Ihr privater Wallet-Schlüssel korrekt in der Umgebungsvariable `WALLET_PRIVATE_KEY` gesetzt ist
+- Vergewissern Sie sich, dass Sie ein kompatibles x402-Client-SDK verwenden
+
+### „Invalid IBAN format", obwohl die IBAN korrekt aussieht
+
+- Entfernen Sie führende/nachfolgende Leerzeichen
+- Stellen Sie sicher, dass keine Nicht-ASCII-Zeichen vorhanden sind (typografische Anführungszeichen, Geviertstriche usw.)
+- Die IBAN darf nur Buchstaben A-Z und Ziffern 0-9 enthalten (Leerzeichen werden automatisch entfernt)
+
+### „Unsupported country" für ein gültiges Land
+
+- IBANforge unterstützt über 80 Länder. Einige Gebiete und Mikrostaaten sind möglicherweise noch nicht enthalten
+- Überprüfen Sie den zweistelligen Ländercode am Anfang der IBAN
+
+### „BIC not found", obwohl der Code existiert
+
+- Die BIC-Datenbank enthält über 39.000 Einträge von GLEIF, deckt aber möglicherweise nicht jede Filiale ab
+- Versuchen Sie die 8-Zeichen-Version (ohne Branch-Code) — z. B. `UBSWCHZH` statt `UBSWCHZH80A`
+- Einige Finanzinstitute verwenden BIC-Codes, die nicht bei SWIFT/GLEIF registriert sind
+
+### Stapelanfrage gibt weniger Ergebnisse zurück als erwartet
+
+- Überprüfen Sie, ob Ihr `ibans`-Array nicht mehr als 10 Einträge enthält
+- Stellen Sie sicher, dass jedes Element ein String ist — Zahlen und Objekte werden abgelehnt
+- Das Ergebnis-Array entspricht immer der Reihenfolge und Anzahl des Eingabe-Arrays
+
+### Zeitüberschreitung oder keine Antwort
+
+- Die API hat ein Timeout von 30 Sekunden. Wenn Sie komplexe Stapelanfragen senden, sollten diese deutlich innerhalb dieses Limits abgeschlossen werden
+- Überprüfen Sie Ihre Netzwerkverbindung und Firewall-Regeln
+- Versuchen Sie den Endpunkt `/health`, um zu überprüfen, ob der Dienst läuft

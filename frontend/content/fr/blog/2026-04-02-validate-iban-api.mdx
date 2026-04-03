@@ -1,0 +1,125 @@
+---
+title: "Comment valider des IBAN et rechercher des codes BIC avec une seule API"
+description: "Guide developpeur pour la validation d'IBAN et la recherche BIC/SWIFT avec l'API IBANforge -- avec des exemples en curl, Python et TypeScript"
+date: "2026-04-02"
+---
+
+# Comment valider des IBAN et rechercher des codes BIC avec une seule API
+
+Les virements internationaux dependent de deux donnees : l'IBAN qui identifie le compte, et le BIC qui achemine le paiement vers la bonne banque. Si l'un des deux est incorrect, votre transaction est retardee, rejetee ou refusee par l'institution destinataire -- parfois sans message d'erreur exploitable. Pour toute application touchant aux paiements transfrontaliers, aux workflows de conformite ou a l'onboarding client, valider ces deux champs avant soumission n'est pas optionnel.
+
+## Le probleme de la validation d'IBAN
+
+Une implementation naive se contente de verifier si la chaine ressemble a un IBAN. Ce n'est pas suffisant.
+
+Une vraie validation d'IBAN necessite trois choses : la bonne **longueur pour le pays concerne** (qui varie de 15 chiffres pour la Norvege a 34 pour Malte), une **somme de controle mod-97** valide sur la chaine numerique reordonnee, et une **structure BBAN correcte** -- les sous-champs code banque, code agence et numero de compte integres dans l'IBAN selon le format bancaire propre a chaque pays.
+
+Ensuite, il y a le probleme du BIC. Meme si un IBAN est structurellement valide, vous avez souvent besoin de savoir a quelle banque il appartient -- pour l'affichage, pour le filtrage de conformite ou pour les decisions de routage. Le code banque integre dans le BBAN vous donne *une indication*, mais le mapper vers un BIC reel et un nom d'institution necessite une base de donnees separee. La plupart des equipes sautent completement cette etape ou paient un second appel API.
+
+## IBANforge : une seule API pour les deux
+
+[IBANforge](https://ibanforge.com) est une API REST qui gere la validation complete d'IBAN -- somme de controle, regles pays, analyse BBAN -- et resout le code BIC dans la meme reponse, a partir du jeu de donnees GLEIF de plus de 39 000 entrees utilise par les banques centrales. Une requete POST, une reponse JSON structuree.
+
+Il existe un endpoint gratuit `/v1/demo` pour tester votre parseur sans toucher aux endpoints payants, et un [playground interactif](https://ibanforge.com/playground) si vous souhaitez coller un IBAN et voir ce qui revient avant d'ecrire une ligne de code.
+
+## Exemple 1 : Valider un IBAN avec curl
+
+```bash
+curl -X POST https://api.ibanforge.com/v1/iban/validate \
+  -H "Content-Type: application/json" \
+  -d '{"iban": "CH93 0076 2011 6238 5295 7"}'
+```
+
+Reponse :
+
+```json
+{
+  "iban": "CH9300762011623852957",
+  "valid": true,
+  "country": { "code": "CH", "name": "Switzerland" },
+  "check_digits": "93",
+  "bban": { "bank_code": "00762", "account_number": "011623852957" },
+  "bic": { "code": "UBSWCHZH", "bank_name": "UBS Switzerland AG", "city": "Zurich" },
+  "sepa": { "member": true, "schemes": ["SCT", "SDD"], "vop_required": false },
+  "issuer": { "type": "bank", "name": "UBS Switzerland AG" },
+  "risk_indicators": {
+    "issuer_type": "bank",
+    "country_risk": "standard",
+    "test_bic": false,
+    "sepa_reachable": true,
+    "vop_coverage": false
+  },
+  "formatted": "CH93 0076 2011 6238 5295 7",
+  "cost_usdc": 0.005,
+  "processing_ms": 1.23
+}
+```
+
+Quelques points a noter dans cette reponse :
+
+- `valid: true` confirme que la somme de controle mod-97 et les regles de longueur et de format specifiques au pays sont passees.
+- `iban` retourne la forme compacte (sans espaces) ; `formatted` ajoute les espaces selon le groupement standard de 4 caracteres.
+- `bban.bank_code` est extrait du BBAN selon le format specifique de la Suisse -- pas une simple operation de sous-chaine.
+- L'objet `bic` inclut le nom de la banque et la ville, resolus a partir du jeu de donnees GLEIF.
+- `sepa` vous indique si ce compte est accessible SEPA, quels schemas de paiement s'appliquent, et si la Verification of Payee (VoP) est exigee par la reglementation europeenne.
+- `issuer` classe l'institution -- `bank`, `digital_bank`, `emi` ou `payment_institution` -- aidant a detecter les IBAN virtuels.
+- `risk_indicators` fournit un signal de risque composite pour les agents de conformite : risque pays, couverture SEPA et statut VoP dans un seul objet.
+
+Si la validation echoue, la reponse inclut un champ `error` avec un code d'erreur lisible par machine (`checksum_failed`, `wrong_length`, `unsupported_country`, etc.) et un `error_detail` avec une explication lisible par un humain.
+
+## Exemple 2 : Python
+
+```python
+import httpx
+
+response = httpx.post(
+    "https://api.ibanforge.com/v1/iban/validate",
+    json={"iban": "DE89 3704 0044 0532 0130 00"}
+)
+result = response.json()
+print(f"Valid: {result['valid']}, Bank: {result.get('bic', {}).get('bank_name')}")
+```
+
+Cet exemple utilise `httpx` pour appeler l'API REST directement. Vous pouvez aussi utiliser `requests` ou tout autre client HTTP -- l'endpoint fonctionne exactement comme montre dans l'exemple curl ci-dessus.
+
+## Exemple 3 : TypeScript
+
+```typescript
+const res = await fetch('https://api.ibanforge.com/v1/iban/validate', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ iban: 'GB29 NWBK 6016 1331 9268 19' }),
+});
+const result = await res.json();
+console.log(result.bic?.bank_name);
+```
+
+Cela fonctionne dans tout environnement JavaScript/TypeScript -- routes API Next.js, fonctions edge, scripts Node.js ou code navigateur. Le champ `bic` est optionnel car la recherche BIC n'est pas disponible pour tous les pays, utilisez donc toujours l'optional chaining pour y acceder.
+
+## Validation par lot
+
+Si vous traitez un import CSV, validez une liste de creanciers lors de l'onboarding, ou executez une tache de rapprochement nocturne, l'endpoint `/v1/iban/batch` accepte jusqu'a 100 IBAN en une seule requete et retourne les resultats par IBAN au tarif forfaitaire de 0,020 $ USDC -- pas de facturation a l'unite. Chaque resultat du tableau a la meme structure qu'une reponse de validation unitaire, incluant l'enrichissement BIC lorsqu'il est disponible.
+
+```bash
+curl -X POST https://api.ibanforge.com/v1/iban/batch \
+  -H "Content-Type: application/json" \
+  -d '{
+    "ibans": [
+      "CH93 0076 2011 6238 5295 7",
+      "DE89 3704 0044 0532 0130 00",
+      "GB29 NWBK 6016 1331 9268 19"
+    ]
+  }'
+```
+
+## Pour les agents IA : integration MCP
+
+IBANforge est livre avec un serveur [Model Context Protocol](https://modelcontextprotocol.io) integre, exposant `validate_iban`, `batch_validate_iban` et `lookup_bic` comme outils natifs. Tout agent compatible MCP -- Claude, Cursor ou un modele open-source -- peut appeler ces outils directement sans wrappers personnalises. Si vous construisez un workflow agentique qui touche aux donnees de paiement, cela permet a la validation de se faire au niveau de l'outil plutot que de compter sur le modele pour obtenir les formats IBAN corrects.
+
+## Pour commencer
+
+- **Playground** -- [ibanforge.com/playground](https://ibanforge.com/playground) : collez n'importe quel IBAN, visualisez la reponse complete en direct, sans configuration requise.
+- **Endpoint de demo gratuit** -- `GET https://api.ibanforge.com/v1/demo` : retourne des exemples de validation pour quelques pays, sans paiement requis.
+- **Documentation** -- [ibanforge.com/docs](https://ibanforge.com/docs) : reference complete des endpoints, schemas de requete/reponse, codes d'erreur et guides d'integration.
+
+Les paiements utilisent le protocole x402 -- des fractions de centime en USDC par requete, sans cle API, sans abonnement. L'endpoint de demo et le playground sont toujours gratuits.

@@ -1,0 +1,91 @@
+---
+title: "v1.0 — Changelog zur Markteinfuehrung"
+description: "Alles, was in der Erstveroeffentlichung von IBANforge enthalten ist"
+date: "2026-04-01"
+---
+
+# v1.0 — Changelog zur Markteinfuehrung
+
+Heute veroeffentlichen wir die erste Version von IBANforge -- eine schnelle, entwicklerfreundliche API zur IBAN-Validierung und BIC/SWIFT-Abfrage, mit x402-Mikrozahlungen und MCP-Unterstuetzung fuer KI-Agenten.
+
+Hier ist alles, was in v1.0 enthalten ist.
+
+## IBAN-Validierung
+
+- Deckt **ueber 80 Laender** mit ISO 13616 IBAN-Formaten ab
+- **Mod-97-Pruefsummen**-Verifizierung bei jeder Anfrage
+- **BBAN-Parsing** -- extrahiert Bankleitzahl, Filialnummer und Kontonummer gemaess der Struktur jedes Landes
+- Normalisiert Eingaben (Leerzeichen, Grossbuchstaben) vor der Validierung
+- Gibt sowohl formatierte (`CH93 0076 2011 6238 5295 7`) als auch kompakte (`CH9300762011623852957`) Darstellungen zurueck
+
+Endpunkt: `POST /v1/iban/validate`
+
+## BIC/SWIFT-Abfrage
+
+- **Ueber 39.000 Eintraege** aus GLEIF (Global LEI Foundation)
+- **LEI-Anreicherung** -- jeder BIC-Eintrag enthaelt den Legal Entity Identifier, sofern verfuegbar
+- **GLEIF-Daten** -- Institutsname, Stadt, Land und Registrierungsstatus
+- BIC-Formatvalidierung (ISO 9362) vor der Datenbankabfrage
+- Unterstuetzt sowohl 8-stellige als auch 11-stellige BIC-Codes
+
+Endpunkt: `GET /v1/bic/:code`
+
+## Batch-Validierung
+
+- Validierung von **bis zu 100 IBANs** in einer einzigen Anfrage
+- Dieselbe Validierungslogik wie beim Einzelendpunkt -- Mod-97, BBAN-Parsing, BIC-Anreicherung
+- Gibt Ergebnisse pro IBAN mit individuellem gueltig/ungueltig-Status zurueck
+- Eine Pauschale fuer den Batch, keine Einzelabrechnung pro IBAN
+
+Endpunkt: `POST /v1/iban/batch`
+
+## MCP-Server
+
+IBANforge wird mit einem integrierten **Model Context Protocol (MCP) Server** ausgeliefert, der 3 Tools fuer KI-Agenten bereitstellt:
+
+- `validate_iban` -- Eine einzelne IBAN validieren und vollstaendig geparste Details erhalten
+- `batch_validate_iban` -- Mehrere IBANs in einem Aufruf validieren
+- `lookup_bic` -- Einen BIC/SWIFT-Code abfragen und Institutsdaten erhalten
+
+Verbinden Sie jeden MCP-kompatiblen KI-Agenten (Claude, Cursor usw.) ohne zusaetzlichen Konfigurationsaufwand mit IBANforge.
+
+Lokal ausfuehren: `npm run mcp`
+
+## x402-Mikrozahlungsunterstuetzung
+
+IBANforge verwendet das **x402-Zahlungsprotokoll** -- HTTP-native Mikrozahlungen in USDC. Keine API-Keys, keine Abonnements, keine Rate-Limits. Sie zahlen pro Anfrage, automatisch.
+
+- `POST /v1/iban/validate` — $0.005
+- `POST /v1/iban/batch` — $0.020
+- `GET /v1/bic/:code` — $0.003
+
+**Derzeit im kostenlosen Modus** waehrend der Einfuehrungsphase. Die x402-Zahlungsdurchsetzung wird aktiviert, sobald die Facilitator-Infrastruktur stabil ist.
+
+## OpenAPI-Spezifikation
+
+Eine vollstaendige **OpenAPI 3.1-Spezifikation** ist verfuegbar unter:
+
+```
+https://api.ibanforge.com/openapi.json
+```
+
+Importieren Sie sie in Postman, Insomnia oder jedes OpenAPI-kompatible Tool. Eine [Postman Collection](/ibanforge-postman.json) steht ebenfalls zum direkten Download bereit.
+
+## Interaktiver Playground
+
+Testen Sie die API direkt in Ihrem Browser unter [ibanforge.com/playground](https://ibanforge.com/playground). Keine Einrichtung erforderlich -- geben Sie eine beliebige IBAN ein und sehen Sie sofort die vollstaendig geparste Antwort.
+
+## Dokumentation
+
+Die vollstaendige Referenzdokumentation ist live unter [ibanforge.com/docs](https://ibanforge.com/docs):
+
+- [IBAN-Validierung](/docs/iban-validate)
+- [Batch-Validierung](/docs/iban-batch)
+- [BIC/SWIFT-Abfrage](/docs/bic-lookup)
+- [x402-Mikrozahlungen](/docs/x402)
+- [MCP-Integration](/docs/mcp)
+- [Fehlerreferenz](/docs/errors)
+
+---
+
+Fragen oder Feedback? Eroeffnen Sie ein Issue auf GitHub oder kontaktieren Sie uns direkt.

@@ -1,0 +1,145 @@
+---
+title: "Reference des erreurs"
+description: "Tous les codes d'erreur, statuts HTTP et guide de depannage de l'API IBANforge."
+order: 6
+---
+
+# Reference des erreurs
+
+IBANforge utilise les codes de statut HTTP standards et renvoie des reponses d'erreur structurees en JSON. Cette page couvre toutes les erreurs que vous pourriez rencontrer.
+
+## Codes de statut HTTP
+
+| Statut | Signification | Quand cela se produit |
+|---|---|---|
+| `200` | OK | La requete a reussi (note : les IBAN invalides renvoient tout de meme 200 avec `valid: false`) |
+| `400` | Bad Request | Corps de requete mal forme, champs manquants ou parametres invalides |
+| `402` | Payment Required | En-tete de paiement manquant, paiement insuffisant ou invalide |
+| `404` | Not Found | Code BIC introuvable dans la base de donnees, ou endpoint inconnu |
+| `500` | Internal Server Error | Erreur inattendue du serveur (merci de nous la signaler) |
+
+## Codes d'erreur de validation
+
+Ces codes apparaissent dans le corps de la reponse lorsqu'un IBAN est invalide. Le statut HTTP reste `200` — la requete elle-meme a reussi, mais l'IBAN n'a pas passe la validation.
+
+| Code | Description | Cause type |
+|---|---|---|
+| `invalid_format` | L'IBAN contient des caracteres invalides ou est vide | Caracteres speciaux, trop court, chaine vide |
+| `unsupported_country` | Le code pays n'est pas dans notre registre | `XX12345678` — "XX" n'est pas un pays valide |
+| `wrong_length` | La longueur de l'IBAN ne correspond pas a celle attendue pour le pays | Un IBAN suisse doit faire 21 caracteres, mais 19 ont ete fournis |
+| `checksum_failed` | La verification du checksum MOD-97 a echoue | Un chiffre a ete modifie ou transpose |
+
+### Exemple : erreur de validation
+
+```json
+{
+  "valid": false,
+  "error": {
+    "code": "wrong_length",
+    "message": "Expected 21 characters for CH (Switzerland), got 19"
+  }
+}
+```
+
+## Codes d'erreur de requete
+
+Ces erreurs renvoient des codes de statut HTTP non-200.
+
+### 400 Bad Request
+
+| Code | Description |
+|---|---|
+| `invalid_body` | Le corps de la requete n'est pas un JSON valide |
+| `missing_iban` | Le champ `iban` est manquant dans le corps de la requete |
+| `missing_ibans` | Le champ `ibans` est manquant dans le corps de la requete batch |
+| `empty_array` | Le tableau `ibans` est vide |
+| `too_many_ibans` | Plus de 10 IBAN dans une requete batch |
+| `invalid_bic_format` | Le code BIC ne fait pas 8 ou 11 caracteres |
+
+### Exemple : requete incorrecte
+
+```json
+{
+  "error": {
+    "code": "too_many_ibans",
+    "message": "Maximum 10 IBANs per batch request, got 15"
+  }
+}
+```
+
+### 402 Payment Required
+
+Renvoye lorsque l'en-tete `X-PAYMENT` est manquant, expire ou invalide. La reponse inclut les instructions de paiement :
+
+```json
+{
+  "error": "Payment Required",
+  "accepts": {
+    "scheme": "exact",
+    "network": "base",
+    "maxAmountRequired": "2000",
+    "resource": "https://api.ibanforge.com/v1/iban/validate",
+    "payTo": "0x...",
+    "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+  }
+}
+```
+
+Consultez [Paiements x402](/docs/x402) pour savoir comment gerer cela.
+
+### 404 Not Found
+
+| Code | Description |
+|---|---|
+| `bic_not_found` | Aucun etablissement trouve correspondant au code BIC fourni |
+| `not_found` | Le endpoint demande n'existe pas |
+
+### 500 Internal Server Error
+
+Si vous recevez une erreur 500, quelque chose d'inattendu s'est produit de notre cote. La reponse contiendra :
+
+```json
+{
+  "error": {
+    "code": "internal_error",
+    "message": "An unexpected error occurred"
+  }
+}
+```
+
+## Depannage
+
+### "Payment Required" a chaque requete
+
+- Assurez-vous d'avoir des USDC sur le reseau **Base** (et non sur le mainnet Ethereum)
+- Verifiez que la cle privee de votre portefeuille est correctement definie dans la variable d'environnement `WALLET_PRIVATE_KEY`
+- Verifiez que vous utilisez un SDK client x402 compatible
+
+### "Invalid IBAN format" alors que l'IBAN semble correct
+
+- Supprimez les espaces en debut et fin de chaine
+- Assurez-vous qu'il n'y a pas de caracteres non-ASCII (guillemets typographiques, tirets cadratins, etc.)
+- L'IBAN ne doit contenir que des lettres A-Z et des chiffres 0-9 (les espaces sont supprimes automatiquement)
+
+### "Unsupported country" pour un pays valide
+
+- IBANforge prend en charge plus de 80 pays. Certains territoires et micro-Etats peuvent ne pas encore etre inclus
+- Verifiez le code pays a deux lettres au debut de l'IBAN
+
+### "BIC not found" alors que le code est reel
+
+- La base de donnees BIC contient plus de 39 000 entrees provenant de GLEIF mais peut ne pas couvrir toutes les agences
+- Essayez la version a 8 caracteres (sans code agence) — par ex., `UBSWCHZH` au lieu de `UBSWCHZH80A`
+- Certains etablissements financiers utilisent des codes BIC qui ne sont pas enregistres aupres de SWIFT/GLEIF
+
+### La requete batch renvoie moins de resultats que prevu
+
+- Verifiez que votre tableau `ibans` ne depasse pas 10 elements
+- Assurez-vous que chaque element est une chaine de caracteres — les nombres et objets sont rejetes
+- Le tableau de resultats correspond toujours a l'ordre et au nombre du tableau d'entree
+
+### Timeout ou absence de reponse
+
+- L'API a un delai d'expiration de 30 secondes. Si vous envoyez des requetes batch complexes, elles devraient se terminer largement dans ce delai
+- Verifiez votre connexion reseau et les regles de pare-feu
+- Essayez le endpoint `/health` pour verifier que le service fonctionne

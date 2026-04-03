@@ -1,0 +1,91 @@
+---
+title: "v1.0 — Journal des modifications du lancement"
+description: "Tout ce qui est inclus dans la version initiale d'IBANforge"
+date: "2026-04-01"
+---
+
+# v1.0 — Journal des modifications du lancement
+
+Aujourd'hui, nous publions la version initiale d'IBANforge -- une API rapide et pensee pour les developpeurs, dediee a la validation d'IBAN et a la recherche BIC/SWIFT, avec micropaiements x402 et support MCP pour les agents IA.
+
+Voici tout ce qui est inclus dans la v1.0.
+
+## Validation d'IBAN
+
+- Couvre **plus de 80 pays** au format IBAN ISO 13616
+- Verification de la **somme de controle mod-97** a chaque requete
+- **Analyse du BBAN** -- extrait le code banque, le code agence et le numero de compte selon la structure de chaque pays
+- Normalise l'entree (espaces, majuscules) avant la validation
+- Retourne les representations formatee (`CH93 0076 2011 6238 5295 7`) et compacte (`CH9300762011623852957`)
+
+Endpoint : `POST /v1/iban/validate`
+
+## Recherche BIC/SWIFT
+
+- **Plus de 39 000 entrees** issues de GLEIF (Global LEI Foundation)
+- **Enrichissement LEI** -- chaque entree BIC inclut le Legal Entity Identifier lorsqu'il est disponible
+- **Donnees GLEIF** -- nom de l'institution, ville, pays et statut d'enregistrement
+- Validation du format BIC (ISO 9362) avant la recherche en base
+- Supporte les codes BIC a 8 et 11 caracteres
+
+Endpoint : `GET /v1/bic/:code`
+
+## Validation par lot
+
+- Validez **jusqu'a 100 IBAN** en une seule requete
+- Meme logique de validation que l'endpoint unitaire -- mod-97, analyse BBAN, enrichissement BIC
+- Retourne les resultats par IBAN avec un statut valide/invalide individuel
+- Un tarif forfaitaire pour le lot, pas de facturation par IBAN
+
+Endpoint : `POST /v1/iban/batch`
+
+## Serveur MCP
+
+IBANforge est livre avec un **serveur Model Context Protocol (MCP)** integre, exposant 3 outils pour les agents IA :
+
+- `validate_iban` -- Valider un IBAN unique et obtenir les details complets analyses
+- `batch_validate_iban` -- Valider plusieurs IBAN en un seul appel
+- `lookup_bic` -- Rechercher un code BIC/SWIFT et obtenir les donnees de l'institution
+
+Connectez n'importe quel agent IA compatible MCP (Claude, Cursor, etc.) a IBANforge sans aucune configuration supplementaire.
+
+Execution locale : `npm run mcp`
+
+## Support des micropaiements x402
+
+IBANforge utilise le **protocole de paiement x402** -- des micropaiements natifs HTTP en USDC. Pas de cles API, pas d'abonnement, pas de limites de requetes. Vous payez par requete, automatiquement.
+
+- `POST /v1/iban/validate` -- 0,005 $
+- `POST /v1/iban/batch` -- 0,020 $
+- `GET /v1/bic/:code` -- 0,003 $
+
+**Actuellement en mode gratuit** pendant la periode de lancement. L'application des paiements x402 sera activee une fois l'infrastructure du facilitateur stabilisee.
+
+## Specification OpenAPI
+
+Une **specification OpenAPI 3.1** complete est disponible a l'adresse :
+
+```
+https://api.ibanforge.com/openapi.json
+```
+
+Importez-la dans Postman, Insomnia ou tout outil compatible OpenAPI. Une [collection Postman](/ibanforge-postman.json) est egalement disponible en telechargement direct.
+
+## Playground interactif
+
+Essayez l'API directement dans votre navigateur sur [ibanforge.com/playground](https://ibanforge.com/playground). Aucune configuration requise -- entrez n'importe quel IBAN et visualisez instantanement la reponse complete analysee.
+
+## Documentation
+
+La documentation de reference complete est en ligne sur [ibanforge.com/docs](https://ibanforge.com/docs) :
+
+- [Validation d'IBAN](/docs/iban-validate)
+- [Validation par lot](/docs/iban-batch)
+- [Recherche BIC/SWIFT](/docs/bic-lookup)
+- [Micropaiements x402](/docs/x402)
+- [Integration MCP](/docs/mcp)
+- [Reference des erreurs](/docs/errors)
+
+---
+
+Des questions ou des retours ? Ouvrez une issue sur GitHub ou contactez-nous directement.

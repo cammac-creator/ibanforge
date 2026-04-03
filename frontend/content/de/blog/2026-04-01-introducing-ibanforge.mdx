@@ -1,0 +1,88 @@
+---
+title: "Wir stellen IBANforge vor"
+description: "Eine neue API zur IBAN-Validierung und BIC/SWIFT-Abfrage, entwickelt fuer KI-Agenten und Entwickler"
+date: "2026-04-01"
+---
+
+Finanzinfrastruktur ist langweilig -- bis sie versagt. Eine falsch eingetippte IBAN verzoegert eine Lieferantenzahlung um drei Tage. Ein veralteter BIC-Code fuehrt dazu, dass eine Ueberweisung zurueckgewiesen wird. Ein Stapel von Onboarding-Formularen ueberspringt die Validierung vollstaendig, weil der Aufruf eines Drittanbieterdiensts pro Anfrage zu teuer ist. Das sind keine Randfaelle -- sie passieren taeglich, in jedem Fintech-Unternehmen, in jeder Buchhaltungsabteilung.
+
+IBANforge ist unsere Antwort auf dieses Problem.
+
+## Was ist IBANforge?
+
+IBANforge ist eine Entwickler-API zur IBAN-Validierung und BIC/SWIFT-Abfrage. Sie deckt **ueber 80 Laender** ab, validiert Struktur und Pruefsumme (Mod-97), parst Bank- und Filialnummern aus der BBAN und gleicht BIC-Codes mit dem **ueber 39.000 Eintraege umfassenden GLEIF-Datensatz** ab -- derselben massgeblichen Quelle, die von Zentralbanken verwendet wird.
+
+Sie senden eine POST-Anfrage. Sie erhalten eine saubere, strukturierte JSON-Antwort. Das ist alles.
+
+```json
+{
+  "iban": "CH9300762011623852957",
+  "valid": true,
+  "country": { "code": "CH", "name": "Switzerland" },
+  "check_digits": "93",
+  "bban": { "bank_code": "00762", "account_number": "011623852957" },
+  "bic": { "code": "UBSWCHZH", "bank_name": "UBS Switzerland AG", "city": "Zurich" },
+  "sepa": { "member": true, "schemes": ["SCT", "SDD"], "vop_required": false },
+  "issuer": { "type": "bank", "name": "UBS Switzerland AG" },
+  "risk_indicators": {
+    "issuer_type": "bank",
+    "country_risk": "standard",
+    "test_bic": false,
+    "sepa_reachable": true,
+    "vop_coverage": false
+  },
+  "formatted": "CH93 0076 2011 6238 5295 7",
+  "cost_usdc": 0.005,
+  "processing_ms": 1.23
+}
+```
+
+## Warum wir IBANforge entwickelt haben
+
+Zwei Entwicklungen sind zusammengekommen, die den richtigen Zeitpunkt geschaffen haben.
+
+Erstens sind KI-Agenten inzwischen Realitaet. Arbeitsprozesse, die frueher einen Menschen erforderten, der sich durch ein Bankportal klickt, laufen jetzt autonom -- aber nur, wenn die zugrunde liegenden Tools zuverlaessig sind. Ein Agent, der ungueltige IBANs an einen Zahlungsdienstleister uebermittelt, verursacht reale Finanzfehler. Die Validierung muss auf Tool-Ebene stattfinden, bevor ein API-Aufruf an eine Bank erfolgt.
+
+Zweitens machen **x402-Mikrozahlungen** ein Pay-per-Call-Modell wirtschaftlich tragfaehig. Anstelle eines monatlichen Abonnements, das bei kleinen Projekten Reibung erzeugt und bei gelegentlicher Nutzung zu teuer ist, berechnet IBANforge Bruchteile eines Cents pro Aufruf in USDC, abgewickelt on-chain ueber das x402-Protokoll. Keine Registrierung, keine Kreditkarte, keine Rate-Limits. Sie zahlen fuer das, was Sie nutzen, wenn Sie es nutzen.
+
+Zusammen machen diese beiden Verschiebungen -- agentenbasierte Workflows + On-Chain-Mikrozahlungen -- eine neue Klasse von APIs moeglich. IBANforge ist fuer diese Welt entwickelt worden.
+
+## Hauptmerkmale
+
+**IBAN-Validierung fuer ueber 80 Laender.** Vollstaendige Mod-97-Pruefsummenverifizierung, laenderspezifische Laengen- und Formatregeln sowie BBAN-Parsing zur Extraktion von Bank-/Filialnummern, wo zutreffend.
+
+**Ueber 39.000 BIC-Eintraege von GLEIF.** Die Global LEI Foundation veroeffentlicht die massgebliche Zuordnung von BIC-Codes zu Finanzinstituten. Wir importieren sie, indexieren sie und liefern sie mit Sub-Millisekunden-Abfragen. Kombinierte IBAN- + BIC-Validierung ist in einer einzigen Anfrage verfuegbar.
+
+**SEPA-Compliance-Daten.** Jede Antwort enthaelt den SEPA-Mitgliedsstatus, verfuegbare Zahlungsverfahren (SCT, SDD, SCT_INST) und ob die Verification of Payee (VoP) gemaess EU-Regulierung erforderlich ist -- unverzichtbar fuer Agenten, die EU-Zahlungsvorschriften navigieren.
+
+**Emittenten-Klassifizierung & vIBAN-Erkennung.** IBANforge identifiziert, ob das ausgebende Institut eine traditionelle Bank, eine Digitalbank (N26, Monzo), ein E-Geld-Institut (Wise, Revolut) oder ein Zahlungsinstitut ist. Dies hilft Compliance-Teams bei der Erkennung virtueller IBANs (vIBANs), die von den EU-Geldwaeschevorschriften erfasst werden.
+
+**Risikoindikatoren.** Ein zusammengesetzter Risikoblock in jeder Antwort: Emittententyp, Laenderrisiko (FATF-basiert), Test-BIC-Erkennung, SEPA-Erreichbarkeit und VoP-Abdeckung. Ein Objekt, fuenf Signale -- entwickelt fuer KI-Compliance-Agenten.
+
+**MCP-Integration fuer KI-Agenten.** IBANforge wird mit einem Model Context Protocol Server ausgeliefert, sodass jeder MCP-kompatible KI-Agent `validate_iban`, `batch_validate_iban` und `lookup_bic` als native Tools aufrufen kann -- ohne benutzerdefinierte Wrapper. Claude, GPT und Open-Source-Agenten sprechen alle MCP.
+
+**x402 Pay-per-Call.** Einzelvalidierung: $0.005 USDC. Batch (bis zu 100): $0.002/IBAN. BIC-Abfrage: $0.003. Kein Konto erforderlich. Funktioniert mit jeder USDC-faehigen Wallet.
+
+**Batch-Validierung.** Reichen Sie bis zu 100 IBANs in einer einzigen Anfrage ein fuer Massen-Onboarding, Importprozesse oder Abstimmungsauftraege.
+
+## Erste Schritte
+
+Der schnellste Weg ist der [Playground](/playground) -- fuegen Sie eine beliebige IBAN ein, sehen Sie die vollstaendige Validierungsantwort live, kein API-Key erforderlich.
+
+Fuer die Integration deckt die [Dokumentation](/docs) jeden Endpunkt, jedes Anfrageformat, jedes Antwortschema und jeden Fehlercode ab. Es gibt auch einen kostenlosen `/v1/demo`-Endpunkt, der Beispielantworten fuer eine Handvoll Laender liefert, damit Sie Ihren Parser testen koennen, bevor Sie einen Cent ausgeben.
+
+```bash
+# Kostenlose Demo — keine Zahlung erforderlich
+curl https://api.ibanforge.com/v1/demo
+```
+
+## Was kommt als Naechstes
+
+IBANforge ist heute live und produktionsbereit. Hier ist, woran wir arbeiten:
+
+- **API-Keys + kostenloses Kontingent** -- 200 kostenlose Aufrufe/Monat fuer Entwickler, neben x402 Pay-per-Call
+- **Erweiterte Emittenten-Datenbank** -- mehr EMI- und Neobank-Zuordnungen fuer noch bessere vIBAN-Erkennung
+- **Webhook-Validierung** -- IBANs inline bei der Formularuebermittlung ueber ein leichtgewichtiges Embed validieren
+- **Mehrsprachige Landing-Page** -- FR/DE-Versionen fuer den europaeischen Markt
+
+Wenn Sie etwas mit IBANforge entwickeln, wuerden wir gerne davon erfahren. Die API ist offen -- keine Warteliste, kein Genehmigungsprozess. Beginnen Sie mit der Validierung.

@@ -1,0 +1,199 @@
+---
+title: "Validation par lot"
+description: "POST /v1/iban/batch — Valider jusqu'a 100 IBAN en une seule requete avec donnees SEPA, emetteur et risque."
+order: 2
+---
+
+# Validation par lot
+
+Validez jusqu'a 100 IBAN en un seul appel API. Chaque IBAN est traite independamment — un IBAN invalide n'affecte pas les autres. 60 % moins cher que les appels individuels.
+
+## Endpoint
+
+```
+POST https://api.ibanforge.com/v1/iban/batch
+```
+
+**Cout :** $0.002 USDC par IBAN (ex. : 10 IBAN = $0.020, 100 IBAN = $0.200)
+
+## Requete
+
+### En-tetes
+
+| En-tete | Valeur | Requis |
+|---|---|---|
+| `Content-Type` | `application/json` | Oui |
+| `X-PAYMENT` | Token de paiement x402 | Oui |
+
+### Corps
+
+```json
+{
+  "ibans": [
+    "CH93 0076 2011 6238 5295 7",
+    "DE89 3704 0044 0532 0130 00",
+    "GB29 NWBK 6016 1331 9268 19",
+    "INVALID123"
+  ]
+}
+```
+
+| Champ | Type | Description |
+|---|---|---|
+| `ibans` | `string[]` | Tableau d'IBAN a valider. De 1 a 100 elements. |
+
+## Reponse
+
+### Succes (200)
+
+```json
+{
+  "results": [
+    {
+      "iban": "CH9300762011623852957",
+      "valid": true,
+      "country": { "code": "CH", "name": "Switzerland" },
+      "check_digits": "93",
+      "bban": { "bank_code": "00762", "account_number": "011623852957" },
+      "bic": { "code": "UBSWCHZH", "bank_name": "UBS SWITZERLAND AG", "city": "ZURICH" },
+      "sepa": { "member": true, "schemes": ["SCT", "SDD"], "vop_required": false },
+      "issuer": { "type": "bank", "name": "UBS SWITZERLAND AG" },
+      "risk_indicators": {
+        "issuer_type": "bank",
+        "country_risk": "standard",
+        "test_bic": false,
+        "sepa_reachable": true,
+        "vop_coverage": false
+      },
+      "formatted": "CH93 0076 2011 6238 5295 7",
+      "cost_usdc": 0.005
+    },
+    {
+      "iban": "DE89370400440532013000",
+      "valid": true,
+      "country": { "code": "DE", "name": "Germany" },
+      "check_digits": "89",
+      "bban": { "bank_code": "37040044", "account_number": "0532013000" },
+      "bic": { "code": "COBADEFF", "bank_name": "COMMERZBANK AG", "city": "FRANKFURT AM MAIN" },
+      "sepa": { "member": true, "schemes": ["SCT", "SDD", "SCT_INST"], "vop_required": true },
+      "issuer": { "type": "bank", "name": "COMMERZBANK AG" },
+      "risk_indicators": {
+        "issuer_type": "bank",
+        "country_risk": "standard",
+        "test_bic": false,
+        "sepa_reachable": true,
+        "vop_coverage": true
+      },
+      "formatted": "DE89 3704 0044 0532 0130 00",
+      "cost_usdc": 0.005
+    },
+    {
+      "iban": "INVALID123",
+      "valid": false,
+      "error": "invalid_format",
+      "error_detail": "IBAN contains invalid characters. Only letters and digits are allowed.",
+      "cost_usdc": 0.005
+    }
+  ],
+  "count": 3,
+  "valid_count": 2,
+  "cost_usdc": 0.006,
+  "processing_ms": 2.45
+}
+```
+
+### Champs de la reponse
+
+**Premier niveau :**
+
+| Champ | Type | Description |
+|---|---|---|
+| `results` | `array` | Tableau des resultats de validation, dans le meme ordre que l'entree |
+| `count` | `number` | Nombre total d'IBAN traites |
+| `valid_count` | `number` | Nombre d'IBAN valides |
+| `cost_usdc` | `number` | Cout total de ce lot |
+| `processing_ms` | `number` | Temps total de traitement |
+
+**Chaque element de `results`** possede la meme structure que la [reponse de validation unitaire](/docs/iban-validate), incluant `sepa`, `issuer` et `risk_indicators` pour les IBAN valides.
+
+### Erreurs
+
+| Statut | Code | Description |
+|---|---|---|
+| 400 | `empty_batch` | Le tableau `ibans` est vide |
+| 400 | `batch_too_large` | Plus de 100 IBAN soumis |
+| 400 | `invalid_request` | Le corps de la requete n'est pas un JSON valide ou le champ `ibans` est manquant |
+
+## Exemples de code
+
+### cURL
+
+```bash
+curl -X POST https://api.ibanforge.com/v1/iban/batch \
+  -H "Content-Type: application/json" \
+  -d '{
+    "ibans": [
+      "CH9300762011623852957",
+      "DE89370400440532013000",
+      "FR7630006000011234567890189"
+    ]
+  }'
+```
+
+### Python
+
+```python
+import requests
+
+response = requests.post(
+    "https://api.ibanforge.com/v1/iban/batch",
+    json={
+        "ibans": [
+            "CH9300762011623852957",
+            "DE89370400440532013000",
+            "FR7630006000011234567890189",
+        ]
+    },
+)
+
+data = response.json()
+print(f"Valid: {data['valid_count']}/{data['count']}")
+
+for result in data["results"]:
+    if result["valid"]:
+        risk = result["risk_indicators"]["country_risk"]
+        issuer = result["issuer"]["type"]
+        print(f"  {result['iban']} — {result['country']['name']} ({issuer}, risk: {risk})")
+    else:
+        print(f"  INVALID — {result['error_detail']}")
+```
+
+### TypeScript
+
+```typescript
+const response = await fetch(
+  "https://api.ibanforge.com/v1/iban/batch",
+  {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      ibans: [
+        "CH9300762011623852957",
+        "DE89370400440532013000",
+        "FR7630006000011234567890189",
+      ],
+    }),
+  }
+);
+
+const data = await response.json();
+console.log(`Valid: ${data.valid_count}/${data.count}`);
+
+for (const result of data.results) {
+  if (result.valid) {
+    console.log(`  ${result.iban} — ${result.issuer.type}, risk: ${result.risk_indicators.country_risk}`);
+  } else {
+    console.log(`  INVALID — ${result.error_detail}`);
+  }
+}
+```

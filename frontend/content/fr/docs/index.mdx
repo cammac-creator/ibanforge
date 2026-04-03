@@ -1,0 +1,103 @@
+---
+title: "Introduction"
+description: "Vue d'ensemble de l'API IBANforge — validation IBAN, recherche BIC/SWIFT, conformite SEPA, classification emetteur et indicateurs de risque."
+order: 0
+---
+
+# API IBANforge
+
+[Telecharger la collection Postman](/ibanforge-postman.json)
+
+IBANforge est une API rapide et fiable pour la **validation IBAN** et la **recherche BIC/SWIFT**. Elle couvre plus de 80 pays avec verification de checksum en temps reel, analyse de la structure BBAN, donnees institutionnelles enrichies via GLEIF, **informations de conformite SEPA**, **classification de l'emetteur** (banque vs. EMI/neobanque) et **indicateurs de risque** pour les agents de conformite.
+
+## URL de base
+
+```
+https://api.ibanforge.com
+```
+
+Tous les endpoints sont servis en HTTPS. Les requetes HTTP sont automatiquement redirigees.
+
+## Authentification
+
+IBANforge utilise les **micropaiements x402** a la place des cles API traditionnelles. Chaque requete coute une fraction de centime, payee automatiquement en USDC. Pas d'inscription, pas d'abonnement, pas de limites de debit.
+
+Votre client HTTP attache un en-tete de paiement, et l'API le verifie avant de traiter la requete. Consultez le [guide des micropaiements x402](/docs/x402) pour plus de details.
+
+## Endpoints en un coup d'oeil
+
+| Endpoint | Methode | Cout | Description |
+|---|---|---|---|
+| `/v1/iban/validate` | POST | $0.005 | Valider un IBAN unique |
+| `/v1/iban/batch` | POST | $0.002/IBAN | Valider jusqu'a 100 IBAN |
+| `/v1/bic/:code` | GET | $0.003 | Rechercher un code BIC/SWIFT |
+| `/v1/demo` | GET | Gratuit | Exemples de validation (sans paiement) |
+| `/health` | GET | Gratuit | Verification de l'etat du service |
+
+## Exemple rapide
+
+```bash
+curl -X POST https://api.ibanforge.com/v1/iban/validate \
+  -H "Content-Type: application/json" \
+  -d '{"iban": "CH93 0076 2011 6238 5295 7"}'
+```
+
+Reponse :
+
+```json
+{
+  "iban": "CH9300762011623852957",
+  "valid": true,
+  "country": {
+    "code": "CH",
+    "name": "Switzerland"
+  },
+  "check_digits": "93",
+  "bban": {
+    "bank_code": "00762",
+    "account_number": "011623852957"
+  },
+  "bic": {
+    "code": "UBSWCHZH",
+    "bank_name": "UBS SWITZERLAND AG",
+    "city": "ZURICH"
+  },
+  "sepa": {
+    "member": true,
+    "schemes": ["SCT", "SDD"],
+    "vop_required": false
+  },
+  "issuer": {
+    "type": "bank",
+    "name": "UBS SWITZERLAND AG"
+  },
+  "risk_indicators": {
+    "issuer_type": "bank",
+    "country_risk": "standard",
+    "test_bic": false,
+    "sepa_reachable": true,
+    "vop_coverage": false
+  },
+  "formatted": "CH93 0076 2011 6238 5295 7",
+  "cost_usdc": 0.005
+}
+```
+
+## Test gratuit
+
+Utilisez le endpoint `/v1/demo` pour tester l'API sans configuration de paiement :
+
+```bash
+curl https://api.ibanforge.com/v1/demo
+```
+
+Cela renvoie des exemples d'IBAN pre-valides de plusieurs pays afin que vous puissiez explorer le format de reponse.
+
+## Etapes suivantes
+
+- [Valider un IBAN unique](/docs/iban-validate) — reference complete du endpoint
+- [Validation par lot](/docs/iban-batch) — valider jusqu'a 100 IBAN en une seule requete
+- [Recherche BIC/SWIFT](/docs/bic-lookup) — rechercher les donnees d'un etablissement par code BIC
+- [Micropaiements x402](/docs/x402) — fonctionnement du paiement
+- [Integration MCP](/docs/mcp) — connecter IBANforge a des agents IA
+- [Reference des erreurs](/docs/errors) — tous les codes d'erreur et depannage

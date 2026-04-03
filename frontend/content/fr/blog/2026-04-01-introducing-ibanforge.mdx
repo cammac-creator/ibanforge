@@ -1,0 +1,88 @@
+---
+title: "Presentation d'IBANforge"
+description: "Une nouvelle API de validation IBAN et de recherche BIC/SWIFT concue pour les agents IA et les developpeurs"
+date: "2026-04-01"
+---
+
+L'infrastructure financiere est ennuyeuse jusqu'a ce qu'elle casse. Un IBAN mal saisi retarde un paiement fournisseur de trois jours. Un code BIC obsolete fait rebondir un virement. Un lot de formulaires d'inscription saute la validation parce que le cout par requete d'un service tiers est trop eleve. Ce ne sont pas des cas limites -- cela arrive chaque jour, dans chaque fintech, dans chaque back-office.
+
+IBANforge est notre reponse a ce probleme.
+
+## Qu'est-ce qu'IBANforge ?
+
+IBANforge est une API pour developpeurs dediee a la validation d'IBAN et a la recherche de codes BIC/SWIFT. Elle couvre **plus de 80 pays**, valide la structure et la somme de controle (mod-97), analyse les codes banque et agence a partir du BBAN, et resout les codes BIC a partir du **jeu de donnees GLEIF de plus de 39 000 entrees** -- la meme source de reference utilisee par les banques centrales.
+
+Vous envoyez une requete POST. Vous recevez une reponse JSON structuree et propre. C'est tout.
+
+```json
+{
+  "iban": "CH9300762011623852957",
+  "valid": true,
+  "country": { "code": "CH", "name": "Switzerland" },
+  "check_digits": "93",
+  "bban": { "bank_code": "00762", "account_number": "011623852957" },
+  "bic": { "code": "UBSWCHZH", "bank_name": "UBS Switzerland AG", "city": "Zurich" },
+  "sepa": { "member": true, "schemes": ["SCT", "SDD"], "vop_required": false },
+  "issuer": { "type": "bank", "name": "UBS Switzerland AG" },
+  "risk_indicators": {
+    "issuer_type": "bank",
+    "country_risk": "standard",
+    "test_bic": false,
+    "sepa_reachable": true,
+    "vop_coverage": false
+  },
+  "formatted": "CH93 0076 2011 6238 5295 7",
+  "cost_usdc": 0.005,
+  "processing_ms": 1.23
+}
+```
+
+## Pourquoi nous l'avons construit
+
+Deux facteurs ont converge pour faire de ce moment le bon.
+
+Premierement, les agents IA sont desormais une realite. Des workflows qui necessitaient auparavant un humain naviguant dans un portail bancaire s'executent maintenant de maniere autonome -- mais uniquement si les outils sous-jacents sont fiables. Un agent qui soumet des IBAN invalides a un processeur de paiement cree de veritables erreurs financieres. La validation doit intervenir au niveau de l'outil, avant tout appel API a une banque.
+
+Deuxiemement, les **micropaiements x402** rendent l'economie du paiement a l'appel viable. Au lieu d'un abonnement mensuel qui cree de la friction pour les petits projets et surfacture les usages occasionnels, IBANforge facture des fractions de centime par appel en USDC, regles on-chain via le protocole x402. Pas d'inscription, pas de carte de credit, pas de limites de requetes. Vous payez ce que vous utilisez, quand vous l'utilisez.
+
+Ensemble, ces deux evolutions -- workflows agentiques + micropaiements on-chain -- rendent possible une nouvelle classe d'API. IBANforge est concu pour ce monde.
+
+## Fonctionnalites cles
+
+**Validation d'IBAN dans plus de 80 pays.** Verification complete de la somme de controle mod-97, regles de longueur et de format specifiques a chaque pays, et analyse du BBAN pour extraire les codes banque/agence le cas echeant.
+
+**Plus de 39 000 entrees BIC issues de GLEIF.** La Global LEI Foundation publie le referentiel officiel de correspondance entre codes BIC et institutions financieres. Nous l'importons, l'indexons et le servons avec des recherches en moins d'une milliseconde. La validation combinee IBAN + BIC est disponible en une seule requete.
+
+**Donnees de conformite SEPA.** Chaque reponse inclut le statut d'adhesion SEPA, les schemas de paiement disponibles (SCT, SDD, SCT_INST), et si la Verification of Payee (VoP) est obligatoire -- essentiel pour les agents naviguant dans les reglementations de paiement europeennes.
+
+**Classification de l'emetteur et detection de vIBAN.** IBANforge identifie si l'institution emettrice est une banque traditionnelle, une banque numerique (N26, Monzo), un EMI (Wise, Revolut) ou un etablissement de paiement. Cela aide les equipes de conformite a detecter les IBAN virtuels (vIBAN) signales par les reglementations europeennes anti-blanchiment.
+
+**Indicateurs de risque.** Un bloc de risque composite dans chaque reponse : type d'emetteur, niveau de risque pays (base GAFI), detection de BIC de test, accessibilite SEPA et couverture VoP. Un objet, cinq signaux -- concu pour les agents IA de conformite.
+
+**Integration MCP pour les agents IA.** IBANforge est livre avec un serveur Model Context Protocol, ce qui signifie que tout agent IA compatible MCP peut appeler `validate_iban`, `batch_validate_iban` et `lookup_bic` comme outils natifs -- sans wrappers personnalises. Claude, GPT et les agents open-source parlent tous MCP.
+
+**Paiement a l'appel x402.** Validation unitaire : 0,005 $ USDC. Lot (jusqu'a 100) : 0,002 $/IBAN. Recherche BIC : 0,003 $. Aucun compte requis. Compatible avec tout portefeuille USDC.
+
+**Validation par lot.** Soumettez jusqu'a 100 IBAN en une seule requete pour l'onboarding en masse, les flux d'import ou les taches de rapprochement.
+
+## Comment demarrer
+
+Le chemin le plus rapide est le [Playground](/playground) -- collez n'importe quel IBAN, visualisez la reponse de validation complete en direct, sans cle API.
+
+Pour l'integration, la [documentation](/docs) couvre chaque endpoint, format de requete, schema de reponse et code d'erreur. Il existe egalement un endpoint gratuit `/v1/demo` qui retourne des exemples de reponses pour quelques pays, afin de tester votre parseur avant de depenser un centime.
+
+```bash
+# Demo gratuite — aucun paiement requis
+curl https://api.ibanforge.com/v1/demo
+```
+
+## Et ensuite
+
+IBANforge est en ligne et pret pour la production des aujourd'hui. Voici ce que nous construisons pour la suite :
+
+- **Cles API + offre gratuite** -- 200 appels gratuits/mois pour les developpeurs, en complement du paiement a l'appel x402
+- **Base d'emetteurs etendue** -- davantage de correspondances EMI et neobanque pour une detection de vIBAN encore plus precise
+- **Validation par webhook** -- validez les IBAN en ligne lors de la soumission de formulaire via un embed leger
+- **Landing multilingue** -- versions FR/DE pour le marche europeen
+
+Si vous construisez quelque chose avec IBANforge, nous voulons en entendre parler. L'API est ouverte -- pas de liste d'attente, pas de processus d'approbation. Commencez a valider.

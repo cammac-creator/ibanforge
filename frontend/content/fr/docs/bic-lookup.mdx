@@ -1,0 +1,129 @@
+---
+title: "Recherche BIC"
+description: "GET /v1/bic/:code — Rechercher les donnees d'un etablissement par code BIC/SWIFT."
+order: 3
+---
+
+# Recherche BIC
+
+Recherchez des informations detaillees sur un etablissement par code BIC/SWIFT. La base de donnees contient plus de 39 000 entrees enrichies avec les donnees LEI de GLEIF.
+
+## Endpoint
+
+```
+GET https://api.ibanforge.com/v1/bic/:code
+```
+
+**Cout :** $0.003 USDC par requete
+
+## Parametres
+
+| Parametre | Emplacement | Type | Description |
+|---|---|---|---|
+| `code` | Chemin URL | `string` | Code BIC/SWIFT — 8 ou 11 caracteres. Insensible a la casse. |
+
+Un code BIC suit le format ISO 9362 :
+
+```
+AAAA BB CC DDD
+│    │  │  └── Code agence (optionnel, 3 car. — XXX = siege)
+│    │  └──── Code localite (2 car.)
+│    └─────── Code pays (ISO 3166-1 alpha-2)
+└──────────── Code etablissement (4 car.)
+```
+
+## Reponse
+
+### Succes (200)
+
+```json
+{
+  "bic": "UBSWCHZH80A",
+  "institution": "UBS SWITZERLAND AG",
+  "country": "Switzerland",
+  "countryCode": "CH",
+  "city": "ZURICH",
+  "branch": "WEALTH MANAGEMENT",
+  "lei": "BFM8T61CT2L1QCEMIK50"
+}
+```
+
+### Champs de la reponse
+
+| Champ | Type | Description |
+|---|---|---|
+| `bic` | `string` | Code BIC normalise (majuscules, 8 ou 11 caracteres) |
+| `institution` | `string` | Nom officiel de l'etablissement |
+| `country` | `string` | Nom complet du pays |
+| `countryCode` | `string` | Code pays ISO 3166-1 alpha-2 |
+| `city` | `string` | Ville ou se situe l'agence |
+| `branch` | `string \| null` | Nom de l'agence, le cas echeant |
+| `lei` | `string \| null` | Legal Entity Identifier (20 caracteres), si disponible dans les donnees GLEIF |
+
+### Non trouve (404)
+
+```json
+{
+  "error": {
+    "code": "bic_not_found",
+    "message": "No institution found for BIC code XXXXCHZZXXX"
+  }
+}
+```
+
+### Erreurs
+
+| Statut | Code | Description |
+|---|---|---|
+| 400 | `invalid_bic_format` | Le code BIC ne fait pas 8 ou 11 caracteres, ou contient des caracteres invalides |
+| 404 | `bic_not_found` | Aucun etablissement correspondant dans la base de donnees |
+
+## Exemples de code
+
+### cURL
+
+```bash
+curl https://api.ibanforge.com/v1/bic/UBSWCHZH80A
+```
+
+### BIC a 8 caracteres (siege)
+
+```bash
+curl https://api.ibanforge.com/v1/bic/COBADEFF
+```
+
+Lorsque vous transmettez un BIC a 8 caracteres, l'API recherche l'entree du siege (equivalent a ajouter `XXX`).
+
+### Python
+
+```python
+import requests
+
+response = requests.get(
+    "https://api.ibanforge.com/v1/bic/UBSWCHZH80A"
+)
+
+data = response.json()
+print(f"Institution: {data['institution']}")
+print(f"Location: {data['city']}, {data['country']}")
+if data.get("lei"):
+    print(f"LEI: {data['lei']}")
+```
+
+### TypeScript
+
+```typescript
+const code = "UBSWCHZH80A";
+const response = await fetch(
+  `https://api.ibanforge.com/v1/bic/${code}`
+);
+
+if (!response.ok) {
+  const error = await response.json();
+  console.error(error.error.message);
+} else {
+  const data = await response.json();
+  console.log(`Institution: ${data.institution}`);
+  console.log(`Location: ${data.city}, ${data.country}`);
+}
+```
