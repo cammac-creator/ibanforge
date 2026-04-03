@@ -1,4 +1,5 @@
 import { MDXRemote } from "next-mdx-remote/rsc";
+import { useTranslations } from "next-intl";
 import { getPost, getAllPosts } from "@/lib/blog";
 import { notFound } from "next/navigation";
 import Link from "next/link";
@@ -10,11 +11,11 @@ export function generateStaticParams() {
 export async function generateMetadata({
   params,
 }: {
-  params: Promise<{ slug: string }>;
+  params: Promise<{ locale: string; slug: string }>;
 }) {
-  const { slug } = await params;
+  const { locale, slug } = await params;
   try {
-    const { meta } = getPost(slug);
+    const { meta } = getPost(slug, locale);
     return {
       title: `${meta.title} | IBANforge Blog`,
       description: meta.description,
@@ -27,13 +28,14 @@ export async function generateMetadata({
 export default async function BlogPostPage({
   params,
 }: {
-  params: Promise<{ slug: string }>;
+  params: Promise<{ locale: string; slug: string }>;
 }) {
-  const { slug } = await params;
+  const { locale, slug } = await params;
+  const t = useTranslations('blog');
 
   let post;
   try {
-    post = getPost(slug);
+    post = getPost(slug, locale);
   } catch {
     notFound();
   }
@@ -44,17 +46,17 @@ export default async function BlogPostPage({
     <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8 py-16">
       <div className="mb-10">
         <Link
-          href="/blog"
+          href={`/${locale}/blog`}
           className="text-sm text-muted-foreground hover:text-foreground transition-colors mb-8 inline-block"
         >
-          ← Back to blog
+          {t('backToBlog')}
         </Link>
         <h1 className="text-4xl font-heading font-bold tracking-tight text-foreground mt-6 mb-4">
           {meta.title}
         </h1>
         <div className="flex items-center gap-3 text-sm text-muted-foreground">
           <time dateTime={meta.date}>
-            {new Date(meta.date).toLocaleDateString("en-US", {
+            {new Date(meta.date).toLocaleDateString(locale, {
               year: "numeric",
               month: "long",
               day: "numeric",

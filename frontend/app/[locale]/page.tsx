@@ -1,5 +1,6 @@
 import type { Metadata } from "next"
 import Link from "next/link"
+import { useTranslations } from "next-intl"
 import { CodeBlock } from "@/components/code-block"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -19,100 +20,57 @@ const CURL_EXAMPLE = `curl -X POST https://api.ibanforge.com/v1/iban/validate \\
   -H "Content-Type: application/json" \\
   -d '{"iban": "CH93 0076 2011 6238 5295 7"}'`
 
-const FEATURES = [
-  {
-    badge: "75+ Countries",
-    title: "IBAN Validation",
-    description:
-      "Full IBAN validation with BBAN structure parsing. Supports 75+ countries with mod97 checksum verification and detailed field breakdown.",
-  },
-  {
-    badge: "39,000+ BIC Entries",
-    title: "BIC/SWIFT Lookup",
-    description:
-      "Complete BIC/SWIFT database sourced from GLEIF, enriched with LEI (Legal Entity Identifier) data for financial institution identification.",
-  },
-  {
-    badge: "SEPA + VoP",
-    title: "Compliance Ready",
-    description:
-      "SEPA membership, payment schemes (SCT/SDD/SCT_INST), and Verification of Payee (VoP) requirement per country. Built for EU regulatory compliance.",
-  },
-  {
-    badge: "vIBAN Detection",
-    title: "Issuer Classification",
-    description:
-      "Identifies if the issuer is a traditional bank, neobank, EMI, or payment institution. Detects virtual IBANs for AML/CFT compliance workflows.",
-  },
-  {
-    badge: "Risk Scoring",
-    title: "Risk Indicators",
-    description:
-      "Composite risk signal per IBAN: issuer type, country risk (FATF-based), test BIC detection, SEPA reachability, and VoP coverage in one object.",
-  },
-  {
-    badge: "MCP Integration",
-    title: "AI Agent Ready",
-    description:
-      "Native Model Context Protocol support. AI agents can validate IBANs and look up BIC codes directly — no custom tooling required.",
-  },
-]
+const FEATURE_COUNT = 6
+const ENDPOINT_COUNT = 3
 
-const ENDPOINTS = [
-  {
-    method: "POST",
-    path: "/v1/iban/validate",
-    cost: "$0.005",
-    description: "Validate a single IBAN",
-  },
-  {
-    method: "POST",
-    path: "/v1/iban/batch",
-    cost: "$0.002/IBAN",
-    description: "Validate up to 100 IBANs",
-  },
-  {
-    method: "GET",
-    path: "/v1/bic/:code",
-    cost: "$0.003",
-    description: "Lookup BIC/SWIFT code",
-  },
-]
+export default async function Home({ params }: { params: Promise<{ locale: string }> }) {
+  const { locale } = await params;
+  const t = useTranslations('home');
 
-export default function Home() {
+  const FEATURES = Array.from({ length: FEATURE_COUNT }, (_, i) => ({
+    badge: t(`features.${i}.badge`),
+    title: t(`features.${i}.title`),
+    description: t(`features.${i}.description`),
+  }))
+
+  const ENDPOINTS = Array.from({ length: ENDPOINT_COUNT }, (_, i) => ({
+    method: t(`endpoints.${i}.method`),
+    path: t(`endpoints.${i}.path`),
+    cost: t(`endpoints.${i}.cost`),
+    description: t(`endpoints.${i}.description`),
+  }))
+
   return (
     <div className="flex flex-col">
       {/* ── Hero ──────────────────────────────────────────────────────────── */}
       <section className="flex flex-col items-center justify-center text-center px-4 py-28 gap-6">
         <Badge variant="outline" className="text-amber-500 border-amber-500/40 bg-amber-500/5 px-3 py-1 text-xs tracking-widest uppercase">
-          Free during beta
+          {t('badge')}
         </Badge>
 
         <h1 className="text-5xl sm:text-6xl md:text-7xl font-bold tracking-tight font-mono text-foreground">
-          IBAN<span className="text-amber-500">forge</span>
+          {t('hero.title.prefix')}<span className="text-amber-500">{t('hero.title.highlight')}</span>
         </h1>
 
         <p className="max-w-2xl text-lg text-muted-foreground leading-relaxed">
-          IBAN validation, BIC/SWIFT lookup, SEPA compliance &amp; risk indicators
-          <br className="hidden sm:block" />
-          for developers and AI agents
+          {t('hero.description')}
         </p>
 
         <div className="flex flex-col sm:flex-row gap-3 mt-2">
           <Button
             size="lg"
             className="bg-amber-500 hover:bg-amber-400 text-zinc-950 font-semibold px-6"
-            render={<Link href="/playground" />}
+            render={<Link href={`/${locale}/playground`} />}
           >
-            Try it free
+            {t('hero.cta.tryFree')}
           </Button>
           <Button
             size="lg"
             variant="outline"
             className="px-6"
-            render={<Link href="/docs" />}
+            render={<Link href={`/${locale}/docs`} />}
           >
-            Read the docs
+            {t('hero.cta.readDocs')}
           </Button>
         </div>
       </section>
@@ -120,7 +78,7 @@ export default function Home() {
       {/* ── Features ──────────────────────────────────────────────────────── */}
       <section className="px-4 py-20 max-w-5xl mx-auto w-full">
         <h2 className="text-2xl font-semibold tracking-tight mb-10 text-center">
-          Everything you need
+          {t('features.heading')}
         </h2>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -147,10 +105,10 @@ export default function Home() {
       {/* ── Endpoints table ───────────────────────────────────────────────── */}
       <section className="px-4 py-20 max-w-5xl mx-auto w-full">
         <h2 className="text-2xl font-semibold tracking-tight mb-4 text-center">
-          Endpoints &amp; pricing
+          {t('endpoints.heading')}
         </h2>
         <p className="text-center text-muted-foreground mb-10 text-sm">
-          Currently free during beta. Prices below will apply when x402 micropayments are activated.
+          {t('endpoints.subtitle')}
         </p>
 
         <div className="rounded-xl border border-border overflow-hidden">
@@ -158,16 +116,16 @@ export default function Home() {
             <thead>
               <tr className="border-b border-border bg-zinc-900/60">
                 <th className="px-5 py-3 text-left font-medium text-muted-foreground">
-                  Method
+                  {t('endpoints.table.method')}
                 </th>
                 <th className="px-5 py-3 text-left font-medium text-muted-foreground">
-                  Path
+                  {t('endpoints.table.path')}
                 </th>
                 <th className="px-5 py-3 text-left font-medium text-muted-foreground">
-                  Cost
+                  {t('endpoints.table.cost')}
                 </th>
                 <th className="px-5 py-3 text-left font-medium text-muted-foreground hidden sm:table-cell">
-                  Description
+                  {t('endpoints.table.description')}
                 </th>
               </tr>
             </thead>
@@ -203,10 +161,10 @@ export default function Home() {
       {/* ── Quick start ───────────────────────────────────────────────────── */}
       <section className="px-4 py-20 max-w-5xl mx-auto w-full">
         <h2 className="text-2xl font-semibold tracking-tight mb-4 text-center">
-          Quick start
+          {t('quickStart.heading')}
         </h2>
         <p className="text-center text-muted-foreground mb-10 text-sm">
-          No API key required — just send a request. Free during beta.
+          {t('quickStart.subtitle')}
         </p>
 
         <CodeBlock code={CURL_EXAMPLE} language="bash" className="max-w-2xl mx-auto" />
@@ -215,17 +173,17 @@ export default function Home() {
       {/* ── Final CTA ─────────────────────────────────────────────────────── */}
       <section className="flex flex-col items-center text-center px-4 py-28 gap-6 border-t border-border">
         <h2 className="text-3xl sm:text-4xl font-bold tracking-tight">
-          Ready to build?
+          {t('cta.heading')}
         </h2>
         <p className="text-muted-foreground max-w-md">
-          Integrate in minutes. Free during beta — no API key, no subscription.
+          {t('cta.description')}
         </p>
         <Button
           size="lg"
           className="bg-amber-500 hover:bg-amber-400 text-zinc-950 font-semibold px-8 mt-2"
-          render={<Link href="/docs" />}
+          render={<Link href={`/${locale}/docs`} />}
         >
-          Start building
+          {t('cta.button')}
         </Button>
       </section>
     </div>

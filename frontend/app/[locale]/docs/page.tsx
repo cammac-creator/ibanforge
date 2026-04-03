@@ -9,8 +9,9 @@ export const metadata: Metadata = {
     "API documentation for IBANforge — IBAN validation, BIC/SWIFT lookup, and x402 micropayments.",
 };
 
-export default function DocsPage() {
-  const { content } = getDoc("index");
+export default async function DocsPage({ params }: { params: Promise<{ locale: string }> }) {
+  const { locale } = await params;
+  const { content } = getDoc("index", locale);
 
   return <MDXRemote source={content} />;
 }

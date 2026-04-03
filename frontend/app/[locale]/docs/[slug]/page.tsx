@@ -11,11 +11,11 @@ export function generateStaticParams() {
 export async function generateMetadata({
   params,
 }: {
-  params: Promise<{ slug: string }>;
+  params: Promise<{ locale: string; slug: string }>;
 }) {
-  const { slug } = await params;
+  const { locale, slug } = await params;
   try {
-    const { meta } = getDoc(slug);
+    const { meta } = getDoc(slug, locale);
     return {
       title: `${meta.title} | IBANforge Docs`,
       description: meta.description,
@@ -28,12 +28,12 @@ export async function generateMetadata({
 export default async function DocPage({
   params,
 }: {
-  params: Promise<{ slug: string }>;
+  params: Promise<{ locale: string; slug: string }>;
 }) {
-  const { slug } = await params;
+  const { locale, slug } = await params;
 
   try {
-    const { content } = getDoc(slug);
+    const { content } = getDoc(slug, locale);
     return <MDXRemote source={content} />;
   } catch {
     notFound();

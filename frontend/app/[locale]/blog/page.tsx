@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { getAllPosts } from "@/lib/blog";
 
 import type { Metadata } from "next";
@@ -9,22 +10,24 @@ export const metadata: Metadata = {
     "Updates, guides, and changelog from the IBANforge team.",
 };
 
-export default function BlogPage() {
-  const posts = getAllPosts();
+export default async function BlogPage({ params }: { params: Promise<{ locale: string }> }) {
+  const { locale } = await params;
+  const t = useTranslations('blog');
+  const posts = getAllPosts(locale);
 
   return (
     <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8 py-16">
       <div className="mb-12">
         <h1 className="text-4xl font-heading font-bold tracking-tight text-foreground mb-3">
-          Blog
+          {t('title')}
         </h1>
         <p className="text-lg text-muted-foreground">
-          Updates, guides, and changelog
+          {t('subtitle')}
         </p>
       </div>
 
       {posts.length === 0 ? (
-        <p className="text-muted-foreground">No posts yet.</p>
+        <p className="text-muted-foreground">{t('noPosts')}</p>
       ) : (
         <div className="space-y-10">
           {posts.map((post) => (
@@ -34,7 +37,7 @@ export default function BlogPage() {
             >
               <div className="flex items-center gap-3 text-sm text-muted-foreground mb-3">
                 <time dateTime={post.date}>
-                  {new Date(post.date).toLocaleDateString("en-US", {
+                  {new Date(post.date).toLocaleDateString(locale, {
                     year: "numeric",
                     month: "long",
                     day: "numeric",
@@ -45,7 +48,7 @@ export default function BlogPage() {
               </div>
               <h2 className="text-2xl font-heading font-semibold tracking-tight text-foreground mb-2">
                 <Link
-                  href={`/blog/${post.slug}`}
+                  href={`/${locale}/blog/${post.slug}`}
                   className="hover:text-primary transition-colors"
                 >
                   {post.title}
@@ -57,10 +60,10 @@ export default function BlogPage() {
                 </p>
               )}
               <Link
-                href={`/blog/${post.slug}`}
+                href={`/${locale}/blog/${post.slug}`}
                 className="text-sm font-medium text-primary hover:underline"
               >
-                Read more →
+                {t('readMore')}
               </Link>
             </article>
           ))}

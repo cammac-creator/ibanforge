@@ -1,5 +1,6 @@
 import type { Metadata } from "next"
 import Link from "next/link"
+import { useTranslations } from "next-intl"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { CostCalculator } from "./calculator"
@@ -11,70 +12,40 @@ export const metadata: Metadata = {
     "Simple, transparent pay-per-call pricing. No subscriptions. No API keys. Pay with USDC via x402 micropayments.",
 }
 
-const ENDPOINTS = [
-  {
-    method: "POST",
-    path: "/v1/iban/validate",
-    cost: "$0.005",
-    costLabel: "per call",
-    description: "Validate a single IBAN with SEPA, issuer, and risk data",
-  },
-  {
-    method: "POST",
-    path: "/v1/iban/batch",
-    cost: "$0.002",
-    costLabel: "per IBAN (up to 100)",
-    description: "Batch validation with full enrichment per IBAN",
-  },
-  {
-    method: "GET",
-    path: "/v1/bic/:code",
-    cost: "$0.003",
-    costLabel: "per call",
-    description: "Lookup BIC/SWIFT code from GLEIF database",
-  },
-]
+const ENDPOINT_COUNT = 3
 
-const faqJsonLd = {
-  "@context": "https://schema.org",
-  "@type": "FAQPage",
-  "mainEntity": [
-    {
-      "@type": "Question",
-      "name": "What is x402?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "x402 is an open micropayment protocol that uses HTTP status code 402 (Payment Required). When you call a paid endpoint, the server responds with a 402 containing payment details. Your client automatically sends a signed USDC payment on Base, and the server re-processes your request — all within a single HTTP round-trip.",
-      },
-    },
-    {
-      "@type": "Question",
-      "name": "How do I pay?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "Payments are made in USDC on the Base network. Your HTTP client (or SDK) handles it automatically by attaching payment headers to each request. No wallet UI, no manual confirmation — just fractions of a cent deducted per call. Check the docs for integration examples.",
-      },
-    },
-    {
-      "@type": "Question",
-      "name": "Is there a free tier?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "Yes. The /v1/demo endpoint returns pre-computed example validations at no cost, perfect for testing your integration. The /playground on this site lets you try live calls for free too. No signup or payment method required to get started.",
-      },
-    },
-    {
-      "@type": "Question",
-      "name": "What about high volume?",
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": "The per-call pricing scales linearly with no rate limits. For very high volumes (millions of calls/month), open an issue on our GitHub repository (github.com/cammac-creator/ibanforge) — we can discuss custom pricing or a bulk arrangement that makes more sense for your use case.",
-      },
-    },
-  ],
-}
+export default async function PricingPage({ params }: { params: Promise<{ locale: string }> }) {
+  const { locale } = await params;
+  const t = useTranslations('pricing');
 
-export default function PricingPage() {
+  const ENDPOINTS = Array.from({ length: ENDPOINT_COUNT }, (_, i) => ({
+    method: t(`endpoints.${i}.method`),
+    path: t(`endpoints.${i}.path`),
+    cost: t(`endpoints.${i}.cost`),
+    costLabel: t(`endpoints.${i}.costLabel`),
+    description: t(`endpoints.${i}.description`),
+  }))
+
+  const X402_ITEMS = [
+    { icon: "💳", text: t('x402.items.0') },
+    { icon: "⚡", text: t('x402.items.1') },
+    { icon: "🔗", text: t('x402.items.2') },
+    { icon: "🆓", text: t('x402.items.3') },
+  ]
+
+  const faqJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": Array.from({ length: 4 }, (_, i) => ({
+      "@type": "Question",
+      "name": t(`faq.${i}.question`),
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": t(`faq.${i}.answer`),
+      },
+    })),
+  }
+
   return (
     <div className="flex flex-col">
       {/* ── Hero ──────────────────────────────────────────────────────────── */}
@@ -83,33 +54,32 @@ export default function PricingPage() {
           variant="outline"
           className="text-amber-500 border-amber-500/40 bg-amber-500/5 px-3 py-1 text-xs tracking-widest uppercase"
         >
-          Transparent pricing
+          {t('badge')}
         </Badge>
 
         <h1 className="text-5xl sm:text-6xl font-bold tracking-tight font-mono">
-          Pay per <span className="text-amber-500">call</span>
+          {t('hero.title.prefix')} <span className="text-amber-500">{t('hero.title.highlight')}</span>
         </h1>
 
         <p className="max-w-xl text-lg text-muted-foreground leading-relaxed">
-          No subscription. No API key. Fractions of a cent per request — billed
-          on-chain with USDC via the x402 protocol.
+          {t('hero.description')}
         </p>
 
         <div className="flex flex-col sm:flex-row gap-3 mt-2">
           <Button
             size="lg"
             className="bg-amber-500 hover:bg-amber-400 text-zinc-950 font-semibold px-6"
-            render={<Link href="/playground" />}
+            render={<Link href={`/${locale}/playground`} />}
           >
-            Try it free
+            {t('hero.cta.tryFree')}
           </Button>
           <Button
             size="lg"
             variant="outline"
             className="px-6"
-            render={<Link href="/docs/x402" />}
+            render={<Link href={`/${locale}/docs/x402`} />}
           >
-            x402 explained →
+            {t('hero.cta.x402Explained')}
           </Button>
         </div>
       </section>
@@ -117,10 +87,10 @@ export default function PricingPage() {
       {/* ── Pricing table ─────────────────────────────────────────────────── */}
       <section className="px-4 py-16 max-w-5xl mx-auto w-full">
         <h2 className="text-2xl font-semibold tracking-tight mb-2 text-center">
-          Endpoint pricing
+          {t('table.heading')}
         </h2>
         <p className="text-center text-muted-foreground mb-10 text-sm">
-          Currently free during beta. Prices below will apply when x402 payments are activated.
+          {t('table.subtitle')}
         </p>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -155,23 +125,27 @@ export default function PricingPage() {
         {/* Free endpoints note */}
         <div className="mt-6 rounded-xl border border-border bg-zinc-900/30 px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
           <div>
-            <p className="text-sm font-medium text-foreground">Free endpoints</p>
+            <p className="text-sm font-medium text-foreground">{t('free.title')}</p>
             <p className="text-sm text-muted-foreground mt-0.5">
-              <code className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded">
-                GET /v1/demo
-              </code>
-              {" "}and{" "}
-              <code className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded">
-                GET /health
-              </code>
-              {" "}are always free — no payment required.
+              {t.rich('free.description', {
+                demo: () => (
+                  <code className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded">
+                    {t('free.demo')}
+                  </code>
+                ),
+                health: () => (
+                  <code className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded">
+                    {t('free.health')}
+                  </code>
+                ),
+              })}
             </p>
           </div>
           <Link
-            href="/playground"
+            href={`/${locale}/playground`}
             className="shrink-0 text-sm text-amber-500 hover:text-amber-400 underline underline-offset-4 transition-colors"
           >
-            Try in playground →
+            {t('free.playgroundLink')}
           </Link>
         </div>
       </section>
@@ -179,10 +153,10 @@ export default function PricingPage() {
       {/* ── Cost calculator ───────────────────────────────────────────────── */}
       <section className="px-4 py-16 max-w-3xl mx-auto w-full">
         <h2 className="text-2xl font-semibold tracking-tight mb-2 text-center">
-          Estimate your costs
+          {t('calculator.heading')}
         </h2>
         <p className="text-center text-muted-foreground mb-10 text-sm">
-          Adjust the slider to see what you would pay each month.
+          {t('calculator.subtitle')}
         </p>
 
         <CostCalculator />
@@ -196,30 +170,13 @@ export default function PricingPage() {
               variant="outline"
               className="w-fit text-amber-500 border-amber-500/40 bg-amber-500/10 font-mono text-xs"
             >
-              x402 Protocol
+              {t('x402.badge')}
             </Badge>
             <h2 className="text-2xl font-semibold tracking-tight">
-              How payments work
+              {t('x402.heading')}
             </h2>
             <ul className="flex flex-col gap-3">
-              {[
-                {
-                  icon: "💳",
-                  text: "No subscription. No API key. Pay per call with USDC.",
-                },
-                {
-                  icon: "⚡",
-                  text: "Your HTTP client sends a tiny payment with each request — automatically, via standard headers.",
-                },
-                {
-                  icon: "🔗",
-                  text: "Payments settle on Base (Ethereum L2) — fast, cheap, and verifiable on-chain.",
-                },
-                {
-                  icon: "🆓",
-                  text: "Free testing available via the /v1/demo endpoint and the /playground.",
-                },
-              ].map((item) => (
+              {X402_ITEMS.map((item) => (
                 <li key={item.text} className="flex gap-3 text-sm text-muted-foreground leading-relaxed">
                   <span className="text-base shrink-0">{item.icon}</span>
                   <span>{item.text}</span>
@@ -227,24 +184,24 @@ export default function PricingPage() {
               ))}
             </ul>
             <Link
-              href="/docs/x402"
+              href={`/${locale}/docs/x402`}
               className="text-sm text-amber-500 hover:text-amber-400 underline underline-offset-4 transition-colors w-fit mt-1"
             >
-              Full x402 documentation →
+              {t('x402.docsLink')}
             </Link>
           </div>
 
           {/* Code snippet */}
           <div className="flex-1">
             <p className="text-xs text-muted-foreground uppercase tracking-widest mb-3 font-medium">
-              Example — automatic payment
+              {t('x402.codeExample.title')}
             </p>
             <div className="rounded-lg bg-zinc-950 border border-border p-4 font-mono text-xs leading-relaxed overflow-x-auto">
-              <p className="text-zinc-500"># Install the x402 HTTP client</p>
+              <p className="text-zinc-500">{t('x402.codeExample.install')}</p>
               <p className="text-zinc-300">npm install x402-fetch</p>
-              <p className="mt-3 text-zinc-500"># Then call the API normally</p>
+              <p className="mt-3 text-zinc-500">{t('x402.codeExample.call')}</p>
               <p className="text-amber-400">{"import"}{" "}<span className="text-zinc-300">{"{ wrapFetch }"}</span>{" "}<span className="text-amber-400">from</span>{" "}<span className="text-green-400">{'"x402-fetch"'}</span></p>
-              <p className="text-zinc-500 mt-1">{"//"} Payment handled automatically</p>
+              <p className="text-zinc-500 mt-1">{t('x402.codeExample.comment')}</p>
               <p className="text-zinc-300">{"const"} fetch = wrapFetch()</p>
               <p className="mt-2 text-zinc-300">{"const"} res = <span className="text-amber-400">await</span> fetch(</p>
               <p className="text-green-400 pl-4">{'"https://api.ibanforge.com/v1/iban/validate"'}</p>
@@ -261,7 +218,7 @@ export default function PricingPage() {
           dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
         />
         <h2 className="text-2xl font-semibold tracking-tight mb-10 text-center">
-          Frequently asked questions
+          {t('faq.heading')}
         </h2>
 
         <Faq />
@@ -270,27 +227,26 @@ export default function PricingPage() {
       {/* ── CTA ───────────────────────────────────────────────────────────── */}
       <section className="flex flex-col items-center text-center px-4 py-24 gap-6 border-t border-border">
         <h2 className="text-3xl sm:text-4xl font-bold tracking-tight">
-          Start building for free
+          {t('cta.heading')}
         </h2>
         <p className="text-muted-foreground max-w-md">
-          No credit card, no account. Hit the playground, read the docs, ship
-          when you are ready.
+          {t('cta.description')}
         </p>
         <div className="flex flex-col sm:flex-row gap-3 mt-2">
           <Button
             size="lg"
             className="bg-amber-500 hover:bg-amber-400 text-zinc-950 font-semibold px-8"
-            render={<Link href="/playground" />}
+            render={<Link href={`/${locale}/playground`} />}
           >
-            Open playground
+            {t('cta.openPlayground')}
           </Button>
           <Button
             size="lg"
             variant="outline"
             className="px-8"
-            render={<Link href="/docs" />}
+            render={<Link href={`/${locale}/docs`} />}
           >
-            Read the docs
+            {t('cta.readDocs')}
           </Button>
         </div>
       </section>
