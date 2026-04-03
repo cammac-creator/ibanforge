@@ -18,7 +18,7 @@ server.tool(
 
 Use this tool when you need to validate one IBAN at a time — for example, verifying a payment recipient before a wire transfer, checking a bank account provided by a user, or confirming IBAN format during onboarding.
 
-Returns: validity status, country, bank code, BIC/SWIFT, bank name, BBAN structure.
+Returns: validity status, country, bank code, BIC/SWIFT, bank name, BBAN structure, SEPA membership & schemes (SCT/SDD/SCT_INST) with VoP requirement, issuer classification (bank/digital_bank/emi/payment_institution) with institution name, and composite risk indicators (issuer_type, country_risk, test_bic, sepa_reachable, vop_coverage).
 Supports 75+ countries including all SEPA countries (EU, Switzerland, UK, Norway, etc.).
 
 Example input: 'CH56 0483 5012 3456 7800 9' (spaces are stripped automatically)
@@ -49,7 +49,7 @@ server.tool(
 
 Use this tool when you need to validate multiple IBANs at once — for example, processing a CSV of supplier accounts, validating a payment batch before submission, running KYC checks on a list of customers, or auditing an accounts-payable file.
 
-Returns an array of results in the same order as the input, each containing: validity, country, BIC, bank name.
+Returns an array of results in the same order as the input, each containing: validity, country, BIC, bank name, SEPA info & schemes, issuer classification, and risk indicators.
 
 Example input: ['CH56 0483 5012 3456 7800 9', 'DE89370400440532013000', 'FR7630006000011234567890189']
 Cost: $0.002 USDC per IBAN (e.g. 10 IBANs = $0.020, 50 IBANs = $0.100, 100 IBANs = $0.200)

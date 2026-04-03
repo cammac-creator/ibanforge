@@ -19,9 +19,9 @@ startCommand:
 # Tools provided
 tools:
   - name: validate_iban
-    description: "Validate a single IBAN — returns country, bank code, BIC, and formatting"
+    description: "Validate a single IBAN — returns country, bank code, BIC, formatting, SEPA membership & schemes, issuer classification, and risk indicators"
   - name: batch_validate_iban
-    description: "Validate up to 100 IBANs in one call"
+    description: "Validate up to 100 IBANs in one call — each result includes BIC, SEPA info, issuer type, and risk indicators"
   - name: lookup_bic
     description: "Look up a BIC/SWIFT code — returns institution, country, city, LEI"
 
