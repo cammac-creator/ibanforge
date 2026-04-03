@@ -1,12 +1,15 @@
 import { getAllDocs } from "@/lib/mdx";
 import { DocsSidebar } from "@/components/docs/sidebar";
 
-export default function DocsLayout({
+export default async function DocsLayout({
   children,
+  params,
 }: {
   children: React.ReactNode;
+  params: Promise<{ locale: string }>;
 }) {
-  const docs = getAllDocs();
+  const { locale } = await params;
+  const docs = getAllDocs(locale);
 
   return (
     <div className="flex min-h-[calc(100vh-3.5rem)]">

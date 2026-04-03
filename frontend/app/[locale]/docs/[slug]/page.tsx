@@ -3,7 +3,7 @@ import { getDoc, getAllDocs } from "@/lib/mdx";
 import { notFound } from "next/navigation";
 
 export function generateStaticParams() {
-  return getAllDocs()
+  return getAllDocs('en')
     .filter((doc) => doc.slug !== "index")
     .map((doc) => ({ slug: doc.slug }));
 }
