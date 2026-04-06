@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useTranslations, useLocale } from "next-intl"
 import Link from "next/link"
 import { Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -12,6 +13,8 @@ import { JsonViewer } from "@/components/json-viewer"
 type TabType = "iban" | "bic"
 
 export default function PlaygroundPage() {
+  const t = useTranslations('playground')
+  const locale = useLocale()
   const [activeTab, setActiveTab] = useState<TabType>("iban")
   const [ibanValue, setIbanValue] = useState("")
   const [bicValue, setBicValue] = useState("")
@@ -37,7 +40,7 @@ export default function PlaygroundPage() {
       const data = await res.json()
 
       if (!res.ok) {
-        setError(data?.error ?? "Unexpected error from the API.")
+        setError(data?.error ?? t('error.unexpected'))
         return
       }
 
@@ -45,7 +48,7 @@ export default function PlaygroundPage() {
       setResponseMs(ms)
       setResult(data)
     } catch {
-      setError("Could not reach the API. Please check your connection or try again later.")
+      setError(t('error.network'))
     } finally {
       setLoading(false)
     }
@@ -63,10 +66,10 @@ export default function PlaygroundPage() {
       {/* Header */}
       <div className="text-center flex flex-col gap-3">
         <h1 className="text-4xl font-bold tracking-tight font-mono">
-          Play<span className="text-amber-500">ground</span>
+          {t('title.prefix')}<span className="text-amber-500">{t('title.highlight')}</span>
         </h1>
         <p className="text-muted-foreground text-base">
-          Test the API for free — no payment, no signup
+          {t('subtitle')}
         </p>
       </div>
 
@@ -78,8 +81,8 @@ export default function PlaygroundPage() {
           className="w-full"
         >
           <TabsList className="mb-4">
-            <TabsTrigger value="iban">Validate IBAN</TabsTrigger>
-            <TabsTrigger value="bic">Lookup BIC</TabsTrigger>
+            <TabsTrigger value="iban">{t('tabs.iban')}</TabsTrigger>
+            <TabsTrigger value="bic">{t('tabs.bic')}</TabsTrigger>
           </TabsList>
 
           {/* IBAN Tab */}
@@ -108,7 +111,7 @@ export default function PlaygroundPage() {
                 {loading ? (
                   <Loader2 className="size-4 animate-spin" />
                 ) : (
-                  "Validate"
+                  t('button.validate')
                 )}
               </Button>
             </form>
@@ -140,7 +143,7 @@ export default function PlaygroundPage() {
                 {loading ? (
                   <Loader2 className="size-4 animate-spin" />
                 ) : (
-                  "Lookup"
+                  t('button.lookup')
                 )}
               </Button>
             </form>
@@ -158,7 +161,7 @@ export default function PlaygroundPage() {
         {result !== null && !error && (
           <div className="flex flex-col gap-3">
             <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground font-medium">Response</span>
+              <span className="text-sm text-muted-foreground font-medium">{t('result.label')}</span>
               {responseMs !== null && (
                 <Badge
                   variant="outline"
@@ -175,12 +178,12 @@ export default function PlaygroundPage() {
 
       {/* Docs link */}
       <p className="text-sm text-muted-foreground">
-        Want to use this in your code?{" "}
+        {t('docsPrompt')}{" "}
         <Link
-          href="/docs"
+          href={`/${locale}/docs`}
           className="text-amber-500 hover:text-amber-400 underline underline-offset-4 transition-colors"
         >
-          See the docs →
+          {t('docsLink')}
         </Link>
       </p>
     </div>
