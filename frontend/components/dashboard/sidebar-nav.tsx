@@ -2,15 +2,18 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-
-const NAV_ITEMS = [
-  { href: '/dashboard', label: 'Vue d\u2019ensemble', icon: '📊', exact: true },
-  { href: '/dashboard/api-stats', label: 'API Stats', icon: '📈', exact: false },
-  { href: '/dashboard/monitoring', label: 'Monitoring', icon: '🔍', exact: false },
-];
+import { useTranslations, useLocale } from 'next-intl';
 
 export function SidebarNav() {
   const pathname = usePathname();
+  const t = useTranslations('dashboard');
+  const locale = useLocale();
+
+  const NAV_ITEMS = [
+    { href: `/${locale}/dashboard`, label: t('sidebar.overview'), icon: '📊', exact: true },
+    { href: `/${locale}/dashboard/api-stats`, label: t('sidebar.apiStats'), icon: '📈', exact: false },
+    { href: `/${locale}/dashboard/monitoring`, label: t('sidebar.monitoring'), icon: '🔍', exact: false },
+  ];
 
   function isActive(href: string, exact: boolean): boolean {
     if (exact) return pathname === href;
@@ -20,7 +23,7 @@ export function SidebarNav() {
   return (
     <div className="space-y-1">
       <p className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-widest text-zinc-600">
-        Navigation
+        {t('sidebar.label')}
       </p>
       {NAV_ITEMS.map((item) => {
         const active = isActive(item.href, item.exact);

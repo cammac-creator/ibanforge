@@ -1,36 +1,42 @@
-import Link from 'next/link';
+'use client';
 
-const ACTIONS = [
-  {
-    href: '/dashboard/api-stats',
-    label: 'Voir API Stats',
-    desc: 'Breakdown détaillé par endpoint',
-    icon: '📈',
-  },
-  {
-    href: '/dashboard/monitoring',
-    label: 'Monitoring',
-    desc: 'Statut et santé de l\u2019API',
-    icon: '🔍',
-  },
-  {
-    href: '/playground',
-    label: 'Playground',
-    desc: 'Tester les endpoints en live',
-    icon: '🧪',
-  },
-  {
-    href: '/docs',
-    label: 'Documentation',
-    desc: 'Guides et référence API',
-    icon: '📖',
-  },
-];
+import Link from 'next/link';
+import { useTranslations, useLocale } from 'next-intl';
 
 export function QuickActions() {
+  const t = useTranslations('dashboard');
+  const locale = useLocale();
+
+  const ACTIONS = [
+    {
+      href: `/${locale}/dashboard/api-stats`,
+      label: t('quickActions.apiStats.label'),
+      desc: t('quickActions.apiStats.desc'),
+      icon: '📈',
+    },
+    {
+      href: `/${locale}/dashboard/monitoring`,
+      label: t('quickActions.monitoring.label'),
+      desc: t('quickActions.monitoring.desc'),
+      icon: '🔍',
+    },
+    {
+      href: `/${locale}/playground`,
+      label: t('quickActions.playground.label'),
+      desc: t('quickActions.playground.desc'),
+      icon: '🧪',
+    },
+    {
+      href: `/${locale}/docs`,
+      label: t('quickActions.docs.label'),
+      desc: t('quickActions.docs.desc'),
+      icon: '📖',
+    },
+  ];
+
   return (
     <div>
-      <p className="text-sm font-medium text-zinc-300 mb-3">Accès rapides</p>
+      <p className="text-sm font-medium text-zinc-300 mb-3">{t('quickActions.title')}</p>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {ACTIONS.map((a) => (
           <Link

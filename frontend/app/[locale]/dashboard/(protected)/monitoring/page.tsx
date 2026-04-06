@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { useTranslations } from 'next-intl';
 import { UptimeBar } from '@/components/uptime-bar';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://ibanforge-production.up.railway.app';
@@ -46,18 +47,18 @@ function saveChecks(checks: UptimeCheck[]): void {
   }
 }
 
-function formatUptime(seconds: number): string {
+function formatUptimeI18n(seconds: number, t: (key: string, values?: Record<string, unknown>) => string): string {
   const days = Math.floor(seconds / 86400);
   const hours = Math.floor((seconds % 86400) / 3600);
   const mins = Math.floor((seconds % 3600) / 60);
 
   if (days > 0) {
-    return `${days} jour${days > 1 ? 's' : ''}, ${hours} heure${hours > 1 ? 's' : ''}`;
+    return `${days} ${t('monitoring.day', { count: days })}, ${hours} ${t('monitoring.hour', { count: hours })}`;
   }
   if (hours > 0) {
-    return `${hours} heure${hours > 1 ? 's' : ''}, ${mins} min`;
+    return `${hours} ${t('monitoring.hour', { count: hours })}, ${mins} min`;
   }
-  return `${mins} minute${mins > 1 ? 's' : ''}`;
+  return `${mins} ${t('monitoring.minute', { count: mins })}`;
 }
 
 function responseTimeColor(ms: number): string {
@@ -77,6 +78,7 @@ function fmt(n: number): string {
 }
 
 export default function MonitoringPage() {
+  const t = useTranslations('dashboard');
   const [online, setOnline] = useState<boolean | null>(null);
   const [responseMs, setResponseMs] = useState<number>(0);
   const [health, setHealth] = useState<HealthData | null>(null);
@@ -148,8 +150,8 @@ export default function MonitoringPage() {
   return (
     <div className="max-w-3xl flex flex-col gap-6">
       <div>
-        <h1 className="text-2xl font-semibold text-white">Monitoring</h1>
-        <p className="text-sm text-zinc-500 mt-1">Santé et disponibilité de l&apos;API</p>
+        <h1 className="text-2xl font-semibold text-white">{t('monitoring.title')}</h1>
+        <p className="text-sm text-zinc-500 mt-1">{t('monitoring.subtitle')}</p>
       </div>
 
       {/* Big status indicator */}
@@ -176,14 +178,14 @@ export default function MonitoringPage() {
             </div>
           </div>
           <h2 className="text-xl font-semibold text-white">
-            {isLoading ? 'Vérification...' : online ? 'API en ligne' : 'API hors ligne'}
+            {isLoading ? t('monitoring.checking') : online ? t('monitoring.apiOnline') : t('monitoring.apiOffline')}
           </h2>
           <p className="text-sm text-zinc-500 mt-1">
             {isLoading
-              ? 'Test de connexion en cours'
+              ? t('monitoring.checkingSubtext')
               : online
-                ? 'Tous les systèmes fonctionnent normalement'
-                : 'Le serveur ne répond pas'}
+                ? t('monitoring.onlineSubtext')
+                : t('monitoring.offlineSubtext')}
           </p>
         </div>
 
@@ -192,7 +194,7 @@ export default function MonitoringPage() {
           {/* Response time */}
           <div className={`rounded-lg border p-4 ${isLoading ? 'bg-zinc-800/60 border-zinc-700' : responseTimeBg(responseMs)}`}>
             <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-1">
-              Temps de réponse
+              {t('monitoring.responseTime')}
             </p>
             <p className={`text-2xl font-mono font-bold ${isLoading ? 'text-zinc-500' : responseTimeColor(responseMs)}`}>
               {isLoading ? '—' : `${responseMs}`}
@@ -203,7 +205,7 @@ export default function MonitoringPage() {
           {/* Version */}
           <div className="rounded-lg border border-zinc-700/50 bg-zinc-800/40 p-4">
             <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-1">
-              Version
+              {t('monitoring.version')}
             </p>
             <p className="text-2xl font-mono font-bold text-white">
               {isLoading ? '—' : health ? `v${health.version}` : '—'}
@@ -213,23 +215,23 @@ export default function MonitoringPage() {
           {/* Uptime */}
           <div className="rounded-lg border border-zinc-700/50 bg-zinc-800/40 p-4">
             <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-1">
-              Uptime
+              {t('monitoring.uptime')}
             </p>
             <p className="text-lg font-mono font-bold text-white leading-tight">
-              {isLoading ? '—' : health ? formatUptime(health.uptime_seconds) : '—'}
+              {isLoading ? '—' : health ? formatUptimeI18n(health.uptime_seconds, t) : '—'}
             </p>
           </div>
 
           {/* BIC entries */}
           <div className="rounded-lg border border-zinc-700/50 bg-zinc-800/40 p-4">
             <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-1">
-              Base BIC
+              {t('monitoring.bicDatabase')}
             </p>
             <p className="text-2xl font-mono font-bold text-white">
               {isLoading ? '—' : health ? fmt(health.bic_database_entries) : '—'}
             </p>
             {!isLoading && health && (
-              <p className="text-xs text-zinc-600 mt-0.5">entrées</p>
+              <p className="text-xs text-zinc-600 mt-0.5">{t('monitoring.entries')}</p>
             )}
           </div>
         </div>
@@ -239,15 +241,15 @@ export default function MonitoringPage() {
       {health?.stats && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4 text-center">
-            <p className="text-xs text-zinc-500 uppercase tracking-wider mb-1">Opérations totales</p>
+            <p className="text-xs text-zinc-500 uppercase tracking-wider mb-1">{t('monitoring.totalOperations')}</p>
             <p className="text-xl font-mono font-bold text-amber-400">{fmt(health.stats.total_operations)}</p>
           </div>
           <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4 text-center">
-            <p className="text-xs text-zinc-500 uppercase tracking-wider mb-1">Validations IBAN</p>
+            <p className="text-xs text-zinc-500 uppercase tracking-wider mb-1">{t('monitoring.ibanValidations')}</p>
             <p className="text-xl font-mono font-bold text-white">{fmt(health.stats.iban_validations)}</p>
           </div>
           <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4 text-center">
-            <p className="text-xs text-zinc-500 uppercase tracking-wider mb-1">Lookups BIC</p>
+            <p className="text-xs text-zinc-500 uppercase tracking-wider mb-1">{t('monitoring.bicLookups')}</p>
             <p className="text-xl font-mono font-bold text-white">{fmt(health.stats.bic_lookups)}</p>
           </div>
         </div>
@@ -256,7 +258,7 @@ export default function MonitoringPage() {
       {/* Uptime bar — 30 days */}
       <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
         <div className="flex items-center justify-between mb-1">
-          <h2 className="text-sm font-medium text-zinc-300">Disponibilité — 30 jours</h2>
+          <h2 className="text-sm font-medium text-zinc-300">{t('monitoring.availability30d')}</h2>
           <div className="flex items-center gap-3">
             {uptimePercent !== '—' && (
               <span className="text-xs font-mono text-green-400">{uptimePercent}% uptime</span>
@@ -274,7 +276,7 @@ export default function MonitoringPage() {
         </div>
         {avgResponseMs > 0 && (
           <p className="text-xs text-zinc-600 mb-4">
-            Temps moyen : <span className={`font-mono ${responseTimeColor(avgResponseMs)}`}>{avgResponseMs} ms</span>
+            {t('monitoring.avgResponseTime')} <span className={`font-mono ${responseTimeColor(avgResponseMs)}`}>{avgResponseMs} ms</span>
           </p>
         )}
 
@@ -283,17 +285,17 @@ export default function MonitoringPage() {
         <div className="flex items-center gap-4 mt-3 text-xs text-zinc-500">
           <span className="flex items-center gap-1.5">
             <span className="inline-block w-2.5 h-2.5 rounded-sm bg-green-500" />
-            En ligne
+            {t('monitoring.online')}
           </span>
           <span className="flex items-center gap-1.5">
             <span className="inline-block w-2.5 h-2.5 rounded-sm bg-red-500" />
-            Hors ligne
+            {t('monitoring.offline')}
           </span>
           <span className="flex items-center gap-1.5">
             <span className="inline-block w-2.5 h-2.5 rounded-sm bg-zinc-700" />
-            Aucune donnée
+            {t('monitoring.noData')}
           </span>
-          <span className="ml-auto text-zinc-600">Auto-refresh: 60s</span>
+          <span className="ml-auto text-zinc-600">{t('monitoring.autoRefresh')}</span>
         </div>
       </div>
     </div>

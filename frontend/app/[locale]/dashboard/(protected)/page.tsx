@@ -4,33 +4,14 @@ import { DonutChart } from '@/components/donut-chart';
 import { DashboardHeader } from '@/components/dashboard/dashboard-header';
 import { QuickActions } from '@/components/dashboard/quick-actions';
 import Link from 'next/link';
+import { getTranslations, getLocale } from 'next-intl/server';
 
 const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 const STATS_TOKEN = process.env.STATS_TOKEN || '';
 const statsHeaders: HeadersInit = STATS_TOKEN ? { Authorization: `Bearer ${STATS_TOKEN}` } : {};
 
-/** ISO country code -> full country name */
-const COUNTRY_NAMES: Record<string, string> = {
-  CH: 'Suisse', DE: 'Allemagne', FR: 'France', IT: 'Italie', AT: 'Autriche',
-  GB: 'Royaume-Uni', ES: 'Espagne', NL: 'Pays-Bas', BE: 'Belgique', LU: 'Luxembourg',
-  PT: 'Portugal', IE: 'Irlande', SE: 'Suède', DK: 'Danemark', NO: 'Norvège',
-  FI: 'Finlande', PL: 'Pologne', CZ: 'Tchéquie', HU: 'Hongrie', GR: 'Grèce',
-  RO: 'Roumanie', BG: 'Bulgarie', HR: 'Croatie', SK: 'Slovaquie', SI: 'Slovénie',
-  EE: 'Estonie', LV: 'Lettonie', LT: 'Lituanie', CY: 'Chypre', MT: 'Malte',
-  US: 'États-Unis', CA: 'Canada', AU: 'Australie', JP: 'Japon', CN: 'Chine',
-  BR: 'Brésil', MX: 'Mexique', IN: 'Inde', RU: 'Russie', TR: 'Turquie',
-  SA: 'Arabie Saoudite', AE: 'Émirats Arabes Unis', IL: 'Israël', ZA: 'Afrique du Sud',
-  SG: 'Singapour', HK: 'Hong Kong', KR: 'Corée du Sud', TW: 'Taïwan',
-  MA: 'Maroc', TN: 'Tunisie', EG: 'Égypte', NG: 'Nigeria',
-  LI: 'Liechtenstein', MC: 'Monaco', SM: 'Saint-Marin', AD: 'Andorre',
-};
-
-function countryLabel(code: string): string {
-  return COUNTRY_NAMES[code] ?? code;
-}
-
-function fmt(n: number): string {
-  return n.toLocaleString('fr-CH');
+function fmt(n: number, locale: string): string {
+  return n.toLocaleString(locale);
 }
 
 interface StatsResponse {
@@ -75,6 +56,8 @@ async function fetchHistory(): Promise<HistoryEntry[]> {
 }
 
 export default async function DashboardPage() {
+  const t = await getTranslations('dashboard');
+  const locale = await getLocale();
   const [stats, history] = await Promise.all([fetchStats(), fetchHistory()]);
 
   if (!stats) {
@@ -85,9 +68,9 @@ export default async function DashboardPage() {
           <div className="mx-auto mb-4 w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center">
             <span className="text-red-400 text-xl">!</span>
           </div>
-          <p className="text-zinc-300 font-medium">API indisponible</p>
+          <p className="text-zinc-300 font-medium">{t('error.apiUnavailable')}</p>
           <p className="text-sm text-zinc-500 mt-1">
-            Le backend n&apos;est pas joignable. Démarrez le serveur API et rafraîchissez.
+            {t('error.apiUnavailableDescription')}
           </p>
         </div>
       </div>
@@ -129,15 +112,15 @@ export default async function DashboardPage() {
     : 0;
 
   const donutData = [
-    { name: 'IBAN validate', value: stats.by_type.iban_validate?.total ?? 0, color: '#f59e0b' },
-    { name: 'IBAN batch', value: stats.by_type.iban_batch?.total ?? 0, color: '#3b82f6' },
-    { name: 'BIC lookup', value: stats.by_type.bic_lookup?.total ?? 0, color: '#22c55e' },
+    { name: t('chart.legends.ibanValidate'), value: stats.by_type.iban_validate?.total ?? 0, color: '#f59e0b' },
+    { name: t('chart.legends.ibanBatch'), value: stats.by_type.iban_batch?.total ?? 0, color: '#3b82f6' },
+    { name: t('chart.legends.bicLookup'), value: stats.by_type.bic_lookup?.total ?? 0, color: '#22c55e' },
   ];
 
   const lineConfig = [
-    { key: 'iban_validate', color: '#f59e0b', label: 'IBAN validate' },
-    { key: 'iban_batch', color: '#3b82f6', label: 'IBAN batch' },
-    { key: 'bic_lookup', color: '#22c55e', label: 'BIC lookup' },
+    { key: 'iban_validate', color: '#f59e0b', label: t('chart.legends.ibanValidate') },
+    { key: 'iban_batch', color: '#3b82f6', label: t('chart.legends.ibanBatch') },
+    { key: 'bic_lookup', color: '#22c55e', label: t('chart.legends.bicLookup') },
   ];
 
   const topCountries = (stats.top_countries ?? []).slice(0, 10);
@@ -150,45 +133,45 @@ export default async function DashboardPage() {
       {/* Stat cards — 4 columns */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
-          title="Aujourd'hui"
-          value={fmt(todayCalls)}
-          subtitle="Appels API"
+          title={t('stats.today')}
+          value={fmt(todayCalls, locale)}
+          subtitle={t('stats.apiCalls')}
           trend={todayTrend}
-          trendLabel={trendPct ? `${trendPct} vs hier` : undefined}
+          trendLabel={trendPct ? t('stats.vsYesterday', { percent: trendPct }) : undefined}
         />
         <StatCard
-          title="Cette semaine"
-          value={fmt(weekCalls)}
-          subtitle="7 derniers jours"
+          title={t('stats.thisWeek')}
+          value={fmt(weekCalls, locale)}
+          subtitle={t('stats.last7Days')}
         />
         <StatCard
-          title="Revenu total"
+          title={t('stats.totalRevenue')}
           value={`$${(stats.total_revenue_usdc ?? 0).toFixed(4)}`}
-          subtitle="USDC collectés"
+          subtitle={t('stats.usdcCollected')}
         />
         <StatCard
-          title="Base BIC"
-          value={fmt(stats.bic_database_entries ?? 39243)}
-          subtitle="Entrées GLEIF"
+          title={t('stats.bicDatabase')}
+          value={fmt(stats.bic_database_entries ?? 39243, locale)}
+          subtitle={t('stats.gleifEntries')}
         />
       </div>
 
       {/* Line chart — full width */}
       <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
         <div className="flex items-center justify-between mb-4">
-          <p className="text-sm font-medium text-zinc-300">Appels API — 30 derniers jours</p>
+          <p className="text-sm font-medium text-zinc-300">{t('chart.apiCalls30d')}</p>
           <Link
-            href="/dashboard/api-stats"
+            href={`/${locale}/dashboard/api-stats`}
             className="text-xs text-amber-400/70 hover:text-amber-400 transition"
           >
-            Voir détails →
+            {t('chart.viewDetails')}
           </Link>
         </div>
         {history.length > 0 ? (
           <LineChart data={history} lines={lineConfig} />
         ) : (
           <div className="flex h-64 items-center justify-center text-zinc-500 text-sm">
-            Aucune donnée historique disponible
+            {t('chart.noHistoryData')}
           </div>
         )}
       </div>
@@ -197,19 +180,19 @@ export default async function DashboardPage() {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {/* Donut chart */}
         <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
-          <p className="mb-2 text-sm font-medium text-zinc-300">Répartition par endpoint</p>
+          <p className="mb-2 text-sm font-medium text-zinc-300">{t('chart.endpointBreakdown')}</p>
           {donutData.some((d) => d.value > 0) ? (
             <DonutChart data={donutData} />
           ) : (
             <div className="flex h-64 items-center justify-center text-zinc-500 text-sm">
-              Aucune donnée
+              {t('chart.noData')}
             </div>
           )}
         </div>
 
         {/* Top 10 countries */}
         <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
-          <p className="mb-4 text-sm font-medium text-zinc-300">Top 10 pays</p>
+          <p className="mb-4 text-sm font-medium text-zinc-300">{t('chart.top10Countries')}</p>
           {topCountries.length > 0 ? (
             <div className="space-y-2.5">
               {topCountries.map((row, i) => {
@@ -220,10 +203,10 @@ export default async function DashboardPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between mb-0.5">
                         <span className="text-sm text-zinc-200 truncate">
-                          {countryLabel(row.country)}
+                          {t.has(`countries.${row.country}`) ? t(`countries.${row.country}` as any) : row.country}
                         </span>
                         <span className="text-xs font-mono text-amber-400 ml-2 flex-shrink-0">
-                          {fmt(row.count)}
+                          {fmt(row.count, locale)}
                         </span>
                       </div>
                       <div className="h-1.5 w-full rounded-full bg-zinc-800 overflow-hidden">
@@ -239,7 +222,7 @@ export default async function DashboardPage() {
             </div>
           ) : (
             <div className="flex h-48 items-center justify-center text-zinc-500 text-sm">
-              Aucune donnée pays
+              {t('chart.noCountryData')}
             </div>
           )}
         </div>

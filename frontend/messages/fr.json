@@ -567,6 +567,33 @@
     },
     "logout": {
       "label": "Se déconnecter"
+    },
+    "monitoring": {
+      "title": "Monitoring",
+      "subtitle": "Santé et disponibilité de l'API",
+      "checking": "Vérification...",
+      "apiOnline": "API en ligne",
+      "apiOffline": "API hors ligne",
+      "checkingSubtext": "Test de connexion en cours",
+      "onlineSubtext": "Tous les systèmes fonctionnent normalement",
+      "offlineSubtext": "Le serveur ne répond pas",
+      "responseTime": "Temps de réponse",
+      "version": "Version",
+      "uptime": "Uptime",
+      "bicDatabase": "Base BIC",
+      "entries": "entrées",
+      "totalOperations": "Opérations totales",
+      "ibanValidations": "Validations IBAN",
+      "bicLookups": "Lookups BIC",
+      "availability30d": "Disponibilité — 30 jours",
+      "avgResponseTime": "Temps moyen :",
+      "online": "En ligne",
+      "offline": "Hors ligne",
+      "noData": "Aucune donnée",
+      "autoRefresh": "Auto-refresh: 60s",
+      "day": "{count, plural, one {jour} other {jours}}",
+      "hour": "{count, plural, one {heure} other {heures}}",
+      "minute": "{count, plural, one {minute} other {minutes}}"
     }
   },
   "docs": {

@@ -72,7 +72,7 @@ export function SiteFooter() {
 
         <div className="py-5 flex items-center justify-between gap-4 flex-wrap">
           <p className="text-xs text-muted-foreground">
-            &copy; {new Date().getFullYear()} IBANforge. {t("copyright")}
+            {t("copyright", { year: new Date().getFullYear() })}
           </p>
           <p className="text-xs text-muted-foreground">
             {t("builtWith")}{" "}

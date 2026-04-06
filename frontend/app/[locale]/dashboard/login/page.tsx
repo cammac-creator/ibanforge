@@ -2,9 +2,11 @@
 
 import { useState, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 
 export default function DashboardLoginPage() {
   const router = useRouter();
+  const t = useTranslations('dashboard');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -25,10 +27,10 @@ export default function DashboardLoginPage() {
         router.push('/dashboard');
       } else {
         const data = await res.json();
-        setError(data.error || 'Wrong password');
+        setError(data.error || t('login.error.wrongPassword'));
       }
     } catch {
-      setError('Network error, please try again');
+      setError(t('login.error.network'));
     } finally {
       setLoading(false);
     }
@@ -38,13 +40,13 @@ export default function DashboardLoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-zinc-950">
       <div className="w-full max-w-sm">
         <div className="border border-zinc-800 rounded-xl p-8 bg-zinc-900 shadow-2xl">
-          <h1 className="text-2xl font-semibold text-white mb-2">Dashboard Login</h1>
-          <p className="text-zinc-400 text-sm mb-6">Enter your password to access the dashboard.</p>
+          <h1 className="text-2xl font-semibold text-white mb-2">{t('login.title')}</h1>
+          <p className="text-zinc-400 text-sm mb-6">{t('login.subtitle')}</p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-zinc-300 mb-1.5">
-                Password
+                {t('login.passwordLabel')}
               </label>
               <input
                 id="password"
@@ -68,7 +70,7 @@ export default function DashboardLoginPage() {
               disabled={loading}
               className="w-full py-2.5 px-4 bg-amber-500 hover:bg-amber-400 disabled:bg-amber-500/50 text-zinc-950 font-semibold rounded-lg transition focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 focus:ring-offset-zinc-900"
             >
-              {loading ? 'Logging in…' : 'Login'}
+              {loading ? t('login.loading') : t('login.button')}
             </button>
           </form>
         </div>
