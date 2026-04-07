@@ -48,11 +48,15 @@ app.use('*', rateLimitMiddleware());
 app.use('*', compress());
 
 // Track all HTTP requests for dashboard analytics
+// Exclude internal/monitoring endpoints to avoid feedback loop
+const SKIP_TRACKING = new Set(['/stats', '/stats/history', '/stats/hourly', '/stats/errors', '/stats/patterns', '/health', '/ping']);
 app.use('*', async (c, next) => {
   const start = performance.now();
   await next();
-  const ms = performance.now() - start;
-  recordRequest(c.req.method, new URL(c.req.url).pathname, c.res.status, ms);
+  const path = new URL(c.req.url).pathname;
+  if (!SKIP_TRACKING.has(path)) {
+    recordRequest(c.req.method, path, c.res.status, performance.now() - start);
+  }
 });
 
 // /ping — ultra-lightweight endpoint for latency testing and uptime monitoring
