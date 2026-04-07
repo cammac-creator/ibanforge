@@ -116,3 +116,28 @@ export interface StatsOverview {
   top_countries: Array<{ country: string; count: number }>;
   last_7_days: Array<{ date: string; total: number; revenue: number }>;
 }
+
+// --- Dashboard v2: Hourly / Error / Pattern stats ---
+
+export interface HourlyHeatmapEntry { day: number; hour: number; total: number; }
+export interface HourlyStatsResponse {
+  heatmap: HourlyHeatmapEntry[];
+  peak_hours: { start: number; end: number; days: number[] };
+  weekend_drop_pct: number;
+}
+
+export interface ErrorStatsResponse {
+  error_rate: {
+    iban_validate: { rate: number; trend: number[] };
+    bic_lookup: { rate: number; trend: number[] };
+  };
+  top_invalid_ibans: Array<{ prefix: string; country: string; count: number; error_type: string }>;
+  top_missing_bics: Array<{ bic: string; count: number; country: string }>;
+  errors_by_country: Array<{ country: string; count: number }>;
+}
+
+export interface PatternStatsResponse {
+  endpoint_share_trend: Array<{ date: string; iban_validate: number; iban_batch: number; bic_lookup: number }>;
+  geo_trend: Array<Record<string, number | string>>;
+  top_countries_list: string[];
+}

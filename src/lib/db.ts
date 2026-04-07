@@ -38,7 +38,10 @@ export function getStatsDB(): Database.Database {
         operation_type TEXT NOT NULL,
         country_code TEXT,
         success INTEGER NOT NULL,
-        created_at TEXT DEFAULT (datetime('now'))
+        created_at TEXT DEFAULT (datetime('now')),
+        hour INTEGER,
+        day_of_week INTEGER,
+        error_detail TEXT
       );
       CREATE TABLE IF NOT EXISTS daily_stats (
         date TEXT NOT NULL,
@@ -48,7 +51,21 @@ export function getStatsDB(): Database.Database {
         revenue_usdc REAL DEFAULT 0,
         PRIMARY KEY (date, operation_type)
       );
+      CREATE TABLE IF NOT EXISTS hourly_stats (
+        date TEXT NOT NULL,
+        hour INTEGER NOT NULL,
+        day_of_week INTEGER NOT NULL,
+        operation_type TEXT NOT NULL,
+        total INTEGER DEFAULT 0,
+        success_count INTEGER DEFAULT 0,
+        PRIMARY KEY (date, hour, operation_type)
+      );
     `);
+    // Migrate existing databases that may be missing the new columns
+    const existingCols = (statsDB.prepare("PRAGMA table_info(operations)").all() as Array<{ name: string }>).map(r => r.name);
+    if (!existingCols.includes('hour')) statsDB.exec('ALTER TABLE operations ADD COLUMN hour INTEGER');
+    if (!existingCols.includes('day_of_week')) statsDB.exec('ALTER TABLE operations ADD COLUMN day_of_week INTEGER');
+    if (!existingCols.includes('error_detail')) statsDB.exec('ALTER TABLE operations ADD COLUMN error_detail TEXT');
   }
   return statsDB;
 }
