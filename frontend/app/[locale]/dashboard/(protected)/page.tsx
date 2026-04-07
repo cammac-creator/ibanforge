@@ -1,4 +1,5 @@
 import { LineChart } from '@/components/line-chart';
+import { StackedBarChart } from '@/components/stacked-bar-chart';
 import { StatCardV2 } from '@/components/dashboard/stat-card-v2';
 import { ProgressBars } from '@/components/dashboard/progress-bars';
 import { getTranslations, getLocale } from 'next-intl/server';
@@ -35,6 +36,10 @@ interface HistoryEntry {
   bic_lookup: number;
   revenue_usdc: number;
   total_requests: number;
+  s2xx: number;
+  s3xx: number;
+  s4xx: number;
+  s5xx: number;
 }
 
 async function fetchStats(): Promise<StatsResponse | null> {
@@ -136,9 +141,8 @@ export default async function DashboardPage() {
   const ibanValid = stats.by_type.iban_validate?.valid_count ?? 0;
   const successRate = ibanTotal > 0 ? ((ibanValid / ibanTotal) * 100).toFixed(1) : '—';
 
-  // Line chart config
+  // Line chart config (API operations only)
   const lineConfig = [
-    { key: 'total_requests', color: '#a855f7', label: 'Total HTTP' },
     { key: 'iban_validate', color: '#f59e0b', label: t('chart.legends.ibanValidate') },
     { key: 'iban_batch', color: '#3b82f6', label: t('chart.legends.ibanBatch') },
     { key: 'bic_lookup', color: '#22c55e', label: t('chart.legends.bicLookup') },
@@ -235,18 +239,39 @@ export default async function DashboardPage() {
         />
       </div>
 
-      {/* Line chart — full width */}
-      <div className="rounded-xl border border-zinc-800/60 bg-gradient-to-br from-zinc-900 to-zinc-900/60 p-5">
-        <div className="flex items-center justify-between mb-4">
-          <p className="text-sm font-medium text-zinc-300">Traffic — 30 days</p>
+      {/* Two charts side by side */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        {/* Stacked bar chart — HTTP requests by status code (Railway style) */}
+        <div className="rounded-xl border border-zinc-800/60 bg-gradient-to-br from-zinc-900 to-zinc-900/60 p-5">
+          <p className="mb-4 text-sm font-medium text-zinc-300">Requests — 30 days</p>
+          {history.length > 0 ? (
+            <StackedBarChart
+              data={history}
+              bars={[
+                { key: 's2xx', color: '#3b82f6', label: '2xx' },
+                { key: 's3xx', color: '#f59e0b', label: '3xx' },
+                { key: 's4xx', color: '#eab308', label: '4xx' },
+                { key: 's5xx', color: '#ef4444', label: '5xx' },
+              ]}
+            />
+          ) : (
+            <div className="flex h-64 items-center justify-center text-zinc-500 text-sm">
+              {t('chart.noHistoryData')}
+            </div>
+          )}
         </div>
-        {history.length > 0 ? (
-          <LineChart data={history} lines={lineConfig} />
-        ) : (
-          <div className="flex h-64 items-center justify-center text-zinc-500 text-sm">
-            {t('chart.noHistoryData')}
-          </div>
-        )}
+
+        {/* Line chart — API operations */}
+        <div className="rounded-xl border border-zinc-800/60 bg-gradient-to-br from-zinc-900 to-zinc-900/60 p-5">
+          <p className="mb-4 text-sm font-medium text-zinc-300">{t('chart.apiCalls30d')}</p>
+          {history.length > 0 ? (
+            <LineChart data={history} lines={lineConfig} />
+          ) : (
+            <div className="flex h-64 items-center justify-center text-zinc-500 text-sm">
+              {t('chart.noHistoryData')}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Requests by path + status */}
