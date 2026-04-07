@@ -47,7 +47,8 @@ function saveChecks(checks: UptimeCheck[]): void {
   }
 }
 
-function formatUptimeI18n(seconds: number, t: (key: string, values?: Record<string, unknown>) => string): string {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function formatUptimeI18n(seconds: number, t: (key: any, values?: any) => string): string {
   const days = Math.floor(seconds / 86400);
   const hours = Math.floor((seconds % 86400) / 3600);
   const mins = Math.floor((seconds % 3600) / 60);
@@ -155,7 +156,7 @@ export default function MonitoringPage() {
       </div>
 
       {/* Big status indicator */}
-      <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-8">
+      <div className="bg-gradient-to-br from-zinc-900 to-zinc-900/60 border border-zinc-800/60 rounded-xl p-8">
         <div className="flex flex-col items-center text-center mb-8">
           {/* Pulsing circle */}
           <div className="relative mb-4">
@@ -240,15 +241,15 @@ export default function MonitoringPage() {
       {/* Stats summary if online */}
       {health?.stats && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4 text-center">
+          <div className="rounded-xl border border-zinc-800/60 bg-gradient-to-br from-zinc-900 to-zinc-900/60 p-4 text-center">
             <p className="text-xs text-zinc-500 uppercase tracking-wider mb-1">{t('monitoring.totalOperations')}</p>
             <p className="text-xl font-mono font-bold text-amber-400">{fmt(health.stats.total_operations)}</p>
           </div>
-          <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4 text-center">
+          <div className="rounded-xl border border-zinc-800/60 bg-gradient-to-br from-zinc-900 to-zinc-900/60 p-4 text-center">
             <p className="text-xs text-zinc-500 uppercase tracking-wider mb-1">{t('monitoring.ibanValidations')}</p>
             <p className="text-xl font-mono font-bold text-white">{fmt(health.stats.iban_validations)}</p>
           </div>
-          <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4 text-center">
+          <div className="rounded-xl border border-zinc-800/60 bg-gradient-to-br from-zinc-900 to-zinc-900/60 p-4 text-center">
             <p className="text-xs text-zinc-500 uppercase tracking-wider mb-1">{t('monitoring.bicLookups')}</p>
             <p className="text-xl font-mono font-bold text-white">{fmt(health.stats.bic_lookups)}</p>
           </div>
@@ -256,7 +257,7 @@ export default function MonitoringPage() {
       )}
 
       {/* Uptime bar — 30 days */}
-      <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+      <div className="bg-gradient-to-br from-zinc-900 to-zinc-900/60 border border-zinc-800/60 rounded-xl p-6">
         <div className="flex items-center justify-between mb-1">
           <h2 className="text-sm font-medium text-zinc-300">{t('monitoring.availability30d')}</h2>
           <div className="flex items-center gap-3">

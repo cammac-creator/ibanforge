@@ -1,9 +1,6 @@
-import { StatCard } from '@/components/stat-card';
 import { LineChart } from '@/components/line-chart';
-import { DonutChart } from '@/components/donut-chart';
-import { DashboardHeader } from '@/components/dashboard/dashboard-header';
-import { QuickActions } from '@/components/dashboard/quick-actions';
-import Link from 'next/link';
+import { StatCardV2 } from '@/components/dashboard/stat-card-v2';
+import { ProgressBars } from '@/components/dashboard/progress-bars';
 import { getTranslations, getLocale } from 'next-intl/server';
 
 const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
@@ -63,8 +60,7 @@ export default async function DashboardPage() {
   if (!stats) {
     return (
       <div className="flex flex-col gap-6">
-        <DashboardHeader />
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-8 text-center">
+        <div className="rounded-xl border border-zinc-800/60 bg-gradient-to-br from-zinc-900 to-zinc-900/60 p-8 text-center">
           <div className="mx-auto mb-4 w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center">
             <span className="text-red-400 text-xl">!</span>
           </div>
@@ -107,65 +103,122 @@ export default async function DashboardPage() {
       ? `${Math.abs(Math.round(((todayCalls - yesterdayCalls) / yesterdayCalls) * 100))}%`
       : undefined;
 
-  const weekCalls = Array.isArray(stats.last_7_days)
-    ? stats.last_7_days.reduce((sum, day) => sum + (day.total ?? 0), 0)
-    : 0;
+  // Revenue trend
+  const todayRevenue = history.length > 0 ? (history[history.length - 1].revenue_usdc ?? 0) : 0;
+  const yesterdayRevenue = history.length > 1 ? (history[history.length - 2].revenue_usdc ?? 0) : 0;
+  const revenueTrend: 'up' | 'down' | 'neutral' =
+    yesterdayRevenue === 0
+      ? 'neutral'
+      : todayRevenue > yesterdayRevenue
+        ? 'up'
+        : todayRevenue < yesterdayRevenue
+          ? 'down'
+          : 'neutral';
+  const revenueTrendPct =
+    yesterdayRevenue > 0
+      ? `${Math.abs(Math.round(((todayRevenue - yesterdayRevenue) / yesterdayRevenue) * 100))}%`
+      : undefined;
 
-  const donutData = [
-    { name: t('chart.legends.ibanValidate'), value: stats.by_type.iban_validate?.total ?? 0, color: '#f59e0b' },
-    { name: t('chart.legends.ibanBatch'), value: stats.by_type.iban_batch?.total ?? 0, color: '#3b82f6' },
-    { name: t('chart.legends.bicLookup'), value: stats.by_type.bic_lookup?.total ?? 0, color: '#22c55e' },
-  ];
+  // Sparklines — last 7 days of history
+  const last7 = history.slice(-7);
+  const callsSparkline = last7.map(
+    (d) => (d.iban_validate ?? 0) + (d.iban_batch ?? 0) + (d.bic_lookup ?? 0),
+  );
+  const revenueSparkline = last7.map((d) => d.revenue_usdc ?? 0);
 
+  // Success rate
+  const ibanTotal = stats.by_type.iban_validate?.total ?? 0;
+  const ibanValid = stats.by_type.iban_validate?.valid_count ?? 0;
+  const successRate = ibanTotal > 0 ? ((ibanValid / ibanTotal) * 100).toFixed(1) : '—';
+
+  // Line chart config
   const lineConfig = [
     { key: 'iban_validate', color: '#f59e0b', label: t('chart.legends.ibanValidate') },
     { key: 'iban_batch', color: '#3b82f6', label: t('chart.legends.ibanBatch') },
     { key: 'bic_lookup', color: '#22c55e', label: t('chart.legends.bicLookup') },
   ];
 
-  const topCountries = (stats.top_countries ?? []).slice(0, 10);
+  // Endpoint breakdown for ProgressBars
+  const endpointTotal =
+    (stats.by_type.iban_validate?.total ?? 0) +
+    (stats.by_type.iban_batch?.total ?? 0) +
+    (stats.by_type.bic_lookup?.total ?? 0);
+
+  const progressItems = [
+    {
+      label: t('chart.legends.ibanValidate'),
+      value: stats.by_type.iban_validate?.total ?? 0,
+      color: '#f59e0b',
+      total: endpointTotal,
+    },
+    {
+      label: t('chart.legends.ibanBatch'),
+      value: stats.by_type.iban_batch?.total ?? 0,
+      color: '#3b82f6',
+      total: endpointTotal,
+    },
+    {
+      label: t('chart.legends.bicLookup'),
+      value: stats.by_type.bic_lookup?.total ?? 0,
+      color: '#22c55e',
+      total: endpointTotal,
+    },
+  ];
+
+  const topCountries = (stats.top_countries ?? []).slice(0, 5);
   const maxCountryCount = topCountries.length > 0 ? topCountries[0].count : 1;
 
   return (
-    <div className="flex flex-col gap-6 max-w-7xl">
-      <DashboardHeader />
-
-      {/* Stat cards — 4 columns */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
+    <div className="flex flex-col gap-6">
+      {/* Stat cards — 3 columns */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <StatCardV2
           title={t('stats.today')}
           value={fmt(todayCalls, locale)}
-          subtitle={t('stats.apiCalls')}
-          trend={todayTrend}
-          trendLabel={trendPct ? t('stats.vsYesterday', { percent: trendPct }) : undefined}
+          trend={
+            trendPct
+              ? {
+                  direction: todayTrend,
+                  label: t('stats.vsYesterday', { percent: trendPct }),
+                }
+              : undefined
+          }
+          sparkline={callsSparkline}
+          accentColor="#f59e0b"
         />
-        <StatCard
-          title={t('stats.thisWeek')}
-          value={fmt(weekCalls, locale)}
-          subtitle={t('stats.last7Days')}
-        />
-        <StatCard
+        <StatCardV2
           title={t('stats.totalRevenue')}
           value={`$${(stats.total_revenue_usdc ?? 0).toFixed(4)}`}
-          subtitle={t('stats.usdcCollected')}
+          trend={
+            revenueTrendPct
+              ? {
+                  direction: revenueTrend,
+                  label: t('stats.vsYesterday', { percent: revenueTrendPct }),
+                }
+              : undefined
+          }
+          sparkline={revenueSparkline}
+          accentColor="#22c55e"
         />
-        <StatCard
-          title={t('stats.bicDatabase')}
-          value={fmt(stats.bic_database_entries ?? 39243, locale)}
-          subtitle={t('stats.gleifEntries')}
+        <StatCardV2
+          title={t('stats.successRate')}
+          value={successRate !== '—' ? `${successRate}%` : '—'}
+          trend={
+            successRate !== '—'
+              ? {
+                  direction: parseFloat(successRate) >= 95 ? 'up' : 'down',
+                  label: `${successRate}%`,
+                }
+              : undefined
+          }
+          accentColor="#3b82f6"
         />
       </div>
 
       {/* Line chart — full width */}
-      <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
+      <div className="rounded-xl border border-zinc-800/60 bg-gradient-to-br from-zinc-900 to-zinc-900/60 p-5">
         <div className="flex items-center justify-between mb-4">
           <p className="text-sm font-medium text-zinc-300">{t('chart.apiCalls30d')}</p>
-          <Link
-            href={`/${locale}/dashboard/api-stats`}
-            className="text-xs text-amber-400/70 hover:text-amber-400 transition"
-          >
-            {t('chart.viewDetails')}
-          </Link>
         </div>
         {history.length > 0 ? (
           <LineChart data={history} lines={lineConfig} />
@@ -176,22 +229,22 @@ export default async function DashboardPage() {
         )}
       </div>
 
-      {/* Two columns: Donut + Countries */}
+      {/* Two columns: ProgressBars + Top 5 countries */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        {/* Donut chart */}
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
-          <p className="mb-2 text-sm font-medium text-zinc-300">{t('chart.endpointBreakdown')}</p>
-          {donutData.some((d) => d.value > 0) ? (
-            <DonutChart data={donutData} />
+        {/* Endpoint breakdown */}
+        <div className="rounded-xl border border-zinc-800/60 bg-gradient-to-br from-zinc-900 to-zinc-900/60 p-5">
+          <p className="mb-4 text-sm font-medium text-zinc-300">{t('chart.endpointBreakdown')}</p>
+          {endpointTotal > 0 ? (
+            <ProgressBars items={progressItems} />
           ) : (
-            <div className="flex h-64 items-center justify-center text-zinc-500 text-sm">
+            <div className="flex h-32 items-center justify-center text-zinc-500 text-sm">
               {t('chart.noData')}
             </div>
           )}
         </div>
 
-        {/* Top 10 countries */}
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
+        {/* Top 5 countries */}
+        <div className="rounded-xl border border-zinc-800/60 bg-gradient-to-br from-zinc-900 to-zinc-900/60 p-5">
           <p className="mb-4 text-sm font-medium text-zinc-300">{t('chart.top10Countries')}</p>
           {topCountries.length > 0 ? (
             <div className="space-y-2.5">
@@ -203,7 +256,7 @@ export default async function DashboardPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between mb-0.5">
                         <span className="text-sm text-zinc-200 truncate">
-                          {t.has(`countries.${row.country}`) ? t(`countries.${row.country}` as any) : row.country}
+                          {t.has(`countries.${row.country}`) ? t(`countries.${row.country}` as Parameters<typeof t>[0]) : row.country}
                         </span>
                         <span className="text-xs font-mono text-amber-400 ml-2 flex-shrink-0">
                           {fmt(row.count, locale)}
@@ -227,9 +280,6 @@ export default async function DashboardPage() {
           )}
         </div>
       </div>
-
-      {/* Quick actions */}
-      <QuickActions />
     </div>
   );
 }
