@@ -106,6 +106,10 @@ export interface HealthResponse {
 }
 
 export interface StatsOverview {
+  total_requests: number;
+  requests_today: number;
+  requests_by_path: Array<{ path: string; count: number; avg_ms: number }>;
+  requests_by_status: Array<{ status_group: string; count: number }>;
   total_operations: number;
   by_type: {
     iban_validate: { total: number; valid_count: number; success_rate: number };

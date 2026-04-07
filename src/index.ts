@@ -17,6 +17,7 @@ import { mcpHttp } from './routes/mcp-http.js';
 import { mcpCard } from './routes/mcp-card.js';
 import { createX402Middleware, ensureWalletConfigured } from './middleware/x402.js';
 import { rateLimitMiddleware } from './middleware/rate-limit.js';
+import { recordRequest } from './lib/stats.js';
 
 // Fail-fast: refuse to start in production without wallet config
 ensureWalletConfigured();
@@ -45,6 +46,14 @@ app.use('*', async (c, next) => {
 });
 app.use('*', rateLimitMiddleware());
 app.use('*', compress());
+
+// Track all HTTP requests for dashboard analytics
+app.use('*', async (c, next) => {
+  const start = performance.now();
+  await next();
+  const ms = performance.now() - start;
+  recordRequest(c.req.method, new URL(c.req.url).pathname, c.res.status, ms);
+});
 
 // /ping — ultra-lightweight endpoint for latency testing and uptime monitoring
 app.get('/ping', (c) => c.text('pong'));

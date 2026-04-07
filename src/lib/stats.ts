@@ -9,6 +9,7 @@ import type { OperationType, StatsOverview, HourlyStatsResponse, ErrorStatsRespo
 let _insertOp: Database.Statement | null = null;
 let _upsertDaily: Database.Statement | null = null;
 let _upsertHourly: Database.Statement | null = null;
+let _insertRequest: Database.Statement | null = null;
 
 function insertOp() {
   if (!_insertOp) {
@@ -46,9 +47,34 @@ function upsertHourly() {
   return _upsertHourly;
 }
 
+function insertRequest() {
+  if (!_insertRequest) {
+    _insertRequest = getStatsDB().prepare(
+      'INSERT INTO request_log (method, path, status, response_ms, hour, day_of_week) VALUES (?, ?, ?, ?, ?, ?)',
+    );
+  }
+  return _insertRequest;
+}
+
 // ---------------------------------------------------------------------------
 // Record helpers
 // ---------------------------------------------------------------------------
+
+/**
+ * Record any HTTP request (all traffic, not just business operations)
+ */
+export function recordRequest(method: string, path: string, status: number, responseMs: number) {
+  try {
+    const now = new Date();
+    const hour = now.getUTCHours();
+    const dow = (now.getUTCDay() + 6) % 7;
+    // Normalize paths: /v1/bic/DEUTDEFF → /v1/bic/:code
+    const normalizedPath = path.replace(/\/v1\/bic\/[A-Za-z0-9]+/, '/v1/bic/:code');
+    insertRequest().run(method, normalizedPath, status, Math.round(responseMs), hour, dow);
+  } catch {
+    // Non-critical
+  }
+}
 
 /**
  * Record a single operation (IBAN validation, BIC lookup, etc.)
@@ -100,6 +126,7 @@ export function resetStatsStatements() {
   _insertOp = null;
   _upsertDaily = null;
   _upsertHourly = null;
+  _insertRequest = null;
 }
 
 // ---------------------------------------------------------------------------
@@ -141,7 +168,28 @@ export function getStats(): StatsOverview {
     "SELECT date, SUM(total) as total, SUM(revenue_usdc) as revenue FROM daily_stats WHERE date >= date('now', '-7 days') GROUP BY date ORDER BY date DESC"
   ).all() as Array<{ date: string; total: number; revenue: number }>;
 
+  // Total HTTP requests (all traffic)
+  const totalRequests = db.prepare(
+    'SELECT COUNT(*) as total FROM request_log'
+  ).get() as { total: number };
+
+  const requestsByPath = db.prepare(
+    'SELECT path, COUNT(*) as count, ROUND(AVG(response_ms), 0) as avg_ms FROM request_log GROUP BY path ORDER BY count DESC LIMIT 15'
+  ).all() as Array<{ path: string; count: number; avg_ms: number }>;
+
+  const requestsByStatus = db.prepare(
+    "SELECT CASE WHEN status >= 200 AND status < 300 THEN '2xx' WHEN status >= 300 AND status < 400 THEN '3xx' WHEN status >= 400 AND status < 500 THEN '4xx' ELSE '5xx' END as status_group, COUNT(*) as count FROM request_log GROUP BY status_group ORDER BY status_group"
+  ).all() as Array<{ status_group: string; count: number }>;
+
+  const requestsToday = db.prepare(
+    "SELECT COUNT(*) as total FROM request_log WHERE created_at >= datetime('now', 'start of day')"
+  ).get() as { total: number };
+
   return {
+    total_requests: totalRequests.total,
+    requests_today: requestsToday.total,
+    requests_by_path: requestsByPath,
+    requests_by_status: requestsByStatus,
     total_operations: totalOps,
     by_type: {
       iban_validate: {

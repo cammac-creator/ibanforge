@@ -60,6 +60,18 @@ export function getStatsDB(): Database.Database {
         success_count INTEGER DEFAULT 0,
         PRIMARY KEY (date, hour, operation_type)
       );
+      CREATE TABLE IF NOT EXISTS request_log (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        method TEXT NOT NULL,
+        path TEXT NOT NULL,
+        status INTEGER NOT NULL,
+        response_ms INTEGER,
+        created_at TEXT DEFAULT (datetime('now')),
+        hour INTEGER,
+        day_of_week INTEGER
+      );
+      CREATE INDEX IF NOT EXISTS idx_request_log_date ON request_log(created_at);
+      CREATE INDEX IF NOT EXISTS idx_request_log_path ON request_log(path);
     `);
     // Migrate existing databases that may be missing the new columns
     const existingCols = (statsDB.prepare("PRAGMA table_info(operations)").all() as Array<{ name: string }>).map(r => r.name);
