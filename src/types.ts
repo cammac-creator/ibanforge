@@ -4,7 +4,7 @@
 
 // --- Operation tracking ---
 
-export type OperationType = 'iban_validate' | 'iban_batch' | 'bic_lookup';
+export type OperationType = 'iban_validate' | 'iban_batch' | 'bic_lookup' | 'iban_compliance';
 
 // --- IBAN Validation ---
 
@@ -144,4 +144,35 @@ export interface PatternStatsResponse {
   endpoint_share_trend: Array<{ date: string; iban_validate: number; iban_batch: number; bic_lookup: number }>;
   geo_trend: Array<Record<string, number | string>>;
   top_countries_list: string[];
+}
+
+// --- Compliance Bundle ---
+
+export interface SanctionsCheck {
+  country_sanctioned: boolean;
+  bank_sanctioned: boolean;
+  matched_lists: string[];
+  fatf_status: 'member' | 'grey_list' | 'black_list' | 'non_member';
+}
+
+export interface ReachabilityCheck {
+  sepa_instant: boolean;
+  sct: boolean;
+  sdd: boolean;
+}
+
+export interface VopCheck {
+  participant: boolean;
+  status: 'active' | 'pending' | 'inactive' | 'not_found';
+}
+
+export type RiskLevel = 'low' | 'medium' | 'elevated' | 'high' | 'critical';
+
+export interface ComplianceResult {
+  sanctions: SanctionsCheck;
+  reachability: ReachabilityCheck;
+  vop: VopCheck;
+  risk_score: number;
+  risk_level: RiskLevel;
+  flags: string[];
 }
