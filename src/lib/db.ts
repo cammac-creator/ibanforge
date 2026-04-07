@@ -3,6 +3,7 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { resetStatements } from './bic-lookup.js';
 import { resetStatsStatements } from './stats.js';
+import { closeComplianceDB } from './compliance-db.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -97,4 +98,5 @@ export function closeAll(): void {
     statsDB = null;
     resetStatsStatements();
   }
+  closeComplianceDB();
 }
