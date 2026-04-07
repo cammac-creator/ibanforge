@@ -108,6 +108,12 @@
         "cost": "$0.003",
         "description": "BIC/SWIFT-Code nachschlagen"
       },
+      "3": {
+        "method": "POST",
+        "path": "/v1/iban/compliance",
+        "cost": "$0.02",
+        "description": "Vollständiger Compliance-Check: Sanktionen, SEPA Instant, VoP, Risiko-Score"
+      },
       "heading": "Endpoints und Preise",
       "subtitle": "Zahlung pro Anfrage mit USDC über x402. Testen Sie den /v1/demo-Endpoint kostenlos.",
       "table": {
@@ -169,6 +175,13 @@
         "cost": "$0.003",
         "costLabel": "pro Aufruf",
         "description": "BIC/SWIFT-Code in der GLEIF-Datenbank nachschlagen"
+      },
+      "3": {
+        "method": "POST",
+        "path": "/v1/iban/compliance",
+        "cost": "$0.02",
+        "costLabel": "pro Aufruf",
+        "description": "Vollständiger Compliance-Check mit Sanktionsprüfung, SEPA-Instant-Erreichbarkeit, VoP-Status und Risiko-Score (0-100)"
       }
     },
     "free": {

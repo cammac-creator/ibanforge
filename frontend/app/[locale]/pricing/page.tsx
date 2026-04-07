@@ -12,7 +12,7 @@ export const metadata: Metadata = {
     "Simple, transparent pay-per-call pricing. No subscriptions. No API keys. Pay with USDC via x402 micropayments.",
 }
 
-const ENDPOINT_COUNT = 3
+const ENDPOINT_COUNT = 4
 
 export default async function PricingPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
@@ -93,7 +93,7 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
           {t('table.subtitle')}
         </p>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {ENDPOINTS.map((ep) => (
             <div
               key={ep.path}

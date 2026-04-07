@@ -108,6 +108,12 @@
         "cost": "$0.003",
         "description": "Lookup BIC/SWIFT code"
       },
+      "3": {
+        "method": "POST",
+        "path": "/v1/iban/compliance",
+        "cost": "$0.02",
+        "description": "Full compliance check: sanctions, SEPA Instant, VoP, risk score"
+      },
       "heading": "Endpoints & pricing",
       "subtitle": "Pay per request with USDC via x402. Try the /v1/demo endpoint for free.",
       "table": {
@@ -169,6 +175,13 @@
         "cost": "$0.003",
         "costLabel": "per call",
         "description": "Lookup BIC/SWIFT code from GLEIF database"
+      },
+      "3": {
+        "method": "POST",
+        "path": "/v1/iban/compliance",
+        "cost": "$0.02",
+        "costLabel": "per call",
+        "description": "Full compliance check with sanctions screening, SEPA Instant reachability, VoP participant status, and risk score (0-100)"
       }
     },
     "free": {
