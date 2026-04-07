@@ -454,7 +454,8 @@
       "totalRevenue": "Gesamteinnahmen",
       "usdcCollected": "USDC gesammelt",
       "bicDatabase": "BIC-Datenbank",
-      "gleifEntries": "GLEIF-Einträge"
+      "gleifEntries": "GLEIF-Einträge",
+      "successRate": "Erfolgsrate"
     },
     "chart": {
       "apiCalls30d": "API-Aufrufe — letzte 30 Tage",

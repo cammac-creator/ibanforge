@@ -34,6 +34,7 @@ interface HistoryEntry {
   iban_batch: number;
   bic_lookup: number;
   revenue_usdc: number;
+  total_requests: number;
 }
 
 async function fetchStats(): Promise<StatsResponse | null> {
@@ -137,6 +138,7 @@ export default async function DashboardPage() {
 
   // Line chart config
   const lineConfig = [
+    { key: 'total_requests', color: '#a855f7', label: 'Total HTTP' },
     { key: 'iban_validate', color: '#f59e0b', label: t('chart.legends.ibanValidate') },
     { key: 'iban_batch', color: '#3b82f6', label: t('chart.legends.ibanBatch') },
     { key: 'bic_lookup', color: '#22c55e', label: t('chart.legends.bicLookup') },
@@ -236,7 +238,7 @@ export default async function DashboardPage() {
       {/* Line chart — full width */}
       <div className="rounded-xl border border-zinc-800/60 bg-gradient-to-br from-zinc-900 to-zinc-900/60 p-5">
         <div className="flex items-center justify-between mb-4">
-          <p className="text-sm font-medium text-zinc-300">{t('chart.apiCalls30d')}</p>
+          <p className="text-sm font-medium text-zinc-300">Traffic — 30 days</p>
         </div>
         {history.length > 0 ? (
           <LineChart data={history} lines={lineConfig} />

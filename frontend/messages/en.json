@@ -454,7 +454,8 @@
       "totalRevenue": "Total revenue",
       "usdcCollected": "USDC collected",
       "bicDatabase": "BIC database",
-      "gleifEntries": "GLEIF entries"
+      "gleifEntries": "GLEIF entries",
+      "successRate": "Success rate"
     },
     "chart": {
       "apiCalls30d": "API calls — last 30 days",

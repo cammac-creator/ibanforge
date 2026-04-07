@@ -454,7 +454,8 @@
       "totalRevenue": "Revenus totaux",
       "usdcCollected": "USDC collectés",
       "bicDatabase": "Base de données BIC",
-      "gleifEntries": "Entrées GLEIF"
+      "gleifEntries": "Entrées GLEIF",
+      "successRate": "Taux de succès"
     },
     "chart": {
       "apiCalls30d": "Appels API — 30 derniers jours",
