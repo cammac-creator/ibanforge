@@ -149,6 +149,56 @@ const spec = {
         },
       },
     },
+    '/v1/iban/compliance': {
+      post: {
+        operationId: 'complianceCheck',
+        summary: 'Full IBAN compliance check',
+        description:
+          'Validates an IBAN and returns everything from /v1/iban/validate PLUS a full compliance layer: sanctions screening (OFAC/EU/UN), FATF status, SEPA Instant reachability, VoP participant check, and a composite risk score (0-100). Costs $0.02 USDC via x402.',
+        tags: ['Compliance'],
+        security: [{ x402Payment: [] }],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['iban'],
+                properties: {
+                  iban: {
+                    type: 'string',
+                    description: 'IBAN to check',
+                    example: 'DE89370400440532013000',
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': {
+            description: 'Compliance check result (includes full IBAN validation + compliance layer)',
+            content: {
+              'application/json': {
+                schema: {
+                  allOf: [
+                    { $ref: '#/components/schemas/IBANValidationResult' },
+                    {
+                      type: 'object',
+                      properties: {
+                        compliance: { $ref: '#/components/schemas/ComplianceResult' },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          '402': { description: 'Payment required (x402) — $0.02 USDC' },
+          '400': { description: 'Missing or malformed request body' },
+        },
+      },
+    },
     '/v1/demo': {
       get: {
         operationId: 'getDemo',
@@ -422,6 +472,39 @@ const spec = {
           processing_ms: { type: 'number' },
         },
       },
+      ComplianceResult: {
+        type: 'object',
+        required: ['sanctions', 'reachability', 'vop', 'risk_score', 'risk_level', 'flags'],
+        properties: {
+          sanctions: {
+            type: 'object',
+            properties: {
+              country_sanctioned: { type: 'boolean' },
+              bank_sanctioned: { type: 'boolean' },
+              matched_lists: { type: 'array', items: { type: 'string' }, example: ['OFAC_SDN', 'EU_SANCTIONS'] },
+              fatf_status: { type: 'string', enum: ['member', 'grey_list', 'black_list', 'non_member'] },
+            },
+          },
+          reachability: {
+            type: 'object',
+            properties: {
+              sepa_instant: { type: 'boolean', description: 'Whether the bank supports SEPA Instant Credit Transfer' },
+              sct: { type: 'boolean', description: 'SEPA Credit Transfer participant' },
+              sdd: { type: 'boolean', description: 'SEPA Direct Debit participant' },
+            },
+          },
+          vop: {
+            type: 'object',
+            properties: {
+              participant: { type: 'boolean', description: 'Whether the bank participates in Verification of Payee' },
+              status: { type: 'string', enum: ['active', 'pending', 'inactive', 'not_found'] },
+            },
+          },
+          risk_score: { type: 'integer', minimum: 0, maximum: 100, description: 'Composite risk score (0 = no risk, 100 = critical)' },
+          risk_level: { type: 'string', enum: ['low', 'medium', 'elevated', 'high', 'critical'] },
+          flags: { type: 'array', items: { type: 'string' }, description: 'List of specific risk flags detected', example: ['fatf_grey_list', 'emi_issuer', 'no_vop'] },
+        },
+      },
       HealthResponse: {
         type: 'object',
         required: ['status', 'version', 'uptime_seconds', 'stats'],
@@ -504,6 +587,7 @@ const spec = {
   tags: [
     { name: 'IBAN', description: 'IBAN validation endpoints (paid via x402)' },
     { name: 'BIC', description: 'BIC/SWIFT lookup endpoints (paid via x402)' },
+    { name: 'Compliance', description: 'Compliance check endpoint — IBAN validation + sanctions + SEPA + VoP + risk score (paid via x402)' },
     { name: 'Free', description: 'Free endpoints — no payment required' },
   ],
 };
