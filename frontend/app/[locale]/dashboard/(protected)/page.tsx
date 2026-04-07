@@ -12,6 +12,10 @@ function fmt(n: number, locale: string): string {
 }
 
 interface StatsResponse {
+  total_requests: number;
+  requests_today: number;
+  requests_by_path: Array<{ path: string; count: number; avg_ms: number }>;
+  requests_by_status: Array<{ status_group: string; count: number }>;
   total_operations: number;
   by_type: {
     iban_validate: { total: number; valid_count: number; success_rate: number };
@@ -168,12 +172,26 @@ export default async function DashboardPage() {
   const topCountries = (stats.top_countries ?? []).slice(0, 5);
   const maxCountryCount = topCountries.length > 0 ? topCountries[0].count : 1;
 
+  // Requests by path for the table
+  const requestsByPath = stats.requests_by_path ?? [];
+  const requestsByStatus = stats.requests_by_status ?? [];
+
   return (
     <div className="flex flex-col gap-6">
-      {/* Stat cards — 3 columns */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      {/* Stat cards — 4 columns */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCardV2
+          title="Total requests"
+          value={fmt(stats.total_requests ?? 0, locale)}
+          accentColor="#a855f7"
+        />
         <StatCardV2
           title={t('stats.today')}
+          value={fmt(stats.requests_today ?? 0, locale)}
+          accentColor="#8b5cf6"
+        />
+        <StatCardV2
+          title={t('stats.today') + ' (API)'}
           value={fmt(todayCalls, locale)}
           trend={
             trendPct
@@ -227,6 +245,71 @@ export default async function DashboardPage() {
             {t('chart.noHistoryData')}
           </div>
         )}
+      </div>
+
+      {/* Requests by path + status */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        {/* Requests by path */}
+        <div className="rounded-xl border border-zinc-800/60 bg-gradient-to-br from-zinc-900 to-zinc-900/60 p-5">
+          <p className="mb-4 text-sm font-medium text-zinc-300">Requests by endpoint</p>
+          {requestsByPath.length > 0 ? (
+            <div className="space-y-2">
+              {requestsByPath.map((row) => {
+                const maxCount = requestsByPath[0]?.count || 1;
+                const pct = (row.count / maxCount) * 100;
+                return (
+                  <div key={row.path}>
+                    <div className="flex items-center justify-between mb-0.5">
+                      <span className="text-xs font-mono text-zinc-300 truncate max-w-[60%]">{row.path}</span>
+                      <div className="flex items-center gap-3">
+                        <span className="text-[10px] font-mono text-zinc-600">{row.avg_ms}ms</span>
+                        <span className="text-xs font-mono text-purple-400">{fmt(row.count, locale)}</span>
+                      </div>
+                    </div>
+                    <div className="h-1.5 w-full rounded-full bg-zinc-800/60 overflow-hidden">
+                      <div className="h-full rounded-full bg-purple-500/40" style={{ width: `${pct}%` }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="flex h-32 items-center justify-center text-zinc-600 text-sm">No request data yet</div>
+          )}
+        </div>
+
+        {/* Status codes */}
+        <div className="rounded-xl border border-zinc-800/60 bg-gradient-to-br from-zinc-900 to-zinc-900/60 p-5">
+          <p className="mb-4 text-sm font-medium text-zinc-300">Response status codes</p>
+          {requestsByStatus.length > 0 ? (
+            <div className="space-y-3">
+              {requestsByStatus.map((row) => {
+                const color = row.status_group === '2xx' ? '#22c55e' : row.status_group === '3xx' ? '#f59e0b' : row.status_group === '4xx' ? '#eab308' : '#ef4444';
+                const totalReqs = requestsByStatus.reduce((s, r) => s + r.count, 0);
+                const pct = totalReqs > 0 ? (row.count / totalReqs) * 100 : 0;
+                return (
+                  <div key={row.status_group}>
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
+                        <span className="text-sm font-mono text-zinc-300">{row.status_group}</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs font-mono text-zinc-400">{fmt(row.count, locale)}</span>
+                        <span className="text-xs font-mono text-zinc-600 w-12 text-right">{pct.toFixed(1)}%</span>
+                      </div>
+                    </div>
+                    <div className="h-2 w-full rounded-full bg-zinc-800/60 overflow-hidden">
+                      <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: color }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="flex h-32 items-center justify-center text-zinc-600 text-sm">No request data yet</div>
+          )}
+        </div>
       </div>
 
       {/* Two columns: ProgressBars + Top 5 countries */}
