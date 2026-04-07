@@ -1,0 +1,52 @@
+import { Hono } from 'hono';
+import { validateIBAN } from '../lib/iban.js';
+import { enrichResult } from '../lib/enrich.js';
+import { buildComplianceResult } from '../lib/compliance.js';
+import { recordOperation } from '../lib/stats.js';
+import type { IBANValidationResult, ComplianceResult } from '../types.js';
+
+const ibanCompliance = new Hono();
+
+ibanCompliance.post('/v1/iban/compliance', async (c) => {
+  const start = performance.now();
+
+  let body: { iban?: unknown };
+  try {
+    body = await c.req.json<{ iban?: unknown }>();
+  } catch {
+    return c.json({ error: 'invalid_json', message: 'Request body must be valid JSON' }, 400);
+  }
+
+  if (!body.iban || typeof body.iban !== 'string' || body.iban.trim() === '') {
+    return c.json({ error: 'invalid_request', message: "Request body must include an 'iban' field (string)" }, 400);
+  }
+
+  const result: IBANValidationResult = validateIBAN(body.iban as string);
+  enrichResult(result);
+
+  const countryCode = result.country?.code ?? '';
+  const bic8 = result.bic?.code?.slice(0, 8) ?? null;
+  const issuerType = result.issuer?.type ?? 'bank';
+  const countryRisk = result.risk_indicators?.country_risk ?? 'standard';
+  const isTestBic = result.risk_indicators?.test_bic ?? false;
+
+  let compliance: ComplianceResult;
+  try {
+    compliance = buildComplianceResult(countryCode, bic8, issuerType, countryRisk, isTestBic);
+  } catch {
+    compliance = {
+      sanctions: { country_sanctioned: false, bank_sanctioned: false, matched_lists: [], fatf_status: 'non_member' },
+      reachability: { sepa_instant: false, sct: false, sdd: false },
+      vop: { participant: false, status: 'not_found' },
+      risk_score: 0, risk_level: 'low', flags: ['compliance_data_unavailable'],
+    };
+  }
+
+  const processingMs = Math.round((performance.now() - start) * 100) / 100;
+  const errorDetail = result.valid ? undefined : result.iban.slice(0, 4);
+  recordOperation('iban_compliance', countryCode || null, result.valid, 0.02, errorDetail);
+
+  return c.json({ ...result, compliance, cost_usdc: 0.02, processing_ms: processingMs });
+});
+
+export { ibanCompliance };

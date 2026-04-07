@@ -1,6 +1,7 @@
 import type { MiddlewareHandler } from 'hono';
 
-const USDC_BASE = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
+// USDC contract address on Base L2
+export const USDC_BASE = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
 
 /**
  * x402 payment middleware for IBANforge.
@@ -75,6 +76,16 @@ export function createX402Middleware(): MiddlewareHandler {
             maxTimeoutSeconds: 60,
           },
           description: 'BIC/SWIFT code lookup with LEI enrichment',
+        },
+        'POST /v1/iban/compliance': {
+          accepts: {
+            scheme: 'exact',
+            network: 'eip155:8453' as const,
+            price: '$0.02',
+            payTo: walletAddress,
+            maxTimeoutSeconds: 60,
+          },
+          description: 'IBAN compliance check: validation + sanctions + SEPA reachability + VoP + risk score',
         },
       };
 

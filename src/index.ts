@@ -7,6 +7,7 @@ import { logger } from 'hono/logger';
 import { ibanValidate } from './routes/iban-validate.js';
 import { ibanBatch } from './routes/iban-batch.js';
 import { bicLookup } from './routes/bic-lookup.js';
+import { ibanCompliance } from './routes/iban-compliance.js';
 import { health } from './routes/health.js';
 import { stats } from './routes/stats.js';
 import { demo } from './routes/demo.js';
@@ -69,6 +70,7 @@ app.use('/v1/*', createX402Middleware());
 app.route('/', ibanValidate);
 app.route('/', ibanBatch);
 app.route('/', bicLookup);
+app.route('/', ibanCompliance);
 
 // Free routes
 app.route('/', health);
