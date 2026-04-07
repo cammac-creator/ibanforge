@@ -41,15 +41,16 @@ export function createX402Middleware(): MiddlewareHandler {
     }
 
     try {
-      const { paymentMiddlewareFromConfig } = await import('@x402/hono');
-      const { HTTPFacilitatorClient } = await import('@x402/core/server');
+      const { paymentMiddleware } = await import('@x402/hono');
+      const { x402ResourceServer, HTTPFacilitatorClient } = await import('@x402/core/server');
+      const { ExactEvmScheme } = await import('@x402/evm/exact/server');
 
       const routes: Record<string, unknown> = {
         'POST /v1/iban/validate': {
           accepts: {
             scheme: 'exact',
             network: 'eip155:8453' as const,
-            price: { amount: '5000', asset: USDC_BASE },
+            price: '$0.005',
             payTo: walletAddress,
             maxTimeoutSeconds: 60,
           },
@@ -59,17 +60,17 @@ export function createX402Middleware(): MiddlewareHandler {
           accepts: {
             scheme: 'exact',
             network: 'eip155:8453' as const,
-            price: { amount: '200000', asset: USDC_BASE },
+            price: '$0.20',
             payTo: walletAddress,
             maxTimeoutSeconds: 60,
           },
-          description: 'Batch IBAN validation (up to 100 IBANs, $0.002/IBAN)',
+          description: 'Batch IBAN validation (up to 100 IBANs)',
         },
         'GET /v1/bic/:code': {
           accepts: {
             scheme: 'exact',
             network: 'eip155:8453' as const,
-            price: { amount: '3000', asset: USDC_BASE },
+            price: '$0.003',
             payTo: walletAddress,
             maxTimeoutSeconds: 60,
           },
@@ -77,23 +78,29 @@ export function createX402Middleware(): MiddlewareHandler {
         },
       };
 
-      // Use Coinbase CDP facilitator with API key auth
+      // Create CDP facilitator client
       const cdpKeyId = process.env.CDP_API_KEY_ID;
       const cdpKeySecret = process.env.CDP_API_KEY_SECRET;
 
-      let facilitatorClient: InstanceType<typeof HTTPFacilitatorClient> | undefined;
+      let facilitatorClient: InstanceType<typeof HTTPFacilitatorClient>;
 
       if (cdpKeyId && cdpKeySecret) {
         const { createFacilitatorConfig } = await import('@coinbase/x402');
         const config = createFacilitatorConfig(cdpKeyId, cdpKeySecret);
         facilitatorClient = new HTTPFacilitatorClient(config);
-      } else if (process.env.FACILITATOR_URL) {
-        facilitatorClient = new HTTPFacilitatorClient({ url: process.env.FACILITATOR_URL });
+      } else {
+        facilitatorClient = new HTTPFacilitatorClient({
+          url: process.env.FACILITATOR_URL || 'https://x402.org/facilitator',
+        });
       }
 
-      const middleware = paymentMiddlewareFromConfig(
-        routes as Parameters<typeof paymentMiddlewareFromConfig>[0],
-        facilitatorClient,
+      // Build x402 resource server with EVM scheme (like official example)
+      const x402Server = new x402ResourceServer(facilitatorClient);
+      x402Server.register('eip155:*', new ExactEvmScheme());
+
+      const middleware = paymentMiddleware(
+        routes as Parameters<typeof paymentMiddleware>[0],
+        x402Server,
       );
       return middleware(c, next);
     } catch (err) {
