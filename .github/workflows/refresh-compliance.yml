@@ -1,0 +1,35 @@
+name: Refresh Compliance Data
+
+on:
+  schedule:
+    - cron: '0 3 * * 0'
+  workflow_dispatch: {}
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Refresh compliance data
+        run: npm run compliance:refresh
+      - name: Check for changes
+        id: changes
+        run: |
+          if git diff --quiet data/compliance.sqlite; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+          fi
+      - name: Commit and push
+        if: steps.changes.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/compliance.sqlite
+          git commit -m "chore(compliance): weekly data refresh [automated]"
+          git push
