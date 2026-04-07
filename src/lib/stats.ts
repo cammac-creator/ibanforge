@@ -224,6 +224,10 @@ export function getStatsHistory(days: number = 7): Array<{
   bic_lookup: number;
   revenue_usdc: number;
   total_requests: number;
+  s2xx: number;
+  s3xx: number;
+  s4xx: number;
+  s5xx: number;
 }> {
   const db = getStatsDB();
   // Business operations from daily_stats
@@ -246,28 +250,39 @@ export function getStatsHistory(days: number = 7): Array<{
     revenue_usdc: number;
   }>;
 
-  // Total HTTP requests from request_log
+  // Total HTTP requests from request_log, broken down by status group
   const reqRows = db.prepare(`
-    SELECT date(created_at) as date, COUNT(*) as total_requests
+    SELECT date(created_at) as date, COUNT(*) as total_requests,
+      SUM(CASE WHEN status >= 200 AND status < 300 THEN 1 ELSE 0 END) as s2xx,
+      SUM(CASE WHEN status >= 300 AND status < 400 THEN 1 ELSE 0 END) as s3xx,
+      SUM(CASE WHEN status >= 400 AND status < 500 THEN 1 ELSE 0 END) as s4xx,
+      SUM(CASE WHEN status >= 500 THEN 1 ELSE 0 END) as s5xx
     FROM request_log
     WHERE created_at >= datetime('now', '-' || ? || ' days')
     GROUP BY date(created_at)
-  `).all(days) as Array<{ date: string; total_requests: number }>;
+  `).all(days) as Array<{ date: string; total_requests: number; s2xx: number; s3xx: number; s4xx: number; s5xx: number }>;
 
-  const reqMap = new Map(reqRows.map(r => [r.date, r.total_requests]));
+  const reqMap = new Map(reqRows.map(r => [r.date, r]));
 
   // Merge: use all dates from both sources
   const allDates = new Set([...opsRows.map(r => r.date), ...reqRows.map(r => r.date)]);
   const opsMap = new Map(opsRows.map(r => [r.date, r]));
 
-  return Array.from(allDates).sort().map(date => ({
-    date,
-    iban_validate: opsMap.get(date)?.iban_validate ?? 0,
-    iban_batch: opsMap.get(date)?.iban_batch ?? 0,
-    bic_lookup: opsMap.get(date)?.bic_lookup ?? 0,
-    revenue_usdc: opsMap.get(date)?.revenue_usdc ?? 0,
-    total_requests: reqMap.get(date) ?? 0,
-  }));
+  return Array.from(allDates).sort().map(date => {
+    const req = reqMap.get(date);
+    return {
+      date,
+      iban_validate: opsMap.get(date)?.iban_validate ?? 0,
+      iban_batch: opsMap.get(date)?.iban_batch ?? 0,
+      bic_lookup: opsMap.get(date)?.bic_lookup ?? 0,
+      revenue_usdc: opsMap.get(date)?.revenue_usdc ?? 0,
+      total_requests: req?.total_requests ?? 0,
+      s2xx: req?.s2xx ?? 0,
+      s3xx: req?.s3xx ?? 0,
+      s4xx: req?.s4xx ?? 0,
+      s5xx: req?.s5xx ?? 0,
+    };
+  });
 }
 
 /**
