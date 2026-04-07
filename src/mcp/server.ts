@@ -5,6 +5,7 @@ import { validateIBAN } from '../lib/iban.js';
 import { enrichResult } from '../lib/enrich.js';
 import { lookup } from '../lib/bic-lookup.js';
 import { validateBIC } from '../lib/bic-validator.js';
+import { buildComplianceResult } from '../lib/compliance.js';
 
 const server = new McpServer({
   name: 'ibanforge',
@@ -132,6 +133,61 @@ Tip: if you already have an IBAN, use validate_iban instead — it resolves the 
 
     return {
       content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
+    };
+  },
+);
+
+// --- Tool: compliance_check ---
+server.tool(
+  'compliance_check',
+  `Run a full compliance check on an IBAN: sanctions screening, SEPA reachability, VoP participation, and composite risk scoring.
+
+Use this tool when you need to assess the compliance risk of a payment recipient — for example, verifying an IBAN is not associated with a sanctioned country or bank, checking if a bank participates in SEPA Instant (SCT Inst) or Verification of Payee (VoP), or producing a structured risk score for AML/KYC workflows.
+
+Returns: IBAN validation result + compliance bundle:
+  - sanctions: country_sanctioned, bank_sanctioned, matched_lists, fatf_status
+  - reachability: sepa_instant (SCT Inst), sct, sdd
+  - vop: participant, status
+  - risk_score (0–100), risk_level (low/medium/elevated/high/critical), flags
+
+Example input: 'CH56 0483 5012 3456 7800 9'
+Example output: { valid: true, compliance: { sanctions: { country_sanctioned: false, ... }, risk_score: 10, risk_level: 'low', ... } }
+
+Cost: $0.02 USDC per call via x402 micropayment on Base L2.`,
+  {
+    iban: z
+      .string()
+      .describe(
+        "IBAN to check. Spaces and hyphens are accepted and stripped automatically. Example: 'CH56 0483 5012 3456 7800 9' or 'DE89370400440532013000'",
+      ),
+  },
+  async ({ iban }) => {
+    const result = validateIBAN(iban);
+    enrichResult(result);
+
+    const countryCode = result.country?.code ?? '';
+    const bic8 = result.bic?.code?.slice(0, 8) ?? null;
+    const issuerType = result.issuer?.type ?? 'bank';
+    const countryRisk = result.risk_indicators?.country_risk ?? 'standard';
+    const isTestBic = result.risk_indicators?.test_bic ?? false;
+
+    let compliance;
+    try {
+      compliance = buildComplianceResult(countryCode, bic8, issuerType, countryRisk, isTestBic);
+    } catch {
+      compliance = {
+        sanctions: { country_sanctioned: false, bank_sanctioned: false, matched_lists: [], fatf_status: 'non_member' },
+        reachability: { sepa_instant: false, sct: false, sdd: false },
+        vop: { participant: false, status: 'not_found' },
+        risk_score: 0,
+        risk_level: 'low',
+        flags: ['compliance_data_unavailable'],
+      };
+    }
+
+    const combined = { ...result, compliance, cost_usdc: 0.02 };
+    return {
+      content: [{ type: 'text' as const, text: JSON.stringify(combined, null, 2) }],
     };
   },
 );

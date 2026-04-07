@@ -1,11 +1,12 @@
+import type Database from 'better-sqlite3';
 import { getComplianceDB } from './compliance-db.js';
 import type { SanctionsCheck, ReachabilityCheck, VopCheck, ComplianceResult, RiskLevel } from '../types.js';
 
-let _checkSanctionedCountry: any = null;
-let _checkSanctionedBank: any = null;
-let _checkFatf: any = null;
-let _checkReachability: any = null;
-let _checkVop: any = null;
+let _checkSanctionedCountry: Database.Statement | null = null;
+let _checkSanctionedBank: Database.Statement | null = null;
+let _checkFatf: Database.Statement | null = null;
+let _checkReachability: Database.Statement | null = null;
+let _checkVop: Database.Statement | null = null;
 
 export function checkSanctions(countryCode: string, bic8: string | null): SanctionsCheck {
   const db = getComplianceDB();
