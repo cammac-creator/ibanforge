@@ -223,9 +223,11 @@ export function getStatsHistory(days: number = 7): Array<{
   iban_batch: number;
   bic_lookup: number;
   revenue_usdc: number;
+  total_requests: number;
 }> {
   const db = getStatsDB();
-  const rows = db.prepare(`
+  // Business operations from daily_stats
+  const opsRows = db.prepare(`
     SELECT
       date,
       SUM(CASE WHEN operation_type = 'iban_validate' THEN total ELSE 0 END) as iban_validate,
@@ -243,7 +245,29 @@ export function getStatsHistory(days: number = 7): Array<{
     bic_lookup: number;
     revenue_usdc: number;
   }>;
-  return rows;
+
+  // Total HTTP requests from request_log
+  const reqRows = db.prepare(`
+    SELECT date(created_at) as date, COUNT(*) as total_requests
+    FROM request_log
+    WHERE created_at >= datetime('now', '-' || ? || ' days')
+    GROUP BY date(created_at)
+  `).all(days) as Array<{ date: string; total_requests: number }>;
+
+  const reqMap = new Map(reqRows.map(r => [r.date, r.total_requests]));
+
+  // Merge: use all dates from both sources
+  const allDates = new Set([...opsRows.map(r => r.date), ...reqRows.map(r => r.date)]);
+  const opsMap = new Map(opsRows.map(r => [r.date, r]));
+
+  return Array.from(allDates).sort().map(date => ({
+    date,
+    iban_validate: opsMap.get(date)?.iban_validate ?? 0,
+    iban_batch: opsMap.get(date)?.iban_batch ?? 0,
+    bic_lookup: opsMap.get(date)?.bic_lookup ?? 0,
+    revenue_usdc: opsMap.get(date)?.revenue_usdc ?? 0,
+    total_requests: reqMap.get(date) ?? 0,
+  }));
 }
 
 /**
