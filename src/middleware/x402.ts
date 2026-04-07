@@ -5,7 +5,7 @@ const USDC_BASE = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
 /**
  * x402 payment middleware for IBANforge.
  *
- * To enable payments: set X402_ENABLED=true + WALLET_ADDRESS in env.
+ * To enable payments: set X402_ENABLED=true + WALLET_ADDRESS + CDP_API_KEY_ID + CDP_API_KEY_SECRET in env.
  * When disabled (default), all endpoints are free — useful for launch phase.
  */
 export function ensureWalletConfigured(): void {
@@ -44,8 +44,6 @@ export function createX402Middleware(): MiddlewareHandler {
       const { paymentMiddlewareFromConfig } = await import('@x402/hono');
       const { HTTPFacilitatorClient } = await import('@x402/core/server');
 
-      const facilitatorUrl = process.env.FACILITATOR_URL;
-
       const routes: Record<string, unknown> = {
         'POST /v1/iban/validate': {
           accepts: {
@@ -57,11 +55,6 @@ export function createX402Middleware(): MiddlewareHandler {
           },
           description: 'IBAN validation + BIC lookup',
         },
-        // TODO: Dynamic pricing — x402 'exact' scheme requires a fixed price,
-        // but batch cost should be $0.002 * IBAN count. Current workaround:
-        // charge for max batch size (100 * 2000 = 200000). Overpayment is
-        // the user's choice — they can send fewer IBANs. Needs x402 'range'
-        // scheme or custom middleware to inspect body before pricing.
         'POST /v1/iban/batch': {
           accepts: {
             scheme: 'exact',
@@ -84,17 +77,27 @@ export function createX402Middleware(): MiddlewareHandler {
         },
       };
 
-      const facilitatorClient = facilitatorUrl
-        ? new HTTPFacilitatorClient({ url: facilitatorUrl })
-        : undefined;
+      // Use Coinbase CDP facilitator with API key auth
+      const cdpKeyId = process.env.CDP_API_KEY_ID;
+      const cdpKeySecret = process.env.CDP_API_KEY_SECRET;
+
+      let facilitatorClient: InstanceType<typeof HTTPFacilitatorClient> | undefined;
+
+      if (cdpKeyId && cdpKeySecret) {
+        const { createFacilitatorConfig } = await import('@coinbase/x402');
+        const config = createFacilitatorConfig(cdpKeyId, cdpKeySecret);
+        facilitatorClient = new HTTPFacilitatorClient(config);
+      } else if (process.env.FACILITATOR_URL) {
+        facilitatorClient = new HTTPFacilitatorClient({ url: process.env.FACILITATOR_URL });
+      }
 
       const middleware = paymentMiddlewareFromConfig(
         routes as Parameters<typeof paymentMiddlewareFromConfig>[0],
         facilitatorClient,
       );
       return middleware(c, next);
-    } catch {
-      // x402 package not available — only acceptable in dev/test
+    } catch (err) {
+      console.error('[x402] Middleware error:', err);
       if (process.env.NODE_ENV === 'production') {
         return c.json(
           { error: 'Payment system unavailable. Please try again later.' },
