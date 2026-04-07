@@ -38,13 +38,13 @@
   "home": {
     "metadata": {
       "title": "IBANforge — IBAN Validation & BIC/SWIFT Lookup API",
-      "description": "IBAN validation, BIC/SWIFT lookup, SEPA compliance, issuer classification, and risk indicators for developers and AI agents. Free during beta.",
+      "description": "IBAN validation, BIC/SWIFT lookup, SEPA compliance, issuer classification, and risk indicators for developers and AI agents. Pay per request with USDC via x402.",
       "og": {
         "title": "IBANforge",
         "description": "IBAN validation & BIC/SWIFT lookup API with compliance data for AI agents"
       }
     },
-    "badge": "Free during beta",
+    "badge": "x402 payments live",
     "hero": {
       "title": {
         "prefix": "IBAN",
@@ -109,7 +109,7 @@
         "description": "Lookup BIC/SWIFT code"
       },
       "heading": "Endpoints & pricing",
-      "subtitle": "Currently free during beta. Prices below will apply when x402 micropayments are activated.",
+      "subtitle": "Pay per request with USDC via x402. Try the /v1/demo endpoint for free.",
       "table": {
         "method": "Method",
         "path": "Path",
@@ -119,11 +119,11 @@
     },
     "quickStart": {
       "heading": "Quick start",
-      "subtitle": "No API key required — just send a request. Free during beta."
+      "subtitle": "No API key required — pay per request with USDC on Base L2."
     },
     "cta": {
       "heading": "Ready to build?",
-      "description": "Integrate in minutes. Free during beta — no API key, no subscription.",
+      "description": "Integrate in minutes. Pay with USDC — no API key, no subscription.",
       "button": "Start building"
     }
   },
@@ -146,7 +146,7 @@
     },
     "table": {
       "heading": "Endpoint pricing",
-      "subtitle": "Currently free during beta. Prices below will apply when x402 payments are activated."
+      "subtitle": "Pay per request with USDC via x402 on Base L2. No subscription, no API key."
     },
     "endpoints": {
       "0": {

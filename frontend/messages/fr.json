@@ -38,13 +38,13 @@
   "home": {
     "metadata": {
       "title": "IBANforge — API de validation IBAN et recherche BIC/SWIFT",
-      "description": "Validation IBAN, recherche BIC/SWIFT, conformité SEPA, classification émetteur et indicateurs de risque pour développeurs et agents AI. Gratuit pendant la beta.",
+      "description": "Validation IBAN, recherche BIC/SWIFT, conformité SEPA, classification émetteur et indicateurs de risque pour développeurs et agents AI. Paiement par requête en USDC via x402.",
       "og": {
         "title": "IBANforge",
         "description": "API de validation IBAN et recherche BIC/SWIFT avec données de conformité pour agents AI"
       }
     },
-    "badge": "Gratuit pendant la beta",
+    "badge": "Paiements x402 actifs",
     "hero": {
       "title": {
         "prefix": "IBAN",
@@ -109,7 +109,7 @@
         "description": "Rechercher un code BIC/SWIFT"
       },
       "heading": "Endpoints et tarifs",
-      "subtitle": "Actuellement gratuit pendant la beta. Les tarifs ci-dessous s'appliqueront à l'activation des micropaiements x402.",
+      "subtitle": "Paiement par requête en USDC via x402. Essayez le endpoint /v1/demo gratuitement.",
       "table": {
         "method": "Méthode",
         "path": "Chemin",
@@ -119,11 +119,11 @@
     },
     "quickStart": {
       "heading": "Démarrage rapide",
-      "subtitle": "Aucune clé API requise — envoyez simplement une requête. Gratuit pendant la beta."
+      "subtitle": "Aucune clé API requise — paiement par requête en USDC sur Base L2."
     },
     "cta": {
       "heading": "Prêt à développer ?",
-      "description": "Intégration en quelques minutes. Gratuit pendant la beta — sans clé API, sans abonnement.",
+      "description": "Intégration en quelques minutes. Paiement en USDC — sans clé API, sans abonnement.",
       "button": "Commencer à développer"
     }
   },
@@ -146,7 +146,7 @@
     },
     "table": {
       "heading": "Tarifs par endpoint",
-      "subtitle": "Actuellement gratuit pendant la beta. Les tarifs ci-dessous s'appliqueront à l'activation des paiements x402."
+      "subtitle": "Paiement par requête en USDC via x402 sur Base L2. Sans abonnement, sans clé API."
     },
     "endpoints": {
       "0": {

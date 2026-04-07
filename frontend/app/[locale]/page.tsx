@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge"
 export const metadata: Metadata = {
   title: "IBANforge — IBAN Validation & BIC/SWIFT Lookup API",
   description:
-    "IBAN validation, BIC/SWIFT lookup, SEPA compliance, issuer classification, and risk indicators for developers and AI agents. Free during beta.",
+    "IBAN validation, BIC/SWIFT lookup, SEPA compliance, issuer classification, and risk indicators for developers and AI agents. Pay per request with USDC via x402.",
   openGraph: {
     title: "IBANforge",
     description: "IBAN validation & BIC/SWIFT lookup API with compliance data for AI agents",

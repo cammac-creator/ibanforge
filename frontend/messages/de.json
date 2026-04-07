@@ -38,13 +38,13 @@
   "home": {
     "metadata": {
       "title": "IBANforge — API zur IBAN-Validierung und BIC/SWIFT-Suche",
-      "description": "IBAN-Validierung, BIC/SWIFT-Suche, SEPA-Konformität, Emittenten-Klassifizierung und Risikoindikatoren für Entwickler und AI-Agenten. Kostenlos während der Beta.",
+      "description": "IBAN-Validierung, BIC/SWIFT-Suche, SEPA-Konformität, Emittenten-Klassifizierung und Risikoindikatoren für Entwickler und AI-Agenten. Zahlung pro Anfrage mit USDC über x402.",
       "og": {
         "title": "IBANforge",
         "description": "API zur IBAN-Validierung und BIC/SWIFT-Suche mit Compliance-Daten für AI-Agenten"
       }
     },
-    "badge": "Kostenlos während der Beta",
+    "badge": "x402-Zahlungen aktiv",
     "hero": {
       "title": {
         "prefix": "IBAN",
@@ -109,7 +109,7 @@
         "description": "BIC/SWIFT-Code nachschlagen"
       },
       "heading": "Endpoints und Preise",
-      "subtitle": "Derzeit kostenlos während der Beta. Die unten aufgeführten Preise gelten ab Aktivierung der x402-Mikrozahlungen.",
+      "subtitle": "Zahlung pro Anfrage mit USDC über x402. Testen Sie den /v1/demo-Endpoint kostenlos.",
       "table": {
         "method": "Methode",
         "path": "Pfad",
@@ -119,11 +119,11 @@
     },
     "quickStart": {
       "heading": "Schnellstart",
-      "subtitle": "Kein API-Schlüssel erforderlich — senden Sie einfach eine Anfrage. Kostenlos während der Beta."
+      "subtitle": "Kein API-Schlüssel erforderlich — Zahlung pro Anfrage mit USDC auf Base L2."
     },
     "cta": {
       "heading": "Bereit loszulegen?",
-      "description": "Integration in wenigen Minuten. Kostenlos während der Beta — ohne API-Schlüssel, ohne Abonnement.",
+      "description": "Integration in wenigen Minuten. Zahlung mit USDC — ohne API-Schlüssel, ohne Abonnement.",
       "button": "Jetzt starten"
     }
   },
@@ -146,7 +146,7 @@
     },
     "table": {
       "heading": "Preise pro Endpoint",
-      "subtitle": "Derzeit kostenlos während der Beta. Die unten aufgeführten Preise gelten ab Aktivierung der x402-Zahlungen."
+      "subtitle": "Zahlung pro Anfrage mit USDC über x402 auf Base L2. Ohne Abonnement, ohne API-Schlüssel."
     },
     "endpoints": {
       "0": {
