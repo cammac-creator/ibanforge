@@ -179,110 +179,93 @@ function insertStaticData(db: Database.Database): void {
 // ---------------------------------------------------------------------------
 
 async function fetchOpenSanctions(db: Database.Database): Promise<void> {
-  console.log('\n[2/5] Downloading OpenSanctions data...');
-  const csvPath = resolve(TMP_DIR, 'opensanctions.csv');
+  console.log('\n[2/5] Downloading OpenSanctions data (3 sources)...');
 
-  try {
-    const url = 'https://data.opensanctions.org/datasets/latest/sanctions/targets.simple.csv';
-    console.log(`  Fetching: ${url}`);
-    await downloadFile(url, csvPath);
-    console.log('  Download complete. Parsing BICs...');
+  // Download each sanctions source separately for better source_list classification
+  const SANCTIONS_SOURCES = [
+    { name: 'OFAC', url: 'https://data.opensanctions.org/datasets/latest/us_ofac_sdn/targets.simple.csv' },
+    { name: 'EU', url: 'https://data.opensanctions.org/datasets/latest/eu_fsf/targets.simple.csv' },
+    { name: 'UN', url: 'https://data.opensanctions.org/datasets/latest/un_sc_sanctions/targets.simple.csv' },
+  ];
 
-    const insertEntity = db.prepare(
-      `INSERT OR IGNORE INTO sanctioned_entities (bic8, entity_name, source_list, country_code)
-       VALUES (?, ?, ?, ?)`
-    );
-
-    let lineCount = 0;
-    let bicCount = 0;
-    let headerParsed = false;
-    let colIdentifiers = -1;
-    let colName = -1;
-    let colDatasets = -1;
-    let colCountries = -1;
-
-    // We parse the CSV line by line using readline to handle large files
-    const { createReadStream } = await import('node:fs');
-    const rl = createInterface({
-      input: createReadStream(csvPath),
-      crlfDelay: Infinity,
-    });
-
-    const insertBatch = db.transaction((rows: Array<[string, string, string, string]>) => {
-      for (const row of rows) {
-        insertEntity.run(...row);
-      }
-    });
-
-    const batch: Array<[string, string, string, string]> = [];
-
-    for await (const line of rl) {
-      lineCount++;
-
-      if (!headerParsed) {
-        // Parse CSV header to find column indices
-        const cols = parseCsvLine(line);
-        colIdentifiers = cols.indexOf('identifiers');
-        colName = cols.indexOf('caption');
-        if (colName === -1) colName = cols.indexOf('name');
-        colDatasets = cols.indexOf('datasets');
-        colCountries = cols.indexOf('countries');
-        headerParsed = true;
-        continue;
-      }
-
-      const cols = parseCsvLine(line);
-      if (cols.length < 3) continue;
-
-      const identifiers = colIdentifiers >= 0 ? (cols[colIdentifiers] ?? '') : '';
-      const entityName = colName >= 0 ? (cols[colName] ?? '') : '';
-      const datasets = colDatasets >= 0 ? (cols[colDatasets] ?? '') : '';
-      const countries = colCountries >= 0 ? (cols[colCountries] ?? '') : '';
-
-      if (!identifiers) continue;
-
-      // Extract BIC/SWIFT codes from identifiers field
-      const bics = new Set<string>();
-      let match: RegExpExecArray | null;
-      BIC_REGEX.lastIndex = 0;
-      while ((match = BIC_REGEX.exec(identifiers)) !== null) {
-        bics.add(match[1].substring(0, 8));
-      }
-
-      if (bics.size === 0) continue;
-
-      // Determine source list from datasets
-      let sourceList = 'OTHER';
-      const dsLower = datasets.toLowerCase();
-      if (dsLower.includes('ofac')) sourceList = 'OFAC';
-      else if (dsLower.includes('eu_') || dsLower.includes('eu-')) sourceList = 'EU';
-      else if (dsLower.includes('un_') || dsLower.includes('un-')) sourceList = 'UN';
-
-      const countryCode = countries.split(/[,;|\s]+/)[0]?.trim().toUpperCase() ?? '';
-
-      for (const bic8 of bics) {
-        batch.push([bic8, entityName.substring(0, 200), sourceList, countryCode]);
-        bicCount++;
-      }
-
-      // Flush batch every 500 rows
-      if (batch.length >= 500) {
-        insertBatch(batch.splice(0, batch.length));
-      }
+  for (const source of SANCTIONS_SOURCES) {
+    const csvPath = resolve(TMP_DIR, `opensanctions_${source.name}.csv`);
+    try {
+      await importSanctionsCSV(db, source.url, source.name, csvPath);
+    } catch (err) {
+      console.warn(`  WARNING: ${source.name} download failed: ${(err as Error).message}`);
     }
-
-    // Flush remaining
-    if (batch.length > 0) {
-      insertBatch(batch.splice(0, batch.length));
-    }
-
-    const entityCount = (db.prepare(`SELECT COUNT(*) as n FROM sanctioned_entities`).get() as { n: number }).n;
-    console.log(`  Processed ${lineCount} CSV lines, found ${bicCount} BIC references`);
-    console.log(`  sanctioned_entities: ${entityCount} rows (after dedup)`);
-  } catch (err) {
-    console.warn(`  WARNING: OpenSanctions download/parse failed: ${(err as Error).message}`);
-    console.warn('  Continuing with country-level sanctions only.');
   }
+
+  const entityCount = (db.prepare(`SELECT COUNT(*) as n FROM sanctioned_entities`).get() as { n: number }).n;
+  console.log(`  sanctioned_entities total: ${entityCount} rows (after dedup across all sources)`);
+}
+
+async function importSanctionsCSV(db: Database.Database, url: string, sourceLabel: string, csvPath: string): Promise<void> {
+  console.log(`  Fetching ${sourceLabel}: ${url}`);
+  await downloadFile(url, csvPath);
+  console.log(`  Parsing ${sourceLabel} BICs...`);
+
+  const insertEntity = db.prepare(
+    `INSERT OR IGNORE INTO sanctioned_entities (bic8, entity_name, source_list, country_code)
+     VALUES (?, ?, ?, ?)`
+  );
+
+  let lineCount = 0;
+  let bicCount = 0;
+  let headerParsed = false;
+  let colIdentifiers = -1;
+  let colName = -1;
+  let colCountries = -1;
+
+  const { createReadStream } = await import('node:fs');
+  const rl = createInterface({ input: createReadStream(csvPath), crlfDelay: Infinity });
+
+  const insertBatch = db.transaction((rows: Array<[string, string, string, string]>) => {
+    for (const row of rows) insertEntity.run(...row);
+  });
+
+  const batch: Array<[string, string, string, string]> = [];
+
+  for await (const line of rl) {
+    lineCount++;
+    if (!headerParsed) {
+      const cols = parseCsvLine(line);
+      colIdentifiers = cols.indexOf('identifiers');
+      colName = cols.indexOf('caption');
+      if (colName === -1) colName = cols.indexOf('name');
+      colCountries = cols.indexOf('countries');
+      headerParsed = true;
+      continue;
+    }
+
+    const cols = parseCsvLine(line);
+    if (cols.length < 3) continue;
+
+    const identifiers = colIdentifiers >= 0 ? (cols[colIdentifiers] ?? '') : '';
+    const entityName = colName >= 0 ? (cols[colName] ?? '') : '';
+    const countries = colCountries >= 0 ? (cols[colCountries] ?? '') : '';
+
+    if (!identifiers) continue;
+
+    const bics = new Set<string>();
+    let match: RegExpExecArray | null;
+    BIC_REGEX.lastIndex = 0;
+    while ((match = BIC_REGEX.exec(identifiers)) !== null) {
+      bics.add(match[1].substring(0, 8));
+    }
+    if (bics.size === 0) continue;
+
+    const countryCode = countries.split(/[,;|\s]+/)[0]?.trim().toUpperCase() ?? '';
+    for (const bic8 of bics) {
+      batch.push([bic8, entityName.substring(0, 200), sourceLabel, countryCode]);
+      bicCount++;
+    }
+    if (batch.length >= 500) insertBatch(batch.splice(0, batch.length));
+  }
+  if (batch.length > 0) insertBatch(batch.splice(0, batch.length));
+
+  console.log(`  ${sourceLabel}: ${lineCount} lines, ${bicCount} BICs extracted`);
 }
 
 // ---------------------------------------------------------------------------
