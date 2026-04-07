@@ -16,6 +16,7 @@
     "typecheck": "tsc --noEmit",
     "db:seed": "tsx src/db/seed.ts",
     "db:enrich": "tsx scripts/enrich-countries.ts",
+    "compliance:refresh": "npx tsx scripts/refresh-compliance.ts",
     "mcp": "tsx src/mcp/server.ts",
     "docker:build": "docker build -t ibanforge .",
     "docker:run": "docker run -p 3000:3000 --env-file .env ibanforge",
