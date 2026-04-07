@@ -528,9 +528,45 @@
       "SM": "San Marino",
       "AD": "Andorra"
     },
+    "topNav": {
+      "overview": "Übersicht",
+      "analytics": "Analytik",
+      "quality": "Qualität",
+      "monitoring": "Monitoring",
+      "backToSite": "Zurück zur Seite"
+    },
+    "analytics": {
+      "title": "Analytik",
+      "subtitle": "Nutzungsmuster und Trends",
+      "heatmap": {
+        "title": "Stündliche Aktivität",
+        "subtitle": "Aufrufe nach Stunde und Wochentag",
+        "noData": "Keine stündlichen Daten verfügbar",
+        "days": { "mon": "Mo", "tue": "Di", "wed": "Mi", "thu": "Do", "fri": "Fr", "sat": "Sa", "sun": "So" }
+      },
+      "peak": {
+        "title": "Spitzenaktivität",
+        "hours": "Spitzenzeiten: {start}h–{end}h",
+        "days": "Aktivste Tage: {days}",
+        "weekendDrop": "Wochenend-Rückgang: -{pct}%"
+      },
+      "geoTrend": { "title": "Geografischer Trend", "subtitle": "Top 5 Länder im Zeitverlauf" },
+      "endpointTrend": { "title": "Endpoint-Verteilung", "subtitle": "Nutzungsverteilung im Zeitverlauf" }
+    },
+    "quality": {
+      "title": "Qualität",
+      "subtitle": "Anfragequalität und Fehleranalyse",
+      "errorRate": { "ibanValidate": "IBAN-Fehlerrate", "bicLookup": "BIC-Fehlrate", "totalErrors": "Gesamtfehler" },
+      "topInvalidIbans": { "title": "Häufigste ungültige IBANs", "prefix": "Präfix", "country": "Land", "count": "Anzahl", "noData": "Keine ungültigen IBAN-Daten" },
+      "topMissingBics": { "title": "Häufigste fehlende BICs", "bic": "BIC-Code", "country": "Land", "count": "Suchen", "noData": "Keine fehlenden BIC-Daten" },
+      "errorsByCountry": { "title": "Fehler nach Land", "noData": "Keine Fehlerdaten" },
+      "successTrend": { "title": "Erfolgsraten-Trend" }
+    },
     "sidebar": {
       "label": "Navigation",
       "overview": "Übersicht",
+      "analytics": "Analytik",
+      "quality": "Qualität",
       "apiStats": "API-Statistiken",
       "monitoring": "Überwachung"
     },

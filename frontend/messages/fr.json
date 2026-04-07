@@ -528,9 +528,45 @@
       "SM": "Saint-Marin",
       "AD": "Andorre"
     },
+    "topNav": {
+      "overview": "Vue d'ensemble",
+      "analytics": "Analytics",
+      "quality": "Qualité",
+      "monitoring": "Monitoring",
+      "backToSite": "Retour au site"
+    },
+    "analytics": {
+      "title": "Analytics",
+      "subtitle": "Patterns d'usage et tendances",
+      "heatmap": {
+        "title": "Activité horaire",
+        "subtitle": "Appels par heure et jour de la semaine",
+        "noData": "Aucune donnée horaire disponible",
+        "days": { "mon": "Lun", "tue": "Mar", "wed": "Mer", "thu": "Jeu", "fri": "Ven", "sat": "Sam", "sun": "Dim" }
+      },
+      "peak": {
+        "title": "Pic d'activité",
+        "hours": "Heures de pointe : {start}h–{end}h",
+        "days": "Jours les plus actifs : {days}",
+        "weekendDrop": "Baisse weekend : -{pct}%"
+      },
+      "geoTrend": { "title": "Tendance géographique", "subtitle": "Top 5 pays dans le temps" },
+      "endpointTrend": { "title": "Répartition endpoints", "subtitle": "Distribution d'usage dans le temps" }
+    },
+    "quality": {
+      "title": "Qualité",
+      "subtitle": "Qualité des requêtes et analyse des erreurs",
+      "errorRate": { "ibanValidate": "Taux d'erreur IBAN", "bicLookup": "Taux BIC introuvables", "totalErrors": "Total erreurs" },
+      "topInvalidIbans": { "title": "Top IBANs invalides", "prefix": "Préfixe", "country": "Pays", "count": "Nombre", "noData": "Aucun IBAN invalide" },
+      "topMissingBics": { "title": "Top BICs introuvables", "bic": "Code BIC", "country": "Pays", "count": "Recherches", "noData": "Aucun BIC manquant" },
+      "errorsByCountry": { "title": "Erreurs par pays", "noData": "Aucune donnée d'erreur" },
+      "successTrend": { "title": "Tendance taux de succès" }
+    },
     "sidebar": {
       "label": "Navigation",
       "overview": "Vue d'ensemble",
+      "analytics": "Analytics",
+      "quality": "Qualité",
       "apiStats": "Statistiques API",
       "monitoring": "Supervision"
     },
