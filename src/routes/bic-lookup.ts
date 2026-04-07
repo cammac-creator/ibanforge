@@ -40,7 +40,8 @@ bicLookup.get('/v1/bic/:code', (c) => {
   const row = lookup(validation.bic11!);
   const found = row !== null;
 
-  recordOperation('bic_lookup', validation.country_code ?? null, found, COST_USDC);
+  const errorDetail = found ? undefined : validation.bic;
+  recordOperation('bic_lookup', validation.country_code ?? null, found, COST_USDC, errorDetail);
 
   const result: BICLookupResult = {
     bic: validation.bic,

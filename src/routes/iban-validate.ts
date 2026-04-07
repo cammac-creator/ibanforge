@@ -35,7 +35,8 @@ ibanValidate.post('/v1/iban/validate', async (c) => {
 
   result.processing_ms = Math.round((performance.now() - start) * 100) / 100;
 
-  recordOperation('iban_validate', result.country?.code ?? null, result.valid, result.cost_usdc);
+  const errorDetail = result.valid ? undefined : result.iban.slice(0, 4);
+  recordOperation('iban_validate', result.country?.code ?? null, result.valid, result.cost_usdc, errorDetail);
 
   return c.json(result);
 });
