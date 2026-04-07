@@ -44,15 +44,15 @@ const FATF_MEMBERS = [
 const EPC_REGISTERS: { scheme: string; url: string }[] = [
   {
     scheme: 'SCT',
-    url: 'https://www.europeanpaymentscouncil.eu/sites/default/files/participants/SCT/EPC_Register_SCT.xml',
+    url: 'https://www.europeanpaymentscouncil.eu/sites/default/files/participants_export/sct/sct.csv',
   },
   {
     scheme: 'SDD',
-    url: 'https://www.europeanpaymentscouncil.eu/sites/default/files/participants/SDD/EPC_Register_SDD.xml',
+    url: 'https://www.europeanpaymentscouncil.eu/sites/default/files/participants_export/sdd_core/sdd_core.csv',
   },
   {
     scheme: 'SCT_INST',
-    url: 'https://www.europeanpaymentscouncil.eu/sites/default/files/participants/SCT_INST/EPC_Register_SCTinst.xml',
+    url: 'https://www.europeanpaymentscouncil.eu/sites/default/files/participants_export/sct_inst/sct_inst.csv',
   },
 ];
 
@@ -319,39 +319,43 @@ function parseCsvLine(line: string): string[] {
 // ---------------------------------------------------------------------------
 
 async function fetchSepaRegisters(db: Database.Database): Promise<void> {
-  console.log('\n[3/5] Downloading EPC SEPA registers...');
+  console.log('\n[3/5] Downloading EPC SEPA registers (CSV)...');
 
   const insertSepa = db.prepare(
     `INSERT OR IGNORE INTO sepa_participants (bic8, scheme, status) VALUES (?, ?, 'active')`
   );
 
-  let totalSepa = 0;
-
   for (const register of EPC_REGISTERS) {
     try {
-      const xmlPath = resolve(TMP_DIR, `sepa_${register.scheme}.xml`);
+      const csvPath = resolve(TMP_DIR, `sepa_${register.scheme}.csv`);
       console.log(`  Fetching ${register.scheme}: ${register.url}`);
-      await downloadFile(register.url, xmlPath);
+      await downloadFile(register.url, csvPath);
 
-      const { readFileSync } = await import('node:fs');
-      const xml = readFileSync(xmlPath, 'utf-8');
+      const { createReadStream } = await import('node:fs');
+      const rl = createInterface({ input: createReadStream(csvPath), crlfDelay: Infinity });
 
       const bics = new Set<string>();
-      let match: RegExpExecArray | null;
-      BIC_XML_REGEX.lastIndex = 0;
-      while ((match = BIC_XML_REGEX.exec(xml)) !== null) {
-        bics.add(match[1].substring(0, 8));
+      let headerParsed = false;
+      let bicIdx = -1;
+
+      for await (const line of rl) {
+        const cols = parseCsvLine(line);
+        if (!headerParsed) {
+          bicIdx = cols.findIndex(c => c.toUpperCase() === 'BIC');
+          headerParsed = true;
+          continue;
+        }
+        const bic = cols[bicIdx]?.trim();
+        if (bic && bic.length >= 8) {
+          bics.add(bic.substring(0, 8));
+        }
       }
 
       const insertBatch = db.transaction((bicsArr: string[]) => {
-        for (const bic8 of bicsArr) {
-          insertSepa.run(bic8, register.scheme);
-        }
+        for (const bic8 of bicsArr) insertSepa.run(bic8, register.scheme);
       });
-
       insertBatch([...bics]);
       console.log(`  ${register.scheme}: ${bics.size} BICs inserted`);
-      totalSepa += bics.size;
     } catch (err) {
       console.warn(`  WARNING: ${register.scheme} register download failed: ${(err as Error).message}`);
       console.warn(`  Skipping ${register.scheme} — continuing.`);
@@ -366,15 +370,55 @@ async function fetchSepaRegisters(db: Database.Database): Promise<void> {
 // VoP participants (derived from SCT)
 // ---------------------------------------------------------------------------
 
-function populateVop(db: Database.Database): void {
-  console.log('\n[4/5] Populating VoP participants from SCT...');
+async function fetchVopRegister(db: Database.Database): Promise<void> {
+  console.log('\n[4/5] Downloading EPC VoP register (CSV)...');
 
-  db.exec(`
-    INSERT OR IGNORE INTO vop_participants (bic8, status)
-    SELECT bic8, 'active'
-    FROM sepa_participants
-    WHERE scheme = 'SCT'
-  `);
+  const vopUrl = 'https://www.europeanpaymentscouncil.eu/sites/default/files/participants_export/vop/vop.csv';
+  const insertVop = db.prepare(
+    `INSERT OR IGNORE INTO vop_participants (bic8, status) VALUES (?, ?)`
+  );
+
+  try {
+    const csvPath = resolve(TMP_DIR, 'vop.csv');
+    console.log(`  Fetching: ${vopUrl}`);
+    await downloadFile(vopUrl, csvPath);
+
+    const { createReadStream } = await import('node:fs');
+    const rl = createInterface({ input: createReadStream(csvPath), crlfDelay: Infinity });
+
+    const bics = new Set<string>();
+    let headerParsed = false;
+    let bicIdx = -1;
+    let statusIdx = -1;
+
+    for await (const line of rl) {
+      const cols = parseCsvLine(line);
+      if (!headerParsed) {
+        bicIdx = cols.findIndex(c => c.toUpperCase() === 'BIC');
+        statusIdx = cols.findIndex(c => c.toUpperCase() === 'STATUS');
+        headerParsed = true;
+        continue;
+      }
+      const bic = cols[bicIdx]?.trim();
+      const status = cols[statusIdx]?.trim().toLowerCase() ?? '';
+      if (bic && bic.length >= 8 && status.includes('ready')) {
+        bics.add(bic.substring(0, 8));
+      }
+    }
+
+    const insertBatch = db.transaction((bicsArr: string[]) => {
+      for (const bic8 of bicsArr) insertVop.run(bic8, 'active');
+    });
+    insertBatch([...bics]);
+    console.log(`  VoP: ${bics.size} active participants`);
+  } catch (err) {
+    console.warn(`  WARNING: VoP register download failed: ${(err as Error).message}`);
+    console.warn('  Falling back to SCT participants as VoP baseline...');
+    db.exec(`
+      INSERT OR IGNORE INTO vop_participants (bic8, status)
+      SELECT bic8, 'active' FROM sepa_participants WHERE scheme = 'SCT'
+    `);
+  }
 
   const vopCount = (db.prepare(`SELECT COUNT(*) as n FROM vop_participants`).get() as { n: number }).n;
   console.log(`  vop_participants: ${vopCount} rows`);
@@ -455,8 +499,8 @@ async function main(): Promise<void> {
   // 5. EPC SEPA registers
   await fetchSepaRegisters(db);
 
-  // 6. VoP from SCT
-  populateVop(db);
+  // 6. VoP register (real data)
+  await fetchVopRegister(db);
 
   // 7. Metadata
   insertMetadata(db);
