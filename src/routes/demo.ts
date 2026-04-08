@@ -2,6 +2,8 @@ import { Hono } from 'hono';
 import { validateIBAN } from '../lib/iban.js';
 import { enrichResult } from '../lib/enrich.js';
 import { buildComplianceResult } from '../lib/compliance.js';
+import { validateBIC } from '../lib/bic-validator.js';
+import { lookup } from '../lib/bic-lookup.js';
 
 const demo = new Hono();
 
@@ -46,7 +48,22 @@ demo.get('/v1/demo', (c) => {
     message:
       'Demo — these results are free. Use POST /v1/iban/validate, POST /v1/iban/batch, GET /v1/bic/:code, or POST /v1/iban/compliance for your own queries.',
     iban_examples: ibanResults,
-    bic_examples: DEMO_BICS.map(({ bic, label }) => ({ label, bic, endpoint: `/v1/bic/${bic}` })),
+    bic_examples: DEMO_BICS.map(({ bic, label }) => {
+      const validation = validateBIC(bic);
+      const row = validation.valid ? lookup(validation.bic11!) : null;
+      return {
+        label,
+        bic: validation.bic,
+        bic8: validation.bic8,
+        bic11: validation.bic11,
+        found: !!row,
+        institution: row?.institution ?? null,
+        country: { code: validation.country_code, name: row?.country_name ?? null },
+        city: row?.city ?? null,
+        lei: row?.lei ?? null,
+        cost_usdc: 0.003,
+      };
+    }),
     compliance_example: {
       description: 'Full compliance check for DE89370400440532013000 (Commerzbank, Germany)',
       endpoint: 'POST /v1/iban/compliance',
