@@ -58,6 +58,12 @@ export const BBAN_STRUCTURE: Record<string, BBANStructure> = {
   SI: { bankCode: [0, 2], branchCode: [2, 3], accountNumber: [5, 10] },
   SK: { bankCode: [0, 4], accountNumber: [4, 16] },
   SM: { bankCode: [1, 5], branchCode: [6, 5], accountNumber: [11, 12] },
+  // Micro-states and territories
+  FO: { bankCode: [0, 4], accountNumber: [4, 10] },         // Same as DK
+  GL: { bankCode: [0, 4], accountNumber: [4, 10] },         // Same as DK
+  ST: { bankCode: [0, 4], branchCode: [4, 4], accountNumber: [8, 13] },
+  VA: { bankCode: [0, 3], accountNumber: [3, 15] },
+  XK: { bankCode: [0, 2], branchCode: [2, 2], accountNumber: [4, 12] },
 };
 
 // ---------------------------------------------------------------------------

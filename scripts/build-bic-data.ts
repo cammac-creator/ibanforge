@@ -112,6 +112,71 @@ for (const [bankCode, entry] of Object.entries(IT_BANKS)) {
 }
 console.log(`  IT: ${Object.keys(IT_BANKS).length} entries (manual)`);
 
+// Vatican (VA) — single bank (IOR)
+result['VA:001'] = { bic: 'IOPRVAVX', bank_name: 'Istituto per le Opere di Religione (IOR)', city: 'Vatican City' };
+console.log('  VA: 1 entry (IOR)');
+
+// Kosovo (XK) — 2-digit bank codes assigned by CBK
+const XK_BANKS: Record<string, BICEntry> = {
+  '10': { bic: 'CBRKXKPR', bank_name: 'Central Bank of the Republic of Kosovo', city: 'Pristina' },
+  '11': { bic: 'MBKOXKPR', bank_name: 'ProCredit Bank', city: 'Pristina' },
+  '13': { bic: 'BPBXXKPR', bank_name: 'Banka per Biznes', city: 'Pristina' },
+  '14': { bic: 'EKOMXKPR', bank_name: 'Banka Ekonomike', city: 'Pristina' },
+  '15': { bic: 'RBKOXKPR', bank_name: 'Raiffeisen Bank Kosovo', city: 'Pristina' },
+  '17': { bic: 'NLPRXKPR', bank_name: 'NLB Banka', city: 'Pristina' },
+  '19': { bic: 'NCBAXKPR', bank_name: 'Banka Kombetare Tregtare (BKT)', city: 'Pristina' },
+  '20': { bic: 'TEBKXKPR', bank_name: 'TEB SH.A.', city: 'Pristina' },
+  '21': { bic: 'TCZBXKPR', bank_name: 'Ziraat Bankasi', city: 'Pristina' },
+  '22': { bic: 'ISBKXKPR', bank_name: 'Turkiye Is Bankasi', city: 'Pristina' },
+  '23': { bic: 'PHHAXKPR', bank_name: 'PriBank', city: 'Pristina' },
+  '25': { bic: 'CDISXKPR', bank_name: 'Banka Credins Kosove', city: 'Pristina' },
+  '50': { bic: 'PAYKXKP2', bank_name: 'Paysera Kosovo', city: 'Pristina' },
+};
+for (const [bankCode, entry] of Object.entries(XK_BANKS)) {
+  result[`XK:${bankCode}`] = entry;
+}
+console.log(`  XK: ${Object.keys(XK_BANKS).length} entries (CBK registry)`);
+
+// Faroe Islands (FO) — 4-digit bank codes (Danish-style clearing codes)
+const FO_BANKS: Record<string, BICEntry> = {
+  '6460': { bic: 'FIFBFOTX', bank_name: 'Foroya Banki (BankNordik)', city: 'Torshavn' },
+  '6664': { bic: 'EIKBFOTF', bank_name: 'Betri Banki', city: 'Torshavn' },
+  '6570': { bic: 'NOYAFO21', bank_name: 'Nordoya Sparikassi', city: 'Klaksvik' },
+  '9870': { bic: 'SUSPFOT1', bank_name: 'Suduroyar Sparikassi', city: 'Vagur' },
+};
+for (const [bankCode, entry] of Object.entries(FO_BANKS)) {
+  result[`FO:${bankCode}`] = entry;
+}
+console.log(`  FO: ${Object.keys(FO_BANKS).length} entries (manual)`);
+
+// Greenland (GL) — 4-digit bank codes (Danish-style clearing codes)
+const GL_BANKS: Record<string, BICEntry> = {
+  '6460': { bic: 'FIFBFOTX', bank_name: 'Foroya Banki (Bankivik)', city: 'Nuuk' },
+  '1601': { bic: 'GRENGLGX', bank_name: 'Gronlandsbanken', city: 'Nuuk' },
+};
+for (const [bankCode, entry] of Object.entries(GL_BANKS)) {
+  result[`GL:${bankCode}`] = entry;
+}
+console.log(`  GL: ${Object.keys(GL_BANKS).length} entries (manual)`);
+
+// São Tomé e Príncipe (ST) — 4-digit bank codes
+const ST_BANKS: Record<string, BICEntry> = {
+  '0001': { bic: 'INOISTST', bank_name: 'Banco Internacional de Sao Tome e Principe (BISTP)', city: 'Sao Tome' },
+  '0002': { bic: 'CSTPSTST', bank_name: 'Banco Central de Sao Tome e Principe', city: 'Sao Tome' },
+  '0003': { bic: 'ECOCSTST', bank_name: 'Ecobank Sao Tome', city: 'Sao Tome' },
+  '0004': { bic: 'BGFISTST', bank_name: 'BGFIBank Sao Tome et Principe', city: 'Sao Tome' },
+  '0005': { bic: 'AFFSSTST', bank_name: 'Afriland First Bank STP', city: 'Sao Tome' },
+  '0006': { bic: 'ESTPSTST', bank_name: 'Energy Bank Sao Tome e Principe', city: 'Sao Tome' },
+  '0007': { bic: 'CBSTSTST', bank_name: 'Commercial Bank Sao Tome e Principe', city: 'Sao Tome' },
+  '0008': { bic: 'ISLNSTST', bank_name: 'Island Bank S.A.', city: 'Sao Tome' },
+  '0009': { bic: 'BNSTSTS1', bank_name: 'Banco Nacional de Sao Tome e Principe', city: 'Sao Tome' },
+  '0010': { bic: 'EQSRSTST', bank_name: 'Banco Equador SARL', city: 'Sao Tome' },
+};
+for (const [bankCode, entry] of Object.entries(ST_BANKS)) {
+  result[`ST:${bankCode}`] = entry;
+}
+console.log(`  ST: ${Object.keys(ST_BANKS).length} entries (manual)`);
+
 // Write output
 writeFileSync(OUTPUT, JSON.stringify(result, null, 0));
 const entries = Object.keys(result).length;
