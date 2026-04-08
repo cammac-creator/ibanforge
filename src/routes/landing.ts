@@ -7,6 +7,8 @@ const landing = new Hono();
 landing.get('/', (c) => {
   c.header('Cache-Control', 'public, max-age=3600');
 
+  const playgroundKey = process.env.PLAYGROUND_API_KEY || '';
+
   const jsonLdWebAPI = JSON.stringify({
     "@context":"https://schema.org",
     "@type":"WebAPI",
@@ -380,6 +382,8 @@ console.<span class="f">log</span>(result);
       var k=Object.keys(o);if(!k.length)return'{}';
       return'{\\n'+k.map(x=>p+'  <span class="json-key">"'+x+'"</span>: '+cj(o[x],i+1)).join(',\\n')+'\\n'+p+'}';
     }
+    var _pk='${playgroundKey}';
+    var _ah=_pk?{'Content-Type':'application/json','Authorization':'Bearer '+_pk}:{'Content-Type':'application/json'};
     async function submit(){
       var val=document.getElementById('input').value.trim();if(!val)return;
       var btn=document.getElementById('btn'),res=document.getElementById('result');
@@ -387,17 +391,16 @@ console.<span class="f">log</span>(result);
       try{
         var resp;
         if(mode==='compliance'){
-          resp=await fetch('/v1/demo');
-          var demoData=await resp.json();
-          var ms=Math.round(performance.now()-t0);
-          var data=demoData.compliance_example.result;
-          res.innerHTML='<div class="tryit-status"><span class="tryit-valid">\u2713 Compliance Check</span><span class="tryit-ms">'+ms+'ms</span></div>'+cj(data);
+          resp=await fetch('/v1/iban/compliance',{method:'POST',headers:_ah,body:JSON.stringify({iban:val})});
+          var ms=Math.round(performance.now()-t0),data=await resp.json();
+          var ok=!data.error;
+          res.innerHTML='<div class="tryit-status"><span class="'+(ok?'tryit-valid':'tryit-invalid')+'">'+(ok?'\u2713 Compliance Check':'\u2717 Error')+'</span><span class="tryit-ms">'+ms+'ms</span></div>'+cj(data);
           res.classList.add('show');
           btn.disabled=false;
           return;
         }
-        if(mode==='iban')resp=await fetch('/v1/iban/validate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({iban:val})});
-        else resp=await fetch('/v1/bic/'+encodeURIComponent(val));
+        if(mode==='iban')resp=await fetch('/v1/iban/validate',{method:'POST',headers:_ah,body:JSON.stringify({iban:val})});
+        else resp=await fetch('/v1/bic/'+encodeURIComponent(val),{headers:_pk?{'Authorization':'Bearer '+_pk}:{}});
         var ms=Math.round(performance.now()-t0),data=await resp.json();
         var ok=data.valid===true||!!data.iban;
         res.innerHTML='<div class="tryit-status"><span class="'+(ok?'tryit-valid':'tryit-invalid')+'">'+(ok?'\u2713 Valid':'\u2717 Invalid')+'</span><span class="tryit-ms">'+ms+'ms</span></div>'+cj(data);
