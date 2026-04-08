@@ -507,21 +507,13 @@ const spec = {
       },
       HealthResponse: {
         type: 'object',
-        required: ['status', 'version', 'uptime_seconds', 'stats'],
+        required: ['status', 'version', 'uptime_seconds', 'bic_database_entries'],
         properties: {
           status: { type: 'string', enum: ['ok'] },
           version: { type: 'string', example: '1.0.0' },
           uptime_seconds: { type: 'number' },
-          stats: {
-            type: 'object',
-            required: ['total_operations', 'iban_validations', 'bic_lookups', 'success_rate'],
-            properties: {
-              total_operations: { type: 'integer' },
-              iban_validations: { type: 'integer' },
-              bic_lookups: { type: 'integer' },
-              success_rate: { type: 'number' },
-            },
-          },
+          bic_database_entries: { type: 'integer', description: 'Number of BIC entries in the database', example: 121197 },
+          bic_data_last_updated: { type: 'string', description: 'Last update timestamp of BIC data' },
         },
       },
       StatsOverview: {

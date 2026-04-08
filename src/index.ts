@@ -44,6 +44,7 @@ app.use('*', async (c, next) => {
   c.header('X-Content-Type-Options', 'nosniff');
   c.header('X-Frame-Options', 'DENY');
   c.header('Referrer-Policy', 'strict-origin-when-cross-origin');
+  c.header('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
 });
 app.use('*', rateLimitMiddleware());
 app.use('*', compress());
@@ -62,6 +63,36 @@ app.use('*', async (c, next) => {
 
 // /ping — ultra-lightweight endpoint for latency testing and uptime monitoring
 app.get('/ping', (c) => c.text('pong'));
+
+// Pre-validate requests before x402 paywall (don't charge for invalid input)
+app.post('/v1/iban/validate', async (c, next) => {
+  const body = await c.req.json().catch(() => null);
+  if (!body || typeof body.iban !== 'string' || body.iban.trim() === '') {
+    return c.json({ error: 'invalid_request', message: "Request body must include an 'iban' field (string)" }, 400);
+  }
+  await next();
+});
+app.post('/v1/iban/compliance', async (c, next) => {
+  const body = await c.req.json().catch(() => null);
+  if (!body || typeof body.iban !== 'string' || body.iban.trim() === '') {
+    return c.json({ error: 'invalid_request', message: "Request body must include an 'iban' field (string)" }, 400);
+  }
+  await next();
+});
+app.post('/v1/iban/batch', async (c, next) => {
+  const body = await c.req.json().catch(() => null);
+  if (!body || !Array.isArray(body.ibans) || body.ibans.length === 0) {
+    return c.json({ error: 'invalid_request', message: "Request body must include a non-empty 'ibans' array" }, 400);
+  }
+  await next();
+});
+app.get('/v1/bic/:code', async (c, next) => {
+  const code = c.req.param('code');
+  if (!/^[A-Za-z0-9]{8}([A-Za-z0-9]{3})?$/.test(code)) {
+    return c.json({ error: 'invalid_bic_format', message: 'BIC code must be 8 or 11 alphanumeric characters' }, 400);
+  }
+  await next();
+});
 
 // x402 payment middleware (only on paid routes)
 app.use('/v1/*', createX402Middleware());
@@ -83,6 +114,11 @@ app.route('/', mcpCard);
 
 // Landing page (must be last — catches GET /)
 app.route('/', landing);
+
+// JSON 404 for unmatched routes
+app.notFound((c) => {
+  return c.json({ error: 'not_found', message: `Route ${c.req.method} ${new URL(c.req.url).pathname} not found` }, 404);
+});
 
 const port = parseInt(process.env.PORT ?? '3000', 10);
 

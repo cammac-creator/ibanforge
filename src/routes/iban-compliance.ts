@@ -38,7 +38,7 @@ ibanCompliance.post('/v1/iban/compliance', async (c) => {
       sanctions: { country_sanctioned: false, bank_sanctioned: false, matched_lists: [], fatf_status: 'non_member' },
       reachability: { sepa_instant: false, sct: false, sdd: false },
       vop: { participant: false, status: 'not_found' },
-      risk_score: 0, risk_level: 'low', flags: ['compliance_data_unavailable'],
+      risk_score: 50, risk_level: 'elevated', flags: ['compliance_data_unavailable'],
     };
   }
 

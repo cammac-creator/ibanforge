@@ -179,8 +179,8 @@ Cost: $0.02 USDC per call via x402 micropayment on Base L2.`,
         sanctions: { country_sanctioned: false, bank_sanctioned: false, matched_lists: [], fatf_status: 'non_member' },
         reachability: { sepa_instant: false, sct: false, sdd: false },
         vop: { participant: false, status: 'not_found' },
-        risk_score: 0,
-        risk_level: 'low',
+        risk_score: 50,
+        risk_level: 'elevated',
         flags: ['compliance_data_unavailable'],
       };
     }
