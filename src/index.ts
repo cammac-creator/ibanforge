@@ -17,6 +17,8 @@ import { discovery } from './routes/discovery.js';
 import { mcpHttp } from './routes/mcp-http.js';
 import { mcpCard } from './routes/mcp-card.js';
 import { createX402Middleware, ensureWalletConfigured } from './middleware/x402.js';
+import { apiKeyMiddleware } from './middleware/api-key.js';
+import { apiKeys } from './routes/api-keys.js';
 import { rateLimitMiddleware } from './middleware/rate-limit.js';
 import { recordRequest } from './lib/stats.js';
 
@@ -94,7 +96,13 @@ app.get('/v1/bic/:code', async (c, next) => {
   await next();
 });
 
-// x402 payment middleware (only on paid routes)
+// Key management routes (free, before x402)
+app.route('/', apiKeys);
+
+// API key middleware — checks Bearer ifk_* tokens before x402
+app.use('/v1/*', apiKeyMiddleware());
+
+// x402 payment middleware (only on paid routes, skipped if API key valid)
 app.use('/v1/*', createX402Middleware());
 
 // Paid routes
