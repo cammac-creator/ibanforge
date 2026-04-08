@@ -7,3 +7,4 @@ data/*.sqlite-wal
 data/*.sqlite-shm
 coverage/
 *.tsbuildinfo
+.superpowers/
