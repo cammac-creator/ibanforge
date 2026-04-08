@@ -35,6 +35,12 @@ export function createX402Middleware(): MiddlewareHandler {
       return;
     }
 
+    // Skip x402 if authenticated via API key
+    if (c.get('apiKeyAuthenticated')) {
+      await next();
+      return;
+    }
+
     const walletAddress = process.env.WALLET_ADDRESS;
     if (!walletAddress) {
       await next();
