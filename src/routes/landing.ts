@@ -253,7 +253,7 @@ landing.get('/', (c) => {
             <li><span class="check">&check;</span> Bearer token auth</li>
             <li><span class="check">&check;</span> Usage dashboard</li>
           </ul>
-          <a href="/v1/keys/generate" class="path-cta path-cta-outline">Get free API key</a>
+          <a href="#pricing" class="path-cta path-cta-outline">Get free API key</a>
         </div>
         <div class="path-card path-x402">
           <div class="path-badge path-badge-amber">PAY PER CALL</div>
@@ -312,7 +312,8 @@ landing.get('/', (c) => {
   body: JSON.<span class="f">stringify</span>({ iban: <span class="s">'GB29NWBK60161331926819'</span> }),
 });
 <span class="k">const</span> data = <span class="k">await</span> res.<span class="f">json</span>();
-console.<span class="f">log</span>(data);</div>
+console.<span class="f">log</span>(data);
+<span class="c">// x402: omit Authorization header, add X-Payment instead</span></div>
       <div class="qs-code" data-lang="python"><span class="k">import</span> requests
 
 res = requests.<span class="f">post</span>(
@@ -323,7 +324,8 @@ res = requests.<span class="f">post</span>(
     },
     json={<span class="s">"iban"</span>: <span class="s">"GB29NWBK60161331926819"</span>},
 )
-<span class="f">print</span>(res.<span class="f">json</span>())</div>
+<span class="f">print</span>(res.<span class="f">json</span>())
+<span class="c"># x402: omit Authorization header, add X-Payment instead</span></div>
       <div class="qs-code" data-lang="sdk"><span class="k">import</span> { IBANforge } <span class="k">from</span> <span class="s">'@ibanforge/sdk'</span>;
 
 <span class="k">const</span> client = <span class="k">new</span> <span class="f">IBANforge</span>(<span class="s">'ifk_your_key_here'</span>);
@@ -347,6 +349,7 @@ console.<span class="f">log</span>(result);
         <a href="/openapi.json" class="footer-link"><span>/openapi.json</span> &mdash; OpenAPI spec</a>
         <a href="/health" class="footer-link"><span>/health</span> &mdash; Status</a>
         <a href="/v1/demo" class="footer-link"><span>/v1/demo</span> &mdash; Free examples</a>
+        <a href="https://www.npmjs.com/package/@ibanforge/sdk" class="footer-link"><span>npm</span> &mdash; @ibanforge/sdk</a>
       </div>
     </div>
 
@@ -383,9 +386,18 @@ console.<span class="f">log</span>(result);
       btn.disabled=true;var t0=performance.now();
       try{
         var resp;
+        if(mode==='compliance'){
+          resp=await fetch('/v1/demo');
+          var demoData=await resp.json();
+          var ms=Math.round(performance.now()-t0);
+          var data=demoData.compliance_example.result;
+          res.innerHTML='<div class="tryit-status"><span class="tryit-valid">\u2713 Compliance Check</span><span class="tryit-ms">'+ms+'ms</span></div>'+cj(data);
+          res.classList.add('show');
+          btn.disabled=false;
+          return;
+        }
         if(mode==='iban')resp=await fetch('/v1/iban/validate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({iban:val})});
-        else if(mode==='bic')resp=await fetch('/v1/bic/'+encodeURIComponent(val));
-        else resp=await fetch('/v1/iban/compliance',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({iban:val})});
+        else resp=await fetch('/v1/bic/'+encodeURIComponent(val));
         var ms=Math.round(performance.now()-t0),data=await resp.json();
         var ok=data.valid===true||!!data.iban;
         res.innerHTML='<div class="tryit-status"><span class="'+(ok?'tryit-valid':'tryit-invalid')+'">'+(ok?'\u2713 Valid':'\u2717 Invalid')+'</span><span class="tryit-ms">'+ms+'ms</span></div>'+cj(data);
