@@ -156,10 +156,30 @@ landing.get('/', (c) => {
     .footer-link span{color:#f59e0b}
     .footer-bottom{text-align:center;color:#3f3f46;font-size:12px;padding-top:48px}
     .footer-bottom a{color:#71717a;text-decoration:none}
-    @media(max-width:640px){.features-grid{grid-template-columns:1fr}.pricing-paths{grid-template-columns:1fr}.tryit-input{flex-direction:column}.hero h1{font-size:36px}.hero-ctas{flex-direction:column;align-items:center}.mcp-callout{flex-direction:column;text-align:center}.footer-links{flex-direction:column;align-items:center}}
+    .nav{position:sticky;top:0;z-index:50;background:rgba(9,9,11,.85);backdrop-filter:blur(12px);border-bottom:1px solid #1f1f28;padding:0 24px}
+    .nav-inner{max-width:820px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;height:52px}
+    .nav-logo{font-size:18px;font-weight:800;color:#fafafa;text-decoration:none}.nav-logo span{color:#f59e0b}
+    .nav-links{display:flex;gap:24px;align-items:center}
+    .nav-links a{font-size:13px;color:#71717a;text-decoration:none;transition:color .15s}.nav-links a:hover{color:#e5e5e5}
+    .nav-links a.nav-active{color:#f59e0b}
+    .nav-site{font-size:12px;color:#52525b;padding:4px 10px;border:1px solid #27272a;border-radius:6px;text-decoration:none;transition:all .15s}.nav-site:hover{color:#f59e0b;border-color:#f59e0b33}
+    @media(max-width:640px){.features-grid{grid-template-columns:1fr}.pricing-paths{grid-template-columns:1fr}.tryit-input{flex-direction:column}.hero h1{font-size:36px}.hero-ctas{flex-direction:column;align-items:center}.mcp-callout{flex-direction:column;text-align:center}.footer-links{flex-direction:column;align-items:center}.nav-links{gap:12px}.nav-links a{font-size:12px}}
   </style>
 </head>
 <body>
+  <nav class="nav">
+    <div class="nav-inner">
+      <a href="/" class="nav-logo">IBAN<span>forge</span></a>
+      <div class="nav-links">
+        <a href="#tryit">Try it</a>
+        <a href="#pricing">Pricing</a>
+        <a href="https://ibanforge.com/en/docs" target="_blank">Docs</a>
+        <a href="https://ibanforge.com/en/blog" target="_blank">Blog</a>
+        <a href="https://ibanforge.com/en/playground" target="_blank">Playground</a>
+        <a href="https://ibanforge.com" class="nav-site" target="_blank">ibanforge.com &rarr;</a>
+      </div>
+    </div>
+  </nav>
   <div class="container">
 
     <!-- HERO -->
