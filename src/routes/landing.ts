@@ -1,6 +1,6 @@
 // src/routes/landing.ts
 import { Hono } from 'hono';
-import { html } from 'hono/html';
+import { html, raw } from 'hono/html';
 
 const landing = new Hono();
 
@@ -51,8 +51,8 @@ landing.get('/', (c) => {
   <meta name="twitter:title" content="IBANforge — IBAN Validation API">
   <meta name="twitter:description" content="121K BICs. Compliance scoring. MCP native. Free or pay-per-call with USDC.">
   <meta name="twitter:image" content="https://api.ibanforge.com/og-image.png">
-  <script type="application/ld+json">${jsonLdWebAPI}</script>
-  <script type="application/ld+json">${jsonLdFAQ}</script>
+  <script type="application/ld+json">${raw(jsonLdWebAPI)}</script>
+  <script type="application/ld+json">${raw(jsonLdFAQ)}</script>
   <style>
     *{margin:0;padding:0;box-sizing:border-box}
     body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;background:#09090b;color:#e5e5e5;min-height:100vh}
