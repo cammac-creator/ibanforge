@@ -1,0 +1,146 @@
+---
+title: "API-Schluessel"
+description: "Generieren Sie einen kostenlosen API-Schluessel fuer 200 Anfragen/Monat auf allen IBANforge-Endpunkten — keine Kreditkarte, keine Krypto-Wallet erforderlich."
+order: 1
+---
+
+# API-Schluessel
+
+IBANforge bietet ein **kostenloses Kontingent** ueber API-Schluessel — 200 Anfragen/Monat auf allen Endpunkten. Keine Kreditkarte, keine Krypto-Wallet erforderlich. Fuer hoehere Volumen koennen Sie [x402-Mikrozahlungen](/docs/x402) verwenden.
+
+## Kostenlosen API-Schluessel generieren
+
+Senden Sie eine POST-Anfrage an `/v1/keys/generate` mit Ihrer E-Mail-Adresse:
+
+```bash
+curl -X POST https://api.ibanforge.com/v1/keys/generate \
+  -H "Content-Type: application/json" \
+  -d '{"email": "sie@beispiel.de"}'
+```
+
+### Antwort
+
+```json
+{
+  "key": "ifk_live_xxxxxxxxxxxxxxxxxxxx",
+  "email": "sie@beispiel.de",
+  "tier": "free",
+  "quota": {
+    "requests_per_month": 200,
+    "used": 0,
+    "resets_at": "2026-05-01T00:00:00.000Z"
+  }
+}
+```
+
+Ihr Schluessel beginnt mit `ifk_` (IBANforge Key). **Bewahren Sie ihn sicher auf** — er wird nicht erneut angezeigt.
+
+## Ihren API-Schluessel verwenden
+
+Uebermitteln Sie den Schluessel im `Authorization`-Header als Bearer-Token:
+
+```bash
+curl -X POST https://api.ibanforge.com/v1/iban/validate \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer ifk_live_xxxxxxxxxxxxxxxxxxxx" \
+  -d '{"iban": "CH93 0076 2011 6238 5295 7"}'
+```
+
+Der Schluessel funktioniert auf allen kostenpflichtigen Endpunkten:
+- `POST /v1/iban/validate`
+- `POST /v1/iban/batch`
+- `GET /v1/bic/:code`
+- `POST /v1/iban/compliance`
+
+## Grenzen des kostenlosen Kontingents
+
+| Plan | Anfragen/Monat | Kosten |
+|---|---|---|
+| Kostenlos (API-Schluessel) | 200 | $0 |
+| x402 Pay-per-Call | Unbegrenzt | $0,003–$0,02/Aufruf |
+
+Die 200 kostenlosen Anfragen werden ueber alle Endpunkte geteilt und setzen sich am 1. jedes Monats zurueck.
+
+## Ihre Nutzung pruefen
+
+```bash
+curl https://api.ibanforge.com/v1/keys/usage \
+  -H "Authorization: Bearer ifk_live_xxxxxxxxxxxxxxxxxxxx"
+```
+
+### Antwort
+
+```json
+{
+  "tier": "free",
+  "quota": {
+    "requests_per_month": 200,
+    "used": 47,
+    "remaining": 153,
+    "resets_at": "2026-05-01T00:00:00.000Z"
+  }
+}
+```
+
+## Wenn Ihr Kontingent erschoepft ist
+
+Wenn Ihre 200 kostenlosen Anfragen aufgebraucht sind, gibt die API eine `429 Too Many Requests`-Antwort zurueck:
+
+```json
+{
+  "error": {
+    "code": "quota_exceeded",
+    "message": "Kostenloses Kontingent erschoepft (200/Monat). Wechseln Sie zu x402 Pay-per-Call fuer unbegrenzten Zugriff.",
+    "resets_at": "2026-05-01T00:00:00.000Z"
+  }
+}
+```
+
+Sie haben dann zwei Moeglichkeiten:
+1. **Auf den monatlichen Reset warten** — das Kontingent setzt sich am 1. jedes Monats zurueck
+2. **Zu x402 Pay-per-Call wechseln** — entfernen Sie den `Authorization`-Header und lassen Sie Ihren x402-kompatiblen Client die Zahlungen automatisch verwalten. Siehe [x402-Zahlungen](/docs/x402).
+
+## TypeScript-Beispiel
+
+```typescript
+const API_KEY = process.env.IBANFORGE_API_KEY;
+
+const response = await fetch("https://api.ibanforge.com/v1/iban/validate", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "Authorization": `Bearer ${API_KEY}`,
+  },
+  body: JSON.stringify({ iban: "CH93 0076 2011 6238 5295 7" }),
+});
+
+const data = await response.json();
+console.log(data);
+```
+
+## Python-Beispiel
+
+```python
+import os
+import requests
+
+API_KEY = os.environ["IBANFORGE_API_KEY"]
+
+response = requests.post(
+    "https://api.ibanforge.com/v1/iban/validate",
+    headers={
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {API_KEY}",
+    },
+    json={"iban": "CH93 0076 2011 6238 5295 7"},
+)
+
+data = response.json()
+print(data)
+```
+
+## Naechste Schritte
+
+- [x402-Mikrozahlungen](/docs/x402) — unbegrenztes Pay-per-Call mit USDC
+- [IBAN-Validierung](/docs/iban-validate) — vollstaendige Endpunktreferenz
+- [Fehlerreferenz](/docs/errors) — alle Fehlercodes und Fehlerbehebung

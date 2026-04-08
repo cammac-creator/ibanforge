@@ -63,7 +63,7 @@
         "description": "Full IBAN validation with BBAN structure parsing. Supports 75+ countries with mod97 checksum verification and detailed field breakdown."
       },
       "1": {
-        "badge": "39,000+ BIC Entries",
+        "badge": "121,000+ BIC Entries",
         "title": "BIC/SWIFT Lookup",
         "description": "Complete BIC/SWIFT database sourced from GLEIF, enriched with LEI (Legal Entity Identifier) data for financial institution identification."
       },
@@ -125,7 +125,7 @@
     },
     "quickStart": {
       "heading": "Quick start",
-      "subtitle": "No API key required — pay per request with USDC on Base L2."
+      "subtitle": "Get 200 free requests/month with an API key, or pay per request with USDC via x402."
     },
     "cta": {
       "heading": "Ready to build?",
@@ -251,7 +251,7 @@
       },
       "2": {
         "question": "Is there a free tier?",
-        "answer": "Yes. The /v1/demo endpoint returns pre-computed example validations at no cost, perfect for testing your integration. The /playground on this site lets you try live calls for free too. No signup or payment method required to get started."
+        "answer": "Yes! Generate a free API key at POST /v1/keys/generate with your email. Get 200 requests/month on all endpoints. No credit card, no crypto wallet needed. For higher volumes, use x402 USDC micropayments."
       },
       "3": {
         "question": "What about high volume?",

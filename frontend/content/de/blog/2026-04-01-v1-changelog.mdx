@@ -22,7 +22,7 @@ Endpunkt: `POST /v1/iban/validate`
 
 ## BIC/SWIFT-Abfrage
 
-- **Ueber 39.000 Eintraege** aus GLEIF (Global LEI Foundation)
+- **Ueber 121.000 Eintraege** aus GLEIF (Global LEI Foundation)
 - **LEI-Anreicherung** -- jeder BIC-Eintrag enthaelt den Legal Entity Identifier, sofern verfuegbar
 - **GLEIF-Daten** -- Institutsname, Stadt, Land und Registrierungsstatus
 - BIC-Formatvalidierung (ISO 9362) vor der Datenbankabfrage
@@ -41,11 +41,12 @@ Endpunkt: `POST /v1/iban/batch`
 
 ## MCP-Server
 
-IBANforge wird mit einem integrierten **Model Context Protocol (MCP) Server** ausgeliefert, der 3 Tools fuer KI-Agenten bereitstellt:
+IBANforge wird mit einem integrierten **Model Context Protocol (MCP) Server** ausgeliefert, der 4 Tools fuer KI-Agenten bereitstellt:
 
 - `validate_iban` -- Eine einzelne IBAN validieren und vollstaendig geparste Details erhalten
 - `batch_validate_iban` -- Mehrere IBANs in einem Aufruf validieren
 - `lookup_bic` -- Einen BIC/SWIFT-Code abfragen und Institutsdaten erhalten
+- `compliance_check` -- Vollstaendiger Compliance-Check: Sanktionspruefung, SEPA-Instant-Erreichbarkeit, VoP-Pruefung, Risiko-Score (0-100)
 
 Verbinden Sie jeden MCP-kompatiblen KI-Agenten (Claude, Cursor usw.) ohne zusaetzlichen Konfigurationsaufwand mit IBANforge.
 

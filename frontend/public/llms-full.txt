@@ -124,7 +124,7 @@ Cost: $0.002 per IBAN (free during launch)
 
 ## GET /v1/bic/{code}
 
-Looks up a BIC/SWIFT code against the GLEIF database (39,000+ entries with LEI enrichment).
+Looks up a BIC/SWIFT code against the GLEIF database (121,000+ entries with LEI enrichment).
 
 Cost: $0.003 USDC (free during launch)
 
@@ -212,7 +212,7 @@ Health check endpoint. Always free.
   "status": "ok",
   "uptime": 3600,
   "database": "connected",
-  "bicEntries": 39243,
+  "bicEntries": 121197,
   "timestamp": "2025-01-01T00:00:00.000Z"
 }
 ```
@@ -283,6 +283,7 @@ IBANforge exposes a Model Context Protocol (MCP) server for native AI agent inte
 - `validate_iban` — Validate a single IBAN
 - `batch_validate_iban` — Validate up to 100 IBANs
 - `lookup_bic` — Look up a BIC/SWIFT code
+- `compliance_check` — Full compliance check: IBAN validation + sanctions screening (OFAC/EU/UN) + SEPA Instant reachability + VoP participant check + risk score (0-100). Cost: $0.02 USDC.
 
 ### Claude Desktop Config
 ```json

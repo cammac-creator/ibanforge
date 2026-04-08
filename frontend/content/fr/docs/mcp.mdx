@@ -80,6 +80,19 @@ Recherche les details d'un etablissement par code BIC/SWIFT.
 
 **Sortie :** Nom de l'etablissement, pays, ville, agence et donnees LEI (identique a `/v1/bic/:code`).
 
+### compliance_check
+
+Check compliance complet combinant validation IBAN, screening sanctions, accessibilite SEPA Instant, verification VoP et score de risque composite.
+
+**Entree :**
+```json
+{
+  "iban": "CH9300762011623852957"
+}
+```
+
+**Sortie :** Resultat de validation IBAN + statut du screening sanctions (OFAC/EU/ONU) + accessibilite SEPA Instant + verification participant VoP + score de risque (0-100). Cout : $0.02 USDC (identique a `/v1/iban/compliance`).
+
 ## Exemple de conversation avec un agent
 
 Une fois configure, vous pouvez interroger Claude naturellement :
@@ -121,5 +134,5 @@ Tout client compatible MCP peut utiliser les outils IBANforge :
 ## Remarques
 
 - Le serveur MCP s'execute **localement** et accede directement a la base de donnees BIC — aucun appel API ni paiement necessaire
-- Les trois outils renvoient les memes donnees structurees que l'API REST
+- Les quatre outils renvoient les memes donnees structurees que l'API REST
 - Le serveur utilise le protocole de transport stdio (aucun serveur HTTP implique)

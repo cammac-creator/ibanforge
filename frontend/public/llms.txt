@@ -32,11 +32,11 @@ GET /openapi.json — OpenAPI 3.1 specification
 GET /.well-known/x402 — x402 agent discovery
 
 ## MCP Integration
-Tools: validate_iban, batch_validate_iban, lookup_bic
+Tools: validate_iban, batch_validate_iban, lookup_bic, compliance_check
 Config: {"command": "npx", "args": ["tsx", "src/mcp/server.ts"]}
 
 ## SDKs
-TypeScript: npm install ibanforge
+TypeScript: npm install @ibanforge/sdk
 Python: pip install ibanforge
 
 ## Links

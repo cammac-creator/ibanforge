@@ -80,6 +80,19 @@ Ruft Institutsdaten anhand eines BIC/SWIFT-Codes ab.
 
 **Ausgabe:** Institutsname, Land, Stadt, Filiale und LEI-Daten (identisch mit `/v1/bic/:code`).
 
+### compliance_check
+
+Vollstaendiger Compliance-Check mit IBAN-Validierung, Sanktionspruefung, SEPA-Instant-Erreichbarkeit, VoP-Teilnehmerpruefung und zusammengesetztem Risiko-Score.
+
+**Eingabe:**
+```json
+{
+  "iban": "CH9300762011623852957"
+}
+```
+
+**Ausgabe:** IBAN-Validierungsergebnis + Sanktionspruefungsstatus (OFAC/EU/UN) + SEPA-Instant-Erreichbarkeit + VoP-Teilnehmerpruefung + Risiko-Score (0-100). Kosten: $0.02 USDC (identisch mit `/v1/iban/compliance`).
+
 ## Beispiel einer Agentenkonversation
 
 Nach der Konfiguration können Sie Claude ganz natürlich fragen:
@@ -121,5 +134,5 @@ Jeder MCP-kompatible Client kann die IBANforge-Werkzeuge nutzen:
 ## Hinweise
 
 - Der MCP-Server läuft **lokal** und greift direkt auf die BIC-Datenbank zu — keine API-Aufrufe oder Zahlungen erforderlich
-- Alle drei Werkzeuge liefern dieselben strukturierten Daten wie die REST API
+- Alle vier Werkzeuge liefern dieselben strukturierten Daten wie die REST API
 - Der Server verwendet das stdio-Transportprotokoll (kein HTTP-Server beteiligt)

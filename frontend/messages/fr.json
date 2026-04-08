@@ -63,7 +63,7 @@
         "description": "Validation complète des IBAN avec analyse de la structure BBAN. Prise en charge de 75+ pays avec vérification du checksum MOD-97 et décomposition détaillée des champs."
       },
       "1": {
-        "badge": "39 000+ entrées BIC",
+        "badge": "121 000+ entrées BIC",
         "title": "Recherche BIC/SWIFT",
         "description": "Base de données BIC/SWIFT complète issue de GLEIF, enrichie de données LEI (Legal Entity Identifier) pour l'identification des établissements financiers."
       },
@@ -125,7 +125,7 @@
     },
     "quickStart": {
       "heading": "Démarrage rapide",
-      "subtitle": "Aucune clé API requise — paiement par requête en USDC sur Base L2."
+      "subtitle": "Obtenez 200 requêtes gratuites/mois avec une clé API, ou paiement par requête en USDC via x402."
     },
     "cta": {
       "heading": "Prêt à développer ?",
@@ -251,7 +251,7 @@
       },
       "2": {
         "question": "Existe-t-il une offre gratuite ?",
-        "answer": "Oui. L'endpoint /v1/demo renvoie des validations d'exemple précalculées sans aucun coût, idéal pour tester votre intégration. Le /playground sur ce site vous permet également d'effectuer des appels en direct gratuitement. Aucune inscription ni moyen de paiement requis pour commencer."
+        "answer": "Oui ! Générez une clé API gratuite via POST /v1/keys/generate avec votre email. Obtenez 200 requêtes/mois sur tous les endpoints. Aucune carte bancaire, aucun portefeuille crypto requis. Pour des volumes plus élevés, utilisez les micropaiements x402 en USDC."
       },
       "3": {
         "question": "Et pour les gros volumes ?",

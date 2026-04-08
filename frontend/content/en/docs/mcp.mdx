@@ -80,6 +80,19 @@ Look up institution details by BIC/SWIFT code.
 
 **Output:** Institution name, country, city, branch, and LEI data (same as `/v1/bic/:code`).
 
+### compliance_check
+
+Full compliance check combining IBAN validation, sanctions screening, SEPA Instant reachability, VoP participant verification, and a composite risk score.
+
+**Input:**
+```json
+{
+  "iban": "CH9300762011623852957"
+}
+```
+
+**Output:** IBAN validation result + sanctions screening status (OFAC/EU/UN) + SEPA Instant reachability + VoP participant check + risk score (0-100). Cost: $0.02 USDC (same as `/v1/iban/compliance`).
+
 ## Example agent conversation
 
 Once configured, you can ask Claude naturally:
@@ -121,5 +134,5 @@ Any MCP-compatible client can use IBANforge tools:
 ## Notes
 
 - The MCP server runs **locally** and accesses the BIC database directly — no API calls or payments needed
-- All three tools return the same structured data as the REST API
+- All four tools return the same structured data as the REST API
 - The server uses the stdio transport protocol (no HTTP server involved)

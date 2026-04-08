@@ -10,7 +10,7 @@ IBANforge ist unsere Antwort auf dieses Problem.
 
 ## Was ist IBANforge?
 
-IBANforge ist eine Entwickler-API zur IBAN-Validierung und BIC/SWIFT-Abfrage. Sie deckt **ueber 80 Laender** ab, validiert Struktur und Pruefsumme (Mod-97), parst Bank- und Filialnummern aus der BBAN und gleicht BIC-Codes mit dem **ueber 39.000 Eintraege umfassenden GLEIF-Datensatz** ab -- derselben massgeblichen Quelle, die von Zentralbanken verwendet wird.
+IBANforge ist eine Entwickler-API zur IBAN-Validierung und BIC/SWIFT-Abfrage. Sie deckt **ueber 80 Laender** ab, validiert Struktur und Pruefsumme (Mod-97), parst Bank- und Filialnummern aus der BBAN und gleicht BIC-Codes mit dem **ueber 121.000 Eintraege umfassenden GLEIF-Datensatz** ab -- derselben massgeblichen Quelle, die von Zentralbanken verwendet wird.
 
 Sie senden eine POST-Anfrage. Sie erhalten eine saubere, strukturierte JSON-Antwort. Das ist alles.
 
@@ -51,7 +51,7 @@ Zusammen machen diese beiden Verschiebungen -- agentenbasierte Workflows + On-Ch
 
 **IBAN-Validierung fuer ueber 80 Laender.** Vollstaendige Mod-97-Pruefsummenverifizierung, laenderspezifische Laengen- und Formatregeln sowie BBAN-Parsing zur Extraktion von Bank-/Filialnummern, wo zutreffend.
 
-**Ueber 39.000 BIC-Eintraege von GLEIF.** Die Global LEI Foundation veroeffentlicht die massgebliche Zuordnung von BIC-Codes zu Finanzinstituten. Wir importieren sie, indexieren sie und liefern sie mit Sub-Millisekunden-Abfragen. Kombinierte IBAN- + BIC-Validierung ist in einer einzigen Anfrage verfuegbar.
+**Ueber 121.000 BIC-Eintraege von GLEIF.** Die Global LEI Foundation veroeffentlicht die massgebliche Zuordnung von BIC-Codes zu Finanzinstituten. Wir importieren sie, indexieren sie und liefern sie mit Sub-Millisekunden-Abfragen. Kombinierte IBAN- + BIC-Validierung ist in einer einzigen Anfrage verfuegbar.
 
 **SEPA-Compliance-Daten.** Jede Antwort enthaelt den SEPA-Mitgliedsstatus, verfuegbare Zahlungsverfahren (SCT, SDD, SCT_INST) und ob die Verification of Payee (VoP) gemaess EU-Regulierung erforderlich ist -- unverzichtbar fuer Agenten, die EU-Zahlungsvorschriften navigieren.
 

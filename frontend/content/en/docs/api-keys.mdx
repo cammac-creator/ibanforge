@@ -1,0 +1,146 @@
+---
+title: "API Keys"
+description: "Generate a free API key to get 200 requests/month on all IBANforge endpoints — no credit card, no crypto wallet required."
+order: 1
+---
+
+# API Keys
+
+IBANforge offers a **free tier** via API keys — 200 requests/month across all endpoints. No credit card, no crypto wallet required. For higher volumes, you can use [x402 micropayments](/docs/x402).
+
+## Generate a free API key
+
+Send a POST request to `/v1/keys/generate` with your email address:
+
+```bash
+curl -X POST https://api.ibanforge.com/v1/keys/generate \
+  -H "Content-Type: application/json" \
+  -d '{"email": "you@example.com"}'
+```
+
+### Response
+
+```json
+{
+  "key": "ifk_live_xxxxxxxxxxxxxxxxxxxx",
+  "email": "you@example.com",
+  "tier": "free",
+  "quota": {
+    "requests_per_month": 200,
+    "used": 0,
+    "resets_at": "2026-05-01T00:00:00.000Z"
+  }
+}
+```
+
+Your key starts with `ifk_` (IBANforge Key). **Store it securely** — it will not be shown again.
+
+## Using your API key
+
+Pass the key in the `Authorization` header as a Bearer token:
+
+```bash
+curl -X POST https://api.ibanforge.com/v1/iban/validate \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer ifk_live_xxxxxxxxxxxxxxxxxxxx" \
+  -d '{"iban": "CH93 0076 2011 6238 5295 7"}'
+```
+
+The key works on all paid endpoints:
+- `POST /v1/iban/validate`
+- `POST /v1/iban/batch`
+- `GET /v1/bic/:code`
+- `POST /v1/iban/compliance`
+
+## Free tier limits
+
+| Plan | Requests/month | Cost |
+|---|---|---|
+| Free (API key) | 200 | $0 |
+| x402 pay-per-call | Unlimited | $0.003–$0.02/call |
+
+The 200 free requests are shared across all endpoints and reset on the 1st of each month.
+
+## Check your usage
+
+```bash
+curl https://api.ibanforge.com/v1/keys/usage \
+  -H "Authorization: Bearer ifk_live_xxxxxxxxxxxxxxxxxxxx"
+```
+
+### Response
+
+```json
+{
+  "tier": "free",
+  "quota": {
+    "requests_per_month": 200,
+    "used": 47,
+    "remaining": 153,
+    "resets_at": "2026-05-01T00:00:00.000Z"
+  }
+}
+```
+
+## When you exceed the quota
+
+When your 200 free requests are exhausted, the API returns a `429 Too Many Requests` response:
+
+```json
+{
+  "error": {
+    "code": "quota_exceeded",
+    "message": "Free tier quota exhausted (200/month). Switch to x402 pay-per-call for unlimited access.",
+    "resets_at": "2026-05-01T00:00:00.000Z"
+  }
+}
+```
+
+At that point, you have two options:
+1. **Wait for the monthly reset** — quota resets on the 1st of each month
+2. **Switch to x402 pay-per-call** — remove the `Authorization` header and let your x402-compatible client handle payments automatically. See [x402 Payments](/docs/x402).
+
+## TypeScript example
+
+```typescript
+const API_KEY = process.env.IBANFORGE_API_KEY;
+
+const response = await fetch("https://api.ibanforge.com/v1/iban/validate", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "Authorization": `Bearer ${API_KEY}`,
+  },
+  body: JSON.stringify({ iban: "CH93 0076 2011 6238 5295 7" }),
+});
+
+const data = await response.json();
+console.log(data);
+```
+
+## Python example
+
+```python
+import os
+import requests
+
+API_KEY = os.environ["IBANFORGE_API_KEY"]
+
+response = requests.post(
+    "https://api.ibanforge.com/v1/iban/validate",
+    headers={
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {API_KEY}",
+    },
+    json={"iban": "CH93 0076 2011 6238 5295 7"},
+)
+
+data = response.json()
+print(data)
+```
+
+## Next steps
+
+- [x402 Micropayments](/docs/x402) — unlimited pay-per-call with USDC
+- [IBAN Validation](/docs/iban-validate) — full endpoint reference
+- [Error Reference](/docs/errors) — all error codes and troubleshooting
