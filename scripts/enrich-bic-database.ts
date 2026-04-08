@@ -236,6 +236,114 @@ async function importSixBankMaster(db: Database.Database): Promise<number> {
 }
 
 // ---------------------------------------------------------------------------
+// Source 4: OeNB Austria (daily)
+// ---------------------------------------------------------------------------
+
+async function importOeNB(db: Database.Database): Promise<number> {
+  console.log('\n[4/5] Importing OeNB Austria...');
+
+  const csvPath = resolve(TMP_DIR, 'oenb.csv');
+  await downloadFile('https://www.oenb.at/docroot/downloads_observ/sepa-zv-vz_gesamt.csv', csvPath);
+
+  const insert = db.prepare(`
+    INSERT OR IGNORE INTO bic_entries (bic8, bic11, institution, country_code, country_name, city, branch_code, source)
+    VALUES (?, ?, ?, 'AT', 'Austria', ?, ?, 'oenb')
+  `);
+
+  const raw = await readFile(csvPath, 'latin1');
+  const lines = raw.split('\n');
+  let headerParsed = false;
+  let bicIdx = -1, nameIdx = -1, cityIdx = -1;
+  const rows: Array<[string, string, string, string, string]> = [];
+
+  for (const line of lines) {
+    const cols = parseCsvLine(line, ';');
+    if (!headerParsed) {
+      if (cols.some(c => c.toUpperCase().includes('SWIFT'))) {
+        bicIdx = cols.findIndex(c => c.toUpperCase().includes('SWIFT'));
+        nameIdx = cols.findIndex(c => c.toUpperCase().includes('BANKENNAME') || c.toUpperCase().includes('NAME'));
+        cityIdx = cols.findIndex(c => c.toUpperCase() === 'ORT');
+        headerParsed = true;
+      }
+      continue;
+    }
+
+    const bic = cols[bicIdx]?.trim();
+    if (!bic || bic.length < 8) continue;
+
+    const bic8 = bic.slice(0, 8);
+    const bic11 = bic.length === 11 ? bic : bic + 'XXX';
+    const name = cols[nameIdx]?.trim() ?? '';
+    const city = cols[cityIdx]?.trim() ?? '';
+
+    rows.push([bic8, bic11, name, city, bic11.slice(8)]);
+  }
+
+  const insertBatch = db.transaction((r: typeof rows) => {
+    for (const row of r) insert.run(...row);
+  });
+  insertBatch(rows);
+
+  console.log(`  OeNB Austria: ${rows.length} entries processed`);
+  return rows.length;
+}
+
+// ---------------------------------------------------------------------------
+// Source 5: NBP Poland (EWIB)
+// ---------------------------------------------------------------------------
+
+async function importNBP(db: Database.Database): Promise<number> {
+  console.log('\n[5/5] Importing NBP Poland (EWIB)...');
+
+  const txtPath = resolve(TMP_DIR, 'nbp_ewib.txt');
+  await downloadFile('https://ewib.nbp.pl/faces/PlainDok?dokNazwa=plewibnra.txt', txtPath);
+
+  const insert = db.prepare(`
+    INSERT OR IGNORE INTO bic_entries (bic8, bic11, institution, country_code, country_name, city, branch_code, source)
+    VALUES (?, ?, ?, 'PL', 'Poland', ?, ?, 'nbp')
+  `);
+
+  const raw = await readFile(txtPath, 'latin1');
+  const lines = raw.split('\n');
+  const rows: Array<[string, string, string, string, string]> = [];
+
+  for (const line of lines) {
+    // Tab-separated, BIC is around column 20-21
+    const cols = line.split('\t');
+    if (cols.length < 21) continue;
+
+    // Find BIC-like values in columns 20-21 (0-indexed: 19-20)
+    for (const idx of [19, 20]) {
+      const bic = cols[idx]?.trim();
+      if (!bic || bic.length < 8 || !/^[A-Z]{4}[A-Z]{2}[A-Z0-9]{2}/.test(bic)) continue;
+
+      const bic8 = bic.slice(0, 8);
+      const bic11 = bic.length === 11 ? bic : bic + 'XXX';
+      const name = cols[1]?.trim() ?? '';
+      const city = cols[7]?.trim() ?? '';
+
+      rows.push([bic8, bic11, name, city, bic11.slice(8)]);
+    }
+  }
+
+  // Deduplicate
+  const seen = new Set<string>();
+  const deduped = rows.filter(r => {
+    if (seen.has(r[1])) return false;
+    seen.add(r[1]);
+    return true;
+  });
+
+  const insertBatch = db.transaction((r: typeof deduped) => {
+    for (const row of r) insert.run(...row);
+  });
+  insertBatch(deduped);
+
+  console.log(`  NBP Poland: ${deduped.length} entries processed`);
+  return deduped.length;
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
@@ -264,6 +372,8 @@ async function main(): Promise<void> {
   await importSwiftCodes(db);
   await importBundesbank(db);
   await importSixBankMaster(db);
+  try { await importOeNB(db); } catch (err) { console.warn(`  WARNING: OeNB import failed: ${(err as Error).message}`); }
+  try { await importNBP(db); } catch (err) { console.warn(`  WARNING: NBP import failed: ${(err as Error).message}`); }
 
   // Count after
   const afterCount = (db.prepare('SELECT COUNT(*) as n FROM bic_entries').get() as { n: number }).n;
