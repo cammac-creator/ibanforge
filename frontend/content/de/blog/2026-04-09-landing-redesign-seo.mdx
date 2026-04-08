@@ -1,0 +1,55 @@
+---
+title: "Neue Landing Page, vollstaendiges SEO und persistente API-Schluessel"
+description: "IBANforge erhaelt eine neu gestaltete entwicklerorientierte Landing Page mit strukturierten Daten, OG-Bildern, interaktiver Compliance-Demo, dualem Preismodell und persistentem Speicher fuer API-Schluessel."
+date: "2026-04-09"
+---
+
+Drei Updates heute: ein **komplettes Landing-Page-Redesign** auf api.ibanforge.com, **produktionsreifes SEO** und eine **Korrektur fuer persistenten Speicher**, die sicherstellt, dass Ihre API-Schluessel jedes Deployment ueberleben.
+
+---
+
+## Entwicklerorientierte Landing Page
+
+Die API-Landing-Page auf [api.ibanforge.com](https://api.ibanforge.com) wurde von Grund auf mit einem entwicklerorientierten Funnel neu aufgebaut:
+
+1. **Hero** mit drei klaren CTAs: Demo testen, kostenlosen API-Schluessel erhalten oder direkt zum curl Quickstart springen
+2. **Interaktive Demo** direkt unter dem Fold — testen Sie IBAN-Validierung, BIC-Suche und Compliance-Pruefungen ohne Kontoerstellung
+3. **Feature-Grid** mit allen sechs Funktionen: 121K BICs, Risiko-Scoring, MCP-Tools, x402-Zahlungen, SEPA/VoP und Entwickler-Tooling
+4. **Duales Preismodell** mit beiden Optionen nebeneinander: kostenloser Tier (200 Anfragen/Monat) und x402 Pay-per-Call
+5. **Quick Start** mit Code-Snippets in vier Sprachen: cURL, JavaScript, Python und dem npm SDK
+
+Der Compliance-Tab in der Demo ist neu — Sie koennen jetzt eine vollstaendige Sanktions- + SEPA- + VoP- + Risiko-Scoring-Pruefung direkt von der Landing Page aus durchfuehren.
+
+## Strukturierte Daten und SEO
+
+Die Landing Page enthaelt jetzt:
+
+- **Open Graph** und **Twitter Card** Meta-Tags fuer reichhaltige Social-Media-Vorschauen
+- **Zwei JSON-LD-Schemas**: `WebAPI` (fuer Suchmaschinen) und `FAQPage` (fuer Google Rich Snippets)
+- Richtige `<meta name="description">`, kanonische URL und Robots-Anweisungen
+- Ein dediziertes **OG-Bild** unter `/og-image.png` mit IBANforge-Branding
+- `Cache-Control`-Header fuer bessere Crawl-Effizienz
+
+Wenn Sie `api.ibanforge.com` auf Twitter, LinkedIn oder Slack teilen, sehen Sie jetzt eine richtige Vorschaukarte statt eines leeren Links.
+
+## Persistente API-Schluessel
+
+Zuvor setzte jedes Deployment auf Railway die SQLite-Datenbank zurueck, die API-Schluessel speichert — Client-Schluessel gingen bei jedem Update verloren. Wir haben dies behoben durch:
+
+- Hinzufuegen eines **persistenten Volumes** gemountet auf `/app/data`
+- Erstellen eines Entrypoint-Skripts, das schreibgeschuetzte Datenbanken (BIC, Compliance) aus dem Build kopiert, waehrend die Stats-Datenbank mit den API-Schluesseln **nie ueberschrieben** wird
+- Ihre API-Schluessel ueberleben jetzt alle zukuenftigen Deployments
+
+## Navigation zwischen den Seiten
+
+Die API-Landing-Page enthaelt jetzt eine **sticky Navigationsleiste** mit Links zur Dokumentation, zum Blog, zum Playground und zu den Preisen der Hauptseite. Wenn Sie auf `api.ibanforge.com` landen, finden Sie leicht den Weg zu [ibanforge.com](https://ibanforge.com) und zurueck.
+
+---
+
+## Was kommt als naechstes
+
+- Playground-Verbesserungen: Code-Snippet-Generierung, Anfrageverlauf
+- Zusaetzliche Compliance-Datenquellen
+- SDK-Verbesserungen und neue MCP-Tools
+
+Testen Sie die neue Landing Page auf [api.ibanforge.com](https://api.ibanforge.com), oder probieren Sie die interaktive Demo direkt aus — kein Konto erforderlich.

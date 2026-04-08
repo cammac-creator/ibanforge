@@ -1,0 +1,55 @@
+---
+title: "Nouvelle landing page, SEO complet et cles API persistantes"
+description: "IBANforge se dote d'une landing page redesignee orientee developpeurs, avec donnees structurees, images OG, demo compliance interactive, double tarification et stockage persistant pour les cles API."
+date: "2026-04-09"
+---
+
+Trois mises a jour aujourd'hui : une **refonte complete de la landing page** sur api.ibanforge.com, un **SEO de niveau production**, et une **correction de stockage persistant** qui garantit que vos cles API survivent a chaque deploiement.
+
+---
+
+## Landing page orientee developpeurs
+
+La landing page de l'API sur [api.ibanforge.com](https://api.ibanforge.com) a ete reconstruite de zero avec un parcours pense pour les developpeurs :
+
+1. **Hero** avec trois CTAs clairs : tester la demo, obtenir une cle API gratuite, ou aller directement au quickstart curl
+2. **Demo interactive** juste sous le hero — testez la validation IBAN, la recherche BIC et les checks de compliance sans creer de compte
+3. **Grille de fonctionnalites** mettant en avant les six capacites : 121K BICs, scoring de risque, outils MCP, paiements x402, SEPA/VoP et outils developpeurs
+4. **Double tarification** montrant les deux chemins cote a cote : tier gratuit (200 req/mois) et x402 pay-per-call
+5. **Quick start** avec des snippets de code en quatre langages : cURL, JavaScript, Python et le SDK npm
+
+L'onglet compliance dans la demo est nouveau — vous pouvez maintenant lancer un check complet sanctions + SEPA + VoP + scoring de risque directement depuis la landing page.
+
+## Donnees structurees et SEO
+
+La landing page inclut desormais :
+
+- Des meta tags **Open Graph** et **Twitter Card** pour des previsualisations riches sur les reseaux sociaux
+- **Deux schemas JSON-LD** : `WebAPI` (pour les moteurs de recherche) et `FAQPage` (pour les rich snippets Google)
+- Une `<meta name="description">` appropriee, une URL canonique et des directives robots
+- Une **image OG** dediee a `/og-image.png` avec le branding IBANforge
+- Des en-tetes `Cache-Control` pour une meilleure efficacite de crawl
+
+Si vous partagez `api.ibanforge.com` sur Twitter, LinkedIn ou Slack, vous verrez maintenant une carte de previsualisation au lieu d'un lien vide.
+
+## Cles API persistantes
+
+Auparavant, chaque deploiement sur Railway reintialisait la base de donnees SQLite qui stocke les cles API — les cles clients etaient perdues a chaque mise a jour. Nous avons corrige cela en :
+
+- Ajoutant un **volume persistant** monte sur `/app/data`
+- Creant un script d'entree qui copie les bases de donnees en lecture seule (BIC, compliance) depuis le build tout en **ne remplacant jamais** la base stats qui contient les cles API
+- Vos cles API survivent desormais a tous les futurs deploiements
+
+## Navigation entre les sites
+
+La landing page de l'API inclut maintenant une **barre de navigation sticky** avec des liens vers la documentation, le blog, le playground et les tarifs du site principal. Si vous arrivez sur `api.ibanforge.com`, vous pouvez facilement acceder a [ibanforge.com](https://ibanforge.com) et inversement.
+
+---
+
+## Et ensuite
+
+- Ameliorations du playground : generation de snippets de code, historique des requetes
+- Sources de donnees compliance supplementaires
+- Ameliorations du SDK et nouveaux outils MCP
+
+Essayez la nouvelle landing page sur [api.ibanforge.com](https://api.ibanforge.com), ou testez la demo interactive directement — aucun compte requis.

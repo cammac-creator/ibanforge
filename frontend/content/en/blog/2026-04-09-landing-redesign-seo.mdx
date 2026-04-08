@@ -1,0 +1,55 @@
+---
+title: "New Landing Page, Full SEO, and Persistent API Keys"
+description: "IBANforge gets a redesigned dev-first landing page with structured data, OG images, interactive compliance demo, dual pricing paths, and persistent storage for API keys."
+date: "2026-04-09"
+---
+
+We've shipped three updates today: a **complete landing page redesign** at api.ibanforge.com, **production-grade SEO**, and a **persistent storage fix** that ensures your API keys survive every deployment.
+
+---
+
+## Dev-first landing page
+
+The API landing page at [api.ibanforge.com](https://api.ibanforge.com) has been rebuilt from scratch with a developer-first funnel:
+
+1. **Hero** with three clear CTAs: try the demo, get a free API key, or jump to the curl quickstart
+2. **Interactive demo** right below the fold — test IBAN validation, BIC lookup, and compliance checks without creating an account
+3. **Features grid** highlighting all six capabilities: 121K BICs, compliance scoring, MCP tools, x402 payments, SEPA/VoP, and developer tooling
+4. **Dual pricing** showing both paths side by side: free tier (200 req/month) and x402 pay-per-call
+5. **Quick start** with code snippets in four languages: cURL, JavaScript, Python, and the npm SDK
+
+The compliance tab in the demo is new — you can now run a full sanctions + SEPA + VoP + risk scoring check directly from the landing page.
+
+## Structured data and SEO
+
+The landing page now includes:
+
+- **Open Graph** and **Twitter Card** meta tags for rich social previews
+- **Two JSON-LD schemas**: `WebAPI` (for search engines) and `FAQPage` (for Google rich snippets)
+- Proper `<meta name="description">`, canonical URL, and robots directives
+- A dedicated **OG image** at `/og-image.png` with IBANforge branding
+- `Cache-Control` headers for better crawl efficiency
+
+If you share `api.ibanforge.com` on Twitter, LinkedIn, or Slack, you'll now see a proper preview card instead of a blank link.
+
+## Persistent API keys
+
+Previously, every deployment on Railway would reset the SQLite database that stores API keys — meaning client keys were lost on each update. We fixed this by:
+
+- Adding a **persistent volume** mounted at `/app/data`
+- Creating an entrypoint script that copies read-only databases (BIC, compliance) from the build while **never overwriting** the stats database that holds API keys
+- Your API keys now survive all future deployments
+
+## Navigation between sites
+
+The API landing page now includes a **sticky navigation bar** linking to the main site's documentation, blog, playground, and pricing. If you land on `api.ibanforge.com`, you can easily find your way to [ibanforge.com](https://ibanforge.com) and back.
+
+---
+
+## What's next
+
+- Playground improvements: code snippet generation, request history
+- Additional compliance data sources
+- SDK enhancements and new MCP tools
+
+Try the new landing page at [api.ibanforge.com](https://api.ibanforge.com), or test the interactive demo directly — no account required.
