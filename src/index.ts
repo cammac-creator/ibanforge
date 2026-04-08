@@ -14,6 +14,7 @@ import { demo } from './routes/demo.js';
 import { landing } from './routes/landing.js';
 import { openapi } from './routes/openapi.js';
 import { discovery } from './routes/discovery.js';
+import { ogImage } from './routes/og-image.js';
 import { mcpHttp } from './routes/mcp-http.js';
 import { mcpCard } from './routes/mcp-card.js';
 import { createX402Middleware, ensureWalletConfigured } from './middleware/x402.js';
@@ -117,6 +118,7 @@ app.route('/', stats);
 app.route('/', demo);
 app.route('/', openapi);
 app.route('/', discovery);
+app.route('/', ogImage);
 app.route('/', mcpHttp);
 app.route('/', mcpCard);
 
