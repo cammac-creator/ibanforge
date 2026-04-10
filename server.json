@@ -1,0 +1,20 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.cammac-creator/ibanforge",
+  "description": "IBAN validation, BIC/SWIFT lookup, SEPA compliance, issuer classification and risk indicators for AI agents. 121K+ bank entries from GLEIF. Supports 84 countries.",
+  "repository": {
+    "url": "https://github.com/cammac-creator/ibanforge",
+    "source": "github"
+  },
+  "version": "1.0.3",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "ibanforge",
+      "version": "1.0.3",
+      "transport": {
+        "type": "stdio"
+      }
+    }
+  ]
+}
