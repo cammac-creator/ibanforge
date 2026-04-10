@@ -1,11 +1,28 @@
-import Database from 'better-sqlite3';
+import type DatabaseType from 'better-sqlite3';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
 import { resetStatements } from './bic-lookup.js';
 import { resetStatsStatements } from './stats.js';
 import { closeComplianceDB } from './compliance-db.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const require = createRequire(import.meta.url);
+
+// ---------------------------------------------------------------------------
+// Lazy-load better-sqlite3 so the module can be imported even when the native
+// addon is not compiled (e.g. during Glama MCP inspection).
+// ---------------------------------------------------------------------------
+
+type DatabaseConstructor = typeof DatabaseType;
+let _Database: DatabaseConstructor | null = null;
+
+function loadDatabaseSync(): DatabaseConstructor {
+  if (!_Database) {
+    _Database = require('better-sqlite3') as DatabaseConstructor;
+  }
+  return _Database;
+}
 
 // ---------------------------------------------------------------------------
 // BIC database (read-only) — contains bic_entries table
@@ -13,11 +30,12 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const BIC_DB_PATH = process.env.BIC_DB_PATH ?? resolve(__dirname, '../../data/bic.sqlite');
 
-let bicDB: Database.Database | null = null;
+let bicDB: DatabaseType.Database | null = null;
 
-export function getBicDB(): Database.Database {
+export function getBicDB(): DatabaseType.Database {
   if (!bicDB) {
-    bicDB = new Database(BIC_DB_PATH, { readonly: true });
+    const Db = loadDatabaseSync();
+    bicDB = new Db(BIC_DB_PATH, { readonly: true });
   }
   return bicDB;
 }
@@ -28,11 +46,12 @@ export function getBicDB(): Database.Database {
 
 const STATS_DB_PATH = process.env.STATS_DB_PATH ?? resolve(__dirname, '../../data/stats.sqlite');
 
-let statsDB: Database.Database | null = null;
+let statsDB: DatabaseType.Database | null = null;
 
-export function getStatsDB(): Database.Database {
+export function getStatsDB(): DatabaseType.Database {
   if (!statsDB) {
-    statsDB = new Database(STATS_DB_PATH);
+    const Db = loadDatabaseSync();
+    statsDB = new Db(STATS_DB_PATH);
     statsDB.exec(`
       CREATE TABLE IF NOT EXISTS operations (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
