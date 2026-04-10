@@ -1,7 +1,7 @@
 {
   "name": "ibanforge",
   "version": "1.0.0",
-  "description": "IBANforge — IBAN validation & BIC/SWIFT lookup API with x402 micropayments and MCP",
+  "description": "IBAN validation, BIC/SWIFT lookup, SEPA compliance, issuer classification and risk indicators for AI agents. 121K+ bank entries from GLEIF. Supports 84 countries.",
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",

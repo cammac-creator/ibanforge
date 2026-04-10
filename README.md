@@ -3,16 +3,15 @@
 [![API Status](https://img.shields.io/badge/API-live-brightgreen)](https://ibanforge-production.up.railway.app/health)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.7-blue)](https://www.typescriptlang.org/)
-[![MCP](https://img.shields.io/badge/MCP-3_tools-purple)](https://ibanforge.vercel.app/docs/mcp)
+[![MCP](https://img.shields.io/badge/MCP-4_tools-purple)](https://ibanforge.vercel.app/docs/mcp)
+[![npm](https://img.shields.io/npm/v/ibanforge)](https://www.npmjs.com/package/ibanforge)
 
 **IBAN validation & BIC/SWIFT lookup API** with SEPA compliance data, issuer classification, risk indicators, x402 micropayments, and MCP integration for AI agents.
 
-> **Free during beta** — all endpoints are currently free. Prices shown below will apply when x402 micropayments are activated.
-
 ## Features
 
-- **IBAN Validation** — Full mod-97 checksum verification, BBAN structure parsing, 75+ countries
-- **BIC/SWIFT Lookup** — 39,000+ entries from GLEIF with LEI enrichment
+- **IBAN Validation** — Full mod-97 checksum verification, BBAN structure parsing, 84 countries
+- **BIC/SWIFT Lookup** — 121,000+ entries from GLEIF with LEI enrichment
 - **SEPA Compliance** — Membership status, payment schemes (SCT/SDD/SCT_INST), VoP requirement per country
 - **Issuer Classification** — Detects traditional banks, neobanks, EMIs (Wise, Revolut, N26...), and payment institutions for vIBAN detection
 - **Risk Indicators** — Composite risk signal: issuer type, country risk (FATF-based), test BIC, SEPA reachability, VoP coverage
