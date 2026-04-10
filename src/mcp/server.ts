@@ -20,7 +20,7 @@ server.tool(
 Use this tool when you need to validate one IBAN at a time — for example, verifying a payment recipient before a wire transfer, checking a bank account provided by a user, or confirming IBAN format during onboarding.
 
 Returns: validity status, country, bank code, BIC/SWIFT, bank name, BBAN structure, SEPA membership & schemes (SCT/SDD/SCT_INST) with VoP requirement, issuer classification (bank/digital_bank/emi/payment_institution) with institution name, and composite risk indicators (issuer_type, country_risk, test_bic, sepa_reachable, vop_coverage).
-Supports 75+ countries including all SEPA countries (EU, Switzerland, UK, Norway, etc.).
+Supports 84 countries including all SEPA countries (EU, Switzerland, UK, Norway, etc.).
 
 Example input: 'CH56 0483 5012 3456 7800 9' (spaces are stripped automatically)
 Example output: { valid: true, country: { code: 'CH', name: 'Switzerland' }, bic: 'CRESCHZZ80A', ... }
@@ -80,7 +80,7 @@ Use this tool when you have a BIC/SWIFT code and need to identify the bank behin
 
 Returns: validity, institution name, country, city, branch info, LEI identifier, LEI status.
 Supports BIC8 (e.g. 'UBSWCHZH') and BIC11 (e.g. 'UBSWCHZH80A') formats.
-Database: 39,000+ institutions from GLEIF with LEI enrichment.
+Database: 121,000+ institutions from GLEIF with LEI enrichment.
 
 Example input: 'BNPAFRPP' → BNP Paribas, France, Paris
 Example input: 'UBSWCHZH80A' → UBS AG, Switzerland, Zurich (branch 80A)

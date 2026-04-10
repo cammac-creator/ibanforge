@@ -64,7 +64,7 @@ No decorators, no class inheritance, no magic -- just functions.
 
 ## SQLite for Lookup Data
 
-IBANforge stores 39,000+ BIC/SWIFT entries from [GLEIF](https://www.gleif.org/) (the Global Legal Entity Identifier Foundation). The data is CC0-licensed, free to use.
+IBANforge stores 121,000+ BIC/SWIFT entries from [GLEIF](https://www.gleif.org/) (the Global Legal Entity Identifier Foundation). The data is CC0-licensed, free to use.
 
 Why SQLite instead of PostgreSQL?
 
@@ -118,7 +118,7 @@ const server = new McpServer({
 server.tool(
   'validate_iban',
   `Validate a single IBAN and retrieve BIC/SWIFT info.
-   Supports 75+ countries including all SEPA countries.`,
+   Supports 84 countries including all SEPA countries.`,
   {
     iban: z.string().describe(
       "IBAN to validate. Spaces accepted."
@@ -173,7 +173,7 @@ The entire infrastructure costs ~$6/month:
 | Domain | ~$1/month |
 | GLEIF data | free (CC0) |
 
-The SQLite database is 39,243 BIC entries in a ~15MB file. No managed database fees.
+The SQLite database is 121,197 BIC entries. No managed database fees.
 
 ## Try It
 
