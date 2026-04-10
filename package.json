@@ -47,6 +47,30 @@
   "bin": {
     "ibanforge-mcp": "dist/mcp/server.js"
   },
+  "files": [
+    "dist/**/*.js",
+    "dist/**/*.d.ts",
+    "data/bic.sqlite"
+  ],
+  "keywords": [
+    "iban",
+    "bic",
+    "swift",
+    "sepa",
+    "mcp",
+    "validation",
+    "fintech",
+    "banking",
+    "compliance",
+    "x402"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cammac-creator/ibanforge"
+  },
+  "homepage": "https://ibanforge.com",
+  "prepublishOnly": "npm run build",
   "engines": {
     "node": ">=20"
   }
