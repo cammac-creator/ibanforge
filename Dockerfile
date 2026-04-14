@@ -7,7 +7,7 @@ RUN npm ci
 
 COPY src/ src/
 COPY tsconfig.json ./
-RUN npx tsc
+RUN npx tsc && mkdir -p dist/private && cp src/private/brainstorm.html dist/private/brainstorm.html
 
 FROM node:20-slim
 
