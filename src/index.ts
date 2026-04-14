@@ -17,7 +17,6 @@ import { discovery } from './routes/discovery.js';
 import { ogImage } from './routes/og-image.js';
 import { mcpHttp } from './routes/mcp-http.js';
 import { mcpCard } from './routes/mcp-card.js';
-import { brainstorm } from './routes/brainstorm.js';
 import { createX402Middleware, ensureWalletConfigured } from './middleware/x402.js';
 import { apiKeyMiddleware } from './middleware/api-key.js';
 import { apiKeys } from './routes/api-keys.js';
@@ -122,9 +121,6 @@ app.route('/', discovery);
 app.route('/', ogImage);
 app.route('/', mcpHttp);
 app.route('/', mcpCard);
-
-// Private brainstorm page — basic auth via BRAINSTORM_USER + BRAINSTORM_PASSWORD env
-app.route('/brainstorm', brainstorm);
 
 // Landing page (must be last — catches GET /)
 app.route('/', landing);
