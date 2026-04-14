@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc && cp src/db/bic_data.json dist/db/bic_data.json",
+    "build": "tsc && cp src/db/bic_data.json dist/db/bic_data.json && mkdir -p dist/private && cp src/private/brainstorm.html dist/private/brainstorm.html",
     "start": "node dist/index.js",
     "test": "vitest run",
     "test:watch": "vitest",
