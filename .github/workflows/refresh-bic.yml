@@ -41,5 +41,6 @@ jobs:
             echo "No changes to BIC database"
           else
             git commit -m "chore: refresh BIC database from GLEIF (monthly cron)"
+            git pull --rebase
             git push
           fi

@@ -35,4 +35,5 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add data/compliance.sqlite
           git commit -m "chore(compliance): weekly data refresh [automated]"
+          git pull --rebase
           git push
