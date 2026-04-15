@@ -63,4 +63,41 @@ describe('enrichResult', () => {
     expect(result.risk_indicators!.issuer_type).toBe('bank');
     expect(result.risk_indicators!.sepa_reachable).toBe(false);
   });
+
+  // Swiss clearing enrichment tests
+
+  it('enriches a valid CH IBAN with clearing data', () => {
+    const result = validateIBAN('CH5604835012345678009');
+    enrichResult(result);
+
+    expect(result.clearing).toBeDefined();
+    expect(result.clearing!.iid).toBe('04835');
+    expect(typeof result.clearing!.sic).toBe('boolean');
+    expect(typeof result.clearing!.instant_payments_chf).toBe('boolean');
+    expect(typeof result.clearing!.eurosic).toBe('boolean');
+  });
+
+  it('DE IBAN does NOT get clearing field', () => {
+    const result = validateIBAN('DE89370400440532013000');
+    enrichResult(result);
+
+    expect(result.clearing).toBeUndefined();
+  });
+
+  it('invalid CH IBAN does NOT get clearing field', () => {
+    const result = validateIBAN('CH5604835012345678000'); // bad checksum
+    enrichResult(result);
+
+    expect(result.clearing).toBeUndefined();
+  });
+
+  it('CH IBAN with known bank_code gets correct institution type', () => {
+    // CH5604835012345678009 has bank_code '04835'
+    const result = validateIBAN('CH5604835012345678009');
+    enrichResult(result);
+
+    if (result.clearing) {
+      expect(['bank', 'cantonal_bank', 'postfinance', 'raiffeisen', 'central_bank', 'foreign_participant']).toContain(result.clearing.type);
+    }
+  });
 });

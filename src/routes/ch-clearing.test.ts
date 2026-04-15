@@ -1,0 +1,109 @@
+import { describe, it, expect } from 'vitest';
+import { Hono } from 'hono';
+import { chClearing } from './ch-clearing.js';
+
+// Create a minimal test app with the clearing route
+const app = new Hono();
+
+// Pre-validation middleware (mirrors index.ts)
+app.get('/v1/ch/clearing/:iid', async (c, next) => {
+  const iid = c.req.param('iid');
+  if (!/^\d{1,5}$/.test(iid)) {
+    return c.json({ error: 'invalid_iid_format', message: 'IID must be a 1-5 digit number.' }, 400);
+  }
+  await next();
+});
+app.route('/', chClearing);
+
+describe('GET /v1/ch/clearing/:iid', () => {
+  it('GET /v1/ch/clearing/230 → 200, found=true', async () => {
+    const res = await app.request('/v1/ch/clearing/230');
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.found).toBe(true);
+    expect(body.iid).toBe('00230');
+    expect(body.institution.name).toBe('UBS Switzerland AG');
+    expect(body.cost_usdc).toBe(0.003);
+    expect(typeof body.processing_ms).toBe('number');
+  });
+
+  it('GET /v1/ch/clearing/00230 → 200, found=true, same result', async () => {
+    const res = await app.request('/v1/ch/clearing/00230');
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.found).toBe(true);
+    expect(body.iid).toBe('00230');
+    expect(body.institution.name).toBe('UBS Switzerland AG');
+  });
+
+  it('GET /v1/ch/clearing/30000 → PostFinance', async () => {
+    const res = await app.request('/v1/ch/clearing/30000');
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.found).toBe(true);
+    expect(body.institution.name).toBe('PostFinance AG');
+    expect(body.institution.type).toBe('postfinance');
+    expect(body.qr_iid).toBe('9000');
+    expect(body.payment_services.lsv_bdd_chf).toBe(false);
+  });
+
+  it('GET /v1/ch/clearing/700 → Cantonal bank', async () => {
+    const res = await app.request('/v1/ch/clearing/700');
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.found).toBe(true);
+    expect(body.institution.type).toBe('cantonal_bank');
+  });
+
+  it('GET /v1/ch/clearing/99999 → 200, found=false', async () => {
+    const res = await app.request('/v1/ch/clearing/99999');
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.found).toBe(false);
+    expect(body.error).toBe('clearing_not_found');
+    expect(body.cost_usdc).toBe(0.003);
+  });
+
+  it('GET /v1/ch/clearing/abc → 400, invalid_iid_format', async () => {
+    const res = await app.request('/v1/ch/clearing/abc');
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe('invalid_iid_format');
+  });
+
+  it('GET /v1/ch/clearing/123456 → 400, invalid_iid_format (too long)', async () => {
+    const res = await app.request('/v1/ch/clearing/123456');
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe('invalid_iid_format');
+  });
+
+  it('GET /v1/ch/clearing/30025 → follows redirect', async () => {
+    const res = await app.request('/v1/ch/clearing/30025');
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.found).toBe(true);
+    expect(body.redirected_from).toBe('30025');
+    expect(body.note).toContain('merged');
+  });
+
+  it('response includes payment_services structure', async () => {
+    const res = await app.request('/v1/ch/clearing/00230');
+    const body = await res.json();
+    expect(body.payment_services).toBeDefined();
+    expect(typeof body.payment_services.sic).toBe('boolean');
+    expect(typeof body.payment_services.rtgs_chf).toBe('boolean');
+    expect(typeof body.payment_services.instant_payments_chf).toBe('boolean');
+    expect(typeof body.payment_services.eurosic).toBe('boolean');
+    expect(typeof body.payment_services.lsv_bdd_chf).toBe('boolean');
+    expect(typeof body.payment_services.lsv_bdd_eur).toBe('boolean');
+  });
+
+  it('response includes address structure', async () => {
+    const res = await app.request('/v1/ch/clearing/00230');
+    const body = await res.json();
+    expect(body.address).toBeDefined();
+    expect(body.address.country).toBe('CH');
+    expect(typeof body.address.town).toBe('string');
+  });
+});

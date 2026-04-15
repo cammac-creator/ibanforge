@@ -7,6 +7,7 @@
 import { lookupByCountryBank } from './bic-lookup.js';
 import { classifyIssuer } from './issuers.js';
 import { getCountryRisk } from './countries.js';
+import { lookupClearingByBankCode } from './ch-clearing.js';
 import type { IBANValidationResult } from '../types.js';
 
 /**
@@ -35,4 +36,21 @@ export function enrichResult(result: IBANValidationResult): void {
     sepa_reachable: result.sepa?.member ?? false,
     vop_coverage: result.sepa?.vop_required ?? false,
   };
+
+  // Swiss clearing enrichment (CH and LI IBANs)
+  if ((cc === 'CH' || cc === 'LI') && result.bban?.bank_code) {
+    const clearing = lookupClearingByBankCode(result.bban.bank_code);
+    if (clearing) {
+      result.clearing = {
+        iid: clearing.iid,
+        name: clearing.name,
+        type: clearing.institution_type,
+        town: clearing.address.town,
+        sic: clearing.payment_services.sic,
+        instant_payments_chf: clearing.payment_services.instant_payments_chf,
+        eurosic: clearing.payment_services.eurosic,
+        qr_iid: clearing.qr_iid,
+      };
+    }
+  }
 }

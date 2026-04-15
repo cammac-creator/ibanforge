@@ -6,7 +6,7 @@ API de validation IBAN et lookup BIC/SWIFT avec micropaiements x402, interface M
 
 - **Runtime** : Node.js 20+ / TypeScript
 - **Framework** : Hono
-- **Database** : SQLite (better-sqlite3) — `data/bic.sqlite` (39K+ entries GLEIF), `data/stats.sqlite`
+- **Database** : SQLite (better-sqlite3) — `data/bic.sqlite` (39K+ BIC entries GLEIF + 1190 Swiss clearing entries SIX), `data/stats.sqlite`
 - **Payments** : x402/hono (USDC micropayments)
 - **AI Agents** : MCP SDK (Model Context Protocol)
 - **Deploy** : Docker → Railway
@@ -22,13 +22,15 @@ src/
     iban-validate.ts    # POST /v1/iban/validate (single IBAN)
     iban-batch.ts       # POST /v1/iban/batch (up to 100)
     bic-lookup.ts       # GET /v1/bic/:code (BIC/SWIFT lookup)
+    ch-clearing.ts      # GET /v1/ch/clearing/:iid (Swiss BC-Nummer lookup)
     health.ts           # GET /health
     stats.ts            # GET /stats
     landing.ts          # GET / (HTML landing page)
     demo.ts             # GET /v1/demo (free examples)
   lib/
     iban.ts             # IBAN validation logic (mod97, BBAN parsing)
-    enrich.ts           # Post-validation enrichment (BIC, issuer, SEPA, risk)
+    enrich.ts           # Post-validation enrichment (BIC, issuer, SEPA, risk, CH clearing)
+    ch-clearing.ts      # Swiss BC-Nummer lookup, institution type detection
     issuers.ts          # EMI/neobank classification (30+ known BIC8 mappings)
     bic-validator.ts    # BIC format validation (ISO 9362)
     bic-lookup.ts       # BIC database queries
@@ -38,14 +40,15 @@ src/
   middleware/
     x402.ts             # x402 payment middleware
   mcp/
-    server.ts           # MCP server (validate_iban, batch_validate, lookup_bic)
+    server.ts           # MCP server (validate_iban, batch_validate, lookup_bic, lookup_ch_clearing)
   db/
     schema.sql          # SQLite schema
     seed.ts             # GLEIF BIC-LEI data seeder
 scripts/
   enrich-countries.ts   # Backfill country_name on existing data
+  seed-bc-nummer.ts     # Download + seed SIX BankMaster CSV into bic.sqlite
 data/
-  bic.sqlite            # Pre-built BIC database (tracked in git)
+  bic.sqlite            # Pre-built BIC + Swiss clearing database (tracked in git)
   stats.sqlite          # API usage stats
 ```
 
@@ -67,6 +70,7 @@ data/
 | POST | /v1/iban/validate | 0.005 | Validate single IBAN + optional BIC lookup |
 | POST | /v1/iban/batch | 0.020 | Validate up to 100 IBANs |
 | GET | /v1/bic/:code | 0.003 | Lookup BIC/SWIFT code |
+| GET | /v1/ch/clearing/:iid | 0.003 | Swiss BC-Nummer / IID clearing lookup |
 | GET | /v1/demo | free | Example validations |
 | GET | /health | free | Health check + stats |
 | GET | /stats | free | Detailed statistics |
@@ -82,6 +86,7 @@ npm run test         # Run tests
 npm run check        # typecheck + lint + test (pre-push)
 npm run db:seed      # Seed BIC database from GLEIF
 npm run db:enrich    # Backfill country names
+npm run db:seed-ch   # Seed Swiss BC-Nummer from SIX BankMaster
 npm run mcp          # Start MCP server for AI agents
 ```
 
@@ -105,17 +110,19 @@ The middleware must NOT fail-open. If `WALLET_ADDRESS` is not set in production,
 
 ## Database
 
-- `bic.sqlite` : 39,243 BIC entries with LEI enrichment from GLEIF. Read-only at runtime.
+- `bic.sqlite` : 39,243 BIC entries with LEI enrichment from GLEIF + 1,190 Swiss clearing entries from SIX BankMaster. Read-only at runtime.
 - `stats.sqlite` : API usage tracking. Read-write.
 - Both use WAL mode for concurrent access.
 - Country names populated via `Intl.DisplayNames` API (no hardcoded list).
+- Swiss clearing data includes BC-Nummern, SIC/euroSIC participation, QR-IID allocations, and institution classification.
 
 ## MCP Integration
 
 The MCP server exposes tools for AI agents:
-- `validate_iban` — Validate a single IBAN
+- `validate_iban` — Validate a single IBAN (includes Swiss clearing enrichment for CH/LI)
 - `batch_validate_iban` — Validate multiple IBANs
 - `lookup_bic` — Look up a BIC/SWIFT code
+- `lookup_ch_clearing` — Look up a Swiss BC-Nummer / IID (institution, SIC, QR-IID)
 
 Run with: `npm run mcp` (stdio transport)
 
