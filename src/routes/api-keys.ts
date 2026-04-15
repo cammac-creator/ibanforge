@@ -41,13 +41,13 @@ apiKeys.get('/v1/keys/usage', (c) => {
   }
 
   const key = authHeader.slice(7);
-  const { valid, keyHash } = validateApiKey(key);
+  const { valid, keyHash, monthlyLimit } = validateApiKey(key);
 
   if (!valid) {
     return c.json({ error: 'invalid_key', message: 'API key not found or inactive' }, 401);
   }
 
-  const usage = getUsage(keyHash);
+  const usage = getUsage(keyHash, monthlyLimit);
   return c.json({ ...usage, key_prefix: key.slice(0, 12) });
 });
 
