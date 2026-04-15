@@ -44,7 +44,7 @@ app.use('*', logger());
 app.use('*', async (c, next) => {
   await next();
   c.header('X-Powered-By', 'IBANforge');
-  c.header('X-API-Version', '1.0.0');
+  c.header('X-API-Version', '1.1.0');
   c.header('X-Content-Type-Options', 'nosniff');
   c.header('X-Frame-Options', 'DENY');
   c.header('Referrer-Policy', 'strict-origin-when-cross-origin');

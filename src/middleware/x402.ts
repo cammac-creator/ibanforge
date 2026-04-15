@@ -93,6 +93,16 @@ export function createX402Middleware(): MiddlewareHandler {
           },
           description: 'IBAN compliance check: validation + sanctions + SEPA reachability + VoP + risk score',
         },
+        'GET /v1/ch/clearing/:iid': {
+          accepts: {
+            scheme: 'exact',
+            network: 'eip155:8453' as const,
+            price: '$0.003',
+            payTo: walletAddress,
+            maxTimeoutSeconds: 60,
+          },
+          description: 'Swiss BC-Nummer / IID clearing lookup',
+        },
       };
 
       // Create CDP facilitator client
