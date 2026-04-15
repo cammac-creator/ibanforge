@@ -20,6 +20,7 @@ import { mcpHttp } from './routes/mcp-http.js';
 import { mcpCard } from './routes/mcp-card.js';
 import { createX402Middleware, ensureWalletConfigured } from './middleware/x402.js';
 import { apiKeyMiddleware } from './middleware/api-key.js';
+import { enrich402Middleware } from './middleware/enrich-402.js';
 import { apiKeys } from './routes/api-keys.js';
 import { rateLimitMiddleware } from './middleware/rate-limit.js';
 import { recordRequest } from './lib/stats.js';
@@ -104,6 +105,9 @@ app.get('/v1/ch/clearing/:iid', async (c, next) => {
   }
   await next();
 });
+
+// Enrich empty 402 responses with human-readable instructions
+app.use('/v1/*', enrich402Middleware());
 
 // Key management routes (free, before x402)
 app.route('/', apiKeys);
