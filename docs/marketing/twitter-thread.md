@@ -26,8 +26,10 @@ I needed something simple: send an IBAN, get back validation + bank details. So 
 
 What makes IBANforge different:
 
-- MCP integration -- AI agents (Claude, GPT, Cursor) can discover and use it natively
+- MCP integration -- AI agents (Claude, GPT, Cursor) can discover and use it natively (5 tools)
+- Swiss clearing data -- 1,190 BC-Nummer entries from SIX (SIC, euroSIC, Instant Payments, QR-IID)
 - Open data -- 121K BIC entries from GLEIF (CC0 license)
+- 85 EMI/neobank classifications for vIBAN detection
 - Self-hostable -- MIT license, Docker, SQLite
 - x402 micropayments -- pay $0.005/call, no subscription
 
@@ -75,12 +77,12 @@ curl -X POST https://api.ibanforge.com/v1/iban/validate \
 
 ## Tweet 7 -- What's Next + CTA
 
-What's next:
+What's new in v1.1.0:
 
-- Activate x402 micropayments
-- Add SEPA reachability data
-- Python and TypeScript SDKs
-- More BIC data sources
+- Swiss clearing: 1,190 BC-Nummer from SIX (SIC, euroSIC, Instant Payments)
+- 85 EMI/neobank classifications (was 30)
+- 5 MCP tools (added lookup_ch_clearing)
+- CH/LI IBAN enrichment with clearing data
 
 If you're building payment tools, AI agents, or fintech products -- I'd love your feedback.
 

@@ -2,7 +2,7 @@ openapi: 3.0.3
 
 info:
   title: IBANforge API
-  version: 1.0.0
+  version: 1.1.0
   description: |
     **IBANforge** is a production-grade IBAN validation, BIC/SWIFT lookup, and compliance screening API.
 
@@ -10,10 +10,11 @@ info:
     - **IBAN Validation** — Validate any IBAN from 75+ countries with full BBAN parsing, check-digit verification, and formatted output.
     - **BIC/SWIFT Lookup** — Search 121K+ BIC entries sourced from GLEIF, enriched with LEI data, institution names, and branch info.
     - **Compliance Screening** — Sanctions lists (OFAC/EU/UN), FATF grey/black list status, SEPA Instant reachability, Verification of Payee (VoP) participant checks, and composite risk scoring (0–100).
-    - **Issuer Classification** — Detect vIBANs by classifying issuers as traditional banks, digital banks, EMIs, or payment institutions (30+ known BIC8 mappings).
+    - **Issuer Classification** — Detect vIBANs by classifying issuers as traditional banks, digital banks, EMIs, or payment institutions (85 known BIC8 mappings).
     - **SEPA Data** — SCT, SDD, and SCT_INST scheme support plus VoP requirement flags.
     - **Batch Processing** — Validate up to 100 IBANs in a single request at a discounted rate.
-    - **MCP Integration** — 4 MCP tools for AI agent integration (validate_iban, batch_validate_iban, lookup_bic, compliance_check).
+    - **Swiss Clearing** — 1,190 BC-Nummer entries from SIX BankMaster with SIC, euroSIC, Instant Payments, and QR-IID data for CH/LI IBANs.
+    - **MCP Integration** — 5 MCP tools for AI agent integration (validate_iban, batch_validate_iban, lookup_bic, compliance_check, lookup_ch_clearing).
 
     ## Payment (x402 Protocol)
     Paid endpoints use the [x402 micropayment protocol](https://www.x402.org/). Include a payment token in the `X-Payment` header.
@@ -25,6 +26,7 @@ info:
     | POST /v1/iban/batch | $0.002 per IBAN |
     | GET /v1/bic/{code} | $0.003 |
     | POST /v1/iban/compliance | $0.020 |
+    | GET /v1/ch/clearing/{iid} | $0.003 |
 
     ## Free Endpoints
     `/v1/demo`, `/health`, and `/openapi.json` are free and require no payment.
@@ -51,6 +53,10 @@ tags:
     description: >-
       Full compliance checks — IBAN validation + sanctions screening (OFAC/EU/UN) +
       FATF status + SEPA Instant reachability + VoP + composite risk score (paid via x402 or API key)
+  - name: Swiss Clearing
+    description: >-
+      Swiss BC-Nummer / IID clearing lookups from SIX BankMaster (1,190 entries).
+      SIC, euroSIC, Instant Payments participation, and QR-IID data (paid via x402 or API key).
   - name: System
     description: Health checks, statistics, and demo endpoints (free)
 
@@ -425,6 +431,104 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaymentRequired'
 
+  /v1/ch/clearing/{iid}:
+    get:
+      operationId: lookupChClearing
+      summary: Lookup a Swiss BC-Nummer / IID clearing code
+      description: |
+        Returns institution details for a Swiss BC-Nummer (Bank Clearing Number / IID) from the SIX BankMaster database (1,190 entries).
+        Includes payment infrastructure participation (SIC, euroSIC, Instant Payments), QR-IID allocation, and institution type classification.
+
+        Accepts both raw (e.g. `230`) and zero-padded (e.g. `00230`) IIDs. Follows concatenation redirects transparently.
+
+        **Cost:** $0.003 USDC per call.
+      tags:
+        - Swiss Clearing
+      security:
+        - x402Payment: []
+        - bearerApiKey: []
+      parameters:
+        - name: iid
+          in: path
+          required: true
+          description: Swiss BC-Nummer / IID (1 to 5 digits)
+          schema:
+            type: string
+            pattern: '^\d{1,5}$'
+            minLength: 1
+            maxLength: 5
+          examples:
+            ubs:
+              summary: UBS Switzerland AG
+              value: '230'
+            postfinance:
+              summary: PostFinance AG
+              value: '30000'
+            zkb:
+              summary: Zuercher Kantonalbank
+              value: '700'
+      responses:
+        '200':
+          description: Clearing lookup result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChClearingLookupResult'
+              examples:
+                found:
+                  summary: UBS Switzerland AG
+                  value:
+                    iid: '00230'
+                    found: true
+                    institution:
+                      name: UBS Switzerland AG
+                      type: bank
+                      iid_type: headquarters
+                      headquarters_iid: '00230'
+                    address:
+                      street: Bahnhofstrasse
+                      building_number: '45'
+                      post_code: '8098'
+                      town: Zürich
+                      country: CH
+                    bic: UBSWCHZH80A
+                    payment_services:
+                      sic: true
+                      rtgs_chf: true
+                      instant_payments_chf: true
+                      eurosic: true
+                      lsv_bdd_chf: true
+                      lsv_bdd_eur: true
+                    sic_iid: '002301'
+                    qr_iid: null
+                    valid_on: '2026-04-15'
+                    cost_usdc: 0.003
+                    processing_ms: 0.42
+                not_found:
+                  summary: Not found
+                  value:
+                    iid: '99999'
+                    found: false
+                    error: clearing_not_found
+                    message: IID 99999 not found in Swiss BankMaster database.
+                    cost_usdc: 0.003
+                    processing_ms: 0.12
+        '400':
+          description: Invalid IID format
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error: invalid_iid_format
+                message: IID must be a 1-5 digit number.
+        '402':
+          description: Payment required (x402 micropayment)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentRequired'
+
   /v1/demo:
     get:
       operationId: getDemo
@@ -460,7 +564,7 @@ paths:
                 $ref: '#/components/schemas/HealthResponse'
               example:
                 status: ok
-                version: 1.0.0
+                version: 1.1.0
                 uptime_seconds: 86400
                 bic_database_entries: 121197
                 bic_data_last_updated: '2025-01-15T00:00:00Z'
@@ -1034,6 +1138,159 @@ components:
           type: number
           description: Server-side processing time in milliseconds
           example: 0.45
+
+    ChClearingLookupResult:
+      type: object
+      required:
+        - iid
+        - found
+        - cost_usdc
+      properties:
+        iid:
+          type: string
+          description: Zero-padded 5-digit IID (BC-Nummer)
+          example: '00230'
+        found:
+          type: boolean
+          description: Whether the IID was found in the SIX BankMaster database
+          example: true
+        redirected_from:
+          type: string
+          description: Original IID if the lookup followed a concatenation redirect
+          example: '30025'
+        institution:
+          type: object
+          description: Institution details
+          properties:
+            name:
+              type: string
+              description: Official institution name
+              example: UBS Switzerland AG
+            type:
+              type: string
+              enum:
+                - bank
+                - cantonal_bank
+                - postfinance
+                - raiffeisen
+                - central_bank
+                - foreign_participant
+              description: Institution type classification
+              example: bank
+            iid_type:
+              type: string
+              enum:
+                - headquarters
+                - branch
+                - other
+              description: IID type (1=headquarters, 2=branch, 4=other)
+              example: headquarters
+            headquarters_iid:
+              type: string
+              description: IID of the headquarters institution
+              example: '00230'
+          required:
+            - name
+            - type
+            - iid_type
+            - headquarters_iid
+        address:
+          type: object
+          description: Institution address
+          properties:
+            street:
+              type: string
+              nullable: true
+              example: Bahnhofstrasse
+            building_number:
+              type: string
+              nullable: true
+              example: '45'
+            post_code:
+              type: string
+              nullable: true
+              example: '8098'
+            town:
+              type: string
+              nullable: true
+              example: Zürich
+            country:
+              type: string
+              description: ISO 3166-1 alpha-2 country code
+              example: CH
+        bic:
+          type: string
+          nullable: true
+          description: BIC/SWIFT code (11 characters)
+          example: UBSWCHZH80A
+        payment_services:
+          type: object
+          description: Payment infrastructure participation
+          properties:
+            sic:
+              type: boolean
+              description: SIC interbank clearing participant
+              example: true
+            rtgs_chf:
+              type: boolean
+              description: RTGS for CHF customer payments
+              example: true
+            instant_payments_chf:
+              type: boolean
+              description: Instant Payments for CHF customer payments
+              example: true
+            eurosic:
+              type: boolean
+              description: euroSIC clearing participant (EUR payments)
+              example: true
+            lsv_bdd_chf:
+              type: boolean
+              description: Direct debit (LSV+/BDD) in CHF
+              example: true
+            lsv_bdd_eur:
+              type: boolean
+              description: Direct debit (LSV+/BDD) in EUR
+              example: true
+          required:
+            - sic
+            - rtgs_chf
+            - instant_payments_chf
+            - eurosic
+            - lsv_bdd_chf
+            - lsv_bdd_eur
+        sic_iid:
+          type: string
+          nullable: true
+          description: 6-digit SIC system identifier
+          example: '002301'
+        qr_iid:
+          type: string
+          nullable: true
+          description: QR-IID allocation for QR-bill processing
+          example: null
+        valid_on:
+          type: string
+          nullable: true
+          description: Data validity date (YYYY-MM-DD)
+          example: '2026-04-15'
+        note:
+          type: string
+          description: Additional note (e.g. for redirected/merged IIDs)
+        error:
+          type: string
+          description: Error code when IID is not found
+          example: clearing_not_found
+        message:
+          type: string
+          description: Human-readable error or info message
+        cost_usdc:
+          type: number
+          description: Cost of this operation in USDC
+          example: 0.003
+        processing_ms:
+          type: number
+          description: Server-side processing time in milliseconds
+          example: 0.42
 
     ComplianceResult:
       type: object

@@ -6,6 +6,8 @@
 
 I just shipped IBANforge, a free IBAN validation and BIC/SWIFT lookup API. It validates IBANs for 84 countries with full BBAN parsing (bank code, branch, account number) and auto-resolves the BIC/SWIFT code.
 
+New in v1.1.0: Swiss clearing data (1,190 BC-Nummer entries from SIX with SIC, euroSIC, Instant Payments, QR-IID), 85 EMI/neobank classifications for vIBAN detection, and 5 MCP tools for AI agents.
+
 Built with Hono + TypeScript + SQLite. 121K+ BIC entries from GLEIF open data. Also has MCP integration so AI agents can use it natively.
 
 Free during launch, no API key needed. Interactive playground if you want to try it without writing code.
@@ -43,9 +45,9 @@ Curious what you think of the architecture. Any suggestions for improving query 
 
 I launched IBANforge, a free API for IBAN validation and BIC/SWIFT code lookup. Built it because every existing solution is either overpriced ($500+/year) or poorly documented.
 
-What it does: validates IBANs for 84 countries, looks up BIC/SWIFT codes from a 121K entry database (GLEIF, CC0 license), returns bank name, LEI, country. Also has batch validation for up to 100 IBANs per call.
+What it does: validates IBANs for 84 countries, looks up BIC/SWIFT codes from a 121K entry database (GLEIF, CC0 license), returns bank name, LEI, country. Also has batch validation for up to 100 IBANs per call. New: Swiss clearing data with 1,190 BC-Nummer entries from SIX and 85 EMI/neobank classifications.
 
-The differentiator: it has MCP (Model Context Protocol) integration, meaning AI agents like Claude can use it natively for payment verification, KYC workflows, and invoice processing.
+The differentiator: it has MCP (Model Context Protocol) integration with 5 tools, meaning AI agents like Claude can use it natively for payment verification, KYC workflows, and invoice processing -- including Swiss bank clearing lookups.
 
 Free during launch, MIT license, self-hostable with Docker.
 
@@ -68,7 +70,7 @@ Infrastructure costs:
 - Domain: ~$1/month
 - Data source (GLEIF): free
 
-What it does: validates IBANs for 84 countries, resolves BIC/SWIFT codes with bank names and LEI data, has an interactive playground, full API docs, and MCP support for AI agents.
+What it does: validates IBANs for 84 countries, resolves BIC/SWIFT codes with bank names and LEI data, Swiss clearing data (1,190 BC-Nummer from SIX), 85 EMI/neobank classifications, has an interactive playground, full API docs, and MCP support for AI agents (5 tools).
 
 The plan is to add x402 micropayments ($0.005/call) and target $3K MRR within 12 months. Everything is open source and self-hostable.
 

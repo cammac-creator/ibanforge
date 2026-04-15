@@ -28,7 +28,7 @@
 ### Entry for "🤖 AI Agent Integration" section
 
 ```markdown
-- [IBANforge MCP Server](https://ibanforge.com/docs/mcp) - MCP server exposing `validate_iban`, `batch_validate_iban`, `lookup_bic`, and `compliance_check` tools. AI agents can validate bank account numbers and look up BIC codes paying per-call with x402/USDC. [GitHub](https://github.com/cammac-creator/ibanforge)
+- [IBANforge MCP Server](https://ibanforge.com/docs/mcp) - MCP server exposing `validate_iban`, `batch_validate_iban`, `lookup_bic`, `compliance_check`, and `lookup_ch_clearing` tools. AI agents can validate bank account numbers, look up BIC codes, and query Swiss clearing data, paying per-call with x402/USDC. [GitHub](https://github.com/cammac-creator/ibanforge)
 ```
 
 ---
@@ -49,7 +49,7 @@
 ### Entry to Add
 
 ```markdown
-- [IBANforge](https://github.com/cammac-creator/ibanforge) - IBAN validation and BIC/SWIFT lookup REST API + MCP server with x402 micropayments. $0.002–$0.005/request in USDC on Base. 84 countries, 121K+ GLEIF BIC entries.
+- [IBANforge](https://github.com/cammac-creator/ibanforge) - IBAN validation, BIC/SWIFT lookup, and Swiss clearing REST API + MCP server with x402 micropayments. $0.002–$0.005/request in USDC on Base. 84 countries, 121K+ GLEIF BIC entries, 1,190 Swiss BC-Nummer from SIX.
 ```
 
 ---

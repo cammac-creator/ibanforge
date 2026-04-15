@@ -7,7 +7,7 @@ cover_image: https://ibanforge.com/og-image.png
 
 # Building an IBAN Validation API with Hono, SQLite, and MCP
 
-I recently shipped [IBANforge](https://ibanforge.com), a free API for IBAN validation and BIC/SWIFT lookup. In this article, I'll walk through the key architectural decisions and share real code from the project.
+I recently shipped [IBANforge](https://ibanforge.com), a free API for IBAN validation and BIC/SWIFT lookup. v1.1.0 adds Swiss clearing data (1,190 BC-Nummer entries from SIX with SIC, euroSIC, Instant Payments), 85 EMI/neobank classifications, and 5 MCP tools for AI agents. In this article, I'll walk through the key architectural decisions and share real code from the project.
 
 ## Why Hono Over Express
 
