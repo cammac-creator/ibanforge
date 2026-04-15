@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import type { HonoEnv } from '../types.js';
 import { validateBIC } from '../lib/bic-validator.js';
 import { lookup } from '../lib/bic-lookup.js';
 import { recordOperation } from '../lib/stats.js';
@@ -6,7 +7,7 @@ import type { BICLookupResult } from '../types.js';
 
 const COST_USDC = 0.003;
 
-const bicLookup = new Hono();
+const bicLookup = new Hono<HonoEnv>();
 
 bicLookup.get('/v1/bic/:code', (c) => {
   const start = performance.now();

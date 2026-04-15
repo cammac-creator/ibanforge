@@ -6,6 +6,7 @@
  */
 
 import { Hono } from 'hono';
+import type { HonoEnv } from '../types.js';
 import {
   lookupClearingByBankCode,
   normalizeIid,
@@ -15,7 +16,7 @@ import type { ChClearingLookupResult } from '../types.js';
 
 const COST_USDC = 0.003;
 
-const chClearing = new Hono();
+const chClearing = new Hono<HonoEnv>();
 
 chClearing.get('/v1/ch/clearing/:iid', (c) => {
   const start = performance.now();
