@@ -49,16 +49,18 @@ ibanBatch.post('/v1/iban/batch', async (c) => {
     );
   }
 
+  const isApiKey = c.get('apiKeyAuthenticated');
+
   const results: IBANValidationResult[] = ibans.map((iban) => {
     const result = validateIBAN(iban);
     enrichResult(result);
-    result.cost_usdc = 0.002; // Batch rate (vs $0.005 single)
+    result.cost_usdc = isApiKey ? 0 : 0.002; // Batch rate (vs $0.005 single), free for API key tier
     return result;
   });
 
   // Proportional cost: $0.002 per IBAN (discount vs individual $0.005)
   // e.g. 10 IBANs = $0.020, 100 IBANs = $0.200
-  const totalCost = Math.round(ibans.length * 0.002 * 1000) / 1000;
+  const totalCost = isApiKey ? 0 : Math.round(ibans.length * 0.002 * 1000) / 1000;
   const processingMs = Math.round((performance.now() - start) * 100) / 100;
   const validCount = results.filter((r) => r.valid).length;
 

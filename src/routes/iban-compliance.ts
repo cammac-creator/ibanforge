@@ -46,7 +46,9 @@ ibanCompliance.post('/v1/iban/compliance', async (c) => {
   const errorDetail = result.valid ? undefined : result.iban.slice(0, 4);
   recordOperation('iban_compliance', countryCode || null, result.valid, 0.02, errorDetail);
 
-  return c.json({ ...result, compliance, cost_usdc: 0.02, processing_ms: processingMs });
+  const costUsdc = c.get('apiKeyAuthenticated') ? 0 : 0.02;
+
+  return c.json({ ...result, compliance, cost_usdc: costUsdc, processing_ms: processingMs });
 });
 
 export { ibanCompliance };

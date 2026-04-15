@@ -42,7 +42,7 @@ export interface IBANValidationResult {
     sepa_reachable: boolean;
     vop_coverage: boolean;
   };
-  clearing?: ChClearingSummary;
+  clearing?: ChClearingSummary | null;
   formatted?: string;
   error?: 'invalid_format' | 'unsupported_country' | 'wrong_length' | 'checksum_failed';
   error_detail?: string;

@@ -61,7 +61,7 @@ bicLookup.get('/v1/bic/:code', (c) => {
     lei_status: row?.lei_status ?? null,
     is_test_bic: validation.is_test_bic!,
     source: row?.source ?? null,
-    cost_usdc: COST_USDC,
+    cost_usdc: c.get('apiKeyAuthenticated') ? 0 : COST_USDC,
     processing_ms: Math.round((performance.now() - start) * 100) / 100,
   };
 

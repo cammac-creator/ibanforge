@@ -51,6 +51,8 @@ export function enrichResult(result: IBANValidationResult): void {
         eurosic: clearing.payment_services.eurosic,
         qr_iid: clearing.qr_iid,
       };
+    } else {
+      result.clearing = null;
     }
   }
 }
