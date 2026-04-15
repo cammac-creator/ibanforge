@@ -23,6 +23,7 @@ appliquees en priorite.**
 | `SUMSLT21` | SumUp | Non confirme ; SumUp LT = SUPULT22 | `SUPULT22` | LT |
 | `MOLOIE22` | Modulr (IE) | Non confirme ; Modulr IE = MODRIE22 | `MODRIE22` | IE |
 | `FABORL2X` | Finom | Non confirme ; Finom = FNOMNL22 | `FNOMNL22` | NL |
+| `REVOGB21` | Revolut (GB) | Code inactif ; remplace par REVOGB2L | `REVOGB2L` | GB |
 
 ## 2. Entrees non verifiees (a confirmer manuellement)
 
@@ -175,13 +176,17 @@ Ces entrees sont deja dans `issuers.ts` et sont confirmees correctes :
 
 | Categorie | Nombre |
 |-----------|--------|
-| Entrees actuelles confirmees | 14 |
-| Corrections de BIC errones | 9 |
+| Entrees actuelles confirmees (inchangees) | 14 |
+| Corrections de BIC errones (remplacement) | 10 |
 | Entrees non verifiees a investiguer | 6 |
-| Nouvelles entrees digital_bank | 5 |
-| Nouvelles entrees emi | 49 |
-| Nouvelles entrees payment_institution | 10 |
-| **Total apres implementation** | **~84** |
+| Nouvelles institutions digital_bank | 5 |
+| Nouvelles institutions emi (hors corrections) | 39 |
+| Nouvelles institutions payment_institution (hors corrections) | 6 |
+| **Total entrees apres implementation** | **~84** |
+
+Note : les 10 corrections remplacent des entrees existantes (ne s'ajoutent pas
+au total). Les "nouvelles entrees emi" de la section 4.2 incluent a la fois
+les BIC corriges (marques "Remplace X") et les institutions entierement nouvelles.
 
 ---
 
