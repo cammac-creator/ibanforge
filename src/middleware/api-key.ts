@@ -10,23 +10,26 @@ export function apiKeyMiddleware(): MiddlewareHandler {
     }
 
     const key = authHeader.slice(7);
-    const { valid, keyHash } = validateApiKey(key);
+    const { valid, keyHash, monthlyLimit } = validateApiKey(key);
 
     if (!valid) {
       await next();
       return;
     }
 
-    const quota = checkAndIncrementQuota(keyHash);
+    const quota = checkAndIncrementQuota(keyHash, monthlyLimit);
 
     if (!quota.allowed) {
-      return c.json({
-        error: 'quota_exceeded',
-        message: 'Monthly limit of 200 requests reached. Use x402 payment for additional requests.',
-        used: quota.used,
-        limit: quota.limit,
-        month: quota.month,
-      }, 429);
+      return c.json(
+        {
+          error: 'quota_exceeded',
+          message: `Monthly limit of ${quota.limit} requests reached. Contact support for higher limits.`,
+          used: quota.used,
+          limit: quota.limit,
+          month: quota.month,
+        },
+        429,
+      );
     }
 
     c.set('apiKeyAuthenticated', true);
