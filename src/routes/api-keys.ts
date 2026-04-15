@@ -84,6 +84,46 @@ apiKeys.post('/v1/admin/keys', async (c) => {
   }, 201);
 });
 
+apiKeys.post('/v1/admin/keys/import', async (c) => {
+  const adminSecret = process.env.ADMIN_SECRET;
+  if (!adminSecret || c.req.header('X-Admin-Secret') !== adminSecret) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
+
+  let body: { api_key?: unknown; email?: unknown; monthly_limit?: unknown };
+  try {
+    body = await c.req.json<{ api_key?: unknown; email?: unknown; monthly_limit?: unknown }>();
+  } catch {
+    return c.json({ error: 'invalid_json' }, 400);
+  }
+
+  const apiKey = body.api_key;
+  const email = body.email;
+  if (!apiKey || typeof apiKey !== 'string' || !apiKey.startsWith('ifk_')) {
+    return c.json({ error: 'invalid_key', message: 'api_key must start with ifk_' }, 400);
+  }
+  if (!email || typeof email !== 'string' || !email.includes('@')) {
+    return c.json({ error: 'invalid_email' }, 400);
+  }
+
+  const { createHash } = await import('node:crypto');
+  const keyHash = createHash('sha256').update(apiKey).digest('hex');
+  const keyPrefix = apiKey.slice(0, 12);
+  const monthlyLimit = typeof body.monthly_limit === 'number' ? body.monthly_limit : null;
+
+  const db = getStatsDB();
+  const existing = db.prepare('SELECT id FROM api_keys WHERE key_hash = ?').get(keyHash);
+  if (existing) {
+    return c.json({ error: 'key_exists', key_prefix: keyPrefix }, 409);
+  }
+
+  db.prepare(
+    'INSERT INTO api_keys (key_hash, key_prefix, email, monthly_limit) VALUES (?, ?, ?, ?)',
+  ).run(keyHash, keyPrefix, email.trim().toLowerCase(), monthlyLimit);
+
+  return c.json({ imported: true, key_prefix: keyPrefix, email: email.trim().toLowerCase(), monthly_limit: monthlyLimit ?? 200 }, 201);
+});
+
 apiKeys.get('/v1/admin/keys', (c) => {
   const adminSecret = process.env.ADMIN_SECRET;
   if (!adminSecret || c.req.header('X-Admin-Secret') !== adminSecret) {
