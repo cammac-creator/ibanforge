@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { generateApiKey, validateApiKey, getUsage } from '../lib/api-keys.js';
+import { getStatsDB } from '../lib/db.js';
 
 const apiKeys = new Hono();
 
@@ -49,6 +50,56 @@ apiKeys.get('/v1/keys/usage', (c) => {
 
   const usage = getUsage(keyHash, monthlyLimit);
   return c.json({ ...usage, key_prefix: key.slice(0, 12) });
+});
+
+apiKeys.post('/v1/admin/keys', async (c) => {
+  const adminSecret = process.env.ADMIN_SECRET;
+  if (!adminSecret || c.req.header('X-Admin-Secret') !== adminSecret) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
+
+  let body: { email?: unknown; monthly_limit?: unknown };
+  try {
+    body = await c.req.json<{ email?: unknown; monthly_limit?: unknown }>();
+  } catch {
+    return c.json({ error: 'invalid_json' }, 400);
+  }
+
+  const email = body.email;
+  if (!email || typeof email !== 'string' || !email.includes('@')) {
+    return c.json({ error: 'invalid_email' }, 400);
+  }
+
+  const monthlyLimit = typeof body.monthly_limit === 'number' ? body.monthly_limit : undefined;
+  const result = generateApiKey(email.trim().toLowerCase(), monthlyLimit);
+  if (!result) {
+    return c.json({ error: 'rate_limited' }, 429);
+  }
+
+  return c.json({
+    api_key: result.api_key,
+    key_prefix: result.key_prefix,
+    email: email.trim().toLowerCase(),
+    monthly_limit: monthlyLimit ?? 200,
+  }, 201);
+});
+
+apiKeys.get('/v1/admin/keys', (c) => {
+  const adminSecret = process.env.ADMIN_SECRET;
+  if (!adminSecret || c.req.header('X-Admin-Secret') !== adminSecret) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
+
+  const db = getStatsDB();
+  const month = new Date().toISOString().slice(0, 7);
+  const rows = db.prepare(
+    `SELECT k.key_prefix, k.email, k.monthly_limit, k.active, k.created_at,
+            COALESCE(u.count, 0) as used
+     FROM api_keys k
+     LEFT JOIN api_usage u ON u.key_hash = k.key_hash AND u.month = ?
+     ORDER BY k.created_at DESC`
+  ).all(month);
+  return c.json({ month, keys: rows });
 });
 
 export { apiKeys };
