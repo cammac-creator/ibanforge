@@ -11,7 +11,7 @@ health.get('/health', (c) => {
 
     return c.json({
       status: 'ok',
-      version: '1.0.0',
+      version: '1.1.0',
       uptime_seconds: Math.floor((Date.now() - startTime) / 1000),
       bic_database_entries: bicEntries,
       ch_clearing_entries: getChClearingCount(),

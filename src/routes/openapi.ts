@@ -6,7 +6,7 @@ const spec = {
   openapi: '3.1.0',
   info: {
     title: 'IBANforge API',
-    version: '1.0.0',
+    version: '1.1.0',
     description:
       'IBAN validation & BIC/SWIFT lookup API with x402 micropayments and MCP integration',
     contact: {
@@ -199,6 +199,81 @@ const spec = {
         },
       },
     },
+    '/v1/ch/clearing/{iid}': {
+      get: {
+        operationId: 'lookupChClearing',
+        summary: 'Swiss BC-Nummer / IID clearing lookup',
+        description:
+          'Returns institution details, payment service participation (SIC, euroSIC, Instant Payments CHF), and QR-IID allocation for a Swiss BC-Nummer (IID). Costs 0.003 USDC via x402.',
+        tags: ['Swiss Clearing'],
+        security: [{ x402Payment: [] }, { apiKey: [] }],
+        parameters: [
+          {
+            name: 'iid',
+            in: 'path',
+            required: true,
+            description: 'Swiss BC-Nummer / IID (1-5 digits, zero-padded to 5)',
+            schema: {
+              type: 'string',
+              pattern: '^\\d{1,5}$',
+              example: '230',
+            },
+          },
+        ],
+        responses: {
+          '200': {
+            description: 'Clearing lookup result',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ChClearingResult' },
+              },
+            },
+          },
+          '402': { description: 'Payment required (x402)' },
+          '400': { description: 'Invalid IID format' },
+        },
+      },
+    },
+    '/v1/keys/generate': {
+      post: {
+        operationId: 'generateApiKey',
+        summary: 'Generate a free API key',
+        description: 'Generates a free API key with 200 requests/month quota. One key per email per day.',
+        tags: ['API Keys'],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['email'],
+                properties: {
+                  email: { type: 'string', format: 'email', description: 'Email address for key registration' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '201': { description: 'API key generated (shown only once)' },
+          '429': { description: 'Rate limited — one key per email per day' },
+          '400': { description: 'Invalid email' },
+        },
+      },
+    },
+    '/v1/keys/usage': {
+      get: {
+        operationId: 'getApiKeyUsage',
+        summary: 'Check API key usage',
+        description: 'Returns current month usage and remaining quota for the provided API key.',
+        tags: ['API Keys'],
+        security: [{ apiKey: [] }],
+        responses: {
+          '200': { description: 'Usage statistics for the current month' },
+          '401': { description: 'Missing or invalid API key' },
+        },
+      },
+    },
     '/v1/demo': {
       get: {
         operationId: 'getDemo',
@@ -319,6 +394,11 @@ const spec = {
         in: 'header',
         name: 'X-Payment',
         description: 'x402 USDC micropayment token',
+      },
+      apiKey: {
+        type: 'http',
+        scheme: 'bearer',
+        description: 'API key (Bearer ifk_xxx) — 200 free requests/month, or custom quota for paid keys',
       },
     },
     schemas: {
@@ -505,6 +585,50 @@ const spec = {
           flags: { type: 'array', items: { type: 'string' }, description: 'List of specific risk flags detected', example: ['fatf_grey_list', 'emi_issuer', 'no_vop'] },
         },
       },
+      ChClearingResult: {
+        type: 'object',
+        required: ['iid', 'found'],
+        properties: {
+          iid: { type: 'string', example: '00230', description: 'Zero-padded 5-digit IID' },
+          found: { type: 'boolean' },
+          institution: {
+            type: 'object',
+            properties: {
+              name: { type: 'string', example: 'UBS Switzerland AG' },
+              type: { type: 'string', enum: ['bank', 'raiffeisen', 'cantonal_bank', 'private_bank', 'foreign_bank', 'securities_dealer', 'finance_company', 'postfinance', 'snb', 'other'] },
+              iid_type: { type: 'string', enum: ['headquarters', 'branch', 'other'] },
+              headquarters_iid: { type: 'string', nullable: true },
+            },
+          },
+          address: {
+            type: 'object',
+            properties: {
+              street: { type: 'string', nullable: true },
+              building_number: { type: 'string', nullable: true },
+              post_code: { type: 'string', nullable: true },
+              town: { type: 'string', nullable: true },
+              country: { type: 'string', example: 'CH' },
+            },
+          },
+          bic: { type: 'string', nullable: true, example: 'UBSWCHZH80A' },
+          payment_services: {
+            type: 'object',
+            properties: {
+              sic: { type: 'boolean', description: 'SIC (Swiss Interbank Clearing) participation' },
+              rtgs_chf: { type: 'boolean', description: 'Real-Time Gross Settlement CHF' },
+              instant_payments_chf: { type: 'boolean', description: 'Instant Payments CHF' },
+              eurosic: { type: 'boolean', description: 'euroSIC participation' },
+              lsv_bdd_chf: { type: 'boolean', description: 'LSV/BDD CHF direct debit' },
+              lsv_bdd_eur: { type: 'boolean', description: 'LSV/BDD EUR direct debit' },
+            },
+          },
+          sic_iid: { type: 'string', nullable: true },
+          qr_iid: { type: 'string', nullable: true, description: 'QR-IID for QR-bill payments' },
+          valid_on: { type: 'string', format: 'date' },
+          cost_usdc: { type: 'number', example: 0.003 },
+          processing_ms: { type: 'number' },
+        },
+      },
       HealthResponse: {
         type: 'object',
         required: ['status', 'version', 'uptime_seconds', 'bic_database_entries'],
@@ -580,6 +704,8 @@ const spec = {
     { name: 'IBAN', description: 'IBAN validation endpoints (paid via x402)' },
     { name: 'BIC', description: 'BIC/SWIFT lookup endpoints (paid via x402)' },
     { name: 'Compliance', description: 'Compliance check endpoint — IBAN validation + sanctions + SEPA + VoP + risk score (paid via x402)' },
+    { name: 'Swiss Clearing', description: 'Swiss BC-Nummer / IID clearing lookup (paid via x402)' },
+    { name: 'API Keys', description: 'API key management — generate free keys and check usage' },
     { name: 'Free', description: 'Free endpoints — no payment required' },
   ],
 };

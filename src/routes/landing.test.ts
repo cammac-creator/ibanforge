@@ -1,14 +1,20 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
+import { Hono } from 'hono';
+import { landing } from './landing.js';
 
-const BASE = process.env.TEST_BASE_URL ?? 'http://localhost:3000';
+const app = new Hono();
+app.route('/', landing);
+
+let res: Response;
+let html: string;
+
+beforeAll(async () => {
+  res = await app.request('/');
+  html = await res.text();
+});
 
 describe('Landing page', () => {
-  let html: string;
-  let res: Response;
-
-  it('returns 200 with HTML content-type', async () => {
-    res = await fetch(BASE + '/');
-    html = await res.text();
+  it('returns 200 with HTML content-type', () => {
     expect(res.status).toBe(200);
     expect(res.headers.get('content-type')).toContain('text/html');
   });
