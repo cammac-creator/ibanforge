@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IBANforge - Expliqué simplement</title>
+<style>
+/* ── Reset & Base ─────────────────────────────────── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{
+  font-family:'Segoe UI',-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
+  background:#09090b;color:#e5e5e5;line-height:1.7;overflow-x:hidden;
+}
+a{color:#f59e0b;text-decoration:none}
+a:hover{text-decoration:underline}
+
+/* ── Layout ───────────────────────────────────────── */
+.container{max-width:780px;margin:0 auto;padding:0 24px}
+section{padding:80px 0}
+section:nth-child(even){background:linear-gradient(180deg,#0f0f13 0%,#09090b 100%)}
+h2{font-size:clamp(1.6rem,4vw,2.2rem);font-weight:800;color:#fafafa;margin-bottom:16px}
+h3{font-size:1.2rem;font-weight:700;color:#fafafa;margin-bottom:8px}
+.subtitle{color:#a1a1aa;font-size:1.05rem;margin-bottom:32px;max-width:560px}
+.amber{color:#f59e0b}
+.green{color:#22c55e}
+.red{color:#ef4444}
+.blue{color:#60a5fa}
+.purple{color:#a855f7}
+.divider{height:1px;background:linear-gradient(90deg,transparent,#f59e0b44,transparent);margin:0 auto;max-width:400px}
+
+/* ── Section 1 : Accroche ─────────────────────────── */
+.hero{text-align:center;padding:100px 0 80px;position:relative}
+.hero h1{font-size:clamp(2rem,5vw,3rem);font-weight:900;color:#fafafa;margin-bottom:24px;letter-spacing:-1px}
+.hero h1 span{color:#f59e0b}
+.hero .tagline{font-size:clamp(1.1rem,2.5vw,1.3rem);color:#a1a1aa;max-width:520px;margin:0 auto 40px;line-height:1.6}
+
+/* Forge illustration */
+.forge-illustration{margin:0 auto 32px;width:180px;height:180px;position:relative}
+.anvil{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);width:120px;height:50px;background:linear-gradient(180deg,#71717a,#52525b);border-radius:6px 6px 2px 2px;clip-path:polygon(0% 30%,10% 0%,90% 0%,100% 30%,95% 100%,5% 100%)}
+.anvil-base{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);width:80px;height:16px;background:#3f3f46;border-radius:2px}
+.hammer{position:absolute;top:12px;left:50%;transform:translateX(-50%) rotate(-25deg);transform-origin:bottom center;animation:hammerSwing 2s ease-in-out infinite}
+.hammer-head{width:48px;height:28px;background:linear-gradient(180deg,#f59e0b,#d97706);border-radius:4px;position:relative}
+.hammer-handle{width:8px;height:70px;background:linear-gradient(180deg,#92400e,#78350f);margin:0 auto;border-radius:2px}
+.sparks{position:absolute;bottom:55px;left:50%;transform:translateX(-50%)}
+.spark{position:absolute;width:4px;height:4px;background:#f59e0b;border-radius:50%;animation:sparkle 2s ease-in-out infinite}
+.spark:nth-child(1){left:-20px;top:-10px;animation-delay:0.8s}
+.spark:nth-child(2){left:15px;top:-18px;animation-delay:1s}
+.spark:nth-child(3){left:-8px;top:-22px;animation-delay:0.9s}
+.spark:nth-child(4){left:22px;top:-6px;animation-delay:1.1s}
+
+@keyframes hammerSwing{
+  0%,100%{transform:translateX(-50%) rotate(-25deg)}
+  40%,60%{transform:translateX(-50%) rotate(5deg)}
+}
+@keyframes sparkle{
+  0%,70%,100%{opacity:0;transform:scale(0)}
+  45%,55%{opacity:1;transform:scale(1.5)}
+}
+
+/* ── Section 2 : C'est quoi un IBAN ───────────────── */
+.iban-breakdown{
+  background:#1a1a22;border-radius:16px;padding:32px;margin:24px 0;
+  border:1px solid #27272a;overflow-x:auto;
+}
+.iban-display{
+  font-family:'SF Mono',Monaco,'Cascadia Code',monospace;
+  font-size:clamp(1rem,3vw,1.5rem);font-weight:700;
+  text-align:center;margin-bottom:28px;letter-spacing:2px;
+  display:flex;flex-wrap:wrap;justify-content:center;gap:4px;
+}
+.iban-part{padding:8px 10px;border-radius:8px;position:relative;cursor:default;transition:transform .2s}
+.iban-part:hover{transform:translateY(-3px)}
+.iban-part.pays{background:#3b82f620;color:#60a5fa;border:1px solid #3b82f640}
+.iban-part.controle{background:#a855f720;color:#a855f7;border:1px solid #a855f740}
+.iban-part.banque{background:#f59e0b20;color:#f59e0b;border:1px solid #f59e0b40}
+.iban-part.compte{background:#22c55e20;color:#22c55e;border:1px solid #22c55e40}
+
+.legend{display:flex;flex-wrap:wrap;gap:16px;justify-content:center}
+.legend-item{display:flex;align-items:center;gap:8px;font-size:0.9rem}
+.legend-dot{width:12px;height:12px;border-radius:4px}
+.legend-dot.c-blue{background:#3b82f6}
+.legend-dot.c-purple{background:#a855f7}
+.legend-dot.c-amber{background:#f59e0b}
+.legend-dot.c-green{background:#22c55e}
+
+.iban-explain{margin-top:24px;display:grid;gap:12px}
+.iban-explain-item{display:flex;gap:12px;align-items:start;padding:12px 16px;border-radius:10px;background:#09090b;border:1px solid #1f1f28}
+.iban-explain-item .icon-box{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0}
+.iban-explain-item p{font-size:0.95rem;color:#a1a1aa}
+.iban-explain-item p strong{color:#e5e5e5}
+
+/* ── Section 3 : Les problemes ────────────────────── */
+.problems-grid{display:grid;gap:20px;margin-top:32px}
+@media(min-width:640px){.problems-grid{grid-template-columns:repeat(3,1fr)}}
+.problem-card{
+  background:#1a1a22;border:1px solid #27272a;border-radius:14px;padding:28px 20px;
+  text-align:center;transition:transform .2s,border-color .2s;
+}
+.problem-card:hover{transform:translateY(-4px);border-color:#ef444444}
+.problem-icon{font-size:2.8rem;margin-bottom:16px;display:block}
+.problem-card h3{font-size:1.05rem;margin-bottom:8px}
+.problem-card p{font-size:0.9rem;color:#a1a1aa;line-height:1.5}
+
+/* ── Section 4 : Transformation ───────────────────── */
+.transform-flow{
+  display:flex;flex-direction:column;align-items:center;gap:0;margin:32px 0;
+}
+@media(min-width:640px){
+  .transform-flow{flex-direction:row;gap:0;justify-content:center}
+}
+.transform-box{
+  background:#1a1a22;border:1px solid #27272a;border-radius:14px;
+  padding:24px;min-width:220px;max-width:280px;text-align:center;flex-shrink:0;
+}
+.transform-box.input-box{border-color:#ef444440}
+.transform-box.output-box{border-color:#22c55e40}
+.transform-arrow{
+  font-size:2rem;color:#f59e0b;padding:12px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+}
+@media(max-width:639px){.transform-arrow{transform:rotate(90deg)}}
+.forge-badge{
+  background:linear-gradient(135deg,#f59e0b20,#f59e0b08);
+  border:2px solid #f59e0b60;border-radius:50%;width:72px;height:72px;
+  display:flex;align-items:center;justify-content:center;font-size:2rem;
+  flex-shrink:0;
+}
+.mini-code{
+  font-family:'SF Mono',Monaco,monospace;font-size:0.8rem;
+  background:#09090b;border-radius:8px;padding:12px;text-align:left;
+  margin-top:12px;line-height:1.6;color:#a1a1aa;
+}
+.mini-code .key{color:#60a5fa}
+.mini-code .val{color:#22c55e}
+.mini-code .val-red{color:#ef4444}
+
+/* ── Section 5 : Les 5 outils ─────────────────────── */
+.tools-list{display:grid;gap:24px;margin-top:32px}
+.tool-item{
+  display:flex;gap:20px;align-items:start;
+  background:#1a1a22;border:1px solid #27272a;border-radius:14px;
+  padding:28px 24px;transition:transform .2s,border-color .2s;
+}
+.tool-item:hover{transform:translateX(6px);border-color:#f59e0b40}
+.tool-number{
+  width:48px;height:48px;border-radius:12px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:1.1rem;font-weight:800;flex-shrink:0;
+}
+.tool-number.t1{background:#3b82f620;color:#60a5fa;border:1px solid #3b82f640}
+.tool-number.t2{background:#f59e0b20;color:#f59e0b;border:1px solid #f59e0b40}
+.tool-number.t3{background:#22c55e20;color:#22c55e;border:1px solid #22c55e40}
+.tool-number.t4{background:#ef444420;color:#ef4444;border:1px solid #ef444440}
+.tool-number.t5{background:#a855f720;color:#a855f7;border:1px solid #a855f740}
+.tool-body h3{margin-bottom:6px}
+.tool-body p{font-size:0.95rem;color:#a1a1aa;line-height:1.6}
+.tool-body .tool-example{
+  margin-top:12px;padding:10px 14px;background:#09090b;border-radius:8px;
+  font-size:0.85rem;color:#71717a;border-left:3px solid;
+}
+.tool-body .tool-example.ex1{border-color:#3b82f6}
+.tool-body .tool-example.ex2{border-color:#f59e0b}
+.tool-body .tool-example.ex3{border-color:#22c55e}
+.tool-body .tool-example.ex4{border-color:#ef4444}
+.tool-body .tool-example.ex5{border-color:#a855f7}
+
+/* ── Section 6 : Concurrence ──────────────────────── */
+.compare-table-wrap{overflow-x:auto;margin:32px 0;border-radius:14px;border:1px solid #27272a}
+.compare-table{width:100%;border-collapse:collapse;min-width:500px}
+.compare-table th,.compare-table td{padding:14px 16px;text-align:center;font-size:0.9rem}
+.compare-table thead th{
+  background:#1a1a22;color:#a1a1aa;font-weight:600;font-size:0.8rem;
+  text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #27272a;
+}
+.compare-table thead th:first-child{text-align:left}
+.compare-table tbody td{border-bottom:1px solid #1f1f28}
+.compare-table tbody td:first-child{text-align:left;font-weight:600;color:#fafafa}
+.compare-table tbody tr:last-child td{border-bottom:none}
+.compare-table .highlight-col{background:#f59e0b08}
+.compare-table thead .highlight-col{background:#f59e0b15;color:#f59e0b}
+.check{color:#22c55e;font-weight:700;font-size:1.1rem}
+.cross{color:#ef4444;font-weight:700;font-size:1.1rem}
+.meh{color:#71717a;font-size:0.85rem}
+.price-tag{font-weight:700}
+.price-tag.cheap{color:#22c55e}
+.price-tag.expensive{color:#ef4444}
+
+/* ── Section 7 : Chiffres ─────────────────────────── */
+.stats-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:20px;margin-top:32px}
+@media(min-width:640px){.stats-grid{grid-template-columns:repeat(4,1fr)}}
+.stat-card{
+  background:#1a1a22;border:1px solid #27272a;border-radius:14px;
+  padding:24px 16px;text-align:center;
+}
+.stat-number{font-size:clamp(1.5rem,4vw,2rem);font-weight:900;color:#f59e0b;margin-bottom:4px}
+.stat-label{font-size:0.85rem;color:#a1a1aa}
+
+/* ── Section 8 : Footer ──────────────────────────── */
+.footer{text-align:center;padding:48px 0;border-top:1px solid #1f1f28}
+.footer .swiss{font-size:1.1rem;margin-bottom:8px}
+.footer .links{font-size:0.9rem;color:#71717a}
+.footer .links a{margin:0 12px}
+
+/* ── Animations au scroll ─────────────────────────── */
+.fade-up{opacity:0;transform:translateY(30px);transition:opacity .6s ease,transform .6s ease}
+.fade-up.visible{opacity:1;transform:translateY(0)}
+</style>
+</head>
+<body>
+
+<!-- ╔══════════════════════════════════════════════════╗ -->
+<!-- ║  Section 1 — Accroche                           ║ -->
+<!-- ╚══════════════════════════════════════════════════╝ -->
+<section class="hero">
+<div class="container">
+  <div class="forge-illustration">
+    <div class="sparks">
+      <div class="spark"></div><div class="spark"></div>
+      <div class="spark"></div><div class="spark"></div>
+    </div>
+    <div class="hammer">
+      <div class="hammer-head"></div>
+      <div class="hammer-handle"></div>
+    </div>
+    <div class="anvil"></div>
+    <div class="anvil-base"></div>
+  </div>
+
+  <h1>IBAN<span>forge</span></h1>
+  <p class="tagline">
+    Tu sais, les longs numéros sur ton relevé bancaire ?<br>
+    Moi, j'ai construit un outil pour les vérifier, les décoder,<br>
+    et protéger les gens contre les erreurs et les arnaques.
+  </p>
+  <div class="divider"></div>
+</div>
+</section>
+
+<!-- ╔══════════════════════════════════════════════════╗ -->
+<!-- ║  Section 2 — C'est quoi un IBAN ?               ║ -->
+<!-- ╚══════════════════════════════════════════════════╝ -->
+<section>
+<div class="container">
+  <h2 class="fade-up">D'abord, c'est quoi un <span class="amber">IBAN</span> ?</h2>
+  <p class="subtitle fade-up">IBAN signifie <em>International Bank Account Number</em>. C'est un format universel pour identifier un compte bancaire dans le monde entier. Décortiquons-en un vrai :</p>
+
+  <div class="iban-breakdown fade-up">
+    <div class="iban-display">
+      <span class="iban-part pays">CH</span>
+      <span class="iban-part controle">93</span>
+      <span class="iban-part banque">0076</span>
+      <span class="iban-part compte">2011 6238 5295 7</span>
+    </div>
+    <div class="legend">
+      <div class="legend-item"><div class="legend-dot c-blue"></div>Pays</div>
+      <div class="legend-item"><div class="legend-dot c-purple"></div>Controle</div>
+      <div class="legend-item"><div class="legend-dot c-amber"></div>Banque</div>
+      <div class="legend-item"><div class="legend-dot c-green"></div>Compte</div>
+    </div>
+
+    <div class="iban-explain">
+      <div class="iban-explain-item">
+        <div class="icon-box" style="background:#3b82f620;color:#60a5fa">CH</div>
+        <div><p><strong>Le pays</strong> — Les deux premières lettres indiquent le pays. Ici, <span class="blue">CH</span> = Suisse. FR = France, DE = Allemagne, etc.</p></div>
+      </div>
+      <div class="iban-explain-item">
+        <div class="icon-box" style="background:#a855f720;color:#a855f7">93</div>
+        <div><p><strong>Les chiffres de controle</strong> — Un mini calcul mathématique qui permet de détecter les fautes de frappe. Si tu changes un seul chiffre, le controle échoue.</p></div>
+      </div>
+      <div class="iban-explain-item">
+        <div class="icon-box" style="background:#f59e0b20;color:#f59e0b">0076</div>
+        <div><p><strong>Le code banque</strong> — Identifie ta banque. Ici, <span class="amber">0076</span> = Banque Cantonale de Zurich. Chaque banque a son propre code.</p></div>
+      </div>
+      <div class="iban-explain-item">
+        <div class="icon-box" style="background:#22c55e20;color:#22c55e">N&deg;</div>
+        <div><p><strong>Le numéro de compte</strong> — Ton numéro de compte personnel au sein de la banque. La partie verte est unique pour chaque client.</p></div>
+      </div>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ╔══════════════════════════════════════════════════╗ -->
+<!-- ║  Section 3 — Le problème                        ║ -->
+<!-- ╚══════════════════════════════════════════════════╝ -->
+<section>
+<div class="container">
+  <h2 class="fade-up">Pourquoi c'est un <span class="red">problème</span> ?</h2>
+  <p class="subtitle fade-up">Chaque jour, des millions de virements passent par ces numéros. Et ça se passe mal plus souvent qu'on ne le croit.</p>
+
+  <div class="problems-grid">
+    <div class="problem-card fade-up">
+      <span class="problem-icon">😱</span>
+      <h3>Erreurs de frappe</h3>
+      <p>Un seul chiffre faux et ton virement part dans le vide. L'argent peut mettre des semaines à revenir — ou ne jamais revenir.</p>
+    </div>
+    <div class="problem-card fade-up">
+      <span class="problem-icon">🎭</span>
+      <h3>Faux IBAN (vIBAN)</h3>
+      <p>Des escrocs utilisent des "IBAN virtuels" qui ressemblent à ceux d'une grande banque, mais qui cachent un intermédiaire douteux.</p>
+    </div>
+    <div class="problem-card fade-up">
+      <span class="problem-icon">🌍</span>
+      <h3>84 pays, 84 formats</h3>
+      <p>Un IBAN suisse fait 21 caractères, un maltais en fait 31. Chaque pays a ses propres règles. Le casse-tête est mondial.</p>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ╔══════════════════════════════════════════════════╗ -->
+<!-- ║  Section 4 — La transformation                  ║ -->
+<!-- ╚══════════════════════════════════════════════════╝ -->
+<section>
+<div class="container">
+  <h2 class="fade-up">Et c'est là qu'<span class="amber">IBANforge</span> intervient</h2>
+  <p class="subtitle fade-up">Tu lui donnes un IBAN brut, et en moins d'une seconde, il te dit tout ce qu'il y a à savoir.</p>
+
+  <div class="transform-flow fade-up">
+    <div class="transform-box input-box">
+      <p style="font-size:0.8rem;color:#ef4444;margin-bottom:8px;text-transform:uppercase;font-weight:600;letter-spacing:1px">Entrée</p>
+      <p style="font-family:monospace;font-size:1rem;color:#fafafa;word-break:break-all">FR7630006000011234567890189</p>
+      <p style="font-size:0.85rem;color:#71717a;margin-top:8px">Juste un numéro...<br>Est-il valide ? De quelle banque ? Quel pays ?</p>
+    </div>
+
+    <div class="transform-arrow">
+      <div class="forge-badge">🔨</div>
+    </div>
+
+    <div class="transform-box output-box">
+      <p style="font-size:0.8rem;color:#22c55e;margin-bottom:8px;text-transform:uppercase;font-weight:600;letter-spacing:1px">Résultat</p>
+      <div class="mini-code">
+        <span class="key">Valide :</span> <span class="val">Oui ✓</span><br>
+        <span class="key">Pays :</span> <span class="val">France 🇫🇷</span><br>
+        <span class="key">Banque :</span> <span class="val">BNP Paribas</span><br>
+        <span class="key">Code BIC :</span> <span class="val">BNPAFRPP</span><br>
+        <span class="key">Zone SEPA :</span> <span class="val">Oui</span><br>
+        <span class="key">Type :</span> <span class="val">Banque traditionnelle</span><br>
+        <span class="key">Risque :</span> <span class="val">Faible</span>
+      </div>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ╔══════════════════════════════════════════════════╗ -->
+<!-- ║  Section 5 — Les 5 outils                       ║ -->
+<!-- ╚══════════════════════════════════════════════════╝ -->
+<section>
+<div class="container">
+  <h2 class="fade-up">Les 5 outils de la <span class="amber">forge</span></h2>
+  <p class="subtitle fade-up">IBANforge n'est pas un seul outil, mais une boîte à outils complète. Voici ce que chacun fait, en langage simple.</p>
+
+  <div class="tools-list">
+    <div class="tool-item fade-up">
+      <div class="tool-number t1">🔍</div>
+      <div class="tool-body">
+        <h3>Vérificateur d'IBAN</h3>
+        <p>Tu donnes un IBAN, et l'outil vérifie s'il est correct, identifie la banque, le pays, et te dit si c'est un "vrai" compte bancaire ou un intermédiaire potentiellement risqué.</p>
+        <div class="tool-example ex1">
+          <strong>Exemple :</strong> "Est-ce que DE89 3704 0044 0532 0130 00 est un IBAN valide ?"<br>
+          → "Oui, c'est un compte chez Commerzbank en Allemagne."
+        </div>
+      </div>
+    </div>
+
+    <div class="tool-item fade-up">
+      <div class="tool-number t2">🏦</div>
+      <div class="tool-body">
+        <h3>Recherche BIC/SWIFT</h3>
+        <p>Le code BIC (ou SWIFT), c'est comme le "numéro de téléphone" d'une banque dans le réseau international. Tu tapes un code, et IBANforge te dit quelle banque c'est, dans quelle ville, dans quel pays.</p>
+        <div class="tool-example ex2">
+          <strong>Exemple :</strong> "C'est quoi UBSWCHZH80A ?"<br>
+          → "C'est UBS, à Zurich, en Suisse."
+        </div>
+      </div>
+    </div>
+
+    <div class="tool-item fade-up">
+      <div class="tool-number t3">📦</div>
+      <div class="tool-body">
+        <h3>Vérification par lots</h3>
+        <p>Imagine une entreprise qui doit payer 100 fournisseurs d'un coup. Au lieu de vérifier chaque IBAN un par un, elle envoie toute la liste et récupère 100 résultats en une seule fois. Rapide et moins cher.</p>
+        <div class="tool-example ex3">
+          <strong>Exemple :</strong> "Voici mes 100 IBANs de fournisseurs, vérifie-les tous."<br>
+          → "97 valides, 3 avec des erreurs (lignes 12, 45 et 89)."
+        </div>
+      </div>
+    </div>
+
+    <div class="tool-item fade-up">
+      <div class="tool-number t4">🇨🇭</div>
+      <div class="tool-body">
+        <h3>Clearing suisse</h3>
+        <p>Un outil spécialisé pour la Suisse. Il connaît les 1 190 banques et succursales suisses en détail : leur numéro de clearing (BC-Nummer), si elles supportent les paiements instantanés, les QR-factures, etc.</p>
+        <div class="tool-example ex4">
+          <strong>Exemple :</strong> "Dis-moi tout sur le clearing 76."<br>
+          → "Banque Cantonale de Zurich, siège à Zurich, SIC : oui, euroSIC : oui, QR-IID : 3076."
+        </div>
+      </div>
+    </div>
+
+    <div class="tool-item fade-up">
+      <div class="tool-number t5">🤖</div>
+      <div class="tool-body">
+        <h3>Agent IA</h3>
+        <p>Les intelligences artificielles (comme ChatGPT ou Claude) peuvent utiliser IBANforge directement, sans intervention humaine. Si un robot doit vérifier un virement, il peut demander à IBANforge comme un collègue demanderait à un expert.</p>
+        <div class="tool-example ex5">
+          <strong>Exemple :</strong> Un agent IA qui traite des factures peut demander : "Vérifie cet IBAN avant de déclencher le paiement" — et IBANforge lui répond instantanément.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ╔══════════════════════════════════════════════════╗ -->
+<!-- ║  Section 6 — Face à la concurrence              ║ -->
+<!-- ╚══════════════════════════════════════════════════╝ -->
+<section>
+<div class="container">
+  <h2 class="fade-up">Et les autres, ils font quoi ?</h2>
+  <p class="subtitle fade-up">Il existe d'autres services qui vérifient les IBAN. Voici comment IBANforge se compare.</p>
+
+  <div class="compare-table-wrap fade-up">
+    <table class="compare-table">
+      <thead>
+        <tr>
+          <th></th>
+          <th class="highlight-col">IBANforge</th>
+          <th>IBAN.com</th>
+          <th>IBANAPI</th>
+          <th>ApyHub</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Prix par vérification</td>
+          <td class="highlight-col"><span class="price-tag cheap">$0.005</span></td>
+          <td><span class="price-tag expensive">$0.047 – 0.27</span></td>
+          <td><span class="price-tag">$0.01</span></td>
+          <td><span class="price-tag">$0.02</span></td>
+        </tr>
+        <tr>
+          <td>Banques référencées</td>
+          <td class="highlight-col"><strong class="amber">121 000+</strong></td>
+          <td>~50 000</td>
+          <td>~30 000</td>
+          <td>Inconnu</td>
+        </tr>
+        <tr>
+          <td>Détection des faux IBAN</td>
+          <td class="highlight-col"><span class="check">✓</span> 85 émetteurs</td>
+          <td><span class="cross">✗</span></td>
+          <td><span class="cross">✗</span></td>
+          <td><span class="cross">✗</span></td>
+        </tr>
+        <tr>
+          <td>Score de risque</td>
+          <td class="highlight-col"><span class="check">✓</span> 0–100</td>
+          <td><span class="cross">✗</span></td>
+          <td><span class="cross">✗</span></td>
+          <td><span class="cross">✗</span></td>
+        </tr>
+        <tr>
+          <td>Données suisses (clearing)</td>
+          <td class="highlight-col"><span class="check">✓</span> 1 190 entrées</td>
+          <td><span class="cross">✗</span></td>
+          <td><span class="cross">✗</span></td>
+          <td><span class="cross">✗</span></td>
+        </tr>
+        <tr>
+          <td>Utilisable par une IA</td>
+          <td class="highlight-col"><span class="check">✓</span> MCP natif</td>
+          <td><span class="cross">✗</span></td>
+          <td><span class="cross">✗</span></td>
+          <td><span class="cross">✗</span></td>
+        </tr>
+        <tr>
+          <td>Open source</td>
+          <td class="highlight-col"><span class="check">✓</span></td>
+          <td><span class="cross">✗</span></td>
+          <td><span class="cross">✗</span></td>
+          <td><span class="cross">✗</span></td>
+        </tr>
+        <tr>
+          <td>Coût annuel minimum</td>
+          <td class="highlight-col"><span class="price-tag cheap">~$0*</span></td>
+          <td><span class="price-tag expensive">$588/an</span></td>
+          <td><span class="price-tag expensive">$108/an</span></td>
+          <td><span class="price-tag expensive">$240/an</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p style="font-size:0.8rem;color:#52525b;text-align:center">* Gratuit pendant le lancement. Ensuite, paiement à l'usage uniquement — pas d'abonnement.</p>
+</div>
+</section>
+
+<!-- ╔══════════════════════════════════════════════════╗ -->
+<!-- ║  Section 7 — Les chiffres                       ║ -->
+<!-- ╚══════════════════════════════════════════════════╝ -->
+<section>
+<div class="container">
+  <h2 class="fade-up" style="text-align:center">En quelques chiffres</h2>
+  <div class="stats-grid fade-up">
+    <div class="stat-card">
+      <div class="stat-number">121K+</div>
+      <div class="stat-label">banques dans la base</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number">84</div>
+      <div class="stat-label">pays couverts</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number">&lt;30ms</div>
+      <div class="stat-label">temps de réponse</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-number">$6</div>
+      <div class="stat-label">par mois d'infrastructure</div>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ╔══════════════════════════════════════════════════╗ -->
+<!-- ║  Section 8 — Footer                             ║ -->
+<!-- ╚══════════════════════════════════════════════════╝ -->
+<footer class="footer">
+<div class="container">
+  <p class="swiss">Fait en Suisse 🇨🇭 avec du code et du café</p>
+  <p class="links">
+    <a href="https://ibanforge.com">ibanforge.com</a>
+    <a href="https://github.com/cammac-creator/ibanforge">GitHub</a>
+  </p>
+</div>
+</footer>
+
+<!-- ── Scroll animations ──────────────────────────── -->
+<script>
+const obs = new IntersectionObserver((entries) => {
+  entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
+}, { threshold: 0.15 });
+document.querySelectorAll('.fade-up').forEach(el => obs.observe(el));
+</script>
+</body>
+</html>
