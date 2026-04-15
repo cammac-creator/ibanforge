@@ -28,6 +28,37 @@ CREATE INDEX IF NOT EXISTS idx_bic11   ON bic_entries(bic11);
 CREATE INDEX IF NOT EXISTS idx_lei     ON bic_entries(lei);
 CREATE INDEX IF NOT EXISTS idx_country ON bic_entries(country_code);
 
+-- Swiss clearing database (ch_clearing table in bic.sqlite — read-only at runtime):
+
+CREATE TABLE IF NOT EXISTS ch_clearing (
+  iid              TEXT PRIMARY KEY,    -- 5-digit zero-padded (e.g. '00230', '30000', '81998')
+  valid_on         TEXT,                -- YYYY-MM-DD
+  concatenation    INTEGER DEFAULT 0,   -- 1 if merged into another IID
+  redirect_iid     TEXT,                -- target IID when concatenation=1
+  sic_iid          TEXT,                -- 6-digit SIC identifier
+  headquarters_iid TEXT,                -- IID of the headquarters
+  iid_type         INTEGER,            -- 1=HQ, 2=branch, 4=other
+  qr_iid           TEXT,                -- QR-IID allocation (for QR-bill)
+  name             TEXT NOT NULL,       -- Bank/institution name
+  street           TEXT,
+  building_number  TEXT,
+  post_code        TEXT,
+  town             TEXT,
+  country          TEXT DEFAULT 'CH',   -- ISO alpha-2
+  bic              TEXT,                -- BIC/SWIFT (11 chars)
+  sic_participation       INTEGER DEFAULT 0,
+  rtgs_chf               INTEGER DEFAULT 0,
+  ip_chf                 INTEGER DEFAULT 0,  -- Instant Payments CHF
+  eurosic_participation  INTEGER DEFAULT 0,
+  lsv_bdd_chf           INTEGER DEFAULT 0,
+  lsv_bdd_eur           INTEGER DEFAULT 0,
+  updated_at       TEXT DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_ch_clearing_bic ON ch_clearing(bic);
+CREATE INDEX IF NOT EXISTS idx_ch_clearing_hq ON ch_clearing(headquarters_iid);
+CREATE INDEX IF NOT EXISTS idx_ch_clearing_name ON ch_clearing(name);
+
 -- Stats database (stats.sqlite — read-write):
 
 CREATE TABLE IF NOT EXISTS operations (

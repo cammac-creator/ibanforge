@@ -8,6 +8,7 @@ import { ibanValidate } from './routes/iban-validate.js';
 import { ibanBatch } from './routes/iban-batch.js';
 import { bicLookup } from './routes/bic-lookup.js';
 import { ibanCompliance } from './routes/iban-compliance.js';
+import { chClearing } from './routes/ch-clearing.js';
 import { health } from './routes/health.js';
 import { stats } from './routes/stats.js';
 import { demo } from './routes/demo.js';
@@ -96,6 +97,13 @@ app.get('/v1/bic/:code', async (c, next) => {
   }
   await next();
 });
+app.get('/v1/ch/clearing/:iid', async (c, next) => {
+  const iid = c.req.param('iid');
+  if (!/^\d{1,5}$/.test(iid)) {
+    return c.json({ error: 'invalid_iid_format', message: 'IID must be a 1-5 digit number.' }, 400);
+  }
+  await next();
+});
 
 // Key management routes (free, before x402)
 app.route('/', apiKeys);
@@ -111,6 +119,7 @@ app.route('/', ibanValidate);
 app.route('/', ibanBatch);
 app.route('/', bicLookup);
 app.route('/', ibanCompliance);
+app.route('/', chClearing);
 
 // Free routes
 app.route('/', health);

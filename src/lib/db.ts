@@ -5,6 +5,7 @@ import { createRequire } from 'node:module';
 import { resetStatements } from './bic-lookup.js';
 import { resetStatsStatements } from './stats.js';
 import { closeComplianceDB } from './compliance-db.js';
+import { resetChClearingStatements } from './ch-clearing.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
@@ -127,6 +128,7 @@ export function closeAll(): void {
     bicDB.close();
     bicDB = null;
     resetStatements();
+    resetChClearingStatements();
   }
   if (statsDB) {
     statsDB.close();

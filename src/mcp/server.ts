@@ -7,6 +7,7 @@ import { enrichResult } from '../lib/enrich.js';
 import { lookup } from '../lib/bic-lookup.js';
 import { validateBIC } from '../lib/bic-validator.js';
 import { buildComplianceResult } from '../lib/compliance.js';
+import { lookupClearingByBankCode, normalizeIid, getChClearingCount } from '../lib/ch-clearing.js';
 
 const server = new McpServer({
   name: 'ibanforge',
@@ -246,10 +247,113 @@ Cost: $0.02 USDC per call via x402 micropayment on Base L2.`,
   },
 );
 
+server.registerTool(
+  'lookup_ch_clearing',
+  {
+    title: 'Lookup Swiss Bank Clearing Number',
+    description: `Look up a Swiss BC-Nummer (Bank Clearing Number / IID) and return institution details, payment infrastructure participation (SIC, euroSIC, Instant Payments), and QR-bill data.
+
+When to use: resolving the bank behind a Swiss IBAN, checking SIC/euroSIC participation, verifying QR-bill IID allocation, or identifying PostFinance/cantonal bank accounts.
+When NOT to use: for non-Swiss IBANs, use validate_iban instead.
+
+Behavior: this tool is read-only with no side effects. It queries a local SQLite database of 1190+ Swiss bank clearing entries sourced from SIX BankMaster. Follows concatenation redirects (merged IIDs). Response time is under 10ms. Returns a single JSON object.
+
+Input: IID as string, 1-5 digits (e.g. '230', '00230', '30000', '80000').
+Returns: institution name and type, address, BIC, payment service participation (SIC, RTGS, Instant Payments CHF, euroSIC, LSV+/BDD), QR-IID allocation, and headquarters IID.
+
+Institution types detected: bank, cantonal_bank, postfinance, raiffeisen, central_bank, foreign_participant.
+
+Cost: $0.003 USDC per call via x402 micropayment on Base L2.`,
+    inputSchema: {
+      iid: z
+        .string()
+        .describe(
+          "Swiss BC-Nummer / IID. 1-5 digits, e.g. '230' or '00230'. Zero-padded internally to 5 digits. Examples: '230' (UBS), '30000' (PostFinance), '700' (Zürcher Kantonalbank), '80000' (Raiffeisen).",
+        ),
+    },
+    annotations: {
+      title: 'Lookup Swiss Bank Clearing Number',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+  },
+  async ({ iid }) => {
+    // Validate format
+    if (!/^\d{1,5}$/.test(iid)) {
+      return {
+        content: [
+          {
+            type: 'text' as const,
+            text: JSON.stringify(
+              { error: 'invalid_iid_format', message: 'IID must be a 1-5 digit number.' },
+              null,
+              2,
+            ),
+          },
+        ],
+      };
+    }
+
+    const normalizedIid = normalizeIid(iid);
+    const entry = lookupClearingByBankCode(normalizedIid);
+
+    if (!entry) {
+      return {
+        content: [
+          {
+            type: 'text' as const,
+            text: JSON.stringify(
+              {
+                iid: normalizedIid,
+                found: false,
+                error: 'clearing_not_found',
+                message: `IID ${normalizedIid} not found in Swiss BankMaster database.`,
+                cost_usdc: 0.003,
+              },
+              null,
+              2,
+            ),
+          },
+        ],
+      };
+    }
+
+    const result: Record<string, unknown> = {
+      iid: entry.iid,
+      found: true,
+      institution: {
+        name: entry.name,
+        type: entry.institution_type,
+        iid_type: entry.iid_type,
+        headquarters_iid: entry.headquarters_iid,
+      },
+      address: entry.address,
+      bic: entry.bic,
+      payment_services: entry.payment_services,
+      sic_iid: entry.sic_iid,
+      qr_iid: entry.qr_iid,
+      valid_on: entry.valid_on,
+      cost_usdc: 0.003,
+    };
+
+    if (entry.redirected_from) {
+      result.redirected_from = entry.redirected_from;
+      result.note = `IID ${entry.redirected_from} has been merged into IID ${entry.iid}.`;
+    }
+
+    return {
+      content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
+    };
+  },
+);
+
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error('IBANforge MCP Server running on stdio');
+  console.error(`Swiss clearing entries: ${getChClearingCount()}`);
 }
 
 main().catch(console.error);

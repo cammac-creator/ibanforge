@@ -4,7 +4,7 @@
 
 // --- Operation tracking ---
 
-export type OperationType = 'iban_validate' | 'iban_batch' | 'bic_lookup' | 'iban_compliance';
+export type OperationType = 'iban_validate' | 'iban_batch' | 'bic_lookup' | 'iban_compliance' | 'ch_clearing_lookup';
 
 // --- IBAN Validation ---
 
@@ -42,6 +42,7 @@ export interface IBANValidationResult {
     sepa_reachable: boolean;
     vop_coverage: boolean;
   };
+  clearing?: ChClearingSummary;
   formatted?: string;
   error?: 'invalid_format' | 'unsupported_country' | 'wrong_length' | 'checksum_failed';
   error_detail?: string;
@@ -175,4 +176,93 @@ export interface ComplianceResult {
   risk_score: number;
   risk_level: RiskLevel;
   flags: string[];
+}
+
+// --- Swiss Clearing (BC-Nummer) ---
+
+export type ChInstitutionType =
+  | 'bank'
+  | 'cantonal_bank'
+  | 'postfinance'
+  | 'raiffeisen'
+  | 'central_bank'
+  | 'foreign_participant';
+
+export type ChIidType = 'headquarters' | 'branch' | 'other';
+
+export interface ChClearingEntry {
+  iid: string;
+  name: string;
+  institution_type: ChInstitutionType;
+  iid_type: ChIidType;
+  headquarters_iid: string;
+  address: {
+    street: string | null;
+    building_number: string | null;
+    post_code: string | null;
+    town: string | null;
+    country: string;
+  };
+  bic: string | null;
+  payment_services: {
+    sic: boolean;
+    rtgs_chf: boolean;
+    instant_payments_chf: boolean;
+    eurosic: boolean;
+    lsv_bdd_chf: boolean;
+    lsv_bdd_eur: boolean;
+  };
+  sic_iid: string | null;
+  qr_iid: string | null;
+  valid_on: string;
+  concatenation: boolean;
+  redirect_iid: string | null;
+}
+
+export interface ChClearingLookupResult {
+  iid: string;
+  found: boolean;
+  redirected_from?: string;
+  institution?: {
+    name: string;
+    type: ChInstitutionType;
+    iid_type: ChIidType;
+    headquarters_iid: string;
+  };
+  address?: {
+    street: string | null;
+    building_number: string | null;
+    post_code: string | null;
+    town: string | null;
+    country: string;
+  };
+  bic?: string | null;
+  payment_services?: {
+    sic: boolean;
+    rtgs_chf: boolean;
+    instant_payments_chf: boolean;
+    eurosic: boolean;
+    lsv_bdd_chf: boolean;
+    lsv_bdd_eur: boolean;
+  };
+  sic_iid?: string | null;
+  qr_iid?: string | null;
+  valid_on?: string;
+  note?: string;
+  error?: string;
+  message?: string;
+  cost_usdc: number;
+  processing_ms?: number;
+}
+
+// Compact clearing info for IBAN validate enrichment
+export interface ChClearingSummary {
+  iid: string;
+  name: string;
+  type: ChInstitutionType;
+  town: string | null;
+  sic: boolean;
+  instant_payments_chf: boolean;
+  eurosic: boolean;
+  qr_iid: string | null;
 }

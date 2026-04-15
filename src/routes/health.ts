@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { getEntryCount, getLastUpdated } from '../lib/bic-lookup.js';
+import { getChClearingCount } from '../lib/ch-clearing.js';
 
 const health = new Hono();
 const startTime = Date.now();
@@ -13,6 +14,7 @@ health.get('/health', (c) => {
       version: '1.0.0',
       uptime_seconds: Math.floor((Date.now() - startTime) / 1000),
       bic_database_entries: bicEntries,
+      ch_clearing_entries: getChClearingCount(),
       bic_data_last_updated: getLastUpdated(),
     });
   } catch {
