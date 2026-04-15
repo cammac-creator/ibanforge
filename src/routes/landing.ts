@@ -163,6 +163,20 @@ landing.get('/', (c) => {
     .nav-links a{font-size:13px;color:#71717a;text-decoration:none;transition:color .15s}.nav-links a:hover{color:#e5e5e5}
     .nav-links a.nav-active{color:#f59e0b}
     .nav-site{font-size:12px;color:#52525b;padding:4px 10px;border:1px solid #27272a;border-radius:6px;text-decoration:none;transition:all .15s}.nav-site:hover{color:#f59e0b;border-color:#f59e0b33}
+    .keygen{max-width:480px;margin:24px auto 0;display:none}
+    .keygen.show{display:block}
+    .keygen-form{display:flex;gap:8px}
+    .keygen-form input{flex:1;background:#1a1a1a;border:1px solid #27272a;border-radius:8px;padding:12px 16px;color:#fafafa;font-size:14px;outline:none;transition:border-color .15s}
+    .keygen-form input:focus{border-color:#f59e0b}
+    .keygen-form input::placeholder{color:#52525b}
+    .keygen-form button{padding:12px 20px;background:#22c55e;color:#fff;border:none;border-radius:8px;font-weight:700;font-size:14px;cursor:pointer;white-space:nowrap;transition:background .15s}
+    .keygen-form button:hover{background:#16a34a}
+    .keygen-result{margin-top:12px;padding:16px;background:#22c55e10;border:1px solid #22c55e40;border-radius:10px;display:none;font-size:13px;color:#e5e5e5}
+    .keygen-result.show{display:block}
+    .keygen-result code{font-family:'SF Mono',Monaco,monospace;color:#22c55e;word-break:break-all;font-size:12px;display:block;margin-top:8px;padding:8px 12px;background:#09090b;border-radius:6px}
+    .keygen-result .warn{color:#f59e0b;font-size:12px;margin-top:8px}
+    .keygen-error{color:#ef4444;font-size:13px;margin-top:8px;display:none}
+    .keygen-error.show{display:block}
     @media(max-width:640px){.features-grid{grid-template-columns:1fr}.pricing-paths{grid-template-columns:1fr}.tryit-input{flex-direction:column}.hero h1{font-size:36px}.hero-ctas{flex-direction:column;align-items:center}.mcp-callout{flex-direction:column;text-align:center}.footer-links{flex-direction:column;align-items:center}.nav-links{gap:12px}.nav-links a{font-size:12px}}
   </style>
 </head>
@@ -195,8 +209,20 @@ landing.get('/', (c) => {
       <p class="hero-features">Compliance-grade validation &middot; Sanctions screening &middot; SEPA &amp; VoP coverage &middot; 75+ countries</p>
       <div class="hero-ctas">
         <a href="#tryit" class="cta cta-primary">Try it free &darr;</a>
-        <a href="#pricing" class="cta cta-secondary">Get API key &mdash; 200 req/mo free</a>
+        <button class="cta cta-secondary" onclick="document.querySelector('.keygen').classList.toggle('show')">Get API key &mdash; free</button>
         <a href="#quickstart" class="cta cta-tertiary">curl quickstart</a>
+      </div>
+      <div class="keygen">
+        <form class="keygen-form" onsubmit="return generateKey(event)">
+          <input type="email" name="email" placeholder="your@email.com" required>
+          <button type="submit">Get my key</button>
+        </form>
+        <div class="keygen-result" id="keygenResult">
+          <strong>Your API key (save it now):</strong>
+          <code id="keygenKey"></code>
+          <div class="warn">200 requests/month free. This key will not be shown again.</div>
+        </div>
+        <div class="keygen-error" id="keygenError"></div>
       </div>
     </div>
 
@@ -433,6 +459,19 @@ console.<span class="f">log</span>(result);
     function switchLang(l){
       document.querySelectorAll('.qs-tab').forEach(t=>t.classList.toggle('active',t.dataset.lang===l));
       document.querySelectorAll('.qs-code').forEach(c=>c.classList.toggle('active',c.dataset.lang===l));
+    }
+    async function generateKey(e){
+      e.preventDefault();
+      var form=e.target,email=form.email.value;
+      var errEl=document.getElementById('keygenError'),resEl=document.getElementById('keygenResult'),keyEl=document.getElementById('keygenKey');
+      errEl.className='keygen-error';resEl.className='keygen-result';
+      try{
+        var r=await fetch('/v1/keys/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:email})});
+        var d=await r.json();
+        if(!r.ok){errEl.textContent=d.message||'Error generating key';errEl.className='keygen-error show';return false;}
+        keyEl.textContent=d.api_key;resEl.className='keygen-result show';form.email.value='';
+      }catch(err){errEl.textContent='Network error. Try again.';errEl.className='keygen-error show';}
+      return false;
     }
   </script>
 </body>
