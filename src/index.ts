@@ -28,7 +28,9 @@ import { recordRequest } from './lib/stats.js';
 // Fail-fast: refuse to start in production without wallet config
 ensureWalletConfigured();
 
-const app = new Hono();
+import type { HonoEnv } from './types.js';
+
+const app = new Hono<HonoEnv>();
 
 // Global middleware
 const configuredOrigins = (process.env.CORS_ORIGIN || '*').split(',').map(s => s.trim());

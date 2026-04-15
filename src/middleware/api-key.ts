@@ -1,7 +1,8 @@
 import type { MiddlewareHandler } from 'hono';
+import type { HonoEnv } from '../types.js';
 import { validateApiKey, checkAndIncrementQuota } from '../lib/api-keys.js';
 
-export function apiKeyMiddleware(): MiddlewareHandler {
+export function apiKeyMiddleware(): MiddlewareHandler<HonoEnv> {
   return async (c, next) => {
     const authHeader = c.req.header('Authorization');
     if (!authHeader?.startsWith('Bearer ifk_')) {

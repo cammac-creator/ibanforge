@@ -1,4 +1,5 @@
 import type { MiddlewareHandler } from 'hono';
+import type { HonoEnv } from '../types.js';
 
 // USDC contract address on Base L2
 export const USDC_BASE = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
@@ -18,7 +19,7 @@ export function ensureWalletConfigured(): void {
   }
 }
 
-export function createX402Middleware(): MiddlewareHandler {
+export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
   return async (c, next) => {
     // Dev bypass
     if (

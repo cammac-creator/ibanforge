@@ -2,6 +2,16 @@
  * IBANforge — Unified types for IBAN validation + BIC lookup
  */
 
+// --- Hono context variables ---
+
+type HonoEnv = {
+  Variables: {
+    apiKeyAuthenticated: boolean;
+  };
+};
+
+export type { HonoEnv };
+
 // --- Operation tracking ---
 
 export type OperationType = 'iban_validate' | 'iban_batch' | 'bic_lookup' | 'iban_compliance' | 'ch_clearing_lookup';

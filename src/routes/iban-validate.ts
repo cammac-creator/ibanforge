@@ -1,10 +1,11 @@
 import { Hono } from 'hono';
+import type { HonoEnv } from '../types.js';
 import { validateIBAN } from '../lib/iban.js';
 import { enrichResult } from '../lib/enrich.js';
 import { recordOperation } from '../lib/stats.js';
 import type { IBANValidationResult } from '../types.js';
 
-const ibanValidate = new Hono();
+const ibanValidate = new Hono<HonoEnv>();
 
 ibanValidate.post('/v1/iban/validate', async (c) => {
   const start = performance.now();
