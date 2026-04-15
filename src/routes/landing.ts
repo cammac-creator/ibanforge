@@ -301,7 +301,7 @@ landing.get('/', (c) => {
             <li><span class="check">&check;</span> Bearer token auth</li>
             <li><span class="check">&check;</span> Usage dashboard</li>
           </ul>
-          <a href="#pricing" class="path-cta path-cta-outline">Get free API key</a>
+          <button class="path-cta path-cta-outline" onclick="document.querySelector('.hero').scrollIntoView({behavior:'smooth'});setTimeout(()=>document.querySelector('.keygen').classList.add('show'),400)">Get free API key</button>
         </div>
         <div class="path-card path-x402">
           <div class="path-badge path-badge-amber">PAY PER CALL</div>

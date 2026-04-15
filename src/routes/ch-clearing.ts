@@ -46,7 +46,7 @@ chClearing.get('/v1/ch/clearing/:iid', (c) => {
       found: false,
       error: 'clearing_not_found',
       message: `IID ${normalizedIid} not found in Swiss BankMaster database.`,
-      cost_usdc: COST_USDC,
+      cost_usdc: c.get('apiKeyAuthenticated') ? 0 : COST_USDC,
       processing_ms: processingMs,
     };
     return c.json(result);
@@ -69,7 +69,7 @@ chClearing.get('/v1/ch/clearing/:iid', (c) => {
     sic_iid: entry.sic_iid,
     qr_iid: entry.qr_iid,
     valid_on: entry.valid_on,
-    cost_usdc: COST_USDC,
+    cost_usdc: c.get('apiKeyAuthenticated') ? 0 : COST_USDC,
     processing_ms: processingMs,
   };
 

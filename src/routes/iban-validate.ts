@@ -33,6 +33,10 @@ ibanValidate.post('/v1/iban/validate', async (c) => {
 
   enrichResult(result);
 
+  if (c.get('apiKeyAuthenticated')) {
+    result.cost_usdc = 0;
+  }
+
   result.processing_ms = Math.round((performance.now() - start) * 100) / 100;
 
   const errorDetail = result.valid ? undefined : result.iban.slice(0, 4);
