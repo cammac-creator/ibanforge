@@ -10,9 +10,10 @@ IBANforge validates IBANs and looks up BIC/SWIFT codes for 84 countries, with SE
 
 - 121,000+ BIC entries from GLEIF (open data)
 - SEPA membership, payment schemes, and VoP requirement per country
-- Issuer classification: detects Revolut, Wise, N26, etc. for vIBAN detection
+- Swiss clearing: 1,190 BC-Nummer entries from SIX (SIC, euroSIC, Instant Payments, QR-IID)
+- Issuer classification: 85 EMI/neobank classifications (Revolut, Wise, N26, etc.) for vIBAN detection
 - Risk indicators: country risk (FATF), SEPA reachability, VoP coverage
-- MCP integration for Claude, GPT, and other AI agents
+- 5 MCP tools for Claude, GPT, and other AI agents (validate, batch, BIC lookup, compliance, Swiss clearing)
 - Free during beta -- no API key, no subscription
 - Interactive playground to test instantly
 - Self-hostable (MIT license, Docker)

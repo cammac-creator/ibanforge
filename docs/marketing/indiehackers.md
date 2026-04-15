@@ -26,9 +26,11 @@ I just launched IBANforge -- a free API for IBAN validation and BIC/SWIFT lookup
 
 - IBAN validation for 84 countries
 - BIC/SWIFT lookup with bank names, LEI
+- Swiss clearing: 1,190 BC-Nummer entries from SIX (SIC, euroSIC, Instant Payments, QR-IID)
+- 85 EMI/neobank classifications for vIBAN detection
+- 5 MCP tools for AI agents (validate, batch, BIC lookup, compliance, Swiss clearing)
 - Interactive playground
 - Full API docs
-- MCP server for AI agents
 - OpenAPI spec
 
 **Business model (future):**

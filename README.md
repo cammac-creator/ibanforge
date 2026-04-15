@@ -3,7 +3,7 @@
 [![API Status](https://img.shields.io/badge/API-live-brightgreen)](https://ibanforge-production.up.railway.app/health)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.7-blue)](https://www.typescriptlang.org/)
-[![MCP](https://img.shields.io/badge/MCP-4_tools-purple)](https://ibanforge.vercel.app/docs/mcp)
+[![MCP](https://img.shields.io/badge/MCP-5_tools-purple)](https://ibanforge.vercel.app/docs/mcp)
 [![npm](https://img.shields.io/npm/v/ibanforge)](https://www.npmjs.com/package/ibanforge)
 
 **IBAN validation & BIC/SWIFT lookup API** with SEPA compliance data, issuer classification, risk indicators, x402 micropayments, and MCP integration for AI agents.
@@ -13,11 +13,12 @@
 - **IBAN Validation** — Full mod-97 checksum verification, BBAN structure parsing, 84 countries
 - **BIC/SWIFT Lookup** — 121,000+ entries from GLEIF with LEI enrichment
 - **SEPA Compliance** — Membership status, payment schemes (SCT/SDD/SCT_INST), VoP requirement per country
-- **Issuer Classification** — Detects traditional banks, neobanks, EMIs (Wise, Revolut, N26...), and payment institutions for vIBAN detection
+- **Issuer Classification** — Detects traditional banks, neobanks, EMIs (Wise, Revolut, N26...), and payment institutions for vIBAN detection (85 known BIC8 mappings)
 - **Risk Indicators** — Composite risk signal: issuer type, country risk (FATF-based), test BIC, SEPA reachability, VoP coverage
 - **Batch Processing** — Validate up to 100 IBANs in one call
 - **x402 Micropayments** — Pay-per-call with USDC (from $0.002/request)
 - **MCP Server** — Native AI agent integration via Model Context Protocol
+- **Swiss Clearing** — 1,190 BC-Nummer entries from SIX BankMaster with SIC, euroSIC, Instant Payments, and QR-IID data for CH/LI IBANs
 - **Self-hosted** — Docker deployment, SQLite database, no external dependencies
 
 ## Quick Start
@@ -37,6 +38,7 @@ npm run dev
 | `POST` | `/v1/iban/validate` | $0.005 | Validate a single IBAN |
 | `POST` | `/v1/iban/batch` | $0.002/IBAN | Validate up to 100 IBANs |
 | `GET` | `/v1/bic/:code` | $0.003 | Lookup BIC/SWIFT code |
+| `GET` | `/v1/ch/clearing/:iid` | $0.003 | Swiss BC-Nummer / IID clearing lookup |
 | `GET` | `/v1/demo` | Free | Example validations |
 | `GET` | `/health` | Free | Health check |
 | `GET` | `/stats` | Free | Usage statistics |
@@ -73,7 +75,7 @@ Add to your Claude Desktop or AI agent config:
 }
 ```
 
-Available tools: `validate_iban`, `batch_validate_iban`, `lookup_bic`
+Available tools: `validate_iban`, `batch_validate_iban`, `lookup_bic`, `compliance_check`, `lookup_ch_clearing`
 
 ## Development
 

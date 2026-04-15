@@ -29,7 +29,7 @@ landing.get('/', (c) => {
     "mainEntity":[
       {"@type":"Question","name":"What is IBANforge?","acceptedAnswer":{"@type":"Answer","text":"IBANforge is a REST API for IBAN validation, BIC/SWIFT lookup, and compliance risk scoring. It covers 75+ countries with 121K BIC entries sourced from GLEIF."}},
       {"@type":"Question","name":"How much does IBANforge cost?","acceptedAnswer":{"@type":"Answer","text":"IBANforge offers a free tier with 200 requests per month using an API key. Beyond that, pay $0.003 to $0.02 per call using USDC micropayments via the x402 protocol. No subscription required."}},
-      {"@type":"Question","name":"Can AI agents use IBANforge?","acceptedAnswer":{"@type":"Answer","text":"Yes. IBANforge is MCP-native with 4 tools for AI agents: validate_iban, batch_validate_iban, lookup_bic, and compliance_check. Compatible with Claude, GPT, and any MCP client."}},
+      {"@type":"Question","name":"Can AI agents use IBANforge?","acceptedAnswer":{"@type":"Answer","text":"Yes. IBANforge is MCP-native with 5 tools for AI agents: validate_iban, batch_validate_iban, lookup_bic, compliance_check, and lookup_ch_clearing. Compatible with Claude, GPT, and any MCP client."}},
       {"@type":"Question","name":"What countries does IBANforge support?","acceptedAnswer":{"@type":"Answer","text":"IBANforge supports 75+ countries with full BBAN parsing, SEPA membership detection, Verification of Payee (VoP) status, and country-level risk classification."}}
     ]
   });
@@ -232,12 +232,12 @@ landing.get('/', (c) => {
         <div class="feat-card">
           <div class="feat-icon feat-icon-rose"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
           <h3>Compliance &amp; Risk Scoring</h3>
-          <p>Sanctions screening (OFAC/EU/UN), FATF status, composite risk score 0&ndash;100, issuer classification.</p>
+          <p>Sanctions screening (OFAC/EU/UN), FATF status, composite risk score 0&ndash;100, 85 EMI/neobank classifications, Swiss clearing data.</p>
         </div>
         <div class="feat-card">
           <div class="feat-icon feat-icon-purple"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M12 2a4 4 0 0 0-4 4c0 2 2 3 2 6h8c0-3 2-4 2-6a4 4 0 0 0-4-4z"/><rect x="9" y="12" width="6" height="4" rx="1"/><path d="M10 16v1a2 2 0 1 0 4 0v-1"/></svg></div>
           <h3>MCP Native</h3>
-          <p>4 tools for AI agents via Model Context Protocol. Works with Claude, GPT, and any MCP client.</p>
+          <p>5 tools for AI agents via Model Context Protocol. Works with Claude, GPT, and any MCP client.</p>
         </div>
         <div class="feat-card">
           <div class="feat-icon feat-icon-cyan"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M2 12h4l3-9 6 18 3-9h4"/></svg></div>
@@ -299,6 +299,7 @@ landing.get('/', (c) => {
           <tr><td>POST /v1/iban/batch</td><td>$0.002/IBAN</td></tr>
           <tr><td>GET /v1/bic/:code</td><td>$0.003</td></tr>
           <tr><td>POST /v1/iban/compliance</td><td>$0.020</td></tr>
+          <tr><td>GET /v1/ch/clearing/:iid</td><td>$0.003</td></tr>
         </tbody>
       </table>
     </div>
@@ -364,7 +365,7 @@ console.<span class="f">log</span>(result);
         <div class="mcp-icon"><svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M12 2a4 4 0 0 0-4 4c0 2 2 3 2 6h8c0-3 2-4 2-6a4 4 0 0 0-4-4z"/><rect x="9" y="12" width="6" height="4" rx="1"/><path d="M10 16v1a2 2 0 1 0 4 0v-1"/></svg></div>
         <div>
           <h3>AI Agents? Use MCP</h3>
-          <p>Add IBANforge to your agent with <code>npm run mcp</code> &mdash; exposes 4 tools via stdio transport. Compatible with Claude Desktop, Cursor, and any MCP client.</p>
+          <p>Add IBANforge to your agent with <code>npm run mcp</code> &mdash; exposes 5 tools via stdio transport. Compatible with Claude Desktop, Cursor, and any MCP client.</p>
         </div>
       </div>
       <div class="footer-links">
@@ -376,7 +377,7 @@ console.<span class="f">log</span>(result);
     </div>
 
     <div class="footer-bottom">
-      <p>IBANforge v1.0.0 &mdash; <a href="https://ibanforge.com">ibanforge.com</a></p>
+      <p>IBANforge v1.1.0 &mdash; <a href="https://ibanforge.com">ibanforge.com</a></p>
     </div>
 
   </div>
