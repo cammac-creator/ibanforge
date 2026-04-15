@@ -2,7 +2,7 @@
 title: Building an IBAN Validation API with Hono, SQLite, and MCP
 published: true
 tags: typescript, api, webdev, ai
-cover_image: https://ibanforge.com/og-image.png
+cover_image: https://api.ibanforge.com/og-image.png
 ---
 
 # Building an IBAN Validation API with Hono, SQLite, and MCP
@@ -72,7 +72,7 @@ Why SQLite instead of PostgreSQL?
 - **Read performance** -- Queries take <10ms for exact BIC lookups
 - **Simplicity** -- No connection pools, no migrations server, no managed database costs
 
-The BIC lookup uses prepared statements with an LRU cache:
+The BIC lookup uses prepared statements with an LRU cache on top:
 
 ```typescript
 import { getBicDB } from './db.js';
@@ -80,25 +80,28 @@ import { LRUCache } from './cache.js';
 
 const bicCache = new LRUCache<BICRow | null>(2000);
 
-let stmtByBic11: Database.Statement | null = null;
+function lookupByBic11(bic11: string): BICRow | null {
+  const db = getBicDB();
+  const stmt = db.prepare(
+    'SELECT * FROM bic_entries WHERE bic11 = ? LIMIT 1'
+  );
+  return (stmt.get(bic11) as BICRow) ?? null;
+}
 
-export function lookupByBic11(bic11: string): BICRow | null {
-  const cached = bicCache.get(bic11);
+export function lookup(bic: string): BICRow | null {
+  const cached = bicCache.get(bic);
   if (cached !== undefined) return cached;
 
-  if (!stmtByBic11) {
-    stmtByBic11 = getBicDB().prepare(
-      'SELECT * FROM bic_entries WHERE bic11 = ? LIMIT 1'
-    );
-  }
+  const result = bic.length === 11
+    ? lookupByBic11(bic)
+    : lookupByBic11(bic + 'XXX');
 
-  const row = (stmtByBic11.get(bic11) as BICRow) ?? null;
-  bicCache.set(bic11, row);
-  return row;
+  bicCache.set(bic, result);
+  return result;
 }
 ```
 
-With the LRU cache, repeated lookups for the same BIC code are sub-microsecond. For the initial lookup, SQLite returns in ~2-5ms -- fast enough for real-time validation.
+The LRU cache wraps the main `lookup()` entry point, so repeated lookups for the same BIC code are sub-microsecond. For the initial lookup, SQLite returns in ~2-5ms -- fast enough for real-time validation.
 
 ## MCP Integration: How AI Agents Use the API
 
@@ -112,30 +115,29 @@ import { z } from 'zod';
 
 const server = new McpServer({
   name: 'ibanforge',
-  version: '1.0.0',
+  version: '1.1.0',
 });
 
-server.tool(
+server.registerTool(
   'validate_iban',
-  `Validate a single IBAN and retrieve BIC/SWIFT info.
-   Supports 84 countries including all SEPA countries.`,
   {
-    iban: z.string().describe(
-      "IBAN to validate. Spaces accepted."
-    ),
+    title: 'Validate IBAN',
+    description: 'Validate a single IBAN and retrieve BIC/SWIFT info.',
+    inputSchema: {
+      iban: z.string().describe('IBAN to validate. Spaces accepted.'),
+    },
+    annotations: {
+      readOnlyHint: true,
+      idempotentHint: true,
+    },
   },
   async ({ iban }) => {
     const result = validateIBAN(iban);
-    if (result.valid && result.bban?.bank_code) {
-      result.bic = lookupByCountryBank(
-        result.country!.code,
-        result.bban.bank_code
-      );
-    }
+    enrichResult(result);
     return {
       content: [{
         type: 'text',
-        text: JSON.stringify(result, null, 2)
+        text: JSON.stringify(result, null, 2),
       }],
     };
   },
