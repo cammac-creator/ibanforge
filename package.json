@@ -1,9 +1,21 @@
 {
   "name": "ibanforge",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "mcpName": "io.github.cammac-creator/ibanforge",
   "description": "IBAN validation, BIC/SWIFT lookup, Swiss clearing, SEPA compliance, issuer classification and risk indicators for AI agents. 121K+ bank entries from GLEIF, 1,190 Swiss BC-Nummer from SIX. Supports 84 countries.",
   "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./mcp": {
+      "import": "./dist/mcp/server.js",
+      "types": "./dist/mcp/server.d.ts"
+    }
+  },
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc && cp src/db/bic_data.json dist/db/bic_data.json",
