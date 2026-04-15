@@ -31,12 +31,14 @@ ensureWalletConfigured();
 const app = new Hono();
 
 // Global middleware
-const allowedOrigins = (process.env.CORS_ORIGIN || '*').split(',').map(s => s.trim());
+const configuredOrigins = (process.env.CORS_ORIGIN || '*').split(',').map(s => s.trim());
+const localhostPattern = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
 
 app.use('*', cors({
   origin: (origin) => {
-    if (allowedOrigins.includes('*')) return '*';
-    return allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
+    if (configuredOrigins.includes('*')) return '*';
+    if (localhostPattern.test(origin)) return origin;
+    return configuredOrigins.includes(origin) ? origin : configuredOrigins[0];
   },
   allowMethods: ['GET', 'POST', 'OPTIONS'],
   allowHeaders: ['Content-Type', 'Authorization', 'X-Payment'],
