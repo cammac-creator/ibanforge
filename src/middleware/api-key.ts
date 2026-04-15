@@ -23,10 +23,15 @@ export function apiKeyMiddleware(): MiddlewareHandler {
       return c.json(
         {
           error: 'quota_exceeded',
-          message: `Monthly limit of ${quota.limit} requests reached. Contact support for higher limits.`,
+          message: `Monthly limit of ${quota.limit} requests reached. Quota resets on the 1st of each month.`,
           used: quota.used,
           limit: quota.limit,
           month: quota.month,
+          upgrade: {
+            description: 'Need more? Contact us for a custom plan with higher limits.',
+            email: 'support@ibanforge.com',
+            x402: 'Or use x402 micropayments for unlimited pay-per-call access (no quota).',
+          },
         },
         429,
       );
