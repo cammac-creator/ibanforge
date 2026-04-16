@@ -14,7 +14,7 @@ info:
     - **SEPA Data** — SCT, SDD, and SCT_INST scheme support plus VoP requirement flags.
     - **Batch Processing** — Validate up to 100 IBANs in a single request at a discounted rate.
     - **Swiss Clearing** — 1,190 BC-Nummer entries from SIX BankMaster with SIC, euroSIC, Instant Payments, and QR-IID data for CH/LI IBANs.
-    - **MCP Integration** — 5 MCP tools for AI agent integration (validate_iban, batch_validate_iban, lookup_bic, compliance_check, lookup_ch_clearing).
+    - **MCP Integration** — 5 MCP tools for AI agent integration (validate_iban, batch_validate_iban, lookup_bic, check_compliance, lookup_ch_clearing).
 
     ## Payment (x402 Protocol)
     Paid endpoints use the [x402 micropayment protocol](https://www.x402.org/). Include a payment token in the `X-Payment` header.

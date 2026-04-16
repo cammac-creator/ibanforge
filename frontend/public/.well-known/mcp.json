@@ -37,7 +37,7 @@
       }
     },
     {
-      "name": "compliance_check",
+      "name": "check_compliance",
       "description": "Full compliance check: IBAN validation + sanctions screening (OFAC/EU/UN) + SEPA Instant reachability + VoP participant check + risk score (0-100). Cost: $0.02 USDC.",
       "inputSchema": {
         "type": "object",

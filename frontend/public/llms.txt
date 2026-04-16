@@ -32,7 +32,7 @@ GET /openapi.json — OpenAPI 3.1 specification
 GET /.well-known/x402 — x402 agent discovery
 
 ## MCP Integration
-Tools: validate_iban, batch_validate_iban, lookup_bic, compliance_check
+Tools: validate_iban, batch_validate_iban, lookup_bic, check_compliance
 Config: {"command": "npx", "args": ["tsx", "src/mcp/server.ts"]}
 
 ## SDKs

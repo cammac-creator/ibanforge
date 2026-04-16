@@ -34,7 +34,7 @@ The Finance & Fintech section format is:
 **Entry to insert (alphabetical order — after 'h' entries, before other 'i' entries):**
 
 ```markdown
-- [cammac-creator/ibanforge](https://github.com/cammac-creator/ibanforge) 📇 ☁️ 🏠 🍎 🪟 🐧 - IBAN validation and BIC/SWIFT lookup MCP server with 5 tools: `validate_iban`, `batch_validate_iban`, `lookup_bic`, `compliance_check`, `lookup_ch_clearing`. Covers 84 countries, 121K+ bank entries from GLEIF, Swiss clearing data from SIX. Pay-per-call via x402 micropayments (USDC) or self-host with Docker. [ibanforge.com](https://ibanforge.com)
+- [cammac-creator/ibanforge](https://github.com/cammac-creator/ibanforge) 📇 ☁️ 🏠 🍎 🪟 🐧 - IBAN validation and BIC/SWIFT lookup MCP server with 5 tools: `validate_iban`, `batch_validate_iban`, `lookup_bic`, `check_compliance`, `lookup_ch_clearing`. Covers 84 countries, 121K+ bank entries from GLEIF, Swiss clearing data from SIX. Pay-per-call via x402 micropayments (USDC) or self-host with Docker. [ibanforge.com](https://ibanforge.com)
 ```
 
 ## Alternative entry (shorter format)
@@ -49,6 +49,6 @@ Some entries in the list are more concise:
 
 - The MCP server is documented at: https://ibanforge.com/docs/mcp
 - smithery.yaml is present in the repo for Smithery registry compatibility
-- Tools exposed: `validate_iban`, `batch_validate_iban`, `lookup_bic`, `compliance_check`, `lookup_ch_clearing`
+- Tools exposed: `validate_iban`, `batch_validate_iban`, `lookup_bic`, `check_compliance`, `lookup_ch_clearing`
 - Transport: stdio and HTTP/SSE
 - Self-hostable via Docker
