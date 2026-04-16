@@ -73,26 +73,131 @@ app.use('*', async (c, next) => {
 // /ping — ultra-lightweight endpoint for latency testing and uptime monitoring
 app.get('/ping', (c) => c.text('pong'));
 
-// Pre-validate requests before x402 paywall (don't charge for invalid input)
-app.post('/v1/iban/validate', async (c, next) => {
-  const body = await c.req.json().catch(() => null);
-  if (!body || typeof body.iban !== 'string' || body.iban.trim() === '') {
-    return c.json({ error: 'invalid_request', message: "Request body must include an 'iban' field (string)" }, 400);
+// ─── Crawler / agent-friendly metadata ───────────────────────────────────────
+
+// /robots.txt — allow all bots, point crawlers to OpenAPI + agent discovery
+app.get('/robots.txt', (c) => {
+  return c.text(
+    [
+      'User-agent: *',
+      'Allow: /',
+      '',
+      '# AI agent discovery',
+      'Sitemap: https://ibanforge.com/sitemap.xml',
+      'X-OpenAPI: https://api.ibanforge.com/openapi.json',
+      'X-x402: https://api.ibanforge.com/.well-known/x402',
+      'X-MCP: https://api.ibanforge.com/mcp',
+    ].join('\n'),
+    200,
+    { 'Content-Type': 'text/plain; charset=utf-8' },
+  );
+});
+
+// /llms.txt — emerging standard (llmstxt.org) for AI agents to understand the API
+app.get('/llms.txt', (c) => {
+  return c.text(
+    `# IBANforge
+
+> IBAN validation, BIC/SWIFT lookup, Swiss clearing and compliance risk scoring API designed for AI agents and developers. 121K+ bank entries from GLEIF, 1,190 Swiss BC-Nummer from SIX, 84 countries, 85 EMI/vIBAN issuer classifications.
+
+## Quick start for agents
+
+- **Free demo (no auth):** GET https://api.ibanforge.com/v1/demo
+- **Free tier (200 req/month):** POST https://api.ibanforge.com/v1/keys/generate {"email":"you@example.com"} then use \`Authorization: Bearer ifk_xxx\` (or \`X-API-Key: ifk_xxx\`).
+- **Pay per call (x402, USDC on Base L2):** see https://api.ibanforge.com/.well-known/x402
+
+## Discovery endpoints
+
+- OpenAPI 3.1: https://api.ibanforge.com/openapi.json
+- x402 metadata: https://api.ibanforge.com/.well-known/x402
+- Agent capabilities: https://api.ibanforge.com/.well-known/agents.json
+- MCP HTTP transport: https://api.ibanforge.com/mcp
+- MCP server card: https://api.ibanforge.com/.well-known/mcp/server-card.json
+
+## Endpoints
+
+- POST /v1/iban/validate — single IBAN validation ($0.005)
+- POST /v1/iban/batch — up to 100 IBANs ($0.002 each)
+- GET /v1/bic/:code — BIC/SWIFT lookup ($0.003)
+- POST /v1/iban/compliance — full compliance check ($0.02)
+- GET /v1/ch/clearing/:iid — Swiss clearing lookup ($0.003)
+
+## Documentation
+
+- Human docs: https://ibanforge.com/docs
+- Pricing: https://ibanforge.com/pricing
+- GitHub: https://github.com/cammac-creator/ibanforge
+`,
+    200,
+    { 'Content-Type': 'text/plain; charset=utf-8' },
+  );
+});
+
+// /v1 index — agents that probe /v1 root expect a discovery hint instead of 404
+app.get('/v1', (c) =>
+  c.json({
+    name: 'IBANforge API v1',
+    documentation: 'https://api.ibanforge.com/openapi.json',
+    discovery: {
+      x402: 'https://api.ibanforge.com/.well-known/x402',
+      mcp: 'https://api.ibanforge.com/mcp',
+      agents: 'https://api.ibanforge.com/.well-known/agents.json',
+      llms: 'https://api.ibanforge.com/llms.txt',
+    },
+    endpoints: {
+      paid: ['POST /v1/iban/validate', 'POST /v1/iban/batch', 'GET /v1/bic/:code', 'POST /v1/iban/compliance', 'GET /v1/ch/clearing/:iid'],
+      free: ['GET /v1/demo', 'POST /v1/keys/generate', 'GET /v1/keys/usage'],
+    },
+  }),
+);
+
+// /docs — common path agents try; redirect to actual docs
+app.get('/docs', (c) => c.redirect('https://ibanforge.com/docs', 302));
+
+// /api and /api/v1 aliases — common probing patterns
+app.get('/api', (c) => c.redirect('/v1', 302));
+app.get('/api/v1', (c) => c.redirect('/v1', 302));
+
+// Pre-validate requests before x402 paywall (don't charge for invalid input).
+// Accept any case for field names (iban, IBAN, Iban) — agents/LLMs commonly
+// uppercase IBAN as it's an acronym. Normalize the body so handlers can read body.iban.
+function pickField<T = unknown>(body: Record<string, unknown> | null, names: string[]): T | undefined {
+  if (!body) return undefined;
+  for (const name of names) {
+    if (name in body) return body[name] as T;
+    const lower = name.toLowerCase();
+    for (const k of Object.keys(body)) {
+      if (k.toLowerCase() === lower) return body[k] as T;
+    }
   }
+  return undefined;
+}
+
+app.post('/v1/iban/validate', async (c, next) => {
+  const body = (await c.req.json().catch(() => null)) as Record<string, unknown> | null;
+  const iban = pickField<string>(body, ['iban']);
+  if (!iban || typeof iban !== 'string' || iban.trim() === '') {
+    return c.json({ error: 'invalid_request', message: "Request body must include an 'iban' field (string). Field names are case-insensitive: 'iban', 'IBAN', 'Iban' all work." }, 400);
+  }
+  if (body && !('iban' in body)) (body as Record<string, unknown>).iban = iban;
   await next();
 });
 app.post('/v1/iban/compliance', async (c, next) => {
-  const body = await c.req.json().catch(() => null);
-  if (!body || typeof body.iban !== 'string' || body.iban.trim() === '') {
-    return c.json({ error: 'invalid_request', message: "Request body must include an 'iban' field (string)" }, 400);
+  const body = (await c.req.json().catch(() => null)) as Record<string, unknown> | null;
+  const iban = pickField<string>(body, ['iban']);
+  if (!iban || typeof iban !== 'string' || iban.trim() === '') {
+    return c.json({ error: 'invalid_request', message: "Request body must include an 'iban' field (string). Field names are case-insensitive." }, 400);
   }
+  if (body && !('iban' in body)) (body as Record<string, unknown>).iban = iban;
   await next();
 });
 app.post('/v1/iban/batch', async (c, next) => {
-  const body = await c.req.json().catch(() => null);
-  if (!body || !Array.isArray(body.ibans) || body.ibans.length === 0) {
-    return c.json({ error: 'invalid_request', message: "Request body must include a non-empty 'ibans' array" }, 400);
+  const body = (await c.req.json().catch(() => null)) as Record<string, unknown> | null;
+  const ibans = pickField<unknown[]>(body, ['ibans', 'iban_list', 'list']);
+  if (!Array.isArray(ibans) || ibans.length === 0) {
+    return c.json({ error: 'invalid_request', message: "Request body must include a non-empty 'ibans' array (also accepts 'iban_list' or 'list')." }, 400);
   }
+  if (body && !('ibans' in body)) (body as Record<string, unknown>).ibans = ibans;
   await next();
 });
 app.get('/v1/bic/:code', async (c, next) => {
