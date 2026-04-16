@@ -1,7 +1,7 @@
 /**
  * HTTP transport for the MCP server.
  * Exposes the same 5 tools as the stdio MCP server (validate_iban, batch_validate_iban,
- * lookup_bic, compliance_check, lookup_ch_clearing) via Streamable HTTP at /mcp —
+ * lookup_bic, check_compliance, lookup_ch_clearing) via Streamable HTTP at /mcp —
  * compatible with Smithery, remote MCP clients, etc.
  */
 
@@ -145,7 +145,7 @@ function createMcpServer(): McpServer {
   );
 
   server.registerTool(
-    'compliance_check',
+    'check_compliance',
     {
       title: 'Compliance Check',
       description:

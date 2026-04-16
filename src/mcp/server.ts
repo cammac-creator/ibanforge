@@ -44,7 +44,7 @@ server.registerTool(
     description: `Validate a single IBAN and retrieve the associated BIC/SWIFT code, bank details, SEPA membership, issuer classification, and risk indicators.
 
 When to use: verifying a payment recipient before a wire transfer, checking a bank account during onboarding, or confirming IBAN format and bank identity in a KYC workflow.
-When NOT to use: for multiple IBANs, use batch_validate_iban instead (60% cheaper per IBAN). For compliance/sanctions screening, use compliance_check instead.
+When NOT to use: for multiple IBANs, use batch_validate_iban instead (60% cheaper per IBAN). For compliance/sanctions screening, use check_compliance instead.
 
 Behavior: this tool is read-only and performs no writes, no network calls to external services, and no side effects. It validates the IBAN checksum (ISO 13616 mod-97), parses the BBAN structure, resolves the BIC from a local database of 121,000+ entries (GLEIF-sourced), and classifies the issuer type. Response time is under 30ms. Returns a single JSON object.
 
@@ -86,7 +86,7 @@ server.registerTool(
     description: `Validate up to 100 IBANs in a single call with the same enrichment as validate_iban, at 60% lower cost per IBAN.
 
 When to use: processing a CSV of supplier bank accounts, validating a payment batch before submission, running KYC checks on a customer list, or auditing an accounts-payable file.
-When NOT to use: for a single IBAN, use validate_iban instead. For compliance/sanctions screening, use compliance_check on each IBAN.
+When NOT to use: for a single IBAN, use validate_iban instead. For compliance/sanctions screening, use check_compliance on each IBAN.
 
 Behavior: this tool is read-only with no side effects. It validates each IBAN independently using the same logic as validate_iban (mod-97 checksum, BBAN parsing, BIC resolution, issuer classification). Results are returned in the same order as the input array. If one IBAN is invalid, the others are still processed — there is no short-circuit on error. Response time scales linearly: ~30ms per IBAN. Returns a JSON array.
 
@@ -133,7 +133,7 @@ server.registerTool(
     description: `Look up a BIC/SWIFT code and return full institution details including name, country, city, branch info, and LEI regulatory data.
 
 When to use: identifying the bank behind a BIC/SWIFT code for compliance checks, payment routing validation, correspondent banking lookups, or KYC enrichment.
-When NOT to use: if you already have an IBAN, use validate_iban instead — it resolves the BIC automatically as part of the validation. For sanctions/compliance screening, use compliance_check.
+When NOT to use: if you already have an IBAN, use validate_iban instead — it resolves the BIC automatically as part of the validation. For sanctions/compliance screening, use check_compliance.
 
 Behavior: this tool is read-only with no side effects. It validates the BIC format (ISO 9362), then queries a local SQLite database of 121,000+ institutions sourced from GLEIF. For BIC11 lookups, if the specific branch is not found, it falls back to the head office (XXX suffix). Detects test BICs (e.g., MARKDEF patterns). Response time is under 10ms. Returns a single JSON object.
 
@@ -205,7 +205,7 @@ Cost: $0.003 USDC per call via x402 micropayment on Base L2.`,
 );
 
 server.registerTool(
-  'compliance_check',
+  'check_compliance',
   {
     title: 'Compliance Risk Check',
     description: `Run a full compliance check on an IBAN: validates the IBAN, enriches with bank data, then screens against sanctions lists, checks SEPA reachability, verifies VoP participation, and computes a composite risk score.

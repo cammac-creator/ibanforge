@@ -283,7 +283,7 @@ IBANforge exposes a Model Context Protocol (MCP) server for native AI agent inte
 - `validate_iban` — Validate a single IBAN
 - `batch_validate_iban` — Validate up to 100 IBANs
 - `lookup_bic` — Look up a BIC/SWIFT code
-- `compliance_check` — Full compliance check: IBAN validation + sanctions screening (OFAC/EU/UN) + SEPA Instant reachability + VoP participant check + risk score (0-100). Cost: $0.02 USDC.
+- `check_compliance` — Full compliance check: IBAN validation + sanctions screening (OFAC/EU/UN) + SEPA Instant reachability + VoP participant check + risk score (0-100). Cost: $0.02 USDC.
 
 ### Claude Desktop Config
 ```json

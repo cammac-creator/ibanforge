@@ -16,7 +16,7 @@ What makes it different:
 - SEPA compliance data: membership, payment schemes (SCT/SDD/SCT_INST), VoP requirement per country
 - Issuer classification: detects if the bank is a traditional bank, neobank, EMI (Wise, Revolut, N26...) -- useful for vIBAN detection under EU AML regulations
 - Risk indicators: country risk (FATF-based), SEPA reachability, VoP coverage -- one object, five signals
-- MCP server: AI agents can discover and use it natively (5 tools: validate_iban, batch_validate_iban, lookup_bic, compliance_check, lookup_ch_clearing)
+- MCP server: AI agents can discover and use it natively (5 tools: validate_iban, batch_validate_iban, lookup_bic, check_compliance, lookup_ch_clearing)
 - 121,000+ BIC entries from GLEIF (open data, CC0 license)
 - 84 countries for IBAN validation with full BBAN parsing
 - Multilingual: EN/FR/DE (docs, blog, UI)

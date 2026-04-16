@@ -75,7 +75,7 @@ Add to your Claude Desktop or AI agent config:
 }
 ```
 
-Available tools: `validate_iban`, `batch_validate_iban`, `lookup_bic`, `compliance_check`, `lookup_ch_clearing`
+Available tools: `validate_iban`, `batch_validate_iban`, `lookup_bic`, `check_compliance`, `lookup_ch_clearing`
 
 ## Development
 
