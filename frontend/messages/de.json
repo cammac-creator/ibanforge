@@ -544,10 +544,61 @@
     },
     "topNav": {
       "overview": "Übersicht",
+      "customers": "Kunden",
       "analytics": "Analytik",
       "quality": "Qualität",
       "monitoring": "Monitoring",
       "backToSite": "Zurück zur Seite"
+    },
+    "customers": {
+      "error": {
+        "title": "Kundendaten nicht verfügbar",
+        "description": "ADMIN_SECRET muss serverseitig gesetzt sein, um diesen Bereich zu laden."
+      },
+      "stats": {
+        "totalPilots": "Pilot-Keys",
+        "active": "aktiv",
+        "silent": "inaktiv",
+        "freeTier": "Free-Tier-Keys",
+        "used": "mit Nutzung",
+        "silentAlert": "Stille Piloten",
+        "silentAlertDescription": "Keine Aktivität nach 3 Tagen",
+        "month": "Monat",
+        "monthDescription": "Aktuelle Nutzungsperiode"
+      },
+      "silentSection": {
+        "title": "Stille Piloten — Follow-up empfohlen",
+        "description": "Diese Interessenten haben ihren Key erhalten, aber nach über 3 Tagen keine einzige Anfrage gestellt. Ein sanftes Follow-up könnte sinnvoll sein.",
+        "agoWithoutUse": "ohne Nutzung"
+      },
+      "pilotsSection": {
+        "title": "Pilotkunden (individuelles Kontingent)",
+        "empty": "Noch keine Pilot-Keys. Verwenden Sie die Admin-API oder das CLI zur Erstellung."
+      },
+      "freeTierSection": {
+        "title": "Free-Tier — aktive Nutzer"
+      },
+      "table": {
+        "customer": "Kunde",
+        "created": "Erstellt",
+        "usage": "Nutzung (Monat)",
+        "status": "Status",
+        "type": "Typ",
+        "ago": "vor"
+      },
+      "status": {
+        "active": "Aktiv",
+        "silent": "Still",
+        "pending": "Ausstehend",
+        "at-risk": "Gefährdet",
+        "unused": "Ungenutzt",
+        "inactive": "Inaktiv"
+      },
+      "type": {
+        "pilot": "Pilot",
+        "free": "Gratis",
+        "internal": "Intern"
+      }
     },
     "analytics": {
       "title": "Analytik",

@@ -15,6 +15,7 @@ export function TopNav({ period = 30 }: TopNavProps) {
 
   const NAV_TABS = [
     { key: 'overview', href: `/${locale}/dashboard`, label: t('topNav.overview'), exact: true },
+    { key: 'customers', href: `/${locale}/dashboard/customers`, label: t('topNav.customers'), exact: false },
     { key: 'analytics', href: `/${locale}/dashboard/analytics`, label: t('topNav.analytics'), exact: false },
     { key: 'quality', href: `/${locale}/dashboard/quality`, label: t('topNav.quality'), exact: false },
     { key: 'monitoring', href: `/${locale}/dashboard/monitoring`, label: t('topNav.monitoring'), exact: false },
