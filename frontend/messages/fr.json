@@ -544,10 +544,61 @@
     },
     "topNav": {
       "overview": "Vue d'ensemble",
+      "customers": "Clients",
       "analytics": "Analytics",
       "quality": "Qualité",
       "monitoring": "Monitoring",
       "backToSite": "Retour au site"
+    },
+    "customers": {
+      "error": {
+        "title": "Données clients indisponibles",
+        "description": "La variable ADMIN_SECRET doit être définie côté serveur pour charger cette section."
+      },
+      "stats": {
+        "totalPilots": "Clés pilotes",
+        "active": "actives",
+        "silent": "silencieuses",
+        "freeTier": "Clés gratuites",
+        "used": "avec usage",
+        "silentAlert": "Pilotes silencieux",
+        "silentAlertDescription": "Aucune activité après 3 jours",
+        "month": "Mois",
+        "monthDescription": "Période d'usage actuelle"
+      },
+      "silentSection": {
+        "title": "Pilotes silencieux — relance recommandée",
+        "description": "Ces prospects ont reçu leur clé mais n'ont pas fait une seule requête après 3 jours ou plus. Envisagez une relance douce.",
+        "agoWithoutUse": "sans usage"
+      },
+      "pilotsSection": {
+        "title": "Clients pilotes (quota personnalisé)",
+        "empty": "Aucune clé pilote. Utilisez l'API admin ou le CLI pour en créer une."
+      },
+      "freeTierSection": {
+        "title": "Tier gratuit — utilisateurs actifs"
+      },
+      "table": {
+        "customer": "Client",
+        "created": "Créée",
+        "usage": "Usage (mois)",
+        "status": "Statut",
+        "type": "Type",
+        "ago": "il y a"
+      },
+      "status": {
+        "active": "Actif",
+        "silent": "Silencieux",
+        "pending": "En attente",
+        "at-risk": "À risque",
+        "unused": "Non utilisé",
+        "inactive": "Inactif"
+      },
+      "type": {
+        "pilot": "Pilote",
+        "free": "Gratuit",
+        "internal": "Interne"
+      }
     },
     "analytics": {
       "title": "Analytics",

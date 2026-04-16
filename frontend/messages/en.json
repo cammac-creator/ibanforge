@@ -544,10 +544,61 @@
     },
     "topNav": {
       "overview": "Overview",
+      "customers": "Customers",
       "analytics": "Analytics",
       "quality": "Quality",
       "monitoring": "Monitoring",
       "backToSite": "Back to site"
+    },
+    "customers": {
+      "error": {
+        "title": "Customers data unavailable",
+        "description": "ADMIN_SECRET must be set on the server to load this section."
+      },
+      "stats": {
+        "totalPilots": "Pilot keys",
+        "active": "active",
+        "silent": "silent",
+        "freeTier": "Free tier keys",
+        "used": "have usage",
+        "silentAlert": "Silent pilots",
+        "silentAlertDescription": "No activity after 3 days",
+        "month": "Month",
+        "monthDescription": "Current usage period"
+      },
+      "silentSection": {
+        "title": "Silent pilots — follow-up recommended",
+        "description": "These prospects received their key but have not run a single request after 3+ days. Consider a gentle follow-up.",
+        "agoWithoutUse": "ago, no usage"
+      },
+      "pilotsSection": {
+        "title": "Pilot customers (custom quota)",
+        "empty": "No pilot keys yet. Use the admin API or CLI to create one."
+      },
+      "freeTierSection": {
+        "title": "Free tier — active users"
+      },
+      "table": {
+        "customer": "Customer",
+        "created": "Created",
+        "usage": "Usage (month)",
+        "status": "Status",
+        "type": "Type",
+        "ago": "ago"
+      },
+      "status": {
+        "active": "Active",
+        "silent": "Silent",
+        "pending": "Pending",
+        "at-risk": "At risk",
+        "unused": "Unused",
+        "inactive": "Inactive"
+      },
+      "type": {
+        "pilot": "Pilot",
+        "free": "Free",
+        "internal": "Internal"
+      }
     },
     "analytics": {
       "title": "Analytics",
