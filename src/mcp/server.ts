@@ -17,7 +17,23 @@ const pkg = JSON.parse(readFileSync(resolve(__dirname, '../../package.json'), 'u
 
 const server = new McpServer({
   name: 'ibanforge',
+  title: 'IBANforge',
   version: pkg.version,
+  description:
+    'IBAN validation, BIC/SWIFT lookup, Swiss clearing, SEPA compliance and risk indicators. 121K+ bank entries from GLEIF, 1,190 Swiss BC-Nummer from SIX, 84 countries.',
+  websiteUrl: 'https://ibanforge.com',
+  icons: [
+    {
+      src: 'https://www.ibanforge.com/favicon.ico',
+      mimeType: 'image/vnd.microsoft.icon',
+      sizes: ['64x64'],
+    },
+    {
+      src: 'https://api.ibanforge.com/og-image.png',
+      mimeType: 'image/svg+xml',
+      sizes: ['1200x630'],
+    },
+  ],
 });
 
 server.registerTool(
