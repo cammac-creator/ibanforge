@@ -11,6 +11,7 @@ import { lookup } from '../lib/bic-lookup.js';
 import { validateBIC } from '../lib/bic-validator.js';
 import { buildComplianceResult } from '../lib/compliance.js';
 import { lookupClearingByBankCode, normalizeIid, getChClearingCount } from '../lib/ch-clearing.js';
+import { buildCountriesPayload, buildPricingPayload, buildValidateAndExplainPrompt } from '../lib/mcp-resources.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const pkg = JSON.parse(readFileSync(resolve(__dirname, '../../package.json'), 'utf-8'));
@@ -369,6 +370,64 @@ Cost: $0.003 USDC per call via x402 micropayment on Base L2.`,
       content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
     };
   },
+);
+
+// ── Resources ────────────────────────────────────────────────────────────────
+
+server.registerResource(
+  'countries',
+  'ibanforge://countries',
+  {
+    title: 'Supported Countries',
+    description: 'List of all 84 countries supported by IBANforge with IBAN length, SEPA membership, VoP status, and country risk classification.',
+    mimeType: 'application/json',
+  },
+  async () => ({
+    contents: [{
+      uri: 'ibanforge://countries',
+      mimeType: 'application/json',
+      text: JSON.stringify(buildCountriesPayload(), null, 2),
+    }],
+  }),
+);
+
+server.registerResource(
+  'pricing',
+  'ibanforge://pricing',
+  {
+    title: 'Pricing',
+    description: 'Per-call pricing for IBANforge API endpoints (USDC on Base L2 via x402 protocol).',
+    mimeType: 'application/json',
+  },
+  async () => ({
+    contents: [{
+      uri: 'ibanforge://pricing',
+      mimeType: 'application/json',
+      text: JSON.stringify(buildPricingPayload(), null, 2),
+    }],
+  }),
+);
+
+// ── Prompts ──────────────────────────────────────────────────────────────────
+
+server.registerPrompt(
+  'validate_and_explain',
+  {
+    title: 'Validate and Explain IBAN',
+    description: 'Validate an IBAN and generate a human-readable explanation suitable for non-technical users.',
+    argsSchema: {
+      iban: z.string().describe('The IBAN to validate and explain'),
+    },
+  },
+  async ({ iban }) => ({
+    messages: [{
+      role: 'user',
+      content: {
+        type: 'text',
+        text: buildValidateAndExplainPrompt(iban),
+      },
+    }],
+  }),
 );
 
 async function main() {
