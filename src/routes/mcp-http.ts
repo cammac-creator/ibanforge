@@ -27,13 +27,46 @@ const mcpHttp = new Hono();
 // Store active transports by session ID
 const transports = new Map<string, WebStandardStreamableHTTPServerTransport>();
 
-function createMcpServer(): McpServer {
-  const server = new McpServer({ name: 'ibanforge', version: pkg.version });
+const READ_ONLY_ANNOTATIONS = {
+  readOnlyHint: true,
+  idempotentHint: true,
+  destructiveHint: false,
+  openWorldHint: false,
+} as const;
 
-  server.tool(
+function createMcpServer(): McpServer {
+  const server = new McpServer({
+    name: 'ibanforge',
+    title: 'IBANforge',
+    version: pkg.version,
+    description:
+      'IBAN validation, BIC/SWIFT lookup, Swiss clearing, SEPA compliance and risk indicators. 121K+ bank entries from GLEIF, 1,190 Swiss BC-Nummer from SIX, 84 countries.',
+    websiteUrl: 'https://ibanforge.com',
+    icons: [
+      {
+        src: 'https://www.ibanforge.com/favicon.ico',
+        mimeType: 'image/vnd.microsoft.icon',
+        sizes: ['64x64'],
+      },
+      {
+        src: 'https://api.ibanforge.com/og-image.png',
+        mimeType: 'image/svg+xml',
+        sizes: ['1200x630'],
+      },
+    ],
+  });
+
+  server.registerTool(
     'validate_iban',
-    'Validate a single IBAN — returns country, BIC, SEPA info, issuer classification, and risk indicators. 84 countries.',
-    { iban: z.string().describe('IBAN to validate (spaces/hyphens stripped automatically)') },
+    {
+      title: 'Validate IBAN',
+      description:
+        'Validate a single IBAN — returns country, BIC, SEPA info, issuer classification, and risk indicators. 84 countries.',
+      inputSchema: {
+        iban: z.string().describe('IBAN to validate (spaces/hyphens stripped automatically)'),
+      },
+      annotations: { title: 'Validate IBAN', ...READ_ONLY_ANNOTATIONS },
+    },
     async ({ iban }) => {
       const result = validateIBAN(iban);
       enrichResult(result);
@@ -41,10 +74,17 @@ function createMcpServer(): McpServer {
     },
   );
 
-  server.tool(
+  server.registerTool(
     'batch_validate_iban',
-    'Validate up to 100 IBANs in one call — each result includes BIC, SEPA, issuer, and risk data.',
-    { ibans: z.array(z.string()).min(1).max(100).describe('Array of IBANs (1-100)') },
+    {
+      title: 'Batch Validate IBANs',
+      description:
+        'Validate up to 100 IBANs in one call — each result includes BIC, SEPA, issuer, and risk data.',
+      inputSchema: {
+        ibans: z.array(z.string()).min(1).max(100).describe('Array of IBANs (1-100)'),
+      },
+      annotations: { title: 'Batch Validate IBANs', ...READ_ONLY_ANNOTATIONS },
+    },
     async ({ ibans }) => {
       const results = ibans.map((iban) => {
         const result = validateIBAN(iban);
@@ -55,36 +95,65 @@ function createMcpServer(): McpServer {
     },
   );
 
-  server.tool(
+  server.registerTool(
     'lookup_bic',
-    'Look up a BIC/SWIFT code — returns institution, country, city, LEI, branch info. 121K+ entries from GLEIF.',
-    { bic: z.string().describe('BIC/SWIFT code (8 or 11 chars)') },
+    {
+      title: 'Lookup BIC/SWIFT',
+      description:
+        'Look up a BIC/SWIFT code — returns institution, country, city, LEI, branch info. 121K+ entries from GLEIF.',
+      inputSchema: {
+        bic: z.string().describe('BIC/SWIFT code (8 or 11 chars)'),
+      },
+      annotations: { title: 'Lookup BIC/SWIFT', ...READ_ONLY_ANNOTATIONS },
+    },
     async ({ bic }) => {
       const validation = validateBIC(bic);
       if (!validation.valid) {
         return {
-          content: [{ type: 'text' as const, text: JSON.stringify({ bic: validation.bic, valid: false, error: validation.error }, null, 2) }],
+          content: [
+            {
+              type: 'text' as const,
+              text: JSON.stringify(
+                { bic: validation.bic, valid: false, error: validation.error },
+                null,
+                2,
+              ),
+            },
+          ],
         };
       }
       const row = lookup(validation.bic11!);
       const result = {
-        bic: validation.bic, bic8: validation.bic8, bic11: validation.bic11,
-        valid_format: true, found: row !== null,
+        bic: validation.bic,
+        bic8: validation.bic8,
+        bic11: validation.bic11,
+        valid_format: true,
+        found: row !== null,
         institution: row?.institution ?? null,
-        country_code: validation.country_code, country_name: row?.country_name ?? null,
-        city: row?.city ?? null, branch_code: validation.branch_code,
+        country_code: validation.country_code,
+        country_name: row?.country_name ?? null,
+        city: row?.city ?? null,
+        branch_code: validation.branch_code,
         branch_info: row?.branch_info ?? null,
-        lei: row?.lei ?? null, lei_status: row?.lei_status ?? null,
+        lei: row?.lei ?? null,
+        lei_status: row?.lei_status ?? null,
         is_test_bic: validation.is_test_bic,
       };
       return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
     },
   );
 
-  server.tool(
+  server.registerTool(
     'compliance_check',
-    'Compliance check for an IBAN: validation + issuer classification + risk indicators + SEPA reachability + sanctions screening.',
-    { iban: z.string().describe('IBAN to check') },
+    {
+      title: 'Compliance Check',
+      description:
+        'Compliance check for an IBAN: validation + issuer classification + risk indicators + SEPA reachability + sanctions screening.',
+      inputSchema: {
+        iban: z.string().describe('IBAN to check'),
+      },
+      annotations: { title: 'Compliance Check', ...READ_ONLY_ANNOTATIONS },
+    },
     async ({ iban }) => {
       const result = validateIBAN(iban);
       enrichResult(result);
@@ -100,7 +169,12 @@ function createMcpServer(): McpServer {
         compliance = buildComplianceResult(countryCode, bic8, issuerType, countryRisk, isTestBic);
       } catch {
         compliance = {
-          sanctions: { country_sanctioned: false, bank_sanctioned: false, matched_lists: [], fatf_status: 'non_member' as const },
+          sanctions: {
+            country_sanctioned: false,
+            bank_sanctioned: false,
+            matched_lists: [],
+            fatf_status: 'non_member' as const,
+          },
           reachability: { sepa_instant: false, sct: false, sdd: false },
           vop: { participant: false, status: 'not_found' as const },
           risk_score: 50,
@@ -114,21 +188,52 @@ function createMcpServer(): McpServer {
     },
   );
 
-  server.tool(
+  server.registerTool(
     'lookup_ch_clearing',
-    'Look up a Swiss BC-Nummer / IID — returns institution, SIC/euroSIC participation, QR-IID. 1,190 entries from SIX BankMaster.',
-    { iid: z.string().describe('Swiss IID (1-5 digit number)') },
+    {
+      title: 'Swiss Clearing Lookup',
+      description:
+        'Look up a Swiss BC-Nummer / IID — returns institution, SIC/euroSIC participation, QR-IID. 1,190 entries from SIX BankMaster.',
+      inputSchema: {
+        iid: z.string().describe('Swiss IID (1-5 digit number)'),
+      },
+      annotations: { title: 'Swiss Clearing Lookup', ...READ_ONLY_ANNOTATIONS },
+    },
     async ({ iid }) => {
       if (!/^\d{1,5}$/.test(iid)) {
         return {
-          content: [{ type: 'text' as const, text: JSON.stringify({ error: 'invalid_iid_format', message: 'IID must be a 1-5 digit number.' }, null, 2) }],
+          content: [
+            {
+              type: 'text' as const,
+              text: JSON.stringify(
+                { error: 'invalid_iid_format', message: 'IID must be a 1-5 digit number.' },
+                null,
+                2,
+              ),
+            },
+          ],
         };
       }
       const normalizedIid = normalizeIid(iid);
       const entry = lookupClearingByBankCode(normalizedIid);
       if (!entry) {
         return {
-          content: [{ type: 'text' as const, text: JSON.stringify({ iid: normalizedIid, found: false, error: 'clearing_not_found', message: `IID ${normalizedIid} not found in Swiss BankMaster database.`, cost_usdc: 0.003 }, null, 2) }],
+          content: [
+            {
+              type: 'text' as const,
+              text: JSON.stringify(
+                {
+                  iid: normalizedIid,
+                  found: false,
+                  error: 'clearing_not_found',
+                  message: `IID ${normalizedIid} not found in Swiss BankMaster database.`,
+                  cost_usdc: 0.003,
+                },
+                null,
+                2,
+              ),
+            },
+          ],
         };
       }
       const result: Record<string, unknown> = {
