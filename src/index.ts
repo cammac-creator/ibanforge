@@ -159,45 +159,31 @@ app.get('/api', (c) => c.redirect('/v1', 302));
 app.get('/api/v1', (c) => c.redirect('/v1', 302));
 
 // Pre-validate requests before x402 paywall (don't charge for invalid input).
-// Accept any case for field names (iban, IBAN, Iban) — agents/LLMs commonly
-// uppercase IBAN as it's an acronym. Normalize the body so handlers can read body.iban.
-function pickField<T = unknown>(body: Record<string, unknown> | null, names: string[]): T | undefined {
-  if (!body) return undefined;
-  for (const name of names) {
-    if (name in body) return body[name] as T;
-    const lower = name.toLowerCase();
-    for (const k of Object.keys(body)) {
-      if (k.toLowerCase() === lower) return body[k] as T;
-    }
-  }
-  return undefined;
-}
+// Field names are case-insensitive (handled by route handlers via getIban/getIbansArray).
+import { getIban, getIbansArray } from './lib/request-helpers.js';
 
 app.post('/v1/iban/validate', async (c, next) => {
   const body = (await c.req.json().catch(() => null)) as Record<string, unknown> | null;
-  const iban = pickField<string>(body, ['iban']);
+  const iban = getIban(body);
   if (!iban || typeof iban !== 'string' || iban.trim() === '') {
-    return c.json({ error: 'invalid_request', message: "Request body must include an 'iban' field (string). Field names are case-insensitive: 'iban', 'IBAN', 'Iban' all work." }, 400);
+    return c.json({ error: 'invalid_request', message: "Request body must include an 'iban' field (case-insensitive: 'iban', 'IBAN', 'Iban' all work)." }, 400);
   }
-  if (body && !('iban' in body)) (body as Record<string, unknown>).iban = iban;
   await next();
 });
 app.post('/v1/iban/compliance', async (c, next) => {
   const body = (await c.req.json().catch(() => null)) as Record<string, unknown> | null;
-  const iban = pickField<string>(body, ['iban']);
+  const iban = getIban(body);
   if (!iban || typeof iban !== 'string' || iban.trim() === '') {
-    return c.json({ error: 'invalid_request', message: "Request body must include an 'iban' field (string). Field names are case-insensitive." }, 400);
+    return c.json({ error: 'invalid_request', message: "Request body must include an 'iban' field (case-insensitive)." }, 400);
   }
-  if (body && !('iban' in body)) (body as Record<string, unknown>).iban = iban;
   await next();
 });
 app.post('/v1/iban/batch', async (c, next) => {
   const body = (await c.req.json().catch(() => null)) as Record<string, unknown> | null;
-  const ibans = pickField<unknown[]>(body, ['ibans', 'iban_list', 'list']);
+  const ibans = getIbansArray(body);
   if (!Array.isArray(ibans) || ibans.length === 0) {
-    return c.json({ error: 'invalid_request', message: "Request body must include a non-empty 'ibans' array (also accepts 'iban_list' or 'list')." }, 400);
+    return c.json({ error: 'invalid_request', message: "Request body must include a non-empty array of IBANs. Field accepted: 'ibans', 'iban_list' or 'list'." }, 400);
   }
-  if (body && !('ibans' in body)) (body as Record<string, unknown>).ibans = ibans;
   await next();
 });
 app.get('/v1/bic/:code', async (c, next) => {
