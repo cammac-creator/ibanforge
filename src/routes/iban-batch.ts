@@ -3,6 +3,7 @@ import type { HonoEnv } from '../types.js';
 import { validateIBAN } from '../lib/iban.js';
 import { enrichResult } from '../lib/enrich.js';
 import { recordBatch } from '../lib/stats.js';
+import { getIbansArray } from '../lib/request-helpers.js';
 import type { IBANValidationResult } from '../types.js';
 
 const ibanBatch = new Hono<HonoEnv>();
@@ -10,9 +11,9 @@ const ibanBatch = new Hono<HonoEnv>();
 ibanBatch.post('/v1/iban/batch', async (c) => {
   const start = performance.now();
 
-  let body: { ibans?: unknown };
+  let body: Record<string, unknown> | null;
   try {
-    body = await c.req.json<{ ibans?: unknown }>();
+    body = await c.req.json<Record<string, unknown>>();
   } catch {
     return c.json(
       { error: 'invalid_json', message: 'Request body must be valid JSON' },
@@ -20,21 +21,18 @@ ibanBatch.post('/v1/iban/batch', async (c) => {
     );
   }
 
-  if (
-    !body.ibans ||
-    !Array.isArray(body.ibans) ||
-    !body.ibans.every((item) => typeof item === 'string')
-  ) {
+  const rawIbans = getIbansArray(body);
+  if (!rawIbans || !Array.isArray(rawIbans) || !rawIbans.every((item) => typeof item === 'string')) {
     return c.json(
       {
         error: 'invalid_request',
-        message: "Request body must include an 'ibans' array of strings (1-100 items)",
+        message: "Request body must include an array of IBAN strings (1-100 items). Field accepted: 'ibans', 'iban_list' or 'list'.",
       },
       400,
     );
   }
 
-  const ibans = body.ibans as string[];
+  const ibans = rawIbans as string[];
 
   if (ibans.length === 0) {
     return c.json(

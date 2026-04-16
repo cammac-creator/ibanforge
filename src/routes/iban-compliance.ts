@@ -4,6 +4,7 @@ import { validateIBAN } from '../lib/iban.js';
 import { enrichResult } from '../lib/enrich.js';
 import { buildComplianceResult } from '../lib/compliance.js';
 import { recordOperation } from '../lib/stats.js';
+import { getIban } from '../lib/request-helpers.js';
 import type { IBANValidationResult, ComplianceResult } from '../types.js';
 
 const ibanCompliance = new Hono<HonoEnv>();
@@ -11,18 +12,19 @@ const ibanCompliance = new Hono<HonoEnv>();
 ibanCompliance.post('/v1/iban/compliance', async (c) => {
   const start = performance.now();
 
-  let body: { iban?: unknown };
+  let body: Record<string, unknown> | null;
   try {
-    body = await c.req.json<{ iban?: unknown }>();
+    body = await c.req.json<Record<string, unknown>>();
   } catch {
     return c.json({ error: 'invalid_json', message: 'Request body must be valid JSON' }, 400);
   }
 
-  if (!body.iban || typeof body.iban !== 'string' || body.iban.trim() === '') {
-    return c.json({ error: 'invalid_request', message: "Request body must include an 'iban' field (string)" }, 400);
+  const iban = getIban(body);
+  if (!iban || typeof iban !== 'string' || iban.trim() === '') {
+    return c.json({ error: 'invalid_request', message: "Request body must include an 'iban' field (case-insensitive)." }, 400);
   }
 
-  const result: IBANValidationResult = validateIBAN(body.iban as string);
+  const result: IBANValidationResult = validateIBAN(iban);
   enrichResult(result);
 
   const countryCode = result.country?.code ?? '';

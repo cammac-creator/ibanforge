@@ -3,6 +3,7 @@ import type { HonoEnv } from '../types.js';
 import { validateIBAN } from '../lib/iban.js';
 import { enrichResult } from '../lib/enrich.js';
 import { recordOperation } from '../lib/stats.js';
+import { getIban } from '../lib/request-helpers.js';
 import type { IBANValidationResult } from '../types.js';
 
 const ibanValidate = new Hono<HonoEnv>();
@@ -10,9 +11,9 @@ const ibanValidate = new Hono<HonoEnv>();
 ibanValidate.post('/v1/iban/validate', async (c) => {
   const start = performance.now();
 
-  let body: { iban?: unknown };
+  let body: Record<string, unknown> | null;
   try {
-    body = await c.req.json<{ iban?: unknown }>();
+    body = await c.req.json<Record<string, unknown>>();
   } catch {
     return c.json(
       { error: 'invalid_json', message: 'Request body must be valid JSON' },
@@ -20,17 +21,18 @@ ibanValidate.post('/v1/iban/validate', async (c) => {
     );
   }
 
-  if (!body.iban || typeof body.iban !== 'string' || body.iban.trim() === '') {
+  const iban = getIban(body);
+  if (!iban || typeof iban !== 'string' || iban.trim() === '') {
     return c.json(
       {
         error: 'invalid_request',
-        message: "Request body must include an 'iban' field (string)",
+        message: "Request body must include an 'iban' field (case-insensitive: 'iban', 'IBAN', 'Iban' all work).",
       },
       400,
     );
   }
 
-  const result: IBANValidationResult = validateIBAN(body.iban as string);
+  const result: IBANValidationResult = validateIBAN(iban);
 
   enrichResult(result);
 
