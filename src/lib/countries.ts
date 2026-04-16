@@ -90,7 +90,7 @@ export const COUNTRY_NAMES: Record<string, string> = {
   RO: 'Romania', RS: 'Serbia', RU: 'Russia', SA: 'Saudi Arabia',
   SC: 'Seychelles', SD: 'Sudan', SE: 'Sweden', SI: 'Slovenia',
   SK: 'Slovakia', SM: 'San Marino', SO: 'Somalia', ST: 'Sao Tome and Principe',
-  SV: 'El Salvador', TL: 'East Timor', TN: 'Tunisia', TR: 'Turkey',
+  SV: 'El Salvador', TL: 'East Timor', TN: 'Tunisia', TR: 'Türkiye',
   UA: 'Ukraine', VA: 'Vatican City', VG: 'British Virgin Islands', XK: 'Kosovo',
 };
 
@@ -196,7 +196,7 @@ const ELEVATED_RISK = new Set([
   'PS', // Palestine
   'SC', // Seychelles
   'TN', // Tunisia
-  'TR', // Turkey
+  'TR', // Türkiye
   'UA', // Ukraine (conflict zone)
   'VG', // British Virgin Islands
 ]);
