@@ -115,4 +115,8 @@ Push to `main` — Railway auto-deploys via Dockerfile.
 
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE).
+
+This project includes third-party components licensed under the Apache License 2.0
+(notably `@coinbase/x402` and related x402 packages). See [NOTICE](NOTICE) for
+full attributions and required Apache 2.0 notices.
