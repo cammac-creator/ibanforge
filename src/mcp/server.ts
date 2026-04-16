@@ -2,6 +2,9 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve } from 'node:path';
 import { validateIBAN } from '../lib/iban.js';
 import { enrichResult } from '../lib/enrich.js';
 import { lookup } from '../lib/bic-lookup.js';
@@ -9,9 +12,12 @@ import { validateBIC } from '../lib/bic-validator.js';
 import { buildComplianceResult } from '../lib/compliance.js';
 import { lookupClearingByBankCode, normalizeIid, getChClearingCount } from '../lib/ch-clearing.js';
 
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const pkg = JSON.parse(readFileSync(resolve(__dirname, '../../package.json'), 'utf-8'));
+
 const server = new McpServer({
   name: 'ibanforge',
-  version: '1.0.0',
+  version: pkg.version,
 });
 
 server.registerTool(

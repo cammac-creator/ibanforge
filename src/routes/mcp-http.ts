@@ -1,17 +1,26 @@
 /**
  * HTTP transport for the MCP server.
- * Exposes the same tools as the stdio MCP server (validate_iban, batch_validate_iban, lookup_bic)
- * via Streamable HTTP at /mcp — compatible with Smithery, remote MCP clients, etc.
+ * Exposes the same 5 tools as the stdio MCP server (validate_iban, batch_validate_iban,
+ * lookup_bic, compliance_check, lookup_ch_clearing) via Streamable HTTP at /mcp —
+ * compatible with Smithery, remote MCP clients, etc.
  */
 
 import { Hono } from 'hono';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 import { z } from 'zod';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve } from 'node:path';
 import { validateIBAN } from '../lib/iban.js';
 import { enrichResult } from '../lib/enrich.js';
 import { lookup } from '../lib/bic-lookup.js';
 import { validateBIC } from '../lib/bic-validator.js';
+import { buildComplianceResult } from '../lib/compliance.js';
+import { lookupClearingByBankCode, normalizeIid } from '../lib/ch-clearing.js';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const pkg = JSON.parse(readFileSync(resolve(__dirname, '../../package.json'), 'utf-8'));
 
 const mcpHttp = new Hono();
 
@@ -19,11 +28,11 @@ const mcpHttp = new Hono();
 const transports = new Map<string, WebStandardStreamableHTTPServerTransport>();
 
 function createMcpServer(): McpServer {
-  const server = new McpServer({ name: 'ibanforge', version: '1.0.0' });
+  const server = new McpServer({ name: 'ibanforge', version: pkg.version });
 
   server.tool(
     'validate_iban',
-    'Validate a single IBAN — returns country, BIC, SEPA info, issuer classification, and risk indicators. 75+ countries.',
+    'Validate a single IBAN — returns country, BIC, SEPA info, issuer classification, and risk indicators. 84 countries.',
     { iban: z.string().describe('IBAN to validate (spaces/hyphens stripped automatically)') },
     async ({ iban }) => {
       const result = validateIBAN(iban);
@@ -48,7 +57,7 @@ function createMcpServer(): McpServer {
 
   server.tool(
     'lookup_bic',
-    'Look up a BIC/SWIFT code — returns institution, country, city, LEI, branch info. 39K+ entries from GLEIF.',
+    'Look up a BIC/SWIFT code — returns institution, country, city, LEI, branch info. 121K+ entries from GLEIF.',
     { bic: z.string().describe('BIC/SWIFT code (8 or 11 chars)') },
     async ({ bic }) => {
       const validation = validateBIC(bic);
@@ -68,6 +77,81 @@ function createMcpServer(): McpServer {
         lei: row?.lei ?? null, lei_status: row?.lei_status ?? null,
         is_test_bic: validation.is_test_bic,
       };
+      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+    },
+  );
+
+  server.tool(
+    'compliance_check',
+    'Compliance check for an IBAN: validation + issuer classification + risk indicators + SEPA reachability + sanctions screening.',
+    { iban: z.string().describe('IBAN to check') },
+    async ({ iban }) => {
+      const result = validateIBAN(iban);
+      enrichResult(result);
+
+      const countryCode = result.country?.code ?? '';
+      const bic8 = result.bic?.code?.slice(0, 8) ?? null;
+      const issuerType = result.issuer?.type ?? 'bank';
+      const countryRisk = result.risk_indicators?.country_risk ?? 'standard';
+      const isTestBic = result.risk_indicators?.test_bic ?? false;
+
+      let compliance;
+      try {
+        compliance = buildComplianceResult(countryCode, bic8, issuerType, countryRisk, isTestBic);
+      } catch {
+        compliance = {
+          sanctions: { country_sanctioned: false, bank_sanctioned: false, matched_lists: [], fatf_status: 'non_member' as const },
+          reachability: { sepa_instant: false, sct: false, sdd: false },
+          vop: { participant: false, status: 'not_found' as const },
+          risk_score: 50,
+          risk_level: 'elevated' as const,
+          flags: ['compliance_data_unavailable'],
+        };
+      }
+
+      const combined = { ...result, compliance, cost_usdc: 0.02 };
+      return { content: [{ type: 'text' as const, text: JSON.stringify(combined, null, 2) }] };
+    },
+  );
+
+  server.tool(
+    'lookup_ch_clearing',
+    'Look up a Swiss BC-Nummer / IID — returns institution, SIC/euroSIC participation, QR-IID. 1,190 entries from SIX BankMaster.',
+    { iid: z.string().describe('Swiss IID (1-5 digit number)') },
+    async ({ iid }) => {
+      if (!/^\d{1,5}$/.test(iid)) {
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify({ error: 'invalid_iid_format', message: 'IID must be a 1-5 digit number.' }, null, 2) }],
+        };
+      }
+      const normalizedIid = normalizeIid(iid);
+      const entry = lookupClearingByBankCode(normalizedIid);
+      if (!entry) {
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify({ iid: normalizedIid, found: false, error: 'clearing_not_found', message: `IID ${normalizedIid} not found in Swiss BankMaster database.`, cost_usdc: 0.003 }, null, 2) }],
+        };
+      }
+      const result: Record<string, unknown> = {
+        iid: entry.iid,
+        found: true,
+        institution: {
+          name: entry.name,
+          type: entry.institution_type,
+          iid_type: entry.iid_type,
+          headquarters_iid: entry.headquarters_iid,
+        },
+        address: entry.address,
+        bic: entry.bic,
+        payment_services: entry.payment_services,
+        sic_iid: entry.sic_iid,
+        qr_iid: entry.qr_iid,
+        valid_on: entry.valid_on,
+        cost_usdc: 0.003,
+      };
+      if (entry.redirected_from) {
+        result.redirected_from = entry.redirected_from;
+        result.note = `IID ${entry.redirected_from} has been merged into IID ${entry.iid}.`;
+      }
       return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
     },
   );
