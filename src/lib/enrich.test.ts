@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { enrichResult } from './enrich.js';
+import { enrichResult, isTestBic } from './enrich.js';
 import { validateIBAN } from './iban.js';
 import type { IBANValidationResult } from '../types.js';
 
@@ -99,5 +99,33 @@ describe('enrichResult', () => {
     if (result.clearing) {
       expect(['bank', 'cantonal_bank', 'postfinance', 'raiffeisen', 'central_bank', 'foreign_participant']).toContain(result.clearing.type);
     }
+  });
+
+  // Regression: test_bic was previously hardcoded to false in enrich.ts,
+  // silently disabling the +30 risk score penalty for test BICs in
+  // compliance.calculateRiskScore.
+  describe('isTestBic (ISO 9362 §5.3 — location code[1] === "0")', () => {
+    it('false for a production BIC', () => {
+      expect(isTestBic('COBADEFFXXX')).toBe(false);
+      expect(isTestBic('UBSWCHZH')).toBe(false);
+    });
+
+    it('true when location code second char is "0"', () => {
+      expect(isTestBic('MARKDE50')).toBe(true);
+      expect(isTestBic('TESTUS60XXX')).toBe(true);
+    });
+
+    it('false for empty, undefined, or too-short input', () => {
+      expect(isTestBic(undefined)).toBe(false);
+      expect(isTestBic(null)).toBe(false);
+      expect(isTestBic('')).toBe(false);
+      expect(isTestBic('SHORT')).toBe(false);
+    });
+
+    it('enrichResult uses isTestBic for real IBANs (non-test production path)', () => {
+      const result = validateIBAN('DE89370400440532013000');
+      enrichResult(result);
+      expect(result.risk_indicators?.test_bic).toBe(false);
+    });
   });
 });

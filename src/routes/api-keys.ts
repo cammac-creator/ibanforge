@@ -1,8 +1,29 @@
 import { Hono } from 'hono';
+import { timingSafeEqual } from 'node:crypto';
 import { generateApiKey, validateApiKey, getUsage } from '../lib/api-keys.js';
 import { getStatsDB } from '../lib/db.js';
 
 const apiKeys = new Hono();
+
+/**
+ * Constant-time admin auth. Returns true only if ADMIN_SECRET is set AND
+ * the provided header matches exactly. Length-normalized before timing-safe
+ * compare so comparison cost does not leak the secret's length.
+ */
+function isAdminAuthorized(provided: string | undefined): boolean {
+  const expected = process.env.ADMIN_SECRET;
+  if (!expected || !provided) return false;
+  const expectedBuf = Buffer.from(expected, 'utf8');
+  const providedBuf = Buffer.from(provided, 'utf8');
+  // Pad provided to the same length (compare a dummy if mismatched) to make
+  // the decision branch-free from attacker's POV.
+  if (expectedBuf.length !== providedBuf.length) {
+    // Still do a dummy compare to equalize timing.
+    timingSafeEqual(expectedBuf, expectedBuf);
+    return false;
+  }
+  return timingSafeEqual(expectedBuf, providedBuf);
+}
 
 apiKeys.post('/v1/keys/generate', async (c) => {
   let body: { email?: unknown };
@@ -53,8 +74,7 @@ apiKeys.get('/v1/keys/usage', (c) => {
 });
 
 apiKeys.post('/v1/admin/keys', async (c) => {
-  const adminSecret = process.env.ADMIN_SECRET;
-  if (!adminSecret || c.req.header('X-Admin-Secret') !== adminSecret) {
+  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
     return c.json({ error: 'unauthorized' }, 401);
   }
 
@@ -85,8 +105,7 @@ apiKeys.post('/v1/admin/keys', async (c) => {
 });
 
 apiKeys.post('/v1/admin/keys/import', async (c) => {
-  const adminSecret = process.env.ADMIN_SECRET;
-  if (!adminSecret || c.req.header('X-Admin-Secret') !== adminSecret) {
+  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
     return c.json({ error: 'unauthorized' }, 401);
   }
 
@@ -125,8 +144,7 @@ apiKeys.post('/v1/admin/keys/import', async (c) => {
 });
 
 apiKeys.get('/v1/admin/keys', (c) => {
-  const adminSecret = process.env.ADMIN_SECRET;
-  if (!adminSecret || c.req.header('X-Admin-Secret') !== adminSecret) {
+  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
     return c.json({ error: 'unauthorized' }, 401);
   }
 

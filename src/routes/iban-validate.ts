@@ -3,7 +3,7 @@ import type { HonoEnv } from '../types.js';
 import { validateIBAN } from '../lib/iban.js';
 import { enrichResult } from '../lib/enrich.js';
 import { recordOperation } from '../lib/stats.js';
-import { getIban } from '../lib/request-helpers.js';
+import { getIban, computeRevenue } from '../lib/request-helpers.js';
 import type { IBANValidationResult } from '../types.js';
 
 const ibanValidate = new Hono<HonoEnv>();
@@ -36,6 +36,7 @@ ibanValidate.post('/v1/iban/validate', async (c) => {
 
   enrichResult(result);
 
+  const postedPrice = result.cost_usdc;
   if (c.get('apiKeyAuthenticated')) {
     result.cost_usdc = 0;
   }
@@ -43,7 +44,8 @@ ibanValidate.post('/v1/iban/validate', async (c) => {
   result.processing_ms = Math.round((performance.now() - start) * 100) / 100;
 
   const errorDetail = result.valid ? undefined : result.iban.slice(0, 4);
-  recordOperation('iban_validate', result.country?.code ?? null, result.valid, result.cost_usdc, errorDetail);
+  const revenue = computeRevenue(c, postedPrice);
+  recordOperation('iban_validate', result.country?.code ?? null, result.valid, revenue, errorDetail);
 
   return c.json(result);
 });

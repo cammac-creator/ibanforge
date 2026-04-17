@@ -77,3 +77,16 @@ export function getUsage(
   const used = row?.count ?? 0;
   return { used, limit: monthlyLimit, remaining: monthlyLimit - used, month };
 }
+
+/**
+ * Decrement the quota counter for this key+month. Used to refund a consumed
+ * slot when the underlying request failed with a client error (4xx) — we
+ * should not punish callers for malformed input by eating their quota.
+ */
+export function decrementQuota(keyHash: string): void {
+  const db = getStatsDB();
+  const month = new Date().toISOString().slice(0, 7);
+  db.prepare(
+    'UPDATE api_usage SET count = MAX(count - 1, 0) WHERE key_hash = ? AND month = ?',
+  ).run(keyHash, month);
+}

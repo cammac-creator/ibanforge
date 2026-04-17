@@ -4,7 +4,7 @@ import { validateIBAN } from '../lib/iban.js';
 import { enrichResult } from '../lib/enrich.js';
 import { buildComplianceResult } from '../lib/compliance.js';
 import { recordOperation } from '../lib/stats.js';
-import { getIban } from '../lib/request-helpers.js';
+import { getIban, computeRevenue } from '../lib/request-helpers.js';
 import type { IBANValidationResult, ComplianceResult } from '../types.js';
 
 const ibanCompliance = new Hono<HonoEnv>();
@@ -47,7 +47,8 @@ ibanCompliance.post('/v1/iban/compliance', async (c) => {
 
   const processingMs = Math.round((performance.now() - start) * 100) / 100;
   const errorDetail = result.valid ? undefined : result.iban.slice(0, 4);
-  recordOperation('iban_compliance', countryCode || null, result.valid, 0.02, errorDetail);
+  const revenue = computeRevenue(c, 0.02);
+  recordOperation('iban_compliance', countryCode || null, result.valid, revenue, errorDetail);
 
   const costUsdc = c.get('apiKeyAuthenticated') ? 0 : 0.02;
 

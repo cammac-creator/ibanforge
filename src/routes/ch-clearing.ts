@@ -12,6 +12,7 @@ import {
   normalizeIid,
 } from '../lib/ch-clearing.js';
 import { recordOperation } from '../lib/stats.js';
+import { computeRevenue } from '../lib/request-helpers.js';
 import type { ChClearingLookupResult } from '../types.js';
 
 const COST_USDC = 0.003;
@@ -38,9 +39,10 @@ chClearing.get('/v1/ch/clearing/:iid', (c) => {
   // Use lookupClearingByBankCode to follow redirects
   const entry = lookupClearingByBankCode(normalizedIid);
   const processingMs = Math.round((performance.now() - start) * 100) / 100;
+  const revenue = computeRevenue(c, COST_USDC);
 
   if (!entry) {
-    recordOperation('ch_clearing_lookup', 'CH', false, COST_USDC, normalizedIid);
+    recordOperation('ch_clearing_lookup', 'CH', false, revenue, normalizedIid);
 
     const result: ChClearingLookupResult = {
       iid: normalizedIid,
@@ -53,7 +55,7 @@ chClearing.get('/v1/ch/clearing/:iid', (c) => {
     return c.json(result);
   }
 
-  recordOperation('ch_clearing_lookup', entry.address.country, true, COST_USDC);
+  recordOperation('ch_clearing_lookup', entry.address.country, true, revenue);
 
   const result: ChClearingLookupResult = {
     iid: entry.iid,
