@@ -3,7 +3,7 @@ import type { HonoEnv } from '../types.js';
 import { validateIBAN } from '../lib/iban.js';
 import { enrichResult } from '../lib/enrich.js';
 import { recordBatch } from '../lib/stats.js';
-import { getIbansArray } from '../lib/request-helpers.js';
+import { getIbansArray, computeRevenue } from '../lib/request-helpers.js';
 import type { IBANValidationResult } from '../types.js';
 
 const ibanBatch = new Hono<HonoEnv>();
@@ -60,10 +60,12 @@ ibanBatch.post('/v1/iban/batch', async (c) => {
   // Proportional cost: $0.002 per IBAN (discount vs individual $0.005)
   // e.g. 10 IBANs = $0.020, 100 IBANs = $0.200
   const totalCost = isApiKey ? 0 : Math.round(ibans.length * 0.002 * 1000) / 1000;
+  const postedTotal = Math.round(ibans.length * 0.002 * 1000) / 1000;
   const processingMs = Math.round((performance.now() - start) * 100) / 100;
   const validCount = results.filter((r) => r.valid).length;
 
-  recordBatch(results.length, validCount, totalCost);
+  const revenue = computeRevenue(c, postedTotal);
+  recordBatch(results.length, validCount, revenue);
 
   return c.json({
     results,

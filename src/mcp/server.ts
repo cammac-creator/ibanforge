@@ -58,6 +58,9 @@ Cost: $0.005 USDC per call via x402 micropayment on Base L2.`,
     inputSchema: {
       iban: z
         .string()
+        .trim()
+        .min(5, 'IBAN is too short')
+        .max(42, 'IBAN is too long (max 34 chars + 8 separators)')
         .describe(
           "The IBAN to validate. Must be a string of 15-34 alphanumeric characters. Spaces and hyphens are accepted and stripped automatically before validation. Examples: 'CH56 0483 5012 3456 7800 9', 'DE89370400440532013000', 'FR76-3000-6000-0112-3456-7890-189'.",
         ),
@@ -99,7 +102,7 @@ Example: input ['DE89370400440532013000', 'INVALID123'] → [{ valid: true, ... 
 Cost: $0.002 USDC per IBAN (e.g., 10 IBANs = $0.020, 50 IBANs = $0.100, 100 IBANs = $0.200).`,
     inputSchema: {
       ibans: z
-        .array(z.string())
+        .array(z.string().trim().min(5).max(42))
         .min(1)
         .max(100)
         .describe(
@@ -149,6 +152,8 @@ Cost: $0.003 USDC per call via x402 micropayment on Base L2.`,
     inputSchema: {
       bic: z
         .string()
+        .trim()
+        .regex(/^[A-Za-z0-9]{8}([A-Za-z0-9]{3})?$/, 'BIC must be 8 or 11 alphanumeric characters')
         .describe(
           "The BIC/SWIFT code to look up. Must be 8 characters (BIC8, e.g., 'UBSWCHZH') or 11 characters (BIC11, e.g., 'UBSWCHZH80A'). Case-insensitive. The first 4 characters are the institution code, characters 5-6 are the country code (ISO 3166-1), characters 7-8 are the location code, and optional characters 9-11 are the branch code.",
         ),
@@ -227,6 +232,9 @@ Cost: $0.02 USDC per call via x402 micropayment on Base L2.`,
     inputSchema: {
       iban: z
         .string()
+        .trim()
+        .min(5)
+        .max(42)
         .describe(
           "The IBAN to check. Must be a string of 15-34 alphanumeric characters. Spaces and hyphens are accepted and stripped automatically before validation. Examples: 'CH56 0483 5012 3456 7800 9', 'DE89370400440532013000'.",
         ),
@@ -290,6 +298,8 @@ Cost: $0.003 USDC per call via x402 micropayment on Base L2.`,
     inputSchema: {
       iid: z
         .string()
+        .trim()
+        .regex(/^\d{1,5}$/, 'IID must be a 1-5 digit number')
         .describe(
           "Swiss BC-Nummer / IID. 1-5 digits, e.g. '230' or '00230'. Zero-padded internally to 5 digits. Examples: '230' (UBS), '30000' (PostFinance), '700' (Zürcher Kantonalbank), '80000' (Raiffeisen).",
         ),

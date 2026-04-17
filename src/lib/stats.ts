@@ -77,13 +77,18 @@ export function recordRequest(method: string, path: string, status: number, resp
 }
 
 /**
- * Record a single operation (IBAN validation, BIC lookup, etc.)
+ * Record a single operation (IBAN validation, BIC lookup, etc.).
+ *
+ * `revenueUsdc` is the amount actually collected (NOT the posted price).
+ * Pass 0 when the request was served for free (API-key auth, x402 disabled,
+ * or dev-skip) so the dashboard reflects real revenue instead of phantom
+ * earnings.
  */
 export function recordOperation(
   type: OperationType,
   countryCode: string | null,
   success: boolean,
-  costUsdc: number,
+  revenueUsdc: number,
   errorDetail?: string,
 ) {
   try {
@@ -91,7 +96,7 @@ export function recordOperation(
     const dow = (new Date().getUTCDay() + 6) % 7; // 0=Mon, 6=Sun
     const truncatedError = errorDetail ? errorDetail.slice(0, 12) : null;
     insertOp().run(type, countryCode, success ? 1 : 0, hour, dow, truncatedError);
-    upsertDaily().run(type, 1, success ? 1 : 0, costUsdc);
+    upsertDaily().run(type, 1, success ? 1 : 0, revenueUsdc);
     upsertHourly().run(hour, dow, type, 1, success ? 1 : 0);
   } catch {
     // Stats are non-critical — never crash the API
@@ -101,7 +106,7 @@ export function recordOperation(
 /**
  * Record a batch of IBAN validations in one call
  */
-export function recordBatch(count: number, validCount: number, costUsdc: number) {
+export function recordBatch(count: number, validCount: number, revenueUsdc: number) {
   try {
     const hour = new Date().getUTCHours();
     const dow = (new Date().getUTCDay() + 6) % 7; // 0=Mon, 6=Sun
@@ -110,7 +115,7 @@ export function recordBatch(count: number, validCount: number, costUsdc: number)
       const stmt = insertOp();
       for (let i = 0; i < validCount; i++) stmt.run('iban_batch', null, 1, hour, dow, null);
       for (let i = 0; i < count - validCount; i++) stmt.run('iban_batch', null, 0, hour, dow, null);
-      upsertDaily().run('iban_batch', count, validCount, costUsdc);
+      upsertDaily().run('iban_batch', count, validCount, revenueUsdc);
       upsertHourly().run(hour, dow, 'iban_batch', count, validCount);
     });
     tx();

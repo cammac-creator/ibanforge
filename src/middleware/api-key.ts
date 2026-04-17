@@ -1,6 +1,6 @@
 import type { MiddlewareHandler } from 'hono';
 import type { HonoEnv } from '../types.js';
-import { validateApiKey, checkAndIncrementQuota } from '../lib/api-keys.js';
+import { validateApiKey, checkAndIncrementQuota, decrementQuota } from '../lib/api-keys.js';
 
 /**
  * Extract an IBANforge API key from common locations agents use:
@@ -60,5 +60,14 @@ export function apiKeyMiddleware(): MiddlewareHandler<HonoEnv> {
 
     c.set('apiKeyAuthenticated', true);
     await next();
+
+    // Refund the quota slot if the downstream handler rejected the request
+    // with a 4xx client error (bad input, validation failure). Otherwise an
+    // attacker could burn a key's monthly quota for free by spamming invalid
+    // payloads. 5xx is NOT refunded — we charge for server-side failures to
+    // avoid hiding infrastructure problems.
+    if (c.res.status >= 400 && c.res.status < 500) {
+      decrementQuota(keyHash);
+    }
   };
 }

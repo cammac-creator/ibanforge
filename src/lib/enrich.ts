@@ -11,6 +11,15 @@ import { lookupClearingByBankCode } from './ch-clearing.js';
 import type { IBANValidationResult } from '../types.js';
 
 /**
+ * A BIC is a test/internal institution if the second character of the
+ * location code is "0" (ISO 9362 §5.3). The location code occupies
+ * positions 7-8 (0-indexed) of the BIC.
+ */
+export function isTestBic(bicCode: string | null | undefined): boolean {
+  return !!bicCode && bicCode.length >= 8 && bicCode[7] === '0';
+}
+
+/**
  * Enrich a valid IBAN result with BIC lookup, issuer classification,
  * and risk indicators. Mutates the result object in place.
  */
@@ -28,11 +37,10 @@ export function enrichResult(result: IBANValidationResult): void {
     result.issuer = known ?? { type: 'bank', name: result.bic.bank_name ?? 'Unknown' };
   }
 
-  // Risk indicators
   result.risk_indicators = {
     issuer_type: result.issuer?.type ?? 'bank',
     country_risk: getCountryRisk(cc),
-    test_bic: false,
+    test_bic: isTestBic(result.bic?.code),
     sepa_reachable: result.sepa?.member ?? false,
     vop_coverage: result.sepa?.vop_required ?? false,
   };

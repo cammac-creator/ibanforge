@@ -3,6 +3,7 @@ import type { HonoEnv } from '../types.js';
 import { validateBIC } from '../lib/bic-validator.js';
 import { lookup } from '../lib/bic-lookup.js';
 import { recordOperation } from '../lib/stats.js';
+import { computeRevenue } from '../lib/request-helpers.js';
 import type { BICLookupResult } from '../types.js';
 
 const COST_USDC = 0.003;
@@ -42,7 +43,8 @@ bicLookup.get('/v1/bic/:code', (c) => {
   const found = row !== null;
 
   const errorDetail = found ? undefined : validation.bic;
-  recordOperation('bic_lookup', validation.country_code ?? null, found, COST_USDC, errorDetail);
+  const revenue = computeRevenue(c, COST_USDC);
+  recordOperation('bic_lookup', validation.country_code ?? null, found, revenue, errorDetail);
 
   const result: BICLookupResult = {
     bic: validation.bic,

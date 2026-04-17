@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { generateApiKey, validateApiKey, checkAndIncrementQuota, getUsage } from './api-keys.js';
+import { generateApiKey, validateApiKey, checkAndIncrementQuota, getUsage, decrementQuota } from './api-keys.js';
 
 // Use a unique suffix per test run to avoid rate-limit conflicts across runs
 const RUN_ID = Date.now();
@@ -44,5 +44,24 @@ describe('API Keys', () => {
     const usage = getUsage(v.keyHash);
     expect(usage.used).toBe(2);
     expect(usage.remaining).toBe(198);
+  });
+
+  it('decrementQuota refunds a consumed slot', () => {
+    const result = generateApiKey(`refund-${RUN_ID}@example.com`);
+    const v = validateApiKey(result!.api_key);
+    checkAndIncrementQuota(v.keyHash);
+    checkAndIncrementQuota(v.keyHash);
+    decrementQuota(v.keyHash);
+    const usage = getUsage(v.keyHash);
+    expect(usage.used).toBe(1);
+  });
+
+  it('decrementQuota never drops below zero', () => {
+    const result = generateApiKey(`refund-floor-${RUN_ID}@example.com`);
+    const v = validateApiKey(result!.api_key);
+    decrementQuota(v.keyHash);
+    decrementQuota(v.keyHash);
+    const usage = getUsage(v.keyHash);
+    expect(usage.used).toBe(0);
   });
 });
