@@ -323,8 +323,72 @@ function createMcpServer(): McpServer {
   return server;
 }
 
+// ── MCP tool call rate limiting ───────────────────────────────────────────────
+// Free MCP access is limited to 50 tool calls per IP per day.
+// Discovery (initialize, tools/list, resources/list) is unlimited.
+const MCP_DAILY_LIMIT = 50;
+const mcpCallCounts = new Map<string, { count: number; date: string }>();
+
+// Clean up stale entries every 10 minutes
+setInterval(() => {
+  const today = new Date().toISOString().slice(0, 10);
+  for (const [key, val] of mcpCallCounts) {
+    if (val.date !== today) mcpCallCounts.delete(key);
+  }
+}, 10 * 60 * 1000);
+
+function checkMcpRateLimit(ip: string): { allowed: boolean; used: number; remaining: number } {
+  const today = new Date().toISOString().slice(0, 10);
+  const entry = mcpCallCounts.get(ip);
+  if (!entry || entry.date !== today) {
+    mcpCallCounts.set(ip, { count: 1, date: today });
+    return { allowed: true, used: 1, remaining: MCP_DAILY_LIMIT - 1 };
+  }
+  entry.count++;
+  const allowed = entry.count <= MCP_DAILY_LIMIT;
+  return { allowed, used: entry.count, remaining: Math.max(0, MCP_DAILY_LIMIT - entry.count) };
+}
+
 // Handle POST /mcp (client → server messages)
 mcpHttp.post('/mcp', async (c) => {
+  // Parse the body to check if this is a tools/call (rate-limited)
+  // vs. discovery (unlimited). We clone the request so the transport
+  // can still read the original body.
+  const cloned = c.req.raw.clone();
+  let isToolCall = false;
+  let rpcId: unknown = null;
+  try {
+    const body = await cloned.json();
+    if (body?.method === 'tools/call') {
+      isToolCall = true;
+      rpcId = body.id;
+    }
+  } catch {
+    // Not JSON or malformed — let the transport handle the error
+  }
+
+  if (isToolCall) {
+    const ip = c.req.header('x-forwarded-for')?.split(',')[0]?.trim()
+      ?? c.req.header('x-real-ip')
+      ?? 'unknown';
+    const limit = checkMcpRateLimit(ip);
+    if (!limit.allowed) {
+      // Return a proper JSON-RPC error so the MCP client understands
+      return c.json({
+        jsonrpc: '2.0',
+        id: rpcId,
+        error: {
+          code: -32000,
+          message: `Daily MCP free tier limit reached (${MCP_DAILY_LIMIT} tool calls/day). `
+            + 'For unlimited access, use the REST API with an API key '
+            + '(free: POST /v1/keys/generate) or x402 micropayments. '
+            + 'See https://api.ibanforge.com/.well-known/x402',
+          data: { used: limit.used, limit: MCP_DAILY_LIMIT, remaining: 0 },
+        },
+      });
+    }
+  }
+
   const sessionId = c.req.header('mcp-session-id');
 
   let transport = sessionId ? transports.get(sessionId) : undefined;
