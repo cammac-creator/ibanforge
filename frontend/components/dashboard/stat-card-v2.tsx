@@ -1,3 +1,6 @@
+import type { ReactNode } from 'react';
+import { InfoDot } from './info-dot';
+
 interface TrendProps {
   direction: 'up' | 'down' | 'neutral';
   label: string;
@@ -9,6 +12,7 @@ interface StatCardV2Props {
   trend?: TrendProps;
   sparkline?: number[];
   accentColor?: string;
+  hint?: ReactNode;
 }
 
 function SparklineSVG({
@@ -90,14 +94,18 @@ export function StatCardV2({
   trend,
   sparkline,
   accentColor = '#f59e0b',
+  hint,
 }: StatCardV2Props) {
   return (
     <div className="bg-gradient-to-br from-zinc-900 to-zinc-900/60 border border-zinc-800/60 rounded-xl p-4">
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
-          <p className="text-[11px] font-medium uppercase tracking-wider text-zinc-500 mb-2">
-            {title}
-          </p>
+          <div className="mb-2 flex items-center gap-1.5">
+            <p className="text-[11px] font-medium uppercase tracking-wider text-zinc-500">
+              {title}
+            </p>
+            {hint && <InfoDot>{hint}</InfoDot>}
+          </div>
           <p className="text-2xl font-bold font-mono text-white leading-none mb-2">
             {value}
           </p>
