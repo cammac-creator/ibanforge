@@ -183,6 +183,17 @@ describe('getStatusByPath', () => {
     }
   });
 
+  it('by_method sums back to total and keys are HTTP verbs', () => {
+    const rows = getStatusByPath(30);
+    for (const r of rows) {
+      const sum = Object.values(r.by_method).reduce((s, n) => s + n, 0);
+      expect(sum).toBe(r.total);
+      for (const m of Object.keys(r.by_method)) {
+        expect(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS']).toContain(m);
+      }
+    }
+  });
+
   it('rows are ordered by total desc', () => {
     const rows = getStatusByPath(30);
     for (let i = 1; i < rows.length; i++) {
