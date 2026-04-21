@@ -60,7 +60,17 @@ app.use('*', compress());
 
 // Track all HTTP requests for dashboard analytics
 // Exclude internal/monitoring endpoints to avoid feedback loop
-const SKIP_TRACKING = new Set(['/stats', '/stats/history', '/stats/hourly', '/stats/errors', '/stats/patterns', '/health', '/ping']);
+const SKIP_TRACKING = new Set([
+  '/stats',
+  '/stats/history',
+  '/stats/hourly',
+  '/stats/errors',
+  '/stats/patterns',
+  '/stats/status-by-path',
+  '/stats/business-funnel',
+  '/health',
+  '/ping',
+]);
 app.use('*', async (c, next) => {
   const start = performance.now();
   await next();
