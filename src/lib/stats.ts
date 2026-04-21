@@ -370,6 +370,71 @@ export function getHourlyStats(days: number = 7): HourlyStatsResponse {
 }
 
 /**
+ * Daily business funnel: only counts requests that actually target a
+ * billable endpoint with the RIGHT HTTP verb (anything else is scanner
+ * noise or wrong-method and gets excluded). Categorises into signals
+ * that matter for conversion: paid success, paywall hit (= money left
+ * on the table), authenticated user hitting a hard error (quota / bad
+ * input), and real server failures.
+ */
+export interface BusinessFunnelDay {
+  date: string;
+  /** 2xx on a billable endpoint with the expected method. */
+  success: number;
+  /** 402 Payment Required — agent wanted it but didn't pay / no key. */
+  paywall: number;
+  /** 401 Unauthorized or 429 Too Many Requests — convert opportunity. */
+  auth_or_quota: number;
+  /** 400 Bad Request on a billable endpoint. */
+  bad_input: number;
+  /** 5xx — real problems, must stay at 0. */
+  server_error: number;
+}
+
+// (method, path-prefix) pairs that count as billable business traffic.
+// Intentionally conservative: any path normalised to a billable family with
+// the expected verb is in; everything else (scanner hitting POST on a GET
+// route, or /robots.txt, /favicon.ico, /) is excluded.
+const BILLABLE_RULES: Array<{ method: string; pathStartsWith: string }> = [
+  { method: 'POST', pathStartsWith: '/v1/iban/validate' },
+  { method: 'POST', pathStartsWith: '/v1/iban/batch' },
+  { method: 'POST', pathStartsWith: '/v1/iban/compliance' },
+  { method: 'GET', pathStartsWith: '/v1/bic/' },
+  { method: 'GET', pathStartsWith: '/v1/ch/clearing/' },
+];
+
+function buildBillableFilter(): { sql: string; params: string[] } {
+  // (method = ? AND path LIKE ?) OR (method = ? AND path LIKE ?) ...
+  const clauses = BILLABLE_RULES.map(() => '(method = ? AND path LIKE ?)').join(' OR ');
+  const params: string[] = [];
+  for (const r of BILLABLE_RULES) {
+    params.push(r.method);
+    params.push(r.pathStartsWith + '%');
+  }
+  return { sql: clauses, params };
+}
+
+export function getBusinessFunnel(days: number = 30): BusinessFunnelDay[] {
+  const db = getStatsDB();
+  const filter = buildBillableFilter();
+  const rows = db.prepare(`
+    SELECT
+      date(created_at) as date,
+      SUM(CASE WHEN status >= 200 AND status < 300 THEN 1 ELSE 0 END) as success,
+      SUM(CASE WHEN status = 402 THEN 1 ELSE 0 END) as paywall,
+      SUM(CASE WHEN status = 401 OR status = 429 THEN 1 ELSE 0 END) as auth_or_quota,
+      SUM(CASE WHEN status = 400 THEN 1 ELSE 0 END) as bad_input,
+      SUM(CASE WHEN status >= 500 THEN 1 ELSE 0 END) as server_error
+    FROM request_log
+    WHERE created_at >= datetime('now', '-' || ? || ' days')
+      AND (${filter.sql})
+    GROUP BY date(created_at)
+    ORDER BY date ASC
+  `).all(days, ...filter.params) as BusinessFunnelDay[];
+  return rows;
+}
+
+/**
  * HTTP status-code breakdown per endpoint path over the last N days.
  *
  * Answers "where are the 4xx actually coming from?" — critical for
