@@ -376,7 +376,7 @@ export function getHourlyStats(days: number = 7): HourlyStatsResponse {
  * telling real-funnel signal (402 on /v1/* = agent hit the paywall)
  * from noise (404 on /wp-admin = scanner).
  */
-export function getStatusByPath(days: number = 30): Array<{
+export interface StatusByPathRow {
   path: string;
   total: number;
   s2xx: number;
@@ -384,9 +384,13 @@ export function getStatusByPath(days: number = 30): Array<{
   s4xx: number;
   s5xx: number;
   avg_ms: number;
-}> {
+  /** Exact HTTP status code → count. Keys are stringified ints ("400", "402", "404"...). */
+  by_status: Record<string, number>;
+}
+
+export function getStatusByPath(days: number = 30): StatusByPathRow[] {
   const db = getStatsDB();
-  const rows = db.prepare(`
+  const aggregates = db.prepare(`
     SELECT
       path,
       COUNT(*) as total,
@@ -400,16 +404,32 @@ export function getStatusByPath(days: number = 30): Array<{
     GROUP BY path
     ORDER BY total DESC
     LIMIT 30
-  `).all(days) as Array<{
-    path: string;
-    total: number;
-    s2xx: number;
-    s3xx: number;
-    s4xx: number;
-    s5xx: number;
-    avg_ms: number;
-  }>;
-  return rows;
+  `).all(days) as Array<Omit<StatusByPathRow, 'by_status'>>;
+
+  if (aggregates.length === 0) return [];
+
+  // Second pass: exact status × path for the paths we kept. One row per (path,
+  // status) — cheaper than a GROUP_CONCAT and keeps the SQL portable.
+  const pathPlaceholders = aggregates.map(() => '?').join(',');
+  const detailRows = db.prepare(`
+    SELECT path, status, COUNT(*) as n
+    FROM request_log
+    WHERE created_at >= datetime('now', '-' || ? || ' days')
+      AND path IN (${pathPlaceholders})
+    GROUP BY path, status
+  `).all(days, ...aggregates.map(r => r.path)) as Array<{ path: string; status: number; n: number }>;
+
+  const detailMap = new Map<string, Record<string, number>>();
+  for (const r of detailRows) {
+    const existing = detailMap.get(r.path) ?? {};
+    existing[String(r.status)] = r.n;
+    detailMap.set(r.path, existing);
+  }
+
+  return aggregates.map(r => ({
+    ...r,
+    by_status: detailMap.get(r.path) ?? {},
+  }));
 }
 
 /**

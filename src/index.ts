@@ -188,6 +188,17 @@ app.post('/v1/iban/batch', async (c, next) => {
 });
 app.get('/v1/bic/:code', async (c, next) => {
   const code = c.req.param('code');
+  // Agents sometimes call the OpenAPI template path literally (e.g. `/v1/bic/{code}`
+  // decoded to `{code}`). Catch this with a dedicated message instead of the
+  // generic format error, so the agent can self-correct.
+  if (code === '{code}' || /^\{.*\}$/.test(code)) {
+    return c.json({
+      error: 'placeholder_literal',
+      message: "You sent the literal OpenAPI placeholder '" + code + "'. Substitute it with a real BIC.",
+      example: 'GET /v1/bic/UBSWCHZH',
+      schema: 'https://api.ibanforge.com/openapi.json',
+    }, 400);
+  }
   if (!/^[A-Za-z0-9]{8}([A-Za-z0-9]{3})?$/.test(code)) {
     return c.json({ error: 'invalid_bic_format', message: 'BIC code must be 8 or 11 alphanumeric characters' }, 400);
   }
@@ -195,6 +206,14 @@ app.get('/v1/bic/:code', async (c, next) => {
 });
 app.get('/v1/ch/clearing/:iid', async (c, next) => {
   const iid = c.req.param('iid');
+  if (iid === '{iid}' || /^\{.*\}$/.test(iid)) {
+    return c.json({
+      error: 'placeholder_literal',
+      message: "You sent the literal OpenAPI placeholder '" + iid + "'. Substitute it with a real Swiss IID.",
+      example: 'GET /v1/ch/clearing/230',
+      schema: 'https://api.ibanforge.com/openapi.json',
+    }, 400);
+  }
   if (!/^\d{1,5}$/.test(iid)) {
     return c.json({ error: 'invalid_iid_format', message: 'IID must be a 1-5 digit number.' }, 400);
   }

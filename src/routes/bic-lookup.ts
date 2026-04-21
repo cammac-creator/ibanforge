@@ -14,6 +14,18 @@ bicLookup.get('/v1/bic/:code', (c) => {
   const start = performance.now();
   const code = c.req.param('code');
 
+  if (code === '{code}' || /^\{.*\}$/.test(code)) {
+    return c.json(
+      {
+        error: 'placeholder_literal',
+        message: "You sent the literal OpenAPI placeholder '" + code + "'. Substitute it with a real BIC.",
+        example: 'GET /v1/bic/UBSWCHZH',
+        schema: 'https://api.ibanforge.com/openapi.json',
+      },
+      400,
+    );
+  }
+
   if (!/^[A-Za-z0-9]{8}([A-Za-z0-9]{3})?$/.test(code)) {
     return c.json(
       {
