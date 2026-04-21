@@ -1,5 +1,5 @@
 import { describe, it, expect, afterAll } from 'vitest';
-import { recordOperation, recordBatch, getStats, getQuickStats, getStatsHistory, getStatusByPath } from './stats.js';
+import { recordOperation, recordBatch, getStats, getQuickStats, getStatsHistory, getStatusByPath, getBusinessFunnel } from './stats.js';
 import { closeAll } from './db.js';
 
 afterAll(() => {
@@ -198,6 +198,35 @@ describe('getStatusByPath', () => {
     const rows = getStatusByPath(30);
     for (let i = 1; i < rows.length; i++) {
       expect(rows[i - 1].total).toBeGreaterThanOrEqual(rows[i].total);
+    }
+  });
+});
+
+describe('getBusinessFunnel', () => {
+  it('returns an array (possibly empty)', () => {
+    expect(Array.isArray(getBusinessFunnel())).toBe(true);
+  });
+
+  it('each row has date + 5 numeric buckets, all non-negative', () => {
+    const rows = getBusinessFunnel(30);
+    for (const r of rows) {
+      expect(typeof r.date).toBe('string');
+      for (const k of ['success', 'paywall', 'auth_or_quota', 'bad_input', 'server_error'] as const) {
+        expect(typeof r[k]).toBe('number');
+        expect(r[k]).toBeGreaterThanOrEqual(0);
+      }
+    }
+  });
+
+  it('honours the period clamp without throwing', () => {
+    expect(() => getBusinessFunnel(1)).not.toThrow();
+    expect(() => getBusinessFunnel(90)).not.toThrow();
+  });
+
+  it('rows are chronologically ascending', () => {
+    const rows = getBusinessFunnel(30);
+    for (let i = 1; i < rows.length; i++) {
+      expect(rows[i].date >= rows[i - 1].date).toBe(true);
     }
   });
 });

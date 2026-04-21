@@ -3,6 +3,7 @@ import { StackedBarChart } from '@/components/stacked-bar-chart';
 import { StatCardV2 } from '@/components/dashboard/stat-card-v2';
 import { ProgressBars } from '@/components/dashboard/progress-bars';
 import { StatusByPathTable, type StatusByPathRow } from '@/components/dashboard/status-by-path-table';
+import { BusinessFunnelChart, type BusinessFunnelDay } from '@/components/dashboard/business-funnel-chart';
 import { InfoDot } from '@/components/dashboard/info-dot';
 import { getTranslations, getLocale } from 'next-intl/server';
 
@@ -75,10 +76,26 @@ async function fetchStatusByPath(): Promise<StatusByPathRow[]> {
   }
 }
 
+async function fetchBusinessFunnel(): Promise<BusinessFunnelDay[]> {
+  try {
+    const res = await fetch(`${API_URL}/stats/business-funnel?period=30`, { cache: 'no-store', headers: statsHeaders });
+    if (!res.ok) return [];
+    const data = (await res.json()) as { rows?: BusinessFunnelDay[] };
+    return data.rows ?? [];
+  } catch {
+    return [];
+  }
+}
+
 export default async function DashboardPage() {
   const t = await getTranslations('dashboard');
   const locale = await getLocale();
-  const [stats, history, statusByPath] = await Promise.all([fetchStats(), fetchHistory(), fetchStatusByPath()]);
+  const [stats, history, statusByPath, funnel] = await Promise.all([
+    fetchStats(),
+    fetchHistory(),
+    fetchStatusByPath(),
+    fetchBusinessFunnel(),
+  ]);
 
   if (!stats) {
     return (
@@ -257,51 +274,28 @@ export default async function DashboardPage() {
         />
       </div>
 
-      {/* Two charts side by side */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        {/* Stacked bar chart — HTTP requests by status code (Railway style) */}
-        <div className="rounded-xl border border-zinc-800/60 bg-gradient-to-br from-zinc-900 to-zinc-900/60 p-5">
-          <div className="mb-4 flex items-center gap-2">
-            <p className="text-sm font-medium text-zinc-300">Requests — 30 days</p>
-            <InfoDot>
-              Total des requêtes HTTP par jour, ventilées par classe de statut.
-              <br />
-              <strong>2xx</strong> = succès · <strong>3xx</strong> = redirect · <strong>4xx</strong> = erreur client (auth, paywall, 404…) · <strong>5xx</strong> = erreur serveur.
-            </InfoDot>
-          </div>
-          {history.length > 0 ? (
-            <StackedBarChart
-              data={history}
-              bars={[
-                { key: 's2xx', color: '#3b82f6', label: '2xx' },
-                { key: 's3xx', color: '#f59e0b', label: '3xx' },
-                { key: 's4xx', color: '#eab308', label: '4xx' },
-                { key: 's5xx', color: '#ef4444', label: '5xx' },
-              ]}
-            />
-          ) : (
-            <div className="flex h-64 items-center justify-center text-zinc-500 text-sm">
-              {t('chart.noHistoryData')}
-            </div>
-          )}
+      {/* NEW: Business funnel — the chart that actually tells the conversion story */}
+      <div className="rounded-xl border border-zinc-800/60 bg-gradient-to-br from-zinc-900 to-zinc-900/60 p-5">
+        <div className="mb-4 flex items-center gap-2">
+          <p className="text-sm font-medium text-zinc-300">Funnel métier — 30 jours</p>
+          <InfoDot>
+            Seules les requêtes sur les endpoints facturables (IBAN / BIC / CH clearing)
+            avec la bonne méthode HTTP. Le bruit (scanner, robots, favicon, trafic
+            discovery) est exclu.
+            <br />
+            <br />
+            <strong className="text-emerald-400">Paid success</strong> = l’agent a payé (x402) ou utilisé sa clé API et reçu 2xx.
+            <br />
+            <strong className="text-amber-400">Paywall hit</strong> = agent intéressé mais sans auth → 402. C’est là que se joue la conversion.
+            <br />
+            <strong className="text-violet-400">Auth / quota</strong> = 401 (mauvaise clé) ou 429 (quota mensuel atteint).
+            <br />
+            <strong className="text-yellow-400">Bad input</strong> = 400 (body mal formé, IBAN manquant).
+            <br />
+            <strong className="text-red-400">Server error</strong> = 5xx, doit rester à zéro.
+          </InfoDot>
         </div>
-
-        {/* Line chart — API operations */}
-        <div className="rounded-xl border border-zinc-800/60 bg-gradient-to-br from-zinc-900 to-zinc-900/60 p-5">
-          <div className="mb-4 flex items-center gap-2">
-            <p className="text-sm font-medium text-zinc-300">{t('chart.apiCalls30d')}</p>
-            <InfoDot>
-              Opérations métier uniquement (IBAN validés, batchs, lookups BIC). Ne compte pas les requêtes rejetées avant le handler (402, 400, 404).
-            </InfoDot>
-          </div>
-          {history.length > 0 ? (
-            <LineChart data={history} lines={lineConfig} />
-          ) : (
-            <div className="flex h-64 items-center justify-center text-zinc-500 text-sm">
-              {t('chart.noHistoryData')}
-            </div>
-          )}
-        </div>
+        <BusinessFunnelChart data={funnel} />
       </div>
 
       {/* Status-code × path — the "where do the 4xx actually come from?" table */}
@@ -444,6 +438,56 @@ export default async function DashboardPage() {
               {t('chart.noCountryData')}
             </div>
           )}
+        </div>
+      </div>
+
+      {/* Legacy charts kept in footer — useful for infra-level debugging
+          (scanner detection, bot waves, per-class noise ratios) even if not
+          the best lens for business conversion. */}
+      <div className="mt-2 border-t border-zinc-800/60 pt-6">
+        <p className="mb-3 text-xs uppercase tracking-wider text-zinc-600">Vue brute — toutes requêtes HTTP (infra)</p>
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          {/* Original stacked bar: ALL requests incl. scanner/noise */}
+          <div className="rounded-xl border border-zinc-800/60 bg-gradient-to-br from-zinc-900 to-zinc-900/60 p-5">
+            <div className="mb-4 flex items-center gap-2">
+              <p className="text-sm font-medium text-zinc-300">Requests — 30 days</p>
+              <InfoDot>
+                Total des requêtes HTTP par jour, toutes routes confondues y compris scanner, /favicon.ico, /robots.txt et discovery. Garde un œil sur la pente globale et les 5xx, mais pour la conversion business regarde plutôt le graphique « Funnel métier » en haut de page.
+              </InfoDot>
+            </div>
+            {history.length > 0 ? (
+              <StackedBarChart
+                data={history}
+                bars={[
+                  { key: 's2xx', color: '#3b82f6', label: '2xx' },
+                  { key: 's3xx', color: '#f59e0b', label: '3xx' },
+                  { key: 's4xx', color: '#eab308', label: '4xx' },
+                  { key: 's5xx', color: '#ef4444', label: '5xx' },
+                ]}
+              />
+            ) : (
+              <div className="flex h-64 items-center justify-center text-zinc-500 text-sm">
+                {t('chart.noHistoryData')}
+              </div>
+            )}
+          </div>
+
+          {/* Line chart — business ops per type */}
+          <div className="rounded-xl border border-zinc-800/60 bg-gradient-to-br from-zinc-900 to-zinc-900/60 p-5">
+            <div className="mb-4 flex items-center gap-2">
+              <p className="text-sm font-medium text-zinc-300">{t('chart.apiCalls30d')}</p>
+              <InfoDot>
+                Opérations métier qui ont atteint le handler (2xx uniquement), ventilées par type d’endpoint. Ne compte pas les 402 / 400 / 429.
+              </InfoDot>
+            </div>
+            {history.length > 0 ? (
+              <LineChart data={history} lines={lineConfig} />
+            ) : (
+              <div className="flex h-64 items-center justify-center text-zinc-500 text-sm">
+                {t('chart.noHistoryData')}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
