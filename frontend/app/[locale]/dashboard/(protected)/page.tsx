@@ -2,6 +2,8 @@ import { LineChart } from '@/components/line-chart';
 import { StackedBarChart } from '@/components/stacked-bar-chart';
 import { StatCardV2 } from '@/components/dashboard/stat-card-v2';
 import { ProgressBars } from '@/components/dashboard/progress-bars';
+import { StatusByPathTable, type StatusByPathRow } from '@/components/dashboard/status-by-path-table';
+import { InfoDot } from '@/components/dashboard/info-dot';
 import { getTranslations, getLocale } from 'next-intl/server';
 
 const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
@@ -62,10 +64,21 @@ async function fetchHistory(): Promise<HistoryEntry[]> {
   }
 }
 
+async function fetchStatusByPath(): Promise<StatusByPathRow[]> {
+  try {
+    const res = await fetch(`${API_URL}/stats/status-by-path?period=30`, { cache: 'no-store', headers: statsHeaders });
+    if (!res.ok) return [];
+    const data = (await res.json()) as { rows?: StatusByPathRow[] };
+    return data.rows ?? [];
+  } catch {
+    return [];
+  }
+}
+
 export default async function DashboardPage() {
   const t = await getTranslations('dashboard');
   const locale = await getLocale();
-  const [stats, history] = await Promise.all([fetchStats(), fetchHistory()]);
+  const [stats, history, statusByPath] = await Promise.all([fetchStats(), fetchHistory(), fetchStatusByPath()]);
 
   if (!stats) {
     return (
@@ -190,11 +203,13 @@ export default async function DashboardPage() {
           title="Total requests"
           value={fmt(stats.total_requests ?? 0, locale)}
           accentColor="#a855f7"
+          hint="Toutes les requêtes HTTP vues par le serveur depuis le début, y compris /mcp, scanners et health checks."
         />
         <StatCardV2
           title={t('stats.today')}
           value={fmt(stats.requests_today ?? 0, locale)}
           accentColor="#8b5cf6"
+          hint="Requêtes HTTP reçues depuis minuit UTC (tous paths confondus)."
         />
         <StatCardV2
           title={t('stats.today') + ' (API)'}
@@ -209,6 +224,7 @@ export default async function DashboardPage() {
           }
           sparkline={callsSparkline}
           accentColor="#f59e0b"
+          hint="Uniquement les opérations métier du jour (validate + batch + bic_lookup). Exclut les 4xx/5xx et /mcp."
         />
         <StatCardV2
           title={t('stats.totalRevenue')}
@@ -223,6 +239,7 @@ export default async function DashboardPage() {
           }
           sparkline={revenueSparkline}
           accentColor="#22c55e"
+          hint="Revenu USDC réellement perçu (x402). Depuis le fix du 17 avril, les revenus affichés = revenus collectés. L’historique avant cette date contient ~$0.23 de revenus fantômes non corrigés."
         />
         <StatCardV2
           title={t('stats.successRate')}
@@ -236,6 +253,7 @@ export default async function DashboardPage() {
               : undefined
           }
           accentColor="#3b82f6"
+          hint="% d’IBAN jugés valides parmi les IBAN soumis à /v1/iban/validate. Un taux bas signifie que les appelants envoient beaucoup d’IBAN mal formés."
         />
       </div>
 
@@ -243,7 +261,14 @@ export default async function DashboardPage() {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {/* Stacked bar chart — HTTP requests by status code (Railway style) */}
         <div className="rounded-xl border border-zinc-800/60 bg-gradient-to-br from-zinc-900 to-zinc-900/60 p-5">
-          <p className="mb-4 text-sm font-medium text-zinc-300">Requests — 30 days</p>
+          <div className="mb-4 flex items-center gap-2">
+            <p className="text-sm font-medium text-zinc-300">Requests — 30 days</p>
+            <InfoDot>
+              Total des requêtes HTTP par jour, ventilées par classe de statut.
+              <br />
+              <strong>2xx</strong> = succès · <strong>3xx</strong> = redirect · <strong>4xx</strong> = erreur client (auth, paywall, 404…) · <strong>5xx</strong> = erreur serveur.
+            </InfoDot>
+          </div>
           {history.length > 0 ? (
             <StackedBarChart
               data={history}
@@ -263,7 +288,12 @@ export default async function DashboardPage() {
 
         {/* Line chart — API operations */}
         <div className="rounded-xl border border-zinc-800/60 bg-gradient-to-br from-zinc-900 to-zinc-900/60 p-5">
-          <p className="mb-4 text-sm font-medium text-zinc-300">{t('chart.apiCalls30d')}</p>
+          <div className="mb-4 flex items-center gap-2">
+            <p className="text-sm font-medium text-zinc-300">{t('chart.apiCalls30d')}</p>
+            <InfoDot>
+              Opérations métier uniquement (IBAN validés, batchs, lookups BIC). Ne compte pas les requêtes rejetées avant le handler (402, 400, 404).
+            </InfoDot>
+          </div>
           {history.length > 0 ? (
             <LineChart data={history} lines={lineConfig} />
           ) : (
@@ -274,40 +304,28 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      {/* Requests by path + status */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        {/* Requests by path */}
-        <div className="rounded-xl border border-zinc-800/60 bg-gradient-to-br from-zinc-900 to-zinc-900/60 p-5">
-          <p className="mb-4 text-sm font-medium text-zinc-300">Requests by endpoint</p>
-          {requestsByPath.length > 0 ? (
-            <div className="space-y-2">
-              {requestsByPath.map((row) => {
-                const maxCount = requestsByPath[0]?.count || 1;
-                const pct = (row.count / maxCount) * 100;
-                return (
-                  <div key={row.path}>
-                    <div className="flex items-center justify-between mb-0.5">
-                      <span className="text-xs font-mono text-zinc-300 truncate max-w-[60%]">{row.path}</span>
-                      <div className="flex items-center gap-3">
-                        <span className="text-[10px] font-mono text-zinc-600">{row.avg_ms}ms</span>
-                        <span className="text-xs font-mono text-purple-400">{fmt(row.count, locale)}</span>
-                      </div>
-                    </div>
-                    <div className="h-1.5 w-full rounded-full bg-zinc-800/60 overflow-hidden">
-                      <div className="h-full rounded-full bg-purple-500/40" style={{ width: `${pct}%` }} />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="flex h-32 items-center justify-center text-zinc-600 text-sm">No request data yet</div>
-          )}
+      {/* Status-code × path — the "where do the 4xx actually come from?" table */}
+      <div className="rounded-xl border border-zinc-800/60 bg-gradient-to-br from-zinc-900 to-zinc-900/60 p-5">
+        <div className="mb-4 flex items-center gap-2">
+          <p className="text-sm font-medium text-zinc-300">Status × endpoint — 30 days</p>
+          <InfoDot>
+            Pour chaque path, la mini-barre montre la part 2xx/3xx/4xx/5xx.
+            Survole un segment ou un chiffre pour l’explication.
+            <br />
+            <strong>Lecture rapide</strong> : pastille verte = endpoint sain ; orange = beaucoup de 4xx (paywall, scanners) ; rouge = 5xx → à investiguer.
+          </InfoDot>
         </div>
+        <StatusByPathTable rows={statusByPath} />
+      </div>
 
-        {/* Status codes */}
+      {/* Summary row: aggregate status + response codes */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        {/* Status codes (overall) */}
         <div className="rounded-xl border border-zinc-800/60 bg-gradient-to-br from-zinc-900 to-zinc-900/60 p-5">
-          <p className="mb-4 text-sm font-medium text-zinc-300">Response status codes</p>
+          <div className="mb-4 flex items-center gap-2">
+            <p className="text-sm font-medium text-zinc-300">Response status codes</p>
+            <InfoDot>Ventilation globale toutes routes confondues, depuis le démarrage du tracking.</InfoDot>
+          </div>
           {requestsByStatus.length > 0 ? (
             <div className="space-y-3">
               {requestsByStatus.map((row) => {
@@ -337,13 +355,48 @@ export default async function DashboardPage() {
             <div className="flex h-32 items-center justify-center text-zinc-600 text-sm">No request data yet</div>
           )}
         </div>
+
+        {/* Fastest / slowest endpoints */}
+        <div className="rounded-xl border border-zinc-800/60 bg-gradient-to-br from-zinc-900 to-zinc-900/60 p-5">
+          <div className="mb-4 flex items-center gap-2">
+            <p className="text-sm font-medium text-zinc-300">Top endpoints by volume</p>
+            <InfoDot>Top 15 paths par nombre de requêtes depuis le démarrage. Le détail par classe de statut se lit dans la table ci-dessus.</InfoDot>
+          </div>
+          {requestsByPath.length > 0 ? (
+            <div className="space-y-2">
+              {requestsByPath.map((row) => {
+                const maxCount = requestsByPath[0]?.count || 1;
+                const pct = (row.count / maxCount) * 100;
+                return (
+                  <div key={row.path}>
+                    <div className="flex items-center justify-between mb-0.5">
+                      <span className="text-xs font-mono text-zinc-300 truncate max-w-[60%]">{row.path}</span>
+                      <div className="flex items-center gap-3">
+                        <span className="text-[10px] font-mono text-zinc-600">{row.avg_ms}ms</span>
+                        <span className="text-xs font-mono text-purple-400">{fmt(row.count, locale)}</span>
+                      </div>
+                    </div>
+                    <div className="h-1.5 w-full rounded-full bg-zinc-800/60 overflow-hidden">
+                      <div className="h-full rounded-full bg-purple-500/40" style={{ width: `${pct}%` }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="flex h-32 items-center justify-center text-zinc-600 text-sm">No request data yet</div>
+          )}
+        </div>
       </div>
 
       {/* Two columns: ProgressBars + Top 5 countries */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {/* Endpoint breakdown */}
         <div className="rounded-xl border border-zinc-800/60 bg-gradient-to-br from-zinc-900 to-zinc-900/60 p-5">
-          <p className="mb-4 text-sm font-medium text-zinc-300">{t('chart.endpointBreakdown')}</p>
+          <div className="mb-4 flex items-center gap-2">
+            <p className="text-sm font-medium text-zinc-300">{t('chart.endpointBreakdown')}</p>
+            <InfoDot>Répartition des opérations métier (IBAN/BIC) entre les trois endpoints facturables. Ne couvre pas /v1/iban/compliance ni /v1/ch/clearing.</InfoDot>
+          </div>
           {endpointTotal > 0 ? (
             <ProgressBars items={progressItems} />
           ) : (
@@ -355,7 +408,10 @@ export default async function DashboardPage() {
 
         {/* Top 5 countries */}
         <div className="rounded-xl border border-zinc-800/60 bg-gradient-to-br from-zinc-900 to-zinc-900/60 p-5">
-          <p className="mb-4 text-sm font-medium text-zinc-300">{t('chart.top10Countries')}</p>
+          <div className="mb-4 flex items-center gap-2">
+            <p className="text-sm font-medium text-zinc-300">{t('chart.top10Countries')}</p>
+            <InfoDot>Déduit du code pays ISO extrait de l’IBAN ou du BIC validé. « XX » = BIC test/internal.</InfoDot>
+          </div>
           {topCountries.length > 0 ? (
             <div className="space-y-2.5">
               {topCountries.map((row, i) => {

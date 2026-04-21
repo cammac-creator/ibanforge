@@ -370,6 +370,49 @@ export function getHourlyStats(days: number = 7): HourlyStatsResponse {
 }
 
 /**
+ * HTTP status-code breakdown per endpoint path over the last N days.
+ *
+ * Answers "where are the 4xx actually coming from?" — critical for
+ * telling real-funnel signal (402 on /v1/* = agent hit the paywall)
+ * from noise (404 on /wp-admin = scanner).
+ */
+export function getStatusByPath(days: number = 30): Array<{
+  path: string;
+  total: number;
+  s2xx: number;
+  s3xx: number;
+  s4xx: number;
+  s5xx: number;
+  avg_ms: number;
+}> {
+  const db = getStatsDB();
+  const rows = db.prepare(`
+    SELECT
+      path,
+      COUNT(*) as total,
+      SUM(CASE WHEN status >= 200 AND status < 300 THEN 1 ELSE 0 END) as s2xx,
+      SUM(CASE WHEN status >= 300 AND status < 400 THEN 1 ELSE 0 END) as s3xx,
+      SUM(CASE WHEN status >= 400 AND status < 500 THEN 1 ELSE 0 END) as s4xx,
+      SUM(CASE WHEN status >= 500 THEN 1 ELSE 0 END) as s5xx,
+      ROUND(AVG(response_ms), 0) as avg_ms
+    FROM request_log
+    WHERE created_at >= datetime('now', '-' || ? || ' days')
+    GROUP BY path
+    ORDER BY total DESC
+    LIMIT 30
+  `).all(days) as Array<{
+    path: string;
+    total: number;
+    s2xx: number;
+    s3xx: number;
+    s4xx: number;
+    s5xx: number;
+    avg_ms: number;
+  }>;
+  return rows;
+}
+
+/**
  * Error rate stats for the last N days
  */
 export function getErrorStats(days: number = 30): ErrorStatsResponse {

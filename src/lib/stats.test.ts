@@ -1,5 +1,5 @@
 import { describe, it, expect, afterAll } from 'vitest';
-import { recordOperation, recordBatch, getStats, getQuickStats, getStatsHistory } from './stats.js';
+import { recordOperation, recordBatch, getStats, getQuickStats, getStatsHistory, getStatusByPath } from './stats.js';
 import { closeAll } from './db.js';
 
 afterAll(() => {
@@ -141,6 +141,33 @@ describe('getStatsHistory', () => {
       expect(entry).toHaveProperty('iban_batch');
       expect(entry).toHaveProperty('bic_lookup');
       expect(entry).toHaveProperty('revenue_usdc');
+    }
+  });
+});
+
+describe('getStatusByPath', () => {
+  it('returns an array', () => {
+    expect(Array.isArray(getStatusByPath())).toBe(true);
+  });
+
+  it('accepts a custom number of days and clamps output', () => {
+    expect(Array.isArray(getStatusByPath(7))).toBe(true);
+    expect(getStatusByPath(1).length).toBeLessThanOrEqual(30);
+  });
+
+  it('each row has path + per-class counters summing to total', () => {
+    const rows = getStatusByPath(30);
+    for (const r of rows) {
+      expect(typeof r.path).toBe('string');
+      expect(r.s2xx + r.s3xx + r.s4xx + r.s5xx).toBe(r.total);
+      expect(typeof r.avg_ms === 'number' || r.avg_ms === null).toBe(true);
+    }
+  });
+
+  it('rows are ordered by total desc', () => {
+    const rows = getStatusByPath(30);
+    for (let i = 1; i < rows.length; i++) {
+      expect(rows[i - 1].total).toBeGreaterThanOrEqual(rows[i].total);
     }
   });
 });

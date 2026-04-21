@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { getStats, getStatsHistory, getHourlyStats, getErrorStats, getPatternStats } from '../lib/stats.js';
+import { getStats, getStatsHistory, getHourlyStats, getErrorStats, getPatternStats, getStatusByPath } from '../lib/stats.js';
 import { getEntryCount } from '../lib/bic-lookup.js';
 
 const stats = new Hono();
@@ -73,6 +73,22 @@ stats.get('/stats/errors', (c) => {
     if (isNaN(days)) days = 30;
     days = Math.max(1, Math.min(90, days));
     return c.json(getErrorStats(days));
+  } catch {
+    return c.json({ error: 'stats_unavailable' }, 500);
+  }
+});
+
+stats.get('/stats/status-by-path', (c) => {
+  if (!checkAuth(c.req.header('Authorization'))) {
+    return c.json({ error: 'unauthorized', message: 'Stats require authentication.' }, 403);
+  }
+
+  try {
+    const periodParam = c.req.query('period');
+    let days = periodParam ? parseInt(periodParam, 10) : 30;
+    if (isNaN(days)) days = 30;
+    days = Math.max(1, Math.min(90, days));
+    return c.json({ period_days: days, rows: getStatusByPath(days) });
   } catch {
     return c.json({ error: 'stats_unavailable' }, 500);
   }
