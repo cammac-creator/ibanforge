@@ -386,6 +386,8 @@ export interface StatusByPathRow {
   avg_ms: number;
   /** Exact HTTP status code → count. Keys are stringified ints ("400", "402", "404"...). */
   by_status: Record<string, number>;
+  /** HTTP method → count. Reveals e.g. "agent sent GET on a POST-only route". */
+  by_method: Record<string, number>;
 }
 
 export function getStatusByPath(days: number = 30): StatusByPathRow[] {
@@ -426,9 +428,25 @@ export function getStatusByPath(days: number = 30): StatusByPathRow[] {
     detailMap.set(r.path, existing);
   }
 
+  const methodRows = db.prepare(`
+    SELECT path, method, COUNT(*) as n
+    FROM request_log
+    WHERE created_at >= datetime('now', '-' || ? || ' days')
+      AND path IN (${pathPlaceholders})
+    GROUP BY path, method
+  `).all(days, ...aggregates.map(r => r.path)) as Array<{ path: string; method: string; n: number }>;
+
+  const methodMap = new Map<string, Record<string, number>>();
+  for (const r of methodRows) {
+    const existing = methodMap.get(r.path) ?? {};
+    existing[r.method] = r.n;
+    methodMap.set(r.path, existing);
+  }
+
   return aggregates.map(r => ({
     ...r,
     by_status: detailMap.get(r.path) ?? {},
+    by_method: methodMap.get(r.path) ?? {},
   }));
 }
 

@@ -11,6 +11,7 @@ export interface StatusByPathRow {
   s5xx: number;
   avg_ms: number | null;
   by_status?: Record<string, number>;
+  by_method?: Record<string, number>;
 }
 
 type ClassKey = 's2xx' | 's3xx' | 's4xx' | 's5xx';
@@ -102,8 +103,9 @@ export function StatusByPathTable({ rows }: { rows: StatusByPathRow[] }) {
   return (
     <div className="space-y-1.5">
       {/* Header */}
-      <div className="grid grid-cols-[1fr_auto_auto] items-center gap-3 px-2 pb-1 text-[10px] uppercase tracking-wider text-zinc-600">
+      <div className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-3 px-2 pb-1 text-[10px] uppercase tracking-wider text-zinc-600">
         <span>Path</span>
+        <span className="text-right">Meth</span>
         <span className="text-right">ms</span>
         <span className="w-16 text-right">Total</span>
       </div>
@@ -111,12 +113,24 @@ export function StatusByPathTable({ rows }: { rows: StatusByPathRow[] }) {
       {rows.map((row) => {
         const pct = (row.total / maxTotal) * 100;
         const dotColor = healthColor(row);
+        const methods = row.by_method
+          ? Object.entries(row.by_method).sort((a, b) => b[1] - a[1])
+          : [];
         return (
           <div key={row.path} className="group rounded-md px-2 py-1.5 transition-colors hover:bg-zinc-800/30">
-            <div className="grid grid-cols-[1fr_auto_auto] items-center gap-3">
+            <div className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-3">
               <div className="flex items-center gap-2 min-w-0">
                 <HoverTooltip
-                  content={<span>{describePath(row.path)}</span>}
+                  content={
+                    <div className="space-y-1">
+                      <div>{describePath(row.path)}</div>
+                      {methods.length > 0 && (
+                        <div className="text-zinc-400">
+                          Méthodes : {methods.map(([m, n]) => `${m} ×${n}`).join(' · ')}
+                        </div>
+                      )}
+                    </div>
+                  }
                 >
                   <span
                     className="h-2 w-2 shrink-0 rounded-full"
@@ -127,6 +141,13 @@ export function StatusByPathTable({ rows }: { rows: StatusByPathRow[] }) {
                   <span className="truncate font-mono text-xs text-zinc-200">{row.path}</span>
                 </HoverTooltip>
               </div>
+              {methods.length > 0 && (
+                <HoverTooltip content={<span>Méthodes HTTP utilisées sur ce path.</span>}>
+                  <span className="text-[10px] font-mono text-zinc-600 tabular-nums">
+                    {methods.map(([m]) => m).join('/')}
+                  </span>
+                </HoverTooltip>
+              )}
               <span className="text-[10px] font-mono text-zinc-600 tabular-nums">
                 {row.avg_ms != null ? `${row.avg_ms}ms` : '—'}
               </span>
