@@ -8,6 +8,9 @@ const app = new Hono();
 // Pre-validation middleware (mirrors index.ts)
 app.get('/v1/ch/clearing/:iid', async (c, next) => {
   const iid = c.req.param('iid');
+  if (iid === '{iid}' || /^\{.*\}$/.test(iid)) {
+    return c.json({ error: 'placeholder_literal', example: 'GET /v1/ch/clearing/230' }, 400);
+  }
   if (!/^\d{1,5}$/.test(iid)) {
     return c.json({ error: 'invalid_iid_format', message: 'IID must be a 1-5 digit number.' }, 400);
   }
@@ -76,6 +79,14 @@ describe('GET /v1/ch/clearing/:iid', () => {
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(body.error).toBe('invalid_iid_format');
+  });
+
+  it('GET /v1/ch/clearing/{iid} (literal OpenAPI placeholder) → 400, placeholder_literal', async () => {
+    const res = await app.request('/v1/ch/clearing/%7Biid%7D');
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.error).toBe('placeholder_literal');
+    expect(body.example).toContain('/v1/ch/clearing/');
   });
 
   it('GET /v1/ch/clearing/30025 → follows redirect', async () => {

@@ -51,4 +51,13 @@ describe('GET /v1/bic/:code', () => {
     const json = (await res.json()) as { bic11: string };
     expect(json.bic11).toBe('UBSWCHZH80A');
   });
+
+  it('returns a dedicated 400 when the agent sends the literal {code} placeholder', async () => {
+    const app = makeApp();
+    const res = await app.request('/v1/bic/%7Bcode%7D');
+    expect(res.status).toBe(400);
+    const json = (await res.json()) as { error: string; example: string };
+    expect(json.error).toBe('placeholder_literal');
+    expect(json.example).toContain('UBSWCHZH');
+  });
 });

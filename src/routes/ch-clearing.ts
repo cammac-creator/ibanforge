@@ -23,6 +23,18 @@ chClearing.get('/v1/ch/clearing/:iid', (c) => {
   const start = performance.now();
   const rawIid = c.req.param('iid');
 
+  if (rawIid === '{iid}' || /^\{.*\}$/.test(rawIid)) {
+    return c.json(
+      {
+        error: 'placeholder_literal',
+        message: "You sent the literal OpenAPI placeholder '" + rawIid + "'. Substitute it with a real Swiss IID.",
+        example: 'GET /v1/ch/clearing/230',
+        schema: 'https://api.ibanforge.com/openapi.json',
+      },
+      400,
+    );
+  }
+
   // Validate format (1-5 digits)
   if (!/^\d{1,5}$/.test(rawIid)) {
     return c.json(

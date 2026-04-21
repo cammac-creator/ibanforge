@@ -164,6 +164,25 @@ describe('getStatusByPath', () => {
     }
   });
 
+  it('by_status entries sum back to total', () => {
+    const rows = getStatusByPath(30);
+    for (const r of rows) {
+      const sum = Object.values(r.by_status).reduce((s, n) => s + n, 0);
+      expect(sum).toBe(r.total);
+    }
+  });
+
+  it('by_status keys are stringified HTTP status codes', () => {
+    const rows = getStatusByPath(30);
+    for (const r of rows) {
+      for (const code of Object.keys(r.by_status)) {
+        const n = parseInt(code, 10);
+        expect(n).toBeGreaterThanOrEqual(100);
+        expect(n).toBeLessThan(600);
+      }
+    }
+  });
+
   it('rows are ordered by total desc', () => {
     const rows = getStatusByPath(30);
     for (let i = 1; i < rows.length; i++) {
