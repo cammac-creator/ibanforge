@@ -417,6 +417,10 @@ function buildBillableFilter(): { sql: string; params: string[] } {
 export function getBusinessFunnel(days: number = 30): BusinessFunnelDay[] {
   const db = getStatsDB();
   const filter = buildBillableFilter();
+  // Exclude OpenAPI placeholder paths (%7B...%7D or literal {...}) — they match
+  // the billable path-prefix but are never real business traffic, just scanners
+  // or agents mis-substituting the OpenAPI spec template variables. Counting
+  // them as "bad_input" made the funnel look 100% broken.
   const rows = db.prepare(`
     SELECT
       date(created_at) as date,
@@ -428,6 +432,8 @@ export function getBusinessFunnel(days: number = 30): BusinessFunnelDay[] {
     FROM request_log
     WHERE created_at >= datetime('now', '-' || ? || ' days')
       AND (${filter.sql})
+      AND path NOT LIKE '%\\%7B%' ESCAPE '\\'
+      AND path NOT LIKE '%{%'
     GROUP BY date(created_at)
     ORDER BY date ASC
   `).all(days, ...filter.params) as BusinessFunnelDay[];
