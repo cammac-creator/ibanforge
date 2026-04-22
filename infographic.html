@@ -436,65 +436,74 @@ h3{font-size:1.2rem;font-weight:700;color:#fafafa;margin-bottom:8px}
       </thead>
       <tbody>
         <tr>
-          <td>Prix par vérification</td>
-          <td class="highlight-col"><span class="price-tag cheap">$0.005</span></td>
-          <td><span class="price-tag expensive">$0.047 – 0.27</span></td>
-          <td><span class="price-tag">$0.01</span></td>
-          <td><span class="price-tag">$0.02</span></td>
+          <td>Modèle de facturation</td>
+          <td class="highlight-col"><span class="price-tag cheap">À l'usage<br><small style="color:#a1a1aa;font-weight:400">dès $0.005 / appel</small></span></td>
+          <td><span class="meh">Plan annuel</span></td>
+          <td><span class="meh">Plan mensuel<br><small>(dès $15/mois)</small></span></td>
+          <td><span class="meh">Crédits<br><small>(&laquo; atoms &raquo;)</small></span></td>
         </tr>
         <tr>
-          <td>Banques référencées</td>
-          <td class="highlight-col"><strong class="amber">121 000+</strong></td>
-          <td>~50 000</td>
-          <td>~30 000</td>
-          <td>Inconnu</td>
+          <td>Palier gratuit</td>
+          <td class="highlight-col"><span class="check">✓</span> 200 appels/mois, sans CB</td>
+          <td><span class="meh">100 appels, 1 mois</span></td>
+          <td><span class="check">✓</span> Free forever (limité)</td>
+          <td><span class="check">✓</span> Starter (limité)</td>
         </tr>
         <tr>
-          <td>Détection des faux IBAN</td>
-          <td class="highlight-col"><span class="check">✓</span> 85 émetteurs</td>
-          <td><span class="cross">✗</span></td>
-          <td><span class="cross">✗</span></td>
-          <td><span class="cross">✗</span></td>
-        </tr>
-        <tr>
-          <td>Score de risque</td>
-          <td class="highlight-col"><span class="check">✓</span> 0–100</td>
+          <td>Score de risque composite</td>
+          <td class="highlight-col"><span class="check">✓</span> 0–100, 21 flags</td>
           <td><span class="cross">✗</span></td>
           <td><span class="cross">✗</span></td>
           <td><span class="cross">✗</span></td>
         </tr>
         <tr>
-          <td>Données suisses (clearing)</td>
-          <td class="highlight-col"><span class="check">✓</span> 1 190 entrées</td>
+          <td>Classification vIBAN / EMI</td>
+          <td class="highlight-col"><span class="check">✓</span> 85 émetteurs (Wise, Revolut…)</td>
+          <td><span class="meh">Partiel</span></td>
+          <td><span class="cross">✗</span></td>
+          <td><span class="cross">✗</span></td>
+        </tr>
+        <tr>
+          <td>Clearing suisse (BC-Nummer, SIC, QR-IID)</td>
+          <td class="highlight-col"><span class="check">✓</span> 1 190 entrées SIX BankMaster</td>
           <td><span class="cross">✗</span></td>
           <td><span class="cross">✗</span></td>
           <td><span class="cross">✗</span></td>
         </tr>
         <tr>
-          <td>Utilisable par une IA</td>
-          <td class="highlight-col"><span class="check">✓</span> MCP natif</td>
+          <td>Couverture VoP (EU 2024/886)</td>
+          <td class="highlight-col"><span class="check">✓</span> par pays + par BIC</td>
           <td><span class="cross">✗</span></td>
           <td><span class="cross">✗</span></td>
           <td><span class="cross">✗</span></td>
         </tr>
         <tr>
-          <td>Open source</td>
+          <td>Utilisable par une IA (MCP)</td>
+          <td class="highlight-col"><span class="check">✓</span> natif, 5 outils</td>
+          <td><span class="cross">✗</span></td>
+          <td><span class="cross">✗</span></td>
+          <td><span class="cross">✗</span></td>
+        </tr>
+        <tr>
+          <td>Micropaiements (x402, USDC)</td>
           <td class="highlight-col"><span class="check">✓</span></td>
           <td><span class="cross">✗</span></td>
           <td><span class="cross">✗</span></td>
           <td><span class="cross">✗</span></td>
         </tr>
         <tr>
-          <td>Coût annuel minimum</td>
-          <td class="highlight-col"><span class="price-tag cheap">~$0*</span></td>
-          <td><span class="price-tag expensive">$588/an</span></td>
-          <td><span class="price-tag expensive">$108/an</span></td>
-          <td><span class="price-tag expensive">$240/an</span></td>
+          <td>Open source (code auditable)</td>
+          <td class="highlight-col"><span class="check">✓</span> MIT, GitHub public</td>
+          <td><span class="cross">✗</span></td>
+          <td><span class="cross">✗</span></td>
+          <td><span class="cross">✗</span></td>
         </tr>
       </tbody>
     </table>
   </div>
-  <p style="font-size:0.8rem;color:#52525b;text-align:center">* Gratuit pendant le lancement. Ensuite, paiement à l'usage uniquement — pas d'abonnement.</p>
+  <p style="font-size:0.8rem;color:#52525b;text-align:center;margin-top:16px">
+    Comparaison basée sur les sites officiels au 22 avril 2026. Les prix des concurrents dépendent de leurs plans (non détaillés ici car sujets à évolution) ; IBANforge facture exclusivement à l'usage — pas d'abonnement, pas de minimum annuel.
+  </p>
 </div>
 </section>
 
