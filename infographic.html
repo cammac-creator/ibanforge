@@ -10,18 +10,18 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #FAFAF7;
-    --bg-alt: #F4F3EE;
-    --bg-dark: #0F1115;
-    --ink: #0F1115;
-    --ink-soft: #4A4D55;
-    --ink-mute: #8A8D95;
-    --line: #E8E6DF;
-    --line-soft: #F0EEE8;
-    --amber: #B87A1E;          /* forge — accent principal */
-    --amber-soft: #FAF0DF;
-    --amber-bright: #F59E0B;   /* moments d'accent lumineux */
-    --swiss: #DC1F2D;          /* red Swiss — moat & hero */
+    --bg: #FAF6EC;             /* papier banque chaud */
+    --bg-alt: #F1E9D4;         /* sable doré */
+    --bg-dark: #141210;        /* ink très chaud (pas bleuté) */
+    --ink: #141210;
+    --ink-soft: #55483A;
+    --ink-mute: #938673;
+    --line: #E4D9BE;           /* ligne dorée */
+    --line-soft: #EFE7D2;
+    --amber: #B87A1E;          /* forge — accent principal dominant */
+    --amber-soft: #F5E8CA;
+    --amber-bright: #D89A2E;   /* moments d'accent lumineux */
+    --swiss: #DC1F2D;          /* red Swiss — réservé moat & alertes */
     --swiss-soft: #FCE8EA;
     --ink-teal: #1F6E6B;
     --shadow-sm: 0 1px 2px rgba(15,17,21,.04), 0 0 0 1px rgba(15,17,21,.04);
@@ -653,13 +653,13 @@
     .tool-price { grid-column: auto; }
   }
   .tool-num {
-    font-family: 'Instrument Serif', serif;
-    font-size: 38px;
-    font-style: italic;
-    line-height: 1;
-    color: var(--amber);
-    letter-spacing: -.02em;
+    width: 56px;
+    height: 56px;
+    display: grid;
+    place-items: center;
+    color: var(--ink-soft);
   }
+  .tool-num svg { display: block; width: 100%; height: 100%; }
   .tool-body h3 {
     font-size: 18px;
     margin-bottom: 4px;
@@ -1271,7 +1271,7 @@
             <line x1="46" y1="20" x2="46" y2="46" stroke="currentColor" stroke-width="1.2"/>
             <line x1="58" y1="20" x2="58" y2="46" stroke="currentColor" stroke-width="1.2"/>
             <line x1="2" y1="50" x2="70" y2="50" stroke="currentColor" stroke-width="1.4"/>
-            <rect x="22" y="28" width="38" height="22" rx="4" fill="#FAFAF7" stroke="#DC1F2D" stroke-width="1.8"/>
+            <rect x="22" y="28" width="38" height="22" rx="4" fill="#FAF6EC" stroke="#DC1F2D" stroke-width="1.8"/>
             <rect x="27" y="36" width="8" height="6" rx="1" fill="#DC1F2D"/>
             <rect x="47" y="36" width="8" height="6" rx="1" fill="#DC1F2D"/>
             <line x1="35" y1="39" x2="47" y2="39" stroke="#DC1F2D" stroke-width="1.2"/>
@@ -1285,14 +1285,14 @@
           <svg viewBox="0 0 72 56" fill="none" xmlns="http://www.w3.org/2000/svg">
             <line x1="22" y1="3" x2="22" y2="13" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
             <line x1="50" y1="3" x2="50" y2="13" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
-            <rect x="10" y="10" width="52" height="42" rx="3" fill="#FAFAF7" stroke="currentColor" stroke-width="1.4"/>
+            <rect x="10" y="10" width="52" height="42" rx="3" fill="#FAF6EC" stroke="currentColor" stroke-width="1.4"/>
             <line x1="10" y1="20" x2="62" y2="20" stroke="currentColor" stroke-width="1.2"/>
             <text x="36" y="18" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="6" font-weight="600" fill="currentColor">OCT 2025</text>
             <g fill="currentColor">
               <circle cx="18" cy="28" r="1"/><circle cx="26" cy="28" r="1"/><circle cx="34" cy="28" r="1"/><circle cx="42" cy="28" r="1"/><circle cx="50" cy="28" r="1"/><circle cx="58" cy="28" r="1"/>
               <circle cx="18" cy="36" r="1"/><circle cx="26" cy="36" r="1"/>
             </g>
-            <circle cx="42" cy="40" r="10" fill="#FAFAF7" stroke="#DC1F2D" stroke-width="1.8"/>
+            <circle cx="42" cy="40" r="10" fill="#FAF6EC" stroke="#DC1F2D" stroke-width="1.8"/>
             <path d="M37 40 L41 44 L47 36" stroke="#DC1F2D" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
         </span>
@@ -1384,7 +1384,16 @@ curl -X POST https://api.ibanforge.com/v1/iban/validate \<br>
 
     <div class="tool-list">
       <div class="tool-row reveal">
-        <div class="tool-num">i.</div>
+        <div class="tool-num" aria-hidden="true">
+          <svg viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="8" y="8" width="34" height="40" rx="3" stroke="currentColor" stroke-width="1.4"/>
+            <line x1="14" y1="18" x2="36" y2="18" stroke="currentColor" stroke-width="1.2"/>
+            <line x1="14" y1="25" x2="30" y2="25" stroke="currentColor" stroke-width="1.2"/>
+            <line x1="14" y1="32" x2="34" y2="32" stroke="currentColor" stroke-width="1.2"/>
+            <circle cx="38" cy="38" r="10" fill="#FAF6EC" stroke="#B87A1E" stroke-width="1.6"/>
+            <path d="M33 38 L36.5 41.5 L43 34.5" stroke="#B87A1E" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
         <div class="tool-body">
           <h3>validate_iban</h3>
           <p>Contrôle mod-97, parse le BBAN, résout le BIC via GLEIF, classifie l'émetteur (banque / néobanque / EMI / institution de paiement), évalue le risque. Enrichi du clearing suisse pour CH et LI.</p>
@@ -1394,7 +1403,16 @@ curl -X POST https://api.ibanforge.com/v1/iban/validate \<br>
       </div>
 
       <div class="tool-row reveal" data-delay="1">
-        <div class="tool-num">ii.</div>
+        <div class="tool-num" aria-hidden="true">
+          <svg viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="6" y="9" width="44" height="9" rx="2" stroke="currentColor" stroke-width="1.2"/>
+            <rect x="6" y="23" width="44" height="9" rx="2" stroke="currentColor" stroke-width="1.2"/>
+            <rect x="6" y="37" width="44" height="9" rx="2" stroke="currentColor" stroke-width="1.2"/>
+            <path d="M40 13.5 L42.5 16 L46 12.5" stroke="#B87A1E" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M40 27.5 L42.5 30 L46 26.5" stroke="#B87A1E" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M40 41.5 L42.5 44 L46 40.5" stroke="#B87A1E" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
         <div class="tool-body">
           <h3>batch_validate_iban</h3>
           <p>Jusqu'à 100 IBAN par appel, avec la même enrichissement. Conçu pour la validation d'exports CSV de fournisseurs, d'imports ERP, de listes de bénéficiaires avant batch SEPA.</p>
@@ -1404,7 +1422,13 @@ curl -X POST https://api.ibanforge.com/v1/iban/validate \<br>
       </div>
 
       <div class="tool-row reveal" data-delay="2">
-        <div class="tool-num">iii.</div>
+        <div class="tool-num" aria-hidden="true">
+          <svg viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="23" cy="23" r="13" stroke="currentColor" stroke-width="1.6"/>
+            <line x1="33" y1="33" x2="47" y2="47" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+            <text x="23" y="26" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="8" font-weight="700" fill="#B87A1E">BIC</text>
+          </svg>
+        </div>
         <div class="tool-body">
           <h3>lookup_bic</h3>
           <p>Interroge directement par code BIC/SWIFT. Retourne institution, pays, ville, code succursale, LEI et statut LEI, détection BIC de test (ISO 9362 §5.3).</p>
@@ -1414,7 +1438,12 @@ curl -X POST https://api.ibanforge.com/v1/iban/validate \<br>
       </div>
 
       <div class="tool-row reveal" data-delay="3">
-        <div class="tool-num">iv.</div>
+        <div class="tool-num" aria-hidden="true">
+          <svg viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M28 5 L10 11 v15 c0 11 8 19 18 21 c10 -2 18 -10 18 -21 V11 z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+            <path d="M19 28 L25 34 L37 20" stroke="#B87A1E" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
         <div class="tool-body">
           <h3>check_compliance</h3>
           <p>Validation complète + screening sanctions (OFAC/EU/UN), statut FATF du pays, couverture SEPA Instant, participation VoP par BIC, score de risque composite avec 21 flags pondérés.</p>
@@ -1424,7 +1453,13 @@ curl -X POST https://api.ibanforge.com/v1/iban/validate \<br>
       </div>
 
       <div class="tool-row reveal" data-delay="4">
-        <div class="tool-num">v.</div>
+        <div class="tool-num" aria-hidden="true">
+          <svg viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="6" y="6" width="44" height="44" rx="4" fill="#DC1F2D"/>
+            <rect x="25" y="14" width="6" height="28" fill="white"/>
+            <rect x="14" y="25" width="28" height="6" fill="white"/>
+          </svg>
+        </div>
         <div class="tool-body">
           <h3>lookup_ch_clearing</h3>
           <p>Le moat suisse. Résout un BC-Nummer / IID via les 1 190 entrées SIX BankMaster : institution, type (banque, cantonale, PostFinance, Raiffeisen), SIC, euroSIC, Instant Payments CHF, QR-IID.</p>
