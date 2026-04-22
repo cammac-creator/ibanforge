@@ -1,4 +1,53 @@
 {
   "$schema": "https://glama.ai/mcp/schemas/server.json",
-  "maintainers": ["cammac-creator"]
+  "maintainers": ["cammac-creator"],
+  "name": "IBANforge",
+  "description": "IBAN validation, BIC/SWIFT lookup, Swiss BC-Nummer clearing, SEPA compliance and risk scoring API for AI agents. 121K+ bank entries from GLEIF, 1,190 Swiss clearing entries from SIX BankMaster, 84 countries. x402 micropayments on Base L2.",
+  "homepage": "https://ibanforge.com",
+  "repository": "https://github.com/cammac-creator/ibanforge",
+  "documentation": "https://ibanforge.com/docs/mcp",
+  "categories": [
+    "finance",
+    "compliance",
+    "data-validation",
+    "banking"
+  ],
+  "keywords": [
+    "iban",
+    "bic",
+    "swift",
+    "sepa",
+    "vop",
+    "swiss-clearing",
+    "bc-nummer",
+    "qr-iid",
+    "fintech",
+    "compliance",
+    "risk-scoring",
+    "x402",
+    "micropayments",
+    "mcp"
+  ],
+  "tools": [
+    {
+      "name": "validate_iban",
+      "description": "Validate a single IBAN with BIC, SEPA, issuer, and risk data ($0.005)"
+    },
+    {
+      "name": "batch_validate_iban",
+      "description": "Validate up to 100 IBANs in one call ($0.002 each)"
+    },
+    {
+      "name": "lookup_bic",
+      "description": "Look up a BIC/SWIFT code with LEI enrichment from 121K+ GLEIF entries ($0.003)"
+    },
+    {
+      "name": "check_compliance",
+      "description": "Full compliance check: sanctions + FATF + SEPA reachability + VoP + risk score ($0.02)"
+    },
+    {
+      "name": "lookup_ch_clearing",
+      "description": "Look up a Swiss BC-Nummer / IID with SIC, QR-IID, institution type — 1,190 entries from SIX BankMaster ($0.003)"
+    }
+  ]
 }
