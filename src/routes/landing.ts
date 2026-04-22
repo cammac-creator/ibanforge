@@ -67,6 +67,9 @@ landing.get('/', (c) => {
     .hero-badge{background:#1a1a2e;padding:4px 12px;border-radius:99px;font-size:12px;font-weight:600;letter-spacing:.5px}
     .hero-badge-amber{color:#f59e0b;border:1px solid #f59e0b33}
     .hero-badge-green{color:#22c55e;border:1px solid #22c55e33}
+    .hero-badge-red{color:#ef4444;border:1px solid #ef444444;background:#ef444411}
+    .hero-moat{max-width:620px;margin:16px auto 28px;padding:12px 20px;border:1px solid #ef444433;border-radius:10px;background:linear-gradient(135deg,#ef444411,#18181b);color:#e5e5e5;font-size:14px;line-height:1.55}
+    .hero-moat strong{color:#f87171;font-weight:600}
     .hero h1{font-size:48px;font-weight:800;color:#fafafa;margin-bottom:16px;line-height:1.1}
     .hero h1 span{color:#f59e0b}
     .hero-sub{font-size:20px;color:#a1a1aa;margin-bottom:4px}
@@ -202,11 +205,15 @@ landing.get('/', (c) => {
         <span class="hero-badge hero-badge-amber">x402 MICROPAYMENTS</span>
         <span class="hero-badge hero-badge-amber">MCP NATIVE</span>
         <span class="hero-badge hero-badge-green">121K BICs</span>
+        <span class="hero-badge hero-badge-red">🇨🇭 SWISS BC-NUMMER</span>
       </div>
       <h1>IBAN<span>forge</span></h1>
       <p class="hero-sub">Validate IBANs. Lookup BICs. Score risk.</p>
       <p class="hero-sub"><strong>One API for developers &amp; AI agents.</strong></p>
-      <p class="hero-features">Compliance-grade validation &middot; Sanctions screening &middot; SEPA &amp; VoP coverage &middot; 75+ countries</p>
+      <p class="hero-features">Compliance-grade validation &middot; Sanctions screening &middot; SEPA &amp; VoP coverage &middot; 84 countries</p>
+      <div class="hero-moat">
+        <strong>The only API</strong> with Swiss <strong>BC-Nummer</strong> &amp; <strong>QR-IID</strong> lookup &mdash; 1,190 entries from SIX BankMaster, with SIC/euroSIC/Instant Payments participation included.
+      </div>
       <div class="hero-ctas">
         <a href="#tryit" class="cta cta-primary">Try it free &darr;</a>
         <button class="cta cta-secondary" onclick="document.querySelector('.keygen').classList.toggle('show')">Get API key &mdash; free</button>
