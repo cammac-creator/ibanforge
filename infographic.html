@@ -547,14 +547,14 @@
     color: var(--ink-soft);
     line-height: 1.55;
   }
-  .problem-cell-num {
-    font-family: 'Instrument Serif', serif;
-    font-style: italic;
-    font-size: 24px;
-    color: var(--swiss);
-    margin-bottom: 10px;
+  .problem-cell-illu {
     display: block;
+    width: 72px;
+    height: 56px;
+    margin-bottom: 14px;
+    color: var(--ink-soft);
   }
+  .problem-cell-illu svg { display: block; width: 100%; height: 100%; }
 
   /* ===== Explain (multi-age) ===== */
   .explain {
@@ -644,8 +644,13 @@
     box-shadow: var(--shadow-md);
     border-color: var(--ink);
   }
-  @media (max-width: 720px) {
-    .tool-row { grid-template-columns: 1fr; gap: 12px; padding: 20px 22px; }
+  @media (max-width: 960px) {
+    .tool-row { grid-template-columns: 64px 1fr; gap: 18px; padding: 22px 24px; }
+    .tool-price { justify-self: start; grid-column: 2; margin-top: 2px; }
+  }
+  @media (max-width: 560px) {
+    .tool-row { grid-template-columns: 1fr; gap: 10px; padding: 20px 22px; }
+    .tool-price { grid-column: auto; }
   }
   .tool-num {
     font-family: 'Instrument Serif', serif;
@@ -1102,8 +1107,8 @@
       <span class="serif">sans faire confiance au hasard.</span>
     </h1>
     <p class="lede">
-      Chaque année, des milliards d'euros partent vers le mauvais compte à cause d'une faute de frappe, d'un IBAN virtuel douteux, ou d'un contrôle réglementaire manqué.
-      <strong>IBANforge</strong> valide l'IBAN, retrouve la banque, détecte les intermédiaires à risque et couvre la conformité SEPA & VoP — le tout en un appel de 40 millisecondes.
+      Vous payez un fournisseur. Vous tapez son numéro de compte, vous cliquez, l'argent part. Parfois au mauvais endroit. Parfois chez quelqu'un qui s'est glissé à sa place.
+      <strong>IBANforge</strong> regarde avant vous — la bonne banque, le bon pays, pas d'intermédiaire douteux — en moins d'une demi-seconde.
     </p>
     <div class="hero-cta">
       <a href="https://ibanforge.com" class="btn btn-primary">
@@ -1238,19 +1243,61 @@
 
     <div class="problems-row">
       <div class="problem-cell reveal">
-        <span class="problem-cell-num">i</span>
+        <span class="problem-cell-illu" aria-hidden="true">
+          <svg viewBox="0 0 72 56" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="1.5" y="18" width="15" height="20" rx="2" stroke="currentColor" stroke-width="1.4"/>
+            <rect x="19.5" y="18" width="15" height="20" rx="2" stroke="currentColor" stroke-width="1.4"/>
+            <rect x="37.5" y="18" width="15" height="20" rx="2" stroke="#DC1F2D" stroke-width="2"/>
+            <rect x="55.5" y="18" width="15" height="20" rx="2" stroke="currentColor" stroke-width="1.4"/>
+            <text x="9" y="33" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor">C</text>
+            <text x="27" y="33" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor">H</text>
+            <text x="45" y="33" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="12" font-weight="600" fill="#DC1F2D">?</text>
+            <text x="63" y="33" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="11" fill="currentColor">3</text>
+            <path d="M45 6 L45 13 M41.5 10 L45 14 L48.5 10" stroke="#DC1F2D" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M3 48 L69 48" stroke="currentColor" stroke-width="0.8" stroke-dasharray="2 2" opacity=".5"/>
+          </svg>
+        </span>
         <h4>Fautes de frappe silencieuses</h4>
-        <p>Le checksum mod-97 attrape la majorité, mais pas tout. Un mauvais BIC correspondant à un IBAN valide passe sans alerte.</p>
+        <p>Un chiffre de travers dans un IBAN peut passer tous les contrôles classiques. L'argent part quand même — vers un compte qui existe, mais pas le bon.</p>
       </div>
       <div class="problem-cell reveal" data-delay="1">
-        <span class="problem-cell-num">ii</span>
-        <h4>vIBAN et intermédiaires EMI</h4>
-        <p>Wise, Revolut, N26 émettent des IBAN virtuels sur une banque partenaire. Le bénéficiaire affiché n'est pas l'entité réelle détentrice du compte.</p>
+        <span class="problem-cell-illu" aria-hidden="true">
+          <svg viewBox="0 0 72 56" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M6 18 L36 6 L66 18" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
+            <line x1="4" y1="18" x2="68" y2="18" stroke="currentColor" stroke-width="1.4"/>
+            <line x1="4" y1="46" x2="68" y2="46" stroke="currentColor" stroke-width="1.4"/>
+            <line x1="14" y1="20" x2="14" y2="46" stroke="currentColor" stroke-width="1.2"/>
+            <line x1="26" y1="20" x2="26" y2="46" stroke="currentColor" stroke-width="1.2"/>
+            <line x1="46" y1="20" x2="46" y2="46" stroke="currentColor" stroke-width="1.2"/>
+            <line x1="58" y1="20" x2="58" y2="46" stroke="currentColor" stroke-width="1.2"/>
+            <line x1="2" y1="50" x2="70" y2="50" stroke="currentColor" stroke-width="1.4"/>
+            <rect x="22" y="28" width="38" height="22" rx="4" fill="#FAFAF7" stroke="#DC1F2D" stroke-width="1.8"/>
+            <rect x="27" y="36" width="8" height="6" rx="1" fill="#DC1F2D"/>
+            <rect x="47" y="36" width="8" height="6" rx="1" fill="#DC1F2D"/>
+            <line x1="35" y1="39" x2="47" y2="39" stroke="#DC1F2D" stroke-width="1.2"/>
+          </svg>
+        </span>
+        <h4>Des comptes qui ne sont pas ce qu'ils prétendent</h4>
+        <p>Beaucoup d'IBAN affichent une banque de façade alors que l'argent passe en réalité par une fintech intermédiaire. Pratique ou piège : impossible de le savoir sans vérification.</p>
       </div>
       <div class="problem-cell reveal" data-delay="2">
-        <span class="problem-cell-num">iii</span>
-        <h4>Réglementation VoP 2024/886</h4>
-        <p>Depuis octobre 2025, toute PSP européenne doit vérifier le nom du bénéficiaire avant chaque SEPA Instant. La majorité des acteurs bricolent encore.</p>
+        <span class="problem-cell-illu" aria-hidden="true">
+          <svg viewBox="0 0 72 56" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <line x1="22" y1="3" x2="22" y2="13" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+            <line x1="50" y1="3" x2="50" y2="13" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+            <rect x="10" y="10" width="52" height="42" rx="3" fill="#FAFAF7" stroke="currentColor" stroke-width="1.4"/>
+            <line x1="10" y1="20" x2="62" y2="20" stroke="currentColor" stroke-width="1.2"/>
+            <text x="36" y="18" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="6" font-weight="600" fill="currentColor">OCT 2025</text>
+            <g fill="currentColor">
+              <circle cx="18" cy="28" r="1"/><circle cx="26" cy="28" r="1"/><circle cx="34" cy="28" r="1"/><circle cx="42" cy="28" r="1"/><circle cx="50" cy="28" r="1"/><circle cx="58" cy="28" r="1"/>
+              <circle cx="18" cy="36" r="1"/><circle cx="26" cy="36" r="1"/>
+            </g>
+            <circle cx="42" cy="40" r="10" fill="#FAFAF7" stroke="#DC1F2D" stroke-width="1.8"/>
+            <path d="M37 40 L41 44 L47 36" stroke="#DC1F2D" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </span>
+        <h4>Une nouvelle règle devenue obligatoire</h4>
+        <p>Depuis octobre 2025, chaque virement instantané en Europe doit passer par un contrôle du nom du bénéficiaire. Beaucoup d'acteurs courent encore derrière.</p>
       </div>
     </div>
   </div>
@@ -1623,51 +1670,51 @@ curl -X POST https://api.ibanforge.com/v1/iban/validate \<br>
       <span class="serif">Mesuré, audité,</span> listé.
     </h2>
     <p class="section-intro reveal" data-delay="2">
-      IBANforge est évalué en continu par les plateformes de référence de l'écosystème MCP et x402. Voici l'état actuel — mis à jour à chaque scan.
+      Quatre signaux pour vérifier qu'IBANforge tient la route — trois évaluations indépendantes et un code ouvert à tout auditeur.
     </p>
 
     <div class="trust-grid">
       <div class="trust-card reveal">
         <div class="trust-meta">
-          <span class="trust-tag">Score 94 / 100</span>
+          <span class="trust-tag">Note 94 / 100</span>
           <span class="trust-date">avril 2026</span>
         </div>
-        <h3>Smithery.ai — registre MCP</h3>
+        <h3>L'App Store des outils pour IA nous note 94 / 100</h3>
         <p>
-          Référencé sur le plus grand directory d'outils MCP avec un score de qualité de 94/100. Profil vérifié, métadonnées complètes, 5 outils exposés, installation one-click.
+          Smithery est l'annuaire le plus utilisé pour les outils que les assistants IA peuvent appeler. Sur leur grille de qualité, IBANforge obtient 94 sur 100 — profil vérifié, installation en un clic.
         </p>
       </div>
 
       <div class="trust-card reveal" data-delay="1">
         <div class="trust-meta">
-          <span class="trust-tag amber">Profil 83 %</span>
+          <span class="trust-tag amber">Sécurité A · Licence A</span>
           <span class="trust-date">avril 2026</span>
         </div>
-        <h3>Glama.ai — audit MCP</h3>
+        <h3>Un audit indépendant nous donne A en sécurité et A en licence</h3>
         <p>
-          Sécurité notée A, licence notée A. Profil en progression (coherence server + outputSchema en cours). L'une des rares API IBAN listées sur Glama.
+          Glama audite les outils IA du marché. Sur leurs deux critères les plus durs — la sécurité du code et la licence — IBANforge décroche la note maximale. L'une des rares API IBAN qu'ils listent.
         </p>
       </div>
 
       <div class="trust-card reveal" data-delay="2">
         <div class="trust-meta">
-          <span class="trust-tag">Mergé</span>
+          <span class="trust-tag">Index officiel</span>
           <span class="trust-date">avril 2026</span>
         </div>
-        <h3>awesome-x402 — liste officielle</h3>
+        <h3>Listés aux côtés de Coinbase dans l'index officiel</h3>
         <p>
-          Listé dans l'index officiel des projets x402 maintenu par xpay.sh, aux côtés de Coinbase CDP et Cloudflare. Pull request 221 mergée le 22 avril.
+          Le paiement à l'usage pour IA a maintenant son standard : x402. Sa liste officielle ne retient que les projets sérieux — IBANforge y figure à côté de Coinbase et Cloudflare.
         </p>
       </div>
 
       <div class="trust-card reveal" data-delay="3">
         <div class="trust-meta">
-          <span class="trust-tag swiss">Code source MIT</span>
+          <span class="trust-tag swiss">Code ouvert MIT</span>
           <span class="trust-date">GitHub public</span>
         </div>
-        <h3>Auditable, sans surprise</h3>
+        <h3>Le code est public, tout le monde peut vérifier</h3>
         <p>
-          Le code complet d'IBANforge est publié sous licence MIT sur GitHub. Les équipes compliance peuvent auditer chaque règle de validation, chaque classification d'émetteur, chaque calcul de score.
+          Chaque règle de validation, chaque classification de banque, chaque calcul de risque est publié sur GitHub sous licence libre. Votre équipe compliance peut tout relire avant de signer.
         </p>
       </div>
     </div>
