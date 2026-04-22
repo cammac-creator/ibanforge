@@ -1,10 +1,13 @@
 # IBANforge
 
-[![API Status](https://img.shields.io/badge/API-live-brightgreen)](https://ibanforge-production.up.railway.app/health)
+[![API Status](https://img.shields.io/badge/API-live-brightgreen)](https://api.ibanforge.com/health)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.7-blue)](https://www.typescriptlang.org/)
-[![MCP](https://img.shields.io/badge/MCP-5_tools-purple)](https://ibanforge.vercel.app/docs/mcp)
+[![MCP](https://img.shields.io/badge/MCP-5_tools-purple)](https://ibanforge.com/docs/mcp)
 [![npm](https://img.shields.io/npm/v/ibanforge)](https://www.npmjs.com/package/ibanforge)
+[![smithery badge](https://smithery.ai/badge/@cammac-creator/ibanforge)](https://smithery.ai/server/@cammac-creator/ibanforge)
+[![Glama](https://glama.ai/mcp/servers/@cammac-creator/ibanforge/badge)](https://glama.ai/mcp/servers/@cammac-creator/ibanforge)
+[![awesome-x402](https://img.shields.io/badge/awesome--x402-listed-blueviolet)](https://github.com/xpaysh/awesome-x402)
 
 **IBAN validation & BIC/SWIFT lookup API** with SEPA compliance data, issuer classification, risk indicators, x402 micropayments, and MCP integration for AI agents.
 
