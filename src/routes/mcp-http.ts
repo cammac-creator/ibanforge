@@ -410,13 +410,46 @@ mcpHttp.post('/mcp', async (c) => {
   return response;
 });
 
-// Handle GET /mcp (SSE stream for server → client notifications)
+// Handle GET /mcp (SSE stream for server → client notifications, OR discovery hint)
 mcpHttp.get('/mcp', async (c) => {
   const sessionId = c.req.header('mcp-session-id');
   const transport = sessionId ? transports.get(sessionId) : undefined;
 
   if (!transport) {
-    return c.json({ error: 'No active session. Send a POST first.' }, 400);
+    // No session: this is either an agent/dev probing the endpoint with a browser
+    // or curl. Return a discoverable JSON hint instead of an opaque "No active session".
+    return c.json(
+      {
+        protocol: 'mcp',
+        version: '2024-11-05',
+        transport: 'streamable-http',
+        endpoint: 'https://api.ibanforge.com/mcp',
+        message:
+          'This is the IBANforge MCP HTTP endpoint. To use it, send a POST with a JSON-RPC initialize request, then keep the returned mcp-session-id header on subsequent requests.',
+        quickstart: {
+          stdio_npx:
+            'npx -y ibanforge-mcp  # easiest path: run our stdio server, no HTTP session juggling',
+          claude_desktop_config: {
+            mcpServers: {
+              ibanforge: { command: 'npx', args: ['-y', 'ibanforge-mcp'] },
+            },
+          },
+          claude_code_cli: 'claude mcp add ibanforge --transport http https://api.ibanforge.com/mcp',
+          curl_initialize: `curl -X POST https://api.ibanforge.com/mcp -H 'Content-Type: application/json' -H 'Accept: application/json,text/event-stream' -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"curl","version":"1"}}}' -i`,
+        },
+        tools: ['validate_iban', 'batch_validate_iban', 'lookup_bic', 'lookup_ch_clearing', 'check_compliance'],
+        free_tier: {
+          mcp_daily_limit: MCP_DAILY_LIMIT,
+          rest_api_signup: 'POST /v1/keys/generate {"email":"you@example.com"} for 200 req/month',
+        },
+        x402: 'https://api.ibanforge.com/.well-known/x402',
+        documentation: 'https://ibanforge.com/docs',
+        llms_txt: 'https://api.ibanforge.com/llms.txt',
+        server_card: 'https://ibanforge.com/.well-known/mcp/server-card.json',
+        registry: 'https://registry.modelcontextprotocol.io/v0/servers?search=ibanforge',
+      },
+      200,
+    );
   }
 
   const response = await transport.handleRequest(c.req.raw);
