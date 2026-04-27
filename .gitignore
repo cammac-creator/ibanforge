@@ -8,3 +8,6 @@ data/*.sqlite-shm
 coverage/
 *.tsbuildinfo
 .superpowers/
+# Append to .gitignore
+mcp/node_modules/
+mcp/dist/
