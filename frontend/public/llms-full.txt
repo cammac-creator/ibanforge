@@ -311,7 +311,7 @@ IBANforge exposes a Model Context Protocol (MCP) server for native AI agent inte
 
 ## Supported Countries
 
-IBANforge validates IBANs for all 77 countries with standardized IBAN formats, including:
+IBANforge validates IBANs for all 84 countries with standardized IBAN formats, including:
 CH (Switzerland), DE (Germany), GB (United Kingdom), FR (France), NL (Netherlands),
 AT (Austria), BE (Belgium), ES (Spain), IT (Italy), PT (Portugal), SE (Sweden),
 NO (Norway), DK (Denmark), FI (Finland), PL (Poland), and more.
