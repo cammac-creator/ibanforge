@@ -18,6 +18,7 @@ import { discovery } from './routes/discovery.js';
 import { ogImage } from './routes/og-image.js';
 import { mcpHttp } from './routes/mcp-http.js';
 import { mcpCard } from './routes/mcp-card.js';
+import { feedback } from './routes/feedback.js';
 import { createX402Middleware, ensureWalletConfigured } from './middleware/x402.js';
 import { apiKeyMiddleware } from './middleware/api-key.js';
 import { enrich402Middleware } from './middleware/enrich-402.js';
@@ -258,6 +259,7 @@ app.route('/', discovery);
 app.route('/', ogImage);
 app.route('/', mcpHttp);
 app.route('/', mcpCard);
+app.route('/', feedback);
 
 // Landing page (must be last — catches GET /)
 app.route('/', landing);
