@@ -144,7 +144,7 @@ const oauthResourceMetadata = {
   authentication_methods: [
     {
       type: 'api_key',
-      description: 'Free tier: 1,000 requests/month. POST /v1/keys/generate to obtain.',
+      description: 'Free tier: 200 requests/month. POST /v1/keys/generate to obtain.',
       docs: 'https://ibanforge.com/docs',
     },
     {

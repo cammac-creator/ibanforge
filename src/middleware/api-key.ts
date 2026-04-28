@@ -44,25 +44,15 @@ export function apiKeyMiddleware(): MiddlewareHandler<HonoEnv> {
       return c.json(
         {
           error: 'quota_exceeded',
-          message: `You have used your ${quota.limit} free calls this month. Continue without interruption by paying per call in USDC via x402 — no credit card, no signup, just a wallet on Base. Drop your API key from the request to switch to x402 mode automatically.`,
+          message: `Monthly limit of ${quota.limit} requests reached. Quota resets on the 1st of each month.`,
           used: quota.used,
           limit: quota.limit,
           month: quota.month,
-          next: {
-            mode: 'x402',
-            how: 'Remove the Authorization/X-API-Key header and retry the same request — the API will respond with HTTP 402 Payment Required and a payment instruction conforming to https://x402.org.',
-            pricing: {
-              'POST /v1/iban/validate': '$0.005',
-              'POST /v1/iban/batch': '$0.20',
-              'GET /v1/bic/{code}': '$0.003',
-              'GET /v1/ch/clearing/{iid}': '$0.003',
-              'POST /v1/iban/compliance': '$0.02',
-            },
-            discovery: 'https://api.ibanforge.com/.well-known/x402',
-            docs: 'https://x402.org',
+          upgrade: {
+            description: 'Need more? Contact us for a custom plan with higher limits.',
+            email: 'support@ibanforge.com',
+            x402: 'Or use x402 micropayments for unlimited pay-per-call access (no quota).',
           },
-          quota_reset: 'Quota resets on the 1st of each month.',
-          contact: 'For volume agreements (≥ 5M calls/month, prepaid), email sales@ibanforge.com.',
         },
         429,
       );

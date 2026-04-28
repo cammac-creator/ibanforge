@@ -51,7 +51,7 @@ apiKeys.post('/v1/keys/generate', async (c) => {
     api_key: result.api_key,
     key_prefix: result.key_prefix,
     email: email.trim().toLowerCase(),
-    monthly_limit: 1000,
+    monthly_limit: 200,
     message: 'Save this key — it will not be shown again.',
   }, 201);
 });
@@ -100,7 +100,7 @@ apiKeys.post('/v1/admin/keys', async (c) => {
     api_key: result.api_key,
     key_prefix: result.key_prefix,
     email: email.trim().toLowerCase(),
-    monthly_limit: monthlyLimit ?? 1000,
+    monthly_limit: monthlyLimit ?? 200,
   }, 201);
 });
 
@@ -140,7 +140,7 @@ apiKeys.post('/v1/admin/keys/import', async (c) => {
     'INSERT INTO api_keys (key_hash, key_prefix, email, monthly_limit) VALUES (?, ?, ?, ?)',
   ).run(keyHash, keyPrefix, email.trim().toLowerCase(), monthlyLimit);
 
-  return c.json({ imported: true, key_prefix: keyPrefix, email: email.trim().toLowerCase(), monthly_limit: monthlyLimit ?? 1000 }, 201);
+  return c.json({ imported: true, key_prefix: keyPrefix, email: email.trim().toLowerCase(), monthly_limit: monthlyLimit ?? 200 }, 201);
 });
 
 apiKeys.get('/v1/admin/keys', (c) => {

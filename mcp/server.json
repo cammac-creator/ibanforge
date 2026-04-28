@@ -22,7 +22,7 @@
       "environmentVariables": [
         {
           "name": "IBANFORGE_API_KEY",
-          "description": "Optional Bearer ifk_* API key (free tier 1,000 req/month).",
+          "description": "Optional Bearer ifk_* API key (free tier 200 req/month).",
           "isRequired": false,
           "isSecret": true
         },
