@@ -15,11 +15,31 @@ mcpCard.get('/.well-known/mcp/server-card.json', (c) => {
     transport: 'streamable-http',
     version: pkg.version,
     tools: [
-      { name: 'validate_iban', description: 'Validate a single IBAN with BIC, SEPA, issuer, and risk data ($0.005)' },
-      { name: 'batch_validate_iban', description: 'Validate up to 100 IBANs in one call ($0.002 each)' },
-      { name: 'lookup_bic', description: 'Look up a BIC/SWIFT code with LEI enrichment (121K+ GLEIF entries, $0.003)' },
-      { name: 'check_compliance', description: 'Full compliance check: sanctions + FATF + SEPA reachability + VoP + risk score ($0.02)' },
-      { name: 'lookup_ch_clearing', description: 'Look up a Swiss BC-Nummer / IID with SIC, QR-IID, institution type (1,190 entries, $0.003)' },
+      {
+        name: 'validate_iban',
+        description:
+          'Verify a European IBAN AND enrich it with bank, compliance and routing data. Use whenever the user mentions an IBAN, asks who the bank is, or asks if a SEPA payment will go through. Returns: valid, country, BIC, bank name, EMI/vIBAN flag, SEPA + VoP, risk_score, Swiss bc_nummer for CH/LI. Cost: $0.005.',
+      },
+      {
+        name: 'batch_validate_iban',
+        description:
+          'Validate up to 100 IBANs in one call (cheaper than calling validate_iban repeatedly). Use for CSV/spreadsheet cleanup, customer DB dedup, or pre-flight payout list triage. Cost: $0.002 per IBAN, max $0.20 per batch.',
+      },
+      {
+        name: 'lookup_bic',
+        description:
+          'Resolve a BIC/SWIFT code (8 or 11 chars) into the underlying bank. Use only when the user already has a BIC — for IBAN inputs, prefer validate_iban which resolves the BIC automatically. Backed by 121,197 GLEIF entries with LEI enrichment. Cost: $0.003.',
+      },
+      {
+        name: 'check_compliance',
+        description:
+          'Pre-flight compliance triage on an IBAN before a SEPA / cross-border payment: sanctions screening (OFAC/EU/UN), FATF jurisdiction flag, SEPA Instant reachability, VoP (EU 2024/886) participant. Returns risk_score 0-100. Informational, not a regulated AML/CFT product. Cost: $0.02.',
+      },
+      {
+        name: 'lookup_ch_clearing',
+        description:
+          'Resolve a Swiss BC-Nummer / IID (1-5 digits) into institution name, type, SIC, euroSIC, QR-IID. The only API that exposes this data — alternatives do not cover it. Backed by 1,190 SIX BankMaster entries. Cost: $0.003. Only relevant for CH/LI accounts.',
+      },
     ],
     homepage: 'https://ibanforge.com',
     repository: 'https://github.com/cammac-creator/ibanforge',
