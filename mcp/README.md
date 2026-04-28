@@ -11,7 +11,7 @@ Official **Model Context Protocol (MCP) server** for [IBANforge](https://ibanfor
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------ | ----------- |
 | `validate_iban`       | Validate a single IBAN (ISO 13616 mod-97), resolve BIC, classify issuer (bank/EMI/vIBAN), SEPA + VoP flags               | 0.005       |
 | `batch_validate_iban` | Validate up to 100 IBANs in one call                                                                                     | 0.002 each  |
-| `lookup_bic`          | Lookup BIC/SWIFT against 39,243 GLEIF entries with LEI enrichment                                                        | 0.003       |
+| `lookup_bic`          | Lookup BIC/SWIFT against 121,197 GLEIF entries with LEI enrichment                                                        | 0.003       |
 | `lookup_ch_clearing`  | Lookup Swiss BC-Nummer / IID against 1,190 SIX BankMaster entries (SIC, euroSIC, QR-IID)                                 | 0.003       |
 | `check_compliance`    | Full compliance check: IBAN + sanctions (OFAC/EU/UN) + SEPA Instant + VoP + risk score (0-100)                           | 0.02        |
 
@@ -84,7 +84,7 @@ After adding the server, ask your AI agent:
 
 ## Data sources
 
-- **39,243 BIC entries** from [GLEIF](https://www.gleif.org) (Global Legal Entity Identifier Foundation), enriched with LEI codes
+- **121,197 BIC entries** from [GLEIF](https://www.gleif.org) (Global Legal Entity Identifier Foundation), enriched with LEI codes
 - **1,190 BC-Nummern** from the official [SIX BankMaster](https://www.six-group.com/en/products-services/banking-services/bank-master-data.html) CSV
 - **EMI / vIBAN classification** from a curated dataset of 30+ known issuer prefixes
 - **VoP participants** from the EBA RT1 / SCT Inst directories
