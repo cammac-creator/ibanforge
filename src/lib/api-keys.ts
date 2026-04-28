@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { getStatsDB } from './db.js';
 
-const DEFAULT_MONTHLY_LIMIT = 200;
+const DEFAULT_MONTHLY_LIMIT = 1000;
 const KEY_PREFIX = 'ifk_';
 
 function hashKey(key: string): string {
