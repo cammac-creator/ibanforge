@@ -18,7 +18,7 @@ landing.get('/', (c) => {
     "documentation":"https://api.ibanforge.com/openapi.json",
     "provider":{"@type":"Organization","name":"IBANforge","url":"https://ibanforge.com"},
     "offers":[
-      {"@type":"Offer","price":"0","priceCurrency":"USD","description":"Free tier: 1,000 requests/month with API key"},
+      {"@type":"Offer","price":"0","priceCurrency":"USD","description":"Free tier: 200 requests/month with API key"},
       {"@type":"Offer","price":"0.003","priceCurrency":"USD","description":"Pay per call via x402 USDC on Base L2"}
     ]
   });
@@ -28,7 +28,7 @@ landing.get('/', (c) => {
     "@type":"FAQPage",
     "mainEntity":[
       {"@type":"Question","name":"What is IBANforge?","acceptedAnswer":{"@type":"Answer","text":"IBANforge is a REST API for IBAN validation, BIC/SWIFT lookup, and compliance risk scoring. It covers 75+ countries with 121K BIC entries sourced from GLEIF."}},
-      {"@type":"Question","name":"How much does IBANforge cost?","acceptedAnswer":{"@type":"Answer","text":"IBANforge offers a free tier with 1,000 requests per month using an API key. Beyond that, pay $0.003 to $0.02 per call using USDC micropayments via the x402 protocol. No subscription required."}},
+      {"@type":"Question","name":"How much does IBANforge cost?","acceptedAnswer":{"@type":"Answer","text":"IBANforge offers a free tier with 200 requests per month using an API key. Beyond that, pay $0.003 to $0.02 per call using USDC micropayments via the x402 protocol. No subscription required."}},
       {"@type":"Question","name":"Can AI agents use IBANforge?","acceptedAnswer":{"@type":"Answer","text":"Yes. IBANforge is MCP-native with 5 tools for AI agents: validate_iban, batch_validate_iban, lookup_bic, check_compliance, and lookup_ch_clearing. Compatible with Claude, GPT, and any MCP client."}},
       {"@type":"Question","name":"What countries does IBANforge support?","acceptedAnswer":{"@type":"Answer","text":"IBANforge supports 75+ countries with full BBAN parsing, SEPA membership detection, Verification of Payee (VoP) status, and country-level risk classification."}}
     ]
@@ -227,7 +227,7 @@ landing.get('/', (c) => {
         <div class="keygen-result" id="keygenResult">
           <strong>Your API key (save it now):</strong>
           <code id="keygenKey"></code>
-          <div class="warn">1,000 requests/month free. This key will not be shown again.</div>
+          <div class="warn">200 requests/month free. This key will not be shown again.</div>
         </div>
         <div class="keygen-error" id="keygenError"></div>
       </div>
@@ -286,7 +286,7 @@ landing.get('/', (c) => {
           <div class="feat-icon feat-icon-blue"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="m13 2-2 2.5h3L12 7"/><path d="M10 14v-3M14 14v-3"/><rect x="3" y="14" width="18" height="7" rx="2"/></svg></div>
           <div class="feat-stat">&lt;30ms</div>
           <h3>Fast &amp; Developer-friendly</h3>
-          <p>OpenAPI spec. npm SDK. Batch up to 100 IBANs. Free tier with 1,000 req/month.</p>
+          <p>OpenAPI spec. npm SDK. Batch up to 100 IBANs. Free tier with 200 req/month.</p>
         </div>
       </div>
     </div>
@@ -300,7 +300,7 @@ landing.get('/', (c) => {
         <div class="path-card path-free">
           <div class="path-badge path-badge-green">FREE TIER</div>
           <h3>API Key</h3>
-          <p class="path-price"><strong>1,000 requests/month</strong> &mdash; no card required</p>
+          <p class="path-price"><strong>200 requests/month</strong> &mdash; no card required</p>
           <ul class="path-features">
             <li><span class="check">&check;</span> All endpoints included</li>
             <li><span class="check">&check;</span> IBAN validate, BIC lookup, compliance</li>

@@ -440,7 +440,7 @@ mcpHttp.get('/mcp', async (c) => {
         tools: ['validate_iban', 'batch_validate_iban', 'lookup_bic', 'lookup_ch_clearing', 'check_compliance'],
         free_tier: {
           mcp_daily_limit: MCP_DAILY_LIMIT,
-          rest_api_signup: 'POST /v1/keys/generate {"email":"you@example.com"} for 1,000 req/month',
+          rest_api_signup: 'POST /v1/keys/generate {"email":"you@example.com"} for 200 req/month',
         },
         x402: 'https://api.ibanforge.com/.well-known/x402',
         documentation: 'https://ibanforge.com/docs',

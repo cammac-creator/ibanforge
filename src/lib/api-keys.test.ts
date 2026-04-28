@@ -33,7 +33,7 @@ describe('API Keys', () => {
     const q = checkAndIncrementQuota(v.keyHash);
     expect(q.allowed).toBe(true);
     expect(q.used).toBe(1);
-    expect(q.remaining).toBe(999);
+    expect(q.remaining).toBe(199);
   });
 
   it('returns usage stats', () => {
@@ -43,7 +43,7 @@ describe('API Keys', () => {
     checkAndIncrementQuota(v.keyHash);
     const usage = getUsage(v.keyHash);
     expect(usage.used).toBe(2);
-    expect(usage.remaining).toBe(998);
+    expect(usage.remaining).toBe(198);
   });
 
   it('decrementQuota refunds a consumed slot', () => {

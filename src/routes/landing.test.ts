@@ -74,7 +74,7 @@ describe('Landing page', () => {
   });
 
   it('has pricing section with both paths', () => {
-    expect(html).toContain('1,000 requests');
+    expect(html).toContain('200 requests');
     expect(html).toContain('$0.003');
   });
 
