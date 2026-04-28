@@ -238,7 +238,7 @@ const spec = {
       post: {
         operationId: 'generateApiKey',
         summary: 'Generate a free API key',
-        description: 'Generates a free API key with 200 requests/month quota. One key per email per day.',
+        description: 'Generates a free API key with 1,000 requests/month quota. One key per email per day.',
         tags: ['API Keys'],
         requestBody: {
           required: true,
@@ -398,7 +398,7 @@ const spec = {
       apiKey: {
         type: 'http',
         scheme: 'bearer',
-        description: 'API key (Bearer ifk_xxx) — 200 free requests/month, or custom quota for paid keys',
+        description: 'API key (Bearer ifk_xxx) — 1,000 free requests/month, or custom quota for paid keys',
       },
     },
     schemas: {
