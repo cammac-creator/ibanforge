@@ -52,6 +52,31 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
       const { paymentMiddleware } = await import('@x402/hono');
       const { x402ResourceServer, HTTPFacilitatorClient } = await import('@x402/core/server');
       const { ExactEvmScheme } = await import('@x402/evm/exact/server');
+      const { bazaarResourceServerExtension } = await import('@x402/extensions');
+
+      // Bazaar discoverability blocks per route — let x402 facilitators (Coinbase CDP, x402.org)
+      // index our endpoints in their public catalog so AI agents discover IBANforge automatically.
+      const ibanInputSchema = {
+        type: 'object',
+        properties: {
+          iban: { type: 'string', description: 'IBAN to validate. Spaces and lowercase accepted.' },
+        },
+        required: ['iban'],
+      };
+      const ibanOutputSchema = {
+        type: 'object',
+        properties: {
+          valid: { type: 'boolean' },
+          country: { type: 'string' },
+          country_name: { type: 'string' },
+          bic_resolved: { type: 'string' },
+          bank_name: { type: 'string' },
+          issuer_class: { type: 'string', enum: ['bank', 'emi', 'viban', 'unknown'] },
+          sepa: { type: 'object' },
+          vop_status: { type: 'string' },
+          risk_score: { type: 'number' },
+        },
+      };
 
       const routes: Record<string, unknown> = {
         'POST /v1/iban/validate': {
@@ -62,7 +87,17 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
             payTo: walletAddress,
             maxTimeoutSeconds: 60,
           },
-          description: 'IBAN validation + BIC lookup',
+          description:
+            'Validate a European IBAN and enrich it with bank, compliance and routing data. Use whenever the user mentions an IBAN, a bank account, a SEPA payment or asks who the bank is. Returns: valid, country, BIC/SWIFT, bank name, EMI/vIBAN flag, SEPA + VoP reachability, risk score, Swiss bc_nummer for CH/LI.',
+          mimeType: 'application/json',
+          extensions: {
+            bazaar: {
+              discoverable: true,
+              bodyType: 'json',
+              inputSchema: ibanInputSchema,
+              outputSchema: ibanOutputSchema,
+            },
+          },
         },
         'POST /v1/iban/batch': {
           accepts: {
@@ -72,7 +107,35 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
             payTo: walletAddress,
             maxTimeoutSeconds: 60,
           },
-          description: 'Batch IBAN validation (up to 100 IBANs)',
+          description:
+            'Validate up to 100 IBANs in one call (10x cheaper per IBAN than calling validate_iban repeatedly). Use for CSV cleanup, customer DB dedup, or pre-flight payout list triage.',
+          mimeType: 'application/json',
+          extensions: {
+            bazaar: {
+              discoverable: true,
+              bodyType: 'json',
+              inputSchema: {
+                type: 'object',
+                properties: {
+                  ibans: {
+                    type: 'array',
+                    items: { type: 'string' },
+                    minItems: 1,
+                    maxItems: 100,
+                    description: 'Array of 1 to 100 IBAN strings.',
+                  },
+                },
+                required: ['ibans'],
+              },
+              outputSchema: {
+                type: 'object',
+                properties: {
+                  results: { type: 'array', items: ibanOutputSchema },
+                  summary: { type: 'object' },
+                },
+              },
+            },
+          },
         },
         'GET /v1/bic/:code': {
           accepts: {
@@ -82,7 +145,27 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
             payTo: walletAddress,
             maxTimeoutSeconds: 60,
           },
-          description: 'BIC/SWIFT code lookup with LEI enrichment',
+          description:
+            'Resolve a BIC/SWIFT code (8 or 11 chars) into the underlying bank: name, country, city, LEI, address. Backed by 121,197 GLEIF entries with LEI enrichment. Use only when you already have the BIC — for IBAN inputs, prefer /v1/iban/validate which resolves the BIC for you.',
+          mimeType: 'application/json',
+          extensions: {
+            bazaar: {
+              discoverable: true,
+              pathParams: {
+                code: { type: 'string', description: 'BIC/SWIFT code (8 or 11 alphanumeric).' },
+              },
+              outputSchema: {
+                type: 'object',
+                properties: {
+                  bank_name: { type: 'string' },
+                  country: { type: 'string' },
+                  city: { type: 'string' },
+                  lei: { type: 'string' },
+                  address: { type: 'string' },
+                },
+              },
+            },
+          },
         },
         'POST /v1/iban/compliance': {
           accepts: {
@@ -92,7 +175,24 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
             payTo: walletAddress,
             maxTimeoutSeconds: 60,
           },
-          description: 'IBAN compliance check: validation + sanctions + SEPA reachability + VoP + risk score',
+          description:
+            'Pre-flight compliance triage on an IBAN before a SEPA / cross-border payment: sanctions screening (OFAC/EU/UN), FATF jurisdiction flag, SEPA Instant reachability, VoP (EU 2024/886) participant. Returns risk_score 0-100. Informational, not a regulated AML/CFT product.',
+          mimeType: 'application/json',
+          extensions: {
+            bazaar: {
+              discoverable: true,
+              bodyType: 'json',
+              inputSchema: ibanInputSchema,
+              outputSchema: {
+                type: 'object',
+                properties: {
+                  risk_score: { type: 'number', minimum: 0, maximum: 100 },
+                  flags: { type: 'object' },
+                  recommended_action: { type: 'string' },
+                },
+              },
+            },
+          },
         },
         'GET /v1/ch/clearing/:iid': {
           accepts: {
@@ -102,7 +202,28 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
             payTo: walletAddress,
             maxTimeoutSeconds: 60,
           },
-          description: 'Swiss BC-Nummer / IID clearing lookup',
+          description:
+            'Resolve a Swiss BC-Nummer / IID (1-5 digits) into institution name, type, SIC, euroSIC, QR-IID. The only API that exposes this data — alternatives (iban.com, OpenIBAN, payeer, sepa.com) do not cover it. Backed by 1,190 SIX BankMaster entries.',
+          mimeType: 'application/json',
+          extensions: {
+            bazaar: {
+              discoverable: true,
+              pathParams: {
+                iid: { type: 'string', description: 'Swiss IID / BC-Nummer (1-5 digits).' },
+              },
+              outputSchema: {
+                type: 'object',
+                properties: {
+                  institution_name: { type: 'string' },
+                  institution_type: { type: 'string' },
+                  sic_participant: { type: 'boolean' },
+                  eurosic_participant: { type: 'boolean' },
+                  instant_payments: { type: 'boolean' },
+                  qr_iid: { type: 'string' },
+                },
+              },
+            },
+          },
         },
       };
 
@@ -125,6 +246,10 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
       // Build x402 resource server with EVM scheme (like official example)
       const x402Server = new x402ResourceServer(facilitatorClient);
       x402Server.register('eip155:*', new ExactEvmScheme());
+      // Register the Bazaar discovery extension so each route ships its
+      // inputSchema/outputSchema to facilitator catalogs (Coinbase CDP, x402.org)
+      // and AI agents can find IBANforge automatically.
+      x402Server.registerExtension(bazaarResourceServerExtension);
 
       const middleware = paymentMiddleware(
         routes as Parameters<typeof paymentMiddleware>[0],
