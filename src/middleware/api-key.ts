@@ -41,21 +41,19 @@ export function apiKeyMiddleware(): MiddlewareHandler<HonoEnv> {
     const quota = checkAndIncrementQuota(keyHash, monthlyLimit);
 
     if (!quota.allowed) {
-      return c.json(
-        {
-          error: 'quota_exceeded',
-          message: `Monthly limit of ${quota.limit} requests reached. Quota resets on the 1st of each month.`,
-          used: quota.used,
-          limit: quota.limit,
-          month: quota.month,
-          upgrade: {
-            description: 'Need more? Contact us for a custom plan with higher limits.',
-            email: 'support@ibanforge.com',
-            x402: 'Or use x402 micropayments for unlimited pay-per-call access (no quota).',
-          },
-        },
-        429,
-      );
+      // Quota exhausted. Instead of returning a hard 429 (which is a dead-end
+      // for autonomous agents), we fall through WITHOUT setting
+      // apiKeyAuthenticated. The x402 middleware will then advertise
+      // payment requirements and the agent can pay-per-call seamlessly until
+      // their quota resets next month.
+      // Hint headers tell the agent what happened so it can log + decide.
+      c.header('X-Quota-Exhausted', 'true');
+      c.header('X-Quota-Used', String(quota.used));
+      c.header('X-Quota-Limit', String(quota.limit));
+      c.header('X-Quota-Month', quota.month);
+      c.header('X-Quota-Reset-Hint', 'monthly, 1st of month');
+      await next();
+      return;
     }
 
     c.set('apiKeyAuthenticated', true);
