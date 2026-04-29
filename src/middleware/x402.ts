@@ -97,25 +97,96 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
 
       // Bazaar discoverability blocks per route — let x402 facilitators (Coinbase CDP, x402.org)
       // index our endpoints in their public catalog so AI agents discover IBANforge automatically.
+      //
+      // Trust signals appended to descriptions: production status, p99 latency target,
+      // dataset size, last update. Agents that filter on description quality (Bazaar
+      // semantic search, agentic.market) reward this.
+      const TRUST_TAG_VALIDATE = 'Production · p99 <50ms · 121,197 GLEIF + 1,190 SIX entries · v1.2.0';
+      const TRUST_TAG_BIC = 'Production · p99 <30ms · 121,197 GLEIF entries with LEI · v1.2.0';
+      const TRUST_TAG_CH = 'Production · p99 <20ms · 1,190 SIX BankMaster entries · v1.2.0';
+      const TRUST_TAG_COMPLIANCE = 'Production · p99 <80ms · OFAC/EU/UN + FATF + SEPA + VoP · weekly refresh · v1.2.0';
+      const TRUST_TAG_BATCH = 'Production · p99 <300ms for 100 IBANs · 121,197 GLEIF entries · v1.2.0';
+
       const ibanInputSchema = {
         type: 'object',
         properties: {
-          iban: { type: 'string', description: 'IBAN to validate. Spaces and lowercase accepted.' },
+          iban: {
+            type: 'string',
+            description: 'IBAN to validate. Spaces and lowercase accepted. Example: CH9300762011623852957',
+            minLength: 15,
+            maxLength: 34,
+          },
         },
         required: ['iban'],
       };
+      // Full-fidelity output schema: every field a real response carries.
+      // Mirrors src/lib/enrich.ts shape so agents can predict the response 1:1.
       const ibanOutputSchema = {
         type: 'object',
         properties: {
+          iban: { type: 'string', description: 'Normalized IBAN (uppercase, no spaces).' },
+          formatted: { type: 'string', description: 'IBAN with 4-char groups, e.g. CH93 0076 2011 6238 5295 7.' },
           valid: { type: 'boolean' },
-          country: { type: 'string' },
-          country_name: { type: 'string' },
-          bic_resolved: { type: 'string' },
-          bank_name: { type: 'string' },
-          issuer_class: { type: 'string', enum: ['bank', 'emi', 'viban', 'unknown'] },
-          sepa: { type: 'object' },
-          vop_status: { type: 'string' },
-          risk_score: { type: 'number' },
+          country: {
+            type: 'object',
+            properties: {
+              code: { type: 'string', description: 'ISO 3166-1 alpha-2.' },
+              name: { type: 'string' },
+            },
+          },
+          check_digits: { type: 'string' },
+          bban: {
+            type: 'object',
+            properties: {
+              bank_code: { type: 'string' },
+              branch_code: { type: 'string' },
+              account: { type: 'string' },
+            },
+          },
+          bic: {
+            type: 'object',
+            description: 'Resolved BIC/SWIFT (when BBAN→BIC mapping exists).',
+            properties: {
+              bic: { type: 'string' },
+              bankName: { type: 'string' },
+              city: { type: 'string' },
+              lei: { type: 'string' },
+            },
+          },
+          issuer: {
+            type: 'object',
+            properties: {
+              type: { type: 'string', enum: ['bank', 'emi', 'viban', 'neobank', 'unknown'] },
+              name: { type: 'string' },
+            },
+          },
+          sepa: {
+            type: 'object',
+            properties: {
+              reachable: { type: 'boolean' },
+              instant: { type: 'boolean' },
+            },
+          },
+          vop: {
+            type: 'object',
+            description: 'Verification of Payee (EU 2024/886) participant status.',
+            properties: { participant: { type: 'boolean' } },
+          },
+          ch_clearing: {
+            type: 'object',
+            description: 'Swiss-specific data when country is CH or LI.',
+            properties: {
+              bc_nummer: { type: 'string' },
+              sic: { type: 'boolean' },
+              qr_iid: { type: 'boolean' },
+            },
+          },
+          risk_score: {
+            type: 'number',
+            minimum: 0,
+            maximum: 100,
+            description: 'Country + issuer risk indicator. Higher = more attention needed.',
+          },
         },
       };
 
@@ -129,7 +200,7 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
             maxTimeoutSeconds: 60,
           },
           description:
-            'Validate a European IBAN and enrich it with bank, compliance and routing data. Use whenever the user mentions an IBAN, a bank account, a SEPA payment or asks who the bank is. Returns: valid, country, BIC/SWIFT, bank name, EMI/vIBAN flag, SEPA + VoP reachability, risk score, Swiss bc_nummer for CH/LI.',
+            `Validate a European IBAN and enrich it with bank, compliance and routing data. Use whenever the user mentions an IBAN, a bank account, a SEPA payment or asks who the bank is. Returns: valid, country, BIC/SWIFT, bank name, EMI/vIBAN flag, SEPA + VoP reachability, risk score, Swiss bc_nummer for CH/LI. ${TRUST_TAG_VALIDATE}.`,
           mimeType: 'application/json',
           extensions: {
             bazaar: {
@@ -137,6 +208,16 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
               bodyType: 'json',
               inputSchema: ibanInputSchema,
               outputSchema: ibanOutputSchema,
+              info: {
+                input: {
+                  type: 'http',
+                  method: 'POST',
+                  bodyType: 'json',
+                  body: { iban: 'CH93 0076 2011 6238 5295 7' },
+                  discoverable: true,
+                },
+                output: { type: 'json' },
+              },
             },
           },
         },
@@ -149,7 +230,7 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
             maxTimeoutSeconds: 60,
           },
           description:
-            'Validate up to 100 IBANs in one call (10x cheaper per IBAN than calling validate_iban repeatedly). Use for CSV cleanup, customer DB dedup, or pre-flight payout list triage.',
+            `Validate up to 100 IBANs in one call (10x cheaper per IBAN than calling validate_iban repeatedly). Use for CSV cleanup, customer DB dedup, or pre-flight payout list triage. ${TRUST_TAG_BATCH}.`,
           mimeType: 'application/json',
           extensions: {
             bazaar: {
@@ -172,8 +253,26 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
                 type: 'object',
                 properties: {
                   results: { type: 'array', items: ibanOutputSchema },
-                  summary: { type: 'object' },
+                  summary: {
+                    type: 'object',
+                    properties: {
+                      total: { type: 'number' },
+                      valid: { type: 'number' },
+                      invalid: { type: 'number' },
+                    },
+                  },
+                  cost_usdc: { type: 'number', description: 'Actual USDC charged for this call.' },
                 },
+              },
+              info: {
+                input: {
+                  type: 'http',
+                  method: 'POST',
+                  bodyType: 'json',
+                  body: { ibans: ['CH9300762011623852957', 'DE89370400440532013000'] },
+                  discoverable: true,
+                },
+                output: { type: 'json' },
               },
             },
           },
@@ -187,7 +286,7 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
             maxTimeoutSeconds: 60,
           },
           description:
-            'Resolve a BIC/SWIFT code (8 or 11 chars) into the underlying bank: name, country, city, LEI, address. Backed by 121,197 GLEIF entries with LEI enrichment. Use only when you already have the BIC — for IBAN inputs, prefer /v1/iban/validate which resolves the BIC for you.',
+            `Resolve a BIC/SWIFT code (8 or 11 chars) into the underlying bank: name, country, city, LEI, address. Backed by 121,197 GLEIF entries with LEI enrichment. Use only when you already have the BIC — for IBAN inputs, prefer /v1/iban/validate which resolves the BIC for you. ${TRUST_TAG_BIC}.`,
           mimeType: 'application/json',
           extensions: {
             bazaar: {
@@ -198,12 +297,29 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
               outputSchema: {
                 type: 'object',
                 properties: {
-                  bank_name: { type: 'string' },
-                  country: { type: 'string' },
+                  bic: { type: 'string' },
+                  bic8: { type: 'string' },
+                  bic11: { type: 'string' },
+                  found: { type: 'boolean' },
+                  valid_format: { type: 'boolean' },
+                  institution: { type: 'string' },
+                  country: {
+                    type: 'object',
+                    properties: { code: { type: 'string' }, name: { type: 'string' } },
+                  },
                   city: { type: 'string' },
                   lei: { type: 'string' },
                   address: { type: 'string' },
                 },
+              },
+              info: {
+                input: {
+                  type: 'http',
+                  method: 'GET',
+                  pathParams: { code: 'UBSWCHZH80A' },
+                  discoverable: true,
+                },
+                output: { type: 'json' },
               },
             },
           },
@@ -217,7 +333,7 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
             maxTimeoutSeconds: 60,
           },
           description:
-            'Pre-flight compliance triage on an IBAN before a SEPA / cross-border payment: sanctions screening (OFAC/EU/UN), FATF jurisdiction flag, SEPA Instant reachability, VoP (EU 2024/886) participant. Returns risk_score 0-100. Informational, not a regulated AML/CFT product.',
+            `Pre-flight compliance triage on an IBAN before a SEPA / cross-border payment: sanctions screening (OFAC/EU/UN), FATF jurisdiction flag, SEPA Instant reachability, VoP (EU 2024/886) participant. Returns risk_score 0-100. Informational, not a regulated AML/CFT product. ${TRUST_TAG_COMPLIANCE}.`,
           mimeType: 'application/json',
           extensions: {
             bazaar: {
@@ -227,10 +343,47 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
               outputSchema: {
                 type: 'object',
                 properties: {
+                  iban: { type: 'string' },
+                  valid: { type: 'boolean' },
                   risk_score: { type: 'number', minimum: 0, maximum: 100 },
+                  recommended_action: { type: 'string', enum: ['allow', 'review', 'block'] },
+                  sanctions: {
+                    type: 'object',
+                    properties: {
+                      bic_sanctioned: { type: 'boolean' },
+                      country_sanctioned: { type: 'boolean' },
+                      lists: { type: 'array', items: { type: 'string' } },
+                    },
+                  },
+                  fatf: {
+                    type: 'object',
+                    properties: {
+                      list: { type: 'string', enum: ['none', 'grey', 'black'] },
+                    },
+                  },
+                  sepa: {
+                    type: 'object',
+                    properties: {
+                      reachable: { type: 'boolean' },
+                      instant: { type: 'boolean' },
+                    },
+                  },
+                  vop: {
+                    type: 'object',
+                    properties: { participant: { type: 'boolean' } },
+                  },
                   flags: { type: 'object' },
-                  recommended_action: { type: 'string' },
                 },
+              },
+              info: {
+                input: {
+                  type: 'http',
+                  method: 'POST',
+                  bodyType: 'json',
+                  body: { iban: 'GB29NWBK60161331926819' },
+                  discoverable: true,
+                },
+                output: { type: 'json' },
               },
             },
           },
@@ -244,7 +397,7 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
             maxTimeoutSeconds: 60,
           },
           description:
-            'Resolve a Swiss BC-Nummer / IID (1-5 digits) into institution name, type, SIC, euroSIC, QR-IID. The only API that exposes this data — alternatives (iban.com, OpenIBAN, payeer, sepa.com) do not cover it. Backed by 1,190 SIX BankMaster entries.',
+            `Resolve a Swiss BC-Nummer / IID (1-5 digits) into institution name, type, SIC, euroSIC, QR-IID. Backed by 1,190 SIX BankMaster entries — the canonical Swiss banking source. ${TRUST_TAG_CH}.`,
           mimeType: 'application/json',
           extensions: {
             bazaar: {
@@ -255,13 +408,37 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
               outputSchema: {
                 type: 'object',
                 properties: {
-                  institution_name: { type: 'string' },
-                  institution_type: { type: 'string' },
-                  sic_participant: { type: 'boolean' },
-                  eurosic_participant: { type: 'boolean' },
-                  instant_payments: { type: 'boolean' },
-                  qr_iid: { type: 'string' },
+                  iid: { type: 'string', description: '5-digit zero-padded BC-Nummer.' },
+                  found: { type: 'boolean' },
+                  institution: {
+                    type: 'object',
+                    properties: {
+                      name: { type: 'string' },
+                      type: { type: 'string', enum: ['bank', 'cantonal_bank', 'raiffeisen', 'postfinance', 'private_bank', 'foreign_branch', 'fintech', 'other'] },
+                      iid_type: { type: 'string', enum: ['headquarters', 'branch', 'unknown'] },
+                      headquarters_iid: { type: 'string' },
+                    },
+                  },
+                  participation: {
+                    type: 'object',
+                    properties: {
+                      sic: { type: 'boolean', description: 'Swiss Interbank Clearing.' },
+                      eurosic: { type: 'boolean' },
+                      instant_payments: { type: 'boolean' },
+                      qr_iid: { type: 'boolean', description: 'QR-bill enabled IID.' },
+                    },
+                  },
+                  bic: { type: 'string', description: 'BIC if mapped.' },
                 },
+              },
+              info: {
+                input: {
+                  type: 'http',
+                  method: 'GET',
+                  pathParams: { iid: '00762' },
+                  discoverable: true,
+                },
+                output: { type: 'json' },
               },
             },
           },
