@@ -1,0 +1,180 @@
+---
+title: "ibanforge sur PyPI : un SDK Python pour IBAN, BIC, BC-Nummer suisse et compliance"
+description: "pip install ibanforge — clients Python sync + async pour l'API IBANforge, avec exceptions typées, fallback x402 automatique quand le quota gratuit est épuisé, et génération de clé API en une ligne. Pensé pour fintech et agents IA."
+date: "2026-04-29"
+---
+
+Le SDK Python d'IBANforge est en ligne sur PyPI. Une ligne pour installer, une ligne pour valider, six endpoints, et une mécanique de quota qui ne bloque pas votre agent à la 201ème requête du mois.
+
+```bash
+pip install ibanforge
+```
+
+## Quick start
+
+Si vous n'avez pas encore de clé API, générez-la dans le même script :
+
+```python
+from ibanforge import IBANforge
+
+key = IBANforge.generate_api_key("vous@example.com")
+client = IBANforge(api_key=key["api_key"])
+
+result = client.validate_iban("CH9300762011623852957")
+print(result["valid"], result["bic"]["bankName"])
+```
+
+Free tier : 200 appels/mois, sans captcha, sans formulaire d'inscription. La clé est affichée une seule fois — gardez-la. Une fois les 200 appels passés, la même clé continue de fonctionner via x402 (détaillé plus bas).
+
+Si vous avez juste besoin du check de format (mod-97 + structure, sans BIC/SEPA/sanctions), c'est gratuit et sans authentification — voir le post d'hier sur [l'endpoint format gratuit](/blog/2026-04-29-free-iban-format-endpoint) :
+
+```python
+from ibanforge import IBANforge
+
+client = IBANforge()  # pas de clé
+fmt = client.format_iban("CH9300762011623852957")
+print(fmt["valid"], fmt["bban"]["bank_code"])
+print(fmt["upgrade_to_full_validation"])
+# -> "POST /v1/iban/validate ($0.005) — adds BIC, SEPA, VoP, sanctions, Swiss BC-Nummer."
+```
+
+Chaque réponse free embarque ce hint `upgrade_to_full_validation` — un agent qui veut plus de profondeur sait directement où aller, sans passer par la doc.
+
+## Ce qu'il y a dans le SDK
+
+| Méthode | Endpoint | Coût | Ce qu'elle fait |
+|---|---|---|---|
+| `format_iban(iban)` | `/v1/iban/format` | gratuit | Mod-97 + structure BBAN, sans DB lookup |
+| `validate_iban(iban)` | `/v1/iban/validate` | 0,005 $ | Enrichissement complet — BIC, pays, SEPA, VoP, risque, BC-Nummer suisse |
+| `validate_batch(ibans)` | `/v1/iban/batch` | 0,002 $/IBAN | Jusqu'à 100 IBAN par appel |
+| `lookup_bic(code)` | `/v1/bic/{code}` | 0,003 $ | 121 197 entrées GLEIF — banque, pays, ville, LEI |
+| `lookup_ch_clearing(iid)` | `/v1/ch/clearing/{iid}` | 0,003 $ | 1 190 entrées SIX BankMaster — seule API publique à exposer ces données |
+| `check_compliance(iban)` | `/v1/iban/compliance` | 0,02 $ | Sanctions OFAC/EU/UN + FATF + SEPA Instant + VoP + risk score |
+
+Type hints partout via `TypedDict`. Compatible Python 3.9+. 16 tests unitaires qui passent (HTTP mocké via respx).
+
+## Path async
+
+Pour FastAPI, du fan-out concurrent ou n'importe quelle stack async :
+
+```python
+import asyncio
+from ibanforge import AsyncIBANforge
+
+async def validate_many(ibans):
+    async with AsyncIBANforge(api_key="ifk_...") as client:
+        results = await asyncio.gather(*[
+            client.validate_iban(iban) for iban in ibans
+        ])
+    return results
+
+ibans = ["CH9300762011623852957", "DE89370400440532013000", "FR1420041010050500013M02606"]
+out = asyncio.run(validate_many(ibans))
+```
+
+`AsyncIBANforge` est un wrapper léger autour de `httpx.AsyncClient` — mêmes noms de méthodes, mêmes types de retour, mêmes exceptions, juste awaitable.
+
+Pour des batches au-delà de quelques dizaines d'IBAN, préférez `validate_batch(ibans)` à `asyncio.gather` : un seul aller-retour HTTP coûte moins que N, et le prix par IBAN tombe à 0,002 $.
+
+## Quota gratuit avec fallback x402 automatique
+
+La plupart des API fintech vous accueillent avec un `HTTP 429 quota_exceeded` dès que le free tier est consommé. Fin du script. L'API IBANforge fait autrement : quand une clé authentifiée atteint sa limite mensuelle, la requête bascule vers le middleware x402 au lieu de retourner 429. La réponse devient `HTTP 402 Payment Required` avec le tarif de l'endpoint, et un agent qui possède un wallet sur Base L2 peut signer une autorisation USDC et compléter l'appel en 1-2 secondes.
+
+En Python, il suffit de catcher la bonne exception :
+
+```python
+from ibanforge import (
+    IBANforge,
+    AuthError,
+    PaymentRequiredError,
+    QuotaExhaustedError,
+    RateLimitError,
+    InvalidInputError,
+    APIError,
+    IBANforgeError,
+)
+
+client = IBANforge(api_key="ifk_...")
+
+try:
+    out = client.validate_iban("CH9300762011623852957")
+except AuthError:
+    print("Clé absente ou invalide — appelez IBANforge.generate_api_key(email).")
+except PaymentRequiredError as e:
+    # 402 = quota épuisé, l'API demande un micropaiement x402
+    price = (e.body or {}).get("accepts", [{}])[0].get("maxAmountRequired")
+    print(f"Il faut payer {price} USDC via x402 pour débloquer cet appel.")
+except QuotaExhaustedError:
+    # Cas rare — seulement quand l'API renvoie explicitement 429 quota_exceeded
+    print("Quota dépassé — attendez le reset mensuel ou passez par x402.")
+except RateLimitError:
+    print("Rate-limit (cap par seconde, pas le quota). Back off et retry.")
+except InvalidInputError as e:
+    print(f"IBAN ou payload invalide : {e}")
+except APIError:
+    print("Erreur côté serveur — retry avec backoff.")
+except IBANforgeError as e:
+    print(f"Catch-all : {e} (status {e.status})")
+```
+
+Voilà l'arbre complet. `IBANforgeError` est la classe de base — attrapez-la si la distinction ne vous intéresse pas.
+
+Le même code marche sans aucune clé API : instanciez `IBANforge()` sans clé, et chaque appel payant remontera immédiatement un `PaymentRequiredError`. Signature x402, nouvelle requête, c'est passé. Pas d'inscription, pas d'humain dans la boucle.
+
+## Pour les agents LangChain / LlamaIndex / CrewAI
+
+Emballer une méthode du SDK en outil d'agent tient en deux lignes. Exemple avec LangChain :
+
+```python
+from langchain_core.tools import tool
+from ibanforge import IBANforge, IBANforgeError
+
+client = IBANforge(api_key="ifk_...")
+
+@tool
+def validate_iban(iban: str) -> dict:
+    """Valide un IBAN et retourne BIC, banque, atteignabilité SEPA et risk score."""
+    try:
+        return client.validate_iban(iban)
+    except IBANforgeError as e:
+        return {"error": str(e), "status": e.status}
+```
+
+C'est tout. Branchez `validate_iban` sur votre `AgentExecutor`, votre Crew CrewAI ou un `FunctionTool.from_defaults()` LlamaIndex. Même pattern pour `lookup_bic`, `lookup_ch_clearing` et `check_compliance`. Nous proposons aussi un [serveur MCP natif](https://ibanforge.com/agents) pour Claude Desktop, Cursor et Cline — drop-in, sans wrapper Python.
+
+## Triage compliance en 1 appel
+
+`check_compliance` renvoie sanctions, SEPA, VoP, FATF et un risk score 0-100 d'un seul coup :
+
+```python
+out = client.check_compliance("DE89370400440532013000")
+
+# {
+#   "iban": "DE89370400440532013000",
+#   "valid": true,
+#   "country": {"code": "DE", "name": "Germany"},
+#   "sanctions": {"ofac": false, "eu": false, "un": false},
+#   "fatf": {"high_risk": false, "monitored": false},
+#   "sepa": {"reachable": true, "instant": true},
+#   "vop": {"participant": true},
+#   "risk_score": 5,
+#   "recommended_action": "allow"
+# }
+
+if out["recommended_action"] == "block":
+    raise PermissionError(f"Compliance block : {out}")
+elif out["recommended_action"] == "review":
+    queue_for_human_review(out)
+else:
+    proceed_with_payout(out)
+```
+
+Un appel à 0,02 $ remplace cinq vérifications vendor séparées. À titre informatif, ce n'est pas un produit AML/CFT régulé — mais c'est exactement ce qu'il faut comme pré-flight avant un payout, une relance ou un démarrage KYC.
+
+## Liens
+
+- PyPI : <https://pypi.org/project/ibanforge/1.1.0/>
+- GitHub : <https://github.com/cammac-creator/ibanforge> (`sdks/python/`)
+- Guide d'intégration agent : [/agents](/agents)
+
+Voilà le SDK en entier. `pip install ibanforge`, vous générez une clé, et vous validez des IBAN en cinq lignes.
