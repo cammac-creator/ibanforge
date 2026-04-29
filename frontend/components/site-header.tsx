@@ -13,6 +13,7 @@ export function SiteHeader() {
   const locale = useLocale()
 
   const navLinks = [
+    { href: `/${locale}/agents`, label: t("nav.agents") },
     { href: `/${locale}/docs`, label: t("nav.docs") },
     { href: `/${locale}/playground`, label: t("nav.playground") },
     { href: `/${locale}/pricing`, label: t("nav.pricing") },

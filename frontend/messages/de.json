@@ -2,6 +2,7 @@
   "header": {
     "logo": "IBANforge",
     "nav": {
+      "agents": "Agenten",
       "docs": "Dokumentation",
       "playground": "Playground",
       "pricing": "Preise",
@@ -817,5 +818,73 @@
     "errorHeadline": "Schlüssel konnte nicht erstellt werden",
     "retry": "Erneut versuchen",
     "close": "Schliessen"
+  },
+  "agents": {
+    "eyebrow": "Für KI-Agenten",
+    "hero": {
+      "title": "Für autonome Agenten gebaut.",
+      "description": "IBANforge ist die einzige IBAN/BIC/Compliance-API, die einen nativen MCP-Server, x402-Mikrozahlungen und einen kostenlosen API-Schlüssel kombiniert — ganz ohne menschliches Onboarding. Drei Integrationswege, 60 Sekunden Setup.",
+      "cta": {
+        "mcp": "MCP-Server installieren",
+        "x402": "Pay-per-call einrichten"
+      }
+    },
+    "paths": {
+      "heading": "Drei Wege für einen Agenten, IBANforge zu nutzen",
+      "mcp": {
+        "badge": "Weg 1 · MCP",
+        "title": "Nativer MCP-Server",
+        "description": "In Claude Desktop, Cursor oder Cline einbinden. 5 Tools automatisch erkannt. Ideal für Desktop-Agenten und IDE-Assistenten.",
+        "tradeoff": "Stdio oder HTTP · npm oder Remote"
+      },
+      "apiKey": {
+        "badge": "Weg 2 · Kostenloser Schlüssel",
+        "title": "Kostenloser API-Schlüssel",
+        "description": "POSTen Sie eine E-Mail, erhalten Sie einen Schlüssel mit 200 kostenlosen Aufrufen/Monat. Keine Verifizierung, kein Captcha. Ideal für Prototypen oder Agenten mit geringem Volumen.",
+        "tradeoff": "Header: Authorization: Bearer ifk_…"
+      },
+      "x402": {
+        "badge": "Weg 3 · x402",
+        "title": "Pay-per-call x402",
+        "description": "Nutzen Sie ein Wallet auf Base L2, der Agent zahlt USDC autonom. Keine Anmeldung, kein Kontingent. Ideal für hohes Volumen und reibungslose Integrationen.",
+        "tradeoff": "USDC auf Base · Coinbase CDP Facilitator"
+      }
+    },
+    "mcp": {
+      "eyebrow": "Weg 1 · MCP",
+      "heading": "In Claude Desktop, Cursor oder Cline installieren",
+      "description": "Der IBANforge MCP-Server stellt 5 Tools für Ihren KI-Client bereit. Zwei Transporte: stdio über npm-Paket oder remote streamable-HTTP.",
+      "claudeLabel": "Stdio · Claude Desktop",
+      "claudePath": "Hinzufügen zu ~/Library/Application Support/Claude/claude_desktop_config.json (macOS) oder %APPDATA%/Claude/claude_desktop_config.json (Windows).",
+      "httpLabel": "HTTP · Remote-Endpunkt",
+      "httpDescription": "Verbinden Sie jeden MCP-kompatiblen Client mit:",
+      "toolsHeading": "5 verfügbare Tools"
+    },
+    "apiKey": {
+      "eyebrow": "Weg 2 · Kostenloser Schlüssel",
+      "heading": "200 kostenlose Aufrufe/Monat — ohne Registrierung",
+      "description": "POSTen Sie die E-Mail Ihres Agenten und erhalten Sie einen Schlüssel. Der Schlüssel wird nur einmal angezeigt. Fügen Sie ihn als Authorization: Bearer ifk_… bei jedem Aufruf hinzu.",
+      "fallbackNote": "Wenn das monatliche Kontingent erschöpft ist, wechselt die API automatisch auf x402: derselbe Agent kann weiter aufrufen und zahlt $0.005 pro Request, ohne zusätzliches Setup, bis das Kontingent am 1. des nächsten Monats zurückgesetzt wird."
+    },
+    "x402": {
+      "eyebrow": "Weg 3 · x402",
+      "heading": "Pay-per-call in USDC auf Base",
+      "description": "Kein Kontingent, keine Anmeldung, keine E-Mail. Das Wallet Ihres Agenten signiert eine Autorisierung, der Coinbase CDP Facilitator wickelt die Zahlung ab, die API liefert die Antwort. Hin- und Rücklauf in ~1-2 Sekunden.",
+      "discoveryNote": "Der Tarif wird an jedem kostenpflichtigen Endpunkt via 402-Antworten mit vollständigen Zahlungsanforderungen angekündigt (network: base, asset: USDC, payTo, amount, schema). Im Coinbase Bazaar für autonome Entdeckung gelistet."
+    },
+    "endpoints": {
+      "heading": "5 kostenpflichtige Endpunkte, alle über MCP + x402 + API-Schlüssel verfügbar",
+      "subtitle": "Gleiche Daten, drei Integrationswege."
+    },
+    "discovery": {
+      "eyebrow": "Auto-Entdeckung",
+      "heading": "Maschinenlesbare Metadaten",
+      "description": "Standard-Discovery-Endpunkte für Agenten, die das Web nach nutzbaren APIs durchsuchen:"
+    },
+    "cta": {
+      "heading": "Bereit, wenn Ihr Agent es ist.",
+      "description": "Kostenloser Schlüssel in 1 Zeile. MCP-Installation in 30 Sekunden. x402 wickelt in 2 Sekunden ab.",
+      "button": "Playground öffnen"
+    }
   }
 }
