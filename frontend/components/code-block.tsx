@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useTranslations } from "next-intl"
 import { Check, Copy } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -11,6 +12,7 @@ interface CodeBlockProps {
 }
 
 export function CodeBlock({ code, language, className }: CodeBlockProps) {
+  const t = useTranslations("common")
   const [copied, setCopied] = useState(false)
 
   async function handleCopy() {
@@ -37,7 +39,7 @@ export function CodeBlock({ code, language, className }: CodeBlockProps) {
         </span>
         <button
           onClick={handleCopy}
-          aria-label={copied ? "Copied" : "Copy code"}
+          aria-label={copied ? t("copied") : t("copyCode")}
           className={cn(
             "inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium transition-all",
             "text-muted-foreground hover:text-foreground hover:bg-muted",
@@ -47,12 +49,12 @@ export function CodeBlock({ code, language, className }: CodeBlockProps) {
           {copied ? (
             <>
               <Check className="size-3" />
-              Copied!
+              {t("copied")}
             </>
           ) : (
             <>
               <Copy className="size-3" />
-              Copy
+              {t("copy")}
             </>
           )}
         </button>

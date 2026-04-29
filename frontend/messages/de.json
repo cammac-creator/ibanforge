@@ -771,7 +771,11 @@
     "yes": "Ja",
     "no": "Nein",
     "free": "Kostenlos",
-    "and": "und"
+    "and": "und",
+    "copy": "Kopieren",
+    "copied": "Kopiert!",
+    "copyCode": "Code kopieren",
+    "somethingWentWrong": "Etwas ist schiefgelaufen"
   },
   "errors": {
     "notFound": {
@@ -783,6 +787,13 @@
       "title": "Etwas ist schiefgelaufen",
       "fallback": "Ein unerwarteter Fehler ist aufgetreten",
       "button": "Erneut versuchen"
+    }
+  },
+  "monitoring": {
+    "uptime": {
+      "up": "Online",
+      "down": "Offline",
+      "noData": "Keine Daten"
     }
   }
 }
