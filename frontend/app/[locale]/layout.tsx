@@ -4,6 +4,7 @@ import { Inter, JetBrains_Mono } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import { routing } from "@/i18n/routing";
 import { ConditionalShell } from "@/components/conditional-shell";
+import { JsonLd } from "@/components/json-ld";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -14,23 +15,6 @@ const jetbrainsMono = JetBrains_Mono({
   variable: "--font-jetbrains-mono",
   subsets: ["latin"],
 });
-
-const jsonLd = {
-  "@context": "https://schema.org",
-  "@type": "WebAPI",
-  name: "IBANforge",
-  description:
-    "IBAN validation & BIC/SWIFT lookup API for developers and AI agents",
-  url: "https://ibanforge.com",
-  documentation: "https://ibanforge.com/docs",
-  provider: { "@type": "Organization", name: "IBANforge" },
-  offers: {
-    "@type": "Offer",
-    price: "0.003",
-    priceCurrency: "USD",
-    description: "Pay per call — from $0.003/request",
-  },
-};
 
 type Props = {
   children: React.ReactNode;
@@ -117,10 +101,7 @@ export default async function LocaleLayout({ children, params }: Props) {
       suppressHydrationWarning
     >
       <head>
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-        />
+        <JsonLd />
       </head>
       <body className="min-h-full flex flex-col antialiased">
         <ThemeProvider
