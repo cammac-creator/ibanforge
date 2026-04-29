@@ -2,6 +2,7 @@
   "header": {
     "logo": "IBANforge",
     "nav": {
+      "agents": "Agents",
       "docs": "Documentation",
       "playground": "Playground",
       "pricing": "Tarifs",
@@ -817,5 +818,73 @@
     "errorHeadline": "Impossible de créer la clé",
     "retry": "Réessayer",
     "close": "Fermer"
+  },
+  "agents": {
+    "eyebrow": "Pour les agents IA",
+    "hero": {
+      "title": "Conçu pour les agents autonomes.",
+      "description": "IBANforge est la seule API IBAN/BIC/compliance qui combine un serveur MCP natif, des micropaiements x402 et une clé API gratuite — sans aucun onboarding humain. Trois voies d'intégration, 60 secondes de setup.",
+      "cta": {
+        "mcp": "Installer le serveur MCP",
+        "x402": "Paiement à l'appel"
+      }
+    },
+    "paths": {
+      "heading": "Trois façons pour un agent d'utiliser IBANforge",
+      "mcp": {
+        "badge": "Voie 1 · MCP",
+        "title": "Serveur MCP natif",
+        "description": "Branchez-le sur Claude Desktop, Cursor ou Cline. 5 outils auto-découverts. Idéal pour les agents desktop et les assistants IDE.",
+        "tradeoff": "Stdio ou HTTP · npm ou distant"
+      },
+      "apiKey": {
+        "badge": "Voie 2 · Clé gratuite",
+        "title": "Clé API gratuite",
+        "description": "POST avec un email, vous recevez une clé avec 200 appels gratuits/mois. Pas de vérification, pas de captcha. Parfait pour prototyper ou les agents à faible volume.",
+        "tradeoff": "Header : Authorization: Bearer ifk_…"
+      },
+      "x402": {
+        "badge": "Voie 3 · x402",
+        "title": "Paiement à l'appel x402",
+        "description": "Utilisez un wallet sur Base L2, l'agent paie en USDC de façon autonome. Pas d'inscription, pas de quota. Idéal pour les gros volumes et les intégrations zéro-friction.",
+        "tradeoff": "USDC sur Base · facilitator Coinbase CDP"
+      }
+    },
+    "mcp": {
+      "eyebrow": "Voie 1 · MCP",
+      "heading": "Installer dans Claude Desktop, Cursor ou Cline",
+      "description": "Le serveur MCP IBANforge expose 5 outils à votre client IA. Deux transports : stdio via package npm ou HTTP streamable distant.",
+      "claudeLabel": "Stdio · Claude Desktop",
+      "claudePath": "Ajouter à ~/Library/Application Support/Claude/claude_desktop_config.json (macOS) ou %APPDATA%/Claude/claude_desktop_config.json (Windows).",
+      "httpLabel": "HTTP · endpoint distant",
+      "httpDescription": "Pointez n'importe quel client MCP compatible vers :",
+      "toolsHeading": "5 outils disponibles"
+    },
+    "apiKey": {
+      "eyebrow": "Voie 2 · Clé gratuite",
+      "heading": "200 appels gratuits/mois — sans inscription",
+      "description": "POST l'email de votre agent, recevez la clé. La clé n'est affichée qu'une fois. Ajoutez-la dans Authorization: Bearer ifk_… à chaque appel.",
+      "fallbackNote": "Quand le quota mensuel est épuisé, l'API bascule automatiquement sur x402 : le même agent peut continuer à appeler, en payant 0,005 $ par requête, sans setup supplémentaire jusqu'au reset du quota le 1er du mois suivant."
+    },
+    "x402": {
+      "eyebrow": "Voie 3 · x402",
+      "heading": "Paiement à l'appel en USDC sur Base",
+      "description": "Pas de quota, pas d'inscription, pas d'email. Le wallet de votre agent signe une autorisation, le facilitator Coinbase CDP settle le paiement, l'API renvoie la réponse. Aller-retour en ~1-2 secondes.",
+      "discoveryNote": "Le tarif est annoncé sur chaque endpoint payant via les réponses 402 avec les exigences de paiement complètes (network: base, asset: USDC, payTo, amount, schema). Référencé sur le Bazaar Coinbase pour la découverte autonome."
+    },
+    "endpoints": {
+      "heading": "5 endpoints payants, tous accessibles via MCP + x402 + clé API",
+      "subtitle": "Mêmes données, trois voies d'intégration."
+    },
+    "discovery": {
+      "eyebrow": "Auto-découverte",
+      "heading": "Métadonnées lisibles par machine",
+      "description": "Endpoints de découverte standards pour les agents qui scannent le web à la recherche d'APIs utilisables :"
+    },
+    "cta": {
+      "heading": "Prêt quand votre agent est prêt.",
+      "description": "Clé gratuite en 1 ligne. Install MCP en 30 secondes. x402 settle en 2 secondes.",
+      "button": "Ouvrir le playground"
+    }
   }
 }

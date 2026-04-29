@@ -2,6 +2,7 @@
   "header": {
     "logo": "IBANforge",
     "nav": {
+      "agents": "Agents",
       "docs": "Docs",
       "playground": "Playground",
       "pricing": "Pricing",
@@ -817,5 +818,73 @@
     "errorHeadline": "Could not generate the key",
     "retry": "Try again",
     "close": "Close"
+  },
+  "agents": {
+    "eyebrow": "For AI Agents",
+    "hero": {
+      "title": "Built for autonomous agents.",
+      "description": "IBANforge is the only IBAN/BIC/compliance API that combines a native MCP server, x402 micropayments, and a free API key — all without human onboarding. Three integration paths, 60-second setup.",
+      "cta": {
+        "mcp": "Install MCP server",
+        "x402": "Pay-per-call setup"
+      }
+    },
+    "paths": {
+      "heading": "Three ways for an agent to use IBANforge",
+      "mcp": {
+        "badge": "Path 1 · MCP",
+        "title": "Native MCP server",
+        "description": "Drop into Claude Desktop, Cursor, or Cline. 5 tools auto-discovered. Best for desktop agents and IDE assistants.",
+        "tradeoff": "Stdio or HTTP · npm or remote"
+      },
+      "apiKey": {
+        "badge": "Path 2 · Free key",
+        "title": "Free API key",
+        "description": "POST any email, get a key with 200 free calls/month. No verification, no captcha. Best for prototyping or low-volume agents.",
+        "tradeoff": "Header: Authorization: Bearer ifk_…"
+      },
+      "x402": {
+        "badge": "Path 3 · x402",
+        "title": "Pay-per-call x402",
+        "description": "Use a wallet on Base L2, agent pays USDC autonomously. No signup, no quota. Best for high-volume agents and zero-friction integrations.",
+        "tradeoff": "USDC on Base · Coinbase CDP facilitator"
+      }
+    },
+    "mcp": {
+      "eyebrow": "Path 1 · MCP",
+      "heading": "Install in Claude Desktop, Cursor or Cline",
+      "description": "The IBANforge MCP server exposes 5 tools to your AI client. Two transports: stdio via npm package or remote streamable-HTTP.",
+      "claudeLabel": "Stdio · Claude Desktop",
+      "claudePath": "Add to ~/Library/Application Support/Claude/claude_desktop_config.json (macOS) or %APPDATA%/Claude/claude_desktop_config.json (Windows).",
+      "httpLabel": "HTTP · remote endpoint",
+      "httpDescription": "Point any MCP-compatible client to:",
+      "toolsHeading": "5 tools available"
+    },
+    "apiKey": {
+      "eyebrow": "Path 2 · Free key",
+      "heading": "200 free calls/month — no signup",
+      "description": "POST your agent's email and receive a key. The key is shown once. Add it as Authorization: Bearer ifk_… on every call.",
+      "fallbackNote": "When the monthly quota is exhausted, the API automatically falls back to x402: the same agent can keep calling, paying $0.005 per request, with no extra setup until the quota resets on the 1st of the next month."
+    },
+    "x402": {
+      "eyebrow": "Path 3 · x402",
+      "heading": "Pay-per-call in USDC on Base",
+      "description": "No quota, no signup, no email. Your agent's wallet signs an authorization, the Coinbase CDP facilitator settles the payment, and the API returns the response. ~1-2 second round-trip.",
+      "discoveryNote": "Pricing is advertised on every paid endpoint via 402 responses with full payment requirements (network: base, asset: USDC, payTo, amount, schema). Listed on Coinbase Bazaar discovery for autonomous discovery."
+    },
+    "endpoints": {
+      "heading": "5 paid endpoints, all available via MCP + x402 + API key",
+      "subtitle": "Same data, three integration paths."
+    },
+    "discovery": {
+      "eyebrow": "Auto-discovery",
+      "heading": "Machine-readable metadata",
+      "description": "Standard discovery endpoints for agents that crawl the web for usable APIs:"
+    },
+    "cta": {
+      "heading": "Ready when your agent is.",
+      "description": "Free key in 1 line. MCP install in 30 seconds. x402 settles in 2 seconds.",
+      "button": "Open the playground"
+    }
   }
 }
