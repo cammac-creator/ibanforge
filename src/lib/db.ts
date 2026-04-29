@@ -120,6 +120,14 @@ export function getStatsDB(): DatabaseType.Database {
         count INTEGER DEFAULT 0,
         PRIMARY KEY (key_hash, month)
       );
+      -- Hot path: most usage queries scope by month then look up by key_hash.
+      -- The PRIMARY KEY (key_hash, month) already covers (key_hash, month) lookups.
+      -- This index covers the "list keys used this month" admin query.
+      CREATE INDEX IF NOT EXISTS idx_api_usage_month ON api_usage(month);
+      -- Same idea for api_keys: protect the daily quota check that filters by
+      -- created_at >= now-1day for rate-limiting key creation per email.
+      CREATE INDEX IF NOT EXISTS idx_api_keys_email_created ON api_keys(email, created_at);
+      CREATE INDEX IF NOT EXISTS idx_api_keys_active ON api_keys(active);
     `);
     // Migrate existing databases that may be missing the new columns
     const existingCols = (statsDB.prepare("PRAGMA table_info(operations)").all() as Array<{ name: string }>).map(r => r.name);
