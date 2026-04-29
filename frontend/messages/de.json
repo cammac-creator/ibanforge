@@ -795,5 +795,27 @@
       "down": "Offline",
       "noData": "Keine Daten"
     }
+  },
+  "apiKeyDialog": {
+    "eyebrow": "Kostenloser Tarif",
+    "title": "Kostenlosen API-Schlüssel erhalten",
+    "subtitle": "200 kostenlose Aufrufe pro Monat. Keine Kreditkarte. Der Schlüssel wird nur einmal angezeigt.",
+    "emailLabel": "E-Mail",
+    "emailPlaceholder": "ihre@email.com",
+    "submit": "Schlüssel generieren",
+    "submitting": "Generierung…",
+    "keyCreated": "Schlüssel erstellt",
+    "successTitle": "Hier ist Ihr API-Schlüssel",
+    "successWarn": "⚠ Dieser Schlüssel wird nicht mehr angezeigt. Kopieren Sie ihn und speichern Sie ihn sicher.",
+    "copy": "Schlüssel kopieren",
+    "monthly": "Monatliches Limit",
+    "nextSteps": "Nächste Schritte",
+    "step1": "Fügen Sie den Schlüssel als Header hinzu: Authorization: Bearer ifk_…",
+    "step2": "Rufen Sie /v1/iban/validate mit einer IBAN auf",
+    "step3": "Vollständige Dokumentation →",
+    "errorTitle": "Fehler",
+    "errorHeadline": "Schlüssel konnte nicht erstellt werden",
+    "retry": "Erneut versuchen",
+    "close": "Schliessen"
   }
 }

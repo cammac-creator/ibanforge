@@ -5,6 +5,7 @@ import { ThemeProvider } from "next-themes";
 import { routing } from "@/i18n/routing";
 import { ConditionalShell } from "@/components/conditional-shell";
 import { JsonLd } from "@/components/json-ld";
+import { ApiKeyDialogProvider } from "@/components/api-key-dialog";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -110,7 +111,9 @@ export default async function LocaleLayout({ children, params }: Props) {
           enableSystem={false}
         >
           <NextIntlClientProvider>
-            <ConditionalShell>{children}</ConditionalShell>
+            <ApiKeyDialogProvider>
+              <ConditionalShell>{children}</ConditionalShell>
+            </ApiKeyDialogProvider>
           </NextIntlClientProvider>
         </ThemeProvider>
       </body>
