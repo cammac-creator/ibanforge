@@ -5,6 +5,7 @@ import { compress } from 'hono/compress';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
 import { ibanValidate } from './routes/iban-validate.js';
+import { ibanFormat } from './routes/iban-format.js';
 import { ibanBatch } from './routes/iban-batch.js';
 import { bicLookup } from './routes/bic-lookup.js';
 import { ibanCompliance } from './routes/iban-compliance.js';
@@ -320,6 +321,7 @@ app.route('/', ibanCompliance);
 app.route('/', chClearing);
 
 // Free routes
+app.route('/', ibanFormat);
 app.route('/', health);
 app.route('/', stats);
 app.route('/', demo);
