@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSessionCookieConfig } from '@/lib/auth';
+import { getSessionCookieConfig, passwordsMatch } from '@/lib/auth';
 
+// Best-effort in-memory rate limit. On Vercel Lambdas this is per-instance,
+// not global — an attacker can re-roll a different cold start. Acceptable
+// for a single-user dashboard, but if the dashboard becomes multi-user or
+// the threat model changes, swap this for an Upstash Redis (or similar) store.
 const loginAttempts = new Map<string, { count: number; resetAt: number }>();
 const MAX_ATTEMPTS = 5;
 const WINDOW_MS = 15 * 60 * 1000; // 15 minutes
@@ -16,6 +20,12 @@ function checkBruteForce(ip: string): boolean {
   return record.count <= MAX_ATTEMPTS;
 }
 
+// Constant-time per request: avoid leaking via response timing whether the
+// password env was set, even if the rate limiter or password were checked.
+async function constantTimeDelay() {
+  await new Promise((r) => setTimeout(r, 200));
+}
+
 export async function POST(req: NextRequest) {
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
 
@@ -26,13 +36,27 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { password } = await req.json();
+  let body: unknown = null;
+  try {
+    body = await req.json();
+  } catch {
+    await constantTimeDelay();
+    return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
+  }
 
-  if (!process.env.DASHBOARD_PASSWORD) {
+  const password =
+    body && typeof body === 'object' && 'password' in body
+      ? String((body as { password: unknown }).password ?? '')
+      : '';
+
+  const expected = process.env.DASHBOARD_PASSWORD;
+  if (!expected) {
+    await constantTimeDelay();
     return NextResponse.json({ error: 'Server misconfigured' }, { status: 500 });
   }
 
-  if (password !== process.env.DASHBOARD_PASSWORD) {
+  if (!passwordsMatch(password, expected)) {
+    await constantTimeDelay();
     return NextResponse.json({ error: 'Wrong password' }, { status: 401 });
   }
 
