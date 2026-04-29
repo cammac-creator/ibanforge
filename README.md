@@ -3,6 +3,9 @@
 [![API Status](https://img.shields.io/badge/API-live-brightgreen)](https://api.ibanforge.com/health)
 [![MCP Registry](https://img.shields.io/badge/MCP_Registry-1.2.0-purple)](https://registry.modelcontextprotocol.io/v0/servers?search=ibanforge)
 [![npm ibanforge-mcp](https://img.shields.io/npm/v/ibanforge-mcp?label=ibanforge-mcp)](https://www.npmjs.com/package/ibanforge-mcp)
+[![npm @ibanforge/sdk](https://img.shields.io/npm/v/@ibanforge/sdk?label=@ibanforge/sdk)](https://www.npmjs.com/package/@ibanforge/sdk)
+[![PyPI ibanforge](https://img.shields.io/pypi/v/ibanforge?label=pypi%20ibanforge)](https://pypi.org/project/ibanforge/)
+[![Glama MCP](https://glama.ai/mcp/servers/cammac-creator/ibanforge/badges/score.svg)](https://glama.ai/mcp/servers/cammac-creator/ibanforge)
 [![x402](https://img.shields.io/badge/x402-USDC_on_Base-blueviolet)](https://api.ibanforge.com/.well-known/x402)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.7-blue)](https://www.typescriptlang.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -77,6 +80,35 @@ No human in the loop, no sales call, no card. See the [x402 spec](https://x402.o
 
 ---
 
+## SDKs
+
+Pick your language:
+
+| Language | Package | Install | Source |
+|---|---|---|---|
+| **TypeScript / JavaScript** | [`@ibanforge/sdk`](https://www.npmjs.com/package/@ibanforge/sdk) | `npm install @ibanforge/sdk` | [`sdks/typescript/`](sdks/typescript/) |
+| **Python** | [`ibanforge`](https://pypi.org/project/ibanforge/) | `pip install ibanforge` | [`sdks/python/`](sdks/python/) |
+| **MCP server** | [`ibanforge-mcp`](https://www.npmjs.com/package/ibanforge-mcp) | `npx -y ibanforge-mcp` | [`mcp/`](mcp/) |
+| Curl / any HTTP client | — | — | [OpenAPI spec](https://api.ibanforge.com/openapi.json) |
+
+The Python SDK ships with sync + async clients, typed exception classes, and a free-tier quota fallback to x402 baked in:
+
+```python
+from ibanforge import IBANforge
+
+# 1-line free key (200 req/month, no signup form)
+key = IBANforge.generate_api_key("you@example.com")
+
+with IBANforge(api_key=key["api_key"]) as client:
+    out = client.validate_iban("CH9300762011623852957")
+    print(out["country"]["code"])      # CH
+    print(out["bic"]["bankName"])      # UBS Switzerland AG
+    print(out["sepa"]["instant"])      # True
+
+# Or the free format-only check (mod-97 + structure, no DB hit)
+out = IBANforge().format_iban("DE89370400440532013000")
+```
+
 ## For developers — REST API
 
 ```bash
@@ -89,6 +121,9 @@ curl -X POST https://api.ibanforge.com/v1/iban/validate \
 # Lookup BIC
 curl https://api.ibanforge.com/v1/bic/UBSWCHZH80A
 
+# Free format pre-flight (no auth, mod-97 only)
+curl 'https://api.ibanforge.com/v1/iban/format?iban=CH9300762011623852957'
+
 # Free demo (no auth)
 curl https://api.ibanforge.com/v1/demo
 ```
@@ -100,6 +135,7 @@ curl https://api.ibanforge.com/v1/demo
 | `GET`  | `/v1/bic/{code}`           | $0.003        | BIC/SWIFT lookup with LEI                                      |
 | `GET`  | `/v1/ch/clearing/{iid}`    | $0.003        | Swiss BC-Nummer / IID — SIC, euroSIC, QR-IID                  |
 | `POST` | `/v1/iban/compliance`      | $0.02         | Sanctions + FATF + SEPA Instant + VoP + risk score 0-100      |
+| `GET`  | `/v1/iban/format`          | **free**      | Pure mod-97 + structure check, no DB hit                       |
 | `GET`  | `/v1/demo`                 | free          | Example validations, no auth                                   |
 | `GET`  | `/health`                  | free          | Health + DB status                                             |
 | `POST` | `/v1/keys/generate`        | free          | Generate an `ifk_*` API key (200 req/month) — body: `{email}`  |

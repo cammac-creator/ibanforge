@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 const IBAN_DEMO = "CH93 0076 2011 6238 5295 7";
-const IBAN_TYPO = "CH93 0076 2011 6X38 5295 7";
 
 export function FamilleClient() {
   return (
@@ -93,7 +92,7 @@ function AnimatedIban() {
 
   useEffect(() => {
     let cancelled = false;
-    let timers: ReturnType<typeof setTimeout>[] = [];
+    const timers: ReturnType<typeof setTimeout>[] = [];
 
     const run = () => {
       if (cancelled) return;
