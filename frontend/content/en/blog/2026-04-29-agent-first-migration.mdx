@@ -1,0 +1,72 @@
+---
+title: "Agent-First Migration: One Site, Three Integration Paths, Zero Dead-Ends"
+description: "ibanforge.com is now served by a single Next.js codebase built for AI agents (70%) and developers (30%). New /agents page, OpenAPI reference, and a critical fix that lets agents auto-fall-back to x402 when their free quota runs out."
+date: "2026-04-29"
+---
+
+Today's release rewires IBANforge around its actual primary user: **autonomous AI agents**. Three things shipped — a new website, a new agent guide, and a quietly important fix to the free-tier funnel.
+
+---
+
+## One site, one codebase
+
+For the past few weeks, `ibanforge.com` and the Next.js project in our repo were two different sites. We had a SPA design-system in production and a more complete Next.js version sitting on a non-public preview URL. That's now resolved: **`ibanforge.com` is the Next.js version**, with all 14 pages (landing, pricing, playground, compare, docs, blog, agents, openapi, dashboard) live on every locale (EN/FR/DE).
+
+The old design-system is archived. We kept the visual identity — sober dark palette, JetBrains Mono titles with amber accents, the `pulse-live` green dot eyebrow — and ported it forward as design tokens that any future component can use.
+
+Result: less surface area to maintain, more pages exposed to crawlers and agents.
+
+---
+
+## A page built for agents
+
+[`/agents`](https://ibanforge.com/en/agents) is the new entry point for any AI agent or developer integrating IBANforge. It walks through three paths in plain language:
+
+1. **MCP** — drop the IBANforge MCP server into Claude Desktop, Cursor, or Cline. Five tools auto-discovered: `validate_iban`, `batch_validate_iban`, `lookup_bic`, `lookup_ch_clearing`, `check_compliance`. Either stdio (`npx -y ibanforge-mcp`) or remote streamable-HTTP at `https://api.ibanforge.com/mcp`.
+2. **Free API key** — POST any email to `/v1/keys/generate`, receive a key with 200 free calls/month, no captcha, no email verification, no signup form. The key is shown once — bots and humans handle this the same way.
+3. **x402 micropayments** — sign a payment authorization with a wallet on Base L2, the Coinbase CDP facilitator settles in ~1-2 seconds, the API returns the response. No quota, no subscription. Perfect for agents that scale beyond 200 calls.
+
+Every paid endpoint advertises its price via `/.well-known/x402`, agents.json, mcp.json, openapi.json, and llms.txt — so a crawling agent can discover IBANforge, learn how to authenticate, and start using it without a human in the loop.
+
+---
+
+## The fix that unblocks the funnel
+
+Until today, an agent that hit the 200/month quota with an API key got a hard `HTTP 429 quota_exceeded`. Dead-end. The agent would either wait until the 1st of the next month or contact support. For an agent-first product, that's a self-inflicted wound.
+
+**As of this release**, when an authenticated agent's quota is exhausted, the API falls through to the x402 middleware instead of returning 429. The 402 response advertises payment requirements; the agent signs a $0.005 USDC authorization and the request completes. Same wallet, same code path, no human handoff.
+
+Hint headers (`X-Quota-Exhausted`, `X-Quota-Used`, `X-Quota-Reset-Hint`) tell the agent what happened so it can log + budget. The free tier resets on the 1st of the next month and the API key is back to the no-charge path.
+
+This single change converts the free-tier-out cliff into a smooth ramp.
+
+---
+
+## OpenAPI, live
+
+[`/openapi`](https://ibanforge.com/en/openapi) renders the IBANforge OpenAPI 3.1 spec with [Scalar](https://scalar.com/). Every endpoint is documented, every schema is browsable, every request has a try-it-out button that generates curl/JS/Python/PHP/Go snippets. Same content as before (`api.ibanforge.com/openapi.json`), better UI.
+
+---
+
+## Under the hood
+
+A few things that aren't visible but matter:
+
+- **Persistent volume** — `stats.sqlite` (which holds your API keys, monthly quotas, and revenue logs) is now declared as a Railway persistent volume. Every redeploy used to risk wiping this if the dashboard config drifted.
+- **Fail-closed x402** — in production, if `X402_ENABLED` or `WALLET_ADDRESS` aren't set, the server now refuses to start instead of silently serving paid endpoints for free.
+- **WAL + indices** on `stats.sqlite` so the dashboard's `/stats/*` queries don't full-scan when the dataset grows.
+- **Hardened dashboard auth** — the session secret is now distinct from the dashboard password, comparisons are timing-safe, and every login response has a constant 200ms delay so attackers can't probe via timing.
+- **Per-locale SEO** — `/fr` and `/de` finally get their own `<html lang>`, `<title>`, and `<meta description>`. `hreflang` alternates emit so search engines route the right language to the right user.
+- **6 JSON-LD schemas** at the layout level — `SoftwareApplication`, `Organization`, `FAQPage`, `HowTo`, `BreadcrumbList`, `WebAPI` — so AI agents and search engines can parse what IBANforge does, what it costs, and how to use it.
+
+---
+
+## What's next
+
+Coming in the next releases:
+
+- **External listings** — submit IBANforge to PulseMCP, the Cline MCP marketplace, awesome-x402-servers, and agentic.market.
+- **Stripe plans** — for human teams that prefer monthly subscriptions over USDC. $19/10k, $99/100k, $499/1M with SLA. x402 stays for agents.
+- **Dashboard i18n** — finish translating internal dashboard strings.
+
+If you're integrating IBANforge into an agent right now, start at [`/agents`](https://ibanforge.com/en/agents). If you've already got a key and you're hitting the quota, just keep calling — your agent will pay-per-call seamlessly until the 1st of next month.
