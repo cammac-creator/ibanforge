@@ -1,8 +1,10 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { UptimeBar } from '@/components/uptime-bar';
+
+const LOCALE_TAG: Record<string, string> = { en: 'en-US', fr: 'fr-CH', de: 'de-CH' };
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://ibanforge-production.up.railway.app';
 const STORAGE_KEY = 'ibanforge_uptime_checks';
@@ -74,12 +76,11 @@ function responseTimeBg(ms: number): string {
   return 'bg-red-500/10 border-red-500/20';
 }
 
-function fmt(n: number): string {
-  return n.toLocaleString('fr-CH');
-}
-
 export default function MonitoringPage() {
+  const locale = useLocale();
+  const localeTag = LOCALE_TAG[locale] ?? 'en-US';
   const t = useTranslations('dashboard');
+  const fmt = (n: number) => n.toLocaleString(localeTag);
   const [online, setOnline] = useState<boolean | null>(null);
   const [responseMs, setResponseMs] = useState<number>(0);
   const [health, setHealth] = useState<HealthData | null>(null);
@@ -271,7 +272,7 @@ export default function MonitoringPage() {
             )}
             {lastChecked && (
               <span className="text-xs text-zinc-600">
-                {lastChecked.toLocaleTimeString('fr-CH', {
+                {lastChecked.toLocaleTimeString(localeTag, {
                   hour: '2-digit',
                   minute: '2-digit',
                   second: '2-digit',

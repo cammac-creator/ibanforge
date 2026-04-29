@@ -1,5 +1,7 @@
 'use client';
 
+import { useLocale, useTranslations } from 'next-intl';
+
 interface UptimeCheck {
   date: string;
   status: 'up' | 'down';
@@ -16,7 +18,13 @@ function getBarColor(status: 'up' | 'down' | null): string {
   return '#3f3f46'; // zinc-700 for no data
 }
 
+const LOCALE_TAG: Record<string, string> = { en: 'en-US', fr: 'fr-CH', de: 'de-CH' };
+
 export function UptimeBar({ checks }: UptimeBarProps) {
+  const locale = useLocale();
+  const t = useTranslations('monitoring.uptime');
+  const tag = LOCALE_TAG[locale] ?? 'en-US';
+
   // Build a map of date -> check for fast lookup
   const checkMap = new Map<string, UptimeCheck>();
   for (const check of checks) {
@@ -31,7 +39,7 @@ export function UptimeBar({ checks }: UptimeBarProps) {
     const d = new Date();
     d.setDate(d.getDate() - i);
     const dateKey = d.toISOString().slice(0, 10);
-    const label = d.toLocaleDateString('fr-CH', {
+    const label = d.toLocaleDateString(tag, {
       day: '2-digit',
       month: 'short',
     });
@@ -44,8 +52,8 @@ export function UptimeBar({ checks }: UptimeBarProps) {
         const check = checkMap.get(dateKey) ?? null;
         const color = getBarColor(check ? check.status : null);
         const title = check
-          ? `${label} — ${check.status === 'up' ? 'En ligne' : 'Hors ligne'} · ${check.response_ms} ms`
-          : `${label} — Aucune donnée`;
+          ? `${label} — ${check.status === 'up' ? t('up') : t('down')} · ${check.response_ms} ms`
+          : `${label} — ${t('noData')}`;
 
         return (
           <div

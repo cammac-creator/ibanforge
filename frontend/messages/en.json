@@ -771,7 +771,11 @@
     "yes": "Yes",
     "no": "No",
     "free": "Free",
-    "and": "and"
+    "and": "and",
+    "copy": "Copy",
+    "copied": "Copied!",
+    "copyCode": "Copy code",
+    "somethingWentWrong": "Something went wrong"
   },
   "errors": {
     "notFound": {
@@ -783,6 +787,13 @@
       "title": "Something went wrong",
       "fallback": "An unexpected error occurred",
       "button": "Try again"
+    }
+  },
+  "monitoring": {
+    "uptime": {
+      "up": "Online",
+      "down": "Offline",
+      "noData": "No data"
     }
   }
 }
