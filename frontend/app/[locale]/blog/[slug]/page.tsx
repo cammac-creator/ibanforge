@@ -1,10 +1,18 @@
 import { MDXRemote } from "next-mdx-remote/rsc";
 import { getTranslations } from "next-intl/server";
-import { getPost, getAllPosts } from "@/lib/blog";
+import { getPost } from "@/lib/blog";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 
 export const dynamicParams = true;
+
+function tryGetPost(slug: string, locale: string) {
+  try {
+    return getPost(slug, locale);
+  } catch {
+    return null;
+  }
+}
 
 export async function generateMetadata({
   params,
@@ -12,15 +20,12 @@ export async function generateMetadata({
   params: Promise<{ locale: string; slug: string }>;
 }) {
   const { locale, slug } = await params;
-  try {
-    const { meta } = getPost(slug, locale);
-    return {
-      title: `${meta.title} | IBANforge Blog`,
-      description: meta.description,
-    };
-  } catch {
-    return { title: "Not Found | IBANforge Blog" };
-  }
+  const post = tryGetPost(slug, locale);
+  if (!post) return { title: "Not Found | IBANforge Blog" };
+  return {
+    title: `${post.meta.title} | IBANforge Blog`,
+    description: post.meta.description,
+  };
 }
 
 export default async function BlogPostPage({
@@ -31,12 +36,8 @@ export default async function BlogPostPage({
   const { locale, slug } = await params;
   const t = await getTranslations('blog');
 
-  let post;
-  try {
-    post = getPost(slug, locale);
-  } catch {
-    notFound();
-  }
+  const post = tryGetPost(slug, locale);
+  if (!post) notFound();
 
   const { meta, content } = post;
 

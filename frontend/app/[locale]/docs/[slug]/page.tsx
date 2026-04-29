@@ -1,8 +1,16 @@
 import { MDXRemote } from "next-mdx-remote/rsc";
-import { getDoc, getAllDocs } from "@/lib/mdx";
+import { getDoc } from "@/lib/mdx";
 import { notFound } from "next/navigation";
 
 export const dynamicParams = true;
+
+function tryGetDoc(slug: string, locale: string) {
+  try {
+    return getDoc(slug, locale);
+  } catch {
+    return null;
+  }
+}
 
 export async function generateMetadata({
   params,
@@ -10,15 +18,12 @@ export async function generateMetadata({
   params: Promise<{ locale: string; slug: string }>;
 }) {
   const { locale, slug } = await params;
-  try {
-    const { meta } = getDoc(slug, locale);
-    return {
-      title: `${meta.title} | IBANforge Docs`,
-      description: meta.description,
-    };
-  } catch {
-    return { title: "Not Found | IBANforge Docs" };
-  }
+  const doc = tryGetDoc(slug, locale);
+  if (!doc) return { title: "Not Found | IBANforge Docs" };
+  return {
+    title: `${doc.meta.title} | IBANforge Docs`,
+    description: doc.meta.description,
+  };
 }
 
 export default async function DocPage({
@@ -27,11 +32,7 @@ export default async function DocPage({
   params: Promise<{ locale: string; slug: string }>;
 }) {
   const { locale, slug } = await params;
-
-  try {
-    const { content } = getDoc(slug, locale);
-    return <MDXRemote source={content} />;
-  } catch {
-    notFound();
-  }
+  const doc = tryGetDoc(slug, locale);
+  if (!doc) notFound();
+  return <MDXRemote source={doc.content} />;
 }

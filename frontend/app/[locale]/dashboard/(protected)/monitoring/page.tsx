@@ -83,7 +83,11 @@ export default function MonitoringPage() {
   const [online, setOnline] = useState<boolean | null>(null);
   const [responseMs, setResponseMs] = useState<number>(0);
   const [health, setHealth] = useState<HealthData | null>(null);
-  const [checks, setChecks] = useState<UptimeCheck[]>([]);
+  // Lazy initializer: load from localStorage once at mount, not in useEffect.
+  // Avoids the cascading-render lint (react-hooks/set-state-in-effect).
+  const [checks, setChecks] = useState<UptimeCheck[]>(() =>
+    typeof window === 'undefined' ? [] : loadChecks(),
+  );
   const [lastChecked, setLastChecked] = useState<Date | null>(null);
 
   const runCheck = useCallback(async () => {
@@ -124,8 +128,9 @@ export default function MonitoringPage() {
   }, []);
 
   useEffect(() => {
-    const stored = loadChecks();
-    setChecks(stored);
+    // Polling pattern: trigger initial check + 60s interval. State updates are
+    // intentional here (status, response time, latest health snapshot).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     runCheck();
     const interval = setInterval(runCheck, 60_000);
     return () => clearInterval(interval);
