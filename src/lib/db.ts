@@ -53,6 +53,12 @@ export function getStatsDB(): DatabaseType.Database {
   if (!statsDB) {
     const Db = loadDatabaseSync();
     statsDB = new Db(STATS_DB_PATH);
+    // Concurrent reads + better write throughput. WAL is critical because
+    // multiple request handlers write to stats.sqlite simultaneously
+    // (recordOperation, recordRequest, increment quota).
+    statsDB.pragma('journal_mode = WAL');
+    statsDB.pragma('synchronous = NORMAL');
+    statsDB.pragma('busy_timeout = 5000');
     statsDB.exec(`
       CREATE TABLE IF NOT EXISTS operations (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -93,6 +99,11 @@ export function getStatsDB(): DatabaseType.Database {
       );
       CREATE INDEX IF NOT EXISTS idx_request_log_date ON request_log(created_at);
       CREATE INDEX IF NOT EXISTS idx_request_log_path ON request_log(path);
+      CREATE INDEX IF NOT EXISTS idx_operations_type ON operations(operation_type);
+      CREATE INDEX IF NOT EXISTS idx_operations_created ON operations(created_at);
+      CREATE INDEX IF NOT EXISTS idx_operations_country ON operations(country_code);
+      CREATE INDEX IF NOT EXISTS idx_daily_stats_date ON daily_stats(date);
+      CREATE INDEX IF NOT EXISTS idx_hourly_stats_date ON hourly_stats(date);
       CREATE TABLE IF NOT EXISTS api_keys (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         key_hash TEXT UNIQUE NOT NULL,

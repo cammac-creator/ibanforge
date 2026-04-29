@@ -7,15 +7,38 @@ export const USDC_BASE = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
 /**
  * x402 payment middleware for IBANforge.
  *
- * To enable payments: set X402_ENABLED=true + WALLET_ADDRESS + CDP_API_KEY_ID + CDP_API_KEY_SECRET in env.
- * When disabled (default), all endpoints are free — useful for launch phase.
+ * Production rule (must NOT fail-open):
+ *   - X402_ENABLED=true + WALLET_ADDRESS + CDP_API_KEY_ID + CDP_API_KEY_SECRET
+ *   - OR explicit IBANFORGE_FREE_MODE=true (loud warning, all endpoints free)
+ *
+ * Anything else in production = boot crash. In dev/test, free mode is the default.
  */
 export function ensureWalletConfigured(): void {
-  if (process.env.X402_ENABLED === 'true' && !process.env.WALLET_ADDRESS) {
-    throw new Error(
-      'WALLET_ADDRESS is required when X402_ENABLED=true. ' +
-        'Either set WALLET_ADDRESS or remove X402_ENABLED to run in free mode.',
+  const isProd = process.env.NODE_ENV === 'production';
+  const x402Enabled = process.env.X402_ENABLED === 'true';
+  const walletAddress = process.env.WALLET_ADDRESS;
+  const explicitFreeMode = process.env.IBANFORGE_FREE_MODE === 'true';
+
+  if (!isProd) {
+    return;
+  }
+
+  if (explicitFreeMode) {
+    console.warn(
+      '[x402] PRODUCTION boot with IBANFORGE_FREE_MODE=true — all paid endpoints are FREE. ' +
+        'Disable this flag and set X402_ENABLED=true + WALLET_ADDRESS to enable monetization.',
     );
+    return;
+  }
+
+  if (!x402Enabled) {
+    throw new Error(
+      'In production, X402_ENABLED must be "true". To run in explicit free mode, set IBANFORGE_FREE_MODE=true.',
+    );
+  }
+
+  if (!walletAddress) {
+    throw new Error('WALLET_ADDRESS is required when X402_ENABLED=true.');
   }
 }
 
@@ -30,20 +53,38 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
       return;
     }
 
-    // x402 disabled — all endpoints are free
-    if (process.env.X402_ENABLED !== 'true') {
+    const isProd = process.env.NODE_ENV === 'production';
+    const explicitFreeMode = process.env.IBANFORGE_FREE_MODE === 'true';
+    const x402Enabled = process.env.X402_ENABLED === 'true';
+
+    // Skip x402 if authenticated via API key (free tier inside the quota)
+    if (c.get('apiKeyAuthenticated')) {
       await next();
       return;
     }
 
-    // Skip x402 if authenticated via API key
-    if (c.get('apiKeyAuthenticated')) {
+    // Free mode (dev/test, or explicit prod opt-in) — all paid endpoints are free
+    if (!x402Enabled) {
+      if (isProd && !explicitFreeMode) {
+        // Defense in depth: if boot-time validation was bypassed somehow,
+        // refuse to serve paid endpoints rather than fail-open.
+        return c.json(
+          { error: 'Payment system misconfigured. Please contact support.' },
+          503,
+        );
+      }
       await next();
       return;
     }
 
     const walletAddress = process.env.WALLET_ADDRESS;
     if (!walletAddress) {
+      if (isProd) {
+        return c.json(
+          { error: 'Payment system misconfigured. Please contact support.' },
+          503,
+        );
+      }
       await next();
       return;
     }

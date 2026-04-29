@@ -6,3 +6,11 @@ healthcheckPath = "/health"
 healthcheckTimeout = 30
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 3
+
+# CRITICAL: persistent volume for stats.sqlite (API keys, quotas, revenue).
+# Without this, every redeploy wipes user data.
+# The volume MUST also be attached in the Railway dashboard to this service:
+# Service settings > Volumes > Mount path /app/data, name "ibanforge-data".
+[[deploy.mounts]]
+volumeName = "ibanforge-data"
+mountPath = "/app/data"
