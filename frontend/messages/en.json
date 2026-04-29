@@ -795,5 +795,27 @@
       "down": "Offline",
       "noData": "No data"
     }
+  },
+  "apiKeyDialog": {
+    "eyebrow": "Free tier",
+    "title": "Get your free API key",
+    "subtitle": "200 free calls per month. No credit card. The key is shown only once.",
+    "emailLabel": "Email",
+    "emailPlaceholder": "your@email.com",
+    "submit": "Generate my key",
+    "submitting": "Generating…",
+    "keyCreated": "Key created",
+    "successTitle": "Here is your API key",
+    "successWarn": "⚠ This key will not be shown again. Copy it and store it somewhere safe.",
+    "copy": "Copy key",
+    "monthly": "Monthly limit",
+    "nextSteps": "Next steps",
+    "step1": "Add the key as a header: Authorization: Bearer ifk_…",
+    "step2": "Call /v1/iban/validate with an IBAN to validate",
+    "step3": "Read the full docs →",
+    "errorTitle": "Error",
+    "errorHeadline": "Could not generate the key",
+    "retry": "Try again",
+    "close": "Close"
   }
 }

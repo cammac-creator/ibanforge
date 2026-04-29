@@ -795,5 +795,27 @@
       "down": "Hors ligne",
       "noData": "Aucune donnée"
     }
+  },
+  "apiKeyDialog": {
+    "eyebrow": "Tier gratuit",
+    "title": "Obtenir une clé API gratuite",
+    "subtitle": "200 appels gratuits par mois. Pas de carte bancaire. La clé est affichée une seule fois.",
+    "emailLabel": "Email",
+    "emailPlaceholder": "votre@email.com",
+    "submit": "Générer ma clé",
+    "submitting": "Génération…",
+    "keyCreated": "Clé créée",
+    "successTitle": "Voici votre clé API",
+    "successWarn": "⚠ Cette clé ne sera plus affichée. Copiez-la et stockez-la quelque part de sûr.",
+    "copy": "Copier la clé",
+    "monthly": "Limite mensuelle",
+    "nextSteps": "Prochaines étapes",
+    "step1": "Ajoutez la clé dans l'en-tête : Authorization: Bearer ifk_…",
+    "step2": "Appelez /v1/iban/validate avec un IBAN à valider",
+    "step3": "Voir la doc complète →",
+    "errorTitle": "Erreur",
+    "errorHeadline": "Impossible de créer la clé",
+    "retry": "Réessayer",
+    "close": "Fermer"
   }
 }
