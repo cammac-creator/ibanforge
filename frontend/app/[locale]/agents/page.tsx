@@ -28,6 +28,46 @@ const FREE_KEY_CURL = `curl -X POST https://api.ibanforge.com/v1/keys/generate \
 
 # → returns { "api_key": "ifk_...", "monthly_limit": 200 }`;
 
+const SDK_PYTHON_QUICKSTART = `# pip install ibanforge
+from ibanforge import IBANforge
+
+# Generate a free key in one line
+key = IBANforge.generate_api_key("agent@yourdomain.com")
+
+with IBANforge(api_key=key["api_key"]) as client:
+    out = client.validate_iban("CH9300762011623852957")
+    print(out["country"]["code"])      # CH
+    print(out["bic"]["bankName"])      # UBS Switzerland AG
+    print(out["sepa"]["instant"])      # True
+    print(out["risk_score"])           # 5
+
+    # Compliance triage in one call ($0.02)
+    out = client.check_compliance("GB29NWBK60161331926819")
+    print(out["recommended_action"])   # "allow" | "review" | "block"
+
+# Async path (FastAPI / LangChain async / fan-out)
+import asyncio
+from ibanforge import AsyncIBANforge
+
+async def main():
+    async with AsyncIBANforge(api_key=key["api_key"]) as client:
+        results = await asyncio.gather(*[
+            client.validate_iban(iban) for iban in many_ibans
+        ])`;
+
+const SDK_TYPESCRIPT_QUICKSTART = `// npm install @ibanforge/sdk
+import { IBANforge } from "@ibanforge/sdk";
+
+const ibanforge = new IBANforge({ apiKey: "ifk_..." });
+
+const out = await ibanforge.validateIban({
+  iban: "CH9300762011623852957",
+});
+
+console.log(out.country.code);          // CH
+console.log(out.bic?.bankName);         // UBS Switzerland AG
+console.log(out.sepa.instant);          // true`;
+
 const X402_CLIENT_TS = `import { wrapFetchWithPayment } from "@x402/fetch";
 import { x402Client } from "@x402/fetch";
 import { ExactEvmScheme, toClientEvmSigner } from "@x402/evm";
@@ -231,6 +271,55 @@ export default async function AgentsPage({
         <p className="text-xs text-muted-foreground mt-4" style={{ lineHeight: 1.65 }}>
           {t("apiKey.fallbackNote")}
         </p>
+      </section>
+
+      {/* Native SDKs */}
+      <section className="px-4 py-24 max-w-3xl mx-auto w-full">
+        <span className="eyebrow mb-3 inline-block">SDKs</span>
+        <h2
+          className="text-2xl sm:text-3xl font-semibold tracking-tight mb-3"
+          style={{ letterSpacing: "-0.02em" }}
+        >
+          Drop-in libraries
+        </h2>
+        <p className="text-muted-foreground mb-8 text-sm" style={{ lineHeight: 1.65 }}>
+          Skip the HTTP wiring. Type-safe clients with sync + async, retry-aware
+          exception classes, and a free-tier quota fallback to x402 baked in.
+        </p>
+
+        <div className="rounded-lg border p-5 mb-6" style={{ borderColor: "var(--ink-4)", background: "var(--ink-1)" }}>
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <p className="font-mono text-xs uppercase tracking-caps text-muted-foreground">
+              Python
+            </p>
+            <a
+              href="https://pypi.org/project/ibanforge/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-amber-500 hover:underline"
+            >
+              pypi.org/project/ibanforge ↗
+            </a>
+          </div>
+          <CodeBlock code={SDK_PYTHON_QUICKSTART} language="python" />
+        </div>
+
+        <div className="rounded-lg border p-5" style={{ borderColor: "var(--ink-4)", background: "var(--ink-1)" }}>
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <p className="font-mono text-xs uppercase tracking-caps text-muted-foreground">
+              TypeScript / JavaScript
+            </p>
+            <a
+              href="https://www.npmjs.com/package/@ibanforge/sdk"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-amber-500 hover:underline"
+            >
+              npmjs.com/package/@ibanforge/sdk ↗
+            </a>
+          </div>
+          <CodeBlock code={SDK_TYPESCRIPT_QUICKSTART} language="typescript" />
+        </div>
       </section>
 
       {/* x402 quickstart */}
