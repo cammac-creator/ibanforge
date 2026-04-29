@@ -1,0 +1,90 @@
+---
+title: "Endpoint IBAN gratuit : payez uniquement pour ce qui vaut vraiment d'être payé"
+description: "GET /v1/iban/format — un nouvel endpoint gratuit qui fait le check mod-97 + structure sans toucher aux bases BIC, SEPA, VoP, sanctions ou BC-Nummer suisse. Utilisez-le pour pré-filtrer les IBAN mal formés avant de payer la version enrichie."
+date: "2026-04-29"
+---
+
+Nous venons de livrer `GET /v1/iban/format` — un endpoint gratuit qui fait du check IBAN pur format. Mod-97 plus la structure BBAN spécifique au pays, c'est tout.
+
+Disponible ici :
+
+```
+https://api.ibanforge.com/v1/iban/format?iban=CH9300762011623852957
+```
+
+Pas de clé API, pas de paiement, pas de quota — uniquement le rate-limit global comme tout endpoint public.
+
+## Pourquoi cet endpoint existe
+
+Si vous êtes un agent qui traite 10 000 IBAN par jour depuis un CSV client, payer 0,005 $ par appel pour découvrir que 2 400 sont des chaînes mal formées, c'est gaspiller votre budget. Vous préférez :
+
+1. Faire un format check gratuit en amont
+2. Jeter les évidences fausses
+3. Payer l'enrichissement (BIC, SEPA, VoP, sanctions, BC-Nummer suisse) uniquement sur les IBAN qui passent
+
+C'est ce flow que `/v1/iban/format` permet.
+
+## Ce qu'il retourne
+
+Cas succès :
+
+```json
+{
+  "iban": "CH9300762011623852957",
+  "formatted": "CH93 0076 2011 6238 5295 7",
+  "valid": true,
+  "country": { "code": "CH", "name": "Switzerland" },
+  "check_digits": "93",
+  "bban": {
+    "bank_code": "00762",
+    "account_number": "011623852957"
+  },
+  "upgrade_to_full_validation": "POST /v1/iban/validate ($0.005) — adds BIC, SEPA, VoP, sanctions, Swiss BC-Nummer."
+}
+```
+
+Cas échec : retour `valid: false` avec un de ces codes d'erreur :
+
+- `invalid_format` — caractères non alphanumériques
+- `unsupported_country` — code pays non reconnu
+- `wrong_length` — longueur incorrecte pour le pays donné
+- `checksum_failed` — mod-97 a échoué (probable typo)
+
+## Ce qu'il ne retourne PAS
+
+- Pas de `bic`, `bank_name`, `lei`, `address`
+- Pas de `sepa.reachable`, ni `sepa.instant`
+- Pas de `vop.participant`
+- Pas de `risk_score`, sanctions, FATF
+- Pas de BC-Nummer suisse, SIC, QR-IID
+
+Pour tout cela, utilisez `POST /v1/iban/validate` (0,005 $) ou `POST /v1/iban/compliance` (0,02 $).
+
+## Quel endpoint pour quel usage
+
+| Situation | Endpoint | Coût |
+|---|---|---|
+| Validation côté formulaire client | `/v1/iban/format` | gratuit |
+| Pré-filtrage CSV avant batch payout | `/v1/iban/format` | gratuit |
+| Virement réel, besoin de la banque | `/v1/iban/validate` | 0,005 $ |
+| SEPA cross-border + sanctions | `/v1/iban/compliance` | 0,02 $ |
+| Dédup base clients en bulk | `/v1/iban/batch` | 0,002 $/IBAN |
+
+Chaque réponse du format endpoint contient un hint `upgrade_to_full_validation` qui pointe vers l'endpoint payant — les agents qui ont besoin de plus passent sans aller chercher une doc séparée.
+
+## Source de la spec
+
+ISO 13616 :
+- Mod-97 sur l'IBAN réarrangé + numérisé, valide si reste = 1
+- Longueur et structure BBAN spécifiques au pays (75+ pays supportés)
+- Chiffres de contrôle en positions 3-4
+
+Même algorithme, même code que `/v1/iban/validate` payant — on saute juste les DB lookups et les champs enrichis.
+
+## Essayez
+
+```bash
+curl 'https://api.ibanforge.com/v1/iban/format?iban=CH9300762011623852957'
+```
+
+Gratuit pour les 200 prochaines requêtes, les 2 000 prochaines, les 200 000 — pas de quota sur celui-là.
