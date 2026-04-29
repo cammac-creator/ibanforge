@@ -12,7 +12,7 @@ export const metadata: Metadata = {
     "Simple, transparent pay-per-call pricing. No subscriptions. No API keys. Pay with USDC via x402 micropayments.",
 }
 
-const ENDPOINT_COUNT = 4
+const ENDPOINT_COUNT = 5
 
 export default async function PricingPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;

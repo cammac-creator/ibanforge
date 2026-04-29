@@ -21,7 +21,7 @@ const CURL_EXAMPLE = `curl -X POST https://api.ibanforge.com/v1/iban/validate \\
   -d '{"iban": "CH93 0076 2011 6238 5295 7"}'`
 
 const FEATURE_COUNT = 6
-const ENDPOINT_COUNT = 4
+const ENDPOINT_COUNT = 5
 
 export default async function Home({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
