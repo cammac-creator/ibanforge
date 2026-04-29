@@ -4,6 +4,7 @@ import { getTranslations } from "next-intl/server"
 import { CodeBlock } from "@/components/code-block"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { EndpointRow } from "@/components/ui/endpoint-row"
 
 export const metadata: Metadata = {
   title: "IBANforge — IBAN Validation & BIC/SWIFT Lookup API",
@@ -43,16 +44,17 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
   return (
     <div className="flex flex-col">
       {/* ── Hero ──────────────────────────────────────────────────────────── */}
-      <section className="flex flex-col items-center justify-center text-center px-4 py-28 gap-6">
-        <Badge variant="outline" className="text-amber-500 border-amber-500/40 bg-amber-500/5 px-3 py-1 text-xs tracking-widest uppercase">
+      <section className="flex flex-col items-center justify-center text-center px-4 py-28 sm:py-32 gap-7 max-w-3xl mx-auto">
+        <span className="eyebrow inline-flex items-center gap-2">
+          <span className="inline-block w-1.5 h-1.5 rounded-full animate-pulse-live" style={{ backgroundColor: 'var(--live)', boxShadow: '0 0 0 3px rgba(34, 197, 94, 0.18)' }} />
           {t('badge')}
-        </Badge>
+        </span>
 
-        <h1 className="text-5xl sm:text-6xl md:text-7xl font-bold tracking-tight font-mono text-foreground">
+        <h1 className="text-5xl sm:text-6xl md:text-7xl font-bold tracking-tight font-mono text-foreground" style={{ lineHeight: 1.05, letterSpacing: '-0.035em' }}>
           {t('hero.title.prefix')}<span className="text-amber-500">{t('hero.title.highlight')}</span>
         </h1>
 
-        <p className="max-w-2xl text-lg text-muted-foreground leading-relaxed">
+        <p className="max-w-2xl text-lg text-muted-foreground" style={{ lineHeight: 1.65 }}>
           {t('hero.description')}
         </p>
 
@@ -76,16 +78,17 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
       </section>
 
       {/* ── Features ──────────────────────────────────────────────────────── */}
-      <section className="px-4 py-20 max-w-5xl mx-auto w-full">
-        <h2 className="text-2xl font-semibold tracking-tight mb-10 text-center">
+      <section className="px-4 py-24 max-w-6xl mx-auto w-full">
+        <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight mb-14 text-center" style={{ letterSpacing: '-0.02em' }}>
           {t('features.heading')}
         </h2>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6 lg:gap-8">
           {FEATURES.map((feature) => (
             <div
               key={feature.badge}
-              className="rounded-xl border border-border bg-zinc-900/50 p-6 flex flex-col gap-3"
+              className="rounded-xl border p-7 flex flex-col gap-3 transition-colors"
+              style={{ borderColor: 'var(--ink-4)', background: 'var(--ink-1)' }}
             >
               <Badge
                 variant="outline"
@@ -94,7 +97,7 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
                 {feature.badge}
               </Badge>
               <h3 className="font-semibold text-foreground">{feature.title}</h3>
-              <p className="text-sm text-muted-foreground leading-relaxed">
+              <p className="text-sm text-muted-foreground" style={{ lineHeight: 1.65 }}>
                 {feature.description}
               </p>
             </div>
@@ -102,80 +105,56 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
         </div>
       </section>
 
-      {/* ── Endpoints table ───────────────────────────────────────────────── */}
-      <section className="px-4 py-20 max-w-5xl mx-auto w-full">
-        <h2 className="text-2xl font-semibold tracking-tight mb-4 text-center">
+      {/* ── Endpoints (vertical stack instead of dense table) ─────────────── */}
+      <section className="px-4 py-24 max-w-3xl mx-auto w-full">
+        <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight mb-3 text-center" style={{ letterSpacing: '-0.02em' }}>
           {t('endpoints.heading')}
         </h2>
-        <p className="text-center text-muted-foreground mb-10 text-sm">
+        <p className="text-center text-muted-foreground mb-12 text-sm">
           {t('endpoints.subtitle')}
         </p>
 
-        <div className="rounded-xl border border-border overflow-hidden">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border bg-zinc-900/60">
-                <th className="px-5 py-3 text-left font-medium text-muted-foreground">
-                  {t('endpoints.table.method')}
-                </th>
-                <th className="px-5 py-3 text-left font-medium text-muted-foreground">
-                  {t('endpoints.table.path')}
-                </th>
-                <th className="px-5 py-3 text-left font-medium text-muted-foreground">
-                  {t('endpoints.table.cost')}
-                </th>
-                <th className="px-5 py-3 text-left font-medium text-muted-foreground hidden sm:table-cell">
-                  {t('endpoints.table.description')}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {ENDPOINTS.map((endpoint, i) => (
-                <tr
-                  key={endpoint.path}
-                  className={
-                    i < ENDPOINTS.length - 1 ? "border-b border-border" : ""
-                  }
-                >
-                  <td className="px-5 py-4">
-                    <span className="font-mono text-xs font-semibold text-amber-500 bg-amber-500/10 border border-amber-500/20 rounded px-1.5 py-0.5">
-                      {endpoint.method}
-                    </span>
-                  </td>
-                  <td className="px-5 py-4 font-mono text-xs text-foreground">
-                    {endpoint.path}
-                  </td>
-                  <td className="px-5 py-4 font-mono text-xs text-muted-foreground">
-                    {endpoint.cost}
-                  </td>
-                  <td className="px-5 py-4 text-muted-foreground hidden sm:table-cell">
-                    {endpoint.description}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="flex flex-col gap-3">
+          {ENDPOINTS.map((endpoint) => (
+            <div
+              key={endpoint.path}
+              className="rounded-lg border px-5 py-4 transition-colors"
+              style={{ borderColor: 'var(--ink-4)', background: 'var(--ink-1)' }}
+            >
+              <EndpointRow
+                method={endpoint.method as 'GET' | 'POST' | 'PUT' | 'DELETE'}
+                path={endpoint.path}
+                price={endpoint.cost}
+              />
+              <p className="text-xs text-muted-foreground mt-2 ml-[68px]">
+                {endpoint.description}
+              </p>
+            </div>
+          ))}
         </div>
       </section>
 
       {/* ── Quick start ───────────────────────────────────────────────────── */}
-      <section className="px-4 py-20 max-w-5xl mx-auto w-full">
-        <h2 className="text-2xl font-semibold tracking-tight mb-4 text-center">
+      <section className="px-4 py-24 max-w-3xl mx-auto w-full">
+        <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight mb-3 text-center" style={{ letterSpacing: '-0.02em' }}>
           {t('quickStart.heading')}
         </h2>
         <p className="text-center text-muted-foreground mb-10 text-sm">
           {t('quickStart.subtitle')}
         </p>
 
-        <CodeBlock code={CURL_EXAMPLE} language="bash" className="max-w-2xl mx-auto" />
+        <CodeBlock code={CURL_EXAMPLE} language="bash" />
       </section>
 
       {/* ── Final CTA ─────────────────────────────────────────────────────── */}
-      <section className="flex flex-col items-center text-center px-4 py-28 gap-6 border-t border-border">
-        <h2 className="text-3xl sm:text-4xl font-bold tracking-tight">
+      <section
+        className="flex flex-col items-center text-center px-4 py-32 gap-6 border-t"
+        style={{ borderColor: 'var(--ink-4)', background: 'var(--ink-0)' }}
+      >
+        <h2 className="text-3xl sm:text-4xl font-bold tracking-tight" style={{ letterSpacing: '-0.02em' }}>
           {t('cta.heading')}
         </h2>
-        <p className="text-muted-foreground max-w-md">
+        <p className="text-muted-foreground max-w-md" style={{ lineHeight: 1.65 }}>
           {t('cta.description')}
         </p>
         <Button
