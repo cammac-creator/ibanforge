@@ -1,0 +1,71 @@
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    groups:
+      x402:
+        patterns:
+          - "@x402/*"
+          - "@coinbase/x402"
+          - "@coinbase/cdp-sdk"
+      mcp:
+        patterns:
+          - "@modelcontextprotocol/*"
+      hono:
+        patterns:
+          - "hono"
+          - "@hono/*"
+      dev-tooling:
+        patterns:
+          - "vitest"
+          - "typescript"
+          - "@types/*"
+          - "eslint"
+          - "@typescript-eslint/*"
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
+
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    groups:
+      next:
+        patterns:
+          - "next"
+          - "next-intl"
+          - "next-themes"
+          - "next-mdx-remote"
+      tooling:
+        patterns:
+          - "typescript"
+          - "@types/*"
+          - "eslint*"
+          - "tailwindcss"
+    commit-message:
+      prefix: "chore(deps,frontend)"
+      include: "scope"
+
+  - package-ecosystem: "npm"
+    directory: "/mcp"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "chore(deps,mcp)"
+      include: "scope"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    commit-message:
+      prefix: "chore(ci)"
