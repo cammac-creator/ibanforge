@@ -15,11 +15,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
     // Static pages
     entries.push(
       { url: prefix, lastModified: now, changeFrequency: "weekly", priority: 1 },
+      { url: `${prefix}/agents`, lastModified: now, changeFrequency: "monthly", priority: 0.95 },
       { url: `${prefix}/playground`, lastModified: now, changeFrequency: "monthly", priority: 0.9 },
       { url: `${prefix}/docs`, lastModified: now, changeFrequency: "weekly", priority: 0.8 },
       { url: `${prefix}/pricing`, lastModified: now, changeFrequency: "monthly", priority: 0.7 },
+      { url: `${prefix}/openapi`, lastModified: now, changeFrequency: "monthly", priority: 0.7 },
       { url: `${prefix}/blog`, lastModified: now, changeFrequency: "weekly", priority: 0.6 },
-      { url: `${prefix}/compare`, lastModified: now, changeFrequency: "monthly", priority: 0.7 },
     );
 
     // Doc pages

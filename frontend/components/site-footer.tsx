@@ -10,10 +10,11 @@ export function SiteFooter() {
     {
       title: t("column.product"),
       links: [
+        { href: `/${locale}/agents`, label: t("link.agents") },
         { href: `/${locale}/docs`, label: t("link.docs") },
         { href: `/${locale}/playground`, label: t("link.playground") },
         { href: `/${locale}/pricing`, label: t("link.pricing") },
-        { href: `/${locale}/compare`, label: t("link.compare") },
+        { href: `/${locale}/openapi`, label: t("link.openapi") },
       ],
     },
     {

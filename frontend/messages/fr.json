@@ -23,11 +23,12 @@
       "docs": "Documentation",
       "playground": "Playground",
       "pricing": "Tarifs",
-      "compare": "Comparatif",
       "github": "GitHub",
       "mcp": "MCP",
       "apiStatus": "État de l'API",
-      "mitLicense": "Licence MIT"
+      "mitLicense": "Licence MIT",
+      "agents": "Agents",
+      "openapi": "OpenAPI"
     },
     "copyright": "© {year} IBANforge. Publié sous licence MIT.",
     "builtWith": "Propulsé par",
@@ -267,162 +268,6 @@
     "cta": {
       "heading": "Commencez gratuitement",
       "description": "Pas de carte bancaire, pas de compte. Ouvrez le playground, lisez la documentation, déployez quand vous êtes prêt.",
-      "openPlayground": "Ouvrir le playground",
-      "readDocs": "Lire la documentation"
-    }
-  },
-  "compare": {
-    "metadata": {
-      "title": "Comparer les API de validation IBAN",
-      "description": "Comparez IBANforge avec iban.com, IBANAPI et AbstractAPI. Tarifs, fonctionnalités, support agents AI et options d'auto-hébergement."
-    },
-    "badge": "Comparatif",
-    "hero": {
-      "title": {
-        "prefix": "IBANforge vs",
-        "highlight": "alternatives"
-      },
-      "description": "Comment IBANforge se compare aux autres API de validation IBAN — en termes de tarifs, fonctionnalités et capacités natives pour l'AI.",
-      "cta": {
-        "tryFree": "Essayer IBANforge gratuitement",
-        "seePricing": "Voir les tarifs →"
-      }
-    },
-    "table": {
-      "header": {
-        "feature": "Fonctionnalité",
-        "ibanforge": "IBANforge",
-        "ibancom": "iban.com",
-        "ibanapi": "IBANAPI",
-        "abstractapi": "AbstractAPI"
-      }
-    },
-    "features": {
-      "0": {
-        "label": "Prix par appel",
-        "ibanforge": "$0.005",
-        "ibancom": "$0.047+",
-        "ibanapi": "$0.023+",
-        "abstract": "$0.002"
-      },
-      "1": {
-        "label": "Recherche BIC incluse",
-        "ibanforge": "Oui",
-        "ibancom": "Séparé",
-        "ibanapi": "Non",
-        "abstract": "Non"
-      },
-      "2": {
-        "label": "Données de conformité SEPA",
-        "ibanforge": "Oui",
-        "ibancom": "Partiel",
-        "ibanapi": "Non",
-        "abstract": "Non"
-      },
-      "3": {
-        "label": "Classification émetteur",
-        "ibanforge": "Oui",
-        "ibancom": "Non",
-        "ibanapi": "Non",
-        "abstract": "Non"
-      },
-      "4": {
-        "label": "Détection vIBAN",
-        "ibanforge": "Oui",
-        "ibancom": "Non",
-        "ibanapi": "Non",
-        "abstract": "Non"
-      },
-      "5": {
-        "label": "Indicateurs de risque",
-        "ibanforge": "Oui",
-        "ibancom": "Non",
-        "ibanapi": "Non",
-        "abstract": "Non"
-      },
-      "6": {
-        "label": "Support agents AI (MCP)",
-        "ibanforge": "Oui",
-        "ibancom": "Non",
-        "ibanapi": "Non",
-        "abstract": "Non"
-      },
-      "7": {
-        "label": "Micropaiements x402",
-        "ibanforge": "Oui",
-        "ibancom": "Non",
-        "ibanapi": "Non",
-        "abstract": "Non"
-      },
-      "8": {
-        "label": "Aucune clé API requise",
-        "ibanforge": "Oui",
-        "ibancom": "Non",
-        "ibanapi": "Non",
-        "abstract": "Non"
-      },
-      "9": {
-        "label": "Playground gratuit",
-        "ibanforge": "Oui",
-        "ibancom": "Non",
-        "ibanapi": "Limité",
-        "abstract": "Non"
-      },
-      "10": {
-        "label": "Pays supportés",
-        "ibanforge": "75+",
-        "ibancom": "95+",
-        "ibanapi": "80+",
-        "abstract": "70+"
-      },
-      "11": {
-        "label": "Données LEI / GLEIF",
-        "ibanforge": "Oui",
-        "ibancom": "Non",
-        "ibanapi": "Non",
-        "abstract": "Non"
-      },
-      "12": {
-        "label": "Validation par lot",
-        "ibanforge": "Oui (100/appel)",
-        "ibancom": "Non",
-        "ibanapi": "Oui",
-        "abstract": "Non"
-      },
-      "13": {
-        "label": "Auto-hébergeable",
-        "ibanforge": "Oui (MIT)",
-        "ibancom": "Non",
-        "ibanapi": "Non",
-        "abstract": "Non"
-      },
-      "14": {
-        "label": "Open source",
-        "ibanforge": "Oui",
-        "ibancom": "Non",
-        "ibanapi": "Non",
-        "abstract": "Non"
-      }
-    },
-    "disclaimer": "Tarifs en date d'avril 2026 — susceptibles d'avoir changé. Vérifiez toujours sur le site de chaque fournisseur avant de prendre une décision.",
-    "differentiators": {
-      "0": {
-        "title": "Sans clé API, sans abonnement",
-        "body": "Les micropaiements x402 vous permettent de payer à l'appel en USDC — pas de carte bancaire, pas de compte, pas de facture mensuelle. Commencez à utiliser l'API en quelques minutes."
-      },
-      "1": {
-        "title": "Conçu pour les agents AI",
-        "body": "Le serveur MCP (Model Context Protocol) natif permet à Claude, GPT-4 et d'autres agents LLM d'appeler validate_iban et lookup_bic comme outils structurés — sans ingénierie de prompt."
-      },
-      "2": {
-        "title": "Open source (MIT)",
-        "body": "Le code source complet est sur GitHub. Auditez le code, auto-hébergez gratuitement ou contribuez des améliorations. Aucun verrouillage fournisseur."
-      },
-      "heading": "Ce qui distingue IBANforge"
-    },
-    "cta": {
-      "heading": "Prêt à essayer ?",
-      "description": "Pas de compte, pas de carte bancaire. Ouvrez le playground et validez votre premier IBAN en moins d'une minute.",
       "openPlayground": "Ouvrir le playground",
       "readDocs": "Lire la documentation"
     }
