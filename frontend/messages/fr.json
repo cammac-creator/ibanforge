@@ -121,6 +121,12 @@
         "path": "Chemin",
         "cost": "Coût",
         "description": "Description"
+      },
+      "4": {
+        "method": "GET",
+        "path": "/v1/ch/clearing/:iid",
+        "cost": "$0.003",
+        "description": "Recherche BC-Numéro suisse (1 190 entrées SIX)"
       }
     },
     "quickStart": {
@@ -182,6 +188,13 @@
         "cost": "$0.02",
         "costLabel": "par appel",
         "description": "Check compliance complet avec screening sanctions, accessibilité SEPA Instant, statut VoP et score de risque (0-100)"
+      },
+      "4": {
+        "method": "GET",
+        "path": "/v1/ch/clearing/:iid",
+        "cost": "$0.003",
+        "costLabel": "par appel",
+        "description": "Recherche BC-Numéro / IID suisse avec SIC, euroSIC, paiements instantanés et données QR-IID — basé sur 1 190 entrées SIX BankMaster"
       }
     },
     "free": {
@@ -192,35 +205,26 @@
       "playgroundLink": "Essayer dans le playground →"
     },
     "calculator": {
-      "heading": "Estimez vos coûts",
-      "subtitle": "Ajustez le curseur pour voir ce que vous paieriez chaque mois.",
       "callsPerMonth": "Appels par mois",
-      "callsUnit": "appels / mois",
+      "callsPerMonthUnit": "appels / mois",
       "costBreakdown": "Détail des coûts",
+      "perCall": "appel",
       "table": {
         "endpoint": "Endpoint",
         "rate": "Tarif",
         "monthlyCost": "Coût mensuel"
       },
       "endpoints": {
-        "0": {
-          "label": "Validation IBAN",
-          "description": "Valider un IBAN unique"
-        },
-        "1": {
-          "label": "IBAN par lot (par IBAN)",
-          "description": "Valider jusqu'à 100 IBAN"
-        },
-        "2": {
-          "label": "Recherche BIC",
-          "description": "Rechercher un code BIC/SWIFT"
-        }
+        "validate": "Validation IBAN",
+        "batch": "Validation par lot (par IBAN)",
+        "bic": "Recherche BIC",
+        "chClearing": "BC-Numéro suisse",
+        "compliance": "Vérification compliance"
       },
       "summary": {
-        "at": "À",
-        "callsPerEndpoint": "appels/mois par endpoint",
-        "payForWhat": "Vous ne payez que ce que vous utilisez réellement",
-        "forValidate": "pour /v1/iban/validate"
+        "line": "À <strong>{count}</strong> appels/mois par endpoint",
+        "note": "Vous ne payez que ce que vous appelez réellement",
+        "forEndpoint": "pour {path}"
       }
     },
     "x402": {
@@ -607,7 +611,15 @@
         "title": "Activité horaire",
         "subtitle": "Appels par heure et jour de la semaine",
         "noData": "Aucune donnée horaire disponible",
-        "days": { "mon": "Lun", "tue": "Mar", "wed": "Mer", "thu": "Jeu", "fri": "Ven", "sat": "Sam", "sun": "Dim" }
+        "days": {
+          "mon": "Lun",
+          "tue": "Mar",
+          "wed": "Mer",
+          "thu": "Jeu",
+          "fri": "Ven",
+          "sat": "Sam",
+          "sun": "Dim"
+        }
       },
       "peak": {
         "title": "Pic d'activité",
@@ -615,17 +627,44 @@
         "days": "Jours les plus actifs : {days}",
         "weekendDrop": "Baisse weekend : -{pct}%"
       },
-      "geoTrend": { "title": "Tendance géographique", "subtitle": "Top 5 pays dans le temps" },
-      "endpointTrend": { "title": "Répartition endpoints", "subtitle": "Distribution d'usage dans le temps" }
+      "geoTrend": {
+        "title": "Tendance géographique",
+        "subtitle": "Top 5 pays dans le temps"
+      },
+      "endpointTrend": {
+        "title": "Répartition endpoints",
+        "subtitle": "Distribution d'usage dans le temps"
+      }
     },
     "quality": {
       "title": "Qualité",
       "subtitle": "Qualité des requêtes et analyse des erreurs",
-      "errorRate": { "ibanValidate": "Taux d'erreur IBAN", "bicLookup": "Taux BIC introuvables", "totalErrors": "Total erreurs" },
-      "topInvalidIbans": { "title": "Top IBANs invalides", "prefix": "Préfixe", "country": "Pays", "count": "Nombre", "noData": "Aucun IBAN invalide" },
-      "topMissingBics": { "title": "Top BICs introuvables", "bic": "Code BIC", "country": "Pays", "count": "Recherches", "noData": "Aucun BIC manquant" },
-      "errorsByCountry": { "title": "Erreurs par pays", "noData": "Aucune donnée d'erreur" },
-      "successTrend": { "title": "Tendance taux de succès" }
+      "errorRate": {
+        "ibanValidate": "Taux d'erreur IBAN",
+        "bicLookup": "Taux BIC introuvables",
+        "totalErrors": "Total erreurs"
+      },
+      "topInvalidIbans": {
+        "title": "Top IBANs invalides",
+        "prefix": "Préfixe",
+        "country": "Pays",
+        "count": "Nombre",
+        "noData": "Aucun IBAN invalide"
+      },
+      "topMissingBics": {
+        "title": "Top BICs introuvables",
+        "bic": "Code BIC",
+        "country": "Pays",
+        "count": "Recherches",
+        "noData": "Aucun BIC manquant"
+      },
+      "errorsByCountry": {
+        "title": "Erreurs par pays",
+        "noData": "Aucune donnée d'erreur"
+      },
+      "successTrend": {
+        "title": "Tendance taux de succès"
+      }
     },
     "sidebar": {
       "label": "Navigation",
