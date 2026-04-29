@@ -1,0 +1,90 @@
+---
+title: "Kostenloser IBAN-Format-Endpunkt: zahlen Sie nur für das, was sich wirklich lohnt"
+description: "GET /v1/iban/format — ein neuer kostenloser Endpunkt, der den mod-97- und Strukturcheck durchführt, ohne die BIC-, SEPA-, VoP-, Sanktions- oder Schweizer BC-Nummer-Datenbanken zu berühren. Nutzen Sie ihn, um fehlerhafte IBANs vorzufiltern, bevor Sie für die volle Anreicherung bezahlen."
+date: "2026-04-29"
+---
+
+Wir haben gerade `GET /v1/iban/format` veröffentlicht — einen kostenlosen Endpunkt, der reines Format-Checking durchführt. Mod-97 plus die länderspezifische BBAN-Struktur, mehr nicht.
+
+Verfügbar unter:
+
+```
+https://api.ibanforge.com/v1/iban/format?iban=CH9300762011623852957
+```
+
+Kein API-Schlüssel, keine Zahlung, kein Kontingent — nur das globale Rate-Limit wie bei jeder öffentlichen Route.
+
+## Warum dieser Endpunkt existiert
+
+Wenn Sie ein Agent sind, der täglich 10 000 IBANs aus einem Kunden-CSV verarbeitet, ist es eine Geldverschwendung, $0.005 pro Aufruf zu zahlen, nur um festzustellen, dass 2 400 davon fehlerhafte Strings sind. Sie möchten lieber:
+
+1. Sie zuerst durch einen kostenlosen Format-Check laufen lassen
+2. Den offensichtlichen Müll verwerfen
+3. Nur für die sinnvolle Anreicherung (BIC, SEPA, VoP, Sanktionen, Schweizer BC-Nummer) bei den IBANs zahlen, die durchkommen
+
+Genau diesen Workflow ermöglicht `/v1/iban/format`.
+
+## Was er zurückgibt
+
+Erfolgsfall:
+
+```json
+{
+  "iban": "CH9300762011623852957",
+  "formatted": "CH93 0076 2011 6238 5295 7",
+  "valid": true,
+  "country": { "code": "CH", "name": "Switzerland" },
+  "check_digits": "93",
+  "bban": {
+    "bank_code": "00762",
+    "account_number": "011623852957"
+  },
+  "upgrade_to_full_validation": "POST /v1/iban/validate ($0.005) — adds BIC, SEPA, VoP, sanctions, Swiss BC-Nummer."
+}
+```
+
+Fehlerfall: Rückgabe `valid: false` mit einem dieser Fehlercodes:
+
+- `invalid_format` — nicht-alphanumerische Zeichen
+- `unsupported_country` — Ländercode nicht erkannt
+- `wrong_length` — IBAN-Länge passt nicht zum Ländercode
+- `checksum_failed` — Mod-97-Prüfung fehlgeschlagen (Tippfehler wahrscheinlich)
+
+## Was er NICHT zurückgibt
+
+- Kein `bic`, `bank_name`, `lei`, `address`
+- Kein `sepa.reachable`, kein `sepa.instant`
+- Kein `vop.participant`
+- Kein `risk_score`, keine Sanktionen, kein FATF
+- Keine Schweizer BC-Nummer, SIC, QR-IID
+
+Für all das verwenden Sie `POST /v1/iban/validate` ($0.005) oder `POST /v1/iban/compliance` ($0.02).
+
+## Welcher Endpunkt für welche Situation
+
+| Situation | Endpunkt | Kosten |
+|---|---|---|
+| Client-seitige Formularvalidierung | `/v1/iban/format` | kostenlos |
+| Vorfilterung CSV vor Auszahlungs-Triage | `/v1/iban/format` | kostenlos |
+| Echte Auszahlung, Bankinfo benötigt | `/v1/iban/validate` | $0.005 |
+| Grenzüberschreitend SEPA + Sanktionen | `/v1/iban/compliance` | $0.02 |
+| Dedupe Kundendatenbank in bulk | `/v1/iban/batch` | $0.002/IBAN |
+
+Jede Antwort des Format-Endpunkts enthält einen `upgrade_to_full_validation`-Hinweis, der zum kostenpflichtigen Endpunkt verweist — Agenten, die mehr Tiefe brauchen, wechseln nahtlos ohne zusätzliches Doc-Lookup.
+
+## Spezifikationsquelle
+
+ISO 13616:
+- Mod-97 über den umgestellten und numerisierten IBAN, gültig wenn Rest = 1
+- Länderspezifische BBAN-Länge und -Struktur (75+ Länder unterstützt)
+- Prüfziffern an Position 3-4
+
+Gleicher Algorithmus, gleicher Bibliothekscode wie der bezahlte `/v1/iban/validate` — wir überspringen einfach die DB-Lookups und die Anreicherungsfelder.
+
+## Probieren Sie es aus
+
+```bash
+curl 'https://api.ibanforge.com/v1/iban/format?iban=CH9300762011623852957'
+```
+
+Kostenlos für die nächsten 200 Anfragen, die nächsten 2 000, die nächsten 200 000 — auf diesen gibt es kein Kontingent.
