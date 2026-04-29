@@ -33,13 +33,24 @@ import type { HonoEnv } from './types.js';
 
 const app = new Hono<HonoEnv>();
 
-// Global middleware
-const configuredOrigins = (process.env.CORS_ORIGIN || '*').split(',').map(s => s.trim());
+// Global middleware — CORS
+// In production, CORS_ORIGIN MUST be explicitly set to a comma-separated list.
+// Wildcard '*' in production is rejected to avoid drive-by access from any origin
+// when combined with Authorization/X-Payment headers.
+const isProd = process.env.NODE_ENV === 'production';
+const corsRaw = process.env.CORS_ORIGIN;
+if (isProd && (!corsRaw || corsRaw.includes('*'))) {
+  throw new Error(
+    'In production, CORS_ORIGIN must be set to an explicit comma-separated list (no wildcard). ' +
+      'Example: CORS_ORIGIN=https://ibanforge.com,https://www.ibanforge.com',
+  );
+}
+const configuredOrigins = (corsRaw || '*').split(',').map(s => s.trim());
 const localhostPattern = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
 
 app.use('*', cors({
   origin: (origin) => {
-    if (configuredOrigins.includes('*')) return '*';
+    if (!isProd && configuredOrigins.includes('*')) return '*';
     if (localhostPattern.test(origin)) return origin;
     return configuredOrigins.includes(origin) ? origin : configuredOrigins[0];
   },
@@ -55,6 +66,30 @@ app.use('*', async (c, next) => {
   c.header('X-Frame-Options', 'DENY');
   c.header('Referrer-Policy', 'strict-origin-when-cross-origin');
   c.header('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  // Permissions-Policy: deny dangerous browser features the API never uses
+  c.header(
+    'Permissions-Policy',
+    'geolocation=(), microphone=(), camera=(), payment=(), usb=()',
+  );
+  // CSP for HTML responses only (don't apply to JSON API responses)
+  const ct = c.res.headers.get('content-type') || '';
+  if (ct.includes('text/html')) {
+    c.header(
+      'Content-Security-Policy',
+      [
+        "default-src 'self'",
+        // Allow inline scripts on the landing (we hardcode JSON-LD inline)
+        "script-src 'self' 'unsafe-inline'",
+        "style-src 'self' 'unsafe-inline'",
+        "img-src 'self' data: https:",
+        "font-src 'self' data:",
+        "connect-src 'self' https://api.ibanforge.com",
+        "frame-ancestors 'none'",
+        "base-uri 'self'",
+        "form-action 'self'",
+      ].join('; '),
+    );
+  }
 });
 app.use('*', rateLimitMiddleware());
 app.use('*', compress());
