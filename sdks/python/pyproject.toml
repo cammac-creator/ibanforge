@@ -1,18 +1,62 @@
 [build-system]
 requires = ["hatchling"]
-build-backend = "hatchling.backends"
+build-backend = "hatchling.build"
 
 [project]
 name = "ibanforge"
-version = "1.0.0"
-description = "Official Python SDK for the IBANforge API — IBAN validation & BIC/SWIFT lookup"
+version = "1.1.0"
+description = "Official Python SDK for the IBANforge API — IBAN validation, BIC/SWIFT lookup, Swiss BC-Nummer, sanctions/SEPA/VoP compliance triage."
 readme = "README.md"
 license = "MIT"
-requires-python = ">=3.8"
+requires-python = ">=3.9"
+authors = [{ name = "IBANforge", email = "support@ibanforge.com" }]
 dependencies = ["httpx>=0.24.0"]
-keywords = ["iban", "bic", "swift", "validation", "banking", "api"]
+keywords = [
+    "iban",
+    "bic",
+    "swift",
+    "validation",
+    "banking",
+    "api",
+    "sepa",
+    "vop",
+    "fintech",
+    "ai-agent",
+    "x402",
+    "compliance",
+    "sanctions",
+    "swiss",
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Financial and Insurance Industry",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Internet :: WWW/HTTP",
+    "Topic :: Office/Business :: Financial",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Typing :: Typed",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7", "pytest-asyncio>=0.21", "respx>=0.20"]
 
 [project.urls]
 Homepage = "https://ibanforge.com"
 Documentation = "https://ibanforge.com/docs"
+"Agent Guide" = "https://ibanforge.com/agents"
+"OpenAPI Reference" = "https://ibanforge.com/openapi"
 Repository = "https://github.com/cammac-creator/ibanforge"
+"Issue Tracker" = "https://github.com/cammac-creator/ibanforge/issues"
+Changelog = "https://github.com/cammac-creator/ibanforge/blob/main/CHANGELOG.md"
+
+[tool.hatch.build.targets.wheel]
+packages = ["ibanforge"]
