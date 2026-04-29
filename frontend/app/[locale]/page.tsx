@@ -1,4 +1,3 @@
-import type { Metadata } from "next"
 import Link from "next/link"
 import { getTranslations } from "next-intl/server"
 import { CodeBlock } from "@/components/code-block"
@@ -6,16 +5,9 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { EndpointRow } from "@/components/ui/endpoint-row"
 
-export const metadata: Metadata = {
-  title: "IBANforge — IBAN Validation & BIC/SWIFT Lookup API",
-  description:
-    "IBAN validation, BIC/SWIFT lookup, SEPA compliance, issuer classification, and risk indicators for developers and AI agents. Pay per request with USDC via x402.",
-  openGraph: {
-    title: "IBANforge",
-    description: "IBAN validation & BIC/SWIFT lookup API with compliance data for AI agents",
-    url: "https://ibanforge.com",
-  },
-};
+// Metadata is generated per-locale by app/[locale]/layout.tsx — do NOT define
+// a static `metadata` here, it would override the locale-aware version with
+// the EN default. Sub-pages (pricing, agents, etc.) can still set their own.
 
 const CURL_EXAMPLE = `curl -X POST https://api.ibanforge.com/v1/iban/validate \\
   -H "Content-Type: application/json" \\
