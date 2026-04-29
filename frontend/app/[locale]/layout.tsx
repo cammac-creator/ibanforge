@@ -37,20 +37,69 @@ type Props = {
   params: Promise<{ locale: string }>;
 };
 
+const META_BY_LOCALE = {
+  en: {
+    title: "IBANforge — IBAN Validation & BIC/SWIFT Lookup API for AI Agents",
+    description:
+      "Validate IBANs, lookup BICs/SWIFT, score compliance risk. 121K BICs across 75+ countries, sanctions screening, SEPA + VoP, native MCP for AI agents, x402 micropayments. Free tier: 200 requests/month.",
+    ogLocale: "en_US",
+    alternates: { fr: "fr", de: "de" },
+  },
+  fr: {
+    title: "IBANforge — API de validation IBAN & BIC/SWIFT pour agents IA",
+    description:
+      "Validez vos IBAN, recherchez des BIC/SWIFT, évaluez le risque de conformité. 121K codes BIC sur 75+ pays, screening sanctions, SEPA + VoP, MCP natif pour agents IA, micropaiements x402. Gratuit : 200 requêtes/mois.",
+    ogLocale: "fr_FR",
+    alternates: { en: "en", de: "de" },
+  },
+  de: {
+    title: "IBANforge — IBAN-Validierung & BIC/SWIFT-Lookup-API für KI-Agenten",
+    description:
+      "IBANs validieren, BIC/SWIFT abfragen, Compliance-Risiken bewerten. 121K BIC-Einträge in 75+ Ländern, Sanktionsprüfung, SEPA + VoP, natives MCP für KI-Agenten, x402-Mikrozahlungen. Kostenlos: 200 Anfragen/Monat.",
+    ogLocale: "de_DE",
+    alternates: { en: "en", fr: "fr" },
+  },
+} as const;
+
 export async function generateMetadata({
   params,
 }: {
   params: Promise<{ locale: string }>;
 }) {
   const { locale } = await params;
-  const ogLocale =
-    locale === "fr" ? "fr_FR" : locale === "de" ? "de_DE" : "en_US";
+  const meta =
+    META_BY_LOCALE[locale as keyof typeof META_BY_LOCALE] ?? META_BY_LOCALE.en;
+
+  const baseUrl = "https://ibanforge.com";
+  const canonicalUrl = locale === "en" ? baseUrl : `${baseUrl}/${locale}`;
+
   return {
+    title: { default: meta.title, template: "%s | IBANforge" },
+    description: meta.description,
+    alternates: {
+      canonical: canonicalUrl,
+      languages: {
+        en: `${baseUrl}`,
+        "fr-CH": `${baseUrl}/fr`,
+        "de-CH": `${baseUrl}/de`,
+        "x-default": `${baseUrl}`,
+      },
+    },
     openGraph: {
       type: "website",
-      locale: ogLocale,
-      url: `https://ibanforge.com/${locale}`,
+      locale: meta.ogLocale,
+      alternateLocale: Object.values(meta.alternates).map((l) =>
+        l === "en" ? "en_US" : l === "fr" ? "fr_FR" : "de_DE",
+      ),
+      url: canonicalUrl,
       siteName: "IBANforge",
+      title: meta.title,
+      description: meta.description,
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: meta.title,
+      description: meta.description,
     },
   };
 }
