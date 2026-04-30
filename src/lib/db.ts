@@ -136,6 +136,12 @@ export function getStatsDB(): DatabaseType.Database {
     if (!existingCols.includes('error_detail')) statsDB.exec('ALTER TABLE operations ADD COLUMN error_detail TEXT');
     const keyCols = (statsDB.prepare("PRAGMA table_info(api_keys)").all() as Array<{ name: string }>).map(r => r.name);
     if (!keyCols.includes('monthly_limit')) statsDB.exec('ALTER TABLE api_keys ADD COLUMN monthly_limit INTEGER');
+    // Track request provenance: distinguish MCP HTTP / MCP stdio / REST direct / bot / web
+    const reqCols = (statsDB.prepare("PRAGMA table_info(request_log)").all() as Array<{ name: string }>).map(r => r.name);
+    if (!reqCols.includes('client_kind')) {
+      statsDB.exec('ALTER TABLE request_log ADD COLUMN client_kind TEXT');
+      statsDB.exec('CREATE INDEX IF NOT EXISTS idx_request_log_client_kind ON request_log(client_kind)');
+    }
   }
   return statsDB;
 }

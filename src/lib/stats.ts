@@ -50,10 +50,56 @@ function upsertHourly() {
 function insertRequest() {
   if (!_insertRequest) {
     _insertRequest = getStatsDB().prepare(
-      'INSERT INTO request_log (method, path, status, response_ms, hour, day_of_week) VALUES (?, ?, ?, ?, ?, ?)',
+      'INSERT INTO request_log (method, path, status, response_ms, hour, day_of_week, client_kind) VALUES (?, ?, ?, ?, ?, ?, ?)',
     );
   }
   return _insertRequest;
+}
+
+/**
+ * Provenance bucket for an incoming request, used to attribute traffic to the
+ * MCP / REST / discovery / browser channels in the dashboard.
+ *
+ * - `mcp_http`  : hit on /mcp* (Smithery, remote Claude clients, agent gateways)
+ * - `mcp_stdio` : npm package ibanforge-mcp run locally — User-Agent: ibanforge-mcp/*
+ * - `bot`       : known crawlers/probes (Decixa, x402scan, Glama, GoogleBot, etc.)
+ * - `web`       : interactive browser session (UA contains Mozilla + WebKit/Gecko)
+ * - `api`       : everything else (REST direct, programmatic, server-to-server)
+ */
+export type ClientKind = 'mcp_http' | 'mcp_stdio' | 'bot' | 'web' | 'api';
+
+const BOT_PATTERNS = [
+  'decixa',
+  'x402scan',
+  'glama',
+  'smithery',
+  'mcp.so',
+  'pulsemcp',
+  'agentic.market',
+  'bazaar',
+  'cdp-bot',
+  'googlebot',
+  'bingbot',
+  'duckduckbot',
+  'yandex',
+  'baiduspider',
+  'crawl',
+  'spider',
+  'wget',
+];
+
+export function classifyClient(path: string, userAgent: string | undefined): ClientKind {
+  if (path.startsWith('/mcp')) return 'mcp_http';
+  if (!userAgent) return 'api';
+  const ua = userAgent.toLowerCase();
+  if (ua.startsWith('ibanforge-mcp/') || ua.includes('mcp-proxy') || ua.includes('mcp-stdio')) {
+    return 'mcp_stdio';
+  }
+  if (BOT_PATTERNS.some((p) => ua.includes(p))) return 'bot';
+  if (ua.includes('mozilla') && (ua.includes('webkit') || ua.includes('gecko') || ua.includes('chrome') || ua.includes('safari') || ua.includes('firefox') || ua.includes('edge'))) {
+    return 'web';
+  }
+  return 'api';
 }
 
 // ---------------------------------------------------------------------------
@@ -63,14 +109,16 @@ function insertRequest() {
 /**
  * Record any HTTP request (all traffic, not just business operations)
  */
-export function recordRequest(method: string, path: string, status: number, responseMs: number) {
+export function recordRequest(method: string, path: string, status: number, responseMs: number, clientKind: ClientKind = 'api') {
   try {
     const now = new Date();
     const hour = now.getUTCHours();
     const dow = (now.getUTCDay() + 6) % 7;
     // Normalize paths: /v1/bic/DEUTDEFF → /v1/bic/:code
-    const normalizedPath = path.replace(/\/v1\/bic\/[A-Za-z0-9]+/, '/v1/bic/:code');
-    insertRequest().run(method, normalizedPath, status, Math.round(responseMs), hour, dow);
+    const normalizedPath = path
+      .replace(/\/v1\/bic\/[A-Za-z0-9]+/, '/v1/bic/:code')
+      .replace(/\/v1\/ch\/clearing\/\d+/, '/v1/ch/clearing/:iid');
+    insertRequest().run(method, normalizedPath, status, Math.round(responseMs), hour, dow, clientKind);
   } catch {
     // Non-critical
   }
@@ -132,6 +180,77 @@ export function resetStatsStatements() {
   _upsertDaily = null;
   _upsertHourly = null;
   _insertRequest = null;
+}
+
+// ---------------------------------------------------------------------------
+// Provenance / channel attribution
+// ---------------------------------------------------------------------------
+
+export interface SourceStatsRow {
+  client_kind: ClientKind;
+  total: number;
+  paid_calls: number;        // status 200 on paid /v1/* endpoints
+  paywall_hits: number;      // status 402 (discovery probes + unauth attempts)
+  errors: number;            // status >= 400, excluding 402
+  avg_response_ms: number;
+}
+
+export interface SourceStatsResponse {
+  period_days: number;
+  total_requests: number;
+  by_client_kind: SourceStatsRow[];
+  paid_endpoints_breakdown: Array<{
+    path: string;
+    client_kind: ClientKind;
+    total: number;
+    success: number;
+  }>;
+}
+
+/**
+ * Aggregate request_log by client_kind over the last N days.
+ * Powers the "MCP vs REST" attribution view: shows which channels actually
+ * convert (200 on paid endpoints) vs which only ever hit the paywall (402).
+ */
+export function getSourceStats(days: number): SourceStatsResponse {
+  const db = getStatsDB();
+
+  const byKind = db.prepare(`
+    SELECT
+      COALESCE(client_kind, 'api') AS client_kind,
+      COUNT(*) AS total,
+      SUM(CASE WHEN status = 200 AND path LIKE '/v1/%' AND path != '/v1/iban/format' THEN 1 ELSE 0 END) AS paid_calls,
+      SUM(CASE WHEN status = 402 THEN 1 ELSE 0 END) AS paywall_hits,
+      SUM(CASE WHEN status >= 400 AND status != 402 THEN 1 ELSE 0 END) AS errors,
+      ROUND(AVG(response_ms), 1) AS avg_response_ms
+    FROM request_log
+    WHERE created_at >= datetime('now', ?)
+    GROUP BY COALESCE(client_kind, 'api')
+    ORDER BY total DESC
+  `).all(`-${days} days`) as SourceStatsRow[];
+
+  const breakdown = db.prepare(`
+    SELECT
+      path,
+      COALESCE(client_kind, 'api') AS client_kind,
+      COUNT(*) AS total,
+      SUM(CASE WHEN status = 200 THEN 1 ELSE 0 END) AS success
+    FROM request_log
+    WHERE created_at >= datetime('now', ?)
+      AND path LIKE '/v1/%' AND path != '/v1/iban/format'
+    GROUP BY path, COALESCE(client_kind, 'api')
+    ORDER BY total DESC
+    LIMIT 50
+  `).all(`-${days} days`) as Array<{ path: string; client_kind: ClientKind; total: number; success: number }>;
+
+  const total = byKind.reduce((acc, r) => acc + r.total, 0);
+
+  return {
+    period_days: days,
+    total_requests: total,
+    by_client_kind: byKind,
+    paid_endpoints_breakdown: breakdown,
+  };
 }
 
 // ---------------------------------------------------------------------------
