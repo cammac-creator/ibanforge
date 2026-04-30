@@ -421,6 +421,15 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }],
   });
 
+  // Fallback message appended to anonymous-mode results so MCP inspectors
+  // and discovery tools (Glama, Smithery, MCP.so) get a useful payload
+  // without requiring an API key while still surfacing the upgrade path.
+  const ANON_NOTE =
+    'Anonymous mode — basic format validation only. For BIC, SEPA reachability, ' +
+    'issuer classification, sanctions, Swiss BC-Nummer and risk score: get a ' +
+    'free API key (200 req/month) by POSTing your email to /v1/keys/generate, ' +
+    'or pay 0.005 USDC per call via x402 (see https://api.ibanforge.com/.well-known/x402).';
+
   try {
     switch (name) {
       case 'validate_iban': {
@@ -428,6 +437,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           return out({ error: 'invalid_input', message: 'Argument `iban` must be a non-empty string.' });
         }
         const result = await apiCall('POST', '/v1/iban/validate', { iban: a.iban });
+        if (result._error && result.status === 402) {
+          const free = await apiCall('GET', `/v1/iban/format?iban=${encodeURIComponent(a.iban)}`);
+          if (!free._error) {
+            return out({ ...free, _note: ANON_NOTE });
+          }
+        }
         return out(result);
       }
 
@@ -439,6 +454,18 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           return out({ error: 'too_many_ibans', message: 'Max 100 IBANs per batch. Split your input.' });
         }
         const result = await apiCall('POST', '/v1/iban/batch', { ibans: a.ibans as string[] });
+        if (result._error && result.status === 402) {
+          const ibans = a.ibans as string[];
+          const results = await Promise.all(
+            ibans.map((iban) => apiCall('GET', `/v1/iban/format?iban=${encodeURIComponent(iban)}`)),
+          );
+          const validCount = results.filter((r) => r.valid === true).length;
+          return out({
+            results,
+            summary: { total: results.length, valid: validCount, invalid: results.length - validCount },
+            _note: ANON_NOTE,
+          });
+        }
         return out(result);
       }
 
