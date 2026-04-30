@@ -50,6 +50,76 @@ const TOOLS: Tool[] = [
       },
       required: ['iban'],
     },
+    outputSchema: {
+      type: 'object',
+      description: 'Validation result with full enrichment.',
+      properties: {
+        iban: { type: 'string', description: 'Normalized IBAN (uppercase, no spaces).' },
+        formatted: { type: 'string', description: 'IBAN with 4-char groups for display.' },
+        valid: { type: 'boolean' },
+        country: {
+          type: 'object',
+          properties: {
+            code: { type: 'string', description: 'ISO 3166-1 alpha-2 country code.' },
+            name: { type: 'string' },
+          },
+        },
+        check_digits: { type: 'string' },
+        bban: {
+          type: 'object',
+          properties: {
+            bank_code: { type: 'string' },
+            branch_code: { type: 'string' },
+            account: { type: 'string' },
+          },
+        },
+        bic: {
+          type: 'object',
+          description: 'Resolved BIC/SWIFT (when BBAN→BIC mapping exists).',
+          properties: {
+            bic: { type: 'string' },
+            bankName: { type: 'string' },
+            city: { type: 'string' },
+            lei: { type: 'string' },
+          },
+        },
+        issuer: {
+          type: 'object',
+          properties: {
+            type: { type: 'string', enum: ['bank', 'emi', 'viban', 'neobank', 'unknown'] },
+            name: { type: 'string' },
+          },
+        },
+        sepa: {
+          type: 'object',
+          properties: {
+            reachable: { type: 'boolean' },
+            instant: { type: 'boolean' },
+          },
+        },
+        vop: {
+          type: 'object',
+          description: 'Verification of Payee (EU 2024/886) participant status.',
+          properties: { participant: { type: 'boolean' } },
+        },
+        ch_clearing: {
+          type: 'object',
+          description: 'Swiss-specific data when country is CH or LI.',
+          properties: {
+            bc_nummer: { type: 'string' },
+            sic: { type: 'boolean' },
+            qr_iid: { type: 'boolean' },
+          },
+        },
+        risk_score: {
+          type: 'number',
+          minimum: 0,
+          maximum: 100,
+          description: 'Country + issuer risk indicator. Higher = more attention needed.',
+        },
+      },
+      required: ['iban', 'valid'],
+    },
   },
   {
     name: 'batch_validate_iban',
@@ -73,6 +143,38 @@ const TOOLS: Tool[] = [
       },
       required: ['ibans'],
     },
+    outputSchema: {
+      type: 'object',
+      description: 'Per-IBAN results plus an aggregate summary.',
+      properties: {
+        results: {
+          type: 'array',
+          description: 'One entry per input IBAN, in the same order. Same shape as validate_iban output.',
+          items: {
+            type: 'object',
+            properties: {
+              iban: { type: 'string' },
+              valid: { type: 'boolean' },
+              country: { type: 'object' },
+              bic: { type: 'object' },
+              issuer: { type: 'object' },
+              sepa: { type: 'object' },
+              error: { type: 'string', description: 'Set when valid=false.' },
+            },
+          },
+        },
+        summary: {
+          type: 'object',
+          properties: {
+            total: { type: 'number' },
+            valid: { type: 'number' },
+            invalid: { type: 'number' },
+          },
+        },
+        cost_usdc: { type: 'number', description: 'Actual USDC charged for this call.' },
+      },
+      required: ['results', 'summary'],
+    },
   },
   {
     name: 'lookup_bic',
@@ -93,6 +195,29 @@ const TOOLS: Tool[] = [
         },
       },
       required: ['bic'],
+    },
+    outputSchema: {
+      type: 'object',
+      description: 'BIC/SWIFT lookup result from the GLEIF database.',
+      properties: {
+        bic: { type: 'string', description: 'Echo of the input, normalized to uppercase.' },
+        bic8: { type: 'string', description: '8-char form (institution-level).' },
+        bic11: { type: 'string', description: '11-char form including branch.' },
+        found: { type: 'boolean' },
+        valid_format: { type: 'boolean' },
+        institution: { type: 'string', description: 'Bank legal name.' },
+        country: {
+          type: 'object',
+          properties: {
+            code: { type: 'string' },
+            name: { type: 'string' },
+          },
+        },
+        city: { type: 'string' },
+        lei: { type: 'string', description: 'Legal Entity Identifier (ISO 17442) if available.' },
+        address: { type: 'string' },
+      },
+      required: ['bic', 'found', 'valid_format'],
     },
   },
   {
@@ -116,6 +241,37 @@ const TOOLS: Tool[] = [
       },
       required: ['iid'],
     },
+    outputSchema: {
+      type: 'object',
+      description: 'Swiss BC-Nummer / IID resolution from the SIX BankMaster database.',
+      properties: {
+        iid: { type: 'string', description: '5-digit zero-padded BC-Nummer.' },
+        found: { type: 'boolean' },
+        institution: {
+          type: 'object',
+          properties: {
+            name: { type: 'string' },
+            type: {
+              type: 'string',
+              enum: ['bank', 'cantonal_bank', 'raiffeisen', 'postfinance', 'private_bank', 'foreign_branch', 'fintech', 'other'],
+            },
+            iid_type: { type: 'string', enum: ['headquarters', 'branch', 'unknown'] },
+            headquarters_iid: { type: 'string' },
+          },
+        },
+        participation: {
+          type: 'object',
+          properties: {
+            sic: { type: 'boolean', description: 'Swiss Interbank Clearing.' },
+            eurosic: { type: 'boolean' },
+            instant_payments: { type: 'boolean' },
+            qr_iid: { type: 'boolean', description: 'QR-bill enabled IID.' },
+          },
+        },
+        bic: { type: 'string', description: 'BIC if mapped.' },
+      },
+      required: ['iid', 'found'],
+    },
   },
   {
     name: 'check_compliance',
@@ -138,6 +294,66 @@ const TOOLS: Tool[] = [
         },
       },
       required: ['iban'],
+    },
+    outputSchema: {
+      type: 'object',
+      description: 'Compliance triage result. Informational, not a regulated AML/CFT product.',
+      properties: {
+        iban: { type: 'string' },
+        valid: { type: 'boolean' },
+        risk_score: {
+          type: 'number',
+          minimum: 0,
+          maximum: 100,
+          description: '0 = safest, 100 = block. Combines sanctions, country risk, FATF flag, vIBAN/EMI flags.',
+        },
+        recommended_action: {
+          type: 'string',
+          enum: ['allow', 'review', 'block'],
+          description: 'Suggested workflow gate.',
+        },
+        sanctions: {
+          type: 'object',
+          properties: {
+            bic_sanctioned: { type: 'boolean' },
+            country_sanctioned: { type: 'boolean' },
+            lists: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'List of matched sanctions sources (e.g. ["OFAC", "EU"]).',
+            },
+          },
+        },
+        fatf: {
+          type: 'object',
+          properties: {
+            list: { type: 'string', enum: ['none', 'grey', 'black'], description: 'FATF mutual evaluation status.' },
+          },
+        },
+        sepa: {
+          type: 'object',
+          properties: {
+            reachable: { type: 'boolean' },
+            instant: { type: 'boolean' },
+          },
+        },
+        vop: {
+          type: 'object',
+          properties: { participant: { type: 'boolean' } },
+        },
+        flags: {
+          type: 'object',
+          description: 'Boolean flags rolled up into risk_score.',
+          properties: {
+            sanctions_match: { type: 'boolean' },
+            fatf_high_risk: { type: 'boolean' },
+            sepa_unreachable: { type: 'boolean' },
+            viban: { type: 'boolean' },
+            emi: { type: 'boolean' },
+          },
+        },
+      },
+      required: ['iban', 'valid', 'risk_score', 'recommended_action'],
     },
   },
 ];
