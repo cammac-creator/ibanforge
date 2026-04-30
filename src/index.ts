@@ -25,7 +25,7 @@ import { apiKeyMiddleware } from './middleware/api-key.js';
 import { enrich402Middleware } from './middleware/enrich-402.js';
 import { apiKeys } from './routes/api-keys.js';
 import { rateLimitMiddleware } from './middleware/rate-limit.js';
-import { recordRequest } from './lib/stats.js';
+import { recordRequest, classifyClient } from './lib/stats.js';
 
 // Fail-fast: refuse to start in production without wallet config
 ensureWalletConfigured();
@@ -105,6 +105,7 @@ const SKIP_TRACKING = new Set([
   '/stats/patterns',
   '/stats/status-by-path',
   '/stats/business-funnel',
+  '/stats/sources',
   '/health',
   '/ping',
 ]);
@@ -113,7 +114,8 @@ app.use('*', async (c, next) => {
   await next();
   const path = new URL(c.req.url).pathname;
   if (!SKIP_TRACKING.has(path)) {
-    recordRequest(c.req.method, path, c.res.status, performance.now() - start);
+    const clientKind = classifyClient(path, c.req.header('user-agent'));
+    recordRequest(c.req.method, path, c.res.status, performance.now() - start, clientKind);
   }
 });
 
