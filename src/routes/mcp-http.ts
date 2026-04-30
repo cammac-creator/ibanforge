@@ -75,12 +75,65 @@ function createMcpServer(): McpServer {
       inputSchema: {
         iban: z.string().describe('IBAN to validate (spaces/hyphens stripped automatically)'),
       },
+      outputSchema: {
+        iban: z.string().describe('Normalized IBAN (uppercase, no spaces).'),
+        valid: z.boolean(),
+        formatted: z.string().optional().describe('IBAN with 4-char groups for display.'),
+        country: z.object({
+          code: z.string().describe('ISO 3166-1 alpha-2 country code.'),
+          name: z.string(),
+        }).optional(),
+        check_digits: z.string().optional(),
+        bban: z.object({
+          bank_code: z.string(),
+          branch_code: z.string().optional(),
+          account_number: z.string(),
+        }).optional(),
+        bic: z.object({
+          code: z.string(),
+          bank_name: z.string().nullable(),
+          city: z.string().nullable(),
+        }).nullable().optional().describe('Resolved BIC/SWIFT when BBAN→BIC mapping exists.'),
+        sepa: z.object({
+          member: z.boolean(),
+          schemes: z.array(z.string()),
+          vop_required: z.boolean(),
+        }).optional(),
+        issuer: z.object({
+          type: z.string().describe('bank | digital_bank | emi | payment_institution'),
+          name: z.string(),
+        }).optional(),
+        risk_indicators: z.object({
+          issuer_type: z.string(),
+          country_risk: z.string(),
+          test_bic: z.boolean(),
+          sepa_reachable: z.boolean(),
+          vop_coverage: z.boolean(),
+        }).optional(),
+        clearing: z.object({
+          iid: z.string(),
+          name: z.string(),
+          type: z.string(),
+          town: z.string().nullable(),
+          sic: z.boolean(),
+          instant_payments_chf: z.boolean(),
+          eurosic: z.boolean(),
+          qr_iid: z.string().nullable(),
+        }).nullable().optional().describe('Swiss clearing data when country is CH or LI.'),
+        error: z.string().optional(),
+        error_detail: z.string().optional(),
+        cost_usdc: z.number(),
+        processing_ms: z.number().optional(),
+      },
       annotations: { title: 'Validate IBAN', ...READ_ONLY_ANNOTATIONS },
     },
     async ({ iban }) => {
       const result = validateIBAN(iban);
       enrichResult(result);
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      return {
+        content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
+        structuredContent: result as unknown as Record<string, unknown>,
+      };
     },
   );
 
@@ -97,6 +150,50 @@ function createMcpServer(): McpServer {
       inputSchema: {
         ibans: z.array(z.string()).min(1).max(100).describe('Array of IBANs (1-100)'),
       },
+      outputSchema: {
+        results: z.array(z.object({
+          iban: z.string(),
+          valid: z.boolean(),
+          country: z.object({ code: z.string(), name: z.string() }).optional(),
+          bban: z.object({
+            bank_code: z.string(),
+            branch_code: z.string().optional(),
+            account_number: z.string(),
+          }).optional(),
+          bic: z.object({
+            code: z.string(),
+            bank_name: z.string().nullable(),
+            city: z.string().nullable(),
+          }).nullable().optional(),
+          issuer: z.object({ type: z.string(), name: z.string() }).optional(),
+          sepa: z.object({
+            member: z.boolean(),
+            schemes: z.array(z.string()),
+            vop_required: z.boolean(),
+          }).optional(),
+          risk_indicators: z.object({
+            issuer_type: z.string(),
+            country_risk: z.string(),
+            test_bic: z.boolean(),
+            sepa_reachable: z.boolean(),
+            vop_coverage: z.boolean(),
+          }).optional(),
+          clearing: z.object({
+            iid: z.string(),
+            name: z.string(),
+            type: z.string(),
+            town: z.string().nullable(),
+            sic: z.boolean(),
+            instant_payments_chf: z.boolean(),
+            eurosic: z.boolean(),
+            qr_iid: z.string().nullable(),
+          }).nullable().optional(),
+          error: z.string().optional(),
+          error_detail: z.string().optional(),
+          cost_usdc: z.number(),
+        })).describe('One result per input IBAN, in the same order. Same shape as validate_iban.'),
+        count: z.number().describe('Number of IBANs processed.'),
+      },
       annotations: { title: 'Batch Validate IBANs', ...READ_ONLY_ANNOTATIONS },
     },
     async ({ ibans }) => {
@@ -105,7 +202,10 @@ function createMcpServer(): McpServer {
         enrichResult(result);
         return result;
       });
-      return { content: [{ type: 'text' as const, text: JSON.stringify(results, null, 2) }] };
+      return {
+        content: [{ type: 'text' as const, text: JSON.stringify(results, null, 2) }],
+        structuredContent: { results: results as unknown as Array<Record<string, unknown>>, count: results.length },
+      };
     },
   );
 
@@ -122,22 +222,38 @@ function createMcpServer(): McpServer {
       inputSchema: {
         bic: z.string().describe('BIC/SWIFT code (8 or 11 chars)'),
       },
+      outputSchema: {
+        bic: z.string().describe('Echo of the input, normalized to uppercase.'),
+        bic8: z.string().optional().describe('8-char form (institution-level).'),
+        bic11: z.string().optional().describe('11-char form including branch.'),
+        valid_format: z.boolean().optional(),
+        found: z.boolean().optional(),
+        institution: z.string().nullable().optional().describe('Bank legal name.'),
+        country_code: z.string().optional(),
+        country_name: z.string().nullable().optional(),
+        city: z.string().nullable().optional(),
+        branch_code: z.string().optional(),
+        branch_info: z.string().nullable().optional(),
+        lei: z.string().nullable().optional().describe('Legal Entity Identifier (ISO 17442) if available.'),
+        lei_status: z.string().nullable().optional(),
+        is_test_bic: z.boolean().optional(),
+        valid: z.boolean().optional().describe('Set when the BIC failed format validation.'),
+        error: z.string().optional(),
+      },
       annotations: { title: 'Lookup BIC/SWIFT', ...READ_ONLY_ANNOTATIONS },
     },
     async ({ bic }) => {
       const validation = validateBIC(bic);
       if (!validation.valid) {
+        const errorPayload = { bic: validation.bic, valid: false, error: validation.error };
         return {
           content: [
             {
               type: 'text' as const,
-              text: JSON.stringify(
-                { bic: validation.bic, valid: false, error: validation.error },
-                null,
-                2,
-              ),
+              text: JSON.stringify(errorPayload, null, 2),
             },
           ],
+          structuredContent: errorPayload as unknown as Record<string, unknown>,
         };
       }
       const row = lookup(validation.bic11!);
@@ -157,7 +273,10 @@ function createMcpServer(): McpServer {
         lei_status: row?.lei_status ?? null,
         is_test_bic: validation.is_test_bic,
       };
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      return {
+        content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
+        structuredContent: result as unknown as Record<string, unknown>,
+      };
     },
   );
 
@@ -175,6 +294,52 @@ function createMcpServer(): McpServer {
         'RETURNS: risk_score (0-100, 0 = safest), flags { sanctions_match, fatf_high_risk, sepa_unreachable, viban, emi }, recommended_action.',
       inputSchema: {
         iban: z.string().describe('IBAN to check'),
+      },
+      outputSchema: {
+        iban: z.string(),
+        valid: z.boolean(),
+        country: z.object({ code: z.string(), name: z.string() }).optional(),
+        bic: z.object({
+          code: z.string(),
+          bank_name: z.string().nullable(),
+          city: z.string().nullable(),
+        }).nullable().optional(),
+        issuer: z.object({ type: z.string(), name: z.string() }).optional(),
+        sepa: z.object({
+          member: z.boolean(),
+          schemes: z.array(z.string()),
+          vop_required: z.boolean(),
+        }).optional(),
+        risk_indicators: z.object({
+          issuer_type: z.string(),
+          country_risk: z.string(),
+          test_bic: z.boolean(),
+          sepa_reachable: z.boolean(),
+          vop_coverage: z.boolean(),
+        }).optional(),
+        compliance: z.object({
+          sanctions: z.object({
+            country_sanctioned: z.boolean(),
+            bank_sanctioned: z.boolean(),
+            matched_lists: z.array(z.string()),
+            fatf_status: z.string(),
+          }),
+          reachability: z.object({
+            sepa_instant: z.boolean(),
+            sct: z.boolean(),
+            sdd: z.boolean(),
+          }),
+          vop: z.object({
+            participant: z.boolean(),
+            status: z.string(),
+          }),
+          risk_score: z.number().min(0).max(100).describe('0 = safest, 100 = block.'),
+          risk_level: z.string().describe('low | medium | elevated | high | critical'),
+          flags: z.array(z.string()),
+        }),
+        cost_usdc: z.number(),
+        error: z.string().optional(),
+        error_detail: z.string().optional(),
       },
       annotations: { title: 'Compliance Check', ...READ_ONLY_ANNOTATIONS },
     },
@@ -208,7 +373,10 @@ function createMcpServer(): McpServer {
       }
 
       const combined = { ...result, compliance, cost_usdc: 0.02 };
-      return { content: [{ type: 'text' as const, text: JSON.stringify(combined, null, 2) }] };
+      return {
+        content: [{ type: 'text' as const, text: JSON.stringify(combined, null, 2) }],
+        structuredContent: combined as unknown as Record<string, unknown>,
+      };
     },
   );
 
@@ -228,43 +396,73 @@ function createMcpServer(): McpServer {
       inputSchema: {
         iid: z.string().describe('Swiss IID (1-5 digit number)'),
       },
+      outputSchema: {
+        iid: z.string().optional().describe('Normalized 5-digit BC-Nummer.'),
+        found: z.boolean().optional(),
+        institution: z.object({
+          name: z.string(),
+          type: z.string().describe('bank | cantonal_bank | postfinance | raiffeisen | central_bank | foreign_participant'),
+          iid_type: z.string().describe('headquarters | branch | other'),
+          headquarters_iid: z.string(),
+        }).optional(),
+        address: z.object({
+          street: z.string().nullable(),
+          building_number: z.string().nullable(),
+          post_code: z.string().nullable(),
+          town: z.string().nullable(),
+          country: z.string(),
+        }).optional(),
+        bic: z.string().nullable().optional().describe('BIC if mapped.'),
+        payment_services: z.object({
+          sic: z.boolean().describe('Swiss Interbank Clearing.'),
+          rtgs_chf: z.boolean(),
+          instant_payments_chf: z.boolean(),
+          eurosic: z.boolean(),
+          lsv_bdd_chf: z.boolean(),
+          lsv_bdd_eur: z.boolean(),
+        }).optional(),
+        sic_iid: z.string().nullable().optional(),
+        qr_iid: z.string().nullable().optional().describe('QR-bill enabled IID.'),
+        valid_on: z.string().optional(),
+        redirected_from: z.string().optional(),
+        note: z.string().optional(),
+        cost_usdc: z.number().optional(),
+        error: z.string().optional(),
+        message: z.string().optional(),
+      },
       annotations: { title: 'Swiss Clearing Lookup', ...READ_ONLY_ANNOTATIONS },
     },
     async ({ iid }) => {
       if (!/^\d{1,5}$/.test(iid)) {
+        const errorPayload = { error: 'invalid_iid_format', message: 'IID must be a 1-5 digit number.' };
         return {
           content: [
             {
               type: 'text' as const,
-              text: JSON.stringify(
-                { error: 'invalid_iid_format', message: 'IID must be a 1-5 digit number.' },
-                null,
-                2,
-              ),
+              text: JSON.stringify(errorPayload, null, 2),
             },
           ],
+          structuredContent: errorPayload as unknown as Record<string, unknown>,
         };
       }
       const normalizedIid = normalizeIid(iid);
       const entry = lookupClearingByBankCode(normalizedIid);
       if (!entry) {
+        const notFoundPayload = {
+          iid: normalizedIid,
+          found: false,
+          error: 'clearing_not_found',
+          message: `IID ${normalizedIid} not found in Swiss BankMaster database.`,
+          cost_usdc: 0.003,
+        };
         return {
           content: [
             {
               type: 'text' as const,
-              text: JSON.stringify(
-                {
-                  iid: normalizedIid,
-                  found: false,
-                  error: 'clearing_not_found',
-                  message: `IID ${normalizedIid} not found in Swiss BankMaster database.`,
-                  cost_usdc: 0.003,
-                },
-                null,
-                2,
-              ),
+              text: JSON.stringify(notFoundPayload, null, 2),
             },
           ],
+          structuredContent: notFoundPayload as unknown as Record<string, unknown>,
         };
       }
       const result: Record<string, unknown> = {
@@ -288,7 +486,10 @@ function createMcpServer(): McpServer {
         result.redirected_from = entry.redirected_from;
         result.note = `IID ${entry.redirected_from} has been merged into IID ${entry.iid}.`;
       }
-      return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
+      return {
+        content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
+        structuredContent: result,
+      };
     },
   );
 
