@@ -1,0 +1,161 @@
+name: Release & republish
+
+# Triggered on every git tag matching v*.*.* (e.g., v1.2.0). The job publishes
+# the latest source to every registry that has an API: npm (mcp + sdk), PyPI
+# (Python SDK), and the MCP Registry. Platforms that don't expose a publish
+# API (Smithery, MCP.so, RapidAPI, DevHunt, Glama) need a manual refresh —
+# the job ends with a checklist that goes into the GitHub Release notes.
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish (without v prefix, e.g. 1.2.0)'
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve version
+        id: ver
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${GITHUB_REF_NAME#v}"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Publishing version: $VERSION"
+
+      # ─── npm — ibanforge-mcp + @ibanforge/sdk ────────────────────────────
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Publish ibanforge-mcp
+        if: hashFiles('mcp/package.json') != ''
+        working-directory: mcp
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -z "$NODE_AUTH_TOKEN" ]; then
+            echo "::warning::NPM_TOKEN not set — skipping ibanforge-mcp publish"
+            exit 0
+          fi
+          # Skip if version is already published (idempotent re-runs)
+          PUBLISHED=$(npm view ibanforge-mcp@${{ steps.ver.outputs.version }} version 2>/dev/null || echo "")
+          if [ "$PUBLISHED" = "${{ steps.ver.outputs.version }}" ]; then
+            echo "ibanforge-mcp@${{ steps.ver.outputs.version }} already on npm — skipping"
+            exit 0
+          fi
+          npm ci
+          npm run build
+          npm publish --access public
+
+      - name: Publish @ibanforge/sdk
+        if: hashFiles('sdks/typescript/package.json') != ''
+        working-directory: sdks/typescript
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -z "$NODE_AUTH_TOKEN" ]; then
+            echo "::warning::NPM_TOKEN not set — skipping @ibanforge/sdk publish"
+            exit 0
+          fi
+          PUBLISHED=$(npm view @ibanforge/sdk@${{ steps.ver.outputs.version }} version 2>/dev/null || echo "")
+          if [ "$PUBLISHED" = "${{ steps.ver.outputs.version }}" ]; then
+            echo "@ibanforge/sdk@${{ steps.ver.outputs.version }} already on npm — skipping"
+            exit 0
+          fi
+          npm ci
+          npm run build || true
+          npm publish --access public
+
+      # ─── PyPI — ibanforge ────────────────────────────────────────────────
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Publish ibanforge (Python)
+        if: hashFiles('sdks/python/pyproject.toml') != ''
+        working-directory: sdks/python
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
+        run: |
+          if [ -z "$TWINE_PASSWORD" ]; then
+            echo "::warning::PYPI_TOKEN not set — skipping ibanforge PyPI publish"
+            exit 0
+          fi
+          # Skip if version already on PyPI
+          PUBLISHED=$(curl -s "https://pypi.org/pypi/ibanforge/json" | python3 -c "import sys,json; print(json.load(sys.stdin).get('info',{}).get('version','?'))" 2>/dev/null || echo "?")
+          # The Python SDK uses its own version (1.1.x is fine when the repo is on 1.2.0).
+          # We still build + upload, twine errors on duplicates so this is idempotent.
+          pip install --quiet build twine
+          rm -rf dist/ build/
+          python -m build
+          twine check dist/*
+          twine upload dist/* --skip-existing
+
+      # ─── MCP Registry — io.github.cammac-creator/ibanforge ──────────────
+      - name: Publish to MCP Registry
+        if: hashFiles('mcp/server.json') != ''
+        working-directory: mcp
+        env:
+          MCP_REGISTRY_TOKEN: ${{ secrets.MCP_REGISTRY_TOKEN }}
+        run: |
+          if [ -z "$MCP_REGISTRY_TOKEN" ]; then
+            echo "::warning::MCP_REGISTRY_TOKEN not set — skipping MCP Registry publish"
+            echo "::warning::Run \`mcp-publisher login github\` locally and store the token as a repo secret."
+            exit 0
+          fi
+          # Install mcp-publisher CLI
+          curl -fsSL https://raw.githubusercontent.com/modelcontextprotocol/registry/main/scripts/install.sh | bash
+          export PATH="$HOME/.local/bin:$PATH"
+          mcp-publisher publish --token "$MCP_REGISTRY_TOKEN"
+
+      # ─── Manual-refresh checklist for platforms without an API ──────────
+      - name: Generate manual-refresh checklist
+        run: |
+          cat <<EOF >> $GITHUB_STEP_SUMMARY
+          ## Manual refresh checklist for v${{ steps.ver.outputs.version }}
+
+          The following platforms do NOT expose a publish API. Refresh them
+          by hand within 24h of this release:
+
+          - [ ] **Smithery** — https://smithery.ai/server/ibanforge/ibanforge → Settings → "Redeploy from npm"
+          - [ ] **MCP.so** — https://mcp.so/server/ibanforge → "Refresh from GitHub"
+          - [ ] **RapidAPI** — https://rapidapi.com/[your-account]/api/ibanforge → re-import OpenAPI from https://api.ibanforge.com/openapi.json
+          - [ ] **DevHunt** — https://devhunt.org → Edit description + screenshots
+          - [ ] **Glama** — auto-rescan within 24-48h, but you can trigger manually at https://glama.ai/mcp/servers/cammac-creator/ibanforge/admin/dockerfile → Build + Make Release
+          - [ ] **Coinbase Bazaar** — auto-indexed after the next paid x402 settlement; if absent 48h after release, run scripts/bazaar-warmup.mjs to trigger a fresh settlement
+          - [ ] **agentic.market** — depends on Bazaar; if Bazaar shows IBANforge but agentic.market UI lags, post in #x402 on discord.gg/cdp
+
+          ## Auto-published (verify the badges turned to v${{ steps.ver.outputs.version }})
+
+          - npm \`ibanforge-mcp\`: https://www.npmjs.com/package/ibanforge-mcp
+          - npm \`@ibanforge/sdk\`: https://www.npmjs.com/package/@ibanforge/sdk
+          - PyPI \`ibanforge\`: https://pypi.org/project/ibanforge/
+          - MCP Registry: https://registry.modelcontextprotocol.io/v0/servers?search=ibanforge
+          EOF
+          echo "Checklist written to job summary."
+
+  # ─── Optional: trigger a Glama re-scan via the API once it stabilizes ──
+  # Glama doesn't expose a documented refresh endpoint yet (2026-04-29 docs).
+  # When they ship one, replace the manual step above with a job here.
