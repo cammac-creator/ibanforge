@@ -149,11 +149,28 @@ Note : il existe **plusieurs** repos awesome-x402 (xpaysh/awesome-x402, a6b8/awe
 
 ---
 
-## 4) agentic.market (Coinbase) — formulaire (15 min)
+## 4) agentic.market (Coinbase) — pas de formulaire public (statut 2026-04-30)
 
 **URL** : https://agentic.market/
 
-**Action** : cherche le bouton "Submit a service" / "List your service" / "Submit". Si la soumission est manuelle :
+**Conclusion après investigation 2026-04-30** : agentic.market n'a **aucune soumission directe** :
+
+- Aucun bouton "Submit", aucun formulaire web, aucun repo GitHub public.
+- Le catalogue `/v1/services` (https://api.agentic.market/v1/services) **pulle exclusivement depuis le Coinbase Bazaar** (`api.cdp.coinbase.com/platform/v2/x402/discovery/resources`) avec ~24h de lag.
+- IBANforge n'apparaît **ni** dans agentic.market (search "ibanforge"/"iban" → 0 résultat IBANforge), **ni** dans le Bazaar Coinbase (vérifié sur 600+ resources).
+- Concurrents déjà listés : orbisapi.com (15 endpoints IBAN/BIC, $0.001-0.004) et api.strale.io ($0.01).
+
+**`.well-known/x402` IBANforge** : valide et live (https://api.ibanforge.com/.well-known/x402, retourne x402Version 1, 5 endpoints, pricing, payTo). Mais le facilitator CDP n'a pas encore enregistré IBANforge dans son flux de découverte.
+
+**Actions à mener pour être listé** :
+
+1. **Augmenter le volume de transactions x402 réelles** sur Base mainnet via le facilitator CDP (`https://x402.org/facilitator`) — le Bazaar indexe les ressources qui settlent des paiements observés par le facilitator. Les 4 transactions notées le 2026-04-29 ne suffisent visiblement pas encore.
+2. **Demande directe à Coinbase CDP** via les 3 canaux préparés dans `docs/marketing/agentic-market-submission.md` :
+   - Discord CDP `#x402` (channel principal, message prêt)
+   - Twitter `@CoinbaseDev` + `@base` (tweet prêt)
+   - Email `cdp-support@coinbase.com` (escalade après 7-10 jours)
+
+**Champs préparés (pour réponse rapide à toute requête CDP)** :
 
 | Champ                | Valeur                                                                                          |
 | -------------------- | ----------------------------------------------------------------------------------------------- |
@@ -181,6 +198,6 @@ Add to the **roadmap memory** :
 - [ ] PulseMCP — submitted on YYYY-MM-DD, awaiting review
 - [ ] Cline marketplace — PR #__ on cline/mcp-marketplace
 - [ ] awesome-x402-servers — PR #__ on a6b8/awesome-x402-servers (and any other awesome-x402 repos)
-- [ ] agentic.market — submitted on YYYY-MM-DD
+- [x] agentic.market — investigated 2026-04-30 : aucun submission form public ; agentic.market pull depuis le Bazaar Coinbase. IBANforge ni dans agentic.market ni dans le Bazaar (600+ resources scannées). Action restante : pousser via Discord CDP `#x402` + augmenter volume x402 sur Base.
 
 Re-check 1 week later. If a submission is rejected, ask why (often a missing field or category). Resubmit.
