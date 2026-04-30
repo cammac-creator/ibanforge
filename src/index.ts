@@ -241,9 +241,22 @@ app.get('/api/v1', (c) => c.redirect('/v1', 302));
 
 // Pre-validate requests before x402 paywall (don't charge for invalid input).
 // Field names are case-insensitive (handled by route handlers via getIban/getIbansArray).
+//
+// IMPORTANT: only run the pre-validation when the request has auth (API key
+// or x402 payment header). Unauthenticated probes (Decixa, x402scan, MCP
+// inspectors) call POST without a body to discover the 402 envelope — they
+// MUST receive a 402, not a 400. Otherwise indexers mark the endpoint as
+// "non_402_response" and refuse to list it.
 import { getIban, getIbansArray } from './lib/request-helpers.js';
 
+function isAuthenticatedProbe(c: { req: { header: (n: string) => string | undefined } }): boolean {
+  const auth = c.req.header('authorization');
+  const payment = c.req.header('x-payment');
+  return Boolean(payment) || Boolean(auth?.toLowerCase().startsWith('bearer '));
+}
+
 app.post('/v1/iban/validate', async (c, next) => {
+  if (!isAuthenticatedProbe(c)) return next();
   const body = (await c.req.json().catch(() => null)) as Record<string, unknown> | null;
   const iban = getIban(body);
   if (!iban || typeof iban !== 'string' || iban.trim() === '') {
@@ -252,6 +265,7 @@ app.post('/v1/iban/validate', async (c, next) => {
   await next();
 });
 app.post('/v1/iban/compliance', async (c, next) => {
+  if (!isAuthenticatedProbe(c)) return next();
   const body = (await c.req.json().catch(() => null)) as Record<string, unknown> | null;
   const iban = getIban(body);
   if (!iban || typeof iban !== 'string' || iban.trim() === '') {
@@ -260,6 +274,7 @@ app.post('/v1/iban/compliance', async (c, next) => {
   await next();
 });
 app.post('/v1/iban/batch', async (c, next) => {
+  if (!isAuthenticatedProbe(c)) return next();
   const body = (await c.req.json().catch(() => null)) as Record<string, unknown> | null;
   const ibans = getIbansArray(body);
   if (!Array.isArray(ibans) || ibans.length === 0) {
