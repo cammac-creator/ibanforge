@@ -187,6 +187,88 @@ This single call exercises the 3 USPs (Swiss BC-Nummer, EMI/vIBAN classification
 - GET /v1/ch/clearing/:iid — Swiss clearing lookup ($0.003 USDC)
 - POST /v1/feedback — free, report incorrect data or claim x402 refunds
 
+## Concrete examples (copy-paste curls)
+
+### 1. validate_iban — single IBAN with full enrichment ($0.005)
+
+\`\`\`bash
+curl -s -X POST https://api.ibanforge.com/v1/iban/validate \\
+  -H "Content-Type: application/json" \\
+  -H "Authorization: Bearer ifk_YOUR_KEY" \\
+  -d '{"iban":"CH9300762011623852957"}'
+\`\`\`
+
+Response (trimmed to fields agents typically need):
+\`\`\`json
+{
+  "iban": "CH9300762011623852957",
+  "valid": true,
+  "country": { "code": "CH", "name": "Switzerland" },
+  "bic": { "code": "UBSWCHZH", "bank_name": "UBS Switzerland AG", "city": "Zurich" },
+  "issuer": { "type": "bank", "name": "UBS Switzerland AG" },
+  "sepa": { "member": true, "schemes": ["SCT","SDD"], "vop_required": false },
+  "clearing": { "iid": "00762", "type": "bank", "sic": true, "qr_iid": null },
+  "risk_indicators": { "country_risk": "standard", "sepa_reachable": true }
+}
+\`\`\`
+
+### 2. batch_validate_iban — clean a customer DB / payout list ($0.002 × N)
+
+\`\`\`bash
+curl -s -X POST https://api.ibanforge.com/v1/iban/batch \\
+  -H "Content-Type: application/json" \\
+  -H "Authorization: Bearer ifk_YOUR_KEY" \\
+  -d '{"ibans":["DE89370400440532013000","FR1420041010050500013M02606","XX00BAD"]}'
+\`\`\`
+
+### 3. lookup_bic — resolve a BIC/SWIFT code ($0.003)
+
+\`\`\`bash
+curl -s https://api.ibanforge.com/v1/bic/UBSWCHZH80A \\
+  -H "Authorization: Bearer ifk_YOUR_KEY"
+\`\`\`
+
+Response includes: institution name, country, city, LEI (ISO 17442), branch info.
+
+### 4. lookup_ch_clearing — Swiss BC-Nummer / IID ($0.003, **only API exposing this**)
+
+\`\`\`bash
+curl -s https://api.ibanforge.com/v1/ch/clearing/762 \\
+  -H "Authorization: Bearer ifk_YOUR_KEY"
+\`\`\`
+
+Returns: institution name, type (bank/cantonal_bank/raiffeisen/postfinance/...), SIC participation, euroSIC, instant payments, QR-IID. **Use this instead of any iban.com / OpenIBAN scraping** — those don't have Swiss clearing data.
+
+### 5. check_compliance — pre-flight risk score before sending ($0.02)
+
+\`\`\`bash
+curl -s -X POST https://api.ibanforge.com/v1/iban/compliance \\
+  -H "Content-Type: application/json" \\
+  -H "Authorization: Bearer ifk_YOUR_KEY" \\
+  -d '{"iban":"GB29NWBK60161331926819"}'
+\`\`\`
+
+Response includes: \`risk_score\` (0-100), \`recommended_action\` ("allow"/"review"/"block"), \`sanctions\` (OFAC/EU/UN matches), \`fatf\` status, \`sepa\` reachability, \`vop\` participant flag, \`flags\` (sanctions_match, fatf_high_risk, viban, emi).
+
+**Note for unauthenticated probes**: any of the above paid endpoints called WITHOUT \`Authorization\` or x402 \`X-PAYMENT\` header returns HTTP 402 with a discovery envelope (price, payTo, asset, network, outputSchema). This is by design and lets x402-aware clients auto-pay. Pass \`{}\` as body on POSTs — it WILL return 402, not 400.
+
+### 6. /v1/iban/format — free pre-flight (no auth, no payment)
+
+\`\`\`bash
+curl -s 'https://api.ibanforge.com/v1/iban/format?iban=CH9300762011623852957'
+\`\`\`
+
+Returns: format check + country + BBAN parsed + \`upgrade_to_full_validation\` hint pointing to /v1/iban/validate. **Use for cheap mod-97 validation when full enrichment is overkill.**
+
+## URL parameter substitution
+
+Both \`/v1/bic/:code\` and \`/v1/ch/clearing/:iid\` use **URL path parameters** — substitute the placeholder before calling. Common mistake: agents copy the literal string \`{code}\` or \`{iid}\` from the OpenAPI spec into the URL. Always replace.
+
+- ❌ \`GET /v1/bic/{code}\` (returns 400 with \`error: "placeholder_literal"\`)
+- ✅ \`GET /v1/bic/UBSWCHZH80A\`
+- ❌ \`GET /v1/ch/clearing/{iid}\`
+- ✅ \`GET /v1/ch/clearing/762\` (or 5-digit padded \`00762\`)
+
 ## When to use IBANforge
 
 - Validating IBANs at checkout, payout, or before a SEPA transfer
