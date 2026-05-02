@@ -68,6 +68,8 @@ function insertRequest() {
  */
 export type ClientKind = 'mcp_http' | 'mcp_stdio' | 'bot' | 'web' | 'api';
 
+// Indexers / catalogs / search engine crawlers — non-paying, non-monetizable
+// but useful to track for distribution attribution.
 const BOT_PATTERNS = [
   'decixa',
   'x402scan',
@@ -88,6 +90,43 @@ const BOT_PATTERNS = [
   'wget',
 ];
 
+// Known AI agent / LLM clients — these are MCP and REST consumers we do
+// monetize (or want to monetize). Detected separately from generic bots so
+// the dashboard can distinguish "agent traffic" from "indexer traffic".
+//
+// Sources:
+//   - openai.com/gptbot / OpenAI's "ChatGPT-User" UA for inline tool use
+//   - Anthropic publishes "Claude-User" / "ClaudeBot" UAs for fetches inside
+//     conversation context, plus claude.ai/code "Claude Code" agent
+//   - Cursor / Cline / Continue / Windsurf / Aider / Cody (Sourcegraph)
+//   - Perplexity ("PerplexityBot"), You.com ("YouBot")
+const AGENT_PATTERNS = [
+  'chatgpt-user',
+  'gptbot',
+  'oai-searchbot',
+  'claudebot',
+  'claude-user',
+  'claude-web',
+  'anthropic',
+  'cursor',
+  'cline',
+  'continue',
+  'windsurf',
+  'aider',
+  'cody',
+  'perplexitybot',
+  'perplexity',
+  'youbot',
+];
+
+/**
+ * Classify the origin of an HTTP request into one of 5 buckets so the
+ * dashboard can attribute traffic and revenue per channel.
+ *
+ * Order matters: we check `/mcp` path first (highest signal), then known
+ * client UAs (most specific), then bots (catch-all crawlers), then the
+ * loose "browser" heuristic, then fallback to `api`.
+ */
 export function classifyClient(path: string, userAgent: string | undefined): ClientKind {
   if (path.startsWith('/mcp')) return 'mcp_http';
   if (!userAgent) return 'api';
@@ -95,6 +134,11 @@ export function classifyClient(path: string, userAgent: string | undefined): Cli
   if (ua.startsWith('ibanforge-mcp/') || ua.includes('mcp-proxy') || ua.includes('mcp-stdio')) {
     return 'mcp_stdio';
   }
+  // Known AI clients — bucket as `mcp_stdio` (semantically: an LLM-driven
+  // client calling our REST surface, even when not via MCP transport).
+  // This makes the "agent traffic" total in the dashboard reflect ALL
+  // agent-originated calls, not just those via npm i ibanforge-mcp.
+  if (AGENT_PATTERNS.some((p) => ua.includes(p))) return 'mcp_stdio';
   if (BOT_PATTERNS.some((p) => ua.includes(p))) return 'bot';
   if (ua.includes('mozilla') && (ua.includes('webkit') || ua.includes('gecko') || ua.includes('chrome') || ua.includes('safari') || ua.includes('firefox') || ua.includes('edge'))) {
     return 'web';
