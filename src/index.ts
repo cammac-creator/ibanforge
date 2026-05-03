@@ -24,6 +24,7 @@ import { createX402Middleware, ensureWalletConfigured } from './middleware/x402.
 import { apiKeyMiddleware } from './middleware/api-key.js';
 import { enrich402Middleware } from './middleware/enrich-402.js';
 import { apiKeys } from './routes/api-keys.js';
+import { creditsBuy } from './routes/credits-buy.js';
 import { rateLimitMiddleware } from './middleware/rate-limit.js';
 import { recordRequest, classifyClient } from './lib/stats.js';
 
@@ -418,6 +419,9 @@ app.route('/', ibanBatch);
 app.route('/', bicLookup);
 app.route('/', ibanCompliance);
 app.route('/', chClearing);
+// Bundle credits — POST /v1/credits/buy/:bundle is gated by the x402
+// middleware above. When the agent paid, this handler mints a key.
+app.route('/', creditsBuy);
 
 // Free routes
 app.route('/', ibanFormat);

@@ -136,6 +136,12 @@ export function getStatsDB(): DatabaseType.Database {
     if (!existingCols.includes('error_detail')) statsDB.exec('ALTER TABLE operations ADD COLUMN error_detail TEXT');
     const keyCols = (statsDB.prepare("PRAGMA table_info(api_keys)").all() as Array<{ name: string }>).map(r => r.name);
     if (!keyCols.includes('monthly_limit')) statsDB.exec('ALTER TABLE api_keys ADD COLUMN monthly_limit INTEGER');
+    // Credits-based keys (Bundle credits product). When credits_remaining is
+    // NULL the key follows the existing monthly subscription model. When it
+    // is an integer >= 0 the key consumes from the prepaid bundle (and the
+    // monthly_limit is ignored). Decremented atomically per call.
+    if (!keyCols.includes('credits_remaining')) statsDB.exec('ALTER TABLE api_keys ADD COLUMN credits_remaining INTEGER');
+    if (!keyCols.includes('credits_total')) statsDB.exec('ALTER TABLE api_keys ADD COLUMN credits_total INTEGER');
     // Track request provenance: distinguish MCP HTTP / MCP stdio / REST direct / bot / web
     const reqCols = (statsDB.prepare("PRAGMA table_info(request_log)").all() as Array<{ name: string }>).map(r => r.name);
     if (!reqCols.includes('client_kind')) {

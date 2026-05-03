@@ -3,6 +3,23 @@ import { timingSafeEqual } from 'node:crypto';
 import { generateApiKey, validateApiKey, getUsage } from '../lib/api-keys.js';
 import { getStatsDB } from '../lib/db.js';
 
+// Bundle credits — prepaid pools sized for the 3 typical agent stacks.
+// Pricing keeps a fair per-call rate (cheaper than retail x402) so agents
+// have a reason to buy in bulk vs paying per call.
+//
+//   Bundle 1k:   5 USDC   = 0.005  USDC/call (same as retail validate_iban)
+//   Bundle 5k:  20 USDC   = 0.004  USDC/call (-20%)
+//   Bundle 25k: 80 USDC   = 0.0032 USDC/call (-36%)
+//
+// Pricing is enforced by the x402 middleware on /v1/credits/buy/:bundle.
+// If the agent paid → x402 lets the request through → handler creates
+// a fresh credit key with `credits` credits and returns it.
+const BUNDLES: Record<string, { credits: number; price_usdc: number }> = {
+  '1k': { credits: 1000, price_usdc: 5 },
+  '5k': { credits: 5000, price_usdc: 20 },
+  '25k': { credits: 25000, price_usdc: 80 },
+};
+
 const apiKeys = new Hono();
 
 /**
@@ -54,6 +71,61 @@ apiKeys.post('/v1/keys/generate', async (c) => {
     monthly_limit: 200,
     message: 'Save this key — it will not be shown again.',
   }, 201);
+});
+
+/**
+ * Bundle credits endpoint — agents (or humans) pay once via x402, get a key
+ * with N prepaid calls. The endpoint is gated by the x402 middleware in
+ * src/middleware/x402.ts at the configured price for each bundle. When the
+ * payment clears, the handler runs and we mint a fresh credit-based key.
+ *
+ * GET /v1/credits/bundles  — public, lists the 3 bundles + prices
+ * POST /v1/credits/buy/:bundle  — gated 5/20/80 USDC, returns the key on success
+ * GET /v1/credits/balance  — auth-gated by the API key middleware
+ */
+apiKeys.get('/v1/credits/bundles', (c) => {
+  return c.json({
+    bundles: Object.entries(BUNDLES).map(([slug, b]) => ({
+      slug,
+      credits: b.credits,
+      price_usdc: b.price_usdc,
+      price_per_call_usdc: Math.round((b.price_usdc / b.credits) * 1_000_000) / 1_000_000,
+      buy_endpoint: `POST /v1/credits/buy/${slug}`,
+    })),
+    payment_method: 'x402 USDC on Base mainnet',
+    documentation: 'https://ibanforge.com/agents#credits',
+  });
+});
+
+// NOTE: POST /v1/credits/buy/:bundle lives in src/routes/credits-buy.ts
+// because it must be mounted AFTER the x402 middleware to be payment-gated.
+// `apiKeys` here is mounted before x402 (free routes only).
+
+apiKeys.get('/v1/credits/balance', (c) => {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader?.startsWith('Bearer ifk_')) {
+    return c.json({ error: 'missing_key', message: 'Provide your API key via Authorization: Bearer ifk_xxx' }, 401);
+  }
+  const key = authHeader.slice(7);
+  const v = validateApiKey(key);
+  if (!v.valid) {
+    return c.json({ error: 'invalid_key', message: 'API key not found or inactive' }, 401);
+  }
+  if (typeof v.creditsRemaining !== 'number') {
+    return c.json({
+      type: 'subscription',
+      key_prefix: key.slice(0, 12),
+      message: 'This is a monthly subscription key, not a credit bundle. Use GET /v1/keys/usage for monthly stats.',
+    });
+  }
+  return c.json({
+    type: 'credit_bundle',
+    key_prefix: key.slice(0, 12),
+    credits_remaining: v.creditsRemaining,
+    credits_total: v.creditsTotal ?? 0,
+    credits_used: (v.creditsTotal ?? 0) - v.creditsRemaining,
+    topup_endpoints: Object.keys(BUNDLES).map((s) => `POST /v1/credits/buy/${s}`),
+  });
 });
 
 apiKeys.get('/v1/keys/usage', (c) => {
