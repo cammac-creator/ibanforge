@@ -388,6 +388,78 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
             },
           },
         },
+        // -- Bundle credits ----------------------------------------------------
+        // 3 prepaid bundles. Once the agent pays, the handler in
+        // src/routes/api-keys.ts mints a fresh key with N credits.
+        // Pricing is: 1k=$5 (0.005/call), 5k=$20 (0.004/call), 25k=$80 (0.0032/call).
+        'POST /v1/credits/buy/1k': {
+          accepts: {
+            scheme: 'exact',
+            network: 'eip155:8453' as const,
+            price: '$5.00',
+            payTo: walletAddress,
+            maxTimeoutSeconds: 60,
+          },
+          description:
+            'Prepaid bundle of 1,000 IBAN/BIC/compliance API calls for AI agents. Same per-call cost as retail (0.005 USDC) but only ONE x402 settlement instead of 1,000 — most agent stacks handle a single payment far better than micropayments. Returns ifk_xxx key with 1,000 credits valid for any /v1/iban/* or /v1/bic/* endpoint. No expiry.',
+          mimeType: 'application/json',
+          extensions: {
+            bazaar: {
+              discoverable: true,
+              bodyType: 'json',
+              inputSchema: {
+                type: 'object',
+                properties: {
+                  email: { type: 'string', description: 'Optional. Anonymous keys work too.' },
+                },
+              },
+              outputSchema: {
+                type: 'object',
+                properties: {
+                  api_key: { type: 'string' },
+                  key_prefix: { type: 'string' },
+                  credits: { type: 'number' },
+                  price_paid_usdc: { type: 'number' },
+                  usage_hint: { type: 'string' },
+                },
+              },
+              info: {
+                input: { type: 'http', method: 'POST', bodyType: 'json', body: {}, discoverable: true },
+                output: { type: 'json' },
+              },
+            },
+          },
+        },
+        'POST /v1/credits/buy/5k': {
+          accepts: {
+            scheme: 'exact',
+            network: 'eip155:8453' as const,
+            price: '$20.00',
+            payTo: walletAddress,
+            maxTimeoutSeconds: 60,
+          },
+          description:
+            'Prepaid bundle of 5,000 IBAN/BIC/compliance calls (-20% vs retail, 0.004 USDC per call). One x402 settlement, no monthly subscription, no expiry. Fits a mid-volume agent that runs payment validation continuously.',
+          mimeType: 'application/json',
+          extensions: {
+            bazaar: { discoverable: true, bodyType: 'json' },
+          },
+        },
+        'POST /v1/credits/buy/25k': {
+          accepts: {
+            scheme: 'exact',
+            network: 'eip155:8453' as const,
+            price: '$80.00',
+            payTo: walletAddress,
+            maxTimeoutSeconds: 60,
+          },
+          description:
+            'Prepaid bundle of 25,000 IBAN/BIC/compliance calls (-36% vs retail, 0.0032 USDC per call). One x402 settlement, no expiry. Designed for scale agents (KYB, payroll, batch reconciliation) that want predictable cost.',
+          mimeType: 'application/json',
+          extensions: {
+            bazaar: { discoverable: true, bodyType: 'json' },
+          },
+        },
         'GET /v1/ch/clearing/:iid': {
           accepts: {
             scheme: 'exact',

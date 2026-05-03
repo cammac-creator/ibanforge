@@ -1,6 +1,6 @@
 import type { MiddlewareHandler } from 'hono';
 import type { HonoEnv } from '../types.js';
-import { validateApiKey, checkAndIncrementQuota, decrementQuota } from '../lib/api-keys.js';
+import { validateApiKey, checkAndIncrementQuota, decrementQuota, decrementCredits, refundCredit } from '../lib/api-keys.js';
 
 /**
  * Extract an IBANforge API key from common locations agents use:
@@ -31,13 +31,39 @@ export function apiKeyMiddleware(): MiddlewareHandler<HonoEnv> {
     }
 
 
-    const { valid, keyHash, monthlyLimit } = validateApiKey(key);
+    const { valid, keyHash, monthlyLimit, creditsRemaining, creditsTotal } = validateApiKey(key);
 
     if (!valid) {
       await next();
       return;
     }
 
+    // Bundle credits path: the key has a prepaid balance (credits_remaining
+    // is an integer, monthly_limit is NULL). Decrement atomically and serve.
+    // When credits run out, fall through to x402 instead of hard-blocking,
+    // exactly like the monthly-quota exhaustion path below.
+    if (typeof creditsRemaining === 'number') {
+      const newBalance = decrementCredits(keyHash);
+      if (newBalance < 0) {
+        c.header('X-Credits-Exhausted', 'true');
+        c.header('X-Credits-Used', String(creditsTotal ?? 0));
+        c.header('X-Credits-Total', String(creditsTotal ?? 0));
+        c.header('X-Credits-Topup-Hint', 'POST /v1/credits/buy/1k for a fresh 1000-call bundle');
+        await next();
+        return;
+      }
+      c.header('X-Credits-Remaining', String(newBalance));
+      c.header('X-Credits-Total', String(creditsTotal ?? 0));
+      c.set('apiKeyAuthenticated', true);
+      await next();
+      // Refund credit on 4xx client errors (mirror monthly quota behavior).
+      if (c.res.status >= 400 && c.res.status < 500) {
+        refundCredit(keyHash);
+      }
+      return;
+    }
+
+    // Monthly subscription path (existing behavior).
     const quota = checkAndIncrementQuota(keyHash, monthlyLimit);
 
     if (!quota.allowed) {
