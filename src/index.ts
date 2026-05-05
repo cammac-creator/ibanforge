@@ -25,6 +25,7 @@ import { apiKeyMiddleware } from './middleware/api-key.js';
 import { enrich402Middleware } from './middleware/enrich-402.js';
 import { apiKeys } from './routes/api-keys.js';
 import { creditsBuy } from './routes/credits-buy.js';
+import { ibanStructure } from './routes/iban-structure.js';
 import { rateLimitMiddleware } from './middleware/rate-limit.js';
 import { recordRequest, classifyClient } from './lib/stats.js';
 
@@ -261,6 +262,14 @@ curl -s 'https://api.ibanforge.com/v1/iban/format?iban=CH9300762011623852957'
 
 Returns: format check + country + BBAN parsed + \`upgrade_to_full_validation\` hint pointing to /v1/iban/validate. **Use for cheap mod-97 validation when full enrichment is overkill.**
 
+### 7. /v1/iban/structure/:country — free metadata (no auth, no payment)
+
+\`\`\`bash
+curl -s 'https://api.ibanforge.com/v1/iban/structure/CH'
+\`\`\`
+
+Returns the IBAN structural template for the country: total IBAN length (21 for CH), BBAN field positions (bank_code, branch_code, account_number with their 0-indexed start + length within the BBAN), SEPA membership + scheme list + VoP obligation flag, and a canonical example IBAN you can copy-paste to test. **Use this when an agent needs to know the IBAN format for a country before crafting a validation call** — saves a Wikipedia roundtrip. List all 84 countries: \`GET /v1/iban/structure\`.
+
 ## URL parameter substitution
 
 Both \`/v1/bic/:code\` and \`/v1/ch/clearing/:iid\` use **URL path parameters** — substitute the placeholder before calling. Common mistake: agents copy the literal string \`{code}\` or \`{iid}\` from the OpenAPI spec into the URL. Always replace.
@@ -425,6 +434,7 @@ app.route('/', creditsBuy);
 
 // Free routes
 app.route('/', ibanFormat);
+app.route('/', ibanStructure);
 app.route('/', health);
 app.route('/', stats);
 app.route('/', demo);
