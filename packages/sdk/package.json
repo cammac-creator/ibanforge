@@ -1,6 +1,6 @@
 {
   "name": "@ibanforge/sdk",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Official SDK for the IBANforge API — IBAN validation, BIC/SWIFT lookup, compliance checks",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
@@ -12,14 +12,29 @@
       "require": "./dist/index.js"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsup src/index.ts --format esm,cjs --dts --clean",
     "prepublishOnly": "npm run build"
   },
-  "keywords": ["iban", "bic", "swift", "sepa", "validation", "compliance", "x402", "mcp", "fintech"],
+  "keywords": [
+    "iban",
+    "bic",
+    "swift",
+    "sepa",
+    "validation",
+    "compliance",
+    "x402",
+    "mcp",
+    "fintech"
+  ],
   "license": "MIT",
-  "repository": { "type": "git", "url": "https://github.com/cammac-creator/ibanforge" },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cammac-creator/ibanforge"
+  },
   "homepage": "https://ibanforge.com",
   "devDependencies": {
     "tsup": "^8.0.0",
