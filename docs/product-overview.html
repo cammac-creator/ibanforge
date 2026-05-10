@@ -527,11 +527,11 @@
 
     <div class="hero-stats">
       <div class="stat-card">
-        <div class="stat-num">121<span class="unit">399</span></div>
+        <div class="stat-num">121 399</div>
         <div class="stat-label">BIC dans la base</div>
       </div>
       <div class="stat-card">
-        <div class="stat-num">1<span class="unit">190</span></div>
+        <div class="stat-num">1 190</div>
         <div class="stat-label">BC-Nummern Suisse</div>
       </div>
       <div class="stat-card">
@@ -559,7 +559,7 @@
   <div class="container-narrow">
     <span class="section-tag">// 01 — TL;DR</span>
     <h2>En quatre phrases.</h2>
-    <p class="section-intro">IBANforge est une API de validation/enrichissement IBAN + BIC + Swiss clearing + compliance. Elle est consommable par humains (REST), par développeurs (SDK TypeScript & Python), et par agents IA (MCP stdio + MCP HTTP). Le paiement se fait soit via clé API gratuite (200 req/mois), soit via x402 micropaiements USDC sans compte, soit — Phase 2 — via crédits Stripe prépayés. Le produit fonctionne, mais l'acquisition client n'est pas encore prouvée : ~211 signups, conversion proche de zéro (avril 2026).</p>
+    <p class="section-intro">IBANforge est une API de validation/enrichissement IBAN + BIC + Swiss clearing + compliance. Elle est consommable par humains (REST), par développeurs (SDK TypeScript & Python), et par agents IA (MCP stdio + MCP HTTP). Le paiement se fait soit via clé API gratuite (200 req/mois), soit via x402 micropaiements USDC sans compte, soit — Phase 2 — via crédits Stripe prépayés. Le produit fonctionne, mais l'acquisition client n'est pas encore prouvée : plusieurs centaines de signups générées, conversion en clients payants proche de zéro (mai 2026).</p>
 
     <div class="grid-2">
       <div class="card amber">
@@ -579,7 +579,7 @@
           <li>Marché x402 actuellement quasi-nul (early adopter)</li>
           <li>SEO inexistant face à IBAN.com (20 ans d'historique)</li>
           <li>Stripe credits non encore implémentés (Phase 2)</li>
-          <li>Conversion signup → call ≈ 1 par utilisateur sur 211</li>
+          <li>Conversion signup → client payant proche de zéro malgré ~280 clés API générées</li>
         </ul>
       </div>
     </div>
@@ -921,7 +921,7 @@
       </div>
       <div class="card">
         <h4>Émetteurs vIBAN / EMI</h4>
-        <p style="font-size:13.5px; color:var(--ink-soft);"><b>85 entrées</b> dans <code>issuers.ts</code> classifiées en 3 types : <code>digital_bank</code> (12 — bunq, Monzo, N26, Revolut, Qonto, Starling…), <code>emi</code> (62 — Wise, Mollie, Adyen, Currencycloud…), <code>payment_institution</code> (11 — Stripe Europe, Modulr, Solarisbank, GoCardless…). Curé manuellement à partir des registres EBA et nationaux.</p>
+        <p style="font-size:13.5px; color:var(--ink-soft);"><b>85 entrées</b> dans <code>issuers.ts</code> classifiées en 3 types : <code>digital_bank</code> (12 — bunq, Monzo, N26, Revolut, Qonto, Starling…), <code>emi</code> (60 — Wise, Mollie, Adyen, Currencycloud…), <code>payment_institution</code> (13 — Stripe Europe, Modulr, Solarisbank, GoCardless, TrueLayer, LHV…). Curé manuellement à partir des registres EBA et nationaux.</p>
       </div>
       <div class="card">
         <h4>Pays IBAN</h4>
@@ -1206,7 +1206,7 @@
 <section id="roadmap">
   <div class="container">
     <span class="section-tag">// 07 — Plan actuel & plan futur</span>
-    <h2>Cinq phases, deux faites, trois en cours ou aspirationnelles.</h2>
+    <h2>Cinq phases : une faite, une en cours, trois aspirationnelles.</h2>
     <p class="section-intro">Ne pas confondre ce qui est <b>live</b> avec ce qui est <b>planifié</b>. Beaucoup de la roadmap n'est pas encore commencée.</p>
 
     <div class="grid-2">
@@ -1444,7 +1444,7 @@
       </div>
       <div class="card">
         <h4>Acquisition non prouvée</h4>
-        <p style="font-size:13.5px; color:var(--ink-soft);">~211 signups mais conversion en clients payants proche de zéro à mai 2026. Hypothèse à valider : produit B2B déguisé en self-serve. Recommandation : 10–15 conversations 1:1 avec PSPs/fintechs Suisse pour confirmer.</p>
+        <p style="font-size:13.5px; color:var(--ink-soft);">Plusieurs centaines de clés API générées mais conversion en clients payants proche de zéro à mai 2026. Hypothèse à valider : produit B2B déguisé en self-serve. Recommandation : 10–15 conversations 1:1 avec PSPs/fintechs Suisse pour confirmer.</p>
       </div>
     </div>
 
