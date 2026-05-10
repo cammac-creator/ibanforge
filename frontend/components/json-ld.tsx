@@ -47,7 +47,7 @@ const SOFTWARE_APPLICATION = {
     {
       '@type': 'Offer',
       name: 'Lookup BIC',
-      description: 'Lookup BIC/SWIFT against 121,197 BIC entries (38,761 LEI-enriched via GLEIF)',
+      description: 'Lookup BIC/SWIFT against 121,000+ BIC entries from public sources (GLEIF, SWIFT directory, Bundesbank, SIX, NBP), with LEI enrichment for ~38K rows sourced from GLEIF',
       price: '0.003',
       priceCurrency: 'USDC',
       eligibleQuantity: { '@type': 'QuantitativeValue', value: 1, unitText: 'request' },
@@ -80,7 +80,7 @@ const SOFTWARE_APPLICATION = {
   ],
   featureList: [
     'IBAN validation (ISO 13616 mod-97 + BBAN)',
-    'BIC/SWIFT lookup against 121,197 GLEIF entries',
+    'BIC/SWIFT lookup against 121,000+ BIC entries (38K LEI-enriched via GLEIF)',
     'Swiss BC-Nummer / IID lookup (1,190 SIX BankMaster)',
     'EMI / vIBAN / neobank issuer classification',
     'SEPA Instant reachability flag',
@@ -117,7 +117,7 @@ const FAQ = {
       name: 'What does IBANforge validate?',
       acceptedAnswer: {
         '@type': 'Answer',
-        text: 'IBANforge validates IBAN structure (ISO 13616 mod-97 check digits + country-specific BBAN), resolves the associated BIC/SWIFT against 121,197 GLEIF entries, looks up Swiss BC-Nummer / IID against 1,190 SIX BankMaster entries, classifies the issuer (bank, EMI, vIBAN provider, neobank), and flags SEPA Instant + VoP (Verification of Payee, EU 2024/886) reachability.',
+        text: 'IBANforge validates IBAN structure (ISO 13616 mod-97 check digits + country-specific BBAN), resolves the associated BIC/SWIFT against 121,000+ BIC entries from public sources (GLEIF, SWIFT directory, Bundesbank, SIX, NBP) with LEI enrichment for ~38K rows sourced from GLEIF, looks up Swiss BC-Nummer / IID against 1,190 SIX BankMaster entries, classifies the issuer (bank, EMI, vIBAN provider, neobank), and flags SEPA Instant + VoP (Verification of Payee, EU 2024/886) reachability.',
       },
     },
     {
@@ -165,7 +165,7 @@ const FAQ = {
       name: 'Where does the BIC and Swiss clearing data come from?',
       acceptedAnswer: {
         '@type': 'Answer',
-        text: 'BIC/SWIFT data: 121,197 entries from GLEIF (Global Legal Entity Identifier Foundation), enriched with LEI codes. Swiss data: 1,190 BC-Nummern from the official SIX BankMaster CSV — the canonical source used by the Swiss banking industry.',
+        text: 'BIC/SWIFT data: 121,000+ entries from public sources — GLEIF (Global Legal Entity Identifier Foundation, ~38K rows with LEI enrichment), the SWIFT directory, the Deutsche Bundesbank, SIX, and the NBP. Swiss data: 1,190 BC-Nummern from the official SIX BankMaster CSV — the canonical source used by the Swiss banking industry.',
       },
     },
     {

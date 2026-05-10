@@ -22,9 +22,9 @@ Endpunkt: `POST /v1/iban/validate`
 
 ## BIC/SWIFT-Abfrage
 
-- **Ueber 121.000 Eintraege** aus GLEIF (Global LEI Foundation)
-- **LEI-Anreicherung** -- jeder BIC-Eintrag enthaelt den Legal Entity Identifier, sofern verfuegbar
-- **GLEIF-Daten** -- Institutsname, Stadt, Land und Registrierungsstatus
+- **Ueber 121.000 BIC-Eintraege** aus oeffentlichen Quellen (GLEIF, SWIFT-Verzeichnis, Bundesbank, SIX, NBP)
+- **LEI-Anreicherung** -- die ~38K Eintraege aus GLEIF enthalten den Legal Entity Identifier
+- **Institutsdaten** -- Institutsname, Stadt, Land und Registrierungsstatus
 - BIC-Formatvalidierung (ISO 9362) vor der Datenbankabfrage
 - Unterstuetzt sowohl 8-stellige als auch 11-stellige BIC-Codes
 

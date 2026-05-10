@@ -18,7 +18,7 @@ Ensuite, il y a le probleme du BIC. Meme si un IBAN est structurellement valide,
 
 ## IBANforge : une seule API pour les deux
 
-[IBANforge](https://ibanforge.com) est une API REST qui gere la validation complete d'IBAN -- somme de controle, regles pays, analyse BBAN -- et resout le code BIC dans la meme reponse, a partir du jeu de donnees GLEIF de plus de 121 000 entrees utilise par les banques centrales. Une requete POST, une reponse JSON structuree.
+[IBANforge](https://ibanforge.com) est une API REST qui gere la validation complete d'IBAN -- somme de controle, regles pays, analyse BBAN -- et resout le code BIC dans la meme reponse, a partir d'un jeu de donnees BIC consolide de plus de 121 000 entrees issu de sources publiques (GLEIF, annuaire SWIFT, Bundesbank, SIX, NBP), avec enrichissement LEI pour ~38K lignes provenant de GLEIF. Une requete POST, une reponse JSON structuree.
 
 Il existe un endpoint gratuit `/v1/demo` pour tester votre parseur sans toucher aux endpoints payants, et un [playground interactif](https://ibanforge.com/playground) si vous souhaitez coller un IBAN et voir ce qui revient avant d'ecrire une ligne de code.
 
@@ -60,7 +60,7 @@ Quelques points a noter dans cette reponse :
 - `valid: true` confirme que la somme de controle mod-97 et les regles de longueur et de format specifiques au pays sont passees.
 - `iban` retourne la forme compacte (sans espaces) ; `formatted` ajoute les espaces selon le groupement standard de 4 caracteres.
 - `bban.bank_code` est extrait du BBAN selon le format specifique de la Suisse -- pas une simple operation de sous-chaine.
-- L'objet `bic` inclut le nom de la banque et la ville, resolus a partir du jeu de donnees GLEIF.
+- L'objet `bic` inclut le nom de la banque et la ville, resolus a partir du jeu de donnees BIC consolide (GLEIF et autres sources publiques).
 - `sepa` vous indique si ce compte est accessible SEPA, quels schemas de paiement s'appliquent, et si la Verification of Payee (VoP) est exigee par la reglementation europeenne.
 - `issuer` classe l'institution -- `bank`, `digital_bank`, `emi` ou `payment_institution` -- aidant a detecter les IBAN virtuels.
 - `risk_indicators` fournit un signal de risque composite pour les agents de conformite : risque pays, couverture SEPA et statut VoP dans un seul objet.

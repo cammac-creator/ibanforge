@@ -67,7 +67,7 @@
       "1": {
         "badge": "121,000+ BIC Entries",
         "title": "BIC/SWIFT Lookup",
-        "description": "Complete BIC/SWIFT database sourced from GLEIF, enriched with LEI (Legal Entity Identifier) data for financial institution identification."
+        "description": "121,000+ BIC entries from public sources (GLEIF, SWIFT directory, Bundesbank, SIX, NBP), with LEI enrichment for ~38K rows sourced from GLEIF for financial institution identification."
       },
       "2": {
         "badge": "SEPA + VoP",

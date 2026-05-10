@@ -105,7 +105,7 @@ const TOOLS = [
   {
     name: "lookup_bic",
     price: "$0.003",
-    description: "Resolve a BIC/SWIFT into bank name, country, city, LEI, address. 121,197 GLEIF entries.",
+    description: "Resolve a BIC/SWIFT into bank name, country, city, LEI, address. 121,000+ BIC entries (38K LEI-enriched via GLEIF).",
   },
   {
     name: "lookup_ch_clearing",
