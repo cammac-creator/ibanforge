@@ -31,7 +31,7 @@ Format awesome-langchain : `- [Name](url): description ![GitHub Repo stars](http
 Ligne exacte a coller (a la toute fin de `### Agents`) :
 
 ```markdown
-- [IBANforge](https://github.com/cammac-creator/ibanforge): MCP server + Python SDK (`pip install ibanforge`) for IBAN validation, BIC/SWIFT lookup (121K+ GLEIF entries), Swiss BC-Nummer (1,190 SIX entries), and compliance triage (OFAC/EU/UN sanctions, FATF, VoP, risk score). Lets LangChain agents validate bank accounts and pre-flight SEPA payments. Pay-per-call x402/USDC or self-host. ![GitHub Repo stars](https://img.shields.io/github/stars/cammac-creator/ibanforge?style=social)
+- [IBANforge](https://github.com/cammac-creator/ibanforge): MCP server + Python SDK (`pip install ibanforge`) for IBAN validation, BIC/SWIFT lookup (121K+ BIC entries, 38K LEI-enriched via GLEIF), Swiss BC-Nummer (1,190 SIX entries), and compliance triage (OFAC/EU/UN sanctions, FATF, VoP, risk score). Lets LangChain agents validate bank accounts and pre-flight SEPA payments. Pay-per-call x402/USDC or self-host. ![GitHub Repo stars](https://img.shields.io/github/stars/cammac-creator/ibanforge?style=social)
 ```
 
 ---
@@ -53,7 +53,7 @@ IBANforge is an open-source MCP server and Python SDK (MIT, https://pypi.org/pro
 
 - `validate_iban` — mod-97 + BBAN structure check, 84 countries
 - `batch_validate_iban` — up to 100 IBANs in one call
-- `lookup_bic` — 121,197 BIC entries from GLEIF, with LEI enrichment
+- `lookup_bic` — 121,197 BIC entries from public sources (GLEIF, SWIFT directory, Bundesbank, SIX, NBP), with LEI enrichment for 38,761 GLEIF rows
 - `lookup_ch_clearing` — 1,190 Swiss BC-Nummer / IID entries from SIX BankMaster (unique dataset, not in any other public API)
 - `check_compliance` — OFAC / EU / UN sanctions, FATF, SEPA Instant, VoP support, risk score 0–100, in a single call
 
@@ -87,5 +87,5 @@ Eligibility: open source (MIT), maintained, English, agent-related, adds value n
 - Les PR mal places sont fermees automatiquement. Verifie 2 fois la sous-section.
 - Si le mainteneur demande un raccourcissement, version courte de l'entry :
   ```markdown
-  - [IBANforge](https://github.com/cammac-creator/ibanforge): MCP server + Python SDK for IBAN validation, BIC/SWIFT lookup (121K GLEIF entries), Swiss clearing data, and compliance/sanctions triage. Pay-per-call x402 or self-host.
+  - [IBANforge](https://github.com/cammac-creator/ibanforge): MCP server + Python SDK for IBAN validation, BIC/SWIFT lookup (121K+ BIC entries, 38K LEI-enriched via GLEIF), Swiss clearing data, and compliance/sanctions triage. Pay-per-call x402 or self-host.
   ```

@@ -53,13 +53,13 @@ Le differenciateur n'est pas la donnee (GLEIF est public) mais l'accessibilite :
 
 **Marge brute estimee : >90%** a tout niveau de volume.
 
-**Point d'attention juridique :** Les donnees BIC proviennent de GLEIF (CC0), pas du registre SWIFT propriétaire. Etre transparent sur la couverture (~39K entrees vs ~100K+ dans le registre officiel SWIFT).
+**Point d'attention juridique :** Les donnees BIC proviennent de sources publiques (GLEIF CC0, SWIFT directory PeterNotenboom MIT, Bundesbank, SIX, NBP), pas du registre SWIFT propriétaire. Etre transparent sur la couverture (121K entrees agregees, dont 38K GLEIF avec LEI enrichment) vs le registre officiel SWIFT.
 
 ## Phases de developpement
 
 ### Phase 1 — MVP (en cours, semaines 1-4)
 - [x] API fonctionnelle (Hono + SQLite + x402)
-- [x] 39K entrees BIC avec LEI enrichment
+- [x] 121K entrees BIC (38K GLEIF avec LEI enrichment + SWIFT directory + Bundesbank + SIX + NBP)
 - [x] MCP server (3 outils)
 - [x] Frontend ibanforge.com (landing, playground, docs, dashboard)
 - [x] Deploy Railway + Vercel + DNS

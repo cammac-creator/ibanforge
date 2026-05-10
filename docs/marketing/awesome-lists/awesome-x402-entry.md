@@ -16,13 +16,13 @@
 ### Entry for "🌟 Ecosystem Projects" section
 
 ```markdown
-- [IBANforge](https://ibanforge.com) - IBAN validation & BIC/SWIFT lookup API with x402 micropayments. Validate IBANs for 84 countries, look up 121K+ bank BIC codes from GLEIF. Pay-per-call from $0.003 in USDC on Base. Also exposes an MCP server for AI agent integration. [GitHub](https://github.com/cammac-creator/ibanforge)
+- [IBANforge](https://ibanforge.com) - IBAN validation & BIC/SWIFT lookup API with x402 micropayments. Validate IBANs for 84 countries, look up 121K+ bank BIC codes (38K LEI-enriched via GLEIF). Pay-per-call from $0.003 in USDC on Base. Also exposes an MCP server for AI agent integration. [GitHub](https://github.com/cammac-creator/ibanforge)
 ```
 
 ### Entry for "🏭 Production Implementations" section
 
 ```markdown
-- [IBANforge](https://ibanforge.com) - Production IBAN validation and BIC/SWIFT lookup API. x402 pay-per-call micropayments from $0.003/request in USDC. 84 countries, 121K+ GLEIF entries, MCP server included. Self-hostable via Docker.
+- [IBANforge](https://ibanforge.com) - Production IBAN validation and BIC/SWIFT lookup API. x402 pay-per-call micropayments from $0.003/request in USDC. 84 countries, 121K+ BIC entries (38K LEI-enriched via GLEIF), MCP server included. Self-hostable via Docker.
 ```
 
 ### Entry for "🤖 AI Agent Integration" section
@@ -49,7 +49,7 @@
 ### Entry to Add
 
 ```markdown
-- [IBANforge](https://github.com/cammac-creator/ibanforge) - IBAN validation, BIC/SWIFT lookup, and Swiss clearing REST API + MCP server with x402 micropayments. $0.002–$0.005/request in USDC on Base. 84 countries, 121K+ GLEIF BIC entries, 1,190 Swiss BC-Nummer from SIX.
+- [IBANforge](https://github.com/cammac-creator/ibanforge) - IBAN validation, BIC/SWIFT lookup, and Swiss clearing REST API + MCP server with x402 micropayments. $0.002–$0.005/request in USDC on Base. 84 countries, 121K+ BIC entries (38K LEI-enriched via GLEIF), 1,190 Swiss BC-Nummer from SIX.
 ```
 
 ---

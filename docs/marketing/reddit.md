@@ -8,7 +8,7 @@ I just shipped IBANforge, a free IBAN validation and BIC/SWIFT lookup API. It va
 
 New in v1.1.0: Swiss clearing data (1,190 BC-Nummer entries from SIX with SIC, euroSIC, Instant Payments, QR-IID), 85 EMI/neobank classifications for vIBAN detection, and 5 MCP tools for AI agents.
 
-Built with Hono + TypeScript + SQLite. 121K+ BIC entries from GLEIF open data. Also has MCP integration so AI agents can use it natively.
+Built with Hono + TypeScript + SQLite. 121K+ BIC entries from public sources (GLEIF, SWIFT directory, Bundesbank, SIX, NBP), 38K LEI-enriched via GLEIF. Also has MCP integration so AI agents can use it natively.
 
 Free during launch, no API key needed. Interactive playground if you want to try it without writing code.
 
@@ -22,11 +22,11 @@ Would love feedback on the API design and documentation. What would make this mo
 
 ## r/node
 
-**Title:** Built a Hono API with SQLite for BIC/SWIFT lookup -- 121K entries, <10ms queries
+**Title:** Built a Hono API with SQLite for BIC/SWIFT lookup -- 121K BIC entries, <10ms queries
 
 Sharing a project I just finished: IBANforge, an IBAN validation + BIC lookup API built with Hono and SQLite (better-sqlite3).
 
-The BIC database has 121K entries from GLEIF, stored in a single SQLite file shipped inside the Docker image. Queries run in <10ms with prepared statements and an LRU cache on top. No PostgreSQL, no connection pools, no managed DB costs.
+The BIC database has 121K entries aggregated from public sources (GLEIF, SWIFT directory, Bundesbank, SIX, NBP), stored in a single SQLite file shipped inside the Docker image. Queries run in <10ms with prepared statements and an LRU cache on top. No PostgreSQL, no connection pools, no managed DB costs.
 
 The whole thing runs on $5/month on Railway. TypeScript throughout, vitest for testing, x402 middleware for future micropayments.
 
@@ -45,7 +45,7 @@ Curious what you think of the architecture. Any suggestions for improving query 
 
 I launched IBANforge, a free API for IBAN validation and BIC/SWIFT code lookup. Built it because every existing solution is either overpriced ($500+/year) or poorly documented.
 
-What it does: validates IBANs for 84 countries, looks up BIC/SWIFT codes from a 121K entry database (GLEIF, CC0 license), returns bank name, LEI, country. Also has batch validation for up to 100 IBANs per call. New: Swiss clearing data with 1,190 BC-Nummer entries from SIX and 85 EMI/neobank classifications.
+What it does: validates IBANs for 84 countries, looks up BIC/SWIFT codes from a 121K BIC entry database (sourced from GLEIF, SWIFT directory, Bundesbank, SIX, NBP — with LEI enrichment for 38K GLEIF rows, CC0 where applicable), returns bank name, LEI, country. Also has batch validation for up to 100 IBANs per call. New: Swiss clearing data with 1,190 BC-Nummer entries from SIX and 85 EMI/neobank classifications.
 
 The differentiator: it has MCP (Model Context Protocol) integration with 5 tools, meaning AI agents like Claude can use it natively for payment verification, KYC workflows, and invoice processing -- including Swiss bank clearing lookups.
 

@@ -64,7 +64,7 @@ No decorators, no class inheritance, no magic -- just functions.
 
 ## SQLite for Lookup Data
 
-IBANforge stores 121,000+ BIC/SWIFT entries from [GLEIF](https://www.gleif.org/) (the Global Legal Entity Identifier Foundation). The data is CC0-licensed, free to use.
+IBANforge stores 121,197 BIC/SWIFT entries aggregated from public sources (GLEIF, SWIFT directory, Bundesbank, SIX, NBP), with LEI enrichment for the 38,761 rows sourced from [GLEIF](https://www.gleif.org/) (the Global Legal Entity Identifier Foundation, CC0).
 
 Why SQLite instead of PostgreSQL?
 
@@ -175,7 +175,7 @@ The entire infrastructure costs ~$6/month:
 | Domain | ~$1/month |
 | GLEIF data | free (CC0) |
 
-The SQLite database is 121,197 BIC entries. No managed database fees.
+The SQLite database holds 121,197 BIC entries (38,761 LEI-enriched via GLEIF). No managed database fees.
 
 ## Try It
 
