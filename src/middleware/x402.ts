@@ -101,11 +101,11 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
       // Trust signals appended to descriptions: production status, p99 latency target,
       // dataset size, last update. Agents that filter on description quality (Bazaar
       // semantic search, agentic.market) reward this.
-      const TRUST_TAG_VALIDATE = 'Production · p99 <50ms · 121,197 GLEIF + 1,190 SIX entries · v1.2.0';
-      const TRUST_TAG_BIC = 'Production · p99 <30ms · 121,197 GLEIF entries with LEI · v1.2.0';
+      const TRUST_TAG_VALIDATE = 'Production · p99 <50ms · 121,197 BICs (38K LEI via GLEIF) + 1,190 SIX · v1.2.0';
+      const TRUST_TAG_BIC = 'Production · p99 <30ms · 121,197 BICs (38,761 LEI-enriched via GLEIF) · v1.2.0';
       const TRUST_TAG_CH = 'Production · p99 <20ms · 1,190 SIX BankMaster entries · v1.2.0';
       const TRUST_TAG_COMPLIANCE = 'Production · p99 <80ms · OFAC/EU/UN + FATF + SEPA + VoP · weekly refresh · v1.2.0';
-      const TRUST_TAG_BATCH = 'Production · p99 <300ms for 100 IBANs · 121,197 GLEIF entries · v1.2.0';
+      const TRUST_TAG_BATCH = 'Production · p99 <300ms for 100 IBANs · 121,197 BICs · v1.2.0';
 
       const ibanInputSchema = {
         type: 'object',
@@ -286,7 +286,7 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
             maxTimeoutSeconds: 60,
           },
           description:
-            `Resolve a BIC/SWIFT code (8 or 11 chars) into the underlying bank: name, country, city, LEI, address. Backed by 121,197 GLEIF entries with LEI enrichment. Use only when you already have the BIC — for IBAN inputs, prefer /v1/iban/validate which resolves the BIC for you. ${TRUST_TAG_BIC}.`,
+            `Resolve a BIC/SWIFT code (8 or 11 chars) into the underlying bank: name, country, city, LEI, address. Backed by 121,197 BIC entries (38,761 LEI-enriched via GLEIF; additional rows from SWIFT directory, Deutsche Bundesbank, SIX BankMaster, NBP). Use only when you already have the BIC — for IBAN inputs, prefer /v1/iban/validate which resolves the BIC for you. ${TRUST_TAG_BIC}.`,
           mimeType: 'application/json',
           extensions: {
             bazaar: {

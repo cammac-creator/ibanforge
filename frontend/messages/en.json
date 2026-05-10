@@ -182,7 +182,7 @@
         "path": "/v1/bic/:code",
         "cost": "$0.003",
         "costLabel": "per call",
-        "description": "Lookup BIC/SWIFT code from GLEIF database"
+        "description": "Lookup BIC/SWIFT code (121K BIC database, LEI-enriched via GLEIF)"
       },
       "3": {
         "method": "POST",

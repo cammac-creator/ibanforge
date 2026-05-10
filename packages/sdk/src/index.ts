@@ -88,7 +88,7 @@ export class IBANforge {
   }
 
   /**
-   * Look up a BIC/SWIFT code in the GLEIF database (39K+ entries).
+   * Look up a BIC/SWIFT code in the BIC database (121K+ entries; 38K LEI-enriched via GLEIF).
    * @param code - BIC8 or BIC11 code
    */
   async lookupBIC(code: string): Promise<BICLookupResult> {

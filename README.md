@@ -13,7 +13,7 @@
 > **The compliance API for AI agents.** IBAN validation, BIC/SWIFT lookup, Swiss clearing (BC-Nummer / QR-IID / SIX BankMaster), EMI/vIBAN classification, SEPA Instant + VoP reachability, and risk scoring — exposed natively over **MCP** and **x402 micropayments**, with no API key signup required.
 
 ```
-121,197 BIC entries (GLEIF) · 1,190 Swiss BC-Nummern (SIX) · 84 IBAN countries · <50ms p99
+121,197 BIC entries (38K LEI via GLEIF) · 1,190 Swiss BC-Nummern (SIX) · 84 IBAN countries · <50ms p99
 ```
 
 ---
@@ -59,7 +59,7 @@ Standard JSON-RPC `initialize` + `tools/list` + `tools/call` flow. Use this when
 | --------------------- | ----------------------------------------------------------------------------------------- | -------- |
 | `validate_iban`       | User mentions an IBAN, a bank account, or a SEPA payment                                  | $0.005   |
 | `batch_validate_iban` | List of IBANs, CSV cleanup, customer DB dedup, payout list triage                         | $0.002/each |
-| `lookup_bic`          | User already has a BIC/SWIFT — backed by 121,197 GLEIF entries with LEI enrichment        | $0.003   |
+| `lookup_bic`          | User already has a BIC/SWIFT — backed by 121,197 BIC entries (38,761 LEI-enriched via GLEIF) | $0.003   |
 | `lookup_ch_clearing`  | Swiss BC-Nummer / IID — **the only API with this data** (1,190 SIX BankMaster entries)    | $0.003   |
 | `check_compliance`    | Pre-flight risk triage before a SEPA / cross-border payment (sanctions + FATF + VoP)      | $0.02    |
 
@@ -178,8 +178,13 @@ Push to `main` — Railway auto-deploys via Dockerfile.
 
 ## Data Sources
 
-- **121,197 BIC/SWIFT entries**: [GLEIF BIC-LEI mapping](https://www.gleif.org/en/lei-data/lei-mapping/download-bic-to-lei-relationship-files), refreshed weekly
-- **LEI enrichment**: [GLEIF API](https://api.gleif.org)
+- **121,197 BIC/SWIFT entries** from public sources, refreshed monthly:
+  - 38,761 from [GLEIF BIC-LEI mapping](https://www.gleif.org/en/lei-data/lei-mapping/download-bic-to-lei-relationship-files) (the only rows with LEI)
+  - 81,642 from [PeterNotenboom/SwiftCodes](https://github.com/PeterNotenboom/SwiftCodes) (MIT-licensed SWIFT directory aggregate)
+  - 142 from [Deutsche Bundesbank BLZ](https://www.bundesbank.de/en/tasks/payment-systems/services/bank-sort-codes) (official quarterly BLZ→BIC file)
+  - 633 from [SIX Group BankMaster](https://www.six-group.com/en/products-services/banking-services/bank-master-data.html) Swiss BICs
+  - 19 from [NBP EWIB](https://ewib.nbp.pl/) (official Polish bank registry)
+- **LEI enrichment** for the 38,761 GLEIF rows: [GLEIF API](https://api.gleif.org)
 - **1,190 Swiss BC-Nummern / IIDs**: Official [SIX BankMaster](https://www.six-group.com/en/products-services/banking-services/bank-master-data.html) CSV
 - **EMI / vIBAN classification**: Curated set of 85+ known issuer BIC8 prefixes (Wise, Revolut, N26, Mercury, Modulr, etc.)
 - **VoP participants**: EBA RT1 / SCT Inst directories
