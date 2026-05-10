@@ -11,7 +11,7 @@ Official **Model Context Protocol (MCP) server** for [IBANforge](https://ibanfor
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------ | ----------- |
 | `validate_iban`       | Validate a single IBAN (ISO 13616 mod-97), resolve BIC, classify issuer (bank/EMI/vIBAN), SEPA + VoP flags               | 0.005       |
 | `batch_validate_iban` | Validate up to 100 IBANs in one call                                                                                     | 0.002 each  |
-| `lookup_bic`          | Lookup BIC/SWIFT against 121,197 BIC entries (38,761 LEI-enriched via GLEIF)                                              | 0.003       |
+| `lookup_bic`          | Lookup BIC/SWIFT against 121,399 BIC entries (38,761 LEI-enriched via GLEIF)                                              | 0.003       |
 | `lookup_ch_clearing`  | Lookup Swiss BC-Nummer / IID against 1,190 SIX BankMaster entries (SIC, euroSIC, QR-IID)                                 | 0.003       |
 | `check_compliance`    | Full compliance check: IBAN + sanctions (OFAC/EU/UN) + SEPA Instant + VoP + risk score (0-100)                           | 0.02        |
 
@@ -84,11 +84,12 @@ After adding the server, ask your AI agent:
 
 ## Data sources
 
-- **121,197 BIC entries** from public sources, refreshed monthly:
+- **121,399 BIC entries** from public sources, refreshed monthly:
   - 38,761 from [GLEIF](https://www.gleif.org) (the only rows with LEI codes)
   - 81,642 from [PeterNotenboom/SwiftCodes](https://github.com/PeterNotenboom/SwiftCodes) (MIT-licensed SWIFT directory)
   - 142 from Deutsche Bundesbank BLZ (official quarterly file)
   - 633 from SIX Group BankMaster (Swiss BICs)
+  - 201 from EBA Clearing STEP2 SCT (official SEPA Reachable PSPs directory)
   - 19 from NBP EWIB (official Polish bank registry)
 - **1,190 BC-Nummern** from the official [SIX BankMaster](https://www.six-group.com/en/products-services/banking-services/bank-master-data.html) CSV
 - **EMI / vIBAN classification** from a curated dataset of 30+ known issuer prefixes

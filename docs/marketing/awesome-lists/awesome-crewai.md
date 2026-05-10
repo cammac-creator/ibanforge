@@ -78,7 +78,7 @@ IBANforge is an open-source (MIT) MCP server + Python SDK that gives CrewAI agen
 
 - `validate_iban` — mod-97 + BBAN structure, 84 countries
 - `batch_validate_iban` — up to 100 IBANs per call
-- `lookup_bic` — 121,197 BIC entries from public sources (GLEIF, SWIFT directory, Bundesbank, SIX, NBP), with LEI enrichment for 38,761 GLEIF rows
+- `lookup_bic` — 121,399 BIC entries from public sources (GLEIF, SWIFT directory, Bundesbank, SIX, NBP, EBA Step2 SCT), with LEI enrichment for 38,761 GLEIF rows
 - `lookup_ch_clearing` — 1,190 Swiss BC-Nummer / IID entries from SIX BankMaster (dataset not exposed as an API anywhere else)
 - `check_compliance` — OFAC, EU, UN sanctions, FATF, SEPA Instant, VoP, risk score 0–100, in a single tool call
 

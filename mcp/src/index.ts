@@ -183,7 +183,7 @@ const TOOLS: Tool[] = [
       'USE WHEN: the user already has a BIC/SWIFT (8 or 11 chars, alphanumeric, e.g., "UBSWCHZH80A", "DEUTDEFF") ' +
       'and asks which bank it belongs to, where the bank is, or its LEI for compliance/regulatory matching. ' +
       'DO NOT USE for IBAN inputs — call validate_iban instead, it resolves the BIC for you. ' +
-      'BACKED BY: 121,197 BIC entries (38,761 LEI-enriched via GLEIF; additional rows from SWIFT directory, Bundesbank, SIX, NBP), refreshed monthly. ' +
+      'BACKED BY: 121,399 BIC entries (38,761 LEI-enriched via GLEIF; additional rows from SWIFT directory, Bundesbank, SIX, NBP, EBA Step2 SCT), refreshed monthly. ' +
       'RETURNS: bank_name, country, country_name, city, lei, address (if available). ' +
       'COST: 0.003 USDC.',
     inputSchema: {

@@ -636,7 +636,7 @@ const spec = {
           status: { type: 'string', enum: ['ok'] },
           version: { type: 'string', example: '1.0.0' },
           uptime_seconds: { type: 'number' },
-          bic_database_entries: { type: 'integer', description: 'Number of BIC entries in the database', example: 121197 },
+          bic_database_entries: { type: 'integer', description: 'Number of BIC entries in the database', example: 121399 },
           bic_data_last_updated: { type: 'string', description: 'Last update timestamp of BIC data' },
         },
       },

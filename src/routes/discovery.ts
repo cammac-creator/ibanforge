@@ -79,7 +79,7 @@ discovery.get('/.well-known/x402', (c) => {
     x402Version: 1,
     name: 'IBANforge',
     description:
-      'IBAN validation, BIC/SWIFT lookup, Swiss clearing & compliance API. 121,197 BIC entries (38,761 LEI-enriched via GLEIF), 1,190 Swiss BC-Nummer from SIX, 84 countries, 85 EMI/vIBAN issuer classifications.',
+      'IBAN validation, BIC/SWIFT lookup, Swiss clearing & compliance API. 121,399 BIC entries (38,761 LEI-enriched via GLEIF), 1,190 Swiss BC-Nummer from SIX, 84 countries, 85 EMI/vIBAN issuer classifications.',
     homepage: 'https://ibanforge.com',
     documentation: 'https://ibanforge.com/docs',
     pricing: 'https://ibanforge.com/pricing',

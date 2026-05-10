@@ -18,7 +18,7 @@ Dann gibt es das BIC-Problem. Selbst wenn eine IBAN strukturell gueltig ist, mue
 
 ## IBANforge: eine API fuer beides
 
-[IBANforge](https://ibanforge.com) ist eine REST-API, die vollstaendige IBAN-Validierung -- Pruefsumme, Laenderregeln, BBAN-Parsing -- durchfuehrt und den BIC-Code in derselben Antwort aufloest, gegen einen ueber 121.000 Eintraege umfassenden konsolidierten BIC-Datensatz aus oeffentlichen Quellen (GLEIF, SWIFT-Verzeichnis, Bundesbank, SIX, NBP), mit LEI-Anreicherung fuer ~38K Eintraege aus GLEIF. Eine POST-Anfrage, eine strukturierte JSON-Antwort.
+[IBANforge](https://ibanforge.com) ist eine REST-API, die vollstaendige IBAN-Validierung -- Pruefsumme, Laenderregeln, BBAN-Parsing -- durchfuehrt und den BIC-Code in derselben Antwort aufloest, gegen einen ueber 121.000 Eintraege umfassenden konsolidierten BIC-Datensatz aus oeffentlichen Quellen (GLEIF, SWIFT-Verzeichnis, Bundesbank, SIX, NBP, EBA Step2 SCT), mit LEI-Anreicherung fuer ~38K Eintraege aus GLEIF. Eine POST-Anfrage, eine strukturierte JSON-Antwort.
 
 Es gibt einen kostenlosen `/v1/demo`-Endpunkt, um Ihren Parser zu testen, ohne die kostenpflichtigen Endpunkte zu beruehren, und einen [interaktiven Playground](https://ibanforge.com/playground), wenn Sie eine IBAN einfuegen und sehen moechten, was zurueckkommt, bevor Sie eine Zeile Code schreiben.
 

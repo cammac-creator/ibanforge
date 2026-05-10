@@ -41,7 +41,7 @@ function createMcpServer(): McpServer {
     title: 'IBANforge',
     version: pkg.version,
     description:
-      'IBAN validation, BIC/SWIFT lookup, Swiss clearing, SEPA compliance and risk indicators. 121,197 BIC entries (38,761 LEI-enriched via GLEIF), 1,190 Swiss BC-Nummer from SIX, 84 countries.',
+      'IBAN validation, BIC/SWIFT lookup, Swiss clearing, SEPA compliance and risk indicators. 121,399 BIC entries (38,761 LEI-enriched via GLEIF), 1,190 Swiss BC-Nummer from SIX, 84 countries.',
     websiteUrl: 'https://ibanforge.com',
     icons: [
       {
@@ -218,7 +218,7 @@ function createMcpServer(): McpServer {
         'USE WHEN: the user already has a BIC/SWIFT (8 or 11 chars, alphanumeric, e.g., "UBSWCHZH80A", "DEUTDEFF") ' +
         'and asks which bank it belongs to, where the bank is, or its LEI for compliance/regulatory matching. ' +
         'DO NOT USE for IBAN inputs — call validate_iban instead, it resolves the BIC for you. ' +
-        'BACKED BY: 121,197 BIC entries (38,761 LEI-enriched via GLEIF; additional rows from SWIFT directory, Bundesbank, SIX, NBP), refreshed monthly.',
+        'BACKED BY: 121,399 BIC entries (38,761 LEI-enriched via GLEIF; additional rows from SWIFT directory, Bundesbank, SIX, NBP, EBA Step2 SCT), refreshed monthly.',
       inputSchema: {
         bic: z.string().describe('BIC/SWIFT code (8 or 11 chars)'),
       },

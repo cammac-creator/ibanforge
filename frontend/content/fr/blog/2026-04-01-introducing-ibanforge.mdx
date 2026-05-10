@@ -10,7 +10,7 @@ IBANforge est notre reponse a ce probleme.
 
 ## Qu'est-ce qu'IBANforge ?
 
-IBANforge est une API pour developpeurs dediee a la validation d'IBAN et a la recherche de codes BIC/SWIFT. Elle couvre **plus de 80 pays**, valide la structure et la somme de controle (mod-97), analyse les codes banque et agence a partir du BBAN, et resout les codes BIC a partir d'un **jeu de donnees consolide de plus de 121 000 entrees** issu de sources publiques (GLEIF, annuaire SWIFT, Bundesbank, SIX, NBP), avec enrichissement LEI pour ~38K lignes provenant de GLEIF.
+IBANforge est une API pour developpeurs dediee a la validation d'IBAN et a la recherche de codes BIC/SWIFT. Elle couvre **plus de 80 pays**, valide la structure et la somme de controle (mod-97), analyse les codes banque et agence a partir du BBAN, et resout les codes BIC a partir d'un **jeu de donnees consolide de plus de 121 000 entrees** issu de sources publiques (GLEIF, annuaire SWIFT, Bundesbank, SIX, NBP, EBA Step2 SCT), avec enrichissement LEI pour ~38K lignes provenant de GLEIF.
 
 Vous envoyez une requete POST. Vous recevez une reponse JSON structuree et propre. C'est tout.
 
@@ -51,7 +51,7 @@ Ensemble, ces deux evolutions -- workflows agentiques + micropaiements on-chain 
 
 **Validation d'IBAN dans plus de 80 pays.** Verification complete de la somme de controle mod-97, regles de longueur et de format specifiques a chaque pays, et analyse du BBAN pour extraire les codes banque/agence le cas echeant.
 
-**Plus de 121 000 entrees BIC issues de sources publiques.** La base consolide GLEIF, l'annuaire SWIFT, la Bundesbank, SIX et la NBP. Les ~38K lignes provenant de GLEIF sont en plus enrichies avec le Legal Entity Identifier (LEI). Nous importons, indexons et servons l'ensemble avec des recherches en moins d'une milliseconde. La validation combinee IBAN + BIC est disponible en une seule requete.
+**Plus de 121 000 entrees BIC issues de sources publiques.** La base consolide GLEIF, l'annuaire SWIFT, la Bundesbank, SIX, la NBP et EBA Clearing STEP2 SCT. Les ~38K lignes provenant de GLEIF sont en plus enrichies avec le Legal Entity Identifier (LEI). Nous importons, indexons et servons l'ensemble avec des recherches en moins d'une milliseconde. La validation combinee IBAN + BIC est disponible en une seule requete.
 
 **Donnees de conformite SEPA.** Chaque reponse inclut le statut d'adhesion SEPA, les schemas de paiement disponibles (SCT, SDD, SCT_INST), et si la Verification of Payee (VoP) est obligatoire -- essentiel pour les agents naviguant dans les reglementations de paiement europeennes.
 

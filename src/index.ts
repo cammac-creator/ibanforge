@@ -12,6 +12,7 @@ import { ibanCompliance } from './routes/iban-compliance.js';
 import { chClearing } from './routes/ch-clearing.js';
 import { health } from './routes/health.js';
 import { stats } from './routes/stats.js';
+import { adminRevenue } from './routes/admin-revenue.js';
 import { demo } from './routes/demo.js';
 import { landing } from './routes/landing.js';
 import { openapi } from './routes/openapi.js';
@@ -149,7 +150,7 @@ app.get('/llms.txt', (c) => {
   return c.text(
     `# IBANforge
 
-> IBAN validation, BIC/SWIFT lookup, Swiss clearing and compliance risk scoring API designed for AI agents and developers. 121,197 BIC entries (38,761 LEI-enriched via GLEIF; additional rows from SWIFT directory, Bundesbank, SIX, NBP), 1,190 Swiss BC-Nummer from SIX, 84 countries, 85 EMI/vIBAN issuer classifications.
+> IBAN validation, BIC/SWIFT lookup, Swiss clearing and compliance risk scoring API designed for AI agents and developers. 121,399 BIC entries (38,761 LEI-enriched via GLEIF; additional rows from SWIFT directory, Bundesbank, SIX, NBP, EBA Step2 SCT), 1,190 Swiss BC-Nummer from SIX, 84 countries, 85 EMI/vIBAN issuer classifications.
 
 ## Instructions for LLM agents
 
@@ -437,6 +438,7 @@ app.route('/', ibanFormat);
 app.route('/', ibanStructure);
 app.route('/', health);
 app.route('/', stats);
+app.route('/', adminRevenue);
 app.route('/', demo);
 app.route('/', openapi);
 app.route('/', discovery);
