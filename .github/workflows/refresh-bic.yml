@@ -26,6 +26,9 @@ jobs:
       - name: Seed BIC database from GLEIF
         run: npm run db:seed
 
+      - name: Enrich BIC database from public sources (SwiftCodes, Bundesbank, SIX, OeNB, NBP, EBA Step2)
+        run: npm run bic:enrich
+
       - name: Enrich country names
         run: npm run db:enrich
 
@@ -40,7 +43,7 @@ jobs:
           if git diff --staged --quiet; then
             echo "No changes to BIC database"
           else
-            git commit -m "chore: refresh BIC database from GLEIF (monthly cron)"
+            git commit -m "chore: refresh BIC database from GLEIF + public sources (monthly cron)"
             git pull --rebase
             git push
           fi
