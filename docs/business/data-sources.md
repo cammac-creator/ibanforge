@@ -1,7 +1,15 @@
 # Sources de donnees BIC/SWIFT — Recherche 2026-04-01
 
 ## Source actuelle
-- **GLEIF BIC-LEI mapping** : 39 243 entrees, CC0, CSV mensuel
+La base contient 121 197 entrees BIC au total, agregees depuis :
+- **GLEIF BIC-LEI mapping** : 38 761 entrees, CC0, CSV mensuel — seules avec LEI enrichment
+- **SWIFT directory** (PeterNotenboom/SwiftCodes, MIT) : 81 642 entrees
+- **SIX Group** (Suisse) : 633 entrees
+- **Deutsche Bundesbank** : 142 entrees
+- **NBP Pologne** : 19 entrees
+
+Refresh mensuel via cron GitHub Actions.
+
 - **bic_data.json** : 6 908 correspondances bankcode→BIC (10 pays EU), probablement via sigalor/iban-to-bic
 
 ## Sources exploitables (licence OK)
@@ -34,4 +42,4 @@
 - maranemil/swift-bic-all — licence inconnue, scraping
 
 ## Potentiel d'enrichissement
-39K actuelles → ~55K+ avec Bundesbank + SIX Group + mise a jour sigalor
+121K actuelles (38K GLEIF + 81K SWIFT directory + 633 SIX + 142 Bundesbank + 19 NBP) → enrichissement futur via mise a jour sigalor et autres sources publiques.

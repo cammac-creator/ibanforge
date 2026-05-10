@@ -8,7 +8,7 @@
 
 ## 🎯 Tier 1 — Extensions **directes** d'IBANforge (même API, même données, même stack)
 
-Ces projets réutilisent ≥70 % du code IBANforge, la base BIC 39k GLEIF, le middleware x402 et le serveur MCP. Timing parfait avec les deadlines VoP 2025/2027. Ce sont les candidats les plus naturels si tu veux capitaliser sur l'actif IBANforge.
+Ces projets réutilisent ≥70 % du code IBANforge, la base BIC 121k entrées (38k LEI-enrichies via GLEIF + SWIFT directory + Bundesbank + SIX + NBP), le middleware x402 et le serveur MCP. Timing parfait avec les deadlines VoP 2025/2027. Ce sont les candidats les plus naturels si tu veux capitaliser sur l'actif IBANforge.
 
 
 ### #1 · SEPAgate  🟢  💎
@@ -17,7 +17,7 @@ Ces projets réutilisent ≥70 % du code IBANforge, la base BIC 39k GLEIF, le mi
 - **Fit Alain** : 80% stack réutilisable (Hono, x402, SQLite, MCP), trilingue FR/DE/IT parfait pour tuning name-matching zone euro. Pas besoin d'associé, extension naturelle du savoir IBANforge.
 - **Problème** : Le règlement EU 2024/886 impose la Verification of Payee (VoP) à toutes les banques de la zone euro depuis le 9 octobre 2025, et hors euro depuis le 9 juillet 2027 — mais les agents IA qui initient des virements SEPA n'ont aucun oracle normalisé pour pré-valider nom↔IBAN↔BIC avant soumission. Les PSP facturent la VoP 0.02 à 0.10 EUR par requête et 
 - **Monétisation** : 0.015 USDC/vérification VoP (3x le prix validate IBAN pur), tier flat 149 EUR/mois 15k vérifs pour corporates. Break-even ~1200 vérifs/jour soit ~18 USD/jour. Cible 24 mois : 60 corporates flat + 40 agents x402, ARR réaliste 140-180k CHF. Marge 82% après coût DB + Railway.
-- **Solution** : API unique POST /vop qui retourne match/close-match/no-match + score, combinant sources publiques (registres commerce CH/DE/FR/IT, LEI GLEIF, BIC directory) et heuristiques fuzzy name-matching. Extension directe d'IBANforge : réutilise la base BIC 39k entrées, la validation mod97, le middleware x402. Ajout d'un module 
+- **Solution** : API unique POST /vop qui retourne match/close-match/no-match + score, combinant sources publiques (registres commerce CH/DE/FR/IT, LEI GLEIF, BIC directory) et heuristiques fuzzy name-matching. Extension directe d'IBANforge : réutilise la base BIC 121k entrées (38k LEI-enrichies via GLEIF), la validation mod97, le middleware x402. Ajout d'un module 
 - **Barrière** : Construire le graphe nom↔IBAN propre prend 6-9 mois (agrégation Zefix/Handelsregister/RNE + matching LEI + nettoyage doublons). Un concurrent doit répliquer la stack IBANforge + VoP + fuzzy multilingue FR/DE/IT/ES. Wise/Revolut ne vendront 
 - **Risque** : Les banques/PSP pourraient pousser un standard VoP gratuit côté émetteur qui rendrait l'oracle tiers redondant d'ici 2027.
 

@@ -21,8 +21,9 @@ IBANforge is an x402-native compliance API for AI finance agents. It's been
 live on Base mainnet via the CDP facilitator for several weeks, with the full
 Bazaar discovery extension and 5 paid endpoints. The angle that's not on
 agentic.market today: a single call returns IBAN validity + BIC/SWIFT (121,197
-GLEIF entries) + Swiss BC-Nummer (1,190 SIX entries — the only API exposing
-this) + sanctions/SEPA/VoP risk score + EMI/vIBAN classification.
+BIC entries, 38,761 LEI-enriched via GLEIF) + Swiss BC-Nummer (1,190 SIX entries
+— the only API exposing this) + sanctions/SEPA/VoP risk score + EMI/vIBAN
+classification.
 
 Agent-first details:
 - Native MCP server (5 tools) — npm i ibanforge-mcp, also remote streamable-HTTP
@@ -96,7 +97,7 @@ with the only Swiss BC-Nummer endpoint and a sanctions+SEPA+VoP risk score
 in one call.
 
 Quick stats:
-- 121,197 GLEIF BIC entries (LEI-enriched)
+- 121,197 BIC entries from public sources (GLEIF, SWIFT directory, Bundesbank, SIX, NBP), 38,761 LEI-enriched via GLEIF
 - 1,190 SIX BankMaster entries (Swiss BC-Nummer, unique on the marketplace)
 - 84 countries with IBAN coverage
 - 5 MCP tools, free tier (200 req/mo) with x402 fallback when exhausted

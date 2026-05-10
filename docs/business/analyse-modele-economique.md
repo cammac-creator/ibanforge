@@ -66,5 +66,5 @@ Le tier gratuit (200 appels/mois) sert le SEO et le funnel de conversion (taux c
 ### Donnees GLEIF : avantages et limites
 
 - Avantage : CC0 (domaine public), gratuit, mis a jour 3x/jour
-- Limite : ~39K entrees BIC-LEI vs ~100K+ dans le registre SWIFT officiel
+- Limite : ~38K entrees BIC-LEI via GLEIF seul ; couverture totale portee a 121K via aggregation avec SWIFT directory (MIT), Bundesbank, SIX et NBP
 - Strategie : transparence sur la couverture, enrichissement progressif

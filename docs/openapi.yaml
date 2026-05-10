@@ -8,7 +8,7 @@ info:
 
     ## Features
     - **IBAN Validation** — Validate any IBAN from 75+ countries with full BBAN parsing, check-digit verification, and formatted output.
-    - **BIC/SWIFT Lookup** — Search 121K+ BIC entries sourced from GLEIF, enriched with LEI data, institution names, and branch info.
+    - **BIC/SWIFT Lookup** — Search 121,197 BIC entries from public sources (GLEIF, SWIFT directory, Bundesbank, SIX, NBP), with LEI enrichment for 38,761 GLEIF rows, plus institution names and branch info.
     - **Compliance Screening** — Sanctions lists (OFAC/EU/UN), FATF grey/black list status, SEPA Instant reachability, Verification of Payee (VoP) participant checks, and composite risk scoring (0–100).
     - **Issuer Classification** — Detect vIBANs by classifying issuers as traditional banks, digital banks, EMIs, or payment institutions (85 known BIC8 mappings).
     - **SEPA Data** — SCT, SDD, and SCT_INST scheme support plus VoP requirement flags.
@@ -258,7 +258,7 @@ paths:
       summary: Lookup a BIC/SWIFT code
       description: |
         Returns institution details for a BIC/SWIFT code (8 or 11 characters).
-        Data sourced from GLEIF with 121K+ entries, enriched with LEI identifiers.
+        Database covers 121,197 BIC entries from public sources (GLEIF, SWIFT directory, Bundesbank, SIX, NBP), with LEI enrichment for 38,761 GLEIF rows.
 
         **Cost:** $0.003 USDC per call.
       tags:
@@ -876,7 +876,7 @@ components:
             bank_name:
               type: string
               nullable: true
-              description: Institution name from GLEIF database
+              description: Institution name from the BIC database
               example: NATWEST
             city:
               type: string
@@ -1069,7 +1069,7 @@ components:
           example: UBSWCHZHXXX
         found:
           type: boolean
-          description: Whether the BIC was found in the GLEIF database
+          description: Whether the BIC was found in the database
           example: true
         valid_format:
           type: boolean
@@ -1507,7 +1507,7 @@ components:
           example: 86400
         bic_database_entries:
           type: integer
-          description: Number of BIC entries in the GLEIF database
+          description: Total number of BIC entries in the database (GLEIF + SWIFT directory + Bundesbank + SIX + NBP)
           example: 121197
         bic_data_last_updated:
           type: string

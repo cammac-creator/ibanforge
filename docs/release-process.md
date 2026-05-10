@@ -97,6 +97,6 @@ curl -s 'https://glama.ai/api/mcp/v1/servers/cammac-creator/ibanforge' | python3
 
 ## Why this matters
 
-A platform showing **3 tools instead of 5** or **39K BICs instead of 121K** doesn't just look bad — it actively misleads agents that scan the description for capability signals. They will pick a competitor whose listing claims more, even if the actual API is identical.
+A platform showing **3 tools instead of 5** or **38K BICs instead of 121K** doesn't just look bad — it actively misleads agents that scan the description for capability signals. They will pick a competitor whose listing claims more, even if the actual API is identical.
 
 Keeping all listings fresh is part of distribution, not maintenance.

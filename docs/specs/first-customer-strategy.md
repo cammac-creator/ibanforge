@@ -68,7 +68,7 @@ Pas des clients directs, mais des prescripteurs qui integrent des APIs chez leur
 | Fonctionnalite | IBANforge | IBANAPI | iban.com | OpenIBAN |
 |---|---|---|---|---|
 | Validation IBAN (mod97) | Oui | Oui | Oui | Oui |
-| BIC/SWIFT lookup (39K+ GLEIF) | Oui | Partiel | Oui | Non |
+| BIC/SWIFT lookup (121K+ entrees, 38K LEI-enrichies via GLEIF) | Oui | Partiel | Oui | Non |
 | **Detection vIBAN** (EMI/neobank) | **Oui** (30+ BIC8) | Non | Non | Non |
 | **Risk scoring pays** | **Oui** | Non | Non | Non |
 | **Statut SEPA / VoP** | **Oui** | Non | Partiel | Non |
@@ -179,7 +179,7 @@ Je suis [Prenom], fondateur d'IBANforge -- une API de validation IBAN pensee pou
 
 En une seule requete API, IBANforge retourne :
 - La validation IBAN complete (75+ pays)
-- Le BIC/SWIFT associe (39K+ entrees GLEIF)
+- Le BIC/SWIFT associe (121K+ entrees, dont 38K LEI-enrichies via GLEIF)
 - La **classification emetteur** : banque traditionnelle, neobank, EMI (detection vIBAN)
 - Le **score de risque pays** et le statut SEPA/VoP
 
@@ -206,7 +206,7 @@ mein Name ist [Vorname], Grunder von IBANforge -- einer IBAN-Validierungs-API, d
 
 Mit einem einzigen API-Aufruf liefert IBANforge:
 - Vollstandige IBAN-Validierung (75+ Lander)
-- BIC/SWIFT-Zuordnung (39'000+ Eintrage aus GLEIF)
+- BIC/SWIFT-Zuordnung (121'000+ Eintrage, davon 38'000 mit LEI-Anreicherung via GLEIF)
 - **Emittenten-Klassifizierung**: traditionelle Bank, Neobank oder EMI (vIBAN-Erkennung)
 - **Landerrisiko-Scoring** und SEPA/VoP-Status
 

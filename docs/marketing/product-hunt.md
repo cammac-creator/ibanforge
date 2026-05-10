@@ -8,7 +8,7 @@ Free IBAN validation & BIC lookup API for AI agents
 
 IBANforge validates IBANs and looks up BIC/SWIFT codes for 84 countries, with SEPA compliance data, issuer classification (bank vs EMI/neobank), and risk indicators. Built for developers and AI agents.
 
-- 121,000+ BIC entries from GLEIF (open data)
+- 121,197 BIC entries from public sources (GLEIF, SWIFT directory, Bundesbank, SIX, NBP), 38,761 LEI-enriched via GLEIF
 - SEPA membership, payment schemes, and VoP requirement per country
 - Swiss clearing: 1,190 BC-Nummer entries from SIX (SIC, euroSIC, Instant Payments, QR-IID)
 - Issuer classification: 85 EMI/neobank classifications (Revolut, Wise, N26, etc.) for vIBAN detection

@@ -44,7 +44,7 @@ Sharing a tool I built that LlamaIndex agents may find useful when handling bank
 
 - `pip install ibanforge`
 - 5 tools: `validate_iban`, `batch_validate_iban`, `lookup_bic`, `lookup_ch_clearing`, `check_compliance`
-- Datasets: 121,197 BICs (GLEIF), 1,190 Swiss BC-Nummer (SIX BankMaster — not available elsewhere as an API)
+- Datasets: 121,197 BICs from public sources (GLEIF, SWIFT directory, Bundesbank, SIX, NBP — with LEI enrichment for 38,761 GLEIF rows), 1,190 Swiss BC-Nummer (SIX BankMaster — not available elsewhere as an API)
 - 200 req/month free tier (no signup form, just `ifk_` key) + x402 pay-per-call (USDC on Base) when quota exceeded
 - Open source (MIT) for SDK + MCP, hosted API is commercial
 

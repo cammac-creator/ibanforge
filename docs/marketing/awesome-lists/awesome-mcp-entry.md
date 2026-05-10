@@ -34,7 +34,7 @@ The Finance & Fintech section format is:
 **Entry to insert (alphabetical order — after 'h' entries, before other 'i' entries):**
 
 ```markdown
-- [cammac-creator/ibanforge](https://github.com/cammac-creator/ibanforge) 📇 ☁️ 🏠 🍎 🪟 🐧 - IBAN validation and BIC/SWIFT lookup MCP server with 5 tools: `validate_iban`, `batch_validate_iban`, `lookup_bic`, `check_compliance`, `lookup_ch_clearing`. Covers 84 countries, 121K+ bank entries from GLEIF, Swiss clearing data from SIX. Pay-per-call via x402 micropayments (USDC) or self-host with Docker. [ibanforge.com](https://ibanforge.com)
+- [cammac-creator/ibanforge](https://github.com/cammac-creator/ibanforge) 📇 ☁️ 🏠 🍎 🪟 🐧 - IBAN validation and BIC/SWIFT lookup MCP server with 5 tools: `validate_iban`, `batch_validate_iban`, `lookup_bic`, `check_compliance`, `lookup_ch_clearing`. Covers 84 countries, 121K+ BIC entries (38K LEI-enriched via GLEIF), Swiss clearing data from SIX. Pay-per-call via x402 micropayments (USDC) or self-host with Docker. [ibanforge.com](https://ibanforge.com)
 ```
 
 ## Alternative entry (shorter format)
@@ -42,7 +42,7 @@ The Finance & Fintech section format is:
 Some entries in the list are more concise:
 
 ```markdown
-- [cammac-creator/ibanforge](https://github.com/cammac-creator/ibanforge) 📇 ☁️ - IBAN validation & BIC/SWIFT lookup for 84 countries. 5 MCP tools, 121K+ bank entries, Swiss clearing data, x402 micropayments.
+- [cammac-creator/ibanforge](https://github.com/cammac-creator/ibanforge) 📇 ☁️ - IBAN validation & BIC/SWIFT lookup for 84 countries. 5 MCP tools, 121K+ BIC entries (38K LEI-enriched via GLEIF), Swiss clearing data, x402 micropayments.
 ```
 
 ## Notes

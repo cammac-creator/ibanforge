@@ -1176,7 +1176,7 @@
     <div class="stats-row reveal">
       <div class="stat">
         <div class="stat-num">121K<span class="unit">+</span></div>
-        <div class="stat-label">banques référencées (source GLEIF)</div>
+        <div class="stat-label">banques référencées (GLEIF, SWIFT directory, Bundesbank, SIX, NBP)</div>
       </div>
       <div class="stat">
         <div class="stat-num">1 190</div>
@@ -1345,7 +1345,7 @@
       <div class="age-content" data-age="pro">
         <h3>Un endpoint HTTP, cinq outils MCP, USDC micropayments en option.</h3>
         <p>
-          <code>POST /v1/iban/validate</code> — mod-97 check, BBAN parsing par pays (84 schémas), BIC lookup via base GLEIF 121K entrées, classification issuer (85 EMI/neobanks), pays FATF, VoP coverage, score composite 0-100. Latence p95 &lt; 40 ms. Zero dépendance externe au runtime (SQLite local).
+          <code>POST /v1/iban/validate</code> — mod-97 check, BBAN parsing par pays (84 schémas), BIC lookup via base 121K entrées (38K LEI-enrichies via GLEIF + SWIFT directory + Bundesbank + SIX + NBP), classification issuer (85 EMI/neobanks), pays FATF, VoP coverage, score composite 0-100. Latence p95 &lt; 40 ms. Zero dépendance externe au runtime (SQLite local).
         </p>
         <p>
           Intégrations natives : SDK npm, OpenAPI 3.1, serveur MCP (5 outils : validate, batch, bic_lookup, check_compliance, ch_clearing_lookup), référencement Smithery (94/100), Glama, awesome-x402. Micropaiements x402 sur Base L2 en option (USDC), pas obligatoires.
@@ -1396,7 +1396,7 @@ curl -X POST https://api.ibanforge.com/v1/iban/validate \<br>
         </div>
         <div class="tool-body">
           <h3>validate_iban</h3>
-          <p>Contrôle mod-97, parse le BBAN, résout le BIC via GLEIF, classifie l'émetteur (banque / néobanque / EMI / institution de paiement), évalue le risque. Enrichi du clearing suisse pour CH et LI.</p>
+          <p>Contrôle mod-97, parse le BBAN, résout le BIC via la base interne (121K entrées agrégées de sources publiques), classifie l'émetteur (banque / néobanque / EMI / institution de paiement), évalue le risque. Enrichi du clearing suisse pour CH et LI.</p>
           <code>POST /v1/iban/validate</code>
         </div>
         <div class="tool-price">$0.005</div>
@@ -1803,7 +1803,7 @@ curl -X POST https://api.ibanforge.com/v1/iban/validate \<br>
   </div>
   <div class="container">
     <div class="disclaimer">
-      <strong>Note.</strong> IBANforge est un outil technique d'aide à la validation. La responsabilité finale d'exécuter ou non un virement reste à la charge de l'utilisateur et de son prestataire de services de paiement. Les données sources proviennent de GLEIF (BIC/LEI, licence CC0) et SIX BankMaster (clearing suisse, republication autorisée pour les données publiques). Le score de risque composite est un indicateur statistique, pas un avis juridique. Comparaisons concurrents vérifiées le 22 avril 2026 sur les sites officiels — sujettes à évolution.
+      <strong>Note.</strong> IBANforge est un outil technique d'aide à la validation. La responsabilité finale d'exécuter ou non un virement reste à la charge de l'utilisateur et de son prestataire de services de paiement. Les données sources proviennent de plusieurs registres publics : GLEIF (BIC/LEI, licence CC0), SWIFT directory (PeterNotenboom/SwiftCodes, MIT), Deutsche Bundesbank, SIX BankMaster (clearing suisse, republication autorisée pour les données publiques) et NBP Pologne. Le score de risque composite est un indicateur statistique, pas un avis juridique. Comparaisons concurrents vérifiées le 22 avril 2026 sur les sites officiels — sujettes à évolution.
     </div>
   </div>
 </footer>

@@ -4,7 +4,7 @@
 
 I just launched IBANforge -- a free API for IBAN validation and BIC/SWIFT lookup.
 
-84 countries. 121K+ BIC entries. MCP integration for AI agents.
+84 countries. 121K+ BIC entries (38K LEI-enriched via GLEIF). MCP integration for AI agents.
 
 Free during launch. No API key. No signup.
 
@@ -28,7 +28,7 @@ What makes IBANforge different:
 
 - MCP integration -- AI agents (Claude, GPT, Cursor) can discover and use it natively (5 tools)
 - Swiss clearing data -- 1,190 BC-Nummer entries from SIX (SIC, euroSIC, Instant Payments, QR-IID)
-- Open data -- 121K BIC entries from GLEIF (CC0 license)
+- Open data -- 121K BIC entries (38K LEI-enriched via GLEIF, CC0)
 - 85 EMI/neobank classifications for vIBAN detection
 - Self-hostable -- MIT license, Docker, SQLite
 - x402 micropayments -- pay $0.005/call, no subscription
