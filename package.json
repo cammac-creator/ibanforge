@@ -2,7 +2,7 @@
   "name": "ibanforge",
   "version": "1.2.1",
   "mcpName": "io.github.cammac-creator/ibanforge",
-  "description": "IBAN validation, BIC/SWIFT lookup, Swiss clearing, SEPA compliance, issuer classification and risk indicators for AI agents. 121,197 BIC entries (38,761 LEI-enriched via GLEIF; additional rows from SWIFT directory, Bundesbank, SIX, NBP), 1,190 Swiss BC-Nummer from SIX. Supports 84 countries.",
+  "description": "IBAN validation, BIC/SWIFT lookup, Swiss clearing, SEPA compliance, issuer classification and risk indicators for AI agents. 121,399 BIC entries (38,761 LEI-enriched via GLEIF; additional rows from SWIFT directory, Bundesbank, SIX, NBP, EBA Step2 SCT), 1,190 Swiss BC-Nummer from SIX. Supports 84 countries.",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -57,7 +57,8 @@
     "tsx": "^4.19.0",
     "typescript": "^5.7.0",
     "typescript-eslint": "^8.58.0",
-    "vitest": "^3.0.0"
+    "vitest": "^3.0.0",
+    "xlsx": "^0.18.5"
   },
   "bin": {
     "ibanforge-mcp": "dist/mcp/server.js"

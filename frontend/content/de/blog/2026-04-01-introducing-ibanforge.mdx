@@ -10,7 +10,7 @@ IBANforge ist unsere Antwort auf dieses Problem.
 
 ## Was ist IBANforge?
 
-IBANforge ist eine Entwickler-API zur IBAN-Validierung und BIC/SWIFT-Abfrage. Sie deckt **ueber 80 Laender** ab, validiert Struktur und Pruefsumme (Mod-97), parst Bank- und Filialnummern aus der BBAN und gleicht BIC-Codes mit einem **ueber 121.000 BIC-Eintraege umfassenden Datensatz aus oeffentlichen Quellen** (GLEIF, SWIFT-Verzeichnis, Bundesbank, SIX, NBP) ab, mit LEI-Anreicherung fuer ~38K Eintraege aus GLEIF.
+IBANforge ist eine Entwickler-API zur IBAN-Validierung und BIC/SWIFT-Abfrage. Sie deckt **ueber 80 Laender** ab, validiert Struktur und Pruefsumme (Mod-97), parst Bank- und Filialnummern aus der BBAN und gleicht BIC-Codes mit einem **ueber 121.000 BIC-Eintraege umfassenden Datensatz aus oeffentlichen Quellen** (GLEIF, SWIFT-Verzeichnis, Bundesbank, SIX, NBP, EBA Step2 SCT) ab, mit LEI-Anreicherung fuer ~38K Eintraege aus GLEIF.
 
 Sie senden eine POST-Anfrage. Sie erhalten eine saubere, strukturierte JSON-Antwort. Das ist alles.
 
@@ -51,7 +51,7 @@ Zusammen machen diese beiden Verschiebungen -- agentenbasierte Workflows + On-Ch
 
 **IBAN-Validierung fuer ueber 80 Laender.** Vollstaendige Mod-97-Pruefsummenverifizierung, laenderspezifische Laengen- und Formatregeln sowie BBAN-Parsing zur Extraktion von Bank-/Filialnummern, wo zutreffend.
 
-**Ueber 121.000 BIC-Eintraege aus oeffentlichen Quellen.** Die Datenbank vereint GLEIF, das SWIFT-Verzeichnis, die Bundesbank, SIX und NBP. Die ~38K Eintraege aus GLEIF werden zusaetzlich mit dem Legal Entity Identifier (LEI) angereichert. Wir importieren, indexieren und liefern alles mit Sub-Millisekunden-Abfragen. Kombinierte IBAN- + BIC-Validierung ist in einer einzigen Anfrage verfuegbar.
+**Ueber 121.000 BIC-Eintraege aus oeffentlichen Quellen.** Die Datenbank vereint GLEIF, das SWIFT-Verzeichnis, die Bundesbank, SIX, NBP und EBA Clearing STEP2 SCT. Die ~38K Eintraege aus GLEIF werden zusaetzlich mit dem Legal Entity Identifier (LEI) angereichert. Wir importieren, indexieren und liefern alles mit Sub-Millisekunden-Abfragen. Kombinierte IBAN- + BIC-Validierung ist in einer einzigen Anfrage verfuegbar.
 
 **SEPA-Compliance-Daten.** Jede Antwort enthaelt den SEPA-Mitgliedsstatus, verfuegbare Zahlungsverfahren (SCT, SDD, SCT_INST) und ob die Verification of Payee (VoP) gemaess EU-Regulierung erforderlich ist -- unverzichtbar fuer Agenten, die EU-Zahlungsvorschriften navigieren.
 

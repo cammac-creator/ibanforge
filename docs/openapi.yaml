@@ -8,7 +8,7 @@ info:
 
     ## Features
     - **IBAN Validation** — Validate any IBAN from 75+ countries with full BBAN parsing, check-digit verification, and formatted output.
-    - **BIC/SWIFT Lookup** — Search 121,197 BIC entries from public sources (GLEIF, SWIFT directory, Bundesbank, SIX, NBP), with LEI enrichment for 38,761 GLEIF rows, plus institution names and branch info.
+    - **BIC/SWIFT Lookup** — Search 121,399 BIC entries from public sources (GLEIF, SWIFT directory, Bundesbank, SIX, NBP, EBA Step2 SCT), with LEI enrichment for 38,761 GLEIF rows, plus institution names and branch info.
     - **Compliance Screening** — Sanctions lists (OFAC/EU/UN), FATF grey/black list status, SEPA Instant reachability, Verification of Payee (VoP) participant checks, and composite risk scoring (0–100).
     - **Issuer Classification** — Detect vIBANs by classifying issuers as traditional banks, digital banks, EMIs, or payment institutions (85 known BIC8 mappings).
     - **SEPA Data** — SCT, SDD, and SCT_INST scheme support plus VoP requirement flags.
@@ -258,7 +258,7 @@ paths:
       summary: Lookup a BIC/SWIFT code
       description: |
         Returns institution details for a BIC/SWIFT code (8 or 11 characters).
-        Database covers 121,197 BIC entries from public sources (GLEIF, SWIFT directory, Bundesbank, SIX, NBP), with LEI enrichment for 38,761 GLEIF rows.
+        Database covers 121,399 BIC entries from public sources (GLEIF, SWIFT directory, Bundesbank, SIX, NBP, EBA Step2 SCT), with LEI enrichment for 38,761 GLEIF rows.
 
         **Cost:** $0.003 USDC per call.
       tags:
@@ -566,7 +566,7 @@ paths:
                 status: ok
                 version: 1.1.0
                 uptime_seconds: 86400
-                bic_database_entries: 121197
+                bic_database_entries: 121399
                 bic_data_last_updated: '2025-01-15T00:00:00Z'
         '503':
           description: Service unhealthy
@@ -1507,8 +1507,8 @@ components:
           example: 86400
         bic_database_entries:
           type: integer
-          description: Total number of BIC entries in the database (GLEIF + SWIFT directory + Bundesbank + SIX + NBP)
-          example: 121197
+          description: Total number of BIC entries in the database (GLEIF + SWIFT directory + Bundesbank + SIX + NBP + EBA Step2 SCT)
+          example: 121399
         bic_data_last_updated:
           type: string
           description: Timestamp of the last BIC data update
