@@ -20,6 +20,7 @@ import { pipeline } from 'node:stream/promises';
 import { createInterface } from 'node:readline';
 import { createReadStream } from 'node:fs';
 import { execSync } from 'node:child_process';
+import * as XLSX from 'xlsx';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = resolve(__dirname, '../data');
@@ -344,6 +345,91 @@ async function importNBP(db: Database.Database): Promise<number> {
 }
 
 // ---------------------------------------------------------------------------
+// Source 6: EBA Clearing STEP2 SCT (SEPA Reachable PSPs, monthly)
+// Official directory of all PSPs reachable via STEP2 SCT — covers entire
+// SEPA zone (32+ countries). Used to give France (and other SEPA markets)
+// an authoritative source beyond the SwiftCodes aggregate.
+// ---------------------------------------------------------------------------
+
+async function importEbaStep2(db: Database.Database): Promise<number> {
+  console.log('\n[6/6] Importing EBA Step2 SCT (official SEPA PSPs)...');
+
+  const xlsxPath = resolve(TMP_DIR, 'eba_step2_sct.xlsx');
+
+  // EBA publishes the file on the 5th of each month with filename `YYYYMM05-...xlsx`,
+  // but uploads it into the WordPress folder of the *previous* month
+  // (e.g., the file dated 2026-05-05 lives at /2026/04/...). We try both
+  // conventions just in case EBA's upload policy changes.
+  const now = new Date();
+  const candidates: string[] = [];
+  for (let i = 0; i < 12; i++) {
+    const fileDate = new Date(now.getFullYear(), now.getMonth() - i, 5);
+    const fileYY = fileDate.getFullYear();
+    const fileMM = String(fileDate.getMonth() + 1).padStart(2, '0');
+    const filename = `${fileYY}${fileMM}05-SCT-Reachable-PSP-List_CUG.xlsx`;
+
+    // Pattern 1: previous month's folder (current EBA convention)
+    const folder = new Date(fileYY, fileDate.getMonth() - 1, 5);
+    const folderYY = folder.getFullYear();
+    const folderMM = String(folder.getMonth() + 1).padStart(2, '0');
+    candidates.push(`https://www.ebaclearing.eu/wp-content/uploads/${folderYY}/${folderMM}/${filename}`);
+
+    // Pattern 2: same-month folder (fallback)
+    candidates.push(`https://www.ebaclearing.eu/wp-content/uploads/${fileYY}/${fileMM}/${filename}`);
+  }
+
+  let downloadedFrom = '';
+  for (const url of candidates) {
+    try {
+      await downloadFile(url, xlsxPath);
+      downloadedFrom = url;
+      break;
+    } catch {
+      /* try next month */
+    }
+  }
+  if (!downloadedFrom) {
+    throw new Error(`EBA Step2 download failed (tried ${candidates.length} candidate URLs)`);
+  }
+  console.log(`  Source: ${downloadedFrom}`);
+
+  const buffer = await readFile(xlsxPath);
+  const wb = XLSX.read(buffer, { type: 'buffer' });
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, defval: '' });
+
+  const insert = db.prepare(`
+    INSERT OR IGNORE INTO bic_entries (bic8, bic11, institution, country_code, country_name, city, branch_code, source)
+    VALUES (?, ?, ?, ?, ?, ?, ?, 'eba_step2')
+  `);
+
+  const valid: Array<[string, string, string, string, string, string, string]> = [];
+  const bicRegex = /^[A-Z]{4}[A-Z]{2}[A-Z0-9]{2}([A-Z0-9]{3})?$/;
+
+  for (const row of rows) {
+    if (!Array.isArray(row)) continue;
+    const bic = String(row[0] ?? '').trim().toUpperCase();
+    const name = String(row[2] ?? '').trim();
+    if (!bic || bic.length < 8 || !bicRegex.test(bic)) continue;
+
+    const bic8 = bic.slice(0, 8);
+    const bic11 = bic.length === 11 ? bic : bic + 'XXX';
+    const cc = bic.slice(4, 6); // ISO country code embedded in BIC
+    const branchCode = bic11.slice(8);
+
+    valid.push([bic8, bic11, name, cc, '', '', branchCode]);
+  }
+
+  const insertBatch = db.transaction((r: typeof valid) => {
+    for (const row of r) insert.run(...row);
+  });
+  insertBatch(valid);
+
+  console.log(`  EBA Step2 SCT: ${valid.length} entries processed`);
+  return valid.length;
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
@@ -374,6 +460,7 @@ async function main(): Promise<void> {
   await importSixBankMaster(db);
   try { await importOeNB(db); } catch (err) { console.warn(`  WARNING: OeNB import failed: ${(err as Error).message}`); }
   try { await importNBP(db); } catch (err) { console.warn(`  WARNING: NBP import failed: ${(err as Error).message}`); }
+  try { await importEbaStep2(db); } catch (err) { console.warn(`  WARNING: EBA Step2 import failed: ${(err as Error).message}`); }
 
   // Count after
   const afterCount = (db.prepare('SELECT COUNT(*) as n FROM bic_entries').get() as { n: number }).n;
