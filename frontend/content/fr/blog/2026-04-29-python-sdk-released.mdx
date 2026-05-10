@@ -47,7 +47,7 @@ Chaque réponse free embarque ce hint `upgrade_to_full_validation` — un agent 
 | `format_iban(iban)` | `/v1/iban/format` | gratuit | Mod-97 + structure BBAN, sans DB lookup |
 | `validate_iban(iban)` | `/v1/iban/validate` | 0,005 $ | Enrichissement complet — BIC, pays, SEPA, VoP, risque, BC-Nummer suisse |
 | `validate_batch(ibans)` | `/v1/iban/batch` | 0,002 $/IBAN | Jusqu'à 100 IBAN par appel |
-| `lookup_bic(code)` | `/v1/bic/{code}` | 0,003 $ | 121 197 entrées GLEIF — banque, pays, ville, LEI |
+| `lookup_bic(code)` | `/v1/bic/{code}` | 0,003 $ | plus de 121 000 entrées BIC (38K enrichies LEI via GLEIF) — banque, pays, ville, LEI |
 | `lookup_ch_clearing(iid)` | `/v1/ch/clearing/{iid}` | 0,003 $ | 1 190 entrées SIX BankMaster — seule API publique à exposer ces données |
 | `check_compliance(iban)` | `/v1/iban/compliance` | 0,02 $ | Sanctions OFAC/EU/UN + FATF + SEPA Instant + VoP + risk score |
 

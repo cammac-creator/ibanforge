@@ -18,7 +18,7 @@ Dann gibt es das BIC-Problem. Selbst wenn eine IBAN strukturell gueltig ist, mue
 
 ## IBANforge: eine API fuer beides
 
-[IBANforge](https://ibanforge.com) ist eine REST-API, die vollstaendige IBAN-Validierung -- Pruefsumme, Laenderregeln, BBAN-Parsing -- durchfuehrt und den BIC-Code in derselben Antwort aufloest, gegen den ueber 121.000 Eintraege umfassenden GLEIF-Datensatz, der von Zentralbanken verwendet wird. Eine POST-Anfrage, eine strukturierte JSON-Antwort.
+[IBANforge](https://ibanforge.com) ist eine REST-API, die vollstaendige IBAN-Validierung -- Pruefsumme, Laenderregeln, BBAN-Parsing -- durchfuehrt und den BIC-Code in derselben Antwort aufloest, gegen einen ueber 121.000 Eintraege umfassenden konsolidierten BIC-Datensatz aus oeffentlichen Quellen (GLEIF, SWIFT-Verzeichnis, Bundesbank, SIX, NBP), mit LEI-Anreicherung fuer ~38K Eintraege aus GLEIF. Eine POST-Anfrage, eine strukturierte JSON-Antwort.
 
 Es gibt einen kostenlosen `/v1/demo`-Endpunkt, um Ihren Parser zu testen, ohne die kostenpflichtigen Endpunkte zu beruehren, und einen [interaktiven Playground](https://ibanforge.com/playground), wenn Sie eine IBAN einfuegen und sehen moechten, was zurueckkommt, bevor Sie eine Zeile Code schreiben.
 
@@ -60,7 +60,7 @@ Einige bemerkenswerte Punkte in dieser Antwort:
 - `valid: true` bestaetigt, dass sowohl die Mod-97-Pruefsumme als auch die laenderspezifischen Laengen- und Formatregeln bestanden wurden.
 - `iban` gibt die kompakte Form zurueck (ohne Leerzeichen); `formatted` fuegt Leerzeichen in der standardmaessigen 4-Zeichen-Gruppierung hinzu.
 - `bban.bank_code` wird aus der BBAN gemaess dem schweizerischen Format extrahiert -- nicht einfach als Substring-Operation.
-- Das `bic`-Objekt enthaelt den Banknamen und die Stadt, aufgeloest aus dem GLEIF-Datensatz.
+- Das `bic`-Objekt enthaelt den Banknamen und die Stadt, aufgeloest aus dem konsolidierten BIC-Datensatz (GLEIF und weitere oeffentliche Quellen).
 - `sepa` teilt Ihnen mit, ob dieses Konto SEPA-erreichbar ist, welche Zahlungsverfahren gelten und ob die Verification of Payee (VoP) gemaess EU-Regulierung erforderlich ist.
 - `issuer` klassifiziert das Institut -- `bank`, `digital_bank`, `emi` oder `payment_institution` -- und hilft bei der Erkennung virtueller IBANs.
 - `risk_indicators` liefert ein zusammengesetztes Risikosignal fuer Compliance-Agenten: Laenderrisiko, SEPA-Abdeckung und VoP-Status in einem Objekt.

@@ -401,7 +401,7 @@ function MoneyJourney() {
             IBANforge
           </text>
           <text x="400" y="115" textAnchor="middle" className="famille-journey-sub">
-            121 197 banques
+            121 000+ BIC
           </text>
           <text x="400" y="135" textAnchor="middle" className="famille-journey-sub">
             75 + pays
@@ -818,7 +818,7 @@ function SectionMaintenant() {
    ───────────────────────────────────────────────────────────── */
 function SectionChiffres() {
   const stats = [
-    { value: "121 197", label: "banques répertoriées (source GLEIF)" },
+    { value: "121 000+", label: "entrées BIC (sources GLEIF, SWIFT, Bundesbank, SIX, NBP)" },
     { value: "75+", label: "pays couverts dans le monde" },
     { value: "1 190", label: "institutions suisses (source SIX)" },
     { value: "~50 ms", label: "par vérification" },

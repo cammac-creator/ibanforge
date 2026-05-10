@@ -67,7 +67,7 @@
       "1": {
         "badge": "121 000+ entrées BIC",
         "title": "Recherche BIC/SWIFT",
-        "description": "Base de données BIC/SWIFT complète issue de GLEIF, enrichie de données LEI (Legal Entity Identifier) pour l'identification des établissements financiers."
+        "description": "plus de 121 000 entrées BIC issues de sources publiques (GLEIF, annuaire SWIFT, Bundesbank, SIX, NBP), avec enrichissement LEI pour ~38K lignes provenant de GLEIF pour l'identification des établissements financiers."
       },
       "2": {
         "badge": "SEPA + VoP",
@@ -182,7 +182,7 @@
         "path": "/v1/bic/:code",
         "cost": "$0.003",
         "costLabel": "par appel",
-        "description": "Rechercher un code BIC/SWIFT dans la base GLEIF"
+        "description": "Rechercher un code BIC/SWIFT dans la base consolidée (GLEIF, annuaire SWIFT, Bundesbank, SIX, NBP)"
       },
       "3": {
         "method": "POST",
