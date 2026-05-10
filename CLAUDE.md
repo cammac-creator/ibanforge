@@ -6,7 +6,7 @@ API de validation IBAN et lookup BIC/SWIFT avec micropaiements x402, interface M
 
 - **Runtime** : Node.js 20+ / TypeScript
 - **Framework** : Hono
-- **Database** : SQLite (better-sqlite3) — `data/bic.sqlite` (39K+ BIC entries GLEIF + 1190 Swiss clearing entries SIX), `data/stats.sqlite`
+- **Database** : SQLite (better-sqlite3) — `data/bic.sqlite` (121,197 BIC entries: 38,761 GLEIF + 81,642 SwiftCodes/MIT + 633 SIX + 142 Bundesbank + 19 NBP; plus 1,190 Swiss clearing entries SIX), `data/stats.sqlite`
 - **Payments** : x402/hono (USDC micropayments)
 - **AI Agents** : MCP SDK (Model Context Protocol)
 - **Deploy** : Docker → Railway
@@ -110,7 +110,7 @@ The middleware must NOT fail-open. If `WALLET_ADDRESS` is not set in production,
 
 ## Database
 
-- `bic.sqlite` : 39,243 BIC entries with LEI enrichment from GLEIF + 1,190 Swiss clearing entries from SIX BankMaster. Read-only at runtime.
+- `bic.sqlite` : 121,197 BIC entries (38,761 LEI-enriched via GLEIF + 81,642 from PeterNotenboom/SwiftCodes MIT + 633 SIX Group + 142 Bundesbank + 19 NBP) + 1,190 Swiss clearing entries from SIX BankMaster. Read-only at runtime. Refreshed monthly via `.github/workflows/refresh-bic.yml`.
 - `stats.sqlite` : API usage tracking. Read-write.
 - Both use WAL mode for concurrent access.
 - Country names populated via `Intl.DisplayNames` API (no hardcoded list).

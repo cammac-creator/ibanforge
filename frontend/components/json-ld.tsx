@@ -47,7 +47,7 @@ const SOFTWARE_APPLICATION = {
     {
       '@type': 'Offer',
       name: 'Lookup BIC',
-      description: 'Lookup BIC/SWIFT against 121,197 GLEIF entries with LEI enrichment',
+      description: 'Lookup BIC/SWIFT against 121,197 BIC entries (38,761 LEI-enriched via GLEIF)',
       price: '0.003',
       priceCurrency: 'USDC',
       eligibleQuantity: { '@type': 'QuantitativeValue', value: 1, unitText: 'request' },

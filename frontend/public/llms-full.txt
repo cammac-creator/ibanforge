@@ -124,7 +124,7 @@ Cost: $0.002 per IBAN (free during launch)
 
 ## GET /v1/bic/{code}
 
-Looks up a BIC/SWIFT code against the GLEIF database (121,000+ entries with LEI enrichment).
+Looks up a BIC/SWIFT code against a 121,000+ BIC database (38K LEI-enriched via GLEIF + additional rows from SWIFT directory, Bundesbank, SIX BankMaster, NBP).
 
 Cost: $0.003 USDC (free during launch)
 

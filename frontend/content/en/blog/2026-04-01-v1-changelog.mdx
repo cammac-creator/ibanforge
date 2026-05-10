@@ -22,9 +22,9 @@ Endpoint: `POST /v1/iban/validate`
 
 ## BIC/SWIFT Lookup
 
-- **121,000+ entries** sourced from GLEIF (Global LEI Foundation)
-- **LEI enrichment** — each BIC entry includes the Legal Entity Identifier when available
-- **GLEIF data** — institution name, city, country, and registration status
+- **121,000+ BIC entries** from public sources (GLEIF, SWIFT directory, Bundesbank, SIX, NBP)
+- **LEI enrichment** — 38K rows include the Legal Entity Identifier (GLEIF-sourced)
+- **Institution data** — name, city, country, and registration status
 - BIC format validation (ISO 9362) before database lookup
 - Supports both 8-character and 11-character BIC codes
 
