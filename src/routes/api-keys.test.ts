@@ -11,6 +11,9 @@ function makeApp() {
 const originalEnv = { ...process.env };
 beforeEach(() => {
   process.env.ADMIN_SECRET = 'correct-horse-battery-staple';
+  // Allow @example.com / disposable domains in test suite so we don't have to
+  // invent unique real-looking emails for every test case.
+  process.env.IBANFORGE_ADMIN_TEST_KEYS = 'true';
 });
 afterEach(() => {
   process.env = { ...originalEnv };

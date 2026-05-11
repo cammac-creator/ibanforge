@@ -42,6 +42,10 @@ function isAdminAuthorized(provided: string | undefined): boolean {
   return timingSafeEqual(expectedBuf, providedBuf);
 }
 
+// Domains we refuse for free-tier signups to keep the stats funnel honest.
+// They get re-allowed when IBANFORGE_ADMIN_TEST_KEYS=true (CI/automation only).
+const BLOCKED_EMAIL_DOMAINS = /@(example|test|invalid|localhost|mailinator|tempmail|guerrillamail|10minutemail|throwaway|dispostable|trashmail|fakeinbox|getnada|maildrop|sharklasers|yopmail)\.(com|org|net|io|me|fr|ch|de)$/i;
+
 apiKeys.post('/v1/keys/generate', async (c) => {
   let body: { email?: unknown };
   try {
@@ -53,6 +57,19 @@ apiKeys.post('/v1/keys/generate', async (c) => {
   const email = body.email;
   if (!email || typeof email !== 'string' || !email.includes('@') || email.length > 255) {
     return c.json({ error: 'invalid_email', message: 'A valid email address is required' }, 400);
+  }
+
+  // Stricter shape check: local-part@domain.tld (avoids "test@" or "foo@bar")
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+    return c.json({ error: 'invalid_email', message: 'Email must be a valid address (e.g. you@company.com)' }, 400);
+  }
+
+  // Block disposable / fictional domains unless explicitly allowed (CI tests).
+  if (process.env.IBANFORGE_ADMIN_TEST_KEYS !== 'true' && BLOCKED_EMAIL_DOMAINS.test(email)) {
+    return c.json({
+      error: 'disposable_email',
+      message: 'Free tier requires a real email address. example.com, mailinator and other disposable domains are blocked.',
+    }, 400);
   }
 
   const result = generateApiKey(email.trim().toLowerCase());
