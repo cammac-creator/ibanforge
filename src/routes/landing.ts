@@ -120,6 +120,14 @@ landing.get('/', (c) => {
     .path-card{border-radius:16px;padding:32px 28px;display:flex;flex-direction:column}
     .path-free{background:#0f0f13;border:1px solid #1f1f28}
     .path-stripe{background:linear-gradient(135deg,rgba(99,91,255,.08),rgba(99,91,255,.02));border:1px solid rgba(99,91,255,.25)}
+    .stripe-buttons{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:14px}
+    .stripe-pack-btn{display:flex;flex-direction:column;align-items:center;gap:1px;padding:10px 6px;background:#0f0f13;border:1px solid #27272a;border-radius:6px;color:#e5e5e5;text-decoration:none;transition:all .15s ease;cursor:pointer}
+    .stripe-pack-btn:hover{border-color:#9b94ff;background:rgba(99,91,255,.06)}
+    .stripe-pack-btn-best{border-color:rgba(99,91,255,.4);background:rgba(99,91,255,.05)}
+    .stripe-pack-btn-best:hover{border-color:#9b94ff}
+    .pack-credits{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;color:#fafafa}
+    .pack-price{font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:#9b94ff;margin-top:1px}
+    .pack-rate{font-size:10px;color:#a1a1aa;letter-spacing:.02em;margin-top:1px}
     .path-x402{background:linear-gradient(135deg,rgba(245,158,11,.06),rgba(245,158,11,.02));border:1px solid rgba(245,158,11,.2)}
     .path-badge{display:inline-block;font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;padding:4px 10px;border-radius:6px;margin-bottom:20px;width:fit-content}
     .path-badge-green{background:rgba(34,197,94,.1);color:#22c55e}
@@ -318,13 +326,29 @@ landing.get('/', (c) => {
           <h3>Stripe / Card</h3>
           <p class="path-price"><strong>From $5 / 1k credits</strong> &mdash; pay by card</p>
           <ul class="path-features">
-            <li><span class="check">&check;</span> 1k credits for $5 ($0.005/call)</li>
-            <li><span class="check">&check;</span> 5k credits for $20 ($0.004/call)</li>
-            <li><span class="check">&check;</span> 25k credits for $80 ($0.0032/call)</li>
             <li><span class="check">&check;</span> Credits never expire</li>
             <li><span class="check">&check;</span> Bearer token, all endpoints</li>
+            <li><span class="check">&check;</span> Larger packs = lower per-call cost</li>
+            <li><span class="check">&check;</span> Card, Apple Pay, Google Pay</li>
+            <li><span class="check">&check;</span> Receipt + key by email</li>
           </ul>
-          <a href="STRIPE_PAYMENT_LINK_5K" class="path-cta path-cta-solid" data-stripe-bundle="5k">Buy 5k credits — $20</a>
+          <div class="stripe-buttons" data-stripe-guard="true">
+            <a href="STRIPE_PAYMENT_LINK_1K" class="stripe-pack-btn" data-stripe-bundle="1k">
+              <span class="pack-credits">1 000</span>
+              <span class="pack-price">$5</span>
+              <span class="pack-rate">$0.005/call</span>
+            </a>
+            <a href="STRIPE_PAYMENT_LINK_5K" class="stripe-pack-btn stripe-pack-btn-best" data-stripe-bundle="5k">
+              <span class="pack-credits">5 000</span>
+              <span class="pack-price">$20</span>
+              <span class="pack-rate">$0.004/call</span>
+            </a>
+            <a href="STRIPE_PAYMENT_LINK_25K" class="stripe-pack-btn" data-stripe-bundle="25k">
+              <span class="pack-credits">25 000</span>
+              <span class="pack-price">$80</span>
+              <span class="pack-rate">$0.0032/call</span>
+            </a>
+          </div>
         </div>
         <div class="path-card path-x402">
           <div class="path-badge path-badge-amber">PAY PER CALL</div>
@@ -432,6 +456,15 @@ console.<span class="f">log</span>(result);
   </div>
 
   <script>
+    // Guard against unconfigured Stripe Payment Links — until Alain pastes the
+    // real URLs into the data-href attributes, clicking these buttons would
+    // navigate to a relative path matching the literal placeholder and 404.
+    document.querySelectorAll('[data-stripe-guard="true"] a[href^="STRIPE_PAYMENT_LINK_"]').forEach(function(a){
+      a.addEventListener('click', function(e){
+        e.preventDefault();
+        alert('Stripe Payment Links not yet configured. Email support@ibanforge.com to purchase credits manually for now.');
+      });
+    });
     let mode='iban';
     function switchTab(m){
       mode=m;

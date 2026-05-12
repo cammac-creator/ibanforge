@@ -14,6 +14,7 @@ function mockEvent(opts: {
   bundle?: string;
   email?: string | null;
   sessionId?: string;
+  paymentStatus?: 'paid' | 'unpaid' | 'no_payment_required';
 }): Stripe.Event {
   return {
     id: opts.id,
@@ -24,6 +25,7 @@ function mockEvent(opts: {
         metadata: opts.bundle === undefined ? null : { bundle: opts.bundle },
         customer_email: opts.email ?? null,
         customer_details: opts.email ? { email: opts.email } : null,
+        payment_status: opts.paymentStatus ?? 'paid',
       },
     },
   } as unknown as Stripe.Event;
@@ -91,6 +93,39 @@ describe('processStripeEvent — idempotency', () => {
     expect(second.body.key_prefix).toBeUndefined();
     // First call's key was minted, second call did not return a new one
     expect(typeof firstPrefix).toBe('string');
+  });
+});
+
+describe('processStripeEvent — async payment guard', () => {
+  it('does NOT mint when payment_status is unpaid (async methods pending)', () => {
+    const eventId = `evt_test_${Date.now()}_unpaid`;
+    const result = processStripeEvent(
+      mockEvent({
+        id: eventId,
+        bundle: '5k',
+        sessionId: `cs_test_${Date.now()}_unpaid`,
+        email: `unpaid-${Date.now()}@example.com`,
+        paymentStatus: 'unpaid',
+      }),
+    );
+    expect(result.status).toBe(200);
+    expect(result.body.pending).toBe(true);
+    expect(result.body.payment_status).toBe('unpaid');
+    expect(result.body.credits_minted).toBeUndefined();
+  });
+
+  it('mints when payment_status is paid (card payments, default)', () => {
+    const eventId = `evt_test_${Date.now()}_paid_explicit`;
+    const result = processStripeEvent(
+      mockEvent({
+        id: eventId,
+        bundle: '5k',
+        sessionId: `cs_test_${Date.now()}_paid_explicit`,
+        email: `paid-${Date.now()}@example.com`,
+        paymentStatus: 'paid',
+      }),
+    );
+    expect(result.body.credits_minted).toBe(5000);
   });
 });
 

@@ -67,6 +67,20 @@ export function processStripeEvent(event: Stripe.Event): { status: number; body:
   }
 
   const session = event.data.object as Stripe.Checkout.Session;
+
+  // Guard against async payment methods (SEPA Debit, ACH, etc.) where
+  // checkout.session.completed fires BEFORE the payment is actually settled.
+  // For card payments (Payment Links default) this is always 'paid'. For async
+  // methods, Stripe fires checkout.session.async_payment_succeeded later.
+  if (session.payment_status && session.payment_status !== 'paid') {
+    db.prepare('INSERT INTO processed_webhooks (stripe_event_id, event_type) VALUES (?, ?)')
+      .run(event.id, event.type);
+    return {
+      status: 200,
+      body: { received: true, pending: true, payment_status: session.payment_status },
+    };
+  }
+
   const bundle = (session.metadata?.bundle ?? '') as string;
   const bundleConfig = STRIPE_BUNDLES[bundle];
 
