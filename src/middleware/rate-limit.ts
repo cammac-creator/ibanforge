@@ -47,6 +47,14 @@ export function rateLimitMiddleware(): MiddlewareHandler {
       return;
     }
 
+    // Stripe webhooks come from Stripe's IP pool and can burst on retries.
+    // The webhook handler itself verifies the signature, so rate-limiting by
+    // IP gives us no security and risks dropping legitimate events.
+    if (path === '/v1/stripe/webhook') {
+      await next();
+      return;
+    }
+
     const ip = getClientIp(c.req.raw);
     const now = Date.now();
 
