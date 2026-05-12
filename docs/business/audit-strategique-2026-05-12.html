@@ -317,31 +317,31 @@
 
   <div class="kpis">
     <div class="kpi">
-      <div class="val">98</div>
-      <div class="lbl">Clés API créées</div>
-      <div class="src">DB locale ; prod à confirmer</div>
+      <div class="val">78</div>
+      <div class="lbl">Opérations facturables (lifetime)</div>
+      <div class="src">Prod /stats — 2026-05-12</div>
     </div>
     <div class="kpi">
-      <div class="val">65</div>
-      <div class="lbl">Clés avec crédits prépayés</div>
-      <div class="src">DB locale ; achats Stripe one-shot, pas MRR</div>
+      <div class="val">$0,32</div>
+      <div class="lbl">Revenu x402 cumulé</div>
+      <div class="src">Prod ; Stripe cumulé non récupérable (Basescan V1 deprecated)</div>
     </div>
     <div class="kpi">
-      <div class="val">~15 k$/j</div>
-      <div class="lbl">Volume x402 mondial réel</div>
-      <div class="src">Artemis / CoinDesk 2026</div>
+      <div class="val">10</div>
+      <div class="lbl">Opérations sur 7 jours</div>
+      <div class="src">2026-05-06 → 2026-05-12, 0 $ revenu</div>
     </div>
     <div class="kpi">
-      <div class="val">&lt; 5 %</div>
-      <div class="lbl">MCP servers monétisés</div>
-      <div class="src">17 k+ servers — &lt; 850 paient</div>
+      <div class="val">82 / 78</div>
+      <div class="lbl">Top country = CH</div>
+      <div class="src">Confirme la thèse "Swiss specialist"</div>
     </div>
   </div>
 
-  <div class="verdict warn">
+  <div class="verdict stop">
     <span class="label">Verdict global</span>
-    <h4>Maintien conditionnel à 90 jours, avec un pivot de positionnement immédiat.</h4>
-    <p>L'angle « API IBAN + MCP + x402 » est trop large pour un solo founder. Le seul positionnement défendable contre IBAN.com, SurePay et iPiD est <strong>« Swiss-specialized + agent-native »</strong>. Si un premier client suisse payant n'est pas signé d'ici le <strong>11 août 2026</strong>, le projet bascule en mode « rente passive » (maintenance minimale, focus sur un autre projet) ou abandon assumé.</p>
+    <h4>Pivot positionnement immédiat ou bascule en mode rente sous 90 jours. La situation est plus critique que prévu.</h4>
+    <p>Les vrais chiffres prod sont brutaux&nbsp;: <strong>78 opérations facturables en 14 mois</strong>, <strong>$0,32 de revenu x402 cumulé</strong>, <strong>10 opérations sur les 7 derniers jours</strong>. Le funnel ne convertit pratiquement personne. Le seul signal positif est la <strong>concentration suisse</strong> (82 ops top country = CH, sur 78 totales — proche de 100 % du peu de trafic réel est CH). Si un premier client suisse payant en mode pack récurrent n'est pas signé d'ici le <strong>11 août 2026</strong>, bascule en mode « rente passive » assumée ou abandon contrôlé.</p>
   </div>
 </section>
 
@@ -424,14 +424,16 @@
 
   <p class="lead">Le pricing est rationnel sur le papier. Mais il fait deux paris simultanés (x402 et MCP) qui ne paient pas en 2026, et un volume freemium qui ne convertit pas.</p>
 
-  <h3>État réel des revenus (estimation honnête)</h3>
+  <h3>État réel des revenus (chiffres prod, 2026-05-12)</h3>
   <table>
-    <thead><tr><th>Source</th><th>Signal</th><th>Lecture</th></tr></thead>
+    <thead><tr><th>Indicateur</th><th>Valeur réelle</th><th>Lecture</th></tr></thead>
     <tbody>
-      <tr><td>Clés API créées</td><td>98 (DB locale, prod &gt; ?)</td><td>Funnel d'entrée correct pour 14 mois sans marketing direct</td></tr>
-      <tr><td>Clés avec crédits Stripe</td><td>65 (DB locale)</td><td>Si confirmé en prod&nbsp;: signal &laquo;&nbsp;produit acheté volontairement&nbsp;&raquo; — mais ticket moyen inconnu</td></tr>
-      <tr><td>Volume x402 IBANforge</td><td>~0 (inférence)</td><td>L'écosystème x402 entier fait ~15 k$/jour réels après filtrage wash trading. Aucun agent finance documenté n'achète de l'IBAN validation en mai 2026.</td></tr>
-      <tr><td>Tier gratuit (200/mois)</td><td>Conversion attendue 3-7 %</td><td>Sur 98 clés, si 70 % sont sur le free et 5 % convertissent &rarr; <strong>3-4 conversions sur 14 mois</strong></td></tr>
+      <tr><td>Opérations facturables lifetime</td><td><strong>78</strong> (54 IBAN validate, 13 batch, 11 BIC lookup)</td><td>14 mois × 30 j ≈ 420 j → <strong>1 op tous les 5,4 jours</strong>. Trafic réel quasi inexistant.</td></tr>
+      <tr><td>Revenu x402 cumulé</td><td><strong>$0,324</strong> USDC</td><td>Confirmation chiffrée que le rail x402 ne rapporte rien à ce stade — &lt; 1 $ en 14 mois.</td></tr>
+      <tr><td>Opérations 7 derniers jours</td><td><strong>10</strong> (3+1+1+2+1+2 répartis sur la semaine)</td><td>Pas de croissance hebdo. Pas de signal d'accélération.</td></tr>
+      <tr><td>Total requêtes brutes lifetime</td><td>35 339</td><td>Mais&nbsp;: 16 080 en 4xx (45 %, bots/scrapers/probes non authentifiés) + 4 597 sur /openapi.json (scrapers) + 3 911 sur /.well-known/x402 (discovery automatique). <strong>L'usage humain/agent réel est dans les 78 opérations.</strong></td></tr>
+      <tr><td>Concentration géographique</td><td>CH 82 ops, GB 9, DE 6, autres 6</td><td><strong>Quasi 100 % du peu de trafic réel est suisse.</strong> C'est la seule donnée du tableau qui valide une thèse stratégique.</td></tr>
+      <tr><td>Revenu Stripe cumulé</td><td><em>Non récupérable via /admin/revenue (Basescan V1 deprecated)</em></td><td>À vérifier directement dans le dashboard Stripe. La DB locale comptait 65 clés avec crédits prépayés — si confirmé, c'est le seul revenu réel d'IBANforge à ce jour.</td></tr>
     </tbody>
   </table>
 
@@ -448,7 +450,7 @@
   <div class="block">
     <h4>Maths du break-even (à calibrer par toi)</h4>
     <p>Coûts infra ~6 $/mois, négligeables. Le vrai coût d'IBANforge, c'est ton temps. <em>Hypothèse à valider&nbsp;: si tu y mets ~10 h/sem et valorises ce temps à 80 CHF/h (taux dev senior CH), c'est ~3 200 CHF/mois de coût d'opportunité.</em> Pour justifier économiquement ce temps, il faut viser <strong>2 500-3 000 CHF MRR récurrent</strong> d'ici 12 mois — cible cohérente avec la roadmap d'avril (3 000 $).</p>
-    <p>Distinction importante&nbsp;: les 65 clés avec crédits prépayés (DB locale) représentent du <strong>revenu Stripe cumulé one-shot</strong> (potentiellement ~1 500-3 000 $ si tickets moyens $25-$50), <em>pas du MRR</em>. Les packs prépayés n'ont pas de renouvellement automatique — ils créent un revenu en dents de scie, pas une rente. Le MRR récurrent réel à ce jour est très probablement nul ou marginal en attendant que des clients re-rechargent.</p>
+    <p>Distinction importante&nbsp;: les 65 clés avec crédits prépayés (DB locale, à confirmer en prod) représentent du <strong>revenu Stripe cumulé one-shot</strong> (potentiellement ~1 500-3 000 $ si tickets moyens $25-$50), <em>pas du MRR</em>. Les packs prépayés n'ont pas de renouvellement automatique — ils créent un revenu en dents de scie, pas une rente. Et les <strong>78 opérations facturables totales en 14 mois</strong> côté prod suggèrent que la majorité de ces clés n'ont quasiment pas été utilisées&nbsp;: les crédits dorment, le funnel d'usage est cassé.</p>
   </div>
 
   <h3>Re-pricing recommandé</h3>
@@ -539,22 +541,22 @@
         <td><span class="bear">BEAR</span> — Stagnation</td>
         <td>5-15</td>
         <td>3-8 k CHF</td>
-        <td>Pivot Swiss n'attire que des early adopters. Aucun PSP CH n'intègre IBANforge. x402 reste marginal. MCP monétisation toujours &lt;5 %. Concurrent (iPiD/Worldline) capte le marché VoP CH.</td>
-        <td><strong>~45 %</strong></td>
+        <td>Pivot Swiss n'attire que des early adopters. Aucun PSP CH n'intègre IBANforge. x402 reste marginal. MCP monétisation toujours &lt;5 %. Concurrent (iPiD/Worldline) capte le marché VoP CH. <em>Ajusté à la hausse au vu des chiffres prod 2026-05 (78 ops lifetime, $0,32 x402).</em></td>
+        <td><strong>~55 %</strong></td>
       </tr>
       <tr>
         <td><span class="base">BASE</span> — Niche Swiss installée</td>
         <td>30-80</td>
         <td>30-90 k CHF</td>
         <td>3-5 clients Swiss B2B récurrents (fintechs, comptables). Module vIBAN/EMI vendu à 2-3 éditeurs AML en marque blanche. SEO long-tail rapporte 10-15 % du trafic. PSR/PSD3 applicable mi-2028 crée une vague d'intérêt sur 6-12 mois.</td>
-        <td><strong>~40 %</strong></td>
+        <td><strong>~33 %</strong></td>
       </tr>
       <tr>
         <td><span class="bull">BULL</span> — Acquisition / exit</td>
         <td>100+</td>
         <td>150-400 k CHF, ou exit 300 k-1,5 M CHF</td>
         <td>Adoption x402 massive 2027-2028. 1 grand acteur (ComplyAdvantage, iPiD, Worldline) propose un rachat / acqui-hire pour intégrer le module vIBAN+Swiss. Ou MRR scale à 15-30 k CHF/mois via 2-3 deals enterprise CH. AMLR 2027+ force registre vIBAN, IBANforge devient référence.</td>
-        <td><strong>~15 %</strong></td>
+        <td><strong>~12 %</strong></td>
       </tr>
     </tbody>
   </table>
@@ -581,8 +583,8 @@
 
   <div class="verdict neutral">
     <span class="label">Verdict 3 ans</span>
-    <h4>Le scénario BASE (~40 % de probabilité, ARR 30-90 k CHF) est la cible réaliste. Le BULL (exit) est un bonus possible, pas un plan.</h4>
-    <p>Si tu plannifies pour le BULL, tu vas surinvestir, prendre des décisions trop risquées et te démoraliser quand le BASE arrivera. Plannifie pour le BASE&nbsp;: il te donne un complément de revenu honnête (2,5-7,5 k CHF/mois) et une option d'exit asymétrique gratuite. La vraie question des 36 prochains mois est&nbsp;: <strong>combien de temps par semaine tu acceptes d'investir pour ce niveau de retour</strong>, sachant que c'est un side-revenue, pas un remplacement de salaire.</p>
+    <h4>Le scénario BASE (~33 % de probabilité, ARR 30-90 k CHF) reste la cible réaliste mais minoritaire. Le BEAR (~55 %) est désormais le scénario médian.</h4>
+    <p>Le réalignement des probabilités vient des chiffres prod réels&nbsp;: 14 mois de production pour 78 opérations facturables suggèrent que sans pivot/outreach actif, l'inertie naturelle continue. Plannifie pour le BASE comme objectif, mais accepte mentalement que le BEAR est plus probable. La vraie question des 36 prochains mois&nbsp;: <strong>combien de temps par semaine tu acceptes d'investir sachant que c'est un side-revenue 2,5-7,5 k CHF/mois dans le meilleur cas, et 0,3-0,7 k CHF/mois plus probablement</strong>. Si la réponse est « moins de 5 h/sem », bascule en mode rente dès maintenant&nbsp;: tu auras de toute façon ton scénario passif.</p>
   </div>
 </section>
 
@@ -592,11 +594,11 @@
 <footer class="bottom">
   <div class="wrap">
     <h3>Prochaines 72 heures — actions concrètes</h3>
-    <p>1. <strong>Récupérer STATS_TOKEN Railway</strong> et confirmer les vrais chiffres prod (clés actives, MRR, revenu Stripe à date) pour valider/infirmer les hypothèses de cet audit.<br>
+    <p>1. <strong>Vérifier le revenu Stripe cumulé</strong> dans le dashboard Stripe directement (l'endpoint /admin/revenue échoue actuellement — Basescan V1 deprecated, à corriger côté code). Sans ce chiffre, on ne sait pas si les 65 clés avec crédits ont réellement payé.<br>
     2. <strong>Renommer le landing</strong>&nbsp;: titre primaire « Swiss IBAN intelligence + vIBAN detection », titre secondaire « MCP-native, x402-ready ».<br>
     3. <strong>Envoyer 5 messages chauds</strong> (Rémond, Neves, Bilican, Kehrli, Aumasson) — texte personnalisé, pas template.<br>
     4. <strong>Bloquer la date 11 août 2026</strong> dans ton calendrier&nbsp;: checkpoint binaire continuer / mode rente.</p>
-    <p style="margin-top:18px; font-size:12px; color:var(--bleu-5);">Audit produit par synthèse de&nbsp;: mémoires projet, ROI 90j (12 mai 2026), recherche concurrentielle web (mai 2026), DB locale stats. Les chiffres prod restent à confirmer. Cet audit ne reprend volontairement aucune recommandation déjà couverte dans le ROI 90j.</p>
+    <p style="margin-top:18px; font-size:12px; color:var(--bleu-5);">Audit produit par synthèse de&nbsp;: mémoires projet, ROI 90j (12 mai 2026), recherche concurrentielle web (mai 2026), chiffres prod /stats (2026-05-12 via STATS_TOKEN). Revenu Stripe cumulé non récupérable en automatique (Basescan API V1 deprecated — à corriger). Cet audit est complémentaire au ROI 90j opérationnel.</p>
   </div>
 </footer>
 
