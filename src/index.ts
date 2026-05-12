@@ -26,6 +26,8 @@ import { apiKeyMiddleware } from './middleware/api-key.js';
 import { enrich402Middleware } from './middleware/enrich-402.js';
 import { apiKeys } from './routes/api-keys.js';
 import { creditsBuy } from './routes/credits-buy.js';
+import { stripeWebhook } from './routes/stripe-webhook.js';
+import { stripeRetrieve } from './routes/stripe-retrieve.js';
 import { ibanStructure } from './routes/iban-structure.js';
 import { rateLimitMiddleware } from './middleware/rate-limit.js';
 import { recordRequest, classifyClient } from './lib/stats.js';
@@ -416,6 +418,12 @@ app.use('/v1/*', enrich402Middleware());
 
 // Key management routes (free, before x402)
 app.route('/', apiKeys);
+
+// Stripe routes (free — auth via Stripe signature for webhook, via session_id
+// for the one-time retrieval endpoint). MUST be mounted BEFORE the api-key
+// and x402 middleware so they're not gated by Bearer tokens.
+app.route('/', stripeWebhook);
+app.route('/', stripeRetrieve);
 
 // API key middleware — checks Bearer ifk_* tokens before x402
 app.use('/v1/*', apiKeyMiddleware());

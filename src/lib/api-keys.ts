@@ -52,6 +52,72 @@ export function generateCreditKey(
   return { api_key: rawKey, key_prefix: keyPrefix, credits };
 }
 
+/**
+ * Stripe-paid credits — equivalent to generateCreditKey but also stores the
+ * Stripe Checkout session id (for webhook idempotency) and the raw key in a
+ * one-time-view column the success page can fetch via consumeOneTimeKey().
+ *
+ * Idempotent: if a key already exists for this stripe_session_id, returns
+ * the existing key_prefix (without the raw key, since it was either already
+ * consumed by the buyer or is still pending consumption — either way we
+ * MUST NOT regenerate, as that would double-mint credits).
+ */
+export function generateStripeKey(
+  email: string | null,
+  credits: number,
+  stripeSessionId: string,
+): { api_key: string | null; key_prefix: string; credits: number; idempotent: boolean } {
+  const db = getStatsDB();
+  const existing = db
+    .prepare('SELECT key_prefix FROM api_keys WHERE stripe_session_id = ?')
+    .get(stripeSessionId) as { key_prefix: string } | undefined;
+  if (existing) {
+    return { api_key: null, key_prefix: existing.key_prefix, credits, idempotent: true };
+  }
+
+  const rawKey = KEY_PREFIX + randomBytes(32).toString('hex');
+  const keyHash = hashKey(rawKey);
+  const keyPrefix = rawKey.slice(0, 12);
+  const storedEmail = email && email.includes('@') ? email : 'stripe-buyer';
+
+  db.prepare(
+    'INSERT INTO api_keys (key_hash, key_prefix, email, monthly_limit, credits_remaining, credits_total, stripe_session_id, raw_key_one_time_view) VALUES (?, ?, ?, NULL, ?, ?, ?, ?)',
+  ).run(keyHash, keyPrefix, storedEmail, credits, credits, stripeSessionId, rawKey);
+
+  return { api_key: rawKey, key_prefix: keyPrefix, credits, idempotent: false };
+}
+
+/**
+ * Read the raw API key for a Stripe session ONCE, then null the column so it
+ * can never be retrieved again. Returns null if the session was already
+ * consumed or the webhook hasn't created the key yet.
+ *
+ * Why one-time-view: the raw key would otherwise have to be returned by every
+ * GET on /v1/stripe/key/:session_id, but the session_id leaks into browser
+ * history and could be sniffed. One-shot retrieval limits the attack window.
+ */
+export function consumeOneTimeKey(
+  stripeSessionId: string,
+): { api_key: string; credits_total: number; credits_remaining: number; email: string | null } | null {
+  const db = getStatsDB();
+  const row = db.prepare(
+    'SELECT raw_key_one_time_view, credits_total, credits_remaining, email FROM api_keys WHERE stripe_session_id = ? AND raw_key_one_time_view IS NOT NULL AND active = 1',
+  ).get(stripeSessionId) as
+    | { raw_key_one_time_view: string; credits_total: number; credits_remaining: number; email: string }
+    | undefined;
+
+  if (!row) return null;
+
+  db.prepare('UPDATE api_keys SET raw_key_one_time_view = NULL WHERE stripe_session_id = ?').run(stripeSessionId);
+
+  return {
+    api_key: row.raw_key_one_time_view,
+    credits_total: row.credits_total,
+    credits_remaining: row.credits_remaining,
+    email: row.email === 'stripe-buyer' ? null : row.email,
+  };
+}
+
 export interface ApiKeyValidation {
   valid: boolean;
   keyHash: string;
