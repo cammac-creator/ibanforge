@@ -116,12 +116,14 @@ landing.get('/', (c) => {
     .feat-card h3{font-size:15px;font-weight:600;margin-bottom:8px;color:#fafafa}
     .feat-card p{font-size:13px;line-height:1.6;color:#71717a}
     .pricing-section{padding:48px 0}
-    .pricing-paths{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:32px}
+    .pricing-paths{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-bottom:32px}
     .path-card{border-radius:16px;padding:32px 28px;display:flex;flex-direction:column}
     .path-free{background:#0f0f13;border:1px solid #1f1f28}
+    .path-stripe{background:linear-gradient(135deg,rgba(99,91,255,.08),rgba(99,91,255,.02));border:1px solid rgba(99,91,255,.25)}
     .path-x402{background:linear-gradient(135deg,rgba(245,158,11,.06),rgba(245,158,11,.02));border:1px solid rgba(245,158,11,.2)}
     .path-badge{display:inline-block;font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;padding:4px 10px;border-radius:6px;margin-bottom:20px;width:fit-content}
     .path-badge-green{background:rgba(34,197,94,.1);color:#22c55e}
+    .path-badge-blue{background:rgba(99,91,255,.12);color:#9b94ff}
     .path-badge-amber{background:rgba(245,158,11,.1);color:#f59e0b}
     .path-card h3{font-size:20px;font-weight:700;margin-bottom:4px;color:#fafafa}
     .path-price{font-size:14px;color:#71717a;margin-bottom:20px}
@@ -180,6 +182,7 @@ landing.get('/', (c) => {
     .keygen-result .warn{color:#f59e0b;font-size:12px;margin-top:8px}
     .keygen-error{color:#ef4444;font-size:13px;margin-top:8px;display:none}
     .keygen-error.show{display:block}
+    @media(max-width:960px){.pricing-paths{grid-template-columns:1fr}}
     @media(max-width:640px){.features-grid{grid-template-columns:1fr}.pricing-paths{grid-template-columns:1fr}.tryit-input{flex-direction:column}.hero h1{font-size:36px}.hero-ctas{flex-direction:column;align-items:center}.mcp-callout{flex-direction:column;text-align:center}.footer-links{flex-direction:column;align-items:center}.nav-links{gap:12px}.nav-links a{font-size:12px}}
   </style>
 </head>
@@ -294,7 +297,7 @@ landing.get('/', (c) => {
     <!-- PRICING -->
     <div class="pricing-section" id="pricing">
       <div class="section-label">Pricing</div>
-      <div class="section-title">Two paths, same API</div>
+      <div class="section-title">Three paths, same API</div>
       <p class="section-sub">Choose what fits your workflow. Switch anytime.</p>
       <div class="pricing-paths">
         <div class="path-card path-free">
@@ -309,6 +312,19 @@ landing.get('/', (c) => {
             <li><span class="check">&check;</span> Usage dashboard</li>
           </ul>
           <button class="path-cta path-cta-outline" onclick="document.querySelector('.hero').scrollIntoView({behavior:'smooth'});setTimeout(()=>document.querySelector('.keygen').classList.add('show'),400)">Get free API key</button>
+        </div>
+        <div class="path-card path-stripe">
+          <div class="path-badge path-badge-blue">CREDIT PACKS</div>
+          <h3>Stripe / Card</h3>
+          <p class="path-price"><strong>From $5 / 1k credits</strong> &mdash; pay by card</p>
+          <ul class="path-features">
+            <li><span class="check">&check;</span> 1k credits for $5 ($0.005/call)</li>
+            <li><span class="check">&check;</span> 5k credits for $20 ($0.004/call)</li>
+            <li><span class="check">&check;</span> 25k credits for $80 ($0.0032/call)</li>
+            <li><span class="check">&check;</span> Credits never expire</li>
+            <li><span class="check">&check;</span> Bearer token, all endpoints</li>
+          </ul>
+          <a href="STRIPE_PAYMENT_LINK_5K" class="path-cta path-cta-solid" data-stripe-bundle="5k">Buy 5k credits — $20</a>
         </div>
         <div class="path-card path-x402">
           <div class="path-badge path-badge-amber">PAY PER CALL</div>

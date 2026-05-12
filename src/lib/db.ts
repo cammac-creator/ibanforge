@@ -142,6 +142,29 @@ export function getStatsDB(): DatabaseType.Database {
     // monthly_limit is ignored). Decremented atomically per call.
     if (!keyCols.includes('credits_remaining')) statsDB.exec('ALTER TABLE api_keys ADD COLUMN credits_remaining INTEGER');
     if (!keyCols.includes('credits_total')) statsDB.exec('ALTER TABLE api_keys ADD COLUMN credits_total INTEGER');
+    // Stripe Checkout session id — links an api_key to the Stripe payment that
+    // minted it. Used for idempotency (we never mint twice for the same session)
+    // and to retrieve the raw key once via /v1/stripe/key/:session_id.
+    if (!keyCols.includes('stripe_session_id')) {
+      statsDB.exec('ALTER TABLE api_keys ADD COLUMN stripe_session_id TEXT');
+      statsDB.exec('CREATE INDEX IF NOT EXISTS idx_api_keys_stripe_session ON api_keys(stripe_session_id)');
+    }
+    // Raw API key stored in plaintext for ONE-TIME retrieval after Stripe payment.
+    // Nulled out by consumeOneTimeKey() as soon as the buyer fetches it from the
+    // success page. Never read by the auth middleware (that uses key_hash).
+    if (!keyCols.includes('raw_key_one_time_view')) {
+      statsDB.exec('ALTER TABLE api_keys ADD COLUMN raw_key_one_time_view TEXT');
+    }
+    // Idempotency log for Stripe webhooks — Stripe retries up to 3 days.
+    // Insert AFTER successful key mint; presence of stripe_event_id here means
+    // "we've already minted for this event, don't do it again".
+    statsDB.exec(`
+      CREATE TABLE IF NOT EXISTS processed_webhooks (
+        stripe_event_id TEXT PRIMARY KEY,
+        event_type TEXT NOT NULL,
+        processed_at TEXT DEFAULT (datetime('now'))
+      );
+    `);
     // Track request provenance: distinguish MCP HTTP / MCP stdio / REST direct / bot / web
     const reqCols = (statsDB.prepare("PRAGMA table_info(request_log)").all() as Array<{ name: string }>).map(r => r.name);
     if (!reqCols.includes('client_kind')) {
