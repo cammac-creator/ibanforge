@@ -28,6 +28,7 @@ import { apiKeys } from './routes/api-keys.js';
 import { creditsBuy } from './routes/credits-buy.js';
 import { stripeWebhook } from './routes/stripe-webhook.js';
 import { stripeRetrieve } from './routes/stripe-retrieve.js';
+import { stripeSuccess } from './routes/stripe-success.js';
 import { ibanStructure } from './routes/iban-structure.js';
 import { rateLimitMiddleware } from './middleware/rate-limit.js';
 import { recordRequest, classifyClient } from './lib/stats.js';
@@ -424,6 +425,7 @@ app.route('/', apiKeys);
 // and x402 middleware so they're not gated by Bearer tokens.
 app.route('/', stripeWebhook);
 app.route('/', stripeRetrieve);
+app.route('/', stripeSuccess);
 
 // API key middleware — checks Bearer ifk_* tokens before x402
 app.use('/v1/*', apiKeyMiddleware());

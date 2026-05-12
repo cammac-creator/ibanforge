@@ -63,7 +63,8 @@ Pour chaque produit → **Create a payment link** :
 - Quantity : non modifiable (1)
 - **Collect customer email** : ON (essentiel — c'est l'email associé à la clé)
 - **Success page** : "Don't show confirmation page → Use a custom URL"
-  - URL : `https://ibanforge.com/stripe/success?session_id={CHECKOUT_SESSION_ID}`
+  - URL : `https://api.ibanforge.com/stripe/success?session_id={CHECKOUT_SESSION_ID}`
+  - (Page servie par le backend Hono. Migrera plus tard sur `ibanforge.com/stripe/success` côté Next.js si besoin.)
 - **Add metadata** : `bundle = 1k` (ou `5k` / `25k` selon le produit)
 
 Copie les 3 URLs Payment Link (de la forme `https://buy.stripe.com/XXXXXX`).
