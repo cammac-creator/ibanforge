@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IBANforge — Audit stratégique 360°</title>
+<style>
+  :root {
+    --bleu-1: #0a2540;
+    --bleu-2: #0f3a6b;
+    --bleu-3: #1d5fa6;
+    --bleu-4: #3b82f6;
+    --bleu-5: #dbeafe;
+    --bleu-6: #f0f7ff;
+    --bleu-7: #eaf2fb;
+    --blanc: #ffffff;
+    --gris-1: #f8fafc;
+    --gris-2: #e2e8f0;
+    --gris-3: #94a3b8;
+    --gris-4: #475569;
+    --gris-5: #1e293b;
+    --vert: #166534;
+    --vert-bg: #dcfce7;
+    --orange: #9a3412;
+    --orange-bg: #fed7aa;
+    --rouge: #991b1b;
+    --rouge-bg: #fee2e2;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    background: var(--blanc);
+    color: var(--gris-5);
+    line-height: 1.65;
+    font-size: 16px;
+  }
+  .wrap { max-width: 920px; margin: 0 auto; padding: 0 24px; }
+  header.top {
+    background: linear-gradient(135deg, var(--bleu-1) 0%, var(--bleu-3) 100%);
+    color: var(--blanc);
+    padding: 56px 0 48px;
+    margin-bottom: 0;
+  }
+  header.top .meta {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: var(--bleu-5);
+    margin-bottom: 16px;
+    font-weight: 600;
+  }
+  header.top h1 {
+    font-size: 42px;
+    line-height: 1.15;
+    font-weight: 800;
+    margin-bottom: 12px;
+    letter-spacing: -0.5px;
+  }
+  header.top h1 small {
+    display: block;
+    font-size: 20px;
+    font-weight: 400;
+    color: var(--bleu-5);
+    margin-top: 8px;
+    letter-spacing: 0;
+  }
+  header.top .baseline {
+    font-size: 16px;
+    color: var(--bleu-5);
+    max-width: 720px;
+    margin-top: 8px;
+  }
+  nav.toc {
+    background: var(--bleu-6);
+    border-bottom: 1px solid var(--bleu-5);
+    padding: 16px 0;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  nav.toc ul {
+    list-style: none;
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+    justify-content: center;
+    font-size: 13px;
+  }
+  nav.toc a {
+    color: var(--bleu-2);
+    text-decoration: none;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-weight: 500;
+    transition: all .15s;
+  }
+  nav.toc a:hover { background: var(--bleu-5); }
+  main { padding: 48px 0 80px; }
+  section { margin-bottom: 56px; scroll-margin-top: 70px; }
+  h2 {
+    font-size: 28px;
+    color: var(--bleu-1);
+    margin-bottom: 16px;
+    font-weight: 700;
+    letter-spacing: -0.3px;
+    border-left: 4px solid var(--bleu-4);
+    padding-left: 16px;
+  }
+  h2 .num {
+    color: var(--bleu-4);
+    font-weight: 800;
+    margin-right: 8px;
+  }
+  h3 {
+    font-size: 18px;
+    color: var(--bleu-2);
+    margin: 24px 0 12px;
+    font-weight: 700;
+  }
+  p { margin-bottom: 14px; }
+  p.lead {
+    font-size: 17px;
+    color: var(--gris-4);
+    margin-bottom: 20px;
+  }
+  ul, ol {
+    margin: 12px 0 16px 22px;
+  }
+  li { margin-bottom: 6px; }
+  strong { color: var(--bleu-1); font-weight: 700; }
+  em { color: var(--gris-4); font-style: italic; }
+  a { color: var(--bleu-3); }
+
+  /* Boîtes verdict */
+  .verdict {
+    border-radius: 10px;
+    padding: 18px 22px;
+    margin: 20px 0 8px;
+    border-left: 5px solid;
+    background: var(--bleu-6);
+  }
+  .verdict.go { background: var(--vert-bg); border-color: var(--vert); }
+  .verdict.go .label { color: var(--vert); }
+  .verdict.warn { background: var(--orange-bg); border-color: var(--orange); }
+  .verdict.warn .label { color: var(--orange); }
+  .verdict.stop { background: var(--rouge-bg); border-color: var(--rouge); }
+  .verdict.stop .label { color: var(--rouge); }
+  .verdict.neutral { background: var(--bleu-7); border-color: var(--bleu-3); }
+  .verdict.neutral .label { color: var(--bleu-2); }
+  .verdict .label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    font-weight: 800;
+    margin-bottom: 6px;
+    display: block;
+  }
+  .verdict h4 {
+    font-size: 17px;
+    margin-bottom: 8px;
+    color: var(--gris-5);
+    font-weight: 700;
+  }
+  .verdict p { margin-bottom: 0; color: var(--gris-5); font-size: 15px; }
+
+  /* Tableaux */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 18px 0;
+    font-size: 14px;
+    background: var(--blanc);
+    box-shadow: 0 1px 3px rgba(15,58,107,.06);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  thead { background: var(--bleu-1); }
+  th {
+    color: var(--blanc);
+    text-align: left;
+    padding: 11px 14px;
+    font-weight: 600;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+  }
+  td {
+    padding: 11px 14px;
+    border-top: 1px solid var(--gris-2);
+    vertical-align: top;
+  }
+  tr:nth-child(even) td { background: var(--gris-1); }
+  td .bear { color: var(--rouge); font-weight: 600; }
+  td .base { color: var(--bleu-3); font-weight: 600; }
+  td .bull { color: var(--vert); font-weight: 600; }
+
+  /* Cartes de chiffres */
+  .kpis {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 14px;
+    margin: 20px 0 28px;
+  }
+  .kpi {
+    background: var(--bleu-6);
+    border: 1px solid var(--bleu-5);
+    border-radius: 10px;
+    padding: 18px 20px;
+  }
+  .kpi .val {
+    font-size: 26px;
+    font-weight: 800;
+    color: var(--bleu-1);
+    line-height: 1.1;
+    margin-bottom: 4px;
+  }
+  .kpi .lbl {
+    font-size: 12px;
+    color: var(--gris-4);
+    text-transform: uppercase;
+    letter-spacing: .8px;
+    font-weight: 600;
+  }
+  .kpi .src {
+    font-size: 11px;
+    color: var(--gris-3);
+    margin-top: 6px;
+    font-style: italic;
+  }
+
+  /* Encart "Constat / Données / Verdict" */
+  .block {
+    background: var(--bleu-7);
+    border-radius: 10px;
+    padding: 20px 24px;
+    margin: 16px 0;
+  }
+  .block h4 {
+    color: var(--bleu-2);
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-weight: 800;
+    margin-bottom: 8px;
+  }
+
+  /* Petite étiquette */
+  .tag {
+    display: inline-block;
+    background: var(--bleu-5);
+    color: var(--bleu-2);
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 9px;
+    border-radius: 99px;
+    letter-spacing: .5px;
+    text-transform: uppercase;
+    margin-right: 6px;
+  }
+  .tag.go { background: var(--vert-bg); color: var(--vert); }
+  .tag.warn { background: var(--orange-bg); color: var(--orange); }
+  .tag.stop { background: var(--rouge-bg); color: var(--rouge); }
+
+  /* Footer */
+  footer.bottom {
+    background: var(--bleu-1);
+    color: var(--bleu-5);
+    padding: 32px 0;
+    margin-top: 40px;
+    font-size: 14px;
+  }
+  footer.bottom h3 { color: var(--blanc); margin-bottom: 10px; font-size: 16px; }
+  footer.bottom strong { color: var(--blanc); }
+
+  @media (max-width: 640px) {
+    header.top h1 { font-size: 30px; }
+    h2 { font-size: 22px; }
+    nav.toc ul { font-size: 12px; }
+    table { font-size: 12px; }
+    th, td { padding: 8px 10px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <div class="meta">Audit stratégique · 12 mai 2026</div>
+    <h1>IBANforge sous le scanner
+      <small>Marketing · Positionnement · Modèle économique · Pivot/Maintien/Abandon · Projection 3 ans</small>
+    </h1>
+    <p class="baseline">Audit critique à froid, sans complaisance. Complémentaire au ROI 90 jours opérationnel du 12 mai — focus ici sur les angles morts, le verdict pivot/maintien/abandon et la projection 36 mois.</p>
+  </div>
+</header>
+
+<nav class="toc">
+  <div class="wrap">
+    <ul>
+      <li><a href="#executif">Résumé exécutif</a></li>
+      <li><a href="#marketing">1. Marketing</a></li>
+      <li><a href="#positionnement">2. Positionnement</a></li>
+      <li><a href="#economique">3. Modèle économique</a></li>
+      <li><a href="#decision">4. Pivot / Maintien / Abandon</a></li>
+      <li><a href="#projection">5. Projection 3 ans</a></li>
+    </ul>
+  </div>
+</nav>
+
+<main>
+<div class="wrap">
+
+<section id="executif">
+  <h2><span class="num">0.</span>Résumé exécutif</h2>
+
+  <p class="lead">Le produit est techniquement solide, mais la stratégie commerciale est dispersée sur quatre positionnements, parie sur deux marchés non encore monétisés (MCP, x402), et n'a engagé aucune conversation B2B directe 14 mois après le lancement.</p>
+
+  <div class="kpis">
+    <div class="kpi">
+      <div class="val">98</div>
+      <div class="lbl">Clés API créées</div>
+      <div class="src">DB locale ; prod à confirmer</div>
+    </div>
+    <div class="kpi">
+      <div class="val">65</div>
+      <div class="lbl">Clés avec crédits prépayés</div>
+      <div class="src">DB locale ; achats Stripe one-shot, pas MRR</div>
+    </div>
+    <div class="kpi">
+      <div class="val">~15 k$/j</div>
+      <div class="lbl">Volume x402 mondial réel</div>
+      <div class="src">Artemis / CoinDesk 2026</div>
+    </div>
+    <div class="kpi">
+      <div class="val">&lt; 5 %</div>
+      <div class="lbl">MCP servers monétisés</div>
+      <div class="src">17 k+ servers — &lt; 850 paient</div>
+    </div>
+  </div>
+
+  <div class="verdict warn">
+    <span class="label">Verdict global</span>
+    <h4>Maintien conditionnel à 90 jours, avec un pivot de positionnement immédiat.</h4>
+    <p>L'angle « API IBAN + MCP + x402 » est trop large pour un solo founder. Le seul positionnement défendable contre IBAN.com, SurePay et iPiD est <strong>« Swiss-specialized + agent-native »</strong>. Si un premier client suisse payant n'est pas signé d'ici le <strong>11 août 2026</strong>, le projet bascule en mode « rente passive » (maintenance minimale, focus sur un autre projet) ou abandon assumé.</p>
+  </div>
+</section>
+
+<!-- ===================== 1. MARKETING ===================== -->
+<section id="marketing">
+  <h2><span class="num">1.</span>Stratégie marketing</h2>
+
+  <p class="lead">Tu refuses le spam mailing — c'est sain. Mais ce n'est pas <em>« mailing vs pas mailing »</em>, c'est <em>« inbound large vs outbound étroit »</em>. Aujourd'hui tu fais ni l'un ni l'autre vraiment.</p>
+
+  <div class="block">
+    <h4>Constat</h4>
+    <p>14 mois après le lancement, le marketing est essentiellement inbound passif&nbsp;: Twitter/X, awesome-lists, Show HN (mort), Dev.to (&lt;25 vues), MCP Registry, Glama, Smithery. Résultat documenté&nbsp;: <strong>0 stars GitHub</strong>, 19 visiteurs HN, 8 Reddit, 1 ChatGPT, 458 npm dl/sem qui ne sont que le bruit des mirrors. Zéro outreach B2B direct vers les fintechs suisses identifiées.</p>
+  </div>
+
+  <div class="block">
+    <h4>Données / Concurrence sur la distribution</h4>
+    <ul>
+      <li>IBAN.com a 20 ans de SEO. Reddit / HN / Dev.to ne battront jamais ce mur.</li>
+      <li>Le top referrer historique du site est Reddit (8 visites uniques) — c'est dérisoire et confirme que les canaux choisis sont mauvais pour B2B fintech.</li>
+      <li>Le ROI 90 jours daté du 12 mai (interne) chiffre le canal LinkedIn Sales Navigator à <strong>2-5 % cold→demo, 20-30 % demo→paid</strong>. C'est la seule voie testée pour B2B fintech sans budget media.</li>
+      <li>Le marché VoP (déclencheur réglementaire) <strong>n'est pas accessible</strong> sans name-matching IBAN↔nom, qu'IBANforge ne propose pas. Donc le marketing vers PSPs/AML est prématuré.</li>
+    </ul>
+  </div>
+
+  <div class="block">
+    <h4>Le vrai problème (que tu n'avais pas formulé ainsi)</h4>
+    <p>« Pas fan du spam mailing » est devenu une excuse pour <em>ne pas faire</em> de contact direct. Or B2B ≠ broadcast. Tu peux écrire <strong>une seule personne par jour</strong>, nommément, avec un message qui parle de son entreprise et de son besoin. Ça ne ressemble à rien de ce que tu appelles « spam » — c'est de la vente artisanale.</p>
+    <p>Le doc ROI 90j liste 20 prospects nommés. Tu en as activé <strong>zéro</strong>. C'est le seul KPI qui compte cette semaine.</p>
+  </div>
+
+  <div class="verdict warn">
+    <span class="label">Verdict marketing</span>
+    <h4>Bascule vers outreach étroit (1 prospect / jour) + contenu SEO de niche compound, abandon des canaux dev générique.</h4>
+    <p>Action 30 jours&nbsp;: 5 warm intros activés (Rémond/Neves/SwissBorg, Bilican/Relai, Kehrli/NetGuardians, Aumasson/Taurus) + 1 article SEO publié par semaine sur les requêtes long-tail « VoP Switzerland 2027 », « QR-IID validation », « vIBAN detection AML ». <strong>Tout le reste est facultatif.</strong></p>
+  </div>
+</section>
+
+<!-- ===================== 2. POSITIONNEMENT ===================== -->
+<section id="positionnement">
+  <h2><span class="num">2.</span>Positionnement marché</h2>
+
+  <p class="lead">Tu vends quatre produits différents à quatre cibles différentes. C'est la dilution maximale pour un solo founder.</p>
+
+  <h3>Les 4 positionnements actuellement actifs</h3>
+  <table>
+    <thead><tr><th>Positionnement</th><th>Cible</th><th>Concurrent direct</th><th>Verdict</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Dev tool IBAN/BIC</strong></td><td>Devs solo, hobbyists</td><td>IBANAPI à 15 $/mois flat, OpenIBAN gratuit</td><td><span class="tag stop">Perdu</span> Pricing commodité, pas de moat</td></tr>
+      <tr><td><strong>MCP-native pour agents IA</strong></td><td>Agents Claude/GPT autonomes</td><td>Aucun (premier sur ce créneau)</td><td><span class="tag warn">Pari 2027</span> Marché embryonnaire, &lt;5 % MCP monétisent</td></tr>
+      <tr><td><strong>Compliance / VoP / risk scoring</strong></td><td>Éditeurs AML, PSPs</td><td>SurePay, iPiD, Sumsub (1,35 $/check)</td><td><span class="tag stop">Hors-jeu</span> Pas de name-matching → exclu du VoP réglementaire</td></tr>
+      <tr><td><strong>Swiss specialist (BC-Nummer / QR-IID)</strong></td><td>Fintechs CH/LI, trésoreries</td><td>Worldline CH (enterprise only)</td><td><span class="tag go">Défendable</span> Niche profonde, ticket moyen possible</td></tr>
+    </tbody>
+  </table>
+
+  <div class="block">
+    <h4>Vérité douloureuse #1 — Le VoP réglementaire n'est pas pour toi</h4>
+    <p>Le Verification of Payee obligatoire en zone euro depuis octobre 2025 (et qui sera étendu à l'EEE en juillet 2027) exige <strong>de matcher le nom du bénéficiaire avec le titulaire du compte</strong>. Tu valides un IBAN, tu enrichis BIC, tu détectes vIBAN/EMI — bien, mais tu ne fais pas le name matching. SurePay (85 % part de marché NL), iPiD (4,5 Md de comptes couverts), Worldline VoP le font. Tu ne peux donc <strong>pas</strong> vendre une solution VoP compliance à un PSP aujourd'hui. Ton positionnement « compliance » sur la landing est mal calibré.</p>
+  </div>
+
+  <div class="block">
+    <h4>Vérité douloureuse #2 — Le MCP est un canal, pas un produit</h4>
+    <p>Sur 17 000+ MCP servers, &lt; 5 % monétisent. Le success story le plus cité (21st.dev Magic) plafonne à <strong>~400 £ MRR</strong>. Les grandes plateformes (Atlassian, Notion, Stripe) utilisent MCP pour augmenter la stickiness de leur produit principal, pas pour facturer. Tu n'as pas de produit derrière le MCP qui justifierait que des agents paient — tu as une API IBAN.</p>
+  </div>
+
+  <div class="block">
+    <h4>Vérité douloureuse #3 — Le moat « vIBAN/EMI detection » est intéressant mais pas vendu</h4>
+    <p>Tu as 84+ mappings BIC8 → EMI/néobanque que personne d'autre n'expose publiquement. <strong>Ça, c'est ton vrai moat.</strong> Mais ça n'apparaît ni dans le titre du landing, ni dans le pitch, ni dans le pricing différencié. Ton API <em>fait</em> ce que les éditeurs AML voudraient — détecter les vIBANs Wise/Revolut/N26 — mais tu vends « validation IBAN ». C'est une erreur de packaging, pas de produit.</p>
+  </div>
+
+  <div class="verdict warn">
+    <span class="label">Verdict positionnement</span>
+    <h4>Forcer le choix&nbsp;: garder UN positionnement primaire (Swiss + vIBAN), reléguer les 3 autres en sous-features.</h4>
+    <p>Le titre du landing doit devenir quelque chose comme <strong>« API d'intelligence IBAN suisse&nbsp;: BC-Nummer, QR-IID et détection vIBAN/EMI pour fintechs et compliance teams »</strong>. Le MCP/x402 reste mentionné en deuxième moitié de page, comme atout d'innovation et non comme produit. La détection vIBAN/EMI doit devenir l'endpoint phare avec son propre pricing (ex&nbsp;: 0,01 $/check vs 0,005 $ pour validation simple).</p>
+  </div>
+</section>
+
+<!-- ===================== 3. MODÈLE ÉCONOMIQUE ===================== -->
+<section id="economique">
+  <h2><span class="num">3.</span>Modèle économique</h2>
+
+  <p class="lead">Le pricing est rationnel sur le papier. Mais il fait deux paris simultanés (x402 et MCP) qui ne paient pas en 2026, et un volume freemium qui ne convertit pas.</p>
+
+  <h3>État réel des revenus (estimation honnête)</h3>
+  <table>
+    <thead><tr><th>Source</th><th>Signal</th><th>Lecture</th></tr></thead>
+    <tbody>
+      <tr><td>Clés API créées</td><td>98 (DB locale, prod &gt; ?)</td><td>Funnel d'entrée correct pour 14 mois sans marketing direct</td></tr>
+      <tr><td>Clés avec crédits Stripe</td><td>65 (DB locale)</td><td>Si confirmé en prod&nbsp;: signal &laquo;&nbsp;produit acheté volontairement&nbsp;&raquo; — mais ticket moyen inconnu</td></tr>
+      <tr><td>Volume x402 IBANforge</td><td>~0 (inférence)</td><td>L'écosystème x402 entier fait ~15 k$/jour réels après filtrage wash trading. Aucun agent finance documenté n'achète de l'IBAN validation en mai 2026.</td></tr>
+      <tr><td>Tier gratuit (200/mois)</td><td>Conversion attendue 3-7 %</td><td>Sur 98 clés, si 70 % sont sur le free et 5 % convertissent &rarr; <strong>3-4 conversions sur 14 mois</strong></td></tr>
+    </tbody>
+  </table>
+
+  <div class="block">
+    <h4>Vérité économique #1 — Le pricing $0.005 n'est pas un avantage</h4>
+    <p>IBANAPI Enterprise est à <strong>0,0038 $/lookup</strong>. AbstractAPI à <strong>0,00165 $/appel</strong>. Tu n'es pas le moins cher. Tu es <em>milieu de marché</em> avec un emballage moderne. Le pricing seul ne convertira pas — c'est <strong>la spécificité du contenu (Swiss + vIBAN)</strong> qui justifie qu'on te paie plutôt qu'un concurrent commodité.</p>
+  </div>
+
+  <div class="block">
+    <h4>Vérité économique #2 — Le ratio x402/Stripe est inversé</h4>
+    <p>Hypothèse roadmap d'avril&nbsp;: 25 % x402 / 75 % Stripe. Réalité 2026&nbsp;: <strong>~0 % x402, 100 % Stripe</strong>. Le rail x402 a coûté du temps de dev, mais ne rapporte rien. C'est un investissement R&D / positionnement valable, mais il ne doit pas peser dans les projections de revenus 2026-2027.</p>
+  </div>
+
+  <div class="block">
+    <h4>Maths du break-even (à calibrer par toi)</h4>
+    <p>Coûts infra ~6 $/mois, négligeables. Le vrai coût d'IBANforge, c'est ton temps. <em>Hypothèse à valider&nbsp;: si tu y mets ~10 h/sem et valorises ce temps à 80 CHF/h (taux dev senior CH), c'est ~3 200 CHF/mois de coût d'opportunité.</em> Pour justifier économiquement ce temps, il faut viser <strong>2 500-3 000 CHF MRR récurrent</strong> d'ici 12 mois — cible cohérente avec la roadmap d'avril (3 000 $).</p>
+    <p>Distinction importante&nbsp;: les 65 clés avec crédits prépayés (DB locale) représentent du <strong>revenu Stripe cumulé one-shot</strong> (potentiellement ~1 500-3 000 $ si tickets moyens $25-$50), <em>pas du MRR</em>. Les packs prépayés n'ont pas de renouvellement automatique — ils créent un revenu en dents de scie, pas une rente. Le MRR récurrent réel à ce jour est très probablement nul ou marginal en attendant que des clients re-rechargent.</p>
+  </div>
+
+  <h3>Re-pricing recommandé</h3>
+  <table>
+    <thead><tr><th>Endpoint</th><th>Prix actuel</th><th>Prix suggéré</th><th>Justification</th></tr></thead>
+    <tbody>
+      <tr><td>IBAN validate (simple)</td><td>$0,005</td><td><strong>$0,003</strong></td><td>S'aligner sur commodité — c'est un loss-leader pour upsell vIBAN</td></tr>
+      <tr><td>vIBAN/EMI detection</td><td>—</td><td><strong>$0,015</strong></td><td>Endpoint dédié, pricing premium, c'est ton moat</td></tr>
+      <tr><td>Swiss BC-Nummer / QR-IID</td><td>$0,003</td><td><strong>$0,010</strong></td><td>Pas de concurrent à ce niveau de profondeur sur CH/LI</td></tr>
+      <tr><td>Batch 100 IBANs</td><td>$0,020</td><td><strong>$0,020</strong></td><td>OK — appel d'air pour comptables / AP automation</td></tr>
+      <tr><td>Pack Stripe « Swiss Compliance »</td><td>—</td><td><strong>199 $/mois 5k vIBAN + 5k IBAN</strong></td><td>Bundle vendable à 1 client CH = couvre le coût d'opportunité mensuel</td></tr>
+    </tbody>
+  </table>
+
+  <div class="verdict warn">
+    <span class="label">Verdict économique</span>
+    <h4>Repackager autour du vIBAN+Swiss premium, pas du volume bas-prix. Sortir x402 des projections.</h4>
+    <p>1 client Swiss à <strong>199 $/mois</strong> = 2 400 $/an = équivaut à 480 000 appels x402 à $0,005. Cible 2026&nbsp;: <strong>5 à 10 clients de ce profil</strong>, pas 75 utilisateurs free qui convertissent à 5 %.</p>
+  </div>
+</section>
+
+<!-- ===================== 4. PIVOT / MAINTIEN / ABANDON ===================== -->
+<section id="decision">
+  <h2><span class="num">4.</span>Pivot · Maintien · Abandon</h2>
+
+  <p class="lead">Le point dur de cet audit. Trois scénarios possibles, classés par probabilité décroissante de retour sur temps investi.</p>
+
+  <h3>Évaluation des trois options</h3>
+  <table>
+    <thead><tr><th>Option</th><th>Coût (temps)</th><th>Probabilité de succès 12 mois</th><th>Upside</th><th>Downside</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>A. Pivot positionnement Swiss + vIBAN</strong></td>
+        <td>~80 h sur 60 jours (relandig, repricing, outreach 20 prospects)</td>
+        <td><span class="base">40-55 %</span> d'atteindre 2,5K CHF MRR</td>
+        <td>Niche défendable, possible exit B2B à 50-200 k CHF</td>
+        <td>Reste un marché petit (~50-200 cibles CH)</td>
+      </tr>
+      <tr>
+        <td><strong>B. Maintien tel quel (statu quo)</strong></td>
+        <td>~5 h/sem en mode autopilote</td>
+        <td><span class="bear">10-15 %</span> de dépasser 500 $/mois MRR</td>
+        <td>Apprentissage continu, brand asset pour CV</td>
+        <td>Hémorragie de temps, frustration, opportunité ratée sur PSR/VoP</td>
+      </tr>
+      <tr>
+        <td><strong>C. Abandon assumé / mode rente</strong></td>
+        <td>~1 h/sem (DB refresh auto)</td>
+        <td><span class="bull">95 %</span> de garder ~50-200 $/mois passif</td>
+        <td>Libère 8 h/sem pour un autre projet plus rentable</td>
+        <td>« On lâche trop tôt » — biais émotionnel</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="block">
+    <h4>Critères de décision — checkpoint 11 août 2026 (90 jours)</h4>
+    <p>D'ici cette date, l'option A doit avoir produit&nbsp;:</p>
+    <ul>
+      <li><strong>1 client suisse payant</strong> en mode pack Stripe (199 $/mois ou équivalent crédits)</li>
+      <li><strong>3 réponses qualifiées</strong> sur les 5 warm intros (Rémond, Neves, Bilican, Kehrli, Aumasson)</li>
+      <li><strong>1 article SEO ranking</strong> top 20 Google sur une requête CH (« BC-Nummer API », « vIBAN detection »)</li>
+      <li><strong>Landing repositionnée</strong> et OpenAPI mise à jour</li>
+    </ul>
+    <p>Si <strong>au moins 3 des 4 critères</strong> sont remplis&nbsp;: continuer option A 6 mois supplémentaires. Sinon&nbsp;: basculer en option C (mode rente) <em>sans culpabilité</em>, car le marché aura parlé.</p>
+  </div>
+
+  <div class="verdict go">
+    <span class="label">Verdict décision</span>
+    <h4>Option A — Pivot Swiss+vIBAN — pendant 90 jours, puis évaluation binaire stricte.</h4>
+    <p>L'option A est la seule où le travail investi en 14 mois conserve une valeur résiduelle. L'option B est <strong>la plus dangereuse</strong> car elle consomme du temps sans franchir le seuil de rentabilité. L'option C reste un parachute honorable&nbsp;: tu as appris MCP, x402, Stripe, fintech B2B — c'est transférable. <em>Aucun de ces trois choix n'est un échec.</em></p>
+  </div>
+</section>
+
+<!-- ===================== 5. PROJECTION 3 ANS ===================== -->
+<section id="projection">
+  <h2><span class="num">5.</span>Projection du projet à 3 ans</h2>
+
+  <p class="lead">Trois scénarios chiffrés, en mai 2029, en prenant comme variables&nbsp;: l'adoption réelle du VoP/PSR, la traction du pivot Swiss, et l'émergence (ou non) du marché agentique MCP/x402.</p>
+
+  <h3>Scénarios à mai 2029</h3>
+  <table>
+    <thead><tr>
+      <th>Scénario</th><th>Clients payants</th><th>ARR (CHF)</th><th>Hypothèses</th><th>Probabilité</th>
+    </tr></thead>
+    <tbody>
+      <tr>
+        <td><span class="bear">BEAR</span> — Stagnation</td>
+        <td>5-15</td>
+        <td>3-8 k CHF</td>
+        <td>Pivot Swiss n'attire que des early adopters. Aucun PSP CH n'intègre IBANforge. x402 reste marginal. MCP monétisation toujours &lt;5 %. Concurrent (iPiD/Worldline) capte le marché VoP CH.</td>
+        <td><strong>~45 %</strong></td>
+      </tr>
+      <tr>
+        <td><span class="base">BASE</span> — Niche Swiss installée</td>
+        <td>30-80</td>
+        <td>30-90 k CHF</td>
+        <td>3-5 clients Swiss B2B récurrents (fintechs, comptables). Module vIBAN/EMI vendu à 2-3 éditeurs AML en marque blanche. SEO long-tail rapporte 10-15 % du trafic. PSR/PSD3 applicable mi-2028 crée une vague d'intérêt sur 6-12 mois.</td>
+        <td><strong>~40 %</strong></td>
+      </tr>
+      <tr>
+        <td><span class="bull">BULL</span> — Acquisition / exit</td>
+        <td>100+</td>
+        <td>150-400 k CHF, ou exit 300 k-1,5 M CHF</td>
+        <td>Adoption x402 massive 2027-2028. 1 grand acteur (ComplyAdvantage, iPiD, Worldline) propose un rachat / acqui-hire pour intégrer le module vIBAN+Swiss. Ou MRR scale à 15-30 k CHF/mois via 2-3 deals enterprise CH. AMLR 2027+ force registre vIBAN, IBANforge devient référence.</td>
+        <td><strong>~15 %</strong></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="block">
+    <h4>Inflexions externes à surveiller (signaux faibles)</h4>
+    <ul>
+      <li><strong>PSR (vote final mai 2026, applicable Q2/Q3 2026)</strong> — déclenche responsabilité PSP renforcée sur APP scams. Premier driver de demande VoP.</li>
+      <li><strong>PSD3 transposition Q2/Q3 2028</strong> — élargit à tous les virements (pas seulement instant). Pic de demande VoP en CH attendu fin 2027.</li>
+      <li><strong>AMLR 2027</strong> — registre centralisé vIBAN, KYC obligatoire pour émetteurs vIBAN. Si tu maintiens ta base 84+ mappings et l'enrichis à 200+ d'ici 2027, tu deviens <em>une source de référence</em>.</li>
+      <li><strong>x402 ou successeur</strong> — Coinbase / AWS / Cloudflare poussent ; si l'adoption dépasse <strong>1 M$ jour</strong> de volume réel (10×) d'ici fin 2027, le rail x402 d'IBANforge devient un actif.</li>
+      <li><strong>SurePay / iPiD côté CH</strong> — Si l'un d'eux ouvre une offre Swiss specialiste, l'option A est mort-née. À surveiller chaque trimestre.</li>
+    </ul>
+  </div>
+
+  <div class="block">
+    <h4>Ce qui n'arrivera (probablement) PAS, même en BULL</h4>
+    <ul>
+      <li>Concurrencer IBAN.com sur l'inbound généraliste — leur SEO de 20 ans est imprenable</li>
+      <li>Devenir « la VoP suisse de référence » — il faut une licence bancaire ou un partenariat top-3 banque CH, hors de portée solo</li>
+      <li>MRR &gt;50 k CHF/mois en solo founder — au-delà, il faut une équipe, du sales, du compliance officer</li>
+    </ul>
+  </div>
+
+  <div class="verdict neutral">
+    <span class="label">Verdict 3 ans</span>
+    <h4>Le scénario BASE (~40 % de probabilité, ARR 30-90 k CHF) est la cible réaliste. Le BULL (exit) est un bonus possible, pas un plan.</h4>
+    <p>Si tu plannifies pour le BULL, tu vas surinvestir, prendre des décisions trop risquées et te démoraliser quand le BASE arrivera. Plannifie pour le BASE&nbsp;: il te donne un complément de revenu honnête (2,5-7,5 k CHF/mois) et une option d'exit asymétrique gratuite. La vraie question des 36 prochains mois est&nbsp;: <strong>combien de temps par semaine tu acceptes d'investir pour ce niveau de retour</strong>, sachant que c'est un side-revenue, pas un remplacement de salaire.</p>
+  </div>
+</section>
+
+</div>
+</main>
+
+<footer class="bottom">
+  <div class="wrap">
+    <h3>Prochaines 72 heures — actions concrètes</h3>
+    <p>1. <strong>Récupérer STATS_TOKEN Railway</strong> et confirmer les vrais chiffres prod (clés actives, MRR, revenu Stripe à date) pour valider/infirmer les hypothèses de cet audit.<br>
+    2. <strong>Renommer le landing</strong>&nbsp;: titre primaire « Swiss IBAN intelligence + vIBAN detection », titre secondaire « MCP-native, x402-ready ».<br>
+    3. <strong>Envoyer 5 messages chauds</strong> (Rémond, Neves, Bilican, Kehrli, Aumasson) — texte personnalisé, pas template.<br>
+    4. <strong>Bloquer la date 11 août 2026</strong> dans ton calendrier&nbsp;: checkpoint binaire continuer / mode rente.</p>
+    <p style="margin-top:18px; font-size:12px; color:var(--bleu-5);">Audit produit par synthèse de&nbsp;: mémoires projet, ROI 90j (12 mai 2026), recherche concurrentielle web (mai 2026), DB locale stats. Les chiffres prod restent à confirmer. Cet audit ne reprend volontairement aucune recommandation déjà couverte dans le ROI 90j.</p>
+  </div>
+</footer>
+
+</body>
+</html>
