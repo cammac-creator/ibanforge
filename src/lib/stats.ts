@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type Database from 'better-sqlite3';
 import { getStatsDB } from './db.js';
 import type { OperationType, StatsOverview, HourlyStatsResponse, ErrorStatsResponse, PatternStatsResponse } from '../types.js';
@@ -50,10 +51,36 @@ function upsertHourly() {
 function insertRequest() {
   if (!_insertRequest) {
     _insertRequest = getStatsDB().prepare(
-      'INSERT INTO request_log (method, path, status, response_ms, hour, day_of_week, client_kind) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO request_log (method, path, status, response_ms, hour, day_of_week, client_kind, ip_hash, user_agent) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
     );
   }
   return _insertRequest;
+}
+
+const IP_HASH_SECRET = process.env.IP_HASH_SECRET ?? process.env.SESSION_SECRET ?? 'ibanforge-default-salt-change-me';
+
+/**
+ * Truncated salted SHA-256 of a client IP, used to cluster requests from the
+ * same source without retaining the original address. The 16-hex-char prefix
+ * gives 2^64 buckets — collision-resistant in practice and not reversible
+ * without the server-side secret.
+ */
+export function hashIp(ip: string | null | undefined): string | null {
+  if (!ip || ip === 'unknown') return null;
+  return createHash('sha256').update(`${IP_HASH_SECRET}:${ip}`).digest('hex').slice(0, 16);
+}
+
+/**
+ * Extract the client IP from a Hono request, honoring the proxy headers that
+ * Railway sets (`x-forwarded-for` first, then `x-real-ip`).
+ */
+export function extractClientIp(headers: { 'x-forwarded-for'?: string | null; 'x-real-ip'?: string | null }): string | null {
+  const xff = headers['x-forwarded-for'];
+  if (xff) {
+    const first = xff.split(',')[0]?.trim();
+    if (first) return first;
+  }
+  return headers['x-real-ip'] ?? null;
 }
 
 /**
@@ -151,9 +178,20 @@ export function classifyClient(path: string, userAgent: string | undefined): Cli
 // ---------------------------------------------------------------------------
 
 /**
- * Record any HTTP request (all traffic, not just business operations)
+ * Record any HTTP request (all traffic, not just business operations).
+ *
+ * `ipHash` and `userAgent` are optional and feed the /admin/scanners endpoint;
+ * legacy callers that omit them still work (columns are nullable).
  */
-export function recordRequest(method: string, path: string, status: number, responseMs: number, clientKind: ClientKind = 'api') {
+export function recordRequest(
+  method: string,
+  path: string,
+  status: number,
+  responseMs: number,
+  clientKind: ClientKind = 'api',
+  ipHash: string | null = null,
+  userAgent: string | null = null,
+) {
   try {
     const now = new Date();
     const hour = now.getUTCHours();
@@ -162,7 +200,8 @@ export function recordRequest(method: string, path: string, status: number, resp
     const normalizedPath = path
       .replace(/\/v1\/bic\/[A-Za-z0-9]+/, '/v1/bic/:code')
       .replace(/\/v1\/ch\/clearing\/\d+/, '/v1/ch/clearing/:iid');
-    insertRequest().run(method, normalizedPath, status, Math.round(responseMs), hour, dow, clientKind);
+    const truncatedUa = userAgent ? userAgent.slice(0, 256) : null;
+    insertRequest().run(method, normalizedPath, status, Math.round(responseMs), hour, dow, clientKind, ipHash, truncatedUa);
   } catch {
     // Non-critical
   }

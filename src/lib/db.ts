@@ -171,6 +171,17 @@ export function getStatsDB(): DatabaseType.Database {
       statsDB.exec('ALTER TABLE request_log ADD COLUMN client_kind TEXT');
       statsDB.exec('CREATE INDEX IF NOT EXISTS idx_request_log_client_kind ON request_log(client_kind)');
     }
+    // Scanner identification: HMAC-truncated IP hash (clustering, not reversible)
+    // and full User-Agent. Used by /admin/scanners to expose top sources of
+    // automated traffic. ip_hash uses a server-side secret so dump leaks cannot
+    // be rainbow-tabled back to an address.
+    if (!reqCols.includes('ip_hash')) {
+      statsDB.exec('ALTER TABLE request_log ADD COLUMN ip_hash TEXT');
+      statsDB.exec('CREATE INDEX IF NOT EXISTS idx_request_log_ip_hash ON request_log(ip_hash)');
+    }
+    if (!reqCols.includes('user_agent')) {
+      statsDB.exec('ALTER TABLE request_log ADD COLUMN user_agent TEXT');
+    }
   }
   return statsDB;
 }

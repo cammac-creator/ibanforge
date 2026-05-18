@@ -13,6 +13,7 @@ import { chClearing } from './routes/ch-clearing.js';
 import { health } from './routes/health.js';
 import { stats } from './routes/stats.js';
 import { adminRevenue } from './routes/admin-revenue.js';
+import { adminScanners } from './routes/admin-scanners.js';
 import { demo } from './routes/demo.js';
 import { landing } from './routes/landing.js';
 import { openapi } from './routes/openapi.js';
@@ -31,7 +32,7 @@ import { stripeRetrieve } from './routes/stripe-retrieve.js';
 import { stripeSuccess } from './routes/stripe-success.js';
 import { ibanStructure } from './routes/iban-structure.js';
 import { rateLimitMiddleware } from './middleware/rate-limit.js';
-import { recordRequest, classifyClient } from './lib/stats.js';
+import { recordRequest, classifyClient, hashIp, extractClientIp } from './lib/stats.js';
 
 // Fail-fast: refuse to start in production without wallet config
 ensureWalletConfigured();
@@ -120,8 +121,13 @@ app.use('*', async (c, next) => {
   await next();
   const path = new URL(c.req.url).pathname;
   if (!SKIP_TRACKING.has(path)) {
-    const clientKind = classifyClient(path, c.req.header('user-agent'));
-    recordRequest(c.req.method, path, c.res.status, performance.now() - start, clientKind);
+    const userAgent = c.req.header('user-agent') ?? null;
+    const clientKind = classifyClient(path, userAgent ?? undefined);
+    const ip = extractClientIp({
+      'x-forwarded-for': c.req.header('x-forwarded-for') ?? null,
+      'x-real-ip': c.req.header('x-real-ip') ?? null,
+    });
+    recordRequest(c.req.method, path, c.res.status, performance.now() - start, clientKind, hashIp(ip), userAgent);
   }
 });
 
@@ -449,6 +455,7 @@ app.route('/', ibanStructure);
 app.route('/', health);
 app.route('/', stats);
 app.route('/', adminRevenue);
+app.route('/', adminScanners);
 app.route('/', demo);
 app.route('/', openapi);
 app.route('/', discovery);
