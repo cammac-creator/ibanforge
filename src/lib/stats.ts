@@ -416,6 +416,9 @@ export function getStats(): StatsOverview {
       },
     },
     total_revenue_usdc: Math.round(revenue.total * 1000000) / 1000000,
+    total_revenue_attempted_usdc: Math.round(revenue.total * 1000000) / 1000000,
+    revenue_note:
+      'total_revenue_usdc and total_revenue_attempted_usdc both reflect the SUM of revenue_usdc in daily_stats — these are x402 calls that PASSED the payment middleware verify step, NOT a confirmation of on-chain settlement. Authoritative settled USDC is /admin/revenue (Bearer STATS_TOKEN). Historical drift observed: ~0.226 USDC counted as attempted between 2026-04-08 and 2026-04-17 with no matching Base mainnet Transfer events to the seller wallet — likely facilitator settlement failures during the early x402 rollout.',
     top_countries: topCountries,
     last_7_days: last7,
   };
@@ -429,7 +432,9 @@ export function getStatsHistory(days: number = 7): Array<{
   iban_validate: number;
   iban_batch: number;
   bic_lookup: number;
+  /** @deprecated use revenue_attempted_usdc + /admin/revenue (on-chain source of truth) */
   revenue_usdc: number;
+  revenue_attempted_usdc: number;
   total_requests: number;
   s2xx: number;
   s3xx: number;
@@ -477,12 +482,14 @@ export function getStatsHistory(days: number = 7): Array<{
 
   return Array.from(allDates).sort().map(date => {
     const req = reqMap.get(date);
+    const rev = opsMap.get(date)?.revenue_usdc ?? 0;
     return {
       date,
       iban_validate: opsMap.get(date)?.iban_validate ?? 0,
       iban_batch: opsMap.get(date)?.iban_batch ?? 0,
       bic_lookup: opsMap.get(date)?.bic_lookup ?? 0,
-      revenue_usdc: opsMap.get(date)?.revenue_usdc ?? 0,
+      revenue_usdc: rev,
+      revenue_attempted_usdc: rev,
       total_requests: req?.total_requests ?? 0,
       s2xx: req?.s2xx ?? 0,
       s3xx: req?.s3xx ?? 0,

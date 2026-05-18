@@ -674,7 +674,16 @@ const spec = {
               },
             },
           },
-          total_revenue_usdc: { type: 'number' },
+          total_revenue_usdc: {
+            type: 'number',
+            deprecated: true,
+            description: 'Deprecated alias for total_revenue_attempted_usdc. Use /admin/revenue for on-chain settled USDC.',
+          },
+          total_revenue_attempted_usdc: {
+            type: 'number',
+            description: 'SUM of revenue_usdc in daily_stats. Reflects x402 calls that PASSED the payment middleware verify step, NOT a confirmation of on-chain settlement. For settled USDC see /admin/revenue.',
+          },
+          revenue_note: { type: 'string' },
           top_countries: {
             type: 'array',
             items: {
