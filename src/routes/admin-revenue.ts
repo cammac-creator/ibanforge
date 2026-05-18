@@ -57,29 +57,27 @@ async function rpcCall<T>(method: string, params: unknown[]): Promise<T> {
   return json.result as T;
 }
 
-async function fetchLogsChunk(from: bigint, to: bigint, recipientTopic: string): Promise<RpcLog[]> {
+async function fetchLogsChunk(
+  from: bigint,
+  to: bigint,
+  recipientTopic: string,
+): Promise<{ logs: RpcLog[]; failed: boolean }> {
+  const params = [
+    {
+      address: USDC_BASE_CONTRACT,
+      fromBlock: '0x' + from.toString(16),
+      toBlock: '0x' + to.toString(16),
+      topics: [TRANSFER_TOPIC, null, recipientTopic],
+    },
+  ];
   try {
-    return await rpcCall<RpcLog[]>('eth_getLogs', [
-      {
-        address: USDC_BASE_CONTRACT,
-        fromBlock: '0x' + from.toString(16),
-        toBlock: '0x' + to.toString(16),
-        topics: [TRANSFER_TOPIC, null, recipientTopic],
-      },
-    ]);
+    return { logs: await rpcCall<RpcLog[]>('eth_getLogs', params), failed: false };
   } catch {
     await new Promise((r) => setTimeout(r, 250));
     try {
-      return await rpcCall<RpcLog[]>('eth_getLogs', [
-        {
-          address: USDC_BASE_CONTRACT,
-          fromBlock: '0x' + from.toString(16),
-          toBlock: '0x' + to.toString(16),
-          topics: [TRANSFER_TOPIC, null, recipientTopic],
-        },
-      ]);
+      return { logs: await rpcCall<RpcLog[]>('eth_getLogs', params), failed: false };
     } catch {
-      return [];
+      return { logs: [], failed: true };
     }
   }
 }
@@ -134,12 +132,9 @@ adminRevenue.get('/admin/revenue', async (c) => {
   for (let i = 0; i < chunks.length; i += PARALLEL_BATCH) {
     const batch = chunks.slice(i, i + PARALLEL_BATCH);
     const results = await Promise.all(batch.map((ch) => fetchLogsChunk(ch.from, ch.to, recipientTopic)));
-    for (let j = 0; j < results.length; j++) {
-      if (results[j].length === 0 && batch[j].to - batch[j].from > 0n) {
-        // Note: empty results are normal; we can't distinguish "no events" from "rate-limited retried-and-failed".
-        // The retry inside fetchLogsChunk catches the obvious failures.
-      }
-      allLogs.push(...results[j]);
+    for (const r of results) {
+      if (r.failed) failedChunks += 1;
+      allLogs.push(...r.logs);
     }
     if (Date.now() - t0 > 25_000) break;
   }
@@ -190,7 +185,12 @@ adminRevenue.get('/admin/revenue', async (c) => {
       approx_days: (Number(head - startBlock) * BASE_BLOCK_TIME_SEC) / 86400,
     },
     elapsed_ms: Date.now() - t0,
+    chunks_total: chunks.length,
     chunks_failed: failedChunks,
+    accuracy_note:
+      failedChunks > 0
+        ? `${failedChunks}/${chunks.length} chunks failed (RPC rate-limit) — total may be under-reported. Configure BASE_RPC_URL with a dedicated endpoint for full accuracy.`
+        : 'all chunks succeeded',
     by_day: sortedByDay,
     recent,
     docs: 'Pass Bearer STATS_TOKEN. Queries USDC Transfer events to the wallet via Base mainnet RPC (no API key needed). Override range with ?blocks=N. Note: public RPC rate-limits cause silent chunk drops on aggressive lookbacks — for full history use a dedicated RPC URL via BASE_RPC_URL env var.',
