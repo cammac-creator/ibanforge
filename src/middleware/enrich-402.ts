@@ -419,7 +419,8 @@ export function enrich402Middleware(): MiddlewareHandler {
     const pricing = findPricing(method, url.pathname);
     const walletAddress = process.env.WALLET_ADDRESS ?? '0x0000000000000000000000000000000000000000';
 
-    // Path 2: existing 402 from x402 middleware — patch accepts with outputSchema
+    // Path 2: existing 402 with an `accepts` body — patch accepts with
+    // outputSchema AND add the human/agent access ramp around it.
     if (text && text.trim() !== '' && text.trim() !== '{}') {
       let parsed: { accepts?: AcceptEntry[]; [key: string]: unknown };
       try {
@@ -429,17 +430,23 @@ export function enrich402Middleware(): MiddlewareHandler {
       }
       if (!Array.isArray(parsed.accepts) || parsed.accepts.length === 0) return;
 
-      let modified = false;
-      parsed.accepts = parsed.accepts.map((a) => {
-        const before = a.outputSchema;
-        const patched = injectOutputSchema(method, url.pathname, { ...a });
-        if (patched.outputSchema && patched.outputSchema !== before) modified = true;
-        return patched;
-      });
+      const patchedAccepts = parsed.accepts.map((a) =>
+        injectOutputSchema(method, url.pathname, { ...a }),
+      );
 
-      if (!modified) return;
+      // Spread `parsed` first to keep any field the x402 SDK produced
+      // (x402Version, error, …); the ramp's fields then take precedence.
+      // `accepts` is never part of buildAccessRamp() — reassigned explicitly
+      // so the outputSchema injection stays intact.
+      const enriched: Record<string, unknown> = {
+        x402Version: 1,
+        error: 'payment_required',
+        ...parsed,
+        ...buildAccessRamp(),
+      };
+      enriched.accepts = patchedAccepts;
 
-      c.res = new Response(JSON.stringify(parsed, null, 2), {
+      c.res = new Response(JSON.stringify(enriched, null, 2), {
         status: 402,
         headers: c.res.headers,
       });
