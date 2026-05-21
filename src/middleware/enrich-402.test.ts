@@ -52,4 +52,30 @@ describe('enrich402Middleware', () => {
     const body = await res.json();
     expect(body.error).toBe('custom_402');
   });
+
+  it('Path 1 — exposes the credit_packs rail and a 3-way message', async () => {
+    const app = new Hono();
+    app.use('*', enrich402Middleware());
+    app.post('/v1/iban/validate', () => {
+      return new Response('{}', {
+        status: 402,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    });
+
+    const res = await app.request('/v1/iban/validate', { method: 'POST', body: '{}' });
+    expect(res.status).toBe(402);
+
+    const body = await res.json();
+    // new credit_packs rail
+    expect(body.credit_packs).toBeDefined();
+    expect(body.credit_packs.pay_by_card).toBe('https://api.ibanforge.com/#pricing');
+    expect(body.credit_packs.pay_by_usdc).toContain('/v1/credits/buy');
+    expect(body.credit_packs.pricing).toContain('$5');
+    // message now names the packs rail
+    expect(body.message).toContain('credit pack');
+    // existing blocks keep their field names
+    expect(body.free_tier.signup).toContain('/v1/keys/generate');
+    expect(body.x402).toBeDefined();
+  });
 });
