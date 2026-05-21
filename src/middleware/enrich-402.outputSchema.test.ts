@@ -224,4 +224,36 @@ describe('enrich402 outputSchema injection (CyberSapper recipe)', () => {
     expect(out).toHaveProperty('institution');
     expect(out).toHaveProperty('participation');
   });
+
+  it('Path 2 — adds the access ramp without disturbing accepts / outputSchema', async () => {
+    const app = makeApp(() =>
+      new Response(
+        JSON.stringify({
+          accepts: [
+            {
+              scheme: 'exact',
+              network: 'base',
+              maxAmountRequired: '5000',
+              payTo: '0xD13bD0A4120BA301125290e5cc0c7EFD4CB40a55',
+            },
+          ],
+        }),
+        { status: 402, headers: { 'Content-Type': 'application/json' } },
+      ),
+    );
+
+    const r = await app.request('/v1/iban/validate', { method: 'POST', body: '{}' });
+    expect(r.status).toBe(402);
+    const body = (await r.json()) as {
+      accepts: Array<Record<string, unknown>>;
+      credit_packs?: Record<string, unknown>;
+      free_tier?: Record<string, unknown>;
+    };
+    // access ramp added alongside accepts
+    expect(body.credit_packs).toBeDefined();
+    expect(body.free_tier).toBeDefined();
+    // accepts untouched: count preserved, outputSchema still injected
+    expect(body.accepts).toHaveLength(1);
+    expect(body.accepts[0]).toHaveProperty('outputSchema');
+  });
 });
