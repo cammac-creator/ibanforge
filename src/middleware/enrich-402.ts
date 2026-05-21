@@ -361,6 +361,39 @@ function injectOutputSchema(method: string, path: string, accept: AcceptEntry): 
 }
 
 /**
+ * Human- and agent-readable access ramp shared by both 402 enrichment paths.
+ * Lists the three ways to call a paid endpoint: a free API key, prepaid
+ * credit packs (card or USDC), and pay-per-call x402. The machine `accepts`
+ * array is built separately and never lives here.
+ */
+function buildAccessRamp(): Record<string, unknown> {
+  return {
+    message:
+      'Authentication or payment required. Three ways in: a free API key ' +
+      '(200 req/month), prepaid credit packs (card or USDC), or pay-per-call via x402.',
+    free_tier: {
+      description: '200 requests/month — no credit card, no subscription',
+      signup: 'POST /v1/keys/generate with body {"email":"you@example.com"}',
+      usage: 'Add header: Authorization: Bearer ifk_your_key_here',
+    },
+    credit_packs: {
+      description: 'Prepaid credits — never expire, lower per-call cost than retail',
+      pay_by_card: 'https://api.ibanforge.com/#pricing',
+      pay_by_usdc: 'POST /v1/credits/buy/1k|5k|25k — list: GET /v1/credits/bundles',
+      pricing: '1k = $5 · 5k = $20 (-20%) · 25k = $80 (-36%)',
+    },
+    x402: {
+      description: 'Pay per call with USDC on Base L2 (machine-to-machine)',
+      protocol_docs: 'https://x402.org',
+      discovery: 'https://api.ibanforge.com/.well-known/x402',
+      bazaar: 'https://api.cdp.coinbase.com/platform/v2/x402/discovery/resources',
+    },
+    documentation: 'https://ibanforge.com/docs',
+    llms: 'https://api.ibanforge.com/llms.txt',
+  };
+}
+
+/**
  * Enriches HTTP 402 responses to be both machine-readable (x402 v0.1 spec compliant)
  * AND human-readable. Agents need the `accepts` array to automate payment;
  * humans need the message + free_tier instructions.
@@ -440,22 +473,8 @@ export function enrich402Middleware(): MiddlewareHandler {
     const body = {
       x402Version: 1,
       error: 'payment_required',
-      message:
-        'Authentication required. Get a free API key (200 req/month) or pay per call via x402.',
       accepts,
-      free_tier: {
-        description: '200 requests/month — no credit card, no subscription',
-        signup: 'POST /v1/keys/generate with body {"email":"you@example.com"}',
-        usage: 'Add header: Authorization: Bearer ifk_your_key_here',
-      },
-      x402: {
-        description: 'Pay per call with USDC on Base L2 (machine-to-machine)',
-        protocol_docs: 'https://x402.org',
-        discovery: 'https://api.ibanforge.com/.well-known/x402',
-        bazaar: 'https://api.cdp.coinbase.com/platform/v2/x402/discovery/resources',
-      },
-      documentation: 'https://ibanforge.com/docs',
-      llms: 'https://api.ibanforge.com/llms.txt',
+      ...buildAccessRamp(),
     };
 
     c.res = new Response(JSON.stringify(body, null, 2), {
