@@ -1,0 +1,111 @@
+{
+  "info": {
+    "name": "IBANforge API",
+    "description": "IBAN validation, BIC/SWIFT lookup, Swiss clearing and compliance risk scoring — for AI agents and developers.\n\n## Getting started\n1. The **Demo** request needs no key — run it first to check the collection works.\n2. For the paid endpoints, set the `apiKey` collection variable. Get a free key (200 requests/month) by calling `POST /v1/keys/generate {\"email\":\"you@example.com\"}`, or buy prepaid credits at https://api.ibanforge.com/#pricing\n3. Beyond the free tier, calls are pay-per-use in USDC via the x402 protocol — see https://api.ibanforge.com/.well-known/x402\n\nOpenAPI: https://api.ibanforge.com/openapi.json · MCP server: `npx -y ibanforge-mcp`",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{apiKey}}", "type": "string" }]
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "https://api.ibanforge.com", "type": "string" },
+    { "key": "apiKey", "value": "ifk_YOUR_KEY_HERE", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "Demo — free sample (no auth)",
+      "request": {
+        "auth": { "type": "noauth" },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/v1/demo",
+          "host": ["{{baseUrl}}"],
+          "path": ["v1", "demo"]
+        },
+        "description": "A free, no-auth sample validation. Run this first to confirm the collection and base URL are working."
+      }
+    },
+    {
+      "name": "Validate an IBAN",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"iban\": \"CH9300762011623852957\"\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/v1/iban/validate",
+          "host": ["{{baseUrl}}"],
+          "path": ["v1", "iban", "validate"]
+        },
+        "description": "Validate one IBAN and enrich it: BIC/SWIFT, country, issuer type (EMI / digital bank / vIBAN signal), SEPA + VoP reachability, risk indicators, and Swiss BC-Nummer for CH/LI accounts. Cost: $0.005."
+      }
+    },
+    {
+      "name": "Validate a batch of IBANs",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"ibans\": [\n    \"DE89370400440532013000\",\n    \"FR1420041010050500013M02606\",\n    \"XX00BAD\"\n  ]\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/v1/iban/batch",
+          "host": ["{{baseUrl}}"],
+          "path": ["v1", "iban", "batch"]
+        },
+        "description": "Validate up to 100 IBANs in one call — ideal for CSV cleanup or pre-flight payout-list triage. Cost: $0.002 per IBAN."
+      }
+    },
+    {
+      "name": "Look up a BIC / SWIFT code",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/v1/bic/UBSWCHZH80A",
+          "host": ["{{baseUrl}}"],
+          "path": ["v1", "bic", "UBSWCHZH80A"]
+        },
+        "description": "Resolve a BIC/SWIFT code (8 or 11 characters) into bank name, country, city, LEI and branch info. Backed by 121,399 BIC entries. Cost: $0.003."
+      }
+    },
+    {
+      "name": "Compliance check on an IBAN",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"iban\": \"GB29NWBK60161331926819\"\n}",
+          "options": { "raw": { "language": "json" } }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/v1/iban/compliance",
+          "host": ["{{baseUrl}}"],
+          "path": ["v1", "iban", "compliance"]
+        },
+        "description": "Pre-flight compliance triage before a SEPA / cross-border payment: sanctions screening (OFAC / EU / UN / SECO), FATF jurisdiction flag, SEPA Instant reachability, VoP participation. Returns a 0-100 risk score. Cost: $0.02."
+      }
+    },
+    {
+      "name": "Swiss clearing lookup (BC-Nummer / IID)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/v1/ch/clearing/762",
+          "host": ["{{baseUrl}}"],
+          "path": ["v1", "ch", "clearing", "762"]
+        },
+        "description": "Resolve a Swiss BC-Nummer / IID (1-5 digits) into institution name, type, SIC, euroSIC and QR-IID. Backed by 1,190 SIX BankMaster entries — the only API exposing this dataset. Cost: $0.003."
+      }
+    }
+  ]
+}
