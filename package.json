@@ -37,6 +37,7 @@
     "check": "npm run typecheck && npm run lint && npm run test",
     "bic:enrich": "npx tsx scripts/enrich-bic-database.ts",
     "issuers:build": "node scripts/build-issuer-index.mjs",
+    "iban-registry:check": "npx tsx scripts/check-iban-registry.ts",
     "admin": "tsx scripts/admin-keys.ts"
   },
   "dependencies": {

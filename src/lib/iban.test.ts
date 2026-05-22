@@ -137,4 +137,40 @@ describe('IBAN Validation', () => {
       expect(r.formatted).toBe('CH56 0483 5012 3456 7800 9');
     });
   });
+
+  describe('BBAN bank-code extraction (SWIFT registry sync)', () => {
+    it('IT extracts the 5-digit ABI as bank code (decomposition convention kept)', () => {
+      // [1,5] skips the CIN check letter — must NOT be "aligned" to registry [0,6].
+      const r = validateIBAN('IT60X0542811101000000123456');
+      expect(r.valid).toBe(true);
+      expect(r.bban?.bank_code).toBe('05428');
+    });
+
+    it('PL extracts the full 8-digit routing number as bank code', () => {
+      // Regression: was [0,3], too short to match the bic_data.json lookup keys.
+      const r = validateIBAN('PL61109010140000071219812874');
+      expect(r.valid).toBe(true);
+      expect(r.bban?.bank_code).toBe('10901014');
+    });
+
+    it('SI extracts the 5-digit bank identifier', () => {
+      // Regression: was [0,2], too short to match the bic_data.json lookup keys.
+      const r = validateIBAN('SI56263300012039086');
+      expect(r.valid).toBe(true);
+      expect(r.bban?.bank_code).toBe('26330');
+    });
+
+    it('validates an IBAN from a newly-synced registry country (YE)', () => {
+      const r = validateIBAN('YE9600010002123456789012345678');
+      expect(r.valid).toBe(true);
+      expect(r.country?.code).toBe('YE');
+      expect(r.bban?.bank_code).toBe('0001');
+    });
+
+    it('validates an IBAN from a newly-synced registry country (OM)', () => {
+      const r = validateIBAN('OM490010123456789012345');
+      expect(r.valid).toBe(true);
+      expect(r.country?.code).toBe('OM');
+    });
+  });
 });

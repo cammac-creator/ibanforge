@@ -51,4 +51,8 @@ describe('compliance-static', () => {
       expect(new Set(list).size).toBe(list.length);
     }
   });
+
+  it('FATF grey list includes Yemen (a registry-sync country added to countries.ts)', () => {
+    expect(FATF_GREY_LIST).toContain('YE');
+  });
 });
