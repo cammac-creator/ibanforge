@@ -470,10 +470,10 @@ Expected : `main -> main` accepté par le remote.
 Railway redéploie automatiquement (~1-2 min). Poller les 6 chemins jusqu'à ce qu'ils renvoient tous `200` (timeout ~5 min) :
 
 ```bash
-PATHS="/.well-known/agent.json /agents.json /agent-directory.json /agents.txt /.well-known/mcp.json /mcp.json"
 for i in $(seq 1 20); do
   ok=0
-  for p in $PATHS; do
+  # Chemins listés littéralement — zsh ne découpe pas une variable non quotée sur les espaces.
+  for p in /.well-known/agent.json /agents.json /agent-directory.json /agents.txt /.well-known/mcp.json /mcp.json; do
     code=$(curl -s -m 15 -o /dev/null -w "%{http_code}" "https://api.ibanforge.com$p")
     [ "$code" = "200" ] && ok=$((ok + 1))
   done
