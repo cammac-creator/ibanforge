@@ -18,6 +18,8 @@ export const IBAN_LENGTHS: Record<string, number> = {
   RO: 24, RS: 22, RU: 33, SA: 24, SC: 31, SD: 18, SE: 24, SI: 19,
   SK: 24, SM: 27, SO: 23, ST: 25, SV: 28, TL: 23, TN: 24, TR: 26,
   UA: 29, VA: 22, VG: 24, XK: 20,
+  // Registry countries added from the 2026-05 SWIFT IBAN Registry sync
+  BI: 27, HN: 28, MN: 20, OM: 23, YE: 30,
 };
 
 // ---------------------------------------------------------------------------
@@ -52,10 +54,14 @@ export const BBAN_STRUCTURE: Record<string, BBANStructure> = {
   MC: { bankCode: [0, 5], branchCode: [5, 5], accountNumber: [10, 13] },
   NL: { bankCode: [0, 4], accountNumber: [4, 10] },
   NO: { bankCode: [0, 4], accountNumber: [4, 7] },
-  PL: { bankCode: [0, 3], branchCode: [3, 5], accountNumber: [8, 16] },
+  // PL: the full 8-digit national routing number is the bank identifier
+  // (SWIFT registry). A shorter [0,3] never matched the bic_data.json keys.
+  PL: { bankCode: [0, 8], accountNumber: [8, 16] },
   PT: { bankCode: [0, 4], branchCode: [4, 4], accountNumber: [8, 13] },
   SE: { bankCode: [0, 3], accountNumber: [3, 17] },
-  SI: { bankCode: [0, 2], branchCode: [2, 3], accountNumber: [5, 10] },
+  // SI: the 5-digit code is the bank identifier (SWIFT registry); [0,2] was
+  // too short to match the bic_data.json keys.
+  SI: { bankCode: [0, 5], accountNumber: [5, 10] },
   SK: { bankCode: [0, 4], accountNumber: [4, 16] },
   SM: { bankCode: [1, 5], branchCode: [6, 5], accountNumber: [11, 12] },
   // Micro-states and territories
@@ -64,6 +70,12 @@ export const BBAN_STRUCTURE: Record<string, BBANStructure> = {
   ST: { bankCode: [0, 4], branchCode: [4, 4], accountNumber: [8, 13] },
   VA: { bankCode: [0, 3], accountNumber: [3, 15] },
   XK: { bankCode: [0, 2], branchCode: [2, 2], accountNumber: [4, 12] },
+  // Registry countries added from the 2026-05 SWIFT IBAN Registry sync
+  BI: { bankCode: [0, 5], branchCode: [5, 5], accountNumber: [10, 13] },
+  HN: { bankCode: [0, 4], accountNumber: [4, 20] },
+  MN: { bankCode: [0, 4], accountNumber: [4, 12] },
+  OM: { bankCode: [0, 3], accountNumber: [3, 16] },
+  YE: { bankCode: [0, 4], branchCode: [4, 4], accountNumber: [8, 18] },
 };
 
 // ---------------------------------------------------------------------------
@@ -92,6 +104,7 @@ export const COUNTRY_NAMES: Record<string, string> = {
   SK: 'Slovakia', SM: 'San Marino', SO: 'Somalia', ST: 'Sao Tome and Principe',
   SV: 'El Salvador', TL: 'East Timor', TN: 'Tunisia', TR: 'Türkiye',
   UA: 'Ukraine', VA: 'Vatican City', VG: 'British Virgin Islands', XK: 'Kosovo',
+  BI: 'Burundi', HN: 'Honduras', MN: 'Mongolia', OM: 'Oman', YE: 'Yemen',
 };
 
 // ---------------------------------------------------------------------------
