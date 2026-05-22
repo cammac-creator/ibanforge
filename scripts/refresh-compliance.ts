@@ -12,6 +12,15 @@ import { mkdirSync, rmSync, renameSync, existsSync, createWriteStream } from 'no
 import { createInterface } from 'node:readline';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
+import {
+  FATF_AS_OF,
+  FATF_BLACK_LIST,
+  FATF_GREY_LIST,
+  FATF_MEMBERS,
+  SANCTIONED_COUNTRIES_COMPREHENSIVE,
+  SANCTIONED_COUNTRIES_SECTORAL,
+} from '../src/lib/compliance-static.js';
+import { validateBIC } from '../src/lib/bic-validator.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = resolve(__dirname, '../data');
@@ -20,22 +29,9 @@ const TMP_DB_PATH = resolve(TMP_DIR, 'compliance.sqlite');
 const FINAL_DB_PATH = resolve(DATA_DIR, 'compliance.sqlite');
 
 // ---------------------------------------------------------------------------
-// Static compliance data
+// Static compliance data — FATF lists & sanctioned countries are maintained
+// and dated in src/lib/compliance-static.ts (imported above). See FATF_AS_OF.
 // ---------------------------------------------------------------------------
-
-const SANCTIONED_COUNTRIES_COMPREHENSIVE = ['CU', 'IR', 'KP', 'SY', 'RU'];
-const SANCTIONED_COUNTRIES_SECTORAL = ['BY', 'VE', 'ZW', 'MM', 'SD', 'CF', 'SO', 'LY', 'YE'];
-const FATF_BLACK_LIST = ['KP', 'IR', 'MM'];
-const FATF_GREY_LIST = [
-  'BF', 'CM', 'HR', 'CD', 'HT', 'KE', 'ML', 'MZ', 'NA', 'NG',
-  'PH', 'SN', 'SS', 'SY', 'TZ', 'VE', 'VN', 'YE',
-];
-const FATF_MEMBERS = [
-  'AR', 'AU', 'AT', 'BE', 'BR', 'CA', 'CN', 'DK', 'FI', 'FR',
-  'DE', 'GR', 'HK', 'IS', 'IN', 'IE', 'IL', 'IT', 'JP', 'KR',
-  'LU', 'MY', 'MX', 'NL', 'NZ', 'NO', 'PT', 'RU', 'SA', 'SG',
-  'ZA', 'ES', 'SE', 'CH', 'TR', 'GB', 'US',
-];
 
 // ---------------------------------------------------------------------------
 // EPC SEPA register URLs
@@ -179,29 +175,45 @@ function insertStaticData(db: Database.Database): void {
 // ---------------------------------------------------------------------------
 
 async function fetchOpenSanctions(db: Database.Database): Promise<void> {
-  console.log('\n[2/5] Downloading OpenSanctions data (3 sources)...');
+  console.log('\n[2/5] Downloading OpenSanctions data (4 sources)...');
 
   // Download each sanctions source separately for better source_list classification
   const SANCTIONS_SOURCES = [
     { name: 'OFAC', url: 'https://data.opensanctions.org/datasets/latest/us_ofac_sdn/targets.simple.csv' },
     { name: 'EU', url: 'https://data.opensanctions.org/datasets/latest/eu_fsf/targets.simple.csv' },
     { name: 'UN', url: 'https://data.opensanctions.org/datasets/latest/un_sc_sanctions/targets.simple.csv' },
+    { name: 'SECO', url: 'https://data.opensanctions.org/datasets/latest/ch_seco_sanctions/targets.simple.csv' },
   ];
 
-  for (const source of SANCTIONS_SOURCES) {
-    const csvPath = resolve(TMP_DIR, `opensanctions_${source.name}.csv`);
-    try {
-      await importSanctionsCSV(db, source.url, source.name, csvPath);
-    } catch (err) {
-      console.warn(`  WARNING: ${source.name} download failed: ${(err as Error).message}`);
+  // Cross-check candidate BICs against the real BIC base (read-only): a regex
+  // match on free-text identifiers is only kept if it is an actual bank BIC.
+  const bicDB = new Database(resolve(DATA_DIR, 'bic.sqlite'), { readonly: true });
+  const bicLookup = bicDB.prepare('SELECT 1 FROM bic_entries WHERE bic8 = ? LIMIT 1');
+
+  try {
+    for (const source of SANCTIONS_SOURCES) {
+      const csvPath = resolve(TMP_DIR, `opensanctions_${source.name}.csv`);
+      try {
+        await importSanctionsCSV(db, source.url, source.name, csvPath, bicLookup);
+      } catch (err) {
+        console.warn(`  WARNING: ${source.name} download failed: ${(err as Error).message}`);
+      }
     }
+  } finally {
+    bicDB.close();
   }
 
   const entityCount = (db.prepare(`SELECT COUNT(*) as n FROM sanctioned_entities`).get() as { n: number }).n;
   console.log(`  sanctioned_entities total: ${entityCount} rows (after dedup across all sources)`);
 }
 
-async function importSanctionsCSV(db: Database.Database, url: string, sourceLabel: string, csvPath: string): Promise<void> {
+async function importSanctionsCSV(
+  db: Database.Database,
+  url: string,
+  sourceLabel: string,
+  csvPath: string,
+  bicLookup: Database.Statement,
+): Promise<void> {
   console.log(`  Fetching ${sourceLabel}: ${url}`);
   await downloadFile(url, csvPath);
   console.log(`  Parsing ${sourceLabel} BICs...`);
@@ -213,6 +225,7 @@ async function importSanctionsCSV(db: Database.Database, url: string, sourceLabe
 
   let lineCount = 0;
   let bicCount = 0;
+  let rejectedCount = 0;
   let headerParsed = false;
   let colIdentifiers = -1;
   let colName = -1;
@@ -258,6 +271,12 @@ async function importSanctionsCSV(db: Database.Database, url: string, sourceLabe
 
     const countryCode = countries.split(/[,;|\s]+/)[0]?.trim().toUpperCase() ?? '';
     for (const bic8 of bics) {
+      // Reject regex matches that are not real bank identifiers: the candidate
+      // must pass ISO 9362 format validation AND exist in the BIC base.
+      if (!validateBIC(bic8).valid || !bicLookup.get(bic8)) {
+        rejectedCount++;
+        continue;
+      }
       batch.push([bic8, entityName.substring(0, 200), sourceLabel, countryCode]);
       bicCount++;
     }
@@ -265,7 +284,7 @@ async function importSanctionsCSV(db: Database.Database, url: string, sourceLabe
   }
   if (batch.length > 0) insertBatch(batch.splice(0, batch.length));
 
-  console.log(`  ${sourceLabel}: ${lineCount} lines, ${bicCount} BICs extracted`);
+  console.log(`  ${sourceLabel}: ${lineCount} lines, ${bicCount} BICs kept, ${rejectedCount} rejected (invalid format or unknown BIC)`);
 }
 
 // ---------------------------------------------------------------------------
@@ -421,7 +440,8 @@ function insertMetadata(db: Database.Database): void {
   const runMeta = db.transaction(() => {
     insertMeta.run('last_refresh', new Date().toISOString());
     insertMeta.run('version', '1.0.0');
-    insertMeta.run('sources', 'OpenSanctions,FATF,EPC-SCT,EPC-SDD,EPC-SCT_INST');
+    insertMeta.run('sources', 'OpenSanctions,SECO,FATF,EPC-SCT,EPC-SDD,EPC-SCT_INST');
+    insertMeta.run('fatf_as_of', FATF_AS_OF);
   });
 
   runMeta();
@@ -460,6 +480,15 @@ function printSummary(db: Database.Database): void {
 async function main(): Promise<void> {
   console.log('=== IBANforge compliance:refresh ===');
   console.log(`Output: ${FINAL_DB_PATH}`);
+
+  // Staleness guard — FATF lists are hand-maintained (src/lib/compliance-static.ts).
+  const fatfAgeMonths =
+    (Date.now() - new Date(`${FATF_AS_OF}-01T00:00:00Z`).getTime()) / (1000 * 60 * 60 * 24 * 30.4);
+  if (fatfAgeMonths > 5) {
+    console.warn(
+      `[compliance] WARNING: FATF lists are stale (as of ${FATF_AS_OF}, ~${Math.round(fatfAgeMonths)} months old) — recalibrate src/lib/compliance-static.ts after the latest FATF plenary.`,
+    );
+  }
 
   // 1. Prepare temp directory
   if (existsSync(TMP_DIR)) {
