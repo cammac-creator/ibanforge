@@ -1,7 +1,8 @@
 # IBANforge — External Submissions Pack
 
-Tout le matériel prêt-à-coller pour soumettre IBANforge sur 4 plateformes
-(PulseMCP, Cline marketplace, awesome-x402-servers, agentic.market).
+Tout le matériel prêt-à-coller pour soumettre IBANforge sur 6 plateformes
+(PulseMCP, Cline marketplace, awesome-x402-servers, agentic.market,
+x402-list.com, x402scan).
 
 À la fin de ces 4 soumissions, IBANforge sera visible sur les principaux
 points de découverte qu'utilisent les agents IA et les devs qui les intègrent.
@@ -191,13 +192,61 @@ IBANforge is a compliance API for AI agents — IBAN validation (mod-97 + BBAN p
 
 ---
 
+## 5) x402-list.com — annuaire agent-first des services x402 (5 min)
+
+**URL de soumission** : https://x402-list.com/submit
+
+Annuaire ouvert et machine-lisible des services x402, conçu pour que des agents
+IA découvrent et paient des API automatiquement. IBANforge n'y figure pas encore
+— soumission directe, effort minime, fort différenciateur (peu d'API sont
+x402-natives).
+
+**Champs à remplir** :
+
+| Champ          | Valeur                                            |
+| -------------- | ------------------------------------------------- |
+| Service name   | `IBANforge`                                       |
+| Service URL    | `https://api.ibanforge.com`                       |
+| Discovery URL  | `https://api.ibanforge.com/.well-known/x402`       |
+| Category       | Finance / Compliance / Banking                    |
+| Network        | Base (eip155:8453)                                |
+| Repository     | `https://github.com/cammac-creator/ibanforge`     |
+
+Description : réutiliser le bloc de description de la section 4 (agentic.market).
+
+---
+
+## 6) x402scan — explorateur de l'écosystème x402 (2 min)
+
+**URL d'enregistrement** : https://x402scan.com/resources/register
+(à confirmer sur place — le chemin exact n'a pas pu être vérifié directement.)
+
+x402scan (Merit Systems) indexe les ressources x402 par découverte
+semi-automatique : on soumet l'URL de découverte d'un service ; si elle renvoie
+un schéma x402 valide, elle est cataloguée. Soumettre explicitement plutôt que
+d'attendre une indexation passive.
+
+**À soumettre** : `https://api.ibanforge.com/.well-known/x402`
+
+---
+
 ## After submission — track them
 
-Add to the **roadmap memory** :
+Statuts vérifiés le 2026-05-22 via `gh search prs --author cammac-creator`.
 
-- [ ] PulseMCP — submitted on YYYY-MM-DD, awaiting review
-- [ ] Cline marketplace — PR #__ on cline/mcp-marketplace
-- [ ] awesome-x402-servers — PR #__ on a6b8/awesome-x402-servers (and any other awesome-x402 repos)
-- [x] agentic.market — investigated 2026-04-30 : aucun submission form public ; agentic.market pull depuis le Bazaar Coinbase. IBANforge ni dans agentic.market ni dans le Bazaar (600+ resources scannées). Action restante : pousser via Discord CDP `#x402` + augmenter volume x402 sur Base.
+- [ ] **PulseMCP** — non soumis (formulaire web, non traçable via `gh`).
+- [ ] **Cline marketplace** — non soumis (aucune PR `cammac-creator` sur `cline/mcp-marketplace`).
+- [ ] **awesome-x402-servers (a6b8)** — non soumis (aucune PR sur `a6b8/awesome-x402-servers`).
+- [ ] **x402-list.com** — non soumis (section 5).
+- [ ] **x402scan** — non soumis (section 6).
+- [x] **agentic.market** — investigué le 2026-04-30 : pas de formulaire public ; le catalogue pull depuis le Bazaar Coinbase. Action restante : Discord CDP `#x402` + volume x402 sur Base.
 
-Re-check 1 week later. If a submission is rejected, ask why (often a missing field or category). Resubmit.
+**À noter (needs follow-up — pas une soumission à faire)** : IBANforge a déjà
+**2 PRs ouvertes** sur `punkpeye/awesome-mcp-servers` — #4458 (`has-glama`) et
+#4912 (`missing-glama`), ouvertes depuis avril/mai, plus #4053 fermée. À
+consolider en une seule PR et relancer le mainteneur. Par ailleurs IBANforge est
+déjà mergé sur `xpaysh/awesome-x402` (#221, #296) ; la PR #353 « Refine entry »
+y reste ouverte.
+
+Re-vérifier 1 semaine après chaque soumission. Si une soumission est rejetée,
+demander pourquoi (souvent un champ ou une catégorie manquante) et resoumettre.
