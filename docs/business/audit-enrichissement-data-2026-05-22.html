@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Audit — Enrichissement des données · IBANforge</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0b0c0e;--bg-card:#15171c;--border:#262a33;--border-soft:#1d212a;
+    --text:#e7e9ed;--dim:#878d9b;--faint:#5a606e;
+    --accent:#5b9dff;--accent-2:#7c79ff;--green:#46d07f;--amber:#e8a93f;--red:#e5564b;
+    --mono:'IBM Plex Mono',ui-monospace,Menlo,monospace;
+    --sans:'IBM Plex Sans',-apple-system,sans-serif;
+    --display:'Fraunces',Georgia,serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    background:var(--bg);color:var(--text);font-family:var(--sans);line-height:1.6;
+    -webkit-font-smoothing:antialiased;min-height:100vh;padding:0 24px 120px;
+    background-image:
+      radial-gradient(900px 440px at 50% -130px,rgba(91,157,255,.11),transparent 70%),
+      linear-gradient(rgba(255,255,255,.020) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(255,255,255,.020) 1px,transparent 1px);
+    background-size:auto,46px 46px,46px 46px;
+  }
+  .wrap{max-width:940px;margin:0 auto}
+  .reveal{opacity:0;transform:translateY(14px);animation:rise .8s cubic-bezier(.2,.75,.2,1) forwards;animation-delay:calc(var(--d,0)*80ms)}
+  @keyframes rise{to{opacity:1;transform:none}}
+
+  header{padding:74px 0 34px}
+  .eyebrow{font-family:var(--mono);font-size:11px;font-weight:500;letter-spacing:.22em;
+    text-transform:uppercase;color:var(--accent);display:flex;align-items:center;gap:11px;margin-bottom:24px}
+  .mark{width:16px;height:16px;flex:none;border-radius:4px;
+    background:linear-gradient(140deg,var(--accent),var(--accent-2));position:relative;box-shadow:0 0 14px rgba(91,157,255,.45)}
+  .mark::after{content:"";position:absolute;width:5.5px;height:5.5px;border-radius:1.5px;background:#0b0c0e;top:5.25px;left:5.25px}
+  h1{font-family:var(--display);font-weight:600;font-size:clamp(40px,7vw,64px);line-height:1.03;letter-spacing:-.02em;margin-bottom:20px}
+  h1 em{font-style:italic;color:var(--dim);font-weight:500}
+  .meta{font-family:var(--mono);font-size:12.5px;color:var(--dim);display:flex;flex-wrap:wrap;gap:8px 16px}
+  .meta b{color:var(--text);font-weight:500}
+
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:30px}
+  .stat{background:var(--bg-card);border:1px solid var(--border-soft);border-radius:12px;padding:18px 20px}
+  .stat .n{font-family:var(--mono);font-weight:600;font-size:26px;line-height:1;color:var(--text);white-space:nowrap}
+  .stat .l{font-size:12.5px;color:var(--dim);margin-top:8px;line-height:1.4}
+
+  .sec{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.2em;text-transform:uppercase;
+    color:var(--faint);margin:56px 0 20px;display:flex;align-items:center;gap:14px}
+  .sec::after{content:"";flex:1;height:1px;background:var(--border-soft)}
+
+  /* diagnostic */
+  .lead{background:var(--bg-card);border:1px solid var(--border-soft);border-left:3px solid var(--green);
+    border-radius:14px;padding:22px 26px}
+  .lead p{font-size:15px;color:#d2d6df}
+  .lead p+p{margin-top:10px}
+  .lead b{color:var(--text);font-weight:600}
+  .lead .ok{color:var(--green);font-style:italic;font-family:var(--display)}
+
+  /* ===== PIPELINE FLOW ===== */
+  .flow{display:flex;flex-direction:column;gap:14px}
+  .frow{background:var(--bg-card);border:1px solid var(--border-soft);border-radius:14px;
+    padding:18px 20px;display:flex;align-items:center;gap:16px}
+  .fsrc{display:flex;flex-wrap:wrap;gap:6px;flex:1;min-width:0}
+  .fsrc .schip{font-family:var(--mono);font-size:11.5px;color:#cdd2db;background:#0c0e12;
+    border:1px solid var(--border-soft);border-radius:6px;padding:5px 9px}
+  .farrow{display:flex;flex-direction:column;align-items:center;gap:4px;flex:none;color:var(--faint)}
+  .farrow .fa-line{font-size:20px;color:var(--accent)}
+  .farrow .fa-l{font-family:var(--mono);font-size:10px;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap}
+  .fdb{flex:none;width:200px;background:linear-gradient(180deg,#16191f,#121419);
+    border:1px solid rgba(91,157,255,.3);border-radius:12px;padding:15px 17px}
+  .fdb .fdb-name{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--accent)}
+  .fdb .fdb-fig{font-family:var(--display);font-size:23px;font-weight:600;margin-top:6px;line-height:1.15}
+  .fdb .fdb-sub{font-size:11.5px;color:var(--dim);margin-top:3px}
+  .flow-note{font-size:12.5px;color:var(--faint);font-style:italic;margin-top:12px;padding-left:16px;
+    border-left:2px solid rgba(70,208,127,.4)}
+  .flow-note b{color:var(--green);font-style:normal;font-weight:600}
+
+  /* weaknesses */
+  .weak{background:rgba(232,169,63,.05);border:1px solid rgba(232,169,63,.3);border-radius:13px;
+    padding:20px 22px;margin-bottom:12px;display:flex;gap:16px;align-items:flex-start}
+  .weak .wico{width:32px;height:32px;border-radius:9px;flex:none;background:rgba(232,169,63,.14);
+    color:var(--amber);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700}
+  .weak h4{font-family:var(--display);font-size:17px;font-weight:600;margin-bottom:5px}
+  .weak p{font-size:13.5px;color:#d8d2d2}
+  .weak p code{font-family:var(--mono);font-size:12px;background:#0c0e12;border:1px solid var(--border-soft);border-radius:5px;padding:1px 6px;color:#bcc2cd}
+
+  /* contrast 85 -> milliers */
+  .contrast{background:linear-gradient(180deg,#121821,#10141a);border:1px solid rgba(91,157,255,.34);
+    border-radius:16px;padding:28px 30px;display:flex;align-items:center;justify-content:center;gap:30px;flex-wrap:wrap}
+  .c-side{text-align:center}
+  .c-from .c-fig{font-family:var(--display);font-size:46px;font-weight:600;color:var(--faint);line-height:1}
+  .c-to .c-fig{font-family:var(--display);font-size:54px;font-weight:600;
+    background:linear-gradient(140deg,var(--accent),var(--green));-webkit-background-clip:text;background-clip:text;color:transparent;line-height:1}
+  .c-lab{font-size:12.5px;color:var(--dim);margin-top:9px;max-width:190px}
+  .c-mid{display:flex;flex-direction:column;align-items:center;gap:6px}
+  .c-mid .c-ar{font-size:30px;color:var(--accent)}
+  .c-mid .c-via{font-family:var(--mono);font-size:11px;color:var(--faint);text-align:center;max-width:130px;line-height:1.4}
+
+  /* source cards */
+  .srcs{display:grid;grid-template-columns:repeat(2,1fr);gap:13px}
+  .src{background:var(--bg-card);border:1px solid var(--border-soft);border-left:2.5px solid var(--accent);
+    border-radius:12px;padding:17px 19px}
+  .src h4{font-family:var(--display);font-size:16px;font-weight:600;margin-bottom:6px}
+  .src p{font-size:13px;color:#cdd2db}
+  .src .stag{font-family:var(--mono);font-size:11px;color:var(--accent);margin-top:8px;display:block}
+
+  /* avoid */
+  .avoid{background:rgba(229,86,75,.05);border:1px solid rgba(229,86,75,.28);border-radius:13px;padding:18px 22px}
+  .avoid ul{list-style:none;display:flex;flex-direction:column;gap:9px}
+  .avoid li{font-size:13.5px;color:#d8d2d2;padding-left:24px;position:relative}
+  .avoid li::before{content:"✕";position:absolute;left:0;top:0;color:var(--red);font-weight:700;font-size:12px}
+  .avoid li b{color:var(--text);font-weight:600}
+
+  /* top 5 */
+  .rank{background:var(--bg-card);border:1px solid var(--border-soft);border-radius:13px;
+    padding:18px 22px;margin-bottom:11px;display:flex;gap:18px;align-items:flex-start}
+  .rank.r1{border-color:rgba(70,208,127,.4);background:linear-gradient(180deg,rgba(70,208,127,.05),var(--bg-card))}
+  .rnum{font-family:var(--display);font-weight:600;font-size:30px;line-height:1;color:var(--faint);flex:none;width:32px}
+  .rank.r1 .rnum{color:var(--green)}
+  .rbody{flex:1;min-width:0}
+  .rbody h4{font-family:var(--display);font-size:17px;font-weight:600;margin-bottom:5px}
+  .rbody p{font-size:13.5px;color:#cdd2db}
+  .rbody code{font-family:var(--mono);font-size:12px;background:#0c0e12;border:1px solid var(--border-soft);border-radius:5px;padding:1px 6px;color:#bcc2cd}
+  .gauges{display:flex;gap:20px;margin-top:11px;flex-wrap:wrap}
+  .gauge{display:flex;align-items:center;gap:8px}
+  .gauge .gl{font-family:var(--mono);font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--faint)}
+  .bars{display:flex;gap:3px}
+  .bars i{width:16px;height:6px;border-radius:2px;background:#23262e;display:block}
+  .bars.effort i.on{background:var(--amber)}
+  .bars.value i.on{background:var(--green)}
+
+  footer{margin-top:60px;padding-top:24px;border-top:1px solid var(--border-soft);
+    font-family:var(--mono);font-size:12px;color:var(--faint);line-height:1.85}
+  footer code{color:var(--dim);background:#0c0e12;border:1px solid var(--border-soft);border-radius:5px;padding:1.5px 6px}
+
+  @media(max-width:760px){
+    .stats,.srcs{grid-template-columns:1fr}
+    .frow{flex-direction:column;align-items:stretch}
+    .fdb{width:auto}
+    .farrow{flex-direction:row}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow reveal" style="--d:0"><span class="mark"></span>Audit · IBANforge · 22 mai 2026</div>
+    <h1 class="reveal" style="--d:1">Enrichir les<br><em>données.</em></h1>
+    <div class="meta reveal" style="--d:2">
+      <span>Question&nbsp;<b>quelles sources officielles ajouter</b></span>
+      <span>Périmètre&nbsp;<b>BIC · IBAN · SEPA · risque · clearing</b></span>
+    </div>
+    <div class="stats reveal" style="--d:3">
+      <div class="stat"><div class="n">121&nbsp;399</div><div class="l">entrées BIC + 1&nbsp;190 de clearing suisse</div></div>
+      <div class="stat"><div class="n">9</div><div class="l">sources publiques déjà branchées</div></div>
+      <div class="stat"><div class="n">2</div><div class="l">bases en refresh automatisé (mensuel / hebdo)</div></div>
+    </div>
+  </header>
+
+  <!-- DIAGNOSTIC -->
+  <div class="sec reveal" style="--d:4">Le diagnostic</div>
+  <div class="lead reveal" style="--d:4">
+    <p>Le socle de données est <span class="ok">solide et déjà automatisé.</span> L'enjeu n'est pas d'ajouter « une source SEPA » ou « OeNB » — <b>elles sont déjà branchées</b>. La vérification du code a évité ce piège : deux sources que la recherche recommandait sont en réalité déjà intégrées.</p>
+    <p>Le vrai gisement est en deux temps : <b>fiabiliser</b> trois maillons faibles, et <b>étendre</b> la couverture là où elle plafonne (la classification EMI).</p>
+  </div>
+
+  <!-- PIPELINE -->
+  <div class="sec reveal" style="--d:5">Le pipeline actuel — ce qui alimente IBANforge</div>
+  <div class="flow">
+    <div class="frow reveal" style="--d:5">
+      <div class="fsrc">
+        <span class="schip">GLEIF</span><span class="schip">SwiftCodes</span><span class="schip">Bundesbank</span>
+        <span class="schip">SIX</span><span class="schip">OeNB</span><span class="schip">NBP</span><span class="schip">EBA Step2</span>
+      </div>
+      <div class="farrow"><span class="fa-line">→</span><span class="fa-l">refresh mensuel</span></div>
+      <div class="fdb">
+        <div class="fdb-name">bic.sqlite</div>
+        <div class="fdb-fig">121&nbsp;399 BIC</div>
+        <div class="fdb-sub">+ 1&nbsp;190 entrées clearing (SIX BankMaster)</div>
+      </div>
+    </div>
+    <div class="frow reveal" style="--d:6">
+      <div class="fsrc">
+        <span class="schip">OpenSanctions</span><span class="schip">Registres EPC</span><span class="schip">VoP EPC</span>
+        <span class="schip">FATF · pays — codés en dur</span>
+      </div>
+      <div class="farrow"><span class="fa-line">→</span><span class="fa-l">refresh hebdo</span></div>
+      <div class="fdb">
+        <div class="fdb-name">compliance.sqlite</div>
+        <div class="fdb-fig">sanctions · SEPA · VoP</div>
+        <div class="fdb-sub">+ EMI/vIBAN : ~85 entrées (issuers.ts)</div>
+      </div>
+    </div>
+  </div>
+  <p class="flow-note reveal" style="--d:6"><b>Déjà intégré :</b> OeNB et les registres EPC (SCT / SDD / VoP) — la recherche web les « recommandait », la lecture du code a montré qu'ils tournent déjà. Aucun doublon recommandé.</p>
+
+  <!-- 3 FAIBLESSES -->
+  <div class="sec reveal" style="--d:7">Les 3 maillons faibles</div>
+
+  <div class="weak reveal" style="--d:7">
+    <div class="wico">!</div>
+    <div>
+      <h4>Les sanctions passent par un agrégateur tiers</h4>
+      <p>OFAC, EU et UN sont téléchargés depuis <code>OpenSanctions</code> — réputé, mais ce n'est <b>pas la source officielle</b>. Pour un acheteur compliance/AML, « d'où viennent vos sanctions » est une vraie question. Aggravant : les BIC sanctionnés sont extraits par expression régulière sur du texte libre — fragile. À arbitrer consciemment.</p>
+    </div>
+  </div>
+
+  <div class="weak reveal" style="--d:8">
+    <div class="wico">!</div>
+    <div>
+      <h4>Les listes FATF et pays sanctionnés sont codées en dur</h4>
+      <p>Ce sont des constantes dans un script. Le refresh hebdomadaire ne les met <b>pas</b> à jour — il ré-insère les mêmes valeurs figées. La FATF actualise 3×/an : le tableau est probablement déjà décalé. <b>Risque concret : des indicateurs de risque faux en production</b>, sans alerte.</p>
+    </div>
+  </div>
+
+  <div class="weak reveal" style="--d:9">
+    <div class="wico">!</div>
+    <div>
+      <h4>La classification EMI / vIBAN plafonne</h4>
+      <p>~85 correspondances BIC8 mappées à la main. C'est un vrai différenciateur produit, mais tout émetteur absent de la liste est classé « inconnu » — alors que le marché EMI/PI européen se compte en milliers.</p>
+    </div>
+  </div>
+
+  <!-- GAIN -->
+  <div class="sec reveal" style="--d:10">Le gain principal — changer d'échelle sur les EMI</div>
+  <div class="contrast reveal" style="--d:10">
+    <div class="c-side c-from">
+      <div class="c-fig">~85</div>
+      <div class="c-lab">émetteurs EMI/vIBAN aujourd'hui — mappés à la main</div>
+    </div>
+    <div class="c-mid">
+      <span class="c-ar">→</span>
+      <span class="c-via">via le registre central EBA PSD2 (1 fichier JSON, refresh quotidien)</span>
+    </div>
+    <div class="c-side c-to">
+      <div class="c-fig">des milliers</div>
+      <div class="c-lab">PI + EMI de toute l'UE/EEE, en une source</div>
+    </div>
+  </div>
+
+  <!-- NOUVELLES SOURCES -->
+  <div class="sec reveal" style="--d:11">Nouvelles sources à instruire</div>
+  <div class="srcs">
+    <div class="src reveal" style="--d:11">
+      <h4>Registre EBA PSD2</h4>
+      <p>JSON machine-lisible, gratuit, refresh quotidien. Étend la détection EMI/vIBAN à toute l'UE/EEE.</p>
+      <span class="stag">euclid.eba.europa.eu</span>
+    </div>
+    <div class="src reveal" style="--d:11">
+      <h4>SWIFT IBAN Registry</h4>
+      <p>Spécification officielle ISO 13616 du format IBAN par pays. Source canonique pour maintenir <code style="font-family:var(--mono);font-size:11.5px">countries.ts</code>.</p>
+      <span class="stag">swift.com · licence à clarifier</span>
+    </div>
+    <div class="src reveal" style="--d:12">
+      <h4>Banques centrales — CNB, DNB, REGAFI</h4>
+      <p>Clearing tchèque (CSV), API officielles néerlandaise et française (ACPR) pour vérifier le statut d'agrément.</p>
+      <span class="stag">API officielles gratuites</span>
+    </div>
+    <div class="src reveal" style="--d:12">
+      <h4>SECO — sanctions suisses</h4>
+      <p>CSV/XML officiels. IBANforge couvre OFAC/EU/UN mais pas la Suisse — ajout à coût faible, cohérent avec le positionnement.</p>
+      <span class="stag">seco.admin.ch</span>
+    </div>
+  </div>
+
+  <!-- ECARTE -->
+  <div class="sec reveal" style="--d:13">Écarté — les pièges</div>
+  <div class="avoid reveal" style="--d:13">
+    <ul>
+      <li><b>EISCD (UK)</b> — le meilleur clearing UK, mais payant (~2 000 £/an) et accès réservé.</li>
+      <li><b>Routing Directory US (Fed)</b> — non redistribuable ; hors périmètre IBAN.</li>
+      <li><b>Liste PEP « officielle » de personnes</b> — elle n'existe pas. Ne pas promettre un screening PEP adossé à une source officielle gratuite.</li>
+      <li><b>EPC Directory Service (VoP)</b> — réservé aux participants ; IBANforge utilise déjà le bon proxy public.</li>
+    </ul>
+  </div>
+
+  <!-- TOP 5 -->
+  <div class="sec reveal" style="--d:14">Les 5 actions priorisées</div>
+
+  <div class="rank r1 reveal" style="--d:14">
+    <div class="rnum">1</div>
+    <div class="rbody">
+      <h4>Fiabiliser les listes FATF + pays sanctionnés</h4>
+      <p>Recaler les listes codées en dur, puis caler le process sur les plénières FATF. Corrige un risque de données <b>fausses</b> en production.</p>
+      <div class="gauges">
+        <div class="gauge"><span class="gl">Effort</span><div class="bars effort"><i class="on"></i><i></i><i></i></div></div>
+        <div class="gauge"><span class="gl">Valeur</span><div class="bars value"><i class="on"></i><i class="on"></i><i class="on"></i></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="rank reveal" style="--d:15">
+    <div class="rnum">2</div>
+    <div class="rbody">
+      <h4>Intégrer le registre EBA PSD2</h4>
+      <p>Un JSON quotidien — fait passer la détection EMI/vIBAN de ~85 à des milliers d'émetteurs.</p>
+      <div class="gauges">
+        <div class="gauge"><span class="gl">Effort</span><div class="bars effort"><i class="on"></i><i class="on"></i><i></i></div></div>
+        <div class="gauge"><span class="gl">Valeur</span><div class="bars value"><i class="on"></i><i class="on"></i><i class="on"></i></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="rank reveal" style="--d:15">
+    <div class="rnum">3</div>
+    <div class="rbody">
+      <h4>Arbitrer la source des sanctions</h4>
+      <p>Décision : garder OpenSanctions / migrer aux sources officielles / hybride. Et fiabiliser l'extraction des BIC.</p>
+      <div class="gauges">
+        <div class="gauge"><span class="gl">Effort</span><div class="bars effort"><i class="on"></i><i class="on"></i><i></i></div></div>
+        <div class="gauge"><span class="gl">Valeur</span><div class="bars value"><i class="on"></i><i class="on"></i><i></i></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="rank reveal" style="--d:16">
+    <div class="rnum">4</div>
+    <div class="rbody">
+      <h4>SWIFT IBAN Registry comme source de maintenance</h4>
+      <p>Remplace les mises à jour manuelles de la structure IBAN par une source officielle. Clarifier la redistribution.</p>
+      <div class="gauges">
+        <div class="gauge"><span class="gl">Effort</span><div class="bars effort"><i class="on"></i><i></i><i></i></div></div>
+        <div class="gauge"><span class="gl">Valeur</span><div class="bars value"><i class="on"></i><i class="on"></i><i></i></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="rank reveal" style="--d:16">
+    <div class="rnum">5</div>
+    <div class="rbody">
+      <h4>Ajouter SECO + instruire l'API REGAFI</h4>
+      <p>SECO renforce le positionnement suisse à coût faible ; REGAFI ajoute une couche officielle FR via API gratuite.</p>
+      <div class="gauges">
+        <div class="gauge"><span class="gl">Effort</span><div class="bars effort"><i class="on"></i><i class="on"></i><i></i></div></div>
+        <div class="gauge"><span class="gl">Valeur</span><div class="bars value"><i class="on"></i><i class="on"></i><i></i></div></div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    Audit complet (détail des sources, URLs, formats, licences) — <code>docs/business/audit-enrichissement-data-2026-05-22.md</code><br>
+    Recherche web réelle 2026, croisée avec le code (<code>scripts/refresh-compliance.ts</code>, <code>refresh-bic.yml</code>). Les jauges effort/valeur sont des estimations raisonnées.
+  </footer>
+
+</div>
+</body>
+</html>
