@@ -36,6 +36,7 @@
     "docker:run": "docker run -p 3000:3000 --env-file .env ibanforge",
     "check": "npm run typecheck && npm run lint && npm run test",
     "bic:enrich": "npx tsx scripts/enrich-bic-database.ts",
+    "issuers:build": "node scripts/build-issuer-index.mjs",
     "admin": "tsx scripts/admin-keys.ts"
   },
   "dependencies": {
