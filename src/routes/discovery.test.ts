@@ -41,4 +41,13 @@ describe('discovery — agent manifest + aliases', () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual(canonical);
   });
+
+  it('serves /agents.txt as plain text', async () => {
+    const res = await makeApp().request('/agents.txt');
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toMatch(/^text\/plain/);
+    const body = await res.text();
+    expect(body).toContain('IBANforge');
+    expect(body).toContain('llms.txt');
+  });
 });

@@ -209,4 +209,26 @@ for (const path of [
   discovery.get(path, (c) => c.json(AGENT_MANIFEST));
 }
 
+// /agents.txt — plain-text discovery index (llms.txt-style), requested by
+// directory crawlers (~53 hits/month previously landed in 404).
+const AGENTS_TXT = `# IBANforge — agent & API discovery
+
+IBAN validation, BIC/SWIFT lookup, Swiss clearing and compliance risk
+scoring API, built for AI agents and developers.
+
+## Discovery endpoints
+- Agent manifest (A2A): https://api.ibanforge.com/.well-known/agents.json
+- MCP server card:      https://api.ibanforge.com/.well-known/mcp/server-card.json
+- OpenAPI 3.1:          https://api.ibanforge.com/openapi.json
+- x402 payment:         https://api.ibanforge.com/.well-known/x402
+- MCP server (HTTP):    https://api.ibanforge.com/mcp
+
+## Full agent guide
+https://api.ibanforge.com/llms.txt
+`;
+
+discovery.get('/agents.txt', (c) =>
+  c.text(AGENTS_TXT, 200, { 'Content-Type': 'text/plain; charset=utf-8' }),
+);
+
 export { discovery };
