@@ -21,10 +21,19 @@ export async function generateMetadata({
 }) {
   const { locale, slug } = await params;
   const post = tryGetPost(slug, locale);
-  if (!post) return { title: "Not Found | IBANforge Blog" };
+  if (!post) return { title: { absolute: "Not Found — IBANforge Blog" } };
+  const url = `https://ibanforge.com/${locale}/blog/${slug}`;
   return {
-    title: `${post.meta.title} | IBANforge Blog`,
+    title: { absolute: `${post.meta.title} — IBANforge Blog` },
     description: post.meta.description,
+    alternates: { canonical: url },
+    openGraph: {
+      type: "article",
+      title: post.meta.title,
+      description: post.meta.description,
+      url,
+      publishedTime: post.meta.date,
+    },
   };
 }
 
@@ -40,9 +49,46 @@ export default async function BlogPostPage({
   if (!post) notFound();
 
   const { meta, content } = post;
+  const url = `https://ibanforge.com/${locale}/blog/${slug}`;
+
+  const articleLd = {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    headline: meta.title,
+    description: meta.description,
+    datePublished: meta.date,
+    dateModified: meta.date,
+    inLanguage: locale,
+    author: { "@type": "Organization", name: "IBANforge", url: "https://ibanforge.com" },
+    publisher: { "@type": "Organization", name: "IBANforge", url: "https://ibanforge.com" },
+    mainEntityOfPage: { "@type": "WebPage", "@id": url },
+  };
+
+  const faqLd =
+    meta.faq && meta.faq.length > 0
+      ? {
+          "@context": "https://schema.org",
+          "@type": "FAQPage",
+          mainEntity: meta.faq.map((f) => ({
+            "@type": "Question",
+            name: f.q,
+            acceptedAnswer: { "@type": "Answer", text: f.a },
+          })),
+        }
+      : null;
 
   return (
     <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8 py-16">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(articleLd) }}
+      />
+      {faqLd && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(faqLd) }}
+        />
+      )}
       <div className="mb-10">
         <Link
           href={`/${locale}/blog`}
