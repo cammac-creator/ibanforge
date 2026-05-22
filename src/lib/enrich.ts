@@ -31,9 +31,9 @@ export function enrichResult(result: IBANValidationResult): void {
   // BIC lookup
   result.bic = lookupByCountryBank(cc, result.bban.bank_code);
 
-  // Issuer classification
+  // Issuer classification — BIC8 exact match, then institution-name fallback
   if (result.bic) {
-    const known = classifyIssuer(result.bic.code);
+    const known = classifyIssuer(result.bic.code, result.bic.bank_name ?? undefined);
     result.issuer = known ?? { type: 'bank', name: result.bic.bank_name ?? 'Unknown' };
   }
 

@@ -9,6 +9,8 @@
  * public BIC directories (Wise, bank.codes, theswiftcodes).
  */
 
+import { GENERATED_ISSUERS } from './issuers-generated.js';
+
 export type IssuerType = 'bank' | 'digital_bank' | 'emi' | 'payment_institution';
 
 interface IssuerEntry {
@@ -114,17 +116,65 @@ const KNOWN_ISSUERS: Record<string, IssuerEntry> = {
   YOUIFRPP: { type: 'payment_institution', name: 'Younited' },    // FR
 };
 
+/**
+ * Normalize an institution name for matching: lowercase, non-alphanumeric
+ * runs collapsed to single spaces, trimmed.
+ */
+export function normalizeIssuerName(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+/**
+ * Normalized-name → issuer type index, derived from KNOWN_ISSUERS' brand
+ * names. Sorted longest-key-first so the most specific brand wins on a
+ * prefix match. Backs the stage-2 name fallback in classifyIssuer.
+ */
+const NAME_INDEX: ReadonlyArray<readonly [string, IssuerType]> = (() => {
+  const map = new Map<string, IssuerType>();
+  for (const entry of Object.values(KNOWN_ISSUERS)) {
+    const key = normalizeIssuerName(entry.name);
+    if (key) map.set(key, entry.type);
+  }
+  return [...map.entries()].sort((a, b) => b[0].length - a[0].length);
+})();
+
 export interface IssuerInfo {
   type: IssuerType;
   name: string;
 }
 
 /**
- * Classify an institution by its BIC8 code.
- * Returns null if BIC is unknown (caller should default to 'bank').
+ * Classify an institution.
+ *
+ * Stage 1a — exact BIC8 match against the hand-curated KNOWN_ISSUERS (precise,
+ *   takes precedence; carries a verified display name).
+ * Stage 1b — exact BIC8 match against GENERATED_ISSUERS, the cross-match of the
+ *   EBA PIR + FCA UK register against the BIC base.
+ * Stage 2  — institution-name fallback against known brands.
+ *
+ * Returns null if no stage matches (caller should default to 'bank').
  */
-export function classifyIssuer(bic8: string): IssuerInfo | null {
-  const normalized = bic8.toUpperCase().substring(0, 8);
-  const entry = KNOWN_ISSUERS[normalized];
-  return entry ?? null;
+export function classifyIssuer(bic8: string, institutionName?: string): IssuerInfo | null {
+  const normalizedBic = bic8.toUpperCase().substring(0, 8);
+
+  // Stage 1a — hand-curated map.
+  const entry = KNOWN_ISSUERS[normalizedBic];
+  if (entry) return entry;
+
+  // Stage 1b — generated register cross-match.
+  const generatedType = GENERATED_ISSUERS[normalizedBic];
+  if (generatedType) {
+    return { type: generatedType, name: institutionName ?? normalizedBic };
+  }
+
+  // Stage 2 — institution-name fallback.
+  if (!institutionName) return null;
+  const name = normalizeIssuerName(institutionName);
+  if (!name) return null;
+  for (const [key, type] of NAME_INDEX) {
+    if (name === key || name.startsWith(`${key} `)) {
+      return { type, name: institutionName };
+    }
+  }
+  return null;
 }

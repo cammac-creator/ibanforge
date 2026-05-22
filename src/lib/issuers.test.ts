@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { classifyIssuer } from './issuers.js';
+import { classifyIssuer, normalizeIssuerName } from './issuers.js';
+import { GENERATED_ISSUERS } from './issuers-generated.js';
 
 describe('classifyIssuer', () => {
   describe('known digital banks', () => {
@@ -198,6 +199,60 @@ describe('classifyIssuer', () => {
     it('handles 11-char BIC (strips branch)', () => {
       const r = classifyIssuer('REVOLT21XXX');
       expect(r?.type).toBe('digital_bank');
+    });
+  });
+
+  describe('name fallback (stage 2)', () => {
+    it('classifies an unknown BIC by a known brand name', () => {
+      // BIC8 not in KNOWN_ISSUERS, institution name matches the "Wise" brand
+      const r = classifyIssuer('WISEXX99', 'Wise Payments Belgium SA');
+      expect(r).toEqual({ type: 'emi', name: 'Wise Payments Belgium SA' });
+    });
+
+    it('does not classify a traditional bank by name', () => {
+      expect(classifyIssuer('UBSWCHZH', 'UBS Switzerland AG')).toBeNull();
+    });
+
+    it('lets the known BIC8 win over the name (stage 1 first)', () => {
+      const r = classifyIssuer('TRWIBEB1', 'Some Unrelated Bank');
+      expect(r).toEqual({ type: 'emi', name: 'Wise' });
+    });
+
+    it('returns null for an unknown BIC with no name', () => {
+      expect(classifyIssuer('ZZZZ9999')).toBeNull();
+    });
+
+    it('returns null for an unknown BIC with an unmatched name', () => {
+      expect(classifyIssuer('ZZZZ9999', 'Banque Cantonale Vaudoise')).toBeNull();
+    });
+  });
+
+  describe('normalizeIssuerName', () => {
+    it('lowercases and collapses punctuation to single spaces', () => {
+      expect(normalizeIssuerName('Stripe Payments Europe Ltd.')).toBe('stripe payments europe ltd');
+    });
+
+    it('trims surrounding whitespace', () => {
+      expect(normalizeIssuerName('  N26  ')).toBe('n26');
+    });
+  });
+
+  describe('generated register index (stage 1b)', () => {
+    it('GENERATED_ISSUERS has the expected scale (regression guard)', () => {
+      // Catches a silent build-script breakage producing few/zero entries.
+      expect(Object.keys(GENERATED_ISSUERS).length).toBeGreaterThan(800);
+    });
+
+    it('classifies a BIC present only in the generated index', () => {
+      // NEPYITM1 (Nexi Payments) is in GENERATED_ISSUERS, not in KNOWN_ISSUERS.
+      const r = classifyIssuer('NEPYITM1', 'NEXI PAYMENTS S.P.A.');
+      expect(r).toEqual({ type: 'emi', name: 'NEXI PAYMENTS S.P.A.' });
+    });
+
+    it('uses the BIC8 as name when no institution name is supplied', () => {
+      const r = classifyIssuer('NEPYITM1');
+      expect(r?.type).toBe('emi');
+      expect(r?.name).toBe('NEPYITM1');
     });
   });
 });
