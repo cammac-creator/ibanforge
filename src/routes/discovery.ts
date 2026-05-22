@@ -161,42 +161,52 @@ discovery.get('/.well-known/oauth-protected-resource/mcp', (c) =>
 );
 
 // ──────────────────────────────────────────────────────────────────────────────
-// /.well-known/agents.json — A2A agent discovery (emerging standard)
-// Lets autonomous agents discover IBANforge as a service they can pay & call.
+// /.well-known/agents.json — A2A agent discovery (emerging standard).
+// Served at the canonical path and at the agent.json / agents.json /
+// agent-directory.json aliases that directory crawlers request
+// (~182 hits/month previously landed in 404). The singular agent.json alias
+// intentionally serves the same A2A manifest — better than a 404.
 // ──────────────────────────────────────────────────────────────────────────────
 
-discovery.get('/.well-known/agents.json', (c) => {
-  return c.json({
-    schema_version: 'v1',
-    name: 'IBANforge',
-    description:
-      'IBAN validation, BIC/SWIFT lookup, Swiss clearing and compliance risk scoring for autonomous agents.',
-    url: 'https://ibanforge.com',
-    contact: 'https://github.com/cammac-creator/ibanforge',
-    capabilities: [
-      'iban_validation',
-      'bic_lookup',
-      'swift_lookup',
-      'swiss_clearing_lookup',
-      'sepa_compliance_check',
-      'sanctions_screening',
-      'vop_check',
-      'emi_classification',
-      'viban_detection',
-      'country_risk_scoring',
-    ],
-    payment: {
-      protocol: 'x402',
-      network: NETWORK,
-      asset: USDC_BASE,
-      discovery: 'https://api.ibanforge.com/.well-known/x402',
-    },
-    interfaces: [
-      { type: 'rest', url: 'https://api.ibanforge.com', spec: 'https://api.ibanforge.com/openapi.json' },
-      { type: 'mcp', transport: 'http', url: 'https://api.ibanforge.com/mcp' },
-      { type: 'mcp', transport: 'stdio', package: 'ibanforge-mcp' },
-    ],
-  });
-});
+const AGENT_MANIFEST = {
+  schema_version: 'v1',
+  name: 'IBANforge',
+  description:
+    'IBAN validation, BIC/SWIFT lookup, Swiss clearing and compliance risk scoring for autonomous agents.',
+  url: 'https://ibanforge.com',
+  contact: 'https://github.com/cammac-creator/ibanforge',
+  capabilities: [
+    'iban_validation',
+    'bic_lookup',
+    'swift_lookup',
+    'swiss_clearing_lookup',
+    'sepa_compliance_check',
+    'sanctions_screening',
+    'vop_check',
+    'emi_classification',
+    'viban_detection',
+    'country_risk_scoring',
+  ],
+  payment: {
+    protocol: 'x402',
+    network: NETWORK,
+    asset: USDC_BASE,
+    discovery: 'https://api.ibanforge.com/.well-known/x402',
+  },
+  interfaces: [
+    { type: 'rest', url: 'https://api.ibanforge.com', spec: 'https://api.ibanforge.com/openapi.json' },
+    { type: 'mcp', transport: 'http', url: 'https://api.ibanforge.com/mcp' },
+    { type: 'mcp', transport: 'stdio', package: 'ibanforge-mcp' },
+  ],
+};
+
+for (const path of [
+  '/.well-known/agents.json',
+  '/.well-known/agent.json',
+  '/agents.json',
+  '/agent-directory.json',
+]) {
+  discovery.get(path, (c) => c.json(AGENT_MANIFEST));
+}
 
 export { discovery };
