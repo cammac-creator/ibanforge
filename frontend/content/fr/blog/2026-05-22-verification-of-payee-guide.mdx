@@ -1,0 +1,96 @@
+---
+title: "Verification of Payee (VoP) : ce que c'est, les dates clés et comment s'y préparer"
+description: "La Verification of Payee (VoP) est le contrôle nom/IBAN obligatoire de l'UE avant un virement SEPA. Ce que c'est, les dates qui comptent au titre du règlement (UE) 2024/886, ce que les prestataires de services de paiement doivent faire, et où se situe la validation d'IBAN."
+date: "2026-05-22"
+faq:
+  - q: "Qu'est-ce que la Verification of Payee (VoP) ?"
+    a: "La Verification of Payee est un contrôle en temps réel qui vérifie si le nom d'un bénéficiaire correspond à son IBAN avant l'envoi d'un virement SEPA. Le prestataire de services de paiement du payeur interroge le PSP du bénéficiaire et renvoie une correspondance, une correspondance partielle ou une absence de correspondance, afin que le payeur décide de poursuivre ou non."
+  - q: "Quand la VoP devient-elle obligatoire ?"
+    a: "Au titre du règlement (UE) 2024/886, le règlement européen sur les paiements instantanés, la VoP est obligatoire pour les prestataires de services de paiement des États membres de la zone euro depuis le 9 octobre 2025. Les PSP des États membres de l'EEE hors zone euro doivent s'y conformer à partir du 9 juillet 2027."
+  - q: "La VoP s'applique-t-elle aux virements SEPA non instantanés ?"
+    a: "Oui. L'obligation couvre les virements SEPA en général — aussi bien les virements SEPA instantanés que les virements SEPA classiques, non instantanés."
+  - q: "La VoP est-elle gratuite pour le payeur ?"
+    a: "Oui. Le règlement sur les paiements instantanés impose que le service de vérification du bénéficiaire soit proposé gratuitement au payeur."
+  - q: "Qu'est-ce qu'un Routing and Verification Mechanism (RVM) ?"
+    a: "Un RVM est un intermédiaire qui connecte un PSP aux autres PSP pour la VoP — il gère la requête et la réponse de correspondance de noms ainsi que le routage via l'annuaire. Les PSP de taille modeste passent généralement par un RVM plutôt que d'établir des connexions directes avec chaque autre PSP."
+  - q: "IBANforge fournit-il la Verification of Payee ?"
+    a: "Non. IBANforge n'est ni une solution VoP ni un RVM. Il couvre la couche de données amont — validation d'IBAN, résolution de BIC, classification des établissements de monnaie électronique et des IBAN virtuels, et indicateurs de joignabilité SEPA/VoP — qui aide à nettoyer les données de bénéficiaires avant qu'elles n'atteignent un contrôle VoP. La vérification elle-même est réalisée par les PSP via le dispositif VoP de l'EPC."
+---
+
+Si votre produit fait circuler de l'argent dans la zone SEPA — néobanque, plateforme de paiement, outil de trésorerie, marketplace qui reverse des fonds à des vendeurs — la Verification of Payee est déjà sur votre feuille de route, que vous l'y ayez mise ou non. Voici une explication claire de ce que c'est, de ce qu'exige la réglementation, des dates qui comptent, et de ce que cela implique pour les systèmes que vous construisez.
+
+**En bref :** la Verification of Payee (VoP) est un contrôle en temps réel qui vérifie si le nom d'un bénéficiaire correspond à son IBAN, effectué juste avant l'envoi d'un virement SEPA. Elle est obligatoire pour les prestataires de services de paiement de la zone euro depuis le 9 octobre 2025 au titre du règlement européen sur les paiements instantanés, et s'applique aux PSP des États de l'EEE hors zone euro à partir du 9 juillet 2027. Son objectif : réduire les virements mal dirigés et la fraude au virement autorisé (APP fraud).
+
+## Qu'est-ce que la Verification of Payee ?
+
+La Verification of Payee est un contrôle qui intervient avant la confirmation d'un virement. Lorsqu'un payeur saisit le nom et l'IBAN d'un bénéficiaire, le prestataire de services de paiement (PSP) du payeur demande au PSP du bénéficiaire si ce nom correspond effectivement à ce compte. Le payeur reçoit l'une de quelques réponses — généralement une **correspondance**, une **correspondance partielle** (avec le nom correct proposé), ou une **absence de correspondance** — puis décide de poursuivre ou non.
+
+C'est un petit changement dans l'expérience du payeur et un grand changement dans la tuyauterie. Le virement lui-même n'est pas modifié ; ce qui est nouveau, c'est un échange de vérification de nom en temps réel entre deux PSP, qui doit aboutir dans les secondes précédant la confirmation du payeur.
+
+## Pourquoi la VoP existe
+
+Deux problèmes. Le premier est l'erreur pure : un IBAN mal saisi ou mal collé envoie l'argent à un inconnu, et rappeler un virement SEPA est lent et incertain. Le second — et le véritable moteur — est la **fraude au virement autorisé (APP fraud)** : des escroqueries où la victime est manipulée pour envoyer elle-même l'argent, vers un compte qu'elle croit légitime.
+
+Comme la victime autorise le paiement, les contrôles antifraude classiques ne le détectent pas. Vérifier le nom du bénéficiaire face à l'IBAN au moment du paiement est l'une des rares interventions efficaces contre ce schéma.
+
+## Ce qu'exige la réglementation — et quand
+
+La VoP est imposée par le règlement européen sur les paiements instantanés — le **règlement (UE) 2024/886** — qui modifie le cadre SEPA. L'obligation s'applique selon un calendrier échelonné :
+
+- **9 octobre 2025** — la VoP est devenue obligatoire pour les prestataires de services de paiement des États membres de la zone euro.
+- **20 septembre 2026** — les modifications de la version 1.1 du rulebook du dispositif Verification of Payee de l'EPC entrent en vigueur.
+- **9 juillet 2027** — la VoP devient obligatoire pour les PSP des États membres de l'EEE hors zone euro.
+
+La VoP couvre les virements SEPA — instantanés comme non instantanés — et le service doit être proposé **gratuitement au payeur**. Le European Payments Council (EPC) gère le dispositif auquel adhèrent les PSP, y compris la couche d'annuaire et de routage qu'ils utilisent pour se joindre les uns les autres.
+
+## Ce que les PSP doivent concrètement faire
+
+En pratique, se mettre en conformité VoP suppose trois choses :
+
+1. **Se connecter à un mécanisme de vérification.** Un PSP établit soit des connexions directes vers d'autres PSP, soit — plus courant pour les acteurs de taille modeste — passe par un Routing and Verification Mechanism (RVM), un intermédiaire qui gère l'échange de vérification de nom et la consultation de l'annuaire.
+2. **Bien traiter les réponses.** Correspondance, correspondance partielle, absence de correspondance — chacune exige une expérience utilisateur claire et rapide. Une correspondance partielle doit faire apparaître le nom proposé sans en divulguer plus que nécessaire ; une absence de correspondance doit alerter le payeur sans bloquer purement et simplement les paiements légitimes.
+3. **Disposer de données amont fiables.** La correspondance de noms ne vaut que ce que valent ses données d'entrée. Un IBAN mal formé, un compte ouvert auprès d'un établissement de monnaie électronique qui émet des IBAN virtuels, ou un PSP bénéficiaire non joignable pour le dispositif SEPA concerné — tout cela complique le contrôle. Nettoyer et enrichir les données de bénéficiaires avant qu'elles n'atteignent l'étape VoP élimine beaucoup de frictions évitables.
+
+## Où se situe la validation d'IBAN
+
+La VoP est une obligation de correspondance de noms. Ce n'est pas un produit de validation d'IBAN — et **IBANforge n'est ni une solution VoP ni un RVM**. Mais les deux se rejoignent au niveau des données, et il vaut la peine d'être précis là-dessus.
+
+Avant même qu'une requête VoP vaille la peine d'être envoyée, l'IBAN doit être structurellement correct et routable. C'est ce segment amont que couvre IBANforge : il valide l'IBAN (structure et somme de contrôle mod-97), résout le BIC, indique si le compte est émis par une banque traditionnelle ou par un établissement de monnaie électronique ou un émetteur numérique — là où apparaissent les IBAN virtuels et les correspondances de noms plus délicates — et signale la joignabilité SEPA et VoP côté bénéficiaire. C'est le contrôle préalable, pas la vérification elle-même.
+
+Pour une équipe qui se prépare à la VoP, IBANforge est ainsi utile à deux endroits : nettoyer une base de clients ou de bénéficiaires pour que les mauvais IBAN soient repérés avant même d'atteindre le flux de vérification, et donner à l'interface de paiement assez de contexte — type d'émetteur, joignabilité — pour traiter sensément les cas limites. Il ne remplace ni un RVM ni une connexion au dispositif VoP.
+
+## Comment s'y préparer
+
+Le calendrier échelonné laisse de la marge aux PSP hors zone euro, mais le travail sur les données, lui, n'attend pas d'échéance. Des données d'IBAN propres, une résolution de BIC correcte et une vision claire du type d'émetteur et de la joignabilité sont utiles la veille de l'entrée en vigueur de la VoP comme le lendemain — et ce socle est la partie la moins coûteuse du projet à amorcer dès maintenant.
+
+Première étape concrète : auditer vos données existantes de bénéficiaires et de versements pour repérer les IBAN structurellement invalides, les BIC non résolus et les comptes d'établissements de monnaie électronique ou à IBAN virtuel, afin de connaître l'ampleur du nettoyage avant que la couche de vérification ne la rende visible. L'[API IBANforge](/fr/docs) valide un IBAN, résout son BIC et signale le type d'émetteur en un seul appel, et l'[endpoint batch](/fr/docs/iban-batch) applique les mêmes contrôles à l'ensemble d'une base existante.
+
+## Questions fréquentes
+
+### Qu'est-ce que la Verification of Payee (VoP) ?
+
+La Verification of Payee est un contrôle en temps réel qui vérifie si le nom d'un bénéficiaire correspond à son IBAN avant l'envoi d'un virement SEPA. Le prestataire de services de paiement du payeur interroge le PSP du bénéficiaire et renvoie une correspondance, une correspondance partielle ou une absence de correspondance, afin que le payeur décide de poursuivre ou non.
+
+### Quand la VoP devient-elle obligatoire ?
+
+Au titre du règlement (UE) 2024/886, le règlement européen sur les paiements instantanés, la VoP est obligatoire pour les prestataires de services de paiement des États membres de la zone euro depuis le 9 octobre 2025. Les PSP des États membres de l'EEE hors zone euro doivent s'y conformer à partir du 9 juillet 2027.
+
+### La VoP s'applique-t-elle aux virements SEPA non instantanés ?
+
+Oui. L'obligation couvre les virements SEPA en général — aussi bien les virements SEPA instantanés que les virements SEPA classiques, non instantanés.
+
+### La VoP est-elle gratuite pour le payeur ?
+
+Oui. Le règlement sur les paiements instantanés impose que le service de vérification du bénéficiaire soit proposé gratuitement au payeur.
+
+### Qu'est-ce qu'un Routing and Verification Mechanism (RVM) ?
+
+Un RVM est un intermédiaire qui connecte un PSP aux autres PSP pour la VoP — il gère la requête et la réponse de correspondance de noms ainsi que le routage via l'annuaire. Les PSP de taille modeste passent généralement par un RVM plutôt que d'établir des connexions directes avec chaque autre PSP.
+
+### IBANforge fournit-il la Verification of Payee ?
+
+Non. IBANforge n'est ni une solution VoP ni un RVM. Il couvre la couche de données amont — validation d'IBAN, résolution de BIC, classification des établissements de monnaie électronique et des IBAN virtuels, et indicateurs de joignabilité SEPA/VoP — qui aide à nettoyer les données de bénéficiaires avant qu'elles n'atteignent un contrôle VoP. La vérification elle-même est réalisée par les PSP via le dispositif VoP de l'EPC.
+
+---
+
+*Ce guide fournit des informations générales sur le règlement européen sur les paiements instantanés et le dispositif Verification of Payee du European Payments Council — il ne constitue pas un avis juridique. Vérifiez les obligations et les dates auprès du [règlement (UE) 2024/886](https://eur-lex.europa.eu/eli/reg/2024/886/oj/fra) et des publications du [European Payments Council](https://www.europeanpaymentscouncil.eu/what-we-do/other-schemes/verification-payee). Revu le 22 mai 2026.*
