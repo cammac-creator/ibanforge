@@ -6,12 +6,18 @@ function blogDir(locale: string): string {
   return path.join(process.cwd(), 'content', locale, 'blog');
 }
 
+export interface FaqItem {
+  q: string;
+  a: string;
+}
+
 export interface BlogPost {
   slug: string;
   title: string;
   description: string;
   date: string;
   readingTime: string;
+  faq?: FaqItem[];
 }
 
 export function getAllPosts(locale: string = 'en'): BlogPost[] {
@@ -48,6 +54,7 @@ export function getPost(slug: string, locale: string = 'en'): { meta: BlogPost; 
       description: data.description || '',
       date: data.date,
       readingTime: `${Math.ceil(words / 200)} min read`,
+      faq: Array.isArray(data.faq) ? (data.faq as FaqItem[]) : undefined,
     },
     content,
   };
