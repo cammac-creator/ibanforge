@@ -49,9 +49,11 @@ from .types import (
     IBANValidationResult,
 )
 
+from ._version import __version__
+
 DEFAULT_BASE_URL = "https://api.ibanforge.com"
 DEFAULT_TIMEOUT = 30.0
-USER_AGENT = "ibanforge-python/1.1.0"
+USER_AGENT = f"ibanforge-python/{__version__}"
 
 
 def _raise_for_status(res: httpx.Response) -> None:
@@ -161,11 +163,14 @@ class IBANforge:
     def check_compliance(self, iban: str) -> ComplianceResult:
         """Pre-flight compliance triage on an IBAN ($0.02 / call with API key).
 
-        Returns sanctions screening (OFAC/EU/UN), FATF jurisdiction flag,
-        SEPA Instant reachability, VoP participant status, risk score 0-100,
-        and a recommended_action of "allow" | "review" | "block".
+        Returns the validate result plus a nested ``compliance`` block:
+        sanctions screening (OFAC/EU/UN), FATF jurisdiction flag, SEPA Instant
+        reachability, VoP participant status, and a risk score 0-100. Read it at
+        ``out["compliance"]["risk_score"]`` / ``["risk_level"]`` — there is no
+        top-level ``risk_score`` or ``recommended_action`` field.
 
-        Informational, not a regulated AML/CFT product.
+        Informational, not a regulated AML/CFT product. Sanctions screening is
+        at the BANK (BIC8) level only and does not screen the beneficiary name.
         """
         res = self._client.post("/v1/iban/compliance", json={"iban": iban})
         _raise_for_status(res)

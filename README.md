@@ -13,7 +13,7 @@
 > **The compliance API for AI agents.** IBAN validation, BIC/SWIFT lookup, Swiss clearing (BC-Nummer / QR-IID / SIX BankMaster), EMI/vIBAN classification, SEPA Instant + VoP reachability, and risk scoring — exposed natively over **MCP** and **x402 micropayments**, with no API key signup required.
 
 ```
-121,399 BIC entries (38K LEI via GLEIF) · 1,190 Swiss BC-Nummern (SIX) · 84 IBAN countries · <50ms p99
+121,399 BIC entries (38K LEI via GLEIF) · 1,190 Swiss BC-Nummern (SIX) · 89 IBAN countries · <50ms p99
 ```
 
 ---

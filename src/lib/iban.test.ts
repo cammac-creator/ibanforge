@@ -37,6 +37,18 @@ describe('IBAN Validation', () => {
       expect(r.bban?.branch_code).toBe('601613');
       expect(r.bban?.account_number).toBe('31926819');
     });
+
+    it('SK valid — bank code, account prefix (branch) and account isolated per SWIFT registry', () => {
+      // SK BBAN = 4-digit bank + 6-digit account prefix + 10-digit account.
+      // Regression guard: the prefix must NOT be folded into account_number.
+      const r = validateIBAN('SK3112000000198742637541');
+      expect(r.valid).toBe(true);
+      expect(r.country?.code).toBe('SK');
+      expect(r.bban?.bank_code).toBe('1200');
+      expect(r.bban?.branch_code).toBe('000019');
+      expect(r.bban?.account_number).toBe('8742637541');
+      expect(r.bban?.account_number).toHaveLength(10);
+    });
   });
 
   describe('Invalid — checksum', () => {

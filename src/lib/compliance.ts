@@ -58,7 +58,11 @@ export function calculateRiskScore(
   if (sanctions.bank_sanctioned) { score += 50; flags.push('sanctioned_bank'); }
   if (sanctions.fatf_status === 'black_list') { score += 30; flags.push('fatf_black_list'); }
   if (sanctions.fatf_status === 'grey_list') { score += 20; flags.push('fatf_grey_list'); }
-  if (sanctions.fatf_status === 'non_member') { score += 10; flags.push('fatf_non_member'); }
+  // NOTE: there is intentionally NO weight for fatf_status === 'non_member'.
+  // FATF has ~40 members; non-membership says nothing about AML risk (most
+  // SEPA countries — PL, CZ, MT, HR… — are not FATF members yet are low-risk).
+  // A previous +10 weight here inflated the risk of ~13 standard EU/SEPA
+  // countries from 'low' to 'medium'. Only grey/black list carry signal.
   if (issuerType === 'payment_institution') { score += 15; flags.push('payment_institution_issuer'); }
   if (issuerType === 'emi') { score += 10; flags.push('emi_issuer'); }
   if (countryRisk === 'high') { score += 20; flags.push('high_risk_country'); }

@@ -10,7 +10,7 @@ const pkg = require('../../package.json') as { version: string };
 const MCP_SERVER_CARD = {
   name: 'IBANforge',
   description:
-    'IBAN validation, BIC/SWIFT lookup, Swiss clearing, SEPA compliance and risk scoring API for AI agents. 121,399 BIC entries (38,761 LEI-enriched via GLEIF), 1,190 Swiss BC-Nummer from SIX, 84 countries.',
+    'IBAN validation, BIC/SWIFT lookup, Swiss clearing, SEPA compliance and risk scoring API for AI agents. 121,399 BIC entries (38,761 LEI-enriched via GLEIF), 1,190 Swiss BC-Nummer from SIX, 89 countries.',
   url: 'https://api.ibanforge.com/mcp',
   transport: 'streamable-http',
   version: pkg.version,

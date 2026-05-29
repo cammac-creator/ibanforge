@@ -221,7 +221,7 @@ landing.get('/', (c) => {
       <h1>IBAN<span>forge</span></h1>
       <p class="hero-sub">Validate IBANs. Lookup BICs. Score risk.</p>
       <p class="hero-sub"><strong>One API for developers &amp; AI agents.</strong></p>
-      <p class="hero-features">Compliance-grade validation &middot; Sanctions screening &middot; SEPA &amp; VoP coverage &middot; 84 countries</p>
+      <p class="hero-features">Compliance-grade validation &middot; Sanctions screening &middot; SEPA &amp; VoP coverage &middot; 89 countries</p>
       <div class="hero-moat">
         <strong>The only API</strong> with Swiss <strong>BC-Nummer</strong> &amp; <strong>QR-IID</strong> lookup &mdash; 1,190 entries from SIX BankMaster, with SIC/euroSIC/Instant Payments participation included.
       </div>

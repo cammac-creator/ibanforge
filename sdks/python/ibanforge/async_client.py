@@ -45,9 +45,11 @@ from .types import (
     IBANValidationResult,
 )
 
+from ._version import __version__
+
 DEFAULT_BASE_URL = "https://api.ibanforge.com"
 DEFAULT_TIMEOUT = 30.0
-USER_AGENT = "ibanforge-python/1.1.0"
+USER_AGENT = f"ibanforge-python/{__version__}"
 
 
 def _raise_for_status(res: httpx.Response) -> None:

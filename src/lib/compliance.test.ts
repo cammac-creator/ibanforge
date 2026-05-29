@@ -47,4 +47,17 @@ describe('calculateRiskScore', () => {
     expect(r.risk_score).toBe(30);
     expect(r.flags).toContain('test_bic');
   });
+
+  it('does NOT penalise a standard FATF non-member SEPA country (e.g. PL, MT)', () => {
+    // Regression guard: a +10 'fatf_non_member' weight used to push ~13 standard
+    // EU/SEPA countries from 'low' to 'medium'. FATF non-membership carries no
+    // AML signal, so a clean non-member bank must score 0 / low.
+    const nonMember: SanctionsCheck = {
+      country_sanctioned: false, bank_sanctioned: false, matched_lists: [], fatf_status: 'non_member',
+    };
+    const r = calculateRiskScore(nonMember, goodReach, goodVop, 'bank', 'standard', false);
+    expect(r.risk_score).toBe(0);
+    expect(r.risk_level).toBe('low');
+    expect(r.flags).not.toContain('fatf_non_member');
+  });
 });

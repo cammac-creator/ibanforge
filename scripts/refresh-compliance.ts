@@ -520,6 +520,24 @@ async function main(): Promise<void> {
   // 8. Summary
   printSummary(db);
 
+  // 8b. Sanity floor — refuse to ship a database that screens nothing.
+  // Each OpenSanctions source can fail with only a WARNING (network/format),
+  // so a fully-failed refresh would otherwise produce a DB with 0 sanctioned
+  // entities and the live API would answer "clean" for every BIC — a systemic
+  // false-negative. Abort and keep the previous compliance.sqlite instead.
+  const SANCTIONS_FLOOR = 50; // well below the normal few-hundred bank BICs
+  const shippedEntities = (
+    db.prepare('SELECT COUNT(*) AS n FROM sanctioned_entities').get() as { n: number }
+  ).n;
+  if (shippedEntities < SANCTIONS_FLOOR) {
+    db.close();
+    throw new Error(
+      `Refusing to ship compliance.sqlite: only ${shippedEntities} sanctioned entities ` +
+        `(floor is ${SANCTIONS_FLOOR}). Likely an OpenSanctions download failure — ` +
+        `keeping the existing database. Re-run once the sources are reachable.`,
+    );
+  }
+
   // 9. Close DB and atomically replace final file
   db.close();
 

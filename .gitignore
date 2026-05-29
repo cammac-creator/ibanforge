@@ -5,6 +5,10 @@ dist/
 .DS_Store
 data/*.sqlite-wal
 data/*.sqlite-shm
+# stats.sqlite is runtime-mutated (usage, API keys) and rebuilt by the app via
+# CREATE TABLE IF NOT EXISTS — keeping it in git only produced permanent binary
+# diff noise. bic.sqlite / compliance.sqlite stay tracked (read-only seed data).
+data/stats.sqlite
 coverage/
 *.tsbuildinfo
 .superpowers/
