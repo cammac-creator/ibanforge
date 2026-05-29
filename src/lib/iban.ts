@@ -60,6 +60,19 @@ function parseBBAN(countryCode: string, bban: string): {
  * Validate an IBAN and return full decomposition
  */
 export function validateIBAN(input: string): IBANValidationResult {
+  // Step 0 — Reject absurdly long input BEFORE any regex / toUpperCase / BigInt.
+  // The longest real IBAN is 33 chars; allow generous room for separators but
+  // cap hard so a multi-megabyte string can't burn CPU on the cleanup + mod-97.
+  if (typeof input !== 'string' || input.length > 64) {
+    return {
+      iban: typeof input === 'string' ? input.slice(0, 64) : '',
+      valid: false,
+      error: 'invalid_format',
+      error_detail: 'IBAN is too long to be valid (max 34 characters, separators aside).',
+      cost_usdc: 0.005,
+    };
+  }
+
   // Step 1 — Clean
   const cleaned = input.replace(/[\s-]/g, '').toUpperCase();
 

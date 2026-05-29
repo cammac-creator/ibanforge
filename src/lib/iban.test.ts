@@ -71,6 +71,14 @@ describe('IBAN Validation', () => {
       expect(r.valid).toBe(false);
       expect(r.error).toBe('wrong_length');
     });
+
+    it('rejects absurdly long input fast without throwing (CPU guard)', () => {
+      const r = validateIBAN('CH' + '9'.repeat(5000));
+      expect(r.valid).toBe(false);
+      expect(r.error).toBe('invalid_format');
+      // The echoed iban must be capped, not the multi-KB input.
+      expect(r.iban.length).toBeLessThanOrEqual(64);
+    });
   });
 
   describe('Invalid — unknown country', () => {
