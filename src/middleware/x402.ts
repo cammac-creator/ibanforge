@@ -1,5 +1,9 @@
 import type { MiddlewareHandler } from 'hono';
+import { createRequire } from 'node:module';
 import type { HonoEnv } from '../types.js';
+
+const require = createRequire(import.meta.url);
+const pkg = require('../../package.json') as { version: string };
 
 // USDC contract address on Base L2
 export const USDC_BASE = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
@@ -101,11 +105,12 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
       // Trust signals appended to descriptions: production status, p99 latency target,
       // dataset size, last update. Agents that filter on description quality (Bazaar
       // semantic search, agentic.market) reward this.
-      const TRUST_TAG_VALIDATE = 'Production · p99 <50ms · 121,399 BICs (38K LEI via GLEIF) + 1,190 SIX · v1.2.0';
-      const TRUST_TAG_BIC = 'Production · p99 <30ms · 121,399 BICs (38,761 LEI-enriched via GLEIF) · v1.2.0';
-      const TRUST_TAG_CH = 'Production · p99 <20ms · 1,190 SIX BankMaster entries · v1.2.0';
-      const TRUST_TAG_COMPLIANCE = 'Production · p99 <80ms · OFAC/EU/UN + FATF + SEPA + VoP · weekly refresh · v1.2.0';
-      const TRUST_TAG_BATCH = 'Production · p99 <300ms for 100 IBANs · 121,399 BICs · v1.2.0';
+      const V = `v${pkg.version}`;
+      const TRUST_TAG_VALIDATE = `Production · p99 <50ms · 121,399 BICs (38K LEI via GLEIF) + 1,190 SIX · ${V}`;
+      const TRUST_TAG_BIC = `Production · p99 <30ms · 121,399 BICs (38,761 LEI-enriched via GLEIF) · ${V}`;
+      const TRUST_TAG_CH = `Production · p99 <20ms · 1,190 SIX BankMaster entries · ${V}`;
+      const TRUST_TAG_COMPLIANCE = `Production · p99 <80ms · OFAC/EU/UN + FATF + SEPA + VoP · weekly refresh · ${V}`;
+      const TRUST_TAG_BATCH = `Production · p99 <300ms for 100 IBANs · 121,399 BICs · ${V}`;
 
       const ibanInputSchema = {
         type: 'object',
@@ -225,12 +230,28 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
           accepts: {
             scheme: 'exact',
             network: 'eip155:8453' as const,
-            price: '$0.20',
+            // Dynamic price: $0.002 per IBAN, so a 1-IBAN call settles $0.002
+            // (not the old flat $0.20 = 100× overcharge). x402 awaits this
+            // function with the request context; we read the batch size from
+            // the parsed body. Fail-safe: if the body can't be read, fall back
+            // to the $0.20 cap rather than under-charging.
+            price: async (context: { adapter?: { getBody?: () => unknown } }): Promise<string> => {
+              try {
+                const body = (await context.adapter?.getBody?.()) as Record<string, unknown> | undefined;
+                const arr = (body?.ibans ?? body?.iban_list ?? body?.list) as unknown;
+                const n = Array.isArray(arr) ? arr.length : 0;
+                // Clamp to [1, 100]; 0/unknown → cap so we never under-charge.
+                const count = n >= 1 && n <= 100 ? n : 100;
+                return '$' + (count * 0.002).toFixed(3);
+              } catch {
+                return '$0.20';
+              }
+            },
             payTo: walletAddress,
             maxTimeoutSeconds: 60,
           },
           description:
-            `Validate up to 100 IBANs in one call (10x cheaper per IBAN than calling validate_iban repeatedly). Use for CSV cleanup, customer DB dedup, or pre-flight payout list triage. ${TRUST_TAG_BATCH}.`,
+            `Validate up to 100 IBANs in one call at $0.002 per IBAN (10x cheaper than calling validate_iban repeatedly). Use for CSV cleanup, customer DB dedup, or pre-flight payout list triage. ${TRUST_TAG_BATCH}.`,
           mimeType: 'application/json',
           extensions: {
             bazaar: {
