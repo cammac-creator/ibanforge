@@ -113,4 +113,13 @@ describe('validateBIC', () => {
     expect(result.valid).toBe(false);
     expect(result.error).toBe('invalid_country');
   });
+
+  it('accepts the "XX" placeholder country but flags it as a test BIC', () => {
+    // XX is the SWIFT test/internal placeholder — valid format, but it must
+    // never read as a real institution for compliance/risk callers.
+    const result = validateBIC('ABCDXX12');
+    expect(result.valid).toBe(true);
+    expect(result.country_code).toBe('XX');
+    expect(result.is_test_bic).toBe(true);
+  });
 });
