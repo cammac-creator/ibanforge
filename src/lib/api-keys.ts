@@ -165,8 +165,11 @@ export function decrementCredits(keyHash: string): number {
  * a 4xx (client error — bad input). Mirrors decrementQuota for monthly keys.
  */
 export function refundCredit(keyHash: string): void {
+  // Cap the refund at credits_total so a stray double-refund can never inflate
+  // the balance above what was purchased (mirrors the MAX(count-1,0) clamp in
+  // decrementQuota).
   getStatsDB().prepare(
-    'UPDATE api_keys SET credits_remaining = credits_remaining + 1 WHERE key_hash = ? AND credits_remaining IS NOT NULL',
+    'UPDATE api_keys SET credits_remaining = MIN(credits_remaining + 1, credits_total) WHERE key_hash = ? AND credits_remaining IS NOT NULL',
   ).run(keyHash);
 }
 

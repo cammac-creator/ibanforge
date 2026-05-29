@@ -126,6 +126,12 @@ describe('Swiss BC-Nummer Clearing Lookup', () => {
       expect(detectInstitutionType('Raiffeisen Schweiz', '80000', 'CH')).toBe('raiffeisen');
     });
 
+    it('detectInstitutionType for Romandy/Ticino "Banque/Banca Raiffeisen" → "raiffeisen"', () => {
+      // Regression guard: startsWith("raiffeisen") used to misclassify these as 'bank'.
+      expect(detectInstitutionType('Banque Raiffeisen du Léman', '81234', 'CH')).toBe('raiffeisen');
+      expect(detectInstitutionType('Banca Raiffeisen Lugano', '81235', 'CH')).toBe('raiffeisen');
+    });
+
     it('detectInstitutionType for SNB → "central_bank"', () => {
       expect(detectInstitutionType('Schweizerische Nationalbank', '00100', 'CH')).toBe(
         'central_bank',

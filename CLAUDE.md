@@ -68,9 +68,10 @@ data/
 | Method | Path | Cost (USDC) | Description |
 |--------|------|-------------|-------------|
 | POST | /v1/iban/validate | 0.005 | Validate single IBAN + optional BIC lookup |
-| POST | /v1/iban/batch | 0.020 | Validate up to 100 IBANs |
+| POST | /v1/iban/batch | 0.002/IBAN (max $0.20 / batch of 100) | Validate up to 100 IBANs |
 | GET | /v1/bic/:code | 0.003 | Lookup BIC/SWIFT code |
 | GET | /v1/ch/clearing/:iid | 0.003 | Swiss BC-Nummer / IID clearing lookup |
+| POST | /v1/iban/compliance | 0.02 | Sanctions (bank-BIC) + FATF + SEPA + VoP + risk score 0-100 |
 | GET | /v1/demo | free | Example validations |
 | GET | /health | free | Health check + stats |
 | GET | /stats | free | Detailed statistics |

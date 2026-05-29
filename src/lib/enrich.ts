@@ -24,9 +24,12 @@ export function isTestBic(bicCode: string | null | undefined): boolean {
  * and risk indicators. Mutates the result object in place.
  */
 export function enrichResult(result: IBANValidationResult): void {
-  if (!result.valid || !result.bban?.bank_code) return;
+  // Make the invariant local and explicit instead of relying on a non-null
+  // assertion on result.country (a valid IBAN always carries country + bban,
+  // but the guard documents and enforces it here).
+  if (!result.valid || !result.country || !result.bban?.bank_code) return;
 
-  const cc = result.country!.code;
+  const cc = result.country.code;
 
   // BIC lookup
   result.bic = lookupByCountryBank(cc, result.bban.bank_code);

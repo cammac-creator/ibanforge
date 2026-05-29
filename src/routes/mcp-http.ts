@@ -41,7 +41,7 @@ function createMcpServer(): McpServer {
     title: 'IBANforge',
     version: pkg.version,
     description:
-      'IBAN validation, BIC/SWIFT lookup, Swiss clearing, SEPA compliance and risk indicators. 121,399 BIC entries (38,761 LEI-enriched via GLEIF), 1,190 Swiss BC-Nummer from SIX, 84 countries.',
+      'IBAN validation, BIC/SWIFT lookup, Swiss clearing, SEPA compliance and risk indicators. 121,399 BIC entries (38,761 LEI-enriched via GLEIF), 1,190 Swiss BC-Nummer from SIX, 89 countries.',
     websiteUrl: 'https://ibanforge.com',
     icons: [
       {
@@ -500,7 +500,7 @@ function createMcpServer(): McpServer {
     'ibanforge://countries',
     {
       title: 'Supported Countries',
-      description: 'List of all 84 countries supported by IBANforge with IBAN length, SEPA membership, VoP status, and country risk classification.',
+      description: 'List of all 89 countries supported by IBANforge with IBAN length, SEPA membership, VoP status, and country risk classification.',
       mimeType: 'application/json',
     },
     async () => ({
@@ -631,7 +631,20 @@ mcpHttp.post('/mcp', async (c) => {
       onsessioninitialized: (id) => {
         transports.set(id, transport!);
       },
+      // Purge the session as soon as the SDK reports it closed. Most MCP clients
+      // and directory crawlers (Smithery, Glama, MCP.so) open a session and walk
+      // away WITHOUT sending DELETE — without this hook the Map (and a full
+      // McpServer per session) grows unbounded and eventually OOM-kills the
+      // process on a long-running host (Railway).
+      onsessionclosed: (id) => {
+        transports.delete(id);
+      },
     });
+
+    const localTransport = transport;
+    transport.onclose = () => {
+      if (localTransport.sessionId) transports.delete(localTransport.sessionId);
+    };
 
     const server = createMcpServer();
     await server.connect(transport);

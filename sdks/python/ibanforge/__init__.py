@@ -11,7 +11,7 @@ Quick start:
     from ibanforge import IBANforge
     client = IBANforge(api_key="ifk_...")
     out = client.validate_iban("CH9300762011623852957")
-    print(out["valid"], out.get("bic", {}).get("bankName"))
+    print(out["valid"], (out.get("bic") or {}).get("bank_name"))
 
 For asyncio (FastAPI, langchain async, fan-out concurrency):
 
@@ -20,6 +20,7 @@ For asyncio (FastAPI, langchain async, fan-out concurrency):
         out = await client.validate_iban("...")
 """
 
+from ._version import __version__
 from .async_client import AsyncIBANforge
 from .client import IBANforge
 from .exceptions import (
@@ -42,5 +43,5 @@ __all__ = [
     "RateLimitError",
     "InvalidInputError",
     "APIError",
+    "__version__",
 ]
-__version__ = "1.1.0"

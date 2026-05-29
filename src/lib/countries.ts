@@ -62,7 +62,10 @@ export const BBAN_STRUCTURE: Record<string, BBANStructure> = {
   // SI: the 5-digit code is the bank identifier (SWIFT registry); [0,2] was
   // too short to match the bic_data.json keys.
   SI: { bankCode: [0, 5], accountNumber: [5, 10] },
-  SK: { bankCode: [0, 4], accountNumber: [4, 16] },
+  // SK: 4-digit bank code, 6-digit account prefix (the SWIFT registry isolates
+  // it as the branch field), then 10-digit account number. Folding the prefix
+  // into accountNumber drops the branch and corrupts the decomposition.
+  SK: { bankCode: [0, 4], branchCode: [4, 6], accountNumber: [10, 10] },
   SM: { bankCode: [1, 5], branchCode: [6, 5], accountNumber: [11, 12] },
   // Micro-states and territories
   FO: { bankCode: [0, 4], accountNumber: [4, 10] },         // Same as DK

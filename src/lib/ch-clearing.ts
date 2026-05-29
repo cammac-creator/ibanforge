@@ -83,8 +83,10 @@ export function detectInstitutionType(
     return 'cantonal_bank';
   }
 
-  // 4. Raiffeisen
-  if (nameLower.startsWith('raiffeisen')) {
+  // 4. Raiffeisen — match the word anywhere, case-insensitive, multilingual.
+  //    Romandy/Ticino branches are named "Banque Raiffeisen …" / "Banca
+  //    Raiffeisen …", so startsWith('raiffeisen') misclassified them as 'bank'.
+  if (/\braiffeisen\b/i.test(name)) {
     return 'raiffeisen';
   }
 

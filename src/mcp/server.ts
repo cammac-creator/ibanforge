@@ -21,7 +21,7 @@ const server = new McpServer({
   title: 'IBANforge',
   version: pkg.version,
   description:
-    'IBAN validation, BIC/SWIFT lookup, Swiss clearing, SEPA compliance and risk indicators. 121,399 BIC entries (38,761 LEI-enriched via GLEIF), 1,190 Swiss BC-Nummer from SIX, 84 countries.',
+    'IBAN validation, BIC/SWIFT lookup, Swiss clearing, SEPA compliance and risk indicators. 121,399 BIC entries (38,761 LEI-enriched via GLEIF), 1,190 Swiss BC-Nummer from SIX, 89 countries.',
   websiteUrl: 'https://ibanforge.com',
   icons: [
     {
@@ -50,7 +50,7 @@ Behavior: this tool is read-only and performs no writes, no network calls to ext
 
 Returns: { valid, country: { code, name }, check_digits, bban: { bank_code, branch_code, account_number }, bic: { code, institution, country_code, city }, sepa: { member, schemes, vop_required }, issuer: { type, name }, risk_indicators: { issuer_type, country_risk, test_bic, sepa_reachable, vop_coverage } }
 
-Supports 84 countries including all SEPA/EEA countries, Switzerland, UK, and 50+ non-SEPA countries.
+Supports 89 countries including all SEPA/EEA countries, Switzerland, UK, and 50+ non-SEPA countries.
 
 Example: input 'DE89370400440532013000' → { valid: true, country: { code: 'DE', name: 'Germany' }, bic: { code: 'COBADEFFXXX', institution: 'Commerzbank' }, issuer: { type: 'bank' }, ... }
 
@@ -218,7 +218,7 @@ server.registerTool(
 When to use: assessing compliance risk of a payment recipient for AML/KYC workflows, verifying an IBAN is not associated with a sanctioned country or bank, checking SEPA Instant and Verification of Payee participation, or producing a structured risk assessment before approving a payment.
 When NOT to use: for simple IBAN format validation without compliance data, use validate_iban (4x cheaper). For BIC-only lookups, use lookup_bic.
 
-Behavior: this tool is read-only with no side effects. It performs IBAN validation and enrichment (same as validate_iban), then queries a local compliance database for sanctions (OFAC/EU/UN lists), FATF grey/black list status, SEPA scheme participation (SCT, SDD, SCT_INST), and VoP participant status. Computes a composite risk score from 0 (lowest risk) to 100 (highest risk) based on 21 weighted risk flags. Response time is under 50ms. Returns a single JSON object. If compliance data is unavailable for a country/BIC, returns a fallback risk_level of 'elevated' with a flag 'compliance_data_unavailable'.
+Behavior: this tool is read-only with no side effects. It performs IBAN validation and enrichment (same as validate_iban), then queries a local compliance database for sanctions (OFAC/EU/UN lists), FATF grey/black list status, SEPA scheme participation (SCT, SDD, SCT_INST), and VoP participant status. Computes a composite risk score from 0 (lowest risk) to 100 (highest risk) based on 11 weighted risk flags. Response time is under 50ms. Returns a single JSON object. Scope: sanctions screening is at the BANK (BIC8) level only — it does NOT screen the beneficiary/account-holder name and is not a substitute for KYC/AML name screening. If compliance data is unavailable for a country/BIC, returns a fallback risk_level of 'elevated' with a flag 'compliance_data_unavailable'.
 
 Risk score weights: sanctioned country (+50), sanctioned bank (+50), FATF black list (+30), FATF grey list (+20), high-risk country (+20), elevated-risk country (+10), payment institution issuer (+15), EMI issuer (+10), no SEPA Instant (+5), no VoP (+5), test BIC (+30).
 
@@ -389,7 +389,7 @@ server.registerResource(
   'ibanforge://countries',
   {
     title: 'Supported Countries',
-    description: 'List of all 84 countries supported by IBANforge with IBAN length, SEPA membership, VoP status, and country risk classification.',
+    description: 'List of all 89 countries supported by IBANforge with IBAN length, SEPA membership, VoP status, and country risk classification.',
     mimeType: 'application/json',
   },
   async () => ({

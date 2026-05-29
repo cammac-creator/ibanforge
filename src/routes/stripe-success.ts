@@ -116,7 +116,7 @@ stripeSuccess.get('/stripe/success', (c) => {
         '<div class="stat"><div class="stat-label">Email</div><div class="stat-value" style="font-size:13px">' + (email || '—') + '</div></div>' +
       '</div>' +
       '<h3 style="font-size:14px;margin-bottom:8px;color:#fafafa">Test it now</h3>' +
-      '<pre>curl -X POST https://api.ibanforge.com/v1/iban/validate \\\n  -H "Authorization: Bearer ' + key + '" \\\n  -H "Content-Type: application/json" \\\n  -d '{"iban":"CH9300762011623852957"}'</pre>' +
+      '<pre>curl -X POST https://api.ibanforge.com/v1/iban/validate \\\n  -H "Authorization: Bearer ' + key + '" \\\n  -H "Content-Type: application/json" \\\n  -d \\'{"iban":"CH9300762011623852957"}\\'</pre>' +
       '<p class="small">Docs: <a href="https://api.ibanforge.com/openapi.json">openapi.json</a> · <a href="/llms.txt">llms.txt</a> · <a href="/">Home</a></p>';
 
     const btn = document.getElementById('copybtn');

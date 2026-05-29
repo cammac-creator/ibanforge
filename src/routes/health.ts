@@ -1,6 +1,10 @@
 import { Hono } from 'hono';
+import { createRequire } from 'node:module';
 import { getEntryCount, getLastUpdated } from '../lib/bic-lookup.js';
 import { getChClearingCount } from '../lib/ch-clearing.js';
+
+const require = createRequire(import.meta.url);
+const pkg = require('../../package.json') as { version: string };
 
 const health = new Hono();
 const startTime = Date.now();
@@ -11,7 +15,7 @@ health.get('/health', (c) => {
 
     return c.json({
       status: 'ok',
-      version: '1.1.0',
+      version: pkg.version,
       uptime_seconds: Math.floor((Date.now() - startTime) / 1000),
       bic_database_entries: bicEntries,
       ch_clearing_entries: getChClearingCount(),

@@ -202,8 +202,10 @@ export function recordRequest(
       .replace(/\/v1\/ch\/clearing\/\d+/, '/v1/ch/clearing/:iid');
     const truncatedUa = userAgent ? userAgent.slice(0, 256) : null;
     insertRequest().run(method, normalizedPath, status, Math.round(responseMs), hour, dow, clientKind, ipHash, truncatedUa);
-  } catch {
-    // Non-critical
+  } catch (err) {
+    // Request tracking is non-critical and must never break the API, but a
+    // silent swallow would hide a broken stats DB. Log without rethrowing.
+    console.error('[stats] recordRequest failed:', err);
   }
 }
 
@@ -229,8 +231,10 @@ export function recordOperation(
     insertOp().run(type, countryCode, success ? 1 : 0, hour, dow, truncatedError);
     upsertDaily().run(type, 1, success ? 1 : 0, revenueUsdc);
     upsertHourly().run(hour, dow, type, 1, success ? 1 : 0);
-  } catch {
-    // Stats are non-critical — never crash the API
+  } catch (err) {
+    // Stats are non-critical — never crash the API, but log so a broken stats
+    // DB is visible instead of silently dropping every operation.
+    console.error('[stats] recordOperation failed:', err);
   }
 }
 
@@ -250,8 +254,9 @@ export function recordBatch(count: number, validCount: number, revenueUsdc: numb
       upsertHourly().run(hour, dow, 'iban_batch', count, validCount);
     });
     tx();
-  } catch {
-    // Non-critical
+  } catch (err) {
+    // Non-critical — log instead of swallowing so a broken stats DB is visible.
+    console.error('[stats] recordBatch failed:', err);
   }
 }
 

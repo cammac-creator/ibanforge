@@ -85,7 +85,7 @@ ibanStructure.get('/v1/iban/structure/:country', (c) => {
   if (!length) {
     return c.json({
       error: 'unsupported_country',
-      message: `'${raw}' is not a recognised IBAN country. We cover 84 countries — see /v1/iban/structure for the full list.`,
+      message: `'${raw}' is not a recognised IBAN country. We cover 89 countries — see /v1/iban/structure for the full list.`,
       countries_endpoint: 'GET /v1/iban/structure (list)',
     }, 404);
   }

@@ -1,4 +1,5 @@
 import { serve } from '@hono/node-server';
+import { createRequire } from 'node:module';
 import { closeAll } from './lib/db.js';
 import { Hono } from 'hono';
 import { compress } from 'hono/compress';
@@ -37,6 +38,9 @@ import { recordRequest, classifyClient, hashIp, extractClientIp } from './lib/st
 // Fail-fast: refuse to start in production without wallet config
 ensureWalletConfigured();
 
+const require = createRequire(import.meta.url);
+const pkg = require('../package.json') as { version: string };
+
 import type { HonoEnv } from './types.js';
 
 const app = new Hono<HonoEnv>();
@@ -69,7 +73,7 @@ app.use('*', logger());
 app.use('*', async (c, next) => {
   await next();
   c.header('X-Powered-By', 'IBANforge');
-  c.header('X-API-Version', '1.1.0');
+  c.header('X-API-Version', pkg.version);
   c.header('X-Content-Type-Options', 'nosniff');
   c.header('X-Frame-Options', 'DENY');
   c.header('Referrer-Policy', 'strict-origin-when-cross-origin');
@@ -159,7 +163,7 @@ app.get('/llms.txt', (c) => {
   return c.text(
     `# IBANforge
 
-> IBAN validation, BIC/SWIFT lookup, Swiss clearing and compliance risk scoring API designed for AI agents and developers. 121,399 BIC entries (38,761 LEI-enriched via GLEIF; additional rows from SWIFT directory, Bundesbank, SIX, NBP, EBA Step2 SCT), 1,190 Swiss BC-Nummer from SIX, 84 countries, 85 EMI/vIBAN issuer classifications.
+> IBAN validation, BIC/SWIFT lookup, Swiss clearing and compliance risk scoring API designed for AI agents and developers. 121,399 BIC entries (38,761 LEI-enriched via GLEIF; additional rows from SWIFT directory, Bundesbank, SIX, NBP, EBA Step2 SCT), 1,190 Swiss BC-Nummer from SIX, 89 countries, 85 EMI/vIBAN issuer classifications.
 
 ## Instructions for LLM agents
 
@@ -279,7 +283,7 @@ Returns: format check + country + BBAN parsed + \`upgrade_to_full_validation\` h
 curl -s 'https://api.ibanforge.com/v1/iban/structure/CH'
 \`\`\`
 
-Returns the IBAN structural template for the country: total IBAN length (21 for CH), BBAN field positions (bank_code, branch_code, account_number with their 0-indexed start + length within the BBAN), SEPA membership + scheme list + VoP obligation flag, and a canonical example IBAN you can copy-paste to test. **Use this when an agent needs to know the IBAN format for a country before crafting a validation call** — saves a Wikipedia roundtrip. List all 84 countries: \`GET /v1/iban/structure\`.
+Returns the IBAN structural template for the country: total IBAN length (21 for CH), BBAN field positions (bank_code, branch_code, account_number with their 0-indexed start + length within the BBAN), SEPA membership + scheme list + VoP obligation flag, and a canonical example IBAN you can copy-paste to test. **Use this when an agent needs to know the IBAN format for a country before crafting a validation call** — saves a Wikipedia roundtrip. List all 89 countries: \`GET /v1/iban/structure\`.
 
 ## URL parameter substitution
 
