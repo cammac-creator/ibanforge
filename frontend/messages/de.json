@@ -60,9 +60,9 @@
     },
     "features": {
       "0": {
-        "badge": "75+ Länder",
+        "badge": "89 Länder",
         "title": "IBAN-Validierung",
-        "description": "Vollständige IBAN-Validierung mit BBAN-Strukturanalyse. Unterstützt 75+ Länder mit MOD-97-Prüfsummenverifizierung und detaillierter Feldaufschlüsselung."
+        "description": "Vollständige IBAN-Validierung mit BBAN-Strukturanalyse. Unterstützt 89 Länder mit MOD-97-Prüfsummenverifizierung und detaillierter Feldaufschlüsselung."
       },
       "1": {
         "badge": "121.000+ BIC-Einträge",

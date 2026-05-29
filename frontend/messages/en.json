@@ -60,9 +60,9 @@
     },
     "features": {
       "0": {
-        "badge": "75+ Countries",
+        "badge": "89 Countries",
         "title": "IBAN Validation",
-        "description": "Full IBAN validation with BBAN structure parsing. Supports 75+ countries with mod97 checksum verification and detailed field breakdown."
+        "description": "Full IBAN validation with BBAN structure parsing. Supports 89 countries with mod97 checksum verification and detailed field breakdown."
       },
       "1": {
         "badge": "121,000+ BIC Entries",
