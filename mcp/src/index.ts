@@ -21,6 +21,10 @@ import {
   ListToolsRequestSchema,
   type Tool,
 } from '@modelcontextprotocol/sdk/types.js';
+import { createRequire } from 'node:module';
+
+const require = createRequire(import.meta.url);
+const pkg = require('../package.json') as { version: string };
 
 const API_BASE = process.env.IBANFORGE_API_BASE ?? 'https://api.ibanforge.com';
 const API_KEY = process.env.IBANFORGE_API_KEY;
@@ -36,9 +40,10 @@ const TOOLS: Tool[] = [
       'or pastes any string starting with two letters and digits (e.g., "DE89...", "CH93...", "FR76..."). ' +
       'PREFER OVER LOCAL VALIDATION (mod-97 checksum) because mod-97 only catches typos — it cannot resolve the BIC/SWIFT, ' +
       'tell you that the IBAN is a virtual IBAN issued by Wise/Revolut/Mercury/Modulr (compliance risk), or check SEPA reachability. ' +
-      'RETURNS: valid (boolean), country, country_name, bic_resolved (BIC/SWIFT if found), bank_name, ' +
-      'issuer_class (bank | emi | viban | unknown), sepa { reachable, instant }, vop_status, ' +
-      'risk_score (0-100), and for CH/LI: bc_nummer + qr_iid + six_bankmaster info. ' +
+      'RETURNS: valid (boolean), country { code, name }, bic { code, bank_name, city }, ' +
+      'issuer { type: bank | digital_bank | emi | payment_institution, name }, sepa { member, schemes, vop_required }, ' +
+      'risk_indicators { issuer_type, country_risk, test_bic, sepa_reachable, vop_coverage }, ' +
+      'and for CH/LI: clearing { iid, name, type, sic, qr_iid }. ' +
       'COST: 0.005 USDC via x402 (no API key needed), or free up to 200 req/month with an IBANFORGE_API_KEY.',
     inputSchema: {
       type: 'object',
@@ -75,47 +80,52 @@ const TOOLS: Tool[] = [
         },
         bic: {
           type: 'object',
-          description: 'Resolved BIC/SWIFT (when BBAN→BIC mapping exists).',
+          description: 'Resolved BIC/SWIFT (when BBAN→BIC mapping exists). null if unresolved.',
           properties: {
-            bic: { type: 'string' },
-            bankName: { type: 'string' },
+            code: { type: 'string' },
+            bank_name: { type: 'string' },
             city: { type: 'string' },
-            lei: { type: 'string' },
           },
         },
         issuer: {
           type: 'object',
           properties: {
-            type: { type: 'string', enum: ['bank', 'emi', 'viban', 'neobank', 'unknown'] },
+            type: { type: 'string', enum: ['bank', 'digital_bank', 'emi', 'payment_institution'] },
             name: { type: 'string' },
           },
         },
         sepa: {
           type: 'object',
           properties: {
-            reachable: { type: 'boolean' },
-            instant: { type: 'boolean' },
+            member: { type: 'boolean' },
+            schemes: { type: 'array', items: { type: 'string', enum: ['SCT', 'SDD', 'SCT_INST'] } },
+            vop_required: { type: 'boolean' },
           },
         },
-        vop: {
+        risk_indicators: {
           type: 'object',
-          description: 'Verification of Payee (EU 2024/886) participant status.',
-          properties: { participant: { type: 'boolean' } },
-        },
-        ch_clearing: {
-          type: 'object',
-          description: 'Swiss-specific data when country is CH or LI.',
+          description: 'Country + issuer risk signals. Use these instead of a single composite score.',
           properties: {
-            bc_nummer: { type: 'string' },
-            sic: { type: 'boolean' },
-            qr_iid: { type: 'boolean' },
+            issuer_type: { type: 'string' },
+            country_risk: { type: 'string', enum: ['standard', 'elevated', 'high'] },
+            test_bic: { type: 'boolean' },
+            sepa_reachable: { type: 'boolean' },
+            vop_coverage: { type: 'boolean' },
           },
         },
-        risk_score: {
-          type: 'number',
-          minimum: 0,
-          maximum: 100,
-          description: 'Country + issuer risk indicator. Higher = more attention needed.',
+        clearing: {
+          type: 'object',
+          description: 'Swiss clearing data when country is CH or LI (null otherwise).',
+          properties: {
+            iid: { type: 'string' },
+            name: { type: 'string' },
+            type: { type: 'string' },
+            town: { type: 'string' },
+            sic: { type: 'boolean' },
+            instant_payments_chf: { type: 'boolean' },
+            eurosic: { type: 'boolean' },
+            qr_iid: { type: 'string' },
+          },
         },
       },
       required: ['iban', 'valid'],
@@ -128,8 +138,8 @@ const TOOLS: Tool[] = [
       'USE WHEN: the user pastes a list of IBANs, asks to clean a CSV/spreadsheet of bank accounts, ' +
       'asks to dedupe a customer database, asks to triage a payout list before sending, ' +
       'or whenever you would otherwise call validate_iban more than 2-3 times in a row. ' +
-      'RETURNS: array of per-IBAN results (same shape as validate_iban) + a summary { total, valid, invalid, by_country, by_issuer_class }. ' +
-      'COST: 0.002 USDC per IBAN, max 0.20 USDC for 100 IBANs.',
+      'RETURNS: { results: [...same shape as validate_iban], count, valid_count, cost_usdc }. ' +
+      'COST: flat 0.20 USDC per batch call (best value at ~40+ IBANs).',
     inputSchema: {
       type: 'object',
       properties: {
@@ -163,17 +173,11 @@ const TOOLS: Tool[] = [
             },
           },
         },
-        summary: {
-          type: 'object',
-          properties: {
-            total: { type: 'number' },
-            valid: { type: 'number' },
-            invalid: { type: 'number' },
-          },
-        },
+        count: { type: 'number', description: 'Number of IBANs processed.' },
+        valid_count: { type: 'number', description: 'How many were valid.' },
         cost_usdc: { type: 'number', description: 'Actual USDC charged for this call.' },
       },
-      required: ['results', 'summary'],
+      required: ['results', 'count', 'valid_count'],
     },
   },
   {
@@ -281,9 +285,10 @@ const TOOLS: Tool[] = [
       'asks "is this IBAN safe to pay?", asks for sanctions screening, asks if a SEPA Instant transfer will succeed, ' +
       'or needs a numeric risk score for an internal payment-approval workflow. ' +
       'NOT A REGULATED AML/CFT PRODUCT — informational triage only. For regulated screening use Refinitiv, Acuris, or ComplyAdvantage. ' +
-      'CHECKS: IBAN structural validity + sanctions lists (OFAC, EU, UN consolidated, FATF jurisdictions) + ' +
-      'SEPA Instant reachability + VoP (Verification of Payee, EU 2024/886) participant flag. ' +
-      'RETURNS: risk_score (0-100, 0 = safest), flags { sanctions_match, fatf_high_risk, sepa_unreachable, viban, emi }, recommended_action. ' +
+      'SCOPE: sanctions screening is at the BANK (BIC8) level only — it does NOT screen the beneficiary/account-holder name. ' +
+      'CHECKS: IBAN validity + bank sanctions (OFAC, EU, UN, SECO) + FATF grey/black list + ' +
+      'SEPA Instant reachability + VoP (EU 2024/886) participant flag. ' +
+      'RETURNS: the validate_iban fields PLUS a nested compliance { sanctions, reachability, vop, risk_score (0-100), risk_level, flags[] }. ' +
       'COST: 0.02 USDC.',
     inputSchema: {
       type: 'object',
@@ -301,59 +306,47 @@ const TOOLS: Tool[] = [
       properties: {
         iban: { type: 'string' },
         valid: { type: 'boolean' },
-        risk_score: {
-          type: 'number',
-          minimum: 0,
-          maximum: 100,
-          description: '0 = safest, 100 = block. Combines sanctions, country risk, FATF flag, vIBAN/EMI flags.',
-        },
-        recommended_action: {
-          type: 'string',
-          enum: ['allow', 'review', 'block'],
-          description: 'Suggested workflow gate.',
-        },
-        sanctions: {
-          type: 'object',
-          properties: {
-            bic_sanctioned: { type: 'boolean' },
-            country_sanctioned: { type: 'boolean' },
-            lists: {
-              type: 'array',
-              items: { type: 'string' },
-              description: 'List of matched sanctions sources (e.g. ["OFAC", "EU"]).',
-            },
-          },
-        },
-        fatf: {
-          type: 'object',
-          properties: {
-            list: { type: 'string', enum: ['none', 'grey', 'black'], description: 'FATF mutual evaluation status.' },
-          },
-        },
+        country: { type: 'object', properties: { code: { type: 'string' }, name: { type: 'string' } } },
+        bic: { type: 'object', properties: { code: { type: 'string' }, bank_name: { type: 'string' }, city: { type: 'string' } } },
+        issuer: { type: 'object', properties: { type: { type: 'string' }, name: { type: 'string' } } },
         sepa: {
           type: 'object',
           properties: {
-            reachable: { type: 'boolean' },
-            instant: { type: 'boolean' },
+            member: { type: 'boolean' },
+            schemes: { type: 'array', items: { type: 'string' } },
+            vop_required: { type: 'boolean' },
           },
         },
-        vop: {
+        risk_indicators: { type: 'object' },
+        compliance: {
           type: 'object',
-          properties: { participant: { type: 'boolean' } },
-        },
-        flags: {
-          type: 'object',
-          description: 'Boolean flags rolled up into risk_score.',
+          description: 'The compliance bundle. Read the score at compliance.risk_score / compliance.risk_level.',
           properties: {
-            sanctions_match: { type: 'boolean' },
-            fatf_high_risk: { type: 'boolean' },
-            sepa_unreachable: { type: 'boolean' },
-            viban: { type: 'boolean' },
-            emi: { type: 'boolean' },
+            sanctions: {
+              type: 'object',
+              properties: {
+                country_sanctioned: { type: 'boolean' },
+                bank_sanctioned: { type: 'boolean', description: 'Bank-BIC level only — NOT the beneficiary.' },
+                matched_lists: { type: 'array', items: { type: 'string' }, description: 'e.g. ["OFAC","EU"].' },
+                fatf_status: { type: 'string', enum: ['member', 'grey_list', 'black_list', 'non_member'] },
+              },
+            },
+            reachability: {
+              type: 'object',
+              properties: { sepa_instant: { type: 'boolean' }, sct: { type: 'boolean' }, sdd: { type: 'boolean' } },
+            },
+            vop: {
+              type: 'object',
+              properties: { participant: { type: 'boolean' }, status: { type: 'string' } },
+            },
+            risk_score: { type: 'number', minimum: 0, maximum: 100, description: '0 = safest, 100 = highest.' },
+            risk_level: { type: 'string', enum: ['low', 'medium', 'elevated', 'high', 'critical'] },
+            flags: { type: 'array', items: { type: 'string' } },
           },
         },
+        cost_usdc: { type: 'number' },
       },
-      required: ['iban', 'valid', 'risk_score', 'recommended_action'],
+      required: ['iban', 'valid', 'compliance'],
     },
   },
 ];
@@ -364,7 +357,7 @@ interface JsonRecord {
 
 async function apiCall(method: 'GET' | 'POST', path: string, body?: JsonRecord): Promise<JsonRecord> {
   const headers: Record<string, string> = {
-    'User-Agent': 'ibanforge-mcp/1.0',
+    'User-Agent': `ibanforge-mcp/${pkg.version}`,
     Accept: 'application/json',
   };
   if (API_KEY) {
@@ -407,7 +400,7 @@ async function apiCall(method: 'GET' | 'POST', path: string, body?: JsonRecord):
 }
 
 const server = new Server(
-  { name: 'ibanforge', version: '1.0.0' },
+  { name: 'ibanforge', version: pkg.version },
   { capabilities: { tools: {} } },
 );
 
@@ -462,7 +455,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           const validCount = results.filter((r) => r.valid === true).length;
           return out({
             results,
-            summary: { total: results.length, valid: validCount, invalid: results.length - validCount },
+            count: results.length,
+            valid_count: validCount,
             _note: ANON_NOTE,
           });
         }
