@@ -188,13 +188,24 @@ export interface Compliance {
   flags: string[];
 }
 
+export interface ComplianceMeta {
+  /** Always 'bank_bic_only' — screening is at the bank BIC, never the beneficiary. */
+  scope: 'bank_bic_only';
+  disclaimer: string;
+  sanctions_as_of: string | null;
+  fatf_as_of: string | null;
+  sources: string | null;
+}
+
 /**
  * POST /v1/iban/compliance — the validate result PLUS a nested `compliance`
  * block. There is no top-level `risk_score`; read it at `result.compliance.risk_score`.
- * Scope: sanctions screening is BANK-level (BIC8) only, not beneficiary-name.
+ * Scope: sanctions screening is BANK-level (BIC8) only, not beneficiary-name —
+ * see `meta.scope` / `meta.disclaimer`.
  */
 export interface ComplianceResult extends IBANValidationResult {
   compliance: Compliance;
+  meta?: ComplianceMeta;
 }
 
 export interface APIKey {

@@ -344,6 +344,17 @@ const TOOLS: Tool[] = [
             flags: { type: 'array', items: { type: 'string' } },
           },
         },
+        meta: {
+          type: 'object',
+          description: 'Scope + freshness disclosure. Read this before trusting the result.',
+          properties: {
+            scope: { type: 'string', enum: ['bank_bic_only'], description: 'Sanctions are screened at the bank BIC, NOT the beneficiary name.' },
+            disclaimer: { type: 'string' },
+            sanctions_as_of: { type: 'string', description: 'ISO timestamp of the last data refresh.' },
+            fatf_as_of: { type: 'string', description: 'YYYY-MM of the FATF plenary reflected.' },
+            sources: { type: 'string' },
+          },
+        },
         cost_usdc: { type: 'number' },
       },
       required: ['iban', 'valid', 'compliance'],
