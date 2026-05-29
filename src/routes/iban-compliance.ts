@@ -3,6 +3,7 @@ import type { HonoEnv } from '../types.js';
 import { validateIBAN } from '../lib/iban.js';
 import { enrichResult } from '../lib/enrich.js';
 import { buildComplianceResult } from '../lib/compliance.js';
+import { getComplianceMeta } from '../lib/compliance-db.js';
 import { recordOperation } from '../lib/stats.js';
 import { getIban, computeRevenue } from '../lib/request-helpers.js';
 import type { IBANValidationResult, ComplianceResult } from '../types.js';
@@ -52,7 +53,9 @@ ibanCompliance.post('/v1/iban/compliance', async (c) => {
 
   const costUsdc = c.get('apiKeyAuthenticated') ? 0 : 0.02;
 
-  return c.json({ ...result, compliance, cost_usdc: costUsdc, processing_ms: processingMs });
+  // Always surface the scope + disclaimer + data freshness so an agent never
+  // mistakes a bank-BIC sanctions check for full beneficiary screening.
+  return c.json({ ...result, compliance, meta: getComplianceMeta(), cost_usdc: costUsdc, processing_ms: processingMs });
 });
 
 export { ibanCompliance };

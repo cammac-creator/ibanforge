@@ -184,6 +184,16 @@ class Compliance(TypedDict, total=False):
     flags: List[str]
 
 
+class ComplianceMeta(TypedDict, total=False):
+    """Scope + freshness disclosure attached to every compliance response."""
+
+    scope: str  # always 'bank_bic_only' — screening is at the bank BIC, not the beneficiary
+    disclaimer: str
+    sanctions_as_of: Optional[str]
+    fatf_as_of: Optional[str]
+    sources: Optional[str]
+
+
 class ComplianceResult(TypedDict, total=False):
     """POST /v1/iban/compliance — the validate result PLUS a nested `compliance`
     block. There is no top-level `risk_score` or `recommended_action`; read the
@@ -203,6 +213,7 @@ class ComplianceResult(TypedDict, total=False):
     risk_indicators: RiskIndicators
     clearing: Optional[Clearing]
     compliance: Compliance
+    meta: ComplianceMeta
     cost_usdc: float
     processing_ms: int
     error: str

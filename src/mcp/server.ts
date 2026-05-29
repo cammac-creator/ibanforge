@@ -10,6 +10,7 @@ import { enrichResult } from '../lib/enrich.js';
 import { lookup } from '../lib/bic-lookup.js';
 import { validateBIC } from '../lib/bic-validator.js';
 import { buildComplianceResult } from '../lib/compliance.js';
+import { getComplianceMeta } from '../lib/compliance-db.js';
 import { lookupClearingByBankCode, normalizeIid, getChClearingCount } from '../lib/ch-clearing.js';
 import { buildCountriesPayload, buildPricingPayload, buildValidateAndExplainPrompt } from '../lib/mcp-resources.js';
 
@@ -271,7 +272,7 @@ Cost: $0.02 USDC per call via x402 micropayment on Base L2.`,
       };
     }
 
-    const combined = { ...result, compliance, cost_usdc: 0.02 };
+    const combined = { ...result, compliance, meta: getComplianceMeta(), cost_usdc: 0.02 };
     return {
       content: [{ type: 'text' as const, text: JSON.stringify(combined, null, 2) }],
     };
