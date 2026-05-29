@@ -1,53 +1,93 @@
-# IBANforge TypeScript SDK
+# @ibanforge/sdk
 
-Official TypeScript SDK for the [IBANforge API](https://ibanforge.com) — IBAN validation & BIC/SWIFT lookup with zero dependencies.
+Official TypeScript/JavaScript SDK for the [IBANforge API](https://ibanforge.com) — IBAN validation, BIC/SWIFT lookup, Swiss BC-Nummer clearing, SEPA + VoP reachability and compliance risk scoring. Zero runtime dependencies (uses native `fetch`).
 
 ## Install
 
 ```bash
-npm install ibanforge
+npm install @ibanforge/sdk
 ```
 
-## Usage
+## Quick start
 
 ```typescript
-import IBANforge from 'ibanforge';
+import { IBANforge } from '@ibanforge/sdk';
 
-const client = new IBANforge();
+// Free format check — no API key needed
+const fmt = await new IBANforge().formatIban('CH9300762011623852957');
+console.log(fmt.valid); // true
 
-// Validate a single IBAN
-const result = await client.validateIBAN('CH9300762011623852957');
-console.log(result.valid);       // true
-console.log(result.formatted);   // 'CH93 0076 2011 6238 5295 7'
-console.log(result.bic?.code);   // 'UBSWCHZH80A'
+// Authenticated calls (required for paid endpoints, unless you pay per-call via x402)
+const client = new IBANforge({ apiKey: 'ifk_...' });
 
-// Validate a batch of IBANs
-const batch = await client.validateBatch([
-  'CH9300762011623852957',
-  'DE89370400440532013000',
-  'FR7630006000011234567890189',
-]);
-console.log(batch.count);        // 3
-console.log(batch.valid_count);  // 3
-console.log(batch.cost_usdc);    // total cost in USDC
-
-// Lookup a BIC/SWIFT code
-const bic = await client.lookupBIC('UBSWCHZH80A');
-console.log(bic.found);          // true
-console.log(bic.institution);    // 'UBS AG'
-console.log(bic.city);           // 'ZURICH'
-console.log(bic.lei);            // LEI identifier if available
-
-// Health check
-const health = await client.health();
-console.log(health.status);      // 'ok'
-console.log(health.version);     // API version
+const r = await client.validateIban('CH9300762011623852957');
+console.log(r.valid);            // true
+console.log(r.bic?.code);        // 'UBSWCHZH'
+console.log(r.bic?.bank_name);   // 'UBS Switzerland AG'
+console.log(r.sepa?.member);     // true
+console.log(r.clearing?.iid);    // '00762' (Swiss BC-Nummer, CH/LI only)
 ```
 
-## Custom base URL
+## Get a free key in one line
 
 ```typescript
-const client = new IBANforge({ baseUrl: 'https://api.ibanforge.com' });
+const key = await IBANforge.generateApiKey('you@example.com'); // 200 req/month
+const client = new IBANforge({ apiKey: key.api_key });
+```
+
+## All methods
+
+```typescript
+await client.formatIban(iban);          // FREE — mod-97 + structure only
+await client.validateIban(iban);        // full enrichment
+await client.validateBatch([...ibans]); // up to 100, $0.002/IBAN
+await client.lookupBic('UBSWCHZH80A');  // BIC → bank, country, LEI
+await client.lookupChClearing('762');   // Swiss BC-Nummer / IID (only API with this)
+await client.checkCompliance(iban);     // sanctions + FATF + SEPA + VoP + risk score
+await client.usage();                   // current month quota for your key
+await client.health();
+```
+
+### Compliance result shape
+
+```typescript
+const c = await client.checkCompliance('GB29NWBK60161331926819');
+console.log(c.compliance.risk_score);  // 0–100
+console.log(c.compliance.risk_level);  // 'low' | 'medium' | 'elevated' | 'high' | 'critical'
+console.log(c.compliance.sanctions.matched_lists); // e.g. ['OFAC']
+```
+
+> Sanctions screening is at the **bank (BIC8)** level — it does not screen the beneficiary name and is not a regulated AML/CFT product.
+
+## Typed errors
+
+Every failure throws a typed subclass of `IBANforgeError`, so an agent can branch on it:
+
+```typescript
+import { IBANforge, PaymentRequiredError, AuthError, RateLimitError } from '@ibanforge/sdk';
+
+try {
+  await new IBANforge().validateIban('CH9300762011623852957'); // no key → 402
+} catch (err) {
+  if (err instanceof PaymentRequiredError) {
+    // err.accepts carries the x402 challenge — pay and retry, no dead-end
+    console.log(err.accepts);
+  } else if (err instanceof AuthError) {
+    // bad/expired key
+  } else if (err instanceof RateLimitError) {
+    // back off
+  }
+}
+```
+
+## Config
+
+```typescript
+new IBANforge({
+  apiKey: 'ifk_...',                  // optional
+  baseUrl: 'https://api.ibanforge.com', // optional override
+  timeoutMs: 30_000,                   // optional, default 30s
+});
 ```
 
 ## Full documentation
