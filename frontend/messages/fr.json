@@ -60,9 +60,9 @@
     },
     "features": {
       "0": {
-        "badge": "75+ pays",
+        "badge": "89 pays",
         "title": "Validation IBAN",
-        "description": "Validation complète des IBAN avec analyse de la structure BBAN. Prise en charge de 75+ pays avec vérification du checksum MOD-97 et décomposition détaillée des champs."
+        "description": "Validation complète des IBAN avec analyse de la structure BBAN. Prise en charge de 89 pays avec vérification du checksum MOD-97 et décomposition détaillée des champs."
       },
       "1": {
         "badge": "121 000+ entrées BIC",
