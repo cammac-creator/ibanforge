@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Point d'étape — IBANforge</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0b0c0e;
+    --bg-card:#15171c;
+    --border:#262a33;
+    --border-soft:#1d212a;
+    --text:#e7e9ed;
+    --dim:#878d9b;
+    --faint:#5a606e;
+    --accent:#5b9dff;
+    --accent-2:#7c79ff;
+    --green:#46d07f;
+    --amber:#e8a93f;
+    --red:#e5564b;
+    --mono:'IBM Plex Mono',ui-monospace,Menlo,monospace;
+    --sans:'IBM Plex Sans',-apple-system,sans-serif;
+    --display:'Fraunces',Georgia,serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:var(--sans);
+    line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+    padding:0 24px 120px;
+    background-image:
+      radial-gradient(900px 440px at 50% -130px,rgba(91,157,255,.11),transparent 70%),
+      linear-gradient(rgba(255,255,255,.020) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(255,255,255,.020) 1px,transparent 1px);
+    background-size:auto, 46px 46px, 46px 46px;
+  }
+  .wrap{max-width:880px;margin:0 auto}
+
+  /* ---- reveal ---- */
+  .reveal{opacity:0;transform:translateY(14px);animation:rise .8s cubic-bezier(.2,.75,.2,1) forwards;animation-delay:calc(var(--d,0)*80ms)}
+  @keyframes rise{to{opacity:1;transform:none}}
+
+  /* ---- header ---- */
+  header{padding:74px 0 36px}
+  .eyebrow{
+    font-family:var(--mono);font-size:11px;font-weight:500;
+    letter-spacing:.22em;text-transform:uppercase;color:var(--accent);
+    display:flex;align-items:center;gap:11px;margin-bottom:24px;
+  }
+  .mark{
+    width:16px;height:16px;flex:none;border-radius:4px;
+    background:linear-gradient(140deg,var(--accent),var(--accent-2));
+    position:relative;box-shadow:0 0 14px rgba(91,157,255,.45);
+  }
+  .mark::after{content:"";position:absolute;width:5.5px;height:5.5px;border-radius:1.5px;background:#0b0c0e;top:5.25px;left:5.25px}
+  h1{
+    font-family:var(--display);font-weight:600;font-size:clamp(40px,7vw,66px);
+    line-height:1.03;letter-spacing:-.02em;margin-bottom:20px;
+  }
+  h1 em{font-style:italic;color:var(--dim);font-weight:500}
+  .meta{font-family:var(--mono);font-size:12.5px;color:var(--dim);display:flex;flex-wrap:wrap;gap:8px 16px}
+  .meta b{color:var(--text);font-weight:500}
+  .chip{
+    display:inline-flex;align-items:center;gap:9px;margin-top:25px;
+    background:rgba(70,208,127,.07);border:1px solid rgba(70,208,127,.32);
+    color:var(--green);font-family:var(--mono);font-size:12px;font-weight:500;
+    padding:9px 15px;border-radius:999px;
+  }
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--green);position:relative;flex:none}
+  .dot::after{content:"";position:absolute;inset:-5px;border-radius:50%;border:1px solid var(--green);opacity:.55;animation:ping 2.4s ease-out infinite}
+  @keyframes ping{0%{transform:scale(.6);opacity:.6}80%,100%{transform:scale(1.7);opacity:0}}
+
+  /* ---- section label ---- */
+  .sec-label{
+    font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.2em;
+    text-transform:uppercase;color:var(--faint);
+    margin:58px 0 22px;display:flex;align-items:center;gap:14px;
+  }
+  .sec-label::after{content:"";flex:1;height:1px;background:var(--border-soft)}
+
+  /* ---- win (hero done card) ---- */
+  .win{
+    background:linear-gradient(180deg,#161d18,#121613);
+    border:1px solid var(--border);border-left:3px solid var(--green);
+    border-radius:16px;padding:28px 30px;
+    box-shadow:0 30px 60px -34px rgba(0,0,0,.85);
+  }
+  .win .tag{
+    display:inline-flex;align-items:center;gap:7px;
+    font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.08em;
+    text-transform:uppercase;color:#06140c;background:var(--green);
+    padding:5px 11px;border-radius:999px;margin-bottom:15px;
+  }
+  .win h3{font-family:var(--display);font-weight:600;font-size:25px;letter-spacing:-.01em;margin-bottom:11px}
+  .win > p{font-size:15px;color:#d2d6df}
+  .win > p b{color:var(--text);font-weight:600}
+  .win code,.donecard code,.step code,.pitem code,footer code{
+    font-family:var(--mono);font-size:12px;background:#0c0e12;
+    border:1px solid var(--border-soft);border-radius:5px;padding:1px 6px;color:#bcc2cd;
+  }
+  .ministat{
+    display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:20px;
+    padding-top:20px;border-top:1px solid var(--border-soft);
+  }
+  .ministat div{text-align:left}
+  .ministat .n{
+    font-family:var(--mono);font-weight:600;font-size:21px;color:var(--green);line-height:1;
+  }
+  .ministat .l{font-size:12px;color:var(--dim);margin-top:6px;line-height:1.35}
+
+  /* ---- done row ---- */
+  .donerow{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-top:13px}
+  .donecard{
+    background:var(--bg-card);border:1px solid var(--border-soft);
+    border-radius:13px;padding:19px 21px;
+  }
+  .donecard h4{
+    font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:.07em;
+    text-transform:uppercase;color:var(--dim);margin-bottom:9px;
+    display:flex;align-items:center;gap:8px;
+  }
+  .donecard h4::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--green);flex:none}
+  .donecard p{font-size:13.5px;color:#cdd2db}
+
+  /* ---- next steps ---- */
+  .step{
+    background:var(--bg-card);border:1px solid var(--border-soft);
+    border-radius:14px;padding:22px 24px;margin-bottom:13px;
+    display:flex;gap:18px;align-items:flex-start;
+  }
+  .step.key{border-color:rgba(232,169,63,.4);background:linear-gradient(180deg,rgba(232,169,63,.055),var(--bg-card))}
+  .stepnum{
+    font-family:var(--display);font-weight:600;font-size:30px;line-height:1;
+    color:var(--faint);flex:none;width:34px;padding-top:2px;
+  }
+  .step.key .stepnum{color:var(--amber)}
+  .step .body{flex:1;min-width:0}
+  .step .top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+  .owner{
+    font-family:var(--mono);font-size:10.5px;font-weight:600;letter-spacing:.07em;
+    text-transform:uppercase;padding:3px 9px;border-radius:999px;flex:none;
+  }
+  .owner.you{background:rgba(232,169,63,.13);border:1px solid rgba(232,169,63,.4);color:#e6bd72}
+  .owner.dev{background:rgba(91,157,255,.12);border:1px solid rgba(91,157,255,.34);color:var(--accent)}
+  .step h3{font-family:var(--display);font-weight:600;font-size:19px;letter-spacing:-.01em}
+  .step .body > p{font-size:14px;color:#cdd2db;margin-top:2px}
+  .stepmeta{
+    font-family:var(--mono);font-size:11.5px;color:var(--faint);
+    margin-top:11px;display:flex;flex-wrap:wrap;gap:6px 14px;
+  }
+  .stepmeta b{color:var(--amber);font-weight:500}
+
+  /* ---- P2-P7 list ---- */
+  .plist{margin-top:14px;border-top:1px solid var(--border-soft)}
+  .pitem{
+    display:flex;gap:14px;align-items:baseline;
+    padding:11px 0;border-bottom:1px solid var(--border-soft);
+  }
+  .pitem:last-child{border-bottom:none}
+  .pitem .pk{font-family:var(--mono);font-size:12.5px;font-weight:600;color:var(--accent);flex:none;width:26px}
+  .pitem .pt{font-size:13.5px;color:#cdd2db;flex:1;min-width:0}
+  .pitem .pt b{color:var(--text);font-weight:600}
+  .pitem .imp{
+    font-family:var(--mono);font-size:10.5px;font-weight:500;flex:none;
+    padding:2px 8px;border-radius:999px;
+  }
+  .imp.win-tag{background:rgba(70,208,127,.1);border:1px solid rgba(70,208,127,.3);color:#7bdca4}
+  .imp.mid{background:rgba(232,169,63,.09);border:1px solid rgba(232,169,63,.28);color:#e6bd72}
+  .imp.lo{background:#0c0e12;border:1px solid var(--border-soft);color:var(--faint)}
+
+  /* ---- footer ---- */
+  footer{
+    margin-top:60px;padding-top:24px;border-top:1px solid var(--border-soft);
+    font-family:var(--mono);font-size:12px;color:var(--faint);line-height:1.85;
+  }
+  footer code{color:var(--dim)}
+
+  @media(max-width:680px){
+    .ministat{grid-template-columns:repeat(2,1fr)}
+    .donerow{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow reveal" style="--d:0"><span class="mark"></span>État du projet · IBANforge</div>
+    <h1 class="reveal" style="--d:1">Point<br>d'<em>étape.</em></h1>
+    <div class="meta reveal" style="--d:2">
+      <span>Projet&nbsp;<b>IBANforge</b></span>
+      <span>Date&nbsp;<b>21 mai 2026</b></span>
+      <span>Jalon&nbsp;<b>P1 livré</b></span>
+    </div>
+    <div class="chip reveal" style="--d:3"><span class="dot"></span>P1 — rampe d'accès 402 — livrée et vérifiée en production</div>
+  </header>
+
+  <!-- ===== 01 — FAIT ===== -->
+  <div class="sec-label reveal" style="--d:4">01 — Ce qui a été fait</div>
+
+  <div class="win reveal" style="--d:4">
+    <span class="tag">✓ Livré · vérifié en prod</span>
+    <h3>P1 — La rampe d'accès 402</h3>
+    <p>Le mur de paiement <code>402</code> — tapé par <b>13&nbsp;100+ requêtes</b> sans aucune conversion — est devenu une rampe. La réponse expose maintenant <b>les trois façons d'utiliser l'API</b> au lieu du seul rail crypto : <b>clé gratuite</b>, <b>packs de crédits</b> (carte ou USDC) et <b>x402</b> au paiement à l'appel. En chemin, on a découvert que le 402 proposait déjà la clé gratuite — P1 a donc été recadré sur le seul vrai manque, le bloc <code>credit_packs</code>.</p>
+    <div class="ministat">
+      <div><div class="n">4</div><div class="l">commits livrés sur main</div></div>
+      <div><div class="n">325</div><div class="l">tests verts · check complet</div></div>
+      <div><div class="n">3</div><div class="l">voies d'accès dans le 402</div></div>
+      <div><div class="n">✓</div><div class="l">live, confirmé en prod</div></div>
+    </div>
+  </div>
+
+  <div class="donerow reveal" style="--d:5">
+    <div class="donecard">
+      <h4>En amont — l'analyse de trafic</h4>
+      <p>Le pic de trafic ×12 diagnostiqué : des bots crawlers d'annuaires, pas des clients. Rapport livré avec 7 priorités classées (P1 → P7). C'est le point de départ de P1.</p>
+    </div>
+    <div class="donecard">
+      <h4>Correctifs au passage</h4>
+      <p>Le rapport d'analyse corrigé (il décrivait mal l'enveloppe 402). Une erreur de lint préexistante dans <code>stripe-success.ts</code> réparée — <code>npm run check</code> repassé 100&nbsp;% vert.</p>
+    </div>
+  </div>
+
+  <!-- ===== 02 — PROCHAINES ÉTAPES ===== -->
+  <div class="sec-label reveal" style="--d:6">02 — Prochaines étapes</div>
+
+  <div class="step key reveal" style="--d:6">
+    <div class="stepnum">1</div>
+    <div class="body">
+      <div class="top"><span class="owner you">Toi</span><h3>Activer le paiement par carte</h3></div>
+      <p>Dernier morceau pour que le rail carte de P1 soit pleinement fonctionnel. Créer 3 <b style="color:#e6bd72">Stripe Payment Links</b> (1k&nbsp;=&nbsp;$5, 5k&nbsp;=&nbsp;$20, 25k&nbsp;=&nbsp;$80) dans ton dashboard Stripe, puis coller les URLs dans <code>landing.ts</code> à la place des placeholders <code>STRIPE_PAYMENT_LINK_*</code>. Le 402 et la page <code>#pricing</code> pointent déjà au bon endroit.</p>
+      <div class="stepmeta"><span>Effort&nbsp;<b>≈ 10 min</b></span><span class="sep">·</span><span>Débloque le rail carte</span><span class="sep">·</span><span>Clé gratuite + USDC déjà fonctionnels</span></div>
+    </div>
+  </div>
+
+  <div class="step key reveal" style="--d:7">
+    <div class="stepnum">2</div>
+    <div class="body">
+      <div class="top"><span class="owner you">Toi</span><h3>Trancher les 2 questions de l'analyse</h3></div>
+      <p><b>(1)</b> Le <code>ibanforge-mcp/1.0</code> qui a essayé ton paquet npm les 19-20 mai — toi en test, ou un vrai prospect&nbsp;? <b>(2)</b> Une capture du dashboard où tu vois « l'activité étrangère », pour croiser la géo avec les User-Agents identifiés.</p>
+      <div class="stepmeta"><span>Tu analyses déjà la page dashboard</span></div>
+    </div>
+  </div>
+
+  <div class="step reveal" style="--d:8">
+    <div class="stepnum">3</div>
+    <div class="body">
+      <div class="top"><span class="owner dev">Dév</span><h3>Enchaîner P2 → P7 du rapport de trafic</h3></div>
+      <p>Les 6 priorités restantes de l'analyse. La plus rentable d'abord : <b>P3</b>, un quick win à fort ratio.</p>
+      <div class="plist">
+        <div class="pitem"><span class="pk">P3</span><span class="pt"><b>Fichiers <code>.well-known</code> manquants</b> — ~420 requêtes 404 sur des conventions de découverte ; routes alias = découvrabilité gratuite.</span><span class="imp win-tag">quick win</span></div>
+        <div class="pitem"><span class="pk">P2</span><span class="pt"><b>308 connexions MCP perdues en 406</b> — comportement conforme au spec ; option d'un shim pédagogique.</span><span class="imp mid">moyen</span></div>
+        <div class="pitem"><span class="pk">P4</span><span class="pt"><b>Erreur 400 pédagogique</b> sur <code>/v1/bic/:code</code> — agents qui n'ont pas substitué le placeholder <code>{code}</code>.</span><span class="imp mid">moyen</span></div>
+        <div class="pitem"><span class="pk">P5</span><span class="pt"><b>Séparer signal et bruit</b> dans le dashboard — élargir <code>BOT_PATTERNS</code> pour démasquer le vrai funnel.</span><span class="imp mid">moyen</span></div>
+        <div class="pitem"><span class="pk">P6</span><span class="pt"><b>Fiabiliser la mesure</b> — logging IP/UA à 14&nbsp;% seulement, RPC Base dédié, « phantom drift » de 0,23&nbsp;$.</span><span class="imp mid">structurant</span></div>
+        <div class="pitem"><span class="pk">P7</span><span class="pt"><b>405 au lieu de 404</b> sur les méthodes fuzzées ; <code>/sitemap.xml</code> côté front.</span><span class="imp lo">mineur</span></div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    Point d'étape local — <code>~/ibanforge/POINT-SITUATION.html</code> · mis à jour le 21 mai 2026, après livraison de P1.<br>
+    Traçabilité — spec <code>docs/superpowers/specs/2026-05-21-rampe-402-design.md</code> · plan <code>docs/superpowers/plans/2026-05-21-rampe-402.md</code> · rapport <code>docs/business/analyse-trafic-2026-05-21.md</code>.<br>
+    Commits P1 : <code>818e28e</code> · <code>2ce32c2</code> · <code>9c4d460</code> · <code>e903146</code> — poussés sur <code>main</code>, déployés sur Railway.
+  </footer>
+
+</div>
+</body>
+</html>
