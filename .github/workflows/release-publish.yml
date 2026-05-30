@@ -18,6 +18,9 @@ on:
 
 permissions:
   contents: write
+  # Required for the MCP Registry publish, which authenticates via GitHub
+  # Actions OIDC for the io.github.cammac-creator/* namespace — no stored token.
+  id-token: write
 
 concurrency:
   group: release-publish
@@ -114,21 +117,18 @@ jobs:
           twine upload dist/* --skip-existing
 
       # ─── MCP Registry — io.github.cammac-creator/ibanforge ──────────────
+      # Authenticates via GitHub Actions OIDC (no stored secret): the runner
+      # mints an OIDC token the registry validates against the io.github.<owner>
+      # namespace, confirming the repo owner. Requires id-token: write above.
       - name: Publish to MCP Registry
         if: hashFiles('mcp/server.json') != ''
         working-directory: mcp
-        env:
-          MCP_REGISTRY_TOKEN: ${{ secrets.MCP_REGISTRY_TOKEN }}
         run: |
-          if [ -z "$MCP_REGISTRY_TOKEN" ]; then
-            echo "::warning::MCP_REGISTRY_TOKEN not set — skipping MCP Registry publish"
-            echo "::warning::Run \`mcp-publisher login github\` locally and store the token as a repo secret."
-            exit 0
-          fi
           # Install mcp-publisher CLI
           curl -fsSL https://raw.githubusercontent.com/modelcontextprotocol/registry/main/scripts/install.sh | bash
           export PATH="$HOME/.local/bin:$PATH"
-          mcp-publisher publish --token "$MCP_REGISTRY_TOKEN"
+          mcp-publisher login github-oidc
+          mcp-publisher publish
 
       # ─── Manual-refresh checklist for platforms without an API ──────────
       - name: Generate manual-refresh checklist
