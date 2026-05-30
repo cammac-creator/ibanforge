@@ -67,7 +67,9 @@ app.use('*', cors({
     return configuredOrigins.includes(origin) ? origin : configuredOrigins[0];
   },
   allowMethods: ['GET', 'POST', 'OPTIONS'],
-  allowHeaders: ['Content-Type', 'Authorization', 'X-Payment'],
+  // X-API-Key is a documented auth header (api-key middleware accepts it), so it
+  // must be allowed through CORS preflight or browser callers can't use it.
+  allowHeaders: ['Content-Type', 'Authorization', 'X-Payment', 'X-API-Key'],
 }));
 app.use('*', logger());
 app.use('*', async (c, next) => {

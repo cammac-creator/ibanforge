@@ -134,12 +134,12 @@ const TOOLS: Tool[] = [
   {
     name: 'batch_validate_iban',
     description:
-      'Validate up to 100 IBANs in a single call (10x cheaper per IBAN than calling validate_iban repeatedly). ' +
+      'Validate up to 100 IBANs in a single call at $0.002 per IBAN (60% cheaper than calling validate_iban repeatedly at $0.005). ' +
       'USE WHEN: the user pastes a list of IBANs, asks to clean a CSV/spreadsheet of bank accounts, ' +
       'asks to dedupe a customer database, asks to triage a payout list before sending, ' +
       'or whenever you would otherwise call validate_iban more than 2-3 times in a row. ' +
       'RETURNS: { results: [...same shape as validate_iban], count, valid_count, cost_usdc }. ' +
-      'COST: flat 0.20 USDC per batch call (best value at ~40+ IBANs).',
+      'COST: 0.002 USDC per IBAN (e.g. 10 IBANs = 0.02, 100 IBANs = 0.20).',
     inputSchema: {
       type: 'object',
       properties: {
