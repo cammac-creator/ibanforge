@@ -49,6 +49,24 @@ describe('IBAN Validation', () => {
       expect(r.bban?.account_number).toBe('8742637541');
       expect(r.bban?.account_number).toHaveLength(10);
     });
+
+    it('EU EMI hubs (LT/EE/LV/MT/CY) decompose a non-empty bank_code', () => {
+      // Regression guard: these had no BBAN_STRUCTURE, so bank_code came back
+      // empty and enrichResult bailed early — silently killing BIC/EMI/vIBAN
+      // detection for the European EMI capital (LT) and neighbours.
+      const cases: Array<[string, string]> = [
+        ['LT121000011101001000', '10000'],
+        ['EE382200221020145685', '22'],
+        ['LV80BANK0000435195001', 'BANK'],
+        ['MT84MALT011000012345MTLCAST001S', 'MALT'],
+        ['CY17002001280000001200527600', '002'],
+      ];
+      for (const [iban, bankCode] of cases) {
+        const r = validateIBAN(iban);
+        expect(r.valid).toBe(true);
+        expect(r.bban?.bank_code).toBe(bankCode);
+      }
+    });
   });
 
   describe('Invalid — checksum', () => {

@@ -73,6 +73,16 @@ export const BBAN_STRUCTURE: Record<string, BBANStructure> = {
   ST: { bankCode: [0, 4], branchCode: [4, 4], accountNumber: [8, 13] },
   VA: { bankCode: [0, 3], accountNumber: [3, 15] },
   XK: { bankCode: [0, 2], branchCode: [2, 2], accountNumber: [4, 12] },
+  // EU EMI / vIBAN hubs — these were missing a BBAN_STRUCTURE, which silently
+  // disabled BIC/issuer/risk detection for them. LT especially is the European
+  // EMI capital (Revolut, Paysera, Wise… are licensed there), so vIBAN/EMI
+  // detection — a core compliance selling point — was dead exactly where it
+  // matters most. Positions from the committed SWIFT IBAN Registry snapshot.
+  LT: { bankCode: [0, 5], accountNumber: [5, 11] },
+  EE: { bankCode: [0, 2], accountNumber: [2, 14] },
+  LV: { bankCode: [0, 4], accountNumber: [4, 13] },
+  MT: { bankCode: [0, 4], branchCode: [4, 5], accountNumber: [9, 18] },
+  CY: { bankCode: [0, 3], branchCode: [3, 5], accountNumber: [8, 16] },
   // Registry countries added from the 2026-05 SWIFT IBAN Registry sync
   BI: { bankCode: [0, 5], branchCode: [5, 5], accountNumber: [10, 13] },
   HN: { bankCode: [0, 4], accountNumber: [4, 20] },
