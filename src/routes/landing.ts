@@ -1,6 +1,10 @@
 // src/routes/landing.ts
 import { Hono } from 'hono';
 import { html, raw } from 'hono/html';
+import { createRequire } from 'node:module';
+
+const require = createRequire(import.meta.url);
+const pkg = require('../../package.json') as { version: string };
 
 const landing = new Hono();
 
@@ -450,7 +454,7 @@ console.<span class="f">log</span>(result);
     </div>
 
     <div class="footer-bottom">
-      <p>IBANforge v1.1.0 &mdash; <a href="https://ibanforge.com">ibanforge.com</a></p>
+      <p>IBANforge v${pkg.version} &mdash; <a href="https://ibanforge.com">ibanforge.com</a></p>
     </div>
 
   </div>

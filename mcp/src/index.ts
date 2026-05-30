@@ -257,9 +257,9 @@ const TOOLS: Tool[] = [
             name: { type: 'string' },
             type: {
               type: 'string',
-              enum: ['bank', 'cantonal_bank', 'raiffeisen', 'postfinance', 'private_bank', 'foreign_branch', 'fintech', 'other'],
+              enum: ['bank', 'cantonal_bank', 'postfinance', 'raiffeisen', 'central_bank', 'foreign_participant'],
             },
-            iid_type: { type: 'string', enum: ['headquarters', 'branch', 'unknown'] },
+            iid_type: { type: 'string', enum: ['headquarters', 'branch', 'other'] },
             headquarters_iid: { type: 'string' },
           },
         },
