@@ -1,46 +1,58 @@
 # IBANforge
 
-> IBAN validation & BIC/SWIFT lookup API for developers and AI agents
+> The compliance API for AI agents. IBAN validation, BIC/SWIFT lookup, Swiss clearing (BC-Nummer / QR-IID / SIX BankMaster — the only API that exposes this), EMI/vIBAN classification, SEPA Instant + VoP reachability, and risk scoring — exposed natively over MCP and x402 micropayments, no API-key signup required.
+
+121,399 BIC entries (38,761 LEI-enriched via GLEIF) · 1,190 Swiss BC-Nummern (SIX) · 89 countries · 85 EMI/vIBAN issuer classifications
 
 ## API Base URL
 https://api.ibanforge.com
 
-## Endpoints
+## How AI agents connect (pick one)
 
-### Validate IBAN
-POST /v1/iban/validate
-Content-Type: application/json
-Body: {"iban": "CH93 0076 2011 6238 5295 7"}
-Cost: $0.005 USDC (free during launch)
+### MCP server (stdio — easiest, no signup)
+npx -y ibanforge-mcp
+Claude Desktop / Cursor / Cline config:
+{"mcpServers": {"ibanforge": {"command": "npx", "args": ["-y", "ibanforge-mcp"]}}}
+Optional: set IBANFORGE_API_KEY=ifk_... in env for the free tier (200 req/month).
 
-### Batch Validate
-POST /v1/iban/batch
-Content-Type: application/json
-Body: {"ibans": ["CH93...", "DE89..."]}
-Cost: $0.002/IBAN (free during launch)
+### MCP server (streamable HTTP — no install)
+POST https://api.ibanforge.com/mcp  (JSON-RPC: initialize → tools/list → tools/call)
 
-### Lookup BIC/SWIFT
-GET /v1/bic/{code}
-Example: GET /v1/bic/UBSWCHZH80A
-Cost: $0.003 USDC (free during launch)
+### Pay-per-call without an API key (x402, USDC on Base L2)
+GET https://api.ibanforge.com/.well-known/x402 returns the full catalog. Any agent with a Base wallet can discover, pay, and call.
 
-### Free Endpoints
-GET /v1/demo — Example results, always free
-GET /health — API health check
-GET /stats — Usage statistics
-GET /openapi.json — OpenAPI 3.1 specification
-GET /.well-known/x402 — x402 agent discovery
+## 5 MCP tools
+- validate_iban — validate one IBAN + enrich (BIC, issuer EMI/vIBAN, SEPA, VoP, risk, Swiss bc_nummer). Cost: $0.005
+- batch_validate_iban — up to 100 IBANs in one call. Cost: $0.002 per IBAN (e.g. 100 = $0.20)
+- lookup_bic — resolve a BIC/SWIFT into bank, country, city, LEI. Cost: $0.003
+- lookup_ch_clearing — Swiss BC-Nummer / IID → institution, SIC/euroSIC, QR-IID. The ONLY API with this data. Cost: $0.003
+- check_compliance — sanctions (OFAC/EU/UN/SECO, bank-BIC level) + FATF + SEPA Instant + VoP + risk score 0-100. Informational, not regulated AML/CFT. Cost: $0.02
 
-## MCP Integration
-Tools: validate_iban, batch_validate_iban, lookup_bic, check_compliance
-Config: {"command": "npx", "args": ["tsx", "src/mcp/server.ts"]}
+## REST endpoints
+- POST /v1/iban/validate — single IBAN, full enrichment ($0.005)
+- POST /v1/iban/batch — up to 100 IBANs ($0.002 each)
+- GET  /v1/bic/{code} — BIC/SWIFT lookup with LEI ($0.003)
+- GET  /v1/ch/clearing/{iid} — Swiss clearing lookup ($0.003)
+- POST /v1/iban/compliance — sanctions + FATF + SEPA + VoP + risk ($0.02)
+- GET  /v1/iban/format?iban=... — free mod-97 + structure check (no auth)
+- GET  /v1/demo — free example validations
+- POST /v1/keys/generate {"email":"you@example.com"} — free API key (200 req/month)
+
+## How to pay (3 rails, no dead-ends)
+- Free tier: POST /v1/keys/generate → Authorization: Bearer ifk_... (200 req/month)
+- Credit packs (card or USDC, never expire): 1k = $5, 5k = $20, 25k = $80 → POST /v1/credits/buy/1k|5k|25k
+- x402 micropayments: pay per call in USDC on Base L2, no signup
 
 ## SDKs
-TypeScript: npm install @ibanforge/sdk
-Python: pip install ibanforge
+- TypeScript: npm install @ibanforge/sdk
+- Python: pip install ibanforge
+
+## Discovery
+- OpenAPI 3.1: https://api.ibanforge.com/openapi.json
+- x402: https://api.ibanforge.com/.well-known/x402
+- A2A agents: https://api.ibanforge.com/.well-known/agents.json
+- MCP server card: https://api.ibanforge.com/.well-known/mcp/server-card.json
+- Full agent guide: https://api.ibanforge.com/llms.txt
 
 ## Links
-Documentation: https://ibanforge.com/docs
-Playground: https://ibanforge.com/playground
-Pricing: https://ibanforge.com/pricing
-GitHub: https://github.com/cammac-creator/ibanforge
+Docs: https://ibanforge.com/docs · Playground: https://ibanforge.com/playground · Pricing: https://ibanforge.com/pricing · GitHub: https://github.com/cammac-creator/ibanforge
