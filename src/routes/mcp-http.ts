@@ -142,11 +142,11 @@ function createMcpServer(): McpServer {
     {
       title: 'Batch Validate IBANs',
       description:
-        'Validate up to 100 IBANs in a single call (10x cheaper per IBAN than calling validate_iban repeatedly). ' +
+        'Validate up to 100 IBANs in a single call at $0.002 per IBAN (60% cheaper than calling validate_iban repeatedly at $0.005). ' +
         'USE WHEN: the user pastes a list of IBANs, asks to clean a CSV/spreadsheet of bank accounts, ' +
         'asks to dedupe a customer database, asks to triage a payout list before sending, ' +
         'or whenever you would otherwise call validate_iban more than 2-3 times in a row. ' +
-        'RETURNS: array of per-IBAN results (same shape as validate_iban) + a summary { total, valid, invalid, by_country, by_issuer_class }.',
+        'RETURNS: { results: [...same shape as validate_iban], count, valid_count }.',
       inputSchema: {
         ibans: z.array(z.string()).min(1).max(100).describe('Array of IBANs (1-100)'),
       },

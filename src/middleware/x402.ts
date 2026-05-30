@@ -161,7 +161,7 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
           issuer: {
             type: 'object',
             properties: {
-              type: { type: 'string', enum: ['bank', 'emi', 'viban', 'neobank', 'unknown'] },
+              type: { type: 'string', enum: ['bank', 'digital_bank', 'emi', 'payment_institution'] },
               name: { type: 'string' },
             },
           },
@@ -507,7 +507,7 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
                     type: 'object',
                     properties: {
                       name: { type: 'string' },
-                      type: { type: 'string', enum: ['bank', 'cantonal_bank', 'raiffeisen', 'postfinance', 'private_bank', 'foreign_branch', 'fintech', 'other'] },
+                      type: { type: 'string', enum: ['bank', 'cantonal_bank', 'postfinance', 'raiffeisen', 'central_bank', 'foreign_participant'] },
                       iid_type: { type: 'string', enum: ['headquarters', 'branch', 'unknown'] },
                       headquarters_iid: { type: 'string' },
                     },
