@@ -198,6 +198,54 @@
   </ul>
 </div>
 
+<!-- MES RECOMMANDATIONS -->
+<div class="sec reveal">06 — Mes recommandations sur chaque décision</div>
+<h2 class="reveal">Mon avis tranché, pas juste les options.</h2>
+<p class="sub reveal">Pour chaque point qui demande ta réflexion, voici ce que je ferais à ta place — solo founder, produit pas encore monétisé, vendu sur sa rigueur. Avec le pourquoi et l'action concrète.</p>
+
+<div class="reveal" style="--d:1">
+
+  <div style="background:var(--bg-card);border:1px solid rgba(229,86,75,.3);border-radius:14px;padding:20px 24px;margin-bottom:14px">
+    <div style="font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--red);margin-bottom:7px">Décision 1 · Licence OpenSanctions · le plus urgent</div>
+    <h4 style="font-family:var(--display);font-size:19px;font-weight:600;margin-bottom:10px">Ma reco : <span style="color:var(--green)">migrer vers les sources primaires</span> (pas acheter la licence)</h4>
+    <p style="font-size:13.5px;color:#cdd2db;line-height:1.65;margin-bottom:9px"><b style="color:#fff">Pourquoi :</b> OpenSanctions est en CC-BY-NC — usage commercial interdit sans licence payante (de l'ordre de plusieurs k€/an, <em>à confirmer sur opensanctions.org/licensing</em>). Mais les sources sous-jacentes sont gratuites ET réutilisables commercialement : OFAC (domaine public US), liste consolidée UE, liste ONU, SECO (CH). Ton screening est au niveau <b style="color:#fff">banque-BIC seulement (~198 entités)</b> — un périmètre étroit qui ne nécessite PAS l'entity-resolution complète d'OpenSanctions. Bonus : « directement depuis OFAC/UE/ONU/SECO » est un signal de confiance <b style="color:#fff">plus fort</b> que « via OpenSanctions » pour un produit de compliance.</p>
+    <p style="font-size:13px;color:#bcc2cd;line-height:1.6"><b style="color:var(--gold)">Action :</b> (a) <b>tout de suite, sûr</b> — ajouter l'attribution OpenSanctions dans <code>NOTICE</code> (la CC-BY l'exige de toute façon) ; (b) <b>court terme</b> — réécrire <code>refresh-compliance.ts</code> pour tirer des sources primaires ; (c) à défaut, souscrire la licence. <b style="color:#fff">À régler AVANT toute pousse de revenu/marketing.</b></p>
+  </div>
+
+  <div style="background:var(--bg-card);border:1px solid rgba(232,169,63,.3);border-radius:14px;padding:20px 24px;margin-bottom:14px">
+    <div style="font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--amber);margin-bottom:7px">Décision 2 · Sur-promesse VoP</div>
+    <h4 style="font-family:var(--display);font-size:19px;font-weight:600;margin-bottom:10px">Ma reco : <span style="color:var(--green)">renommer en « VoP reachability » maintenant</span> · ne PAS construire le vrai name-match</h4>
+    <p style="font-size:13.5px;color:#cdd2db;line-height:1.65;margin-bottom:9px"><b style="color:#fff">Pourquoi :</b> le vrai VoP (règlement EU 2024/886, obligatoire en zone euro depuis le 9 oct. 2025) = matching <b style="color:#fff">NOM ↔ IBAN</b>, ce qui exige l'accès aux noms des titulaires via le schéma EPC VoP (un RVM) — hors de portée réaliste d'un solo founder. Ce que tu fais réellement = « cette banque participe-t-elle au VoP ». C'est <b style="color:#fff">utile et honnête</b>… à condition de le nommer correctement.</p>
+    <p style="font-size:13px;color:#bcc2cd;line-height:1.6"><b style="color:var(--gold)">Action :</b> renommer partout « VoP <b>reachability</b> / participant » et préciser « we tell you if the recipient bank supports VoP, so you know whether VoP protection applies ». Trivial — <b>je peux le faire</b>. Le vrai name-match = éventuel partenariat futur, pas un build.</p>
+  </div>
+
+  <div style="background:var(--bg-card);border:1px solid rgba(91,157,255,.3);border-radius:14px;padding:20px 24px;margin-bottom:14px">
+    <div style="font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);margin-bottom:7px">Décision 3 · Republier en v1.3.1 ?</div>
+    <h4 style="font-family:var(--display);font-size:19px;font-weight:600;margin-bottom:10px">Ma reco : <span style="color:var(--green)">oui — mais un seul tag, groupé</span></h4>
+    <p style="font-size:13.5px;color:#cdd2db;line-height:1.65;margin-bottom:9px"><b style="color:#fff">Pourquoi :</b> les corrections de schémas/enums/keywords MCP de cette session ne touchent npm/PyPI/MCP&nbsp;Registry qu'à un nouveau tag, et elles comptent pour le score Smithery/Glama + ce que lisent les agents. Autant ne taguer qu'une fois en y groupant les 2 fixes « honnêteté ».</p>
+    <p style="font-size:13px;color:#bcc2cd;line-height:1.6"><b style="color:var(--gold)">Action :</b> je prépare <b>attribution OpenSanctions (NOTICE)</b> + <b>rename VoP</b>, tu valides, puis <code>git tag v1.3.1 &amp;&amp; git push origin v1.3.1</code>. Ne PAS bloquer ce tag sur la grande décision migrate-vs-license : l'attribution suffit pour être propre au moment du tag.</p>
+  </div>
+
+  <div style="background:var(--bg-card);border:1px solid rgba(124,121,255,.3);border-radius:14px;padding:20px 24px;margin-bottom:14px">
+    <div style="font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent-2);margin-bottom:7px">Décision 4 · Frontend (preview Vercel)</div>
+    <h4 style="font-family:var(--display);font-size:19px;font-weight:600;margin-bottom:10px">Ma reco : <span style="color:var(--green)">oui — session dédiée, dans cet ordre de ROI</span></h4>
+    <p style="font-size:13.5px;color:#cdd2db;line-height:1.65;margin-bottom:9px"><b style="color:#fff">Pourquoi :</b> c'est là qu'est le plus gros levier d'adoption restant, mais ça se vérifie mieux en preview avant prod.</p>
+    <ol style="font-size:13px;color:#cdd2db;line-height:1.7;margin:0 0 9px 18px">
+      <li><b style="color:#fff">Hero USP suisse + réparer le 1er curl cassé</b> (1ère impression / aha moment)</li>
+      <li><b style="color:#fff">Brancher le modal clé gratuite + rendre les credit packs visibles</b> (chemin de conversion = revenu direct)</li>
+      <li><b style="color:#fff">Playground : onglets compliance + clearing</b> (montrer les différenciateurs)</li>
+      <li><b style="color:#fff">Exemples .mdx corrigés + retirer le <code>.venv</code> committé</b> (confiance / hygiène)</li>
+    </ol>
+    <p style="font-size:13px;color:#bcc2cd;line-height:1.6"><b style="color:var(--gold)">Action :</b> feu vert de ta part → je vérifie chaque changement en preview Vercel avant prod. Le retrait du <code>.venv</code>, je peux le faire <b>tout de suite</b> (git rm, zéro risque).</p>
+  </div>
+
+  <div style="background:linear-gradient(180deg,rgba(70,208,127,.07),rgba(70,208,127,.02));border:1px solid rgba(70,208,127,.3);border-radius:14px;padding:20px 24px">
+    <div style="font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--green);margin-bottom:7px">Si tu me dis « go »</div>
+    <p style="font-size:13.5px;color:#d6e8dd;line-height:1.65">Je peux enchaîner <b style="color:#fff">tout de suite, sans risque</b> : (1) attribution OpenSanctions dans NOTICE, (2) rename VoP → « reachability » sur toutes les surfaces, (3) retrait du <code>.venv</code> committé. Puis tu n'as plus qu'à taguer <code>v1.3.1</code>. Le reste (migration sources primaires, frontend profond) = sessions dédiées quand tu veux.</p>
+  </div>
+
+</div>
+
 <footer class="reveal">
   IBANforge · Audit global v2 (perfectionnement + attractivité) · 29 mai 2026<br>
   48 agents · 120 findings · 9 élevés confirmés · 71 leviers d'attractivité · 9 corrigés &amp; déployés cette session<br>
