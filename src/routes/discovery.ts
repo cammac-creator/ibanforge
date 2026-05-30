@@ -26,7 +26,7 @@ const PAID_ENDPOINTS: PricedEndpoint[] = [
     method: 'POST',
     path: '/v1/iban/batch',
     price_usdc: 0.002,
-    price_note: 'per IBAN, max 100 IBANs per batch ($0.20 max)',
+    price_note: 'per IBAN, billed dynamically (1 IBAN = $0.002, 100 = $0.20)',
     description: 'Validate up to 100 IBANs in one call',
   },
   {
