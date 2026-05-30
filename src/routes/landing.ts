@@ -31,7 +31,7 @@ landing.get('/', (c) => {
     "@context":"https://schema.org",
     "@type":"FAQPage",
     "mainEntity":[
-      {"@type":"Question","name":"What is IBANforge?","acceptedAnswer":{"@type":"Answer","text":"IBANforge is a REST API for IBAN validation, BIC/SWIFT lookup, and compliance risk scoring. It covers 75+ countries with 121K+ BIC entries from public sources (GLEIF, SWIFT directory, Bundesbank, SIX, NBP), 38K of which are LEI-enriched via GLEIF."}},
+      {"@type":"Question","name":"What is IBANforge?","acceptedAnswer":{"@type":"Answer","text":"IBANforge is a REST API for IBAN validation, BIC/SWIFT lookup, and compliance risk scoring. It covers 89 countries with 121K+ BIC entries from public sources (GLEIF, SWIFT directory, Bundesbank, SIX, NBP), 38K of which are LEI-enriched via GLEIF."}},
       {"@type":"Question","name":"How much does IBANforge cost?","acceptedAnswer":{"@type":"Answer","text":"IBANforge offers a free tier with 200 requests per month using an API key. Beyond that, pay $0.003 to $0.02 per call using USDC micropayments via the x402 protocol. No subscription required."}},
       {"@type":"Question","name":"Can AI agents use IBANforge?","acceptedAnswer":{"@type":"Answer","text":"Yes. IBANforge is MCP-native with 5 tools for AI agents: validate_iban, batch_validate_iban, lookup_bic, check_compliance, and lookup_ch_clearing. Compatible with Claude, GPT, and any MCP client."}},
       {"@type":"Question","name":"What countries does IBANforge support?","acceptedAnswer":{"@type":"Answer","text":"IBANforge supports 89 countries with full BBAN parsing, SEPA membership detection, Verification of Payee (VoP) reachability status, and country-level risk classification."}}
@@ -44,7 +44,7 @@ landing.get('/', (c) => {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>IBANforge — IBAN Validation & BIC Lookup API for Developers & AI Agents</title>
-  <meta name="description" content="Validate IBANs, lookup BICs, score compliance risk. 121K BICs, 75+ countries. Free tier or x402 micropayments. MCP native for AI agents.">
+  <meta name="description" content="Validate IBANs, lookup BICs, score compliance risk. 121K BICs, 89 countries. Free tier or x402 micropayments. MCP native for AI agents.">
   <meta name="robots" content="index, follow">
   <link rel="canonical" href="https://api.ibanforge.com">
   <meta property="og:title" content="IBANforge — IBAN Validation & BIC Lookup API">
@@ -274,7 +274,7 @@ landing.get('/', (c) => {
         <div class="feat-card">
           <div class="feat-icon feat-icon-amber"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></div>
           <div class="feat-stat">121K</div>
-          <h3>BICs across 75+ countries</h3>
+          <h3>BICs across 89 countries</h3>
           <p>GLEIF-sourced database with LEI enrichment. Full BBAN parsing per country format.</p>
         </div>
         <div class="feat-card">
