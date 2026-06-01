@@ -139,11 +139,15 @@ jobs:
         if: hashFiles('mcp/server.json') != ''
         working-directory: mcp
         run: |
-          # Install mcp-publisher CLI
-          curl -fsSL https://raw.githubusercontent.com/modelcontextprotocol/registry/main/scripts/install.sh | bash
-          export PATH="$HOME/.local/bin:$PATH"
-          mcp-publisher login github-oidc
-          mcp-publisher publish
+          # Install the mcp-publisher CLI from the latest GitHub release binary.
+          # (The old install.sh script URL now 404s.)
+          TAG=$(curl -fsSL https://api.github.com/repos/modelcontextprotocol/registry/releases/latest | grep -oP '"tag_name":\s*"\K[^"]+')
+          echo "mcp-publisher $TAG"
+          curl -fsSL "https://github.com/modelcontextprotocol/registry/releases/download/${TAG}/mcp-publisher_linux_amd64.tar.gz" -o /tmp/mcp-publisher.tgz
+          tar -xzf /tmp/mcp-publisher.tgz -C /tmp mcp-publisher
+          chmod +x /tmp/mcp-publisher
+          /tmp/mcp-publisher login github-oidc
+          /tmp/mcp-publisher publish
 
       # ─── Manual-refresh checklist for platforms without an API ──────────
       - name: Generate manual-refresh checklist
