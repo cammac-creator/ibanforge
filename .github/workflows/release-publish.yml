@@ -51,7 +51,15 @@ jobs:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
 
-      - name: Publish ibanforge-mcp
+      # npm publish is best-effort in CI: npm's 2FA approval gate (staged
+      # publishing) requires a live interactive 2FA challenge that no token can
+      # satisfy, so a CI publish fails with EOTP by design. We attempt it (in
+      # case the gate is ever lifted), but never fail the whole release on it —
+      # PyPI + the MCP Registry publish fine automatically. When npm is skipped
+      # this way, publish the two packages manually with Touch ID:
+      #   cd mcp && npm publish --access public
+      #   cd sdks/typescript && npm run build && npm publish --access public
+      - name: Publish ibanforge-mcp (best-effort — manual fallback on 2FA gate)
         if: hashFiles('mcp/package.json') != ''
         working-directory: mcp
         env:
@@ -61,7 +69,6 @@ jobs:
             echo "::warning::NPM_TOKEN not set — skipping ibanforge-mcp publish"
             exit 0
           fi
-          # Skip if version is already published (idempotent re-runs)
           PUBLISHED=$(npm view ibanforge-mcp@${{ steps.ver.outputs.version }} version 2>/dev/null || echo "")
           if [ "$PUBLISHED" = "${{ steps.ver.outputs.version }}" ]; then
             echo "ibanforge-mcp@${{ steps.ver.outputs.version }} already on npm — skipping"
@@ -69,9 +76,13 @@ jobs:
           fi
           npm ci
           npm run build
-          npm publish --access public
+          if npm publish --access public; then
+            echo "ibanforge-mcp@${{ steps.ver.outputs.version }} published to npm"
+          else
+            echo "::warning::npm publish of ibanforge-mcp failed (likely the 2FA approval gate). Publish manually: cd mcp && npm publish --access public"
+          fi
 
-      - name: Publish @ibanforge/sdk
+      - name: Publish @ibanforge/sdk (best-effort — manual fallback on 2FA gate)
         if: hashFiles('sdks/typescript/package.json') != ''
         working-directory: sdks/typescript
         env:
@@ -88,7 +99,11 @@ jobs:
           fi
           npm ci
           npm run build || true
-          npm publish --access public
+          if npm publish --access public; then
+            echo "@ibanforge/sdk@${{ steps.ver.outputs.version }} published to npm"
+          else
+            echo "::warning::npm publish of @ibanforge/sdk failed (likely the 2FA approval gate). Publish manually: cd sdks/typescript && npm run build && npm publish --access public"
+          fi
 
       # ─── PyPI — ibanforge ────────────────────────────────────────────────
       - uses: actions/setup-python@v5
