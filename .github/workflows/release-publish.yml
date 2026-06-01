@@ -1,10 +1,18 @@
 name: Release & republish
 
-# Triggered on every git tag matching v*.*.* (e.g., v1.2.0). The job publishes
-# the latest source to every registry that has an API: npm (mcp + sdk), PyPI
-# (Python SDK), and the MCP Registry. Platforms that don't expose a publish
-# API (Smithery, MCP.so, RapidAPI, DevHunt, Glama) need a manual refresh —
-# the job ends with a checklist that goes into the GitHub Release notes.
+# Triggered on every git tag matching v*.*.* (or manually via workflow_dispatch
+# with a `version` input). Auto-publishes the registries that allow token/OIDC
+# automation: PyPI (PYPI_TOKEN) and the MCP Registry (GitHub Actions OIDC).
+#
+# npm is HYBRID: npm's 2026 "2FA approval gate" (staged publishing) requires a
+# live interactive 2FA challenge that no automation token can satisfy, so the two
+# npm steps are best-effort and the maintainer publishes them by hand with
+# Touch ID (see RELEASING.md). The MCP Registry validates that the npm package
+# version exists, so the correct order is: npm (manual) FIRST, then re-run this
+# workflow so the MCP Registry step succeeds.
+#
+# Platforms without a publish API (Smithery, MCP.so, RapidAPI, DevHunt, Glama)
+# need a manual refresh — the job ends with a checklist in the run summary.
 
 on:
   push:
@@ -166,12 +174,19 @@ jobs:
           - [ ] **Coinbase Bazaar** — auto-indexed after the next paid x402 settlement; if absent 48h after release, run scripts/bazaar-warmup.mjs to trigger a fresh settlement
           - [ ] **agentic.market** — depends on Bazaar; if Bazaar shows IBANforge but agentic.market UI lags, post in #x402 on discord.gg/cdp
 
+          ## npm — MANUAL (npm 2FA approval gate; see RELEASING.md)
+
+          Publish these two with Touch ID, THEN re-run this workflow so the
+          MCP Registry step (which validates the npm version exists) passes:
+          - [ ] \`cd mcp && npm publish --access public\` → ibanforge-mcp@${{ steps.ver.outputs.version }}
+          - [ ] \`cd sdks/typescript && npm run build && npm publish --access public\` → @ibanforge/sdk@${{ steps.ver.outputs.version }}
+
           ## Auto-published (verify the badges turned to v${{ steps.ver.outputs.version }})
 
-          - npm \`ibanforge-mcp\`: https://www.npmjs.com/package/ibanforge-mcp
-          - npm \`@ibanforge/sdk\`: https://www.npmjs.com/package/@ibanforge/sdk
           - PyPI \`ibanforge\`: https://pypi.org/project/ibanforge/
           - MCP Registry: https://registry.modelcontextprotocol.io/v0/servers?search=ibanforge
+          - npm \`ibanforge-mcp\`: https://www.npmjs.com/package/ibanforge-mcp (manual)
+          - npm \`@ibanforge/sdk\`: https://www.npmjs.com/package/@ibanforge/sdk (manual)
           EOF
           echo "Checklist written to job summary."
 
