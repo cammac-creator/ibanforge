@@ -17,7 +17,7 @@ const caveat = Caveat({
 
 export const metadata: Metadata = {
   title: "Pour ma famille",
-  description: "Une lettre d'Alain à sa famille — comprendre IBANforge sans jargon.",
+  description: "Les questions que ma famille me pose sur IBANforge — et mes réponses, sans jargon.",
   robots: { index: false, follow: false },
 };
 
