@@ -5,11 +5,12 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { CostCalculator } from "./calculator"
 import { Faq } from "./faq"
+import { GetKeyButton } from "@/components/api-key-dialog"
 
 export const metadata: Metadata = {
   title: "Pricing",
   description:
-    "Simple, transparent pay-per-call pricing. No subscriptions. No API keys. Pay with USDC via x402 micropayments.",
+    "Three ways to pay, zero dead-ends: pay-per-call with x402 (no signup), a free key (200 req/month), or prepaid credit packs. Fractions of a cent per request.",
 }
 
 const ENDPOINT_COUNT = 5
@@ -66,21 +67,68 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
         </p>
 
         <div className="flex flex-col sm:flex-row gap-3 mt-2">
-          <Button
-            size="lg"
-            className="bg-amber-500 hover:bg-amber-400 text-zinc-950 font-semibold px-6"
-            render={<Link href={`/${locale}/playground`} />}
-          >
-            {t('hero.cta.tryFree')}
-          </Button>
+          <GetKeyButton className="bg-amber-500 hover:bg-amber-400 text-zinc-950 font-semibold px-6">
+            {t('rails.key.cta')}
+          </GetKeyButton>
           <Button
             size="lg"
             variant="outline"
             className="px-6"
-            render={<Link href={`/${locale}/docs/x402`} />}
+            render={<Link href={`/${locale}/playground`} />}
           >
-            {t('hero.cta.x402Explained')}
+            {t('hero.cta.tryFree')}
           </Button>
+        </div>
+      </section>
+
+      {/* ── Three payment rails ───────────────────────────────────────────── */}
+      <section className="px-4 pt-4 pb-12 max-w-5xl mx-auto w-full">
+        <h2 className="text-2xl font-semibold tracking-tight mb-2 text-center">
+          {t('rails.heading')}
+        </h2>
+        <p className="text-center text-muted-foreground mb-10 text-sm">
+          {t('rails.subtitle')}
+        </p>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* x402 */}
+          <div className="rounded-xl border border-border bg-zinc-900/50 p-6 flex flex-col gap-3">
+            <span className="font-mono text-xs uppercase tracking-widest text-amber-500">
+              {t('rails.x402.tag')}
+            </span>
+            <h3 className="text-lg font-semibold">{t('rails.x402.title')}</h3>
+            <p className="text-sm text-muted-foreground leading-relaxed flex-1">{t('rails.x402.body')}</p>
+            <Link
+              href={`/${locale}/docs/x402`}
+              className="text-sm text-amber-500 hover:text-amber-400 underline underline-offset-4 transition-colors w-fit"
+            >
+              {t('rails.x402.cta')}
+            </Link>
+          </div>
+          {/* Free key — highlighted */}
+          <div className="rounded-xl border border-amber-500/40 bg-amber-500/5 p-6 flex flex-col gap-3">
+            <span className="font-mono text-xs uppercase tracking-widest text-amber-500">
+              {t('rails.key.tag')}
+            </span>
+            <h3 className="text-lg font-semibold">{t('rails.key.title')}</h3>
+            <p className="text-sm text-muted-foreground leading-relaxed flex-1">{t('rails.key.body')}</p>
+            <GetKeyButton
+              size="sm"
+              className="bg-amber-500 hover:bg-amber-400 text-zinc-950 font-semibold w-fit px-4"
+            >
+              {t('rails.key.cta')}
+            </GetKeyButton>
+          </div>
+          {/* Credit packs — info only (no dead card CTA) */}
+          <div className="rounded-xl border border-border bg-zinc-900/50 p-6 flex flex-col gap-3">
+            <span className="font-mono text-xs uppercase tracking-widest text-amber-500">
+              {t('rails.packs.tag')}
+            </span>
+            <h3 className="text-lg font-semibold">{t('rails.packs.title')}</h3>
+            <p className="text-sm text-muted-foreground leading-relaxed flex-1">{t('rails.packs.body')}</p>
+            <p className="text-xs text-muted-foreground/70 leading-relaxed border-t border-border pt-3">
+              {t('rails.packs.note')}
+            </p>
+          </div>
         </div>
       </section>
 
