@@ -76,7 +76,7 @@ Chaque réponse du format endpoint contient un hint `upgrade_to_full_validation`
 
 ISO 13616 :
 - Mod-97 sur l'IBAN réarrangé + numérisé, valide si reste = 1
-- Longueur et structure BBAN spécifiques au pays (75+ pays supportés)
+- Longueur et structure BBAN spécifiques au pays (89 pays supportés)
 - Chiffres de contrôle en positions 3-4
 
 Même algorithme, même code que `/v1/iban/validate` payant — on saute juste les DB lookups et les champs enrichis.

@@ -26,21 +26,21 @@ const META_BY_LOCALE = {
   en: {
     title: "IBANforge — IBAN Validation & BIC/SWIFT Lookup API for AI Agents",
     description:
-      "Validate IBANs, lookup BICs/SWIFT, score compliance risk. 121K BICs across 75+ countries, sanctions screening, SEPA + VoP, native MCP for AI agents, x402 micropayments. Free tier: 200 requests/month.",
+      "Validate IBANs, lookup BICs/SWIFT, score compliance risk. 121K BICs across 89 countries, sanctions screening, SEPA + VoP, native MCP for AI agents, x402 micropayments. Free tier: 200 requests/month.",
     ogLocale: "en_US",
     alternates: { fr: "fr", de: "de" },
   },
   fr: {
     title: "IBANforge — API de validation IBAN & BIC/SWIFT pour agents IA",
     description:
-      "Validez vos IBAN, recherchez des BIC/SWIFT, évaluez le risque de conformité. 121K codes BIC sur 75+ pays, screening sanctions, SEPA + VoP, MCP natif pour agents IA, micropaiements x402. Gratuit : 200 requêtes/mois.",
+      "Validez vos IBAN, recherchez des BIC/SWIFT, évaluez le risque de conformité. 121K codes BIC sur 89 pays, screening sanctions, SEPA + VoP, MCP natif pour agents IA, micropaiements x402. Gratuit : 200 requêtes/mois.",
     ogLocale: "fr_FR",
     alternates: { en: "en", de: "de" },
   },
   de: {
     title: "IBANforge — IBAN-Validierung & BIC/SWIFT-Lookup-API für KI-Agenten",
     description:
-      "IBANs validieren, BIC/SWIFT abfragen, Compliance-Risiken bewerten. 121K BIC-Einträge in 75+ Ländern, Sanktionsprüfung, SEPA + VoP, natives MCP für KI-Agenten, x402-Mikrozahlungen. Kostenlos: 200 Anfragen/Monat.",
+      "IBANs validieren, BIC/SWIFT abfragen, Compliance-Risiken bewerten. 121K BIC-Einträge in 89 Ländern, Sanktionsprüfung, SEPA + VoP, natives MCP für KI-Agenten, x402-Mikrozahlungen. Kostenlos: 200 Anfragen/Monat.",
     ogLocale: "de_DE",
     alternates: { en: "en", fr: "fr" },
   },
