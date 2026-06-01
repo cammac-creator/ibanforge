@@ -4,14 +4,15 @@ import { CodeBlock } from "@/components/code-block"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { EndpointRow } from "@/components/ui/endpoint-row"
+import { GetKeyButton } from "@/components/api-key-dialog"
 
 // Metadata is generated per-locale by app/[locale]/layout.tsx — do NOT define
 // a static `metadata` here, it would override the locale-aware version with
 // the EN default. Sub-pages (pricing, agents, etc.) can still set their own.
 
-const CURL_EXAMPLE = `curl -X POST https://api.ibanforge.com/v1/iban/validate \\
-  -H "Content-Type: application/json" \\
-  -d '{"iban": "CH93 0076 2011 6238 5295 7"}'`
+// Free, no-auth endpoint so the very first example actually returns a result
+// (the paid /v1/iban/validate would answer 402 without a key — an anti-demo).
+const CURL_EXAMPLE = `curl 'https://api.ibanforge.com/v1/iban/format?iban=CH93+0076+2011+6238+5295+7'`
 
 const FEATURE_COUNT = 6
 const ENDPOINT_COUNT = 5
@@ -51,20 +52,16 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
         </p>
 
         <div className="flex flex-col sm:flex-row gap-3 mt-2">
-          <Button
-            size="lg"
-            className="bg-amber-500 hover:bg-amber-400 text-zinc-950 font-semibold px-6"
-            render={<Link href={`/${locale}/playground`} />}
-          >
-            {t('hero.cta.tryFree')}
-          </Button>
+          <GetKeyButton className="bg-amber-500 hover:bg-amber-400 text-zinc-950 font-semibold px-6">
+            {t('hero.cta.getKey')}
+          </GetKeyButton>
           <Button
             size="lg"
             variant="outline"
             className="px-6"
-            render={<Link href={`/${locale}/docs`} />}
+            render={<Link href={`/${locale}/playground`} />}
           >
-            {t('hero.cta.readDocs')}
+            {t('hero.cta.tryFree')}
           </Button>
         </div>
       </section>
@@ -149,13 +146,19 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
         <p className="text-muted-foreground max-w-md" style={{ lineHeight: 1.65 }}>
           {t('cta.description')}
         </p>
-        <Button
-          size="lg"
-          className="bg-amber-500 hover:bg-amber-400 text-zinc-950 font-semibold px-8 mt-2"
-          render={<Link href={`/${locale}/docs`} />}
-        >
-          {t('cta.button')}
-        </Button>
+        <div className="flex flex-col sm:flex-row gap-3 mt-2">
+          <GetKeyButton className="bg-amber-500 hover:bg-amber-400 text-zinc-950 font-semibold px-8">
+            {t('cta.getKeyButton')}
+          </GetKeyButton>
+          <Button
+            size="lg"
+            variant="outline"
+            className="px-8"
+            render={<Link href={`/${locale}/docs`} />}
+          >
+            {t('cta.button')}
+          </Button>
+        </div>
       </section>
     </div>
   )
