@@ -275,3 +275,26 @@ export function ApiKeyDialogProvider({ children }: { children: ReactNode }) {
 export function useApiKeyDialog() {
   return useContext(Ctx);
 }
+
+/**
+ * Client CTA that opens the free-API-key dialog. Server components (home,
+ * pricing) can't call the hook directly, so they render this instead.
+ */
+export function GetKeyButton({
+  children,
+  className,
+  variant,
+  size = 'lg',
+}: {
+  children: ReactNode;
+  className?: string;
+  variant?: 'default' | 'outline' | 'secondary' | 'ghost' | 'link' | 'destructive';
+  size?: 'default' | 'xs' | 'sm' | 'lg' | 'icon';
+}) {
+  const { open } = useApiKeyDialog();
+  return (
+    <Button type="button" onClick={open} className={className} variant={variant} size={size}>
+      {children}
+    </Button>
+  );
+}
