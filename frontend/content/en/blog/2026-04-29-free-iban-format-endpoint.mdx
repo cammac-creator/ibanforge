@@ -76,7 +76,7 @@ Every response from the free format endpoint includes an `upgrade_to_full_valida
 
 ISO 13616:
 - Mod-97 over the rearranged + numericized IBAN, valid if remainder = 1
-- Country-specific BBAN length and structure (75+ countries supported)
+- Country-specific BBAN length and structure (89 countries supported)
 - Check digit positions 3-4
 
 Same algorithm, same library code as the paid `/v1/iban/validate` — we just skip the database lookups and the enrichment fields.
