@@ -10,7 +10,7 @@ IBANforge is our answer to that problem.
 
 ## What is IBANforge?
 
-IBANforge is a developer API for IBAN validation and BIC/SWIFT lookup. It covers **80+ countries**, validates structure and checksum (mod-97), parses bank and branch codes from the BBAN, and resolves BIC codes against a **consolidated dataset of 121,000+ BIC entries from public sources** (GLEIF, SWIFT directory, Bundesbank, SIX, NBP, EBA Step2 SCT), with LEI enrichment for ~38K rows sourced from GLEIF.
+IBANforge is a developer API for IBAN validation and BIC/SWIFT lookup. It covers **89 countries**, validates structure and checksum (mod-97), parses bank and branch codes from the BBAN, and resolves BIC codes against a **consolidated dataset of 121,000+ BIC entries from public sources** (GLEIF, SWIFT directory, Bundesbank, SIX, NBP, EBA Step2 SCT), with LEI enrichment for ~38K rows sourced from GLEIF.
 
 You send a POST request. You get back a clean, structured JSON response. That's it.
 
@@ -49,7 +49,7 @@ Together, these two shifts — agentic workflows + on-chain micropayments — ma
 
 ## Key features
 
-**IBAN validation across 80+ countries.** Full mod-97 checksum verification, country-specific length and format rules, and BBAN parsing to extract bank/branch codes where applicable.
+**IBAN validation across 89 countries.** Full mod-97 checksum verification, country-specific length and format rules, and BBAN parsing to extract bank/branch codes where applicable.
 
 **121,000+ BIC entries from public sources.** The database consolidates GLEIF, the SWIFT directory, the Bundesbank, SIX, NBP, and EBA Clearing STEP2 SCT. The ~38K rows sourced from GLEIF are additionally enriched with the Legal Entity Identifier (LEI). We import, index, and serve everything with sub-millisecond lookups. Combined IBAN + BIC validation is available in a single request.
 
