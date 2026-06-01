@@ -52,42 +52,43 @@
         "prefix": "IBAN",
         "highlight": "forge"
       },
-      "description": "Validation IBAN, recherche BIC/SWIFT, conformité SEPA et indicateurs de risque pour développeurs et agents AI",
+      "description": "L’API de compliance pour agents IA. La seule API avec les données de clearing suisse BC-Nummer / QR-IID — plus validation IBAN, BIC/SWIFT, détection EMI/vIBAN et risque sanctions. Native MCP et x402, sans inscription.",
       "cta": {
         "tryFree": "Essayer gratuitement",
-        "readDocs": "Lire la documentation"
+        "readDocs": "Lire la documentation",
+        "getKey": "Obtenir une clé gratuite"
       }
     },
     "features": {
       "0": {
-        "badge": "89 pays",
-        "title": "Validation IBAN",
-        "description": "Validation complète des IBAN avec analyse de la structure BBAN. Prise en charge de 89 pays avec vérification du checksum MOD-97 et décomposition détaillée des champs."
+        "badge": "Clearing suisse — exclusif",
+        "title": "BC-Nummer / QR-IID",
+        "description": "La seule API exposant les données de clearing suisses SIX BankMaster : 1 190 BC-Nummern, SIC/euroSIC, QR-IID et type d’institution. Aucun concurrent ne l’a."
       },
       "1": {
-        "badge": "121 000+ entrées BIC",
-        "title": "Recherche BIC/SWIFT",
-        "description": "plus de 121 000 entrées BIC issues de sources publiques (GLEIF, annuaire SWIFT, Bundesbank, SIX, NBP), avec enrichissement LEI pour ~38K lignes provenant de GLEIF pour l'identification des établissements financiers."
+        "badge": "MCP-native — pour agents",
+        "title": "5 outils, sans inscription",
+        "description": "Serveur Model Context Protocol natif (stdio + HTTP). Claude, Cursor et tout agent MCP s’installent en une ligne : npx -y ibanforge-mcp."
       },
       "2": {
-        "badge": "SEPA + VoP",
-        "title": "Prêt pour la conformité",
-        "description": "Adhésion SEPA, schémas de paiement (SCT/SDD/SCT_INST) et exigence de vérification du bénéficiaire (VoP) par pays. Conçu pour la conformité réglementaire européenne."
+        "badge": "89 pays",
+        "title": "Validation IBAN",
+        "description": "Validation mod-97 ISO 13616 avec décomposition BBAN complète sur 89 pays, dont les hubs EMI européens (LT, EE, MT)."
       },
       "3": {
-        "badge": "Détection vIBAN",
-        "title": "Classification émetteur",
-        "description": "Identifie si l'émetteur est une banque traditionnelle, une néobanque, un EMI ou un établissement de paiement. Détecte les IBAN virtuels pour les processus de conformité AML/CFT."
+        "badge": "121 399 BIC",
+        "title": "Lookup BIC/SWIFT",
+        "description": "121 399 entrées BIC (38 761 enrichies LEI via GLEIF) issues de GLEIF, du répertoire SWIFT, Bundesbank, SIX, NBP et EBA Step2."
       },
       "4": {
-        "badge": "Score de risque",
-        "title": "Indicateurs de risque",
-        "description": "Signal de risque composite par IBAN : type d'émetteur, risque pays (basé FATF), détection de BIC de test, accessibilité SEPA et couverture VoP dans un seul objet."
+        "badge": "EMI / vIBAN",
+        "title": "Classification émetteur",
+        "description": "Détecte les IBAN virtuels et les EMI (Wise, Revolut, N26, Mercury…) — un vrai signal compliance qu’un simple mod-97 ne donnera jamais."
       },
       "5": {
-        "badge": "Intégration MCP",
-        "title": "Prêt pour les agents AI",
-        "description": "Support natif du Model Context Protocol. Les agents AI peuvent valider des IBAN et rechercher des codes BIC directement — sans outillage personnalisé."
+        "badge": "Sanctions + FATF",
+        "title": "Score de risque compliance",
+        "description": "Screening sanctions au niveau banque-BIC (OFAC/UE/ONU/SECO) + FATF + SEPA + VoP, distillés en un score de risque 0-100."
       },
       "heading": "Tout ce qu'il vous faut"
     },
@@ -116,6 +117,12 @@
         "cost": "$0.02",
         "description": "Check compliance complet : sanctions, SEPA Instant, VoP, score de risque"
       },
+      "4": {
+        "method": "GET",
+        "path": "/v1/ch/clearing/:iid",
+        "cost": "$0.003",
+        "description": "Recherche BC-Numéro suisse (1 190 entrées SIX)"
+      },
       "heading": "Endpoints et tarifs",
       "subtitle": "Paiement par requête en USDC via x402. Essayez le endpoint /v1/demo gratuitement.",
       "table": {
@@ -123,12 +130,6 @@
         "path": "Chemin",
         "cost": "Coût",
         "description": "Description"
-      },
-      "4": {
-        "method": "GET",
-        "path": "/v1/ch/clearing/:iid",
-        "cost": "$0.003",
-        "description": "Recherche BC-Numéro suisse (1 190 entrées SIX)"
       }
     },
     "quickStart": {
@@ -138,13 +139,14 @@
     "cta": {
       "heading": "Prêt à développer ?",
       "description": "Intégration en quelques minutes. Paiement en USDC — sans clé API, sans abonnement.",
-      "button": "Commencer à développer"
+      "button": "Commencer à développer",
+      "getKeyButton": "Obtenir une clé gratuite"
     }
   },
   "pricing": {
     "metadata": {
       "title": "Tarifs",
-      "description": "Tarification simple et transparente à l'appel. Sans abonnement. Sans clé API. Paiement en USDC via micropaiements x402."
+      "description": "Trois façons de payer, aucune impasse : x402 à l’appel (sans inscription), une clé gratuite (200/mois), ou des packs de crédits prépayés."
     },
     "badge": "Tarification transparente",
     "hero": {
@@ -152,7 +154,7 @@
         "prefix": "Paiement à",
         "highlight": "l'appel"
       },
-      "description": "Sans abonnement. Sans clé API. Des fractions de centime par requête — facturées on-chain en USDC via le protocole x402.",
+      "description": "Trois façons de payer, aucune impasse : paiement à l’appel via x402 (sans inscription), une clé gratuite (200 req/mois), ou des packs de crédits prépayés. Des fractions de centime par requête.",
       "cta": {
         "tryFree": "Essayer gratuitement",
         "x402Explained": "x402 expliqué →"
@@ -267,9 +269,31 @@
     },
     "cta": {
       "heading": "Commencez gratuitement",
-      "description": "Pas de carte bancaire, pas de compte. Ouvrez le playground, lisez la documentation, déployez quand vous êtes prêt.",
+      "description": "Commencez avec x402 (sans compte) ou obtenez une clé gratuite en quelques secondes. Ouvrez le playground, lisez la doc, lancez quand vous êtes prêt.",
       "openPlayground": "Ouvrir le playground",
       "readDocs": "Lire la documentation"
+    },
+    "rails": {
+      "heading": "Trois façons de payer",
+      "subtitle": "Choisissez ce qui vous convient — votre agent ou votre app n’est jamais dans une impasse.",
+      "x402": {
+        "tag": "x402 · sans inscription",
+        "title": "Paiement à l’appel",
+        "body": "Tout agent avec un wallet Base paie en USDC, par requête, sans compte. Découverte sur /.well-known/x402.",
+        "cta": "x402 expliqué →"
+      },
+      "key": {
+        "tag": "Offre gratuite",
+        "title": "Clé API gratuite",
+        "body": "200 requêtes/mois, sans carte. Un email et vous obtenez une clé ifk_ instantanément.",
+        "cta": "Obtenir une clé gratuite"
+      },
+      "packs": {
+        "tag": "Packs de crédits",
+        "title": "Crédits prépayés",
+        "body": "Achat en volume, sans expiration : 1k = 5 $, 5k = 20 $, 25k = 80 $ (jusqu’à 0,0032 $/appel). Les agents achètent en USDC via POST /v1/credits/buy/1k|5k|25k.",
+        "note": "Paiement par carte bientôt disponible — pour l’instant, les agents paient en USDC ou écrivent à support@ibanforge.com."
+      }
     }
   },
   "playground": {

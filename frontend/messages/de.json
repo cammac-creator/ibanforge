@@ -52,42 +52,43 @@
         "prefix": "IBAN",
         "highlight": "forge"
       },
-      "description": "IBAN-Validierung, BIC/SWIFT-Suche, SEPA-Konformität und Risikoindikatoren für Entwickler und AI-Agenten",
+      "description": "Die Compliance-API für KI-Agenten. Die einzige API mit Schweizer BC-Nummer-/QR-IID-Clearingdaten — plus IBAN-Validierung, BIC/SWIFT, EMI/vIBAN-Erkennung und Sanktionsrisiko. Nativ über MCP und x402, ohne Anmeldung.",
       "cta": {
         "tryFree": "Kostenlos testen",
-        "readDocs": "Dokumentation lesen"
+        "readDocs": "Dokumentation lesen",
+        "getKey": "Kostenlosen Key holen"
       }
     },
     "features": {
       "0": {
-        "badge": "89 Länder",
-        "title": "IBAN-Validierung",
-        "description": "Vollständige IBAN-Validierung mit BBAN-Strukturanalyse. Unterstützt 89 Länder mit MOD-97-Prüfsummenverifizierung und detaillierter Feldaufschlüsselung."
+        "badge": "Schweizer Clearing — exklusiv",
+        "title": "BC-Nummer / QR-IID",
+        "description": "Die einzige API mit Schweizer SIX-BankMaster-Clearingdaten: 1.190 BC-Nummern, SIC/euroSIC, QR-IID und Institutstyp. Kein Wettbewerber hat das."
       },
       "1": {
-        "badge": "121.000+ BIC-Einträge",
-        "title": "BIC/SWIFT-Suche",
-        "description": "über 121.000 BIC-Einträge aus öffentlichen Quellen (GLEIF, SWIFT-Verzeichnis, Bundesbank, SIX, NBP), mit LEI-Anreicherung für ~38K Einträge aus GLEIF zur Identifizierung von Finanzinstituten."
+        "badge": "MCP-nativ — agentenbereit",
+        "title": "5 Tools, ohne Anmeldung",
+        "description": "Nativer Model-Context-Protocol-Server (stdio + HTTP). Claude, Cursor und jeder MCP-Agent installieren in einer Zeile: npx -y ibanforge-mcp."
       },
       "2": {
-        "badge": "SEPA + VoP",
-        "title": "Compliance-bereit",
-        "description": "SEPA-Mitgliedschaft, Zahlungsschemata (SCT/SDD/SCT_INST) und VoP-Anforderungen (Verification of Payee) pro Land. Entwickelt für die EU-Regulierungskonformität."
+        "badge": "89 Länder",
+        "title": "IBAN-Validierung",
+        "description": "ISO-13616-Mod-97-Validierung mit vollständiger BBAN-Analyse über 89 Länder, inklusive der EU-EMI-Hubs (LT, EE, MT)."
       },
       "3": {
-        "badge": "vIBAN-Erkennung",
-        "title": "Emittenten-Klassifizierung",
-        "description": "Erkennt, ob der Emittent eine traditionelle Bank, Neobank, ein EMI oder ein Zahlungsinstitut ist. Erkennt virtuelle IBAN für AML/CFT-Compliance-Workflows."
+        "badge": "121.399 BICs",
+        "title": "BIC/SWIFT-Lookup",
+        "description": "121.399 BIC-Einträge (38.761 LEI-angereichert via GLEIF) aus GLEIF, SWIFT-Verzeichnis, Bundesbank, SIX, NBP und EBA Step2."
       },
       "4": {
-        "badge": "Risikobewertung",
-        "title": "Risikoindikatoren",
-        "description": "Zusammengesetztes Risikosignal pro IBAN: Emittententyp, Länderrisiko (FATF-basiert), Test-BIC-Erkennung, SEPA-Erreichbarkeit und VoP-Abdeckung in einem Objekt."
+        "badge": "EMI / vIBAN",
+        "title": "Emittenten-Klassifizierung",
+        "description": "Erkennt virtuelle IBANs und EMIs (Wise, Revolut, N26, Mercury…) — ein echtes Compliance-Signal, das eine Mod-97-Prüfung nie liefert."
       },
       "5": {
-        "badge": "MCP-Integration",
-        "title": "Bereit für AI-Agenten",
-        "description": "Native Unterstützung des Model Context Protocol. AI-Agenten können IBAN validieren und BIC-Codes direkt abfragen — ohne individuelle Werkzeuge."
+        "badge": "Sanktionen + FATF",
+        "title": "Compliance-Risikoscore",
+        "description": "Sanktions-Screening auf Bank-BIC-Ebene (OFAC/EU/UN/SECO) + FATF + SEPA + VoP, destilliert zu einem 0-100-Risikoscore."
       },
       "heading": "Alles, was Sie brauchen"
     },
@@ -116,6 +117,12 @@
         "cost": "$0.02",
         "description": "Vollständiger Compliance-Check: Sanktionen, SEPA Instant, VoP, Risiko-Score"
       },
+      "4": {
+        "method": "GET",
+        "path": "/v1/ch/clearing/:iid",
+        "cost": "$0.003",
+        "description": "Schweizer BC-Nummer-Suche (1 190 SIX-Einträge)"
+      },
       "heading": "Endpoints und Preise",
       "subtitle": "Zahlung pro Anfrage mit USDC über x402. Testen Sie den /v1/demo-Endpoint kostenlos.",
       "table": {
@@ -123,12 +130,6 @@
         "path": "Pfad",
         "cost": "Kosten",
         "description": "Beschreibung"
-      },
-      "4": {
-        "method": "GET",
-        "path": "/v1/ch/clearing/:iid",
-        "cost": "$0.003",
-        "description": "Schweizer BC-Nummer-Suche (1 190 SIX-Einträge)"
       }
     },
     "quickStart": {
@@ -138,13 +139,14 @@
     "cta": {
       "heading": "Bereit loszulegen?",
       "description": "Integration in wenigen Minuten. Zahlung mit USDC — ohne API-Schlüssel, ohne Abonnement.",
-      "button": "Jetzt starten"
+      "button": "Jetzt starten",
+      "getKeyButton": "Kostenlosen Key holen"
     }
   },
   "pricing": {
     "metadata": {
       "title": "Preise",
-      "description": "Einfache, transparente Abrechnung pro Aufruf. Kein Abonnement. Kein API-Schlüssel. Bezahlung mit USDC via x402-Mikrozahlungen."
+      "description": "Drei Zahlungswege, keine Sackgassen: x402 Pay-per-Call (ohne Anmeldung), ein kostenloser Key (200/Monat) oder Prepaid-Credit-Packs."
     },
     "badge": "Transparente Preise",
     "hero": {
@@ -152,7 +154,7 @@
         "prefix": "Zahlung pro",
         "highlight": "Aufruf"
       },
-      "description": "Kein Abonnement. Kein API-Schlüssel. Bruchteile eines Cents pro Anfrage — on-chain abgerechnet mit USDC über das x402-Protokoll.",
+      "description": "Drei Zahlungswege, keine Sackgassen: Pay-per-Call mit x402 (ohne Anmeldung), ein kostenloser Key (200 Anfragen/Monat) oder Prepaid-Credit-Packs. Bruchteile eines Cents pro Anfrage.",
       "cta": {
         "tryFree": "Kostenlos testen",
         "x402Explained": "x402 erklärt →"
@@ -267,9 +269,31 @@
     },
     "cta": {
       "heading": "Kostenlos starten",
-      "description": "Keine Kreditkarte, kein Konto. Öffnen Sie den Playground, lesen Sie die Dokumentation, deployen Sie, wenn Sie bereit sind.",
+      "description": "Starten Sie mit x402 (ohne Konto) oder holen Sie sich in Sekunden einen kostenlosen Key. Öffnen Sie den Playground, lesen Sie die Docs, gehen Sie live, wenn Sie bereit sind.",
       "openPlayground": "Playground öffnen",
       "readDocs": "Dokumentation lesen"
+    },
+    "rails": {
+      "heading": "Drei Zahlungswege",
+      "subtitle": "Wählen Sie, was passt — Ihr Agent oder Ihre App landet nie in einer Sackgasse.",
+      "x402": {
+        "tag": "x402 · ohne Anmeldung",
+        "title": "Pay-per-Call",
+        "body": "Jeder Agent mit Base-Wallet zahlt in USDC, pro Anfrage, ohne Konto. Discovery unter /.well-known/x402.",
+        "cta": "x402 erklärt →"
+      },
+      "key": {
+        "tag": "Kostenlos",
+        "title": "Kostenloser API-Key",
+        "body": "200 Anfragen/Monat, ohne Karte. Eine E-Mail und Sie erhalten sofort einen ifk_-Key.",
+        "cta": "Kostenlosen Key holen"
+      },
+      "packs": {
+        "tag": "Credit-Packs",
+        "title": "Prepaid-Credits",
+        "body": "Im Paket kaufen, ohne Ablauf: 1k = 5 $, 5k = 20 $, 25k = 80 $ (bis 0,0032 $/Aufruf). Agenten kaufen in USDC via POST /v1/credits/buy/1k|5k|25k.",
+        "note": "Kartenzahlung bald verfügbar — vorerst kaufen Agenten in USDC oder schreiben an support@ibanforge.com."
+      }
     }
   },
   "playground": {
