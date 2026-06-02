@@ -36,14 +36,15 @@ key = IBANforge.generate_api_key("agent@yourdomain.com")
 
 with IBANforge(api_key=key["api_key"]) as client:
     out = client.validate_iban("CH9300762011623852957")
-    print(out["country"]["code"])      # CH
-    print(out["bic"]["bankName"])      # UBS Switzerland AG
-    print(out["sepa"]["instant"])      # True
-    print(out["risk_score"])           # 5
+    print(out["country"]["code"])              # CH
+    print(out["bic"]["bank_name"])            # UBS Switzerland AG
+    print(out["sepa"]["member"])              # True
+    print(out["risk_indicators"]["country_risk"])  # "standard"
 
     # Compliance triage in one call ($0.02)
     out = client.check_compliance("GB29NWBK60161331926819")
-    print(out["recommended_action"])   # "allow" | "review" | "block"
+    print(out["compliance"]["risk_score"])    # 0-100
+    print(out["compliance"]["risk_level"])    # "low" | "medium" | "elevated" | "high" | "critical"
 
 # Async path (FastAPI / LangChain async / fan-out)
 import asyncio
@@ -60,13 +61,11 @@ import { IBANforge } from "@ibanforge/sdk";
 
 const ibanforge = new IBANforge({ apiKey: "ifk_..." });
 
-const out = await ibanforge.validateIban({
-  iban: "CH9300762011623852957",
-});
+const out = await ibanforge.validateIban("CH9300762011623852957");
 
-console.log(out.country.code);          // CH
-console.log(out.bic?.bankName);         // UBS Switzerland AG
-console.log(out.sepa.instant);          // true`;
+console.log(out.country?.code);          // CH
+console.log(out.bic?.bank_name);         // UBS Switzerland AG
+console.log(out.sepa?.member);           // true`;
 
 const X402_CLIENT_TS = `import { wrapFetchWithPayment } from "@x402/fetch";
 import { x402Client } from "@x402/fetch";
