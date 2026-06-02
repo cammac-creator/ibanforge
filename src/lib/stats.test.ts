@@ -1,9 +1,25 @@
 import { describe, it, expect, afterAll } from 'vitest';
-import { recordOperation, recordBatch, getStats, getQuickStats, getStatsHistory, getStatusByPath, getBusinessFunnel, classifyClient } from './stats.js';
+import { recordOperation, recordBatch, getStats, getQuickStats, getStatsHistory, getStatusByPath, getBusinessFunnel, classifyClient, extractClientIp } from './stats.js';
 import { closeAll } from './db.js';
 
 afterAll(() => {
   closeAll();
+});
+
+describe('extractClientIp (spoof-resistant, trusted-proxy last hop)', () => {
+  it('prefers x-real-ip (set by the proxy, not the client)', () => {
+    expect(extractClientIp({ 'x-real-ip': '9.9.9.9', 'x-forwarded-for': '1.1.1.1, 2.2.2.2' })).toBe('9.9.9.9');
+  });
+  it('uses the LAST X-Forwarded-For hop (the trusted proxy appends it)', () => {
+    // A client-forged first entry must NOT win — the real peer is the last hop.
+    expect(extractClientIp({ 'x-forwarded-for': '6.6.6.6, 10.0.0.1' })).toBe('10.0.0.1');
+  });
+  it('handles a single XFF value', () => {
+    expect(extractClientIp({ 'x-forwarded-for': '203.0.113.7' })).toBe('203.0.113.7');
+  });
+  it('returns null when no proxy headers are present', () => {
+    expect(extractClientIp({})).toBeNull();
+  });
 });
 
 describe('recordOperation', () => {

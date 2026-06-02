@@ -71,16 +71,26 @@ export function hashIp(ip: string | null | undefined): string | null {
 }
 
 /**
- * Extract the client IP from a Hono request, honoring the proxy headers that
- * Railway sets (`x-forwarded-for` first, then `x-real-ip`).
+ * Extract the client IP from a Hono request behind a trusted reverse proxy
+ * (Railway).
+ *
+ * Security: a client can send any `X-Forwarded-For` it wants, so the FIRST
+ * segment is attacker-controlled and must NOT be trusted — keying rate-limits or
+ * IP hashes off it lets an attacker rotate the key per request (bypass) or
+ * poison another IP's bucket. The trusted proxy appends the real peer address as
+ * the LAST segment, so we read that. `x-real-ip` (set by the proxy itself) is
+ * preferred when present.
  */
 export function extractClientIp(headers: { 'x-forwarded-for'?: string | null; 'x-real-ip'?: string | null }): string | null {
+  const realIp = headers['x-real-ip']?.trim();
+  if (realIp) return realIp;
   const xff = headers['x-forwarded-for'];
   if (xff) {
-    const first = xff.split(',')[0]?.trim();
-    if (first) return first;
+    const parts = xff.split(',').map((p) => p.trim()).filter(Boolean);
+    const last = parts[parts.length - 1];
+    if (last) return last;
   }
-  return headers['x-real-ip'] ?? null;
+  return null;
 }
 
 /**

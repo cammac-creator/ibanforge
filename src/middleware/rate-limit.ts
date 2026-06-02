@@ -1,4 +1,5 @@
 import type { MiddlewareHandler } from 'hono';
+import { extractClientIp } from '../lib/stats.js';
 
 const LIMIT = parseInt(process.env.RATE_LIMIT_PER_MIN ?? '100', 10);
 const WINDOW_MS = 60_000; // 1 minute
@@ -21,11 +22,14 @@ setInterval(() => {
   }
 }, CLEANUP_INTERVAL_MS).unref();
 
+// Use the shared, spoof-resistant extractor (trusted-proxy last hop / x-real-ip)
+// so an attacker can't rotate the rate-limit key via a forged X-Forwarded-For.
 function getClientIp(req: Request): string {
   return (
-    req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
-    req.headers.get('x-real-ip') ??
-    'unknown'
+    extractClientIp({
+      'x-forwarded-for': req.headers.get('x-forwarded-for'),
+      'x-real-ip': req.headers.get('x-real-ip'),
+    }) ?? 'unknown'
   );
 }
 
