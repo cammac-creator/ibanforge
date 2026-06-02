@@ -3,6 +3,54 @@
 All notable changes to IBANforge are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Self-service API-key lifecycle** — `POST /v1/keys/revoke` (kill a leaked key, idempotent) and `POST /v1/keys/rotate` (mint a fresh key that atomically inherits the email, monthly limit and remaining credits, then deactivates the old one). +7 regression tests.
+- **Python SDK ships a `py.typed` marker** (PEP 561) so downstream `mypy`/`pyright` actually consume the inline type hints the package already advertised via the `Typing :: Typed` classifier.
+- **TypeScript SDK test suite** — 25 Vitest specs (mocked `fetch`): base-URL normalization, Bearer-auth headers, request shapes, `validateBatch` input guards, full HTTP-status → typed-error mapping (401/403/402/429-quota/429-rate/4xx/5xx), timeout/network wrapping, and the `usage()` no-key precondition. The SDK previously had zero tests.
+- **Monthly Swiss-clearing refresh** — the `ch_clearing` table (SIX BankMaster) is now reseeded and committed by the existing monthly database cron, in the same workflow as the BIC database (both live in `data/bic.sqlite`, so one workflow / one commit avoids a same-file race).
+
+### Changed
+- **Bank-level sanctions are now built from primary sources** — OFAC SDN (US public domain) as the spine, with EU / UN / SECO consolidated lists best-effort — removing the runtime dependency on the CC-BY-NC OpenSanctions dataset. Country-level FATF/sanctions signals are unchanged. Net effect on BIC8 indicators: identical coverage minus one entity.
+
+### Fixed
+- **Spoof-resistant client-IP extraction** — rate-limiting and stats now read `x-real-ip` (or the *last*, trusted-proxy hop of `X-Forwarded-For`) instead of the attacker-controlled first segment, so a forged `X-Forwarded-For` can no longer rotate around the rate limiter. Single shared extractor (`extractClientIp`) used by both call sites.
+- **Swiss-clearing seed sanity floor** — `seed-bc-nummer.ts` aborts *before* dropping `ch_clearing` if the SIX BankMaster feed returns fewer than 800 rows, so a truncated download can never wipe the ~1190-row table under the unattended cron.
+
+### Notes
+- Two audit findings were investigated and confirmed **false positives** (no change, now documented in code): `qr_iid` is a genuinely distinct allocation column (not a copy of the clearing IID), and `getCountryRisk` is a deliberately separate AML axis that stacks on top of the DB FATF/sanctions signal — re-deriving it from the FATF table would *downgrade* sanctioned/grey-listed country scores.
+
+## [1.3.1] — 2026-05-30
+
+### Fixed
+- **Broken copy-paste SDK examples on `/agents`** — corrected field names to the real response shape (`bank_name`, `sepa.member`, `risk_indicators.country_risk`, `compliance.risk_score`/`risk_level`, `validateIban(iban)`), plus stale country counts.
+- **Coherence pass** — every remaining "75+ countries" string aligned to the real **89** (layout meta in 3 languages, OG image, landing FAQ/meta/H3, blog articles, footer version, published MCP enum).
+
+### Changed
+- Frontend: wired the free-key modal end-to-end, lead with the Swiss / MCP USP, 3-rail pricing.
+- `/fr/famille` reworked into a clear, illustrated FAQ.
+- **Release process** — hybrid procedure documented (`RELEASING.md`): PyPI + MCP Registry publish automatically (MCP via GitHub Actions OIDC), npm publishes manually behind the 2026 npm 2FA approval gate; `mcp-publisher` installed from its release binary.
+- TypeScript SDK published as `@ibanforge/sdk` with corrected package metadata and an accurate README.
+
+## [1.3.0] — 2026-05-29
+
+### Added
+- **BBAN structure for LT, EE, LV, MT, CY** — revives EMI / virtual-IBAN detection in those jurisdictions.
+- **EBA Clearing STEP2 SCT** as an official SEPA reachability source (+201 BICs); EMI classification extended via the EBA / FCA registers.
+- **Compliance transparency** — every response now discloses scope, a disclaimer, and data-freshness metadata.
+- **Discovery surfaces** — `/agents.txt` plain-text index, `agent.json` and `mcp.json` path aliases, regenerated `llms.txt` / `mcp.json` to 1.3.0 truth.
+- **Stripe Checkout credit-pack rail** + success page that retrieves the API key once.
+
+### Changed
+- Hardened the compliance enrichment pipeline (primary-source ingestion).
+- Aligned tool schemas and prices across all three MCP surfaces (stdio, HTTP, card).
+
+### Fixed
+- Flag `XX`-country BICs as test BICs; cap oversized IBAN input.
+- Corrected bank-code drift against the SWIFT IBAN Registry.
+- Correctness, data-accuracy and SDK-parity fixes surfaced by the 4.8 multi-agent audit.
+
 ## [1.2.0] — 2026-04-29
 
 ### Added
