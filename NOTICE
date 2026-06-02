@@ -62,5 +62,14 @@ Foundation) under CC0 1.0 Universal Public Domain Dedication:
 Swiss BC-Nummer / clearing data is sourced from SIX Group AG BankMaster:
   https://www.six-group.com/en/products-services/banking-services/payment-services/bc-bank-master.html
 
+Bank-level (BIC8) sanctions indicators are built directly from the official,
+freely-redistributable consolidated sanctions lists published by:
+  - OFAC (U.S. Office of Foreign Assets Control) — SDN list, U.S. public domain
+  - European Union — consolidated financial sanctions list
+  - United Nations — Security Council consolidated list
+  - SECO (Swiss State Secretariat for Economic Affairs)
+OFAC provides essentially all of the bank-BIC coverage. No third-party
+aggregator is used, so there is no non-commercial (CC-BY-NC) data dependency.
+
 Country risk indicators are derived from publicly available FATF
-(Financial Action Task Force) and EU sanctions lists.
+(Financial Action Task Force) statements and the sanctions lists above.
