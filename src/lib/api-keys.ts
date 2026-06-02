@@ -128,6 +128,61 @@ export interface ApiKeyValidation {
   creditsTotal?: number;
 }
 
+/**
+ * Self-service revocation: deactivate a key given the raw key itself. Returns
+ * true if an active key was found and deactivated. A revoked key can never be
+ * reactivated (rotate to get a fresh one). Idempotent: revoking twice returns
+ * false the second time.
+ */
+export function revokeApiKey(key: string): boolean {
+  if (!key.startsWith(KEY_PREFIX)) return false;
+  const keyHash = hashKey(key);
+  const result = getStatsDB()
+    .prepare('UPDATE api_keys SET active = 0 WHERE key_hash = ? AND active = 1')
+    .run(keyHash);
+  return result.changes > 0;
+}
+
+/**
+ * Self-service rotation: given a valid raw key, mint a fresh key that inherits
+ * the same email, monthly_limit and remaining credits, then revoke the old one
+ * — atomically. A leaked key can thus be replaced without losing the plan or
+ * the prepaid balance. Returns the new raw key, or null if the input key is
+ * invalid/inactive.
+ */
+export function rotateApiKey(
+  oldKey: string,
+): { api_key: string; key_prefix: string; monthly_limit: number | null; credits_remaining: number | null } | null {
+  if (!oldKey.startsWith(KEY_PREFIX)) return null;
+  const db = getStatsDB();
+  const oldHash = hashKey(oldKey);
+  const row = db
+    .prepare('SELECT email, monthly_limit, credits_remaining, credits_total FROM api_keys WHERE key_hash = ? AND active = 1')
+    .get(oldHash) as
+    | { email: string; monthly_limit: number | null; credits_remaining: number | null; credits_total: number | null }
+    | undefined;
+  if (!row) return null;
+
+  const rawKey = KEY_PREFIX + randomBytes(32).toString('hex');
+  const newHash = hashKey(rawKey);
+  const keyPrefix = rawKey.slice(0, 12);
+
+  const tx = db.transaction(() => {
+    db.prepare(
+      'INSERT INTO api_keys (key_hash, key_prefix, email, monthly_limit, credits_remaining, credits_total) VALUES (?, ?, ?, ?, ?, ?)',
+    ).run(newHash, keyPrefix, row.email, row.monthly_limit, row.credits_remaining, row.credits_total);
+    db.prepare('UPDATE api_keys SET active = 0 WHERE key_hash = ?').run(oldHash);
+  });
+  tx();
+
+  return {
+    api_key: rawKey,
+    key_prefix: keyPrefix,
+    monthly_limit: row.monthly_limit,
+    credits_remaining: row.credits_remaining,
+  };
+}
+
 export function validateApiKey(key: string): ApiKeyValidation {
   if (!key.startsWith(KEY_PREFIX)) return { valid: false, keyHash: '', monthlyLimit: DEFAULT_MONTHLY_LIMIT };
   const keyHash = hashKey(key);

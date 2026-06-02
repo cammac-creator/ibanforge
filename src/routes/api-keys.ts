@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { timingSafeEqual } from 'node:crypto';
-import { generateApiKey, validateApiKey, getUsage } from '../lib/api-keys.js';
+import { generateApiKey, validateApiKey, getUsage, revokeApiKey, rotateApiKey } from '../lib/api-keys.js';
 import { getStatsDB } from '../lib/db.js';
 
 // Bundle credits — prepaid pools sized for the 3 typical agent stacks.
@@ -160,6 +160,47 @@ apiKeys.get('/v1/keys/usage', (c) => {
 
   const usage = getUsage(keyHash, monthlyLimit);
   return c.json({ ...usage, key_prefix: key.slice(0, 12) });
+});
+
+/**
+ * Self-service revocation. Auth is the key itself (Authorization: Bearer ifk_*)
+ * — if you hold the key, you may kill it. Lets a holder disable a leaked key
+ * immediately without contacting support.
+ */
+apiKeys.post('/v1/keys/revoke', (c) => {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader?.startsWith('Bearer ifk_')) {
+    return c.json({ error: 'missing_key', message: 'Provide the key to revoke via Authorization: Bearer ifk_xxx' }, 401);
+  }
+  const key = authHeader.slice(7);
+  const revoked = revokeApiKey(key);
+  if (!revoked) {
+    return c.json({ error: 'invalid_key', message: 'Key not found or already revoked.' }, 404);
+  }
+  return c.json({ revoked: true, key_prefix: key.slice(0, 12), message: 'Key permanently deactivated. Rotate to get a fresh one.' });
+});
+
+/**
+ * Self-service rotation. Auth is the (still valid) key itself. Mints a fresh key
+ * inheriting the same plan + remaining credits and revokes the old one atomically.
+ */
+apiKeys.post('/v1/keys/rotate', (c) => {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader?.startsWith('Bearer ifk_')) {
+    return c.json({ error: 'missing_key', message: 'Provide the key to rotate via Authorization: Bearer ifk_xxx' }, 401);
+  }
+  const key = authHeader.slice(7);
+  const rotated = rotateApiKey(key);
+  if (!rotated) {
+    return c.json({ error: 'invalid_key', message: 'Key not found or inactive.' }, 404);
+  }
+  return c.json({
+    api_key: rotated.api_key,
+    key_prefix: rotated.key_prefix,
+    monthly_limit: rotated.monthly_limit ?? 200,
+    credits_remaining: rotated.credits_remaining,
+    message: 'New key issued and the old one revoked. Save this — it will not be shown again.',
+  }, 201);
 });
 
 apiKeys.post('/v1/admin/keys', async (c) => {
