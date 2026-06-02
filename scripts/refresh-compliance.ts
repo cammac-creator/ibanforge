@@ -1,6 +1,8 @@
 /**
  * Compliance data refresh script.
- * Downloads OpenSanctions bulk data + EPC SEPA registers and builds compliance.sqlite.
+ * Downloads primary-source sanctions lists (OFAC/EU/UN/SECO) + EPC SEPA
+ * registers and builds compliance.sqlite. Uses the official, freely
+ * redistributable lists directly — no OpenSanctions (CC-BY-NC) dependency.
  *
  * Run with: npm run compliance:refresh  (or: npx tsx scripts/refresh-compliance.ts)
  */
@@ -51,10 +53,6 @@ const EPC_REGISTERS: { scheme: string; url: string }[] = [
     url: 'https://www.europeanpaymentscouncil.eu/sites/default/files/participants_export/sct_inst/sct_inst.csv',
   },
 ];
-
-// BIC regex for extracting BICs from text
-const BIC_REGEX = /\b([A-Z]{4}[A-Z]{2}[A-Z0-9]{2}(?:[A-Z0-9]{3})?)\b/g;
-const BIC_XML_REGEX = /<BIC>([A-Z0-9]{8,11})<\/BIC>/g;
 
 // ---------------------------------------------------------------------------
 // Helper: fetch with timeout
@@ -171,120 +169,143 @@ function insertStaticData(db: Database.Database): void {
 }
 
 // ---------------------------------------------------------------------------
-// OpenSanctions download & parse
+// Primary-source sanctions download & parse
+//
+// We ingest the official, freely-redistributable consolidated lists directly —
+// OFAC (US public domain), the EU consolidated list, the UN SC consolidated XML
+// and SECO (CH) — instead of OpenSanctions, whose dataset is CC-BY-NC
+// (non-commercial) and cannot be used in a paid product. OFAC is the spine:
+// its SDN remarks field carries "SWIFT/BIC <code>" tokens for sanctioned banks.
+// The other three rarely expose a BIC in their raw exports (measured: EU≈3,
+// SECO≈1, UN≈0 — OpenSanctions wasn't enriching them either), but we keep them
+// wired, best-effort, so the OFAC/EU/UN/SECO claim stays honest.
 // ---------------------------------------------------------------------------
 
-async function fetchOpenSanctions(db: Database.Database): Promise<void> {
-  console.log('\n[2/5] Downloading OpenSanctions data (4 sources)...');
+// "SWIFT/BIC HAVIGB2L" or "SWIFT HAVIGB2L" inside free-text remarks.
+const SWIFT_REMARK_REGEX = /SWIFT(?:\/BIC)?[:\s]+([A-Z]{4}[A-Z]{2}[A-Z0-9]{2}(?:[A-Z0-9]{3})?)/gi;
 
-  // Download each sanctions source separately for better source_list classification
-  const SANCTIONS_SOURCES = [
-    { name: 'OFAC', url: 'https://data.opensanctions.org/datasets/latest/us_ofac_sdn/targets.simple.csv' },
-    { name: 'EU', url: 'https://data.opensanctions.org/datasets/latest/eu_fsf/targets.simple.csv' },
-    { name: 'UN', url: 'https://data.opensanctions.org/datasets/latest/un_sc_sanctions/targets.simple.csv' },
-    { name: 'SECO', url: 'https://data.opensanctions.org/datasets/latest/ch_seco_sanctions/targets.simple.csv' },
-  ];
+async function fetchPrimarySanctions(db: Database.Database): Promise<void> {
+  console.log('\n[2/5] Downloading primary-source sanctions (OFAC/EU/UN/SECO)...');
 
-  // Cross-check candidate BICs against the real BIC base (read-only): a regex
-  // match on free-text identifiers is only kept if it is an actual bank BIC.
+  // Cross-check candidate BICs against the real BIC base (read-only): a match
+  // is only kept if it is an actual bank BIC present in our directory.
   const bicDB = new Database(resolve(DATA_DIR, 'bic.sqlite'), { readonly: true });
   const bicLookup = bicDB.prepare('SELECT 1 FROM bic_entries WHERE bic8 = ? LIMIT 1');
 
+  const insertEntity = db.prepare(
+    `INSERT OR IGNORE INTO sanctioned_entities (bic8, entity_name, source_list, country_code)
+     VALUES (?, ?, ?, ?)`
+  );
+  const insertBatch = db.transaction((rows: Array<[string, string, string, string]>) => {
+    for (const row of rows) insertEntity.run(...row);
+  });
+
+  // Extract every "SWIFT/BIC <code>" from a blob of text, validate it, keep the
+  // ones that are real bank BICs (dedup via `seen`). Returns the kept bic8 list.
+  const extractBics = (text: string, seen: Set<string>): string[] => {
+    const out: string[] = [];
+    let m: RegExpExecArray | null;
+    SWIFT_REMARK_REGEX.lastIndex = 0;
+    while ((m = SWIFT_REMARK_REGEX.exec(text)) !== null) {
+      const bic8 = m[1].toUpperCase().substring(0, 8);
+      if (seen.has(bic8)) continue;
+      if (!validateBIC(bic8).valid || !bicLookup.get(bic8)) continue;
+      seen.add(bic8);
+      out.push(bic8);
+    }
+    return out;
+  };
+
   try {
-    for (const source of SANCTIONS_SOURCES) {
-      const csvPath = resolve(TMP_DIR, `opensanctions_${source.name}.csv`);
-      try {
-        await importSanctionsCSV(db, source.url, source.name, csvPath, bicLookup);
-      } catch (err) {
-        console.warn(`  WARNING: ${source.name} download failed: ${(err as Error).message}`);
+    // ---- OFAC SDN (US public domain) — the spine ----
+    try {
+      const csvPath = resolve(TMP_DIR, 'ofac_sdn.csv');
+      console.log('  Fetching OFAC SDN: https://www.treasury.gov/ofac/downloads/sdn.csv');
+      await downloadFile('https://www.treasury.gov/ofac/downloads/sdn.csv', csvPath);
+      const { createReadStream } = await import('node:fs');
+      const rl = createInterface({ input: createReadStream(csvPath), crlfDelay: Infinity });
+      const seen = new Set<string>();
+      const batch: Array<[string, string, string, string]> = [];
+      let lines = 0;
+      // SDN.csv columns (no header): 0=ent_num,1=SDN_Name,2=SDN_Type,3=Program,
+      // 4=Title,... last meaningful free-text field = remarks (col 11).
+      for await (const line of rl) {
+        lines++;
+        const cols = parseCsvLine(line);
+        const name = (cols[1] ?? '').replace(/^-0-\s*$/, '').substring(0, 200);
+        const remarks = cols[11] ?? cols[cols.length - 1] ?? '';
+        if (!/SWIFT/i.test(remarks)) continue;
+        for (const bic8 of extractBics(remarks, seen)) {
+          batch.push([bic8, name, 'OFAC', '']);
+        }
       }
+      if (batch.length) insertBatch(batch);
+      console.log(`  OFAC: ${lines} rows, ${batch.length} bank BICs kept`);
+    } catch (err) {
+      console.warn(`  WARNING: OFAC download/parse failed: ${(err as Error).message}`);
+    }
+
+    // ---- EU consolidated list (best-effort; rarely carries BICs) ----
+    try {
+      const csvPath = resolve(TMP_DIR, 'eu_fsf.csv');
+      const euUrl =
+        'https://webgate.ec.europa.eu/fsd/fsf/public/files/csvFullSanctionsList_1_1/content?token=dG9rZW4tMjAxNw';
+      console.log('  Fetching EU consolidated list...');
+      await downloadFile(euUrl, csvPath);
+      const { readFileSync } = await import('node:fs');
+      const text = readFileSync(csvPath, 'utf-8');
+      const seen = new Set<string>();
+      const batch: Array<[string, string, string, string]> = [];
+      for (const bic8 of extractBics(text, seen)) {
+        batch.push([bic8, 'EU-listed entity', 'EU', '']);
+      }
+      if (batch.length) insertBatch(batch);
+      console.log(`  EU: ${batch.length} bank BICs kept`);
+    } catch (err) {
+      console.warn(`  WARNING: EU download/parse failed: ${(err as Error).message}`);
+    }
+
+    // ---- UN SC consolidated XML (best-effort) ----
+    try {
+      const xmlPath = resolve(TMP_DIR, 'un_consolidated.xml');
+      console.log('  Fetching UN consolidated list...');
+      await downloadFile('https://scsanctions.un.org/resources/xml/en/consolidated.xml', xmlPath);
+      const { readFileSync } = await import('node:fs');
+      const text = readFileSync(xmlPath, 'utf-8');
+      const seen = new Set<string>();
+      const batch: Array<[string, string, string, string]> = [];
+      for (const bic8 of extractBics(text, seen)) {
+        batch.push([bic8, 'UN-listed entity', 'UN', '']);
+      }
+      if (batch.length) insertBatch(batch);
+      console.log(`  UN: ${batch.length} bank BICs kept`);
+    } catch (err) {
+      console.warn(`  WARNING: UN download/parse failed: ${(err as Error).message}`);
+    }
+
+    // ---- SECO (CH) consolidated list — XML (best-effort) ----
+    try {
+      const xmlPath = resolve(TMP_DIR, 'seco.xml');
+      console.log('  Fetching SECO (CH) list...');
+      await downloadFile('https://www.sesam.search.admin.ch/sesam-search-web/pages/search/searchSanctionWithExport.xhtml?lang=en&action=exportXml', xmlPath);
+      const { readFileSync } = await import('node:fs');
+      const text = readFileSync(xmlPath, 'utf-8');
+      const seen = new Set<string>();
+      const batch: Array<[string, string, string, string]> = [];
+      for (const bic8 of extractBics(text, seen)) {
+        batch.push([bic8, 'SECO-listed entity', 'SECO', '']);
+      }
+      if (batch.length) insertBatch(batch);
+      console.log(`  SECO: ${batch.length} bank BICs kept`);
+    } catch (err) {
+      console.warn(`  WARNING: SECO download/parse failed: ${(err as Error).message}`);
     }
   } finally {
     bicDB.close();
   }
 
   const entityCount = (db.prepare(`SELECT COUNT(*) as n FROM sanctioned_entities`).get() as { n: number }).n;
-  console.log(`  sanctioned_entities total: ${entityCount} rows (after dedup across all sources)`);
-}
-
-async function importSanctionsCSV(
-  db: Database.Database,
-  url: string,
-  sourceLabel: string,
-  csvPath: string,
-  bicLookup: Database.Statement,
-): Promise<void> {
-  console.log(`  Fetching ${sourceLabel}: ${url}`);
-  await downloadFile(url, csvPath);
-  console.log(`  Parsing ${sourceLabel} BICs...`);
-
-  const insertEntity = db.prepare(
-    `INSERT OR IGNORE INTO sanctioned_entities (bic8, entity_name, source_list, country_code)
-     VALUES (?, ?, ?, ?)`
-  );
-
-  let lineCount = 0;
-  let bicCount = 0;
-  let rejectedCount = 0;
-  let headerParsed = false;
-  let colIdentifiers = -1;
-  let colName = -1;
-  let colCountries = -1;
-
-  const { createReadStream } = await import('node:fs');
-  const rl = createInterface({ input: createReadStream(csvPath), crlfDelay: Infinity });
-
-  const insertBatch = db.transaction((rows: Array<[string, string, string, string]>) => {
-    for (const row of rows) insertEntity.run(...row);
-  });
-
-  const batch: Array<[string, string, string, string]> = [];
-
-  for await (const line of rl) {
-    lineCount++;
-    if (!headerParsed) {
-      const cols = parseCsvLine(line);
-      colIdentifiers = cols.indexOf('identifiers');
-      colName = cols.indexOf('caption');
-      if (colName === -1) colName = cols.indexOf('name');
-      colCountries = cols.indexOf('countries');
-      headerParsed = true;
-      continue;
-    }
-
-    const cols = parseCsvLine(line);
-    if (cols.length < 3) continue;
-
-    const identifiers = colIdentifiers >= 0 ? (cols[colIdentifiers] ?? '') : '';
-    const entityName = colName >= 0 ? (cols[colName] ?? '') : '';
-    const countries = colCountries >= 0 ? (cols[colCountries] ?? '') : '';
-
-    if (!identifiers) continue;
-
-    const bics = new Set<string>();
-    let match: RegExpExecArray | null;
-    BIC_REGEX.lastIndex = 0;
-    while ((match = BIC_REGEX.exec(identifiers)) !== null) {
-      bics.add(match[1].substring(0, 8));
-    }
-    if (bics.size === 0) continue;
-
-    const countryCode = countries.split(/[,;|\s]+/)[0]?.trim().toUpperCase() ?? '';
-    for (const bic8 of bics) {
-      // Reject regex matches that are not real bank identifiers: the candidate
-      // must pass ISO 9362 format validation AND exist in the BIC base.
-      if (!validateBIC(bic8).valid || !bicLookup.get(bic8)) {
-        rejectedCount++;
-        continue;
-      }
-      batch.push([bic8, entityName.substring(0, 200), sourceLabel, countryCode]);
-      bicCount++;
-    }
-    if (batch.length >= 500) insertBatch(batch.splice(0, batch.length));
-  }
-  if (batch.length > 0) insertBatch(batch.splice(0, batch.length));
-
-  console.log(`  ${sourceLabel}: ${lineCount} lines, ${bicCount} BICs kept, ${rejectedCount} rejected (invalid format or unknown BIC)`);
+  console.log(`  sanctioned_entities total: ${entityCount} rows (deduped across sources)`);
 }
 
 // ---------------------------------------------------------------------------
@@ -440,7 +461,7 @@ function insertMetadata(db: Database.Database): void {
   const runMeta = db.transaction(() => {
     insertMeta.run('last_refresh', new Date().toISOString());
     insertMeta.run('version', '1.0.0');
-    insertMeta.run('sources', 'OpenSanctions,SECO,FATF,EPC-SCT,EPC-SDD,EPC-SCT_INST');
+    insertMeta.run('sources', 'OFAC,EU,UN,SECO,FATF,EPC-SCT,EPC-SDD,EPC-SCT_INST');
     insertMeta.run('fatf_as_of', FATF_AS_OF);
   });
 
@@ -505,8 +526,8 @@ async function main(): Promise<void> {
   // 3. Insert static data
   insertStaticData(db);
 
-  // 4. OpenSanctions (BIC-level)
-  await fetchOpenSanctions(db);
+  // 4. Primary-source sanctions (OFAC/EU/UN/SECO, BIC-level)
+  await fetchPrimarySanctions(db);
 
   // 5. EPC SEPA registers
   await fetchSepaRegisters(db);
@@ -521,11 +542,11 @@ async function main(): Promise<void> {
   printSummary(db);
 
   // 8b. Sanity floor — refuse to ship a database that screens nothing.
-  // Each OpenSanctions source can fail with only a WARNING (network/format),
-  // so a fully-failed refresh would otherwise produce a DB with 0 sanctioned
-  // entities and the live API would answer "clean" for every BIC — a systemic
-  // false-negative. Abort and keep the previous compliance.sqlite instead.
-  const SANCTIONS_FLOOR = 50; // well below the normal few-hundred bank BICs
+  // OFAC carries ~98% of our BIC coverage, so an OFAC fetch failure can fail
+  // with only a WARNING and otherwise leave a DB that screens almost nothing —
+  // the live API would answer "clean" for every BIC, a systemic false-negative.
+  // Abort and keep the previous compliance.sqlite instead.
+  const SANCTIONS_FLOOR = 50; // well below the normal ~190 OFAC bank BICs
   const shippedEntities = (
     db.prepare('SELECT COUNT(*) AS n FROM sanctioned_entities').get() as { n: number }
   ).n;
@@ -533,7 +554,7 @@ async function main(): Promise<void> {
     db.close();
     throw new Error(
       `Refusing to ship compliance.sqlite: only ${shippedEntities} sanctioned entities ` +
-        `(floor is ${SANCTIONS_FLOOR}). Likely an OpenSanctions download failure — ` +
+        `(floor is ${SANCTIONS_FLOOR}). Likely an OFAC download failure — ` +
         `keeping the existing database. Re-run once the sources are reachable.`,
     );
   }
