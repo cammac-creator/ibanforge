@@ -19,6 +19,13 @@ const Database = require('better-sqlite3') as typeof import('better-sqlite3');
 const BIC_DB_PATH = resolve(__dirname, '../data/bic.sqlite');
 const CSV_URL = 'https://api.six-group.com/api/epcd/bankmaster/v3/bankmaster_V3.csv';
 
+// Sanity floor: the live SIX BankMaster has ~1190 institutions. If a fetch
+// returns far fewer (truncated download, upstream incident, format change that
+// our parser silently mangles), we MUST NOT drop the good table and replace it
+// with garbage — especially under the unattended monthly cron. Abort loudly
+// *before* touching the DB and let the existing data stand.
+const MIN_EXPECTED_ROWS = 800;
+
 function zeroPad(value: string | number, length = 5): string {
   return String(value).padStart(length, '0');
 }
@@ -149,6 +156,11 @@ function transformRow(row: Record<string, string>): ClearingRow | null {
   const iidTypeRaw = parseInt(row['IID type'] ?? '', 10);
   const iid_type = [1, 2, 4].includes(iidTypeRaw) ? iidTypeRaw : null;
 
+  // QR-IID is its OWN allocation column, distinct from the clearing IID. They
+  // coincide for only a handful of institutions (e.g. UBS) and differ for most
+  // (e.g. PostFinance iid=30000 → qr_iid=09000). An audit flagged "qr_iid looks
+  // wrong" — verified false positive: the column mapping is correct, the values
+  // are genuinely independent. Do NOT "fix" this by sourcing it from iid.
   const qrIidRaw = row['QR-IID allocation'];
   const qr_iid = qrIidRaw && qrIidRaw.trim() !== '' ? zeroPad(qrIidRaw) : null;
 
@@ -181,6 +193,14 @@ async function main() {
   const csvText = await downloadCSV();
   const rows = parseCSV(csvText);
   console.log(`Parsed ${rows.length} CSV rows`);
+
+  if (rows.length < MIN_EXPECTED_ROWS) {
+    throw new Error(
+      `Sanity floor: parsed ${rows.length} rows but expected at least ${MIN_EXPECTED_ROWS}. ` +
+        `Refusing to drop ch_clearing — keeping the existing table intact. ` +
+        `Check the SIX BankMaster feed (${CSV_URL}).`,
+    );
+  }
 
   // Open database in read-write mode (NOT via getBicDB which is readonly)
   const db = new Database(BIC_DB_PATH);
