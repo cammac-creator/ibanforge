@@ -69,6 +69,7 @@ jobs:
       #   cd sdks/typescript && npm run build && npm publish --access public
       - name: Publish ibanforge-mcp (best-effort — manual fallback on 2FA gate)
         if: hashFiles('mcp/package.json') != ''
+        continue-on-error: true # never let an npm hiccup (incl. npm ci) block the PyPI/MCP steps
         working-directory: mcp
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -92,6 +93,7 @@ jobs:
 
       - name: Publish @ibanforge/sdk (best-effort — manual fallback on 2FA gate)
         if: hashFiles('sdks/typescript/package.json') != ''
+        continue-on-error: true # never let an npm hiccup (incl. npm ci) block the PyPI/MCP steps
         working-directory: sdks/typescript
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

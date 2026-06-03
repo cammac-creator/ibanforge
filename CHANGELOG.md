@@ -7,8 +7,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ### Added
 - **Self-service API-key lifecycle** — `POST /v1/keys/revoke` (kill a leaked key, idempotent) and `POST /v1/keys/rotate` (mint a fresh key that atomically inherits the email, monthly limit and remaining credits, then deactivates the old one). +7 regression tests.
-- **Python SDK ships a `py.typed` marker** (PEP 561) so downstream `mypy`/`pyright` actually consume the inline type hints the package already advertised via the `Typing :: Typed` classifier.
-- **TypeScript SDK test suite** — 25 Vitest specs (mocked `fetch`): base-URL normalization, Bearer-auth headers, request shapes, `validateBatch` input guards, full HTTP-status → typed-error mapping (401/403/402/429-quota/429-rate/4xx/5xx), timeout/network wrapping, and the `usage()` no-key precondition. The SDK previously had zero tests.
+- **TypeScript SDK test suite** — 25 Vitest specs (mocked `fetch`): base-URL normalization, Bearer-auth headers, request shapes, `validateBatch` input guards, full HTTP-status → typed-error mapping (401/403/402/429-quota/429-rate/4xx/5xx), timeout/network wrapping, and the `usage()` no-key precondition. The SDK previously had zero tests. Both SDK suites now run in CI on every push.
 - **Monthly Swiss-clearing refresh** — the `ch_clearing` table (SIX BankMaster) is now reseeded and committed by the existing monthly database cron, in the same workflow as the BIC database (both live in `data/bic.sqlite`, so one workflow / one commit avoids a same-file race).
 
 ### Changed
@@ -20,6 +19,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ### Notes
 - Two audit findings were investigated and confirmed **false positives** (no change, now documented in code): `qr_iid` is a genuinely distinct allocation column (not a copy of the clearing IID), and `getCountryRisk` is a deliberately separate AML axis that stacks on top of the DB FATF/sanctions signal — re-deriving it from the FATF table would *downgrade* sanctioned/grey-listed country scores.
+
+## [1.3.2] — 2026-06-03
+
+### Fixed
+- **Python SDK now ships its `py.typed` marker** (PEP 561). The package already advertised `Typing :: Typed`, but without the marker file downstream `mypy`/`pyright` silently ignored the inline type hints. `pip install -U ibanforge` (≥ 1.3.2) now gives type-checked autocompletion and signature checking. _Python SDK only — the API, npm SDK and MCP server are unchanged at 1.3.1._
 
 ## [1.3.1] — 2026-05-30
 
