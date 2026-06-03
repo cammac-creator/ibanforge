@@ -20,3 +20,6 @@ mcp/dist/
 .mcpregistry_*_token
 mcp/.mcpregistry_*_token
 .vercel
+
+# Private internal reports (revenue/traffic reality) — never publish
+docs/internal/
