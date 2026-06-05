@@ -604,6 +604,24 @@
       "day": "{count, plural, one {jour} other {jours}}",
       "hour": "{count, plural, one {heure} other {heures}}",
       "minute": "{count, plural, one {minute} other {minutes}}"
+    },
+    "revenue": {
+      "title": "Revenus & solde on-chain",
+      "hint": "Solde live du wallet x402 (USDC sur Base) lu directement on-chain, plus l'historique des transactions à la demande. Le rail Stripe (carte) est codé mais pas encore configuré.",
+      "usdcRail": "USDC · x402 · Base",
+      "live": "live",
+      "liveBalance": "Solde on-chain (live)",
+      "loadHistory": "Charger l'historique on-chain",
+      "loading": "Scan de la blockchain…",
+      "totalReceived": "Total reçu",
+      "noTx": "Aucune transaction dans la fenêtre scannée.",
+      "rpcHint": "Le solde provient de transferts antérieurs. Pour l'historique complet, configure un RPC dédié (BASE_RPC_URL).",
+      "error": "Historique indisponible (RPC lent ou timeout).",
+      "partial": "Scan partiel (limite RPC) — total possiblement sous-estimé.",
+      "stripeRail": "Stripe · carte",
+      "stripeRailSub": "Paiements par carte",
+      "stripeNotConfigured": "Non configuré",
+      "stripeHint": "Le code est prêt — il manque la config compte Stripe (clés + Payment Links). Voir docs/business/stripe-setup.md."
     }
   },
   "docs": {

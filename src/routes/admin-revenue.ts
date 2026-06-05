@@ -6,6 +6,8 @@ const USDC_BASE_CONTRACT = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
 const BASE_RPC_URL = process.env.BASE_RPC_URL ?? 'https://mainnet.base.org';
 const USDC_DECIMALS = 6;
 const TRANSFER_TOPIC = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
+// keccak256("balanceOf(address)")[:4] — ERC-20 balance read.
+const BALANCE_OF_SELECTOR = '0x70a08231';
 const CHUNK_SIZE = 10_000n;
 const DEFAULT_LOOKBACK_BLOCKS = 1_300_000n;
 const BASE_BLOCK_TIME_SEC = 2;
@@ -82,6 +84,23 @@ async function fetchLogsChunk(
   }
 }
 
+/**
+ * Live on-chain USDC balance of the wallet via a single `balanceOf` eth_call.
+ * Instant (one RPC round-trip) and always exact — unlike summing Transfer logs,
+ * it needs no block-range scan, so it surfaces funds received OUTSIDE the
+ * lookback window. Returns null if the RPC call fails.
+ */
+async function fetchBalanceUsdc(wallet: string): Promise<number | null> {
+  try {
+    const data = BALANCE_OF_SELECTOR + wallet.slice(2).padStart(64, '0').toLowerCase();
+    const hex = await rpcCall<string>('eth_call', [{ to: USDC_BASE_CONTRACT, data }, 'latest']);
+    if (!hex || hex === '0x') return 0;
+    return rawToUsdc(BigInt(hex));
+  } catch {
+    return null;
+  }
+}
+
 function topicToAddress(topic: string): string {
   return '0x' + topic.slice(-40).toLowerCase();
 }
@@ -98,6 +117,20 @@ adminRevenue.get('/admin/revenue', async (c) => {
   const wallet = process.env.WALLET_ADDRESS;
   if (!wallet || wallet === '0x0000000000000000000000000000000000000000') {
     return c.json({ error: 'no_wallet', message: 'WALLET_ADDRESS not configured.' }, 500);
+  }
+
+  // Fast path: live balance only (single eth_call, no Transfer-log scan).
+  // The full scan below can take ~25s; the dashboard headline uses this so the
+  // page never blocks on log fetching.
+  if (c.req.query('balance_only') === 'true') {
+    return c.json({
+      wallet,
+      network: 'base',
+      asset: 'USDC',
+      contract: USDC_BASE_CONTRACT,
+      balance_usdc: await fetchBalanceUsdc(wallet),
+      balance_only: true,
+    });
   }
 
   const lookbackParam = c.req.query('blocks');
@@ -177,6 +210,7 @@ adminRevenue.get('/admin/revenue', async (c) => {
     network: 'base',
     asset: 'USDC',
     contract: USDC_BASE_CONTRACT,
+    balance_usdc: await fetchBalanceUsdc(wallet),
     total_received_usdc: rawToUsdc(totalRaw),
     transaction_count: txs.length,
     block_range: {

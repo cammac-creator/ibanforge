@@ -5,6 +5,7 @@ import { ProgressBars } from '@/components/dashboard/progress-bars';
 import { StatusByPathTable, type StatusByPathRow } from '@/components/dashboard/status-by-path-table';
 import { BusinessFunnelChart, type BusinessFunnelDay } from '@/components/dashboard/business-funnel-chart';
 import { InfoDot } from '@/components/dashboard/info-dot';
+import { RevenueCard } from '@/components/dashboard/revenue-card';
 import { getTranslations, getLocale } from 'next-intl/server';
 
 const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
@@ -273,6 +274,9 @@ export default async function DashboardPage() {
           hint="% d’IBAN jugés valides parmi les IBAN soumis à /v1/iban/validate. Un taux bas signifie que les appelants envoient beaucoup d’IBAN mal formés."
         />
       </div>
+
+      {/* Revenue & on-chain balance — live USDC wallet balance + tx history (+ Stripe rail placeholder) */}
+      <RevenueCard />
 
       {/* NEW: Business funnel — the chart that actually tells the conversion story */}
       <div className="rounded-xl border border-zinc-800/60 bg-gradient-to-br from-zinc-900 to-zinc-900/60 p-5">

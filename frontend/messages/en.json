@@ -604,6 +604,24 @@
       "day": "{count, plural, one {day} other {days}}",
       "hour": "{count, plural, one {hour} other {hours}}",
       "minute": "{count, plural, one {minute} other {minutes}}"
+    },
+    "revenue": {
+      "title": "Revenue & on-chain balance",
+      "hint": "Live balance of the x402 wallet (USDC on Base) read directly on-chain, plus on-demand transaction history. The Stripe (card) rail is coded but not yet configured.",
+      "usdcRail": "USDC · x402 · Base",
+      "live": "live",
+      "liveBalance": "On-chain balance (live)",
+      "loadHistory": "Load on-chain history",
+      "loading": "Scanning the blockchain…",
+      "totalReceived": "Total received",
+      "noTx": "No transactions in the scanned window.",
+      "rpcHint": "The balance comes from earlier transfers. For the full history, set a dedicated RPC (BASE_RPC_URL).",
+      "error": "History unavailable (slow RPC or timeout).",
+      "partial": "Partial scan (RPC rate limit) — total may be under-reported.",
+      "stripeRail": "Stripe · card",
+      "stripeRailSub": "Card payments",
+      "stripeNotConfigured": "Not configured",
+      "stripeHint": "The code is ready — only the Stripe account config is missing (keys + Payment Links). See docs/business/stripe-setup.md."
     }
   },
   "docs": {

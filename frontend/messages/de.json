@@ -604,6 +604,24 @@
       "day": "{count, plural, one {Tag} other {Tage}}",
       "hour": "{count, plural, one {Stunde} other {Stunden}}",
       "minute": "{count, plural, one {Minute} other {Minuten}}"
+    },
+    "revenue": {
+      "title": "Einnahmen & On-Chain-Saldo",
+      "hint": "Live-Saldo des x402-Wallets (USDC auf Base), direkt on-chain gelesen, plus Transaktionsverlauf auf Anfrage. Der Stripe-Kanal (Karte) ist programmiert, aber noch nicht konfiguriert.",
+      "usdcRail": "USDC · x402 · Base",
+      "live": "live",
+      "liveBalance": "On-Chain-Saldo (live)",
+      "loadHistory": "On-Chain-Verlauf laden",
+      "loading": "Blockchain wird gescannt…",
+      "totalReceived": "Gesamt erhalten",
+      "noTx": "Keine Transaktionen im gescannten Zeitraum.",
+      "rpcHint": "Der Saldo stammt aus früheren Überweisungen. Für den vollständigen Verlauf einen dedizierten RPC (BASE_RPC_URL) konfigurieren.",
+      "error": "Verlauf nicht verfügbar (langsamer RPC oder Timeout).",
+      "partial": "Teil-Scan (RPC-Limit) — Summe evtl. unvollständig.",
+      "stripeRail": "Stripe · Karte",
+      "stripeRailSub": "Kartenzahlungen",
+      "stripeNotConfigured": "Nicht konfiguriert",
+      "stripeHint": "Der Code ist fertig — es fehlt nur die Stripe-Kontokonfiguration (Schlüssel + Payment Links). Siehe docs/business/stripe-setup.md."
     }
   },
   "docs": {
