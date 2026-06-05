@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { getStatsDB } from '../lib/db.js';
 
 const adminRevenue = new Hono();
 
@@ -108,6 +109,55 @@ function topicToAddress(topic: string): string {
   return '0x' + topic.slice(-40).toLowerCase();
 }
 
+// ---------------------------------------------------------------------------
+// Transaction cache
+//
+// Public Base RPCs cap eth_getLogs ranges and silently drop chunks under load,
+// so a single full scan returns a NONDETERMINISTIC subset (5, 8, 13…). We
+// persist every transfer a scan ever sees (keyed by tx hash) and serve the
+// accumulated union — so the history converges to complete and then stays
+// stable, independent of per-call RPC flakiness. A dedicated BASE_RPC_URL makes
+// each scan complete on its own, but the cache means we don't depend on it.
+// ---------------------------------------------------------------------------
+interface CachedTx {
+  hash: string;
+  from_addr: string;
+  value_usdc: number;
+  block: number;
+  ts: string | null;
+}
+
+function ensureTxCache(): void {
+  getStatsDB().exec(
+    `CREATE TABLE IF NOT EXISTS wallet_transactions (
+       hash TEXT PRIMARY KEY,
+       from_addr TEXT,
+       value_usdc REAL NOT NULL,
+       block INTEGER NOT NULL,
+       ts TEXT
+     )`,
+  );
+}
+
+function cacheTxs(
+  rows: Array<{ hash: string; from: string; value_usdc: number; block: number; time: string }>,
+): void {
+  if (rows.length === 0) return;
+  const db = getStatsDB();
+  const stmt = db.prepare(
+    'INSERT OR IGNORE INTO wallet_transactions (hash, from_addr, value_usdc, block, ts) VALUES (?, ?, ?, ?, ?)',
+  );
+  db.transaction((rs: typeof rows) => {
+    for (const r of rs) stmt.run(r.hash, r.from, r.value_usdc, r.block, r.time);
+  })(rows);
+}
+
+function readCachedTxs(): CachedTx[] {
+  return getStatsDB()
+    .prepare('SELECT hash, from_addr, value_usdc, block, ts FROM wallet_transactions ORDER BY block DESC')
+    .all() as CachedTx[];
+}
+
 function addressToTopic(addr: string): string {
   return '0x' + addr.slice(2).padStart(64, '0').toLowerCase();
 }
@@ -189,21 +239,34 @@ adminRevenue.get('/admin/revenue', async (c) => {
     .filter((tx) => tx.to === walletLc)
     .sort((a, b) => Number(b.blockNumber - a.blockNumber));
 
-  let totalRaw = 0n;
+  // Persist this (best-effort, possibly partial) scan, then serve the union of
+  // everything ever seen — converges to the complete history and stays stable.
+  ensureTxCache();
+  cacheTxs(
+    txs.map((tx) => ({
+      hash: tx.hash,
+      from: tx.from,
+      value_usdc: rawToUsdc(tx.value),
+      block: Number(tx.blockNumber),
+      time: new Date(tx.timestamp * 1000).toISOString(),
+    })),
+  );
+  const cached = readCachedTxs();
+
+  const totalUsdc = cached.reduce((s, t) => s + t.value_usdc, 0);
   const byDay: Record<string, number> = {};
-  for (const tx of txs) {
-    totalRaw += tx.value;
-    const day = new Date(tx.timestamp * 1000).toISOString().slice(0, 10);
-    byDay[day] = (byDay[day] ?? 0) + rawToUsdc(tx.value);
+  for (const t of cached) {
+    const day = (t.ts ?? '').slice(0, 10);
+    if (day) byDay[day] = (byDay[day] ?? 0) + t.value_usdc;
   }
 
-  const recent = txs.slice(0, 20).map((tx) => ({
-    hash: tx.hash,
-    from: tx.from,
-    value_usdc: rawToUsdc(tx.value),
-    block: Number(tx.blockNumber),
-    time: new Date(tx.timestamp * 1000).toISOString(),
-    explorer: `https://basescan.org/tx/${tx.hash}`,
+  const recent = cached.slice(0, 20).map((t) => ({
+    hash: t.hash,
+    from: t.from_addr,
+    value_usdc: t.value_usdc,
+    block: t.block,
+    time: t.ts,
+    explorer: `https://basescan.org/tx/${t.hash}`,
   }));
 
   const sortedByDay = Object.fromEntries(Object.entries(byDay).sort((a, b) => b[0].localeCompare(a[0])));
@@ -214,8 +277,9 @@ adminRevenue.get('/admin/revenue', async (c) => {
     asset: 'USDC',
     contract: USDC_BASE_CONTRACT,
     balance_usdc: await fetchBalanceUsdc(wallet),
-    total_received_usdc: rawToUsdc(totalRaw),
-    transaction_count: txs.length,
+    total_received_usdc: totalUsdc,
+    transaction_count: cached.length,
+    scanned_this_call: txs.length,
     block_range: {
       from: Number(startBlock),
       to: Number(head),
