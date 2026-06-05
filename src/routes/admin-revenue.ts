@@ -8,7 +8,10 @@ const USDC_DECIMALS = 6;
 const TRANSFER_TOPIC = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
 // keccak256("balanceOf(address)")[:4] — ERC-20 balance read.
 const BALANCE_OF_SELECTOR = '0x70a08231';
-const CHUNK_SIZE = 10_000n;
+// Max block span per eth_getLogs call. Public mainnet.base.org caps this at
+// 10k; dedicated RPCs (e.g. base.publicnode.com) allow 50k — set
+// RPC_LOG_CHUNK_SIZE to match so the full history scan needs 5x fewer calls.
+const CHUNK_SIZE = BigInt(process.env.RPC_LOG_CHUNK_SIZE ?? '10000');
 const DEFAULT_LOOKBACK_BLOCKS = 1_300_000n;
 const BASE_BLOCK_TIME_SEC = 2;
 const PARALLEL_BATCH = 5;
