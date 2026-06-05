@@ -13,9 +13,11 @@ import { isAuthenticated } from '@/lib/auth';
 const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 const STATS_TOKEN = process.env.STATS_TOKEN || '';
 
-// Wide enough to reach the early-rollout transfers that fund the current
-// balance (they predate the 30-day default window).
-const FULL_LOOKBACK_BLOCKS = 3_000_000;
+// ~46 days of Base blocks. Wide enough to reach the early-May x402 settlements
+// that fund the current balance (~1.47M blocks back) while staying fast when
+// the backend uses a 50k-chunk RPC. The headline balance is all-time exact
+// regardless; this only bounds the transaction LIST window.
+const FULL_LOOKBACK_BLOCKS = 2_000_000;
 
 export async function GET(req: NextRequest) {
   if (!(await isAuthenticated())) {
