@@ -3,6 +3,7 @@
 import {
   BarChart as RechartsBarChart,
   Bar,
+  Cell,
   XAxis,
   YAxis,
   Tooltip,
@@ -16,9 +17,20 @@ interface StackedBarChartProps {
   bars: Array<{ key: string; color: string; label: string }>;
 }
 
+// The stats history always ends on the current UTC day, which is still in
+// progress — its bar is therefore shorter than a full day and must NOT be read
+// as a traffic drop. We fade that last bar and add a note instead of hiding it.
+function isCurrentUtcDay(date: unknown): boolean {
+  return typeof date === 'string' && date === new Date().toISOString().slice(0, 10);
+}
+
 export function StackedBarChart({ data, bars }: StackedBarChartProps) {
+  const lastIdx = data.length - 1;
+  const lastIsPartial = lastIdx >= 0 && isCurrentUtcDay(data[lastIdx]?.date);
+
   return (
-    <ResponsiveContainer width="100%" height={280}>
+    <div>
+      <ResponsiveContainer width="100%" height={280}>
       <RechartsBarChart data={data} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
         <XAxis
           dataKey="date"
@@ -60,9 +72,24 @@ export function StackedBarChart({ data, bars }: StackedBarChartProps) {
             fill={bar.color}
             stackId="status"
             radius={[0, 0, 0, 0]}
-          />
+          >
+            {data.map((entry, i) => (
+              <Cell
+                key={i}
+                fillOpacity={lastIsPartial && i === lastIdx ? 0.3 : 1}
+              />
+            ))}
+          </Bar>
         ))}
       </RechartsBarChart>
-    </ResponsiveContainer>
+      </ResponsiveContainer>
+      {lastIsPartial && (
+        <p className="mt-2 text-[11px] leading-snug text-zinc-500">
+          La dernière barre = <strong className="text-zinc-400">aujourd&apos;hui</strong>, jour en
+          cours (comptage depuis minuit UTC). Elle se remplit au fil de la journée — ce n&apos;est
+          pas une chute de trafic.
+        </p>
+      )}
+    </div>
   );
 }
