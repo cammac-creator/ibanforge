@@ -22,9 +22,20 @@ interface LineChartProps {
   lines: LineConfig[];
 }
 
+// The series always ends on the current UTC day, which is still in progress —
+// its last point is therefore lower than a full day and must NOT be read as a
+// drop. We flag it with a note rather than hiding it.
+function isCurrentUtcDay(date: unknown): boolean {
+  return typeof date === 'string' && date === new Date().toISOString().slice(0, 10);
+}
+
 export function LineChart({ data, lines }: LineChartProps) {
+  const lastIdx = data.length - 1;
+  const lastIsPartial = lastIdx >= 0 && isCurrentUtcDay(data[lastIdx]?.date);
+
   return (
-    <ResponsiveContainer width="100%" height={280}>
+    <div>
+      <ResponsiveContainer width="100%" height={280}>
       <RechartsLineChart data={data} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
         <XAxis
@@ -62,6 +73,13 @@ export function LineChart({ data, lines }: LineChartProps) {
           />
         ))}
       </RechartsLineChart>
-    </ResponsiveContainer>
+      </ResponsiveContainer>
+      {lastIsPartial && (
+        <p className="mt-2 text-[11px] leading-snug text-zinc-500">
+          Le dernier point = <strong className="text-zinc-400">aujourd&apos;hui</strong>, jour en
+          cours (comptage depuis minuit UTC) — encore incomplet, ce n&apos;est pas une chute.
+        </p>
+      )}
+    </div>
   );
 }
