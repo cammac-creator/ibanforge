@@ -3,12 +3,20 @@
 import {
   BarChart as RechartsBarChart,
   Bar,
+  Cell,
   XAxis,
   YAxis,
   Tooltip,
   ResponsiveContainer,
   Legend,
 } from 'recharts';
+
+// The funnel series always ends on the current UTC day, still in progress —
+// its last bar is shorter than a full day and must NOT be read as a drop. We
+// fade it and add a note instead of rendering a misleading cliff.
+function isCurrentUtcDay(date: unknown): boolean {
+  return typeof date === 'string' && date === new Date().toISOString().slice(0, 10);
+}
 
 export interface BusinessFunnelDay {
   date: string;
@@ -83,7 +91,11 @@ export function BusinessFunnelChart({ data }: { data: BusinessFunnelDay[] }) {
     );
   }
 
+  const lastIdx = rows.length - 1;
+  const lastIsPartial = lastIdx >= 0 && isCurrentUtcDay(rows[lastIdx]?.date);
+
   return (
+    <div>
     <ResponsiveContainer width="100%" height={280}>
       <RechartsBarChart data={rows} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
         <XAxis
@@ -117,9 +129,20 @@ export function BusinessFunnelChart({ data }: { data: BusinessFunnelDay[] }) {
             fill={b.color}
             stackId="funnel"
             radius={[0, 0, 0, 0]}
-          />
+          >
+            {rows.map((_, i) => (
+              <Cell key={i} fillOpacity={lastIsPartial && i === lastIdx ? 0.3 : 1} />
+            ))}
+          </Bar>
         ))}
       </RechartsBarChart>
-    </ResponsiveContainer>
+      </ResponsiveContainer>
+      {lastIsPartial && (
+        <p className="mt-2 text-[11px] leading-snug text-zinc-500">
+          La dernière barre = <strong className="text-zinc-400">aujourd&apos;hui</strong>, jour en
+          cours (comptage depuis minuit UTC) — encore incomplet, ce n&apos;est pas une chute.
+        </p>
+      )}
+    </div>
   );
 }
