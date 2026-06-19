@@ -292,7 +292,7 @@
         "tag": "Packs de crédits",
         "title": "Crédits prépayés",
         "body": "Achat en volume, sans expiration : 1k = 5 $, 5k = 20 $, 25k = 80 $ (jusqu’à 0,0032 $/appel). Les agents achètent en USDC via POST /v1/credits/buy/1k|5k|25k.",
-        "note": "Paiement par carte bientôt disponible — pour l’instant, les agents paient en USDC ou écrivent à support@ibanforge.com."
+        "note": "Paiement carte sécurisé · clé API livrée par email · ou à l’appel en USDC."
       }
     }
   },
