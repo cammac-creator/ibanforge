@@ -337,17 +337,17 @@ landing.get('/', (c) => {
             <li><span class="check">&check;</span> Receipt + key by email</li>
           </ul>
           <div class="stripe-buttons" data-stripe-guard="true">
-            <a href="STRIPE_PAYMENT_LINK_1K" class="stripe-pack-btn" data-stripe-bundle="1k">
+            <a href="https://buy.stripe.com/3cI00c18lauh1i8bqO8so00" class="stripe-pack-btn" data-stripe-bundle="1k">
               <span class="pack-credits">1 000</span>
               <span class="pack-price">$5</span>
               <span class="pack-rate">$0.005/call</span>
             </a>
-            <a href="STRIPE_PAYMENT_LINK_5K" class="stripe-pack-btn stripe-pack-btn-best" data-stripe-bundle="5k">
+            <a href="https://buy.stripe.com/aFafZa6sF45TaSI9iG8so01" class="stripe-pack-btn stripe-pack-btn-best" data-stripe-bundle="5k">
               <span class="pack-credits">5 000</span>
               <span class="pack-price">$20</span>
               <span class="pack-rate">$0.004/call</span>
             </a>
-            <a href="STRIPE_PAYMENT_LINK_25K" class="stripe-pack-btn" data-stripe-bundle="25k">
+            <a href="https://buy.stripe.com/14A7sE9ERbyld0QcuS8so02" class="stripe-pack-btn" data-stripe-bundle="25k">
               <span class="pack-credits">25 000</span>
               <span class="pack-price">$80</span>
               <span class="pack-rate">$0.0032/call</span>
