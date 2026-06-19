@@ -15,6 +15,13 @@ export const metadata: Metadata = {
 
 const ENDPOINT_COUNT = 5
 
+// Live Stripe Payment Links for the prepaid credit packs (card checkout).
+const CREDIT_PACKS = [
+  { bundle: "1k", price: "$5", credits: "1 000", url: "https://buy.stripe.com/3cI00c18lauh1i8bqO8so00" },
+  { bundle: "5k", price: "$20", credits: "5 000", url: "https://buy.stripe.com/aFafZa6sF45TaSI9iG8so01" },
+  { bundle: "25k", price: "$80", credits: "25 000", url: "https://buy.stripe.com/14A7sE9ERbyld0QcuS8so02" },
+] as const
+
 export default async function PricingPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
   const t = await getTranslations('pricing');
@@ -118,13 +125,25 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
               {t('rails.key.cta')}
             </GetKeyButton>
           </div>
-          {/* Credit packs — info only (no dead card CTA) */}
+          {/* Credit packs — buyable via Stripe (live card checkout) */}
           <div className="rounded-xl border border-border bg-zinc-900/50 p-6 flex flex-col gap-3">
             <span className="font-mono text-xs uppercase tracking-widest text-amber-500">
               {t('rails.packs.tag')}
             </span>
             <h3 className="text-lg font-semibold">{t('rails.packs.title')}</h3>
             <p className="text-sm text-muted-foreground leading-relaxed flex-1">{t('rails.packs.body')}</p>
+            <div className="grid grid-cols-3 gap-2 pt-1">
+              {CREDIT_PACKS.map((p) => (
+                <a
+                  key={p.bundle}
+                  href={p.url}
+                  className="flex flex-col items-center gap-0.5 rounded-lg border border-amber-500/30 bg-amber-500/5 px-2 py-2.5 text-center transition-colors hover:border-amber-500/60 hover:bg-amber-500/10"
+                >
+                  <span className="font-mono text-base font-bold text-amber-500">{p.price}</span>
+                  <span className="text-[11px] text-muted-foreground">{p.credits}</span>
+                </a>
+              ))}
+            </div>
             <p className="text-xs text-muted-foreground/70 leading-relaxed border-t border-border pt-3">
               {t('rails.packs.note')}
             </p>
