@@ -41,7 +41,7 @@ function createMcpServer(): McpServer {
     title: 'IBANforge',
     version: pkg.version,
     description:
-      'IBAN validation, BIC/SWIFT lookup, Swiss clearing, SEPA compliance and risk indicators. 121,399 BIC entries (38,761 LEI-enriched via GLEIF), 1,190 Swiss BC-Nummer from SIX, 89 countries.',
+      'Pre-payout screening for agents — vet a counterparty IBAN before you send funds: IBAN validation, BIC/SWIFT lookup, Swiss clearing, SEPA/VoP reachability, sanctions and risk indicators. 121,399 BIC entries (38,761 LEI-enriched via GLEIF), 1,190 Swiss BC-Nummer from SIX, 89 countries.',
     websiteUrl: 'https://ibanforge.com',
     icons: [
       {

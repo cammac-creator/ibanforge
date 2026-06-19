@@ -1,6 +1,6 @@
 # IBANforge
 
-> The compliance API for AI agents. IBAN validation, BIC/SWIFT lookup, Swiss clearing (BC-Nummer / QR-IID / SIX BankMaster — the only API that exposes this), EMI/vIBAN classification, SEPA Instant + VoP reachability, and risk scoring — exposed natively over MCP and x402 micropayments, no API-key signup required.
+> Pre-payout screening for AI agents — vet a counterparty IBAN before you send funds. IBAN validation, BIC/SWIFT lookup, Swiss clearing (BC-Nummer / QR-IID / SIX BankMaster — the only API that exposes this), EMI/vIBAN classification, SEPA Instant + VoP reachability, and sanctions + risk scoring — exposed natively over MCP and x402 micropayments, no API-key signup required.
 
 121,399 BIC entries (38,761 LEI-enriched via GLEIF) · 1,190 Swiss BC-Nummern (SIX) · 89 countries · 85 EMI/vIBAN issuer classifications
 
