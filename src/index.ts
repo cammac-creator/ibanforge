@@ -165,7 +165,7 @@ app.get('/llms.txt', (c) => {
   return c.text(
     `# IBANforge
 
-> IBAN validation, BIC/SWIFT lookup, Swiss clearing and compliance risk scoring API designed for AI agents and developers. 121,399 BIC entries (38,761 LEI-enriched via GLEIF; additional rows from SWIFT directory, Bundesbank, SIX, NBP, EBA Step2 SCT), 1,190 Swiss BC-Nummer from SIX, 89 countries, 85 EMI/vIBAN issuer classifications.
+> Pre-payout screening for AI agents — vet a counterparty IBAN before you send funds. IBAN validation, BIC/SWIFT lookup, Swiss clearing, sanctions and compliance risk scoring, designed for AI agents and developers. 121,399 BIC entries (38,761 LEI-enriched via GLEIF; additional rows from SWIFT directory, Bundesbank, SIX, NBP, EBA Step2 SCT), 1,190 Swiss BC-Nummer from SIX, 89 countries, 85 EMI/vIBAN issuer classifications.
 
 ## Instructions for LLM agents
 

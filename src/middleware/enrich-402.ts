@@ -283,7 +283,7 @@ const PRICING: EndpointPricing[] = [
     match: (m, p) => m === 'POST' && p === '/v1/iban/compliance',
     price_usdc: 0.02,
     description:
-      'Full compliance check: IBAN validation + sanctions screening (OFAC/EU/UN) + SEPA Instant reachability + VoP participant + risk score (0-100). Pre-flight triage, not a regulated AML product.',
+      'Pre-payout screening for agents — vet a counterparty IBAN before you send funds: validation + sanctions screening (OFAC/EU/UN) + SEPA Instant reachability + VoP participant + risk score (0-100). Pre-flight triage, not a regulated AML product.',
     inputSchema: {
       type: 'object',
       required: ['iban'],

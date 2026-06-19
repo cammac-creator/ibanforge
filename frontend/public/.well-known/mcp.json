@@ -1,6 +1,6 @@
 {
   "name": "ibanforge",
-  "description": "The compliance API for AI agents — IBAN validation, BIC/SWIFT lookup, Swiss BC-Nummer clearing (the only API with SIX BankMaster data), EMI/vIBAN classification, SEPA + VoP reachability and compliance risk scoring.",
+  "description": "Pre-payout screening for AI agents — vet a counterparty IBAN before you send funds: IBAN validation, BIC/SWIFT lookup, Swiss BC-Nummer clearing (the only API with SIX BankMaster data), EMI/vIBAN classification, SEPA + VoP reachability and sanctions + risk scoring.",
   "version": "1.3.0",
   "install": {
     "npm": "npx -y ibanforge-mcp",
