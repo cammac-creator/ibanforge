@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { timingSafeEqual } from 'node:crypto';
 import { generateApiKey, validateApiKey, getUsage, revokeApiKey, rotateApiKey } from '../lib/api-keys.js';
 import { getStatsDB } from '../lib/db.js';
+import { notifyPurchaseTelegram } from '../lib/notify.js';
 
 // Bundle credits — prepaid pools sized for the 3 typical agent stacks.
 // Pricing keeps a fair per-call rate (cheaper than retail x402) so agents
@@ -288,6 +289,67 @@ apiKeys.get('/v1/admin/keys', (c) => {
      ORDER BY k.created_at DESC`
   ).all(month);
   return c.json({ month, keys: rows });
+});
+
+/**
+ * Read-only delivery check for a Stripe purchase. NON-CONSUMING: it only SELECTs
+ * (never nulls raw_key_one_time_view), so calling it does not affect the
+ * customer's success-page retrieval. `raw_key_still_available: true` means the
+ * buyer never opened the success page → they may be stuck without their key.
+ * Pass ?reveal=1 to also return the raw key (admin only) for a manual backfill.
+ */
+apiKeys.get('/v1/admin/stripe/delivery/:session_id', (c) => {
+  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
+  const sessionId = c.req.param('session_id');
+  const reveal = c.req.query('reveal') === '1';
+  const db = getStatsDB();
+  const row = db
+    .prepare(
+      'SELECT key_prefix, email, credits_total, credits_remaining, raw_key_one_time_view FROM api_keys WHERE stripe_session_id = ?',
+    )
+    .get(sessionId) as
+    | {
+        key_prefix: string;
+        email: string;
+        credits_total: number | null;
+        credits_remaining: number | null;
+        raw_key_one_time_view: string | null;
+      }
+    | undefined;
+  if (!row) {
+    return c.json({ found: false, session_id: sessionId });
+  }
+  const stillAvailable = row.raw_key_one_time_view !== null;
+  return c.json({
+    found: true,
+    key_prefix: row.key_prefix,
+    email: row.email,
+    credits_total: row.credits_total,
+    credits_remaining: row.credits_remaining,
+    delivered_via_success_page: !stillAvailable,
+    raw_key_still_available: stillAvailable,
+    ...(reveal && stillAvailable ? { raw_key: row.raw_key_one_time_view } : {}),
+  });
+});
+
+/**
+ * Fire a test Telegram purchase alert — verifies the deployed notify wiring
+ * (token/chat env + Telegram reachability) without needing a real Stripe event.
+ */
+apiKeys.post('/v1/admin/test-notify', async (c) => {
+  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
+  const sent = await notifyPurchaseTelegram({
+    amountUsd: 0,
+    bundle: 'TEST',
+    credits: 0,
+    email: 'test@ibanforge.com',
+    keyPrefix: 'ifk_test0000',
+  });
+  return c.json({ sent });
 });
 
 export { apiKeys };
