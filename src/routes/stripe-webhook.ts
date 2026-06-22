@@ -23,6 +23,7 @@ import Stripe from 'stripe';
 import { getStatsDB } from '../lib/db.js';
 import { generateStripeKey } from '../lib/api-keys.js';
 import { notifyPurchaseTelegram } from '../lib/notify.js';
+import { sendApiKeyEmail } from '../lib/email.js';
 
 export const STRIPE_BUNDLES: Record<string, { credits: number; price_usd: number }> = {
   '1k': { credits: 1000, price_usd: 5 },
@@ -57,6 +58,7 @@ export interface StripePurchaseNotify {
   credits: number;
   priceUsd: number;
   keyPrefix: string;
+  rawKey: string;
 }
 
 export function processStripeEvent(
@@ -116,6 +118,7 @@ export function processStripeEvent(
         credits: bundleConfig.credits,
         priceUsd: bundleConfig.price_usd,
         keyPrefix: mintResult.key_prefix,
+        rawKey: mintResult.api_key,
       }
     : undefined;
 
@@ -163,6 +166,7 @@ stripeWebhook.post('/v1/stripe/webhook', async (c) => {
   // returns a bool; we still .catch() defensively so a notify issue can never
   // turn a successful payment webhook into a 500 (Stripe would then retry).
   if (result.notify) {
+    // Owner alert (Telegram).
     await notifyPurchaseTelegram({
       amountUsd: result.notify.priceUsd,
       bundle: result.notify.bundle,
@@ -170,6 +174,17 @@ stripeWebhook.post('/v1/stripe/webhook', async (c) => {
       email: result.notify.email,
       keyPrefix: result.notify.keyPrefix,
     }).catch(() => {});
+
+    // Customer key delivery (ibanforge.com SMTP — safety net beside the success
+    // page). No-ops if SMTP_* is unset; never blocks/fails the webhook.
+    if (result.notify.email && result.notify.email.includes('@')) {
+      await sendApiKeyEmail({
+        to: result.notify.email,
+        rawKey: result.notify.rawKey,
+        credits: result.notify.credits,
+        bundle: result.notify.bundle,
+      }).catch(() => {});
+    }
   }
 
   return c.json(result.body, result.status as 200 | 400 | 503);

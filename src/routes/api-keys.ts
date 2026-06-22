@@ -3,6 +3,7 @@ import { timingSafeEqual } from 'node:crypto';
 import { generateApiKey, validateApiKey, getUsage, revokeApiKey, rotateApiKey } from '../lib/api-keys.js';
 import { getStatsDB } from '../lib/db.js';
 import { notifyPurchaseTelegram } from '../lib/notify.js';
+import { sendApiKeyEmail, isEmailConfigured } from '../lib/email.js';
 
 // Bundle credits — prepaid pools sized for the 3 typical agent stacks.
 // Pricing keeps a fair per-call rate (cheaper than retail x402) so agents
@@ -350,6 +351,22 @@ apiKeys.post('/v1/admin/test-notify', async (c) => {
     keyPrefix: 'ifk_test0000',
   });
   return c.json({ sent });
+});
+
+/**
+ * Send a test API-key email (verifies the deployed SMTP wiring once SMTP_* is
+ * set on the server). Pass ?to=you@example.com. No-ops + reports if unconfigured.
+ */
+apiKeys.post('/v1/admin/test-email', async (c) => {
+  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
+  const to = c.req.query('to');
+  if (!to || !to.includes('@')) {
+    return c.json({ error: 'missing_to', message: 'pass ?to=email@example.com' }, 400);
+  }
+  const sent = await sendApiKeyEmail({ to, rawKey: 'ifk_test_0000000000000000', credits: 0, bundle: 'TEST' });
+  return c.json({ sent, configured: isEmailConfigured() });
 });
 
 export { apiKeys };
