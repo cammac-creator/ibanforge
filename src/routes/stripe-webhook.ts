@@ -22,6 +22,7 @@ import { Hono } from 'hono';
 import Stripe from 'stripe';
 import { getStatsDB } from '../lib/db.js';
 import { generateStripeKey } from '../lib/api-keys.js';
+import { notifyPurchaseTelegram } from '../lib/notify.js';
 
 export const STRIPE_BUNDLES: Record<string, { credits: number; price_usd: number }> = {
   '1k': { credits: 1000, price_usd: 5 },
@@ -50,7 +51,17 @@ export function resetStripeClient(): void {
  * Idempotency: writes to processed_webhooks AFTER successful key mint so a
  * crash mid-flow leaves the event un-processed and Stripe will retry.
  */
-export function processStripeEvent(event: Stripe.Event): { status: number; body: Record<string, unknown> } {
+export interface StripePurchaseNotify {
+  email: string | null;
+  bundle: string;
+  credits: number;
+  priceUsd: number;
+  keyPrefix: string;
+}
+
+export function processStripeEvent(
+  event: Stripe.Event,
+): { status: number; body: Record<string, unknown>; notify?: StripePurchaseNotify } {
   const db = getStatsDB();
 
   const already = db
@@ -96,6 +107,18 @@ export function processStripeEvent(event: Stripe.Event): { status: number; body:
   db.prepare('INSERT INTO processed_webhooks (stripe_event_id, event_type) VALUES (?, ?)')
     .run(event.id, event.type);
 
+  // Owner alert fires only on a FRESH mint (api_key non-null). On Stripe retries
+  // the mint is idempotent → api_key is null → no notify → no duplicate alert.
+  const notify: StripePurchaseNotify | undefined = mintResult.api_key
+    ? {
+        email,
+        bundle,
+        credits: bundleConfig.credits,
+        priceUsd: bundleConfig.price_usd,
+        keyPrefix: mintResult.key_prefix,
+      }
+    : undefined;
+
   return {
     status: 200,
     body: {
@@ -105,6 +128,7 @@ export function processStripeEvent(event: Stripe.Event): { status: number; body:
       credits_minted: bundleConfig.credits,
       key_prefix: mintResult.key_prefix,
     },
+    notify,
   };
 }
 
@@ -134,5 +158,19 @@ stripeWebhook.post('/v1/stripe/webhook', async (c) => {
   }
 
   const result = processStripeEvent(event);
+
+  // Best-effort owner alert (Telegram). notifyPurchaseTelegram never throws and
+  // returns a bool; we still .catch() defensively so a notify issue can never
+  // turn a successful payment webhook into a 500 (Stripe would then retry).
+  if (result.notify) {
+    await notifyPurchaseTelegram({
+      amountUsd: result.notify.priceUsd,
+      bundle: result.notify.bundle,
+      credits: result.notify.credits,
+      email: result.notify.email,
+      keyPrefix: result.notify.keyPrefix,
+    }).catch(() => {});
+  }
+
   return c.json(result.body, result.status as 200 | 400 | 503);
 });
