@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { Fraunces, Caveat } from "next/font/google";
+import { Fraunces, Caveat, Hanken_Grotesk, JetBrains_Mono } from "next/font/google";
 import { FamilleClient } from "./famille-client";
 
 const fraunces = Fraunces({
@@ -12,6 +12,20 @@ const fraunces = Fraunces({
 const caveat = Caveat({
   subsets: ["latin"],
   variable: "--font-caveat",
+  display: "swap",
+});
+
+// Warm humanist sans for long-form body copy (distinctive, not Inter/Roboto).
+const hankenGrotesk = Hanken_Grotesk({
+  subsets: ["latin"],
+  variable: "--font-hanken",
+  display: "swap",
+});
+
+// Mono for IBAN / code / technical labels — referenced throughout PAGE_CSS.
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: "--font-jetbrains-mono",
   display: "swap",
 });
 
@@ -30,7 +44,9 @@ export default async function Page({
   if (locale !== "fr") notFound();
 
   return (
-    <div className={`${fraunces.variable} ${caveat.variable}`}>
+    <div
+      className={`${fraunces.variable} ${caveat.variable} ${hankenGrotesk.variable} ${jetbrainsMono.variable}`}
+    >
       <FamilleClient />
     </div>
   );
