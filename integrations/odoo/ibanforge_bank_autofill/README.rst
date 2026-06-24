@@ -84,6 +84,17 @@ How it works
   creates the ``res.bank`` by BIC and links it via ``bank_id``. A bank you set
   manually is never overwritten.
 
+Known limitations (MVP)
+=======================
+
+* **Changing an IBAN on an existing account** does not relink the bank if a
+  bank is already set: the existing ``bank_id`` is preserved (so a manually
+  chosen bank is never lost). Clear the bank field to re-trigger detection.
+* **Two API calls per new account via the UI**: one on change (instant
+  feedback) and one on save (authoritative). With a 200/month free key this
+  consumes roughly twice per manually entered account. Imports and API-created
+  records only call once (on ``create``).
+
 Privacy
 =======
 
