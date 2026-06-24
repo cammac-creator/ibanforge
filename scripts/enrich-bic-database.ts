@@ -21,11 +21,24 @@ import { createInterface } from 'node:readline';
 import { createReadStream } from 'node:fs';
 import { execSync } from 'node:child_process';
 import * as XLSX from 'xlsx';
+import { getCountryName } from '../src/lib/countries.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = resolve(__dirname, '../data');
 const BIC_DB_PATH = resolve(DATA_DIR, 'bic.sqlite');
 const TMP_DIR = resolve(__dirname, '../.tmp-bic-enrich');
+
+/**
+ * SIX BankMaster TOWN values occasionally carry a company-form prefix
+ * (e.g. "BV Amsterdam") or a trailing state+ZIP ("New York, NY 1006-3053").
+ * Strip those conservatively without touching legitimate city names.
+ */
+function cleanSixCity(city: string): string {
+  return city
+    .replace(/^(BV|PP|NV)\s+/i, '')
+    .replace(/,?\s+[A-Z]{2}\s+[\d-]+$/, '')
+    .trim();
+}
 
 // ---------------------------------------------------------------------------
 
@@ -193,7 +206,7 @@ async function importSixBankMaster(db: Database.Database): Promise<number> {
 
   const insert = db.prepare(`
     INSERT OR REPLACE INTO bic_entries (bic8, bic11, institution, country_code, country_name, city, branch_code, source)
-    VALUES (?, ?, ?, 'CH', 'Switzerland', ?, ?, 'six_group')
+    VALUES (?, ?, ?, ?, ?, ?, ?, 'six_group')
   `);
 
   let count = 0;
@@ -202,7 +215,7 @@ async function importSixBankMaster(db: Database.Database): Promise<number> {
 
   const rl = createInterface({ input: createReadStream(csvPath), crlfDelay: Infinity });
 
-  const rows: Array<[string, string, string, string, string]> = [];
+  const rows: Array<[string, string, string, string, string, string, string]> = [];
 
   for await (const line of rl) {
     const cols = parseCsvLine(line, ';');
@@ -220,10 +233,16 @@ async function importSixBankMaster(db: Database.Database): Promise<number> {
     const bic8 = bic.slice(0, 8);
     const bic11 = bic.length === 11 ? bic : bic + 'XXX';
     const name = cols[nameIdx]?.trim() ?? '';
-    const city = cols[cityIdx]?.trim() ?? '';
+    const city = cleanSixCity(cols[cityIdx]?.trim() ?? '');
     const branchCode = bic11.slice(8);
 
-    rows.push([bic8, bic11, name, city, branchCode]);
+    // Country from the BIC itself (positions 5-6), not hardcoded CH: the SIX
+    // BankMaster includes foreign euroSIC participants (ING/NL, Starling/GB,
+    // all Liechtenstein banks, SECB/DE...) whose BIC country code is not CH.
+    const countryCode = bic8.slice(4, 6).toUpperCase();
+    const countryName = getCountryName(countryCode) ?? countryCode;
+
+    rows.push([bic8, bic11, name, countryCode, countryName, city, branchCode]);
     count++;
   }
 
