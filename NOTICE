@@ -55,9 +55,17 @@ The full Apache License 2.0 text is available at:
 Data Sources
 ================================================================================
 
-BIC/SWIFT data is sourced from GLEIF (Global Legal Entity Identifier
-Foundation) under CC0 1.0 Universal Public Domain Dedication:
+BIC/SWIFT data, including registered/head-office addresses, is sourced from
+GLEIF (Global Legal Entity Identifier Foundation) reference data under
+CC0 1.0 Universal Public Domain Dedication:
   https://www.gleif.org/en/about/open-data
+
+The BIC-to-LEI mapping used to key this data to BIC codes is published by GLEIF
+in collaboration with SWIFT and is provided under SWIFT's royalty-free,
+commercial-use terms, which require the following attribution:
+  "This service uses the BIC to LEI relationship file. The mapping table has
+   been developed by SWIFT. SWIFT and BIC are registered trademarks of S.W.I.F.T. SC."
+  https://www.gleif.org/en/lei-data/lei-mapping/download-bic-to-lei-relationship-files
 
 Swiss BC-Nummer / clearing data is sourced from SIX Group AG BankMaster:
   https://www.six-group.com/en/products-services/banking-services/payment-services/bc-bank-master.html

@@ -307,7 +307,7 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
             maxTimeoutSeconds: 60,
           },
           description:
-            `Resolve a BIC/SWIFT code (8 or 11 chars) into the underlying bank: name, country, city, LEI, address. Backed by 121,399 BIC entries (38,761 LEI-enriched via GLEIF; additional rows from SWIFT directory, Deutsche Bundesbank, SIX BankMaster, NBP, EBA Step2 SCT). Use only when you already have the BIC — for IBAN inputs, prefer /v1/iban/validate which resolves the BIC for you. ${TRUST_TAG_BIC}.`,
+            `Resolve a BIC/SWIFT code (8 or 11 chars) into the underlying bank: name, country, city, LEI, and registered head-office address (where available). Backed by 121,399 BIC entries (38,761 LEI-enriched via GLEIF; additional rows from SWIFT directory, Deutsche Bundesbank, SIX BankMaster, NBP, EBA Step2 SCT). Use only when you already have the BIC — for IBAN inputs, prefer /v1/iban/validate which resolves the BIC for you. ${TRUST_TAG_BIC}.`,
           mimeType: 'application/json',
           extensions: {
             bazaar: {
@@ -330,7 +330,20 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
                   },
                   city: { type: 'string' },
                   lei: { type: 'string' },
-                  address: { type: 'string' },
+                  address: {
+                    type: 'object',
+                    description: 'Registered/head-office address (GLEIF, CC0). Entity-level, not per-branch; null for branch or non-LEI BICs.',
+                    properties: {
+                      street: { type: 'string' },
+                      post_code: { type: 'string' },
+                      region: { type: 'string' },
+                      city: { type: 'string' },
+                      country: { type: 'string' },
+                      romanized: { type: 'string' },
+                      source: { type: 'string' },
+                    },
+                  },
+                  address_available: { type: 'boolean' },
                 },
               },
               info: {

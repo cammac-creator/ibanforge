@@ -214,7 +214,7 @@ function createMcpServer(): McpServer {
     {
       title: 'Lookup BIC/SWIFT',
       description:
-        'Resolve a BIC / SWIFT code into the underlying bank: name, country, city, LEI, address. ' +
+        'Resolve a BIC / SWIFT code into the underlying bank: name, country, city, LEI, and registered head-office address (where available). ' +
         'USE WHEN: the user already has a BIC/SWIFT (8 or 11 chars, alphanumeric, e.g., "UBSWCHZH80A", "DEUTDEFF") ' +
         'and asks which bank it belongs to, where the bank is, or its LEI for compliance/regulatory matching. ' +
         'DO NOT USE for IBAN inputs — call validate_iban instead, it resolves the BIC for you. ' +

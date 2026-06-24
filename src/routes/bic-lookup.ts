@@ -70,6 +70,22 @@ bicLookup.get('/v1/bic/:code', (c) => {
       name: row?.country_name ?? validation.country_code!,
     },
     city: row?.city ?? null,
+    address:
+      row && (row.street || row.address_en)
+        ? {
+            type: 'registered' as const,
+            street: row.street,
+            post_code: row.post_code,
+            region: row.region,
+            city: row.city,
+            country: validation.country_code!,
+            romanized: row.address_en,
+            source: row.address_source ?? 'GLEIF',
+            language: row.address_lang,
+            as_of: row.address_as_of,
+          }
+        : null,
+    address_available: !!(row && (row.street || row.address_en)),
     branch_code: validation.branch_code!,
     branch_info: row?.branch_info ?? null,
     lei: row?.lei ?? null,

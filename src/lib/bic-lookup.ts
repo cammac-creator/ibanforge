@@ -41,6 +41,13 @@ export interface BICRow {
   lei_status: string | null;
   is_test_bic: number;
   source: string;
+  street: string | null;
+  post_code: string | null;
+  region: string | null;
+  address_en: string | null;
+  address_source: string | null;
+  address_lang: string | null;
+  address_as_of: string | null;
 }
 
 const bicCache = new LRUCache<BICRow | null>(2000);

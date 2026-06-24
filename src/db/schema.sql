@@ -20,6 +20,15 @@ CREATE TABLE IF NOT EXISTS bic_entries (
   lei_status   TEXT,
   is_test_bic  INTEGER DEFAULT 0,
   source       TEXT DEFAULT 'gleif',
+  -- Registered/head-office address (GLEIF, CC0). Only populated when the BIC's
+  -- own country matches the entity's registered country (no foreign-branch HQ).
+  street         TEXT,
+  post_code      TEXT,
+  region         TEXT,
+  address_en     TEXT,   -- Latin/romanized street line for non-Latin entities
+  address_source TEXT,   -- e.g. 'GLEIF'
+  address_lang   TEXT,   -- language of `street`
+  address_as_of  TEXT,   -- GLEIF registration lastUpdateDate (YYYY-MM-DD)
   updated_at   TEXT DEFAULT (datetime('now'))
 );
 
