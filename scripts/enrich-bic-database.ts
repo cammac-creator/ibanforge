@@ -88,9 +88,15 @@ async function importSwiftCodes(db: Database.Database): Promise<number> {
   const { readdirSync } = await import('node:fs');
   const files = readdirSync(countriesDir).filter(f => f.endsWith('.json')).sort();
 
+  // SwiftCodes runs after the GLEIF seed. Use an upsert that BACKFILLS the city
+  // when GLEIF left it NULL (foreign-branch BICs suppressed by the same-country
+  // guard, e.g. FABMCNSHXXX) with SwiftCodes' correct branch city — without ever
+  // overwriting an existing GLEIF city, LEI or address.
   const insert = db.prepare(`
-    INSERT OR IGNORE INTO bic_entries (bic8, bic11, institution, country_code, country_name, city, branch_code, branch_info, source)
+    INSERT INTO bic_entries (bic8, bic11, institution, country_code, country_name, city, branch_code, branch_info, source)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'swiftcodes')
+    ON CONFLICT(bic11) DO UPDATE SET
+      city = CASE WHEN (bic_entries.city IS NULL OR bic_entries.city = '') THEN excluded.city ELSE bic_entries.city END
   `);
 
   let count = 0;
@@ -205,7 +211,7 @@ async function importSixBankMaster(db: Database.Database): Promise<number> {
   await downloadFile('https://api.six-group.com/api/epcd/bankmaster/v3/bankmaster_V3.csv', csvPath);
 
   const insert = db.prepare(`
-    INSERT OR REPLACE INTO bic_entries (bic8, bic11, institution, country_code, country_name, city, branch_code, source)
+    INSERT OR IGNORE INTO bic_entries (bic8, bic11, institution, country_code, country_name, city, branch_code, source)
     VALUES (?, ?, ?, ?, ?, ?, ?, 'six_group')
   `);
 

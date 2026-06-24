@@ -60,4 +60,38 @@ describe('GET /v1/bic/:code', () => {
     expect(json.error).toBe('placeholder_literal');
     expect(json.example).toContain('UBSWCHZH');
   });
+
+  it('returns a registered GLEIF address (with romanization) for a head-office BIC', async () => {
+    const app = makeApp();
+    const res = await app.request('/v1/bic/ABOCCNBJXXX');
+    expect(res.status).toBe(200);
+    const json = (await res.json()) as {
+      found: boolean;
+      address_available: boolean;
+      address: {
+        type: string;
+        post_code: string | null;
+        country: string;
+        romanized: string | null;
+        source: string;
+      } | null;
+    };
+    expect(json.found).toBe(true);
+    expect(json.address_available).toBe(true);
+    expect(json.address).not.toBeNull();
+    expect(json.address!.type).toBe('registered');
+    expect(json.address!.country).toBe('CN');
+    expect(json.address!.post_code).toBe('100005');
+    expect(json.address!.romanized).toContain('Jianguomen Nei Avenue');
+    expect(json.address!.source).toBe('GLEIF');
+  });
+
+  it('suppresses the address for a foreign-branch BIC (same-country guard)', async () => {
+    const app = makeApp();
+    const res = await app.request('/v1/bic/FABMCNSHXXX');
+    expect(res.status).toBe(200);
+    const json = (await res.json()) as { address: unknown; address_available: boolean };
+    expect(json.address).toBeNull();
+    expect(json.address_available).toBe(false);
+  });
 });

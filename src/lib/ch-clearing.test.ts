@@ -73,11 +73,11 @@ describe('Swiss BC-Nummer Clearing Lookup', () => {
       expect(entry!.iid).toBe('00100');
     });
 
-    it('lookupClearingByBankCode("04835") does direct lookup without padding', () => {
-      const entry = lookupClearingByBankCode('04835');
+    it('lookupClearingByBankCode("30024") does direct lookup without padding', () => {
+      const entry = lookupClearingByBankCode('30024');
       // This may or may not exist depending on the dataset, just verify no crash
       if (entry) {
-        expect(entry.iid).toBe('04835');
+        expect(entry.iid).toBe('30024');
       }
     });
   });
@@ -85,17 +85,17 @@ describe('Swiss BC-Nummer Clearing Lookup', () => {
   // 9.3 Concatenation / redirect following
 
   describe('Concatenation / redirect following', () => {
-    it('lookupClearingByBankCode("30025") follows redirect to "30024"', () => {
-      const entry = lookupClearingByBankCode('30025');
+    it('lookupClearingByBankCode("04835") follows the CS→UBS concatenation to "00230"', () => {
+      const entry = lookupClearingByBankCode('04835');
       expect(entry).not.toBeNull();
-      expect(entry!.iid).toBe('30024');
-      expect(entry!.name).toBe('Valiant Bank AG');
+      expect(entry!.iid).toBe('00230');
+      expect(entry!.name).toBe('UBS Switzerland AG');
     });
 
     it('redirect result includes redirected_from field', () => {
-      const entry = lookupClearingByBankCode('30025');
+      const entry = lookupClearingByBankCode('04835');
       expect(entry).not.toBeNull();
-      expect(entry!.redirected_from).toBe('30025');
+      expect(entry!.redirected_from).toBe('04835');
     });
 
     it('non-redirected lookup does not have redirected_from', () => {
