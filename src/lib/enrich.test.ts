@@ -71,7 +71,8 @@ describe('enrichResult', () => {
     enrichResult(result);
 
     expect(result.clearing).toBeDefined();
-    expect(result.clearing!.iid).toBe('04835');
+    // 04835 (ex-Credit Suisse) now concatenates to UBS's 00230 after the merger.
+    expect(result.clearing!.iid).toBe('00230');
     expect(typeof result.clearing!.sic).toBe('boolean');
     expect(typeof result.clearing!.instant_payments_chf).toBe('boolean');
     expect(typeof result.clearing!.eurosic).toBe('boolean');

@@ -89,12 +89,12 @@ describe('GET /v1/ch/clearing/:iid', () => {
     expect(body.example).toContain('/v1/ch/clearing/');
   });
 
-  it('GET /v1/ch/clearing/30025 → follows redirect', async () => {
-    const res = await app.request('/v1/ch/clearing/30025');
+  it('GET /v1/ch/clearing/04835 → follows the CS→UBS concatenation', async () => {
+    const res = await app.request('/v1/ch/clearing/04835');
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.found).toBe(true);
-    expect(body.redirected_from).toBe('30025');
+    expect(body.redirected_from).toBe('04835');
     expect(body.note).toContain('merged');
   });
 
