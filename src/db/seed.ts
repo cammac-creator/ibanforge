@@ -212,24 +212,12 @@ async function seed() {
     console.log(`Inserted ${Math.min(i + BATCH, rows.length)}/${rows.length} BIC entries`);
   }
 
-  // Create stats DB
-  const statsPath = resolve(dirname(DB_PATH), 'stats.sqlite');
-  const statsDb = new Database(statsPath);
-  statsDb.exec(`
-    CREATE TABLE IF NOT EXISTS lookups (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      country_code TEXT,
-      found INTEGER NOT NULL,
-      created_at TEXT DEFAULT (datetime('now'))
-    );
-    CREATE TABLE IF NOT EXISTS daily_stats (
-      date TEXT PRIMARY KEY,
-      total INTEGER DEFAULT 0,
-      found_count INTEGER DEFAULT 0,
-      revenue_usdc REAL DEFAULT 0
-    );
-  `);
-  statsDb.close();
+  // NOTE: do NOT create stats.sqlite here. It is created and migrated lazily by
+  // getStatsDB() in src/lib/db.ts — the single source of truth for the stats
+  // schema. Seeding a legacy `daily_stats` (without operation_type) here made the
+  // CREATE TABLE IF NOT EXISTS in db.ts a no-op, so getStatsHistory crashed with
+  // "no such column: operation_type" — which failed the cron's test step and
+  // silently skipped the "Commit updated database" step (stale bic.sqlite).
 
   const count = (db.prepare('SELECT COUNT(*) as cnt FROM bic_entries').get() as { cnt: number }).cnt;
   console.log(`\n=== Done! ${count} BIC entries in database ===`);
