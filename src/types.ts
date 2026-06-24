@@ -91,6 +91,26 @@ export interface BICLookupResult {
     name: string;
   };
   city: string | null;
+  /**
+   * Registered / head-office address (GLEIF, CC0). Entity-level, NOT per-branch:
+   * a branch (non-XXX) BIC returns its head-office address. Null when the BIC
+   * carries no LEI/address or is a foreign branch (suppressed by the
+   * same-country guard).
+   */
+  address: {
+    type: 'registered';
+    street: string | null;
+    post_code: string | null;
+    region: string | null;
+    city: string | null;
+    country: string;
+    /** Latin/romanized street line for non-Latin entities (else equals street). */
+    romanized: string | null;
+    source: string;
+    language: string | null;
+    as_of: string | null;
+  } | null;
+  address_available: boolean;
   branch_code: string;
   branch_info: string | null;
   lei: string | null;

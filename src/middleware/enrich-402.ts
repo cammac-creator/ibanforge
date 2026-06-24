@@ -256,7 +256,7 @@ const PRICING: EndpointPricing[] = [
     match: (m, p) => m === 'GET' && p.startsWith('/v1/bic/'),
     price_usdc: 0.003,
     description:
-      'Lookup a BIC/SWIFT code against 121,399 BIC entries (38,761 LEI-enriched via GLEIF). Returns bank name, country, city, LEI and address.',
+      'Lookup a BIC/SWIFT code against 121,399 BIC entries (38,761 LEI-enriched via GLEIF). Returns bank name, country, city, LEI, and registered head-office address (where available).',
     inputSchema: {
       type: 'object',
       required: ['code'],

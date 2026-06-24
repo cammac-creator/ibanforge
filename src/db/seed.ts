@@ -9,6 +9,7 @@ import { Readable } from 'node:stream';
 import { createUnzip } from 'node:zlib';
 import { execSync } from 'node:child_process';
 import { getCountryName } from '../lib/countries.js';
+import { extractGleifAddress, addressMatchesBic, type GleifEntityAddresses } from '../lib/gleif-address.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DB_PATH = process.env.DB_PATH ?? resolve(__dirname, '../../data/bic.sqlite');
@@ -75,6 +76,12 @@ interface EntityInfo {
   country: string;
   countryName: string | null;
   city: string | null;
+  street: string | null;
+  postCode: string | null;
+  region: string | null;
+  addressEn: string | null;
+  addressLang: string | null;
+  asOf: string | null;
 }
 
 async function fetchEntities(leis: string[]): Promise<Map<string, EntityInfo>> {
@@ -103,19 +110,27 @@ async function fetchEntities(leis: string[]): Promise<Map<string, EntityInfo>> {
             entity: {
               legalName: { name: string };
               legalAddress: { country: string; city?: string };
-            };
+            } & GleifEntityAddresses;
+            registration?: { lastUpdateDate?: string };
           };
         }>;
       };
 
       for (const record of json.data) {
         const a = record.attributes;
+        const addr = extractGleifAddress(a.entity);
         map.set(a.lei, {
           lei: a.lei,
           name: a.entity.legalName.name,
           country: a.entity.legalAddress.country,
           countryName: getCountryName(a.entity.legalAddress.country),
           city: a.entity.legalAddress.city ?? null,
+          street: addr?.street ?? null,
+          postCode: addr?.post_code ?? null,
+          region: addr?.region ?? null,
+          addressEn: addr?.romanized ?? null,
+          addressLang: addr?.language ?? null,
+          asOf: a.registration?.lastUpdateDate ? a.registration.lastUpdateDate.slice(0, 10) : null,
         });
       }
     } catch (err) {
@@ -164,8 +179,8 @@ async function seed() {
   db.exec(schema);
 
   const insert = db.prepare(`
-    INSERT OR IGNORE INTO bic_entries (bic8, bic11, institution, country_code, country_name, city, branch_code, branch_info, lei, lei_status, is_test_bic, source)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'gleif')
+    INSERT OR IGNORE INTO bic_entries (bic8, bic11, institution, country_code, country_name, city, branch_code, branch_info, lei, lei_status, is_test_bic, street, post_code, region, address_en, address_source, address_lang, address_as_of, source)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'gleif')
   `);
 
   const insertMany = db.transaction((rows: unknown[][]) => {
@@ -189,6 +204,11 @@ async function seed() {
     const isTestBic = locationCode[1] === '0' ? 1 : 0;
 
     const entity = entities.get(lei);
+    // Same-country guard: a GLEIF entity address is head-office level. Only
+    // attach city + address when the BIC's own country matches the entity's
+    // registered country, otherwise this BIC is a foreign branch and would
+    // inherit the wrong (parent HQ) location.
+    const matches = entity ? addressMatchesBic(bic11, entity.country) : false;
 
     rows.push([
       bic8,
@@ -196,12 +216,19 @@ async function seed() {
       entity?.name ?? null,
       countryCode,
       entity?.countryName ?? getCountryName(countryCode),
-      entity?.city ?? null,
+      matches ? (entity!.city ?? null) : null,
       branchCode,
       null, // branch_info
       lei,
       entity ? 'ACTIVE' : null,
       isTestBic,
+      matches ? entity!.street : null,
+      matches ? entity!.postCode : null,
+      matches ? entity!.region : null,
+      matches ? entity!.addressEn : null,
+      matches && entity!.street ? 'GLEIF' : null,
+      matches ? entity!.addressLang : null,
+      matches ? entity!.asOf : null,
     ]);
   }
 
