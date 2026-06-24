@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Part of IBANforge Bank Auto-fill. See LICENSE file for full copyright and licensing details. -->
+<odoo>
+
+    <record id="view_partner_bank_form_ibanforge" model="ir.ui.view">
+        <field name="name">res.partner.bank.form.inherit.ibanforge</field>
+        <field name="model">res.partner.bank</field>
+        <field name="inherit_id" ref="base.view_partner_bank_form"/>
+        <field name="arch" type="xml">
+            <field name="bank_id" position="after">
+                <field name="ibanforge_detected_bic"
+                       invisible="not ibanforge_detected_bic"/>
+                <field name="ibanforge_detected_bank_name"
+                       invisible="not ibanforge_detected_bank_name"/>
+                <field name="ibanforge_info"
+                       invisible="not ibanforge_info"/>
+            </field>
+        </field>
+    </record>
+
+</odoo>

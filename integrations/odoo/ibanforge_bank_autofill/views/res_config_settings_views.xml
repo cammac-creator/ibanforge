@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Part of IBANforge Bank Auto-fill. See LICENSE file for full copyright and licensing details. -->
+<odoo>
+
+    <record id="res_config_settings_view_form_ibanforge" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.inherit.ibanforge</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="base.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//form" position="inside">
+                <app data-string="IBANforge"
+                     string="IBANforge"
+                     name="ibanforge_bank_autofill"
+                     logo="/ibanforge_bank_autofill/static/description/icon.png">
+                    <block title="Bank Auto-fill"
+                           name="ibanforge_autofill_settings">
+                        <setting id="ibanforge_api_key_setting"
+                                 string="API Key"
+                                 help="Authenticate calls to the IBANforge validate endpoint.">
+                            <field name="ibanforge_api_key" password="True"/>
+                            <div class="text-muted mt-2">
+                                <a href="https://ibanforge.com/?utm_source=odoo"
+                                   target="_blank"
+                                   rel="noreferrer noopener">
+                                    Get a free API key (200 requests/month)
+                                </a>
+                            </div>
+                        </setting>
+                        <setting id="ibanforge_base_url_setting"
+                                 string="API Base URL"
+                                 help="Leave the default unless you use a dedicated or self-hosted endpoint.">
+                            <field name="ibanforge_base_url"
+                                   placeholder="https://api.ibanforge.com"/>
+                        </setting>
+                        <setting id="ibanforge_risk_badge_setting"
+                                 string="SEPA / risk badge"
+                                 help="Show SEPA reachability and country-risk indicators on the bank account.">
+                            <field name="ibanforge_enable_risk_badge"/>
+                        </setting>
+                    </block>
+                </app>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>

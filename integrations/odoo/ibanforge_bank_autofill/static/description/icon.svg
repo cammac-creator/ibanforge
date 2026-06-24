@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="140" height="140" viewBox="0 0 140 140" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="IBANforge Bank Auto-fill">
+  <defs>
+    <linearGradient id="ibf" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1f6feb"/>
+      <stop offset="1" stop-color="#0b3d91"/>
+    </linearGradient>
+  </defs>
+  <rect width="140" height="140" rx="28" fill="url(#ibf)"/>
+  <!-- bank pediment -->
+  <path d="M70 26 L108 46 L32 46 Z" fill="#ffffff"/>
+  <rect x="40" y="54" width="8" height="40" fill="#ffffff"/>
+  <rect x="58" y="54" width="8" height="40" fill="#ffffff"/>
+  <rect x="74" y="54" width="8" height="40" fill="#ffffff"/>
+  <rect x="92" y="54" width="8" height="40" fill="#ffffff"/>
+  <rect x="30" y="100" width="80" height="9" rx="2" fill="#ffffff"/>
+  <!-- spark / auto-fill checkmark -->
+  <circle cx="104" cy="100" r="18" fill="#2ea043"/>
+  <path d="M96 100 l5 6 l11 -13" fill="none" stroke="#ffffff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
