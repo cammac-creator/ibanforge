@@ -442,7 +442,7 @@ async function importEbaStep2(db: Database.Database): Promise<number> {
     const cc = bic.slice(4, 6); // ISO country code embedded in BIC
     const branchCode = bic11.slice(8);
 
-    valid.push([bic8, bic11, name, cc, '', '', branchCode]);
+    valid.push([bic8, bic11, name, cc, getCountryName(cc) ?? cc, '', branchCode]);
   }
 
   const insertBatch = db.transaction((r: typeof valid) => {
