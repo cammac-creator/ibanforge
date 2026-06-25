@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { extractGleifAddress, addressMatchesBic } from './gleif-address.js';
+import { extractGleifAddress, addressMatchesBic, hasNonLatinScript } from './gleif-address.js';
 
 // Real-shaped GLEIF payloads (trimmed) verified against api.gleif.org.
 const ABC = {
@@ -83,5 +83,31 @@ describe('addressMatchesBic (same-country guard)', () => {
 
   it('rejects when entity country is missing', () => {
     expect(addressMatchesBic('INGBNL2AXXX', null)).toBe(false);
+  });
+});
+
+describe('hasNonLatinScript', () => {
+  it('detects genuinely non-Latin scripts', () => {
+    expect(hasNonLatinScript('东城区建国门内大街69号')).toBe(true); // Chinese
+    expect(hasNonLatinScript('ул. Тверская, 7')).toBe(true); // Cyrillic
+    expect(hasNonLatinScript('Λεωφόρος Συγγρού 12')).toBe(true); // Greek
+    expect(hasNonLatinScript('شارع كورنيش النيل')).toBe(true); // Arabic
+    expect(hasNonLatinScript('東京都')).toBe(true); // Japanese kanji/kana
+  });
+
+  it('treats Latin (incl. diacritics and transliterations) as readable', () => {
+    // GLEIF tags these 'el'/'ar' but the filed text is already Latin — the bug
+    // that mislabeled 254 readable addresses as "romanization unavailable".
+    expect(hasNonLatinScript('VALAORITOU 17')).toBe(false);
+    expect(hasNonLatinScript('306 CORNICHE EL NIL, MAADI')).toBe(false);
+    expect(hasNonLatinScript('München')).toBe(false);
+    expect(hasNonLatinScript('BUCUREȘTI, SECTORUL 2')).toBe(false);
+    expect(hasNonLatinScript('Zürich')).toBe(false);
+  });
+
+  it('is false for empty / null input', () => {
+    expect(hasNonLatinScript('')).toBe(false);
+    expect(hasNonLatinScript(null)).toBe(false);
+    expect(hasNonLatinScript(undefined)).toBe(false);
   });
 });

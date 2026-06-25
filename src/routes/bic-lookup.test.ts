@@ -113,6 +113,20 @@ describe('GET /v1/bic/:code', () => {
     }
   });
 
+  it('treats an already-Latin Greek/Arabic address as original_latin, not unavailable', async () => {
+    const app = makeApp();
+    // PESUGRA1XXX (GR) is tagged language 'el' by GLEIF but filed its address in
+    // Latin ("VALAORITOU 17") — it must read as Latin, with a non-null romanized.
+    const res = await app.request('/v1/bic/PESUGRA1XXX');
+    const json = (await res.json()) as {
+      address: { street: string | null; romanized: string | null; romanization: string } | null;
+    };
+    if (json.address) {
+      expect(json.address.romanization).toBe('original_latin');
+      expect(json.address.romanized).not.toBeNull();
+    }
+  });
+
   it('suppresses the address for a foreign-branch BIC (same-country guard)', async () => {
     const app = makeApp();
     const res = await app.request('/v1/bic/FABMCNSHXXX');
