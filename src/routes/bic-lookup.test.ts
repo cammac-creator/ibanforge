@@ -70,9 +70,11 @@ describe('GET /v1/bic/:code', () => {
       address_available: boolean;
       address: {
         type: string;
+        street: string | null;
         post_code: string | null;
         country: string;
         romanized: string | null;
+        romanization: 'original_latin' | 'gleif_english' | 'unavailable';
         source: string;
       } | null;
     };
@@ -84,6 +86,31 @@ describe('GET /v1/bic/:code', () => {
     expect(json.address!.post_code).toBe('100005');
     expect(json.address!.romanized).toContain('Jianguomen Nei Avenue');
     expect(json.address!.source).toBe('GLEIF');
+    // romanization provenance must be consistent with the fields (logic, not
+    // data-coupled): a distinct Latin reading for a non-Latin address = GLEIF English.
+    expect(['original_latin', 'gleif_english', 'unavailable']).toContain(
+      json.address!.romanization,
+    );
+    expect(json.address!.romanization).toBe('gleif_english');
+  });
+
+  it('reports romanization provenance consistently with the fields', async () => {
+    const app = makeApp();
+    // ING NL — a Latin-script registered address: romanized equals the address itself.
+    const res = await app.request('/v1/bic/INGBNL2AXXX');
+    const json = (await res.json()) as {
+      address: { street: string | null; romanized: string | null; romanization: string } | null;
+    };
+    expect(json.address).not.toBeNull();
+    const a = json.address!;
+    // Invariant the API guarantees, independent of which exact bank this is:
+    if (a.romanized === null) {
+      expect(a.romanization).toBe('unavailable');
+    } else if (a.romanized === a.street) {
+      expect(a.romanization).toBe('original_latin');
+    } else {
+      expect(a.romanization).toBe('gleif_english');
+    }
   });
 
   it('suppresses the address for a foreign-branch BIC (same-country guard)', async () => {
