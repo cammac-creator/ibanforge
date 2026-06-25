@@ -14,11 +14,13 @@ const DB_PATH = process.env.DB_PATH ?? resolve(__dirname, '../data/bic.sqlite');
 console.log(`Opening database: ${DB_PATH}`);
 const db = new Database(DB_PATH);
 
-// Find rows that have a country_code but no country_name
+// Find rows that have a country_code but no country_name.
+// NOTE: some importers (e.g. EBA Step2) write an empty string rather than NULL,
+// so we must catch '' too — otherwise those rows silently keep a blank country.
 const rows = db
   .prepare(
     `SELECT id, country_code FROM bic_entries
-     WHERE country_name IS NULL AND country_code IS NOT NULL`
+     WHERE (country_name IS NULL OR country_name = '') AND country_code IS NOT NULL`
   )
   .all() as { id: number; country_code: string }[];
 
