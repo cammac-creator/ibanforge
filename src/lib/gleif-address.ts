@@ -109,12 +109,43 @@ export function addressMatchesBic(
   return bic.slice(4, 6).toUpperCase() === entityCountry.trim().toUpperCase();
 }
 
+// Code-point ranges for the major non-Latin scripts. Expressed as numeric pairs
+// (not a regex character class) so no combined characters can sneak in, and so
+// Latin-with-diacritics (München, BUCUREȘTI) is never matched — it is readable
+// Latin and needs no romanization.
+const NON_LATIN_RANGES: ReadonlyArray<readonly [number, number]> = [
+  [0x0370, 0x03ff], // Greek & Coptic
+  [0x0400, 0x052f], // Cyrillic (+ Supplement)
+  [0x0530, 0x058f], // Armenian
+  [0x0590, 0x05ff], // Hebrew
+  [0x0600, 0x06ff], // Arabic
+  [0x0700, 0x074f], // Syriac
+  [0x0900, 0x097f], // Devanagari
+  [0x0e00, 0x0e7f], // Thai
+  [0x10a0, 0x10ff], // Georgian
+  [0x1100, 0x11ff], // Hangul Jamo
+  [0x3040, 0x30ff], // Hiragana & Katakana
+  [0x3130, 0x318f], // Hangul Compatibility Jamo
+  [0x3400, 0x4dbf], // CJK Extension A
+  [0x4e00, 0x9fff], // CJK Unified Ideographs
+  [0xac00, 0xd7af], // Hangul Syllables
+];
+
 /**
- * True when the address language uses a non-Latin script (Chinese, Arabic,
- * Cyrillic, Greek, Hebrew…). For these, a Latin reading is expected only when
- * GLEIF ships an official English alternative — otherwise the API reports
- * `romanization: 'unavailable'` rather than fabricating a transliteration.
+ * True when a stored address line actually contains non-Latin-script characters
+ * (so it cannot be read without a romanized form). Unlike the GLEIF language
+ * tag — which marks Greek/Arabic entities 'el'/'ar' even when they filed an
+ * already-Latin transliterated address (e.g. "VALAORITOU 17", "306 CORNICHE EL
+ * NIL") — this inspects the real text, so such addresses are correctly treated
+ * as readable Latin rather than reported as missing a romanization.
  */
-export function isNonLatinLang(lang: string | null | undefined): boolean {
-  return NON_LATIN_LANGS.has(lang2(lang));
+export function hasNonLatinScript(s: string | null | undefined): boolean {
+  if (!s) return false;
+  for (const ch of s) {
+    const cp = ch.codePointAt(0)!;
+    for (const [lo, hi] of NON_LATIN_RANGES) {
+      if (cp >= lo && cp <= hi) return true;
+    }
+  }
+  return false;
 }

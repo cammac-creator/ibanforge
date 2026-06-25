@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import type { HonoEnv } from '../types.js';
 import { validateBIC } from '../lib/bic-validator.js';
 import { lookup } from '../lib/bic-lookup.js';
-import { isNonLatinLang } from '../lib/gleif-address.js';
+import { hasNonLatinScript } from '../lib/gleif-address.js';
 import { recordOperation } from '../lib/stats.js';
 import { computeRevenue } from '../lib/request-helpers.js';
 import type { BICLookupResult } from '../types.js';
@@ -59,6 +59,21 @@ bicLookup.get('/v1/bic/:code', (c) => {
   const revenue = computeRevenue(c, COST_USDC);
   recordOperation('bic_lookup', validation.country_code ?? null, found, revenue, errorDetail);
 
+  // Provenance of the Latin reading, decided from the ACTUAL script of the
+  // stored street — not the GLEIF language tag, which marks Greek/Arabic
+  // entities 'el'/'ar' even when they filed an already-Latin address. We never
+  // fabricate a transliteration: a genuinely non-Latin address with no official
+  // English variant is reported as 'unavailable'.
+  const streetIsNonLatin = hasNonLatinScript(row?.street);
+  const romanizedReading = streetIsNonLatin
+    ? (row?.address_en ?? null)
+    : (row?.street ?? row?.address_en ?? null);
+  const romanization: 'original_latin' | 'gleif_english' | 'unavailable' = !streetIsNonLatin
+    ? 'original_latin'
+    : row?.address_en
+      ? 'gleif_english'
+      : 'unavailable';
+
   const result: BICLookupResult = {
     bic: validation.bic,
     bic8: validation.bic8!,
@@ -80,15 +95,8 @@ bicLookup.get('/v1/bic/:code', (c) => {
             region: row.region,
             city: row.city,
             country: validation.country_code!,
-            romanized: row.address_en,
-            // Provenance of the Latin reading — never a fabricated transliteration.
-            romanization: !row.address_en
-              ? isNonLatinLang(row.address_lang)
-                ? ('unavailable' as const)
-                : ('original_latin' as const)
-              : row.address_en === row.street
-                ? ('original_latin' as const)
-                : ('gleif_english' as const),
+            romanized: romanizedReading,
+            romanization,
             source: row.address_source ?? 'GLEIF',
             language: row.address_lang,
             as_of: row.address_as_of,
