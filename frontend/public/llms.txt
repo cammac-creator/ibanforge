@@ -18,6 +18,10 @@ Optional: set IBANFORGE_API_KEY=ifk_... in env for the free tier (200 req/month)
 ### MCP server (streamable HTTP — no install)
 POST https://api.ibanforge.com/mcp  (JSON-RPC: initialize → tools/list → tools/call)
 
+### OpenAI agents (no Custom GPT or ChatGPT Plus needed)
+Agents SDK: point MCPServerStreamableHttp at the MCP URL above — the 5 tools auto-load.
+Function-calling (Chat Completions / Responses): wire tools to the OpenAPI at /openapi.json.
+
 ### Pay-per-call without an API key (x402, USDC on Base L2)
 GET https://api.ibanforge.com/.well-known/x402 returns the full catalog. Any agent with a Base wallet can discover, pay, and call.
 
