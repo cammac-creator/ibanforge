@@ -108,3 +108,13 @@ export function addressMatchesBic(
   if (!entityCountry || bic.length < 6) return false;
   return bic.slice(4, 6).toUpperCase() === entityCountry.trim().toUpperCase();
 }
+
+/**
+ * True when the address language uses a non-Latin script (Chinese, Arabic,
+ * Cyrillic, Greek, Hebrew…). For these, a Latin reading is expected only when
+ * GLEIF ships an official English alternative — otherwise the API reports
+ * `romanization: 'unavailable'` rather than fabricating a transliteration.
+ */
+export function isNonLatinLang(lang: string | null | undefined): boolean {
+  return NON_LATIN_LANGS.has(lang2(lang));
+}

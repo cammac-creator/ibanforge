@@ -104,8 +104,22 @@ export interface BICLookupResult {
     region: string | null;
     city: string | null;
     country: string;
-    /** Latin/romanized street line for non-Latin entities (else equals street). */
+    /**
+     * Latin reading of the address: GLEIF's official English alternative for
+     * non-Latin entities, or the address itself when already Latin. Null when
+     * the entity is non-Latin and GLEIF ships no official Latin form — we never
+     * fabricate a transliteration (see `romanization`).
+     */
     romanized: string | null;
+    /**
+     * Provenance of the Latin reading, so a consumer knows whether to trust it
+     * and why it may be absent:
+     *  - 'original_latin' — the registered address is itself in Latin script.
+     *  - 'gleif_english'  — `romanized` is GLEIF's official English address.
+     *  - 'unavailable'    — non-Latin entity with no official Latin form; not
+     *                       fabricated, so `romanized` is null.
+     */
+    romanization: 'original_latin' | 'gleif_english' | 'unavailable';
     source: string;
     language: string | null;
     as_of: string | null;

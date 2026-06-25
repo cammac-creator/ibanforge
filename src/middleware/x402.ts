@@ -332,14 +332,25 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
                   lei: { type: 'string' },
                   address: {
                     type: 'object',
-                    description: 'Registered/head-office address (GLEIF, CC0). Entity-level, not per-branch; null for branch or non-LEI BICs.',
+                    description:
+                      'Registered/head-office address (GLEIF, CC0). Entity-level, not per-branch; null for branch or non-LEI BICs. Non-Latin addresses (Chinese, Arabic, Greek…) carry an official Latin reading in `romanized` only when GLEIF provides one; otherwise `romanization` is "unavailable" and we never fabricate a transliteration.',
                     properties: {
                       street: { type: 'string' },
                       post_code: { type: 'string' },
                       region: { type: 'string' },
                       city: { type: 'string' },
                       country: { type: 'string' },
-                      romanized: { type: 'string' },
+                      romanized: {
+                        type: 'string',
+                        description:
+                          "Latin reading: GLEIF's official English address for non-Latin entities, or the address itself when already Latin. Null when no official Latin form exists (never fabricated).",
+                      },
+                      romanization: {
+                        type: 'string',
+                        enum: ['original_latin', 'gleif_english', 'unavailable'],
+                        description:
+                          'Provenance of the Latin reading: original_latin | gleif_english | unavailable (non-Latin entity with no official Latin form — not transliterated).',
+                      },
                       source: { type: 'string' },
                     },
                   },

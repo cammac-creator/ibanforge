@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type { HonoEnv } from '../types.js';
 import { validateBIC } from '../lib/bic-validator.js';
 import { lookup } from '../lib/bic-lookup.js';
+import { isNonLatinLang } from '../lib/gleif-address.js';
 import { recordOperation } from '../lib/stats.js';
 import { computeRevenue } from '../lib/request-helpers.js';
 import type { BICLookupResult } from '../types.js';
@@ -80,6 +81,14 @@ bicLookup.get('/v1/bic/:code', (c) => {
             city: row.city,
             country: validation.country_code!,
             romanized: row.address_en,
+            // Provenance of the Latin reading — never a fabricated transliteration.
+            romanization: !row.address_en
+              ? isNonLatinLang(row.address_lang)
+                ? ('unavailable' as const)
+                : ('original_latin' as const)
+              : row.address_en === row.street
+                ? ('original_latin' as const)
+                : ('gleif_english' as const),
             source: row.address_source ?? 'GLEIF',
             language: row.address_lang,
             as_of: row.address_as_of,
