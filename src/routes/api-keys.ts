@@ -281,15 +281,35 @@ apiKeys.get('/v1/admin/keys', (c) => {
   }
 
   const db = getStatsDB();
-  const month = new Date().toISOString().slice(0, 7);
+  const now = new Date();
+  const month = now.toISOString().slice(0, 7);
+  // Previous calendar month (UTC, year-boundary safe) for the usage trend.
+  const prevMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1))
+    .toISOString()
+    .slice(0, 7);
+  // Rich per-customer payload for the CRM tab. credits_total/credits_remaining
+  // and `paid` are what actually separate a paying customer (Stripe/x402 credit
+  // pack) from a free key — the previous SELECT exposed neither, so the two were
+  // indistinguishable. used_all_time / last_active_month / used_prev power the
+  // activation, recency and trend indicators. All read-only.
   const rows = db.prepare(
     `SELECT k.key_prefix, k.email, k.monthly_limit, k.active, k.created_at,
-            COALESCE(u.count, 0) as used
+            k.credits_total, k.credits_remaining,
+            CASE WHEN k.stripe_session_id IS NOT NULL THEN 1 ELSE 0 END AS paid,
+            COALESCE(u.count, 0) AS used,
+            COALESCE(p.count, 0) AS used_prev,
+            COALESCE(t.total, 0) AS used_all_time,
+            lam.last_active_month AS last_active_month
      FROM api_keys k
      LEFT JOIN api_usage u ON u.key_hash = k.key_hash AND u.month = ?
+     LEFT JOIN api_usage p ON p.key_hash = k.key_hash AND p.month = ?
+     LEFT JOIN (SELECT key_hash, SUM(count) AS total FROM api_usage GROUP BY key_hash) t
+            ON t.key_hash = k.key_hash
+     LEFT JOIN (SELECT key_hash, MAX(month) AS last_active_month FROM api_usage GROUP BY key_hash) lam
+            ON lam.key_hash = k.key_hash
      ORDER BY k.created_at DESC`
-  ).all(month);
-  return c.json({ month, keys: rows });
+  ).all(month, prevMonth);
+  return c.json({ month, prev_month: prevMonth, keys: rows });
 });
 
 /**
