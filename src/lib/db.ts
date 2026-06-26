@@ -128,6 +128,19 @@ export function getStatsDB(): DatabaseType.Database {
       -- created_at >= now-1day for rate-limiting key creation per email.
       CREATE INDEX IF NOT EXISTS idx_api_keys_email_created ON api_keys(email, created_at);
       CREATE INDEX IF NOT EXISTS idx_api_keys_active ON api_keys(active);
+      -- Email exchange summaries per customer, synced from the tabornio mail DB
+      -- (which lives on a separate VPS, unreachable from this service). Populated
+      -- by POST /v1/admin/email-summary and LEFT JOINed into the CRM by email.
+      CREATE TABLE IF NOT EXISTS email_summaries (
+        email TEXT PRIMARY KEY,
+        mail_count INTEGER DEFAULT 0,
+        received INTEGER DEFAULT 0,
+        sent INTEGER DEFAULT 0,
+        last_date TEXT,
+        last_subject TEXT,
+        last_snippet TEXT,
+        updated_at TEXT DEFAULT (datetime('now'))
+      );
     `);
     // Migrate existing databases that may be missing the new columns
     const existingCols = (statsDB.prepare("PRAGMA table_info(operations)").all() as Array<{ name: string }>).map(r => r.name);

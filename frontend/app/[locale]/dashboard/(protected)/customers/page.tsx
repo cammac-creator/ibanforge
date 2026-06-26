@@ -22,6 +22,10 @@ interface KeyRow {
   credits_total: number | null;
   credits_remaining: number | null;
   paid: number;
+  mail_count: number;
+  mail_received: number;
+  mail_last_date: string | null;
+  mail_last_subject: string | null;
 }
 interface KeysResponse {
   month: string;
@@ -157,6 +161,13 @@ function CompanyCell({ c }: { c: Customer }) {
       </span>
       <span className="truncate max-w-[200px] text-[11px] text-zinc-500">{c.email}</span>
       {c.company.sector && <span className="text-[10px] text-zinc-600">{c.company.sector}{c.company.country ? ` · ${c.company.country}` : ''}</span>}
+      {c.mail_count > 0 && (
+        <span className="text-[10px] text-blue-400/80" title={c.mail_last_subject ?? undefined}>
+          📧 {c.mail_count} mail{c.mail_count > 1 ? 's' : ''}
+          {c.mail_last_date ? ` · ${c.mail_last_date.slice(0, 10)}` : ''}
+          {c.mail_last_subject ? ` · « ${c.mail_last_subject.slice(0, 40)}${c.mail_last_subject.length > 40 ? '…' : ''} »` : ''}
+        </span>
+      )}
     </div>
   );
 }

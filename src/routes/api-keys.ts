@@ -299,7 +299,11 @@ apiKeys.get('/v1/admin/keys', (c) => {
             COALESCE(u.count, 0) AS used,
             COALESCE(p.count, 0) AS used_prev,
             COALESCE(t.total, 0) AS used_all_time,
-            lam.last_active_month AS last_active_month
+            lam.last_active_month AS last_active_month,
+            COALESCE(es.mail_count, 0) AS mail_count,
+            COALESCE(es.received, 0) AS mail_received,
+            es.last_date AS mail_last_date,
+            es.last_subject AS mail_last_subject
      FROM api_keys k
      LEFT JOIN api_usage u ON u.key_hash = k.key_hash AND u.month = ?
      LEFT JOIN api_usage p ON p.key_hash = k.key_hash AND p.month = ?
@@ -307,9 +311,73 @@ apiKeys.get('/v1/admin/keys', (c) => {
             ON t.key_hash = k.key_hash
      LEFT JOIN (SELECT key_hash, MAX(month) AS last_active_month FROM api_usage GROUP BY key_hash) lam
             ON lam.key_hash = k.key_hash
+     LEFT JOIN email_summaries es ON es.email = k.email
      ORDER BY k.created_at DESC`
   ).all(month, prevMonth);
   return c.json({ month, prev_month: prevMonth, keys: rows });
+});
+
+interface EmailSummaryInput {
+  email?: unknown;
+  mail_count?: unknown;
+  received?: unknown;
+  sent?: unknown;
+  last_date?: unknown;
+  last_subject?: unknown;
+  last_snippet?: unknown;
+}
+
+/**
+ * Ingest per-customer email-exchange summaries synced from the tabornio mail DB
+ * (separate VPS). Body: { summaries: [{ email, mail_count, received, sent,
+ * last_date, last_subject, last_snippet }] }. Upserts by email; the CRM reads
+ * them back via the LEFT JOIN in GET /v1/admin/keys.
+ */
+apiKeys.post('/v1/admin/email-summary', async (c) => {
+  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
+  let body: { summaries?: unknown };
+  try {
+    body = await c.req.json<{ summaries?: unknown }>();
+  } catch {
+    return c.json({ error: 'invalid_json', message: 'Request body must be valid JSON' }, 400);
+  }
+  if (!Array.isArray(body.summaries)) {
+    return c.json({ error: 'invalid_body', message: 'Expected { summaries: [...] }' }, 400);
+  }
+
+  const db = getStatsDB();
+  const upsert = db.prepare(
+    `INSERT INTO email_summaries (email, mail_count, received, sent, last_date, last_subject, last_snippet, updated_at)
+     VALUES (@email, @mail_count, @received, @sent, @last_date, @last_subject, @last_snippet, datetime('now'))
+     ON CONFLICT(email) DO UPDATE SET
+       mail_count = excluded.mail_count, received = excluded.received, sent = excluded.sent,
+       last_date = excluded.last_date, last_subject = excluded.last_subject,
+       last_snippet = excluded.last_snippet, updated_at = datetime('now')`,
+  );
+  const str = (v: unknown): string | null => (typeof v === 'string' && v.length ? v.slice(0, 500) : null);
+  const num = (v: unknown): number => (Number.isFinite(Number(v)) ? Number(v) : 0);
+
+  const tx = db.transaction((rows: EmailSummaryInput[]) => {
+    let n = 0;
+    for (const r of rows) {
+      if (!r || typeof r.email !== 'string' || !r.email.includes('@')) continue;
+      upsert.run({
+        email: r.email.trim().toLowerCase(),
+        mail_count: num(r.mail_count),
+        received: num(r.received),
+        sent: num(r.sent),
+        last_date: str(r.last_date),
+        last_subject: str(r.last_subject),
+        last_snippet: str(r.last_snippet),
+      });
+      n++;
+    }
+    return n;
+  });
+  const upserted = tx(body.summaries as EmailSummaryInput[]);
+  return c.json({ upserted });
 });
 
 /**
