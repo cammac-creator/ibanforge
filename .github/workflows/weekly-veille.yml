@@ -1,0 +1,29 @@
+name: Weekly market-watch (veille) → Dory
+
+on:
+  schedule:
+    # Mondays ~08:23 Europe/Zurich (06:23 UTC). Off-minute on purpose so the
+    # job doesn't land on the same instant as every other :00 cron on GitHub.
+    - cron: '23 6 * * 1'
+  workflow_dispatch: {} # manual trigger for testing
+
+jobs:
+  veille:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Run weekly veille and push the report to Dory
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          STATS_TOKEN: ${{ secrets.STATS_TOKEN }}
+          TELEGRAM_DORY_TOKEN: ${{ secrets.TELEGRAM_DORY_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: npm run veille
