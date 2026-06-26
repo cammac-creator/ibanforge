@@ -31,6 +31,7 @@
     "db:enrich": "tsx scripts/enrich-countries.ts",
     "db:seed-ch": "tsx scripts/seed-bc-nummer.ts",
     "compliance:refresh": "npx tsx scripts/refresh-compliance.ts",
+    "veille": "tsx scripts/weekly-veille.ts",
     "mcp": "tsx src/mcp/server.ts",
     "docker:build": "docker build -t ibanforge .",
     "docker:run": "docker run -p 3000:3000 --env-file .env ibanforge",
