@@ -107,6 +107,7 @@ function buildCustomer(row: KeyRow): Customer {
   if (isInternal) action = 'Compte interne / test';
   else if (isPaid && consumed === 0) action = 'Onboarder — a payé mais n’utilise pas';
   else if (isPaid && consumedPct != null && consumedPct > 80) action = 'Upsell — propose un pack supérieur';
+  else if (isPaid && consumedPct != null && consumedPct < 10) action = 'Suivi — a payé mais usage faible, garde le lien';
   else if (category === 'PILOTE' && row.used_all_time === 0 && ageDays >= 3) action = 'Relancer par mail — lead offert dormant';
   else if (category === 'GRATUIT' && consumedPct != null && consumedPct >= 80) action = 'Proposer un bundle payant';
   else if (trend === 'down') action = 'Relance anti-churn — usage en chute';
