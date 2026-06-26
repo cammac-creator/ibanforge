@@ -26,6 +26,7 @@ interface KeyRow {
   mail_received: number;
   mail_last_date: string | null;
   mail_last_subject: string | null;
+  series: number[];
 }
 interface KeysResponse {
   month: string;
@@ -140,6 +141,28 @@ function healthColor(h: number): string {
   return h >= 80 ? '#22c55e' : h >= 40 ? '#f59e0b' : '#ef4444';
 }
 
+/** Inline 6-month usage sparkline for a single customer. */
+function Sparkline({ data, color = '#f59e0b' }: { data: number[]; color?: string }) {
+  if (!data || data.length < 2 || data.every((v) => v === 0)) {
+    return <span className="text-[10px] text-zinc-700">—</span>;
+  }
+  const max = Math.max(...data, 1);
+  const w = 70;
+  const h = 18;
+  const step = w / (data.length - 1);
+  const pts = data.map((v, i) => `${(i * step).toFixed(1)},${(h - (v / max) * h).toFixed(1)}`).join(' ');
+  const last = data[data.length - 1];
+  return (
+    <span className="inline-flex items-center gap-1.5" title={`Appels/mois (6 mois) : ${data.join(' · ')}`}>
+      <svg width={w} height={h} className="overflow-visible">
+        <polyline points={pts} fill="none" stroke={color} strokeWidth="1.5" strokeLinejoin="round" />
+        <circle cx={w} cy={Number((h - (last / max) * h).toFixed(1))} r="2" fill={color} />
+      </svg>
+      <span className="font-mono text-[10px] text-zinc-500">{last}</span>
+    </span>
+  );
+}
+
 const CARD = 'rounded-xl border border-zinc-800/60 bg-gradient-to-br from-zinc-900 to-zinc-900/60 p-5';
 
 function CompanyCell({ c }: { c: Customer }) {
@@ -205,16 +228,18 @@ export default async function CustomersPage({
   }
 
   const all = data.keys.map(buildCustomer);
-  const real = all.filter((c) => !c.isInternal);
-  const internalCount = all.length - real.length;
+  // Pilots (offered 5000-quota keys) never genuinely used the API — their only
+  // calls were Claude-Alain's own tests — so they are hidden from the roster.
+  const isHidden = (c: Customer) => c.isInternal || c.category === 'PILOTE';
+  const real = all.filter((c) => !isHidden(c));
+  const hiddenCount = all.length - real.length;
 
   const payants = real.filter((c) => c.category === 'PAYANT').sort((a, b) => (b.revenueUsd ?? 0) - (a.revenueUsd ?? 0));
-  const pilotes = real.filter((c) => c.category === 'PILOTE').sort((a, b) => b.used_all_time - a.used_all_time);
   const gratuitsActifs = real.filter((c) => c.category === 'GRATUIT' && c.used_all_time > 0).sort((a, b) => b.used_all_time - a.used_all_time);
-  const silentPilots = pilotes.filter((c) => c.used_all_time === 0 && c.ageDays >= 3);
+  const withMail = real.filter((c) => c.mail_count > 0).length;
   const totalRevenue = payants.reduce((s, c) => s + (c.revenueUsd ?? 0), 0);
-  const toRelance = silentPilots.length + gratuitsActifs.filter((c) => (c.consumedPct ?? 0) >= 80).length;
-  const internalRows = showInternal ? all.filter((c) => c.isInternal) : [];
+  const toRelance = gratuitsActifs.filter((c) => (c.consumedPct ?? 0) >= 80).length;
+  const hiddenRows = showInternal ? all.filter(isHidden) : [];
 
   const th = 'pb-2 font-medium text-left';
   const headRow = 'border-b border-zinc-800 text-xs uppercase tracking-wide text-zinc-500';
@@ -226,8 +251,8 @@ export default async function CustomersPage({
         <div>
           <h1 className="text-xl font-semibold text-white">Clients — CRM</h1>
           <p className="mt-1 text-sm text-zinc-500">
-            {payants.length} payant{payants.length > 1 ? 's' : ''} · {pilotes.length} pilotes · {gratuitsActifs.length} gratuits actifs
-            <span className="text-zinc-600"> · ~{internalCount} internes/tests masqués</span>
+            {payants.length} payant{payants.length > 1 ? 's' : ''} · {gratuitsActifs.length} gratuits actifs
+            <span className="text-zinc-600"> · {hiddenCount} masqués (pilotes sans usage + internes/tests)</span>
           </p>
         </div>
         <a
@@ -248,11 +273,10 @@ export default async function CustomersPage({
           hint="Somme du CA réel des clients payants (pack Stripe : 1k=$5, 5k=$20, 25k=$80). x402/USDC n'est pas attribuable par client. Interprétation : concentre ton énergie sur les plus hauts — ce sont eux qu'il ne faut pas perdre."
         />
         <StatCardV2
-          title="Pilotes fintech"
-          value={String(pilotes.length)}
+          title="Échanges mails"
+          value={String(withMail)}
           accentColor="#3b82f6"
-          trend={{ direction: silentPilots.length > 0 ? 'down' : 'up', label: `${pilotes.length - silentPilots.length} actifs` }}
-          hint="Clés à quota relevé (5000) offertes à des leads fintech. Interprétation : un pilote qui n'appelle jamais est un lead dormant — c'est gratuit pour lui, à toi de l'activer."
+          hint="Clients réels avec qui tu as un échange mail (source : tes boîtes). Interprétation : une relation déjà engagée — réponds vite, c'est là que se noue la confiance."
         />
         <StatCardV2
           title="Gratuits actifs"
@@ -268,21 +292,6 @@ export default async function CustomersPage({
           hint="Pilotes silencieux (≥3 j sans appel) + gratuits à ≥80% de leur quota. Interprétation : c'est ta liste d'actions du jour — l'argent et l'activation les plus faciles."
         />
       </div>
-
-      {/* Silent pilots alert */}
-      {silentPilots.length > 0 && (
-        <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
-          <p className="mb-1 text-sm font-medium text-amber-300">⚠ {silentPilots.length} pilotes silencieux à relancer</p>
-          <p className="mb-3 text-xs text-amber-200/70">Leads fintech à qui tu as offert une clé 5000/mois mais qui n’ont jamais appelé l’API (≥ 3 jours). Un mail de relance ici = ton meilleur ROI.</p>
-          <div className="flex flex-wrap gap-2">
-            {silentPilots.map((c) => (
-              <span key={c.key_prefix} className="rounded-md bg-amber-500/10 px-2 py-1 text-xs text-amber-200">
-                {c.company.company ?? c.email} <span className="text-amber-500/60">· {c.ageDays}j</span>
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* PAYANTS */}
       <div className={CARD}>
@@ -329,41 +338,6 @@ export default async function CustomersPage({
         )}
       </div>
 
-      {/* PILOTES */}
-      <div className={CARD}>
-        <div className="mb-4 flex items-center gap-2">
-          <p className="text-sm font-medium text-zinc-300">🔵 Pilotes (clés 5000 offertes)</p>
-          <InfoDot>Leads fintech à qui tu as offert un quota relevé pour tester. « Quota relevé » est un proxy — ce n’est PAS un paiement. Objectif : les faire passer de dormants à actifs, puis payants.</InfoDot>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className={headRow}>
-                <th className={th}>Client</th>
-                <th className={th}>Créé</th>
-                <th className={th}>Appels (total)</th>
-                <th className={th}>Activé</th>
-                <th className={th}>Santé</th>
-                <th className={th}>Action recommandée</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pilotes.map((c) => (
-                <tr key={c.key_prefix} className="border-b border-zinc-800/50 last:border-0">
-                  <td className="py-3"><CompanyCell c={c} /></td>
-                  <td className="py-3 text-xs text-zinc-400">{c.ageDays} j</td>
-                  <td className="py-3 font-mono text-xs text-zinc-300">{fmt(c.used_all_time)}</td>
-                  <td className="py-3">
-                    <span className={`text-xs ${c.activated ? 'text-green-400' : 'text-red-400'}`}>{c.activated ? 'oui' : 'jamais'}</span>
-                  </td>
-                  <td className="py-3 font-mono text-xs font-semibold" style={{ color: healthColor(c.health) }}>{c.health}</td>
-                  <td className="py-3 text-xs text-zinc-300">{c.action}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
 
       {/* GRATUITS ACTIFS */}
       <div className={CARD}>
@@ -380,6 +354,7 @@ export default async function CustomersPage({
                 <tr className={headRow}>
                   <th className={th}>Client</th>
                   <th className={th}>Quota ce mois</th>
+                  <th className={th}>Usage 6 mois</th>
                   <th className={th}>Tendance</th>
                   <th className={th}>Santé</th>
                   <th className={th}>Action recommandée</th>
@@ -400,6 +375,7 @@ export default async function CustomersPage({
                           <span className="font-mono text-[10px] text-zinc-500">{pct}%</span>
                         </div>
                       </td>
+                      <td className="py-3"><Sparkline data={c.series} color="#a855f7" /></td>
                       <td className="py-3 text-xs">
                         <span className={c.trend === 'up' ? 'text-green-400' : c.trend === 'down' ? 'text-red-400' : 'text-zinc-500'}>
                           {c.trend === 'up' ? '▲' : c.trend === 'down' ? '▼' : '='} {c.trendPct != null ? `${c.trendPct > 0 ? '+' : ''}${c.trendPct}%` : ''}
@@ -430,12 +406,12 @@ export default async function CustomersPage({
       </div>
 
       {/* Internal / test (toggle) */}
-      {showInternal && internalRows.length > 0 && (
+      {showInternal && hiddenRows.length > 0 && (
         <div className={CARD}>
-          <p className="mb-3 text-sm font-medium text-zinc-500">Internes & tests ({internalRows.length}) — exclus des compteurs</p>
+          <p className="mb-3 text-sm font-medium text-zinc-500">Masqués — pilotes sans usage réel + internes/tests ({hiddenRows.length}) — exclus des compteurs</p>
           <div className="flex flex-wrap gap-1.5">
-            {internalRows.map((c) => (
-              <span key={c.key_prefix} className="rounded bg-zinc-800/50 px-2 py-0.5 text-[11px] text-zinc-500">{c.email}</span>
+            {hiddenRows.map((c) => (
+              <span key={c.key_prefix} className="rounded bg-zinc-800/50 px-2 py-0.5 text-[11px] text-zinc-500">{c.company.company ?? c.email}</span>
             ))}
           </div>
         </div>

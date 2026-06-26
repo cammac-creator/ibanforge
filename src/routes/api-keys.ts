@@ -293,7 +293,7 @@ apiKeys.get('/v1/admin/keys', (c) => {
   // indistinguishable. used_all_time / last_active_month / used_prev power the
   // activation, recency and trend indicators. All read-only.
   const rows = db.prepare(
-    `SELECT k.key_prefix, k.email, k.monthly_limit, k.active, k.created_at,
+    `SELECT k.key_hash, k.key_prefix, k.email, k.monthly_limit, k.active, k.created_at,
             k.credits_total, k.credits_remaining,
             CASE WHEN k.stripe_session_id IS NOT NULL THEN 1 ELSE 0 END AS paid,
             COALESCE(u.count, 0) AS used,
@@ -313,8 +313,35 @@ apiKeys.get('/v1/admin/keys', (c) => {
             ON lam.key_hash = k.key_hash
      LEFT JOIN email_summaries es ON es.email = k.email
      ORDER BY k.created_at DESC`
-  ).all(month, prevMonth);
-  return c.json({ month, prev_month: prevMonth, keys: rows });
+  ).all(month, prevMonth) as Array<Record<string, unknown> & { key_hash: string }>;
+
+  // Per-customer monthly usage series (last 6 months) → CRM sparkline.
+  const months: string[] = [];
+  for (let i = 5; i >= 0; i--) {
+    months.push(
+      new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1)).toISOString().slice(0, 7),
+    );
+  }
+  const usage = db
+    .prepare('SELECT key_hash, month, count FROM api_usage WHERE month >= ?')
+    .all(months[0]) as Array<{ key_hash: string; month: string; count: number }>;
+  const byHash = new Map<string, Map<string, number>>();
+  for (const u of usage) {
+    let m = byHash.get(u.key_hash);
+    if (!m) {
+      m = new Map();
+      byHash.set(u.key_hash, m);
+    }
+    m.set(u.month, u.count);
+  }
+  const keys = rows.map((r) => {
+    const m = byHash.get(r.key_hash);
+    const series = months.map((mo) => m?.get(mo) ?? 0);
+    const out: Record<string, unknown> = { ...r, series };
+    delete out.key_hash; // internal join key, never exposed
+    return out;
+  });
+  return c.json({ month, prev_month: prevMonth, months, keys });
 });
 
 interface EmailSummaryInput {
