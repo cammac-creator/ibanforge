@@ -141,6 +141,20 @@ export function getStatsDB(): DatabaseType.Database {
         last_snippet TEXT,
         updated_at TEXT DEFAULT (datetime('now'))
       );
+      -- Full per-customer email thread (one row per message), synced from the
+      -- tabornio mail DB + Sent folders. Powers the CRM conversation cockpit.
+      -- direction: 'in' = customer -> founder, 'out' = founder -> customer.
+      CREATE TABLE IF NOT EXISTS email_messages (
+        id TEXT PRIMARY KEY,
+        customer_email TEXT NOT NULL,
+        direction TEXT NOT NULL,
+        msg_date TEXT,
+        subject TEXT,
+        snippet TEXT,
+        counterparty TEXT,
+        created_at TEXT DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_email_messages_customer ON email_messages(customer_email, msg_date);
     `);
     // Migrate existing databases that may be missing the new columns
     const existingCols = (statsDB.prepare("PRAGMA table_info(operations)").all() as Array<{ name: string }>).map(r => r.name);
