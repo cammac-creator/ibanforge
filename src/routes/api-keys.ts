@@ -407,6 +407,80 @@ apiKeys.post('/v1/admin/email-summary', async (c) => {
   return c.json({ upserted });
 });
 
+interface EmailMessageInput {
+  id?: unknown;
+  customer_email?: unknown;
+  direction?: unknown;
+  msg_date?: unknown;
+  subject?: unknown;
+  snippet?: unknown;
+  counterparty?: unknown;
+}
+
+/**
+ * Ingest full per-customer email messages (one row per message) synced from the
+ * tabornio mail DB + Sent folders. Upserts by stable id. Powers the CRM
+ * conversation cockpit (GET /v1/admin/email-messages).
+ */
+apiKeys.post('/v1/admin/email-messages', async (c) => {
+  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
+  let body: { messages?: unknown };
+  try {
+    body = await c.req.json<{ messages?: unknown }>();
+  } catch {
+    return c.json({ error: 'invalid_json', message: 'Request body must be valid JSON' }, 400);
+  }
+  if (!Array.isArray(body.messages)) {
+    return c.json({ error: 'invalid_body', message: 'Expected { messages: [...] }' }, 400);
+  }
+
+  const db = getStatsDB();
+  const clip = (v: unknown, n: number): string | null => (typeof v === 'string' && v.length ? v.slice(0, n) : null);
+  const upsert = db.prepare(
+    `INSERT INTO email_messages (id, customer_email, direction, msg_date, subject, snippet, counterparty)
+     VALUES (@id, @customer_email, @direction, @msg_date, @subject, @snippet, @counterparty)
+     ON CONFLICT(id) DO UPDATE SET
+       customer_email = excluded.customer_email, direction = excluded.direction,
+       msg_date = excluded.msg_date, subject = excluded.subject,
+       snippet = excluded.snippet, counterparty = excluded.counterparty`,
+  );
+  const tx = db.transaction((rows: EmailMessageInput[]) => {
+    let n = 0;
+    for (const r of rows) {
+      if (!r || typeof r.id !== 'string' || typeof r.customer_email !== 'string' || !r.customer_email.includes('@')) continue;
+      upsert.run({
+        id: r.id.slice(0, 200),
+        customer_email: r.customer_email.trim().toLowerCase(),
+        direction: r.direction === 'out' ? 'out' : 'in',
+        msg_date: clip(r.msg_date, 40),
+        subject: clip(r.subject, 500),
+        snippet: clip(r.snippet, 300),
+        counterparty: clip(r.counterparty, 255),
+      });
+      n++;
+    }
+    return n;
+  });
+  const upserted = tx(body.messages as EmailMessageInput[]);
+  return c.json({ upserted });
+});
+
+apiKeys.get('/v1/admin/email-messages', (c) => {
+  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
+  const db = getStatsDB();
+  const rows = db
+    .prepare(
+      `SELECT customer_email, direction, msg_date, subject, snippet, counterparty
+       FROM email_messages ORDER BY msg_date ASC`,
+    )
+    .all();
+  return c.json({ messages: rows });
+});
+
 /**
  * Read-only delivery check for a Stripe purchase. NON-CONSUMING: it only SELECTs
  * (never nulls raw_key_one_time_view), so calling it does not affect the
