@@ -2,6 +2,19 @@ import { getLocale } from 'next-intl/server';
 import { StatCardV2 } from '@/components/dashboard/stat-card-v2';
 import { InfoDot } from '@/components/dashboard/info-dot';
 import { enrichEmail, type CompanyInfo } from '@/lib/company-enrichment';
+import { CustomerThread, type ThreadMessage, type ThreadStatus } from '@/components/dashboard/customer-thread';
+
+interface MessageRow extends ThreadMessage {
+  customer_email: string;
+}
+
+function statusOf(messages: ThreadMessage[]): ThreadStatus {
+  if (!messages.length) return 'not_contacted';
+  const last = messages[messages.length - 1];
+  if (last.direction === 'in') return 'replied';
+  const days = last.msg_date ? Math.floor((Date.now() - new Date(last.msg_date).getTime()) / 86_400_000) : 0;
+  return days > 5 ? 'followup_due' : 'awaiting';
+}
 
 const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 const ADMIN_SECRET = process.env.ADMIN_SECRET || '';
@@ -227,6 +240,28 @@ export default async function CustomersPage({
     );
   }
 
+  // Per-customer conversation threads (follow-up cockpit).
+  let messageRows: MessageRow[] = [];
+  if (ADMIN_SECRET) {
+    try {
+      const r = await fetch(`${API_URL}/v1/admin/email-messages`, {
+        cache: 'no-store',
+        headers: { 'X-Admin-Secret': ADMIN_SECRET },
+      });
+      if (r.ok) messageRows = ((await r.json()) as { messages?: MessageRow[] }).messages ?? [];
+    } catch {
+      messageRows = [];
+    }
+  }
+  const threadsByEmail = new Map<string, ThreadMessage[]>();
+  for (const m of messageRows) {
+    const key = m.customer_email.toLowerCase();
+    const arr = threadsByEmail.get(key);
+    if (arr) arr.push(m);
+    else threadsByEmail.set(key, [m]);
+  }
+  const threadFor = (email: string): ThreadMessage[] => threadsByEmail.get(email.toLowerCase()) ?? [];
+
   const all = data.keys.map(buildCustomer);
   // Pilots (offered 5000-quota keys) never genuinely used the API — their only
   // calls were Claude-Alain's own tests — so they are hidden from the roster.
@@ -310,6 +345,7 @@ export default async function CustomersPage({
                   <th className={th}>Revenu</th>
                   <th className={th}>Crédits consommés</th>
                   <th className={th}>Santé</th>
+                  <th className={th}>Suivi</th>
                   <th className={th}>Action recommandée</th>
                 </tr>
               </thead>
@@ -328,6 +364,9 @@ export default async function CustomersPage({
                     </td>
                     <td className="py-3">
                       <span className="font-mono text-xs font-semibold" style={{ color: healthColor(c.health) }}>{c.health}</span>
+                    </td>
+                    <td className="py-3">
+                      <CustomerThread name={c.company.company ?? c.email} status={statusOf(threadFor(c.email))} messages={threadFor(c.email)} />
                     </td>
                     <td className="py-3 text-xs text-zinc-300">{c.action}</td>
                   </tr>
@@ -357,6 +396,7 @@ export default async function CustomersPage({
                   <th className={th}>Usage 6 mois</th>
                   <th className={th}>Tendance</th>
                   <th className={th}>Santé</th>
+                  <th className={th}>Suivi</th>
                   <th className={th}>Action recommandée</th>
                 </tr>
               </thead>
@@ -382,6 +422,9 @@ export default async function CustomersPage({
                         </span>
                       </td>
                       <td className="py-3 font-mono text-xs font-semibold" style={{ color: healthColor(c.health) }}>{c.health}</td>
+                      <td className="py-3">
+                        <CustomerThread name={c.company.company ?? c.email} status={statusOf(threadFor(c.email))} messages={threadFor(c.email)} />
+                      </td>
                       <td className="py-3 text-xs text-zinc-300">{c.action}</td>
                     </tr>
                   );
