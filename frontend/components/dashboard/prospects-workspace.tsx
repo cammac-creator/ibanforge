@@ -247,6 +247,7 @@ function ProspectDetail({ p }: { p: Prospect }) {
                 </a>
               </>
             )}
+            {p.status === 'a_enrichir' && <span className="text-amber-400/70"> · à confirmer (non vérifié)</span>}
           </p>
         ) : (
           <p className="text-xs text-amber-400/80">Pas d’email vérifié — à enrichir (on ne devine jamais une adresse).</p>
