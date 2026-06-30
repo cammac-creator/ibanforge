@@ -24,6 +24,6 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           STATS_TOKEN: ${{ secrets.STATS_TOKEN }}
-          TELEGRAM_DORY_TOKEN: ${{ secrets.TELEGRAM_DORY_TOKEN }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: npm run veille

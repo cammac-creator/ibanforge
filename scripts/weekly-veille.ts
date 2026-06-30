@@ -8,14 +8,14 @@
  * 3. Sends a concise French report to Claude-Alain via the Dory Telegram bot.
  *
  * Runs weekly from .github/workflows/weekly-veille.yml. All inputs come from env
- * (GitHub Actions secrets): ANTHROPIC_API_KEY, STATS_TOKEN, TELEGRAM_DORY_TOKEN,
+ * (GitHub Actions secrets): ANTHROPIC_API_KEY, STATS_TOKEN, TELEGRAM_BOT_TOKEN,
  * TELEGRAM_CHAT_ID. No external deps — native fetch (Node 20+).
  */
 
 const API_BASE = process.env.IBANFORGE_API_BASE ?? 'https://api.ibanforge.com';
 const STATS_TOKEN = process.env.STATS_TOKEN ?? '';
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY ?? '';
-const DORY_TOKEN = process.env.TELEGRAM_DORY_TOKEN ?? '';
+const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN ?? '';
 const CHAT_ID = process.env.TELEGRAM_CHAT_ID ?? '';
 const MODEL = process.env.VEILLE_MODEL ?? 'claude-sonnet-4-6';
 
@@ -42,7 +42,7 @@ function requireEnv(): void {
   const missing = [
     ['ANTHROPIC_API_KEY', ANTHROPIC_API_KEY],
     ['STATS_TOKEN', STATS_TOKEN],
-    ['TELEGRAM_DORY_TOKEN', DORY_TOKEN],
+    ['TELEGRAM_BOT_TOKEN', BOT_TOKEN],
     ['TELEGRAM_CHAT_ID', CHAT_ID],
   ].filter(([, v]) => !v).map(([k]) => k);
   if (missing.length) {
@@ -202,7 +202,7 @@ function splitForTelegram(text: string, limit = 3900): string[] {
 
 async function sendToDory(text: string): Promise<void> {
   for (const chunk of splitForTelegram(text)) {
-    const res = await fetch(`https://api.telegram.org/bot${DORY_TOKEN}/sendMessage`, {
+    const res = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       signal: AbortSignal.timeout(20_000),
