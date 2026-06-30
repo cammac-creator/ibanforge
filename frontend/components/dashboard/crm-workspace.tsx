@@ -9,6 +9,7 @@ export interface CrmMessage {
   snippet: string | null;
   snippet_fr?: string | null;
   lang?: string | null;
+  body?: string | null;
   counterparty: string | null;
 }
 
@@ -211,6 +212,54 @@ function ClientDetail({ client: c }: { client: CrmClient }) {
   );
 }
 
+function TimelineMessage({ m }: { m: CrmMessage }) {
+  const [open, setOpen] = useState(false);
+  const [showOrig, setShowOrig] = useState(false);
+  const foreign = !!(m.lang && m.lang !== 'en' && m.lang !== 'fr');
+  const original = m.body || m.snippet || '';
+  const frText = foreign ? m.snippet_fr || m.snippet || '' : '';
+  const display = foreign && !showOrig ? frText : original;
+  const long = display.length > 300;
+  const text = open || !long ? display : display.slice(0, 300) + '…';
+  return (
+    <div className="relative">
+      <span
+        className="absolute -left-[21px] top-1 h-2.5 w-2.5 rounded-full border-2 border-zinc-900"
+        style={{ backgroundColor: m.direction === 'in' ? '#3b82f6' : '#f59e0b' }}
+      />
+      <div className="flex flex-wrap items-center gap-2 text-[11px] text-zinc-500">
+        <span className={m.direction === 'in' ? 'text-blue-400' : 'text-amber-400'}>
+          {m.direction === 'in' ? '📥 reçu' : '📨 envoyé'}
+        </span>
+        <span>{m.msg_date}</span>
+        {foreign && (
+          <span className="rounded bg-violet-500/15 px-1.5 py-0.5 text-[9px] text-violet-300" title="Traduit automatiquement en français">
+            🌐 traduit {m.lang && LANG_LABEL[m.lang] ? `du ${LANG_LABEL[m.lang]}` : ''}
+          </span>
+        )}
+      </div>
+      <p className="mt-0.5 text-xs font-medium text-zinc-200">{m.subject || '(sans objet)'}</p>
+      {display && (
+        <p className={`mt-0.5 whitespace-pre-wrap text-[11px] leading-relaxed ${foreign && !showOrig ? 'text-violet-200/80' : 'text-zinc-400'}`}>
+          {text}
+        </p>
+      )}
+      <div className="mt-1 flex gap-3 text-[10px]">
+        {long && (
+          <button type="button" onClick={() => setOpen(!open)} className="text-zinc-500 hover:text-zinc-300">
+            {open ? 'réduire' : 'voir tout'}
+          </button>
+        )}
+        {foreign && (
+          <button type="button" onClick={() => setShowOrig(!showOrig)} className="text-violet-400 hover:text-violet-300">
+            {showOrig ? 'voir la traduction' : 'voir l’original'}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function Timeline({ client: c }: { client: CrmClient }) {
   const tool = c.endpoints[0] ? `${TOOL[c.endpoints[0].path] ?? c.endpoints[0].path}` : null;
   const totalCalls = c.series.reduce((a, b) => a + b, 0);
@@ -219,31 +268,9 @@ function Timeline({ client: c }: { client: CrmClient }) {
       <p className="mb-3 text-[11px] uppercase tracking-wide text-zinc-500">Timeline</p>
       <div className="relative flex flex-col gap-3 border-l border-zinc-800 pl-4">
         {c.messages.length === 0 && <p className="text-sm text-zinc-600">Aucun échange mail pour l’instant.</p>}
-        {c.messages.map((m, i) => {
-          const foreign = m.lang && m.lang !== 'en' && m.lang !== 'fr';
-          const shown = foreign && m.snippet_fr ? m.snippet_fr : m.snippet;
-          return (
-            <div key={i} className="relative">
-              <span
-                className="absolute -left-[21px] top-1 h-2.5 w-2.5 rounded-full border-2 border-zinc-900"
-                style={{ backgroundColor: m.direction === 'in' ? '#3b82f6' : '#f59e0b' }}
-              />
-              <div className="flex items-center gap-2 text-[11px] text-zinc-500">
-                <span className={m.direction === 'in' ? 'text-blue-400' : 'text-amber-400'}>
-                  {m.direction === 'in' ? '📥 reçu' : '📨 envoyé'}
-                </span>
-                <span>{m.msg_date}</span>
-                {foreign && (
-                  <span className="rounded bg-violet-500/15 px-1.5 py-0.5 text-[9px] text-violet-300" title="Traduit automatiquement en français">
-                    🌐 traduit {m.lang && LANG_LABEL[m.lang] ? `du ${LANG_LABEL[m.lang]}` : ''}
-                  </span>
-                )}
-              </div>
-              <p className="mt-0.5 text-xs font-medium text-zinc-200">{m.subject || '(sans objet)'}</p>
-              {shown && <p className={`mt-0.5 text-[11px] leading-relaxed ${foreign ? 'text-violet-200/80' : 'text-zinc-400'}`}>{shown}</p>}
-            </div>
-          );
-        })}
+        {c.messages.map((m, i) => (
+          <TimelineMessage key={i} m={m} />
+        ))}
         {totalCalls > 0 && (
           <div className="relative">
             <span className="absolute -left-[21px] top-1 h-2.5 w-2.5 rounded-full border-2 border-zinc-900 bg-violet-500" />
