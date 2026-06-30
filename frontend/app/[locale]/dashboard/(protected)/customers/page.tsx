@@ -53,7 +53,9 @@ function statusOf(messages: CrmMessage[]): CrmClient['status'] {
   const last = messages[messages.length - 1];
   if (last.direction === 'in') return 'replied';
   const d = last.msg_date ? Math.floor((Date.now() - new Date(last.msg_date).getTime()) / 86_400_000) : 0;
-  return d > 5 ? 'followup_due' : 'awaiting';
+  // Relance "due" seulement après une vraie fenêtre de suivi (10 j) sans réponse :
+  // un mail envoyé il y a quelques jours n'est PAS à relancer.
+  return d > 10 ? 'followup_due' : 'awaiting';
 }
 
 export default async function CustomersPage() {
@@ -208,7 +210,8 @@ export default async function CustomersPage() {
     if (revenueUsd) revenue += revenueUsd;
     if (messages.length) withMail += 1;
     if (category === 'GRATUIT' && row.used_all_time > 0) freeActive += 1;
-    if (status === 'followup_due' || (consumedPct ?? 0) >= 80) toRelance += 1;
+    // "À relancer" = suivi MAIL en attente (l'usage élevé est un signal d'upsell, pas de relance).
+    if (status === 'followup_due') toRelance += 1;
   }
 
   // Priority sort: payants → relance due → awaiting → others; then by health desc.
