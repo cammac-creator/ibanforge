@@ -149,18 +149,28 @@ export default async function CustomersPage() {
 
     // Compose helpers
     const warm = messages.length > 0;
+    const activeUser = !warm && row.used_all_time > 0; // uses the API, never emailed
     const account = warm ? 'cammac@bluewin.ch' : 'claude-alain@ibanforge.com';
     const lastSubj = messages.length ? messages[messages.length - 1].subject : null;
-    const subject = warm && lastSubj ? lastSubj : `IBANforge${company.company ? ' — ' + company.company : ''}`;
+    const subject = warm && lastSubj
+      ? lastSubj
+      : activeUser
+        ? 'Quick question from the IBANforge founder'
+        : `IBANforge${company.company ? ' — ' + company.company : ''}`;
     const threadTxt = messages
       .slice(-4)
       .map((m) => `[${m.direction === 'in' ? 'them' : 'me'} ${m.msg_date ?? ''}] ${m.subject ?? ''}: ${m.snippet ?? ''}`)
       .join('\n');
+    const goal = warm
+      ? `Recent thread (them = client, me = founder):\n${threadTxt}\nContinue this conversation toward: ${action}.`
+      : activeUser
+        ? 'This person ALREADY uses IBANforge (they have made real API calls) but you have NEVER emailed them. Write a SHORT, warm, NON-salesy note from the founder: thank them for using it, then ask just two easy questions — (1) a brief bit of feedback on their experience so far, and (2) how they discovered IBANforge. Do NOT pitch features and do NOT ask for a call.'
+        : 'No prior emails and no API usage yet — COLD first-touch: a short, credible pitch + one low-friction ask.';
     const brief = [
       `Client: ${company.company ?? row.email} <${row.email}>`,
       company.sector ? `Sector: ${company.sector}` : '',
       `Category: ${category}. Recommended next action: ${action}`,
-      warm ? `Recent thread (them = client, me = founder):\n${threadTxt}` : 'No prior emails — COLD first-touch outreach.',
+      goal,
       row.email.includes('ib4.net') ? 'IMPORTANT: never mention "IB4" anywhere.' : '',
     ]
       .filter(Boolean)

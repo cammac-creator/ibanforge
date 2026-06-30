@@ -220,6 +220,7 @@ export function getStatsDB(): DatabaseType.Database {
     const msgCols = (statsDB.prepare('PRAGMA table_info(email_messages)').all() as Array<{ name: string }>).map((r) => r.name);
     if (msgCols.length && !msgCols.includes('snippet_fr')) statsDB.exec('ALTER TABLE email_messages ADD COLUMN snippet_fr TEXT');
     if (msgCols.length && !msgCols.includes('lang')) statsDB.exec('ALTER TABLE email_messages ADD COLUMN lang TEXT');
+    if (msgCols.length && !msgCols.includes('body')) statsDB.exec('ALTER TABLE email_messages ADD COLUMN body TEXT');
   }
   return statsDB;
 }
