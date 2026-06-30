@@ -216,6 +216,10 @@ export function getStatsDB(): DatabaseType.Database {
       statsDB.exec('ALTER TABLE request_log ADD COLUMN key_prefix TEXT');
       statsDB.exec('CREATE INDEX IF NOT EXISTS idx_request_log_key_prefix ON request_log(key_prefix)');
     }
+    // CRM timeline: French translation + detected language of foreign messages.
+    const msgCols = (statsDB.prepare('PRAGMA table_info(email_messages)').all() as Array<{ name: string }>).map((r) => r.name);
+    if (msgCols.length && !msgCols.includes('snippet_fr')) statsDB.exec('ALTER TABLE email_messages ADD COLUMN snippet_fr TEXT');
+    if (msgCols.length && !msgCols.includes('lang')) statsDB.exec('ALTER TABLE email_messages ADD COLUMN lang TEXT');
   }
   return statsDB;
 }
