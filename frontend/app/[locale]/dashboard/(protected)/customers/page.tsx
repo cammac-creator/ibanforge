@@ -3,6 +3,7 @@ import { StatCardV2 } from '@/components/dashboard/stat-card-v2';
 import { InfoDot } from '@/components/dashboard/info-dot';
 import { enrichEmail, type CompanyInfo } from '@/lib/company-enrichment';
 import { CustomerThread, type ThreadMessage, type ThreadStatus } from '@/components/dashboard/customer-thread';
+import { CustomerActivity, type ClientActivity } from '@/components/dashboard/customer-activity';
 
 interface MessageRow extends ThreadMessage {
   customer_email: string;
@@ -44,6 +45,7 @@ interface KeyRow {
 interface KeysResponse {
   month: string;
   prev_month: string;
+  months?: string[];
   keys: KeyRow[];
 }
 
@@ -154,27 +156,6 @@ function healthColor(h: number): string {
   return h >= 80 ? '#22c55e' : h >= 40 ? '#f59e0b' : '#ef4444';
 }
 
-/** Inline 6-month usage sparkline for a single customer. */
-function Sparkline({ data, color = '#f59e0b' }: { data: number[]; color?: string }) {
-  if (!data || data.length < 2 || data.every((v) => v === 0)) {
-    return <span className="text-[10px] text-zinc-700">—</span>;
-  }
-  const max = Math.max(...data, 1);
-  const w = 70;
-  const h = 18;
-  const step = w / (data.length - 1);
-  const pts = data.map((v, i) => `${(i * step).toFixed(1)},${(h - (v / max) * h).toFixed(1)}`).join(' ');
-  const last = data[data.length - 1];
-  return (
-    <span className="inline-flex items-center gap-1.5" title={`Appels/mois (6 mois) : ${data.join(' · ')}`}>
-      <svg width={w} height={h} className="overflow-visible">
-        <polyline points={pts} fill="none" stroke={color} strokeWidth="1.5" strokeLinejoin="round" />
-        <circle cx={w} cy={Number((h - (last / max) * h).toFixed(1))} r="2" fill={color} />
-      </svg>
-      <span className="font-mono text-[10px] text-zinc-500">{last}</span>
-    </span>
-  );
-}
 
 const CARD = 'rounded-xl border border-zinc-800/60 bg-gradient-to-br from-zinc-900 to-zinc-900/60 p-5';
 
@@ -262,6 +243,21 @@ export default async function CustomersPage({
   }
   const threadFor = (email: string): ThreadMessage[] => threadsByEmail.get(email.toLowerCase()) ?? [];
 
+  // Per-client API activity (tools used + activity dates). Forward-only data.
+  const months = data.months ?? [];
+  let activityByKey: Record<string, ClientActivity> = {};
+  if (ADMIN_SECRET) {
+    try {
+      const r = await fetch(`${API_URL}/v1/admin/client-activity`, {
+        cache: 'no-store',
+        headers: { 'X-Admin-Secret': ADMIN_SECRET },
+      });
+      if (r.ok) activityByKey = ((await r.json()) as { by_key?: Record<string, ClientActivity> }).by_key ?? {};
+    } catch {
+      activityByKey = {};
+    }
+  }
+
   const all = data.keys.map(buildCustomer);
   // Pilots (offered 5000-quota keys) never genuinely used the API — their only
   // calls were Claude-Alain's own tests — so they are hidden from the roster.
@@ -344,6 +340,7 @@ export default async function CustomersPage({
                   <th className={th}>Client</th>
                   <th className={th}>Revenu</th>
                   <th className={th}>Crédits consommés</th>
+                  <th className={th}>Activité</th>
                   <th className={th}>Santé</th>
                   <th className={th}>Suivi</th>
                   <th className={th}>Action recommandée</th>
@@ -361,6 +358,15 @@ export default async function CustomersPage({
                           <div className="h-full rounded-full bg-green-500/50" style={{ width: `${Math.min(c.consumedPct ?? 0, 100)}%` }} />
                         </div>
                       </div>
+                    </td>
+                    <td className="py-3">
+                      <CustomerActivity
+                        name={c.company.company ?? c.email}
+                        months={months}
+                        series={c.series}
+                        lastActive={c.last_active_month}
+                        activity={activityByKey[c.key_prefix]}
+                      />
                     </td>
                     <td className="py-3">
                       <span className="font-mono text-xs font-semibold" style={{ color: healthColor(c.health) }}>{c.health}</span>
@@ -415,7 +421,15 @@ export default async function CustomersPage({
                           <span className="font-mono text-[10px] text-zinc-500">{pct}%</span>
                         </div>
                       </td>
-                      <td className="py-3"><Sparkline data={c.series} color="#a855f7" /></td>
+                      <td className="py-3">
+                        <CustomerActivity
+                          name={c.company.company ?? c.email}
+                          months={months}
+                          series={c.series}
+                          lastActive={c.last_active_month}
+                          activity={activityByKey[c.key_prefix]}
+                        />
+                      </td>
                       <td className="py-3 text-xs">
                         <span className={c.trend === 'up' ? 'text-green-400' : c.trend === 'down' ? 'text-red-400' : 'text-zinc-500'}>
                           {c.trend === 'up' ? '▲' : c.trend === 'down' ? '▼' : '='} {c.trendPct != null ? `${c.trendPct > 0 ? '+' : ''}${c.trendPct}%` : ''}
