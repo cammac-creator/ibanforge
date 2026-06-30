@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 export interface CrmMessage {
   direction: 'in' | 'out';
@@ -286,6 +287,7 @@ function Timeline({ client: c }: { client: CrmClient }) {
 }
 
 function Composer({ client: c }: { client: CrmClient }) {
+  const router = useRouter();
   const [gen, setGen] = useState<GenResult | null>(null);
   const [busy, setBusy] = useState<false | 'gen' | 'send'>(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -326,8 +328,9 @@ function Composer({ client: c }: { client: CrmClient }) {
       const d = await r.json();
       if (!r.ok) setMsg(d.message || d.error || 'Échec envoi');
       else {
-        setMsg('✅ Envoyé ! (visible dans la timeline au prochain rafraîchissement)');
+        setMsg('✅ Envoyé et ajouté à la timeline.');
         setGen(null);
+        router.refresh(); // re-fetch server data: the sent message now shows immediately
       }
     } catch {
       setMsg('Erreur réseau');
