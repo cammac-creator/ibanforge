@@ -209,6 +209,13 @@ export function getStatsDB(): DatabaseType.Database {
     if (!reqCols.includes('user_agent')) {
       statsDB.exec('ALTER TABLE request_log ADD COLUMN user_agent TEXT');
     }
+    // Per-customer attribution: which API key made each request → unlocks the
+    // CRM "tools used + activity dates per client" view. Populated forward-only
+    // from apiKeyMiddleware (historical rows stay NULL).
+    if (!reqCols.includes('key_prefix')) {
+      statsDB.exec('ALTER TABLE request_log ADD COLUMN key_prefix TEXT');
+      statsDB.exec('CREATE INDEX IF NOT EXISTS idx_request_log_key_prefix ON request_log(key_prefix)');
+    }
   }
   return statsDB;
 }
