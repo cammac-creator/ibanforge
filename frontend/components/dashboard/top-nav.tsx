@@ -13,12 +13,15 @@ export function TopNav() {
   const locale = useLocale();
 
   const onCustomers = pathname.includes('/dashboard/customers');
+  const onProspects = pathname.includes('/dashboard/prospects');
+  const onOverview = !onCustomers && !onProspects;
   const current = Number(searchParams.get('period') ?? 30);
   const period = PERIODS.includes(current) ? current : 30;
 
   const TABS = [
-    { key: 'overview', href: `/${locale}/dashboard`, label: t('topNav.overview'), active: !onCustomers },
+    { key: 'overview', href: `/${locale}/dashboard`, label: t('topNav.overview'), active: onOverview },
     { key: 'customers', href: `/${locale}/dashboard/customers`, label: t('topNav.customers'), active: onCustomers },
+    { key: 'prospects', href: `/${locale}/dashboard/prospects`, label: t('topNav.prospects'), active: onProspects },
   ];
 
   return (
@@ -51,7 +54,7 @@ export function TopNav() {
 
       {/* Right: period pills (overview only) + back link */}
       <div className="flex items-center gap-3">
-        {!onCustomers && (
+        {onOverview && (
           <div className="flex items-center gap-1">
             {PERIODS.map((p) => (
               <Link

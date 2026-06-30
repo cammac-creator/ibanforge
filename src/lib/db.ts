@@ -155,6 +155,42 @@ export function getStatsDB(): DatabaseType.Database {
         created_at TEXT DEFAULT (datetime('now'))
       );
       CREATE INDEX IF NOT EXISTS idx_email_messages_customer ON email_messages(customer_email, msg_date);
+      -- Outbound prospect list (people who are NOT yet customers). Populated by
+      -- the prospecting campaign via POST /v1/admin/prospects. Each row carries a
+      -- pre-written, personalized cold email (EN+FR) so the CRM can show it for
+      -- review before sending. status: 'a_mailer' (verified email + mail ready) |
+      -- 'a_enrichir' (no safe email yet) | 'archive' (set aside) | 'rejete'.
+      -- A prospect that gets emailed lands in email_messages by contact_email, so
+      -- the CRM derives "contacted / replied" exactly like it does for customers.
+      CREATE TABLE IF NOT EXISTS prospects (
+        id TEXT PRIMARY KEY,
+        company TEXT NOT NULL,
+        segment TEXT,
+        website TEXT,
+        country TEXT,
+        what_they_do TEXT,
+        fit_reason TEXT,
+        buying_signal TEXT,
+        signal_source_url TEXT,
+        contact_name TEXT,
+        contact_role TEXT,
+        contact_email TEXT,
+        email_source_url TEXT,
+        personalization_hook TEXT,
+        confidence TEXT,
+        status TEXT DEFAULT 'a_enrichir',
+        mail_subject_en TEXT,
+        mail_body_en TEXT,
+        mail_subject_fr TEXT,
+        mail_body_fr TEXT,
+        recommended_lang TEXT,
+        source TEXT,
+        created_at TEXT DEFAULT (datetime('now')),
+        updated_at TEXT DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_prospects_segment ON prospects(segment);
+      CREATE INDEX IF NOT EXISTS idx_prospects_status ON prospects(status);
+      CREATE INDEX IF NOT EXISTS idx_prospects_email ON prospects(contact_email);
     `);
     // Migrate existing databases that may be missing the new columns
     const existingCols = (statsDB.prepare("PRAGMA table_info(operations)").all() as Array<{ name: string }>).map(r => r.name);
