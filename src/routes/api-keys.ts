@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { timingSafeEqual } from 'node:crypto';
+import { timingSafeEqual, createHash } from 'node:crypto';
 import { generateApiKey, validateApiKey, getUsage, revokeApiKey, rotateApiKey } from '../lib/api-keys.js';
 import { getStatsDB } from '../lib/db.js';
 import { notifyPurchaseTelegram } from '../lib/notify.js';
@@ -600,6 +600,166 @@ apiKeys.post('/v1/admin/test-email', async (c) => {
   }
   const sent = await sendApiKeyEmail({ to, rawKey: 'ifk_test_0000000000000000', credits: 0, bundle: 'TEST' });
   return c.json({ sent, configured: isEmailConfigured() });
+});
+
+// ---------------------------------------------------------------------------
+// Prospects — outbound list of NOT-yet-customers for the CRM "Prospects" tab.
+// Identified by the prospecting campaign; each row carries a pre-written,
+// personalized cold email (EN+FR) for review-before-send. Admin-only.
+// ---------------------------------------------------------------------------
+
+interface ProspectInput {
+  id?: unknown;
+  company?: unknown;
+  segment?: unknown;
+  website?: unknown;
+  country?: unknown;
+  what_they_do?: unknown;
+  fit_reason?: unknown;
+  buying_signal?: unknown;
+  signal_source_url?: unknown;
+  contact_name?: unknown;
+  contact_role?: unknown;
+  contact_email?: unknown;
+  email_source_url?: unknown;
+  personalization_hook?: unknown;
+  confidence?: unknown;
+  status?: unknown;
+  mail_subject_en?: unknown;
+  mail_body_en?: unknown;
+  mail_subject_fr?: unknown;
+  mail_body_fr?: unknown;
+  recommended_lang?: unknown;
+  source?: unknown;
+}
+
+/** Stable id from website domain + company, so re-running the campaign upserts. */
+function prospectId(r: ProspectInput): string {
+  const site = typeof r.website === 'string' ? r.website : '';
+  const company = typeof r.company === 'string' ? r.company : '';
+  const basis = `${site}|${company}`.toLowerCase().trim();
+  return 'p_' + createHash('md5').update(basis).digest('hex').slice(0, 16);
+}
+
+apiKeys.get('/v1/admin/prospects', (c) => {
+  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
+  const db = getStatsDB();
+  const rows = db
+    .prepare(
+      `SELECT id, company, segment, website, country, what_they_do, fit_reason,
+              buying_signal, signal_source_url, contact_name, contact_role,
+              contact_email, email_source_url, personalization_hook, confidence,
+              status, mail_subject_en, mail_body_en, mail_subject_fr, mail_body_fr,
+              recommended_lang, source, created_at, updated_at
+       FROM prospects
+       ORDER BY
+         CASE status WHEN 'a_mailer' THEN 0 WHEN 'a_enrichir' THEN 1 WHEN 'archive' THEN 2 ELSE 3 END,
+         company COLLATE NOCASE`,
+    )
+    .all();
+  return c.json({ prospects: rows });
+});
+
+/**
+ * Upsert a batch of prospects (idempotent by id, derived from website+company
+ * when not provided). Body: { prospects: [...] }. Seeds the list from the
+ * prospecting campaign; preserves created_at on conflict, refreshes updated_at.
+ */
+apiKeys.post('/v1/admin/prospects', async (c) => {
+  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
+  let body: { prospects?: unknown };
+  try {
+    body = await c.req.json<{ prospects?: unknown }>();
+  } catch {
+    return c.json({ error: 'invalid_json', message: 'Request body must be valid JSON' }, 400);
+  }
+  if (!Array.isArray(body.prospects)) {
+    return c.json({ error: 'invalid_body', message: 'Expected { prospects: [...] }' }, 400);
+  }
+
+  const db = getStatsDB();
+  const clip = (v: unknown, n: number): string | null => (typeof v === 'string' && v.length ? v.slice(0, n) : null);
+  const upsert = db.prepare(
+    `INSERT INTO prospects (id, company, segment, website, country, what_they_do, fit_reason,
+        buying_signal, signal_source_url, contact_name, contact_role, contact_email,
+        email_source_url, personalization_hook, confidence, status,
+        mail_subject_en, mail_body_en, mail_subject_fr, mail_body_fr, recommended_lang, source, updated_at)
+     VALUES (@id, @company, @segment, @website, @country, @what_they_do, @fit_reason,
+        @buying_signal, @signal_source_url, @contact_name, @contact_role, @contact_email,
+        @email_source_url, @personalization_hook, @confidence, @status,
+        @mail_subject_en, @mail_body_en, @mail_subject_fr, @mail_body_fr, @recommended_lang, @source, datetime('now'))
+     ON CONFLICT(id) DO UPDATE SET
+        company = excluded.company, segment = excluded.segment, website = excluded.website,
+        country = excluded.country, what_they_do = excluded.what_they_do, fit_reason = excluded.fit_reason,
+        buying_signal = excluded.buying_signal, signal_source_url = excluded.signal_source_url,
+        contact_name = excluded.contact_name, contact_role = excluded.contact_role,
+        contact_email = excluded.contact_email, email_source_url = excluded.email_source_url,
+        personalization_hook = excluded.personalization_hook, confidence = excluded.confidence,
+        status = excluded.status, mail_subject_en = excluded.mail_subject_en, mail_body_en = excluded.mail_body_en,
+        mail_subject_fr = excluded.mail_subject_fr, mail_body_fr = excluded.mail_body_fr,
+        recommended_lang = excluded.recommended_lang, source = excluded.source, updated_at = datetime('now')`,
+  );
+  const tx = db.transaction((rows: ProspectInput[]) => {
+    let n = 0;
+    for (const r of rows) {
+      if (!r || typeof r.company !== 'string' || !r.company.trim()) continue;
+      upsert.run({
+        id: clip(r.id, 200) || prospectId(r),
+        company: r.company.slice(0, 200),
+        segment: clip(r.segment, 40),
+        website: clip(r.website, 300),
+        country: clip(r.country, 80),
+        what_they_do: clip(r.what_they_do, 1000),
+        fit_reason: clip(r.fit_reason, 1000),
+        buying_signal: clip(r.buying_signal, 1000),
+        signal_source_url: clip(r.signal_source_url, 500),
+        contact_name: clip(r.contact_name, 120),
+        contact_role: clip(r.contact_role, 120),
+        contact_email: clip(r.contact_email, 200),
+        email_source_url: clip(r.email_source_url, 500),
+        personalization_hook: clip(r.personalization_hook, 1000),
+        confidence: clip(r.confidence, 20),
+        status: clip(r.status, 20) || 'a_enrichir',
+        mail_subject_en: clip(r.mail_subject_en, 300),
+        mail_body_en: clip(r.mail_body_en, 6000),
+        mail_subject_fr: clip(r.mail_subject_fr, 300),
+        mail_body_fr: clip(r.mail_body_fr, 6000),
+        recommended_lang: clip(r.recommended_lang, 8),
+        source: clip(r.source, 80),
+      });
+      n++;
+    }
+    return n;
+  });
+  const upserted = tx(body.prospects as ProspectInput[]);
+  return c.json({ upserted });
+});
+
+/** Update a single prospect's status (archive / reactivate / reject) from the UI. */
+apiKeys.post('/v1/admin/prospects/update', async (c) => {
+  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
+  let body: { id?: unknown; status?: unknown };
+  try {
+    body = await c.req.json<{ id?: unknown; status?: unknown }>();
+  } catch {
+    return c.json({ error: 'invalid_json' }, 400);
+  }
+  if (typeof body.id !== 'string' || typeof body.status !== 'string') {
+    return c.json({ error: 'invalid_body', message: 'Expected { id, status }' }, 400);
+  }
+  const allowed = ['a_mailer', 'a_enrichir', 'archive', 'rejete'];
+  if (!allowed.includes(body.status)) {
+    return c.json({ error: 'invalid_status', message: `status must be one of ${allowed.join(', ')}` }, 400);
+  }
+  const db = getStatsDB();
+  const r = db.prepare("UPDATE prospects SET status = ?, updated_at = datetime('now') WHERE id = ?").run(body.status, body.id);
+  return c.json({ updated: r.changes });
 });
 
 export { apiKeys };
