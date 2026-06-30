@@ -51,7 +51,7 @@ function upsertHourly() {
 function insertRequest() {
   if (!_insertRequest) {
     _insertRequest = getStatsDB().prepare(
-      'INSERT INTO request_log (method, path, status, response_ms, hour, day_of_week, client_kind, ip_hash, user_agent) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO request_log (method, path, status, response_ms, hour, day_of_week, client_kind, ip_hash, user_agent, key_prefix) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
     );
   }
   return _insertRequest;
@@ -201,6 +201,7 @@ export function recordRequest(
   clientKind: ClientKind = 'api',
   ipHash: string | null = null,
   userAgent: string | null = null,
+  keyPrefix: string | null = null,
 ) {
   try {
     const now = new Date();
@@ -211,7 +212,7 @@ export function recordRequest(
       .replace(/\/v1\/bic\/[A-Za-z0-9]+/, '/v1/bic/:code')
       .replace(/\/v1\/ch\/clearing\/\d+/, '/v1/ch/clearing/:iid');
     const truncatedUa = userAgent ? userAgent.slice(0, 256) : null;
-    insertRequest().run(method, normalizedPath, status, Math.round(responseMs), hour, dow, clientKind, ipHash, truncatedUa);
+    insertRequest().run(method, normalizedPath, status, Math.round(responseMs), hour, dow, clientKind, ipHash, truncatedUa, keyPrefix);
   } catch (err) {
     // Request tracking is non-critical and must never break the API, but a
     // silent swallow would hide a broken stats DB. Log without rethrowing.

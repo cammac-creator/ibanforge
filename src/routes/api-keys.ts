@@ -482,6 +482,43 @@ apiKeys.get('/v1/admin/email-messages', (c) => {
 });
 
 /**
+ * Per-customer API activity for the CRM: which endpoints each key calls + the
+ * per-day activity over the last 30 days. Keyed by key_prefix. Populated
+ * forward-only since request_log.key_prefix was added (historical rows NULL).
+ */
+apiKeys.get('/v1/admin/client-activity', (c) => {
+  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
+  const db = getStatsDB();
+  const endpoints = db
+    .prepare(
+      `SELECT key_prefix, path, COUNT(*) AS count
+       FROM request_log
+       WHERE key_prefix IS NOT NULL AND status < 400
+       GROUP BY key_prefix, path
+       ORDER BY key_prefix, count DESC`,
+    )
+    .all() as Array<{ key_prefix: string; path: string; count: number }>;
+  const days = db
+    .prepare(
+      `SELECT key_prefix, date(created_at) AS day, COUNT(*) AS count
+       FROM request_log
+       WHERE key_prefix IS NOT NULL AND created_at >= date('now', '-30 days')
+       GROUP BY key_prefix, day
+       ORDER BY key_prefix, day`,
+    )
+    .all() as Array<{ key_prefix: string; day: string; count: number }>;
+
+  type Activity = { endpoints: Array<{ path: string; count: number }>; days: Array<{ day: string; count: number }> };
+  const byKey: Record<string, Activity> = {};
+  const ensure = (k: string): Activity => (byKey[k] ??= { endpoints: [], days: [] });
+  for (const e of endpoints) ensure(e.key_prefix).endpoints.push({ path: e.path, count: e.count });
+  for (const d of days) ensure(d.key_prefix).days.push({ day: d.day, count: d.count });
+  return c.json({ by_key: byKey });
+});
+
+/**
  * Read-only delivery check for a Stripe purchase. NON-CONSUMING: it only SELECTs
  * (never nulls raw_key_one_time_view), so calling it does not affect the
  * customer's success-page retrieval. `raw_key_still_available: true` means the

@@ -55,6 +55,7 @@ export function apiKeyMiddleware(): MiddlewareHandler<HonoEnv> {
       c.header('X-Credits-Remaining', String(newBalance));
       c.header('X-Credits-Total', String(creditsTotal ?? 0));
       c.set('apiKeyAuthenticated', true);
+      c.set('apiKeyPrefix', key.slice(0, 12));
       await next();
       // Refund credit on 4xx client errors (mirror monthly quota behavior).
       if (c.res.status >= 400 && c.res.status < 500) {

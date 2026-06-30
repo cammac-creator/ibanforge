@@ -133,7 +133,8 @@ app.use('*', async (c, next) => {
       'x-forwarded-for': c.req.header('x-forwarded-for') ?? null,
       'x-real-ip': c.req.header('x-real-ip') ?? null,
     });
-    recordRequest(c.req.method, path, c.res.status, performance.now() - start, clientKind, hashIp(ip), userAgent);
+    const keyPrefix = c.get('apiKeyPrefix') ?? null;
+    recordRequest(c.req.method, path, c.res.status, performance.now() - start, clientKind, hashIp(ip), userAgent, keyPrefix);
   }
 });
 

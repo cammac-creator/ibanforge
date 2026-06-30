@@ -7,6 +7,7 @@
 type HonoEnv = {
   Variables: {
     apiKeyAuthenticated: boolean;
+    apiKeyPrefix: string | null;
   };
 };
 
