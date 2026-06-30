@@ -414,6 +414,8 @@ interface EmailMessageInput {
   msg_date?: unknown;
   subject?: unknown;
   snippet?: unknown;
+  snippet_fr?: unknown;
+  lang?: unknown;
   counterparty?: unknown;
 }
 
@@ -439,12 +441,13 @@ apiKeys.post('/v1/admin/email-messages', async (c) => {
   const db = getStatsDB();
   const clip = (v: unknown, n: number): string | null => (typeof v === 'string' && v.length ? v.slice(0, n) : null);
   const upsert = db.prepare(
-    `INSERT INTO email_messages (id, customer_email, direction, msg_date, subject, snippet, counterparty)
-     VALUES (@id, @customer_email, @direction, @msg_date, @subject, @snippet, @counterparty)
+    `INSERT INTO email_messages (id, customer_email, direction, msg_date, subject, snippet, snippet_fr, lang, counterparty)
+     VALUES (@id, @customer_email, @direction, @msg_date, @subject, @snippet, @snippet_fr, @lang, @counterparty)
      ON CONFLICT(id) DO UPDATE SET
        customer_email = excluded.customer_email, direction = excluded.direction,
        msg_date = excluded.msg_date, subject = excluded.subject,
-       snippet = excluded.snippet, counterparty = excluded.counterparty`,
+       snippet = excluded.snippet, snippet_fr = excluded.snippet_fr, lang = excluded.lang,
+       counterparty = excluded.counterparty`,
   );
   const tx = db.transaction((rows: EmailMessageInput[]) => {
     let n = 0;
@@ -457,6 +460,8 @@ apiKeys.post('/v1/admin/email-messages', async (c) => {
         msg_date: clip(r.msg_date, 40),
         subject: clip(r.subject, 500),
         snippet: clip(r.snippet, 300),
+        snippet_fr: clip(r.snippet_fr, 400),
+        lang: clip(r.lang, 8),
         counterparty: clip(r.counterparty, 255),
       });
       n++;
@@ -474,7 +479,7 @@ apiKeys.get('/v1/admin/email-messages', (c) => {
   const db = getStatsDB();
   const rows = db
     .prepare(
-      `SELECT customer_email, direction, msg_date, subject, snippet, counterparty
+      `SELECT customer_email, direction, msg_date, subject, snippet, snippet_fr, lang, counterparty
        FROM email_messages ORDER BY msg_date ASC`,
     )
     .all();
