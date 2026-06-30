@@ -87,7 +87,7 @@ export function CrmWorkspace({ clients }: { clients: CrmClient[] }) {
     const term = q.trim().toLowerCase();
     return clients.filter((c) => {
       if (filter === 'payants' && c.category !== 'PAYANT') return false;
-      if (filter === 'relance' && !(c.status === 'followup_due' || (c.consumedPct ?? 0) >= 80)) return false;
+      if (filter === 'relance' && c.status !== 'followup_due') return false;
       if (term && !(`${c.company ?? ''} ${c.email}`.toLowerCase().includes(term))) return false;
       return true;
     });
