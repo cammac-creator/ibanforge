@@ -4,6 +4,7 @@ import { InfoDot } from '@/components/dashboard/info-dot';
 import { enrichEmail, type CompanyInfo } from '@/lib/company-enrichment';
 import { CustomerThread, type ThreadMessage, type ThreadStatus } from '@/components/dashboard/customer-thread';
 import { CustomerActivity, type ClientActivity } from '@/components/dashboard/customer-activity';
+import { GenerateMailButton } from '@/components/dashboard/generate-mail-button';
 
 interface MessageRow extends ThreadMessage {
   customer_email: string;
@@ -243,6 +244,31 @@ export default async function CustomersPage({
   }
   const threadFor = (email: string): ThreadMessage[] => threadsByEmail.get(email.toLowerCase()) ?? [];
 
+  // Build the props for the "Générer le mail" button: which mailbox to deposit
+  // into (warm thread → bluewin to preserve threading, cold → pro address) + a
+  // brief the AI turns into the email.
+  const mailProps = (c: Customer) => {
+    const thread = threadFor(c.email);
+    const warm = thread.length > 0;
+    const account = warm ? 'cammac@bluewin.ch' : 'claude-alain@ibanforge.com';
+    const lastSubj = thread.length ? thread[thread.length - 1].subject : null;
+    const subject = warm && lastSubj ? lastSubj : `IBANforge${c.company.company ? ' — ' + c.company.company : ''}`;
+    const threadTxt = thread
+      .slice(-4)
+      .map((m) => `[${m.direction === 'in' ? 'them' : 'me'} ${m.msg_date ?? ''}] ${m.subject ?? ''}: ${m.snippet ?? ''}`)
+      .join('\n');
+    const brief = [
+      `Client: ${c.company.company ?? c.email} <${c.email}>`,
+      c.company.sector ? `Sector: ${c.company.sector}` : '',
+      `Category: ${c.category}. Recommended next action: ${c.action}`,
+      warm ? `Recent thread (them = client, me = founder):\n${threadTxt}` : 'No prior emails — this is a COLD first-touch outreach.',
+      c.email.includes('customer-n.example') ? 'IMPORTANT: never mention "Customer N" anywhere in the email.' : '',
+    ]
+      .filter(Boolean)
+      .join('\n');
+    return { name: c.company.company ?? c.email, to: c.email, account, subject, brief };
+  };
+
   // Per-client API activity (tools used + activity dates). Forward-only data.
   const months = data.months ?? [];
   let activityByKey: Record<string, ClientActivity> = {};
@@ -374,7 +400,7 @@ export default async function CustomersPage({
                     <td className="py-3">
                       <CustomerThread name={c.company.company ?? c.email} status={statusOf(threadFor(c.email))} messages={threadFor(c.email)} />
                     </td>
-                    <td className="py-3 text-xs text-zinc-300">{c.action}</td>
+                    <td className="py-3 text-xs text-zinc-300"><div className="flex flex-col items-start gap-1.5"><span>{c.action}</span><GenerateMailButton {...mailProps(c)} /></div></td>
                   </tr>
                 ))}
               </tbody>
@@ -439,7 +465,7 @@ export default async function CustomersPage({
                       <td className="py-3">
                         <CustomerThread name={c.company.company ?? c.email} status={statusOf(threadFor(c.email))} messages={threadFor(c.email)} />
                       </td>
-                      <td className="py-3 text-xs text-zinc-300">{c.action}</td>
+                      <td className="py-3 text-xs text-zinc-300"><div className="flex flex-col items-start gap-1.5"><span>{c.action}</span><GenerateMailButton {...mailProps(c)} /></div></td>
                     </tr>
                   );
                 })}
