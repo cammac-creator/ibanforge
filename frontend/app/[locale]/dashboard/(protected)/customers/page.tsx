@@ -207,6 +207,8 @@ export default async function CustomersPage() {
       brief,
       messages,
       series: row.series ?? [],
+      months: data.months ?? [],
+      days: activityByKey[row.key_prefix]?.days ?? [],
       lastActive: row.last_active_month,
       endpoints: activityByKey[row.key_prefix]?.endpoints ?? [],
       unread: threadIsUnread(messages, reads[row.email.toLowerCase()]),

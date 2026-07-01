@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { UsageChart } from './usage-chart';
 
 export interface CrmMessage {
   direction: 'in' | 'out';
@@ -36,6 +37,8 @@ export interface CrmClient {
   brief: string;
   messages: CrmMessage[];
   series: number[];
+  months: string[];
+  days: Array<{ day: string; count: number }>;
   lastActive: string | null;
   endpoints: Array<{ path: string; count: number }>;
   unread: boolean;
@@ -185,7 +188,7 @@ export function CrmWorkspace({ clients }: { clients: CrmClient[] }) {
   );
 }
 
-function ClientDetail({ client: c }: { client: CrmClient }) {
+export function ClientDetail({ client: c }: { client: CrmClient }) {
   return (
     <div className="flex flex-col gap-5">
       {/* identity */}
@@ -224,6 +227,7 @@ function ClientDetail({ client: c }: { client: CrmClient }) {
             </p>
           </div>
         </div>
+        <UsageChart days={c.days} series={c.series} months={c.months} />
       </div>
 
       {/* next action */}
