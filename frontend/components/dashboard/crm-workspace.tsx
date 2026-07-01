@@ -220,7 +220,9 @@ export function TimelineMessage({ m }: { m: CrmMessage }) {
   const [open, setOpen] = useState(false);
   const [showOrig, setShowOrig] = useState(false);
   // Show a French translation by default for ANY non-French message (English included).
-  const hasFr = !!(m.lang && m.lang !== 'fr' && m.snippet_fr);
+  // Guard against malformed lang values (e.g. model echoing a placeholder, or 'und').
+  const validLang = !!(m.lang && /^[a-z]{2,3}$/.test(m.lang) && m.lang !== 'und');
+  const hasFr = !!(validLang && m.lang !== 'fr' && m.snippet_fr);
   const original = m.body || m.snippet || '';
   const frText = hasFr ? m.snippet_fr || '' : '';
   const display = hasFr && !showOrig ? frText : original;
@@ -237,7 +239,7 @@ export function TimelineMessage({ m }: { m: CrmMessage }) {
           {m.direction === 'in' ? '📥 reçu' : '📨 envoyé'}
         </span>
         <span>{m.msg_date}</span>
-        {m.lang && (
+        {validLang && (
           <span
             className="rounded bg-violet-500/15 px-1.5 py-0.5 text-[9px] text-violet-300"
             title={hasFr ? 'Traduit automatiquement en français' : 'Langue détectée du message'}
