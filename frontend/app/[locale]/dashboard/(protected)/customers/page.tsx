@@ -1,7 +1,8 @@
 import { getLocale } from 'next-intl/server';
 import { StatCardV2 } from '@/components/dashboard/stat-card-v2';
 import { enrichEmail } from '@/lib/company-enrichment';
-import { CrmWorkspace, threadIsUnread, type CrmClient, type CrmMessage } from '@/components/dashboard/crm-workspace';
+import { CrmWorkspace, type CrmClient, type CrmMessage } from '@/components/dashboard/crm-workspace';
+import { threadIsUnread } from '@/lib/thread-unread';
 
 const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 const ADMIN_SECRET = process.env.ADMIN_SECRET || '';

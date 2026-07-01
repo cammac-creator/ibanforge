@@ -1,6 +1,7 @@
 import { StatCardV2 } from '@/components/dashboard/stat-card-v2';
 import { ProspectsWorkspace, type Prospect } from '@/components/dashboard/prospects-workspace';
-import { threadIsUnread, type CrmMessage } from '@/components/dashboard/crm-workspace';
+import type { CrmMessage } from '@/components/dashboard/crm-workspace';
+import { threadIsUnread } from '@/lib/thread-unread';
 
 const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 const ADMIN_SECRET = process.env.ADMIN_SECRET || '';

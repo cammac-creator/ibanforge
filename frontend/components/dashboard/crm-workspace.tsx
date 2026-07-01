@@ -41,12 +41,6 @@ export interface CrmClient {
   unread: boolean;
 }
 
-/** Inbox-style unread: a thread with an inbound message newer than last_read_at. */
-export function threadIsUnread(messages: CrmMessage[], lastReadAt?: string | null): boolean {
-  const lastRead = lastReadAt ? lastReadAt.replace(' ', 'T') : '';
-  return messages.some((m) => m.direction === 'in' && (m.msg_date ?? '') > lastRead);
-}
-
 const CAT = {
   PAYANT: { label: 'Payant', dot: '#22c55e' },
   PILOTE: { label: 'Pilote', dot: '#3b82f6' },
