@@ -213,7 +213,7 @@ function ClientDetail({ client: c }: { client: CrmClient }) {
   );
 }
 
-function TimelineMessage({ m }: { m: CrmMessage }) {
+export function TimelineMessage({ m }: { m: CrmMessage }) {
   const [open, setOpen] = useState(false);
   const [showOrig, setShowOrig] = useState(false);
   const foreign = !!(m.lang && m.lang !== 'en' && m.lang !== 'fr');
