@@ -191,6 +191,13 @@ export function getStatsDB(): DatabaseType.Database {
       CREATE INDEX IF NOT EXISTS idx_prospects_segment ON prospects(segment);
       CREATE INDEX IF NOT EXISTS idx_prospects_status ON prospects(status);
       CREATE INDEX IF NOT EXISTS idx_prospects_email ON prospects(contact_email);
+      -- Per-thread read marker (by counterpart email), like an inbox. A thread is
+      -- "unread" when it has an inbound message newer than last_read_at. Set when
+      -- Claude-Alain opens the client/prospect in the CRM.
+      CREATE TABLE IF NOT EXISTS thread_reads (
+        email TEXT PRIMARY KEY,
+        last_read_at TEXT
+      );
     `);
     // Migrate existing databases that may be missing the new columns
     const existingCols = (statsDB.prepare("PRAGMA table_info(operations)").all() as Array<{ name: string }>).map(r => r.name);

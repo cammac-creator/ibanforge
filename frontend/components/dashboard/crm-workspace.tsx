@@ -38,6 +38,13 @@ export interface CrmClient {
   series: number[];
   lastActive: string | null;
   endpoints: Array<{ path: string; count: number }>;
+  unread: boolean;
+}
+
+/** Inbox-style unread: a thread with an inbound message newer than last_read_at. */
+export function threadIsUnread(messages: CrmMessage[], lastReadAt?: string | null): boolean {
+  const lastRead = lastReadAt ? lastReadAt.replace(' ', 'T') : '';
+  return messages.some((m) => m.direction === 'in' && (m.msg_date ?? '') > lastRead);
 }
 
 const CAT = {
@@ -84,17 +91,36 @@ interface GenResult {
 export function CrmWorkspace({ clients }: { clients: CrmClient[] }) {
   const [filter, setFilter] = useState<'all' | 'payants' | 'relance'>('all');
   const [q, setQ] = useState('');
-  const [selEmail, setSelEmail] = useState<string | null>(clients[0]?.email ?? null);
+  const [readLocal, setReadLocal] = useState<Set<string>>(new Set());
+  const [selEmail, setSelEmail] = useState<string | null>(null);
+
+  const isUnread = (c: CrmClient) => c.unread && !readLocal.has(c.email);
+
+  function open(email: string) {
+    setSelEmail(email);
+    const c = clients.find((x) => x.email === email);
+    if (c && isUnread(c)) {
+      setReadLocal((prev) => new Set(prev).add(email));
+      fetch('/api/crm/thread-read', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      }).catch(() => {});
+    }
+  }
 
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
-    return clients.filter((c) => {
-      if (filter === 'payants' && c.category !== 'PAYANT') return false;
-      if (filter === 'relance' && c.status !== 'followup_due') return false;
-      if (term && !(`${c.company ?? ''} ${c.email}`.toLowerCase().includes(term))) return false;
-      return true;
-    });
-  }, [clients, filter, q]);
+    return clients
+      .filter((c) => {
+        if (filter === 'payants' && c.category !== 'PAYANT') return false;
+        if (filter === 'relance' && c.status !== 'followup_due') return false;
+        if (term && !(`${c.company ?? ''} ${c.email}`.toLowerCase().includes(term))) return false;
+        return true;
+      })
+      // Unread replies first, like an inbox (stable: keeps the priority order within each group).
+      .sort((a, b) => Number(isUnread(b)) - Number(isUnread(a)));
+  }, [clients, filter, q, readLocal]);
 
   const sel = clients.find((c) => c.email === selEmail) ?? null;
 
@@ -127,16 +153,18 @@ export function CrmWorkspace({ clients }: { clients: CrmClient[] }) {
           {filtered.map((c) => {
             const st = STATUS[c.status];
             const active = c.email === selEmail;
+            const unread = isUnread(c);
             return (
               <button
                 key={c.email}
                 type="button"
-                onClick={() => setSelEmail(c.email)}
-                className={`flex w-full flex-col gap-1 border-b border-zinc-800/40 px-3 py-2.5 text-left transition-colors ${active ? 'bg-zinc-800/60' : 'hover:bg-zinc-800/30'}`}
+                onClick={() => open(c.email)}
+                className={`flex w-full flex-col gap-1 border-b border-zinc-800/40 px-3 py-2.5 text-left transition-colors ${active ? 'bg-zinc-800/60' : unread ? 'bg-blue-500/10 hover:bg-blue-500/15' : 'hover:bg-zinc-800/30'}`}
               >
                 <div className="flex items-center gap-2">
+                  {unread && <span className="h-2 w-2 shrink-0 rounded-full bg-blue-500" title="Réponse non lue" />}
                   <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: CAT[c.category].dot }} />
-                  <span className="truncate text-sm font-medium text-zinc-200">{c.company ?? c.email}</span>
+                  <span className={`truncate text-sm ${unread ? 'font-bold text-white' : 'font-medium text-zinc-200'}`}>{c.company ?? c.email}</span>
                   {c.revenueUsd ? <span className="ml-auto shrink-0 font-mono text-xs text-green-400">${c.revenueUsd}</span> : null}
                 </div>
                 <div className="flex items-center gap-2 pl-4">

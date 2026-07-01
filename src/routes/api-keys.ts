@@ -767,4 +767,44 @@ apiKeys.post('/v1/admin/prospects/update', async (c) => {
   return c.json({ updated: r.changes });
 });
 
+// ---------------------------------------------------------------------------
+// Thread read-state — inbox-style unread markers per counterpart email.
+// A thread is unread when it has an inbound message newer than last_read_at.
+// ---------------------------------------------------------------------------
+
+apiKeys.get('/v1/admin/thread-reads', (c) => {
+  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
+  const db = getStatsDB();
+  const rows = db.prepare('SELECT email, last_read_at FROM thread_reads').all() as Array<{
+    email: string;
+    last_read_at: string | null;
+  }>;
+  const reads: Record<string, string> = {};
+  for (const r of rows) if (r.last_read_at) reads[r.email] = r.last_read_at;
+  return c.json({ reads });
+});
+
+apiKeys.post('/v1/admin/thread-read', async (c) => {
+  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
+  let body: { email?: unknown };
+  try {
+    body = await c.req.json<{ email?: unknown }>();
+  } catch {
+    return c.json({ error: 'invalid_json' }, 400);
+  }
+  if (typeof body.email !== 'string' || !body.email.includes('@')) {
+    return c.json({ error: 'invalid_body', message: 'Expected { email }' }, 400);
+  }
+  const db = getStatsDB();
+  db.prepare(
+    `INSERT INTO thread_reads (email, last_read_at) VALUES (?, datetime('now'))
+     ON CONFLICT(email) DO UPDATE SET last_read_at = datetime('now')`,
+  ).run(body.email.trim().toLowerCase());
+  return c.json({ ok: true });
+});
+
 export { apiKeys };

@@ -31,6 +31,7 @@ export interface Prospect {
   contacted: boolean;
   replied: boolean;
   becameClient: boolean;
+  unread: boolean;
   lastTouch: string | null;
 }
 
@@ -73,21 +74,40 @@ export function ProspectsWorkspace({ prospects }: { prospects: Prospect[] }) {
   const [segFilter, setSegFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<'actifs' | 'a_mailer' | 'contactes' | 'archive'>('actifs');
   const [q, setQ] = useState('');
-  const [selId, setSelId] = useState<string | null>(prospects[0]?.id ?? null);
+  const [readLocal, setReadLocal] = useState<Set<string>>(new Set());
+  const [selId, setSelId] = useState<string | null>(null);
+
+  const isUnread = (p: Prospect) => p.unread && !!p.contact_email && !readLocal.has(p.contact_email.toLowerCase());
+
+  function open(p: Prospect) {
+    setSelId(p.id);
+    const email = p.contact_email?.toLowerCase();
+    if (email && isUnread(p)) {
+      setReadLocal((prev) => new Set(prev).add(email));
+      fetch('/api/crm/thread-read', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      }).catch(() => {});
+    }
+  }
 
   const filtered = useMemo(() => {
     const term = q.trim().toLowerCase();
-    return prospects.filter((p) => {
-      const ds = displayStatus(p);
-      if (statusFilter === 'actifs' && ds === 'archive') return false;
-      if (statusFilter === 'a_mailer' && ds !== 'a_mailer') return false;
-      if (statusFilter === 'contactes' && ds !== 'contacte' && ds !== 'replied' && ds !== 'followup_due') return false;
-      if (statusFilter === 'archive' && ds !== 'archive') return false;
-      if (segFilter !== 'all' && p.segment !== segFilter) return false;
-      if (term && !`${p.company} ${p.contact_email ?? ''} ${p.country ?? ''}`.toLowerCase().includes(term)) return false;
-      return true;
-    });
-  }, [prospects, segFilter, statusFilter, q]);
+    return prospects
+      .filter((p) => {
+        const ds = displayStatus(p);
+        if (statusFilter === 'actifs' && ds === 'archive') return false;
+        if (statusFilter === 'a_mailer' && ds !== 'a_mailer') return false;
+        if (statusFilter === 'contactes' && ds !== 'contacte' && ds !== 'replied' && ds !== 'followup_due') return false;
+        if (statusFilter === 'archive' && ds !== 'archive') return false;
+        if (segFilter !== 'all' && p.segment !== segFilter) return false;
+        if (term && !`${p.company} ${p.contact_email ?? ''} ${p.country ?? ''}`.toLowerCase().includes(term)) return false;
+        return true;
+      })
+      // Unread replies first, like an inbox.
+      .sort((a, b) => Number(isUnread(b)) - Number(isUnread(a)));
+  }, [prospects, segFilter, statusFilter, q, readLocal]);
 
   const sel = prospects.find((p) => p.id === selId) ?? null;
 
@@ -141,16 +161,18 @@ export function ProspectsWorkspace({ prospects }: { prospects: Prospect[] }) {
             const st = PSTATUS[ds];
             const sg = seg(p.segment);
             const active = p.id === selId;
+            const unread = isUnread(p);
             return (
               <button
                 key={p.id}
                 type="button"
-                onClick={() => setSelId(p.id)}
-                className={`flex w-full flex-col gap-1 border-b border-zinc-800/40 px-3 py-2.5 text-left transition-colors ${active ? 'bg-zinc-800/60' : 'hover:bg-zinc-800/30'}`}
+                onClick={() => open(p)}
+                className={`flex w-full flex-col gap-1 border-b border-zinc-800/40 px-3 py-2.5 text-left transition-colors ${active ? 'bg-zinc-800/60' : unread ? 'bg-blue-500/10 hover:bg-blue-500/15' : 'hover:bg-zinc-800/30'}`}
               >
                 <div className="flex items-center gap-2">
+                  {unread && <span className="h-2 w-2 shrink-0 rounded-full bg-blue-500" title="Réponse non lue" />}
                   <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: sg.dot }} />
-                  <span className="truncate text-sm font-medium text-zinc-200">{p.company}</span>
+                  <span className={`truncate text-sm ${unread ? 'font-bold text-white' : 'font-medium text-zinc-200'}`}>{p.company}</span>
                   {p.country && <span className="ml-auto shrink-0 text-[10px] text-zinc-600">{p.country}</span>}
                 </div>
                 <div className="flex items-center gap-2 pl-4">
