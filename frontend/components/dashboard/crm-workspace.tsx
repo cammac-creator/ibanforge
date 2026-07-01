@@ -64,7 +64,10 @@ const TOOL: Record<string, string> = {
 };
 
 const LANG_LABEL: Record<string, string> = {
-  zh: 'chinois', de: 'allemand', it: 'italien', es: 'espagnol', ru: 'russe', ar: 'arabe', ja: 'japonais', pt: 'portugais', nl: 'néerlandais',
+  fr: 'français', en: 'anglais', de: 'allemand', it: 'italien', es: 'espagnol', pt: 'portugais',
+  nl: 'néerlandais', zh: 'chinois', ru: 'russe', ar: 'arabe', ja: 'japonais', pl: 'polonais',
+  sv: 'suédois', da: 'danois', no: 'norvégien', fi: 'finnois', tr: 'turc', el: 'grec', he: 'hébreu',
+  cs: 'tchèque', uk: 'ukrainien', ro: 'roumain', hu: 'hongrois',
 };
 
 function healthColor(h: number) {
@@ -216,10 +219,11 @@ function ClientDetail({ client: c }: { client: CrmClient }) {
 export function TimelineMessage({ m }: { m: CrmMessage }) {
   const [open, setOpen] = useState(false);
   const [showOrig, setShowOrig] = useState(false);
-  const foreign = !!(m.lang && m.lang !== 'en' && m.lang !== 'fr');
+  // Show a French translation by default for ANY non-French message (English included).
+  const hasFr = !!(m.lang && m.lang !== 'fr' && m.snippet_fr);
   const original = m.body || m.snippet || '';
-  const frText = foreign ? m.snippet_fr || m.snippet || '' : '';
-  const display = foreign && !showOrig ? frText : original;
+  const frText = hasFr ? m.snippet_fr || '' : '';
+  const display = hasFr && !showOrig ? frText : original;
   const long = display.length > 300;
   const text = open || !long ? display : display.slice(0, 300) + '…';
   return (
@@ -233,15 +237,19 @@ export function TimelineMessage({ m }: { m: CrmMessage }) {
           {m.direction === 'in' ? '📥 reçu' : '📨 envoyé'}
         </span>
         <span>{m.msg_date}</span>
-        {foreign && (
-          <span className="rounded bg-violet-500/15 px-1.5 py-0.5 text-[9px] text-violet-300" title="Traduit automatiquement en français">
-            🌐 traduit {m.lang && LANG_LABEL[m.lang] ? `du ${LANG_LABEL[m.lang]}` : ''}
+        {m.lang && (
+          <span
+            className="rounded bg-violet-500/15 px-1.5 py-0.5 text-[9px] text-violet-300"
+            title={hasFr ? 'Traduit automatiquement en français' : 'Langue détectée du message'}
+          >
+            🌐 {LANG_LABEL[m.lang] || m.lang}
+            {hasFr && !showOrig ? ' · traduit' : ''}
           </span>
         )}
       </div>
       <p className="mt-0.5 text-xs font-medium text-zinc-200">{m.subject || '(sans objet)'}</p>
       {display && (
-        <p className={`mt-0.5 whitespace-pre-wrap text-[11px] leading-relaxed ${foreign && !showOrig ? 'text-violet-200/80' : 'text-zinc-400'}`}>
+        <p className={`mt-0.5 whitespace-pre-wrap text-[11px] leading-relaxed ${hasFr && !showOrig ? 'text-violet-200/80' : 'text-zinc-400'}`}>
           {text}
         </p>
       )}
@@ -251,7 +259,7 @@ export function TimelineMessage({ m }: { m: CrmMessage }) {
             {open ? 'réduire' : 'voir tout'}
           </button>
         )}
-        {foreign && (
+        {hasFr && (
           <button type="button" onClick={() => setShowOrig(!showOrig)} className="text-violet-400 hover:text-violet-300">
             {showOrig ? 'voir la traduction' : 'voir l’original'}
           </button>
