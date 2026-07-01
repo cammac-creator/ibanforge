@@ -447,7 +447,12 @@ apiKeys.post('/v1/admin/email-messages', async (c) => {
      ON CONFLICT(id) DO UPDATE SET
        customer_email = excluded.customer_email, direction = excluded.direction,
        msg_date = excluded.msg_date, subject = excluded.subject,
-       snippet = excluded.snippet, snippet_fr = excluded.snippet_fr, lang = excluded.lang,
+       snippet = excluded.snippet,
+       -- Preserve an existing FR translation / detected language when a later
+       -- re-sync of the same message carries none (translations are set out-of-band
+       -- by translate-messages.py; a raw re-sync must not wipe them).
+       snippet_fr = COALESCE(excluded.snippet_fr, snippet_fr),
+       lang = COALESCE(excluded.lang, lang),
        body = excluded.body, counterparty = excluded.counterparty`,
   );
   const tx = db.transaction((rows: EmailMessageInput[]) => {
@@ -481,7 +486,7 @@ apiKeys.get('/v1/admin/email-messages', (c) => {
   const db = getStatsDB();
   const rows = db
     .prepare(
-      `SELECT customer_email, direction, msg_date, subject, snippet, snippet_fr, lang, body, counterparty
+      `SELECT id, customer_email, direction, msg_date, subject, snippet, snippet_fr, lang, body, counterparty
        FROM email_messages ORDER BY msg_date ASC`,
     )
     .all();

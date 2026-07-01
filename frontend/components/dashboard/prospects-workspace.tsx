@@ -30,6 +30,7 @@ export interface Prospect {
   messages: CrmMessage[];
   contacted: boolean;
   replied: boolean;
+  becameClient: boolean;
   lastTouch: string | null;
 }
 
@@ -153,6 +154,9 @@ export function ProspectsWorkspace({ prospects }: { prospects: Prospect[] }) {
                   {p.country && <span className="ml-auto shrink-0 text-[10px] text-zinc-600">{p.country}</span>}
                 </div>
                 <div className="flex items-center gap-2 pl-4">
+                  {p.becameClient && (
+                    <span className="rounded-full bg-green-500/20 px-1.5 py-0.5 text-[9px] font-semibold uppercase text-green-300">✓ client</span>
+                  )}
                   <span className="rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase" style={{ color: st.color, backgroundColor: st.bg }}>
                     {st.label}
                   </span>
@@ -218,6 +222,12 @@ function ProspectDetail({ p }: { p: Prospect }) {
           {st.label}
         </span>
       </div>
+
+      {p.becameClient && (
+        <div className="rounded-lg border border-green-500/30 bg-green-500/10 px-3 py-2 text-sm text-green-200">
+          🎉 <span className="font-semibold">Devenu client</span> — cette personne a désormais une clé API (inscription ou achat). Le suivi continue dans l’onglet Clients.
+        </div>
+      )}
 
       {/* why this prospect */}
       <div className="grid gap-3 sm:grid-cols-2">

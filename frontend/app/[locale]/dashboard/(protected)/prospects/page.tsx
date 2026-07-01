@@ -37,18 +37,25 @@ export default async function ProspectsPage() {
   let rows: ProspectApiRow[] = [];
   let messageRows: MessageRow[] = [];
   let reachable = false;
+  const customerEmails = new Set<string>();
 
   if (ADMIN_SECRET) {
     const h = { headers: { 'X-Admin-Secret': ADMIN_SECRET }, cache: 'no-store' as const };
-    const [p, m] = await Promise.all([
+    const [p, m, k] = await Promise.all([
       fetch(`${API_URL}/v1/admin/prospects`, h).then((r) => (r.ok ? r.json() : null)).catch(() => null),
       fetch(`${API_URL}/v1/admin/email-messages`, h).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+      fetch(`${API_URL}/v1/admin/keys`, h).then((r) => (r.ok ? r.json() : null)).catch(() => null),
     ]);
     if (p) {
       reachable = true;
       rows = (p.prospects ?? []) as ProspectApiRow[];
     }
     messageRows = (m?.messages ?? []) as MessageRow[];
+    // A prospect "became a client" when its contact email now has an API key.
+    for (const row of (k?.keys ?? []) as Array<{ email?: string }>) {
+      const e = (row.email ?? '').toLowerCase().trim();
+      if (e.includes('@') && !e.endsWith('@example.com') && !e.endsWith('@ibanforge.com')) customerEmails.add(e);
+    }
   }
 
   if (!reachable) {
@@ -77,7 +84,14 @@ export default async function ProspectsPage() {
       const contacted = messages.some((x) => x.direction === 'out');
       const replied = messages.length > 0 && messages[messages.length - 1].direction === 'in';
       const lastMsgDate = messages.length ? messages[messages.length - 1].msg_date : null;
-      return { ...r, messages, contacted, replied, lastTouch: lastMsgDate ? lastMsgDate.slice(0, 10) : null };
+      return {
+        ...r,
+        messages,
+        contacted,
+        replied,
+        lastTouch: lastMsgDate ? lastMsgDate.slice(0, 10) : null,
+        becameClient: !!(r.contact_email && customerEmails.has(r.contact_email.toLowerCase())),
+      };
     });
 
   const kpiMailer = prospects.filter((p) => p.status === 'a_mailer' && !p.contacted).length;
@@ -85,6 +99,7 @@ export default async function ProspectsPage() {
   const kpiContacted = prospects.filter((p) => p.contacted && !p.replied).length;
   const kpiReplied = prospects.filter((p) => p.replied).length;
   const active = prospects.filter((p) => p.status !== 'archive').length;
+  const converted = prospects.filter((p) => p.becameClient);
 
   return (
     <div className="flex flex-col gap-5">
@@ -101,6 +116,15 @@ export default async function ProspectsPage() {
         <StatCardV2 title="Contactés" value={String(kpiContacted)} accentColor="#3b82f6" hint="Mail envoyé, en attente de réponse." />
         <StatCardV2 title="Réponses" value={String(kpiReplied)} accentColor="#a855f7" hint="Ils ont répondu — à toi de jouer." />
       </div>
+
+      {converted.length > 0 && (
+        <div className="rounded-xl border border-green-500/30 bg-green-500/10 px-4 py-3 text-sm text-green-200">
+          🎉 <span className="font-semibold">
+            {converted.length} prospect{converted.length > 1 ? 's' : ''} devenu{converted.length > 1 ? 's' : ''} client{converted.length > 1 ? 's' : ''}
+          </span>{' '}
+          : {converted.map((p) => p.company).join(', ')}
+        </div>
+      )}
 
       <ProspectsWorkspace prospects={prospects} />
 
