@@ -1,6 +1,6 @@
 import { StatCardV2 } from '@/components/dashboard/stat-card-v2';
 import { ProspectsWorkspace, type Prospect } from '@/components/dashboard/prospects-workspace';
-import type { CrmMessage } from '@/components/dashboard/crm-workspace';
+import { threadIsUnread, type CrmMessage } from '@/components/dashboard/crm-workspace';
 
 const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 const ADMIN_SECRET = process.env.ADMIN_SECRET || '';
@@ -38,19 +38,22 @@ export default async function ProspectsPage() {
   let messageRows: MessageRow[] = [];
   let reachable = false;
   const customerEmails = new Set<string>();
+  let reads: Record<string, string> = {};
 
   if (ADMIN_SECRET) {
     const h = { headers: { 'X-Admin-Secret': ADMIN_SECRET }, cache: 'no-store' as const };
-    const [p, m, k] = await Promise.all([
+    const [p, m, k, tr] = await Promise.all([
       fetch(`${API_URL}/v1/admin/prospects`, h).then((r) => (r.ok ? r.json() : null)).catch(() => null),
       fetch(`${API_URL}/v1/admin/email-messages`, h).then((r) => (r.ok ? r.json() : null)).catch(() => null),
       fetch(`${API_URL}/v1/admin/keys`, h).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+      fetch(`${API_URL}/v1/admin/thread-reads`, h).then((r) => (r.ok ? r.json() : null)).catch(() => null),
     ]);
     if (p) {
       reachable = true;
       rows = (p.prospects ?? []) as ProspectApiRow[];
     }
     messageRows = (m?.messages ?? []) as MessageRow[];
+    reads = (tr?.reads ?? {}) as Record<string, string>;
     // A prospect "became a client" when its contact email now has an API key.
     for (const row of (k?.keys ?? []) as Array<{ email?: string }>) {
       const e = (row.email ?? '').toLowerCase().trim();
@@ -91,6 +94,7 @@ export default async function ProspectsPage() {
         replied,
         lastTouch: lastMsgDate ? lastMsgDate.slice(0, 10) : null,
         becameClient: !!(r.contact_email && customerEmails.has(r.contact_email.toLowerCase())),
+        unread: threadIsUnread(messages, r.contact_email ? reads[r.contact_email.toLowerCase()] : undefined),
       };
     });
 
