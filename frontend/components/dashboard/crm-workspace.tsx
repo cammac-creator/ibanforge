@@ -244,7 +244,7 @@ export function TimelineMessage({ m }: { m: CrmMessage }) {
             className="rounded bg-violet-500/15 px-1.5 py-0.5 text-[9px] text-violet-300"
             title={hasFr ? 'Traduit automatiquement en français' : 'Langue détectée du message'}
           >
-            🌐 {LANG_LABEL[m.lang] || m.lang}
+            🌐 {(m.lang && LANG_LABEL[m.lang]) || m.lang}
             {hasFr && !showOrig ? ' · traduit' : ''}
           </span>
         )}
