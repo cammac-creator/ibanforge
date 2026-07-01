@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import type { CrmMessage } from './crm-workspace';
+import { TimelineMessage, type CrmMessage } from './crm-workspace';
 
 export interface Prospect {
   id: string;
@@ -45,10 +45,15 @@ function seg(s: string | null) {
   return (s && SEGMENT[s]) || { label: s || 'Autre', dot: '#a1a1aa' };
 }
 
-type DisplayStatus = 'a_mailer' | 'a_enrichir' | 'contacte' | 'replied' | 'archive';
+type DisplayStatus = 'a_mailer' | 'a_enrichir' | 'contacte' | 'followup_due' | 'replied' | 'archive';
 function displayStatus(p: Prospect): DisplayStatus {
   if (p.replied) return 'replied';
-  if (p.contacted) return 'contacte';
+  if (p.contacted) {
+    const last = p.messages[p.messages.length - 1];
+    const d = last?.msg_date ? Math.floor((Date.now() - new Date(last.msg_date).getTime()) / 86_400_000) : 0;
+    // Relance due seulement après une vraie fenêtre de suivi (10 j) sans réponse.
+    return d > 10 ? 'followup_due' : 'contacte';
+  }
   if (p.status === 'archive') return 'archive';
   if (p.status === 'a_mailer') return 'a_mailer';
   return 'a_enrichir';
@@ -57,6 +62,7 @@ const PSTATUS: Record<DisplayStatus, { label: string; color: string; bg: string 
   a_mailer: { label: 'À mailer', color: '#22c55e', bg: '#052e16' },
   a_enrichir: { label: 'À enrichir', color: '#f59e0b', bg: '#451a03' },
   contacte: { label: 'Contacté', color: '#3b82f6', bg: '#172554' },
+  followup_due: { label: 'Relance due', color: '#f59e0b', bg: '#451a03' },
   replied: { label: 'A répondu', color: '#22c55e', bg: '#052e16' },
   archive: { label: 'Archivé', color: '#a1a1aa', bg: '#27272a' },
 };
@@ -74,7 +80,7 @@ export function ProspectsWorkspace({ prospects }: { prospects: Prospect[] }) {
       const ds = displayStatus(p);
       if (statusFilter === 'actifs' && ds === 'archive') return false;
       if (statusFilter === 'a_mailer' && ds !== 'a_mailer') return false;
-      if (statusFilter === 'contactes' && ds !== 'contacte' && ds !== 'replied') return false;
+      if (statusFilter === 'contactes' && ds !== 'contacte' && ds !== 'replied' && ds !== 'followup_due') return false;
       if (statusFilter === 'archive' && ds !== 'archive') return false;
       if (segFilter !== 'all' && p.segment !== segFilter) return false;
       if (term && !`${p.company} ${p.contact_email ?? ''} ${p.country ?? ''}`.toLowerCase().includes(term)) return false;
@@ -259,8 +265,33 @@ function ProspectDetail({ p }: { p: Prospect }) {
         )}
       </div>
 
+      <ProspectTimeline p={p} />
       <ProspectComposer p={p} />
       <StatusActions p={p} />
+    </div>
+  );
+}
+
+function ProspectTimeline({ p }: { p: Prospect }) {
+  if (!p.messages.length) {
+    return (
+      <div className="border-t border-zinc-800/60 pt-4">
+        <p className="mb-1 text-[11px] uppercase tracking-wide text-zinc-500">Conversation</p>
+        <p className="text-sm text-zinc-600">
+          Aucun échange pour l’instant. Le mail que tu envoies s’ajoute ici, et les réponses remontent
+          automatiquement (synchro des boîtes toutes les 15 min).
+        </p>
+      </div>
+    );
+  }
+  return (
+    <div className="border-t border-zinc-800/60 pt-4">
+      <p className="mb-3 text-[11px] uppercase tracking-wide text-zinc-500">Conversation ({p.messages.length})</p>
+      <div className="relative flex flex-col gap-3 border-l border-zinc-800 pl-4">
+        {p.messages.map((m, i) => (
+          <TimelineMessage key={i} m={m} />
+        ))}
+      </div>
     </div>
   );
 }
