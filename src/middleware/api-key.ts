@@ -38,6 +38,11 @@ export function apiKeyMiddleware(): MiddlewareHandler<HonoEnv> {
       return;
     }
 
+    // Attribute the request to this key for per-client telemetry (CRM usage
+    // charts) on EVERY valid-key path — including quota/credit exhaustion
+    // fall-throughs, where the request still belongs to this customer.
+    c.set('apiKeyPrefix', key.slice(0, 12));
+
     // Bundle credits path: the key has a prepaid balance (credits_remaining
     // is an integer, monthly_limit is NULL). Decrement atomically and serve.
     // When credits run out, fall through to x402 instead of hard-blocking,
@@ -55,7 +60,6 @@ export function apiKeyMiddleware(): MiddlewareHandler<HonoEnv> {
       c.header('X-Credits-Remaining', String(newBalance));
       c.header('X-Credits-Total', String(creditsTotal ?? 0));
       c.set('apiKeyAuthenticated', true);
-      c.set('apiKeyPrefix', key.slice(0, 12));
       await next();
       // Refund credit on 4xx client errors (mirror monthly quota behavior).
       if (c.res.status >= 400 && c.res.status < 500) {

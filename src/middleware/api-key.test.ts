@@ -60,3 +60,46 @@ describe('apiKeyMiddleware — quota refund on 4xx', () => {
     expect(after).toBe(before + 1);
   });
 });
+
+describe('apiKeyMiddleware — per-client telemetry (apiKeyPrefix)', () => {
+  it('sets apiKeyPrefix on the monthly-quota path so request_log can attribute the call', async () => {
+    const keyResult = generateApiKey(`prefix-e2e-${RUN_ID}-3@example.com`);
+    const key = keyResult!.api_key;
+
+    let seenPrefix: string | null | undefined;
+    const app = new Hono<HonoEnv>();
+    app.use('/v1/*', apiKeyMiddleware());
+    // Downstream probe: read what the middleware left in context.
+    app.use('/v1/*', async (c, next) => {
+      seenPrefix = c.get('apiKeyPrefix');
+      await next();
+    });
+    app.route('/', ibanValidate);
+
+    const res = await app.request('/v1/iban/validate', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ iban: 'DE89370400440532013000' }),
+    });
+    expect(res.status).toBe(200);
+    expect(seenPrefix).toBe(key.slice(0, 12));
+  });
+
+  it('does not set apiKeyPrefix without a key', async () => {
+    let seenPrefix: string | null | undefined;
+    const app = new Hono<HonoEnv>();
+    app.use('/v1/*', apiKeyMiddleware());
+    app.use('/v1/*', async (c, next) => {
+      seenPrefix = c.get('apiKeyPrefix');
+      await next();
+    });
+    app.route('/', ibanValidate);
+
+    await app.request('/v1/iban/validate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ iban: 'DE89370400440532013000' }),
+    });
+    expect(seenPrefix ?? null).toBeNull();
+  });
+});
