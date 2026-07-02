@@ -232,7 +232,7 @@ export default async function DashboardPage({
         <div className="mb-4 flex items-center gap-2">
           <p className={sectionTitle}>Funnel de conversion — {period} jours</p>
           <InfoDot>
-            Seules les requêtes sur les endpoints facturables (IBAN / BIC / CH clearing) avec la bonne méthode HTTP. Le bruit (scanner, robots, discovery) est exclu.
+            Seules les requêtes sur les endpoints facturables (IBAN / BIC / CH clearing) avec la bonne méthode HTTP. Le bruit (scanner, robots, discovery) est exclu, ainsi que les clés internes (tes tests, les audits Claude, le playground) — le funnel ne mesure que la demande réelle du marché.
             <br />
             <br />
             <strong className="text-emerald-400">Paid success</strong> = l’agent a payé (x402) ou utilisé sa clé et reçu 2xx.

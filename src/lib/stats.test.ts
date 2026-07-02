@@ -1,5 +1,6 @@
 import { describe, it, expect, afterAll } from 'vitest';
-import { recordOperation, recordBatch, getStats, getQuickStats, getStatsHistory, getStatusByPath, getBusinessFunnel, classifyClient, extractClientIp } from './stats.js';
+import { recordOperation, recordBatch, recordRequest, getStats, getQuickStats, getStatsHistory, getStatusByPath, getBusinessFunnel, classifyClient, extractClientIp } from './stats.js';
+import { generateApiKey } from './api-keys.js';
 import { closeAll } from './db.js';
 
 afterAll(() => {
@@ -244,6 +245,26 @@ describe('getBusinessFunnel', () => {
     for (let i = 1; i < rows.length; i++) {
       expect(rows[i].date >= rows[i - 1].date).toBe(true);
     }
+  });
+
+  it('excludes internal-key traffic (founder/Claude audits) but keeps clients and anonymous', () => {
+    const runId = Date.now();
+    const internal = generateApiKey(`perf-audit-${runId}@ibanforge.com`);
+    const external = generateApiKey(`funnel-real-${runId}@acme-corp.com`);
+    expect(internal).not.toBeNull();
+    expect(external).not.toBeNull();
+
+    const today = new Date().toISOString().slice(0, 10);
+    const successToday = () => getBusinessFunnel(1).find((r) => r.date === today)?.success ?? 0;
+
+    const before = successToday();
+    recordRequest('POST', '/v1/iban/validate', 200, 10, 'api', null, null, internal!.key_prefix);
+    recordRequest('POST', '/v1/iban/validate', 200, 10, 'api', null, null, external!.key_prefix);
+    recordRequest('POST', '/v1/iban/validate', 200, 10, 'api', null, null, null); // anonymous (x402)
+    const after = successToday();
+
+    // external + anonymous count; the internal audit key must not.
+    expect(after - before).toBe(2);
   });
 });
 

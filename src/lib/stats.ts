@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import type Database from 'better-sqlite3';
 import { getStatsDB } from './db.js';
+import { isInternalEmail } from './internal-accounts.js';
 import type { OperationType, StatsOverview, HourlyStatsResponse, ErrorStatsResponse, PatternStatsResponse } from '../types.js';
 
 // ---------------------------------------------------------------------------
@@ -642,6 +643,19 @@ function buildBillableFilter(): { sql: string; params: string[] } {
 export function getBusinessFunnel(days: number = 30): BusinessFunnelDay[] {
   const db = getStatsDB();
   const filter = buildBillableFilter();
+  // Keys owned by internal accounts (founder tests, Claude audits, playground)
+  // produce real 2xx traffic that is NOT market signal — a perf audit once
+  // showed up as "126 Paid success" on a day with zero real client calls.
+  // Anonymous traffic (key_prefix NULL) stays counted: it can't be attributed,
+  // and x402 demand is precisely what the funnel exists to measure.
+  const internalPrefixes = (
+    db.prepare('SELECT key_prefix, email FROM api_keys').all() as Array<{ key_prefix: string; email: string }>
+  )
+    .filter((k) => isInternalEmail(k.email))
+    .map((k) => k.key_prefix);
+  const internalFilter = internalPrefixes.length
+    ? `AND (key_prefix IS NULL OR key_prefix NOT IN (${internalPrefixes.map(() => '?').join(',')}))`
+    : '';
   // Exclude OpenAPI placeholder paths (%7B...%7D or literal {...}) — they match
   // the billable path-prefix but are never real business traffic, just scanners
   // or agents mis-substituting the OpenAPI spec template variables. Counting
@@ -659,9 +673,10 @@ export function getBusinessFunnel(days: number = 30): BusinessFunnelDay[] {
       AND (${filter.sql})
       AND path NOT LIKE '%\\%7B%' ESCAPE '\\'
       AND path NOT LIKE '%{%'
+      ${internalFilter}
     GROUP BY date(created_at)
     ORDER BY date ASC
-  `).all(days, ...filter.params) as BusinessFunnelDay[];
+  `).all(days, ...filter.params, ...internalPrefixes) as BusinessFunnelDay[];
   return rows;
 }
 
