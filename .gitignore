@@ -23,3 +23,10 @@ mcp/.mcpregistry_*_token
 
 # Private internal reports (revenue/traffic reality) — never publish
 docs/internal/
+
+# Python bytecode
+__pycache__/
+*.pyc
+
+# One-off operator tool with wallet key material — never commit
+scripts/x402-pay.mjs
