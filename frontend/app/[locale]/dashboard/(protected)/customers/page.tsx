@@ -226,28 +226,48 @@ export default async function CustomersPage() {
   // combined, internal accounts excluded. Same UTC day convention as request_log.
   const todayUtc = new Date().toISOString().slice(0, 10);
   const CAT_RANK = { PAYANT: 0, PILOTE: 1, GRATUIT: 2 } as const;
-  const todayByEmail = new Map<string, TopUserToday>();
-  for (const row of data.keys) {
-    if (INTERNAL_RE.test(row.email)) continue;
-    const count = activityByKey[row.key_prefix]?.days.find((d) => d.day === todayUtc)?.count ?? 0;
-    if (count === 0) continue;
+  const collect = (
+    map: Map<string, TopUserToday>,
+    row: KeyRow,
+    count: number,
+    period: TopUserToday['period'],
+  ) => {
     const category = classify(row, false) as TopUserToday['category'];
-    const prev = todayByEmail.get(row.email.toLowerCase());
+    const prev = map.get(row.email.toLowerCase());
     if (prev) {
       prev.count += count;
       if (CAT_RANK[category] < CAT_RANK[prev.category]) prev.category = category;
     } else {
       const enriched = enrichEmail(row.email);
-      todayByEmail.set(row.email.toLowerCase(), {
+      map.set(row.email.toLowerCase(), {
         email: row.email,
         company: enriched.company,
         sector: enriched.sector,
         category,
         count,
+        period,
       });
     }
+  };
+  const todayByEmail = new Map<string, TopUserToday>();
+  for (const row of data.keys) {
+    if (INTERNAL_RE.test(row.email)) continue;
+    const count = activityByKey[row.key_prefix]?.days.find((d) => d.day === todayUtc)?.count ?? 0;
+    if (count > 0) collect(todayByEmail, row, count, 'today');
   }
   const topToday = [...todayByEmail.values()].sort((a, b) => b.count - a.count).slice(0, 3);
+  // Quiet day → backfill with this month's most active clients (api_usage `used`),
+  // where free-tier usage lives even before daily per-key attribution existed.
+  if (topToday.length < 3) {
+    const monthByEmail = new Map<string, TopUserToday>();
+    for (const row of data.keys) {
+      if (INTERNAL_RE.test(row.email)) continue;
+      if (todayByEmail.has(row.email.toLowerCase())) continue;
+      if (row.used > 0) collect(monthByEmail, row, row.used, 'month');
+    }
+    const monthly = [...monthByEmail.values()].sort((a, b) => b.count - a.count);
+    topToday.push(...monthly.slice(0, 3 - topToday.length));
+  }
 
   // Priority sort: payants → relance due → awaiting → others; then by health desc.
   const order: Record<CrmClient['status'], number> = { followup_due: 0, replied: 1, awaiting: 2, not_contacted: 3 };
