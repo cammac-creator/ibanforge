@@ -175,6 +175,66 @@ Pas d'intro ni de conclusion. Si tu ne trouves rien de récent sur un axe, ne l'
   return text;
 }
 
+/**
+ * AI-recommendability baseline. The one documented discovery channel (IB4,
+ * 2026-06-25) was "Claude Code has recommended". Assistants with web search
+ * recommend from what surfaces in the SERPs at question time — this tracks,
+ * week over week, whether IBANforge shows up for the canonical buyer queries.
+ */
+async function recommendability(): Promise<string> {
+  const prompt = `Tu mesures la "recommandabilité IA" d'IBANforge (ibanforge.com), une API de validation IBAN + BIC + compliance avec free tier 200 appels/mois sans carte.
+
+Un développeur qui demande à un assistant IA (Claude, ChatGPT, Gemini, Perplexity) « quelle API IBAN utiliser » reçoit une recommandation construite depuis la recherche web. Fais UNE recherche web par requête ci-dessous et note ce qui ressort :
+
+1. "best IBAN validation API free tier"
+2. "IBAN validation API"
+3. "BIC SWIFT lookup API"
+4. "IBAN sanctions screening API"
+5. "IBAN prüfen API" (marché DE)
+6. "swiss QR-IBAN validation API"
+
+Réponds en FRANÇAIS, TEXTE BRUT, EXACTEMENT ce format compact (une ligne par requête) :
+
+🤖 RECOMMANDABILITÉ IA (baseline hebdo)
+1. [top 3 acteurs vus] — IBANforge visible : OUI/NON
+2. …(idem pour les 6)
+Score : IBANforge visible sur X/6 requêtes.
+Plus grosse absence à corriger : [1 phrase concrète]
+
+Ne rien inventer : si une recherche ne montre pas IBANforge, dis NON.`;
+
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'x-api-key': ANTHROPIC_API_KEY,
+      'anthropic-version': '2023-06-01',
+      'content-type': 'application/json',
+    },
+    signal: AbortSignal.timeout(240_000),
+    body: JSON.stringify({
+      model: MODEL,
+      max_tokens: 1200,
+      tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 6 }],
+      messages: [{ role: 'user', content: prompt }],
+    }),
+  });
+  const data = (await res.json()) as {
+    type?: string;
+    error?: { message: string };
+    content?: Array<{ type: string; text?: string }>;
+  };
+  if (data.type === 'error' || !data.content) {
+    throw new Error(`Anthropic error: ${data.error?.message ?? JSON.stringify(data)}`);
+  }
+  const text = data.content
+    .filter((b) => b.type === 'text')
+    .map((b) => b.text ?? '')
+    .join('')
+    .trim();
+  if (!text) throw new Error('Anthropic returned no text');
+  return text;
+}
+
 function frDate(): string {
   return new Date().toLocaleDateString('fr-CH', {
     day: '2-digit',
@@ -236,6 +296,14 @@ async function main(): Promise<void> {
     researchBlock = `🚪 PORTES QUI S'OUVRENT\n(recherche indisponible cette semaine : ${(err as Error).message})`;
   }
 
+  console.log('[veille] measuring AI recommendability…');
+  let recoBlock: string;
+  try {
+    recoBlock = await recommendability();
+  } catch (err) {
+    recoBlock = `🤖 RECOMMANDABILITÉ IA\n(mesure indisponible cette semaine : ${(err as Error).message})`;
+  }
+
   const report = [
     `🔔 VEILLE IBANFORGE — ${frDate()}`,
     `Semaine ${w.range}`,
@@ -243,6 +311,8 @@ async function main(): Promise<void> {
     statsBlock,
     '',
     researchBlock,
+    '',
+    recoBlock,
     '',
     '— Dory · veille auto hebdomadaire',
   ].join('\n');
