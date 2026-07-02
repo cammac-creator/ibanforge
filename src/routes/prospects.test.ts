@@ -9,6 +9,7 @@ function makeApp() {
 }
 
 const SECRET = 'correct-horse-battery-staple';
+const RUN_ID = Date.now();
 const originalEnv = { ...process.env };
 beforeEach(() => {
   process.env.ADMIN_SECRET = SECRET;
@@ -111,5 +112,67 @@ describe('/v1/admin/prospects — upsert + read back', () => {
       body: JSON.stringify({ id: 'p_test_fixed_0001', status: 'bogus' }),
     });
     expect(res.status).toBe(400);
+  });
+});
+
+describe('email-messages upsert → prospect status auto-flip', () => {
+  const pid = 'p_test_contact_flip';
+  const email = `flip-${RUN_ID}@prospect-test.example`;
+
+  async function seedProspect(app: Hono, status: string) {
+    const res = await app.request('/v1/admin/prospects', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Secret': SECRET },
+      body: JSON.stringify({
+        prospects: [{ id: pid, company: 'FlipTest AG', contact_email: email, status }],
+      }),
+    });
+    expect(res.status).toBe(200);
+  }
+
+  async function readStatus(app: Hono): Promise<string> {
+    const list = await app.request('/v1/admin/prospects', { headers: { 'X-Admin-Secret': SECRET } });
+    const json = (await list.json()) as { prospects: Array<{ id: string; status: string }> };
+    return json.prospects.find((p) => p.id === pid)!.status;
+  }
+
+  it('an outgoing message to the prospect email flips a_mailer → contacte', async () => {
+    const app = makeApp();
+    await seedProspect(app, 'a_mailer');
+    const res = await app.request('/v1/admin/email-messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Secret': SECRET },
+      body: JSON.stringify({
+        messages: [{ id: `m-out-${RUN_ID}`, customer_email: email.toUpperCase(), direction: 'out', subject: 'Hello', msg_date: '2026-07-02T08:00' }],
+      }),
+    });
+    expect(res.status).toBe(200);
+    expect(await readStatus(app)).toBe('contacte');
+  });
+
+  it('an incoming message alone does NOT flip the preparation status', async () => {
+    const app = makeApp();
+    await seedProspect(app, 'a_mailer');
+    await app.request('/v1/admin/email-messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Secret': SECRET },
+      body: JSON.stringify({
+        messages: [{ id: `m-in-${RUN_ID}`, customer_email: email, direction: 'in', subject: 'Re: Hello', msg_date: '2026-07-02T09:00' }],
+      }),
+    });
+    expect(await readStatus(app)).toBe('a_mailer');
+  });
+
+  it('does not touch terminal statuses (rejete stays rejete)', async () => {
+    const app = makeApp();
+    await seedProspect(app, 'rejete');
+    await app.request('/v1/admin/email-messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Secret': SECRET },
+      body: JSON.stringify({
+        messages: [{ id: `m-out2-${RUN_ID}`, customer_email: email, direction: 'out', subject: 'Hello again', msg_date: '2026-07-02T10:00' }],
+      }),
+    });
+    expect(await readStatus(app)).toBe('rejete');
   });
 });

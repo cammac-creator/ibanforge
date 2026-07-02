@@ -455,14 +455,25 @@ apiKeys.post('/v1/admin/email-messages', async (c) => {
        lang = COALESCE(excluded.lang, lang),
        body = excluded.body, counterparty = excluded.counterparty`,
   );
+  // An outgoing message to a prospect's contact_email means it HAS been
+  // contacted — flip the stale preparation status so the API reflects reality
+  // (the UI already derives contacted/replied from the thread, but scripts and
+  // GET /v1/admin/prospects read the raw status). Message ids are stable
+  // (md5 of email|dir|date|subject), so re-syncs retroactively backfill this.
+  const markContacted = db.prepare(
+    `UPDATE prospects SET status = 'contacte', updated_at = datetime('now')
+     WHERE lower(contact_email) = ? AND status IN ('a_mailer', 'a_enrichir')`,
+  );
   const tx = db.transaction((rows: EmailMessageInput[]) => {
     let n = 0;
     for (const r of rows) {
       if (!r || typeof r.id !== 'string' || typeof r.customer_email !== 'string' || !r.customer_email.includes('@')) continue;
+      const email = r.customer_email.trim().toLowerCase();
+      const direction = r.direction === 'out' ? 'out' : 'in';
       upsert.run({
         id: r.id.slice(0, 200),
-        customer_email: r.customer_email.trim().toLowerCase(),
-        direction: r.direction === 'out' ? 'out' : 'in',
+        customer_email: email,
+        direction,
         msg_date: clip(r.msg_date, 40),
         subject: clip(r.subject, 500),
         snippet: clip(r.snippet, 300),
@@ -471,6 +482,7 @@ apiKeys.post('/v1/admin/email-messages', async (c) => {
         body: clip(r.body, 8000),
         counterparty: clip(r.counterparty, 255),
       });
+      if (direction === 'out') markContacted.run(email);
       n++;
     }
     return n;
