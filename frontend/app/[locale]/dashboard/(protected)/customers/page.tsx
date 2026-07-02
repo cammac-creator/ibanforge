@@ -2,6 +2,7 @@ import { getLocale } from 'next-intl/server';
 import { StatCardV2 } from '@/components/dashboard/stat-card-v2';
 import { enrichEmail } from '@/lib/company-enrichment';
 import { CrmWorkspace, type CrmClient, type CrmMessage } from '@/components/dashboard/crm-workspace';
+import { TopUsersToday, type TopUserToday } from '@/components/dashboard/top-users-today';
 import { threadIsUnread } from '@/lib/thread-unread';
 
 const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
@@ -221,6 +222,33 @@ export default async function CustomersPage() {
     if (status === 'followup_due') toRelance += 1;
   }
 
+  // Today's leaderboard (hero card): attributed requests per client email, all keys
+  // combined, internal accounts excluded. Same UTC day convention as request_log.
+  const todayUtc = new Date().toISOString().slice(0, 10);
+  const CAT_RANK = { PAYANT: 0, PILOTE: 1, GRATUIT: 2 } as const;
+  const todayByEmail = new Map<string, TopUserToday>();
+  for (const row of data.keys) {
+    if (INTERNAL_RE.test(row.email)) continue;
+    const count = activityByKey[row.key_prefix]?.days.find((d) => d.day === todayUtc)?.count ?? 0;
+    if (count === 0) continue;
+    const category = classify(row, false) as TopUserToday['category'];
+    const prev = todayByEmail.get(row.email.toLowerCase());
+    if (prev) {
+      prev.count += count;
+      if (CAT_RANK[category] < CAT_RANK[prev.category]) prev.category = category;
+    } else {
+      const enriched = enrichEmail(row.email);
+      todayByEmail.set(row.email.toLowerCase(), {
+        email: row.email,
+        company: enriched.company,
+        sector: enriched.sector,
+        category,
+        count,
+      });
+    }
+  }
+  const topToday = [...todayByEmail.values()].sort((a, b) => b.count - a.count).slice(0, 3);
+
   // Priority sort: payants → relance due → awaiting → others; then by health desc.
   const order: Record<CrmClient['status'], number> = { followup_due: 0, replied: 1, awaiting: 2, not_contacted: 3 };
   clients.sort((a, b) => {
@@ -235,6 +263,8 @@ export default async function CustomersPage() {
         <h1 className="text-xl font-semibold text-white">Clients — CRM</h1>
         <p className="mt-1 text-sm text-zinc-500">{clients.length} clients suivis · sélectionne à gauche pour voir le fil et agir</p>
       </div>
+
+      <TopUsersToday top={topToday} todayUtc={todayUtc} locale={locale} />
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCardV2 title="Revenu clients" value={`$${revenue}`} accentColor="#22c55e" hint="CA réel des payants (packs Stripe). x402 non attribuable par client." />
