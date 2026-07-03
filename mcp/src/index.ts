@@ -394,15 +394,21 @@ async function apiCall(method: 'GET' | 'POST', path: string, body?: JsonRecord):
 
   if (!res.ok) {
     const obj = parsed as JsonRecord;
+    // The API tells us WHY the paywall triggered (exhausted quota/credits,
+    // broken key) via a `cause` object in the 402 body — relay that truth
+    // instead of the generic "set a key" advice, which is wrong (and
+    // confusing) when a key is already configured.
+    const cause = (obj?.cause ?? undefined) as { reason?: string; detail?: string } | undefined;
     return {
       _error: true,
       status: res.status,
       ...(obj || {}),
       _hint:
         res.status === 402
-          ? 'Payment required. Set IBANFORGE_API_KEY (Bearer ifk_*) for the free 200 req/month tier, or pay 0.005 USDC via x402. See https://api.ibanforge.com/.well-known/x402'
+          ? (cause?.detail ??
+            'Payment required. Set IBANFORGE_API_KEY (Bearer ifk_*) for the free 200 req/month tier, or pay per call via x402 (price in the `accepts` array). See https://api.ibanforge.com/.well-known/x402')
           : res.status === 429
-            ? 'Rate limited. Set IBANFORGE_API_KEY for higher limits.'
+            ? 'Rate limited (per-IP, 100 req/min). Wait for `retry_after` seconds, then retry.'
             : undefined,
     };
   }
@@ -432,7 +438,19 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     'Anonymous mode — basic format validation only. For BIC, SEPA reachability, ' +
     'issuer classification, sanctions, Swiss BC-Nummer and risk score: get a ' +
     'free API key (200 req/month) by POSTing your email to /v1/keys/generate, ' +
-    'or pay 0.005 USDC per call via x402 (see https://api.ibanforge.com/.well-known/x402).';
+    'or pay per call via x402 (see https://api.ibanforge.com/.well-known/x402).';
+
+  // When the 402 carried a cause (exhausted quota/credits, invalid key), the
+  // degraded fallback result must say so: the user HAS a key and would
+  // otherwise believe they are anonymous — or worse, that the degraded
+  // output is a full validation.
+  const degradedNote = (paid: JsonRecord): string => {
+    const cause = (paid?.cause ?? undefined) as { reason?: string; detail?: string } | undefined;
+    if (!cause?.reason) return ANON_NOTE;
+    return (
+      `DEGRADED RESULT — basic format validation only (no BIC, SEPA, issuer or risk data). Reason: ${cause.detail ?? cause.reason}`
+    );
+  };
 
   try {
     switch (name) {
@@ -444,7 +462,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         if (result._error && result.status === 402) {
           const free = await apiCall('GET', `/v1/iban/format?iban=${encodeURIComponent(a.iban)}`);
           if (!free._error) {
-            return out({ ...free, _note: ANON_NOTE });
+            return out({ ...free, _note: degradedNote(result) });
+          }
+          // The free endpoint rejected the input itself (e.g. length out of
+          // bounds): that 400 is the real cause — don't mask it as "payment
+          // required".
+          if (free.status === 400) {
+            return out(free);
           }
         }
         return out(result);
@@ -468,7 +492,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             results,
             count: results.length,
             valid_count: validCount,
-            _note: ANON_NOTE,
+            _note: degradedNote(result),
           });
         }
         return out(result);

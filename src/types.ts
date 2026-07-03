@@ -4,10 +4,24 @@
 
 // --- Hono context variables ---
 
+/**
+ * Why a request is about to fall through to the 402 paywall. Set by the
+ * api-key middleware, injected into the 402 body by enrich-402 — so a client
+ * whose key is exhausted or invalid is told the actual cause instead of a
+ * generic "payment required" (which reads as "anonymous" to MCP clients).
+ */
+export interface PaywallCause {
+  reason: 'monthly_quota_exhausted' | 'credits_exhausted' | 'invalid_api_key';
+  detail: string;
+  quota?: { used: number; limit: number; month: string; resets: string };
+  credits?: { total: number; topup: string };
+}
+
 type HonoEnv = {
   Variables: {
     apiKeyAuthenticated: boolean;
     apiKeyPrefix: string | null;
+    paywallCause?: PaywallCause;
   };
 };
 

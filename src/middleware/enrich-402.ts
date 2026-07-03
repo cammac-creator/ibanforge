@@ -1,4 +1,5 @@
 import type { MiddlewareHandler } from 'hono';
+import type { HonoEnv, PaywallCause } from '../types.js';
 
 const USDC_BASE = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
 const NETWORK = 'base';
@@ -405,7 +406,19 @@ function buildAccessRamp(): Record<string, unknown> {
  *      add `outputSchema` (CyberSapper recipe) at the top level so the CDP
  *      Bazaar v1 catalog extractor indexes the service.
  */
-export function enrich402Middleware(): MiddlewareHandler {
+/**
+ * When the api-key middleware flagged WHY this request fell through to the
+ * paywall (exhausted quota/credits, broken key), surface it prominently:
+ * a `cause` object plus a message that states the real situation. Without
+ * this, an authenticated-but-exhausted client reads the generic 402 as
+ * "you are anonymous" and never learns what actually happened.
+ */
+function causeFields(cause: PaywallCause | undefined): Record<string, unknown> {
+  if (!cause) return {};
+  return { cause, message: cause.detail };
+}
+
+export function enrich402Middleware(): MiddlewareHandler<HonoEnv> {
   return async (c, next) => {
     await next();
 
@@ -443,6 +456,7 @@ export function enrich402Middleware(): MiddlewareHandler {
         error: 'payment_required',
         ...parsed,
         ...buildAccessRamp(),
+        ...causeFields(c.get('paywallCause')),
       };
       enriched.accepts = patchedAccepts;
 
@@ -482,6 +496,7 @@ export function enrich402Middleware(): MiddlewareHandler {
       error: 'payment_required',
       accepts,
       ...buildAccessRamp(),
+      ...causeFields(c.get('paywallCause')),
     };
 
     c.res = new Response(JSON.stringify(body, null, 2), {
