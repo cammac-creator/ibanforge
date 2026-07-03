@@ -34,6 +34,16 @@ export function apiKeyMiddleware(): MiddlewareHandler<HonoEnv> {
     const { valid, keyHash, monthlyLimit, creditsRemaining, creditsTotal } = validateApiKey(key);
 
     if (!valid) {
+      // A key WAS supplied but doesn't validate (typo, truncation, revoked).
+      // Without this marker the request is indistinguishable from anonymous
+      // traffic and the client is never told its key is broken.
+      c.set('paywallCause', {
+        reason: 'invalid_api_key',
+        detail:
+          'An API key was provided (ifk_…) but it is invalid or revoked. ' +
+          'Check for typos or truncation, or generate a new free key: POST /v1/keys/generate.',
+      });
+      c.header('X-API-Key-Invalid', 'true');
       await next();
       return;
     }
@@ -50,6 +60,13 @@ export function apiKeyMiddleware(): MiddlewareHandler<HonoEnv> {
     if (typeof creditsRemaining === 'number') {
       const newBalance = decrementCredits(keyHash);
       if (newBalance < 0) {
+        c.set('paywallCause', {
+          reason: 'credits_exhausted',
+          detail:
+            `Your prepaid credit bundle (${creditsTotal ?? 0} calls) is used up. ` +
+            'Top up: POST /v1/credits/buy/1k|5k|25k — or pay per call via x402.',
+          credits: { total: creditsTotal ?? 0, topup: 'POST /v1/credits/buy/1k|5k|25k' },
+        });
         c.header('X-Credits-Exhausted', 'true');
         c.header('X-Credits-Used', String(creditsTotal ?? 0));
         c.header('X-Credits-Total', String(creditsTotal ?? 0));
@@ -78,6 +95,14 @@ export function apiKeyMiddleware(): MiddlewareHandler<HonoEnv> {
       // payment requirements and the agent can pay-per-call seamlessly until
       // their quota resets next month.
       // Hint headers tell the agent what happened so it can log + decide.
+      c.set('paywallCause', {
+        reason: 'monthly_quota_exhausted',
+        detail:
+          `Your free tier is exhausted for ${quota.month} (${quota.used}/${quota.limit} requests used) — ` +
+          'it resets on the 1st of next month. To keep going now: prepaid credit packs ' +
+          '(POST /v1/credits/buy/1k|5k|25k) or pay per call via x402.',
+        quota: { used: quota.used, limit: quota.limit, month: quota.month, resets: '1st of month' },
+      });
       c.header('X-Quota-Exhausted', 'true');
       c.header('X-Quota-Used', String(quota.used));
       c.header('X-Quota-Limit', String(quota.limit));
