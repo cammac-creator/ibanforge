@@ -19,7 +19,7 @@
  *   const key = await IBANforge.generateApiKey('you@example.com');
  */
 
-const VERSION = '1.3.1';
+const VERSION = '1.3.3';
 const DEFAULT_BASE_URL = 'https://api.ibanforge.com';
 
 // ─── Config ──────────────────────────────────────────────────────────────────
