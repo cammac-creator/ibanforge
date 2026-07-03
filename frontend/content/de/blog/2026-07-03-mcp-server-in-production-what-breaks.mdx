@@ -1,0 +1,92 @@
+---
+title: "Ein MCP-Server in Produktion: was wirklich kaputtgeht"
+description: "Drei Monate Betrieb eines öffentlichen MCP-Servers — stille Ausfälle, Auth-Hürden, Geistertraffic, Registry-Eigenheiten — und die Fixes, mit echten Zahlen."
+date: "2026-07-03"
+faq:
+  - q: "Warum schlagen MCP-Requests in Produktion still fehl?"
+    a: "Weil Fehler auf Ebenen entstehen, die die eigene Anwendung nie loggt: Das MCP-SDK kann Verbindungen selbst ablehnen (z. B. HTTP 406 bei fehlendem Accept-Header), Tool-Fehler reisen in JSON-RPC-Umschlägen mit HTTP 200, und Quota- oder Zahlungsverweigerungen degradieren oft ein Ergebnis, statt es fehlschlagen zu lassen. Man muss den echten Ausgangsstatus pro Pfad loggen und degradierte Ergebnisse explizit kennzeichnen."
+  - q: "Wie monetarisiert man einen MCP-Server?"
+    a: "Jede „Zahlung erforderlich“-Antwort als Auffahrt behandeln, nicht als Sackgasse: Unser 402-Body listet alle Freischaltwege (kostenloser API-Key, Prepaid-Credit-Packs, Pay-per-Call via x402) maschinenlesbar auf, und ein erschöpftes Kontingent fällt auf Pay-per-Call durch, statt ein totes 429 zurückzugeben. Und: die Paywall pro Transport auditieren — ein später ergänzter Transport kann sie komplett umgehen."
+  - q: "Wie wird ein MCP-Server in Registries wie Smithery oder Glama sichtbar?"
+    a: "Registries bewerten Dinge, die die Spec als optional bezeichnet: Output-Schemas pro Tool, Start in einer Sandbox ohne native Abhängigkeiten, eine brauchbare anonyme Antwort statt eines nackten 402. Die eigenen Endpoints mit leerem, nicht authentifiziertem Body anfragen und sicherstellen, dass der Scanner-Pfad kalt funktioniert."
+---
+
+Auf Hacker News gibt es eine wiederkehrende Klage über MCP-Server in Produktion: Auth und Scopes sind mühsam, APIs zerfallen in Dutzende einzeln zu autorisierende Tools, und — am schlimmsten — Requests sterben still, ohne Ergebnis und ohne Fehler.
+
+Wir betreiben einen. IBANforge betreibt seit Anfang April 2026 einen öffentlichen MCP-Server — fünf Tools (IBAN-Validierung, Batch, BIC-Lookup, Schweizer Clearing, Compliance), zwei Transporte (ein stdio-npm-Paket und ein Streamable-HTTP-Endpoint), ein Gratis-Kontingent und dahinter eine Paywall. Dieser Beitrag ist der Erfahrungsbericht, den wir gern vor dem Launch gelesen hätten: was wirklich kaputtging, mit Zahlen, und was wir geändert haben.
+
+## Zuerst die Zahlen, denn sie rücken alles zurecht
+
+In einem 35-Tage-Fenster haben wir **100.027 HTTP-Requests** bedient, die **208 echte Fachoperationen** enthielten — etwa sechs pro Tag. Rund 99 % des Traffics waren Roboter: Registry-Crawler, x402-Scanner, MCP-Scoring-Engines; ein einziger Monitoring-Bot allein stand für ~25.000 Requests pro Monat und tastete sechs Endpoints alle sechs Minuten ab.
+
+Echter MCP-Agenten-Traffic (Claude-, Cursor-, ChatGPT-artige Clients über stdio): **464 von 112.521 Requests** in 90 Tagen. Real, aber klein.
+
+Wenn Sie nur eines aus diesem Beitrag mitnehmen: Instrumentieren Sie die Kanal-Attribution, *bevor* Sie distribuieren — sonst starren Sie auf einen großen Request-Zähler und wissen nicht, ob das Ihr Zielmarkt ist oder ein Crawler. Wir haben unseren `client_kind`-Klassifikator (api / web / bot / mcp_http / mcp_stdio) Monate zu spät eingebaut, und am Tag seiner Inbetriebnahme entpuppte sich unsere „Traction“ als geplanter Scanner mit einer flachen Signatur von ~850 Paywall-Hits pro Tag.
+
+## Stilles Scheitern ist der Normalfall, nicht die Ausnahme
+
+Die HN-Klage — „Requests sterben, weder Ergebnis noch Fehler“ — ist real, und nach unserer Erfahrung hat sie eine präzise Anatomie: Die Ausfälle passieren auf Ebenen, die Ihr Anwendungscode nie sieht.
+
+**Das SDK scheitert in Ihrem Namen.** Wir fanden 308 verlorene MCP-Verbindungen in 30 Tagen, alle mit HTTP 406 abgelehnt — ausgegeben vom Transport des MCP-SDK selbst, weil die Spec von Clients den Header `Accept: application/json, text/event-stream` verlangt. Kein einziger dieser 406er tauchte in unseren Anwendungslogs auf; kein Handler von uns produzierte sie. Wer nur loggt, was der eigene Code zurückgibt, ist blind für das, was die Abhängigkeiten zurückgeben. Loggen Sie den echten Ausgangsstatus pro Pfad.
+
+**Degradierte Ergebnisse tarnen sich als Erfolg.** Diesen Fall fanden wir in unserem eigenen Code — heute Morgen, bei einem Conversion-Audit. Unser npm-Paket fällt auf einen kostenlosen Format-only-Endpoint zurück, wenn der bezahlte Aufruf 402 liefert, damit Registry-Inspektoren (die nie Credentials tragen) ein funktionierendes Tool sehen statt eines Fehlers. Gute Idee. Aber derselbe Fallback feuerte auch für *authentifizierte Kunden mit erschöpftem Gratis-Kontingent* — und etikettierte das Ergebnis als „Anonymous mode“. Ein Nutzer mit konfiguriertem Key sah seine Ergebnisse still die BIC-, SEPA- und Risiko-Felder verlieren, mit einem Hinweis, er sei anonym. Weder ein (vollständiges) Ergebnis noch ein Fehler. Genau der stille Tod, über den HN klagt — und wir hatten ihn selbst gebaut, mit guten Absichten, ein Fallback nach dem anderen.
+
+Der Fix ging heute raus: Der 402-Body der API trägt jetzt eine explizite `cause` — `monthly_quota_exhausted`, `credits_exhausted` oder `invalid_api_key`, mit den Zahlen:
+
+```json
+{
+  "error": "payment_required",
+  "cause": {
+    "reason": "monthly_quota_exhausted",
+    "detail": "Your free tier is exhausted for 2026-07 (200/200 requests used) — it resets on the 1st of next month. …",
+    "quota": { "used": 200, "limit": 200, "month": "2026-07", "resets": "1st of month" }
+  },
+  "accepts": ["…x402-Zahlungsoptionen…"]
+}
+```
+
+und das MCP-Paket kennzeichnet diese Fallbacks nun als `DEGRADED RESULT — basic format validation only. Reason: …`, statt Anonymität vorzutäuschen. Ein ungültiger Key meldet sich jetzt ebenfalls (`X-API-Key-Invalid: true`), statt als anonymer Traffic behandelt zu werden — ein vertippter Key war bisher von gar keinem Key nicht zu unterscheiden.
+
+**Zustand, den man im Speicher vergessen hat.** Unser HTTP-Transport hält MCP-Sessions in einer In-Memory-Map. Jedes Redeployment verwaist still alle lebenden Sessions. Der Client sieht seinen nächsten Aufruf an einer unbekannten Session scheitern — oder schlimmer: hängen, je nach Client. Sessions persistieren oder das Scheitern wenigstens laut machen; das steht bei uns im Backlog, und wir sagen es.
+
+## Auth und Scopes: der Schmerz ist real — das hier hat den Kontakt überlebt
+
+MCP hat keine Auth-Geschichte, auf die sich alle einigen, und die meisten echten APIs haben eine von: API-Keys, OAuth oder Zahlung pro Aufruf. Drei Dinge haben drei Monate Produktion überlebt:
+
+**Eine Ablehnung muss eine Auffahrt sein, keine Sackgasse.** Wir loggten über 13.100 Paywall-Hits, bevor wir das verstanden. Unser 402 bewarb anfangs nur zwei unserer drei Freischaltwege, und ein erschöpftes Kontingent lieferte ein 429 ohne Ausweg. Heute: Das erschöpfte Kontingent *fällt durch* auf Pay-per-Call via x402 (der Agent kann 0,005 $ zahlen und weitermachen), und der 402-Body listet jeden Weg maschinenlesbar — kostenlose Key-Registrierung, Prepaid-Credit-Packs, Zahlung pro Aufruf. Der Funnel wird in genau dem Moment gewonnen oder verloren, in dem Sie einen Request ablehnen.
+
+**Auditieren Sie die Paywall pro Transport, nicht pro Funktion.** Wochenlang rief unser Streamable-HTTP-Transport dieselben fünf Tools auf, *ohne* die Zahlungs-Middleware zu passieren. Jeder Agent konnte alles gratis konsumieren — während die Statistikschicht „Umsatz“ verbuchte, den es on-chain nie gab. Jeder Transport ist eine eigene Tür zu denselben Funktionen; ein später ergänzter Transport umgeht eine Paywall, die in einer einzigen Middleware lebt. Wir kappen den HTTP-Transport jetzt bei 50 Tool-Calls/Tag/IP und gleichen Umsatz gegen die Chain ab, nicht gegen unsere eigenen Zähler (0,324 USDC „versucht“ vs. 0,098 tatsächlich abgewickelt — Lektion gelernt).
+
+**Scanner haben keine Credentials — und sie sind Ihr Schaufenster.** Registry-Inspektoren rufen Ihre Tools kalt auf. Ist die Antwort ein nacktes 402, zeigt Ihr Listing jedem bewertenden Menschen einen roten Fehler. Unser Fallback liefert anonym echte (Basis-)Validierung mit ehrlichem Upgrade-Hinweis — und genau dieser Pfad brauchte den `cause`-Fix von oben, damit er zahlende Nutzer nie wieder anlügt.
+
+## Registries formen Ihren Code stärker als die Spec
+
+Nichts in der MCP-Spec sagt, dass ein Tool ein Output-Schema braucht. Dann bewertet Smithery Sie mit 90/100 und „Output schemas: 0/5“ — und der Score ist öffentlich. Wir haben gelernt:
+
+- Jede Plattform liest Schemas an einem **bestimmten Pfad mit bestimmter Semantik** (Beispielwerte vs. JSON Schema, gewrappt vs. nackt) — das funktionierende Rezept für einen Katalog kam aus einem Discord-Channel, nicht aus der Dokumentation.
+- Inspektions-Sandboxes starten Ihren Server **ohne Ihre nativen Abhängigkeiten**. Unser better-sqlite3-Import ließ Glamas Sandbox abstürzen, bevor die Tools überhaupt registriert waren; jeder native Import ist jetzt lazy. Ein Server, der kalt nicht startet, wird nie indexiert.
+- Leere Test-Requests sind normal: Kataloge POSTen `{}`, um Ihren 402-Zahlungsumschlag zu extrahieren. Läuft die Body-Validierung vor der Paywall-Middleware, bekommt die Sonde ein 400 — und Sie werden als `non_402_response` delistet.
+- Rechnen Sie mit harten Feldgrenzen (100-Zeichen-Limit für die Beschreibung), mit Installationsskripten, die eines Tages 404 liefern, und mit mindestens einer Registry (npm, mit seiner Staged-Publishing-2FA von 2026), die CI-Automatisierung *by design* verweigert. Zielen Sie auf ehrliche Hybrid-Automatisierung, nicht auf die Vollautomatik-Fantasie.
+- Crawler sagen Ihnen wörtlich, welche Discovery-Dateien sie wollen: Wir zählten ~420 monatliche 404s auf `/.well-known/mcp.json`, `/agents.txt` und Co., bevor wir sie auslieferten. Ihre 404s sind Ihre Roadmap.
+
+## Was wir immer noch nicht sehen (der ehrliche Teil)
+
+Zwei bekannte, noch offene Lücken:
+
+1. **Tool-Fehler reisen in HTTP 200.** JSON-RPC-Fehler und Quota-Verweigerungen auf dem MCP-Transport sind auf HTTP-Ebene Erfolge. Unser Request-Log kann einen Agenten, der drei Tage an der Quota-Wand hängt, noch nicht von einem zufriedenen unterscheiden. Der Fix (JSON-RPC-Ausgang und Tool-Name pro Aufruf loggen) ist umrissen, aber nicht ausgeliefert.
+2. **Identität pro Agent ist dünn.** IP plus User-Agent ist ein schwacher Schlüssel für MCP-Traffic, und Tages-Limits pro IP sind über Forwarded-Header spoofbar, wenn man den falschen Hop liest (auch das haben wir einmal falsch gemacht — den *letzten* vertrauenswürdigen Hop lesen, nicht den ersten).
+
+## Die Checkliste
+
+Wenn Sie einen MCP-Server in Produktion betreiben — oder es vorhaben:
+
+1. Traffic vom ersten Tag an nach Kanal klassifizieren (`mcp_stdio` / `mcp_http` / api / bot).
+2. Den echten Ausgangsstatus pro Pfad loggen, inklusive dessen, was SDK und Proxy in Ihrem Namen ausgeben.
+3. Jedes degradierte Ergebnis *sagen lassen*, dass es degradiert ist, und warum. „Anonymous mode“ darf nie einen authentifizierten Nutzer beschreiben.
+4. Den Ablehnungsgrund in den Ablehnungs-Body schreiben — maschinenlesbar, mit jedem Freischaltweg.
+5. Auth/Paywall pro Transport auditieren. Neuer Transport = neues Audit.
+6. Die eigenen Endpoints kalt anfragen: leerer Body, keine Credentials, fehlender Accept-Header.
+7. Umsatz gegen die Wahrheitsquelle abgleichen (bei uns: on-chain), nicht gegen eigene Zähler.
+8. Registry-Scanner als vollwertige Nutzer behandeln: Output-Schemas überall, native Abhängigkeiten lazy, sinnvolle anonyme Antworten.
+
+Einen MCP-Server zu betreiben heißt vor allem, eine API zu betreiben, deren aktivste Nutzer Roboter sind, die Sie bewerten — und deren echte Nutzer still scheitern, solange nicht jede Ablehnung zum Sprechen gebracht wird. Drei Monate später ist MCP für uns ein kleiner, aber realer Kanal — und der einzige, auf dem uns ein Kunde je gesagt hat: „Mein Coding-Agent hat euch empfohlen.“ Dieser Satz ist der Grund, warum sich die Jagd auf die stillen Ausfälle gelohnt hat.
