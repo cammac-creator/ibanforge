@@ -114,8 +114,12 @@ export default async function CustomersPage() {
 
     const company = enrichEmail(row.email);
     const isPaid = row.credits_total != null;
-    const messages = threadsByEmail.get(row.email.toLowerCase()) ?? [];
-    const meaningful = isPaid || row.used_all_time > 0 || messages.length > 0;
+    // Drafts live in the same table but are NOT correspondence: they must not
+    // drive status/unread/relance logic — they only render as a review card.
+    const thread = threadsByEmail.get(row.email.toLowerCase()) ?? [];
+    const messages = thread.filter((m) => m.direction !== 'draft');
+    const draft = thread.filter((m) => m.direction === 'draft').at(-1) ?? null;
+    const meaningful = isPaid || row.used_all_time > 0 || thread.length > 0;
     if (!meaningful) continue;
 
     const limit = row.monthly_limit ?? 200;
@@ -207,6 +211,7 @@ export default async function CustomersPage() {
       subject,
       brief,
       messages,
+      draft,
       series: row.series ?? [],
       months: data.months ?? [],
       days: activityByKey[row.key_prefix]?.days ?? [],

@@ -175,4 +175,60 @@ describe('email-messages upsert → prospect status auto-flip', () => {
     });
     expect(await readStatus(app)).toBe('rejete');
   });
+
+  it('a CRM draft does NOT flip the preparation status (a draft is not correspondence)', async () => {
+    const app = makeApp();
+    await seedProspect(app, 'a_mailer');
+    const res = await app.request('/v1/admin/email-messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Secret': SECRET },
+      body: JSON.stringify({
+        messages: [{ id: `m-draft-${RUN_ID}`, customer_email: email, direction: 'draft', subject: 'Brouillon', msg_date: '2026-07-02T11:00', body: 'draft body' }],
+      }),
+    });
+    expect(res.status).toBe(200);
+    expect(await readStatus(app)).toBe('a_mailer');
+  });
+});
+
+describe('email-messages delete — drafts only', () => {
+  it('deletes a draft, refuses to delete sent history', async () => {
+    const app = makeApp();
+    const mail = `draft-del-${RUN_ID}@example.com`;
+    await app.request('/v1/admin/email-messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Secret': SECRET },
+      body: JSON.stringify({
+        messages: [
+          { id: `del-draft-${RUN_ID}`, customer_email: mail, direction: 'draft', subject: 'Brouillon', msg_date: '2026-07-02T12:00' },
+          { id: `del-out-${RUN_ID}`, customer_email: mail, direction: 'out', subject: 'Envoyé', msg_date: '2026-07-02T12:01' },
+        ],
+      }),
+    });
+
+    const delDraft = await app.request('/v1/admin/email-messages/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Secret': SECRET },
+      body: JSON.stringify({ id: `del-draft-${RUN_ID}` }),
+    });
+    expect(delDraft.status).toBe(200);
+    expect(((await delDraft.json()) as { deleted: number }).deleted).toBe(1);
+
+    const delOut = await app.request('/v1/admin/email-messages/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Secret': SECRET },
+      body: JSON.stringify({ id: `del-out-${RUN_ID}` }),
+    });
+    expect(((await delOut.json()) as { deleted: number }).deleted).toBe(0);
+  });
+
+  it('rejects without the admin secret', async () => {
+    const app = makeApp();
+    const res = await app.request('/v1/admin/email-messages/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: 'whatever' }),
+    });
+    expect(res.status).toBe(401);
+  });
 });

@@ -75,6 +75,7 @@ export default async function ProspectsPage() {
   // so "contacted / replied" derive exactly like for customers.
   const threadsByEmail = new Map<string, CrmMessage[]>();
   for (const m of messageRows) {
+    if (m.direction === 'draft') continue; // CRM drafts are not correspondence (reviewed in the Clients tab)
     const key = m.customer_email.toLowerCase();
     const arr = threadsByEmail.get(key);
     if (arr) arr.push(m);

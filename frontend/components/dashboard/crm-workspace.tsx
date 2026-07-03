@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation';
 import { UsageChart } from './usage-chart';
 
 export interface CrmMessage {
-  direction: 'in' | 'out';
+  id?: string;
+  direction: 'in' | 'out' | 'draft';
   msg_date: string | null;
   subject: string | null;
   snippet: string | null;
@@ -36,6 +37,8 @@ export interface CrmClient {
   subject: string;
   brief: string;
   messages: CrmMessage[];
+  /** CRM-native draft awaiting review (one per client) — shown in the thread with send/edit/delete. */
+  draft: CrmMessage | null;
   series: number[];
   months: string[];
   days: Array<{ day: string; count: number }>;
@@ -308,6 +311,7 @@ function Timeline({ client: c }: { client: CrmClient }) {
         {c.messages.map((m, i) => (
           <TimelineMessage key={i} m={m} />
         ))}
+        {c.draft && <DraftCard client={c} draft={c.draft} />}
         {totalCalls > 0 && (
           <div className="relative">
             <span className="absolute -left-[21px] top-1 h-2.5 w-2.5 rounded-full border-2 border-zinc-900 bg-violet-500" />
@@ -322,10 +326,167 @@ function Timeline({ client: c }: { client: CrmClient }) {
   );
 }
 
+/**
+ * A CRM-native draft sitting in the thread: review it, adjust it in place,
+ * then send it (the draft row is replaced by the instant 'out' record) or
+ * discard it. One draft per client — saving overwrites.
+ */
+function DraftCard({ client: c, draft }: { client: CrmClient; draft: CrmMessage }) {
+  const router = useRouter();
+  const [editing, setEditing] = useState(false);
+  const [subject, setSubject] = useState(draft.subject ?? '');
+  const [body, setBody] = useState(draft.body ?? draft.snippet ?? '');
+  const [busy, setBusy] = useState<false | 'send' | 'save' | 'del'>(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  const account = draft.counterparty || c.account;
+
+  async function send() {
+    setBusy('send');
+    setMsg(null);
+    try {
+      const r = await fetch('/api/crm/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ account, to: c.email, subject, body }),
+      });
+      const d = await r.json();
+      if (!r.ok) setMsg(d.message || d.error || 'Échec envoi');
+      else {
+        if (draft.id) {
+          await fetch('/api/crm/draft-message', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: draft.id }),
+          }).catch(() => {});
+        }
+        setMsg('✅ Envoyé — le brouillon devient un message de la timeline.');
+        router.refresh();
+      }
+    } catch {
+      setMsg('Erreur réseau');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function save() {
+    setBusy('save');
+    setMsg(null);
+    try {
+      const r = await fetch('/api/crm/draft-message', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: c.email, subject, body, account }),
+      });
+      if (!r.ok) setMsg('Échec de l’enregistrement');
+      else {
+        setMsg('💾 Brouillon enregistré.');
+        setEditing(false);
+        router.refresh();
+      }
+    } catch {
+      setMsg('Erreur réseau');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function discard() {
+    if (!draft.id) return;
+    setBusy('del');
+    setMsg(null);
+    try {
+      const r = await fetch('/api/crm/draft-message', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: draft.id }),
+      });
+      if (!r.ok) setMsg('Échec de la suppression');
+      else router.refresh();
+    } catch {
+      setMsg('Erreur réseau');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="relative">
+      <span className="absolute -left-[21px] top-1 h-2.5 w-2.5 rounded-full border-2 border-zinc-900 bg-zinc-500" />
+      <div className="rounded-lg border border-dashed border-amber-500/40 bg-amber-500/5 p-3">
+        <div className="flex flex-wrap items-center gap-2 text-[11px]">
+          <span className="font-semibold text-amber-400">📝 brouillon — en attente de ta relecture</span>
+          <span className="text-zinc-500">{draft.msg_date}</span>
+          <span className="text-zinc-600">· partira de {account}</span>
+        </div>
+        {editing ? (
+          <div className="mt-2 flex flex-col gap-2">
+            <input
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+              className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-xs text-zinc-200 focus:border-amber-500/40 focus:outline-none"
+              placeholder="Objet"
+            />
+            <textarea
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              rows={10}
+              className="w-full rounded-lg border border-zinc-800 bg-zinc-950 p-3 text-xs leading-relaxed text-zinc-200 focus:border-amber-500/40 focus:outline-none"
+            />
+          </div>
+        ) : (
+          <>
+            <p className="mt-1.5 text-xs font-medium text-zinc-200">{subject || '(sans objet)'}</p>
+            <p className="mt-0.5 whitespace-pre-wrap text-[11px] leading-relaxed text-zinc-400">{body}</p>
+          </>
+        )}
+        <div className="mt-2.5 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={send}
+            disabled={busy !== false}
+            className="rounded-lg bg-green-600 px-3 py-1 text-xs font-semibold text-white transition-colors hover:bg-green-500 disabled:opacity-50"
+          >
+            {busy === 'send' ? '… envoi' : '✅ Envoyer'}
+          </button>
+          {editing ? (
+            <button
+              type="button"
+              onClick={save}
+              disabled={busy !== false}
+              className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-xs font-medium text-amber-300 hover:bg-amber-500/20 disabled:opacity-50"
+            >
+              {busy === 'save' ? '… enregistrement' : '💾 Enregistrer'}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setEditing(true)}
+              disabled={busy !== false}
+              className="rounded-lg border border-zinc-700 px-3 py-1 text-xs font-medium text-zinc-300 hover:bg-zinc-800 disabled:opacity-50"
+            >
+              ✏️ Modifier
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={discard}
+            disabled={busy !== false}
+            className="rounded-lg px-3 py-1 text-xs text-zinc-500 hover:text-red-400 disabled:opacity-50"
+          >
+            {busy === 'del' ? '…' : '🗑 Supprimer'}
+          </button>
+          {msg && <span className="text-[11px] text-zinc-300">{msg}</span>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Composer({ client: c }: { client: CrmClient }) {
   const router = useRouter();
   const [gen, setGen] = useState<GenResult | null>(null);
-  const [busy, setBusy] = useState<false | 'gen' | 'send'>(false);
+  const [busy, setBusy] = useState<false | 'gen' | 'send' | 'draft'>(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [editable, setEditable] = useState('');
 
@@ -343,6 +504,29 @@ function Composer({ client: c }: { client: CrmClient }) {
       else {
         setGen(d as GenResult);
         setEditable(d.email_en);
+      }
+    } catch {
+      setMsg('Erreur réseau');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function keepAsDraft() {
+    if (!gen) return;
+    setBusy('draft');
+    setMsg(null);
+    try {
+      const r = await fetch('/api/crm/draft-message', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: c.email, subject: gen.subject, body: editable, account: gen.account }),
+      });
+      if (!r.ok) setMsg('Échec de l’enregistrement du brouillon');
+      else {
+        setMsg('💾 Gardé en brouillon — il t’attend dans la timeline.');
+        setGen(null);
+        router.refresh();
       }
     } catch {
       setMsg('Erreur réseau');
@@ -422,10 +606,19 @@ function Composer({ client: c }: { client: CrmClient }) {
             <button
               type="button"
               onClick={send}
-              disabled={busy === 'send'}
+              disabled={busy !== false}
               className="rounded-lg bg-green-600 px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-green-500 disabled:opacity-50"
             >
               {busy === 'send' ? '… envoi' : '✅ Envoyer maintenant'}
+            </button>
+            <button
+              type="button"
+              onClick={keepAsDraft}
+              disabled={busy !== false}
+              className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-sm font-medium text-amber-300 transition-colors hover:bg-amber-500/20 disabled:opacity-50"
+              title="Enregistre ce mail dans la timeline du client, sans l'envoyer — tu le relis et l'envoies plus tard"
+            >
+              {busy === 'draft' ? '… enregistrement' : '💾 Garder en brouillon'}
             </button>
             <span className="text-[11px] text-zinc-500">à {c.email}</span>
             {msg && <span className="text-[11px] text-zinc-300">{msg}</span>}

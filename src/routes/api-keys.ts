@@ -469,7 +469,10 @@ apiKeys.post('/v1/admin/email-messages', async (c) => {
     for (const r of rows) {
       if (!r || typeof r.id !== 'string' || typeof r.customer_email !== 'string' || !r.customer_email.includes('@')) continue;
       const email = r.customer_email.trim().toLowerCase();
-      const direction = r.direction === 'out' ? 'out' : 'in';
+      // 'draft' = a CRM-native draft awaiting review in the dashboard. It lives
+      // in the same table so the thread UI can show it in place, but it must
+      // never count as real correspondence (no prospect status flip below).
+      const direction = r.direction === 'out' ? 'out' : r.direction === 'draft' ? 'draft' : 'in';
       upsert.run({
         id: r.id.slice(0, 200),
         customer_email: email,
@@ -503,6 +506,30 @@ apiKeys.get('/v1/admin/email-messages', (c) => {
     )
     .all();
   return c.json({ messages: rows });
+});
+
+/**
+ * Delete a CRM draft — and ONLY a draft. Sent/received history is immutable
+ * through this endpoint by design: the WHERE clause refuses anything whose
+ * direction isn't 'draft'. Used by the dashboard when a draft is sent (the
+ * instant recordSent 'out' row replaces it) or discarded.
+ */
+apiKeys.post('/v1/admin/email-messages/delete', async (c) => {
+  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
+  let body: { id?: unknown };
+  try {
+    body = await c.req.json<{ id?: unknown }>();
+  } catch {
+    return c.json({ error: 'invalid_json', message: 'Request body must be valid JSON' }, 400);
+  }
+  if (typeof body.id !== 'string' || !body.id) {
+    return c.json({ error: 'invalid_body', message: 'Expected { id: "…" }' }, 400);
+  }
+  const db = getStatsDB();
+  const res = db.prepare(`DELETE FROM email_messages WHERE id = ? AND direction = 'draft'`).run(body.id);
+  return c.json({ deleted: res.changes });
 });
 
 /**
