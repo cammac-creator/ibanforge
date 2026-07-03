@@ -157,7 +157,19 @@ jobs:
           tar -xzf /tmp/mcp-publisher.tgz -C /tmp mcp-publisher
           chmod +x /tmp/mcp-publisher
           /tmp/mcp-publisher login github-oidc
-          /tmp/mcp-publisher publish
+          # Idempotent: re-running this workflow for an already-published version
+          # (the documented "npm first, then re-run" flow, or two concurrent
+          # dispatches) makes the registry reject the duplicate. That is the
+          # desired end state, not a failure — swallow it so the job stays green
+          # and no false "all jobs failed" email goes out.
+          OUT=$(/tmp/mcp-publisher publish 2>&1) || true
+          echo "$OUT"
+          if echo "$OUT" | grep -qi "duplicate version"; then
+            echo "::notice::MCP Registry already has this version — nothing to do."
+          elif echo "$OUT" | grep -qi "error"; then
+            echo "::error::MCP Registry publish failed."
+            exit 1
+          fi
 
       # ─── Manual-refresh checklist for platforms without an API ──────────
       - name: Generate manual-refresh checklist
