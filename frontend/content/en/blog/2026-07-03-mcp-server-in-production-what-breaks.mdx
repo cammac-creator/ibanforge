@@ -1,0 +1,92 @@
+---
+title: "Running an MCP server in production: what actually breaks"
+description: "Three months of operating a public MCP server — silent failures, auth walls, ghost traffic, registry quirks — and the fixes, with real numbers."
+date: "2026-07-03"
+faq:
+  - q: "Why do MCP requests fail silently in production?"
+    a: "Because errors hide at layers your application never logs: the MCP SDK can reject connections itself (e.g. HTTP 406 for a missing Accept header), tool errors travel inside HTTP 200 JSON-RPC envelopes, and paywall or quota refusals often degrade a result instead of failing it. You have to log the real egress status per path and label degraded results explicitly."
+  - q: "How do you monetize an MCP server?"
+    a: "Treat every 'payment required' response as an on-ramp, not a dead end: our 402 body lists all unlock paths (free API key, prepaid credit packs, pay-per-call x402) machine-readably, and an exhausted quota falls through to pay-per-call instead of returning a dead 429. And audit the paywall per transport — a transport you add later can bypass it entirely."
+  - q: "How do I make an MCP server show up in registries like Smithery or Glama?"
+    a: "Registries score things the spec calls optional: per-tool output schemas, startup in a sandbox without your native dependencies, a useful anonymous response instead of a bare 402. Probe your own endpoints with an empty unauthenticated body and make sure the scanner path works cold."
+---
+
+There is a recurring complaint on Hacker News about MCP servers in production: auth and scopes are painful, APIs explode into dozens of tools to authorize one by one, and — worst of all — requests die silently, returning neither a result nor an error.
+
+We run one. IBANforge has operated a public MCP server since early April 2026 — five tools (IBAN validation, batch, BIC lookup, Swiss clearing, compliance), two transports (a stdio npm package and a Streamable HTTP endpoint), a free tier and a paywall behind it. This post is the field report we wish we had read before shipping: what actually broke, with numbers, and what we changed.
+
+## The numbers first, because they reframe everything
+
+Over one 35-day window we served **100,027 HTTP requests** that contained **208 real business operations** — about six per day. Roughly 99% of the traffic was robots: registry crawlers, x402 scanners, MCP scoring engines, one monitoring bot alone accounting for ~25,000 requests a month probing six endpoints every six minutes.
+
+Real MCP agent traffic (Claude, Cursor, ChatGPT-class clients over stdio) was **464 requests out of 112,521** in 90 days. Real, but small.
+
+If you take one thing from this post: instrument channel attribution *before* you distribute, or you will stare at a big request counter and have no idea whether it's your target market or a crawler. We added a `client_kind` classifier (api / web / bot / mcp_http / mcp_stdio) months too late, and the day it landed, our "traction" turned out to be a scheduled scanner with a flat signature of ~850 paywall hits per day.
+
+## Silent failures are the default, not the exception
+
+The HN complaint — "requests die, neither result nor error" — is real, and in our experience it has a specific anatomy: the failures happen at layers your application code never sees.
+
+**The SDK fails on your behalf.** We found 308 lost MCP connections over 30 days, all rejected with HTTP 406 — emitted by the MCP SDK's transport itself, because the spec requires clients to send `Accept: application/json, text/event-stream`. Not one of those 406s appeared in our application logs; no handler of ours produced them. If you only log what your code returns, you are blind to what your dependencies return. Log the real egress status per path.
+
+**Degraded results masquerade as success.** This one we found in our own code — this morning, during a conversion audit. Our npm package falls back to a free format-only endpoint when the paid call returns 402, so that registry inspectors (which never carry credentials) see a working tool instead of an error. Good idea. But the same fallback fired for *authenticated customers whose free tier had run out* — and labelled the result "Anonymous mode". A paying-intent user with a configured key would see results quietly lose their BIC, SEPA and risk fields, with a note implying they were anonymous. Neither a result (not the full one) nor an error. That is precisely the silent death HN complains about, and we had built it ourselves, with good intentions, one fallback at a time.
+
+The fix shipped today: the API's 402 body now carries an explicit `cause` — `monthly_quota_exhausted`, `credits_exhausted` or `invalid_api_key`, with the numbers:
+
+```json
+{
+  "error": "payment_required",
+  "cause": {
+    "reason": "monthly_quota_exhausted",
+    "detail": "Your free tier is exhausted for 2026-07 (200/200 requests used) — it resets on the 1st of next month. …",
+    "quota": { "used": 200, "limit": 200, "month": "2026-07", "resets": "1st of month" }
+  },
+  "accepts": ["…x402 payment options…"]
+}
+```
+
+and the MCP package now labels those fallbacks `DEGRADED RESULT — basic format validation only. Reason: …` instead of pretending you're anonymous. An invalid key now also announces itself (`X-API-Key-Invalid: true`) instead of being treated as anonymous traffic — a mistyped key was previously indistinguishable from no key at all.
+
+**State you forgot was in memory.** Our HTTP transport keeps MCP sessions in an in-memory map. Every redeploy silently orphans every live session. Clients see their next call fail with an unknown session — or worse, just hang, depending on the client. Persist sessions or at least make the failure loud; we have this on the backlog and say so.
+
+## Auth and scopes: the pain is real, here is what survived contact
+
+MCP has no auth story that everyone agrees on, and most real APIs have one of: API keys, OAuth, or per-call payment. Three things survived three months of production:
+
+**A refusal must be an on-ramp, not a dead end.** We logged 13,100+ paywall hits before understanding this. Our 402 originally advertised two of our three unlock paths and a quota exhaustion returned a dead-end 429. Today: quota exhaustion *falls through* to pay-per-call x402 (the agent can pay $0.005 and continue), and the 402 body lists every path machine-readably — free key signup, prepaid credit packs, per-call payment. The funnel is won or lost at the exact moment you refuse a request.
+
+**Audit the paywall per transport, not per function.** For weeks, our Streamable HTTP transport called the same five tools *without* passing through the payment middleware. Any agent could consume everything free — while the stats layer recorded phantom "revenue" that never existed on-chain. Every transport is a separate door to the same functions; a transport added later will bypass a paywall that lives in one middleware. We now cap the HTTP transport at 50 tool calls/day/IP and reconcile revenue against the chain, not against our own counters (0.324 USDC "attempted" vs 0.098 actually settled taught us that lesson).
+
+**Scanners have no credentials, and they are your storefront.** Registry inspectors call your tools cold. If the answer is a bare 402, your listing shows a red error to every human evaluating you. Our fallback returns real (basic) validation anonymously with an honest upgrade note — that is also exactly the path that needed the `cause` fix above so it never lies to paying users.
+
+## Registries will shape your code more than the spec does
+
+Nothing in the MCP spec says a tool needs an output schema. Then Smithery scores you 90/100 with "Output schemas: 0/5", and the score is public. We learned that:
+
+- Each platform reads schemas at a **specific path with specific semantics** (example values vs JSON Schema, wrapped vs bare) — the working recipe for one catalog came from a Discord channel, not documentation.
+- Inspection sandboxes run your server **without your native dependencies**. Our better-sqlite3 import crashed Glama's sandbox before the tools could even register; every native import is now lazy. A server that doesn't start cold never gets indexed.
+- Empty-body probes are normal: catalogs POST `{}` to extract your 402 payment envelope. If body validation runs before the paywall middleware, the probe gets a 400 and you get delisted as `non_402_response`.
+- Expect hard field limits (a 100-character description cap), install scripts that 404 one day, and at least one registry (npm, with its 2026 staged-publishing 2FA) that refuses CI automation *by design*. Aim for honest hybrid automation, not the fully-automated fantasy.
+- Crawlers literally tell you which discovery files they want: we counted ~420 monthly 404s on `/.well-known/mcp.json`, `/agents.txt` and friends before serving them. Their 404s are your roadmap.
+
+## What we still can't see (the honest part)
+
+Two gaps we know about and haven't closed:
+
+1. **Tool-level failures ride inside HTTP 200.** JSON-RPC errors and quota refusals on the MCP transport are, at the HTTP layer, successes. Our request log can't yet distinguish an agent blocked at the quota wall for three days from a happy one. The fix (log the JSON-RPC outcome and tool name per call) is scoped but not shipped.
+2. **Per-agent identity is thin.** IP plus user-agent is a weak key for MCP traffic, and per-IP daily caps are spoofable via forwarded headers if you read the wrong hop (we got this wrong once too — read the *last* trusted hop, not the first).
+
+## The checklist
+
+If you operate — or are about to operate — an MCP server in production:
+
+1. Classify traffic by channel (`mcp_stdio` / `mcp_http` / api / bot) from day one.
+2. Log the real egress status per path, including what your SDK and proxy emit for you.
+3. Make every degraded result *say* it is degraded, and why. Never let "anonymous mode" describe an authenticated user.
+4. Put the refusal reason in the refusal body — machine-readable, with every unlock path.
+5. Audit auth/paywall per transport. New transport = new audit.
+6. Probe your own endpoints cold: empty body, no credentials, missing Accept header.
+7. Reconcile revenue against the source of truth (for us: on-chain), not your own counters.
+8. Treat registry scanners as first-class users: output schemas everywhere, lazy native deps, sane anonymous responses.
+
+Operating an MCP server is mostly operating an API whose most active users are robots evaluating you, and whose real users fail silently unless you design every refusal to speak. Three months in, MCP is a small but real channel for us — and the only channel where a customer has ever told us "my coding agent recommended you". That sentence is why the silent failures were worth hunting.

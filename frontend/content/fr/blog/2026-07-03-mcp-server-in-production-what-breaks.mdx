@@ -1,0 +1,92 @@
+---
+title: "Faire tourner un serveur MCP en production : ce qui casse vraiment"
+description: "Trois mois d'exploitation d'un serveur MCP public — échecs silencieux, murs d'auth, trafic fantôme, caprices des registres — et les correctifs, chiffres réels à l'appui."
+date: "2026-07-03"
+faq:
+  - q: "Pourquoi des requêtes MCP échouent-elles silencieusement en production ?"
+    a: "Parce que les erreurs se cachent à des couches que votre application ne logge jamais : le SDK MCP peut rejeter des connexions lui-même (ex. HTTP 406 pour un en-tête Accept manquant), les erreurs d'outils voyagent dans des enveloppes JSON-RPC en HTTP 200, et les refus de quota ou de paiement dégradent souvent un résultat au lieu de le faire échouer. Il faut logger le statut de sortie réel par chemin et étiqueter explicitement les résultats dégradés."
+  - q: "Comment monétiser un serveur MCP ?"
+    a: "Traitez chaque réponse « paiement requis » comme une rampe d'accès, pas un cul-de-sac : notre body 402 liste toutes les voies de déblocage (clé API gratuite, packs de crédits prépayés, paiement à l'appel x402) de façon machine-lisible, et un quota épuisé bascule vers le paiement à l'appel au lieu de renvoyer un 429 mort. Et auditez le paywall par transport — un transport ajouté après coup peut le contourner entièrement."
+  - q: "Comment faire apparaître un serveur MCP dans les registres comme Smithery ou Glama ?"
+    a: "Les registres notent des choses que la spec dit optionnelles : schémas de sortie par outil, démarrage dans un sandbox sans vos dépendances natives, réponse anonyme utile plutôt qu'un 402 nu. Sondez vos propres endpoints avec un body vide non authentifié et vérifiez que le chemin du scanner fonctionne à froid."
+---
+
+Il y a une plainte récurrente sur Hacker News à propos des serveurs MCP en production : l'auth et les scopes sont pénibles, les API explosent en dizaines d'outils à autoriser un par un, et — pire que tout — des requêtes meurent silencieusement, sans résultat ni erreur.
+
+Nous en exploitons un. IBANforge opère un serveur MCP public depuis début avril 2026 — cinq outils (validation IBAN, batch, lookup BIC, clearing suisse, compliance), deux transports (un package npm stdio et un endpoint Streamable HTTP), un tier gratuit et un paywall derrière. Ce billet est le retour d'expérience que nous aurions aimé lire avant de livrer : ce qui a réellement cassé, chiffres à l'appui, et ce que nous avons changé.
+
+## Les chiffres d'abord, parce qu'ils recadrent tout
+
+Sur une fenêtre de 35 jours, nous avons servi **100 027 requêtes HTTP** contenant **208 opérations métier réelles** — environ six par jour. À peu près 99 % du trafic était des robots : crawlers de registres, scanners x402, moteurs de scoring MCP, un seul bot de monitoring pesant ~25 000 requêtes par mois à sonder six endpoints toutes les six minutes.
+
+Le vrai trafic d'agents MCP (clients de type Claude, Cursor, ChatGPT en stdio) : **464 requêtes sur 112 521** en 90 jours. Réel, mais petit.
+
+Si vous ne retenez qu'une chose de ce billet : instrumentez l'attribution par canal *avant* de distribuer, sinon vous contemplerez un gros compteur de requêtes sans savoir si c'est votre marché-cible ou un crawler. Nous avons ajouté un classifieur `client_kind` (api / web / bot / mcp_http / mcp_stdio) des mois trop tard — et le jour de sa mise en service, notre « traction » s'est révélée être un scanner planifié à la signature plate de ~850 hits paywall par jour.
+
+## L'échec silencieux est le défaut, pas l'exception
+
+La plainte HN — « des requêtes meurent, ni résultat ni erreur » — est réelle, et d'après notre expérience elle a une anatomie précise : les échecs se produisent à des couches que votre code applicatif ne voit jamais.
+
+**Le SDK échoue à votre place.** Nous avons trouvé 308 connexions MCP perdues sur 30 jours, toutes rejetées en HTTP 406 — émis par le transport du SDK MCP lui-même, parce que la spec impose aux clients l'en-tête `Accept: application/json, text/event-stream`. Pas un seul de ces 406 n'apparaissait dans nos logs applicatifs ; aucun de nos handlers ne les produisait. Si vous ne loggez que ce que votre code renvoie, vous êtes aveugle à ce que vos dépendances renvoient. Loggez le statut de sortie réel par chemin.
+
+**Les résultats dégradés se déguisent en succès.** Celui-là, nous l'avons trouvé dans notre propre code — ce matin, pendant un audit conversion. Notre package npm bascule vers un endpoint gratuit format-seul quand l'appel payant renvoie 402, pour que les inspecteurs de registres (qui ne portent jamais de credentials) voient un outil qui marche plutôt qu'une erreur. Bonne idée. Mais le même fallback se déclenchait pour *des clients authentifiés dont le tier gratuit était épuisé* — en étiquetant le résultat « Anonymous mode ». Un utilisateur avec une clé configurée voyait ses résultats perdre silencieusement les champs BIC, SEPA et risque, avec une note laissant entendre qu'il était anonyme. Ni un résultat (pas le complet) ni une erreur. C'est très exactement la mort silencieuse dont HN se plaint — et nous l'avions construite nous-mêmes, avec de bonnes intentions, un fallback à la fois.
+
+Le correctif est parti aujourd'hui : le body 402 de l'API porte désormais une `cause` explicite — `monthly_quota_exhausted`, `credits_exhausted` ou `invalid_api_key`, avec les chiffres :
+
+```json
+{
+  "error": "payment_required",
+  "cause": {
+    "reason": "monthly_quota_exhausted",
+    "detail": "Your free tier is exhausted for 2026-07 (200/200 requests used) — it resets on the 1st of next month. …",
+    "quota": { "used": 200, "limit": 200, "month": "2026-07", "resets": "1st of month" }
+  },
+  "accepts": ["…options de paiement x402…"]
+}
+```
+
+et le package MCP étiquette désormais ces fallbacks `DEGRADED RESULT — basic format validation only. Reason: …` au lieu de prétendre que vous êtes anonyme. Une clé invalide s'annonce aussi (`X-API-Key-Invalid: true`) au lieu d'être traitée comme du trafic anonyme — une clé avec une faute de frappe était jusqu'ici indiscernable de l'absence de clé.
+
+**L'état que vous aviez oublié en mémoire.** Notre transport HTTP garde les sessions MCP dans une map en mémoire. Chaque redéploiement orphelinise silencieusement toutes les sessions vivantes. Le client voit son appel suivant échouer sur une session inconnue — ou pire, pendre, selon le client. Persistez les sessions ou rendez au moins l'échec bruyant ; c'est dans notre backlog et nous le disons.
+
+## Auth et scopes : la douleur est réelle, voici ce qui a survécu au contact
+
+MCP n'a pas d'histoire d'auth qui fasse consensus, et la plupart des vraies API ont l'une de : clés API, OAuth, ou paiement à l'appel. Trois choses ont survécu à trois mois de production :
+
+**Un refus doit être une rampe d'accès, pas un cul-de-sac.** Nous avons loggé plus de 13 100 hits paywall avant de comprendre ça. Notre 402 n'annonçait au départ que deux de nos trois voies de déblocage, et un quota épuisé renvoyait un 429 sans issue. Aujourd'hui : le quota épuisé *bascule* vers le paiement à l'appel x402 (l'agent peut payer 0,005 $ et continuer), et le body 402 liste chaque voie de façon machine-lisible — inscription clé gratuite, packs de crédits prépayés, paiement à l'appel. Le funnel se gagne ou se perd à l'instant précis où vous refusez une requête.
+
+**Auditez le paywall par transport, pas par fonction.** Pendant des semaines, notre transport Streamable HTTP a appelé les cinq mêmes outils *sans* passer par le middleware de paiement. N'importe quel agent pouvait tout consommer gratuitement — pendant que la couche stats enregistrait un « revenu » fantôme qui n'a jamais existé on-chain. Chaque transport est une porte distincte vers les mêmes fonctions ; un transport ajouté plus tard contournera un paywall qui vit dans un seul middleware. Nous plafonnons désormais le transport HTTP à 50 appels d'outils/jour/IP et réconcilions le revenu contre la chaîne, pas contre nos propres compteurs (0,324 USDC « tenté » contre 0,098 réellement réglé — la leçon est apprise).
+
+**Les scanners n'ont pas de credentials, et ils sont votre vitrine.** Les inspecteurs de registres appellent vos outils à froid. Si la réponse est un 402 nu, votre listing affiche une erreur rouge à chaque humain qui vous évalue. Notre fallback renvoie une vraie validation (basique) en anonyme avec une note d'upgrade honnête — c'est aussi exactement le chemin qui avait besoin du correctif `cause` ci-dessus pour ne plus jamais mentir aux utilisateurs payants.
+
+## Les registres façonneront votre code plus que la spec
+
+Rien dans la spec MCP ne dit qu'un outil a besoin d'un schéma de sortie. Puis Smithery vous note 90/100 avec « Output schemas : 0/5 », et le score est public. Nous avons appris que :
+
+- Chaque plateforme lit les schémas à un **chemin précis avec une sémantique précise** (valeurs d'exemple vs JSON Schema, wrappé vs nu) — la recette qui marche pour un catalogue venait d'un salon Discord, pas de la documentation.
+- Les sandbox d'inspection exécutent votre serveur **sans vos dépendances natives**. Notre import better-sqlite3 faisait crasher le sandbox de Glama avant même l'enregistrement des outils ; chaque import natif est désormais paresseux. Un serveur qui ne démarre pas à froid ne sera jamais indexé.
+- Les sondes à body vide sont normales : les catalogues POSTent `{}` pour extraire votre enveloppe de paiement 402. Si la validation du body tourne avant le middleware paywall, la sonde reçoit un 400 et vous êtes délisté en `non_402_response`.
+- Attendez-vous à des limites de champ dures (un plafond de 100 caractères sur la description), à des scripts d'installation qui 404 un beau jour, et à au moins un registre (npm, avec sa 2FA staged-publishing de 2026) qui refuse l'automatisation CI *par principe*. Visez l'hybride auto/manuel honnête, pas le fantasme du tout-automatique.
+- Les crawlers vous disent littéralement quels fichiers de découverte ils veulent : nous avons compté ~420 404 mensuels sur `/.well-known/mcp.json`, `/agents.txt` et consorts avant de les servir. Leurs 404 sont votre roadmap.
+
+## Ce que nous ne voyons toujours pas (la partie honnête)
+
+Deux trous que nous connaissons et n'avons pas refermés :
+
+1. **Les échecs au niveau outil voyagent dans du HTTP 200.** Les erreurs JSON-RPC et les refus de quota sur le transport MCP sont, à la couche HTTP, des succès. Notre request log ne sait pas encore distinguer un agent bloqué au mur de quota depuis trois jours d'un agent satisfait. Le correctif (logger l'issue JSON-RPC et le nom de l'outil par appel) est cadré mais pas livré.
+2. **L'identité par agent est mince.** IP plus user-agent est une clé faible pour du trafic MCP, et les plafonds quotidiens par IP sont spoofables via les en-têtes forwarded si vous lisez le mauvais hop (nous nous sommes trompés là-dessus aussi — lisez le *dernier* hop de confiance, pas le premier).
+
+## La checklist
+
+Si vous exploitez — ou allez exploiter — un serveur MCP en production :
+
+1. Classifiez le trafic par canal (`mcp_stdio` / `mcp_http` / api / bot) dès le premier jour.
+2. Loggez le statut de sortie réel par chemin, y compris ce que votre SDK et votre proxy émettent à votre place.
+3. Faites *dire* à chaque résultat dégradé qu'il est dégradé, et pourquoi. Ne laissez jamais « mode anonyme » décrire un utilisateur authentifié.
+4. Mettez la raison du refus dans le corps du refus — machine-lisible, avec chaque voie de déblocage.
+5. Auditez l'auth/le paywall par transport. Nouveau transport = nouvel audit.
+6. Sondez vos propres endpoints à froid : body vide, sans credentials, en-tête Accept manquant.
+7. Réconciliez le revenu contre la source de vérité (pour nous : on-chain), pas contre vos propres compteurs.
+8. Traitez les scanners de registres comme des utilisateurs de premier rang : schémas de sortie partout, dépendances natives paresseuses, réponses anonymes sensées.
+
+Exploiter un serveur MCP, c'est surtout exploiter une API dont les utilisateurs les plus actifs sont des robots qui vous évaluent, et dont les vrais utilisateurs échouent en silence tant que vous ne concevez pas chaque refus pour qu'il parle. Trois mois plus tard, MCP est pour nous un canal petit mais réel — et le seul canal où un client nous a déjà dit « mon agent de code vous a recommandé ». Cette phrase est la raison pour laquelle la chasse aux échecs silencieux en valait la peine.
