@@ -53,7 +53,7 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
         </p>
 
         <div className="flex flex-col sm:flex-row gap-3 mt-2">
-          <GetKeyButton className="bg-amber-500 hover:bg-amber-400 text-zinc-950 font-semibold px-6">
+          <GetKeyButton variant="amber" className="px-6">
             {t('hero.cta.getKey')}
           </GetKeyButton>
           <Button
@@ -147,7 +147,7 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
           {t('cta.description')}
         </p>
         <div className="flex flex-col sm:flex-row gap-3 mt-2">
-          <GetKeyButton className="bg-amber-500 hover:bg-amber-400 text-zinc-950 font-semibold px-8">
+          <GetKeyButton variant="amber" className="px-8">
             {t('cta.getKeyButton')}
           </GetKeyButton>
           <Button
