@@ -108,10 +108,10 @@
   --ink-4: #27272A;
   --ink-5: #3F3F46;
 
-  --fg-1: #FAFAFA;
+  --fg-1: #F5F3EF; /* warm white — titles (was #FAFAFA, less clinical) */
   --fg-2: #D4D4D8;
   --fg-3: #A1A1AA;
-  --fg-4: #71717A;
+  --fg-4: #82828C; /* lightened from #71717A → ~4.7:1 WCAG AA on ink surfaces */
   --fg-5: #52525B;
 
   --amber-50:  #FFFBEB;
@@ -158,6 +158,22 @@
   --glow-amber: 0 0 0 1px rgba(245, 158, 11, 0.40), 0 0 24px -4px rgba(245, 158, 11, 0.35);
   --focus-ring: 0 0 0 2px var(--ink-0), 0 0 0 4px var(--amber-500);
 
+  /* Motion — sober by design. Short durations, gentle easings.
+     "On ne voit pas le mouvement, on sent la qualité." */
+  --ease-out: cubic-bezier(.2, .7, .2, 1);
+  --ease-std: cubic-bezier(.4, 0, .2, 1);
+  --dur-1: 120ms;
+  --dur-2: 200ms;
+  --dur-3: 320ms;
+  --dur-4: 600ms;
+
+  /* Cold steel / slate ramp — desaturated. Secondary links, info, active borders. */
+  --steel-300: #CBD5E1;
+  --steel-400: #94A3B8;
+  --steel-500: #64748B;
+  --steel-700: #334155;
+  --steel-soft: rgba(148, 163, 184, 0.12); /* steel-400 @ 12% — subtle fills/hairlines */
+
   /* Section rhythm — single source of truth, see audit Phase 0 reco. */
   --section-py: 6rem;
 }
@@ -201,6 +217,27 @@
   font-family: var(--font-mono);
 }
 
+/* Shared card surface — rest shadow + sober hover elevation.
+   Groundwork toward one card style (features / endpoints / pricing).
+   Pair with Tailwind `rounded-* border p-*`; this owns bg, border-color,
+   shadow and the transition (replaces the inert `transition-colors`). */
+.card-surface {
+  background: var(--ink-1);
+  border-color: var(--ink-4);
+  box-shadow: var(--shadow-sm);
+  transition:
+    transform var(--dur-2) var(--ease-std),
+    box-shadow var(--dur-2) var(--ease-std),
+    border-color var(--dur-2) var(--ease-std);
+}
+@media (hover: hover) {
+  .card-surface:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+    border-color: rgba(245, 158, 11, 0.30); /* amber edge — sober but legible */
+  }
+}
+
 /* ──────────────────────────────────────────────────────────────────────────
    Animations from version A
    ────────────────────────────────────────────────────────────────────────── */
@@ -222,21 +259,21 @@
 /* Dark mode — default theme */
 .dark {
   --background: oklch(0.118 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.165 0 0);
+  --foreground: var(--fg-1); /* warm white #F5F3EF — converges titles/body with maison fg-1 (was oklch(0.985)) */
+  --card: var(--ink-3); /* converge to maison ink ramp — ~identical to oklch(0.165), keeps card elevation above --background */
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.165 0 0);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.769 0.188 70.08);
+  --primary: var(--amber-500); /* single amber source of truth (== oklch(0.769 0.188 70.08)) */
   --primary-foreground: oklch(0.118 0 0);
   --secondary: oklch(0.22 0 0);
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.22 0 0);
-  --muted-foreground: oklch(0.65 0 0);
+  --muted-foreground: var(--fg-3); /* converge secondary text to maison fg-3 (#A1A1AA, ~7:1 AA) */
   --accent: oklch(0.769 0.188 70.08);
   --accent-foreground: oklch(0.118 0 0);
   --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 8%);
+  --border: oklch(1 0 0 / 8%); /* ≈ maison --hairline (rgba(255,255,255,.06)); kept at 8% so docs table row-lines stay legible. Full merge → Phase 3. */
   --input: oklch(1 0 0 / 12%);
   --ring: oklch(0.769 0.188 70.08);
   --chart-1: oklch(0.769 0.188 70.08);

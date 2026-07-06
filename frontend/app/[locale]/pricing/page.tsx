@@ -98,7 +98,7 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
         </p>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* x402 */}
-          <div className="rounded-xl border border-border bg-zinc-900/50 p-6 flex flex-col gap-3">
+          <div className="card-surface rounded-xl border p-6 flex flex-col gap-3">
             <span className="font-mono text-xs uppercase tracking-widest text-amber-500">
               {t('rails.x402.tag')}
             </span>
@@ -126,7 +126,7 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
             </GetKeyButton>
           </div>
           {/* Credit packs — buyable via Stripe (live card checkout) */}
-          <div className="rounded-xl border border-border bg-zinc-900/50 p-6 flex flex-col gap-3">
+          <div className="card-surface rounded-xl border p-6 flex flex-col gap-3">
             <span className="font-mono text-xs uppercase tracking-widest text-amber-500">
               {t('rails.packs.tag')}
             </span>
@@ -164,7 +164,7 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
           {ENDPOINTS.map((ep) => (
             <div
               key={ep.path}
-              className="rounded-xl border border-border bg-zinc-900/50 p-6 flex flex-col gap-4"
+              className="card-surface rounded-xl border p-6 flex flex-col gap-4"
             >
               <div className="flex items-center gap-2">
                 <span className="font-mono text-xs font-semibold text-amber-500 bg-amber-500/10 border border-amber-500/20 rounded px-1.5 py-0.5">
