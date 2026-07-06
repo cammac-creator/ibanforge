@@ -239,6 +239,45 @@
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
+   Sober scroll-reveal primitive (see components/reveal.tsx).
+   PE-safe: the hidden start state is gated behind the `.js` class set by the
+   head script in [locale]/layout.tsx — content stays visible when JS is off.
+   ────────────────────────────────────────────────────────────────────────── */
+.reveal {
+  transition:
+    opacity var(--dur-4) var(--ease-out),
+    transform var(--dur-4) var(--ease-out);
+}
+.js .reveal {
+  opacity: 0;
+  transform: translateY(12px);
+}
+.reveal.is-in {
+  opacity: 1;
+  transform: none;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Global reduced-motion guard — extracted from the famille motion language.
+   Neutralizes animations, transitions and reveals for users who ask for it.
+   ────────────────────────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .reveal,
+  .js .reveal {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
    Animations from version A
    ────────────────────────────────────────────────────────────────────────── */
 @keyframes pulse-live {

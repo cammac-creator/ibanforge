@@ -103,6 +103,13 @@ export default async function LocaleLayout({ children, params }: Props) {
     >
       <head>
         <JsonLd />
+        {/* PE-safe motion: mark that JS is available before first paint so the
+            Reveal hidden state only applies with JS on (see globals.css .js). */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: "document.documentElement.classList.add('js')",
+          }}
+        />
       </head>
       <body className="min-h-full flex flex-col antialiased">
         <ThemeProvider

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { EndpointRow } from "@/components/ui/endpoint-row"
 import { GetKeyButton } from "@/components/api-key-dialog"
+import { Reveal } from "@/components/reveal"
 
 // Metadata is generated per-locale by app/[locale]/layout.tsx — do NOT define
 // a static `metadata` here, it would override the locale-aware version with
@@ -73,9 +74,10 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
         </h2>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6 lg:gap-8">
-          {FEATURES.map((feature) => (
-            <div
+          {FEATURES.map((feature, i) => (
+            <Reveal
               key={feature.badge}
+              delay={i * 60}
               className="card-surface rounded-xl border p-7 flex flex-col gap-3"
             >
               <Badge
@@ -88,7 +90,7 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
               <p className="text-sm text-muted-foreground" style={{ lineHeight: 1.65 }}>
                 {feature.description}
               </p>
-            </div>
+            </Reveal>
           ))}
         </div>
       </section>
