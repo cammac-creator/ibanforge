@@ -88,7 +88,7 @@ export default function PlaygroundPage() {
           {/* IBAN Tab */}
           <TabsContent value="iban">
             <form
-              className="flex gap-2"
+              className="flex flex-col sm:flex-row gap-2"
               onSubmit={(e) => {
                 e.preventDefault()
                 handleSubmit("iban", ibanValue)
@@ -106,7 +106,7 @@ export default function PlaygroundPage() {
               <Button
                 type="submit"
                 disabled={loading || !ibanValue.trim()}
-                className="bg-amber-500 hover:bg-amber-400 text-zinc-950 font-semibold min-w-24"
+                className="bg-amber-500 hover:bg-amber-400 text-zinc-950 font-semibold w-full sm:w-auto sm:min-w-24"
               >
                 {loading ? (
                   <Loader2 className="size-4 animate-spin" />
@@ -120,7 +120,7 @@ export default function PlaygroundPage() {
           {/* BIC Tab */}
           <TabsContent value="bic">
             <form
-              className="flex gap-2"
+              className="flex flex-col sm:flex-row gap-2"
               onSubmit={(e) => {
                 e.preventDefault()
                 handleSubmit("bic", bicValue)
@@ -138,7 +138,7 @@ export default function PlaygroundPage() {
               <Button
                 type="submit"
                 disabled={loading || !bicValue.trim()}
-                className="bg-amber-500 hover:bg-amber-400 text-zinc-950 font-semibold min-w-24"
+                className="bg-amber-500 hover:bg-amber-400 text-zinc-950 font-semibold w-full sm:w-auto sm:min-w-24"
               >
                 {loading ? (
                   <Loader2 className="size-4 animate-spin" />

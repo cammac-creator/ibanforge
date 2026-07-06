@@ -209,6 +209,8 @@
       "playgroundLink": "Im Playground testen →"
     },
     "calculator": {
+      "heading": "Schätzen Sie Ihre monatlichen Kosten",
+      "subtitle": "Zahlen Sie nur für die Aufrufe, die Sie tätigen — ohne Mindestumsatz, ohne Abo.",
       "callsPerMonth": "Aufrufe pro Monat",
       "callsPerMonthUnit": "Aufrufe / Monat",
       "costBreakdown": "Kostenaufschlüsselung",

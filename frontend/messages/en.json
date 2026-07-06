@@ -209,6 +209,8 @@
       "playgroundLink": "Try in playground →"
     },
     "calculator": {
+      "heading": "Estimate your monthly cost",
+      "subtitle": "Pay only for the calls you make — no minimums, no subscription.",
       "callsPerMonth": "Calls per month",
       "callsPerMonthUnit": "calls / month",
       "costBreakdown": "Cost breakdown",
