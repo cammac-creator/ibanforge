@@ -76,8 +76,7 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
           {FEATURES.map((feature) => (
             <div
               key={feature.badge}
-              className="rounded-xl border p-7 flex flex-col gap-3 transition-colors"
-              style={{ borderColor: 'var(--ink-4)', background: 'var(--ink-1)' }}
+              className="card-surface rounded-xl border p-7 flex flex-col gap-3"
             >
               <Badge
                 variant="outline"
@@ -107,8 +106,7 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
           {ENDPOINTS.map((endpoint) => (
             <div
               key={endpoint.path}
-              className="rounded-lg border px-5 py-4 transition-colors"
-              style={{ borderColor: 'var(--ink-4)', background: 'var(--ink-1)' }}
+              className="card-surface rounded-lg border px-5 py-4"
             >
               <EndpointRow
                 method={endpoint.method as 'GET' | 'POST' | 'PUT' | 'DELETE'}
