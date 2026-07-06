@@ -1,5 +1,5 @@
 import { MDXRemote } from "next-mdx-remote/rsc";
-import { getDoc } from "@/lib/mdx";
+import { getDoc, mdxOptions, mdxComponents } from "@/lib/mdx";
 import { notFound } from "next/navigation";
 
 export const dynamicParams = true;
@@ -34,5 +34,5 @@ export default async function DocPage({
   const { locale, slug } = await params;
   const doc = tryGetDoc(slug, locale);
   if (!doc) notFound();
-  return <MDXRemote source={doc.content} />;
+  return <MDXRemote source={doc.content} options={mdxOptions} components={mdxComponents} />;
 }

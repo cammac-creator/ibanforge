@@ -1,6 +1,47 @@
 import fs from 'fs';
 import path from 'path';
+import { createElement, type ComponentProps } from 'react';
 import matter from 'gray-matter';
+import remarkGfm from 'remark-gfm';
+import rehypePrettyCode, { type Options as RehypePrettyCodeOptions } from 'rehype-pretty-code';
+import type { PluggableList } from 'unified';
+
+/**
+ * Shared MDX pipeline for docs + blog (next-mdx-remote/rsc `options` prop).
+ * - remark-gfm: renders GFM tables, strikethrough, task lists, autolinks
+ *   (docs tables were previously showing as raw `| … |` pipes).
+ * - rehype-pretty-code (shiki): syntax highlighting for fenced code blocks.
+ *   `keepBackground: false` lets the site's `prose-pre` card background show
+ *   through; shiki only colors the tokens. `github-dark` is a sober, muted
+ *   theme close to the IBANforge --syn-* palette. See globals.css for the
+ *   prose-code reset that keeps shiki blocks from inheriting inline-code styles.
+ */
+const rehypePrettyCodeOptions: RehypePrettyCodeOptions = {
+  theme: 'github-dark',
+  keepBackground: false,
+};
+
+const remarkPlugins: PluggableList = [remarkGfm];
+const rehypePlugins: PluggableList = [[rehypePrettyCode, rehypePrettyCodeOptions]];
+
+export const mdxOptions = {
+  mdxOptions: { remarkPlugins, rehypePlugins },
+};
+
+/**
+ * MDX component overrides. GFM tables can be wider than a phone; wrap each in a
+ * horizontally scrollable container so they never get clipped by the page's
+ * `overflow-x: clip`. Prose table styling still applies (the table stays inside
+ * `.prose`). Written with createElement to keep this a plain .ts module.
+ */
+export const mdxComponents = {
+  table: (props: ComponentProps<'table'>) =>
+    createElement(
+      'div',
+      { className: 'overflow-x-auto' },
+      createElement('table', props)
+    ),
+};
 
 function docsDir(locale: string): string {
   return path.join(process.cwd(), 'content', locale, 'docs');
