@@ -7,31 +7,30 @@ interface JsonViewerProps {
   className?: string
 }
 
+/**
+ * Syntax-highlighted JSON, colored with the design-system --syn-* tokens
+ * (key = amber, string = lime, number = sky, bool = purple, null = zinc).
+ * Presentational only — the copy button + collapse live in the caller.
+ */
 export function JsonViewer({ data, className }: JsonViewerProps) {
   const raw = JSON.stringify(data, null, 2)
 
-  // Simple line-by-line colorizer
   const lines = raw.split("\n").map((line, i) => {
-    // Detect patterns for coloring
-    // Key: "key": anything
     const keyMatch = line.match(/^(\s*)("(?:[^"\\]|\\.)*")(\s*:)(.*)$/)
     if (keyMatch) {
       const [, indent, key, colon, rest] = keyMatch
-      const coloredRest = colorizeValue(rest)
       return (
         <span key={i}>
           {indent}
-          <span className="text-amber-400">{key}</span>
-          <span className="text-zinc-500">{colon}</span>
-          {coloredRest}
+          <span style={{ color: "var(--syn-key)" }}>{key}</span>
+          <span style={{ color: "var(--syn-punct)" }}>{colon}</span>
+          {colorizeValue(rest)}
           {"\n"}
         </span>
       )
     }
-
-    // Plain value line (array element or opening/closing bracket)
     return (
-      <span key={i} className="text-zinc-400">
+      <span key={i} style={{ color: "var(--syn-punct)" }}>
         {line}
         {"\n"}
       </span>
@@ -39,75 +38,36 @@ export function JsonViewer({ data, className }: JsonViewerProps) {
   })
 
   return (
-    <div
+    <pre
       className={cn(
-        "rounded-xl border border-zinc-800 bg-zinc-900 overflow-auto",
+        "font-mono text-[0.8125rem] leading-relaxed overflow-x-auto",
         className
       )}
+      style={{ color: "var(--syn-punct)" }}
     >
-      <pre className="font-mono text-sm leading-relaxed p-4 text-zinc-300">
-        {lines}
-      </pre>
-    </div>
+      {lines}
+    </pre>
   )
 }
 
 function colorizeValue(value: string): React.ReactNode {
   const trimmed = value.trimStart()
   const leading = value.slice(0, value.length - trimmed.length)
+  const comma = trimmed.endsWith(",")
+  const body = comma ? trimmed.slice(0, -1) : trimmed
 
-  // String value
-  if (trimmed.startsWith('"')) {
-    const trailingComma = trimmed.endsWith(",") ? "," : ""
-    const strPart = trailingComma ? trimmed.slice(0, -1) : trimmed
-    return (
-      <>
-        {leading}
-        <span className="text-emerald-400">{strPart}</span>
-        {trailingComma && <span className="text-zinc-500">{trailingComma}</span>}
-      </>
-    )
-  }
+  let color = "var(--syn-punct)"
+  if (body.startsWith('"')) color = "var(--syn-string)"
+  else if (/^-?\d/.test(body)) color = "var(--syn-number)"
+  else if (body === "true" || body === "false") color = "var(--syn-bool)"
+  else if (body === "null") color = "var(--syn-null)"
+  else if (body === "{" || body === "[" || body === "}" || body === "]") color = "var(--syn-punct)"
 
-  // Number value
-  if (/^-?\d/.test(trimmed)) {
-    const trailingComma = trimmed.endsWith(",") ? "," : ""
-    const numPart = trailingComma ? trimmed.slice(0, -1) : trimmed
-    return (
-      <>
-        {leading}
-        <span className="text-sky-400">{numPart}</span>
-        {trailingComma && <span className="text-zinc-500">{trailingComma}</span>}
-      </>
-    )
-  }
-
-  // Boolean value
-  if (trimmed === "true" || trimmed === "true," || trimmed === "false" || trimmed === "false,") {
-    const trailingComma = trimmed.endsWith(",") ? "," : ""
-    const boolPart = trailingComma ? trimmed.slice(0, -1) : trimmed
-    return (
-      <>
-        {leading}
-        <span className="text-zinc-400">{boolPart}</span>
-        {trailingComma && <span className="text-zinc-500">{trailingComma}</span>}
-      </>
-    )
-  }
-
-  // Null value
-  if (trimmed === "null" || trimmed === "null,") {
-    const trailingComma = trimmed.endsWith(",") ? "," : ""
-    const nullPart = trailingComma ? trimmed.slice(0, -1) : trimmed
-    return (
-      <>
-        {leading}
-        <span className="text-zinc-500">{nullPart}</span>
-        {trailingComma && <span className="text-zinc-500">{trailingComma}</span>}
-      </>
-    )
-  }
-
-  // Fallback: plain
-  return <span className="text-zinc-400">{value}</span>
+  return (
+    <>
+      {leading}
+      <span style={{ color }}>{body}</span>
+      {comma && <span style={{ color: "var(--syn-punct)" }}>,</span>}
+    </>
+  )
 }

@@ -5,189 +5,239 @@ import { useTranslations, useLocale } from "next-intl"
 import Link from "next/link"
 import { Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
-import { JsonViewer } from "@/components/json-viewer"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { StatusDot } from "@/components/ui/status-dot"
+import { ResultCard } from "./result-card"
+import {
+  MODES,
+  CHIPS,
+  DEFAULT_INPUT,
+  DEFAULT_RESULT,
+  type PlaygroundMode,
+  type Chip,
+} from "./examples"
 
-type TabType = "iban" | "bic"
+type Rec = Record<string, unknown>
+
+const BUTTON_KEY: Record<PlaygroundMode, string> = {
+  iban: "button.validate",
+  bic: "button.lookup",
+  compliance: "button.compliance",
+  clearing: "button.clearing",
+}
+
+const TONE_COLOR: Record<Chip["tone"], string> = {
+  ok: "var(--ok)",
+  warn: "var(--warn)",
+  err: "var(--err)",
+  info: "var(--info)",
+}
 
 export default function PlaygroundPage() {
-  const t = useTranslations('playground')
+  const t = useTranslations("playground")
   const locale = useLocale()
-  const [activeTab, setActiveTab] = useState<TabType>("iban")
-  const [ibanValue, setIbanValue] = useState("")
-  const [bicValue, setBicValue] = useState("")
-  const [result, setResult] = useState<unknown>(null)
-  const [responseMs, setResponseMs] = useState<number | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
 
-  async function handleSubmit(type: TabType, value: string) {
+  const [activeTab, setActiveTab] = useState<PlaygroundMode>("iban")
+  const [inputs, setInputs] = useState<Record<PlaygroundMode, string>>({ ...DEFAULT_INPUT })
+  const [results, setResults] = useState<Record<PlaygroundMode, Rec | null>>({ ...DEFAULT_RESULT })
+  const [errors, setErrors] = useState<Record<PlaygroundMode, string | null>>({
+    iban: null,
+    bic: null,
+    compliance: null,
+    clearing: null,
+  })
+  const [loading, setLoading] = useState<PlaygroundMode | null>(null)
+  const [seq, setSeq] = useState(0)
+
+  async function run(mode: PlaygroundMode, value: string) {
     if (!value.trim()) return
-    setLoading(true)
-    setError(null)
-    setResult(null)
-    setResponseMs(null)
+    setLoading(mode)
+    setErrors((e) => ({ ...e, [mode]: null }))
 
     try {
       const res = await fetch("/api/playground", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type, value: value.trim() }),
+        body: JSON.stringify({ type: mode, value: value.trim() }),
       })
+      const data: Rec = await res.json()
+      const hasResult =
+        data && typeof data === "object" && ("valid" in data || "found" in data)
 
-      const data = await res.json()
-
-      if (!res.ok) {
-        setError(data?.error ?? t('error.unexpected'))
-        return
+      if (hasResult) {
+        // Field-level "invalid"/"not found" is a legitimate result, not an error.
+        setResults((r) => ({ ...r, [mode]: data }))
+        setSeq((s) => s + 1)
+      } else {
+        const msg =
+          (typeof data?.message === "string" && data.message) ||
+          (typeof data?.error === "string" && data.error) ||
+          t("error.unexpected")
+        setErrors((e) => ({ ...e, [mode]: msg }))
       }
-
-      const ms = typeof data._playground_ms === "number" ? data._playground_ms : null
-      setResponseMs(ms)
-      setResult(data)
     } catch {
-      setError(t('error.network'))
+      setErrors((e) => ({ ...e, [mode]: t("error.network") }))
     } finally {
-      setLoading(false)
+      setLoading(null)
     }
   }
 
-  function handleTabChange(value: unknown) {
-    setActiveTab(value as TabType)
-    setResult(null)
-    setResponseMs(null)
-    setError(null)
+  function changeTab(mode: PlaygroundMode) {
+    setActiveTab(mode)
+    setSeq((s) => s + 1) // re-play the card reveal on tab switch
   }
 
+  function onChip(chip: Chip) {
+    const target = chip.toMode ?? activeTab
+    if (chip.toMode && chip.toMode !== activeTab) setActiveTab(chip.toMode)
+    setInputs((i) => ({ ...i, [target]: chip.value }))
+    run(target, chip.value)
+  }
+
+  const result = results[activeTab]
+  const error = errors[activeTab]
+  const isLoading = loading === activeTab
+
   return (
-    <div className="flex flex-col items-center px-4 py-16 max-w-3xl mx-auto w-full gap-10">
+    <div className="mx-auto flex w-full max-w-4xl flex-col gap-8 px-4 py-14 sm:py-16">
       {/* Header */}
-      <div className="text-center flex flex-col gap-3">
-        <h1 className="text-4xl font-bold tracking-tight font-mono">
-          {t('title.prefix')}<span className="text-amber-500">{t('title.highlight')}</span>
+      <div className="flex flex-col items-center gap-3 text-center">
+        <span className="eyebrow inline-flex items-center gap-2">
+          <StatusDot kind="live" />
+          {t("eyebrow")}
+        </span>
+        <h1 className="font-mono text-4xl font-bold tracking-tight">
+          {t("title.prefix")}
+          <span className="text-amber-500">{t("title.highlight")}</span>
         </h1>
-        <p className="text-muted-foreground text-base">
-          {t('subtitle')}
-        </p>
+        <p className="max-w-xl text-base text-muted-foreground">{t("subtitle")}</p>
       </div>
 
-      {/* Tabs */}
-      <div className="w-full flex flex-col gap-6">
-        <Tabs
-          value={activeTab}
-          onValueChange={handleTabChange}
-          className="w-full"
-        >
-          <TabsList className="mb-4">
-            <TabsTrigger value="iban">{t('tabs.iban')}</TabsTrigger>
-            <TabsTrigger value="bic">{t('tabs.bic')}</TabsTrigger>
+      {/* Tabs (segmented control) */}
+      <div className="flex flex-col gap-5">
+        <Tabs value={activeTab} onValueChange={(v) => changeTab(v as PlaygroundMode)}>
+          <TabsList className="w-full flex-wrap sm:w-fit">
+            {MODES.map((m) => (
+              <TabsTrigger key={m} value={m} className="flex-1 sm:flex-none">
+                {t(`tabs.${m}`)}
+              </TabsTrigger>
+            ))}
           </TabsList>
-
-          {/* IBAN Tab */}
-          <TabsContent value="iban">
-            <form
-              className="flex flex-col sm:flex-row gap-2"
-              onSubmit={(e) => {
-                e.preventDefault()
-                handleSubmit("iban", ibanValue)
-              }}
-            >
-              <Input
-                className="flex-1 h-10 font-mono"
-                placeholder="CH93 0076 2011 6238 5295 7"
-                value={ibanValue}
-                onChange={(e) => setIbanValue(e.target.value)}
-                disabled={loading}
-                autoComplete="off"
-                spellCheck={false}
-              />
-              <Button
-                type="submit"
-                disabled={loading || !ibanValue.trim()}
-                variant="amber"
-                className="w-full sm:w-auto sm:min-w-24"
-              >
-                {loading ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  t('button.validate')
-                )}
-              </Button>
-            </form>
-          </TabsContent>
-
-          {/* BIC Tab */}
-          <TabsContent value="bic">
-            <form
-              className="flex flex-col sm:flex-row gap-2"
-              onSubmit={(e) => {
-                e.preventDefault()
-                handleSubmit("bic", bicValue)
-              }}
-            >
-              <Input
-                className="flex-1 h-10 font-mono"
-                placeholder="UBSWCHZH80A"
-                value={bicValue}
-                onChange={(e) => setBicValue(e.target.value)}
-                disabled={loading}
-                autoComplete="off"
-                spellCheck={false}
-              />
-              <Button
-                type="submit"
-                disabled={loading || !bicValue.trim()}
-                variant="amber"
-                className="w-full sm:w-auto sm:min-w-24"
-              >
-                {loading ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  t('button.lookup')
-                )}
-              </Button>
-            </form>
-          </TabsContent>
         </Tabs>
 
-        {/* Error state */}
+        {/* Hint */}
+        <p className="text-sm text-[var(--fg-4)]">{t(`hint.${activeTab}`)}</p>
+
+        {/* Input + submit */}
+        <form
+          className="flex flex-col gap-2 sm:flex-row"
+          onSubmit={(e) => {
+            e.preventDefault()
+            run(activeTab, inputs[activeTab])
+          }}
+        >
+          <Input
+            className="h-10 flex-1 font-mono"
+            placeholder={t(`placeholder.${activeTab}`)}
+            value={inputs[activeTab]}
+            onChange={(e) => setInputs((i) => ({ ...i, [activeTab]: e.target.value }))}
+            disabled={isLoading}
+            autoComplete="off"
+            spellCheck={false}
+            aria-label={t(`tabs.${activeTab}`)}
+          />
+          <Button
+            type="submit"
+            disabled={isLoading || !inputs[activeTab].trim()}
+            variant="amber"
+            className="h-10 w-full sm:w-auto sm:min-w-28"
+          >
+            {isLoading ? <Loader2 className="size-4 animate-spin" /> : t(BUTTON_KEY[activeTab])}
+          </Button>
+        </form>
+
+        {/* Quick-example chips */}
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="mr-1 font-mono text-[0.6875rem] uppercase tracking-caps text-[var(--fg-5)]">
+            {t("examples")}
+          </span>
+          {CHIPS[activeTab].map((chip) => (
+            <button
+              key={chip.key}
+              type="button"
+              onClick={() => onChip(chip)}
+              disabled={isLoading}
+              className="inline-flex items-center gap-1.5 rounded-full border border-[var(--ink-4)] bg-[var(--ink-2)] px-3 py-1 font-mono text-xs text-[var(--fg-3)] transition-colors hover:border-[var(--ink-5)] hover:text-[var(--fg-1)] disabled:opacity-50"
+            >
+              <span
+                className="h-[6px] w-[6px] shrink-0 rounded-full"
+                style={{ backgroundColor: TONE_COLOR[chip.tone] }}
+              />
+              {t(`chips.${chip.key}`)}
+            </button>
+          ))}
+        </div>
+
+        {/* Error banner (transport / payment only) */}
         {error && (
           <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
             {error}
           </div>
         )}
 
-        {/* Result area */}
-        {result !== null && !error && (
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground font-medium">{t('result.label')}</span>
-              {responseMs !== null && (
-                <Badge
-                  variant="outline"
-                  className="font-mono text-xs text-amber-500 border-amber-500/40 bg-amber-500/5"
-                >
-                  {responseMs}ms
-                </Badge>
-              )}
-            </div>
-            <JsonViewer data={result} />
-          </div>
+        {/* Result */}
+        {isLoading ? (
+          <SkeletonCard />
+        ) : (
+          result && <ResultCard mode={activeTab} data={result} animateKey={seq} />
         )}
       </div>
 
       {/* Docs link */}
-      <p className="text-sm text-muted-foreground">
-        {t('docsPrompt')}{" "}
+      <p className="text-center text-sm text-muted-foreground">
+        {t("docsPrompt")}{" "}
         <Link
           href={`/${locale}/docs`}
-          className="text-amber-500 hover:text-amber-400 underline underline-offset-4 transition-colors"
+          className="text-amber-500 underline underline-offset-4 transition-colors hover:text-amber-400"
         >
-          {t('docsLink')}
+          {t("docsLink")}
         </Link>
       </p>
+    </div>
+  )
+}
+
+/* Stable-shape loading skeleton — matches the result card silhouette so there
+   is zero layout shift when the real answer lands. */
+function SkeletonCard() {
+  return (
+    <div className="card-surface overflow-hidden rounded-xl border">
+      <div className="border-b border-[var(--hairline)] p-4 sm:p-5">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="pg-skeleton h-6 w-20 rounded-full" />
+          <div className="pg-skeleton h-6 w-16 rounded-full" />
+          <div className="pg-skeleton h-5 w-40 rounded" />
+          <div className="pg-skeleton ml-auto h-4 w-24 rounded" />
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <div className="pg-skeleton h-6 w-24 rounded-full" />
+          <div className="pg-skeleton h-6 w-12 rounded-full" />
+          <div className="pg-skeleton h-6 w-12 rounded-full" />
+        </div>
+      </div>
+      <div className="grid gap-3 p-4 sm:grid-cols-2 sm:p-5">
+        {[0, 1, 2, 3].map((i) => (
+          <div key={i} className="rounded-lg border border-[var(--ink-4)] bg-[var(--ink-2)]/40 p-4">
+            <div className="pg-skeleton mb-3 h-3 w-24 rounded" />
+            <div className="space-y-2">
+              <div className="pg-skeleton h-3 w-full rounded" />
+              <div className="pg-skeleton h-3 w-4/5 rounded" />
+              <div className="pg-skeleton h-3 w-2/3 rounded" />
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
