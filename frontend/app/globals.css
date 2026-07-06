@@ -278,6 +278,36 @@
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
+   rehype-pretty-code (shiki) fenced blocks inside .prose (docs + blog).
+   The layout's `prose-code:*` classes style ALL <code>, including the fenced
+   one — neutralize that so shiki's per-token inline colors show. The pre keeps
+   its `prose-pre:bg-card` background (keepBackground: false in lib/mdx.ts).
+   ────────────────────────────────────────────────────────────────────────── */
+.prose [data-rehype-pretty-code-figure] code {
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+  color: inherit;
+  font-weight: inherit;
+  font-size: 0.875em;
+  counter-reset: line;
+}
+.prose [data-rehype-pretty-code-figure] code::before,
+.prose [data-rehype-pretty-code-figure] code::after {
+  content: none;
+}
+.prose [data-rehype-pretty-code-figure] [data-line] {
+  display: block;
+}
+/* Optional language label rehype-pretty-code can emit via `data-rehype-pretty-code-title` */
+.prose [data-rehype-pretty-code-title] {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--fg-3);
+  margin-bottom: 0.5rem;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
    Animations from version A
    ────────────────────────────────────────────────────────────────────────── */
 @keyframes pulse-live {
