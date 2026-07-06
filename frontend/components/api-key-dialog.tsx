@@ -288,7 +288,7 @@ export function GetKeyButton({
 }: {
   children: ReactNode;
   className?: string;
-  variant?: 'default' | 'outline' | 'secondary' | 'ghost' | 'link' | 'destructive';
+  variant?: 'default' | 'outline' | 'secondary' | 'ghost' | 'link' | 'destructive' | 'amber';
   size?: 'default' | 'xs' | 'sm' | 'lg' | 'icon';
 }) {
   const { open } = useApiKeyDialog();

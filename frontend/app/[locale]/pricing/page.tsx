@@ -74,7 +74,7 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
         </p>
 
         <div className="flex flex-col sm:flex-row gap-3 mt-2">
-          <GetKeyButton className="bg-amber-500 hover:bg-amber-400 text-zinc-950 font-semibold px-6">
+          <GetKeyButton variant="amber" className="px-6">
             {t('rails.key.cta')}
           </GetKeyButton>
           <Button
@@ -120,7 +120,8 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
             <p className="text-sm text-muted-foreground leading-relaxed flex-1">{t('rails.key.body')}</p>
             <GetKeyButton
               size="sm"
-              className="bg-amber-500 hover:bg-amber-400 text-zinc-950 font-semibold w-fit px-4"
+              variant="amber"
+              className="w-fit px-4"
             >
               {t('rails.key.cta')}
             </GetKeyButton>
@@ -301,8 +302,9 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
         </p>
         <div className="flex flex-col sm:flex-row gap-3 mt-2">
           <Button
+            variant="amber"
             size="lg"
-            className="bg-amber-500 hover:bg-amber-400 text-zinc-950 font-semibold px-8"
+            className="px-8"
             render={<Link href={`/${locale}/playground`} />}
           >
             {t('cta.openPlayground')}

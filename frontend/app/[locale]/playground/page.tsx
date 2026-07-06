@@ -106,7 +106,8 @@ export default function PlaygroundPage() {
               <Button
                 type="submit"
                 disabled={loading || !ibanValue.trim()}
-                className="bg-amber-500 hover:bg-amber-400 text-zinc-950 font-semibold w-full sm:w-auto sm:min-w-24"
+                variant="amber"
+                className="w-full sm:w-auto sm:min-w-24"
               >
                 {loading ? (
                   <Loader2 className="size-4 animate-spin" />
@@ -138,7 +139,8 @@ export default function PlaygroundPage() {
               <Button
                 type="submit"
                 disabled={loading || !bicValue.trim()}
-                className="bg-amber-500 hover:bg-amber-400 text-zinc-950 font-semibold w-full sm:w-auto sm:min-w-24"
+                variant="amber"
+                className="w-full sm:w-auto sm:min-w-24"
               >
                 {loading ? (
                   <Loader2 className="size-4 animate-spin" />
