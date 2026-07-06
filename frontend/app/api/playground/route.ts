@@ -23,8 +23,18 @@ export async function POST(req: NextRequest) {
       headers,
       body: JSON.stringify({ iban: value }),
     };
+  } else if (type === 'compliance') {
+    apiPath = '/v1/iban/compliance';
+    fetchOptions = {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ iban: value }),
+    };
   } else if (type === 'bic') {
     apiPath = `/v1/bic/${encodeURIComponent(value)}`;
+    fetchOptions = { method: 'GET', headers };
+  } else if (type === 'clearing') {
+    apiPath = `/v1/ch/clearing/${encodeURIComponent(value)}`;
     fetchOptions = { method: 'GET', headers };
   } else {
     return NextResponse.json({ error: 'Invalid type' }, { status: 400 });

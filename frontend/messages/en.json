@@ -299,23 +299,88 @@
     }
   },
   "playground": {
+    "eyebrow": "Live API · no key required",
     "title": {
       "prefix": "Play",
       "highlight": "ground"
     },
-    "subtitle": "Test the API for free — no payment, no signup",
+    "subtitle": "Test the API for free — no payment, no signup. Every answer below is a real, live response.",
     "tabs": {
-      "iban": "Validate IBAN",
-      "bic": "Lookup BIC"
+      "iban": "IBAN",
+      "bic": "BIC",
+      "compliance": "Compliance",
+      "clearing": "Swiss clearing"
+    },
+    "hint": {
+      "iban": "Validate any IBAN — SEPA reach, issuer type, risk and Swiss clearing.",
+      "bic": "Look up any BIC / SWIFT — GLEIF address and LEI.",
+      "compliance": "Sanctions, Verification of Payee and a 0–100 risk score.",
+      "clearing": "Swiss BC-Nummer / IID — SIC, euroSIC, Instant and QR-IID."
     },
     "placeholder": {
-      "iban": "CH93 0076 2011 6238 5295 7",
-      "bic": "UBSWCHZH80A"
+      "iban": "CH10 0023 0000 0000 1234 5",
+      "bic": "NTSBDEB1",
+      "compliance": "DE89 3704 0044 0532 0130 00",
+      "clearing": "230"
     },
     "button": {
       "validate": "Validate",
-      "lookup": "Lookup"
+      "lookup": "Look up",
+      "compliance": "Check",
+      "clearing": "Look up"
     },
+    "examples": "Examples",
+    "chips": {
+      "ibanCh": "Valid · CH",
+      "ibanEmi": "Neobank / EMI",
+      "ibanInvalid": "Invalid",
+      "ibanSanctions": "Under sanctions →",
+      "bicN26": "N26 · GLEIF",
+      "bicUbs": "UBS · CH",
+      "bicWise": "Wise · EMI",
+      "compClean": "Clean · DE",
+      "compMedium": "Payment institution",
+      "compHigh": "Sanctioned country",
+      "clUbs": "UBS",
+      "clPostfinance": "PostFinance",
+      "clZkb": "ZKB",
+      "clSnb": "SNB"
+    },
+    "glance": {
+      "valid": "Valid",
+      "invalid": "Invalid",
+      "found": "Found",
+      "notFound": "Not found",
+      "risk": "Risk",
+      "server": "server"
+    },
+    "risk": {
+      "low": "Low",
+      "med": "Medium",
+      "high": "High"
+    },
+    "section": {
+      "account": "Account",
+      "sepa": "SEPA reachability",
+      "issuer": "Issuer",
+      "bic": "BIC",
+      "risk": "Risk indicators",
+      "clearing": "Swiss clearing",
+      "institution": "Institution",
+      "address": "Address",
+      "identifiers": "Identifiers",
+      "sanctions": "Sanctions screening",
+      "reachability": "Reachability",
+      "vop": "Verification of Payee",
+      "score": "Risk score",
+      "services": "Payment services",
+      "scope": "Scope"
+    },
+    "raw": {
+      "show": "Raw JSON",
+      "hide": "Hide JSON"
+    },
+    "vibanNote": "Virtual IBAN / EMI — a compliance signal a mod-97 check cannot give.",
     "error": {
       "unexpected": "Unexpected error from the API.",
       "network": "Could not reach the API. Please check your connection or try again later."
