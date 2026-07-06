@@ -65,7 +65,7 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
           {t('badge')}
         </Badge>
 
-        <h1 className="text-5xl sm:text-6xl font-bold tracking-tight font-mono">
+        <h1 className="text-4xl sm:text-6xl font-bold tracking-tight font-mono max-w-full">
           {t('hero.title.prefix')} <span className="text-amber-500">{t('hero.title.highlight')}</span>
         </h1>
 
@@ -132,12 +132,12 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
             </span>
             <h3 className="text-lg font-semibold">{t('rails.packs.title')}</h3>
             <p className="text-sm text-muted-foreground leading-relaxed flex-1">{t('rails.packs.body')}</p>
-            <div className="grid grid-cols-3 gap-2 pt-1">
+            <div className="flex flex-wrap gap-2 pt-1">
               {CREDIT_PACKS.map((p) => (
                 <a
                   key={p.bundle}
                   href={p.url}
-                  className="flex flex-col items-center gap-0.5 rounded-lg border border-amber-500/30 bg-amber-500/5 px-2 py-2.5 text-center transition-colors hover:border-amber-500/60 hover:bg-amber-500/10"
+                  className="flex flex-1 basis-20 flex-col items-center gap-0.5 rounded-lg border border-amber-500/30 bg-amber-500/5 px-2 py-2.5 text-center transition-colors hover:border-amber-500/60 hover:bg-amber-500/10"
                 >
                   <span className="font-mono text-base font-bold text-amber-500">{p.price}</span>
                   <span className="text-[11px] text-muted-foreground">{p.credits}</span>

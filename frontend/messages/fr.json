@@ -209,6 +209,8 @@
       "playgroundLink": "Essayer dans le playground →"
     },
     "calculator": {
+      "heading": "Estimez votre coût mensuel",
+      "subtitle": "Payez seulement les appels que vous faites — sans minimum, sans abonnement.",
       "callsPerMonth": "Appels par mois",
       "callsPerMonthUnit": "appels / mois",
       "costBreakdown": "Détail des coûts",

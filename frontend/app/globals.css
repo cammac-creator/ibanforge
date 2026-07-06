@@ -263,6 +263,10 @@
   }
   body {
     @apply bg-background text-foreground;
+    /* Prevent horizontal page scroll from wide mono headings on small screens.
+       `clip` (not `hidden`) avoids creating a scroll container, so it does not
+       break the sticky header or force an unwanted overflow-y: auto. */
+    overflow-x: clip;
   }
   html {
     @apply font-sans;
