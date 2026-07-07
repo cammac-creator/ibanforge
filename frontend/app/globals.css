@@ -362,42 +362,46 @@
   animation: pg-shimmer 1.6s linear infinite;
 }
 
-/* Dark mode — default theme */
+/* Dark mode — default theme.
+   Phase 3 merge: every shadcn variable now points at the maison tokens
+   (ink ramp / warm fg / amber) so there is ONE color system. Values are
+   near-identical to the previous oklch literals — this is a re-wiring,
+   not a re-design. */
 .dark {
-  --background: oklch(0.118 0 0);
-  --foreground: var(--fg-1); /* warm white #F5F3EF — converges titles/body with maison fg-1 (was oklch(0.985)) */
-  --card: var(--ink-3); /* converge to maison ink ramp — ~identical to oklch(0.165), keeps card elevation above --background */
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.165 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: var(--amber-500); /* single amber source of truth (== oklch(0.769 0.188 70.08)) */
-  --primary-foreground: oklch(0.118 0 0);
-  --secondary: oklch(0.22 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.22 0 0);
-  --muted-foreground: var(--fg-3); /* converge secondary text to maison fg-3 (#A1A1AA, ~7:1 AA) */
-  --accent: oklch(0.769 0.188 70.08);
-  --accent-foreground: oklch(0.118 0 0);
+  --background: var(--ink-0); /* was oklch(0.118) ≈ #0B0B0C — converge to ink-0 #09090B */
+  --foreground: var(--fg-1); /* warm white #F5F3EF */
+  --card: var(--ink-3); /* keeps card elevation above --background */
+  --card-foreground: var(--fg-1);
+  --popover: var(--ink-2); /* was oklch(0.165) — sits between background (ink-0) and card (ink-3) */
+  --popover-foreground: var(--fg-1);
+  --primary: var(--amber-500); /* single amber source of truth */
+  --primary-foreground: var(--ink-0);
+  --secondary: var(--ink-4); /* #27272A == oklch(0.217), was oklch(0.22) */
+  --secondary-foreground: var(--fg-1);
+  --muted: var(--ink-4);
+  --muted-foreground: var(--fg-3); /* #A1A1AA, ~7:1 AA */
+  --accent: var(--amber-500);
+  --accent-foreground: var(--ink-0);
   --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 8%); /* ≈ maison --hairline (rgba(255,255,255,.06)); kept at 8% so docs table row-lines stay legible. Full merge → Phase 3. */
+  --border: oklch(1 0 0 / 8%); /* ≈ maison --hairline (6%); kept at 8% so docs table row-lines stay legible (deliberate, re-confirmed Phase 3) */
   --input: oklch(1 0 0 / 12%);
-  --ring: oklch(0.769 0.188 70.08);
-  --chart-1: oklch(0.769 0.188 70.08);
+  --ring: var(--amber-500);
+  --chart-1: var(--amber-500);
   --chart-2: oklch(0.65 0.163 70.08);
   --chart-3: oklch(0.527 0.188 70.08);
   --chart-4: oklch(0.427 0.163 70.08);
   --chart-5: oklch(0.327 0.138 70.08);
-  --sidebar: oklch(0.145 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.769 0.188 70.08);
-  --sidebar-primary-foreground: oklch(0.118 0 0);
-  --sidebar-accent: oklch(0.22 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar: var(--ink-1); /* was oklch(0.145) ≈ #101010 — converge to ink-1 #0F0F13 */
+  --sidebar-foreground: var(--fg-1);
+  --sidebar-primary: var(--amber-500);
+  --sidebar-primary-foreground: var(--ink-0);
+  --sidebar-accent: var(--ink-4);
+  --sidebar-accent-foreground: var(--fg-1);
   --sidebar-border: oklch(1 0 0 / 8%);
-  --sidebar-ring: oklch(0.769 0.188 70.08);
+  --sidebar-ring: var(--amber-500);
   /* Amber/gold accent — #f59e0b / amber-500 */
-  --amber: oklch(0.769 0.188 70.08);
-  --amber-foreground: oklch(0.118 0 0);
+  --amber: var(--amber-500);
+  --amber-foreground: var(--ink-0);
 }
 
 @layer base {

@@ -29,22 +29,22 @@ export default async function BlogPage({ params }: { params: Promise<{ locale: s
       {posts.length === 0 ? (
         <p className="text-muted-foreground">{t('noPosts')}</p>
       ) : (
-        <div className="space-y-10">
+        <div className="flex flex-col gap-5">
           {posts.map((post) => (
             <article
               key={post.slug}
-              className="border-b border-border pb-10 last:border-0"
+              className="card-surface rounded-xl border p-6 sm:p-7"
             >
               <div className="flex items-center gap-3 text-sm text-muted-foreground mb-3">
-                <time dateTime={post.date}>
+                <time dateTime={post.date} className="font-mono text-xs tracking-caps uppercase">
                   {new Date(post.date).toLocaleDateString(locale, {
                     year: "numeric",
                     month: "long",
                     day: "numeric",
                   })}
                 </time>
-                <span>·</span>
-                <span>{post.readingTime}</span>
+                <span aria-hidden>·</span>
+                <span className="font-mono text-xs">{post.readingTime}</span>
               </div>
               <h2 className="text-2xl font-heading font-semibold tracking-tight text-foreground mb-2">
                 <Link

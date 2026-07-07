@@ -28,12 +28,14 @@ export function CodeBlock({ code, language, className }: CodeBlockProps) {
   return (
     <div
       className={cn(
-        "relative group rounded-xl border border-border bg-muted/40 overflow-hidden",
+        // One code-surface language across the site: ink background, hairline
+        // borders — mirrors the landing hero pane and the docs shiki blocks.
+        "relative group rounded-xl border border-[var(--ink-4)] bg-[var(--ink-0)] overflow-hidden",
         className
       )}
     >
       {/* Language badge + Copy button */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-muted/60">
+      <div className="flex items-center justify-between px-4 py-2 border-b border-[var(--hairline)] bg-[var(--ink-1)]">
         <span className="text-xs font-mono text-muted-foreground uppercase tracking-wider">
           {language}
         </span>
@@ -64,7 +66,7 @@ export function CodeBlock({ code, language, className }: CodeBlockProps) {
       <pre
         className={cn(
           "overflow-x-auto p-4 text-sm leading-relaxed",
-          "font-mono text-foreground"
+          "font-mono text-[var(--fg-2)]"
         )}
         style={{ fontFamily: "var(--font-mono, 'JetBrains Mono', monospace)" }}
       >

@@ -149,7 +149,8 @@ export default async function AgentsPage({
         <div className="flex flex-col sm:flex-row gap-3 mt-2">
           <Button
             size="lg"
-            className="bg-amber-500 hover:bg-amber-400 text-zinc-950 font-semibold px-6"
+            variant="amber"
+            className="px-6"
             render={<a href="#mcp-quickstart" />}
           >
             {t("hero.cta.mcp")}
@@ -420,7 +421,8 @@ export default async function AgentsPage({
         </p>
         <Button
           size="lg"
-          className="bg-amber-500 hover:bg-amber-400 text-zinc-950 font-semibold px-8 mt-2"
+          variant="amber"
+          className="px-8 mt-2"
           render={<Link href={`/${locale}/playground`} />}
         >
           {t("cta.button")}
