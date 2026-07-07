@@ -13,7 +13,7 @@
   },
   "footer": {
     "logo": "IBANforge",
-    "tagline": "API zur IBAN-Validierung und BIC/SWIFT-Suche mit x402-Mikrozahlungen.",
+    "tagline": "Die Bankdaten-API für Entwickler und KI-Agenten — IBAN, BIC, Schweizer Clearing, Compliance.",
     "column": {
       "product": "Produkt",
       "developers": "Entwickler",
@@ -26,44 +26,38 @@
       "github": "GitHub",
       "mcp": "MCP",
       "apiStatus": "API-Status",
-      "mitLicense": "MIT-Lizenz",
       "agents": "Agenten",
-      "openapi": "OpenAPI"
+      "openapi": "OpenAPI",
+      "openSource": "Open-Source-Kern (MIT)",
+      "vendors": "Für Softwareanbieter"
     },
-    "copyright": "© {year} IBANforge. Veröffentlicht unter der MIT-Lizenz.",
-    "builtWith": "Erstellt mit",
-    "tech": {
-      "nextjs": "Next.js",
-      "shadcn": "shadcn/ui"
-    }
+    "copyright": "© {year} IBANforge.",
+    "dataLine": "Daten: GLEIF · SIX · Bundesbank · EBA — monatlich aktualisiert"
   },
   "home": {
     "metadata": {
       "title": "IBANforge — API zur IBAN-Validierung und BIC/SWIFT-Suche",
-      "description": "IBAN-Validierung, BIC/SWIFT-Suche, SEPA-Konformität, Emittenten-Klassifizierung und Risikoindikatoren für Entwickler und AI-Agenten. Zahlung pro Anfrage mit USDC über x402.",
+      "description": "IBAN-Validierung, BIC/SWIFT-Suche, Schweizer Clearingdaten und Compliance-Risiko für Entwickler und KI-Agenten. Gratis-Stufe — 200 Anfragen/Monat; danach Karte oder USDC.",
       "og": {
         "title": "IBANforge",
-        "description": "API zur IBAN-Validierung und BIC/SWIFT-Suche mit Compliance-Daten für AI-Agenten"
+        "description": "Die Bankdaten-API für Entwickler und KI-Agenten — IBAN-Validierung, BIC/SWIFT, Schweizer Clearing, Compliance-Risiko"
       }
     },
-    "badge": "x402-Zahlungen aktiv",
+    "badge": "Live · Zürich",
     "hero": {
-      "title": {
-        "prefix": "IBAN",
-        "highlight": "forge"
-      },
-      "description": "Die Compliance-API für KI-Agenten. Die einzige API mit Schweizer BC-Nummer-/QR-IID-Clearingdaten — plus IBAN-Validierung, BIC/SWIFT, EMI/vIBAN-Erkennung und Sanktionsrisiko. Nativ über MCP und x402, ohne Anmeldung.",
+      "title": "Bankdaten, denen Ihre Agenten <accent>vertrauen</accent>.",
+      "description": "IBANs validieren, BIC/SWIFT auflösen, Sanktionsrisiko bewerten — mit exklusiven Schweizer SIX-Clearingdaten. REST für Ihren Stack, natives MCP für Ihre Agenten.",
       "cta": {
         "tryFree": "Kostenlos testen",
-        "readDocs": "Dokumentation lesen",
         "getKey": "Kostenlosen Key holen"
       }
     },
     "features": {
+      "heading": "Alles, was Sie brauchen",
       "0": {
         "badge": "Schweizer Clearing — exklusiv",
         "title": "BC-Nummer / QR-IID",
-        "description": "Die einzige API mit Schweizer SIX-BankMaster-Clearingdaten: 1.190 BC-Nummern, SIC/euroSIC, QR-IID und Institutstyp. Kein Wettbewerber hat das."
+        "description": "Die einzige API mit SIX-BankMaster-Clearingdaten: jede Schweizer BC-Nummer mit SIC/euroSIC-Teilnahme, QR-IID und Institutstyp. Kein Wettbewerber hat das."
       },
       "1": {
         "badge": "MCP-nativ — agentenbereit",
@@ -71,26 +65,25 @@
         "description": "Nativer Model-Context-Protocol-Server (stdio + HTTP). Claude, Cursor und jeder MCP-Agent installieren in einer Zeile: npx -y ibanforge-mcp."
       },
       "2": {
-        "badge": "89 Länder",
-        "title": "IBAN-Validierung",
-        "description": "ISO-13616-Mod-97-Validierung mit vollständiger BBAN-Analyse über 89 Länder, inklusive der EU-EMI-Hubs (LT, EE, MT)."
+        "badge": "89 Länder · 121K BICs",
+        "title": "IBAN-Validierung & BIC-Lookup",
+        "description": "ISO-13616-Mod-97-Validierung mit vollständiger BBAN-Analyse in 89 Ländern — gestützt auf über 121.000 BIC-Einträge aus GLEIF, SWIFT-Verzeichnis, Bundesbank, SIX, NBP und EBA Step2."
       },
       "3": {
-        "badge": "121.399 BICs",
-        "title": "BIC/SWIFT-Lookup",
-        "description": "121.399 BIC-Einträge (38.761 LEI-angereichert via GLEIF) aus GLEIF, SWIFT-Verzeichnis, Bundesbank, SIX, NBP und EBA Step2."
-      },
-      "4": {
         "badge": "EMI / vIBAN",
         "title": "Emittenten-Klassifizierung",
         "description": "Erkennt virtuelle IBANs und EMIs (Wise, Revolut, N26, Mercury…) — ein echtes Compliance-Signal, das eine Mod-97-Prüfung nie liefert."
       },
-      "5": {
+      "4": {
         "badge": "Sanktionen + FATF",
         "title": "Compliance-Risikoscore",
         "description": "Sanktions-Screening auf Bank-BIC-Ebene (OFAC/EU/UN/SECO) + FATF + SEPA + VoP, destilliert zu einem 0-100-Risikoscore."
       },
-      "heading": "Alles, was Sie brauchen"
+      "5": {
+        "badge": "x402 — Agenten-Zahlungen",
+        "title": "Agenten zahlen pro Aufruf",
+        "description": "Autonome Agenten zahlen pro Anfrage in USDC über x402 — ohne Konto, ohne Checkout. Menschen nutzen den Gratis-Key oder Kartenguthaben; Agenten haben ihre eigene Schiene."
+      }
     },
     "endpoints": {
       "0": {
@@ -121,26 +114,42 @@
         "method": "GET",
         "path": "/v1/ch/clearing/:iid",
         "cost": "$0.003",
-        "description": "Schweizer BC-Nummer-Suche (1 190 SIX-Einträge)"
+        "description": "Schweizer BC-Nummer-Suche (SIX BankMaster)"
       },
       "heading": "Endpoints und Preise",
-      "subtitle": "Zahlung pro Anfrage mit USDC über x402. Testen Sie den /v1/demo-Endpoint kostenlos.",
-      "table": {
-        "method": "Methode",
-        "path": "Pfad",
-        "cost": "Kosten",
-        "description": "Beschreibung"
-      }
+      "subtitle": "Starten Sie mit 200 Gratis-Anfragen pro Monat. Zahlen Sie erst, wenn Sie wachsen — per Karte oder in USDC."
     },
     "quickStart": {
       "heading": "Schnellstart",
-      "subtitle": "200 kostenlose Anfragen/Monat mit API-Schlüssel, oder Zahlung pro Anfrage mit USDC über x402."
+      "subtitle": "Ein POST, eine Antwort — genau das liefert die API zurück."
     },
     "cta": {
       "heading": "Bereit loszulegen?",
-      "description": "Integration in wenigen Minuten. Zahlung mit USDC — ohne API-Schlüssel, ohne Abonnement.",
+      "description": "Starten Sie mit einem kostenlosen Key — 200 Anfragen pro Monat, ohne Karte. Skalieren Sie mit Prepaid-Guthaben per Karte oder zahlen Sie pro Aufruf in USDC.",
       "button": "Jetzt starten",
       "getKeyButton": "Kostenlosen Key holen"
+    },
+    "demo": {
+      "valid": "Gültig",
+      "server": "Server",
+      "clearingTitle": "Schweizer Clearing · SIX",
+      "tryLive": "Live ausprobieren"
+    },
+    "stats": {
+      "bic": "BIC-Einträge",
+      "countries": "abgedeckte Länder",
+      "clearing": "Schweizer Clearing-Einträge · SIX",
+      "latency": "p50 Server-Verarbeitung"
+    },
+    "trust": {
+      "dataLabel": "Datenquellen",
+      "dataValue": "GLEIF · SIX BankMaster · SWIFT-Verzeichnis · Bundesbank · EBA STEP2 · NBP",
+      "dataNote": "Monatlich aktualisiert",
+      "sanctionsLabel": "Sanktionsprüfung",
+      "sanctionsValue": "OFAC · EU · UN · SECO + FATF",
+      "sanctionsNote": "Auf Bankebene (BIC8)",
+      "madeLabel": "Herkunft",
+      "madeNote": "Schweizer Clearingdaten direkt von SIX"
     }
   },
   "pricing": {
@@ -162,7 +171,7 @@
     },
     "table": {
       "heading": "Preise pro Endpoint",
-      "subtitle": "Zahlung pro Anfrage mit USDC über x402 auf Base L2. Ohne Abonnement, ohne API-Schlüssel."
+      "subtitle": "Starten Sie mit 200 Gratis-Anfragen pro Monat. Zahlen Sie erst, wenn Sie wachsen — per Karte oder pro Anfrage in USDC über x402 auf Base L2."
     },
     "endpoints": {
       "0": {
@@ -210,7 +219,7 @@
     },
     "calculator": {
       "heading": "Schätzen Sie Ihre monatlichen Kosten",
-      "subtitle": "Zahlen Sie nur für die Aufrufe, die Sie tätigen — ohne Mindestumsatz, ohne Abo.",
+      "subtitle": "Zahlen Sie nur für die Aufrufe, die Sie tätigen — ohne Mindestumsatz.",
       "callsPerMonth": "Aufrufe pro Monat",
       "callsPerMonthUnit": "Aufrufe / Monat",
       "costBreakdown": "Kostenaufschlüsselung",
@@ -237,7 +246,7 @@
       "badge": "x402-Protokoll",
       "heading": "So funktionieren die Zahlungen",
       "items": {
-        "0": "Kein Abonnement. Kein API-Schlüssel. Zahlung pro Aufruf mit USDC.",
+        "0": "Agenten zahlen pro Aufruf mit USDC — ohne Konto, ohne API-Schlüssel auf dieser Schiene.",
         "1": "Ihr HTTP-Client sendet mit jeder Anfrage eine Mikrozahlung — automatisch, über Standard-Header.",
         "2": "Zahlungen werden auf Base (Ethereum L2) abgewickelt — schnell, günstig und on-chain verifizierbar.",
         "3": "Kostenloses Testen über den Endpoint /v1/demo und den /playground verfügbar."
