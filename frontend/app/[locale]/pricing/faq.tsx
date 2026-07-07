@@ -60,7 +60,10 @@ export function Faq() {
   }))
 
   return (
-    <div className="rounded-xl border border-border bg-zinc-900/50 px-6 divide-y-0">
+    <div
+      className="rounded-xl border border-border px-6 divide-y-0"
+      style={{ background: "var(--ink-1)" }}
+    >
       {faqs.map((faq, i) => (
         <FaqItem
           key={i}

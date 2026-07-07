@@ -155,7 +155,7 @@
   "pricing": {
     "metadata": {
       "title": "Tarifs",
-      "description": "Trois façons de payer, aucune impasse : x402 à l’appel (sans inscription), une clé gratuite (200/mois), ou des packs de crédits prépayés."
+      "description": "Commencez gratuitement avec 200 requêtes/mois, prépayez des packs de crédits par carte ou USDC, ou payez à l’appel via x402. Quelques fractions de centime par requête."
     },
     "badge": "Tarification transparente",
     "hero": {
@@ -163,7 +163,7 @@
         "prefix": "Paiement à",
         "highlight": "l'appel"
       },
-      "description": "Trois façons de payer, aucune impasse : paiement à l’appel via x402 (sans inscription), une clé gratuite (200 req/mois), ou des packs de crédits prépayés. Des fractions de centime par requête.",
+      "description": "Commencez avec une clé gratuite (200 requêtes/mois), rechargez des crédits prépayés par carte ou USDC, ou laissez votre agent payer à l’appel via x402. Quelques fractions de centime par requête.",
       "cta": {
         "tryFree": "Essayer gratuitement",
         "x402Explained": "x402 expliqué →"
@@ -219,10 +219,7 @@
     },
     "calculator": {
       "heading": "Estimez votre coût mensuel",
-      "subtitle": "Payez seulement les appels que vous faites — sans minimum.",
-      "callsPerMonth": "Appels par mois",
-      "callsPerMonthUnit": "appels / mois",
-      "costBreakdown": "Détail des coûts",
+      "subtitle": "Réglez votre volume mensuel par endpoint — le total est la somme de chaque ligne.",
       "perCall": "appel",
       "table": {
         "endpoint": "Endpoint",
@@ -237,10 +234,14 @@
         "compliance": "Vérification compliance"
       },
       "summary": {
-        "line": "À <strong>{count}</strong> appels/mois par endpoint",
+        "total": "Total mensuel estimé",
+        "payg": "paiement à l’appel via x402",
         "note": "Vous ne payez que ce que vous appelez réellement",
-        "forEndpoint": "pour {path}"
-      }
+        "freeKey": "Ce volume tient dans la clé API gratuite — 200 requêtes/mois, 0 $.",
+        "packs": "Ou prépayez {credits} crédits pour {price} — sans expiration (−{percent} vs paiement à l’appel).",
+        "packsEven": "Ou prépayez {credits} crédits pour {price} — même prix, et ils n’expirent jamais."
+      },
+      "callsHeader": "Appels / mois"
     },
     "x402": {
       "badge": "Protocole x402",
@@ -270,7 +271,7 @@
       },
       "2": {
         "question": "Existe-t-il une offre gratuite ?",
-        "answer": "Oui ! Générez une clé API gratuite via POST /v1/keys/generate avec votre email. Obtenez 200 requêtes/mois sur tous les endpoints. Aucune carte bancaire, aucun portefeuille crypto requis. Pour des volumes plus élevés, utilisez les micropaiements x402 en USDC."
+        "answer": "Oui ! Générez une clé API gratuite via POST /v1/keys/generate avec votre email. Obtenez 200 requêtes/mois sur tous les endpoints. Aucune carte bancaire, aucun portefeuille crypto requis. Pour des volumes plus élevés, achetez un pack de crédits prépayé par carte — ou payez à l’appel en USDC via x402."
       },
       "3": {
         "question": "Et pour les gros volumes ?",
@@ -280,13 +281,13 @@
     },
     "cta": {
       "heading": "Commencez gratuitement",
-      "description": "Commencez avec x402 (sans compte) ou obtenez une clé gratuite en quelques secondes. Ouvrez le playground, lisez la doc, lancez quand vous êtes prêt.",
+      "description": "Obtenez une clé gratuite en quelques secondes — ou démarrez directement avec x402, sans compte. Ouvrez le playground, lisez la doc, lancez quand vous êtes prêt.",
       "openPlayground": "Ouvrir le playground",
       "readDocs": "Lire la documentation"
     },
     "rails": {
       "heading": "Trois façons de payer",
-      "subtitle": "Choisissez ce qui vous convient — votre agent ou votre app n’est jamais dans une impasse.",
+      "subtitle": "Commencez gratuitement, prépayez en grandissant — ou laissez votre agent payer à l’appel.",
       "x402": {
         "tag": "x402 · sans inscription",
         "title": "Paiement à l’appel",
@@ -302,9 +303,15 @@
       "packs": {
         "tag": "Packs de crédits",
         "title": "Crédits prépayés",
-        "body": "Achat en volume, sans expiration : 1k = 5 $, 5k = 20 $, 25k = 80 $ (jusqu’à 0,0032 $/appel). Les agents achètent en USDC via POST /v1/credits/buy/1k|5k|25k.",
-        "note": "Paiement carte sécurisé · clé API livrée par email · ou à l’appel en USDC."
+        "body": "Achat en volume, sans expiration : 1k = 5 $, 5k = 20 $, 25k = 80 $ (jusqu’à 0,0032 $/appel). Un crédit = un appel API, quel que soit l’endpoint.",
+        "note": "Paiement Stripe — clé API livrée par email. Les agents peuvent acheter en USDC : POST /v1/credits/buy/1k|5k|25k.",
+        "cardLabel": "Payer par carte"
       }
+    },
+    "oem": {
+      "label": "Éditeur / OEM",
+      "text": "Vous intégrez IBANforge dans votre propre produit ? Licence éditeur / OEM avec SLA et facturation UE — parlons-en.",
+      "cta": "support@ibanforge.com"
     }
   },
   "playground": {
