@@ -51,13 +51,15 @@ The key works on all paid endpoints:
 - `POST /v1/iban/batch`
 - `GET /v1/bic/:code`
 - `POST /v1/iban/compliance`
+- `GET /v1/ch/clearing/:iid`
 
-## Free tier limits
+## Plans at a glance
 
-| Plan | Requests/month | Cost |
+| Plan | Volume | Cost |
 |---|---|---|
-| Free (API key) | 200 | $0 |
-| x402 pay-per-call | Unlimited | $0.003–$0.02/call |
+| Free (API key) | 200 requests/month | $0 |
+| Prepaid credit packs — card or USDC | 1k / 5k / 25k calls | $5 / $20 / $80 — never expire |
+| x402 pay-per-call | Unlimited | $0.002–$0.02/call |
 
 The 200 free requests are shared across all endpoints and reset on the 1st of each month.
 
@@ -84,21 +86,20 @@ curl https://api.ibanforge.com/v1/keys/usage \
 
 ## When you exceed the quota
 
-When your 200 free requests are exhausted, the API returns a `429 Too Many Requests` response:
+Your integration does **not** hit a hard dead-end. Once the 200 monthly requests are used up, the API answers `402 Payment Required` (x402) instead of a blunt 429, with hint headers telling you exactly what happened:
 
-```json
-{
-  "error": {
-    "code": "quota_exceeded",
-    "message": "Free tier quota exhausted (200/month). Switch to x402 pay-per-call for unlimited access.",
-    "resets_at": "2026-05-01T00:00:00.000Z"
-  }
-}
+```
+X-Quota-Exhausted: true
+X-Quota-Used: 200
+X-Quota-Limit: 200
+X-Quota-Month: 2026-07
 ```
 
-At that point, you have two options:
-1. **Wait for the monthly reset** — quota resets on the 1st of each month
-2. **Switch to x402 pay-per-call** — remove the `Authorization` header and let your x402-compatible client handle payments automatically. See [x402 Payments](/docs/x402).
+The 402 body lists your three options in machine-readable form:
+
+1. **Buy a prepaid credit pack** — by card on the [pricing page](/pricing), or in USDC via `POST /v1/credits/buy/1k|5k|25k`. Credits never expire and attach to your existing key.
+2. **Pay per call via x402** — an x402-compatible client pays automatically in USDC, no key change needed. See [x402 Payments](/docs/x402).
+3. **Wait for the monthly reset** — the quota resets on the 1st of each month.
 
 ## TypeScript example
 

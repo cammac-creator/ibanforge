@@ -18,12 +18,12 @@ const groups: DocGroup[] = [
   {
     labelKey: "gettingStarted",
     icon: <BookOpen className="size-4" />,
-    slugs: ["index", "x402"],
+    slugs: ["index", "api-keys", "x402"],
   },
   {
     labelKey: "endpoints",
     icon: <Zap className="size-4" />,
-    slugs: ["iban-validate", "iban-batch", "bic-lookup"],
+    slugs: ["iban-validate", "iban-batch", "bic-lookup", "compliance", "ch-clearing"],
   },
   {
     labelKey: "advanced",

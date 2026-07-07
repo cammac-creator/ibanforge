@@ -8,7 +8,7 @@ order: 0
 
 [Download Postman Collection](/ibanforge-postman.json)
 
-IBANforge is a fast, reliable API for **IBAN validation** and **BIC/SWIFT lookup**. It covers 89 countries with real-time checksum verification, BBAN structure parsing, enriched institution data from GLEIF, **SEPA compliance info**, **issuer classification** (bank vs. EMI/neobank), and **risk indicators** for compliance agents.
+IBANforge is a fast, reliable API for **IBAN validation** and **BIC/SWIFT lookup**. It covers 89 countries with real-time checksum verification, BBAN structure parsing, enriched institution data from GLEIF, **SEPA compliance info**, **issuer classification** (bank vs. EMI/neobank), **sanctions & compliance screening** with a 0–100 risk score, and exclusive **Swiss clearing (BC-Nummer)** data from SIX BankMaster.
 
 ## Base URL
 
@@ -20,9 +20,13 @@ All endpoints are served over HTTPS. HTTP requests are redirected automatically.
 
 ## Authentication
 
-IBANforge uses **x402 micropayments** instead of traditional API keys. Each request costs a fraction of a cent, paid automatically in USDC. No signup, no subscription, no rate limits.
+Three ways in — pick what fits, your app or agent never hits a dead-end:
 
-Your HTTP client attaches a payment header, and the API verifies it before processing. See the [x402 micropayments guide](/docs/x402) for details.
+1. **Free API key** — 200 requests/month, no credit card. [Generate one](/docs/api-keys) with a single POST, then send `Authorization: Bearer ifk_...` with each request.
+2. **Prepaid credit packs** — 1k = $5, 5k = $20, 25k = $80. They never expire, purchasable **by card** or in USDC (`POST /v1/credits/buy/1k|5k|25k`). See [pricing](/pricing).
+3. **x402 micropayments** — fully autonomous pay-per-call in USDC for agents, no account at all. See the [x402 guide](/docs/x402).
+
+A request without a valid key or payment gets a `402` response with machine-readable instructions for all three paths — autonomous agents can self-onboard.
 
 ## Endpoints at a glance
 
@@ -31,6 +35,8 @@ Your HTTP client attaches a payment header, and the API verifies it before proce
 | `/v1/iban/validate` | POST | $0.005 | Validate a single IBAN |
 | `/v1/iban/batch` | POST | $0.002/IBAN | Validate up to 100 IBANs |
 | `/v1/bic/:code` | GET | $0.003 | Look up a BIC/SWIFT code |
+| `/v1/iban/compliance` | POST | $0.02 | Sanctions, FATF, SEPA/VoP reachability + 0–100 risk score |
+| `/v1/ch/clearing/:iid` | GET | $0.003 | Swiss BC-Nummer / IID lookup (SIX BankMaster) |
 | `/v1/demo` | GET | Free | Example validations (no payment needed) |
 | `/health` | GET | Free | Service health check |
 
@@ -95,9 +101,12 @@ This returns pre-validated example IBANs from multiple countries so you can expl
 
 ## Next steps
 
+- [API keys](/docs/api-keys) — get your free key, 200 requests/month
 - [Validate a single IBAN](/docs/iban-validate) — full endpoint reference
 - [Batch validation](/docs/iban-batch) — validate up to 100 IBANs at once
 - [BIC/SWIFT lookup](/docs/bic-lookup) — search institution data by BIC code
-- [x402 micropayments](/docs/x402) — how payment works
+- [Compliance check](/docs/compliance) — sanctions, FATF, VoP and risk score
+- [Swiss Clearing lookup](/docs/ch-clearing) — BC-Nummer, SIC and instant payments
+- [x402 micropayments](/docs/x402) — how autonomous payment works
 - [MCP integration](/docs/mcp) — connect IBANforge to AI agents
 - [Error reference](/docs/errors) — all error codes and troubleshooting

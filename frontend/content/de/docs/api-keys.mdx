@@ -51,13 +51,15 @@ Der Schluessel funktioniert auf allen kostenpflichtigen Endpunkten:
 - `POST /v1/iban/batch`
 - `GET /v1/bic/:code`
 - `POST /v1/iban/compliance`
+- `GET /v1/ch/clearing/:iid`
 
-## Grenzen des kostenlosen Kontingents
+## Die Angebote im Überblick
 
-| Plan | Anfragen/Monat | Kosten |
+| Plan | Volumen | Kosten |
 |---|---|---|
-| Kostenlos (API-Schluessel) | 200 | $0 |
-| x402 Pay-per-Call | Unbegrenzt | $0,003–$0,02/Aufruf |
+| Kostenlos (API-Schluessel) | 200 Anfragen/Monat | $0 |
+| Prepaid-Guthabenpakete — Karte oder USDC | 1k / 5k / 25k Aufrufe | $5 / $20 / $80 — verfallen nie |
+| x402 Pay-per-Call | Unbegrenzt | $0,002–$0,02/Aufruf |
 
 Die 200 kostenlosen Anfragen werden ueber alle Endpunkte geteilt und setzen sich am 1. jedes Monats zurueck.
 
@@ -84,21 +86,20 @@ curl https://api.ibanforge.com/v1/keys/usage \
 
 ## Wenn Ihr Kontingent erschoepft ist
 
-Wenn Ihre 200 kostenlosen Anfragen aufgebraucht sind, gibt die API eine `429 Too Many Requests`-Antwort zurueck:
+Ihre Integration landet **nicht** in einer Sackgasse. Sind die 200 monatlichen Anfragen aufgebraucht, antwortet die API mit `402 Payment Required` (x402) statt einem harten 429 — mit Hinweis-Headern, die genau sagen, was passiert ist:
 
-```json
-{
-  "error": {
-    "code": "quota_exceeded",
-    "message": "Kostenloses Kontingent erschoepft (200/Monat). Wechseln Sie zu x402 Pay-per-Call fuer unbegrenzten Zugriff.",
-    "resets_at": "2026-05-01T00:00:00.000Z"
-  }
-}
+```
+X-Quota-Exhausted: true
+X-Quota-Used: 200
+X-Quota-Limit: 200
+X-Quota-Month: 2026-07
 ```
 
-Sie haben dann zwei Moeglichkeiten:
-1. **Auf den monatlichen Reset warten** — das Kontingent setzt sich am 1. jedes Monats zurueck
-2. **Zu x402 Pay-per-Call wechseln** — entfernen Sie den `Authorization`-Header und lassen Sie Ihren x402-kompatiblen Client die Zahlungen automatisch verwalten. Siehe [x402-Zahlungen](/docs/x402).
+Der 402-Body listet Ihre drei Optionen maschinenlesbar auf:
+
+1. **Prepaid-Guthabenpaket kaufen** — per Karte auf der [Preisseite](/pricing) oder in USDC via `POST /v1/credits/buy/1k|5k|25k`. Guthaben verfällt nie und wird an Ihren bestehenden Schlüssel gebunden.
+2. **Pay-per-Call via x402** — ein x402-kompatibler Client zahlt automatisch in USDC, ohne Schlüsselwechsel. Siehe [x402-Zahlungen](/docs/x402).
+3. **Auf den monatlichen Reset warten** — das Kontingent setzt sich am 1. jedes Monats zurueck.
 
 ## TypeScript-Beispiel
 

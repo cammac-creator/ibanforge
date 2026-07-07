@@ -23,7 +23,8 @@ POST https://api.ibanforge.com/v1/iban/validate
 | Header | Wert | Erforderlich |
 |---|---|---|
 | `Content-Type` | `application/json` | Ja |
-| `X-PAYMENT` | x402-Zahlungstoken | Ja |
+| `Authorization` | `Bearer ifk_...` (kostenloser API-Schlüssel) | Einer von beiden |
+| `X-PAYMENT` | x402-Zahlungstoken | Einer von beiden |
 
 ### Body
 

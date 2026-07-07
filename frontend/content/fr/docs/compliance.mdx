@@ -1,0 +1,127 @@
+---
+title: "Contrôle de conformité"
+description: "POST /v1/iban/compliance — screening sanctions au niveau bancaire (OFAC/EU/ONU/SECO), statut FATF, joignabilité SEPA, participation VoP et score de risque 0–100."
+order: 4
+---
+
+# Contrôle de conformité
+
+Le triage de risque avant paiement, en un seul appel. Exécute une validation IBAN complète, puis ajoute un **bloc compliance** : screening sanctions de la banque teneuse de compte (OFAC, UE, ONU, SECO), statut FATF du pays, joignabilité SEPA (SCT / SDD / SCT Inst), participation à la Verification of Payee, et un **score de risque 0–100** sur lequel votre code ou votre agent peut brancher sa décision.
+
+## Endpoint
+
+```
+POST https://api.ibanforge.com/v1/iban/compliance
+```
+
+**Coût :** 0,02 $ par requête (ou quota gratuit / crédits prépayés)
+
+## Requête
+
+### En-têtes
+
+| En-tête | Valeur | Requis |
+|---|---|---|
+| `Content-Type` | `application/json` | Oui |
+| `Authorization` | `Bearer ifk_...` (clé API gratuite) | L'un des deux |
+| `X-PAYMENT` | Token de paiement x402 | L'un des deux |
+
+### Corps
+
+```json
+{
+  "iban": "DE89 3704 0044 0532 0130 00"
+}
+```
+
+| Champ | Type | Description |
+|---|---|---|
+| `iban` | `string` | L'IBAN à contrôler. Les espaces et tirets sont retirés automatiquement. Insensible à la casse. |
+
+## Réponse
+
+### Succès (200)
+
+```json
+{
+  "iban": "DE89370400440532013000",
+  "valid": true,
+  "country": { "code": "DE", "name": "Germany" },
+  "check_digits": "89",
+  "bban": { "bank_code": "37040044", "account_number": "0532013000" },
+  "sepa": { "member": true, "schemes": ["SCT", "SDD", "SCT_INST"], "vop_required": true },
+  "formatted": "DE89 3704 0044 0532 0130 00",
+  "bic": { "code": "COBADEFF", "bank_name": "COMMERZBANK Aktiengesellschaft", "city": "Frankfurt am Main" },
+  "issuer": { "type": "bank", "name": "COMMERZBANK Aktiengesellschaft" },
+  "risk_indicators": {
+    "issuer_type": "bank",
+    "country_risk": "standard",
+    "test_bic": false,
+    "sepa_reachable": true,
+    "vop_coverage": true
+  },
+  "compliance": {
+    "sanctions": {
+      "country_sanctioned": false,
+      "bank_sanctioned": false,
+      "matched_lists": [],
+      "fatf_status": "member"
+    },
+    "reachability": { "sepa_instant": true, "sct": true, "sdd": true },
+    "vop": { "participant": true, "status": "active" },
+    "risk_score": 0,
+    "risk_level": "low",
+    "flags": []
+  },
+  "meta": {
+    "scope": "bank_bic_only",
+    "disclaimer": "Informational triage only — NOT a regulated AML/CFT product. Sanctions screening is performed at the BANK (BIC8) level: it flags the holding institution, NOT the beneficiary / account-holder name. Most sanctions designations target persons and companies, which this does not screen. Use a regulated provider (Refinitiv, ComplyAdvantage, etc.) for name-level KYC/AML obligations.",
+    "sanctions_as_of": "2026-07-05T04:29:13.136Z",
+    "fatf_as_of": "2026-02",
+    "sources": "OFAC,EU,UN,SECO,FATF,EPC-SCT,EPC-SDD,EPC-SCT_INST"
+  },
+  "cost_usdc": 0.02,
+  "processing_ms": 25.66
+}
+```
+
+### Le bloc `compliance`
+
+| Champ | Description |
+|---|---|
+| `sanctions.country_sanctioned` | Le pays de l'IBAN fait l'objet d'un programme de sanctions global (p. ex. RU, BY, IR). |
+| `sanctions.bank_sanctioned` | La banque teneuse de compte (BIC8) est désignée sur les listes OFAC, UE, ONU ou SECO. |
+| `sanctions.matched_lists` | Les listes concernées, p. ex. `["OFAC", "EU"]`. Vide si rien ne matche. |
+| `sanctions.fatf_status` | Position FATF du pays : `member`, `increased_monitoring` (liste grise), `high_risk` (liste noire) ou `none`. |
+| `reachability` | Joignabilité de la banque via SEPA SCT, SDD et SCT Inst (registres EPC). |
+| `vop` | Participation à la Verification of Payee et son statut — obligatoire en zone euro depuis octobre 2025. |
+| `risk_score` | Agrégat 0–100. Plus c'est haut, plus c'est risqué. |
+| `risk_level` | `low` (0–29), `medium` (30–59), `high` (60–100). |
+| `flags` | Les raisons du score, lisibles par machine, p. ex. `["country_sanctioned", "fatf_high_risk"]`. |
+
+Un IBAN d'un pays sanctionné (p. ex. la Russie) renvoie `risk_level: "high"` avec un score de 60+ et des flags explicites — essayez-le dans le [playground](/playground).
+
+## Périmètre — à lire avant de s'y fier
+
+Le champ `meta.scope` indique `bank_bic_only`, et c'est exactement ça : le screening s'effectue au **niveau de la banque** (BIC8), pas au niveau du titulaire du compte. Il signale les paiements routés via des institutions désignées ou des pays sanctionnés. Il ne contrôle **pas** les noms de bénéficiaires, et ce n'est **pas** un produit AML/CFT réglementé — pour les obligations KYC/AML au niveau des noms, utilisez un fournisseur réglementé. Le disclaimer complet est embarqué dans chaque réponse : les agents en aval ne peuvent pas le manquer.
+
+## Fraîcheur des données
+
+| Source | Rafraîchissement |
+|---|---|
+| Listes de sanctions (OFAC, UE, ONU, SECO) | Hebdomadaire — voir `meta.sanctions_as_of` dans chaque réponse |
+| Listes FATF | À chaque plénière FATF — voir `meta.fatf_as_of` |
+| Joignabilité SEPA (EPC SCT / SDD / SCT Inst) | Mensuel |
+
+## Cas d'usage
+
+- **Triage avant paiement** — bloquer ou escalader `high`, revoir `medium`, laisser passer `low`.
+- **Garde-fous d'agents** — un agent MCP contrôle la conformité avant d'initier tout virement (outil `check_compliance`).
+- **Screening à l'onboarding** — signaler les IBAN de fournisseurs ou clients tenus par des banques désignées avant le premier versement.
+
+## Étapes suivantes
+
+- [Valider un IBAN](/docs/iban-validate) — la validation sans le bloc compliance, à 0,005 $
+- [Clearing suisse](/docs/ch-clearing) — BC-Nummer, SIC et paiements instantanés
+- [Clés API](/docs/api-keys) — 200 requêtes gratuites par mois
+- [Référence des erreurs](/docs/errors) — tous les codes d'erreur

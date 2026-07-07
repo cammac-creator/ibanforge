@@ -8,7 +8,7 @@ order: 0
 
 [Postman Collection herunterladen](/ibanforge-postman.json)
 
-IBANforge ist eine schnelle, zuverlässige API für **IBAN-Validierung** und **BIC/SWIFT-Abfrage**. Sie deckt über 80 Länder ab und bietet Echtzeit-Prüfsummenverifizierung, BBAN-Strukturanalyse, angereicherte Institutsdaten von GLEIF und weiteren öffentlichen Quellen (SWIFT-Verzeichnis, Bundesbank, SIX, NBP), **SEPA-Konformitätsinformationen**, **Emittentenklassifizierung** (Bank vs. E-Geld-Institut/Neobank) und **Risikoindikatoren** für Compliance-Agenten.
+IBANforge ist eine schnelle, zuverlässige API für **IBAN-Validierung** und **BIC/SWIFT-Abfrage**. Sie deckt 89 Länder ab und bietet Echtzeit-Prüfsummenverifizierung, BBAN-Strukturanalyse, angereicherte Institutsdaten von GLEIF und weiteren öffentlichen Quellen (SWIFT-Verzeichnis, Bundesbank, SIX, NBP), **SEPA-Konformitätsinformationen**, **Emittentenklassifizierung** (Bank vs. E-Geld-Institut/Neobank), **Sanktions- und Compliance-Screening** mit Risiko-Score von 0–100 sowie exklusive **Schweizer Clearing-Daten (BC-Nummer)** aus dem SIX BankMaster.
 
 ## Basis-URL
 
@@ -20,9 +20,13 @@ Alle Endpunkte werden über HTTPS bereitgestellt. HTTP-Anfragen werden automatis
 
 ## Authentifizierung
 
-IBANforge verwendet **x402-Mikrozahlungen** anstelle herkömmlicher API-Schlüssel. Jede Anfrage kostet einen Bruchteil eines Cents und wird automatisch in USDC bezahlt. Keine Registrierung, kein Abonnement, keine Ratenlimits.
+Drei Wege hinein — wählen Sie, was passt; Ihre App oder Ihr Agent landet nie in einer Sackgasse:
 
-Ihr HTTP-Client fügt einen Zahlungs-Header hinzu, und die API verifiziert diesen vor der Verarbeitung. Weitere Details finden Sie im [Leitfaden zu x402-Mikrozahlungen](/docs/x402).
+1. **Kostenloser API-Schlüssel** — 200 Anfragen/Monat, keine Kreditkarte. [Generieren Sie einen](/docs/api-keys) mit einem einzigen POST und senden Sie dann `Authorization: Bearer ifk_...` mit jeder Anfrage.
+2. **Prepaid-Guthabenpakete** — 1k = 5 $, 5k = 20 $, 25k = 80 $. Sie verfallen nie und sind **per Karte** oder in USDC kaufbar (`POST /v1/credits/buy/1k|5k|25k`). Siehe [Preise](/pricing).
+3. **x402-Mikrozahlungen** — vollständig autonome Bezahlung pro Aufruf in USDC für Agenten, ganz ohne Konto. Siehe [x402-Leitfaden](/docs/x402).
+
+Eine Anfrage ohne gültigen Schlüssel oder Zahlung erhält eine `402`-Antwort mit maschinenlesbaren Anweisungen für alle drei Wege — autonome Agenten können sich selbst onboarden.
 
 ## Endpunkte im Überblick
 
@@ -31,6 +35,8 @@ Ihr HTTP-Client fügt einen Zahlungs-Header hinzu, und die API verifiziert diese
 | `/v1/iban/validate` | POST | $0.005 | Einzelne IBAN validieren |
 | `/v1/iban/batch` | POST | $0.002/IBAN | Bis zu 100 IBANs validieren |
 | `/v1/bic/:code` | GET | $0.003 | BIC/SWIFT-Code abfragen |
+| `/v1/iban/compliance` | POST | $0.02 | Sanktionen, FATF, SEPA/VoP-Erreichbarkeit + Risiko-Score 0–100 |
+| `/v1/ch/clearing/:iid` | GET | $0.003 | Schweizer BC-Nummer / IID abfragen (SIX BankMaster) |
 | `/v1/demo` | GET | Kostenlos | Beispielvalidierungen (keine Zahlung erforderlich) |
 | `/health` | GET | Kostenlos | Service-Gesundheitsprüfung |
 
@@ -95,9 +101,12 @@ Dieser gibt vorvalidierte Beispiel-IBANs aus mehreren Ländern zurück, damit Si
 
 ## Nächste Schritte
 
+- [API-Schlüssel](/docs/api-keys) — holen Sie Ihren kostenlosen Schlüssel, 200 Anfragen/Monat
 - [Einzelne IBAN validieren](/docs/iban-validate) — vollständige Endpunkt-Referenz
 - [Stapelvalidierung](/docs/iban-batch) — bis zu 100 IBANs auf einmal validieren
 - [BIC/SWIFT-Abfrage](/docs/bic-lookup) — Institutsdaten nach BIC-Code suchen
-- [x402-Mikrozahlungen](/docs/x402) — wie die Bezahlung funktioniert
+- [Compliance-Prüfung](/docs/compliance) — Sanktionen, FATF, VoP und Risiko-Score
+- [Schweizer Clearing](/docs/ch-clearing) — BC-Nummer, SIC und Instant Payments
+- [x402-Mikrozahlungen](/docs/x402) — wie autonome Bezahlung funktioniert
 - [MCP-Integration](/docs/mcp) — IBANforge mit KI-Agenten verbinden
 - [Fehlerreferenz](/docs/errors) — alle Fehlercodes und Fehlerbehebung
