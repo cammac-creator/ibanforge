@@ -155,7 +155,7 @@
   "pricing": {
     "metadata": {
       "title": "Pricing",
-      "description": "Three ways to pay, zero dead-ends: x402 pay-per-call (no signup), a free key (200/mo), or prepaid credit packs."
+      "description": "Start free with 200 requests/month, prepay credit packs by card or USDC, or pay per call with x402. Fractions of a cent per request."
     },
     "badge": "Transparent pricing",
     "hero": {
@@ -163,7 +163,7 @@
         "prefix": "Pay per",
         "highlight": "call"
       },
-      "description": "Three ways to pay, zero dead-ends: pay-per-call with x402 (no signup), a free key (200 req/month), or prepaid credit packs. Fractions of a cent per request.",
+      "description": "Start with a free key (200 requests/month), top up prepaid credits by card or USDC, or let your agent pay per call with x402. Fractions of a cent per request.",
       "cta": {
         "tryFree": "Try it free",
         "x402Explained": "x402 explained →"
@@ -219,10 +219,7 @@
     },
     "calculator": {
       "heading": "Estimate your monthly cost",
-      "subtitle": "Pay only for the calls you make — no minimums.",
-      "callsPerMonth": "Calls per month",
-      "callsPerMonthUnit": "calls / month",
-      "costBreakdown": "Cost breakdown",
+      "subtitle": "Set your monthly volume per endpoint — the total is the sum of every line.",
       "perCall": "call",
       "table": {
         "endpoint": "Endpoint",
@@ -237,10 +234,14 @@
         "compliance": "Compliance Check"
       },
       "summary": {
-        "line": "At <strong>{count}</strong> calls/month per endpoint",
+        "total": "Estimated monthly total",
+        "payg": "pay-per-call via x402",
         "note": "You only pay for what you actually call",
-        "forEndpoint": "for {path}"
-      }
+        "freeKey": "This volume fits in the free API key — 200 requests/month, $0.",
+        "packs": "Or prepay {credits} credits for {price} — they never expire (−{percent} vs pay-per-call).",
+        "packsEven": "Or prepay {credits} credits for {price} — same price, and they never expire."
+      },
+      "callsHeader": "Calls / month"
     },
     "x402": {
       "badge": "x402 Protocol",
@@ -270,7 +271,7 @@
       },
       "2": {
         "question": "Is there a free tier?",
-        "answer": "Yes! Generate a free API key at POST /v1/keys/generate with your email. Get 200 requests/month on all endpoints. No credit card, no crypto wallet needed. For higher volumes, use x402 USDC micropayments."
+        "answer": "Yes! Generate a free API key at POST /v1/keys/generate with your email. Get 200 requests/month on all endpoints. No credit card, no crypto wallet needed. For higher volumes, buy a prepaid credit pack by card — or pay per call in USDC via x402."
       },
       "3": {
         "question": "What about high volume?",
@@ -280,13 +281,13 @@
     },
     "cta": {
       "heading": "Start building for free",
-      "description": "Start with x402 (no account) or grab a free key in seconds. Hit the playground, read the docs, ship when you are ready.",
+      "description": "Grab a free key in seconds — or start straight away with x402, no account needed. Hit the playground, read the docs, ship when you are ready.",
       "openPlayground": "Open playground",
       "readDocs": "Read the docs"
     },
     "rails": {
       "heading": "Three ways to pay",
-      "subtitle": "Pick what fits — your agent or app never hits a dead-end.",
+      "subtitle": "Start free, prepay as you grow — or let your agent pay per call.",
       "x402": {
         "tag": "x402 · no signup",
         "title": "Pay per call",
@@ -302,9 +303,15 @@
       "packs": {
         "tag": "Credit packs",
         "title": "Prepaid credits",
-        "body": "Buy in bulk, never expires: 1k = $5, 5k = $20, 25k = $80 (down to $0.0032/call). Agents purchase in USDC via POST /v1/credits/buy/1k|5k|25k.",
-        "note": "Secure card checkout · API key delivered by email · or pay per call in USDC."
+        "body": "Buy in bulk, never expires: 1k = $5, 5k = $20, 25k = $80 (down to $0.0032/call). One credit = one API call, any endpoint.",
+        "note": "Stripe checkout — API key delivered by email. Agents can buy in USDC: POST /v1/credits/buy/1k|5k|25k.",
+        "cardLabel": "Pay by card"
       }
+    },
+    "oem": {
+      "label": "Editor / OEM",
+      "text": "Embedding IBANforge in your own product? Editor / OEM licensing with SLA and EU invoicing — talk to us.",
+      "cta": "support@ibanforge.com"
     }
   },
   "playground": {

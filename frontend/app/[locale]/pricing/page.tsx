@@ -1,8 +1,10 @@
 import type { Metadata } from "next"
 import Link from "next/link"
 import { getTranslations } from "next-intl/server"
+import { CreditCard, FlaskConical, Link2, Wallet, Zap } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { CodeBlock } from "@/components/code-block"
 import { CostCalculator } from "./calculator"
 import { Faq } from "./faq"
 import { GetKeyButton } from "@/components/api-key-dialog"
@@ -10,7 +12,7 @@ import { GetKeyButton } from "@/components/api-key-dialog"
 export const metadata: Metadata = {
   title: "Pricing",
   description:
-    "Three ways to pay, zero dead-ends: pay-per-call with x402 (no signup), a free key (200 req/month), or prepaid credit packs. Fractions of a cent per request.",
+    "Start free with 200 requests/month, prepay credit packs by card or USDC, or pay per call with x402. Fractions of a cent per request.",
 }
 
 const ENDPOINT_COUNT = 5
@@ -35,11 +37,27 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
   }))
 
   const X402_ITEMS = [
-    { icon: "💳", text: t('x402.items.0') },
-    { icon: "⚡", text: t('x402.items.1') },
-    { icon: "🔗", text: t('x402.items.2') },
-    { icon: "🆓", text: t('x402.items.3') },
+    { Icon: Wallet, text: t('x402.items.0') },
+    { Icon: Zap, text: t('x402.items.1') },
+    { Icon: Link2, text: t('x402.items.2') },
+    { Icon: FlaskConical, text: t('x402.items.3') },
   ]
+
+  // x402 example snippet — rendered through the shared <CodeBlock> so every
+  // code surface on the site speaks the same visual language.
+  const X402_SNIPPET = [
+    t('x402.codeExample.install'),
+    "npm install x402-fetch",
+    "",
+    t('x402.codeExample.call'),
+    'import { wrapFetch } from "x402-fetch"',
+    t('x402.codeExample.comment'),
+    "const fetch = wrapFetch()",
+    "",
+    "const res = await fetch(",
+    '  "https://api.ibanforge.com/v1/iban/validate"',
+    ")",
+  ].join("\n")
 
   const faqJsonLd = {
     "@context": "https://schema.org",
@@ -96,22 +114,9 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
         <p className="text-center text-muted-foreground mb-10 text-sm">
           {t('rails.subtitle')}
         </p>
+        {/* Order mirrors the real 402 hierarchy: free key → prepaid packs → x402. */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* x402 */}
-          <div className="card-surface rounded-xl border p-6 flex flex-col gap-3">
-            <span className="font-mono text-xs uppercase tracking-widest text-amber-500">
-              {t('rails.x402.tag')}
-            </span>
-            <h3 className="text-lg font-semibold">{t('rails.x402.title')}</h3>
-            <p className="text-sm text-muted-foreground leading-relaxed flex-1">{t('rails.x402.body')}</p>
-            <Link
-              href={`/${locale}/docs/x402`}
-              className="text-sm text-amber-500 hover:text-amber-400 underline underline-offset-4 transition-colors w-fit"
-            >
-              {t('rails.x402.cta')}
-            </Link>
-          </div>
-          {/* Free key — highlighted */}
+          {/* 1. Free key — highlighted */}
           <div className="rounded-xl border border-amber-500/40 bg-amber-500/5 p-6 flex flex-col gap-3">
             <span className="font-mono text-xs uppercase tracking-widest text-amber-500">
               {t('rails.key.tag')}
@@ -126,14 +131,18 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
               {t('rails.key.cta')}
             </GetKeyButton>
           </div>
-          {/* Credit packs — buyable via Stripe (live card checkout) */}
+          {/* 2. Credit packs — buyable via Stripe (live card checkout) */}
           <div className="card-surface rounded-xl border p-6 flex flex-col gap-3">
             <span className="font-mono text-xs uppercase tracking-widest text-amber-500">
               {t('rails.packs.tag')}
             </span>
             <h3 className="text-lg font-semibold">{t('rails.packs.title')}</h3>
             <p className="text-sm text-muted-foreground leading-relaxed flex-1">{t('rails.packs.body')}</p>
-            <div className="flex flex-wrap gap-2 pt-1">
+            <p className="inline-flex items-center gap-2 text-sm font-medium text-foreground">
+              <CreditCard className="size-4 text-amber-500" aria-hidden />
+              {t('rails.packs.cardLabel')}
+            </p>
+            <div className="flex flex-wrap gap-2">
               {CREDIT_PACKS.map((p) => (
                 <a
                   key={p.bundle}
@@ -148,6 +157,20 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
             <p className="text-xs text-muted-foreground/70 leading-relaxed border-t border-border pt-3">
               {t('rails.packs.note')}
             </p>
+          </div>
+          {/* 3. x402 */}
+          <div className="card-surface rounded-xl border p-6 flex flex-col gap-3">
+            <span className="font-mono text-xs uppercase tracking-widest text-amber-500">
+              {t('rails.x402.tag')}
+            </span>
+            <h3 className="text-lg font-semibold">{t('rails.x402.title')}</h3>
+            <p className="text-sm text-muted-foreground leading-relaxed flex-1">{t('rails.x402.body')}</p>
+            <Link
+              href={`/${locale}/docs/x402`}
+              className="text-sm text-amber-500 hover:text-amber-400 underline underline-offset-4 transition-colors w-fit"
+            >
+              {t('rails.x402.cta')}
+            </Link>
           </div>
         </div>
       </section>
@@ -191,7 +214,10 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
         </div>
 
         {/* Free endpoints note */}
-        <div className="mt-6 rounded-xl border border-border bg-zinc-900/30 px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-3 justify-between">
+        <div
+          className="mt-6 rounded-xl border border-border px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-3 justify-between"
+          style={{ background: "var(--ink-1)" }}
+        >
           <div>
             <p className="text-sm font-medium text-foreground">{t('free.title')}</p>
             <p className="text-sm text-muted-foreground mt-0.5">
@@ -246,7 +272,7 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
             <ul className="flex flex-col gap-3">
               {X402_ITEMS.map((item) => (
                 <li key={item.text} className="flex gap-3 text-sm text-muted-foreground leading-relaxed">
-                  <span className="text-base shrink-0">{item.icon}</span>
+                  <item.Icon className="size-4 shrink-0 mt-0.5 text-amber-500/90" aria-hidden />
                   <span>{item.text}</span>
                 </li>
               ))}
@@ -259,22 +285,12 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
             </Link>
           </div>
 
-          {/* Code snippet */}
+          {/* Code snippet — shared CodeBlock (same hairline/ink language as /agents and the landing) */}
           <div className="flex-1">
             <p className="text-xs text-muted-foreground uppercase tracking-widest mb-3 font-medium">
               {t('x402.codeExample.title')}
             </p>
-            <div className="rounded-lg bg-zinc-950 border border-border p-4 font-mono text-xs leading-relaxed overflow-x-auto">
-              <p className="text-zinc-500">{t('x402.codeExample.install')}</p>
-              <p className="text-zinc-300">npm install x402-fetch</p>
-              <p className="mt-3 text-zinc-500">{t('x402.codeExample.call')}</p>
-              <p className="text-amber-400">{"import"}{" "}<span className="text-zinc-300">{"{ wrapFetch }"}</span>{" "}<span className="text-amber-400">from</span>{" "}<span className="text-green-400">{'"x402-fetch"'}</span></p>
-              <p className="text-zinc-500 mt-1">{t('x402.codeExample.comment')}</p>
-              <p className="text-zinc-300">{"const"} fetch = wrapFetch()</p>
-              <p className="mt-2 text-zinc-300">{"const"} res = <span className="text-amber-400">await</span> fetch(</p>
-              <p className="text-green-400 pl-4">{'"https://api.ibanforge.com/v1/iban/validate"'}</p>
-              <p className="text-zinc-300 pl-2">{")"}</p>
-            </div>
+            <CodeBlock code={X402_SNIPPET} language="typescript" />
           </div>
         </div>
       </section>
@@ -290,6 +306,25 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
         </h2>
 
         <Faq />
+      </section>
+
+      {/* ── Editor / OEM — contact only, no priced offer (t21 not live yet) ── */}
+      <section
+        className="border-t px-4 py-14 w-full"
+        style={{ borderColor: 'var(--hairline)' }}
+      >
+        <div className="max-w-3xl mx-auto flex flex-col items-center text-center gap-3">
+          <span className="eyebrow">{t('oem.label')}</span>
+          <p className="text-sm text-[var(--fg-2)] leading-relaxed max-w-xl text-balance">
+            {t('oem.text')}
+          </p>
+          <a
+            href="mailto:support@ibanforge.com?subject=OEM%20licensing"
+            className="font-mono text-sm text-amber-500 hover:text-amber-400 underline underline-offset-4 transition-colors"
+          >
+            {t('oem.cta')}
+          </a>
+        </div>
       </section>
 
       {/* ── CTA ───────────────────────────────────────────────────────────── */}
