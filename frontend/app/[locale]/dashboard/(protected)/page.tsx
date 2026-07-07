@@ -127,12 +127,12 @@ export default async function DashboardPage({
 
   if (!stats) {
     return (
-      <div className="rounded-xl border border-zinc-800/60 bg-gradient-to-br from-zinc-900 to-zinc-900/60 p-8 text-center">
+      <div className="rounded-xl border border-[var(--ink-4)]/60 bg-gradient-to-br from-[var(--ink-2)] to-[var(--ink-2)]/60 p-8 text-center">
         <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-500/10">
           <span className="text-xl text-red-400">!</span>
         </div>
-        <p className="font-medium text-zinc-300">{t('error.apiUnavailable')}</p>
-        <p className="mt-1 text-sm text-zinc-500">{t('error.apiUnavailableDescription')}</p>
+        <p className="font-medium text-[var(--fg-2)]">{t('error.apiUnavailable')}</p>
+        <p className="mt-1 text-sm text-[var(--fg-4)]">{t('error.apiUnavailableDescription')}</p>
       </div>
     );
   }
@@ -185,8 +185,8 @@ export default async function DashboardPage({
 
   const heatmapData = hourly?.heatmap ?? [];
 
-  const card = 'rounded-xl border border-zinc-800/60 bg-gradient-to-br from-zinc-900 to-zinc-900/60 p-5';
-  const sectionTitle = 'flex items-center gap-2 text-sm font-medium text-zinc-300';
+  const card = 'rounded-xl border border-[var(--ink-4)]/60 bg-gradient-to-br from-[var(--ink-2)] to-[var(--ink-2)]/60 p-5';
+  const sectionTitle = 'flex items-center gap-2 text-sm font-medium text-[var(--fg-2)]';
 
   return (
     <div className="flex flex-col gap-6">
@@ -235,7 +235,7 @@ export default async function DashboardPage({
             Seules les requêtes sur les endpoints facturables (IBAN / BIC / CH clearing) avec la bonne méthode HTTP. Le bruit (scanner, robots, discovery) est exclu, ainsi que les clés internes (tes tests, les audits Claude, le playground) — le funnel ne mesure que la demande réelle du marché.
             <br />
             <br />
-            <strong className="text-emerald-400">Paid success</strong> = l’agent a payé (x402) ou utilisé sa clé et reçu 2xx.
+            <strong className="text-[var(--ok)]">Paid success</strong> = l’agent a payé (x402) ou utilisé sa clé et reçu 2xx.
             <br />
             <strong className="text-amber-400">Paywall hit</strong> = agent intéressé mais sans auth → 402. C’est là que se joue la conversion.
             <br />
@@ -261,7 +261,7 @@ export default async function DashboardPage({
         </div>
 
         {!keysData ? (
-          <div className="flex h-24 items-center justify-center text-sm text-zinc-600">
+          <div className="flex h-24 items-center justify-center text-sm text-[var(--fg-5)]">
             ADMIN_SECRET non configuré — gestion des clés indisponible.
           </div>
         ) : (
@@ -281,12 +281,12 @@ export default async function DashboardPage({
             )}
 
             {pilots.length === 0 ? (
-              <div className="flex h-24 items-center justify-center text-sm text-zinc-600">Aucun client pilote pour l’instant.</div>
+              <div className="flex h-24 items-center justify-center text-sm text-[var(--fg-5)]">Aucun client pilote pour l’instant.</div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-zinc-800 text-left text-xs uppercase tracking-wide text-zinc-500">
+                    <tr className="border-b border-[var(--ink-4)] text-left text-xs uppercase tracking-wide text-[var(--fg-4)]">
                       <th className="pb-2 font-medium">Client</th>
                       <th className="pb-2 font-medium">Créé</th>
                       <th className="pb-2 font-medium">Usage</th>
@@ -299,20 +299,20 @@ export default async function DashboardPage({
                       const pct = limit > 0 ? Math.round((k.used / limit) * 100) : 0;
                       const status = classify(k);
                       return (
-                        <tr key={k.key_prefix} className="border-b border-zinc-800/50 last:border-0">
+                        <tr key={k.key_prefix} className="border-b border-[var(--ink-4)]/50 last:border-0">
                           <td className="py-3">
                             <div className="flex flex-col">
-                              <span className="max-w-[260px] truncate text-zinc-200">{k.email}</span>
-                              <span className="font-mono text-[10px] text-zinc-600">{k.key_prefix}</span>
+                              <span className="max-w-[260px] truncate text-[var(--fg-1)]">{k.email}</span>
+                              <span className="font-mono text-[10px] text-[var(--fg-5)]">{k.key_prefix}</span>
                             </div>
                           </td>
-                          <td className="py-3 text-xs text-zinc-400">{daysSince(k.created_at)} j</td>
+                          <td className="py-3 text-xs text-[var(--fg-3)]">{daysSince(k.created_at)} j</td>
                           <td className="py-3">
                             <div className="flex items-center gap-3">
-                              <span className="w-24 font-mono text-xs text-zinc-300">
+                              <span className="w-24 font-mono text-xs text-[var(--fg-2)]">
                                 {fmt(k.used, locale)} / {fmt(limit, locale)}
                               </span>
-                              <div className="h-1.5 max-w-[120px] flex-1 overflow-hidden rounded-full bg-zinc-800/60">
+                              <div className="h-1.5 max-w-[120px] flex-1 overflow-hidden rounded-full bg-[var(--ink-4)]/60">
                                 <div className="h-full rounded-full" style={{ width: `${Math.min(pct, 100)}%`, backgroundColor: status.color }} />
                               </div>
                             </div>
@@ -357,7 +357,7 @@ export default async function DashboardPage({
               ]}
             />
           ) : (
-            <div className="flex h-64 items-center justify-center text-sm text-zinc-500">{t('chart.noHistoryData')}</div>
+            <div className="flex h-64 items-center justify-center text-sm text-[var(--fg-4)]">{t('chart.noHistoryData')}</div>
           )}
         </div>
 
@@ -373,13 +373,13 @@ export default async function DashboardPage({
                 const label = t.has(`countries.${row.country}`) ? t(`countries.${row.country}` as Parameters<typeof t>[0]) : row.country;
                 return (
                   <div key={row.country} className="flex items-center gap-3">
-                    <span className="w-5 text-right font-mono text-xs text-zinc-600">{i + 1}</span>
+                    <span className="w-5 text-right font-mono text-xs text-[var(--fg-5)]">{i + 1}</span>
                     <div className="min-w-0 flex-1">
                       <div className="mb-0.5 flex items-center justify-between">
-                        <span className="truncate text-sm text-zinc-200">{label}</span>
+                        <span className="truncate text-sm text-[var(--fg-1)]">{label}</span>
                         <span className="ml-2 flex-shrink-0 font-mono text-xs text-amber-400">{fmt(row.count, locale)}</span>
                       </div>
-                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-800">
+                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--ink-4)]">
                         <div className="h-full rounded-full bg-amber-500/40" style={{ width: `${pct}%` }} />
                       </div>
                     </div>
@@ -388,7 +388,7 @@ export default async function DashboardPage({
               })}
             </div>
           ) : (
-            <div className="flex h-48 items-center justify-center text-sm text-zinc-500">{t('chart.noCountryData')}</div>
+            <div className="flex h-48 items-center justify-center text-sm text-[var(--fg-4)]">{t('chart.noCountryData')}</div>
           )}
         </div>
       </div>

@@ -15,7 +15,7 @@ interface HeatmapProps {
 const DAY_KEYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const;
 
 function cellColor(intensity: number): string {
-  if (intensity === 0) return 'bg-zinc-800/40';
+  if (intensity === 0) return 'bg-[var(--ink-4)]/40';
   if (intensity < 0.25) return 'bg-amber-500/20';
   if (intensity < 0.5) return 'bg-amber-500/40';
   if (intensity < 0.75) return 'bg-amber-500/70';
@@ -41,14 +41,14 @@ export function Heatmap({ data }: HeatmapProps) {
   const isEmpty = data.length === 0;
 
   return (
-    <div className="bg-gradient-to-br from-zinc-900 to-zinc-900/60 border border-zinc-800/60 rounded-xl p-4">
+    <div className="bg-gradient-to-br from-[var(--ink-2)] to-[var(--ink-2)]/60 border border-[var(--ink-4)]/60 rounded-xl p-4">
       <div className="mb-3">
         <p className="text-sm font-semibold text-white">{t('title')}</p>
-        <p className="text-xs text-zinc-500 mt-0.5">{t('subtitle')}</p>
+        <p className="text-xs text-[var(--fg-4)] mt-0.5">{t('subtitle')}</p>
       </div>
 
       {isEmpty ? (
-        <p className="text-sm text-zinc-500 py-6 text-center">{t('noData')}</p>
+        <p className="text-sm text-[var(--fg-4)] py-6 text-center">{t('noData')}</p>
       ) : (
         <div className="overflow-x-auto">
           <div className="min-w-[560px]">
@@ -57,7 +57,7 @@ export function Heatmap({ data }: HeatmapProps) {
               {Array.from({ length: 24 }, (_, h) => (
                 <div key={h} className="flex-1 text-center">
                   {h % 3 === 0 ? (
-                    <span className="text-[9px] text-zinc-600">{h}h</span>
+                    <span className="text-[9px] text-[var(--fg-5)]">{h}h</span>
                   ) : null}
                 </div>
               ))}
@@ -70,7 +70,7 @@ export function Heatmap({ data }: HeatmapProps) {
                 <div key={dayIndex} className="flex items-center gap-1 mb-0.5">
                   {/* Day label */}
                   <div className="w-7 shrink-0 text-right">
-                    <span className="text-[10px] text-zinc-500">
+                    <span className="text-[10px] text-[var(--fg-4)]">
                       {t(`days.${dayKey}`)}
                     </span>
                   </div>

@@ -48,9 +48,9 @@ export function UsageChart({
 
   if (dailyTotal === 0 && monthlyTotal === 0) {
     return (
-      <div className="w-full rounded-lg border border-zinc-800/60 bg-zinc-950/40 px-3 py-2">
-        <p className="text-[10px] uppercase tracking-wide text-zinc-600">Utilisation</p>
-        <p className="mt-1 text-xs text-zinc-600">Aucun appel API enregistré pour l’instant.</p>
+      <div className="w-full rounded-lg border border-[var(--ink-4)]/60 bg-[var(--ink-0)]/40 px-3 py-2">
+        <p className="text-[10px] uppercase tracking-wide text-[var(--fg-5)]">Utilisation</p>
+        <p className="mt-1 text-xs text-[var(--fg-5)]">Aucun appel API enregistré pour l’instant.</p>
       </div>
     );
   }
@@ -80,18 +80,18 @@ export function UsageChart({
   const caption = isDay ? '30 derniers jours · par jour' : '6 derniers mois · par mois';
 
   return (
-    <div className="w-full rounded-lg border border-zinc-800/60 bg-zinc-950/40 px-3 py-2">
+    <div className="w-full rounded-lg border border-[var(--ink-4)]/60 bg-[var(--ink-0)]/40 px-3 py-2">
       <div className="flex items-baseline justify-between gap-2">
-        <p className="text-[10px] uppercase tracking-wide text-zinc-600">Utilisation · {caption}</p>
+        <p className="text-[10px] uppercase tracking-wide text-[var(--fg-5)]">Utilisation · {caption}</p>
         <div className="flex items-center gap-2">
-          <div className="flex overflow-hidden rounded-md border border-zinc-800">
+          <div className="flex overflow-hidden rounded-md border border-[var(--ink-4)]">
             {(['day', 'month'] as const).map((m) => (
               <button
                 key={m}
                 type="button"
                 onClick={() => setMode(m)}
                 className={`px-2 py-0.5 text-[10px] font-medium transition-colors ${
-                  mode === m ? 'bg-violet-500/20 text-violet-200' : 'text-zinc-500 hover:text-zinc-300'
+                  mode === m ? 'bg-violet-500/20 text-violet-200' : 'text-[var(--fg-4)] hover:text-[var(--fg-2)]'
                 }`}
                 aria-pressed={mode === m}
               >
@@ -113,7 +113,7 @@ export function UsageChart({
                 </span>
               )}
               {!isDay && b.value > 0 && (
-                <span className="mb-0.5 text-center font-mono text-[9px] text-zinc-400">{b.value}</span>
+                <span className="mb-0.5 text-center font-mono text-[9px] text-[var(--fg-3)]">{b.value}</span>
               )}
               <div
                 className="w-full rounded-[2px]"
@@ -127,7 +127,7 @@ export function UsageChart({
           );
         })}
       </div>
-      <div className="mt-1 flex justify-between font-mono text-[9px] text-zinc-600">
+      <div className="mt-1 flex justify-between font-mono text-[9px] text-[var(--fg-5)]">
         {isDay ? (
           <>
             <span>{bars[0]?.label}</span>
@@ -139,7 +139,7 @@ export function UsageChart({
         )}
       </div>
       {isDay && dailyTotal === 0 && (
-        <p className="mt-1.5 text-[10px] leading-snug text-zinc-600">
+        <p className="mt-1.5 text-[10px] leading-snug text-[var(--fg-5)]">
           Aucune activité attribuée au jour le jour pour ce client. Le détail quotidien ne se construit que depuis
           le 30 juin&nbsp;; l’historique plus ancien reste visible dans la vue «&nbsp;Mois&nbsp;».
         </p>

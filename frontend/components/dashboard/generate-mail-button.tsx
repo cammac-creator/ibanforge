@@ -62,7 +62,7 @@ export function GenerateMailButton({
       {result && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setResult(null)}>
           <div
-            className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-xl border border-zinc-800 bg-zinc-900 p-5 text-left"
+            className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-xl border border-[var(--ink-4)] bg-[var(--ink-2)] p-5 text-left"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-3 flex items-start justify-between gap-3">
@@ -72,22 +72,22 @@ export function GenerateMailButton({
                   ✓ déposé dans « {result.deposited_in} » de {result.account} — relis et clique Envoyer
                 </p>
               </div>
-              <button type="button" onClick={() => setResult(null)} className="text-lg text-zinc-500 hover:text-white">
+              <button type="button" onClick={() => setResult(null)} className="text-lg text-[var(--fg-4)] hover:text-white">
                 ✕
               </button>
             </div>
-            <p className="mb-1 text-[11px] uppercase tracking-wide text-zinc-500">Objet</p>
-            <p className="mb-4 text-sm text-zinc-200">{result.subject}</p>
+            <p className="mb-1 text-[11px] uppercase tracking-wide text-[var(--fg-4)]">Objet</p>
+            <p className="mb-4 text-sm text-[var(--fg-1)]">{result.subject}</p>
             <div className="grid gap-4 md:grid-cols-2">
               <div>
                 <p className="mb-1 text-[11px] uppercase tracking-wide text-amber-400">Mail envoyé (EN)</p>
-                <pre className="whitespace-pre-wrap rounded-lg border border-zinc-800 bg-zinc-950 p-3 text-xs leading-relaxed text-zinc-200">
+                <pre className="whitespace-pre-wrap rounded-lg border border-[var(--ink-4)] bg-[var(--ink-0)] p-3 text-xs leading-relaxed text-[var(--fg-1)]">
                   {result.email_en}
                 </pre>
               </div>
               <div>
                 <p className="mb-1 text-[11px] uppercase tracking-wide text-blue-400">Traduction FR (toi seul, non envoyée)</p>
-                <pre className="whitespace-pre-wrap rounded-lg border border-zinc-800 bg-zinc-950 p-3 text-xs leading-relaxed text-zinc-400">
+                <pre className="whitespace-pre-wrap rounded-lg border border-[var(--ink-4)] bg-[var(--ink-0)] p-3 text-xs leading-relaxed text-[var(--fg-3)]">
                   {result.translation_fr}
                 </pre>
               </div>

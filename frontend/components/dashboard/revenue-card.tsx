@@ -74,20 +74,20 @@ export function RevenueCard() {
   const partial = (full?.chunks_failed ?? 0) > 0;
 
   return (
-    <div className="rounded-xl border border-zinc-800/60 bg-gradient-to-br from-zinc-900 to-zinc-900/60 p-5">
+    <div className="rounded-xl border border-[var(--ink-4)]/60 bg-gradient-to-br from-[var(--ink-2)] to-[var(--ink-2)]/60 p-5">
       <div className="mb-4 flex items-center gap-2">
-        <p className="text-sm font-medium text-zinc-300">{t('revenue.title')}</p>
+        <p className="text-sm font-medium text-[var(--fg-2)]">{t('revenue.title')}</p>
         <InfoDot>{t('revenue.hint')}</InfoDot>
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {/* ---------- USDC rail ---------- */}
-        <div className="rounded-lg border border-zinc-800/80 bg-zinc-900/40 p-4">
+        <div className="rounded-lg border border-[var(--ink-4)]/80 bg-[var(--ink-2)]/40 p-4">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--fg-4)]">
               {t('revenue.usdcRail')}
             </span>
-            <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-mono font-semibold text-emerald-400">
+            <span className="rounded-full bg-[var(--ok)]/10 px-2 py-0.5 text-[10px] font-mono font-semibold text-[var(--ok)]">
               {t('revenue.live')}
             </span>
           </div>
@@ -98,43 +98,43 @@ export function RevenueCard() {
                 {balance === undefined ? '…' : fmtUsdc(balance)}
               </span>
               {balance !== undefined && balance !== null && (
-                <span className="text-sm font-mono text-zinc-500">USDC</span>
+                <span className="text-sm font-mono text-[var(--fg-4)]">USDC</span>
               )}
             </div>
-            <p className="mt-1 text-xs text-zinc-500">{t('revenue.liveBalance')}</p>
+            <p className="mt-1 text-xs text-[var(--fg-4)]">{t('revenue.liveBalance')}</p>
           </div>
 
           {/* transactions */}
-          <div className="mt-4 border-t border-zinc-800/60 pt-3">
+          <div className="mt-4 border-t border-[var(--ink-4)]/60 pt-3">
             {!full && !txLoading && !txErr && (
               <button
                 onClick={loadHistory}
-                className="w-full rounded-lg border border-zinc-700/70 bg-zinc-800/40 px-3 py-2 text-xs font-medium text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-white"
+                className="w-full rounded-lg border border-[var(--ink-5)]/70 bg-[var(--ink-4)]/40 px-3 py-2 text-xs font-medium text-[var(--fg-2)] transition-colors hover:bg-[var(--ink-4)] hover:text-white"
               >
                 {t('revenue.loadHistory')}
               </button>
             )}
 
             {txLoading && (
-              <div className="flex items-center gap-2 py-2 text-xs text-zinc-500">
-                <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-zinc-600 border-t-amber-400" />
+              <div className="flex items-center gap-2 py-2 text-xs text-[var(--fg-4)]">
+                <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-[var(--fg-5)] border-t-amber-400" />
                 {t('revenue.loading')}
               </div>
             )}
 
             {txErr && (
-              <p className="py-1 text-xs text-zinc-500">
+              <p className="py-1 text-xs text-[var(--fg-4)]">
                 {t('revenue.error')}{' '}
-                <span className="text-zinc-600">{t('revenue.rpcHint')}</span>
+                <span className="text-[var(--fg-5)]">{t('revenue.rpcHint')}</span>
               </p>
             )}
 
             {full && (
               <>
-                <div className="mb-2 flex items-center justify-between text-[11px] text-zinc-500">
+                <div className="mb-2 flex items-center justify-between text-[11px] text-[var(--fg-4)]">
                   <span>
                     {t('revenue.totalReceived')}:{' '}
-                    <span className="font-mono text-zinc-300">{fmtUsdc(full.total_received_usdc)} USDC</span>
+                    <span className="font-mono text-[var(--fg-2)]">{fmtUsdc(full.total_received_usdc)} USDC</span>
                   </span>
                   <span className="font-mono">{full.transaction_count ?? recent.length} tx</span>
                 </div>
@@ -147,20 +147,20 @@ export function RevenueCard() {
                         href={tx.explorer}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center justify-between rounded-md px-2 py-1 text-xs transition-colors hover:bg-zinc-800/60"
+                        className="flex items-center justify-between rounded-md px-2 py-1 text-xs transition-colors hover:bg-[var(--ink-4)]/60"
                       >
-                        <span className="font-mono text-zinc-500">{shortAddr(tx.from)}</span>
+                        <span className="font-mono text-[var(--fg-4)]">{shortAddr(tx.from)}</span>
                         <span className="flex items-center gap-3">
-                          <span className="font-mono text-emerald-400">+{fmtUsdc(tx.value_usdc)}</span>
-                          <span className="text-zinc-600">{tx.time.slice(0, 10)}</span>
+                          <span className="font-mono text-[var(--ok)]">+{fmtUsdc(tx.value_usdc)}</span>
+                          <span className="text-[var(--fg-5)]">{tx.time.slice(0, 10)}</span>
                         </span>
                       </a>
                     ))}
-                    {partial && <p className="mt-1 text-[10px] text-zinc-600">{t('revenue.partial')}</p>}
+                    {partial && <p className="mt-1 text-[10px] text-[var(--fg-5)]">{t('revenue.partial')}</p>}
                   </div>
                 ) : (
-                  <p className="text-xs text-zinc-500">
-                    {t('revenue.noTx')} <span className="text-zinc-600">{t('revenue.rpcHint')}</span>
+                  <p className="text-xs text-[var(--fg-4)]">
+                    {t('revenue.noTx')} <span className="text-[var(--fg-5)]">{t('revenue.rpcHint')}</span>
                   </p>
                 )}
               </>
@@ -169,25 +169,25 @@ export function RevenueCard() {
         </div>
 
         {/* ---------- Stripe rail ---------- */}
-        <div className="rounded-lg border border-zinc-800/80 bg-zinc-900/40 p-4">
+        <div className="rounded-lg border border-[var(--ink-4)]/80 bg-[var(--ink-2)]/40 p-4">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--fg-4)]">
               {t('revenue.stripeRail')}
             </span>
-            <span className="rounded-full bg-zinc-700/40 px-2 py-0.5 text-[10px] font-mono font-semibold text-zinc-400">
+            <span className="rounded-full bg-[var(--ink-5)]/40 px-2 py-0.5 text-[10px] font-mono font-semibold text-[var(--fg-3)]">
               {t('revenue.stripeNotConfigured')}
             </span>
           </div>
 
           <div className="mt-3">
             <div className="flex items-baseline gap-1.5">
-              <span className="font-mono text-3xl font-bold text-zinc-600">—</span>
+              <span className="font-mono text-3xl font-bold text-[var(--fg-5)]">—</span>
             </div>
-            <p className="mt-1 text-xs text-zinc-500">{t('revenue.stripeRailSub')}</p>
+            <p className="mt-1 text-xs text-[var(--fg-4)]">{t('revenue.stripeRailSub')}</p>
           </div>
 
-          <div className="mt-4 border-t border-zinc-800/60 pt-3">
-            <p className="text-xs leading-relaxed text-zinc-500">{t('revenue.stripeHint')}</p>
+          <div className="mt-4 border-t border-[var(--ink-4)]/60 pt-3">
+            <p className="text-xs leading-relaxed text-[var(--fg-4)]">{t('revenue.stripeHint')}</p>
           </div>
         </div>
       </div>

@@ -43,26 +43,26 @@ function CustomTooltip({ active, payload, label }: { active?: boolean; payload?:
   const total = row.total;
   const pct = (n: number) => (total > 0 ? ` (${((n / total) * 100).toFixed(0)}%)` : '');
   return (
-    <div className="rounded-md border border-zinc-700/60 bg-zinc-950/95 px-3 py-2 text-xs text-zinc-200 shadow-lg shadow-black/40 backdrop-blur">
-      <div className="mb-1.5 font-semibold text-zinc-100">
+    <div className="rounded-md border border-[var(--ink-5)]/60 bg-[var(--ink-0)]/95 px-3 py-2 text-xs text-[var(--fg-1)] shadow-lg shadow-black/40 backdrop-blur">
+      <div className="mb-1.5 font-semibold text-[var(--fg-1)]">
         {label} · {total} requêtes métier
       </div>
       {total > 0 ? (
         <>
-          <div className="mb-1 text-[11px] text-zinc-400">
-            Taux de conversion : <span className="font-mono text-emerald-400">{row.conversion.toFixed(0)}%</span>
+          <div className="mb-1 text-[11px] text-[var(--fg-3)]">
+            Taux de conversion : <span className="font-mono text-[var(--ok)]">{row.conversion.toFixed(0)}%</span>
           </div>
-          <div className="space-y-0.5 border-t border-zinc-800 pt-1.5">
+          <div className="space-y-0.5 border-t border-[var(--ink-4)] pt-1.5">
             {BARS.map((b) => {
               const v = row[b.key];
               if (v === 0) return null;
               return (
                 <div key={b.key} className="flex items-center gap-2">
                   <span className="h-2 w-2 rounded-full" style={{ backgroundColor: b.color }} />
-                  <span className="text-zinc-400">{b.label}</span>
-                  <span className="ml-auto font-mono text-zinc-200 tabular-nums">
+                  <span className="text-[var(--fg-3)]">{b.label}</span>
+                  <span className="ml-auto font-mono text-[var(--fg-1)] tabular-nums">
                     {v}
-                    <span className="text-zinc-600">{pct(v)}</span>
+                    <span className="text-[var(--fg-5)]">{pct(v)}</span>
                   </span>
                 </div>
               );
@@ -70,7 +70,7 @@ function CustomTooltip({ active, payload, label }: { active?: boolean; payload?:
           </div>
         </>
       ) : (
-        <div className="text-zinc-500 text-[11px]">Aucune requête métier ce jour-là.</div>
+        <div className="text-[var(--fg-4)] text-[11px]">Aucune requête métier ce jour-là.</div>
       )}
     </div>
   );
@@ -85,7 +85,7 @@ export function BusinessFunnelChart({ data }: { data: BusinessFunnelDay[] }) {
 
   if (rows.length === 0) {
     return (
-      <div className="flex h-64 items-center justify-center text-zinc-500 text-sm">
+      <div className="flex h-64 items-center justify-center text-[var(--fg-4)] text-sm">
         Pas encore de trafic métier à afficher.
       </div>
     );
@@ -138,8 +138,8 @@ export function BusinessFunnelChart({ data }: { data: BusinessFunnelDay[] }) {
       </RechartsBarChart>
       </ResponsiveContainer>
       {lastIsPartial && (
-        <p className="mt-2 text-[11px] leading-snug text-zinc-500">
-          La dernière barre = <strong className="text-zinc-400">aujourd&apos;hui</strong>, jour en
+        <p className="mt-2 text-[11px] leading-snug text-[var(--fg-4)]">
+          La dernière barre = <strong className="text-[var(--fg-3)]">aujourd&apos;hui</strong>, jour en
           cours (comptage depuis minuit UTC) — encore incomplet, ce n&apos;est pas une chute.
         </p>
       )}

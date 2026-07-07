@@ -37,15 +37,15 @@ export default function DashboardLoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-zinc-950">
+    <div className="min-h-screen flex items-center justify-center bg-[var(--ink-0)]">
       <div className="w-full max-w-sm">
-        <div className="border border-zinc-800 rounded-xl p-8 bg-zinc-900 shadow-2xl">
+        <div className="border border-[var(--ink-4)] rounded-xl p-8 bg-[var(--ink-2)] shadow-2xl">
           <h1 className="text-2xl font-semibold text-white mb-2">{t('login.title')}</h1>
-          <p className="text-zinc-400 text-sm mb-6">{t('login.subtitle')}</p>
+          <p className="text-[var(--fg-3)] text-sm mb-6">{t('login.subtitle')}</p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-zinc-300 mb-1.5">
+              <label htmlFor="password" className="block text-sm font-medium text-[var(--fg-2)] mb-1.5">
                 {t('login.passwordLabel')}
               </label>
               <input
@@ -55,7 +55,7 @@ export default function DashboardLoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
                 required
-                className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition"
+                className="w-full px-3 py-2 bg-[var(--ink-4)] border border-[var(--ink-5)] rounded-lg text-white placeholder:text-[var(--fg-4)] focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition"
               />
             </div>
 
@@ -68,7 +68,7 @@ export default function DashboardLoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-2.5 px-4 bg-amber-500 hover:bg-amber-400 disabled:bg-amber-500/50 text-zinc-950 font-semibold rounded-lg transition focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 focus:ring-offset-zinc-900"
+              className="w-full py-2.5 px-4 bg-amber-500 hover:bg-amber-400 disabled:bg-amber-500/50 text-amber-foreground font-semibold rounded-lg transition focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 focus:ring-offset-[var(--ink-2)]"
             >
               {loading ? t('login.loading') : t('login.button')}
             </button>

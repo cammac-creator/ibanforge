@@ -75,8 +75,8 @@ export function LineChart({ data, lines }: LineChartProps) {
       </RechartsLineChart>
       </ResponsiveContainer>
       {lastIsPartial && (
-        <p className="mt-2 text-[11px] leading-snug text-zinc-500">
-          Le dernier point = <strong className="text-zinc-400">aujourd&apos;hui</strong>, jour en
+        <p className="mt-2 text-[11px] leading-snug text-[var(--fg-4)]">
+          Le dernier point = <strong className="text-[var(--fg-3)]">aujourd&apos;hui</strong>, jour en
           cours (comptage depuis minuit UTC) — encore incomplet, ce n&apos;est pas une chute.
         </p>
       )}

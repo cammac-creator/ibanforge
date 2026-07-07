@@ -13,7 +13,7 @@ export default async function DashboardLayout({
 
   return (
     <DashboardTooltipProvider>
-      <div className="min-h-screen bg-zinc-950 text-white">
+      <div className="min-h-screen bg-[var(--ink-0)] text-white">
         <TopNav />
         <main className="px-4 py-6 md:px-8 md:py-8 max-w-7xl mx-auto">
           {children}

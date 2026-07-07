@@ -15,7 +15,7 @@ interface UptimeBarProps {
 function getBarColor(status: 'up' | 'down' | null): string {
   if (status === 'up') return '#22c55e';
   if (status === 'down') return '#ef4444';
-  return '#3f3f46'; // zinc-700 for no data
+  return '#3f3f46'; // ink-5 for no data
 }
 
 const LOCALE_TAG: Record<string, string> = { en: 'en-US', fr: 'fr-CH', de: 'de-CH' };

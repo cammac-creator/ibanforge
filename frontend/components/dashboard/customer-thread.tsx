@@ -47,7 +47,7 @@ export function CustomerThread({
         >
           {s.label}
         </span>
-        {has && <span className="text-[11px] text-zinc-500 underline decoration-dotted">{messages.length} msg</span>}
+        {has && <span className="text-[11px] text-[var(--fg-4)] underline decoration-dotted">{messages.length} msg</span>}
       </button>
 
       {open && (
@@ -56,15 +56,15 @@ export function CustomerThread({
           onClick={() => setOpen(false)}
         >
           <div
-            className="max-h-[80vh] w-full max-w-lg overflow-y-auto rounded-xl border border-zinc-800 bg-zinc-900 p-5"
+            className="max-h-[80vh] w-full max-w-lg overflow-y-auto rounded-xl border border-[var(--ink-4)] bg-[var(--ink-2)] p-5"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-4 flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-white">{name}</p>
-                <p className="text-[11px] text-zinc-500">{messages.length} message(s) · fil complet</p>
+                <p className="text-[11px] text-[var(--fg-4)]">{messages.length} message(s) · fil complet</p>
               </div>
-              <button type="button" onClick={() => setOpen(false)} className="text-lg text-zinc-500 hover:text-white">
+              <button type="button" onClick={() => setOpen(false)} className="text-lg text-[var(--fg-4)] hover:text-white">
                 ✕
               </button>
             </div>
@@ -74,18 +74,18 @@ export function CustomerThread({
                   key={i}
                   className={`rounded-lg border p-3 ${
                     m.direction === 'in'
-                      ? 'border-zinc-700 bg-zinc-800/40'
+                      ? 'border-[var(--ink-5)] bg-[var(--ink-4)]/40'
                       : 'ml-6 border-amber-500/30 bg-amber-500/5'
                   }`}
                 >
-                  <div className="mb-1 flex items-center justify-between text-[10px] text-zinc-500">
+                  <div className="mb-1 flex items-center justify-between text-[10px] text-[var(--fg-4)]">
                     <span className={m.direction === 'in' ? 'text-blue-400' : 'text-amber-400'}>
                       {m.direction === 'in' ? '← reçu' : '→ envoyé'}
                     </span>
                     <span>{m.msg_date}</span>
                   </div>
-                  <p className="text-xs font-medium text-zinc-200">{m.subject || '(sans objet)'}</p>
-                  {m.snippet && <p className="mt-1 text-[11px] leading-relaxed text-zinc-400">{m.snippet}</p>}
+                  <p className="text-xs font-medium text-[var(--fg-1)]">{m.subject || '(sans objet)'}</p>
+                  {m.snippet && <p className="mt-1 text-[11px] leading-relaxed text-[var(--fg-3)]">{m.snippet}</p>}
                 </div>
               ))}
             </div>

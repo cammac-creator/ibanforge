@@ -26,11 +26,11 @@ export function ProgressBars({ items }: ProgressBarsProps) {
                 className="inline-block h-2 w-2 rounded-full shrink-0"
                 style={{ backgroundColor: item.color }}
               />
-              <span className="text-xs text-zinc-400 truncate">{item.label}</span>
+              <span className="text-xs text-[var(--fg-3)] truncate">{item.label}</span>
             </div>
 
             {/* Bar */}
-            <div className="flex-1 h-2 rounded-full bg-zinc-800/60 overflow-hidden">
+            <div className="flex-1 h-2 rounded-full bg-[var(--ink-4)]/60 overflow-hidden">
               <div
                 className="h-full rounded-full transition-all duration-300"
                 style={{
@@ -42,8 +42,8 @@ export function ProgressBars({ items }: ProgressBarsProps) {
 
             {/* Count + percentage */}
             <div className="flex items-center gap-1.5 shrink-0 text-right">
-              <span className="text-xs font-mono text-zinc-300">{item.value.toLocaleString()}</span>
-              <span className="text-[10px] text-zinc-600">
+              <span className="text-xs font-mono text-[var(--fg-2)]">{item.value.toLocaleString()}</span>
+              <span className="text-[10px] text-[var(--fg-5)]">
                 {pct.toFixed(1)}%
               </span>
             </div>
