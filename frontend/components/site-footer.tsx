@@ -14,6 +14,7 @@ export function SiteFooter() {
         { href: `/${locale}/docs`, label: t("link.docs") },
         { href: `/${locale}/playground`, label: t("link.playground") },
         { href: `/${locale}/pricing`, label: t("link.pricing") },
+        { href: `/${locale}/pricing`, label: t("link.vendors") },
         { href: `/${locale}/openapi`, label: t("link.openapi") },
       ],
     },
@@ -22,13 +23,13 @@ export function SiteFooter() {
       links: [
         { href: "https://github.com/cammac-creator/ibanforge", label: t("link.github"), external: true },
         { href: `/${locale}/docs/mcp`, label: t("link.mcp") },
-        { href: "https://ibanforge-production.up.railway.app/health", label: t("link.apiStatus"), external: true },
+        { href: "https://api.ibanforge.com/health", label: t("link.apiStatus"), external: true },
       ],
     },
     {
       title: t("column.legal"),
       links: [
-        { href: "https://opensource.org/licenses/MIT", label: t("link.mitLicense"), external: true },
+        { href: "https://github.com/cammac-creator/ibanforge", label: t("link.openSource"), external: true },
       ],
     },
   ]
@@ -41,7 +42,7 @@ export function SiteFooter() {
             <Link href={`/${locale}`} className="font-bold font-mono text-primary">
               IBANforge
             </Link>
-            <p className="mt-2 text-xs text-muted-foreground leading-relaxed max-w-48">
+            <p className="mt-2 text-xs text-muted-foreground leading-relaxed max-w-52">
               {t("tagline")}
             </p>
           </div>
@@ -53,7 +54,7 @@ export function SiteFooter() {
               </h3>
               <ul className="space-y-2">
                 {col.links.map((link) => (
-                  <li key={link.href}>
+                  <li key={link.label}>
                     <Link
                       href={link.href}
                       target={"external" in link ? "_blank" : undefined}
@@ -75,10 +76,8 @@ export function SiteFooter() {
           <p className="text-xs text-muted-foreground">
             {t("copyright", { year: new Date().getFullYear() })}
           </p>
-          <p className="text-xs text-muted-foreground">
-            {t("builtWith")}{" "}
-            <span className="text-primary font-medium">Next.js</span> &amp;{" "}
-            <span className="text-primary font-medium">shadcn/ui</span>
+          <p className="text-xs font-mono text-muted-foreground">
+            {t("dataLine")}
           </p>
         </div>
       </div>

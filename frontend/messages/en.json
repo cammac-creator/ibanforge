@@ -13,7 +13,7 @@
   },
   "footer": {
     "logo": "IBANforge",
-    "tagline": "IBAN validation & BIC/SWIFT lookup API with x402 micropayments.",
+    "tagline": "Bank data API for developers and AI agents — IBAN, BIC, Swiss clearing, compliance.",
     "column": {
       "product": "Product",
       "developers": "Developers",
@@ -26,44 +26,38 @@
       "github": "GitHub",
       "mcp": "MCP",
       "apiStatus": "API Status",
-      "mitLicense": "MIT License",
       "agents": "Agents",
-      "openapi": "OpenAPI"
+      "openapi": "OpenAPI",
+      "openSource": "Open-source core (MIT)",
+      "vendors": "For software vendors"
     },
-    "copyright": "© {year} IBANforge. Released under the MIT License.",
-    "builtWith": "Built with",
-    "tech": {
-      "nextjs": "Next.js",
-      "shadcn": "shadcn/ui"
-    }
+    "copyright": "© {year} IBANforge.",
+    "dataLine": "Data: GLEIF · SIX · Bundesbank · EBA — refreshed monthly"
   },
   "home": {
     "metadata": {
       "title": "IBANforge — IBAN Validation & BIC/SWIFT Lookup API",
-      "description": "IBAN validation, BIC/SWIFT lookup, SEPA compliance, issuer classification, and risk indicators for developers and AI agents. Pay per request with USDC via x402.",
+      "description": "IBAN validation, BIC/SWIFT lookup, Swiss clearing data and compliance risk for developers and AI agents. Free tier — 200 requests/month; pay by card or in USDC as you grow.",
       "og": {
         "title": "IBANforge",
-        "description": "IBAN validation & BIC/SWIFT lookup API with compliance data for AI agents"
+        "description": "Bank data API for developers and AI agents — IBAN validation, BIC/SWIFT, Swiss clearing, compliance risk"
       }
     },
-    "badge": "x402 payments live",
+    "badge": "Live · Zurich",
     "hero": {
-      "title": {
-        "prefix": "IBAN",
-        "highlight": "forge"
-      },
-      "description": "The compliance API for AI agents. The only API with Swiss BC-Nummer / QR-IID clearing data — plus IBAN validation, BIC/SWIFT, EMI/vIBAN detection and sanctions risk. Native over MCP and x402, no signup.",
+      "title": "Bank data your agents can <accent>trust</accent>.",
+      "description": "Validate IBANs, resolve BIC/SWIFT and score sanctions risk — with exclusive Swiss SIX clearing data. REST for your stack, native MCP for your agents.",
       "cta": {
         "tryFree": "Try it free",
-        "readDocs": "Read the docs",
         "getKey": "Get a free key"
       }
     },
     "features": {
+      "heading": "Everything you need",
       "0": {
         "badge": "Swiss clearing — exclusive",
         "title": "BC-Nummer / QR-IID",
-        "description": "The only API exposing Swiss SIX BankMaster clearing data: 1,190 BC-Nummern, SIC/euroSIC, QR-IID and institution type. No competitor has this."
+        "description": "The only API exposing SIX BankMaster clearing data: every Swiss BC-Nummer with SIC/euroSIC participation, QR-IID and institution type. No competitor has this."
       },
       "1": {
         "badge": "MCP-native — agent ready",
@@ -71,26 +65,25 @@
         "description": "Native Model Context Protocol server (stdio + HTTP). Claude, Cursor and any MCP agent install in one line: npx -y ibanforge-mcp."
       },
       "2": {
-        "badge": "89 countries",
-        "title": "IBAN validation",
-        "description": "ISO 13616 mod-97 validation with full BBAN structure parsing across 89 countries, including the EU EMI hubs (LT, EE, MT)."
+        "badge": "89 countries · 121K BICs",
+        "title": "IBAN validation & BIC lookup",
+        "description": "ISO 13616 mod-97 validation with full BBAN parsing across 89 countries — backed by 121,000+ BIC entries from GLEIF, the SWIFT directory, Bundesbank, SIX, NBP and EBA Step2."
       },
       "3": {
-        "badge": "121,399 BICs",
-        "title": "BIC/SWIFT lookup",
-        "description": "121,399 BIC entries (38,761 LEI-enriched via GLEIF) from GLEIF, SWIFT directory, Bundesbank, SIX, NBP and EBA Step2."
-      },
-      "4": {
         "badge": "EMI / vIBAN",
         "title": "Issuer classification",
         "description": "Detect virtual IBANs and EMIs (Wise, Revolut, N26, Mercury…) — a real compliance signal a mod-97 check can never give you."
       },
-      "5": {
+      "4": {
         "badge": "Sanctions + FATF",
         "title": "Compliance risk score",
         "description": "Bank-BIC sanctions screening (OFAC/EU/UN/SECO) + FATF + SEPA + VoP reachability, distilled into a 0-100 risk score."
       },
-      "heading": "Everything you need"
+      "5": {
+        "badge": "x402 — agent payments",
+        "title": "Agents pay per call",
+        "description": "Autonomous agents can pay per request in USDC via x402 — no account, no checkout. Humans keep the free key or card credits; agents get their own rail."
+      }
     },
     "endpoints": {
       "0": {
@@ -121,26 +114,42 @@
         "method": "GET",
         "path": "/v1/ch/clearing/:iid",
         "cost": "$0.003",
-        "description": "Swiss BC-Nummer lookup (1,190 SIX entries)"
+        "description": "Swiss BC-Nummer lookup (SIX BankMaster)"
       },
       "heading": "Endpoints & pricing",
-      "subtitle": "Pay per request with USDC via x402. Try the /v1/demo endpoint for free.",
-      "table": {
-        "method": "Method",
-        "path": "Path",
-        "cost": "Cost",
-        "description": "Description"
-      }
+      "subtitle": "Start free with 200 requests a month. Pay as you grow — by card or in USDC."
     },
     "quickStart": {
       "heading": "Quick start",
-      "subtitle": "Get 200 free requests/month with an API key, or pay per request with USDC via x402."
+      "subtitle": "One POST, one answer — this is the exact response you get back."
     },
     "cta": {
       "heading": "Ready to build?",
-      "description": "Integrate in minutes. Pay with USDC — no API key, no subscription.",
+      "description": "Start with a free key — 200 requests a month, no card required. Scale with prepaid credits by card, or pay per call in USDC.",
       "button": "Start building",
       "getKeyButton": "Get a free key"
+    },
+    "demo": {
+      "valid": "Valid",
+      "server": "server",
+      "clearingTitle": "Swiss clearing · SIX",
+      "tryLive": "Try it live"
+    },
+    "stats": {
+      "bic": "BIC records",
+      "countries": "countries covered",
+      "clearing": "Swiss clearing entries · SIX",
+      "latency": "p50 server processing"
+    },
+    "trust": {
+      "dataLabel": "Data sources",
+      "dataValue": "GLEIF · SIX BankMaster · SWIFT directory · Bundesbank · EBA STEP2 · NBP",
+      "dataNote": "Refreshed monthly",
+      "sanctionsLabel": "Sanctions screening",
+      "sanctionsValue": "OFAC · EU · UN · SECO + FATF",
+      "sanctionsNote": "Bank-level (BIC8) screening",
+      "madeLabel": "Provenance",
+      "madeNote": "Swiss clearing data straight from SIX"
     }
   },
   "pricing": {
@@ -162,7 +171,7 @@
     },
     "table": {
       "heading": "Endpoint pricing",
-      "subtitle": "Pay per request with USDC via x402 on Base L2. No subscription, no API key."
+      "subtitle": "Start free with 200 requests a month. Pay as you grow — by card, or per request in USDC via x402 on Base L2."
     },
     "endpoints": {
       "0": {
@@ -210,7 +219,7 @@
     },
     "calculator": {
       "heading": "Estimate your monthly cost",
-      "subtitle": "Pay only for the calls you make — no minimums, no subscription.",
+      "subtitle": "Pay only for the calls you make — no minimums.",
       "callsPerMonth": "Calls per month",
       "callsPerMonthUnit": "calls / month",
       "costBreakdown": "Cost breakdown",
@@ -237,7 +246,7 @@
       "badge": "x402 Protocol",
       "heading": "How payments work",
       "items": {
-        "0": "No subscription. No API key. Pay per call with USDC.",
+        "0": "Agents pay per call with USDC — no account, no API key on this rail.",
         "1": "Your HTTP client sends a tiny payment with each request — automatically, via standard headers.",
         "2": "Payments settle on Base (Ethereum L2) — fast, cheap, and verifiable on-chain.",
         "3": "Free testing available via the /v1/demo endpoint and the /playground."
