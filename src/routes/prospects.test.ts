@@ -232,3 +232,43 @@ describe('email-messages delete — drafts only', () => {
     expect(res.status).toBe(401);
   });
 });
+
+describe('/v1/admin/prospects — em dashes scrubbed from mail prose on seed', () => {
+  it('replaces em dashes contextually in the 4 mail fields, leaves internal notes untouched', async () => {
+    const app = makeApp();
+    const id = `p_test_emdash_${RUN_ID}`;
+    const up = await app.request('/v1/admin/prospects', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Secret': SECRET },
+      body: JSON.stringify({
+        prospects: [
+          {
+            id,
+            company: 'EmDash AG',
+            contact_email: 'em@dash.example',
+            status: 'a_mailer',
+            mail_subject_en: 'One call — validation + BIC',
+            mail_body_en:
+              "Hi team — (route this freely). We run checks — that's the gate.\nClaude-Alain Martin — IBANforge — https://ibanforge.com",
+            mail_body_fr: 'Salut — une idée entre développeurs.',
+            fit_reason: 'kept as-is — internal note',
+          },
+        ],
+      }),
+    });
+    expect(up.status).toBe(200);
+
+    const list = await app.request('/v1/admin/prospects', { headers: { 'X-Admin-Secret': SECRET } });
+    const { prospects } = (await list.json()) as { prospects: Array<Record<string, string>> };
+    const p = prospects.find((x) => x.id === id)!;
+
+    expect(p.mail_subject_en).toBe('One call, validation + BIC');
+    expect(p.mail_body_en).toContain('Hi team (route this freely).');
+    expect(p.mail_body_en).toContain("We run checks. That's the gate.");
+    expect(p.mail_body_en).toContain('Claude-Alain Martin · IBANforge · https://ibanforge.com');
+    expect(p.mail_body_fr).toBe('Salut, une idée entre développeurs.');
+    expect(p.mail_body_en).not.toContain('—');
+    // Internal notes are not sendable prose and stay untouched.
+    expect(p.fit_reason).toBe('kept as-is — internal note');
+  });
+});
