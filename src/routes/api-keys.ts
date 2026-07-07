@@ -685,6 +685,36 @@ function prospectId(r: ProspectInput): string {
   return 'p_' + createHash('md5').update(basis).digest('hex').slice(0, 16);
 }
 
+/**
+ * Em dashes are the most recognisable AI-writing tell, so outreach mail prose
+ * is scrubbed on every seed: campaign agents can never reintroduce them into
+ * a sendable mail. Context-aware: signature lines get a middot, clause
+ * starters a period, everything else a comma. Internal notes are untouched.
+ */
+function stripEmDashes(text: string | null): string | null {
+  if (!text || !text.includes('—')) return text;
+  const cleaned = text
+    .split('\n')
+    .map((line) => {
+      if (/ibanforge\.com/i.test(line) || line.trimStart().startsWith('Claude-Alain Martin')) {
+        return line.replace(/\s*—\s*/g, ' · ');
+      }
+      return line
+        .replace(/\s*—\s*\(/g, ' (')
+        .replace(
+          /\s*—\s*(that's|it's|this |these |here's|that is|it is|we |you )/gi,
+          (_m, w: string) => `. ${w.charAt(0).toUpperCase()}${w.slice(1)}`,
+        )
+        .replace(/\s*—\s*/g, ', ');
+    })
+    .join('\n');
+  return cleaned
+    .replace(/,\s*,/g, ', ')
+    .replace(/[ \t]+,/g, ', ')
+    .replace(/,\s*([.;:!?])/g, '$1')
+    .replace(/[ \t]{2,}/g, ' ');
+}
+
 apiKeys.get('/v1/admin/prospects', (c) => {
   if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
     return c.json({ error: 'unauthorized' }, 401);
@@ -768,10 +798,10 @@ apiKeys.post('/v1/admin/prospects', async (c) => {
         personalization_hook: clip(r.personalization_hook, 1000),
         confidence: clip(r.confidence, 20),
         status: clip(r.status, 20) || 'a_enrichir',
-        mail_subject_en: clip(r.mail_subject_en, 300),
-        mail_body_en: clip(r.mail_body_en, 6000),
-        mail_subject_fr: clip(r.mail_subject_fr, 300),
-        mail_body_fr: clip(r.mail_body_fr, 6000),
+        mail_subject_en: stripEmDashes(clip(r.mail_subject_en, 300)),
+        mail_body_en: stripEmDashes(clip(r.mail_body_en, 6000)),
+        mail_subject_fr: stripEmDashes(clip(r.mail_subject_fr, 300)),
+        mail_body_fr: stripEmDashes(clip(r.mail_body_fr, 6000)),
         recommended_lang: clip(r.recommended_lang, 8),
         source: clip(r.source, 80),
       });
