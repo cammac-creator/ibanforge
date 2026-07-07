@@ -64,9 +64,9 @@ function SparklineSVG({
 
 function TrendBadge({ trend }: { trend: TrendProps }) {
   const styles = {
-    up: 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20',
+    up: 'bg-[var(--ok)]/10 text-[var(--ok)] border border-[var(--ok)]/20',
     down: 'bg-red-500/10 text-red-400 border border-red-500/20',
-    neutral: 'bg-zinc-800 text-zinc-400 border border-zinc-700',
+    neutral: 'bg-[var(--ink-4)] text-[var(--fg-3)] border border-[var(--ink-5)]',
   };
 
   const arrows = {
@@ -97,11 +97,11 @@ export function StatCardV2({
   hint,
 }: StatCardV2Props) {
   return (
-    <div className="bg-gradient-to-br from-zinc-900 to-zinc-900/60 border border-zinc-800/60 rounded-xl p-4">
+    <div className="bg-gradient-to-br from-[var(--ink-2)] to-[var(--ink-2)]/60 border border-[var(--ink-4)]/60 rounded-xl p-4">
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
           <div className="mb-2 flex items-center gap-1.5">
-            <p className="text-[11px] font-medium uppercase tracking-wider text-zinc-500">
+            <p className="text-[11px] font-medium uppercase tracking-wider text-[var(--fg-4)]">
               {title}
             </p>
             {hint && <InfoDot>{hint}</InfoDot>}

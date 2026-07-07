@@ -31,7 +31,7 @@ function msColor(ms: number): string {
 function Metric({ label, value, valueClass = 'text-white' }: { label: string; value: string; valueClass?: string }) {
   return (
     <div className="flex flex-col">
-      <span className="text-[9px] font-semibold uppercase tracking-widest text-zinc-600">{label}</span>
+      <span className="text-[9px] font-semibold uppercase tracking-widest text-[var(--fg-5)]">{label}</span>
       <span className={`font-mono text-sm font-semibold leading-tight ${valueClass}`}>{value}</span>
     </div>
   );
@@ -81,7 +81,7 @@ export function LiveHealthStrip() {
   const loading = online === null;
 
   return (
-    <div className="flex flex-wrap items-center gap-x-6 gap-y-3 rounded-xl border border-zinc-800/60 bg-gradient-to-br from-zinc-900 to-zinc-900/60 px-5 py-3.5">
+    <div className="flex flex-wrap items-center gap-x-6 gap-y-3 rounded-xl border border-[var(--ink-4)]/60 bg-gradient-to-br from-[var(--ink-2)] to-[var(--ink-2)]/60 px-5 py-3.5">
       {/* Status */}
       <div className="flex items-center gap-2.5">
         <span className="relative flex h-2.5 w-2.5">
@@ -91,7 +91,7 @@ export function LiveHealthStrip() {
           <span
             className={[
               'relative inline-flex h-2.5 w-2.5 rounded-full',
-              loading ? 'bg-zinc-600' : online ? 'bg-green-500' : 'bg-red-500',
+              loading ? 'bg-[var(--fg-5)]' : online ? 'bg-green-500' : 'bg-red-500',
             ].join(' ')}
           />
         </span>
@@ -100,12 +100,12 @@ export function LiveHealthStrip() {
         </span>
       </div>
 
-      <div className="hidden h-6 w-px bg-zinc-800 sm:block" />
+      <div className="hidden h-6 w-px bg-[var(--ink-4)] sm:block" />
 
       <Metric
         label={t('monitoring.responseTime')}
         value={loading ? '—' : `${ms} ms`}
-        valueClass={loading ? 'text-zinc-500' : msColor(ms)}
+        valueClass={loading ? 'text-[var(--fg-4)]' : msColor(ms)}
       />
       <Metric label={t('monitoring.version')} value={health ? `v${health.version}` : '—'} />
       <Metric label={t('monitoring.uptime')} value={health ? fmtUptime(health.uptime_seconds) : '—'} />

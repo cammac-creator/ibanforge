@@ -127,13 +127,13 @@ export function CrmWorkspace({ clients }: { clients: CrmClient[] }) {
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-[300px_1fr]">
       {/* LEFT — client list */}
-      <div className="rounded-xl border border-zinc-800/60 bg-zinc-900/40">
-        <div className="border-b border-zinc-800/60 p-3">
+      <div className="rounded-xl border border-[var(--ink-4)]/60 bg-[var(--ink-2)]/40">
+        <div className="border-b border-[var(--ink-4)]/60 p-3">
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Rechercher un client…"
-            className="mb-2 w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-sm text-zinc-200 placeholder:text-zinc-600 focus:border-amber-500/40 focus:outline-none"
+            className="mb-2 w-full rounded-lg border border-[var(--ink-4)] bg-[var(--ink-0)] px-3 py-1.5 text-sm text-[var(--fg-1)] placeholder:text-[var(--fg-5)] focus:border-amber-500/40 focus:outline-none"
           />
           <div className="flex gap-1">
             {([['all', 'Tous'], ['payants', 'Payants'], ['relance', 'À relancer']] as const).map(([k, lbl]) => (
@@ -141,7 +141,7 @@ export function CrmWorkspace({ clients }: { clients: CrmClient[] }) {
                 key={k}
                 type="button"
                 onClick={() => setFilter(k)}
-                className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${filter === k ? 'bg-amber-500/15 text-amber-400' : 'text-zinc-500 hover:text-zinc-300'}`}
+                className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${filter === k ? 'bg-amber-500/15 text-amber-400' : 'text-[var(--fg-4)] hover:text-[var(--fg-2)]'}`}
               >
                 {lbl}
               </button>
@@ -149,7 +149,7 @@ export function CrmWorkspace({ clients }: { clients: CrmClient[] }) {
           </div>
         </div>
         <div className="max-h-[70vh] overflow-y-auto">
-          {filtered.length === 0 && <p className="p-4 text-sm text-zinc-600">Aucun client.</p>}
+          {filtered.length === 0 && <p className="p-4 text-sm text-[var(--fg-5)]">Aucun client.</p>}
           {filtered.map((c) => {
             const st = STATUS[c.status];
             const active = c.email === selEmail;
@@ -159,19 +159,19 @@ export function CrmWorkspace({ clients }: { clients: CrmClient[] }) {
                 key={c.email}
                 type="button"
                 onClick={() => open(c.email)}
-                className={`flex w-full flex-col gap-1 border-b border-zinc-800/40 px-3 py-2.5 text-left transition-colors ${active ? 'bg-zinc-800/60' : unread ? 'bg-blue-500/10 hover:bg-blue-500/15' : 'hover:bg-zinc-800/30'}`}
+                className={`flex w-full flex-col gap-1 border-b border-[var(--ink-4)]/40 px-3 py-2.5 text-left transition-colors ${active ? 'bg-[var(--ink-4)]/60' : unread ? 'bg-blue-500/10 hover:bg-blue-500/15' : 'hover:bg-[var(--ink-4)]/30'}`}
               >
                 <div className="flex items-center gap-2">
                   {unread && <span className="h-2 w-2 shrink-0 rounded-full bg-blue-500" title="Réponse non lue" />}
                   <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: CAT[c.category].dot }} />
-                  <span className={`truncate text-sm ${unread ? 'font-bold text-white' : 'font-medium text-zinc-200'}`}>{c.company ?? c.email}</span>
+                  <span className={`truncate text-sm ${unread ? 'font-bold text-white' : 'font-medium text-[var(--fg-1)]'}`}>{c.company ?? c.email}</span>
                   {c.revenueUsd ? <span className="ml-auto shrink-0 font-mono text-xs text-green-400">${c.revenueUsd}</span> : null}
                 </div>
                 <div className="flex items-center gap-2 pl-4">
                   <span className="rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase" style={{ color: st.color, backgroundColor: st.bg }}>
                     {st.label}
                   </span>
-                  {c.lastTouch && <span className="text-[10px] text-zinc-600">{c.lastTouch}</span>}
+                  {c.lastTouch && <span className="text-[10px] text-[var(--fg-5)]">{c.lastTouch}</span>}
                 </div>
               </button>
             );
@@ -180,9 +180,9 @@ export function CrmWorkspace({ clients }: { clients: CrmClient[] }) {
       </div>
 
       {/* RIGHT — detail */}
-      <div className="rounded-xl border border-zinc-800/60 bg-gradient-to-br from-zinc-900 to-zinc-900/60 p-5">
+      <div className="rounded-xl border border-[var(--ink-4)]/60 bg-gradient-to-br from-[var(--ink-2)] to-[var(--ink-2)]/60 p-5">
         {!sel ? (
-          <div className="flex h-64 items-center justify-center text-sm text-zinc-600">Sélectionne un client à gauche.</div>
+          <div className="flex h-64 items-center justify-center text-sm text-[var(--fg-5)]">Sélectionne un client à gauche.</div>
         ) : (
           <ClientDetail client={sel} />
         )}
@@ -195,7 +195,7 @@ export function ClientDetail({ client: c }: { client: CrmClient }) {
   return (
     <div className="flex flex-col gap-5">
       {/* identity */}
-      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-zinc-800/60 pb-4">
+      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--ink-4)]/60 pb-4">
         <div>
           <div className="flex items-center gap-2">
             <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: CAT[c.category].dot }} />
@@ -206,7 +206,7 @@ export function ClientDetail({ client: c }: { client: CrmClient }) {
               </a>
             )}
           </div>
-          <p className="mt-0.5 text-xs text-zinc-500">
+          <p className="mt-0.5 text-xs text-[var(--fg-4)]">
             {c.email}
             {c.sector ? ` · ${c.sector}` : ''}
             {c.country ? ` · ${c.country}` : ''}
@@ -215,17 +215,17 @@ export function ClientDetail({ client: c }: { client: CrmClient }) {
         <div className="flex items-center gap-4 text-right">
           {c.revenueUsd != null && (
             <div>
-              <p className="text-[10px] uppercase tracking-wide text-zinc-600">Revenu</p>
+              <p className="text-[10px] uppercase tracking-wide text-[var(--fg-5)]">Revenu</p>
               <p className="font-mono text-sm font-semibold text-green-400">${c.revenueUsd}</p>
             </div>
           )}
           <div>
-            <p className="text-[10px] uppercase tracking-wide text-zinc-600">Santé</p>
+            <p className="text-[10px] uppercase tracking-wide text-[var(--fg-5)]">Santé</p>
             <p className="font-mono text-sm font-semibold" style={{ color: healthColor(c.health) }}>{c.health}</p>
           </div>
           <div>
-            <p className="text-[10px] uppercase tracking-wide text-zinc-600">{c.creditsTotal != null ? 'Crédits' : 'Quota'}</p>
-            <p className="font-mono text-sm text-zinc-300">
+            <p className="text-[10px] uppercase tracking-wide text-[var(--fg-5)]">{c.creditsTotal != null ? 'Crédits' : 'Quota'}</p>
+            <p className="font-mono text-sm text-[var(--fg-2)]">
               {c.creditsTotal != null ? `${c.consumed}/${c.creditsTotal}` : `${c.consumed}/${c.limit}`}
             </p>
           </div>
@@ -260,10 +260,10 @@ export function TimelineMessage({ m }: { m: CrmMessage }) {
   return (
     <div className="relative">
       <span
-        className="absolute -left-[21px] top-1 h-2.5 w-2.5 rounded-full border-2 border-zinc-900"
+        className="absolute -left-[21px] top-1 h-2.5 w-2.5 rounded-full border-2 border-[var(--ink-2)]"
         style={{ backgroundColor: m.direction === 'in' ? '#3b82f6' : '#f59e0b' }}
       />
-      <div className="flex flex-wrap items-center gap-2 text-[11px] text-zinc-500">
+      <div className="flex flex-wrap items-center gap-2 text-[11px] text-[var(--fg-4)]">
         <span className={m.direction === 'in' ? 'text-blue-400' : 'text-amber-400'}>
           {m.direction === 'in' ? '📥 reçu' : '📨 envoyé'}
         </span>
@@ -278,15 +278,15 @@ export function TimelineMessage({ m }: { m: CrmMessage }) {
           </span>
         )}
       </div>
-      <p className="mt-0.5 text-xs font-medium text-zinc-200">{m.subject || '(sans objet)'}</p>
+      <p className="mt-0.5 text-xs font-medium text-[var(--fg-1)]">{m.subject || '(sans objet)'}</p>
       {display && (
-        <p className={`mt-0.5 whitespace-pre-wrap text-[11px] leading-relaxed ${hasFr && !showOrig ? 'text-violet-200/80' : 'text-zinc-400'}`}>
+        <p className={`mt-0.5 whitespace-pre-wrap text-[11px] leading-relaxed ${hasFr && !showOrig ? 'text-violet-200/80' : 'text-[var(--fg-3)]'}`}>
           {text}
         </p>
       )}
       <div className="mt-1 flex gap-3 text-[10px]">
         {long && (
-          <button type="button" onClick={() => setOpen(!open)} className="text-zinc-500 hover:text-zinc-300">
+          <button type="button" onClick={() => setOpen(!open)} className="text-[var(--fg-4)] hover:text-[var(--fg-2)]">
             {open ? 'réduire' : 'voir tout'}
           </button>
         )}
@@ -305,17 +305,17 @@ function Timeline({ client: c }: { client: CrmClient }) {
   const totalCalls = c.series.reduce((a, b) => a + b, 0);
   return (
     <div>
-      <p className="mb-3 text-[11px] uppercase tracking-wide text-zinc-500">Timeline</p>
-      <div className="relative flex flex-col gap-3 border-l border-zinc-800 pl-4">
-        {c.messages.length === 0 && <p className="text-sm text-zinc-600">Aucun échange mail pour l’instant.</p>}
+      <p className="mb-3 text-[11px] uppercase tracking-wide text-[var(--fg-4)]">Timeline</p>
+      <div className="relative flex flex-col gap-3 border-l border-[var(--ink-4)] pl-4">
+        {c.messages.length === 0 && <p className="text-sm text-[var(--fg-5)]">Aucun échange mail pour l’instant.</p>}
         {c.messages.map((m, i) => (
           <TimelineMessage key={i} m={m} />
         ))}
         {c.draft && <DraftCard client={c} draft={c.draft} />}
         {totalCalls > 0 && (
           <div className="relative">
-            <span className="absolute -left-[21px] top-1 h-2.5 w-2.5 rounded-full border-2 border-zinc-900 bg-violet-500" />
-            <p className="text-[11px] text-zinc-500">
+            <span className="absolute -left-[21px] top-1 h-2.5 w-2.5 rounded-full border-2 border-[var(--ink-2)] bg-violet-500" />
+            <p className="text-[11px] text-[var(--fg-4)]">
               ⚡ {totalCalls} appels sur 6 mois{tool ? ` · surtout ${tool}` : ''}
               {c.lastActive ? ` · dernier mois actif ${c.lastActive}` : ''}
             </p>
@@ -412,32 +412,32 @@ function DraftCard({ client: c, draft }: { client: CrmClient; draft: CrmMessage 
 
   return (
     <div className="relative">
-      <span className="absolute -left-[21px] top-1 h-2.5 w-2.5 rounded-full border-2 border-zinc-900 bg-zinc-500" />
+      <span className="absolute -left-[21px] top-1 h-2.5 w-2.5 rounded-full border-2 border-[var(--ink-2)] bg-[var(--fg-4)]" />
       <div className="rounded-lg border border-dashed border-amber-500/40 bg-amber-500/5 p-3">
         <div className="flex flex-wrap items-center gap-2 text-[11px]">
           <span className="font-semibold text-amber-400">📝 brouillon — en attente de ta relecture</span>
-          <span className="text-zinc-500">{draft.msg_date}</span>
-          <span className="text-zinc-600">· partira de {account}</span>
+          <span className="text-[var(--fg-4)]">{draft.msg_date}</span>
+          <span className="text-[var(--fg-5)]">· partira de {account}</span>
         </div>
         {editing ? (
           <div className="mt-2 flex flex-col gap-2">
             <input
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
-              className="w-full rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-1.5 text-xs text-zinc-200 focus:border-amber-500/40 focus:outline-none"
+              className="w-full rounded-lg border border-[var(--ink-4)] bg-[var(--ink-0)] px-3 py-1.5 text-xs text-[var(--fg-1)] focus:border-amber-500/40 focus:outline-none"
               placeholder="Objet"
             />
             <textarea
               value={body}
               onChange={(e) => setBody(e.target.value)}
               rows={10}
-              className="w-full rounded-lg border border-zinc-800 bg-zinc-950 p-3 text-xs leading-relaxed text-zinc-200 focus:border-amber-500/40 focus:outline-none"
+              className="w-full rounded-lg border border-[var(--ink-4)] bg-[var(--ink-0)] p-3 text-xs leading-relaxed text-[var(--fg-1)] focus:border-amber-500/40 focus:outline-none"
             />
           </div>
         ) : (
           <>
-            <p className="mt-1.5 text-xs font-medium text-zinc-200">{subject || '(sans objet)'}</p>
-            <p className="mt-0.5 whitespace-pre-wrap text-[11px] leading-relaxed text-zinc-400">{body}</p>
+            <p className="mt-1.5 text-xs font-medium text-[var(--fg-1)]">{subject || '(sans objet)'}</p>
+            <p className="mt-0.5 whitespace-pre-wrap text-[11px] leading-relaxed text-[var(--fg-3)]">{body}</p>
           </>
         )}
         <div className="mt-2.5 flex flex-wrap items-center gap-2">
@@ -463,7 +463,7 @@ function DraftCard({ client: c, draft }: { client: CrmClient; draft: CrmMessage 
               type="button"
               onClick={() => setEditing(true)}
               disabled={busy !== false}
-              className="rounded-lg border border-zinc-700 px-3 py-1 text-xs font-medium text-zinc-300 hover:bg-zinc-800 disabled:opacity-50"
+              className="rounded-lg border border-[var(--ink-5)] px-3 py-1 text-xs font-medium text-[var(--fg-2)] hover:bg-[var(--ink-4)] disabled:opacity-50"
             >
               ✏️ Modifier
             </button>
@@ -472,11 +472,11 @@ function DraftCard({ client: c, draft }: { client: CrmClient; draft: CrmMessage 
             type="button"
             onClick={discard}
             disabled={busy !== false}
-            className="rounded-lg px-3 py-1 text-xs text-zinc-500 hover:text-red-400 disabled:opacity-50"
+            className="rounded-lg px-3 py-1 text-xs text-[var(--fg-4)] hover:text-red-400 disabled:opacity-50"
           >
             {busy === 'del' ? '…' : '🗑 Supprimer'}
           </button>
-          {msg && <span className="text-[11px] text-zinc-300">{msg}</span>}
+          {msg && <span className="text-[11px] text-[var(--fg-2)]">{msg}</span>}
         </div>
       </div>
     </div>
@@ -560,7 +560,7 @@ function Composer({ client: c }: { client: CrmClient }) {
   }
 
   return (
-    <div className="border-t border-zinc-800/60 pt-4">
+    <div className="border-t border-[var(--ink-4)]/60 pt-4">
       {!gen ? (
         <div className="flex items-center gap-3">
           <button
@@ -571,20 +571,20 @@ function Composer({ client: c }: { client: CrmClient }) {
           >
             {busy === 'gen' ? '… génération' : '✍️ Générer une relance'}
           </button>
-          <span className="text-[11px] text-zinc-600">
+          <span className="text-[11px] text-[var(--fg-5)]">
             → {c.account === 'cammac@bluewin.ch' ? 'dans ton fil existant' : 'depuis claude-alain@ibanforge.com'}
           </span>
-          {msg && <span className="text-[11px] text-zinc-400">{msg}</span>}
+          {msg && <span className="text-[11px] text-[var(--fg-3)]">{msg}</span>}
         </div>
       ) : (
         <div className="flex flex-col gap-3">
           <div className="flex items-center justify-between">
-            <p className="text-[11px] uppercase tracking-wide text-zinc-500">Aperçu — relis, ajuste, envoie</p>
-            <button type="button" onClick={() => setGen(null)} className="text-xs text-zinc-500 hover:text-zinc-300">
+            <p className="text-[11px] uppercase tracking-wide text-[var(--fg-4)]">Aperçu — relis, ajuste, envoie</p>
+            <button type="button" onClick={() => setGen(null)} className="text-xs text-[var(--fg-4)] hover:text-[var(--fg-2)]">
               annuler
             </button>
           </div>
-          <p className="text-xs text-zinc-400">Objet : <span className="text-zinc-200">{gen.subject}</span></p>
+          <p className="text-xs text-[var(--fg-3)]">Objet : <span className="text-[var(--fg-1)]">{gen.subject}</span></p>
           <div className="grid gap-3 md:grid-cols-2">
             <div>
               <p className="mb-1 text-[10px] uppercase tracking-wide text-amber-400">Mail envoyé (EN) — éditable</p>
@@ -592,12 +592,12 @@ function Composer({ client: c }: { client: CrmClient }) {
                 value={editable}
                 onChange={(e) => setEditable(e.target.value)}
                 rows={10}
-                className="w-full rounded-lg border border-zinc-800 bg-zinc-950 p-3 text-xs leading-relaxed text-zinc-200 focus:border-amber-500/40 focus:outline-none"
+                className="w-full rounded-lg border border-[var(--ink-4)] bg-[var(--ink-0)] p-3 text-xs leading-relaxed text-[var(--fg-1)] focus:border-amber-500/40 focus:outline-none"
               />
             </div>
             <div>
               <p className="mb-1 text-[10px] uppercase tracking-wide text-blue-400">Traduction FR (toi seul)</p>
-              <div className="h-full whitespace-pre-wrap rounded-lg border border-zinc-800 bg-zinc-950 p-3 text-xs leading-relaxed text-zinc-400">
+              <div className="h-full whitespace-pre-wrap rounded-lg border border-[var(--ink-4)] bg-[var(--ink-0)] p-3 text-xs leading-relaxed text-[var(--fg-3)]">
                 {gen.translation_fr}
               </div>
             </div>
@@ -620,8 +620,8 @@ function Composer({ client: c }: { client: CrmClient }) {
             >
               {busy === 'draft' ? '… enregistrement' : '💾 Garder en brouillon'}
             </button>
-            <span className="text-[11px] text-zinc-500">à {c.email}</span>
-            {msg && <span className="text-[11px] text-zinc-300">{msg}</span>}
+            <span className="text-[11px] text-[var(--fg-4)]">à {c.email}</span>
+            {msg && <span className="text-[11px] text-[var(--fg-2)]">{msg}</span>}
           </div>
         </div>
       )}

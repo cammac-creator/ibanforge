@@ -15,7 +15,7 @@ export function LogoutButton() {
   return (
     <button
       onClick={handleLogout}
-      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-zinc-600 hover:text-red-400 hover:bg-red-500/5 transition text-left"
+      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-[var(--fg-5)] hover:text-red-400 hover:bg-red-500/5 transition text-left"
     >
       <span className="text-base">⏻</span>
       <span>{t('logout.label')}</span>

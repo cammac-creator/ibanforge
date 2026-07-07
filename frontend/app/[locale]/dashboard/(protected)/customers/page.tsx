@@ -84,9 +84,9 @@ export default async function CustomersPage() {
 
   if (!data) {
     return (
-      <div className="rounded-xl border border-zinc-800/60 bg-gradient-to-br from-zinc-900 to-zinc-900/60 p-8 text-center">
-        <p className="font-medium text-zinc-300">Données clients indisponibles</p>
-        <p className="mt-1 text-sm text-zinc-500">ADMIN_SECRET non configuré, ou API injoignable.</p>
+      <div className="rounded-xl border border-[var(--ink-4)]/60 bg-gradient-to-br from-[var(--ink-2)] to-[var(--ink-2)]/60 p-8 text-center">
+        <p className="font-medium text-[var(--fg-2)]">Données clients indisponibles</p>
+        <p className="mt-1 text-sm text-[var(--fg-4)]">ADMIN_SECRET non configuré, ou API injoignable.</p>
       </div>
     );
   }
@@ -286,7 +286,7 @@ export default async function CustomersPage() {
     <div className="flex flex-col gap-5">
       <div>
         <h1 className="text-xl font-semibold text-white">Clients — CRM</h1>
-        <p className="mt-1 text-sm text-zinc-500">{clients.length} clients suivis · sélectionne à gauche pour voir le fil et agir</p>
+        <p className="mt-1 text-sm text-[var(--fg-4)]">{clients.length} clients suivis · sélectionne à gauche pour voir le fil et agir</p>
       </div>
 
       <TopUsersToday top={topToday} todayUtc={todayUtc} locale={locale} />
@@ -299,7 +299,7 @@ export default async function CustomersPage() {
       </div>
 
       <CrmWorkspace clients={clients} />
-      <p className="text-[11px] text-zinc-600">{fmt(data.keys.length)} clés au total · pilotes sans usage + internes/tests masqués.</p>
+      <p className="text-[11px] text-[var(--fg-5)]">{fmt(data.keys.length)} clés au total · pilotes sans usage + internes/tests masqués.</p>
     </div>
   );
 }

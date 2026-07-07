@@ -84,8 +84,8 @@ export function StackedBarChart({ data, bars }: StackedBarChartProps) {
       </RechartsBarChart>
       </ResponsiveContainer>
       {lastIsPartial && (
-        <p className="mt-2 text-[11px] leading-snug text-zinc-500">
-          La dernière barre = <strong className="text-zinc-400">aujourd&apos;hui</strong>, jour en
+        <p className="mt-2 text-[11px] leading-snug text-[var(--fg-4)]">
+          La dernière barre = <strong className="text-[var(--fg-3)]">aujourd&apos;hui</strong>, jour en
           cours (comptage depuis minuit UTC). Elle se remplit au fil de la journée — ce n&apos;est
           pas une chute de trafic.
         </p>

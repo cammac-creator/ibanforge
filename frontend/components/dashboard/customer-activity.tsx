@@ -56,57 +56,57 @@ export function CustomerActivity({
             }}
           />
         ))}
-        <span className="ml-1.5 text-[10px] text-zinc-500">{lastActive ?? '—'}</span>
+        <span className="ml-1.5 text-[10px] text-[var(--fg-4)]">{lastActive ?? '—'}</span>
       </button>
 
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setOpen(false)}>
           <div
-            className="max-h-[82vh] w-full max-w-md overflow-y-auto rounded-xl border border-zinc-800 bg-zinc-900 p-5"
+            className="max-h-[82vh] w-full max-w-md overflow-y-auto rounded-xl border border-[var(--ink-4)] bg-[var(--ink-2)] p-5"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-4 flex items-center justify-between">
               <p className="text-sm font-medium text-white">{name} — activité</p>
-              <button type="button" onClick={() => setOpen(false)} className="text-lg text-zinc-500 hover:text-white">
+              <button type="button" onClick={() => setOpen(false)} className="text-lg text-[var(--fg-4)] hover:text-white">
                 ✕
               </button>
             </div>
 
-            <p className="mb-2 text-[11px] uppercase tracking-wide text-zinc-500">Appels par mois (6 mois)</p>
+            <p className="mb-2 text-[11px] uppercase tracking-wide text-[var(--fg-4)]">Appels par mois (6 mois)</p>
             <div className="mb-5 flex items-end gap-2">
               {series.map((v, i) => (
                 <div key={i} className="flex flex-1 flex-col items-center gap-1">
-                  <span className="font-mono text-[10px] text-zinc-400">{v}</span>
+                  <span className="font-mono text-[10px] text-[var(--fg-3)]">{v}</span>
                   <div
                     className="w-full rounded-sm"
                     style={{ height: `${Math.max(3, (v / max) * 56)}px`, backgroundColor: VIOLET, opacity: v === 0 ? 0.2 : 0.8 }}
                   />
-                  <span className="text-[9px] text-zinc-600">{(months[i] ?? '').slice(5) || i + 1}</span>
+                  <span className="text-[9px] text-[var(--fg-5)]">{(months[i] ?? '').slice(5) || i + 1}</span>
                 </div>
               ))}
             </div>
 
-            <p className="mb-2 text-[11px] uppercase tracking-wide text-zinc-500">Outils utilisés</p>
+            <p className="mb-2 text-[11px] uppercase tracking-wide text-[var(--fg-4)]">Outils utilisés</p>
             {activity && activity.endpoints.length ? (
               <div className="mb-5 space-y-1.5">
                 {activity.endpoints.slice(0, 6).map((e) => {
                   const m = Math.max(...activity.endpoints.map((x) => x.count), 1);
                   return (
                     <div key={e.path} className="flex items-center gap-2">
-                      <span className="w-32 truncate text-xs text-zinc-300">{TOOL_LABELS[e.path] ?? e.path}</span>
-                      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-zinc-800">
+                      <span className="w-32 truncate text-xs text-[var(--fg-2)]">{TOOL_LABELS[e.path] ?? e.path}</span>
+                      <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--ink-4)]">
                         <div className="h-full rounded-full bg-amber-500/50" style={{ width: `${(e.count / m) * 100}%` }} />
                       </div>
-                      <span className="w-8 text-right font-mono text-[10px] text-zinc-500">{e.count}</span>
+                      <span className="w-8 text-right font-mono text-[10px] text-[var(--fg-4)]">{e.count}</span>
                     </div>
                   );
                 })}
               </div>
             ) : (
-              <p className="mb-5 text-xs text-zinc-600">Pas encore de détail par outil — se construit dès les prochains appels.</p>
+              <p className="mb-5 text-xs text-[var(--fg-5)]">Pas encore de détail par outil — se construit dès les prochains appels.</p>
             )}
 
-            <p className="mb-2 text-[11px] uppercase tracking-wide text-zinc-500">Jours actifs (30 j)</p>
+            <p className="mb-2 text-[11px] uppercase tracking-wide text-[var(--fg-4)]">Jours actifs (30 j)</p>
             {activity && activity.days.length ? (
               <div className="flex flex-wrap gap-1">
                 {activity.days.map((d) => (
@@ -120,7 +120,7 @@ export function CustomerActivity({
                 ))}
               </div>
             ) : (
-              <p className="text-xs text-zinc-600">Pas encore de dates précises — se construit dès les prochains appels.</p>
+              <p className="text-xs text-[var(--fg-5)]">Pas encore de dates précises — se construit dès les prochains appels.</p>
             )}
           </div>
         </div>
