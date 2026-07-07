@@ -23,7 +23,8 @@ POST https://api.ibanforge.com/v1/iban/batch
 | Header | Value | Required |
 |---|---|---|
 | `Content-Type` | `application/json` | Yes |
-| `X-PAYMENT` | x402 payment token | Yes |
+| `Authorization` | `Bearer ifk_...` (free API key) | One of the two |
+| `X-PAYMENT` | x402 payment token | One of the two |
 
 ### Body
 

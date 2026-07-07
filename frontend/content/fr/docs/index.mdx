@@ -8,7 +8,7 @@ order: 0
 
 [Telecharger la collection Postman](/ibanforge-postman.json)
 
-IBANforge est une API rapide et fiable pour la **validation IBAN** et la **recherche BIC/SWIFT**. Elle couvre plus de 80 pays avec verification de checksum en temps reel, analyse de la structure BBAN, donnees institutionnelles enrichies via GLEIF et autres sources publiques (annuaire SWIFT, Bundesbank, SIX, NBP), **informations de conformite SEPA**, **classification de l'emetteur** (banque vs. EMI/neobanque) et **indicateurs de risque** pour les agents de conformite.
+IBANforge est une API rapide et fiable pour la **validation IBAN** et la **recherche BIC/SWIFT**. Elle couvre 89 pays avec vérification de checksum en temps réel, analyse de la structure BBAN, données institutionnelles enrichies via GLEIF et autres sources publiques (annuaire SWIFT, Bundesbank, SIX, NBP), **informations de conformité SEPA**, **classification de l'émetteur** (banque vs. EMI/néobanque), **screening sanctions & conformité** avec score de risque 0–100, et les données exclusives de **clearing suisse (BC-Nummer)** issues du SIX BankMaster.
 
 ## URL de base
 
@@ -20,9 +20,13 @@ Tous les endpoints sont servis en HTTPS. Les requetes HTTP sont automatiquement 
 
 ## Authentification
 
-IBANforge utilise les **micropaiements x402** a la place des cles API traditionnelles. Chaque requete coute une fraction de centime, payee automatiquement en USDC. Pas d'inscription, pas d'abonnement, pas de limites de debit.
+Trois portes d'entrée — choisissez ce qui vous convient, votre app ou votre agent ne tombe jamais sur un cul-de-sac :
 
-Votre client HTTP attache un en-tete de paiement, et l'API le verifie avant de traiter la requete. Consultez le [guide des micropaiements x402](/docs/x402) pour plus de details.
+1. **Clé API gratuite** — 200 requêtes/mois, sans carte bancaire. [Générez-la](/docs/api-keys) avec un simple POST, puis envoyez `Authorization: Bearer ifk_...` avec chaque requête.
+2. **Packs de crédits prépayés** — 1k = 5 $, 5k = 20 $, 25k = 80 $. Ils n'expirent jamais, achetables **par carte** ou en USDC (`POST /v1/credits/buy/1k|5k|25k`). Voir les [tarifs](/pricing).
+3. **Micropaiements x402** — paiement à l'appel entièrement autonome en USDC pour les agents, sans aucun compte. Voir le [guide x402](/docs/x402).
+
+Une requête sans clé valide ni paiement reçoit une réponse `402` avec des instructions lisibles par machine pour les trois voies — les agents autonomes s'auto-embarquent.
 
 ## Endpoints en un coup d'oeil
 
@@ -31,6 +35,8 @@ Votre client HTTP attache un en-tete de paiement, et l'API le verifie avant de t
 | `/v1/iban/validate` | POST | $0.005 | Valider un IBAN unique |
 | `/v1/iban/batch` | POST | $0.002/IBAN | Valider jusqu'a 100 IBAN |
 | `/v1/bic/:code` | GET | $0.003 | Rechercher un code BIC/SWIFT |
+| `/v1/iban/compliance` | POST | $0.02 | Sanctions, FATF, joignabilité SEPA/VoP + score de risque 0–100 |
+| `/v1/ch/clearing/:iid` | GET | $0.003 | Recherche BC-Nummer / IID suisse (SIX BankMaster) |
 | `/v1/demo` | GET | Gratuit | Exemples de validation (sans paiement) |
 | `/health` | GET | Gratuit | Verification de l'etat du service |
 
@@ -95,9 +101,12 @@ Cela renvoie des exemples d'IBAN pre-valides de plusieurs pays afin que vous pui
 
 ## Etapes suivantes
 
+- [Clés API](/docs/api-keys) — obtenez votre clé gratuite, 200 requêtes/mois
 - [Valider un IBAN unique](/docs/iban-validate) — reference complete du endpoint
 - [Validation par lot](/docs/iban-batch) — valider jusqu'a 100 IBAN en une seule requete
 - [Recherche BIC/SWIFT](/docs/bic-lookup) — rechercher les donnees d'un etablissement par code BIC
-- [Micropaiements x402](/docs/x402) — fonctionnement du paiement
+- [Contrôle de conformité](/docs/compliance) — sanctions, FATF, VoP et score de risque
+- [Clearing suisse](/docs/ch-clearing) — BC-Nummer, SIC et paiements instantanés
+- [Micropaiements x402](/docs/x402) — fonctionnement du paiement autonome
 - [Integration MCP](/docs/mcp) — connecter IBANforge a des agents IA
 - [Reference des erreurs](/docs/errors) — tous les codes d'erreur et depannage

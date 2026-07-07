@@ -51,13 +51,15 @@ La cle fonctionne sur tous les endpoints payants :
 - `POST /v1/iban/batch`
 - `GET /v1/bic/:code`
 - `POST /v1/iban/compliance`
+- `GET /v1/ch/clearing/:iid`
 
-## Limites de l'offre gratuite
+## Les offres en un coup d'oeil
 
-| Plan | Requetes/mois | Cout |
+| Plan | Volume | Cout |
 |---|---|---|
-| Gratuit (cle API) | 200 | 0 $ |
-| x402 paiement a l'appel | Illimite | 0,003 $–0,02 $/appel |
+| Gratuit (cle API) | 200 requetes/mois | 0 $ |
+| Packs de credits prepayes — carte ou USDC | 1k / 5k / 25k appels | 5 $ / 20 $ / 80 $ — n'expirent jamais |
+| x402 paiement a l'appel | Illimite | 0,002 $–0,02 $/appel |
 
 Les 200 requetes gratuites sont partagees entre tous les endpoints et se reinitalisent le 1er de chaque mois.
 
@@ -84,21 +86,20 @@ curl https://api.ibanforge.com/v1/keys/usage \
 
 ## Lorsque votre quota est depasse
 
-Une fois vos 200 requetes gratuites epuisees, l'API retourne une reponse `429 Too Many Requests` :
+Votre intégration ne tombe **pas** sur un cul-de-sac. Une fois les 200 requêtes mensuelles épuisées, l'API répond `402 Payment Required` (x402) plutôt qu'un 429 sec, avec des en-têtes qui disent exactement ce qui s'est passé :
 
-```json
-{
-  "error": {
-    "code": "quota_exceeded",
-    "message": "Quota de l'offre gratuite epuise (200/mois). Passez au paiement a l'appel x402 pour un acces illimite.",
-    "resets_at": "2026-05-01T00:00:00.000Z"
-  }
-}
+```
+X-Quota-Exhausted: true
+X-Quota-Used: 200
+X-Quota-Limit: 200
+X-Quota-Month: 2026-07
 ```
 
-Vous avez alors deux options :
-1. **Attendre la reinitialisation mensuelle** — le quota se reinitialise le 1er de chaque mois
-2. **Passer au paiement a l'appel x402** — supprimez l'en-tete `Authorization` et laissez votre client compatible x402 gerer les paiements automatiquement. Voir [Paiements x402](/docs/x402).
+Le corps du 402 liste vos trois options, lisibles par machine :
+
+1. **Acheter un pack de crédits prépayés** — par carte sur la page [tarifs](/pricing), ou en USDC via `POST /v1/credits/buy/1k|5k|25k`. Les crédits n'expirent jamais et s'attachent à votre clé existante.
+2. **Payer à l'appel via x402** — un client compatible x402 paie automatiquement en USDC, sans changer de clé. Voir [Paiements x402](/docs/x402).
+3. **Attendre la réinitialisation mensuelle** — le quota se réinitialise le 1er de chaque mois.
 
 ## Exemple TypeScript
 
