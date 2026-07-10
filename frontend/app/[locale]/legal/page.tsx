@@ -21,7 +21,7 @@ export default async function LegalIndexPage({
   params: Promise<{ locale: string }>;
 }) {
   const { locale } = await params;
-  const t = await getTranslations("legal");
+  const t = await getTranslations({ locale, namespace: "legal" });
   const docs = getAllLegalDocs();
 
   return (
