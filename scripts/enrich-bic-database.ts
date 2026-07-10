@@ -434,7 +434,10 @@ async function importEbaStep2(db: Database.Database): Promise<number> {
   for (const row of rows) {
     if (!Array.isArray(row)) continue;
     const bic = String(row[0] ?? '').trim().toUpperCase();
-    const name = String(row[2] ?? '').trim();
+    // Institution name is column 1 (the sheet layout is BIC | <name> | Comment).
+    // Reading row[2] here for months seeded 188/189 entries with a NULL name —
+    // "found:true, institution:null" answers that looked broken to clients.
+    const name = String(row[1] ?? '').trim();
     if (!bic || bic.length < 8 || !bicRegex.test(bic)) continue;
 
     const bic8 = bic.slice(0, 8);

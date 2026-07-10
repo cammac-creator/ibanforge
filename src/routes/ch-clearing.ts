@@ -88,6 +88,14 @@ chClearing.get('/v1/ch/clearing/:iid', (c) => {
     processing_ms: processingMs,
   };
 
+  // QR-IID lookups (range 30000–31999): `iid` above already carries the
+  // institution's standard IID and `qr_iid` the queried QR-IID — flag it and
+  // say so, an agent should not have to know the SIX range convention.
+  if (entry.is_qr_iid) {
+    result.is_qr_iid = true;
+    result.note = `IID ${entry.qr_iid} is a QR-IID (QR-bill range 30000–31999) of ${entry.name}; the institution's standard IID is ${entry.iid}.`;
+  }
+
   // Add redirect info if applicable
   if (entry.redirected_from) {
     result.redirected_from = entry.redirected_from;

@@ -77,7 +77,11 @@ describe('Swiss BC-Nummer Clearing Lookup', () => {
       const entry = lookupClearingByBankCode('30024');
       // This may or may not exist depending on the dataset, just verify no crash
       if (entry) {
-        expect(entry.iid).toBe('30024');
+        // 30024 sits in the QR-IID range: the entry presents the institution's
+        // standard IID and carries the queried QR-IID.
+        expect(entry.qr_iid).toBe('30024');
+        expect(entry.is_qr_iid).toBe(true);
+        expect(entry.iid).not.toBe('30024');
       }
     });
   });
@@ -204,14 +208,35 @@ describe('Swiss BC-Nummer Clearing Lookup', () => {
   // QR-IID
 
   describe('QR-IID', () => {
-    it('PostFinance has qr_iid = "9000"', () => {
+    it('QR-IID lookup (30000) presents the STANDARD iid and the queried QR-IID', () => {
+      // BankMaster QR rows carry the master IID in their "QR-IID" column; the
+      // raw echo used to answer iid:30000, qr_iid:"9000" — inverted semantics.
       const pf = lookupClearing('30000');
-      expect(pf!.qr_iid).toBe('9000');
+      expect(pf!.iid).toBe('09000');
+      expect(pf!.qr_iid).toBe('30000');
+      expect(pf!.is_qr_iid).toBe(true);
+      expect(pf!.headquarters_iid).toBe('09000');
+      expect(pf!.name).toBe('PostFinance AG');
+    });
+
+    it('standard lookup (09000) is untouched by the QR presentation swap', () => {
+      const pf = lookupClearing('09000');
+      expect(pf!.iid).toBe('09000');
+      expect(pf!.qr_iid).toBeNull();
+      expect(pf!.is_qr_iid).toBe(false);
+    });
+
+    it('UBS QR-IID (30005) maps back to standard IID 00230', () => {
+      const ubs = lookupClearing('30005');
+      expect(ubs!.iid).toBe('00230');
+      expect(ubs!.qr_iid).toBe('30005');
+      expect(ubs!.is_qr_iid).toBe(true);
     });
 
     it('UBS has no qr_iid', () => {
       const ubs = lookupClearing('00230');
       expect(ubs!.qr_iid).toBeNull();
+      expect(ubs!.is_qr_iid).toBe(false);
     });
   });
 

@@ -277,6 +277,8 @@ export interface ChClearingEntry {
   };
   sic_iid: string | null;
   qr_iid: string | null;
+  /** True when the looked-up IID is a QR-IID (SIX QR-bill range 30000–31999). */
+  is_qr_iid: boolean;
   valid_on: string;
   concatenation: boolean;
   redirect_iid: string | null;
@@ -310,6 +312,8 @@ export interface ChClearingLookupResult {
   };
   sic_iid?: string | null;
   qr_iid?: string | null;
+  /** Present (true) only when the looked-up IID is a QR-IID (30000–31999). */
+  is_qr_iid?: boolean;
   valid_on?: string;
   note?: string;
   error?: string;
@@ -328,4 +332,6 @@ export interface ChClearingSummary {
   instant_payments_chf: boolean;
   eurosic: boolean;
   qr_iid: string | null;
+  /** Present (true) only for QR-IBANs (bank code in the QR-IID range 30000–31999). */
+  is_qr_iid?: boolean;
 }
