@@ -29,7 +29,13 @@
       "agents": "Agents",
       "openapi": "OpenAPI",
       "openSource": "Cœur open-source (MIT)",
-      "vendors": "Pour les éditeurs de logiciels"
+      "vendors": "Pour les éditeurs de logiciels",
+      "changelog": "Changelog",
+      "support": "Support",
+      "terms": "Conditions d'utilisation",
+      "privacy": "Confidentialité",
+      "dpa": "DPA",
+      "imprint": "Mentions légales"
     },
     "copyright": "© {year} IBANforge.",
     "dataLine": "Données : GLEIF · SIX · Bundesbank · EBA — actualisées chaque mois"
@@ -857,5 +863,34 @@
       "description": "Clé gratuite en 1 ligne. Install MCP en 30 secondes. x402 settle en 2 secondes.",
       "button": "Ouvrir le playground"
     }
+  },
+  "legal": {
+    "index": {
+      "title": "Mentions & contrats",
+      "subtitle": "Les documents qui régissent le service : conditions, confidentialité, sous-traitance des données, identité de l'opérateur."
+    },
+    "englishOnly": "Les documents contractuels sont fournis en anglais — la version anglaise fait foi.",
+    "updated": "Mis à jour le"
+  },
+  "status": {
+    "title": "Statut de l'API",
+    "subtitle": "Santé en direct et taux de succès par requête d'api.ibanforge.com, mesurés sur le trafic de production.",
+    "operational": "Tous les systèmes opérationnels",
+    "disrupted": "Perturbation en cours",
+    "w7": "Taux de succès 7 jours",
+    "w30": "Taux de succès 30 jours",
+    "w90": "Taux de succès 90 jours",
+    "last90": "90 derniers jours",
+    "barsHint": "Une barre par jour — vert : aucune erreur serveur, ambre : 5xx isolées, rouge : >1 % d'erreurs serveur.",
+    "noData": "pas de données",
+    "method": "Méthode : taux de succès = part des requêtes servies sans erreur serveur 5xx, calculé depuis le journal de requêtes de production (les erreurs client comme 402/404 sont un comportement attendu de l'API et ne comptent pas contre la disponibilité). Page rafraîchie toutes les 5 minutes. Des SLA écrits sont disponibles dans les accords Editor/OEM."
+  },
+  "changelog": {
+    "title": "Changelog",
+    "subtitle": "Tous les changements notables de l'API, des SDK et du serveur MCP.",
+    "policyTitle": "Politique de versionnage & dépréciation",
+    "policyBody": "L'API /v1 est stable : des champs peuvent être ajoutés, jamais renommés ni supprimés au sein de v1. Un changement cassant passerait par un nouveau chemin majeur (/v2) avec au moins 6 mois de fonctionnement en parallèle, annoncé ici et par email aux détenteurs de clés actives. Le projet suit le versionnage sémantique.",
+    "fallback": "Le changelog n'a pas pu être chargé — consultez-le sur",
+    "englishOnly": "Le changelog est tenu en anglais."
   }
 }

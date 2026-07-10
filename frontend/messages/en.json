@@ -29,7 +29,13 @@
       "agents": "Agents",
       "openapi": "OpenAPI",
       "openSource": "Open-source core (MIT)",
-      "vendors": "For software vendors"
+      "vendors": "For software vendors",
+      "changelog": "Changelog",
+      "support": "Support",
+      "terms": "Terms of Service",
+      "privacy": "Privacy Policy",
+      "dpa": "DPA",
+      "imprint": "Legal notice"
     },
     "copyright": "© {year} IBANforge.",
     "dataLine": "Data: GLEIF · SIX · Bundesbank · EBA — refreshed monthly"
@@ -857,5 +863,34 @@
       "description": "Free key in 1 line. MCP install in 30 seconds. x402 settles in 2 seconds.",
       "button": "Open the playground"
     }
+  },
+  "legal": {
+    "index": {
+      "title": "Legal",
+      "subtitle": "The documents that govern the service: terms, privacy, data processing, operator identity."
+    },
+    "englishOnly": "Contractual documents are provided in English — the English version is authoritative.",
+    "updated": "Updated"
+  },
+  "status": {
+    "title": "API Status",
+    "subtitle": "Live health and per-request success rate of api.ibanforge.com, measured from production traffic.",
+    "operational": "All systems operational",
+    "disrupted": "Service disruption",
+    "w7": "7-day success rate",
+    "w30": "30-day success rate",
+    "w90": "90-day success rate",
+    "last90": "Last 90 days",
+    "barsHint": "One bar per day — green: no server errors, amber: isolated 5xx, red: >1% server errors.",
+    "noData": "no data",
+    "method": "Method: success rate = share of requests answered without a 5xx server error, computed from the production request log (client errors like 402/404 are expected API behavior and do not count against availability). Page refreshes every 5 minutes. Written SLAs are available in Editor/OEM agreements."
+  },
+  "changelog": {
+    "title": "Changelog",
+    "subtitle": "Every notable change to the API, SDKs and MCP server.",
+    "policyTitle": "Versioning & deprecation policy",
+    "policyBody": "The /v1 API is stable: fields are only added, never renamed or removed within v1. Breaking changes would ship as a new major path (/v2) with at least 6 months of parallel operation, announced here and by email to active key holders. The project follows semantic versioning.",
+    "fallback": "The changelog could not be loaded right now — read it on",
+    "englishOnly": "The changelog is maintained in English."
   }
 }

@@ -906,3 +906,20 @@ export function getPatternStats(days: number = 30): PatternStatsResponse {
     top_countries_list: topCountriesList,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Retention
+// ---------------------------------------------------------------------------
+
+/**
+ * Purge per-request metadata older than the retention window (12 months).
+ * Aggregated tables (daily_stats, hourly_stats) hold no personal data and are
+ * kept indefinitely. This backs the public privacy policy — keep both in sync.
+ */
+export function purgeOldRequestLog(months: number = 12): number {
+  const db = getStatsDB();
+  const result = db
+    .prepare(`DELETE FROM request_log WHERE created_at < datetime('now', '-' || ? || ' months')`)
+    .run(months);
+  return result.changes;
+}

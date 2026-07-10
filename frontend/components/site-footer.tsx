@@ -23,12 +23,18 @@ export function SiteFooter() {
       links: [
         { href: "https://github.com/cammac-creator/ibanforge", label: t("link.github"), external: true },
         { href: `/${locale}/docs/mcp`, label: t("link.mcp") },
-        { href: "https://api.ibanforge.com/health", label: t("link.apiStatus"), external: true },
+        { href: `/${locale}/status`, label: t("link.apiStatus") },
+        { href: `/${locale}/changelog`, label: t("link.changelog") },
+        { href: "mailto:support@ibanforge.com", label: t("link.support"), external: true },
       ],
     },
     {
       title: t("column.legal"),
       links: [
+        { href: `/${locale}/legal/terms`, label: t("link.terms") },
+        { href: `/${locale}/legal/privacy`, label: t("link.privacy") },
+        { href: `/${locale}/legal/dpa`, label: t("link.dpa") },
+        { href: `/${locale}/legal/imprint`, label: t("link.imprint") },
         { href: "https://github.com/cammac-creator/ibanforge", label: t("link.openSource"), external: true },
       ],
     },

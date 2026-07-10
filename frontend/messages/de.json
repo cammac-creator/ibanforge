@@ -29,7 +29,13 @@
       "agents": "Agenten",
       "openapi": "OpenAPI",
       "openSource": "Open-Source-Kern (MIT)",
-      "vendors": "Für Softwareanbieter"
+      "vendors": "Für Softwareanbieter",
+      "changelog": "Changelog",
+      "support": "Support",
+      "terms": "Nutzungsbedingungen",
+      "privacy": "Datenschutz",
+      "dpa": "AVV (DPA)",
+      "imprint": "Impressum"
     },
     "copyright": "© {year} IBANforge.",
     "dataLine": "Daten: GLEIF · SIX · Bundesbank · EBA — monatlich aktualisiert"
@@ -857,5 +863,34 @@
       "description": "Kostenloser Schlüssel in 1 Zeile. MCP-Installation in 30 Sekunden. x402 wickelt in 2 Sekunden ab.",
       "button": "Playground öffnen"
     }
+  },
+  "legal": {
+    "index": {
+      "title": "Rechtliches",
+      "subtitle": "Die Dokumente, die den Dienst regeln: Bedingungen, Datenschutz, Auftragsverarbeitung, Betreiberidentität."
+    },
+    "englishOnly": "Vertragsdokumente werden auf Englisch bereitgestellt — die englische Fassung ist massgebend.",
+    "updated": "Aktualisiert am"
+  },
+  "status": {
+    "title": "API-Status",
+    "subtitle": "Live-Zustand und Erfolgsrate pro Anfrage von api.ibanforge.com, gemessen am Produktionsverkehr.",
+    "operational": "Alle Systeme betriebsbereit",
+    "disrupted": "Störung",
+    "w7": "Erfolgsrate 7 Tage",
+    "w30": "Erfolgsrate 30 Tage",
+    "w90": "Erfolgsrate 90 Tage",
+    "last90": "Letzte 90 Tage",
+    "barsHint": "Ein Balken pro Tag — grün: keine Serverfehler, bernstein: vereinzelte 5xx, rot: >1 % Serverfehler.",
+    "noData": "keine Daten",
+    "method": "Methode: Erfolgsrate = Anteil der Anfragen ohne 5xx-Serverfehler, berechnet aus dem Produktions-Request-Log (Client-Fehler wie 402/404 sind erwartetes API-Verhalten und zählen nicht gegen die Verfügbarkeit). Seite aktualisiert sich alle 5 Minuten. Schriftliche SLAs sind in Editor/OEM-Vereinbarungen erhältlich."
+  },
+  "changelog": {
+    "title": "Changelog",
+    "subtitle": "Alle nennenswerten Änderungen an API, SDKs und MCP-Server.",
+    "policyTitle": "Versionierungs- & Deprecation-Politik",
+    "policyBody": "Die /v1-API ist stabil: Felder werden nur hinzugefügt, innerhalb von v1 nie umbenannt oder entfernt. Breaking Changes erschienen als neuer Major-Pfad (/v2) mit mindestens 6 Monaten Parallelbetrieb, angekündigt hier und per E-Mail an aktive Schlüsselinhaber. Das Projekt folgt Semantic Versioning.",
+    "fallback": "Das Changelog konnte gerade nicht geladen werden — lesen Sie es auf",
+    "englishOnly": "Das Changelog wird auf Englisch geführt."
   }
 }
