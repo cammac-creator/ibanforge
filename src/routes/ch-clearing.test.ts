@@ -39,15 +39,31 @@ describe('GET /v1/ch/clearing/:iid', () => {
     expect(body.institution.name).toBe('UBS Switzerland AG');
   });
 
-  it('GET /v1/ch/clearing/30000 → PostFinance', async () => {
+  it('GET /v1/ch/clearing/30000 (QR-IID) → PostFinance with correct semantics', async () => {
     const res = await app.request('/v1/ch/clearing/30000');
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.found).toBe(true);
     expect(body.institution.name).toBe('PostFinance AG');
     expect(body.institution.type).toBe('postfinance');
-    expect(body.qr_iid).toBe('9000');
+    // iid = the institution's STANDARD IID; qr_iid = the queried QR-IID.
+    expect(body.iid).toBe('09000');
+    expect(body.qr_iid).toBe('30000');
+    expect(body.is_qr_iid).toBe(true);
+    expect(body.note).toContain('QR-IID');
     expect(body.payment_services.lsv_bdd_chf).toBe(false);
+  });
+
+  it('GET /v1/ch/clearing/9000 (standard) is unchanged — no is_qr_iid field', async () => {
+    const res = await app.request('/v1/ch/clearing/9000');
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.found).toBe(true);
+    expect(body.iid).toBe('09000');
+    expect(body.institution.name).toBe('PostFinance AG');
+    expect(body.qr_iid).toBeNull();
+    expect(body).not.toHaveProperty('is_qr_iid');
+    expect(body).not.toHaveProperty('note');
   });
 
   it('GET /v1/ch/clearing/700 → Cantonal bank', async () => {

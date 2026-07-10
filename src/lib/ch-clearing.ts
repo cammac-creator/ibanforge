@@ -126,14 +126,43 @@ interface ChClearingRow {
 }
 
 /**
+ * True when an IID belongs to the SIX QR-IID allocation range (30000–31999),
+ * reserved for QR-IBAN issuance.
+ */
+export function isQrIidRange(iid: string): boolean {
+  const n = parseInt(iid, 10);
+  return n >= 30000 && n <= 31999;
+}
+
+/**
  * Convert a raw DB row to a ChClearingEntry.
+ *
+ * QR-IID rows (BankMaster range 30000–31999) need a semantic swap: for those
+ * rows the file's "QR-IID" column carries the institution's STANDARD IID (the
+ * master record), while the row's own `iid` IS the QR-IID being described.
+ * Echoing the raw columns made `GET /v1/ch/clearing/30000` answer
+ * `iid: "30000", qr_iid: "9000"` — inverted. We present: `iid` = the standard
+ * IID, `qr_iid` = the QR-IID, plus `is_qr_iid: true`.
  */
 function rowToEntry(row: ChClearingRow): ChClearingEntry {
-  // Strip leading zeros from qr_iid for display (e.g. '09000' -> '9000')
-  const qrIid = row.qr_iid ? String(parseInt(row.qr_iid, 10)) : null;
+  if (isQrIidRange(row.iid)) {
+    // A handful of QR-range rows are placeholders without a master reference —
+    // fall back to the row's own IID rather than inventing one.
+    const masterIid = row.qr_iid ? row.qr_iid.padStart(5, '0') : row.iid;
+    return {
+      ...buildEntry(row, masterIid, row.iid),
+      is_qr_iid: true,
+      headquarters_iid: masterIid,
+    };
+  }
+  // Standard rows: the qr_iid column is never populated today (verified over
+  // the full BankMaster); keep it zero-padded if SIX ever ships one.
+  return buildEntry(row, row.iid, row.qr_iid ? row.qr_iid.padStart(5, '0') : null);
+}
 
+function buildEntry(row: ChClearingRow, iid: string, qrIid: string | null): ChClearingEntry {
   return {
-    iid: row.iid,
+    iid,
     name: row.name,
     institution_type: detectInstitutionType(row.name, row.iid, row.country),
     iid_type: mapIidType(row.iid_type),
@@ -156,6 +185,7 @@ function rowToEntry(row: ChClearingRow): ChClearingEntry {
     },
     sic_iid: row.sic_iid,
     qr_iid: qrIid,
+    is_qr_iid: false,
     valid_on: row.valid_on ?? '',
     concatenation: row.concatenation === 1,
     redirect_iid: row.redirect_iid,

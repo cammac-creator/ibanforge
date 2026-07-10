@@ -61,6 +61,9 @@ export function enrichResult(result: IBANValidationResult): void {
         instant_payments_chf: clearing.payment_services.instant_payments_chf,
         eurosic: clearing.payment_services.eurosic,
         qr_iid: clearing.qr_iid,
+        // QR-IBAN: the BBAN carries a QR-IID (30000–31999); iid above is the
+        // institution's standard IID, qr_iid the one from the IBAN.
+        ...(clearing.is_qr_iid ? { is_qr_iid: true } : {}),
       };
     } else {
       result.clearing = null;

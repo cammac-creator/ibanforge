@@ -87,7 +87,7 @@ curl https://api.ibanforge.com/v1/ch/clearing/00230 \
 | `payment_services.eurosic` | Participe à euroSIC, le système de clearing euro pour la Suisse. |
 | `payment_services.lsv_bdd_chf` / `lsv_bdd_eur` | Prend en charge les prélèvements LSV+/BDD en CHF / EUR. |
 | `sic_iid` | Le numéro de participant SIC à 6 chiffres. |
-| `qr_iid` | Le QR-IID (plage 30000–31999) si l'institution émet des QR-IBAN, sinon `null`. |
+| `qr_iid` | Lors d'un lookup de QR-IID (plage 30000–31999) : le QR-IID interrogé — `iid` porte alors l'IID standard de l'institution et `is_qr_iid: true` est présent. `null` pour les lookups d'IID standard. |
 | `valid_on` | La date du snapshot BankMaster auquel l'enregistrement est valable. |
 
 ### Introuvable
