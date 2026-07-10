@@ -49,7 +49,7 @@
 ### Entry to Add
 
 ```markdown
-- [IBANforge](https://github.com/cammac-creator/ibanforge) - IBAN validation, BIC/SWIFT lookup, and Swiss clearing REST API + MCP server with x402 micropayments. $0.002–$0.005/request in USDC on Base. 84 countries, 121K+ BIC entries (38K LEI-enriched via GLEIF), 1,190 Swiss BC-Nummer from SIX.
+- [IBANforge](https://github.com/cammac-creator/ibanforge) - IBAN validation, BIC/SWIFT lookup, and Swiss clearing REST API + MCP server with x402 micropayments. $0.002–$0.005/request in USDC on Base. 89 countries, 121k+ BIC entries (38k+ LEI-enriched via GLEIF), ~1,200 Swiss BC-Nummer from SIX.
 ```
 
 ---

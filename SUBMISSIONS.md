@@ -32,8 +32,8 @@ IBANforge is the official MCP server for the IBANforge compliance API, exposing 
 
 - validate_iban — verify any European IBAN AND enrich it with BIC/SWIFT, country, EMI/vIBAN flag, SEPA reachability, VoP (Verification of Payee, EU 2024/886), risk score, and Swiss BC-Nummer for CH/LI accounts. ($0.005)
 - batch_validate_iban — up to 100 IBANs in one call, ideal for CSV cleanup or payout list triage. ($0.002 per IBAN)
-- lookup_bic — resolve a BIC/SWIFT code into bank name, country, city, LEI, address. Backed by 121,399 BIC entries (38,761 LEI-enriched via GLEIF). ($0.003)
-- lookup_ch_clearing — resolve a Swiss BC-Nummer / IID into institution name, type, SIC, euroSIC, QR-IID. The only API exposing this data, backed by 1,190 SIX BankMaster entries. ($0.003)
+- lookup_bic — resolve a BIC/SWIFT code into bank name, country, city, LEI, address. Backed by 121k+ BIC entries (38k+ LEI-enriched via GLEIF, refreshed monthly). ($0.003)
+- lookup_ch_clearing — resolve a Swiss BC-Nummer / IID into institution name, type, address, full payment-rail participation (SIC, euroSIC, CHF instant, LSV+/BDD) and QR-IID — the deepest Swiss clearing data in any public API, backed by ~1,200 SIX BankMaster entries. ($0.003)
 - check_compliance — pre-flight risk triage before a SEPA payment: sanctions screening (OFAC/EU/UN), FATF jurisdictions, SEPA Instant reachability, VoP participant. Returns risk_score 0-100. ($0.02)
 
 Two transports: stdio via npm (`npx -y ibanforge-mcp`) and Streamable HTTP (`https://api.ibanforge.com/mcp`). Free tier: 200 requests/month with an auto-generated API key (POST /v1/keys/generate). Beyond that, pay-per-call in USDC via x402 — no credit card, no signup, just a wallet on Base.
@@ -41,8 +41,8 @@ Two transports: stdio via npm (`npx -y ibanforge-mcp`) and Streamable HTTP (`htt
 
 **Example queries** (si demandé) :
 
-- "Validate IBAN CH9300762011623852957 and tell me if it is a vIBAN, EMI-issued, or sanctioned country."
-- "Look up Swiss BC-Nummer 762."
+- "Validate IBAN CH1000230000000012345 and tell me if it is a vIBAN, EMI-issued, or sanctioned country."
+- "Look up Swiss BC-Nummer 230."
 - "Run a compliance check on IBAN GB29NWBK60161331926819 before I send a payment."
 
 ---
@@ -65,7 +65,7 @@ Ouvre le `README.md` ou le fichier `mcp-servers.json` du repo (regarde la struct
 ```json
 {
   "name": "IBANforge",
-  "description": "IBAN validation, BIC/SWIFT lookup, Swiss BC-Nummer, SEPA + VoP and compliance risk scoring for AI agents. 121,399 BIC entries (38,761 LEI-enriched via GLEIF), 1,190 SIX BankMaster Swiss entries, x402 micropayments.",
+  "description": "IBAN validation, BIC/SWIFT lookup, Swiss BC-Nummer, SEPA + VoP and compliance risk scoring for AI agents. 121k+ BIC entries (38k+ LEI-enriched via GLEIF), ~1,200 SIX BankMaster Swiss entries, x402 micropayments.",
   "github": "https://github.com/cammac-creator/ibanforge",
   "npm": "ibanforge-mcp",
   "command": "npx",
@@ -90,7 +90,7 @@ Adds [IBANforge](https://ibanforge.com), the official MCP server for the IBANfor
 **Highlights**
 
 - 5 tools: validate_iban, batch_validate_iban, lookup_bic, lookup_ch_clearing, check_compliance
-- Backed by 121,399 BIC entries (38,761 LEI-enriched via GLEIF + 81,642 SWIFT directory + 142 Bundesbank + 633 SIX + 201 EBA Step2 SCT + 19 NBP) and 1,190 SIX BankMaster Swiss BC-Nummern (the only API exposing this last dataset)
+- Backed by 121k+ BIC entries (38k+ LEI-enriched via GLEIF; other rows from the SWIFT directory, Bundesbank, SIX, EBA Step2 SCT, NBP — refreshed monthly) and ~1,200 SIX BankMaster Swiss BC-Nummern with full payment-rail participation + QR-IID (the deepest Swiss clearing data in any public API)
 - Two transports: stdio via `npx -y ibanforge-mcp` AND Streamable HTTP at `https://api.ibanforge.com/mcp`
 - x402 micropayments support — pay-per-call in USDC on Base, no API key needed
 - Free tier: 200 req/month with API key (POST /v1/keys/generate)
@@ -124,7 +124,7 @@ git checkout -b add-ibanforge
 Ouvre `README.md`, trouve la table principale des serveurs x402. Ajoute une ligne (en respectant le format existant) — quelque chose comme :
 
 ```markdown
-| [IBANforge](https://ibanforge.com) | Compliance API for AI agents — IBAN validation, BIC lookup, Swiss BC-Nummer (1,190 SIX entries), SEPA + VoP, risk scoring | $0.003–$0.02 / call | [/.well-known/x402](https://api.ibanforge.com/.well-known/x402) | Base | [GitHub](https://github.com/cammac-creator/ibanforge) |
+| [IBANforge](https://ibanforge.com) | Compliance API for AI agents — IBAN validation, BIC lookup, Swiss BC-Nummer (~1,200 SIX entries), SEPA + VoP, risk scoring | $0.003–$0.02 / call | [/.well-known/x402](https://api.ibanforge.com/.well-known/x402) | Base | [GitHub](https://github.com/cammac-creator/ibanforge) |
 ```
 
 (adapte aux colonnes effectivement présentes dans le README)
@@ -187,7 +187,7 @@ Note : il existe **plusieurs** repos awesome-x402 (xpaysh/awesome-x402, a6b8/awe
 **Description** :
 
 ```
-IBANforge is a compliance API for AI agents — IBAN validation (mod-97 + BBAN parsing), BIC/SWIFT resolution against 121,399 BIC entries (38,761 LEI-enriched via GLEIF; additional rows from SWIFT directory, Bundesbank, SIX, NBP, EBA Step2 SCT), Swiss BC-Nummer / QR-IID lookup against 1,190 SIX BankMaster entries (the only API exposing this), EMI/vIBAN issuer classification, SEPA Instant + VoP (EU 2024/886) reachability flag, and composite compliance risk scoring (OFAC/EU/UN sanctions + FATF). Pay per call in USDC via x402 ($0.003 to $0.02 per call) — no API key signup required. Also available as a native MCP server (npm `ibanforge-mcp`).
+IBANforge is a compliance API for AI agents — IBAN validation (mod-97 + BBAN parsing), BIC/SWIFT resolution against 121k+ BIC entries (38k+ LEI-enriched via GLEIF; additional rows from SWIFT directory, Bundesbank, SIX, NBP, EBA Step2 SCT), Swiss BC-Nummer / QR-IID lookup against ~1,200 SIX BankMaster entries (full payment-rail participation — the deepest Swiss clearing data in any public API), EMI/vIBAN issuer classification, SEPA Instant + VoP (EU 2024/886) reachability flag, and composite compliance risk scoring (OFAC/EU/UN sanctions + FATF). Pay per call in USDC via x402 ($0.003 to $0.02 per call) — no API key signup required. Also available as a native MCP server (npm `ibanforge-mcp`).
 ```
 
 ---

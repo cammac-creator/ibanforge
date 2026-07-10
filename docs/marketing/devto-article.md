@@ -7,7 +7,7 @@ cover_image: https://api.ibanforge.com/og-image.png
 
 # Building an IBAN Validation API with Hono, SQLite, and MCP
 
-I recently shipped [IBANforge](https://ibanforge.com), a free API for IBAN validation and BIC/SWIFT lookup. v1.1.0 adds Swiss clearing data (1,190 BC-Nummer entries from SIX with SIC, euroSIC, Instant Payments), 85 EMI/neobank classifications, and 5 MCP tools for AI agents. In this article, I'll walk through the key architectural decisions and share real code from the project.
+I recently shipped [IBANforge](https://ibanforge.com), a free API for IBAN validation and BIC/SWIFT lookup. v1.1.0 adds Swiss clearing data (~1,200 BC-Nummer entries from SIX with SIC, euroSIC, Instant Payments), 85 EMI/neobank classifications, and 5 MCP tools for AI agents. In this article, I'll walk through the key architectural decisions and share real code from the project.
 
 ## Why Hono Over Express
 
@@ -64,7 +64,7 @@ No decorators, no class inheritance, no magic -- just functions.
 
 ## SQLite for Lookup Data
 
-IBANforge stores 121,399 BIC/SWIFT entries aggregated from public sources (GLEIF, SWIFT directory, Bundesbank, SIX, NBP, EBA Step2 SCT), with LEI enrichment for the 38,761 rows sourced from [GLEIF](https://www.gleif.org/) (the Global Legal Entity Identifier Foundation, CC0).
+IBANforge stores 121k+ BIC/SWIFT entries aggregated from public sources (GLEIF, SWIFT directory, Bundesbank, SIX, NBP, EBA Step2 SCT), with LEI enrichment for the 38k+ rows sourced from [GLEIF](https://www.gleif.org/) (the Global Legal Entity Identifier Foundation, CC0).
 
 Why SQLite instead of PostgreSQL?
 
@@ -175,7 +175,7 @@ The entire infrastructure costs ~$6/month:
 | Domain | ~$1/month |
 | GLEIF data | free (CC0) |
 
-The SQLite database holds 121,399 BIC entries (38,761 LEI-enriched via GLEIF). No managed database fees.
+The SQLite database holds 121k+ BIC entries (38k+ LEI-enriched via GLEIF). No managed database fees.
 
 ## Try It
 

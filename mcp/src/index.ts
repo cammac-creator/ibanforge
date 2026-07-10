@@ -50,7 +50,7 @@ const TOOLS: Tool[] = [
       properties: {
         iban: {
           type: 'string',
-          description: 'IBAN to validate. Spaces and lowercase are accepted. Example: "CH93 0076 2011 6238 5295 7" or "de89370400440532013000".',
+          description: 'IBAN to validate. Spaces and lowercase are accepted. Example: "CH10 0023 0000 0000 1234 5" or "de89370400440532013000".',
         },
       },
       required: ['iban'],
@@ -75,7 +75,7 @@ const TOOLS: Tool[] = [
           properties: {
             bank_code: { type: 'string' },
             branch_code: { type: 'string' },
-            account: { type: 'string' },
+            account_number: { type: 'string' },
           },
         },
         bic: {
@@ -187,7 +187,7 @@ const TOOLS: Tool[] = [
       'USE WHEN: the user already has a BIC/SWIFT (8 or 11 chars, alphanumeric, e.g., "UBSWCHZH80A", "DEUTDEFF") ' +
       'and asks which bank it belongs to, where the bank is, or its LEI for compliance/regulatory matching. ' +
       'DO NOT USE for IBAN inputs — call validate_iban instead, it resolves the BIC for you. ' +
-      'BACKED BY: 121,399 BIC entries (38,761 LEI-enriched via GLEIF; additional rows from SWIFT directory, Bundesbank, SIX, NBP, EBA Step2 SCT), refreshed monthly. ' +
+      'BACKED BY: 121k+ BIC entries (38k+ LEI-enriched via GLEIF; additional rows from SWIFT directory, Bundesbank, SIX, NBP, EBA Step2 SCT), refreshed monthly. ' +
       'RETURNS: bank_name, country, country_name, city, lei, address (if available). ' +
       'COST: 0.003 USDC.',
     inputSchema: {
@@ -219,7 +219,21 @@ const TOOLS: Tool[] = [
         },
         city: { type: 'string' },
         lei: { type: 'string', description: 'Legal Entity Identifier (ISO 17442) if available.' },
-        address: { type: 'string' },
+        address: {
+          type: 'object',
+          description: 'Registered head-office address object (present when available).',
+          properties: {
+            type: { type: 'string' },
+            street: { type: 'string' },
+            post_code: { type: 'string' },
+            region: { type: 'string' },
+            city: { type: 'string' },
+            country: { type: 'string' },
+            source: { type: 'string' },
+            as_of: { type: 'string' },
+          },
+        },
+        address_available: { type: 'boolean' },
       },
       required: ['bic', 'found', 'valid_format'],
     },
@@ -231,16 +245,16 @@ const TOOLS: Tool[] = [
       'USE WHEN: the user mentions a Swiss bank by BC-Nummer or IID, pastes a CH or LI IBAN clearing code, ' +
       'asks routing details for a Swiss instant transfer (SIC, euroSIC), asks about QR-bill QR-IID resolution, ' +
       'or needs to classify a Swiss financial institution (bank vs PFS vs SIC-only participant). ' +
-      'THIS IS THE ONLY API THAT EXPOSES THIS DATA — alternatives (iban.com, OpenIBAN, payeer, sepa.com) do not cover it. ' +
-      'BACKED BY: 1,190 SIX BankMaster entries (Swiss official source). ' +
-      'RETURNS: institution_name, institution_type, sic_participant, eurosic_participant, instant_payments, qr_iid, language. ' +
+      'THE DEEPEST SWISS CLEARING DATA IN ANY PUBLIC API — full SIX BankMaster payment-rail participation (SIC, RTGS CHF, Instant Payments CHF, euroSIC, LSV+/BDD) plus QR-IID allocation, not just a name lookup. ' +
+      'BACKED BY: ~1,200 SIX BankMaster entries (Swiss official source, refreshed monthly). ' +
+      'RETURNS: institution { name, type, iid_type, headquarters_iid }, address, bic, payment_services { sic, rtgs_chf, instant_payments_chf, eurosic, lsv_bdd_chf, lsv_bdd_eur }, sic_iid, qr_iid, valid_on. ' +
       'COST: 0.003 USDC. Only relevant for CH and LI accounts.',
     inputSchema: {
       type: 'object',
       properties: {
         iid: {
           type: 'string',
-          description: 'Swiss IID / BC-Nummer (1 to 5 digits, leading zeros stripped). Example: "762" for UBS Switzerland.',
+          description: 'Swiss IID / BC-Nummer (1 to 5 digits, leading zeros stripped). Example: "230" for UBS Switzerland AG.',
         },
       },
       required: ['iid'],
@@ -263,16 +277,31 @@ const TOOLS: Tool[] = [
             headquarters_iid: { type: 'string' },
           },
         },
-        participation: {
+        address: {
           type: 'object',
           properties: {
-            sic: { type: 'boolean', description: 'Swiss Interbank Clearing.' },
-            eurosic: { type: 'boolean' },
-            instant_payments: { type: 'boolean' },
-            qr_iid: { type: 'boolean', description: 'QR-bill enabled IID.' },
+            street: { type: 'string' },
+            building_number: { type: 'string' },
+            post_code: { type: 'string' },
+            town: { type: 'string' },
+            country: { type: 'string' },
           },
         },
         bic: { type: 'string', description: 'BIC if mapped.' },
+        payment_services: {
+          type: 'object',
+          properties: {
+            sic: { type: 'boolean', description: 'Swiss Interbank Clearing.' },
+            rtgs_chf: { type: 'boolean' },
+            instant_payments_chf: { type: 'boolean' },
+            eurosic: { type: 'boolean' },
+            lsv_bdd_chf: { type: 'boolean' },
+            lsv_bdd_eur: { type: 'boolean' },
+          },
+        },
+        sic_iid: { type: 'string' },
+        qr_iid: { type: 'string', description: 'QR-IID allocation, null when none.' },
+        valid_on: { type: 'string' },
       },
       required: ['iid', 'found'],
     },
@@ -513,7 +542,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         if (typeof a.iid !== 'string' || !/^\d{1,5}$/.test(a.iid)) {
           return out({
             error: 'invalid_iid',
-            message: 'IID must be 1-5 digits. Example: 762 for UBS Switzerland AG.',
+            message: 'IID must be 1-5 digits. Example: 230 for UBS Switzerland AG.',
           });
         }
         const result = await apiCall('GET', `/v1/ch/clearing/${encodeURIComponent(a.iid)}`);
