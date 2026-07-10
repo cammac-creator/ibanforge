@@ -20,12 +20,12 @@ console.log(fmt.valid); // true
 // Authenticated calls (required for paid endpoints, unless you pay per-call via x402)
 const client = new IBANforge({ apiKey: 'ifk_...' });
 
-const r = await client.validateIban('CH9300762011623852957');
+const r = await client.validateIban('CH1000230000000012345');
 console.log(r.valid);            // true
 console.log(r.bic?.code);        // 'UBSWCHZH'
 console.log(r.bic?.bank_name);   // 'UBS Switzerland AG'
 console.log(r.sepa?.member);     // true
-console.log(r.clearing?.iid);    // '00762' (Swiss BC-Nummer, CH/LI only)
+console.log(r.clearing?.iid);    // '00230' (Swiss BC-Nummer, CH/LI only)
 ```
 
 ## Get a free key in one line
@@ -42,7 +42,7 @@ await client.formatIban(iban);          // FREE — mod-97 + structure only
 await client.validateIban(iban);        // full enrichment
 await client.validateBatch([...ibans]); // up to 100, $0.002/IBAN
 await client.lookupBic('UBSWCHZH80A');  // BIC → bank, country, LEI
-await client.lookupChClearing('762');   // Swiss BC-Nummer / IID (only API with this)
+await client.lookupChClearing('230');   // Swiss BC-Nummer / IID — full SIX rail participation + QR-IID
 await client.checkCompliance(iban);     // sanctions + FATF + SEPA + VoP + risk score
 await client.usage();                   // current month quota for your key
 await client.health();

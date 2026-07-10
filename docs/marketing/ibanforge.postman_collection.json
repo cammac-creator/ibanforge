@@ -34,7 +34,7 @@
         "header": [{ "key": "Content-Type", "value": "application/json" }],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"iban\": \"CH9300762011623852957\"\n}",
+          "raw": "{\n  \"iban\": \"CH1000230000000012345\"\n}",
           "options": { "raw": { "language": "json" } }
         },
         "url": {
@@ -73,7 +73,7 @@
           "host": ["{{baseUrl}}"],
           "path": ["v1", "bic", "UBSWCHZH80A"]
         },
-        "description": "Resolve a BIC/SWIFT code (8 or 11 characters) into bank name, country, city, LEI and branch info. Backed by 121,399 BIC entries. Cost: $0.003."
+        "description": "Resolve a BIC/SWIFT code (8 or 11 characters) into bank name, country, city, LEI and branch info. Backed by 121k+ BIC entries (refreshed monthly). Cost: $0.003."
       }
     },
     {
@@ -100,11 +100,11 @@
         "method": "GET",
         "header": [],
         "url": {
-          "raw": "{{baseUrl}}/v1/ch/clearing/762",
+          "raw": "{{baseUrl}}/v1/ch/clearing/230",
           "host": ["{{baseUrl}}"],
-          "path": ["v1", "ch", "clearing", "762"]
+          "path": ["v1", "ch", "clearing", "230"]
         },
-        "description": "Resolve a Swiss BC-Nummer / IID (1-5 digits) into institution name, type, SIC, euroSIC and QR-IID. Backed by 1,190 SIX BankMaster entries — the only API exposing this dataset. Cost: $0.003."
+        "description": "Resolve a Swiss BC-Nummer / IID (1-5 digits) into institution name, type, SIC, euroSIC and QR-IID. Backed by ~1,200 SIX BankMaster entries with full payment-rail participation (SIC, euroSIC, CHF instant) and QR-IID — the deepest Swiss clearing data in any public API. Cost: $0.003."
       }
     }
   ]

@@ -32,16 +32,16 @@ When the monthly quota is exhausted, the API automatically falls back to adverti
 from ibanforge import IBANforge
 
 with IBANforge(api_key="ifk_...") as client:
-    out = client.validate_iban("CH9300762011623852957")
+    out = client.validate_iban("CH1000230000000012345")
 
     print(out["valid"])                  # True
     print(out["country"])                # {"code": "CH", "name": "Switzerland"}
-    print(out["bic"]["bankName"])        # "UBS Switzerland AG"
-    print(out["bic"]["lei"])             # "BFM8T61CT2L1QCEMIK50"
-    print(out["sepa"])                   # {"reachable": True, "instant": True}
-    print(out["vop"]["participant"])     # True
-    print(out["ch_clearing"]["bc_nummer"])  # "762"
-    print(out["risk_score"])             # 5
+    print(out["bic"]["bank_name"])       # "UBS Switzerland AG"
+    print(out["sepa"]["member"])         # True
+    print(out["sepa"]["schemes"])        # ["SCT", "SDD"]
+    print(out["clearing"]["iid"])        # "00230" (Swiss BC-Nummer, CH/LI only)
+    print(out["clearing"]["sic"])        # True
+    print(out["risk_indicators"]["country_risk"])  # "standard"
 ```
 
 ## Quick start (async)
@@ -69,8 +69,8 @@ asyncio.run(main())
 | `format_iban(iban)` | **free** | Pure mod-97 + structure check. Use to pre-filter malformed IBANs before paying. |
 | `validate_iban(iban)` | $0.005 | Full enrichment — BIC, country, EMI/vIBAN flag, SEPA + VoP, risk score, Swiss BC-Nummer for CH/LI |
 | `validate_batch([iban, ...])` | $0.002 / IBAN | Up to 100 IBANs in one call. CSV cleanup, payout list triage. |
-| `lookup_bic(code)` | $0.003 | Resolve BIC/SWIFT into bank name, country, city, LEI, address. 121,399 BIC entries (38,761 LEI-enriched via GLEIF). |
-| `lookup_ch_clearing(iid)` | $0.003 | Resolve a Swiss BC-Nummer / IID. The only API with this data. |
+| `lookup_bic(code)` | $0.003 | Resolve BIC/SWIFT into bank name, country, city, LEI, address. 121k+ BIC entries (38k+ LEI-enriched via GLEIF). |
+| `lookup_ch_clearing(iid)` | $0.003 | Resolve a Swiss BC-Nummer / IID — full SIX BankMaster rail participation + QR-IID, the deepest Swiss clearing data in any public API. |
 | `check_compliance(iban)` | $0.02 | Pre-flight risk triage: sanctions (OFAC/EU/UN), FATF, SEPA Instant, VoP, risk score 0-100, recommended_action ∈ {allow, review, block} |
 | `usage()` | free | Current month quota usage for your key |
 | `health()` | free | API version, BIC count, uptime |

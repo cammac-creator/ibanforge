@@ -27,7 +27,7 @@ I needed something simple: send an IBAN, get back validation + bank details. So 
 What makes IBANforge different:
 
 - MCP integration -- AI agents (Claude, GPT, Cursor) can discover and use it natively (5 tools)
-- Swiss clearing data -- 1,190 BC-Nummer entries from SIX (SIC, euroSIC, Instant Payments, QR-IID)
+- Swiss clearing data -- ~1,200 BC-Nummer entries from SIX (SIC, euroSIC, Instant Payments, QR-IID)
 - Open data -- 121K BIC entries (38K LEI-enriched via GLEIF, CC0)
 - 85 EMI/neobank classifications for vIBAN detection
 - Self-hostable -- MIT license, Docker, SQLite
@@ -79,7 +79,7 @@ curl -X POST https://api.ibanforge.com/v1/iban/validate \
 
 What's new in v1.1.0:
 
-- Swiss clearing: 1,190 BC-Nummer from SIX (SIC, euroSIC, Instant Payments)
+- Swiss clearing: ~1,200 BC-Nummer from SIX (SIC, euroSIC, Instant Payments)
 - 85 EMI/neobank classifications (was 30)
 - 5 MCP tools (added lookup_ch_clearing)
 - CH/LI IBAN enrichment with clearing data

@@ -20,9 +20,9 @@ Hi team — sharing IBANforge for agentic.market consideration.
 IBANforge is an x402-native compliance API for AI finance agents. It's been
 live on Base mainnet via the CDP facilitator for several weeks, with the full
 Bazaar discovery extension and 5 paid endpoints. The angle that's not on
-agentic.market today: a single call returns IBAN validity + BIC/SWIFT (121,399
-BIC entries, 38,761 LEI-enriched via GLEIF) + Swiss BC-Nummer (1,190 SIX entries
-— the only API exposing this) + sanctions/SEPA/VoP risk score + EMI/vIBAN
+agentic.market today: a single call returns IBAN validity + BIC/SWIFT (121k+
+BIC entries, 38k+ LEI-enriched via GLEIF) + Swiss BC-Nummer (~1,200 SIX entries
+— the deepest Swiss clearing data in any public API) + sanctions/SEPA/VoP risk score + EMI/vIBAN
 classification.
 
 Agent-first details:
@@ -60,7 +60,7 @@ Just shipped IBANforge v1.2 — agent-first IBAN/BIC/compliance API on x402 + Ba
 5 endpoints, native MCP (5 tools), free API key (200/mo) that auto-falls
 back to x402 — no dead-end when agents scale.
 
-Unique to us: full Swiss BC-Nummer (1,190 SIX entries) + compliance
+Our depth: full Swiss BC-Nummer coverage (~1,200 SIX entries, full rail participation + QR-IID) + compliance
 bundle (sanctions + SEPA + VoP) in one call.
 
 @CoinbaseDev would love a spot on agentic.market. Live on Bazaar discovery 🟢
@@ -97,8 +97,8 @@ with the only Swiss BC-Nummer endpoint and a sanctions+SEPA+VoP risk score
 in one call.
 
 Quick stats:
-- 121,399 BIC entries from public sources (GLEIF, SWIFT directory, Bundesbank, SIX, NBP, EBA Step2 SCT), 38,761 LEI-enriched via GLEIF
-- 1,190 SIX BankMaster entries (Swiss BC-Nummer, unique on the marketplace)
+- 121k+ BIC entries from public sources (GLEIF, SWIFT directory, Bundesbank, SIX, NBP, EBA Step2 SCT), 38k+ LEI-enriched via GLEIF
+- ~1,200 SIX BankMaster entries (Swiss BC-Nummer with full rail participation + QR-IID — the deepest Swiss clearing data in any public API)
 - 84 countries with IBAN coverage
 - 5 MCP tools, free tier (200 req/mo) with x402 fallback when exhausted
 - Trilingual site (EN/FR/DE), production-grade SEO

@@ -90,7 +90,7 @@ const pkg = require('../../package.json') as { version: string };
 const MCP_SERVER_CARD = {
   name: 'IBANforge',
   description:
-    'IBAN validation, BIC/SWIFT lookup, Swiss clearing, SEPA compliance and risk scoring API for AI agents. 121,399 BIC entries (38,761 LEI-enriched via GLEIF), 1,190 Swiss BC-Nummer from SIX, 84 countries.',
+    'IBAN validation, BIC/SWIFT lookup, Swiss clearing, SEPA compliance and risk scoring API for AI agents. 121k+ BIC entries (38k+ LEI-enriched via GLEIF), ~1,200 Swiss BC-Nummer from SIX, 89 countries.',
   url: 'https://api.ibanforge.com/mcp',
   transport: 'streamable-http',
   version: pkg.version,
@@ -108,7 +108,7 @@ const MCP_SERVER_CARD = {
     {
       name: 'lookup_bic',
       description:
-        'Resolve a BIC/SWIFT code (8 or 11 chars) into the underlying bank. Use only when the user already has a BIC — for IBAN inputs, prefer validate_iban which resolves the BIC automatically. Backed by 121,399 BIC entries (38,761 LEI-enriched via GLEIF). Cost: $0.003.',
+        'Resolve a BIC/SWIFT code (8 or 11 chars) into the underlying bank. Use only when the user already has a BIC — for IBAN inputs, prefer validate_iban which resolves the BIC automatically. Backed by 121k+ BIC entries (38k+ LEI-enriched via GLEIF). Cost: $0.003.',
     },
     {
       name: 'check_compliance',

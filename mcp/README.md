@@ -3,7 +3,7 @@
 [![npm](https://img.shields.io/npm/v/ibanforge-mcp)](https://www.npmjs.com/package/ibanforge-mcp)
 [![License](https://img.shields.io/npm/l/ibanforge-mcp)](https://github.com/cammac-creator/ibanforge/blob/main/LICENSE)
 
-Official **Model Context Protocol (MCP) server** for [IBANforge](https://ibanforge.com) — IBAN validation, BIC/SWIFT lookup, Swiss BC-Nummer (1,190 SIX entries), EMI/vIBAN classification, SEPA + VoP reachability and compliance risk scoring.
+Official **Model Context Protocol (MCP) server** for [IBANforge](https://ibanforge.com) — IBAN validation, BIC/SWIFT lookup, Swiss BC-Nummer (~1,200 SIX entries), EMI/vIBAN classification, SEPA + VoP reachability and compliance risk scoring.
 
 ## Tools
 
@@ -11,8 +11,8 @@ Official **Model Context Protocol (MCP) server** for [IBANforge](https://ibanfor
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------ | ----------- |
 | `validate_iban`       | Validate a single IBAN (ISO 13616 mod-97), resolve BIC, classify issuer (bank/EMI/vIBAN), SEPA + VoP flags               | 0.005       |
 | `batch_validate_iban` | Validate up to 100 IBANs in one call                                                                                     | 0.002 each  |
-| `lookup_bic`          | Lookup BIC/SWIFT against 121,399 BIC entries (38,761 LEI-enriched via GLEIF)                                              | 0.003       |
-| `lookup_ch_clearing`  | Lookup Swiss BC-Nummer / IID against 1,190 SIX BankMaster entries (SIC, euroSIC, QR-IID)                                 | 0.003       |
+| `lookup_bic`          | Lookup BIC/SWIFT against 121k+ BIC entries (38k+ LEI-enriched via GLEIF)                                                  | 0.003       |
+| `lookup_ch_clearing`  | Lookup Swiss BC-Nummer / IID against ~1,200 SIX BankMaster entries — full rail participation (SIC, euroSIC, CHF instant) + QR-IID | 0.003       |
 | `check_compliance`    | Full compliance check: IBAN + sanctions (OFAC/EU/UN) + SEPA Instant + VoP + risk score (0-100)                           | 0.02        |
 
 ## Installation
@@ -69,9 +69,9 @@ curl -X POST https://api.ibanforge.com/v1/keys/generate \
 
 After adding the server, ask your AI agent:
 
-- "Validate the IBAN CH93 0076 2011 6238 5295 7"
+- "Validate the IBAN CH10 0023 0000 0000 1234 5"
 - "Look up BIC UBSWCHZH80A"
-- "Look up Swiss BC-Nummer 762"
+- "Look up Swiss BC-Nummer 230"
 - "Run a compliance check on IBAN GB29 NWBK 6016 1331 9268 19"
 - "Validate these 5 IBANs in batch: …"
 
@@ -84,14 +84,14 @@ After adding the server, ask your AI agent:
 
 ## Data sources
 
-- **121,399 BIC entries** from public sources, refreshed monthly:
-  - 38,761 from [GLEIF](https://www.gleif.org) (the only rows with LEI codes)
-  - 81,642 from [PeterNotenboom/SwiftCodes](https://github.com/PeterNotenboom/SwiftCodes) (MIT-licensed SWIFT directory)
-  - 142 from Deutsche Bundesbank BLZ (official quarterly file)
-  - 633 from SIX Group BankMaster (Swiss BICs)
-  - 201 from EBA Clearing STEP2 SCT (official SEPA Reachable PSPs directory)
-  - 19 from NBP EWIB (official Polish bank registry)
-- **1,190 BC-Nummern** from the official [SIX BankMaster](https://www.six-group.com/en/products-services/banking-services/bank-master-data.html) CSV
+- **121k+ BIC entries** from public sources, refreshed monthly — exact live counts at [api.ibanforge.com/llms.txt](https://api.ibanforge.com/llms.txt). Sources:
+  - [PeterNotenboom/SwiftCodes](https://github.com/PeterNotenboom/SwiftCodes) (MIT-licensed SWIFT directory)
+  - [GLEIF](https://www.gleif.org) BIC-LEI mapping (the only rows with LEI codes, 38k+)
+  - EBA Clearing STEP2 SCT (official SEPA Reachable PSPs directory)
+  - Deutsche Bundesbank BLZ (official quarterly file)
+  - NBP EWIB (official Polish bank registry)
+  - SIX Group BankMaster (Swiss BICs)
+- **~1,200 BC-Nummern** from the official [SIX BankMaster](https://www.six-group.com/en/products-services/banking-services/bank-master-data.html) CSV
 - **EMI / vIBAN classification** from a curated dataset of 30+ known issuer prefixes
 - **VoP participants** from the EBA RT1 / SCT Inst directories
 

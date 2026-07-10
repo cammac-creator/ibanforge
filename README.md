@@ -13,7 +13,7 @@
 > **The compliance API for AI agents.** IBAN validation, BIC/SWIFT lookup, Swiss clearing (BC-Nummer / QR-IID / SIX BankMaster), EMI/vIBAN classification, SEPA Instant + VoP reachability, and risk scoring — exposed natively over **MCP** and **x402 micropayments**, with no API key signup required.
 
 ```
-121,399 BIC entries (38K LEI via GLEIF) · 1,190 Swiss BC-Nummern (SIX) · 89 IBAN countries · <50ms p99
+121k+ BIC entries (38k+ LEI via GLEIF) · ~1,200 Swiss BC-Nummern (SIX) · 89 IBAN countries · <50ms p99
 ```
 
 ---
@@ -59,8 +59,8 @@ Standard JSON-RPC `initialize` + `tools/list` + `tools/call` flow. Use this when
 | --------------------- | ----------------------------------------------------------------------------------------- | -------- |
 | `validate_iban`       | User mentions an IBAN, a bank account, or a SEPA payment                                  | $0.005   |
 | `batch_validate_iban` | List of IBANs, CSV cleanup, customer DB dedup, payout list triage                         | $0.002/each |
-| `lookup_bic`          | User already has a BIC/SWIFT — backed by 121,399 BIC entries (38,761 LEI-enriched via GLEIF) | $0.003   |
-| `lookup_ch_clearing`  | Swiss BC-Nummer / IID — **the only API with this data** (1,190 SIX BankMaster entries)    | $0.003   |
+| `lookup_bic`          | User already has a BIC/SWIFT — backed by 121k+ BIC entries (38k+ LEI-enriched via GLEIF) | $0.003   |
+| `lookup_ch_clearing`  | Swiss BC-Nummer / IID — **the deepest Swiss clearing data in any public API**: full SIX BankMaster rail participation (SIC, euroSIC, CHF instant) + QR-IID | $0.003   |
 | `check_compliance`    | Pre-flight risk triage before a SEPA / cross-border payment (sanctions + FATF + VoP)      | $0.02    |
 
 Full descriptions with WHEN-to-use triggers are served live at [`/.well-known/mcp/server-card.json`](https://api.ibanforge.com/.well-known/mcp/server-card.json).
@@ -100,10 +100,10 @@ from ibanforge import IBANforge
 key = IBANforge.generate_api_key("you@example.com")
 
 with IBANforge(api_key=key["api_key"]) as client:
-    out = client.validate_iban("CH9300762011623852957")
-    print(out["country"]["code"])      # CH
-    print(out["bic"]["bankName"])      # UBS Switzerland AG
-    print(out["sepa"]["instant"])      # True
+    out = client.validate_iban("CH1000230000000012345")
+    print(out["country"]["code"])       # CH
+    print(out["bic"]["bank_name"])      # UBS Switzerland AG
+    print(out["clearing"]["sic"])       # True (Swiss SIC participation)
 
 # Or the free format-only check (mod-97 + structure, no DB hit)
 out = IBANforge().format_iban("DE89370400440532013000")
@@ -116,13 +116,13 @@ out = IBANforge().format_iban("DE89370400440532013000")
 curl -X POST https://api.ibanforge.com/v1/iban/validate \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer ifk_..." \
-  -d '{"iban":"CH93 0076 2011 6238 5295 7"}'
+  -d '{"iban":"CH10 0023 0000 0000 1234 5"}'
 
 # Lookup BIC
 curl https://api.ibanforge.com/v1/bic/UBSWCHZH80A
 
 # Free format pre-flight (no auth, mod-97 only)
-curl 'https://api.ibanforge.com/v1/iban/format?iban=CH9300762011623852957'
+curl 'https://api.ibanforge.com/v1/iban/format?iban=CH1000230000000012345'
 
 # Free demo (no auth)
 curl https://api.ibanforge.com/v1/demo
@@ -178,15 +178,15 @@ Push to `main` — Railway auto-deploys via Dockerfile.
 
 ## Data Sources
 
-- **121,399 BIC/SWIFT entries** from public sources, refreshed monthly:
-  - 38,761 from [GLEIF BIC-LEI mapping](https://www.gleif.org/en/lei-data/lei-mapping/download-bic-to-lei-relationship-files) (the only rows with LEI)
-  - 81,642 from [PeterNotenboom/SwiftCodes](https://github.com/PeterNotenboom/SwiftCodes) (MIT-licensed SWIFT directory aggregate)
-  - 142 from [Deutsche Bundesbank BLZ](https://www.bundesbank.de/en/tasks/payment-systems/services/bank-sort-codes) (official quarterly BLZ→BIC file)
-  - 633 from [SIX Group BankMaster](https://www.six-group.com/en/products-services/banking-services/bank-master-data.html) Swiss BICs
-  - 201 from [EBA Clearing STEP2 SCT](https://www.ebaclearing.eu/services/step2/) (official SEPA Reachable PSPs directory)
-  - 19 from [NBP EWIB](https://ewib.nbp.pl/) (official Polish bank registry)
-- **LEI enrichment** for the 38,761 GLEIF rows: [GLEIF API](https://api.gleif.org)
-- **1,190 Swiss BC-Nummern / IIDs**: Official [SIX BankMaster](https://www.six-group.com/en/products-services/banking-services/bank-master-data.html) CSV
+- **121k+ BIC/SWIFT entries** from public sources, refreshed monthly. Exact counts drift at every refresh — the live numbers are served at [`/llms.txt`](https://api.ibanforge.com/llms.txt) and `/health`. Breakdown as of the 2026-07 refresh (121,610 total):
+  - 81,949 from [PeterNotenboom/SwiftCodes](https://github.com/PeterNotenboom/SwiftCodes) (MIT-licensed SWIFT directory aggregate)
+  - 39,288 from [GLEIF BIC-LEI mapping](https://www.gleif.org/en/lei-data/lei-mapping/download-bic-to-lei-relationship-files) (the only rows with LEI)
+  - 189 from [EBA Clearing STEP2 SCT](https://www.ebaclearing.eu/services/step2/) (official SEPA Reachable PSPs directory)
+  - 144 from [Deutsche Bundesbank BLZ](https://www.bundesbank.de/en/tasks/payment-systems/services/bank-sort-codes) (official quarterly BLZ→BIC file)
+  - 21 from [NBP EWIB](https://ewib.nbp.pl/) (official Polish bank registry)
+  - 19 from [SIX Group BankMaster](https://www.six-group.com/en/products-services/banking-services/bank-master-data.html) Swiss BICs not covered elsewhere
+- **LEI enrichment** for the GLEIF rows: [GLEIF API](https://api.gleif.org)
+- **~1,200 Swiss BC-Nummern / IIDs** (1,165 as of 2026-07): Official [SIX BankMaster](https://www.six-group.com/en/products-services/banking-services/bank-master-data.html) CSV
 - **EMI / vIBAN classification**: Curated set of 85+ known issuer BIC8 prefixes (Wise, Revolut, N26, Mercury, Modulr, etc.)
 - **VoP participants**: EBA RT1 / SCT Inst directories
 - **Country names**: Node.js `Intl.DisplayNames` API
