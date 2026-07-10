@@ -306,7 +306,7 @@ Both \`/v1/bic/:code\` and \`/v1/ch/clearing/:iid\` use **URL path parameters** 
 - ❌ \`GET /v1/bic/{code}\` (returns 400 with \`error: "placeholder_literal"\`)
 - ✅ \`GET /v1/bic/UBSWCHZH80A\`
 - ❌ \`GET /v1/ch/clearing/{iid}\`
-- ✅ \`GET /v1/ch/clearing/762\` (or 5-digit padded \`00762\`)
+- ✅ \`GET /v1/ch/clearing/230\` (or 5-digit padded \`00230\`)
 
 ## When to use IBANforge
 

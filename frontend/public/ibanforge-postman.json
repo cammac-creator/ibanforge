@@ -18,7 +18,7 @@
             "method": "POST",
             "url": "{{baseUrl}}/v1/iban/validate",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\"iban\": \"CH93 0076 2011 6238 5295 7\"}" }
+            "body": { "mode": "raw", "raw": "{\"iban\": \"CH10 0023 0000 0000 1234 5\"}" }
           }
         },
         {
@@ -27,7 +27,7 @@
             "method": "POST",
             "url": "{{baseUrl}}/v1/iban/batch",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\"ibans\": [\"CH93 0076 2011 6238 5295 7\", \"DE89 3704 0044 0532 0130 00\"]}" }
+            "body": { "mode": "raw", "raw": "{\"ibans\": [\"CH10 0023 0000 0000 1234 5\", \"DE89 3704 0044 0532 0130 00\"]}" }
           }
         }
       ]

@@ -4,15 +4,15 @@
 
 ## What is IBANforge?
 
-IBANforge is a compliance-grade API built for AI agents and developers. It validates IBANs, resolves BIC/SWIFT codes, exposes Swiss BC-Nummer clearing data (the only API that does), detects EMI/virtual IBANs, checks SEPA Instant + VoP reachability, and returns a compliance risk score. Three payment rails with no dead-ends: a free API-key tier (200 req/month), prepaid credit packs (card or USDC), and x402 micropayments (USDC on Base L2, no signup).
+IBANforge is a compliance-grade API built for AI agents and developers. It validates IBANs, resolves BIC/SWIFT codes, exposes Swiss BC-Nummer clearing data (full SIX BankMaster payment-rail participation + QR-IID — the deepest Swiss clearing data in any public API), detects EMI/virtual IBANs, checks SEPA Instant + VoP reachability, and returns a compliance risk score. Three payment rails with no dead-ends: a free API-key tier (200 req/month), prepaid credit packs (card or USDC), and x402 micropayments (USDC on Base L2, no signup).
 
-121,399 BIC entries (38,761 LEI-enriched via GLEIF) · 1,190 Swiss BC-Nummern (SIX) · 89 countries · 85 EMI/vIBAN issuer classifications.
+121k+ BIC entries (38k+ LEI-enriched via GLEIF) · ~1,200 Swiss BC-Nummern (SIX) · 89 countries · 85 EMI/vIBAN issuer classifications. Live counts: https://api.ibanforge.com/llms.txt
 
 ## Core Capabilities
 
 1. **IBAN Validation** — ISO 13616 MOD-97 checksum, BBAN structure parsing, 89 countries
-2. **BIC/SWIFT Lookup** — 121,399 institutions, 38,761 LEI-enriched via GLEIF
-3. **Swiss Clearing** — BC-Nummer / IID, SIC / euroSIC, QR-IID, institution classification (the ONLY API exposing SIX BankMaster data)
+2. **BIC/SWIFT Lookup** — 121k+ institutions, 38k+ LEI-enriched via GLEIF, refreshed monthly
+3. **Swiss Clearing** — BC-Nummer / IID with the full SIX BankMaster payment-rail participation (SIC, RTGS CHF, CHF instant, euroSIC, LSV+/BDD), QR-IID and institution classification — the deepest Swiss clearing data in any public API
 4. **EMI / vIBAN Detection** — identify virtual IBANs from EMIs (Wise, Revolut, N26, Mercury, Modulr, …)
 5. **Compliance Risk Scoring** — bank-BIC sanctions (OFAC/EU/UN/SECO) + FATF + SEPA Instant + VoP, risk score 0-100
 6. **MCP Integration** — native Model Context Protocol server (stdio + streamable HTTP)
@@ -38,7 +38,7 @@ Three rails, pick what fits — agents never hit a dead-end:
 - `validate_iban` — Validate one IBAN with full enrichment ($0.005)
 - `batch_validate_iban` — Validate up to 100 IBANs, $0.002 each ($0.20 for 100)
 - `lookup_bic` — BIC/SWIFT → bank, country, city, LEI ($0.003)
-- `lookup_ch_clearing` — Swiss BC-Nummer / IID → institution, SIC, QR-IID — only API with this ($0.003)
+- `lookup_ch_clearing` — Swiss BC-Nummer / IID → institution, address, full rail participation, QR-IID — the deepest Swiss clearing data in any public API ($0.003)
 - `check_compliance` — bank-BIC sanctions + FATF + SEPA + VoP + risk score ($0.02; informational, not regulated AML/CFT)
 
 Install: `npx -y ibanforge-mcp` — or HTTP at https://api.ibanforge.com/mcp
@@ -50,20 +50,20 @@ POST https://api.ibanforge.com/v1/iban/validate
 Content-Type: application/json
 Authorization: Bearer ifk_...
 
-{"iban": "CH93 0076 2011 6238 5295 7"}
+{"iban": "CH10 0023 0000 0000 1234 5"}
 ```
 
-Response (trimmed to the fields agents use most):
+Response (real API output, trimmed to the fields agents use most):
 ```json
 {
-  "iban": "CH9300762011623852957",
+  "iban": "CH1000230000000012345",
   "valid": true,
   "country": { "code": "CH", "name": "Switzerland" },
-  "bic": { "code": "UBSWCHZH", "bank_name": "UBS Switzerland AG", "city": "Zurich" },
+  "bic": { "code": "UBSWCHZH", "bank_name": "UBS Switzerland AG", "city": "Zürich" },
   "issuer": { "type": "bank", "name": "UBS Switzerland AG" },
   "sepa": { "member": true, "schemes": ["SCT", "SDD"], "vop_required": false },
-  "clearing": { "iid": "00762", "type": "bank", "sic": true, "qr_iid": null },
-  "risk_indicators": { "country_risk": "standard", "sepa_reachable": true }
+  "clearing": { "iid": "00230", "name": "UBS Switzerland AG", "type": "bank", "town": "Zürich", "sic": true, "instant_payments_chf": true, "eurosic": true, "qr_iid": null },
+  "risk_indicators": { "issuer_type": "bank", "country_risk": "standard", "test_bic": false, "sepa_reachable": true, "vop_coverage": false }
 }
 ```
 
@@ -71,12 +71,13 @@ Response (trimmed to the fields agents use most):
 
 ```
 POST https://api.ibanforge.com/v1/iban/compliance
-{"iban": "GB29NWBK60161331926819"}
+{"iban": "CH1000230000000012345"}
 ```
 
-Returns the validate fields plus a nested `compliance` block:
+Returns the validate fields plus a nested `compliance` block (real API output, trimmed):
 ```json
 {
+  "iban": "CH1000230000000012345",
   "valid": true,
   "compliance": {
     "sanctions": { "country_sanctioned": false, "bank_sanctioned": false, "matched_lists": [], "fatf_status": "member" },
@@ -84,7 +85,7 @@ Returns the validate fields plus a nested `compliance` block:
     "vop": { "participant": false, "status": "not_found" },
     "risk_score": 5,
     "risk_level": "low",
-    "flags": []
+    "flags": ["no_vop"]
   },
   "meta": { "scope": "bank_bic_only", "disclaimer": "...", "sanctions_as_of": "...", "fatf_as_of": "2026-02" }
 }
@@ -94,7 +95,7 @@ Read the score at `compliance.risk_score` / `compliance.risk_level`. Sanctions a
 ## Why IBANforge?
 
 - **Agent-native**: MCP server + x402 micropayments, no human onboarding
-- **A real moat**: Swiss BC-Nummer / QR-IID clearing data no other API exposes
+- **A real moat**: the deepest Swiss clearing data in any public API — full SIX BankMaster rail participation + QR-IID
 - **No dead-ends**: free key → credit packs → x402, your agent always has a path to pay
 - **Honest compliance**: explicit scope + disclaimer + data-freshness on every response
 - **Fast**: sub-50ms p99

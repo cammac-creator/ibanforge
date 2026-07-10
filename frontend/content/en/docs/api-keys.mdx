@@ -43,7 +43,7 @@ Pass the key in the `Authorization` header as a Bearer token:
 curl -X POST https://api.ibanforge.com/v1/iban/validate \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer ifk_live_xxxxxxxxxxxxxxxxxxxx" \
-  -d '{"iban": "CH93 0076 2011 6238 5295 7"}'
+  -d '{"iban": "CH10 0023 0000 0000 1234 5"}'
 ```
 
 The key works on all paid endpoints:
@@ -112,7 +112,7 @@ const response = await fetch("https://api.ibanforge.com/v1/iban/validate", {
     "Content-Type": "application/json",
     "Authorization": `Bearer ${API_KEY}`,
   },
-  body: JSON.stringify({ iban: "CH93 0076 2011 6238 5295 7" }),
+  body: JSON.stringify({ iban: "CH10 0023 0000 0000 1234 5" }),
 });
 
 const data = await response.json();
@@ -133,7 +133,7 @@ response = requests.post(
         "Content-Type": "application/json",
         "Authorization": f"Bearer {API_KEY}",
     },
-    json={"iban": "CH93 0076 2011 6238 5295 7"},
+    json={"iban": "CH10 0023 0000 0000 1234 5"},
 )
 
 data = response.json()

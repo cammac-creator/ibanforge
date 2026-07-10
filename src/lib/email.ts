@@ -58,7 +58,7 @@ export async function sendApiKeyEmail(p: {
     `Use it as a Bearer token:\n` +
     `  curl -H "Authorization: Bearer ${p.rawKey}" \\\n` +
     `       -X POST https://api.ibanforge.com/v1/iban/validate \\\n` +
-    `       -H "content-type: application/json" -d '{"iban":"CH9300762011623852957"}'\n\n` +
+    `       -H "content-type: application/json" -d '{"iban":"CH1000230000000012345"}'\n\n` +
     `Check your balance any time:\n` +
     `  curl -H "Authorization: Bearer ${p.rawKey}" https://api.ibanforge.com/v1/credits/balance\n\n` +
     `Docs: https://ibanforge.com/docs\n` +
@@ -78,7 +78,7 @@ export async function sendApiKeyEmail(p: {
     <pre style="background:#09090b;border:1px solid #1c1c22;border-radius:10px;padding:14px 16px;font-family:'JetBrains Mono',monospace;font-size:12px;color:#d6d3cc;white-space:pre-wrap;overflow-x:auto;margin:0 0 22px">curl -H "Authorization: Bearer ${p.rawKey}" \\
      -X POST https://api.ibanforge.com/v1/iban/validate \\
      -H "content-type: application/json" \\
-     -d '{"iban":"CH9300762011623852957"}'</pre>
+     -d '{"iban":"CH1000230000000012345"}'</pre>
     <p style="font-size:14px;margin:0"><a href="https://ibanforge.com/docs" style="color:#fbbf24;text-decoration:none">Read the docs →</a></p>
     <hr style="border:none;border-top:1px solid rgba(255,255,255,.06);margin:24px 0 14px">
     <p style="color:#52525b;font-size:12px;margin:0">IBANforge · pre-payout screening for AI agents · <a href="https://ibanforge.com" style="color:#71717a">ibanforge.com</a></p>

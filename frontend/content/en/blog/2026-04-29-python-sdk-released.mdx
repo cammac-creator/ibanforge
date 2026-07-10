@@ -21,7 +21,7 @@ key = IBANforge.generate_api_key("you@example.com")
 client = IBANforge(api_key=key["api_key"])
 
 result = client.validate_iban("CH9300762011623852957")
-print(result["valid"], result["bic"]["bankName"])
+print(result["valid"], result["bic"]["bank_name"])
 ```
 
 Free tier: 200 calls/month, no captcha, no signup form. The key is shown once — store it. After 200 calls, the same key keeps working through x402 (more on that below).
@@ -48,7 +48,7 @@ Every free response carries that `upgrade_to_full_validation` hint so an agent t
 | `validate_iban(iban)` | `/v1/iban/validate` | $0.005 | Full enrichment — BIC, country, SEPA, VoP, risk, Swiss BC-Nummer |
 | `validate_batch(ibans)` | `/v1/iban/batch` | $0.002/IBAN | Up to 100 IBANs per call |
 | `lookup_bic(code)` | `/v1/bic/{code}` | $0.003 | 121,000+ BIC entries (38K LEI-enriched via GLEIF) — bank, country, city, LEI |
-| `lookup_ch_clearing(iid)` | `/v1/ch/clearing/{iid}` | $0.003 | 1,190 SIX BankMaster entries — only public API exposing this |
+| `lookup_ch_clearing(iid)` | `/v1/ch/clearing/{iid}` | $0.003 | ~1,200 SIX BankMaster entries — full rail participation + QR-IID, the deepest Swiss clearing data in any public API |
 | `check_compliance(iban)` | `/v1/iban/compliance` | $0.02 | Sanctions OFAC/EU/UN + FATF + SEPA Instant + VoP + risk score |
 
 Type hints everywhere via `TypedDict`. Compatible Python 3.9+. 16 unit tests passing on respx-mocked HTTP.

@@ -35,7 +35,7 @@ from ibanforge import IBANforge
 key = IBANforge.generate_api_key("agent@yourdomain.com")
 
 with IBANforge(api_key=key["api_key"]) as client:
-    out = client.validate_iban("CH9300762011623852957")
+    out = client.validate_iban("CH1000230000000012345")
     print(out["country"]["code"])              # CH
     print(out["bic"]["bank_name"])            # UBS Switzerland AG
     print(out["sepa"]["member"])              # True
@@ -61,7 +61,7 @@ import { IBANforge } from "@ibanforge/sdk";
 
 const ibanforge = new IBANforge({ apiKey: "ifk_..." });
 
-const out = await ibanforge.validateIban("CH9300762011623852957");
+const out = await ibanforge.validateIban("CH1000230000000012345");
 
 console.log(out.country?.code);          // CH
 console.log(out.bic?.bank_name);         // UBS Switzerland AG
@@ -86,7 +86,7 @@ const paid = wrapFetchWithPayment(fetch, client);
 const r = await paid("https://api.ibanforge.com/v1/iban/validate", {
   method: "POST",
   headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ iban: "CH9300762011623852957" }),
+  body: JSON.stringify({ iban: "CH1000230000000012345" }),
 });
 // pays $0.005 USDC autonomously, returns 200 with the response`;
 
@@ -109,7 +109,7 @@ const TOOLS = [
   {
     name: "lookup_ch_clearing",
     price: "$0.003",
-    description: "Resolve a Swiss BC-Nummer / IID. Only API exposing SIC, euroSIC, QR-IID — 1,190 SIX entries.",
+    description: "Resolve a Swiss BC-Nummer / IID — full SIX rail participation (SIC, euroSIC, CHF instant) + QR-IID. ~1,200 SIX entries, the deepest Swiss clearing data in any public API.",
   },
   {
     name: "check_compliance",
