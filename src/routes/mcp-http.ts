@@ -41,7 +41,7 @@ function createMcpServer(): McpServer {
     title: 'IBANforge',
     version: pkg.version,
     description:
-      'Pre-payout screening for agents — vet a counterparty IBAN before you send funds: IBAN validation, BIC/SWIFT lookup, Swiss clearing, SEPA/VoP reachability, sanctions and risk indicators. 121,399 BIC entries (38,761 LEI-enriched via GLEIF), 1,190 Swiss BC-Nummer from SIX, 89 countries.',
+      'Pre-payout screening for agents — vet a counterparty IBAN before you send funds: IBAN validation, BIC/SWIFT lookup, Swiss clearing, SEPA/VoP reachability, sanctions and risk indicators. 121k+ BIC entries (38k+ LEI-enriched via GLEIF), ~1,200 Swiss BC-Nummer from SIX, 89 countries, refreshed monthly.',
     websiteUrl: 'https://ibanforge.com',
     icons: [
       {
@@ -218,7 +218,7 @@ function createMcpServer(): McpServer {
         'USE WHEN: the user already has a BIC/SWIFT (8 or 11 chars, alphanumeric, e.g., "UBSWCHZH80A", "DEUTDEFF") ' +
         'and asks which bank it belongs to, where the bank is, or its LEI for compliance/regulatory matching. ' +
         'DO NOT USE for IBAN inputs — call validate_iban instead, it resolves the BIC for you. ' +
-        'BACKED BY: 121,399 BIC entries (38,761 LEI-enriched via GLEIF; additional rows from SWIFT directory, Bundesbank, SIX, NBP, EBA Step2 SCT), refreshed monthly.',
+        'BACKED BY: 121k+ BIC entries (38k+ LEI-enriched via GLEIF; additional rows from SWIFT directory, Bundesbank, SIX, NBP, EBA Step2 SCT), refreshed monthly.',
       inputSchema: {
         bic: z.string().describe('BIC/SWIFT code (8 or 11 chars)'),
       },
@@ -291,7 +291,7 @@ function createMcpServer(): McpServer {
         'or needs a numeric risk score for an internal payment-approval workflow. ' +
         'NOT A REGULATED AML/CFT PRODUCT — informational triage only. For regulated screening use Refinitiv, Acuris, or ComplyAdvantage. ' +
         'CHECKS: IBAN validity + sanctions (OFAC/EU/UN consolidated, FATF jurisdictions) + SEPA Instant reachability + VoP (EU 2024/886) participant. ' +
-        'RETURNS: risk_score (0-100, 0 = safest), flags { sanctions_match, fatf_high_risk, sepa_unreachable, viban, emi }, recommended_action.',
+        'RETURNS: the full validate enrichment plus a compliance object with risk_score (0-100, 0 = safest), risk_level (low/medium/elevated/high/critical), sanctions matched_lists + fatf_status, reachability, vop status, and flags[] (e.g. sanctioned_country, fatf_grey_list, emi_issuer, no_vop).',
       inputSchema: {
         iban: z.string().describe('IBAN to check'),
       },
@@ -389,9 +389,9 @@ function createMcpServer(): McpServer {
         'USE WHEN: the user mentions a Swiss bank by BC-Nummer or IID, pastes a CH or LI IBAN clearing code, ' +
         'asks routing details for a Swiss instant transfer (SIC, euroSIC), asks about QR-bill QR-IID resolution, ' +
         'or needs to classify a Swiss financial institution (bank vs PFS vs SIC-only participant). ' +
-        'THIS IS THE ONLY API THAT EXPOSES THIS DATA — alternatives (iban.com, OpenIBAN, payeer, sepa.com) do not cover it. ' +
-        'BACKED BY: 1,190 SIX BankMaster entries (Swiss official source). ' +
-        'RETURNS: institution_name, institution_type, sic_participant, eurosic_participant, instant_payments, qr_iid, language. ' +
+        'THE DEEPEST SWISS CLEARING DATA IN ANY PUBLIC API — full SIX BankMaster payment-rail participation (SIC, RTGS CHF, Instant Payments CHF, euroSIC, LSV+/BDD) plus QR-IID allocation, not just a name lookup. ' +
+        'BACKED BY: ~1,200 SIX BankMaster entries (Swiss official source, refreshed monthly). ' +
+        'RETURNS: institution { name, type, iid_type, headquarters_iid }, address, bic, payment_services { sic, rtgs_chf, instant_payments_chf, eurosic, lsv_bdd_chf, lsv_bdd_eur }, sic_iid, qr_iid, valid_on. ' +
         'Only relevant for CH and LI accounts.',
       inputSchema: {
         iid: z.string().describe('Swiss IID (1-5 digit number)'),

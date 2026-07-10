@@ -71,7 +71,7 @@ describe('enrich402 outputSchema injection (CyberSapper recipe)', () => {
       accepts: Array<{ outputSchema?: { input?: { body?: { iban?: string } } } }>;
     };
     const sample = body.accepts[0].outputSchema?.input?.body;
-    expect(sample?.iban).toBe('CH9300762011623852957');
+    expect(sample?.iban).toBe('CH1000230000000012345');
   });
 
   it('outputSchema.input.bodyType = "json" for POST endpoints', async () => {
@@ -200,12 +200,16 @@ describe('enrich402 outputSchema injection (CyberSapper recipe)', () => {
       accepts: Array<{ outputSchema?: { output?: Record<string, unknown> } }>;
     };
     const out = body.accepts[0].outputSchema?.output ?? {};
-    expect(out).toHaveProperty('risk_score');
-    expect(out).toHaveProperty('recommended_action');
-    expect(out).toHaveProperty('sanctions');
-    expect(out).toHaveProperty('fatf');
-    expect(out).toHaveProperty('sepa');
-    expect(out).toHaveProperty('vop');
+    // Real response shape: compliance layer nested under `compliance`,
+    // with risk_score / risk_level / sanctions / reachability / vop inside.
+    expect(out).toHaveProperty('compliance');
+    const compliance = (out as { compliance?: Record<string, unknown> }).compliance ?? {};
+    expect(compliance).toHaveProperty('risk_score');
+    expect(compliance).toHaveProperty('risk_level');
+    expect(compliance).toHaveProperty('sanctions');
+    expect(compliance).toHaveProperty('reachability');
+    expect(compliance).toHaveProperty('vop');
+    expect(compliance).toHaveProperty('flags');
   });
 
   it('Swiss BC-Nummer endpoint output sample carries SIX-specific fields', async () => {
@@ -222,7 +226,8 @@ describe('enrich402 outputSchema injection (CyberSapper recipe)', () => {
     };
     const out = body.accepts[0].outputSchema?.output ?? {};
     expect(out).toHaveProperty('institution');
-    expect(out).toHaveProperty('participation');
+    expect(out).toHaveProperty('payment_services');
+    expect(out).toHaveProperty('qr_iid');
   });
 
   it('Path 2 — adds the access ramp without disturbing accepts / outputSchema', async () => {

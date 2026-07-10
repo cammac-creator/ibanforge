@@ -106,18 +106,18 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
       // dataset size, last update. Agents that filter on description quality (Bazaar
       // semantic search, agentic.market) reward this.
       const V = `v${pkg.version}`;
-      const TRUST_TAG_VALIDATE = `Production · p99 <50ms · 121,399 BICs (38K LEI via GLEIF) + 1,190 SIX · ${V}`;
-      const TRUST_TAG_BIC = `Production · p99 <30ms · 121,399 BICs (38,761 LEI-enriched via GLEIF) · ${V}`;
-      const TRUST_TAG_CH = `Production · p99 <20ms · 1,190 SIX BankMaster entries · ${V}`;
+      const TRUST_TAG_VALIDATE = `Production · p99 <50ms · 121k+ BICs (38k+ LEI via GLEIF) + ~1,200 SIX · ${V}`;
+      const TRUST_TAG_BIC = `Production · p99 <30ms · 121k+ BICs (38k+ LEI-enriched via GLEIF, refreshed monthly) · ${V}`;
+      const TRUST_TAG_CH = `Production · p99 <20ms · ~1,200 SIX BankMaster entries, refreshed monthly · ${V}`;
       const TRUST_TAG_COMPLIANCE = `Production · p99 <80ms · OFAC/EU/UN + FATF + SEPA + VoP · weekly refresh · ${V}`;
-      const TRUST_TAG_BATCH = `Production · p99 <300ms for 100 IBANs · 121,399 BICs · ${V}`;
+      const TRUST_TAG_BATCH = `Production · p99 <300ms for 100 IBANs · 121k+ BICs · ${V}`;
 
       const ibanInputSchema = {
         type: 'object',
         properties: {
           iban: {
             type: 'string',
-            description: 'IBAN to validate. Spaces and lowercase accepted. Example: CH9300762011623852957',
+            description: 'IBAN to validate. Spaces and lowercase accepted. Example: CH1000230000000012345',
             minLength: 15,
             maxLength: 34,
           },
@@ -125,12 +125,13 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
         required: ['iban'],
       };
       // Full-fidelity output schema: every field a real response carries.
-      // Mirrors src/lib/enrich.ts shape so agents can predict the response 1:1.
+      // Mirrors the real /v1/iban/validate response (verified against prod)
+      // so agents can predict the response 1:1.
       const ibanOutputSchema = {
         type: 'object',
         properties: {
           iban: { type: 'string', description: 'Normalized IBAN (uppercase, no spaces).' },
-          formatted: { type: 'string', description: 'IBAN with 4-char groups, e.g. CH93 0076 2011 6238 5295 7.' },
+          formatted: { type: 'string', description: 'IBAN with 4-char groups, e.g. CH10 0023 0000 0000 1234 5.' },
           valid: { type: 'boolean' },
           country: {
             type: 'object',
@@ -145,17 +146,16 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
             properties: {
               bank_code: { type: 'string' },
               branch_code: { type: 'string' },
-              account: { type: 'string' },
+              account_number: { type: 'string' },
             },
           },
           bic: {
             type: 'object',
-            description: 'Resolved BIC/SWIFT (when BBAN→BIC mapping exists).',
+            description: 'Resolved BIC/SWIFT (when BBAN→BIC mapping exists). Null when unresolved.',
             properties: {
-              bic: { type: 'string' },
-              bankName: { type: 'string' },
+              code: { type: 'string' },
+              bank_name: { type: 'string' },
               city: { type: 'string' },
-              lei: { type: 'string' },
             },
           },
           issuer: {
@@ -168,30 +168,44 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
           sepa: {
             type: 'object',
             properties: {
-              reachable: { type: 'boolean' },
-              instant: { type: 'boolean' },
+              member: { type: 'boolean' },
+              schemes: { type: 'array', items: { type: 'string', enum: ['SCT', 'SDD', 'SCT_INST'] } },
+              vop_required: {
+                type: 'boolean',
+                description: 'Verification of Payee (EU 2024/886) obligation for this country.',
+              },
             },
           },
-          vop: {
+          risk_indicators: {
             type: 'object',
-            description: 'Verification of Payee (EU 2024/886) participant status.',
-            properties: { participant: { type: 'boolean' } },
-          },
-          ch_clearing: {
-            type: 'object',
-            description: 'Swiss-specific data when country is CH or LI.',
+            description: 'AML/CFT pre-screening indicators.',
             properties: {
-              bc_nummer: { type: 'string' },
-              sic: { type: 'boolean' },
-              qr_iid: { type: 'boolean' },
+              issuer_type: { type: 'string', enum: ['bank', 'digital_bank', 'emi', 'payment_institution'] },
+              country_risk: { type: 'string', enum: ['standard', 'elevated', 'high'] },
+              test_bic: { type: 'boolean' },
+              sepa_reachable: { type: 'boolean' },
+              vop_coverage: { type: 'boolean' },
             },
           },
-          risk_score: {
-            type: 'number',
-            minimum: 0,
-            maximum: 100,
-            description: 'Country + issuer risk indicator. Higher = more attention needed.',
+          clearing: {
+            type: 'object',
+            description: 'Swiss clearing data when country is CH or LI and the IID is in the SIX BankMaster. Null otherwise.',
+            properties: {
+              iid: { type: 'string', description: '5-digit zero-padded BC-Nummer.' },
+              name: { type: 'string' },
+              type: {
+                type: 'string',
+                enum: ['bank', 'cantonal_bank', 'postfinance', 'raiffeisen', 'central_bank', 'foreign_participant'],
+              },
+              town: { type: 'string' },
+              sic: { type: 'boolean' },
+              instant_payments_chf: { type: 'boolean' },
+              eurosic: { type: 'boolean' },
+              qr_iid: { type: 'string', description: 'QR-IID allocation, null when none.' },
+            },
           },
+          cost_usdc: { type: 'number' },
+          processing_ms: { type: 'number' },
         },
       };
 
@@ -218,7 +232,7 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
                   type: 'http',
                   method: 'POST',
                   bodyType: 'json',
-                  body: { iban: 'CH93 0076 2011 6238 5295 7' },
+                  body: { iban: 'CH10 0023 0000 0000 1234 5' },
                   discoverable: true,
                 },
                 output: { type: 'json' },
@@ -274,14 +288,8 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
                 type: 'object',
                 properties: {
                   results: { type: 'array', items: ibanOutputSchema },
-                  summary: {
-                    type: 'object',
-                    properties: {
-                      total: { type: 'number' },
-                      valid: { type: 'number' },
-                      invalid: { type: 'number' },
-                    },
-                  },
+                  count: { type: 'number', description: 'Total IBANs processed.' },
+                  valid_count: { type: 'number', description: 'Number of valid IBANs.' },
                   cost_usdc: { type: 'number', description: 'Actual USDC charged for this call.' },
                 },
               },
@@ -290,7 +298,7 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
                   type: 'http',
                   method: 'POST',
                   bodyType: 'json',
-                  body: { ibans: ['CH9300762011623852957', 'DE89370400440532013000'] },
+                  body: { ibans: ['CH1000230000000012345', 'DE89370400440532013000'] },
                   discoverable: true,
                 },
                 output: { type: 'json' },
@@ -307,7 +315,7 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
             maxTimeoutSeconds: 60,
           },
           description:
-            `Resolve a BIC/SWIFT code (8 or 11 chars) into the underlying bank: name, country, city, LEI, and registered head-office address (where available). Backed by 121,399 BIC entries (38,761 LEI-enriched via GLEIF; additional rows from SWIFT directory, Deutsche Bundesbank, SIX BankMaster, NBP, EBA Step2 SCT). Use only when you already have the BIC — for IBAN inputs, prefer /v1/iban/validate which resolves the BIC for you. ${TRUST_TAG_BIC}.`,
+            `Resolve a BIC/SWIFT code (8 or 11 chars) into the underlying bank: name, country, city, LEI, and registered head-office address (where available). Backed by 121k+ BIC entries (38k+ LEI-enriched via GLEIF; additional rows from SWIFT directory, Deutsche Bundesbank, SIX BankMaster, NBP, EBA Step2 SCT), refreshed monthly. Use only when you already have the BIC — for IBAN inputs, prefer /v1/iban/validate which resolves the BIC for you. ${TRUST_TAG_BIC}.`,
           mimeType: 'application/json',
           extensions: {
             bazaar: {
@@ -385,39 +393,68 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
               discoverable: true,
               bodyType: 'json',
               inputSchema: ibanInputSchema,
+              // Real response = full /v1/iban/validate enrichment + a nested
+              // `compliance` object + `meta` provenance block (verified against prod).
               outputSchema: {
                 type: 'object',
                 properties: {
                   iban: { type: 'string' },
                   valid: { type: 'boolean' },
-                  risk_score: { type: 'number', minimum: 0, maximum: 100 },
-                  recommended_action: { type: 'string', enum: ['allow', 'review', 'block'] },
-                  sanctions: {
+                  country: {
+                    type: 'object',
+                    properties: { code: { type: 'string' }, name: { type: 'string' } },
+                  },
+                  bic: {
+                    type: 'object',
+                    properties: { code: { type: 'string' }, bank_name: { type: 'string' }, city: { type: 'string' } },
+                  },
+                  compliance: {
                     type: 'object',
                     properties: {
-                      bic_sanctioned: { type: 'boolean' },
-                      country_sanctioned: { type: 'boolean' },
-                      lists: { type: 'array', items: { type: 'string' } },
+                      sanctions: {
+                        type: 'object',
+                        properties: {
+                          country_sanctioned: { type: 'boolean' },
+                          bank_sanctioned: { type: 'boolean' },
+                          matched_lists: { type: 'array', items: { type: 'string' } },
+                          fatf_status: { type: 'string', enum: ['member', 'grey_list', 'black_list', 'non_member'] },
+                        },
+                      },
+                      reachability: {
+                        type: 'object',
+                        properties: {
+                          sepa_instant: { type: 'boolean' },
+                          sct: { type: 'boolean' },
+                          sdd: { type: 'boolean' },
+                        },
+                      },
+                      vop: {
+                        type: 'object',
+                        properties: {
+                          participant: { type: 'boolean' },
+                          status: { type: 'string', enum: ['active', 'pending', 'inactive', 'not_found'] },
+                        },
+                      },
+                      risk_score: { type: 'number', minimum: 0, maximum: 100 },
+                      risk_level: { type: 'string', enum: ['low', 'medium', 'elevated', 'high', 'critical'] },
+                      flags: {
+                        type: 'array',
+                        items: { type: 'string' },
+                        description:
+                          'Risk flags, e.g. sanctioned_country, sanctioned_bank, fatf_grey_list, emi_issuer, test_bic, no_sepa_instant, no_vop.',
+                      },
                     },
                   },
-                  fatf: {
+                  meta: {
                     type: 'object',
                     properties: {
-                      list: { type: 'string', enum: ['none', 'grey', 'black'] },
+                      scope: { type: 'string' },
+                      disclaimer: { type: 'string' },
+                      sanctions_as_of: { type: 'string' },
+                      fatf_as_of: { type: 'string' },
+                      sources: { type: 'string' },
                     },
                   },
-                  sepa: {
-                    type: 'object',
-                    properties: {
-                      reachable: { type: 'boolean' },
-                      instant: { type: 'boolean' },
-                    },
-                  },
-                  vop: {
-                    type: 'object',
-                    properties: { participant: { type: 'boolean' } },
-                  },
-                  flags: { type: 'object' },
                 },
               },
               info: {
@@ -514,7 +551,7 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
             maxTimeoutSeconds: 60,
           },
           description:
-            `Resolve a Swiss BC-Nummer / IID (1-5 digits) into institution name, type, SIC, euroSIC, QR-IID. Backed by 1,190 SIX BankMaster entries — the canonical Swiss banking source. ${TRUST_TAG_CH}.`,
+            `Resolve a Swiss BC-Nummer / IID (1-5 digits) into institution name, type, address, BIC, the full payment-rail participation (SIC, RTGS CHF, Instant Payments CHF, euroSIC, LSV+/BDD) and the QR-IID allocation. Backed by ~1,200 SIX BankMaster entries (refreshed monthly) — the canonical Swiss banking source. ${TRUST_TAG_CH}.`,
           mimeType: 'application/json',
           extensions: {
             bazaar: {
@@ -522,6 +559,7 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
               pathParams: {
                 iid: { type: 'string', description: 'Swiss IID / BC-Nummer (1-5 digits).' },
               },
+              // Mirrors the real /v1/ch/clearing/:iid response (verified against prod).
               outputSchema: {
                 type: 'object',
                 properties: {
@@ -532,27 +570,42 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
                     properties: {
                       name: { type: 'string' },
                       type: { type: 'string', enum: ['bank', 'cantonal_bank', 'postfinance', 'raiffeisen', 'central_bank', 'foreign_participant'] },
-                      iid_type: { type: 'string', enum: ['headquarters', 'branch', 'unknown'] },
+                      iid_type: { type: 'string', enum: ['headquarters', 'branch', 'other'] },
                       headquarters_iid: { type: 'string' },
                     },
                   },
-                  participation: {
+                  address: {
                     type: 'object',
                     properties: {
-                      sic: { type: 'boolean', description: 'Swiss Interbank Clearing.' },
-                      eurosic: { type: 'boolean' },
-                      instant_payments: { type: 'boolean' },
-                      qr_iid: { type: 'boolean', description: 'QR-bill enabled IID.' },
+                      street: { type: 'string' },
+                      building_number: { type: 'string' },
+                      post_code: { type: 'string' },
+                      town: { type: 'string' },
+                      country: { type: 'string' },
                     },
                   },
                   bic: { type: 'string', description: 'BIC if mapped.' },
+                  payment_services: {
+                    type: 'object',
+                    properties: {
+                      sic: { type: 'boolean', description: 'Swiss Interbank Clearing.' },
+                      rtgs_chf: { type: 'boolean' },
+                      instant_payments_chf: { type: 'boolean' },
+                      eurosic: { type: 'boolean' },
+                      lsv_bdd_chf: { type: 'boolean' },
+                      lsv_bdd_eur: { type: 'boolean' },
+                    },
+                  },
+                  sic_iid: { type: 'string' },
+                  qr_iid: { type: 'string', description: 'QR-IID allocation, null when none.' },
+                  valid_on: { type: 'string' },
                 },
               },
               info: {
                 input: {
                   type: 'http',
                   method: 'GET',
-                  pathParams: { iid: '00762' },
+                  pathParams: { iid: '00230' },
                   discoverable: true,
                 },
                 output: { type: 'json' },
