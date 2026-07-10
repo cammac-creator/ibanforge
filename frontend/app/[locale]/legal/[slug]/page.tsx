@@ -1,15 +1,14 @@
 import { MDXRemote } from "next-mdx-remote/rsc";
-import { getLegalDoc, LEGAL_SLUGS } from "@/lib/legal";
+import { getLegalDoc } from "@/lib/legal";
 import { mdxOptions, mdxComponents } from "@/lib/mdx";
 import { getTranslations } from "next-intl/server";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 
+// Fully dynamic, exactly like docs/[slug]: under this project's next-intl
+// setup the locale comes from the request, so any static/ISR rendering of a
+// dynamic segment trips DYNAMIC_SERVER_USAGE.
 export const dynamicParams = true;
-
-export function generateStaticParams() {
-  return LEGAL_SLUGS.map((slug) => ({ slug }));
-}
 
 export async function generateMetadata({
   params,
@@ -33,7 +32,7 @@ export default async function LegalPage({
   const { locale, slug } = await params;
   const doc = getLegalDoc(slug);
   if (!doc) notFound();
-  const t = await getTranslations("legal");
+  const t = await getTranslations({ locale, namespace: "legal" });
 
   return (
     <article className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8 py-10">
