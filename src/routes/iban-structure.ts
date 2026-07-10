@@ -23,42 +23,14 @@ import { Hono } from 'hono';
 import {
   IBAN_LENGTHS,
   BBAN_STRUCTURE,
+  BBAN_SPECS,
+  EXAMPLE_IBANS,
   COUNTRY_NAMES,
   getSepaInfo,
+  getBBANFieldSpec,
 } from '../lib/countries.js';
 
 const ibanStructure = new Hono();
-
-// One canonical example per country code — used by agents to copy-paste a
-// known-valid IBAN and try it immediately. Picked from public/test data only.
-const EXAMPLE_IBANS: Record<string, string> = {
-  AD: 'AD1200012030200359100100',
-  AT: 'AT611904300234573201',
-  BE: 'BE68539007547034',
-  CH: 'CH9300762011623852957',
-  CZ: 'CZ6508000000192000145399',
-  DE: 'DE89370400440532013000',
-  DK: 'DK5000400440116243',
-  ES: 'ES9121000418450200051332',
-  FI: 'FI2112345600000785',
-  FR: 'FR1420041010050500013M02606',
-  GB: 'GB29NWBK60161331926819',
-  GR: 'GR1601101250000000012300695',
-  HR: 'HR1210010051863000160',
-  HU: 'HU42117730161111101800000000',
-  IE: 'IE29AIBK93115212345678',
-  IT: 'IT60X0542811101000000123456',
-  LI: 'LI21088100002324013AA',
-  LU: 'LU280019400644750000',
-  MC: 'MC5811222000010123456789030',
-  NL: 'NL91ABNA0417164300',
-  NO: 'NO9386011117947',
-  PL: 'PL61109010140000071219812874',
-  PT: 'PT50000201231234567890154',
-  SE: 'SE4550000000058398257466',
-  SI: 'SI56263300012039086',
-  SK: 'SK3112000000198742637541',
-};
 
 ibanStructure.get('/v1/iban/structure/:country', (c) => {
   const raw = c.req.param('country').toUpperCase();
@@ -100,11 +72,32 @@ ibanStructure.get('/v1/iban/structure/:country', (c) => {
     bban_length: length - 4,
     bban: bban
       ? {
-          bank_code: { start: bban.bankCode[0], length: bban.bankCode[1] },
-          ...(bban.branchCode ? { branch_code: { start: bban.branchCode[0], length: bban.branchCode[1] } } : {}),
-          account_number: { start: bban.accountNumber[0], length: bban.accountNumber[1] },
+          // `charset` uses SWIFT registry notation per field: n=digits,
+          // a=uppercase letters, c=alphanumeric (e.g. '8!n', '4!a2!n').
+          bank_code: {
+            start: bban.bankCode[0],
+            length: bban.bankCode[1],
+            charset: getBBANFieldSpec(raw, bban.bankCode[0], bban.bankCode[1]),
+          },
+          ...(bban.branchCode
+            ? {
+                branch_code: {
+                  start: bban.branchCode[0],
+                  length: bban.branchCode[1],
+                  charset: getBBANFieldSpec(raw, bban.branchCode[0], bban.branchCode[1]),
+                },
+              }
+            : {}),
+          account_number: {
+            start: bban.accountNumber[0],
+            length: bban.accountNumber[1],
+            charset: getBBANFieldSpec(raw, bban.accountNumber[0], bban.accountNumber[1]),
+          },
         }
       : null,
+    // Full BBAN pattern in SWIFT IBAN Registry notation — what /v1/iban/validate
+    // enforces structurally on top of length + mod-97.
+    bban_pattern: BBAN_SPECS[raw] ?? null,
     sepa: {
       member: sepa.member,
       schemes: sepa.schemes,

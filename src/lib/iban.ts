@@ -1,4 +1,4 @@
-import { IBAN_LENGTHS, BBAN_STRUCTURE, COUNTRY_NAMES, getSepaInfo } from './countries.js';
+import { IBAN_LENGTHS, BBAN_STRUCTURE, COUNTRY_NAMES, getSepaInfo, checkBBANStructure } from './countries.js';
 import type { IBANValidationResult } from '../types.js';
 
 /**
@@ -120,6 +120,30 @@ export function validateIBAN(input: string): IBANValidationResult {
     };
   }
 
+  // Step 2b — Check digits must be numeric and inside the ISO 13616 range.
+  // The mod-97 algorithm can only produce 02–98; 00, 01 and 99 are explicitly
+  // excluded by the standard, yet 00/99 can still slip through a bare mod-97
+  // test (e.g. CH99… passes mod 97 = 1). Reject them before the checksum.
+  const checkDigits = cleaned.substring(2, 4);
+  if (!/^[0-9]{2}$/.test(checkDigits)) {
+    return {
+      iban: cleaned,
+      valid: false,
+      error: 'invalid_check_digits',
+      error_detail: `Check digits must be 2 digits (ISO 13616), got '${checkDigits}'.`,
+      cost_usdc: 0.005,
+    };
+  }
+  if (checkDigits === '00' || checkDigits === '01' || checkDigits === '99') {
+    return {
+      iban: cleaned,
+      valid: false,
+      error: 'invalid_check_digits',
+      error_detail: `Check digits '${checkDigits}' are outside the valid ISO 13616 range (02–98).`,
+      cost_usdc: 0.005,
+    };
+  }
+
   // Step 3 — Checksum modulo 97
   const remainder = mod97(cleaned);
   if (remainder !== 1n) {
@@ -132,9 +156,23 @@ export function validateIBAN(input: string): IBANValidationResult {
     };
   }
 
-  // Step 4 — Parse components
-  const checkDigits = cleaned.substring(2, 4);
+  // Step 3b — BBAN character structure (SWIFT IBAN Registry). A mod-97 pass
+  // says nothing about the BBAN layout: DE17ABCDEFGH1234567890 passes mod 97
+  // yet has letters inside Germany's all-numeric bank code. Validate the
+  // country's registry pattern (precompiled at module load).
   const bban = cleaned.substring(4);
+  const bbanCheck = checkBBANStructure(countryCode, bban);
+  if (!bbanCheck.ok) {
+    return {
+      iban: cleaned,
+      valid: false,
+      error: 'invalid_bban_structure',
+      error_detail: bbanCheck.detail,
+      cost_usdc: 0.005,
+    };
+  }
+
+  // Step 4 — Parse components
   const bbanParsed = parseBBAN(countryCode, bban);
   const countryName = COUNTRY_NAMES[countryCode] ?? countryCode;
 
