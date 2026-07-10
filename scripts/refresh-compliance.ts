@@ -19,6 +19,7 @@ import {
   FATF_BLACK_LIST,
   FATF_GREY_LIST,
   FATF_MEMBERS,
+  FATF_SUSPENDED,
   SANCTIONED_COUNTRIES_COMPREHENSIVE,
   SANCTIONED_COUNTRIES_SECTORAL,
 } from '../src/lib/compliance-static.js';
@@ -157,6 +158,12 @@ function insertStaticData(db: Database.Database): void {
     }
     for (const cc of FATF_MEMBERS) {
       insertFatf.run(cc, 'member');
+    }
+    // Suspended memberships (RU since Feb 2023) — inserted AFTER members so a
+    // code accidentally present in both lists ends up 'suspended', never
+    // silently 'member'.
+    for (const cc of FATF_SUSPENDED) {
+      insertFatf.run(cc, 'suspended');
     }
   });
 
@@ -448,6 +455,51 @@ async function fetchVopRegister(db: Database.Database): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// EMI BIC aliases — documented overrides
+//
+// Some institutions joined the EPC schemes under a different BIC8 than the
+// one their customer IBANs resolve to. The reachability/VoP lookup keys on
+// the IBAN-derived BIC8, so without an alias the answer is a false
+// "sct:false / no_vop" for live, SEPA-reachable banks.
+//
+// Only add entries here with a verified source. Each alias COPIES the
+// registered BIC's sepa_participants + vop_participants rows onto the alias.
+// ---------------------------------------------------------------------------
+
+const EMI_BIC_ALIASES: Array<{ alias: string; registered: string; reason: string }> = [
+  {
+    alias: 'REVOLT21',
+    registered: 'RVUALT2V',
+    reason:
+      'Revolut Bank UAB (LT) participates in EPC SCT/SCT_INST/SDD/VoP under ' +
+      'RVUALT2V (EPC registers, verified 2026-07-10) while customer IBANs ' +
+      'carry BIC REVOLT21. Same legal entity.',
+  },
+  // Verified present under their IBAN-facing BIC8 already (no alias needed):
+  // Wise TRWIBEB1 / TRWIGB22, N26 NTSBDEB1, Bunq BUNQNL2A.
+];
+
+function applyEmiAliases(db: Database.Database): void {
+  console.log('\n[5b] Applying documented EMI BIC aliases...');
+  const copySepa = db.prepare(
+    `INSERT OR IGNORE INTO sepa_participants (bic8, scheme, status)
+     SELECT ?, scheme, status FROM sepa_participants WHERE bic8 = ?`
+  );
+  const copyVop = db.prepare(
+    `INSERT OR IGNORE INTO vop_participants (bic8, status)
+     SELECT ?, status FROM vop_participants WHERE bic8 = ?`
+  );
+  for (const { alias, registered, reason } of EMI_BIC_ALIASES) {
+    const sepa = copySepa.run(alias, registered).changes;
+    const vop = copyVop.run(alias, registered).changes;
+    console.log(`  ${alias} ← ${registered}: +${sepa} sepa rows, +${vop} vop rows (${reason.slice(0, 60)}…)`);
+    if (sepa === 0) {
+      console.warn(`  WARNING: registered BIC ${registered} carried no sepa_participants rows — alias ${alias} is a no-op; re-verify the EPC registers.`);
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Metadata
 // ---------------------------------------------------------------------------
 
@@ -534,6 +586,9 @@ async function main(): Promise<void> {
 
   // 6. VoP register (real data)
   await fetchVopRegister(db);
+
+  // 6b. Documented EMI BIC aliases (EPC membership under a different BIC8)
+  applyEmiAliases(db);
 
   // 7. Metadata
   insertMetadata(db);

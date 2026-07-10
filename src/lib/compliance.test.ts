@@ -60,4 +60,29 @@ describe('calculateRiskScore', () => {
     expect(r.risk_level).toBe('low');
     expect(r.flags).not.toContain('fatf_non_member');
   });
+
+  it('scores a SUSPENDED FATF membership at least as severely as non_member, with a flag', () => {
+    const suspended: SanctionsCheck = {
+      country_sanctioned: false, bank_sanctioned: false, matched_lists: [], fatf_status: 'suspended',
+    };
+    const nonMember: SanctionsCheck = { ...suspended, fatf_status: 'non_member' };
+    const s = calculateRiskScore(suspended, goodReach, goodVop, 'bank', 'standard', false);
+    const n = calculateRiskScore(nonMember, goodReach, goodVop, 'bank', 'standard', false);
+    expect(s.risk_score).toBeGreaterThanOrEqual(n.risk_score);
+    expect(s.flags).toContain('fatf_suspended');
+  });
+
+  it('Russia-shaped inputs (sanctioned + suspended + high country risk) reach critical', () => {
+    const ru: SanctionsCheck = {
+      country_sanctioned: true, bank_sanctioned: false, matched_lists: [], fatf_status: 'suspended',
+    };
+    const nr: ReachabilityCheck = { sepa_instant: false, sct: false, sdd: false };
+    const nv: VopCheck = { participant: false, status: 'not_found' };
+    const r = calculateRiskScore(ru, nr, nv, 'bank', 'high', false);
+    expect(r.risk_score).toBeGreaterThanOrEqual(80);
+    expect(r.risk_level).toBe('critical');
+    expect(r.flags).toContain('sanctioned_country');
+    expect(r.flags).toContain('high_risk_country');
+    expect(r.flags).toContain('fatf_suspended');
+  });
 });

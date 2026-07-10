@@ -4,6 +4,7 @@ import {
   FATF_BLACK_LIST,
   FATF_GREY_LIST,
   FATF_MEMBERS,
+  FATF_SUSPENDED,
   SANCTIONED_COUNTRIES_COMPREHENSIVE,
   SANCTIONED_COUNTRIES_SECTORAL,
 } from './compliance-static.js';
@@ -12,6 +13,7 @@ const ALL_LISTS = [
   FATF_BLACK_LIST,
   FATF_GREY_LIST,
   FATF_MEMBERS,
+  FATF_SUSPENDED,
   SANCTIONED_COUNTRIES_COMPREHENSIVE,
   SANCTIONED_COUNTRIES_SECTORAL,
 ];
@@ -42,8 +44,29 @@ describe('compliance-static', () => {
     }
   });
 
-  it('FATF black list reflects the Feb 2026 plenary (IR, KP, MM)', () => {
+  it('FATF black list reflects the June 2026 plenary (IR, KP, MM — unchanged)', () => {
     expect([...FATF_BLACK_LIST].sort()).toEqual(['IR', 'KP', 'MM']);
+  });
+
+  it('FATF grey list reflects the June 2026 plenary (+BA +IQ, −DZ −NA, 22 total)', () => {
+    expect(FATF_GREY_LIST).toContain('BA');
+    expect(FATF_GREY_LIST).toContain('IQ');
+    expect(FATF_GREY_LIST).not.toContain('DZ');
+    expect(FATF_GREY_LIST).not.toContain('NA');
+    expect(FATF_GREY_LIST).toHaveLength(22);
+    expect(FATF_AS_OF).toBe('2026-06');
+  });
+
+  it('Russia is SUSPENDED from the FATF — never listed as a member', () => {
+    expect(FATF_SUSPENDED).toContain('RU');
+    expect(FATF_MEMBERS).not.toContain('RU');
+  });
+
+  it('no country is both a member and suspended', () => {
+    const members = new Set(FATF_MEMBERS);
+    for (const code of FATF_SUSPENDED) {
+      expect(members.has(code)).toBe(false);
+    }
   });
 
   it('no duplicate entries within any list', () => {
