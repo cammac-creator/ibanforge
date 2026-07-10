@@ -1,8 +1,8 @@
 # IBANforge
 
-> Pre-payout screening for AI agents — vet a counterparty IBAN before you send funds. IBAN validation, BIC/SWIFT lookup, Swiss clearing (BC-Nummer / QR-IID / SIX BankMaster — the only API that exposes this), EMI/vIBAN classification, SEPA Instant + VoP reachability, and sanctions + risk scoring — exposed natively over MCP and x402 micropayments, no API-key signup required.
+> Pre-payout screening for AI agents — vet a counterparty IBAN before you send funds. IBAN validation, BIC/SWIFT lookup, Swiss clearing (BC-Nummer / QR-IID / SIX BankMaster — full payment-rail participation, the deepest Swiss clearing data in any public API), EMI/vIBAN classification, SEPA Instant + VoP reachability, and sanctions + risk scoring — exposed natively over MCP and x402 micropayments, no API-key signup required.
 
-121,399 BIC entries (38,761 LEI-enriched via GLEIF) · 1,190 Swiss BC-Nummern (SIX) · 89 countries · 85 EMI/vIBAN issuer classifications
+121k+ BIC entries (38k+ LEI-enriched via GLEIF) · ~1,200 Swiss BC-Nummern (SIX) · 89 countries · 85 EMI/vIBAN issuer classifications — live counts at https://api.ibanforge.com/llms.txt
 
 ## API Base URL
 https://api.ibanforge.com
@@ -29,7 +29,7 @@ GET https://api.ibanforge.com/.well-known/x402 returns the full catalog. Any age
 - validate_iban — validate one IBAN + enrich (BIC, issuer EMI/vIBAN, SEPA, VoP, risk, Swiss bc_nummer). Cost: $0.005
 - batch_validate_iban — up to 100 IBANs in one call. Cost: $0.002 per IBAN (e.g. 100 = $0.20)
 - lookup_bic — resolve a BIC/SWIFT into bank, country, city, LEI. Cost: $0.003
-- lookup_ch_clearing — Swiss BC-Nummer / IID → institution, SIC/euroSIC, QR-IID. The ONLY API with this data. Cost: $0.003
+- lookup_ch_clearing — Swiss BC-Nummer / IID → institution, address, full rail participation (SIC, euroSIC, CHF instant, LSV+/BDD), QR-IID. The deepest Swiss clearing data in any public API. Cost: $0.003
 - check_compliance — sanctions (OFAC/EU/UN/SECO, bank-BIC level) + FATF + SEPA Instant + VoP + risk score 0-100. Informational, not regulated AML/CFT. Cost: $0.02
 
 ## REST endpoints
@@ -39,6 +39,8 @@ GET https://api.ibanforge.com/.well-known/x402 returns the full catalog. Any age
 - GET  /v1/ch/clearing/{iid} — Swiss clearing lookup ($0.003)
 - POST /v1/iban/compliance — sanctions + FATF + SEPA + VoP + risk ($0.02)
 - GET  /v1/iban/format?iban=... — free mod-97 + structure check (no auth)
+- GET  /v1/iban/structure[/{country}] — free IBAN templates for 89 countries (no auth)
+- GET  /v1/credits/bundles — free, list prepaid credit bundles
 - GET  /v1/demo — free example validations
 - POST /v1/keys/generate {"email":"you@example.com"} — free API key (200 req/month)
 

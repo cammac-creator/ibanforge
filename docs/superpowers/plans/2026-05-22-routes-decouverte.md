@@ -118,7 +118,7 @@ const MCP_SERVER_CARD = {
     {
       name: 'lookup_ch_clearing',
       description:
-        'Resolve a Swiss BC-Nummer / IID (1-5 digits) into institution name, type, SIC, euroSIC, QR-IID. The only API that exposes this data — alternatives do not cover it. Backed by 1,190 SIX BankMaster entries. Cost: $0.003. Only relevant for CH/LI accounts.',
+        'Resolve a Swiss BC-Nummer / IID (1-5 digits) into institution name, type, SIC, euroSIC, QR-IID. The deepest Swiss clearing data in any public API. Backed by ~1,200 SIX BankMaster entries. Cost: $0.003. Only relevant for CH/LI accounts.',
     },
   ],
   homepage: 'https://ibanforge.com',

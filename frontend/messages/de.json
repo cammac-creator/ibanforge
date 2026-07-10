@@ -63,7 +63,7 @@
       "0": {
         "badge": "Schweizer Clearing — exklusiv",
         "title": "BC-Nummer / QR-IID",
-        "description": "Die einzige API mit SIX-BankMaster-Clearingdaten: jede Schweizer BC-Nummer mit SIC/euroSIC-Teilnahme, QR-IID und Institutstyp. Kein Wettbewerber hat das."
+        "description": "Jede Schweizer BC-Nummer aus dem SIX BankMaster mit vollständiger Zahlungsschienen-Teilnahme — SIC, euroSIC, CHF Instant Payments — plus QR-IID und Institutstyp. Die tiefsten Schweizer Clearing-Daten aller öffentlichen APIs."
       },
       "1": {
         "badge": "MCP-nativ — agentenbereit",
@@ -213,7 +213,7 @@
         "path": "/v1/ch/clearing/:iid",
         "cost": "$0.003",
         "costLabel": "pro Aufruf",
-        "description": "Schweizer BC-Nummer / IID-Suche mit SIC, euroSIC, Instant Payments und QR-IID-Daten — gestützt auf 1 190 SIX BankMaster-Einträge"
+        "description": "Schweizer BC-Nummer / IID-Suche mit SIC, euroSIC, Instant Payments und QR-IID-Daten — gestützt auf ~1 200 SIX BankMaster-Einträge"
       }
     },
     "free": {

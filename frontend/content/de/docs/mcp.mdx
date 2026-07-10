@@ -45,7 +45,7 @@ Validiert eine einzelne IBAN und gibt detaillierte Informationen zurück.
 **Eingabe:**
 ```json
 {
-  "iban": "CH9300762011623852957"
+  "iban": "CH1000230000000012345"
 }
 ```
 
@@ -59,7 +59,7 @@ Validiert mehrere IBANs auf einmal.
 ```json
 {
   "ibans": [
-    "CH9300762011623852957",
+    "CH1000230000000012345",
     "DE89370400440532013000"
   ]
 }
@@ -87,7 +87,7 @@ Vollstaendiger Compliance-Check mit IBAN-Validierung, Sanktionspruefung, SEPA-In
 **Eingabe:**
 ```json
 {
-  "iban": "CH9300762011623852957"
+  "iban": "CH1000230000000012345"
 }
 ```
 
@@ -97,12 +97,12 @@ Vollstaendiger Compliance-Check mit IBAN-Validierung, Sanktionspruefung, SEPA-In
 
 Nach der Konfiguration können Sie Claude ganz natürlich fragen:
 
-> **Sie:** Ist diese IBAN gültig? CH93 0076 2011 6238 5295 7
+> **Sie:** Ist diese IBAN gültig? CH10 0023 0000 0000 1234 5
 >
 > **Claude:** Lassen Sie mich diese IBAN für Sie validieren.
 > *[ruft validate_iban auf]*
 >
-> Ja, diese IBAN ist gültig. Sie gehört zur **UBS Switzerland AG** in Zürich, Schweiz. Die Kontonummer lautet 011623852957 und die LEI der Bank ist BFM8T61CT2L1QCEMIK50.
+> Ja, diese IBAN ist gültig. Sie gehört zur **UBS Switzerland AG** in Zürich, Schweiz — BIC UBSWCHZH, Schweizer BC-Nummer 00230, SIC-Teilnehmer mit CHF Instant Payments.
 
 > **Sie:** Können Sie diese 3 IBANs von unserer Lieferantenrechnung prüfen?
 >

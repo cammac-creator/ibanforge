@@ -45,28 +45,28 @@ Eine Anfrage ohne gültigen Schlüssel oder Zahlung erhält eine `402`-Antwort m
 ```bash
 curl -X POST https://api.ibanforge.com/v1/iban/validate \
   -H "Content-Type: application/json" \
-  -d '{"iban": "CH93 0076 2011 6238 5295 7"}'
+  -d '{"iban": "CH10 0023 0000 0000 1234 5"}'
 ```
 
 Antwort:
 
 ```json
 {
-  "iban": "CH9300762011623852957",
+  "iban": "CH1000230000000012345",
   "valid": true,
   "country": {
     "code": "CH",
     "name": "Switzerland"
   },
-  "check_digits": "93",
+  "check_digits": "10",
   "bban": {
-    "bank_code": "00762",
-    "account_number": "011623852957"
+    "bank_code": "00230",
+    "account_number": "000000012345"
   },
   "bic": {
     "code": "UBSWCHZH",
-    "bank_name": "UBS SWITZERLAND AG",
-    "city": "ZURICH"
+    "bank_name": "UBS Switzerland AG",
+    "city": "Zürich"
   },
   "sepa": {
     "member": true,
@@ -75,7 +75,7 @@ Antwort:
   },
   "issuer": {
     "type": "bank",
-    "name": "UBS SWITZERLAND AG"
+    "name": "UBS Switzerland AG"
   },
   "risk_indicators": {
     "issuer_type": "bank",
@@ -84,7 +84,17 @@ Antwort:
     "sepa_reachable": true,
     "vop_coverage": false
   },
-  "formatted": "CH93 0076 2011 6238 5295 7",
+  "clearing": {
+    "iid": "00230",
+    "name": "UBS Switzerland AG",
+    "type": "bank",
+    "town": "Zürich",
+    "sic": true,
+    "instant_payments_chf": true,
+    "eurosic": true,
+    "qr_iid": null
+  },
+  "formatted": "CH10 0023 0000 0000 1234 5",
   "cost_usdc": 0.005
 }
 ```

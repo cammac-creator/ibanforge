@@ -31,9 +31,8 @@ POST https://api.ibanforge.com/v1/iban/batch
 ```json
 {
   "ibans": [
-    "CH93 0076 2011 6238 5295 7",
+    "CH10 0023 0000 0000 1234 5",
     "DE89 3704 0044 0532 0130 00",
-    "GB29 NWBK 6016 1331 9268 19",
     "INVALID123"
   ]
 }
@@ -51,14 +50,14 @@ POST https://api.ibanforge.com/v1/iban/batch
 {
   "results": [
     {
-      "iban": "CH9300762011623852957",
+      "iban": "CH1000230000000012345",
       "valid": true,
       "country": { "code": "CH", "name": "Switzerland" },
-      "check_digits": "93",
-      "bban": { "bank_code": "00762", "account_number": "011623852957" },
-      "bic": { "code": "UBSWCHZH", "bank_name": "UBS SWITZERLAND AG", "city": "ZURICH" },
+      "check_digits": "10",
+      "bban": { "bank_code": "00230", "account_number": "000000012345" },
+      "bic": { "code": "UBSWCHZH", "bank_name": "UBS Switzerland AG", "city": "Zürich" },
       "sepa": { "member": true, "schemes": ["SCT", "SDD"], "vop_required": false },
-      "issuer": { "type": "bank", "name": "UBS SWITZERLAND AG" },
+      "issuer": { "type": "bank", "name": "UBS Switzerland AG" },
       "risk_indicators": {
         "issuer_type": "bank",
         "country_risk": "standard",
@@ -66,8 +65,18 @@ POST https://api.ibanforge.com/v1/iban/batch
         "sepa_reachable": true,
         "vop_coverage": false
       },
-      "formatted": "CH93 0076 2011 6238 5295 7",
-      "cost_usdc": 0.005
+      "clearing": {
+        "iid": "00230",
+        "name": "UBS Switzerland AG",
+        "type": "bank",
+        "town": "Zürich",
+        "sic": true,
+        "instant_payments_chf": true,
+        "eurosic": true,
+        "qr_iid": null
+      },
+      "formatted": "CH10 0023 0000 0000 1234 5",
+      "cost_usdc": 0.002
     },
     {
       "iban": "DE89370400440532013000",
@@ -75,9 +84,9 @@ POST https://api.ibanforge.com/v1/iban/batch
       "country": { "code": "DE", "name": "Germany" },
       "check_digits": "89",
       "bban": { "bank_code": "37040044", "account_number": "0532013000" },
-      "bic": { "code": "COBADEFF", "bank_name": "COMMERZBANK AG", "city": "FRANKFURT AM MAIN" },
+      "bic": { "code": "COBADEFF", "bank_name": "COMMERZBANK Aktiengesellschaft", "city": "Frankfurt am Main" },
       "sepa": { "member": true, "schemes": ["SCT", "SDD", "SCT_INST"], "vop_required": true },
-      "issuer": { "type": "bank", "name": "COMMERZBANK AG" },
+      "issuer": { "type": "bank", "name": "COMMERZBANK Aktiengesellschaft" },
       "risk_indicators": {
         "issuer_type": "bank",
         "country_risk": "standard",
@@ -86,20 +95,20 @@ POST https://api.ibanforge.com/v1/iban/batch
         "vop_coverage": true
       },
       "formatted": "DE89 3704 0044 0532 0130 00",
-      "cost_usdc": 0.005
+      "cost_usdc": 0.002
     },
     {
       "iban": "INVALID123",
       "valid": false,
-      "error": "invalid_format",
-      "error_detail": "IBAN contains invalid characters. Only letters and digits are allowed.",
-      "cost_usdc": 0.005
+      "error": "unsupported_country",
+      "error_detail": "Country code 'IN' is not a recognized IBAN country.",
+      "cost_usdc": 0.002
     }
   ],
   "count": 3,
   "valid_count": 2,
   "cost_usdc": 0.006,
-  "processing_ms": 2.45
+  "processing_ms": 1.05
 }
 ```
 
@@ -134,7 +143,7 @@ curl -X POST https://api.ibanforge.com/v1/iban/batch \
   -H "Content-Type: application/json" \
   -d '{
     "ibans": [
-      "CH9300762011623852957",
+      "CH1000230000000012345",
       "DE89370400440532013000",
       "FR7630006000011234567890189"
     ]
@@ -150,7 +159,7 @@ response = requests.post(
     "https://api.ibanforge.com/v1/iban/batch",
     json={
         "ibans": [
-            "CH9300762011623852957",
+            "CH1000230000000012345",
             "DE89370400440532013000",
             "FR7630006000011234567890189",
         ]
@@ -179,7 +188,7 @@ const response = await fetch(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       ibans: [
-        "CH9300762011623852957",
+        "CH1000230000000012345",
         "DE89370400440532013000",
         "FR7630006000011234567890189",
       ],

@@ -30,7 +30,7 @@ POST https://api.ibanforge.com/v1/iban/validate
 
 ```json
 {
-  "iban": "CH93 0076 2011 6238 5295 7"
+  "iban": "CH10 0023 0000 0000 1234 5"
 }
 ```
 
@@ -44,21 +44,21 @@ POST https://api.ibanforge.com/v1/iban/validate
 
 ```json
 {
-  "iban": "CH9300762011623852957",
+  "iban": "CH1000230000000012345",
   "valid": true,
   "country": {
     "code": "CH",
     "name": "Switzerland"
   },
-  "check_digits": "93",
+  "check_digits": "10",
   "bban": {
-    "bank_code": "00762",
-    "account_number": "011623852957"
+    "bank_code": "00230",
+    "account_number": "000000012345"
   },
   "bic": {
     "code": "UBSWCHZH",
-    "bank_name": "UBS SWITZERLAND AG",
-    "city": "ZURICH"
+    "bank_name": "UBS Switzerland AG",
+    "city": "Zürich"
   },
   "sepa": {
     "member": true,
@@ -67,7 +67,7 @@ POST https://api.ibanforge.com/v1/iban/validate
   },
   "issuer": {
     "type": "bank",
-    "name": "UBS SWITZERLAND AG"
+    "name": "UBS Switzerland AG"
   },
   "risk_indicators": {
     "issuer_type": "bank",
@@ -76,7 +76,17 @@ POST https://api.ibanforge.com/v1/iban/validate
     "sepa_reachable": true,
     "vop_coverage": false
   },
-  "formatted": "CH93 0076 2011 6238 5295 7",
+  "clearing": {
+    "iid": "00230",
+    "name": "UBS Switzerland AG",
+    "type": "bank",
+    "town": "Zürich",
+    "sic": true,
+    "instant_payments_chf": true,
+    "eurosic": true,
+    "qr_iid": null
+  },
+  "formatted": "CH10 0023 0000 0000 1234 5",
   "cost_usdc": 0.005,
   "processing_ms": 1.23
 }
@@ -97,6 +107,7 @@ POST https://api.ibanforge.com/v1/iban/validate
 | `sepa` | `object` | Valid IBANs | SEPA membership, schemes, and VoP requirement |
 | `issuer` | `object` | Valid IBANs with BIC | Institution classification |
 | `risk_indicators` | `object` | Valid IBANs | Composite risk signal for compliance |
+| `clearing` | `object \| null` | Valid CH/LI IBANs | Swiss clearing data from the SIX BankMaster (BC-Nummer, rail participation, QR-IID); `null` when the IID is not listed |
 | `formatted` | `string` | Valid IBANs | IBAN with spaces every 4 characters |
 | `error` | `string` | Invalid IBANs | Error code |
 | `error_detail` | `string` | Invalid IBANs | Human-readable error description |
