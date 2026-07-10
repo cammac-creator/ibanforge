@@ -1,0 +1,63 @@
+---
+title: "Data Processing Agreement"
+description: "Pre-signed DPA (art. 28 GDPR / FADP) for customers who embed the IBANforge API — roles, processing scope, sub-processors, TOMs."
+order: 3
+updated: "2026-07-10"
+---
+
+# Data Processing Agreement (DPA)
+
+**Last updated: July 10, 2026 · Version 1.0**
+
+This DPA supplements the [Terms of Service](/legal/terms) and applies whenever a customer (« **Controller** ») uses the IBANforge API in a way that involves personal data — an IBAN can identify a natural person. It is offered as a standing, pre-signed agreement: by using the Service under a paid or free plan you may rely on it without countersignature; a countersigned PDF is available on request at **support@ibanforge.com**.
+
+## 1. Roles and scope
+
+- **Controller:** you, the customer embedding or calling the API.
+- **Processor:** IBANforge, sole proprietorship established in Switzerland ([Legal Notice](/legal/imprint)).
+- **Subject matter:** validation and enrichment of bank identifiers submitted by the Controller.
+- **Duration:** as long as the Controller uses the Service.
+- **Nature and purpose:** ephemeral, automated processing of submitted identifiers to return validation/enrichment results.
+- **Categories of data:** bank account identifiers (IBANs) and, for account management, the Controller's contact email.
+- **Data subjects:** the Controller's customers, suppliers, employees or end users whose IBANs are submitted.
+
+## 2. Processing instructions
+
+The Processor processes submitted data **only** to produce the API response, and on no other instruction. Submitted IBANs are processed **in memory and are not stored** (sole exception: for invalid IBANs, at most the first 12 characters — country and bank identifier, never the account-identifying part — may be retained up to 12 months for data-quality diagnostics). The Processor does not use Controller data to train models, build marketing profiles, or enrich third-party datasets.
+
+## 3. Confidentiality and personnel
+
+The Service is operated by its owner; no employees have access to production data. Any future personnel will be bound by written confidentiality before access.
+
+## 4. Technical and organisational measures (TOMs)
+
+- Transport encryption (TLS) on all endpoints; HTTP redirected to HTTPS.
+- **Data minimisation by design:** no storage of submitted IBANs; IP addresses stored only as salted hashes; API keys stored only as hashes.
+- Hosting in the **Zurich (Switzerland)** region (Railway), with volume-level isolation.
+- Request metadata automatically purged after **12 months**.
+- Access to production restricted to the operator with strong authentication; secrets held in the hosting platform's secret store.
+- Public status page and monitored error rates.
+
+## 5. Sub-processors
+
+The Controller authorises the sub-processors listed in the [Privacy Policy §3](/legal/privacy) (Railway — Zurich hosting; Vercel — website only; Stripe — card payments; Coinbase CDP — USDC settlement; Infomaniak — email; GitHub — public code, no customer data). Changes are announced in the [changelog](/changelog) at least 30 days before a new sub-processor receives personal data; the Controller may object on reasonable grounds, in which case either party may terminate.
+
+## 6. International transfers
+
+Primary processing occurs in Switzerland (EU adequacy). Where a sub-processor operates from a third country, transfers rely on adequacy decisions or the sub-processor's standard contractual clauses.
+
+## 7. Assistance, incidents, audits
+
+- **Data subject requests:** given that IBANs are not stored, the Processor typically holds no data to retrieve or erase; the Processor will nevertheless assist the Controller within 30 days for whatever is held (account email, request metadata).
+- **Personal data breach:** notification to the Controller **without undue delay and within 72 hours** of becoming aware, with the information required by art. 33(3) GDPR.
+- **Audit:** the Processor provides documentation supporting compliance (this DPA, the Privacy Policy, architecture description) and answers reasonable written audit questions once per year; on-site audits are replaced by these means given the single-operator setup, unless a supervisory authority requires otherwise.
+
+## 8. Deletion and end of service
+
+On termination, the Controller's account data (email, key) is deleted on request; request metadata expires within its 12-month window. There is no stored IBAN corpus to return or delete.
+
+## 9. Liability and law
+
+Liability follows the [Terms of Service §8](/legal/terms). This DPA is governed by Swiss law; for Controllers subject to the GDPR it is to be interpreted in conformity with art. 28 GDPR.
+
+Contact for all DPA matters: **support@ibanforge.com**

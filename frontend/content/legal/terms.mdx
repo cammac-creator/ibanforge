@@ -1,0 +1,64 @@
+---
+title: "Terms of Service"
+description: "The terms that govern use of the IBANforge API and website."
+order: 1
+updated: "2026-07-10"
+---
+
+# Terms of Service
+
+**Last updated: July 10, 2026 · Version 1.0**
+
+These Terms govern your use of the IBANforge API (`api.ibanforge.com`) and website (`ibanforge.com`), operated by **IBANforge**, a sole proprietorship established in Switzerland (see [Legal Notice](/legal/imprint)). By requesting an API key, purchasing credits, paying per call, or otherwise using the Service, you accept these Terms.
+
+## 1. The Service
+
+IBANforge provides programmatic validation and enrichment of bank identifiers: IBAN validation, BIC/SWIFT lookup, Swiss clearing (BC-Nummer) data, issuer classification, and bank-level compliance signals. The Service is provided on a self-service basis via REST API, MCP server, and the website playground.
+
+## 2. Accounts and API keys
+
+A free API key is issued against a working email address. You are responsible for keeping your key confidential; calls made with your key count against your quota. We may revoke keys used for abuse (see §6). You may request deletion of your key and associated email at any time (see [Privacy Policy](/legal/privacy)).
+
+## 3. Plans and payment
+
+- **Free tier** — 200 requests per month, no card required. Quotas reset on the 1st of each month.
+- **Prepaid credit packs** — purchased by card (via Stripe) or in USDC; credits do not expire. Prices are displayed on the [pricing page](/pricing) at the time of purchase.
+- **x402 pay-per-call** — per-request payment in USDC on Base, settled through the x402 protocol.
+
+Prices may change with 30 days' notice on the pricing page; already-purchased credits keep their validity. Card payments are processed by Stripe — we never see or store card numbers. Except where required by law, payments for consumed API calls are non-refundable; unused credit packs purchased by card are refundable within 14 days of purchase on request to support@ibanforge.com.
+
+## 4. Service levels
+
+The free tier and self-service plans are provided **without a contractual SLA**. We operate the Service with production-grade care (status and error rates are published on the [status page](/status)), but availability is not guaranteed. Written SLAs with support commitments are available as part of **Editor/OEM agreements** — contact support@ibanforge.com.
+
+## 5. Data and compliance signals — important limits
+
+The Service returns **informational signals, not regulated advice**:
+
+- Sanctions screening is performed at the **bank level** (BIC8). It does **not** screen beneficiary or account-holder names. It is **not** a regulated AML/CFT product and does not fulfil name-screening obligations under AML law. Use a regulated provider for name-level KYC/AML.
+- Reference data (BIC directories, SEPA registers, Swiss BankMaster, sanctions lists) is compiled from third-party sources and refreshed on the schedule shown in the [documentation](/docs). Data may contain errors or lag behind reality.
+- Validation results confirm structure and registry data; they do **not** confirm that an account exists, is open, or belongs to a specific person.
+
+You remain solely responsible for your own regulatory obligations and payment decisions.
+
+## 6. Acceptable use
+
+You must not: (a) resell raw bulk extracts of the underlying databases as a standalone dataset; (b) use the Service to violate sanctions, AML or data-protection law; (c) attempt to disrupt the Service, circumvent quotas or metering, or probe for vulnerabilities outside a responsible-disclosure context; (d) misrepresent IBANforge results as a regulated compliance opinion. Embedding the API inside your own product for your end customers is permitted with a commercial plan (Editor/OEM) or within your plan's quota.
+
+## 7. Intellectual property
+
+The IBANforge core validation library is open source under the MIT license (see [GitHub](https://github.com/cammac-creator/ibanforge)). The hosted Service, its compiled datasets and its brand remain the property of the operator. API responses may be used freely within your products; the underlying compiled databases may not be extracted wholesale.
+
+## 8. Liability
+
+To the maximum extent permitted by Swiss law, the Service is provided "as is". Our aggregate liability for any claims arising out of the Service is limited to the amounts you paid for the Service in the 12 months preceding the claim. We are not liable for indirect or consequential damages, including losses caused by payment decisions taken on the basis of Service responses. Nothing in these Terms excludes liability for gross negligence or wilful misconduct.
+
+## 9. Changes and termination
+
+We may update these Terms with 30 days' notice published on this page (material changes are also announced in the [changelog](/changelog)). You may stop using the Service at any time. We may terminate keys engaged in abuse with immediate effect, and otherwise with 30 days' notice.
+
+## 10. Governing law and jurisdiction
+
+These Terms are governed by **Swiss law**, excluding conflict-of-law rules. Exclusive place of jurisdiction is the registered seat of the operator in Switzerland, subject to mandatory consumer venues.
+
+Questions: **support@ibanforge.com**

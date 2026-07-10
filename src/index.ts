@@ -33,7 +33,7 @@ import { stripeRetrieve } from './routes/stripe-retrieve.js';
 import { stripeSuccess } from './routes/stripe-success.js';
 import { ibanStructure } from './routes/iban-structure.js';
 import { rateLimitMiddleware } from './middleware/rate-limit.js';
-import { recordRequest, classifyClient, hashIp, extractClientIp } from './lib/stats.js';
+import { recordRequest, classifyClient, hashIp, extractClientIp, purgeOldRequestLog } from './lib/stats.js';
 
 // Fail-fast: refuse to start in production without wallet config
 ensureWalletConfigured();
@@ -485,6 +485,22 @@ const port = parseInt(process.env.PORT ?? '3000', 10);
 serve({ fetch: app.fetch, port }, () => {
   console.log(`IBANforge running on http://localhost:${port}`);
 });
+
+// Retention: purge request metadata older than 12 months (privacy policy commitment).
+// At boot, then daily.
+try {
+  const purged = purgeOldRequestLog(12);
+  if (purged > 0) console.log(`Retention: purged ${purged} request_log rows older than 12 months`);
+} catch (err) {
+  console.error('Retention purge failed at boot:', err);
+}
+setInterval(() => {
+  try {
+    purgeOldRequestLog(12);
+  } catch (err) {
+    console.error('Retention purge failed:', err);
+  }
+}, 24 * 60 * 60 * 1000).unref();
 
 // Graceful shutdown
 function gracefulShutdown(signal: string) {
