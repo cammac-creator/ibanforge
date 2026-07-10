@@ -1,17 +1,30 @@
 import { Hono } from 'hono';
+import { createRequire } from 'node:module';
+import { getEntryCount } from '../lib/bic-lookup.js';
 
 const openapi = new Hono();
 
-const spec = {
+// Version is read from package.json so the spec can never drift from the
+// deployed server again (the spec is fetched ~20k times/month by machines
+// that code against it — it must tell the truth).
+const require = createRequire(import.meta.url);
+const { version: PKG_VERSION } = require('../../package.json') as { version: string };
+
+// Built lazily on first request (needs a DB read for live counts), then memoized.
+const buildSpec = () => ({
   openapi: '3.1.0',
   info: {
     title: 'IBANforge API',
-    version: '1.1.0',
+    version: PKG_VERSION,
     description:
       'IBAN validation & BIC/SWIFT lookup API with x402 micropayments and MCP integration',
     contact: {
       url: 'https://ibanforge.com',
     },
+  },
+  externalDocs: {
+    description: 'Agent-oriented overview (llms.txt) with copy-paste examples',
+    url: 'https://api.ibanforge.com/llms.txt',
   },
   servers: [
     { url: 'https://api.ibanforge.com', description: 'Production' },
@@ -234,6 +247,163 @@ const spec = {
         },
       },
     },
+    '/v1/iban/format': {
+      get: {
+        operationId: 'formatCheckIBAN',
+        summary: 'Free IBAN format check (mod-97 + structure)',
+        description:
+          'FREE pure-format IBAN check: ISO 13616 mod-97 checksum, country-specific length, and BBAN parsing. No payment, no API key, no quota (global rate limit only). Does NOT touch the BIC, SEPA, VoP, sanctions, or Swiss clearing databases — use POST /v1/iban/validate ($0.005) when you need the full enrichment. Ideal for pre-filtering malformed IBANs before paying for validation.',
+        tags: ['Free'],
+        parameters: [
+          {
+            name: 'iban',
+            in: 'query',
+            required: true,
+            description: 'IBAN to check (spaces allowed, will be normalized)',
+            schema: {
+              type: 'string',
+              minLength: 15,
+              maxLength: 34,
+              example: 'CH1000230000000012345',
+            },
+          },
+        ],
+        responses: {
+          '200': {
+            description:
+              'Format check result. valid=true includes parsed components; valid=false includes error + error_detail. Both include an upgrade_to_full_validation hint.',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/IBANFormatResult' },
+              },
+            },
+          },
+          '400': { description: 'Missing ?iban= query parameter, or IBAN shorter than 15 / longer than 34 characters' },
+        },
+      },
+    },
+    '/v1/iban/structure': {
+      get: {
+        operationId: 'listIBANStructures',
+        summary: 'List all supported IBAN countries (free)',
+        description:
+          'FREE metadata endpoint: lists every supported IBAN country with its IBAN length, SEPA membership, and whether a BBAN structure breakdown and example IBAN are available. Use GET /v1/iban/structure/{country} for the full per-country template.',
+        tags: ['Free'],
+        responses: {
+          '200': {
+            description: 'List of supported countries',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  required: ['total', 'countries'],
+                  properties: {
+                    total: { type: 'integer', description: 'Number of supported IBAN countries' },
+                    countries: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          code: { type: 'string', example: 'CH' },
+                          name: { type: 'string', example: 'Switzerland' },
+                          iban_length: { type: 'integer', example: 21 },
+                          sepa_member: { type: 'boolean' },
+                          has_bban_structure: { type: 'boolean' },
+                          has_example: { type: 'boolean' },
+                        },
+                      },
+                    },
+                    endpoint_per_country: { type: 'string', example: 'GET /v1/iban/structure/:country' },
+                    cost_usdc: { type: 'number', example: 0 },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    '/v1/iban/structure/{country}': {
+      get: {
+        operationId: 'getIBANStructure',
+        summary: 'IBAN structure template for a country (free)',
+        description:
+          'FREE metadata endpoint: returns the IBAN structural template for a country — total IBAN length, BBAN field positions (bank code / branch code / account number, 0-indexed within the BBAN), SEPA membership + schemes + VoP obligation, and a canonical example IBAN to copy-paste. Use it when an agent needs to know the IBAN format for a country before crafting a validation call.',
+        tags: ['Free'],
+        parameters: [
+          {
+            name: 'country',
+            in: 'path',
+            required: true,
+            description: 'ISO 3166-1 alpha-2 country code (case-insensitive)',
+            schema: { type: 'string', pattern: '^[A-Za-z]{2}$', example: 'CH' },
+          },
+        ],
+        responses: {
+          '200': {
+            description: 'IBAN structure template',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  required: ['country', 'iban_length', 'bban_length', 'sepa', 'cost_usdc'],
+                  properties: {
+                    country: {
+                      type: 'object',
+                      properties: {
+                        code: { type: 'string', example: 'CH' },
+                        name: { type: 'string', example: 'Switzerland' },
+                      },
+                    },
+                    iban_length: { type: 'integer', example: 21 },
+                    bban_length: { type: 'integer', example: 17 },
+                    bban: {
+                      type: 'object',
+                      nullable: true,
+                      description: 'BBAN field positions, 0-indexed within the BBAN. null when no structure is declared for the country. charset uses SWIFT registry notation (n=digits, a=uppercase letters, c=alphanumeric, e.g. "5!n").',
+                      properties: {
+                        bank_code: {
+                          type: 'object',
+                          properties: { start: { type: 'integer' }, length: { type: 'integer' }, charset: { type: 'string', nullable: true } },
+                        },
+                        branch_code: {
+                          type: 'object',
+                          properties: { start: { type: 'integer' }, length: { type: 'integer' }, charset: { type: 'string', nullable: true } },
+                        },
+                        account_number: {
+                          type: 'object',
+                          properties: { start: { type: 'integer' }, length: { type: 'integer' }, charset: { type: 'string', nullable: true } },
+                        },
+                      },
+                    },
+                    bban_pattern: {
+                      type: 'string',
+                      nullable: true,
+                      description: 'Full BBAN pattern in SWIFT IBAN Registry notation (e.g. "5!n12!c") — what /v1/iban/validate enforces structurally on top of length + mod-97.',
+                      example: '5!n12!c',
+                    },
+                    sepa: {
+                      type: 'object',
+                      properties: {
+                        member: { type: 'boolean' },
+                        schemes: { type: 'array', items: { type: 'string', enum: ['SCT', 'SDD', 'SCT_INST'] } },
+                        vop_required: { type: 'boolean' },
+                      },
+                    },
+                    example_iban: { type: 'string', nullable: true, example: 'CH9300762011623852957' },
+                    notes: { type: 'string' },
+                    upgrade_hint: { type: 'string' },
+                    cost_usdc: { type: 'number', example: 0 },
+                  },
+                },
+              },
+            },
+          },
+          '400': { description: 'Invalid country code (must be 2 letters), or literal {country} placeholder sent unsubstituted' },
+          '404': { description: 'Country not covered — see GET /v1/iban/structure for the full list' },
+        },
+      },
+    },
     '/v1/keys/generate': {
       post: {
         operationId: 'generateApiKey',
@@ -271,6 +441,103 @@ const spec = {
         responses: {
           '200': { description: 'Usage statistics for the current month' },
           '401': { description: 'Missing or invalid API key' },
+        },
+      },
+    },
+    '/v1/credits/bundles': {
+      get: {
+        operationId: 'listCreditBundles',
+        summary: 'List prepaid credit bundles (free)',
+        description:
+          'Lists the available prepaid credit bundles with prices. Buy a bundle once via x402 (POST /v1/credits/buy/{bundle}) and receive an API key preloaded with N calls — credits never expire. Card checkout is also available at https://ibanforge.com/pricing.',
+        tags: ['Credits'],
+        responses: {
+          '200': {
+            description: 'Available bundles',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  required: ['bundles'],
+                  properties: {
+                    bundles: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          slug: { type: 'string', enum: ['1k', '5k', '25k'] },
+                          credits: { type: 'integer', example: 1000 },
+                          price_usdc: { type: 'number', example: 5 },
+                          price_per_call_usdc: { type: 'number', example: 0.005 },
+                          buy_endpoint: { type: 'string', example: 'POST /v1/credits/buy/1k' },
+                        },
+                      },
+                    },
+                    payment_method: { type: 'string', example: 'x402 USDC on Base mainnet' },
+                    documentation: { type: 'string' },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    '/v1/credits/buy/{bundle}': {
+      post: {
+        operationId: 'buyCreditBundle',
+        summary: 'Buy a prepaid credit bundle (x402, USDC)',
+        description:
+          'Pay once via x402 (USDC on Base) and receive a fresh API key preloaded with the bundle credits. Bundles: 1k = $5, 5k = $20, 25k = $80. Credits never expire. Optionally pass {"email": "..."} in the body to attach the key to an email — anonymous keys are fully functional too. Check the balance with GET /v1/credits/balance.',
+        tags: ['Credits'],
+        security: [{ x402Payment: [] }],
+        parameters: [
+          {
+            name: 'bundle',
+            in: 'path',
+            required: true,
+            description: 'Bundle slug',
+            schema: { type: 'string', enum: ['1k', '5k', '25k'], example: '1k' },
+          },
+        ],
+        requestBody: {
+          required: false,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  email: { type: 'string', format: 'email', description: 'Optional — attach the key to an email address' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '201': {
+            description: 'Credit key minted (shown only once — save it)',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  required: ['api_key', 'credits', 'bundle'],
+                  properties: {
+                    api_key: { type: 'string', description: 'Full API key — shown only once' },
+                    key_prefix: { type: 'string' },
+                    credits: { type: 'integer', example: 1000 },
+                    bundle: { type: 'string', example: '1k' },
+                    price_paid_usdc: { type: 'number', example: 5 },
+                    price_per_call_usdc: { type: 'number', example: 0.005 },
+                    usage_hint: { type: 'string' },
+                    balance_endpoint: { type: 'string', example: 'GET /v1/credits/balance' },
+                    message: { type: 'string' },
+                  },
+                },
+              },
+            },
+          },
+          '402': { description: 'Payment required (x402) — bundle price in USDC' },
+          '404': { description: 'Unknown bundle slug — choose 1k, 5k or 25k' },
         },
       },
     },
@@ -383,6 +650,41 @@ const spec = {
               },
             },
           },
+        },
+      },
+    },
+    '/mcp': {
+      post: {
+        operationId: 'mcpStreamableHttp',
+        summary: 'MCP endpoint for AI agents (Streamable HTTP)',
+        description:
+          'Model Context Protocol endpoint — Streamable HTTP transport, JSON-RPC 2.0 over POST. Exposes the same capabilities as this REST API as 5 MCP tools: validate_iban, batch_validate_iban, lookup_bic, check_compliance, lookup_ch_clearing. Flow: POST an `initialize` request, then `tools/list` and `tools/call` (include the returned Mcp-Session-Id header on follow-up calls). Also available as a stdio server via `npx -y ibanforge-mcp`. This path speaks MCP, not the REST conventions documented elsewhere in this spec.',
+        tags: ['MCP'],
+        externalDocs: {
+          description: 'MCP setup guide (Claude Desktop, Cursor, HTTP transport)',
+          url: 'https://ibanforge.com/docs/mcp',
+        },
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                description: 'JSON-RPC 2.0 request (initialize, tools/list, tools/call, ...) per the MCP specification',
+                required: ['jsonrpc', 'method'],
+                properties: {
+                  jsonrpc: { type: 'string', enum: ['2.0'] },
+                  id: { oneOf: [{ type: 'string' }, { type: 'integer' }] },
+                  method: { type: 'string', example: 'tools/list' },
+                  params: { type: 'object' },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': { description: 'JSON-RPC 2.0 response (application/json or text/event-stream, depending on Accept header)' },
+          '400': { description: 'Malformed JSON-RPC request' },
         },
       },
     },
@@ -522,6 +824,43 @@ const spec = {
           },
         },
       },
+      IBANFormatResult: {
+        type: 'object',
+        required: ['iban', 'valid', 'upgrade_to_full_validation'],
+        properties: {
+          iban: { type: 'string', description: 'The IBAN as provided (normalized)', example: 'CH1000230000000012345' },
+          valid: { type: 'boolean', description: 'mod-97 checksum + country structure result' },
+          formatted: { type: 'string', description: 'IBAN formatted in groups of 4 (only when valid)', example: 'CH10 0023 0000 0000 1234 5' },
+          country: {
+            type: 'object',
+            description: 'Only present when valid',
+            properties: {
+              code: { type: 'string', example: 'CH' },
+              name: { type: 'string', example: 'Switzerland' },
+            },
+          },
+          check_digits: { type: 'string', example: '10' },
+          bban: {
+            type: 'object',
+            description: 'Parsed BBAN components (only when valid and the country declares a structure)',
+            properties: {
+              bank_code: { type: 'string', example: '00230' },
+              branch_code: { type: 'string' },
+              account_number: { type: 'string', example: '000000012345' },
+            },
+          },
+          error: {
+            type: 'string',
+            description: 'Only when valid=false',
+            enum: ['invalid_format', 'unsupported_country', 'wrong_length', 'checksum_failed'],
+          },
+          error_detail: { type: 'string', description: 'Only when valid=false' },
+          upgrade_to_full_validation: {
+            type: 'string',
+            description: 'Pointer to POST /v1/iban/validate for BIC, SEPA, VoP, sanctions and Swiss clearing enrichment',
+          },
+        },
+      },
       BICLookupResult: {
         type: 'object',
         required: ['bic', 'bic8', 'bic11', 'found', 'valid_format', 'institution', 'country', 'city', 'branch_code', 'branch_info', 'lei', 'lei_status', 'is_test_bic', 'source', 'cost_usdc'],
@@ -541,6 +880,24 @@ const spec = {
             },
           },
           city: { type: 'string', nullable: true },
+          address: {
+            type: 'object',
+            description: 'Registered head-office address (present when available — GLEIF or directory sourced)',
+            properties: {
+              type: { type: 'string', example: 'registered' },
+              street: { type: 'string', nullable: true, example: 'Bahnhofstrasse 45' },
+              post_code: { type: 'string', nullable: true, example: '8001' },
+              region: { type: 'string', nullable: true, example: 'CH-ZH' },
+              city: { type: 'string', nullable: true, example: 'Zurich' },
+              country: { type: 'string', example: 'CH' },
+              romanized: { type: 'string', nullable: true },
+              romanization: { type: 'string', example: 'original_latin' },
+              source: { type: 'string', example: 'GLEIF' },
+              language: { type: 'string', example: 'en' },
+              as_of: { type: 'string', format: 'date' },
+            },
+          },
+          address_available: { type: 'boolean' },
           branch_code: { type: 'string', example: 'XXX' },
           branch_info: { type: 'string', nullable: true },
           lei: { type: 'string', nullable: true },
@@ -595,7 +952,7 @@ const spec = {
             type: 'object',
             properties: {
               name: { type: 'string', example: 'UBS Switzerland AG' },
-              type: { type: 'string', enum: ['bank', 'raiffeisen', 'cantonal_bank', 'private_bank', 'foreign_bank', 'securities_dealer', 'finance_company', 'postfinance', 'snb', 'other'] },
+              type: { type: 'string', enum: ['bank', 'cantonal_bank', 'postfinance', 'raiffeisen', 'central_bank', 'foreign_participant'] },
               iid_type: { type: 'string', enum: ['headquarters', 'branch', 'other'] },
               headquarters_iid: { type: 'string', nullable: true },
             },
@@ -634,9 +991,13 @@ const spec = {
         required: ['status', 'version', 'uptime_seconds', 'bic_database_entries'],
         properties: {
           status: { type: 'string', enum: ['ok'] },
-          version: { type: 'string', example: '1.0.0' },
+          version: { type: 'string', example: PKG_VERSION },
           uptime_seconds: { type: 'number' },
-          bic_database_entries: { type: 'integer', description: 'Number of BIC entries in the database', example: 121399 },
+          bic_database_entries: {
+            type: 'integer',
+            description: 'Number of BIC entries currently loaded (refreshed monthly from public sources)',
+            example: getEntryCount(),
+          },
           bic_data_last_updated: { type: 'string', description: 'Last update timestamp of BIC data' },
         },
       },
@@ -715,12 +1076,17 @@ const spec = {
     { name: 'Compliance', description: 'Compliance check endpoint — IBAN validation + sanctions + SEPA + VoP + risk score (paid via x402)' },
     { name: 'Swiss Clearing', description: 'Swiss BC-Nummer / IID clearing lookup (paid via x402)' },
     { name: 'API Keys', description: 'API key management — generate free keys and check usage' },
+    { name: 'Credits', description: 'Prepaid credit bundles — pay once in USDC (x402), get an API key with N calls' },
+    { name: 'MCP', description: 'Model Context Protocol endpoint for AI agents (Streamable HTTP)' },
     { name: 'Free', description: 'Free endpoints — no payment required' },
   ],
-};
+});
+
+let specCache: ReturnType<typeof buildSpec> | null = null;
 
 openapi.get('/openapi.json', (c) => {
-  return c.json(spec);
+  if (!specCache) specCache = buildSpec();
+  return c.json(specCache);
 });
 
 export { openapi };

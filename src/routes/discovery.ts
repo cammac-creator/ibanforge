@@ -45,7 +45,7 @@ const PAID_ENDPOINTS: PricedEndpoint[] = [
     method: 'GET',
     path: '/v1/ch/clearing/:iid',
     price_usdc: 0.003,
-    description: 'Swiss BC-Nummer / IID clearing lookup with SIC, euroSIC, Instant Payments and QR-IID data (1,190 SIX entries)',
+    description: 'Swiss BC-Nummer / IID clearing lookup with SIC, euroSIC, Instant Payments and QR-IID data (~1,200 SIX entries, refreshed monthly)',
   },
 ];
 
@@ -79,7 +79,7 @@ discovery.get('/.well-known/x402', (c) => {
     x402Version: 1,
     name: 'IBANforge',
     description:
-      'IBAN validation, BIC/SWIFT lookup, Swiss clearing & compliance API. 121,399 BIC entries (38,761 LEI-enriched via GLEIF), 1,190 Swiss BC-Nummer from SIX, 89 countries, 85 EMI/vIBAN issuer classifications.',
+      'IBAN validation, BIC/SWIFT lookup, Swiss clearing & compliance API. 121k+ BIC entries (38k+ LEI-enriched via GLEIF), ~1,200 Swiss BC-Nummer from SIX, 89 countries, 85 EMI/vIBAN issuer classifications, refreshed monthly.',
     homepage: 'https://ibanforge.com',
     documentation: 'https://ibanforge.com/docs',
     pricing: 'https://ibanforge.com/pricing',

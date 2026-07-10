@@ -95,6 +95,25 @@ export function getEntryCount(): number {
   return (getBicDB().prepare('SELECT COUNT(*) as cnt FROM bic_entries').get() as { cnt: number }).cnt;
 }
 
+/**
+ * Number of Swiss clearing (BC-Nummer / IID) entries currently loaded.
+ * Lives here rather than in ch-clearing.ts because it reads the same
+ * bic.sqlite database and is only used for truthful self-description
+ * surfaces (llms.txt, discovery) — not for lookups.
+ */
+export function getChClearingCount(): number {
+  return (getBicDB().prepare('SELECT COUNT(*) as cnt FROM ch_clearing').get() as { cnt: number }).cnt;
+}
+
+/** Number of BIC entries carrying an LEI (GLEIF-enriched). Same self-description purpose. */
+export function getLeiEnrichedCount(): number {
+  return (
+    getBicDB().prepare("SELECT COUNT(*) as cnt FROM bic_entries WHERE lei IS NOT NULL AND lei != ''").get() as {
+      cnt: number;
+    }
+  ).cnt;
+}
+
 export function getLastUpdated(): string | null {
   const row = getBicDB().prepare('SELECT MAX(updated_at) as last_updated FROM bic_entries').get() as { last_updated: string | null };
   return row.last_updated;

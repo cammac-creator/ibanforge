@@ -227,7 +227,7 @@ landing.get('/', (c) => {
       <p class="hero-sub"><strong>One API for developers &amp; AI agents.</strong></p>
       <p class="hero-features">Compliance-grade validation &middot; Sanctions screening &middot; SEPA &amp; VoP coverage &middot; 89 countries</p>
       <div class="hero-moat">
-        <strong>The only API</strong> with Swiss <strong>BC-Nummer</strong> &amp; <strong>QR-IID</strong> lookup &mdash; 1,190 entries from SIX BankMaster, with SIC/euroSIC/Instant Payments participation included.
+        <strong>The deepest Swiss clearing data in any public API</strong> &mdash; every <strong>BC-Nummer</strong> from SIX BankMaster with full payment-rail participation (SIC, euroSIC, CHF Instant Payments) and <strong>QR-IID</strong> coverage.
       </div>
       <div class="hero-ctas">
         <a href="#tryit" class="cta cta-primary">Try it free &darr;</a>

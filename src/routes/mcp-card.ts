@@ -10,7 +10,7 @@ const pkg = require('../../package.json') as { version: string };
 const MCP_SERVER_CARD = {
   name: 'IBANforge',
   description:
-    'IBAN validation, BIC/SWIFT lookup, Swiss clearing, SEPA compliance and risk scoring API for AI agents. 121,399 BIC entries (38,761 LEI-enriched via GLEIF), 1,190 Swiss BC-Nummer from SIX, 89 countries.',
+    'IBAN validation, BIC/SWIFT lookup, Swiss clearing, SEPA compliance and risk scoring API for AI agents. 121k+ BIC entries (38k+ LEI-enriched via GLEIF), ~1,200 Swiss BC-Nummer from SIX, 89 countries, refreshed monthly.',
   url: 'https://api.ibanforge.com/mcp',
   transport: 'streamable-http',
   version: pkg.version,
@@ -28,7 +28,7 @@ const MCP_SERVER_CARD = {
     {
       name: 'lookup_bic',
       description:
-        'Resolve a BIC/SWIFT code (8 or 11 chars) into the underlying bank. Use only when the user already has a BIC — for IBAN inputs, prefer validate_iban which resolves the BIC automatically. Backed by 121,399 BIC entries (38,761 LEI-enriched via GLEIF). Cost: $0.003.',
+        'Resolve a BIC/SWIFT code (8 or 11 chars) into the underlying bank. Use only when the user already has a BIC — for IBAN inputs, prefer validate_iban which resolves the BIC automatically. Backed by 121k+ BIC entries (38k+ LEI-enriched via GLEIF, refreshed monthly). Cost: $0.003.',
     },
     {
       name: 'check_compliance',
@@ -38,7 +38,7 @@ const MCP_SERVER_CARD = {
     {
       name: 'lookup_ch_clearing',
       description:
-        'Resolve a Swiss BC-Nummer / IID (1-5 digits) into institution name, type, SIC, euroSIC, QR-IID. The only API that exposes this data — alternatives do not cover it. Backed by 1,190 SIX BankMaster entries. Cost: $0.003. Only relevant for CH/LI accounts.',
+        'Resolve a Swiss BC-Nummer / IID (1-5 digits) into institution name, type, address, BIC and the full payment-rail participation (SIC, RTGS CHF, Instant Payments CHF, euroSIC, LSV+/BDD) plus QR-IID — the deepest Swiss clearing data in any public API. Backed by ~1,200 SIX BankMaster entries (refreshed monthly). Cost: $0.003. Only relevant for CH/LI accounts.',
     },
   ],
   homepage: 'https://ibanforge.com',
