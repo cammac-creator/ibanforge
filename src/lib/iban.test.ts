@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { validateIBAN } from './iban.js';
+import { IBAN_LENGTHS, BBAN_SPECS, BBAN_STRUCTURE, EXAMPLE_IBANS } from './countries.js';
 
 describe('IBAN Validation', () => {
   describe('Valid IBANs', () => {
@@ -199,10 +200,13 @@ describe('IBAN Validation', () => {
     });
 
     it('validates an IBAN from a newly-synced registry country (YE)', () => {
-      const r = validateIBAN('YE9600010002123456789012345678');
+      // Official registry sample — YE bank codes are 4!a (the previous test
+      // IBAN 'YE96 0001 0002…' had a numeric bank code, which the registry
+      // pattern rightly rejects).
+      const r = validateIBAN('YE15CBYE0001018861234567891234');
       expect(r.valid).toBe(true);
       expect(r.country?.code).toBe('YE');
-      expect(r.bban?.bank_code).toBe('0001');
+      expect(r.bban?.bank_code).toBe('CBYE');
     });
 
     it('validates an IBAN from a newly-synced registry country (OM)', () => {
@@ -211,4 +215,116 @@ describe('IBAN Validation', () => {
       expect(r.country?.code).toBe('OM');
     });
   });
+
+  // -------------------------------------------------------------------------
+  // Registry conformance suite (2026-07-10 audit): the SWIFT IBAN Registry
+  // publishes one official sample IBAN per country. Every one of the 89 MUST
+  // validate — if a sample fails, the BBAN_SPECS pattern is wrong, not the
+  // sample (anti-over-rejection guard).
+  // -------------------------------------------------------------------------
+  describe('SWIFT registry conformance — all 89 official samples validate', () => {
+    it('covers exactly the supported country set', () => {
+      expect(Object.keys(EXAMPLE_IBANS).sort()).toEqual(Object.keys(IBAN_LENGTHS).sort());
+      expect(Object.keys(BBAN_SPECS).sort()).toEqual(Object.keys(IBAN_LENGTHS).sort());
+    });
+
+    it('every BBAN spec length matches the country IBAN length', () => {
+      for (const [cc, spec] of Object.entries(BBAN_SPECS)) {
+        let len = 0;
+        for (const m of spec.matchAll(/(\d+)!([nac])/g)) len += parseInt(m[1], 10);
+        expect(len, `${cc}: BBAN spec '${spec}' length`).toBe(IBAN_LENGTHS[cc] - 4);
+      }
+    });
+
+    it.each(Object.entries(EXAMPLE_IBANS))('%s official sample %s validates', (cc, iban) => {
+      const r = validateIBAN(iban);
+      expect(r.valid, `${cc} ${iban}: ${r.error} ${r.error_detail ?? ''}`).toBe(true);
+      expect(r.country?.code).toBe(cc);
+      // Full-coverage guarantee: bank_code must decompose for every country
+      // (47 countries used to return an empty bank_code and lost all
+      // BIC/issuer/risk enrichment).
+      expect(r.bban?.bank_code, `${cc}: bank_code`).not.toBe('');
+      expect(r.bban?.bank_code.length).toBe(BBAN_STRUCTURE[cc].bankCode[1]);
+    });
+  });
+
+  describe('BBAN structure rejection (targeted negatives)', () => {
+    it('rejects letters inside an all-numeric bank code (DE) even when mod-97 passes', () => {
+      const r = validateIBAN('DE17ABCDEFGH1234567890');
+      expect(r.valid).toBe(false);
+      expect(r.error).toBe('invalid_bban_structure');
+      expect(r.error_detail).toContain('bank code must be 8 digits');
+      expect(r.error_detail).toContain('8!n10!n');
+    });
+
+    it('rejects digits inside a letters-only bank code (GB)', () => {
+      // GB bank code is 4!a; craft a mod-97-passing IBAN with digits there.
+      // GB29NWBK… with bank '1WBK' → recompute check digits.
+      const bban = '1WBK60161331926819';
+      const candidate = findValidCheckDigits('GB', bban);
+      const r = validateIBAN(candidate);
+      expect(r.valid).toBe(false);
+      expect(r.error).toBe('invalid_bban_structure');
+      expect(r.error_detail).toContain('bank code must be 4 uppercase letters');
+    });
+
+    it('rejects a letter inside a numeric account segment (CH)', () => {
+      // CH BBAN is 5!n12!c — put a letter inside the 5!n bank code.
+      const bban = '0A835012345678009';
+      const candidate = findValidCheckDigits('CH', bban);
+      const r = validateIBAN(candidate);
+      expect(r.valid).toBe(false);
+      expect(r.error).toBe('invalid_bban_structure');
+      expect(r.error_detail).toContain('bank code must be 5 digits');
+    });
+
+    it('names the offending position and field in the detail', () => {
+      const r = validateIBAN('DE17ABCDEFGH1234567890');
+      expect(r.error_detail).toMatch(/found 'A' at BBAN position 1/);
+    });
+  });
+
+  describe('Check digits — ISO 13616 range (02–98)', () => {
+    it('rejects check digits 99 even when mod-97 passes (CH99…)', () => {
+      const r = validateIBAN('CH9900762000000000051');
+      expect(r.valid).toBe(false);
+      expect(r.error).toBe('invalid_check_digits');
+      expect(r.error_detail).toContain('02–98');
+    });
+
+    it('rejects check digits 00 and 01', () => {
+      // Structure-valid BBANs; the CD range must reject before mod-97 runs.
+      for (const cd of ['00', '01']) {
+        const r = validateIBAN(`CH${cd}00762011623852957`);
+        expect(r.valid).toBe(false);
+        expect(r.error).toBe('invalid_check_digits');
+      }
+    });
+
+    it('rejects non-numeric check digits explicitly', () => {
+      const r = validateIBAN('CHAB00762011623852957');
+      expect(r.valid).toBe(false);
+      expect(r.error).toBe('invalid_check_digits');
+    });
+  });
 });
+
+/**
+ * Find the (unique) valid ISO 13616 check digits for a country+BBAN and return
+ * the full IBAN — lets negative tests craft mod-97-passing IBANs so they prove
+ * the STRUCTURE check rejects them (not the checksum).
+ */
+function findValidCheckDigits(cc: string, bban: string): string {
+  for (let cd = 2; cd <= 98; cd++) {
+    const cdStr = String(cd).padStart(2, '0');
+    const candidate = cc + cdStr + bban;
+    const rearranged = candidate.slice(4) + candidate.slice(0, 4);
+    let num = '';
+    for (const ch of rearranged) {
+      const code = ch.charCodeAt(0);
+      num += code >= 65 && code <= 90 ? String(code - 55) : ch;
+    }
+    if (BigInt(num) % 97n === 1n) return candidate;
+  }
+  throw new Error(`No valid check digits for ${cc}${bban}`);
+}

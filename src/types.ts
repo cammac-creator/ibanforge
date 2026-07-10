@@ -69,7 +69,7 @@ export interface IBANValidationResult {
   };
   clearing?: ChClearingSummary | null;
   formatted?: string;
-  error?: 'invalid_format' | 'unsupported_country' | 'wrong_length' | 'checksum_failed';
+  error?: 'invalid_format' | 'unsupported_country' | 'wrong_length' | 'checksum_failed' | 'invalid_check_digits' | 'invalid_bban_structure';
   error_detail?: string;
   cost_usdc: number;
   processing_ms?: number;

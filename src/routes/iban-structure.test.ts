@@ -63,13 +63,23 @@ describe('GET /v1/iban/structure/:country', () => {
     expect(body.error).toBe('unsupported_country');
   });
 
-  it('handles country with no declared BBAN structure (returns null bban)', async () => {
-    // BG is in IBAN_LENGTHS but not in BBAN_STRUCTURE.
+  it('BG (previously structure-less) now exposes bban fields with charsets', async () => {
+    // BG was in IBAN_LENGTHS but not in BBAN_STRUCTURE until the 2026-07-10
+    // full-coverage sync; it must now decompose with SWIFT charsets.
     const res = await makeApp().request('/v1/iban/structure/BG');
     expect(res.status).toBe(200);
-    const body = await res.json() as { bban: unknown; iban_length: number };
-    expect(body.bban).toBeNull();
+    const body = await res.json() as {
+      bban: { bank_code: { charset: string }; branch_code: { charset: string }; account_number: { charset: string } };
+      bban_pattern: string;
+      iban_length: number;
+      example_iban: string | null;
+    };
     expect(body.iban_length).toBe(22);
+    expect(body.bban_pattern).toBe('4!a4!n2!n8!c');
+    expect(body.bban.bank_code.charset).toBe('4!a');
+    expect(body.bban.branch_code.charset).toBe('4!n');
+    expect(body.bban.account_number.charset).toBe('2!n8!c');
+    expect(body.example_iban).toBe('BG80BNBG96611020345678');
   });
 
   it('non-SEPA country (BR) reports member=false', async () => {
