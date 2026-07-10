@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import type { HonoEnv } from '../types.js';
 import { validateIBAN } from '../lib/iban.js';
+import { getCountryRisk } from '../lib/countries.js';
 import { enrichResult } from '../lib/enrich.js';
 import { buildComplianceResult } from '../lib/compliance.js';
 import { getComplianceMeta } from '../lib/compliance-db.js';
@@ -31,7 +32,11 @@ ibanCompliance.post('/v1/iban/compliance', async (c) => {
   const countryCode = result.country?.code ?? '';
   const bic8 = result.bic?.code?.slice(0, 8) ?? null;
   const issuerType = result.issuer?.type ?? 'bank';
-  const countryRisk = result.risk_indicators?.country_risk ?? 'standard';
+  // Country risk comes straight from the country code — NEVER from
+  // risk_indicators, which only exists when BBAN parsing/enrichment succeeded.
+  // (Countries without a BBAN_STRUCTURE used to silently fall back to
+  // 'standard' here: RU scored 60/high instead of ≥80/critical.)
+  const countryRisk = countryCode ? getCountryRisk(countryCode) : 'standard';
   const isTestBic = result.risk_indicators?.test_bic ?? false;
 
   let compliance: ComplianceResult;

@@ -58,6 +58,10 @@ export function calculateRiskScore(
   if (sanctions.bank_sanctioned) { score += 50; flags.push('sanctioned_bank'); }
   if (sanctions.fatf_status === 'black_list') { score += 30; flags.push('fatf_black_list'); }
   if (sanctions.fatf_status === 'grey_list') { score += 20; flags.push('fatf_grey_list'); }
+  // A SUSPENDED membership (RU since Feb 2023) is a disciplinary signal, not
+  // mere non-membership — weight it (and flag it) so it scores at least as
+  // severely as non_member (which carries 0, see note below).
+  if (sanctions.fatf_status === 'suspended') { score += 10; flags.push('fatf_suspended'); }
   // NOTE: there is intentionally NO weight for fatf_status === 'non_member'.
   // FATF has ~40 members; non-membership says nothing about AML risk (most
   // SEPA countries — PL, CZ, MT, HR… — are not FATF members yet are low-risk).

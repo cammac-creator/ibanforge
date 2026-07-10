@@ -216,7 +216,7 @@ export interface SanctionsCheck {
   country_sanctioned: boolean;
   bank_sanctioned: boolean;
   matched_lists: string[];
-  fatf_status: 'member' | 'grey_list' | 'black_list' | 'non_member';
+  fatf_status: 'member' | 'suspended' | 'grey_list' | 'black_list' | 'non_member';
 }
 
 export interface ReachabilityCheck {
