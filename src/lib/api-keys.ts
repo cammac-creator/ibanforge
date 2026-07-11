@@ -137,7 +137,7 @@ export function deactivateBySubscription(stripeSubscriptionId: string): string |
     .prepare('SELECT key_prefix FROM api_keys WHERE stripe_subscription_id = ? AND active = 1')
     .get(stripeSubscriptionId) as { key_prefix: string } | undefined;
   if (!row) return null;
-  db.prepare('UPDATE api_keys SET active = 0 WHERE stripe_subscription_id = ?').run(stripeSubscriptionId);
+  db.prepare("UPDATE api_keys SET active = 0, deactivated_at = datetime('now') WHERE stripe_subscription_id = ?").run(stripeSubscriptionId);
   return row.key_prefix;
 }
 
@@ -193,7 +193,7 @@ export function revokeApiKey(key: string): boolean {
   if (!key.startsWith(KEY_PREFIX)) return false;
   const keyHash = hashKey(key);
   const result = getStatsDB()
-    .prepare('UPDATE api_keys SET active = 0 WHERE key_hash = ? AND active = 1')
+    .prepare("UPDATE api_keys SET active = 0, deactivated_at = datetime('now') WHERE key_hash = ? AND active = 1")
     .run(keyHash);
   return result.changes > 0;
 }
@@ -226,7 +226,7 @@ export function rotateApiKey(
     db.prepare(
       'INSERT INTO api_keys (key_hash, key_prefix, email, monthly_limit, credits_remaining, credits_total) VALUES (?, ?, ?, ?, ?, ?)',
     ).run(newHash, keyPrefix, row.email, row.monthly_limit, row.credits_remaining, row.credits_total);
-    db.prepare('UPDATE api_keys SET active = 0 WHERE key_hash = ?').run(oldHash);
+    db.prepare("UPDATE api_keys SET active = 0, deactivated_at = datetime('now') WHERE key_hash = ?").run(oldHash);
   });
   tx();
 
