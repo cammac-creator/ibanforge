@@ -247,7 +247,7 @@
         "packs": "Ou prépayez {credits} crédits pour {price} — sans expiration (−{percent} vs paiement à l’appel).",
         "packsEven": "Ou prépayez {credits} crédits pour {price} — même prix, et ils n’expirent jamais."
       },
-      "callsHeader": "Appels / mois"
+      "callsHeader": "Volume / mois"
     },
     "x402": {
       "badge": "Protocole x402",
@@ -277,7 +277,7 @@
       },
       "2": {
         "question": "Existe-t-il une offre gratuite ?",
-        "answer": "Oui ! Générez une clé API gratuite via POST /v1/keys/generate avec votre email. Obtenez 200 requêtes/mois sur tous les endpoints. Aucune carte bancaire, aucun portefeuille crypto requis. Pour des volumes plus élevés, achetez un pack de crédits prépayé par carte — ou payez à l’appel en USDC via x402."
+        "answer": "Oui ! Générez une clé API gratuite via POST /v1/keys/generate avec votre email. Obtenez 200 requêtes/mois sur tous les endpoints — la validation par lot compte 1 requête par IBAN. Aucune carte bancaire, aucun portefeuille crypto requis. Pour des volumes plus élevés, achetez un pack de crédits prépayé par carte — ou payez à l’appel en USDC via x402."
       },
       "3": {
         "question": "Et pour les gros volumes ?",
@@ -309,7 +309,7 @@
       "packs": {
         "tag": "Packs de crédits",
         "title": "Crédits prépayés",
-        "body": "Achat en volume, sans expiration : 1k = 5 $, 5k = 20 $, 25k = 80 $ (jusqu’à 0,0032 $/appel). Un crédit = un appel API, quel que soit l’endpoint.",
+        "body": "Achat en volume, sans expiration : 1k = 5 $, 5k = 20 $, 25k = 80 $ (jusqu’à 0,0032 $/crédit). Un crédit = une validation ou un lookup — un lot de N IBANs consomme N crédits.",
         "note": "Paiement Stripe — clé API livrée par email. Les agents peuvent acheter en USDC : POST /v1/credits/buy/1k|5k|25k.",
         "cardLabel": "Payer par carte"
       }

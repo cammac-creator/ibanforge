@@ -9,19 +9,17 @@ interface EndpointDef {
   path: string
   /** Real x402 per-call price in USD (mirror of the live 402 quotes). */
   cost: number
-  /**
-   * Billing units per HTTP request. Batch is priced per IBAN but one request
-   * carries up to 100 IBANs — and one request consumes one prepaid credit.
-   */
-  unitsPerRequest: number
 }
 
+// Volumes are counted in billing units: 1 per validation or lookup. The batch
+// line is entered in IBANs and bills 1 credit / quota request per IBAN — the
+// same rule the API enforces (a batch of 50 = 50 units, not 1).
 const ENDPOINTS: readonly EndpointDef[] = [
-  { key: "validate", path: "/v1/iban/validate", cost: 0.005, unitsPerRequest: 1 },
-  { key: "batch", path: "/v1/iban/batch", cost: 0.002, unitsPerRequest: 100 },
-  { key: "bic", path: "/v1/bic/:code", cost: 0.003, unitsPerRequest: 1 },
-  { key: "chClearing", path: "/v1/ch/clearing/:iid", cost: 0.003, unitsPerRequest: 1 },
-  { key: "compliance", path: "/v1/iban/compliance", cost: 0.02, unitsPerRequest: 1 },
+  { key: "validate", path: "/v1/iban/validate", cost: 0.005 },
+  { key: "batch", path: "/v1/iban/batch", cost: 0.002 },
+  { key: "bic", path: "/v1/bic/:code", cost: 0.003 },
+  { key: "chClearing", path: "/v1/ch/clearing/:iid", cost: 0.003 },
+  { key: "compliance", path: "/v1/iban/compliance", cost: 0.02 },
 ]
 
 const FREE_KEY_MONTHLY_REQUESTS = 200
@@ -39,11 +37,11 @@ function formatCost(amount: number): string {
 }
 
 /**
- * Cheapest combination of prepaid packs covering `calls` credits.
+ * Cheapest combination of prepaid packs covering `units` credits.
  * Packs come in 1k/$5, 5k/$20, 25k/$80; at equal price, prefer more credits.
  */
-function packQuote(calls: number): { price: number; credits: number } {
-  const thousands = Math.ceil(calls / 1000)
+function packQuote(units: number): { price: number; credits: number } {
+  const thousands = Math.ceil(units / 1000)
   const big = Math.floor(thousands / 25)
   const rest = thousands % 25
   // Cover the remainder with 5k/1k packs — or one extra 25k when cheaper.
@@ -101,17 +99,15 @@ export function CostCalculator() {
 
   // The big number is the true sum of every line shown above — nothing less.
   const paygTotal = rows.reduce((sum, r) => sum + r.total, 0)
-  const totalRequests = rows.reduce(
-    (sum, r) => sum + Math.ceil(r.volume / r.unitsPerRequest),
-    0
-  )
+  // Credits / free-tier requests needed: 1 per unit, batch included.
+  const totalUnits = rows.reduce((sum, r) => sum + r.volume, 0)
 
-  const pack = packQuote(totalRequests)
+  const pack = packQuote(totalUnits)
   const packSavings = paygTotal > 0 ? Math.round((1 - pack.price / paygTotal) * 100) : 0
-  const showFreeKey = totalRequests > 0 && totalRequests <= FREE_KEY_MONTHLY_REQUESTS
+  const showFreeKey = totalUnits > 0 && totalUnits <= FREE_KEY_MONTHLY_REQUESTS
   // Show the prepaid anchor whenever packs are at least price-equal — the
   // "never expire" upside is real even at parity. Never show a worse price.
-  const showPacks = totalRequests > FREE_KEY_MONTHLY_REQUESTS && pack.price <= paygTotal
+  const showPacks = totalUnits > FREE_KEY_MONTHLY_REQUESTS && pack.price <= paygTotal
 
   return (
     <div

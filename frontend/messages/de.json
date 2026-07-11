@@ -247,7 +247,7 @@
         "packs": "Oder {credits} Credits für {price} vorauszahlen — ohne Ablauf (−{percent} vs. Pay-per-Call).",
         "packsEven": "Oder {credits} Credits für {price} vorauszahlen — gleicher Preis, und sie verfallen nie."
       },
-      "callsHeader": "Aufrufe / Monat"
+      "callsHeader": "Volumen / Monat"
     },
     "x402": {
       "badge": "x402-Protokoll",
@@ -277,7 +277,7 @@
       },
       "2": {
         "question": "Gibt es ein kostenloses Angebot?",
-        "answer": "Ja! Generieren Sie einen kostenlosen API-Schlüssel über POST /v1/keys/generate mit Ihrer E-Mail-Adresse. Erhalten Sie 200 Anfragen/Monat auf allen Endpunkten. Keine Kreditkarte, keine Krypto-Wallet erforderlich. Für höhere Volumen kaufen Sie ein Prepaid-Credit-Pack per Karte — oder zahlen pro Aufruf in USDC via x402."
+        "answer": "Ja! Generieren Sie einen kostenlosen API-Schlüssel über POST /v1/keys/generate mit Ihrer E-Mail-Adresse. Erhalten Sie 200 Anfragen/Monat auf allen Endpunkten — Batch-Validierung zählt 1 Anfrage pro IBAN. Keine Kreditkarte, keine Krypto-Wallet erforderlich. Für höhere Volumen kaufen Sie ein Prepaid-Credit-Pack per Karte — oder zahlen pro Aufruf in USDC via x402."
       },
       "3": {
         "question": "Was ist mit hohen Volumen?",
@@ -309,7 +309,7 @@
       "packs": {
         "tag": "Credit-Packs",
         "title": "Prepaid-Credits",
-        "body": "Im Paket kaufen, ohne Ablauf: 1k = 5 $, 5k = 20 $, 25k = 80 $ (bis 0,0032 $/Aufruf). Ein Credit = ein API-Aufruf, egal welcher Endpoint.",
+        "body": "Im Paket kaufen, ohne Ablauf: 1k = 5 $, 5k = 20 $, 25k = 80 $ (bis 0,0032 $/Credit). Ein Credit = eine Validierung oder ein Lookup — ein Batch mit N IBANs verbraucht N Credits.",
         "note": "Stripe-Checkout — API-Schlüssel per E-Mail. Agenten können in USDC kaufen: POST /v1/credits/buy/1k|5k|25k.",
         "cardLabel": "Mit Karte zahlen"
       }
