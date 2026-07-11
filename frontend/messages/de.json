@@ -317,7 +317,7 @@
     "oem": {
       "label": "Editor / OEM",
       "text": "Sie betten IBANforge in Ihr eigenes Produkt ein? Editor-/OEM-Lizenz mit SLA und EU-Rechnungsstellung — sprechen Sie mit uns.",
-      "cta": "support@ibanforge.com"
+      "cta": "Zur Hersteller-Seite →"
     }
   },
   "playground": {
@@ -892,5 +892,70 @@
     "policyBody": "Die /v1-API ist stabil: Felder werden nur hinzugefügt, innerhalb von v1 nie umbenannt oder entfernt. Breaking Changes erschienen als neuer Major-Pfad (/v2) mit mindestens 6 Monaten Parallelbetrieb, angekündigt hier und per E-Mail an aktive Schlüsselinhaber. Das Projekt folgt Semantic Versioning.",
     "fallback": "Das Changelog konnte gerade nicht geladen werden — lesen Sie es auf",
     "englishOnly": "Das Changelog wird auf Englisch geführt."
+  },
+  "vendors": {
+    "meta": {
+      "title": "Für Softwarehersteller — IBAN-Validierung in Ihr Produkt einbetten",
+      "description": "OEM-Lizenzierung für ERP-, Buchhaltungs- und Lohnsoftware: Registry-grade IBAN-Validierung, die tiefsten Schweizer Clearing-Daten einer öffentlichen API, Compliance-Vorprüfungen und ein unterschriftsreifer DPA. Reduzieren Sie VoP-Fehlschläge vor der Rulebook-v1.1-Frist (20. Sept. 2026)."
+    },
+    "eyebrow": "Für Softwarehersteller",
+    "hero": {
+      "title": "Ihr Produkt verarbeitet IBANs. Wir halten sie sauber.",
+      "description": "ERP, Buchhaltung, Lohn oder Banking-Software: Betten Sie Registry-grade IBAN-Validierung bei der Eingabe ein, damit die Zahlungen Ihrer Kunden nicht mehr im Zahlungsmoment scheitern. Eine REST-API, maschinenlesbare Fehler, keine Kontodaten gespeichert.",
+      "cta": {
+        "contact": "OEM-Lizenz besprechen",
+        "docs": "Zur Dokumentation"
+      }
+    },
+    "vop": {
+      "badge": "Datierte Frist",
+      "title": "VoP-Rulebook v1.1 — 20. September 2026",
+      "body": "Seit Oktober 2025 müssen Banken im Euroraum den Zahlungsempfänger vor einer Überweisung prüfen (Verification of Payee). Zahlungen mit falsch erfassten oder nicht existierenden IBANs scheitern jetzt laut — im schlechtesten Moment. IBANforge ist kein VoP-Dienst (das EPC-Scheme ist regulierten PSPs vorbehalten), aber eine Vorprüfung bei der Eingabe beseitigt an der Quelle, was VoP später ablehnen würde: kaputte Struktur, unbekannte Bank, unerreichbare Rails.",
+      "note": "Der ehrliche Pitch: jetzt vorprüfen, damit VoP nichts abzulehnen hat."
+    },
+    "flow": {
+      "heading": "Wo es in Ihrem Produkt sitzt",
+      "steps": [
+        {
+          "title": "Ihre Software",
+          "body": "Ein Benutzer erfasst eine IBAN — Lieferanten-Onboarding, Lohnstammdaten, Zahlungserfassung."
+        },
+        {
+          "title": "IBANforge-Vorprüfung",
+          "body": "Struktur (Registry mit 89 Ländern), Bank existiert (121k+ BICs), Rails (SEPA / SIC / Instant), Risiko-Flags — ein Aufruf, p99 unter 50 ms."
+        },
+        {
+          "title": "Im Zahlungsmoment",
+          "body": "Weniger VoP-Ablehnungen, weniger manuelle Korrekturen, weniger Support-Tickets mit Ihrem Namen darauf."
+        }
+      ]
+    },
+    "args": {
+      "heading": "Drei Gründe für IBANforge",
+      "items": [
+        {
+          "title": "Schweizer Daten, die sonst niemand anbietet",
+          "body": "~1.200 SIX-BankMaster-Einträge mit SIC / euroSIC / Instant-Teilnahme und QR-IID-Handling, monatlich aktualisiert — plus 121k+ BICs (38k+ LEI-angereichert via GLEIF). Wenn Ihre Benutzer Schweizer Lieferanten bezahlen, ist das der Unterschied.",
+          "link": "Schweizer Clearing-Doku"
+        },
+        {
+          "title": "Compliance-Vorprüfung eingebaut",
+          "body": "Sanktionsprüfung (OFAC / EU / UN), FATF-Listen, SEPA-Erreichbarkeit und VoP-Pflichtdaten, Risikoscore 0–100 — ein Endpunkt zur Triage, bevor eine Zahlung Ihr Produkt verlässt.",
+          "link": "Compliance-Doku"
+        },
+        {
+          "title": "Ein Trust-Pack für Ihren Einkauf",
+          "body": "Unterschriftsreifer DPA, veröffentlichte AGB und Datenschutzerklärung, Live-Statusseite, versioniertes Changelog. IBANs werden nie gespeichert — die Validierung läuft im Speicher, protokolliert werden nur Land + Bank-Präfix.",
+          "link": "Rechtliches & DPA"
+        }
+      ]
+    },
+    "oem": {
+      "eyebrow": "Editor / OEM",
+      "title": "Eine Lizenz, die zu Ihrer Auslieferung passt",
+      "body": "IBANforge in Ihr eigenes Produkt einzubetten, für Ihre eigenen Kunden, braucht mehr als einen Schlüssel mit Zähler: Weitergaberechte, ein schriftliches SLA, EU-Rechnung, ein benannter Support-Kontakt. Das ist der OEM-Vertrag — keine öffentliche Preisliste, ein Gespräch.",
+      "cta": "support@ibanforge.com",
+      "hint": "Eine E-Mail — sagen Sie uns, was Sie ausliefern und an wen."
+    }
   }
 }

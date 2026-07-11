@@ -317,7 +317,7 @@
     "oem": {
       "label": "Editor / OEM",
       "text": "Embedding IBANforge in your own product? Editor / OEM licensing with SLA and EU invoicing — talk to us.",
-      "cta": "support@ibanforge.com"
+      "cta": "See the vendors page →"
     }
   },
   "playground": {
@@ -892,5 +892,70 @@
     "policyBody": "The /v1 API is stable: fields are only added, never renamed or removed within v1. Breaking changes would ship as a new major path (/v2) with at least 6 months of parallel operation, announced here and by email to active key holders. The project follows semantic versioning.",
     "fallback": "The changelog could not be loaded right now — read it on",
     "englishOnly": "The changelog is maintained in English."
+  },
+  "vendors": {
+    "meta": {
+      "title": "For Software Vendors — embed IBAN validation in your product",
+      "description": "OEM licensing for ERP, accounting and payroll vendors: registry-grade IBAN validation, the deepest Swiss clearing data in any public API, compliance pre-checks and a signable DPA. Cut VoP failures before the rulebook v1.1 deadline (20 Sept 2026)."
+    },
+    "eyebrow": "For software vendors",
+    "hero": {
+      "title": "Your product touches IBANs. We keep them clean.",
+      "description": "ERP, accounting, payroll or banking software: embed registry-grade IBAN validation at input time, so your customers' payments stop failing at payment time. One REST API, machine-readable errors, no bank account data stored.",
+      "cta": {
+        "contact": "Talk OEM licensing",
+        "docs": "Read the docs"
+      }
+    },
+    "vop": {
+      "badge": "Dated deadline",
+      "title": "VoP rulebook v1.1 — 20 September 2026",
+      "body": "Since October 2025, euro-area banks must verify payee details before a credit transfer (Verification of Payee). Payments carrying mistyped or non-existent IBANs now fail loudly — at the worst possible moment. IBANforge is not a VoP service (the EPC scheme is reserved to regulated PSPs), but a pre-check at input time removes what VoP would reject later: broken structure, unknown bank, unreachable rails.",
+      "note": "The honest pitch: pre-check now, so VoP has nothing to reject."
+    },
+    "flow": {
+      "heading": "Where it sits in your product",
+      "steps": [
+        {
+          "title": "Your software",
+          "body": "A user types an IBAN — supplier onboarding, payroll master data, payment entry."
+        },
+        {
+          "title": "IBANforge pre-check",
+          "body": "Structure (89-country registry), bank exists (121k+ BICs), rails (SEPA / SIC / instant), risk flags — one call, p99 under 50 ms."
+        },
+        {
+          "title": "At payment time",
+          "body": "Fewer VoP rejections, fewer manual repairs, fewer support tickets with your name on them."
+        }
+      ]
+    },
+    "args": {
+      "heading": "Three reasons vendors pick IBANforge",
+      "items": [
+        {
+          "title": "Swiss data nobody else exposes",
+          "body": "~1,200 SIX BankMaster entries with SIC / euroSIC / instant participation and QR-IID handling, refreshed monthly — plus 121k+ BICs (38k+ LEI-enriched via GLEIF). If your users pay Swiss suppliers, this is the difference.",
+          "link": "Swiss clearing docs"
+        },
+        {
+          "title": "Compliance pre-check built in",
+          "body": "Sanctions screening (OFAC / EU / UN), FATF lists, SEPA reachability and VoP-requirement data, risk score 0–100 — one endpoint to triage before a payment leaves your product.",
+          "link": "Compliance docs"
+        },
+        {
+          "title": "A trust pack you can send to procurement",
+          "body": "Signable DPA, published terms and privacy policy, live status page, versioned changelog. IBANs are never stored — validation runs in memory and only country + bank-prefix metadata is logged.",
+          "link": "Legal & DPA"
+        }
+      ]
+    },
+    "oem": {
+      "eyebrow": "Editor / OEM",
+      "title": "Licensing that matches how you ship",
+      "body": "Embedding IBANforge inside your own product, for your own customers, takes more than a metered key: redistribution rights, a written SLA, EU invoicing, a named support contact. That is the OEM agreement — no public price list, one conversation.",
+      "cta": "support@ibanforge.com",
+      "hint": "One email — tell us what you ship and to whom."
+    }
   }
 }
