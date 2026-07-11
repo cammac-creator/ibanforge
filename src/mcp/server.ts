@@ -100,7 +100,7 @@ Returns: Array of objects, each identical in structure to the validate_iban resp
 
 Example: input ['DE89370400440532013000', 'INVALID123'] → [{ valid: true, ... }, { valid: false, error: 'Invalid checksum' }]
 
-Cost: $0.002 USDC per IBAN (e.g., 10 IBANs = $0.020, 50 IBANs = $0.100, 100 IBANs = $0.200).`,
+Cost: $0.002 USDC per IBAN via x402 (e.g., 10 IBANs = $0.020, 50 IBANs = $0.100, 100 IBANs = $0.200). With an API key, a batch debits 1 quota request / 1 prepaid credit per IBAN.`,
     inputSchema: {
       ibans: z
         .array(z.string().trim().min(5).max(42))

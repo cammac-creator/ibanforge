@@ -9,9 +9,9 @@ import { sendApiKeyEmail, isEmailConfigured } from '../lib/email.js';
 // Pricing keeps a fair per-call rate (cheaper than retail x402) so agents
 // have a reason to buy in bulk vs paying per call.
 //
-//   Bundle 1k:   5 USDC   = 0.005  USDC/call (same as retail validate_iban)
-//   Bundle 5k:  20 USDC   = 0.004  USDC/call (-20%)
-//   Bundle 25k: 80 USDC   = 0.0032 USDC/call (-36%)
+//   Bundle 1k:   5 USDC   = 0.005  USDC/credit (same as retail validate_iban)
+//   Bundle 5k:  20 USDC   = 0.004  USDC/credit (-20%)
+//   Bundle 25k: 80 USDC   = 0.0032 USDC/credit (-36%)
 //
 // Pricing is enforced by the x402 middleware on /v1/credits/buy/:bundle.
 // If the agent paid → x402 lets the request through → handler creates
@@ -94,7 +94,7 @@ apiKeys.post('/v1/keys/generate', async (c) => {
 
 /**
  * Bundle credits endpoint — agents (or humans) pay once via x402, get a key
- * with N prepaid calls. The endpoint is gated by the x402 middleware in
+ * with N prepaid credits. The endpoint is gated by the x402 middleware in
  * src/middleware/x402.ts at the configured price for each bundle. When the
  * payment clears, the handler runs and we mint a fresh credit-based key.
  *

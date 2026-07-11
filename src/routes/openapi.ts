@@ -76,7 +76,7 @@ const buildSpec = () => ({
         operationId: 'batchValidateIBAN',
         summary: 'Validate up to 100 IBANs in one request',
         description:
-          'Validates a list of IBANs and returns results for each. Costs $0.002 USDC per IBAN (e.g. 10 IBANs = $0.020, 100 IBANs = $0.200).',
+          'Validates a list of IBANs and returns results for each. Costs $0.002 USDC per IBAN via x402 (e.g. 10 IBANs = $0.020, 100 IBANs = $0.200). On API keys, a batch debits 1 request/credit per IBAN — free tier and prepaid packs alike.',
         tags: ['IBAN'],
         security: [{ x402Payment: [] }],
         requestBody: {
@@ -408,7 +408,7 @@ const buildSpec = () => ({
       post: {
         operationId: 'generateApiKey',
         summary: 'Generate a free API key',
-        description: 'Generates a free API key with 200 requests/month quota. One key per email per day.',
+        description: 'Generates a free API key with 200 requests/month quota (batch validation counts 1 request per IBAN). One key per email per day.',
         tags: ['API Keys'],
         requestBody: {
           required: true,
@@ -449,7 +449,7 @@ const buildSpec = () => ({
         operationId: 'listCreditBundles',
         summary: 'List prepaid credit bundles (free)',
         description:
-          'Lists the available prepaid credit bundles with prices. Buy a bundle once via x402 (POST /v1/credits/buy/{bundle}) and receive an API key preloaded with N calls — credits never expire. Card checkout is also available at https://ibanforge.com/pricing.',
+          'Lists the available prepaid credit bundles with prices. Buy a bundle once via x402 (POST /v1/credits/buy/{bundle}) and receive an API key preloaded with N credits (1 credit = 1 validation/lookup; batch validation debits 1 credit per IBAN) — credits never expire. Card checkout is also available at https://ibanforge.com/pricing.',
         tags: ['Credits'],
         responses: {
           '200': {
@@ -1076,7 +1076,7 @@ const buildSpec = () => ({
     { name: 'Compliance', description: 'Compliance check endpoint — IBAN validation + sanctions + SEPA + VoP + risk score (paid via x402)' },
     { name: 'Swiss Clearing', description: 'Swiss BC-Nummer / IID clearing lookup (paid via x402)' },
     { name: 'API Keys', description: 'API key management — generate free keys and check usage' },
-    { name: 'Credits', description: 'Prepaid credit bundles — pay once in USDC (x402), get an API key with N calls' },
+    { name: 'Credits', description: 'Prepaid credit bundles — pay once in USDC (x402), get an API key with N credits; batch validation debits 1 credit per IBAN' },
     { name: 'MCP', description: 'Model Context Protocol endpoint for AI agents (Streamable HTTP)' },
     { name: 'Free', description: 'Free endpoints — no payment required' },
   ],

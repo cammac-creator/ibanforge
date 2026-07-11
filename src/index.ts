@@ -191,7 +191,7 @@ This single call exercises the 3 USPs (Swiss BC-Nummer, EMI/vIBAN classification
 ## Quick start for agents
 
 - **Free demo (no auth):** GET https://api.ibanforge.com/v1/demo
-- **Free tier (200 req/month):** POST https://api.ibanforge.com/v1/keys/generate {"email":"you@example.com"} then use \`Authorization: Bearer ifk_xxx\` (or \`X-API-Key: ifk_xxx\`).
+- **Free tier (200 req/month):** POST https://api.ibanforge.com/v1/keys/generate {"email":"you@example.com"} then use \`Authorization: Bearer ifk_xxx\` (or \`X-API-Key: ifk_xxx\`). Batch validation counts 1 request per IBAN — on API keys and credit packs alike.
 - **Credit packs (card or USDC):** prepaid credits, never expire. Card: https://api.ibanforge.com/#pricing — USDC: POST /v1/credits/buy/1k|5k|25k (list: GET /v1/credits/bundles)
 - **Pay per call (x402, USDC on Base L2):** see https://api.ibanforge.com/.well-known/x402
 - **MCP server (stdio):** \`npx -y ibanforge-mcp\` (5 tools, no signup)

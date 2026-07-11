@@ -29,7 +29,7 @@ export function generateApiKey(
 }
 
 /**
- * Bundle credits — a key that consumes from a prepaid pool of N calls instead
+ * Bundle credits — a key that consumes from a prepaid pool of N credits instead
  * of the monthly subscription model. Created after a successful x402 payment
  * on /v1/credits/buy. No daily-rate-limit on creation (the payment already
  * provided abuse-resistance).
@@ -202,35 +202,46 @@ export function validateApiKey(key: string): ApiKeyValidation {
 
 /**
  * Atomically decrement credits_remaining when a credit-based key serves a call.
- * Returns the new remaining count. -1 if already exhausted (caller should
- * fall through to x402).
+ * `units` is the number of credits this request bills — 1 for every endpoint
+ * except batch validation, which bills 1 credit per IBAN.
+ *
+ * All-or-nothing: when the balance is smaller than `units`, nothing is debited
+ * and ok=false, so the caller can answer 402 with the exact shortfall instead
+ * of silently draining a balance that can't cover the request.
  */
-export function decrementCredits(keyHash: string): number {
+export function decrementCredits(keyHash: string, units = 1): { ok: boolean; remaining: number } {
   const db = getStatsDB();
   const result = db.prepare(
-    'UPDATE api_keys SET credits_remaining = credits_remaining - 1 WHERE key_hash = ? AND active = 1 AND credits_remaining > 0',
-  ).run(keyHash);
-  if (result.changes === 0) return -1;
-  const row = db.prepare('SELECT credits_remaining FROM api_keys WHERE key_hash = ?').get(keyHash) as { credits_remaining: number } | undefined;
-  return row?.credits_remaining ?? -1;
+    'UPDATE api_keys SET credits_remaining = credits_remaining - ? WHERE key_hash = ? AND active = 1 AND credits_remaining >= ?',
+  ).run(units, keyHash, units);
+  const row = db.prepare('SELECT credits_remaining FROM api_keys WHERE key_hash = ?').get(keyHash) as { credits_remaining: number | null } | undefined;
+  return { ok: result.changes > 0, remaining: Math.max(0, row?.credits_remaining ?? 0) };
 }
 
 /**
- * Refund a previously-decremented credit when the downstream handler returned
+ * Refund previously-decremented credits when the downstream handler returned
  * a 4xx (client error — bad input). Mirrors decrementQuota for monthly keys.
  */
-export function refundCredit(keyHash: string): void {
+export function refundCredit(keyHash: string, units = 1): void {
   // Cap the refund at credits_total so a stray double-refund can never inflate
-  // the balance above what was purchased (mirrors the MAX(count-1,0) clamp in
+  // the balance above what was purchased (mirrors the MAX(count-N,0) clamp in
   // decrementQuota).
   getStatsDB().prepare(
-    'UPDATE api_keys SET credits_remaining = MIN(credits_remaining + 1, credits_total) WHERE key_hash = ? AND credits_remaining IS NOT NULL',
-  ).run(keyHash);
+    'UPDATE api_keys SET credits_remaining = MIN(credits_remaining + ?, credits_total) WHERE key_hash = ? AND credits_remaining IS NOT NULL',
+  ).run(units, keyHash);
 }
 
+/**
+ * `units` is the number of quota slots this request consumes — 1 for every
+ * endpoint except batch validation, which consumes 1 slot per IBAN.
+ * All-or-nothing: a batch that doesn't fit in the remaining allowance is
+ * refused without consuming anything (`remaining` then tells the caller how
+ * big a batch would still fit this month).
+ */
 export function checkAndIncrementQuota(
   keyHash: string,
   monthlyLimit: number = DEFAULT_MONTHLY_LIMIT,
+  units = 1,
 ): { allowed: boolean; used: number; limit: number; remaining: number; month: string } {
   const db = getStatsDB();
   const month = new Date().toISOString().slice(0, 7);
@@ -240,15 +251,15 @@ export function checkAndIncrementQuota(
   const row = db.prepare('SELECT count FROM api_usage WHERE key_hash = ? AND month = ?').get(keyHash, month) as {
     count: number;
   };
-  if (row.count >= monthlyLimit) {
-    return { allowed: false, used: row.count, limit: monthlyLimit, remaining: 0, month };
+  if (row.count + units > monthlyLimit) {
+    return { allowed: false, used: row.count, limit: monthlyLimit, remaining: Math.max(0, monthlyLimit - row.count), month };
   }
-  db.prepare('UPDATE api_usage SET count = count + 1 WHERE key_hash = ? AND month = ?').run(keyHash, month);
+  db.prepare('UPDATE api_usage SET count = count + ? WHERE key_hash = ? AND month = ?').run(units, keyHash, month);
   return {
     allowed: true,
-    used: row.count + 1,
+    used: row.count + units,
     limit: monthlyLimit,
-    remaining: monthlyLimit - row.count - 1,
+    remaining: monthlyLimit - row.count - units,
     month,
   };
 }
@@ -267,14 +278,14 @@ export function getUsage(
 }
 
 /**
- * Decrement the quota counter for this key+month. Used to refund a consumed
- * slot when the underlying request failed with a client error (4xx) — we
+ * Decrement the quota counter for this key+month. Used to refund consumed
+ * slots when the underlying request failed with a client error (4xx) — we
  * should not punish callers for malformed input by eating their quota.
  */
-export function decrementQuota(keyHash: string): void {
+export function decrementQuota(keyHash: string, units = 1): void {
   const db = getStatsDB();
   const month = new Date().toISOString().slice(0, 7);
   db.prepare(
-    'UPDATE api_usage SET count = MAX(count - 1, 0) WHERE key_hash = ? AND month = ?',
-  ).run(keyHash, month);
+    'UPDATE api_usage SET count = MAX(count - ?, 0) WHERE key_hash = ? AND month = ?',
+  ).run(units, keyHash, month);
 }
