@@ -193,7 +193,7 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
         className="border-t px-4 py-16 w-full"
         style={{ borderColor: 'var(--hairline)' }}
       >
-        <div className="max-w-6xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-x-8 gap-y-10 text-center">
+        <div className="max-w-6xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-8 gap-y-10 text-center">
           <div className="flex flex-col items-center gap-3">
             <span className="eyebrow">{t('trust.dataLabel')}</span>
             <p className="font-mono text-[0.8125rem] tracking-caps text-[var(--fg-2)] leading-loose text-balance">
@@ -219,6 +219,18 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
               Made in Switzerland
             </p>
             <span className="text-xs text-[var(--fg-4)]">{t('trust.madeNote')}</span>
+          </div>
+          <div className="flex flex-col items-center gap-3">
+            <span className="eyebrow">{t('trust.privacyLabel')}</span>
+            <p className="font-mono text-[0.8125rem] tracking-caps text-[var(--fg-2)] leading-loose text-balance">
+              {t('trust.privacyValue')}
+            </p>
+            <Link
+              href={`/${locale}/legal/dpa`}
+              className="text-xs text-[var(--fg-4)] underline underline-offset-4 decoration-[var(--ink-5)] hover:text-[var(--fg-2)] transition-colors"
+            >
+              {t('trust.privacyNote')}
+            </Link>
           </div>
         </div>
       </section>
