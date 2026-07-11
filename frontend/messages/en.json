@@ -247,7 +247,7 @@
         "packs": "Or prepay {credits} credits for {price} — they never expire (−{percent} vs pay-per-call).",
         "packsEven": "Or prepay {credits} credits for {price} — same price, and they never expire."
       },
-      "callsHeader": "Calls / month"
+      "callsHeader": "Volume / month"
     },
     "x402": {
       "badge": "x402 Protocol",
@@ -277,7 +277,7 @@
       },
       "2": {
         "question": "Is there a free tier?",
-        "answer": "Yes! Generate a free API key at POST /v1/keys/generate with your email. Get 200 requests/month on all endpoints. No credit card, no crypto wallet needed. For higher volumes, buy a prepaid credit pack by card — or pay per call in USDC via x402."
+        "answer": "Yes! Generate a free API key at POST /v1/keys/generate with your email. Get 200 requests/month on all endpoints — batch validation counts 1 request per IBAN. No credit card, no crypto wallet needed. For higher volumes, buy a prepaid credit pack by card — or pay per call in USDC via x402."
       },
       "3": {
         "question": "What about high volume?",
@@ -309,7 +309,7 @@
       "packs": {
         "tag": "Credit packs",
         "title": "Prepaid credits",
-        "body": "Buy in bulk, never expires: 1k = $5, 5k = $20, 25k = $80 (down to $0.0032/call). One credit = one API call, any endpoint.",
+        "body": "Buy in bulk, never expires: 1k = $5, 5k = $20, 25k = $80 (down to $0.0032/credit). One credit = one validation or lookup — a batch of N IBANs uses N credits.",
         "note": "Stripe checkout — API key delivered by email. Agents can buy in USDC: POST /v1/credits/buy/1k|5k|25k.",
         "cardLabel": "Pay by card"
       }

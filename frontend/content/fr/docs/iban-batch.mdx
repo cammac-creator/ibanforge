@@ -14,7 +14,7 @@ Validez jusqu'a 100 IBAN en un seul appel API. Chaque IBAN est traite independam
 POST https://api.ibanforge.com/v1/iban/batch
 ```
 
-**Cout :** $0.002 USDC par IBAN (ex. : 10 IBAN = $0.020, 100 IBAN = $0.200)
+**Cout :** $0.002 USDC par IBAN via x402 (ex. : 10 IBAN = $0.020, 100 IBAN = $0.200). Avec une cle API, un lot debite **1 requete / 1 credit prepaye par IBAN** — offre gratuite et packs de credits inclus. Si le lot depasse votre solde restant, l'API le refuse en tout-ou-rien avec un 402 qui nomme le manque (en-tetes `X-Credits-Required` / `X-Quota-Required`) ; rien n'est consomme.
 
 ## Requete
 
