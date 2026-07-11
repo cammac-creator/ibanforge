@@ -1,0 +1,55 @@
+---
+title: "Service Level Agreement"
+description: "SLA for Editor/OEM subscriptions — 99.5% monthly availability, service credits, measurement by the public status page."
+order: 5
+updated: "2026-07-11"
+---
+
+# Service Level Agreement (SLA)
+
+**Last updated: July 11, 2026 · Version 1.0**
+
+This SLA supplements the [Terms of Service](/legal/terms) and applies **only to active Editor/OEM subscriptions**. The free tier, prepaid credit packs and x402 pay-per-call remain provided without a contractual SLA, as stated in the Terms.
+
+## 1. Availability commitment
+
+We commit to **99.5% Availability of the IBANforge API per calendar month**.
+
+**Availability** is the percentage of minutes in the month during which the API answers requests without a service-wide failure. A minute counts as unavailable when more than half of the valid requests received in that minute fail with a 5xx error, or when the API is unreachable. Months with no traffic in a given minute count that minute as available unless our monitoring shows the service was down.
+
+For reference: measured availability over the last 90 days is published continuously on the [status page](/status), computed from the same server-side request log we use to verify credit claims.
+
+## 2. Service credits
+
+If Availability in a calendar month falls below the commitment, you are entitled to a **service credit** on a following invoice:
+
+| Monthly availability | Service credit |
+|---|---|
+| Below 99.5% | 10% of the monthly fee |
+| Below 99.0% | 25% of the monthly fee |
+| Below 95.0% | 50% of the monthly fee |
+
+Service credits are the **sole and exclusive remedy** for missed availability. They are capped at 50% of one monthly fee, are non-transferable, and have no cash value.
+
+**How to claim:** email [support@ibanforge.com](mailto:support@ibanforge.com) within 30 days of the end of the affected month, naming the month and, if possible, the time windows you observed. We verify claims against our server-side request log and answer with the outcome and the applied credit.
+
+## 3. Exclusions
+
+The following do not count as unavailable time:
+
+- **Announced maintenance** — planned windows announced at least 48 hours in advance on the [status page](/status) or by email. We aim to make maintenance interruption-free; announced windows are rare.
+- **Your side of the integration** — errors caused by malformed requests, exceeded quotas answered with the documented `402` flow, revoked or leaked keys, or use that violates the [Terms of Service](/legal/terms).
+- **Events beyond our reasonable control** — force majeure, Internet backbone failures, or a failure of an upstream provider that no reasonable redundancy on our side would have avoided.
+- **Suspension for non-payment** of the subscription.
+
+## 4. Support
+
+Editor/OEM subscribers have a **named support contact** at [support@ibanforge.com](mailto:support@ibanforge.com) (mention Editor/OEM in the subject). Our target first-response time is **one business day** (Monday–Friday, Swiss business hours). This target is a support commitment, not an availability commitment — service credits under §2 apply to availability only.
+
+## 5. Changes
+
+We may update this SLA with **30 days' notice** by email for changes that reduce your rights; other changes take effect when published, with the change documented in the [changelog](/changelog). The version that applies to a given month is the one in force at the start of that month.
+
+## 6. Precedence
+
+If a separately negotiated Editor/OEM agreement between you and us states different service levels, that agreement prevails over this document.

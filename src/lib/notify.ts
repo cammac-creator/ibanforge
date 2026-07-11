@@ -15,6 +15,9 @@ export async function notifyPurchaseTelegram(p: {
   credits: number;
   email: string | null;
   keyPrefix: string;
+  /** Editor/OEM subscription — recurring revenue, worded differently. */
+  plan?: 'oem';
+  monthlyLimit?: number;
 }): Promise<boolean> {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   const chat = process.env.TELEGRAM_CHAT_ID;
@@ -24,10 +27,15 @@ export async function notifyPurchaseTelegram(p: {
   }
 
   const text =
-    `\u{1F4B0} IBANforge — nouvel achat Stripe\n` +
-    `Montant : $${p.amountUsd} (pack ${p.bundle}, ${p.credits.toLocaleString('en-US')} crédits)\n` +
-    `Client : ${p.email ?? '(email inconnu)'}\n` +
-    `Clé : ${p.keyPrefix}…`;
+    p.plan === 'oem'
+      ? `\u{1F389} IBANforge — ABONNEMENT Editor/OEM (MRR !)\n` +
+        `Montant : $${p.amountUsd}/mois (${(p.monthlyLimit ?? 0).toLocaleString('en-US')} req/mois)\n` +
+        `Client : ${p.email ?? '(email inconnu)'}\n` +
+        `Clé : ${p.keyPrefix}…`
+      : `\u{1F4B0} IBANforge — nouvel achat Stripe\n` +
+        `Montant : $${p.amountUsd} (pack ${p.bundle}, ${p.credits.toLocaleString('en-US')} crédits)\n` +
+        `Client : ${p.email ?? '(email inconnu)'}\n` +
+        `Clé : ${p.keyPrefix}…`;
 
   try {
     const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {

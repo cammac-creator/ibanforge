@@ -92,3 +92,66 @@ export async function sendApiKeyEmail(p: {
     return false;
   }
 }
+
+/**
+ * Editor/OEM subscription welcome — same delivery mechanics as
+ * sendApiKeyEmail but worded for a monthly allowance that renews, not a
+ * prepaid credit pool.
+ */
+export async function sendOemKeyEmail(p: {
+  to: string;
+  rawKey: string;
+  monthlyLimit: number;
+}): Promise<boolean> {
+  const transport = getTransport();
+  if (!transport) {
+    console.error('[email] SMTP_* not configured — OEM key email skipped');
+    return false;
+  }
+  const from = process.env.EMAIL_FROM || `IBANforge <${process.env.SMTP_USER}>`;
+  const limit = p.monthlyLimit.toLocaleString('en-US');
+
+  const text =
+    `Welcome to IBANforge Editor / OEM.\n\n` +
+    `API key: ${p.rawKey}\n` +
+    `Plan: Editor / OEM subscription (${limit} requests/month, resets on the 1st)\n` +
+    `SLA: https://ibanforge.com/en/legal/sla\n` +
+    `DPA: https://ibanforge.com/en/legal/dpa\n\n` +
+    `Use it as a Bearer token:\n` +
+    `  curl -H "Authorization: Bearer ${p.rawKey}" \\\n` +
+    `       -X POST https://api.ibanforge.com/v1/iban/validate \\\n` +
+    `       -H "content-type: application/json" -d '{"iban":"CH1000230000000012345"}'\n\n` +
+    `Check your usage any time:\n` +
+    `  curl -H "Authorization: Bearer ${p.rawKey}" https://api.ibanforge.com/v1/keys/usage\n\n` +
+    `Your named support contact: support@ibanforge.com (mention Editor/OEM).\n` +
+    `Keep this key safe — it will not be shown again.\n\nIBANforge`;
+
+  const html = `<!DOCTYPE html><html><body style="margin:0;background:#0f0f13;padding:28px;font-family:-apple-system,Segoe UI,Roboto,sans-serif;color:#d4d4d8">
+  <div style="max-width:560px;margin:0 auto;background:#16161b;border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:30px 32px">
+    <div style="font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:#71717a;font-family:monospace">IBANforge</div>
+    <h1 style="color:#fafafa;font-size:22px;margin:10px 0 6px">Welcome to Editor / OEM</h1>
+    <p style="color:#a1a1aa;font-size:15px;margin:0 0 22px">Your subscription is active — <b style="color:#fafafa">${limit} requests/month</b>, resets on the 1st.</p>
+    <div style="background:#09090b;border:1px solid #27272a;border-radius:10px;padding:14px 16px;margin:0 0 8px">
+      <div style="font-size:11px;color:#71717a;font-family:monospace;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Your API key</div>
+      <code style="font-family:'JetBrains Mono',monospace;font-size:14px;color:#f59e0b;word-break:break-all">${p.rawKey}</code>
+    </div>
+    <p style="color:#71717a;font-size:12px;margin:0 0 22px">Keep it safe — it will not be shown again.</p>
+    <div style="font-size:13px;color:#a1a1aa;margin-bottom:6px">Use it as a Bearer token:</div>
+    <pre style="background:#09090b;border:1px solid #1c1c22;border-radius:10px;padding:14px 16px;font-family:'JetBrains Mono',monospace;font-size:12px;color:#d6d3cc;white-space:pre-wrap;overflow-x:auto;margin:0 0 22px">curl -H "Authorization: Bearer ${p.rawKey}" \\
+     -X POST https://api.ibanforge.com/v1/iban/validate \\
+     -H "content-type: application/json" \\
+     -d '{"iban":"CH1000230000000012345"}'</pre>
+    <p style="font-size:14px;margin:0 0 6px"><a href="https://ibanforge.com/en/legal/sla" style="color:#fbbf24;text-decoration:none">Your SLA →</a> &nbsp;·&nbsp; <a href="https://ibanforge.com/en/legal/dpa" style="color:#fbbf24;text-decoration:none">DPA →</a> &nbsp;·&nbsp; <a href="https://ibanforge.com/docs" style="color:#fbbf24;text-decoration:none">Docs →</a></p>
+    <p style="color:#a1a1aa;font-size:13px;margin:14px 0 0">Named support: <a href="mailto:support@ibanforge.com" style="color:#fbbf24;text-decoration:none">support@ibanforge.com</a> (mention Editor/OEM).</p>
+    <hr style="border:none;border-top:1px solid rgba(255,255,255,.06);margin:24px 0 14px">
+    <p style="color:#52525b;font-size:12px;margin:0">IBANforge · bank data API for software vendors · <a href="https://ibanforge.com" style="color:#71717a">ibanforge.com</a></p>
+  </div></body></html>`;
+
+  try {
+    await transport.sendMail({ from, to: p.to, subject: `Your IBANforge Editor / OEM key — ${limit} requests/month`, text, html });
+    return true;
+  } catch (e) {
+    console.error('[email] SMTP send failed', (e as Error).message);
+    return false;
+  }
+}

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type Stripe from 'stripe';
 import { processStripeEvent } from './stripe-webhook.js';
-import { consumeOneTimeKey } from '../lib/api-keys.js';
+import { consumeOneTimeKey, validateApiKey, OEM_MONTHLY_LIMIT } from '../lib/api-keys.js';
 
 // Build a minimal Stripe.Event shape — processStripeEvent only reads:
 //   event.id, event.type, event.data.object.metadata.bundle,
@@ -72,6 +72,104 @@ describe('processStripeEvent — checkout.session.completed', () => {
       mockEvent({ id: eventId, bundle: '999k' }),
     );
     expect(replay.body.idempotent).toBe(true);
+  });
+});
+
+// Editor/OEM subscription checkout: metadata carries plan='oem' (set on the
+// private Payment Link) and the session references a Stripe subscription id.
+function mockOemEvent(opts: {
+  id: string;
+  email?: string | null;
+  sessionId?: string;
+  subscriptionId?: string | null;
+}): Stripe.Event {
+  return {
+    id: opts.id,
+    type: 'checkout.session.completed',
+    data: {
+      object: {
+        id: opts.sessionId ?? `cs_test_${opts.id}`,
+        metadata: { plan: 'oem' },
+        customer_email: opts.email ?? null,
+        customer_details: opts.email ? { email: opts.email } : null,
+        payment_status: 'paid',
+        mode: 'subscription',
+        subscription: opts.subscriptionId ?? `sub_test_${opts.id}`,
+      },
+    },
+  } as unknown as Stripe.Event;
+}
+
+function mockSubscriptionDeleted(opts: { id: string; subscriptionId: string }): Stripe.Event {
+  return {
+    id: opts.id,
+    type: 'customer.subscription.deleted',
+    data: { object: { id: opts.subscriptionId } },
+  } as unknown as Stripe.Event;
+}
+
+describe('processStripeEvent — Editor/OEM subscription', () => {
+  it('mints a monthly-limit key (not credits) on an oem checkout', () => {
+    const run = Date.now();
+    const sessionId = `cs_test_oem_${run}`;
+    const result = processStripeEvent(
+      mockOemEvent({ id: `evt_oem_${run}`, email: `oem-${run}@example.com`, sessionId }),
+    );
+    expect(result.status).toBe(200);
+    expect(result.body.plan).toBe('oem');
+    expect(result.body.monthly_limit).toBe(OEM_MONTHLY_LIMIT);
+    expect(result.body.key_prefix).toMatch(/^ifk_/);
+    expect(result.notify?.plan).toBe('oem');
+
+    // The delivered key is a monthly-quota key with the OEM allowance.
+    const delivered = consumeOneTimeKey(sessionId);
+    expect(delivered).not.toBeNull();
+    expect(delivered!.monthly_limit).toBe(OEM_MONTHLY_LIMIT);
+    expect(delivered!.credits_total).toBeNull();
+    const v = validateApiKey(delivered!.api_key);
+    expect(v.valid).toBe(true);
+    expect(v.monthlyLimit).toBe(OEM_MONTHLY_LIMIT);
+    expect(v.creditsRemaining).toBeUndefined();
+  });
+
+  it('does not mint twice for the same checkout session (webhook retry)', () => {
+    const run = Date.now();
+    const sessionId = `cs_test_oem_retry_${run}`;
+    const first = processStripeEvent(
+      mockOemEvent({ id: `evt_oem_a_${run}`, sessionId }),
+    );
+    // Stripe retries deliver a DIFFERENT event id for the same session.
+    const second = processStripeEvent(
+      mockOemEvent({ id: `evt_oem_b_${run}`, sessionId }),
+    );
+    expect(second.status).toBe(200);
+    expect(second.body.key_prefix).toBe(first.body.key_prefix);
+    expect(second.notify).toBeUndefined(); // no duplicate owner alert / email
+  });
+
+  it('deactivates the key when the subscription is canceled', () => {
+    const run = Date.now();
+    const sessionId = `cs_test_oem_churn_${run}`;
+    const subscriptionId = `sub_test_churn_${run}`;
+    processStripeEvent(mockOemEvent({ id: `evt_oem_c_${run}`, sessionId, subscriptionId }));
+    const delivered = consumeOneTimeKey(sessionId);
+    expect(validateApiKey(delivered!.api_key).valid).toBe(true);
+
+    const churn = processStripeEvent(
+      mockSubscriptionDeleted({ id: `evt_churn_${run}`, subscriptionId }),
+    );
+    expect(churn.status).toBe(200);
+    expect(churn.body.key_deactivated).toMatch(/^ifk_/);
+    expect(validateApiKey(delivered!.api_key).valid).toBe(false);
+  });
+
+  it('answers 200 gracefully for an unknown canceled subscription', () => {
+    const run = Date.now();
+    const result = processStripeEvent(
+      mockSubscriptionDeleted({ id: `evt_churn_unknown_${run}`, subscriptionId: `sub_never_minted_${run}` }),
+    );
+    expect(result.status).toBe(200);
+    expect(result.body.key_deactivated).toBe(false);
   });
 });
 

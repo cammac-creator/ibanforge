@@ -47,6 +47,9 @@ stripeRetrieve.get('/v1/stripe/key/:session_id', (c) => {
     key_prefix: result.api_key.slice(0, 12),
     credits_total: result.credits_total,
     credits_remaining: result.credits_remaining,
+    // Editor/OEM subscription keys carry a monthly allowance instead of credits.
+    monthly_limit: result.monthly_limit,
+    plan: result.monthly_limit !== null && result.credits_total === null ? 'oem' : 'credits',
     email: result.email,
     note: 'This key will only be shown ONCE. Store it securely.',
     usage_hint:

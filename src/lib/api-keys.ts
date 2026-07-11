@@ -87,6 +87,60 @@ export function generateStripeKey(
   return { api_key: rawKey, key_prefix: keyPrefix, credits, idempotent: false };
 }
 
+/** Monthly request allowance attached to an Editor/OEM subscription key. */
+export const OEM_MONTHLY_LIMIT = 50_000;
+
+/**
+ * Stripe-paid Editor/OEM subscription key — monthly_limit-based (NOT credits):
+ * the subscription buys embedding rights + a high monthly allowance that
+ * resets on the 1st, not a prepaid pool. Same one-time-view delivery as
+ * generateStripeKey. Stores the Stripe subscription id so a
+ * customer.subscription.deleted webhook can deactivate the key.
+ *
+ * Idempotent per checkout session: Stripe retries webhooks and we must not
+ * mint twice.
+ */
+export function generateOemKey(
+  email: string | null,
+  monthlyLimit: number,
+  stripeSessionId: string,
+  stripeSubscriptionId: string | null,
+): { api_key: string | null; key_prefix: string; monthly_limit: number; idempotent: boolean } {
+  const db = getStatsDB();
+  const existing = db
+    .prepare('SELECT key_prefix FROM api_keys WHERE stripe_session_id = ?')
+    .get(stripeSessionId) as { key_prefix: string } | undefined;
+  if (existing) {
+    return { api_key: null, key_prefix: existing.key_prefix, monthly_limit: monthlyLimit, idempotent: true };
+  }
+
+  const rawKey = KEY_PREFIX + randomBytes(32).toString('hex');
+  const keyHash = hashKey(rawKey);
+  const keyPrefix = rawKey.slice(0, 12);
+  const storedEmail = email && email.includes('@') ? email : 'oem-subscriber';
+
+  db.prepare(
+    'INSERT INTO api_keys (key_hash, key_prefix, email, monthly_limit, stripe_session_id, stripe_subscription_id, raw_key_one_time_view) VALUES (?, ?, ?, ?, ?, ?, ?)',
+  ).run(keyHash, keyPrefix, storedEmail, monthlyLimit, stripeSessionId, stripeSubscriptionId, rawKey);
+
+  return { api_key: rawKey, key_prefix: keyPrefix, monthly_limit: monthlyLimit, idempotent: false };
+}
+
+/**
+ * Deactivate the key tied to a canceled Stripe subscription. Returns the
+ * key_prefix when an active key was deactivated, null when nothing matched
+ * (already deactivated, or a subscription we never minted for). Idempotent.
+ */
+export function deactivateBySubscription(stripeSubscriptionId: string): string | null {
+  const db = getStatsDB();
+  const row = db
+    .prepare('SELECT key_prefix FROM api_keys WHERE stripe_subscription_id = ? AND active = 1')
+    .get(stripeSubscriptionId) as { key_prefix: string } | undefined;
+  if (!row) return null;
+  db.prepare('UPDATE api_keys SET active = 0 WHERE stripe_subscription_id = ?').run(stripeSubscriptionId);
+  return row.key_prefix;
+}
+
 /**
  * Read the raw API key for a Stripe session ONCE, then null the column so it
  * can never be retrieved again. Returns null if the session was already
@@ -98,12 +152,12 @@ export function generateStripeKey(
  */
 export function consumeOneTimeKey(
   stripeSessionId: string,
-): { api_key: string; credits_total: number; credits_remaining: number; email: string | null } | null {
+): { api_key: string; credits_total: number | null; credits_remaining: number | null; monthly_limit: number | null; email: string | null } | null {
   const db = getStatsDB();
   const row = db.prepare(
-    'SELECT raw_key_one_time_view, credits_total, credits_remaining, email FROM api_keys WHERE stripe_session_id = ? AND raw_key_one_time_view IS NOT NULL AND active = 1',
+    'SELECT raw_key_one_time_view, credits_total, credits_remaining, monthly_limit, email FROM api_keys WHERE stripe_session_id = ? AND raw_key_one_time_view IS NOT NULL AND active = 1',
   ).get(stripeSessionId) as
-    | { raw_key_one_time_view: string; credits_total: number; credits_remaining: number; email: string }
+    | { raw_key_one_time_view: string; credits_total: number | null; credits_remaining: number | null; monthly_limit: number | null; email: string }
     | undefined;
 
   if (!row) return null;
@@ -114,7 +168,8 @@ export function consumeOneTimeKey(
     api_key: row.raw_key_one_time_view,
     credits_total: row.credits_total,
     credits_remaining: row.credits_remaining,
-    email: row.email === 'stripe-buyer' ? null : row.email,
+    monthly_limit: row.monthly_limit,
+    email: row.email === 'stripe-buyer' || row.email === 'oem-subscriber' ? null : row.email,
   };
 }
 

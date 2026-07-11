@@ -21,15 +21,21 @@
 import { Hono } from 'hono';
 import Stripe from 'stripe';
 import { getStatsDB } from '../lib/db.js';
-import { generateStripeKey } from '../lib/api-keys.js';
+import { generateStripeKey, generateOemKey, deactivateBySubscription, OEM_MONTHLY_LIMIT } from '../lib/api-keys.js';
 import { notifyPurchaseTelegram } from '../lib/notify.js';
-import { sendApiKeyEmail } from '../lib/email.js';
+import { sendApiKeyEmail, sendOemKeyEmail } from '../lib/email.js';
 
 export const STRIPE_BUNDLES: Record<string, { credits: number; price_usd: number }> = {
   '1k': { credits: 1000, price_usd: 5 },
   '5k': { credits: 5000, price_usd: 20 },
   '25k': { credits: 25000, price_usd: 80 },
 };
+
+// Editor/OEM subscription — sold through a PRIVATE Payment Link sent in
+// conversation (metadata.plan = 'oem'), never listed on the public pricing
+// page. The subscription buys embedding rights + SLA + a monthly allowance,
+// not prepaid credits.
+export const STRIPE_OEM_PLAN = { monthly_limit: OEM_MONTHLY_LIMIT, price_usd: 149 };
 
 let _stripe: Stripe | null = null;
 function getStripe(): Stripe {
@@ -59,6 +65,9 @@ export interface StripePurchaseNotify {
   priceUsd: number;
   keyPrefix: string;
   rawKey: string;
+  /** Set on Editor/OEM subscriptions — switches the customer email template. */
+  plan?: 'oem';
+  monthlyLimit?: number;
 }
 
 export function processStripeEvent(
@@ -71,6 +80,23 @@ export function processStripeEvent(
     .get(event.id);
   if (already) {
     return { status: 200, body: { received: true, idempotent: true, event_id: event.id } };
+  }
+
+  // Subscription churn: the Editor/OEM key dies with its subscription. A live
+  // key surviving a canceled subscription would be silent free service.
+  if (event.type === 'customer.subscription.deleted') {
+    const sub = event.data.object as Stripe.Subscription;
+    const deactivatedPrefix = deactivateBySubscription(sub.id);
+    db.prepare('INSERT INTO processed_webhooks (stripe_event_id, event_type) VALUES (?, ?)')
+      .run(event.id, event.type);
+    return {
+      status: 200,
+      body: {
+        received: true,
+        subscription: sub.id,
+        key_deactivated: deactivatedPrefix ?? false,
+      },
+    };
   }
 
   if (event.type !== 'checkout.session.completed') {
@@ -91,6 +117,45 @@ export function processStripeEvent(
     return {
       status: 200,
       body: { received: true, pending: true, payment_status: session.payment_status },
+    };
+  }
+
+  // Editor/OEM subscription checkout (private Payment Link, metadata.plan='oem').
+  // Mints a monthly-limit key tied to the subscription id — NOT a credit pack.
+  if ((session.metadata?.plan ?? '') === 'oem') {
+    const email = session.customer_email ?? session.customer_details?.email ?? null;
+    const subscriptionId =
+      typeof session.subscription === 'string'
+        ? session.subscription
+        : (session.subscription?.id ?? null);
+    const mint = generateOemKey(email, STRIPE_OEM_PLAN.monthly_limit, session.id, subscriptionId);
+
+    db.prepare('INSERT INTO processed_webhooks (stripe_event_id, event_type) VALUES (?, ?)')
+      .run(event.id, event.type);
+
+    const notify: StripePurchaseNotify | undefined = mint.api_key
+      ? {
+          email,
+          bundle: 'oem',
+          credits: 0,
+          priceUsd: STRIPE_OEM_PLAN.price_usd,
+          keyPrefix: mint.key_prefix,
+          rawKey: mint.api_key,
+          plan: 'oem',
+          monthlyLimit: mint.monthly_limit,
+        }
+      : undefined;
+
+    return {
+      status: 200,
+      body: {
+        received: true,
+        event_id: event.id,
+        plan: 'oem',
+        monthly_limit: mint.monthly_limit,
+        key_prefix: mint.key_prefix,
+      },
+      notify,
     };
   }
 
@@ -173,17 +238,27 @@ stripeWebhook.post('/v1/stripe/webhook', async (c) => {
       credits: result.notify.credits,
       email: result.notify.email,
       keyPrefix: result.notify.keyPrefix,
+      plan: result.notify.plan,
+      monthlyLimit: result.notify.monthlyLimit,
     }).catch(() => {});
 
     // Customer key delivery (ibanforge.com SMTP — safety net beside the success
     // page). No-ops if SMTP_* is unset; never blocks/fails the webhook.
     if (result.notify.email && result.notify.email.includes('@')) {
-      await sendApiKeyEmail({
-        to: result.notify.email,
-        rawKey: result.notify.rawKey,
-        credits: result.notify.credits,
-        bundle: result.notify.bundle,
-      }).catch(() => {});
+      if (result.notify.plan === 'oem') {
+        await sendOemKeyEmail({
+          to: result.notify.email,
+          rawKey: result.notify.rawKey,
+          monthlyLimit: result.notify.monthlyLimit ?? 0,
+        }).catch(() => {});
+      } else {
+        await sendApiKeyEmail({
+          to: result.notify.email,
+          rawKey: result.notify.rawKey,
+          credits: result.notify.credits,
+          bundle: result.notify.bundle,
+        }).catch(() => {});
+      }
     }
   }
 
