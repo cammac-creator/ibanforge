@@ -35,7 +35,8 @@
       "terms": "Nutzungsbedingungen",
       "privacy": "Datenschutz",
       "dpa": "AVV (DPA)",
-      "imprint": "Impressum"
+      "imprint": "Impressum",
+      "compare": "Vergleich"
     },
     "copyright": "© {year} IBANforge.",
     "dataLine": "Daten: GLEIF · SIX · Bundesbank · EBA — monatlich aktualisiert"
@@ -958,5 +959,117 @@
       "hint": "Eine E-Mail — sagen Sie uns, was Sie ausliefern und an wen.",
       "slaLink": "SLA lesen"
     }
+  },
+  "compare": {
+    "meta": {
+      "title": "IBANforge vs iban.com vs IBANAPI vs Open-Source-Bibliotheken — ein ehrlicher Vergleich",
+      "description": "Preise und Fähigkeiten von IBAN-Validierungs-APIs, im Juli 2026 von den öffentlichen Preisseiten erhoben: iban.com ab 530 €/Jahr, IBANAPI ab 15 $/Monat, IBANforge-Packs ab 5 $ ohne Verfall, und wann eine kostenlose Bibliothek genügt."
+    },
+    "eyebrow": "Vergleich",
+    "hero": {
+      "title": "Eine IBAN-Validierungs-API auswählen",
+      "description": "Vier realistische Optionen: zwei etablierte kommerzielle APIs, die Open-Source-Bibliotheken und wir. Dieselbe Aufgabe, sehr unterschiedliche Preismodelle. Die Preise unten wurden am 11. Juli 2026 von den öffentlichen Preisseiten abgelesen."
+    },
+    "disclosure": "Wir verkaufen eines der Produkte in dieser Tabelle — lesen Sie sie mit diesem Wissen. Jede Zahl ist datiert und stammt von einer öffentlichen Seite; wenn sich ein Preis geändert hat oder uns ein Fehler unterlaufen ist, schreiben Sie an support@ibanforge.com und wir korrigieren.",
+    "table": {
+      "heading": "Nebeneinander",
+      "cols": {
+        "feature": "Fähigkeit",
+        "ibanforge": "IBANforge",
+        "ibancom": "iban.com (IBAN Suite)",
+        "ibanapi": "IBANAPI",
+        "libs": "Open-Source-Bibliotheken"
+      },
+      "rows": {
+        "pricing": {
+          "label": "Preismodell",
+          "ibanforge": "Prepaid-Packs: 5 $ / 1.000 Credits, verfallen nie. Oder 0,002–0,02 $ pro Aufruf (x402). Kostenlos: 200/Monat.",
+          "ibancom": "Jahresabo: 530 €/Jahr (2.000 Lookups) bis 4.150 €/Jahr (unbegrenzt), Mindestlaufzeit 1 Jahr, zzgl. MwSt.",
+          "ibanapi": "Monatsabo: 15 $/Monat (2.000 Basic + 400 Bank-Credits) bis 115 $/Monat.",
+          "libs": "Kostenlos (MIT/LGPL). Die Kosten sind Ihre Zeit."
+        },
+        "example": {
+          "label": "2.000 Validierungen mit Bankdaten",
+          "ibanforge": "10 $ einmalig (2 × 1k-Packs) — kein Verfall, kein Abo",
+          "ibancom": "530 €/Jahr (Professional-Plan)",
+          "ibanapi": "Stufe ≥ 40 $/Monat (Bank-Credits sind die harte Grenze: 400/Monat bei 15 $)",
+          "libs": "0 $ — aber gar keine Bankdaten (nur Struktur + Prüfsumme)"
+        },
+        "freeTier": {
+          "label": "Kostenloses Kontingent",
+          "ibanforge": "200 Anfragen/Monat, keine Karte, Schlüssel per E-Mail in einem Aufruf",
+          "ibancom": "Test mit 100 Anfragen, läuft nach einem Monat ab",
+          "ibanapi": "100 Basic + 20 Bank-Credits, 30 Tage",
+          "libs": "Alles kostenlos"
+        },
+        "bankData": {
+          "label": "Bankidentifikation (BIC, Name)",
+          "ibanforge": "121k+ BICs, 38k+ LEI-angereichert via GLEIF, monatlich aktualisiert",
+          "ibancom": "Ja — ihr Kernprodukt",
+          "ibanapi": "„Falls verfügbar“ laut Doku",
+          "libs": "Nein — nur strukturelle Validierung"
+        },
+        "swiss": {
+          "label": "Schweizer Clearing-Tiefe (SIC / euroSIC / QR-IID)",
+          "ibanforge": "~1.200 SIX-BankMaster-Einträge, Instant-Rail-Teilnahme, QR-IID-Semantik",
+          "ibancom": "Nicht als Produkt angeboten",
+          "ibanapi": "Nein",
+          "libs": "Nein"
+        },
+        "compliance": {
+          "label": "Compliance-Vorprüfung (Sanktionen, FATF, VoP-Pflicht)",
+          "ibanforge": "Ein Endpunkt, 0,02 $: OFAC/EU/UN-Bankprüfung, FATF-Listen, SEPA/VoP-Daten, Score 0–100",
+          "ibancom": "Separate Produkte (BAV/VoP ab 2.000 € je 2.500 Prüfungen)",
+          "ibanapi": "Nein",
+          "libs": "Nein"
+        },
+        "agents": {
+          "label": "KI-Agenten (MCP, autonome Zahlung)",
+          "ibanforge": "Nativer MCP-Server (5 Tools) + x402-Zahlung in USDC — ein Agent zahlt ohne Konto",
+          "ibancom": "Nein",
+          "ibanapi": "Nein",
+          "libs": "Nein (eine Bibliothek, kein Dienst)"
+        },
+        "signup": {
+          "label": "Zeit bis zum ersten Aufruf",
+          "ibanforge": "Ein curl für einen kostenlosen Schlüssel — oder null Anmeldung via x402",
+          "ibancom": "Bestellformular, Jahresvertrag",
+          "ibanapi": "Konto anlegen",
+          "libs": "npm/pip install"
+        },
+        "trust": {
+          "label": "Veröffentlichte Rechts-/Ops-Unterlagen",
+          "ibanforge": "AGB, Datenschutz, vorunterzeichneter DPA, OEM-SLA, Live-Statusseite — alles öffentlich",
+          "ibancom": "Enterprise-Bedingungen auf Anfrage (Stand Juli 2026 nicht veröffentlicht)",
+          "ibanapi": "AGB/Datenschutz veröffentlicht; keine öffentliche Statusseite gefunden (Juli 2026)",
+          "libs": "Lizenzdatei"
+        }
+      }
+    },
+    "notFor": {
+      "heading": "Wann IBANforge nicht die richtige Wahl ist",
+      "items": [
+        "Sie brauchen nur Struktur- + Prüfsummenvalidierung. Eine kostenlose Bibliothek (ibantools, schwifty, iban4j, IbanNet) erledigt das lokal, ohne Latenz und Kosten. Ehrlich: Fangen Sie dort an — kommen Sie wieder, wenn Sie Bankdaten, Rails oder Compliance-Signale brauchen.",
+        "Sie brauchen echte Verification of Payee — den Abgleich des NAMENS des Kontoinhabers bei der Bank. Das ist ein Netz regulierter PSPs (EPC-Scheme). Niemand verkauft das als einfache API; iban.coms BAV-Produkt und bankseitige Dienste decken es ab. IBANforge macht Vorprüfungen bei der Eingabe, kein Name-Matching.",
+        "Sie brauchen UK-spezifische Verzeichnisse (Sort Codes, EISCD) — iban.coms SORTware ist dafür gebaut.",
+        "Sie wollen vom ersten Tag an einen Account Manager und einen verhandelten Papiervertrag — die Jahresabo-Anbieter sind dafür aufgestellt; bei uns gibt es das nur über den OEM-Vertrag."
+      ]
+    },
+    "forWho": {
+      "heading": "Wo IBANforge die starke Wahl ist",
+      "items": [
+        "Pay-once-Ökonomie: Prepaid-Credits ohne Verfall statt eines Abos, das Sie amortisieren müssen.",
+        "Schweizer Zahlungen: die tiefsten öffentlichen Schweizer Clearing-Daten aller IBAN-APIs (SIX BankMaster, Instant-Rails, QR-IID).",
+        "Ein einziger Compliance-Triage-Aufruf vor einer Auszahlung: Sanktionen + FATF + SEPA/VoP + Risikoscore in einer 0,02-$-Anfrage.",
+        "KI-Agenten und Automatisierung: native MCP-Tools, maschinenlesbare 402er mit exakten Anweisungen, autonome x402-Zahlung."
+      ]
+    },
+    "cta": {
+      "heading": "Testen Sie es mit Ihren eigenen IBANs",
+      "description": "200 kostenlose Anfragen pro Monat, keine Karte. Der Playground nutzt die echte API.",
+      "getKey": "Kostenlosen Schlüssel holen",
+      "playground": "Playground öffnen"
+    },
+    "footnote": "Preise am 11. Juli 2026 auf iban.com/pricing und ibanapi.com/prices erhoben. MwSt. und Plandetails liegen bei den Anbietern; deren Seiten sind massgeblich."
   }
 }
