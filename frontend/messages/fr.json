@@ -317,7 +317,7 @@
     "oem": {
       "label": "Éditeur / OEM",
       "text": "Vous intégrez IBANforge dans votre propre produit ? Licence éditeur / OEM avec SLA et facturation UE — parlons-en.",
-      "cta": "support@ibanforge.com"
+      "cta": "Voir la page éditeurs →"
     }
   },
   "playground": {
@@ -892,5 +892,70 @@
     "policyBody": "L'API /v1 est stable : des champs peuvent être ajoutés, jamais renommés ni supprimés au sein de v1. Un changement cassant passerait par un nouveau chemin majeur (/v2) avec au moins 6 mois de fonctionnement en parallèle, annoncé ici et par email aux détenteurs de clés actives. Le projet suit le versionnage sémantique.",
     "fallback": "Le changelog n'a pas pu être chargé — consultez-le sur",
     "englishOnly": "Le changelog est tenu en anglais."
+  },
+  "vendors": {
+    "meta": {
+      "title": "Pour les éditeurs de logiciels — intégrez la validation IBAN dans votre produit",
+      "description": "Licence OEM pour éditeurs ERP, compta et paie : validation IBAN registry-grade, les données de clearing suisse les plus profondes d'une API publique, pré-checks compliance et DPA signable. Réduisez les échecs VoP avant l'échéance du rulebook v1.1 (20 sept. 2026)."
+    },
+    "eyebrow": "Pour les éditeurs de logiciels",
+    "hero": {
+      "title": "Votre produit manipule des IBAN. On les garde propres.",
+      "description": "ERP, comptabilité, paie ou logiciel bancaire : intégrez une validation IBAN registry-grade à la saisie, pour que les paiements de vos clients cessent d'échouer au moment du paiement. Une API REST, des erreurs lisibles par machine, aucune donnée de compte stockée.",
+      "cta": {
+        "contact": "Parler licence OEM",
+        "docs": "Lire la doc"
+      }
+    },
+    "vop": {
+      "badge": "Échéance datée",
+      "title": "Rulebook VoP v1.1 — 20 septembre 2026",
+      "body": "Depuis octobre 2025, les banques de la zone euro doivent vérifier le bénéficiaire avant un virement (Verification of Payee). Les paiements portant des IBAN mal saisis ou inexistants échouent désormais bruyamment — au pire moment. IBANforge n'est pas un service VoP (le réseau EPC est réservé aux PSP régulés), mais un pré-check à la saisie élimine à la source ce que la VoP rejetterait plus tard : structure cassée, banque inconnue, rails injoignables.",
+      "note": "Le pitch honnête : pré-vérifier maintenant, pour que la VoP n'ait rien à rejeter."
+    },
+    "flow": {
+      "heading": "Où ça se place dans votre produit",
+      "steps": [
+        {
+          "title": "Votre logiciel",
+          "body": "Un utilisateur saisit un IBAN — onboarding fournisseur, données de paie, saisie de paiement."
+        },
+        {
+          "title": "Pré-check IBANforge",
+          "body": "Structure (registre 89 pays), banque existante (121k+ BIC), rails (SEPA / SIC / instantané), indicateurs de risque — un appel, p99 sous 50 ms."
+        },
+        {
+          "title": "Au moment du paiement",
+          "body": "Moins de rejets VoP, moins de corrections manuelles, moins de tickets support à votre nom."
+        }
+      ]
+    },
+    "args": {
+      "heading": "Trois raisons de choisir IBANforge",
+      "items": [
+        {
+          "title": "Des données suisses qu'aucune autre API n'expose",
+          "body": "~1 200 entrées SIX BankMaster avec participation SIC / euroSIC / instantané et gestion des QR-IID, rafraîchies chaque mois — plus 121k+ BIC (38k+ enrichis LEI via GLEIF). Si vos utilisateurs paient des fournisseurs suisses, c'est la différence.",
+          "link": "Doc clearing suisse"
+        },
+        {
+          "title": "Pré-check compliance intégré",
+          "body": "Filtrage sanctions (OFAC / UE / ONU), listes FATF, joignabilité SEPA et données d'obligation VoP, score de risque 0–100 — un endpoint pour trier avant qu'un paiement ne quitte votre produit.",
+          "link": "Doc compliance"
+        },
+        {
+          "title": "Un trust pack à envoyer au service achats",
+          "body": "DPA signable, CGU et politique de confidentialité publiées, page de statut live, changelog versionné. Les IBAN ne sont jamais stockés — la validation tourne en mémoire et seules les métadonnées pays + préfixe banque sont journalisées.",
+          "link": "Légal & DPA"
+        }
+      ]
+    },
+    "oem": {
+      "eyebrow": "Éditeur / OEM",
+      "title": "Une licence qui colle à votre façon de livrer",
+      "body": "Embarquer IBANforge dans votre propre produit, pour vos propres clients, demande plus qu'une clé au compteur : droits de redistribution, SLA écrit, facturation UE, contact support nommé. C'est l'accord OEM — pas de grille publique, une conversation.",
+      "cta": "support@ibanforge.com",
+      "hint": "Un email — dites-nous ce que vous livrez, et à qui."
+    }
   }
 }

@@ -318,12 +318,12 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
           <p className="text-sm text-[var(--fg-2)] leading-relaxed max-w-xl text-balance">
             {t('oem.text')}
           </p>
-          <a
-            href="mailto:support@ibanforge.com?subject=OEM%20licensing"
+          <Link
+            href={`/${locale}/vendors`}
             className="font-mono text-sm text-amber-500 hover:text-amber-400 underline underline-offset-4 transition-colors"
           >
             {t('oem.cta')}
-          </a>
+          </Link>
         </div>
       </section>
 
