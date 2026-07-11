@@ -156,7 +156,10 @@
       "sanctionsValue": "OFAC · EU · UN · SECO + FATF",
       "sanctionsNote": "Au niveau banque (BIC8)",
       "madeLabel": "Provenance",
-      "madeNote": "Données de clearing suisses directement de SIX"
+      "madeNote": "Données de clearing suisses directement de SIX",
+      "privacyLabel": "Privacy par défaut",
+      "privacyValue": "IBAN jamais stockés · télémétrie auto-supprimée",
+      "privacyNote": "Effacée 30 jours après votre départ — DPA clause 4.7"
     }
   },
   "pricing": {
@@ -946,7 +949,7 @@
         },
         {
           "title": "Un trust pack à envoyer au service achats",
-          "body": "DPA signable, CGU et politique de confidentialité publiées, page de statut live, changelog versionné. Les IBAN ne sont jamais stockés — la validation tourne en mémoire et seules les métadonnées pays + préfixe banque sont journalisées.",
+          "body": "DPA signable, CGU et politique de confidentialité publiées, page de statut live, changelog versionné. Les IBAN ne sont jamais stockés — la validation tourne en mémoire et seules les métadonnées pays + préfixe banque sont journalisées. Et quand un client part, sa télémétrie s'efface d'elle-même : supprimée par défaut 30 jours après la résiliation, contractuellement (DPA clause 4.7).",
           "link": "Légal & DPA"
         }
       ]
@@ -1039,7 +1042,7 @@
         },
         "trust": {
           "label": "Surface légale/ops publiée",
-          "ibanforge": "CGU, confidentialité, DPA pré-signé, SLA OEM, page de statut live : tout est public",
+          "ibanforge": "CGU, confidentialité, DPA pré-signé, SLA OEM, page de statut live : tout est public. La télémétrie s'auto-supprime 30 jours après résiliation (DPA 4.7)",
           "ibancom": "Conditions entreprise sur demande (non publiées en juillet 2026)",
           "ibanapi": "CGU/confidentialité publiées ; pas de page de statut publique trouvée (juillet 2026)",
           "libs": "Fichier de licence"

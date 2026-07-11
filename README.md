@@ -35,6 +35,8 @@ Add to your MCP config (`~/Library/Application Support/Claude/claude_desktop_con
 }
 ```
 
+**Privacy by default:** submitted IBANs are never stored — validation runs in memory, IPs are kept only as salted hashes, and telemetry deletes itself (12-month cap; erased 30 days after a customer terminates, contractually — [DPA clause 4.7](https://ibanforge.com/en/legal/dpa)).
+
 Optional: set `IBANFORGE_API_KEY=ifk_...` in `env` for the free tier (200 req/month). Without it the server uses the public/demo surface; combine with **x402 micropayments** for unlimited pay-per-call access without signup.
 
 ### Claude Code (CLI)

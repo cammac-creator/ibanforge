@@ -156,7 +156,10 @@
       "sanctionsValue": "OFAC · EU · UN · SECO + FATF",
       "sanctionsNote": "Bank-level (BIC8) screening",
       "madeLabel": "Provenance",
-      "madeNote": "Swiss clearing data straight from SIX"
+      "madeNote": "Swiss clearing data straight from SIX",
+      "privacyLabel": "Privacy by default",
+      "privacyValue": "IBANs never stored · self-deleting telemetry",
+      "privacyNote": "Erased 30 days after you leave — DPA clause 4.7"
     }
   },
   "pricing": {
@@ -946,7 +949,7 @@
         },
         {
           "title": "A trust pack you can send to procurement",
-          "body": "Signable DPA, published terms and privacy policy, live status page, versioned changelog. IBANs are never stored — validation runs in memory and only country + bank-prefix metadata is logged.",
+          "body": "Signable DPA, published terms and privacy policy, live status page, versioned changelog. IBANs are never stored — validation runs in memory and only country + bank-prefix metadata is logged. And when a customer leaves, their telemetry deletes itself: erased by default 30 days after termination, contractually (DPA clause 4.7).",
           "link": "Legal & DPA"
         }
       ]
@@ -1039,7 +1042,7 @@
         },
         "trust": {
           "label": "Published legal/ops surface",
-          "ibanforge": "ToS, privacy, pre-signed DPA, OEM SLA, live status page — all public",
+          "ibanforge": "ToS, privacy, pre-signed DPA, OEM SLA, live status page — all public. Telemetry self-deletes 30 days after termination (DPA 4.7)",
           "ibancom": "Enterprise terms on request (not published as of July 2026)",
           "ibanapi": "ToS/privacy published; no public status page found (July 2026)",
           "libs": "License file"

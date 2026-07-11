@@ -156,7 +156,10 @@
       "sanctionsValue": "OFAC · EU · UN · SECO + FATF",
       "sanctionsNote": "Auf Bankebene (BIC8)",
       "madeLabel": "Herkunft",
-      "madeNote": "Schweizer Clearingdaten direkt von SIX"
+      "madeNote": "Schweizer Clearingdaten direkt von SIX",
+      "privacyLabel": "Privacy als Standard",
+      "privacyValue": "IBANs nie gespeichert · selbstlöschende Telemetrie",
+      "privacyNote": "Gelöscht 30 Tage nach Kündigung — DPA Klausel 4.7"
     }
   },
   "pricing": {
@@ -946,7 +949,7 @@
         },
         {
           "title": "Ein Trust-Pack für Ihren Einkauf",
-          "body": "Unterschriftsreifer DPA, veröffentlichte AGB und Datenschutzerklärung, Live-Statusseite, versioniertes Changelog. IBANs werden nie gespeichert — die Validierung läuft im Speicher, protokolliert werden nur Land + Bank-Präfix.",
+          "body": "Unterschriftsreifer DPA, veröffentlichte AGB und Datenschutzerklärung, Live-Statusseite, versioniertes Changelog. IBANs werden nie gespeichert — die Validierung läuft im Speicher, protokolliert werden nur Land + Bank-Präfix. Und wenn ein Kunde geht, löscht sich seine Telemetrie selbst: standardmässig 30 Tage nach Kündigung, vertraglich zugesichert (DPA Klausel 4.7).",
           "link": "Rechtliches & DPA"
         }
       ]
@@ -1039,7 +1042,7 @@
         },
         "trust": {
           "label": "Veröffentlichte Rechts-/Ops-Unterlagen",
-          "ibanforge": "AGB, Datenschutz, vorunterzeichneter DPA, OEM-SLA, Live-Statusseite — alles öffentlich",
+          "ibanforge": "AGB, Datenschutz, vorunterzeichneter DPA, OEM-SLA, Live-Statusseite — alles öffentlich. Telemetrie löscht sich 30 Tage nach Kündigung selbst (DPA 4.7)",
           "ibancom": "Enterprise-Bedingungen auf Anfrage (Stand Juli 2026 nicht veröffentlicht)",
           "ibanapi": "AGB/Datenschutz veröffentlicht; keine öffentliche Statusseite gefunden (Juli 2026)",
           "libs": "Lizenzdatei"
