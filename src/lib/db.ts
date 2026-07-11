@@ -232,6 +232,15 @@ export function getStatsDB(): DatabaseType.Database {
       statsDB.exec('ALTER TABLE api_keys ADD COLUMN stripe_subscription_id TEXT');
       statsDB.exec('CREATE INDEX IF NOT EXISTS idx_api_keys_stripe_subscription ON api_keys(stripe_subscription_id)');
     }
+    // When a key was deactivated — drives the DPA clause 4.7 commitment:
+    // telemetry attributable to a terminated customer is deleted by default
+    // 30 days after termination. Keys already inactive before this column
+    // existed get "now" as their deactivation date, which starts their
+    // 30-day deletion countdown from this deploy (conservative default).
+    if (!keyCols.includes('deactivated_at')) {
+      statsDB.exec('ALTER TABLE api_keys ADD COLUMN deactivated_at TEXT');
+      statsDB.exec("UPDATE api_keys SET deactivated_at = datetime('now') WHERE active = 0 AND deactivated_at IS NULL");
+    }
     // Idempotency log for Stripe webhooks — Stripe retries up to 3 days.
     // Insert AFTER successful key mint; presence of stripe_event_id here means
     // "we've already minted for this event, don't do it again".

@@ -7,7 +7,9 @@ updated: "2026-07-10"
 
 # Data Processing Agreement (DPA)
 
-**Last updated: July 10, 2026 · Version 1.0**
+**Last updated: July 11, 2026 · Version 1.1**
+
+*Revision 1.1 (July 11, 2026): telemetry attributable to a terminated customer is now deleted **by default** 30 days after termination — previously deletion was on request. See Clause 4.7 and Annex I.6.*
 
 This DPA supplements the [Terms of Service](/legal/terms) and applies whenever a customer (« **Controller** ») uses the IBANforge API in a way that involves personal data — an IBAN can identify a natural person. It is offered as a standing, pre-signed agreement: by using the Service under a paid or free plan you may rely on it without countersignature; a countersigned PDF is available on request at **support@ibanforge.com**.
 
@@ -31,12 +33,13 @@ The Service is operated by its owner; no employees have access to production dat
 
 ## 4. Technical and organisational measures (TOMs)
 
-- Transport encryption (TLS) on all endpoints; HTTP redirected to HTTPS.
-- **Data minimisation by design:** no storage of submitted IBANs; IP addresses stored only as salted hashes; API keys stored only as hashes.
-- Hosting in the **Zurich (Switzerland)** region (Railway), with volume-level isolation.
-- Request metadata automatically purged after **12 months**.
-- Access to production restricted to the operator with strong authentication; secrets held in the hosting platform's secret store.
-- Public status page and monitored error rates.
+- **4.1** Transport encryption (TLS) on all endpoints; HTTP redirected to HTTPS.
+- **4.2** **Data minimisation by design:** no storage of submitted IBANs; IP addresses stored only as salted hashes; API keys stored only as hashes.
+- **4.3** Hosting in the **Zurich (Switzerland)** region (Railway), with volume-level isolation.
+- **4.4** Request metadata automatically purged after **12 months** at the latest.
+- **4.5** Access to production restricted to the operator with strong authentication; secrets held in the hosting platform's secret store.
+- **4.6** Public status page and monitored error rates.
+- **4.7** **Telemetry deletion after termination, by default:** request metadata (telemetry) attributable to a customer's API keys is automatically deleted **30 days after termination** of the agreement or deactivation of the customer's last key — without requiring a request. A key rotation does not trigger this deletion (the customer relationship continues). See Annex I.6.
 
 ## 5. Sub-processors
 
@@ -54,10 +57,21 @@ Primary processing occurs in Switzerland (EU adequacy). Where a sub-processor op
 
 ## 8. Deletion and end of service
 
-On termination, the Controller's account data (email, key) is deleted on request; request metadata expires within its 12-month window. There is no stored IBAN corpus to return or delete.
+On termination, telemetry attributable to the Controller's keys is deleted **by default 30 days after termination** (Clause 4.7); the Controller's account record (email, hashed key) is deleted on request, subject to statutory bookkeeping duties for billing records. There is no stored IBAN corpus to return or delete.
 
 ## 9. Liability and law
 
 Liability follows the [Terms of Service §8](/legal/terms). This DPA is governed by Swiss law; for Controllers subject to the GDPR it is to be interpreted in conformity with art. 28 GDPR.
 
 Contact for all DPA matters: **support@ibanforge.com**
+
+---
+
+## Annex I — Description of the processing
+
+- **I.1 Subject matter:** validation and enrichment of bank identifiers (IBAN/BIC) submitted by the Controller through the API.
+- **I.2 Data subjects:** the Controller's customers, suppliers, employees or end users whose IBANs are submitted.
+- **I.3 Categories of personal data:** bank account identifiers (IBANs) and BICs in transit; the Controller's contact email for account management; request metadata (endpoint, timestamp, status, latency, salted IP hash, API-key prefix).
+- **I.4 Special categories:** none.
+- **I.5 Processing operations:** ephemeral, automated in-memory validation/enrichment producing the API response; aggregate service statistics without personal data.
+- **I.6 Retention:** submitted IBANs are **not stored** (sole exception: for invalid IBANs, at most the first 12 characters — country and bank identifier, never the account-identifying part — up to 12 months for data-quality diagnostics). Request metadata (telemetry) is kept **at most 12 months**, and telemetry attributable to a terminated customer is deleted **by default 30 days after termination** (Clause 4.7). Billing records are kept as required by statutory bookkeeping law.

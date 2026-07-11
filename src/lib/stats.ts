@@ -923,3 +923,37 @@ export function purgeOldRequestLog(months: number = 12): number {
     .run(months);
   return result.changes;
 }
+
+// Placeholder emails used when a buyer had no address (x402/Stripe flows).
+// Several unrelated customers share them, so "does this email still have an
+// active key" is meaningless for these — their telemetry is purged per key.
+const PLACEHOLDER_EMAILS = ['credits-buyer', 'stripe-buyer', 'oem-subscriber'];
+
+/**
+ * DPA clause 4.7 — telemetry deletion after termination, BY DEFAULT.
+ * Deletes request_log rows attributable to API keys that were deactivated
+ * more than `days` (default 30) ago AND whose customer has no active key
+ * left. The "no active key left" guard keeps a security rotation (old key
+ * deactivated, same email continues on a fresh key) from wiping the history
+ * of a customer who never terminated. Placeholder emails skip that guard —
+ * each of their keys is its own anonymous customer.
+ */
+export function purgeTerminatedKeyTelemetry(days: number = 30): number {
+  const db = getStatsDB();
+  const placeholders = PLACEHOLDER_EMAILS.map(() => '?').join(',');
+  const result = db
+    .prepare(
+      `DELETE FROM request_log WHERE key_prefix IN (
+         SELECT k.key_prefix FROM api_keys k
+         WHERE k.active = 0
+           AND k.deactivated_at IS NOT NULL
+           AND k.deactivated_at < datetime('now', '-' || ? || ' days')
+           AND (
+             k.email IN (${placeholders})
+             OR NOT EXISTS (SELECT 1 FROM api_keys a WHERE a.email = k.email AND a.active = 1)
+           )
+       )`,
+    )
+    .run(days, ...PLACEHOLDER_EMAILS);
+  return result.changes;
+}
