@@ -955,7 +955,8 @@
       "title": "Une licence qui colle à votre façon de livrer",
       "body": "Embarquer IBANforge dans votre propre produit, pour vos propres clients, demande plus qu'une clé au compteur : droits de redistribution, SLA écrit, facturation UE, contact support nommé. C'est l'accord OEM — pas de grille publique, une conversation.",
       "cta": "support@ibanforge.com",
-      "hint": "Un email — dites-nous ce que vous livrez, et à qui."
+      "hint": "Un email — dites-nous ce que vous livrez, et à qui.",
+      "slaLink": "Lire le SLA"
     }
   }
 }

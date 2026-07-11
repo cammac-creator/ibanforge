@@ -19,7 +19,7 @@ export interface LegalMeta {
   updated: string;
 }
 
-export const LEGAL_SLUGS = ['terms', 'privacy', 'dpa', 'imprint'] as const;
+export const LEGAL_SLUGS = ['terms', 'privacy', 'dpa', 'sla', 'imprint'] as const;
 
 export function getLegalDoc(slug: string): { meta: LegalMeta; content: string } | null {
   if (!(LEGAL_SLUGS as readonly string[]).includes(slug)) return null;

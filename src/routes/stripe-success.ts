@@ -102,17 +102,24 @@ stripeSuccess.get('/stripe/success', (c) => {
 
   function render(data) {
     const key = escapeHtml(data.api_key);
+    const isOem = data.plan === 'oem';
     const total = data.credits_total;
     const email = data.email ? escapeHtml(data.email) : null;
+    const subLine = isOem
+      ? 'Editor / OEM subscription active — ' + Number(data.monthly_limit).toLocaleString() + ' requests/month. Save your API key — it will not be shown again.'
+      : total + ' credits added. Save your API key — it will not be shown again.';
+    const statBlock = isOem
+      ? '<div class="stat"><div class="stat-label">Requests / month</div><div class="stat-value">' + Number(data.monthly_limit).toLocaleString() + '</div></div>'
+      : '<div class="stat"><div class="stat-label">Credits total</div><div class="stat-value">' + Number(total).toLocaleString() + '</div></div>';
     content.innerHTML =
       '<div class="check">✓</div>' +
       '<h1>Payment confirmed</h1>' +
-      '<p class="sub">' + total + ' credits added. Save your API key — it will not be shown again.</p>' +
+      '<p class="sub">' + subLine + '</p>' +
       '<div class="warn"><strong>Save this key now.</strong> We do not store it in plaintext after this page is closed. If lost, contact support@ibanforge.com.</div>' +
       '<div class="key-box" id="keybox">' + key + '</div>' +
       '<button class="copy" id="copybtn" type="button">Copy to clipboard</button>' +
       '<div class="stat-grid">' +
-        '<div class="stat"><div class="stat-label">Credits total</div><div class="stat-value">' + total.toLocaleString() + '</div></div>' +
+        statBlock +
         '<div class="stat"><div class="stat-label">Email</div><div class="stat-value" style="font-size:13px">' + (email || '—') + '</div></div>' +
       '</div>' +
       '<h3 style="font-size:14px;margin-bottom:8px;color:#fafafa">Test it now</h3>' +

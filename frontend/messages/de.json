@@ -955,7 +955,8 @@
       "title": "Eine Lizenz, die zu Ihrer Auslieferung passt",
       "body": "IBANforge in Ihr eigenes Produkt einzubetten, für Ihre eigenen Kunden, braucht mehr als einen Schlüssel mit Zähler: Weitergaberechte, ein schriftliches SLA, EU-Rechnung, ein benannter Support-Kontakt. Das ist der OEM-Vertrag — keine öffentliche Preisliste, ein Gespräch.",
       "cta": "support@ibanforge.com",
-      "hint": "Eine E-Mail — sagen Sie uns, was Sie ausliefern und an wen."
+      "hint": "Eine E-Mail — sagen Sie uns, was Sie ausliefern und an wen.",
+      "slaLink": "SLA lesen"
     }
   }
 }

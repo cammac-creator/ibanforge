@@ -955,7 +955,8 @@
       "title": "Licensing that matches how you ship",
       "body": "Embedding IBANforge inside your own product, for your own customers, takes more than a metered key: redistribution rights, a written SLA, EU invoicing, a named support contact. That is the OEM agreement — no public price list, one conversation.",
       "cta": "support@ibanforge.com",
-      "hint": "One email — tell us what you ship and to whom."
+      "hint": "One email — tell us what you ship and to whom.",
+      "slaLink": "Read the SLA"
     }
   }
 }

@@ -225,6 +225,13 @@ export function getStatsDB(): DatabaseType.Database {
     if (!keyCols.includes('raw_key_one_time_view')) {
       statsDB.exec('ALTER TABLE api_keys ADD COLUMN raw_key_one_time_view TEXT');
     }
+    // Stripe subscription id — set on Editor/OEM subscription keys so
+    // customer.subscription.deleted can deactivate the key when the
+    // subscription ends (churn must not leave a live key behind).
+    if (!keyCols.includes('stripe_subscription_id')) {
+      statsDB.exec('ALTER TABLE api_keys ADD COLUMN stripe_subscription_id TEXT');
+      statsDB.exec('CREATE INDEX IF NOT EXISTS idx_api_keys_stripe_subscription ON api_keys(stripe_subscription_id)');
+    }
     // Idempotency log for Stripe webhooks — Stripe retries up to 3 days.
     // Insert AFTER successful key mint; presence of stripe_event_id here means
     // "we've already minted for this event, don't do it again".

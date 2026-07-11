@@ -185,6 +185,12 @@ export default async function VendorsPage({
             {t("oem.cta")}
           </Button>
           <p className="text-xs text-muted-foreground/70">{t("oem.hint")}</p>
+          <Link
+            href={`/${locale}/legal/sla`}
+            className="text-sm text-amber-500 hover:text-amber-400 underline underline-offset-4 transition-colors"
+          >
+            {t("oem.slaLink")} →
+          </Link>
         </div>
       </section>
     </div>
