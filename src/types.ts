@@ -11,10 +11,17 @@
  * generic "payment required" (which reads as "anonymous" to MCP clients).
  */
 export interface PaywallCause {
-  reason: 'monthly_quota_exhausted' | 'credits_exhausted' | 'invalid_api_key';
+  reason:
+    | 'monthly_quota_exhausted'
+    | 'monthly_quota_insufficient'
+    | 'credits_exhausted'
+    | 'credits_insufficient'
+    | 'invalid_api_key';
   detail: string;
-  quota?: { used: number; limit: number; month: string; resets: string };
-  credits?: { total: number; topup: string };
+  // required/remaining: batch billing (1 unit per IBAN) can refuse a request
+  // all-or-nothing while some allowance is left — these say how much.
+  quota?: { used: number; limit: number; month: string; resets: string; required?: number; remaining?: number };
+  credits?: { required?: number; remaining?: number; total: number; topup: string };
 }
 
 type HonoEnv = {

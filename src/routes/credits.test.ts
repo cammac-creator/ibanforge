@@ -60,20 +60,28 @@ describe('decrementCredits / refundCredit', () => {
   it('atomically decrements and returns the new balance', () => {
     const k = generateCreditKey(null, 10);
     const v = validateApiKey(k.api_key);
-    const after1 = decrementCredits(v.keyHash);
-    expect(after1).toBe(9);
-    const after2 = decrementCredits(v.keyHash);
-    expect(after2).toBe(8);
+    expect(decrementCredits(v.keyHash)).toEqual({ ok: true, remaining: 9 });
+    expect(decrementCredits(v.keyHash)).toEqual({ ok: true, remaining: 8 });
   });
 
-  it('returns -1 when credits are exhausted (caller falls through to x402)', () => {
+  it('refuses when credits are exhausted (caller falls through to x402)', () => {
     const k = generateCreditKey(null, 2);
     const v = validateApiKey(k.api_key);
-    expect(decrementCredits(v.keyHash)).toBe(1);
-    expect(decrementCredits(v.keyHash)).toBe(0);
-    expect(decrementCredits(v.keyHash)).toBe(-1);
-    // Subsequent decrements stay at -1 — never goes negative.
-    expect(decrementCredits(v.keyHash)).toBe(-1);
+    expect(decrementCredits(v.keyHash)).toEqual({ ok: true, remaining: 1 });
+    expect(decrementCredits(v.keyHash)).toEqual({ ok: true, remaining: 0 });
+    expect(decrementCredits(v.keyHash)).toEqual({ ok: false, remaining: 0 });
+    // Subsequent decrements keep refusing — the balance never goes negative.
+    expect(decrementCredits(v.keyHash)).toEqual({ ok: false, remaining: 0 });
+  });
+
+  it('multi-unit decrement (batch billing) is all-or-nothing', () => {
+    const k = generateCreditKey(null, 10);
+    const v = validateApiKey(k.api_key);
+    expect(decrementCredits(v.keyHash, 4)).toEqual({ ok: true, remaining: 6 });
+    // 7 > 6 → refused, and the 6 remaining credits are untouched.
+    expect(decrementCredits(v.keyHash, 7)).toEqual({ ok: false, remaining: 6 });
+    // A batch that exactly fits still passes.
+    expect(decrementCredits(v.keyHash, 6)).toEqual({ ok: true, remaining: 0 });
   });
 
   it('refundCredit re-credits a previously consumed call', () => {
@@ -84,6 +92,17 @@ describe('decrementCredits / refundCredit', () => {
     refundCredit(v.keyHash);
     const v2 = validateApiKey(k.api_key);
     expect(v2.creditsRemaining).toBe(9);
+  });
+
+  it('refundCredit restores multi-unit debits, clamped at credits_total', () => {
+    const k = generateCreditKey(null, 10);
+    const v = validateApiKey(k.api_key);
+    decrementCredits(v.keyHash, 5);
+    refundCredit(v.keyHash, 5);
+    expect(validateApiKey(k.api_key).creditsRemaining).toBe(10);
+    // A stray extra refund cannot inflate the balance above what was bought.
+    refundCredit(v.keyHash, 3);
+    expect(validateApiKey(k.api_key).creditsRemaining).toBe(10);
   });
 
   it('refundCredit is a no-op for monthly-quota keys (credits_remaining IS NULL)', () => {

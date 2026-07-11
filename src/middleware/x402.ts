@@ -265,7 +265,7 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
             maxTimeoutSeconds: 60,
           },
           description:
-            `Validate up to 100 IBANs in one call at $0.002 per IBAN (10x cheaper than calling validate_iban repeatedly). Use for CSV cleanup, customer DB dedup, or pre-flight payout list triage. ${TRUST_TAG_BATCH}.`,
+            `Validate up to 100 IBANs in one call at $0.002 per IBAN (2.5x cheaper per IBAN than single calls at $0.005, and one settlement instead of N). Use for CSV cleanup, customer DB dedup, or pre-flight payout list triage. ${TRUST_TAG_BATCH}.`,
           mimeType: 'application/json',
           extensions: {
             bazaar: {
@@ -473,7 +473,7 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
         // -- Bundle credits ----------------------------------------------------
         // 3 prepaid bundles. Once the agent pays, the handler in
         // src/routes/api-keys.ts mints a fresh key with N credits.
-        // Pricing is: 1k=$5 (0.005/call), 5k=$20 (0.004/call), 25k=$80 (0.0032/call).
+        // Pricing is: 1k=$5 (0.005/credit), 5k=$20 (0.004/credit), 25k=$80 (0.0032/credit).
         'POST /v1/credits/buy/1k': {
           accepts: {
             scheme: 'exact',
@@ -483,7 +483,7 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
             maxTimeoutSeconds: 60,
           },
           description:
-            'Prepaid bundle of 1,000 IBAN/BIC/compliance API calls for AI agents. Same per-call cost as retail (0.005 USDC) but only ONE x402 settlement instead of 1,000 — most agent stacks handle a single payment far better than micropayments. Returns ifk_xxx key with 1,000 credits valid for any /v1/iban/* or /v1/bic/* endpoint. No expiry.',
+            'Prepaid bundle of 1,000 credits for AI agents — 1 credit = 1 validation/lookup, batch validation debits 1 credit per IBAN. Same per-credit cost as retail (0.005 USDC) but only ONE x402 settlement instead of 1,000 — most agent stacks handle a single payment far better than micropayments. Returns ifk_xxx key with 1,000 credits valid for any /v1/iban/* or /v1/bic/* endpoint. No expiry.',
           mimeType: 'application/json',
           extensions: {
             bazaar: {
@@ -521,7 +521,7 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
             maxTimeoutSeconds: 60,
           },
           description:
-            'Prepaid bundle of 5,000 IBAN/BIC/compliance calls (-20% vs retail, 0.004 USDC per call). One x402 settlement, no monthly subscription, no expiry. Fits a mid-volume agent that runs payment validation continuously.',
+            'Prepaid bundle of 5,000 credits (-20% vs retail, 0.004 USDC per credit; batch validation debits 1 credit per IBAN). One x402 settlement, no monthly subscription, no expiry. Fits a mid-volume agent that runs payment validation continuously.',
           mimeType: 'application/json',
           extensions: {
             bazaar: { discoverable: true, bodyType: 'json' },
@@ -536,7 +536,7 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
             maxTimeoutSeconds: 60,
           },
           description:
-            'Prepaid bundle of 25,000 IBAN/BIC/compliance calls (-36% vs retail, 0.0032 USDC per call). One x402 settlement, no expiry. Designed for scale agents (KYB, payroll, batch reconciliation) that want predictable cost.',
+            'Prepaid bundle of 25,000 credits (-36% vs retail, 0.0032 USDC per credit; batch validation debits 1 credit per IBAN). One x402 settlement, no expiry. Designed for scale agents (KYB, payroll, batch reconciliation) that want predictable cost.',
           mimeType: 'application/json',
           extensions: {
             bazaar: { discoverable: true, bodyType: 'json' },

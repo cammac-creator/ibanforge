@@ -32,7 +32,7 @@ landing.get('/', (c) => {
     "@type":"FAQPage",
     "mainEntity":[
       {"@type":"Question","name":"What is IBANforge?","acceptedAnswer":{"@type":"Answer","text":"IBANforge is a REST API for IBAN validation, BIC/SWIFT lookup, and compliance risk scoring. It covers 89 countries with 121K+ BIC entries from public sources (GLEIF, SWIFT directory, Bundesbank, SIX, NBP), 38K of which are LEI-enriched via GLEIF."}},
-      {"@type":"Question","name":"How much does IBANforge cost?","acceptedAnswer":{"@type":"Answer","text":"IBANforge offers a free tier with 200 requests per month using an API key. Beyond that, pay $0.003 to $0.02 per call using USDC micropayments via the x402 protocol. No subscription required."}},
+      {"@type":"Question","name":"How much does IBANforge cost?","acceptedAnswer":{"@type":"Answer","text":"IBANforge offers a free tier with 200 requests per month using an API key. Beyond that, pay $0.002 to $0.02 per call using USDC micropayments via the x402 protocol. No subscription required."}},
       {"@type":"Question","name":"Can AI agents use IBANforge?","acceptedAnswer":{"@type":"Answer","text":"Yes. IBANforge is MCP-native with 5 tools for AI agents: validate_iban, batch_validate_iban, lookup_bic, check_compliance, and lookup_ch_clearing. Compatible with Claude, GPT, and any MCP client."}},
       {"@type":"Question","name":"What countries does IBANforge support?","acceptedAnswer":{"@type":"Answer","text":"IBANforge supports 89 countries with full BBAN parsing, SEPA membership detection, Verification of Payee (VoP) reachability status, and country-level risk classification."}}
     ]
