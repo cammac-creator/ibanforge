@@ -6,6 +6,11 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    ignore:
+      # TypeScript 6 breaks the typescript-eslint peer range (CI red since
+      # 2026-07-13); lift when typescript-eslint supports TS 6.
+      - dependency-name: "typescript"
+        versions: [">=6.0.0"]
     groups:
       x402:
         patterns:
@@ -36,6 +41,9 @@ updates:
       interval: "weekly"
       day: "monday"
     open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: "typescript"
+        versions: [">=6.0.0"]
     groups:
       next:
         patterns:
