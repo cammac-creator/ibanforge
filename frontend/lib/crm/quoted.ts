@@ -6,9 +6,11 @@
  * attribution lines), which makes long threads unreadable when rendered raw.
  */
 
-/** Attribution lines: "On <date>, X wrote:", "Le <date>, X a écrit :", German, Finnish. */
+/** Attribution lines: "On <date>, X wrote:", "Le <date>, X a écrit :", German, Finnish.
+ *  A real attribution always carries a date or an address, so require a digit or an "@":
+ *  without that guard, ordinary prose ending in "wrote:" is mistaken for a quote header. */
 const ATTRIBUTION =
-  /^\s*(On\b.*\bwrote\s*:|Le\b.*\ba écrit\s*:|Am\b.*\bschrieb\b.*:|.*\bkirjoitti\s*:)\s*$/i;
+  /^(?=.*[\d@])\s*(On\b.*\bwrote\s*:|Le\b.*\ba écrit\s*:|Am\b.*\bschrieb\b.*:|.*\bkirjoitti\s*:)\s*$/i;
 
 /** A separator run (underscores or dashes) that introduces a forwarded header block. */
 const SEPARATOR = /^\s*[_-]{5,}\s*$/;
