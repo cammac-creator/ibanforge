@@ -203,3 +203,92 @@ describe('POST /mcp — full handshake', () => {
     expect(uris).toContain('ibanforge://pricing');
   });
 });
+
+/**
+ * Regression guard for the 2026-07-25 security audit, finding 2.
+ *
+ * The daily allowance used to be checked with `body.method === 'tools/call'`.
+ * A JSON-RPC BATCH is an ARRAY, so `body.method` was undefined and a batch of
+ * N tool calls counted as ZERO — the whole paid catalogue was free and
+ * unbounded, and because it rode in one HTTP request the global per-IP rate
+ * limiter did not bound it either. Verified against production before the fix:
+ * counter at 1, 60 tool calls served, counter still at 2.
+ *
+ * Each test pins its own X-Forwarded-For so it gets a fresh daily bucket
+ * (the counter is module-level and keyed by client IP).
+ */
+describe('POST /mcp — JSON-RPC batch billing', () => {
+  function batchOf(n: number, startId = 100) {
+    return Array.from({ length: n }, (_, i) => ({
+      jsonrpc: '2.0',
+      id: startId + i,
+      method: 'tools/call',
+      params: { name: 'lookup_ch_clearing', arguments: { iid: '230' } },
+    }));
+  }
+
+  async function postBatch(app: ReturnType<typeof makeApp>, sessionId: string, ip: string, n: number) {
+    return app.request('/mcp', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json, text/event-stream',
+        'mcp-session-id': sessionId,
+        // Last segment is the trusted-proxy hop, which is what the limiter reads.
+        'X-Forwarded-For': `198.51.100.1, ${ip}`,
+      },
+      body: JSON.stringify(batchOf(n)),
+    });
+  }
+
+  it('bills every tool call in a batch, so an oversized batch is refused', async () => {
+    const app = makeApp();
+    const sessionId = await initialize(app);
+
+    // One batch carrying more calls than a whole day's allowance.
+    const res = await postBatch(app, sessionId, '203.0.113.201', 40);
+    const body = await parseStreamableHttp(res);
+
+    expect(body.error, 'a 40-call batch must not slip past the daily allowance').toBeDefined();
+    expect(body.error?.code).toBe(-32000);
+    expect(body.error?.message).toContain('Daily MCP free tier limit reached');
+  });
+
+  it('leaves a single tool call unaffected', async () => {
+    const app = makeApp();
+    const sessionId = await initialize(app);
+
+    const res = await app.request('/mcp', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json, text/event-stream',
+        'mcp-session-id': sessionId,
+        'X-Forwarded-For': `198.51.100.1, 203.0.113.202`,
+      },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 7, method: 'tools/call', params: { name: 'lookup_ch_clearing', arguments: { iid: '230' } } }),
+    });
+    const body = await parseStreamableHttp(res);
+    expect(body.error).toBeUndefined();
+  });
+
+  it('does not bill discovery, even sent as a batch', async () => {
+    const app = makeApp();
+    const sessionId = await initialize(app);
+
+    const res = await app.request('/mcp', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json, text/event-stream',
+        'mcp-session-id': sessionId,
+        'X-Forwarded-For': `198.51.100.1, 203.0.113.203`,
+      },
+      body: JSON.stringify(
+        Array.from({ length: 40 }, (_, i) => ({ jsonrpc: '2.0', id: 300 + i, method: 'tools/list', params: {} })),
+      ),
+    });
+    const body = await parseStreamableHttp(res);
+    expect(body.error, 'tools/list is free and must stay free in a batch').toBeUndefined();
+  });
+});
