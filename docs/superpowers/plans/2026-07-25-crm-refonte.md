@@ -82,7 +82,6 @@
 **Files:**
 - Create: `frontend/vitest.config.ts`
 - Create: `frontend/lib/crm/types.ts`
-- Create: `frontend/lib/crm/types.test.ts`
 - Modify: `frontend/package.json`
 
 **Interfaces:**
@@ -125,58 +124,14 @@ Dans `frontend/package.json`, section `scripts`, ajouter :
 "test:watch": "vitest"
 ```
 
-- [ ] **Step 4: Écrire le test des types**
-
-`frontend/lib/crm/types.test.ts` — vérifie que l'union discriminée se resserre correctement, ce qui protège les tâches suivantes d'une erreur de modélisation :
-
-```ts
-import { describe, it, expect } from 'vitest';
-import type { Contact } from './types';
-
-describe('Contact discriminated union', () => {
-  it('narrows to the client branch on kind', () => {
-    const c: Contact = {
-      kind: 'client',
-      id: 'acme@example.com',
-      email: 'acme@example.com',
-      company: 'Société Alpha',
-      country: 'CH',
-      website: null,
-      messages: [],
-      draft: null,
-      unread: false,
-      account: 'founder@example.com',
-      apiKey: { keyPrefix: 'ifk_test', paid: true, creditsTotal: 1000, creditsRemaining: 900, monthlyLimit: null, usedAllTime: 42, lastActiveMonth: '2026-07' },
-      usage: { series: [1, 2], months: ['2026-06', '2026-07'], days: [], endpoints: [] },
-    };
-    expect(c.kind === 'client' ? c.apiKey.keyPrefix : null).toBe('ifk_test');
-  });
-
-  it('allows sourcing on a client that came from the prospect list', () => {
-    const c: Contact = {
-      kind: 'client',
-      id: 'beta@example.com',
-      email: 'beta@example.com',
-      company: 'Société Beta',
-      country: 'FR',
-      website: null,
-      messages: [],
-      draft: null,
-      unread: false,
-      account: 'founder@example.com',
-      apiKey: { keyPrefix: 'ifk_beta', paid: false, creditsTotal: null, creditsRemaining: null, monthlyLimit: 200, usedAllTime: 0, lastActiveMonth: null },
-      usage: { series: [], months: [], days: [], endpoints: [] },
-      sourcing: { prospectId: 'p1', segment: 'editeurs', whatTheyDo: null, fitReason: null, buyingSignal: null, signalSourceUrl: null, contactName: null, contactRole: null, emailSourceUrl: null, personalizationHook: null, confidence: 'high', status: 'contacte', source: null },
-    };
-    expect(c.sourcing?.prospectId).toBe('p1');
-  });
-});
-```
-
-- [ ] **Step 5: Lancer le test pour le voir échouer**
+- [ ] **Step 4: Vérifier que vitest tourne**
 
 Run: `cd ~/ibanforge/frontend && npm test`
-Expected: FAIL — `Cannot find module './types'`
+Expected: `No test files found` — vitest est installé et configuré, il n'a simplement rien à exécuter. C'est le résultat attendu : les vrais tests arrivent à la tâche 2.
+
+- [ ] **Step 5: (pas de test unitaire pour les types)**
+
+Un fichier de test qui instancie un objet et vérifie qu'un champ vaut ce qu'on vient d'y écrire n'assert rien : c'est le compilateur qui valide une union discriminée, pas vitest. La garantie vient de `npx tsc --noEmit`, lancé à l'étape 7 et à chaque tâche suivante.
 
 - [ ] **Step 6: Écrire les types**
 
@@ -298,16 +253,16 @@ export interface GuardrailReport {
 }
 ```
 
-- [ ] **Step 7: Lancer le test pour le voir passer**
+- [ ] **Step 7: Vérifier que les types compilent**
 
-Run: `cd ~/ibanforge/frontend && npm test`
-Expected: PASS, 2 tests.
+Run: `cd ~/ibanforge/frontend && npx tsc --noEmit`
+Expected: aucune erreur.
 
 - [ ] **Step 8: Commit**
 
 ```bash
 cd ~/ibanforge
-git add frontend/vitest.config.ts frontend/lib/crm/types.ts frontend/lib/crm/types.test.ts frontend/package.json frontend/package-lock.json
+git add frontend/vitest.config.ts frontend/lib/crm/types.ts frontend/package.json frontend/package-lock.json
 git commit -m "test(crm): add vitest to the frontend and the shared CRM types"
 ```
 
@@ -1068,7 +1023,7 @@ et la signature par `export function threadIsUnread(messages: Message[], lastRea
 - [ ] **Step 6: Vérifier que rien n'est cassé**
 
 Run: `cd ~/ibanforge/frontend && npx tsc --noEmit && npm test`
-Expected: aucune erreur, 27 tests au vert.
+Expected: aucune erreur, 25 tests au vert.
 
 - [ ] **Step 7: Commit**
 
@@ -1587,7 +1542,7 @@ const TABS = [
 - [ ] **Step 6: Vérifier**
 
 Run: `cd ~/ibanforge/frontend && npx tsc --noEmit && npm run lint && npm test`
-Expected: aucune erreur, 27 tests au vert.
+Expected: aucune erreur, 25 tests au vert.
 
 - [ ] **Step 7: Commit**
 
@@ -2586,10 +2541,10 @@ async function askAngles() {
       }),
     });
     const d = await r.json();
-    if (!r.ok) setMsg(`${d.message || d.error || 'Angles indisponibles'} — tu peux générer sans angle.`);
+    if (!r.ok) setMsg(`${d.message || d.error || 'Angles indisponibles'}. Tu peux générer sans angle.`);
     else setAngles(d.angles as Angle[]);
   } catch {
-    setMsg('Erreur réseau — tu peux générer sans angle.');
+    setMsg('Erreur réseau. Tu peux générer sans angle.');
   } finally {
     setBusy(false);
   }
@@ -2679,7 +2634,7 @@ Ouvrir un contact en relance due, cliquer « Générer » : deux ou trois angles
 
 ## Vérification finale
 
-- [ ] `cd ~/ibanforge/frontend && npm test` — 50 tests au vert (types 2, quoted 7, situation 9, build-contacts 9, sent-today 3, guardrails 11, plus les éventuels ajouts)
+- [ ] `cd ~/ibanforge/frontend && npm test` — 39 tests au vert (quoted 7, situation 9, build-contacts 9, sent-today 3, guardrails 11)
 - [ ] `npm run build` réussit
 - [ ] `grep -rn "crm-workspace\|prospects-workspace" frontend/app frontend/components frontend/lib` ne renvoie rien
 - [ ] `/dashboard/customers` et `/dashboard/prospects` redirigent vers `/dashboard/contacts`
