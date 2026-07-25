@@ -23,6 +23,7 @@ import { ogImage } from './routes/og-image.js';
 import { mcpHttp } from './routes/mcp-http.js';
 import { mcpCard } from './routes/mcp-card.js';
 import { feedback } from './routes/feedback.js';
+import { createPlaygroundRelay } from './routes/playground.js';
 import { createX402Middleware, ensureWalletConfigured } from './middleware/x402.js';
 import { apiKeyMiddleware } from './middleware/api-key.js';
 import { enrich402Middleware } from './middleware/enrich-402.js';
@@ -72,7 +73,20 @@ app.use('*', cors({
   // must be allowed through CORS preflight or browser callers can't use it.
   allowHeaders: ['Content-Type', 'Authorization', 'X-Payment', 'X-API-Key'],
 }));
-app.use('*', logger());
+// Hono's logger prints `url.slice(url.indexOf('/', 8))` — the query string
+// INCLUDED — and Railway persists stdout. So `GET /v1/iban/format?iban=CH93…`
+// wrote a full, valid IBAN into log storage, and `?api_key=ifk_…` wrote a live
+// credential next to it. The DPA (clause 6) promises submitted identifiers are
+// "not persisted; processed in memory for the duration of the request", so that
+// log line was a contractual breach that needed no attacker to happen.
+//
+// We keep the parameter NAMES (useful to see which shape callers use) and drop
+// every VALUE. Security audit 2026-07-25, finding 3.
+const redactQueryValues = (line: string): string =>
+  line.replace(/([?&][^=&\s]+)=[^&\s]*/g, '$1=***');
+app.use('*', logger((message: string, ...rest: string[]) => {
+  console.log(redactQueryValues(message), ...rest);
+}));
 app.use('*', async (c, next) => {
   await next();
   c.header('X-Powered-By', 'IBANforge');
@@ -500,6 +514,10 @@ app.route('/', ogImage);
 app.route('/', mcpHttp);
 app.route('/', mcpCard);
 app.route('/', feedback);
+
+// Landing-page demo relay — keeps PLAYGROUND_API_KEY server-side. Mounted
+// outside /v1/* so it is never paywalled, and it re-dispatches into the app.
+app.route('/', createPlaygroundRelay(app));
 
 // Landing page (must be last — catches GET /)
 app.route('/', landing);

@@ -18,6 +18,7 @@ import { lookup } from '../lib/bic-lookup.js';
 import { validateBIC } from '../lib/bic-validator.js';
 import { buildComplianceResult } from '../lib/compliance.js';
 import { lookupClearingByBankCode, normalizeIid } from '../lib/ch-clearing.js';
+import { extractClientIp } from '../lib/stats.js';
 import { buildCountriesPayload, buildPricingPayload, buildValidateAndExplainPrompt } from '../lib/mcp-resources.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -576,14 +577,19 @@ setInterval(() => {
   }
 }, 10 * 60 * 1000);
 
-function checkMcpRateLimit(ip: string): { allowed: boolean; used: number; remaining: number } {
+/**
+ * `units` is the number of tool calls this HTTP request carries — a JSON-RPC
+ * batch bills every element, not one. Defaulting to 1 keeps the single-message
+ * path unchanged.
+ */
+function checkMcpRateLimit(ip: string, units = 1): { allowed: boolean; used: number; remaining: number } {
   const today = new Date().toISOString().slice(0, 10);
   const entry = mcpCallCounts.get(ip);
   if (!entry || entry.date !== today) {
-    mcpCallCounts.set(ip, { count: 1, date: today });
-    return { allowed: true, used: 1, remaining: MCP_DAILY_LIMIT - 1 };
+    mcpCallCounts.set(ip, { count: units, date: today });
+    return { allowed: units <= MCP_DAILY_LIMIT, used: units, remaining: Math.max(0, MCP_DAILY_LIMIT - units) };
   }
-  entry.count++;
+  entry.count += units;
   const allowed = entry.count <= MCP_DAILY_LIMIT;
   return { allowed, used: entry.count, remaining: Math.max(0, MCP_DAILY_LIMIT - entry.count) };
 }
@@ -594,23 +600,34 @@ mcpHttp.post('/mcp', async (c) => {
   // vs. discovery (unlimited). We clone the request so the transport
   // can still read the original body.
   const cloned = c.req.raw.clone();
-  let isToolCall = false;
+  let toolCalls = 0;
   let rpcId: unknown = null;
   try {
     const body = await cloned.json();
-    if (body?.method === 'tools/call') {
-      isToolCall = true;
-      rpcId = body.id;
-    }
+    // JSON-RPC allows a BATCH: the body may be an array of messages. On an
+    // array `body.method` is undefined, so the previous single-object check
+    // scored a 60-call batch as zero tool calls — the daily allowance was
+    // bypassed outright by wrapping the calls in `[...]`, and the global
+    // per-IP rate limiter only ever saw one HTTP request, so nothing else
+    // bounded it either. Count every element instead.
+    // Security audit 2026-07-25, finding 2.
+    const messages: Array<{ method?: unknown; id?: unknown }> = Array.isArray(body) ? body : [body];
+    const calls = messages.filter((m) => m?.method === 'tools/call');
+    toolCalls = calls.length;
+    rpcId = calls[0]?.id ?? null;
   } catch {
     // Not JSON or malformed — let the transport handle the error
   }
 
-  if (isToolCall) {
-    const ip = c.req.header('x-forwarded-for')?.split(',')[0]?.trim()
-      ?? c.req.header('x-real-ip')
-      ?? 'unknown';
-    const limit = checkMcpRateLimit(ip);
+  if (toolCalls > 0) {
+    // Spoof-resistant extraction (trusted-proxy last hop), same rule as the
+    // global rate limiter — the FIRST X-Forwarded-For segment is chosen by the
+    // caller. Audit 2026-07-25, rejected-but-fix-anyway item.
+    const ip = extractClientIp({
+      'x-forwarded-for': c.req.header('x-forwarded-for') ?? null,
+      'x-real-ip': c.req.header('x-real-ip') ?? null,
+    }) ?? 'unknown';
+    const limit = checkMcpRateLimit(ip, toolCalls);
     if (!limit.allowed) {
       // Return a proper JSON-RPC error so the MCP client understands
       return c.json({
