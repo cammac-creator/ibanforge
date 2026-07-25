@@ -251,6 +251,19 @@ export function getStatsDB(): DatabaseType.Database {
         processed_at TEXT DEFAULT (datetime('now'))
       );
     `);
+    // One row per (key, month) once the holder has been warned they are near
+    // the monthly ceiling. The PRIMARY KEY is the idempotency guarantee: a
+    // client burning 190 calls in 12 minutes must get one mail, not 40 — and a
+    // 4xx refund that pushes usage back under the threshold must not re-arm it
+    // within the same month.
+    statsDB.exec(`
+      CREATE TABLE IF NOT EXISTS quota_notices (
+        key_hash TEXT NOT NULL,
+        month    TEXT NOT NULL,
+        sent_at  TEXT DEFAULT (datetime('now')),
+        PRIMARY KEY (key_hash, month)
+      );
+    `);
     // Track request provenance: distinguish MCP HTTP / MCP stdio / REST direct / bot / web
     const reqCols = (statsDB.prepare("PRAGMA table_info(request_log)").all() as Array<{ name: string }>).map(r => r.name);
     if (!reqCols.includes('client_kind')) {

@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { Hono } from 'hono';
 import { apiKeyMiddleware } from './api-key.js';
 import { ibanValidate } from '../routes/iban-validate.js';
@@ -288,6 +288,31 @@ describe('apiKeyMiddleware — paywall cause surfaced in the 402 body', () => {
 
     expect(body.free_tier).toBeUndefined();
     expect(body.credit_packs).toBeDefined();
+  });
+
+  it('fires the 80% warning from the request itself, not from a nightly job', async () => {
+    // A daily cron cannot catch a client that burns 190 of 200 calls in 12
+    // minutes (2026-07-23, funnel audit). The trigger has to be in-request.
+    const key = generateApiKey(`quota80-mw-${RUN_ID}@example.com`, 10)!.api_key;
+    const app = makeApp();
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    try {
+      for (let i = 0; i < 8; i++) {
+        await app.request('/v1/iban/validate', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ iban: 'DE89370400440532013000' }),
+        });
+      }
+      await new Promise((r) => setImmediate(r)); // let the fire-and-forget settle
+
+      // No SMTP in tests, so the send bails loudly — which proves it was reached.
+      const reached = errors.mock.calls.some((c) => String(c[0]).includes('quota warning'));
+      expect(reached).toBe(true);
+    } finally {
+      errors.mockRestore();
+    }
   });
 
   it('leaves the 402 body cause-free for genuinely anonymous requests', async () => {
