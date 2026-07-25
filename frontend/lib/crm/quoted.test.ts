@@ -19,7 +19,19 @@ describe('splitQuoted', () => {
       'Thanks, noted.\n\n________________________________\nFrom: Someone <a@example.com>\nSent: Monday\nSubject: Re: test';
     const r = splitQuoted(body);
     expect(r.fresh).toBe('Thanks, noted.');
-    expect(r.quoted).toContain('From: Someone');
+    // The one exact assertion on `quoted` in the suite: it pins the cut boundary,
+    // which `toContain` cannot do. An off-by-one cut would land on the blank line.
+    expect(r.quoted).toBe(
+      '________________________________\nFrom: Someone <a@example.com>\nSent: Monday\nSubject: Re: test',
+    );
+  });
+
+  it('cuts at a labeled Original Message delimiter', () => {
+    const body =
+      'Thanks, noted.\n\n-----Original Message-----\nFrom: Someone <a@example.com>\nSent: Monday\nSubject: Re: test';
+    const r = splitQuoted(body);
+    expect(r.fresh).toBe('Thanks, noted.');
+    expect(r.quoted).toContain('-----Original Message-----');
   });
 
   it('cuts at a French "a écrit :" attribution', () => {
@@ -32,6 +44,14 @@ describe('splitQuoted', () => {
     const r = splitQuoted('Sounds good.\n\nOn 10 Jul 2026, Jean wrote:\nquoted text');
     expect(r.fresh).toBe('Sounds good.');
     expect(r.quoted).toContain('wrote:');
+  });
+
+  it('cuts at a German attribution line', () => {
+    const r = splitQuoted(
+      'Danke,\n\nAm 10. Juli 2026 um 09:12 schrieb Jean <j@example.com>:\nzitierter Text',
+    );
+    expect(r.fresh).toBe('Danke,');
+    expect(r.quoted).toContain('schrieb');
   });
 
   it('does not cut on a decorative separator with no header after it', () => {

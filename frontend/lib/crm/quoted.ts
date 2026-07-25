@@ -12,10 +12,16 @@
 const ATTRIBUTION =
   /^(?=.*[\d@])\s*(On\b.*\bwrote\s*:|Le\b.*\ba écrit\s*:|Am\b.*\bschrieb\b.*:|.*\bkirjoitti\s*:)\s*$/i;
 
-/** A separator run (underscores or dashes) that introduces a forwarded header block. */
-const SEPARATOR = /^\s*[_-]{5,}\s*$/;
+/** A separator run that introduces a forwarded header block. The middle
+ *  alternative catches labeled delimiters ("-----Original Message-----",
+ *  "---------- Forwarded message ---------"), which a whole-line-of-dashes
+ *  pattern cannot match. The HEADER lookahead below is what keeps a
+ *  decorative rule inside a body from being treated as a quote marker. */
+const SEPARATOR = /^\s*(?:_{5,}|-{3,}[^\n]*?-{3,}|-{5,})\s*$/;
 
-/** Header line that opens a quoted block, in the locales we actually receive. */
+/** Header line that opens a quoted block. English and French forms only: those are the
+ *  header blocks we have actually seen, while ATTRIBUTION deliberately reaches wider
+ *  because this CRM receives mail in locales the interface is not translated into. */
 const HEADER = /^\s*(From|De|Sent|Envoyé|To|À|Subject|Objet)\s*:/i;
 
 export function splitQuoted(body: string | null): { fresh: string; quoted: string } {
