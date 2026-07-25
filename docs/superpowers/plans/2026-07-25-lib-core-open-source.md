@@ -371,7 +371,7 @@ Trois modules feuilles. `issuers-generated.ts` est un fichier **généré** : so
 
 **Interfaces:**
 - Consumes: rien hors de la bibliothèque.
-- Produces: `isValidBIC(code: string): BicResult`, `classifyIssuer(bic8: string, institutionName?: string): IssuerInfo | null`, `normalizeIssuerName(name: string): string`, types `IssuerType`, `IssuerInfo`, `BicResult`.
+- Produces: `validateBIC(code: string): BicResult`, `classifyIssuer(bic8: string, institutionName?: string): IssuerInfo | null`, `normalizeIssuerName(name: string): string`, types `IssuerType`, `IssuerInfo`, `BicResult`.
 
 - [ ] **Step 1: Déplacer les quatre modules et leurs tests**
 
@@ -485,7 +485,7 @@ describe('the package keeps its promises', () => {
     expect(Object.keys(lib).sort()).toEqual(
       [
         'validate',
-        'isValidBIC',
+        'validateBIC',
         'classifyIssuer',
         'normalizeIssuerName',
         'getCountryRisk',
@@ -525,7 +525,7 @@ La surface exporte aussi les tables de structure par pays. Ce n'est pas de la fu
 ```ts
 // Calculation
 export { validate } from './iban.js';
-export { isValidBIC } from './bic-validator.js';
+export { validateBIC } from './bic-validator.js';
 export { classifyIssuer, normalizeIssuerName } from './issuers.js';
 
 // Country reference data (public IBAN registry)
@@ -691,11 +691,11 @@ La tâche la plus délicate. Le garde-fou : **aucun des 607 tests d'IBANforge ne
 **Files:**
 - Modify: `~/ibanforge/package.json` (ajouter la dépendance)
 - Modify: `~/ibanforge/src/lib/iban.ts` (devient un adaptateur)
-- Delete: `~/ibanforge/src/lib/countries.ts`, `bic-validator.ts`, `issuers.ts`, `issuers-generated.ts`, `compliance-static.ts` et leurs tests (déplacés en tâches 1 à 3)
+- Delete: `~/ibanforge/src/lib/issuers-generated.ts` et les tests des modules déplacés (tâches 1 à 3). `countries.ts`, `bic-validator.ts` et `issuers.ts` ne sont pas supprimés mais **remplacés par des façades de réexport** (étape 3). `compliance-static.ts` et son test **restent inchangés** : ils appartiennent au pipeline de rafraîchissement du produit, pas à la bibliothèque.
 - Create: `~/ibanforge/src/lib/countries.ts` → réexport de façade (voir étape 3)
 
 **Interfaces:**
-- Consumes: `validate`, `classifyIssuer`, `isValidBIC`, `getCountryRisk`, `EXAMPLE_IBANS` depuis `ibanforge@^2.0.0`.
+- Consumes: `validate`, `classifyIssuer`, `validateBIC`, `getCountryRisk`, `EXAMPLE_IBANS` depuis `ibanforge@^2.0.0`.
 - Produces: `validateIBAN(input: string): IBANValidationResult` — signature **inchangée** pour les 9 fichiers qui la consomment.
 
 - [ ] **Step 1: Installer la bibliothèque**
@@ -758,7 +758,7 @@ Faire de même pour `bic-validator.ts` :
 
 ```ts
 // Moved to the open-source library (t23).
-export { isValidBIC } from 'ibanforge';
+export { validateBIC } from 'ibanforge';
 ```
 
 et `issuers.ts` :
@@ -772,14 +772,14 @@ export type { IssuerType, IssuerInfo } from 'ibanforge';
 - [ ] **Step 4: Supprimer les fichiers déplacés et leurs tests**
 
 ```bash
-cd ~/ibanforge && git rm src/lib/issuers-generated.ts src/lib/compliance-static.ts \
+cd ~/ibanforge && git rm src/lib/issuers-generated.ts \
   src/lib/countries.test.ts src/lib/iban.test.ts src/lib/bic-validator.test.ts \
-  src/lib/issuers.test.ts src/lib/compliance-static.test.ts
+  src/lib/issuers.test.ts
 ```
 
 Les tests supprimés vivent désormais dans le dépôt de la bibliothèque, où ils testent le code là où il est. Ce sont les **seuls** tests retirés, et ils ne sont pas perdus.
 
-`compliance-static.ts` est consommé par `src/lib/compliance.ts` : y remplacer l'import par `from 'ibanforge'`.
+**`compliance-static.ts` RESTE dans IBANforge, avec son test.** Le plan affirmait à tort qu'il était consommé par `src/lib/compliance.ts` : son seul consommateur réel est `scripts/refresh-compliance.ts`, qui sème la table SQLite `fatf_countries` que le runtime lit ensuite. Le propriétaire canonique de ces listes est donc un pipeline adossé à une base, pas une bibliothèque hors ligne. Il a été retiré de la bibliothèque en tâche 4 : ne le supprime pas ici, et ne touche pas à son import.
 
 - [ ] **Step 5: Lancer la vérification complète**
 
