@@ -2,6 +2,7 @@ import { describe, it, expect, afterAll } from 'vitest';
 import { recordOperation, recordBatch, recordRequest, recordRejection, getRejectionStats, getStats, getQuickStats, getStatsHistory, getStatusByPath, getBusinessFunnel, classifyClient, extractClientIp } from './stats.js';
 import { generateApiKey } from './api-keys.js';
 import { closeAll, getStatsDB } from './db.js';
+import type { RejectReason } from './input-normalize.js';
 
 afterAll(() => {
   closeAll();
@@ -283,16 +284,21 @@ describe('recordRejection', () => {
   // Asserted over EVERY rejection row, not just the ones this test wrote, so a
   // future caller that leaks an IBAN/BIC/IID into the column fails here.
   it('persists a category only — no submitted value, no country attribution', () => {
-    const categories = [
-      'placeholder_literal',
-      'normalizable',
-      'too_short',
-      'too_long',
-      'invalid_length',
-      'invalid_charset',
-      'not_numeric',
-      'not_an_identifier',
-    ];
+    // `satisfies Record<RejectReason, true>` : ajouter une raison à l'union sans
+    // l'ajouter ici ne compile plus. Une simple liste de chaînes avait déjà
+    // dérivé une fois (le jour où `invalid_bic_shape` est apparu), et le test
+    // échouait alors sur des lignes parfaitement légitimes.
+    const categories = Object.keys({
+      placeholder_literal: true,
+      normalizable: true,
+      too_short: true,
+      too_long: true,
+      invalid_length: true,
+      invalid_charset: true,
+      not_numeric: true,
+      not_an_identifier: true,
+      invalid_bic_shape: true,
+    } satisfies Record<RejectReason, true>);
     recordRejection('ch_clearing_lookup', 'not_numeric');
     const rows = getStatsDB()
       .prepare('SELECT country_code, success, error_detail, reject_reason FROM operations WHERE reject_reason IS NOT NULL')

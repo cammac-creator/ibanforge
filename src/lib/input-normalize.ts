@@ -17,7 +17,13 @@ export type RejectReason =
   | 'invalid_length'
   | 'invalid_charset'
   | 'not_numeric'
-  | 'not_an_identifier';
+  | 'not_an_identifier'
+  // Seule raison qu'aucun `classify*` ne rend : elle est enregistrée par la
+  // route APRÈS la garde, pour un BIC qui passe « 8 ou 11 alphanumériques »
+  // mais viole la forme ISO 9362 (ex. 12345678, qui n'a pas [A-Z]{4} en tête).
+  // Sans elle, ces 400 ne tomberaient dans aucune catégorie et les compteurs
+  // ne totaliseraient pas les 400 réellement servis.
+  | 'invalid_bic_shape';
 
 /** Séparateurs qu'agents et humains recopient depuis un document ou un IBAN. */
 const SEPARATORS = /[\s.\-–—_/\\]/g;
@@ -65,8 +71,17 @@ export function classifyBicInput(raw: string): RejectReason | null {
   // que leur jeu de caractères est correct, et gonfleraient un compteur qu'on
   // lira pour décider quoi tolérer en phase 2.
   if (n.length !== 8 && n.length !== 11) return 'invalid_length';
-  // Reste le cas d'une longueur correcte mais d'un caractère dans une position
-  // qui ne l'admet pas (un chiffre dans le code banque ou le code pays).
+  // Branche terminale, vérifiée à l'exécution : il faut DEUX anomalies à la
+  // fois pour l'atteindre.
+  //   1. un caractère non-ASCII dont la majuscule EST alphanumérique ASCII
+  //      (« ſ » → « S », « ı » → « I »), seul moyen d'échouer la garde brute
+  //      sans être capté par le `invalid_charset` du dessus ;
+  //   2. ET un chiffre dans le code banque ou le code pays, sinon la forme
+  //      normalisée est un BIC valide et `normalizable` l'a déjà pris.
+  // Exemple réel : « 1BSWCHZſ ». Un chiffre mal placé SEUL ne vient plus ici
+  // (« 1BSWCHZH » passe la garde et rend null ; « UBSW-1HZH » part en
+  // `not_an_identifier` à cause du tiret) — c'est ce que disait l'ancien
+  // commentaire, et c'était devenu faux.
   return 'invalid_charset';
 }
 
