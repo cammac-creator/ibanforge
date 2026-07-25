@@ -16,10 +16,14 @@ export type RejectReason =
   | 'too_long'
   | 'invalid_length'
   | 'invalid_charset'
-  | 'not_numeric';
+  | 'not_numeric'
+  | 'not_an_identifier';
 
 /** Séparateurs qu'agents et humains recopient depuis un document ou un IBAN. */
 const SEPARATORS = /[\s.\-–—_/\\]/g;
+
+/** Raw input carried a separator: a real identifier would already have matched `normalizable`. */
+const HAS_SEPARATOR = /[\s.\-–—_/\\]/;
 
 const PLACEHOLDER = /^\{.*\}$/;
 
@@ -46,6 +50,13 @@ export function classifyBicInput(raw: string): RejectReason | null {
 
   const n = normalizeIdentifier(raw);
   if (BIC_SHAPE.test(n)) return 'normalizable';
+  // Du texte libre, pas un identifiant mal tapé : un vrai BIC écrit avec des
+  // séparateurs vient d'être capté par `normalizable` juste au-dessus. Sans ce
+  // test, « UBS Switzerland AG » compterait comme `too_long` et ferait conclure
+  // « les agents envoient des identifiants trop longs, tronquons » alors que la
+  // population réelle est des noms de banques — qui appellent une recherche
+  // nom→BIC, pas plus de tolérance.
+  if (HAS_SEPARATOR.test(raw)) return 'not_an_identifier';
   if (!/^[A-Z0-9]*$/.test(n)) return 'invalid_charset';
   if (n.length < 8) return 'too_short';
   if (n.length > 11) return 'too_long';
@@ -69,6 +80,11 @@ export function classifyIidInput(raw: string): RejectReason | null {
   const stripped = normalizeIdentifier(raw).replace(/^CH/, '');
   if (/^\d{1,5}$/.test(stripped)) return 'normalizable';
 
+  // Même raison que côté BIC : « account-230-CHF » et « account-230-CHF-2026 »
+  // sont le même déchet, mais le second compte 7 chiffres et tombait dans
+  // `too_long` — deux seaux différents décidés par un nombre de chiffres
+  // accidentel.
+  if (HAS_SEPARATOR.test(raw)) return 'not_an_identifier';
   if (!/\d/.test(raw)) return 'not_numeric';
   if (raw.replace(/\D/g, '').length > 5) return 'too_long';
   return 'invalid_charset';

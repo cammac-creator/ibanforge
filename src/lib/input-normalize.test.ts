@@ -31,6 +31,11 @@ describe('classifyBicInput', () => {
     expect(classifyBicInput('UBSWCHZHXX')).toBe('invalid_length');
     expect(classifyBicInput('UBSWCHZ!')).toBe('invalid_charset');
   });
+  it('ne compte pas un nom de banque comme un identifiant trop long', () => {
+    expect(classifyBicInput('UBS Switzerland AG')).toBe('not_an_identifier');
+    // Sans séparateur, la longueur reste la vraie explication du rejet.
+    expect(classifyBicInput('UBSSWITZERLANDAG')).toBe('too_long');
+  });
 });
 
 describe('classifyIidInput', () => {
@@ -55,7 +60,14 @@ describe('classifyIidInput', () => {
     expect(classifyIidInput(' 230 ')).toBe('normalizable');
   });
   it('refuse de deviner un IID noyé dans du texte', () => {
-    expect(classifyIidInput('230 Zurich')).toBe('invalid_charset');
-    expect(classifyIidInput('account-230-CHF')).toBe('invalid_charset');
+    expect(classifyIidInput('230 Zurich')).toBe('not_an_identifier');
+    expect(classifyIidInput('account-230-CHF')).toBe('not_an_identifier');
+  });
+  it('range le même déchet dans le même seau, quel que soit le nombre de chiffres', () => {
+    expect(classifyIidInput('account-230-CHF')).toBe('not_an_identifier');
+    expect(classifyIidInput('account-230-CHF-2026')).toBe('not_an_identifier');
+  });
+  it('garde invalid_charset pour un cafouillage sans séparateur', () => {
+    expect(classifyIidInput('a1b2c3')).toBe('invalid_charset');
   });
 });
