@@ -20,7 +20,10 @@ import Database from 'better-sqlite3';
 import { readFileSync, writeFileSync } from 'node:fs';
 
 const SNAPSHOT = 'scripts/data/eu-emi-register-2026-05-22.json';
-const OUT = 'src/lib/issuers-generated.ts';
+// The generated file now lives in the open-source library. The generator stays
+// here: it cross-matches the public EBA/FCA registers against the BIC base,
+// which is private and does not leave this repo.
+const OUT = process.env.ISSUERS_OUT ?? '../iban-core/src/issuers-generated.ts';
 
 // Corporate/legal-form tokens stripped before matching, so that e.g.
 // "Stripe Payments UK Limited" and "STRIPE PAYMENTS UK LTD" align.
