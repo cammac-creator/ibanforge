@@ -1,7 +1,7 @@
 # IBANforge
 
 [![API Status](https://img.shields.io/badge/API-live-brightgreen)](https://api.ibanforge.com/health)
-[![MCP Registry](https://img.shields.io/badge/MCP_Registry-1.2.0-purple)](https://registry.modelcontextprotocol.io/v0/servers?search=ibanforge)
+[![MCP Registry](https://img.shields.io/badge/MCP_Registry-1.3.3-purple)](https://registry.modelcontextprotocol.io/v0/servers?search=ibanforge)
 [![npm ibanforge-mcp](https://img.shields.io/npm/v/ibanforge-mcp?label=ibanforge-mcp)](https://www.npmjs.com/package/ibanforge-mcp)
 [![npm @ibanforge/sdk](https://img.shields.io/npm/v/@ibanforge/sdk?label=@ibanforge/sdk)](https://www.npmjs.com/package/@ibanforge/sdk)
 [![PyPI ibanforge](https://img.shields.io/pypi/v/ibanforge?label=pypi%20ibanforge)](https://pypi.org/project/ibanforge/)
@@ -13,7 +13,7 @@
 > **The compliance API for AI agents.** IBAN validation, BIC/SWIFT lookup, Swiss clearing (BC-Nummer / QR-IID / SIX BankMaster), EMI/vIBAN classification, SEPA Instant + VoP reachability, and risk scoring — exposed natively over **MCP** and **x402 micropayments**, with no API key signup required.
 
 ```
-121k+ BIC entries (38k+ LEI via GLEIF) · ~1,200 Swiss BC-Nummern (SIX) · 89 IBAN countries · <50ms p99
+121k+ BIC entries (39k+ LEI via GLEIF) · ~1,200 Swiss BC-Nummern (SIX) · 89 IBAN countries · <50ms p99
 ```
 
 ---
@@ -61,7 +61,7 @@ Standard JSON-RPC `initialize` + `tools/list` + `tools/call` flow. Use this when
 | --------------------- | ----------------------------------------------------------------------------------------- | -------- |
 | `validate_iban`       | User mentions an IBAN, a bank account, or a SEPA payment                                  | $0.005   |
 | `batch_validate_iban` | List of IBANs, CSV cleanup, customer DB dedup, payout list triage                         | $0.002/each |
-| `lookup_bic`          | User already has a BIC/SWIFT — backed by 121k+ BIC entries (38k+ LEI-enriched via GLEIF) | $0.003   |
+| `lookup_bic`          | User already has a BIC/SWIFT — backed by 121k+ BIC entries (39k+ LEI-enriched via GLEIF) | $0.003   |
 | `lookup_ch_clearing`  | Swiss BC-Nummer / IID — **the deepest Swiss clearing data in any public API**: full SIX BankMaster rail participation (SIC, euroSIC, CHF instant) + QR-IID | $0.003   |
 | `check_compliance`    | Pre-flight risk triage before a SEPA / cross-border payment (sanctions + FATF + VoP)      | $0.02    |
 
