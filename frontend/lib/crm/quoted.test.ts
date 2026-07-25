@@ -20,7 +20,8 @@ describe('splitQuoted', () => {
     const r = splitQuoted(body);
     expect(r.fresh).toBe('Thanks, noted.');
     // The one exact assertion on `quoted` in the suite: it pins the cut boundary,
-    // which `toContain` cannot do. An off-by-one cut would land on the blank line.
+    // which `toContain` cannot do. It catches a cut starting one line too late, which
+    // drops the separator. A cut one line too early is hidden by the trim().
     expect(r.quoted).toBe(
       '________________________________\nFrom: Someone <a@example.com>\nSent: Monday\nSubject: Re: test',
     );
