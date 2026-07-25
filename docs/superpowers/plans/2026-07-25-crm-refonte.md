@@ -105,7 +105,7 @@ import { resolve } from 'node:path';
 
 export default defineConfig({
   test: {
-    // Les seuls modules testés sont purs : pas besoin d'environnement DOM.
+    // The only modules under test are pure: no DOM environment needed.
     environment: 'node',
     include: ['lib/**/*.test.ts'],
   },
