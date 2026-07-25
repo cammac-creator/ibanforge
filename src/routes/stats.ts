@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { getStats, getStatsHistory, getHourlyStats, getErrorStats, getPatternStats, getStatusByPath, getBusinessFunnel, getSourceStats } from '../lib/stats.js';
+import { getStats, getStatsHistory, getHourlyStats, getErrorStats, getPatternStats, getStatusByPath, getBusinessFunnel, getSourceStats, getRejectionStats } from '../lib/stats.js';
 import { getEntryCount } from '../lib/bic-lookup.js';
 
 const stats = new Hono();
@@ -73,6 +73,33 @@ stats.get('/stats/errors', (c) => {
     if (isNaN(days)) days = 30;
     days = Math.max(1, Math.min(90, days));
     return c.json(getErrorStats(days));
+  } catch {
+    return c.json({ error: 'stats_unavailable' }, 500);
+  }
+});
+
+/**
+ * Pourquoi un endpoint à part : un rejet de format n'est jamais une opération
+ * (la requête n'atteint pas le service), il vit dans une voie séparée de la
+ * table `operations` que toutes les autres agrégations excluent. C'est la
+ * lecture qui décidera de la phase 2 — si le volume est surtout
+ * `placeholder_literal`, le problème est dans la spec OpenAPI, pas dans la
+ * tolérance des gardes.
+ *
+ * Le paramètre est `days` (et non `period` comme les routes voisines) : c'est
+ * celui que lit la procédure de dépouillement de la phase 2.
+ */
+stats.get('/stats/rejections', (c) => {
+  if (!checkAuth(c.req.header('Authorization'))) {
+    return c.json({ error: 'unauthorized', message: 'Stats require authentication.' }, 403);
+  }
+
+  try {
+    const daysParam = c.req.query('days');
+    let days = daysParam ? parseInt(daysParam, 10) : 30;
+    if (isNaN(days)) days = 30;
+    days = Math.max(1, Math.min(90, days));
+    return c.json({ period_days: days, rows: getRejectionStats(days) });
   } catch {
     return c.json({ error: 'stats_unavailable' }, 500);
   }

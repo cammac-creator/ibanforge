@@ -34,7 +34,8 @@ import { stripeRetrieve } from './routes/stripe-retrieve.js';
 import { stripeSuccess } from './routes/stripe-success.js';
 import { ibanStructure } from './routes/iban-structure.js';
 import { rateLimitMiddleware } from './middleware/rate-limit.js';
-import { recordRequest, classifyClient, hashIp, extractClientIp, purgeOldRequestLog, purgeTerminatedKeyTelemetry } from './lib/stats.js';
+import { recordRequest, recordRejection, classifyClient, hashIp, extractClientIp, purgeOldRequestLog, purgeTerminatedKeyTelemetry } from './lib/stats.js';
+import { classifyBicInput, classifyIidInput } from './lib/input-normalize.js';
 import { getEntryCount, getChClearingCount, getLeiEnrichedCount } from './lib/bic-lookup.js';
 
 // Fail-fast: refuse to start in production without wallet config
@@ -134,6 +135,7 @@ const SKIP_TRACKING = new Set([
   '/stats/status-by-path',
   '/stats/business-funnel',
   '/stats/sources',
+  '/stats/rejections',
   '/health',
   '/ping',
 ]);
@@ -437,12 +439,21 @@ app.post('/v1/iban/batch', async (c, next) => {
   }
   await next();
 });
+// C'est ICI, et pas dans les routes, que naissent les 400 de format servis en
+// production : ces deux gardes s'exécutent avant le paiement x402 (volontaire —
+// on ne facture pas une entrée malformée) et renvoient sans appeler next(), donc
+// la route n'est jamais atteinte. Instrumenter uniquement les routes compterait
+// zéro rejet. Les routes portent le même comptage pour le cas où elles sont
+// montées seules (tests) ; les deux copies s'excluent mutuellement, un rejet
+// n'est donc jamais compté deux fois.
 app.get('/v1/bic/:code', async (c, next) => {
   const code = c.req.param('code');
   // Agents sometimes call the OpenAPI template path literally (e.g. `/v1/bic/{code}`
   // decoded to `{code}`). Catch this with a dedicated message instead of the
   // generic format error, so the agent can self-correct.
-  if (code === '{code}' || /^\{.*\}$/.test(code)) {
+  const rejection = classifyBicInput(code);
+  if (rejection === 'placeholder_literal') {
+    recordRejection('bic_lookup', rejection);
     return c.json({
       error: 'placeholder_literal',
       message: "You sent the literal OpenAPI placeholder '" + code + "'. Substitute it with a real BIC.",
@@ -450,14 +461,17 @@ app.get('/v1/bic/:code', async (c, next) => {
       schema: 'https://api.ibanforge.com/openapi.json',
     }, 400);
   }
-  if (!/^[A-Za-z0-9]{8}([A-Za-z0-9]{3})?$/.test(code)) {
+  if (rejection !== null) {
+    recordRejection('bic_lookup', rejection);
     return c.json({ error: 'invalid_bic_format', message: 'BIC code must be 8 or 11 alphanumeric characters' }, 400);
   }
   await next();
 });
 app.get('/v1/ch/clearing/:iid', async (c, next) => {
   const iid = c.req.param('iid');
-  if (iid === '{iid}' || /^\{.*\}$/.test(iid)) {
+  const rejection = classifyIidInput(iid);
+  if (rejection === 'placeholder_literal') {
+    recordRejection('ch_clearing_lookup', rejection);
     return c.json({
       error: 'placeholder_literal',
       message: "You sent the literal OpenAPI placeholder '" + iid + "'. Substitute it with a real Swiss IID.",
@@ -465,7 +479,8 @@ app.get('/v1/ch/clearing/:iid', async (c, next) => {
       schema: 'https://api.ibanforge.com/openapi.json',
     }, 400);
   }
-  if (!/^\d{1,5}$/.test(iid)) {
+  if (rejection !== null) {
+    recordRejection('ch_clearing_lookup', rejection);
     return c.json({ error: 'invalid_iid_format', message: 'IID must be a 1-5 digit number.' }, 400);
   }
   await next();

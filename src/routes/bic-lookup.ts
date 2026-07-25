@@ -3,7 +3,8 @@ import type { HonoEnv } from '../types.js';
 import { validateBIC } from '../lib/bic-validator.js';
 import { lookup } from '../lib/bic-lookup.js';
 import { hasNonLatinScript } from '../lib/gleif-address.js';
-import { recordOperation } from '../lib/stats.js';
+import { classifyBicInput } from '../lib/input-normalize.js';
+import { recordOperation, recordRejection } from '../lib/stats.js';
 import { computeRevenue } from '../lib/request-helpers.js';
 import type { BICLookupResult } from '../types.js';
 
@@ -15,7 +16,16 @@ bicLookup.get('/v1/bic/:code', (c) => {
   const start = performance.now();
   const code = c.req.param('code');
 
-  if (code === '{code}' || /^\{.*\}$/.test(code)) {
+  // `classifyBicInput` rend null EXACTEMENT quand l'ancienne garde
+  // « 8 ou 11 alphanumériques » acceptait déjà : les statuts et les corps de
+  // réponse ci-dessous sont inchangés, on ne fait qu'étiqueter le rejet.
+  // Attention : dans l'app montée, ce sont les gardes de src/index.ts qui
+  // répondent en premier (elles s'exécutent avant le paiement x402) et qui
+  // portent le même comptage — les deux ne peuvent pas se déclencher ensemble.
+  const rejection = classifyBicInput(code);
+
+  if (rejection === 'placeholder_literal') {
+    recordRejection('bic_lookup', rejection);
     return c.json(
       {
         error: 'placeholder_literal',
@@ -27,7 +37,8 @@ bicLookup.get('/v1/bic/:code', (c) => {
     );
   }
 
-  if (!/^[A-Za-z0-9]{8}([A-Za-z0-9]{3})?$/.test(code)) {
+  if (rejection !== null) {
+    recordRejection('bic_lookup', rejection);
     return c.json(
       {
         error: 'invalid_bic_format',
@@ -40,6 +51,10 @@ bicLookup.get('/v1/bic/:code', (c) => {
   const validation = validateBIC(code);
 
   if (!validation.valid) {
+    // Passe la garde de format mais viole la forme ISO 9362 (ex. 12345678, qui
+    // n'a pas [A-Z]{4} en tête). Sans ce compteur, ces 400 n'apparaîtraient
+    // dans aucune catégorie et le total des rejets serait sous-estimé.
+    recordRejection('bic_lookup', 'invalid_bic_shape');
     return c.json(
       {
         error: 'invalid_bic_format',
