@@ -68,7 +68,8 @@ export function getStatsDB(): DatabaseType.Database {
         created_at TEXT DEFAULT (datetime('now')),
         hour INTEGER,
         day_of_week INTEGER,
-        error_detail TEXT
+        error_detail TEXT,
+        reject_reason TEXT
       );
       CREATE TABLE IF NOT EXISTS daily_stats (
         date TEXT NOT NULL,
@@ -204,6 +205,12 @@ export function getStatsDB(): DatabaseType.Database {
     if (!existingCols.includes('hour')) statsDB.exec('ALTER TABLE operations ADD COLUMN hour INTEGER');
     if (!existingCols.includes('day_of_week')) statsDB.exec('ALTER TABLE operations ADD COLUMN day_of_week INTEGER');
     if (!existingCols.includes('error_detail')) statsDB.exec('ALTER TABLE operations ADD COLUMN error_detail TEXT');
+    // Why a column of its own, next to error_detail: error_detail holds a
+    // truncated slice of the SUBMITTED value, reject_reason holds only a
+    // category from the RejectReason union. Keeping them apart is what lets us
+    // count "what agents get rejected for" without retaining what they sent (DPA).
+    if (!existingCols.includes('reject_reason')) statsDB.exec('ALTER TABLE operations ADD COLUMN reject_reason TEXT');
+    statsDB.exec('CREATE INDEX IF NOT EXISTS idx_operations_reject ON operations(reject_reason)');
     const keyCols = (statsDB.prepare("PRAGMA table_info(api_keys)").all() as Array<{ name: string }>).map(r => r.name);
     if (!keyCols.includes('monthly_limit')) statsDB.exec('ALTER TABLE api_keys ADD COLUMN monthly_limit INTEGER');
     // Credits-based keys (Bundle credits product). When credits_remaining is
