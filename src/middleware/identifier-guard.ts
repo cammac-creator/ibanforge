@@ -33,8 +33,13 @@ import type { HonoEnv } from '../types.js';
 
 // Les chemins sont dans le TYPE, pas seulement dans src/index.ts : c'est ce qui
 // fait que `c.req.param('code')` est un `string` et non `string | undefined`
-// (Hono déduit le paramètre du motif). Monter une de ces gardes sur un autre
-// chemin ne compile pas — un garde-fou gratuit contre un déplacement mal fait.
+// (Hono déduit le paramètre du motif).
+//
+// ⚠️ Ce type ne protège PAS du montage sur un mauvais chemin : vérifié par
+// compilation hors-arbre, `app.get('/v1/wrong/:other', bicGuardMiddleware())`
+// compile sans erreur — la surcharge permissive de `get` avale l'écart de
+// chemin. Le seul garant que la garde tourne au bon endroit est son montage
+// dans src/index.ts. Ne pas lire ce type comme un filet de sécurité.
 type BIC_PATH = '/v1/bic/:code';
 type IID_PATH = '/v1/ch/clearing/:iid';
 
