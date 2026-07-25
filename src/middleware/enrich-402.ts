@@ -529,6 +529,38 @@ function causeFields(cause: PaywallCause | undefined): Record<string, unknown> {
   return { cause, message: cause.detail };
 }
 
+/**
+ * Causes where the caller ALREADY holds a key and has simply run out of
+ * allowance. For them the free tier is not an upgrade path, it is a way to
+ * never pay: the 2026-07-25 funnel audit measured a client hit the quota wall
+ * at 15:03:40, mint a second free key at 15:08:49 and be back in service by
+ * 15:42:10, for $0. Shipping `free_tier.signup` inside a "you must pay now"
+ * response is what makes that the path of least resistance.
+ *
+ * `invalid_api_key` is deliberately NOT in this set: that caller may genuinely
+ * have lost their key and needs the signup route.
+ */
+const ALLOWANCE_EXHAUSTED: ReadonlySet<PaywallCause['reason']> = new Set([
+  'monthly_quota_exhausted',
+  'monthly_quota_insufficient',
+  'credits_exhausted',
+  'credits_insufficient',
+]);
+
+/**
+ * Strips the free-tier signup rail from a 402 whose cause is an exhausted
+ * allowance, leaving the paid rails (`credit_packs` first, then `x402`) as the
+ * only ways forward. No-op for every other cause.
+ */
+function stripFreeTierWhenExhausted(
+  body: Record<string, unknown>,
+  cause: PaywallCause | undefined,
+): Record<string, unknown> {
+  if (!cause || !ALLOWANCE_EXHAUSTED.has(cause.reason)) return body;
+  const { free_tier: _dropped, ...rest } = body;
+  return rest;
+}
+
 export function enrich402Middleware(): MiddlewareHandler<HonoEnv> {
   return async (c, next) => {
     await next();
@@ -562,13 +594,17 @@ export function enrich402Middleware(): MiddlewareHandler<HonoEnv> {
       // (x402Version, error, …); the ramp's fields then take precedence.
       // `accepts` is never part of buildAccessRamp() — reassigned explicitly
       // so the outputSchema injection stays intact.
-      const enriched: Record<string, unknown> = {
-        x402Version: 1,
-        error: 'payment_required',
-        ...parsed,
-        ...buildAccessRamp(),
-        ...causeFields(c.get('paywallCause')),
-      };
+      const paywallCause = c.get('paywallCause');
+      const enriched: Record<string, unknown> = stripFreeTierWhenExhausted(
+        {
+          x402Version: 1,
+          error: 'payment_required',
+          ...parsed,
+          ...buildAccessRamp(),
+          ...causeFields(paywallCause),
+        },
+        paywallCause,
+      );
       enriched.accepts = patchedAccepts;
 
       c.res = new Response(JSON.stringify(enriched, null, 2), {
@@ -602,13 +638,17 @@ export function enrich402Middleware(): MiddlewareHandler<HonoEnv> {
 
     const accepts = pricing ? [injectOutputSchema(method, url.pathname, baseAccept)] : [];
 
-    const body = {
-      x402Version: 1,
-      error: 'payment_required',
-      accepts,
-      ...buildAccessRamp(),
-      ...causeFields(c.get('paywallCause')),
-    };
+    const fallbackCause = c.get('paywallCause');
+    const body = stripFreeTierWhenExhausted(
+      {
+        x402Version: 1,
+        error: 'payment_required',
+        accepts,
+        ...buildAccessRamp(),
+        ...causeFields(fallbackCause),
+      },
+      fallbackCause,
+    );
 
     c.res = new Response(JSON.stringify(body, null, 2), {
       status: 402,

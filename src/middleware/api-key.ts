@@ -2,6 +2,7 @@ import type { MiddlewareHandler } from 'hono';
 import type { HonoEnv } from '../types.js';
 import { validateApiKey, checkAndIncrementQuota, decrementQuota, decrementCredits, refundCredit } from '../lib/api-keys.js';
 import { getIbansArray } from '../lib/request-helpers.js';
+import { CARD_CHECKOUT_HINT } from '../lib/payment-links.js';
 
 /**
  * Extract an IBANforge API key from common locations agents use:
@@ -95,9 +96,10 @@ export function apiKeyMiddleware(): MiddlewareHandler<HonoEnv> {
           reason: shortfall ? 'credits_insufficient' : 'credits_exhausted',
           detail: shortfall
             ? `This batch of ${units} IBANs needs ${units} credits (1 credit per IBAN) but only ${remaining} remain — nothing was debited. ` +
-              `Send a batch of ≤${remaining} IBANs, top up (POST /v1/credits/buy/1k|5k|25k), or pay per call via x402.`
-            : `Your prepaid credit bundle (${creditsTotal ?? 0} credits) is used up. ` +
-              'Top up: POST /v1/credits/buy/1k|5k|25k — or pay per call via x402.',
+              `Send a batch of ≤${remaining} IBANs, or top up now. ${CARD_CHECKOUT_HINT}. ` +
+              'Prefer USDC? POST /v1/credits/buy/1k|5k|25k, or pay per call via x402.'
+            : `Your prepaid credit bundle (${creditsTotal ?? 0} credits) is used up. ${CARD_CHECKOUT_HINT}. ` +
+              'Prefer USDC? POST /v1/credits/buy/1k|5k|25k, or pay per call via x402.',
           credits: { required: units, remaining, total: creditsTotal ?? 0, topup: 'POST /v1/credits/buy/1k|5k|25k' },
         });
         c.header(shortfall ? 'X-Credits-Insufficient' : 'X-Credits-Exhausted', 'true');
@@ -137,10 +139,11 @@ export function apiKeyMiddleware(): MiddlewareHandler<HonoEnv> {
         detail: shortfall
           ? `This batch of ${units} IBANs needs ${units} free-tier requests (1 per IBAN) but only ${quota.remaining} remain for ${quota.month} ` +
             `(${quota.used}/${quota.limit} used) — nothing was consumed. Send a batch of ≤${quota.remaining} IBANs, ` +
-            'use prepaid credit packs (POST /v1/credits/buy/1k|5k|25k), or pay per call via x402.'
+            `or lift the limit now. ${CARD_CHECKOUT_HINT}. ` +
+            'Prefer USDC? POST /v1/credits/buy/1k|5k|25k, or pay per call via x402.'
           : `Your free tier is exhausted for ${quota.month} (${quota.used}/${quota.limit} requests used) — ` +
-            'it resets on the 1st of next month. To keep going now: prepaid credit packs ' +
-            '(POST /v1/credits/buy/1k|5k|25k) or pay per call via x402.',
+            `it resets on the 1st of next month. To keep going now: ${CARD_CHECKOUT_HINT}. ` +
+            'Prefer USDC? POST /v1/credits/buy/1k|5k|25k, or pay per call via x402.',
         quota: { used: quota.used, limit: quota.limit, month: quota.month, resets: '1st of month', required: units, remaining: quota.remaining },
       });
       c.header(shortfall ? 'X-Quota-Insufficient' : 'X-Quota-Exhausted', 'true');

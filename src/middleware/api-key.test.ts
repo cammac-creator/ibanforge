@@ -263,6 +263,33 @@ describe('apiKeyMiddleware — paywall cause surfaced in the 402 body', () => {
     expect(body.message).toContain('resets on the 1st');
   });
 
+  it('offers a one-click card checkout in the exhausted-quota message, not only USDC rails', async () => {
+    const key = generateApiKey(`cause-card-${RUN_ID}@example.com`)!.api_key;
+    const { keyHash, monthlyLimit } = validateApiKey(key);
+    let quota = checkAndIncrementQuota(keyHash, monthlyLimit ?? undefined);
+    while (quota.allowed) quota = checkAndIncrementQuota(keyHash, monthlyLimit ?? undefined);
+
+    const app = await makePaywalledApp();
+    const res = await app.request('/v1/paid', { headers: { Authorization: `Bearer ${key}` } });
+    const body = (await res.json()) as { message?: string };
+
+    expect(body.message).toContain('https://buy.stripe.com/');
+  });
+
+  it('stops handing the free-tier signup recipe to a client whose quota is exhausted', async () => {
+    const key = generateApiKey(`cause-nofree-${RUN_ID}@example.com`)!.api_key;
+    const { keyHash, monthlyLimit } = validateApiKey(key);
+    let quota = checkAndIncrementQuota(keyHash, monthlyLimit ?? undefined);
+    while (quota.allowed) quota = checkAndIncrementQuota(keyHash, monthlyLimit ?? undefined);
+
+    const app = await makePaywalledApp();
+    const res = await app.request('/v1/paid', { headers: { Authorization: `Bearer ${key}` } });
+    const body = (await res.json()) as { free_tier?: unknown; credit_packs?: unknown };
+
+    expect(body.free_tier).toBeUndefined();
+    expect(body.credit_packs).toBeDefined();
+  });
+
   it('leaves the 402 body cause-free for genuinely anonymous requests', async () => {
     const app = await makePaywalledApp();
     const res = await app.request('/v1/paid');
