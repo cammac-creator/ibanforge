@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import type Database from 'better-sqlite3';
 import { getStatsDB } from './db.js';
 import { isInternalEmail } from './internal-accounts.js';
+import type { RejectReason } from './input-normalize.js';
 import type { OperationType, StatsOverview, HourlyStatsResponse, ErrorStatsResponse, PatternStatsResponse } from '../types.js';
 
 // ---------------------------------------------------------------------------
@@ -248,6 +249,44 @@ export function recordOperation(
     // DB is visible instead of silently dropping every operation.
     console.error('[stats] recordOperation failed:', err);
   }
+}
+
+/**
+ * Un rejet de format n'atteint jamais recordOperation : les routes renvoient
+ * 400 avant. Sans cette fonction, un rejet n'existe que comme un statut 400
+ * anonyme dans request_log, et on ne peut pas dire ce qu'il faudrait tolérer.
+ * On stocke la CATÉGORIE, jamais la valeur soumise (DPA).
+ */
+export function recordRejection(type: OperationType, reason: RejectReason): void {
+  try {
+    const db = getStatsDB();
+    const now = new Date();
+    db.prepare(
+      'INSERT INTO operations (operation_type, country_code, success, hour, day_of_week, reject_reason) VALUES (?, NULL, 0, ?, ?, ?)',
+    ).run(type, now.getUTCHours(), (now.getUTCDay() + 6) % 7, reason);
+  } catch (err) {
+    console.error('[stats] recordRejection failed:', err);
+  }
+}
+
+export interface RejectionRow {
+  operation_type: string;
+  reject_reason: string;
+  count: number;
+}
+
+export function getRejectionStats(days = 30): RejectionRow[] {
+  const db = getStatsDB();
+  return db
+    .prepare(
+      `SELECT operation_type, reject_reason, COUNT(*) AS count
+       FROM operations
+       WHERE reject_reason IS NOT NULL
+         AND created_at >= datetime('now', ?)
+       GROUP BY operation_type, reject_reason
+       ORDER BY count DESC`,
+    )
+    .all(`-${days} days`) as RejectionRow[];
 }
 
 /**

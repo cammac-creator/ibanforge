@@ -1,7 +1,7 @@
 import { describe, it, expect, afterAll } from 'vitest';
-import { recordOperation, recordBatch, recordRequest, getStats, getQuickStats, getStatsHistory, getStatusByPath, getBusinessFunnel, classifyClient, extractClientIp } from './stats.js';
+import { recordOperation, recordBatch, recordRequest, recordRejection, getRejectionStats, getStats, getQuickStats, getStatsHistory, getStatusByPath, getBusinessFunnel, classifyClient, extractClientIp } from './stats.js';
 import { generateApiKey } from './api-keys.js';
-import { closeAll } from './db.js';
+import { closeAll, getStatsDB } from './db.js';
 
 afterAll(() => {
   closeAll();
@@ -265,6 +265,45 @@ describe('getBusinessFunnel', () => {
 
     // external + anonymous count; the internal audit key must not.
     expect(after - before).toBe(2);
+  });
+});
+
+describe('recordRejection', () => {
+  it('enregistre la catégorie et jamais la valeur soumise', () => {
+    recordRejection('bic_lookup', 'normalizable');
+    recordRejection('bic_lookup', 'normalizable');
+    recordRejection('bic_lookup', 'placeholder_literal');
+    const rows = getRejectionStats(30);
+    const bic = rows.filter((r) => r.operation_type === 'bic_lookup');
+    expect(bic.find((r) => r.reject_reason === 'normalizable')?.count).toBeGreaterThanOrEqual(2);
+    expect(bic.find((r) => r.reject_reason === 'placeholder_literal')?.count).toBeGreaterThanOrEqual(1);
+  });
+
+  // DPA: the column must only ever hold a category from the RejectReason union.
+  // Asserted over EVERY rejection row, not just the ones this test wrote, so a
+  // future caller that leaks an IBAN/BIC/IID into the column fails here.
+  it('persists a category only — no submitted value, no country attribution', () => {
+    const categories = [
+      'placeholder_literal',
+      'normalizable',
+      'too_short',
+      'too_long',
+      'invalid_length',
+      'invalid_charset',
+      'not_numeric',
+      'not_an_identifier',
+    ];
+    recordRejection('ch_clearing_lookup', 'not_numeric');
+    const rows = getStatsDB()
+      .prepare('SELECT country_code, success, error_detail, reject_reason FROM operations WHERE reject_reason IS NOT NULL')
+      .all() as Array<{ country_code: string | null; success: number; error_detail: string | null; reject_reason: string }>;
+    expect(rows.length).toBeGreaterThanOrEqual(1);
+    for (const r of rows) {
+      expect(categories).toContain(r.reject_reason);
+      expect(r.country_code).toBeNull();
+      expect(r.error_detail).toBeNull();
+      expect(r.success).toBe(0);
+    }
   });
 });
 
