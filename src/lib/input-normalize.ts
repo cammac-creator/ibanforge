@@ -14,6 +14,7 @@ export type RejectReason =
   | 'normalizable'
   | 'too_short'
   | 'too_long'
+  | 'invalid_length'
   | 'invalid_charset'
   | 'not_numeric';
 
@@ -48,6 +49,13 @@ export function classifyBicInput(raw: string): RejectReason | null {
   if (!/^[A-Z0-9]*$/.test(n)) return 'invalid_charset';
   if (n.length < 8) return 'too_short';
   if (n.length > 11) return 'too_long';
+  // Un BIC fait 8 ou 11 caractères : 9 et 10 ne sont ni trop courts ni trop
+  // longs. Sans cette catégorie ils tomberaient dans `invalid_charset` alors
+  // que leur jeu de caractères est correct, et gonfleraient un compteur qu'on
+  // lira pour décider quoi tolérer en phase 2.
+  if (n.length !== 8 && n.length !== 11) return 'invalid_length';
+  // Reste le cas d'une longueur correcte mais d'un caractère dans une position
+  // qui ne l'admet pas (un chiffre dans le code banque ou le code pays).
   return 'invalid_charset';
 }
 
@@ -55,8 +63,13 @@ export function classifyIidInput(raw: string): RejectReason | null {
   if (PLACEHOLDER.test(raw)) return 'placeholder_literal';
   if (IID_CURRENT_GUARD.test(raw)) return null;
 
-  const digits = raw.replace(/\D/g, '');
-  if (digits.length === 0) return 'not_numeric';
-  if (digits.length > 5) return 'too_long';
-  return 'normalizable';
+  // Tolerate only separators and an optional CH prefix: an agent writing
+  // "CH-230" or " 230 " means IID 230. An agent writing "account-230-CHF"
+  // does not, and answering it with UBS would be a confidently wrong answer.
+  const stripped = normalizeIdentifier(raw).replace(/^CH/, '');
+  if (/^\d{1,5}$/.test(stripped)) return 'normalizable';
+
+  if (!/\d/.test(raw)) return 'not_numeric';
+  if (raw.replace(/\D/g, '').length > 5) return 'too_long';
+  return 'invalid_charset';
 }

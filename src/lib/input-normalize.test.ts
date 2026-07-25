@@ -26,6 +26,11 @@ describe('classifyBicInput', () => {
     expect(classifyBicInput('UBSWCHZHXXXXXX')).toBe('too_long');
     expect(classifyBicInput('UBSWCHZ!')).toBe('invalid_charset');
   });
+  it('distingue une longueur invalide d’un jeu de caractères invalide', () => {
+    expect(classifyBicInput('UBSWCHZHX')).toBe('invalid_length');
+    expect(classifyBicInput('UBSWCHZHXX')).toBe('invalid_length');
+    expect(classifyBicInput('UBSWCHZ!')).toBe('invalid_charset');
+  });
 });
 
 describe('classifyIidInput', () => {
@@ -43,5 +48,14 @@ describe('classifyIidInput', () => {
   it('distingue non numérique et trop long', () => {
     expect(classifyIidInput('UBS')).toBe('not_numeric');
     expect(classifyIidInput('123456789')).toBe('too_long');
+  });
+  it('tolère un préfixe CH et des séparateurs', () => {
+    expect(classifyIidInput('CH230')).toBe('normalizable');
+    expect(classifyIidInput('CH-230')).toBe('normalizable');
+    expect(classifyIidInput(' 230 ')).toBe('normalizable');
+  });
+  it('refuse de deviner un IID noyé dans du texte', () => {
+    expect(classifyIidInput('230 Zurich')).toBe('invalid_charset');
+    expect(classifyIidInput('account-230-CHF')).toBe('invalid_charset');
   });
 });
