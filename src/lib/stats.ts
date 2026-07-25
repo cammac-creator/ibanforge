@@ -396,9 +396,22 @@ export function getSourceStats(days: number): SourceStatsResponse {
 // Read helpers
 // ---------------------------------------------------------------------------
 
+// Rejection rows share the `operations` table but are a SEPARATE LANE: every
+// reader below must exclude them with `reject_reason IS NULL`, and only
+// getRejectionStats() reads them (`reject_reason IS NOT NULL`).
+//
+// Why: a rejection is a request that never reached the operation, not a failed
+// operation. Counting it as success=0 would crater bic_lookup's hit rate to
+// single digits the moment the routes start calling recordRejection —
+// indistinguishable from an outage on a service that sells reliability — and it
+// would corrupt the before/after funnel comparison the tolerance work exists to
+// measure, making a real improvement impossible to tell from an accounting
+// artefact. Historical rows predate the column and are NULL, so the predicate
+// includes all of them.
+
 function typeStats(type: OperationType): { total: number; success_count: number } {
   const row = getStatsDB().prepare(
-    'SELECT COUNT(*) as total, COALESCE(SUM(success), 0) as success_count FROM operations WHERE operation_type = ?'
+    'SELECT COUNT(*) as total, COALESCE(SUM(success), 0) as success_count FROM operations WHERE operation_type = ? AND reject_reason IS NULL'
   ).get(type) as { total: number; success_count: number };
   return row;
 }
@@ -561,15 +574,15 @@ export function getStatsHistory(days: number = 7): Array<{
 export function getQuickStats(): { total_operations: number; iban_validations: number; bic_lookups: number; success_rate: number } {
   const db = getStatsDB();
   const row = db.prepare(
-    'SELECT COUNT(*) as total, COALESCE(SUM(success), 0) as success_count FROM operations'
+    'SELECT COUNT(*) as total, COALESCE(SUM(success), 0) as success_count FROM operations WHERE reject_reason IS NULL'
   ).get() as { total: number; success_count: number };
 
   const ibanCount = db.prepare(
-    "SELECT COUNT(*) as cnt FROM operations WHERE operation_type IN ('iban_validate', 'iban_batch')"
+    "SELECT COUNT(*) as cnt FROM operations WHERE operation_type IN ('iban_validate', 'iban_batch') AND reject_reason IS NULL"
   ).get() as { cnt: number };
 
   const bicCount = db.prepare(
-    "SELECT COUNT(*) as cnt FROM operations WHERE operation_type = 'bic_lookup'"
+    "SELECT COUNT(*) as cnt FROM operations WHERE operation_type = 'bic_lookup' AND reject_reason IS NULL"
   ).get() as { cnt: number };
 
   return {
@@ -812,6 +825,7 @@ export function getErrorStats(days: number = 30): ErrorStatsResponse {
       SELECT COUNT(*) as total, COALESCE(SUM(success), 0) as success_count
       FROM operations
       WHERE operation_type = ? AND created_at >= datetime('now', '-' || ? || ' days')
+        AND reject_reason IS NULL
     `).get(opType, days) as { total: number; success_count: number };
     const errorRate = overall.total > 0 ? Math.round(((overall.total - overall.success_count) / overall.total) * 10000) / 100 : 0;
 
@@ -820,6 +834,7 @@ export function getErrorStats(days: number = 30): ErrorStatsResponse {
       SELECT date(created_at) as day, COUNT(*) as total, COALESCE(SUM(success), 0) as success_count
       FROM operations
       WHERE operation_type = ? AND created_at >= datetime('now', '-7 days')
+        AND reject_reason IS NULL
       GROUP BY day
       ORDER BY day ASC
     `).all(opType) as Array<{ day: string; total: number; success_count: number }>;
