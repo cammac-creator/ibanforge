@@ -1,0 +1,107 @@
+/**
+ * Gardes de format des deux identifiants d'entrée — et le comptage des rejets.
+ *
+ * Pourquoi ces gardes vivent dans un middleware et pas seulement dans les
+ * routes : montées dans src/index.ts, elles s'exécutent AVANT le middleware
+ * x402 (volontaire — on ne facture pas une entrée malformée) et répondent 400
+ * sans appeler `next()`. Le handler de route n'est donc jamais atteint pour une
+ * entrée rejetée, et les gardes des routes sont, dans l'app montée, du code
+ * mort. C'est ici, et nulle part ailleurs, que naissent les 400 de format
+ * servis en production.
+ *
+ * D'où l'extraction : ces compteurs sont les seuls qui se déclenchent vraiment,
+ * et `recordRejection` avale ses erreurs. Laissés inline dans un index.ts que
+ * `serve()` rend inimportable, ils n'avaient aucune couverture automatisée — le
+ * mode de panne était : suite verte, deploy propre, zéro ligne après sept
+ * jours, découvert au dépouillement.
+ *
+ * ⚠️ Les routes portent le MÊME comptage (cas où elles sont montées seules).
+ * Les deux copies s'excluent mutuellement — si le middleware répond 400, la
+ * route n'est pas atteinte ; s'il appelle `next()`, le classifieur rend `null`
+ * dans la route et rien n'est enregistré. Un rejet n'est jamais compté deux
+ * fois. Toute modification doit préserver cette exclusion.
+ *
+ * Phase 1 : on compte, on ne change aucun comportement. Les statuts et les
+ * corps de réponse ci-dessous sont ceux d'avant l'instrumentation, au caractère
+ * près.
+ */
+
+import type { MiddlewareHandler } from 'hono';
+import { classifyBicInput, classifyIidInput } from '../lib/input-normalize.js';
+import { recordRejection } from '../lib/stats.js';
+import type { HonoEnv } from '../types.js';
+
+// Les chemins sont dans le TYPE, pas seulement dans src/index.ts : c'est ce qui
+// fait que `c.req.param('code')` est un `string` et non `string | undefined`
+// (Hono déduit le paramètre du motif). Monter une de ces gardes sur un autre
+// chemin ne compile pas — un garde-fou gratuit contre un déplacement mal fait.
+type BIC_PATH = '/v1/bic/:code';
+type IID_PATH = '/v1/ch/clearing/:iid';
+
+/**
+ * Garde de `GET /v1/bic/:code` — 8 ou 11 alphanumériques.
+ *
+ * `classifyBicInput` rend `null` EXACTEMENT sur l'ensemble que l'ancienne
+ * regex acceptait : la substitution ne déplace pas la frontière du 400.
+ */
+export function bicGuardMiddleware(): MiddlewareHandler<HonoEnv, BIC_PATH> {
+  return async (c, next) => {
+    const code = c.req.param('code');
+    const rejection = classifyBicInput(code);
+
+    // Agents sometimes call the OpenAPI template path literally (e.g.
+    // `/v1/bic/{code}` decoded to `{code}`). Catch this with a dedicated
+    // message instead of the generic format error, so the agent can
+    // self-correct.
+    if (rejection === 'placeholder_literal') {
+      recordRejection('bic_lookup', rejection);
+      return c.json(
+        {
+          error: 'placeholder_literal',
+          message: "You sent the literal OpenAPI placeholder '" + code + "'. Substitute it with a real BIC.",
+          example: 'GET /v1/bic/UBSWCHZH',
+          schema: 'https://api.ibanforge.com/openapi.json',
+        },
+        400,
+      );
+    }
+
+    if (rejection !== null) {
+      recordRejection('bic_lookup', rejection);
+      return c.json(
+        { error: 'invalid_bic_format', message: 'BIC code must be 8 or 11 alphanumeric characters' },
+        400,
+      );
+    }
+
+    await next();
+  };
+}
+
+/** Garde de `GET /v1/ch/clearing/:iid` — 1 à 5 chiffres. Même contrat. */
+export function iidGuardMiddleware(): MiddlewareHandler<HonoEnv, IID_PATH> {
+  return async (c, next) => {
+    const iid = c.req.param('iid');
+    const rejection = classifyIidInput(iid);
+
+    if (rejection === 'placeholder_literal') {
+      recordRejection('ch_clearing_lookup', rejection);
+      return c.json(
+        {
+          error: 'placeholder_literal',
+          message: "You sent the literal OpenAPI placeholder '" + iid + "'. Substitute it with a real Swiss IID.",
+          example: 'GET /v1/ch/clearing/230',
+          schema: 'https://api.ibanforge.com/openapi.json',
+        },
+        400,
+      );
+    }
+
+    if (rejection !== null) {
+      recordRejection('ch_clearing_lookup', rejection);
+      return c.json({ error: 'invalid_iid_format', message: 'IID must be a 1-5 digit number.' }, 400);
+    }
+
+    await next();
+  };
+}

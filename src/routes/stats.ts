@@ -88,6 +88,14 @@ stats.get('/stats/errors', (c) => {
  *
  * Le paramètre est `days` (et non `period` comme les routes voisines) : c'est
  * celui que lit la procédure de dépouillement de la phase 2.
+ *
+ * ⚠️ Les catégories n'ont pas toutes le même dénominateur. Toutes sont
+ * comptées par la garde de format, AVANT les middlewares clé d'API et x402
+ * — sauf `invalid_bic_shape`, seule à être enregistrée par la route, donc
+ * APRÈS eux : elle ne voit que les requêtes qui ont payé ou présenté une clé.
+ * Son compte est tiré d'une population plus petite que les autres et n'est pas
+ * directement comparable — un petit chiffre ne veut PAS dire « la forme de
+ * l'identifiant n'est pas un problème ».
  */
 stats.get('/stats/rejections', (c) => {
   if (!checkAuth(c.req.header('Authorization'))) {
