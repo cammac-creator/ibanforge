@@ -1,5 +1,5 @@
 import { describe, it, expect, afterAll } from 'vitest';
-import { recordOperation, recordBatch, recordRequest, recordRejection, getRejectionStats, getStats, getQuickStats, getStatsHistory, getStatusByPath, getBusinessFunnel, classifyClient, extractClientIp } from './stats.js';
+import { recordOperation, recordBatch, recordRequest, recordRejection, getRejectionStats, getStats, getQuickStats, getStatsHistory, getStatusByPath, getBusinessFunnel, classifyClient, extractClientIp, normalizeRequestPath } from './stats.js';
 import { generateApiKey } from './api-keys.js';
 import { closeAll, getStatsDB } from './db.js';
 import type { RejectReason } from './input-normalize.js';
@@ -400,5 +400,88 @@ describe('classifyClient', () => {
     expect(classifyClient('/v1/iban/validate', 'IBANFORGE-MCP/1.2.2'.toLowerCase())).toBe('mcp_stdio');
     expect(classifyClient('/v1/iban/validate', 'CHATGPT-USER/1.0')).toBe('mcp_stdio');
     expect(classifyClient('/v1/iban/validate', 'GOOGLEBOT/2.1')).toBe('bot');
+  });
+});
+
+describe('normalizeRequestPath', () => {
+  // Each case below was observed to leak before the fix. `request_log` keeps
+  // rows for twelve months, so a survivng identifier is a DPA breach, not a
+  // cosmetic dashboard defect.
+  it('consumes the whole BIC segment, not just its alphanumeric head', () => {
+    // Was '/v1/bic/:code%20CHZH' — the tail of the submitted BIC survived.
+    expect(normalizeRequestPath('/v1/bic/UBSW%20CHZH')).toBe('/v1/bic/:code');
+    expect(normalizeRequestPath('/v1/bic/UBSW+CHZH')).toBe('/v1/bic/:code');
+  });
+
+  it('consumes a non-numeric clearing segment', () => {
+    // Was stored raw and whole: the old pattern required leading digits.
+    expect(normalizeRequestPath('/v1/ch/clearing/CH230')).toBe('/v1/ch/clearing/:iid');
+    expect(normalizeRequestPath('/v1/ch/clearing/762a')).toBe('/v1/ch/clearing/:iid');
+  });
+
+  it('redacts an IBAN-shaped segment on a path no route matches (the 404 case)', () => {
+    // Was stored complete: no rule covered unmatched paths.
+    expect(normalizeRequestPath('/CH9300762011623852957')).toBe('/:redacted');
+    expect(normalizeRequestPath('/lookup/DE89370400440532013000/details')).toBe('/lookup/:redacted/details');
+  });
+
+  it('keeps the existing buckets for well-formed identifiers (no dashboard fragmentation)', () => {
+    expect(normalizeRequestPath('/v1/bic/UBSWCHZH')).toBe('/v1/bic/:code');
+    expect(normalizeRequestPath('/v1/ch/clearing/230')).toBe('/v1/ch/clearing/:iid');
+  });
+
+  // getBusinessFunnel() excludes spec-template paths by matching `{`/`%7B` in
+  // the stored path — folding them into `:code` would start counting them as
+  // bad_input, the very regression that exclusion exists to prevent. There is
+  // no submitted identifier in a template literal, so verbatim is also correct
+  // on the DPA side.
+  it('leaves OpenAPI template literals verbatim, so the funnel keeps excluding them', () => {
+    expect(normalizeRequestPath('/v1/bic/%7Bcode%7D')).toBe('/v1/bic/%7Bcode%7D');
+    expect(normalizeRequestPath('/v1/ch/clearing/%7Biid%7D')).toBe('/v1/ch/clearing/%7Biid%7D');
+    expect(normalizeRequestPath('/v1/bic/{code}')).toBe('/v1/bic/{code}');
+    expect(normalizeRequestPath('/v1/ch/clearing/{iid}')).toBe('/v1/ch/clearing/{iid}');
+  });
+
+  it('leaves ordinary endpoints untouched', () => {
+    for (const p of ['/', '/v1/iban/validate', '/health', '/openapi.json', '/mcp', '/v1/credits/buy/25k', '/v1/iban/structure/CH']) {
+      expect(normalizeRequestPath(p)).toBe(p);
+    }
+  });
+});
+
+// Mirrors the `operations` DPA test above, over the other table this branch
+// writes to. Same reason it is valuable: it sweeps EVERY row rather than only
+// the ones it wrote, so a future caller — or a future narrowing of the
+// normalisation — that lets a submitted value into twelve-month storage fails
+// here rather than in production during the measurement window.
+describe('request_log persists no submitted identifier (DPA)', () => {
+  it('holds no identifier in any stored path, across the whole table', () => {
+    // Write the three shapes that leaked, so the sweep is never vacuous — on CI
+    // the table starts empty and a bare sweep would pass green checking nothing.
+    recordRequest('GET', '/v1/bic/UBSW%20CHZH', 400, 1);
+    recordRequest('GET', '/v1/ch/clearing/CH230', 400, 1);
+    recordRequest('POST', '/CH9300762011623852957', 404, 1);
+
+    // Invariants restated independently of stats.ts: if the production regexes
+    // were wrong, importing them here would make the test wrong the same way.
+    const ibanShape = /^[A-Za-z]{2}\d{2}[A-Za-z0-9]{1,30}$/;
+    const specTemplate = /\{|%7[Bb]/;
+
+    const rows = getStatsDB().prepare('SELECT path FROM request_log').all() as Array<{ path: string }>;
+    expect(rows.length).toBeGreaterThanOrEqual(3);
+
+    for (const { path } of rows) {
+      // A. No segment anywhere is identifier-shaped — covers unmatched routes.
+      expect(path.split('/').filter((segment) => ibanShape.test(segment))).toEqual([]);
+
+      // B. The two identifier-bearing route families only ever store their
+      // label. Invariant A alone would not catch a regression to the narrow
+      // BIC pattern, because '/v1/bic/:code%20CHZH' is not IBAN-shaped.
+      const bic = /^\/v1\/bic\/([^/]+)/.exec(path);
+      if (bic && !specTemplate.test(bic[1])) expect(bic[1]).toBe(':code');
+
+      const iid = /^\/v1\/ch\/clearing\/([^/]+)/.exec(path);
+      if (iid && !specTemplate.test(iid[1])) expect(iid[1]).toBe(':iid');
+    }
   });
 });
