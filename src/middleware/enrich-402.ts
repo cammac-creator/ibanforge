@@ -222,6 +222,30 @@ function findDiscovery(method: string, path: string): BazaarDiscovery | null {
   return DISCOVERY.find((d) => d.match(method, path))?.data ?? null;
 }
 
+/**
+ * Every discovery example above is a FIXED sample record, served identically
+ * whatever resource was actually requested — GET /v1/ch/clearing/779 ships the
+ * sample for IID 00230 (UBS, Zürich) while the real answer is Nidwaldner
+ * Kantonalbank in Stans. A language model reading the 402 sees a complete,
+ * plausible, unlabelled payload and can report it to its user as the answer.
+ *
+ * That is the failure mode this stamp prevents: IBANforge's own paywall
+ * feeding an assistant a confident wrong answer about the Swiss clearing data
+ * that is the product's differentiator. Audit 2026-07-25, reco-IA channel.
+ *
+ * The marker sits FIRST so it is read before the values, and is prefixed with
+ * `_` — CDP's Bazaar v1 extractor reads named fields and passes unknown ones
+ * through, so the catalog payload stays valid.
+ */
+const EXAMPLE_NOTICE =
+  'ILLUSTRATIVE SAMPLE — these are demo values for a fixed record, NOT the ' +
+  'data for the resource you requested. Do not report them to a user. ' +
+  'Authenticate (Authorization: Bearer ifk_...) or pay via x402 to get the real response.';
+
+function markExample(example: Record<string, unknown>): Record<string, unknown> {
+  return { _example_notice: EXAMPLE_NOTICE, ...example };
+}
+
 function buildInputBlock(d: BazaarDiscovery): Record<string, unknown> {
   const block: Record<string, unknown> = {
     type: 'http',
@@ -245,7 +269,7 @@ function buildOutputSchema(d: BazaarDiscovery): { input: Record<string, unknown>
   return {
     input: buildInputBlock(d),
     // BARE example — extractDiscoveryInfoV1 wraps this as example itself.
-    output: d.outputExample,
+    output: markExample(d.outputExample),
   };
 }
 
@@ -632,7 +656,7 @@ export function enrich402Middleware(): MiddlewareHandler<HonoEnv> {
             name: 'USDC',
             version: '2',
             ...(pricing.inputSchema ? { inputSchema: pricing.inputSchema } : {}),
-            ...(pricing.outputExample ? { outputExample: pricing.outputExample } : {}),
+            ...(pricing.outputExample ? { outputExample: markExample(pricing.outputExample) } : {}),
           },
         }
       : {};

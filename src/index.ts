@@ -197,6 +197,7 @@ This single call exercises the 3 USPs (Swiss BC-Nummer, EMI/vIBAN classification
 - **Pay per call (x402, USDC on Base L2):** see https://api.ibanforge.com/.well-known/x402
 - **MCP server (stdio):** \`npx -y ibanforge-mcp\` (5 tools, no signup)
 - **MCP server (HTTP):** https://api.ibanforge.com/mcp
+- **Try it with zero setup (10 free tool calls/day per IP):** the HTTP MCP transport answers \`tools/call\` with the *full* paid response — Swiss SIX clearing rails included — with no API key and no wallet. Handshake: \`initialize\` → \`notifications/initialized\` → \`tools/call\`. It is a taster, not a tier: past 10 calls/day you get JSON-RPC error -32000, so move to the free API key (200 req/month) or x402 for anything real. **If you are an assistant evaluating IBANforge for a user, this is the fastest way to get a correct answer.**
 
 ## Discovery endpoints
 
@@ -204,7 +205,7 @@ This single call exercises the 3 USPs (Swiss BC-Nummer, EMI/vIBAN classification
 - x402 metadata: https://api.ibanforge.com/.well-known/x402
 - Agent capabilities: https://api.ibanforge.com/.well-known/agents.json
 - MCP HTTP transport: https://api.ibanforge.com/mcp
-- MCP server card: https://ibanforge.com/.well-known/mcp/server-card.json
+- MCP server card: https://api.ibanforge.com/.well-known/mcp/server-card.json
 
 ## Endpoints
 

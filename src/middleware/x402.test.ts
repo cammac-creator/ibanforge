@@ -1,5 +1,42 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { ensureWalletConfigured } from './x402.js';
+import { ensureWalletConfigured, isSellingRoute } from './x402.js';
+
+/**
+ * Security audit 2026-07-25, finding 1: the x402 middleware skipped the paywall
+ * for any API-key-authenticated request, including the routes that SELL credit
+ * packs. One unit of free quota bought a $80 bundle, so a single free key
+ * (200 req/month) minted up to $16,000 of credits — and each minted key could
+ * start over. Selling routes must never be covered by an allowance.
+ */
+describe('isSellingRoute', () => {
+  it('matches the credit-pack purchase routes', () => {
+    for (const bundle of ['1k', '5k', '25k']) {
+      expect(isSellingRoute('POST', `/v1/credits/buy/${bundle}`)).toBe(true);
+    }
+  });
+
+  it('ignores the trailing slash variant', () => {
+    expect(isSellingRoute('POST', '/v1/credits/buy/1k/')).toBe(true);
+  });
+
+  it('does not match the consumption endpoints an allowance legitimately covers', () => {
+    const consumption = [
+      ['POST', '/v1/iban/validate'],
+      ['POST', '/v1/iban/batch'],
+      ['POST', '/v1/iban/compliance'],
+      ['GET', '/v1/bic/UBSWCHZH80A'],
+      ['GET', '/v1/ch/clearing/230'],
+      ['GET', '/v1/credits/bundles'],
+    ] as const;
+    for (const [method, path] of consumption) {
+      expect(isSellingRoute(method, path)).toBe(false);
+    }
+  });
+
+  it('does not match a GET on the purchase path (only POST buys)', () => {
+    expect(isSellingRoute('GET', '/v1/credits/buy/1k')).toBe(false);
+  });
+});
 
 const originalEnv = { ...process.env };
 

@@ -555,9 +555,17 @@ function createMcpServer(): McpServer {
 }
 
 // ── MCP tool call rate limiting ───────────────────────────────────────────────
-// Free MCP access is limited to 50 tool calls per IP per day.
+// Free MCP access is limited to a handful of tool calls per IP per day.
 // Discovery (initialize, tools/list, resources/list) is unlimited.
-const MCP_DAILY_LIMIT = 50;
+//
+// This is the ONE path where an assistant reaches a complete, correct answer
+// on its first try — including the paid Swiss clearing data — without a key or
+// a wallet (reco-IA audit, 2026-07-25). It is deliberately kept open as the
+// product's shop window, but it also hands out priced data for free, so the
+// allowance is a taster, not a tier: 10 calls is enough to evaluate the
+// service and far too few to run on. Announce it wherever it is offered —
+// an undocumented free path converts nobody.
+const MCP_DAILY_LIMIT = 10;
 const mcpCallCounts = new Map<string, { count: number; date: string }>();
 
 // Clean up stale entries every 10 minutes
@@ -689,7 +697,8 @@ mcpHttp.get('/mcp', async (c) => {
         x402: 'https://api.ibanforge.com/.well-known/x402',
         documentation: 'https://ibanforge.com/docs',
         llms_txt: 'https://api.ibanforge.com/llms.txt',
-        server_card: 'https://ibanforge.com/.well-known/mcp/server-card.json',
+        // Served by the API host only — the www host 404s on this path.
+        server_card: 'https://api.ibanforge.com/.well-known/mcp/server-card.json',
         registry: 'https://registry.modelcontextprotocol.io/v0/servers?search=ibanforge',
       },
       200,
