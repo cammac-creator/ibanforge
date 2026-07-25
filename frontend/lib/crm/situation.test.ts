@@ -6,7 +6,7 @@ import type { Message } from './types';
 // of every subtraction below are parsed in the runner's zone, so the local offset
 // cancels and the expected day counts hold in any timezone.
 const TODAY = new Date('2026-07-25T12:00:00');
-const msg = (direction: Message['direction'], date: string): Message => ({
+const msg = (direction: Message['direction'], date: string | null): Message => ({
   direction,
   msg_date: date,
   subject: 's',
@@ -119,18 +119,31 @@ describe('situationOf', () => {
     expect(input[0].msg_date).toBe('2026-07-21T09:00');
   });
 
-  it('does not compute silence from a malformed date', () => {
+  it('treats a thread of only undatable messages as no thread at all', () => {
     const s = situationOf([msg('out', 'not-a-date')], TODAY);
+    expect(s.ballInCourt).toBe('none');
     expect(s.silenceDays).toBeNull();
     expect(s.followupDue).toBe(false);
-    expect(s.nextAction).toBe('wait');
+    expect(s.messageCount).toBe(0);
+    expect(s.nextAction).toBe('first_mail');
   });
 
-  it('still picks an action for a replier whose last date is malformed', () => {
+  it('drops an undatable message instead of letting it decide who holds the ball', () => {
     const s = situationOf([msg('in', '2026-07-01T10:00'), msg('out', 'not-a-date')], TODAY);
-    expect(s.ballInCourt).toBe('them');
-    expect(s.silenceDays).toBeNull();
-    expect(s.followupDue).toBe(false);
-    expect(s.nextAction).toBe('firm_offer');
+    expect(s.ballInCourt).toBe('us');
+    expect(s.silenceDays).toBe(24);
+    expect(s.messageCount).toBe(1);
+    expect(s.nextAction).toBe('reply');
+  });
+
+  it('does not let a message with no date blank out the first contact', () => {
+    const s = situationOf(
+      [msg('out', '2026-06-01T10:00'), msg('in', '2026-06-02T10:00'), msg('out', null)],
+      TODAY,
+    );
+    expect(s.firstContactAt).toBe('2026-06-01T10:00');
+    expect(s.messageCount).toBe(2);
+    expect(s.ballInCourt).toBe('us');
+    expect(s.silenceDays).toBe(53);
   });
 });

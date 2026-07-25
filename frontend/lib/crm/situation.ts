@@ -16,13 +16,18 @@ function parseDate(raw: string | null | undefined): Date | null {
  * no clock beyond the `today` argument, so it is deterministic under test.
  *
  * Drafts are excluded from every computation: an unsent draft changes neither
- * who holds the ball nor how long the silence has run.
+ * who holds the ball nor how long the silence has run. Undatable messages are
+ * excluded too, so every field here describes the datable correspondence only.
  */
 export function situationOf(messages: Message[], today: Date = new Date()): Situation {
   // filter() already hands back a fresh array, so sorting it in place leaves the
   // caller's messages untouched.
   const real = messages
     .filter((m) => m.direction === 'in' || m.direction === 'out')
+    // A message with no usable date cannot be placed in the thread, so it cannot
+    // decide who holds the ball, when the silence started, or when contact began.
+    // Dropping it degrades to "we know less", where keeping it would invert the answer.
+    .filter((m) => parseDate(m.msg_date) !== null)
     .sort((a, b) => (a.msg_date ?? '').localeCompare(b.msg_date ?? ''));
 
   if (real.length === 0) {
@@ -42,11 +47,12 @@ export function situationOf(messages: Message[], today: Date = new Date()): Situ
   const hasEverReplied = real.some((m) => m.direction === 'in');
   const firstContactAt = real.find((m) => m.direction === 'out')?.msg_date ?? null;
 
+  // Undatable messages are already gone, so `lastDate` is never null here; the
+  // fallback exists to satisfy the type, not to describe a reachable state.
   const lastDate = parseDate(last.msg_date);
   const silenceDays = lastDate ? Math.floor((today.getTime() - lastDate.getTime()) / DAY_MS) : null;
 
-  // The null check is what lets TypeScript compare below; at runtime a null
-  // silence would already fall through as false.
+  // Same: the null check is what lets TypeScript compare below.
   const followupDue =
     ballInCourt === 'them' && silenceDays !== null && silenceDays > FOLLOWUP_DAYS;
 

@@ -90,6 +90,11 @@ export interface Situation {
   followupDue: boolean;
   firstContactAt: string | null;
   hasEverReplied: boolean;
+  /**
+   * Datable correspondence only. Drafts never count, and neither do messages
+   * whose msg_date cannot be read, since a message that cannot be placed in
+   * time cannot take part in a thread shown next to a silence duration.
+   */
   messageCount: number;
   nextAction: NextAction;
 }
