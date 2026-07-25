@@ -12,12 +12,17 @@
 const ATTRIBUTION =
   /^(?=.*[\d@])\s*(On\b.*\bwrote\s*:|Le\b.*\ba écrit\s*:|Am\b.*\bschrieb\b.*:|.*\bkirjoitti\s*:)\s*$/i;
 
-/** A separator run that introduces a forwarded header block. The middle
- *  alternative catches labeled delimiters ("-----Original Message-----",
- *  "---------- Forwarded message ---------"), which a whole-line-of-dashes
- *  pattern cannot match. The HEADER lookahead below is what keeps a
- *  decorative rule inside a body from being treated as a quote marker. */
-const SEPARATOR = /^\s*(?:_{5,}|-{3,}[^\n]*?-{3,}|-{5,})\s*$/;
+/** A separator run that introduces a forwarded header block, including labeled
+ *  delimiters ("-----Original Message-----", "---------- Forwarded message ---------").
+ *  Fixed-length head and tail tests on a trimmed line, rather than one pattern with
+ *  a lazy middle: when several parts can all consume "-", a long dash run that never
+ *  closes backtracks superlinearly. No quantifier here is unbounded, so a crafted
+ *  body cannot freeze the tab. The HEADER lookahead below is what keeps a decorative
+ *  rule inside a body from being treated as a quote marker. */
+function isSeparator(line: string): boolean {
+  const trimmed = line.trim();
+  return trimmed.length >= 3 && /^[-_]{3}/.test(trimmed) && /[-_]{3}$/.test(trimmed);
+}
 
 /** Header line that opens a quoted block. English and French forms only: those are the
  *  header blocks we have actually seen, while ATTRIBUTION deliberately reaches wider
@@ -42,7 +47,7 @@ export function splitQuoted(body: string | null): { fresh: string; quoted: strin
     }
     // A separator only cuts when a header line follows within the next 3 lines,
     // otherwise it is just decoration in the message itself.
-    if (SEPARATOR.test(line) && lines.slice(i + 1, i + 4).some((l) => HEADER.test(l))) {
+    if (isSeparator(line) && lines.slice(i + 1, i + 4).some((l) => HEADER.test(l))) {
       cut = i;
       break;
     }
