@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { generateApiKey, validateApiKey, checkAndIncrementQuota, getUsage, decrementQuota, revokeApiKey, rotateApiKey } from './api-keys.js';
+import { generateApiKey, validateApiKey, checkAndIncrementQuota, getUsage, decrementQuota, revokeApiKey, rotateApiKey, recordQuotaNotice } from './api-keys.js';
+import { buildQuotaWarningEmail } from './email.js';
 
 // Use a unique suffix per test run to avoid rate-limit conflicts across runs
 const RUN_ID = Date.now();
@@ -88,5 +89,65 @@ describe('API Keys', () => {
     decrementQuota(v.keyHash);
     const usage = getUsage(v.keyHash);
     expect(usage.used).toBe(0);
+  });
+});
+
+// The upsell has to fire on the trajectory, not on the wall. The 23/07 case in
+// the funnel audit burned 190 of its 200 calls in 12 minutes: a daily cron saw
+// 10/200 that morning and 200/200 the next, 14 hours too late. Detection must
+// live in the increment itself.
+describe('quota upsell threshold', () => {
+  it('flags the call that takes usage across 80% of the monthly limit', () => {
+    const key = generateApiKey(`q80-${RUN_ID}@example.com`, 10)!;
+    const { keyHash } = validateApiKey(key.api_key);
+
+    const crossings = Array.from({ length: 10 }, () =>
+      checkAndIncrementQuota(keyHash, 10).crossedNoticeThreshold,
+    );
+
+    expect(crossings.filter(Boolean)).toHaveLength(1);
+    expect(crossings[7]).toBe(true); // 8th call → 8/10 = 80%
+  });
+
+  it('flags the crossing even when a batch jumps straight over the threshold', () => {
+    const key = generateApiKey(`q80-batch-${RUN_ID}@example.com`, 10)!;
+    const { keyHash } = validateApiKey(key.api_key);
+
+    const jump = checkAndIncrementQuota(keyHash, 10, 9); // 0 → 9/10, skips 8
+
+    expect(jump.allowed).toBe(true);
+    expect(jump.crossedNoticeThreshold).toBe(true);
+  });
+
+  it('records the notice for a key and month exactly once', () => {
+    const key = generateApiKey(`q80-once-${RUN_ID}@example.com`, 10)!;
+    const { keyHash } = validateApiKey(key.api_key);
+
+    expect(recordQuotaNotice(keyHash, '2026-07')).toBe(true);
+    expect(recordQuotaNotice(keyHash, '2026-07')).toBe(false);
+    expect(recordQuotaNotice(keyHash, '2026-08')).toBe(true); // new month re-arms
+  });
+});
+
+describe('quota warning email', () => {
+  it('leads with a card checkout link and the real numbers', () => {
+    const mail = buildQuotaWarningEmail({
+      used: 160,
+      limit: 200,
+      month: '2026-07',
+      keyPrefix: 'ifk_da8cb9b9',
+    });
+
+    expect(mail.text).toContain('https://buy.stripe.com/');
+    expect(mail.text).toContain('160');
+    expect(mail.text).toContain('200');
+    expect(mail.subject).toContain('80%');
+  });
+
+  it('never suggests minting a second free key', () => {
+    const mail = buildQuotaWarningEmail({ used: 160, limit: 200, month: '2026-07', keyPrefix: 'ifk_x' });
+
+    expect(mail.text).not.toContain('/v1/keys/generate');
+    expect(mail.html).not.toContain('/v1/keys/generate');
   });
 });

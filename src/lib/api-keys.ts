@@ -293,11 +293,52 @@ export function refundCredit(keyHash: string, units = 1): void {
  * refused without consuming anything (`remaining` then tells the caller how
  * big a batch would still fit this month).
  */
+/**
+ * Share of the monthly allowance at which the holder is warned they are about
+ * to be cut off. 80% leaves enough runway to pay before the wall — the point
+ * is to convert BEFORE the block, not to apologize after it.
+ */
+export const QUOTA_NOTICE_RATIO = 0.8;
+
+/**
+ * Claim the right to warn this key once for this month. Returns true exactly
+ * once per (key, month): the PRIMARY KEY makes the second caller a no-op, so a
+ * burst of calls above the threshold cannot produce a burst of emails.
+ */
+export function recordQuotaNotice(keyHash: string, month: string): boolean {
+  const result = getStatsDB()
+    .prepare('INSERT OR IGNORE INTO quota_notices (key_hash, month) VALUES (?, ?)')
+    .run(keyHash, month);
+  return result.changes > 0;
+}
+
+/**
+ * Release a claimed notice so it can be retried — used when the warning email
+ * failed to leave, otherwise a transient SMTP outage would burn the single
+ * warning that key gets this month.
+ */
+export function clearQuotaNotice(keyHash: string, month: string): void {
+  getStatsDB().prepare('DELETE FROM quota_notices WHERE key_hash = ? AND month = ?').run(keyHash, month);
+}
+
 export function checkAndIncrementQuota(
   keyHash: string,
   monthlyLimit: number = DEFAULT_MONTHLY_LIMIT,
   units = 1,
-): { allowed: boolean; used: number; limit: number; remaining: number; month: string } {
+): {
+  allowed: boolean;
+  used: number;
+  limit: number;
+  remaining: number;
+  month: string;
+  /**
+   * True on the single call that carries usage from below QUOTA_NOTICE_RATIO to
+   * at or above it. Detected here, in the increment, rather than by a daily
+   * cron: the 2026-07-25 funnel audit measured a client burn 190 of its 200
+   * calls in 12 minutes, a window no scheduled job can catch.
+   */
+  crossedNoticeThreshold: boolean;
+} {
   const db = getStatsDB();
   const month = new Date().toISOString().slice(0, 7);
   db.prepare(
@@ -307,15 +348,27 @@ export function checkAndIncrementQuota(
     count: number;
   };
   if (row.count + units > monthlyLimit) {
-    return { allowed: false, used: row.count, limit: monthlyLimit, remaining: Math.max(0, monthlyLimit - row.count), month };
+    return {
+      allowed: false,
+      used: row.count,
+      limit: monthlyLimit,
+      remaining: Math.max(0, monthlyLimit - row.count),
+      month,
+      crossedNoticeThreshold: false,
+    };
   }
   db.prepare('UPDATE api_usage SET count = count + ? WHERE key_hash = ? AND month = ?').run(units, keyHash, month);
+  const used = row.count + units;
+  const threshold = Math.ceil(monthlyLimit * QUOTA_NOTICE_RATIO);
   return {
     allowed: true,
-    used: row.count + units,
+    used,
     limit: monthlyLimit,
-    remaining: monthlyLimit - row.count - units,
+    remaining: monthlyLimit - used,
     month,
+    // A batch can leap over the threshold without landing on it, hence the
+    // before/after comparison rather than an equality on `used`.
+    crossedNoticeThreshold: row.count < threshold && used >= threshold,
   };
 }
 

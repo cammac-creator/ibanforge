@@ -3,6 +3,7 @@ import type { HonoEnv } from '../types.js';
 import { validateApiKey, checkAndIncrementQuota, decrementQuota, decrementCredits, refundCredit } from '../lib/api-keys.js';
 import { getIbansArray } from '../lib/request-helpers.js';
 import { CARD_CHECKOUT_HINT } from '../lib/payment-links.js';
+import { maybeSendQuotaWarning } from '../lib/quota-notice.js';
 
 /**
  * Extract an IBANforge API key from common locations agents use:
@@ -55,7 +56,7 @@ export function apiKeyMiddleware(): MiddlewareHandler<HonoEnv> {
     }
 
 
-    const { valid, keyHash, monthlyLimit, creditsRemaining, creditsTotal } = validateApiKey(key);
+    const { valid, keyHash, email, monthlyLimit, creditsRemaining, creditsTotal } = validateApiKey(key);
 
     if (!valid) {
       // A key WAS supplied but doesn't validate (typo, truncation, revoked).
@@ -158,6 +159,24 @@ export function apiKeyMiddleware(): MiddlewareHandler<HonoEnv> {
     }
 
     if (units > 1) c.header('X-Quota-Charged', String(units));
+
+    // Upsell on the trajectory, not on the wall. A daily job cannot catch a
+    // client that burns 190 of its 200 calls in 12 minutes (measured 2026-07-23),
+    // so the warning is triggered by the very call that crosses 80%.
+    // Fire-and-forget: the customer's request must never wait on SMTP, and
+    // maybeSendQuotaWarning is written not to throw.
+    if (quota.crossedNoticeThreshold && email) {
+      c.header('X-Quota-Notice', 'threshold-crossed');
+      void maybeSendQuotaWarning({
+        keyHash,
+        email,
+        keyPrefix: key.slice(0, 12),
+        used: quota.used,
+        limit: quota.limit,
+        month: quota.month,
+      });
+    }
+
     c.set('apiKeyAuthenticated', true);
     await next();
 

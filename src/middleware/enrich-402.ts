@@ -557,7 +557,8 @@ function stripFreeTierWhenExhausted(
   cause: PaywallCause | undefined,
 ): Record<string, unknown> {
   if (!cause || !ALLOWANCE_EXHAUSTED.has(cause.reason)) return body;
-  const { free_tier: _dropped, ...rest } = body;
+  const rest = { ...body };
+  delete rest.free_tier;
   return rest;
 }
 
