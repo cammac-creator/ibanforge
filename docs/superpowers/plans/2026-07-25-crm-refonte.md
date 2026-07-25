@@ -329,6 +329,19 @@ describe('splitQuoted', () => {
     expect(splitQuoted('   ')).toEqual({ fresh: '', quoted: '' });
   });
 
+  it('cuts at a labeled Original Message delimiter', () => {
+    const body = 'Thanks, noted.\n\n-----Original Message-----\nFrom: Someone <a@example.com>\nSent: Monday\nSubject: Re: test';
+    const r = splitQuoted(body);
+    expect(r.fresh).toBe('Thanks, noted.');
+    expect(r.quoted).toContain('-----Original Message-----');
+  });
+
+  it('cuts at a German attribution line', () => {
+    const r = splitQuoted('Danke,\n\nAm 10. Juli 2026 um 09:12 schrieb Jean <j@example.com>:\nzitierter Text');
+    expect(r.fresh).toBe('Danke,');
+    expect(r.quoted).toContain('schrieb');
+  });
+
   it('does not cut on a decorative separator with no header after it', () => {
     const r = splitQuoted('Point one.\n\n--------\n\nPoint two.');
     expect(r.quoted).toBe('');
@@ -380,8 +393,12 @@ Expected: FAIL — `Cannot find module './quoted'`
 const ATTRIBUTION =
   /^(?=.*[\d@])\s*(On\b.*\bwrote\s*:|Le\b.*\ba écrit\s*:|Am\b.*\bschrieb\b.*:|.*\bkirjoitti\s*:)\s*$/i;
 
-/** A separator run (underscores or dashes) that introduces a forwarded header block. */
-const SEPARATOR = /^\s*[_-]{5,}\s*$/;
+/** A separator run that introduces a forwarded header block. The middle
+ *  alternative catches labeled delimiters ("-----Original Message-----",
+ *  "---------- Forwarded message ---------"), which a whole-line-of-dashes
+ *  pattern cannot match. The HEADER lookahead below is what keeps a
+ *  decorative rule inside a body from being treated as a quote marker. */
+const SEPARATOR = /^\s*(?:_{5,}|-{3,}[^\n]*?-{3,}|-{5,})\s*$/;
 
 /** Header line that opens a quoted block, in the locales we actually receive. */
 const HEADER = /^\s*(From|De|Sent|Envoyé|To|À|Subject|Objet)\s*:/i;
@@ -425,7 +442,7 @@ export function splitQuoted(body: string | null): { fresh: string; quoted: strin
 - [ ] **Step 4: Lancer les tests pour les voir passer**
 
 Run: `npx vitest run lib/crm/quoted.test.ts` depuis `frontend/`
-Expected: PASS, 7 tests.
+Expected: PASS, 12 tests.
 
 - [ ] **Step 5: Commit**
 
@@ -2661,7 +2678,7 @@ Ouvrir un contact en relance due, cliquer « Générer » : deux ou trois angles
 
 ## Vérification finale
 
-- [ ] `cd ~/ibanforge/frontend && npm test` — 39 tests au vert (quoted 7, situation 9, build-contacts 9, sent-today 3, guardrails 11)
+- [ ] `cd ~/ibanforge/frontend && npm test` — 44 tests au vert (quoted 12, situation 9, build-contacts 9, sent-today 3, guardrails 11)
 - [ ] `npm run build` réussit
 - [ ] `grep -rn "crm-workspace\|prospects-workspace" frontend/app frontend/components frontend/lib` ne renvoie rien
 - [ ] `/dashboard/customers` et `/dashboard/prospects` redirigent vers `/dashboard/contacts`
