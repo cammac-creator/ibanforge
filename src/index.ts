@@ -36,6 +36,7 @@ import { ibanStructure } from './routes/iban-structure.js';
 import { rateLimitMiddleware } from './middleware/rate-limit.js';
 import { recordRequest, classifyClient, hashIp, extractClientIp, purgeOldRequestLog, purgeTerminatedKeyTelemetry } from './lib/stats.js';
 import { bicGuardMiddleware, iidGuardMiddleware } from './middleware/identifier-guard.js';
+import { notFoundHandler } from './lib/not-found.js';
 import { getEntryCount, getChClearingCount, getLeiEnrichedCount } from './lib/bic-lookup.js';
 
 // Fail-fast: refuse to start in production without wallet config
@@ -500,10 +501,9 @@ app.route('/', createPlaygroundRelay(app));
 // Landing page (must be last — catches GET /)
 app.route('/', landing);
 
-// JSON 404 for unmatched routes
-app.notFound((c) => {
-  return c.json({ error: 'not_found', message: `Route ${c.req.method} ${new URL(c.req.url).pathname} not found` }, 404);
-});
+// JSON 404 for unmatched routes — the body tells the caller what to call
+// instead (see src/lib/not-found.ts for why, and for its tests).
+app.notFound(notFoundHandler);
 
 const port = parseInt(process.env.PORT ?? '3000', 10);
 
