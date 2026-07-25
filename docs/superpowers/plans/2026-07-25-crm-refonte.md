@@ -342,7 +342,10 @@ describe('splitQuoted', () => {
   });
 
   it('does not mistake ordinary prose ending in "a écrit :" for an attribution', () => {
-    const r = splitQuoted('Le rapport que Jean a écrit :\nvoir la page 4.');
+    // The leading line matters: with the marker on line 0, the purely-quoted
+    // fallback returns the whole body as `fresh` and the assertion would pass
+    // against the buggy regex too. A negative fixture needs fresh text above it.
+    const r = splitQuoted('Bonjour,\n\nLe rapport que Jean a écrit :\nvoir la page 4.');
     expect(r.quoted).toBe('');
     expect(r.fresh).toContain('voir la page 4.');
   });
@@ -350,6 +353,8 @@ describe('splitQuoted', () => {
 ```
 
 Ces trois derniers tests ferment des trous trouvés à l'implémentation : sans eux, la garde du séparateur pouvait être supprimée sans faire rougir la suite, et une phrase ordinaire finissant par « wrote: » était repliée comme une citation.
+
+⚠️ **Piège de conception de test, valable pour tout ce module :** un fixture négatif dont le marqueur est en première ligne ne prouve rien. Le repli « réponse purement citée » renvoie alors tout le corps en `fresh` et `quoted` est vide quelle que soit la justesse de la règle. Toujours placer une ligne de texte neuf au-dessus du marqueur.
 
 - [ ] **Step 2: Lancer les tests pour les voir échouer**
 
