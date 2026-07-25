@@ -328,12 +328,32 @@ describe('splitQuoted', () => {
     expect(splitQuoted(null)).toEqual({ fresh: '', quoted: '' });
     expect(splitQuoted('   ')).toEqual({ fresh: '', quoted: '' });
   });
+
+  it('does not cut on a decorative separator with no header after it', () => {
+    const r = splitQuoted('Point one.\n\n--------\n\nPoint two.');
+    expect(r.quoted).toBe('');
+    expect(r.fresh).toContain('Point two.');
+  });
+
+  it('does not mistake ordinary prose ending in "wrote:" for an attribution', () => {
+    const r = splitQuoted('Hi,\n\nOn the API design you wrote:\nplease keep v1 stable.');
+    expect(r.quoted).toBe('');
+    expect(r.fresh).toContain('please keep v1 stable.');
+  });
+
+  it('does not mistake ordinary prose ending in "a écrit :" for an attribution', () => {
+    const r = splitQuoted('Le rapport que Jean a écrit :\nvoir la page 4.');
+    expect(r.quoted).toBe('');
+    expect(r.fresh).toContain('voir la page 4.');
+  });
 });
 ```
 
+Ces trois derniers tests ferment des trous trouvés à l'implémentation : sans eux, la garde du séparateur pouvait être supprimée sans faire rougir la suite, et une phrase ordinaire finissant par « wrote: » était repliée comme une citation.
+
 - [ ] **Step 2: Lancer les tests pour les voir échouer**
 
-Run: `cd ~/ibanforge/frontend && npm test -- quoted`
+Run: `npx vitest run lib/crm/quoted.test.ts` depuis `frontend/`
 Expected: FAIL — `Cannot find module './quoted'`
 
 - [ ] **Step 3: Écrire l'implémentation**
@@ -349,9 +369,11 @@ Expected: FAIL — `Cannot find module './quoted'`
  * attribution lines), which makes long threads unreadable when rendered raw.
  */
 
-/** Attribution lines: "On <date>, X wrote:", "Le <date>, X a écrit :", German, Finnish. */
+/** Attribution lines: "On <date>, X wrote:", "Le <date>, X a écrit :", German, Finnish.
+ *  A real attribution always carries a date or an address, so require a digit or an "@":
+ *  without that guard, ordinary prose ending in "wrote:" is mistaken for a quote header. */
 const ATTRIBUTION =
-  /^\s*(On\b.*\bwrote\s*:|Le\b.*\ba écrit\s*:|Am\b.*\bschrieb\b.*:|.*\bkirjoitti\s*:)\s*$/i;
+  /^(?=.*[\d@])\s*(On\b.*\bwrote\s*:|Le\b.*\ba écrit\s*:|Am\b.*\bschrieb\b.*:|.*\bkirjoitti\s*:)\s*$/i;
 
 /** A separator run (underscores or dashes) that introduces a forwarded header block. */
 const SEPARATOR = /^\s*[_-]{5,}\s*$/;
@@ -397,7 +419,7 @@ export function splitQuoted(body: string | null): { fresh: string; quoted: strin
 
 - [ ] **Step 4: Lancer les tests pour les voir passer**
 
-Run: `cd ~/ibanforge/frontend && npm test -- quoted`
+Run: `npx vitest run lib/crm/quoted.test.ts` depuis `frontend/`
 Expected: PASS, 7 tests.
 
 - [ ] **Step 5: Commit**
