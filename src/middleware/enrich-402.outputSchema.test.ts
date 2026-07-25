@@ -31,6 +31,66 @@ function makeApp(handler: (c: import('hono').Context) => Promise<Response> | Res
   return app;
 }
 
+/**
+ * Reco-IA audit 2026-07-25. Every discovery example is a FIXED sample record,
+ * served whatever resource was asked for: the 402 for /v1/ch/clearing/779
+ * (Nidwaldner Kantonalbank, Stans) ships the UBS Zürich record for IID 00230.
+ * Unlabelled, an assistant reads that as the answer and reports it to its user
+ * — IBANforge's own paywall producing a confident wrong answer about the Swiss
+ * clearing data that IS the product. The stamp must survive on every path.
+ */
+describe('402 discovery examples are stamped as examples', () => {
+  const NOTICE = /ILLUSTRATIVE SAMPLE/;
+
+  it('stamps outputSchema.output when patching an upstream 402 (path 2)', async () => {
+    const app = makeApp(() =>
+      new Response(JSON.stringify({ accepts: [{ scheme: 'exact', network: 'base' }] }), {
+        status: 402,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+
+    const r = await app.request('/v1/ch/clearing/762');
+    const body = (await r.json()) as {
+      accepts: Array<{ outputSchema: { output: Record<string, unknown> } }>;
+    };
+    const output = body.accepts[0].outputSchema.output;
+    expect(output._example_notice).toMatch(NOTICE);
+    // The sample values must still be there — the Bazaar v1 extractor reads them.
+    expect(output).toHaveProperty('iid', '00230');
+  });
+
+  it('stamps the example on an empty-body 402 too (path 1, extra.outputExample)', async () => {
+    const app = makeApp(() => new Response('', { status: 402 }));
+
+    const r = await app.request('/v1/ch/clearing/762');
+    const body = (await r.json()) as {
+      accepts: Array<{
+        extra: { outputExample: Record<string, unknown> };
+        outputSchema: { output: Record<string, unknown> };
+      }>;
+    };
+    expect(body.accepts[0].extra.outputExample._example_notice).toMatch(NOTICE);
+    expect(body.accepts[0].outputSchema.output._example_notice).toMatch(NOTICE);
+  });
+
+  it('stamps every paid endpoint, not just the Swiss one', async () => {
+    const app = makeApp(() => new Response('', { status: 402 }));
+
+    for (const [path, init] of [
+      ['/v1/iban/validate', { method: 'POST', body: '{}' }],
+      ['/v1/iban/compliance', { method: 'POST', body: '{}' }],
+      ['/v1/bic/UBSWCHZH80A', {}],
+    ] as const) {
+      const r = await app.request(path, init);
+      const body = (await r.json()) as {
+        accepts: Array<{ outputSchema: { output: Record<string, unknown> } }>;
+      };
+      expect(body.accepts[0].outputSchema.output._example_notice, path).toMatch(NOTICE);
+    }
+  });
+});
+
 describe('enrich402 outputSchema injection (CyberSapper recipe)', () => {
   it('injects outputSchema on a paid endpoint when the upstream emits a 402 with accepts', async () => {
     const app = makeApp(() =>

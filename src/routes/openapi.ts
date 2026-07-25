@@ -16,8 +16,18 @@ const buildSpec = () => ({
   info: {
     title: 'IBANforge API',
     version: PKG_VERSION,
+    // This string is the first thing every agent reads about the product, on
+    // the surface machines fetch ~20k times/month. Kept in sync with the
+    // positioning already served by llms.txt and the MCP descriptors — a
+    // generic "IBAN + BIC API" line commoditises the two differentiators
+    // (Swiss SIX clearing depth, sanctions screening) for free.
     description:
-      'IBAN validation & BIC/SWIFT lookup API with x402 micropayments and MCP integration',
+      'Pre-payout screening for AI agents — vet a counterparty IBAN before you send funds. ' +
+      'IBAN validation, BIC/SWIFT lookup, Swiss clearing (BC-Nummer / QR-IID / SIX BankMaster — ' +
+      'full payment-rail participation, the deepest Swiss clearing data in any public API), ' +
+      'EMI/vIBAN classification, SEPA Instant + VoP reachability, and sanctions + risk scoring. ' +
+      'Three ways to pay, no dead-ends: a free API key (200 req/month), prepaid credit packs ' +
+      '(card or USDC), or pay-per-call via x402 micropayments (USDC on Base L2, no signup).',
     contact: {
       url: 'https://ibanforge.com',
     },
@@ -38,7 +48,7 @@ const buildSpec = () => ({
         description:
           'Validates an IBAN and returns parsed components including country, check digits, BBAN, and optional BIC lookup. Costs 0.005 USDC via x402.',
         tags: ['IBAN'],
-        security: [{ x402Payment: [] }],
+        security: [{ x402Payment: [] }, { apiKey: [] }],
         requestBody: {
           required: true,
           content: {
@@ -78,7 +88,7 @@ const buildSpec = () => ({
         description:
           'Validates a list of IBANs and returns results for each. Costs $0.002 USDC per IBAN via x402 (e.g. 10 IBANs = $0.020, 100 IBANs = $0.200). On API keys, a batch debits 1 request/credit per IBAN — free tier and prepaid packs alike.',
         tags: ['IBAN'],
-        security: [{ x402Payment: [] }],
+        security: [{ x402Payment: [] }, { apiKey: [] }],
         requestBody: {
           required: true,
           content: {
@@ -133,7 +143,7 @@ const buildSpec = () => ({
         description:
           'Returns institution details for a BIC/SWIFT code (8 or 11 characters). Costs 0.003 USDC via x402.',
         tags: ['BIC'],
-        security: [{ x402Payment: [] }],
+        security: [{ x402Payment: [] }, { apiKey: [] }],
         parameters: [
           {
             name: 'code',
@@ -169,7 +179,7 @@ const buildSpec = () => ({
         description:
           'Validates an IBAN and returns everything from /v1/iban/validate PLUS a full compliance layer: sanctions screening (OFAC/EU/UN), FATF status, SEPA Instant reachability, VoP participant check, and a composite risk score (0-100). Costs $0.02 USDC via x402.',
         tags: ['Compliance'],
-        security: [{ x402Payment: [] }],
+        security: [{ x402Payment: [] }, { apiKey: [] }],
         requestBody: {
           required: true,
           content: {
@@ -601,9 +611,13 @@ const buildSpec = () => ({
       get: {
         operationId: 'getStats',
         summary: 'Detailed statistics',
-        description: 'Returns detailed API usage statistics broken down by operation type.',
-        tags: ['Free'],
+        description:
+          'Returns detailed API usage statistics broken down by operation type. ' +
+          'Requires authentication — these figures include revenue and are not public.',
+        tags: ['API Keys'],
+        security: [{ apiKey: [] }],
         responses: {
+          '403': { description: 'Authentication required — send Authorization: Bearer ifk_...' },
           '200': {
             description: 'Statistics overview',
             content: {
@@ -619,8 +633,11 @@ const buildSpec = () => ({
       get: {
         operationId: 'getStatsHistory',
         summary: 'Historical statistics',
-        description: 'Returns per-day statistics for the requested period.',
-        tags: ['Free'],
+        description:
+          'Returns per-day statistics for the requested period. ' +
+          'Requires authentication — these figures include revenue and are not public.',
+        tags: ['API Keys'],
+        security: [{ apiKey: [] }],
         parameters: [
           {
             name: 'period',
@@ -631,6 +648,7 @@ const buildSpec = () => ({
           },
         ],
         responses: {
+          '403': { description: 'Authentication required — send Authorization: Bearer ifk_...' },
           '200': {
             description: 'Historical stats array',
             content: {
@@ -739,6 +757,34 @@ const buildSpec = () => ({
             required: ['code', 'bank_name', 'city'],
           },
           formatted: { type: 'string', description: 'IBAN formatted in groups of 4', example: 'GB29 NWBK 6016 1331 9268 19' },
+          // Shipped by the endpoint since 1.x but absent from this schema until
+          // 2026-07-25: agents reading the spec could not see that validating a
+          // CH/LI IBAN already returns the Swiss rail data, and paid a second
+          // call to /v1/ch/clearing/{iid} for something they had.
+          clearing: {
+            type: 'object',
+            nullable: true,
+            description:
+              'Swiss clearing enrichment from the SIX BankMaster directory — present for CH and LI IBANs only, ' +
+              'and included at no extra cost in the 0.005 USDC validation. Full rail participation, not just a name lookup.',
+            properties: {
+              iid: { type: 'string', description: 'Zero-padded 5-digit IID / BC-Nummer', example: '00230' },
+              name: { type: 'string', example: 'UBS Switzerland AG' },
+              type: {
+                type: 'string',
+                enum: ['bank', 'cantonal_bank', 'postfinance', 'raiffeisen', 'central_bank', 'foreign_participant'],
+              },
+              town: { type: 'string', example: 'Zürich' },
+              sic: { type: 'boolean', description: 'SIC (Swiss Interbank Clearing) participation' },
+              instant_payments_chf: { type: 'boolean', description: 'Instant Payments CHF participation' },
+              eurosic: { type: 'boolean', description: 'euroSIC participation' },
+              qr_iid: {
+                type: 'string',
+                nullable: true,
+                description: 'QR-IID allocation for QR-bill reference, null when the institution has none',
+              },
+            },
+          },
           error: {
             type: 'string',
             enum: ['invalid_format', 'unsupported_country', 'wrong_length', 'checksum_failed'],

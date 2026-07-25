@@ -46,6 +46,15 @@ export function ensureWalletConfigured(): void {
   }
 }
 
+/**
+ * Routes that sell something rather than serve something. They must always go
+ * through the payment gate: an allowance covers consumption, never purchase.
+ * Kept as a function (not a bare regex) so the intent survives future routes.
+ */
+export function isSellingRoute(method: string, path: string): boolean {
+  return method === 'POST' && /^\/v1\/credits\/buy\/[^/]+\/?$/.test(path);
+}
+
 export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
   return async (c, next) => {
     // Dev bypass
@@ -61,8 +70,13 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
     const explicitFreeMode = process.env.IBANFORGE_FREE_MODE === 'true';
     const x402Enabled = process.env.X402_ENABLED === 'true';
 
-    // Skip x402 if authenticated via API key (free tier inside the quota)
-    if (c.get('apiKeyAuthenticated')) {
+    // Skip x402 if authenticated via API key (free tier inside the quota) —
+    // EXCEPT on the routes that SELL credits. An API key is a way to spend an
+    // allowance, never a way to acquire one: without this guard a free key
+    // (200 req/month) buys 200 bundles, i.e. up to $16,000 of credits for one
+    // unit of quota, and each minted key can start over.
+    // Security audit 2026-07-25, finding 1.
+    if (c.get('apiKeyAuthenticated') && !isSellingRoute(c.req.method, new URL(c.req.url).pathname)) {
       await next();
       return;
     }
