@@ -2,6 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import { Hono } from 'hono';
 import { enrich402Middleware } from './enrich-402.js';
+import type { HonoEnv, PaywallCause } from '../types.js';
 
 describe('enrich402Middleware', () => {
   it('enriches empty 402 responses with helpful body', async () => {
@@ -77,5 +78,58 @@ describe('enrich402Middleware', () => {
     // existing blocks keep their field names
     expect(body.free_tier.signup).toContain('/v1/keys/generate');
     expect(body.x402).toBeDefined();
+  });
+});
+
+describe('enrich402Middleware — the exhausted client must not be handed a way out for free', () => {
+  function appWithCause(cause: PaywallCause) {
+    const app = new Hono<HonoEnv>();
+    app.use('*', async (c, next) => {
+      c.set('paywallCause', cause);
+      await next();
+    });
+    app.use('*', enrich402Middleware());
+    app.post('/v1/iban/validate', () =>
+      new Response('{}', { status: 402, headers: { 'Content-Type': 'application/json' } }),
+    );
+    return app;
+  }
+
+  it('drops the free_tier block when the monthly quota is exhausted', async () => {
+    const app = appWithCause({
+      reason: 'monthly_quota_exhausted',
+      detail: 'Your free tier is exhausted for 2026-07.',
+    });
+
+    const res = await app.request('/v1/iban/validate', { method: 'POST', body: '{}' });
+    const body = (await res.json()) as Record<string, unknown>;
+
+    expect(body.free_tier).toBeUndefined();
+    expect(body.credit_packs).toBeDefined();
+  });
+
+  it('drops the free_tier block when a prepaid credit bundle is exhausted', async () => {
+    const app = appWithCause({
+      reason: 'credits_exhausted',
+      detail: 'Your prepaid credit bundle is used up.',
+      credits: { total: 1000, remaining: 0, topup: 'POST /v1/credits/buy/1k' },
+    });
+
+    const res = await app.request('/v1/iban/validate', { method: 'POST', body: '{}' });
+    const body = (await res.json()) as Record<string, unknown>;
+
+    expect(body.free_tier).toBeUndefined();
+  });
+
+  it('keeps the free_tier block for an invalid key — that client may genuinely need one', async () => {
+    const app = appWithCause({
+      reason: 'invalid_api_key',
+      detail: 'An API key was provided but it is invalid or revoked.',
+    });
+
+    const res = await app.request('/v1/iban/validate', { method: 'POST', body: '{}' });
+    const body = (await res.json()) as { free_tier?: { signup?: string } };
+
+    expect(body.free_tier?.signup).toContain('/v1/keys/generate');
   });
 });
