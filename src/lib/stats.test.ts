@@ -305,6 +305,35 @@ describe('recordRejection', () => {
       expect(r.success).toBe(0);
     }
   });
+
+  // The defect this guards: rejections live in the same table as operations, so
+  // without `reject_reason IS NULL` on every operation-facing read, one rejection
+  // would count as one failed bic_lookup — and at the observed rejection volume
+  // the hit rate would crater to single digits, reading as an outage rather than
+  // as a measurement change. Asserting the column exists would not catch that.
+  it('keeps rejections out of the operation aggregations (separate lane)', () => {
+    const rejectionCount = () =>
+      getRejectionStats(30).find((r) => r.operation_type === 'bic_lookup' && r.reject_reason === 'too_short')?.count ?? 0;
+
+    const beforeType = getStats().by_type.bic_lookup;
+    const beforeQuick = getQuickStats().bic_lookups;
+    const beforeRejected = rejectionCount();
+
+    recordOperation('bic_lookup', 'CH', true, 0);
+    recordRejection('bic_lookup', 'too_short');
+
+    const afterType = getStats().by_type.bic_lookup;
+
+    // Two rows written, but the operation lane must see exactly the one real
+    // lookup: total +1 (not +2) and found_count +1, so the hit rate contribution
+    // is 1/1 and not 1/2.
+    expect(afterType.total - beforeType.total).toBe(1);
+    expect(afterType.found_count - beforeType.found_count).toBe(1);
+    expect(getQuickStats().bic_lookups - beforeQuick).toBe(1);
+
+    // The rejection is not lost — it is readable through its own lane.
+    expect(rejectionCount() - beforeRejected).toBe(1);
+  });
 });
 
 describe('classifyClient', () => {
