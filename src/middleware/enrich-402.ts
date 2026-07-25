@@ -467,6 +467,52 @@ const PRICING: EndpointPricing[] = [
   },
 ];
 
+/**
+ * Credit packs are gated by the x402 middleware, but the SDK emits an EMPTY
+ * 402 body, so this table is what actually builds the offer an agent reads.
+ * Without an entry here the sales routes answered `accepts: []` — gated, yet
+ * impossible to pay: the only autonomous purchase path was a dead end.
+ * Prices must stay in sync with src/routes/credits-buy.ts and the x402 route
+ * table in src/middleware/x402.ts. Audit 2026-07-25.
+ */
+const CREDIT_BUNDLES: Array<{ slug: string; credits: number; price_usdc: number; discount?: string }> = [
+  { slug: '1k', credits: 1000, price_usdc: 5 },
+  { slug: '5k', credits: 5000, price_usdc: 20, discount: '-20% vs retail' },
+  { slug: '25k', credits: 25000, price_usdc: 80, discount: '-36% vs retail' },
+];
+
+for (const b of CREDIT_BUNDLES) {
+  const perCall = Math.round((b.price_usdc / b.credits) * 1_000_000) / 1_000_000;
+  PRICING.push({
+    match: (m, p) => m === 'POST' && new RegExp(`^/v1/credits/buy/${b.slug}/?$`).test(p),
+    price_usdc: b.price_usdc,
+    description:
+      `Prepaid bundle of ${b.credits.toLocaleString('en-US')} credits for AI agents — ` +
+      `1 credit = 1 validation/lookup, batch validation debits 1 credit per IBAN. ` +
+      `${perCall} USDC per call${b.discount ? ` (${b.discount})` : ''}. ` +
+      `ONE x402 settlement instead of ${b.credits.toLocaleString('en-US')} micropayments. ` +
+      `Returns a fresh ifk_ key valid on any /v1/iban/* or /v1/bic/* endpoint. Credits never expire.`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        email: {
+          type: 'string',
+          description: 'Optional — anonymous keys are fully functional. Used only to let you recover the key.',
+        },
+      },
+    },
+    outputExample: {
+      api_key: 'ifk_live_example_key_shown_once',
+      key_prefix: 'ifk_live_exam',
+      credits: b.credits,
+      bundle: b.slug,
+      price_paid_usdc: b.price_usdc,
+      price_per_call_usdc: perCall,
+      message: 'Save this key — it will not be shown again.',
+    },
+  });
+}
+
 function findPricing(method: string, path: string): EndpointPricing | undefined {
   return PRICING.find((p) => p.match(method, path));
 }

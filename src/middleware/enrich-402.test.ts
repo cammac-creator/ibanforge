@@ -4,6 +4,49 @@ import { Hono } from 'hono';
 import { enrich402Middleware } from './enrich-402.js';
 import type { HonoEnv, PaywallCause } from '../types.js';
 
+/**
+ * Reco-IA audit 2026-07-25. The x402 SDK emits an EMPTY 402 body ({}) for every
+ * gated route, so enrich-402 rebuilds the whole envelope from its own PRICING
+ * table. The credit-pack sales routes were gated but absent from that table, so
+ * they answered 402 with `accepts: []` — no scheme, no payTo, no amount. An
+ * x402 client reads accepts[] to build its EIP-3009 signature, so the ONLY
+ * autonomous way to buy credits was unusable, exactly at the point of
+ * conversion, while "no dead-ends: your agent always has a path to pay" was
+ * published on every surface.
+ */
+describe('credit-pack purchase routes are payable by a machine', () => {
+  const app = new Hono();
+  app.use('*', enrich402Middleware());
+  for (const slug of ['1k', '5k', '25k']) {
+    app.post(`/v1/credits/buy/${slug}`, () => new Response('', { status: 402 }));
+  }
+
+  it.each([
+    ['1k', '5000000'],
+    ['5k', '20000000'],
+    ['25k', '80000000'],
+  ])('bundle %s advertises a payable offer of %s (USDC, 6 decimals)', async (slug, amount) => {
+    const res = await app.request(`/v1/credits/buy/${slug}`, { method: 'POST', body: '{}' });
+    expect(res.status).toBe(402);
+    const body = (await res.json()) as { accepts: Array<Record<string, unknown>> };
+
+    expect(body.accepts).toHaveLength(1);
+    const offer = body.accepts[0];
+    expect(offer.maxAmountRequired).toBe(amount);
+    expect(offer.scheme).toBe('exact');
+    expect(offer.network).toBe('base');
+    expect(offer.payTo).toMatch(/^0x[0-9a-fA-F]{40}$/);
+    expect(offer.asset).toBe('0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913');
+    expect(offer.resource).toBe(`https://api.ibanforge.com/v1/credits/buy/${slug}`);
+  });
+
+  it('states what the buyer receives, so an agent can choose a bundle', async () => {
+    const res = await app.request('/v1/credits/buy/5k', { method: 'POST', body: '{}' });
+    const body = (await res.json()) as { accepts: Array<{ description: string }> };
+    expect(body.accepts[0].description).toMatch(/5,000 credits/);
+  });
+});
+
 describe('enrich402Middleware', () => {
   it('enriches empty 402 responses with helpful body', async () => {
     const app = new Hono();
