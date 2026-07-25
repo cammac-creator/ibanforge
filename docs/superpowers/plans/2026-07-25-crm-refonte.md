@@ -300,10 +300,24 @@ describe('splitQuoted', () => {
   });
 
   it('cuts at an Outlook style From: block', () => {
-    const body = 'Thanks, noted.\n\n________________________________\nFrom: Someone <a@example.com>\nSent: Monday\nSubject: Re: test';
+    const body =
+      'Thanks, noted.\n\n________________________________\nFrom: Someone <a@example.com>\nSent: Monday\nSubject: Re: test';
     const r = splitQuoted(body);
     expect(r.fresh).toBe('Thanks, noted.');
-    expect(r.quoted).toContain('From: Someone');
+    // The one exact assertion on `quoted` in the suite: it pins the cut boundary,
+    // which `toContain` cannot do. It catches a cut starting one line too late, which
+    // drops the separator. A cut one line too early is hidden by the trim().
+    expect(r.quoted).toBe(
+      '________________________________\nFrom: Someone <a@example.com>\nSent: Monday\nSubject: Re: test',
+    );
+  });
+
+  it('cuts at a labeled Original Message delimiter', () => {
+    const body =
+      'Thanks, noted.\n\n-----Original Message-----\nFrom: Someone <a@example.com>\nSent: Monday\nSubject: Re: test';
+    const r = splitQuoted(body);
+    expect(r.fresh).toBe('Thanks, noted.');
+    expect(r.quoted).toContain('-----Original Message-----');
   });
 
   it('cuts at a French "a écrit :" attribution', () => {
@@ -318,6 +332,36 @@ describe('splitQuoted', () => {
     expect(r.quoted).toContain('wrote:');
   });
 
+  it('cuts at a German attribution line', () => {
+    const r = splitQuoted(
+      'Danke,\n\nAm 10. Juli 2026 um 09:12 schrieb Jean <j@example.com>:\nzitierter Text',
+    );
+    expect(r.fresh).toBe('Danke,');
+    expect(r.quoted).toContain('schrieb');
+  });
+
+  it('does not cut on a decorative separator with no header after it', () => {
+    const r = splitQuoted('Point one.\n\n--------\n\nPoint two.');
+    expect(r.fresh).toBe('Point one.\n\n--------\n\nPoint two.');
+    expect(r.quoted).toBe('');
+  });
+
+  it('does not cut on prose that merely ends with "wrote:"', () => {
+    const body = 'Hi,\n\nOn the API design you wrote:\nplease keep v1 stable.';
+    const r = splitQuoted(body);
+    expect(r.fresh).toBe(body);
+    expect(r.quoted).toBe('');
+  });
+
+  it('does not cut on prose that merely ends with "a écrit :"', () => {
+    // The attribution must not sit on line 0: a cut there is masked by the
+    // purely-quoted fallback, which would make this test pass either way.
+    const body = 'Bonjour,\n\nLe rapport que Jean a écrit :\nvoir la page 4.';
+    const r = splitQuoted(body);
+    expect(r.fresh).toBe(body);
+    expect(r.quoted).toBe('');
+  });
+
   it('keeps the quote as fresh when the reply is purely quoted', () => {
     const r = splitQuoted('> only quoted content here');
     expect(r.fresh).toBe('> only quoted content here');
@@ -327,40 +371,6 @@ describe('splitQuoted', () => {
   it('handles null and empty bodies', () => {
     expect(splitQuoted(null)).toEqual({ fresh: '', quoted: '' });
     expect(splitQuoted('   ')).toEqual({ fresh: '', quoted: '' });
-  });
-
-  it('cuts at a labeled Original Message delimiter', () => {
-    const body = 'Thanks, noted.\n\n-----Original Message-----\nFrom: Someone <a@example.com>\nSent: Monday\nSubject: Re: test';
-    const r = splitQuoted(body);
-    expect(r.fresh).toBe('Thanks, noted.');
-    expect(r.quoted).toContain('-----Original Message-----');
-  });
-
-  it('cuts at a German attribution line', () => {
-    const r = splitQuoted('Danke,\n\nAm 10. Juli 2026 um 09:12 schrieb Jean <j@example.com>:\nzitierter Text');
-    expect(r.fresh).toBe('Danke,');
-    expect(r.quoted).toContain('schrieb');
-  });
-
-  it('does not cut on a decorative separator with no header after it', () => {
-    const r = splitQuoted('Point one.\n\n--------\n\nPoint two.');
-    expect(r.quoted).toBe('');
-    expect(r.fresh).toContain('Point two.');
-  });
-
-  it('does not mistake ordinary prose ending in "wrote:" for an attribution', () => {
-    const r = splitQuoted('Hi,\n\nOn the API design you wrote:\nplease keep v1 stable.');
-    expect(r.quoted).toBe('');
-    expect(r.fresh).toContain('please keep v1 stable.');
-  });
-
-  it('does not mistake ordinary prose ending in "a écrit :" for an attribution', () => {
-    // The leading line matters: with the marker on line 0, the purely-quoted
-    // fallback returns the whole body as `fresh` and the assertion would pass
-    // against the buggy regex too. A negative fixture needs fresh text above it.
-    const r = splitQuoted('Bonjour,\n\nLe rapport que Jean a écrit :\nvoir la page 4.');
-    expect(r.quoted).toBe('');
-    expect(r.fresh).toContain('voir la page 4.');
   });
 });
 ```
@@ -393,14 +403,21 @@ Expected: FAIL — `Cannot find module './quoted'`
 const ATTRIBUTION =
   /^(?=.*[\d@])\s*(On\b.*\bwrote\s*:|Le\b.*\ba écrit\s*:|Am\b.*\bschrieb\b.*:|.*\bkirjoitti\s*:)\s*$/i;
 
-/** A separator run that introduces a forwarded header block. The middle
- *  alternative catches labeled delimiters ("-----Original Message-----",
- *  "---------- Forwarded message ---------"), which a whole-line-of-dashes
- *  pattern cannot match. The HEADER lookahead below is what keeps a
- *  decorative rule inside a body from being treated as a quote marker. */
-const SEPARATOR = /^\s*(?:_{5,}|-{3,}[^\n]*?-{3,}|-{5,})\s*$/;
+/** A separator run that introduces a forwarded header block, including labeled
+ *  delimiters ("-----Original Message-----", "---------- Forwarded message ---------").
+ *  Fixed-length head and tail tests on a trimmed line, rather than one pattern with
+ *  a lazy middle: when several parts can all consume "-", a long dash run that never
+ *  closes backtracks superlinearly. No quantifier here is unbounded, so a crafted
+ *  body cannot freeze the tab. The HEADER lookahead below is what keeps a decorative
+ *  rule inside a body from being treated as a quote marker. */
+function isSeparator(line: string): boolean {
+  const trimmed = line.trim();
+  return trimmed.length >= 3 && /^[-_]{3}/.test(trimmed) && /[-_]{3}$/.test(trimmed);
+}
 
-/** Header line that opens a quoted block, in the locales we actually receive. */
+/** Header line that opens a quoted block. English and French forms only: those are the
+ *  header blocks we have actually seen, while ATTRIBUTION deliberately reaches wider
+ *  because this CRM receives mail in locales the interface is not translated into. */
 const HEADER = /^\s*(From|De|Sent|Envoyé|To|À|Subject|Objet)\s*:/i;
 
 export function splitQuoted(body: string | null): { fresh: string; quoted: string } {
@@ -421,7 +438,7 @@ export function splitQuoted(body: string | null): { fresh: string; quoted: strin
     }
     // A separator only cuts when a header line follows within the next 3 lines,
     // otherwise it is just decoration in the message itself.
-    if (SEPARATOR.test(line) && lines.slice(i + 1, i + 4).some((l) => HEADER.test(l))) {
+    if (isSeparator(line) && lines.slice(i + 1, i + 4).some((l) => HEADER.test(l))) {
       cut = i;
       break;
     }
