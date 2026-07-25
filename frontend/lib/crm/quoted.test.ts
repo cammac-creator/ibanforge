@@ -34,6 +34,28 @@ describe('splitQuoted', () => {
     expect(r.quoted).toContain('wrote:');
   });
 
+  it('does not cut on a decorative separator with no header after it', () => {
+    const r = splitQuoted('Point one.\n\n--------\n\nPoint two.');
+    expect(r.fresh).toBe('Point one.\n\n--------\n\nPoint two.');
+    expect(r.quoted).toBe('');
+  });
+
+  it('does not cut on prose that merely ends with "wrote:"', () => {
+    const body = 'Hi,\n\nOn the API design you wrote:\nplease keep v1 stable.';
+    const r = splitQuoted(body);
+    expect(r.fresh).toBe(body);
+    expect(r.quoted).toBe('');
+  });
+
+  it('does not cut on prose that merely ends with "a écrit :"', () => {
+    // The attribution must not sit on line 0: a cut there is masked by the
+    // purely-quoted fallback, which would make this test pass either way.
+    const body = 'Bonjour,\n\nLe rapport que Jean a écrit :\nvoir la page 4.';
+    const r = splitQuoted(body);
+    expect(r.fresh).toBe(body);
+    expect(r.quoted).toBe('');
+  });
+
   it('keeps the quote as fresh when the reply is purely quoted', () => {
     const r = splitQuoted('> only quoted content here');
     expect(r.fresh).toBe('> only quoted content here');
