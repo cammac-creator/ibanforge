@@ -189,6 +189,73 @@ export function classifyClient(path: string, userAgent: string | undefined): Cli
 // Record helpers
 // ---------------------------------------------------------------------------
 
+// A submitted identifier must never reach `request_log`, which has twelve-month
+// retention — that is the signed DPA clause, and the malformed-identifier
+// traffic this instrumentation exists to measure is exactly the population that
+// used to leak. Three shapes had to be closed:
+//
+//   /v1/bic/UBSW%20CHZH      → the old `[A-Za-z0-9]+` stopped at `%`, storing
+//                              `/v1/bic/:code%20CHZH` (tail of the BIC kept).
+//   /v1/ch/clearing/CH230    → the old `\d+` needed leading digits, so a
+//                              non-numeric IID was stored raw and whole.
+//   POST /CH93007620116238…  → no rule covered an unmatched path at all, so a
+//                              404 could put a complete IBAN at rest.
+
+/**
+ * The one shape a submitted value can take on ANY route, including one we never
+ * registered: two letters, two check digits, then alphanumerics.
+ *
+ * Deliberately narrow. Checked against every path this API registers — `v1`,
+ * `validate`, `clearing`, the `1k`/`5k`/`25k` bundle slugs, `cs_…` Stripe
+ * session ids, 2-letter country codes — none has this shape, so the catch-all
+ * cannot swallow a real endpoint and fragment the dashboard.
+ */
+const IBAN_SHAPED_SEGMENT = /^[A-Za-z]{2}\d{2}[A-Za-z0-9]{1,30}$/;
+
+/**
+ * OpenAPI template literals (`{code}`, `%7Bcode%7D`) are NOT submitted values —
+ * they are an agent pasting the spec placeholder verbatim instead of
+ * substituting it.
+ *
+ * They must stay verbatim: getBusinessFunnel() excludes them by matching
+ * `{`/`%7B` in the stored path, and folding them into `:code` would silently
+ * start counting them as `bad_input` — the exact regression that exclusion was
+ * added to fix. Leaving them costs nothing on the DPA side: there is no
+ * submitted identifier in them to redact.
+ */
+const SPEC_TEMPLATE_SEGMENT = /\{|%7[Bb]/;
+
+/** Stands in for a redacted identifier. Contains no `{`/`%7B`, so it never
+ *  trips the funnel's spec-template exclusion. */
+const REDACTED_SEGMENT = ':redacted';
+
+/**
+ * Collapse a request path to a storable label: no submitted identifier, and a
+ * stable bucket per route family so dashboards do not fragment.
+ *
+ * Takes a URL *pathname* (what the tracking middleware passes) — the route
+ * patterns stop at `?` defensively, but query strings are not part of the
+ * contract.
+ *
+ * Redaction runs FIRST, then the route labels. The privacy floor must not
+ * depend on a route pattern being correct: if one is later narrowed, the
+ * IBAN catch-all has already fired. On a path both rules touch
+ * (`/v1/bic/CH9300762011623852957`) the two orders converge on `/v1/bic/:code`
+ * — the ordering buys robustness against future edits, not a different result
+ * today.
+ */
+export function normalizeRequestPath(path: string): string {
+  const redacted = path
+    .split('/')
+    .map((segment) => (IBAN_SHAPED_SEGMENT.test(segment) ? REDACTED_SEGMENT : segment))
+    .join('/');
+  return redacted
+    .replace(/\/v1\/bic\/[^/?]+/, (match) => (SPEC_TEMPLATE_SEGMENT.test(match) ? match : '/v1/bic/:code'))
+    .replace(/\/v1\/ch\/clearing\/[^/?]+/, (match) =>
+      SPEC_TEMPLATE_SEGMENT.test(match) ? match : '/v1/ch/clearing/:iid',
+    );
+}
+
 /**
  * Record any HTTP request (all traffic, not just business operations).
  *
@@ -209,10 +276,9 @@ export function recordRequest(
     const now = new Date();
     const hour = now.getUTCHours();
     const dow = (now.getUTCDay() + 6) % 7;
-    // Normalize paths: /v1/bic/DEUTDEFF → /v1/bic/:code
-    const normalizedPath = path
-      .replace(/\/v1\/bic\/[A-Za-z0-9]+/, '/v1/bic/:code')
-      .replace(/\/v1\/ch\/clearing\/\d+/, '/v1/ch/clearing/:iid');
+    // Normalize paths: /v1/bic/DEUTDEFF → /v1/bic/:code, and redact any
+    // identifier-shaped segment before it reaches storage (see above).
+    const normalizedPath = normalizeRequestPath(path);
     const truncatedUa = userAgent ? userAgent.slice(0, 256) : null;
     insertRequest().run(method, normalizedPath, status, Math.round(responseMs), hour, dow, clientKind, ipHash, truncatedUa, keyPrefix);
   } catch (err) {
