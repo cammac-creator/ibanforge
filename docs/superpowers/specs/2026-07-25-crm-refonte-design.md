@@ -1,7 +1,7 @@
 # Refonte du CRM du dashboard — design
 
 **Date :** 2026-07-25
-**Portée :** `frontend/` (dépôt `ibanforge`) + un endpoint sur le VPS Tabornio (dépôt `tabornio`, lot 4 uniquement).
+**Portée :** `frontend/` (dépôt `ibanforge`) + deux changements sur le VPS Tabornio (dépôt `tabornio`) : un drapeau au lot 1, un endpoint au lot 4.
 
 > Note de confidentialité : ce dépôt est public. Ce document ne cite aucun nom de contact réel,
 > aucune adresse et aucun chiffre commercial. Les exemples sont fictifs.
@@ -210,7 +210,11 @@ Le compteur du jour se lit dans `email_messages` : messages `out` dont `msg_date
 
 ### 5.3 Une seule mécanique de brouillon
 
-Le dépôt IMAP est supprimé. Tout brouillon est une ligne `email_messages` de direction `draft`,
+Le dépôt IMAP est supprimé. Côté VPS, `generate_draft` appelle aujourd'hui `_deposit()` sans
+condition : un drapeau `deposit` (défaut `true`, donc rétrocompatible) permet au CRM de générer
+sans rien écrire dans la boîte. C'est le seul changement Tabornio du lot 1.
+
+Tout brouillon est ensuite une ligne `email_messages` de direction `draft`,
 identifiée par l'email du contact, donc écrasée à chaque enregistrement (au plus un brouillon par
 contact). L'envoi passe par `/api/crm/send`, qui appelle `recordSent()` : le message apparaît dans
 le fil immédiatement.
@@ -253,7 +257,7 @@ Les composants ne sont pas testés unitairement : ils sont vérifiés à l'œil 
 
 | Lot | Contenu | Dépôts |
 |---|---|---|
-| 1 | Socle : types, `build-contacts`, `situation`, `quoted`, page unifiée, liste à compteurs, bulles, bandeau, composeur amarré, suppression du dépôt IMAP | ibanforge |
+| 1 | Socle : types, `build-contacts`, `situation`, `quoted`, page unifiée, liste à compteurs, bulles, bandeau, composeur amarré, suppression du dépôt IMAP | ibanforge **+ tabornio** |
 | 2 | File du jour + compteur d'envois | ibanforge |
 | 3 | Garde-fous, testés, branchés sur le composeur | ibanforge |
 | 4 | Angles de relance | tabornio + ibanforge |
