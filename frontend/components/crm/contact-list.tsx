@@ -23,13 +23,13 @@ const FILTERS: Array<{
   {
     key: 'today',
     label: "Aujourd'hui",
-    test: (c, s) => !isArchived(c) && (s?.ballInCourt === 'us' || s?.followupDue === true),
+    test: (c, s) => !isArchived(c, s) && (s?.ballInCourt === 'us' || s?.followupDue === true),
   },
-  { key: 'all', label: 'Tous', test: (c) => !isArchived(c) },
-  { key: 'followup', label: 'Relances dues', test: (c, s) => !isArchived(c) && s?.followupDue === true },
-  { key: 'prospects', label: 'Prospects', test: (c) => !isArchived(c) && c.kind === 'prospect' },
-  { key: 'clients', label: 'Clients', test: (c) => !isArchived(c) && c.kind === 'client' },
-  { key: 'archived', label: 'Archivés', test: (c) => isArchived(c) },
+  { key: 'all', label: 'Tous', test: (c, s) => !isArchived(c, s) },
+  { key: 'followup', label: 'Relances dues', test: (c, s) => !isArchived(c, s) && s?.followupDue === true },
+  { key: 'prospects', label: 'Prospects', test: (c, s) => !isArchived(c, s) && c.kind === 'prospect' },
+  { key: 'clients', label: 'Clients', test: (c, s) => !isArchived(c, s) && c.kind === 'client' },
+  { key: 'archived', label: 'Archivés', test: (c, s) => isArchived(c, s) },
 ];
 
 const DEFAULT_FILTER = FILTERS[0];

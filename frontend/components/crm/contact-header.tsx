@@ -142,7 +142,7 @@ export function ContactHeader({ contact: c }: { contact: Contact }) {
         <div className="mt-3 flex min-w-0 flex-col gap-3">
           {blocks.fit && (
             <div className="grid min-w-0 gap-3 sm:grid-cols-2">
-              <Field label="Ce qu'ils font" value={sourcing.whatTheyDo} />
+              <Field label="Ce qu’ils font" value={sourcing.whatTheyDo} />
               <Field label="Pourquoi IBANforge leur sert" value={sourcing.fitReason} />
             </div>
           )}
@@ -196,8 +196,24 @@ export function ContactHeader({ contact: c }: { contact: Contact }) {
                 )}
               </p>
             ) : (
-              <p className="text-xs text-amber-400">
+              <p className="wrap-anywhere text-xs text-amber-400">
                 Pas d’email vérifié, à enrichir (on ne devine jamais une adresse).
+                {/* The source link used to live only in the branch above, so a
+                    prospect with a proof URL and no address lost the one lead
+                    that would let the operator find the address. */}
+                {sourcing.emailSourceUrl && (
+                  <>
+                    {' · '}
+                    <a
+                      href={sourcing.emailSourceUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-amber-400 underline hover:no-underline"
+                    >
+                      source ↗
+                    </a>
+                  </>
+                )}
               </p>
             )}
             {sourcing.personalizationHook && (
