@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   changedRows,
@@ -97,10 +97,7 @@ export function ComposerDock({
    * send" and "blocking" never means "there is text worth blocking".
    */
   const sendable = !!c.email && filled && busy === false;
-  // Focused when the override is granted: the blocked button cannot be tabbed
-  // to, so this is what makes a block traversable without a mouse.
-  const sendRef = useRef<HTMLButtonElement>(null);
-  const g = useGuardrails({ subject, body, sentToday, situation: s, sendable, sendRef });
+  const g = useGuardrails({ subject, body, sentToday, situation: s, sendable });
 
   /**
    * Ask before replacing text the operator typed and has not saved anywhere.
@@ -474,7 +471,6 @@ export function ComposerDock({
             <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
               {g.offer && <OverrideButton offer={g.offer} pressed={g.forced} onClick={g.toggle} />}
               <button
-                ref={sendRef}
                 type="button"
                 onClick={send}
                 // disabled, not aria-disabled. A focusable blocked button would

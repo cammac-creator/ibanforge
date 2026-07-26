@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState, type RefObject } from 'react';
+import { useMemo, useState } from 'react';
 import { checkDraft, EM_DASH } from '@/lib/crm/guardrails';
 import type { GuardrailIssue, GuardrailReport, Situation } from '@/lib/crm/types';
 
@@ -103,7 +103,6 @@ export function useGuardrails({
   sentToday,
   situation,
   sendable,
-  sendRef,
 }: {
   subject: string;
   body: string;
@@ -112,16 +111,6 @@ export function useGuardrails({
   /** Undefined only if the page failed to derive one; every rule then falls to its warmer form. */
   situation?: Situation;
   sendable: boolean;
-  /**
-   * The send button, focused when the override is granted.
-   *
-   * That button is `disabled` while blocked, therefore unfocusable, so its
-   * aria-describedby is unreachable in exactly the state where it matters and
-   * the override is the only non-visual way through a block. Without this, a
-   * keyboard user presses Enter on it and lands nowhere. Focused, the button
-   * announces itself, and its own label says what is being passed over.
-   */
-  sendRef?: RefObject<HTMLButtonElement | null>;
 }): Guarded {
   const [overrideFor, setOverrideFor] = useState<string | null>(null);
 
@@ -152,23 +141,38 @@ export function useGuardrails({
    * sendable. Deleting and rewriting is exactly the event that makes the text
    * another draft, so the grant has to die on the edge, not on the value.
    *
+   * The key itself is the third edge, and the ordinary path: at the cap with an
+   * em dash the grant covers both, deleting the dash leaves the cap standing,
+   * so nothing above fires and the grant lies dormant on a key it no longer
+   * matches. Retype the dash and it matches again, armed, with no second click.
+   * Past ten sends both blocks together are the end of day state and Cmd+Z is
+   * the whole sequence.
+   *
    * State adjusted during render rather than in an effect: the corrected value
    * has to be the one this render paints, or the button is red for a frame on
    * a grant nobody gave. React re-runs the component before committing.
    */
-  const [seen, setSeen] = useState({ blocking: false, sendable: false });
-  if (seen.blocking !== report.blocking || seen.sendable !== sendable) {
+  const [seen, setSeen] = useState({ blocking: false, sendable: false, blockKey: '' });
+  if (
+    seen.blocking !== report.blocking ||
+    seen.sendable !== sendable ||
+    seen.blockKey !== blockKey
+  ) {
     const unblocked = seen.blocking && !report.blocking;
     const revived = !seen.sendable && sendable;
-    setSeen({ blocking: report.blocking, sendable });
-    if (unblocked || revived) setOverrideFor(null);
+    const drifted = seen.blockKey !== blockKey;
+    setSeen({ blocking: report.blocking, sendable, blockKey });
+    if (unblocked || revived || drifted) setOverrideFor(null);
   }
 
   const forced = report.blocking && sendable && overrideFor === blockKey;
 
-  useEffect(() => {
-    if (forced) sendRef?.current?.focus();
-  }, [forced, sendRef]);
+  // No focus move on the grant, deliberately. Sending focus to a now live send
+  // button reproduced in the keyboard exactly what the mounted toggle had just
+  // closed for the mouse: Enter grants, focus lands on the armed button, a
+  // second Enter sends, and a held Enter does both inside the repeat delay.
+  // The toggle stays mounted, so the keyboard route through a block is already
+  // open: the button beside it becomes focusable the moment it is armed.
 
   return {
     report,
