@@ -224,15 +224,24 @@ export function ComposerDock({
   const canSaveDraft = !!c.email && filled && busy === false;
 
   return (
-    // max-h-[30vh]: what the thread gets is what this dock leaves, and open it
-    // is a fixed 265px whatever the window, so on a short one it took the last
-    // of the thread. Capped, it scrolls inside itself instead. 30 rather than
-    // 40 because the panel's own padding and margins eat 68px that a naive
-    // budget forgets: at 40vh the thread was still measured at 0 on a 480px
-    // window. At 30vh the dock is untouched at 900px tall (0.3 x 900 is above
-    // its natural 265) and every shorter window gains. Folded the bar is 43px,
-    // far under the cap, so the resting state never sees this.
-    <div className="mt-3 max-h-[30vh] shrink-0 overflow-y-auto border-t border-[var(--ink-4)]/60 pt-3">
+    // The cap, and why it is on a height query rather than flat.
+    //
+    // What the thread gets is what this dock leaves, and open the dock is a
+    // fixed 265px whatever the window, so on a short one it took the last of
+    // the thread. Capped at 30vh it scrolls inside itself instead: measured,
+    // the thread goes from 0 to 141px at 1100x700 and from 0 to 39px at
+    // 1100x480. 30 and not 40 because the panel's own padding and margins eat
+    // 68px a naive budget forgets, and at 40vh the thread was still 0 at 480.
+    //
+    // But the cap has a cost, seen in a capture rather than in the numbers: at
+    // 375x800 the button row wraps, the dock wants 281px, and 30vh of 800 cut
+    // it to 240, which put Envoyer below the dock's own fold. That window is
+    // narrow, not short: uncapped it still leaves the thread 124px. So the cap
+    // applies only under 780px of viewport height, where it is the difference
+    // between a readable thread and none. Above that the dock keeps its
+    // natural height and every control stays in view. Folded the bar is 43px,
+    // far under the cap, so the resting state never sees any of this.
+    <div className="mt-3 shrink-0 overflow-y-auto border-t border-[var(--ink-4)]/60 pt-3 [@media(max-height:780px)]:max-h-[30vh]">
       {!c.email ? (
         // Deliberately not a second copy of the header's sentence, which
         // already says the address is missing. This one says what it costs
