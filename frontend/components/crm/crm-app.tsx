@@ -167,6 +167,9 @@ export function CrmApp({
               key={selected.id}
               contact={selected}
               situation={situation}
+              // The page's count, forwarded untouched: the guardrail that caps
+              // the day reads it, and nothing below this line builds a Date.
+              sentToday={sentToday}
               open={composerOpen}
               onOpenChange={setComposerOpen}
             />

@@ -50,6 +50,14 @@ const OPTOUT_HINTS = [
 const LINK_SCHEMES = ['https://', 'http://'];
 
 /**
+ * Exported so the composer can say which field carries it without writing the
+ * character a second time. A second literal elsewhere would drift the day this
+ * rule widens: the block would still fire and the field pointer would name
+ * nothing, which is the exact failure that pointer exists to prevent.
+ */
+export const EM_DASH = '—';
+
+/**
  * A single character class and no quantifier at all, so there is nothing for a
  * backtracking engine to explore. Every scan below is one left-to-right pass
  * over the body: the draft is operator text of unbounded length, and a pattern
@@ -125,7 +133,7 @@ export function checkDraft({ body, subject, sentToday, isFirstTouch }: CheckInpu
   // dash in prose reads as a machine wrote the sentence, and the whole point of
   // this CRM is a founder writing to one person at a time. A generated subject
   // line announces it just as loudly as a generated paragraph.
-  if (written.includes('—')) {
+  if (written.includes(EM_DASH)) {
     issues.push({
       code: 'em_dash',
       level: 'blocking',

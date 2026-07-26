@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   changedRows,
@@ -10,8 +10,47 @@ import {
   reasonOf,
   withReason,
 } from '@/lib/crm/api-result';
+import { checkDraft, EM_DASH } from '@/lib/crm/guardrails';
 import { NEXT_ACTION_LABEL } from '@/lib/crm/situation';
-import type { Contact, Situation } from '@/lib/crm/types';
+import type { Contact, GuardrailIssue, Situation } from '@/lib/crm/types';
+
+/**
+ * Short names for the blocking rules, used by the two controls that carry the
+ * override. The list under the textarea says the whole sentence; the button
+ * being clicked says what it is being clicked against, because on a short
+ * window that list can be scrolled out of the dock while the button is not.
+ *
+ * Partial on purpose: a blocking rule added later shows its raw code here,
+ * which is ugly and therefore noticed, rather than hiding behind a generic
+ * "le blocage" that would read as if nothing had changed.
+ */
+const BLOCK_LABEL: Partial<Record<GuardrailIssue['code'], string>> = {
+  em_dash: 'tiret cadratin',
+  daily_cap: 'plafond du jour',
+};
+
+/**
+ * Which field carries the em dash.
+ *
+ * It is not always the operator's own typing: a reply is generated from a hint
+ * built on the last message's subject, and the field is then filled from what
+ * comes back, so a dash the recipient wrote can land in the subject and lock
+ * the send on a body that is perfectly clean. Being told "somewhere in your
+ * draft" while staring at a clean body is how an operator concludes the tool
+ * is broken and forces every send out of habit.
+ *
+ * Silent when neither field holds it, which cannot happen while the rule and
+ * this function read the same constant, and is the safe answer if they ever
+ * stop agreeing.
+ */
+function emDashField(subject: string, body: string): string | null {
+  const inSubject = subject.includes(EM_DASH);
+  const inBody = body.includes(EM_DASH);
+  if (inSubject && inBody) return 'Il est dans l’objet et dans le corps.';
+  if (inSubject) return 'Il est dans l’objet.';
+  if (inBody) return 'Il est dans le corps.';
+  return null;
+}
 
 /**
  * The composer, docked at the foot of the detail panel and outside the part
@@ -34,12 +73,21 @@ import type { Contact, Situation } from '@/lib/crm/types';
 export function ComposerDock({
   contact: c,
   situation: s,
+  sentToday,
   open,
   onOpenChange,
 }: {
   contact: Contact;
   /** Undefined only if the page failed to derive one; the goal line is dropped then. */
   situation?: Situation;
+  /**
+   * Real outbound mails dated today, counted by the page against one clock and
+   * handed down untouched, exactly as `situation` is. Never recomputed here:
+   * msg_date carries no timezone, so a UTC server and a browser in Zurich would
+   * disagree on which day a late mail belongs to, and this subtree is
+   * server-rendered before it is hydrated.
+   */
+  sentToday: number;
   /**
    * Folded or unfolded. Controlled by the panel rather than held here, because
    * folding changes how tall the thread is and the panel has to re-anchor it on
@@ -55,6 +103,21 @@ export function ComposerDock({
   const [fr, setFr] = useState<string | null>(null);
   const [busy, setBusy] = useState<false | 'gen' | 'send' | 'draft'>(false);
   const [msg, setMsg] = useState<{ text: string; bad: boolean } | null>(null);
+  /**
+   * The override, held as the blocks it was granted against rather than as a
+   * boolean.
+   *
+   * A boolean granted for an em dash would still be armed when the em dash is
+   * gone and the daily cap has taken its place, which is an override of
+   * something the operator never looked at. Holding the key means the grant
+   * expires by itself the moment the reasons change.
+   *
+   * It is dropped by hand on the four events that make the text a different
+   * draft: a send, a save, a generation, a pre-written mail loaded. Typing does
+   * not drop it, because re-arming the button after every keystroke would train
+   * the operator to click it without reading.
+   */
+  const [overrideFor, setOverrideFor] = useState<string | null>(null);
   /*
    * The resting state, and it is not decoration. The panel is capped at 76vh
    * and the thread is the flex child that absorbs what is left, so a form that
@@ -98,6 +161,7 @@ export function ComposerDock({
     setBody(nextBody);
     setFr(null);
     setMsg(null);
+    setOverrideFor(null);
   }
 
   /**
@@ -177,6 +241,7 @@ export function ComposerDock({
       setSubject(gen.subject || subject);
       setBody(gen.emailEn);
       setFr(gen.translationFr);
+      setOverrideFor(null);
       setMsg({ text: '✍️ Généré, rien n’a été déposé dans la boîte. Relis avant d’envoyer.', bad: false });
     } catch {
       setMsg({ text: 'Erreur réseau, rien n’a été généré.', bad: true });
@@ -214,6 +279,7 @@ export function ComposerDock({
       setSubject('');
       setBody('');
       setFr(null);
+      setOverrideFor(null);
       // Folded back: the text is now the draft card in the thread, and that is
       // where the operator has to look at it.
       setOpen(false);
@@ -259,6 +325,11 @@ export function ComposerDock({
       setSubject('');
       setBody('');
       setFr(null);
+      // The override dies with the mail it covered. Without this the grant
+      // would still be armed for the next draft written to this contact, and
+      // the next blocked send would go out on a click the operator made for
+      // another mail.
+      setOverrideFor(null);
       // Folded back so the thread, where the mail has just appeared, is what
       // the operator sees next.
       setOpen(false);
@@ -284,7 +355,52 @@ export function ComposerDock({
    * protect.
    */
   const hasText = !!subject.trim() || !!body.trim();
-  const canSend = !!c.email && filled && busy === false;
+
+  /**
+   * The pre-send checks, on both fields. The subject is passed because the
+   * generator writes it and nothing was reading it: an em dash the recipient
+   * put in their own subject line travels into the field through the reply
+   * hint, and would otherwise leave the composer.
+   *
+   * `sentToday` is the page's number, never recounted here. `isFirstTouch`
+   * falls to false when the page could not derive a situation, which only
+   * loosens two warnings and never touches a block.
+   */
+  const nextAction = s?.nextAction;
+  const report = useMemo(
+    () => checkDraft({ body, subject, sentToday, isFirstTouch: nextAction === 'first_mail' }),
+    [body, subject, sentToday, nextAction],
+  );
+  const blockers = report.issues.filter((i) => i.level === 'blocking');
+  /** Sorted so the same two blocks always yield the same grant, in any order. */
+  const blockKey = blockers
+    .map((i) => i.code)
+    .sort()
+    .join('+');
+  const blockNames = blockers.map((i) => BLOCK_LABEL[i.code] ?? i.code).join(', ');
+  /**
+   * Gated on `filled`, and that is not a detail: `daily_cap` fires on the
+   * counter alone, so past ten sends every freshly opened composer, on every
+   * contact, starts blocked over an empty draft. Offering the escape hatch
+   * there would re-arm a button `filled` keeps off anyway, and a control that
+   * visibly does nothing when clicked is how the operator learns to distrust
+   * the whole panel. It appears when a send is otherwise possible, which is
+   * also what makes its label true.
+   */
+  const forced = report.blocking && filled && overrideFor === blockKey;
+  const emDashWhere = emDashField(subject, body);
+
+  /**
+   * Guardrails gate the send and nothing else.
+   *
+   * `filled` is what stops a blank mail, and it has to: none of the checks
+   * asks whether anything was written. Two of them even fire on an untouched
+   * draft, the daily cap on the counter and the missing opt-out on a cold
+   * first touch, so "no issue" never means "ready to send" and "blocking" never
+   * means "there is text worth blocking". And a blocked draft can still be
+   * saved: parking a text that needs work is exactly what the draft is for.
+   */
+  const canSend = !!c.email && filled && busy === false && (!report.blocking || forced);
   // The store refuses a draft with no subject, so the button says so by being
   // off rather than by failing after the click.
   const canSaveDraft = !!c.email && filled && busy === false;
@@ -396,6 +512,29 @@ export function ComposerDock({
               <p className="mt-1 whitespace-pre-wrap text-[11px] text-[var(--fg-3)] wrap-anywhere">{fr}</p>
             </details>
           )}
+          {/* The checks, under the text they judge and above the button they
+              govern. Severity is written as a word and not only as a colour:
+              amber against red tells a colour-blind reader nothing, and it
+              tells nobody why one line disables the send and the other does
+              not. No aria-live: this list changes on every keystroke, and a
+              screen reader reading a word count out loud as it is typed would
+              make the composer unusable. */}
+          {report.issues.length > 0 && (
+            <ul id="composer-checks" className="mt-1.5 space-y-0.5">
+              {report.issues.map((i) => (
+                <li
+                  key={i.code}
+                  className={`text-[11px] leading-snug ${
+                    i.level === 'blocking' ? 'text-red-400' : 'text-amber-300'
+                  }`}
+                >
+                  {i.level === 'blocking' ? '🔴 Blocage : ' : '🟠 Attention : '}
+                  {i.message}
+                  {i.code === 'em_dash' && emDashWhere ? ` ${emDashWhere}` : ''}
+                </li>
+              ))}
+            </ul>
+          )}
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <button
               type="button"
@@ -423,14 +562,41 @@ export function ComposerDock({
             >
               {busy === 'draft' ? '…' : '📝 Brouillon'}
             </button>
-            <button
-              type="button"
-              onClick={send}
-              disabled={!canSend}
-              className="ml-auto rounded-lg bg-green-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-green-500 disabled:opacity-50"
-            >
-              {busy === 'send' ? '… envoi' : 'Envoyer'}
-            </button>
+            {/* The override travels with the button it re-arms, in the same
+                row rather than at the foot of the list: under 780px of
+                viewport the dock is capped and scrolls inside itself, so the
+                red lines can be out of sight while the button is not. Both
+                controls name the blocks, so what is being passed over is on
+                the control under the cursor, at both clicks. */}
+            <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+              {report.blocking && filled && !forced && (
+                <button
+                  type="button"
+                  onClick={() => setOverrideFor(blockKey)}
+                  // Deliberate, not easy: this only re-arms the send, and the
+                  // operator still has to press Envoyer. Two clicks, and the
+                  // domain stays theirs to gamble.
+                  className="rounded-lg border border-red-500/40 px-3 py-1.5 text-xs text-red-300 hover:bg-red-500/10"
+                >
+                  Forcer l’envoi malgré : {blockNames}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={send}
+                // disabled, not aria-disabled. A focusable blocked button would
+                // put the whole safety on one onClick guard; the cost is that a
+                // keyboard user cannot tab to it to hear why, which the list
+                // above and the override button both say in text.
+                disabled={!canSend}
+                aria-describedby={report.issues.length > 0 ? 'composer-checks' : undefined}
+                className={`rounded-lg px-4 py-1.5 text-xs font-semibold text-white disabled:opacity-50 ${
+                  forced ? 'bg-red-600 hover:bg-red-500' : 'bg-green-600 hover:bg-green-500'
+                }`}
+              >
+                {busy === 'send' ? '… envoi' : forced ? `⚠️ Envoyer malgré : ${blockNames}` : 'Envoyer'}
+              </button>
+            </div>
           </div>
         </div>
       )}
