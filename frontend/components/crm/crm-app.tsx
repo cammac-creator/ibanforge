@@ -1,9 +1,22 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import type { Contact, Situation } from '@/lib/crm/types';
+import type { Contact, Message, Situation } from '@/lib/crm/types';
+
+/**
+ * Identity of a draft as displayed. The stored id is derived from the address
+ * alone and therefore never changes when the draft is overwritten, so it
+ * cannot be the React key on its own. The date alone is not enough either: it
+ * has minute resolution, so two saves within the same minute share it. The
+ * text is what the card shows, so the text takes part in its identity.
+ */
+function draftKey(contactId: string, draft: Message): string {
+  return `${contactId}|${draft.msg_date ?? ''}|${draft.subject ?? ''}|${draft.snippet ?? ''}`;
+}
+import { ComposerDock } from './composer-dock';
 import { ContactHeader } from './contact-header';
 import { ContactList } from './contact-list';
+import { DraftCard } from './draft-card';
 import { SituationBand } from './situation-band';
 import { Thread } from './thread';
 
@@ -80,8 +93,29 @@ export function CrmApp({
                 // Without this the contact's bubbles are labelled 'lui'. An
                 // address-less prospect has neither, so the fallback stands.
                 counterpartLabel={selected.company || selected.email || undefined}
+                draftSlot={
+                  selected.draft ? (
+                    // Keyed on the draft's content, not only on the contact.
+                    // DraftCard seeds its editable text from props on mount, so
+                    // an unkeyed card would keep the previous contact's text
+                    // after a selection change, and stale text after the
+                    // composer overwrote the draft. Both would offer a send
+                    // button on something the operator is not reading.
+                    <DraftCard
+                      key={draftKey(selected.id, selected.draft)}
+                      contact={selected}
+                      draft={selected.draft}
+                    />
+                  ) : null
+                }
               />
             </div>
+            {/* Outside the scrolling region on purpose: writing stays reachable
+                wherever the thread is scrolled. Keyed on the contact, for the
+                sharper version of the same reason as the card above: text left
+                in the composer must never follow the operator to the next
+                contact and be sent to them. */}
+            <ComposerDock key={selected.id} contact={selected} situation={situation} />
           </>
         )}
       </div>
