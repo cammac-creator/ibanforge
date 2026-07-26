@@ -442,6 +442,27 @@ describe('normalizeRequestPath', () => {
     expect(normalizeRequestPath('/v1/ch/clearing/{iid}')).toBe('/v1/ch/clearing/{iid}');
   });
 
+  // The trap in the rule above: an agent that substitutes the OpenAPI
+  // placeholder but keeps the braces sends `/v1/bic/{CH93…}`, which WHATWG
+  // percent-encodes to `%7BCH93…%7D` before the middleware ever sees it. That
+  // segment is not IBAN-shaped (it starts with `%`), so redaction missed it,
+  // and it contains `%7B`, so the template rule excused it — a COMPLETE IBAN
+  // stored for twelve months, worse than the BIC tail that blocked the merge.
+  //
+  // Both properties must hold at once: the wrapper survives so the funnel
+  // exclusion keeps firing, the identifier does not.
+  it('redacts an identifier wrapped in braces, keeping the wrapper', () => {
+    expect(normalizeRequestPath('/v1/bic/%7BCH9300762011623852957%7D')).toBe('/v1/bic/%7B:redacted%7D');
+    expect(normalizeRequestPath('/v1/ch/clearing/%7BCH9300762011623852957%7D')).toBe('/v1/ch/clearing/%7B:redacted%7D');
+    expect(normalizeRequestPath('/%7BCH9300762011623852957%7D')).toBe('/%7B:redacted%7D');
+    // Raw braces (a client that does not encode) and lowercase hex.
+    expect(normalizeRequestPath('/v1/bic/{CH9300762011623852957}')).toBe('/v1/bic/{:redacted}');
+    expect(normalizeRequestPath('/%7bCH9300762011623852957%7d')).toBe('/%7b:redacted%7d');
+    // Half a wrapper is still a wrapper: `%7B` alone excused the segment too.
+    expect(normalizeRequestPath('/%7BCH9300762011623852957')).toBe('/%7B:redacted');
+    expect(normalizeRequestPath('/CH9300762011623852957%7D')).toBe('/:redacted%7D');
+  });
+
   it('leaves ordinary endpoints untouched', () => {
     for (const p of ['/', '/v1/iban/validate', '/health', '/openapi.json', '/mcp', '/v1/credits/buy/25k', '/v1/iban/structure/CH']) {
       expect(normalizeRequestPath(p)).toBe(p);
@@ -456,23 +477,33 @@ describe('normalizeRequestPath', () => {
 // here rather than in production during the measurement window.
 describe('request_log persists no submitted identifier (DPA)', () => {
   it('holds no identifier in any stored path, across the whole table', () => {
-    // Write the three shapes that leaked, so the sweep is never vacuous — on CI
-    // the table starts empty and a bare sweep would pass green checking nothing.
+    // Write the shapes that leaked, so the sweep is never vacuous — on CI the
+    // table starts empty and a bare sweep would pass green checking nothing.
     recordRequest('GET', '/v1/bic/UBSW%20CHZH', 400, 1);
     recordRequest('GET', '/v1/ch/clearing/CH230', 400, 1);
     recordRequest('POST', '/CH9300762011623852957', 404, 1);
+    // Brace-wrapped: excused by the template rule AND invisible to a
+    // whole-segment shape test. This is the row that made an earlier version of
+    // this very sweep pass green over a table holding complete IBANs.
+    recordRequest('GET', '/v1/bic/%7BCH9300762011623852957%7D', 400, 1);
+    recordRequest('POST', '/%7BCH9300762011623852957%7D', 404, 1);
 
     // Invariants restated independently of stats.ts: if the production regexes
     // were wrong, importing them here would make the test wrong the same way.
     const ibanShape = /^[A-Za-z]{2}\d{2}[A-Za-z0-9]{1,30}$/;
     const specTemplate = /\{|%7[Bb]/;
+    // Percent-escapes and braces delimit an identifier just as `/` does —
+    // splitting on `/` alone hid `%7BCH93…%7D` from invariant A, because the
+    // `B` of `%7B` glues onto the `CH` and the whole segment stops matching.
+    const BOUNDARY = /\/|%[0-9A-Fa-f]{2}|[{}]/;
 
     const rows = getStatsDB().prepare('SELECT path FROM request_log').all() as Array<{ path: string }>;
-    expect(rows.length).toBeGreaterThanOrEqual(3);
+    expect(rows.length).toBeGreaterThanOrEqual(5);
 
     for (const { path } of rows) {
-      // A. No segment anywhere is identifier-shaped — covers unmatched routes.
-      expect(path.split('/').filter((segment) => ibanShape.test(segment))).toEqual([]);
+      // A. No token anywhere is identifier-shaped — covers unmatched routes and
+      // identifiers wrapped in an OpenAPI placeholder.
+      expect(path.split(BOUNDARY).filter((token) => ibanShape.test(token))).toEqual([]);
 
       // B. The two identifier-bearing route families only ever store their
       // label. Invariant A alone would not catch a regression to the narrow

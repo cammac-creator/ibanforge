@@ -200,6 +200,12 @@ export function classifyClient(path: string, userAgent: string | undefined): Cli
 //                              non-numeric IID was stored raw and whole.
 //   POST /CH93007620116238…  → no rule covered an unmatched path at all, so a
 //                              404 could put a complete IBAN at rest.
+//   /v1/bic/%7BCH930076…%7D  → an agent that substitutes the OpenAPI
+//                              placeholder but keeps the braces. Not
+//                              segment-shaped (it starts with `%`), and excused
+//                              by the template rule below — a COMPLETE IBAN at
+//                              rest, worse than the first case. See
+//                              `redactSegment` for why the fix belongs there.
 
 /**
  * The one shape a submitted value can take on ANY route, including one we never
@@ -210,7 +216,19 @@ export function classifyClient(path: string, userAgent: string | undefined): Cli
  * session ids, 2-letter country codes — none has this shape, so the catch-all
  * cannot swallow a real endpoint and fragment the dashboard.
  */
-const IBAN_SHAPED_SEGMENT = /^[A-Za-z]{2}\d{2}[A-Za-z0-9]{1,30}$/;
+const IBAN_SHAPED_TOKEN = /^[A-Za-z]{2}\d{2}[A-Za-z0-9]{1,30}$/;
+
+/**
+ * What delimits an identifier inside a path segment, beyond `/`: a percent
+ * escape or a brace.
+ *
+ * Testing whole segments is not enough. In `%7BCH9300762011623852957%7D` the
+ * `B` of `%7B` glues onto the `CH`, so the segment matches nothing
+ * identifier-shaped while still containing a complete IBAN. Splitting here (the
+ * capture group keeps the delimiters, so the wrapper is rebuilt verbatim)
+ * isolates the core and lets it be redacted in place.
+ */
+const IDENTIFIER_BOUNDARY = /(%[0-9A-Fa-f]{2}|[{}])/;
 
 /**
  * OpenAPI template literals (`{code}`, `%7Bcode%7D`) are NOT submitted values —
@@ -220,14 +238,34 @@ const IBAN_SHAPED_SEGMENT = /^[A-Za-z]{2}\d{2}[A-Za-z0-9]{1,30}$/;
  * They must stay verbatim: getBusinessFunnel() excludes them by matching
  * `{`/`%7B` in the stored path, and folding them into `:code` would silently
  * start counting them as `bad_input` — the exact regression that exclusion was
- * added to fix. Leaving them costs nothing on the DPA side: there is no
- * submitted identifier in them to redact.
+ * added to fix.
+ *
+ * This rule is only safe because `redactSegment` runs first and reaches INSIDE
+ * the wrapper. On its own it is far too coarse: it would happily excuse
+ * `%7BCH9300762011623852957%7D`, whose braces contain a real IBAN rather than a
+ * placeholder name. Narrowing this predicate is the wrong repair — it would
+ * only cover the two named route families, leave `/%7BCH93…%7D` on an unmatched
+ * path open, and give the funnel regression back. Redaction is the layer that
+ * has to be right.
  */
 const SPEC_TEMPLATE_SEGMENT = /\{|%7[Bb]/;
 
 /** Stands in for a redacted identifier. Contains no `{`/`%7B`, so it never
- *  trips the funnel's spec-template exclusion. */
+ *  trips the funnel's spec-template exclusion, and a wrapper redacted to
+ *  `%7B:redacted%7D` still does. */
 const REDACTED_SEGMENT = ':redacted';
+
+/**
+ * Strip any identifier out of one path segment, preserving everything around
+ * it. `%7BCH9300762011623852957%7D` → `%7B:redacted%7D`: the wrapper survives
+ * so the funnel keeps excluding the row, the identifier does not survive at all.
+ */
+function redactSegment(segment: string): string {
+  return segment
+    .split(IDENTIFIER_BOUNDARY)
+    .map((token) => (IBAN_SHAPED_TOKEN.test(token) ? REDACTED_SEGMENT : token))
+    .join('');
+}
 
 /**
  * Collapse a request path to a storable label: no submitted identifier, and a
@@ -245,10 +283,7 @@ const REDACTED_SEGMENT = ':redacted';
  * today.
  */
 export function normalizeRequestPath(path: string): string {
-  const redacted = path
-    .split('/')
-    .map((segment) => (IBAN_SHAPED_SEGMENT.test(segment) ? REDACTED_SEGMENT : segment))
-    .join('/');
+  const redacted = path.split('/').map(redactSegment).join('/');
   return redacted
     .replace(/\/v1\/bic\/[^/?]+/, (match) => (SPEC_TEMPLATE_SEGMENT.test(match) ? match : '/v1/bic/:code'))
     .replace(/\/v1\/ch\/clearing\/[^/?]+/, (match) =>
