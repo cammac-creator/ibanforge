@@ -133,3 +133,57 @@ export function generatedDraft(a: ApiAnswer): GeneratedDraft | null {
     translationFr: typeof fr === 'string' && fr.trim() ? fr : null,
   };
 }
+
+/**
+ * One proposed angle for a follow-up, as the composer offers it.
+ *
+ * `key` is deliberately absent. The VPS builds it with `str(a.get("key") or
+ * "")[:40]`, so it is guaranteed neither non-empty nor unique: two angles can
+ * both carry the empty string, and selecting on it would apply the first when
+ * the operator clicked the second. Selection is by position in the array.
+ */
+export interface ProposedAngle {
+  /** Shown as the choice. At most 60 characters, em dashes scrubbed upstream. */
+  title: string;
+  /** The one line under it. At most 200 characters, scrubbed the same way. */
+  hint: string;
+  /**
+   * The way out of the conversation, which the VPS guarantees is always among
+   * the angles: it appends one itself when the model omits it. This is the only
+   * thing `key` is read for, and the only reason it is read at all.
+   */
+  isExit: boolean;
+}
+
+/**
+ * The angles that can actually be put in front of the operator, or null.
+ *
+ * Validated rather than trusted, for the same reason as generatedDraft above:
+ * the proxy answers `{ error: 'bad_upstream_response' }` at the upstream's own
+ * status, so a 200 whose body did not parse would otherwise put `undefined` in
+ * a button. An angle with no title is dropped, because a button with no label
+ * is a button nobody can choose between.
+ *
+ * Null and an empty array mean the same thing to the caller, "no choice to
+ * offer", and the caller must have one branch for both. The upstream contract
+ * is two or three angles and a 502 below that, so a short list here is already
+ * an upstream that broke its own promise; the composer's answer is the same in
+ * every case, which is to let the mail be written without an angle.
+ */
+export function proposedAngles(a: ApiAnswer): ProposedAngle[] | null {
+  if (!a.ok) return null;
+  const raw = field(a.body, 'angles');
+  if (!Array.isArray(raw)) return null;
+  const out: ProposedAngle[] = [];
+  for (const entry of raw) {
+    const title = field(entry, 'title');
+    if (typeof title !== 'string' || !title.trim()) continue;
+    const hint = field(entry, 'hint');
+    out.push({
+      title: title.trim(),
+      hint: typeof hint === 'string' ? hint.trim() : '',
+      isExit: field(entry, 'key') === 'graceful_exit',
+    });
+  }
+  return out;
+}

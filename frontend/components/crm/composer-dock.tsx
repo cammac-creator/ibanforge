@@ -6,13 +6,28 @@ import {
   changedRows,
   confirmedSent,
   generatedDraft,
+  proposedAngles,
   readAnswer,
   reasonOf,
   withReason,
+  type ProposedAngle,
 } from '@/lib/crm/api-result';
 import { NEXT_ACTION_LABEL } from '@/lib/crm/situation';
 import type { Contact, Situation } from '@/lib/crm/types';
 import { GuardrailChecks, OverrideButton, useGuardrails } from './guardrails-ui';
+
+/**
+ * The angle step, and its failure, in one value: on screen they are one moment,
+ * a panel that opens under the operator's click and either offers the angles or
+ * says why it cannot. Both states carry the same way out, which is what keeps
+ * the promise that a follow-up can always be written, angles or no angles.
+ *
+ * `choose` never holds an empty list: nothing to choose between is a failure
+ * with a different sentence, not a panel of no buttons.
+ */
+type AngleStep =
+  | { kind: 'choose'; angles: ProposedAngle[] }
+  | { kind: 'failed'; reason: string };
 
 /**
  * The composer, docked at the foot of the detail panel and outside the part
@@ -63,8 +78,16 @@ export function ComposerDock({
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
   const [fr, setFr] = useState<string | null>(null);
-  const [busy, setBusy] = useState<false | 'gen' | 'send' | 'draft'>(false);
+  const [busy, setBusy] = useState<false | 'gen' | 'send' | 'draft' | 'angles'>(false);
   const [msg, setMsg] = useState<{ text: string; bad: boolean } | null>(null);
+  /**
+   * The angle panel, and null while there is none.
+   *
+   * Local, like the text, and therefore wiped when the caller remounts this on
+   * a change of contact, which is the point of that key: an angle proposed for
+   * one thread describes that thread and nothing else.
+   */
+  const [step, setStep] = useState<AngleStep | null>(null);
   /*
    * The resting state, and it is not decoration. The panel is capped at 76vh
    * and the thread is the flex child that absorbs what is left, so a form that
@@ -132,8 +155,35 @@ export function ComposerDock({
     setBody(nextBody);
     setFr(null);
     setMsg(null);
+    // An angle chosen for a mail that is no longer the one being written.
+    setStep(null);
     g.clear();
   }
+
+  /**
+   * The last four messages of the thread, in the shape both the generator and
+   * the angles endpoint read them. One function and not two literals: the
+   * angles are proposed from this text and the draft is then written from it,
+   * so the two must be looking at the same thread or the angle describes a
+   * conversation the generation cannot see.
+   *
+   * Empty when there is no correspondence, which the callers each phrase in
+   * their own way rather than sending a bare empty string.
+   */
+  function threadTail(): string {
+    return c.messages
+      .slice(-4)
+      .map((m) => `[${m.direction === 'in' ? 'them' : 'me'} ${m.msg_date ?? ''}] ${m.snippet ?? ''}`)
+      .join('\n');
+  }
+
+  /**
+   * A follow-up is due on this contact, which is the only situation where an
+   * angle is asked for. The owner's rule for a follow-up is that it is short
+   * and carries something new rather than restating the first mail, and that
+   * rule is what the angle serves.
+   */
+  const isFollowup = s?.nextAction === 'followup';
 
   /**
    * What the generator is told: who this is, where the thread stands, what to
@@ -144,8 +194,11 @@ export function ComposerDock({
    * reworded, because both were lost silently when that page went away and the
    * proxy forwards this text verbatim: there is no other place they could
    * live.
+   *
+   * The angle, when one was chosen, is another such line. It is internal: this
+   * whole text steers the draft and none of it is ever sent.
    */
-  function brief(): string {
+  function brief(angle?: ProposedAngle): string {
     // Never emailed, but genuinely calling the API. Writing to them as a cold
     // prospect would pitch a product they already use; the old brief said so
     // explicitly, and said not to sell.
@@ -155,11 +208,19 @@ export function ComposerDock({
       c.sourcing?.whatTheyDo ? `What they do: ${c.sourcing.whatTheyDo}` : '',
       c.sourcing?.personalizationHook ? `Hook: ${c.sourcing.personalizationHook}` : '',
       s ? `Goal: ${NEXT_ACTION_LABEL[s.nextAction]}` : '',
+      // Verbatim, both fields: the operator chose this angle by reading these
+      // very words, so anything reworded here would steer a draft they did not
+      // choose. Em dashes are scrubbed upstream, on all three fields.
+      angle ? `Angle to take: ${angle.title}. ${angle.hint}` : '',
+      // The owner's rule for a follow-up, and it is gated on the situation
+      // rather than on the angle. Hanging it on `angle` would drop the whole
+      // discipline the moment the operator generates without one, which is
+      // exactly the fallback path this feature has to leave open.
+      isFollowup
+        ? 'This is a FOLLOW-UP: at most 2 sentences, one new angle, no recap of the previous mail.'
+        : '',
       c.messages.length
-        ? `Thread so far:\n${c.messages
-            .slice(-4)
-            .map((m) => `[${m.direction === 'in' ? 'them' : 'me'} ${m.msg_date ?? ''}] ${m.snippet ?? ''}`)
-            .join('\n')}`
+        ? `Thread so far:\n${threadTail()}`
         : activeUser
           ? 'This person ALREADY uses IBANforge (they have made real API calls) but you have NEVER emailed them. Write a SHORT, warm, NON-salesy note from the founder: thank them for using it, then ask just two easy questions: (1) a brief bit of feedback on their experience so far, and (2) how they discovered IBANforge. Do NOT pitch features and do NOT ask for a call.'
           : 'No prior email: cold first touch.',
@@ -174,7 +235,53 @@ export function ComposerDock({
       .join('\n');
   }
 
-  async function generate() {
+  /**
+   * Ask the VPS for two or three angles this follow-up could take.
+   *
+   * It asks nothing of the operator and replaces nothing they typed, so it
+   * carries no confirmation: the question about overwriting lives in generate()
+   * below, where the text that would be lost is finally known, and it must be
+   * asked exactly once for one press of the button.
+   *
+   * Every way this can fail ends in a panel with a way out rather than in a
+   * dead end. An operator who cannot reach the generator at all on a contact
+   * whose next action is a follow-up would be worse off than before this
+   * feature existed.
+   */
+  async function askAngles() {
+    setBusy('angles');
+    setMsg(null);
+    setStep(null);
+    try {
+      const r = await fetch('/api/crm/relance-angles', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contact: c.sourcing?.whatTheyDo
+            ? `${c.company || c.email}, ${c.sourcing.whatTheyDo}`
+            : c.company || c.email,
+          thread: threadTail(),
+        }),
+      });
+      const a = await readAnswer(r);
+      const angles = proposedAngles(a);
+      // Null and empty are one case: both mean there is nothing to choose
+      // between, whatever the status line said. The upstream promises two or
+      // three and answers 502 below that, so either is already a broken
+      // promise and the operator's way forward is the same.
+      if (!angles || angles.length === 0) {
+        setStep({ kind: 'failed', reason: withReason('Aucun angle proposé', reasonOf(a)) });
+        return;
+      }
+      setStep({ kind: 'choose', angles });
+    } catch {
+      setStep({ kind: 'failed', reason: 'Erreur réseau, aucun angle proposé.' });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function generate(angle?: ProposedAngle) {
     setBusy('gen');
     setMsg(null);
     try {
@@ -187,7 +294,7 @@ export function ComposerDock({
           // A hint only: the VPS returns its own subject. The last subject of
           // the thread keeps a reply close to what it answers.
           subject: subject.trim() || c.messages.at(-1)?.subject || 'IBANforge',
-          context: brief(),
+          context: brief(angle),
           // deposit:false. The CRM keeps its own draft; nothing is written to
           // the mailbox. Note this does NOT make the call independent of mail
           // configuration: the VPS still refuses when the account has no
@@ -213,7 +320,16 @@ export function ComposerDock({
       setBody(gen.emailEn);
       setFr(gen.translationFr);
       g.clear();
-      setMsg({ text: '✍️ Généré, rien n’a été déposé dans la boîte. Relis avant d’envoyer.', bad: false });
+      // The panel goes when the draft it produced is in the composer, and not
+      // a moment earlier. Closing it on the click would make a failed
+      // generation cost a second round trip to get the same three angles back.
+      setStep(null);
+      setMsg({
+        text: angle
+          ? `✍️ Généré sur l’angle « ${angle.title} ». Rien n’a été déposé dans la boîte, relis avant d’envoyer.`
+          : '✍️ Généré, rien n’a été déposé dans la boîte. Relis avant d’envoyer.',
+        bad: false,
+      });
     } catch {
       setMsg({ text: 'Erreur réseau, rien n’a été généré.', bad: true });
     } finally {
@@ -250,6 +366,7 @@ export function ComposerDock({
       setSubject('');
       setBody('');
       setFr(null);
+      setStep(null);
       g.clear();
       // Folded back: the text is now the draft card in the thread, and that is
       // where the operator has to look at it.
@@ -296,6 +413,9 @@ export function ComposerDock({
       setSubject('');
       setBody('');
       setFr(null);
+      // Same reason as the override below, one step earlier in the flow: the
+      // angle belonged to the mail that has just left.
+      setStep(null);
       // The override dies with the mail it covered. Without this the grant
       // would still be armed for the next draft written to this contact, and
       // the next blocked send would go out on a click the operator made for
@@ -321,6 +441,53 @@ export function ComposerDock({
   // off rather than by failing after the click.
   const canSaveDraft = !!c.email && filled && busy === false;
 
+  /**
+   * One button, two roads, and the fork is the situation rather than a second
+   * control. A follow-up goes through the angles; everything else generates
+   * straight away, exactly as it did before this step existed.
+   *
+   * The two copies of the button, folded and unfolded, share this and the
+   * label below so they can never drift into offering different things.
+   */
+  function startGeneration() {
+    if (isFollowup) void askAngles();
+    else void generate();
+  }
+  const genLabel =
+    busy === 'angles'
+      ? '… angles'
+      : busy === 'gen'
+        ? '… génération'
+        : isFollowup
+          ? '✍️ Relancer'
+          : '✍️ Générer';
+
+  /**
+   * How tall the dock may get, and why the angle panel changes the answer.
+   *
+   * The rule below the return caps the dock at 30vh under 780px of viewport,
+   * where an open composer took the whole thread. Above 780px it was left
+   * uncapped because the dock's natural 264px fits. The angle panel breaks that
+   * premise: it adds 248px, and measured at 1100x900 the dock went to 520px and
+   * the thread from 141px to **0**, which is the very failure the 30vh rule
+   * exists to prevent, arriving on a window that rule does not cover. Same at
+   * 1280x800 and 375x800.
+   *
+   * So a second cap, and only while the panel is up. 40vh and not 30 because
+   * the panel plus the form's own header is 268px, which 40vh of 900 holds
+   * whole while leaving the thread its natural 141px; measured, 30vh there
+   * would have cut the panel itself.
+   *
+   * The two are written as mutually exclusive media queries rather than as one
+   * class overriding the other. A plain `max-h-[40vh]` beside the existing
+   * `[@media(max-height:780px)]:max-h-[30vh]` would decide the short-window
+   * case on the order Tailwind happens to emit them in, and it is the short
+   * window that has the least room to lose.
+   */
+  const dockCap = step
+    ? '[@media(min-height:781px)]:max-h-[40vh] [@media(max-height:780px)]:max-h-[30vh]'
+    : '[@media(max-height:780px)]:max-h-[30vh]';
+
   return (
     // The cap, and why it is on a height query rather than flat.
     //
@@ -339,7 +506,10 @@ export function ComposerDock({
     // between a readable thread and none. Above that the dock keeps its
     // natural height and every control stays in view. Folded the bar is 43px,
     // far under the cap, so the resting state never sees any of this.
-    <div className="mt-3 shrink-0 overflow-y-auto border-t border-[var(--ink-4)]/60 pt-3 [@media(max-height:780px)]:max-h-[30vh]">
+    //
+    // The angle panel adds a second cap above 780px, for the same reason and
+    // measured the same way: see dockCap.
+    <div className={`mt-3 shrink-0 overflow-y-auto border-t border-[var(--ink-4)]/60 pt-3 ${dockCap}`}>
       {!c.email ? (
         // Deliberately not a second copy of the header's sentence, which
         // already says the address is missing. This one says what it costs
@@ -364,13 +534,16 @@ export function ComposerDock({
           <button
             type="button"
             onClick={() => {
+              // Unfolded first, and not only for the text that is coming: on a
+              // follow-up this opens a panel of angles, which is rendered
+              // inside the form and would otherwise have nowhere to appear.
               setOpen(true);
-              void generate();
+              startGeneration();
             }}
             disabled={busy !== false}
             className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs font-medium text-amber-300 hover:bg-amber-500/20 disabled:opacity-50"
           >
-            {busy === 'gen' ? '… génération' : '✍️ Générer'}
+            {genLabel}
           </button>
           {c.kind === 'prospect' && c.readyMail && (
             <button
@@ -402,6 +575,74 @@ export function ComposerDock({
               replier
             </button>
           </div>
+          {/* Above the two fields rather than between them: this is a step
+              that comes before writing, and slotting it under the subject
+              would cut one message in half. It is also where the eye already
+              is, one line under the header the operator just clicked past. */}
+          {step && (
+            <div className="mb-2 rounded-lg border border-amber-500/25 bg-amber-500/5 p-2">
+              {step.kind === 'choose' ? (
+                <>
+                  <p className="mb-1.5 text-[11px] font-medium text-amber-300">
+                    Quel angle pour cette relance ?
+                  </p>
+                  {step.angles.map((a, i) => (
+                    <button
+                      // Position, never the upstream key: it is guaranteed
+                      // neither filled nor unique, so two angles can share the
+                      // empty string and React would hand one row's identity
+                      // to the other. The list is replaced whole and never
+                      // reordered, so the index is a stable identity here.
+                      key={i}
+                      type="button"
+                      onClick={() => void generate(a)}
+                      // A second click during the generation would send a
+                      // second brief on the same press of the same panel.
+                      disabled={busy !== false}
+                      className="mb-1 block w-full rounded-md px-2 py-1.5 text-left transition-colors hover:bg-amber-500/10 disabled:opacity-50"
+                    >
+                      <span className="text-[11px] font-semibold text-amber-300">{a.title}</span>
+                      {/* The way out, named. It is the one angle the VPS
+                          guarantees, and the operator has to be able to see
+                          that it is the one that closes the conversation
+                          rather than another attempt to open it. */}
+                      {a.isExit && (
+                        <span className="ml-1.5 rounded border border-[var(--ink-5)] px-1 py-px text-[10px] text-[var(--fg-3)]">
+                          porte de sortie
+                        </span>
+                      )}
+                      <span className="mt-0.5 block text-[10px] leading-snug text-[var(--fg-3)]">
+                        {a.hint}
+                      </span>
+                    </button>
+                  ))}
+                </>
+              ) : (
+                <p role="alert" className="mb-1.5 text-[11px] leading-snug text-amber-300">
+                  {step.reason} Tu peux générer sans angle, ou écrire toi-même.
+                </p>
+              )}
+              {/* Always both, in both states: the angles are an aid, and the
+                  mail has to be writable when the aid is not there. */}
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => void generate()}
+                  disabled={busy !== false}
+                  className="rounded-md border border-[var(--ink-5)] px-2 py-1 text-[11px] text-[var(--fg-2)] hover:bg-[var(--ink-4)] disabled:opacity-50"
+                >
+                  Générer sans angle
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStep(null)}
+                  className="text-[11px] text-[var(--fg-3)] underline underline-offset-2 hover:text-[var(--fg-1)]"
+                >
+                  annuler
+                </button>
+              </div>
+            </div>
+          )}
           <input
             value={subject}
             onChange={(e) => setSubject(e.target.value)}
@@ -438,11 +679,11 @@ export function ComposerDock({
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <button
               type="button"
-              onClick={generate}
+              onClick={startGeneration}
               disabled={busy !== false}
               className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs font-medium text-amber-300 hover:bg-amber-500/20 disabled:opacity-50"
             >
-              {busy === 'gen' ? '… génération' : '✍️ Générer'}
+              {genLabel}
             </button>
             {c.kind === 'prospect' && c.readyMail && (
               <button

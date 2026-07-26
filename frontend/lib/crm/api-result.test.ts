@@ -3,6 +3,7 @@ import {
   changedRows,
   confirmedSent,
   generatedDraft,
+  proposedAngles,
   readAnswer,
   reasonOf,
   withReason,
@@ -150,5 +151,68 @@ describe('generatedDraft', () => {
     expect(generatedDraft(answer(true, { error: 'bad_upstream_response' }))).toBeNull();
     expect(generatedDraft(answer(true, null))).toBeNull();
     expect(generatedDraft(answer(false, { email_en: 'Body' }))).toBeNull();
+  });
+});
+
+describe('proposedAngles', () => {
+  it('takes the angles as the VPS returns them, in order', () => {
+    expect(
+      proposedAngles(
+        answer(true, {
+          angles: [
+            { key: 'technical_feedback', title: 'Retour technique', hint: 'Demander un retour.' },
+            { key: 'graceful_exit', title: 'Clore le fil', hint: 'Laisser la porte ouverte.' },
+          ],
+        }),
+      ),
+    ).toEqual([
+      { title: 'Retour technique', hint: 'Demander un retour.', isExit: false },
+      { title: 'Clore le fil', hint: 'Laisser la porte ouverte.', isExit: true },
+    ]);
+  });
+
+  it('reads key for the exit and for nothing else, since it is neither unique nor filled', () => {
+    // Both angles carry the empty key the VPS is allowed to produce. Neither is
+    // the exit, and the two stay distinguishable because position decides.
+    const out = proposedAngles(
+      answer(true, {
+        angles: [
+          { key: '', title: 'Premier', hint: 'A' },
+          { key: '', title: 'Second', hint: 'B' },
+        ],
+      }),
+    );
+    expect(out).toEqual([
+      { title: 'Premier', hint: 'A', isExit: false },
+      { title: 'Second', hint: 'B', isExit: false },
+    ]);
+  });
+
+  it('keeps an angle whose hint is missing, since the title is what is chosen', () => {
+    expect(proposedAngles(answer(true, { angles: [{ title: 'Un angle' }] }))).toEqual([
+      { title: 'Un angle', hint: '', isExit: false },
+    ]);
+  });
+
+  it('drops an angle with no title, which would render as a button nobody can read', () => {
+    expect(
+      proposedAngles(
+        answer(true, { angles: [{ title: '   ', hint: 'x' }, 'not an object', null, { title: 'Bon' }] }),
+      ),
+    ).toEqual([{ title: 'Bon', hint: '', isExit: false }]);
+  });
+
+  it('returns null when there is no list to read, whatever the status says', () => {
+    // The 502 the VPS raises below two usable angles, forwarded verbatim.
+    expect(proposedAngles(answer(false, { detail: 'not enough usable angles' }))).toBeNull();
+    expect(proposedAngles(answer(true, { error: 'bad_upstream_response' }))).toBeNull();
+    // A dict keyed by slug instead of a list: a deviation the VPS itself guards
+    // against, and one that must not reach a .map() in the composer.
+    expect(proposedAngles(answer(true, { angles: { a: { title: 'x' } } }))).toBeNull();
+    expect(proposedAngles(answer(true, null))).toBeNull();
+  });
+
+  it('returns an empty list when every angle was unusable, which the caller treats as null', () => {
+    expect(proposedAngles(answer(true, { angles: [{ hint: 'no title' }] }))).toEqual([]);
   });
 });
