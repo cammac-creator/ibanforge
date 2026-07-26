@@ -222,10 +222,19 @@ export function DraftCard({ contact, draft }: { contact: Contact; draft: Message
             ✏️ Modifier
           </button>
         )}
+        {/* busy, not locked, and this is the one button where the difference
+            matters. The failure this card exists to handle is a confirmed send
+            whose draft deletion failed, and its message tells the operator to
+            delete the draft by hand. Under `locked` the send latch greyed this
+            button out for good, since the refresh returns the same row and
+            draftKey is unchanged so the instance survives with `sent` still
+            set: the interface printed an instruction and disabled the only way
+            to follow it. The latch stays on Envoyer, which is the actual
+            duplicate-send guard. */}
         <button
           type="button"
           onClick={discard}
-          disabled={locked}
+          disabled={busy !== false}
           className="rounded-lg px-3 py-1 text-xs text-[var(--fg-3)] hover:text-red-400 disabled:opacity-50"
         >
           {busy === 'del' ? '…' : '🗑 Supprimer'}

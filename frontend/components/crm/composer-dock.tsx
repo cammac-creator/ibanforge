@@ -65,12 +65,37 @@ export function ComposerDock({
    */
   const setOpen = onOpenChange;
 
+  /**
+   * Ask before replacing text the operator typed and has not saved anywhere.
+   *
+   * A stored draft already gets this question, and unsaved typing is the more
+   * likely thing to lose: the folded bar says "message en cours, ni enregistré
+   * ni envoyé" with Générer one click away in the same row. Same shape of
+   * question as the overwrite one, deliberately, so there is one pattern here
+   * and not two.
+   *
+   * Silent when there is nothing to lose, and when what is about to be written
+   * is what is already there, which is the double-click case.
+   */
+  function confirmReplace(next: string, what: string): boolean {
+    const current = body.trim();
+    if (!current || current === next.trim()) return true;
+    return window.confirm(
+      `Un message est en cours dans le composeur. ${what} va le remplacer. Continuer ?`,
+    );
+  }
+
   /** A prospect never contacted starts from its pre-written mail. */
   function loadReadyMail() {
     if (c.kind !== 'prospect' || !c.readyMail) return;
     const useFr = c.readyMail.recommendedLang === 'fr';
-    setSubject((useFr ? c.readyMail.subjectFr : c.readyMail.subjectEn) ?? '');
-    setBody((useFr ? c.readyMail.bodyFr : c.readyMail.bodyEn) ?? '');
+    const nextSubject = (useFr ? c.readyMail.subjectFr : c.readyMail.subjectEn) ?? '';
+    const nextBody = (useFr ? c.readyMail.bodyFr : c.readyMail.bodyEn) ?? '';
+    // Declining says nothing: this is synchronous and the text visibly did not
+    // move. The generation below is the opposite case and does say something.
+    if (!confirmReplace(nextBody, 'Le mail pré-rédigé')) return;
+    setSubject(nextSubject);
+    setBody(nextBody);
     setFr(null);
     setMsg(null);
   }
@@ -118,6 +143,14 @@ export function ComposerDock({
       const gen = generatedDraft(a);
       if (!gen) {
         setMsg({ text: withReason('Échec de la génération', reasonOf(a)), bad: true });
+        return;
+      }
+      // Asked here and not before the call, so the question can be skipped when
+      // the generation turns out to say what is already written, and so it is
+      // never asked for nothing. The operator waited for a network round trip,
+      // so a refusal has to say why nothing moved.
+      if (!confirmReplace(gen.emailEn, 'La génération')) {
+        setMsg({ text: 'Génération abandonnée, ton texte est intact.', bad: false });
         return;
       }
       setSubject(gen.subject || subject);
@@ -218,6 +251,18 @@ export function ComposerDock({
   }
 
   const filled = !!subject.trim() && !!body.trim();
+  /**
+   * Anything at all typed, which is not the same question as `filled`.
+   *
+   * `filled` gates the buttons and needs both fields, since neither a send nor
+   * a save is possible without a subject. What the folded bar has to announce
+   * is something else: that there is text behind the fold which is neither
+   * saved nor sent. Reading `filled` there made the bar say "Écrire à ..." over
+   * a body full of unsaved text whose subject happened to be empty, observed in
+   * the harness, which is precisely the text the question added above exists to
+   * protect.
+   */
+  const hasText = !!subject.trim() || !!body.trim();
   const canSend = !!c.email && filled && busy === false;
   // The store refuses a draft with no subject, so the button says so by being
   // off rather than by failing after the click.
@@ -261,7 +306,7 @@ export function ComposerDock({
             className="min-w-0 flex-1 truncate rounded-lg border border-[var(--ink-4)] bg-[var(--ink-0)] px-3 py-1.5 text-left text-xs text-[var(--fg-3)] hover:border-amber-500/40 hover:text-[var(--fg-2)]"
           >
             {/* Folded text is not lost text: say it is there and unsaved. */}
-            {filled ? '✏️ Message en cours, ni enregistré ni envoyé' : `Écrire à ${c.company || c.email}`}
+            {hasText ? '✏️ Message en cours, ni enregistré ni envoyé' : `Écrire à ${c.company || c.email}`}
           </button>
           <button
             type="button"
