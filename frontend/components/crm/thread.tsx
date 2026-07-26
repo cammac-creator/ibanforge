@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, type ReactNode } from 'react';
+import { formatStamp } from '@/lib/crm/format';
 import { splitQuoted } from '@/lib/crm/quoted';
 import type { Message } from '@/lib/crm/types';
 
@@ -29,28 +30,6 @@ const LANG_LABEL: Record<string, string> = {
   ro: 'roumain',
   hu: 'hongrois',
 };
-
-/**
- * Render a stored msg_date without ever constructing a Date.
- *
- * These bubbles are prerendered on the server and then hydrated in the browser.
- * Stored stamps look like 'YYYY-MM-DDTHH:MM' and carry no timezone, so
- * `new Date(...)` reads them as *local* time and would yield a different string
- * on a UTC server than in a Europe/Zurich browser: a hydration mismatch. Plain
- * string work gives the same answer in both places.
- *
- * The column is free text (clipped to 40 chars server-side), so anything that
- * does not match the expected shape falls back to the raw value rather than
- * disappearing. The year is dropped for density, exactly as the mockup does;
- * the full stamp stays reachable through the title attribute.
- */
-function formatStamp(raw: string | null): string | null {
-  if (!raw) return null;
-  const m = /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2}))?/.exec(raw);
-  if (!m) return raw;
-  const [, , month, day, hour, minute] = m;
-  return hour ? `${day}/${month} ${hour}:${minute}` : `${day}/${month}`;
-}
 
 function Bubble({ m, counterpartLabel }: { m: Message; counterpartLabel?: string }) {
   const [showQuoted, setShowQuoted] = useState(false);
@@ -194,12 +173,12 @@ export function Thread({
 }) {
   if (messages.length === 0 && !draftSlot) {
     return (
-      // --fg-4, not --fg-5: this is a full sentence the reader has to read, and
-      // 14px is below the large-text threshold. On plain ink --fg-4 clears AA
-      // (5.23:1 on ink-0, 5.03:1 on ink-1, 4.74:1 on ink-2) where --fg-5 reaches
-      // only 2.33:1 to 2.57:1. No tint underneath here, so --fg-4 is enough and
-      // going lighter would overstate a message that is only an empty state.
-      <p className="py-6 text-center text-sm text-[var(--fg-4)]">
+      // --fg-3: a full sentence the reader has to read, at 14px, so no
+      // large-text exemption. --fg-4 cleared AA on ink-0 to ink-2 but reached
+      // only ~4.4:1 on ink-3, and globals.css defines --card as ink-3, so the
+      // surface that fails is the default card rather than a hypothetical.
+      // --fg-3 measures 6.6:1 there and stays plainly secondary at this size.
+      <p className="py-6 text-center text-sm text-[var(--fg-3)]">
         Aucun échange pour l’instant. Le mail que tu envoies s’ajoute ici, et les réponses remontent
         automatiquement (synchro des boîtes toutes les 15 min).
       </p>
