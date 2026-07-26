@@ -5,9 +5,20 @@ const TABORNIO_URL = process.env.TABORNIO_CRM_URL || 'https://tabornio.ch';
 const SECRET = process.env.CRM_DRAFT_SECRET || '';
 
 /**
- * Thin authenticated proxy: the dashboard button posts the client brief here,
+ * Thin authenticated proxy: the dashboard button posts the contact brief here,
  * we add the shared secret and forward to the tabornio VPS endpoint that
- * generates (Anthropic) + deposits (IMAP) the draft. Keeps the secret server-side.
+ * generates the draft (Anthropic). Keeps the secret server-side.
+ *
+ * The body is forwarded verbatim, `deposit` included. The CRM composer always
+ * sends `deposit: false`, which makes the VPS generate and return without
+ * writing anything to the mailbox's Drafts folder; the draft is then stored as
+ * a CRM row through /api/crm/draft-message and reviewed in the thread. The
+ * upstream default is still `true` for any other caller.
+ *
+ * Note that `deposit: false` does not make the call independent of mail
+ * configuration: the VPS resolves the active MailAccount and its password
+ * before it looks at the flag, so an unconfigured mailbox is still a 404 or a
+ * 400, with the reason in `detail`.
  */
 export async function POST(req: NextRequest) {
   if (!(await isAuthenticated())) {
