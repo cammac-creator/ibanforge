@@ -397,14 +397,27 @@ describe('buildContacts', () => {
     expect(out[0].id).toBe('pilot@example.net');
   });
 
-  it('drops the whole address when a pilot key out-ranks an ordinary one on it', () => {
-    // Known consequence of ranking before filtering: the ordinary key would have
-    // produced a contact on its own. Recorded so the trade-off stays visible.
+  it('lets an ordinary key represent an address that also holds a pilot key', () => {
+    // Pilots leave the candidate set before the ranking. Rank first and the
+    // pilot wins on usage, then gets dropped, taking a visible person with it.
     const out = buildContacts({
       ...base,
       keys: [
         keyRow('mixed-quota@example.net', { key_prefix: 'ifk_pilot', monthly_limit: 5000, used_all_time: 100 }),
         keyRow('mixed-quota@example.net', { key_prefix: 'ifk_free', monthly_limit: 200, used_all_time: 10 }),
+      ],
+    });
+    expect(out).toHaveLength(1);
+    expect(asClient(out[0]).apiKey.keyPrefix).toBe('ifk_free');
+    expect(asClient(out[0]).apiKey.usedAllTime).toBe(10);
+  });
+
+  it('emits nothing for an address whose every key is a pilot', () => {
+    const out = buildContacts({
+      ...base,
+      keys: [
+        keyRow('allpilot@example.net', { key_prefix: 'ifk_one', monthly_limit: 5000, used_all_time: 100 }),
+        keyRow('allpilot@example.net', { key_prefix: 'ifk_two', monthly_limit: 9000, used_all_time: 900 }),
       ],
     });
     expect(out).toHaveLength(0);
@@ -496,17 +509,56 @@ describe('buildContacts', () => {
     expect(out[0].kind === 'prospect' ? out[0].sourcing.prospectId : null).toBe('pa');
   });
 
-  // Deliberate disagreement with the test just above: the emit side keeps the
-  // first prospect on an address, the merge keeps the last. Both are pinned so
-  // the divergence is visible here rather than only in the task report.
-  it('suppresses every prospect on a converted address and keeps the last sourcing', () => {
+  it('suppresses every prospect on a converted address and keeps the first sourcing', () => {
     const out = buildContacts({
       ...base,
       keys: [keyRow('twin@example.net')],
       prospects: [prospectRow('pa', 'twin@example.net'), prospectRow('pb', 'twin@example.net')],
     });
     expect(out).toHaveLength(1);
-    expect(asClient(out[0]).sourcing?.prospectId).toBe('pb');
+    expect(asClient(out[0]).sourcing?.prospectId).toBe('pa');
+  });
+
+  it('shows the same company before and after an address converts', () => {
+    // One rule for both lookups: the first prospect row represents the address,
+    // so converting must not silently rename the contact.
+    const prospects = [
+      prospectRow('pa', 'twin@example.net', { company: 'Première SA' }),
+      prospectRow('pb', 'twin@example.net', { company: 'Seconde SA' }),
+    ];
+    const before = buildContacts({ ...base, prospects });
+    const after = buildContacts({ ...base, keys: [keyRow('twin@example.net')], prospects });
+    expect(before[0].company).toBe('Première SA');
+    expect(after[0].company).toBe('Première SA');
+    expect(after[0].kind).toBe('client');
+  });
+
+  it('lets a later prospect represent the address when the first one is rejected', () => {
+    // The rejected row leaves before it can claim the address, so the surviving
+    // row is still emitted. Dropping someone here would be a real regression.
+    const out = buildContacts({
+      ...base,
+      prospects: [
+        prospectRow('pa', 'twin@example.net', { status: 'rejete' }),
+        prospectRow('pb', 'twin@example.net'),
+      ],
+    });
+    expect(out).toHaveLength(1);
+    expect(out[0].kind === 'prospect' ? out[0].sourcing.prospectId : null).toBe('pb');
+  });
+
+  it('keeps an address where only one of its keys ever did anything', () => {
+    // The meaningful rule now runs on the representative alone, so the ranking
+    // must never elect the idle key over the one that makes the address visible.
+    const out = buildContacts({
+      ...base,
+      keys: [
+        keyRow('multi@example.net', { key_prefix: 'ifk_aidle', used_all_time: 0 }),
+        keyRow('multi@example.net', { key_prefix: 'ifk_zused', used_all_time: 4 }),
+      ],
+    });
+    expect(out).toHaveLength(1);
+    expect(asClient(out[0]).apiKey.keyPrefix).toBe('ifk_zused');
   });
 
   it('still lists a prospect whose address holds a key we never surfaced', () => {
