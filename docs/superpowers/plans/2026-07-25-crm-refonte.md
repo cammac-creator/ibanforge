@@ -2616,7 +2616,6 @@ Expected: `syntaxe OK`
 cd ~/tabornio
 git add backend/app/api/crm.py
 git commit -m "feat(crm): allow generate-draft to skip the IMAP deposit"
-git push
 git push   # le deploiement se fait par GitHub Action (deploy.yml), PAS par ssh
 ```
 
@@ -3458,7 +3457,6 @@ Expected: `syntaxe OK`
 cd ~/tabornio
 git add backend/app/api/crm.py
 git commit -m "feat(crm): propose follow-up angles from a thread"
-git push
 git push   # le deploiement se fait par GitHub Action (deploy.yml), PAS par ssh
 ```
 
