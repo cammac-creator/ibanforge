@@ -355,9 +355,64 @@ describe('buildContacts', () => {
     expect(without[0].kind === 'prospect' ? without[0].readyMail : undefined).toBeNull();
   });
 
-  // Two rows on one address. Neither today's pages nor this builder deduplicate,
-  // so these tests record what actually comes out rather than an intention.
-  it('emits one contact per key row, so two keys on one address share an id', () => {
+  // --- Pilots: a large free quota is an evaluation, not a customer. -----------
+
+  it('drops a pilot key, so a pilot who is nothing else appears nowhere', () => {
+    const out = buildContacts({
+      ...base,
+      keys: [keyRow('pilot@example.net', { monthly_limit: 5000, used_all_time: 900 })],
+    });
+    expect(out).toHaveLength(0);
+  });
+
+  it('keeps a key on a pilot-sized quota once it has been paid for', () => {
+    const out = buildContacts({
+      ...base,
+      keys: [
+        keyRow('pilot@example.net', { monthly_limit: 5000, credits_total: 1000, credits_remaining: 1000 }),
+      ],
+    });
+    expect(out).toHaveLength(1);
+    expect(out[0].kind).toBe('client');
+  });
+
+  it('keeps a free key just under the pilot quota', () => {
+    const out = buildContacts({
+      ...base,
+      keys: [keyRow('nearly@example.net', { monthly_limit: 4999 })],
+    });
+    expect(out).toHaveLength(1);
+  });
+
+  it('still lists a pilot who is also a prospect, on the prospect side', () => {
+    // The pilot is skipped before it can claim the address, which is how the two
+    // old pages behaved: hidden among the clients, visible among the prospects.
+    const out = buildContacts({
+      ...base,
+      keys: [keyRow('pilot@example.net', { monthly_limit: 5000, used_all_time: 900 })],
+      prospects: [prospectRow('p18', 'pilot@example.net')],
+    });
+    expect(out).toHaveLength(1);
+    expect(out[0].kind).toBe('prospect');
+    expect(out[0].id).toBe('pilot@example.net');
+  });
+
+  it('drops the whole address when a pilot key out-ranks an ordinary one on it', () => {
+    // Known consequence of ranking before filtering: the ordinary key would have
+    // produced a contact on its own. Recorded so the trade-off stays visible.
+    const out = buildContacts({
+      ...base,
+      keys: [
+        keyRow('mixed-quota@example.net', { key_prefix: 'ifk_pilot', monthly_limit: 5000, used_all_time: 100 }),
+        keyRow('mixed-quota@example.net', { key_prefix: 'ifk_free', monthly_limit: 200, used_all_time: 10 }),
+      ],
+    });
+    expect(out).toHaveLength(0);
+  });
+
+  // --- One contact per address, and who represents it. ------------------------
+
+  it('emits one client contact per address, not one per key', () => {
     const out = buildContacts({
       ...base,
       keys: [
@@ -365,20 +420,85 @@ describe('buildContacts', () => {
         keyRow('multi@example.net', { key_prefix: 'ifk_two' }),
       ],
     });
-    expect(out).toHaveLength(2);
-    expect(out.map((c) => c.id)).toEqual(['multi@example.net', 'multi@example.net']);
-    expect(out.map((c) => asClient(c).apiKey.keyPrefix)).toEqual(['ifk_one', 'ifk_two']);
+    expect(out).toHaveLength(1);
+    expect(out[0].id).toBe('multi@example.net');
   });
 
-  it('emits both prospects that share one address', () => {
+  it('lets a paid key represent the address even when an unpaid one is more used', () => {
+    const out = buildContacts({
+      ...base,
+      keys: [
+        keyRow('multi@example.net', { key_prefix: 'ifk_free', used_all_time: 100 }),
+        keyRow('multi@example.net', { key_prefix: 'ifk_paid', used_all_time: 0, credits_total: 1000, credits_remaining: 900 }),
+      ],
+    });
+    expect(out).toHaveLength(1);
+    expect(asClient(out[0]).apiKey.keyPrefix).toBe('ifk_paid');
+    expect(asClient(out[0]).apiKey.paid).toBe(true);
+  });
+
+  it('lets the most used key represent the address when neither is paid', () => {
+    // The busy key sorts AFTER the quiet one, so only the usage level can pick
+    // it: drop that level and the prefix tiebreak returns the other key.
+    const out = buildContacts({
+      ...base,
+      keys: [
+        keyRow('multi@example.net', { key_prefix: 'ifk_aquiet', used_all_time: 3 }),
+        keyRow('multi@example.net', { key_prefix: 'ifk_zbusy', used_all_time: 300 }),
+      ],
+    });
+    expect(asClient(out[0]).apiKey.keyPrefix).toBe('ifk_zbusy');
+    expect(asClient(out[0]).apiKey.usedAllTime).toBe(300);
+  });
+
+  it('falls back to the smaller key prefix when payment and usage tie', () => {
+    const out = buildContacts({
+      ...base,
+      keys: [
+        keyRow('multi@example.net', { key_prefix: 'ifk_zeta' }),
+        keyRow('multi@example.net', { key_prefix: 'ifk_alpha' }),
+      ],
+    });
+    expect(asClient(out[0]).apiKey.keyPrefix).toBe('ifk_alpha');
+  });
+
+  it('picks the same representative whichever order the payload arrives in', () => {
+    const a = keyRow('multi@example.net', { key_prefix: 'ifk_zeta', series: [9] });
+    const b = keyRow('multi@example.net', { key_prefix: 'ifk_alpha', series: [1] });
+    expect(buildContacts({ ...base, keys: [a, b] })).toEqual(buildContacts({ ...base, keys: [b, a] }));
+  });
+
+  it('carries the representative key and its own usage, not a sibling key', () => {
+    const out = buildContacts({
+      ...base,
+      keys: [
+        keyRow('multi@example.net', { key_prefix: 'ifk_aquiet', used_all_time: 3, series: [1, 1] }),
+        keyRow('multi@example.net', { key_prefix: 'ifk_zbusy', used_all_time: 300, series: [7, 7] }),
+      ],
+      activityByKey: {
+        ifk_aquiet: { endpoints: [{ path: '/quiet', count: 3 }], days: [{ day: '2026-07-01', count: 3 }] },
+        ifk_zbusy: { endpoints: [{ path: '/busy', count: 300 }], days: [{ day: '2026-07-01', count: 300 }] },
+      },
+    });
+    const client = asClient(out[0]);
+    expect(client.apiKey.keyPrefix).toBe('ifk_zbusy');
+    expect(client.usage.series).toEqual([7, 7]);
+    expect(client.usage.endpoints).toEqual([{ path: '/busy', count: 300 }]);
+    expect(client.usage.days).toEqual([{ day: '2026-07-01', count: 300 }]);
+  });
+
+  it('emits one contact for two prospects sharing an address, keeping the first', () => {
     const out = buildContacts({
       ...base,
       prospects: [prospectRow('pa', 'twin@example.net'), prospectRow('pb', 'twin@example.net')],
     });
-    expect(out).toHaveLength(2);
-    expect(out.map((c) => c.id)).toEqual(['twin@example.net', 'twin@example.net']);
+    expect(out).toHaveLength(1);
+    expect(out[0].kind === 'prospect' ? out[0].sourcing.prospectId : null).toBe('pa');
   });
 
+  // Deliberate disagreement with the test just above: the emit side keeps the
+  // first prospect on an address, the merge keeps the last. Both are pinned so
+  // the divergence is visible here rather than only in the task report.
   it('suppresses every prospect on a converted address and keeps the last sourcing', () => {
     const out = buildContacts({
       ...base,
