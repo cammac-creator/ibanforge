@@ -291,7 +291,7 @@ function createMcpServer(): McpServer {
         'asks "is this IBAN safe to pay?", asks for sanctions screening, asks if a SEPA Instant transfer will succeed, ' +
         'or needs a numeric risk score for an internal payment-approval workflow. ' +
         'NOT A REGULATED AML/CFT PRODUCT — informational triage only. For regulated screening use Refinitiv, Acuris, or ComplyAdvantage. ' +
-        'CHECKS: IBAN validity + sanctions (OFAC/EU/UN consolidated, FATF jurisdictions) + SEPA Instant reachability + VoP (EU 2024/886) participant. ' +
+        'CHECKS: IBAN validity + sanctions (OFAC list, FATF jurisdictions) + SEPA Instant reachability + VoP (EU 2024/886) participant. ' +
         'RETURNS: the full validate enrichment plus a compliance object with risk_score (0-100, 0 = safest), risk_level (low/medium/elevated/high/critical), sanctions matched_lists + fatf_status, reachability, vop status, and flags[] (e.g. sanctioned_country, fatf_grey_list, emi_issuer, no_vop).',
       inputSchema: {
         iban: z.string().describe('IBAN to check'),

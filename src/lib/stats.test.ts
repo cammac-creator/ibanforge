@@ -1,7 +1,8 @@
 import { describe, it, expect, afterAll } from 'vitest';
-import { recordOperation, recordBatch, recordRequest, getStats, getQuickStats, getStatsHistory, getStatusByPath, getBusinessFunnel, classifyClient, extractClientIp } from './stats.js';
+import { recordOperation, recordBatch, recordRequest, recordRejection, getRejectionStats, getStats, getQuickStats, getStatsHistory, getStatusByPath, getBusinessFunnel, classifyClient, extractClientIp, normalizeRequestPath } from './stats.js';
 import { generateApiKey } from './api-keys.js';
-import { closeAll } from './db.js';
+import { closeAll, getStatsDB } from './db.js';
+import type { RejectReason } from './input-normalize.js';
 
 afterAll(() => {
   closeAll();
@@ -268,6 +269,79 @@ describe('getBusinessFunnel', () => {
   });
 });
 
+describe('recordRejection', () => {
+  it('enregistre la catégorie et jamais la valeur soumise', () => {
+    recordRejection('bic_lookup', 'normalizable');
+    recordRejection('bic_lookup', 'normalizable');
+    recordRejection('bic_lookup', 'placeholder_literal');
+    const rows = getRejectionStats(30);
+    const bic = rows.filter((r) => r.operation_type === 'bic_lookup');
+    expect(bic.find((r) => r.reject_reason === 'normalizable')?.count).toBeGreaterThanOrEqual(2);
+    expect(bic.find((r) => r.reject_reason === 'placeholder_literal')?.count).toBeGreaterThanOrEqual(1);
+  });
+
+  // DPA: the column must only ever hold a category from the RejectReason union.
+  // Asserted over EVERY rejection row, not just the ones this test wrote, so a
+  // future caller that leaks an IBAN/BIC/IID into the column fails here.
+  it('persists a category only — no submitted value, no country attribution', () => {
+    // `satisfies Record<RejectReason, true>` : ajouter une raison à l'union sans
+    // l'ajouter ici ne compile plus. Une simple liste de chaînes avait déjà
+    // dérivé une fois (le jour où `invalid_bic_shape` est apparu), et le test
+    // échouait alors sur des lignes parfaitement légitimes.
+    const categories = Object.keys({
+      placeholder_literal: true,
+      normalizable: true,
+      too_short: true,
+      too_long: true,
+      invalid_length: true,
+      invalid_charset: true,
+      not_numeric: true,
+      not_an_identifier: true,
+      invalid_bic_shape: true,
+    } satisfies Record<RejectReason, true>);
+    recordRejection('ch_clearing_lookup', 'not_numeric');
+    const rows = getStatsDB()
+      .prepare('SELECT country_code, success, error_detail, reject_reason FROM operations WHERE reject_reason IS NOT NULL')
+      .all() as Array<{ country_code: string | null; success: number; error_detail: string | null; reject_reason: string }>;
+    expect(rows.length).toBeGreaterThanOrEqual(1);
+    for (const r of rows) {
+      expect(categories).toContain(r.reject_reason);
+      expect(r.country_code).toBeNull();
+      expect(r.error_detail).toBeNull();
+      expect(r.success).toBe(0);
+    }
+  });
+
+  // The defect this guards: rejections live in the same table as operations, so
+  // without `reject_reason IS NULL` on every operation-facing read, one rejection
+  // would count as one failed bic_lookup — and at the observed rejection volume
+  // the hit rate would crater to single digits, reading as an outage rather than
+  // as a measurement change. Asserting the column exists would not catch that.
+  it('keeps rejections out of the operation aggregations (separate lane)', () => {
+    const rejectionCount = () =>
+      getRejectionStats(30).find((r) => r.operation_type === 'bic_lookup' && r.reject_reason === 'too_short')?.count ?? 0;
+
+    const beforeType = getStats().by_type.bic_lookup;
+    const beforeQuick = getQuickStats().bic_lookups;
+    const beforeRejected = rejectionCount();
+
+    recordOperation('bic_lookup', 'CH', true, 0);
+    recordRejection('bic_lookup', 'too_short');
+
+    const afterType = getStats().by_type.bic_lookup;
+
+    // Two rows written, but the operation lane must see exactly the one real
+    // lookup: total +1 (not +2) and found_count +1, so the hit rate contribution
+    // is 1/1 and not 1/2.
+    expect(afterType.total - beforeType.total).toBe(1);
+    expect(afterType.found_count - beforeType.found_count).toBe(1);
+    expect(getQuickStats().bic_lookups - beforeQuick).toBe(1);
+
+    // The rejection is not lost — it is readable through its own lane.
+    expect(rejectionCount() - beforeRejected).toBe(1);
+  });
+});
+
 describe('classifyClient', () => {
   it('classifies /mcp paths as mcp_http regardless of UA', () => {
     expect(classifyClient('/mcp', 'curl/8.0')).toBe('mcp_http');
@@ -326,5 +400,119 @@ describe('classifyClient', () => {
     expect(classifyClient('/v1/iban/validate', 'IBANFORGE-MCP/1.2.2'.toLowerCase())).toBe('mcp_stdio');
     expect(classifyClient('/v1/iban/validate', 'CHATGPT-USER/1.0')).toBe('mcp_stdio');
     expect(classifyClient('/v1/iban/validate', 'GOOGLEBOT/2.1')).toBe('bot');
+  });
+});
+
+describe('normalizeRequestPath', () => {
+  // Each case below was observed to leak before the fix. `request_log` keeps
+  // rows for twelve months, so a survivng identifier is a DPA breach, not a
+  // cosmetic dashboard defect.
+  it('consumes the whole BIC segment, not just its alphanumeric head', () => {
+    // Was '/v1/bic/:code%20CHZH' — the tail of the submitted BIC survived.
+    expect(normalizeRequestPath('/v1/bic/UBSW%20CHZH')).toBe('/v1/bic/:code');
+    expect(normalizeRequestPath('/v1/bic/UBSW+CHZH')).toBe('/v1/bic/:code');
+  });
+
+  it('consumes a non-numeric clearing segment', () => {
+    // Was stored raw and whole: the old pattern required leading digits.
+    expect(normalizeRequestPath('/v1/ch/clearing/CH230')).toBe('/v1/ch/clearing/:iid');
+    expect(normalizeRequestPath('/v1/ch/clearing/762a')).toBe('/v1/ch/clearing/:iid');
+  });
+
+  it('redacts an IBAN-shaped segment on a path no route matches (the 404 case)', () => {
+    // Was stored complete: no rule covered unmatched paths.
+    expect(normalizeRequestPath('/CH9300762011623852957')).toBe('/:redacted');
+    expect(normalizeRequestPath('/lookup/DE89370400440532013000/details')).toBe('/lookup/:redacted/details');
+  });
+
+  it('keeps the existing buckets for well-formed identifiers (no dashboard fragmentation)', () => {
+    expect(normalizeRequestPath('/v1/bic/UBSWCHZH')).toBe('/v1/bic/:code');
+    expect(normalizeRequestPath('/v1/ch/clearing/230')).toBe('/v1/ch/clearing/:iid');
+  });
+
+  // getBusinessFunnel() excludes spec-template paths by matching `{`/`%7B` in
+  // the stored path — folding them into `:code` would start counting them as
+  // bad_input, the very regression that exclusion exists to prevent. There is
+  // no submitted identifier in a template literal, so verbatim is also correct
+  // on the DPA side.
+  it('leaves OpenAPI template literals verbatim, so the funnel keeps excluding them', () => {
+    expect(normalizeRequestPath('/v1/bic/%7Bcode%7D')).toBe('/v1/bic/%7Bcode%7D');
+    expect(normalizeRequestPath('/v1/ch/clearing/%7Biid%7D')).toBe('/v1/ch/clearing/%7Biid%7D');
+    expect(normalizeRequestPath('/v1/bic/{code}')).toBe('/v1/bic/{code}');
+    expect(normalizeRequestPath('/v1/ch/clearing/{iid}')).toBe('/v1/ch/clearing/{iid}');
+  });
+
+  // The trap in the rule above: an agent that substitutes the OpenAPI
+  // placeholder but keeps the braces sends `/v1/bic/{CH93…}`, which WHATWG
+  // percent-encodes to `%7BCH93…%7D` before the middleware ever sees it. That
+  // segment is not IBAN-shaped (it starts with `%`), so redaction missed it,
+  // and it contains `%7B`, so the template rule excused it — a COMPLETE IBAN
+  // stored for twelve months, worse than the BIC tail that blocked the merge.
+  //
+  // Both properties must hold at once: the wrapper survives so the funnel
+  // exclusion keeps firing, the identifier does not.
+  it('redacts an identifier wrapped in braces, keeping the wrapper', () => {
+    expect(normalizeRequestPath('/v1/bic/%7BCH9300762011623852957%7D')).toBe('/v1/bic/%7B:redacted%7D');
+    expect(normalizeRequestPath('/v1/ch/clearing/%7BCH9300762011623852957%7D')).toBe('/v1/ch/clearing/%7B:redacted%7D');
+    expect(normalizeRequestPath('/%7BCH9300762011623852957%7D')).toBe('/%7B:redacted%7D');
+    // Raw braces (a client that does not encode) and lowercase hex.
+    expect(normalizeRequestPath('/v1/bic/{CH9300762011623852957}')).toBe('/v1/bic/{:redacted}');
+    expect(normalizeRequestPath('/%7bCH9300762011623852957%7d')).toBe('/%7b:redacted%7d');
+    // Half a wrapper is still a wrapper: `%7B` alone excused the segment too.
+    expect(normalizeRequestPath('/%7BCH9300762011623852957')).toBe('/%7B:redacted');
+    expect(normalizeRequestPath('/CH9300762011623852957%7D')).toBe('/:redacted%7D');
+  });
+
+  it('leaves ordinary endpoints untouched', () => {
+    for (const p of ['/', '/v1/iban/validate', '/health', '/openapi.json', '/mcp', '/v1/credits/buy/25k', '/v1/iban/structure/CH']) {
+      expect(normalizeRequestPath(p)).toBe(p);
+    }
+  });
+});
+
+// Mirrors the `operations` DPA test above, over the other table this branch
+// writes to. Same reason it is valuable: it sweeps EVERY row rather than only
+// the ones it wrote, so a future caller — or a future narrowing of the
+// normalisation — that lets a submitted value into twelve-month storage fails
+// here rather than in production during the measurement window.
+describe('request_log persists no submitted identifier (DPA)', () => {
+  it('holds no identifier in any stored path, across the whole table', () => {
+    // Write the shapes that leaked, so the sweep is never vacuous — on CI the
+    // table starts empty and a bare sweep would pass green checking nothing.
+    recordRequest('GET', '/v1/bic/UBSW%20CHZH', 400, 1);
+    recordRequest('GET', '/v1/ch/clearing/CH230', 400, 1);
+    recordRequest('POST', '/CH9300762011623852957', 404, 1);
+    // Brace-wrapped: excused by the template rule AND invisible to a
+    // whole-segment shape test. This is the row that made an earlier version of
+    // this very sweep pass green over a table holding complete IBANs.
+    recordRequest('GET', '/v1/bic/%7BCH9300762011623852957%7D', 400, 1);
+    recordRequest('POST', '/%7BCH9300762011623852957%7D', 404, 1);
+
+    // Invariants restated independently of stats.ts: if the production regexes
+    // were wrong, importing them here would make the test wrong the same way.
+    const ibanShape = /^[A-Za-z]{2}\d{2}[A-Za-z0-9]{1,30}$/;
+    const specTemplate = /\{|%7[Bb]/;
+    // Percent-escapes and braces delimit an identifier just as `/` does —
+    // splitting on `/` alone hid `%7BCH93…%7D` from invariant A, because the
+    // `B` of `%7B` glues onto the `CH` and the whole segment stops matching.
+    const BOUNDARY = /\/|%[0-9A-Fa-f]{2}|[{}]/;
+
+    const rows = getStatsDB().prepare('SELECT path FROM request_log').all() as Array<{ path: string }>;
+    expect(rows.length).toBeGreaterThanOrEqual(5);
+
+    for (const { path } of rows) {
+      // A. No token anywhere is identifier-shaped — covers unmatched routes and
+      // identifiers wrapped in an OpenAPI placeholder.
+      expect(path.split(BOUNDARY).filter((token) => ibanShape.test(token))).toEqual([]);
+
+      // B. The two identifier-bearing route families only ever store their
+      // label. Invariant A alone would not catch a regression to the narrow
+      // BIC pattern, because '/v1/bic/:code%20CHZH' is not IBAN-shaped.
+      const bic = /^\/v1\/bic\/([^/]+)/.exec(path);
+      if (bic && !specTemplate.test(bic[1])) expect(bic[1]).toBe(':code');
+
+      const iid = /^\/v1\/ch\/clearing\/([^/]+)/.exec(path);
+      if (iid && !specTemplate.test(iid[1])) expect(iid[1]).toBe(':iid');
+    }
   });
 });

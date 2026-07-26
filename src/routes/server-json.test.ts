@@ -48,6 +48,22 @@ describe('the two server.json files stay in sync', () => {
   });
 });
 
+/**
+ * Same class of drift, third occurrence: the README badge advertised
+ * "MCP Registry 1.2.0" while the registry served 1.3.3. A hand-maintained
+ * number next to a moving one always loses. This is the cheapest possible
+ * guard — it costs nothing and fails the release that forgets the badge.
+ */
+describe('the README badge tracks the released version', () => {
+  const readme = readFileSync(resolve(here, '../..', 'README.md'), 'utf-8');
+
+  it('shows the version actually published to the MCP Registry', () => {
+    const badge = readme.match(/MCP_Registry-([\d.]+)-/);
+    expect(badge, 'MCP Registry badge not found in README').not.toBeNull();
+    expect(badge?.[1]).toBe(pkg.version);
+  });
+});
+
 describe('the published manifest carries the positioning, not a generic blurb', () => {
   it('states what makes the product different, not just what it does', () => {
     // The registry rejected anything over 100 chars (commit 445d3aa), so this

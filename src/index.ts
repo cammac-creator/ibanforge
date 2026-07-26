@@ -35,6 +35,8 @@ import { stripeSuccess } from './routes/stripe-success.js';
 import { ibanStructure } from './routes/iban-structure.js';
 import { rateLimitMiddleware } from './middleware/rate-limit.js';
 import { recordRequest, classifyClient, hashIp, extractClientIp, purgeOldRequestLog, purgeTerminatedKeyTelemetry } from './lib/stats.js';
+import { bicGuardMiddleware, iidGuardMiddleware } from './middleware/identifier-guard.js';
+import { notFoundHandler } from './lib/not-found.js';
 import { getEntryCount, getChClearingCount, getLeiEnrichedCount } from './lib/bic-lookup.js';
 
 // Fail-fast: refuse to start in production without wallet config
@@ -134,6 +136,7 @@ const SKIP_TRACKING = new Set([
   '/stats/status-by-path',
   '/stats/business-funnel',
   '/stats/sources',
+  '/stats/rejections',
   '/health',
   '/ping',
 ]);
@@ -295,7 +298,7 @@ curl -s -X POST https://api.ibanforge.com/v1/iban/compliance \\
   -d '{"iban":"GB29NWBK60161331926819"}'
 \`\`\`
 
-Response includes a \`compliance\` object with: \`risk_score\` (0-100), \`risk_level\` ("low"/"medium"/"elevated"/"high"/"critical"), \`sanctions\` (OFAC/EU/UN matched lists + FATF status), \`reachability\` (SEPA Instant/SCT/SDD), \`vop\` participant status, and \`flags\` (e.g. sanctioned_country, fatf_grey_list, emi_issuer, no_vop) — plus the full validate enrichment and a \`meta\` provenance block.
+Response includes a \`compliance\` object with: \`risk_score\` (0-100), \`risk_level\` ("low"/"medium"/"elevated"/"high"/"critical"), \`sanctions\` (OFAC matched list + FATF status), \`reachability\` (SEPA Instant/SCT/SDD), \`vop\` participant status, and \`flags\` (e.g. sanctioned_country, fatf_grey_list, emi_issuer, no_vop) — plus the full validate enrichment and a \`meta\` provenance block.
 
 **Note for unauthenticated probes**: any of the above paid endpoints called WITHOUT \`Authorization\` or x402 \`X-PAYMENT\` header returns HTTP 402 with a discovery envelope (price, payTo, asset, network, outputSchema). This is by design and lets x402-aware clients auto-pay. Pass \`{}\` as body on POSTs — it WILL return 402, not 400.
 
@@ -437,39 +440,15 @@ app.post('/v1/iban/batch', async (c, next) => {
   }
   await next();
 });
-app.get('/v1/bic/:code', async (c, next) => {
-  const code = c.req.param('code');
-  // Agents sometimes call the OpenAPI template path literally (e.g. `/v1/bic/{code}`
-  // decoded to `{code}`). Catch this with a dedicated message instead of the
-  // generic format error, so the agent can self-correct.
-  if (code === '{code}' || /^\{.*\}$/.test(code)) {
-    return c.json({
-      error: 'placeholder_literal',
-      message: "You sent the literal OpenAPI placeholder '" + code + "'. Substitute it with a real BIC.",
-      example: 'GET /v1/bic/UBSWCHZH',
-      schema: 'https://api.ibanforge.com/openapi.json',
-    }, 400);
-  }
-  if (!/^[A-Za-z0-9]{8}([A-Za-z0-9]{3})?$/.test(code)) {
-    return c.json({ error: 'invalid_bic_format', message: 'BIC code must be 8 or 11 alphanumeric characters' }, 400);
-  }
-  await next();
-});
-app.get('/v1/ch/clearing/:iid', async (c, next) => {
-  const iid = c.req.param('iid');
-  if (iid === '{iid}' || /^\{.*\}$/.test(iid)) {
-    return c.json({
-      error: 'placeholder_literal',
-      message: "You sent the literal OpenAPI placeholder '" + iid + "'. Substitute it with a real Swiss IID.",
-      example: 'GET /v1/ch/clearing/230',
-      schema: 'https://api.ibanforge.com/openapi.json',
-    }, 400);
-  }
-  if (!/^\d{1,5}$/.test(iid)) {
-    return c.json({ error: 'invalid_iid_format', message: 'IID must be a 1-5 digit number.' }, 400);
-  }
-  await next();
-});
+// ⚠️ ORDRE D'ENREGISTREMENT LOAD-BEARING — ne pas déplacer.
+// Ces deux gardes doivent rester ICI : avant le middleware x402 (l. ~505,
+// volontaire — on ne facture pas une entrée malformée) et avant les
+// `app.route()` des routes payantes. Elles répondent 400 sans appeler next(),
+// donc elles sont le SEUL endroit où naissent les 400 de format servis en
+// production, et le seul où le comptage des rejets se déclenche vraiment.
+// Corps des réponses et comptage : voir src/middleware/identifier-guard.ts.
+app.get('/v1/bic/:code', bicGuardMiddleware());
+app.get('/v1/ch/clearing/:iid', iidGuardMiddleware());
 
 // Enrich empty 402 responses with human-readable instructions
 app.use('/v1/*', enrich402Middleware());
@@ -522,10 +501,9 @@ app.route('/', createPlaygroundRelay(app));
 // Landing page (must be last — catches GET /)
 app.route('/', landing);
 
-// JSON 404 for unmatched routes
-app.notFound((c) => {
-  return c.json({ error: 'not_found', message: `Route ${c.req.method} ${new URL(c.req.url).pathname} not found` }, 404);
-});
+// JSON 404 for unmatched routes — the body tells the caller what to call
+// instead (see src/lib/not-found.ts for why, and for its tests).
+app.notFound(notFoundHandler);
 
 const port = parseInt(process.env.PORT ?? '3000', 10);
 

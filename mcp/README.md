@@ -11,9 +11,9 @@ Official **Model Context Protocol (MCP) server** for [IBANforge](https://ibanfor
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------ | ----------- |
 | `validate_iban`       | Validate a single IBAN (ISO 13616 mod-97), resolve BIC, classify issuer (bank/EMI/vIBAN), SEPA + VoP flags               | 0.005       |
 | `batch_validate_iban` | Validate up to 100 IBANs in one call                                                                                     | 0.002 each  |
-| `lookup_bic`          | Lookup BIC/SWIFT against 121k+ BIC entries (38k+ LEI-enriched via GLEIF)                                                  | 0.003       |
+| `lookup_bic`          | Lookup BIC/SWIFT against 121k+ BIC entries (39k+ LEI-enriched via GLEIF)                                                  | 0.003       |
 | `lookup_ch_clearing`  | Lookup Swiss BC-Nummer / IID against ~1,200 SIX BankMaster entries — full rail participation (SIC, euroSIC, CHF instant) + QR-IID | 0.003       |
-| `check_compliance`    | Full compliance check: IBAN + sanctions (OFAC/EU/UN) + SEPA Instant + VoP + risk score (0-100)                           | 0.02        |
+| `check_compliance`    | Full compliance check: IBAN + sanctions (OFAC) + SEPA Instant + VoP + risk score (0-100)                                 | 0.02        |
 
 ## Installation
 
@@ -86,7 +86,7 @@ After adding the server, ask your AI agent:
 
 - **121k+ BIC entries** from public sources, refreshed monthly — exact live counts at [api.ibanforge.com/llms.txt](https://api.ibanforge.com/llms.txt). Sources:
   - [PeterNotenboom/SwiftCodes](https://github.com/PeterNotenboom/SwiftCodes) (MIT-licensed SWIFT directory)
-  - [GLEIF](https://www.gleif.org) BIC-LEI mapping (the only rows with LEI codes, 38k+)
+  - [GLEIF](https://www.gleif.org) BIC-LEI mapping (the only rows with LEI codes, 39k+)
   - EBA Clearing STEP2 SCT (official SEPA Reachable PSPs directory)
   - Deutsche Bundesbank BLZ (official quarterly file)
   - NBP EWIB (official Polish bank registry)

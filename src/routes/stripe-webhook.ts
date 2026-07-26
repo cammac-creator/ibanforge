@@ -242,23 +242,30 @@ stripeWebhook.post('/v1/stripe/webhook', async (c) => {
       monthlyLimit: result.notify.monthlyLimit,
     }).catch(() => {});
 
-    // Customer key delivery (ibanforge.com SMTP — safety net beside the success
-    // page). No-ops if SMTP_* is unset; never blocks/fails the webhook.
+    // Customer key delivery (safety net beside the success page).
+    //
+    // NOT awaited, on purpose. This used to `await`, which was harmless only
+    // while mail was unconfigured and returned instantly. The moment real
+    // credentials were set on 2026-07-25 it became a live hazard: the transport
+    // hung on a blocked SMTP port while Stripe gives up on a webhook at ~10s
+    // and then retries for three days. Delivery is a safety net; Stripe's
+    // acknowledgement is not. Fire and forget, and never let the two couple
+    // again.
     if (result.notify.email && result.notify.email.includes('@')) {
-      if (result.notify.plan === 'oem') {
-        await sendOemKeyEmail({
-          to: result.notify.email,
-          rawKey: result.notify.rawKey,
-          monthlyLimit: result.notify.monthlyLimit ?? 0,
-        }).catch(() => {});
-      } else {
-        await sendApiKeyEmail({
-          to: result.notify.email,
-          rawKey: result.notify.rawKey,
-          credits: result.notify.credits,
-          bundle: result.notify.bundle,
-        }).catch(() => {});
-      }
+      const deliver =
+        result.notify.plan === 'oem'
+          ? sendOemKeyEmail({
+              to: result.notify.email,
+              rawKey: result.notify.rawKey,
+              monthlyLimit: result.notify.monthlyLimit ?? 0,
+            })
+          : sendApiKeyEmail({
+              to: result.notify.email,
+              rawKey: result.notify.rawKey,
+              credits: result.notify.credits,
+              bundle: result.notify.bundle,
+            });
+      void deliver.catch(() => {});
     }
   }
 

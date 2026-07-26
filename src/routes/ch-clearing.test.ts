@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { Hono } from 'hono';
 import { chClearing } from './ch-clearing.js';
+import { getRejectionStats } from '../lib/stats.js';
 
 // Create a minimal test app with the clearing route
 const app = new Hono();
@@ -132,5 +133,67 @@ describe('GET /v1/ch/clearing/:iid', () => {
     expect(body.address).toBeDefined();
     expect(body.address.country).toBe('CH');
     expect(typeof body.address.town).toBe('string');
+  });
+});
+
+// L'app ci-dessus recopie la pré-validation d'index.ts : elle répond 400 AVANT
+// que la route ne s'exécute, donc elle ne peut pas voir l'instrumentation de la
+// route. Celle-ci monte `chClearing` nu, gardes de la route comprises.
+const bareApp = new Hono();
+bareApp.route('/', chClearing);
+
+function rejections(reason: string): number {
+  return (
+    getRejectionStats(1).find(
+      (r) => r.operation_type === 'ch_clearing_lookup' && r.reject_reason === reason,
+    )?.count ?? 0
+  );
+}
+
+describe('GET /v1/ch/clearing/:iid — instrumentation des rejets (phase 1)', () => {
+  it('renvoie toujours 400 sur un IID préfixé CH (phase 1 ne change rien)', async () => {
+    const res = await bareApp.request('/v1/ch/clearing/CH-230');
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string; message: string };
+    expect(body.error).toBe('invalid_iid_format');
+    expect(body.message).toBe('IID must be a 1-5 digit number.');
+  });
+
+  it('enregistre exactement un rejet `normalizable` pour cet IID préfixé', async () => {
+    const before = rejections('normalizable');
+    await bareApp.request('/v1/ch/clearing/CH-230');
+    expect(rejections('normalizable')).toBe(before + 1);
+  });
+
+  it('enregistre `not_numeric` pour du texte', async () => {
+    const before = rejections('not_numeric');
+    const res = await bareApp.request('/v1/ch/clearing/abc');
+    expect(res.status).toBe(400);
+    expect(rejections('not_numeric')).toBe(before + 1);
+  });
+
+  it('enregistre `too_long` pour 6 chiffres', async () => {
+    const before = rejections('too_long');
+    const res = await bareApp.request('/v1/ch/clearing/123456');
+    expect(res.status).toBe(400);
+    expect(rejections('too_long')).toBe(before + 1);
+  });
+
+  it('enregistre le placeholder littéral, corps de réponse inchangé', async () => {
+    const before = rejections('placeholder_literal');
+    const res = await bareApp.request('/v1/ch/clearing/%7Biid%7D');
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string; example: string };
+    expect(body.error).toBe('placeholder_literal');
+    expect(body.example).toBe('GET /v1/ch/clearing/230');
+    expect(rejections('placeholder_literal')).toBe(before + 1);
+  });
+
+  it("n'enregistre aucun rejet pour un IID accepté, même introuvable", async () => {
+    const before = getRejectionStats(1).reduce((n, r) => n + r.count, 0);
+    const res = await bareApp.request('/v1/ch/clearing/99999');
+    // 200 + found:false : ce n'est pas un rejet de format, il n'a rien à compter.
+    expect(res.status).toBe(200);
+    expect(getRejectionStats(1).reduce((n, r) => n + r.count, 0)).toBe(before);
   });
 });

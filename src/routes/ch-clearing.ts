@@ -11,7 +11,8 @@ import {
   lookupClearingByBankCode,
   normalizeIid,
 } from '../lib/ch-clearing.js';
-import { recordOperation } from '../lib/stats.js';
+import { classifyIidInput } from '../lib/input-normalize.js';
+import { recordOperation, recordRejection } from '../lib/stats.js';
 import { computeRevenue } from '../lib/request-helpers.js';
 import type { ChClearingLookupResult } from '../types.js';
 
@@ -23,7 +24,15 @@ chClearing.get('/v1/ch/clearing/:iid', (c) => {
   const start = performance.now();
   const rawIid = c.req.param('iid');
 
-  if (rawIid === '{iid}' || /^\{.*\}$/.test(rawIid)) {
+  // `classifyIidInput` rend null EXACTEMENT quand l'ancienne garde « 1 à 5
+  // chiffres » acceptait déjà : statuts et corps de réponse sont inchangés, on
+  // ne fait qu'étiqueter le rejet. Même remarque que côté BIC : dans l'app
+  // montée, ce sont les gardes de src/index.ts qui répondent en premier et qui
+  // portent le même comptage — les deux ne peuvent pas se déclencher ensemble.
+  const rejection = classifyIidInput(rawIid);
+
+  if (rejection === 'placeholder_literal') {
+    recordRejection('ch_clearing_lookup', rejection);
     return c.json(
       {
         error: 'placeholder_literal',
@@ -35,8 +44,10 @@ chClearing.get('/v1/ch/clearing/:iid', (c) => {
     );
   }
 
-  // Validate format (1-5 digits)
-  if (!/^\d{1,5}$/.test(rawIid)) {
+  // Validate format (1-5 digits) — la condition est portée par le classifieur,
+  // qui rend null sur exactement le même ensemble que /^\d{1,5}$/.
+  if (rejection !== null) {
+    recordRejection('ch_clearing_lookup', rejection);
     return c.json(
       {
         error: 'invalid_iid_format',

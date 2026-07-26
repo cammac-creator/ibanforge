@@ -1,12 +1,12 @@
 ---
 title: "Compliance Check"
-description: "POST /v1/iban/compliance — bank-level sanctions screening (OFAC/EU/UN/SECO), FATF status, SEPA reachability, VoP participation, and a 0–100 risk score."
+description: "POST /v1/iban/compliance — bank-level sanctions screening (OFAC), FATF status, SEPA reachability, VoP participation, and a 0–100 risk score."
 order: 4
 ---
 
 # Compliance Check
 
-Pre-flight risk triage for a payment, in one call. Runs a full IBAN validation, then adds a **compliance block**: sanctions screening of the holding bank (OFAC, EU, UN, SECO), FATF country status, SEPA reachability (SCT / SDD / SCT Inst), Verification of Payee participation, and a **0–100 risk score** your code or agent can branch on.
+Pre-flight risk triage for a payment, in one call. Runs a full IBAN validation, then adds a **compliance block**: sanctions screening of the holding bank (OFAC), FATF country status, SEPA reachability (SCT / SDD / SCT Inst), Verification of Payee participation, and a **0–100 risk score** your code or agent can branch on.
 
 ## Endpoint
 
@@ -78,7 +78,7 @@ POST https://api.ibanforge.com/v1/iban/compliance
     "disclaimer": "Informational triage only — NOT a regulated AML/CFT product. Sanctions screening is performed at the BANK (BIC8) level: it flags the holding institution, NOT the beneficiary / account-holder name. Most sanctions designations target persons and companies, which this does not screen. Use a regulated provider (Refinitiv, ComplyAdvantage, etc.) for name-level KYC/AML obligations.",
     "sanctions_as_of": "2026-07-05T04:29:13.136Z",
     "fatf_as_of": "2026-02",
-    "sources": "OFAC,EU,UN,SECO,FATF,EPC-SCT,EPC-SDD,EPC-SCT_INST"
+    "sources": "OFAC,FATF,EPC-SCT,EPC-SDD,EPC-SCT_INST"
   },
   "cost_usdc": 0.02,
   "processing_ms": 25.66
@@ -90,8 +90,8 @@ POST https://api.ibanforge.com/v1/iban/compliance
 | Field | Description |
 |---|---|
 | `sanctions.country_sanctioned` | The IBAN country appears on a comprehensive sanctions program (e.g. RU, BY, IR). |
-| `sanctions.bank_sanctioned` | The holding bank (BIC8) is designated on OFAC, EU, UN or SECO lists. |
-| `sanctions.matched_lists` | Which lists matched, e.g. `["OFAC", "EU"]`. Empty when clean. |
+| `sanctions.bank_sanctioned` | The holding bank (BIC8) is designated on the OFAC list. |
+| `sanctions.matched_lists` | Which lists matched, e.g. `["OFAC"]`. Empty when clean. |
 | `sanctions.fatf_status` | FATF standing of the country: `member`, `increased_monitoring` (grey list), `high_risk` (black list), or `none`. |
 | `reachability` | Whether the bank is reachable via SEPA SCT, SDD and SCT Inst (EPC registers). |
 | `vop` | Verification of Payee participation and status — required in the euro area since October 2025. |
@@ -109,7 +109,7 @@ The `meta.scope` field says `bank_bic_only`, and it means it: screening is perfo
 
 | Source | Refresh |
 |---|---|
-| Sanctions lists (OFAC, EU, UN, SECO) | Weekly — see `meta.sanctions_as_of` in every response |
+| Sanctions list (OFAC) | Weekly — see `meta.sanctions_as_of` in every response |
 | FATF lists | Per FATF plenary — see `meta.fatf_as_of` |
 | SEPA reachability (EPC SCT / SDD / SCT Inst) | Monthly |
 

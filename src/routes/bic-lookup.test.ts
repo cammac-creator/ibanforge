@@ -1,12 +1,30 @@
 import { describe, it, expect } from 'vitest';
 import { Hono } from 'hono';
 import { bicLookup } from './bic-lookup.js';
+import { getRejectionStats } from '../lib/stats.js';
 import type { HonoEnv } from '../types.js';
 
 function makeApp() {
   const app = new Hono<HonoEnv>();
   app.route('/', bicLookup);
   return app;
+}
+
+/**
+ * Rejets enregistrés aujourd'hui pour un couple (opération, raison).
+ * On compare des DELTAS : la base de stats est partagée par toute la suite,
+ * un compte absolu serait dépendant de l'ordre des fichiers de test.
+ */
+function rejections(operation: string, reason: string): number {
+  return (
+    getRejectionStats(1).find(
+      (r) => r.operation_type === operation && r.reject_reason === reason,
+    )?.count ?? 0
+  );
+}
+
+function totalRejections(): number {
+  return getRejectionStats(1).reduce((n, r) => n + r.count, 0);
 }
 
 describe('GET /v1/bic/:code', () => {
@@ -134,5 +152,42 @@ describe('GET /v1/bic/:code', () => {
     const json = (await res.json()) as { address: unknown; address_available: boolean };
     expect(json.address).toBeNull();
     expect(json.address_available).toBe(false);
+  });
+});
+
+describe('GET /v1/bic/:code — instrumentation des rejets (phase 1 : on compte, on ne change rien)', () => {
+  it('renvoie toujours 400 sur un BIC espacé (phase 1 ne change rien)', async () => {
+    const app = makeApp();
+    const res = await app.request('/v1/bic/UBSW%20CHZH');
+    expect(res.status).toBe(400);
+    const json = (await res.json()) as { error: string };
+    expect(json.error).toBe('invalid_bic_format');
+  });
+
+  it('enregistre exactement un rejet `normalizable` pour ce BIC espacé', async () => {
+    const before = rejections('bic_lookup', 'normalizable');
+    await makeApp().request('/v1/bic/UBSW%20CHZH');
+    expect(rejections('bic_lookup', 'normalizable')).toBe(before + 1);
+  });
+
+  it('enregistre le placeholder littéral sous sa propre catégorie', async () => {
+    const before = rejections('bic_lookup', 'placeholder_literal');
+    const res = await makeApp().request('/v1/bic/%7Bcode%7D');
+    expect(res.status).toBe(400);
+    expect(rejections('bic_lookup', 'placeholder_literal')).toBe(before + 1);
+  });
+
+  it('compte aussi un BIC de forme ISO invalide qui passe la garde de longueur', async () => {
+    const before = rejections('bic_lookup', 'invalid_bic_shape');
+    const res = await makeApp().request('/v1/bic/12345678');
+    expect(res.status).toBe(400);
+    expect(rejections('bic_lookup', 'invalid_bic_shape')).toBe(before + 1);
+  });
+
+  it("n'enregistre aucun rejet quand la garde accepte l'entrée", async () => {
+    const before = totalRejections();
+    const res = await makeApp().request('/v1/bic/UBSWCHZH');
+    expect(res.status).toBe(200);
+    expect(totalRejections()).toBe(before);
   });
 });

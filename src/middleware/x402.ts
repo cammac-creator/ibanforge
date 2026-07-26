@@ -123,7 +123,7 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
       const TRUST_TAG_VALIDATE = `Production · p99 <50ms · 121k+ BICs (38k+ LEI via GLEIF) + ~1,200 SIX · ${V}`;
       const TRUST_TAG_BIC = `Production · p99 <30ms · 121k+ BICs (38k+ LEI-enriched via GLEIF, refreshed monthly) · ${V}`;
       const TRUST_TAG_CH = `Production · p99 <20ms · ~1,200 SIX BankMaster entries, refreshed monthly · ${V}`;
-      const TRUST_TAG_COMPLIANCE = `Production · p99 <80ms · OFAC/EU/UN + FATF + SEPA + VoP · weekly refresh · ${V}`;
+      const TRUST_TAG_COMPLIANCE = `Production · p99 <80ms · OFAC + FATF + SEPA + VoP · weekly refresh · ${V}`;
       const TRUST_TAG_BATCH = `Production · p99 <300ms for 100 IBANs · 121k+ BICs · ${V}`;
 
       const ibanInputSchema = {
@@ -400,7 +400,7 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
             maxTimeoutSeconds: 60,
           },
           description:
-            `Pre-flight compliance triage on an IBAN before a SEPA / cross-border payment: sanctions screening (OFAC/EU/UN), FATF jurisdiction flag, SEPA Instant reachability, VoP (EU 2024/886) participant. Returns risk_score 0-100. Informational, not a regulated AML/CFT product. ${TRUST_TAG_COMPLIANCE}.`,
+            `Pre-flight compliance triage on an IBAN before a SEPA / cross-border payment: sanctions screening (OFAC), FATF jurisdiction flag, SEPA Instant reachability, VoP (EU 2024/886) participant. Returns risk_score 0-100. Informational, not a regulated AML/CFT product. ${TRUST_TAG_COMPLIANCE}.`,
           mimeType: 'application/json',
           extensions: {
             bazaar: {

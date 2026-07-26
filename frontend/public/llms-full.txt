@@ -14,7 +14,7 @@ IBANforge is a compliance-grade API built for AI agents and developers. It valid
 2. **BIC/SWIFT Lookup** — 121k+ institutions, 38k+ LEI-enriched via GLEIF, refreshed monthly
 3. **Swiss Clearing** — BC-Nummer / IID with the full SIX BankMaster payment-rail participation (SIC, RTGS CHF, CHF instant, euroSIC, LSV+/BDD), QR-IID and institution classification — the deepest Swiss clearing data in any public API
 4. **EMI / vIBAN Detection** — identify virtual IBANs from EMIs (Wise, Revolut, N26, Mercury, Modulr, …)
-5. **Compliance Risk Scoring** — bank-BIC sanctions (OFAC/EU/UN/SECO) + FATF + SEPA Instant + VoP, risk score 0-100
+5. **Compliance Risk Scoring** — bank-BIC sanctions (OFAC) + FATF + SEPA Instant + VoP, risk score 0-100
 6. **MCP Integration** — native Model Context Protocol server (stdio + streamable HTTP)
 
 ## Authentication & Pricing
