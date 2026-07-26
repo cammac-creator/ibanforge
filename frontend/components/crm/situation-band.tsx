@@ -34,7 +34,11 @@ export function SituationBand({ situation: s }: { situation: Situation }) {
             </span>
           )}
         </div>
-        <span className="text-[10px] text-[var(--fg-4)]">
+        {/* --fg-3, not --fg-4: measured on composited pixels, --fg-4 at 10px
+            clears AA on the two dark tints (4.69:1, 4.68:1) but drops to
+            3.92:1 on the lighter 'none' band, so the same line passed or
+            failed depending on the ball state. --fg-3 clears all three. */}
+        <span className="text-[10px] text-[var(--fg-3)]">
           {s.firstContactAt ? `1er contact ${s.firstContactAt.slice(0, 10)} · ` : ''}
           {s.messageCount} message{s.messageCount > 1 ? 's' : ''}
         </span>

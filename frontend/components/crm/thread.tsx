@@ -99,7 +99,11 @@ function Bubble({ m, counterpartLabel }: { m: Message; counterpartLabel?: string
             : 'rounded-bl-sm bg-blue-500/15 text-blue-100',
         ].join(' ')}
       >
-        <div className="mb-1 flex flex-wrap items-center gap-2 text-[10px] text-[var(--fg-4)]">
+        {/* --fg-3, not --fg-4: same ruled defect as the quote below. Measured
+            on composited pixels, --fg-4 at 10px gives 4.28:1 on the blue tint
+            and 3.94:1 on the amber, both under AA. This row carries the date
+            and the 'date inconnue' fallback. */}
+        <div className="mb-1 flex flex-wrap items-center gap-2 text-[10px] text-[var(--fg-3)]">
           <span className={mine ? 'text-amber-400' : 'text-blue-400'}>
             {mine ? 'toi' : (counterpartLabel ?? 'lui')}
           </span>
@@ -126,20 +130,25 @@ function Bubble({ m, counterpartLabel }: { m: Message; counterpartLabel?: string
               type="button"
               onClick={() => setShowQuoted(!showQuoted)}
               aria-expanded={showQuoted}
-              className="mt-1.5 cursor-pointer text-[10px] text-[var(--fg-4)] underline underline-offset-2 hover:text-[var(--fg-2)]"
+              // --fg-3: this is an interactive control, and at --fg-4 it sat at
+              // 3.94:1 on the amber tint, dimmer than the quote it reveals.
+              className="mt-1.5 cursor-pointer text-[10px] text-[var(--fg-3)] underline underline-offset-2 hover:text-[var(--fg-2)]"
             >
               {showQuoted ? `▾ masquer ${quotedLabel}` : `▸ afficher ${quotedLabel}`}
             </button>
             {showQuoted && (
-              // --fg-4, not --fg-5. globals.css documents --fg-4 as the step
-              // lightened to reach ~4.7:1 AA on ink surfaces, which puts --fg-5
-              // below AA, and this sits on a tinted bubble rather than plain
-              // ink, so it is worse than that annotation assumes. Revealed text
-              // has to be readable: splitQuoted cuts at the first marker, so
-              // what is behind this toggle can be genuinely new content.
-              // The quote stays visually secondary through the left rule, the
-              // italics and the 10px size rather than through contrast.
-              <p className="mt-1 whitespace-pre-wrap border-l-2 border-[var(--ink-5)] pl-2 text-[10px] italic text-[var(--fg-4)]">
+              // --fg-3, measured rather than picked by name. The bubble tint
+              // sits between this text and the ink surface, so the token's
+              // documented ratio does not apply: sampled from composited
+              // pixels, --fg-5 gave 1.96:1 (blue) and 1.79:1 (amber), --fg-4
+              // 3.98:1 and 3.64:1, both failing AA, while --fg-3 reaches
+              // 5.90:1 and 5.40:1 and passes on both. At 10px there is no
+              // large-text exemption. Revealed text has to be readable:
+              // splitQuoted cuts at the first marker, so what is behind this
+              // toggle can be genuinely new content. The quote stays visually
+              // secondary through the left rule, the italics and the 10px size
+              // rather than through contrast.
+              <p className="mt-1 whitespace-pre-wrap border-l-2 border-[var(--ink-5)] pl-2 text-[10px] italic text-[var(--fg-3)]">
                 {quoted}
               </p>
             )}
@@ -185,7 +194,12 @@ export function Thread({
 }) {
   if (messages.length === 0 && !draftSlot) {
     return (
-      <p className="py-6 text-center text-sm text-[var(--fg-5)]">
+      // --fg-4, not --fg-5: this is a full sentence the reader has to read, and
+      // 14px is below the large-text threshold. On plain ink --fg-4 clears AA
+      // (5.23:1 on ink-0, 5.03:1 on ink-1, 4.74:1 on ink-2) where --fg-5 reaches
+      // only 2.33:1 to 2.57:1. No tint underneath here, so --fg-4 is enough and
+      // going lighter would overstate a message that is only an empty state.
+      <p className="py-6 text-center text-sm text-[var(--fg-4)]">
         Aucun échange pour l’instant. Le mail que tu envoies s’ajoute ici, et les réponses remontent
         automatiquement (synchro des boîtes toutes les 15 min).
       </p>
