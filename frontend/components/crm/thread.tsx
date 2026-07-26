@@ -52,7 +52,7 @@ function formatStamp(raw: string | null): string | null {
   return hour ? `${day}/${month} ${hour}:${minute}` : `${day}/${month}`;
 }
 
-function Bubble({ m }: { m: Message }) {
+function Bubble({ m, counterpartLabel }: { m: Message; counterpartLabel?: string }) {
   const [showQuoted, setShowQuoted] = useState(false);
   const [showOriginal, setShowOriginal] = useState(false);
 
@@ -100,7 +100,9 @@ function Bubble({ m }: { m: Message }) {
         ].join(' ')}
       >
         <div className="mb-1 flex flex-wrap items-center gap-2 text-[10px] text-[var(--fg-4)]">
-          <span className={mine ? 'text-amber-400' : 'text-blue-400'}>{mine ? 'toi' : 'lui'}</span>
+          <span className={mine ? 'text-amber-400' : 'text-blue-400'}>
+            {mine ? 'toi' : (counterpartLabel ?? 'lui')}
+          </span>
           {stamp ? (
             <span title={m.msg_date ?? undefined}>{stamp}</span>
           ) : (
@@ -129,7 +131,15 @@ function Bubble({ m }: { m: Message }) {
               {showQuoted ? `▾ masquer ${quotedLabel}` : `▸ afficher ${quotedLabel}`}
             </button>
             {showQuoted && (
-              <p className="mt-1 whitespace-pre-wrap border-l-2 border-[var(--ink-5)] pl-2 text-[10px] italic text-[var(--fg-5)]">
+              // --fg-4, not --fg-5. globals.css documents --fg-4 as the step
+              // lightened to reach ~4.7:1 AA on ink surfaces, which puts --fg-5
+              // below AA, and this sits on a tinted bubble rather than plain
+              // ink, so it is worse than that annotation assumes. Revealed text
+              // has to be readable: splitQuoted cuts at the first marker, so
+              // what is behind this toggle can be genuinely new content.
+              // The quote stays visually secondary through the left rule, the
+              // italics and the 10px size rather than through contrast.
+              <p className="mt-1 whitespace-pre-wrap border-l-2 border-[var(--ink-5)] pl-2 text-[10px] italic text-[var(--fg-4)]">
                 {quoted}
               </p>
             )}
@@ -159,7 +169,20 @@ function Bubble({ m }: { m: Message }) {
  * plain node, so a Server Component can be passed straight through this client
  * boundary.
  */
-export function Thread({ messages, draftSlot }: { messages: Message[]; draftSlot?: ReactNode }) {
+export function Thread({
+  messages,
+  counterpartLabel,
+  draftSlot,
+}: {
+  messages: Message[];
+  /**
+   * Shown on inbound bubbles in place of 'lui'. The caller holds the Contact;
+   * this component does not, and Message carries no display name of its own
+   * (counterparty is the sending mailbox, not the person).
+   */
+  counterpartLabel?: string;
+  draftSlot?: ReactNode;
+}) {
   if (messages.length === 0 && !draftSlot) {
     return (
       <p className="py-6 text-center text-sm text-[var(--fg-5)]">
@@ -171,7 +194,7 @@ export function Thread({ messages, draftSlot }: { messages: Message[]; draftSlot
   return (
     <div className="flex flex-col gap-2.5">
       {messages.map((m, i) => (
-        <Bubble key={m.id ?? i} m={m} />
+        <Bubble key={m.id ?? i} m={m} counterpartLabel={counterpartLabel} />
       ))}
       {draftSlot}
     </div>
