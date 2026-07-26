@@ -100,8 +100,21 @@ export function ComposerDock({
     setMsg(null);
   }
 
-  /** What the generator is told: who this is, where the thread stands, what to aim for. */
+  /**
+   * What the generator is told: who this is, where the thread stands, what to
+   * aim for, and the one thing it must never write.
+   *
+   * Two of these lines are restored from the brief the Clients page built
+   * before the refactor, kept in its own shape and wording rather than
+   * reworded, because both were lost silently when that page went away and the
+   * proxy forwards this text verbatim: there is no other place they could
+   * live.
+   */
   function brief(): string {
+    // Never emailed, but genuinely calling the API. Writing to them as a cold
+    // prospect would pitch a product they already use; the old brief said so
+    // explicitly, and said not to sell.
+    const activeUser = c.messages.length === 0 && c.kind === 'client' && c.apiKey.usedAllTime > 0;
     return [
       `Contact: ${c.company || c.email}`,
       c.sourcing?.whatTheyDo ? `What they do: ${c.sourcing.whatTheyDo}` : '',
@@ -112,7 +125,15 @@ export function ComposerDock({
             .slice(-4)
             .map((m) => `[${m.direction === 'in' ? 'them' : 'me'} ${m.msg_date ?? ''}] ${m.snippet ?? ''}`)
             .join('\n')}`
-        : 'No prior email: cold first touch.',
+        : activeUser
+          ? 'This person ALREADY uses IBANforge (they have made real API calls) but you have NEVER emailed them. Write a SHORT, warm, NON-salesy note from the founder: thank them for using it, then ask just two easy questions: (1) a brief bit of feedback on their experience so far, and (2) how they discovered IBANforge. Do NOT pitch features and do NOT ask for a call.'
+          : 'No prior email: cold first touch.',
+      // Confidentiality, and it only exists here. Gated on the recipient so the
+      // line is absent for everyone else: naming the rule to the model for a
+      // contact it does not concern would teach it a name it would otherwise
+      // never see. Lowercased before matching, which the original did not do,
+      // because a capitalised domain would silently drop the net.
+      c.email.toLowerCase().includes('customer-n.example') ? 'IMPORTANT: never mention "Customer N" anywhere.' : '',
     ]
       .filter(Boolean)
       .join('\n');
