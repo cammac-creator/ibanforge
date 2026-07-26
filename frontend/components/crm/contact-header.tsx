@@ -56,10 +56,14 @@ function Field({ label, value }: { label: string; value: string | null }) {
 }
 
 /**
- * Identity first, then whatever the nature of the contact actually justifies:
- * the key and usage block for a client, the sourcing block for a contact that
- * came out of the prospect list. A client that converted from prospecting shows
- * both, and neither kind ever renders the other's empty fields.
+ * Who this is, in one strip: the name, the address, and for a prospect the
+ * stored status. Small on purpose, because the panel pins it.
+ *
+ * The header used to be one block, identity and dossier together, and it was
+ * measured taking 231 to 370px of a panel capped at 76vh. With the composer
+ * open that left the thread nothing at all, so the operator could not read the
+ * message they were answering while they answered it. The split is what fixes
+ * that: this part stays in view, the dossier below scrolls with the thread.
  *
  * No 'use client' here: nothing in this file holds state. It is pulled into the
  * client bundle anyway because crm-app.tsx imports it across the boundary, but
@@ -71,13 +75,12 @@ function Field({ label, value }: { label: string; value: string | null }) {
  * the min-content contribution, so such a token widens the whole page rather
  * than its own box. Only overflow-wrap:anywhere shrinks that contribution.
  */
-export function ContactHeader({ contact: c }: { contact: Contact }) {
+export function ContactIdentity({ contact: c }: { contact: Contact }) {
   const sourcing = c.sourcing;
   const segment = sourcing?.segment ? (SEGMENT[sourcing.segment] ?? sourcing.segment) : null;
-  const blocks = sourcing ? blocksOf(sourcing, !!c.email) : null;
 
   return (
-    <div className="min-w-0 border-b border-[var(--ink-4)]/60 pb-3">
+    <div className="min-w-0 border-b border-[var(--ink-4)]/60 pb-2">
       <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
@@ -110,36 +113,61 @@ export function ContactHeader({ contact: c }: { contact: Contact }) {
           </p>
         </div>
         {c.kind === 'prospect' && <ProspectStatusBadge status={c.sourcing.status} />}
-        {c.kind === 'client' && (
-          // No shrink-0, and this stacks below sm. Measured at a 375px
-          // viewport: with shrink-0 the block held its 526px preferred width,
-          // the flex row could not absorb it and the page scrolled sideways
-          // (body.scrollWidth 559 for a 375 window). min-w-0 lets it go under
-          // its min-content, which the usage chart needs since its columns each
-          // claim a few pixels, and stacking gives the chart the full row
-          // instead of what is left beside the quota.
-          <div className="flex w-full min-w-0 flex-col items-start gap-2 sm:w-auto sm:flex-row sm:items-center sm:gap-4 sm:text-right">
-            <div>
-              <p className="text-[10px] uppercase tracking-wide text-[var(--fg-3)]">
-                {c.apiKey.paid ? 'Crédits' : 'Quota'}
-              </p>
-              <p className="font-mono text-sm text-[var(--fg-2)]">
-                {c.apiKey.paid
-                  ? `${(c.apiKey.creditsTotal ?? 0) - (c.apiKey.creditsRemaining ?? 0)}/${c.apiKey.creditsTotal ?? 0}`
-                  : `${c.apiKey.usedAllTime}/${c.apiKey.monthlyLimit ?? 200}`}
-              </p>
-            </div>
-            <UsageChart days={c.usage.days} series={c.usage.series} months={c.usage.months} />
-          </div>
-        )}
       </div>
+    </div>
+  );
+}
+
+/**
+ * The dossier: whatever the nature of the contact actually justifies. The key
+ * and usage block for a client, the sourcing blocks for a contact that came out
+ * of the prospect list, and the triage control for a prospect. A client that
+ * converted from prospecting shows both, and neither kind ever renders the
+ * other's empty fields.
+ *
+ * Rendered at the top of the scrolling region, above the thread, rather than
+ * pinned. Nothing is lost: it scrolls into view like the oldest message does,
+ * and it is fully visible without scrolling in the case that needs it most, a
+ * cold prospect, whose thread is empty by definition.
+ */
+export function ContactDetail({ contact: c }: { contact: Contact }) {
+  const sourcing = c.sourcing;
+  const blocks = sourcing ? blocksOf(sourcing, !!c.email) : null;
+
+  return (
+    <div className="mb-3 min-w-0 border-b border-[var(--ink-4)]/60 pb-3">
+      {c.kind === 'client' && (
+        // No shrink-0, and this stacks below sm. Measured at a 375px viewport:
+        // with shrink-0 the block held its 526px preferred width, the flex row
+        // could not absorb it and the page scrolled sideways (body.scrollWidth
+        // 559 for a 375 window). min-w-0 lets it go under its min-content,
+        // which the usage chart needs since its columns each claim a few
+        // pixels, and stacking gives the chart the full row instead of what is
+        // left beside the quota.
+        <div className="flex w-full min-w-0 flex-col items-start gap-2 sm:flex-row sm:items-center sm:gap-4">
+          <div>
+            <p className="text-[10px] uppercase tracking-wide text-[var(--fg-3)]">
+              {c.apiKey.paid ? 'Crédits' : 'Quota'}
+            </p>
+            <p className="font-mono text-sm text-[var(--fg-2)]">
+              {c.apiKey.paid
+                ? `${(c.apiKey.creditsTotal ?? 0) - (c.apiKey.creditsRemaining ?? 0)}/${c.apiKey.creditsTotal ?? 0}`
+                : `${c.apiKey.usedAllTime}/${c.apiKey.monthlyLimit ?? 200}`}
+            </p>
+          </div>
+          <UsageChart days={c.usage.days} series={c.usage.series} months={c.usage.months} />
+        </div>
+      )}
 
       {sourcing && blocks?.any && (
         // Grouping taken from the prospect page rather than invented: why they
         // are a fit, then the buying signal with its proof, then the human to
         // write to with the proof of the address. Those last two are what the
         // operator acts on, so they are not folded away.
-        <div className="mt-3 flex min-w-0 flex-col gap-3">
+        //
+        // first:mt-0 because the client block above is absent for a prospect,
+        // which makes this the first child and its top margin a stray gap.
+        <div className="mt-3 flex min-w-0 flex-col gap-3 first:mt-0">
           {blocks.fit && (
             <div className="grid min-w-0 gap-3 sm:grid-cols-2">
               <Field label="Ce qu’ils font" value={sourcing.whatTheyDo} />

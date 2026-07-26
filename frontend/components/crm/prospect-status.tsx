@@ -88,7 +88,9 @@ export function ProspectStatusControl({
     'cursor-pointer text-[var(--fg-3)] underline underline-offset-2 disabled:cursor-default disabled:opacity-50';
 
   return (
-    <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-[var(--ink-4)]/60 pt-3 text-[11px]">
+    // first:* for the prospect whose dossier holds nothing else: this control
+    // is then the first child, and its separator would rule off nothing.
+    <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-[var(--ink-4)]/60 pt-3 text-[11px] first:mt-0 first:border-t-0 first:pt-0">
       <span className="text-[var(--fg-3)]">Classer :</span>
       <button
         type="button"
