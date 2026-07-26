@@ -19,7 +19,7 @@
 - **Langue :** code, noms de variables et commentaires en anglais. Textes d'interface en français, via next-intl quand la clé existe déjà.
 - **TypeScript strict, pas de `any`** sauf cas justifié par un commentaire.
 - **Commits conventionnels** (`feat:`, `fix:`, `refactor:`, `test:`, `chore:`).
-- **Deux dépôts.** `~/ibanforge` pour tout, sauf les tâches 7a et 12 qui touchent `~/tabornio`. Le déploiement Tabornio se fait par `ssh ubuntu@83.228.246.158 'cd ~/tabornio && git pull --ff-only && docker compose up -d --build'`.
+- **Deux dépôts.** `~/ibanforge` pour tout, sauf les tâches 7a et 12 qui touchent `~/tabornio`. **Le déploiement Tabornio se fait par `git push` sur `main`**, qui déclenche `deploy.yml`. La commande ssh `docker compose up -d --build` est un NO-OP : le `docker-compose.yml` tire des images GHCR, sans `build:` ni montage du source. Elle ne livre aucun code, et le contrôle HTTP qui suit ressemble alors à un succès.
 - **Sessions parallèles actives sur `~/ibanforge`.** Faire `git fetch && git rebase origin/main` avant chaque push, et ne jamais `git add -A` : ajouter les fichiers un par un.
 - **Ne jamais modifier** `src/` (l'API Hono) : cette refonte est entièrement frontend, sauf le VPS.
 
@@ -2617,7 +2617,7 @@ cd ~/tabornio
 git add backend/app/api/crm.py
 git commit -m "feat(crm): allow generate-draft to skip the IMAP deposit"
 git push
-ssh ubuntu@83.228.246.158 'cd ~/tabornio && git pull --ff-only && docker compose up -d --build'
+git push   # le deploiement se fait par GitHub Action (deploy.yml), PAS par ssh
 ```
 
 - [ ] **Step 5: Vérifier en live**
@@ -3459,7 +3459,7 @@ cd ~/tabornio
 git add backend/app/api/crm.py
 git commit -m "feat(crm): propose follow-up angles from a thread"
 git push
-ssh ubuntu@83.228.246.158 'cd ~/tabornio && git pull --ff-only && docker compose up -d --build'
+git push   # le deploiement se fait par GitHub Action (deploy.yml), PAS par ssh
 ```
 
 - [ ] **Step 4: Vérifier en live**
