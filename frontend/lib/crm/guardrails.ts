@@ -3,6 +3,18 @@ import type { GuardrailIssue, GuardrailReport } from './types';
 
 export interface CheckInput {
   body: string;
+  /**
+   * The subject line, when the caller has one. Optional so that a body-only
+   * call keeps behaving exactly as it did before the field existed.
+   *
+   * Only `em_dash` and `spam_word` widen to it. Both are about what the
+   * recipient reads, and the subject is the line most certain to be read and
+   * the field spam filters weigh hardest. The other rules stay on the body: a
+   * subject is not prose, so counting its words would distort a window tuned
+   * for a mail, a link in a header is not a link in the text, and an opt-out
+   * belongs in the closing rather than the subject.
+   */
+  subject?: string;
   sentToday: number;
   /** A cold first touch: stricter length window, opt-out required. */
   isFirstTouch: boolean;
@@ -94,14 +106,26 @@ function hasLink(run: string): boolean {
  * Pure by design: `sentToday` arrives as a number and is never recomputed here,
  * so the whole page judges one snapshot and the rules stay testable on the nose.
  */
-export function checkDraft({ body, sentToday, isFirstTouch }: CheckInput): GuardrailReport {
+export function checkDraft({ body, subject, sentToday, isFirstTouch }: CheckInput): GuardrailReport {
   const issues: GuardrailIssue[] = [];
-  const lower = body.toLowerCase();
+  const lowerBody = body.toLowerCase();
+
+  /**
+   * Everything the recipient reads, for the two rules that span both fields.
+   *
+   * Joined with a newline rather than a space on purpose: every multi-word spam
+   * phrase is separated by single spaces, so a space would let a subject ending
+   * in "sans" and a body opening on "engagement" forge a match that neither
+   * field contains. A newline cannot be mistaken for the inside of a phrase.
+   */
+  const written = subject ? `${subject}\n${body}` : body;
+  const lowerWritten = subject ? written.toLowerCase() : lowerBody;
 
   // The owner's own rule, and the reason it blocks rather than warns: an em
   // dash in prose reads as a machine wrote the sentence, and the whole point of
-  // this CRM is a founder writing to one person at a time.
-  if (body.includes('—')) {
+  // this CRM is a founder writing to one person at a time. A generated subject
+  // line announces it just as loudly as a generated paragraph.
+  if (written.includes('—')) {
     issues.push({
       code: 'em_dash',
       level: 'blocking',
@@ -137,7 +161,10 @@ export function checkDraft({ body, sentToday, isFirstTouch }: CheckInput): Guard
     issues.push({
       code: 'length',
       level: 'warning',
-      message: `${words} mots. La cible ${isFirstTouch ? 'pour un premier mail' : 'pour une relance'} est ${target.min}-${target.max}.`,
+      // Task 11 checks as the operator types, so this message is on screen from
+      // the first word onwards. "1 mots" every time a draft is started reads as
+      // a broken tool, which is not what a panel asking to be trusted can do.
+      message: `${words} mot${words > 1 ? 's' : ''}. La cible ${isFirstTouch ? 'pour un premier mail' : 'pour une relance'} est ${target.min}-${target.max}.`,
     });
   }
 
@@ -149,7 +176,8 @@ export function checkDraft({ body, sentToday, isFirstTouch }: CheckInput): Guard
     });
   }
 
-  if (isFirstTouch && !OPTOUT_HINTS.some((h) => lower.includes(h))) {
+  // Body only: an opt-out in the header is not an opt-out.
+  if (isFirstTouch && !OPTOUT_HINTS.some((h) => lowerBody.includes(h))) {
     issues.push({
       code: 'no_optout',
       level: 'warning',
@@ -158,8 +186,9 @@ export function checkDraft({ body, sentToday, isFirstTouch }: CheckInput): Guard
   }
 
   // One flag per draft, not one per match: a panel that turns red seven times
-  // for one bad sentence is a panel the operator stops reading.
-  const hit = SPAM_WORDS.find((w) => lower.includes(w));
+  // for one bad sentence is a panel the operator stops reading. Subject
+  // included, since that is the field the filters weigh hardest.
+  const hit = SPAM_WORDS.find((w) => lowerWritten.includes(w));
   if (hit) {
     issues.push({ code: 'spam_word', level: 'warning', message: `Mot à risque : « ${hit} ».` });
   }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { checkDraft } from './guardrails';
+import { checkDraft, type CheckInput } from './guardrails';
 import { HARD_CAP, SOFT_CAP } from './sent-today';
+import type { GuardrailIssue } from './types';
 
 /**
  * A followup that breaks no rule: 60 words, no link, no spam word, no em dash.
@@ -105,6 +106,9 @@ describe('checkDraft', () => {
       isFirstTouch: false,
     });
     expect(codes(r)).toContain('too_many_links');
+    // Warns, as the name says. Without this the severity is pinned by nothing
+    // and a two-link mail could silently become unsendable-without-override.
+    expect(r.blocking).toBe(false);
   });
 
   it('warns when a cold mail has no opt-out', () => {
@@ -128,6 +132,9 @@ describe('checkDraft', () => {
       isFirstTouch: false,
     });
     expect(codes(r)).toContain('spam_word');
+    // Same reason: a mail containing an ordinary banking word must not lock the
+    // send button because nobody pinned this severity.
+    expect(r.blocking).toBe(false);
   });
 
   it('accepts the clean cold template', () => {
@@ -141,11 +148,21 @@ describe('the daily cap boundary', () => {
   const body = 'Une relance courte et polie qui pose une question.';
 
   it('warns from eight and blocks at ten', () => {
-    // The tests below are written against the constants, which pins the
-    // comparison but not the numbers: move both to 5 and 7 and every one of
-    // them still passes. This is the line that pins the policy itself, and it
-    // belongs here rather than next to the constants, because it is this module
-    // that turns those two numbers into a warning and a locked send button.
+    // Literal 8 and 10, not the constants. Every other test here is written
+    // against SOFT_CAP and HARD_CAP, which pins the comparison but not the
+    // numbers: move both to 5 and 7 and they all still pass. This is the test
+    // that pins the policy, so it states it in full rather than asserting the
+    // two constants and calling it done, which is the same defect it is here to
+    // close. It belongs in this suite because it is this module that turns
+    // those two numbers into a warning and a locked send button.
+    const atEight = checkDraft({ body, sentToday: 8, isFirstTouch: false });
+    expect(codes(atEight)).toContain('daily_high');
+    expect(atEight.blocking).toBe(false);
+
+    const atTen = checkDraft({ body, sentToday: 10, isFirstTouch: false });
+    expect(codes(atTen)).toContain('daily_cap');
+    expect(atTen.blocking).toBe(true);
+
     expect([SOFT_CAP, HARD_CAP]).toEqual([8, 10]);
   });
 
@@ -370,5 +387,172 @@ describe('the report', () => {
       expect(issue.message).not.toContain(EM_DASH);
       expect(issue.message.length).toBeGreaterThan(0);
     }
+  });
+
+  /**
+   * The severity of every code, in one table.
+   *
+   * Two of these were pinned by nothing until a review went looking: flipping
+   * `too_many_links` or `spam_word` to blocking left the whole suite green. The
+   * lesson is not "add two assertions", it is that a per-rule test tends to
+   * check the rule fired and forget what it costs, so the class is covered here
+   * rather than one instance at a time. Task 11 turns `blocking` into a locked
+   * send button, which is what makes this the load-bearing column.
+   */
+  const SEVERITIES: Array<[GuardrailIssue['code'], GuardrailIssue['level'], CheckInput]> = [
+    ['em_dash', 'blocking', { body: `Bonjour ${EM_DASH} la suite.`, sentToday: 0, isFirstTouch: false }],
+    ['daily_cap', 'blocking', { body: cleanFollowup, sentToday: HARD_CAP, isFirstTouch: false }],
+    ['daily_high', 'warning', { body: cleanFollowup, sentToday: SOFT_CAP, isFirstTouch: false }],
+    ['length', 'warning', { body: wordsBody(5), sentToday: 0, isFirstTouch: false }],
+    [
+      'too_many_links',
+      'warning',
+      { body: `${cleanFollowup} https://a.example.com https://b.example.com`, sentToday: 0, isFirstTouch: false },
+    ],
+    ['no_optout', 'warning', { body: wordsBody(100), sentToday: 0, isFirstTouch: true }],
+    ['spam_word', 'warning', { body: `${cleanFollowup} gratuit`, sentToday: 0, isFirstTouch: false }],
+  ];
+
+  for (const [code, level, input] of SEVERITIES) {
+    it(`reports ${code} as ${level}`, () => {
+      const issue = checkDraft(input).issues.find((i) => i.code === code);
+      expect(issue, `${code} did not fire on its own fixture`).toBeDefined();
+      expect(issue?.level).toBe(level);
+    });
+  }
+});
+
+describe('the subject line', () => {
+  /**
+   * The composer holds a subject and fills it from the same generator that
+   * writes the body, so until now the model wrote one line that no rule ever
+   * read. It is also the line most certain to be read by the recipient, and the
+   * field spam filters weigh hardest.
+   *
+   * Only two rules widen to it, deliberately. A subject is not prose: counting
+   * its words would distort a window tuned for a mail, its link would not be a
+   * link in the body, and an opt-out belongs in the closing, not the header.
+   */
+  const coldBody = `${wordsBody(100)}. Répondez pour ne plus recevoir de message.`;
+
+  it('blocks on an em dash in the subject alone', () => {
+    const r = checkDraft({
+      subject: `Votre API bancaire ${EM_DASH} une question`,
+      body: cleanFollowup,
+      sentToday: 0,
+      isFirstTouch: false,
+    });
+    expect(codes(r)).toContain('em_dash');
+    expect(r.blocking).toBe(true);
+  });
+
+  it('warns on a spam word in the subject alone', () => {
+    const r = checkDraft({
+      subject: 'Offre gratuite pour vous',
+      body: cleanFollowup,
+      sentToday: 0,
+      isFirstTouch: false,
+    });
+    expect(codes(r)).toContain('spam_word');
+    expect(r.blocking).toBe(false);
+  });
+
+  it('changes nothing when the subject is clean', () => {
+    const r = checkDraft({
+      subject: 'Une question sur vos coordonnées bancaires',
+      body: cleanFollowup,
+      sentToday: 0,
+      isFirstTouch: false,
+    });
+    expect(r.issues).toEqual([]);
+  });
+
+  it('behaves exactly as before when the subject is omitted', () => {
+    // Task 11 has to be able to adopt this without a flag day, so the two calls
+    // must be indistinguishable.
+    const withoutSubject = checkDraft({ body: cleanColdMail, sentToday: SOFT_CAP, isFirstTouch: true });
+    const withClean = checkDraft({
+      subject: 'Une question',
+      body: cleanColdMail,
+      sentToday: SOFT_CAP,
+      isFirstTouch: true,
+    });
+    expect(withClean).toEqual(withoutSubject);
+  });
+
+  it('does not count the subject in the word window', () => {
+    // The body sits exactly on the followup maximum. A subject folded into the
+    // count would push it over and warn.
+    const r = checkDraft({
+      subject: wordsBody(50),
+      body: wordsBody(90),
+      sentToday: 0,
+      isFirstTouch: false,
+    });
+    expect(codes(r)).not.toContain('length');
+  });
+
+  it('does not count a link in the subject', () => {
+    const r = checkDraft({
+      subject: 'Voir https://a.example.com',
+      body: `${cleanFollowup} https://b.example.com`,
+      sentToday: 0,
+      isFirstTouch: false,
+    });
+    expect(codes(r)).not.toContain('too_many_links');
+  });
+
+  it('does not let the subject satisfy the opt-out rule', () => {
+    // An opt-out in the header is not an opt-out. It belongs in the closing.
+    const r = checkDraft({
+      subject: 'Se désinscrire',
+      body: wordsBody(100),
+      sentToday: 0,
+      isFirstTouch: true,
+    });
+    expect(codes(r)).toContain('no_optout');
+  });
+
+  it('does not forge a spam phrase across the two fields', () => {
+    // Joined with a space, a subject ending in "sans" and a body opening on
+    // "engagement" would invent a match neither field contains.
+    const r = checkDraft({
+      subject: 'Une question sans',
+      body: `engagement de votre part, ${cleanFollowup}`,
+      sentToday: 0,
+      isFirstTouch: false,
+    });
+    expect(codes(r)).not.toContain('spam_word');
+  });
+
+  it('still reads the body when a subject is present', () => {
+    // The widening must not turn into a swap.
+    const r = checkDraft({
+      subject: 'Une question',
+      body: `Bonjour ${EM_DASH} la suite.`,
+      sentToday: 0,
+      isFirstTouch: false,
+    });
+    expect(codes(r)).toContain('em_dash');
+  });
+
+  it('leaves the cold opt-out rule reading the body', () => {
+    const r = checkDraft({ subject: 'Une question', body: coldBody, sentToday: 0, isFirstTouch: true });
+    expect(codes(r)).not.toContain('no_optout');
+  });
+});
+
+describe('the length message', () => {
+  it('says one mot, not one mots', () => {
+    // Task 11 checks as the operator types, so the first word typed shows this
+    // message on every new draft.
+    const r = checkDraft({ body: 'Bonjour', sentToday: 0, isFirstTouch: false });
+    const message = r.issues.find((i) => i.code === 'length')?.message ?? '';
+    expect(message).toContain('1 mot.');
+  });
+
+  it('says two mots', () => {
+    const r = checkDraft({ body: 'Bonjour vous', sentToday: 0, isFirstTouch: false });
+    expect(r.issues.find((i) => i.code === 'length')?.message ?? '').toContain('2 mots.');
   });
 });
