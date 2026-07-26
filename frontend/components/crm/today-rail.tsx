@@ -1,10 +1,10 @@
 'use client';
 
 import { useMemo } from 'react';
+import { ballWithUs, followupDue } from '@/lib/crm/buckets';
 import { HARD_CAP, SOFT_CAP } from '@/lib/crm/sent-today';
 import { FOLLOWUP_DAYS } from '@/lib/crm/situation';
 import type { Contact, Situation } from '@/lib/crm/types';
-import { ballWithUs, followupDue } from './buckets';
 
 /** Rows listed before the overflow line takes over. */
 const SHOWN = 5;

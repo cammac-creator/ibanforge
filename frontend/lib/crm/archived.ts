@@ -1,4 +1,4 @@
-import type { Contact, Situation } from '@/lib/crm/types';
+import type { Contact, Situation } from './types';
 
 /**
  * Whether a contact is archived FOR FILTERING, which is not the same question
