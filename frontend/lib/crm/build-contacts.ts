@@ -106,6 +106,11 @@ function datedAscending(rows: MessageRow[]): MessageRow[] {
     .map((r) => r.message);
 }
 
+/** A large free quota is an evaluation, not a customer. Paid keys are never pilots. */
+function isPilot(row: KeyRow): boolean {
+  return row.credits_total == null && (row.monthly_limit ?? 0) >= PILOT_LIMIT;
+}
+
 /**
  * Order two keys of one address by how well each represents it: a paid key
  * beats an unpaid one, then the most used, then the smaller prefix. The last
@@ -195,10 +200,11 @@ export function buildContacts(input: BuildInput): Contact[] {
 
   const prospectByEmail = new Map<string, ProspectRow>();
   for (const p of input.prospects) {
-    // Last row wins when two prospects share an address, which the schema allows.
-    // Note the emit loop below keeps the FIRST instead, so the company shown can
-    // change at the moment of conversion. Flagged in the task report.
-    if (p.contact_email) prospectByEmail.set(p.contact_email.toLowerCase(), p);
+    // The schema allows two prospect rows on one address. The FIRST represents
+    // it, here and in the emit loop below, so the company shown for a contact
+    // does not change at the moment it converts.
+    const key = p.contact_email?.toLowerCase();
+    if (key && !prospectByEmail.has(key)) prospectByEmail.set(key, p);
   }
 
   // One contact per address, not one per key: an address can hold several keys,
@@ -216,12 +222,16 @@ export function buildContacts(input: BuildInput): Contact[] {
   const claimed = new Set<string>();
 
   for (const [id, group] of keysByAddress) {
-    const row = representativeKey(group);
+    // Pilots leave the candidate set BEFORE the ranking, never after: a pilot
+    // that won an address and was then dropped would take an ordinary key on the
+    // same address down with it, hiding someone the Clients page shows today.
+    const candidates = group.filter((row) => !isPilot(row));
+    // Every key an evaluation: the address is a pilot and emits nothing. It is
+    // left unclaimed, so a pilot that is also a prospect still shows up on the
+    // prospect side, exactly as the two old pages did between them.
+    if (candidates.length === 0) continue;
+    const row = representativeKey(candidates);
     const isPaid = row.credits_total != null;
-    // A large free quota is an evaluation pilot, not a customer. Skipping before
-    // claimed.add leaves the address free, so a pilot that is also a prospect
-    // still shows up on the prospect side, exactly as the two old pages did.
-    if (!isPaid && (row.monthly_limit ?? 0) >= PILOT_LIMIT) continue;
     const { messages, draft, rowCount } = threadOf(id);
     // Same rule as the previous Clients page: hide keys that never did anything.
     // It reads the raw row count, not the datable messages, so a thread we can
