@@ -1,4 +1,4 @@
-import type { CrmMessage } from '@/components/dashboard/crm-workspace';
+import type { Message } from '@/lib/crm/types';
 
 /**
  * Inbox-style unread test: a thread is unread when it has an inbound message
@@ -6,7 +6,7 @@ import type { CrmMessage } from '@/components/dashboard/crm-workspace';
  * be called from Server Components — a function exported by a 'use client' module
  * becomes a client reference and throws if invoked during server render.
  */
-export function threadIsUnread(messages: CrmMessage[], lastReadAt?: string | null): boolean {
+export function threadIsUnread(messages: Message[], lastReadAt?: string | null): boolean {
   const lastRead = lastReadAt ? lastReadAt.replace(' ', 'T') : '';
   return messages.some((m) => m.direction === 'in' && (m.msg_date ?? '') > lastRead);
 }
