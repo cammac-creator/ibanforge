@@ -2,8 +2,9 @@
 
 import { useMemo, useState } from 'react';
 import type { Contact, Situation } from '@/lib/crm/types';
+import { isArchived } from './archived';
 
-export type FilterKey = 'today' | 'all' | 'followup' | 'prospects' | 'clients';
+export type FilterKey = 'today' | 'all' | 'followup' | 'prospects' | 'clients' | 'archived';
 
 /**
  * One predicate per filter, used BOTH to count and to select. That is the whole
@@ -19,11 +20,16 @@ const FILTERS: Array<{
   label: string;
   test: (c: Contact, s: Situation | undefined) => boolean;
 }> = [
-  { key: 'today', label: "Aujourd'hui", test: (_c, s) => s?.ballInCourt === 'us' || s?.followupDue === true },
-  { key: 'all', label: 'Tous', test: () => true },
-  { key: 'followup', label: 'Relances dues', test: (_c, s) => s?.followupDue === true },
-  { key: 'prospects', label: 'Prospects', test: (c) => c.kind === 'prospect' },
-  { key: 'clients', label: 'Clients', test: (c) => c.kind === 'client' },
+  {
+    key: 'today',
+    label: "Aujourd'hui",
+    test: (c, s) => !isArchived(c) && (s?.ballInCourt === 'us' || s?.followupDue === true),
+  },
+  { key: 'all', label: 'Tous', test: (c) => !isArchived(c) },
+  { key: 'followup', label: 'Relances dues', test: (c, s) => !isArchived(c) && s?.followupDue === true },
+  { key: 'prospects', label: 'Prospects', test: (c) => !isArchived(c) && c.kind === 'prospect' },
+  { key: 'clients', label: 'Clients', test: (c) => !isArchived(c) && c.kind === 'client' },
+  { key: 'archived', label: 'Archivés', test: (c) => isArchived(c) },
 ];
 
 const DEFAULT_FILTER = FILTERS[0];
@@ -139,7 +145,9 @@ export function ContactList({
               key={c.id}
               type="button"
               onClick={() => onSelect(c.id)}
-              aria-current={c.id === selectedId}
+              // aria-pressed, not aria-current: this is a selection toggle, not
+              // a link marking the current page or step.
+              aria-pressed={c.id === selectedId}
               className={`flex w-full min-w-0 cursor-pointer flex-col gap-1 border-b border-[var(--ink-4)]/40 px-3 py-2.5 text-left transition-colors ${
                 c.id === selectedId
                   ? 'bg-[var(--ink-4)]/60'
@@ -149,7 +157,16 @@ export function ContactList({
               }`}
             >
               <div className="flex min-w-0 items-center gap-2">
-                {c.unread && <span className="h-2 w-2 shrink-0 rounded-full bg-blue-500" />}
+                {/* The list's primary signal, and colour alone does not carry
+                    it. Both legacy workspaces named the same dot this way. */}
+                {c.unread && (
+                  <span
+                    className="h-2 w-2 shrink-0 rounded-full bg-blue-500"
+                    role="img"
+                    aria-label="Réponse non lue"
+                    title="Réponse non lue"
+                  />
+                )}
                 {/* truncate, not wrap-anywhere: overflow:hidden drops this flex
                     item's automatic minimum size to zero, so a long address
                     clips here instead of widening the column. */}

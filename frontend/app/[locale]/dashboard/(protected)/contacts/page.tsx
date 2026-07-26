@@ -3,6 +3,7 @@ import { CrmApp } from '@/components/crm/crm-app';
 import { StatCardV2 } from '@/components/dashboard/stat-card-v2';
 import { TopUsersToday, type TopUserToday } from '@/components/dashboard/top-users-today';
 import { enrichEmail } from '@/lib/company-enrichment';
+import { isArchived } from '@/components/crm/archived';
 import { buildContacts, fetchCrmData, INTERNAL_RE, type KeyRow } from '@/lib/crm/build-contacts';
 import { situationOf } from '@/lib/crm/situation';
 import type { Situation } from '@/lib/crm/types';
@@ -15,6 +16,9 @@ function categoryOf(row: KeyRow): TopUserToday['category'] {
 }
 
 const CAT_RANK = { PAYANT: 0, PILOTE: 1, GRATUIT: 2 } as const;
+
+/** Stripe pack price by credit bundle, as the Clients page had it. */
+const BUNDLE_USD: Record<number, number> = { 1000: 5, 5000: 20, 25000: 80 };
 
 /**
  * The top-3 hero card, lifted from the Clients page rather than rewritten:
@@ -119,25 +123,48 @@ export default async function ContactsPage() {
   const todayUtc = now.toISOString().slice(0, 10);
   const top = topUsers(data.keys, data.activityByKey, todayUtc);
 
-  const all = Object.values(situations);
-  const ballWithUs = all.filter((s) => s.ballInCourt === 'us').length;
-  const followupDue = all.filter((s) => s.followupDue).length;
-  const prospects = contacts.filter((c) => c.kind === 'prospect').length;
-  const clients = contacts.filter((c) => c.kind === 'client').length;
+  // Every counter below reads the active contacts, never the raw list, so a
+  // card can never advertise a number the matching filter chip refuses to show.
+  const active = contacts.filter((c) => !isArchived(c));
+  const activeSituations = active.map((c) => situations[c.id]);
+  const ballWithUs = activeSituations.filter((s) => s.ballInCourt === 'us').length;
+  const followupDue = activeSituations.filter((s) => s.followupDue).length;
+  const prospects = active.filter((c) => c.kind === 'prospect').length;
+  const clients = active.filter((c) => c.kind === 'client').length;
+
+  // Ported as they stood from the Clients page. The overview's money card is
+  // x402 USDC, which cannot be attributed per client; this one is the Stripe
+  // pack revenue, and the two are complementary rather than duplicates.
+  let revenueUsd = 0;
+  let freeActive = 0;
+  for (const c of active) {
+    if (c.kind !== 'client') continue;
+    if (c.apiKey.paid && c.apiKey.creditsTotal != null) {
+      revenueUsd += BUNDLE_USD[c.apiKey.creditsTotal] ?? 0;
+    } else if (!c.apiKey.paid && c.apiKey.usedAllTime > 0) {
+      freeActive += 1;
+    }
+  }
 
   return (
     <div className="flex min-w-0 flex-col gap-5">
       <div>
         <h1 className="text-xl font-semibold text-white">Contacts</h1>
         <p className="mt-1 text-sm text-[var(--fg-3)]">
-          {contacts.length} contact{contacts.length > 1 ? 's' : ''} suivi
-          {contacts.length > 1 ? 's' : ''}
+          {active.length} contact{active.length > 1 ? 's' : ''} suivi
+          {active.length > 1 ? 's' : ''}
         </p>
       </div>
 
       <TopUsersToday top={top} todayUtc={todayUtc} locale={locale} />
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
+        <StatCardV2
+          title="Revenu clients"
+          value={`$${revenueUsd}`}
+          accentColor="#22c55e"
+          hint="CA réel des payants (packs Stripe). x402 non attribuable par client."
+        />
         <StatCardV2
           title="Tu as la balle"
           value={String(ballWithUs)}
@@ -151,9 +178,15 @@ export default async function ContactsPage() {
           hint="Plus de 10 jours sans réponse depuis ton dernier mail."
         />
         <StatCardV2
+          title="Gratuits actifs"
+          value={String(freeActive)}
+          accentColor="#eab308"
+          hint="Clés gratuites qui appellent réellement l’API, candidats à la conversion."
+        />
+        <StatCardV2
           title="Prospects"
           value={String(prospects)}
-          accentColor="#22c55e"
+          accentColor="#14b8a6"
           hint="Contacts sans clé API."
         />
         <StatCardV2
