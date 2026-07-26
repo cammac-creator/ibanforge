@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { changedRows, confirmedSent, readAnswer, reasonOf, withReason } from '@/lib/crm/api-result';
 import { formatStamp } from '@/lib/crm/format';
@@ -67,7 +67,9 @@ export function DraftCard({
    * row, so they follow the text the operator is actually about to send.
    */
   const sendable = !locked && !!contact.email && !!subject.trim() && !!body.trim();
-  const g = useGuardrails({ subject, body, sentToday, situation, sendable });
+  // Focused when the override is granted, same reason as in the composer.
+  const sendRef = useRef<HTMLButtonElement>(null);
+  const g = useGuardrails({ subject, body, sentToday, situation, sendable, sendRef });
 
   /**
    * Both halves of a send failure in one sentence.
@@ -241,9 +243,16 @@ export function DraftCard({
       )}
       {/* Same panel and same words as the composer: the operator meets one
           vocabulary, not two, wherever the mail is about to leave from. */}
-      <GuardrailChecks id={checksId} report={g.report} subject={subject} body={body} />
+      <GuardrailChecks
+        id={checksId}
+        report={g.report}
+        subject={subject}
+        body={body}
+        forcedNote={g.forcedNote}
+      />
       <div className="mt-2.5 flex flex-wrap items-center gap-2">
         <button
+          ref={sendRef}
           type="button"
           onClick={send}
           // disabled, not aria-disabled, as on the composer: a focusable
@@ -254,10 +263,16 @@ export function DraftCard({
             g.forced ? 'bg-red-600 hover:bg-red-500' : 'bg-green-600 hover:bg-green-500'
           }`}
         >
-          {busy === 'send' ? '… envoi' : sent ? 'envoyé' : g.forced ? g.forcedLabel : '✅ Envoyer'}
+          {/* Constant width whatever the grant: see the composer, and see
+              OverrideButton for what a growing label did to this row. */}
+          {busy === 'send' ? '… envoi' : sent ? 'envoyé' : '✅ Envoyer'}
         </button>
-        {/* Next to the button it re-arms, exactly as in the composer. */}
-        {g.offer && <OverrideButton offer={g.offer} onClick={g.grant} dense />}
+        {/* Next to the button it re-arms, exactly as in the composer, and a
+            toggle rather than a control that vanishes on use: this row is left
+            aligned in DOM order, so an unmount here would pull Modifier and an
+            unconfirmed Supprimer left, under the cursor that had just clicked.
+            discard() asks nothing before destroying the draft. */}
+        {g.offer && <OverrideButton offer={g.offer} pressed={g.forced} onClick={g.toggle} dense />}
         {editing ? (
           <button
             type="button"

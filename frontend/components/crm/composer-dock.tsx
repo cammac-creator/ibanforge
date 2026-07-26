@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   changedRows,
@@ -97,7 +97,10 @@ export function ComposerDock({
    * send" and "blocking" never means "there is text worth blocking".
    */
   const sendable = !!c.email && filled && busy === false;
-  const g = useGuardrails({ subject, body, sentToday, situation: s, sendable });
+  // Focused when the override is granted: the blocked button cannot be tabbed
+  // to, so this is what makes a block traversable without a mouse.
+  const sendRef = useRef<HTMLButtonElement>(null);
+  const g = useGuardrails({ subject, body, sentToday, situation: s, sendable, sendRef });
 
   /**
    * Ask before replacing text the operator typed and has not saved anywhere.
@@ -428,7 +431,13 @@ export function ComposerDock({
               <p className="mt-1 whitespace-pre-wrap text-[11px] text-[var(--fg-3)] wrap-anywhere">{fr}</p>
             </details>
           )}
-          <GuardrailChecks id="composer-checks" report={g.report} subject={subject} body={body} />
+          <GuardrailChecks
+            id="composer-checks"
+            report={g.report}
+            subject={subject}
+            body={body}
+            forcedNote={g.forcedNote}
+          />
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <button
               type="button"
@@ -463,8 +472,9 @@ export function ComposerDock({
                 controls name the blocks, so what is being passed over is on
                 the control under the cursor, at both clicks. */}
             <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
-              {g.offer && <OverrideButton offer={g.offer} onClick={g.grant} />}
+              {g.offer && <OverrideButton offer={g.offer} pressed={g.forced} onClick={g.toggle} />}
               <button
+                ref={sendRef}
                 type="button"
                 onClick={send}
                 // disabled, not aria-disabled. A focusable blocked button would
@@ -477,7 +487,11 @@ export function ComposerDock({
                   g.forced ? 'bg-red-600 hover:bg-red-500' : 'bg-green-600 hover:bg-green-500'
                 }`}
               >
-                {busy === 'send' ? '… envoi' : g.forced ? g.forcedLabel : 'Envoyer'}
+                {/* The label never changes with the grant: a wider button is a
+                    button that moves, and this one sits beside a toggle the
+                    cursor has just clicked. Red says it, and the panel writes
+                    it out for whoever does not see red. */}
+                {busy === 'send' ? '… envoi' : 'Envoyer'}
               </button>
             </div>
           </div>

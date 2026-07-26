@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type RefObject } from 'react';
 import { checkDraft, EM_DASH } from '@/lib/crm/guardrails';
 import type { GuardrailIssue, GuardrailReport, Situation } from '@/lib/crm/types';
 
@@ -61,12 +61,16 @@ export interface Guarded {
   blocked: boolean;
   /** A block stands and the operator has passed over it: the send may proceed. */
   forced: boolean;
-  /** Label of the override control, or null when there is nothing to offer. */
+  /** Label of the override control, or null when there is nothing to pass over. */
   offer: string | null;
-  /** What the send button reads once the override is granted. */
-  forcedLabel: string;
-  /** Pass over the blocks currently on screen. */
-  grant: () => void;
+  /**
+   * Said in the panel once the grant is given, or null. It is in the panel and
+   * not in the send button's label because a label that grows is a button that
+   * moves, and this one must not move: see OverrideButton.
+   */
+  forcedNote: string | null;
+  /** Grant the override, or withdraw a grant already given. */
+  toggle: () => void;
   /** Drop the grant. Call it whenever the text becomes a different draft. */
   clear: () => void;
 }
@@ -99,6 +103,7 @@ export function useGuardrails({
   sentToday,
   situation,
   sendable,
+  sendRef,
 }: {
   subject: string;
   body: string;
@@ -107,6 +112,16 @@ export function useGuardrails({
   /** Undefined only if the page failed to derive one; every rule then falls to its warmer form. */
   situation?: Situation;
   sendable: boolean;
+  /**
+   * The send button, focused when the override is granted.
+   *
+   * That button is `disabled` while blocked, therefore unfocusable, so its
+   * aria-describedby is unreachable in exactly the state where it matters and
+   * the override is the only non-visual way through a block. Without this, a
+   * keyboard user presses Enter on it and lands nowhere. Focused, the button
+   * announces itself, and its own label says what is being passed over.
+   */
+  sendRef?: RefObject<HTMLButtonElement | null>;
 }): Guarded {
   const [overrideFor, setOverrideFor] = useState<string | null>(null);
 
@@ -125,15 +140,43 @@ export function useGuardrails({
     .sort()
     .join('+');
   const blockNames = blockers.map((i) => BLOCK_LABEL[i.code] ?? i.code).join(', ');
+
+  /**
+   * Recurrence, which the key alone cannot catch.
+   *
+   * Holding the codes stops one block covering another, but says nothing about
+   * the same block coming back: delete the em dash and the grant is merely
+   * dormant, paste another and the send is armed again with no second click.
+   * Same through `sendable`: grant at the cap, wipe the draft, write a
+   * completely different mail, and it is live on the keystroke that makes it
+   * sendable. Deleting and rewriting is exactly the event that makes the text
+   * another draft, so the grant has to die on the edge, not on the value.
+   *
+   * State adjusted during render rather than in an effect: the corrected value
+   * has to be the one this render paints, or the button is red for a frame on
+   * a grant nobody gave. React re-runs the component before committing.
+   */
+  const [seen, setSeen] = useState({ blocking: false, sendable: false });
+  if (seen.blocking !== report.blocking || seen.sendable !== sendable) {
+    const unblocked = seen.blocking && !report.blocking;
+    const revived = !seen.sendable && sendable;
+    setSeen({ blocking: report.blocking, sendable });
+    if (unblocked || revived) setOverrideFor(null);
+  }
+
   const forced = report.blocking && sendable && overrideFor === blockKey;
+
+  useEffect(() => {
+    if (forced) sendRef?.current?.focus();
+  }, [forced, sendRef]);
 
   return {
     report,
     blocked: report.blocking && !forced,
     forced,
-    offer: report.blocking && sendable && !forced ? `Forcer l’envoi malgré : ${blockNames}` : null,
-    forcedLabel: `⚠️ Envoyer malgré : ${blockNames}`,
-    grant: () => setOverrideFor(blockKey),
+    offer: report.blocking && sendable ? `Forcer l’envoi malgré : ${blockNames}` : null,
+    forcedNote: forced ? `Forçage accordé. Le mail partira malgré : ${blockNames}.` : null,
+    toggle: () => setOverrideFor((prev) => (prev === blockKey ? null : blockKey)),
     clear: () => setOverrideFor(null),
   };
 }
@@ -152,12 +195,20 @@ export function GuardrailChecks({
   report,
   subject,
   body,
+  forcedNote,
 }: {
   /** Unique per surface: the send button points at it with aria-describedby. */
   id: string;
   report: GuardrailReport;
   subject: string;
   body: string;
+  /**
+   * The armed state, in words. Neither the send button nor the toggle may say
+   * it, because saying it would widen them, so the panel says it: red buttons
+   * alone tell a colour-blind operator nothing about a send that is about to
+   * ignore a rule.
+   */
+  forcedNote?: string | null;
 }) {
   if (report.issues.length === 0) return null;
   const where = emDashField(subject, body);
@@ -175,6 +226,9 @@ export function GuardrailChecks({
           {i.code === 'em_dash' && where ? ` ${where}` : ''}
         </li>
       ))}
+      {forcedNote && (
+        <li className="text-[11px] font-medium leading-snug text-red-300">⚠️ {forcedNote}</li>
+      )}
     </ul>
   );
 }
@@ -184,13 +238,32 @@ export function GuardrailChecks({
  * to press it. Two clicks, and the domain stays theirs to gamble. It belongs
  * next to the button it re-arms, never at the foot of the list, because the
  * escape hatch has to travel with the button.
+ *
+ * A toggle rather than a control that vanishes on use, and one whose label is
+ * the same pressed and unpressed. Both properties are load-bearing, and both
+ * were learnt at the bench rather than reasoned:
+ *
+ *  1. Unmounted on click, it collapsed the row it sits in. On the draft card,
+ *     whose row is left aligned in DOM order, that pulled an unconfirmed
+ *     Supprimer left, into the point the click had just landed on. discard()
+ *     asks nothing and there is no undo.
+ *  2. Mounted but with a send button that renamed itself "Envoyer malgré ..."
+ *     on the grant, the send button grew from 89px to 216px and slid under
+ *     that same cursor: measured, a double click then sent the mail.
+ *
+ * So nothing in this row may change width when the grant is given. The armed
+ * state is carried by the fill, by aria-pressed, and by a line in the panel
+ * above. Pressing again withdraws the grant, which a safety control should
+ * allow.
  */
 export function OverrideButton({
   offer,
+  pressed,
   onClick,
   dense = false,
 }: {
   offer: string;
+  pressed: boolean;
   onClick: () => void;
   /** Matches the shorter buttons of the draft card row. */
   dense?: boolean;
@@ -199,9 +272,13 @@ export function OverrideButton({
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-lg border border-red-500/40 text-xs text-red-300 hover:bg-red-500/10 ${
+      aria-pressed={pressed}
+      // Fill and text colour only between the two states. No weight change:
+      // bolder text is wider text, and a width change is the very movement
+      // this toggle exists to avoid.
+      className={`rounded-lg border border-red-500/40 text-xs hover:bg-red-500/20 ${
         dense ? 'px-3 py-1' : 'px-3 py-1.5'
-      }`}
+      } ${pressed ? 'bg-red-500/20 text-red-100' : 'text-red-300'}`}
     >
       {offer}
     </button>
