@@ -478,14 +478,25 @@ export function ComposerDock({
    * whole while leaving the thread its natural 141px; measured, 30vh there
    * would have cut the panel itself.
    *
-   * The two are written as mutually exclusive media queries rather than as one
-   * class overriding the other. A plain `max-h-[40vh]` beside the existing
-   * `[@media(max-height:780px)]:max-h-[30vh]` would decide the short-window
-   * case on the order Tailwind happens to emit them in, and it is the short
-   * window that has the least room to lose.
+   * An unconditional 40vh with the existing query overriding it, rather than
+   * two queries that split the range between them.
+   *
+   * The first attempt paired `min-height:781px` with `max-height:780px`, on the
+   * reasoning that two exclusive queries cannot be decided by the order
+   * Tailwind emits them in. They are exclusive, but they are not exhaustive: a
+   * viewport of 780.4 CSS pixels, which browser zoom and display scaling
+   * produce routinely, matches neither. The dock was then uncapped with a 248px
+   * panel on top of it, which is the 0px thread this cap exists to prevent,
+   * hiding in the one band the arithmetic did not cover.
+   *
+   * A base utility cannot have that hole: it applies at every height, and the
+   * query only takes over below 780. The ordering that worried the first
+   * attempt is the ordinary Tailwind cascade, a variant over the utility it
+   * varies, and it is measured below rather than assumed: 30vh at 700, 40vh at
+   * 780.4 and at 900.
    */
   const dockCap = step
-    ? '[@media(min-height:781px)]:max-h-[40vh] [@media(max-height:780px)]:max-h-[30vh]'
+    ? 'max-h-[40vh] [@media(max-height:780px)]:max-h-[30vh]'
     : '[@media(max-height:780px)]:max-h-[30vh]';
 
   return (
@@ -633,10 +644,21 @@ export function ComposerDock({
                 >
                   Générer sans angle
                 </button>
+                {/* Off while a call is in flight, like both its siblings.
+                    Clicked during a generation it removed the panel and
+                    nothing else: the fetch still landed, and on an empty
+                    composer confirmReplace has nothing to protect, so it
+                    returned true in silence and the subject and body filled
+                    with a mail written on the angle the operator had just
+                    cancelled. With text already typed it was a confirm dialog
+                    for a step that was over. This is the feature whose premise
+                    is that the operator decides what the model writes, so a
+                    cancel that does not cancel is worse than a missing one. */}
                 <button
                   type="button"
                   onClick={() => setStep(null)}
-                  className="text-[11px] text-[var(--fg-3)] underline underline-offset-2 hover:text-[var(--fg-1)]"
+                  disabled={busy !== false}
+                  className="text-[11px] text-[var(--fg-3)] underline underline-offset-2 hover:text-[var(--fg-1)] disabled:no-underline disabled:opacity-50"
                 >
                   annuler
                 </button>
