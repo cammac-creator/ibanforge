@@ -46,7 +46,7 @@
     "anthropic"
   ],
   "author": "IBANforge",
-  "license": "Apache-2.0",
+  "license": "MIT",
   "homepage": "https://ibanforge.com",
   "repository": {
     "type": "git",
