@@ -1,12 +1,12 @@
 ---
 title: "Compliance-Prüfung"
-description: "POST /v1/iban/compliance — Sanktionsprüfung auf Bankebene (OFAC/EU/UN/SECO), FATF-Status, SEPA-Erreichbarkeit, VoP-Teilnahme und ein Risiko-Score von 0–100."
+description: "POST /v1/iban/compliance — Sanktionsprüfung auf Bankebene (OFAC), FATF-Status, SEPA-Erreichbarkeit, VoP-Teilnahme und ein Risiko-Score von 0–100."
 order: 4
 ---
 
 # Compliance-Prüfung
 
-Die Risikotriage vor der Zahlung, in einem einzigen Aufruf. Führt eine vollständige IBAN-Validierung durch und ergänzt sie um einen **Compliance-Block**: Sanktionsprüfung der kontoführenden Bank (OFAC, EU, UN, SECO), FATF-Status des Landes, SEPA-Erreichbarkeit (SCT / SDD / SCT Inst), Teilnahme an der Verification of Payee und ein **Risiko-Score von 0–100**, auf dem Ihr Code oder Ihr Agent seine Entscheidung aufbauen kann.
+Die Risikotriage vor der Zahlung, in einem einzigen Aufruf. Führt eine vollständige IBAN-Validierung durch und ergänzt sie um einen **Compliance-Block**: Sanktionsprüfung der kontoführenden Bank (OFAC), FATF-Status des Landes, SEPA-Erreichbarkeit (SCT / SDD / SCT Inst), Teilnahme an der Verification of Payee und ein **Risiko-Score von 0–100**, auf dem Ihr Code oder Ihr Agent seine Entscheidung aufbauen kann.
 
 ## Endpoint
 
@@ -78,7 +78,7 @@ POST https://api.ibanforge.com/v1/iban/compliance
     "disclaimer": "Informational triage only — NOT a regulated AML/CFT product. Sanctions screening is performed at the BANK (BIC8) level: it flags the holding institution, NOT the beneficiary / account-holder name. Most sanctions designations target persons and companies, which this does not screen. Use a regulated provider (Refinitiv, ComplyAdvantage, etc.) for name-level KYC/AML obligations.",
     "sanctions_as_of": "2026-07-05T04:29:13.136Z",
     "fatf_as_of": "2026-02",
-    "sources": "OFAC,EU,UN,SECO,FATF,EPC-SCT,EPC-SDD,EPC-SCT_INST"
+    "sources": "OFAC,FATF,EPC-SCT,EPC-SDD,EPC-SCT_INST"
   },
   "cost_usdc": 0.02,
   "processing_ms": 25.66
@@ -90,8 +90,8 @@ POST https://api.ibanforge.com/v1/iban/compliance
 | Feld | Beschreibung |
 |---|---|
 | `sanctions.country_sanctioned` | Das IBAN-Land unterliegt einem umfassenden Sanktionsprogramm (z. B. RU, BY, IR). |
-| `sanctions.bank_sanctioned` | Die kontoführende Bank (BIC8) ist auf OFAC-, EU-, UN- oder SECO-Listen gelistet. |
-| `sanctions.matched_lists` | Welche Listen zutreffen, z. B. `["OFAC", "EU"]`. Leer, wenn sauber. |
+| `sanctions.bank_sanctioned` | Die kontoführende Bank (BIC8) ist auf der OFAC-Liste gelistet. |
+| `sanctions.matched_lists` | Welche Listen zutreffen, z. B. `["OFAC"]`. Leer, wenn sauber. |
 | `sanctions.fatf_status` | FATF-Einstufung des Landes: `member`, `increased_monitoring` (graue Liste), `high_risk` (schwarze Liste) oder `none`. |
 | `reachability` | Erreichbarkeit der Bank über SEPA SCT, SDD und SCT Inst (EPC-Register). |
 | `vop` | Teilnahme an der Verification of Payee und deren Status — im Euroraum seit Oktober 2025 verpflichtend. |
@@ -109,7 +109,7 @@ Das Feld `meta.scope` sagt `bank_bic_only`, und genau das ist gemeint: Die Prüf
 
 | Quelle | Aktualisierung |
 |---|---|
-| Sanktionslisten (OFAC, EU, UN, SECO) | Wöchentlich — siehe `meta.sanctions_as_of` in jeder Antwort |
+| Sanktionsliste (OFAC) | Wöchentlich — siehe `meta.sanctions_as_of` in jeder Antwort |
 | FATF-Listen | Je FATF-Plenum — siehe `meta.fatf_as_of` |
 | SEPA-Erreichbarkeit (EPC SCT / SDD / SCT Inst) | Monatlich |
 

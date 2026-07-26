@@ -84,7 +84,7 @@
       "4": {
         "badge": "Sanctions + FATF",
         "title": "Score de risque compliance",
-        "description": "Screening sanctions au niveau banque-BIC (OFAC/UE/ONU/SECO) + FATF + SEPA + VoP, distillés en un score de risque 0-100."
+        "description": "Screening sanctions au niveau banque-BIC (OFAC) + FATF + SEPA + VoP, distillés en un score de risque 0-100."
       },
       "5": {
         "badge": "x402 — paiement agents",
@@ -153,7 +153,7 @@
       "dataValue": "GLEIF · SIX BankMaster · répertoire SWIFT · Bundesbank · EBA STEP2 · NBP",
       "dataNote": "Actualisées chaque mois",
       "sanctionsLabel": "Screening sanctions",
-      "sanctionsValue": "OFAC · EU · UN · SECO + FATF",
+      "sanctionsValue": "OFAC + FATF",
       "sanctionsNote": "Au niveau banque (BIC8)",
       "madeLabel": "Provenance",
       "madeNote": "Données de clearing suisses directement de SIX",
@@ -944,7 +944,7 @@
         },
         {
           "title": "Pré-check compliance intégré",
-          "body": "Filtrage sanctions (OFAC / UE / ONU), listes FATF, joignabilité SEPA et données d'obligation VoP, score de risque 0–100 — un endpoint pour trier avant qu'un paiement ne quitte votre produit.",
+          "body": "Filtrage sanctions (OFAC), listes FATF, joignabilité SEPA et données d'obligation VoP, score de risque 0–100 — un endpoint pour trier avant qu'un paiement ne quitte votre produit.",
           "link": "Doc compliance"
         },
         {
@@ -1021,7 +1021,7 @@
         },
         "compliance": {
           "label": "Pré-check compliance (sanctions, FATF, obligation VoP)",
-          "ibanforge": "Un endpoint, 0,02 $ : filtrage banques OFAC/UE/ONU, listes FATF, données SEPA/VoP, score 0–100",
+          "ibanforge": "Un endpoint, 0,02 $ : filtrage banques OFAC, listes FATF, données SEPA/VoP, score 0–100",
           "ibancom": "Produits séparés (BAV/VoP dès 2 000 € les 2 500 vérifications)",
           "ibanapi": "Non",
           "libs": "Non"

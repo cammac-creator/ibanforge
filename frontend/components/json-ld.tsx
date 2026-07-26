@@ -64,7 +64,7 @@ const SOFTWARE_APPLICATION = {
       '@type': 'Offer',
       name: 'Compliance check',
       description:
-        'Full compliance triage: sanctions (OFAC/EU/UN), FATF, SEPA Instant, VoP, risk score (0-100)',
+        'Full compliance triage: sanctions (OFAC), FATF, SEPA Instant, VoP, risk score (0-100)',
       price: '0.02',
       priceCurrency: 'USDC',
       eligibleQuantity: { '@type': 'QuantitativeValue', value: 1, unitText: 'request' },
@@ -85,7 +85,7 @@ const SOFTWARE_APPLICATION = {
     'EMI / vIBAN / neobank issuer classification',
     'SEPA Instant reachability flag',
     'VoP (PSR 2024/886) participant check',
-    'Compliance risk scoring (OFAC/EU/UN)',
+    'Compliance risk scoring (OFAC)',
     'x402 micropayments (USDC on Base L2)',
     'Native MCP server (Claude Desktop, Cursor, Cline)',
     '200 free requests/month with API key',
@@ -173,7 +173,7 @@ const FAQ = {
       name: 'Does IBANforge replace a regulated AML/sanctions screening provider?',
       acceptedAnswer: {
         '@type': 'Answer',
-        text: 'No. The /v1/iban/compliance endpoint runs OFAC/EU/UN list checks and produces a risk score (0-100) — useful for triage and pre-flight screening. For regulated AML/CFT obligations use a regulated vendor like Refinitiv World-Check, Acuris or ComplyAdvantage.',
+        text: 'No. The /v1/iban/compliance endpoint runs OFAC list checks and produces a risk score (0-100) — useful for triage and pre-flight screening. For regulated AML/CFT obligations use a regulated vendor like Refinitiv World-Check, Acuris or ComplyAdvantage.',
       },
     },
     {

@@ -74,9 +74,8 @@ Bank-level (BIC8) sanctions indicators are built directly from the official,
 freely-redistributable consolidated sanctions lists published by:
   - OFAC (U.S. Office of Foreign Assets Control) — SDN list, U.S. public domain
   - European Union — consolidated financial sanctions list
-  - United Nations — Security Council consolidated list
-  - SECO (Swiss State Secretariat for Economic Affairs)
-OFAC provides essentially all of the bank-BIC coverage. No third-party
+This file attributes data sources, so it lists only feeds that actually put
+rows in the database: OFAC accounts for all but one of them. No third-party
 aggregator is used, so there is no non-commercial (CC-BY-NC) data dependency.
 
 Country risk indicators are derived from publicly available FATF

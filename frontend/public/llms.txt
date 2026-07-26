@@ -30,7 +30,7 @@ GET https://api.ibanforge.com/.well-known/x402 returns the full catalog. Any age
 - batch_validate_iban — up to 100 IBANs in one call. Cost: $0.002 per IBAN (e.g. 100 = $0.20)
 - lookup_bic — resolve a BIC/SWIFT into bank, country, city, LEI. Cost: $0.003
 - lookup_ch_clearing — Swiss BC-Nummer / IID → institution, address, full rail participation (SIC, euroSIC, CHF instant, LSV+/BDD), QR-IID. The deepest Swiss clearing data in any public API. Cost: $0.003
-- check_compliance — sanctions (OFAC/EU/UN/SECO, bank-BIC level) + FATF + SEPA Instant + VoP + risk score 0-100. Informational, not regulated AML/CFT. Cost: $0.02
+- check_compliance — sanctions (OFAC, bank-BIC level) + FATF + SEPA Instant + VoP + risk score 0-100. Informational, not regulated AML/CFT. Cost: $0.02
 
 ## REST endpoints
 - POST /v1/iban/validate — single IBAN, full enrichment ($0.005)
