@@ -15,6 +15,12 @@ const WARM_ACCOUNT = 'cammac@bluewin.ch';
 export const INTERNAL_RE =
   /(@ibanforge\.com|@example\.com|@test\.|test-|-test|smoke|audit|^ca-[a-z]+-?\d*@proton\.me|^credits-buyer$|^stripe-buyer$|^playground|cammac@bluewin\.ch|cam@ogens\.ch|ptibootch@|gpt-store@)/i;
 
+/**
+ * Monthly quota from which an unpaid key is an evaluation pilot rather than a
+ * customer. Same threshold as the Clients page, which hid pilots entirely.
+ */
+const PILOT_LIMIT = 5000;
+
 export interface KeyRow {
   key_prefix: string;
   email: string;
@@ -100,6 +106,25 @@ function datedAscending(rows: MessageRow[]): MessageRow[] {
     .map((r) => r.message);
 }
 
+/**
+ * Order two keys of one address by how well each represents it: a paid key
+ * beats an unpaid one, then the most used, then the smaller prefix. The last
+ * level is what makes the answer independent of the order the API returned the
+ * rows in; compared by code unit rather than localeCompare, which would make
+ * the choice depend on the runtime locale.
+ */
+function compareKeys(a: KeyRow, b: KeyRow): number {
+  const paid = Number(b.credits_total != null) - Number(a.credits_total != null);
+  if (paid !== 0) return paid;
+  if (a.used_all_time !== b.used_all_time) return b.used_all_time - a.used_all_time;
+  return a.key_prefix < b.key_prefix ? -1 : a.key_prefix > b.key_prefix ? 1 : 0;
+}
+
+/** The key that stands for an address when several share it. */
+function representativeKey(rows: KeyRow[]): KeyRow {
+  return rows.reduce((best, row) => (compareKeys(row, best) < 0 ? row : best));
+}
+
 function sourcingOf(r: ProspectRow): ProspectSourcing {
   return {
     prospectId: r.id,
@@ -171,17 +196,33 @@ export function buildContacts(input: BuildInput): Contact[] {
   const prospectByEmail = new Map<string, ProspectRow>();
   for (const p of input.prospects) {
     // Last row wins when two prospects share an address, which the schema allows.
+    // Note the emit loop below keeps the FIRST instead, so the company shown can
+    // change at the moment of conversion. Flagged in the task report.
     if (p.contact_email) prospectByEmail.set(p.contact_email.toLowerCase(), p);
+  }
+
+  // One contact per address, not one per key: an address can hold several keys,
+  // and the id below is the join key, the selection key and the React key.
+  const keysByAddress = new Map<string, KeyRow[]>();
+  for (const row of input.keys) {
+    if (INTERNAL_RE.test(row.email)) continue;
+    const id = row.email.toLowerCase();
+    const group = keysByAddress.get(id);
+    if (group) group.push(row);
+    else keysByAddress.set(id, [row]);
   }
 
   const out: Contact[] = [];
   const claimed = new Set<string>();
 
-  for (const row of input.keys) {
-    if (INTERNAL_RE.test(row.email)) continue;
-    const id = row.email.toLowerCase();
-    const { messages, draft, rowCount } = threadOf(id);
+  for (const [id, group] of keysByAddress) {
+    const row = representativeKey(group);
     const isPaid = row.credits_total != null;
+    // A large free quota is an evaluation pilot, not a customer. Skipping before
+    // claimed.add leaves the address free, so a pilot that is also a prospect
+    // still shows up on the prospect side, exactly as the two old pages did.
+    if (!isPaid && (row.monthly_limit ?? 0) >= PILOT_LIMIT) continue;
+    const { messages, draft, rowCount } = threadOf(id);
     // Same rule as the previous Clients page: hide keys that never did anything.
     // It reads the raw row count, not the datable messages, so a thread we can
     // display only partially still keeps its owner on the list.
@@ -222,10 +263,16 @@ export function buildContacts(input: BuildInput): Contact[] {
     });
   }
 
+  const emitted = new Set<string>();
+
   for (const p of input.prospects) {
     if (p.status === 'rejete') continue;
     const id = p.contact_email ? p.contact_email.toLowerCase() : '';
     if (id && claimed.has(id)) continue; // already emitted as a client
+    // Two prospect rows may share an address; the first one represents it. The
+    // guard skips empty ids, or every address-less prospect but one would go.
+    if (id && emitted.has(id)) continue;
+    if (id) emitted.add(id);
     const { messages, draft } = id ? threadOf(id) : EMPTY_THREAD;
 
     out.push({
