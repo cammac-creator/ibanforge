@@ -8,6 +8,7 @@ import { ContactList } from './contact-list';
 import { DraftCard } from './draft-card';
 import { SituationBand } from './situation-band';
 import { Thread } from './thread';
+import { TodayRail } from './today-rail';
 
 /**
  * Identity of a draft as displayed. The stored id is derived from the address
@@ -34,10 +35,13 @@ function draftKey(contactId: string, draft: Message): string {
 export function CrmApp({
   contacts,
   situations,
+  sentToday,
 }: {
   contacts: Contact[];
   /** Keyed by Contact.id, one entry per contact, built by the page. */
   situations: Record<string, Situation>;
+  /** Real outbound mails dated today, counted by the page against one clock. */
+  sentToday: number;
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [readLocal, setReadLocal] = useState<Set<string>>(new Set());
@@ -96,7 +100,18 @@ export function CrmApp({
   }, [selectedId, tailCount, composerOpen]);
 
   return (
-    <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[280px_1fr]">
+    <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[170px_260px_1fr]">
+      {/* First column, and a sibling of the thread rather than anything inside
+          it: the day's queue has to stay on screen while the operator moves
+          from contact to contact. Below lg the three columns stack and it
+          comes first, which is the same claim on a phone. */}
+      <TodayRail
+        contacts={view}
+        situations={situations}
+        sentToday={sentToday}
+        selectedId={selectedId}
+        onSelect={open}
+      />
       <ContactList contacts={view} situations={situations} selectedId={selectedId} onSelect={open} />
       <div className="flex min-w-0 max-h-[76vh] flex-col rounded-xl border border-[var(--ink-4)]/60 bg-[var(--ink-2)]/40 p-4">
         {!selected ? (

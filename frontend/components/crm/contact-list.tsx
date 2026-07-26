@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import type { Contact, Situation } from '@/lib/crm/types';
 import { isArchived } from './archived';
+import { dueToday, followupDue } from './buckets';
 
 export type FilterKey = 'today' | 'all' | 'followup' | 'prospects' | 'clients' | 'archived';
 
@@ -10,6 +11,11 @@ export type FilterKey = 'today' | 'all' | 'followup' | 'prospects' | 'clients' |
  * One predicate per filter, used BOTH to count and to select. That is the whole
  * point of this shape: a chip cannot advertise a number the list then fails to
  * show, because there is no second copy of the rule to drift from.
+ *
+ * The two bucket rules come from buckets.ts rather than being spelled out here,
+ * which extends the same guarantee one ring outwards: the day rail's sections
+ * and the page's stat cards read those very functions, so a chip cannot
+ * advertise a number the rail beside it contradicts either.
  *
  * The situation may be missing: the page builds one entry per contact id, so an
  * absent one is a programming error rather than data, and the predicates simply
@@ -20,13 +26,9 @@ const FILTERS: Array<{
   label: string;
   test: (c: Contact, s: Situation | undefined) => boolean;
 }> = [
-  {
-    key: 'today',
-    label: "Aujourd'hui",
-    test: (c, s) => !isArchived(c, s) && (s?.ballInCourt === 'us' || s?.followupDue === true),
-  },
+  { key: 'today', label: "Aujourd'hui", test: dueToday },
   { key: 'all', label: 'Tous', test: (c, s) => !isArchived(c, s) },
-  { key: 'followup', label: 'Relances dues', test: (c, s) => !isArchived(c, s) && s?.followupDue === true },
+  { key: 'followup', label: 'Relances dues', test: followupDue },
   { key: 'prospects', label: 'Prospects', test: (c, s) => !isArchived(c, s) && c.kind === 'prospect' },
   { key: 'clients', label: 'Clients', test: (c, s) => !isArchived(c, s) && c.kind === 'client' },
   { key: 'archived', label: 'Archivés', test: (c, s) => isArchived(c, s) },

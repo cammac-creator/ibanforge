@@ -4,7 +4,9 @@ import { StatCardV2 } from '@/components/dashboard/stat-card-v2';
 import { TopUsersToday, type TopUserToday } from '@/components/dashboard/top-users-today';
 import { enrichEmail } from '@/lib/company-enrichment';
 import { isArchived } from '@/components/crm/archived';
+import { ballWithUs as isBallWithUs, followupDue as isFollowupDue } from '@/components/crm/buckets';
 import { buildContacts, fetchCrmData, INTERNAL_RE, type KeyRow } from '@/lib/crm/build-contacts';
+import { countSentToday } from '@/lib/crm/sent-today';
 import { situationOf } from '@/lib/crm/situation';
 import type { Situation } from '@/lib/crm/types';
 
@@ -123,12 +125,21 @@ export default async function ContactsPage() {
   const todayUtc = now.toISOString().slice(0, 10);
   const top = topUsers(data.keys, data.activityByKey, todayUtc);
 
+  // Same instant again. Counted over the raw messages rather than over the
+  // contacts, so a mail sent to an address buildContacts drops (an internal
+  // one, or a key it treats as an evaluation pilot) still counts against the
+  // day. That errs towards a slightly high number, which is the harmless
+  // direction for a figure whose only job is to say when to stop sending.
+  const sentToday = countSentToday(data.messages, now);
+
   // Every counter below reads the active contacts, never the raw list, so a
-  // card can never advertise a number the matching filter chip refuses to show.
+  // card can never advertise a number the matching filter chip refuses to
+  // show. The two day buckets go one step further and call the very predicates
+  // the chips and the day rail call, so the same figure appears in three
+  // places or in none.
   const active = contacts.filter((c) => !isArchived(c, situations[c.id]));
-  const activeSituations = active.map((c) => situations[c.id]);
-  const ballWithUs = activeSituations.filter((s) => s.ballInCourt === 'us').length;
-  const followupDue = activeSituations.filter((s) => s.followupDue).length;
+  const ballWithUs = contacts.filter((c) => isBallWithUs(c, situations[c.id])).length;
+  const followupDue = contacts.filter((c) => isFollowupDue(c, situations[c.id])).length;
   const prospects = active.filter((c) => c.kind === 'prospect').length;
   const clients = active.filter((c) => c.kind === 'client').length;
 
@@ -197,7 +208,7 @@ export default async function ContactsPage() {
         />
       </div>
 
-      <CrmApp contacts={contacts} situations={situations} />
+      <CrmApp contacts={contacts} situations={situations} sentToday={sentToday} />
     </div>
   );
 }
