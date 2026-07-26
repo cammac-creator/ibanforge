@@ -114,7 +114,7 @@ const TOOLS = [
   {
     name: "check_compliance",
     price: "$0.02",
-    description: "Pre-flight risk triage: sanctions (OFAC/EU/UN), FATF, SEPA Instant, VoP. Returns risk_score 0-100.",
+    description: "Pre-flight risk triage: sanctions (OFAC), FATF, SEPA Instant, VoP. Returns risk_score 0-100.",
   },
 ];
 

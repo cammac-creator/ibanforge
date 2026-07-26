@@ -13,7 +13,7 @@ Official **Model Context Protocol (MCP) server** for [IBANforge](https://ibanfor
 | `batch_validate_iban` | Validate up to 100 IBANs in one call                                                                                     | 0.002 each  |
 | `lookup_bic`          | Lookup BIC/SWIFT against 121k+ BIC entries (39k+ LEI-enriched via GLEIF)                                                  | 0.003       |
 | `lookup_ch_clearing`  | Lookup Swiss BC-Nummer / IID against ~1,200 SIX BankMaster entries — full rail participation (SIC, euroSIC, CHF instant) + QR-IID | 0.003       |
-| `check_compliance`    | Full compliance check: IBAN + sanctions (OFAC/EU/UN) + SEPA Instant + VoP + risk score (0-100)                           | 0.02        |
+| `check_compliance`    | Full compliance check: IBAN + sanctions (OFAC) + SEPA Instant + VoP + risk score (0-100)                                 | 0.02        |
 
 ## Installation
 

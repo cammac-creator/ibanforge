@@ -71,7 +71,7 @@ asyncio.run(main())
 | `validate_batch([iban, ...])` | $0.002 / IBAN | Up to 100 IBANs in one call. CSV cleanup, payout list triage. |
 | `lookup_bic(code)` | $0.003 | Resolve BIC/SWIFT into bank name, country, city, LEI, address. 121k+ BIC entries (38k+ LEI-enriched via GLEIF). |
 | `lookup_ch_clearing(iid)` | $0.003 | Resolve a Swiss BC-Nummer / IID — full SIX BankMaster rail participation + QR-IID, the deepest Swiss clearing data in any public API. |
-| `check_compliance(iban)` | $0.02 | Pre-flight risk triage: sanctions (OFAC/EU/UN), FATF, SEPA Instant, VoP, risk score 0-100, recommended_action ∈ {allow, review, block} |
+| `check_compliance(iban)` | $0.02 | Pre-flight risk triage: sanctions (OFAC), FATF, SEPA Instant, VoP, risk score 0-100, recommended_action ∈ {allow, review, block} |
 | `usage()` | free | Current month quota usage for your key |
 | `health()` | free | API version, BIC count, uptime |
 
