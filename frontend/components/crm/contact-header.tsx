@@ -1,5 +1,59 @@
 import { UsageChart } from '@/components/dashboard/usage-chart';
-import type { Contact } from '@/lib/crm/types';
+import type { Contact, ProspectSourcing } from '@/lib/crm/types';
+import { ProspectStatusBadge, ProspectStatusControl } from './prospect-status';
+
+/** Segment labels, lifted from the prospect page so the wording does not drift. */
+const SEGMENT: Record<string, string> = {
+  'x402-mcp': 'x402 / MCP / agents IA',
+  editeurs: 'Éditeur logiciel CH/EU',
+  'api-concurrentes': 'Migration API concurrente',
+  fintech: 'Fintech / PSP / néobanque',
+};
+
+const CONFIDENCE_COLOR: Record<string, string> = {
+  high: '#22c55e',
+  medium: '#f59e0b',
+  low: '#ef4444',
+};
+
+/**
+ * Which of the qualification blocks have anything to say. The wrapper is gated
+ * on the union of these three rather than on "does sourcing hold any field at
+ * all", so the gate cannot say yes while every block inside says no.
+ *
+ * The first version gated on three of the ten fields, and a prospect qualified
+ * through whatTheyDo and fitReason rendered a name and nothing else. Listing
+ * the ten instead only moved the seam: segment and confidence are shown in the
+ * identity line above, not in this wrapper, so a prospect carrying nothing but
+ * a confidence score opened an empty box. Deriving the gate from the blocks
+ * removes the seam rather than moving it again.
+ */
+function blocksOf(s: ProspectSourcing, hasEmail: boolean) {
+  const fit = !!(s.whatTheyDo || s.fitReason);
+  const signal = !!(s.buyingSignal || s.signalSourceUrl);
+  // The Contact block earns its place only when it adds something the identity
+  // line does not already carry: a named human, a proof of the address, the
+  // hook, the unverified warning, or the reminder never to guess an address.
+  const contact = !!(
+    s.contactName ||
+    s.contactRole ||
+    s.emailSourceUrl ||
+    s.personalizationHook ||
+    s.status === 'a_enrichir' ||
+    !hasEmail
+  );
+  return { fit, signal, contact, any: fit || signal || contact };
+}
+
+function Field({ label, value }: { label: string; value: string | null }) {
+  if (!value) return null;
+  return (
+    <div className="min-w-0">
+      <p className="text-[10px] uppercase tracking-wide text-[var(--fg-3)]">{label}</p>
+      <p className="mt-0.5 wrap-anywhere text-sm text-[var(--fg-2)]">{value}</p>
+    </div>
+  );
+}
 
 /**
  * Identity first, then whatever the nature of the contact actually justifies:
@@ -19,10 +73,8 @@ import type { Contact } from '@/lib/crm/types';
  */
 export function ContactHeader({ contact: c }: { contact: Contact }) {
   const sourcing = c.sourcing;
-  const hasSourcingDetail = !!(
-    sourcing &&
-    (sourcing.buyingSignal || sourcing.personalizationHook || sourcing.signalSourceUrl)
-  );
+  const segment = sourcing?.segment ? (SEGMENT[sourcing.segment] ?? sourcing.segment) : null;
+  const blocks = sourcing ? blocksOf(sourcing, !!c.email) : null;
 
   return (
     <div className="min-w-0 border-b border-[var(--ink-4)]/60 pb-3">
@@ -46,8 +98,18 @@ export function ContactHeader({ contact: c }: { contact: Contact }) {
           <p className="mt-0.5 wrap-anywhere text-xs text-[var(--fg-3)]">
             {c.email || 'pas d’email vérifié'}
             {c.country ? ` · ${c.country}` : ''}
+            {segment ? ` · ${segment}` : ''}
+            {sourcing?.confidence ? (
+              <>
+                {' · '}
+                <span style={{ color: CONFIDENCE_COLOR[sourcing.confidence] ?? '#a1a1aa' }}>
+                  confiance {sourcing.confidence}
+                </span>
+              </>
+            ) : null}
           </p>
         </div>
+        {c.kind === 'prospect' && <ProspectStatusBadge status={c.sourcing.status} />}
         {c.kind === 'client' && (
           // No shrink-0, and this stacks below sm. Measured at a 375px
           // viewport: with shrink-0 the block held its 526px preferred width,
@@ -72,30 +134,88 @@ export function ContactHeader({ contact: c }: { contact: Contact }) {
         )}
       </div>
 
-      {sourcing && hasSourcingDetail && (
-        <div className="mt-3 min-w-0 rounded-lg border border-[var(--ok)]/20 bg-[var(--ok)]/5 px-3 py-2">
-          {sourcing.buyingSignal && (
-            <>
+      {sourcing && blocks?.any && (
+        // Grouping taken from the prospect page rather than invented: why they
+        // are a fit, then the buying signal with its proof, then the human to
+        // write to with the proof of the address. Those last two are what the
+        // operator acts on, so they are not folded away.
+        <div className="mt-3 flex min-w-0 flex-col gap-3">
+          {blocks.fit && (
+            <div className="grid min-w-0 gap-3 sm:grid-cols-2">
+              <Field label="Ce qu'ils font" value={sourcing.whatTheyDo} />
+              <Field label="Pourquoi IBANforge leur sert" value={sourcing.fitReason} />
+            </div>
+          )}
+
+          {blocks.signal && (
+            <div className="min-w-0 rounded-lg border border-[var(--ok)]/20 bg-[var(--ok)]/5 px-3 py-2">
               <p className="text-[10px] uppercase tracking-wide text-[var(--ok)]">Signal d’achat</p>
-              <p className="mt-0.5 wrap-anywhere text-sm text-[var(--fg-1)]">{sourcing.buyingSignal}</p>
-            </>
+              {sourcing.buyingSignal && (
+                <p className="mt-0.5 wrap-anywhere text-sm text-[var(--fg-1)]">{sourcing.buyingSignal}</p>
+              )}
+              {sourcing.signalSourceUrl && (
+                <a
+                  href={sourcing.signalSourceUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="mt-1 inline-block text-[11px] text-[var(--ok)] hover:underline"
+                >
+                  preuve ↗
+                </a>
+              )}
+            </div>
           )}
-          {sourcing.personalizationHook && (
-            <p className="mt-1 wrap-anywhere text-[11px] text-[var(--fg-3)]">
-              <span className="text-[var(--fg-2)]">Accroche :</span> {sourcing.personalizationHook}
-            </p>
-          )}
-          {sourcing.signalSourceUrl && (
-            <a
-              href={sourcing.signalSourceUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="mt-1 inline-block text-[11px] text-[var(--ok)] hover:underline"
-            >
-              preuve ↗
-            </a>
+
+          {blocks.contact && (
+          <div className="min-w-0 rounded-lg border border-[var(--ink-4)] bg-[var(--ink-0)]/50 px-3 py-2">
+            <p className="text-[10px] uppercase tracking-wide text-[var(--fg-3)]">Contact</p>
+            {(sourcing.contactName || sourcing.contactRole) && (
+              <p className="mt-0.5 wrap-anywhere text-sm text-[var(--fg-1)]">
+                {sourcing.contactName || 'nom inconnu'}
+                {sourcing.contactRole ? ` · ${sourcing.contactRole}` : ''}
+              </p>
+            )}
+            {c.email ? (
+              <p className="wrap-anywhere text-xs text-[var(--fg-3)]">
+                {c.email}
+                {sourcing.emailSourceUrl && (
+                  <>
+                    {' · '}
+                    <a
+                      href={sourcing.emailSourceUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-amber-400 hover:underline"
+                    >
+                      source ↗
+                    </a>
+                  </>
+                )}
+                {sourcing.status === 'a_enrichir' && (
+                  <span className="text-amber-400"> · à confirmer (non vérifié)</span>
+                )}
+              </p>
+            ) : (
+              <p className="text-xs text-amber-400">
+                Pas d’email vérifié, à enrichir (on ne devine jamais une adresse).
+              </p>
+            )}
+            {sourcing.personalizationHook && (
+              <p className="mt-1 wrap-anywhere text-[11px] text-[var(--fg-3)]">
+                <span className="text-[var(--fg-2)]">Accroche :</span> {sourcing.personalizationHook}
+              </p>
+            )}
+          </div>
           )}
         </div>
+      )}
+
+      {c.kind === 'prospect' && (
+        <ProspectStatusControl
+          prospectId={c.sourcing.prospectId}
+          status={c.sourcing.status}
+          hasEmail={!!c.email}
+        />
       )}
     </div>
   );
