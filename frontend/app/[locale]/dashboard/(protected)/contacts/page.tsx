@@ -125,7 +125,7 @@ export default async function ContactsPage() {
 
   // Every counter below reads the active contacts, never the raw list, so a
   // card can never advertise a number the matching filter chip refuses to show.
-  const active = contacts.filter((c) => !isArchived(c));
+  const active = contacts.filter((c) => !isArchived(c, situations[c.id]));
   const activeSituations = active.map((c) => situations[c.id]);
   const ballWithUs = activeSituations.filter((s) => s.ballInCourt === 'us').length;
   const followupDue = activeSituations.filter((s) => s.followupDue).length;

@@ -64,7 +64,15 @@ export function ProspectStatusControl({
       // The page this replaces swallowed failures entirely. A silent no-op is
       // the wrong failure here: the operator walks away believing a prospect
       // was rejected while it is still in the list.
-      if (!r.ok) {
+      //
+      // HTTP 200 is not enough. The endpoint answers { updated: r.changes },
+      // so an id that matches no row comes back 200 with updated 0: the
+      // refresh would run, nothing would change, and nothing would be said.
+      // That is precisely the case this check exists for.
+      const body: unknown = await r.json().catch(() => null);
+      const updated =
+        body && typeof body === 'object' && 'updated' in body ? (body as { updated: unknown }).updated : undefined;
+      if (!r.ok || updated === 0) {
         setFailed(true);
         return;
       }
@@ -108,8 +116,10 @@ export function ProspectStatusControl({
           marquer à mailer
         </button>
       )}
+      {/* alert, not status: this is an error raised by something the operator
+          just did, so it should not wait for a pause in speech. */}
       {failed && (
-        <span role="status" className="text-red-400">
+        <span role="alert" className="text-red-400">
           échec, statut inchangé
         </span>
       )}
