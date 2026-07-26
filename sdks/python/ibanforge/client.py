@@ -164,7 +164,7 @@ class IBANforge:
         """Pre-flight compliance triage on an IBAN ($0.02 / call with API key).
 
         Returns the validate result plus a nested ``compliance`` block:
-        sanctions screening (OFAC/EU/UN), FATF jurisdiction flag, SEPA Instant
+        sanctions screening (OFAC), FATF jurisdiction flag, SEPA Instant
         reachability, VoP participant status, and a risk score 0-100. Read it at
         ``out["compliance"]["risk_score"]`` / ``["risk_level"]`` — there is no
         top-level ``risk_score`` or ``recommended_action`` field.

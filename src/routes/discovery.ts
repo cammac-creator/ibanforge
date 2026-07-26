@@ -39,7 +39,7 @@ const PAID_ENDPOINTS: PricedEndpoint[] = [
     method: 'POST',
     path: '/v1/iban/compliance',
     price_usdc: 0.02,
-    description: 'Pre-payout screening — vet a counterparty IBAN before you send funds: validation + sanctions screening (OFAC/EU/UN) + SEPA Instant reachability + VoP participant + risk score (0-100)',
+    description: 'Pre-payout screening — vet a counterparty IBAN before you send funds: validation + sanctions screening (OFAC) + SEPA Instant reachability + VoP participant + risk score (0-100)',
   },
   {
     method: 'GET',

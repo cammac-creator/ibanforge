@@ -298,7 +298,7 @@ curl -s -X POST https://api.ibanforge.com/v1/iban/compliance \\
   -d '{"iban":"GB29NWBK60161331926819"}'
 \`\`\`
 
-Response includes a \`compliance\` object with: \`risk_score\` (0-100), \`risk_level\` ("low"/"medium"/"elevated"/"high"/"critical"), \`sanctions\` (OFAC/EU/UN matched lists + FATF status), \`reachability\` (SEPA Instant/SCT/SDD), \`vop\` participant status, and \`flags\` (e.g. sanctioned_country, fatf_grey_list, emi_issuer, no_vop) — plus the full validate enrichment and a \`meta\` provenance block.
+Response includes a \`compliance\` object with: \`risk_score\` (0-100), \`risk_level\` ("low"/"medium"/"elevated"/"high"/"critical"), \`sanctions\` (OFAC matched list + FATF status), \`reachability\` (SEPA Instant/SCT/SDD), \`vop\` participant status, and \`flags\` (e.g. sanctioned_country, fatf_grey_list, emi_issuer, no_vop) — plus the full validate enrichment and a \`meta\` provenance block.
 
 **Note for unauthenticated probes**: any of the above paid endpoints called WITHOUT \`Authorization\` or x402 \`X-PAYMENT\` header returns HTTP 402 with a discovery envelope (price, payTo, asset, network, outputSchema). This is by design and lets x402-aware clients auto-pay. Pass \`{}\` as body on POSTs — it WILL return 402, not 400.
 
