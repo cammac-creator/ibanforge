@@ -84,7 +84,7 @@
       "4": {
         "badge": "Sanctions + FATF",
         "title": "Compliance risk score",
-        "description": "Bank-BIC sanctions screening (OFAC/EU/UN/SECO) + FATF + SEPA + VoP reachability, distilled into a 0-100 risk score."
+        "description": "Bank-BIC sanctions screening (OFAC) + FATF + SEPA + VoP reachability, distilled into a 0-100 risk score."
       },
       "5": {
         "badge": "x402 — agent payments",
@@ -153,7 +153,7 @@
       "dataValue": "GLEIF · SIX BankMaster · SWIFT directory · Bundesbank · EBA STEP2 · NBP",
       "dataNote": "Refreshed monthly",
       "sanctionsLabel": "Sanctions screening",
-      "sanctionsValue": "OFAC · EU · UN · SECO + FATF",
+      "sanctionsValue": "OFAC + FATF",
       "sanctionsNote": "Bank-level (BIC8) screening",
       "madeLabel": "Provenance",
       "madeNote": "Swiss clearing data straight from SIX",
@@ -944,7 +944,7 @@
         },
         {
           "title": "Compliance pre-check built in",
-          "body": "Sanctions screening (OFAC / EU / UN), FATF lists, SEPA reachability and VoP-requirement data, risk score 0–100 — one endpoint to triage before a payment leaves your product.",
+          "body": "Sanctions screening (OFAC), FATF lists, SEPA reachability and VoP-requirement data, risk score 0–100 — one endpoint to triage before a payment leaves your product.",
           "link": "Compliance docs"
         },
         {
@@ -1021,7 +1021,7 @@
         },
         "compliance": {
           "label": "Compliance pre-check (sanctions, FATF, VoP requirement)",
-          "ibanforge": "One endpoint, $0.02: OFAC/EU/UN bank screening, FATF lists, SEPA/VoP data, 0–100 risk score",
+          "ibanforge": "One endpoint, $0.02: OFAC bank screening, FATF lists, SEPA/VoP data, 0–100 risk score",
           "ibancom": "Separate products (BAV/VoP from €2,000 per 2,500 verifications)",
           "ibanapi": "No",
           "libs": "No"

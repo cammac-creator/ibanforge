@@ -84,7 +84,7 @@
       "4": {
         "badge": "Sanktionen + FATF",
         "title": "Compliance-Risikoscore",
-        "description": "Sanktions-Screening auf Bank-BIC-Ebene (OFAC/EU/UN/SECO) + FATF + SEPA + VoP, destilliert zu einem 0-100-Risikoscore."
+        "description": "Sanktions-Screening auf Bank-BIC-Ebene (OFAC) + FATF + SEPA + VoP, destilliert zu einem 0-100-Risikoscore."
       },
       "5": {
         "badge": "x402 — Agenten-Zahlungen",
@@ -153,7 +153,7 @@
       "dataValue": "GLEIF · SIX BankMaster · SWIFT-Verzeichnis · Bundesbank · EBA STEP2 · NBP",
       "dataNote": "Monatlich aktualisiert",
       "sanctionsLabel": "Sanktionsprüfung",
-      "sanctionsValue": "OFAC · EU · UN · SECO + FATF",
+      "sanctionsValue": "OFAC + FATF",
       "sanctionsNote": "Auf Bankebene (BIC8)",
       "madeLabel": "Herkunft",
       "madeNote": "Schweizer Clearingdaten direkt von SIX",
@@ -944,7 +944,7 @@
         },
         {
           "title": "Compliance-Vorprüfung eingebaut",
-          "body": "Sanktionsprüfung (OFAC / EU / UN), FATF-Listen, SEPA-Erreichbarkeit und VoP-Pflichtdaten, Risikoscore 0–100 — ein Endpunkt zur Triage, bevor eine Zahlung Ihr Produkt verlässt.",
+          "body": "Sanktionsprüfung (OFAC), FATF-Listen, SEPA-Erreichbarkeit und VoP-Pflichtdaten, Risikoscore 0–100 — ein Endpunkt zur Triage, bevor eine Zahlung Ihr Produkt verlässt.",
           "link": "Compliance-Doku"
         },
         {
@@ -1021,7 +1021,7 @@
         },
         "compliance": {
           "label": "Compliance-Vorprüfung (Sanktionen, FATF, VoP-Pflicht)",
-          "ibanforge": "Ein Endpunkt, 0,02 $: OFAC/EU/UN-Bankprüfung, FATF-Listen, SEPA/VoP-Daten, Score 0–100",
+          "ibanforge": "Ein Endpunkt, 0,02 $: OFAC-Bankprüfung, FATF-Listen, SEPA/VoP-Daten, Score 0–100",
           "ibancom": "Separate Produkte (BAV/VoP ab 2.000 € je 2.500 Prüfungen)",
           "ibanapi": "Nein",
           "libs": "Nein"

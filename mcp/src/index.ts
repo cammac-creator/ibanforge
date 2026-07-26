@@ -315,7 +315,7 @@ const TOOLS: Tool[] = [
       'or needs a numeric risk score for an internal payment-approval workflow. ' +
       'NOT A REGULATED AML/CFT PRODUCT — informational triage only. For regulated screening use Refinitiv, Acuris, or ComplyAdvantage. ' +
       'SCOPE: sanctions screening is at the BANK (BIC8) level only — it does NOT screen the beneficiary/account-holder name. ' +
-      'CHECKS: IBAN validity + bank sanctions (OFAC, EU, UN, SECO) + FATF grey/black list + ' +
+      'CHECKS: IBAN validity + bank sanctions (OFAC) + FATF grey/black list + ' +
       'SEPA Instant reachability + VoP (EU 2024/886) participant flag. ' +
       'RETURNS: the validate_iban fields PLUS a nested compliance { sanctions, reachability, vop, risk_score (0-100), risk_level, flags[] }. ' +
       'COST: 0.02 USDC.',

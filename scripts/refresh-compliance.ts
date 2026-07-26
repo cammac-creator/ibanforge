@@ -513,7 +513,13 @@ function insertMetadata(db: Database.Database): void {
   const runMeta = db.transaction(() => {
     insertMeta.run('last_refresh', new Date().toISOString());
     insertMeta.run('version', '1.0.0');
-    insertMeta.run('sources', 'OFAC,EU,UN,SECO,FATF,EPC-SCT,EPC-SDD,EPC-SCT_INST');
+    // This string is served verbatim in meta.sources on every paid
+    // /v1/iban/compliance response — it is the provenance field, the one an
+    // auditor reads. It listed UN and SECO, which contribute zero rows: the
+    // SECO fetch below exists but yields nothing, and there is no UN feed at
+    // all. Only sources that actually put rows in this database belong here.
+    // Audit 2026-07-26.
+    insertMeta.run('sources', 'OFAC,EU,FATF,EPC-SCT,EPC-SDD,EPC-SCT_INST');
     insertMeta.run('fatf_as_of', FATF_AS_OF);
   });
 
