@@ -34,10 +34,20 @@ import type { Contact, Situation } from '@/lib/crm/types';
 export function ComposerDock({
   contact: c,
   situation: s,
+  open,
+  onOpenChange,
 }: {
   contact: Contact;
   /** Undefined only if the page failed to derive one; the goal line is dropped then. */
   situation?: Situation;
+  /**
+   * Folded or unfolded. Controlled by the panel rather than held here, because
+   * folding changes how tall the thread is and the panel has to re-anchor it on
+   * the newest message afterwards, which it can only do in an effect that
+   * depends on this.
+   */
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }) {
   const router = useRouter();
   const [subject, setSubject] = useState('');
@@ -45,17 +55,15 @@ export function ComposerDock({
   const [fr, setFr] = useState<string | null>(null);
   const [busy, setBusy] = useState<false | 'gen' | 'send' | 'draft'>(false);
   const [msg, setMsg] = useState<{ text: string; bad: boolean } | null>(null);
-  /**
-   * The resting state, and it is not decoration.
-   *
-   * The panel is capped at 76vh and the thread is the flex child that absorbs
-   * what is left. Measured with the form always open: 242px of dock against a
-   * 370px client header left the thread 0px at 1100x900 and at 1100x700, i.e.
-   * the reader disappeared to make room for the writer. Folded, the dock is
-   * about 40px and the thread keeps its space until the operator actually
-   * writes. This is the "repos" state the plan named and its code omitted.
+  /*
+   * The resting state, and it is not decoration. The panel is capped at 76vh
+   * and the thread is the flex child that absorbs what is left, so a form that
+   * is always open takes the reader away to make room for the writer: measured
+   * at 242px of dock against a 370px header, the thread was 0px at 1100x900.
+   * Folded the dock is 43px. This is the "repos" state the plan named and its
+   * code omitted. The state itself lives in the panel, see the prop above.
    */
-  const [open, setOpen] = useState(false);
+  const setOpen = onOpenChange;
 
   /** A prospect never contacted starts from its pre-written mail. */
   function loadReadyMail() {
@@ -216,7 +224,15 @@ export function ComposerDock({
   const canSaveDraft = !!c.email && filled && busy === false;
 
   return (
-    <div className="mt-3 shrink-0 border-t border-[var(--ink-4)]/60 pt-3">
+    // max-h-[30vh]: what the thread gets is what this dock leaves, and open it
+    // is a fixed 265px whatever the window, so on a short one it took the last
+    // of the thread. Capped, it scrolls inside itself instead. 30 rather than
+    // 40 because the panel's own padding and margins eat 68px that a naive
+    // budget forgets: at 40vh the thread was still measured at 0 on a 480px
+    // window. At 30vh the dock is untouched at 900px tall (0.3 x 900 is above
+    // its natural 265) and every shorter window gains. Folded the bar is 43px,
+    // far under the cap, so the resting state never sees this.
+    <div className="mt-3 max-h-[30vh] shrink-0 overflow-y-auto border-t border-[var(--ink-4)]/60 pt-3">
       {!c.email ? (
         // Deliberately not a second copy of the header's sentence, which
         // already says the address is missing. This one says what it costs
