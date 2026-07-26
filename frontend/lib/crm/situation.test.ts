@@ -21,6 +21,9 @@ describe('situationOf', () => {
     expect(s.nextAction).toBe('first_mail');
     expect(s.silenceDays).toBeNull();
     expect(s.messageCount).toBe(0);
+    expect(s.firstContactAt).toBeNull();
+    expect(s.hasEverReplied).toBe(false);
+    expect(s.followupDue).toBe(false);
   });
 
   it('puts the ball in our court when the last message is inbound', () => {
@@ -66,6 +69,13 @@ describe('situationOf', () => {
     expect(s.nextAction).toBe('followup');
   });
 
+  it('reports no silence at all for a message dated in the future', () => {
+    const s = situationOf([msg('out', '2026-07-25T14:00')], TODAY);
+    expect(s.silenceDays).toBe(0);
+    expect(s.followupDue).toBe(false);
+    expect(s.nextAction).toBe('wait');
+  });
+
   it('prefers followup over firm_offer when a past replier went quiet', () => {
     const s = situationOf(
       [msg('out', '2026-06-20T10:00'), msg('in', '2026-06-21T10:00'), msg('out', '2026-07-05T10:00')],
@@ -107,6 +117,18 @@ describe('situationOf', () => {
     const s = situationOf([msg('in', '2026-07-24T10:00')], TODAY);
     expect(s.firstContactAt).toBeNull();
     expect(s.hasEverReplied).toBe(true);
+    expect(s.nextAction).toBe('reply');
+  });
+
+  it('orders on the instant, not on the raw string', () => {
+    // Two absolute instants written in different formats: the outbound happened an
+    // hour before the inbound, yet its string sorts after it. Both carry an offset,
+    // so this holds in every timezone.
+    const s = situationOf(
+      [msg('out', '2026-07-21T01:00+03:00'), msg('in', '2026-07-20T23:00Z')],
+      TODAY,
+    );
+    expect(s.ballInCourt).toBe('us');
     expect(s.nextAction).toBe('reply');
   });
 

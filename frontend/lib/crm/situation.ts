@@ -11,6 +11,12 @@ function parseDate(raw: string | null | undefined): Date | null {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
+/** A message we could place in time, paired with the instant it was placed at. */
+interface DatedMessage {
+  message: Message;
+  at: Date;
+}
+
 /**
  * Derive the state of a conversation from its messages alone. Pure: no network,
  * no clock beyond the `today` argument, so it is deterministic under test.
@@ -20,15 +26,19 @@ function parseDate(raw: string | null | undefined): Date | null {
  * excluded too, so every field here describes the datable correspondence only.
  */
 export function situationOf(messages: Message[], today: Date = new Date()): Situation {
-  // filter() already hands back a fresh array, so sorting it in place leaves the
-  // caller's messages untouched.
+  // Each step hands back a fresh array, so sorting the last one in place leaves
+  // the caller's messages untouched.
   const real = messages
     .filter((m) => m.direction === 'in' || m.direction === 'out')
     // A message with no usable date cannot be placed in the thread, so it cannot
     // decide who holds the ball, when the silence started, or when contact began.
     // Dropping it degrades to "we know less", where keeping it would invert the answer.
-    .filter((m) => parseDate(m.msg_date) !== null)
-    .sort((a, b) => (a.msg_date ?? '').localeCompare(b.msg_date ?? ''));
+    .map((m) => ({ message: m, at: parseDate(m.msg_date) }))
+    .filter((m): m is DatedMessage => m.at !== null)
+    // Ordered on the instant, never on the raw string. String order is only
+    // chronological while every row shares one date format, which the API does not
+    // enforce, and localeCompare would additionally depend on the runtime locale.
+    .sort((a, b) => a.at.getTime() - b.at.getTime());
 
   if (real.length === 0) {
     return {
@@ -43,18 +53,15 @@ export function situationOf(messages: Message[], today: Date = new Date()): Situ
   }
 
   const last = real[real.length - 1];
-  const ballInCourt: Situation['ballInCourt'] = last.direction === 'in' ? 'us' : 'them';
-  const hasEverReplied = real.some((m) => m.direction === 'in');
-  const firstContactAt = real.find((m) => m.direction === 'out')?.msg_date ?? null;
+  const ballInCourt: Situation['ballInCourt'] = last.message.direction === 'in' ? 'us' : 'them';
+  const hasEverReplied = real.some((m) => m.message.direction === 'in');
+  const firstContactAt = real.find((m) => m.message.direction === 'out')?.message.msg_date ?? null;
 
-  // Undatable messages are already gone, so `lastDate` is never null here; the
-  // fallback exists to satisfy the type, not to describe a reachable state.
-  const lastDate = parseDate(last.msg_date);
-  const silenceDays = lastDate ? Math.floor((today.getTime() - lastDate.getTime()) / DAY_MS) : null;
+  // Clamped at zero: a message dated in the future is not a negative silence, and
+  // the banner prints this number as it stands.
+  const silenceDays = Math.max(0, Math.floor((today.getTime() - last.at.getTime()) / DAY_MS));
 
-  // Same: the null check is what lets TypeScript compare below.
-  const followupDue =
-    ballInCourt === 'them' && silenceDays !== null && silenceDays > FOLLOWUP_DAYS;
+  const followupDue = ballInCourt === 'them' && silenceDays > FOLLOWUP_DAYS;
 
   // Order matters — see the plan. Without it, followup and firm_offer overlap.
   let nextAction: NextAction;
