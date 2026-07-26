@@ -515,8 +515,11 @@ import { describe, it, expect } from 'vitest';
 import { situationOf } from './situation';
 import type { Message } from './types';
 
-const TODAY = new Date('2026-07-25T12:00:00Z');
-const msg = (direction: Message['direction'], date: string): Message => ({
+// Offset-free on purpose, like the msg_date values the API stores. Both operands
+// of every subtraction below are parsed in the runner's zone, so the local offset
+// cancels and the expected day counts hold in any timezone.
+const TODAY = new Date('2026-07-25T12:00:00');
+const msg = (direction: Message['direction'], date: string | null): Message => ({
   direction,
   msg_date: date,
   subject: 's',
@@ -531,12 +534,23 @@ describe('situationOf', () => {
     expect(s.nextAction).toBe('first_mail');
     expect(s.silenceDays).toBeNull();
     expect(s.messageCount).toBe(0);
+    expect(s.firstContactAt).toBeNull();
+    expect(s.hasEverReplied).toBe(false);
+    expect(s.followupDue).toBe(false);
   });
 
   it('puts the ball in our court when the last message is inbound', () => {
     const s = situationOf([msg('out', '2026-07-20T10:00'), msg('in', '2026-07-21T09:00')], TODAY);
     expect(s.ballInCourt).toBe('us');
     expect(s.silenceDays).toBe(4);
+    expect(s.nextAction).toBe('reply');
+  });
+
+  it('never calls a followup due while the ball is in our court', () => {
+    const s = situationOf([msg('out', '2026-06-01T10:00'), msg('in', '2026-06-02T10:00')], TODAY);
+    expect(s.ballInCourt).toBe('us');
+    expect(s.silenceDays).toBe(53);
+    expect(s.followupDue).toBe(false);
     expect(s.nextAction).toBe('reply');
   });
 
@@ -550,6 +564,27 @@ describe('situationOf', () => {
 
   it('does not mark a followup due inside the 10 day window', () => {
     const s = situationOf([msg('out', '2026-07-20T10:00')], TODAY);
+    expect(s.followupDue).toBe(false);
+    expect(s.nextAction).toBe('wait');
+  });
+
+  it('leaves a followup undue at exactly 10 days of silence', () => {
+    const s = situationOf([msg('out', '2026-07-15T12:00')], TODAY);
+    expect(s.silenceDays).toBe(10);
+    expect(s.followupDue).toBe(false);
+    expect(s.nextAction).toBe('wait');
+  });
+
+  it('makes a followup due at 11 days of silence', () => {
+    const s = situationOf([msg('out', '2026-07-14T12:00')], TODAY);
+    expect(s.silenceDays).toBe(11);
+    expect(s.followupDue).toBe(true);
+    expect(s.nextAction).toBe('followup');
+  });
+
+  it('reports no silence at all for a message dated in the future', () => {
+    const s = situationOf([msg('out', '2026-07-25T14:00')], TODAY);
+    expect(s.silenceDays).toBe(0);
     expect(s.followupDue).toBe(false);
     expect(s.nextAction).toBe('wait');
   });
@@ -586,10 +621,65 @@ describe('situationOf', () => {
     expect(s.firstContactAt).toBe('2026-07-01T10:00');
   });
 
-  it('does not compute silence from a malformed date', () => {
-    const s = situationOf([{ ...msg('out', 'not-a-date') }], TODAY);
+  it('reports the first outbound as first contact even when they wrote first', () => {
+    const s = situationOf([msg('in', '2026-07-01T10:00'), msg('out', '2026-07-02T10:00')], TODAY);
+    expect(s.firstContactAt).toBe('2026-07-02T10:00');
+  });
+
+  it('has no first contact when we have never written', () => {
+    const s = situationOf([msg('in', '2026-07-24T10:00')], TODAY);
+    expect(s.firstContactAt).toBeNull();
+    expect(s.hasEverReplied).toBe(true);
+    expect(s.nextAction).toBe('reply');
+  });
+
+  it('orders on the instant, not on the raw string', () => {
+    // Two absolute instants written in different formats: the outbound happened an
+    // hour before the inbound, yet its string sorts after it. Both carry an offset,
+    // so this holds in every timezone.
+    const s = situationOf(
+      [msg('out', '2026-07-21T01:00+03:00'), msg('in', '2026-07-20T23:00Z')],
+      TODAY,
+    );
+    expect(s.ballInCourt).toBe('us');
+    expect(s.nextAction).toBe('reply');
+  });
+
+  it('sorts the thread by date without mutating the caller array', () => {
+    const input = [msg('in', '2026-07-21T09:00'), msg('out', '2026-07-20T10:00')];
+    const s = situationOf(input, TODAY);
+    expect(s.ballInCourt).toBe('us');
+    expect(s.silenceDays).toBe(4);
+    expect(s.nextAction).toBe('reply');
+    expect(input[0].msg_date).toBe('2026-07-21T09:00');
+  });
+
+  it('treats a thread of only undatable messages as no thread at all', () => {
+    const s = situationOf([msg('out', 'not-a-date')], TODAY);
+    expect(s.ballInCourt).toBe('none');
     expect(s.silenceDays).toBeNull();
     expect(s.followupDue).toBe(false);
+    expect(s.messageCount).toBe(0);
+    expect(s.nextAction).toBe('first_mail');
+  });
+
+  it('drops an undatable message instead of letting it decide who holds the ball', () => {
+    const s = situationOf([msg('in', '2026-07-01T10:00'), msg('out', 'not-a-date')], TODAY);
+    expect(s.ballInCourt).toBe('us');
+    expect(s.silenceDays).toBe(24);
+    expect(s.messageCount).toBe(1);
+    expect(s.nextAction).toBe('reply');
+  });
+
+  it('does not let a message with no date blank out the first contact', () => {
+    const s = situationOf(
+      [msg('out', '2026-06-01T10:00'), msg('in', '2026-06-02T10:00'), msg('out', null)],
+      TODAY,
+    );
+    expect(s.firstContactAt).toBe('2026-06-01T10:00');
+    expect(s.messageCount).toBe(2);
+    expect(s.ballInCourt).toBe('us');
+    expect(s.silenceDays).toBe(53);
   });
 });
 ```
@@ -617,18 +707,34 @@ function parseDate(raw: string | null | undefined): Date | null {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
+/** A message we could place in time, paired with the instant it was placed at. */
+interface DatedMessage {
+  message: Message;
+  at: Date;
+}
+
 /**
  * Derive the state of a conversation from its messages alone. Pure: no network,
  * no clock beyond the `today` argument, so it is deterministic under test.
  *
  * Drafts are excluded from every computation: an unsent draft changes neither
- * who holds the ball nor how long the silence has run.
+ * who holds the ball nor how long the silence has run. Undatable messages are
+ * excluded too, so every field here describes the datable correspondence only.
  */
 export function situationOf(messages: Message[], today: Date = new Date()): Situation {
+  // Each step hands back a fresh array, so sorting the last one in place leaves
+  // the caller's messages untouched.
   const real = messages
     .filter((m) => m.direction === 'in' || m.direction === 'out')
-    .slice()
-    .sort((a, b) => (a.msg_date ?? '').localeCompare(b.msg_date ?? ''));
+    // A message with no usable date cannot be placed in the thread, so it cannot
+    // decide who holds the ball, when the silence started, or when contact began.
+    // Dropping it degrades to "we know less", where keeping it would invert the answer.
+    .map((m) => ({ message: m, at: parseDate(m.msg_date) }))
+    .filter((m): m is DatedMessage => m.at !== null)
+    // Ordered on the instant, never on the raw string. String order is only
+    // chronological while every row shares one date format, which the API does not
+    // enforce, and localeCompare would additionally depend on the runtime locale.
+    .sort((a, b) => a.at.getTime() - b.at.getTime());
 
   if (real.length === 0) {
     return {
@@ -643,15 +749,15 @@ export function situationOf(messages: Message[], today: Date = new Date()): Situ
   }
 
   const last = real[real.length - 1];
-  const ballInCourt: Situation['ballInCourt'] = last.direction === 'in' ? 'us' : 'them';
-  const hasEverReplied = real.some((m) => m.direction === 'in');
-  const firstContactAt = real.find((m) => m.direction === 'out')?.msg_date ?? null;
+  const ballInCourt: Situation['ballInCourt'] = last.message.direction === 'in' ? 'us' : 'them';
+  const hasEverReplied = real.some((m) => m.message.direction === 'in');
+  const firstContactAt = real.find((m) => m.message.direction === 'out')?.message.msg_date ?? null;
 
-  const lastDate = parseDate(last.msg_date);
-  const silenceDays = lastDate ? Math.floor((today.getTime() - lastDate.getTime()) / DAY_MS) : null;
+  // Clamped at zero: a message dated in the future is not a negative silence, and
+  // the banner prints this number as it stands.
+  const silenceDays = Math.max(0, Math.floor((today.getTime() - last.at.getTime()) / DAY_MS));
 
-  const followupDue =
-    ballInCourt === 'them' && silenceDays !== null && silenceDays > FOLLOWUP_DAYS;
+  const followupDue = ballInCourt === 'them' && silenceDays > FOLLOWUP_DAYS;
 
   // Order matters — see the plan. Without it, followup and firm_offer overlap.
   let nextAction: NextAction;
@@ -684,7 +790,7 @@ export const NEXT_ACTION_LABEL: Record<NextAction, string> = {
 - [ ] **Step 4: Lancer les tests pour les voir passer**
 
 Run: `cd ~/ibanforge/frontend && npm test -- situation`
-Expected: PASS, 9 tests.
+Expected: PASS, 19 tests.
 
 - [ ] **Step 5: Commit**
 
@@ -1086,7 +1192,7 @@ export async function fetchCrmData(): Promise<BuildInput | null> {
 - [ ] **Step 4: Lancer les tests pour les voir passer**
 
 Run: `cd ~/ibanforge/frontend && npm test -- build-contacts`
-Expected: PASS, 9 tests.
+Expected: PASS, 19 tests.
 
 - [ ] **Step 5: Faire pointer `thread-unread` sur les nouveaux types**
 
@@ -2712,7 +2818,7 @@ Ouvrir un contact en relance due, cliquer « Générer » : deux ou trois angles
 
 ## Vérification finale
 
-- [ ] `cd ~/ibanforge/frontend && npm test` — 44 tests au vert (quoted 12, situation 9, build-contacts 9, sent-today 3, guardrails 11)
+- [ ] `cd ~/ibanforge/frontend && npm test` — 54 tests au vert (quoted 12, situation 19, build-contacts 9, sent-today 3, guardrails 11)
 - [ ] `npm run build` réussit
 - [ ] `grep -rn "crm-workspace\|prospects-workspace" frontend/app frontend/components frontend/lib` ne renvoie rien
 - [ ] `/dashboard/customers` et `/dashboard/prospects` redirigent vers `/dashboard/contacts`
