@@ -822,8 +822,21 @@ git commit -m "feat(crm): derive ball-in-court, silence and next action from a t
 `frontend/lib/crm/build-contacts.test.ts` :
 
 ```ts
-import { describe, it, expect } from 'vitest';
-import { buildContacts, type BuildInput } from './build-contacts';
+import { describe, expect, it } from 'vitest';
+import {
+  buildContacts,
+  INTERNAL_RE,
+  type BuildInput,
+  type KeyRow,
+  type MessageRow,
+  type ProspectRow,
+} from './build-contacts';
+import type { Contact } from './types';
+
+// example.net is reserved for documentation (RFC 2606) like example.com, but
+// INTERNAL_RE deliberately swallows example.com, so any fixture that must reach
+// the output uses example.net. Local parts avoid "test-", "-test", "smoke" and
+// "audit", which the same regex matches anywhere in an address.
 
 const base: BuildInput = {
   keys: [],
@@ -834,7 +847,7 @@ const base: BuildInput = {
   months: ['2026-06', '2026-07'],
 };
 
-const keyRow = (email: string, over: Record<string, unknown> = {}) => ({
+const keyRow = (email: string, over: Partial<KeyRow> = {}): KeyRow => ({
   key_prefix: `ifk_${email.split('@')[0]}`,
   email,
   monthly_limit: 200,
@@ -851,7 +864,7 @@ const keyRow = (email: string, over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
-const prospectRow = (id: string, email: string | null, over: Record<string, unknown> = {}) => ({
+const prospectRow = (id: string, email: string | null, over: Partial<ProspectRow> = {}): ProspectRow => ({
   id,
   company: `Société ${id}`,
   segment: 'editeurs',
@@ -877,78 +890,609 @@ const prospectRow = (id: string, email: string | null, over: Record<string, unkn
   ...over,
 });
 
+const msgRow = (email: string, over: Partial<MessageRow> = {}): MessageRow => ({
+  customer_email: email,
+  direction: 'out',
+  msg_date: '2026-07-01T10:00',
+  subject: null,
+  snippet: null,
+  counterparty: null,
+  ...over,
+});
+
+/** Narrow to a client contact, failing loudly rather than silently skipping. */
+function asClient(contact: Contact) {
+  if (contact.kind !== 'client') throw new Error(`expected a client contact, got ${contact.kind}`);
+  return contact;
+}
+
+describe('INTERNAL_RE', () => {
+  it('matches internal and documentation addresses, not a real prospect domain', () => {
+    expect(INTERNAL_RE.test('someone@ibanforge.com')).toBe(true);
+    expect(INTERNAL_RE.test('someone@example.com')).toBe(true);
+    expect(INTERNAL_RE.test('SOMEONE@IBANFORGE.COM')).toBe(true);
+    expect(INTERNAL_RE.test('alpha@example.net')).toBe(false);
+  });
+});
+
 describe('buildContacts', () => {
   it('produces one client contact per meaningful key', () => {
-    const out = buildContacts({ ...base, keys: [keyRow('alpha@example.com')] });
+    const out = buildContacts({ ...base, keys: [keyRow('alpha@example.net')] });
     expect(out).toHaveLength(1);
     expect(out[0].kind).toBe('client');
-    expect(out[0].id).toBe('alpha@example.com');
+    expect(out[0].id).toBe('alpha@example.net');
+  });
+
+  it('carries the key, the usage series and the per-key activity onto the client', () => {
+    const out = buildContacts({
+      ...base,
+      keys: [keyRow('alpha@example.net', { credits_total: 1000, credits_remaining: 400 })],
+      activityByKey: {
+        ifk_alpha: { endpoints: [{ path: '/v1/iban', count: 7 }], days: [{ day: '2026-07-01', count: 7 }] },
+      },
+    });
+    const client = asClient(out[0]);
+    expect(client.apiKey).toEqual({
+      keyPrefix: 'ifk_alpha',
+      paid: true,
+      creditsTotal: 1000,
+      creditsRemaining: 400,
+      monthlyLimit: 200,
+      usedAllTime: 5,
+      lastActiveMonth: '2026-07',
+    });
+    expect(client.usage.series).toEqual([1, 2]);
+    expect(client.usage.months).toEqual(['2026-06', '2026-07']);
+    expect(client.usage.days).toEqual([{ day: '2026-07-01', count: 7 }]);
+    expect(client.usage.endpoints).toEqual([{ path: '/v1/iban', count: 7 }]);
   });
 
   it('drops internal and test accounts', () => {
     const out = buildContacts({
       ...base,
-      keys: [keyRow('someone@ibanforge.com'), keyRow('test-buyer@example.com')],
+      keys: [keyRow('someone@ibanforge.com'), keyRow('test-buyer@example.net'), keyRow('doc@example.com')],
     });
     expect(out).toHaveLength(0);
   });
 
   it('drops a key with no usage, no payment and no mail', () => {
-    const out = buildContacts({ ...base, keys: [keyRow('quiet@example.com', { used_all_time: 0 })] });
+    const out = buildContacts({ ...base, keys: [keyRow('quiet@example.net', { used_all_time: 0 })] });
     expect(out).toHaveLength(0);
   });
 
+  it('keeps a key with no usage that was paid for', () => {
+    const out = buildContacts({
+      ...base,
+      keys: [keyRow('quiet@example.net', { used_all_time: 0, credits_total: 1000, credits_remaining: 1000 })],
+    });
+    expect(out).toHaveLength(1);
+  });
+
+  it('keeps a key with no usage that we have a thread with', () => {
+    const out = buildContacts({
+      ...base,
+      keys: [keyRow('quiet@example.net', { used_all_time: 0 })],
+      messages: [msgRow('quiet@example.net')],
+    });
+    expect(out).toHaveLength(1);
+    expect(out[0].messages).toHaveLength(1);
+  });
+
+  it('keeps a key with no usage that only has a draft waiting', () => {
+    const out = buildContacts({
+      ...base,
+      keys: [keyRow('quiet@example.net', { used_all_time: 0 })],
+      messages: [msgRow('quiet@example.net', { direction: 'draft', subject: 'brouillon' })],
+    });
+    expect(out).toHaveLength(1);
+    expect(out[0].messages).toHaveLength(0);
+    expect(out[0].draft?.subject).toBe('brouillon');
+  });
+
   it('produces a prospect contact for a prospect with no key', () => {
-    const out = buildContacts({ ...base, prospects: [prospectRow('p1', 'lead@example.com')] });
+    const out = buildContacts({ ...base, prospects: [prospectRow('p1', 'lead@example.net')] });
     expect(out).toHaveLength(1);
     expect(out[0].kind).toBe('prospect');
+    expect(out[0].company).toBe('Société p1');
   });
 
   it('merges a prospect who became a client into a single client contact', () => {
     const out = buildContacts({
       ...base,
-      keys: [keyRow('both@example.com')],
-      prospects: [prospectRow('p2', 'both@example.com')],
+      keys: [keyRow('both@example.net')],
+      prospects: [prospectRow('p2', 'both@example.net')],
     });
     expect(out).toHaveLength(1);
     expect(out[0].kind).toBe('client');
-    expect(out[0].kind === 'client' ? out[0].sourcing?.prospectId : null).toBe('p2');
+    expect(asClient(out[0]).sourcing?.prospectId).toBe('p2');
+    expect(out[0].company).toBe('Société p2');
+  });
+
+  it('leaves sourcing off a client who never was a prospect and falls back to enrichment', () => {
+    // .example is reserved like example.net, so the derived name is invented too.
+    const out = buildContacts({ ...base, keys: [keyRow('billing@acme-pay.example')] });
+    expect(asClient(out[0]).sourcing).toBeUndefined();
+    expect(out[0].company).toBe('Acme Pay');
+    expect(out[0].website).toBe('https://acme-pay.example');
   });
 
   it('keeps a prospect with no contact email', () => {
     const out = buildContacts({ ...base, prospects: [prospectRow('p3', null, { status: 'a_enrichir' })] });
     expect(out).toHaveLength(1);
     expect(out[0].email).toBe('');
+    expect(out[0].id).toBe('prospect:p3');
+  });
+
+  it('gives two prospects with no contact email distinct ids', () => {
+    const out = buildContacts({
+      ...base,
+      prospects: [prospectRow('p3a', null), prospectRow('p3b', null)],
+    });
+    expect(out.map((c) => c.id)).toEqual(['prospect:p3a', 'prospect:p3b']);
   });
 
   it('excludes rejected prospects', () => {
-    const out = buildContacts({ ...base, prospects: [prospectRow('p4', 'no@example.com', { status: 'rejete' })] });
+    const out = buildContacts({ ...base, prospects: [prospectRow('p4', 'no@example.net', { status: 'rejete' })] });
     expect(out).toHaveLength(0);
   });
 
   it('attaches messages by lowercased email and separates the draft', () => {
     const out = buildContacts({
       ...base,
-      prospects: [prospectRow('p5', 'Lead@Example.com')],
+      prospects: [prospectRow('p5', 'Lead@Example.net')],
       messages: [
-        { customer_email: 'lead@example.com', direction: 'out', msg_date: '2026-07-01T10:00', subject: 'a', snippet: null, counterparty: null },
-        { customer_email: 'lead@example.com', direction: 'draft', msg_date: '2026-07-20T10:00', subject: 'd', snippet: null, counterparty: null },
+        msgRow('lead@example.net', { direction: 'out', msg_date: '2026-07-01T10:00', subject: 'a' }),
+        msgRow('lead@example.net', { direction: 'draft', msg_date: '2026-07-20T10:00', subject: 'd' }),
       ],
     });
     expect(out[0].messages).toHaveLength(1);
+    expect(out[0].messages[0].subject).toBe('a');
     expect(out[0].draft?.subject).toBe('d');
+  });
+
+  it('matches a mixed-case key email with its thread and its read marker', () => {
+    const input: BuildInput = {
+      ...base,
+      keys: [keyRow('Mixed@Example.net')],
+      messages: [msgRow('MIXED@EXAMPLE.NET', { direction: 'in', msg_date: '2026-07-01T10:00' })],
+      reads: { 'mixed@example.net': '2026-07-01 09:00:00' },
+    };
+    const out = buildContacts(input);
+    expect(out[0].id).toBe('mixed@example.net');
+    expect(out[0].email).toBe('Mixed@Example.net');
+    expect(out[0].messages).toHaveLength(1);
+    expect(out[0].unread).toBe(true);
+
+    const read = buildContacts({ ...input, reads: { 'mixed@example.net': '2026-07-02 00:00:00' } });
+    expect(read[0].unread).toBe(false);
   });
 
   it('sorts messages by date ascending', () => {
     const out = buildContacts({
       ...base,
-      prospects: [prospectRow('p6', 'lead6@example.com')],
+      prospects: [prospectRow('p6', 'lead6@example.net')],
       messages: [
-        { customer_email: 'lead6@example.com', direction: 'in', msg_date: '2026-07-05T10:00', subject: 'second', snippet: null, counterparty: null },
-        { customer_email: 'lead6@example.com', direction: 'out', msg_date: '2026-07-01T10:00', subject: 'first', snippet: null, counterparty: null },
+        msgRow('lead6@example.net', { direction: 'in', msg_date: '2026-07-05T10:00', subject: 'second' }),
+        msgRow('lead6@example.net', { direction: 'out', msg_date: '2026-07-01T10:00', subject: 'first' }),
       ],
     });
     expect(out[0].messages.map((m) => m.subject)).toEqual(['first', 'second']);
+  });
+
+  it('sorts on the instant, not on the raw date string', () => {
+    // The two rows use the two formats the ingester actually produces. A raw
+    // string sort puts the space form first (' ' < 'T') and inverts the thread.
+    const out = buildContacts({
+      ...base,
+      prospects: [prospectRow('p7', 'lead7@example.net')],
+      messages: [
+        msgRow('lead7@example.net', { direction: 'out', msg_date: '2026-07-01 23:00:00', subject: 'second' }),
+        msgRow('lead7@example.net', { direction: 'in', msg_date: '2026-07-01T09:00', subject: 'first' }),
+      ],
+    });
+    expect(out[0].messages.map((m) => m.subject)).toEqual(['first', 'second']);
+  });
+
+  it('drops messages whose date cannot be read', () => {
+    const out = buildContacts({
+      ...base,
+      prospects: [prospectRow('p8', 'lead8@example.net')],
+      messages: [
+        msgRow('lead8@example.net', { msg_date: null, subject: 'undated' }),
+        msgRow('lead8@example.net', { msg_date: 'hier matin', subject: 'unparsable' }),
+        msgRow('lead8@example.net', { msg_date: '2026-07-01T10:00', subject: 'real' }),
+      ],
+    });
+    expect(out[0].messages.map((m) => m.subject)).toEqual(['real']);
+  });
+
+  it('still counts an undatable message when deciding a key is meaningful', () => {
+    const out = buildContacts({
+      ...base,
+      keys: [keyRow('quiet@example.net', { used_all_time: 0 })],
+      messages: [msgRow('quiet@example.net', { msg_date: null })],
+    });
+    expect(out).toHaveLength(1);
+    expect(out[0].messages).toHaveLength(0);
+  });
+
+  it('keeps the most recent datable draft', () => {
+    const out = buildContacts({
+      ...base,
+      prospects: [prospectRow('p9', 'lead9@example.net')],
+      messages: [
+        msgRow('lead9@example.net', { direction: 'draft', msg_date: '2026-07-20T10:00', subject: 'latest' }),
+        msgRow('lead9@example.net', { direction: 'draft', msg_date: '2026-07-05T10:00', subject: 'older' }),
+      ],
+    });
+    expect(out[0].draft?.subject).toBe('latest');
+  });
+
+  it('falls back to the last draft in input order when none can be dated', () => {
+    const out = buildContacts({
+      ...base,
+      prospects: [prospectRow('p10', 'lead10@example.net')],
+      messages: [
+        msgRow('lead10@example.net', { direction: 'draft', msg_date: null, subject: 'first' }),
+        msgRow('lead10@example.net', { direction: 'draft', msg_date: 'hier', subject: 'last' }),
+      ],
+    });
+    expect(out[0].draft?.subject).toBe('last');
+  });
+
+  it('does not leak one address thread onto another', () => {
+    const out = buildContacts({
+      ...base,
+      prospects: [prospectRow('p11', 'lead11@example.net'), prospectRow('p12', 'lead12@example.net')],
+      messages: [msgRow('lead11@example.net', { subject: 'only for eleven' })],
+    });
+    expect(out[0].messages.map((m) => m.subject)).toEqual(['only for eleven']);
+    expect(out[1].messages).toHaveLength(0);
+  });
+
+  it('sends from the warm mailbox once a client thread exists, from the cold one otherwise', () => {
+    const cold = buildContacts({ ...base, keys: [keyRow('alpha@example.net')] });
+    expect(cold[0].account).toBe('claude-alain@ibanforge.com');
+
+    const warm = buildContacts({
+      ...base,
+      keys: [keyRow('alpha@example.net')],
+      messages: [msgRow('alpha@example.net')],
+    });
+    expect(warm[0].account).toBe('cammac@bluewin.ch');
+  });
+
+  it('exposes the ready-made mail of a prospect and nothing when there is no body', () => {
+    const withMail = buildContacts({ ...base, prospects: [prospectRow('p13', 'lead13@example.net')] });
+    expect(withMail[0].kind === 'prospect' ? withMail[0].readyMail : null).toEqual({
+      subjectEn: 'Hello',
+      bodyEn: 'Body',
+      subjectFr: null,
+      bodyFr: null,
+      recommendedLang: 'en',
+    });
+
+    const without = buildContacts({
+      ...base,
+      prospects: [prospectRow('p14', 'lead14@example.net', { mail_body_en: null, mail_body_fr: null })],
+    });
+    expect(without[0].kind === 'prospect' ? without[0].readyMail : undefined).toBeNull();
+  });
+
+  // --- Pilots: a large free quota is an evaluation, not a customer. -----------
+
+  it('drops a pilot key, so a pilot who is nothing else appears nowhere', () => {
+    const out = buildContacts({
+      ...base,
+      keys: [keyRow('pilot@example.net', { monthly_limit: 5000, used_all_time: 900 })],
+    });
+    expect(out).toHaveLength(0);
+  });
+
+  it('keeps a key on a pilot-sized quota once it has been paid for', () => {
+    const out = buildContacts({
+      ...base,
+      keys: [
+        keyRow('pilot@example.net', { monthly_limit: 5000, credits_total: 1000, credits_remaining: 1000 }),
+      ],
+    });
+    expect(out).toHaveLength(1);
+    expect(out[0].kind).toBe('client');
+  });
+
+  it('keeps a free key just under the pilot quota', () => {
+    const out = buildContacts({
+      ...base,
+      keys: [keyRow('nearly@example.net', { monthly_limit: 4999 })],
+    });
+    expect(out).toHaveLength(1);
+  });
+
+  it('still lists a pilot who is also a prospect, on the prospect side', () => {
+    // The pilot is skipped before it can claim the address, which is how the two
+    // old pages behaved: hidden among the clients, visible among the prospects.
+    const out = buildContacts({
+      ...base,
+      keys: [keyRow('pilot@example.net', { monthly_limit: 5000, used_all_time: 900 })],
+      prospects: [prospectRow('p18', 'pilot@example.net')],
+    });
+    expect(out).toHaveLength(1);
+    expect(out[0].kind).toBe('prospect');
+    expect(out[0].id).toBe('pilot@example.net');
+  });
+
+  it('lets an ordinary key represent an address that also holds a pilot key', () => {
+    // Pilots leave the candidate set before the ranking. Rank first and the
+    // pilot wins on usage, then gets dropped, taking a visible person with it.
+    const out = buildContacts({
+      ...base,
+      keys: [
+        keyRow('mixed-quota@example.net', { key_prefix: 'ifk_pilot', monthly_limit: 5000, used_all_time: 100 }),
+        keyRow('mixed-quota@example.net', { key_prefix: 'ifk_free', monthly_limit: 200, used_all_time: 10 }),
+      ],
+    });
+    expect(out).toHaveLength(1);
+    expect(asClient(out[0]).apiKey.keyPrefix).toBe('ifk_free');
+    expect(asClient(out[0]).apiKey.usedAllTime).toBe(10);
+  });
+
+  it('emits nothing for an address whose every key is a pilot', () => {
+    const out = buildContacts({
+      ...base,
+      keys: [
+        keyRow('allpilot@example.net', { key_prefix: 'ifk_one', monthly_limit: 5000, used_all_time: 100 }),
+        keyRow('allpilot@example.net', { key_prefix: 'ifk_two', monthly_limit: 9000, used_all_time: 900 }),
+      ],
+    });
+    expect(out).toHaveLength(0);
+  });
+
+  // --- One contact per address, and who represents it. ------------------------
+
+  it('emits one client contact per address, not one per key', () => {
+    const out = buildContacts({
+      ...base,
+      keys: [
+        keyRow('multi@example.net', { key_prefix: 'ifk_one' }),
+        keyRow('multi@example.net', { key_prefix: 'ifk_two' }),
+      ],
+    });
+    expect(out).toHaveLength(1);
+    expect(out[0].id).toBe('multi@example.net');
+  });
+
+  it('lets a paid key represent the address even when an unpaid one is more used', () => {
+    const out = buildContacts({
+      ...base,
+      keys: [
+        keyRow('multi@example.net', { key_prefix: 'ifk_free', used_all_time: 100 }),
+        keyRow('multi@example.net', { key_prefix: 'ifk_paid', used_all_time: 0, credits_total: 1000, credits_remaining: 900 }),
+      ],
+    });
+    expect(out).toHaveLength(1);
+    expect(asClient(out[0]).apiKey.keyPrefix).toBe('ifk_paid');
+    expect(asClient(out[0]).apiKey.paid).toBe(true);
+  });
+
+  it('lets the most used key represent the address when neither is paid', () => {
+    // The busy key sorts AFTER the quiet one, so only the usage level can pick
+    // it: drop that level and the prefix tiebreak returns the other key.
+    const out = buildContacts({
+      ...base,
+      keys: [
+        keyRow('multi@example.net', { key_prefix: 'ifk_aquiet', used_all_time: 3 }),
+        keyRow('multi@example.net', { key_prefix: 'ifk_zbusy', used_all_time: 300 }),
+      ],
+    });
+    expect(asClient(out[0]).apiKey.keyPrefix).toBe('ifk_zbusy');
+    expect(asClient(out[0]).apiKey.usedAllTime).toBe(300);
+  });
+
+  it('falls back to the smaller key prefix when payment and usage tie', () => {
+    const out = buildContacts({
+      ...base,
+      keys: [
+        keyRow('multi@example.net', { key_prefix: 'ifk_zeta' }),
+        keyRow('multi@example.net', { key_prefix: 'ifk_alpha' }),
+      ],
+    });
+    expect(asClient(out[0]).apiKey.keyPrefix).toBe('ifk_alpha');
+  });
+
+  it('picks the same representative whichever order the payload arrives in', () => {
+    const a = keyRow('multi@example.net', { key_prefix: 'ifk_zeta', series: [9] });
+    const b = keyRow('multi@example.net', { key_prefix: 'ifk_alpha', series: [1] });
+    expect(buildContacts({ ...base, keys: [a, b] })).toEqual(buildContacts({ ...base, keys: [b, a] }));
+  });
+
+  it('carries the representative key and its own usage, not a sibling key', () => {
+    const out = buildContacts({
+      ...base,
+      keys: [
+        keyRow('multi@example.net', { key_prefix: 'ifk_aquiet', used_all_time: 3, series: [1, 1] }),
+        keyRow('multi@example.net', { key_prefix: 'ifk_zbusy', used_all_time: 300, series: [7, 7] }),
+      ],
+      activityByKey: {
+        ifk_aquiet: { endpoints: [{ path: '/quiet', count: 3 }], days: [{ day: '2026-07-01', count: 3 }] },
+        ifk_zbusy: { endpoints: [{ path: '/busy', count: 300 }], days: [{ day: '2026-07-01', count: 300 }] },
+      },
+    });
+    const client = asClient(out[0]);
+    expect(client.apiKey.keyPrefix).toBe('ifk_zbusy');
+    expect(client.usage.series).toEqual([7, 7]);
+    expect(client.usage.endpoints).toEqual([{ path: '/busy', count: 300 }]);
+    expect(client.usage.days).toEqual([{ day: '2026-07-01', count: 300 }]);
+  });
+
+  it('emits one contact for two prospects sharing an address, keeping the first', () => {
+    const out = buildContacts({
+      ...base,
+      prospects: [prospectRow('pa', 'twin@example.net'), prospectRow('pb', 'twin@example.net')],
+    });
+    expect(out).toHaveLength(1);
+    expect(out[0].kind === 'prospect' ? out[0].sourcing.prospectId : null).toBe('pa');
+  });
+
+  it('suppresses every prospect on a converted address and keeps the first sourcing', () => {
+    const out = buildContacts({
+      ...base,
+      keys: [keyRow('twin@example.net')],
+      prospects: [prospectRow('pa', 'twin@example.net'), prospectRow('pb', 'twin@example.net')],
+    });
+    expect(out).toHaveLength(1);
+    expect(asClient(out[0]).sourcing?.prospectId).toBe('pa');
+  });
+
+  it('shows the same company before and after an address converts', () => {
+    // One rule for both lookups: the first prospect row represents the address,
+    // so converting must not silently rename the contact.
+    const prospects = [
+      prospectRow('pa', 'twin@example.net', { company: 'Première SA' }),
+      prospectRow('pb', 'twin@example.net', { company: 'Seconde SA' }),
+    ];
+    const before = buildContacts({ ...base, prospects });
+    const after = buildContacts({ ...base, keys: [keyRow('twin@example.net')], prospects });
+    expect(before[0].company).toBe('Première SA');
+    expect(after[0].company).toBe('Première SA');
+    expect(after[0].kind).toBe('client');
+  });
+
+  it('never lets a rejected row give its identity to a client', () => {
+    const out = buildContacts({
+      ...base,
+      keys: [keyRow('twin@example.net')],
+      prospects: [prospectRow('pa', 'twin@example.net', { status: 'rejete', company: 'Rejetée SA' })],
+    });
+    expect(out).toHaveLength(1);
+    const client = asClient(out[0]);
+    expect(client.sourcing).toBeUndefined();
+    expect(client.company).toBe('Example'); // enrichment, not the killed row
+  });
+
+  it('shows the same company before and after conversion when the first row is rejected', () => {
+    // The rejected row must be invisible to both lookups, or the live row names
+    // the address before conversion and the dead one names it after.
+    const prospects = [
+      prospectRow('pa', 'twin@example.net', { status: 'rejete', company: 'Rejetée SA' }),
+      prospectRow('pb', 'twin@example.net', { company: 'Vivante SA' }),
+    ];
+    const before = buildContacts({ ...base, prospects });
+    const after = buildContacts({ ...base, keys: [keyRow('twin@example.net')], prospects });
+    expect(before[0].company).toBe('Vivante SA');
+    expect(after[0].company).toBe('Vivante SA');
+    expect(asClient(after[0]).sourcing?.prospectId).toBe('pb');
+  });
+
+  it('lets a later prospect represent the address when the first one is rejected', () => {
+    // The rejected row leaves before it can claim the address, so the surviving
+    // row is still emitted. Dropping someone here would be a real regression.
+    const out = buildContacts({
+      ...base,
+      prospects: [
+        prospectRow('pa', 'twin@example.net', { status: 'rejete' }),
+        prospectRow('pb', 'twin@example.net'),
+      ],
+    });
+    expect(out).toHaveLength(1);
+    expect(out[0].kind === 'prospect' ? out[0].sourcing.prospectId : null).toBe('pb');
+  });
+
+  it('keeps an address where only one of its keys ever did anything', () => {
+    // The meaningful rule now runs on the representative alone, so the ranking
+    // must never elect the idle key over the one that makes the address visible.
+    const out = buildContacts({
+      ...base,
+      keys: [
+        keyRow('multi@example.net', { key_prefix: 'ifk_aidle', used_all_time: 0 }),
+        keyRow('multi@example.net', { key_prefix: 'ifk_zused', used_all_time: 4 }),
+      ],
+    });
+    expect(out).toHaveLength(1);
+    expect(asClient(out[0]).apiKey.keyPrefix).toBe('ifk_zused');
+  });
+
+  it('still lists a prospect whose address holds a dormant key', () => {
+    // Third leg of the "an unemitted key leaves its address unclaimed" rule,
+    // alongside the internal and pilot cases. The key is real but did nothing,
+    // so it produces no client, and the prospect must survive that.
+    const out = buildContacts({
+      ...base,
+      keys: [keyRow('dormant@example.net', { used_all_time: 0 })],
+      prospects: [prospectRow('p19', 'dormant@example.net')],
+    });
+    expect(out).toHaveLength(1);
+    expect(out[0].kind).toBe('prospect');
+    expect(out[0].id).toBe('dormant@example.net');
+  });
+
+  it('still lists a prospect whose address holds a key we never surfaced', () => {
+    // The key is filtered out as internal, so nothing claims the address and the
+    // prospect must not disappear silently.
+    const out = buildContacts({
+      ...base,
+      keys: [keyRow('ghost@example.com')],
+      prospects: [prospectRow('p15', 'ghost@example.com')],
+    });
+    expect(out).toHaveLength(1);
+    expect(out[0].kind).toBe('prospect');
+  });
+
+  it('copies the whole sourcing block onto a prospect contact', () => {
+    const out = buildContacts({
+      ...base,
+      prospects: [
+        prospectRow('p16', 'lead16@example.net', {
+          segment: 'banques',
+          what_they_do: 'Paiements',
+          fit_reason: 'Valide des IBAN',
+          buying_signal: 'Recrute',
+          signal_source_url: 'https://example.net/jobs',
+          contact_name: 'Prénom Nom',
+          contact_role: 'CTO',
+          email_source_url: 'https://example.net/contact',
+          personalization_hook: 'Leur page API',
+          confidence: 'medium',
+          status: 'contacte',
+          source: 'annuaire',
+        }),
+      ],
+    });
+    expect(out[0].kind === 'prospect' ? out[0].sourcing : null).toEqual({
+      prospectId: 'p16',
+      segment: 'banques',
+      whatTheyDo: 'Paiements',
+      fitReason: 'Valide des IBAN',
+      buyingSignal: 'Recrute',
+      signalSourceUrl: 'https://example.net/jobs',
+      contactName: 'Prénom Nom',
+      contactRole: 'CTO',
+      emailSourceUrl: 'https://example.net/contact',
+      personalizationHook: 'Leur page API',
+      confidence: 'medium',
+      status: 'contacte',
+      source: 'annuaire',
+    });
+  });
+
+  it('gives each message-less contact its own messages array', () => {
+    // One shared empty array would let a renderer that sorts or pushes in place
+    // corrupt every silent contact at once.
+    const out = buildContacts({
+      ...base,
+      prospects: [prospectRow('p20', 'quiet20@example.net'), prospectRow('p21', null)],
+    });
+    expect(out[0].messages).not.toBe(out[1].messages);
+    out[0].messages.push(msgRow('quiet20@example.net'));
+    expect(out[1].messages).toHaveLength(0);
+  });
+
+  it('does not mutate the input messages', () => {
+    const messages = [
+      msgRow('lead17@example.net', { msg_date: '2026-07-05T10:00', subject: 'second' }),
+      msgRow('lead17@example.net', { msg_date: '2026-07-01T10:00', subject: 'first' }),
+    ];
+    buildContacts({ ...base, prospects: [prospectRow('p17', 'lead17@example.net')], messages });
+    expect(messages.map((m) => m.subject)).toEqual(['second', 'first']);
   });
 });
 ```
@@ -972,9 +1516,19 @@ const COLD_ACCOUNT = 'claude-alain@ibanforge.com';
 /** Mailbox that carries the existing warm threads. */
 const WARM_ACCOUNT = 'cammac@bluewin.ch';
 
-/** Internal, test and founder-owned addresses never appear in the CRM. */
+/**
+ * Internal, test and founder-owned addresses never appear in the CRM. Lifted
+ * verbatim from the Clients page so that exactly the same people show up.
+ * Note it also swallows example.com, which is why fixtures use example.net.
+ */
 export const INTERNAL_RE =
   /(@ibanforge\.com|@example\.com|@test\.|test-|-test|smoke|audit|^ca-[a-z]+-?\d*@proton\.me|^credits-buyer$|^stripe-buyer$|^playground|cammac@bluewin\.ch|cam@ogens\.ch|ptibootch@|gpt-store@)/i;
+
+/**
+ * Monthly quota from which an unpaid key is an evaluation pilot rather than a
+ * customer. Same threshold as the Clients page, which hid pilots entirely.
+ */
+const PILOT_LIMIT = 5000;
 
 export interface KeyRow {
   key_prefix: string;
@@ -1031,8 +1585,58 @@ export interface BuildInput {
   prospects: ProspectRow[];
   messages: MessageRow[];
   activityByKey: Record<string, ActivityRow>;
+  /** Last read instant per lowercased counterpart address. */
   reads: Record<string, string>;
   months: string[];
+}
+
+/**
+ * Same parse as situation.ts. msg_date is free-form TEXT filled by the ingester,
+ * so the format is not guaranteed and a raw string comparison is not an order.
+ */
+function parseDate(raw: string | null | undefined): Date | null {
+  if (!raw) return null;
+  const d = new Date(raw);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+/** A row we could place in time, paired with the instant it was placed at. */
+interface DatedRow {
+  message: MessageRow;
+  at: Date;
+}
+
+/** Order rows on the instant, dropping the ones that cannot be placed at all. */
+function datedAscending(rows: MessageRow[]): MessageRow[] {
+  return rows
+    .map((message) => ({ message, at: parseDate(message.msg_date) }))
+    .filter((r): r is DatedRow => r.at !== null)
+    .sort((a, b) => a.at.getTime() - b.at.getTime())
+    .map((r) => r.message);
+}
+
+/** A large free quota is an evaluation, not a customer. Paid keys are never pilots. */
+function isPilot(row: KeyRow): boolean {
+  return row.credits_total == null && (row.monthly_limit ?? 0) >= PILOT_LIMIT;
+}
+
+/**
+ * Order two keys of one address by how well each represents it: a paid key
+ * beats an unpaid one, then the most used, then the smaller prefix. The last
+ * level is what makes the answer independent of the order the API returned the
+ * rows in; compared by code unit rather than localeCompare, which would make
+ * the choice depend on the runtime locale.
+ */
+function compareKeys(a: KeyRow, b: KeyRow): number {
+  const paid = Number(b.credits_total != null) - Number(a.credits_total != null);
+  if (paid !== 0) return paid;
+  if (a.used_all_time !== b.used_all_time) return b.used_all_time - a.used_all_time;
+  return a.key_prefix < b.key_prefix ? -1 : a.key_prefix > b.key_prefix ? 1 : 0;
+}
+
+/** The key that stands for an address when several share it. */
+function representativeKey(rows: KeyRow[]): KeyRow {
+  return rows.reduce((best, row) => (compareKeys(row, best) < 0 ? row : best));
 }
 
 function sourcingOf(r: ProspectRow): ProspectSourcing {
@@ -1064,12 +1668,31 @@ function readyMailOf(r: ProspectRow): ReadyMail | null {
   };
 }
 
+/** What one address holds: its correspondence, its pending draft, its raw size. */
+interface Thread {
+  messages: Message[];
+  draft: Message | null;
+  /** Every row on the address, drafts and undatable ones included. */
+  rowCount: number;
+}
+
 /**
- * Turn the four admin payloads into one contact list. Pure so it can be tested
+ * A fresh empty thread per call, never one shared instance: `contact.messages`
+ * is a plain array a renderer may sort in place, and one shared instance would
+ * let that corrupt every message-less contact at once. Freezing it instead would
+ * turn the same mistake into a crash on some contacts and not others, depending
+ * on the data, so a new array is both safer and uniform.
+ */
+function emptyThread(): Thread {
+  return { messages: [], draft: null, rowCount: 0 };
+}
+
+/**
+ * Turn the admin payloads into one contact list. Pure so it can be tested
  * without the network; the fetching lives in fetchCrmData below.
  */
 export function buildContacts(input: BuildInput): Contact[] {
-  const threads = new Map<string, Message[]>();
+  const threads = new Map<string, MessageRow[]>();
   for (const m of input.messages) {
     const key = m.customer_email.toLowerCase();
     const arr = threads.get(key);
@@ -1077,31 +1700,64 @@ export function buildContacts(input: BuildInput): Contact[] {
     else threads.set(key, [m]);
   }
 
-  const split = (email: string) => {
-    const all = (threads.get(email) ?? [])
-      .slice()
-      .sort((a, b) => (a.msg_date ?? '').localeCompare(b.msg_date ?? ''));
+  const threadOf = (email: string): Thread => {
+    const rows = threads.get(email);
+    if (!rows) return emptyThread();
+    // Drafts are not correspondence: they decide neither who holds the ball nor
+    // how long the silence has run, and they render as their own review card.
+    const drafts = rows.filter((m) => m.direction === 'draft');
+    const dated = datedAscending(drafts);
     return {
-      messages: all.filter((m) => m.direction !== 'draft'),
-      draft: all.filter((m) => m.direction === 'draft').at(-1) ?? null,
+      messages: datedAscending(rows.filter((m) => m.direction !== 'draft')),
+      // The freshest draft we can date. When none is datable we still surface
+      // one: losing text the user wrote is worse than showing it out of order.
+      draft: dated.at(-1) ?? drafts.at(-1) ?? null,
+      rowCount: rows.length,
     };
   };
 
   const prospectByEmail = new Map<string, ProspectRow>();
   for (const p of input.prospects) {
-    if (p.contact_email) prospectByEmail.set(p.contact_email.toLowerCase(), p);
+    // Rejected here too, not only in the emit loop: a client must never wear the
+    // identity of a row the operator killed, and skipping it on one side only
+    // would make the company change at the moment the address converts.
+    if (p.status === 'rejete') continue;
+    // The schema allows two prospect rows on one address. The FIRST represents
+    // it, here and in the emit loop below, for the same reason.
+    const key = p.contact_email?.toLowerCase();
+    if (key && !prospectByEmail.has(key)) prospectByEmail.set(key, p);
+  }
+
+  // One contact per address, not one per key: an address can hold several keys,
+  // and the id below is the join key, the selection key and the React key.
+  const keysByAddress = new Map<string, KeyRow[]>();
+  for (const row of input.keys) {
+    if (INTERNAL_RE.test(row.email)) continue;
+    const id = row.email.toLowerCase();
+    const group = keysByAddress.get(id);
+    if (group) group.push(row);
+    else keysByAddress.set(id, [row]);
   }
 
   const out: Contact[] = [];
   const claimed = new Set<string>();
 
-  for (const row of input.keys) {
-    if (INTERNAL_RE.test(row.email)) continue;
-    const id = row.email.toLowerCase();
-    const { messages, draft } = split(id);
+  for (const [id, group] of keysByAddress) {
+    // Pilots leave the candidate set BEFORE the ranking, never after: a pilot
+    // that won an address and was then dropped would take an ordinary key on the
+    // same address down with it, hiding someone the Clients page shows today.
+    const candidates = group.filter((row) => !isPilot(row));
+    // Every key an evaluation: the address is a pilot and emits nothing. It is
+    // left unclaimed, so a pilot that is also a prospect still shows up on the
+    // prospect side, exactly as the two old pages did between them.
+    if (candidates.length === 0) continue;
+    const row = representativeKey(candidates);
     const isPaid = row.credits_total != null;
+    const { messages, draft, rowCount } = threadOf(id);
     // Same rule as the previous Clients page: hide keys that never did anything.
-    const meaningful = isPaid || row.used_all_time > 0 || messages.length > 0 || draft != null;
+    // It reads the raw row count, not the datable messages, so a thread we can
+    // display only partially still keeps its owner on the list.
+    const meaningful = isPaid || row.used_all_time > 0 || rowCount > 0;
     if (!meaningful) continue;
 
     claimed.add(id);
@@ -1138,14 +1794,22 @@ export function buildContacts(input: BuildInput): Contact[] {
     });
   }
 
+  const emitted = new Set<string>();
+
   for (const p of input.prospects) {
     if (p.status === 'rejete') continue;
     const id = p.contact_email ? p.contact_email.toLowerCase() : '';
     if (id && claimed.has(id)) continue; // already emitted as a client
-    const { messages, draft } = id ? split(id) : { messages: [], draft: null };
+    // Two prospect rows may share an address; the first one represents it. The
+    // guard skips empty ids, or every address-less prospect but one would go.
+    if (id && emitted.has(id)) continue;
+    if (id) emitted.add(id);
+    const { messages, draft } = id ? threadOf(id) : emptyThread();
 
     out.push({
       kind: 'prospect',
+      // A prospect with no address has no join key, so it falls back to its row
+      // id: two of them must not collapse into one contact.
       id: id || `prospect:${p.id}`,
       email: p.contact_email ?? '',
       company: p.company,
@@ -1166,7 +1830,7 @@ export function buildContacts(input: BuildInput): Contact[] {
 const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 const ADMIN_SECRET = process.env.ADMIN_SECRET || '';
 
-/** Fetch the four admin payloads. Returns null when the API is unreachable. */
+/** Fetch the five admin payloads. Returns null when the API is unreachable. */
 export async function fetchCrmData(): Promise<BuildInput | null> {
   if (!ADMIN_SECRET) return null;
   const h = { headers: { 'X-Admin-Secret': ADMIN_SECRET }, cache: 'no-store' as const };
@@ -2818,7 +3482,7 @@ Ouvrir un contact en relance due, cliquer « Générer » : deux ou trois angles
 
 ## Vérification finale
 
-- [ ] `cd ~/ibanforge/frontend && npm test` — 54 tests au vert (quoted 12, situation 19, build-contacts 9, sent-today 3, guardrails 11)
+- [ ] `cd ~/ibanforge/frontend && npm test` — 94 tests au vert (quoted 12, situation 19, build-contacts 49, sent-today 3, guardrails 11)
 - [ ] `npm run build` réussit
 - [ ] `grep -rn "crm-workspace\|prospects-workspace" frontend/app frontend/components frontend/lib` ne renvoie rien
 - [ ] `/dashboard/customers` et `/dashboard/prospects` redirigent vers `/dashboard/contacts`
