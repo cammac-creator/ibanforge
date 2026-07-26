@@ -153,6 +153,10 @@ export function CrmApp({
                       key={draftKey(selected.id, selected.draft)}
                       contact={selected}
                       draft={selected.draft}
+                      // The card sends too, so it gets the same two values the
+                      // composer gets, from the same single snapshot.
+                      situation={situation}
+                      sentToday={sentToday}
                     />
                   ) : null
                 }

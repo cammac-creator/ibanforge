@@ -4,7 +4,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { changedRows, confirmedSent, readAnswer, reasonOf, withReason } from '@/lib/crm/api-result';
 import { formatStamp } from '@/lib/crm/format';
-import type { Contact, Message } from '@/lib/crm/types';
+import type { Contact, Message, Situation } from '@/lib/crm/types';
+import { GuardrailChecks, OverrideButton, useGuardrails } from './guardrails-ui';
 
 /**
  * A CRM-native draft sitting in the thread: read it, adjust it in place, then
@@ -15,12 +16,34 @@ import type { Contact, Message } from '@/lib/crm/types';
  * reviewed here and what makes its send pass through /api/crm/send, hence
  * through recordSent(), hence into the timeline.
  *
+ * It carries the same pre-send checks as the composer, and that is not
+ * symmetry for its own sake: writing now and sending later is the flow this
+ * card was built for, so a draft saved with an em dash, or any draft at all
+ * once the daily cap is reached, would otherwise leave by the one door with no
+ * lock on it. A guardrail with a documented way around it is not a guardrail.
+ *
  * The caller must key this component on the draft's content (crm-app does):
  * the local state below is seeded on mount only, so without a key the card
  * would keep showing the previous contact's text after a selection change, or
  * stale text after the composer overwrote the draft.
  */
-export function DraftCard({ contact, draft }: { contact: Contact; draft: Message }) {
+export function DraftCard({
+  contact,
+  draft,
+  situation,
+  sentToday,
+}: {
+  contact: Contact;
+  draft: Message;
+  /** Undefined only if the page failed to derive one; every rule falls to its warmer form. */
+  situation?: Situation;
+  /**
+   * Real outbound mails dated today, counted by the page against one clock and
+   * handed down untouched. Never recomputed here: msg_date carries no timezone
+   * and this subtree is server-rendered before it is hydrated.
+   */
+  sentToday: number;
+}) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [subject, setSubject] = useState(draft.subject ?? '');
@@ -33,6 +56,18 @@ export function DraftCard({ contact, draft }: { contact: Contact; draft: Message
   const [sent, setSent] = useState(false);
   const [msg, setMsg] = useState<{ text: string; bad: boolean } | null>(null);
   const account = draft.counterparty || contact.account;
+  const locked = busy !== false || sent;
+  /**
+   * Could this be sent at all, the checks aside. `locked` belongs in it: after
+   * a confirmed send whose draft deletion failed, the card stays on screen with
+   * Envoyer latched off, and offering an override there would put a control on
+   * screen that does nothing when clicked.
+   *
+   * The checks read `subject` and `body`, the editable state, not the stored
+   * row, so they follow the text the operator is actually about to send.
+   */
+  const sendable = !locked && !!contact.email && !!subject.trim() && !!body.trim();
+  const g = useGuardrails({ subject, body, sentToday, situation, sendable });
 
   /**
    * Both halves of a send failure in one sentence.
@@ -66,6 +101,10 @@ export function DraftCard({ contact, draft }: { contact: Contact; draft: Message
         return;
       }
       setSent(true);
+      // The override dies with the mail it covered. The card can outlive the
+      // send, when the draft row could not be deleted, and a grant left armed
+      // there would cover a second click nobody granted.
+      g.clear();
       // The draft row has to go, or the refresh brings back a card offering to
       // send the same mail again. The legacy card swallowed this failure; it
       // is the one that ends in a duplicate, so it gets said out loud.
@@ -116,6 +155,8 @@ export function DraftCard({ contact, draft }: { contact: Contact; draft: Message
         return;
       }
       setMsg({ text: '💾 Brouillon enregistré.', bad: false });
+      // Saved text is a new draft to judge: the grant has to be asked again.
+      g.clear();
       setEditing(false);
       router.refresh();
     } catch {
@@ -155,7 +196,11 @@ export function DraftCard({ contact, draft }: { contact: Contact; draft: Message
   }
 
   const stamp = formatStamp(draft.msg_date);
-  const locked = busy !== false || sent;
+  // One draft per contact and one card on screen, so a constant id is unique
+  // and stays readable. Distinct from the composer's, which can be open at the
+  // same time: two lists sharing an id would make both aria-describedby point
+  // at the first one.
+  const checksId = 'draft-checks';
 
   return (
     // min-w-0 and wrap-anywhere for the same reason as the bubbles: a long
@@ -194,15 +239,25 @@ export function DraftCard({ contact, draft }: { contact: Contact; draft: Message
           <p className="mt-0.5 whitespace-pre-wrap text-[11px] leading-relaxed text-[var(--fg-3)]">{body}</p>
         </>
       )}
+      {/* Same panel and same words as the composer: the operator meets one
+          vocabulary, not two, wherever the mail is about to leave from. */}
+      <GuardrailChecks id={checksId} report={g.report} subject={subject} body={body} />
       <div className="mt-2.5 flex flex-wrap items-center gap-2">
         <button
           type="button"
           onClick={send}
-          disabled={locked || !contact.email || !subject.trim() || !body.trim()}
-          className="rounded-lg bg-green-600 px-3 py-1 text-xs font-semibold text-white transition-colors hover:bg-green-500 disabled:opacity-50"
+          // disabled, not aria-disabled, as on the composer: a focusable
+          // blocked button would rest the whole safety on one onClick guard.
+          disabled={!sendable || g.blocked}
+          aria-describedby={g.report.issues.length > 0 ? checksId : undefined}
+          className={`rounded-lg px-3 py-1 text-xs font-semibold text-white transition-colors disabled:opacity-50 ${
+            g.forced ? 'bg-red-600 hover:bg-red-500' : 'bg-green-600 hover:bg-green-500'
+          }`}
         >
-          {busy === 'send' ? '… envoi' : sent ? 'envoyé' : '✅ Envoyer'}
+          {busy === 'send' ? '… envoi' : sent ? 'envoyé' : g.forced ? g.forcedLabel : '✅ Envoyer'}
         </button>
+        {/* Next to the button it re-arms, exactly as in the composer. */}
+        {g.offer && <OverrideButton offer={g.offer} onClick={g.grant} dense />}
         {editing ? (
           <button
             type="button"
