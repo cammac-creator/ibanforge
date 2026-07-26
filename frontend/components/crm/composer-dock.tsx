@@ -229,8 +229,10 @@ export function ComposerDock({
           <button
             type="button"
             onClick={() => setOpen(true)}
+            // aria-expanded only: the form it would control does not exist in
+            // this state, and aria-controls pointing at an absent id is an
+            // invalid reference rather than a hint.
             aria-expanded={false}
-            aria-controls="composer-form"
             className="min-w-0 flex-1 truncate rounded-lg border border-[var(--ink-4)] bg-[var(--ink-0)] px-3 py-1.5 text-left text-xs text-[var(--fg-3)] hover:border-amber-500/40 hover:text-[var(--fg-2)]"
           >
             {/* Folded text is not lost text: say it is there and unsaved. */}

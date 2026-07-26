@@ -126,7 +126,13 @@ export function DraftCard({ contact, draft }: { contact: Contact; draft: Message
   }
 
   async function discard() {
-    if (!draft.id) return;
+    // A draft row with no id cannot be addressed, and the endpoint keys the
+    // deletion on it. Saying so beats a button that does nothing at all: the
+    // legacy card returned here in silence.
+    if (!draft.id) {
+      setMsg({ text: 'Ce brouillon n’a pas d’identifiant : suppression impossible.', bad: true });
+      return;
+    }
     setBusy('del');
     setMsg(null);
     try {
