@@ -12,16 +12,16 @@ export function TopNav() {
   const t = useTranslations('dashboard');
   const locale = useLocale();
 
-  const onCustomers = pathname.includes('/dashboard/customers');
-  const onProspects = pathname.includes('/dashboard/prospects');
-  const onOverview = !onCustomers && !onProspects;
+  // Clients and prospects were two tabs over two near-twin pages. They are one
+  // page now, so one tab. The old paths still resolve, as redirections.
+  const onContacts = pathname.includes('/dashboard/contacts');
+  const onOverview = !onContacts;
   const current = Number(searchParams.get('period') ?? 30);
   const period = PERIODS.includes(current) ? current : 30;
 
   const TABS = [
     { key: 'overview', href: `/${locale}/dashboard`, label: t('topNav.overview'), active: onOverview },
-    { key: 'customers', href: `/${locale}/dashboard/customers`, label: t('topNav.customers'), active: onCustomers },
-    { key: 'prospects', href: `/${locale}/dashboard/prospects`, label: t('topNav.prospects'), active: onProspects },
+    { key: 'contacts', href: `/${locale}/dashboard/contacts`, label: t('topNav.contacts'), active: onContacts },
   ];
 
   return (
