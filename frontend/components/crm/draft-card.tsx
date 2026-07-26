@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { changedRows, confirmedSent, readAnswer, reasonOf, withReason } from '@/lib/crm/api-result';
 import { formatStamp } from '@/lib/crm/format';
@@ -67,9 +67,7 @@ export function DraftCard({
    * row, so they follow the text the operator is actually about to send.
    */
   const sendable = !locked && !!contact.email && !!subject.trim() && !!body.trim();
-  // Focused when the override is granted, same reason as in the composer.
-  const sendRef = useRef<HTMLButtonElement>(null);
-  const g = useGuardrails({ subject, body, sentToday, situation, sendable, sendRef });
+  const g = useGuardrails({ subject, body, sentToday, situation, sendable });
 
   /**
    * Both halves of a send failure in one sentence.
@@ -252,7 +250,6 @@ export function DraftCard({
       />
       <div className="mt-2.5 flex flex-wrap items-center gap-2">
         <button
-          ref={sendRef}
           type="button"
           onClick={send}
           // disabled, not aria-disabled, as on the composer: a focusable
