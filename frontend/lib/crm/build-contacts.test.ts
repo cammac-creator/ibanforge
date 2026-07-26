@@ -533,6 +533,32 @@ describe('buildContacts', () => {
     expect(after[0].kind).toBe('client');
   });
 
+  it('never lets a rejected row give its identity to a client', () => {
+    const out = buildContacts({
+      ...base,
+      keys: [keyRow('twin@example.net')],
+      prospects: [prospectRow('pa', 'twin@example.net', { status: 'rejete', company: 'Rejetée SA' })],
+    });
+    expect(out).toHaveLength(1);
+    const client = asClient(out[0]);
+    expect(client.sourcing).toBeUndefined();
+    expect(client.company).toBe('Example'); // enrichment, not the killed row
+  });
+
+  it('shows the same company before and after conversion when the first row is rejected', () => {
+    // The rejected row must be invisible to both lookups, or the live row names
+    // the address before conversion and the dead one names it after.
+    const prospects = [
+      prospectRow('pa', 'twin@example.net', { status: 'rejete', company: 'Rejetée SA' }),
+      prospectRow('pb', 'twin@example.net', { company: 'Vivante SA' }),
+    ];
+    const before = buildContacts({ ...base, prospects });
+    const after = buildContacts({ ...base, keys: [keyRow('twin@example.net')], prospects });
+    expect(before[0].company).toBe('Vivante SA');
+    expect(after[0].company).toBe('Vivante SA');
+    expect(asClient(after[0]).sourcing?.prospectId).toBe('pb');
+  });
+
   it('lets a later prospect represent the address when the first one is rejected', () => {
     // The rejected row leaves before it can claim the address, so the surviving
     // row is still emitted. Dropping someone here would be a real regression.
@@ -559,6 +585,20 @@ describe('buildContacts', () => {
     });
     expect(out).toHaveLength(1);
     expect(asClient(out[0]).apiKey.keyPrefix).toBe('ifk_zused');
+  });
+
+  it('still lists a prospect whose address holds a dormant key', () => {
+    // Third leg of the "an unemitted key leaves its address unclaimed" rule,
+    // alongside the internal and pilot cases. The key is real but did nothing,
+    // so it produces no client, and the prospect must survive that.
+    const out = buildContacts({
+      ...base,
+      keys: [keyRow('dormant@example.net', { used_all_time: 0 })],
+      prospects: [prospectRow('p19', 'dormant@example.net')],
+    });
+    expect(out).toHaveLength(1);
+    expect(out[0].kind).toBe('prospect');
+    expect(out[0].id).toBe('dormant@example.net');
   });
 
   it('still lists a prospect whose address holds a key we never surfaced', () => {
@@ -608,6 +648,18 @@ describe('buildContacts', () => {
       status: 'contacte',
       source: 'annuaire',
     });
+  });
+
+  it('gives each message-less contact its own messages array', () => {
+    // One shared empty array would let a renderer that sorts or pushes in place
+    // corrupt every silent contact at once.
+    const out = buildContacts({
+      ...base,
+      prospects: [prospectRow('p20', 'quiet20@example.net'), prospectRow('p21', null)],
+    });
+    expect(out[0].messages).not.toBe(out[1].messages);
+    out[0].messages.push(msgRow('quiet20@example.net'));
+    expect(out[1].messages).toHaveLength(0);
   });
 
   it('does not mutate the input messages', () => {
