@@ -167,10 +167,19 @@ interface Thread {
   rowCount: number;
 }
 
-const EMPTY_THREAD: Thread = { messages: [], draft: null, rowCount: 0 };
+/**
+ * A fresh empty thread per call, never one shared instance: `contact.messages`
+ * is a plain array a renderer may sort in place, and one shared instance would
+ * let that corrupt every message-less contact at once. Freezing it instead would
+ * turn the same mistake into a crash on some contacts and not others, depending
+ * on the data, so a new array is both safer and uniform.
+ */
+function emptyThread(): Thread {
+  return { messages: [], draft: null, rowCount: 0 };
+}
 
 /**
- * Turn the four admin payloads into one contact list. Pure so it can be tested
+ * Turn the admin payloads into one contact list. Pure so it can be tested
  * without the network; the fetching lives in fetchCrmData below.
  */
 export function buildContacts(input: BuildInput): Contact[] {
@@ -184,7 +193,7 @@ export function buildContacts(input: BuildInput): Contact[] {
 
   const threadOf = (email: string): Thread => {
     const rows = threads.get(email);
-    if (!rows) return EMPTY_THREAD;
+    if (!rows) return emptyThread();
     // Drafts are not correspondence: they decide neither who holds the ball nor
     // how long the silence has run, and they render as their own review card.
     const drafts = rows.filter((m) => m.direction === 'draft');
@@ -200,9 +209,12 @@ export function buildContacts(input: BuildInput): Contact[] {
 
   const prospectByEmail = new Map<string, ProspectRow>();
   for (const p of input.prospects) {
+    // Rejected here too, not only in the emit loop: a client must never wear the
+    // identity of a row the operator killed, and skipping it on one side only
+    // would make the company change at the moment the address converts.
+    if (p.status === 'rejete') continue;
     // The schema allows two prospect rows on one address. The FIRST represents
-    // it, here and in the emit loop below, so the company shown for a contact
-    // does not change at the moment it converts.
+    // it, here and in the emit loop below, for the same reason.
     const key = p.contact_email?.toLowerCase();
     if (key && !prospectByEmail.has(key)) prospectByEmail.set(key, p);
   }
@@ -283,7 +295,7 @@ export function buildContacts(input: BuildInput): Contact[] {
     // guard skips empty ids, or every address-less prospect but one would go.
     if (id && emitted.has(id)) continue;
     if (id) emitted.add(id);
-    const { messages, draft } = id ? threadOf(id) : EMPTY_THREAD;
+    const { messages, draft } = id ? threadOf(id) : emptyThread();
 
     out.push({
       kind: 'prospect',
@@ -309,7 +321,7 @@ export function buildContacts(input: BuildInput): Contact[] {
 const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 const ADMIN_SECRET = process.env.ADMIN_SECRET || '';
 
-/** Fetch the four admin payloads. Returns null when the API is unreachable. */
+/** Fetch the five admin payloads. Returns null when the API is unreachable. */
 export async function fetchCrmData(): Promise<BuildInput | null> {
   if (!ADMIN_SECRET) return null;
   const h = { headers: { 'X-Admin-Secret': ADMIN_SECRET }, cache: 'no-store' as const };
