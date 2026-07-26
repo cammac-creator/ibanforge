@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import type Database from 'better-sqlite3';
 import { getStatsDB } from './db.js';
 import { isInternalEmail } from './internal-accounts.js';
+import type { RejectReason } from './input-normalize.js';
 import type { OperationType, StatsOverview, HourlyStatsResponse, ErrorStatsResponse, PatternStatsResponse } from '../types.js';
 
 // ---------------------------------------------------------------------------
@@ -188,6 +189,108 @@ export function classifyClient(path: string, userAgent: string | undefined): Cli
 // Record helpers
 // ---------------------------------------------------------------------------
 
+// A submitted identifier must never reach `request_log`, which has twelve-month
+// retention — that is the signed DPA clause, and the malformed-identifier
+// traffic this instrumentation exists to measure is exactly the population that
+// used to leak. Three shapes had to be closed:
+//
+//   /v1/bic/UBSW%20CHZH      → the old `[A-Za-z0-9]+` stopped at `%`, storing
+//                              `/v1/bic/:code%20CHZH` (tail of the BIC kept).
+//   /v1/ch/clearing/CH230    → the old `\d+` needed leading digits, so a
+//                              non-numeric IID was stored raw and whole.
+//   POST /CH93007620116238…  → no rule covered an unmatched path at all, so a
+//                              404 could put a complete IBAN at rest.
+//   /v1/bic/%7BCH930076…%7D  → an agent that substitutes the OpenAPI
+//                              placeholder but keeps the braces. Not
+//                              segment-shaped (it starts with `%`), and excused
+//                              by the template rule below — a COMPLETE IBAN at
+//                              rest, worse than the first case. See
+//                              `redactSegment` for why the fix belongs there.
+
+/**
+ * The one shape a submitted value can take on ANY route, including one we never
+ * registered: two letters, two check digits, then alphanumerics.
+ *
+ * Deliberately narrow. Checked against every path this API registers — `v1`,
+ * `validate`, `clearing`, the `1k`/`5k`/`25k` bundle slugs, `cs_…` Stripe
+ * session ids, 2-letter country codes — none has this shape, so the catch-all
+ * cannot swallow a real endpoint and fragment the dashboard.
+ */
+const IBAN_SHAPED_TOKEN = /^[A-Za-z]{2}\d{2}[A-Za-z0-9]{1,30}$/;
+
+/**
+ * What delimits an identifier inside a path segment, beyond `/`: a percent
+ * escape or a brace.
+ *
+ * Testing whole segments is not enough. In `%7BCH9300762011623852957%7D` the
+ * `B` of `%7B` glues onto the `CH`, so the segment matches nothing
+ * identifier-shaped while still containing a complete IBAN. Splitting here (the
+ * capture group keeps the delimiters, so the wrapper is rebuilt verbatim)
+ * isolates the core and lets it be redacted in place.
+ */
+const IDENTIFIER_BOUNDARY = /(%[0-9A-Fa-f]{2}|[{}])/;
+
+/**
+ * OpenAPI template literals (`{code}`, `%7Bcode%7D`) are NOT submitted values —
+ * they are an agent pasting the spec placeholder verbatim instead of
+ * substituting it.
+ *
+ * They must stay verbatim: getBusinessFunnel() excludes them by matching
+ * `{`/`%7B` in the stored path, and folding them into `:code` would silently
+ * start counting them as `bad_input` — the exact regression that exclusion was
+ * added to fix.
+ *
+ * This rule is only safe because `redactSegment` runs first and reaches INSIDE
+ * the wrapper. On its own it is far too coarse: it would happily excuse
+ * `%7BCH9300762011623852957%7D`, whose braces contain a real IBAN rather than a
+ * placeholder name. Narrowing this predicate is the wrong repair — it would
+ * only cover the two named route families, leave `/%7BCH93…%7D` on an unmatched
+ * path open, and give the funnel regression back. Redaction is the layer that
+ * has to be right.
+ */
+const SPEC_TEMPLATE_SEGMENT = /\{|%7[Bb]/;
+
+/** Stands in for a redacted identifier. Contains no `{`/`%7B`, so it never
+ *  trips the funnel's spec-template exclusion, and a wrapper redacted to
+ *  `%7B:redacted%7D` still does. */
+const REDACTED_SEGMENT = ':redacted';
+
+/**
+ * Strip any identifier out of one path segment, preserving everything around
+ * it. `%7BCH9300762011623852957%7D` → `%7B:redacted%7D`: the wrapper survives
+ * so the funnel keeps excluding the row, the identifier does not survive at all.
+ */
+function redactSegment(segment: string): string {
+  return segment
+    .split(IDENTIFIER_BOUNDARY)
+    .map((token) => (IBAN_SHAPED_TOKEN.test(token) ? REDACTED_SEGMENT : token))
+    .join('');
+}
+
+/**
+ * Collapse a request path to a storable label: no submitted identifier, and a
+ * stable bucket per route family so dashboards do not fragment.
+ *
+ * Takes a URL *pathname* (what the tracking middleware passes) — the route
+ * patterns stop at `?` defensively, but query strings are not part of the
+ * contract.
+ *
+ * Redaction runs FIRST, then the route labels. The privacy floor must not
+ * depend on a route pattern being correct: if one is later narrowed, the
+ * IBAN catch-all has already fired. On a path both rules touch
+ * (`/v1/bic/CH9300762011623852957`) the two orders converge on `/v1/bic/:code`
+ * — the ordering buys robustness against future edits, not a different result
+ * today.
+ */
+export function normalizeRequestPath(path: string): string {
+  const redacted = path.split('/').map(redactSegment).join('/');
+  return redacted
+    .replace(/\/v1\/bic\/[^/?]+/, (match) => (SPEC_TEMPLATE_SEGMENT.test(match) ? match : '/v1/bic/:code'))
+    .replace(/\/v1\/ch\/clearing\/[^/?]+/, (match) =>
+      SPEC_TEMPLATE_SEGMENT.test(match) ? match : '/v1/ch/clearing/:iid',
+    );
+}
+
 /**
  * Record any HTTP request (all traffic, not just business operations).
  *
@@ -208,10 +311,9 @@ export function recordRequest(
     const now = new Date();
     const hour = now.getUTCHours();
     const dow = (now.getUTCDay() + 6) % 7;
-    // Normalize paths: /v1/bic/DEUTDEFF → /v1/bic/:code
-    const normalizedPath = path
-      .replace(/\/v1\/bic\/[A-Za-z0-9]+/, '/v1/bic/:code')
-      .replace(/\/v1\/ch\/clearing\/\d+/, '/v1/ch/clearing/:iid');
+    // Normalize paths: /v1/bic/DEUTDEFF → /v1/bic/:code, and redact any
+    // identifier-shaped segment before it reaches storage (see above).
+    const normalizedPath = normalizeRequestPath(path);
     const truncatedUa = userAgent ? userAgent.slice(0, 256) : null;
     insertRequest().run(method, normalizedPath, status, Math.round(responseMs), hour, dow, clientKind, ipHash, truncatedUa, keyPrefix);
   } catch (err) {
@@ -248,6 +350,44 @@ export function recordOperation(
     // DB is visible instead of silently dropping every operation.
     console.error('[stats] recordOperation failed:', err);
   }
+}
+
+/**
+ * Un rejet de format n'atteint jamais recordOperation : les routes renvoient
+ * 400 avant. Sans cette fonction, un rejet n'existe que comme un statut 400
+ * anonyme dans request_log, et on ne peut pas dire ce qu'il faudrait tolérer.
+ * On stocke la CATÉGORIE, jamais la valeur soumise (DPA).
+ */
+export function recordRejection(type: OperationType, reason: RejectReason): void {
+  try {
+    const db = getStatsDB();
+    const now = new Date();
+    db.prepare(
+      'INSERT INTO operations (operation_type, country_code, success, hour, day_of_week, reject_reason) VALUES (?, NULL, 0, ?, ?, ?)',
+    ).run(type, now.getUTCHours(), (now.getUTCDay() + 6) % 7, reason);
+  } catch (err) {
+    console.error('[stats] recordRejection failed:', err);
+  }
+}
+
+export interface RejectionRow {
+  operation_type: string;
+  reject_reason: string;
+  count: number;
+}
+
+export function getRejectionStats(days = 30): RejectionRow[] {
+  const db = getStatsDB();
+  return db
+    .prepare(
+      `SELECT operation_type, reject_reason, COUNT(*) AS count
+       FROM operations
+       WHERE reject_reason IS NOT NULL
+         AND created_at >= datetime('now', ?)
+       GROUP BY operation_type, reject_reason
+       ORDER BY count DESC`,
+    )
+    .all(`-${days} days`) as RejectionRow[];
 }
 
 /**
@@ -357,9 +497,22 @@ export function getSourceStats(days: number): SourceStatsResponse {
 // Read helpers
 // ---------------------------------------------------------------------------
 
+// Rejection rows share the `operations` table but are a SEPARATE LANE: every
+// reader below must exclude them with `reject_reason IS NULL`, and only
+// getRejectionStats() reads them (`reject_reason IS NOT NULL`).
+//
+// Why: a rejection is a request that never reached the operation, not a failed
+// operation. Counting it as success=0 would crater bic_lookup's hit rate to
+// single digits the moment the routes start calling recordRejection —
+// indistinguishable from an outage on a service that sells reliability — and it
+// would corrupt the before/after funnel comparison the tolerance work exists to
+// measure, making a real improvement impossible to tell from an accounting
+// artefact. Historical rows predate the column and are NULL, so the predicate
+// includes all of them.
+
 function typeStats(type: OperationType): { total: number; success_count: number } {
   const row = getStatsDB().prepare(
-    'SELECT COUNT(*) as total, COALESCE(SUM(success), 0) as success_count FROM operations WHERE operation_type = ?'
+    'SELECT COUNT(*) as total, COALESCE(SUM(success), 0) as success_count FROM operations WHERE operation_type = ? AND reject_reason IS NULL'
   ).get(type) as { total: number; success_count: number };
   return row;
 }
@@ -522,15 +675,15 @@ export function getStatsHistory(days: number = 7): Array<{
 export function getQuickStats(): { total_operations: number; iban_validations: number; bic_lookups: number; success_rate: number } {
   const db = getStatsDB();
   const row = db.prepare(
-    'SELECT COUNT(*) as total, COALESCE(SUM(success), 0) as success_count FROM operations'
+    'SELECT COUNT(*) as total, COALESCE(SUM(success), 0) as success_count FROM operations WHERE reject_reason IS NULL'
   ).get() as { total: number; success_count: number };
 
   const ibanCount = db.prepare(
-    "SELECT COUNT(*) as cnt FROM operations WHERE operation_type IN ('iban_validate', 'iban_batch')"
+    "SELECT COUNT(*) as cnt FROM operations WHERE operation_type IN ('iban_validate', 'iban_batch') AND reject_reason IS NULL"
   ).get() as { cnt: number };
 
   const bicCount = db.prepare(
-    "SELECT COUNT(*) as cnt FROM operations WHERE operation_type = 'bic_lookup'"
+    "SELECT COUNT(*) as cnt FROM operations WHERE operation_type = 'bic_lookup' AND reject_reason IS NULL"
   ).get() as { cnt: number };
 
   return {
@@ -773,6 +926,7 @@ export function getErrorStats(days: number = 30): ErrorStatsResponse {
       SELECT COUNT(*) as total, COALESCE(SUM(success), 0) as success_count
       FROM operations
       WHERE operation_type = ? AND created_at >= datetime('now', '-' || ? || ' days')
+        AND reject_reason IS NULL
     `).get(opType, days) as { total: number; success_count: number };
     const errorRate = overall.total > 0 ? Math.round(((overall.total - overall.success_count) / overall.total) * 10000) / 100 : 0;
 
@@ -781,6 +935,7 @@ export function getErrorStats(days: number = 30): ErrorStatsResponse {
       SELECT date(created_at) as day, COUNT(*) as total, COALESCE(SUM(success), 0) as success_count
       FROM operations
       WHERE operation_type = ? AND created_at >= datetime('now', '-7 days')
+        AND reject_reason IS NULL
       GROUP BY day
       ORDER BY day ASC
     `).all(opType) as Array<{ day: string; total: number; success_count: number }>;

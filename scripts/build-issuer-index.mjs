@@ -20,7 +20,10 @@ import Database from 'better-sqlite3';
 import { readFileSync, writeFileSync } from 'node:fs';
 
 const SNAPSHOT = 'scripts/data/eu-emi-register-2026-05-22.json';
-const OUT = 'src/lib/issuers-generated.ts';
+// The generated file now lives in the open-source library. The generator stays
+// here: it cross-matches the public EBA/FCA registers against the BIC base,
+// which is private and does not leave this repo.
+const OUT = process.env.ISSUERS_OUT ?? '../iban-core/src/issuers-generated.ts';
 
 // Corporate/legal-form tokens stripped before matching, so that e.g.
 // "Stripe Payments UK Limited" and "STRIPE PAYMENTS UK LTD" align.
@@ -72,10 +75,15 @@ for (const e of list) {
 
 const entries = [...generated.entries()].sort((a, b) => a[0].localeCompare(b[0]));
 const body = entries.map(([b, t]) => `  ${b}: '${t}',`).join('\n');
-const content = `// GENERATED — do not edit. Regenerate: npm run issuers:build
-// Cross-match of the EBA PIR + FCA UK EMI/PI register snapshot
-// (scripts/data/eu-emi-register-2026-05-22.json) against the BIC base, by
-// exact normalized-name match. ${entries.length} BIC8 codes.
+// The header below ships inside the open-source library, where this script,
+// its snapshot and the BIC database do not exist. It must therefore stand on
+// its own: no command to run, no path to follow, nothing a reader could look
+// for and fail to find. Audit 2026-07-25.
+const content = `// GENERATED FILE — do not edit by hand.
+// A BIC8 -> issuer-type index, built by cross-matching the public EBA Payment
+// Institutions Register and the FCA UK e-money register against a bank
+// identifier directory, on exact normalised-name match. ${entries.length} BIC8 codes.
+// Refreshed periodically. Open an issue to report a misclassification.
 import type { IssuerType } from './issuers.js';
 
 export const GENERATED_ISSUERS: Record<string, IssuerType> = {

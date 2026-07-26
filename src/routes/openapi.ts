@@ -177,7 +177,7 @@ const buildSpec = () => ({
         operationId: 'complianceCheck',
         summary: 'Full IBAN compliance check',
         description:
-          'Validates an IBAN and returns everything from /v1/iban/validate PLUS a full compliance layer: sanctions screening (OFAC/EU/UN), FATF status, SEPA Instant reachability, VoP participant check, and a composite risk score (0-100). Costs $0.02 USDC via x402.',
+          'Validates an IBAN and returns everything from /v1/iban/validate PLUS a full compliance layer: sanctions screening (OFAC), FATF status, SEPA Instant reachability, VoP participant check, and a composite risk score (0-100). Costs $0.02 USDC via x402.',
         tags: ['Compliance'],
         security: [{ x402Payment: [] }, { apiKey: [] }],
         requestBody: {
@@ -964,7 +964,7 @@ const buildSpec = () => ({
             properties: {
               country_sanctioned: { type: 'boolean' },
               bank_sanctioned: { type: 'boolean' },
-              matched_lists: { type: 'array', items: { type: 'string' }, example: ['OFAC_SDN', 'EU_SANCTIONS'] },
+              matched_lists: { type: 'array', items: { type: 'string' }, example: ['OFAC'] },
               fatf_status: { type: 'string', enum: ['member', 'grey_list', 'black_list', 'non_member'] },
             },
           },

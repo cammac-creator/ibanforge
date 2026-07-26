@@ -30,3 +30,6 @@ __pycache__/
 
 # One-off operator tool with wallet key material — never commit
 scripts/x402-pay.mjs
+
+# Worktrees de sessions parallèles Claude Code — jamais dans le dépôt
+.claude/
