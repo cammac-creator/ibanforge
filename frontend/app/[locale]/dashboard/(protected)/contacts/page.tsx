@@ -1,8 +1,81 @@
+import { getLocale } from 'next-intl/server';
 import { CrmApp } from '@/components/crm/crm-app';
 import { StatCardV2 } from '@/components/dashboard/stat-card-v2';
-import { buildContacts, fetchCrmData } from '@/lib/crm/build-contacts';
+import { TopUsersToday, type TopUserToday } from '@/components/dashboard/top-users-today';
+import { enrichEmail } from '@/lib/company-enrichment';
+import { buildContacts, fetchCrmData, INTERNAL_RE, type KeyRow } from '@/lib/crm/build-contacts';
 import { situationOf } from '@/lib/crm/situation';
 import type { Situation } from '@/lib/crm/types';
+
+/** Ported as it stood from the Clients page: paid beats pilot beats free. */
+function categoryOf(row: KeyRow): TopUserToday['category'] {
+  if (row.credits_total != null) return 'PAYANT';
+  if ((row.monthly_limit ?? 0) >= 5000) return 'PILOTE';
+  return 'GRATUIT';
+}
+
+const CAT_RANK = { PAYANT: 0, PILOTE: 1, GRATUIT: 2 } as const;
+
+/**
+ * The top-3 hero card, lifted from the Clients page rather than rewritten:
+ * requests attributed per client address, all of its keys combined, internal
+ * accounts excluded, on the same UTC day convention as request_log. On a quiet
+ * day it backfills with this month's most active clients (api_usage `used`),
+ * which is where free-tier usage lives from before per-key daily attribution
+ * existed, so the podium always shows real users.
+ *
+ * Everything it needs is already in the payload the page fetches; nothing was
+ * added to the fetch for it.
+ */
+function topUsers(
+  keys: KeyRow[],
+  activityByKey: Record<string, { days: Array<{ day: string; count: number }> }>,
+  todayUtc: string,
+): TopUserToday[] {
+  const collect = (
+    map: Map<string, TopUserToday>,
+    row: KeyRow,
+    count: number,
+    period: TopUserToday['period'],
+  ) => {
+    const category = categoryOf(row);
+    const prev = map.get(row.email.toLowerCase());
+    if (prev) {
+      prev.count += count;
+      if (CAT_RANK[category] < CAT_RANK[prev.category]) prev.category = category;
+    } else {
+      const enriched = enrichEmail(row.email);
+      map.set(row.email.toLowerCase(), {
+        email: row.email,
+        company: enriched.company,
+        sector: enriched.sector,
+        category,
+        count,
+        period,
+      });
+    }
+  };
+
+  const todayByEmail = new Map<string, TopUserToday>();
+  for (const row of keys) {
+    if (INTERNAL_RE.test(row.email)) continue;
+    const count = activityByKey[row.key_prefix]?.days.find((d) => d.day === todayUtc)?.count ?? 0;
+    if (count > 0) collect(todayByEmail, row, count, 'today');
+  }
+  const top = [...todayByEmail.values()].sort((a, b) => b.count - a.count).slice(0, 3);
+
+  if (top.length < 3) {
+    const monthByEmail = new Map<string, TopUserToday>();
+    for (const row of keys) {
+      if (INTERNAL_RE.test(row.email)) continue;
+      if (todayByEmail.has(row.email.toLowerCase())) continue;
+      if (row.used > 0) collect(monthByEmail, row, row.used, 'month');
+    }
+    const monthly = [...monthByEmail.values()].sort((a, b) => b.count - a.count);
+    top.push(...monthly.slice(0, 3 - top.length));
+  }
+  return top;
+}
 
 /**
  * The single CRM page: clients and prospects in one list, one vocabulary, one
@@ -10,6 +83,7 @@ import type { Situation } from '@/lib/crm/types';
  * filters, search and thread.
  */
 export default async function ContactsPage() {
+  const locale = await getLocale();
   const data = await fetchCrmData();
 
   if (!data) {
@@ -41,6 +115,10 @@ export default async function ContactsPage() {
   const situations: Record<string, Situation> = {};
   for (const c of contacts) situations[c.id] = situationOf(c.messages, now);
 
+  // Same instant as the situations above, so the whole page is one snapshot.
+  const todayUtc = now.toISOString().slice(0, 10);
+  const top = topUsers(data.keys, data.activityByKey, todayUtc);
+
   const all = Object.values(situations);
   const ballWithUs = all.filter((s) => s.ballInCourt === 'us').length;
   const followupDue = all.filter((s) => s.followupDue).length;
@@ -56,6 +134,8 @@ export default async function ContactsPage() {
           {contacts.length > 1 ? 's' : ''}
         </p>
       </div>
+
+      <TopUsersToday top={top} todayUtc={todayUtc} locale={locale} />
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <StatCardV2
