@@ -1,5 +1,5 @@
-import type { Contact, Situation } from '@/lib/crm/types';
 import { isArchived } from './archived';
+import type { Contact, Situation } from './types';
 
 /**
  * The two buckets a day's work is made of, written once each.

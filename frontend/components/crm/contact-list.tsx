@@ -1,9 +1,9 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { isArchived } from '@/lib/crm/archived';
+import { dueToday, followupDue } from '@/lib/crm/buckets';
 import type { Contact, Situation } from '@/lib/crm/types';
-import { isArchived } from './archived';
-import { dueToday, followupDue } from './buckets';
 
 export type FilterKey = 'today' | 'all' | 'followup' | 'prospects' | 'clients' | 'archived';
 

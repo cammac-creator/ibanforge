@@ -1,0 +1,221 @@
+import { describe, expect, it } from 'vitest';
+import { ballWithUs, dueToday, followupDue } from './buckets';
+import { FOLLOWUP_DAYS, situationOf } from './situation';
+import type { Contact, Message, ProspectSourcing, Situation } from './types';
+
+/**
+ * Every address and company below is invented; example.net is reserved for
+ * documentation by RFC 2606. Local parts avoid the substrings INTERNAL_RE
+ * matches, so the same fixtures stay usable if these ever meet buildContacts.
+ */
+
+const TODAY = new Date('2026-07-25T09:00:00Z');
+
+/** An ISO stamp n days before TODAY, so silence durations are exact. */
+const daysAgo = (n: number): string => new Date(TODAY.getTime() - n * 86_400_000).toISOString();
+
+const msg = (direction: Message['direction'], msg_date: string | null): Message => ({
+  direction,
+  msg_date,
+  subject: null,
+  snippet: null,
+  counterparty: null,
+});
+
+const sourcing = (status: string): ProspectSourcing => ({
+  prospectId: 'p-1',
+  segment: null,
+  whatTheyDo: null,
+  fitReason: null,
+  buyingSignal: null,
+  signalSourceUrl: null,
+  contactName: null,
+  contactRole: null,
+  emailSourceUrl: null,
+  personalizationHook: null,
+  confidence: null,
+  status,
+  source: null,
+});
+
+const prospect = (id: string, status = 'contacte', messages: Message[] = []): Contact => ({
+  kind: 'prospect',
+  id,
+  email: id,
+  company: 'Fictive Sàrl',
+  country: 'CH',
+  website: null,
+  messages,
+  draft: null,
+  unread: false,
+  account: 'crm@example.net',
+  sourcing: sourcing(status),
+  readyMail: null,
+});
+
+/**
+ * messageCount defaults to 2 so the contact is NOT archived unless a test says
+ * so: isArchived only fires on a thread with no datable message.
+ */
+const situation = (over: Partial<Situation> = {}): Situation => ({
+  ballInCourt: 'none',
+  silenceDays: null,
+  followupDue: false,
+  firstContactAt: null,
+  hasEverReplied: false,
+  messageCount: 2,
+  nextAction: 'wait',
+  ...over,
+});
+
+const ACTIVE = prospect('lena@example.net');
+const ARCHIVED = prospect('otto@example.net', 'archive');
+
+describe('ballWithUs', () => {
+  it('claims a contact whose last message is inbound', () => {
+    expect(ballWithUs(ACTIVE, situation({ ballInCourt: 'us' }))).toBe(true);
+  });
+
+  it('leaves a contact whose ball is not in our court', () => {
+    // 'none' matters as much as 'them': an empty thread owes a first mail, not
+    // a reply, and the rail's "ils attendent ta réponse" section would lie.
+    expect(ballWithUs(ACTIVE, situation({ ballInCourt: 'them' }))).toBe(false);
+    expect(ballWithUs(ACTIVE, situation({ ballInCourt: 'none' }))).toBe(false);
+  });
+
+  it('declines an archived contact even when the ball is with us', () => {
+    // situationOf cannot currently produce this pair, since messageCount 0 also
+    // means ballInCourt 'none'. That is the point: the guard is what keeps the
+    // day's queue empty of archived rows if isArchived is ever loosened.
+    const s = situation({ ballInCourt: 'us', messageCount: 0 });
+    expect(ballWithUs(ARCHIVED, s)).toBe(false);
+  });
+
+  it('declines a contact whose id has no situation', () => {
+    const situations: Record<string, Situation> = {};
+    expect(ballWithUs(ACTIVE, situations[ACTIVE.id])).toBe(false);
+  });
+});
+
+describe('followupDue', () => {
+  it('claims a contact whose silence has run past the threshold', () => {
+    expect(followupDue(ACTIVE, situation({ ballInCourt: 'them', followupDue: true }))).toBe(true);
+  });
+
+  it('leaves a contact whose silence has not', () => {
+    expect(followupDue(ACTIVE, situation({ ballInCourt: 'them', followupDue: false }))).toBe(false);
+  });
+
+  it('declines an archived contact even when a followup is due', () => {
+    const s = situation({ ballInCourt: 'them', followupDue: true, messageCount: 0 });
+    expect(followupDue(ARCHIVED, s)).toBe(false);
+  });
+
+  it('declines a contact whose id has no situation', () => {
+    const situations: Record<string, Situation> = {};
+    expect(followupDue(ACTIVE, situations[ACTIVE.id])).toBe(false);
+  });
+});
+
+describe('a contact whose id has no situation', () => {
+  it('lands in no bucket at all, without throwing', () => {
+    // The page builds one entry per contact id, so an absent one is a bug in
+    // the caller. A predicate that declines the row beats one that throws in
+    // the operator's face, but it must decline it rather than claim it.
+    const situations: Record<string, Situation> = {};
+    const s = situations[ACTIVE.id];
+    expect(() => dueToday(ACTIVE, s)).not.toThrow();
+    expect(ballWithUs(ACTIVE, s)).toBe(false);
+    expect(followupDue(ACTIVE, s)).toBe(false);
+    expect(dueToday(ACTIVE, s)).toBe(false);
+  });
+});
+
+describe('dueToday', () => {
+  const cases: Array<{ name: string; c: Contact; s: Situation | undefined; expected: boolean }> = [
+    { name: 'ball with us', c: ACTIVE, s: situation({ ballInCourt: 'us' }), expected: true },
+    {
+      name: 'followup due',
+      c: ACTIVE,
+      s: situation({ ballInCourt: 'them', followupDue: true }),
+      expected: true,
+    },
+    {
+      name: 'waiting on them, not yet due',
+      c: ACTIVE,
+      s: situation({ ballInCourt: 'them' }),
+      expected: false,
+    },
+    { name: 'empty thread', c: ACTIVE, s: situation({ ballInCourt: 'none' }), expected: false },
+    {
+      name: 'archived with the ball on our side',
+      c: ARCHIVED,
+      s: situation({ ballInCourt: 'us', messageCount: 0 }),
+      expected: false,
+    },
+    {
+      name: 'archived with a followup due',
+      c: ARCHIVED,
+      s: situation({ ballInCourt: 'them', followupDue: true, messageCount: 0 }),
+      expected: false,
+    },
+    { name: 'no situation', c: ACTIVE, s: undefined, expected: false },
+  ];
+
+  for (const { name, c, s, expected } of cases) {
+    it(`is the union of the two buckets: ${name}`, () => {
+      expect(dueToday(c, s)).toBe(expected);
+      expect(dueToday(c, s)).toBe(ballWithUs(c, s) || followupDue(c, s));
+    });
+  }
+});
+
+/**
+ * The invariant the module exists for, pinned against situationOf rather than
+ * against hand-written Situation objects. Nothing in buckets.ts enforces it: a
+ * literal { ballInCourt: 'us', followupDue: true } would satisfy both
+ * predicates at once. Disjointness is a property of situation.ts, which only
+ * calls a followup due when the ball is in THEIR court, and the rail's two
+ * section badges are read against the Aujourd'hui chip on that basis.
+ */
+describe('the two buckets are disjoint', () => {
+  const threads: Array<{ name: string; messages: Message[] }> = [
+    { name: 'empty thread', messages: [] },
+    { name: 'they answered yesterday', messages: [msg('out', daysAgo(4)), msg('in', daysAgo(1))] },
+    {
+      // The row that kills the invariant if situation.ts drops its ballInCourt
+      // term: the ball is with us AND the silence is long enough to look due.
+      name: 'they answered long ago and we never replied',
+      messages: [msg('out', daysAgo(40)), msg('in', daysAgo(FOLLOWUP_DAYS + 15))],
+    },
+    { name: 'we wrote recently', messages: [msg('out', daysAgo(FOLLOWUP_DAYS - 3))] },
+    { name: 'we wrote and got nothing back', messages: [msg('out', daysAgo(FOLLOWUP_DAYS + 1))] },
+    { name: 'only undatable messages', messages: [msg('out', 'last spring'), msg('in', null)] },
+    { name: 'a draft and nothing else', messages: [msg('draft', daysAgo(1))] },
+  ];
+
+  const rows = threads.map(({ name, messages }, i) => ({
+    name,
+    c: prospect(`c${i}@example.net`, 'contacte', messages),
+    s: situationOf(messages, TODAY),
+  }));
+
+  for (const { name, c, s } of rows) {
+    it(`puts "${name}" in at most one bucket`, () => {
+      expect(ballWithUs(c, s) && followupDue(c, s)).toBe(false);
+    });
+  }
+
+  it('splits the day into two buckets that add up', () => {
+    // What the operator actually reads: the rail's two section badges must sum
+    // to the Aujourd'hui chip. That only holds because the buckets are disjoint.
+    const ours = rows.filter(({ c, s }) => ballWithUs(c, s)).length;
+    const due = rows.filter(({ c, s }) => followupDue(c, s)).length;
+    const today = rows.filter(({ c, s }) => dueToday(c, s)).length;
+
+    // Both sides non-zero, otherwise the identity would hold for free.
+    expect(ours).toBe(2);
+    expect(due).toBe(1);
+    expect(today).toBe(ours + due);
+  });
+});
