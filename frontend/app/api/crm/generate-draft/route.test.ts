@@ -137,6 +137,50 @@ describe('POST /api/crm/generate-draft, redaction rules on the wire', () => {
   });
 });
 
+/**
+ * `follow_up` selects the upstream system prompt: its follow-up mode asks for
+ * two or three sentences, one new angle and no recap of the mail already sent.
+ * The composer decides it; this route only has to carry it.
+ *
+ * Worth its own tests because the proxy does not forward the body it received.
+ * It forwards the value `applyRedactionRules` returns, which on a matching rule
+ * is a rebuilt object, and a field dropped there would leave the composer
+ * choosing a mode that never arrives. The failure would be silent: the draft
+ * would come back long and repetitive, exactly as it did before the mode
+ * existed, with no error anywhere.
+ */
+describe('POST /api/crm/generate-draft, the follow-up mode on the wire', () => {
+  it('carries follow_up true untouched', async () => {
+    await post({ ...draft('someone@example.net'), follow_up: true });
+
+    expect(captured!.body.follow_up).toBe(true);
+  });
+
+  it('carries follow_up false rather than dropping it', async () => {
+    await post({ ...draft('someone@example.net'), follow_up: false });
+
+    // Not `toBeFalsy`: an absent field is falsy too, and absent is what a
+    // filtering proxy would produce.
+    expect(captured!.body).toHaveProperty('follow_up', false);
+  });
+
+  it('keeps follow_up through the redaction rewrite, which rebuilds the body', async () => {
+    vi.stubEnv('CRM_DRAFT_REDACTION_RULES', 'example.com=Acme');
+    await post({ ...draft('someone@example.com'), follow_up: true });
+
+    expect(captured!.body.context).toBe(`${BRIEF}\nIMPORTANT: never mention "Acme" anywhere.`);
+    expect(captured!.body.follow_up).toBe(true);
+  });
+
+  it('sends no follow_up at all when the caller sends none', async () => {
+    await post(draft('someone@example.net'));
+
+    // The old body, unchanged: the upstream default is false, so a caller that
+    // never heard of the mode keeps the behaviour it had.
+    expect(captured!.body).not.toHaveProperty('follow_up');
+  });
+});
+
 describe('POST /api/crm/generate-draft, the paths around it', () => {
   it('answers 503 and calls nobody when the shared secret is missing', async () => {
     vi.stubEnv('CRM_DRAFT_SECRET', '');
