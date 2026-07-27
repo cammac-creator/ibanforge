@@ -12,7 +12,9 @@ import {
   withReason,
   type ProposedAngle,
 } from '@/lib/crm/api-result';
+import { canLoadReadyMail } from '@/lib/crm/ready-mail';
 import { NEXT_ACTION_LABEL } from '@/lib/crm/situation';
+import { threadTail } from '@/lib/crm/thread-tail';
 import type { Contact, Situation } from '@/lib/crm/types';
 import { GuardrailChecks, OverrideButton, useGuardrails } from './guardrails-ui';
 
@@ -142,9 +144,16 @@ export function ComposerDock({
     );
   }
 
-  /** A prospect never contacted starts from its pre-written mail. */
+  /**
+   * A prospect never contacted starts from its pre-written mail.
+   *
+   * The guard is the same rule the two buttons are rendered on, called here as
+   * well and not only there: what it stops is loading the mail already sent
+   * back into the composer, and a guard that lives only in the markup is one a
+   * third caller can walk around without noticing there was a rule.
+   */
   function loadReadyMail() {
-    if (c.kind !== 'prospect' || !c.readyMail) return;
+    if (!canLoadReadyMail(c)) return;
     const useFr = c.readyMail.recommendedLang === 'fr';
     const nextSubject = (useFr ? c.readyMail.subjectFr : c.readyMail.subjectEn) ?? '';
     const nextBody = (useFr ? c.readyMail.bodyFr : c.readyMail.bodyEn) ?? '';
@@ -158,23 +167,6 @@ export function ComposerDock({
     // An angle chosen for a mail that is no longer the one being written.
     setStep(null);
     g.clear();
-  }
-
-  /**
-   * The last four messages of the thread, in the shape both the generator and
-   * the angles endpoint read them. One function and not two literals: the
-   * angles are proposed from this text and the draft is then written from it,
-   * so the two must be looking at the same thread or the angle describes a
-   * conversation the generation cannot see.
-   *
-   * Empty when there is no correspondence, which the callers each phrase in
-   * their own way rather than sending a bare empty string.
-   */
-  function threadTail(): string {
-    return c.messages
-      .slice(-4)
-      .map((m) => `[${m.direction === 'in' ? 'them' : 'me'} ${m.msg_date ?? ''}] ${m.snippet ?? ''}`)
-      .join('\n');
   }
 
   /**
@@ -226,7 +218,7 @@ export function ComposerDock({
         ? 'This is a FOLLOW-UP: at most 2 sentences, one new angle, no recap of the previous mail.'
         : '',
       c.messages.length
-        ? `Thread so far:\n${threadTail()}`
+        ? `Thread so far:\n${threadTail(c.messages)}`
         : activeUser
           ? 'This person ALREADY uses IBANforge (they have made real API calls) but you have NEVER emailed them. Write a SHORT, warm, NON-salesy note from the founder: thank them for using it, then ask just two easy questions: (1) a brief bit of feedback on their experience so far, and (2) how they discovered IBANforge. Do NOT pitch features and do NOT ask for a call.'
           : 'No prior email: cold first touch.',
@@ -260,7 +252,7 @@ export function ComposerDock({
           contact: c.sourcing?.whatTheyDo
             ? `${c.company || c.email}, ${c.sourcing.whatTheyDo}`
             : c.company || c.email,
-          thread: threadTail(),
+          thread: threadTail(c.messages),
         }),
       });
       const a = await readAnswer(r);
@@ -556,7 +548,12 @@ export function ComposerDock({
           >
             {genLabel}
           </button>
-          {c.kind === 'prospect' && c.readyMail && (
+          {/* Gated on the thread being empty, here and on its twin below. The
+              pre-written mail is the first mail and is never rewritten, so on
+              a prospect already written to this button loaded the mail already
+              sent back into the composer, next to Envoyer. See
+              lib/crm/ready-mail.ts. */}
+          {canLoadReadyMail(c) && (
             <button
               type="button"
               onClick={() => {
@@ -707,7 +704,9 @@ export function ComposerDock({
             >
               {genLabel}
             </button>
-            {c.kind === 'prospect' && c.readyMail && (
+            {/* Same rule as the folded copy above, and the same call rather
+                than a second reading of it. */}
+            {canLoadReadyMail(c) && (
               <button
                 type="button"
                 onClick={loadReadyMail}
