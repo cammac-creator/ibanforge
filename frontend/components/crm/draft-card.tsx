@@ -67,7 +67,9 @@ export function DraftCard({
    * row, so they follow the text the operator is actually about to send.
    */
   const sendable = !locked && !!contact.email && !!subject.trim() && !!body.trim();
-  const g = useGuardrails({ subject, body, sentToday, situation, sendable });
+  // `contact.messages` is correspondence only, drafts excluded, so this card is
+  // never compared against the very row it is showing.
+  const g = useGuardrails({ subject, body, sentToday, situation, messages: contact.messages, sendable });
 
   /**
    * Both halves of a send failure in one sentence.

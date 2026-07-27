@@ -1,3 +1,4 @@
+import { type PreviousMail, REPEAT_RATIO, repeatRatio, sameSubject } from './repeat';
 import { HARD_CAP, SOFT_CAP } from './sent-today';
 import type { GuardrailIssue, GuardrailReport } from './types';
 
@@ -18,6 +19,16 @@ export interface CheckInput {
   sentToday: number;
   /** A cold first touch: stricter length window, opt-out required. */
   isFirstTouch: boolean;
+  /**
+   * The last mail actually sent to this contact, when there is one.
+   *
+   * Optional, and absent means the two rules that read it say nothing at all,
+   * so a caller that never heard of them keeps the report it had. It is handed
+   * in rather than derived here for the same reason `sentToday` is: this
+   * function stays a function of its arguments, and the selector that finds it
+   * is tested on its own in repeat.ts.
+   */
+  previous?: PreviousMail;
 }
 
 const FOLLOWUP_WORDS = { min: 40, max: 90 };
@@ -114,7 +125,13 @@ function hasLink(run: string): boolean {
  * Pure by design: `sentToday` arrives as a number and is never recomputed here,
  * so the whole page judges one snapshot and the rules stay testable on the nose.
  */
-export function checkDraft({ body, subject, sentToday, isFirstTouch }: CheckInput): GuardrailReport {
+export function checkDraft({
+  body,
+  subject,
+  sentToday,
+  isFirstTouch,
+  previous,
+}: CheckInput): GuardrailReport {
   const issues: GuardrailIssue[] = [];
   const lowerBody = body.toLowerCase();
 
@@ -199,6 +216,41 @@ export function checkDraft({ body, subject, sentToday, isFirstTouch }: CheckInpu
   const hit = SPAM_WORDS.find((w) => lowerWritten.includes(w));
   if (hit) {
     issues.push({ code: 'spam_word', level: 'warning', message: `Mot à risque : « ${hit} ».` });
+  }
+
+  /**
+   * The question nothing here used to ask: does this say what the last mail
+   * already said. Both of these warn and neither ever blocks. See repeat.ts for
+   * why the measure is what it is; the choice of level is the point here.
+   *
+   * An em dash and the daily cap are promises about the domain's reputation,
+   * which is why they take the send away until the operator overrides them.
+   * Resending a close text is not that. It is an editorial call, sometimes the
+   * right one, and the operator is the only one holding what the recipient
+   * said on the phone yesterday. So this is loud and never in the way.
+   */
+  if (previous) {
+    const ratio = repeatRatio(body, previous.text);
+    if (ratio !== null && ratio >= REPEAT_RATIO) {
+      // Rounded to the nearest ten: the figure is a reading of a set overlap,
+      // not a measurement, and printing 62 % invites an argument about the 2.
+      const rounded = Math.round(ratio * 10) * 10;
+      issues.push({
+        code: 'repeat_previous',
+        level: 'warning',
+        message: `Environ ${rounded} % de ce texte se retrouve déjà dans ton dernier mail envoyé. Coupe ce qui a déjà été dit et garde une seule idée neuve.`,
+      });
+    }
+    // Cheaper than the body comparison and more visible to the recipient: the
+    // subject is the line they read before deciding to open anything.
+    if (subject && sameSubject(subject, previous.subject)) {
+      issues.push({
+        code: 'same_subject',
+        level: 'warning',
+        message:
+          'Objet identique à ton dernier mail envoyé. Donne-lui un objet qui annonce ce que celui-ci apporte de neuf.',
+      });
+    }
   }
 
   return { issues, blocking: issues.some((i) => i.level === 'blocking') };
