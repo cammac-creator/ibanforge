@@ -195,6 +195,18 @@ export function ComposerDock({
    *
    * The angle, when one was chosen, is another such line. It is internal: this
    * whole text steers the draft and none of it is ever sent.
+   *
+   * What is NOT here any more is the follow-up discipline. This text used to
+   * carry "This is a FOLLOW-UP: at most 2 sentences, one new angle, no recap of
+   * the previous mail." on the same `isFollowup`, and the `follow_up` flag now
+   * carries all three of those clauses in the upstream system prompt. Two
+   * reasons for deleting rather than keeping both. The instructions disagreed
+   * on the number, at most two sentences here against two or three there, and a
+   * user turn arguing with a system turn over a count is worse than no line at
+   * all: the model has to pick, and it picked the system prompt. And the rule
+   * belongs where it can be tuned without a frontend deploy. Nothing is lost by
+   * the deletion because the same expression gates both: wherever this line
+   * used to appear, the flag now goes.
    */
   function brief(angle?: ProposedAngle): string {
     // Never emailed, but genuinely calling the API. Writing to them as a cold
@@ -210,13 +222,6 @@ export function ComposerDock({
       // very words, so anything reworded here would steer a draft they did not
       // choose. Em dashes are scrubbed upstream, on all three fields.
       angle ? `Angle to take: ${angle.title}. ${angle.hint}` : '',
-      // The owner's rule for a follow-up, and it is gated on the situation
-      // rather than on the angle. Hanging it on `angle` would drop the whole
-      // discipline the moment the operator generates without one, which is
-      // exactly the fallback path this feature has to leave open.
-      isFollowup
-        ? 'This is a FOLLOW-UP: at most 2 sentences, one new angle, no recap of the previous mail.'
-        : '',
       c.messages.length
         ? `Thread so far:\n${threadTail(c.messages)}`
         : activeUser
@@ -287,6 +292,24 @@ export function ComposerDock({
           // the thread keeps a reply close to what it answers.
           subject: subject.trim() || c.messages.at(-1)?.subject || 'IBANforge',
           context: brief(angle),
+          /*
+           * Which system prompt the VPS writes with. Its follow-up mode asks
+           * for two or three sentences, under sixty words, one new angle, and
+           * no recap of the mail already sent; the default keeps the mode this
+           * composer has always had, byte for byte.
+           *
+           * `isFollowup` and nothing else, which is the same expression that
+           * names the button and opens the angle panel. Three decisions on one
+           * reading of the situation: a second reading is a second answer
+           * waiting to happen, and the one that would drift is this one, since
+           * it is the only one of the three the operator cannot see.
+           *
+           * Written out even when false, though an absent field means the same
+           * thing upstream. A flag that is sometimes absent and sometimes
+           * false costs a reader of a captured request one deduction, and the
+           * whole point of this line is to be legible on the wire.
+           */
+          follow_up: isFollowup,
           // deposit:false. The CRM keeps its own draft; nothing is written to
           // the mailbox. Note this does NOT make the call independent of mail
           // configuration: the VPS still refuses when the account has no
