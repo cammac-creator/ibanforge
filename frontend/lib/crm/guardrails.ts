@@ -31,6 +31,28 @@ export interface CheckInput {
   previous?: PreviousMail;
 }
 
+/**
+ * Short names for the blocking rules, for the two controls that carry the
+ * override. The list under the composer says the whole sentence; the button
+ * being clicked says what it is being clicked against, because on a short
+ * window that list can be scrolled out of view while the button is not.
+ *
+ * Beside the rules rather than beside the markup that renders it: what belongs
+ * in this map is decided by which rules block, which is decided here.
+ *
+ * Partial on purpose. A warning never reaches the override button, so a warning
+ * needs no entry, and adding one for every rule would suggest the button can be
+ * offered for any of them. A **blocking** rule with no entry is another matter:
+ * it puts a raw code such as `daily_cap` in front of the operator. That case is
+ * pinned by a test rather than left to be noticed, precisely because the rule
+ * that would break it is one word away, in this file, from the rules that do
+ * not block.
+ */
+export const BLOCK_LABEL: Partial<Record<GuardrailIssue['code'], string>> = {
+  em_dash: 'tiret cadratin',
+  daily_cap: 'plafond du jour',
+};
+
 const FOLLOWUP_WORDS = { min: 40, max: 90 };
 const FIRST_TOUCH_WORDS = { min: 90, max: 140 };
 

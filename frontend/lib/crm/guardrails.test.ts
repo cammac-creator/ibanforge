@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { checkDraft, type CheckInput } from './guardrails';
+import { BLOCK_LABEL, checkDraft, type CheckInput } from './guardrails';
 import { HARD_CAP, SOFT_CAP } from './sent-today';
 import type { GuardrailIssue } from './types';
 
@@ -723,5 +723,71 @@ Claude-Alain`;
     });
     expect(codes(r)).toContain('repeat_previous');
     expect(r.blocking).toBe(true);
+  });
+});
+
+/**
+ * The override control names what it is being clicked against, and it reads
+ * those names out of BLOCK_LABEL. A blocking rule missing from that map puts a
+ * raw code such as `daily_cap` on a button in front of the operator.
+ *
+ * Written as a sweep over drafts that raise every rule rather than as a list of
+ * codes copied from the source: a list copied from the source agrees with the
+ * source by construction, and would still agree the day a warning is promoted
+ * to a block.
+ */
+describe('the names the override button reads', () => {
+  const previous = { subject: 'Un objet déjà utilisé', text: cleanColdMail };
+
+  /** One draft per rule, enough between them to raise all nine. */
+  const battery: CheckInput[] = [
+    { body: `Bonjour ${EM_DASH} la suite.`, sentToday: 0, isFirstTouch: false },
+    { body: cleanFollowup, sentToday: HARD_CAP, isFirstTouch: false },
+    { body: cleanFollowup, sentToday: SOFT_CAP, isFirstTouch: false },
+    { body: wordsBody(3), sentToday: 0, isFirstTouch: false },
+    { body: 'https://a.example.net https://b.example.net', sentToday: 0, isFirstTouch: false },
+    { body: cleanFollowup, sentToday: 0, isFirstTouch: true },
+    { body: `${cleanFollowup} C’est gratuit.`, sentToday: 0, isFirstTouch: false },
+    { subject: 'Un objet déjà utilisé', body: cleanColdMail, sentToday: 0, isFirstTouch: false, previous },
+  ];
+
+  const raised = battery.flatMap((input) => checkDraft(input).issues);
+
+  it('exercises every rule there is, or it proves nothing', () => {
+    // The sweep is only worth what it covers, so the coverage is asserted
+    // first. A rule added without a draft here would slip past the check below
+    // in silence, which is the failure this test exists to prevent.
+    const seen = new Set(raised.map((i) => i.code));
+    expect([...seen].sort()).toEqual([
+      'daily_cap',
+      'daily_high',
+      'em_dash',
+      'length',
+      'no_optout',
+      'repeat_previous',
+      'same_subject',
+      'spam_word',
+      'too_many_links',
+    ]);
+  });
+
+  it('has a French name for every rule that takes the send away', () => {
+    const blocking = [...new Set(raised.filter((i) => i.level === 'blocking').map((i) => i.code))];
+    expect(blocking.length).toBeGreaterThan(0);
+    for (const code of blocking) {
+      expect(BLOCK_LABEL[code], `no override label for ${code}`).toBeTruthy();
+    }
+  });
+
+  it('does not name the rules that only warn, since they never reach that button', () => {
+    // "Only warn", not "warn": a rule that blocks under other inputs is
+    // entitled to its label, so it is subtracted rather than assumed absent.
+    // Without that, this test and the one above would contradict each other the
+    // day a rule blocks in one case and warns in another.
+    const blocking = new Set(raised.filter((i) => i.level === 'blocking').map((i) => i.code));
+    const onlyWarn = [...new Set(raised.map((i) => i.code))].filter((c) => !blocking.has(c));
+    for (const code of onlyWarn) {
+      expect(BLOCK_LABEL[code], `${code} only warns and needs no override label`).toBeUndefined();
+    }
   });
 });
