@@ -1,9 +1,9 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { checkDraft, EM_DASH } from '@/lib/crm/guardrails';
+import { BLOCK_LABEL, checkDraft, EM_DASH } from '@/lib/crm/guardrails';
 import { lastOutbound } from '@/lib/crm/repeat';
-import type { GuardrailIssue, GuardrailReport, Message, Situation } from '@/lib/crm/types';
+import type { GuardrailReport, Message, Situation } from '@/lib/crm/types';
 
 /**
  * The pre-send checks as the operator meets them, shared by the two places a
@@ -15,21 +15,6 @@ import type { GuardrailIssue, GuardrailReport, Message, Situation } from '@/lib/
  * documented way around it, and two wordings of the same rule teach the
  * operator that the rule is decorative.
  */
-
-/**
- * Short names for the blocking rules, for the two controls that carry the
- * override. The list says the whole sentence; the button being clicked says
- * what it is being clicked against, because on a short window that list can be
- * scrolled out of view while the button is not.
- *
- * Partial on purpose: a blocking rule added later shows its raw code here,
- * which is ugly and therefore noticed, rather than hiding behind a generic
- * "le blocage" that would read as if nothing had changed.
- */
-const BLOCK_LABEL: Partial<Record<GuardrailIssue['code'], string>> = {
-  em_dash: 'tiret cadratin',
-  daily_cap: 'plafond du jour',
-};
 
 /**
  * Which field carries the em dash.
