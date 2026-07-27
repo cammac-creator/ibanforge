@@ -107,7 +107,9 @@ export interface GuardrailIssue {
     | 'length'
     | 'too_many_links'
     | 'no_optout'
-    | 'spam_word';
+    | 'spam_word'
+    | 'repeat_previous'
+    | 'same_subject';
   level: 'blocking' | 'warning';
   message: string;
 }

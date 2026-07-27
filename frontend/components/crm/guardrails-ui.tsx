@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from 'react';
 import { checkDraft, EM_DASH } from '@/lib/crm/guardrails';
-import type { GuardrailIssue, GuardrailReport, Situation } from '@/lib/crm/types';
+import { lastOutbound } from '@/lib/crm/repeat';
+import type { GuardrailIssue, GuardrailReport, Message, Situation } from '@/lib/crm/types';
 
 /**
  * The pre-send checks as the operator meets them, shared by the two places a
@@ -102,6 +103,7 @@ export function useGuardrails({
   body,
   sentToday,
   situation,
+  messages,
   sendable,
 }: {
   subject: string;
@@ -110,6 +112,13 @@ export function useGuardrails({
   sentToday: number;
   /** Undefined only if the page failed to derive one; every rule then falls to its warmer form. */
   situation?: Situation;
+  /**
+   * The contact's correspondence, from which the last mail actually sent is
+   * taken. Required, not optional: the two rules that read it exist because the
+   * same defect reached the operator through both surfaces, and a prop that can
+   * be forgotten is how the second surface loses a rule the first one has.
+   */
+  messages: Message[];
   sendable: boolean;
 }): Guarded {
   const [overrideFor, setOverrideFor] = useState<string | null>(null);
@@ -117,9 +126,12 @@ export function useGuardrails({
   // What a cold first touch is, decided once for both surfaces. Undefined
   // falls to false, which only loosens two warnings and never a block.
   const isFirstTouch = situation?.nextAction === 'first_mail';
+  // Held apart from the report below so that typing, which changes `body` on
+  // every keystroke, does not walk the whole thread again each time.
+  const previous = useMemo(() => lastOutbound(messages) ?? undefined, [messages]);
   const report = useMemo(
-    () => checkDraft({ body, subject, sentToday, isFirstTouch }),
-    [body, subject, sentToday, isFirstTouch],
+    () => checkDraft({ body, subject, sentToday, isFirstTouch, previous }),
+    [body, subject, sentToday, isFirstTouch, previous],
   );
 
   const blockers = report.issues.filter((i) => i.level === 'blocking');

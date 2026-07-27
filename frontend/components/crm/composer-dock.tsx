@@ -122,7 +122,7 @@ export function ComposerDock({
    * send" and "blocking" never means "there is text worth blocking".
    */
   const sendable = !!c.email && filled && busy === false;
-  const g = useGuardrails({ subject, body, sentToday, situation: s, sendable });
+  const g = useGuardrails({ subject, body, sentToday, situation: s, messages: c.messages, sendable });
 
   /**
    * Ask before replacing text the operator typed and has not saved anywhere.

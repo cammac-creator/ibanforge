@@ -556,3 +556,172 @@ describe('the length message', () => {
     expect(r.issues.find((i) => i.code === 'length')?.message ?? '').toContain('2 mots.');
   });
 });
+
+/**
+ * The fourth cause of "a follow-up sends back the mail already sent": nothing
+ * between the text and the send button ever compared the two. The measure is
+ * pinned in repeat.test.ts; what is pinned here is the reading of it, and above
+ * all that it never blocks.
+ */
+describe('the repeat of the last mail sent', () => {
+  const sent = `Bonjour,
+
+Je construis une petite interface qui vérifie un identifiant bancaire, retrouve l'établissement correspondant et renvoie le tout en une seule requête, sans aucune base à maintenir de votre côté.
+
+Votre équipe publie des intégrations de facturation, et la saisie des coordonnées bancaires y revient sans cesse. Je peux vous montrer le résultat sur vos propres données en quelques minutes, quand cela vous arrange.
+
+Si le sujet ne vous parle pas, dites-le moi franchement et je ne reviendrai pas dessus.
+
+Bien à vous,
+Claude-Alain`;
+
+  const previous = { subject: 'Vérification des coordonnées bancaires', text: sent };
+
+  it('warns when the draft is the mail already sent', () => {
+    const r = checkDraft({ body: sent, sentToday: 0, isFirstTouch: false, previous });
+    expect(codes(r)).toContain('repeat_previous');
+  });
+
+  it('never blocks on it, whatever the resemblance', () => {
+    // The hard requirement of this rule. Resending a close text is an editorial
+    // call the owner is entitled to make, unlike an em dash or the daily cap,
+    // which are promises to the domain's reputation.
+    const r = checkDraft({ body: sent, sentToday: 0, isFirstTouch: false, previous });
+    expect(r.issues.find((i) => i.code === 'repeat_previous')?.level).toBe('warning');
+    expect(r.blocking).toBe(false);
+  });
+
+  it('says how much of the text is old, and what to do about it', () => {
+    const r = checkDraft({ body: sent, sentToday: 0, isFirstTouch: false, previous });
+    const message = r.issues.find((i) => i.code === 'repeat_previous')?.message ?? '';
+    expect(message).toContain('100 %');
+    // An instruction, not only a diagnosis.
+    expect(message).toContain('Coupe');
+    expect(message).not.toContain(EM_DASH);
+  });
+
+  it('rounds the figure rather than printing false precision', () => {
+    // Most of the mail already sent, followed by a paragraph that owes it
+    // nothing: 0.87, printed as 90 %. A figure to the percent would read as a
+    // measurement, and this is a reading of a set overlap that moves on a
+    // comma. It also has to be a value other than 100, or a hard-coded
+    // "Environ 100 %" would pass every test above.
+    const half = `${sent.slice(0, 480)}\n\nUne idée toute neuve, écrite pour ce mail seulement, qui ne doit rien à ce qui précède et qui rallonge le texte sans le répéter du tout aujourd'hui.`;
+    const message = checkDraft({ body: half, sentToday: 0, isFirstTouch: false, previous })
+      .issues.find((i) => i.code === 'repeat_previous')?.message ?? '';
+    expect(message).toMatch(/Environ \d0 %/);
+  });
+
+  it('fires exactly at the threshold, not one step past it', () => {
+    // Built to land on 0.5 on the nose rather than described as landing there.
+    // The previous mail is 40 distinct words, so 38 trigrams. The draft opens
+    // on its first 21 words and then says 21 words of its own: 42 words, 40
+    // trigrams, of which the 19 lying wholly inside that opening are shared.
+    // The trigram straddling the seam is not. 19 over min(40, 38) is one half.
+    const older = Array.from({ length: 40 }, (_, i) => `ancien${i}`).join(' ');
+    const draft = [
+      ...Array.from({ length: 21 }, (_, i) => `ancien${i}`),
+      ...Array.from({ length: 21 }, (_, i) => `nouveau${i}`),
+    ].join(' ');
+    const r = checkDraft({
+      body: draft,
+      sentToday: 0,
+      isFirstTouch: false,
+      previous: { subject: null, text: older },
+    });
+    expect(codes(r)).toContain('repeat_previous');
+    expect(r.issues.find((i) => i.code === 'repeat_previous')?.message).toContain('50 %');
+  });
+
+  it('stays quiet on a follow-up that shares only the greeting, the closing and the signature', () => {
+    const genuine = `Bonjour,
+
+Combien de temps votre support passe-t-il chaque semaine à corriger un numéro de compte mal saisi ? Si la réponse dépasse dix minutes, je crois avoir de quoi vous aider très vite.
+
+Si le sujet ne vous parle pas, dites-le moi franchement et je ne reviendrai pas dessus.
+
+Bien à vous,
+Claude-Alain`;
+    const r = checkDraft({ body: genuine, sentToday: 0, isFirstTouch: false, previous });
+    expect(codes(r)).not.toContain('repeat_previous');
+  });
+
+  it('says nothing when the pair is too short to be judged', () => {
+    // Found by the mutation sweep: reading an abstention as a repeat put
+    // "Environ 0 %" on screen, which is a warning about nothing and the fastest
+    // way to teach the operator to stop reading the panel. Abstaining is not
+    // the same answer as "no repetition" and must not be printed as one.
+    const tiny = 'Trop court pour être jugé.';
+    const r = checkDraft({
+      body: tiny,
+      sentToday: 0,
+      isFirstTouch: false,
+      previous: { subject: null, text: tiny },
+    });
+    expect(codes(r)).not.toContain('repeat_previous');
+  });
+
+  it('says nothing at all when there is no previous mail', () => {
+    // The default, and what keeps every other test in this file unchanged.
+    const r = checkDraft({ body: sent, sentToday: 0, isFirstTouch: false });
+    expect(codes(r)).not.toContain('repeat_previous');
+    expect(codes(r)).not.toContain('same_subject');
+  });
+
+  it('warns on a subject identical to the last one sent', () => {
+    const r = checkDraft({
+      subject: 'Vérification des coordonnées bancaires',
+      body: cleanFollowup,
+      sentToday: 0,
+      isFirstTouch: false,
+      previous,
+    });
+    const issue = r.issues.find((i) => i.code === 'same_subject');
+    expect(issue?.level).toBe('warning');
+    expect(issue?.message).not.toContain(EM_DASH);
+    expect(r.blocking).toBe(false);
+  });
+
+  it('says nothing about a subject that says something else', () => {
+    const r = checkDraft({
+      subject: 'Une question que je ne vous ai pas posée',
+      body: cleanFollowup,
+      sentToday: 0,
+      isFirstTouch: false,
+      previous,
+    });
+    expect(codes(r)).not.toContain('same_subject');
+  });
+
+  it('says nothing about an empty subject', () => {
+    // A draft being written has no subject yet, and neither does one saved from
+    // a generation that returned none. Neither is a duplicate.
+    const r = checkDraft({ subject: '  ', body: cleanFollowup, sentToday: 0, isFirstTouch: false, previous });
+    expect(codes(r)).not.toContain('same_subject');
+  });
+
+  it('raises the two of them at once when both are true, and still does not block', () => {
+    const r = checkDraft({
+      subject: 'Vérification des coordonnées bancaires',
+      body: sent,
+      sentToday: 0,
+      isFirstTouch: false,
+      previous,
+    });
+    expect(codes(r)).toContain('repeat_previous');
+    expect(codes(r)).toContain('same_subject');
+    expect(r.blocking).toBe(false);
+  });
+
+  it('leaves the blocking rules blocking when a repeat carries one', () => {
+    // The warning must not soften what sits beside it.
+    const r = checkDraft({
+      body: `${sent} ${EM_DASH}`,
+      sentToday: 0,
+      isFirstTouch: false,
+      previous,
+    });
+    expect(codes(r)).toContain('repeat_previous');
+    expect(r.blocking).toBe(true);
+  });
+});
