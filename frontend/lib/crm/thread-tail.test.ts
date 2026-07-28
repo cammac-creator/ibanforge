@@ -88,8 +88,43 @@ describe('threadTail', () => {
     const out = threadTail([msg('in', { body })]);
     expect(out).toContain(`its first ${INCOMING_MAIL_CHARS} characters`);
     expect(out).toContain('NOT by the sender');
-    expect(out).toContain('[cut here]');
+    // At the boundary too, where the wrong impression forms: the label is by
+    // then four thousand characters behind.
+    expect(out).toContain('[truncated by this tool, not by the sender]');
     expect(out).not.toContain(LABEL_IN_FULL);
+  });
+
+  it('never marks a support robot as the mail to answer', () => {
+    // situation() filters automated messages and this file does not see its
+    // verdict, so a desk acknowledgement arriving last would otherwise be
+    // introduced as the mail to answer, and the draft would reply to a robot.
+    const out = threadTail([
+      msg('out', { msg_date: '2026-06-01T08:00', body: 'Our mail' }),
+      msg('in', {
+        msg_date: '2026-06-02T08:00',
+        counterparty: 'no-reply@desk.example',
+        snippet: 'Your request has been received. Ticket #4471.',
+        body: 'Your request has been received. Ticket #4471. Do not reply to this message.',
+      }),
+    ]);
+    expect(out).not.toContain('THEIR MAIL');
+    // Still in the tail as context, on its snippet like any unmarked line.
+    expect(out).toContain('Ticket #4471');
+    expect(out).not.toContain('Do not reply to this message');
+  });
+
+  it('marks the human mail still waiting behind a later robot acknowledgement', () => {
+    const out = threadTail([
+      msg('in', { msg_date: '2026-06-01T08:00', body: 'Could you confirm the pricing?' }),
+      msg('in', {
+        msg_date: '2026-06-02T08:00',
+        counterparty: 'no-reply@desk.example',
+        body: 'This is an automated response, please do not reply.',
+      }),
+    ]);
+    expect(out).toContain(LABEL_IN_FULL);
+    expect(out).toContain('Could you confirm the pricing?');
+    expect(out.match(/THEIR MAIL/g)).toHaveLength(1);
   });
 
   it('falls back to the snippet when their body is missing, and still owns the cut', () => {

@@ -1,3 +1,4 @@
+import { isAutomated } from './automated';
 import { freshOnly } from './quoted';
 import type { Message } from './types';
 
@@ -97,7 +98,11 @@ function incomingMail(m: Message): { label: string; text: string } {
   if (fresh.length > INCOMING_MAIL_CHARS) {
     return {
       label: `THEIR MAIL, its first ${INCOMING_MAIL_CHARS} characters, ${OUR_CUT}. Answer every question in it:`,
-      text: `${fresh.slice(0, INCOMING_MAIL_CHARS)} [cut here]`,
+      // The marker carries the ownership of the cut too, rather than the bare
+      // `[cut here]` the outbound line uses. By the time the model reaches it
+      // the label is four thousand characters behind, and the boundary is
+      // exactly where the wrong impression forms.
+      text: `${fresh.slice(0, INCOMING_MAIL_CHARS)} [truncated by this tool, not by the sender]`,
     };
   }
   return {
@@ -106,11 +111,11 @@ function incomingMail(m: Message): { label: string; text: string } {
   };
 }
 
-/** The last message of the tail going in `direction` that has any text at all. */
-function lastWithText(tail: Message[], direction: Message['direction']): number {
+/** The last message of the tail this predicate accepts that has any text at all. */
+function lastWithText(tail: Message[], accept: (m: Message) => boolean): number {
   for (let i = tail.length - 1; i >= 0; i -= 1) {
     const m = tail[i];
-    if (m.direction !== direction) continue;
+    if (!accept(m)) continue;
     if (!(m.body ?? '').trim() && !(m.snippet ?? '').trim()) continue;
     return i;
   }
@@ -168,8 +173,20 @@ function lastWithText(tail: Message[], direction: Message['direction']): number 
 export function threadTail(messages: Message[]): string {
   const tail = messages.slice(-TAIL_LENGTH);
 
-  const markedOut = lastWithText(tail, 'out');
-  const lastIn = lastWithText(tail, 'in');
+  const markedOut = lastWithText(tail, (m) => m.direction === 'out');
+  /*
+   * Automated messages are skipped here and nowhere else in this file. They
+   * stay in the tail as context, which costs nothing, but a support-desk
+   * acknowledgement introduced as the mail to answer would have the generator
+   * write a reply to a robot. `situation` already filters them for the same
+   * reason and this file does not see its verdict, so the rule is applied
+   * again rather than assumed: five of sixteen inbound messages were
+   * automation when the mailbox was measured, so the case is ordinary.
+   *
+   * Skipping rather than stopping: a human mail still waiting for an answer
+   * behind a later robot ack is still the mail to answer.
+   */
+  const lastIn = lastWithText(tail, (m) => m.direction === 'in' && !isAutomated(m));
   // Unanswered, which is the only state where the mail is one to answer.
   const markedIn = lastIn > markedOut ? lastIn : -1;
 
