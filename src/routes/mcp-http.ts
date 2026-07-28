@@ -235,8 +235,12 @@ function createMcpServer(): McpServer {
         valid_format: z.boolean().optional(),
         found: z.boolean().optional(),
         institution: z.string().nullable().optional().describe('Bank legal name.'),
-        country_code: z.string().optional(),
-        country_name: z.string().nullable().optional(),
+        country_code: z.string().optional().describe('DEPRECATED since 1.4.0, removed no earlier than 2027-01-01. Use country.code.'),
+        country_name: z.string().nullable().optional().describe('DEPRECATED since 1.4.0, removed no earlier than 2027-01-01. Use country.name, which falls back to the code rather than to null.'),
+        country: z
+          .object({ code: z.string(), name: z.string() })
+          .optional()
+          .describe('Same shape as REST GET /v1/bic/:code. name falls back to the country code when the row carries no name.'),
         city: z.string().nullable().optional(),
         branch_code: z.string().optional(),
         branch_info: z.string().nullable().optional(),
@@ -272,6 +276,17 @@ function createMcpServer(): McpServer {
         institution: row?.institution ?? null,
         country_code: validation.country_code,
         country_name: row?.country_name ?? null,
+      // Aligned on the REST shape (GET /v1/bic/:code returns country: {code, name}),
+        // which validate_iban already used on both surfaces. The flat pair stays
+        // for now so no agent breaks mid-conversation; it is deprecated and dated
+        // in the tool description.
+        //
+        // The two keep DIFFERENT null semantics on purpose. REST falls back to the
+        // country code when the row carries no name; the flat MCP key has always
+        // answered null. Mirroring REST into `country.name` while leaving
+        // `country_name: null` is the honest reading of both histories: the nested
+        // object is the aligned one, the flat pair is preserved exactly as it was.
+        country: { code: validation.country_code, name: row?.country_name ?? validation.country_code },
         city: row?.city ?? null,
         branch_code: validation.branch_code,
         branch_info: row?.branch_info ?? null,

@@ -54,11 +54,15 @@ When NOT to use: for multiple IBANs, use batch_validate_iban instead (60% cheape
 
 Behavior: this tool is read-only and performs no writes, no network calls to external services, and no side effects. It validates the IBAN checksum (ISO 13616 mod-97), parses the BBAN structure, resolves the BIC from a local database of ${F.claim.bic} entries (GLEIF-sourced), and classifies the issuer type. Server-side processing is under 5 ms; network latency is yours to measure (GET /ping). Returns a single JSON object.
 
-Returns: { valid, country: { code, name }, check_digits, bban: { bank_code, branch_code, account_number }, bic: { code, institution, country_code, city }, sepa: { member, schemes, vop_required }, issuer: { type, name }, risk_indicators: { issuer_type, country_risk, test_bic, sepa_reachable, vop_coverage } }
+Returns: { valid, country: { code, name }, check_digits, bban: { bank_code, branch_code?, account_number }, bic: { code, bank_name, city } | null, sepa: { member, schemes, vop_required }, issuer: { type, name }, risk_indicators: { issuer_type, country_risk, test_bic, sepa_reachable, vop_coverage }, clearing: { iid, name, type, town, sic, eurosic, qr_iid } | null, formatted, cost_usdc }
+
+When valid is false the object carries { valid: false, error, error_detail } and none of the enrichment fields. bic is null when no BBAN-to-BIC mapping exists for the bank code; branch_code is present only for countries whose BBAN defines one; clearing is present only for CH and LI when the IID is in the SIX BankMaster.
 
 Supports 89 countries including all SEPA/EEA countries, Switzerland, UK, and 50+ non-SEPA countries.
 
-Example: input 'DE89370400440532013000' → { valid: true, country: { code: 'DE', name: 'Germany' }, bic: { code: 'COBADEFFXXX', institution: 'Commerzbank' }, issuer: { type: 'bank' }, ... }
+Example: input 'DE89370400440532013000' → { valid: true, country: { code: 'DE', name: 'Germany' }, bban: { bank_code: '37040044', account_number: '0532013000' }, bic: { code: 'COBADEFF', bank_name: 'COMMERZBANK Aktiengesellschaft', city: 'Frankfurt am Main' }, issuer: { type: 'bank', name: 'COMMERZBANK Aktiengesellschaft' }, ... }
+
+The BIC is normalised to 8 characters. Ask for the branch with lookup_bic if you need the 11-character form.
 
 Cost: $0.005 USDC per call via x402 micropayment on Base L2.`,
     inputSchema: {
@@ -148,9 +152,11 @@ Behavior: this tool is read-only with no side effects. It validates the BIC form
 
 Input: accepts BIC8 (e.g., 'UBSWCHZH') or BIC11 (e.g., 'UBSWCHZH80A'). Case-insensitive.
 
-Returns: { bic, bic8, bic11, valid_format, found, institution, country_code, country_name, city, branch_code, branch_info, lei, lei_status, is_test_bic }
+Returns: { bic, bic8, bic11, valid_format, found, institution, country: { code, name }, city, branch_code, branch_info, lei, lei_status, is_test_bic }
 
-Example: input 'BNPAFRPP' → { institution: 'BNP PARIBAS', country_code: 'FR', country_name: 'France', city: 'PARIS', lei: '...', found: true }
+country is the same shape as REST GET /v1/bic/:code, and name falls back to the country code when the row carries no name. The flat country_code and country_name keys are still returned but DEPRECATED since 1.4.0 and will be removed no earlier than 2027-01-01; country_name answers null where country.name answers the code.
+
+Example: input 'BNPAFRPP' → { found: true, bic8: 'BNPAFRPP', bic11: 'BNPAFRPPXXX', institution: 'BNP PARIBAS', country: { code: 'FR', name: 'France' }, city: 'PARIS', lei: 'R0MUWSFPU8MPRO8K5P83', lei_status: 'ACTIVE', is_test_bic: false }
 Example: input 'INVALIDX' → { valid_format: true, found: false }
 Example: input '123' → { valid_format: false, error: 'BIC must be 8 or 11 characters' }
 
@@ -201,6 +207,17 @@ Cost: $0.003 USDC per call via x402 micropayment on Base L2.`,
       institution: row?.institution ?? null,
       country_code: validation.country_code,
       country_name: row?.country_name ?? null,
+      // Aligned on the REST shape (GET /v1/bic/:code returns country: {code, name}),
+      // which validate_iban already used on both surfaces. The flat pair stays
+      // for now so no agent breaks mid-conversation; it is deprecated and dated
+      // in the tool description.
+      //
+      // The two keep DIFFERENT null semantics on purpose. REST falls back to the
+      // country code when the row carries no name; the flat MCP key has always
+      // answered null. Mirroring REST into `country.name` while leaving
+      // `country_name: null` is the honest reading of both histories: the nested
+      // object is the aligned one, the flat pair is preserved exactly as it was.
+      country: { code: validation.country_code, name: row?.country_name ?? validation.country_code },
       city: row?.city ?? null,
       branch_code: validation.branch_code,
       branch_info: row?.branch_info ?? null,
