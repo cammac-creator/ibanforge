@@ -238,7 +238,14 @@ export function ComposerDock({
       // Verbatim, both fields: the operator chose this angle by reading these
       // very words, so anything reworded here would steer a draft they did not
       // choose. Em dashes are scrubbed upstream, on all three fields.
-      angle ? `Angle to take: ${angle.title}. ${angle.hint}` : '',
+      //
+      // The two fields come back in French since 28/07, because they are read
+      // and never sent. Both draft prompts pin the mail to ENGLISH, so this
+      // does not decide the language, and the label says so rather than
+      // leaving a French instruction sitting unexplained in an English brief.
+      angle
+        ? `Angle to take, written in French because the operator reads it, steering only, the mail itself stays in English: ${angle.title}. ${angle.hint}`
+        : '',
       c.messages.length
         ? `Thread so far:\n${threadTail(c.messages)}`
         : activeUser
