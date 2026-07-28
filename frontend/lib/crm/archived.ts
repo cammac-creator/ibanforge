@@ -32,6 +32,13 @@ import type { Contact, Situation } from './types';
  *    undatable rows already dropped by build-contacts, and messageCount counts
  *    it.
  *
+ *    Since automated inbound stopped counting (situation.ts), messageCount is
+ *    human correspondence only, and that matters here rather than being a
+ *    detail: without it a support robot answering a prospect the operator had
+ *    deliberately set aside would pull the row straight back out of the
+ *    archive, which is the same defect as the one automated.ts was written to
+ *    fix, wearing a different hat.
+ *
  * A plain module with no directive on purpose. The page is a Server Component
  * and the list is a Client Component, and both need this exact rule: a second
  * copy would be free to drift, while exporting it from the client file would

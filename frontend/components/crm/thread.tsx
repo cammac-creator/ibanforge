@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, type ReactNode } from 'react';
+import { isAutomated } from '@/lib/crm/automated';
 import { formatStamp } from '@/lib/crm/format';
 import { splitQuoted } from '@/lib/crm/quoted';
 import type { Message } from '@/lib/crm/types';
@@ -41,6 +42,13 @@ function Bubble({ m, counterpartLabel }: { m: Message; counterpartLabel?: string
   // which `=== 'out'` would do, is not.
   const mine = m.direction !== 'in';
 
+  // A desk robot, not a person. It stays in the thread, because hiding mail
+  // that genuinely arrived would be its own kind of lie, but it is drawn in
+  // neutral grey rather than the contact's blue and it says outright that it
+  // does not count. situationOf ignores it, so the band above the thread and
+  // this bubble agree without either consulting the other.
+  const robot = isAutomated(m);
+
   // Show a French translation by default for any non-French message, English
   // included. Guard against malformed lang values (a model echoing a
   // placeholder, or 'und').
@@ -73,9 +81,11 @@ function Bubble({ m, counterpartLabel }: { m: Message; counterpartLabel?: string
           // bubble shrink; overflow-wrap inherits, so subject, body and quote
           // are all covered here.
           'min-w-0 max-w-[78%] rounded-xl px-3 py-2 text-xs leading-relaxed wrap-anywhere',
-          mine
-            ? 'rounded-br-sm bg-amber-500/15 text-amber-100'
-            : 'rounded-bl-sm bg-blue-500/15 text-blue-100',
+          robot
+            ? 'rounded-bl-sm bg-[var(--ink-3)] text-[var(--fg-2)]'
+            : mine
+              ? 'rounded-br-sm bg-amber-500/15 text-amber-100'
+              : 'rounded-bl-sm bg-blue-500/15 text-blue-100',
         ].join(' ')}
       >
         {/* --fg-3, not --fg-4: same ruled defect as the quote below. Measured
@@ -83,9 +93,17 @@ function Bubble({ m, counterpartLabel }: { m: Message; counterpartLabel?: string
             and 3.94:1 on the amber, both under AA. This row carries the date
             and the 'date inconnue' fallback. */}
         <div className="mb-1 flex flex-wrap items-center gap-2 text-[10px] text-[var(--fg-3)]">
-          <span className={mine ? 'text-amber-400' : 'text-blue-400'}>
+          <span className={robot ? 'text-[var(--fg-3)]' : mine ? 'text-amber-400' : 'text-blue-400'}>
             {mine ? 'toi' : (counterpartLabel ?? 'lui')}
           </span>
+          {robot && (
+            <span
+              className="rounded bg-[var(--ink-5)] px-1.5 py-0.5 text-[9px] font-medium text-[var(--fg-2)]"
+              title="Accusé de réception, relance de guichet ou enquête de satisfaction. Ce message ne compte ni comme une réponse ni comme une balle dans ton camp."
+            >
+              ⚙ automatique · ne compte pas comme une réponse
+            </span>
+          )}
           {stamp ? (
             <span title={m.msg_date ?? undefined}>{stamp}</span>
           ) : (

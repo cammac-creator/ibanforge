@@ -1,3 +1,4 @@
+import { isAutomated } from './automated';
 import type { Message, NextAction, Situation } from './types';
 
 /** Days of silence after which an unanswered outbound becomes a followup. */
@@ -24,12 +25,22 @@ interface DatedMessage {
  * Drafts are excluded from every computation: an unsent draft changes neither
  * who holds the ball nor how long the silence has run. Undatable messages are
  * excluded too, so every field here describes the datable correspondence only.
+ *
+ * Automated inbound is excluded on the same footing, and for the same reason:
+ * a support desk acknowledging a ticket has not answered us. Measured on the
+ * real mailbox, letting robots through put two companies in `hasEverReplied`
+ * that had never written, and left four of the five ball-in-court threads
+ * waiting on a reply nobody was owed. See automated.ts, which also explains
+ * why the test is on the text rather than on the sender. The messages stay in
+ * `Contact.messages` and still render in the thread; they simply do not decide
+ * anything here.
  */
 export function situationOf(messages: Message[], today: Date = new Date()): Situation {
   // Each step hands back a fresh array, so sorting the last one in place leaves
   // the caller's messages untouched.
   const real = messages
     .filter((m) => m.direction === 'in' || m.direction === 'out')
+    .filter((m) => !isAutomated(m))
     // A message with no usable date cannot be placed in the thread, so it cannot
     // decide who holds the ball, when the silence started, or when contact began.
     // Dropping it degrades to "we know less", where keeping it would invert the answer.

@@ -168,4 +168,61 @@ describe('situationOf', () => {
     expect(s.ballInCourt).toBe('us');
     expect(s.silenceDays).toBe(53);
   });
+
+  /**
+   * Automated inbound decides nothing. Each case below is one of the two
+   * shapes measured in the real mailbox on 27/07/2026.
+   */
+  describe('automated inbound', () => {
+    const robot = (date: string, snippet: string): Message => ({
+      direction: 'in',
+      msg_date: date,
+      subject: 'Ticket',
+      snippet,
+      counterparty: 'hello@northwind.example.net',
+    });
+    const ACK = 'We have received your message and a ticket has been created.';
+
+    it('does not hand us the ball, and does not stop the silence running', () => {
+      // The exact shape of the two false positives: we wrote, a desk robot
+      // acknowledged, nobody answered. Before the fix this read "they are
+      // waiting on you" and was excluded from the follow-up queue.
+      const s = situationOf([msg('out', '2026-07-01T10:00'), robot('2026-07-01T22:00', ACK)], TODAY);
+      expect(s.ballInCourt).toBe('them');
+      expect(s.hasEverReplied).toBe(false);
+      expect(s.silenceDays).toBe(24);
+      expect(s.followupDue).toBe(true);
+      expect(s.nextAction).toBe('followup');
+      expect(s.messageCount).toBe(1);
+    });
+
+    it('keeps a human reply that arrives between two robots', () => {
+      // The desk that sent an acknowledgement, then a person, then a nag. The
+      // person must survive, or fixing the false positive creates a worse
+      // false negative: relancer quelqu'un qui a répondu.
+      const s = situationOf(
+        [
+          msg('out', '2026-07-20T10:00'),
+          robot('2026-07-20T12:00', ACK),
+          msg('in', '2026-07-21T16:00'),
+          robot('2026-07-22T17:00', 'We are just checking in regarding your support request.'),
+        ],
+        TODAY,
+      );
+      expect(s.ballInCourt).toBe('us');
+      expect(s.hasEverReplied).toBe(true);
+      expect(s.nextAction).toBe('reply');
+      // Counted from the human reply, not from the robot that came after it.
+      expect(s.silenceDays).toBe(3);
+      expect(s.messageCount).toBe(2);
+    });
+
+    it('leaves a thread of nothing but robots as never answered', () => {
+      const s = situationOf([msg('out', '2026-07-01T10:00'), robot('2026-07-02T10:00', ACK)], TODAY);
+      expect(s.hasEverReplied).toBe(false);
+      // messageCount is human correspondence: archived.ts leans on it so that
+      // a robot cannot pull a deliberately archived prospect back into view.
+      expect(s.messageCount).toBe(1);
+    });
+  });
 });

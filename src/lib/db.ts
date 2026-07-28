@@ -160,7 +160,12 @@ export function getStatsDB(): DatabaseType.Database {
       -- the prospecting campaign via POST /v1/admin/prospects. Each row carries a
       -- pre-written, personalized cold email (EN+FR) so the CRM can show it for
       -- review before sending. status: 'a_mailer' (verified email + mail ready) |
-      -- 'a_enrichir' (no safe email yet) | 'archive' (set aside) | 'rejete'.
+      -- 'a_enrichir' (no safe email yet) | 'contacte' (an outbound reached the
+      -- address; written by the email-messages ingester, never by the UI) |
+      -- 'archive' (set aside) | 'rejete'.
+      -- 'contacte' was long absent from this list while being the most common
+      -- value in the table, which is how it also came to be missing from the
+      -- badge map in the CRM. Keep the two in step.
       -- A prospect that gets emailed lands in email_messages by contact_email, so
       -- the CRM derives "contacted / replied" exactly like it does for customers.
       CREATE TABLE IF NOT EXISTS prospects (
