@@ -163,7 +163,15 @@ export function lookupByCountryBank(
   const db = getBicDB();
   const row = db
     .prepare(
-      'SELECT bic8, institution, city FROM bic_entries WHERE country_code = ? AND bic8 LIKE ? LIMIT 1',
+      // ORDER BY is load-bearing, not tidiness. Without it SQLite is free to
+      // return any matching row, and 1,858 (country, prefix) pairs in this
+      // table match more than one BIC8. GLEIF first because it is the
+      // registry-grade source (39k rows, LEI-backed) against the bulk
+      // swiftcodes import; then bic8 so the answer is fully determined.
+      // Measured 28/07/2026 over the 308 prefixes actually reachable through
+      // this fallback: gleif-first changes zero answers versus today, so this
+      // pins current behaviour rather than altering it.
+      "SELECT bic8, institution, city FROM bic_entries WHERE country_code = ? AND bic8 LIKE ? ORDER BY (source = 'gleif') DESC, bic8 LIMIT 1",
     )
     .get(countryCode, bankCode + '%') as
     | { bic8: string; institution: string | null; city: string | null }
