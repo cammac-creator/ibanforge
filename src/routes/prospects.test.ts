@@ -115,6 +115,91 @@ describe('/v1/admin/prospects — upsert + read back', () => {
   });
 });
 
+/**
+ * The outcome axis. `status` says where the sourcing got to; `outcome` says
+ * where the relationship got to, and the two must never disturb each other.
+ */
+describe('/v1/admin/prospects/update — the outcome axis', () => {
+  const pid = `p_outcome_${RUN_ID}`;
+
+  const update = (body: Record<string, unknown>) =>
+    makeApp().request('/v1/admin/prospects/update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Secret': SECRET },
+      body: JSON.stringify({ id: pid, ...body }),
+    });
+
+  const read = async () => {
+    const res = await makeApp().request('/v1/admin/prospects', { headers: { 'X-Admin-Secret': SECRET } });
+    const json = (await res.json()) as { prospects: Array<Record<string, string | null>> };
+    return json.prospects.find((p) => p.id === pid)!;
+  };
+
+  beforeEach(async () => {
+    await makeApp().request('/v1/admin/prospects', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Secret': SECRET },
+      body: JSON.stringify({
+        prospects: [{ id: pid, company: 'Fictive Sàrl', status: 'contacte', contact_email: `outcome-${RUN_ID}@prospect-test.example` }],
+      }),
+    });
+  });
+
+  it('records an outcome and reads it back', async () => {
+    expect((await update({ outcome: 'pas_interesse', outcomeNote: 'Ils ont déjà un fournisseur.' })).status).toBe(200);
+    const row = await read();
+    expect(row.outcome).toBe('pas_interesse');
+    expect(row.outcome_note).toBe('Ils ont déjà un fournisseur.');
+    expect(row.outcome_at).toBeTruthy();
+  });
+
+  it('leaves the sourcing status alone when only an outcome is sent', async () => {
+    await update({ outcome: 'en_discussion' });
+    expect((await read()).status).toBe('contacte');
+  });
+
+  it('leaves the outcome alone when only a status is sent', async () => {
+    await update({ outcome: 'en_discussion' });
+    await update({ status: 'archive' });
+    const row = await read();
+    expect(row.status).toBe('archive');
+    expect(row.outcome).toBe('en_discussion');
+  });
+
+  it('requires a wake-up date for "not now", and stores it', async () => {
+    // Without a date this outcome is indistinguishable from silence, and the
+    // contact would come back every ten days to be dismissed by hand again.
+    expect((await update({ outcome: 'pas_maintenant' })).status).toBe(400);
+    expect((await update({ outcome: 'pas_maintenant', wakeUpAt: '2026-09' })).status).toBe(400);
+    expect((await update({ outcome: 'pas_maintenant', wakeUpAt: '2026-09-15' })).status).toBe(200);
+    expect((await read()).wake_up_at).toBe('2026-09-15');
+  });
+
+  it('refuses a wake-up date on any other outcome', async () => {
+    // Accepting one would let a contact judged dead quietly resurface.
+    await update({ outcome: 'pas_interesse', wakeUpAt: '2026-09-15' });
+    expect((await read()).wake_up_at).toBeNull();
+  });
+
+  it('clears the date and the note when the outcome is taken back', async () => {
+    await update({ outcome: 'pas_maintenant', wakeUpAt: '2026-09-15', outcomeNote: 'rappeler après l été' });
+    await update({ outcome: null });
+    const row = await read();
+    expect(row.outcome).toBeNull();
+    expect(row.wake_up_at).toBeNull();
+    expect(row.outcome_note).toBeNull();
+    expect(row.outcome_at).toBeNull();
+  });
+
+  it('rejects an outcome nobody planned for', async () => {
+    expect((await update({ outcome: 'peut-etre' })).status).toBe(400);
+  });
+
+  it('rejects a body that changes nothing', async () => {
+    expect((await update({})).status).toBe(400);
+  });
+});
+
 describe('email-messages upsert → prospect status auto-flip', () => {
   const pid = 'p_test_contact_flip';
   const email = `flip-${RUN_ID}@prospect-test.example`;

@@ -726,7 +726,8 @@ apiKeys.get('/v1/admin/prospects', (c) => {
               buying_signal, signal_source_url, contact_name, contact_role,
               contact_email, email_source_url, personalization_hook, confidence,
               status, mail_subject_en, mail_body_en, mail_subject_fr, mail_body_fr,
-              recommended_lang, source, created_at, updated_at
+              recommended_lang, source, outcome, outcome_note, wake_up_at, outcome_at,
+              created_at, updated_at
        FROM prospects
        ORDER BY
          CASE status WHEN 'a_mailer' THEN 0 WHEN 'a_enrichir' THEN 1 WHEN 'archive' THEN 2 ELSE 3 END,
@@ -813,26 +814,81 @@ apiKeys.post('/v1/admin/prospects', async (c) => {
   return c.json({ upserted });
 });
 
-/** Update a single prospect's status (archive / reactivate / reject) from the UI. */
+/**
+ * Update one prospect from the UI: its sourcing status, its outcome, or both.
+ *
+ * Two independent axes, and the endpoint keeps them independent. `status` says
+ * where the sourcing got to (address found, mail ready, contacted, set aside,
+ * rejected). `outcome` says where the RELATIONSHIP got to, which no value of
+ * `status` can express. Sending one never disturbs the other.
+ *
+ * Body: { id, status? , outcome?, outcomeNote?, wakeUpAt? }. At least one of
+ * status or outcome must be present. `outcome: null` clears the outcome, which
+ * is how a judgement recorded by mistake is taken back.
+ */
 apiKeys.post('/v1/admin/prospects/update', async (c) => {
   if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
     return c.json({ error: 'unauthorized' }, 401);
   }
-  let body: { id?: unknown; status?: unknown };
+  let body: { id?: unknown; status?: unknown; outcome?: unknown; outcomeNote?: unknown; wakeUpAt?: unknown };
   try {
-    body = await c.req.json<{ id?: unknown; status?: unknown }>();
+    body = await c.req.json();
   } catch {
     return c.json({ error: 'invalid_json' }, 400);
   }
-  if (typeof body.id !== 'string' || typeof body.status !== 'string') {
-    return c.json({ error: 'invalid_body', message: 'Expected { id, status }' }, 400);
+  if (typeof body.id !== 'string') {
+    return c.json({ error: 'invalid_body', message: 'Expected { id, status? , outcome? }' }, 400);
   }
-  const allowed = ['a_mailer', 'a_enrichir', 'archive', 'rejete'];
-  if (!allowed.includes(body.status)) {
-    return c.json({ error: 'invalid_status', message: `status must be one of ${allowed.join(', ')}` }, 400);
+
+  const hasStatus = body.status !== undefined;
+  const hasOutcome = body.outcome !== undefined;
+  if (!hasStatus && !hasOutcome) {
+    return c.json({ error: 'invalid_body', message: 'Expected at least one of status, outcome' }, 400);
   }
+
+  const sets: string[] = [];
+  const args: Array<string | null> = [];
+
+  if (hasStatus) {
+    const allowed = ['a_mailer', 'a_enrichir', 'archive', 'rejete'];
+    if (typeof body.status !== 'string' || !allowed.includes(body.status)) {
+      return c.json({ error: 'invalid_status', message: `status must be one of ${allowed.join(', ')}` }, 400);
+    }
+    sets.push('status = ?');
+    args.push(body.status);
+  }
+
+  if (hasOutcome) {
+    const allowed = ['en_discussion', 'pas_maintenant', 'pas_interesse', 'mauvaise_personne'];
+    if (body.outcome !== null && (typeof body.outcome !== 'string' || !allowed.includes(body.outcome))) {
+      return c.json({ error: 'invalid_outcome', message: `outcome must be null or one of ${allowed.join(', ')}` }, 400);
+    }
+    const outcome = body.outcome as string | null;
+
+    // A wake-up date only means something for "not now". Accepting one on any
+    // other outcome would let a contact judged dead quietly resurface.
+    let wakeUpAt: string | null = null;
+    if (outcome === 'pas_maintenant') {
+      if (typeof body.wakeUpAt !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(body.wakeUpAt)) {
+        return c.json({ error: 'invalid_wake_up_at', message: 'pas_maintenant requires wakeUpAt as YYYY-MM-DD' }, 400);
+      }
+      wakeUpAt = body.wakeUpAt;
+    }
+
+    const note = typeof body.outcomeNote === 'string' && body.outcomeNote.trim()
+      ? body.outcomeNote.trim().slice(0, 500)
+      : null;
+
+    sets.push('outcome = ?', 'outcome_note = ?', 'wake_up_at = ?', 'outcome_at = ?');
+    // Clearing the outcome clears everything that hangs off it, so no orphan
+    // wake-up date survives to wake a contact nobody is waiting on any more.
+    args.push(outcome, outcome === null ? null : note, wakeUpAt, outcome === null ? null : new Date().toISOString());
+  }
+
   const db = getStatsDB();
-  const r = db.prepare("UPDATE prospects SET status = ?, updated_at = datetime('now') WHERE id = ?").run(body.status, body.id);
+  const r = db
+    .prepare(`UPDATE prospects SET ${sets.join(', ')}, updated_at = datetime('now') WHERE id = ?`)
+    .run(...args, body.id);
   return c.json({ updated: r.changes });
 });
 

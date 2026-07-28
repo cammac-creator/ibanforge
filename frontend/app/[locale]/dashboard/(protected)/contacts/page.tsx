@@ -8,6 +8,7 @@ import { ballWithUs as isBallWithUs, followupDue as isFollowupDue } from '@/lib/
 import { buildContacts, fetchCrmData, INTERNAL_RE, type KeyRow } from '@/lib/crm/build-contacts';
 import { sendableStock } from '@/lib/crm/priority';
 import { countSentToday } from '@/lib/crm/sent-today';
+import { snoozedMap } from '@/lib/crm/snooze';
 import { situationOf } from '@/lib/crm/situation';
 import type { Situation } from '@/lib/crm/types';
 
@@ -122,6 +123,11 @@ export default async function ContactsPage() {
   const situations: Record<string, Situation> = {};
   for (const c of contacts) situations[c.id] = situationOf(c.messages, now);
 
+  // Same clock, same reason. A contact put to sleep until a date is compared
+  // against the server's calendar day once, rather than each component asking
+  // the runtime what day it is and two of them disagreeing across midnight.
+  const snoozed = snoozedMap(contacts, now);
+
   // Same instant as the situations above, so the whole page is one snapshot.
   const todayUtc = now.toISOString().slice(0, 10);
   const top = topUsers(data.keys, data.activityByKey, todayUtc);
@@ -140,7 +146,8 @@ export default async function ContactsPage() {
   // places or in none.
   const active = contacts.filter((c) => !isArchived(c, situations[c.id]));
   const ballWithUs = contacts.filter((c) => isBallWithUs(c, situations[c.id])).length;
-  const followupDue = contacts.filter((c) => isFollowupDue(c, situations[c.id])).length;
+  const followupDue = contacts.filter((c) => isFollowupDue(c, situations[c.id], snoozed[c.id])).length;
+  const asleep = contacts.filter((c) => snoozed[c.id] && !isArchived(c, situations[c.id])).length;
   const prospects = active.filter((c) => c.kind === 'prospect').length;
   const clients = active.filter((c) => c.kind === 'client').length;
 
@@ -193,7 +200,7 @@ export default async function ContactsPage() {
           title="Relances dues"
           value={String(followupDue)}
           accentColor="#f59e0b"
-          hint="Plus de 10 jours sans réponse depuis ton dernier mail."
+          hint={`Plus de 10 jours sans réponse depuis ton dernier mail.${asleep ? ` ${asleep} contact${asleep > 1 ? 's' : ''} en veille jusqu'à une date ne sont pas comptés ici.` : ''}`}
         />
         <StatCardV2
           title="Gratuits actifs"
@@ -215,7 +222,7 @@ export default async function ContactsPage() {
         />
       </div>
 
-      <CrmApp contacts={contacts} situations={situations} sentToday={sentToday} />
+      <CrmApp contacts={contacts} situations={situations} snoozed={snoozed} sentToday={sentToday} />
     </div>
   );
 }

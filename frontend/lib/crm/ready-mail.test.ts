@@ -25,6 +25,10 @@ const sourcing: ProspectSourcing = {
   confidence: null,
   status: 'a_contacter',
   source: null,
+  outcome: null,
+  outcomeNote: null,
+  wakeUpAt: null,
+  outcomeAt: null,
 };
 
 const readyMail: ReadyMail = {

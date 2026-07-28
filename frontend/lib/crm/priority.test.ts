@@ -26,6 +26,10 @@ const sourcing = (over: Partial<ProspectSourcing> = {}): ProspectSourcing => ({
   confidence: null,
   status: 'contacte',
   source: null,
+  outcome: null,
+  outcomeNote: null,
+  wakeUpAt: null,
+  outcomeAt: null,
   ...over,
 });
 

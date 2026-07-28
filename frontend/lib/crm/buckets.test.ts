@@ -36,6 +36,10 @@ const sourcing = (status: string): ProspectSourcing => ({
   confidence: null,
   status,
   source: null,
+  outcome: null,
+  outcomeNote: null,
+  wakeUpAt: null,
+  outcomeAt: null,
 });
 
 const prospect = (id: string, status = 'contacte', messages: Message[] = []): Contact => ({
@@ -217,5 +221,38 @@ describe('the two buckets are disjoint', () => {
     expect(ours).toBe(2);
     expect(due).toBe(1);
     expect(today).toBe(ours + due);
+  });
+});
+
+/**
+ * The snooze. A contact put to sleep until a date must leave the day's queue,
+ * which is the entire point of recording 'pas maintenant': without it the row
+ * comes back every ten days to be dismissed by hand.
+ */
+describe('a contact asleep until a date', () => {
+  const due = situation({ ballInCourt: 'them', followupDue: true, silenceDays: 30 });
+
+  it('leaves the follow-up bucket', () => {
+    expect(followupDue(ACTIVE, due, false)).toBe(true);
+    expect(followupDue(ACTIVE, due, true)).toBe(false);
+  });
+
+  it('leaves the day entirely', () => {
+    expect(dueToday(ACTIVE, due, true)).toBe(false);
+  });
+
+  it('comes straight back the moment they write', () => {
+    // Writing overtakes the snooze: burying that message would hide the one
+    // event proving the snooze wrong.
+    const wrote = situation({ ballInCourt: 'us', silenceDays: 1 });
+    expect(ballWithUs(ACTIVE, wrote)).toBe(true);
+    expect(dueToday(ACTIVE, wrote, true)).toBe(true);
+  });
+
+  it('defaults to awake when no caller passes the flag', () => {
+    // Every existing call site kept compiling when the parameter was added;
+    // this pins that the default is the old behaviour rather than silence.
+    expect(followupDue(ACTIVE, due)).toBe(true);
+    expect(dueToday(ACTIVE, due)).toBe(true);
   });
 });

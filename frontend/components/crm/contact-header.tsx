@@ -1,5 +1,6 @@
 import { UsageChart } from '@/components/dashboard/usage-chart';
 import type { Contact, ProspectSourcing } from '@/lib/crm/types';
+import { OutcomeBadge, OutcomeControl } from './outcome-control';
 import { ProspectStatusBadge, ProspectStatusControl } from './prospect-status';
 
 /** Segment labels, lifted from the prospect page so the wording does not drift. */
@@ -113,6 +114,11 @@ export function ContactIdentity({ contact: c }: { contact: Contact }) {
           </p>
         </div>
         {c.kind === 'prospect' && <ProspectStatusBadge status={c.sourcing.status} />}
+        {/* Where the relationship stands, beside where the sourcing stands.
+            Shown for a converted client too: the outcome outlives the
+            conversion, and a client marked "pas maintenant" on an upsell is a
+            real thing to record. */}
+        {sourcing && <OutcomeBadge sourcing={sourcing} />}
       </div>
     </div>
   );
@@ -261,6 +267,10 @@ export function ContactDetail({ contact: c }: { contact: Contact }) {
           hasEmail={!!c.email}
         />
       )}
+
+      {/* Anything carrying a prospect row can hold an outcome, client included:
+          the row survives the conversion and so does what was learned. */}
+      {sourcing && <OutcomeControl sourcing={sourcing} />}
     </div>
   );
 }

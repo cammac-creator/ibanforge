@@ -25,7 +25,7 @@ export type FilterKey = 'today' | 'all' | 'followup' | 'prospects' | 'clients' |
 const FILTERS: Array<{
   key: FilterKey;
   label: string;
-  test: (c: Contact, s: Situation | undefined) => boolean;
+  test: (c: Contact, s: Situation | undefined, snoozed: boolean) => boolean;
 }> = [
   { key: 'today', label: "Aujourd'hui", test: dueToday },
   { key: 'all', label: 'Tous', test: (c, s) => !isArchived(c, s) },
@@ -83,12 +83,15 @@ function statusLine(s: Situation | undefined): string | null {
 export function ContactList({
   contacts,
   situations,
+  snoozed,
   selectedId,
   onSelect,
 }: {
   contacts: Contact[];
   /** Keyed by Contact.id, one entry per contact, built by the page. */
   situations: Record<string, Situation>;
+  /** Keyed the same way, same clock. See CrmApp. */
+  snoozed: Record<string, boolean>;
   selectedId: string | null;
   onSelect: (id: string) => void;
 }) {
@@ -99,9 +102,10 @@ export function ContactList({
     () =>
       contacts.map((c) => {
         const s = situations[c.id] as Situation | undefined;
-        return { c, s, p: priorityOf(c, s) };
+        const asleep = snoozed[c.id] === true;
+        return { c, s, asleep, p: priorityOf(c, s, asleep) };
       }),
-    [contacts, situations],
+    [contacts, situations, snoozed],
   );
 
   // Counts describe the buckets, so they stay stable while the operator types:
@@ -109,7 +113,7 @@ export function ContactList({
   // navigate. The search narrows what is shown, never what is counted.
   const counts = useMemo(() => {
     const out = {} as Record<FilterKey, number>;
-    for (const f of FILTERS) out[f.key] = rows.filter(({ c, s }) => f.test(c, s)).length;
+    for (const f of FILTERS) out[f.key] = rows.filter(({ c, s, asleep }) => f.test(c, s, asleep)).length;
     return out;
   }, [rows]);
 
@@ -117,7 +121,7 @@ export function ContactList({
     const term = q.trim().toLowerCase();
     const f = FILTERS.find((x) => x.key === filter) ?? DEFAULT_FILTER;
     return rows
-      .filter(({ c, s }) => f.test(c, s))
+      .filter(({ c, s, asleep }) => f.test(c, s, asleep))
       .filter(({ c }) => !term || `${c.company ?? ''} ${c.email}`.toLowerCase().includes(term))
       .sort((a, b) => {
         // Unread still wins outright: a person wrote and it has not been read.

@@ -135,6 +135,7 @@ function Section({
 export function TodayRail({
   contacts,
   situations,
+  snoozed,
   sentToday,
   selectedId,
   onSelect,
@@ -142,6 +143,9 @@ export function TodayRail({
   contacts: Contact[];
   /** Keyed by Contact.id, one entry per contact, built by the page. */
   situations: Record<string, Situation>;
+  /** Keyed the same way and on the same clock. A contact asleep until a date
+   *  leaves the day's queue: that is the whole point of 'pas maintenant'. */
+  snoozed: Record<string, boolean>;
   /** Real outbound mails dated today, drafts excluded. */
   sentToday: number;
   selectedId: string | null;
@@ -150,12 +154,16 @@ export function TodayRail({
   const { ours, due } = useMemo(() => {
     // filter hands back a fresh array each time, so sorting it in place leaves
     // the caller's contacts untouched.
-    const rows: Ranked[] = contacts.map((c) => ({ c, s: situations[c.id] as Situation | undefined }));
+    const rows: Array<Ranked & { asleep: boolean }> = contacts.map((c) => ({
+      c,
+      s: situations[c.id] as Situation | undefined,
+      asleep: snoozed[c.id] === true,
+    }));
     return {
       ours: rows.filter(({ c, s }) => ballWithUs(c, s)).sort(byOldestSilence),
-      due: rows.filter(({ c, s }) => followupDue(c, s)).sort(byOldestSilence),
+      due: rows.filter(({ c, s, asleep }) => followupDue(c, s, asleep)).sort(byOldestSilence),
     };
-  }, [contacts, situations]);
+  }, [contacts, situations, snoozed]);
 
   // The threshold is named in the text, not only in the colour: amber alone
   // tells a colour-blind reader nothing, and neither does it tell anyone why 8

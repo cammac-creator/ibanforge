@@ -18,6 +18,10 @@ const sourcing = (status: string): ProspectSourcing => ({
   confidence: null,
   status,
   source: null,
+  outcome: null,
+  outcomeNote: null,
+  wakeUpAt: null,
+  outcomeAt: null,
 });
 
 const base = {

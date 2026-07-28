@@ -1,6 +1,9 @@
 import { enrichEmail } from '@/lib/company-enrichment';
 import { threadIsUnread } from '@/lib/thread-unread';
-import type { Contact, Message, ProspectSourcing, ReadyMail } from './types';
+import type { Contact, Message, Outcome, ProspectSourcing, ReadyMail } from './types';
+
+/** The outcome values the UI knows how to draw. Anything else reads as none. */
+const OUTCOMES: readonly string[] = ['en_discussion', 'pas_maintenant', 'pas_interesse', 'mauvaise_personne'];
 
 /** Mailbox used for a contact we have never emailed. */
 const COLD_ACCOUNT = 'claude-alain@ibanforge.com';
@@ -54,6 +57,17 @@ export interface ProspectRow {
   personalization_hook: string | null;
   confidence: string | null;
   status: string;
+  /**
+   * Optional on the wire, required in ProspectSourcing. The frontend and the
+   * API deploy independently (Vercel and Railway), so between the two pushes
+   * this page runs against an API that does not return these columns yet. An
+   * optional field degrades to "no outcome recorded"; a required one would
+   * make the whole CRM fail to type against its own live backend.
+   */
+  outcome?: string | null;
+  outcome_note?: string | null;
+  wake_up_at?: string | null;
+  outcome_at?: string | null;
   mail_subject_en: string | null;
   mail_body_en: string | null;
   mail_subject_fr: string | null;
@@ -145,6 +159,12 @@ function sourcingOf(r: ProspectRow): ProspectSourcing {
     confidence: r.confidence,
     status: r.status,
     source: r.source,
+    // Validated on the way in rather than trusted: the column is free TEXT and
+    // an unknown value reaching the UI would render a blank badge.
+    outcome: OUTCOMES.includes(r.outcome as Outcome) ? (r.outcome as Outcome) : null,
+    outcomeNote: r.outcome_note ?? null,
+    wakeUpAt: r.wake_up_at ?? null,
+    outcomeAt: r.outcome_at ?? null,
   };
 }
 

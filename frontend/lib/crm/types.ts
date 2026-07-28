@@ -28,6 +28,12 @@ export interface UsageSeries {
   endpoints: Array<{ path: string; count: number }>;
 }
 
+/**
+ * The four things learned about a contact that the sourcing state cannot say.
+ * Deliberately short: a longer list is a list nobody fills in honestly.
+ */
+export type Outcome = 'en_discussion' | 'pas_maintenant' | 'pas_interesse' | 'mauvaise_personne';
+
 export interface ProspectSourcing {
   prospectId: string;
   segment: string | null;
@@ -40,8 +46,20 @@ export interface ProspectSourcing {
   emailSourceUrl: string | null;
   personalizationHook: string | null;
   confidence: string | null;
+  /** Sourcing state: where finding and contacting them got to. */
   status: string;
   source: string | null;
+  /**
+   * Where the RELATIONSHIP got to, which no value of `status` can express.
+   * Null means nothing has been recorded, which is not a negative outcome.
+   */
+  outcome: Outcome | null;
+  /** The operator's own words on why. */
+  outcomeNote: string | null;
+  /** YYYY-MM-DD, only ever set with 'pas_maintenant'. */
+  wakeUpAt: string | null;
+  /** When the outcome was recorded, so a stale judgement shows as one. */
+  outcomeAt: string | null;
 }
 
 export interface ReadyMail {

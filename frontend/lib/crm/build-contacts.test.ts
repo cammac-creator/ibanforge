@@ -647,7 +647,50 @@ describe('buildContacts', () => {
       confidence: 'medium',
       status: 'contacte',
       source: 'annuaire',
+      outcome: null,
+      outcomeNote: null,
+      wakeUpAt: null,
+      outcomeAt: null,
     });
+  });
+
+  it('carries the outcome across, and refuses one it does not recognise', () => {
+    const carried = buildContacts({
+      ...base,
+      prospects: [
+        prospectRow('p17', 'lead17@example.net', {
+          outcome: 'pas_maintenant',
+          outcome_note: 'Budget gelé, revoir à la rentrée.',
+          wake_up_at: '2026-09-15',
+          outcome_at: '2026-07-28T08:00:00.000Z',
+        }),
+      ],
+    });
+    const s = carried[0].kind === 'prospect' ? carried[0].sourcing : null;
+    expect(s?.outcome).toBe('pas_maintenant');
+    expect(s?.wakeUpAt).toBe('2026-09-15');
+    expect(s?.outcomeNote).toBe('Budget gelé, revoir à la rentrée.');
+
+    // The column is free TEXT. A value the UI has no badge for must read as
+    // "nothing recorded" rather than reaching the interface and drawing blank.
+    const bogus = buildContacts({
+      ...base,
+      prospects: [prospectRow('p18', 'lead18@example.net', { outcome: 'peut-etre' })],
+    });
+    expect(bogus[0].kind === 'prospect' ? bogus[0].sourcing.outcome : 'x').toBeNull();
+  });
+
+  it('reads an API that does not return the outcome columns yet', () => {
+    // Vercel and Railway deploy independently: between the two pushes the page
+    // runs against a backend whose SELECT has no outcome columns at all.
+    const out = buildContacts({
+      ...base,
+      prospects: [prospectRow('p19', 'lead19@example.net', {})],
+    });
+    const s = out[0].kind === 'prospect' ? out[0].sourcing : null;
+    expect(s?.outcome).toBeNull();
+    expect(s?.wakeUpAt).toBeNull();
+    expect(s?.outcomeAt).toBeNull();
   });
 
   it('gives each message-less contact its own messages array', () => {

@@ -35,11 +35,18 @@ function draftKey(contactId: string, draft: Message): string {
 export function CrmApp({
   contacts,
   situations,
+  snoozed,
   sentToday,
 }: {
   contacts: Contact[];
   /** Keyed by Contact.id, one entry per contact, built by the page. */
   situations: Record<string, Situation>;
+  /**
+   * One entry per contact id, computed by the page against the same clock as
+   * the situations. Never derived here: a boolean about "what day is it"
+   * recomputed in the browser is a hydration mismatch waiting for midnight.
+   */
+  snoozed: Record<string, boolean>;
   /** Real outbound mails dated today, counted by the page against one clock. */
   sentToday: number;
 }) {
@@ -108,11 +115,18 @@ export function CrmApp({
       <TodayRail
         contacts={view}
         situations={situations}
+        snoozed={snoozed}
         sentToday={sentToday}
         selectedId={selectedId}
         onSelect={open}
       />
-      <ContactList contacts={view} situations={situations} selectedId={selectedId} onSelect={open} />
+      <ContactList
+        contacts={view}
+        situations={situations}
+        snoozed={snoozed}
+        selectedId={selectedId}
+        onSelect={open}
+      />
       <div className="flex min-w-0 max-h-[76vh] flex-col rounded-xl border border-[var(--ink-4)]/60 bg-[var(--ink-2)]/40 p-4">
         {!selected ? (
           // "dans la liste", not "à gauche": below the lg breakpoint the list

@@ -305,6 +305,44 @@ export function getStatsDB(): DatabaseType.Database {
     if (msgCols.length && !msgCols.includes('snippet_fr')) statsDB.exec('ALTER TABLE email_messages ADD COLUMN snippet_fr TEXT');
     if (msgCols.length && !msgCols.includes('lang')) statsDB.exec('ALTER TABLE email_messages ADD COLUMN lang TEXT');
     if (msgCols.length && !msgCols.includes('body')) statsDB.exec('ALTER TABLE email_messages ADD COLUMN body TEXT');
+    // Where the RELATIONSHIP stands, which `status` cannot say.
+    //
+    // `status` is a sourcing state: is there an address, is the mail ready, has
+    // one gone out. Audited 27/07/2026, it was found not to drift from reality
+    // (one row out of eighty), so the problem was never that it lied. The
+    // problem is that its vocabulary has no way to record an outcome: not
+    // interested, not now call me in September, wrong person, in discussion.
+    // The only gestures available were archive and reject, which erase the row
+    // instead of qualifying it, so nothing learned from a conversation
+    // survived to inform the next campaign.
+    //
+    // Separate columns rather than more `status` values, deliberately.
+    // build-contacts branches on 'rejete' in two places and isArchived on
+    // 'archive'; the ingester flips 'a_mailer'/'a_enrichir' to 'contacte'.
+    // Adding outcomes to that field means auditing every one of those sites
+    // and leaves an outcome one re-sync away from being overwritten. These
+    // columns are orthogonal to all of it.
+    const prospectCols = (statsDB.prepare('PRAGMA table_info(prospects)').all() as Array<{ name: string }>).map((r) => r.name);
+    if (prospectCols.length && !prospectCols.includes('outcome')) {
+      // 'en_discussion' | 'pas_maintenant' | 'pas_interesse' | 'mauvaise_personne',
+      // or NULL for "no outcome recorded", which is not the same as a negative one.
+      statsDB.exec('ALTER TABLE prospects ADD COLUMN outcome TEXT');
+      statsDB.exec('CREATE INDEX IF NOT EXISTS idx_prospects_outcome ON prospects(outcome)');
+    }
+    // Why, in the operator's own words. Short and free text on purpose: the
+    // reason a deal dies is never one of five buttons, and a wrong button
+    // teaches the next campaign the wrong lesson.
+    if (prospectCols.length && !prospectCols.includes('outcome_note')) statsDB.exec('ALTER TABLE prospects ADD COLUMN outcome_note TEXT');
+    // YYYY-MM-DD. Set with 'pas_maintenant': until that day the contact leaves
+    // the day's queue entirely, instead of coming back every ten days like
+    // everyone else and being dismissed by hand each time.
+    if (prospectCols.length && !prospectCols.includes('wake_up_at')) {
+      statsDB.exec('ALTER TABLE prospects ADD COLUMN wake_up_at TEXT');
+      statsDB.exec('CREATE INDEX IF NOT EXISTS idx_prospects_wake_up ON prospects(wake_up_at)');
+    }
+    // When the outcome was recorded, so a stale judgement can be told from a
+    // fresh one without reading the thread.
+    if (prospectCols.length && !prospectCols.includes('outcome_at')) statsDB.exec('ALTER TABLE prospects ADD COLUMN outcome_at TEXT');
   }
   return statsDB;
 }

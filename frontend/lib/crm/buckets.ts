@@ -30,14 +30,25 @@ import type { Contact, Situation } from './types';
  * declines to claim the row beats one that throws in the operator's face.
  */
 
-/** Their last message is inbound: they are waiting on us. */
+/**
+ * Their last message is inbound: they are waiting on us.
+ *
+ * Deliberately blind to the snooze. Someone who writes while asleep has
+ * overtaken their own "call me in September", and burying that message would
+ * hide the one event that proves the snooze wrong.
+ */
 export function ballWithUs(c: Contact, s: Situation | undefined): boolean {
   return !isArchived(c, s) && s?.ballInCourt === 'us';
 }
 
-/** Our last mail has gone unanswered past FOLLOWUP_DAYS. */
-export function followupDue(c: Contact, s: Situation | undefined): boolean {
-  return !isArchived(c, s) && s?.followupDue === true;
+/**
+ * Our last mail has gone unanswered past FOLLOWUP_DAYS, and the contact is not
+ * asleep until a date. The snooze is the whole point of the outcome
+ * 'pas_maintenant': without this term the row would come back every ten days
+ * to be dismissed by hand, which is exactly the cycle it exists to break.
+ */
+export function followupDue(c: Contact, s: Situation | undefined, snoozed: boolean = false): boolean {
+  return !snoozed && !isArchived(c, s) && s?.followupDue === true;
 }
 
 /**
@@ -46,6 +57,6 @@ export function followupDue(c: Contact, s: Situation | undefined): boolean {
  * sum of the two counts above, which is what lets the rail's two section
  * badges be read against the Aujourd'hui chip.
  */
-export function dueToday(c: Contact, s: Situation | undefined): boolean {
-  return ballWithUs(c, s) || followupDue(c, s);
+export function dueToday(c: Contact, s: Situation | undefined, snoozed: boolean = false): boolean {
+  return ballWithUs(c, s) || followupDue(c, s, snoozed);
 }
