@@ -37,7 +37,10 @@ function getClientIp(req: Request): string {
  * In-memory rate limiter middleware.
  *
  * - Default: 100 req/min per IP (configurable via RATE_LIMIT_PER_MIN)
- * - Adds X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset headers
+ * - Adds both header spellings: the legacy X-RateLimit-Limit/-Remaining/-Reset
+ *   (Reset = unix timestamp) and the IETF RateLimit-Limit/-Remaining/-Reset
+ *   (Reset = delta-seconds), so standard-aware scorers and existing clients
+ *   both find what they look for
  * - Returns 429 when limit exceeded
  * - Exempt paths: /health, /openapi.json, /ping, /stats, /v1/demo
  */
@@ -71,10 +74,23 @@ export function rateLimitMiddleware(): MiddlewareHandler {
     win.count += 1;
     const remaining = Math.max(0, LIMIT - win.count);
     const resetSec = Math.ceil(win.resetAt / 1000);
+    const resetDelta = Math.max(1, Math.ceil((win.resetAt - now) / 1000));
 
+    // Legacy triple, kept because existing clients read it. X-RateLimit-Reset
+    // is a unix timestamp here, which is why the IETF header below is NOT an
+    // alias: the standard spells Reset as delta-seconds.
     c.header('X-RateLimit-Limit', String(LIMIT));
     c.header('X-RateLimit-Remaining', String(remaining));
     c.header('X-RateLimit-Reset', String(resetSec));
+
+    // IETF draft-ietf-httpapi-ratelimit-headers spelling. Emitted alongside the
+    // legacy names because automated agent-readiness scorers look for the
+    // standard field names: the 2026-07-28 channel audit found api-evangelist
+    // reporting `rate_limit_signal: false` while the server was already sending
+    // the X-prefixed triple on every limited route.
+    c.header('RateLimit-Limit', String(LIMIT));
+    c.header('RateLimit-Remaining', String(remaining));
+    c.header('RateLimit-Reset', String(resetDelta));
 
     if (win.count > LIMIT) {
       const retryAfter = Math.ceil((win.resetAt - now) / 1000);
