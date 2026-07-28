@@ -51,7 +51,7 @@
     },
     {
       "name": "lookup_ch_clearing",
-      "description": "Resolve a Swiss BC-Nummer / IID into institution name, type, address, full payment-rail participation (SIC, euroSIC, CHF instant, LSV+/BDD) and QR-IID — the deepest Swiss clearing data in any public API (~1,200 SIX BankMaster entries). Cost: $0.003 USDC.",
+      "description": "Resolve a Swiss BC-Nummer / IID into institution name, type, address, full payment-rail participation (SIC, euroSIC, CHF instant, LSV+/BDD) and QR-IID — the deepest Swiss clearing data in any public API (1,100+ SIX BankMaster entries). Cost: $0.003 USDC.",
       "inputSchema": {
         "type": "object",
         "properties": {

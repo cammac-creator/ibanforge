@@ -109,7 +109,7 @@ const TOOLS = [
   {
     name: "lookup_ch_clearing",
     price: "$0.003",
-    description: "Resolve a Swiss BC-Nummer / IID — full SIX rail participation (SIC, euroSIC, CHF instant) + QR-IID. ~1,200 SIX entries, the deepest Swiss clearing data in any public API.",
+    description: "Resolve a Swiss BC-Nummer / IID — full SIX rail participation (SIC, euroSIC, CHF instant) + QR-IID. 1,100+ SIX entries, the deepest Swiss clearing data in any public API.",
   },
   {
     name: "check_compliance",

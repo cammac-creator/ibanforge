@@ -3,7 +3,7 @@
 [![npm](https://img.shields.io/npm/v/ibanforge-mcp)](https://www.npmjs.com/package/ibanforge-mcp)
 [![License](https://img.shields.io/npm/l/ibanforge-mcp)](https://github.com/cammac-creator/ibanforge/blob/main/LICENSE)
 
-Official **Model Context Protocol (MCP) server** for [IBANforge](https://ibanforge.com) — IBAN validation, BIC/SWIFT lookup, Swiss BC-Nummer (~1,200 SIX entries), EMI/vIBAN classification, SEPA + VoP reachability and compliance risk scoring.
+Official **Model Context Protocol (MCP) server** for [IBANforge](https://ibanforge.com) — IBAN validation, BIC/SWIFT lookup, Swiss BC-Nummer (1,100+ SIX entries), EMI/vIBAN classification, SEPA + VoP reachability and compliance risk scoring.
 
 ## Tools
 
@@ -12,7 +12,7 @@ Official **Model Context Protocol (MCP) server** for [IBANforge](https://ibanfor
 | `validate_iban`       | Validate a single IBAN (ISO 13616 mod-97), resolve BIC, classify issuer (bank/EMI/vIBAN), SEPA + VoP flags               | 0.005       |
 | `batch_validate_iban` | Validate up to 100 IBANs in one call                                                                                     | 0.002 each  |
 | `lookup_bic`          | Lookup BIC/SWIFT against 121k+ BIC entries (39k+ LEI-enriched via GLEIF)                                                  | 0.003       |
-| `lookup_ch_clearing`  | Lookup Swiss BC-Nummer / IID against ~1,200 SIX BankMaster entries — full rail participation (SIC, euroSIC, CHF instant) + QR-IID | 0.003       |
+| `lookup_ch_clearing`  | Lookup Swiss BC-Nummer / IID against 1,100+ SIX BankMaster entries — full rail participation (SIC, euroSIC, CHF instant) + QR-IID | 0.003       |
 | `check_compliance`    | Full compliance check: IBAN + sanctions (OFAC) + SEPA Instant + VoP + risk score (0-100)                                 | 0.02        |
 
 ## Installation
@@ -91,7 +91,7 @@ After adding the server, ask your AI agent:
   - Deutsche Bundesbank BLZ (official quarterly file)
   - NBP EWIB (official Polish bank registry)
   - SIX Group BankMaster (Swiss BICs)
-- **~1,200 BC-Nummern** from the official [SIX BankMaster](https://www.six-group.com/en/products-services/banking-services/bank-master-data.html) CSV
+- **1,100+ BC-Nummern** from the official [SIX BankMaster](https://www.six-group.com/en/products-services/banking-services/bank-master-data.html) CSV
 - **EMI / vIBAN classification** from a curated dataset of 30+ known issuer prefixes
 - **VoP participants** from the EBA RT1 / SCT Inst directories
 

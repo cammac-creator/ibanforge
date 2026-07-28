@@ -246,7 +246,7 @@ const TOOLS: Tool[] = [
       'asks routing details for a Swiss instant transfer (SIC, euroSIC), asks about QR-bill QR-IID resolution, ' +
       'or needs to classify a Swiss financial institution (bank vs PFS vs SIC-only participant). ' +
       'THE DEEPEST SWISS CLEARING DATA IN ANY PUBLIC API — full SIX BankMaster payment-rail participation (SIC, RTGS CHF, Instant Payments CHF, euroSIC, LSV+/BDD) plus QR-IID allocation, not just a name lookup. ' +
-      'BACKED BY: ~1,200 SIX BankMaster entries (Swiss official source, refreshed monthly). ' +
+      'BACKED BY: 1,100+ SIX BankMaster entries (Swiss official source, refreshed monthly). ' +
       'RETURNS: institution { name, type, iid_type, headquarters_iid }, address, bic, payment_services { sic, rtgs_chf, instant_payments_chf, eurosic, lsv_bdd_chf, lsv_bdd_eur }, sic_iid, qr_iid, valid_on. ' +
       'COST: 0.003 USDC. Only relevant for CH and LI accounts.',
     inputSchema: {

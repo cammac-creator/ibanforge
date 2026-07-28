@@ -26,7 +26,7 @@ const SOFTWARE_APPLICATION = {
   operatingSystem: 'Web, REST API, MCP',
   url: 'https://ibanforge.com',
   description:
-    'IBAN validation, BIC/SWIFT lookup, Swiss BC-Nummer (~1,200 SIX entries), EMI/vIBAN classification, SEPA + VoP reachability and compliance risk scoring. Pay-per-call in USDC via x402, or 200 free requests/month with an API key. Native MCP server for Claude Desktop, Cursor, and Cline.',
+    'IBAN validation, BIC/SWIFT lookup, Swiss BC-Nummer (1,100+ SIX entries), EMI/vIBAN classification, SEPA + VoP reachability and compliance risk scoring. Pay-per-call in USDC via x402, or 200 free requests/month with an API key. Native MCP server for Claude Desktop, Cursor, and Cline.',
   offers: [
     {
       '@type': 'Offer',
@@ -55,7 +55,7 @@ const SOFTWARE_APPLICATION = {
     {
       '@type': 'Offer',
       name: 'Swiss clearing lookup',
-      description: 'Swiss BC-Nummer / IID lookup (~1,200 SIX BankMaster entries)',
+      description: 'Swiss BC-Nummer / IID lookup (1,100+ SIX BankMaster entries)',
       price: '0.003',
       priceCurrency: 'USDC',
       eligibleQuantity: { '@type': 'QuantitativeValue', value: 1, unitText: 'request' },
@@ -81,7 +81,7 @@ const SOFTWARE_APPLICATION = {
   featureList: [
     'IBAN validation (ISO 13616 mod-97 + BBAN)',
     'BIC/SWIFT lookup against 121,000+ BIC entries (38K LEI-enriched via GLEIF)',
-    'Swiss BC-Nummer / IID lookup (~1,200 SIX BankMaster)',
+    'Swiss BC-Nummer / IID lookup (1,100+ SIX BankMaster)',
     'EMI / vIBAN / neobank issuer classification',
     'SEPA Instant reachability flag',
     'VoP (PSR 2024/886) participant check',
@@ -117,7 +117,7 @@ const FAQ = {
       name: 'What does IBANforge validate?',
       acceptedAnswer: {
         '@type': 'Answer',
-        text: 'IBANforge validates IBAN structure (ISO 13616 mod-97 check digits + country-specific BBAN), resolves the associated BIC/SWIFT against 121,000+ BIC entries from public sources (GLEIF, SWIFT directory, Bundesbank, SIX, NBP, EBA Step2 SCT) with LEI enrichment for ~38K rows sourced from GLEIF, looks up Swiss BC-Nummer / IID against ~1,200 SIX BankMaster entries, classifies the issuer (bank, EMI, vIBAN provider, neobank), and flags SEPA Instant + VoP (Verification of Payee, EU 2024/886) reachability.',
+        text: 'IBANforge validates IBAN structure (ISO 13616 mod-97 check digits + country-specific BBAN), resolves the associated BIC/SWIFT against 121,000+ BIC entries from public sources (GLEIF, SWIFT directory, Bundesbank, SIX, NBP, EBA Step2 SCT) with LEI enrichment for ~38K rows sourced from GLEIF, looks up Swiss BC-Nummer / IID against 1,100+ SIX BankMaster entries, classifies the issuer (bank, EMI, vIBAN provider, neobank), and flags SEPA Instant + VoP (Verification of Payee, EU 2024/886) reachability.',
       },
     },
     {
@@ -165,7 +165,7 @@ const FAQ = {
       name: 'Where does the BIC and Swiss clearing data come from?',
       acceptedAnswer: {
         '@type': 'Answer',
-        text: 'BIC/SWIFT data: 121,000+ entries from public sources — GLEIF (Global Legal Entity Identifier Foundation, ~38K rows with LEI enrichment), the SWIFT directory, the Deutsche Bundesbank, SIX, the NBP, and EBA Clearing STEP2 SCT. Swiss data: ~1,200 BC-Nummern from the official SIX BankMaster CSV — the canonical source used by the Swiss banking industry.',
+        text: 'BIC/SWIFT data: 121,000+ entries from public sources — GLEIF (Global Legal Entity Identifier Foundation, ~38K rows with LEI enrichment), the SWIFT directory, the Deutsche Bundesbank, SIX, the NBP, and EBA Clearing STEP2 SCT. Swiss data: 1,100+ BC-Nummern from the official SIX BankMaster CSV — the canonical source used by the Swiss banking industry.',
       },
     },
     {

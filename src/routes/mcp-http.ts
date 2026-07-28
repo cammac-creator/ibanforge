@@ -20,6 +20,11 @@ import { buildComplianceResponse } from '../lib/compliance-response.js';
 import { lookupClearingByBankCode, normalizeIid } from '../lib/ch-clearing.js';
 import { extractClientIp } from '../lib/stats.js';
 import { buildCountriesPayload, buildPricingPayload, buildValidateAndExplainPrompt } from '../lib/mcp-resources.js';
+import { datasetFacts } from '../lib/dataset-facts.js';
+
+/** Dataset sizes, read once and rounded down so a claim cannot outlive its data. */
+const F = datasetFacts();
+
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const pkg = JSON.parse(readFileSync(resolve(__dirname, '../../package.json'), 'utf-8'));
@@ -42,7 +47,7 @@ function createMcpServer(): McpServer {
     title: 'IBANforge',
     version: pkg.version,
     description:
-      'Pre-payout screening for agents — vet a counterparty IBAN before you send funds: IBAN validation, BIC/SWIFT lookup, Swiss clearing, SEPA/VoP reachability, sanctions and risk indicators. 121k+ BIC entries (38k+ LEI-enriched via GLEIF), ~1,200 Swiss BC-Nummer from SIX, 89 countries, refreshed monthly.',
+      `Pre-payout screening for agents — vet a counterparty IBAN before you send funds: IBAN validation, BIC/SWIFT lookup, Swiss clearing, SEPA/VoP reachability, sanctions and risk indicators. ${F.claim.bic} BIC entries (${F.claim.lei} LEI-enriched via GLEIF), ${F.claim.chClearing} Swiss BC-Nummer from SIX, 89 countries, refreshed monthly.`,
     websiteUrl: 'https://ibanforge.com',
     icons: [
       {
@@ -219,7 +224,7 @@ function createMcpServer(): McpServer {
         'USE WHEN: the user already has a BIC/SWIFT (8 or 11 chars, alphanumeric, e.g., "UBSWCHZH80A", "DEUTDEFF") ' +
         'and asks which bank it belongs to, where the bank is, or its LEI for compliance/regulatory matching. ' +
         'DO NOT USE for IBAN inputs — call validate_iban instead, it resolves the BIC for you. ' +
-        'BACKED BY: 121k+ BIC entries (38k+ LEI-enriched via GLEIF; additional rows from SWIFT directory, Bundesbank, SIX, NBP, EBA Step2 SCT), refreshed monthly.',
+        `BACKED BY: ${F.claim.bic} BIC entries (${F.claim.lei} LEI-enriched via GLEIF; additional rows from SWIFT directory, Bundesbank, SIX, NBP, EBA Step2 SCT), refreshed monthly.`,
       inputSchema: {
         bic: z.string().describe('BIC/SWIFT code (8 or 11 chars)'),
       },
@@ -391,7 +396,7 @@ function createMcpServer(): McpServer {
         'asks routing details for a Swiss instant transfer (SIC, euroSIC), asks about QR-bill QR-IID resolution, ' +
         'or needs to classify a Swiss financial institution (bank vs PFS vs SIC-only participant). ' +
         'THE DEEPEST SWISS CLEARING DATA IN ANY PUBLIC API — full SIX BankMaster payment-rail participation (SIC, RTGS CHF, Instant Payments CHF, euroSIC, LSV+/BDD) plus QR-IID allocation, not just a name lookup. ' +
-        'BACKED BY: ~1,200 SIX BankMaster entries (Swiss official source, refreshed monthly). ' +
+        `BACKED BY: ${F.claim.chClearing} SIX BankMaster entries (Swiss official source, refreshed monthly). ` +
         'RETURNS: institution { name, type, iid_type, headquarters_iid }, address, bic, payment_services { sic, rtgs_chf, instant_payments_chf, eurosic, lsv_bdd_chf, lsv_bdd_eur }, sic_iid, qr_iid, valid_on. ' +
         'Only relevant for CH and LI accounts.',
       inputSchema: {
