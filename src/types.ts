@@ -237,13 +237,31 @@ export interface VopCheck {
   status: 'active' | 'pending' | 'inactive' | 'not_found';
 }
 
-export type RiskLevel = 'low' | 'medium' | 'elevated' | 'high' | 'critical';
+/**
+ * 'unassessable' is not a point on the scale, it is the absence of one.
+ *
+ * Until 28/07/2026 an IBAN that failed validation still received a score, and
+ * that score was 10 / 'low': the two "we know nothing" penalties (no SEPA
+ * Instant, no VoP) added up to just under the 20-point 'medium' threshold. So
+ * the less the API could establish, the more reassuring its verdict. Measured
+ * on production, a one-character typo took a Russian IBAN from 90 / 'critical'
+ * with a sanctioned_country flag down to 10 / 'low'.
+ *
+ * On a pre-payout screening product the direction of the error matters more
+ * than its frequency: a reassuring false negative costs a transfer, an alarming
+ * false positive costs a second look. So an unvalidatable IBAN now says so.
+ */
+export type RiskLevel = 'low' | 'medium' | 'elevated' | 'high' | 'critical' | 'unassessable';
+
+/** The levels the scorer can actually emit. 'unassessable' never comes from a score. */
+export type ScoredRiskLevel = Exclude<RiskLevel, 'unassessable'>;
 
 export interface ComplianceResult {
   sanctions: SanctionsCheck;
   reachability: ReachabilityCheck;
   vop: VopCheck;
-  risk_score: number;
+  /** null when the IBAN could not be validated: there was nothing to score. */
+  risk_score: number | null;
   risk_level: RiskLevel;
   flags: string[];
 }

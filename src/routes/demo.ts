@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { validateIBAN } from '../lib/iban.js';
 import { enrichResult } from '../lib/enrich.js';
-import { buildComplianceResult } from '../lib/compliance.js';
+import { buildComplianceResponse } from '../lib/compliance-response.js';
 import { validateBIC } from '../lib/bic-validator.js';
 import { lookup } from '../lib/bic-lookup.js';
 
@@ -26,20 +26,13 @@ demo.get('/v1/demo', (c) => {
     return { label, ...result };
   });
 
-  // Compliance demo: show a full compliance check for one IBAN
-  const complianceIban = 'DE89370400440532013000';
-  const complianceResult = validateIBAN(complianceIban);
-  enrichResult(complianceResult);
-
+  // Compliance demo: show a full compliance check for one IBAN.
+  // Same shared assembly as the paid route, so the demo can never advertise a
+  // shape the real endpoint does not return. It also gains `meta`, the
+  // bank_bic_only disclaimer this route silently omitted.
   let complianceDemo;
   try {
-    const countryCode = complianceResult.country?.code ?? '';
-    const bic8 = complianceResult.bic?.code?.slice(0, 8) ?? null;
-    const issuerType = complianceResult.issuer?.type ?? 'bank';
-    const countryRisk = complianceResult.risk_indicators?.country_risk ?? 'standard';
-    const isTestBic = complianceResult.risk_indicators?.test_bic ?? false;
-    const compliance = buildComplianceResult(countryCode, bic8, issuerType, countryRisk, isTestBic);
-    complianceDemo = { ...complianceResult, compliance, cost_usdc: 0.02 };
+    complianceDemo = { ...buildComplianceResponse('DE89370400440532013000'), cost_usdc: 0.02 };
   } catch {
     complianceDemo = { error: 'Compliance data unavailable' };
   }

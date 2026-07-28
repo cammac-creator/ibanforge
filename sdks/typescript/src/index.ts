@@ -183,8 +183,14 @@ export interface Compliance {
   sanctions: { country_sanctioned: boolean; bank_sanctioned: boolean; matched_lists: string[]; fatf_status: string };
   reachability: { sepa_instant: boolean; sct: boolean; sdd: boolean };
   vop: { participant: boolean; status: string };
-  risk_score: number;
-  risk_level: 'low' | 'medium' | 'elevated' | 'high' | 'critical';
+  /** null when the IBAN did not validate: there was nothing to score. */
+  risk_score: number | null;
+  /**
+   * 'unassessable' means the IBAN itself failed validation, so no screening was
+   * possible. It is the absence of a verdict, never a favourable one: do not
+   * fold it into a "safe to pay" branch.
+   */
+  risk_level: 'low' | 'medium' | 'elevated' | 'high' | 'critical' | 'unassessable';
   flags: string[];
 }
 

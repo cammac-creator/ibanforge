@@ -369,7 +369,11 @@ const TOOLS: Tool[] = [
               properties: { participant: { type: 'boolean' }, status: { type: 'string' } },
             },
             risk_score: { type: 'number', minimum: 0, maximum: 100, description: '0 = safest, 100 = highest.' },
-            risk_level: { type: 'string', enum: ['low', 'medium', 'elevated', 'high', 'critical'] },
+            risk_level: {
+              type: 'string',
+              enum: ['low', 'medium', 'elevated', 'high', 'critical', 'unassessable'],
+              description: 'unassessable = the IBAN failed validation, no screening was possible. Never treat it as low.',
+            },
             flags: { type: 'array', items: { type: 'string' } },
           },
         },

@@ -983,8 +983,20 @@ const buildSpec = () => ({
               status: { type: 'string', enum: ['active', 'pending', 'inactive', 'not_found'] },
             },
           },
-          risk_score: { type: 'integer', minimum: 0, maximum: 100, description: 'Composite risk score (0 = no risk, 100 = critical)' },
-          risk_level: { type: 'string', enum: ['low', 'medium', 'elevated', 'high', 'critical'] },
+          risk_score: {
+            type: 'integer',
+            minimum: 0,
+            maximum: 100,
+            nullable: true,
+            description:
+              'Composite risk score (0 = no risk, 100 = critical). null when the IBAN did not validate: there was nothing to score.',
+          },
+          risk_level: {
+            type: 'string',
+            enum: ['low', 'medium', 'elevated', 'high', 'critical', 'unassessable'],
+            description:
+              'unassessable means the IBAN itself failed validation, so no screening was possible. It is the absence of a verdict, never a favourable one: do not treat it as low.',
+          },
           flags: { type: 'array', items: { type: 'string' }, description: 'List of specific risk flags detected', example: ['fatf_grey_list', 'emi_issuer', 'no_vop'] },
         },
       },

@@ -1,6 +1,6 @@
 import type Database from 'better-sqlite3';
 import { getComplianceDB } from './compliance-db.js';
-import type { SanctionsCheck, ReachabilityCheck, VopCheck, ComplianceResult, RiskLevel } from '../types.js';
+import type { SanctionsCheck, ReachabilityCheck, VopCheck, ComplianceResult, ScoredRiskLevel } from '../types.js';
 
 let _checkSanctionedCountry: Database.Statement | null = null;
 let _checkSanctionedBank: Database.Statement | null = null;
@@ -50,7 +50,7 @@ export function calculateRiskScore(
   issuerType: string,
   countryRisk: string,
   isTestBic: boolean,
-): { risk_score: number; risk_level: RiskLevel; flags: string[] } {
+): { risk_score: number; risk_level: ScoredRiskLevel; flags: string[] } {
   let score = 0;
   const flags: string[] = [];
 
@@ -76,7 +76,7 @@ export function calculateRiskScore(
   if (!vop.participant) { score += 5; flags.push('no_vop'); }
 
   score = Math.min(score, 100);
-  const risk_level: RiskLevel =
+  const risk_level: ScoredRiskLevel =
     score >= 80 ? 'critical' :
     score >= 60 ? 'high' :
     score >= 40 ? 'elevated' :
@@ -86,13 +86,49 @@ export function calculateRiskScore(
   return { risk_score: score, risk_level, flags };
 }
 
+/**
+ * The verdict for an IBAN that could not be validated.
+ *
+ * A factory rather than a shared constant: each caller gets its own object, so
+ * one that attaches a field cannot corrupt the next. Exported because tests and
+ * any future caller must assert against one definition — three call sites used
+ * to assemble this block by hand and two had already drifted.
+ *
+ * Everything here reads as "nothing established", never as "nothing wrong".
+ */
+export function unassessableCompliance(): ComplianceResult {
+  return {
+    sanctions: { country_sanctioned: false, bank_sanctioned: false, matched_lists: [], fatf_status: 'non_member' },
+    reachability: { sepa_instant: false, sct: false, sdd: false },
+    vop: { participant: false, status: 'not_found' },
+    risk_score: null,
+    risk_level: 'unassessable',
+    flags: ['iban_invalid'],
+  };
+}
+
+/**
+ * `valid` is REQUIRED and comes first, deliberately.
+ *
+ * An optional `valid = true` would have compiled at every existing call site
+ * and preserved the defect at any one the author forgot. Required means
+ * TypeScript names each of the four callers. And it is a parameter rather than
+ * a `countryCode === ''` test because that emptiness is an accident of how the
+ * validator reports errors, not a contract: it happens to hold on all six
+ * error paths today and nothing keeps it holding tomorrow.
+ */
 export function buildComplianceResult(
+  valid: boolean,
   countryCode: string,
   bic8: string | null,
   issuerType: string,
   countryRisk: string,
   isTestBic: boolean,
 ): ComplianceResult {
+  // Nothing to screen. Return before touching the database: the sanctions,
+  // reachability and VoP lookups would all miss and their misses are what used
+  // to be added up into a reassuring 10.
+  if (!valid) return unassessableCompliance();
   const sanctions = checkSanctions(countryCode, bic8);
   const reachability = checkReachability(bic8);
   const vop = checkVop(bic8);
