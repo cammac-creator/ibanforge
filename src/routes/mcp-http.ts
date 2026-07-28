@@ -16,7 +16,7 @@ import { validateIBAN } from '../lib/iban.js';
 import { enrichResult } from '../lib/enrich.js';
 import { lookup } from '../lib/bic-lookup.js';
 import { validateBIC } from '../lib/bic-validator.js';
-import { buildComplianceResult } from '../lib/compliance.js';
+import { buildComplianceResponse } from '../lib/compliance-response.js';
 import { lookupClearingByBankCode, normalizeIid } from '../lib/ch-clearing.js';
 import { extractClientIp } from '../lib/stats.js';
 import { buildCountriesPayload, buildPricingPayload, buildValidateAndExplainPrompt } from '../lib/mcp-resources.js';
@@ -334,10 +334,34 @@ function createMcpServer(): McpServer {
             participant: z.boolean(),
             status: z.string(),
           }),
-          risk_score: z.number().min(0).max(100).describe('0 = safest, 100 = block.'),
-          risk_level: z.string().describe('low | medium | elevated | high | critical'),
+          // .nullable() is load-bearing, not defensive. This tool returns
+          // structuredContent, so the MCP SDK validates the payload against
+          // this schema and throws McpError on a mismatch. Without it, every
+          // invalid-IBAN call on the production /mcp transport would become a
+          // JSON-RPC protocol error instead of the fixed verdict.
+          risk_score: z
+            .number()
+            .min(0)
+            .max(100)
+            .nullable()
+            .describe('0 = safest, 100 = block. null when the IBAN could not be validated: there was nothing to score.'),
+          risk_level: z
+            .string()
+            .describe('low | medium | elevated | high | critical | unassessable. unassessable means the IBAN itself did not validate, so no screening was possible: it is the absence of a verdict, never a favourable one.'),
           flags: z.array(z.string()),
         }),
+        // Declared because the shared assembly now attaches it here too. This
+        // transport was the only one omitting the bank_bic_only disclaimer, and
+        // an undeclared key would be stripped by the schema on the way out.
+        meta: z
+          .object({
+            scope: z.string(),
+            disclaimer: z.string(),
+            sanctions_as_of: z.string().nullable().optional(),
+            fatf_as_of: z.string().nullable().optional(),
+            sources: z.string().optional(),
+          })
+          .passthrough(),
         cost_usdc: z.number(),
         error: z.string().optional(),
         error_detail: z.string().optional(),
@@ -345,35 +369,11 @@ function createMcpServer(): McpServer {
       annotations: { title: 'Compliance Check', ...READ_ONLY_ANNOTATIONS },
     },
     async ({ iban }) => {
-      const result = validateIBAN(iban);
-      enrichResult(result);
-
-      const countryCode = result.country?.code ?? '';
-      const bic8 = result.bic?.code?.slice(0, 8) ?? null;
-      const issuerType = result.issuer?.type ?? 'bank';
-      const countryRisk = result.risk_indicators?.country_risk ?? 'standard';
-      const isTestBic = result.risk_indicators?.test_bic ?? false;
-
-      let compliance;
-      try {
-        compliance = buildComplianceResult(countryCode, bic8, issuerType, countryRisk, isTestBic);
-      } catch {
-        compliance = {
-          sanctions: {
-            country_sanctioned: false,
-            bank_sanctioned: false,
-            matched_lists: [],
-            fatf_status: 'non_member' as const,
-          },
-          reachability: { sepa_instant: false, sct: false, sdd: false },
-          vop: { participant: false, status: 'not_found' as const },
-          risk_score: 50,
-          risk_level: 'elevated' as const,
-          flags: ['compliance_data_unavailable'],
-        };
-      }
-
-      const combined = { ...result, compliance, cost_usdc: 0.02 };
+      // Shared with the REST route and the stdio MCP server. See
+      // src/lib/compliance-response.ts. This copy was the one that omitted
+      // `meta`, so the surface agents actually reach never carried the
+      // disclaimer saying the screening is on the bank, not the beneficiary.
+      const combined = { ...buildComplianceResponse(iban), cost_usdc: 0.02 };
       return {
         content: [{ type: 'text' as const, text: JSON.stringify(combined, null, 2) }],
         structuredContent: combined as unknown as Record<string, unknown>,

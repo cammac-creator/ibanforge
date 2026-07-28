@@ -449,8 +449,18 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
                           status: { type: 'string', enum: ['active', 'pending', 'inactive', 'not_found'] },
                         },
                       },
-                      risk_score: { type: 'number', minimum: 0, maximum: 100 },
-                      risk_level: { type: 'string', enum: ['low', 'medium', 'elevated', 'high', 'critical'] },
+                      risk_score: {
+                        type: ['number', 'null'],
+                        minimum: 0,
+                        maximum: 100,
+                        description: 'null when the IBAN did not validate: there was nothing to score.',
+                      },
+                      risk_level: {
+                        type: 'string',
+                        enum: ['low', 'medium', 'elevated', 'high', 'critical', 'unassessable'],
+                        description:
+                          'unassessable = the IBAN failed validation, no screening was possible. Never treat it as low.',
+                      },
                       flags: {
                         type: 'array',
                         items: { type: 'string' },

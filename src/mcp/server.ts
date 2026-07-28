@@ -9,7 +9,7 @@ import { validateIBAN } from '../lib/iban.js';
 import { enrichResult } from '../lib/enrich.js';
 import { lookup } from '../lib/bic-lookup.js';
 import { validateBIC } from '../lib/bic-validator.js';
-import { buildComplianceResult } from '../lib/compliance.js';
+import { buildComplianceResponse } from '../lib/compliance-response.js';
 import { getComplianceMeta } from '../lib/compliance-db.js';
 import { lookupClearingByBankCode, normalizeIid, getChClearingCount } from '../lib/ch-clearing.js';
 import { buildCountriesPayload, buildPricingPayload, buildValidateAndExplainPrompt } from '../lib/mcp-resources.js';
@@ -249,30 +249,11 @@ Cost: $0.02 USDC per call via x402 micropayment on Base L2.`,
     },
   },
   async ({ iban }) => {
-    const result = validateIBAN(iban);
-    enrichResult(result);
-
-    const countryCode = result.country?.code ?? '';
-    const bic8 = result.bic?.code?.slice(0, 8) ?? null;
-    const issuerType = result.issuer?.type ?? 'bank';
-    const countryRisk = result.risk_indicators?.country_risk ?? 'standard';
-    const isTestBic = result.risk_indicators?.test_bic ?? false;
-
-    let compliance;
-    try {
-      compliance = buildComplianceResult(countryCode, bic8, issuerType, countryRisk, isTestBic);
-    } catch {
-      compliance = {
-        sanctions: { country_sanctioned: false, bank_sanctioned: false, matched_lists: [], fatf_status: 'non_member' },
-        reachability: { sepa_instant: false, sct: false, sdd: false },
-        vop: { participant: false, status: 'not_found' },
-        risk_score: 50,
-        risk_level: 'elevated',
-        flags: ['compliance_data_unavailable'],
-      };
-    }
-
-    const combined = { ...result, compliance, meta: getComplianceMeta(), cost_usdc: 0.02 };
+    // Shared with the REST route and the HTTP MCP transport. See
+    // src/lib/compliance-response.ts: this block used to be a fourth hand copy,
+    // and it read country risk from a field that is absent on an unparseable
+    // BBAN, which is how a Russian IBAN once scored 60 instead of critical.
+    const combined = { ...buildComplianceResponse(iban), cost_usdc: 0.02 };
     return {
       content: [{ type: 'text' as const, text: JSON.stringify(combined, null, 2) }],
     };

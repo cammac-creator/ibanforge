@@ -17,7 +17,7 @@ const num = (v: unknown): number | null => (typeof v === "number" ? v : null)
 const isTrue = (v: unknown): boolean => v === true
 const arr = (v: unknown): unknown[] => (Array.isArray(v) ? v : [])
 
-type ChipLevel = "low" | "med" | "high"
+type ChipLevel = "low" | "med" | "high" | "unknown"
 
 function codeToFlag(code?: string | null): string {
   if (!code || code.length !== 2) return "🏳️"
@@ -265,9 +265,8 @@ function BannerPills({
   // Risk chip
   if (mode === "compliance") {
     const c = rec(data.compliance)
-    const score = num(c.risk_score) ?? 0
     const level = complianceLevel(str(c.risk_level))
-    pills.push(<RiskChip key="risk" level={level} score={`${score}/100`} />)
+    pills.push(<RiskChip key="risk" level={level} score={scoreLabel(c.risk_score)} />)
   } else if (mode === "iban" && isTrue(data.valid)) {
     const ri = rec(data.risk_indicators)
     if (Object.keys(ri).length) {
@@ -437,14 +436,13 @@ function ComplianceSections({ data, t }: SecProps) {
   const vop = rec(c.vop)
   const meta = rec(data.meta)
   const flags = arr(c.flags).map(String)
-  const score = num(c.risk_score) ?? 0
   const level = complianceLevel(str(c.risk_level))
   return (
     <>
       <Section title={t("section.score")}>
         <Row k="Score">
           <span className="inline-flex items-center gap-2">
-            <RiskChip level={level} score={`${score}/100`} />
+            <RiskChip level={level} score={scoreLabel(c.risk_score)} />
           </span>
         </Row>
         <Row k="Level">{str(c.risk_level)}</Row>
@@ -537,7 +535,17 @@ function InvalidNote({ data }: { data: Rec }) {
 function complianceLevel(lvl: string | null): ChipLevel {
   if (lvl === "high" || lvl === "critical") return "high"
   if (lvl === "medium" || lvl === "elevated") return "med"
+  // The API answers 'unassessable' when the IBAN failed validation: nothing was
+  // screened. The old bare `return "low"` turned that into a green chip, which
+  // is the defect the API fix exists to remove, reappearing one layer up.
+  if (lvl === "unassessable") return "unknown"
   return "low"
+}
+
+/** The score to print. A null score is "—", never 0: 0 is the safest value. */
+function scoreLabel(v: unknown): string {
+  const n = num(v)
+  return n === null || n === undefined ? "—" : `${n}/100`
 }
 
 function ibanRisk(ri: Rec): { level: ChipLevel; tag: string } {

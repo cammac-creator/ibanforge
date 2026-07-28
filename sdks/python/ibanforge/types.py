@@ -179,8 +179,12 @@ class Compliance(TypedDict, total=False):
     sanctions: Sanctions
     reachability: Reachability
     vop: VoP
-    risk_score: float  # 0 (safest) .. 100
-    risk_level: str  # low | medium | elevated | high | critical
+    # None when the IBAN did not validate: there was nothing to score.
+    risk_score: Optional[float]  # 0 (safest) .. 100, or None
+    # low | medium | elevated | high | critical | unassessable
+    # 'unassessable' = the IBAN failed validation, no screening was possible.
+    # It is the absence of a verdict, never a favourable one.
+    risk_level: str
     flags: List[str]
 
 
