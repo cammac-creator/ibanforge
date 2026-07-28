@@ -34,3 +34,15 @@ describe('mcpCard — MCP server card + discovery aliases', () => {
     expect(await res.json()).toEqual(canonical);
   });
 });
+
+describe('mcp card — extensionless alias measured on crawler traffic', () => {
+  // /.well-known/mcp was requested 254 times by 6 distinct IPs on 2026-07-28
+  // and returned 404, while /.well-known/mcp.json returned 200.
+  it('serves /.well-known/mcp identically to /.well-known/mcp.json', async () => {
+    const app = makeApp();
+    const canonical = await (await app.request('/.well-known/mcp.json')).json();
+    const res = await app.request('/.well-known/mcp');
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual(canonical);
+  });
+});

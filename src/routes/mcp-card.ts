@@ -53,7 +53,7 @@ const MCP_SERVER_CARD = {
 
 const mcpCard = new Hono();
 
-for (const path of ['/.well-known/mcp/server-card.json', '/.well-known/mcp.json', '/mcp.json']) {
+for (const path of ['/.well-known/mcp/server-card.json', '/.well-known/mcp.json', '/mcp.json', '/.well-known/mcp']) {
   mcpCard.get(path, (c) => c.json(MCP_SERVER_CARD));
 }
 

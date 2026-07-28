@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { datasetFacts } from '../lib/dataset-facts.js';
+import { PAYMENT_LINKS, PRICING_PAGE } from '../lib/payment-links.js';
 
 /** Dataset sizes, read once and rounded down so a claim cannot outlive its data. */
 const F = datasetFacts();
@@ -165,6 +166,19 @@ discovery.get('/.well-known/oauth-protected-resource/mcp', (c) =>
   c.json({ ...oauthResourceMetadata, resource: 'https://api.ibanforge.com/mcp' }),
 );
 
+// RFC 9728 inserts the well-known segment before the resource path, which the
+// route above already serves. Plenty of MCP clients append it instead, and on
+// 2026-07-28 that spelling was requested 1,021 times by 90 distinct IPs and
+// answered 404. A 404 there is worse than unhelpful: the client cannot tell
+// "this server needs no OAuth" from "this server is broken".
+discovery.get('/mcp/.well-known/oauth-protected-resource', (c) =>
+  c.json({ ...oauthResourceMetadata, resource: 'https://api.ibanforge.com/mcp' }),
+);
+
+// We deliberately do NOT serve /.well-known/oauth-authorization-server. There
+// is no authorization server; a 404 is the correct RFC 8414 signal and lets a
+// client fall through to the API-key or x402 path advertised above.
+
 // ──────────────────────────────────────────────────────────────────────────────
 // /.well-known/agents.json — A2A agent discovery (emerging standard).
 // Served at the canonical path and at the agent.json / agents.json /
@@ -210,6 +224,13 @@ for (const path of [
   '/.well-known/agent.json',
   '/agents.json',
   '/agent-directory.json',
+  // Measured 2026-07-28 in production request_log, all previously 404:
+  //   /.well-known/agent-card.json      411 hits / 104 distinct IPs
+  //   /.well-known/agent-directory.json 253 hits /   3 distinct IPs
+  // agent-card.json is the A2A spelling most crawlers reach for, and it was
+  // the single largest agent-discovery 404 on the service.
+  '/.well-known/agent-card.json',
+  '/.well-known/agent-directory.json',
 ]) {
   discovery.get(path, (c) => c.json(AGENT_MANIFEST));
 }
@@ -235,5 +256,82 @@ https://api.ibanforge.com/llms.txt
 discovery.get('/agents.txt', (c) =>
   c.text(AGENTS_TXT, 200, { 'Content-Type': 'text/plain; charset=utf-8' }),
 );
+
+// ──────────────────────────────────────────────────────────────────────────────
+// /.well-known/glama.json — the manifest glama.ai fetches to (re)ingest a
+// server. It was requested 181 times by 45 distinct IPs on 2026-07-28 and
+// answered 404, while glama's own API still served `tools: []` and a frozen
+// "39K+ entries / 75+ countries" description that has since been observed
+// resurfacing inside AI-written summaries of the product.
+//
+// The repository ships a glama.json at its root, but that file is static and
+// its counts are hardcoded — which the project CLAUDE.md forbids for anything
+// actually served. The served copy therefore derives every figure from the
+// live dataset instead.
+// ──────────────────────────────────────────────────────────────────────────────
+
+const GLAMA_MANIFEST = {
+  $schema: 'https://glama.ai/mcp/schemas/server.json',
+  maintainers: ['cammac-creator'],
+  name: 'IBANforge',
+  description:
+    `Vet a counterparty IBAN before you send funds: IBAN validation, BIC/SWIFT lookup, ` +
+    `Swiss BC-Nummer clearing with payment-rail participation, sanctions screening (OFAC) ` +
+    `at bank level, SEPA and VoP reachability, and a 0-100 risk score. ` +
+    `${F.claim.bic} BIC entries (${F.claim.lei} LEI-enriched via GLEIF; further rows from the ` +
+    `SWIFT directory, Bundesbank, SIX and EBA STEP2 SCT), ${F.claim.chClearing} Swiss clearing ` +
+    `entries from the SIX BankMaster refreshed monthly, ${F.claim.countries} countries. ` +
+    `MCP-native over HTTP and stdio, x402 micropayments on Base L2, free tier.`,
+  homepage: 'https://ibanforge.com',
+  repository: 'https://github.com/cammac-creator/ibanforge',
+  documentation: 'https://ibanforge.com/docs/mcp',
+  categories: ['finance', 'compliance', 'data-validation', 'banking'],
+  keywords: [
+    'iban', 'bic', 'swift', 'sepa', 'vop', 'swiss-clearing', 'bc-nummer',
+    'qr-iid', 'fintech', 'compliance', 'risk-scoring', 'x402', 'micropayments', 'mcp',
+  ],
+  tools: [
+    { name: 'validate_iban', description: 'Validate a single IBAN with BIC, SEPA, issuer and risk data ($0.005)' },
+    { name: 'batch_validate_iban', description: 'Validate up to 100 IBANs in one call ($0.002 each)' },
+    { name: 'lookup_bic', description: `Look up a BIC/SWIFT code against ${F.claim.bic} entries ($0.003)` },
+    { name: 'check_compliance', description: 'Sanctions (OFAC) at bank level + FATF + SEPA reachability + VoP + risk score ($0.02)' },
+    { name: 'lookup_ch_clearing', description: `Look up a Swiss BC-Nummer / IID with SIC, euroSIC, CHF instant, QR-IID and institution type — ${F.claim.chClearing} entries from the SIX BankMaster ($0.003)` },
+  ],
+} as const;
+
+discovery.get('/.well-known/glama.json', (c) => c.json(GLAMA_MANIFEST));
+
+// /.well-known/security.txt — RFC 9116. Probed by 16 distinct IPs; several
+// directory scorers treat its absence as a maturity signal.
+const SECURITY_TXT = `Contact: mailto:security@ibanforge.com
+Preferred-Languages: en, fr, de
+Canonical: https://api.ibanforge.com/.well-known/security.txt
+Policy: https://ibanforge.com/docs
+`;
+
+discovery.get('/.well-known/security.txt', (c) =>
+  c.text(SECURITY_TXT, 200, { 'Content-Type': 'text/plain; charset=utf-8' }),
+);
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Dead Stripe placeholders. The landing page shipped literal
+// href="STRIPE_PAYMENT_LINK_*" anchors between 2026-05-12 and 2026-06-19,
+// rewritten only by client-side JS — which crawlers never run. The HTML is
+// fixed, but the URLs live on in caches: on 2026-07-28 the three paths were
+// still drawing ~90 distinct IPs each. A 301 both rescues that traffic and
+// tells the indexes holding the bad URL where the real one is.
+// ──────────────────────────────────────────────────────────────────────────────
+
+for (const [suffix, bundle] of [['1K', '1k'], ['5K', '5k'], ['25K', '25k']] as const) {
+  discovery.get(`/STRIPE_PAYMENT_LINK_${suffix}`, (c) => c.redirect(PAYMENT_LINKS[bundle], 301));
+}
+
+// www-only pages probed on the api host. Claude Code fetched /pricing and
+// /en/docs here and got 404 while ibanforge.com serves both; /docs already
+// redirected, these did not. Measured on Claude-User traffic, 2026-07-28.
+discovery.get('/pricing', (c) => c.redirect(PRICING_PAGE, 302));
+for (const lang of ['en', 'de', 'fr']) {
+  discovery.get(`/${lang}/docs`, (c) => c.redirect(`https://ibanforge.com/${lang}/docs`, 302));
+}
 
 export { discovery };
