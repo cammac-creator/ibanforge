@@ -36,31 +36,46 @@ function isSeparator(line: string): boolean {
  *  because this CRM receives mail in locales the interface is not translated into. */
 const HEADER = /^\s*(From|De|Sent|Envoyé|To|À|Subject|Objet)\s*:/i;
 
+/** Index of the first line that opens the quoted history, or -1. */
+function quoteCut(lines: string[]): number {
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    // The '>' test is O(1) and always runs; the regex checks are length-guarded.
+    if (line.trimStart().startsWith('>')) return i;
+    const scannable = line.length <= MAX_MARKER_LINE;
+    if (scannable && ATTRIBUTION.test(line)) return i;
+    // A separator only cuts when a header line follows within the next 3 lines,
+    // otherwise it is just decoration in the message itself.
+    if (scannable && isSeparator(line) && lines.slice(i + 1, i + 4).some((l) => HEADER.test(l))) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+/**
+ * The new text of a reply, empty when the reply is nothing but quoted history.
+ *
+ * The same scan as splitQuoted, without its display fallback. That fallback
+ * exists so a thread bubble is never empty, and to get there it returns the
+ * quoted history under the name `fresh`. A caller about to hand the result to
+ * a generator needs the opposite answer: the quoted history is very often our
+ * own previous mail, and passing it on would be the repetition the brief
+ * spends its instructions forbidding.
+ */
+export function freshOnly(body: string | null): string {
+  if (!body || !body.trim()) return '';
+  const lines = body.split('\n');
+  const cut = quoteCut(lines);
+  if (cut === -1) return body.trim();
+  return lines.slice(0, cut).join('\n').trim();
+}
+
 export function splitQuoted(body: string | null): { fresh: string; quoted: string } {
   if (!body || !body.trim()) return { fresh: '', quoted: '' };
 
   const lines = body.split('\n');
-  let cut = -1;
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    // The '>' test is O(1) and always runs; the regex checks are length-guarded.
-    if (line.trimStart().startsWith('>')) {
-      cut = i;
-      break;
-    }
-    const scannable = line.length <= MAX_MARKER_LINE;
-    if (scannable && ATTRIBUTION.test(line)) {
-      cut = i;
-      break;
-    }
-    // A separator only cuts when a header line follows within the next 3 lines,
-    // otherwise it is just decoration in the message itself.
-    if (scannable && isSeparator(line) && lines.slice(i + 1, i + 4).some((l) => HEADER.test(l))) {
-      cut = i;
-      break;
-    }
-  }
+  const cut = quoteCut(lines);
 
   if (cut === -1) return { fresh: body.trim(), quoted: '' };
 

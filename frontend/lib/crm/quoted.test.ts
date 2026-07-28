@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { splitQuoted } from './quoted';
+import { freshOnly, splitQuoted } from './quoted';
 
 describe('splitQuoted', () => {
   it('returns everything as fresh when there is no quote marker', () => {
@@ -86,5 +86,36 @@ describe('splitQuoted', () => {
   it('handles null and empty bodies', () => {
     expect(splitQuoted(null)).toEqual({ fresh: '', quoted: '' });
     expect(splitQuoted('   ')).toEqual({ fresh: '', quoted: '' });
+  });
+});
+
+describe('freshOnly', () => {
+  it('agrees with splitQuoted whenever there is any new text', () => {
+    for (const body of [
+      'Bonjour,\n\nMerci pour le retour.',
+      'Yes, that works.\n\n> we agreed already',
+      'Short answer: yes.\n\nOn Tue, 21 Jul 2026, someone wrote:\nthe old mail',
+    ]) {
+      expect(freshOnly(body)).toBe(splitQuoted(body).fresh);
+    }
+  });
+
+  it('is empty on a reply that opens on a quote marker, where splitQuoted is not', () => {
+    // The divergence this function exists for: splitQuoted returns the quoted
+    // history so the thread bubble is never empty, and that history is usually
+    // the mail we sent. A generator handed it would send it back.
+    const body = '> the whole mail we sent\n> second line';
+    expect(splitQuoted(body).fresh).toContain('the whole mail we sent');
+    expect(freshOnly(body)).toBe('');
+  });
+
+  it('is empty on a reply that opens on an attribution line', () => {
+    const body = 'Le 21 juillet 2026, Claude-Alain a écrit :\nle mail que nous avons envoyé';
+    expect(freshOnly(body)).toBe('');
+  });
+
+  it('handles null and empty bodies', () => {
+    expect(freshOnly(null)).toBe('');
+    expect(freshOnly('   ')).toBe('');
   });
 });

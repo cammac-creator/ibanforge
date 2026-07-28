@@ -218,6 +218,23 @@ export function ComposerDock({
       c.sourcing?.whatTheyDo ? `What they do: ${c.sourcing.whatTheyDo}` : '',
       c.sourcing?.personalizationHook ? `Hook: ${c.sourcing.personalizationHook}` : '',
       s ? `Goal: ${NEXT_ACTION_LABEL[s.nextAction]}` : '',
+      /*
+       * Said in the brief and not upstream, unlike the follow-up discipline
+       * documented below, because it has no counterpart in either system
+       * prompt: the VPS knows the mode it is writing in, follow-up or default,
+       * and nothing tells it that the thread is waiting on an answer. So there
+       * is no instruction here to disagree with, which was the reason the
+       * follow-up clauses moved out.
+       *
+       * It is a second line of defence and not the fix. The generator failed
+       * to answer their questions because threadTail showed it 280 characters
+       * of their mail; it now sees the whole thing, labelled as the mail to
+       * answer. This line only makes the goal explicit in the mode that has
+       * none.
+       */
+      s?.nextAction === 'reply'
+        ? 'They wrote last and are waiting on you. Answer every question their mail asks, each one explicitly, before anything else. Do not open on a new pitch.'
+        : '',
       // Verbatim, both fields: the operator chose this angle by reading these
       // very words, so anything reworded here would steer a draft they did not
       // choose. Em dashes are scrubbed upstream, on all three fields.
@@ -704,7 +721,19 @@ export function ComposerDock({
             className="w-full min-w-0 rounded-lg border border-[var(--ink-4)] bg-[var(--ink-0)] p-3 text-xs leading-relaxed text-[var(--fg-1)] focus:border-amber-500/40 focus:outline-none"
           />
           {fr && (
-            <details className="mt-1">
+            /*
+             * Open on arrival: the translation is what the owner actually
+             * reads to judge a draft, so hiding it behind a click made the
+             * reading step optional on the one screen whose whole purpose is
+             * to be read before sending. Still a `details`, so it can be
+             * folded away when the English is enough.
+             *
+             * `key={fr}` because `open` is initial state only. Without it, a
+             * translation folded once stays folded through every later
+             * generation, since the node is never unmounted between two
+             * non-null values and React would not re-apply the attribute.
+             */
+            <details key={fr} open className="mt-1">
               <summary className="cursor-pointer text-[10px] text-blue-400">
                 Traduction FR (pour toi seul, jamais envoyée)
               </summary>
