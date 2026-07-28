@@ -1,5 +1,10 @@
 import type { MiddlewareHandler } from 'hono';
 import type { HonoEnv, PaywallCause } from '../types.js';
+import { datasetFacts } from '../lib/dataset-facts.js';
+
+/** Dataset sizes, read once and rounded down so a claim cannot outlive its data. */
+const F = datasetFacts();
+
 
 const USDC_BASE = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
 const NETWORK = 'base';
@@ -363,7 +368,7 @@ const PRICING: EndpointPricing[] = [
     match: (m, p) => m === 'GET' && p.startsWith('/v1/bic/'),
     price_usdc: 0.003,
     description:
-      'Lookup a BIC/SWIFT code against 121k+ BIC entries (38k+ LEI-enriched via GLEIF, refreshed monthly). Returns bank name, country, city, LEI, and registered head-office address (where available).',
+      `Lookup a BIC/SWIFT code against ${F.claim.bic} BIC entries (${F.claim.lei} LEI-enriched via GLEIF, refreshed monthly). Returns bank name, country, city, LEI, and registered head-office address (where available).`,
     inputSchema: {
       type: 'object',
       required: ['code'],
@@ -435,7 +440,7 @@ const PRICING: EndpointPricing[] = [
     match: (m, p) => m === 'GET' && p.startsWith('/v1/ch/clearing/'),
     price_usdc: 0.003,
     description:
-      'Swiss BC-Nummer / IID clearing lookup against ~1,200 SIX BankMaster entries (refreshed monthly). Returns institution name, type, address, BIC, the full payment-rail participation (SIC, RTGS CHF, Instant Payments CHF, euroSIC, LSV+/BDD) and the QR-IID allocation.',
+      `Swiss BC-Nummer / IID clearing lookup against ${F.claim.chClearing} SIX BankMaster entries (refreshed monthly). Returns institution name, type, address, BIC, the full payment-rail participation (SIC, RTGS CHF, Instant Payments CHF, euroSIC, LSV+/BDD) and the QR-IID allocation.`,
     inputSchema: {
       type: 'object',
       required: ['iid'],

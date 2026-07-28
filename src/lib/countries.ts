@@ -21,6 +21,27 @@ import { COUNTRY_NAMES as LIB_COUNTRY_NAMES } from 'iban-core';
 // ---------------------------------------------------------------------------
 // The one thing that did NOT move: getCountryName.
 //
+
+// ---------------------------------------------------------------------------
+// The other thing that did NOT move: COUNTRY_RISK_AS_OF.
+//
+// It dates the two risk sets that now live in the library, and it is read by
+// compliance-db.ts to stamp country_risk_as_of on the served response — a
+// product concern, so it stays on this side of the boundary.
+//
+// Why the date matters (kept from the upstream commit that added it): the
+// FATF axis and the country-risk axis are meant to STACK, not to be derived
+// from one another — folding one into the other would DOWNGRADE sanctioned
+// countries. The sets are deliberately not the FATF list. What was missing
+// was simply this date: fatf_status carried one and this axis carried none,
+// so a caller seeing the two disagree could not tell a considered editorial
+// difference from a stale hardcoded list. Now both are dated and both state
+// their scope.
+//
+// Review cadence: after each FATF plenary (3x/year), same as FATF_AS_OF.
+// ---------------------------------------------------------------------------
+export const COUNTRY_RISK_AS_OF = '2026-07';
+
 // It resolves *any* ISO 3166-1 country, not just IBAN countries, because it
 // names the countries of BIC records coming out of the database (seed.ts,
 // enrich-bic-database.ts, mcp-resources.ts). That is a product concern —

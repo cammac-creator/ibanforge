@@ -1,5 +1,10 @@
 import { Hono } from 'hono';
 import { createRequire } from 'node:module';
+import { datasetFacts } from '../lib/dataset-facts.js';
+
+/** Dataset sizes, read once and rounded down so a claim cannot outlive its data. */
+const F = datasetFacts();
+
 
 const require = createRequire(import.meta.url);
 const pkg = require('../../package.json') as { version: string };
@@ -10,7 +15,7 @@ const pkg = require('../../package.json') as { version: string };
 const MCP_SERVER_CARD = {
   name: 'IBANforge',
   description:
-    'IBAN validation, BIC/SWIFT lookup, Swiss clearing, SEPA compliance and risk scoring API for AI agents. 121k+ BIC entries (38k+ LEI-enriched via GLEIF), ~1,200 Swiss BC-Nummer from SIX, 89 countries, refreshed monthly.',
+    `IBAN validation, BIC/SWIFT lookup, Swiss clearing, SEPA compliance and risk scoring API for AI agents. ${F.claim.bic} BIC entries (${F.claim.lei} LEI-enriched via GLEIF), ${F.claim.chClearing} Swiss BC-Nummer from SIX, 89 countries, refreshed monthly.`,
   url: 'https://api.ibanforge.com/mcp',
   transport: 'streamable-http',
   version: pkg.version,
@@ -28,7 +33,7 @@ const MCP_SERVER_CARD = {
     {
       name: 'lookup_bic',
       description:
-        'Resolve a BIC/SWIFT code (8 or 11 chars) into the underlying bank. Use only when the user already has a BIC — for IBAN inputs, prefer validate_iban which resolves the BIC automatically. Backed by 121k+ BIC entries (38k+ LEI-enriched via GLEIF, refreshed monthly). Cost: $0.003.',
+        `Resolve a BIC/SWIFT code (8 or 11 chars) into the underlying bank. Use only when the user already has a BIC — for IBAN inputs, prefer validate_iban which resolves the BIC automatically. Backed by ${F.claim.bic} BIC entries (${F.claim.lei} LEI-enriched via GLEIF, refreshed monthly). Cost: $0.003.`,
     },
     {
       name: 'check_compliance',
@@ -38,7 +43,7 @@ const MCP_SERVER_CARD = {
     {
       name: 'lookup_ch_clearing',
       description:
-        'Resolve a Swiss BC-Nummer / IID (1-5 digits) into institution name, type, address, BIC and the full payment-rail participation (SIC, RTGS CHF, Instant Payments CHF, euroSIC, LSV+/BDD) plus QR-IID — the deepest Swiss clearing data in any public API. Backed by ~1,200 SIX BankMaster entries (refreshed monthly). Cost: $0.003. Only relevant for CH/LI accounts.',
+        `Resolve a Swiss BC-Nummer / IID (1-5 digits) into institution name, type, address, BIC and the full payment-rail participation (SIC, RTGS CHF, Instant Payments CHF, euroSIC, LSV+/BDD) plus QR-IID — the deepest Swiss clearing data in any public API. Backed by ${F.claim.chClearing} SIX BankMaster entries (refreshed monthly). Cost: $0.003. Only relevant for CH/LI accounts.`,
     },
   ],
   homepage: 'https://ibanforge.com',

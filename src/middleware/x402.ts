@@ -1,6 +1,7 @@
 import type { MiddlewareHandler } from 'hono';
 import { createRequire } from 'node:module';
 import type { HonoEnv } from '../types.js';
+import { datasetFacts } from '../lib/dataset-facts.js';
 
 const require = createRequire(import.meta.url);
 const pkg = require('../../package.json') as { version: string };
@@ -116,15 +117,34 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
       // Bazaar discoverability blocks per route — let x402 facilitators (Coinbase CDP, x402.org)
       // index our endpoints in their public catalog so AI agents discover IBANforge automatically.
       //
-      // Trust signals appended to descriptions: production status, p99 latency target,
+      // Trust signals appended to descriptions: production status, latency,
       // dataset size, last update. Agents that filter on description quality (Bazaar
       // semantic search, agentic.market) reward this.
+      //
+      // Two things were wrong here until 28/07/2026 and both are fixed by
+      // construction rather than by editing numbers again:
+      //
+      //  1. The dataset figures were string literals, and they had drifted. The
+      //     Swiss table holds 1,165 rows; three of these tags said "~1,200" and
+      //     one said "1190+". They now come from datasetFacts(), rounded DOWN,
+      //     so they stay true across a monthly refresh. CLAUDE.md forbids
+      //     hardcoding them in a served surface; this is that rule applied.
+      //  2. The latency claim said "p99 <50ms" with nothing saying what was
+      //     measured. Server-side processing is 0.55 ms median (max 1.26 over 20
+      //     production calls), but a client in Zurich observes p50 132 ms once
+      //     the network is counted: the number was true of the handler and
+      //     unobservable for any buyer. It now names the boundary it measures.
+      //     One uniform bound replaces five per-endpoint ones that were never
+      //     grounded in anything — a local benchmark puts the heaviest path
+      //     (validate + enrich + compliance) at p99 0.184 ms.
       const V = `v${pkg.version}`;
-      const TRUST_TAG_VALIDATE = `Production · p99 <50ms · 121k+ BICs (38k+ LEI via GLEIF) + ~1,200 SIX · ${V}`;
-      const TRUST_TAG_BIC = `Production · p99 <30ms · 121k+ BICs (38k+ LEI-enriched via GLEIF, refreshed monthly) · ${V}`;
-      const TRUST_TAG_CH = `Production · p99 <20ms · ~1,200 SIX BankMaster entries, refreshed monthly · ${V}`;
-      const TRUST_TAG_COMPLIANCE = `Production · p99 <80ms · OFAC + FATF + SEPA + VoP · weekly refresh · ${V}`;
-      const TRUST_TAG_BATCH = `Production · p99 <300ms for 100 IBANs · 121k+ BICs · ${V}`;
+      const F = datasetFacts();
+      const PERF = 'server processing <5ms (network excluded — measure your own round trip on GET /ping)';
+      const TRUST_TAG_VALIDATE = `Production · ${PERF} · ${F.claim.bic} BICs (${F.claim.lei} LEI via GLEIF) + ${F.claim.chClearing} SIX · ${V}`;
+      const TRUST_TAG_BIC = `Production · ${PERF} · ${F.claim.bic} BICs (${F.claim.lei} LEI-enriched via GLEIF, refreshed monthly) · ${V}`;
+      const TRUST_TAG_CH = `Production · ${PERF} · ${F.claim.chClearing} SIX BankMaster entries, refreshed monthly · ${V}`;
+      const TRUST_TAG_COMPLIANCE = `Production · ${PERF} · OFAC + FATF + SEPA + VoP · weekly refresh · ${V}`;
+      const TRUST_TAG_BATCH = `Production · ${PERF} for a 100-IBAN batch · ${F.claim.bic} BICs · ${V}`;
 
       const ibanInputSchema = {
         type: 'object',
@@ -329,7 +349,7 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
             maxTimeoutSeconds: 60,
           },
           description:
-            `Resolve a BIC/SWIFT code (8 or 11 chars) into the underlying bank: name, country, city, LEI, and registered head-office address (where available). Backed by 121k+ BIC entries (38k+ LEI-enriched via GLEIF; additional rows from SWIFT directory, Deutsche Bundesbank, SIX BankMaster, NBP, EBA Step2 SCT), refreshed monthly. Use only when you already have the BIC — for IBAN inputs, prefer /v1/iban/validate which resolves the BIC for you. ${TRUST_TAG_BIC}.`,
+            `Resolve a BIC/SWIFT code (8 or 11 chars) into the underlying bank: name, country, city, LEI, and registered head-office address (where available). Backed by ${F.claim.bic} BIC entries (${F.claim.lei} LEI-enriched via GLEIF; additional rows from SWIFT directory, Deutsche Bundesbank, SIX BankMaster, NBP, EBA Step2 SCT), refreshed monthly. Use only when you already have the BIC — for IBAN inputs, prefer /v1/iban/validate which resolves the BIC for you. ${TRUST_TAG_BIC}.`,
           mimeType: 'application/json',
           extensions: {
             bazaar: {
@@ -476,6 +496,12 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
                       disclaimer: { type: 'string' },
                       sanctions_as_of: { type: 'string' },
                       fatf_as_of: { type: 'string' },
+                      country_risk_as_of: {
+                        type: 'string',
+                        description:
+                          'Year-month the editorial country-risk axis was last reviewed. risk_indicators.country_risk is a SEPARATE axis layered on top of fatf_status, not a restatement of it: the two can disagree on a country by design.',
+                      },
+                      country_risk_scope: { type: 'string' },
                       sources: { type: 'string' },
                     },
                   },
@@ -575,7 +601,7 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
             maxTimeoutSeconds: 60,
           },
           description:
-            `Resolve a Swiss BC-Nummer / IID (1-5 digits) into institution name, type, address, BIC, the full payment-rail participation (SIC, RTGS CHF, Instant Payments CHF, euroSIC, LSV+/BDD) and the QR-IID allocation. Backed by ~1,200 SIX BankMaster entries (refreshed monthly) — the canonical Swiss banking source. ${TRUST_TAG_CH}.`,
+            `Resolve a Swiss BC-Nummer / IID (1-5 digits) into institution name, type, address, BIC, the full payment-rail participation (SIC, RTGS CHF, Instant Payments CHF, euroSIC, LSV+/BDD) and the QR-IID allocation. Backed by ${F.claim.chClearing} SIX BankMaster entries (refreshed monthly) — the canonical Swiss banking source. ${TRUST_TAG_CH}.`,
           mimeType: 'application/json',
           extensions: {
             bazaar: {

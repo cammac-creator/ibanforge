@@ -13,6 +13,11 @@ import { buildComplianceResponse } from '../lib/compliance-response.js';
 import { getComplianceMeta } from '../lib/compliance-db.js';
 import { lookupClearingByBankCode, normalizeIid, getChClearingCount } from '../lib/ch-clearing.js';
 import { buildCountriesPayload, buildPricingPayload, buildValidateAndExplainPrompt } from '../lib/mcp-resources.js';
+import { datasetFacts } from '../lib/dataset-facts.js';
+
+/** Dataset sizes, read once and rounded down so a claim cannot outlive its data. */
+const F = datasetFacts();
+
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const pkg = JSON.parse(readFileSync(resolve(__dirname, '../../package.json'), 'utf-8'));
@@ -22,7 +27,7 @@ const server = new McpServer({
   title: 'IBANforge',
   version: pkg.version,
   description:
-    'IBAN validation, BIC/SWIFT lookup, Swiss clearing, SEPA compliance and risk indicators. 121k+ BIC entries (38k+ LEI-enriched via GLEIF), ~1,200 Swiss BC-Nummer from SIX, 89 countries, refreshed monthly.',
+    `IBAN validation, BIC/SWIFT lookup, Swiss clearing, SEPA compliance and risk indicators. ${F.claim.bic} BIC entries (${F.claim.lei} LEI-enriched via GLEIF), ${F.claim.chClearing} Swiss BC-Nummer from SIX, 89 countries, refreshed monthly.`,
   websiteUrl: 'https://ibanforge.com',
   icons: [
     {
@@ -47,13 +52,17 @@ server.registerTool(
 When to use: verifying a payment recipient before a wire transfer, checking a bank account during onboarding, or confirming IBAN format and bank identity in a KYC workflow.
 When NOT to use: for multiple IBANs, use batch_validate_iban instead (60% cheaper per IBAN). For compliance/sanctions screening, use check_compliance instead.
 
-Behavior: this tool is read-only and performs no writes, no network calls to external services, and no side effects. It validates the IBAN checksum (ISO 13616 mod-97), parses the BBAN structure, resolves the BIC from a local database of 121,000+ entries (GLEIF-sourced), and classifies the issuer type. Response time is under 30ms. Returns a single JSON object.
+Behavior: this tool is read-only and performs no writes, no network calls to external services, and no side effects. It validates the IBAN checksum (ISO 13616 mod-97), parses the BBAN structure, resolves the BIC from a local database of ${F.claim.bic} entries (GLEIF-sourced), and classifies the issuer type. Server-side processing is under 5 ms; network latency is yours to measure (GET /ping). Returns a single JSON object.
 
-Returns: { valid, country: { code, name }, check_digits, bban: { bank_code, branch_code, account_number }, bic: { code, institution, country_code, city }, sepa: { member, schemes, vop_required }, issuer: { type, name }, risk_indicators: { issuer_type, country_risk, test_bic, sepa_reachable, vop_coverage } }
+Returns: { valid, country: { code, name }, check_digits, bban: { bank_code, branch_code?, account_number }, bic: { code, bank_name, city } | null, sepa: { member, schemes, vop_required }, issuer: { type, name }, risk_indicators: { issuer_type, country_risk, test_bic, sepa_reachable, vop_coverage }, clearing: { iid, name, type, town, sic, eurosic, qr_iid } | null, formatted, cost_usdc }
+
+When valid is false the object carries { valid: false, error, error_detail } and none of the enrichment fields. bic is null when no BBAN-to-BIC mapping exists for the bank code; branch_code is present only for countries whose BBAN defines one; clearing is present only for CH and LI when the IID is in the SIX BankMaster.
 
 Supports 89 countries including all SEPA/EEA countries, Switzerland, UK, and 50+ non-SEPA countries.
 
-Example: input 'DE89370400440532013000' → { valid: true, country: { code: 'DE', name: 'Germany' }, bic: { code: 'COBADEFFXXX', institution: 'Commerzbank' }, issuer: { type: 'bank' }, ... }
+Example: input 'DE89370400440532013000' → { valid: true, country: { code: 'DE', name: 'Germany' }, bban: { bank_code: '37040044', account_number: '0532013000' }, bic: { code: 'COBADEFF', bank_name: 'COMMERZBANK Aktiengesellschaft', city: 'Frankfurt am Main' }, issuer: { type: 'bank', name: 'COMMERZBANK Aktiengesellschaft' }, ... }
+
+The BIC is normalised to 8 characters. Ask for the branch with lookup_bic if you need the 11-character form.
 
 Cost: $0.005 USDC per call via x402 micropayment on Base L2.`,
     inputSchema: {
@@ -92,7 +101,7 @@ server.registerTool(
 When to use: processing a CSV of supplier bank accounts, validating a payment batch before submission, running KYC checks on a customer list, or auditing an accounts-payable file.
 When NOT to use: for a single IBAN, use validate_iban instead. For compliance/sanctions screening, use check_compliance on each IBAN.
 
-Behavior: this tool is read-only with no side effects. It validates each IBAN independently using the same logic as validate_iban (mod-97 checksum, BBAN parsing, BIC resolution, issuer classification). Results are returned in the same order as the input array. If one IBAN is invalid, the others are still processed — there is no short-circuit on error. Response time scales linearly: ~30ms per IBAN. Returns a JSON array.
+Behavior: this tool is read-only with no side effects. It validates each IBAN independently using the same logic as validate_iban (mod-97 checksum, BBAN parsing, BIC resolution, issuer classification). Results are returned in the same order as the input array. If one IBAN is invalid, the others are still processed — there is no short-circuit on error. Server-side processing scales sub-linearly: a full 100-IBAN batch is a few milliseconds, network excluded. Returns a JSON array.
 
 Input constraints: minimum 1 IBAN, maximum 100 IBANs per call. Exceeding 100 returns a validation error.
 
@@ -139,13 +148,15 @@ server.registerTool(
 When to use: identifying the bank behind a BIC/SWIFT code for compliance checks, payment routing validation, correspondent banking lookups, or KYC enrichment.
 When NOT to use: if you already have an IBAN, use validate_iban instead — it resolves the BIC automatically as part of the validation. For sanctions/compliance screening, use check_compliance.
 
-Behavior: this tool is read-only with no side effects. It validates the BIC format (ISO 9362), then queries a local SQLite database of 121,000+ institutions sourced from GLEIF. For BIC11 lookups, if the specific branch is not found, it falls back to the head office (XXX suffix). Detects test BICs (e.g., MARKDEF patterns). Response time is under 10ms. Returns a single JSON object.
+Behavior: this tool is read-only with no side effects. It validates the BIC format (ISO 9362), then queries a local SQLite database of ${F.claim.bic} institutions sourced from GLEIF. For BIC11 lookups, if the specific branch is not found, it falls back to the head office (XXX suffix). Detects test BICs (e.g., MARKDEF patterns). Response time is under 10ms. Returns a single JSON object.
 
 Input: accepts BIC8 (e.g., 'UBSWCHZH') or BIC11 (e.g., 'UBSWCHZH80A'). Case-insensitive.
 
-Returns: { bic, bic8, bic11, valid_format, found, institution, country_code, country_name, city, branch_code, branch_info, lei, lei_status, is_test_bic }
+Returns: { bic, bic8, bic11, valid_format, found, institution, country: { code, name }, city, branch_code, branch_info, lei, lei_status, is_test_bic }
 
-Example: input 'BNPAFRPP' → { institution: 'BNP PARIBAS', country_code: 'FR', country_name: 'France', city: 'PARIS', lei: '...', found: true }
+country is the same shape as REST GET /v1/bic/:code, and name falls back to the country code when the row carries no name. The flat country_code and country_name keys are still returned but DEPRECATED since 1.4.0 and will be removed no earlier than 2027-01-01; country_name answers null where country.name answers the code.
+
+Example: input 'BNPAFRPP' → { found: true, bic8: 'BNPAFRPP', bic11: 'BNPAFRPPXXX', institution: 'BNP PARIBAS', country: { code: 'FR', name: 'France' }, city: 'PARIS', lei: 'R0MUWSFPU8MPRO8K5P83', lei_status: 'ACTIVE', is_test_bic: false }
 Example: input 'INVALIDX' → { valid_format: true, found: false }
 Example: input '123' → { valid_format: false, error: 'BIC must be 8 or 11 characters' }
 
@@ -196,6 +207,17 @@ Cost: $0.003 USDC per call via x402 micropayment on Base L2.`,
       institution: row?.institution ?? null,
       country_code: validation.country_code,
       country_name: row?.country_name ?? null,
+      // Aligned on the REST shape (GET /v1/bic/:code returns country: {code, name}),
+      // which validate_iban already used on both surfaces. The flat pair stays
+      // for now so no agent breaks mid-conversation; it is deprecated and dated
+      // in the tool description.
+      //
+      // The two keep DIFFERENT null semantics on purpose. REST falls back to the
+      // country code when the row carries no name; the flat MCP key has always
+      // answered null. Mirroring REST into `country.name` while leaving
+      // `country_name: null` is the honest reading of both histories: the nested
+      // object is the aligned one, the flat pair is preserved exactly as it was.
+      country: { code: validation.country_code, name: row?.country_name ?? validation.country_code },
       city: row?.city ?? null,
       branch_code: validation.branch_code,
       branch_info: row?.branch_info ?? null,
@@ -269,7 +291,7 @@ server.registerTool(
 When to use: resolving the bank behind a Swiss IBAN, checking SIC/euroSIC participation, verifying QR-bill IID allocation, or identifying PostFinance/cantonal bank accounts.
 When NOT to use: for non-Swiss IBANs, use validate_iban instead.
 
-Behavior: this tool is read-only with no side effects. It queries a local SQLite database of 1190+ Swiss bank clearing entries sourced from SIX BankMaster. Follows concatenation redirects (merged IIDs). Response time is under 10ms. Returns a single JSON object.
+Behavior: this tool is read-only with no side effects. It queries a local SQLite database of ${F.claim.chClearing} Swiss bank clearing entries sourced from SIX BankMaster. Follows concatenation redirects (merged IIDs). Response time is under 10ms. Returns a single JSON object.
 
 Input: IID as string, 1-5 digits (e.g. '230', '00230', '30000', '80000').
 Returns: institution name and type, address, BIC, payment service participation (SIC, RTGS, Instant Payments CHF, euroSIC, LSV+/BDD), QR-IID allocation, and headquarters IID.

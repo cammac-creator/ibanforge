@@ -13,7 +13,7 @@
 > **The compliance API for AI agents.** IBAN validation, BIC/SWIFT lookup, Swiss clearing (BC-Nummer / QR-IID / SIX BankMaster), EMI/vIBAN classification, SEPA Instant + VoP reachability, and risk scoring — exposed natively over **MCP** and **x402 micropayments**, with no API key signup required.
 
 ```
-121k+ BIC entries (39k+ LEI via GLEIF) · ~1,200 Swiss BC-Nummern (SIX) · 89 IBAN countries · <50ms p99
+121k+ BIC entries (39k+ LEI via GLEIF) · 1,100+ Swiss BC-Nummern (SIX) · 89 IBAN countries · <50ms p99
 ```
 
 ---
@@ -188,7 +188,7 @@ Push to `main` — Railway auto-deploys via Dockerfile.
   - 21 from [NBP EWIB](https://ewib.nbp.pl/) (official Polish bank registry)
   - 19 from [SIX Group BankMaster](https://www.six-group.com/en/products-services/banking-services/bank-master-data.html) Swiss BICs not covered elsewhere
 - **LEI enrichment** for the GLEIF rows: [GLEIF API](https://api.gleif.org)
-- **~1,200 Swiss BC-Nummern / IIDs** (1,165 as of 2026-07): Official [SIX BankMaster](https://www.six-group.com/en/products-services/banking-services/bank-master-data.html) CSV
+- **1,100+ Swiss BC-Nummern / IIDs** (1,165 as of 2026-07): Official [SIX BankMaster](https://www.six-group.com/en/products-services/banking-services/bank-master-data.html) CSV
 - **EMI / vIBAN classification**: Curated set of 85+ known issuer BIC8 prefixes (Wise, Revolut, N26, Mercury, Modulr, etc.)
 - **VoP participants**: EBA RT1 / SCT Inst directories
 - **Country names**: Node.js `Intl.DisplayNames` API

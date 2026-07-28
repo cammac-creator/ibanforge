@@ -217,7 +217,7 @@
         "path": "/v1/ch/clearing/:iid",
         "cost": "$0.003",
         "costLabel": "per call",
-        "description": "Swiss BC-Nummer / IID lookup with SIC, euroSIC, Instant Payments and QR-IID data — backed by ~1,200 SIX BankMaster entries"
+        "description": "Swiss BC-Nummer / IID lookup with SIC, euroSIC, Instant Payments and QR-IID data — backed by 1,100+ SIX BankMaster entries"
       }
     },
     "free": {
@@ -940,7 +940,7 @@
       "items": [
         {
           "title": "Swiss data nobody else exposes",
-          "body": "~1,200 SIX BankMaster entries with SIC / euroSIC / instant participation and QR-IID handling, refreshed monthly — plus 121k+ BICs (38k+ LEI-enriched via GLEIF). If your users pay Swiss suppliers, this is the difference.",
+          "body": "1,100+ SIX BankMaster entries with SIC / euroSIC / instant participation and QR-IID handling, refreshed monthly — plus 121k+ BICs (38k+ LEI-enriched via GLEIF). If your users pay Swiss suppliers, this is the difference.",
           "link": "Swiss clearing docs"
         },
         {
@@ -1015,7 +1015,7 @@
         },
         "swiss": {
           "label": "Swiss clearing depth (SIC / euroSIC / QR-IID)",
-          "ibanforge": "~1,200 SIX BankMaster entries, instant-rail participation, QR-IID semantics",
+          "ibanforge": "1,100+ SIX BankMaster entries, instant-rail participation, QR-IID semantics",
           "ibancom": "Not exposed as a product",
           "ibanapi": "No",
           "libs": "No"

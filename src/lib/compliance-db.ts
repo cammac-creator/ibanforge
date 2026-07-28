@@ -2,6 +2,7 @@ import type DatabaseType from 'better-sqlite3';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
+import { COUNTRY_RISK_AS_OF } from './countries.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
@@ -36,6 +37,18 @@ export interface ComplianceMeta {
   fatf_as_of: string | null;
   /** Comma-separated data sources (null if unknown). */
   sources: string | null;
+  /**
+   * Year-month the editorial country-risk axis was last reviewed.
+   *
+   * `risk_indicators.country_risk` is NOT a restatement of `fatf_status`: it is
+   * a separate, broader AML picture (offshore centres, conflict zones,
+   * EBA-flagged jurisdictions) that stacks on top of the FATF signal. The two
+   * can therefore disagree on a given country by design. Both now carry a date
+   * so a caller can tell a considered difference from a stale list.
+   */
+  country_risk_as_of: string;
+  /** One line naming the two axes, so the disagreement is never read as a bug. */
+  country_risk_scope: string;
 }
 
 const DISCLAIMER =
@@ -61,6 +74,9 @@ export function getComplianceMeta(): ComplianceMeta {
     sanctions_as_of: null,
     fatf_as_of: null,
     sources: null,
+    country_risk_as_of: COUNTRY_RISK_AS_OF,
+    country_risk_scope:
+      'risk_indicators.country_risk is a separate editorial AML axis (offshore centres, conflict zones, EBA-flagged jurisdictions) layered ON TOP of compliance.sanctions.fatf_status, not a restatement of it. The two can disagree on a country by design; each carries its own review date.',
   };
   try {
     const db = getComplianceDB();

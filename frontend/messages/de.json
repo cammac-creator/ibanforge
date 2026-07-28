@@ -940,7 +940,7 @@
       "items": [
         {
           "title": "Schweizer Daten, die sonst niemand anbietet",
-          "body": "~1.200 SIX-BankMaster-Einträge mit SIC / euroSIC / Instant-Teilnahme und QR-IID-Handling, monatlich aktualisiert — plus 121k+ BICs (38k+ LEI-angereichert via GLEIF). Wenn Ihre Benutzer Schweizer Lieferanten bezahlen, ist das der Unterschied.",
+          "body": "1,100+ SIX-BankMaster-Einträge mit SIC / euroSIC / Instant-Teilnahme und QR-IID-Handling, monatlich aktualisiert — plus 121k+ BICs (38k+ LEI-angereichert via GLEIF). Wenn Ihre Benutzer Schweizer Lieferanten bezahlen, ist das der Unterschied.",
           "link": "Schweizer Clearing-Doku"
         },
         {
@@ -1015,7 +1015,7 @@
         },
         "swiss": {
           "label": "Schweizer Clearing-Tiefe (SIC / euroSIC / QR-IID)",
-          "ibanforge": "~1.200 SIX-BankMaster-Einträge, Instant-Rail-Teilnahme, QR-IID-Semantik",
+          "ibanforge": "1,100+ SIX-BankMaster-Einträge, Instant-Rail-Teilnahme, QR-IID-Semantik",
           "ibancom": "Nicht als Produkt angeboten",
           "ibanapi": "Nein",
           "libs": "Nein"
