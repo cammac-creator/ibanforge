@@ -606,6 +606,26 @@ export function getSepaInfo(countryCode: string): SepaInfo {
 
 export type CountryRisk = 'standard' | 'elevated' | 'high';
 
+/**
+ * When the two sets below were last reviewed, exposed to the caller.
+ *
+ * The audit of 28/07/2026 reported Bulgaria and Monaco coming back
+ * `fatf_status: "grey_list"` and `country_risk: "standard"` in one body, and
+ * Türkiye the reverse, and recommended deriving country_risk from the dated
+ * FATF table. That recommendation was wrong, and the warning above says why:
+ * the two axes are meant to stack, and folding one into the other would
+ * DOWNGRADE sanctioned countries. The sets are deliberately not the FATF list.
+ *
+ * What was actually missing is this line. `fatf_status` carried a date and this
+ * axis carried none, so a caller seeing the two disagree had no way to tell
+ * whether he was looking at a considered editorial difference or at a stale
+ * hardcoded list. Now both are dated and both state their scope, and the
+ * apparent contradiction reads as what it is: two questions, two answers.
+ *
+ * Review cadence: after each FATF plenary (3x/year), same as FATF_AS_OF.
+ */
+export const COUNTRY_RISK_AS_OF = '2026-07';
+
 /** FATF black list / EU high-risk third countries (updated periodically) */
 const HIGH_RISK = new Set([
   'RU', // Russia — FATF countermeasures

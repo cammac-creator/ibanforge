@@ -496,6 +496,12 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
                       disclaimer: { type: 'string' },
                       sanctions_as_of: { type: 'string' },
                       fatf_as_of: { type: 'string' },
+                      country_risk_as_of: {
+                        type: 'string',
+                        description:
+                          'Year-month the editorial country-risk axis was last reviewed. risk_indicators.country_risk is a SEPARATE axis layered on top of fatf_status, not a restatement of it: the two can disagree on a country by design.',
+                      },
+                      country_risk_scope: { type: 'string' },
                       sources: { type: 'string' },
                     },
                   },

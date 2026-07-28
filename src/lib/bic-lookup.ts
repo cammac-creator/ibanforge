@@ -20,10 +20,69 @@ interface BicDataEntry {
 
 let bicDataCache: Record<string, BicDataEntry> | null = null;
 
+/**
+ * Swiss bank codes the curated map claims but the authoritative source no
+ * longer lists are dropped at load time.
+ *
+ * ## What was happening
+ *
+ * bic_data.json is a curated bank-code-to-BIC map; ch_clearing is the SIX
+ * BankMaster, the official Swiss register, refreshed monthly by workflow. The
+ * first is hand-maintained, the second is authoritative, and nothing compared
+ * them. Audited 28/07/2026, four CH codes were asserting a live institution
+ * that the register does not contain:
+ *
+ *   00762 -> "UBS Switzerland AG"
+ *   31100 -> "radicant bank ag"
+ *   83015 -> "++MBaer Merchant Bank AG in Liquidation"
+ *   83036 -> "radicant bank ag"
+ *
+ * 00762 is the bank code of the canonical Swiss example IBAN
+ * (CH93 0076 2011 6238 5295 7, the one in every documentation). It is not an
+ * allocated IID: a fixture that leaked into production data and was handed a
+ * real bank's name. The others are institutions wound up or absorbed, plus a
+ * literal `++` parsing artifact served to customers inside a bank_name field.
+ *
+ * ## Why a load-time filter rather than editing the JSON
+ *
+ * An edit fixes today's four. The filter fixes every future one: the next
+ * monthly BankMaster refresh removes another bank and the map goes stale again
+ * on its own. This makes the authoritative source authoritative.
+ *
+ * Dropping a key means the lookup falls through to the strategy-2 prefix
+ * search, which cannot resurrect it: no CH bic8 begins with a digit, so a
+ * numeric Swiss bank code matches nothing there. The customer gets `bic: null`,
+ * which is the honest answer for a bank code that is not allocated.
+ */
+function pruneStaleSwissCodes(data: Record<string, BicDataEntry>): Record<string, BicDataEntry> {
+  let known: Set<string>;
+  try {
+    const rows = getBicDB().prepare('SELECT iid FROM ch_clearing').all() as Array<{ iid: string }>;
+    known = new Set(rows.map((r) => r.iid));
+  } catch {
+    // No clearing table means no ground truth to prune against. Leaving the map
+    // untouched is the safe failure: it degrades to the old behaviour rather
+    // than emptying every Swiss lookup.
+    return data;
+  }
+  if (known.size === 0) return data;
+
+  for (const key of Object.keys(data)) {
+    if (!key.startsWith('CH:')) continue;
+    const raw = key.slice(3);
+    if (!/^\d{1,5}$/.test(raw)) continue;
+    // The map holds both padded and unpadded forms of the same IID (100 and
+    // 00100); the register holds the padded one only.
+    if (!known.has(raw.padStart(5, '0'))) delete data[key];
+  }
+  return data;
+}
+
 function getBicData(): Record<string, BicDataEntry> {
   if (!bicDataCache) {
     const require = createRequire(import.meta.url);
-    bicDataCache = require(resolve(__dirname, '../db/bic_data.json')) as Record<string, BicDataEntry>;
+    const raw = require(resolve(__dirname, '../db/bic_data.json')) as Record<string, BicDataEntry>;
+    bicDataCache = pruneStaleSwissCodes({ ...raw });
   }
   return bicDataCache;
 }
