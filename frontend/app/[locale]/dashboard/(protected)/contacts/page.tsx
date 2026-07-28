@@ -1,11 +1,13 @@
 import { getLocale } from 'next-intl/server';
 import { CrmApp } from '@/components/crm/crm-app';
+import { FunnelPanel } from '@/components/crm/funnel-panel';
 import { StatCardV2 } from '@/components/dashboard/stat-card-v2';
 import { TopUsersToday, type TopUserToday } from '@/components/dashboard/top-users-today';
 import { enrichEmail } from '@/lib/company-enrichment';
 import { isArchived } from '@/lib/crm/archived';
 import { ballWithUs as isBallWithUs, followupDue as isFollowupDue } from '@/lib/crm/buckets';
 import { buildContacts, fetchCrmData, INTERNAL_RE, type KeyRow } from '@/lib/crm/build-contacts';
+import { BY_CAMPAIGN, BY_CONFIDENCE, BY_COUNTRY, BY_SEGMENT, funnelBy } from '@/lib/crm/funnel';
 import { sendableStock } from '@/lib/crm/priority';
 import { countSentToday } from '@/lib/crm/sent-today';
 import { snoozedMap } from '@/lib/crm/snooze';
@@ -157,6 +159,13 @@ export default async function ContactsPage() {
   // reserve when the reserve is empty is worse than no card at all.
   const stock = sendableStock(active);
 
+  // Computed from the contacts already built, so the funnel can never disagree
+  // with the list beside it. Archived rows are excluded like everywhere else.
+  const bySegment = funnelBy(active, BY_SEGMENT);
+  const byCampaign = funnelBy(active, BY_CAMPAIGN);
+  const byConfidence = funnelBy(active, BY_CONFIDENCE);
+  const byCountry = funnelBy(active, BY_COUNTRY);
+
   // Ported as they stood from the Clients page. The overview's money card is
   // x402 USDC, which cannot be attributed per client; this one is the Stripe
   // pack revenue, and the two are complementary rather than duplicates.
@@ -221,6 +230,13 @@ export default async function ContactsPage() {
           hint="Contacts qui ont une clé API."
         />
       </div>
+
+      <FunnelPanel
+        bySegment={bySegment}
+        byCampaign={byCampaign}
+        byConfidence={byConfidence}
+        byCountry={byCountry}
+      />
 
       <CrmApp contacts={contacts} situations={situations} snoozed={snoozed} sentToday={sentToday} />
     </div>
