@@ -1,6 +1,6 @@
 import { humanOnly } from './automated';
 import { resolveCountry } from './country';
-import type { Contact } from './types';
+import type { Contact, ProspectSourcing } from './types';
 
 /**
  * What each campaign, segment, confidence tier and country actually produced.
@@ -95,9 +95,13 @@ export function funnelBy(
   );
 }
 
-/** The sourcing block, whichever branch of Contact carries it. */
-function sourcingOf(c: Contact) {
-  return c.kind === 'prospect' ? c.sourcing : c.sourcing;
+/**
+ * The sourcing block. Required on a prospect, present on a client only when
+ * that address came from the prospect list, so the union answers
+ * `ProspectSourcing | undefined` without needing to narrow.
+ */
+function sourcingOf(c: Contact): ProspectSourcing | undefined {
+  return c.sourcing;
 }
 
 export const BY_SEGMENT = (c: Contact) => {
@@ -123,12 +127,23 @@ export const BY_CONFIDENCE = (c: Contact) => {
 };
 
 /**
- * Geography. Rows whose stored text names no country land in one visible
- * bucket rather than vanishing: a breakdown that silently drops eight rows of
- * eighty claims a completeness it does not have. See country.ts.
+ * Geography, over EVERY contact, unlike the three cuts above.
+ *
+ * Those three read the sourcing block and skip a contact that has none, since
+ * a customer who never came from the prospect list genuinely has no segment
+ * and inventing one would put a made-up row in a table meant to drive
+ * sourcing. Country is different: it lives on ContactBase and build-contacts
+ * fills it for a client from enrichEmail, so the data is there. Gating this
+ * cut on the sourcing block the way the others do left the customers out:
+ * measured on the real list, the geography table summed to 78 rows where 99
+ * contacts were active, quietly omitting the whole customer base from the one
+ * screen meant to say where the business actually is.
+ *
+ * Rows whose stored text names no country land in one visible bucket rather
+ * than vanishing: a breakdown that silently drops a tenth of its rows claims a
+ * completeness it does not have. See country.ts.
  */
 export const BY_COUNTRY = (c: Contact) => {
-  if (!sourcingOf(c)) return null;
   const r = resolveCountry(c.country);
   return { key: r.code ?? '??', label: r.label };
 };

@@ -153,6 +153,23 @@ describe('funnelBy', () => {
     expect(rows.reduce((n, r) => n + r.stock, 0)).toBe(2);
   });
 
+  it('counts a client with no prospect row in the geography, unlike the other cuts', () => {
+    // Found on the real list: gating geography on the sourcing block the way
+    // the segment cut is gated left every customer out, and the table summed
+    // to 78 rows where 99 contacts were active. Country lives on the contact,
+    // not on the sourcing, so it is known for a customer who was never a
+    // prospect.
+    const rows = funnelBy([prospect('a@example.net'), client('b@example.net', 10, [], false)], BY_COUNTRY);
+    expect(rows.reduce((n, r) => n + r.stock, 0)).toBe(2);
+    expect(rows[0].key).toBe('CH');
+    expect(rows[0].converted).toBe(1);
+  });
+
+  it('keeps the sourcing cuts gated, so no made-up row informs a decision', () => {
+    const rows = funnelBy([prospect('a@example.net'), client('b@example.net', 10, [], false)], BY_CONFIDENCE);
+    expect(rows.reduce((n, r) => n + r.stock, 0)).toBe(1);
+  });
+
   it('returns nothing for an empty list', () => {
     expect(funnelBy([], BY_SEGMENT)).toEqual([]);
   });
