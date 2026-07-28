@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { isArchived } from '@/lib/crm/archived';
 import { dueToday, followupDue } from '@/lib/crm/buckets';
+import { byPriority, priorityOf, type Priority } from '@/lib/crm/priority';
 import type { Contact, Situation } from '@/lib/crm/types';
 
 export type FilterKey = 'today' | 'all' | 'followup' | 'prospects' | 'clients' | 'archived';
@@ -36,12 +37,30 @@ const FILTERS: Array<{
 
 const DEFAULT_FILTER = FILTERS[0];
 
-/** Ordering rank: our turn first, then the followups, then everything else. */
-function rankOf(s: Situation | undefined): number {
-  if (s?.ballInCourt === 'us') return 0;
-  if (s?.followupDue) return 1;
-  return 2;
-}
+/**
+ * Ordering used to be: our turn, then the followups, then the rest, and inside
+ * each of those, the longest silence. That last step was the whole ordering in
+ * practice, because the follow-up bucket held fifty of the rows at once, and
+ * silence is the least informative thing known about a thread. priority.ts
+ * replaces it with a ladder and hands back the reason, which the row shows.
+ */
+
+/**
+ * Tint per rung. Warm where the row is worth the next send, neutral where it
+ * is not, so the column reads at a glance without having to parse the words.
+ * Every value is a --fg token or a 300-level colour on a /15 tint, the pairing
+ * ruled AA during the refactor.
+ */
+const PRIORITY_TINT: Record<Priority['key'], string> = {
+  answer: 'bg-blue-500/15 text-blue-300',
+  client: 'bg-purple-500/15 text-purple-300',
+  replied: 'bg-emerald-500/15 text-emerald-300',
+  high: 'bg-amber-500/15 text-amber-300',
+  medium: 'bg-[var(--ink-5)] text-[var(--fg-2)]',
+  low: 'bg-[var(--ink-4)] text-[var(--fg-3)]',
+  unknown: 'bg-[var(--ink-4)] text-[var(--fg-3)]',
+  snoozed: 'bg-[var(--ink-4)] text-[var(--fg-3)]',
+};
 
 /** The one-line status shown under a contact, or null when we know nothing. */
 function statusLine(s: Situation | undefined): string | null {
@@ -77,7 +96,11 @@ export function ContactList({
   const [q, setQ] = useState('');
 
   const rows = useMemo(
-    () => contacts.map((c) => ({ c, s: situations[c.id] as Situation | undefined })),
+    () =>
+      contacts.map((c) => {
+        const s = situations[c.id] as Situation | undefined;
+        return { c, s, p: priorityOf(c, s) };
+      }),
     [contacts, situations],
   );
 
@@ -97,9 +120,11 @@ export function ContactList({
       .filter(({ c, s }) => f.test(c, s))
       .filter(({ c }) => !term || `${c.company ?? ''} ${c.email}`.toLowerCase().includes(term))
       .sort((a, b) => {
+        // Unread still wins outright: a person wrote and it has not been read.
+        // Robots no longer reach this test (thread-unread.ts), so the top of
+        // the queue cannot be taken by a ticket acknowledgement any more.
         if (a.c.unread !== b.c.unread) return a.c.unread ? -1 : 1;
-        if (rankOf(a.s) !== rankOf(b.s)) return rankOf(a.s) - rankOf(b.s);
-        return (b.s?.silenceDays ?? 0) - (a.s?.silenceDays ?? 0);
+        return byPriority(a, b);
       });
   }, [rows, filter, q]);
 
@@ -140,8 +165,12 @@ export function ContactList({
           // same sizes, was ruled under AA twice during task 5 and lifted there.
           <p className="p-4 text-sm text-[var(--fg-3)]">Aucun contact.</p>
         )}
-        {shown.map(({ c, s }) => {
+        {shown.map(({ c, s, p }) => {
           const status = statusLine(s);
+          // 'answer' would repeat the status line word for word, so the reason
+          // is shown only where it says something the status does not: why THIS
+          // row sits where it does among the fifty that all read "relance due".
+          const reason = p.key === 'answer' ? null : p.reason;
           return (
             <button
               key={c.id}
@@ -182,7 +211,17 @@ export function ContactList({
                   {c.kind === 'client' ? 'client' : 'prospect'}
                 </span>
               </div>
-              {status && <span className="pl-4 text-[10px] text-[var(--fg-3)]">{status}</span>}
+              <div className="flex min-w-0 items-center gap-1.5 pl-4">
+                {status && <span className="truncate text-[10px] text-[var(--fg-3)]">{status}</span>}
+                {reason && (
+                  <span
+                    className={`shrink-0 rounded px-1 py-px text-[9px] ${PRIORITY_TINT[p.key]}`}
+                    title="Pourquoi ce contact est placé ici dans la file"
+                  >
+                    {reason}
+                  </span>
+                )}
+              </div>
             </button>
           );
         })}

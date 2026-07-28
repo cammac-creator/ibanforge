@@ -6,6 +6,7 @@ import { enrichEmail } from '@/lib/company-enrichment';
 import { isArchived } from '@/lib/crm/archived';
 import { ballWithUs as isBallWithUs, followupDue as isFollowupDue } from '@/lib/crm/buckets';
 import { buildContacts, fetchCrmData, INTERNAL_RE, type KeyRow } from '@/lib/crm/build-contacts';
+import { sendableStock } from '@/lib/crm/priority';
 import { countSentToday } from '@/lib/crm/sent-today';
 import { situationOf } from '@/lib/crm/situation';
 import type { Situation } from '@/lib/crm/types';
@@ -143,6 +144,12 @@ export default async function ContactsPage() {
   const prospects = active.filter((c) => c.kind === 'prospect').length;
   const clients = active.filter((c) => c.kind === 'client').length;
 
+  // What is actually left to write to, which the "Prospects" total does not
+  // say. Measured on 27/07/2026 that total read 78 while the number of high
+  // confidence prospects still to write to was zero: a card that reads as a
+  // reserve when the reserve is empty is worse than no card at all.
+  const stock = sendableStock(active);
+
   // Ported as they stood from the Clients page. The overview's money card is
   // x402 USDC, which cannot be attributed per client; this one is the Stripe
   // pack revenue, and the two are complementary rather than duplicates.
@@ -195,10 +202,10 @@ export default async function ContactsPage() {
           hint="Clés gratuites qui appellent réellement l’API, candidats à la conversion."
         />
         <StatCardV2
-          title="Prospects"
-          value={String(prospects)}
-          accentColor="#14b8a6"
-          hint="Contacts sans clé API."
+          title="À écrire"
+          value={String(stock.byConfidence.high ?? 0)}
+          accentColor={stock.byConfidence.high ? '#14b8a6' : '#ef4444'}
+          hint={`Prospects en confiance haute, avec une adresse, jamais écrits. Vivier total encore envoyable : ${stock.total} (dont ${stock.byConfidence.medium ?? 0} moyenne, ${stock.byConfidence.low ?? 0} faible). Sur ${prospects} prospects au total.`}
         />
         <StatCardV2
           title="Clients"
