@@ -15,9 +15,16 @@ const OUTCOMES: readonly string[] = ['en_discussion', 'pas_maintenant', 'pas_int
  * Internal, test and founder-owned addresses never appear in the CRM. Lifted
  * verbatim from the Clients page so that exactly the same people show up.
  * Note it also swallows example.com, which is why fixtures use example.net.
+ *
+ * Two additions on 29/07/2026, both found by the "Nouveaux clients" chip: probe
+ * keys minted and revoked during a session live on @ibanforge.internal, and the
+ * founder's own throwaway tests are plus-addressed on his personal Gmail. Both
+ * were sitting in the new-customer list beside three real signups, which is
+ * exactly where a false positive costs the most. The plus term is deliberately
+ * narrow: his bare address is not a test account.
  */
 export const INTERNAL_RE =
-  /(@ibanforge\.com|@example\.com|@test\.|test-|-test|smoke|audit|^ca-[a-z]+-?\d*@proton\.me|^credits-buyer$|^stripe-buyer$|^playground|cammac@bluewin\.ch|cam@ogens\.ch|ptibootch@|gpt-store@)/i;
+  /(@ibanforge\.com|@ibanforge\.internal|@example\.com|@test\.|test-|-test|smoke|audit|^ca-[a-z]+-?\d*@proton\.me|^credits-buyer$|^stripe-buyer$|^playground|cammac@bluewin\.ch|cam@ogens\.ch|ptibootch@|gpt-store@|claudealainmartin06\+)/i;
 
 /**
  * Monthly quota from which an unpaid key is an evaluation pilot rather than a

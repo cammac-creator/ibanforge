@@ -89,6 +89,36 @@ describe('INTERNAL_RE', () => {
     expect(INTERNAL_RE.test('SOMEONE@IBANFORGE.COM')).toBe(true);
     expect(INTERNAL_RE.test('alpha@example.net')).toBe(false);
   });
+
+  it('swallows the probe keys this session mints and revokes', () => {
+    // These landed in the "Nouveaux clients" list on 29/07/2026, next to three
+    // real signups. A list of good news polluted by our own test keys is worth
+    // about as much as no list.
+    expect(INTERNAL_RE.test('edge-probe@ibanforge.internal')).toBe(true);
+    expect(INTERNAL_RE.test('nextsteps-probe@ibanforge.internal')).toBe(true);
+  });
+
+  it("swallows the founder's own plus-addressed test accounts", () => {
+    expect(INTERNAL_RE.test('claudealainmartin06+relaytest0725@gmail.com')).toBe(true);
+    expect(INTERNAL_RE.test('claudealainmartin06+batchtest0711@gmail.com')).toBe(true);
+    // His real address is not a test account and must still come through.
+    expect(INTERNAL_RE.test('claudealainmartin06@gmail.com')).toBe(false);
+  });
+
+  it('leaves a genuine customer alone', () => {
+    // Every one of these is a real key holder as of 29/07/2026.
+    for (const real of [
+      'customer-b@example.com',
+      'customer-c@example.com',
+      'ladislav.proc@onsaplus.eu',
+      'developer@calyx-solutions.com',
+      'koopkoa@gmail.com',
+      'customer-a@example.com',
+      'petteri@asterpay.io',
+    ]) {
+      expect(INTERNAL_RE.test(real), real).toBe(false);
+    }
+  });
 });
 
 describe('buildContacts', () => {
