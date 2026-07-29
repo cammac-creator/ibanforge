@@ -42,3 +42,23 @@ export const BANK_CODE_CHECK_SCHEMA = {
   },
   required: ['value', 'status', 'match', 'register', 'authoritative', 'as_of'],
 };
+
+export const NEXT_STEPS_SCHEMA = {
+  type: 'array' as const,
+  description:
+    'Ordered advice derived from THIS result: what blocks a payment first, what merely enriches it after. Branch on `code`, never on the prose. Absent or empty for an IBAN that failed validation, since the error already says what to do.',
+  items: {
+    type: 'object',
+    properties: {
+      code: {
+        type: 'string',
+        description:
+          'Stable identifier. Today: bank_code_not_allocated (the national register denies the code, do not send), verify_payee_name (we cannot confirm it, treat as unavailable and let a name check decide), bic_is_advisory (the BIC was picked from several candidates), test_bic, expect_virtual_iban (curated non-bank issuer, account holder and IBAN holder often differ), screen_compliance.',
+      },
+      do: { type: 'string', description: 'The instruction, in one sentence an agent can relay to a person.' },
+      because: { type: 'string', description: 'The field of this response that produced the step, so the advice is auditable.' },
+      action: { type: 'string', description: 'An IBANforge call that performs the step, when one exists.' },
+    },
+    required: ['code', 'do', 'because'],
+  },
+};

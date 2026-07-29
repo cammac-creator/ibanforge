@@ -89,6 +89,8 @@ export interface BankCodeCheck {
   as_of: string;
 }
 
+import type { NextStep } from './lib/next-steps.js';
+
 export interface IBANValidationResult {
   iban: string;
   valid: boolean;
@@ -142,6 +144,11 @@ export interface IBANValidationResult {
     vop_coverage: boolean;
   };
   bank_code_check?: BankCodeCheck;
+  /**
+   * What to do next, derived from this result. Ordered: what blocks a payment
+   * comes before what merely enriches it. See lib/next-steps.ts.
+   */
+  next_steps?: NextStep[];
   clearing?: ChClearingSummary | null;
   formatted?: string;
   error?: 'invalid_format' | 'unsupported_country' | 'wrong_length' | 'checksum_failed' | 'invalid_check_digits' | 'invalid_bban_structure';

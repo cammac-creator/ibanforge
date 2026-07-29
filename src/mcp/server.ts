@@ -54,11 +54,13 @@ When NOT to use: for multiple IBANs, use batch_validate_iban instead (60% cheape
 
 Behavior: this tool is read-only and performs no writes, no network calls to external services, and no side effects. It validates the IBAN checksum (ISO 13616 mod-97), parses the BBAN structure, resolves the BIC from a local database of ${F.claim.bic} entries (GLEIF-sourced), and classifies the issuer type. Server-side processing is under 5 ms; network latency is yours to measure (GET /ping). Returns a single JSON object.
 
-Returns: { valid, country: { code, name }, check_digits, bban: { bank_code, branch_code?, account_number }, bic: { code, bank_name, city } | null, sepa: { member, schemes, vop_required }, issuer: { type, name, classification: curated | default }, risk_indicators: { issuer_type (null when no institution resolved), country_risk, test_bic, sepa_reachable, sepa_reachable_scope: 'country', vop_coverage }, bank_code_check { value, status: verified | not_in_register | unavailable, match: register | prefix | null, register, authoritative, candidates?, as_of }, clearing: { iid, name, type, town, sic, eurosic, qr_iid } | null, formatted, cost_usdc }
+Returns: { valid, country: { code, name }, check_digits, bban: { bank_code, branch_code?, account_number }, bic: { code, bank_name, city } | null, sepa: { member, schemes, vop_required }, issuer: { type, name, classification: curated | default }, risk_indicators: { issuer_type (null when no institution resolved), country_risk, test_bic, sepa_reachable, sepa_reachable_scope: 'country', vop_coverage }, bank_code_check { value, status: verified | not_in_register | unavailable, match: register | prefix | null, register, authoritative, candidates?, as_of }, next_steps [{ code, do, because, action? }], clearing: { iid, name, type, town, sic, eurosic, qr_iid } | null, formatted, cost_usdc }
 
 When valid is false the object carries { valid: false, error, error_detail } and none of the enrichment fields. bic is null when no BBAN-to-BIC mapping exists for the bank code. IMPORTANT — bic: null does not mean the bank code is wrong. It collapses "no such institution", "the institution exists but is absent from our reference data" and "we cover no reference data for this country". Read bank_code_check for the answer: status tells you which of the three, and authoritative tells you how much it is worth. Only where authoritative is true (today CH and LI, checked against the SIX BankMaster) does not_in_register mean the bank code is not allocated; everywhere else treat it as UNAVAILABLE and let the downstream name check decide. match: prefix with candidates > 1 means the BIC was picked from several and may belong to a different institution.  branch_code is present only for countries whose BBAN defines one; clearing is present only for CH and LI when the IID is in the SIX BankMaster.
 
 Supports 89 countries including all SEPA/EEA countries, Switzerland, UK, and 50+ non-SEPA countries.
+
+next_steps is ordered advice derived from the result: what blocks a payment first, what merely enriches it after. Branch on the code field, not on the prose, and relay the do field to the user. bank_code_not_allocated means stop; verify_payee_name means carry on and let a beneficiary name check decide.
 
 Example: input 'DE89370400440532013000' → { valid: true, country: { code: 'DE', name: 'Germany' }, bban: { bank_code: '37040044', account_number: '0532013000' }, bic: { code: 'COBADEFF', bank_name: 'COMMERZBANK Aktiengesellschaft', city: 'Frankfurt am Main' }, issuer: { type: 'bank', name: 'COMMERZBANK Aktiengesellschaft' }, ... }
 
@@ -105,7 +107,7 @@ Behavior: this tool is read-only with no side effects. It validates each IBAN in
 
 Input constraints: minimum 1 IBAN, maximum 100 IBANs per call. Exceeding 100 returns a validation error.
 
-Returns: Array of objects, each identical in structure to the validate_iban response: { valid, country, bban, bic, sepa, issuer, risk_indicators, bank_code_check }
+Returns: Array of objects, each identical in structure to the validate_iban response: { valid, country, bban, bic, sepa, issuer, risk_indicators, bank_code_check, next_steps }
 
 Example: input ['DE89370400440532013000', 'INVALID123'] → [{ valid: true, ... }, { valid: false, error: 'Invalid checksum' }]
 
@@ -247,7 +249,7 @@ Risk score weights: sanctioned country (+50), sanctioned bank (+50), FATF black 
 
 Risk levels: low (0-19), medium (20-39), elevated (40-59), high (60-79), critical (80-100).
 
-Returns: { valid, country, bban, bic, sepa, issuer, risk_indicators, bank_code_check, compliance: { sanctions: { country_sanctioned, bank_sanctioned, matched_lists, fatf_status }, reachability: { sepa_instant, sct, sdd }, vop: { participant, status }, risk_score, risk_level, flags } }
+Returns: { valid, country, bban, bic, sepa, issuer, risk_indicators, bank_code_check, next_steps, compliance: { sanctions: { country_sanctioned, bank_sanctioned, matched_lists, fatf_status }, reachability: { sepa_instant, sct, sdd }, vop: { participant, status }, risk_score, risk_level, flags } }
 
 Example: input 'DE89370400440532013000' → { valid: true, compliance: { sanctions: { country_sanctioned: false, fatf_status: 'member' }, risk_score: 5, risk_level: 'low', flags: [] } }
 

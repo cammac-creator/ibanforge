@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { createRequire } from 'node:module';
 import { getEntryCount } from '../lib/bic-lookup.js';
-import { BANK_CODE_CHECK_SCHEMA } from '../lib/bank-code-schema.js';
+import { BANK_CODE_CHECK_SCHEMA , NEXT_STEPS_SCHEMA } from '../lib/bank-code-schema.js';
 
 const openapi = new Hono();
 
@@ -885,6 +885,7 @@ const buildSpec = () => ({
             required: ['issuer_type', 'country_risk', 'test_bic', 'sepa_reachable', 'sepa_reachable_scope', 'vop_coverage'],
           },
           bank_code_check: BANK_CODE_CHECK_SCHEMA,
+          next_steps: NEXT_STEPS_SCHEMA,
         },
       },
       IBANFormatResult: {

@@ -2,7 +2,7 @@ import type { MiddlewareHandler } from 'hono';
 import { createRequire } from 'node:module';
 import type { HonoEnv } from '../types.js';
 import { datasetFacts } from '../lib/dataset-facts.js';
-import { BANK_CODE_CHECK_SCHEMA as BANK_CODE_CHECK_OPENAPI } from '../lib/bank-code-schema.js';
+import { BANK_CODE_CHECK_SCHEMA as BANK_CODE_CHECK_OPENAPI , NEXT_STEPS_SCHEMA as NEXT_STEPS_OPENAPI } from '../lib/bank-code-schema.js';
 
 const require = createRequire(import.meta.url);
 const pkg = require('../../package.json') as { version: string };
@@ -238,6 +238,7 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
             },
           },
           bank_code_check: BANK_CODE_CHECK_OPENAPI,
+          next_steps: NEXT_STEPS_OPENAPI,
           clearing: {
             type: 'object',
             description: 'Swiss clearing data when country is CH or LI and the IID is in the SIX BankMaster. Null otherwise.',

@@ -33,6 +33,25 @@ const F = datasetFacts();
  * letting it through: only `authoritative: true` turns `not_in_register` into
  * evidence that the bank code does not exist.
  */
+/**
+ * What an agent should do next. Declared once, attached to all three tools, for
+ * the same reason as BANK_CODE_CHECK_SCHEMA: the MCP SDK validates a tool's
+ * output against its declared schema and silently drops `structuredContent` on
+ * a mismatch, so a field added to the response and not to every schema stops
+ * the structured path without any error.
+ */
+const NEXT_STEPS_SCHEMA = z
+  .array(
+    z.object({
+      code: z.string().describe('Stable identifier. Branch on this.'),
+      do: z.string(),
+      because: z.string().describe('The response field that produced this step.'),
+      action: z.string().optional().describe('An IBANforge call that performs the step, when one exists.'),
+    }),
+  )
+  .optional()
+  .describe('Ordered advice derived from THIS result: what blocks a payment first, what merely enriches it after. Branch on `code`, never on the prose. `because` names the field that produced the step so the advice is auditable. Empty for an IBAN that failed validation.');
+
 const BANK_CODE_CHECK_SCHEMA = z
   .object({
     value: z.string(),
@@ -152,6 +171,7 @@ function createMcpServer(): McpServer {
           vop_coverage: z.boolean(),
         }).optional(),
         bank_code_check: BANK_CODE_CHECK_SCHEMA,
+        next_steps: NEXT_STEPS_SCHEMA,
         clearing: z.object({
           iid: z.string(),
           name: z.string(),
@@ -222,6 +242,7 @@ function createMcpServer(): McpServer {
             vop_coverage: z.boolean(),
           }).optional(),
           bank_code_check: BANK_CODE_CHECK_SCHEMA,
+          next_steps: NEXT_STEPS_SCHEMA,
           clearing: z.object({
             iid: z.string(),
             name: z.string(),
@@ -378,6 +399,7 @@ function createMcpServer(): McpServer {
           vop_coverage: z.boolean(),
         }).optional(),
         bank_code_check: BANK_CODE_CHECK_SCHEMA,
+        next_steps: NEXT_STEPS_SCHEMA,
         compliance: z.object({
           sanctions: z.object({
             country_sanctioned: z.boolean(),

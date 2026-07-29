@@ -9,6 +9,7 @@ import { classifyIssuer } from './issuers.js';
 import { getCountryRisk } from './countries.js';
 import { lookupClearingByBankCode } from './ch-clearing.js';
 import type { BankCodeCheck, IBANValidationResult } from '../types.js';
+import { nextSteps } from './next-steps.js';
 
 /**
  * A BIC is a test/internal institution if the second character of the
@@ -169,4 +170,7 @@ export function enrichResult(result: IBANValidationResult): void {
       result.clearing = null;
     }
   }
+
+  // Last, so every field it reasons about is already populated.
+  result.next_steps = nextSteps(result);
 }
