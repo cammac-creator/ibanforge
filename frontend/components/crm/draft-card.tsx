@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { changedRows, confirmedSent, readAnswer, reasonOf, withReason } from '@/lib/crm/api-result';
+import { draftReading } from '@/lib/crm/draft-reading';
 import { formatStamp } from '@/lib/crm/format';
 import type { Contact, Message, Situation } from '@/lib/crm/types';
 import { GuardrailChecks, OverrideButton, useGuardrails } from './guardrails-ui';
@@ -46,8 +47,13 @@ export function DraftCard({
 }) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
+  // Reading language for the read-only view. Defaults to the translation
+  // when one exists, matching TimelineMessage, so the operator meets one
+  // convention across the thread and the card sitting at the end of it.
+  const [showOriginal, setShowOriginal] = useState(false);
   const [subject, setSubject] = useState(draft.subject ?? '');
   const [body, setBody] = useState(draft.body ?? draft.snippet ?? '');
+  const reading = draftReading(draft, showOriginal);
   const [busy, setBusy] = useState<false | 'send' | 'save' | 'del'>(false);
   // Latched on a confirmed send. router.refresh() is not awaitable and the
   // card stays mounted until the new payload arrives, so without this the send
@@ -238,7 +244,30 @@ export function DraftCard({
       ) : (
         <>
           <p className="mt-1.5 text-xs font-medium text-[var(--fg-1)]">{subject || '(sans objet)'}</p>
-          <p className="mt-0.5 whitespace-pre-wrap text-[11px] leading-relaxed text-[var(--fg-3)]">{body}</p>
+          {/* Reading view only. `reading.text` may be the French translation,
+              which is never what leaves: the send path reads `body`, the state
+              the textarea edits. draftReading() owns that distinction and
+              flags it, so the badge below can say so plainly. */}
+          <p className="mt-0.5 whitespace-pre-wrap text-[11px] leading-relaxed text-[var(--fg-3)]">
+            {reading.text}
+          </p>
+          {reading.canTranslate && (
+            <div className="mt-1.5 flex flex-wrap items-center gap-2">
+              <span className="rounded bg-[var(--ink-4)] px-1.5 py-0.5 text-[10px] text-[var(--fg-3)]">
+                {reading.isTranslation
+                  ? '🌐 traduction française · le mail partira en ' +
+                    (draft.lang ?? 'langue d’origine')
+                  : '✉️ texte qui sera envoyé'}
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowOriginal(!showOriginal)}
+                className="text-[10px] text-[var(--fg-3)] underline decoration-dotted underline-offset-2 hover:text-[var(--fg-1)]"
+              >
+                {showOriginal ? 'voir la traduction' : 'voir l’original'}
+              </button>
+            </div>
+          )}
         </>
       )}
       {/* Same panel and same words as the composer: the operator meets one
