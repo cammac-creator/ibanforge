@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ballWithUs, dueToday, followupDue } from './buckets';
+import { ballWithUs, dueToday, followupDue, neverContacted } from './buckets';
 import { FOLLOWUP_DAYS, situationOf } from './situation';
 import type { Contact, Message, ProspectSourcing, Situation } from './types';
 
@@ -254,5 +254,53 @@ describe('a contact asleep until a date', () => {
     // this pins that the default is the old behaviour rather than silence.
     expect(followupDue(ACTIVE, due)).toBe(true);
     expect(dueToday(ACTIVE, due)).toBe(true);
+  });
+});
+
+describe('neverContacted', () => {
+  it('claims a prospect no mail has ever gone out to', () => {
+    // The whole point: this row is invisible in every other bucket. It is not
+    // due today (nobody is waiting on anybody) and no follow-up is due (there
+    // is nothing to follow up), so finding it meant scrolling the full list.
+    expect(neverContacted(prospect('a'), situation({ nextAction: 'first_mail', messageCount: 0 }), false)).toBe(true);
+  });
+
+  it('drops the row the moment a first mail exists', () => {
+    for (const next of ['reply', 'followup', 'firm_offer', 'wait'] as const) {
+      expect(neverContacted(prospect('b'), situation({ nextAction: next }), false), next).toBe(false);
+    }
+  });
+
+  it('respects the snooze, like every other bucket', () => {
+    // Someone told us to come back in September. A cold first mail is exactly
+    // the thing that must not reappear in the meantime.
+    expect(neverContacted(prospect('c'), situation({ nextAction: 'first_mail', messageCount: 0 }), true)).toBe(false);
+  });
+
+  it('never claims a client', () => {
+    // A client with no stored thread is a sync gap, not someone to cold-mail.
+    const c: Contact = {
+      ...prospect('d'),
+      kind: 'client',
+      apiKey: {
+        keyPrefix: 'ifk_demo',
+        paid: true,
+        creditsTotal: null,
+        creditsRemaining: null,
+        monthlyLimit: 200,
+        usedAllTime: 12,
+        lastActiveMonth: '2026-07',
+      },
+      usage: { series: [], months: [], days: [], endpoints: [] },
+    };
+    expect(neverContacted(c, situation({ nextAction: 'first_mail', messageCount: 0 }), false)).toBe(false);
+  });
+
+  it('cannot overlap the day buckets', () => {
+    // dueToday needs a message in the thread; never-contacted has none. The two
+    // counts must stay addable, which is what makes the chips trustworthy.
+    const s = situation({ nextAction: 'first_mail', messageCount: 0 });
+    const c = prospect('e');
+    expect(neverContacted(c, s, false) && dueToday(c, s, false)).toBe(false);
   });
 });

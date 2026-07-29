@@ -2,11 +2,11 @@
 
 import { useMemo, useState } from 'react';
 import { isArchived } from '@/lib/crm/archived';
-import { dueToday, followupDue } from '@/lib/crm/buckets';
+import { dueToday, followupDue, neverContacted } from '@/lib/crm/buckets';
 import { byPriority, priorityOf, type Priority } from '@/lib/crm/priority';
 import type { Contact, Situation } from '@/lib/crm/types';
 
-export type FilterKey = 'today' | 'all' | 'followup' | 'prospects' | 'clients' | 'archived';
+export type FilterKey = 'today' | 'first' | 'all' | 'followup' | 'prospects' | 'clients' | 'archived';
 
 /**
  * One predicate per filter, used BOTH to count and to select. That is the whole
@@ -28,6 +28,9 @@ const FILTERS: Array<{
   test: (c: Contact, s: Situation | undefined, snoozed: boolean) => boolean;
 }> = [
   { key: 'today', label: "Aujourd'hui", test: dueToday },
+  // Placed second, right after the day's queue: these rows appear in no other
+  // bucket, so anywhere further down is where they were already being missed.
+  { key: 'first', label: 'Jamais contactés', test: neverContacted },
   { key: 'all', label: 'Tous', test: (c, s) => !isArchived(c, s) },
   { key: 'followup', label: 'Relances dues', test: followupDue },
   { key: 'prospects', label: 'Prospects', test: (c, s) => !isArchived(c, s) && c.kind === 'prospect' },

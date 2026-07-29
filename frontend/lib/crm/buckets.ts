@@ -60,3 +60,24 @@ export function followupDue(c: Contact, s: Situation | undefined, snoozed: boole
 export function dueToday(c: Contact, s: Situation | undefined, snoozed: boolean = false): boolean {
   return ballWithUs(c, s) || followupDue(c, s, snoozed);
 }
+
+/**
+ * A prospect no mail has ever gone out to.
+ *
+ * These rows sit in no other bucket by construction: nothing is due today
+ * because nobody is waiting on anybody, and no follow-up is due because there
+ * is nothing to follow up. So the only way to reach them was to scroll the
+ * whole list and read the small "jamais contacté" line under each row, which is
+ * how a queue of first mails becomes invisible work.
+ *
+ * Clients are excluded on purpose. A client with no stored thread is a mail-sync
+ * gap, not somebody to cold-mail, and putting one in this bucket would invite
+ * exactly the wrong send.
+ *
+ * The snooze is honoured, unlike in ballWithUs: someone who said "come back in
+ * September" has not been contacted either, and a cold first mail is precisely
+ * what must not resurface before that date.
+ */
+export function neverContacted(c: Contact, s: Situation | undefined, snoozed: boolean = false): boolean {
+  return !snoozed && c.kind === 'prospect' && !isArchived(c, s) && s?.nextAction === 'first_mail';
+}
