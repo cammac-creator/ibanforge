@@ -25,7 +25,12 @@ async function recordSent(to: string, subject: string, body: string, account: st
     msg_date: date,
     subject,
     snippet,
-    body: body.slice(0, 6000),
+    // 50k, not 6k. The cap existed to keep the row small, but it silently
+    // amputated the three longest mails we ever sent: measured 29/07/2026, both
+    // AsterPay replies were stored at exactly 6000 characters, cut mid-sentence.
+    // The send itself was never truncated, so the loss was invisible until the
+    // record was read back. A mail past 50k is a different problem.
+    body: body.slice(0, 50_000),
     counterparty: account,
   };
   try {
