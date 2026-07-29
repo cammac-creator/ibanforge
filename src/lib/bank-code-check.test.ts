@@ -84,6 +84,18 @@ describe('bank_code_check', () => {
     }
   });
 
+  it('never names a national register on a non-authoritative answer', () => {
+    // The field used to list the contributing sources, Bundesbank among them.
+    // A customer asking whether German bank codes are checked against the
+    // Bundesbank register would read that as yes, while authoritative:false on
+    // the same object says no. Two fields contradicting each other on the exact
+    // point at issue is worse than saying less.
+    const r = check('DE89370400440532013000');
+    expect(r.bank_code_check!.authoritative).toBe(false);
+    expect(r.bank_code_check!.register).not.toMatch(/bundesbank|nbp|six|eba/i);
+    expect(r.bank_code_check!.register).toMatch(/not a national/i);
+  });
+
   it('carries the date of the reference data it checked against', () => {
     const r = check('DE89370400440532013000');
     expect(r.bank_code_check!.as_of).toMatch(/^\d{4}-\d{2}/);

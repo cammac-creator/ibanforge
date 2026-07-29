@@ -38,7 +38,17 @@ const NATIONAL_REGISTERS: Record<string, string> = {
   LI: 'SIX BankMaster (Swiss IID / BC-Nummer register)',
 };
 
-const COMPOSITE_REGISTER = 'IBANforge composite bank-code map (GLEIF, SWIFT directory, Bundesbank, SIX, EBA STEP2 SCT, NBP)';
+/**
+ * Named for what it is, not for what fed it.
+ *
+ * This string used to list the contributing sources, Bundesbank among them. A
+ * customer asking whether we check German bank codes against the Bundesbank
+ * register would read that as yes, while `authoritative: false` on the same
+ * object says no — the two fields contradicting each other on the exact point at
+ * issue. The provenance belongs in the documentation, where it cannot be mistaken
+ * for a claim of exhaustiveness. `source='bundesbank'` is 144 rows.
+ */
+const COMPOSITE_REGISTER = 'IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)';
 
 /**
  * Decide the bank-code verdict, and be explicit about how much it is worth.
