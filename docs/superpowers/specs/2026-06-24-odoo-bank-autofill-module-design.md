@@ -21,7 +21,7 @@ l'API (free tier → x402 / credits / Stripe), pas du module.
 **Décisions actées** :
 - Approche **A** — module **gratuit** (AGPL-3, repo public), funnel vers l'API.
 - Cible **Odoo 18.0** (Community) en premier. Backport 17.0 possible ensuite.
-- Build immédiat (ne pas attendre la réponse de the integrator), en parallèle de la relance email.
+- Build immédiat (ne pas attendre la réponse de l'intégrateur), en parallèle de la relance email.
 
 ## 2. Proposition de valeur (vs Odoo natif)
 
@@ -205,9 +205,9 @@ obtenir une clé 200/mois.
 
 ## 13. Risques / questions ouvertes
 
-- **Demande réelle** : the integrator (Customer N) pourrait répondre que l'API directe lui suffit → le module
+- **Demande réelle** : l'intégrateur pourrait répondre que l'API directe lui suffit → le module
   reste un pari distribution autonome (App Store), pas une dépendance à sa réponse.
-- **Version Odoo d'Customer N** inconnue (18 ? 17 ?) — à confirmer via la relance ; MVP cible 18.0.
+- **Version Odoo de l'intégrateur** inconnue (18 ? 17 ?) — à confirmer via la relance ; MVP cible 18.0.
 - **Quota free tier** (200/mois) : suffisant pour saisie manuelle ; usage massif → credits/x402.
 - **Bug annexe noté** (hors scope) : l'`outputExample` x402 de `validate` diverge de la réponse
   réelle (camelCase vs snake_case) — à corriger côté API dans une tâche séparée.

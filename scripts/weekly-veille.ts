@@ -176,7 +176,7 @@ Pas d'intro ni de conclusion. Si tu ne trouves rien de récent sur un axe, ne l'
 }
 
 /**
- * AI-recommendability baseline. The one documented discovery channel (Customer N,
+ * AI-recommendability baseline. The one documented discovery channel (an Odoo integrator,
  * 2026-06-25) was "Claude Code has recommended". Assistants with web search
  * recommend from what surfaces in the SERPs at question time — this tracks,
  * week over week, whether IBANforge shows up for the canonical buyer queries.

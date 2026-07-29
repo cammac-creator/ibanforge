@@ -2,9 +2,9 @@
  * Lightweight, instant company enrichment from a customer email.
  *
  * Source priority:
- *  1. CURATED — real companies behind known customer domains (verified live by
- *     the discovery scouts on 2026-06-26, incl. rebrands like customer-f→Customer F
- *     and customer-e→Customer E that a frozen DB would miss).
+ *  1. CURATED — companies behind known customer domains, supplied privately at
+ *     runtime (see loadCurated below). Hand-curated because it catches rebrands
+ *     and acquisitions that a frozen third-party database would still get wrong.
  *  2. DERIVED — for any other business domain: a capitalised name + website link.
  *  3. PERSONAL — public/disposable mailbox → not a company, not enriched.
  *
@@ -34,21 +34,32 @@ const PERSONAL_DOMAINS = new Set([
   'trashmail.com', 'tempmail.com', 'getnada.com', 'sharklasers.com',
 ]);
 
-// Real customer companies, keyed by email domain. name/sector verified live.
-const CURATED: Record<string, Omit<CompanyInfo, 'isBusiness' | 'source'>> = {
-  'customer-e.example': { company: 'Customer E', sector: 'Banque on-chain', website: 'https://www.customer-e.example', linkedin: 'https://www.linkedin.com/company/customer-e', country: 'CH' },
-  'customer-e.example': { company: 'Customer E', sector: 'Banque on-chain', website: 'https://www.customer-e.example', linkedin: 'https://www.linkedin.com/company/customer-e', country: 'CH' },
-  'customer-f.example': { company: 'Customer F (ex-Customer F)', sector: 'Fincrime / AML', website: 'https://www.customer-f.com', linkedin: 'https://www.linkedin.com/company/customer-f', country: 'CH' },
-  'customer-g.example': { company: 'Customer G', sector: 'RegTech', website: 'https://www.customer-g.example', linkedin: 'https://www.linkedin.com/company/customer-g', country: 'CH' },
-  'customer-h.example': { company: 'Customer H', sector: 'Néobanque B2B (IBAN suisse)', website: 'https://www.customer-h.example', linkedin: 'https://www.linkedin.com/company/relioch', country: 'CH' },
-  'customer-i.example': { company: 'Customer I', sector: 'FinTech / embedded finance', website: 'https://www.customer-i.example', linkedin: 'https://www.linkedin.com/company/customer-i', country: 'CH' },
-  'customer-j.example': { company: 'Customer J', sector: 'Comptes multi-devises', website: 'https://www.customer-j.example', linkedin: null, country: 'CH' },
-  'customer-k.example': { company: 'Customer K', sector: 'RegTech / AML', website: 'https://www.customer-k.example', linkedin: null, country: 'CH' },
-  'customer-l.example': { company: 'Customer L', sector: 'Compliance / KYC', website: 'https://www.customer-l.example', linkedin: null, country: 'CH' },
-  'customer-m.example': { company: 'Customer M', sector: 'Trésorerie / FX PME', website: 'https://www.customer-m.example', linkedin: 'https://www.linkedin.com/company/customer-m-treasury', country: 'CH' },
-  'customer-n.example': { company: 'Customer N', sector: 'Services bancaires', website: 'https://www.customer-n.example', linkedin: null, country: 'CH' },
-  'customer-o.example': { company: 'Customer O', sector: 'IT / logiciels', website: 'https://www.customer-o.example', linkedin: 'https://www.linkedin.com/company/customer-o', country: 'CN' },
-};
+type CuratedEntry = Omit<CompanyInfo, 'isBusiness' | 'source'>;
+
+/**
+ * Curated domain → company map, loaded at runtime from a private environment
+ * variable. It used to be a literal in this file, which published the customer
+ * list to anyone reading this public repository. Set CRM_CURATED_COMPANIES to a
+ * JSON object of the same shape.
+ *
+ * An unset or unparseable value disables curated enrichment and falls through
+ * to DERIVED. That is the safe direction: a slightly worse label in the CRM,
+ * never a crash and never a leak.
+ */
+function loadCurated(): Record<string, CuratedEntry> {
+  const raw = process.env.CRM_CURATED_COMPANIES;
+  if (!raw) return {};
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+    return parsed as Record<string, CuratedEntry>;
+  } catch {
+    console.warn('[crm] CRM_CURATED_COMPANIES is not valid JSON — curated enrichment disabled');
+    return {};
+  }
+}
+
+const CURATED: Record<string, CuratedEntry> = loadCurated();
 
 function tldCountry(domain: string): string | null {
   if (domain.endsWith('.ch')) return 'CH';
