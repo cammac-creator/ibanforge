@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { getBicDB } from './db.js';
 import { LRUCache } from './cache.js';
 import type Database from 'better-sqlite3';
+import { lookupFiInstitution } from './fi-register.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -121,11 +122,38 @@ function pruneStaleGermanCodes(data: Record<string, BicDataEntry>): Record<strin
   return data;
 }
 
+/**
+ * Finnish prefixes the curated map claims and Finance Finland allocates to
+ * nobody are dropped at load time.
+ *
+ * The Swiss and German story a third time, with one twist: Finland allocates
+ * variable-length codes, so a curated 3-digit key must be resolved the same way
+ * a real BBAN is, by longest allocated prefix. Measured 29/07/2026, 21 of our
+ * 656 Finnish keys asserted an institution the published list does not carry,
+ * led by Handelsbanken (31x) and Swedbank (38x), both of which left Finnish
+ * retail banking.
+ *
+ * Without this the same response could resolve a BIC for a code its own
+ * bank_code_check called not_in_register with authoritative: true.
+ */
+function pruneStaleFinnishCodes(data: Record<string, BicDataEntry>): Record<string, BicDataEntry> {
+  for (const key of Object.keys(data)) {
+    if (!key.startsWith('FI:')) continue;
+    const raw = key.slice(3);
+    if (!/^\d{3}$/.test(raw)) continue;
+    // Pad to a BBAN-shaped string: the resolver reads a prefix, and the tail
+    // never participates in the decision.
+    const hit = lookupFiInstitution(raw.padEnd(14, '0'));
+    if (hit?.status === 'not_allocated') delete data[key];
+  }
+  return data;
+}
+
 function getBicData(): Record<string, BicDataEntry> {
   if (!bicDataCache) {
     const require = createRequire(import.meta.url);
     const raw = require(resolve(__dirname, '../db/bic_data.json')) as Record<string, BicDataEntry>;
-    bicDataCache = pruneStaleGermanCodes(pruneStaleSwissCodes({ ...raw }));
+    bicDataCache = pruneStaleFinnishCodes(pruneStaleGermanCodes(pruneStaleSwissCodes({ ...raw })));
   }
   return bicDataCache;
 }

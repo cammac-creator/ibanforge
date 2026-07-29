@@ -13,7 +13,11 @@ export const BANK_CODE_CHECK_SCHEMA = {
   description:
     'Separate verdict on the BBAN bank code. `valid` answers ISO 13616 (structure + mod-97) and says nothing about whether the bank code identifies an institution; this field answers that, and states how much weight the answer carries. Present only when the IBAN is valid.',
   properties: {
-    value: { type: 'string', description: 'The bank code taken from the BBAN, echoed back.' },
+    value: {
+      type: 'string',
+      description:
+        'The bank code that was actually checked. Normally identical to bban.bank_code. It differs in Finland, where the monetary institution code is 1 to 4 characters depending on its leading digits while bban.bank_code stays the fixed positional slice: a Nordea IBAN carries bban.bank_code "123" and value "1". When they differ, this field is the one the verdict is about.',
+    },
     status: {
       type: 'string',
       enum: ['verified', 'not_in_register', 'unavailable'],
@@ -31,7 +35,7 @@ export const BANK_CODE_CHECK_SCHEMA = {
     authoritative: {
       type: 'boolean',
       description:
-        'True only where that reference set is the national register: today CH and LI against the SIX BankMaster, and DE against the Bundesbank Bankleitzahlendatei. This is the flag to branch on: everywhere else an absence is evidence of absence from our data, not of non-existence.',
+        'True only where that reference set is the national register: today CH and LI against the SIX BankMaster, DE against the Bundesbank Bankleitzahlendatei, and FI against the Finance Finland monetary institution list. This is the flag to branch on: everywhere else an absence is evidence of absence from our data, not of non-existence. One asymmetry worth knowing: CH, LI and DE allocate codes to individual institutions, while FI allocates prefixes to banking groups, so a Finnish verified confirms the group and its BIC rather than one specific bank. The negative direction carries full weight in all four.',
     },
     candidates: {
       type: 'integer',

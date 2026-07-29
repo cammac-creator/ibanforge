@@ -6,6 +6,7 @@
 
 import { lookupByCountryBank, countryHasReferenceData, getReferenceAsOf } from './bic-lookup.js';
 import { classifyIssuer } from './issuers.js';
+import { lookupFiInstitution } from './fi-register.js';
 import { getCountryRisk } from './countries.js';
 import { lookupClearingByBankCode } from './ch-clearing.js';
 import { blzRegisterAvailable, lookupBlz } from './de-blz.js';
@@ -39,6 +40,12 @@ const NATIONAL_REGISTERS: Record<string, string> = {
   CH: 'SIX BankMaster (Swiss IID / BC-Nummer register)',
   LI: 'SIX BankMaster (Swiss IID / BC-Nummer register)',
   DE: 'Deutsche Bundesbank Bankleitzahlendatei',
+  // Finland says what it is worth in the string itself. CH, LI and DE allocate
+  // to institutions; Finland allocates prefixes to banking groups, so a hit
+  // confirms the group rather than a specific bank. Same field name, weaker
+  // positive, and leaving that undeclared would be the collapse this whole
+  // verdict exists to undo.
+  FI: 'Finance Finland monetary institution codes (allocated to banking groups, not individual institutions)',
 };
 
 /**
@@ -49,9 +56,30 @@ const NATIONAL_REGISTERS: Record<string, string> = {
 function askNationalRegister(
   cc: string,
   bankCode: string,
-): { allocated: boolean; retired?: true; successor?: string } | null {
+  bban?: string,
+): {
+  allocated: boolean;
+  retired?: true;
+  successor?: string;
+  /** The code actually checked, when it is not the positional slice. */
+  value?: string;
+  /** The register defines this space but names no holder: decline, do not deny. */
+  inconclusive?: true;
+} | null {
   if (cc === 'CH' || cc === 'LI') {
     return { allocated: !!lookupClearingByBankCode(bankCode) };
+  }
+  if (cc === 'FI') {
+    // Finland needs the whole BBAN, not the 3-digit slice: institution codes
+    // run 1 to 4 characters and only the longest allocated prefix is the real
+    // one. Asking about the slice would read Nordea's '1' as '123' and deny
+    // the country's largest bank.
+    if (!bban) return null;
+    const hit = lookupFiInstitution(bban);
+    if (!hit) return null;
+    if (hit.status === 'unknown') return { allocated: false, inconclusive: true };
+    if (hit.status === 'not_allocated') return { allocated: false };
+    return { allocated: true, value: hit.code };
   }
   if (cc === 'DE') {
     // A database built before the seeder existed has no table. Declining
@@ -93,14 +121,28 @@ function checkBankCode(
   cc: string,
   bankCode: string,
   hit: { match: 'register' | 'prefix'; candidates?: number } | null,
+  bban?: string,
 ): BankCodeCheck {
   const as_of = getReferenceAsOf();
   const national = NATIONAL_REGISTERS[cc];
 
-  const verdict = national ? askNationalRegister(cc, bankCode) : null;
+  const verdict = national ? askNationalRegister(cc, bankCode, bban) : null;
+  if (national && verdict?.inconclusive) {
+    // The register defines this code space but publishes no holder for it.
+    // Silence is not a denial, so this reports unavailable and drops the
+    // authority claim rather than telling a caller to stop a payment.
+    return {
+      value: verdict.value ?? bankCode,
+      status: 'unavailable',
+      match: null,
+      register: national,
+      authoritative: false,
+      as_of,
+    };
+  }
   if (national && verdict) {
     return {
-      value: bankCode,
+      value: verdict.value ?? bankCode,
       status: verdict.allocated ? 'verified' : 'not_in_register',
       match: verdict.allocated ? 'register' : null,
       register: national,
@@ -181,7 +223,10 @@ export function enrichResult(result: IBANValidationResult): void {
     vop_coverage: result.sepa?.vop_required ?? false,
   };
 
-  result.bank_code_check = checkBankCode(cc, bankCode, hit);
+  // The BBAN, taken from the normalised IBAN rather than reassembled from the
+  // parsed parts: Finland resolves on the whole string, and a country whose
+  // bank_code slice is not a prefix of the BBAN would silently reassemble wrong.
+  result.bank_code_check = checkBankCode(cc, bankCode, hit, result.iban.slice(4));
 
   // Swiss clearing enrichment (CH and LI IBANs)
   if ((cc === 'CH' || cc === 'LI') && result.bban?.bank_code) {
