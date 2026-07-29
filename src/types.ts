@@ -115,6 +115,14 @@ export interface IBANValidationResult {
   issuer?: {
     type: 'bank' | 'digital_bank' | 'emi' | 'payment_institution';
     name: string;
+    /**
+     * Whether the type was established or assumed.
+     * - `curated` — the BIC8 is in the issuer set; this is an identification.
+     * - `default` — nothing is on file, so 'bank' is what we fall back to. True
+     *   most of the time and never established. Count only `curated` when
+     *   sizing exposure to virtual IBANs.
+     */
+    classification: 'curated' | 'default';
   };
   risk_indicators?: {
     /**

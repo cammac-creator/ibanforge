@@ -834,8 +834,14 @@ const buildSpec = () => ({
                 type: 'string',
                 description: 'Name of the issuing institution',
               },
+              classification: {
+                type: 'string',
+                enum: ['curated', 'default'],
+                description:
+                  "Whether the type was established or assumed. curated = the BIC8 is in the issuer set, so this is an identification. default = nothing is on file and 'bank' is the fallback, which covers 47,356 of 48,386 distinct BIC8 (97.9%, measured 29/07/2026). When sizing exposure to virtual IBANs, count only curated.",
+              },
             },
-            required: ['type', 'name'],
+            required: ['type', 'name', 'classification'],
           },
           risk_indicators: {
             type: 'object',

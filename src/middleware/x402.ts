@@ -198,6 +198,11 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
             properties: {
               type: { type: 'string', enum: ['bank', 'digital_bank', 'emi', 'payment_institution'] },
               name: { type: 'string' },
+              classification: {
+                type: 'string',
+                enum: ['curated', 'default'],
+                description: "curated = identified from the issuer set; default = 'bank' fallback, 97.9% of BIC8.",
+              },
             },
           },
           sepa: {

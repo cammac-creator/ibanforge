@@ -63,7 +63,7 @@ const DISCOVERY: Array<{ match: (m: string, p: string) => boolean; data: BazaarD
         sepa: { member: true, schemes: ['SCT', 'SDD'], vop_required: false },
         formatted: 'CH10 0023 0000 0000 1234 5',
         bic: { code: 'UBSWCHZH', bank_name: 'UBS Switzerland AG', city: 'Zürich' },
-        issuer: { type: 'bank', name: 'UBS Switzerland AG' },
+        issuer: { type: 'bank', name: 'UBS Switzerland AG', classification: 'default' },
         risk_indicators: {
           issuer_type: 'bank',
           country_risk: 'standard',
@@ -324,7 +324,7 @@ const PRICING: EndpointPricing[] = [
       sepa: { member: true, schemes: ['SCT', 'SDD'], vop_required: false },
       formatted: 'CH10 0023 0000 0000 1234 5',
       bic: { code: 'UBSWCHZH', bank_name: 'UBS Switzerland AG', city: 'Zürich' },
-      issuer: { type: 'bank', name: 'UBS Switzerland AG' },
+      issuer: { type: 'bank', name: 'UBS Switzerland AG', classification: 'default' },
       risk_indicators: {
         issuer_type: 'bank',
         country_risk: 'standard',

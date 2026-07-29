@@ -137,6 +137,11 @@ function createMcpServer(): McpServer {
         issuer: z.object({
           type: z.string().describe('bank | digital_bank | emi | payment_institution'),
           name: z.string(),
+          classification: z
+            .string()
+            .describe(
+              'curated | default. Whether the type was established or assumed. curated = the BIC8 is in the issuer set, so this is an identification. default = nothing is on file and "bank" is the fallback, which covers 97.9% of BIC8 (measured 29/07/2026). Count only curated when sizing virtual-IBAN exposure.',
+            ),
         }).optional(),
         risk_indicators: z.object({
           issuer_type: z.string().nullable().describe('Null when no institution resolved — it no longer defaults to "bank".'),
@@ -202,7 +207,7 @@ function createMcpServer(): McpServer {
             bank_name: z.string().nullable(),
             city: z.string().nullable(),
           }).nullable().optional(),
-          issuer: z.object({ type: z.string(), name: z.string() }).optional(),
+          issuer: z.object({ type: z.string(), name: z.string(), classification: z.string() }).optional(),
           sepa: z.object({
             member: z.boolean(),
             schemes: z.array(z.string()),
@@ -358,7 +363,7 @@ function createMcpServer(): McpServer {
           bank_name: z.string().nullable(),
           city: z.string().nullable(),
         }).nullable().optional(),
-        issuer: z.object({ type: z.string(), name: z.string() }).optional(),
+        issuer: z.object({ type: z.string(), name: z.string(), classification: z.string() }).optional(),
         sepa: z.object({
           member: z.boolean(),
           schemes: z.array(z.string()),

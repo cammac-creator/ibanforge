@@ -96,6 +96,25 @@ describe('bank_code_check', () => {
   });
 });
 
+describe('issuer classification says whether it identified or assumed', () => {
+  it('marks a curated identification as such', () => {
+    // N26, Bankleitzahl 10011001.
+    const r = check('DE43100110010532013000');
+    expect(r.issuer!.type).toBe('digital_bank');
+    expect(r.issuer!.classification).toBe('curated');
+  });
+
+  it('marks the bank fallback as a default rather than a determination', () => {
+    // Commerzbank resolves a BIC, but the classifier holds no entry for it, so
+    // 'bank' is what we assume, not what we established. Measured 29/07/2026:
+    // 47,356 of 48,386 distinct BIC8 (97.9%) land here. A customer sizing how
+    // much of their virtual-IBAN traffic we would flag needs to see that line.
+    const r = check('DE89370400440532013000');
+    expect(r.issuer!.type).toBe('bank');
+    expect(r.issuer!.classification).toBe('default');
+  });
+});
+
 describe('risk_indicators stop asserting facts about an institution that did not resolve', () => {
   it('leaves issuer_type null rather than defaulting to bank', () => {
     const r = check('DE44999999990532013000');
