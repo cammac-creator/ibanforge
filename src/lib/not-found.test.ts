@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { Hono } from 'hono';
-import { notFoundBody, notFoundHandler } from './not-found.js';
+import { methodMismatch, notFoundBody, notFoundHandler } from './not-found.js';
 import type { HonoEnv } from '../types.js';
 
 /**
@@ -82,5 +82,48 @@ describe('DPA — le corps nomme le chemin, jamais la charge utile', () => {
     // Le seul champ variable est `message`, qui reprend le pathname. Ici le
     // pathname est `/` : l'IBAN posté ne ressort nulle part.
     expect(await res.text()).not.toContain(iban);
+  });
+});
+
+/**
+ * A 404 tells a machine "this endpoint does not exist" and it stops. A 405
+ * with an Allow header tells it "right path, wrong verb" in a field it can act
+ * on without parsing prose. Production request_log, 2026-07-29, distinct IPs
+ * that hit a real endpoint with the wrong method and were told it did not
+ * exist: 93 on /v1/iban/validate, 64 on /v1/iban/batch, 25 on
+ * /v1/iban/compliance, 24 on /v1/keys/generate.
+ */
+describe('method mismatch — 405 with Allow, not 404', () => {
+  const post = ['/v1/iban/validate', '/v1/iban/batch', '/v1/iban/compliance', '/v1/keys/generate'];
+
+  for (const path of post) {
+    it(`reports GET ${path} as a method mismatch allowing POST`, () => {
+      const m = methodMismatch('GET', path);
+      expect(m).toEqual({ allow: ['POST'] });
+    });
+  }
+
+  it('treats HEAD and DELETE on a POST endpoint the same way', () => {
+    expect(methodMismatch('HEAD', '/v1/iban/validate')).toEqual({ allow: ['POST'] });
+    expect(methodMismatch('DELETE', '/v1/iban/compliance')).toEqual({ allow: ['POST'] });
+  });
+
+  it('reports POST on the GET-only BIC lookup as allowing GET', () => {
+    expect(methodMismatch('POST', '/v1/bic/UBSWCHZH')).toEqual({ allow: ['GET'] });
+  });
+
+  it('does not fire on the correct method', () => {
+    expect(methodMismatch('POST', '/v1/iban/validate')).toBeNull();
+    expect(methodMismatch('GET', '/v1/bic/UBSWCHZH')).toBeNull();
+  });
+
+  it('does not fire on a path that is genuinely unknown', () => {
+    expect(methodMismatch('GET', '/v1/nope')).toBeNull();
+    expect(methodMismatch('POST', '/')).toBeNull();
+  });
+
+  it('still carries the did_you_mean hint in the body', () => {
+    // The hint already existed; only the status code was wrong.
+    expect(notFoundBody('GET', '/v1/iban/validate').did_you_mean).toMatch(/POST the same path/);
   });
 });

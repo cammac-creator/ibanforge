@@ -67,6 +67,51 @@ export function notFoundBody(method: string, path: string): NotFoundBody {
   };
 }
 
-/** Monté par `app.notFound(...)` dans src/index.ts — statut 404 inchangé. */
-export const notFoundHandler: NotFoundHandler<HonoEnv> = (c) =>
-  c.json(notFoundBody(c.req.method, new URL(c.req.url).pathname), 404);
+/**
+ * Les routes réelles et les méthodes qu'elles acceptent.
+ *
+ * Un 404 dit à une machine « ce point d'entrée n'existe pas » et elle s'arrête.
+ * Un 405 avec un en-tête `Allow` lui dit « bon chemin, mauvais verbe » dans un
+ * champ qu'elle sait exploiter sans lire la prose du corps.
+ *
+ * Mesuré dans `request_log` le 29/07/2026 — IP distinctes ayant appelé une
+ * route existante avec la mauvaise méthode et s'étant entendu répondre qu'elle
+ * n'existait pas : 93 sur `/v1/iban/validate`, 64 sur `/v1/iban/batch`, 25 sur
+ * `/v1/iban/compliance`, 24 sur `/v1/keys/generate`.
+ */
+const ROUTE_METHODS: Array<{ match: RegExp; allow: readonly string[] }> = [
+  { match: /^\/v1\/iban\/(validate|batch|compliance)\/?$/, allow: ['POST'] },
+  { match: /^\/v1\/keys\/generate\/?$/, allow: ['POST'] },
+  { match: /^\/v1\/bic\/[^/]+\/?$/, allow: ['GET'] },
+  { match: /^\/v1\/ch\/clearing\/[^/]+\/?$/, allow: ['GET'] },
+];
+
+/**
+ * `null` si le chemin est inconnu OU si la méthode est la bonne. Sinon les
+ * méthodes acceptées, pour l'en-tête `Allow`.
+ *
+ * On ne répond 405 que sur des chemins réellement montés : prétendre « bon
+ * chemin, mauvais verbe » sur une route inexistante enverrait l'agent réessayer
+ * indéfiniment, ce qui est pire qu'un 404 honnête.
+ */
+export function methodMismatch(method: string, path: string): { allow: readonly string[] } | null {
+  const route = ROUTE_METHODS.find((r) => r.match.test(path));
+  if (!route) return null;
+  if (route.allow.includes(method)) return null;
+  return { allow: route.allow };
+}
+
+/** Monté par `app.notFound(...)` dans src/index.ts. */
+export const notFoundHandler: NotFoundHandler<HonoEnv> = (c) => {
+  const path = new URL(c.req.url).pathname;
+  const method = c.req.method;
+  const body = notFoundBody(method, path);
+
+  const mismatch = methodMismatch(method, path);
+  if (mismatch) {
+    c.header('Allow', mismatch.allow.join(', '));
+    return c.json({ ...body, error: 'method_not_allowed', allow: mismatch.allow }, 405);
+  }
+
+  return c.json(body, 404);
+};

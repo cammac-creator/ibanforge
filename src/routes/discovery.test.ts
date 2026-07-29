@@ -157,3 +157,47 @@ describe('discovery — www-only pages probed on the api host', () => {
     });
   }
 });
+
+describe('discovery — second sweep, 2026-07-29', () => {
+  // The first sweep filtered the log too aggressively and missed these.
+  it('serves /mcp/.well-known/mcp, the sibling of the oauth probe (90 distinct IPs)', async () => {
+    const res = await makeApp().request('/mcp/.well-known/mcp');
+    expect(res.status).toBe(200);
+  });
+
+  it('points /swagger.json at the OpenAPI document (13 distinct IPs)', async () => {
+    const res = await makeApp().request('/swagger.json');
+    expect(res.status).toBe(301);
+    expect(res.headers.get('location')).toBe('/openapi.json');
+  });
+
+  it('points /api/openapi.json at the OpenAPI document (9 distinct IPs)', async () => {
+    const res = await makeApp().request('/api/openapi.json');
+    expect(res.status).toBe(301);
+    expect(res.headers.get('location')).toBe('/openapi.json');
+  });
+
+  it('points /sse at the MCP endpoint (14 distinct IPs on the legacy transport)', async () => {
+    const res = await makeApp().request('/sse');
+    expect(res.status).toBe(308);
+    expect(res.headers.get('location')).toBe('/mcp');
+  });
+
+  it('tolerates the trailing dot in /mcp. (23 distinct IPs, a client-side bug)', async () => {
+    const res = await makeApp().request('/mcp.');
+    expect(res.status).toBe(308);
+    expect(res.headers.get('location')).toBe('/mcp');
+  });
+
+  it('sends /favicon.ico to the site favicon (366 distinct IPs, the largest 404 we had)', async () => {
+    const res = await makeApp().request('/favicon.ico');
+    expect(res.status).toBe(301);
+    expect(res.headers.get('location')).toBe('https://ibanforge.com/favicon.ico');
+  });
+
+  it('sends /sitemap.xml to the site sitemap (36 distinct IPs)', async () => {
+    const res = await makeApp().request('/sitemap.xml');
+    expect(res.status).toBe(301);
+    expect(res.headers.get('location')).toBe('https://ibanforge.com/sitemap.xml');
+  });
+});

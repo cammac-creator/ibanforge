@@ -334,4 +334,36 @@ for (const lang of ['en', 'de', 'fr']) {
   discovery.get(`/${lang}/docs`, (c) => c.redirect(`https://ibanforge.com/${lang}/docs`, 302));
 }
 
+// ──────────────────────────────────────────────────────────────────────────────
+// Second sweep of the same log, 2026-07-29. The first pass filtered out
+// anything resembling a scanner probe and threw the baby out with it.
+// ──────────────────────────────────────────────────────────────────────────────
+
+// Sibling of the oauth probe fixed above: clients that append the well-known
+// segment to /mcp ask for both. 1,021 hits / 90 distinct IPs.
+discovery.get('/mcp/.well-known/mcp', (c) =>
+  c.json({
+    name: 'IBANforge',
+    url: 'https://api.ibanforge.com/mcp',
+    transport: 'streamable-http',
+    server_card: 'https://api.ibanforge.com/.well-known/mcp/server-card.json',
+  }),
+);
+
+// OpenAPI under the two names tooling reaches for besides /openapi.json.
+// 13 and 9 distinct IPs.
+discovery.get('/swagger.json', (c) => c.redirect('/openapi.json', 301));
+discovery.get('/api/openapi.json', (c) => c.redirect('/openapi.json', 301));
+
+// /sse is the pre-streamable MCP transport; /mcp. is a client-side bug that
+// leaves the trailing dot on. 14 and 23 distinct IPs. 308 keeps the method, so
+// a JSON-RPC POST survives the hop instead of degrading to GET.
+discovery.get('/sse', (c) => c.redirect('/mcp', 308));
+discovery.all('/mcp.', (c) => c.redirect('/mcp', 308));
+
+// Not agent discovery, but the two largest plain 404s on the service: 366 and
+// 36 distinct IPs. Both exist on the www host.
+discovery.get('/favicon.ico', (c) => c.redirect('https://ibanforge.com/favicon.ico', 301));
+discovery.get('/sitemap.xml', (c) => c.redirect('https://ibanforge.com/sitemap.xml', 301));
+
 export { discovery };
