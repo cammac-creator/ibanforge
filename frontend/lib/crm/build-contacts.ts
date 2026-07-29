@@ -262,17 +262,27 @@ export function buildContacts(input: BuildInput, now: Date = new Date()): Contac
   const claimed = new Set<string>();
 
   for (const [id, group] of keysByAddress) {
+    const { messages, draft, rowCount } = threadOf(id);
     // Pilots leave the candidate set BEFORE the ranking, never after: a pilot
     // that won an address and was then dropped would take an ordinary key on the
     // same address down with it, hiding someone the Clients page shows today.
-    const candidates = group.filter((row) => !isPilot(row));
+    const ordinary = group.filter((row) => !isPilot(row));
     // Every key an evaluation: the address is a pilot and emits nothing. It is
     // left unclaimed, so a pilot that is also a prospect still shows up on the
     // prospect side, exactly as the two old pages did between them.
+    //
+    // Unless we are already writing to them. That hand-off assumes a prospect
+    // row exists, and an unprompted signup has none: Raison.finance registered
+    // on 20/07/2026, spent its whole quota in one afternoon and got a reply from
+    // us, yet fell between the two sides and was invisible on 30/07/2026. Worse,
+    // raising their quota after they hit the wall is what turned them into a
+    // pilot and erased them. An open thread is the line, and it is also what
+    // separates this case from the nine outreach pilots we minted ourselves,
+    // which carry a couple of smoke-test calls and no correspondence at all.
+    const candidates = ordinary.length > 0 ? ordinary : rowCount > 0 ? group : [];
     if (candidates.length === 0) continue;
     const row = representativeKey(candidates);
     const isPaid = row.credits_total != null;
-    const { messages, draft, rowCount } = threadOf(id);
     // Same rule as the previous Clients page: hide keys that never did anything.
     // It reads the raw row count, not the datable messages, so a thread we can
     // display only partially still keeps its owner on the list.

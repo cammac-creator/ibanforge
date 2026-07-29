@@ -462,6 +462,20 @@ describe('buildContacts', () => {
     expect(out).toHaveLength(0);
   });
 
+  it('still lists an all-pilot address we are already in a thread with', () => {
+    // Raison.finance, 30/07/2026: signed up unprompted, burned its whole quota,
+    // we answered by mail. No prospect row, so the prospect side could not catch
+    // it either, and the hottest lead of the month was invisible in the CRM.
+    const out = buildContacts({
+      ...base,
+      keys: [keyRow('inthread@example.net', { monthly_limit: 5000, used_all_time: 200 })],
+      messages: [msgRow('inthread@example.net', { direction: 'out', msg_date: '2026-07-21T12:08' })],
+    });
+    expect(out).toHaveLength(1);
+    expect(out[0].id).toBe('inthread@example.net');
+    expect(out[0].kind).toBe('client');
+  });
+
   // --- One contact per address, and who represents it. ------------------------
 
   it('emits one client contact per address, not one per key', () => {
