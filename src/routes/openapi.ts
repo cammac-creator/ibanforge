@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { createRequire } from 'node:module';
 import { getEntryCount } from '../lib/bic-lookup.js';
+import { BANK_CODE_CHECK_SCHEMA } from '../lib/bank-code-schema.js';
 
 const openapi = new Hono();
 
@@ -843,8 +844,10 @@ const buildSpec = () => ({
             properties: {
               issuer_type: {
                 type: 'string',
-                enum: ['bank', 'digital_bank', 'emi', 'payment_institution'],
-                description: 'Type of the issuing institution (mirrors issuer.type for convenience)',
+                nullable: true,
+                enum: ['bank', 'digital_bank', 'emi', 'payment_institution', null],
+                description:
+                  'Type of the issuing institution (mirrors issuer.type for convenience). Null when the bank code resolved no institution — it used to default to "bank", which typed an institution that had not been found. Read bank_code_check to tell an unresolved code from a genuine bank.',
               },
               country_risk: {
                 type: 'string',
@@ -858,7 +861,14 @@ const buildSpec = () => ({
               },
               sepa_reachable: {
                 type: 'boolean',
-                description: 'Whether the IBAN can receive SEPA Credit Transfers',
+                description:
+                  'Whether SEPA Credit Transfers reach this COUNTRY. Derived from the country, not from the account: it stays true on an IBAN whose bank code resolved nothing. See sepa_reachable_scope.',
+              },
+              sepa_reachable_scope: {
+                type: 'string',
+                enum: ['country'],
+                description:
+                  'The scope sepa_reachable holds at. Present so the field cannot be read as an account-level assertion.',
               },
               vop_coverage: {
                 type: 'boolean',
@@ -866,8 +876,9 @@ const buildSpec = () => ({
                   'Whether the institution is covered by Verification of Payee, reducing payee impersonation risk',
               },
             },
-            required: ['issuer_type', 'country_risk', 'test_bic', 'sepa_reachable', 'vop_coverage'],
+            required: ['issuer_type', 'country_risk', 'test_bic', 'sepa_reachable', 'sepa_reachable_scope', 'vop_coverage'],
           },
+          bank_code_check: BANK_CODE_CHECK_SCHEMA,
         },
       },
       IBANFormatResult: {

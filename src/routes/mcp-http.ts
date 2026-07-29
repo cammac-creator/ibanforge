@@ -25,6 +25,34 @@ import { datasetFacts } from '../lib/dataset-facts.js';
 /** Dataset sizes, read once and rounded down so a claim cannot outlive its data. */
 const F = datasetFacts();
 
+/**
+ * The bank-code verdict, declared once and reused by all three tool schemas.
+ *
+ * An agent reading this needs the branch spelled out, because the difference
+ * between the three statuses is the difference between stopping a payment and
+ * letting it through: only `authoritative: true` turns `not_in_register` into
+ * evidence that the bank code does not exist.
+ */
+const BANK_CODE_CHECK_SCHEMA = z
+  .object({
+    value: z.string(),
+    status: z
+      .string()
+      .describe(
+        'verified | not_in_register | unavailable. A separate verdict on the bank code, so bic:null stops meaning three different things.',
+      ),
+    match: z.string().nullable().describe('register (exact key) | prefix (bic8 LIKE heuristic) | null'),
+    register: z.string().nullable(),
+    authoritative: z
+      .boolean()
+      .describe(
+        'True only where the reference set is the national register (CH, LI). Only then does not_in_register mean the code is not allocated.',
+      ),
+    candidates: z.number().optional().describe('BIC8 the prefix matched; >1 means the BIC may belong to another institution.'),
+    as_of: z.string(),
+  })
+  .optional();
+
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const pkg = JSON.parse(readFileSync(resolve(__dirname, '../../package.json'), 'utf-8'));
@@ -77,7 +105,8 @@ function createMcpServer(): McpServer {
         'tell you that the IBAN is a virtual IBAN issued by Wise/Revolut/Mercury/Modulr (compliance risk), or check SEPA reachability. ' +
         'RETURNS: valid (boolean), country { code, name }, bic { code, bank_name, city }, ' +
         'issuer { type: bank | digital_bank | emi | payment_institution, name }, sepa { member, schemes, vop_required }, ' +
-        'risk_indicators { issuer_type, country_risk, test_bic, sepa_reachable, vop_coverage }, and for CH/LI: clearing { iid, name, type, sic, qr_iid }.',
+        'risk_indicators { issuer_type (null when no institution resolved), country_risk, test_bic, sepa_reachable, sepa_reachable_scope, vop_coverage }, and for CH/LI: clearing { iid, name, type, sic, qr_iid }. ' +
+        'IMPORTANT — bic: null does not mean the bank code is wrong. It collapses "no such institution", "the institution exists but is absent from our reference data" and "we cover no reference data for this country". Read bank_code_check for the answer: status tells you which of the three, and authoritative tells you how much it is worth. Only where authoritative is true (today CH and LI, checked against the SIX BankMaster) does not_in_register mean the bank code is not allocated; everywhere else treat it as UNAVAILABLE and let the downstream name check decide. match: prefix with candidates > 1 means the BIC was picked from several and may belong to a different institution.',
       inputSchema: {
         iban: z.string().describe('IBAN to validate (spaces/hyphens stripped automatically)'),
       },
@@ -110,12 +139,14 @@ function createMcpServer(): McpServer {
           name: z.string(),
         }).optional(),
         risk_indicators: z.object({
-          issuer_type: z.string(),
+          issuer_type: z.string().nullable().describe('Null when no institution resolved — it no longer defaults to "bank".'),
           country_risk: z.string(),
           test_bic: z.boolean(),
           sepa_reachable: z.boolean(),
+          sepa_reachable_scope: z.string().describe('Scope the reachability holds at. Country-derived, not account-derived.'),
           vop_coverage: z.boolean(),
         }).optional(),
+        bank_code_check: BANK_CODE_CHECK_SCHEMA,
         clearing: z.object({
           iid: z.string(),
           name: z.string(),
@@ -178,12 +209,14 @@ function createMcpServer(): McpServer {
             vop_required: z.boolean(),
           }).optional(),
           risk_indicators: z.object({
-            issuer_type: z.string(),
+            issuer_type: z.string().nullable(),
             country_risk: z.string(),
             test_bic: z.boolean(),
             sepa_reachable: z.boolean(),
+            sepa_reachable_scope: z.string(),
             vop_coverage: z.boolean(),
           }).optional(),
+          bank_code_check: BANK_CODE_CHECK_SCHEMA,
           clearing: z.object({
             iid: z.string(),
             name: z.string(),
@@ -332,12 +365,14 @@ function createMcpServer(): McpServer {
           vop_required: z.boolean(),
         }).optional(),
         risk_indicators: z.object({
-          issuer_type: z.string(),
+          issuer_type: z.string().nullable().describe('Null when no institution resolved — it no longer defaults to "bank".'),
           country_risk: z.string(),
           test_bic: z.boolean(),
           sepa_reachable: z.boolean(),
+          sepa_reachable_scope: z.string().describe('Scope the reachability holds at. Country-derived, not account-derived.'),
           vop_coverage: z.boolean(),
         }).optional(),
+        bank_code_check: BANK_CODE_CHECK_SCHEMA,
         compliance: z.object({
           sanctions: z.object({
             country_sanctioned: z.boolean(),

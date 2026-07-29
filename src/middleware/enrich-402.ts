@@ -69,7 +69,16 @@ const DISCOVERY: Array<{ match: (m: string, p: string) => boolean; data: BazaarD
           country_risk: 'standard',
           test_bic: false,
           sepa_reachable: true,
+          sepa_reachable_scope: 'country',
           vop_coverage: false,
+        },
+        bank_code_check: {
+          value: '00230',
+          status: 'verified',
+          match: 'register',
+          register: 'SIX BankMaster (Swiss IID / BC-Nummer register)',
+          authoritative: true,
+          as_of: '2026-07',
         },
         clearing: {
           iid: '00230',
@@ -321,7 +330,16 @@ const PRICING: EndpointPricing[] = [
         country_risk: 'standard',
         test_bic: false,
         sepa_reachable: true,
+        sepa_reachable_scope: 'country',
         vop_coverage: false,
+      },
+      bank_code_check: {
+        value: '00230',
+        status: 'verified',
+        match: 'register',
+        register: 'SIX BankMaster (Swiss IID / BC-Nummer register)',
+        authoritative: true,
+        as_of: '2026-07',
       },
       clearing: {
         iid: '00230',

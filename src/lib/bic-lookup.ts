@@ -109,6 +109,21 @@ export interface BICRow {
   address_as_of: string | null;
 }
 
+/**
+ * A resolved bank code, carrying how it was resolved.
+ *
+ * The provenance is not decoration. Strategy 1 is an exact key; strategy 2 is a
+ * prefix search that can only fire where a bank code may open on a letter, and
+ * that may match several institutions at once.
+ */
+export interface BankLookupHit {
+  code: string;
+  bank_name: string | null;
+  city: string | null;
+  match: 'register' | 'prefix';
+  candidates?: number;
+}
+
 const bicCache = new LRUCache<BICRow | null>(2000);
 
 let stmtByBic11: Database.Statement | null = null;
@@ -190,7 +205,7 @@ export function getLastUpdated(): string | null {
 export function lookupByCountryBank(
   countryCode: string,
   bankCode: string,
-): { code: string; bank_name: string | null; city: string | null } | null {
+): BankLookupHit | null {
   // Strategy 1: exact key lookup in bic_data.json
   const data = getBicData();
   const key = `${countryCode}:${bankCode}`;
@@ -215,6 +230,7 @@ export function lookupByCountryBank(
       code: bic8,
       bank_name: bankName,
       city: cityName,
+      match: 'register',
     };
   }
 
@@ -237,7 +253,51 @@ export function lookupByCountryBank(
     | undefined;
 
   if (!row) return null;
-  return { code: row.bic8, bank_name: row.institution, city: row.city };
+
+  // How many institutions does this prefix actually match? The ORDER BY above
+  // makes the pick deterministic, not correct: 1,858 (country, prefix) pairs in
+  // this table match more than one BIC8, and in 65 British and 24 Dutch cases
+  // those BIC8 belong to different institutions (measured 29/07/2026). Returning
+  // the count lets a caller running a payment pre-flight downgrade the answer
+  // instead of trusting a coin flip.
+  const { n } = db
+    .prepare('SELECT COUNT(DISTINCT bic8) AS n FROM bic_entries WHERE country_code = ? AND bic8 LIKE ?')
+    .get(countryCode, bankCode + '%') as { n: number };
+
+  return { code: row.bic8, bank_name: row.institution, city: row.city, match: 'prefix', candidates: n };
+}
+
+/**
+ * Whether we hold any reference data at all for a country.
+ *
+ * This is what separates `not_in_register` from `unavailable`: the first says we
+ * looked and did not find, the second says we have nothing to look in. Collapsing
+ * them is the same mistake as collapsing everything into `bic: null`.
+ */
+const referenceDataCache = new Map<string, boolean>();
+
+export function countryHasReferenceData(countryCode: string): boolean {
+  const cached = referenceDataCache.get(countryCode);
+  if (cached !== undefined) return cached;
+
+  const prefix = `${countryCode}:`;
+  let has = Object.keys(getBicData()).some((k) => k.startsWith(prefix));
+  if (!has) {
+    const row = getBicDB()
+      .prepare('SELECT 1 AS hit FROM bic_entries WHERE country_code = ? LIMIT 1')
+      .get(countryCode) as { hit: number } | undefined;
+    has = !!row;
+  }
+  referenceDataCache.set(countryCode, has);
+  return has;
+}
+
+/**
+ * Year-month the BIC reference set was last refreshed, for dating the answer.
+ * Falls back to the empty string rather than inventing a date.
+ */
+export function getReferenceAsOf(): string {
+  return (getLastUpdated() ?? '').slice(0, 7);
 }
 
 /**

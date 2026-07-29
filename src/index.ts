@@ -258,7 +258,8 @@ Response (real API output, trimmed to the fields agents typically need):
   "issuer": { "type": "bank", "name": "UBS Switzerland AG" },
   "sepa": { "member": true, "schemes": ["SCT","SDD"], "vop_required": false },
   "clearing": { "iid": "00230", "name": "UBS Switzerland AG", "type": "bank", "town": "Zürich", "sic": true, "instant_payments_chf": true, "eurosic": true, "qr_iid": null },
-  "risk_indicators": { "issuer_type": "bank", "country_risk": "standard", "test_bic": false, "sepa_reachable": true, "vop_coverage": false }
+  "risk_indicators": { "issuer_type": "bank", "country_risk": "standard", "test_bic": false, "sepa_reachable": true, "sepa_reachable_scope": "country", "vop_coverage": false },
+  "bank_code_check": { "value": "00230", "status": "verified", "match": "register", "register": "SIX BankMaster (Swiss IID / BC-Nummer register)", "authoritative": true, "as_of": "2026-07" }
 }
 \`\`\`
 

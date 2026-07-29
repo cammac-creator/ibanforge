@@ -60,7 +60,11 @@ describe('enrichResult', () => {
     enrichResult(result);
 
     expect(result.risk_indicators).toBeDefined();
-    expect(result.risk_indicators!.issuer_type).toBe('bank');
+    // Was 'bank'. That default typed an institution the lookup had not found,
+    // and a caller could not tell it apart from a genuine bank — see
+    // bank-code-check.test.ts. The honest answer for an unresolved bank code is
+    // no answer.
+    expect(result.risk_indicators!.issuer_type).toBeNull();
     expect(result.risk_indicators!.sepa_reachable).toBe(false);
   });
 

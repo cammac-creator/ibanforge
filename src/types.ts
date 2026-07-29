@@ -40,6 +40,55 @@ export type OperationType = 'iban_validate' | 'iban_batch' | 'bic_lookup' | 'iba
 
 // --- IBAN Validation ---
 
+/**
+ * A separate verdict on the BBAN bank code, so that `bic: null` stops carrying
+ * three different meanings at once.
+ *
+ * `valid` answers ISO 13616 — structure and mod-97 arithmetic. It says nothing
+ * about whether the bank code inside the BBAN identifies anything. A payee
+ * pre-flight needs that second answer, and needs to know how much weight it may
+ * put on it, which is what `authoritative` and `match` are for.
+ *
+ * The status values are deliberately not `found` / `not_found`. For 87 of the 89
+ * IBAN countries our reference data is a composite map assembled from BIC
+ * directories, not the national bank-code register, so an absence there is
+ * evidence of nothing more than absence. Only Switzerland and Liechtenstein are
+ * checked against the register itself (SIX BankMaster), and only there does
+ * `not_in_register` mean the code is not allocated. That is what `authoritative`
+ * marks, and it is the flag to branch on.
+ */
+export interface BankCodeCheck {
+  /** The bank code taken from the BBAN, echoed so the caller can log it. */
+  value: string;
+  /**
+   * - `verified` — the bank code resolves to an institution we can name.
+   * - `not_in_register` — it does not, in reference data we do hold for this
+   *   country. Actionable as non-existence only when `authoritative` is true.
+   * - `unavailable` — we hold no reference data for this country. No opinion.
+   */
+  status: 'verified' | 'not_in_register' | 'unavailable';
+  /**
+   * How the answer was obtained, when there is one.
+   * - `register` — exact key in the reference set. Deterministic.
+   * - `prefix` — the fallback `bic8 LIKE bank_code%` search. Only reachable in
+   *   the 30 countries whose bank code may open on a letter, since a BIC8 always
+   *   does; see `candidates` for how many institutions the prefix matched.
+   */
+  match: 'register' | 'prefix' | null;
+  /** Human name of the reference set that was consulted. */
+  register: string | null;
+  /** True only where that reference set is the national register. */
+  authoritative: boolean;
+  /**
+   * Number of BIC8 the prefix search matched. Present only for `match: 'prefix'`.
+   * Greater than 1 means the returned BIC is one of several and may belong to a
+   * different institution than the account does.
+   */
+  candidates?: number;
+  /** Year-month the consulted reference set was last refreshed. */
+  as_of: string;
+}
+
 export interface IBANValidationResult {
   iban: string;
   valid: boolean;
@@ -68,12 +117,23 @@ export interface IBANValidationResult {
     name: string;
   };
   risk_indicators?: {
-    issuer_type: 'bank' | 'digital_bank' | 'emi' | 'payment_institution';
+    /**
+     * Null when no institution resolved. It used to default to 'bank', which
+     * asserted a type for an institution we had not found — the one reading a
+     * payee pre-flight must never be given.
+     */
+    issuer_type: 'bank' | 'digital_bank' | 'emi' | 'payment_institution' | null;
     country_risk: 'standard' | 'elevated' | 'high';
     test_bic: boolean;
     sepa_reachable: boolean;
+    /**
+     * The scope `sepa_reachable` is true at. It is derived from the country, not
+     * from the account, and the name alone invited an account-level reading.
+     */
+    sepa_reachable_scope: 'country';
     vop_coverage: boolean;
   };
+  bank_code_check?: BankCodeCheck;
   clearing?: ChClearingSummary | null;
   formatted?: string;
   error?: 'invalid_format' | 'unsupported_country' | 'wrong_length' | 'checksum_failed' | 'invalid_check_digits' | 'invalid_bban_structure';

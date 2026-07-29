@@ -2,6 +2,7 @@ import type { MiddlewareHandler } from 'hono';
 import { createRequire } from 'node:module';
 import type { HonoEnv } from '../types.js';
 import { datasetFacts } from '../lib/dataset-facts.js';
+import { BANK_CODE_CHECK_SCHEMA as BANK_CODE_CHECK_OPENAPI } from '../lib/bank-code-schema.js';
 
 const require = createRequire(import.meta.url);
 const pkg = require('../../package.json') as { version: string };
@@ -214,13 +215,24 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
             type: 'object',
             description: 'AML/CFT pre-screening indicators.',
             properties: {
-              issuer_type: { type: 'string', enum: ['bank', 'digital_bank', 'emi', 'payment_institution'] },
+              issuer_type: {
+                type: 'string',
+                nullable: true,
+                enum: ['bank', 'digital_bank', 'emi', 'payment_institution', null],
+                description: 'Null when no institution resolved. It no longer defaults to "bank" for an institution we did not find.',
+              },
               country_risk: { type: 'string', enum: ['standard', 'elevated', 'high'] },
               test_bic: { type: 'boolean' },
               sepa_reachable: { type: 'boolean' },
+              sepa_reachable_scope: {
+                type: 'string',
+                enum: ['country'],
+                description: 'Scope sepa_reachable holds at. Derived from the country, never from the account.',
+              },
               vop_coverage: { type: 'boolean' },
             },
           },
+          bank_code_check: BANK_CODE_CHECK_OPENAPI,
           clearing: {
             type: 'object',
             description: 'Swiss clearing data when country is CH or LI and the IID is in the SIX BankMaster. Null otherwise.',
