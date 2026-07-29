@@ -832,19 +832,26 @@ const buildSpec = () => ({
             properties: {
               type: {
                 type: 'string',
-                enum: ['bank', 'digital_bank', 'emi', 'payment_institution'],
+                nullable: true,
+                enum: ['bank', 'digital_bank', 'emi', 'payment_institution', null],
                 description:
-                  'Type of financial institution (bank = traditional bank, digital_bank = neobank/challenger, emi = Electronic Money Institution, payment_institution = licensed PI)',
+                  'Type of financial institution (bank = traditional bank, digital_bank = neobank/challenger, emi = Electronic Money Institution, payment_institution = licensed PI). Null when we hold no support for a type: falling back to bank would be an assertion, and a payee pre-flight must not be handed one.',
               },
               name: {
                 type: 'string',
-                description: 'Name of the issuing institution',
+                description: 'Name of the institution holding this BIC',
               },
               classification: {
                 type: 'string',
                 enum: ['curated', 'default'],
                 description:
-                  "Whether the type was established or assumed. curated = the BIC8 is in the issuer set, so this is an identification. default = nothing is on file and 'bank' is the fallback, which covers 47,356 of 48,386 distinct BIC8 (97.9%, measured 29/07/2026). When sizing exposure to virtual IBANs, count only curated.",
+                  "Whether the type was established or assumed. curated = the BIC8 is in the issuer set, so this is an identification. default = nothing is on file and 'bank' is the fallback, which covers 42,195 of 43,199 distinct BIC8 (97.7%, recounted 29/07/2026; the count drifts at every monthly refresh). When sizing exposure to virtual IBANs, count only curated.",
+              },
+              iban_issuer: {
+                type: 'string',
+                enum: ['confirmed', 'not_listed'],
+                description:
+                  "Whether the country's own list of IBAN-issuing providers names the holder of this bank code. Present only where such a list exists, today NL. confirmed = the identifier belongs to a provider that issues IBANs. not_listed = it resolves to a BIC, but the holder is not among the known issuers, so the account may not exist: measured 29/07/2026, only 90 of our 815 Dutch codes are on that list and the rest resolve to corporate treasuries that hold a Dutch BIC for their own SWIFT traffic. NOT a denial, because the Dutch list is explicitly not exhaustive, which is also why NL keeps bank_code_check.authoritative false.",
               },
             },
             required: ['type', 'name', 'classification'],

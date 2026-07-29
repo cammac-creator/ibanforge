@@ -66,7 +66,7 @@ export const NEXT_STEPS_SCHEMA = {
       code: {
         type: 'string',
         description:
-          'Stable identifier. Today: bank_code_not_allocated (the national register denies the code, do not send), bank_code_retired (allocated but being withdrawn, re-paper against superseded_by), verify_payee_name (we cannot confirm it, treat as unavailable and let a name check decide), bic_is_advisory (the BIC was picked from several candidates), test_bic, expect_virtual_iban (curated non-bank issuer, account holder and IBAN holder often differ), screen_compliance.',
+          'Stable identifier. Today: bank_code_not_allocated (the national register denies the code, do not send), bank_code_retired (allocated but being withdrawn, re-paper against superseded_by), verify_payee_name (we cannot confirm it, treat as unavailable and let a name check decide), bic_is_advisory (the BIC was picked from several candidates), issuer_not_a_known_iban_issuer (the code resolves to a BIC, but its holder is not among the providers known to issue IBANs in that country), test_bic, expect_virtual_iban (curated non-bank issuer, account holder and IBAN holder often differ), screen_compliance.',
       },
       do: { type: 'string', description: 'The instruction, in one sentence an agent can relay to a person.' },
       because: { type: 'string', description: 'The field of this response that produced the step, so the advice is auditable.' },

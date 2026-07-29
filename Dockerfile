@@ -18,6 +18,7 @@ RUN npm ci --omit=dev
 
 COPY --from=builder /app/dist/ dist/
 COPY src/db/bic_data.json dist/db/bic_data.json
+COPY src/db/nl-psp.json dist/db/nl-psp.json
 
 # Seed read-only databases to staging dir (NOT the volume mount point)
 COPY data/bic.sqlite data/compliance.sqlite data-seed/

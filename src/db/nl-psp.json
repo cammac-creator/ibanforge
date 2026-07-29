@@ -1,0 +1,382 @@
+{
+  "source": "https://www.betaalvereniging.nl/wp-content/uploads/2026/03/BIC-lijst-NL-2.xlsx",
+  "as_of": "2026-06-19",
+  "providers": {
+    "ABNA": {
+      "bic": "ABNANL2A",
+      "name": "ABN AMRO BANK N.V."
+    },
+    "ABNC": {
+      "bic": "ABNCNL2A",
+      "name": "ABN AMRO Clearing Bank N.V."
+    },
+    "ADYB": {
+      "bic": "ADYBNL2A",
+      "name": "ADYEN"
+    },
+    "AEGO": {
+      "bic": "AEGONL2U",
+      "name": "AEGON BANK"
+    },
+    "AINH": {
+      "bic": "AINHNL22",
+      "name": "AIRWALLEX (NETHERLANDS) B.V."
+    },
+    "ANDL": {
+      "bic": "ANDLNL2A",
+      "name": "ANADOLUBANK"
+    },
+    "ARBN": {
+      "bic": "ARBNNL22",
+      "name": "ACHMEA BANK"
+    },
+    "ARSN": {
+      "bic": "ARSNNL21",
+      "name": "ARGENTA SPAARBANK"
+    },
+    "ASNB": {
+      "bic": "ASNBNL21",
+      "name": "ASN BANK"
+    },
+    "BARC": {
+      "bic": "BARCNL22",
+      "name": "BARCLAYS BANK"
+    },
+    "BCIT": {
+      "bic": "BCITNL2A",
+      "name": "INTESA SANPAOLO"
+    },
+    "BICK": {
+      "bic": "BICKNL2A",
+      "name": "BINCKBANK"
+    },
+    "BINK": {
+      "bic": "BINKNL21",
+      "name": "BINCKBANK, PROF"
+    },
+    "BITS": {
+      "bic": "BITSNL2A",
+      "name": "BITSAFE PAYMENTS"
+    },
+    "BKCH": {
+      "bic": "BKCHNL2R",
+      "name": "BANK OF CHINA"
+    },
+    "BKMG": {
+      "bic": "BKMGNL2A",
+      "name": "BANK MENDES GANS"
+    },
+    "BLGW": {
+      "bic": "BLGWNL21",
+      "name": "BLG WONEN"
+    },
+    "BNDA": {
+      "bic": "BNDANL2A",
+      "name": "BRAND NEW DAY BANK"
+    },
+    "BNGH": {
+      "bic": "BNGHNL2G",
+      "name": "BANK NEDERLANDSE GEMEENTEN"
+    },
+    "BNPA": {
+      "bic": "BNPANL2A",
+      "name": "BNP PARIBAS"
+    },
+    "BOFA": {
+      "bic": "BOFANLNX",
+      "name": "BANK OF AMERICA"
+    },
+    "BOFS": {
+      "bic": "BOFSNL21",
+      "name": "BANK OF SCOTLAND, Amsterdam"
+    },
+    "BOTK": {
+      "bic": "BOTKNL2X",
+      "name": "MUFG BANK"
+    },
+    "BUKK": {
+      "bic": "BUKKNL22",
+      "name": "BUCKAROO B.V."
+    },
+    "BUNQ": {
+      "bic": "BUNQNL2A",
+      "name": "BUNQ"
+    },
+    "BUUT": {
+      "bic": "BUUTNL2A",
+      "name": "ABN AMRO BANK N.V."
+    },
+    "CCBV": {
+      "bic": "CCBVNL2A",
+      "name": "CURRENCYCLOUD B.V."
+    },
+    "CEPA": {
+      "bic": "CEPANL2A",
+      "name": "CAISSE D'EPARGNE, Netherlands"
+    },
+    "CHAS": {
+      "bic": "CHASNL2X",
+      "name": "JPMORGAN CHASE"
+    },
+    "CITC": {
+      "bic": "CITCNL2A",
+      "name": "CITCO BANK"
+    },
+    "CITI": {
+      "bic": "CITINL2X",
+      "name": "CITIBANK INTERNATIONAL"
+    },
+    "CLRB": {
+      "bic": "CLRBNL2A",
+      "name": "CLEARBANK EUROPE N.V."
+    },
+    "COBA": {
+      "bic": "COBANL2X",
+      "name": "COMMERZBANK"
+    },
+    "DELE": {
+      "bic": "DELENL22",
+      "name": "DELEN PRIVATE BANK NEDERLAND"
+    },
+    "DEUT": {
+      "bic": "DEUTNL2A",
+      "name": "DEUTSCHE BANK (bij alle SEPA-transacties)"
+    },
+    "DHBN": {
+      "bic": "DHBNNL2R",
+      "name": "DEMIR-HALK BANK"
+    },
+    "DNIB": {
+      "bic": "DNIBNL2G",
+      "name": "NIBC"
+    },
+    "EBPB": {
+      "bic": "EBPBNL22",
+      "name": "EBURY NETHERLANDS (Brussel entiteit)"
+    },
+    "EBUR": {
+      "bic": "EBURNL21",
+      "name": "EBURY NETHERLANDS (Londen entiteit)"
+    },
+    "FBHL": {
+      "bic": "FBHLNL2A",
+      "name": "NEXENT BANK N.V."
+    },
+    "FIRH": {
+      "bic": "FIRHNL22",
+      "name": "FIAT REPUBLIC NETHERLANDS B.V."
+    },
+    "FLOR": {
+      "bic": "FLORNL2A",
+      "name": "DE NEDERLANDSCHE BANK"
+    },
+    "FNOM": {
+      "bic": "FNOMNL22",
+      "name": "FINOM Payments B.V."
+    },
+    "FRNX": {
+      "bic": "FRNXNL2A",
+      "name": "FRANX"
+    },
+    "FROM": {
+      "bic": "FROMNL2A",
+      "name": "FROMENTY AND CUSTARD E-COMMERCE"
+    },
+    "FVLB": {
+      "bic": "FVLBNL22",
+      "name": "VAN LANSCHOT"
+    },
+    "FXBB": {
+      "bic": "FXBBNL22",
+      "name": "IBANFIRST"
+    },
+    "GILL": {
+      "bic": "GILLNL2A",
+      "name": "INSINGERGILISSEN"
+    },
+    "GOLD": {
+      "bic": "GOLDNL2A",
+      "name": "GOLDMAN SACHS BANK EUROPE SE, AMSTERDAM BRANCH"
+    },
+    "HAND": {
+      "bic": "HANDNL2A",
+      "name": "SVENSKA HANDELSBANKEN"
+    },
+    "HIFX": {
+      "bic": "HIFXNL2A",
+      "name": "XE EUROPE BV"
+    },
+    "HLGT": {
+      "bic": "HLGTNL22",
+      "name": "HILLGATE FINANCE B.V."
+    },
+    "HUSH": {
+      "bic": "HUSHNL2A",
+      "name": "HUSHPAY"
+    },
+    "HSBC": {
+      "bic": "HSBCNL2A",
+      "name": "HSBC BANK"
+    },
+    "ICBC": {
+      "bic": "ICBCNL2A",
+      "name": "MEGA INTERNATIONAL COMMERCIAL BANK"
+    },
+    "ICBK": {
+      "bic": "ICBKNL2A",
+      "name": "INDUSTRIAL & COMMERCIAL BANK OF CHINA"
+    },
+    "ICEP": {
+      "bic": "ICEPNL21",
+      "name": "ICEPAY"
+    },
+    "INGB": {
+      "bic": "INGBNL2A",
+      "name": "ING"
+    },
+    "ISAE": {
+      "bic": "ISAENL2A",
+      "name": "CACEIS BANK, Netherlands Branch"
+    },
+    "ISBK": {
+      "bic": "ISBKNL2A",
+      "name": "ISBANK"
+    },
+    "KABA": {
+      "bic": "KABANL2A",
+      "name": "YAPI KREDI BANK"
+    },
+    "KNAB": {
+      "bic": "KNABNL2H",
+      "name": "KNAB"
+    },
+    "KOEX": {
+      "bic": "KOEXNL2A",
+      "name": "KEB HANA BANK"
+    },
+    "KRED": {
+      "bic": "KREDNL2X",
+      "name": "KBC BANK"
+    },
+    "LOYD": {
+      "bic": "LOYDNL2A",
+      "name": "LLOYDS TSB BANK"
+    },
+    "LPLN": {
+      "bic": "LPLNNL2F",
+      "name": "LEASEPLAN CORPORATION"
+    },
+    "MHCB": {
+      "bic": "MHCBNL2A",
+      "name": "MIZUHO BANK EUROPE NV"
+    },
+    "MLLE": {
+      "bic": "MLLENL2A",
+      "name": "MOLLIE B.V."
+    },
+    "MODR": {
+      "bic": "MODRNL22",
+      "name": "MODULR FINANCE B.V."
+    },
+    "NNBA": {
+      "bic": "NNBANL2G",
+      "name": "NATIONALE-NEDERLANDEN BANK"
+    },
+    "NWAB": {
+      "bic": "NWABNL2G",
+      "name": "NEDERLANDSE WATERSCHAPSBANK"
+    },
+    "PANX": {
+      "bic": "PANXNL22",
+      "name": "UNIFIEDPOST PAYMENTS"
+    },
+    "PCBC": {
+      "bic": "PCBCNL2A",
+      "name": "CHINA CONSTRUCTION BANK, Amsterdam Branch"
+    },
+    "PNOW": {
+      "bic": "PNOWNL2A",
+      "name": "PAY NOW"
+    },
+    "PYNL": {
+      "bic": "PYNLNL22",
+      "name": "PAY.NL"
+    },
+    "QNTO": {
+      "bic": "QNTONL22",
+      "name": "QONTO"
+    },
+    "RABO": {
+      "bic": "RABONL2U",
+      "name": "RABOBANK"
+    },
+    "RBRB": {
+      "bic": "RBRBNL21",
+      "name": "REGIOBANK"
+    },
+    "REVO": {
+      "bic": "REVONL22",
+      "name": "REVOLUT BANK UAB"
+    },
+    "SBOS": {
+      "bic": "SBOSNL2A",
+      "name": "STATE STREET BANK INTERNATIONAL GbmH"
+    },
+    "SNSB": {
+      "bic": "SNSBNL2A",
+      "name": "ASN BANK"
+    },
+    "SOGE": {
+      "bic": "SOGENL2A",
+      "name": "SOCIETE GENERALE"
+    },
+    "SWNB": {
+      "bic": "SWNBNL22",
+      "name": "SWAN"
+    },
+    "TRBK": {
+      "bic": "TRBKNL2A",
+      "name": "TRADE REPUBLIC BANK GmbH, Netherlands Branch"
+    },
+    "TRIO": {
+      "bic": "TRIONL2U",
+      "name": "TRIODOS BANK"
+    },
+    "UGBI": {
+      "bic": "UGBINL2A",
+      "name": "GARANTIBANK INTERNATIONAL"
+    },
+    "VOWA": {
+      "bic": "VOWANL21",
+      "name": "VOLKSWAGEN BANK"
+    },
+    "VTPS": {
+      "bic": "VTPSNL2R",
+      "name": "VITESSE PSP"
+    },
+    "VVID": {
+      "bic": "VVIDNL22",
+      "name": "VIVID MONEY SA, Netherlands Branch"
+    },
+    "WOFT": {
+      "bic": "WOFTNL22",
+      "name": "WORLD FIRST NETHERLANDS B.V."
+    },
+    "XTAF": {
+      "bic": "XTAFNL2A",
+      "name": "XTRANSFER B.V."
+    },
+    "YABN": {
+      "bic": "YABNNL22",
+      "name": "YABANDPAY B.V."
+    },
+    "YOUR": {
+      "bic": "YOURNL2A",
+      "name": "YOURSAFE B.V."
+    },
+    "ZWLB": {
+      "bic": "ZWLBNL21",
+      "name": "VOLKSBANK N.V. ( ex ZWITSERLEVENBANK)"
+    }
+  }
+}

@@ -106,6 +106,21 @@ export function nextSteps(result: IBANValidationResult): NextStep[] {
     });
   }
 
+  // 3b. The bank code resolved, but the country's own list of IBAN-issuing
+  //     providers does not name its holder. Measured 29/07/2026, only 90 of our
+  //     815 Dutch keys are on that list; the rest resolve to corporate
+  //     treasuries that hold a Dutch BIC for their own SWIFT traffic and issue
+  //     no IBANs at all. Not a denial, since the list is not exhaustive, but a
+  //     resolved BIC is no longer allowed to pass for a confirmed bank.
+  if (issuer?.iban_issuer === 'not_listed') {
+    steps.push({
+      code: 'issuer_not_a_known_iban_issuer',
+      do:
+        'Do not treat this as a confirmed bank. The code resolves to a BIC, but its holder is not among the providers known to issue IBANs in this country, so the account may not exist. Verify the payee by name before sending.',
+      because: 'issuer.iban_issuer is not_listed, so the BIC holder is not a known IBAN issuer',
+    });
+  }
+
   // 4. Ours to offer, and only once the account itself is not in doubt.
   if (check?.status === 'verified') {
     steps.push({

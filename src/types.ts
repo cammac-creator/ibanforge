@@ -125,8 +125,22 @@ export interface IBANValidationResult {
     vop_required: boolean;
   };
   issuer?: {
-    type: 'bank' | 'digital_bank' | 'emi' | 'payment_institution';
+    /**
+     * Null when we hold no support for a type. Falling back to 'bank' would be
+     * an assertion, and a payee pre-flight must not be handed one.
+     */
+    type: 'bank' | 'digital_bank' | 'emi' | 'payment_institution' | null;
     name: string;
+    /**
+     * Whether the country's own list of IBAN-issuing providers names the holder
+     * of this bank code. Present only where such a list exists (today NL).
+     *
+     * - `confirmed` — the identifier belongs to a provider that issues IBANs.
+     * - `not_listed` — it resolves to a BIC, but the holder is not among the
+     *   known issuers, so it may issue no IBANs at all. NOT a denial: the Dutch
+     *   list is explicitly not exhaustive.
+     */
+    iban_issuer?: 'confirmed' | 'not_listed';
     /**
      * Whether the type was established or assumed.
      * - `curated` — the BIC8 is in the issuer set; this is an identification.

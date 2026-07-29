@@ -8,6 +8,7 @@ import { lookupByCountryBank, countryHasReferenceData, getReferenceAsOf } from '
 import { classifyIssuer } from './issuers.js';
 import { lookupFiInstitution } from './fi-register.js';
 import { lookupNationalCode, nationalRegisterAvailable } from './national-registers.js';
+import { lookupNlPsp } from './nl-psp.js';
 import { getCountryRisk } from './countries.js';
 import { lookupClearingByBankCode } from './ch-clearing.js';
 import { blzRegisterAvailable, lookupBlz } from './de-blz.js';
@@ -216,6 +217,24 @@ export function enrichResult(result: IBANValidationResult): void {
     result.issuer = known
       ? { ...known, classification: 'curated' }
       : { type: 'bank', name: result.bic.bank_name ?? 'Unknown', classification: 'default' };
+
+    // Does the country's own list of IBAN-issuing providers name this holder?
+    //
+    // Only the Netherlands publishes one today, and it exists because the Dutch
+    // bank code is an identifier handed to a provider BECAUSE it issues IBANs.
+    // Holding a Dutch BIC is a different fact: measured 29/07/2026, only 90 of
+    // our 815 Dutch keys are on that list, and a fabricated IBAN carrying SHEL
+    // was served as a bank named SHELL ASSET MANAGEMENT COMPANY B.V.
+    //
+    // 'not_listed' drops the type to null rather than denying the code. The
+    // list is not exhaustive, so absence is not proof of non-issuance; but
+    // 'bank' was an assertion we could not support, which is the same defect
+    // this file already fixed one layer down for unresolved bank codes.
+    if (cc === 'NL') {
+      const listed = lookupNlPsp(bankCode);
+      result.issuer.iban_issuer = listed ? 'confirmed' : 'not_listed';
+      if (!listed && result.issuer.classification === 'default') result.issuer.type = null;
+    }
   }
 
   result.risk_indicators = {

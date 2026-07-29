@@ -6,6 +6,7 @@ import { LRUCache } from './cache.js';
 import type Database from 'better-sqlite3';
 import { lookupFiInstitution } from './fi-register.js';
 import { allocatedCodes, nationalRegisterAvailable, normaliseCode } from './national-registers.js';
+import { nlPspEntries } from './nl-psp.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -180,12 +181,35 @@ function pruneStaleNationalCodes(data: Record<string, BicDataEntry>): Record<str
   return data;
 }
 
+/**
+ * Add the Dutch providers the curated map does not carry.
+ *
+ * The other direction of the same finding: our Dutch keys are derived from the
+ * BIC directory, so a provider we hold no BIC for is simply missing. Measured
+ * 29/07/2026 on production, HLGT and PYNL are on Betaalvereniging's published
+ * list and came back not_in_register with no BIC. We were turning away two real
+ * Dutch banks.
+ *
+ * Existing entries win: the list is a supplement here, and 90 of the 90 codes
+ * the two sources share already agree on the BIC, so there is nothing to
+ * arbitrate.
+ */
+function addListedDutchProviders(data: Record<string, BicDataEntry>): Record<string, BicDataEntry> {
+  for (const [code, provider] of nlPspEntries()) {
+    const key = `NL:${code}`;
+    if (!data[key]) data[key] = { bic: provider.bic, bank_name: provider.name };
+  }
+  return data;
+}
+
 function getBicData(): Record<string, BicDataEntry> {
   if (!bicDataCache) {
     const require = createRequire(import.meta.url);
     const raw = require(resolve(__dirname, '../db/bic_data.json')) as Record<string, BicDataEntry>;
-    bicDataCache = pruneStaleNationalCodes(
-      pruneStaleFinnishCodes(pruneStaleGermanCodes(pruneStaleSwissCodes({ ...raw }))),
+    bicDataCache = addListedDutchProviders(
+      pruneStaleNationalCodes(
+        pruneStaleFinnishCodes(pruneStaleGermanCodes(pruneStaleSwissCodes({ ...raw }))),
+      ),
     );
   }
   return bicDataCache;
