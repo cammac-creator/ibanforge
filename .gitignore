@@ -33,3 +33,4 @@ scripts/x402-pay.mjs
 
 # Worktrees de sessions parallèles Claude Code — jamais dans le dépôt
 .claude/
+.exam.mjs

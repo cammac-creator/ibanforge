@@ -106,15 +106,20 @@ describe('INTERNAL_RE', () => {
   });
 
   it('leaves a genuine customer alone', () => {
-    // Every one of these is a real key holder as of 29/07/2026.
+    // The shapes real key holders actually arrive in, not the addresses
+    // themselves: a customer list does not belong in a public repository, and
+    // the filter has no idea who anyone is. It reads the local part and the
+    // domain, so exercising the shapes is what tests it. Each of these has a
+    // trait that has caused a false positive somewhere: a role-style local part
+    // ('admin', 'developer'), a dotted one, a hyphenated domain, a short novel
+    // TLD, and a plain free-mail address.
     for (const real of [
-      'customer-b@example.com',
-      'customer-c@example.com',
-      'ladislav.proc@onsaplus.eu',
-      'developer@calyx-solutions.com',
-      'koopkoa@gmail.com',
-      'customer-a@example.com',
-      'petteri@asterpay.io',
+      'bankdesk@nordvik.no',
+      'mgwenabab@gmail.com',
+      'petr.novak@ledgerworks.eu',
+      'developer@meridian-systems.com',
+      'admin@verity.ai',
+      'treasury@northwind-pay.io',
     ]) {
       expect(INTERNAL_RE.test(real), real).toBe(false);
     }

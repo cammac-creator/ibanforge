@@ -8,10 +8,9 @@
 
 ## 1. Contexte & motivation
 
-Premier utilisateur organique réel d'IBANforge : **Customer N** (`customer-n.example`, secteur bancaire), via
-`nc.sls@customer-n.example`. Cas d'usage déclaré : *« auto filling for Odoo CRM system »* — ils
-auto-remplissent des coordonnées bancaires dans Odoo à partir d'un IBAN, intégration câblée
-eux-mêmes via Claude (« everything works fine »).
+Premier utilisateur organique réel d'IBANforge, un acteur du secteur bancaire. Cas d'usage
+déclaré : auto-remplissage de coordonnées bancaires dans Odoo à partir d'un IBAN, intégration
+câblée par leurs soins.
 
 Ce module n'est **pas** une demande explicite du client (son intégration directe lui suffit) :
 c'est un **pari de distribution**. L'Odoo App Store touche des millions de PME **non-crypto** —

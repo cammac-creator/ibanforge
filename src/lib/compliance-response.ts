@@ -59,7 +59,7 @@ export function buildComplianceResponse(iban: string): ComplianceResponse {
   // The bank-code verdict enrichResult already computed, fed into the score.
   // Until 29/07/2026 this endpoint ignored it and scored a fabricated bank code
   // exactly like Commerzbank, while next_steps routed callers here from the
-  // endpoint that had stopped guessing. AsterPay caught it by reading the two
+  // endpoint that had stopped guessing. A pilot customer caught it by reading the two
   // payloads against each other.
   const check = result.bank_code_check;
   const bankCode: BankCodeConfidence =

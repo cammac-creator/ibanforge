@@ -47,7 +47,7 @@ export function checkVop(bic8: string | null): VopCheck {
  * How much the bank code itself could be confirmed, which the score used to
  * ignore entirely.
  *
- * AsterPay put it precisely: next_steps routed a caller from the endpoint that
+ * A pilot customer put it precisely: next_steps routed a caller from the endpoint that
  * had stopped guessing to the one that still did, without telling them. An
  * unresolved bank code scored as an ordinary bank, which is 0 added risk, so a
  * fabricated Bankleitzahl and Commerzbank came out the same.

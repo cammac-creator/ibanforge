@@ -7,7 +7,7 @@
  * not allocated, and it may only be made where we hold the national register
  * itself. Until now that was Switzerland alone, via SIX BankMaster. Germany was
  * checked against a composite map assembled from BIC directories, so a German
- * miss meant "absent from our data" and nothing more. That is the gap AsterPay
+ * miss meant "absent from our data" and nothing more. That is the gap a pilot customer
  * named as the one that mattered, and Germany is their largest settlement
  * corridor.
  *
@@ -20,7 +20,7 @@
  * ## Deleted codes and successors
  *
  * 75 BLZ carry a deletion mark and 34 of those name a successor. A merged or
- * renamed bank is precisely the failure mode AsterPay put on their own edge-case
+ * renamed bank is precisely the failure mode a pilot customer put on their own edge-case
  * list and the one case I had no verifiable example for. Those rows are kept,
  * not dropped: a retired BLZ was really allocated, and answering
  * `not_in_register` for it would be a worse lie than answering `verified`

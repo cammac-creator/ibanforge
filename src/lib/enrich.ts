@@ -154,7 +154,9 @@ export function enrichResult(result: IBANValidationResult): void {
   // Issuer classification — BIC8 exact match, then institution-name fallback
   if (result.bic) {
     // 'bank' is the fallback for every BIC8 the curated set does not name, which
-    // is 47,356 of 48,386 (97.9%, measured 29/07/2026). Mostly right, and still
+    // is 42,195 of 43,199 (97.7%, recounted 29/07/2026 against bic_entries; the
+    // count drifts at every monthly refresh, so re-measure before quoting it).
+    // Mostly right, and still
     // an assumption dressed as a determination — the same defect as defaulting
     // issuer_type on an unresolved bank code, one layer down. Saying which of
     // the two it is costs one field and lets a caller sizing virtual-IBAN

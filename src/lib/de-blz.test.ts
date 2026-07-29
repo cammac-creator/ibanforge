@@ -18,7 +18,7 @@ describe('Germany answers from the Bundesbank register', () => {
   });
 
   it('now says a fabricated Bankleitzahl does not exist', () => {
-    // The gap AsterPay named. Until the register was ingested this answered
+    // The gap a pilot customer named. Until the register was ingested this answered
     // not_in_register with authoritative false, meaning "absent from our data",
     // which they could only treat as UNAVAILABLE. It is now a fact.
     const r = check('DE44999999990532013000');

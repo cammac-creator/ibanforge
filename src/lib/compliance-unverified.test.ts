@@ -9,7 +9,7 @@ function compliance(iban: string) {
 }
 
 /**
- * AsterPay's observation, in their words: "on a verified result, next_steps
+ * A pilot customer's observation, in their words: "on a verified result, next_steps
  * points to POST /v1/iban/compliance, the endpoint you just told me still scores
  * unresolved issuers as ordinary banks. Anyone reading only the payload gets
  * routed from the endpoint that stopped guessing to the one that still does,

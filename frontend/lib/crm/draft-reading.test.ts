@@ -5,13 +5,13 @@ import type { Message } from './types';
 function draft(over: Partial<Message> = {}): Message {
   return {
     id: 'd1',
-    customer_email: 'petteri@asterpay.io',
+    customer_email: 'pilot@example.com',
     direction: 'draft',
     msg_date: '2026-07-29T09:00',
     subject: 'Re: The payee half of your KYA check',
     snippet: null,
-    body: 'Hi Petteri, your three-layer split is right.',
-    snippet_fr: 'Bonjour Petteri, votre découpage en trois couches est juste.',
+    body: 'Hi Alex, your three-layer split is right.',
+    snippet_fr: 'Bonjour Alex, votre découpage en trois couches est juste.',
     lang: 'en',
     ...over,
   } as Message;
@@ -20,14 +20,14 @@ function draft(over: Partial<Message> = {}): Message {
 describe('draftReading', () => {
   it('shows the translation by default when one exists', () => {
     const r = draftReading(draft(), false);
-    expect(r.text).toMatch(/^Bonjour Petteri/);
+    expect(r.text).toMatch(/^Bonjour Alex/);
     expect(r.isTranslation).toBe(true);
     expect(r.canTranslate).toBe(true);
   });
 
   it('shows the body that would actually be sent when the operator asks for the original', () => {
     const r = draftReading(draft(), true);
-    expect(r.text).toMatch(/^Hi Petteri/);
+    expect(r.text).toMatch(/^Hi Alex/);
     expect(r.isTranslation).toBe(false);
   });
 
@@ -35,7 +35,7 @@ describe('draftReading', () => {
     const r = draftReading(draft({ lang: 'fr', snippet_fr: 'doublon' }), false);
     expect(r.canTranslate).toBe(false);
     expect(r.isTranslation).toBe(false);
-    expect(r.text).toMatch(/^Hi Petteri/);
+    expect(r.text).toMatch(/^Hi Alex/);
   });
 
   it('ignores a malformed language code rather than offering an empty toggle', () => {
@@ -50,7 +50,7 @@ describe('draftReading', () => {
     for (const fr of ['', '   ', null]) {
       const r = draftReading(draft({ snippet_fr: fr }), false);
       expect(r.canTranslate).toBe(false);
-      expect(r.text).toMatch(/^Hi Petteri/);
+      expect(r.text).toMatch(/^Hi Alex/);
     }
   });
 

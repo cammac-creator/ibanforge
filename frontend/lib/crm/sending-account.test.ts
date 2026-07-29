@@ -17,8 +17,8 @@ describe('sendingAccount', () => {
     // The bug this exists for. A draft posted through the admin API carried
     // counterparty: the customer's own address, the card handed it to the send
     // path as the FROM mailbox, and the VPS answered "no active account
-    // petteri@asterpay.io" in front of the operator, at send time.
-    expect(sendingAccount('petteri@asterpay.io', 'claude-alain@ibanforge.com')).toBe(
+    // pilot@example.com" in front of the operator, at send time.
+    expect(sendingAccount('pilot@example.com', 'claude-alain@ibanforge.com')).toBe(
       'claude-alain@ibanforge.com',
     );
   });

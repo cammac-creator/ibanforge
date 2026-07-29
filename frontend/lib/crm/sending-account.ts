@@ -8,7 +8,7 @@
  * OTHER end of the conversation: for an inbound message it is the customer. A
  * draft posted through the admin API carried the customer's own address there,
  * the card handed it to the send path as the FROM mailbox, and the VPS answered
- * `no active account petteri@asterpay.io` at the moment of sending.
+ * `no active account pilot@example.com` at the moment of sending.
  *
  * The field was doing two jobs with one name, so the failure could only surface
  * at send time, on a real customer thread. The fix is to stop trusting the
