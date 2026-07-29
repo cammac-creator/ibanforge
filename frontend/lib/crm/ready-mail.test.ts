@@ -75,6 +75,8 @@ const apiKey: ClientKeyInfo = {
   monthlyLimit: 1000,
   usedAllTime: 0,
   lastActiveMonth: null,
+  createdAt: null,
+  isNew: false,
 };
 
 const usage: UsageSeries = { series: [], months: [], days: [], endpoints: [] };

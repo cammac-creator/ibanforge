@@ -67,6 +67,8 @@ const client = (id: string, over: Partial<Contact & { kind: 'client' }> = {}): C
     monthlyLimit: 1000,
     usedAllTime: 0,
     lastActiveMonth: null,
+    createdAt: null,
+    isNew: false,
   },
   usage: { series: [], months: [], days: [], endpoints: [] },
   ...over,
@@ -106,7 +108,7 @@ describe('priorityOf', () => {
 
   it('ranks a paying client above a warm prospect', () => {
     const paying = priorityOf(
-      client('a@example.net', { apiKey: { keyPrefix: 'k', paid: true, creditsTotal: 5000, creditsRemaining: 10, monthlyLimit: null, usedAllTime: 40, lastActiveMonth: '2026-07' } }),
+      client('a@example.net', { apiKey: { keyPrefix: 'k', paid: true, creditsTotal: 5000, creditsRemaining: 10, monthlyLimit: null, usedAllTime: 40, lastActiveMonth: '2026-07', createdAt: null, isNew: false } }),
       situation(),
     );
     const warm = priorityOf(prospect('b@example.net'), situation({ hasEverReplied: true }));
@@ -124,7 +126,7 @@ describe('priorityOf', () => {
 
   it('counts a free key that is genuinely used as a client', () => {
     const used = priorityOf(
-      client('a@example.net', { apiKey: { keyPrefix: 'k', paid: false, creditsTotal: null, creditsRemaining: null, monthlyLimit: 1000, usedAllTime: 231, lastActiveMonth: '2026-07' } }),
+      client('a@example.net', { apiKey: { keyPrefix: 'k', paid: false, creditsTotal: null, creditsRemaining: null, monthlyLimit: 1000, usedAllTime: 231, lastActiveMonth: '2026-07', createdAt: null, isNew: false } }),
       situation(),
     );
     expect(used.key).toBe('client');
@@ -152,7 +154,7 @@ describe('priorityOf', () => {
   it('still ranks a converted prospect as a client once the key is used', () => {
     const active = client('a@example.net', {
       sourcing: sourcing({ confidence: 'low' }),
-      apiKey: { keyPrefix: 'k', paid: false, creditsTotal: null, creditsRemaining: null, monthlyLimit: 1000, usedAllTime: 900, lastActiveMonth: '2026-07' },
+      apiKey: { keyPrefix: 'k', paid: false, creditsTotal: null, creditsRemaining: null, monthlyLimit: 1000, usedAllTime: 900, lastActiveMonth: '2026-07', createdAt: null, isNew: false },
     });
     expect(priorityOf(active, situation()).key).toBe('client');
   });
@@ -170,7 +172,7 @@ describe('priorityOf', () => {
     reasons.add(priorityOf(prospect('a@example.net'), situation({ ballInCourt: 'us' })).reason);
     reasons.add(priorityOf(prospect('a@example.net'), situation({ hasEverReplied: true })).reason);
     reasons.add(priorityOf(prospect('a@example.net'), situation(), true).reason);
-    reasons.add(priorityOf(client('a@example.net', { apiKey: { keyPrefix: 'k', paid: true, creditsTotal: 1000, creditsRemaining: 1, monthlyLimit: null, usedAllTime: 1, lastActiveMonth: null } }), situation()).reason);
+    reasons.add(priorityOf(client('a@example.net', { apiKey: { keyPrefix: 'k', paid: true, creditsTotal: 1000, creditsRemaining: 1, monthlyLimit: null, usedAllTime: 1, lastActiveMonth: null, createdAt: null, isNew: false } }), situation()).reason);
     expect(reasons.size).toBe(keys.length);
     for (const r of reasons) {
       expect(r).not.toContain('—'); // no em dash in operator-facing copy

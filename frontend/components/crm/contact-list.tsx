@@ -6,7 +6,7 @@ import { dueToday, followupDue, neverContacted } from '@/lib/crm/buckets';
 import { byPriority, priorityOf, type Priority } from '@/lib/crm/priority';
 import type { Contact, Situation } from '@/lib/crm/types';
 
-export type FilterKey = 'today' | 'first' | 'all' | 'followup' | 'prospects' | 'clients' | 'archived';
+export type FilterKey = 'today' | 'new' | 'first' | 'all' | 'followup' | 'prospects' | 'clients' | 'archived';
 
 /**
  * One predicate per filter, used BOTH to count and to select. That is the whole
@@ -28,8 +28,13 @@ const FILTERS: Array<{
   test: (c: Contact, s: Situation | undefined, snoozed: boolean) => boolean;
 }> = [
   { key: 'today', label: "Aujourd'hui", test: dueToday },
-  // Placed second, right after the day's queue: these rows appear in no other
-  // bucket, so anywhere further down is where they were already being missed.
+  // First after the day's queue. Someone who took a key in the last fortnight is
+  // the best news the CRM holds, and until 29/07/2026 a signup with no calls yet
+  // was not merely buried but absent: buildContacts hid any key that had never
+  // done anything, which is every new customer by definition.
+  { key: 'new', label: 'Nouveaux clients', test: (c) => c.kind === 'client' && c.apiKey.isNew },
+  // Then the rows that appear in no other bucket, so anywhere further down is
+  // where they were already being missed.
   { key: 'first', label: 'Jamais contactés', test: neverContacted },
   { key: 'all', label: 'Tous', test: (c, s) => !isArchived(c, s) },
   { key: 'followup', label: 'Relances dues', test: followupDue },
@@ -214,7 +219,22 @@ export function ContactList({
                 >
                   {c.company || c.email || 'Sans nom'}
                 </span>
-                <span className="ml-auto shrink-0 text-[9px] uppercase text-[var(--fg-3)]">
+                {/* The badge, not just the chip: a new customer found through
+                    any other filter must still read as new, and this is the one
+                    piece of good news the column has to give. */}
+                {c.kind === 'client' && c.apiKey.isNew && (
+                  <span
+                    className="ml-auto shrink-0 rounded bg-emerald-500/15 px-1.5 py-px text-[9px] font-semibold uppercase text-emerald-300"
+                    title="Clé créée il y a moins de 14 jours"
+                  >
+                    nouveau
+                  </span>
+                )}
+                <span
+                  className={`shrink-0 text-[9px] uppercase text-[var(--fg-3)]${
+                    c.kind === 'client' && c.apiKey.isNew ? ' ml-1.5' : ' ml-auto'
+                  }`}
+                >
                   {c.kind === 'client' ? 'client' : 'prospect'}
                 </span>
               </div>

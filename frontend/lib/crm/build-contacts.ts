@@ -1,5 +1,6 @@
 import { enrichEmail } from '@/lib/company-enrichment';
 import { threadIsUnread } from '@/lib/thread-unread';
+import { signedUpRecently } from './new-signup';
 import type { Contact, Message, Outcome, ProspectSourcing, ReadyMail } from './types';
 // One definition of our mailboxes: the send path validates against this list,
 // so a second copy here could drift and make a contact unsendable.
@@ -202,7 +203,7 @@ function emptyThread(): Thread {
  * Turn the admin payloads into one contact list. Pure so it can be tested
  * without the network; the fetching lives in fetchCrmData below.
  */
-export function buildContacts(input: BuildInput): Contact[] {
+export function buildContacts(input: BuildInput, now: Date = new Date()): Contact[] {
   const threads = new Map<string, MessageRow[]>();
   for (const m of input.messages) {
     const key = m.customer_email.toLowerCase();
@@ -268,7 +269,14 @@ export function buildContacts(input: BuildInput): Contact[] {
     // Same rule as the previous Clients page: hide keys that never did anything.
     // It reads the raw row count, not the datable messages, so a thread we can
     // display only partially still keeps its owner on the list.
-    const meaningful = isPaid || row.used_all_time > 0 || rowCount > 0;
+    //
+    // The last term is the one that was missing. A signup that happened this
+    // morning has no calls and no thread BY DEFINITION, so this rule hid the
+    // single most valuable row in the CRM. Nineteen customers were invisible on
+    // 29/07/2026. The window is what keeps that from swinging the other way and
+    // burying them under every dead key back to May.
+    const isNew = signedUpRecently(row.created_at, now);
+    const meaningful = isPaid || row.used_all_time > 0 || rowCount > 0 || isNew;
     if (!meaningful) continue;
 
     claimed.add(id);
@@ -294,6 +302,8 @@ export function buildContacts(input: BuildInput): Contact[] {
         monthlyLimit: row.monthly_limit,
         usedAllTime: row.used_all_time,
         lastActiveMonth: row.last_active_month,
+        createdAt: row.created_at ?? null,
+        isNew,
       },
       usage: {
         series: row.series ?? [],

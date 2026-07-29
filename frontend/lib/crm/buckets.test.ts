@@ -290,6 +290,8 @@ describe('neverContacted', () => {
         monthlyLimit: 200,
         usedAllTime: 12,
         lastActiveMonth: '2026-07',
+    createdAt: null,
+    isNew: false,
       },
       usage: { series: [], months: [], days: [], endpoints: [] },
     };

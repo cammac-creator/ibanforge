@@ -116,6 +116,10 @@ describe('buildContacts', () => {
       monthlyLimit: 200,
       usedAllTime: 5,
       lastActiveMonth: '2026-07',
+      // Carried through from the key row so the UI can date a signup, alongside
+      // the decision itself, taken once server-side against one clock.
+      createdAt: '2026-06-01 10:00:00',
+      isNew: false,
     });
     expect(client.usage.series).toEqual([1, 2]);
     expect(client.usage.months).toEqual(['2026-06', '2026-07']);

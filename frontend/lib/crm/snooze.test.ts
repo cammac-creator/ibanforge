@@ -111,6 +111,8 @@ describe('snoozedMap', () => {
         monthlyLimit: 1000,
         usedAllTime: 0,
         lastActiveMonth: null,
+        createdAt: null,
+        isNew: false,
       },
       usage: { series: [], months: [], days: [], endpoints: [] },
     };

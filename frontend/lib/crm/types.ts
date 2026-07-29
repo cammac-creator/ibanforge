@@ -19,6 +19,14 @@ export interface ClientKeyInfo {
   monthlyLimit: number | null;
   usedAllTime: number;
   lastActiveMonth: string | null;
+  /** When the key was minted, as stored. */
+  createdAt: string | null;
+  /**
+   * Whether that is recent enough to still be a new customer. Decided once,
+   * server-side, against one clock: see lib/crm/new-signup.ts. A boolean rather
+   * than a date so the client never re-derives it and disagrees with the server.
+   */
+  isNew: boolean;
 }
 
 export interface UsageSeries {
