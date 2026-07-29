@@ -1,0 +1,113 @@
+---
+title: "Résoudre un QR-IID : quel établissement se cache derrière un QR-IBAN suisse ?"
+description: "Le QR-IID d'un QR-IBAN suisse se situe dans la plage 30000–31999 et n'est pas le numéro de clearing de la banque. Comment résoudre un QR-IID vers l'établissement émetteur, son BIC et sa participation aux rails de paiement, avec de vrais exemples et un seul appel d'API."
+date: "2026-07-29"
+faq:
+  - q: "Qu'est-ce qu'un QR-IID ?"
+    a: "Le QR-IID est l'identifiant d'établissement contenu dans un QR-IBAN suisse. Il se situe toujours dans la plage 30000 à 31999 et sert exclusivement aux QR-factures portant une référence QR. Il occupe les mêmes positions dans l'IBAN qu'un numéro de clearing ordinaire, mais identifie l'établissement via une plage de numéros distincte."
+  - q: "Le QR-IID est-il le même numéro que le clearing de la banque ?"
+    a: "Non, et c'est l'erreur d'interprétation la plus fréquente. Un établissement possède un numéro de clearing ordinaire (BC-Nummer / IID) et, en plus, son propre QR-IID. La Valiant Bank AG a par exemple le clearing 06300 et le QR-IID 30024. Chercher le QR-IID directement dans une table de numéros de clearing ne donne rien."
+  - q: "Comment reconnaître un QR-IBAN ?"
+    a: "À l'identifiant d'établissement, aux positions 5 à 9 de l'IBAN. S'il est compris entre 30000 et 31999, il s'agit d'un QR-IBAN et le paiement doit obligatoirement porter une référence QR. S'il est hors de cette plage, c'est un IBAN ordinaire."
+  - q: "Combien de QR-IID existe-t-il ?"
+    a: "Le SIX BankMaster contient actuellement 231 entrées dont l'identifiant d'établissement se situe dans la plage QR, dont 224 avec un BIC. Ce nombre évolue au gré des créations, fusions et changements de participation des établissements."
+  - q: "Combien coûte la résolution d'un QR-IID ?"
+    a: "Le point d'entrée coûte 0,003 dollar par requête. Un palier gratuit de 200 requêtes par mois et par clé est disponible, et le paiement peut aussi se faire à l'appel en USDC via x402, sans inscription."
+---
+
+Si vous traitez des QR-factures suisses, vous connaissez ce moment : vous avez un IBAN dont l'identifiant d'établissement tombe dans la plage 30000 à 31999. Votre bibliothèque vous dit correctement qu'il s'agit d'un QR-IBAN et qu'une référence QR est obligatoire. Ce qu'elle ne vous dit pas, c'est **quel établissement se trouve derrière.**
+
+Cet article explique pourquoi la réponse évidente ne marche pas, et comment la résolution fonctionne réellement.
+
+## Le QR-IID n'est pas le numéro de clearing
+
+C'est le cœur du problème, et l'endroit où la plupart des implémentations échouent.
+
+Un établissement financier suisse possède un **numéro de clearing** ordinaire (BC-Nummer, aussi appelé IID, pour identification de l'institut). Pour les QR-factures portant une référence QR, il reçoit en plus **son propre QR-IID**, distinct, issu de la plage réservée 30000–31999. Les deux numéros n'ont aucun rapport entre eux, ni arithmétique, ni de préfixe.
+
+| Établissement | Numéro de clearing | QR-IID |
+|---|---|---|
+| PostFinance AG | `09000` | `30000` |
+| Valiant Bank AG | `06300` | `30024` |
+| Entris Banking AG | `06395` | `30032` |
+
+Cherchez `30024` dans une table de numéros de clearing : vous ne trouvez rien. Concluez-en que le QR-IBAN est invalide, et vous venez de rejeter une coordonnée de paiement parfaitement correcte. Cela arrive régulièrement en production.
+
+## Ce que donne la vérification de format gratuite
+
+Le point d'entrée gratuit `/v1/iban/format` décompose l'IBAN sans rien consulter :
+
+```bash
+curl "https://api.ibanforge.com/v1/iban/format?iban=CH5530024123000889012"
+```
+
+```json
+{
+  "formatted": "CH55 3002 4123 0008 8901 2",
+  "valid": true,
+  "check_digits": "55",
+  "country": { "code": "CH", "name": "Switzerland" },
+  "bban": { "bank_code": "30024", "account_number": "123000889012" }
+}
+```
+
+Vous obtenez `30024` comme code banque. La clé de contrôle est bonne, la structure est bonne. Vous ignorez toujours qu'il s'agit de la Valiant Bank.
+
+## La résolution
+
+Le point d'entrée clearing accepte directement le QR-IID et renvoie l'établissement :
+
+```bash
+curl -H "Authorization: Bearer ifk_..." \
+  "https://api.ibanforge.com/v1/ch/clearing/30024"
+```
+
+```json
+{
+  "iid": "06300",
+  "qr_iid": "30024",
+  "found": true,
+  "institution": { "name": "Valiant Bank AG", "type": "bank" },
+  "bic": "VABECH22XXX",
+  "address": { "street": "Bundesplatz", "building_number": "4", "post_code": "3001", "town": "Bern" },
+  "payment_services": {
+    "sic": true,
+    "rtgs_chf": true,
+    "instant_payments_chf": true,
+    "eurosic": true,
+    "lsv_bdd_chf": false,
+    "lsv_bdd_eur": false
+  },
+  "valid_on": "2026-07-01"
+}
+```
+
+Regardez les deux premiers champs : vous interrogez avec le QR-IID `30024` et vous récupérez `iid: "06300"`, c'est-à-dire le **numéro de clearing ordinaire du même établissement**. Le point d'entrée fait la traduction entre les deux plages au lieu de vous la laisser.
+
+Le bloc `payment_services` répond à la question qui suit presque toujours dans le domaine des paiements : cet établissement est-il joignable en Instant Payments CHF, participe-t-il à euroSIC, accepte-t-il les prélèvements LSV+/BDD.
+
+## La couverture, chiffrée honnêtement
+
+Les données proviennent du **SIX BankMaster** et sont rafraîchies mensuellement. Chaque réponse porte un champ `valid_on`, pour que vous sachiez sur quel millésime vous vous appuyez.
+
+- **231 entrées** dont l'identifiant d'établissement se situe dans la plage QR 30000–31999
+- dont **224 portent un BIC**
+- 1 165 entrées de clearing suisse au total
+
+Les sept entrées sans BIC sont des établissements qui n'en portent pas dans le BankMaster. Le champ `bic` vaut alors `null`, et c'est une réponse correcte, pas une erreur. Testez-le avant de le consommer.
+
+Un QR-IID absent du BankMaster renvoie `found: false` avec `error: "clearing_not_found"`. C'est le cas honnête : le numéro appartient bien à la plage QR, mais n'est attribué à aucun établissement.
+
+## Si vous partez de l'IBAN
+
+Pour les IBAN suisses et liechtensteinois, vous n'avez pas besoin d'extraire vous-même l'identifiant d'établissement. [`/v1/iban/validate`](/docs/iban-validate) renvoie déjà les données de clearing dans son champ `clearing`, aux côtés de la résolution du BIC, de la joignabilité SEPA et du score de risque.
+
+Utilisez [`/v1/ch/clearing/:iid`](/docs/ch-clearing) quand votre point de départ est un numéro plutôt qu'un IBAN : depuis un système de facturation, depuis une gestion de données de base, ou justement depuis le code QR.
+
+## Ce que cela implique pour votre implémentation
+
+Trois points qui paient en pratique :
+
+1. **Traitez la plage 30000–31999 comme un signal, pas comme une erreur.** Un IBAN porteur d'un QR-IID est valide ; il exige simplement une référence QR au lieu d'un message libre.
+2. **Ne cherchez jamais un QR-IID dans une liste de numéros de clearing.** Il vous faut la traduction entre les deux plages, sinon vous produisez des faux négatifs.
+3. **Vérifiez `valid_on`.** Les établissements fusionnent. Un QR-IID valide il y a un an peut être redirigé aujourd'hui.

@@ -1,0 +1,113 @@
+---
+title: "QR-IID auflösen: welches Institut steckt hinter einer Schweizer QR-IBAN?"
+description: "Die QR-IID einer QR-IBAN liegt im Bereich 30000–31999 und ist nicht die BC-Nummer der Bank. Wie Sie aus einer QR-IID das ausstellende Institut, seinen BIC und seine Zahlungsschienen-Teilnahme auflösen, mit echten Beispielen und einem API-Aufruf."
+date: "2026-07-29"
+faq:
+  - q: "Was ist eine QR-IID?"
+    a: "Die QR-IID ist die Institutsidentifikation in einer Schweizer QR-IBAN. Sie liegt immer im Bereich 30000 bis 31999 und wird ausschliesslich für QR-Rechnungen mit QR-Referenz verwendet. Sie steht an denselben Stellen der IBAN wie eine gewöhnliche BC-Nummer, identifiziert das Institut aber über einen separaten Nummernkreis."
+  - q: "Ist die QR-IID dieselbe Nummer wie die BC-Nummer der Bank?"
+    a: "Nein, und das ist die häufigste Fehlannahme. Ein Institut hat eine gewöhnliche BC-Nummer und zusätzlich eine eigene QR-IID. Die Valiant Bank AG hat zum Beispiel die BC-Nummer 06300 und die QR-IID 30024. Wer die QR-IID direkt in einer BC-Nummern-Tabelle nachschlägt, findet nichts."
+  - q: "Woran erkenne ich, dass eine IBAN eine QR-IBAN ist?"
+    a: "An der Institutsidentifikation an Position 5 bis 9 der IBAN. Liegt sie zwischen 30000 und 31999, handelt es sich um eine QR-IBAN, und die Zahlung muss zwingend mit einer QR-Referenz erfolgen. Liegt sie ausserhalb, ist es eine gewöhnliche IBAN."
+  - q: "Wie viele QR-IID gibt es?"
+    a: "Im SIX BankMaster sind aktuell 231 Einträge mit einer Institutsidentifikation im QR-Bereich verzeichnet, davon 224 mit einem BIC. Der Bestand ändert sich, wenn Institute hinzukommen, fusionieren oder ihre Teilnahme anpassen."
+  - q: "Kostet die Auflösung einer QR-IID etwas?"
+    a: "Der Endpoint kostet 0,003 US-Dollar pro Anfrage. Es gibt ein monatliches Gratiskontingent von 200 Anfragen pro API-Key, und die Bezahlung kann alternativ per x402 in USDC ohne Registrierung erfolgen."
+---
+
+Wenn Sie Schweizer QR-Rechnungen verarbeiten, kennen Sie diesen Moment: Sie haben eine IBAN, deren Institutsidentifikation im Bereich 30000 bis 31999 liegt. Ihre Bibliothek sagt Ihnen korrekt, dass es sich um eine QR-IBAN handelt und dass eine QR-Referenz Pflicht ist. Was sie Ihnen nicht sagt: **welches Institut dahintersteckt.**
+
+Dieser Artikel zeigt, warum die naheliegende Antwort nicht funktioniert, und wie die Auflösung tatsächlich läuft.
+
+## Die QR-IID ist nicht die BC-Nummer
+
+Das ist der Kern des Problems, und die Stelle, an der die meisten Implementierungen scheitern.
+
+Ein Schweizer Finanzinstitut besitzt eine gewöhnliche **BC-Nummer** (auch IID, Institutsidentifikation). Für QR-Rechnungen mit QR-Referenz erhält es zusätzlich eine **eigene, separate QR-IID** aus dem reservierten Bereich 30000–31999. Die beiden Nummern haben nichts miteinander zu tun, weder rechnerisch noch als Präfix.
+
+| Institut | BC-Nummer | QR-IID |
+|---|---|---|
+| PostFinance AG | `09000` | `30000` |
+| Valiant Bank AG | `06300` | `30024` |
+| Entris Banking AG | `06395` | `30032` |
+
+Wer `30024` in einer BC-Nummern-Tabelle nachschlägt, findet nichts. Wer daraus schliesst, die QR-IBAN sei ungültig, verwirft eine völlig korrekte Zahlungsverbindung. Genau das passiert in der Praxis regelmässig.
+
+## Was die kostenlose Formatprüfung liefert
+
+Der freie Endpoint `/v1/iban/format` zerlegt die IBAN, ohne etwas nachzuschlagen:
+
+```bash
+curl "https://api.ibanforge.com/v1/iban/format?iban=CH5530024123000889012"
+```
+
+```json
+{
+  "formatted": "CH55 3002 4123 0008 8901 2",
+  "valid": true,
+  "check_digits": "55",
+  "country": { "code": "CH", "name": "Switzerland" },
+  "bban": { "bank_code": "30024", "account_number": "123000889012" }
+}
+```
+
+Sie erhalten `30024` als Bankcode. Die Prüfziffer stimmt, die Struktur stimmt. Nur wissen Sie immer noch nicht, dass es sich um die Valiant Bank handelt.
+
+## Die Auflösung
+
+Der Clearing-Endpoint nimmt die QR-IID direkt entgegen und gibt das Institut zurück:
+
+```bash
+curl -H "Authorization: Bearer ifk_..." \
+  "https://api.ibanforge.com/v1/ch/clearing/30024"
+```
+
+```json
+{
+  "iid": "06300",
+  "qr_iid": "30024",
+  "found": true,
+  "institution": { "name": "Valiant Bank AG", "type": "bank" },
+  "bic": "VABECH22XXX",
+  "address": { "street": "Bundesplatz", "building_number": "4", "post_code": "3001", "town": "Bern" },
+  "payment_services": {
+    "sic": true,
+    "rtgs_chf": true,
+    "instant_payments_chf": true,
+    "eurosic": true,
+    "lsv_bdd_chf": false,
+    "lsv_bdd_eur": false
+  },
+  "valid_on": "2026-07-01"
+}
+```
+
+Beachten Sie die ersten beiden Felder: Sie fragen mit der QR-IID `30024` an und erhalten `iid: "06300"` zurück, also die **gewöhnliche BC-Nummer desselben Instituts**. Der Endpoint übersetzt zwischen den beiden Nummernkreisen, statt Sie das selbst tun zu lassen.
+
+Das Feld `payment_services` beantwortet die Anschlussfrage, die im Zahlungsverkehr meist direkt folgt: Erreicht dieses Institut Instant Payments in CHF, nimmt es an euroSIC teil, akzeptiert es LSV+/BDD-Lastschriften.
+
+## Abdeckung, ehrlich beziffert
+
+Die Daten stammen aus dem **SIX BankMaster** und werden monatlich aktualisiert. Jede Antwort trägt das Feld `valid_on`, damit Sie wissen, auf welchen Stand Sie sich stützen.
+
+- **231 Einträge** mit einer Institutsidentifikation im QR-Bereich 30000–31999
+- davon **224 mit einem BIC**
+- 1 165 Schweizer Clearing-Einträge insgesamt
+
+Die sieben Einträge ohne BIC sind Institute, die im BankMaster keinen führen. `bic` ist dann `null`, und das ist eine korrekte Antwort, kein Fehler. Prüfen Sie das Feld, bevor Sie es weiterverarbeiten.
+
+Eine QR-IID, die nicht im BankMaster steht, ergibt `found: false` mit `error: "clearing_not_found"`. Das ist der ehrliche Fall: die Nummer liegt zwar im QR-Bereich, ist aber keinem Institut zugeteilt.
+
+## Wenn Sie von der IBAN ausgehen
+
+Für Schweizer und Liechtensteiner IBANs müssen Sie die Institutsidentifikation nicht selbst herausschneiden. [`/v1/iban/validate`](/docs/iban-validate) liefert die Clearing-Daten bereits im Feld `clearing` mit, zusammen mit BIC-Auflösung, SEPA-Erreichbarkeit und Risikobewertung.
+
+Nutzen Sie [`/v1/ch/clearing/:iid`](/docs/ch-clearing) dann, wenn Ihr Ausgangspunkt eine Nummer ist statt einer IBAN: aus einem Rechnungssystem, aus einer Stammdatenpflege, oder eben aus dem QR-Code.
+
+## Was das für Ihre Implementierung heisst
+
+Drei Punkte, die sich in der Praxis auszahlen:
+
+1. **Behandeln Sie den Bereich 30000–31999 als Signal, nicht als Fehler.** Eine IBAN mit QR-IID ist gültig; sie verlangt lediglich zwingend eine QR-Referenz statt einer freien Mitteilung.
+2. **Schlagen Sie die QR-IID niemals in einer BC-Nummern-Liste nach.** Sie brauchen die Übersetzung zwischen den Nummernkreisen, sonst produzieren Sie falsche Negative.
+3. **Prüfen Sie `valid_on`.** Institute fusionieren. Eine QR-IID, die vor einem Jahr gültig war, kann heute umgeleitet sein.
