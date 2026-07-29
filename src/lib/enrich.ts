@@ -7,6 +7,7 @@
 import { lookupByCountryBank, countryHasReferenceData, getReferenceAsOf } from './bic-lookup.js';
 import { classifyIssuer } from './issuers.js';
 import { lookupFiInstitution } from './fi-register.js';
+import { lookupNationalCode, nationalRegisterAvailable } from './national-registers.js';
 import { getCountryRisk } from './countries.js';
 import { lookupClearingByBankCode } from './ch-clearing.js';
 import { blzRegisterAvailable, lookupBlz } from './de-blz.js';
@@ -46,6 +47,8 @@ const NATIONAL_REGISTERS: Record<string, string> = {
   // positive, and leaving that undeclared would be the collapse this whole
   // verdict exists to undo.
   FI: 'Finance Finland monetary institution codes (allocated to banking groups, not individual institutions)',
+  AT: 'Oesterreichische Nationalbank SEPA-Zahlungsverkehrs-Verzeichnis',
+  BE: 'Banque nationale de Belgique, bank identification codes (Protocol Secretariat)',
 };
 
 /**
@@ -80,6 +83,12 @@ function askNationalRegister(
     if (hit.status === 'unknown') return { allocated: false, inconclusive: true };
     if (hit.status === 'not_allocated') return { allocated: false };
     return { allocated: true, value: hit.code };
+  }
+  if (cc === 'AT' || cc === 'BE') {
+    // Same safe failure as Germany: no table means no ground truth, so decline
+    // authority rather than reading every code as unallocated.
+    if (!nationalRegisterAvailable(cc)) return null;
+    return { allocated: !!lookupNationalCode(cc, bankCode) };
   }
   if (cc === 'DE') {
     // A database built before the seeder existed has no table. Declining

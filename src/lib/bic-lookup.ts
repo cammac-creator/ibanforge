@@ -5,6 +5,7 @@ import { getBicDB } from './db.js';
 import { LRUCache } from './cache.js';
 import type Database from 'better-sqlite3';
 import { lookupFiInstitution } from './fi-register.js';
+import { allocatedCodes, nationalRegisterAvailable, normaliseCode } from './national-registers.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -149,11 +150,43 @@ function pruneStaleFinnishCodes(data: Record<string, BicDataEntry>): Record<stri
   return data;
 }
 
+/**
+ * Austrian and Belgian codes the curated map claims and the national register
+ * does not allocate are dropped at load time.
+ *
+ * The fourth and fifth countries on this pattern. Measured 29/07/2026, 8 of our
+ * 870 Austrian keys and 23 of our 781 Belgian ones asserted an institution the
+ * register does not carry.
+ *
+ * Belgium is the interesting half. The NBB publishes all 1000 three-digit slots
+ * and writes 'VRIJ' in the BIC column for the 210 it has not allocated, so those
+ * 23 keys are not merely absent from the register: the register is explicitly
+ * saying nobody holds them. Serving a bank there contradicted the source in the
+ * strongest terms available.
+ */
+function pruneStaleNationalCodes(data: Record<string, BicDataEntry>): Record<string, BicDataEntry> {
+  for (const cc of ['AT', 'BE'] as const) {
+    if (!nationalRegisterAvailable(cc)) continue;
+    const known = allocatedCodes(cc);
+    if (known.size === 0) continue;
+    for (const key of Object.keys(data)) {
+      if (!key.startsWith(`${cc}:`)) continue;
+      const code = normaliseCode(cc, key.slice(3));
+      // A key we cannot normalise is not a bank code of that country's shape;
+      // leave it alone rather than guess.
+      if (code && !known.has(code)) delete data[key];
+    }
+  }
+  return data;
+}
+
 function getBicData(): Record<string, BicDataEntry> {
   if (!bicDataCache) {
     const require = createRequire(import.meta.url);
     const raw = require(resolve(__dirname, '../db/bic_data.json')) as Record<string, BicDataEntry>;
-    bicDataCache = pruneStaleFinnishCodes(pruneStaleGermanCodes(pruneStaleSwissCodes({ ...raw })));
+    bicDataCache = pruneStaleNationalCodes(
+      pruneStaleFinnishCodes(pruneStaleGermanCodes(pruneStaleSwissCodes({ ...raw }))),
+    );
   }
   return bicDataCache;
 }

@@ -48,6 +48,9 @@ jobs:
       - name: Seed German Bankleitzahlen (Bundesbank)
         run: npm run db:seed-blz
 
+      - name: Refresh Austrian and Belgian registers
+        run: npm run db:seed-national
+
       - name: Run tests
         run: npm run test
 
