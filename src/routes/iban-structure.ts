@@ -65,6 +65,13 @@ ibanStructure.get('/v1/iban/structure/:country', (c) => {
   const bban = BBAN_STRUCTURE[raw];
   const sepa = getSepaInfo(raw);
   const example = EXAMPLE_IBANS[raw];
+  // These come from the SWIFT IBAN Registry's example column, whose bank codes
+  // are illustrations rather than allocations: LV uses the literal 'BANK', RO
+  // uses 'AAAA', and the Swiss one (00762) is independently PROVEN unallocated
+  // by the SIX BankMaster. Measured 29/07/2026, 36 of the 89 come back
+  // not_in_register from our own bank_code_check, and a customer who runs one
+  // and sees that cannot tell a fabricated example from a hole in our data.
+  // Saying what the string is costs one field and removes the whole question.
 
   return c.json({
     country: { code: raw, name: COUNTRY_NAMES[raw] ?? raw },
@@ -104,6 +111,9 @@ ibanStructure.get('/v1/iban/structure/:country', (c) => {
       vop_required: sepa.vop_required,
     },
     example_iban: example ?? null,
+    example_iban_note: example
+      ? 'Illustration from the SWIFT IBAN Registry. Its bank code is not guaranteed to be allocated, so this IBAN may come back bank_code_check.status not_in_register from POST /v1/iban/validate. That is the example being fictional, not a gap in our data.'
+      : null,
     notes: bban
       ? 'BBAN positions are 0-indexed within the BBAN portion of the IBAN (after country code + check digits).'
       : 'BBAN structure not declared for this country — we still validate the IBAN length and mod-97 checksum, but cannot break the BBAN into fields.',

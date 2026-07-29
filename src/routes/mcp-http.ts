@@ -65,9 +65,14 @@ const BANK_CODE_CHECK_SCHEMA = z
     authoritative: z
       .boolean()
       .describe(
-        'True only where the reference set is the national register (CH, LI). Only then does not_in_register mean the code is not allocated.',
+        'True only where the reference set is the national register (CH, LI, DE). Only then does not_in_register mean the code is not allocated.',
       ),
     candidates: z.number().optional().describe('BIC8 the prefix matched; >1 means the BIC may belong to another institution.'),
+    retired: z
+      .boolean()
+      .optional()
+      .describe('True when an authoritative register is withdrawing the code. Still a verified result: it WAS allocated.'),
+    superseded_by: z.string().optional().describe('The bank code that takes over. Re-paper the beneficiary against it.'),
     as_of: z.string(),
   })
   .optional();
@@ -125,7 +130,7 @@ function createMcpServer(): McpServer {
         'RETURNS: valid (boolean), country { code, name }, bic { code, bank_name, city }, ' +
         'issuer { type: bank | digital_bank | emi | payment_institution, name }, sepa { member, schemes, vop_required }, ' +
         'risk_indicators { issuer_type (null when no institution resolved), country_risk, test_bic, sepa_reachable, sepa_reachable_scope, vop_coverage }, and for CH/LI: clearing { iid, name, type, sic, qr_iid }. ' +
-        'IMPORTANT — bic: null does not mean the bank code is wrong. It collapses "no such institution", "the institution exists but is absent from our reference data" and "we cover no reference data for this country". Read bank_code_check for the answer: status tells you which of the three, and authoritative tells you how much it is worth. Only where authoritative is true (today CH and LI, checked against the SIX BankMaster) does not_in_register mean the bank code is not allocated; everywhere else treat it as UNAVAILABLE and let the downstream name check decide. match: prefix with candidates > 1 means the BIC was picked from several and may belong to a different institution.',
+        'IMPORTANT — bic: null does not mean the bank code is wrong. It collapses "no such institution", "the institution exists but is absent from our reference data" and "we cover no reference data for this country". Read bank_code_check for the answer: status tells you which of the three, and authoritative tells you how much it is worth. Only where authoritative is true (today CH and LI against the SIX BankMaster, and DE against the Bundesbank Bankleitzahlendatei) does not_in_register mean the bank code is not allocated; everywhere else treat it as UNAVAILABLE and let the downstream name check decide. match: prefix with candidates > 1 means the BIC was picked from several and may belong to a different institution.',
       inputSchema: {
         iban: z.string().describe('IBAN to validate (spaces/hyphens stripped automatically)'),
       },

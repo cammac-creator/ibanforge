@@ -1,5 +1,5 @@
 import { getCountryRisk } from './countries.js';
-import { buildComplianceResult, unassessableCompliance } from './compliance.js';
+import { buildComplianceResult, type BankCodeConfidence, unassessableCompliance } from './compliance.js';
 import { getComplianceMeta, type ComplianceMeta } from './compliance-db.js';
 import { enrichResult } from './enrich.js';
 import { validateIBAN } from './iban.js';
@@ -56,6 +56,18 @@ export function buildComplianceResponse(iban: string): ComplianceResponse {
   const countryCode = result.country?.code ?? '';
   const bic8 = result.bic?.code?.slice(0, 8) ?? null;
   const issuerType = result.issuer?.type ?? 'bank';
+  // The bank-code verdict enrichResult already computed, fed into the score.
+  // Until 29/07/2026 this endpoint ignored it and scored a fabricated bank code
+  // exactly like Commerzbank, while next_steps routed callers here from the
+  // endpoint that had stopped guessing. AsterPay caught it by reading the two
+  // payloads against each other.
+  const check = result.bank_code_check;
+  const bankCode: BankCodeConfidence =
+    !check || check.status === 'verified'
+      ? 'confirmed'
+      : check.authoritative
+        ? 'denied'
+        : 'unverified';
   // Country risk comes straight from the country code — NEVER from
   // risk_indicators, which only exists when BBAN parsing/enrichment succeeded.
   // (Countries without a BBAN_STRUCTURE used to silently fall back to
@@ -67,7 +79,7 @@ export function buildComplianceResponse(iban: string): ComplianceResponse {
 
   let compliance: ComplianceResult;
   try {
-    compliance = buildComplianceResult(true, countryCode, bic8, issuerType, countryRisk, isTestBic);
+    compliance = buildComplianceResult(true, countryCode, bic8, issuerType, countryRisk, isTestBic, bankCode);
   } catch {
     // The database is unreachable, which is a different thing from an IBAN we
     // could not read: here we HAVE a valid IBAN and cannot check it, so the

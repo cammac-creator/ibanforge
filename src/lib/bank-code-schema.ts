@@ -31,12 +31,21 @@ export const BANK_CODE_CHECK_SCHEMA = {
     authoritative: {
       type: 'boolean',
       description:
-        'True only where that reference set is the national register — today CH and LI, checked against the SIX BankMaster. This is the flag to branch on: everywhere else an absence is evidence of absence from our data, not of non-existence.',
+        'True only where that reference set is the national register: today CH and LI against the SIX BankMaster, and DE against the Bundesbank Bankleitzahlendatei. This is the flag to branch on: everywhere else an absence is evidence of absence from our data, not of non-existence.',
     },
     candidates: {
       type: 'integer',
       description:
         'BIC8 the prefix search matched. Present only for match=prefix. Greater than 1 means the returned BIC is one of several and may belong to a different institution than the account does.',
+    },
+    retired: {
+      type: 'boolean',
+      description:
+        'Present and true when an authoritative register marks the code for deletion: the institution is being retired. The code WAS allocated, so this is a verified result, not a denial. See superseded_by.',
+    },
+    superseded_by: {
+      type: 'string',
+      description: 'The bank code that takes over, when the register names one. Re-paper the beneficiary against it.',
     },
     as_of: { type: 'string', description: 'Year-month the consulted reference set was last refreshed.' },
   },
@@ -53,7 +62,7 @@ export const NEXT_STEPS_SCHEMA = {
       code: {
         type: 'string',
         description:
-          'Stable identifier. Today: bank_code_not_allocated (the national register denies the code, do not send), verify_payee_name (we cannot confirm it, treat as unavailable and let a name check decide), bic_is_advisory (the BIC was picked from several candidates), test_bic, expect_virtual_iban (curated non-bank issuer, account holder and IBAN holder often differ), screen_compliance.',
+          'Stable identifier. Today: bank_code_not_allocated (the national register denies the code, do not send), bank_code_retired (allocated but being withdrawn, re-paper against superseded_by), verify_payee_name (we cannot confirm it, treat as unavailable and let a name check decide), bic_is_advisory (the BIC was picked from several candidates), test_bic, expect_virtual_iban (curated non-bank issuer, account holder and IBAN holder often differ), screen_compliance.',
       },
       do: { type: 'string', description: 'The instruction, in one sentence an agent can relay to a person.' },
       because: { type: 'string', description: 'The field of this response that produced the step, so the advice is auditable.' },

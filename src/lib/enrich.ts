@@ -8,6 +8,7 @@ import { lookupByCountryBank, countryHasReferenceData, getReferenceAsOf } from '
 import { classifyIssuer } from './issuers.js';
 import { getCountryRisk } from './countries.js';
 import { lookupClearingByBankCode } from './ch-clearing.js';
+import { blzRegisterAvailable, lookupBlz } from './de-blz.js';
 import type { BankCodeCheck, IBANValidationResult } from '../types.js';
 import { nextSteps } from './next-steps.js';
 
@@ -37,7 +38,36 @@ export function isTestBic(bicCode: string | null | undefined): boolean {
 const NATIONAL_REGISTERS: Record<string, string> = {
   CH: 'SIX BankMaster (Swiss IID / BC-Nummer register)',
   LI: 'SIX BankMaster (Swiss IID / BC-Nummer register)',
+  DE: 'Deutsche Bundesbank Bankleitzahlendatei',
 };
+
+/**
+ * Ask the right register for a country. Each returns whether the code is
+ * allocated and, when the register says so, that it is being retired and what
+ * takes over.
+ */
+function askNationalRegister(
+  cc: string,
+  bankCode: string,
+): { allocated: boolean; retired?: true; successor?: string } | null {
+  if (cc === 'CH' || cc === 'LI') {
+    return { allocated: !!lookupClearingByBankCode(bankCode) };
+  }
+  if (cc === 'DE') {
+    // A database built before the seeder existed has no table. Declining
+    // authority is the safe failure: Germany degrades to the composite map it
+    // used before rather than claiming every code is unallocated.
+    if (!blzRegisterAvailable()) return null;
+    const hit = lookupBlz(bankCode);
+    if (!hit) return { allocated: false };
+    return {
+      allocated: true,
+      ...(hit.retired ? { retired: true as const } : {}),
+      ...(hit.successor ? { successor: hit.successor } : {}),
+    };
+  }
+  return null;
+}
 
 /**
  * Named for what it is, not for what fed it.
@@ -67,14 +97,16 @@ function checkBankCode(
   const as_of = getReferenceAsOf();
   const national = NATIONAL_REGISTERS[cc];
 
-  if (national) {
-    const allocated = lookupClearingByBankCode(bankCode);
+  const verdict = national ? askNationalRegister(cc, bankCode) : null;
+  if (national && verdict) {
     return {
       value: bankCode,
-      status: allocated ? 'verified' : 'not_in_register',
-      match: allocated ? 'register' : null,
+      status: verdict.allocated ? 'verified' : 'not_in_register',
+      match: verdict.allocated ? 'register' : null,
       register: national,
       authoritative: true,
+      ...(verdict.retired ? { retired: true as const } : {}),
+      ...(verdict.successor ? { superseded_by: verdict.successor } : {}),
       as_of,
     };
   }

@@ -31,18 +31,31 @@ describe('bank_code_check', () => {
   });
 
   it('separates "absent from our reference data" from "we have no data here"', () => {
-    // Fabricated German bank code: valid checksum, no such Bankleitzahl in our map.
-    const r = check('DE44999999990532013000');
-    expect(r.valid).toBe(true); // still ISO 13616 conformant — that is a separate question
+    // Fabricated French bank code: valid checksum, no such code in our map.
+    const r = check('FR1499999000010123456789A42');
+    expect(r.valid).toBe(true); // still ISO 13616 conformant, a separate question
     expect(r.bic).toBeNull();
     expect(r.bank_code_check!.status).toBe('not_in_register');
     expect(r.bank_code_check!.match).toBeNull();
   });
 
-  it('does not claim a German miss proves the bank code does not exist', () => {
-    // The whole point. We hold a composite map for DE, not the Bundesbank
-    // register, so `not_in_register` must not be read as non-existence.
+  it('now answers Germany from the register, not from the map', () => {
+    // The same fabricated Bankleitzahl this test file used to prove the LIMIT
+    // now proves the capability. Kept here so the change of meaning is visible
+    // in the file that documented the old one. See de-blz.test.ts.
     const r = check('DE44999999990532013000');
+    expect(r.bank_code_check!.status).toBe('not_in_register');
+    expect(r.bank_code_check!.authoritative).toBe(true);
+    expect(r.bank_code_check!.register).toMatch(/Bundesbank/i);
+  });
+
+  it('does not claim a French miss proves the bank code does not exist', () => {
+    // The invariant, moved off Germany when Germany gained a register on
+    // 29/07/2026. France is still a composite map, so `not_in_register` there
+    // must not be read as non-existence. The test has to live on a country that
+    // is still composite or it stops testing anything.
+    const r = check('FR1499999000010123456789A42');
+    expect(r.bank_code_check!.status).toBe('not_in_register');
     expect(r.bank_code_check!.authoritative).toBe(false);
   });
 
@@ -90,7 +103,7 @@ describe('bank_code_check', () => {
     // Bundesbank register would read that as yes, while authoritative:false on
     // the same object says no. Two fields contradicting each other on the exact
     // point at issue is worse than saying less.
-    const r = check('DE89370400440532013000');
+    const r = check('FR7630006000011234567890189');
     expect(r.bank_code_check!.authoritative).toBe(false);
     expect(r.bank_code_check!.register).not.toMatch(/bundesbank|nbp|six|eba/i);
     expect(r.bank_code_check!.register).toMatch(/not a national/i);

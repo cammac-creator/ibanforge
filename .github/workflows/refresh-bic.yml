@@ -41,6 +41,13 @@ jobs:
       - name: Seed Swiss clearing (SIX BankMaster BC-Nummer)
         run: npm run db:seed-ch
 
+      # The German register, for the same reason as the Swiss one:
+      # bank_code_check.authoritative is only honest while the register is
+      # current. The seeder refuses to replace a good table with a short
+      # download, so a bad month leaves the previous data standing.
+      - name: Seed German Bankleitzahlen (Bundesbank)
+        run: npm run db:seed-blz
+
       - name: Run tests
         run: npm run test
 

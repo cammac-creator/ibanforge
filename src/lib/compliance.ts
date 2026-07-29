@@ -43,6 +43,23 @@ export function checkVop(bic8: string | null): VopCheck {
   return { participant: !!row, status: (row?.status as VopCheck['status']) ?? 'not_found' };
 }
 
+/**
+ * How much the bank code itself could be confirmed, which the score used to
+ * ignore entirely.
+ *
+ * AsterPay put it precisely: next_steps routed a caller from the endpoint that
+ * had stopped guessing to the one that still did, without telling them. An
+ * unresolved bank code scored as an ordinary bank, which is 0 added risk, so a
+ * fabricated Bankleitzahl and Commerzbank came out the same.
+ *
+ * The two states are weighted differently on purpose. `denied` is a national
+ * register saying the code is not allocated, which is a fact. `unverified` is
+ * our composite map not carrying it, which is an absence of knowledge. Scoring
+ * them the same would repeat, inside the score, exactly the collapse that
+ * bank_code_check exists to undo.
+ */
+export type BankCodeConfidence = 'confirmed' | 'unverified' | 'denied';
+
 export function calculateRiskScore(
   sanctions: SanctionsCheck,
   reachability: ReachabilityCheck,
@@ -50,6 +67,7 @@ export function calculateRiskScore(
   issuerType: string,
   countryRisk: string,
   isTestBic: boolean,
+  bankCode: BankCodeConfidence = 'confirmed',
 ): { risk_score: number; risk_level: ScoredRiskLevel; flags: string[] } {
   let score = 0;
   const flags: string[] = [];
@@ -72,6 +90,12 @@ export function calculateRiskScore(
   if (countryRisk === 'high') { score += 20; flags.push('high_risk_country'); }
   if (countryRisk === 'elevated') { score += 10; flags.push('elevated_risk_country'); }
   if (isTestBic) { score += 30; flags.push('test_bic'); }
+  // A register that denies the code outranks every soft signal below: there is
+  // no institution to screen, so the screening result means nothing on its own.
+  if (bankCode === 'denied') { score += 40; flags.push('bank_code_not_allocated'); }
+  // We could not confirm it, which is not the same accusation. Enough to move
+  // the level, not enough to pretend we know.
+  if (bankCode === 'unverified') { score += 10; flags.push('bank_code_unverified'); }
   if (!reachability.sepa_instant) { score += 5; flags.push('no_sepa_instant'); }
   if (!vop.participant) { score += 5; flags.push('no_vop'); }
 
@@ -124,6 +148,7 @@ export function buildComplianceResult(
   issuerType: string,
   countryRisk: string,
   isTestBic: boolean,
+  bankCode: BankCodeConfidence = 'confirmed',
 ): ComplianceResult {
   // Nothing to screen. Return before touching the database: the sanctions,
   // reachability and VoP lookups would all miss and their misses are what used
@@ -132,7 +157,7 @@ export function buildComplianceResult(
   const sanctions = checkSanctions(countryCode, bic8);
   const reachability = checkReachability(bic8);
   const vop = checkVop(bic8);
-  const { risk_score, risk_level, flags } = calculateRiskScore(sanctions, reachability, vop, issuerType, countryRisk, isTestBic);
+  const { risk_score, risk_level, flags } = calculateRiskScore(sanctions, reachability, vop, issuerType, countryRisk, isTestBic, bankCode);
   return { sanctions, reachability, vop, risk_score, risk_level, flags };
 }
 

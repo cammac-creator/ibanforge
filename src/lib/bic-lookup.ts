@@ -78,11 +78,54 @@ function pruneStaleSwissCodes(data: Record<string, BicDataEntry>): Record<string
   return data;
 }
 
+/**
+ * German bank codes the curated map claims and the Bundesbank register does not
+ * list are dropped at load time.
+ *
+ * Exactly the Swiss story one country over. bic_data.json is hand-assembled from
+ * BIC directories; de_blz is the Bundesbank Bankleitzahlendatei, reseeded monthly
+ * by the same workflow. Nothing compared them until Germany was promoted to an
+ * authoritative answer, and measured 29/07/2026, 52 of our 3,552 German keys
+ * asserted an institution the register does not carry, including several
+ * Landesbanken and Volksbanken absorbed years ago.
+ *
+ * A load-time filter rather than an edit to the JSON, for the same reason as the
+ * Swiss one: an edit fixes today's 52, the filter fixes every future one. It also
+ * keeps the two answers consistent, since it would otherwise be possible to
+ * resolve a BIC for a code that bank_code_check calls not_in_register in the same
+ * response.
+ *
+ * Dropping a key means the lookup falls through to the prefix search, which
+ * cannot resurrect it: a German bank code is eight digits and no BIC8 begins with
+ * one, so the customer gets `bic: null`, which is the honest answer.
+ */
+function pruneStaleGermanCodes(data: Record<string, BicDataEntry>): Record<string, BicDataEntry> {
+  let known: Set<string>;
+  try {
+    const rows = getBicDB().prepare('SELECT blz FROM de_blz').all() as Array<{ blz: string }>;
+    known = new Set(rows.map((r) => r.blz));
+  } catch {
+    // No register means no ground truth to prune against. Leaving the map alone
+    // is the safe failure: it degrades to the old behaviour rather than emptying
+    // every German lookup.
+    return data;
+  }
+  if (known.size === 0) return data;
+
+  for (const key of Object.keys(data)) {
+    if (!key.startsWith('DE:')) continue;
+    const raw = key.slice(3);
+    if (!/^\d{8}$/.test(raw)) continue;
+    if (!known.has(raw)) delete data[key];
+  }
+  return data;
+}
+
 function getBicData(): Record<string, BicDataEntry> {
   if (!bicDataCache) {
     const require = createRequire(import.meta.url);
     const raw = require(resolve(__dirname, '../db/bic_data.json')) as Record<string, BicDataEntry>;
-    bicDataCache = pruneStaleSwissCodes({ ...raw });
+    bicDataCache = pruneStaleGermanCodes(pruneStaleSwissCodes({ ...raw }));
   }
   return bicDataCache;
 }

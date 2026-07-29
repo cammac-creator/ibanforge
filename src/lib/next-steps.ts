@@ -65,6 +65,19 @@ export function nextSteps(result: IBANValidationResult): NextStep[] {
     });
   }
 
+  // The code is allocated and being withdrawn. Not a reason to stop, a reason to
+  // update the beneficiary before the transition period ends. This is the
+  // merged-bank case, which only a national register can answer.
+  if (check?.retired) {
+    steps.push({
+      code: 'bank_code_retired',
+      do: check.superseded_by
+        ? `Update the beneficiary details. The register is retiring this bank code; ${check.superseded_by} takes over.`
+        : 'Update the beneficiary details. The register is retiring this bank code and names no successor.',
+      because: `bank_code_check.retired is true in ${check.register ?? 'the national register'}`,
+    });
+  }
+
   // 2. Qualify an answer we did give, when we gave it on a heuristic.
   if (check?.match === 'prefix' && (check.candidates ?? 0) > 1) {
     steps.push({
@@ -97,7 +110,9 @@ export function nextSteps(result: IBANValidationResult): NextStep[] {
   if (check?.status === 'verified') {
     steps.push({
       code: 'screen_compliance',
-      do: 'Screen the institution against sanctions, FATF status and VoP reachability before the transfer.',
+      do:
+        'Screen the institution against sanctions, FATF status and VoP reachability before the transfer. ' +
+        'That endpoint reads the same bank-code verdict as this one, so it will not score an unconfirmed code as an ordinary bank.',
       because: 'bank_code_check.status is verified, so there is an institution to screen',
       action: COMPLIANCE_ACTION,
     });

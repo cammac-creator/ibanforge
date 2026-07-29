@@ -52,9 +52,10 @@ export type OperationType = 'iban_validate' | 'iban_batch' | 'bic_lookup' | 'iba
  * The status values are deliberately not `found` / `not_found`. For 87 of the 89
  * IBAN countries our reference data is a composite map assembled from BIC
  * directories, not the national bank-code register, so an absence there is
- * evidence of nothing more than absence. Only Switzerland and Liechtenstein are
- * checked against the register itself (SIX BankMaster), and only there does
- * `not_in_register` mean the code is not allocated. That is what `authoritative`
+ * evidence of nothing more than absence. Switzerland and Liechtenstein are
+ * checked against the register itself (SIX BankMaster) and Germany against the
+ * Bundesbank Bankleitzahlendatei, and only there does `not_in_register` mean
+ * the code is not allocated. That is what `authoritative`
  * marks, and it is the flag to branch on.
  */
 export interface BankCodeCheck {
@@ -85,6 +86,15 @@ export interface BankCodeCheck {
    * different institution than the account does.
    */
   candidates?: number;
+  /**
+   * The register marks the code for deletion: the institution is being retired.
+   * Present only when true, and only from an authoritative register. A retired
+   * code WAS allocated, so answering `not_in_register` for it would be a worse
+   * lie than answering `verified` without qualification.
+   */
+  retired?: true;
+  /** The bank code that takes over, when the register names one. */
+  superseded_by?: string;
   /** Year-month the consulted reference set was last refreshed. */
   as_of: string;
 }

@@ -12,10 +12,11 @@ const codes = (iban: string) => steps(iban).map((s) => s.code);
 
 describe('nextSteps', () => {
   it('tells an agent to fall back to a name check when we cannot confirm the bank code', () => {
-    // Fabricated Bankleitzahl: valid IBAN, unconfirmable institution, and we
-    // hold no German register, so the only honest instruction is "do not treat
-    // this as a rejection, verify the payee downstream".
-    const s = steps('DE44999999990532013000');
+    // Fabricated French bank code: valid IBAN, unconfirmable institution, and we
+    // hold no French register, so the only honest instruction is "do not treat
+    // this as a rejection, verify the payee downstream". Was Germany until
+    // 29/07/2026, when the Bundesbank register made that case a hard denial.
+    const s = steps('FR1499999000010123456789A42');
     const hit = s.find((x) => x.code === 'verify_payee_name');
     expect(hit).toBeDefined();
     expect(hit!.because).toMatch(/bank_code_check/);

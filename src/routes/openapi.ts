@@ -402,6 +402,12 @@ const buildSpec = () => ({
                       },
                     },
                     example_iban: { type: 'string', nullable: true, example: 'CH9300762011623852957' },
+                    example_iban_note: {
+                      type: 'string',
+                      nullable: true,
+                      description:
+                        "Says what example_iban is: an illustration from the SWIFT IBAN Registry whose bank code is not guaranteed to be allocated. 36 of the 89 come back bank_code_check.status not_in_register, which is the example being fictional rather than a gap in our data. LV uses the literal 'BANK', RO uses 'AAAA', and the Swiss one is proven unallocated by the SIX BankMaster.",
+                    },
                     notes: { type: 'string' },
                     upgrade_hint: { type: 'string' },
                     cost_usdc: { type: 'number', example: 0 },

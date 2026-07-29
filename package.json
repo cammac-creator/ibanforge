@@ -39,7 +39,8 @@
     "bic:enrich": "npx tsx scripts/enrich-bic-database.ts",
     "issuers:build": "node scripts/build-issuer-index.mjs",
     "iban-registry:check": "npx tsx scripts/check-iban-registry.ts",
-    "admin": "tsx scripts/admin-keys.ts"
+    "admin": "tsx scripts/admin-keys.ts",
+    "db:seed-blz": "tsx scripts/seed-blz.ts"
   },
   "dependencies": {
     "@coinbase/x402": "^2.1.0",
