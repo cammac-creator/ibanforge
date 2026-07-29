@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { changedRows, confirmedSent, readAnswer, reasonOf, withReason } from '@/lib/crm/api-result';
 import { draftReading } from '@/lib/crm/draft-reading';
+import { sendingAccount } from '@/lib/crm/sending-account';
 import { formatStamp } from '@/lib/crm/format';
 import type { Contact, Message, Situation } from '@/lib/crm/types';
 import { GuardrailChecks, OverrideButton, useGuardrails } from './guardrails-ui';
@@ -61,7 +62,11 @@ export function DraftCard({
   // sends the same mail twice.
   const [sent, setSent] = useState(false);
   const [msg, setMsg] = useState<{ text: string; bad: boolean } | null>(null);
-  const account = draft.counterparty || contact.account;
+  // Never `draft.counterparty || contact.account`: counterparty is written by
+  // the IMAP sync and means the OTHER end of the thread, so a draft that
+  // carried the customer's address there used to be handed to SMTP as the FROM
+  // mailbox. sendingAccount() only ever returns one of ours.
+  const account = sendingAccount(draft.counterparty, contact.account);
   const locked = busy !== false || sent;
   /**
    * Could this be sent at all, the checks aside. `locked` belongs in it: after

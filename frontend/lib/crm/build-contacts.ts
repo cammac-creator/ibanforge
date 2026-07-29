@@ -1,14 +1,14 @@
 import { enrichEmail } from '@/lib/company-enrichment';
 import { threadIsUnread } from '@/lib/thread-unread';
 import type { Contact, Message, Outcome, ProspectSourcing, ReadyMail } from './types';
+// One definition of our mailboxes: the send path validates against this list,
+// so a second copy here could drift and make a contact unsendable.
+import { COLD_ACCOUNT, WARM_ACCOUNT } from './sending-account';
 
 /** The outcome values the UI knows how to draw. Anything else reads as none. */
 const OUTCOMES: readonly string[] = ['en_discussion', 'pas_maintenant', 'pas_interesse', 'mauvaise_personne'];
 
-/** Mailbox used for a contact we have never emailed. */
-const COLD_ACCOUNT = 'claude-alain@ibanforge.com';
-/** Mailbox that carries the existing warm threads. */
-const WARM_ACCOUNT = 'cammac@bluewin.ch';
+
 
 /**
  * Internal, test and founder-owned addresses never appear in the CRM. Lifted
