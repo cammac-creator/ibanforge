@@ -73,6 +73,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+      # Node stays at 20 here, unlike the frontend job: this package advertises
+      # `engines: node >=18`, so testing it on an old runtime is the point. Only
+      # npm moves. Every lockfile in this repo is written by npm 11, and npm 10
+      # rejects the @emnapi tree vitest pulls in — the same disagreement that
+      # broke the frontend job, arriving through a different dependency.
+      - run: npm i -g npm@11
       - name: Install, build & test the published MCP server
         working-directory: mcp
         run: |
