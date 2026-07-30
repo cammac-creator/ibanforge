@@ -10,7 +10,7 @@ import { ClientDossierPanel, flag, relativeDays } from './client-dossier-panel';
  * one that describes a customer we are actively losing.
  */
 const VERDICTS: Array<{ key: Verdict; label: string; colour: string; why: string }> = [
-  { key: 'blocked', label: 'Bloqués', colour: 'var(--err)', why: 'quota épuisé et refusé au moins une fois' },
+  { key: 'blocked', label: 'Bloqués', colour: 'var(--err)', why: 'le dernier échange a été un refus, et rien depuis' },
   { key: 'struggling', label: 'En difficulté', colour: 'var(--warn)', why: 'plus de 30 % de leurs appels sont rejetés' },
   { key: 'rising', label: 'En montée', colour: 'var(--ok)', why: 'volume en nette hausse sur 7 jours' },
   { key: 'active', label: 'Actifs', colour: 'var(--info)', why: 'appellent régulièrement' },
@@ -28,8 +28,9 @@ const SORTS: Array<{ key: SortKey; label: string }> = [
 
 function MiniSpark({ days }: { days: Array<{ day: string; count: number }> }) {
   if (days.length === 0) return <span className="inline-block h-5 w-20" />;
-  const max = Math.max(...days.map((d) => d.count));
   const tail = days.slice(-30);
+  const max = Math.max(...tail.map((d) => d.count));
+  if (max === 0) return <span className="inline-block h-5 w-20" />;
   return (
     <span className="inline-flex h-5 w-20 items-end gap-px" aria-hidden>
       {tail.map((d) => (
@@ -43,9 +44,17 @@ function MiniSpark({ days }: { days: Array<{ day: string; count: number }> }) {
   );
 }
 
+/**
+ * Two thirds of the addresses hold a key that has never been called once — free
+ * signups that evaporated, and the pilot keys we mint for outreach. They are
+ * real and worth being able to see, but opening the page on them buries the
+ * dozen customers who actually exist, so the default view is those who called.
+ */
+type Filter = Verdict | 'all' | 'used';
+
 export function ClientsApp({ dossiers, locale }: { dossiers: ClientDossier[]; locale: string }) {
   const [sort, setSort] = useState<SortKey>('requests');
-  const [filter, setFilter] = useState<Verdict | 'all'>('all');
+  const [filter, setFilter] = useState<Filter>('used');
   const [query, setQuery] = useState('');
   const [openId, setOpenId] = useState<string | null>(null);
 
@@ -59,7 +68,8 @@ export function ClientsApp({ dossiers, locale }: { dossiers: ClientDossier[]; lo
   const view = useMemo(() => {
     const q = query.trim().toLowerCase();
     const filtered = dossiers.filter((d) => {
-      if (filter !== 'all' && d.verdict !== filter) return false;
+      if (filter === 'used' && d.requests === 0) return false;
+      if (filter !== 'all' && filter !== 'used' && d.verdict !== filter) return false;
       if (!q) return true;
       return (
         d.email.toLowerCase().includes(q) ||
@@ -81,7 +91,7 @@ export function ClientsApp({ dossiers, locale }: { dossiers: ClientDossier[]; lo
           { l: 'Clients', v: String(dossiers.length), h: `${dossiers.filter((d) => d.requests > 0).length} ont appelé` },
           { l: 'Requêtes cumulées', v: totalRequests.toLocaleString('fr-CH'), h: '90 derniers jours' },
           { l: 'Pays contrôlés', v: String(distinctCountries), h: 'tous clients confondus' },
-          { l: 'À débloquer', v: String(counts.blocked), h: 'quota épuisé, refusés' },
+          { l: 'À débloquer', v: String(counts.blocked), h: 'arrêtés sur un refus' },
         ].map((s) => (
           <div key={s.l} className="rounded-xl border border-[var(--ink-4)]/60 bg-[var(--ink-2)]/60 px-4 py-3">
             <div className="text-[10px] uppercase tracking-wider text-[var(--fg-5)]">{s.l}</div>
@@ -92,6 +102,15 @@ export function ClientsApp({ dossiers, locale }: { dossiers: ClientDossier[]; lo
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
+        <button
+          onClick={() => setFilter('used')}
+          title="Les adresses qui ont appelé au moins une fois"
+          className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+            filter === 'used' ? 'bg-[var(--ink-5)] text-white' : 'text-[var(--fg-4)] hover:text-[var(--fg-2)]'
+          }`}
+        >
+          Ont appelé <span className="tabular-nums">{dossiers.filter((d) => d.requests > 0).length}</span>
+        </button>
         <button
           onClick={() => setFilter('all')}
           className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${

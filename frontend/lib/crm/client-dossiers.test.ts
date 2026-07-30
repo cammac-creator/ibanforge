@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildDossiers,
+  denseDays,
   sortDossiers,
   type ClientProfileRow,
   type DossierInput,
@@ -290,5 +291,25 @@ describe('sortDossiers', () => {
     const list = [a, b, c];
     sortDossiers(list, 'requests');
     expect(list.map((d) => d.email)).toEqual(['a@example.net', 'b@example.net', 'c@example.net']);
+  });
+});
+
+describe('denseDays', () => {
+  it('fills the gaps, so three busy days do not draw as three fat bars', () => {
+    const out = denseDays([{ day: '2026-07-28', count: 5 }, { day: '2026-07-30', count: 9 }], NOW, 5);
+    expect(out.map((d) => d.day)).toEqual(['2026-07-26', '2026-07-27', '2026-07-28', '2026-07-29', '2026-07-30']);
+    expect(out.map((d) => d.count)).toEqual([0, 0, 5, 0, 9]);
+  });
+
+  it('ignores days older than the span rather than stretching to reach them', () => {
+    const out = denseDays([{ day: '2026-01-01', count: 99 }, { day: '2026-07-30', count: 1 }], NOW, 3);
+    expect(out).toHaveLength(3);
+    expect(out.reduce((s, d) => s + d.count, 0)).toBe(1);
+  });
+
+  it('returns a flat span for a customer who never called', () => {
+    const out = denseDays([], NOW, 4);
+    expect(out).toHaveLength(4);
+    expect(out.every((d) => d.count === 0)).toBe(true);
   });
 });

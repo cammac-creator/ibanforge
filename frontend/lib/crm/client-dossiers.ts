@@ -118,6 +118,29 @@ function latest(values: Array<string | null>): string | null {
   return present.length ? present.reduce((a, b) => (a >= b ? a : b)) : null;
 }
 
+/**
+ * A continuous run of `span` days ending today, gaps filled with zero.
+ *
+ * The API returns only the days a customer called. Drawing those directly means
+ * a customer with three active days gets three bars each a third of the chart
+ * wide, which reads as constant heavy use — the opposite of the truth. A dense
+ * axis makes a burst look like a burst.
+ */
+export function denseDays(
+  days: Array<{ day: string; count: number }>,
+  now: Date,
+  span = 90,
+): Array<{ day: string; count: number }> {
+  const known = new Map(days.map((d) => [d.day, d.count]));
+  const end = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  const out: Array<{ day: string; count: number }> = [];
+  for (let i = span - 1; i >= 0; i--) {
+    const day = new Date(end - i * DAY_MS).toISOString().slice(0, 10);
+    out.push({ day, count: known.get(day) ?? 0 });
+  }
+  return out;
+}
+
 function mergeCounts<T extends string>(
   lists: Array<Array<Record<string, unknown>>>,
   labelKey: T,
@@ -253,7 +276,7 @@ export function buildDossiers(input: DossierInput): ClientDossier[] {
       clientKinds: mergeCounts(profiles.map((p) => p.client_kinds ?? []), 'kind'),
       rejectReasons: mergeCounts(profiles.map((p) => p.reject_reasons ?? []), 'reason'),
       hours,
-      days: mergeCounts(profiles.map((p) => p.days ?? []), 'day').sort((a, b) => a.day.localeCompare(b.day)),
+      days: denseDays(mergeCounts(profiles.map((p) => p.days ?? []), 'day'), now),
       mails: {
         sent: thread.filter((m) => m.direction === 'out').length,
         received: thread.filter((m) => m.direction === 'in').length,
