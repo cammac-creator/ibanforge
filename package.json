@@ -117,5 +117,8 @@
   "prepublishOnly": "npm run build",
   "engines": {
     "node": ">=20"
+  },
+  "overrides": {
+    "axios": "^1.19.0"
   }
 }
