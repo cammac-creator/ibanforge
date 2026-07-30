@@ -867,6 +867,15 @@ export interface ClientProfile {
   server_error: number;
   avg_ms: number;
   p95_ms: number;
+  /**
+   * The last time we served them, and the last time we turned them away. Two
+   * instants rather than one flag, because "their quota is full right now" and
+   * "they walked away at a wall and never came back" are different situations
+   * and only the second one is a customer being lost. Raising a quota clears
+   * the first and leaves the second exactly as it was.
+   */
+  last_success_at: string | null;
+  last_refusal_at: string | null;
   endpoints: Array<{ path: string; count: number }>;
   /** ISO country codes they actually checked, busiest first. */
   countries: Array<{ code: string; count: number }>;
@@ -907,6 +916,8 @@ export function getClientProfiles(days = 90): Record<string, ClientProfile> {
       server_error: 0,
       avg_ms: 0,
       p95_ms: 0,
+      last_success_at: null,
+      last_refusal_at: null,
       endpoints: [],
       countries: [],
       user_agents: [],
@@ -929,7 +940,9 @@ export function getClientProfiles(days = 90): Record<string, ClientProfile> {
               MIN(created_at) first_seen,
               MAX(created_at) last_seen,
               COUNT(DISTINCT ip_hash) distinct_ips,
-              AVG(response_ms) avg_ms
+              AVG(response_ms) avg_ms,
+              MAX(CASE WHEN status >= 200 AND status < 300 THEN created_at END) last_success_at,
+              MAX(CASE WHEN status IN (401, 402, 429) THEN created_at END) last_refusal_at
        FROM request_log WHERE key_prefix IS NOT NULL GROUP BY key_prefix`,
     )
     .all() as Array<Record<string, number | string | null>>;
@@ -945,6 +958,8 @@ export function getClientProfiles(days = 90): Record<string, ClientProfile> {
     p.last_seen = (r.last_seen as string) ?? null;
     p.distinct_ips = Number(r.distinct_ips ?? 0);
     p.avg_ms = Math.round(Number(r.avg_ms ?? 0));
+    p.last_success_at = (r.last_success_at as string) ?? null;
+    p.last_refusal_at = (r.last_refusal_at as string) ?? null;
   }
 
   // p95 per key. SQLite has no percentile function, so it is an offset into the
