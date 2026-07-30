@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import type { Handler } from 'hono';
 import { datasetFacts } from '../lib/dataset-facts.js';
 import { PAYMENT_LINKS, PRICING_PAGE } from '../lib/payment-links.js';
 
@@ -78,7 +79,11 @@ function buildAccepts(endpoint: PricedEndpoint, walletAddress: string) {
 // /.well-known/x402 — primary x402 discovery endpoint (machine-readable)
 // ──────────────────────────────────────────────────────────────────────────────
 
-discovery.get('/.well-known/x402', (c) => {
+// The `.json` suffix is what agent-tools.cloud, agent-discover-indexer and
+// three others reach for: 457 hits over the ninety days to 30/07. Same handler
+// rather than a redirect, because an x402 client that follows a 301 on its
+// discovery document is not guaranteed to keep reading.
+const x402Document: Handler = (c) => {
   const walletAddress = process.env.WALLET_ADDRESS ?? '0x0000000000000000000000000000000000000000';
 
   return c.json({
@@ -133,7 +138,10 @@ discovery.get('/.well-known/x402', (c) => {
       },
     },
   });
-});
+};
+
+discovery.get('/.well-known/x402', x402Document);
+discovery.get('/.well-known/x402.json', x402Document);
 
 // ──────────────────────────────────────────────────────────────────────────────
 // /.well-known/oauth-protected-resource — RFC 9728 (MCP OAuth discovery)
@@ -365,5 +373,38 @@ discovery.all('/mcp.', (c) => c.redirect('/mcp', 308));
 // 36 distinct IPs. Both exist on the www host.
 discovery.get('/favicon.ico', (c) => c.redirect('https://ibanforge.com/favicon.ico', 301));
 discovery.get('/sitemap.xml', (c) => c.redirect('https://ibanforge.com/sitemap.xml', 301));
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Third sweep, 2026-07-30, read off the Clients Bot tab: what the first two
+// passes left. Counts are hits over the ninety days to 30/07.
+// ──────────────────────────────────────────────────────────────────────────────
+
+// The largest single 404 left on the service, and it was never a missing page:
+// APIHub-HealthCheck POSTs the API root, 3,469 times. 404 tells a health
+// checker the API is not there; 405 with Allow tells it the API is there and
+// the verb was wrong, which is what actually happened. GET and HEAD fall
+// through to the landing page, which is mounted after this router.
+discovery.on(['POST', 'PUT', 'PATCH', 'DELETE'], '/', (c) =>
+  c.json(
+    { error: 'method_not_allowed', message: 'The API root answers GET and HEAD. See /openapi.json for the endpoints.' },
+    405,
+    { Allow: 'GET, HEAD' },
+  ),
+);
+
+// RFC 9116 puts security.txt under /.well-known; a copy at the root would be a
+// second thing to keep in step with the first. 83 hits, one scanner.
+discovery.get('/security.txt', (c) => c.redirect('/.well-known/security.txt', 301));
+
+// Clients that assume every API lives under /api. 308 keeps the method, so a
+// JSON-RPC POST survives. 76 hits across five agents.
+discovery.all('/api/mcp', (c) => c.redirect('/mcp', 308));
+
+// NOT served, deliberately: /.well-known/oauth-authorization-server and its
+// /mcp sibling, 1,164 hits from aisec-registry. RFC 8414 metadata describes an
+// OAuth authorization server, and we do not run one — authentication here is an
+// API key or an x402 payment, which is what the protected-resource document
+// already says. Publishing a document there would misrepresent us to a security
+// registry. 404 is the honest answer and it stays.
 
 export { discovery };
