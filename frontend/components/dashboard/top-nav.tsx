@@ -16,8 +16,11 @@ export function TopNav() {
   // Contacts. The Clients tab that came back on 30/07/2026 is a different
   // thing: Contacts is the conversation, Clients is what they do with the API.
   const onContacts = pathname.includes('/dashboard/contacts');
-  const onClients = pathname.includes('/dashboard/clients');
-  const onOverview = !onContacts && !onClients;
+  // Order matters: '/dashboard/clients-bot' also contains '/dashboard/clients',
+  // so the longer path is tested first or both tabs light up at once.
+  const onBots = pathname.includes('/dashboard/clients-bot');
+  const onClients = !onBots && pathname.includes('/dashboard/clients');
+  const onOverview = !onContacts && !onClients && !onBots;
   const current = Number(searchParams.get('period') ?? 30);
   const period = PERIODS.includes(current) ? current : 30;
 
@@ -25,6 +28,7 @@ export function TopNav() {
     { key: 'overview', href: `/${locale}/dashboard`, label: t('topNav.overview'), active: onOverview },
     { key: 'contacts', href: `/${locale}/dashboard/contacts`, label: t('topNav.contacts'), active: onContacts },
     { key: 'clients', href: `/${locale}/dashboard/clients`, label: 'Clients', active: onClients },
+    { key: 'bots', href: `/${locale}/dashboard/clients-bot`, label: 'Clients Bot', active: onBots },
   ];
 
   return (
