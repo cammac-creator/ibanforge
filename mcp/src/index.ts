@@ -460,9 +460,30 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
   const a = (args ?? {}) as JsonRecord;
 
+  // Every tool here declares an `outputSchema`, and the spec is not optional
+  // about what that obliges: a client may refuse a result that has one and
+  // carries no `structuredContent`. The official SDKs do exactly that —
+  // "Tool <name> has an output schema but did not return structured content"
+  // — so for two months every call against this server failed on arrival
+  // while `tools/list` kept looking healthy.
   const out = async (data: unknown) => ({
     content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }],
+    structuredContent: data as Record<string, unknown>,
   });
+
+  // Errors take the other branch. Each schema has a `required` list that a
+  // rejection payload cannot satisfy, so attaching structuredContent here
+  // would swap "missing structured content" for "structured content does not
+  // validate". `isError` is the branch the spec reserves for this, and it is
+  // what tells a client to skip output-schema validation entirely.
+  const fail = async (data: unknown) => ({
+    content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }],
+    isError: true,
+  });
+
+  // An upstream non-ok response arrives as `_error: true` from apiCall. It is
+  // a failure whatever the tool, and it never matches the success schema.
+  const relay = async (data: JsonRecord) => (data._error ? fail(data) : out(data));
 
   // Fallback message appended to anonymous-mode results so MCP inspectors
   // and discovery tools (Glama, Smithery, MCP.so) get a useful payload
@@ -489,7 +510,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     switch (name) {
       case 'validate_iban': {
         if (typeof a.iban !== 'string' || !a.iban.trim()) {
-          return out({ error: 'invalid_input', message: 'Argument `iban` must be a non-empty string.' });
+          return fail({ error: 'invalid_input', message: 'Argument `iban` must be a non-empty string.' });
         }
         const result = await apiCall('POST', '/v1/iban/validate', { iban: a.iban });
         if (result._error && result.status === 402) {
@@ -501,18 +522,18 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           // bounds): that 400 is the real cause — don't mask it as "payment
           // required".
           if (free.status === 400) {
-            return out(free);
+            return fail(free);
           }
         }
-        return out(result);
+        return relay(result);
       }
 
       case 'batch_validate_iban': {
         if (!Array.isArray(a.ibans) || a.ibans.length === 0) {
-          return out({ error: 'invalid_input', message: 'Argument `ibans` must be a non-empty array of strings.' });
+          return fail({ error: 'invalid_input', message: 'Argument `ibans` must be a non-empty array of strings.' });
         }
         if (a.ibans.length > 100) {
-          return out({ error: 'too_many_ibans', message: 'Max 100 IBANs per batch. Split your input.' });
+          return fail({ error: 'too_many_ibans', message: 'Max 100 IBANs per batch. Split your input.' });
         }
         const result = await apiCall('POST', '/v1/iban/batch', { ibans: a.ibans as string[] });
         if (result._error && result.status === 402) {
@@ -528,29 +549,29 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             _note: degradedNote(result),
           });
         }
-        return out(result);
+        return relay(result);
       }
 
       case 'lookup_bic': {
         if (typeof a.bic !== 'string' || !/^[A-Za-z0-9]{8}([A-Za-z0-9]{3})?$/.test(a.bic)) {
-          return out({
+          return fail({
             error: 'invalid_bic',
             message: 'BIC must be 8 or 11 alphanumeric characters. Example: UBSWCHZH80A.',
           });
         }
         const result = await apiCall('GET', `/v1/bic/${encodeURIComponent(a.bic.toUpperCase())}`);
-        return out(result);
+        return relay(result);
       }
 
       case 'lookup_ch_clearing': {
         if (typeof a.iid !== 'string' || !/^\d{1,5}$/.test(a.iid)) {
-          return out({
+          return fail({
             error: 'invalid_iid',
             message: 'IID must be 1-5 digits. Example: 230 for UBS Switzerland AG.',
           });
         }
         const result = await apiCall('GET', `/v1/ch/clearing/${encodeURIComponent(a.iid)}`);
-        return out(result);
+        return relay(result);
       }
 
       case 'check_compliance': {
@@ -558,15 +579,15 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           return out({ error: 'invalid_input', message: 'Argument `iban` must be a non-empty string.' });
         }
         const result = await apiCall('POST', '/v1/iban/compliance', { iban: a.iban });
-        return out(result);
+        return relay(result);
       }
 
       default:
-        return out({ error: 'unknown_tool', message: `Tool "${name}" is not implemented.` });
+        return fail({ error: 'unknown_tool', message: `Tool "${name}" is not implemented.` });
     }
   } catch (err) {
     const e = err as Error;
-    return out({
+    return fail({
       _error: true,
       message: e?.message ?? String(err),
       hint: 'Network error reaching api.ibanforge.com. Check connectivity or set IBANFORGE_API_BASE for self-hosted instances.',
