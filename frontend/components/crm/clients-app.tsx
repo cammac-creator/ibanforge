@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from 'react';
 import { sortDossiers, type ClientDossier, type SortKey, type Verdict } from '@/lib/crm/client-dossiers';
-import { ClientDossierPanel, flag, relativeDays } from './client-dossier-panel';
+import { ClientDossierPanel } from './client-dossier-panel';
+import { flag, relativeDays } from './dossier-bits';
 
 /**
  * The verdict vocabulary, in the order it is offered as a filter: what needs
