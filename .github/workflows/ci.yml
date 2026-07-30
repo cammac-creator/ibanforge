@@ -63,6 +63,22 @@ jobs:
         working-directory: frontend
         run: npm run test
 
+  # `mcp/` is published to npm as ibanforge-mcp and had no job at all: never
+  # built here, never tested. That is how a server whose every tool call
+  # failed against a conformant client stayed broken for two months.
+  mcp:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install, build & test the published MCP server
+        working-directory: mcp
+        run: |
+          npm ci
+          npm test
+
   sdk-typescript:
     runs-on: ubuntu-latest
     steps:

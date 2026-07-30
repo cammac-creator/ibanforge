@@ -15,5 +15,8 @@
     "isolatedModules": true
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist"]
+  // The test is excluded from the build, not from the run: vitest transpiles
+  // it itself and drives `dist/index.js` as a client would. Left in, tsc
+  // emitted dist/index.test.js and `npm pack` shipped it to every installer.
+  "exclude": ["node_modules", "dist", "src/**/*.test.ts"]
 }
