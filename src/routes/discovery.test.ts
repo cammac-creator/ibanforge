@@ -247,3 +247,52 @@ describe('discovery — third sweep', () => {
     expect(res.status).toBe(404);
   });
 });
+
+// The x402 catalogue advertised the route TEMPLATE as the resource URL:
+// "resource": "https://api.ibanforge.com/v1/bic/:code". An agent following the
+// listing calls that literally, the server reads ":code" as a BIC and answers
+// 400 — so the agent never sees the 402 and can neither learn the price nor
+// pay. Two of five priced resources were unbuyable this way for two months.
+describe('x402 catalogue — every advertised resource must be callable', () => {
+  const accepts = async () => {
+    const res = await makeApp().request('/.well-known/x402');
+    const body = (await res.json()) as {
+      endpoints: Array<{ method: string; path: string; accepts: Array<{ resource: string }> }>;
+    };
+    return body.endpoints;
+  };
+
+  it('never publishes a path parameter inside a resource URL', async () => {
+    for (const e of await accepts()) {
+      for (const a of e.accepts) {
+        const pathPart = a.resource.replace('https://api.ibanforge.com', '');
+        expect(pathPart, `${e.method} ${e.path} advertises a template`).not.toMatch(/[:{]/);
+      }
+    }
+  });
+
+  it('advertises a BIC that our own validator accepts, or the 402 never happens', async () => {
+    const { validateBIC } = await import('../lib/bic-validator.js');
+    const bic = (await accepts()).find((e) => e.path.startsWith('/v1/bic/'));
+    const code = bic!.accepts[0].resource.split('/').pop()!;
+    expect(validateBIC(code).valid).toBe(true);
+  });
+
+  it('advertises a Swiss IID our clearing register actually holds', async () => {
+    const { lookupClearing } = await import('../lib/ch-clearing.js');
+    const ch = (await accepts()).find((e) => e.path.startsWith('/v1/ch/clearing/'));
+    const iid = ch!.accepts[0].resource.split('/').pop()!;
+    expect(lookupClearing(iid)).not.toBeNull();
+  });
+
+  it('keeps the template in `path`, which is what documents the shape', async () => {
+    const paths = (await accepts()).map((e) => e.path);
+    expect(paths).toContain('/v1/bic/:code');
+    expect(paths).toContain('/v1/ch/clearing/:iid');
+  });
+
+  it('leaves the bodyless endpoints exactly as they were', async () => {
+    const validate = (await accepts()).find((e) => e.path === '/v1/iban/validate');
+    expect(validate!.accepts[0].resource).toBe('https://api.ibanforge.com/v1/iban/validate');
+  });
+});

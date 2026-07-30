@@ -16,7 +16,25 @@ const NETWORK_CHAIN_ID = 'eip155:8453';
 
 interface PricedEndpoint {
   method: string;
+  /** The route template, which is what documents the shape of the URL. */
   path: string;
+  /**
+   * A concrete URL for the x402 `resource` field, required wherever `path`
+   * carries a parameter.
+   *
+   * The catalogue used to advertise the template itself, so an agent following
+   * the listing called /v1/bic/:code literally, the route read ":code" as a BIC
+   * and answered 400 — the agent never reached the 402 and could neither learn
+   * the price nor pay. Two of five priced resources were unbuyable that way
+   * from May to 30/07/2026, and x402-observer, a public trust monitor, scored
+   * us on it the whole time.
+   *
+   * Safe to change: the paywall middleware builds the resource it demands from
+   * the URL actually requested, never from this document. Verified against
+   * production — GET /v1/bic/DEUTDEFF answers 402 quoting itself as the
+   * resource — so a client paying for a different BIC is unaffected.
+   */
+  examplePath?: string;
   price_usdc: number;
   description: string;
   price_note?: string;
@@ -39,6 +57,7 @@ const PAID_ENDPOINTS: PricedEndpoint[] = [
   {
     method: 'GET',
     path: '/v1/bic/:code',
+    examplePath: '/v1/bic/DEUTDEFF',
     price_usdc: 0.003,
     description: 'Lookup BIC/SWIFT code with LEI enrichment',
   },
@@ -51,6 +70,7 @@ const PAID_ENDPOINTS: PricedEndpoint[] = [
   {
     method: 'GET',
     path: '/v1/ch/clearing/:iid',
+    examplePath: '/v1/ch/clearing/100',
     price_usdc: 0.003,
     description: `Swiss BC-Nummer / IID clearing lookup with SIC, euroSIC, Instant Payments and QR-IID data (${F.claim.chClearing} SIX entries, refreshed monthly)`,
   },
@@ -64,7 +84,7 @@ function buildAccepts(endpoint: PricedEndpoint, walletAddress: string) {
       scheme: 'exact',
       network: NETWORK,
       maxAmountRequired: atomicAmount,
-      resource: `https://api.ibanforge.com${endpoint.path}`,
+      resource: `https://api.ibanforge.com${endpoint.examplePath ?? endpoint.path}`,
       description: endpoint.description,
       mimeType: 'application/json',
       payTo: walletAddress,
