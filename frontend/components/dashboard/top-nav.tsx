@@ -12,16 +12,19 @@ export function TopNav() {
   const t = useTranslations('dashboard');
   const locale = useLocale();
 
-  // Clients and prospects were two tabs over two near-twin pages. They are one
-  // page now, so one tab. The old paths still resolve, as redirections.
+  // Clients and prospects were two tabs over two near-twin pages, merged into
+  // Contacts. The Clients tab that came back on 30/07/2026 is a different
+  // thing: Contacts is the conversation, Clients is what they do with the API.
   const onContacts = pathname.includes('/dashboard/contacts');
-  const onOverview = !onContacts;
+  const onClients = pathname.includes('/dashboard/clients');
+  const onOverview = !onContacts && !onClients;
   const current = Number(searchParams.get('period') ?? 30);
   const period = PERIODS.includes(current) ? current : 30;
 
   const TABS = [
     { key: 'overview', href: `/${locale}/dashboard`, label: t('topNav.overview'), active: onOverview },
     { key: 'contacts', href: `/${locale}/dashboard/contacts`, label: t('topNav.contacts'), active: onContacts },
+    { key: 'clients', href: `/${locale}/dashboard/clients`, label: 'Clients', active: onClients },
   ];
 
   return (
