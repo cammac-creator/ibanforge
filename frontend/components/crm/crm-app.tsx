@@ -3,14 +3,38 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { CLIENT_PARAM, contactIdFromParam } from '@/lib/crm/deep-link';
+import { intentOf } from '@/lib/crm/intent';
 import type { Contact, Message, Situation } from '@/lib/crm/types';
-import { ComposerDock } from './composer-dock';
 import { ContactDetail, ContactIdentity } from './contact-header';
-import { ContactList } from './contact-list';
 import { DraftCard } from './draft-card';
+import { MailList } from './mail-list';
+import { OUTBOUND_SHEET_COVER_PX, OutboundSheet } from './outbound-sheet';
+import { REPLY_SHEET_COVER_PX, ReplySheet } from './reply-sheet';
 import { SituationBand } from './situation-band';
 import { Thread } from './thread';
-import { TodayRail } from './today-rail';
+
+/**
+ * How tall the thread pane stands, as one value rather than a number scattered
+ * over the file.
+ *
+ * Posed by arithmetic, from the real top of the pane. The context line is the
+ * only thing above it now, so on the ordinary window: the top bar is 57px
+ * (py-3 around a 32px tab row, plus its bottom border), the dashboard's main
+ * pads 32px at the md breakpoint, the context line is one 24px row and the
+ * page's gap-5 adds 20. That is 133px above the pane, and 9rem leaves the foot
+ * of the pane just short of the fold.
+ *
+ * It replaces a 76vh cap that was sized for a page carrying a podium, six
+ * figure cards and a campaign band above the CRM. With those gone the cap left
+ * a quarter of the window empty under the thread.
+ *
+ * It could not be measured where it was written: the dashboard is behind a
+ * login and the CRM reads live data through an admin secret, and a development
+ * checkout carries neither. So it is posed by arithmetic, in one place, and
+ * checked against a real window on a deploy preview. One constant is what makes
+ * that check a one-line correction rather than a hunt.
+ */
+const PANE_HEIGHT = 'h-[calc(100vh-9rem)]';
 
 /**
  * Identity of a draft as displayed. The stored id is derived from the address
@@ -63,9 +87,10 @@ export function CrmApp({
   );
   const [selectedId, setSelectedId] = useState<string | null>(linked);
   const [readLocal, setReadLocal] = useState<Set<string>>(new Set());
-  // Owned here rather than in the dock: folding changes how tall the thread is,
-  // and the thread has to be re-anchored on its newest message afterwards,
-  // which only an effect that depends on this can do.
+  // Owned here rather than in the sheets: opening one decides how much scroll
+  // room the thread has to hand back, and the thread has to be re-anchored on
+  // its newest message afterwards, which only an effect that depends on this
+  // can do.
   const [composerOpen, setComposerOpen] = useState(false);
 
   // Same behaviour as the workspace this replaces: opening a thread clears its
@@ -87,12 +112,18 @@ export function CrmApp({
     }
   }
 
-  // Memoised: a fresh array on every keystroke in the list's search box would
-  // invalidate every memo down there for nothing.
+  // Memoised: the projection clones every contact read this session, so
+  // without the memo each render of this component would hand the tree below
+  // fresh objects to reconcile. The list's search costs nothing here either
+  // way: its state lives in MailList, so typing re-renders that column alone.
   //
   // A thread arrived at by link counts as read exactly like one arrived at by
   // click, and that is derived here rather than pushed into readLocal from an
   // effect: the badge is a function of what is open, not a second copy of it.
+  // Clearing unread also re-ranks the row: "À répondre" sorts unread first
+  // (mail-rows.ts), so the linked thread yields the top of that filter the
+  // moment it opens. Intended, and not new: a click clears the badge through
+  // readLocal and moves the row the same way.
   const view = useMemo(
     () => contacts.map((c) => (readLocal.has(c.id) || c.id === linked ? { ...c, unread: false } : c)),
     [contacts, readLocal, linked],
@@ -100,6 +131,13 @@ export function CrmApp({
 
   const selected = view.find((c) => c.id === selectedId) ?? null;
   const situation = selected ? situations[selected.id] : undefined;
+  /**
+   * Which of the two writing paths this contact is on. Read once here and
+   * nowhere else in this tree: the sheet that is rendered and the room the
+   * thread reserves for it have to agree, and two readings are two answers
+   * waiting to disagree.
+   */
+  const intent = intentOf(situation);
 
   // The scrolling region holds the dossier and then the thread, oldest message
   // first, so its natural resting place is the top: the dossier. What the
@@ -115,8 +153,8 @@ export function CrmApp({
   const scroller = useRef<HTMLDivElement>(null);
 
   // Telling the server the linked thread was read. Only the network call lives
-  // here — the badge itself is derived above — and the ref makes it fire once
-  // per address rather than on every re-render.
+  // here, since the badge itself is derived above, and the ref makes it fire
+  // once per address rather than on every re-render.
   const readPosted = useRef<string | null>(null);
   useEffect(() => {
     if (!linked || readPosted.current === linked) return;
@@ -139,27 +177,28 @@ export function CrmApp({
   }, [selectedId, tailCount, composerOpen]);
 
   return (
-    <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[170px_260px_1fr]">
+    <div className="grid min-w-0 grid-cols-1 gap-0 lg:grid-cols-[296px_1fr]">
       {/* First column, and a sibling of the thread rather than anything inside
-          it: the day's queue has to stay on screen while the operator moves
-          from contact to contact. Below lg the three columns stack and it
-          comes first, which is the same claim on a phone. */}
-      <TodayRail
-        contacts={view}
-        situations={situations}
-        snoozed={snoozed}
-        sentToday={sentToday}
+          it: on a desktop the day's queue stays on screen while the operator
+          moves from contact to contact. Below lg the two columns stack, the
+          list first; the queue scrolls away with the page there, so what
+          survives on a phone is first place, not permanence. */}
+      <MailList
+        input={{ contacts: view, situations, snoozed }}
         selectedId={selectedId}
         onSelect={open}
       />
-      <ContactList
-        contacts={view}
-        situations={situations}
-        snoozed={snoozed}
-        selectedId={selectedId}
-        onSelect={open}
-      />
-      <div className="flex min-w-0 max-h-[76vh] flex-col rounded-xl border border-[var(--ink-4)]/60 bg-[var(--ink-2)]/40 p-4">
+      {/* Positioned, so the writing sheet can float over its foot. Whichever of
+          the two is rendered, it is the only absolutely positioned thing in
+          here, and without this it would anchor itself to the page instead.
+
+          The p-4 below is counted on: both sheets subtract it from their
+          heights as PANEL_PADDING_PX (panel-padding.ts). A class cannot read
+          a constant, so nothing enforces the pair; change this padding and
+          that constant must change with it. */}
+      <div
+        className={`relative flex min-w-0 ${PANE_HEIGHT} flex-col rounded-xl border border-[var(--ink-4)]/60 bg-[var(--ink-2)]/40 p-4`}
+      >
         {!selected ? (
           // "dans la liste", not "à gauche": below the lg breakpoint the list
           // sits above this pane, not beside it.
@@ -169,18 +208,39 @@ export function CrmApp({
         ) : (
           <>
             {/* Pinned: who this is, and what to do about them. Everything else
-                scrolls. Measured with the whole header pinned, a 370px header
-                against a 265px open composer left the thread 0px inside the
-                76vh panel, on the most ordinary window there is. The banner in
-                particular has to stay: its job is to answer "what next" at the
-                moment the operator decides what to write. */}
+                scrolls. It is a tall thing to pin, and it is what made the
+                writing surface float: measured with this header pinned, its
+                370px against a 265px composer that sat in the flow left the
+                thread 0px inside the 76vh panel, on the most ordinary window
+                there is. The banner in particular has to stay: its job is to
+                answer "what next" at the moment the operator decides what to
+                write. */}
             <ContactIdentity contact={selected} />
             {situation && (
               <div className="mt-3">
                 <SituationBand situation={situation} />
               </div>
             )}
-            <div ref={scroller} className="mt-3 min-h-0 flex-1 overflow-y-auto pr-1">
+            {/* The room the open sheet covers, handed back as scroll space.
+                The sheet floats, so this region keeps its full height, but the
+                effect above scrolls it to its very end and that end would sit
+                behind the sheet. This padding is what lets the newest message
+                rise above it. Each sheet declares what it covers, and the two
+                differ: prospecting writes in six rows where an answer takes
+                four. Nothing is reserved while both are folded, since a folded
+                bar sits in the flow and covers nothing. */}
+            <div
+              ref={scroller}
+              style={
+                composerOpen
+                  ? {
+                      paddingBottom:
+                        intent === 'reply' ? REPLY_SHEET_COVER_PX : OUTBOUND_SHEET_COVER_PX,
+                    }
+                  : undefined
+              }
+              className="mt-3 min-h-0 flex-1 overflow-y-auto pr-1"
+            >
               <ContactDetail contact={selected} />
               <Thread
                 messages={selected.messages}
@@ -212,17 +272,35 @@ export function CrmApp({
                 wherever the thread is scrolled. Keyed on the contact, for the
                 sharper version of the same reason as the card above: text left
                 in the composer must never follow the operator to the next
-                contact and be sent to them. */}
-            <ComposerDock
-              key={selected.id}
-              contact={selected}
-              situation={situation}
-              // The page's count, forwarded untouched: the guardrail that caps
-              // the day reads it, and nothing below this line builds a Date.
-              sentToday={sentToday}
-              open={composerOpen}
-              onOpenChange={setComposerOpen}
-            />
+                contact and be sent to them.
+
+                Two paths and not one. Answering somebody who wrote to us has
+                nothing to choose and nothing to prospect, so it gets a short
+                sheet and the two checks that still apply. A mail nobody asked
+                for gets the angles, the pre-written mail, the draft and the
+                whole rule set. Both float over this panel; only the height
+                they cover differs. */}
+            {intent === 'reply' ? (
+              <ReplySheet
+                key={selected.id}
+                contact={selected}
+                situation={situation}
+                // The page's count, forwarded untouched: the guardrail that caps
+                // the day reads it, and nothing below this line builds a Date.
+                sentToday={sentToday}
+                open={composerOpen}
+                onOpenChange={setComposerOpen}
+              />
+            ) : (
+              <OutboundSheet
+                key={selected.id}
+                contact={selected}
+                situation={situation}
+                sentToday={sentToday}
+                open={composerOpen}
+                onOpenChange={setComposerOpen}
+              />
+            )}
           </>
         )}
       </div>

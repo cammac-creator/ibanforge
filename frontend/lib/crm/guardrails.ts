@@ -1,9 +1,18 @@
+import type { Intent } from './intent';
 import { type PreviousMail, REPEAT_RATIO, repeatRatio, sameSubject } from './repeat';
 import { HARD_CAP, SOFT_CAP } from './sent-today';
 import type { GuardrailIssue, GuardrailReport } from './types';
 
 export interface CheckInput {
   body: string;
+  /**
+   * Which writing path this is. Derived by intent.ts, never asked.
+   *
+   * Required rather than optional with a default: a caller that forgets it
+   * would silently get the prospecting rule set on a reply, which is the exact
+   * defect this field exists to remove. A compile error is the cheaper failure.
+   */
+  intent: Intent;
   /**
    * The subject line, when the caller has one. Optional so that a body-only
    * call keeps behaving exactly as it did before the field existed.
@@ -50,6 +59,7 @@ export interface CheckInput {
  */
 export const BLOCK_LABEL: Partial<Record<GuardrailIssue['code'], string>> = {
   em_dash: 'tiret cadratin',
+  empty_body: 'message vide',
   daily_cap: 'plafond du jour',
 };
 
@@ -153,6 +163,7 @@ export function checkDraft({
   sentToday,
   isFirstTouch,
   previous,
+  intent,
 }: CheckInput): GuardrailReport {
   const issues: GuardrailIssue[] = [];
   const lowerBody = body.toLowerCase();
@@ -181,97 +192,122 @@ export function checkDraft({
     });
   }
 
-  if (sentToday >= HARD_CAP) {
+  /**
+   * Both intentions. Sending an empty mail is never what was meant, and it is
+   * the one mistake a fast reply path makes easy: the sheet opens focused, and
+   * a stray Enter would otherwise send nothing at all.
+   */
+  if (!body.trim()) {
     issues.push({
-      code: 'daily_cap',
+      code: 'empty_body',
       level: 'blocking',
-      message: `Plafond du jour atteint (${sentToday}/${HARD_CAP}). Au-delà, tu joues la réputation du domaine.`,
+      message: 'Le message est vide.',
     });
-  } else if (sentToday >= SOFT_CAP) {
-    issues.push({
-      code: 'daily_high',
-      level: 'warning',
-      message: `${sentToday} mails déjà partis aujourd’hui. La cadence visée est de 5 à 8.`,
-    });
-  }
-
-  const { words, links } = scanBody(body);
-
-  // An empty body raises nothing on purpose: a blank draft is the composer's
-  // business, and answering "0 mots, la cible est 40-90" to someone who has not
-  // started writing would be noise on every new draft.
-  // Named `target` rather than `window`: this package ships to a browser, and a
-  // local binding that shadows the DOM global inside a function is a trap for
-  // whoever edits it next.
-  const target = isFirstTouch ? FIRST_TOUCH_WORDS : FOLLOWUP_WORDS;
-  if (words > 0 && (words < target.min || words > target.max)) {
-    issues.push({
-      code: 'length',
-      level: 'warning',
-      // Task 11 checks as the operator types, so this message is on screen from
-      // the first word onwards. "1 mots" every time a draft is started reads as
-      // a broken tool, which is not what a panel asking to be trusted can do.
-      message: `${words} mot${words > 1 ? 's' : ''}. La cible ${isFirstTouch ? 'pour un premier mail' : 'pour une relance'} est ${target.min}-${target.max}.`,
-    });
-  }
-
-  if (links > 1) {
-    issues.push({
-      code: 'too_many_links',
-      level: 'warning',
-      message: `${links} liens. Un seul suffit, au-delà le filtre anti-spam se méfie.`,
-    });
-  }
-
-  // Body only: an opt-out in the header is not an opt-out.
-  if (isFirstTouch && !OPTOUT_HINTS.some((h) => lowerBody.includes(h))) {
-    issues.push({
-      code: 'no_optout',
-      level: 'warning',
-      message: 'Pas de sortie proposée. Un premier mail à froid doit offrir de ne plus être contacté.',
-    });
-  }
-
-  // One flag per draft, not one per match: a panel that turns red seven times
-  // for one bad sentence is a panel the operator stops reading. Subject
-  // included, since that is the field the filters weigh hardest.
-  const hit = SPAM_WORDS.find((w) => lowerWritten.includes(w));
-  if (hit) {
-    issues.push({ code: 'spam_word', level: 'warning', message: `Mot à risque : « ${hit} ».` });
   }
 
   /**
-   * The question nothing here used to ask: does this say what the last mail
-   * already said. Both of these warn and neither ever blocks. See repeat.ts for
-   * why the measure is what it is; the choice of level is the point here.
+   * Everything below is prospecting hygiene: cadence against a domain's
+   * reputation, a length window tuned for a cold mail, an opt-out a stranger is
+   * owed, and repetition against the last mail we sent unprompted.
    *
-   * An em dash and the daily cap are promises about the domain's reputation,
-   * which is why they take the send away until the operator overrides them.
-   * Resending a close text is not that. It is an editorial call, sometimes the
-   * right one, and the operator is the only one holding what the recipient
-   * said on the phone yesterday. So this is loud and never in the way.
+   * None of it applies to a reply. Answering a question in two sentences is not
+   * a mail that is too short, and someone who just wrote to us does not need to
+   * be offered a way to stop being contacted.
    */
-  if (previous) {
-    const ratio = repeatRatio(body, previous.text);
-    if (ratio !== null && ratio >= REPEAT_RATIO) {
-      // Rounded to the nearest ten: the figure is a reading of a set overlap,
-      // not a measurement, and printing 62 % invites an argument about the 2.
-      const rounded = Math.round(ratio * 10) * 10;
+  if (intent === 'outbound') {
+    if (sentToday >= HARD_CAP) {
       issues.push({
-        code: 'repeat_previous',
+        code: 'daily_cap',
+        level: 'blocking',
+        message: `Plafond du jour atteint (${sentToday}/${HARD_CAP}). Au-delà, tu joues la réputation du domaine.`,
+      });
+    } else if (sentToday >= SOFT_CAP) {
+      issues.push({
+        code: 'daily_high',
         level: 'warning',
-        message: `Environ ${rounded} % de ce texte se retrouve déjà dans ton dernier mail envoyé. Coupe ce qui a déjà été dit et garde une seule idée neuve.`,
+        message: `${sentToday} mails déjà partis aujourd’hui. La cadence visée est de 5 à 8.`,
       });
     }
-    // Cheaper than the body comparison and more visible to the recipient: the
-    // subject is the line they read before deciding to open anything.
-    if (subject && sameSubject(subject, previous.subject)) {
+
+    const { words, links } = scanBody(body);
+
+    // An empty body raises `empty_body` above and must not also be lectured on
+    // length here: "0 mots, la cible est 40-90" on a draft not yet started is
+    // noise on every open of the sheet, and a word count only means something
+    // once there are words.
+    // Named `target` rather than `window`: this package ships to a browser, and a
+    // local binding that shadows the DOM global inside a function is a trap for
+    // whoever edits it next.
+    const target = isFirstTouch ? FIRST_TOUCH_WORDS : FOLLOWUP_WORDS;
+    if (words > 0 && (words < target.min || words > target.max)) {
       issues.push({
-        code: 'same_subject',
+        code: 'length',
         level: 'warning',
-        message:
-          'Objet identique à ton dernier mail envoyé. Donne-lui un objet qui annonce ce que celui-ci apporte de neuf.',
+        // Task 11 checks as the operator types, so this message is on screen from
+        // the first word onwards. "1 mots" every time a draft is started reads as
+        // a broken tool, which is not what a panel asking to be trusted can do.
+        message: `${words} mot${words > 1 ? 's' : ''}. La cible ${isFirstTouch ? 'pour un premier mail' : 'pour une relance'} est ${target.min}-${target.max}.`,
       });
+    }
+
+    if (links > 1) {
+      issues.push({
+        code: 'too_many_links',
+        level: 'warning',
+        message: `${links} liens. Un seul suffit, au-delà le filtre anti-spam se méfie.`,
+      });
+    }
+
+    // Body only: an opt-out in the header is not an opt-out.
+    if (isFirstTouch && !OPTOUT_HINTS.some((h) => lowerBody.includes(h))) {
+      issues.push({
+        code: 'no_optout',
+        level: 'warning',
+        message: 'Pas de sortie proposée. Un premier mail à froid doit offrir de ne plus être contacté.',
+      });
+    }
+
+    // One flag per draft, not one per match: a panel that turns red seven times
+    // for one bad sentence is a panel the operator stops reading. Subject
+    // included, since that is the field the filters weigh hardest.
+    const hit = SPAM_WORDS.find((w) => lowerWritten.includes(w));
+    if (hit) {
+      issues.push({ code: 'spam_word', level: 'warning', message: `Mot à risque : « ${hit} ».` });
+    }
+
+    /**
+     * The question nothing here used to ask: does this say what the last mail
+     * already said. Both of these warn and neither ever blocks. See repeat.ts for
+     * why the measure is what it is; the choice of level is the point here.
+     *
+     * An em dash and the daily cap are promises about the domain's reputation,
+     * which is why they take the send away until the operator overrides them.
+     * Resending a close text is not that. It is an editorial call, sometimes the
+     * right one, and the operator is the only one holding what the recipient
+     * said on the phone yesterday. So this is loud and never in the way.
+     */
+    if (previous) {
+      const ratio = repeatRatio(body, previous.text);
+      if (ratio !== null && ratio >= REPEAT_RATIO) {
+        // Rounded to the nearest ten: the figure is a reading of a set overlap,
+        // not a measurement, and printing 62 % invites an argument about the 2.
+        const rounded = Math.round(ratio * 10) * 10;
+        issues.push({
+          code: 'repeat_previous',
+          level: 'warning',
+          message: `Environ ${rounded} % de ce texte se retrouve déjà dans ton dernier mail envoyé. Coupe ce qui a déjà été dit et garde une seule idée neuve.`,
+        });
+      }
+      // Cheaper than the body comparison and more visible to the recipient: the
+      // subject is the line they read before deciding to open anything.
+      if (subject && sameSubject(subject, previous.subject)) {
+        issues.push({
+          code: 'same_subject',
+          level: 'warning',
+          message:
+            'Objet identique à ton dernier mail envoyé. Donne-lui un objet qui annonce ce que celui-ci apporte de neuf.',
+        });
+      }
     }
   }
 

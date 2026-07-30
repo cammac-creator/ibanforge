@@ -7,9 +7,9 @@ import type { Contact, ProspectSourcing } from './types';
  *
  * Every figure below was computable from data the CRM already held on
  * 27/07/2026, and the CRM computed none of them. Deciding what to source next
- * without them means deciding blind, which is how four segments came to be
- * worked at the same intensity while one of them had returned nothing in
- * twelve sends and another had returned a paying customer.
+ * without them means deciding blind, which is how the segments came to be
+ * worked at the same intensity while one of them had returned nothing at all
+ * and another had returned a paying customer.
  *
  * ## What counts as what
  *
@@ -17,9 +17,9 @@ import type { Contact, ProspectSourcing } from './types';
  * nothing from them in between, which is a real follow-up; counting "received
  * two mails" instead would score every conversation as a follow-up and inflate
  * the figure four-fold on this data. `replied` is at least one inbound from a
- * person, robots excluded (see automated.ts), which is the difference between
- * six replies and eight. `converted` is holding an API key that is paid or
- * actually used.
+ * person, robots excluded (see automated.ts), which took a quarter off the
+ * reply column when the mailbox was measured. `converted` is holding an API
+ * key that is paid or actually used.
  */
 export interface FunnelRow {
   key: string;
@@ -135,9 +135,9 @@ export const BY_CONFIDENCE = (c: Contact) => {
  * sourcing. Country is different: it lives on ContactBase and build-contacts
  * fills it for a client from enrichEmail, so the data is there. Gating this
  * cut on the sourcing block the way the others do left the customers out:
- * measured on the real list, the geography table summed to 78 rows where 99
- * contacts were active, quietly omitting the whole customer base from the one
- * screen meant to say where the business actually is.
+ * measured on the real list, the geography table summed to noticeably fewer
+ * rows than there were active contacts, quietly omitting the whole customer
+ * base from the one screen meant to say where the business actually is.
  *
  * Rows whose stored text names no country land in one visible bucket rather
  * than vanishing: a breakdown that silently drops a tenth of its rows claims a

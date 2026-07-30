@@ -3,8 +3,9 @@
  *
  * ## What the field actually holds
  *
- * Measured on 27/07/2026: 42 distinct labels for 80 rows, more than half of
- * them appearing once. The same country written three ways ("Suisse",
+ * Measured on 27/07/2026: about half as many distinct labels as there were
+ * rows, more than half of those labels appearing exactly once. The same country
+ * written three ways ("Suisse",
  * "Switzerland", "Switzerland / EU"), ISO codes mixed with names in two
  * languages ("DE" beside "Allemagne" beside "Germany"), and whole sentences
  * where a country was expected:
@@ -54,8 +55,8 @@ const NOT_A_COUNTRY = new Set([
   'EU', 'EZ', 'UN', 'ZZ', 'QO', 'XA', 'XB',
   // Deprecated codes the runtime still names, and whose name collides with a
   // live country's. FX ("France métropolitaine") comes back as plain "France"
-  // in English: measured on the real data, six rows saying "France" were
-  // filed under FX rather than FR before this line existed.
+  // in English: measured on the real data, rows saying "France" were filed
+  // under FX rather than FR before this line existed.
   'FX', 'AN', 'CS', 'SU', 'YU', 'ZR', 'TP', 'BU', 'DD', 'NT', 'QU',
 ]);
 

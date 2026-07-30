@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { BLOCK_LABEL, checkDraft, EM_DASH } from '@/lib/crm/guardrails';
+import { intentOf } from '@/lib/crm/intent';
 import { lastOutbound } from '@/lib/crm/repeat';
 import type { GuardrailReport, Message, Situation } from '@/lib/crm/types';
 
@@ -74,11 +75,12 @@ export interface Guarded {
  *
  * `sendable` is the caller's own answer to "could this be sent at all, the
  * checks aside": an address, a subject, a body, nothing in flight. The
- * override is tied to it because `daily_cap` fires on the counter alone, so
- * past ten sends every freshly opened composer starts blocked over an empty
- * draft, and an escape hatch offered there would re-arm a button that is off
- * for another reason. A control that visibly does nothing when clicked is how
- * the operator learns to distrust the whole panel.
+ * override is tied to it because two blocks fire with nothing typed:
+ * `empty_body` on the text alone, under both intents, and `daily_cap` on the
+ * counter alone, on the outbound path only. So a freshly opened composer
+ * starts blocked over an empty draft, and an escape hatch offered there would
+ * re-arm a button that is off for another reason. A control that visibly does
+ * nothing when clicked is how the operator learns to distrust the whole panel.
  *
  * `sentToday` is never recounted here and no Date is built: msg_date carries
  * no timezone, and this tree is server-rendered before it is hydrated.
@@ -95,7 +97,12 @@ export function useGuardrails({
   body: string;
   /** Counted by the page, against the one instant the situations use. */
   sentToday: number;
-  /** Undefined only if the page failed to derive one; every rule then falls to its warmer form. */
+  /**
+   * Undefined only if the page failed to derive one. Absent, the checks take
+   * the stricter road, not a warmer one: intent falls to 'outbound', which
+   * arms the whole prospecting rule set; only isFirstTouch falls loose, and
+   * it governs two warnings.
+   */
   situation?: Situation;
   /**
    * The contact's correspondence, from which the last mail actually sent is
@@ -111,12 +118,16 @@ export function useGuardrails({
   // What a cold first touch is, decided once for both surfaces. Undefined
   // falls to false, which only loosens two warnings and never a block.
   const isFirstTouch = situation?.nextAction === 'first_mail';
+  // Which rule set applies, decided once for both surfaces. Derived rather than
+  // passed in: an absent situation answers `outbound`, which keeps every
+  // guardrail armed, so a surface that forgets to hand one down loses no check.
+  const intent = intentOf(situation);
   // Held apart from the report below so that typing, which changes `body` on
   // every keystroke, does not walk the whole thread again each time.
   const previous = useMemo(() => lastOutbound(messages) ?? undefined, [messages]);
   const report = useMemo(
-    () => checkDraft({ body, subject, sentToday, isFirstTouch, previous }),
-    [body, subject, sentToday, isFirstTouch, previous],
+    () => checkDraft({ body, subject, sentToday, isFirstTouch, previous, intent }),
+    [body, subject, sentToday, isFirstTouch, previous, intent],
   );
 
   const blockers = report.issues.filter((i) => i.level === 'blocking');

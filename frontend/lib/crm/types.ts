@@ -128,6 +128,7 @@ export interface Situation {
 export interface GuardrailIssue {
   code:
     | 'em_dash'
+    | 'empty_body'
     | 'daily_cap'
     | 'daily_high'
     | 'length'

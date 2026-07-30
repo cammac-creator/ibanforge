@@ -24,9 +24,9 @@ const STORED_STATUS: Record<string, { label: string; color: string; bg: string }
   a_mailer: { label: 'À mailer', color: '#22c55e', bg: '#052e16' },
   a_enrichir: { label: 'À enrichir', color: '#f59e0b', bg: '#451a03' },
   // The value the ingester writes as soon as an outbound reaches the address,
-  // and by far the most common one in the table: 62 rows of 80 on 27/07/2026.
-  // It was missing here, so the badge rendered null for three prospects out of
-  // four, and the schema comment in src/lib/db.ts did not list it either.
+  // and by far the most common one in the table when this was written. It was
+  // missing here, so the badge rendered null for the large majority of
+  // prospects, and the schema comment in src/lib/db.ts did not list it either.
   contacte: { label: 'Contacté', color: '#60a5fa', bg: '#172554' },
   archive: { label: 'Archivé', color: '#a1a1aa', bg: '#27272a' },
 };

@@ -128,7 +128,18 @@ function datedAscending(rows: MessageRow[]): MessageRow[] {
     .map((r) => r.message);
 }
 
-/** A large free quota is an evaluation, not a customer. Paid keys are never pilots. */
+/**
+ * A large free quota is an evaluation, not a customer. Paid keys are never
+ * pilots.
+ *
+ * A SECOND, different definition of "pilot" lives on the overview:
+ * app/[locale]/dashboard/(protected)/page.tsx counts `monthly_limit > 200`,
+ * with no credits term. Keys between the two thresholds are pilots there and
+ * clients here, and a key at PILOT_LIMIT is a pilot there and absent from the
+ * CRM cards this rule feeds. Both rules pre-date the page that shows them
+ * together; the divergence is known, not a bug, and moving either threshold
+ * moves figures the owner reads daily.
+ */
 function isPilot(row: KeyRow): boolean {
   return row.credits_total == null && (row.monthly_limit ?? 0) >= PILOT_LIMIT;
 }
@@ -289,9 +300,9 @@ export function buildContacts(input: BuildInput, now: Date = new Date()): Contac
     //
     // The last term is the one that was missing. A signup that happened this
     // morning has no calls and no thread BY DEFINITION, so this rule hid the
-    // single most valuable row in the CRM. Nineteen customers were invisible on
-    // 29/07/2026. The window is what keeps that from swinging the other way and
-    // burying them under every dead key back to May.
+    // single most valuable row in the CRM. A sizeable share of the customer
+    // base was invisible on 29/07/2026. The window is what keeps that from
+    // swinging the other way and burying them under every dead key back to May.
     const isNew = signedUpRecently(row.created_at, now);
     const meaningful = isPaid || row.used_all_time > 0 || rowCount > 0 || isNew;
     if (!meaningful) continue;

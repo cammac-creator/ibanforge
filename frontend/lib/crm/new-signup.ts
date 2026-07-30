@@ -8,8 +8,8 @@
  * from May that is right. For someone who signed up this morning it is exactly
  * backwards: a fresh signup has no calls and no thread BY DEFINITION, so the
  * single most valuable row in the CRM was the one row guaranteed to be missing.
- * Nineteen customers were invisible on 29/07/2026, one of them from a cluster
- * being actively worked.
+ * A sizeable share of the customer base was invisible on 29/07/2026, including
+ * a signup from a cluster being actively worked.
  *
  * ## Why a window rather than showing them all
  *

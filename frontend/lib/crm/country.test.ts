@@ -2,14 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { nameOf, resolveCountry, UNKNOWN_LABEL } from './country';
 
 /**
- * The shapes below are the real ones. The 27/07/2026 measurement found 42
- * distinct labels for 80 rows; these are one of each class it contained.
+ * The shapes below are the real ones. The 27/07/2026 measurement found about
+ * half as many distinct labels as there were rows; these are one of each class
+ * it contained.
  */
 describe('resolveCountry', () => {
   it('folds the three spellings of one country onto one code', () => {
-    // The single most common defect in the field: sixteen rows said "Suisse",
-    // three said "Switzerland", one said "CH", and they counted as three
-    // different places.
+    // The single most common defect in the field: rows said "Suisse", others
+    // said "Switzerland" or "CH", and they counted as three different places.
     for (const v of ['Suisse', 'Switzerland', 'CH', 'suisse', ' SUISSE ']) {
       expect(resolveCountry(v).code).toBe('CH');
     }

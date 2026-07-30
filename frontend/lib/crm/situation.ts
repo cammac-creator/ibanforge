@@ -28,9 +28,9 @@ interface DatedMessage {
  *
  * Automated inbound is excluded on the same footing, and for the same reason:
  * a support desk acknowledging a ticket has not answered us. Measured on the
- * real mailbox, letting robots through put two companies in `hasEverReplied`
- * that had never written, and left four of the five ball-in-court threads
- * waiting on a reply nobody was owed. See automated.ts, which also explains
+ * real mailbox, letting robots through put companies in `hasEverReplied` that
+ * had never written, and left most of the ball-in-court threads waiting on a
+ * reply nobody was owed. See automated.ts, which also explains
  * why the test is on the text rather than on the sender. The messages stay in
  * `Contact.messages` and still render in the thread; they simply do not decide
  * anything here.

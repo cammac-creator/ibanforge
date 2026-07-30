@@ -5,12 +5,13 @@ import type { Contact, Situation } from './types';
  *
  * ## The problem this solves
  *
- * Measured on 27/07/2026: fifty follow-ups due at once, median silence 25
- * days, and 47 of the 50 had received exactly one mail. The list ordered them
- * by how long they had been silent, which is the least informative signal
- * available, and showed no reason for the order it had chosen. At five to ten
- * sends a day, the order in which that queue is attacked is the most
- * consequential decision of the week, and the tool was not helping make it.
+ * Measured on 27/07/2026: a large batch of follow-ups came due at once, weeks
+ * of median silence, and nearly all of them had received exactly one mail. The
+ * list ordered them by how long they had been silent, which is the least
+ * informative signal available, and showed no reason for the order it had
+ * chosen. At five to ten sends a day, the order in which that queue is attacked
+ * is the most consequential decision of the week, and the tool was not helping
+ * make it.
  *
  * ## The ladder
  *
@@ -29,12 +30,12 @@ import type { Contact, Situation } from './types';
  *
  * ## Why segment is NOT a rung, though the audit listed it
  *
- * The reply counts by segment on the real data are 3, 2, 1 and 0 out of
- * sixteen to nineteen sends each. Ranking on those numbers would harden a
+ * The reply counts by segment on the real data are a handful at most, out of
+ * a few dozen sends in all. Ranking on those numbers would harden a
  * difference that samples this small do not support: at a uniform 10 % reply
- * rate, seeing zero out of twelve happens about once in four campaigns. The
- * same caution is written into the audit and it would be incoherent to encode
- * the opposite here. Confidence earns its three rungs on a different basis: it
+ * rate, a dozen sends come back with zero replies about once in four times.
+ * The same caution is written into the audit and it would be incoherent to
+ * encode the opposite here. Confidence earns its three rungs on a different basis: it
  * is the only field where the whole of the evidence and the whole of the
  * absence of evidence point the same way, so ordering by it costs nothing if
  * it turns out to be noise.
@@ -125,10 +126,10 @@ export function byPriority(
  * buildContacts drops them.
  *
  * This exists because the "Prospects" card counts the whole list and therefore
- * reads as a reserve. On 27/07/2026 it said 78 while the number of high
- * confidence prospects left to write to was zero, the last one having been
- * rejected. A card that says "reserve" when the reserve is empty is worse than
- * no card.
+ * reads as a reserve. Measured on 27/07/2026, it showed the full list while the
+ * number of high confidence prospects left to write to had fallen to zero, the
+ * last one having been rejected. A card that says "reserve" when the reserve is
+ * empty is worse than no card.
  */
 export function sendableStock(contacts: Contact[]): { total: number; byConfidence: Record<string, number> } {
   const byConfidence: Record<string, number> = { high: 0, medium: 0, low: 0, unknown: 0 };

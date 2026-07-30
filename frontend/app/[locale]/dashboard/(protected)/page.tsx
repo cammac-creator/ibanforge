@@ -6,6 +6,14 @@ import { ErrorTable } from '@/components/dashboard/error-table';
 import { InfoDot } from '@/components/dashboard/info-dot';
 import { RevenueCard } from '@/components/dashboard/revenue-card';
 import { LiveHealthStrip } from '@/components/dashboard/live-health-strip';
+import { TopUsersToday } from '@/components/dashboard/top-users-today';
+import { FunnelPanel } from '@/components/crm/funnel-panel';
+import { fetchCrmData, type BuildInput } from '@/lib/crm/build-contacts';
+import { BY_CAMPAIGN, BY_CONFIDENCE, BY_COUNTRY, BY_SEGMENT, funnelBy } from '@/lib/crm/funnel';
+import { sendableStock } from '@/lib/crm/priority';
+import { FOLLOWUP_DAYS } from '@/lib/crm/situation';
+import { crmSnapshot } from '@/lib/crm/snapshot';
+import { topUsers } from '@/lib/crm/top-users';
 import { getTranslations, getLocale } from 'next-intl/server';
 
 const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
@@ -102,6 +110,91 @@ function classify(row: KeyRow): { label: string; color: string; bg: string } {
   return { label: 'unused', color: '#71717a', bg: '#27272a' };
 }
 
+// ---------------------------------------------------------------- contact base
+/**
+ * What the contact base looks like right now: who called today, what state the
+ * relationships are in, what each campaign produced.
+ *
+ * This used to sit on /dashboard/contacts, stacked above the CRM. Watching the
+ * base and working in it are two gestures, and the second one is what the
+ * Contacts page is for, so the watching moved here.
+ *
+ * A plain Server Component with no state: everything it shows is derived from
+ * the payload the page already fetched. Its own component rather than inline
+ * JSX so the whole block narrows `crm` once and the page body stays readable.
+ *
+ * Every figure it shows comes from crmSnapshot, which the Contacts page reads
+ * too. Nothing here recomputes a number the other page also shows.
+ */
+function ContactBase({ crm, locale }: { crm: BuildInput; locale: string }) {
+  const snap = crmSnapshot(crm);
+  const top = topUsers(crm.keys, crm.activityByKey, snap.todayUtc);
+
+  // What is actually left to write to, which the "Prospects" total does not
+  // say: a total that reads as a reserve when the high confidence reserve is
+  // empty is worse than no figure at all.
+  const stock = sendableStock(snap.active);
+
+  // Computed from the contacts already built, so the funnel can never disagree
+  // with the figures beside it. Archived rows are excluded like everywhere else.
+  const bySegment = funnelBy(snap.active, BY_SEGMENT);
+  const byCampaign = funnelBy(snap.active, BY_CAMPAIGN);
+  const byConfidence = funnelBy(snap.active, BY_CONFIDENCE);
+  const byCountry = funnelBy(snap.active, BY_COUNTRY);
+
+  return (
+    <>
+      <TopUsersToday top={top} todayUtc={snap.todayUtc} locale={locale} />
+
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
+        <StatCardV2
+          title="Revenu clients"
+          value={`$${snap.revenueUsd}`}
+          accentColor="#22c55e"
+          hint="CA réel des payants (packs Stripe). x402 non attribuable par client."
+        />
+        <StatCardV2
+          title="Tu as la balle"
+          value={String(snap.ballWithUs)}
+          accentColor="#3b82f6"
+          hint="Fils dont le dernier message est entrant : ils attendent ta réponse."
+        />
+        <StatCardV2
+          title="Relances dues"
+          value={String(snap.followupDue)}
+          accentColor="#f59e0b"
+          hint={`Plus de ${FOLLOWUP_DAYS} jours sans réponse depuis ton dernier mail.${snap.asleep ? ` ${snap.asleep} contact${snap.asleep > 1 ? 's' : ''} en veille jusqu'à une date ne sont pas comptés ici.` : ''}`}
+        />
+        <StatCardV2
+          title="Gratuits actifs"
+          value={String(snap.freeActive)}
+          accentColor="#eab308"
+          hint="Clés gratuites qui appellent réellement l’API, candidats à la conversion."
+        />
+        <StatCardV2
+          title="À écrire"
+          value={String(stock.byConfidence.high ?? 0)}
+          accentColor={stock.byConfidence.high ? '#14b8a6' : '#ef4444'}
+          hint={`Prospects en confiance haute, avec une adresse, jamais écrits. Vivier total encore envoyable : ${stock.total} (dont ${stock.byConfidence.medium ?? 0} moyenne, ${stock.byConfidence.low ?? 0} faible). Sur ${snap.prospects} prospects au total.`}
+        />
+        <StatCardV2
+          title="Clients"
+          value={String(snap.clients)}
+          accentColor="#a855f7"
+          hint="Contacts qui ont une clé API."
+        />
+      </div>
+
+      <FunnelPanel
+        bySegment={bySegment}
+        byCampaign={byCampaign}
+        byConfidence={byConfidence}
+        byCountry={byCountry}
+      />
+    </>
+  );
+}
+
 // ================================================================ page
 export default async function DashboardPage({
   searchParams,
@@ -116,13 +209,17 @@ export default async function DashboardPage({
     ? (periodParam as ValidPeriod)
     : 30;
 
-  const [stats, history, funnel, keysData, errors, hourly] = await Promise.all([
+  const [stats, history, funnel, keysData, errors, hourly, crm] = await Promise.all([
     getJSON<StatsResponse>('/stats', statsHeaders),
     getJSON<HistoryEntry[]>(`/stats/history?period=${period}`, statsHeaders),
     getJSON<{ rows?: BusinessFunnelDay[] }>(`/stats/business-funnel?period=${period}`, statsHeaders),
     ADMIN_SECRET ? getJSON<KeysResponse>('/v1/admin/keys', { 'X-Admin-Secret': ADMIN_SECRET }) : Promise.resolve(null),
     getJSON<ErrorsResponse>(`/stats/errors?period=${period}`, statsHeaders),
     getJSON<HourlyResponse>(`/stats/hourly?period=${period}`, statsHeaders),
+    // The CRM payloads, alongside the rest rather than after it. Null when
+    // ADMIN_SECRET is unset or the API is unreachable, which is the same
+    // condition the leads section already draws its own empty state for.
+    fetchCrmData(),
   ]);
 
   if (!stats) {
@@ -164,6 +261,15 @@ export default async function DashboardPage({
   const successRate = ibanTotal > 0 ? ((ibanValid / ibanTotal) * 100).toFixed(1) : '—';
 
   // --- Leads / pilots
+  //
+  // "Pilot" has a SECOND, different definition in the CRM:
+  // lib/crm/build-contacts.ts (isPilot) requires
+  // `credits_total == null && monthly_limit >= 5000` before it sets a key
+  // aside as an evaluation. So an unpaid key at, say, 1000/month is a pilot to
+  // this KPI and an ordinary client to the CRM cards, and one at 5000 is a
+  // pilot here and absent from those cards entirely. Both rules pre-date the
+  // page that put them side by side; the divergence is known, not a bug, and
+  // moving either threshold moves figures the owner reads daily.
   const allKeys = keysData?.keys ?? [];
   const pilots = allKeys
     .filter((k) => (k.monthly_limit ?? 200) > 200)
@@ -209,7 +315,7 @@ export default async function DashboardPage({
           trend={revTrendPct ? { direction: revTrend, label: t('stats.vsYesterday', { percent: revTrendPct }) } : undefined}
           sparkline={revenueSparkline}
           accentColor="#22c55e"
-          hint="Revenu USDC réellement perçu (x402), cumulé. L'historique avant le 17 avril contient ~$0.23 de revenus fantômes non corrigés."
+          hint="Revenu USDC réellement perçu (x402), cumulé. L'historique avant le 17 avril contient des revenus fantômes non corrigés, donc le cumul est surestimé."
         />
         <StatCardV2
           title={t('stats.successRate')}
@@ -249,7 +355,10 @@ export default async function DashboardPage({
         <BusinessFunnelChart data={funnelRows} />
       </div>
 
-      {/* 3. Leads — silent pilots to chase (primacy) */}
+      {/* 3. Contact base — the podium, the relationship figures, the campaigns */}
+      {crm && <ContactBase crm={crm} locale={locale} />}
+
+      {/* 4. Leads — silent pilots to chase (primacy) */}
       <div className={card}>
         <div className="mb-4 flex items-center justify-between gap-2">
           <p className={sectionTitle}>Clients & leads{keysData ? ` — ${keysData.month}` : ''}</p>
@@ -336,10 +445,10 @@ export default async function DashboardPage({
         )}
       </div>
 
-      {/* 4. Revenue (live USDC wallet) */}
+      {/* 5. Revenue (live USDC wallet) */}
       <RevenueCard />
 
-      {/* 5. Traffic — trend + geography */}
+      {/* 6. Traffic — trend + geography */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div className={card}>
           <div className="mb-4 flex items-center gap-2">
@@ -393,7 +502,7 @@ export default async function DashboardPage({
         </div>
       </div>
 
-      {/* 6. Quality — error rates + what's actually failing */}
+      {/* 7. Quality — error rates + what's actually failing */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
         <StatCardV2 title="Taux erreur IBAN" value={`${ibanErrRate.toFixed(2)}%`} sparkline={ibanErrTrend} accentColor="#ef4444" hint="% de /v1/iban/validate renvoyant invalide, sur la période." />
         <StatCardV2 title="Taux miss BIC" value={`${bicMissRate.toFixed(2)}%`} sparkline={bicMissTrend} accentColor="#eab308" hint="% de /v1/bic/:code sans correspondance, sur la période." />
@@ -423,7 +532,7 @@ export default async function DashboardPage({
         />
       </div>
 
-      {/* 7. Activity heatmap — when the traffic happens */}
+      {/* 8. Activity heatmap — when the traffic happens */}
       <Heatmap data={heatmapData} />
     </div>
   );

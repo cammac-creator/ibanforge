@@ -180,7 +180,7 @@ export function threadTail(messages: Message[]): string {
    * acknowledgement introduced as the mail to answer would have the generator
    * write a reply to a robot. `situation` already filters them for the same
    * reason and this file does not see its verdict, so the rule is applied
-   * again rather than assumed: five of sixteen inbound messages were
+   * again rather than assumed: close to a third of inbound messages were
    * automation when the mailbox was measured, so the case is ordinary.
    *
    * Skipping rather than stopping: a human mail still waiting for an answer

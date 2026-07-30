@@ -132,8 +132,8 @@ describe('funnelBy', () => {
   });
 
   it('folds the spellings of one country into one row', () => {
-    // Sixteen rows saying "Suisse" and three saying "Switzerland" were three
-    // separate places before country.ts.
+    // Rows saying "Suisse", "Switzerland" and "CH" were three separate places
+    // before country.ts.
     const rows = funnelBy(
       [prospect('a@example.net', [], {}, 'Suisse'), prospect('b@example.net', [], {}, 'Switzerland'), prospect('c@example.net', [], {}, 'CH')],
       BY_COUNTRY,

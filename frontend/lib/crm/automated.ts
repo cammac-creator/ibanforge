@@ -6,13 +6,13 @@ import type { Message } from './types';
  * ## Why this exists
  *
  * Every inbound row used to count as a human reply. Measured on the real
- * mailbox on 27/07/2026: five of sixteen inbound messages were support-desk
+ * mailbox on 27/07/2026, close to a third of inbound messages were support-desk
  * automation, and they were corrupting the single most action-driving signal
- * in the CRM. Two companies were listed as "ont répondu" when nobody had
- * written a word, and the "Tu as la balle" card showed five threads of which
- * one actually wanted an answer. The tool was not merely hiding information,
- * it was manufacturing it: sending the operator to answer robots and making
- * the campaign look like it converted better than it did.
+ * in the CRM. Companies were listed as "ont répondu" when nobody had written a
+ * word, and most of the threads on the "Tu as la balle" card wanted no answer
+ * at all. The tool was not merely hiding information, it was manufacturing it:
+ * sending the operator to answer robots and making the campaign look like it
+ * converted better than it did.
  *
  * ## Why the test is on the text and not on the sender
  *

@@ -1,13 +1,9 @@
+import type { TopUserToday } from '@/lib/crm/top-users';
 import { InfoDot } from './info-dot';
 
-export interface TopUserToday {
-  email: string;
-  company: string | null;
-  sector: string | null;
-  category: 'PAYANT' | 'PILOTE' | 'GRATUIT';
-  count: number;
-  period: 'today' | 'month';
-}
+// Re-exported so a caller that draws the podium can name its rows without
+// reaching past this file. The shape itself is declared where it is computed.
+export type { TopUserToday };
 
 const MEDALS = ['🥇', '🥈', '🥉'] as const;
 
