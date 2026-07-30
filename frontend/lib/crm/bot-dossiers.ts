@@ -38,9 +38,10 @@ export interface BotProfileRow {
  *
  * ⚠️ `servi` is deliberately NOT called "payeur". A 2xx on a priced endpoint
  * with no key can be an accepted x402 settlement OR a call served for free, and
- * request_log does not record which. Measured 30/07/2026: 1,119 such calls
- * against 0.151 USDC ever received on chain — about thirty calls' worth — so
- * treating them all as payments would overstate revenue by a factor of forty.
+ * request_log does not record which. Checked against the on-chain receipts,
+ * the calls served this way outnumber the ones actually paid for by more than
+ * an order of magnitude, so treating them all as payments would grossly
+ * overstate revenue.
  */
 export type BotVerdict = 'servi' | 'perdu' | 'parti' | 'sonde' | 'annuaire' | 'visiteur';
 

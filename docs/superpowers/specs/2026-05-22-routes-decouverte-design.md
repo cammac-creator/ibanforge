@@ -8,16 +8,14 @@ Servir les conventions de découverte que les crawlers d'annuaires agent / MCP r
 
 ## 1. Contexte
 
-Sur 30 jours, ~420 requêtes tombent en `404` sur des chemins de découverte qu'IBANforge ne sert pas :
+Sur 30 jours, plusieurs centaines de requêtes tombent en `404` sur des chemins de découverte qu'IBANforge ne sert pas, les plus demandés en tête :
 
-| Chemin | Hits 404 |
-|---|---|
-| `/.well-known/mcp.json` | 83 |
-| `/.well-known/agent.json` | 78 |
-| `/agents.txt` | 53 |
-| `/agents.json` | 52 |
-| `/agent-directory.json` | 52 |
-| `/mcp.json` | 52 |
+- `/.well-known/mcp.json`
+- `/.well-known/agent.json`
+- `/agents.txt`
+- `/agents.json`
+- `/agent-directory.json`
+- `/mcp.json`
 
 IBANforge sert **déjà les manifestes équivalents** :
 

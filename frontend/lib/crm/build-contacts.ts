@@ -19,7 +19,7 @@ const OUTCOMES: readonly string[] = ['en_discussion', 'pas_maintenant', 'pas_int
  * Two additions on 29/07/2026, both found by the "Nouveaux clients" chip: probe
  * keys minted and revoked during a session live on @ibanforge.internal, and the
  * founder's own throwaway tests are plus-addressed on his personal Gmail. Both
- * were sitting in the new-customer list beside three real signups, which is
+ * were sitting in the new-customer list beside genuine signups, which is
  * exactly where a false positive costs the most. The plus term is deliberately
  * narrow: his bare address is not a test account.
  */
@@ -283,12 +283,12 @@ export function buildContacts(input: BuildInput, now: Date = new Date()): Contac
     // prospect side, exactly as the two old pages did between them.
     //
     // Unless we are already writing to them. That hand-off assumes a prospect
-    // row exists, and an unprompted signup has none: Raison.finance registered
-    // on 20/07/2026, spent its whole quota in one afternoon and got a reply from
-    // us, yet fell between the two sides and was invisible on 30/07/2026. Worse,
+    // row exists, and an unprompted signup has none: a real customer signed up
+    // unprompted, spent its whole quota in short order and got a reply from
+    // us, yet fell between the two sides and stayed invisible for days. Worse,
     // raising their quota after they hit the wall is what turned them into a
     // pilot and erased them. An open thread is the line, and it is also what
-    // separates this case from the nine outreach pilots we minted ourselves,
+    // separates this case from the outreach pilots we minted ourselves,
     // which carry a couple of smoke-test calls and no correspondence at all.
     const candidates = ordinary.length > 0 ? ordinary : rowCount > 0 ? group : [];
     if (candidates.length === 0) continue;

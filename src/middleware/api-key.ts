@@ -161,8 +161,9 @@ export function apiKeyMiddleware(): MiddlewareHandler<HonoEnv> {
     if (units > 1) c.header('X-Quota-Charged', String(units));
 
     // Upsell on the trajectory, not on the wall. A daily job cannot catch a
-    // client that burns 190 of its 200 calls in 12 minutes (measured 2026-07-23),
-    // so the warning is triggered by the very call that crosses 80%.
+    // client that burns nearly its whole monthly allowance in a matter of
+    // minutes (a real, measured case), so the warning is triggered by the very
+    // call that crosses 80%.
     // Fire-and-forget: the customer's request must never wait on SMTP, and
     // maybeSendQuotaWarning is written not to throw.
     if (quota.crossedNoticeThreshold && email) {

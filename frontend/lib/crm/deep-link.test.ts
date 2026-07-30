@@ -3,8 +3,8 @@ import { contactIdFromParam, contactsHref } from './deep-link';
 
 describe('contactsHref', () => {
   it('carries the address so the thread opens instead of the bare page', () => {
-    expect(contactsHref('fr', 'D.Protasov@Raison.Finance')).toBe(
-      '/fr/dashboard/contacts?client=d.protasov%40raison.finance',
+    expect(contactsHref('fr', 'A.Dupont@Societe-Alpha.Example')).toBe(
+      '/fr/dashboard/contacts?client=a.dupont%40societe-alpha.example',
     );
   });
 
@@ -15,14 +15,14 @@ describe('contactsHref', () => {
 });
 
 describe('contactIdFromParam', () => {
-  const ids = ['d.protasov@raison.finance', 'petteri@asterpay.io'];
+  const ids = ['acme@example.com', 'a.dupont@societe-alpha.example'];
 
   it('finds the contact the link points at', () => {
-    expect(contactIdFromParam('d.protasov@raison.finance', ids)).toBe('d.protasov@raison.finance');
+    expect(contactIdFromParam('acme@example.com', ids)).toBe('acme@example.com');
   });
 
   it('matches whatever the casing of the address in the link', () => {
-    expect(contactIdFromParam('Petteri@AsterPay.io', ids)).toBe('petteri@asterpay.io');
+    expect(contactIdFromParam('A.Dupont@Societe-Alpha.Example', ids)).toBe('a.dupont@societe-alpha.example');
   });
 
   it('selects nothing rather than guessing when the address is unknown', () => {

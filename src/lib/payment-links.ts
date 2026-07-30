@@ -4,8 +4,8 @@
  * Single source of truth for the card rail. They were previously inlined in
  * `src/routes/landing.ts` only, which is why the 402 paywall could advertise
  * `pay_by_card` while pointing at an HTML anchor a machine client never
- * renders: the 2026-07-25 funnel audit found the biggest evaluator of June
- * received 3,862 x 402 and never loaded a single HTML page.
+ * renders: the 2026-07-25 funnel audit found the period's biggest evaluator
+ * received thousands of 402s and never loaded a single HTML page.
  *
  * Keep in sync with `src/routes/landing.ts` and `frontend/app/[locale]/pricing`.
  */

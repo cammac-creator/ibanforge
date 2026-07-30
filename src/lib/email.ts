@@ -84,8 +84,9 @@ export interface QuotaWarningInput {
  *
  * Deliberately does NOT mention POST /v1/keys/generate: pointing a client who
  * is running out of allowance at a second free key is what the 2026-07-25
- * funnel audit measured happening (wall at 15:03, new free key at 15:08, back
- * in service at 15:42, $0). Card first, USDC second, nothing else.
+ * funnel audit measured happening (hit the wall, minted a fresh free key and
+ * was back in service within the hour, without paying). Card first, USDC
+ * second, nothing else.
  */
 export function buildQuotaWarningEmail(p: QuotaWarningInput): { subject: string; text: string; html: string } {
   const pct = Math.round((p.used / p.limit) * 100);

@@ -92,10 +92,11 @@ describe('API Keys', () => {
   });
 });
 
-// The upsell has to fire on the trajectory, not on the wall. The 23/07 case in
-// the funnel audit burned 190 of its 200 calls in 12 minutes: a daily cron saw
-// 10/200 that morning and 200/200 the next, 14 hours too late. Detection must
-// live in the increment itself.
+// The upsell has to fire on the trajectory, not on the wall. The case in the
+// funnel audit burned nearly its whole monthly allowance in a matter of
+// minutes: a daily cron would have seen a barely touched quota one morning and
+// an exhausted one the next, many hours too late. Detection must live in the
+// increment itself.
 describe('quota upsell threshold', () => {
   it('flags the call that takes usage across 80% of the monthly limit', () => {
     const key = generateApiKey(`q80-${RUN_ID}@example.com`, 10)!;

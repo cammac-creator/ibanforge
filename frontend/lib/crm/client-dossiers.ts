@@ -39,8 +39,8 @@ export interface DossierInput {
  * What this customer is, in one word, ordered by which fact matters most.
  *
  * `blocked` outranks `dormant` deliberately: both look like silence on a chart,
- * but one of them is silence we caused and can undo. Raison.finance was dormant
- * for a week on 30/07/2026 and nobody knew it was because they had hit the wall.
+ * but one of them is silence we caused and can undo. A real customer once sat
+ * dormant for days and nobody knew it was because they had hit the wall.
  */
 export type Verdict = 'blocked' | 'struggling' | 'dormant' | 'rising' | 'active' | 'silent';
 
@@ -174,9 +174,9 @@ function decideVerdict(d: ClientDossier, now: Date): Verdict {
   // The last thing that happened to them was being turned away, and nothing
   // has gone right since. Deliberately NOT "their quota is full right now":
   // raising a customer's quota clears that condition without telling the
-  // customer anything, which is exactly how Raison.finance sat unnoticed for a
-  // week in July 2026. The wall they walked away from is the fact that matters,
-  // and only a successful call of their own can clear it.
+  // customer anything, which is exactly how a blocked customer once sat
+  // unnoticed for days. The wall they walked away from is the fact that
+  // matters, and only a successful call of their own can clear it.
   if (d.lastRefusalAt && (!d.lastSuccessAt || d.lastRefusalAt >= d.lastSuccessAt)) return 'blocked';
   if (d.requests >= 20 && d.badInput / d.requests > 0.3) return 'struggling';
   if (d.daysSinceLastCall != null && d.daysSinceLastCall > 14) return 'dormant';

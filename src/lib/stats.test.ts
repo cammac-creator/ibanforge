@@ -606,9 +606,10 @@ describe('the last thing that happened to a customer', () => {
   afterAll(clearSynthetic);
 
   it('separates the last refusal from the last success, so a wall can be told from a pause', () => {
-    // Raison.finance ended on a 402 on 23/07/2026. Their quota was raised
-    // afterwards, so "quota exhausted" is false today and the fact that they
-    // walked away at a wall would be invisible without these two instants.
+    // The case this exists for: a customer ends on a 402 and goes quiet. Their
+    // quota gets raised afterwards, so "quota exhausted" is false today and the
+    // fact that they walked away at a wall would be invisible without these
+    // two instants.
     recordRequest('POST', '/v1/iban/validate', 200, 5, 'api', 'ip', 'ua', 'ifk_profile1');
     recordRequest('POST', '/v1/iban/validate', 402, 5, 'api', 'ip', 'ua', 'ifk_profile1');
     const p = getClientProfiles()['ifk_profile1'];

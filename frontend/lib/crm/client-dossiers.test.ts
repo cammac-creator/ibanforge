@@ -77,11 +77,11 @@ const msg = (email: string, over: Partial<MessageRow> = {}): MessageRow => ({
 
 const prospectRow = (email: string, over: Partial<ProspectRow> = {}): ProspectRow => ({
   id: `p-${email}`,
-  company: 'Raison',
+  company: 'Société Alpha',
   segment: null,
-  website: 'https://raison.example.net',
+  website: 'https://alpha.example.net',
   country: 'CH',
-  what_they_do: 'wealth app',
+  what_they_do: 'invoicing suite',
   fit_reason: null,
   buying_signal: null,
   signal_source_url: null,
@@ -128,11 +128,11 @@ describe('buildDossiers', () => {
   it('takes company, website and country from the prospect record when there is one', () => {
     const out = buildDossiers({
       ...base,
-      keys: [keyRow('d@raison.example.net')],
-      prospects: [prospectRow('d@raison.example.net')],
+      keys: [keyRow('d@alpha.example.net')],
+      prospects: [prospectRow('d@alpha.example.net')],
     });
-    expect(out[0].company).toBe('Raison');
-    expect(out[0].website).toBe('https://raison.example.net');
+    expect(out[0].company).toBe('Société Alpha');
+    expect(out[0].website).toBe('https://alpha.example.net');
     expect(out[0].country).toBe('CH');
   });
 
@@ -190,11 +190,12 @@ describe('the verdict, which is the point of the page', () => {
     })[0].verdict;
 
   it('calls a customer blocked when the last thing we did was turn them away', () => {
-    // Raison.finance, 23/07/2026: 200 calls, then six 402s, then silence.
+    // The real shape, invented figures: a customer runs through its whole
+    // monthly allowance, takes a string of 402s, then goes silent.
     expect(
       verdictOf({}, {
-        total: 206, ok: 200, paywall: 6, last_seen: '2026-07-23 15:35:41',
-        last_success_at: '2026-07-23 15:03:30', last_refusal_at: '2026-07-23 15:35:41',
+        total: 204, ok: 200, paywall: 4, last_seen: '2026-07-25 14:30:00',
+        last_success_at: '2026-07-25 14:00:00', last_refusal_at: '2026-07-25 14:30:00',
       }, { used: 200, monthly_limit: 200 }),
     ).toBe('blocked');
   });
@@ -204,8 +205,8 @@ describe('the verdict, which is the point of the page', () => {
     // a wall and nothing since has told them otherwise. This is the whole point.
     expect(
       verdictOf({}, {
-        total: 206, ok: 200, paywall: 6, last_seen: '2026-07-23 15:35:41',
-        last_success_at: '2026-07-23 15:03:30', last_refusal_at: '2026-07-23 15:35:41',
+        total: 204, ok: 200, paywall: 4, last_seen: '2026-07-25 14:30:00',
+        last_success_at: '2026-07-25 14:00:00', last_refusal_at: '2026-07-25 14:30:00',
       }, { used: 200, monthly_limit: 5000 }),
     ).toBe('blocked');
   });
@@ -213,8 +214,8 @@ describe('the verdict, which is the point of the page', () => {
   it('stops saying blocked once they have called successfully since', () => {
     expect(
       verdictOf({}, {
-        total: 206, ok: 200, paywall: 6, last_seen: '2026-07-29 15:00:00',
-        last_refusal_at: '2026-07-23 15:35:41', last_success_at: '2026-07-29 15:00:00',
+        total: 204, ok: 200, paywall: 4, last_seen: '2026-07-29 15:00:00',
+        last_refusal_at: '2026-07-25 14:30:00', last_success_at: '2026-07-29 15:00:00',
       }, { used: 200, monthly_limit: 5000 }),
     ).not.toBe('blocked');
   });
@@ -252,7 +253,7 @@ describe('the verdict, which is the point of the page', () => {
   it('ranks blocked above dormant, because the reason for the silence is the story', () => {
     expect(
       verdictOf({}, {
-        total: 206, ok: 200, paywall: 6, last_seen: '2026-07-10 09:00:00',
+        total: 204, ok: 200, paywall: 4, last_seen: '2026-07-10 09:00:00',
         last_success_at: '2026-07-10 08:00:00', last_refusal_at: '2026-07-10 09:00:00',
       }, { used: 200, monthly_limit: 200 }),
     ).toBe('blocked');
