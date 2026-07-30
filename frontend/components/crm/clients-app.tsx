@@ -10,13 +10,13 @@ import { flag, relativeDays } from './dossier-bits';
  * doing first, then what is merely true. `blocked` leads because it is the only
  * one that describes a customer we are actively losing.
  */
-const VERDICTS: Array<{ key: Verdict; label: string; colour: string; why: string }> = [
-  { key: 'blocked', label: 'Bloqués', colour: 'var(--err)', why: 'le dernier échange a été un refus, et rien depuis' },
-  { key: 'struggling', label: 'En difficulté', colour: 'var(--warn)', why: 'plus de 30 % de leurs appels sont rejetés' },
-  { key: 'rising', label: 'En montée', colour: 'var(--ok)', why: 'volume en nette hausse sur 7 jours' },
-  { key: 'active', label: 'Actifs', colour: 'var(--info)', why: 'appellent régulièrement' },
-  { key: 'dormant', label: 'Dormants', colour: 'var(--fg-4)', why: 'plus rien depuis plus de 14 jours' },
-  { key: 'silent', label: 'Muets', colour: 'var(--fg-5)', why: 'une clé, jamais utilisée' },
+const VERDICTS: Array<{ key: Verdict; label: string; one: string; colour: string; why: string }> = [
+  { key: 'blocked', label: 'Bloqués', one: 'Bloqué', colour: 'var(--err)', why: 'le dernier échange a été un refus, et rien depuis' },
+  { key: 'struggling', label: 'En difficulté', one: 'En difficulté', colour: 'var(--warn)', why: 'plus de 30 % de leurs appels sont rejetés' },
+  { key: 'rising', label: 'En montée', one: 'En montée', colour: 'var(--ok)', why: 'volume en nette hausse sur 7 jours' },
+  { key: 'active', label: 'Actifs', one: 'Actif', colour: 'var(--info)', why: 'appellent régulièrement' },
+  { key: 'dormant', label: 'Dormants', one: 'Dormant', colour: 'var(--fg-4)', why: 'plus rien depuis plus de 14 jours' },
+  { key: 'silent', label: 'Muets', one: 'Muet', colour: 'var(--fg-5)', why: 'une clé, jamais utilisée' },
 ];
 
 const VERDICT_BY_KEY = Object.fromEntries(VERDICTS.map((v) => [v.key, v])) as Record<Verdict, (typeof VERDICTS)[number]>;
@@ -191,7 +191,7 @@ export function ClientsApp({ dossiers, locale }: { dossiers: ClientDossier[]; lo
                   <span className="flex w-auto items-center gap-1.5 md:w-[13%]">
                     <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: v.colour }} />
                     <span className="truncate text-xs" style={{ color: v.colour }}>
-                      {v.label.replace(/s$/, '')}
+                      {v.one}
                     </span>
                   </span>
                   <span className="w-auto text-right font-mono text-sm tabular-nums text-[var(--fg-1)] md:w-[12%]">

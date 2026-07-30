@@ -4,7 +4,10 @@ import { buildBots, fetchBotProfiles } from '@/lib/crm/bot-dossiers';
 export const dynamic = 'force-dynamic';
 
 export default async function ClientsBotPage() {
-  const profiles = await fetchBotProfiles(90, 5);
+  // Twenty, not five: the 231 agents between the two account for 1.4 % of the
+  // traffic and are almost all one-off visitors. It is also the floor the
+  // `perdu` and `sonde` verdicts need before a ratio means anything.
+  const profiles = await fetchBotProfiles(90, 20);
   const bots = buildBots(profiles, new Date());
 
   if (bots.length === 0) {

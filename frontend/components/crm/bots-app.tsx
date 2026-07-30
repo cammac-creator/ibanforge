@@ -5,13 +5,15 @@ import { sortBots, type BotDossier, type BotSortKey, type BotVerdict } from '@/l
 import { BotDossierPanel } from './bot-dossier-panel';
 import { relativeDays } from './dossier-bits';
 
-const VERDICTS: Array<{ key: BotVerdict; label: string; colour: string; why: string }> = [
-  { key: 'servi', label: 'Passés au travers', colour: 'var(--warn)', why: 'un appel facturé leur a été servi sans clé API' },
-  { key: 'perdu', label: 'Perdus', colour: 'var(--warn)', why: 'plus de la moitié de leurs appels finissent en 404' },
-  { key: 'annuaire', label: 'Annuaires', colour: 'var(--info)', why: 'robot déclaré, servi correctement' },
-  { key: 'sonde', label: 'Sondes', colour: 'var(--amber-600)', why: 'refusés en boucle, ils reviennent, ils ne paient pas' },
-  { key: 'parti', label: 'Partis', colour: 'var(--fg-4)', why: 'plus rien depuis plus de 14 jours' },
-  { key: 'visiteur', label: 'Visiteurs', colour: 'var(--fg-5)', why: 'appel anonyme qui ne se déclare pas' },
+// `one` is spelled out rather than derived by trimming the plural's final s:
+// that trick turns "Passés au travers" into "Passés au traver".
+const VERDICTS: Array<{ key: BotVerdict; label: string; one: string; colour: string; why: string }> = [
+  { key: 'servi', label: 'Passés au travers', one: 'Passé au travers', colour: 'var(--warn)', why: 'un appel facturé leur a été servi sans clé API' },
+  { key: 'perdu', label: 'Perdus', one: 'Perdu', colour: 'var(--warn)', why: 'plus de la moitié de leurs appels finissent en 404' },
+  { key: 'annuaire', label: 'Annuaires', one: 'Annuaire', colour: 'var(--info)', why: 'robot déclaré, servi correctement' },
+  { key: 'sonde', label: 'Sondes', one: 'Sonde', colour: 'var(--amber-600)', why: 'refusés en boucle, ils reviennent, ils ne paient pas' },
+  { key: 'parti', label: 'Partis', one: 'Parti', colour: 'var(--fg-4)', why: 'plus rien depuis plus de 14 jours' },
+  { key: 'visiteur', label: 'Visiteurs', one: 'Visiteur', colour: 'var(--fg-5)', why: 'appel anonyme qui ne se déclare pas' },
 ];
 
 const VERDICT_BY_KEY = Object.fromEntries(VERDICTS.map((v) => [v.key, v])) as Record<
@@ -47,6 +49,10 @@ export function BotsApp({ bots }: { bots: BotDossier[] }) {
   const [filter, setFilter] = useState<BotVerdict | 'all'>('all');
   const [query, setQuery] = useState('');
   const [openId, setOpenId] = useState<string | null>(null);
+  // Nearly two hundred agents clear the floor. Rendering them all made a page
+  // twenty-five thousand pixels tall, where the dozen that matter were
+  // indistinguishable from the tail. Nothing is hidden, only folded.
+  const [showAll, setShowAll] = useState(false);
 
   const counts = useMemo(() => {
     const c = {} as Record<BotVerdict, number>;
@@ -69,6 +75,8 @@ export function BotsApp({ bots }: { bots: BotDossier[] }) {
     return sortBots(filtered, sort);
   }, [bots, filter, query, sort]);
 
+  const VISIBLE = 50;
+  const shown = showAll ? view : view.slice(0, VISIBLE);
   const totalRequests = bots.reduce((s, b) => s + b.requests, 0);
   const lost404 = bots.filter((b) => b.verdict === 'perdu').reduce((s, b) => s + b.notFound, 0);
 
@@ -76,7 +84,7 @@ export function BotsApp({ bots }: { bots: BotDossier[] }) {
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[
-          { l: 'Agents distincts', v: String(bots.length), h: 'au moins 5 appels sur 90 j' },
+          { l: 'Agents distincts', v: String(bots.length), h: 'au moins 20 appels sur 90 j' },
           { l: 'Requêtes anonymes', v: totalRequests.toLocaleString('fr-CH'), h: 'sans aucune clé API' },
           { l: 'Passés au travers', v: String(counts.servi), h: 'appel facturé servi sans clé' },
           { l: 'Appels dans le vide', v: lost404.toLocaleString('fr-CH'), h: '404 servis à des annuaires' },
@@ -145,10 +153,10 @@ export function BotsApp({ bots }: { bots: BotDossier[] }) {
           <span className="w-14 text-right">404</span>
         </div>
 
-        {view.length === 0 ? (
+        {shown.length === 0 ? (
           <p className="px-4 py-8 text-center text-sm text-[var(--fg-4)]">Aucun agent ne correspond.</p>
         ) : (
-          view.map((b) => {
+          shown.map((b) => {
             const v = VERDICT_BY_KEY[b.verdict];
             const open = openId === b.id;
             return (
@@ -169,7 +177,7 @@ export function BotsApp({ bots }: { bots: BotDossier[] }) {
                   <span className="flex w-auto items-center gap-1.5 md:w-[12%]">
                     <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: v.colour }} />
                     <span className="truncate text-xs" style={{ color: v.colour }}>
-                      {v.label.replace(/s$/, '')}
+                      {v.one}
                     </span>
                   </span>
                   <span className="w-auto text-right font-mono text-sm tabular-nums text-[var(--fg-1)] md:w-[11%]">
@@ -197,6 +205,23 @@ export function BotsApp({ bots }: { bots: BotDossier[] }) {
           })
         )}
       </div>
+
+      {view.length > shown.length && (
+        <button
+          onClick={() => setShowAll(true)}
+          className="w-full rounded-xl border border-[var(--ink-4)]/60 bg-[var(--ink-2)]/40 py-2.5 text-xs font-medium text-[var(--fg-3)] transition-colors hover:bg-[var(--ink-3)]/50 hover:text-[var(--fg-1)]"
+        >
+          Afficher les {view.length - shown.length} agents suivants
+        </button>
+      )}
+      {showAll && view.length > VISIBLE && (
+        <button
+          onClick={() => setShowAll(false)}
+          className="w-full py-1 text-xs text-[var(--fg-5)] transition-colors hover:text-[var(--fg-3)]"
+        >
+          Replier
+        </button>
+      )}
     </div>
   );
 }
