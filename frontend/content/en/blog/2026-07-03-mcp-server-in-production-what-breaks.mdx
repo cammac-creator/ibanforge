@@ -21,7 +21,7 @@ Over one 35-day window we served **100,027 HTTP requests** that contained **208 
 
 Real MCP agent traffic (Claude, Cursor, ChatGPT-class clients over stdio) was **464 requests out of 112,521** in 90 days. Real, but small.
 
-If you take one thing from this post: instrument channel attribution *before* you distribute, or you will stare at a big request counter and have no idea whether it's your target market or a crawler. We added a `client_kind` classifier (api / web / bot / mcp_http / mcp_stdio) months too late, and the day it landed, our "traction" turned out to be a scheduled scanner with a flat signature of ~850 paywall hits per day.
+If you take one thing from this post: instrument channel attribution *before* you distribute, or you will stare at a big request counter and have no idea whether it's your target market or a crawler. We added a `client_kind` classifier (api / web / bot / mcp_http / mcp_stdio) months too late, and the day it landed, our "traction" turned out to be a scheduled scanner with a flat daily signature of paywall hits.
 
 ## Silent failures are the default, not the exception
 
@@ -53,9 +53,9 @@ and the MCP package now labels those fallbacks `DEGRADED RESULT — basic format
 
 MCP has no auth story that everyone agrees on, and most real APIs have one of: API keys, OAuth, or per-call payment. Three things survived three months of production:
 
-**A refusal must be an on-ramp, not a dead end.** We logged 13,100+ paywall hits before understanding this. Our 402 originally advertised two of our three unlock paths and a quota exhaustion returned a dead-end 429. Today: quota exhaustion *falls through* to pay-per-call x402 (the agent can pay $0.005 and continue), and the 402 body lists every path machine-readably — free key signup, prepaid credit packs, per-call payment. The funnel is won or lost at the exact moment you refuse a request.
+**A refusal must be an on-ramp, not a dead end.** We logged thousands of paywall hits before understanding this. Our 402 originally advertised two of our three unlock paths and a quota exhaustion returned a dead-end 429. Today: quota exhaustion *falls through* to pay-per-call x402 (the agent can pay $0.005 and continue), and the 402 body lists every path machine-readably — free key signup, prepaid credit packs, per-call payment. The funnel is won or lost at the exact moment you refuse a request.
 
-**Audit the paywall per transport, not per function.** For weeks, our Streamable HTTP transport called the same five tools *without* passing through the payment middleware. Any agent could consume everything free — while the stats layer recorded phantom "revenue" that never existed on-chain. Every transport is a separate door to the same functions; a transport added later will bypass a paywall that lives in one middleware. We now cap the HTTP transport at 50 tool calls/day/IP and reconcile revenue against the chain, not against our own counters (0.324 USDC "attempted" vs 0.098 actually settled taught us that lesson).
+**Audit the paywall per transport, not per function.** For weeks, our Streamable HTTP transport called the same five tools *without* passing through the payment middleware. Any agent could consume everything free — while the stats layer recorded phantom "revenue" that never existed on-chain. Every transport is a separate door to the same functions; a transport added later will bypass a paywall that lives in one middleware. We now cap the HTTP transport at 50 tool calls/day/IP and reconcile revenue against the chain, not against our own counters (our own counters claimed roughly three times what the chain had actually settled, which is how we learned that lesson).
 
 **Scanners have no credentials, and they are your storefront.** Registry inspectors call your tools cold. If the answer is a bare 402, your listing shows a red error to every human evaluating you. Our fallback returns real (basic) validation anonymously with an honest upgrade note — that is also exactly the path that needed the `cause` fix above so it never lies to paying users.
 
