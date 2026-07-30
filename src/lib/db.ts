@@ -216,6 +216,14 @@ export function getStatsDB(): DatabaseType.Database {
     // count "what agents get rejected for" without retaining what they sent (DPA).
     if (!existingCols.includes('reject_reason')) statsDB.exec('ALTER TABLE operations ADD COLUMN reject_reason TEXT');
     statsDB.exec('CREATE INDEX IF NOT EXISTS idx_operations_reject ON operations(reject_reason)');
+    // Which customer asked. request_log already carried key_prefix but holds no
+    // country, and operations held the country but not who asked, so "which
+    // countries does this customer check" was unanswerable — the question the
+    // Clients tab exists for. Forward-only: rows written before 2026-07-30 are
+    // attributed by scripts/backfill-operation-keys.ts where a single request
+    // can be matched, and stay NULL where it cannot.
+    if (!existingCols.includes('key_prefix')) statsDB.exec('ALTER TABLE operations ADD COLUMN key_prefix TEXT');
+    statsDB.exec('CREATE INDEX IF NOT EXISTS idx_operations_key ON operations(key_prefix)');
     const keyCols = (statsDB.prepare("PRAGMA table_info(api_keys)").all() as Array<{ name: string }>).map(r => r.name);
     if (!keyCols.includes('monthly_limit')) statsDB.exec('ALTER TABLE api_keys ADD COLUMN monthly_limit INTEGER');
     // Credits-based keys (Bundle credits product). When credits_remaining is

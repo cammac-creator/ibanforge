@@ -29,7 +29,7 @@ ibanCompliance.post('/v1/iban/compliance', async (c) => {
   const processingMs = Math.round((performance.now() - start) * 100) / 100;
   const errorDetail = result.valid ? undefined : result.iban.slice(0, 4);
   const revenue = computeRevenue(c, 0.02);
-  recordOperation('iban_compliance', result.country?.code ?? null, result.valid, revenue, errorDetail);
+  recordOperation('iban_compliance', result.country?.code ?? null, result.valid, revenue, errorDetail, c.get('apiKeyPrefix'));
 
   const costUsdc = c.get('apiKeyAuthenticated') ? 0 : 0.02;
 

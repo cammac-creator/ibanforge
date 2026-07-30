@@ -65,7 +65,15 @@ ibanBatch.post('/v1/iban/batch', async (c) => {
   const validCount = results.filter((r) => r.valid).length;
 
   const revenue = computeRevenue(c, postedTotal);
-  recordBatch(results.length, validCount, revenue);
+  // One outcome per IBAN, so the Clients tab can show which countries a
+  // batch-only customer actually checks. The batch used to record none.
+  recordBatch(
+    results.length,
+    validCount,
+    revenue,
+    c.get('apiKeyPrefix'),
+    results.map((r) => ({ valid: r.valid, country: r.country?.code ?? null })),
+  );
 
   return c.json({
     results,

@@ -65,7 +65,7 @@ chClearing.get('/v1/ch/clearing/:iid', (c) => {
   const revenue = computeRevenue(c, COST_USDC);
 
   if (!entry) {
-    recordOperation('ch_clearing_lookup', 'CH', false, revenue, normalizedIid);
+    recordOperation('ch_clearing_lookup', 'CH', false, revenue, normalizedIid, c.get('apiKeyPrefix'));
 
     const result: ChClearingLookupResult = {
       iid: normalizedIid,
@@ -78,7 +78,7 @@ chClearing.get('/v1/ch/clearing/:iid', (c) => {
     return c.json(result);
   }
 
-  recordOperation('ch_clearing_lookup', entry.address.country, true, revenue);
+  recordOperation('ch_clearing_lookup', entry.address.country, true, revenue, undefined, c.get('apiKeyPrefix'));
 
   const result: ChClearingLookupResult = {
     iid: entry.iid,

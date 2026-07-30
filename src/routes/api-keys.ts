@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { timingSafeEqual, createHash } from 'node:crypto';
 import { generateApiKey, validateApiKey, getUsage, revokeApiKey, rotateApiKey } from '../lib/api-keys.js';
 import { getStatsDB } from '../lib/db.js';
+import { getClientProfiles } from '../lib/stats.js';
 import { notifyPurchaseTelegram } from '../lib/notify.js';
 import { sendApiKeyEmail, isEmailConfigured } from '../lib/email.js';
 
@@ -567,6 +568,50 @@ apiKeys.get('/v1/admin/client-activity', (c) => {
   for (const e of endpoints) ensure(e.key_prefix).endpoints.push({ path: e.path, count: e.count });
   for (const d of days) ensure(d.key_prefix).days.push({ day: d.day, count: d.count });
   return c.json({ by_key: byKey });
+});
+
+/**
+ * Everything the Clients tab needs about each customer's API use, in one call:
+ * volume and verdict mix, endpoints, countries checked, latency they actually
+ * experience, the shape of their day, their stack, and how many machines call.
+ *
+ * Separate from /v1/admin/client-activity, which stays as-is: that one feeds the
+ * sparkline on the Contacts page and is fetched on every render of it.
+ */
+apiKeys.get('/v1/admin/client-profiles', (c) => {
+  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
+  const daysParam = parseInt(c.req.query('days') ?? '90', 10);
+  const days = Number.isNaN(daysParam) ? 90 : Math.max(1, Math.min(365, daysParam));
+  const db = getStatsDB();
+  // Monthly consumption per key, so the panel can show the trend rather than
+  // only the current month. api_usage is keyed by hash; the CRM knows prefixes.
+  const usage = db
+    .prepare(
+      `SELECT k.key_prefix, u.month, u.count
+       FROM api_usage u JOIN api_keys k ON k.key_hash = u.key_hash
+       ORDER BY k.key_prefix, u.month`,
+    )
+    .all() as Array<{ key_prefix: string; month: string; count: number }>;
+  const monthsByKey: Record<string, Array<{ month: string; count: number }>> = {};
+  for (const r of usage) (monthsByKey[r.key_prefix] ??= []).push({ month: r.month, count: r.count });
+  // Which keys we have already warned about their quota, so the panel does not
+  // suggest sending a notice twice.
+  const warned = db
+    .prepare(
+      `SELECT k.key_prefix, q.month FROM quota_notices q JOIN api_keys k ON k.key_hash = q.key_hash`,
+    )
+    .all() as Array<{ key_prefix: string; month: string }>;
+  const warnedByKey: Record<string, string[]> = {};
+  for (const r of warned) (warnedByKey[r.key_prefix] ??= []).push(r.month);
+
+  return c.json({
+    period_days: days,
+    profiles: getClientProfiles(days),
+    months_by_key: monthsByKey,
+    quota_warned_by_key: warnedByKey,
+  });
 });
 
 /**
