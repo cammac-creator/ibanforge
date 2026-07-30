@@ -11,6 +11,13 @@
  *
  * That is exactly what happened on 2026-07-30: npm went to 1.4.1, the registry
  * received 1.4.0, and every check was green.
+ *
+ * This overlaps with src/routes/server-json.test.ts in the API suite, and both
+ * are worth keeping: that one compares mcp/server.json against the ROOT
+ * package.json (plus the root server.json and the README badge), this one
+ * against mcp/package.json. Different pairs. This job is also the only one that
+ * runs when a change touches mcp/ alone, since it installs nothing from the
+ * repo root.
  */
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';

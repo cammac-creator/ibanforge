@@ -3,7 +3,7 @@
   "name": "io.github.cammac-creator/ibanforge",
   "title": "IBANforge",
   "description": "Pre-payout IBAN screening for AI agents: validation, sanctions (OFAC), Swiss clearing, risk",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "websiteUrl": "https://ibanforge.com",
   "repository": {
     "url": "https://github.com/cammac-creator/ibanforge",
