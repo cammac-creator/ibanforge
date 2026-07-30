@@ -1050,6 +1050,153 @@ export function getClientProfiles(days = 90): Record<string, ClientProfile> {
   return out;
 }
 
+/** Everything one unauthenticated caller did, keyed by its user agent. */
+export interface BotProfile {
+  user_agent: string;
+  /** Its busiest classification. A caller rarely spans two. */
+  client_kind: string | null;
+  /** The contact page most crawlers advertise as "+https://…" inside their UA. */
+  homepage: string | null;
+  first_seen: string | null;
+  last_seen: string | null;
+  total: number;
+  ok: number;
+  paywall: number;
+  bad_input: number;
+  not_found: number;
+  server_error: number;
+  /** 2xx on a priced endpoint with no API key: an x402 payment went through. */
+  billable_ok: number;
+  avg_ms: number;
+  distinct_ips: number;
+  endpoints: Array<{ path: string; count: number }>;
+  /** What it asked for and we do not serve, busiest first. */
+  not_found_paths: Array<{ path: string; count: number }>;
+  hours: number[];
+  days: Array<{ day: string; count: number }>;
+}
+
+/** Crawlers conventionally carry their contact page in the UA as "+https://…". */
+function homepageFromUserAgent(ua: string): string | null {
+  return /\+(https?:\/\/[^\s;)]+)/.exec(ua)?.[1] ?? null;
+}
+
+/**
+ * One profile per unauthenticated caller, keyed by user agent.
+ *
+ * Keyed by UA rather than by IP on purpose: the salted IP hash resets whenever
+ * IP_HASH_SECRET is rotated — it did on 2026-07-10, which made every long-lived
+ * caller look like it had left and been replaced — whereas a crawler's UA is
+ * stable for as long as it exists.
+ *
+ * `minRequests` is a noise floor: 1,532 distinct agents called in the last 90
+ * days and the great majority came once. Serving all of them would bury the
+ * forty that matter.
+ */
+export function getBotProfiles(days = 90, minRequests = 5): Record<string, BotProfile> {
+  const db = getStatsDB();
+  const since = `-${Math.max(1, Math.min(365, days))} days`;
+  const anon = `key_prefix IS NULL AND user_agent IS NOT NULL AND created_at >= date('now', ?)`;
+  const billable = buildBillableFilter();
+  const out: Record<string, BotProfile> = {};
+
+  const rows = db
+    .prepare(
+      `SELECT user_agent ua,
+              COUNT(*) total,
+              SUM(status >= 200 AND status < 300) ok,
+              SUM(status = 402) paywall,
+              SUM(status = 400) bad_input,
+              SUM(status = 404) not_found,
+              SUM(status >= 500) server_error,
+              SUM(CASE WHEN status >= 200 AND status < 300 AND (${billable.sql}) THEN 1 ELSE 0 END) billable_ok,
+              MIN(created_at) first_seen,
+              MAX(created_at) last_seen,
+              COUNT(DISTINCT ip_hash) distinct_ips,
+              AVG(response_ms) avg_ms
+       FROM request_log WHERE ${anon}
+       GROUP BY ua HAVING total >= ?`,
+    )
+    .all(...billable.params, since, minRequests) as Array<Record<string, string | number | null>>;
+
+  for (const r of rows) {
+    const ua = String(r.ua);
+    out[ua] = {
+      user_agent: ua,
+      client_kind: null,
+      homepage: homepageFromUserAgent(ua),
+      first_seen: (r.first_seen as string) ?? null,
+      last_seen: (r.last_seen as string) ?? null,
+      total: Number(r.total ?? 0),
+      ok: Number(r.ok ?? 0),
+      paywall: Number(r.paywall ?? 0),
+      bad_input: Number(r.bad_input ?? 0),
+      not_found: Number(r.not_found ?? 0),
+      server_error: Number(r.server_error ?? 0),
+      billable_ok: Number(r.billable_ok ?? 0),
+      avg_ms: Math.round(Number(r.avg_ms ?? 0)),
+      distinct_ips: Number(r.distinct_ips ?? 0),
+      endpoints: [],
+      not_found_paths: [],
+      hours: Array(24).fill(0),
+      days: [],
+    };
+  }
+
+  const known = (ua: string): BotProfile | null => out[ua] ?? null;
+  const cap = <T>(list: T[], v: T, max: number) => {
+    if (list.length < max) list.push(v);
+  };
+
+  for (const r of db
+    .prepare(
+      `SELECT user_agent ua, client_kind kind, COUNT(*) count FROM request_log
+       WHERE ${anon} AND client_kind IS NOT NULL GROUP BY ua, kind ORDER BY ua, count DESC`,
+    )
+    .all(since) as Array<{ ua: string; kind: string; count: number }>) {
+    const p = known(r.ua);
+    if (p && p.client_kind == null) p.client_kind = r.kind;
+  }
+  for (const r of db
+    .prepare(
+      `SELECT user_agent ua, path, COUNT(*) count FROM request_log
+       WHERE ${anon} GROUP BY ua, path ORDER BY ua, count DESC`,
+    )
+    .all(since) as Array<{ ua: string; path: string; count: number }>) {
+    const p = known(r.ua);
+    if (p) cap(p.endpoints, { path: r.path, count: r.count }, 12);
+  }
+  for (const r of db
+    .prepare(
+      `SELECT user_agent ua, path, COUNT(*) count FROM request_log
+       WHERE ${anon} AND status = 404 GROUP BY ua, path ORDER BY ua, count DESC`,
+    )
+    .all(since) as Array<{ ua: string; path: string; count: number }>) {
+    const p = known(r.ua);
+    if (p) cap(p.not_found_paths, { path: r.path, count: r.count }, 10);
+  }
+  for (const r of db
+    .prepare(
+      `SELECT user_agent ua, hour, COUNT(*) count FROM request_log
+       WHERE ${anon} AND hour IS NOT NULL GROUP BY ua, hour`,
+    )
+    .all(since) as Array<{ ua: string; hour: number; count: number }>) {
+    const p = known(r.ua);
+    if (p && r.hour >= 0 && r.hour < 24) p.hours[r.hour] = r.count;
+  }
+  for (const r of db
+    .prepare(
+      `SELECT user_agent ua, date(created_at) day, COUNT(*) count FROM request_log
+       WHERE ${anon} GROUP BY ua, day ORDER BY ua, day`,
+    )
+    .all(since) as Array<{ ua: string; day: string; count: number }>) {
+    const p = known(r.ua);
+    if (p) p.days.push({ day: r.day, count: r.count });
+  }
+
+  return out;
+}
+
 /**
  * HTTP status-code breakdown per endpoint path over the last N days.
  *
