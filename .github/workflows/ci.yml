@@ -34,9 +34,17 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # 24, not 20, and the reason is npm rather than node. `frontend/` is the
+      # only lockfile npm 10 and npm 11 disagree about: npm 11 resolves the
+      # @scalar -> radix-vue chain onto @swc/helpers 0.5.15, npm 10 demands
+      # 0.5.23 and refuses the tree it is handed. Node 20 ships npm 10, so
+      # every push since 26/07 failed here on `npm ci` while the same command
+      # succeeded on every developer machine. Node 24 ships npm 11, which is
+      # what writes this lockfile and what Vercel builds the site with. It also
+      # clears the EBADENGINE warnings: @scalar/* asks for node >=22.
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
 
       - run: npm ci
         working-directory: frontend
