@@ -62,6 +62,31 @@ data/
 - **Tests** : vitest, fichiers `*.test.ts` a cote du code source
 - **Formatting** : prettier (voir .prettierrc)
 - **Linting** : eslint (voir eslint.config.js)
+- **Prenom** : Claude-Alain, jamais « Alain »
+
+## ⚠️ Sessions parallèles sur ce dépôt
+
+Plusieurs terminaux Claude travaillent souvent ici en même temps, parfois dans
+`.claude/worktrees/`. Le 30/07/2026 ça a coûté deux pannes silencieuses, les
+deux causées par des pushs concurrents sur `main`.
+
+**1. `git fetch` puis rebase avant CHAQUE push.** Sans exception.
+
+**2. Ne jamais pousser pendant que Claude-Alain publie sur npm.**
+`npm version patch` modifie `package.json` et le lockfile, *puis* commite et
+tague. Si l'arbre est sale à cet instant, il **ne touche pas à git du tout et
+ne dit rien**. Le 30/07 : npm servait 1.4.1 pendant que le dépôt disait 1.4.0,
+sans tag, donc sans mise à jour du registre MCP.
+
+**3. Un `main` laissé rouge devient le problème de l'autre session.** Le 30/07,
+un commit CRM est passé au rouge en héritant d'un désaccord de versions
+introduit deux commits plus tôt. La session concernée a cherché la panne chez
+elle. Si on casse `main`, on répare tout de suite ou on revert.
+
+**4. Ne pas ranger le chantier d'une autre session.** Worktrees, branches et
+stashes appartiennent à qui les a créés. Vérifier l'activité récente avant de
+supposer qu'un worktree est mort :
+`find .claude/worktrees/<nom> -type f -not -path "*/node_modules/*" -newermt "-1 day"`.
 
 ## API Endpoints
 
