@@ -1,5 +1,5 @@
 import { describe, it, expect, afterAll, beforeEach } from 'vitest';
-import { recordOperation, recordBatch, recordRequest, recordRejection, getRejectionStats, getStats, getQuickStats, getStatsHistory, getStatusByPath, getBusinessFunnel, getClientProfiles, classifyClient, extractClientIp, normalizeRequestPath } from './stats.js';
+import { recordOperation, recordBatch, recordRequest, recordRejection, getRejectionStats, getStats, getQuickStats, getStatsHistory, getStatusByPath, getBusinessFunnel, getClientProfiles, getBotProfiles, classifyClient, extractClientIp, normalizeRequestPath } from './stats.js';
 import { generateApiKey } from './api-keys.js';
 import { closeAll, getStatsDB } from './db.js';
 import type { RejectReason } from './input-normalize.js';
@@ -622,5 +622,52 @@ describe('the last thing that happened to a customer', () => {
     const p = getClientProfiles()['ifk_profile1'];
     expect(p.last_refusal_at).toBeNull();
     expect(p.last_success_at).not.toBeNull();
+  });
+});
+
+describe('getBotProfiles', () => {
+  const clearBots = () => {
+    const db = getStatsDB();
+    db.prepare("DELETE FROM request_log WHERE user_agent LIKE 'synthbot%'").run();
+  };
+  beforeEach(clearBots);
+  afterAll(clearBots);
+
+  it('groups anonymous callers by user agent, which is what survives a salt rotation', () => {
+    recordRequest('GET', '/.well-known/x402', 200, 4, 'bot', 'ipA', 'synthbot-crawler/1.0', null);
+    recordRequest('GET', '/openapi.json', 200, 3, 'bot', 'ipB', 'synthbot-crawler/1.0', null);
+    const p = getBotProfiles(90, 1)['synthbot-crawler/1.0'];
+    expect(p.total).toBe(2);
+    expect(p.ok).toBe(2);
+    expect(p.distinct_ips).toBe(2);
+    expect(p.client_kind).toBe('bot');
+  });
+
+  it('never mixes in a caller that authenticated: those belong to the Clients tab', () => {
+    recordRequest('GET', '/.well-known/x402', 200, 4, 'api', 'ipC', 'synthbot-keyed/1.0', 'ifk_somekey01');
+    expect(getBotProfiles(90, 1)['synthbot-keyed/1.0']).toBeUndefined();
+  });
+
+  it('reports the paths a caller keeps failing to find, which is what it came for', () => {
+    for (const path of ['/.well-known/agent.json', '/.well-known/agent.json', '/manifest.json']) {
+      recordRequest('GET', path, 404, 2, 'bot', 'ipD', 'synthbot-lost/1.0', null);
+    }
+    const p = getBotProfiles(90, 1)['synthbot-lost/1.0'];
+    expect(p.not_found).toBe(3);
+    expect(p.not_found_paths[0]).toEqual({ path: '/.well-known/agent.json', count: 2 });
+  });
+
+  it('counts the paid calls it got through without a key, which is an x402 payment', () => {
+    recordRequest('POST', '/v1/iban/validate', 200, 9, 'api', 'ipE', 'synthbot-payer/1.0', null);
+    recordRequest('GET', '/health', 200, 1, 'api', 'ipE', 'synthbot-payer/1.0', null);
+    const p = getBotProfiles(90, 1)['synthbot-payer/1.0'];
+    expect(p.billable_ok).toBe(1);
+    expect(p.total).toBe(2);
+  });
+
+  it('ignores the long tail below the noise floor', () => {
+    recordRequest('GET', '/', 200, 1, 'web', 'ipF', 'synthbot-onehit/1.0', null);
+    expect(getBotProfiles(90, 5)['synthbot-onehit/1.0']).toBeUndefined();
+    expect(getBotProfiles(90, 1)['synthbot-onehit/1.0']).toBeDefined();
   });
 });

@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { timingSafeEqual, createHash } from 'node:crypto';
 import { generateApiKey, validateApiKey, getUsage, revokeApiKey, rotateApiKey } from '../lib/api-keys.js';
 import { getStatsDB } from '../lib/db.js';
-import { getClientProfiles } from '../lib/stats.js';
+import { getClientProfiles, getBotProfiles } from '../lib/stats.js';
 import { notifyPurchaseTelegram } from '../lib/notify.js';
 import { sendApiKeyEmail, isEmailConfigured } from '../lib/email.js';
 
@@ -612,6 +612,22 @@ apiKeys.get('/v1/admin/client-profiles', (c) => {
     months_by_key: monthsByKey,
     quota_warned_by_key: warnedByKey,
   });
+});
+
+/**
+ * The other half of the audience: everyone who calls without a key. Crawlers,
+ * MCP registries, x402 probes, agent directories and the odd human with curl.
+ * Keyed by user agent, which is what survives an IP_HASH_SECRET rotation.
+ */
+apiKeys.get('/v1/admin/bot-profiles', (c) => {
+  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
+  const daysParam = parseInt(c.req.query('days') ?? '90', 10);
+  const days = Number.isNaN(daysParam) ? 90 : Math.max(1, Math.min(365, daysParam));
+  const minParam = parseInt(c.req.query('min') ?? '5', 10);
+  const min = Number.isNaN(minParam) ? 5 : Math.max(1, Math.min(1000, minParam));
+  return c.json({ period_days: days, min_requests: min, bots: getBotProfiles(days, min) });
 });
 
 /**
