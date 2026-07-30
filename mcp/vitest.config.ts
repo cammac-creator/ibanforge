@@ -12,8 +12,10 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     include: ['src/**/*.test.ts'],
-    // The suite spawns `dist/index.js` and talks to it over stdio. First run on
-    // a cold CI runner pays for the process start plus the MCP handshake.
+    // The spawn of `dist/index.js` and the MCP handshake happen in `beforeAll`,
+    // which already carries its own 30s. This raises the ceiling for the calls
+    // themselves: they are round trips over stdio to a separate process, not
+    // in-process assertions, and a cold CI runner is slower than it looks.
     testTimeout: 30_000,
   },
 });
