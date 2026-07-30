@@ -201,3 +201,49 @@ describe('discovery — second sweep, 2026-07-29', () => {
     expect(res.headers.get('location')).toBe('https://ibanforge.com/sitemap.xml');
   });
 });
+
+// Third sweep, 2026-07-30, from the Clients Bot tab: what still 404s after the
+// two passes above. Counts are hits over the ninety days to 30/07.
+describe('discovery — third sweep', () => {
+  it('answers POST / with 405 and says which verbs work (3,469 hits, one health checker)', async () => {
+    // APIHub-HealthCheck POSTs the API root. 404 tells it we do not exist;
+    // 405 tells it we do and it used the wrong verb, which is the truth.
+    const res = await makeApp().request('/', { method: 'POST' });
+    expect(res.status).toBe(405);
+    expect(res.headers.get('allow')).toBe('GET, HEAD');
+  });
+
+  it('leaves GET / alone, which the landing page answers', async () => {
+    // discovery mounts before landing, so a catch-all here would eat the site.
+    const res = await makeApp().request('/');
+    expect(res.status).toBe(404);
+  });
+
+  it('serves /.well-known/x402.json, the name half the crawlers use (457 hits)', async () => {
+    const res = await makeApp().request('/.well-known/x402.json');
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { x402Version: number; endpoints: unknown[] };
+    expect(body.x402Version).toBe(1);
+    expect(Array.isArray(body.endpoints)).toBe(true);
+  });
+
+  it('sends /security.txt to its RFC 9116 home rather than duplicating it (83 hits)', async () => {
+    const res = await makeApp().request('/security.txt');
+    expect(res.status).toBe(301);
+    expect(res.headers.get('location')).toBe('/.well-known/security.txt');
+  });
+
+  it('sends /api/mcp to /mcp without losing the method (76 hits)', async () => {
+    const res = await makeApp().request('/api/mcp', { method: 'POST' });
+    expect(res.status).toBe(308);
+    expect(res.headers.get('location')).toBe('/mcp');
+  });
+
+  it('still refuses to invent an OAuth authorization server (1,044 hits, and rightly 404)', async () => {
+    // aisec-registry probes RFC 8414 metadata. We have no authorization server:
+    // authentication is an API key or an x402 payment. Publishing a document
+    // there would misrepresent us to a security registry, of all readers.
+    const res = await makeApp().request('/.well-known/oauth-authorization-server');
+    expect(res.status).toBe(404);
+  });
+});
