@@ -24,7 +24,7 @@ jobs:
       # committed to the repo (a daily commit would trigger a needless Railway
       # redeploy).
       - name: Restore radar state
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: .radar-state
           key: lifecycle-radar-state-${{ github.run_id }}
