@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import { validateIBAN } from '../lib/iban.js';
+import type { HonoEnv } from '../types.js';
 import { recordOperation } from '../lib/stats.js';
 
 /**
@@ -18,7 +19,7 @@ import { recordOperation } from '../lib/stats.js';
  *
  * Spec source: ISO 13616 (mod 97, country-specific BBAN length).
  */
-const ibanFormat = new Hono();
+const ibanFormat = new Hono<HonoEnv>();
 
 const querySchema = z.object({
   iban: z
@@ -66,6 +67,7 @@ ibanFormat.get('/v1/iban/format', async (c) => {
       result.valid,
       0,
       result.error ?? undefined,
+      c.get('apiKeyPrefix'),
     );
   } catch {
     // stats failure must not break the response

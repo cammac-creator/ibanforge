@@ -45,7 +45,7 @@ ibanValidate.post('/v1/iban/validate', async (c) => {
 
   const errorDetail = result.valid ? undefined : result.iban.slice(0, 4);
   const revenue = computeRevenue(c, postedPrice);
-  recordOperation('iban_validate', result.country?.code ?? null, result.valid, revenue, errorDetail);
+  recordOperation('iban_validate', result.country?.code ?? null, result.valid, revenue, errorDetail, c.get('apiKeyPrefix'));
 
   return c.json(result);
 });

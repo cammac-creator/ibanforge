@@ -17,7 +17,7 @@ let _insertRequest: Database.Statement | null = null;
 function insertOp() {
   if (!_insertOp) {
     _insertOp = getStatsDB().prepare(
-      'INSERT INTO operations (operation_type, country_code, success, hour, day_of_week, error_detail) VALUES (?, ?, ?, ?, ?, ?)',
+      'INSERT INTO operations (operation_type, country_code, success, hour, day_of_week, error_detail, key_prefix) VALUES (?, ?, ?, ?, ?, ?, ?)',
     );
   }
   return _insertOp;
@@ -337,12 +337,13 @@ export function recordOperation(
   success: boolean,
   revenueUsdc: number,
   errorDetail?: string,
+  keyPrefix?: string | null,
 ) {
   try {
     const hour = new Date().getUTCHours();
     const dow = (new Date().getUTCDay() + 6) % 7; // 0=Mon, 6=Sun
     const truncatedError = errorDetail ? errorDetail.slice(0, 12) : null;
-    insertOp().run(type, countryCode, success ? 1 : 0, hour, dow, truncatedError);
+    insertOp().run(type, countryCode, success ? 1 : 0, hour, dow, truncatedError, keyPrefix ?? null);
     upsertDaily().run(type, 1, success ? 1 : 0, revenueUsdc);
     upsertHourly().run(hour, dow, type, 1, success ? 1 : 0);
   } catch (err) {
@@ -393,15 +394,34 @@ export function getRejectionStats(days = 30): RejectionRow[] {
 /**
  * Record a batch of IBAN validations in one call
  */
-export function recordBatch(count: number, validCount: number, revenueUsdc: number) {
+/**
+ * `outcomes` carries one entry per IBAN in the batch, each with its own country
+ * and verdict. Without it the batch wrote country_code NULL on every row, so a
+ * customer who validates only through /v1/iban/batch appeared to check no
+ * countries at all — invisible on the very panel meant to show what they look
+ * at. It stays optional so a caller that cannot supply it still records
+ * something, on the old count/validCount shape.
+ */
+export function recordBatch(
+  count: number,
+  validCount: number,
+  revenueUsdc: number,
+  keyPrefix?: string | null,
+  outcomes?: Array<{ valid: boolean; country: string | null }>,
+) {
   try {
     const hour = new Date().getUTCHours();
     const dow = (new Date().getUTCDay() + 6) % 7; // 0=Mon, 6=Sun
     const db = getStatsDB();
+    const key = keyPrefix ?? null;
     const tx = db.transaction(() => {
       const stmt = insertOp();
-      for (let i = 0; i < validCount; i++) stmt.run('iban_batch', null, 1, hour, dow, null);
-      for (let i = 0; i < count - validCount; i++) stmt.run('iban_batch', null, 0, hour, dow, null);
+      if (outcomes) {
+        for (const o of outcomes) stmt.run('iban_batch', o.country, o.valid ? 1 : 0, hour, dow, null, key);
+      } else {
+        for (let i = 0; i < validCount; i++) stmt.run('iban_batch', null, 1, hour, dow, null, key);
+        for (let i = 0; i < count - validCount; i++) stmt.run('iban_batch', null, 0, hour, dow, null, key);
+      }
       upsertDaily().run('iban_batch', count, validCount, revenueUsdc);
       upsertHourly().run(hour, dow, 'iban_batch', count, validCount);
     });
@@ -831,6 +851,188 @@ export function getBusinessFunnel(days: number = 30): BusinessFunnelDay[] {
     ORDER BY date ASC
   `).all(days, ...filter.params, ...internalPrefixes) as BusinessFunnelDay[];
   return rows;
+}
+
+/** Everything one API key did, as one object. Feeds the CRM's Clients tab. */
+export interface ClientProfile {
+  key_prefix: string;
+  first_seen: string | null;
+  last_seen: string | null;
+  /** Every request, whatever the verdict. The four counters below are subsets. */
+  total: number;
+  ok: number;
+  paywall: number;
+  bad_input: number;
+  auth_or_quota: number;
+  server_error: number;
+  avg_ms: number;
+  p95_ms: number;
+  endpoints: Array<{ path: string; count: number }>;
+  /** ISO country codes they actually checked, busiest first. */
+  countries: Array<{ code: string; count: number }>;
+  user_agents: Array<{ ua: string; count: number }>;
+  client_kinds: Array<{ kind: string; count: number }>;
+  /** Distinct salted IP hashes: how many machines or environments call us. */
+  distinct_ips: number;
+  /** 24 UTC buckets. The shape of the day says more about a customer than a timezone field would. */
+  hours: number[];
+  /** Calls per day over the window, oldest first. */
+  days: Array<{ day: string; count: number }>;
+  /** What their inputs got rejected for, busiest first. */
+  reject_reasons: Array<{ reason: string; count: number }>;
+}
+
+/**
+ * One profile per API key that has actually called something, keyed by prefix.
+ *
+ * Built from request_log (who, when, how, how fast) joined to operations (what
+ * countries). Keys that never called are absent rather than present-and-empty:
+ * the caller decides how to present a customer with no activity, and an empty
+ * object would look like a customer whose data failed to load.
+ */
+export function getClientProfiles(days = 90): Record<string, ClientProfile> {
+  const db = getStatsDB();
+  const since = `-${Math.max(1, Math.min(365, days))} days`;
+  const out: Record<string, ClientProfile> = {};
+  const ensure = (k: string): ClientProfile =>
+    (out[k] ??= {
+      key_prefix: k,
+      first_seen: null,
+      last_seen: null,
+      total: 0,
+      ok: 0,
+      paywall: 0,
+      bad_input: 0,
+      auth_or_quota: 0,
+      server_error: 0,
+      avg_ms: 0,
+      p95_ms: 0,
+      endpoints: [],
+      countries: [],
+      user_agents: [],
+      client_kinds: [],
+      distinct_ips: 0,
+      hours: Array(24).fill(0),
+      days: [],
+      reject_reasons: [],
+    });
+
+  const totals = db
+    .prepare(
+      `SELECT key_prefix,
+              COUNT(*) total,
+              SUM(status >= 200 AND status < 300) ok,
+              SUM(status = 402) paywall,
+              SUM(status = 400) bad_input,
+              SUM(status = 401 OR status = 429) auth_or_quota,
+              SUM(status >= 500) server_error,
+              MIN(created_at) first_seen,
+              MAX(created_at) last_seen,
+              COUNT(DISTINCT ip_hash) distinct_ips,
+              AVG(response_ms) avg_ms
+       FROM request_log WHERE key_prefix IS NOT NULL GROUP BY key_prefix`,
+    )
+    .all() as Array<Record<string, number | string | null>>;
+  for (const r of totals) {
+    const p = ensure(String(r.key_prefix));
+    p.total = Number(r.total ?? 0);
+    p.ok = Number(r.ok ?? 0);
+    p.paywall = Number(r.paywall ?? 0);
+    p.bad_input = Number(r.bad_input ?? 0);
+    p.auth_or_quota = Number(r.auth_or_quota ?? 0);
+    p.server_error = Number(r.server_error ?? 0);
+    p.first_seen = (r.first_seen as string) ?? null;
+    p.last_seen = (r.last_seen as string) ?? null;
+    p.distinct_ips = Number(r.distinct_ips ?? 0);
+    p.avg_ms = Math.round(Number(r.avg_ms ?? 0));
+  }
+
+  // p95 per key. SQLite has no percentile function, so it is an offset into the
+  // key's own ordered latencies — the count is already known from the pass above.
+  const p95 = db.prepare(
+    `SELECT response_ms FROM request_log WHERE key_prefix = ? AND response_ms IS NOT NULL
+     ORDER BY response_ms LIMIT 1 OFFSET ?`,
+  );
+  const nth = db.prepare(
+    `SELECT COUNT(*) n FROM request_log WHERE key_prefix = ? AND response_ms IS NOT NULL`,
+  );
+  for (const p of Object.values(out)) {
+    const n = Number((nth.get(p.key_prefix) as { n: number }).n);
+    if (n === 0) continue;
+    const row = p95.get(p.key_prefix, Math.min(n - 1, Math.floor(n * 0.95))) as { response_ms: number } | undefined;
+    p.p95_ms = row ? Math.round(row.response_ms) : 0;
+  }
+
+  const push = <T>(list: T[], v: T, cap: number) => {
+    if (list.length < cap) list.push(v);
+  };
+  for (const r of db
+    .prepare(
+      `SELECT key_prefix, path, COUNT(*) count FROM request_log
+       WHERE key_prefix IS NOT NULL GROUP BY key_prefix, path ORDER BY key_prefix, count DESC`,
+    )
+    .all() as Array<{ key_prefix: string; path: string; count: number }>) {
+    push(ensure(r.key_prefix).endpoints, { path: r.path, count: r.count }, 12);
+  }
+  for (const r of db
+    .prepare(
+      `SELECT key_prefix, user_agent ua, COUNT(*) count FROM request_log
+       WHERE key_prefix IS NOT NULL AND user_agent IS NOT NULL
+       GROUP BY key_prefix, ua ORDER BY key_prefix, count DESC`,
+    )
+    .all() as Array<{ key_prefix: string; ua: string; count: number }>) {
+    push(ensure(r.key_prefix).user_agents, { ua: r.ua, count: r.count }, 6);
+  }
+  for (const r of db
+    .prepare(
+      `SELECT key_prefix, client_kind kind, COUNT(*) count FROM request_log
+       WHERE key_prefix IS NOT NULL AND client_kind IS NOT NULL
+       GROUP BY key_prefix, kind ORDER BY key_prefix, count DESC`,
+    )
+    .all() as Array<{ key_prefix: string; kind: string; count: number }>) {
+    push(ensure(r.key_prefix).client_kinds, { kind: r.kind, count: r.count }, 5);
+  }
+  for (const r of db
+    .prepare(
+      `SELECT key_prefix, hour, COUNT(*) count FROM request_log
+       WHERE key_prefix IS NOT NULL AND hour IS NOT NULL GROUP BY key_prefix, hour`,
+    )
+    .all() as Array<{ key_prefix: string; hour: number; count: number }>) {
+    const p = ensure(r.key_prefix);
+    if (r.hour >= 0 && r.hour < 24) p.hours[r.hour] = r.count;
+  }
+  for (const r of db
+    .prepare(
+      `SELECT key_prefix, date(created_at) day, COUNT(*) count FROM request_log
+       WHERE key_prefix IS NOT NULL AND created_at >= date('now', ?)
+       GROUP BY key_prefix, day ORDER BY key_prefix, day`,
+    )
+    .all(since) as Array<{ key_prefix: string; day: string; count: number }>) {
+    ensure(r.key_prefix).days.push({ day: r.day, count: r.count });
+  }
+
+  // The countries only exist for rows operations could be attributed to, so a
+  // customer active before 2026-07-30 shows fewer than they really checked.
+  for (const r of db
+    .prepare(
+      `SELECT key_prefix, country_code code, COUNT(*) count FROM operations
+       WHERE key_prefix IS NOT NULL AND country_code IS NOT NULL
+       GROUP BY key_prefix, code ORDER BY key_prefix, count DESC`,
+    )
+    .all() as Array<{ key_prefix: string; code: string; count: number }>) {
+    push(ensure(r.key_prefix).countries, { code: r.code, count: r.count }, 30);
+  }
+  for (const r of db
+    .prepare(
+      `SELECT key_prefix, reject_reason reason, COUNT(*) count FROM operations
+       WHERE key_prefix IS NOT NULL AND reject_reason IS NOT NULL
+       GROUP BY key_prefix, reason ORDER BY key_prefix, count DESC`,
+    )
+    .all() as Array<{ key_prefix: string; reason: string; count: number }>) {
+    push(ensure(r.key_prefix).reject_reasons, { reason: r.reason, count: r.count }, 8);
+  }
+
+  return out;
 }
 
 /**

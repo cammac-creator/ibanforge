@@ -1,5 +1,5 @@
-import { describe, it, expect, afterAll } from 'vitest';
-import { recordOperation, recordBatch, recordRequest, recordRejection, getRejectionStats, getStats, getQuickStats, getStatsHistory, getStatusByPath, getBusinessFunnel, classifyClient, extractClientIp, normalizeRequestPath } from './stats.js';
+import { describe, it, expect, afterAll, beforeEach } from 'vitest';
+import { recordOperation, recordBatch, recordRequest, recordRejection, getRejectionStats, getStats, getQuickStats, getStatsHistory, getStatusByPath, getBusinessFunnel, getClientProfiles, classifyClient, extractClientIp, normalizeRequestPath } from './stats.js';
 import { generateApiKey } from './api-keys.js';
 import { closeAll, getStatsDB } from './db.js';
 import type { RejectReason } from './input-normalize.js';
@@ -514,5 +514,89 @@ describe('request_log persists no submitted identifier (DPA)', () => {
       const iid = /^\/v1\/ch\/clearing\/([^/]+)/.exec(path);
       if (iid && !specTemplate.test(iid[1])) expect(iid[1]).toBe(':iid');
     }
+  });
+});
+
+// The suite runs against the repository's real stats DB, which persists between
+// runs, so any test that counts its own rows has to start from a known state or
+// it passes once and drifts upward for ever after.
+const SYNTHETIC = ['ifk_attrib01', 'ifk_batch01', 'ifk_profile1'];
+function clearSynthetic() {
+  const db = getStatsDB();
+  for (const k of SYNTHETIC) {
+    db.prepare('DELETE FROM operations WHERE key_prefix = ?').run(k);
+    db.prepare('DELETE FROM request_log WHERE key_prefix = ?').run(k);
+  }
+}
+
+describe('per-client attribution (operations carry the key that asked)', () => {
+  beforeEach(clearSynthetic);
+  afterAll(clearSynthetic);
+
+  it('stores the key prefix alongside the operation', () => {
+    recordOperation('iban_validate', 'PT', true, 0, undefined, 'ifk_attrib01');
+    const row = getStatsDB()
+      .prepare(`SELECT country_code, key_prefix FROM operations WHERE key_prefix = 'ifk_attrib01'`)
+      .get() as { country_code: string; key_prefix: string } | undefined;
+    expect(row).toBeDefined();
+    expect(row?.country_code).toBe('PT');
+  });
+
+  it('leaves the key prefix null for an unauthenticated (x402 or anonymous) call', () => {
+    recordOperation('bic_lookup', 'GR', true, 0.003);
+    const row = getStatsDB()
+      .prepare(`SELECT key_prefix FROM operations WHERE country_code = 'GR' ORDER BY id DESC`)
+      .get() as { key_prefix: string | null };
+    expect(row.key_prefix).toBeNull();
+  });
+
+  it('records one row per IBAN in a batch, each with its own country and the caller', () => {
+    // The batch used to write country_code NULL for every row, so a customer
+    // who validates only through /v1/iban/batch showed no countries at all.
+    recordBatch(3, 2, 0, 'ifk_batch01', [
+      { valid: true, country: 'MT' },
+      { valid: true, country: 'CY' },
+      { valid: false, country: 'MT' },
+    ]);
+    const rows = getStatsDB()
+      .prepare(`SELECT country_code, success FROM operations WHERE key_prefix = 'ifk_batch01' ORDER BY id`)
+      .all() as Array<{ country_code: string | null; success: number }>;
+    expect(rows).toHaveLength(3);
+    expect(rows.map((r) => r.country_code).sort()).toEqual(['CY', 'MT', 'MT']);
+    expect(rows.filter((r) => r.success === 1)).toHaveLength(2);
+  });
+
+  it('still records a batch when the caller passes no countries', () => {
+    expect(() => recordBatch(2, 2, 0)).not.toThrow();
+  });
+});
+
+describe('getClientProfiles', () => {
+  beforeEach(clearSynthetic);
+  afterAll(clearSynthetic);
+
+  it('reports what one customer did: volume, endpoints, countries and freshness', () => {
+    recordRequest('POST', '/v1/iban/validate', 200, 12, 'api', 'iphash1', 'guzzle/7', 'ifk_profile1');
+    recordRequest('POST', '/v1/iban/validate', 402, 8, 'api', 'iphash1', 'guzzle/7', 'ifk_profile1');
+    recordOperation('iban_validate', 'ES', true, 0, undefined, 'ifk_profile1');
+    recordOperation('iban_validate', 'ES', true, 0, undefined, 'ifk_profile1');
+    recordOperation('iban_validate', 'IT', false, 0, undefined, 'ifk_profile1');
+
+    const p = getClientProfiles()['ifk_profile1'];
+    expect(p).toBeDefined();
+    expect(p.total).toBe(2);
+    expect(p.paywall).toBe(1);
+    expect(p.ok).toBe(1);
+    expect(p.endpoints[0]).toEqual({ path: '/v1/iban/validate', count: 2 });
+    // Countries are ranked by volume, so the panel leads with what they check most.
+    expect(p.countries[0]).toEqual({ code: 'ES', count: 2 });
+    expect(p.countries.map((c) => c.code)).toContain('IT');
+    expect(p.distinct_ips).toBe(1);
+    expect(p.user_agents[0].ua).toBe('guzzle/7');
+    expect(p.last_seen).not.toBeNull();
+  });
+
+  it('omits a key that never called anything', () => {
+    expect(getClientProfiles()['ifk_never_called_xyz']).toBeUndefined();
   });
 });

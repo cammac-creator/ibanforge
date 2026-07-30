@@ -72,7 +72,7 @@ bicLookup.get('/v1/bic/:code', (c) => {
 
   const errorDetail = found ? undefined : validation.bic;
   const revenue = computeRevenue(c, COST_USDC);
-  recordOperation('bic_lookup', validation.country_code ?? null, found, revenue, errorDetail);
+  recordOperation('bic_lookup', validation.country_code ?? null, found, revenue, errorDetail, c.get('apiKeyPrefix'));
 
   // Provenance of the Latin reading, decided from the ACTUAL script of the
   // stored street — not the GLEIF language tag, which marks Greek/Arabic
