@@ -10,7 +10,7 @@
  * SDK raises `RuntimeError: Tool <name> has an output schema but did not
  * return structured content` and the call never completes. The server starts,
  * `tools/list` looks healthy, and every single call fails. A maintainer at
- * agno hit exactly this on 2026-06-06 and it sat unnoticed for two months.
+ * agno hit exactly this on 2026-05-28 and it sat unnoticed for two months.
  *
  * So the assertion has to be made where the client makes it: on the wire.
  * The API is stubbed on localhost, which keeps the test hermetic and lets us
