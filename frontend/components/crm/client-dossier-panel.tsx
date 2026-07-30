@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import type { ClientDossier } from '@/lib/crm/client-dossiers';
+import { contactsHref } from '@/lib/crm/deep-link';
 
 /** ISO 3166-1 alpha-2 → flag emoji. Anything else renders as the raw code. */
 export function flag(code: string): string {
@@ -314,7 +315,7 @@ export function ClientDossierPanel({ d, locale }: { d: ClientDossier; locale: st
             </div>
           )}
           <Link
-            href={`/${locale}/dashboard/contacts`}
+            href={contactsHref(locale, d.id)}
             className="mt-2 inline-block text-[11px] text-[var(--amber-400)] underline-offset-2 hover:underline"
           >
             Ouvrir le fil dans Contacts →

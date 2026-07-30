@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { CLIENT_PARAM, contactIdFromParam } from '@/lib/crm/deep-link';
 import type { Contact, Message, Situation } from '@/lib/crm/types';
 import { ComposerDock } from './composer-dock';
 import { ContactDetail, ContactIdentity } from './contact-header';
@@ -50,7 +52,16 @@ export function CrmApp({
   /** Real outbound mails dated today, counted by the page against one clock. */
   sentToday: number;
 }) {
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Arriving from the Clients tab, the address to open travels in the query
+  // string. Read once, as the initial value rather than in an effect, so the
+  // thread is already there on the first paint instead of flashing the empty
+  // pane. Server and browser see the same URL, so the two renders agree.
+  const searchParams = useSearchParams();
+  const linked = contactIdFromParam(
+    searchParams.get(CLIENT_PARAM),
+    contacts.map((c) => c.id),
+  );
+  const [selectedId, setSelectedId] = useState<string | null>(linked);
   const [readLocal, setReadLocal] = useState<Set<string>>(new Set());
   // Owned here rather than in the dock: folding changes how tall the thread is,
   // and the thread has to be re-anchored on its newest message afterwards,
@@ -78,9 +89,13 @@ export function CrmApp({
 
   // Memoised: a fresh array on every keystroke in the list's search box would
   // invalidate every memo down there for nothing.
+  //
+  // A thread arrived at by link counts as read exactly like one arrived at by
+  // click, and that is derived here rather than pushed into readLocal from an
+  // effect: the badge is a function of what is open, not a second copy of it.
   const view = useMemo(
-    () => contacts.map((c) => (readLocal.has(c.id) ? { ...c, unread: false } : c)),
-    [contacts, readLocal],
+    () => contacts.map((c) => (readLocal.has(c.id) || c.id === linked ? { ...c, unread: false } : c)),
+    [contacts, readLocal, linked],
   );
 
   const selected = view.find((c) => c.id === selectedId) ?? null;
@@ -98,6 +113,23 @@ export function CrmApp({
   // what the operator is writing from, so nothing scrolls and they stay in
   // view. A warm contact scrolls, and its dossier is one scroll up.
   const scroller = useRef<HTMLDivElement>(null);
+
+  // Telling the server the linked thread was read. Only the network call lives
+  // here — the badge itself is derived above — and the ref makes it fire once
+  // per address rather than on every re-render.
+  const readPosted = useRef<string | null>(null);
+  useEffect(() => {
+    if (!linked || readPosted.current === linked) return;
+    const c = contacts.find((x) => x.id === linked);
+    if (!c?.unread || !c.email) return;
+    readPosted.current = linked;
+    void fetch('/api/crm/thread-read', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: c.email }),
+    }).catch(() => {});
+  }, [linked, contacts]);
+
   // The draft card counts: on a contact with no correspondence it is the one
   // thing at the end of the region that has to be seen.
   const tailCount = (selected?.messages.length ?? 0) + (selected?.draft ? 1 : 0);
