@@ -4,7 +4,7 @@ API de validation IBAN et lookup BIC/SWIFT avec micropaiements x402, interface M
 
 ## Stack
 
-- **Runtime** : Node.js 20+ / TypeScript
+- **Runtime** : Node.js 22+ / TypeScript (20 est en fin de vie depuis le 2026-04-30 ; 24 est impossible tant que better-sqlite3 11 ne publie pas de binaire linux-x64 pour l'ABI 137)
 - **Framework** : Hono
 - **Database** : SQLite (better-sqlite3) — `data/bic.sqlite` (121k+ BIC entries from GLEIF + SwiftCodes/MIT + SIX + EBA Step2 SCT + Bundesbank + NBP, plus 1,100+ Swiss clearing entries SIX — counts drift at each monthly refresh, read them live via `getEntryCount()` / `getChClearingCount()`), `data/stats.sqlite`
 - **Payments** : x402/hono (USDC micropayments)

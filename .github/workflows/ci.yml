@@ -13,9 +13,14 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # 22, matching the Dockerfile. Node 20 went end-of-life on 2026-04-30 and
+      # stopped receiving security patches, so production had been sitting on an
+      # unsupported runtime. 24 is not an option here: better-sqlite3 11 ships no
+      # linux-x64 prebuild for ABI 137, and node:24-slim has no compiler, so the
+      # image build would fail. ABI 127 (Node 22) is the newest one it prebuilds.
       - uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - run: npm ci

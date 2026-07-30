@@ -116,7 +116,7 @@
   "homepage": "https://ibanforge.com",
   "prepublishOnly": "npm run build",
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "overrides": {
     "axios": "^1.19.0"
