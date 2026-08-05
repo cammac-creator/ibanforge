@@ -1,0 +1,52 @@
+---
+title: "Datenquellen & Provenienz"
+description: "Woher jede Antwort stammt: die sechs nationalen Register, die zusammengesetzte BIC-Karte, die Sanktions- und SEPA-Feeds, ihre Aktualisierungszyklen — und was ein Fehlen jeweils bedeutet."
+order: 6
+---
+
+# Datenquellen & Provenienz
+
+Jede Antwort sagt, wie viel sie wert ist (`bank_code_check.authoritative`, `register`, `as_of`). Diese Seite ist die Langfassung: welcher Referenzbestand für welches Land antwortet, was er veröffentlicht, wie frisch er ist — und, der wichtigste Teil, **was ein Fehlen jeweils bedeutet**.
+
+## Nationale Register — wo `authoritative: true`
+
+In diesen Ländern **ist** der konsultierte Referenzbestand das nationale Register: `not_in_register` heißt, der Code ist nicht vergeben — ein starker Grund, eine Zahlung zu stoppen.
+
+| Land | Register | Aktualisierung | Was es über den Code hinaus veröffentlicht |
+|---|---|---|---|
+| **CH / LI** | SIX BankMaster (IID / BC-Nummer) | monatlich | vollständige Sitzadresse, BIC, Rail-Teilnahme (SIC, euroSIC, CHF Instant), QR-IID |
+| **DE** | Deutsche Bundesbank, Bankleitzahlendatei | monatlich | Name, PLZ + Ort (das Register führt keine Straße), Löschung + Nachfolge-BLZ |
+| **AT** | Oesterreichische Nationalbank, SEPA-Zahlungsverkehrs-Verzeichnis | monatlich (Quelle erscheint täglich neu) | vollständige Sitzadresse, BIC, LEI |
+| **BE** | Banque nationale de Belgique, Bankidentifikationscodes | monatlich | Name in bis zu vier Sprachen — die Datei enthält keine Adressen; reservierte Slots (*VRIJ*, *Onbeschikbaar*) gelten als nicht vergeben |
+| **FI** | Finance Finland, Codes der monetären Institute | bei Neuveröffentlichung | Codes sind **Bankengruppen** zugeteilt, nicht Instituten — ein Treffer bestätigt die Gruppe; die positive Aussage ist schwächer, und die Antwort sagt das |
+
+Was das Register über das Institut veröffentlicht, wird in `bank_code_check.institution` ausgeliefert: Name, Sitzadresse in der Tiefe des Registers, LEI wo vorhanden. Fehlende Felder sind `null`, nie geraten.
+
+## Die zusammengesetzte BIC-Karte — wo `authoritative: false`
+
+Überall sonst lösen Bankcodes gegen unsere zusammengesetzte Karte auf: **121k+ BIC-Einträge** aus GLEIF (LEI-angereichert), dem öffentlichen SWIFT-Verzeichnis, SIX, EBA STEP2 SCT, Bundesbank und NBP. Ein Treffer benennt den Inhaber des passenden BIC — er beweist **nicht**, dass das Institut IBANs ausgibt, und ein Fehlen beweist gar nichts. In den rund 30 Ländern mit Buchstaben-Bankcodes kann ein Präfix-Rückfall `candidates > 1` liefern; die Antwort kennzeichnet das als Hinweis.
+
+Die Niederlande werden zusätzlich gegen die Liste IBAN-ausgebender Zahlungsdienstleister der Betaalvereniging geprüft (`issuer.iban_issuer`): Ein Code, dessen Inhaber dort fehlt, behält seinen Namen, verliert aber den Typ `bank` — den BIC-Inhaber zu nennen ist ein Fakt; ihn zur Bank Ihrer Gegenpartei zu erklären wäre eine Vermutung.
+
+## Compliance-Signale
+
+| Signal | Quelle | Aktualisierung |
+|---|---|---|
+| Sanktionen auf Bankebene | OFAC SDN (das Rückgrat — seine Einträge tragen BICs) + konsolidierte EU-Liste, best-effort | wöchentlich |
+| Länderlisten | FATF-Grau-/Schwarzliste (Plenums-synchron), EU-Hochrisiko-Drittländer | je Plenum |
+| SEPA-Erreichbarkeit | EPC-Teilnehmerregister (SCT, SDD, SCT Inst) | wöchentlich |
+| VoP-Bereitschaft | EPC-Register des Verification-of-Payee-Schemes | wöchentlich |
+
+Sanktions-Screening erfolgt **auf Bankebene (BIC8), nicht auf Namensebene** — jede Compliance-Antwort wiederholt das in ihrem eigenen `meta`. Es ist kein reguliertes AML/CFT-Produkt.
+
+## Die Wächter-Tests — warum diese Aussagen wahr bleiben
+
+Zwei Fehlerarten haben die Versprechen dieser Seite früher gebrochen: eine ausgelieferte Zahl, die über die Realität hinauswächst, und eine Abdeckungsaussage, die ihre Daten überlebt. Beide werden jetzt von Tests gehalten, die bei jedem Push laufen **und im wöchentlichen Refresh-Workflow, bevor er committen darf**:
+
+- jede auf einer ausgelieferten Oberfläche veröffentlichte Datensatzzahl muss **kleiner oder gleich** dem Live-Bestand sein;
+- keine ausgelieferte Oberfläche darf eine Sanktionsbehörde nennen, die in der gelieferten Datenbank fehlt — der wöchentliche Refresh schlägt laut fehl, statt eine Aussage auszuliefern, die seine eigenen Daten nicht mehr tragen;
+- keine ausgelieferte Oberfläche darf eine Prüfung auf Kontoebene versprechen, in keiner der drei Sprachen.
+
+Der Monat der konsultierten Referenzdaten wird in jeder Antwort als `bank_code_check.as_of` zurückgegeben.
+
+Siehe auch: [Was „verified" bedeutet](/docs/iban-validate) · [VoP-Bereitschaft](/docs/vop) · [Compliance-Check](/docs/compliance)

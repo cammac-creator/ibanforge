@@ -1,0 +1,52 @@
+---
+title: "Data Sources & Provenance"
+description: "Where every answer comes from: the six national registers, the composite BIC map, the sanctions and SEPA feeds, their refresh cadence, and what an absence means in each."
+order: 6
+---
+
+# Data Sources & Provenance
+
+Every response says how much it is worth (`bank_code_check.authoritative`, `register`, `as_of`). This page is the long version: which reference set answers for which country, what it publishes, how fresh it is, and — the part that matters most — **what an absence means in each**.
+
+## National registers — where `authoritative: true`
+
+In these countries, the reference set consulted **is** the national register: `not_in_register` means the code is not allocated, a strong reason to stop a payment.
+
+| Country | Register | Refresh | What it publishes beyond the code |
+|---|---|---|---|
+| **CH / LI** | SIX BankMaster (IID / BC-Nummer) | monthly | full seat address, BIC, payment-rail participation (SIC, euroSIC, CHF Instant), QR-IID |
+| **DE** | Deutsche Bundesbank, Bankleitzahlendatei | monthly | name, postal code + town (the register has no street column), retirement + successor BLZ |
+| **AT** | Oesterreichische Nationalbank, SEPA-Zahlungsverkehrs-Verzeichnis | monthly (source republishes daily) | full seat address, BIC, LEI |
+| **BE** | Banque nationale de Belgique, bank identification codes | monthly | name in up to four languages — the file publishes no addresses; reserved slots (*VRIJ*, *Onbeschikbaar*) are treated as unallocated |
+| **FI** | Finance Finland, monetary institution codes | on republication | codes are allocated to **banking groups**, not institutions — a hit confirms the group, so the positive claim is weaker and the response says so |
+
+What the register publishes about the allocated institution is served in `bank_code_check.institution` — name, seat address to the depth the register carries, LEI where available. Absent fields are `null`, never guessed.
+
+## The composite BIC map — where `authoritative: false`
+
+Everywhere else, bank codes resolve against our composite map: **121k+ BIC entries** assembled from GLEIF (LEI-enriched), the public SWIFT directory, SIX, EBA STEP2 SCT, Bundesbank and NBP data. A hit names who holds the matching BIC — it does **not** prove the institution issues IBANs, and an absence proves nothing at all. In the ~30 countries whose bank codes are letters, a prefix fallback can return `candidates > 1`, and the response flags it as indicative.
+
+The Netherlands additionally checks the Betaalvereniging list of IBAN-issuing providers (`issuer.iban_issuer`): a code whose holder is not on that list keeps its name but loses its `bank` type — naming the BIC holder is a fact, calling it your counterparty's bank would be a guess.
+
+## Compliance signals
+
+| Signal | Source | Refresh |
+|---|---|---|
+| Bank-level sanctions | OFAC SDN (the spine — its records carry BICs) + EU consolidated list, best-effort | weekly |
+| Country lists | FATF grey/black lists (plenary-synced), EU high-risk third countries | on each plenary |
+| SEPA reachability | EPC participant registers (SCT, SDD, SCT Inst) | weekly |
+| VoP readiness | EPC Verification of Payee scheme register | weekly |
+
+Sanctions screening is **bank-level (BIC8), not name-level** — every compliance response repeats this in its own `meta`. It is not a regulated AML/CFT product.
+
+## The guard tests — why these claims stay true
+
+Two failure modes broke this page's promises in the past: a served figure drifting above reality, and a coverage claim outliving its data. Both are now held by tests that run on every push **and inside the weekly refresh workflow, before it may commit**:
+
+- every dataset figure published on a served surface must be **less than or equal to** the live count;
+- no served surface may name a sanctions authority absent from the shipped database — the weekly refresh fails loudly rather than shipping a claim its own data no longer supports;
+- no served surface may promise account-level verification, in any of the three languages.
+
+The month of the reference data consulted is returned in every response as `bank_code_check.as_of`.
+
+Related: [What "verified" means](/docs/iban-validate#what-verified-means--and-what-it-does-not) · [VoP readiness](/docs/vop) · [Compliance check](/docs/compliance)

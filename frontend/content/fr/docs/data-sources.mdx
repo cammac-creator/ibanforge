@@ -1,0 +1,52 @@
+---
+title: "Sources & provenance des données"
+description: "D'où vient chaque réponse : les six registres nationaux, la carte composite des BIC, les flux sanctions et SEPA, leur cadence de rafraîchissement, et ce qu'une absence signifie dans chacun."
+order: 6
+---
+
+# Sources & provenance des données
+
+Chaque réponse dit ce qu'elle vaut (`bank_code_check.authoritative`, `register`, `as_of`). Cette page est la version longue : quel jeu de référence répond pour quel pays, ce qu'il publie, sa fraîcheur, et — le point qui compte le plus — **ce qu'une absence y signifie**.
+
+## Registres nationaux — là où `authoritative: true`
+
+Dans ces pays, le jeu de référence consulté **est** le registre national : `not_in_register` signifie que le code n'est pas attribué, une raison forte d'arrêter un paiement.
+
+| Pays | Registre | Rafraîchissement | Ce qu'il publie au-delà du code |
+|---|---|---|---|
+| **CH / LI** | SIX BankMaster (IID / BC-Nummer) | mensuel | adresse complète du siège, BIC, participation aux rails (SIC, euroSIC, CHF Instant), QR-IID |
+| **DE** | Deutsche Bundesbank, Bankleitzahlendatei | mensuel | nom, code postal + ville (le registre n'a pas de colonne rue), retrait + BLZ successeur |
+| **AT** | Oesterreichische Nationalbank, SEPA-Zahlungsverkehrs-Verzeichnis | mensuel (la source republie quotidiennement) | adresse complète du siège, BIC, LEI |
+| **BE** | Banque nationale de Belgique, codes d'identification bancaire | mensuel | nom en quatre langues au plus — le fichier ne publie aucune adresse ; les créneaux réservés (*VRIJ*, *Onbeschikbaar*) sont traités comme non attribués |
+| **FI** | Finance Finland, codes d'établissements monétaires | à chaque republication | les codes sont attribués à des **groupes bancaires**, pas à des établissements — un résultat confirme le groupe, l'affirmation positive est donc plus faible et la réponse le dit |
+
+Ce que le registre publie sur l'établissement titulaire est servi dans `bank_code_check.institution` : nom, adresse du siège à la profondeur que le registre porte, LEI quand il existe. Les champs absents sont `null`, jamais devinés.
+
+## La carte composite des BIC — là où `authoritative: false`
+
+Partout ailleurs, les codes banque se résolvent contre notre carte composite : **121k+ entrées BIC** assemblées depuis GLEIF (enrichi LEI), l'annuaire SWIFT public, SIX, EBA STEP2 SCT, la Bundesbank et la NBP. Un résultat nomme le détenteur du BIC correspondant — il ne prouve **pas** que l'établissement émet des IBAN, et une absence ne prouve rien du tout. Dans la trentaine de pays aux codes banque alphabétiques, un repli par préfixe peut renvoyer `candidates > 1`, et la réponse le signale comme indicatif.
+
+Les Pays-Bas passent en plus par la liste des prestataires émetteurs d'IBAN de la Betaalvereniging (`issuer.iban_issuer`) : un code dont le détenteur n'y figure pas garde son nom mais perd son type `bank` — nommer le détenteur du BIC est un fait, en faire la banque de votre contrepartie serait une supposition.
+
+## Signaux de conformité
+
+| Signal | Source | Rafraîchissement |
+|---|---|---|
+| Sanctions au niveau banque | OFAC SDN (la colonne vertébrale — ses fiches portent des BIC) + liste consolidée UE, best-effort | hebdomadaire |
+| Listes pays | Listes grise/noire FATF (synchronisées aux plénières), pays tiers à haut risque UE | à chaque plénière |
+| Accessibilité SEPA | Registres de participants EPC (SCT, SDD, SCT Inst) | hebdomadaire |
+| Préparation VoP | Registre du scheme Verification of Payee de l'EPC | hebdomadaire |
+
+Le screening sanctions est **au niveau banque (BIC8), pas au niveau des noms** — chaque réponse compliance le répète dans son propre `meta`. Ce n'est pas un produit AML/CFT réglementé.
+
+## Les tests-gardes — pourquoi ces affirmations restent vraies
+
+Deux modes de défaillance ont cassé les promesses de cette page par le passé : un chiffre servi qui dérive au-dessus de la réalité, et une affirmation de couverture qui survit à sa donnée. Les deux sont désormais tenus par des tests qui tournent à chaque push **et dans le workflow hebdomadaire de rafraîchissement, avant qu'il ait le droit de committer** :
+
+- tout chiffre de volumétrie publié sur une surface servie doit être **inférieur ou égal** au compte réel ;
+- aucune surface servie ne peut nommer une autorité de sanctions absente de la base livrée — le rafraîchissement hebdomadaire échoue bruyamment plutôt que de servir une affirmation que sa propre donnée ne soutient plus ;
+- aucune surface servie ne peut promettre une vérification au niveau du compte, dans aucune des trois langues.
+
+Le mois des données de référence consultées est renvoyé dans chaque réponse via `bank_code_check.as_of`.
+
+Voir aussi : [Ce que « verified » veut dire](/docs/iban-validate) · [Préparation VoP](/docs/vop) · [Contrôle conformité](/docs/compliance)
