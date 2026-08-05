@@ -43,7 +43,7 @@ const TOOLS: Tool[] = [
       'RETURNS: valid (boolean), country { code, name }, bic { code, bank_name, city }, ' +
       'issuer { type: bank | digital_bank | emi | payment_institution | null when unsubstantiated, name, classification }, ' +
       'bank_code_check { status, authoritative — read authoritative to know how much a "verified" is worth }, ' +
-      'sepa { member, schemes, vop_required }, next_steps (recommended follow-ups with reasons), ' +
+      'sepa { member, schemes, vop_required, vop_participant — is the recipient bank listed as ready in the EPC VoP register }, next_steps (recommended follow-ups with reasons), ' +
       'risk_indicators { issuer_type, country_risk, test_bic, sepa_reachable, vop_coverage }, ' +
       'and for CH/LI: clearing { iid, name, type, sic, qr_iid }. ' +
       'LIMITS: validates the IBAN and identifies the issuing institution — it does not confirm that the account exists, ' +
@@ -119,6 +119,11 @@ const TOOLS: Tool[] = [
             member: { type: 'boolean' },
             schemes: { type: 'array', items: { type: 'string', enum: ['SCT', 'SDD', 'SCT_INST'] } },
             vop_required: { type: 'boolean' },
+            vop_participant: {
+              type: ['boolean', 'null'],
+              description:
+                'Bank-level VoP readiness: true = resolved bank is listed as ready in the EPC Verification of Payee scheme register; null = no institution resolved.',
+            },
           },
         },
         risk_indicators: {

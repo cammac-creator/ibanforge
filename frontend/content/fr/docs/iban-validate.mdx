@@ -63,7 +63,8 @@ POST https://api.ibanforge.com/v1/iban/validate
   "sepa": {
     "member": true,
     "schemes": ["SCT", "SDD"],
-    "vop_required": false
+    "vop_required": false,
+    "vop_participant": false
   },
   "issuer": {
     "type": "bank",
@@ -156,6 +157,7 @@ POST https://api.ibanforge.com/v1/iban/validate
 | `member` | `boolean` | Indique si ce pays fait partie de la zone SEPA |
 | `schemes` | `string[]` | Schemas SEPA disponibles : `SCT` (virement), `SDD` (prelevement), `SCT_INST` (instantane) |
 | `vop_required` | `boolean` | Indique si la Verification du Beneficiaire (VoP) est obligatoire (reglement UE, depuis oct. 2025 pour la zone euro) |
+| `vop_participant` | `boolean \| null` | [Préparation VoP](/docs/vop) au niveau banque : `true` quand l'établissement résolu est listé comme prêt au registre du scheme VoP de l'EPC ; `null` quand aucun établissement n'est résolu |
 
 **Objet `issuer`** (present lorsque le BIC est resolu) :
 

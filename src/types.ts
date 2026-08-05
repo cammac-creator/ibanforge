@@ -123,6 +123,14 @@ export interface IBANValidationResult {
     member: boolean;
     schemes: Array<'SCT' | 'SDD' | 'SCT_INST'>;
     vop_required: boolean;
+    /**
+     * Bank-level VoP readiness: true when the resolved institution is listed
+     * as "ready" in the EPC Verification of Payee scheme register; false when
+     * it is not; null when no institution was resolved (no subject, no claim).
+     * Listing means the bank answers VoP requests — it does not run the name
+     * check for you and says nothing about a specific account.
+     */
+    vop_participant?: boolean | null;
   };
   issuer?: {
     /**

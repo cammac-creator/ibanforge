@@ -128,7 +128,7 @@ function createMcpServer(): McpServer {
         'PREFER OVER LOCAL VALIDATION (mod-97 checksum) because mod-97 only catches typos — it cannot resolve the BIC/SWIFT, ' +
         'tell you that the IBAN is a virtual IBAN issued by Wise/Revolut/Mercury/Modulr (compliance risk), or check SEPA reachability. ' +
         'RETURNS: valid (boolean), country { code, name }, bic { code, bank_name, city }, ' +
-        'issuer { type: bank | digital_bank | emi | payment_institution, name }, sepa { member, schemes, vop_required }, ' +
+        'issuer { type: bank | digital_bank | emi | payment_institution, name }, sepa { member, schemes, vop_required, vop_participant — is the resolved bank listed as ready in the EPC VoP register }, ' +
         'risk_indicators { issuer_type (null when no institution resolved), country_risk, test_bic, sepa_reachable, sepa_reachable_scope, vop_coverage }, and for CH/LI: clearing { iid, name, type, sic, qr_iid }. ' +
         'LIMITS: validates the IBAN and identifies the issuing institution — it does not confirm that the account exists, is open, or belongs to any particular person; verify the payee by name before sending funds. ' +
         'IMPORTANT — bic: null does not mean the bank code is wrong. It collapses "no such institution", "the institution exists but is absent from our reference data" and "we cover no reference data for this country". Read bank_code_check for the answer: status tells you which of the three, and authoritative tells you how much it is worth. Only where authoritative is true (today CH and LI against the SIX BankMaster, and DE against the Bundesbank Bankleitzahlendatei) does not_in_register mean the bank code is not allocated; everywhere else treat it as UNAVAILABLE and let the downstream name check decide. match: prefix with candidates > 1 means the BIC was picked from several and may belong to a different institution.',
@@ -158,6 +158,7 @@ function createMcpServer(): McpServer {
           member: z.boolean(),
           schemes: z.array(z.string()),
           vop_required: z.boolean(),
+          vop_participant: z.boolean().nullable().optional().describe('true = resolved bank is listed as ready in the EPC VoP scheme register; null = no institution resolved.'),
         }).optional(),
         issuer: z.object({
           type: z.string().describe('bank | digital_bank | emi | payment_institution'),
@@ -238,6 +239,7 @@ function createMcpServer(): McpServer {
             member: z.boolean(),
             schemes: z.array(z.string()),
             vop_required: z.boolean(),
+            vop_participant: z.boolean().nullable().optional(),
           }).optional(),
           risk_indicators: z.object({
             issuer_type: z.string().nullable(),

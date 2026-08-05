@@ -1,0 +1,64 @@
+---
+title: "Préparation VoP"
+description: "Vérifiez si la banque du bénéficiaire figure au registre du scheme Verification of Payee de l'EPC avant d'envoyer un paiement SEPA — vop_required et vop_participant expliqués."
+order: 4
+---
+
+# Préparation VoP — Verification of Payee
+
+Depuis le règlement européen sur les paiements instantanés (IPR), **la Verification of Payee n'est plus optionnelle** dans la zone euro :
+
+- **9 octobre 2025** — les PSP de la zone euro doivent pouvoir *répondre* aux requêtes VoP (vérifier le nom du bénéficiaire contre l'IBAN avant un virement).
+- **Avril 2026** — les PSP côté payeur doivent exécuter la vérification en temps réel pour les virements en euros.
+- **9 juillet 2027** — l'obligation s'étend aux PSP de l'UE hors zone euro.
+
+La vérification du nom elle-même se joue entre les banques, au sein du scheme VoP de l'EPC. Ce qu'un intégrateur doit savoir *avant* d'initier un paiement : **la banque du bénéficiaire est-elle réellement joignable en VoP ?** C'est ce qu'IBANforge répond.
+
+## Deux champs, deux questions
+
+Chaque réponse de `POST /v1/iban/validate` porte les deux :
+
+| Champ | Niveau | Question |
+|---|---|---|
+| `sepa.vop_required` | Pays | Le pays de cet IBAN est-il soumis à l'obligation VoP de l'IPR ? |
+| `sepa.vop_participant` | Banque | L'établissement *résolu* est-il listé comme **prêt** dans le [registre du scheme VoP de l'EPC](https://www.europeanpaymentscouncil.eu/what-we-do/other-schemes/verification-payee) ? `null` quand aucun établissement n'est résolu — pas de sujet, pas d'affirmation. |
+
+Le registre est rafraîchi chaque semaine depuis l'export officiel des participants de l'EPC.
+
+## Exemple
+
+```bash
+curl -X POST https://api.ibanforge.com/v1/iban/validate \
+  -H "Authorization: Bearer ifk_votre_cle" \
+  -H "content-type: application/json" \
+  -d '{"iban": "DE89370400440532013000"}'
+```
+
+```json
+{
+  "valid": true,
+  "bic": { "code": "COBADEFF", "bank_name": "Commerzbank", "city": "Köln" },
+  "sepa": {
+    "member": true,
+    "schemes": ["SCT", "SDD", "SCT_INST"],
+    "vop_required": true,
+    "vop_participant": true
+  }
+}
+```
+
+Une contrepartie suisse renvoie au contraire typiquement `"vop_required": false, "vop_participant": false` — la Suisse est joignable en SEPA mais hors du champ de l'IPR, et la plupart des établissements suisses ne participent pas au scheme VoP.
+
+## Dans un flux de paiement sortant
+
+1. **Valider d'abord.** Une requête VoP sur un IBAN structurellement invalide ou fabriqué gaspille un aller-retour et pollue vos statistiques de correspondance. `valid`, `bank_code_check` et `issuer` disent s'il existe un établissement réel à interroger.
+2. **Lire `vop_participant`.** `true` : la requête VoP de votre PSP aura une contrepartie qui répond. `false` ou `null` : prévoyez la branche `no match / other` de votre flux plutôt que de la traiter comme une panne.
+3. **Exécuter la vérification du nom via votre PSP.** IBANforge n'exécute pas la VoP et ne voit pas les noms de comptes — le résultat en feu tricolore (`match`, `close match`, `no match`) vient des banques, dans le scheme.
+
+## Limites, dites clairement
+
+- Figurer au registre EPC signifie que la banque **répond aux requêtes VoP**. Cela ne signifie pas qu'un compte précis existe, et ce n'est pas la vérification du nom elle-même.
+- `vop_participant` vaut `null` dès qu'aucun établissement n'a pu être résolu pour le code banque — même règle que `issuer.type` : pas d'affirmation sur un établissement que nous ne pouvons pas étayer.
+- La participation au scheme évolue chaque semaine ; les réponses portent le mois des données dans `bank_code_check.as_of`.
+
+Voir aussi : [Validation IBAN](/docs/iban-validate) · [Contrôle conformité](/docs/compliance) (sanctions, FATF, score de risque) · [Validation par lots](/docs/iban-batch)

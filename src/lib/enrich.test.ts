@@ -27,6 +27,26 @@ describe('enrichResult', () => {
     expect(result.risk_indicators!.vop_coverage).toBe(true);
   });
 
+  describe('sepa.vop_participant (bank-level EPC VoP readiness)', () => {
+    it('is a boolean when an institution was resolved', () => {
+      // Not pinned to a specific bank being "ready": the EPC register is
+      // refreshed weekly and banks join it — only the CONTRACT is stable
+      // (resolved institution → boolean, never undefined/null).
+      const result = validateIBAN('DE89370400440532013000');
+      enrichResult(result);
+      expect(result.bic?.code).toBeTruthy();
+      expect(typeof result.sepa!.vop_participant).toBe('boolean');
+    });
+
+    it('is null when no institution was resolved — no subject, no claim', () => {
+      // NL IBAN on a bank code that resolves no BIC in the composite map.
+      const result = validateIBAN('NL51ZZZZ0123456789');
+      enrichResult(result);
+      if (result.bic?.code) return; // guard: dataset drift would void the premise
+      expect(result.sepa!.vop_participant).toBeNull();
+    });
+  });
+
   it('does not enrich invalid IBANs', () => {
     const result = validateIBAN('INVALID');
     enrichResult(result);

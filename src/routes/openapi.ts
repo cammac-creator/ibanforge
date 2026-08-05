@@ -822,6 +822,12 @@ const buildSpec = () => ({
                 description:
                   'Whether Verification of Payee (VoP) is required under EU Instant Payments Regulation for this institution',
               },
+              vop_participant: {
+                type: 'boolean',
+                nullable: true,
+                description:
+                  'Bank-level VoP readiness: true when the resolved institution is listed as "ready" in the EPC Verification of Payee scheme register; false when it is not; null when no institution was resolved. Listing means the bank answers VoP requests — it does not run the name check for you.',
+              },
             },
             required: ['member', 'schemes', 'vop_required'],
           },

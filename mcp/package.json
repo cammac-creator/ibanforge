@@ -1,6 +1,6 @@
 {
   "name": "ibanforge-mcp",
-  "version": "1.4.1",
+  "version": "1.4.2",
   "mcpName": "io.github.cammac-creator/ibanforge",
   "description": "MCP server for IBANforge — IBAN validation, BIC/SWIFT lookup, Swiss BC-Nummer (1,100+ SIX entries, refreshed monthly), EMI/vIBAN classification, SEPA + VoP reachability and compliance risk scoring.",
   "type": "module",

@@ -12,6 +12,7 @@ import { lookupNlPsp } from './nl-psp.js';
 import { getCountryRisk } from './countries.js';
 import { lookupClearingByBankCode } from './ch-clearing.js';
 import { blzRegisterAvailable, lookupBlz } from './de-blz.js';
+import { checkVop } from './compliance.js';
 import type { BankCodeCheck, IBANValidationResult } from '../types.js';
 import { nextSteps } from './next-steps.js';
 
@@ -235,6 +236,19 @@ export function enrichResult(result: IBANValidationResult): void {
       result.issuer.iban_issuer = listed ? 'confirmed' : 'not_listed';
       if (!listed && result.issuer.classification === 'default') result.issuer.type = null;
     }
+  }
+
+  // VoP readiness at the BANK level: is the resolved institution listed as
+  // "ready" in the EPC Verification of Payee scheme register? Country-level
+  // duty already lives in sepa.vop_required; this answers the other half a
+  // payer needs since the IPR deadlines (euro-area PSPs answer VoP since
+  // 2025-10-09, payer-side real-time checks since 2026-04). Null when no
+  // institution was resolved — same rule as issuer.type: no substantiated
+  // subject, no claim about it.
+  if (result.sepa) {
+    result.sepa.vop_participant = result.bic?.code
+      ? checkVop(result.bic.code.slice(0, 8)).participant
+      : null;
   }
 
   result.risk_indicators = {
