@@ -298,6 +298,7 @@
     "rails": {
       "heading": "Trois façons de payer",
       "subtitle": "Commencez gratuitement, prépayez en grandissant — ou laissez votre agent payer à l’appel.",
+      "termsNotice": "Les achats et l'utilisation de l'API sont régis par les <terms>Conditions d'utilisation</terms>. Les packs payés par carte et non utilisés sont remboursables pendant 14 jours.",
       "x402": {
         "tag": "x402 · sans inscription",
         "title": "Paiement à l’appel",
@@ -787,6 +788,7 @@
     "emailPlaceholder": "votre@email.com",
     "submit": "Générer ma clé",
     "submitting": "Génération…",
+    "termsNotice": "En demandant une clé, vous acceptez les <terms>Conditions d'utilisation</terms> et la <privacy>Politique de confidentialité</privacy>.",
     "keyCreated": "Clé créée",
     "successTitle": "Voici votre clé API",
     "successWarn": "⚠ Cette clé ne sera plus affichée. Copiez-la et stockez-la quelque part de sûr.",

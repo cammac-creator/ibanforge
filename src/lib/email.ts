@@ -43,6 +43,7 @@ export async function sendApiKeyEmail(p: {
     `Check your balance any time:\n` +
     `  curl -H "Authorization: Bearer ${p.rawKey}" https://api.ibanforge.com/v1/credits/balance\n\n` +
     `Docs: https://ibanforge.com/docs\n` +
+    `Terms: https://ibanforge.com/legal/terms (unused card-paid packs: 14-day refund)\n` +
     `Keep this key safe — it will not be shown again.\n\nIBANforge`;
 
   const html = `<!DOCTYPE html><html><body style="margin:0;background:#0f0f13;padding:28px;font-family:-apple-system,Segoe UI,Roboto,sans-serif;color:#d4d4d8">
@@ -60,9 +61,9 @@ export async function sendApiKeyEmail(p: {
      -X POST https://api.ibanforge.com/v1/iban/validate \\
      -H "content-type: application/json" \\
      -d '{"iban":"CH1000230000000012345"}'</pre>
-    <p style="font-size:14px;margin:0"><a href="https://ibanforge.com/docs" style="color:#fbbf24;text-decoration:none">Read the docs →</a></p>
+    <p style="font-size:14px;margin:0"><a href="https://ibanforge.com/docs" style="color:#fbbf24;text-decoration:none">Read the docs →</a> &nbsp;·&nbsp; <a href="https://ibanforge.com/legal/terms" style="color:#fbbf24;text-decoration:none">Terms →</a></p>
     <hr style="border:none;border-top:1px solid rgba(255,255,255,.06);margin:24px 0 14px">
-    <p style="color:#52525b;font-size:12px;margin:0">IBANforge · pre-payout screening for AI agents · <a href="https://ibanforge.com" style="color:#71717a">ibanforge.com</a></p>
+    <p style="color:#52525b;font-size:12px;margin:0">IBANforge · pre-payout screening for AI agents · <a href="https://ibanforge.com" style="color:#71717a">ibanforge.com</a> · governed by the <a href="https://ibanforge.com/legal/terms" style="color:#71717a">Terms of Service</a></p>
   </div></body></html>`;
 
   const ok = await sendViaRelay({ to: p.to, subject: `Your IBANforge API key — ${credits} credits`, text, html });
@@ -153,7 +154,8 @@ export async function sendOemKeyEmail(p: {
     `API key: ${p.rawKey}\n` +
     `Plan: Editor / OEM subscription (${limit} requests/month, resets on the 1st)\n` +
     `SLA: https://ibanforge.com/en/legal/sla\n` +
-    `DPA: https://ibanforge.com/en/legal/dpa\n\n` +
+    `DPA: https://ibanforge.com/en/legal/dpa\n` +
+    `Terms: https://ibanforge.com/en/legal/terms\n\n` +
     `Use it as a Bearer token:\n` +
     `  curl -H "Authorization: Bearer ${p.rawKey}" \\\n` +
     `       -X POST https://api.ibanforge.com/v1/iban/validate \\\n` +
@@ -178,7 +180,7 @@ export async function sendOemKeyEmail(p: {
      -X POST https://api.ibanforge.com/v1/iban/validate \\
      -H "content-type: application/json" \\
      -d '{"iban":"CH1000230000000012345"}'</pre>
-    <p style="font-size:14px;margin:0 0 6px"><a href="https://ibanforge.com/en/legal/sla" style="color:#fbbf24;text-decoration:none">Your SLA →</a> &nbsp;·&nbsp; <a href="https://ibanforge.com/en/legal/dpa" style="color:#fbbf24;text-decoration:none">DPA →</a> &nbsp;·&nbsp; <a href="https://ibanforge.com/docs" style="color:#fbbf24;text-decoration:none">Docs →</a></p>
+    <p style="font-size:14px;margin:0 0 6px"><a href="https://ibanforge.com/en/legal/sla" style="color:#fbbf24;text-decoration:none">Your SLA →</a> &nbsp;·&nbsp; <a href="https://ibanforge.com/en/legal/dpa" style="color:#fbbf24;text-decoration:none">DPA →</a> &nbsp;·&nbsp; <a href="https://ibanforge.com/en/legal/terms" style="color:#fbbf24;text-decoration:none">Terms →</a> &nbsp;·&nbsp; <a href="https://ibanforge.com/docs" style="color:#fbbf24;text-decoration:none">Docs →</a></p>
     <p style="color:#a1a1aa;font-size:13px;margin:14px 0 0">Named support: <a href="mailto:support@ibanforge.com" style="color:#fbbf24;text-decoration:none">support@ibanforge.com</a> (mention Editor/OEM).</p>
     <hr style="border:none;border-top:1px solid rgba(255,255,255,.06);margin:24px 0 14px">
     <p style="color:#52525b;font-size:12px;margin:0">IBANforge · bank data API for software vendors · <a href="https://ibanforge.com" style="color:#71717a">ibanforge.com</a></p>

@@ -243,6 +243,7 @@ landing.get('/', (c) => {
           <input type="email" name="email" placeholder="your@email.com" required>
           <button type="submit">Get my key</button>
         </form>
+        <p style="margin:8px 0 0;font-size:11px;color:#52525b">By requesting a key you agree to the <a href="https://ibanforge.com/legal/terms" style="color:#71717a">Terms of Service</a> and <a href="https://ibanforge.com/legal/privacy" style="color:#71717a">Privacy Policy</a>.</p>
         <div class="keygen-result" id="keygenResult">
           <strong>Your API key (save it now):</strong>
           <code id="keygenKey"></code>

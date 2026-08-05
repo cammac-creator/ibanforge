@@ -103,6 +103,14 @@ After adding the server, ask your AI agent:
 - [x402 discovery](https://api.ibanforge.com/.well-known/x402)
 - [Issue tracker](https://github.com/cammac-creator/ibanforge/issues)
 
+## Legal
+
+Calls made through this server hit the hosted API and are governed by the
+[Terms of Service](https://ibanforge.com/legal/terms) ([privacy](https://ibanforge.com/legal/privacy),
+[DPA](https://ibanforge.com/legal/dpa)). Validation confirms IBAN structure
+and registry data — it does not confirm that an account exists or belongs to
+anyone; verify the payee by name before sending funds.
+
 ## License
 
 Apache-2.0

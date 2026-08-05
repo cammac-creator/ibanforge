@@ -298,6 +298,7 @@
     "rails": {
       "heading": "Drei Zahlungswege",
       "subtitle": "Kostenlos starten, bei Bedarf vorauszahlen — oder Ihr Agent zahlt pro Aufruf.",
+      "termsNotice": "Käufe und API-Nutzung unterliegen den <terms>Nutzungsbedingungen</terms>. Ungenutzte, per Karte bezahlte Pakete sind 14 Tage lang erstattungsfähig.",
       "x402": {
         "tag": "x402 · ohne Anmeldung",
         "title": "Pay-per-Call",
@@ -787,6 +788,7 @@
     "emailPlaceholder": "ihre@email.com",
     "submit": "Schlüssel generieren",
     "submitting": "Generierung…",
+    "termsNotice": "Mit der Anforderung eines Schlüssels akzeptieren Sie die <terms>Nutzungsbedingungen</terms> und die <privacy>Datenschutzerklärung</privacy>.",
     "keyCreated": "Schlüssel erstellt",
     "successTitle": "Hier ist Ihr API-Schlüssel",
     "successWarn": "⚠ Dieser Schlüssel wird nicht mehr angezeigt. Kopieren Sie ihn und speichern Sie ihn sicher.",

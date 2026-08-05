@@ -203,6 +203,16 @@ Push to `main` — Railway auto-deploys via Dockerfile.
 - [npm `ibanforge-mcp`](https://www.npmjs.com/package/ibanforge-mcp) — stdio MCP server
 - [MCP Registry](https://registry.modelcontextprotocol.io/v0/servers?search=ibanforge) — official listing
 
+## Legal
+
+Use of the hosted API (`api.ibanforge.com`) is governed by the
+[Terms of Service](https://ibanforge.com/legal/terms). See also the
+[Privacy Policy](https://ibanforge.com/legal/privacy) and the pre-signed
+[Data Processing Agreement](https://ibanforge.com/legal/dpa) (art. 28 GDPR)
+for customers whose calls involve personal data. Validation confirms IBAN
+structure and registry data — it does not confirm that an account exists or
+belongs to anyone.
+
 ## License
 
 MIT — see [LICENSE](LICENSE).

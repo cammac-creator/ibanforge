@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useCallback, useContext, useEffect, useState, type FormEvent, type ReactNode } from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://api.ibanforge.com';
@@ -25,6 +25,7 @@ type Stage = 'form' | 'loading' | 'success' | 'error';
 export function ApiKeyDialogProvider({ children }: { children: ReactNode }) {
   const t = useTranslations('apiKeyDialog');
   const tCommon = useTranslations('common');
+  const locale = useLocale();
   const [isOpen, setIsOpen] = useState(false);
   const [stage, setStage] = useState<Stage>('form');
   const [email, setEmail] = useState('');
@@ -176,6 +177,20 @@ export function ApiKeyDialogProvider({ children }: { children: ReactNode }) {
                 <Button type="submit" disabled={stage === 'loading'} className="w-full">
                   {stage === 'loading' ? t('submitting') : t('submit')}
                 </Button>
+                <p className="mt-3 text-[11px] leading-relaxed" style={{ color: 'var(--fg-3, #71717a)' }}>
+                  {t.rich('termsNotice', {
+                    terms: (chunks) => (
+                      <a href={`/${locale}/legal/terms`} target="_blank" rel="noreferrer" className="underline underline-offset-2">
+                        {chunks}
+                      </a>
+                    ),
+                    privacy: (chunks) => (
+                      <a href={`/${locale}/legal/privacy`} target="_blank" rel="noreferrer" className="underline underline-offset-2">
+                        {chunks}
+                      </a>
+                    ),
+                  })}
+                </p>
               </form>
             )}
 

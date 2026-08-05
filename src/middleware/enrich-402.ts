@@ -594,6 +594,7 @@ function buildAccessRamp(): Record<string, unknown> {
       bazaar: 'https://api.cdp.coinbase.com/platform/v2/x402/discovery/resources',
     },
     documentation: 'https://ibanforge.com/docs',
+    terms: 'https://ibanforge.com/legal/terms — using the API constitutes acceptance',
     llms: 'https://api.ibanforge.com/llms.txt',
   };
 }

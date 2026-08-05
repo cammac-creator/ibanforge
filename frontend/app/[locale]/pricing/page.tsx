@@ -173,6 +173,15 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
             </Link>
           </div>
         </div>
+        <p className="mt-6 text-center text-xs text-muted-foreground">
+          {t.rich('rails.termsNotice', {
+            terms: (chunks) => (
+              <Link href={`/${locale}/legal/terms`} className="underline underline-offset-2 hover:text-foreground">
+                {chunks}
+              </Link>
+            ),
+          })}
+        </p>
       </section>
 
       {/* ── Pricing table ─────────────────────────────────────────────────── */}

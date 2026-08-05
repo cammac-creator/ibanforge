@@ -90,6 +90,7 @@ apiKeys.post('/v1/keys/generate', async (c) => {
     email: email.trim().toLowerCase(),
     monthly_limit: 200,
     message: 'Save this key — it will not be shown again.',
+    terms_url: 'https://ibanforge.com/legal/terms',
   }, 201);
 });
 
