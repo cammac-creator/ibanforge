@@ -2,12 +2,14 @@
 title: "Privacy Policy"
 description: "What data IBANforge processes, what it stores, for how long, and your rights under the Swiss FADP and the GDPR."
 order: 2
-updated: "2026-08-05"
+updated: "2026-08-06"
 ---
 
 # Privacy Policy
 
-**Last updated: August 5, 2026 · Version 1.1**
+**Last updated: August 6, 2026 · Version 1.2**
+
+*Revision 1.2 (August 6, 2026): the daily account-lifecycle job moved from CI into the API runtime itself — GitHub's runners no longer process account data at all; the GitHub row below is updated accordingly.*
 
 *Revision 1.1 (August 5, 2026): corrected the hosting region — the API runs in Railway's Amsterdam (EU) region, not Zurich; only Railway's network edge sits in Zurich. Completed the processor list (AI drafting assistance, CI infrastructure, dashboard traffic), added the feedback-reports row and the business-contacts section.*
 
@@ -39,7 +41,7 @@ The API and its databases run on Railway infrastructure in the **Amsterdam, Neth
 | Stripe Payments Europe | Card payments | EU |
 | Coinbase (CDP facilitator) | x402/USDC settlement (x402.org facilitator as fallback) | US |
 | Infomaniak Network SA | Transactional & support email (operator-managed relay) | Switzerland |
-| GitHub Inc. | Public source code & CI — scheduled jobs transiently process account emails, nothing is stored in CI | US |
+| GitHub Inc. | Public source code & CI (no customer data — scheduled data-refresh jobs handle public reference files only) | US |
 | Anthropic PBC | AI-assisted drafting of customer correspondence, operator-triggered, under redaction rules | US |
 
 Where processors are outside Switzerland/EEA, transfers rely on adequacy decisions or standard contractual clauses maintained by the processor.

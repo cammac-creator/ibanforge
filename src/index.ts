@@ -35,6 +35,7 @@ import { stripeSuccess } from './routes/stripe-success.js';
 import { ibanStructure } from './routes/iban-structure.js';
 import { rateLimitMiddleware } from './middleware/rate-limit.js';
 import { recordRequest, classifyClient, hashIp, extractClientIp, purgeOldRequestLog, purgeTerminatedKeyTelemetry } from './lib/stats.js';
+import { startLifecycleRadar } from './lib/lifecycle-radar-server.js';
 import { bicGuardMiddleware, iidGuardMiddleware } from './middleware/identifier-guard.js';
 import { notFoundHandler } from './lib/not-found.js';
 import { getEntryCount, getChClearingCount, getLeiEnrichedCount } from './lib/bic-lookup.js';
@@ -532,6 +533,10 @@ setInterval(() => {
     console.error('Retention purge failed:', err);
   }
 }, 24 * 60 * 60 * 1000).unref();
+
+// Daily commercial lifecycle radar, in-process — the customer ledger must not
+// transit an external CI runner (see lifecycle-radar-server.ts).
+startLifecycleRadar(port);
 
 // Graceful shutdown
 function gracefulShutdown(signal: string) {

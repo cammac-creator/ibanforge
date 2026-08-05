@@ -3,12 +3,15 @@
  *
  * Pure, side-effect-free logic (account classification, event detection,
  * anti-repetition state diffing and French Telegram formatting) so it can be
- * unit-tested under `npm run check`. All I/O (HTTP fetch, cache/tmp state,
- * Telegram send) lives in scripts/lifecycle-radar.ts, which imports from here.
+ * unit-tested under `npm run check`. All I/O (state persistence, Telegram
+ * send, scheduling) lives in lifecycle-radar-server.ts, which runs inside the
+ * API process — deliberately NOT in CI, so the customer ledger never transits
+ * an external runner.
  *
  * Mirrors the JSON shapes of GET /v1/admin/keys and /v1/admin/client-activity
  * (see src/routes/api-keys.ts).
  */
+import { createHash } from 'node:crypto';
 
 // ---------------------------------------------------------------------------
 // API payload shapes
@@ -96,7 +99,10 @@ export function emailDomain(email: string): string {
 }
 
 const INTERNAL_DOMAINS = ['ibanforge.com', 'example.com', 'example.org'];
-const INTERNAL_EMAILS = ['cammac@bluewin.ch', 'ptibootch@gmail.com', 'cam@ogens.ch'];
+// Operator accounts, held as sha256 prefixes: this repo is public and must
+// not carry a personal address in the clear (the class that keeps coming
+// back). Extend privately via RADAR_INTERNAL_EMAILS (comma-separated, env).
+const INTERNAL_EMAIL_HASHES = new Set(['63a1239cff05c15f', 'db87e93d31614006', 'dff4e83bc451606b']);
 const INTERNAL_SUBSTRINGS = [
   'playground',
   'workflow-test',
@@ -108,11 +114,21 @@ const INTERNAL_SUBSTRINGS = [
 ];
 const INTERNAL_PROTON_RE = /^ca-[a-z]+-?\d*@proton\.me$/;
 
+function sha16(s: string): string {
+  return createHash('sha256').update(s).digest('hex').slice(0, 16);
+}
+
+const ENV_INTERNAL = (process.env.RADAR_INTERNAL_EMAILS ?? '')
+  .split(',')
+  .map((s) => s.trim().toLowerCase())
+  .filter(Boolean);
+
 /** Internal / test accounts we must never surface as commercial leads. */
 export function isInternal(email: string): boolean {
   const e = email.trim().toLowerCase();
   if (!e) return true; // no address => not an actionable lead
-  if (INTERNAL_EMAILS.includes(e)) return true;
+  if (INTERNAL_EMAIL_HASHES.has(sha16(e))) return true;
+  if (ENV_INTERNAL.includes(e)) return true;
   if (INTERNAL_DOMAINS.includes(emailDomain(e))) return true;
   if (INTERNAL_PROTON_RE.test(e)) return true;
   if (INTERNAL_SUBSTRINGS.some((s) => e.includes(s))) return true;
