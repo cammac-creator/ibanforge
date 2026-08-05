@@ -67,13 +67,23 @@ POST https://api.ibanforge.com/v1/iban/validate
   },
   "issuer": {
     "type": "bank",
-    "name": "UBS Switzerland AG"
+    "name": "UBS Switzerland AG",
+    "classification": "default"
+  },
+  "bank_code_check": {
+    "value": "00230",
+    "status": "verified",
+    "match": "register",
+    "register": "SIX BankMaster (Swiss IID / BC-Nummer register)",
+    "authoritative": true,
+    "as_of": "2026-08"
   },
   "risk_indicators": {
     "issuer_type": "bank",
     "country_risk": "standard",
     "test_bic": false,
     "sepa_reachable": true,
+    "sepa_reachable_scope": "country",
     "vop_coverage": false
   },
   "clearing": {
@@ -106,6 +116,8 @@ POST https://api.ibanforge.com/v1/iban/validate
 | `bic` | `object \| null` | Gültige IBANs | BIC/SWIFT-Code und Institutsdaten (null, wenn keine Übereinstimmung gefunden) |
 | `sepa` | `object` | Gültige IBANs | SEPA-Mitgliedschaft, Schemata und VoP-Anforderung |
 | `issuer` | `object` | Gültige IBANs mit BIC | Institutsklassifizierung |
+| `bank_code_check` | `object` | Gültige IBANs | Ob der Bankcode in Referenzdaten auflöst — und wie viel diese Antwort wert ist (siehe Abschnitt „verified" unten) |
+| `next_steps` | `array` | Fallabhängig | Maschinenlesbare Folgeschritte (Compliance-Screening, Empfängerprüfung …), jeweils mit Begründung |
 | `risk_indicators` | `object` | Gültige IBANs | Zusammengesetztes Risikosignal für Compliance |
 | `clearing` | `object \| null` | Gültige CH/LI-IBANs | Schweizer Clearing-Daten aus dem SIX BankMaster (BC-Nummer, Zahlungsschienen-Teilnahme, QR-IID); `null`, wenn die IID nicht gelistet ist |
 | `formatted` | `string` | Gültige IBANs | IBAN mit Leerzeichen alle 4 Zeichen |
@@ -149,20 +161,44 @@ POST https://api.ibanforge.com/v1/iban/validate
 
 | Feld | Typ | Beschreibung |
 |---|---|---|
-| `type` | `string` | `bank` (traditionell), `digital_bank` (Neobank), `emi` (E-Geld-Institut) oder `payment_institution` |
-| `name` | `string` | Institutsname |
+| `type` | `string \| null` | `bank` (traditionell), `digital_bank` (Neobank), `emi` (E-Geld-Institut), `payment_institution` — oder `null`, wenn sich kein Institut belegen lässt (z. B. weil der Bankcode kein gelisteter IBAN-Emittent ist) |
+| `name` | `string` | Institutsname — der Inhaber des passenden BIC. Kann auch gesetzt sein, wenn `type` den Wert `null` hat: den BIC-Inhaber zu nennen ist ein Fakt; ihn zur Bank Ihrer Gegenpartei zu erklären wäre eine Vermutung |
+| `classification` | `string` | `curated` — der Typ ist eine positive Identifikation aus gepflegten Listen (EMI/Neobanken/Zahlungsinstitute); `default` — der Typ fällt auf `bank` zurück, weil die meisten BIC-Inhaber Banken sind. Verlassen Sie sich auf `curated`; behandeln Sie `default` als Vermutung |
+| `iban_issuer` | `string?` | Nur für Länder mit veröffentlichter Liste IBAN-ausgebender Zahlungsdienstleister (heute: NL). `confirmed` — der Code steht auf dieser Liste; `not_listed` — nicht gelistet, `type` wird `null`, und `next_steps` weist darauf hin, dass das Konto möglicherweise nicht existiert |
 
 > **vIBAN-Erkennung:** Wenn `issuer.type` den Wert `emi`, `digital_bank` oder `payment_institution` hat, handelt es sich mit höherer Wahrscheinlichkeit um eine virtuelle IBAN (vIBAN). Dies ist nützlich für die AML/CFT-Compliance gemäß der EU-AMLR-Verordnung (Juli 2027).
+
+**`bank_code_check`-Objekt:**
+
+| Feld | Typ | Beschreibung |
+|---|---|---|
+| `value` | `string` | Der aus dem BBAN entnommene Bankcode, zurückgegeben für Ihre Logs |
+| `status` | `string` | `verified` — der Code löst zu einem benennbaren Institut auf; `not_in_register` — nicht auflösbar in den Referenzdaten, die wir für dieses Land halten; `unavailable` — keine Referenzdaten für dieses Land, keine Aussage |
+| `match` | `string \| null` | `register` — exakter Schlüssel im Referenzbestand (deterministisch); `prefix` — Rückfall über BIC-Präfixsuche, nur möglich, wo Bankcodes aus Buchstaben bestehen; siehe `candidates` |
+| `register` | `string \| null` | Name des konsultierten Referenzbestands |
+| `authoritative` | `boolean` | `true` nur dort, wo der Referenzbestand das nationale Register IST — siehe unten |
+| `candidates` | `number?` | Bei `match: "prefix"`: Anzahl passender Institute. Mehr als 1 heißt: nur ein Hinweis |
+| `as_of` | `string` | Monat der Referenzdaten |
 
 **`risk_indicators`-Objekt:**
 
 | Feld | Typ | Beschreibung |
 |---|---|---|
-| `issuer_type` | `string` | Identisch mit `issuer.type` — `bank`, `digital_bank`, `emi` oder `payment_institution` |
+| `issuer_type` | `string \| null` | Identisch mit `issuer.type`; `null`, wenn kein Institut belegt wurde |
 | `country_risk` | `string` | `standard`, `elevated` (FATF-Grauliste) oder `high` (FATF-Schwarzliste / EU-Hochrisikoliste) |
 | `test_bic` | `boolean` | Ob der BIC ein Test-/Sandbox-Code ist |
-| `sepa_reachable` | `boolean` | Ob das Konto in der SEPA-Zone liegt |
+| `sepa_reachable` | `boolean` | Ob das Land des Kontos in der SEPA-Zone liegt |
+| `sepa_reachable_scope` | `string` | `country` — die Erreichbarkeitsaussage betrifft die Verfahren des Landes, nie dieses konkrete Konto |
 | `vop_coverage` | `boolean` | Ob VoP für dieses Land verpflichtend ist |
+
+### Was „verified" bedeutet — und was nicht
+
+`bank_code_check.status: "verified"` bedeutet: Der Bankcode löst in den konsultierten Referenzdaten zu einem Institut auf, das wir benennen können. Wie viel das wert ist, sagt genau `authoritative`:
+
+- **`authoritative: true`** — der Referenzbestand ist das nationale Register selbst. Heute: **CH und LI** (SIX BankMaster), **DE** (Bankleitzahlendatei der Bundesbank), **FI** (Finance-Finland-Codes — an Bankengruppen vergeben, ein Treffer bestätigt die Gruppe), **AT** (OeNB-Verzeichnis), **BE** (BNB-Codeliste). In diesen Ländern bedeutet `not_in_register`, dass der Code **nicht vergeben** ist — ein starker Grund, eine Zahlung zu stoppen.
+- **`authoritative: false`** — der Referenzbestand ist unsere zusammengesetzte Bankcode-Karte aus BIC-Verzeichnissen. Ein Treffer benennt den Inhaber des passenden BIC; er beweist **nicht**, dass dieses Institut IBANs ausgibt. Wo Bankcodes aus Buchstaben bestehen, heißt `match: "prefix"` mit `candidates > 1`: nur ein Hinweis.
+
+**Nichts davon bestätigt, dass das Konto existiert, geführt wird oder einer bestimmten Person gehört.** Eine strukturell gültige IBAN mit real existierendem Institut kann dennoch fabriziert sein. Zur Empfängerprüfung nutzen Sie die Verification of Payee der Banken (`sepa.vop_required` zeigt, wann sie vorgeschrieben ist) oder einen Namensabgleich mit Ihrer Gegenpartei — wo eine Antwort diese Lücke offenlässt, sagt `next_steps` es ausdrücklich.
 
 ### Ungültige IBAN (200)
 

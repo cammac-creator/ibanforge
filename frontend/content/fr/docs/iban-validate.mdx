@@ -67,13 +67,23 @@ POST https://api.ibanforge.com/v1/iban/validate
   },
   "issuer": {
     "type": "bank",
-    "name": "UBS Switzerland AG"
+    "name": "UBS Switzerland AG",
+    "classification": "default"
+  },
+  "bank_code_check": {
+    "value": "00230",
+    "status": "verified",
+    "match": "register",
+    "register": "SIX BankMaster (Swiss IID / BC-Nummer register)",
+    "authoritative": true,
+    "as_of": "2026-08"
   },
   "risk_indicators": {
     "issuer_type": "bank",
     "country_risk": "standard",
     "test_bic": false,
     "sepa_reachable": true,
+    "sepa_reachable_scope": "country",
     "vop_coverage": false
   },
   "clearing": {
@@ -106,6 +116,8 @@ POST https://api.ibanforge.com/v1/iban/validate
 | `bic` | `object \| null` | IBAN valides | Code BIC/SWIFT et donnees de l'etablissement (null si aucune correspondance trouvee) |
 | `sepa` | `object` | IBAN valides | Adhesion SEPA, schemas et exigence VoP |
 | `issuer` | `object` | IBAN valides avec BIC | Classification de l'etablissement |
+| `bank_code_check` | `object` | IBAN valides | Le code banque se résout-il dans les données de référence — et ce que cette réponse vaut (voir la section « verified » ci-dessous) |
+| `next_steps` | `array` | Selon le cas | Suites recommandées, lisibles par machine (screening conformité, vérification du bénéficiaire…), chacune avec sa raison |
 | `risk_indicators` | `object` | IBAN valides | Signal de risque composite pour la conformite |
 | `clearing` | `object \| null` | IBAN CH/LI valides | Donnees de clearing suisses du SIX BankMaster (BC-Nummer, participation aux rails, QR-IID) ; `null` si l'IID n'y figure pas |
 | `formatted` | `string` | IBAN valides | IBAN formate avec des espaces tous les 4 caracteres |
@@ -149,20 +161,44 @@ POST https://api.ibanforge.com/v1/iban/validate
 
 | Champ | Type | Description |
 |---|---|---|
-| `type` | `string` | `bank` (traditionnelle), `digital_bank` (neobanque), `emi` (Etablissement de Monnaie Electronique) ou `payment_institution` |
-| `name` | `string` | Nom de l'etablissement |
+| `type` | `string \| null` | `bank` (traditionnelle), `digital_bank` (néobanque), `emi` (Établissement de Monnaie Électronique), `payment_institution` — ou `null` quand aucun établissement ne peut être étayé (par exemple, le code banque n'est pas un émetteur d'IBAN répertorié) |
+| `name` | `string` | Nom de l'établissement — le détenteur du BIC correspondant. Peut être renseigné même quand `type` est `null` : nommer le détenteur du BIC est un fait, en faire la banque de votre contrepartie serait une supposition |
+| `classification` | `string` | `curated` — le type est une identification positive issue de listes maintenues (EMI/néobanques/établissements de paiement) ; `default` — le type retombe sur `bank` parce que la plupart des détenteurs de BIC sont des banques. Comptez sur `curated` ; traitez `default` comme une présomption |
+| `iban_issuer` | `string?` | Uniquement pour les pays qui publient une liste des prestataires émetteurs d'IBAN (aujourd'hui : NL). `confirmed` — le code figure sur cette liste ; `not_listed` — non, `type` passe à `null`, et `next_steps` signale que le compte peut ne pas exister |
 
 > **Detection vIBAN :** Si `issuer.type` est `emi`, `digital_bank` ou `payment_institution`, l'IBAN est plus susceptible d'etre un IBAN virtuel (vIBAN). Ceci est utile pour la conformite AML/CFT dans le cadre du reglement AMLR de l'UE (juillet 2027).
+
+**Objet `bank_code_check` :**
+
+| Champ | Type | Description |
+|---|---|---|
+| `value` | `string` | Le code banque extrait du BBAN, renvoyé pour vos journaux |
+| `status` | `string` | `verified` — le code se résout vers un établissement que nous savons nommer ; `not_in_register` — il ne se résout pas, dans les données de référence que nous détenons pour ce pays ; `unavailable` — nous n'avons pas de données de référence pour ce pays, aucun avis |
+| `match` | `string \| null` | `register` — clé exacte dans le jeu de référence (déterministe) ; `prefix` — repli par préfixe de BIC, possible seulement où les codes banque sont alphabétiques ; voir `candidates` |
+| `register` | `string \| null` | Nom du jeu de référence consulté |
+| `authoritative` | `boolean` | `true` uniquement là où le jeu de référence EST le registre national — voir ci-dessous |
+| `candidates` | `number?` | Sur `match: "prefix"` : nombre d'établissements correspondants. Au-delà de 1, la réponse n'est qu'indicative |
+| `as_of` | `string` | Mois des données de référence |
 
 **Objet `risk_indicators` :**
 
 | Champ | Type | Description |
 |---|---|---|
-| `issuer_type` | `string` | Identique a `issuer.type` — `bank`, `digital_bank`, `emi` ou `payment_institution` |
+| `issuer_type` | `string \| null` | Identique a `issuer.type` ; `null` quand aucun établissement n'a été étayé |
 | `country_risk` | `string` | `standard`, `elevated` (liste grise FATF) ou `high` (liste noire FATF / haut risque UE) |
 | `test_bic` | `boolean` | Indique si le BIC est un code de test/sandbox |
-| `sepa_reachable` | `boolean` | Indique si le compte est dans la zone SEPA |
+| `sepa_reachable` | `boolean` | Indique si le pays du compte est dans la zone SEPA |
+| `sepa_reachable_scope` | `string` | `country` — l'affirmation d'accessibilité porte sur les schémas du pays, jamais sur ce compte précis |
 | `vop_coverage` | `boolean` | Indique si la VoP est obligatoire pour ce pays |
+
+### Ce que « verified » veut dire — et ce qu'il ne dit pas
+
+`bank_code_check.status: "verified"` signifie que le code banque se résout vers un établissement que nous savons nommer dans les données de référence consultées. Ce que cela vaut est exactement ce que dit `authoritative` :
+
+- **`authoritative: true`** — le jeu de référence est le registre national lui-même. Aujourd'hui : **CH et LI** (SIX BankMaster), **DE** (Bankleitzahlendatei de la Bundesbank), **FI** (codes Finance Finland — attribués à des groupes bancaires, un résultat confirme le groupe), **AT** (répertoire OeNB), **BE** (liste de codes de la BNB). Dans ces pays, `not_in_register` signifie que le code n'est **pas attribué** — une raison forte d'arrêter un paiement.
+- **`authoritative: false`** — le jeu de référence est notre carte composite de codes banque, assemblée depuis des annuaires de BIC. Un résultat nomme le détenteur du BIC correspondant ; il ne prouve **pas** que cet établissement émet des IBAN. Là où les codes banque sont alphabétiques, `match: "prefix"` avec `candidates > 1` signifie que la réponse n'est qu'indicative.
+
+**Rien de tout cela ne confirme que le compte existe, est ouvert, ou appartient à une personne donnée.** Un IBAN structurellement valide nommant un établissement réel peut être fabriqué. Pour vérifier le bénéficiaire, utilisez la Verification of Payee des banques (`sepa.vop_required` indique quand elle est exigée) ou un contrôle du nom auprès de votre contrepartie — chaque fois qu'une réponse laisse ce vide ouvert, `next_steps` le dit explicitement.
 
 ### IBAN invalide (200)
 

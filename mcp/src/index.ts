@@ -41,7 +41,9 @@ const TOOLS: Tool[] = [
       'PREFER OVER LOCAL VALIDATION (mod-97 checksum) because mod-97 only catches typos — it cannot resolve the BIC/SWIFT, ' +
       'tell you that the IBAN is a virtual IBAN issued by Wise/Revolut/Mercury/Modulr (compliance risk), or check SEPA reachability. ' +
       'RETURNS: valid (boolean), country { code, name }, bic { code, bank_name, city }, ' +
-      'issuer { type: bank | digital_bank | emi | payment_institution, name }, sepa { member, schemes, vop_required }, ' +
+      'issuer { type: bank | digital_bank | emi | payment_institution | null when unsubstantiated, name, classification }, ' +
+      'bank_code_check { status, authoritative — read authoritative to know how much a "verified" is worth }, ' +
+      'sepa { member, schemes, vop_required }, next_steps (recommended follow-ups with reasons), ' +
       'risk_indicators { issuer_type, country_risk, test_bic, sepa_reachable, vop_coverage }, ' +
       'and for CH/LI: clearing { iid, name, type, sic, qr_iid }. ' +
       'LIMITS: validates the IBAN and identifies the issuing institution — it does not confirm that the account exists, ' +
@@ -92,9 +94,24 @@ const TOOLS: Tool[] = [
         issuer: {
           type: 'object',
           properties: {
-            type: { type: 'string', enum: ['bank', 'digital_bank', 'emi', 'payment_institution'] },
+            // type is null when no institution could be substantiated (e.g. a
+            // bank code that is not a listed IBAN issuer). An enum without
+            // null would make the SDK silently drop structuredContent on
+            // exactly the answers that matter most.
+            type: { type: ['string', 'null'], enum: ['bank', 'digital_bank', 'emi', 'payment_institution', null] },
             name: { type: 'string' },
+            classification: { type: 'string', enum: ['curated', 'default'] },
+            iban_issuer: { type: 'string', enum: ['confirmed', 'not_listed'] },
           },
+        },
+        bank_code_check: {
+          type: 'object',
+          description:
+            'Whether the bank code resolves in reference data. Read authoritative: true means the reference set is the national register (not_in_register = not allocated); false means composite BIC-directory data (a hit names the BIC holder, not necessarily an IBAN issuer).',
+        },
+        next_steps: {
+          type: 'array',
+          description: 'Recommended machine-readable follow-ups, each with the reason it is suggested.',
         },
         sepa: {
           type: 'object',
@@ -108,7 +125,7 @@ const TOOLS: Tool[] = [
           type: 'object',
           description: 'Country + issuer risk signals. Use these instead of a single composite score.',
           properties: {
-            issuer_type: { type: 'string' },
+            issuer_type: { type: ['string', 'null'] },
             country_risk: { type: 'string', enum: ['standard', 'elevated', 'high'] },
             test_bic: { type: 'boolean' },
             sepa_reachable: { type: 'boolean' },
@@ -339,7 +356,7 @@ const TOOLS: Tool[] = [
         valid: { type: 'boolean' },
         country: { type: 'object', properties: { code: { type: 'string' }, name: { type: 'string' } } },
         bic: { type: 'object', properties: { code: { type: 'string' }, bank_name: { type: 'string' }, city: { type: 'string' } } },
-        issuer: { type: 'object', properties: { type: { type: 'string' }, name: { type: 'string' } } },
+        issuer: { type: 'object', properties: { type: { type: ['string', 'null'] }, name: { type: 'string' } } },
         sepa: {
           type: 'object',
           properties: {
