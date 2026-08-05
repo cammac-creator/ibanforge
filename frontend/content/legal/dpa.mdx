@@ -2,12 +2,14 @@
 title: "Data Processing Agreement"
 description: "Pre-signed DPA (art. 28 GDPR / FADP) for customers who embed the IBANforge API — roles, processing scope, sub-processors, TOMs."
 order: 3
-updated: "2026-07-10"
+updated: "2026-08-05"
 ---
 
 # Data Processing Agreement (DPA)
 
-**Last updated: July 11, 2026 · Version 1.1**
+**Last updated: August 5, 2026 · Version 1.2**
+
+*Revision 1.2 (August 5, 2026): corrected the hosting region in Clauses 4.3 and 6 — processing runs in Railway's Amsterdam (EU) region, not Zurich; only Railway's network edge sits in Zurich. Sub-processor list completed and aligned with Privacy Policy §3 (AI drafting assistance, CI infrastructure). Clause 4.2 now states the one-time key delivery window. Retention clauses extended to every per-request table.*
 
 *Revision 1.1 (July 11, 2026): telemetry attributable to a terminated customer is now deleted **by default** 30 days after termination — previously deletion was on request. See Clause 4.7 and Annex I.6.*
 
@@ -34,8 +36,8 @@ The Service is operated by its owner; no employees have access to production dat
 ## 4. Technical and organisational measures (TOMs)
 
 - **4.1** Transport encryption (TLS) on all endpoints; HTTP redirected to HTTPS.
-- **4.2** **Data minimisation by design:** no storage of submitted IBANs; IP addresses stored only as salted hashes; API keys stored only as hashes.
-- **4.3** Hosting in the **Zurich (Switzerland)** region (Railway), with volume-level isolation.
+- **4.2** **Data minimisation by design:** no storage of submitted IBANs; IP addresses stored only as salted hashes; API keys stored as hashes — a newly issued key is additionally held for one-time retrieval (cleared on first read, or after 7 days at the latest) and delivered to the customer by email.
+- **4.3** Hosting in the **Amsterdam (EU)** region (Railway), with volume-level isolation and a Zurich network edge for Swiss traffic.
 - **4.4** Request metadata automatically purged after **12 months** at the latest.
 - **4.5** Access to production restricted to the operator with strong authentication; secrets held in the hosting platform's secret store.
 - **4.6** Public status page and monitored error rates.
@@ -43,11 +45,11 @@ The Service is operated by its owner; no employees have access to production dat
 
 ## 5. Sub-processors
 
-The Controller authorises the sub-processors listed in the [Privacy Policy §3](/legal/privacy) (Railway — Zurich hosting; Vercel — website only; Stripe — card payments; Coinbase CDP — USDC settlement; Infomaniak — email; GitHub — public code, no customer data). Changes are announced in the [changelog](/changelog) at least 30 days before a new sub-processor receives personal data; the Controller may object on reasonable grounds, in which case either party may terminate.
+The Controller authorises the sub-processors listed in the [Privacy Policy §3](/legal/privacy) (Railway — Amsterdam (EU) hosting; Vercel — website & dashboard; Stripe — card payments; Coinbase CDP — USDC settlement, with the x402.org facilitator as fallback; Infomaniak — email; GitHub — public code & CI; Anthropic — AI-assisted drafting of correspondence). Changes are announced in the [changelog](/changelog) at least 30 days before a new sub-processor receives personal data; the Controller may object on reasonable grounds, in which case either party may terminate.
 
 ## 6. International transfers
 
-Primary processing occurs in Switzerland (EU adequacy). Where a sub-processor operates from a third country, transfers rely on adequacy decisions or the sub-processor's standard contractual clauses.
+Primary processing occurs within the European Union (Netherlands). For Controllers subject to the GDPR, processing therefore stays within the EU; for Swiss Controllers, Swiss law recognises the EU as adequate. Where a sub-processor operates from a third country, transfers rely on adequacy decisions or the sub-processor's standard contractual clauses.
 
 ## 7. Assistance, incidents, audits
 

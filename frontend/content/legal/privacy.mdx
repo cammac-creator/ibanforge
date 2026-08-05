@@ -2,12 +2,14 @@
 title: "Privacy Policy"
 description: "What data IBANforge processes, what it stores, for how long, and your rights under the Swiss FADP and the GDPR."
 order: 2
-updated: "2026-07-10"
+updated: "2026-08-05"
 ---
 
 # Privacy Policy
 
-**Last updated: July 10, 2026 · Version 1.0**
+**Last updated: August 5, 2026 · Version 1.1**
+
+*Revision 1.1 (August 5, 2026): corrected the hosting region — the API runs in Railway's Amsterdam (EU) region, not Zurich; only Railway's network edge sits in Zurich. Completed the processor list (AI drafting assistance, CI infrastructure, dashboard traffic), added the feedback-reports row and the business-contacts section.*
 
 This policy explains what personal data **IBANforge** (see [Legal Notice](/legal/imprint)) processes when you use `ibanforge.com` and `api.ibanforge.com`, under the Swiss Federal Act on Data Protection (FADP) and, where applicable, the EU GDPR. The short version: **IBANs you submit are validated in memory and are not stored.**
 
@@ -20,23 +22,25 @@ This policy explains what personal data **IBANforge** (see [Legal Notice](/legal
 | **Request metadata** (path, status, latency, timestamp, pseudonymised IP, user-agent, key prefix) | Abuse prevention, capacity planning, the public status page | Yes, **12 months maximum**, then automatically deleted. |
 | **Aggregated statistics** (daily counts by endpoint/country — no personal data) | Product analytics, public metrics | Yes, indefinitely (anonymous). |
 | **Payment data** | Processing card or USDC payments | Handled by Stripe / the x402 facilitator. We never see card numbers; we store the transaction reference. |
+| **Feedback reports** (free-form report, optional contact address) | Investigating data-quality issues, x402 refund decisions | Yes, **12 months**, then automatically deleted. |
 
 **IP addresses** are pseudonymised before storage: we keep only a salted hash, never the raw address.
 
 ## 2. Where the data lives
 
-The API and its databases run on Railway infrastructure in the **Zurich, Switzerland region**. Switzerland benefits from an EU adequacy decision, and the FADP provides equivalent protection.
+The API and its databases run on Railway infrastructure in the **Amsterdam, Netherlands region (EU)**, fronted by Railway's European network edge (Zurich for most Swiss traffic). For EU/EEA customers, processing stays within the EU. For Swiss customers, data is processed in the EU: Swiss law recognises the EU as providing an adequate level of protection, and this policy and the [DPA](/legal/dpa) apply regardless of where you are.
 
 ## 3. Processors we use
 
 | Processor | Role | Location/region |
 |---|---|---|
-| Railway Corp. | API hosting & storage | Region: Zurich (CH) |
-| Vercel Inc. | Website hosting (no API data) | Global CDN |
+| Railway Corp. | API hosting & storage | Region: Amsterdam (EU) |
+| Vercel Inc. | Website & dashboard hosting — customer data transits its functions when the operator uses the dashboard, and playground submissions are relayed to the API | Global CDN |
 | Stripe Payments Europe | Card payments | EU |
-| Coinbase (CDP facilitator) | x402/USDC settlement | US |
-| Infomaniak Network SA | Transactional & support email | Switzerland |
-| GitHub Inc. | Public source code (no customer data) | US |
+| Coinbase (CDP facilitator) | x402/USDC settlement (x402.org facilitator as fallback) | US |
+| Infomaniak Network SA | Transactional & support email (operator-managed relay) | Switzerland |
+| GitHub Inc. | Public source code & CI — scheduled jobs transiently process account emails, nothing is stored in CI | US |
+| Anthropic PBC | AI-assisted drafting of customer correspondence, operator-triggered, under redaction rules | US |
 
 Where processors are outside Switzerland/EEA, transfers rely on adequacy decisions or standard contractual clauses maintained by the processor.
 
@@ -55,7 +59,15 @@ Under the FADP/GDPR you can request access, rectification, deletion, restriction
 
 The website uses **no advertising trackers**. The dashboard uses a session cookie strictly for authentication. Locale preference is stored client-side.
 
-## 7. Changes
+## 7. Business contacts and prospecting
+
+For sales and support, IBANforge keeps a lightweight record of business contacts: name, role, professional email address, company, the correspondence exchanged with us, and notes about product needs. Legal basis: legitimate interest in B2B communication (art. 6(1)(f) GDPR; FADP balancing test). We may also record publicly available professional contact details of companies that could plausibly use the Service, in order to write to them once, relevantly.
+
+- These records are never sold, never shared beyond the processors above, and not used for automated profiling.
+- Correspondence is kept for the duration of the business relationship; billing-related records follow statutory bookkeeping duties.
+- If you want out, reply "remove me" to any message or write to **support@ibanforge.com** — we delete the contact record and stop writing.
+
+## 8. Changes
 
 Material changes to this policy are announced on this page and in the [changelog](/changelog) 30 days before they take effect.
 
