@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildContacts,
   INTERNAL_RE,
+  SEEDED_PILOT_RE,
   type BuildInput,
   type KeyRow,
   type MessageRow,
@@ -81,6 +82,32 @@ function asClient(contact: Contact) {
   if (contact.kind !== 'client') throw new Error(`expected a client contact, got ${contact.kind}`);
   return contact;
 }
+
+describe('SEEDED_PILOT_RE', () => {
+  // The dashboard listed a dozen of these under "Pilotes silencieux, à
+  // relancer" for 111 days. They are keys we minted ourselves at launch, one
+  // per company we wanted to approach, and nobody ever called them. Presented
+  // as leads going cold they read as a backlog of missed opportunities; they
+  // are neither leads nor missed.
+  it('matches the outreach keys we minted at launch', () => {
+    expect(SEEDED_PILOT_RE.test('acme-pilot@acme.example.net')).toBe(true);
+    expect(SEEDED_PILOT_RE.test('ACME-PILOT@ACME.EXAMPLE.NET')).toBe(true);
+  });
+
+  // The hyphen carries the whole rule, so these three are the ones that decide
+  // whether it is narrow enough to be safe.
+  it('leaves ordinary addresses alone', () => {
+    expect(SEEDED_PILOT_RE.test('copilot@alpha.example.net')).toBe(false);
+    expect(SEEDED_PILOT_RE.test('contact@pilot-school.example.net')).toBe(false);
+    expect(SEEDED_PILOT_RE.test('alpha@example.net')).toBe(false);
+  });
+
+  // A company we seeded that later signs up for real does so with a normal
+  // address, so this filter must not be what hides them.
+  it('does not swallow a real signup from a seeded company', () => {
+    expect(SEEDED_PILOT_RE.test('ops@acme.example.net')).toBe(false);
+  });
+});
 
 describe('INTERNAL_RE', () => {
   it('matches internal and documentation addresses, not a real prospect domain', () => {

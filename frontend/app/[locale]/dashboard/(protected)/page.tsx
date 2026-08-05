@@ -8,7 +8,7 @@ import { RevenueCard } from '@/components/dashboard/revenue-card';
 import { LiveHealthStrip } from '@/components/dashboard/live-health-strip';
 import { TopUsersToday } from '@/components/dashboard/top-users-today';
 import { FunnelPanel } from '@/components/crm/funnel-panel';
-import { fetchCrmData, type BuildInput } from '@/lib/crm/build-contacts';
+import { fetchCrmData, SEEDED_PILOT_RE, type BuildInput } from '@/lib/crm/build-contacts';
 import { BY_CAMPAIGN, BY_CONFIDENCE, BY_COUNTRY, BY_SEGMENT, funnelBy } from '@/lib/crm/funnel';
 import { sendableStock } from '@/lib/crm/priority';
 import { FOLLOWUP_DAYS } from '@/lib/crm/situation';
@@ -272,6 +272,11 @@ export default async function DashboardPage({
   // moving either threshold moves figures the owner reads daily.
   const allKeys = keysData?.keys ?? [];
   const pilots = allKeys
+    // The outreach keys we minted at launch are unused by construction, so
+    // every one of them landed in "silent pilots to chase" and stayed there.
+    // A dozen names nobody was ever waiting on, presented as opportunities
+    // going cold, for 111 days, plus a KPI card counting them.
+    .filter((k) => !SEEDED_PILOT_RE.test(k.email))
     .filter((k) => (k.monthly_limit ?? 200) > 200)
     .sort((a, b) => b.used - a.used);
   const activePilots = pilots.filter((k) => k.used > 0).length;

@@ -27,6 +27,27 @@ export const INTERNAL_RE =
   /(@ibanforge\.com|@ibanforge\.internal|@example\.com|@test\.|test-|-test|smoke|audit|^ca-[a-z]+-?\d*@proton\.me|^credits-buyer$|^stripe-buyer$|^playground|cammac@bluewin\.ch|cam@ogens\.ch|ptibootch@|gpt-store@|claudealainmartin06\+)/i;
 
 /**
+ * The outreach keys minted at launch, one per company we meant to approach.
+ * None was ever called.
+ *
+ * They are not the same thing as `isPilot()` below, which reads a quota and
+ * asks "is this key an evaluation?". These are recognised by their address
+ * because that is the only thing that distinguishes them: a key we created
+ * *for* someone, that they never received or never used, from one someone
+ * created for themselves. No quota can tell those apart.
+ *
+ * The dashboard listed a dozen of them as "silent pilots to chase" for 111
+ * days, which reads as a backlog of opportunities going cold. They are neither
+ * opportunities nor going cold, and the number sat in a KPI card the owner
+ * reads daily.
+ *
+ * The hyphen is load-bearing: it keeps `copilot@` and a `pilot-` domain out,
+ * and it leaves any real signup from one of those companies alone, since a
+ * genuine account is never created on this address shape.
+ */
+export const SEEDED_PILOT_RE = /-pilot@/i;
+
+/**
  * Monthly quota from which an unpaid key is an evaluation pilot rather than a
  * customer. Same threshold as the Clients page, which hid pilots entirely.
  */
