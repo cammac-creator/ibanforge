@@ -23,7 +23,7 @@ const buildSpec = () => ({
     // generic "IBAN + BIC API" line commoditises the two differentiators
     // (Swiss SIX clearing depth, sanctions screening) for free.
     description:
-      'Pre-payout screening for AI agents — vet a counterparty IBAN before you send funds. ' +
+      'Pre-payout screening for AI agents — check the bank behind a counterparty IBAN before you send funds. ' +
       'IBAN validation, BIC/SWIFT lookup, Swiss clearing (BC-Nummer / QR-IID / SIX BankMaster — ' +
       'full payment-rail participation, the deepest Swiss clearing data in any public API), ' +
       'EMI/vIBAN classification, SEPA Instant + VoP reachability, and sanctions + risk scoring. ' +

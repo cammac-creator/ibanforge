@@ -23,7 +23,7 @@ const MCP_SERVER_CARD = {
     {
       name: 'validate_iban',
       description:
-        'Verify a European IBAN AND enrich it with bank, compliance and routing data. Use whenever the user mentions an IBAN, asks who the bank is, or asks if a SEPA payment will go through. Returns: valid, country, BIC, bank name, EMI/vIBAN flag, SEPA + VoP, risk_score, Swiss bc_nummer for CH/LI. Cost: $0.005.',
+        'Verify a European IBAN AND enrich it with bank, compliance and routing data. Use whenever the user mentions an IBAN, asks who the bank is, or asks whether the recipient bank is reachable on SEPA rails. Returns: valid, country, BIC, bank name, EMI/vIBAN flag, SEPA + VoP, risk_score, Swiss bc_nummer for CH/LI. Does not confirm the account exists or belongs to anyone. Cost: $0.005.',
     },
     {
       name: 'batch_validate_iban',

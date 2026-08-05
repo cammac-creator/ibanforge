@@ -50,7 +50,7 @@
         "description": "L’API de données bancaires pour développeurs et agents IA — validation IBAN, BIC/SWIFT, clearing suisse, risque compliance"
       }
     },
-    "badge": "Live · Zurich",
+    "badge": "Live · Europe",
     "hero": {
       "title": "La donnée bancaire de <accent>confiance</accent> pour vos agents.",
       "description": "Validez les IBAN, résolvez les BIC/SWIFT, évaluez le risque sanctions — avec les données de clearing suisses SIX, en exclusivité. REST pour votre stack, MCP natif pour vos agents.",
@@ -927,7 +927,7 @@
         },
         {
           "title": "Pré-check IBANforge",
-          "body": "Structure (registre 89 pays), banque existante (121k+ BIC), rails (SEPA / SIC / instantané), indicateurs de risque — un appel, p99 sous 50 ms."
+          "body": "Structure (registre 89 pays), banque émettrice identifiée (121k+ BIC), rails (SEPA / SIC / instantané), indicateurs de risque — un appel, p99 sous 50 ms."
         },
         {
           "title": "Au moment du paiement",

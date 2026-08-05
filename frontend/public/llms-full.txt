@@ -1,6 +1,6 @@
 # IBANforge — Full LLM Reference
 
-> Pre-payout screening for AI agents — vet a counterparty IBAN before you send funds. IBAN validation, BIC/SWIFT lookup, Swiss clearing (BC-Nummer / QR-IID / SIX BankMaster), EMI/vIBAN classification, SEPA Instant + VoP reachability, and sanctions + risk scoring — native over MCP and x402 micropayments.
+> Pre-payout screening for AI agents — check the bank behind a counterparty IBAN before you send funds. IBAN validation, BIC/SWIFT lookup, Swiss clearing (BC-Nummer / QR-IID / SIX BankMaster), EMI/vIBAN classification, SEPA Instant + VoP reachability, and sanctions + risk scoring — native over MCP and x402 micropayments.
 
 ## What is IBANforge?
 

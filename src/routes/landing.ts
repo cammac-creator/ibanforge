@@ -52,7 +52,7 @@ landing.get('/', (c) => {
   <meta name="robots" content="index, follow">
   <link rel="canonical" href="https://api.ibanforge.com">
   <meta property="og:title" content="IBANforge — IBAN Validation & BIC Lookup API">
-  <meta property="og:description" content="Compliance-grade IBAN intelligence. 121K BICs, sanctions screening, risk scoring. Free tier + x402 micropayments.">
+  <meta property="og:description" content="Compliance-grade IBAN intelligence. 121K BICs, bank-level sanctions screening, risk scoring. Free tier + x402 micropayments.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://api.ibanforge.com">
   <meta property="og:image" content="https://api.ibanforge.com/og-image.png">
@@ -229,7 +229,7 @@ landing.get('/', (c) => {
       <h1>IBAN<span>forge</span></h1>
       <p class="hero-sub">Validate IBANs. Lookup BICs. Score risk.</p>
       <p class="hero-sub"><strong>One API for developers &amp; AI agents.</strong></p>
-      <p class="hero-features">Compliance-grade validation &middot; Sanctions screening &middot; SEPA &amp; VoP coverage &middot; 89 countries</p>
+      <p class="hero-features">Compliance-grade validation &middot; Bank-level sanctions screening &middot; SEPA &amp; VoP coverage &middot; 89 countries</p>
       <div class="hero-moat">
         <strong>The deepest Swiss clearing data in any public API</strong> &mdash; every <strong>BC-Nummer</strong> from SIX BankMaster with full payment-rail participation (SIC, euroSIC, CHF Instant Payments) and <strong>QR-IID</strong> coverage.
       </div>

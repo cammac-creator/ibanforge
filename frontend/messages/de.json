@@ -50,7 +50,7 @@
         "description": "Die Bankdaten-API für Entwickler und KI-Agenten — IBAN-Validierung, BIC/SWIFT, Schweizer Clearing, Compliance-Risiko"
       }
     },
-    "badge": "Live · Zürich",
+    "badge": "Live · Europa",
     "hero": {
       "title": "Bankdaten, denen Ihre Agenten <accent>vertrauen</accent>.",
       "description": "IBANs validieren, BIC/SWIFT auflösen, Sanktionsrisiko bewerten — mit exklusiven Schweizer SIX-Clearingdaten. REST für Ihren Stack, natives MCP für Ihre Agenten.",
@@ -927,7 +927,7 @@
         },
         {
           "title": "IBANforge-Vorprüfung",
-          "body": "Struktur (Registry mit 89 Ländern), Bank existiert (121k+ BICs), Rails (SEPA / SIC / Instant), Risiko-Flags — ein Aufruf, p99 unter 50 ms."
+          "body": "Struktur (Registry mit 89 Ländern), ausgebende Bank identifiziert (121k+ BICs), Rails (SEPA / SIC / Instant), Risiko-Flags — ein Aufruf, p99 unter 50 ms."
         },
         {
           "title": "Im Zahlungsmoment",

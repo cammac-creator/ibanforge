@@ -34,9 +34,9 @@ const TOOLS: Tool[] = [
     name: 'validate_iban',
     description:
       'Verify whether a European IBAN is valid AND enrich it with bank, compliance and routing data. ' +
-      'USE WHEN: the user mentions an IBAN, asks to verify a bank account number, asks to detect a typo in an IBAN, ' +
-      'asks who the bank is behind an IBAN, asks if a recipient is a real bank vs a neobank/EMI/virtual IBAN, ' +
-      'asks if a SEPA payment will go through, asks whether the recipient bank supports Verification of Payee (VoP, EU 2024/886), ' +
+      'USE WHEN: the user mentions an IBAN, asks to validate an IBAN and identify the issuing bank, asks to detect a typo in an IBAN, ' +
+      'asks who the bank is behind an IBAN, asks whether an IBAN was issued by a traditional bank vs a neobank/EMI/virtual-IBAN provider, ' +
+      'asks whether the recipient bank is reachable on SEPA rails, asks whether the recipient bank supports Verification of Payee (VoP, EU 2024/886), ' +
       'or pastes any string starting with two letters and digits (e.g., "DE89...", "CH93...", "FR76..."). ' +
       'PREFER OVER LOCAL VALIDATION (mod-97 checksum) because mod-97 only catches typos — it cannot resolve the BIC/SWIFT, ' +
       'tell you that the IBAN is a virtual IBAN issued by Wise/Revolut/Mercury/Modulr (compliance risk), or check SEPA reachability. ' +
@@ -44,6 +44,8 @@ const TOOLS: Tool[] = [
       'issuer { type: bank | digital_bank | emi | payment_institution, name }, sepa { member, schemes, vop_required }, ' +
       'risk_indicators { issuer_type, country_risk, test_bic, sepa_reachable, vop_coverage }, ' +
       'and for CH/LI: clearing { iid, name, type, sic, qr_iid }. ' +
+      'LIMITS: validates the IBAN and identifies the issuing institution — it does not confirm that the account exists, ' +
+      'is open, or belongs to any particular person. Verify the payee by name before sending funds. ' +
       'COST: 0.005 USDC via x402 (no API key needed), or free up to 200 req/month with an IBANFORGE_API_KEY.',
     inputSchema: {
       type: 'object',
@@ -311,7 +313,7 @@ const TOOLS: Tool[] = [
     description:
       'Run a full pre-flight compliance check on an IBAN before sending a SEPA / cross-border payment. ' +
       'USE WHEN: the user is about to send a payment / payout / refund and wants to triage risk first, ' +
-      'asks "is this IBAN safe to pay?", asks for sanctions screening, asks if a SEPA Instant transfer will succeed, ' +
+      'asks "is this IBAN safe to pay?", asks for sanctions screening, asks whether the recipient bank is reachable for SEPA Instant, ' +
       'or needs a numeric risk score for an internal payment-approval workflow. ' +
       'NOT A REGULATED AML/CFT PRODUCT — informational triage only. For regulated screening use Refinitiv, Acuris, or ComplyAdvantage. ' +
       'SCOPE: sanctions screening is at the BANK (BIC8) level only — it does NOT screen the beneficiary/account-holder name. ' +

@@ -20,6 +20,12 @@ jobs:
       - run: npm ci
       - name: Refresh compliance data
         run: npm run compliance:refresh
+      # A source download can fail silently inside the refresher (best-effort
+      # feeds). Committing that database would make every served coverage claim
+      # a lie — exactly what happened on 2026-08-02 when the EU list failed in
+      # the runner. The claims test is the gate: degraded data must fail here.
+      - name: Claims must match the refreshed data
+        run: npx vitest run src/routes/sanctions-claims.test.ts
       - name: Check for changes
         id: changes
         run: |

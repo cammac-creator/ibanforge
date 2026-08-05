@@ -44,7 +44,7 @@ const SKIP_DIRS = new Set([
 ]);
 
 /** Extensions worth scanning: served code, copy, descriptors and manifests. */
-const EXTS = /\.(ts|tsx|js|mjs|json|md|txt|html)$/;
+const EXTS = /\.(ts|tsx|js|mjs|json|md|mdx|txt|html)$/;
 
 /** Files whose mention of a list is a description of the pipeline, not a promise to a customer. */
 const ALLOWED = new Set([
@@ -113,5 +113,47 @@ describe('sanctions coverage claims match the shipped database', () => {
     }
 
     expect(offenders, `Surfaces claiming a sanctions list that is not in the database:\n${offenders.join('\n')}`).toEqual([]);
+  });
+});
+
+describe('served copy claims only what the product can prove', () => {
+  it('no served surface promises account-level verification', () => {
+    // The API validates an IBAN and identifies the bank behind it. It cannot
+    // see accounts or account holders. Copy that promises more sells a check
+    // we do not perform — the exact wording that turned the NL composite-map
+    // gap into a liability (src/lib/nl-psp.ts: a fabricated IBAN came back
+    // "verified" naming a corporate treasury as the bank). Same audit trail
+    // as the sanctions guard above: the phrasing lived on eleven surfaces,
+    // so it needs something that fails, not another sweep.
+    const FORBIDDEN: Array<[RegExp, string]> = [
+      [/vet a counterparty/i, 'promises payee vetting; we screen the bank'],
+      [/\bbank exists\b/i, 'a composite-map hit is not proof of existence'],
+      [/banque existante/i, 'French variant of the same promise'],
+      [/Bank existiert/i, 'German variant of the same promise'],
+      [/verify a bank account number/i, 'we validate IBANs, not accounts'],
+      [/payment will go through/i, 'we answer bank reachability, not payment outcome'],
+      [/is a real bank\b/i, 'issuer classification, not proof of life'],
+    ];
+
+    const offenders: string[] = [];
+    for (const file of walk(ROOT)) {
+      const rel = relative(ROOT, file).split('\\').join('/');
+      if (ALLOWED.has(rel)) continue;
+      let text: string;
+      try {
+        text = readFileSync(file, 'utf8');
+      } catch {
+        continue;
+      }
+      for (const line of text.split('\n')) {
+        for (const [pattern, why] of FORBIDDEN) {
+          if (pattern.test(line)) {
+            offenders.push(`${rel} (${why}): ${line.trim().slice(0, 140)}`);
+          }
+        }
+      }
+    }
+
+    expect(offenders, `Surfaces promising a check we do not perform:\n${offenders.join('\n')}`).toEqual([]);
   });
 });

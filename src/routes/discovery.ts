@@ -65,7 +65,7 @@ const PAID_ENDPOINTS: PricedEndpoint[] = [
     method: 'POST',
     path: '/v1/iban/compliance',
     price_usdc: 0.02,
-    description: 'Pre-payout screening — vet a counterparty IBAN before you send funds: validation + sanctions screening (OFAC) + SEPA Instant reachability + VoP participant + risk score (0-100)',
+    description: 'Pre-payout screening — check the bank behind a counterparty IBAN before you send funds: validation + sanctions screening (OFAC) + SEPA Instant reachability + VoP participant + risk score (0-100)',
   },
   {
     method: 'GET',
@@ -219,7 +219,7 @@ const AGENT_MANIFEST = {
   schema_version: 'v1',
   name: 'IBANforge',
   description:
-    'Pre-payout compliance screening for autonomous agents — vet a counterparty IBAN before you send funds: validation, sanctions, Swiss clearing, SEPA/VoP reachability and risk scoring.',
+    'Pre-payout compliance screening for autonomous agents — check the bank behind a counterparty IBAN before you send funds: validation, sanctions, Swiss clearing, SEPA/VoP reachability and risk scoring.',
   url: 'https://ibanforge.com',
   contact: 'https://github.com/cammac-creator/ibanforge',
   capabilities: [
@@ -303,7 +303,7 @@ const GLAMA_MANIFEST = {
   maintainers: ['cammac-creator'],
   name: 'IBANforge',
   description:
-    `Vet a counterparty IBAN before you send funds: IBAN validation, BIC/SWIFT lookup, ` +
+    `Check the bank behind a counterparty IBAN before you send funds: IBAN validation, BIC/SWIFT lookup, ` +
     `Swiss BC-Nummer clearing with payment-rail participation, sanctions screening (OFAC) ` +
     `at bank level, SEPA and VoP reachability, and a 0-100 risk score. ` +
     `${F.claim.bic} BIC entries (${F.claim.lei} LEI-enriched via GLEIF; further rows from the ` +

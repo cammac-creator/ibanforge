@@ -425,7 +425,7 @@ const PRICING: EndpointPricing[] = [
     match: (m, p) => m === 'POST' && p === '/v1/iban/compliance',
     price_usdc: 0.02,
     description:
-      'Pre-payout screening for agents — vet a counterparty IBAN before you send funds: validation + sanctions screening (OFAC) + SEPA Instant reachability + VoP participant + risk score (0-100). Pre-flight triage, not a regulated AML product.',
+      'Pre-payout screening for agents — check the bank behind a counterparty IBAN before you send funds: validation + sanctions screening (OFAC) + SEPA Instant reachability + VoP participant + risk score (0-100). Pre-flight triage, not a regulated AML product.',
     inputSchema: {
       type: 'object',
       required: ['iban'],

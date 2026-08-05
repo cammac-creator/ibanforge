@@ -190,7 +190,7 @@ function buildLlmsTxt(): string {
   const leiCount = getLeiEnrichedCount().toLocaleString('en-US');
   return `# IBANforge
 
-> Pre-payout screening for AI agents — vet a counterparty IBAN before you send funds. IBAN validation, BIC/SWIFT lookup, Swiss clearing, sanctions and compliance risk scoring, designed for AI agents and developers. ${bicCount} BIC entries (${leiCount} LEI-enriched via GLEIF; additional rows from SWIFT directory, Bundesbank, SIX, NBP, EBA Step2 SCT), ${chCount} Swiss BC-Nummer from SIX, 89 countries, 85 EMI/vIBAN issuer classifications. Counts in this file are generated live from the serving database.
+> Pre-payout screening for AI agents — check the bank behind a counterparty IBAN before you send funds. IBAN validation, BIC/SWIFT lookup, Swiss clearing, sanctions and compliance risk scoring, designed for AI agents and developers. ${bicCount} BIC entries (${leiCount} LEI-enriched via GLEIF; additional rows from SWIFT directory, Bundesbank, SIX, NBP, EBA Step2 SCT), ${chCount} Swiss BC-Nummer from SIX, 89 countries, 85 EMI/vIBAN issuer classifications. Counts in this file are generated live from the serving database.
 
 ## Instructions for LLM agents
 

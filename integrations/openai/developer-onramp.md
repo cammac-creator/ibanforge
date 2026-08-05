@@ -49,7 +49,7 @@ async def main():
         agent = Agent(
             name="Payments checker",
             instructions=(
-                "Vet a counterparty's bank details before a payout. Use the "
+                "Check a counterparty's bank details before a payout. Use the "
                 "IBANforge tools to validate IBANs, look up BICs, check SEPA "
                 "reachability and sanctions/risk. Never invent bank data."
             ),
