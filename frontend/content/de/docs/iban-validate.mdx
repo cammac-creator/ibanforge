@@ -77,6 +77,13 @@ POST https://api.ibanforge.com/v1/iban/validate
     "match": "register",
     "register": "SIX BankMaster (Swiss IID / BC-Nummer register)",
     "authoritative": true,
+    "institution": {
+      "name": "UBS Switzerland AG",
+      "street": "Bahnhofstrasse 45",
+      "post_code": "8098",
+      "town": "Zürich",
+      "country": "CH"
+    },
     "as_of": "2026-08"
   },
   "risk_indicators": {
@@ -180,6 +187,7 @@ POST https://api.ibanforge.com/v1/iban/validate
 | `register` | `string \| null` | Name des konsultierten Referenzbestands |
 | `authoritative` | `boolean` | `true` nur dort, wo der Referenzbestand das nationale Register IST — siehe unten |
 | `candidates` | `number?` | Bei `match: "prefix"`: Anzahl passender Institute. Mehr als 1 heißt: nur ein Hinweis |
+| `institution` | `object?` | Was das nationale Register über das Institut veröffentlicht: Name, Sitzadresse, LEI wo vorhanden. Nur bei autoritativen Antworten. Tiefe variiert: CH/LI und AT volle Adresse, DE nur PLZ + Ort (das Register führt keine Straße), BE nur der Name. Fehlende Felder sind `null`, nie geraten. Es ist das Institut, das den Bankcode hält — keine Filiale und kein Beleg für ein Konto |
 | `as_of` | `string` | Monat der Referenzdaten |
 
 **`risk_indicators`-Objekt:**

@@ -14,6 +14,8 @@ export interface BlzEntry {
   name: string;
   bic: string | null;
   town: string | null;
+  /** The Bankleitzahlendatei publishes PLZ and Ort, never a street. */
+  post_code: string | null;
   /** The register marks the code for deletion: the institution is being retired. */
   retired: boolean;
   /** The BLZ that takes over, when the register names one. */
@@ -25,6 +27,7 @@ interface BlzRow {
   name: string;
   bic: string | null;
   town: string | null;
+  post_code: string | null;
   retired: number;
   successor_blz: string | null;
 }
@@ -56,7 +59,9 @@ export function lookupBlz(bankCode: string): BlzEntry | null {
   if (!hasTable()) return null;
   if (!/^\d{8}$/.test(bankCode)) return null;
   if (!stmt) {
-    stmt = getBicDB().prepare('SELECT blz, name, bic, town, retired, successor_blz FROM de_blz WHERE blz = ?');
+    stmt = getBicDB().prepare(
+      'SELECT blz, name, bic, town, post_code, retired, successor_blz FROM de_blz WHERE blz = ?',
+    );
   }
   const row = stmt.get(bankCode) as BlzRow | undefined;
   if (!row) return null;
@@ -65,6 +70,7 @@ export function lookupBlz(bankCode: string): BlzEntry | null {
     name: row.name,
     bic: row.bic,
     town: row.town,
+    post_code: row.post_code ?? null,
     retired: row.retired === 1,
     successor: row.successor_blz,
   };

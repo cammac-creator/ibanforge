@@ -13,7 +13,7 @@ import { getCountryRisk } from './countries.js';
 import { lookupClearingByBankCode } from './ch-clearing.js';
 import { blzRegisterAvailable, lookupBlz } from './de-blz.js';
 import { checkVop } from './compliance.js';
-import type { BankCodeCheck, IBANValidationResult } from '../types.js';
+import type { BankCodeCheck, IBANValidationResult, RegisterInstitution } from '../types.js';
 import { nextSteps } from './next-steps.js';
 
 /**
@@ -70,9 +70,24 @@ function askNationalRegister(
   value?: string;
   /** The register defines this space but names no holder: decline, do not deny. */
   inconclusive?: true;
+  /** What the register publishes about the allocated institution. */
+  institution?: RegisterInstitution;
 } | null {
   if (cc === 'CH' || cc === 'LI') {
-    return { allocated: !!lookupClearingByBankCode(bankCode) };
+    const hit = lookupClearingByBankCode(bankCode);
+    if (!hit) return { allocated: false };
+    return {
+      allocated: true,
+      institution: {
+        name: hit.name,
+        // SIX splits street and house number; GLEIF and the OeNB publish one
+        // line. Serve the one-line shape everywhere.
+        street: [hit.address.street, hit.address.building_number].filter(Boolean).join(' ') || null,
+        post_code: hit.address.post_code,
+        town: hit.address.town,
+        country: hit.address.country || cc,
+      },
+    };
   }
   if (cc === 'FI') {
     // Finland needs the whole BBAN, not the 3-digit slice: institution codes
@@ -90,7 +105,21 @@ function askNationalRegister(
     // Same safe failure as Germany: no table means no ground truth, so decline
     // authority rather than reading every code as unallocated.
     if (!nationalRegisterAvailable(cc)) return null;
-    return { allocated: !!lookupNationalCode(cc, bankCode) };
+    const hit = lookupNationalCode(cc, bankCode);
+    if (!hit) return { allocated: false };
+    return {
+      allocated: true,
+      institution: {
+        name: hit.name,
+        // OeNB: full seat address. BNB: names only — nulls are the honest
+        // shape of what Belgium publishes, not missing data on our side.
+        street: hit.street,
+        post_code: hit.post_code,
+        town: hit.town,
+        country: cc,
+        ...(hit.lei ? { lei: hit.lei } : {}),
+      },
+    };
   }
   if (cc === 'DE') {
     // A database built before the seeder existed has no table. Declining
@@ -101,6 +130,15 @@ function askNationalRegister(
     if (!hit) return { allocated: false };
     return {
       allocated: true,
+      institution: {
+        name: hit.name,
+        // The Bankleitzahlendatei has no street column at all — PLZ and Ort
+        // are the whole address the register publishes.
+        street: null,
+        post_code: hit.post_code,
+        town: hit.town,
+        country: 'DE',
+      },
       ...(hit.retired ? { retired: true as const } : {}),
       ...(hit.successor ? { successor: hit.successor } : {}),
     };
@@ -160,6 +198,7 @@ function checkBankCode(
       authoritative: true,
       ...(verdict.retired ? { retired: true as const } : {}),
       ...(verdict.successor ? { superseded_by: verdict.successor } : {}),
+      ...(verdict.institution ? { institution: verdict.institution } : {}),
       as_of,
     };
   }

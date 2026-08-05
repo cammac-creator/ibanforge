@@ -107,7 +107,7 @@ const TOOLS: Tool[] = [
         bank_code_check: {
           type: 'object',
           description:
-            'Whether the bank code resolves in reference data. Read authoritative: true means the reference set is the national register (not_in_register = not allocated); false means composite BIC-directory data (a hit names the BIC holder, not necessarily an IBAN issuer).',
+            'Whether the bank code resolves in reference data. Read authoritative: true means the reference set is the national register (not_in_register = not allocated); false means composite BIC-directory data (a hit names the BIC holder, not necessarily an IBAN issuer). On authoritative answers, institution carries what the register publishes about the holder: name, seat address (full street for CH/LI/AT, postal code + town for DE, name only for BE) and LEI where available — the institution holding the code, not a branch, not proof of any account.',
         },
         next_steps: {
           type: 'array',

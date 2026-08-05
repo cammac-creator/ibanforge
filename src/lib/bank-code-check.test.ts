@@ -160,3 +160,42 @@ describe('risk_indicators stop asserting facts about an institution that did not
     expect(r.risk_indicators!.sepa_reachable_scope).toBe('country');
   });
 });
+
+describe('bank_code_check.institution — what the register publishes, no more', () => {
+  it('serves the full Swiss seat address, street and house number joined', () => {
+    // SIX splits street and number; the served shape is one line, like GLEIF.
+    const r = check('CH5604835012345678009');
+    const inst = r.bank_code_check?.institution;
+    expect(inst?.name).toBeTruthy();
+    expect(inst?.street).toMatch(/\d/); // street WITH its house number
+    expect(inst?.post_code).toBeTruthy();
+    expect(inst?.town).toBeTruthy();
+    expect(inst?.country).toBe('CH');
+  });
+
+  it('serves Germany as postal code and town only — the register has no street', () => {
+    const r = check('DE89370400440532013000');
+    const inst = r.bank_code_check?.institution;
+    expect(inst?.name).toBeTruthy();
+    expect(inst?.street).toBeNull();
+    expect(inst?.post_code).toMatch(/^\d{5}$/);
+    expect(inst?.town).toBeTruthy();
+  });
+
+  it('stays absent on a composite-map hit — no register was consulted', () => {
+    const r = check('GB29NWBK60161331926819');
+    expect(r.bank_code_check?.authoritative).toBe(false);
+    expect(r.bank_code_check?.institution).toBeUndefined();
+  });
+
+  it('stays absent for Finland — codes belong to banking groups, not seats', () => {
+    const r = check('FI1499901234567890');
+    expect(r.bank_code_check?.institution).toBeUndefined();
+  });
+
+  it('stays absent when the register denies the code — no subject, no claim', () => {
+    const r = check('DE44999999990532013000');
+    expect(r.bank_code_check?.status).toBe('not_in_register');
+    expect(r.bank_code_check?.institution).toBeUndefined();
+  });
+});

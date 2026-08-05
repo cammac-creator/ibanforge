@@ -77,6 +77,13 @@ POST https://api.ibanforge.com/v1/iban/validate
     "match": "register",
     "register": "SIX BankMaster (Swiss IID / BC-Nummer register)",
     "authoritative": true,
+    "institution": {
+      "name": "UBS Switzerland AG",
+      "street": "Bahnhofstrasse 45",
+      "post_code": "8098",
+      "town": "Zürich",
+      "country": "CH"
+    },
     "as_of": "2026-08"
   },
   "risk_indicators": {
@@ -180,6 +187,7 @@ POST https://api.ibanforge.com/v1/iban/validate
 | `register` | `string \| null` | Nom du jeu de référence consulté |
 | `authoritative` | `boolean` | `true` uniquement là où le jeu de référence EST le registre national — voir ci-dessous |
 | `candidates` | `number?` | Sur `match: "prefix"` : nombre d'établissements correspondants. Au-delà de 1, la réponse n'est qu'indicative |
+| `institution` | `object?` | Ce que le registre national publie sur l'établissement titulaire : nom, adresse du siège, LEI quand il existe. Seulement sur les réponses autoritaires. La profondeur varie : CH/LI et AT adresse complète, DE code postal + ville (son registre n'a pas de rue), BE nom seul. Les champs absents sont `null`, jamais devinés. C'est l'établissement titulaire du code banque, pas une agence, et pas la preuve d'un compte |
 | `as_of` | `string` | Mois des données de référence |
 
 **Objet `risk_indicators` :**

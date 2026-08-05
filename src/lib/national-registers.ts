@@ -18,6 +18,12 @@ export interface NationalCodeEntry {
   code: string;
   name: string;
   bic: string | null;
+  /** One line, house number included (OeNB publishes it that way); null for BE. */
+  street: string | null;
+  post_code: string | null;
+  town: string | null;
+  /** LEI where the register publishes one (OeNB, 99% filled); null for BE. */
+  lei: string | null;
 }
 
 /** Width of the bank code as an IBAN of that country carries it. */
@@ -90,12 +96,25 @@ export function lookupNationalCode(cc: string, bankCode: string): NationalCodeEn
   if (!code) return null;
   try {
     if (!stmt) {
+      // SELECT * with defensive mapping, not an explicit column list: a
+      // database seeded before the address columns existed must degrade to
+      // nulls, not turn every Austrian lookup into a caught error that reads
+      // as "no register" and silently drops the authority claim.
       stmt = getBicDB().prepare(
-        'SELECT code, name, bic FROM national_bank_codes WHERE country = ? AND code = ?',
+        'SELECT * FROM national_bank_codes WHERE country = ? AND code = ?',
       );
     }
-    const row = stmt.get(cc, code) as NationalCodeEntry | undefined;
-    return row ?? null;
+    const row = stmt.get(cc, code) as Record<string, unknown> | undefined;
+    if (!row) return null;
+    return {
+      code: String(row.code),
+      name: String(row.name),
+      bic: (row.bic as string | null | undefined) ?? null,
+      street: (row.street as string | null | undefined) ?? null,
+      post_code: (row.post_code as string | null | undefined) ?? null,
+      town: (row.town as string | null | undefined) ?? null,
+      lei: (row.lei as string | null | undefined) ?? null,
+    };
   } catch {
     return null;
   }

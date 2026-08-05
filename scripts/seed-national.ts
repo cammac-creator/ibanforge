@@ -50,6 +50,11 @@ interface Entry {
   code: string;
   name: string;
   bic: string | null;
+  /** Street with house number, as the OeNB publishes it; null where absent. */
+  street: string | null;
+  post_code: string | null;
+  town: string | null;
+  lei: string | null;
 }
 
 function pad(code: string, width: number): string | null {
@@ -84,7 +89,21 @@ async function parseAustria(): Promise<Entry[]> {
   const iCode = header.indexOf('Bankleitzahl');
   const iName = header.indexOf('Bankenname');
   const iBic = header.findIndex((h) => /SWIF/i.test(h));
+  // The head-office address, published street-and-house-number in one field.
+  // indexOf finds the FIRST 'PLZ'/'Ort', which is the seat — the second pair
+  // belongs to 'Postadresse', a separate mailing address that is often a PO
+  // box and must not be served as where the institution is.
+  const iStreet = header.indexOf('Straße');
+  const iPlz = header.indexOf('PLZ');
+  const iOrt = header.indexOf('Ort');
+  const iLei = header.indexOf('LEI');
   if (iCode < 0 || iName < 0) throw new Error('AT: expected columns missing');
+
+  const opt = (f: string[], i: number): string | null => {
+    if (i < 0) return null;
+    const v = (f[i] ?? '').trim();
+    return v || null;
+  };
 
   const seen = new Map<string, Entry>();
   for (const line of lines.slice(headerIdx + 1)) {
@@ -93,7 +112,15 @@ async function parseAustria(): Promise<Entry[]> {
     if (!code || seen.has(code)) continue;
     const name = (f[iName] ?? '').trim();
     if (!name) continue;
-    seen.set(code, { code, name, bic: iBic >= 0 ? bic8(f[iBic] ?? '') : null });
+    seen.set(code, {
+      code,
+      name,
+      bic: iBic >= 0 ? bic8(f[iBic] ?? '') : null,
+      street: opt(f, iStreet),
+      post_code: opt(f, iPlz),
+      town: opt(f, iOrt),
+      lei: opt(f, iLei),
+    });
   }
   return [...seen.values()];
 }
@@ -119,9 +146,20 @@ async function parseBelgium(): Promise<Entry[]> {
     // Institution name: Dutch, then French, then English, whichever is filled.
     const name = [r[2], r[3], r[5], r[4]].map((v) => String(v ?? '').trim()).find(Boolean);
     if (!name) continue;
-    seen.set(code, { code, name, bic: bic8(rawBic) });
+    // Beyond VRIJ, the register also writes 'Onbeschikbaar' / 'Indisponible'
+    // (unavailable) for the handful of slots it reserves — code 539, the
+    // web's favourite example IBAN, is one of them. Neither word names an
+    // institution; storing it would serve a bank called "Onbeschikbaar",
+    // the NL corporate-treasury defect in miniature.
+    if (/^(onbeschikbaar|indisponible|unavailable|nicht verf)/i.test(name)) {
+      vacant++;
+      continue;
+    }
+    // The BNB file publishes six columns and no address at all (verified
+    // 05/08/2026, every row) — Belgium is names-only, honestly.
+    seen.set(code, { code, name, bic: bic8(rawBic), street: null, post_code: null, town: null, lei: null });
   }
-  console.log(`  BE: ${vacant} slots marked VRIJ, dropped on purpose`);
+  console.log(`  BE: ${vacant} slots marked VRIJ or unavailable, dropped on purpose`);
   return [...seen.values()];
 }
 
@@ -135,9 +173,9 @@ function write(db: Database.Database, cc: string, entries: Entry[]): void {
   const tx = db.transaction(() => {
     db.prepare('DELETE FROM national_bank_codes WHERE country = ?').run(cc);
     const ins = db.prepare(
-      'INSERT INTO national_bank_codes (country, code, name, bic) VALUES (?, ?, ?, ?)',
+      'INSERT INTO national_bank_codes (country, code, name, bic, street, post_code, town, lei) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
     );
-    for (const e of entries) ins.run(cc, e.code, e.name, e.bic);
+    for (const e of entries) ins.run(cc, e.code, e.name, e.bic, e.street, e.post_code, e.town, e.lei);
   });
   tx();
   console.log(`  ${cc}: ${entries.length} codes written`);
@@ -148,13 +186,26 @@ async function main(): Promise<void> {
   const db = new Database(DB_PATH);
   db.exec(`
     CREATE TABLE IF NOT EXISTS national_bank_codes (
-      country TEXT NOT NULL,
-      code    TEXT NOT NULL,
-      name    TEXT NOT NULL,
-      bic     TEXT,
+      country   TEXT NOT NULL,
+      code      TEXT NOT NULL,
+      name      TEXT NOT NULL,
+      bic       TEXT,
+      street    TEXT,
+      post_code TEXT,
+      town      TEXT,
+      lei       TEXT,
       PRIMARY KEY (country, code)
     );
   `);
+  // CREATE TABLE IF NOT EXISTS does not migrate an existing table — a base
+  // seeded before the address columns existed needs an explicit ALTER, or the
+  // INSERT below fails on column count.
+  const have = new Set(
+    (db.prepare(`PRAGMA table_info(national_bank_codes)`).all() as Array<{ name: string }>).map((c) => c.name),
+  );
+  for (const col of ['street', 'post_code', 'town', 'lei']) {
+    if (!have.has(col)) db.exec(`ALTER TABLE national_bank_codes ADD COLUMN ${col} TEXT`);
+  }
 
   const jobs: Array<[string, () => Promise<Entry[]>]> = [
     ['AT', parseAustria],

@@ -95,8 +95,32 @@ export interface BankCodeCheck {
   retired?: true;
   /** The bank code that takes over, when the register names one. */
   superseded_by?: string;
+  /**
+   * What the national register publishes about the allocated institution.
+   * Present only on an authoritative answer: a composite-map hit stays bare
+   * on purpose (naming a BIC holder is the `bic` block's job, and promoting
+   * its address here would imply a register we did not consult). Depth varies
+   * by register — SIX and the OeNB publish full street addresses, the
+   * Bundesbank publishes postal code and town only, the BNB publishes names
+   * alone. Absent fields are null, never guessed. Finland stays without this
+   * block entirely: its codes are allocated to banking groups, and a group
+   * has no branch address to publish.
+   */
+  institution?: RegisterInstitution;
   /** Year-month the consulted reference set was last refreshed. */
   as_of: string;
+}
+
+/** What a national bank-code register publishes about an allocated institution. */
+export interface RegisterInstitution {
+  name: string;
+  /** One line, house number included, matching the GLEIF shape. */
+  street: string | null;
+  post_code: string | null;
+  town: string | null;
+  country: string;
+  /** Legal Entity Identifier, where the register publishes one (OeNB does). */
+  lei?: string | null;
 }
 
 import type { NextStep } from './lib/next-steps.js';

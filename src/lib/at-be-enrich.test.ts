@@ -66,6 +66,42 @@ describe('Belgium answers from the NBB Protocol register', () => {
       }
     }
   });
+
+  it.skipIf(noBE)('denies the reserved slot the whole web uses as its example IBAN', () => {
+    // The register writes 'Onbeschikbaar' (unavailable) for code 539 — it is
+    // reserved, held by nobody. Before the seeder dropped these, the served
+    // answer named a bank called "Onbeschikbaar": the corporate-treasury
+    // defect in miniature.
+    const r = check('BE68539007547034');
+    expect(r.bank_code_check?.status).toBe('not_in_register');
+    expect(r.bank_code_check?.institution).toBeUndefined();
+  });
+
+  it.skipIf(noBE)('serves the Belgian institution name, and only nulls for its address', () => {
+    // The BNB file publishes names in four languages and no address at all.
+    // Nulls are the honest shape of what Belgium publishes.
+    const r = check('BE23001123456789');
+    const inst = r.bank_code_check?.institution;
+    expect(inst?.name).toBeTruthy();
+    expect(inst?.street).toBeNull();
+    expect(inst?.post_code).toBeNull();
+    expect(inst?.town).toBeNull();
+    expect(inst?.country).toBe('BE');
+  });
+});
+
+describe('Austria publishes the full seat address, and it is served', () => {
+  it.skipIf(noAT)('serves street with house number, postal code, town and LEI', () => {
+    // The central bank: every field the OeNB publishes, none invented.
+    const r = check('AT170010000012345678');
+    const inst = r.bank_code_check?.institution;
+    expect(inst?.name).toMatch(/Nationalbank/i);
+    expect(inst?.street).toMatch(/\d/);
+    expect(inst?.post_code).toBeTruthy();
+    expect(inst?.town).toBeTruthy();
+    expect(inst?.country).toBe('AT');
+    expect(inst?.lei).toMatch(/^[A-Z0-9]{20}$/);
+  });
 });
 
 describe('the four registers keep their separate meanings', () => {

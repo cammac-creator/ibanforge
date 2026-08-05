@@ -51,6 +51,28 @@ export const BANK_CODE_CHECK_SCHEMA = {
       type: 'string',
       description: 'The bank code that takes over, when the register names one. Re-paper the beneficiary against it.',
     },
+    institution: {
+      type: 'object',
+      description:
+        'What the national register publishes about the allocated institution. Present only on an authoritative answer — composite-map hits stay bare (naming a BIC holder is the bic block, and its address would imply a register that was not consulted). Depth varies by register: SIX (CH/LI) and the OeNB (AT) publish the full seat address, the Bundesbank (DE) publishes postal code and town only, the BNB (BE) publishes names alone; Finland stays without this block, its codes belong to banking groups. Absent fields are null, never guessed. This is the institution allocated the BANK CODE — not a branch, and not proof of any account.',
+      properties: {
+        name: { type: 'string' },
+        street: {
+          type: 'string',
+          nullable: true,
+          description: 'One line, house number included, matching the GLEIF shape. Null where the register publishes none (DE, BE).',
+        },
+        post_code: { type: 'string', nullable: true },
+        town: { type: 'string', nullable: true },
+        country: { type: 'string' },
+        lei: {
+          type: 'string',
+          nullable: true,
+          description: 'Legal Entity Identifier, where the register publishes one (the OeNB does, 99% of entries).',
+        },
+      },
+      required: ['name', 'street', 'post_code', 'town', 'country'],
+    },
     as_of: { type: 'string', description: 'Year-month the consulted reference set was last refreshed.' },
   },
   required: ['value', 'status', 'match', 'register', 'authoritative', 'as_of'],
