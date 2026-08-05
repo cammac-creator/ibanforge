@@ -236,7 +236,6 @@ stripeWebhook.post('/v1/stripe/webhook', async (c) => {
       amountUsd: result.notify.priceUsd,
       bundle: result.notify.bundle,
       credits: result.notify.credits,
-      email: result.notify.email,
       keyPrefix: result.notify.keyPrefix,
       plan: result.notify.plan,
       monthlyLimit: result.notify.monthlyLimit,

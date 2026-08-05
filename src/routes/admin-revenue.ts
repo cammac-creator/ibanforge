@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { timingSafeEqual } from 'node:crypto';
 import { getStatsDB } from '../lib/db.js';
 
 const adminRevenue = new Hono();
@@ -38,8 +39,10 @@ function rawToUsdc(raw: bigint): number {
 
 function checkAuth(authHeader: string | undefined): boolean {
   const token = process.env.STATS_TOKEN;
-  if (!token) return false;
-  return authHeader === `Bearer ${token}`;
+  if (!token || !authHeader) return false;
+  const expected = Buffer.from(`Bearer ${token}`);
+  const got = Buffer.from(authHeader);
+  return expected.length === got.length && timingSafeEqual(expected, got);
 }
 
 async function rpcCall<T>(method: string, params: unknown[]): Promise<T> {

@@ -685,7 +685,6 @@ apiKeys.post('/v1/admin/test-notify', async (c) => {
     amountUsd: 0,
     bundle: 'TEST',
     credits: 0,
-    email: 'test@ibanforge.com',
     keyPrefix: 'ifk_test0000',
   });
   return c.json({ sent });

@@ -407,11 +407,15 @@ export function formatReport(
     const meta = KIND_META[kind];
     lines.push(`${meta.emoji} ${meta.title}`);
     for (const e of group) {
-      const who = e.company ? `${e.email} (${e.company})` : e.email;
+      // Key prefix + company/domain, never the email address: this report
+      // transits Telegram, which is not a declared processor — no personal
+      // data may ride along. The dashboard resolves the identity.
+      const who = `${e.keyPrefix}… (${e.company || e.domain})`;
       lines.push(`• ${who} — ${e.detail}${activityHint(e, opts.activity)}. Action : ${meta.action}`);
     }
     lines.push('');
   }
+  lines.push('Identités : https://ibanforge.com/dashboard/clients');
   lines.push('— Dory · radar lifecycle quotidien');
   return lines.join('\n').trim();
 }

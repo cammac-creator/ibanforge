@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { getStatsDB } from '../lib/db.js';
+import { hashIp } from '../lib/stats.js';
 
 const feedback = new Hono();
 
@@ -37,13 +38,32 @@ function ensureFeedbackTable() {
       notes TEXT,
       contact TEXT,
       agent TEXT,
-      ip TEXT,
+      ip_hash TEXT,
       status TEXT NOT NULL DEFAULT 'open'
     );
     CREATE INDEX IF NOT EXISTS idx_feedback_created ON feedback(created_at);
     CREATE INDEX IF NOT EXISTS idx_feedback_endpoint ON feedback(endpoint);
     CREATE INDEX IF NOT EXISTS idx_feedback_status ON feedback(status);
   `);
+
+  // Migration: this table used to store the raw client IP, while the privacy
+  // policy has always promised "only a salted hash, never the raw address".
+  // Hash what exists, then drop the raw column so the promise is structural.
+  const cols = db.prepare(`PRAGMA table_info(feedback)`).all() as Array<{ name: string }>;
+  if (cols.some((c) => c.name === 'ip')) {
+    if (!cols.some((c) => c.name === 'ip_hash')) {
+      db.exec(`ALTER TABLE feedback ADD COLUMN ip_hash TEXT`);
+    }
+    const rows = db.prepare(`SELECT id, ip FROM feedback WHERE ip IS NOT NULL`).all() as Array<{
+      id: number;
+      ip: string;
+    }>;
+    const set = db.prepare(`UPDATE feedback SET ip_hash = ? WHERE id = ?`);
+    db.transaction(() => {
+      for (const r of rows) set.run(hashIp(r.ip), r.id);
+      db.exec(`ALTER TABLE feedback DROP COLUMN ip`);
+    })();
+  }
 }
 
 ensureFeedbackTable();
@@ -107,7 +127,7 @@ feedback.post('/v1/feedback', async (c) => {
 
   const db = getStatsDB();
   const stmt = db.prepare(
-    `INSERT INTO feedback (tx_hash, endpoint, error_type, expected, got, notes, contact, agent, ip)
+    `INSERT INTO feedback (tx_hash, endpoint, error_type, expected, got, notes, contact, agent, ip_hash)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   );
   const info = stmt.run(
@@ -119,7 +139,7 @@ feedback.post('/v1/feedback', async (c) => {
     body.notes ?? null,
     body.contact ?? null,
     body.agent ?? null,
-    ip,
+    hashIp(ip),
   );
 
   return c.json(

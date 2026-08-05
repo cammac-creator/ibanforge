@@ -59,7 +59,17 @@ function insertRequest() {
   return _insertRequest;
 }
 
-const IP_HASH_SECRET = process.env.IP_HASH_SECRET ?? process.env.SESSION_SECRET ?? 'ibanforge-default-salt-change-me';
+const IP_HASH_SECRET = process.env.IP_HASH_SECRET ?? process.env.SESSION_SECRET ?? '';
+
+// Fail closed, like ensureWalletConfigured(): pseudonymising IPs with a salt
+// that is public in this repository would make the privacy policy's "salted
+// hash, never the raw address" promise brute-forceable. Refuse to boot.
+if (!IP_HASH_SECRET && process.env.NODE_ENV === 'production') {
+  throw new Error(
+    'IP_HASH_SECRET (or SESSION_SECRET) must be set in production — refusing to pseudonymise client IPs with a well-known default salt.',
+  );
+}
+const EFFECTIVE_IP_SALT = IP_HASH_SECRET || 'ibanforge-default-salt-change-me';
 
 /**
  * Truncated salted SHA-256 of a client IP, used to cluster requests from the
@@ -69,7 +79,7 @@ const IP_HASH_SECRET = process.env.IP_HASH_SECRET ?? process.env.SESSION_SECRET 
  */
 export function hashIp(ip: string | null | undefined): string | null {
   if (!ip || ip === 'unknown') return null;
-  return createHash('sha256').update(`${IP_HASH_SECRET}:${ip}`).digest('hex').slice(0, 16);
+  return createHash('sha256').update(`${EFFECTIVE_IP_SALT}:${ip}`).digest('hex').slice(0, 16);
 }
 
 /**
@@ -1432,15 +1442,37 @@ export function getPatternStats(days: number = 30): PatternStatsResponse {
 
 /**
  * Purge per-request metadata older than the retention window (12 months).
- * Aggregated tables (daily_stats, hourly_stats) hold no personal data and are
- * kept indefinitely. This backs the public privacy policy — keep both in sync.
+ * Covers every table the privacy policy's retention promise reaches:
+ * request_log, operations (invalid-IBAN prefixes live in error_detail) and
+ * feedback (free-text reports, contact address). Aggregated tables
+ * (daily_stats, hourly_stats) hold no personal data and are kept
+ * indefinitely. This backs the public privacy policy — keep both in sync.
  */
 export function purgeOldRequestLog(months: number = 12): number {
   const db = getStatsDB();
-  const result = db
+  let purged = db
     .prepare(`DELETE FROM request_log WHERE created_at < datetime('now', '-' || ? || ' months')`)
-    .run(months);
-  return result.changes;
+    .run(months).changes;
+  purged += db
+    .prepare(`DELETE FROM operations WHERE created_at < datetime('now', '-' || ? || ' months')`)
+    .run(months).changes;
+  // The feedback table is created lazily by its route; a stats DB opened by
+  // tests or scripts may not have it yet.
+  const hasFeedback = db
+    .prepare(`SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'feedback'`)
+    .get();
+  if (hasFeedback) {
+    purged += db
+      .prepare(`DELETE FROM feedback WHERE created_at < datetime('now', '-' || ? || ' months')`)
+      .run(months).changes;
+  }
+  // A never-retrieved one-time key view is a plaintext credential at rest;
+  // seven days is far beyond any legitimate retrieval delay (DPA 4.2).
+  db.prepare(
+    `UPDATE api_keys SET raw_key_one_time_view = NULL
+     WHERE raw_key_one_time_view IS NOT NULL AND created_at < datetime('now', '-7 days')`,
+  ).run();
+  return purged;
 }
 
 // Placeholder emails used when a buyer had no address (x402/Stripe flows).
@@ -1460,9 +1492,7 @@ const PLACEHOLDER_EMAILS = ['credits-buyer', 'stripe-buyer', 'oem-subscriber'];
 export function purgeTerminatedKeyTelemetry(days: number = 30): number {
   const db = getStatsDB();
   const placeholders = PLACEHOLDER_EMAILS.map(() => '?').join(',');
-  const result = db
-    .prepare(
-      `DELETE FROM request_log WHERE key_prefix IN (
+  const terminatedKeys = `
          SELECT k.key_prefix FROM api_keys k
          WHERE k.active = 0
            AND k.deactivated_at IS NOT NULL
@@ -1470,9 +1500,13 @@ export function purgeTerminatedKeyTelemetry(days: number = 30): number {
            AND (
              k.email IN (${placeholders})
              OR NOT EXISTS (SELECT 1 FROM api_keys a WHERE a.email = k.email AND a.active = 1)
-           )
-       )`,
-    )
-    .run(days, ...PLACEHOLDER_EMAILS);
-  return result.changes;
+           )`;
+  // Both per-request tables carry key_prefix; DPA 4.7 covers them equally.
+  let purged = db
+    .prepare(`DELETE FROM request_log WHERE key_prefix IN (${terminatedKeys})`)
+    .run(days, ...PLACEHOLDER_EMAILS).changes;
+  purged += db
+    .prepare(`DELETE FROM operations WHERE key_prefix IN (${terminatedKeys})`)
+    .run(days, ...PLACEHOLDER_EMAILS).changes;
+  return purged;
 }

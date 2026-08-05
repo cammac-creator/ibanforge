@@ -1,12 +1,15 @@
 import { Hono } from 'hono';
+import { timingSafeEqual } from 'node:crypto';
 import { getStatsDB } from '../lib/db.js';
 
 const adminScanners = new Hono();
 
 function checkAuth(authHeader: string | undefined): boolean {
   const token = process.env.STATS_TOKEN;
-  if (!token) return false;
-  return authHeader === `Bearer ${token}`;
+  if (!token || !authHeader) return false;
+  const expected = Buffer.from(`Bearer ${token}`);
+  const got = Buffer.from(authHeader);
+  return expected.length === got.length && timingSafeEqual(expected, got);
 }
 
 interface ScannerRow {
