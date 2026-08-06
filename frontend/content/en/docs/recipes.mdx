@@ -16,7 +16,7 @@ curl -X POST https://api.ibanforge.com/v1/keys/generate \
 
 The honest note that belongs in every integration: a local mod-97 check catches typos and nothing else. Three of the four official example IBANs pass every checksum and still point at bank codes no register allocated — [the full story](/blog/2026-08-06-example-ibans-unallocated-bank-codes). The register check is the part you cannot do locally.
 
-## Python {#validate-iban-in-python}
+## Python
 
 With the official SDK (`pip install ibanforge`):
 
@@ -44,7 +44,7 @@ data = r.json()
 print(data["valid"], data["bank_code_check"]["status"])  # True verified
 ```
 
-## Node.js / TypeScript {#validate-iban-in-node}
+## Node.js / TypeScript
 
 Native `fetch`, no dependency:
 
@@ -64,7 +64,7 @@ console.log(data.valid, data.bic?.code, data.bank_code_check?.status);
 
 The official SDK (`npm install @ibanforge/sdk`) wraps the same call with types.
 
-## PHP {#validate-iban-in-php}
+## PHP
 
 No extension needed beyond what ships with PHP:
 
@@ -84,7 +84,7 @@ echo $data["valid"] ? "valid" : "invalid", " — ",
 // valid — verified
 ```
 
-## Google Sheets {#validate-iban-in-google-sheets}
+## Google Sheets
 
 Extensions → Apps Script, then a custom function you can use as `=VALIDATE_IBAN(A2)`:
 
@@ -104,7 +104,7 @@ function VALIDATE_IBAN(iban) {
 
 Mind your quota: one call per cell evaluation. For a whole column, prefer the [batch endpoint](/docs/iban-batch) from a script (up to 100 IBANs per call).
 
-## n8n {#validate-iban-in-n8n}
+## n8n
 
 Install the community node — it wraps validation, BIC lookup, Swiss clearing and the compliance pre-check with a credentials screen:
 
@@ -114,7 +114,7 @@ Settings → Community nodes → Install → n8n-nodes-ibanforge
 
 Self-hosted: `npm install n8n-nodes-ibanforge`. (Unverified community nodes run on self-hosted n8n; the verified listing for n8n Cloud is in progress.)
 
-## AI agents (MCP) {#validate-iban-with-an-ai-agent}
+## AI agents (MCP)
 
 Claude Desktop, Claude Code, Cursor and any MCP client:
 
