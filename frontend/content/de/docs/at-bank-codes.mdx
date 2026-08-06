@@ -1,0 +1,68 @@
+---
+title: "Österreichische Bankleitzahlen (OeNB)"
+description: "Eine österreichische Bankleitzahl (5 Ziffern) im Verzeichnis der Oesterreichischen Nationalbank nachschlagen: unser reichhaltigstes Register — vollständige Sitzadresse und LEI — und die offizielle österreichische Beispiel-IBAN, deren Code an niemanden vergeben ist."
+order: 9
+---
+
+# Österreichische Bankleitzahlen — das Verzeichnis der OeNB
+
+Österreich sagt ebenfalls **Bankleitzahl**, doch die österreichische hat fünf Ziffern statt der deutschen acht: Stellen 5–9 einer `AT`-IBAN. Dahinter steht als Register das **SEPA-Zahlungsverkehrs-Verzeichnis der Oesterreichischen Nationalbank** — das OeNB-eigene Verzeichnis der österreichischen Zahlungsverkehrsteilnehmer und die Vergabestelle dieser fünf Ziffern.
+
+Es ist zugleich der **reichhaltigste** Referenzbestand, den wir halten. Wo die deutsche Datei bei PLZ und Ort endet, veröffentlicht die OeNB die vollständige Sitzadresse des Instituts — Straße und Hausnummer inklusive — und seinen **LEI**, den kein anderes von uns konsultiertes nationales Register führt.
+
+## Ein Aufruf
+
+```bash
+curl -X POST https://api.ibanforge.com/v1/iban/validate \
+  -H "Content-Type: application/json" \
+  -d '{"iban": "AT611904300234573201"}'
+```
+
+```json
+{
+  "valid": true,
+  "bic": null,
+  "bank_code_check": {
+    "value": "19043",
+    "status": "not_in_register",
+    "match": null,
+    "register": "Oesterreichische Nationalbank SEPA-Zahlungsverkehrs-Verzeichnis",
+    "authoritative": true,
+    "as_of": "2026-08"
+  }
+}
+```
+
+Diese IBAN ist kein Tippfehler. `AT61 1904 3002 3457 3201` ist **Österreichs offizielle Beispiel-IBAN**, jene, die in Tutorials, Testsuites und API-Dokumentationen überall kopiert wird — und ihre Bankleitzahl `19043` ist an niemanden vergeben. Die Struktur ist einwandfrei (`valid: true`), die Vergabe ist leer (`not_in_register`), und beide Aussagen stimmen gleichzeitig. Das Muster, quer über die offiziellen Beispiele von vier Ländern, haben wir aufgeschrieben in [Die zwei beliebtesten Beispiel-IBANs der Welt zeigen auf Bankcodes, die es nicht gibt](/blog/2026-08-06-example-ibans-unallocated-bank-codes).
+
+`bic` ist aus demselben Grund `null`: Es gibt kein vergebenes Institut zu benennen, und eines zu raten wäre schlimmer als ein ehrliches null.
+
+## Was `not_in_register` hier bedeutet
+
+`authoritative: true` ist das Feld, das diesem „Nein" sein Gewicht gibt. Es sagt, dass der konsultierte Referenzbestand jenes Register **ist**, das österreichische Bankcodes vergibt — ein Fehlen ist also das Urteil der Vergabestelle selbst und keine Lücke in unseren Daten. Überall dort, wo wir auf die zusammengesetzte BIC-Karte zurückfallen, beweist ein Fehlen nichts; hier schon.
+
+## Was das OeNB-Register veröffentlicht
+
+Für einen vergebenen Code trägt `bank_code_check.institution`, was das Verzeichnis führt:
+
+| Feld | Im österreichischen Register | Anmerkung |
+|---|---|---|
+| `name` | ja | das Institut, wie die OeNB es führt |
+| `street` | ja | vollständige Straße und Hausnummer — neben dem Schweizer BankMaster von SIX das einzige Register, das eine veröffentlicht |
+| `post_code` / `town` | ja | Sitz |
+| `lei` | ja, wo vergeben | der Legal Entity Identifier, direkt aus dem Verzeichnis — nur ausgeliefert, wenn das Register einen führt |
+
+Fehlende Felder bleiben `null`. Nichts hier wird aus einer dritten Quelle angereichert und als Angabe des Registers ausgegeben.
+
+## Frische — und eine ehrliche Asymmetrie
+
+Die OeNB **veröffentlicht ihr Verzeichnis täglich neu**. Wir aktualisieren es **monatlich**, im selben Zyklus wie die übrigen nationalen Register, und jede Antwort stempelt die gelesene Ausgabe in `as_of` (oben `2026-08`). Ein heute in Wien vergebener Code kann hier also bis zu einen Monat davon entfernt sein, `verified` zu antworten. Das sagen wir lieber klar, als den Takt der Quelle als unseren auszugeben.
+
+## Die ehrlichen Grenzen
+
+- **Wir prüfen den Bankcode, nie das Konto und nie den Inhaber.** Ein `verified` österreichischer Code benennt das Institut, dem der Code gehört — und nichts zur danebenstehenden Kontonummer.
+- **Institut, nicht Filiale.** Österreichische Bankleitzahlen identifizieren Institute; Filialtiefe ist aus einer IBAN nicht ableitbar.
+- **Eine monatliche Momentaufnahme einer täglichen Datei** — siehe oben. `as_of` sagt genau, welche geantwortet hat.
+- **Der LEI kommt aus dem Register, nicht von uns.** Wo die OeNB keinen veröffentlicht, ist das Feld `null` statt aus GLEIF nachgefüllt: Was Sie lesen, ist das, was Österreich veröffentlicht hat.
+
+Siehe auch: [Was „verified" bedeutet](/docs/iban-validate) · [Datenquellen & Provenienz](/docs/data-sources) · [IBAN zu BIC](/docs/iban-to-bic) · [BLZ-Prüfung Deutschland](/docs/blz-check)

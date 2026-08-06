@@ -1,0 +1,68 @@
+---
+title: "Austrian Bank Code Lookup (OeNB)"
+description: "Look up an Austrian bank code (Bankleitzahl, 5 digits) against the Oesterreichische Nationalbank directory: the richest of our registers — full seat address and LEI — and the official Austrian example IBAN whose code is allocated to nobody."
+order: 9
+---
+
+# Austrian bank code lookup — the OeNB directory
+
+Austria calls it a **Bankleitzahl** too, but it is five digits, not Germany's eight: positions 5–9 of an `AT` IBAN. The register behind it is the **Oesterreichische Nationalbank, SEPA-Zahlungsverkehrs-Verzeichnis** — the OeNB's own directory of Austrian payment participants, and the allocation authority for those five digits.
+
+It is also the **richest** reference set we hold. Where the German file stops at postcode and town, the OeNB publishes the full seat address of the institution — street and number included — and its **LEI**, which no other national register we consult carries.
+
+## One call
+
+```bash
+curl -X POST https://api.ibanforge.com/v1/iban/validate \
+  -H "Content-Type: application/json" \
+  -d '{"iban": "AT611904300234573201"}'
+```
+
+```json
+{
+  "valid": true,
+  "bic": null,
+  "bank_code_check": {
+    "value": "19043",
+    "status": "not_in_register",
+    "match": null,
+    "register": "Oesterreichische Nationalbank SEPA-Zahlungsverkehrs-Verzeichnis",
+    "authoritative": true,
+    "as_of": "2026-08"
+  }
+}
+```
+
+That IBAN is not a typo. `AT61 1904 3002 3457 3201` is **Austria's official example IBAN**, the one copied into tutorials, test suites and API documentation everywhere — and its bank code `19043` is allocated to nobody. The structure is perfect (`valid: true`), the allocation is empty (`not_in_register`), and both statements are true at once. We wrote up the pattern, across four countries' official examples, in [the world's two favourite example IBANs point at bank codes that don't exist](/blog/2026-08-06-example-ibans-unallocated-bank-codes).
+
+`bic` is `null` for the same reason: there is no allocated institution to name, and guessing one would be worse than an honest null.
+
+## What `not_in_register` means here
+
+`authoritative: true` is the field that gives that "no" its weight. It says the reference set consulted **is** the register that hands out Austrian bank codes — so an absence is the allocation authority's own verdict, not a gap in our data. Everywhere we fall back to the composite BIC map, an absence proves nothing; here it does.
+
+## What the OeNB register publishes
+
+For an allocated code, `bank_code_check.institution` carries what the directory holds:
+
+| Field | In the Austrian register | Note |
+|---|---|---|
+| `name` | yes | the institution as the OeNB lists it |
+| `street` | yes | full street and number — the only register besides SIX's Swiss BankMaster that publishes one |
+| `post_code` / `town` | yes | seat |
+| `lei` | yes, where allocated | the Legal Entity Identifier, straight from the directory — served only when the register carries one |
+
+Absent fields stay `null`. Nothing here is enriched from a third source and passed off as the register's.
+
+## Freshness — and one honest asymmetry
+
+The OeNB **republishes its directory daily**. We refresh it **monthly**, in the same cycle as the other national registers, and every answer stamps the edition it read in `as_of` (`2026-08` above). So a code allocated in Vienna today can be up to a month away from answering `verified` here. We would rather say that plainly than describe the source's cadence as if it were ours.
+
+## The honest limits
+
+- **We check the bank code, never the account or its holder.** A `verified` Austrian code names the institution the code belongs to and nothing about the account number beside it.
+- **Institution, not branch.** Austrian bank codes identify institutions; branch detail is not derivable from an IBAN.
+- **A monthly snapshot of a daily file** — see above. `as_of` tells you exactly which one answered.
+- **The LEI comes from the register, not from us.** Where the OeNB publishes none, the field is `null` rather than back-filled from GLEIF, so what you read is what Austria published.
+
+Related: [What "verified" means](/docs/iban-validate) · [Data sources & provenance](/docs/data-sources) · [IBAN to BIC](/docs/iban-to-bic) · [German BLZ check](/docs/blz-check)

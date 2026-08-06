@@ -1,0 +1,78 @@
+---
+title: "Contrôle de BLZ allemande (Bankleitzahl)"
+description: "Vérifier une Bankleitzahl allemande contre le registre de la Deutsche Bundesbank : les 8 chiffres présents dans tout IBAN DE, ce que publie la Bankleitzahlendatei, et ce que l'Allemagne est la seule à dire — une BLZ retirée et le code qui lui succède."
+order: 8
+---
+
+# Contrôle de BLZ — une Bankleitzahl face au registre de la Bundesbank
+
+Tout IBAN allemand porte sa **Bankleitzahl** en clair : les huit chiffres des positions 5 à 12, juste après `DE` et les deux chiffres de contrôle. Les lire relève de l'arithmétique. Savoir si ces huit chiffres appartiennent à un établissement — et auquel — exige un registre, et l'Allemagne en publie un excellent : la **Bankleitzahlendatei de la Deutsche Bundesbank**, republiée chaque mois, le fichier même sur lequel s'appuient les paiements allemands.
+
+C'est toute la différence entre un contrôle de format et un contrôle de BLZ. La clé mod-97 attrape les fautes de frappe ; elle ne sait rien de l'attribution d'un code banque.
+
+## Un appel
+
+```bash
+curl -X POST https://api.ibanforge.com/v1/iban/validate \
+  -H "Content-Type: application/json" \
+  -d '{"iban": "DE89370400440532013000"}'
+```
+
+```json
+{
+  "valid": true,
+  "bic": {
+    "code": "COBADEFF",
+    "bank_name": "COMMERZBANK Aktiengesellschaft",
+    "city": "Frankfurt am Main"
+  },
+  "bank_code_check": {
+    "value": "37040044",
+    "status": "verified",
+    "match": "register",
+    "register": "Deutsche Bundesbank Bankleitzahlendatei",
+    "authoritative": true,
+    "as_of": "2026-08"
+  }
+}
+```
+
+La BLZ `37040044` a été extraite de l'IBAN, confrontée au fichier de la Bundesbank elle-même, puis résolue vers Commerzbank. `authoritative: true` dit que la réponse vient de l'autorité d'attribution — pas d'un annuaire BIC qui mentionne au passage des banques allemandes. `as_of` dit quelle édition mensuelle a répondu.
+
+## Ce que publie la Bankleitzahlendatei
+
+Pour une BLZ attribuée, ce que le registre porte sur l'établissement est servi dans `bank_code_check.institution` :
+
+| Champ | Dans le registre allemand | Remarque |
+|---|---|---|
+| `name` | oui | le nom de l'établissement tel que l'imprime la Bundesbank |
+| `post_code` | oui | code postal du siège |
+| `town` | oui | ville du siège |
+| `street` | **non** | toujours `null` — la Bankleitzahlendatei n'a aucune colonne rue. Le champ reste honnêtement vide plutôt que rempli depuis une autre source |
+| `lei` | non | le fichier allemand n'en porte pas (le registre autrichien, si — voir [codes banque autrichiens](/docs/at-bank-codes)) |
+
+Un `null` est ici un fait sur le registre, pas une lacune de la recherche. Remplir cette rue depuis un annuaire BIC produirait une adresse que la Bundesbank n'a jamais publiée.
+
+## Les retraits — ce que seule l'Allemagne dit
+
+La Bankleitzahlendatei est le seul de nos registres nationaux à publier la **fin** d'un code aussi clairement que son début. Quand une BLZ est marquée pour suppression — le plus souvent après une fusion — la réponse porte deux champs supplémentaires :
+
+| Champ | Signification |
+|---|---|
+| `retired: true` | le registre marque ce code pour suppression. Le code **a bien été** attribué : le statut reste donc `verified` — c'est un avertissement, pas un refus |
+| `superseded_by` | la BLZ successeur qui prend le relais, quand le registre en nomme une |
+
+C'est ce qui rend l'information utile au moment du paiement. Une BLZ retirée continue de valider et continue de nommer un établissement réel : aucun contrôle de format ne la signalera. Pourtant les coordonnées bancaires bâties dessus ont une date de péremption, et le registre indique ce qui les remplace.
+
+## Ce que `not_in_register` signifie ici
+
+Comme la Bundesbank **est** l'autorité d'attribution des codes banque allemands, une absence est un fait sur l'Allemagne, pas sur notre couverture : les huit chiffres ne sont attribués à personne. C'est ce que veut dire `status: "not_in_register"` avec `authoritative: true`, et c'est une raison forte d'arrêter un paiement avant sa soumission. L'IBAN, lui, continuera de répondre `valid: true` juste à côté — structure et attribution sont deux questions distinctes, et seule la seconde exige un registre.
+
+## Les limites honnêtes
+
+- **Nous contrôlons le code banque, jamais le compte ni son titulaire.** Une BLZ `verified` dit que l'établissement existe et le nomme ; elle ne dit rien des dix chiffres qui suivent dans l'IBAN.
+- **L'établissement, pas l'agence.** La BLZ identifie l'établissement. Le niveau agence n'est dérivable d'un IBAN allemand ni par nous ni par personne.
+- **Fraîcheur mensuelle.** La Bundesbank republie chaque mois et nous suivons cette cadence : un code attribué en cours de mois apparaît à l'édition suivante. Chaque réponse estampille dans `as_of` l'édition lue.
+- **Pas de rue, par construction.** Voir le tableau ci-dessus : le registre n'en publie aucune.
+
+Voir aussi : [Ce que « verified » veut dire](/docs/iban-validate) · [Sources & provenance](/docs/data-sources) · [IBAN vers BIC](/docs/iban-to-bic) · [Codes banque autrichiens](/docs/at-bank-codes)

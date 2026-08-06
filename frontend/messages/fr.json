@@ -728,7 +728,9 @@
     "groups": {
       "gettingStarted": "Premiers pas",
       "endpoints": "Endpoints",
-      "advanced": "Avancé"
+      "advanced": "Avancé",
+      "registers": "Registres bancaires",
+      "more": "Autres"
     }
   },
   "blog": {

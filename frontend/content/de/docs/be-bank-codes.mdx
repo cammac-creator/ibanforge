@@ -1,0 +1,72 @@
+---
+title: "Belgische Bankcodes prüfen (BNB)"
+description: "Einen belgischen Bankcode (3 Ziffern) gegen die Liste der Belgischen Nationalbank prüfen: alle 1000 Slots in einer Datei, was VRIJ und Onbeschikbaar wirklich heißen, und warum die berühmte Beispiel-IBAN BE68 an niemanden vergeben ist."
+order: 10
+---
+
+# Belgische Bankcodes — die Liste der BNB
+
+Belgische Bankcodes sind kurz: **drei Ziffern**, Stellen 5–7 einer `BE`-IBAN. Damit ist Belgien das eine Land, dessen komplette Vergabetabelle auf einen Bildschirm passt — und die Banque nationale de Belgique veröffentlicht genau das: **alle 1000 Slots in einer einzigen öffentlichen Datei** (`full_list_current.xlsx`), hier ausgeliefert unter dem Register `Banque nationale de Belgique, bank identification codes (Protocol Secretariat)`.
+
+Ein dreistelliger Coderaum, in dem jeder Slot einen veröffentlichten Zustand hat, macht die negative Antwort ungewöhnlich belastbar. In Belgien gibt es kein „haben wir noch nie gesehen": Jeder Code ist entweder an ein benanntes Institut vergeben oder ausdrücklich nicht.
+
+## Ein Aufruf
+
+```bash
+curl -X POST https://api.ibanforge.com/v1/iban/validate \
+  -H "Content-Type: application/json" \
+  -d '{"iban": "BE68539007547034"}'
+```
+
+```json
+{
+  "valid": true,
+  "bank_code_check": {
+    "value": "539",
+    "status": "not_in_register",
+    "match": null,
+    "register": "Banque nationale de Belgique, bank identification codes (Protocol Secretariat)",
+    "authoritative": true,
+    "as_of": "2026-08"
+  }
+}
+```
+
+`BE68 5390 0754 7034` ist die meistkopierte Beispiel-IBAN der Welt — europäisches Normungsmaterial, tausende Tutorials, unzählige Test-Fixtures. Ihr Bankcode `539` ist einer der acht Slots, die die BNB selbst als **„Onbeschikbaar / Indisponible"** führt: reserviert, an niemanden vergeben. `valid: true` und `not_in_register` sind beide richtig, und der Abstand zwischen beiden ist der ganze Grund, Bankcodes überhaupt zu prüfen. Die vollständige Geschichte, mit dem Schweizer und dem österreichischen Gegenstück, steht in [Die zwei beliebtesten Beispiel-IBANs der Welt zeigen auf Bankcodes, die es nicht gibt](/blog/2026-08-06-example-ibans-unallocated-bank-codes).
+
+## Die Arithmetik der 1000 Slots
+
+In der BNB-Datei mit Stand 5. August 2026 geht die Rechnung exakt auf:
+
+| Zustand in der Datei | Slots | Wie wir ihn behandeln |
+|---|---|---|
+| An ein benanntes Institut vergeben | 781 | `verified` |
+| `VRIJ` (frei) | 211 | **nicht vergeben** |
+| `Onbeschikbaar` / `Indisponible` (reserviert, nicht verfügbar) | 8 | **nicht vergeben** |
+| **Summe** | **1000** | |
+
+Beide nicht vergebenen Zustände antworten `not_in_register`. Ein reservierter Slot ist keine Bank: Das Register schreibt `VRIJ` dorthin, wo ein Institutsname stünde — eine Abfrage, die diese Zeilen speicherte, meldete bereitwillig eine Bank namens „VRIJ", die exakte Umkehrung dessen, was die Datei sagt. Wir verwerfen sie mit Absicht.
+
+## Was die BNB-Datei veröffentlicht — und was nicht
+
+| Feld | In der belgischen Datei | Anmerkung |
+|---|---|---|
+| `name` | ja | der Name des Instituts, in bis zu vier Sprachen veröffentlicht |
+| `street` | **nein** | `null` |
+| `post_code` / `town` | **nein** | `null` |
+| `lei` | nein | der Schlüssel fehlt schlicht in der Antwort |
+
+Die belgische Datei ist ein **reines Namensregister**: keine Adressen, in keiner Sprache. `bank_code_check.institution` trägt für Belgien deshalb einen Namen und ehrliche `null` ringsum. Diese `null` sind die Form dessen, was Belgien veröffentlicht, keine fehlende Arbeit auf unserer Seite — sie aus einem BIC-Verzeichnis zu füllen, schriebe der BNB eine Adresse zu, die sie nie gedruckt hat.
+
+## Was `not_in_register` hier bedeutet
+
+`authoritative: true` macht es zum Urteil des Registers selbst: In einem Coderaum, in dem jeder der 1000 Slots einen veröffentlichten Zustand hat, ist der Code an kein Institut vergeben. Für eine Zahlung, die gleich hinausgeht, ist das ein starker Grund innezuhalten und die Empfängerdaten zu prüfen — während die Prüfziffer der IBAN weiterhin `valid: true` sagt, denn mod-97 fängt nur Übertragungsfehler.
+
+## Die ehrlichen Grenzen
+
+- **Wir prüfen den Bankcode, nie das Konto und nie den Inhaber.** Ein `verified` belgischer Code benennt das Institut, dem die drei Ziffern gehören, und hört dort auf.
+- **Namen, keine Adressen.** Siehe Tabelle oben — Belgien veröffentlicht keine, also liefern wir keine.
+- **Monatliche Frische.** Die Liste wird monatlich neu eingelesen; jede Antwort trägt die Ausgabe in `as_of` (oben `2026-08`), damit die Frische des Urteils immer bekannt ist.
+- **Ein reservierter Slot kann später aktiviert werden.** `Onbeschikbaar` heute heißt nicht für immer — es heißt, dass die BNB ihn zum Stand der antwortenden Ausgabe nicht vergeben hat.
+
+Siehe auch: [Was „verified" bedeutet](/docs/iban-validate) · [Datenquellen & Provenienz](/docs/data-sources) · [IBAN zu BIC](/docs/iban-to-bic) · [BLZ-Prüfung Deutschland](/docs/blz-check)

@@ -1,0 +1,72 @@
+---
+title: "Belgian Bank Code Check (NBB)"
+description: "Check a Belgian bank code (3 digits) against the National Bank of Belgium list: all 1,000 slots published in one file, what VRIJ and Onbeschikbaar really mean, and why the famous BE68 example IBAN is allocated to nobody."
+order: 10
+---
+
+# Belgian bank code check — the NBB list
+
+Belgian bank codes are short: **three digits**, positions 5–7 of a `BE` IBAN. Which makes Belgium the one country where the whole allocation table fits on a screen — and the National Bank of Belgium publishes exactly that: **all 1,000 slots in a single public file** (`full_list_current.xlsx`), served here as the register `Banque nationale de Belgique, bank identification codes (Protocol Secretariat)`.
+
+A three-digit code space with a published state for every slot means the negative answer is unusually solid. There is no "we haven't seen it" in Belgium. Every code is either allocated to a named institution or explicitly not.
+
+## One call
+
+```bash
+curl -X POST https://api.ibanforge.com/v1/iban/validate \
+  -H "Content-Type: application/json" \
+  -d '{"iban": "BE68539007547034"}'
+```
+
+```json
+{
+  "valid": true,
+  "bank_code_check": {
+    "value": "539",
+    "status": "not_in_register",
+    "match": null,
+    "register": "Banque nationale de Belgique, bank identification codes (Protocol Secretariat)",
+    "authoritative": true,
+    "as_of": "2026-08"
+  }
+}
+```
+
+`BE68 5390 0754 7034` is the most-copied example IBAN in the world — European standards material, a thousand tutorials, countless test fixtures. Its bank code `539` is one of the eight slots the NBB itself marks **"Onbeschikbaar / Indisponible"**: reserved, allocated to nobody. `valid: true` and `not_in_register` are both correct, and the gap between them is the entire reason to check bank codes at all. The full story, with the Swiss and Austrian equivalents, is in [the world's two favourite example IBANs point at bank codes that don't exist](/blog/2026-08-06-example-ibans-unallocated-bank-codes).
+
+## The arithmetic of 1,000 slots
+
+In the NBB file dated 5 August 2026, the numbers close exactly:
+
+| State in the file | Slots | How we treat it |
+|---|---|---|
+| Allocated to a named institution | 781 | `verified` |
+| `VRIJ` (vacant) | 211 | **unallocated** |
+| `Onbeschikbaar` / `Indisponible` (reserved, unavailable) | 8 | **unallocated** |
+| **Total** | **1,000** | |
+
+Both non-allocated states answer `not_in_register`. A reserved slot is not a bank: the register writes `VRIJ` where an institution name would go, so a lookup that stored those rows would happily report a bank called "VRIJ" — the exact inversion of what the file says. We drop them on purpose.
+
+## What the NBB file publishes — and what it does not
+
+| Field | In the Belgian file | Note |
+|---|---|---|
+| `name` | yes | the institution's name, published in up to four languages |
+| `street` | **no** | `null` |
+| `post_code` / `town` | **no** | `null` |
+| `lei` | no | the key is simply absent from the response |
+
+The Belgian file is a **name-only** register: no addresses, in any language. So `bank_code_check.institution` for Belgium carries a name and honest nulls around it. Those nulls are the shape of what Belgium publishes, not missing work on our side — filling them from a BIC directory would attribute to the NBB an address it never printed.
+
+## What `not_in_register` means here
+
+`authoritative: true` marks it as the register's own verdict: within a code space where every one of the 1,000 slots has a published state, the code is not allocated to any institution. For a payment about to leave, that is a strong reason to stop and check the beneficiary details — while the IBAN's checksum keeps saying `valid: true`, because mod-97 only catches transcription errors.
+
+## The honest limits
+
+- **We check the bank code, never the account or its holder.** A `verified` Belgian code names the institution the three digits belong to, and stops there.
+- **Names, not addresses.** See the table above — Belgium publishes no address, so we serve none.
+- **Monthly freshness.** The list is re-read monthly; every answer carries the edition in `as_of` (`2026-08` above), so you always know how fresh the verdict is.
+- **A reserved slot can be activated later.** `Onbeschikbaar` today does not mean forever — it means the NBB has not allocated it as of the edition that answered.
+
+Related: [What "verified" means](/docs/iban-validate) · [Data sources & provenance](/docs/data-sources) · [IBAN to BIC](/docs/iban-to-bic) · [German BLZ check](/docs/blz-check)

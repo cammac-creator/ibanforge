@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { ChevronRight, Menu, X, BookOpen, Zap, Server } from "lucide-react";
+import { ChevronRight, Menu, X, BookOpen, Zap, Server, Landmark, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { DocMeta } from "@/lib/mdx";
 
@@ -23,12 +23,17 @@ const groups: DocGroup[] = [
   {
     labelKey: "endpoints",
     icon: <Zap className="size-4" />,
-    slugs: ["iban-validate", "iban-batch", "bic-lookup", "compliance", "ch-clearing"],
+    slugs: ["iban-validate", "iban-batch", "bic-lookup", "iban-to-bic", "compliance", "ch-clearing", "vop"],
+  },
+  {
+    labelKey: "registers",
+    icon: <Landmark className="size-4" />,
+    slugs: ["blz-check", "at-bank-codes", "be-bank-codes", "fi-bank-codes"],
   },
   {
     labelKey: "advanced",
     icon: <Server className="size-4" />,
-    slugs: ["mcp", "errors"],
+    slugs: ["mcp", "errors", "data-sources"],
   },
 ];
 
@@ -51,9 +56,18 @@ export function DocsSidebar({ docs }: { docs: DocMeta[] }) {
 
   const docsBySlug = new Map(docs.map((d) => [d.slug, d]));
 
+  // Any doc not claimed by a group above still gets rendered: three pages
+  // (vop, data-sources, iban-to-bic) shipped invisible because this list was
+  // hard-coded and nobody remembered it. Never again.
+  const claimed = new Set(groups.flatMap((g) => g.slugs));
+  const orphans = docs.filter((d) => !claimed.has(d.slug));
+  const renderedGroups: DocGroup[] = orphans.length
+    ? [...groups, { labelKey: "more", icon: <FileText className="size-4" />, slugs: orphans.map((d) => d.slug) }]
+    : groups;
+
   const sidebarContent = (
     <nav className="space-y-6">
-      {groups.map((group) => (
+      {renderedGroups.map((group) => (
         <div key={group.labelKey}>
           <div className="flex items-center gap-2 px-3 mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             {group.icon}

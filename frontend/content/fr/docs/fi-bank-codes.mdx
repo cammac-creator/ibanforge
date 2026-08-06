@@ -1,0 +1,71 @@
+---
+title: "Contrôle des codes banque finlandais (Finance Finland)"
+description: "Vérifier un code banque finlandais contre les codes d'établissements monétaires de Finance Finland — et comprendre l'asymétrie qui rend la Finlande différente : les codes sont attribués à des groupes bancaires, pas à des établissements, donc un résultat confirme le groupe."
+order: 11
+---
+
+# Codes banque finlandais — les codes d'établissements monétaires
+
+Les codes banque finlandais viennent de la liste des **codes d'établissements monétaires de Finance Finland**, et ils se comportent autrement que dans tous les autres registres que nous consultons, pour deux raisons.
+
+D'abord, le code n'est pas une tranche fixe de l'IBAN : les codes d'établissement finlandais font **un à quatre caractères** en tête du BBAN, si bien que le contrôle lit le *plus long préfixe attribué* plutôt qu'une découpe positionnelle. Prenez une tranche fixe de trois chiffres dans `FI21 1234 5600 0007 85` et vous interrogeriez `123` — refusant au passage le plus grand groupe bancaire du pays, dont le code est simplement `1`.
+
+Ensuite — et c'est le point à intégrer dans votre conception — **les codes finlandais sont attribués à des groupes bancaires, pas à des établissements individuels.**
+
+## Un appel
+
+```bash
+curl -X POST https://api.ibanforge.com/v1/iban/validate \
+  -H "Content-Type: application/json" \
+  -d '{"iban": "FI2112345600000785"}'
+```
+
+La réponse est abrégée ci-dessous au bloc dont traite cette page ; la même réponse porte aussi l'objet `bic`, dont le `code` vaut ici `NDEAFIHH`.
+
+```json
+{
+  "valid": true,
+  "bank_code_check": {
+    "value": "1",
+    "status": "verified",
+    "match": "register",
+    "register": "Finance Finland monetary institution codes (allocated to banking groups, not individual institutions)",
+    "authoritative": true,
+    "as_of": "2026-08"
+  }
+}
+```
+
+C'est **l'IBAN d'exemple officiel finlandais**, et il est le contre-exemple des exemples cassés : contrairement aux exemples officiels belge, suisse et autrichien, dont les codes banque ne sont [attribués à personne](/blog/2026-08-06-example-ibans-unallocated-bank-codes), l'exemple finlandais se résout proprement — parce que le code `1` est réel et appartient au groupe bancaire Nordea.
+
+## Lisez la chaîne `register`, elle travaille
+
+Regardez ce que dit `register` : *« allocated to banking groups, not individual institutions »*. Cette précision n'est pas un ornement de documentation, elle voyage **dans la réponse**, parce qu'un `verified` finlandais affirme moins qu'un allemand ou un autrichien :
+
+| Registre | Ce que veut dire un résultat `verified` |
+|---|---|
+| DE, AT, BE, CH / LI | le code est attribué à **cet établissement nommé** |
+| **FI** | le code est attribué à **ce groupe bancaire** |
+
+En Finlande, l'affirmation positive est donc plus faible par construction, et l'API le dit là où une intégration peut le lire, au lieu de l'enfouir dans une page comme celle-ci. L'asymétrie ne porte que sur ce qu'un résultat positif prouve — le sens négatif, lui, reste intact, comme le détaille la section suivante.
+
+## Ce que `not_in_register` signifie ici
+
+Voici la moitié contre-intuitive : à cette affirmation positive plus faible répond un **négatif de pleine force**. C'est Finance Finland qui attribue ces codes — un code absent de sa liste n'est attribué à aucun groupe bancaire, et `status: "not_in_register"` avec `authoritative: true` y pèse exactement le même poids qu'en Allemagne ou en Belgique. L'asymétrie est entièrement du côté positif : un résultat confirme le groupe, tandis qu'une absence est le « non » de l'autorité d'attribution elle-même, et une raison forte d'arrêter un paiement avant sa soumission. À côté, la clé de contrôle de l'IBAN continuera de dire `valid: true`.
+
+## Pas de bloc `institution` pour la Finlande
+
+Les quatre autres registres nationaux publient quelque chose sur le titulaire : un nom, une adresse à la profondeur qu'ils portent, parfois un LEI. Celui de la Finlande, non — et il ne le peut pas : un code au niveau du groupe n'a pas d'établissement unique à décrire, donc il n'existe aucune adresse par établissement à servir. Pour la Finlande, `bank_code_check` répond à la question de l'attribution et s'arrête là, plutôt que d'inventer un sujet au code du groupe.
+
+## Fraîcheur
+
+La liste est relue à chaque republication par Finance Finland, et chaque réponse estampille dans `as_of` l'édition de référence consultée (`2026-08` ci-dessus) — le même champ, avec le même sens, que pour tous les autres pays.
+
+## Les limites honnêtes
+
+- **Un résultat confirme le groupe, pas l'agence ni l'établissement.** Si votre processus doit savoir exactement quelle banque membre tient le compte, le contrôle du code banque finlandais n'est pas l'outil.
+- **Nous contrôlons le code banque, jamais le compte ni son titulaire.** Rien dans cette réponse ne regarde au-delà du code en tête du BBAN.
+- **La longueur du préfixe compte.** Le contrôle utilise le plus long préfixe attribué ; une découpe naïve à largeur fixe d'un BBAN finlandais produira de mauvaises recherches dans n'importe quel registre, celui-ci compris.
+- **Aucune adresse.** Voir ci-dessus : la Finlande n'en publie pas au niveau de l'établissement.
+
+Voir aussi : [Ce que « verified » veut dire](/docs/iban-validate) · [Sources & provenance](/docs/data-sources) · [IBAN vers BIC](/docs/iban-to-bic) · [Codes banque belges](/docs/be-bank-codes)

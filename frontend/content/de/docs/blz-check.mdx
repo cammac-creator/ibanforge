@@ -1,0 +1,78 @@
+---
+title: "BLZ-Prüfung (Bankleitzahl)"
+description: "Eine deutsche Bankleitzahl gegen das Register der Deutschen Bundesbank prüfen: die 8 Ziffern in jeder DE-IBAN, was die Bankleitzahlendatei veröffentlicht — und das eine, was nur Deutschland verrät: eine gelöschte BLZ und ihre Nachfolge-BLZ."
+order: 8
+---
+
+# BLZ-Prüfung — eine Bankleitzahl gegen das Bundesbank-Register
+
+Jede deutsche IBAN trägt ihre **Bankleitzahl** offen: die acht Ziffern an den Stellen 5–12, direkt nach `DE` und den beiden Prüfziffern. Sie zu lesen ist Rechnen. Zu wissen, ob diese acht Ziffern einem Institut gehören — und welchem —, verlangt ein Register, und Deutschland veröffentlicht ein ausgesprochen gutes: die **Bankleitzahlendatei der Deutschen Bundesbank**, monatlich neu erscheinend, dieselbe Datei, nach der der deutsche Zahlungsverkehr leitet.
+
+Genau darin liegt der Unterschied zwischen einer Formatprüfung und einer BLZ-Prüfung. Die Prüfziffer nach mod-97 fängt Tippfehler; über die Vergabe eines Bankcodes weiß sie nichts.
+
+## Ein Aufruf
+
+```bash
+curl -X POST https://api.ibanforge.com/v1/iban/validate \
+  -H "Content-Type: application/json" \
+  -d '{"iban": "DE89370400440532013000"}'
+```
+
+```json
+{
+  "valid": true,
+  "bic": {
+    "code": "COBADEFF",
+    "bank_name": "COMMERZBANK Aktiengesellschaft",
+    "city": "Frankfurt am Main"
+  },
+  "bank_code_check": {
+    "value": "37040044",
+    "status": "verified",
+    "match": "register",
+    "register": "Deutsche Bundesbank Bankleitzahlendatei",
+    "authoritative": true,
+    "as_of": "2026-08"
+  }
+}
+```
+
+Die BLZ `37040044` wurde aus der IBAN extrahiert, gegen die Datei der Bundesbank selbst geprüft und zur Commerzbank aufgelöst. `authoritative: true` sagt, dass die Antwort von der Vergabestelle selbst kommt — nicht aus einem BIC-Verzeichnis, das nebenbei deutsche Banken führt. `as_of` sagt, welche Monatsausgabe geantwortet hat.
+
+## Was die Bankleitzahlendatei veröffentlicht
+
+Für eine vergebene BLZ wird das, was das Register über das Institut führt, in `bank_code_check.institution` ausgeliefert:
+
+| Feld | Im deutschen Register | Anmerkung |
+|---|---|---|
+| `name` | ja | der Name des Instituts, wie die Bundesbank ihn führt |
+| `post_code` | ja | PLZ des Sitzes |
+| `town` | ja | Ort des Sitzes |
+| `street` | **nein** | immer `null` — die Bankleitzahlendatei hat überhaupt keine Straßenspalte. Das Feld bleibt ehrlich leer, statt aus einer anderen Quelle gefüllt zu werden |
+| `lei` | nein | die deutsche Datei führt keinen (das österreichische Register schon — siehe [österreichische Bankleitzahlen](/docs/at-bank-codes)) |
+
+Ein `null` ist hier eine Tatsache über das Register, keine Lücke der Abfrage. Diese Straße aus einem BIC-Verzeichnis zu füllen, ergäbe eine Adresse, die die Bundesbank nie veröffentlicht hat.
+
+## Löschungen — was nur Deutschland verrät
+
+Die Bankleitzahlendatei ist das einzige unserer nationalen Register, das das **Ende** eines Codes so klar veröffentlicht wie seinen Anfang. Ist eine BLZ zur Löschung vorgemerkt — meist nach einer Fusion —, trägt die Antwort zwei zusätzliche Felder:
+
+| Feld | Bedeutung |
+|---|---|
+| `retired: true` | das Register merkt diesen Code zur Löschung vor. Der Code **war** vergeben, der Status bleibt deshalb `verified` — das ist eine Warnung, keine Verneinung |
+| `superseded_by` | die Nachfolge-BLZ, die übernimmt, sofern das Register eine nennt |
+
+Diese Unterscheidung macht die Information zum Zahlungszeitpunkt wertvoll. Eine gelöschte BLZ validiert weiterhin und benennt weiterhin ein echtes Institut — keine Formatprüfung wird sie melden. Bankverbindungen, die darauf beruhen, haben aber ein Verfallsdatum, und das Register sagt, was an ihre Stelle tritt.
+
+## Was `not_in_register` hier bedeutet
+
+Weil die Bundesbank die Vergabestelle für deutsche Bankcodes **ist**, ist ein Fehlen eine Tatsache über Deutschland und nicht über unsere Abdeckung: Die acht Ziffern sind an niemanden vergeben. Genau das heißt `status: "not_in_register"` mit `authoritative: true`, und es ist ein starker Grund, eine Zahlung vor der Einreichung zu stoppen. Die IBAN wird daneben weiterhin `valid: true` melden — Struktur und Vergabe sind zwei verschiedene Fragen, und nur die zweite braucht ein Register.
+
+## Die ehrlichen Grenzen
+
+- **Wir prüfen den Bankcode, nie das Konto und nie den Inhaber.** Eine `verified` BLZ sagt, dass es das Institut gibt, und benennt es; über die zehn Ziffern, die in der IBAN folgen, sagt sie nichts.
+- **Institut, nicht Filiale.** Die BLZ identifiziert das Institut. Filialtiefe ist aus einer deutschen IBAN nicht ableitbar — von uns so wenig wie von anderen.
+- **Monatliche Frische.** Die Bundesbank veröffentlicht monatlich neu, und wir folgen diesem Takt: Ein mitten im Monat vergebener Code erscheint in der nächsten Ausgabe. Jede Antwort stempelt die gelesene Ausgabe in `as_of`.
+- **Keine Straße, konstruktionsbedingt.** Siehe Tabelle oben: Das Register veröffentlicht keine.
+
+Siehe auch: [Was „verified" bedeutet](/docs/iban-validate) · [Datenquellen & Provenienz](/docs/data-sources) · [IBAN zu BIC](/docs/iban-to-bic) · [Österreichische Bankleitzahlen](/docs/at-bank-codes)

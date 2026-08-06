@@ -1,0 +1,72 @@
+---
+title: "Contrôle des codes banque belges (BNB)"
+description: "Vérifier un code banque belge (3 chiffres) contre la liste de la Banque nationale de Belgique : les 1 000 créneaux publiés dans un seul fichier, ce que veulent vraiment dire VRIJ et Onbeschikbaar, et pourquoi le célèbre IBAN d'exemple BE68 n'est attribué à personne."
+order: 10
+---
+
+# Codes banque belges — la liste de la BNB
+
+Les codes banque belges sont courts : **trois chiffres**, positions 5 à 7 d'un IBAN `BE`. Ce qui fait de la Belgique le seul pays dont toute la table d'attribution tient sur un écran — et la Banque nationale de Belgique publie exactement cela : **les 1 000 créneaux dans un unique fichier public** (`full_list_current.xlsx`), servi ici sous le registre `Banque nationale de Belgique, bank identification codes (Protocol Secretariat)`.
+
+Un espace de codes à trois chiffres dont chaque créneau a un état publié rend la réponse négative particulièrement solide. En Belgique, il n'y a pas de « nous ne l'avons jamais vu » : chaque code est soit attribué à un établissement nommé, soit explicitement pas attribué.
+
+## Un appel
+
+```bash
+curl -X POST https://api.ibanforge.com/v1/iban/validate \
+  -H "Content-Type: application/json" \
+  -d '{"iban": "BE68539007547034"}'
+```
+
+```json
+{
+  "valid": true,
+  "bank_code_check": {
+    "value": "539",
+    "status": "not_in_register",
+    "match": null,
+    "register": "Banque nationale de Belgique, bank identification codes (Protocol Secretariat)",
+    "authoritative": true,
+    "as_of": "2026-08"
+  }
+}
+```
+
+`BE68 5390 0754 7034` est l'IBAN d'exemple le plus recopié au monde — documents de normalisation européens, milliers de tutoriels, innombrables fixtures de test. Son code banque `539` est l'un des huit créneaux que la BNB marque elle-même **« Onbeschikbaar / Indisponible »** : réservé, attribué à personne. `valid: true` et `not_in_register` sont tous deux corrects, et l'écart entre les deux est toute la raison de contrôler les codes banque. L'histoire complète, avec les équivalents suisse et autrichien, est dans [Les deux IBAN d'exemple préférés du web pointent des codes banque qui n'existent pas](/blog/2026-08-06-example-ibans-unallocated-bank-codes).
+
+## L'arithmétique des 1 000 créneaux
+
+Dans le fichier de la BNB daté du 5 août 2026, les comptes tombent juste :
+
+| État dans le fichier | Créneaux | Ce que nous en faisons |
+|---|---|---|
+| Attribué à un établissement nommé | 781 | `verified` |
+| `VRIJ` (libre) | 211 | **non attribué** |
+| `Onbeschikbaar` / `Indisponible` (réservé, indisponible) | 8 | **non attribué** |
+| **Total** | **1 000** | |
+
+Les deux états non attribués répondent `not_in_register`. Un créneau réservé n'est pas une banque : le registre écrit `VRIJ` là où irait un nom d'établissement, si bien qu'une recherche qui stockerait ces lignes rapporterait joyeusement une banque nommée « VRIJ » — l'exacte inversion de ce que dit le fichier. Nous les écartons délibérément.
+
+## Ce que le fichier de la BNB publie — et ce qu'il ne publie pas
+
+| Champ | Dans le fichier belge | Remarque |
+|---|---|---|
+| `name` | oui | le nom de l'établissement, publié en quatre langues au plus |
+| `street` | **non** | `null` |
+| `post_code` / `town` | **non** | `null` |
+| `lei` | non | la clé est simplement absente de la réponse |
+
+Le fichier belge est un registre **de noms seulement** : aucune adresse, dans aucune langue. `bank_code_check.institution` porte donc, pour la Belgique, un nom et des `null` honnêtes autour. Ces `null` sont la forme de ce que la Belgique publie, pas du travail manquant chez nous — les remplir depuis un annuaire BIC attribuerait à la BNB une adresse qu'elle n'a jamais imprimée.
+
+## Ce que `not_in_register` signifie ici
+
+`authoritative: true` en fait le verdict du registre lui-même : dans un espace de codes où chacun des 1 000 créneaux a un état publié, le code n'est attribué à aucun établissement. Pour un paiement sur le point de partir, c'est une raison forte de s'arrêter et de revérifier les coordonnées du bénéficiaire — pendant que la clé de contrôle de l'IBAN, elle, continue de dire `valid: true`, puisque mod-97 n'attrape que les erreurs de recopie.
+
+## Les limites honnêtes
+
+- **Nous contrôlons le code banque, jamais le compte ni son titulaire.** Un code belge `verified` nomme l'établissement titulaire des trois chiffres, et s'arrête là.
+- **Des noms, pas des adresses.** Voir le tableau ci-dessus : la Belgique n'en publie aucune, nous n'en servons aucune.
+- **Fraîcheur mensuelle.** La liste est relue chaque mois ; chaque réponse porte l'édition dans `as_of` (`2026-08` ci-dessus), pour que la fraîcheur du verdict soit toujours connue.
+- **Un créneau réservé peut être activé plus tard.** `Onbeschikbaar` aujourd'hui ne veut pas dire pour toujours : cela veut dire que la BNB ne l'a pas attribué à la date de l'édition qui a répondu.
+
+Voir aussi : [Ce que « verified » veut dire](/docs/iban-validate) · [Sources & provenance](/docs/data-sources) · [IBAN vers BIC](/docs/iban-to-bic) · [Contrôle de BLZ allemande](/docs/blz-check)

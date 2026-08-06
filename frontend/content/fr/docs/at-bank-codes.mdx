@@ -1,0 +1,68 @@
+---
+title: "Codes banque autrichiens (OeNB)"
+description: "Rechercher un code banque autrichien (Bankleitzahl, 5 chiffres) dans le répertoire de l'Oesterreichische Nationalbank : le plus riche de nos registres — adresse complète du siège et LEI — et l'IBAN d'exemple officiel autrichien dont le code n'est attribué à personne."
+order: 9
+---
+
+# Codes banque autrichiens — le répertoire de l'OeNB
+
+L'Autriche parle elle aussi de **Bankleitzahl**, mais la sienne fait cinq chiffres, pas huit comme l'allemande : positions 5 à 9 d'un IBAN `AT`. Derrière elle, le registre est le **SEPA-Zahlungsverkehrs-Verzeichnis de l'Oesterreichische Nationalbank** — le répertoire des participants autrichiens aux paiements tenu par l'OeNB, autorité d'attribution de ces cinq chiffres.
+
+C'est aussi le jeu de référence le **plus riche** que nous détenions. Là où le fichier allemand s'arrête au code postal et à la ville, l'OeNB publie l'adresse complète du siège de l'établissement — rue et numéro compris — ainsi que son **LEI**, qu'aucun autre registre national que nous consultons ne porte.
+
+## Un appel
+
+```bash
+curl -X POST https://api.ibanforge.com/v1/iban/validate \
+  -H "Content-Type: application/json" \
+  -d '{"iban": "AT611904300234573201"}'
+```
+
+```json
+{
+  "valid": true,
+  "bic": null,
+  "bank_code_check": {
+    "value": "19043",
+    "status": "not_in_register",
+    "match": null,
+    "register": "Oesterreichische Nationalbank SEPA-Zahlungsverkehrs-Verzeichnis",
+    "authoritative": true,
+    "as_of": "2026-08"
+  }
+}
+```
+
+Cet IBAN n'est pas une coquille. `AT61 1904 3002 3457 3201` est **l'IBAN d'exemple officiel autrichien**, celui que recopient les tutoriels, les jeux de tests et les documentations d'API — et son code banque `19043` n'est attribué à personne. La structure est parfaite (`valid: true`), l'attribution est vide (`not_in_register`), et les deux affirmations sont vraies en même temps. Nous avons documenté ce motif, sur les exemples officiels de quatre pays, dans [Les deux IBAN d'exemple préférés du web pointent des codes banque qui n'existent pas](/blog/2026-08-06-example-ibans-unallocated-bank-codes).
+
+`bic` vaut `null` pour la même raison : il n'y a aucun établissement attribué à nommer, et en deviner un serait pire qu'un null honnête.
+
+## Ce que `not_in_register` signifie ici
+
+`authoritative: true` est le champ qui donne son poids à ce « non ». Il dit que le jeu de référence consulté **est** le registre qui attribue les codes banque autrichiens : une absence est donc le verdict de l'autorité d'attribution elle-même, pas un trou dans nos données. Partout où nous nous replions sur la carte composite des BIC, une absence ne prouve rien ; ici, si.
+
+## Ce que publie le registre de l'OeNB
+
+Pour un code attribué, `bank_code_check.institution` porte ce que le répertoire contient :
+
+| Champ | Dans le registre autrichien | Remarque |
+|---|---|---|
+| `name` | oui | l'établissement tel que l'OeNB le référence |
+| `street` | oui | rue et numéro complets — le seul registre, avec le BankMaster suisse de SIX, à en publier |
+| `post_code` / `town` | oui | siège |
+| `lei` | oui, quand il est attribué | l'identifiant d'entité juridique, directement issu du répertoire — servi uniquement quand le registre en porte un |
+
+Les champs absents restent `null`. Rien ici n'est enrichi depuis une troisième source puis présenté comme venant du registre.
+
+## Fraîcheur — et une asymétrie honnête
+
+L'OeNB **republie son répertoire quotidiennement**. Nous le rafraîchissons **mensuellement**, dans le même cycle que les autres registres nationaux, et chaque réponse estampille dans `as_of` l'édition lue (`2026-08` ci-dessus). Un code attribué aujourd'hui à Vienne peut donc être à un mois de répondre `verified` ici. Nous préférons le dire clairement plutôt que de présenter la cadence de la source comme si c'était la nôtre.
+
+## Les limites honnêtes
+
+- **Nous contrôlons le code banque, jamais le compte ni son titulaire.** Un code autrichien `verified` nomme l'établissement titulaire du code, et rien sur le numéro de compte qui le suit.
+- **L'établissement, pas l'agence.** Les codes banque autrichiens identifient des établissements ; le niveau agence n'est pas dérivable d'un IBAN.
+- **Un instantané mensuel d'un fichier quotidien** — voir ci-dessus. `as_of` dit exactement lequel a répondu.
+- **Le LEI vient du registre, pas de nous.** Là où l'OeNB n'en publie pas, le champ vaut `null` plutôt que d'être complété depuis GLEIF : ce que vous lisez est ce que l'Autriche a publié.
+
+Voir aussi : [Ce que « verified » veut dire](/docs/iban-validate) · [Sources & provenance](/docs/data-sources) · [IBAN vers BIC](/docs/iban-to-bic) · [Contrôle de BLZ allemande](/docs/blz-check)
