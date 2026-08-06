@@ -59,18 +59,8 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
     ")",
   ].join("\n")
 
-  const faqJsonLd = {
-    "@context": "https://schema.org",
-    "@type": "FAQPage",
-    "mainEntity": Array.from({ length: 4 }, (_, i) => ({
-      "@type": "Question",
-      "name": t(`faq.${i}.question`),
-      "acceptedAnswer": {
-        "@type": "Answer",
-        "text": t(`faq.${i}.answer`),
-      },
-    })),
-  }
+  // FAQPage JSON-LD removed 2026-08: Google dropped the FAQ rich result on
+  // 2026-05-07. The visible FAQ section below is what humans and crawlers read.
 
   return (
     <div className="flex flex-col">
@@ -306,10 +296,6 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
 
       {/* ── FAQ ───────────────────────────────────────────────────────────── */}
       <section className="px-4 py-16 max-w-3xl mx-auto w-full">
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
-        />
         <h2 className="text-2xl font-semibold tracking-tight mb-10 text-center">
           {t('faq.heading')}
         </h2>

@@ -65,18 +65,9 @@ export default async function BlogPostPage({
     mainEntityOfPage: { "@type": "WebPage", "@id": url },
   };
 
-  const faqLd =
-    meta.faq && meta.faq.length > 0
-      ? {
-          "@context": "https://schema.org",
-          "@type": "FAQPage",
-          mainEntity: meta.faq.map((f) => ({
-            "@type": "Question",
-            name: f.q,
-            acceptedAnswer: { "@type": "Answer", text: f.a },
-          })),
-        }
-      : null;
+  // FAQPage JSON-LD removed 2026-08: Google dropped the FAQ rich result on
+  // 2026-05-07 and no other consumer was identified. The frontmatter faq stays
+  // available for content use; BlogPosting above is what still gets consumed.
 
   return (
     <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8 py-16">
@@ -84,12 +75,6 @@ export default async function BlogPostPage({
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(articleLd) }}
       />
-      {faqLd && (
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(faqLd) }}
-        />
-      )}
       <div className="mb-10">
         <Link
           href={`/${locale}/blog`}
