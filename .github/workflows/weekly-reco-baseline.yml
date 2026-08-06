@@ -1,0 +1,28 @@
+name: Weekly reco-AI baseline → Telegram
+
+on:
+  schedule:
+    # Mondays ~08:47 Europe/Zurich (06:47 UTC), offset from the veille cron so
+    # the two Monday jobs never race for the same rate limits.
+    - cron: '47 6 * * 1'
+  workflow_dispatch: {} # manual trigger for testing
+
+jobs:
+  baseline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Probe the reference buyer queries and send the score to Telegram
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: npm run reco-baseline
