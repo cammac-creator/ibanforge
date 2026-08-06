@@ -1,0 +1,147 @@
+---
+title: "Rezepte: IBAN validieren in Python, Node, PHP, Sheets, n8n"
+description: "Copy-paste-Rezepte, um eine IBAN zu validieren und die ausgebende Bank zu identifizieren — in Python, Node.js/TypeScript, PHP, Google Sheets, n8n und KI-Agenten (MCP), mit der ehrlichen Notiz, was eine Prüfziffer allein nicht sagen kann."
+order: 12
+---
+
+# Rezepte — IBAN validieren in Ihrem Stack
+
+Jedes Rezept macht denselben Aufruf: `POST /v1/iban/validate` — Struktur + Prüfziffer, ausgebende Bank (BIC), Bankcode-Prüfung gegen das Nationalregister, EMI/vIBAN-Klassifikation und SEPA/VoP-Erreichbarkeit. Zuerst ein kostenloser Schlüssel (200 Anfragen/Monat, ohne Karte):
+
+```bash
+curl -X POST https://api.ibanforge.com/v1/keys/generate \
+  -H "Content-Type: application/json" \
+  -d '{"email": "sie@firma.com"}'
+```
+
+Die ehrliche Notiz, die in jede Integration gehört: Eine lokale Mod-97-Prüfung fängt Tippfehler — sonst nichts. Drei der vier offiziellen Beispiel-IBANs bestehen jede Prüfziffer und zeigen dennoch auf Bankcodes, die kein Register vergeben hat — [die ganze Geschichte](/blog/2026-08-06-example-ibans-unallocated-bank-codes). Die Registerprüfung ist der Teil, der lokal unmöglich ist.
+
+## Python {#iban-validieren-in-python}
+
+Mit dem offiziellen SDK (`pip install ibanforge`):
+
+```python
+from ibanforge import IBANforge
+
+client = IBANforge(api_key="ifk_ihr_schluessel")
+result = client.validate("DE89370400440532013000")
+print(result["valid"], result["bic"]["code"], result["bank_code_check"]["status"])
+# True COBADEFF verified
+```
+
+Oder schlicht `requests`:
+
+```python
+import requests
+
+r = requests.post(
+    "https://api.ibanforge.com/v1/iban/validate",
+    json={"iban": "DE89370400440532013000"},
+    headers={"Authorization": "Bearer ifk_ihr_schluessel"},
+    timeout=15,
+)
+data = r.json()
+print(data["valid"], data["bank_code_check"]["status"])  # True verified
+```
+
+## Node.js / TypeScript {#iban-validieren-in-node}
+
+Natives `fetch`, keine Abhängigkeit:
+
+```ts
+const res = await fetch("https://api.ibanforge.com/v1/iban/validate", {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    Authorization: "Bearer ifk_ihr_schluessel",
+  },
+  body: JSON.stringify({ iban: "DE89370400440532013000" }),
+});
+const data = await res.json();
+console.log(data.valid, data.bic?.code, data.bank_code_check?.status);
+// true COBADEFF verified
+```
+
+Das offizielle SDK (`npm install @ibanforge/sdk`) kapselt denselben Aufruf mit Typen.
+
+## PHP {#iban-validieren-in-php}
+
+Nichts über das hinaus, was PHP mitbringt:
+
+```php
+<?php
+$payload = json_encode(["iban" => "DE89370400440532013000"]);
+$ctx = stream_context_create(["http" => [
+    "method"  => "POST",
+    "header"  => "Content-Type: application/json\r\nAuthorization: Bearer ifk_ihr_schluessel",
+    "content" => $payload,
+    "timeout" => 15,
+]]);
+$data = json_decode(file_get_contents(
+    "https://api.ibanforge.com/v1/iban/validate", false, $ctx), true);
+echo $data["valid"] ? "gültig" : "ungültig", " — ",
+     $data["bank_code_check"]["status"] ?? "n/a", PHP_EOL;
+// gültig — verified
+```
+
+## Google Sheets {#iban-validieren-in-google-sheets}
+
+Erweiterungen → Apps Script, dann eine benutzerdefinierte Funktion für `=VALIDATE_IBAN(A2)`:
+
+```javascript
+function VALIDATE_IBAN(iban) {
+  const res = UrlFetchApp.fetch("https://api.ibanforge.com/v1/iban/validate", {
+    method: "post",
+    contentType: "application/json",
+    headers: { Authorization: "Bearer ifk_ihr_schluessel" },
+    payload: JSON.stringify({ iban: String(iban) }),
+    muteHttpExceptions: true,
+  });
+  const d = JSON.parse(res.getContentText());
+  return [[d.valid, d.bic ? d.bic.code : "", d.bank_code_check ? d.bank_code_check.status : ""]];
+}
+```
+
+Quota im Blick behalten: ein Aufruf pro Zellauswertung. Für ganze Spalten besser der [Batch-Endpoint](/docs/iban-batch) aus einem Script (bis 100 IBANs pro Aufruf).
+
+## n8n {#iban-validieren-in-n8n}
+
+Community-Node installieren — Validierung, BIC-Suche, Schweizer Clearing und Compliance-Vorprüfung, mit Credentials-Maske:
+
+```
+Settings → Community nodes → Install → n8n-nodes-ibanforge
+```
+
+Self-hosted: `npm install n8n-nodes-ibanforge`. (Unverifizierte Community-Nodes laufen self-hosted; das verifizierte Listing für n8n Cloud ist unterwegs.)
+
+## KI-Agenten (MCP) {#iban-validieren-mit-einem-agenten}
+
+Claude Desktop, Claude Code, Cursor und jeder MCP-Client:
+
+```bash
+npx -y ibanforge-mcp        # stdio, 5 Tools, Free-Tier-Schlüssel optional
+```
+
+Oder der gehostete Transport, ohne Installation: `https://api.ibanforge.com/mcp` — 10 kostenlose Tool-Aufrufe pro IP und Tag, ganz ohne Schlüssel: der schnellste Weg für einen Assistenten, die Daten zu prüfen, bevor Sie sich festlegen.
+
+## Was zurückkommt
+
+Die Antwort, die die Rezepte ausgeben (Produktionsantwort, gekürzt):
+
+```json
+{
+  "valid": true,
+  "bic": { "code": "COBADEFF", "bank_name": "COMMERZBANK Aktiengesellschaft", "city": "Frankfurt am Main" },
+  "bank_code_check": {
+    "value": "37040044",
+    "status": "verified",
+    "register": "Deutsche Bundesbank Bankleitzahlendatei",
+    "authoritative": true,
+    "as_of": "2026-08"
+  }
+}
+```
+
+`authoritative: true` heißt: das Nationalregister selbst hat geantwortet. Felder, die die Daten nicht tragen, sind `null` — nie geraten. Die [vollständige Semantik](/docs/iban-validate) erklärt, was `verified` verspricht und was nicht.
+
+Siehe auch: [Was „verified" bedeutet](/docs/iban-validate) · [IBAN zu BIC](/docs/iban-to-bic) · [Test-IBAN-Generator](/tools/test-iban) · [Datenquellen](/docs/data-sources)
