@@ -150,8 +150,10 @@ async function parseBelgium(): Promise<Entry[]> {
     // (unavailable) for the handful of slots it reserves — code 539, the
     // web's favourite example IBAN, is one of them. Neither word names an
     // institution; storing it would serve a bank called "Onbeschikbaar",
-    // the NL corporate-treasury defect in miniature.
-    if (/^(onbeschikbaar|indisponible|unavailable|nicht verf)/i.test(name)) {
+    // the NL corporate-treasury defect in miniature. Two vacant slots also
+    // carry 'N/A' in the BIC column and VRIJ as their *name*, so the BIC
+    // filter above misses them — match the name too, whole-word only.
+    if (/^(vrij|libre)$|^(onbeschikbaar|indisponible|unavailable|nicht verf)/i.test(name)) {
       vacant++;
       continue;
     }
