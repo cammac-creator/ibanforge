@@ -128,7 +128,16 @@ const x402Document: Handler = (c) => {
       name: 'USD Coin',
     },
     pay_to: walletAddress,
-    facilitator: process.env.FACILITATOR_URL || 'https://x402.org/facilitator',
+    // Mirror the middleware's ACTUAL facilitator selection (src/middleware/
+    // x402.ts): with CDP keys set, settlement runs through Coinbase CDP — yet
+    // this advertisement said "x402.org" for months, because it read a
+    // FACILITATOR_URL variable production never had. A discovery document
+    // that contradicts the runtime is the kind of lie indexers act on.
+    facilitator:
+      process.env.CDP_API_KEY_ID && process.env.CDP_API_KEY_SECRET
+        ? 'https://api.cdp.coinbase.com/platform/v2/x402'
+        : process.env.FACILITATOR_URL || 'https://x402.org/facilitator',
+    contact: 'support@ibanforge.com',
     endpoints: PAID_ENDPOINTS.map((ep) => ({
       ...ep,
       atomic_amount: Math.round(ep.price_usdc * 1_000_000).toString(),
