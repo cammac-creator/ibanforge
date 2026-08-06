@@ -48,7 +48,7 @@ Jede Free-Antwort enthält diesen `upgrade_to_full_validation`-Hinweis — ein A
 | `validate_iban(iban)` | `/v1/iban/validate` | $0.005 | Volle Anreicherung — BIC, Land, SEPA, VoP, Risiko, Schweizer BC-Nummer |
 | `validate_batch(ibans)` | `/v1/iban/batch` | $0.002/IBAN | Bis zu 100 IBANs pro Aufruf |
 | `lookup_bic(code)` | `/v1/bic/{code}` | $0.003 | über 121.000 BIC-Einträge (38K LEI-angereichert via GLEIF) — Bank, Land, Stadt, LEI |
-| `lookup_ch_clearing(iid)` | `/v1/ch/clearing/{iid}` | $0.003 | ~1.200 SIX-BankMaster-Einträge — vollständige Zahlungsschienen-Teilnahme + QR-IID, die tiefsten Schweizer Clearing-Daten aller öffentlichen APIs |
+| `lookup_ch_clearing(iid)` | `/v1/ch/clearing/{iid}` | $0.003 | 1.100+ SIX-BankMaster-Einträge — vollständige Zahlungsschienen-Teilnahme + QR-IID, die tiefsten Schweizer Clearing-Daten aller öffentlichen APIs |
 | `check_compliance(iban)` | `/v1/iban/compliance` | $0.02 | Sanktionen OFAC + FATF + SEPA Instant + VoP + Risk Score |
 
 Type Hints überall via `TypedDict`. Kompatibel ab Python 3.9. 16 Unit-Tests grün (HTTP via respx gemockt).

@@ -942,7 +942,7 @@
       "items": [
         {
           "title": "Des données suisses qu'aucune autre API n'expose",
-          "body": "1,100+ entrées SIX BankMaster avec participation SIC / euroSIC / instantané et gestion des QR-IID, rafraîchies chaque mois — plus 121k+ BIC (38k+ enrichis LEI via GLEIF). Si vos utilisateurs paient des fournisseurs suisses, c'est la différence.",
+          "body": "1,100+ entrées SIX BankMaster avec participation SIC / euroSIC / instantané et gestion des QR-IID, rafraîchies chaque mois — plus 121k+ BIC (39k+ enrichis LEI via GLEIF). Si vos utilisateurs paient des fournisseurs suisses, c'est la différence.",
           "link": "Doc clearing suisse"
         },
         {
@@ -1010,7 +1010,7 @@
         },
         "bankData": {
           "label": "Identification de la banque (BIC, nom)",
-          "ibanforge": "121k+ BIC, 38k+ enrichis LEI via GLEIF, rafraîchis chaque mois",
+          "ibanforge": "121k+ BIC, 39k+ enrichis LEI via GLEIF, rafraîchis chaque mois",
           "ibancom": "Oui, c'est leur cœur de produit",
           "ibanapi": "« Si disponible » selon leur doc",
           "libs": "Non, validation structurelle seulement"

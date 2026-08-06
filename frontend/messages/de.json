@@ -217,7 +217,7 @@
         "path": "/v1/ch/clearing/:iid",
         "cost": "$0.003",
         "costLabel": "pro Aufruf",
-        "description": "Schweizer BC-Nummer / IID-Suche mit SIC, euroSIC, Instant Payments und QR-IID-Daten — gestützt auf ~1 200 SIX BankMaster-Einträge"
+        "description": "Schweizer BC-Nummer / IID-Suche mit SIC, euroSIC, Instant Payments und QR-IID-Daten — gestützt auf 1'100+ SIX BankMaster-Einträge"
       }
     },
     "free": {
@@ -942,7 +942,7 @@
       "items": [
         {
           "title": "Schweizer Daten, die sonst niemand anbietet",
-          "body": "1,100+ SIX-BankMaster-Einträge mit SIC / euroSIC / Instant-Teilnahme und QR-IID-Handling, monatlich aktualisiert — plus 121k+ BICs (38k+ LEI-angereichert via GLEIF). Wenn Ihre Benutzer Schweizer Lieferanten bezahlen, ist das der Unterschied.",
+          "body": "1,100+ SIX-BankMaster-Einträge mit SIC / euroSIC / Instant-Teilnahme und QR-IID-Handling, monatlich aktualisiert — plus 121k+ BICs (39k+ LEI-angereichert via GLEIF). Wenn Ihre Benutzer Schweizer Lieferanten bezahlen, ist das der Unterschied.",
           "link": "Schweizer Clearing-Doku"
         },
         {
@@ -1010,7 +1010,7 @@
         },
         "bankData": {
           "label": "Bankidentifikation (BIC, Name)",
-          "ibanforge": "121k+ BICs, 38k+ LEI-angereichert via GLEIF, monatlich aktualisiert",
+          "ibanforge": "121k+ BICs, 39k+ LEI-angereichert via GLEIF, monatlich aktualisiert",
           "ibancom": "Ja — ihr Kernprodukt",
           "ibanapi": "„Falls verfügbar“ laut Doku",
           "libs": "Nein — nur strukturelle Validierung"

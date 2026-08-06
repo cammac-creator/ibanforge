@@ -80,7 +80,7 @@ Since **October 2025**, euro-area banks must run Verification of Payee before cr
 Two things to know:
 
 1. **Real VoP (matching the account holder's name) is a regulated-PSP network.** No API vendor can sell you actual VoP as a simple REST call — anyone claiming otherwise is reselling something else. What you *can* do is pre-check at input time so VoP has nothing to reject: structure, bank existence, rail reachability (`sepa.schemes`, instant participation).
-2. **Rail data is country-specific.** For Swiss payments: whether the institution participates in SIC/euroSIC, handles instant payments, and how QR-IIDs (30000–31999) map back to the real clearing number. That data comes from the SIX BankMaster; IBANforge exposes ~1,200 entries of it (as far as I know, the only public API that does).
+2. **Rail data is country-specific.** For Swiss payments: whether the institution participates in SIC/euroSIC, handles instant payments, and how QR-IIDs (30000–31999) map back to the real clearing number. That data comes from the SIX BankMaster; IBANforge exposes 1,100+ entries of it (as far as I know, the only public API that does).
 
 ## Level 4 — Should you send money there at all?
 

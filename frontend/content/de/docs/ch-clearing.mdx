@@ -1,12 +1,12 @@
 ---
 title: "Schweizer Clearing (BC-Nummer)"
-description: "GET /v1/ch/clearing/:iid — eine Schweizer BC-Nummer / IID auflösen: Institut, Adresse, SIC/euroSIC-Teilnahme, Instant Payments, QR-IID. ~1'200 SIX-BankMaster-Einträge."
+description: "GET /v1/ch/clearing/:iid — eine Schweizer BC-Nummer / IID auflösen: Institut, Adresse, SIC/euroSIC-Teilnahme, Instant Payments, QR-IID. 1'100+ SIX-BankMaster-Einträge."
 order: 5
 ---
 
 # Schweizer Clearing (BC-Nummer)
 
-Lösen Sie eine Schweizer **BC-Nummer / IID** (Institutsidentifikation) auf und erhalten Sie das Institut, seine offizielle Adresse, seinen BIC und seine **Teilnahme an den Zahlungsschienen**: SIC, RTGS in CHF, Instant Payments, euroSIC sowie LSV+/BDD-Lastschriften. Basierend auf **~1'200 Einträgen aus dem offiziellen SIX BankMaster**, monatlich aktualisiert — die tiefsten Schweizer Clearing-Daten aller öffentlichen APIs: vollständige Zahlungsschienen-Teilnahme plus QR-IID, nicht nur eine Namensauflösung.
+Lösen Sie eine Schweizer **BC-Nummer / IID** (Institutsidentifikation) auf und erhalten Sie das Institut, seine offizielle Adresse, seinen BIC und seine **Teilnahme an den Zahlungsschienen**: SIC, RTGS in CHF, Instant Payments, euroSIC sowie LSV+/BDD-Lastschriften. Basierend auf **1'100+ Einträgen aus dem offiziellen SIX BankMaster**, monatlich aktualisiert — die tiefsten Schweizer Clearing-Daten aller öffentlichen APIs: vollständige Zahlungsschienen-Teilnahme plus QR-IID, nicht nur eine Namensauflösung.
 
 Für Schweizer und Liechtensteiner IBANs liefert [`/v1/iban/validate`](/docs/iban-validate) diese Daten bereits im Feld `clearing` mit. Nutzen Sie diesen Endpoint, wenn Ihr Ausgangspunkt eine Clearing-Nummer statt einer IBAN ist.
 

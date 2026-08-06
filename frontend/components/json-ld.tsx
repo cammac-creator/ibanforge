@@ -1,16 +1,15 @@
 /**
  * JSON-LD structured data for IBANforge.
  *
- * Six schemas help AI agents and search engines understand the product:
+ * Four schemas help AI agents and search engines understand the product:
  * - SoftwareApplication: full product description with offers + featureList
  * - Organization: name, logo, social links
- * - FAQPage: 10 Q&A about validation, pricing, MCP, x402, coverage, etc.
  * - HowTo: 3-step integration guide (key/x402 → validate → MCP)
  * - BreadcrumbList: site hierarchy hint for crawlers
- * - WebAPI: machine-readable pointer to OpenAPI spec
  *
- * Ported from version A (Vite/SSG live on ibanforge.com) to maintain SEO and
- * agent-discovery parity when this Next.js version replaces it.
+ * FAQPage and WebAPI were removed 2026-08: Google dropped the FAQ rich result
+ * on 2026-05-07, and no consumer of the WebAPI type was ever identified — the
+ * OpenAPI pointer lives in Breadcrumb and /.well-known/api-catalog instead.
  *
  * Embedded in app/[locale]/layout.tsx <head>. Inline JSON.stringify is safe
  * here because we control the source — none of these strings contain user
@@ -47,7 +46,7 @@ const SOFTWARE_APPLICATION = {
     {
       '@type': 'Offer',
       name: 'Lookup BIC',
-      description: 'Lookup BIC/SWIFT against 121,000+ BIC entries from public sources (GLEIF, SWIFT directory, Bundesbank, SIX, NBP, EBA Step2 SCT), with LEI enrichment for ~38K rows sourced from GLEIF',
+      description: 'Lookup BIC/SWIFT against 121k+ BIC entries from public sources (GLEIF, SWIFT directory, Bundesbank, SIX, NBP, EBA Step2 SCT), with LEI enrichment for 39k+ rows sourced from GLEIF',
       price: '0.003',
       priceCurrency: 'USDC',
       eligibleQuantity: { '@type': 'QuantitativeValue', value: 1, unitText: 'request' },
@@ -80,7 +79,7 @@ const SOFTWARE_APPLICATION = {
   ],
   featureList: [
     'IBAN validation (ISO 13616 mod-97 + BBAN)',
-    'BIC/SWIFT lookup against 121,000+ BIC entries (38K LEI-enriched via GLEIF)',
+    'BIC/SWIFT lookup against 121k+ BIC entries (39k+ LEI-enriched via GLEIF)',
     'Swiss BC-Nummer / IID lookup (1,100+ SIX BankMaster)',
     'EMI / vIBAN / neobank issuer classification',
     'SEPA Instant reachability flag',
@@ -108,93 +107,6 @@ const ORGANIZATION = {
   ],
 };
 
-const FAQ = {
-  '@context': 'https://schema.org',
-  '@type': 'FAQPage',
-  mainEntity: [
-    {
-      '@type': 'Question',
-      name: 'What does IBANforge validate?',
-      acceptedAnswer: {
-        '@type': 'Answer',
-        text: 'IBANforge validates IBAN structure (ISO 13616 mod-97 check digits + country-specific BBAN), resolves the associated BIC/SWIFT against 121,000+ BIC entries from public sources (GLEIF, SWIFT directory, Bundesbank, SIX, NBP, EBA Step2 SCT) with LEI enrichment for ~38K rows sourced from GLEIF, looks up Swiss BC-Nummer / IID against 1,100+ SIX BankMaster entries, classifies the issuer (bank, EMI, vIBAN provider, neobank), and flags SEPA Instant + VoP (Verification of Payee, EU 2024/886) reachability.',
-      },
-    },
-    {
-      '@type': 'Question',
-      name: 'How much does IBANforge cost?',
-      acceptedAnswer: {
-        '@type': 'Answer',
-        text: 'Pay-per-call in USDC via x402: 0.005 USDC for IBAN validation, 0.003 USDC for BIC lookup, 0.003 USDC for Swiss BC-Nummer lookup, 0.002 USDC per IBAN in batch mode, 0.02 USDC for full compliance check. Or use an API key for 200 free requests per month.',
-      },
-    },
-    {
-      '@type': 'Question',
-      name: 'Does IBANforge support MCP (Model Context Protocol)?',
-      acceptedAnswer: {
-        '@type': 'Answer',
-        text: 'Yes. IBANforge ships an official MCP server (com.ibanforge/mcp) with 5 tools: validate_iban, batch_validate_iban, lookup_bic, lookup_ch_clearing, check_compliance. Install in Claude Desktop, Cursor, Cline or any MCP-compatible client via npx or streamable-HTTP at https://api.ibanforge.com/mcp.',
-      },
-    },
-    {
-      '@type': 'Question',
-      name: 'Does IBANforge support x402 for autonomous AI agents?',
-      acceptedAnswer: {
-        '@type': 'Answer',
-        text: 'Yes. Every paid endpoint accepts x402 micropayments in USDC on Base L2. Agents discover pricing via /.well-known/x402, pay autonomously and call the API without human onboarding. Listed on Coinbase Bazaar discovery.',
-      },
-    },
-    {
-      '@type': 'Question',
-      name: 'How many countries does IBANforge cover?',
-      acceptedAnswer: {
-        '@type': 'Answer',
-        text: 'All 84 countries with a standardized IBAN format, including the full SEPA zone, the UK, Switzerland, and most of MENA and Latin America with IBAN coverage.',
-      },
-    },
-    {
-      '@type': 'Question',
-      name: 'What is vIBAN detection and why does it matter?',
-      acceptedAnswer: {
-        '@type': 'Answer',
-        text: 'A virtual IBAN (vIBAN) is an IBAN issued by an EMI or fintech (e.g., Wise, Revolut, Mercury, Modulr) that maps to an underlying account at a partner bank. Detecting vIBANs matters for compliance: VoP often fails on vIBANs and EMI exposure changes the risk profile. IBANforge classifies 30+ known issuer prefixes.',
-      },
-    },
-    {
-      '@type': 'Question',
-      name: 'Where does the BIC and Swiss clearing data come from?',
-      acceptedAnswer: {
-        '@type': 'Answer',
-        text: 'BIC/SWIFT data: 121,000+ entries from public sources — GLEIF (Global Legal Entity Identifier Foundation, ~38K rows with LEI enrichment), the SWIFT directory, the Deutsche Bundesbank, SIX, the NBP, and EBA Clearing STEP2 SCT. Swiss data: 1,100+ BC-Nummern from the official SIX BankMaster CSV — the canonical source used by the Swiss banking industry.',
-      },
-    },
-    {
-      '@type': 'Question',
-      name: 'Does IBANforge replace a regulated AML/sanctions screening provider?',
-      acceptedAnswer: {
-        '@type': 'Answer',
-        text: 'No. The /v1/iban/compliance endpoint runs OFAC list checks and produces a risk score (0-100) — useful for triage and pre-flight screening. For regulated AML/CFT obligations use a regulated vendor like Refinitiv World-Check, Acuris or ComplyAdvantage.',
-      },
-    },
-    {
-      '@type': 'Question',
-      name: 'How fast is IBANforge?',
-      acceptedAnswer: {
-        '@type': 'Answer',
-        text: 'p99 latency under 50ms for /v1/iban/validate (single IBAN). All databases are SQLite WAL with in-process reads — no external lookups. Batch endpoint scales linearly to 100 IBANs per request.',
-      },
-    },
-    {
-      '@type': 'Question',
-      name: 'Is IBANforge open-source?',
-      acceptedAnswer: {
-        '@type': 'Answer',
-        text: 'The MCP server (ibanforge-mcp), the SDK (@ibanforge/sdk) and the OpenAPI spec are open-source on GitHub at github.com/cammac-creator/ibanforge. The hosted API and proprietary issuer classification dataset are commercial.',
-      },
-    },
-  ],
-};
-
 const HOW_TO = {
   '@context': 'https://schema.org',
   '@type': 'HowTo',
@@ -211,7 +123,7 @@ const HOW_TO = {
     {
       '@type': 'HowToStep',
       name: 'Call the validate endpoint',
-      text: 'curl -X POST https://api.ibanforge.com/v1/iban/validate -H "Authorization: Bearer ifk_***" -H "Content-Type: application/json" -d \'{"iban": "CH93 0076 2011 6238 5295 7"}\'',
+      text: 'curl -X POST https://api.ibanforge.com/v1/iban/validate -H "Authorization: Bearer ifk_***" -H "Content-Type: application/json" -d \'{"iban": "CH1000230000000012345"}\'',
       url: 'https://ibanforge.com/docs/iban-validate',
     },
     {
@@ -233,18 +145,7 @@ const BREADCRUMB = {
   ],
 };
 
-const WEB_API = {
-  '@context': 'https://schema.org',
-  '@type': 'WebAPI',
-  name: 'IBANforge REST API',
-  url: 'https://api.ibanforge.com',
-  documentation: 'https://ibanforge.com/docs',
-  termsOfService: 'https://ibanforge.com/terms',
-  provider: { '@type': 'Organization', name: 'IBANforge', url: 'https://ibanforge.com' },
-  endpointDescription: 'https://api.ibanforge.com/openapi.json',
-};
-
-const SCHEMAS = [SOFTWARE_APPLICATION, ORGANIZATION, FAQ, HOW_TO, BREADCRUMB, WEB_API];
+const SCHEMAS = [SOFTWARE_APPLICATION, ORGANIZATION, HOW_TO, BREADCRUMB];
 
 export function JsonLd() {
   return (

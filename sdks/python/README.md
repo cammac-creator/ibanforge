@@ -69,7 +69,7 @@ asyncio.run(main())
 | `format_iban(iban)` | **free** | Pure mod-97 + structure check. Use to pre-filter malformed IBANs before paying. |
 | `validate_iban(iban)` | $0.005 | Full enrichment — BIC, country, EMI/vIBAN flag, SEPA + VoP, risk score, Swiss BC-Nummer for CH/LI |
 | `validate_batch([iban, ...])` | $0.002 / IBAN | Up to 100 IBANs in one call. CSV cleanup, payout list triage. |
-| `lookup_bic(code)` | $0.003 | Resolve BIC/SWIFT into bank name, country, city, LEI, address. 121k+ BIC entries (38k+ LEI-enriched via GLEIF). |
+| `lookup_bic(code)` | $0.003 | Resolve BIC/SWIFT into bank name, country, city, LEI, address. 121k+ BIC entries (39k+ LEI-enriched via GLEIF). |
 | `lookup_ch_clearing(iid)` | $0.003 | Resolve a Swiss BC-Nummer / IID — full SIX BankMaster rail participation + QR-IID, the deepest Swiss clearing data in any public API. |
 | `check_compliance(iban)` | $0.02 | Pre-flight risk triage: sanctions (OFAC), FATF, SEPA Instant, VoP, risk score 0-100, recommended_action ∈ {allow, review, block} |
 | `usage()` | free | Current month quota usage for your key |

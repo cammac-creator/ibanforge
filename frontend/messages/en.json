@@ -74,7 +74,7 @@
       "2": {
         "badge": "89 countries · 121K BICs",
         "title": "IBAN validation & BIC lookup",
-        "description": "ISO 13616 mod-97 validation with full BBAN parsing across 89 countries — backed by 121,000+ BIC entries from GLEIF, the SWIFT directory, Bundesbank, SIX, NBP and EBA Step2."
+        "description": "ISO 13616 mod-97 validation with full BBAN parsing across 89 countries — backed by 121k+ BIC entries from GLEIF, the SWIFT directory, Bundesbank, SIX, NBP and EBA Step2."
       },
       "3": {
         "badge": "EMI / vIBAN",
@@ -942,7 +942,7 @@
       "items": [
         {
           "title": "Swiss data nobody else exposes",
-          "body": "1,100+ SIX BankMaster entries with SIC / euroSIC / instant participation and QR-IID handling, refreshed monthly — plus 121k+ BICs (38k+ LEI-enriched via GLEIF). If your users pay Swiss suppliers, this is the difference.",
+          "body": "1,100+ SIX BankMaster entries with SIC / euroSIC / instant participation and QR-IID handling, refreshed monthly — plus 121k+ BICs (39k+ LEI-enriched via GLEIF). If your users pay Swiss suppliers, this is the difference.",
           "link": "Swiss clearing docs"
         },
         {
@@ -1010,7 +1010,7 @@
         },
         "bankData": {
           "label": "Bank identification (BIC, name)",
-          "ibanforge": "121k+ BICs, 38k+ LEI-enriched via GLEIF, refreshed monthly",
+          "ibanforge": "121k+ BICs, 39k+ LEI-enriched via GLEIF, refreshed monthly",
           "ibancom": "Yes — their core product",
           "ibanapi": "“If available” per their docs",
           "libs": "No — structural validation only"

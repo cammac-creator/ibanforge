@@ -55,7 +55,7 @@ Accept: application/json, text/event-stream
 
 Standard JSON-RPC `initialize` + `tools/list` + `tools/call` flow. Use this when stdio is not an option (CI/CD, serverless, Vercel agents, etc.).
 
-### 5 MCP tools
+## Tools
 
 | Tool                  | When to use it                                                                            | Cost     |
 | --------------------- | ----------------------------------------------------------------------------------------- | -------- |

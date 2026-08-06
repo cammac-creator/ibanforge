@@ -1,7 +1,7 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-09-29/server.schema.json",
   "name": "io.github.cammac-creator/ibanforge",
-  "description": "Pre-payout IBAN screening for AI agents: validation, sanctions (OFAC), Swiss clearing, risk",
+  "description": "Pre-payout IBAN screening for AI agents: validation, sanctions, Swiss clearing, risk scoring",
   "status": "active",
   "repository": {
     "url": "https://github.com/cammac-creator/ibanforge",

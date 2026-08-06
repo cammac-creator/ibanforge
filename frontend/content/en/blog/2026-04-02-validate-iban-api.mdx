@@ -18,7 +18,7 @@ Then there is the BIC problem. Even if an IBAN is structurally valid, you often 
 
 ## IBANforge: one API for both
 
-[IBANforge](https://ibanforge.com) is a REST API that handles full IBAN validation — checksum, country rules, BBAN parsing — and resolves the BIC code in the same response, against a consolidated dataset of 121,000+ BIC entries from public sources (GLEIF, SWIFT directory, Bundesbank, SIX, NBP, EBA Step2 SCT), with LEI enrichment for ~38K rows sourced from GLEIF. One POST request, one structured JSON response.
+[IBANforge](https://ibanforge.com) is a REST API that handles full IBAN validation — checksum, country rules, BBAN parsing — and resolves the BIC code in the same response, against a consolidated dataset of 121k+ BIC entries from public sources (GLEIF, SWIFT directory, Bundesbank, SIX, NBP, EBA Step2 SCT), with LEI enrichment for ~38K rows sourced from GLEIF. One POST request, one structured JSON response.
 
 There is a free `/v1/demo` endpoint to test your parser without touching the paid endpoints, and an [interactive playground](https://ibanforge.com/playground) if you want to paste an IBAN and see what comes back before writing a line of code.
 

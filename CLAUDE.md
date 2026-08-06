@@ -31,7 +31,7 @@ src/
     iban.ts             # IBAN validation logic (mod97, BBAN parsing)
     enrich.ts           # Post-validation enrichment (BIC, issuer, SEPA, risk, CH clearing)
     ch-clearing.ts      # Swiss BC-Nummer lookup, institution type detection
-    issuers.ts          # EMI/neobank classification (30+ known BIC8 mappings)
+    issuers.ts          # EMI/neobank classification (85 known BIC8 mappings — the live count is served in /llms.txt)
     bic-validator.ts    # BIC format validation (ISO 9362)
     bic-lookup.ts       # BIC database queries
     countries.ts        # ISO country data (IBAN lengths, BBAN structures, SEPA zones, VoP, country risk)

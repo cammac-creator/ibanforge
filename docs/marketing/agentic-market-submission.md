@@ -21,7 +21,7 @@ IBANforge is an x402-native compliance API for AI finance agents. It's been
 live on Base mainnet via the CDP facilitator for several weeks, with the full
 Bazaar discovery extension and 5 paid endpoints. The angle that's not on
 agentic.market today: a single call returns IBAN validity + BIC/SWIFT (121k+
-BIC entries, 38k+ LEI-enriched via GLEIF) + Swiss BC-Nummer (~1,200 SIX entries
+BIC entries, 39k+ LEI-enriched via GLEIF) + Swiss BC-Nummer (1,100+ SIX entries
 — the deepest Swiss clearing data in any public API) + sanctions/SEPA/VoP risk score + EMI/vIBAN
 classification.
 
@@ -29,7 +29,7 @@ Agent-first details:
 - Native MCP server (5 tools) — npm i ibanforge-mcp, also remote streamable-HTTP
 - Free API key in 1 POST, 200 calls/month, no signup form
 - Quota exhaustion auto-falls back to x402 (no dead-end for agents that scale)
-- Coverage: 84 countries IBAN, 75 with bank-code mapping, full SEPA + EU VoP
+- Coverage: 89 IBAN countries, bank-code checks against 6 national registers + a composite BIC map, full SEPA + EU VoP
 
 Endpoints + pricing:
 - POST /v1/iban/validate — $0.005
@@ -60,7 +60,7 @@ Just shipped IBANforge v1.2 — agent-first IBAN/BIC/compliance API on x402 + Ba
 5 endpoints, native MCP (5 tools), free API key (200/mo) that auto-falls
 back to x402 — no dead-end when agents scale.
 
-Our depth: full Swiss BC-Nummer coverage (~1,200 SIX entries, full rail participation + QR-IID) + compliance
+Our depth: full Swiss BC-Nummer coverage (1,100+ SIX entries, full rail participation + QR-IID) + compliance
 bundle (sanctions + SEPA + VoP) in one call.
 
 @CoinbaseDev would love a spot on agentic.market. Live on Bazaar discovery 🟢
@@ -97,9 +97,9 @@ with the only Swiss BC-Nummer endpoint and a sanctions+SEPA+VoP risk score
 in one call.
 
 Quick stats:
-- 121k+ BIC entries from public sources (GLEIF, SWIFT directory, Bundesbank, SIX, NBP, EBA Step2 SCT), 38k+ LEI-enriched via GLEIF
-- ~1,200 SIX BankMaster entries (Swiss BC-Nummer with full rail participation + QR-IID — the deepest Swiss clearing data in any public API)
-- 84 countries with IBAN coverage
+- 121k+ BIC entries from public sources (GLEIF, SWIFT directory, Bundesbank, SIX, NBP, EBA Step2 SCT), 39k+ LEI-enriched via GLEIF
+- 1,100+ SIX BankMaster entries (Swiss BC-Nummer with full rail participation + QR-IID — the deepest Swiss clearing data in any public API)
+- 89 countries with IBAN coverage
 - 5 MCP tools, free tier (200 req/mo) with x402 fallback when exhausted
 - Trilingual site (EN/FR/DE), production-grade SEO
 

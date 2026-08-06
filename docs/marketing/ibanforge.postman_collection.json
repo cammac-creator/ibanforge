@@ -104,7 +104,7 @@
           "host": ["{{baseUrl}}"],
           "path": ["v1", "ch", "clearing", "230"]
         },
-        "description": "Resolve a Swiss BC-Nummer / IID (1-5 digits) into institution name, type, SIC, euroSIC and QR-IID. Backed by ~1,200 SIX BankMaster entries with full payment-rail participation (SIC, euroSIC, CHF instant) and QR-IID — the deepest Swiss clearing data in any public API. Cost: $0.003."
+        "description": "Resolve a Swiss BC-Nummer / IID (1-5 digits) into institution name, type, SIC, euroSIC and QR-IID. Backed by 1,100+ SIX BankMaster entries with full payment-rail participation (SIC, euroSIC, CHF instant) and QR-IID — the deepest Swiss clearing data in any public API. Cost: $0.003."
       }
     }
   ]

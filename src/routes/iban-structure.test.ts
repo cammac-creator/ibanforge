@@ -99,11 +99,11 @@ describe('GET /v1/iban/structure/:country', () => {
 });
 
 describe('GET /v1/iban/structure (list)', () => {
-  it('returns all 84 countries with metadata flags', async () => {
+  it('returns every IBAN country with metadata flags (89 as of 2026-07)', async () => {
     const res = await makeApp().request('/v1/iban/structure');
     expect(res.status).toBe(200);
     const body = await res.json() as { total: number; countries: Array<{ code: string; name: string; iban_length: number; sepa_member: boolean }> };
-    expect(body.total).toBeGreaterThanOrEqual(84);
+    expect(body.total).toBeGreaterThanOrEqual(89);
     expect(body.countries.length).toBe(body.total);
     const ch = body.countries.find((c) => c.code === 'CH');
     expect(ch).toBeDefined();

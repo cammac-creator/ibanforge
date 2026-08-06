@@ -47,8 +47,8 @@ Every free response carries that `upgrade_to_full_validation` hint so an agent t
 | `format_iban(iban)` | `/v1/iban/format` | free | Mod-97 + BBAN structure, no DB lookups |
 | `validate_iban(iban)` | `/v1/iban/validate` | $0.005 | Full enrichment — BIC, country, SEPA, VoP, risk, Swiss BC-Nummer |
 | `validate_batch(ibans)` | `/v1/iban/batch` | $0.002/IBAN | Up to 100 IBANs per call |
-| `lookup_bic(code)` | `/v1/bic/{code}` | $0.003 | 121,000+ BIC entries (38K LEI-enriched via GLEIF) — bank, country, city, LEI |
-| `lookup_ch_clearing(iid)` | `/v1/ch/clearing/{iid}` | $0.003 | ~1,200 SIX BankMaster entries — full rail participation + QR-IID, the deepest Swiss clearing data in any public API |
+| `lookup_bic(code)` | `/v1/bic/{code}` | $0.003 | 121k+ BIC entries (38K LEI-enriched via GLEIF) — bank, country, city, LEI |
+| `lookup_ch_clearing(iid)` | `/v1/ch/clearing/{iid}` | $0.003 | 1,100+ SIX BankMaster entries — full rail participation + QR-IID, the deepest Swiss clearing data in any public API |
 | `check_compliance(iban)` | `/v1/iban/compliance` | $0.02 | Sanctions OFAC + FATF + SEPA Instant + VoP + risk score |
 
 Type hints everywhere via `TypedDict`. Compatible Python 3.9+. 16 unit tests passing on respx-mocked HTTP.

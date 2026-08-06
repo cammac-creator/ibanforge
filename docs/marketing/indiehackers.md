@@ -12,7 +12,7 @@ I just launched IBANforge -- a free API for IBAN validation and BIC/SWIFT lookup
 
 **The problem:** Every IBAN/BIC API either costs $500+/year or has terrible documentation. AI agents can't use any of them.
 
-**The solution:** IBANforge -- free API, MIT license, MCP integration for AI agents, 121K+ BIC entries (38K LEI-enriched via GLEIF) from open data.
+**The solution:** IBANforge -- free API, MIT license, MCP integration for AI agents, 121k+ BIC entries (39k+ LEI-enriched via GLEIF) from open data.
 
 **Infrastructure costs:**
 
@@ -24,9 +24,9 @@ I just launched IBANforge -- a free API for IBAN validation and BIC/SWIFT lookup
 
 **What's included:**
 
-- IBAN validation for 84 countries
+- IBAN validation for 89 countries
 - BIC/SWIFT lookup with bank names, LEI
-- Swiss clearing: ~1,200 BC-Nummer entries from SIX (SIC, euroSIC, Instant Payments, QR-IID)
+- Swiss clearing: 1,100+ BC-Nummer entries from SIX (SIC, euroSIC, Instant Payments, QR-IID)
 - 85 EMI/neobank classifications for vIBAN detection
 - 5 MCP tools for AI agents (validate, batch, BIC lookup, compliance, Swiss clearing)
 - Interactive playground

@@ -44,7 +44,7 @@ Format awesome-quant : `- [name](url) - \`Language\` - description.`
 Ligne exacte a coller :
 
 ```markdown
-- [IBANforge](https://github.com/cammac-creator/ibanforge) - `Python` - IBAN validation (84 countries, mod-97 + BBAN), BIC/SWIFT lookup (121k+ BIC entries from GLEIF, SWIFT directory, Bundesbank, SIX, NBP, EBA Step2 SCT — with LEI enrichment for the 38k+ GLEIF rows), Swiss BC-Nummer / IID lookup (~1,200 SIX BankMaster entries), and compliance/sanctions triage (OFAC, EU, UN, FATF, SEPA Instant, VoP). Python SDK (`pip install ibanforge`), MCP server, and REST API. Open-source (MIT) SDK + self-hostable Docker image; hosted endpoint with free tier + x402 pay-per-call.
+- [IBANforge](https://github.com/cammac-creator/ibanforge) - `Python` - IBAN validation (89 countries, mod-97 + BBAN), BIC/SWIFT lookup (121k+ BIC entries from GLEIF, SWIFT directory, Bundesbank, SIX, NBP, EBA Step2 SCT — with LEI enrichment for the 39k+ GLEIF rows), Swiss BC-Nummer / IID lookup (1,100+ SIX BankMaster entries), and compliance/sanctions triage (OFAC, EU, UN, FATF, SEPA Instant, VoP). Python SDK (`pip install ibanforge`), MCP server, and REST API. Open-source (MIT) SDK + self-hostable Docker image; hosted endpoint with free tier + x402 pay-per-call.
 ```
 
 ---
@@ -64,9 +64,9 @@ Adds IBANforge under `## Market Data & Data Sources`.
 
 IBANforge exposes financial reference data that is otherwise scattered across paywalled feeds or not available as an API at all:
 
-- **IBAN validation** — 84 countries, mod-97 checksum + per-country BBAN structure
-- **BIC/SWIFT** — 121k+ BIC entries from public sources (GLEIF, SWIFT directory, Bundesbank, SIX, NBP, EBA Step2 SCT), with LEI enrichment for the 38k+ GLEIF rows
-- **Swiss BC-Nummer / IID** — ~1,200 entries from the SIX BankMaster dataset, including full SIC/euroSIC/instant participation, QR-IID allocations, and institution classification (the deepest Swiss clearing data in any public API, to my knowledge)
+- **IBAN validation** — 89 countries, mod-97 checksum + per-country BBAN structure
+- **BIC/SWIFT** — 121k+ BIC entries from public sources (GLEIF, SWIFT directory, Bundesbank, SIX, NBP, EBA Step2 SCT), with LEI enrichment for the 39k+ GLEIF rows
+- **Swiss BC-Nummer / IID** — 1,100+ entries from the SIX BankMaster dataset, including full SIC/euroSIC/instant participation, QR-IID allocations, and institution classification (the deepest Swiss clearing data in any public API, to my knowledge)
 - **Compliance triage** — OFAC, EU, UN sanctions + FATF + SEPA Instant + VoP support + risk score 0–100, in a single call
 
 Python usage:

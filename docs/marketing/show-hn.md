@@ -17,10 +17,10 @@ What makes it different:
 - Issuer classification: detects if the bank is a traditional bank, neobank, EMI (Wise, Revolut, N26...) -- useful for vIBAN detection under EU AML regulations
 - Risk indicators: country risk (FATF-based), SEPA reachability, VoP coverage -- one object, five signals
 - MCP server: AI agents can discover and use it natively (5 tools: validate_iban, batch_validate_iban, lookup_bic, check_compliance, lookup_ch_clearing)
-- 121k+ BIC entries from public sources (GLEIF, SWIFT directory, Bundesbank, SIX, NBP, EBA Step2 SCT), with LEI enrichment for the 38k+ GLEIF rows (CC0 where applicable)
-- 84 countries for IBAN validation with full BBAN parsing
+- 121k+ BIC entries from public sources (GLEIF, SWIFT directory, Bundesbank, SIX, NBP, EBA Step2 SCT), with LEI enrichment for the 39k+ GLEIF rows (CC0 where applicable)
+- 89 countries for IBAN validation with full BBAN parsing
 - Multilingual: EN/FR/DE (docs, blog, UI)
-- Swiss clearing data: ~1,200 BC-Nummer entries from SIX with SIC, euroSIC, Instant Payments, and QR-IID for CH/LI IBANs
+- Swiss clearing data: 1,100+ BC-Nummer entries from SIX with SIC, euroSIC, Instant Payments, and QR-IID for CH/LI IBANs
 - Self-hostable (MIT license, SQLite, Docker)
 
 Free during beta -- no API key, no signup. Pay-per-call via x402 micropayments (USDC) when activated.
