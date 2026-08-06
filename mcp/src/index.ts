@@ -29,9 +29,21 @@ const pkg = require('../package.json') as { version: string };
 const API_BASE = process.env.IBANFORGE_API_BASE ?? 'https://api.ibanforge.com';
 const API_KEY = process.env.IBANFORGE_API_KEY;
 
+// Same hints as the remote server (src/routes/mcp-http.ts): all five tools are
+// pure reads against our own API. Without readOnlyHint, MCP clients ask the
+// user to confirm every single call — a real usage tax on the busiest channel.
+const READ_ONLY = {
+  readOnlyHint: true,
+  idempotentHint: true,
+  destructiveHint: false,
+  openWorldHint: false,
+} as const;
+
 const TOOLS: Tool[] = [
   {
     name: 'validate_iban',
+    title: 'Validate IBAN',
+    annotations: { title: 'Validate IBAN', ...READ_ONLY },
     description:
       'Verify whether a European IBAN is valid AND enrich it with bank, compliance and routing data. ' +
       'USE WHEN: the user mentions an IBAN, asks to validate an IBAN and identify the issuing bank, asks to detect a typo in an IBAN, ' +
@@ -157,6 +169,8 @@ const TOOLS: Tool[] = [
   },
   {
     name: 'batch_validate_iban',
+    title: 'Batch Validate IBANs',
+    annotations: { title: 'Batch Validate IBANs', ...READ_ONLY },
     description:
       'Validate up to 100 IBANs in a single call at $0.002 per IBAN (60% cheaper than calling validate_iban repeatedly at $0.005). ' +
       'USE WHEN: the user pastes a list of IBANs, asks to clean a CSV/spreadsheet of bank accounts, ' +
@@ -206,6 +220,8 @@ const TOOLS: Tool[] = [
   },
   {
     name: 'lookup_bic',
+    title: 'Lookup BIC/SWIFT',
+    annotations: { title: 'Lookup BIC/SWIFT', ...READ_ONLY },
     description:
       'Resolve a BIC / SWIFT code into the underlying bank: name, country, city, LEI, address. ' +
       'USE WHEN: the user already has a BIC/SWIFT (8 or 11 chars, alphanumeric, e.g., "UBSWCHZH80A", "DEUTDEFF") ' +
@@ -264,6 +280,8 @@ const TOOLS: Tool[] = [
   },
   {
     name: 'lookup_ch_clearing',
+    title: 'Swiss Clearing Lookup',
+    annotations: { title: 'Swiss Clearing Lookup', ...READ_ONLY },
     description:
       'Resolve a Swiss BC-Nummer / IID (1 to 5 digits) into the underlying institution. ' +
       'USE WHEN: the user mentions a Swiss bank by BC-Nummer or IID, pastes a CH or LI IBAN clearing code, ' +
@@ -332,6 +350,8 @@ const TOOLS: Tool[] = [
   },
   {
     name: 'check_compliance',
+    title: 'Compliance Check',
+    annotations: { title: 'Compliance Check', ...READ_ONLY },
     description:
       'Run a full pre-flight compliance check on an IBAN before sending a SEPA / cross-border payment. ' +
       'USE WHEN: the user is about to send a payment / payout / refund and wants to triage risk first, ' +

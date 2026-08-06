@@ -1,7 +1,7 @@
 # IBANforge
 
 [![API Status](https://img.shields.io/badge/API-live-brightgreen)](https://api.ibanforge.com/health)
-[![MCP Registry](https://img.shields.io/badge/MCP_Registry-1.4.2-purple)](https://registry.modelcontextprotocol.io/v0/servers?search=ibanforge)
+[![MCP Registry](https://img.shields.io/badge/MCP_Registry-1.4.3-purple)](https://registry.modelcontextprotocol.io/v0/servers?search=ibanforge)
 [![npm ibanforge-mcp](https://img.shields.io/npm/v/ibanforge-mcp?label=ibanforge-mcp)](https://www.npmjs.com/package/ibanforge-mcp)
 [![npm @ibanforge/sdk](https://img.shields.io/npm/v/@ibanforge/sdk?label=@ibanforge/sdk)](https://www.npmjs.com/package/@ibanforge/sdk)
 [![PyPI ibanforge](https://img.shields.io/pypi/v/ibanforge?label=pypi%20ibanforge)](https://pypi.org/project/ibanforge/)
