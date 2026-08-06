@@ -59,12 +59,52 @@ describe('discovery — agent manifest + aliases', () => {
  * convention we simply had not covered.
  */
 describe('discovery — 404s measured on real crawler traffic (2026-07-28)', () => {
-  it('serves /.well-known/agent-card.json, the A2A card spelling (104 distinct IPs)', async () => {
-    const app = makeApp();
-    const canonical = await (await app.request('/.well-known/agents.json')).json();
-    const res = await app.request('/.well-known/agent-card.json');
+  it('serves a spec-shaped A2A AgentCard on /.well-known/agent-card.json (104 distinct IPs)', async () => {
+    // Until 2026-08 this path served the in-house manifest, whose shape is the
+    // dead ai-plugin.json dialect — every A2A client failed at parse time.
+    // The five fields below are REQUIRED by the A2A spec; their absence was
+    // the exact defect measured in the 2026-08-06 inventory.
+    const res = await makeApp().request('/.well-known/agent-card.json');
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual(canonical);
+    const card = await res.json() as Record<string, unknown>;
+    expect(card.protocolVersion).toBeTruthy();
+    expect(card.version).toBeTruthy();
+    expect(Array.isArray(card.skills)).toBe(true);
+    expect((card.skills as unknown[]).length).toBeGreaterThanOrEqual(5);
+    expect(card.defaultInputModes).toEqual(['application/json']);
+    expect(card.defaultOutputModes).toEqual(['application/json']);
+    // Honesty: the card must say it is a tool-style API, not an A2A agent,
+    // and must not carry the dead ai-plugin dialect marker.
+    expect(String(card.description)).toMatch(/not a conversational A2A agent/);
+    expect(card.schema_version).toBeUndefined();
+    // Every skill carries the fields A2A requires.
+    for (const skill of card.skills as Array<Record<string, unknown>>) {
+      expect(skill.id).toBeTruthy();
+      expect(skill.name).toBeTruthy();
+      expect(skill.description).toBeTruthy();
+      expect(Array.isArray(skill.tags)).toBe(true);
+    }
+  });
+
+  it('serves the RFC 9727 api-catalog with the linkset content type', async () => {
+    const res = await makeApp().request('/.well-known/api-catalog');
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toContain('application/linkset+json');
+    const body = await res.json() as { linkset: Array<{ anchor: string; 'service-desc': unknown[] }> };
+    expect(body.linkset[0].anchor).toBe('https://api.ibanforge.com');
+    expect(body.linkset[0]['service-desc']).toBeTruthy();
+  });
+
+  it('serves apis.json at both the root and well-known paths, with live figures', async () => {
+    const app = makeApp();
+    const root = await (await app.request('/apis.json')).json() as { apis: Array<{ properties: Array<{ type: string }> }>; description: string };
+    const wk = await (await app.request('/.well-known/apis.json')).json();
+    expect(wk).toEqual(root);
+    const types = root.apis[0].properties.map((p) => p.type);
+    expect(types).toContain('OpenAPI');
+    expect(types).toContain('MCP-Server');
+    // The description carries the rounded live claims, not frozen counts.
+    expect(root.description).toMatch(/121(k\+|,000\+)/);
   });
 
   it('serves /.well-known/agent-directory.json, not only the bare path (3 distinct IPs)', async () => {

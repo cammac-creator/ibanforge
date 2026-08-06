@@ -56,9 +56,10 @@ const BANNED: Array<{ pattern: RegExp; wanted: string }> = [
   { pattern: /\b7[05]\+?\s+(countries|pays|Länder)/, wanted: '89 countries' },
   { pattern: /~\s?1[,.'   ]?200\b/, wanted: '1,100+ Swiss entries' },
   { pattern: /\b1[,.']190\b/, wanted: '1,100+ Swiss entries' },
+  // 121,000+ / 39,000+ are the long spellings datasetFacts() itself emits on
+  // live surfaces — same value as 121k+/39k+, so they are not banned. Only
+  // wrong or stale VALUES are.
   { pattern: /\b38[Kk]\+/, wanted: '39k+ LEI-enriched' },
-  { pattern: /\b121,000\+/, wanted: '121k+' },
-  { pattern: /\b39,000\+/, wanted: '39k+' },
   { pattern: /\b121,(197|610|716)\b/, wanted: '121k+ (or a dated snapshot line)' },
   { pattern: /\b39,265\b/, wanted: '39k+ (or a dated snapshot line)' },
 ];
