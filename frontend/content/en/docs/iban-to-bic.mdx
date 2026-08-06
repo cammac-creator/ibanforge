@@ -1,0 +1,54 @@
+---
+title: "IBAN to BIC"
+description: "Derive the BIC/SWIFT code from an IBAN: how bank-code-to-BIC resolution actually works, which countries answer from the official national register, and what an honest null means. One call, real examples."
+order: 7
+---
+
+# IBAN to BIC — deriving the BIC from an IBAN
+
+The question comes up constantly — a form demands a BIC the user doesn't know, an ERP field won't stay empty, a non-SEPA corridor requires it — and most tools answer it badly, because **deriving a BIC is a data problem, not a parsing problem**. The BIC is not hidden inside the IBAN; the IBAN carries a national bank code, and only a register that maps bank codes to institutions can tell you whose BIC that is.
+
+Honesty first: **within SEPA, the BIC is no longer required.** Regulation (EU) 260/2012 made euro payments IBAN-only years ago. If your counterparty and you are both in SEPA and your bank still demands a BIC, that is their legacy, not the standard. The question stays real everywhere else — international wires, non-SEPA corridors, legacy ERPs, compliance forms — which is why this page exists.
+
+## One call
+
+```bash
+curl -X POST https://api.ibanforge.com/v1/iban/validate \
+  -H "Content-Type: application/json" \
+  -d '{"iban": "DE89370400440532013000"}'
+```
+
+```json
+{
+  "valid": true,
+  "bic": {
+    "code": "COBADEFF",
+    "bank_name": "COMMERZBANK Aktiengesellschaft",
+    "city": "Frankfurt am Main"
+  },
+  "bank_code_check": {
+    "value": "37040044",
+    "status": "verified",
+    "match": "register",
+    "register": "Deutsche Bundesbank Bankleitzahlendatei",
+    "authoritative": true,
+    "as_of": "2026-08"
+  }
+}
+```
+
+The German bank code `37040044` was extracted from the IBAN, checked against the Bundesbank's own file, and resolved to Commerzbank's BIC. `authoritative: true` tells you the source was the national register, and `as_of` tells you which month's edition answered.
+
+## How the resolution actually works
+
+1. **Extract the bank code** from the IBAN using the country's BBAN structure (89 countries covered).
+2. **Ask the national register first.** For CH/LI (SIX BankMaster), DE (Bundesbank), AT (OeNB), BE (BNB) and FI, the register is the allocation authority: a hit is the institution the code belongs to, a miss (`not_in_register`) means the code is allocated to nobody — a strong reason to stop a payment. See [data sources](/docs/data-sources) for what each register publishes.
+3. **Fall back to the composite BIC map** everywhere else: 121k+ BIC entries assembled from GLEIF, the public SWIFT directory, SIX, EBA STEP2, Bundesbank and NBP. A hit names who holds the matching BIC — the response marks these `authoritative: false`, because naming the BIC holder is a fact, while promising it is your counterparty's bank would be a guess.
+
+## The honest limits
+
+- **You get the institution's BIC, not a branch BIC.** Registers allocate bank codes to institutions; branch-level BIC11s are not derivable from an IBAN in any country, by anyone.
+- **Some countries have no code-to-BIC mapping at all.** There, `bic` is `null` — never guessed. An honest null beats a fabricated code that bounces a payment.
+- **The BIC that a register publishes can lag reality** by up to a month (registers republish monthly). Every answer carries `as_of` so you know exactly how fresh it is.
+
+Related: [BIC lookup](/docs/bic-lookup) (when you already have the BIC) · [What "verified" means](/docs/iban-validate) · [Data sources & provenance](/docs/data-sources)
