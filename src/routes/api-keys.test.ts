@@ -103,3 +103,37 @@ describe('/v1/admin/keys GET — listing', () => {
     expect(Array.isArray(json.keys)).toBe(true);
   });
 });
+
+describe('/v1/keys/generate — acquisition source (best-effort)', () => {
+  it('stores a well-formed source and ignores a malformed one', async () => {
+    process.env.IBANFORGE_ADMIN_TEST_KEYS = 'true';
+    const app = makeApp();
+    const { getStatsDB } = await import('../lib/db.js');
+
+    const okEmail = `src-ok-${Date.now()}@example.com`;
+    const ok = await app.request('/v1/keys/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: okEmail, source: 'NPM-Readme' }),
+    });
+    expect(ok.status).toBe(201);
+    const row = getStatsDB()
+      .prepare('SELECT source FROM api_keys WHERE email = ?')
+      .get(okEmail) as { source: string | null };
+    expect(row.source).toBe('npm-readme');
+
+    // Malformed source (spaces, too long, injection-ish) must not block the
+    // key and must land as NULL — attribution is best-effort by contract.
+    const badEmail = `src-bad-${Date.now()}@example.com`;
+    const bad = await app.request('/v1/keys/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: badEmail, source: 'not a valid source!! ' + 'x'.repeat(60) }),
+    });
+    expect(bad.status).toBe(201);
+    const rowBad = getStatsDB()
+      .prepare('SELECT source FROM api_keys WHERE email = ?')
+      .get(badEmail) as { source: string | null };
+    expect(rowBad.source).toBeNull();
+  });
+});

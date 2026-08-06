@@ -11,6 +11,7 @@ function hashKey(key: string): string {
 export function generateApiKey(
   email: string,
   monthlyLimit?: number,
+  source?: string,
 ): { api_key: string; key_prefix: string } | null {
   const db = getStatsDB();
   const existing = db
@@ -23,8 +24,8 @@ export function generateApiKey(
   const keyPrefix = rawKey.slice(0, 12);
 
   db.prepare(
-    'INSERT INTO api_keys (key_hash, key_prefix, email, monthly_limit) VALUES (?, ?, ?, ?)',
-  ).run(keyHash, keyPrefix, email, monthlyLimit ?? null);
+    'INSERT INTO api_keys (key_hash, key_prefix, email, monthly_limit, source) VALUES (?, ?, ?, ?, ?)',
+  ).run(keyHash, keyPrefix, email, monthlyLimit ?? null, source ?? null);
   return { api_key: rawKey, key_prefix: keyPrefix };
 }
 

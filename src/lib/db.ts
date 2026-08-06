@@ -226,6 +226,11 @@ export function getStatsDB(): DatabaseType.Database {
     statsDB.exec('CREATE INDEX IF NOT EXISTS idx_operations_key ON operations(key_prefix)');
     const keyCols = (statsDB.prepare("PRAGMA table_info(api_keys)").all() as Array<{ name: string }>).map(r => r.name);
     if (!keyCols.includes('monthly_limit')) statsDB.exec('ALTER TABLE api_keys ADD COLUMN monthly_limit INTEGER');
+    // Acquisition channel ("src" query param carried by our outbound links:
+    // npm README, n8n node, directory listings…). Forward-only and best-effort:
+    // NULL means "unattributed", never a guess. Added 2026-08-06 so that new
+    // discovery doors can be measured from their first day.
+    if (!keyCols.includes('source')) statsDB.exec('ALTER TABLE api_keys ADD COLUMN source TEXT');
     // Credits-based keys (Bundle credits product). When credits_remaining is
     // NULL the key follows the existing monthly subscription model. When it
     // is an integer >= 0 the key consumes from the prepaid bundle (and the

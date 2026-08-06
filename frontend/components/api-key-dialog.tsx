@@ -70,10 +70,16 @@ export function ApiKeyDialogProvider({ children }: { children: ReactNode }) {
     setStage('loading');
     setError('');
     try {
+      // Best-effort acquisition attribution: forward the ?src= our outbound
+      // links carry (npm README, n8n node, directories). Absent → omitted.
+      const src =
+        typeof window !== 'undefined'
+          ? new URLSearchParams(window.location.search).get('src')
+          : null;
       const r = await fetch(`${API_BASE}/v1/keys/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim() }),
+        body: JSON.stringify({ email: email.trim(), ...(src ? { source: src } : {}) }),
       });
       if (!r.ok) {
         const body = await r.json().catch(() => ({}));

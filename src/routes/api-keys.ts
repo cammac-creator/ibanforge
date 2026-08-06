@@ -50,9 +50,9 @@ function isAdminAuthorized(provided: string | undefined): boolean {
 const BLOCKED_EMAIL_DOMAINS = /@(example|test|invalid|localhost|mailinator|tempmail|guerrillamail|10minutemail|throwaway|dispostable|trashmail|fakeinbox|getnada|maildrop|sharklasers|yopmail)\.(com|org|net|io|me|fr|ch|de)$/i;
 
 apiKeys.post('/v1/keys/generate', async (c) => {
-  let body: { email?: unknown };
+  let body: { email?: unknown; source?: unknown };
   try {
-    body = await c.req.json<{ email?: unknown }>();
+    body = await c.req.json<{ email?: unknown; source?: unknown }>();
   } catch {
     return c.json({ error: 'invalid_json', message: 'Request body must be valid JSON' }, 400);
   }
@@ -75,7 +75,15 @@ apiKeys.post('/v1/keys/generate', async (c) => {
     }, 400);
   }
 
-  const result = generateApiKey(email.trim().toLowerCase());
+  // Acquisition channel, carried by our own outbound links (?src=npm, the n8n
+  // node, directory listings…). Best-effort by design: an absent or malformed
+  // value silently becomes NULL — attribution must never block a key.
+  const source =
+    typeof body.source === 'string' && /^[a-z0-9_-]{1,40}$/i.test(body.source.trim())
+      ? body.source.trim().toLowerCase()
+      : undefined;
+
+  const result = generateApiKey(email.trim().toLowerCase(), undefined, source);
 
   if (!result) {
     return c.json({
