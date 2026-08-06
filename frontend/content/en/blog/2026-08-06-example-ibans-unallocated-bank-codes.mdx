@@ -25,6 +25,8 @@ Code **539** — the bank code inside `BE68 5390 0754 7034` — is one of the ei
 
 **Switzerland.** The institution identifier inside `CH93 0076 2011 6238 5295 7` is IID **00762**. The [SIX BankMaster](https://api.six-group.com/api/epcd/bankmaster/v3/bankmaster_V3.csv) — the file the Swiss banking industry itself routes by — lists 00758 and 00759 (Zürcher Kantonalbank), 00761 (Aargauische Kantonalbank), 00763 (Appenzeller Kantonalbank), and continues through the cantonal banks. **00762 is simply not there.** The world's most-copied Swiss IBAN sits in a gap in the middle of the cantonal-bank range.
 
+**And it doesn't stop at two.** After finding those, we checked Austria's official example, `AT61 1904 3002 3457 3201`: bank code **19043** — `not_in_register`, per the Oesterreichische Nationalbank's own directory. Three of the four official examples we tested point at unallocated codes. The exception proves the pattern is a choice, not a law: Finland's official example resolves cleanly to the Nordea banking group, because Finnish codes are allocated to groups and code 1 is real.
+
 ## Checksum ≠ allocation
 
 None of this makes the checksum wrong. The mod-97 check does exactly one job: it catches transcription errors. It knows nothing about whether a bank code was ever allocated — that knowledge lives in national registers, published by the central bank or clearing operator of each country, updated monthly.

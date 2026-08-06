@@ -25,6 +25,8 @@ Le code **539** — celui de `BE68 5390 0754 7034` — est l'un des huit. Les mo
 
 **Suisse.** L'identifiant d'établissement dans `CH93 0076 2011 6238 5295 7` est l'IID **00762**. Le [BankMaster de SIX](https://api.six-group.com/api/epcd/bankmaster/v3/bankmaster_V3.csv) — le fichier avec lequel la place bancaire suisse route ses paiements — liste 00758 et 00759 (Zürcher Kantonalbank), 00761 (Aargauische Kantonalbank), 00763 (Appenzeller Kantonalbank), et continue à travers les banques cantonales. **Le 00762 n'y figure tout simplement pas.** L'IBAN suisse le plus copié du monde tombe dans un trou, au milieu de la plage des banques cantonales.
 
+**Et ça ne s'arrête pas à deux.** Après ces trouvailles, nous avons vérifié l'exemple officiel autrichien, `AT61 1904 3002 3457 3201` : code banque **19043** — `not_in_register`, selon l'annuaire de l'Oesterreichische Nationalbank elle-même. Trois des quatre exemples officiels testés pointent des codes non attribués. L'exception confirme que c'est un choix, pas une loi : l'exemple officiel finlandais se résout proprement vers le groupe bancaire Nordea, parce que les codes finlandais sont attribués à des groupes et que le code 1 est réel.
+
 ## Somme de contrôle ≠ attribution
 
 Rien de tout cela ne met la somme de contrôle en tort. Le mod-97 fait exactement un travail : attraper les fautes de frappe. Il ne sait rien de l'attribution d'un code banque — cette connaissance vit dans les registres nationaux, publiés par la banque centrale ou l'opérateur de clearing de chaque pays, mis à jour chaque mois.
