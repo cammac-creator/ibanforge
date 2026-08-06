@@ -1,0 +1,72 @@
+---
+title: "Die zwei beliebtesten Beispiel-IBANs der Welt zeigen auf Bankcodes, die es nicht gibt"
+description: "BE68 5390 0754 7034 und CH93 0076 2011 6238 5295 7 bestehen jede Prüfziffernkontrolle und stehen in tausenden Tutorials. Das belgische Nationalregister markiert Code 539 als nicht verfügbar, und der Schweizer BankMaster kennt kein Institut 762. Was Prüfziffernvalidierung wirklich beweist — gegen beide Register verifiziert, mit zwei öffentlichen Dateien reproduzierbar."
+date: "2026-08-06"
+---
+
+Öffnen Sie ein beliebiges IBAN-Tutorial, eine Testsuite oder eine API-Dokumentation: Zwei Beispiel-IBANs kehren immer wieder.
+
+- `BE68 5390 0754 7034` — das belgische Beispiel aus dem Normungsmaterial des europäischen Bankwesens, seither in unzählige Dokumente kopiert;
+- `CH93 0076 2011 6238 5295 7` — das Schweizer Beispiel, das in SWIFTs eigenem IBAN-Registry-Eintrag für die Schweiz steht.
+
+Beide bestehen die Mod-97-Prüfung. Beide sind strukturell perfekt. Und am 5. August 2026 zeigte keine von beiden auf eine vergebene Bank.
+
+## Was die Register tatsächlich sagen
+
+**Belgien.** Die Belgische Nationalbank veröffentlicht die vollständige Vergabetabelle des dreistelligen belgischen Bankcodes — alle 1 000 Slots, in [einer herunterladbaren Datei](https://www.nbb.be/doc/be/be/protocol/full_list_current.xlsx). In der Datei mit Stand 05.08.2026 ist die Arithmetik exakt:
+
+| Zustand | Slots |
+|---|---|
+| An ein benanntes Institut vergeben | 781 |
+| `VRIJ` (frei) | 211 |
+| `Onbeschikbaar` / `Indisponible` (reserviert) | **8** |
+
+Code **539** — der Bankcode in `BE68 5390 0754 7034` — ist einer der acht. Die Worte des Registers selbst: „Onbeschikbaar / Indisponible". Ein reservierter Slot, an niemanden vergeben.
+
+**Schweiz.** Die Institutskennung in `CH93 0076 2011 6238 5295 7` ist die IID **00762**. Der [SIX BankMaster](https://api.six-group.com/api/epcd/bankmaster/v3/bankmaster_V3.csv) — die Datei, nach der der Schweizer Bankenplatz selbst routet — führt 00758 und 00759 (Zürcher Kantonalbank), 00761 (Aargauische Kantonalbank), 00763 (Appenzeller Kantonalbank) und weiter durch die Kantonalbanken. **00762 ist schlicht nicht darin.** Die meistkopierte Schweizer IBAN der Welt liegt in einer Lücke, mitten im Nummernbereich der Kantonalbanken.
+
+## Prüfziffer ≠ Vergabe
+
+Nichts davon macht die Prüfziffer falsch. Mod-97 erledigt genau eine Aufgabe: Tippfehler abfangen. Ob ein Bankcode je vergeben wurde, weiß sie nicht — dieses Wissen liegt in den nationalen Registern, veröffentlicht von der Zentralbank oder dem Clearing-Betreiber jedes Landes, monatlich aktualisiert.
+
+Die Unterscheidung ist leicht auszusprechen und leicht zu vergessen, denn beide Fehlermodi sehen im Moment der Eingabe identisch aus: Eine vertippte IBAN und eine wohlgeformte IBAN ins Nichts lesen sich beide als „eine IBAN". Nur eine davon fängt die Arithmetik.
+
+Zur Einordnung des Ökosystems: Das ist eine systemische Falle, kein individuelles Versagen. Die Vergabeprüfung verlangt, pro Land eine andere Registerdatei herunterzuladen, zu parsen und aktuell zu halten — die meisten Bibliotheken beschränken sich vernünftigerweise auf Struktur und Prüfziffer, und sagen das auch. Werkzeuge, die Register konsultieren, stimmen mit den Registern überein: OpenIBAN, ein Open-Source-Validator, antwortet `valid: false` — „Invalid bank code: 539" — sobald seine Bankcode-Prüfung eingeschaltet ist, und ebenso für 00762. Die Register sind eindeutig; was variiert, ist, ob Software sie fragt.
+
+Die Falle schnappt aber bei echten Inhalten zu. Ein populärer Referenzguide erklärt derzeit, gängige belgische Bankcodes seien „539 (Crelan), 310 (ING), 001 (BNP Paribas Fortis) und 734 (KBC)" (abgerufen am 06.08.2026). Drei dieser Zuordnungen decken sich mit dem Register. Die eine, die es nicht tut — 539, einer Bank „zugeordnet" — ist genau der Code aus der Beispiel-IBAN, die alle kopieren. Der Fehler ist verständlich: Wenn eine IBAN in tausend Tutorials steht, muss ihre Bank doch existieren.
+
+Und fairerweise: In die Schweizer Falle sind wir selbst getappt. Unser eigenes Changelog dokumentiert, dass `CH93 0076…` Anfang des Jahres aus einer Test-Fixture in ausgelieferte Dokumentation gelangte — mit Anreicherungsdaten, die sie nie haben konnte. Es ist die perfekte Falle, gerade weil es das *offizielle* Beispiel ist.
+
+## Warum Beispiel-IBANs so gebaut sind
+
+Es liegt nahe, dass die Normungsgremien absichtlich nicht vergebene Codes wählten: Eine Beispiel-IBAN auf ein echtes Konto würde Testzahlungen an die Bank von irgendjemandem einladen. Die Beispiele sind sicher, *weil* sie ins Leere führen.
+
+Das Problem ist, was danach geschah: Ein ganzes Ökosystem von „Test-IBAN-Generatoren" produziert heute prüfziffernvalide IBANs mit willkürlichen Bankcodes, Tutorials verwenden die offiziellen Beispiele, als wären sie routbar, und Validierungscode wird gegen IBANs getestet, deren Bankauflösung nie gelingen kann. Wenn Ihr Integrationstest behauptet, `CH93 0076…` löse zu einer Bank auf, ist Ihr Test falsch — und er läuft grün auf jedem Validator, der bei der Prüfziffer aufhört.
+
+## Reproduzieren Sie es selbst
+
+Beide Quelldateien sind öffentlich — die [NBB-Liste](https://www.nbb.be/doc/be/be/protocol/full_list_current.xlsx) und der [SIX BankMaster](https://api.six-group.com/api/epcd/bankmaster/v3/bankmaster_V3.csv). Oder fragen Sie eine API, die sie konsultiert. IBANforge prüft Bankcodes gegen sechs nationale Register und antwortet mit dem Verdikt des Registers selbst:
+
+```bash
+curl -X POST https://api.ibanforge.com/v1/iban/validate \
+  -H "Content-Type: application/json" \
+  -d '{"iban": "BE68539007547034"}'
+```
+
+```json
+{
+  "valid": true,
+  "bank_code_check": {
+    "value": "539",
+    "status": "not_in_register",
+    "match": null,
+    "register": "Banque nationale de Belgique, bank identification codes (Protocol Secretariat)",
+    "authoritative": true,
+    "as_of": "2026-08"
+  }
+}
+```
+
+`valid: true` — die Struktur stimmt. `not_in_register`, aus der autoritativen Quelle — die Bank dahinter existiert nicht. Beide Aussagen sind gleichzeitig wahr, und ihr Unterschied ist der ganze Sinn einer Prüfung jenseits der Prüfziffer, bevor Geld fließt.
+
+*Daten verifiziert am 06.08.2026 gegen die NBB-Datei mit Stand 05.08.2026 und den aktuellen SIX BankMaster. Register ändern sich monatlich; die API liest sie bei jedem Refresh neu und datiert jede Antwort mit `as_of`.*

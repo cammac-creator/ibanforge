@@ -1,0 +1,72 @@
+---
+title: "Les deux IBAN d'exemple préférés du web pointent des codes banque qui n'existent pas"
+description: "BE68 5390 0754 7034 et CH93 0076 2011 6238 5295 7 passent tous les contrôles de clé et figurent dans des milliers de tutoriels. Le registre national belge marque le code 539 comme indisponible, et le BankMaster suisse n'a aucun établissement 762. Ce que la validation par somme de contrôle prouve vraiment — vérifié dans les deux registres, reproductible avec deux fichiers publics."
+date: "2026-08-06"
+---
+
+Ouvrez n'importe quel tutoriel IBAN, suite de tests ou documentation d'API : deux IBAN d'exemple reviennent sans cesse.
+
+- `BE68 5390 0754 7034` — l'exemple belge issu du matériel de normalisation bancaire européen, recopié depuis dans d'innombrables docs ;
+- `CH93 0076 2011 6238 5295 7` — l'exemple suisse imprimé dans la fiche Suisse du registre IBAN de SWIFT lui-même.
+
+Les deux passent le contrôle mod-97. Les deux sont structurellement parfaits. Et au 5 août 2026, aucun des deux ne pointait vers une banque attribuée.
+
+## Ce que disent les registres
+
+**Belgique.** La Banque nationale de Belgique publie la table d'attribution complète du code banque belge à 3 chiffres — les 1 000 créneaux, dans [un seul fichier téléchargeable](https://www.nbb.be/doc/be/be/protocol/full_list_current.xlsx). Dans le fichier daté du 05/08/2026, l'arithmétique est exacte :
+
+| État | Créneaux |
+|---|---|
+| Attribués à un établissement nommé | 781 |
+| `VRIJ` (libres) | 211 |
+| `Onbeschikbaar` / `Indisponible` (réservés) | **8** |
+
+Le code **539** — celui de `BE68 5390 0754 7034` — est l'un des huit. Les mots du registre lui-même : « Onbeschikbaar / Indisponible ». Un créneau réservé, attribué à personne.
+
+**Suisse.** L'identifiant d'établissement dans `CH93 0076 2011 6238 5295 7` est l'IID **00762**. Le [BankMaster de SIX](https://api.six-group.com/api/epcd/bankmaster/v3/bankmaster_V3.csv) — le fichier avec lequel la place bancaire suisse route ses paiements — liste 00758 et 00759 (Zürcher Kantonalbank), 00761 (Aargauische Kantonalbank), 00763 (Appenzeller Kantonalbank), et continue à travers les banques cantonales. **Le 00762 n'y figure tout simplement pas.** L'IBAN suisse le plus copié du monde tombe dans un trou, au milieu de la plage des banques cantonales.
+
+## Somme de contrôle ≠ attribution
+
+Rien de tout cela ne met la somme de contrôle en tort. Le mod-97 fait exactement un travail : attraper les fautes de frappe. Il ne sait rien de l'attribution d'un code banque — cette connaissance vit dans les registres nationaux, publiés par la banque centrale ou l'opérateur de clearing de chaque pays, mis à jour chaque mois.
+
+La distinction est facile à énoncer et facile à oublier, parce que les deux modes de défaillance se ressemblent au moment de la saisie : un IBAN mal tapé et un IBAN bien formé qui ne mène nulle part se lisent tous deux comme « un IBAN ». Un seul des deux se détecte par l'arithmétique.
+
+Soyons clairs sur l'écosystème : c'est un piège systémique, pas la faute d'un acteur en particulier. Vérifier l'attribution exige de télécharger, parser et rafraîchir un fichier de registre différent par pays — la plupart des bibliothèques se limitent raisonnablement à la structure et à la clé, et le disent. Les outils qui consultent les registres sont d'accord avec eux : OpenIBAN, un validateur open source, répond `valid: false` — « Invalid bank code: 539 » — dès qu'on active son contrôle du code banque, et fait de même pour le 00762. Les registres sont sans ambiguïté ; ce qui varie, c'est si le logiciel les interroge.
+
+Le piège mord pourtant du vrai contenu. Un guide de référence populaire explique actuellement que les codes banque belges courants « incluent 539 (Crelan), 310 (ING), 001 (BNP Paribas Fortis) et 734 (KBC) » (consulté le 06/08/2026). Trois de ces attributions collent au registre. Celle qui ne colle pas — le 539, « attribué » à une banque — est précisément le code de l'IBAN d'exemple que tout le monde copie. L'erreur se comprend : si un IBAN figure dans mille tutoriels, sa banque existe forcément.
+
+Et en toute honnêteté, nous sommes tombés nous-mêmes dans le piège suisse : notre propre changelog documente que `CH93 0076…` a fui d'une fixture de test vers de la documentation servie plus tôt cette année, affichant des données d'enrichissement qu'il ne pouvait pas avoir. C'est le piège parfait, justement parce que c'est l'exemple *officiel*.
+
+## Pourquoi les IBAN d'exemple sont faits ainsi
+
+Il est raisonnable de penser que les organismes de normalisation ont choisi des codes non attribués à dessein : un IBAN d'exemple pointant un vrai compte inviterait des paiements de test vers la banque de quelqu'un. Les exemples sont sûrs *parce qu'ils* ne mènent nulle part.
+
+Le problème est la suite : tout un écosystème de « générateurs d'IBAN de test » produit désormais des IBAN à clé valide avec des codes banque arbitraires, les tutoriels collent les exemples officiels comme s'ils étaient routables, et du code de validation se teste contre des IBAN dont la résolution bancaire ne peut jamais réussir. Si votre test d'intégration affirme que `CH93 0076…` se résout vers une banque, votre test est faux — et il passera sur n'importe quel validateur qui s'arrête à la clé.
+
+## Reproduisez-le vous-même
+
+Les deux fichiers sources sont publics — la [liste BNB](https://www.nbb.be/doc/be/be/protocol/full_list_current.xlsx) et le [BankMaster SIX](https://api.six-group.com/api/epcd/bankmaster/v3/bankmaster_V3.csv). Ou interrogez une API qui les consulte. IBANforge confronte les codes banque à six registres nationaux et répond avec le verdict du registre lui-même :
+
+```bash
+curl -X POST https://api.ibanforge.com/v1/iban/validate \
+  -H "Content-Type: application/json" \
+  -d '{"iban": "BE68539007547034"}'
+```
+
+```json
+{
+  "valid": true,
+  "bank_code_check": {
+    "value": "539",
+    "status": "not_in_register",
+    "match": null,
+    "register": "Banque nationale de Belgique, bank identification codes (Protocol Secretariat)",
+    "authoritative": true,
+    "as_of": "2026-08"
+  }
+}
+```
+
+`valid: true` — la structure est bonne. `not_in_register`, depuis la source autoritative — la banque derrière n'existe pas. Les deux affirmations sont vraies en même temps, et leur différence est tout l'enjeu d'une vérification au-delà de la clé avant qu'un paiement parte.
+
+*Données vérifiées le 06/08/2026 contre le fichier BNB daté du 05/08/2026 et le BankMaster SIX courant. Les registres changent chaque mois ; l'API les relit à chaque rafraîchissement et date chaque réponse avec `as_of`.*

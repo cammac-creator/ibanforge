@@ -1,0 +1,72 @@
+---
+title: "The world's two favourite example IBANs point at bank codes that don't exist"
+description: "BE68 5390 0754 7034 and CH93 0076 2011 6238 5295 7 pass every checksum and appear in thousands of tutorials. The Belgian national register marks code 539 as unavailable, and the Swiss BankMaster has no institution 762 at all. What checksum validation actually proves — verified against both registers, reproducible with two public files."
+date: "2026-08-06"
+---
+
+Open any IBAN tutorial, test suite or API documentation and two example IBANs keep coming back:
+
+- `BE68 5390 0754 7034` — the Belgian example that ships in standards material from the European banking world and has been copied into countless docs since;
+- `CH93 0076 2011 6238 5295 7` — the Swiss example printed in SWIFT's own IBAN Registry entry for Switzerland.
+
+Both pass the mod-97 checksum. Both are structurally perfect. And on 5 August 2026, neither of them pointed at an allocated bank.
+
+## What the registers actually say
+
+**Belgium.** The National Bank of Belgium publishes the full allocation table for the 3-digit Belgian bank code — all 1,000 slots, in [one downloadable file](https://www.nbb.be/doc/be/be/protocol/full_list_current.xlsx). In the file dated 2026-08-05 the arithmetic is exact:
+
+| State | Slots |
+|---|---|
+| Allocated to a named institution | 781 |
+| `VRIJ` (vacant) | 211 |
+| `Onbeschikbaar` / `Indisponible` (reserved, unavailable) | **8** |
+
+Code **539** — the bank code inside `BE68 5390 0754 7034` — is one of the eight. The register's own words for it are "Onbeschikbaar / Indisponible": a reserved slot, allocated to nobody.
+
+**Switzerland.** The institution identifier inside `CH93 0076 2011 6238 5295 7` is IID **00762**. The [SIX BankMaster](https://api.six-group.com/api/epcd/bankmaster/v3/bankmaster_V3.csv) — the file the Swiss banking industry itself routes by — lists 00758 and 00759 (Zürcher Kantonalbank), 00761 (Aargauische Kantonalbank), 00763 (Appenzeller Kantonalbank), and continues through the cantonal banks. **00762 is simply not there.** The world's most-copied Swiss IBAN sits in a gap in the middle of the cantonal-bank range.
+
+## Checksum ≠ allocation
+
+None of this makes the checksum wrong. The mod-97 check does exactly one job: it catches transcription errors. It knows nothing about whether a bank code was ever allocated — that knowledge lives in national registers, published by the central bank or clearing operator of each country, updated monthly.
+
+That distinction is easy to state and easy to forget, because the two failure modes look identical at the moment of input: a mistyped IBAN and a well-formed IBAN pointing at nothing both read as "an IBAN". Only one of them is caught by arithmetic.
+
+To be clear about the ecosystem: this is a systemic trap, not anyone's individual failure. Checking allocation requires downloading, parsing and refreshing a different registry file per country — most libraries reasonably scope themselves to structure and checksum, and say so. Tools that do consult registers agree with the registers: OpenIBAN, an open-source validator, returns `valid: false` — "Invalid bank code: 539" — the moment its bank-code check is switched on, and does the same for 00762. The registers are unambiguous; what varies is whether software asks them.
+
+The trap does bite real content, though. One popular reference guide currently explains that common Belgian bank codes "include 539 (Crelan), 310 (ING), 001 (BNP Paribas Fortis), and 734 (KBC)" (retrieved 2026-08-06). Three of those attributions match the register. The one that doesn't — 539, "attributed" to a bank — is precisely the code from the example IBAN everyone copies. The error is understandable: if an IBAN appears in a thousand tutorials, surely its bank exists.
+
+And in fairness, we fell for the Swiss one ourselves: our own changelog records that `CH93 0076…` leaked from a test fixture into served documentation earlier this year, showing enrichment data it could never have. It is the perfect trap because it is the *official* example.
+
+## Why example IBANs are built this way
+
+It is reasonable to assume the standards bodies chose unallocated codes deliberately: an example IBAN that pointed at a real account would invite test payments at somebody's actual bank. The examples are safe *because* they lead nowhere.
+
+The problem is what happened next: an entire ecosystem of "test IBAN generators" now produces checksum-valid IBANs with arbitrary bank codes, tutorials paste the official examples as if they were routable, and validation code is tested against IBANs whose bank-code lookups can never succeed. If your integration test asserts that `CH93 0076…` resolves to a bank, your test is wrong — and it will pass against any validator that stops at the checksum.
+
+## Reproduce it yourself
+
+Both source files are public — the [NBB list](https://www.nbb.be/doc/be/be/protocol/full_list_current.xlsx) and the [SIX BankMaster](https://api.six-group.com/api/epcd/bankmaster/v3/bankmaster_V3.csv). Or ask an API that consults them. IBANforge checks bank codes against six national registers and answers with the register's own verdict:
+
+```bash
+curl -X POST https://api.ibanforge.com/v1/iban/validate \
+  -H "Content-Type: application/json" \
+  -d '{"iban": "BE68539007547034"}'
+```
+
+```json
+{
+  "valid": true,
+  "bank_code_check": {
+    "value": "539",
+    "status": "not_in_register",
+    "match": null,
+    "register": "Banque nationale de Belgique, bank identification codes (Protocol Secretariat)",
+    "authoritative": true,
+    "as_of": "2026-08"
+  }
+}
+```
+
+`valid: true` — the structure is fine. `not_in_register`, from the authoritative source — the bank behind it does not exist. Both statements are true at once, and the difference between them is the entire point of checking beyond the checksum before money moves.
+
+*Data verified on 2026-08-06 against the NBB file dated 2026-08-05 and the current SIX BankMaster. Registers change monthly; the API re-reads them on every refresh and stamps every answer with `as_of`.*
