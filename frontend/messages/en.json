@@ -1079,5 +1079,29 @@
       "playground": "Open the playground"
     },
     "footnote": "Prices checked on July 11, 2026 on iban.com/pricing and ibanapi.com/prices. VAT and plan details are theirs to change; the linked pages are authoritative."
+  },
+  "testIban": {
+    "metaTitle": "Test IBAN Generator — real bank codes, verified against national registers",
+    "metaDescription": "Generate test IBANs whose bank codes are actually allocated: drawn live from the Swiss, German, Austrian and Belgian national registers, with the register proof attached. Random account digits, safe for fixtures and demos.",
+    "eyebrow": "Free tool",
+    "title": "Test IBAN generator — with real bank codes",
+    "intro": "Most test-IBAN generators emit checksum-valid IBANs with made-up bank codes — even three of the four official example IBANs point at codes no register ever allocated. This generator draws its bank codes live from the national registers (SIX, Bundesbank, OeNB, NBB), so your fixtures survive a real bank-code check. The account digits are random and belong to nobody.",
+    "articleLink": "Read the story: the official example IBANs point at banks that do not exist",
+    "countryLabel": "Country",
+    "random": "Random",
+    "generate": "Generate",
+    "generating": "Generating…",
+    "copy": "Copy",
+    "copied": "Copied!",
+    "proofTitle": "The proof — our own engine’s answer for this IBAN",
+    "registerLabel": "Register",
+    "statusLabel": "Bank code",
+    "institutionLabel": "Institution",
+    "asOfLabel": "Register data as of",
+    "bicLabel": "BIC",
+    "devTitle": "For your test suite",
+    "devIntro": "Same generator, straight from the API — free, no key:",
+    "disclaimer": "Bank codes are real (the registers publish them). Account digits are random — these are NOT real accounts. Do not send money to them.",
+    "error": "Generation failed — try again."
   }
 }

@@ -558,6 +558,60 @@ const buildSpec = () => ({
         },
       },
     },
+    '/v1/test-iban': {
+      get: {
+        operationId: 'getTestIban',
+        summary: 'Generate test IBANs with REAL bank codes',
+        description:
+          'Free. Generates structurally valid test IBANs whose bank codes are drawn from the national registers we serve (CH, DE, AT, BE) — unlike the usual generators, whose checksum-valid IBANs carry arbitrary codes no register allocated. Account digits are random and belong to nobody. Each item ships with the proof: our own bank_code_check answer for that IBAN.',
+        tags: ['Free'],
+        parameters: [
+          {
+            name: 'country',
+            in: 'query',
+            required: false,
+            schema: { type: 'string', enum: ['CH', 'DE', 'AT', 'BE'] },
+            description: 'Omit for a random supported country',
+          },
+          {
+            name: 'count',
+            in: 'query',
+            required: false,
+            schema: { type: 'integer', minimum: 1, maximum: 10, default: 1 },
+          },
+        ],
+        responses: {
+          '200': {
+            description: 'Generated test IBANs, each with its register proof',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    test_ibans: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          iban: { type: 'string' },
+                          formatted: { type: 'string' },
+                          country: { type: 'string' },
+                          proof: { type: 'object' },
+                          note: { type: 'string' },
+                        },
+                      },
+                    },
+                    disclaimer: { type: 'string' },
+                    cost_usdc: { type: 'number' },
+                  },
+                },
+              },
+            },
+          },
+          '400': { description: 'Unsupported country' },
+        },
+      },
+    },
     '/v1/demo': {
       get: {
         operationId: 'getDemo',

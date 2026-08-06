@@ -71,4 +71,6 @@ curl -X POST https://api.ibanforge.com/v1/iban/validate \
 
 `valid: true` — la structure est bonne. `not_in_register`, depuis la source autoritative — la banque derrière n'existe pas. Les deux affirmations sont vraies en même temps, et leur différence est tout l'enjeu d'une vérification au-delà de la clé avant qu'un paiement parte.
 
+**Besoin d'IBAN de test sûrs aux codes banque réels ?** Nous avons construit la version honnête : le [générateur d'IBAN de test](/tools/test-iban) tire des codes réellement attribués, preuve incluse.
+
 *Données vérifiées le 06/08/2026 contre le fichier BNB daté du 05/08/2026 et le BankMaster SIX courant. Les registres changent chaque mois ; l'API les relit à chaque rafraîchissement et date chaque réponse avec `as_of`.*

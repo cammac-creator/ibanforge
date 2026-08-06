@@ -71,4 +71,6 @@ curl -X POST https://api.ibanforge.com/v1/iban/validate \
 
 `valid: true` — the structure is fine. `not_in_register`, from the authoritative source — the bank behind it does not exist. Both statements are true at once, and the difference between them is the entire point of checking beyond the checksum before money moves.
 
+**Need safe test IBANs whose bank codes are real?** We built the honest version: the [test IBAN generator](/tools/test-iban) draws register-allocated codes live, with the proof attached.
+
 *Data verified on 2026-08-06 against the NBB file dated 2026-08-05 and the current SIX BankMaster. Registers change monthly; the API re-reads them on every refresh and stamps every answer with `as_of`.*

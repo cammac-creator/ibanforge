@@ -1079,5 +1079,29 @@
       "playground": "Ouvrir le playground"
     },
     "footnote": "Prix relevés le 11 juillet 2026 sur iban.com/pricing et ibanapi.com/prices. La TVA et le détail des plans leur appartiennent ; leurs pages font foi."
+  },
+  "testIban": {
+    "metaTitle": "Générateur d'IBAN de test — codes banque réels, vérifiés aux registres nationaux",
+    "metaDescription": "Générez des IBAN de test dont les codes banque sont réellement attribués : tirés en direct des registres nationaux suisse, allemand, autrichien et belge, preuve du registre incluse. Chiffres de compte aléatoires, sûrs pour fixtures et démos.",
+    "eyebrow": "Outil gratuit",
+    "title": "Générateur d'IBAN de test — avec de vrais codes banque",
+    "intro": "La plupart des générateurs d'IBAN de test produisent des IBAN à clé valide avec des codes banque inventés — trois des quatre IBAN d'exemple officiels pointent même des codes qu'aucun registre n'a attribués. Ce générateur tire ses codes banque en direct des registres nationaux (SIX, Bundesbank, OeNB, BNB) : vos fixtures survivent à un vrai contrôle du code banque. Les chiffres de compte sont aléatoires et n'appartiennent à personne.",
+    "articleLink": "Lire l'histoire : les IBAN d'exemple officiels pointent des banques qui n'existent pas",
+    "countryLabel": "Pays",
+    "random": "Aléatoire",
+    "generate": "Générer",
+    "generating": "Génération…",
+    "copy": "Copier",
+    "copied": "Copié !",
+    "proofTitle": "La preuve — la réponse de notre propre moteur pour cet IBAN",
+    "registerLabel": "Registre",
+    "statusLabel": "Code banque",
+    "institutionLabel": "Établissement",
+    "asOfLabel": "Données du registre au",
+    "bicLabel": "BIC",
+    "devTitle": "Pour votre suite de tests",
+    "devIntro": "Le même générateur, directement par l'API — gratuit, sans clé :",
+    "disclaimer": "Les codes banque sont réels (les registres les publient). Les chiffres de compte sont aléatoires — ce ne sont PAS de vrais comptes. N'y envoyez pas d'argent.",
+    "error": "Échec de génération — réessayez."
   }
 }

@@ -1079,5 +1079,29 @@
       "playground": "Playground öffnen"
     },
     "footnote": "Preise am 11. Juli 2026 auf iban.com/pricing und ibanapi.com/prices erhoben. MwSt. und Plandetails liegen bei den Anbietern; deren Seiten sind massgeblich."
+  },
+  "testIban": {
+    "metaTitle": "Test-IBAN-Generator — echte Bankcodes, gegen Nationalregister verifiziert",
+    "metaDescription": "Generieren Sie Test-IBANs, deren Bankcodes wirklich vergeben sind: live aus den Schweizer, deutschen, österreichischen und belgischen Nationalregistern, mit Registernachweis. Zufällige Kontoziffern, sicher für Fixtures und Demos.",
+    "eyebrow": "Kostenloses Tool",
+    "title": "Test-IBAN-Generator — mit echten Bankcodes",
+    "intro": "Die meisten Test-IBAN-Generatoren erzeugen prüfziffernvalide IBANs mit erfundenen Bankcodes — sogar drei der vier offiziellen Beispiel-IBANs zeigen auf Codes, die kein Register je vergeben hat. Dieser Generator zieht seine Bankcodes live aus den Nationalregistern (SIX, Bundesbank, OeNB, NBB): Ihre Fixtures überstehen eine echte Bankcode-Prüfung. Die Kontoziffern sind zufällig und gehören niemandem.",
+    "articleLink": "Die Geschichte lesen: die offiziellen Beispiel-IBANs zeigen auf Banken, die es nicht gibt",
+    "countryLabel": "Land",
+    "random": "Zufällig",
+    "generate": "Generieren",
+    "generating": "Generiere…",
+    "copy": "Kopieren",
+    "copied": "Kopiert!",
+    "proofTitle": "Der Nachweis — die Antwort unserer eigenen Engine für diese IBAN",
+    "registerLabel": "Register",
+    "statusLabel": "Bankcode",
+    "institutionLabel": "Institut",
+    "asOfLabel": "Registerstand",
+    "bicLabel": "BIC",
+    "devTitle": "Für Ihre Testsuite",
+    "devIntro": "Derselbe Generator, direkt über die API — kostenlos, ohne Schlüssel:",
+    "disclaimer": "Die Bankcodes sind echt (die Register veröffentlichen sie). Die Kontoziffern sind zufällig — das sind KEINE echten Konten. Senden Sie kein Geld dorthin.",
+    "error": "Generierung fehlgeschlagen — bitte erneut versuchen."
   }
 }
