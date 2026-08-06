@@ -222,8 +222,12 @@ This single call exercises the 3 USPs (Swiss BC-Nummer, EMI/vIBAN classification
 - OpenAPI 3.1: https://api.ibanforge.com/openapi.json
 - x402 metadata: https://api.ibanforge.com/.well-known/x402
 - Agent capabilities: https://api.ibanforge.com/.well-known/agents.json
+- A2A agent card: https://api.ibanforge.com/.well-known/agent-card.json
+- API catalog (RFC 9727): https://api.ibanforge.com/.well-known/api-catalog
+- apis.json: https://api.ibanforge.com/apis.json
 - MCP HTTP transport: https://api.ibanforge.com/mcp
 - MCP server card: https://api.ibanforge.com/.well-known/mcp/server-card.json
+- Blog & release feed (RSS): https://ibanforge.com/rss.xml
 
 ## Endpoints
 
