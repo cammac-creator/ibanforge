@@ -286,7 +286,16 @@ for (const path of [
 // ──────────────────────────────────────────────────────────────────────────────
 
 const A2A_AGENT_CARD = {
-  protocolVersion: '0.3.0',
+  // A2A 1.0: the normative proto consolidates url/transport/version into
+  // supportedInterfaces, and protocol versions are Major.Minor by spec
+  // ("0.3", "1.0" — patch versions SHOULD NOT be used). The flat
+  // protocolVersion/url/preferredTransport siblings are the 0.3-era
+  // spelling, kept on purpose: the crawlers that read this card today
+  // still look there, and unknown members are harmless to 1.0 validators.
+  protocolVersion: '1.0',
+  supportedInterfaces: [
+    { url: 'https://api.ibanforge.com', protocolBinding: 'HTTP+JSON', protocolVersion: '1.0' },
+  ],
   name: 'IBANforge',
   description:
     'Pre-payout IBAN screening: validation, issuing-bank identification, sanctions (OFAC), ' +
@@ -305,6 +314,9 @@ const A2A_AGENT_CARD = {
   capabilities: {
     streaming: false,
     pushNotifications: false,
+    // 1.0 spelling (the extended-card flag relocated into capabilities) next
+    // to the 0.3-era stateTransitionHistory, kept for older readers.
+    extendedAgentCard: false,
     stateTransitionHistory: false,
   },
   securitySchemes: {

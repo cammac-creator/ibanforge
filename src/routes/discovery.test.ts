@@ -73,6 +73,17 @@ describe('discovery — 404s measured on real crawler traffic (2026-07-28)', () 
     expect((card.skills as unknown[]).length).toBeGreaterThanOrEqual(5);
     expect(card.defaultInputModes).toEqual(['application/json']);
     expect(card.defaultOutputModes).toEqual(['application/json']);
+    // A2A 1.0 (2026-08-07, flagged by the apis.io grader): versions are
+    // Major.Minor by spec, and the normative proto consolidates
+    // url/transport/version into supportedInterfaces. The flat 0.3-era
+    // fields stay alongside for the crawlers that still read them.
+    expect(card.protocolVersion).toBe('1.0');
+    const ifaces = card.supportedInterfaces as Array<Record<string, unknown>>;
+    expect(Array.isArray(ifaces)).toBe(true);
+    expect(ifaces[0].url).toBe('https://api.ibanforge.com');
+    expect(ifaces[0].protocolBinding).toBeTruthy();
+    expect(ifaces[0].protocolVersion).toBe('1.0');
+    expect((card.capabilities as Record<string, unknown>).extendedAgentCard).toBe(false);
     // Honesty: the card must say it is a tool-style API, not an A2A agent,
     // and must not carry the dead ai-plugin dialect marker.
     expect(String(card.description)).toMatch(/not a conversational A2A agent/);
