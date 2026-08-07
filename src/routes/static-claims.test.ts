@@ -54,7 +54,7 @@ const CODE_EXT = /\.(ts|tsx|js|mjs)$/;
 const BANNED: Array<{ pattern: RegExp; wanted: string }> = [
   { pattern: /\b84\s+(countries|pays|Länder)/, wanted: '89 countries (real count, live at /llms.txt)' },
   { pattern: /\b7[05]\+?\s+(countries|pays|Länder)/, wanted: '89 countries' },
-  { pattern: /~\s?1[,.'   ]?200\b/, wanted: '1,100+ Swiss entries' },
+  { pattern: /~\s?1[,.'\u00a0\u202f ]?200\b/, wanted: '1,100+ Swiss entries' },
   { pattern: /\b1[,.']190\b/, wanted: '1,100+ Swiss entries' },
   // 121,000+ / 39,000+ are the long spellings datasetFacts() itself emits on
   // live surfaces — same value as 121k+/39k+, so they are not banned. Only
