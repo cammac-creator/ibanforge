@@ -25,13 +25,12 @@ export const BANK_CODE_CHECK_SCHEMA = {
         'verified: resolves to an institution we can name. not_in_register: it does not, in reference data we do hold for this country — actionable as non-existence ONLY when authoritative is true. unavailable: we hold no reference data for this country, so no opinion.',
     },
     match: {
-      type: 'string',
-      nullable: true,
+      type: ['string', 'null'],
       enum: ['register', 'prefix', null],
       description:
         'register: exact key in the reference set, deterministic. prefix: the bic8 LIKE fallback, reachable only in the 30 countries whose bank code may open on a letter (a BIC8 always does) — check candidates.',
     },
-    register: { type: 'string', nullable: true, description: 'Name of the reference set consulted.' },
+    register: { type: ['string', 'null'], description: 'Name of the reference set consulted.' },
     authoritative: {
       type: 'boolean',
       description:
@@ -58,16 +57,14 @@ export const BANK_CODE_CHECK_SCHEMA = {
       properties: {
         name: { type: 'string' },
         street: {
-          type: 'string',
-          nullable: true,
+          type: ['string', 'null'],
           description: 'One line, house number included, matching the GLEIF shape. Null where the register publishes none (DE, BE).',
         },
-        post_code: { type: 'string', nullable: true },
-        town: { type: 'string', nullable: true },
+        post_code: { type: ['string', 'null'] },
+        town: { type: ['string', 'null'] },
         country: { type: 'string' },
         lei: {
-          type: 'string',
-          nullable: true,
+          type: ['string', 'null'],
           description: 'Legal Entity Identifier, where the register publishes one (the OeNB does, 99% of entries).',
         },
       },

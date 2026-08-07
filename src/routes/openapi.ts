@@ -369,27 +369,25 @@ const buildSpec = () => ({
                     iban_length: { type: 'integer', example: 21 },
                     bban_length: { type: 'integer', example: 17 },
                     bban: {
-                      type: 'object',
-                      nullable: true,
+                      type: ['object', 'null'],
                       description: 'BBAN field positions, 0-indexed within the BBAN. null when no structure is declared for the country. charset uses SWIFT registry notation (n=digits, a=uppercase letters, c=alphanumeric, e.g. "5!n").',
                       properties: {
                         bank_code: {
                           type: 'object',
-                          properties: { start: { type: 'integer' }, length: { type: 'integer' }, charset: { type: 'string', nullable: true } },
+                          properties: { start: { type: 'integer' }, length: { type: 'integer' }, charset: { type: ['string', 'null'] } },
                         },
                         branch_code: {
                           type: 'object',
-                          properties: { start: { type: 'integer' }, length: { type: 'integer' }, charset: { type: 'string', nullable: true } },
+                          properties: { start: { type: 'integer' }, length: { type: 'integer' }, charset: { type: ['string', 'null'] } },
                         },
                         account_number: {
                           type: 'object',
-                          properties: { start: { type: 'integer' }, length: { type: 'integer' }, charset: { type: 'string', nullable: true } },
+                          properties: { start: { type: 'integer' }, length: { type: 'integer' }, charset: { type: ['string', 'null'] } },
                         },
                       },
                     },
                     bban_pattern: {
-                      type: 'string',
-                      nullable: true,
+                      type: ['string', 'null'],
                       description: 'Full BBAN pattern in SWIFT IBAN Registry notation (e.g. "5!n12!c") — what /v1/iban/validate enforces structurally on top of length + mod-97.',
                       example: '5!n12!c',
                     },
@@ -401,10 +399,9 @@ const buildSpec = () => ({
                         vop_required: { type: 'boolean' },
                       },
                     },
-                    example_iban: { type: 'string', nullable: true, example: 'CH9300762011623852957' },
+                    example_iban: { type: ['string', 'null'], example: 'CH9300762011623852957' },
                     example_iban_note: {
-                      type: 'string',
-                      nullable: true,
+                      type: ['string', 'null'],
                       description:
                         "Says what example_iban is: an illustration from the SWIFT IBAN Registry whose bank code is not guaranteed to be allocated. 36 of the 89 come back bank_code_check.status not_in_register, which is the example being fictional rather than a gap in our data. LV uses the literal 'BANK', RO uses 'AAAA', and the Swiss one is proven unallocated by the SIX BankMaster.",
                     },
@@ -808,12 +805,11 @@ const buildSpec = () => ({
             required: ['bank_code', 'account_number'],
           },
           bic: {
-            type: 'object',
-            nullable: true,
+            type: ['object', 'null'],
             properties: {
               code: { type: 'string', example: 'NWBKGB2L' },
-              bank_name: { type: 'string', nullable: true },
-              city: { type: 'string', nullable: true },
+              bank_name: { type: ['string', 'null'] },
+              city: { type: ['string', 'null'] },
             },
             required: ['code', 'bank_name', 'city'],
           },
@@ -823,8 +819,7 @@ const buildSpec = () => ({
           // CH/LI IBAN already returns the Swiss rail data, and paid a second
           // call to /v1/ch/clearing/{iid} for something they had.
           clearing: {
-            type: 'object',
-            nullable: true,
+            type: ['object', 'null'],
             description:
               'Swiss clearing enrichment from the SIX BankMaster directory — present for CH and LI IBANs only, ' +
               'and included at no extra cost in the 0.005 USDC validation. Full rail participation, not just a name lookup.',
@@ -840,8 +835,7 @@ const buildSpec = () => ({
               instant_payments_chf: { type: 'boolean', description: 'Instant Payments CHF participation' },
               eurosic: { type: 'boolean', description: 'euroSIC participation' },
               qr_iid: {
-                type: 'string',
-                nullable: true,
+                type: ['string', 'null'],
                 description: 'QR-IID allocation for QR-bill reference, null when the institution has none',
               },
             },
@@ -877,8 +871,7 @@ const buildSpec = () => ({
                   'Whether Verification of Payee (VoP) is required under EU Instant Payments Regulation for this institution',
               },
               vop_participant: {
-                type: 'boolean',
-                nullable: true,
+                type: ['boolean', 'null'],
                 description:
                   'Bank-level VoP readiness: true when the resolved institution is listed as "ready" in the EPC Verification of Payee scheme register; false when it is not; null when no institution was resolved. Listing means the bank answers VoP requests — it does not run the name check for you.',
               },
@@ -891,8 +884,7 @@ const buildSpec = () => ({
               'Issuer classification for the institution behind the IBAN. Useful for vIBAN detection and KYC enrichment. Only present when the IBAN is valid and the BIC is resolved.',
             properties: {
               type: {
-                type: 'string',
-                nullable: true,
+                type: ['string', 'null'],
                 enum: ['bank', 'digital_bank', 'emi', 'payment_institution', null],
                 description:
                   'Type of financial institution (bank = traditional bank, digital_bank = neobank/challenger, emi = Electronic Money Institution, payment_institution = licensed PI). Null when we hold no support for a type: falling back to bank would be an assertion, and a payee pre-flight must not be handed one.',
@@ -922,8 +914,7 @@ const buildSpec = () => ({
               'AML/CFT risk indicators derived from the IBAN structure, issuer type, and country. Designed for compliance pre-screening and fraud prevention workflows. Only present when the IBAN is valid.',
             properties: {
               issuer_type: {
-                type: 'string',
-                nullable: true,
+                type: ['string', 'null'],
                 enum: ['bank', 'digital_bank', 'emi', 'payment_institution', null],
                 description:
                   'Type of the issuing institution (mirrors issuer.type for convenience). Null when the bank code resolved no institution — it used to default to "bank", which typed an institution that had not been found. Read bank_code_check to tell an unresolved code from a genuine bank.',
@@ -1007,7 +998,7 @@ const buildSpec = () => ({
           bic11: { type: 'string', example: 'UBSWCHZHXXX' },
           found: { type: 'boolean' },
           valid_format: { type: 'boolean' },
-          institution: { type: 'string', nullable: true, example: 'UBS AG' },
+          institution: { type: ['string', 'null'], example: 'UBS AG' },
           country: {
             type: 'object',
             required: ['code', 'name'],
@@ -1016,18 +1007,18 @@ const buildSpec = () => ({
               name: { type: 'string', example: 'Switzerland' },
             },
           },
-          city: { type: 'string', nullable: true },
+          city: { type: ['string', 'null'] },
           address: {
             type: 'object',
             description: 'Registered head-office address (present when available — GLEIF or directory sourced)',
             properties: {
               type: { type: 'string', example: 'registered' },
-              street: { type: 'string', nullable: true, example: 'Bahnhofstrasse 45' },
-              post_code: { type: 'string', nullable: true, example: '8001' },
-              region: { type: 'string', nullable: true, example: 'CH-ZH' },
-              city: { type: 'string', nullable: true, example: 'Zurich' },
+              street: { type: ['string', 'null'], example: 'Bahnhofstrasse 45' },
+              post_code: { type: ['string', 'null'], example: '8001' },
+              region: { type: ['string', 'null'], example: 'CH-ZH' },
+              city: { type: ['string', 'null'], example: 'Zurich' },
               country: { type: 'string', example: 'CH' },
-              romanized: { type: 'string', nullable: true },
+              romanized: { type: ['string', 'null'] },
               romanization: { type: 'string', example: 'original_latin' },
               source: { type: 'string', example: 'GLEIF' },
               language: { type: 'string', example: 'en' },
@@ -1036,11 +1027,11 @@ const buildSpec = () => ({
           },
           address_available: { type: 'boolean' },
           branch_code: { type: 'string', example: 'XXX' },
-          branch_info: { type: 'string', nullable: true },
-          lei: { type: 'string', nullable: true },
-          lei_status: { type: 'string', nullable: true },
+          branch_info: { type: ['string', 'null'] },
+          lei: { type: ['string', 'null'] },
+          lei_status: { type: ['string', 'null'] },
           is_test_bic: { type: 'boolean' },
-          source: { type: 'string', nullable: true },
+          source: { type: ['string', 'null'] },
           note: { type: 'string' },
           cost_usdc: { type: 'number', example: 0.003 },
           processing_ms: { type: 'number' },
@@ -1075,10 +1066,9 @@ const buildSpec = () => ({
             },
           },
           risk_score: {
-            type: 'integer',
+            type: ['integer', 'null'],
             minimum: 0,
             maximum: 100,
-            nullable: true,
             description:
               'Composite risk score (0 = no risk, 100 = critical). null when the IBAN did not validate: there was nothing to score.',
           },
@@ -1103,20 +1093,20 @@ const buildSpec = () => ({
               name: { type: 'string', example: 'UBS Switzerland AG' },
               type: { type: 'string', enum: ['bank', 'cantonal_bank', 'postfinance', 'raiffeisen', 'central_bank', 'foreign_participant'] },
               iid_type: { type: 'string', enum: ['headquarters', 'branch', 'other'] },
-              headquarters_iid: { type: 'string', nullable: true },
+              headquarters_iid: { type: ['string', 'null'] },
             },
           },
           address: {
             type: 'object',
             properties: {
-              street: { type: 'string', nullable: true },
-              building_number: { type: 'string', nullable: true },
-              post_code: { type: 'string', nullable: true },
-              town: { type: 'string', nullable: true },
+              street: { type: ['string', 'null'] },
+              building_number: { type: ['string', 'null'] },
+              post_code: { type: ['string', 'null'] },
+              town: { type: ['string', 'null'] },
               country: { type: 'string', example: 'CH' },
             },
           },
-          bic: { type: 'string', nullable: true, example: 'UBSWCHZH80A' },
+          bic: { type: ['string', 'null'], example: 'UBSWCHZH80A' },
           payment_services: {
             type: 'object',
             properties: {
@@ -1128,8 +1118,8 @@ const buildSpec = () => ({
               lsv_bdd_eur: { type: 'boolean', description: 'LSV/BDD EUR direct debit' },
             },
           },
-          sic_iid: { type: 'string', nullable: true },
-          qr_iid: { type: 'string', nullable: true, description: 'QR-IID for QR-bill payments' },
+          sic_iid: { type: ['string', 'null'] },
+          qr_iid: { type: ['string', 'null'], description: 'QR-IID for QR-bill payments' },
           valid_on: { type: 'string', format: 'date' },
           cost_usdc: { type: 'number', example: 0.003 },
           processing_ms: { type: 'number' },

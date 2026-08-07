@@ -221,8 +221,7 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
             description: 'AML/CFT pre-screening indicators.',
             properties: {
               issuer_type: {
-                type: 'string',
-                nullable: true,
+                type: ['string', 'null'],
                 enum: ['bank', 'digital_bank', 'emi', 'payment_institution', null],
                 description: 'Null when no institution resolved. It no longer defaults to "bank" for an institution we did not find.',
               },
