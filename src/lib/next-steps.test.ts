@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import { nextSteps } from './next-steps.js';
 import { enrichResult } from './enrich.js';
 import { validateIBAN } from './iban.js';
@@ -69,6 +69,37 @@ describe('nextSteps', () => {
     const verify = c.indexOf('verify_payee_name');
     const screen = c.indexOf('screen_compliance');
     if (screen >= 0) expect(verify).toBeLessThan(screen);
+  });
+
+  describe('generate_payment_qr — partner handoff behind the PARTNER_PAYQR gate', () => {
+    afterEach(() => {
+      delete process.env.PARTNER_PAYQR;
+    });
+
+    it('stays silent while the flag is off, whatever the result', () => {
+      expect(codes('DE89370400440532013000')).not.toContain('generate_payment_qr');
+    });
+
+    it('fires on a register-confirmed SEPA account once the flag is on', () => {
+      process.env.PARTNER_PAYQR = '1';
+      const hit = steps('DE89370400440532013000').find((s) => s.code === 'generate_payment_qr');
+      expect(hit).toBeDefined();
+      expect(hit!.because).toMatch(/sepa\.member/);
+      expect(hit!.action).toBe('https://qr.cz-agents.dev');
+      // The two limits the partner asked to keep in the copy must travel with it.
+      expect(hit!.do).toMatch(/does not verify account ownership/);
+      expect(hit!.do).toMatch(/Swiss QR-bills/);
+    });
+
+    it('never fires on CH or LI, whose native QR-bill PayQR does not cover', () => {
+      process.env.PARTNER_PAYQR = '1';
+      expect(codes('CH1000230000000012345')).not.toContain('generate_payment_qr');
+    });
+
+    it('never rides on a result where the register denied the code', () => {
+      process.env.PARTNER_PAYQR = '1';
+      expect(codes('DE44999999990532013000')).not.toContain('generate_payment_qr');
+    });
   });
 
   it('always gives every step a code, a sentence and its evidence', () => {

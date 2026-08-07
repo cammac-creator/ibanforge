@@ -33,7 +33,7 @@ export interface NextStep {
   do: string;
   /** The field of this response that produced the step, so the advice is auditable. */
   because: string;
-  /** An IBANforge call that performs the step, when one exists. */
+  /** The call that performs the step, when one exists: an IBANforge endpoint, or the partner site for a partner handoff. */
   action?: string;
 }
 
@@ -130,6 +130,30 @@ export function nextSteps(result: IBANValidationResult): NextStep[] {
         'That endpoint reads the same bank-code verdict as this one, so it will not score an unconfirmed code as an ordinary bank.',
       because: 'bank_code_check.status is verified, so there is an institution to screen',
       action: COMPLIANCE_ACTION,
+    });
+  }
+
+  // 5. A partner handoff, twice gated: on the result (a register-confirmed
+  //    account in a SEPA country, outside CH/LI whose native QR-bill PayQR
+  //    does not cover) and on PARTNER_PAYQR=1, because the two directions of
+  //    the referral switch on together by agreement, not by deploy. The entry
+  //    quotes the partner's own one-sentence description and both of its
+  //    stated limits, so the advice stays as auditable as every other step.
+  const country = result.country?.code;
+  if (
+    process.env.PARTNER_PAYQR === '1' &&
+    check?.status === 'verified' &&
+    result.sepa?.member &&
+    country !== 'CH' &&
+    country !== 'LI'
+  ) {
+    steps.push({
+      code: 'generate_payment_qr',
+      do:
+        'To turn the confirmed account into a scannable payment, PayQR (npx -y @czagents/payqr, hosted MCP https://payqr.cz-agents.dev/mcp) generates and self-checks a European payment QR: SPAYD for CZ/SK accounts, EUR-only EPC/GiroCode for other SEPA accounts; EPC requires recipient_name. ' +
+        'PayQR validates the IBAN checksum but does not verify account ownership or the beneficiary name, and it does not generate native Swiss QR-bills.',
+      because: 'sepa.member is true and bank_code_check.status is verified',
+      action: 'https://qr.cz-agents.dev',
     });
   }
 

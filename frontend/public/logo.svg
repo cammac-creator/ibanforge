@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="ibf-title">
+  <title id="ibf-title">IBANforge</title>
+  <rect width="64" height="64" rx="14" fill="#14263f"/>
+  <path d="M15 21h6v22h-6z" fill="#f5f1e6"/>
+  <path d="M27 21h17v5.5H33V43h-6z" fill="#f5f1e6"/>
+  <path d="M33 30.5h9V36h-9z" fill="#c8742f"/>
+  <circle cx="48" cy="23.75" r="2.6" fill="#c8742f"/>
+</svg>

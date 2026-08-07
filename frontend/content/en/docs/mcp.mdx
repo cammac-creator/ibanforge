@@ -1,20 +1,20 @@
 ---
 title: "MCP Integration"
-description: "Connect IBANforge to AI agents using the Model Context Protocol (MCP)."
+description: "Connect IBANforge to Claude, Cursor and any MCP agent: the ibanforge-mcp npm package, a hosted endpoint with nothing to install, five tools, and results that say what to do next."
 order: 5
 ---
 
 # MCP Integration
 
-IBANforge includes a built-in **MCP server** (Model Context Protocol) that lets AI agents validate IBANs and look up BIC codes as tool calls. This means Claude, GPT, or any MCP-compatible agent can use IBANforge directly.
+IBANforge ships an official **MCP server** for AI agents: [`ibanforge-mcp`](https://www.npmjs.com/package/ibanforge-mcp) on npm, plus a hosted endpoint with nothing to install. Claude, Cursor, or any MCP-compatible client can validate IBANs, resolve BICs, check Swiss clearing numbers and run a compliance pre-check as tool calls.
 
 ## What is MCP?
 
-The [Model Context Protocol](https://modelcontextprotocol.io/) is an open standard that allows AI assistants to use external tools. Instead of asking the user to copy-paste API results, the agent calls the tool directly and gets structured data back.
+The [Model Context Protocol](https://modelcontextprotocol.io/) is an open standard that lets AI assistants use external tools. Instead of asking the user to copy-paste API results, the agent calls the tool directly and gets structured data back.
 
-## Setup for Claude Desktop
+## Option 1 — the npm package (stdio)
 
-Add IBANforge to your Claude Desktop configuration file:
+**Claude Desktop** — add IBANforge to the configuration file:
 
 **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
 
@@ -25,84 +25,87 @@ Add IBANforge to your Claude Desktop configuration file:
   "mcpServers": {
     "ibanforge": {
       "command": "npx",
-      "args": ["tsx", "src/mcp/server.ts"],
-      "cwd": "/path/to/ibanforge"
+      "args": ["-y", "ibanforge-mcp"],
+      "env": { "IBANFORGE_API_KEY": "ifk_your_key" }
     }
   }
 }
 ```
 
-Replace `/path/to/ibanforge` with the actual path to your local IBANforge repository.
+**Claude Code** — one command:
 
-After saving, restart Claude Desktop. You should see the IBANforge tools in the tools menu.
+```bash
+claude mcp add ibanforge -e IBANFORGE_API_KEY=ifk_your_key -- npx -y ibanforge-mcp
+```
 
-## Available tools
+The key is optional and free: [create one](/) with an email address (200 requests/month, no card). Without a key the server still starts, and paid tools answer with x402 payment instructions that an agent holding USDC on Base can settle per call.
+
+After saving, restart the client. Five IBANforge tools appear in the tools menu.
+
+## Option 2 — the hosted endpoint (nothing to install)
+
+```
+https://api.ibanforge.com/mcp
+```
+
+Streamable HTTP transport, **10 free tool calls per IP per day**, no key at all: the fastest way for an agent to evaluate the data before committing to anything. For sustained use, run the npm package with your free key.
+
+On the official MCP registry the server is listed as `io.github.cammac-creator/ibanforge`.
+
+## The five tools
 
 ### validate_iban
 
-Validate a single IBAN and return detailed information.
+Validate a single IBAN: structure and checksum, issuing bank (BIC), bank-code check against the national register, EMI/vIBAN classification, SEPA/VoP reachability and risk indicators — the same data as `POST /v1/iban/validate`.
 
-**Input:**
 ```json
-{
-  "iban": "CH1000230000000012345"
-}
+{ "iban": "CH1000230000000012345" }
 ```
-
-**Output:** Full validation result including country, bank code, account number, and BIC institution data (same as the `/v1/iban/validate` endpoint).
 
 ### batch_validate_iban
 
-Validate multiple IBANs at once.
+Up to 100 IBANs in one call, each result identical in structure to `validate_iban` — same as `POST /v1/iban/batch`.
 
-**Input:**
 ```json
-{
-  "ibans": [
-    "CH1000230000000012345",
-    "DE89370400440532013000"
-  ]
-}
+{ "ibans": ["CH1000230000000012345", "DE89370400440532013000"] }
 ```
-
-**Output:** Array of validation results with a summary count (same as `/v1/iban/batch`).
 
 ### lookup_bic
 
-Look up institution details by BIC/SWIFT code.
+Institution details for a BIC/SWIFT code: name, country, city, branch, LEI where available — same as `GET /v1/bic/:code`.
 
-**Input:**
 ```json
-{
-  "code": "UBSWCHZH80A"
-}
+{ "code": "UBSWCHZH80A" }
 ```
 
-**Output:** Institution name, country, city, branch, and LEI data (same as `/v1/bic/:code`).
+### lookup_ch_clearing
+
+Swiss BC-Nummer / IID lookup: institution, type, town, SIC/euroSIC participation and QR-IID allocation — same as `GET /v1/ch/clearing/:iid`.
+
+```json
+{ "iid": "230" }
+```
 
 ### check_compliance
 
-Full compliance check combining IBAN validation, sanctions screening, SEPA Instant reachability, VoP participant verification, and a composite risk score.
+Full pre-check in one call: sanctions screening on the resolved bank BIC, FATF status, SEPA Instant reachability, VoP participation and a composite risk score from 0 to 100 — same as `POST /v1/iban/compliance`.
 
-**Input:**
 ```json
-{
-  "iban": "CH1000230000000012345"
-}
+{ "iban": "CH1000230000000012345" }
 ```
 
-**Output:** IBAN validation result + sanctions screening status (OFAC) + SEPA Instant reachability + VoP participant check + risk score (0-100). Cost: $0.02 USDC (same as `/v1/iban/compliance`).
+## Results that say what to do next
+
+Every validation result carries an ordered `next_steps` field: what blocks a payment comes first, what merely enriches it after. Each entry has a stable `code` to branch on, a `do` sentence the agent can relay, and a `because` naming the response field that produced it, so the advice is auditable rather than taken on trust. `bank_code_not_allocated` means stop; `verify_payee_name` means carry on and let a beneficiary name check decide.
 
 ## Example agent conversation
-
-Once configured, you can ask Claude naturally:
 
 > **You:** Is this IBAN valid? CH10 0023 0000 0000 1234 5
 >
 > **Claude:** Let me validate that IBAN for you.
 > *[calls validate_iban]*
 >
-> Yes, that IBAN is valid. It belongs to **UBS Switzerland AG** in Zürich, Switzerland — BIC UBSWCHZH, Swiss BC-Nummer 00230, SIC participant with CHF instant payments.
+> Yes, that IBAN is valid — and the bank code is confirmed in the SIX register: **UBS Switzerland AG** in Zürich, BIC UBSWCHZH, Swiss BC-Nummer 00230, SIC participant with CHF instant payments.
 
 > **You:** Can you check these 3 IBANs from our supplier invoice?
 >
@@ -111,28 +114,21 @@ Once configured, you can ask Claude naturally:
 >
 > 2 out of 3 are valid. The third one (FR76...) has a checksum error — it looks like a digit was transposed.
 
-## Running the MCP server standalone
+## Works well with
 
-You can also run the MCP server directly:
-
-```bash
-cd /path/to/ibanforge
-npm run mcp
-```
-
-This starts the server using **stdio transport**, which is the standard for local MCP integrations. The server reads JSON-RPC messages from stdin and writes responses to stdout.
+**[PayQR](https://qr.cz-agents.dev)** — `npx -y @czagents/payqr`, hosted MCP `https://payqr.cz-agents.dev/mcp`, registry `dev.cz-agents/payqr`. Generate and self-check a European payment QR from an IBAN and payment details: SPAYD for CZ/SK accounts, or EUR-only EPC/GiroCode for other SEPA accounts; EPC requires `recipient_name`. PayQR validates the IBAN checksum but does not verify account ownership or the beneficiary name, and it does not generate native Swiss QR-bills — the register check, VoP readiness and risk indicators are exactly what IBANforge adds on top.
 
 ## Supported clients
 
-Any MCP-compatible client can use IBANforge tools:
-
-- **Claude Desktop** — native MCP support
-- **Claude Code** — CLI with MCP support
-- **Continue.dev** — VS Code AI extension
+- **Claude Desktop** and **Claude Code** — native MCP support
+- **Cursor** and **Continue.dev** — via their MCP configuration
+- **n8n** — prefer the dedicated [community node](/docs/recipes)
 - **Custom agents** — any app using the MCP SDK
 
 ## Notes
 
-- The MCP server runs **locally** and accesses the BIC database directly — no API calls or payments needed
-- All four tools return the same structured data as the REST API
-- The server uses the stdio transport protocol (no HTTP server involved)
+- The npm package is a thin client for `api.ibanforge.com`: the data lives server-side, there is nothing to download, and results always reflect the latest register refresh.
+- All five tools return the same JSON as the REST API, both as text and as MCP `structuredContent`.
+- Releases are published on [npm](https://www.npmjs.com/package/ibanforge-mcp) and mirrored to the MCP registry.
+
+Related: [Recipes](/docs/recipes) · [What "verified" means](/docs/iban-validate) · [Data sources](/docs/data-sources)
