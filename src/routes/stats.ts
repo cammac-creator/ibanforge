@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { getStats, getStatsHistory, getHourlyStats, getErrorStats, getPatternStats, getStatusByPath, getBusinessFunnel, getSourceStats, getRejectionStats } from '../lib/stats.js';
+import { getEvents } from '../lib/events.js';
 import { getEntryCount } from '../lib/bic-lookup.js';
 
 const stats = new Hono();
@@ -156,6 +157,24 @@ stats.get('/stats/patterns', (c) => {
     if (isNaN(days)) days = 30;
     days = Math.max(1, Math.min(90, days));
     return c.json(getPatternStats(days));
+  } catch {
+    return c.json({ error: 'stats_unavailable' }, 500);
+  }
+});
+
+// Chart annotations: deploys recorded at boot plus manual notes posted via
+// /v1/admin/events. Same bearer as the other /stats/* routes — the dashboard
+// fetches them alongside the history they annotate.
+stats.get('/stats/events', (c) => {
+  if (!checkAuth(c.req.header('Authorization'))) {
+    return c.json({ error: 'unauthorized', message: 'Stats require authentication.' }, 403);
+  }
+  try {
+    const periodParam = c.req.query('period');
+    let days = periodParam ? parseInt(periodParam, 10) : 90;
+    if (isNaN(days)) days = 90;
+    days = Math.max(1, Math.min(365, days));
+    return c.json({ period_days: days, events: getEvents(days) });
   } catch {
     return c.json({ error: 'stats_unavailable' }, 500);
   }

@@ -4,6 +4,7 @@ import { generateApiKey, validateApiKey, getUsage, revokeApiKey, rotateApiKey } 
 import { getStatsDB } from '../lib/db.js';
 import { getClientProfiles, getBotProfiles } from '../lib/stats.js';
 import { getActivation } from '../lib/activation.js';
+import { recordEvent } from '../lib/events.js';
 import { notifyPurchaseTelegram } from '../lib/notify.js';
 import { sendApiKeyEmail, isEmailConfigured } from '../lib/email.js';
 
@@ -637,6 +638,29 @@ apiKeys.get('/v1/admin/activation', (c) => {
   const daysParam = parseInt(c.req.query('days') ?? '30', 10);
   const days = daysParam === 90 ? 90 : 30;
   return c.json(getActivation(days));
+});
+
+/**
+ * Manual chart annotation — "rotation du secret", "campagne annuaire",
+ * "mention presse". One line on the dashboard charts is what turns a traffic
+ * move from a mystery into a caption.
+ */
+apiKeys.post('/v1/admin/events', async (c) => {
+  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
+  let body: { label?: unknown };
+  try {
+    body = await c.req.json<{ label?: unknown }>();
+  } catch {
+    return c.json({ error: 'invalid_json' }, 400);
+  }
+  const label = typeof body.label === 'string' ? body.label.trim() : '';
+  if (!label) {
+    return c.json({ error: 'label_required', message: 'A non-empty label is required.' }, 400);
+  }
+  recordEvent('manual', label);
+  return c.json({ recorded: true }, 201);
 });
 
 /**

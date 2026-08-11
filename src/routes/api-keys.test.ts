@@ -164,3 +164,32 @@ describe('/v1/admin/activation — per-email activation view', () => {
     expect(body.funnel.period_days).toBe(30);
   });
 });
+
+describe('POST /v1/admin/events — manual annotations', () => {
+  it('rejects without the admin secret', async () => {
+    const app = makeApp();
+    const res = await app.request('/v1/admin/events', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ label: 'nope' }),
+    });
+    expect(res.status).toBe(401);
+  });
+
+  it('rejects an empty label, records a real one', async () => {
+    const app = makeApp();
+    const headers = { 'Content-Type': 'application/json', 'X-Admin-Secret': 'correct-horse-battery-staple' };
+    const bad = await app.request('/v1/admin/events', { method: 'POST', headers, body: JSON.stringify({ label: '  ' }) });
+    expect(bad.status).toBe(400);
+    const ok = await app.request('/v1/admin/events', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ label: 'admin-events-route-fixture' }),
+    });
+    expect(ok.status).toBe(201);
+    const { getEvents } = await import('../lib/events.js');
+    expect(getEvents(1).some((e) => e.label === 'admin-events-route-fixture' && e.kind === 'manual')).toBe(true);
+    const { getStatsDB } = await import('../lib/db.js');
+    getStatsDB().prepare(`DELETE FROM events WHERE label = 'admin-events-route-fixture'`).run();
+  });
+});

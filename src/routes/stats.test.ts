@@ -77,3 +77,47 @@ describe('GET /stats — clean revenue total', () => {
     expect(body.total_revenue_usdc_clean).toBeLessThanOrEqual(body.total_revenue_usdc);
   });
 });
+
+describe('GET /stats — freshness witness', () => {
+  it('serves last_write_at so the dashboard can tell a dead collector from a quiet day', async () => {
+    const res = await app.request('/stats', auth);
+    const body = (await res.json()) as { last_write_at: string | null };
+    // The local DB always has request_log rows (the suite itself writes some),
+    // so the witness must be a datetime string, not undefined.
+    expect(typeof body.last_write_at).toBe('string');
+  });
+});
+
+describe('GET /stats/events', () => {
+  it('requires the stats token', async () => {
+    const res = await app.request('/stats/events');
+    expect(res.status).toBe(403);
+  });
+
+  it('returns annotation rows', async () => {
+    const { recordEvent } = await import('../lib/events.js');
+    recordEvent('manual', 'stats-route-events-fixture');
+    const res = await app.request('/stats/events?period=7', auth);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { events: Array<{ label: string; kind: string }> };
+    expect(body.events.some((e) => e.label === 'stats-route-events-fixture')).toBe(true);
+    const { getStatsDB } = await import('../lib/db.js');
+    getStatsDB().prepare(`DELETE FROM events WHERE label = 'stats-route-events-fixture'`).run();
+  });
+});
+
+describe('GET /stats/history — expected weekday band', () => {
+  it('every entry carries expected_min/expected_max fields (null when history is short)', async () => {
+    const res = await app.request('/stats/history?period=7', auth);
+    const body = (await res.json()) as Array<{
+      date: string;
+      expected_min: number | null;
+      expected_max: number | null;
+    }>;
+    expect(body.length).toBeGreaterThan(0);
+    for (const row of body) {
+      expect('expected_min' in row).toBe(true);
+      expect('expected_max' in row).toBe(true);
+    }
+  });
+});

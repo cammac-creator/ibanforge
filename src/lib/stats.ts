@@ -600,9 +600,18 @@ export function getStats(): StatsOverview {
     "SELECT COUNT(*) as total FROM request_log WHERE created_at >= datetime('now', 'start of day')"
   ).get() as { total: number };
 
+  // Freshness witness: when the collector dies (auth broken, disk full,
+  // middleware unplugged), every counter above reads zero — exactly like a
+  // quiet day. The dashboard compares this timestamp to the clock instead of
+  // trusting the zeros.
+  const lastWrite = db.prepare(
+    'SELECT MAX(created_at) as last FROM request_log'
+  ).get() as { last: string | null };
+
   return {
     total_requests: totalRequests.total,
     requests_today: requestsToday.total,
+    last_write_at: lastWrite.last,
     requests_by_path: requestsByPath,
     requests_by_status: requestsByStatus,
     total_operations: totalOps,
@@ -649,6 +658,9 @@ export function getStatsHistory(days: number = 7): Array<{
   s3xx: number;
   s4xx: number;
   s5xx: number;
+  /** min over up to 8 prior same-weekday totals — null under 3 samples. */
+  expected_min: number | null;
+  expected_max: number | null;
 }> {
   const db = getStatsDB();
   // Business operations from daily_stats
@@ -671,7 +683,10 @@ export function getStatsHistory(days: number = 7): Array<{
     revenue_usdc: number;
   }>;
 
-  // Total HTTP requests from request_log, broken down by status group
+  // Total HTTP requests from request_log, broken down by status group.
+  // The window is widened by 8 weeks beyond the requested period: the extra
+  // days never leave this function, they only feed the expected band (a
+  // 7-day view has no same-weekday history of its own to compare against).
   const reqRows = db.prepare(`
     SELECT date(created_at) as date, COUNT(*) as total_requests,
       SUM(CASE WHEN status >= 200 AND status < 300 THEN 1 ELSE 0 END) as s2xx,
@@ -681,17 +696,38 @@ export function getStatsHistory(days: number = 7): Array<{
     FROM request_log
     WHERE created_at >= datetime('now', '-' || ? || ' days')
     GROUP BY date(created_at)
-  `).all(days) as Array<{ date: string; total_requests: number; s2xx: number; s3xx: number; s4xx: number; s5xx: number }>;
+  `).all(days + 56) as Array<{ date: string; total_requests: number; s2xx: number; s3xx: number; s4xx: number; s5xx: number }>;
 
   const reqMap = new Map(reqRows.map(r => [r.date, r]));
 
-  // Merge: use all dates from both sources
-  const allDates = new Set([...opsRows.map(r => r.date), ...reqRows.map(r => r.date)]);
+  // Expected band per date: min/max of the totals of up to 8 PRIOR dates
+  // sharing its weekday. Under 3 samples the band is null — a band drawn
+  // from one or two points would read as confidence nobody has.
+  const band = (date: string): { min: number | null; max: number | null } => {
+    const target = new Date(`${date}T00:00:00Z`);
+    const samples: number[] = [];
+    for (let w = 1; w <= 8; w++) {
+      const prior = new Date(target);
+      prior.setUTCDate(prior.getUTCDate() - w * 7);
+      const row = reqMap.get(prior.toISOString().slice(0, 10));
+      if (row) samples.push(row.total_requests);
+    }
+    if (samples.length < 3) return { min: null, max: null };
+    return { min: Math.min(...samples), max: Math.max(...samples) };
+  };
+
+  // Merge: all dates from both sources, then slice back to the requested
+  // period so the widened band window stays internal.
+  const cutoff = new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
+  const allDates = [...new Set([...opsRows.map(r => r.date), ...reqRows.map(r => r.date)])]
+    .filter(d => d >= cutoff)
+    .sort();
   const opsMap = new Map(opsRows.map(r => [r.date, r]));
 
-  return Array.from(allDates).sort().map(date => {
+  return allDates.map(date => {
     const req = reqMap.get(date);
     const rev = opsMap.get(date)?.revenue_usdc ?? 0;
+    const b = band(date);
     return {
       date,
       iban_validate: opsMap.get(date)?.iban_validate ?? 0,
@@ -704,6 +740,8 @@ export function getStatsHistory(days: number = 7): Array<{
       s3xx: req?.s3xx ?? 0,
       s4xx: req?.s4xx ?? 0,
       s5xx: req?.s5xx ?? 0,
+      expected_min: b.min,
+      expected_max: b.max,
     };
   });
 }

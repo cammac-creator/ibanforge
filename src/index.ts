@@ -37,6 +37,7 @@ import { ibanStructure } from './routes/iban-structure.js';
 import { rateLimitMiddleware } from './middleware/rate-limit.js';
 import { recordRequest, classifyClient, hashIp, extractClientIp, purgeOldRequestLog, purgeTerminatedKeyTelemetry } from './lib/stats.js';
 import { startLifecycleRadar } from './lib/lifecycle-radar-server.js';
+import { recordEvent } from './lib/events.js';
 import { bicGuardMiddleware, iidGuardMiddleware } from './middleware/identifier-guard.js';
 import { notFoundHandler } from './lib/not-found.js';
 import { getEntryCount, getChClearingCount, getLeiEnrichedCount } from './lib/bic-lookup.js';
@@ -139,6 +140,7 @@ const SKIP_TRACKING = new Set([
   '/stats/business-funnel',
   '/stats/sources',
   '/stats/rejections',
+  '/stats/events',
   '/health',
   '/ping',
 ]);
@@ -518,6 +520,14 @@ const port = parseInt(process.env.PORT ?? '3000', 10);
 serve({ fetch: app.fetch, port }, () => {
   console.log(`IBANforge running on http://localhost:${port}`);
 });
+
+// Deploy marker for the dashboard charts. recordEvent dedups same-version
+// boots within 6 h, so Railway restarts don't stripe the timeline.
+try {
+  recordEvent('deploy', `v${pkg.version}`);
+} catch (err) {
+  console.error('Deploy event not recorded:', err);
+}
 
 // Retention: purge request metadata older than 12 months (privacy policy
 // commitment), and telemetry of terminated customers 30 days after their

@@ -204,6 +204,26 @@ export function getStatsDB(): DatabaseType.Database {
         email TEXT PRIMARY KEY,
         last_read_at TEXT
       );
+      -- Timeline annotations for the dashboard charts: deploys recorded at
+      -- boot, plus manual notes (secret rotation, campaign, press mention).
+      -- Correlating a traffic move with "what happened that day" used to
+      -- require an archaeology session; these are the dig markers.
+      CREATE TABLE IF NOT EXISTS events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        created_at TEXT DEFAULT (datetime('now')),
+        kind TEXT NOT NULL CHECK (kind IN ('deploy','manual')),
+        label TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_events_date ON events(created_at);
+      -- One row per ISO week: the Monday-morning auto-written digest the
+      -- dashboard shows and Telegram delivers. Upserted by week so the cron
+      -- can be re-run without duplicating.
+      CREATE TABLE IF NOT EXISTS weekly_digest (
+        week TEXT PRIMARY KEY,
+        created_at TEXT DEFAULT (datetime('now')),
+        body_fr TEXT NOT NULL,
+        facts_json TEXT NOT NULL
+      );
     `);
     // Migrate existing databases that may be missing the new columns
     const existingCols = (statsDB.prepare("PRAGMA table_info(operations)").all() as Array<{ name: string }>).map(r => r.name);

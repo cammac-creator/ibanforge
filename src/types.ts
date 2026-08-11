@@ -306,6 +306,8 @@ export interface HealthResponse {
 export interface StatsOverview {
   total_requests: number;
   requests_today: number;
+  /** MAX(created_at) of request_log — the dashboard's collection-freshness witness. Null on an empty log. */
+  last_write_at: string | null;
   requests_by_path: Array<{ path: string; count: number; avg_ms: number }>;
   requests_by_status: Array<{ status_group: string; count: number }>;
   total_operations: number;
