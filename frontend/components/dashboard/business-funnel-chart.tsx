@@ -7,9 +7,11 @@ import {
   XAxis,
   YAxis,
   Tooltip,
+  ReferenceLine,
   ResponsiveContainer,
   Legend,
 } from 'recharts';
+import type { ChartMarker } from '@/components/stacked-bar-chart';
 
 // The funnel series always ends on the current UTC day, still in progress —
 // its last bar is shorter than a full day and must NOT be read as a drop. We
@@ -76,7 +78,7 @@ function CustomTooltip({ active, payload, label }: { active?: boolean; payload?:
   );
 }
 
-export function BusinessFunnelChart({ data }: { data: BusinessFunnelDay[] }) {
+export function BusinessFunnelChart({ data, markers }: { data: BusinessFunnelDay[]; markers?: ChartMarker[] }) {
   const rows: Row[] = data.map((d) => {
     const total = d.success + d.paywall + d.auth_or_quota + d.bad_input + d.server_error;
     const conversion = total > 0 ? (d.success / total) * 100 : 0;
@@ -93,6 +95,15 @@ export function BusinessFunnelChart({ data }: { data: BusinessFunnelDay[] }) {
 
   const lastIdx = rows.length - 1;
   const lastIsPartial = lastIdx >= 0 && isCurrentUtcDay(rows[lastIdx]?.date);
+
+  // Same convention as the traffic chart: one marker per day, labels joined.
+  const dates = new Set(rows.map((r) => r.date));
+  const markersByDate = new Map<string, string>();
+  for (const m of markers ?? []) {
+    const day = m.date.slice(0, 10);
+    if (!dates.has(day)) continue;
+    markersByDate.set(day, markersByDate.has(day) ? `${markersByDate.get(day)} · ${m.label}` : m.label);
+  }
 
   return (
     <div>
@@ -134,6 +145,21 @@ export function BusinessFunnelChart({ data }: { data: BusinessFunnelDay[] }) {
               <Cell key={i} fillOpacity={lastIsPartial && i === lastIdx ? 0.3 : 1} />
             ))}
           </Bar>
+        ))}
+        {[...markersByDate.entries()].map(([day, label]) => (
+          <ReferenceLine
+            key={day}
+            x={day}
+            stroke="#a78bfa"
+            strokeDasharray="4 3"
+            strokeOpacity={0.7}
+            label={{
+              value: label.length > 22 ? `${label.slice(0, 22)}…` : label,
+              position: 'top',
+              fill: '#a78bfa',
+              fontSize: 10,
+            }}
+          />
         ))}
       </RechartsBarChart>
       </ResponsiveContainer>

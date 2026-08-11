@@ -1,4 +1,4 @@
-import { StackedBarChart } from '@/components/stacked-bar-chart';
+import { StackedBarChart, type ChartMarker } from '@/components/stacked-bar-chart';
 import { StatCardV2 } from '@/components/dashboard/stat-card-v2';
 import { BusinessFunnelChart, type BusinessFunnelDay } from '@/components/dashboard/business-funnel-chart';
 import { ClientsTable, type ActivationClientRow } from '@/components/dashboard/clients-table';
@@ -47,6 +47,7 @@ interface StatsResponse {
   };
   total_revenue_usdc: number;
   total_revenue_usdc_clean: number;
+  last_write_at: string | null;
   top_countries: Array<{ country: string; count: number }>;
 }
 
@@ -59,6 +60,8 @@ interface ActivationData {
 
 interface HistoryEntry {
   date: string;
+  expected_min: number | null;
+  expected_max: number | null;
   iban_validate: number;
   iban_batch: number;
   bic_lookup: number;
@@ -84,14 +87,39 @@ interface HourlyResponse {
 }
 
 // ---------------------------------------------------------------- fetchers
-async function getJSON<T>(path: string, headers: HeadersInit): Promise<T | null> {
+interface Fetched<T> {
+  ok: boolean;
+  /** HTTP status; 0 = network failure/timeout. */
+  status: number;
+  data: T | null;
+}
+
+/**
+ * Every block distinguishes "the fetch failed" from "the data is zero".
+ * A broken STATS_TOKEN once rendered as four days of empty charts that read
+ * exactly like a traffic collapse — a failed fetch must say so, in its own
+ * words, instead of drawing zeros.
+ */
+async function fetchJSON<T>(path: string, headers: HeadersInit): Promise<Fetched<T>> {
   try {
     const res = await fetch(`${API_URL}${path}`, { cache: 'no-store', headers });
-    if (!res.ok) return null;
-    return (await res.json()) as T;
+    if (!res.ok) return { ok: false, status: res.status, data: null };
+    return { ok: true, status: res.status, data: (await res.json()) as T };
   } catch {
-    return null;
+    return { ok: false, status: 0, data: null };
   }
+}
+
+function FetchFailed({ name, status }: { name: string; status: number }) {
+  return (
+    <div className="flex h-24 flex-col items-center justify-center gap-1 rounded-xl border border-red-500/30 bg-red-500/5 p-4">
+      <p className="text-sm font-medium text-red-300">{name} — récupération en échec</p>
+      <p className="text-xs text-[var(--fg-4)]">
+        {status === 0 ? 'API injoignable (timeout ou réseau)' : status === 401 || status === 403 ? `HTTP ${status} — jeton invalide ou tourné` : `HTTP ${status}`}
+        . Ce bloc n&rsquo;affiche pas des zéros : les données n&rsquo;ont pas pu être lues.
+      </p>
+    </div>
+  );
 }
 
 // ---------------------------------------------------------------- contact base
@@ -193,23 +221,28 @@ export default async function DashboardPage({
     ? (periodParam as ValidPeriod)
     : 30;
 
-  const [stats, history, funnel, activation, errors, hourly, crm] = await Promise.all([
-    getJSON<StatsResponse>('/stats', statsHeaders),
-    getJSON<HistoryEntry[]>(`/stats/history?period=${period}`, statsHeaders),
-    getJSON<{ rows?: BusinessFunnelDay[] }>(`/stats/business-funnel?period=${period}`, statsHeaders),
+  const [statsRes, historyRes, funnelRes, activationRes, errorsRes, hourlyRes, eventsRes, crm] = await Promise.all([
+    fetchJSON<StatsResponse>('/stats', statsHeaders),
+    fetchJSON<HistoryEntry[]>(`/stats/history?period=${period}`, statsHeaders),
+    fetchJSON<{ rows?: BusinessFunnelDay[] }>(`/stats/business-funnel?period=${period}`, statsHeaders),
     // Per-email activation: the clients table, human funnel, sources and
     // cohorts all read this one payload. Only 30 and 90 are served upstream.
     ADMIN_SECRET
-      ? getJSON<ActivationData>(`/v1/admin/activation?days=${period === 90 ? 90 : 30}`, { 'X-Admin-Secret': ADMIN_SECRET })
-      : Promise.resolve(null),
-    getJSON<ErrorsResponse>(`/stats/errors?period=${period}`, statsHeaders),
-    getJSON<HourlyResponse>(`/stats/hourly?period=${period}`, statsHeaders),
+      ? fetchJSON<ActivationData>(`/v1/admin/activation?days=${period === 90 ? 90 : 30}`, { 'X-Admin-Secret': ADMIN_SECRET })
+      : Promise.resolve({ ok: false, status: 0, data: null } satisfies Fetched<ActivationData>),
+    fetchJSON<ErrorsResponse>(`/stats/errors?period=${period}`, statsHeaders),
+    fetchJSON<HourlyResponse>(`/stats/hourly?period=${period}`, statsHeaders),
+    fetchJSON<{ events: Array<{ created_at: string; kind: string; label: string }> }>(
+      `/stats/events?period=${period}`,
+      statsHeaders,
+    ),
     // The CRM payloads, alongside the rest rather than after it. Null when
     // ADMIN_SECRET is unset or the API is unreachable, which is the same
     // condition the leads section already draws its own empty state for.
     fetchCrmData(),
   ]);
 
+  const stats = statsRes.data;
   if (!stats) {
     return (
       <div className="rounded-xl border border-[var(--ink-4)]/60 bg-gradient-to-br from-[var(--ink-2)] to-[var(--ink-2)]/60 p-8 text-center">
@@ -217,13 +250,29 @@ export default async function DashboardPage({
           <span className="text-xl text-red-400">!</span>
         </div>
         <p className="font-medium text-[var(--fg-2)]">{t('error.apiUnavailable')}</p>
-        <p className="mt-1 text-sm text-[var(--fg-4)]">{t('error.apiUnavailableDescription')}</p>
+        <p className="mt-1 text-sm text-[var(--fg-4)]">
+          {t('error.apiUnavailableDescription')}{' '}
+          {statsRes.status === 401 || statsRes.status === 403
+            ? `(HTTP ${statsRes.status} — le jeton stats est invalide ou vient d'être tourné.)`
+            : statsRes.status !== 0
+              ? `(HTTP ${statsRes.status})`
+              : '(injoignable)'}
+        </p>
       </div>
     );
   }
 
+  const activation = activationRes.data;
+  const history = historyRes.data;
   const hist = history ?? [];
-  const funnelRows = funnel?.rows ?? [];
+  const funnelRows = funnelRes.data?.rows ?? [];
+  const errors = errorsRes.data;
+  const hourly = hourlyRes.data;
+  const chartMarkers: ChartMarker[] = (eventsRes.data?.events ?? []).map((e) => ({
+    date: e.created_at.slice(0, 10),
+    label: e.label,
+    kind: e.kind,
+  }));
 
   // --- KPIs: today's API operations + trend + sparkline
   const ops = (d?: HistoryEntry) =>
@@ -279,8 +328,8 @@ export default async function DashboardPage({
 
   return (
     <div className="flex flex-col gap-6">
-      {/* 0. Live health */}
-      <LiveHealthStrip />
+      {/* 0. Live health + collection freshness witness */}
+      <LiveHealthStrip lastWriteAt={stats.last_write_at} />
 
       {/* 1. KPI row — the four numbers that matter */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -345,7 +394,11 @@ export default async function DashboardPage({
             <strong className="text-red-400">Server error</strong> = 5xx, doit rester à zéro.
           </InfoDot>
         </div>
-        <BusinessFunnelChart data={funnelRows} />
+        {!funnelRes.ok ? (
+          <FetchFailed name="Funnel métier" status={funnelRes.status} />
+        ) : (
+          <BusinessFunnelChart data={funnelRows} markers={chartMarkers} />
+        )}
       </div>
 
       {/* 3. Contact base — the podium, the relationship figures, the campaigns */}
@@ -354,9 +407,13 @@ export default async function DashboardPage({
       {/* 4. Clients — per email, credits first */}
       {!activation ? (
         <div className={card}>
-          <div className="flex h-24 items-center justify-center text-sm text-[var(--fg-5)]">
-            ADMIN_SECRET non configuré — vue clients indisponible.
-          </div>
+          {ADMIN_SECRET && activationRes.status !== 0 ? (
+            <FetchFailed name="Vue clients (activation)" status={activationRes.status} />
+          ) : (
+            <div className="flex h-24 items-center justify-center text-sm text-[var(--fg-5)]">
+              ADMIN_SECRET non configuré — vue clients indisponible.
+            </div>
+          )}
         </div>
       ) : (
         <>
@@ -375,7 +432,9 @@ export default async function DashboardPage({
             <p className={sectionTitle}>Requêtes HTTP — {period} jours</p>
             <InfoDot>Total des requêtes par jour, toutes routes (y compris scanner, discovery). Surveille la pente et surtout les 5xx (rouge).</InfoDot>
           </div>
-          {hist.length > 0 ? (
+          {!historyRes.ok ? (
+            <FetchFailed name="Requêtes HTTP" status={historyRes.status} />
+          ) : hist.length > 0 ? (
             <StackedBarChart
               data={hist}
               bars={[
@@ -384,6 +443,8 @@ export default async function DashboardPage({
                 { key: 's4xx', color: '#eab308', label: '4xx' },
                 { key: 's5xx', color: '#ef4444', label: '5xx' },
               ]}
+              band={{ minKey: 'expected_min', maxKey: 'expected_max' }}
+              markers={chartMarkers}
             />
           ) : (
             <div className="flex h-64 items-center justify-center text-sm text-[var(--fg-4)]">{t('chart.noHistoryData')}</div>
