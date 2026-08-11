@@ -316,6 +316,8 @@ export interface StatsOverview {
   };
   /** @deprecated use total_revenue_attempted_usdc + /admin/revenue (on-chain source of truth) */
   total_revenue_usdc: number;
+  /** Attempted x402 revenue counted from 2026-04-18 only — excludes the early-rollout drift where verify passed but settlement never landed. */
+  total_revenue_usdc_clean: number;
   /** Sum of `revenue_usdc` recorded in daily_stats — represents x402 calls that PASSED the payment middleware verify step, NOT necessarily settled on-chain. For settled USDC see /admin/revenue. */
   total_revenue_attempted_usdc: number;
   revenue_note: string;

@@ -567,6 +567,14 @@ export function getStats(): StatsOverview {
     'SELECT COALESCE(SUM(revenue_usdc), 0) as total FROM daily_stats'
   ).get() as { total: number };
 
+  // The early x402 rollout (before 2026-04-18) recorded attempted payments
+  // whose on-chain settlement never happened — see revenue_note below. The
+  // clean figure starts after that drift so the dashboard can show a sum
+  // that is not knowingly overstated.
+  const revenueClean = db.prepare(
+    "SELECT COALESCE(SUM(revenue_usdc), 0) as total FROM daily_stats WHERE date >= '2026-04-18'"
+  ).get() as { total: number };
+
   const topCountries = db.prepare(
     'SELECT country_code as country, COUNT(*) as count FROM operations WHERE country_code IS NOT NULL GROUP BY country_code ORDER BY count DESC LIMIT 10'
   ).all() as Array<{ country: string; count: number }>;
@@ -616,6 +624,7 @@ export function getStats(): StatsOverview {
       },
     },
     total_revenue_usdc: Math.round(revenue.total * 1000000) / 1000000,
+    total_revenue_usdc_clean: Math.round(revenueClean.total * 1000000) / 1000000,
     total_revenue_attempted_usdc: Math.round(revenue.total * 1000000) / 1000000,
     revenue_note:
       'total_revenue_usdc and total_revenue_attempted_usdc both reflect the SUM of revenue_usdc in daily_stats — these are x402 calls that PASSED the payment middleware verify step, NOT a confirmation of on-chain settlement. Authoritative settled USDC is /admin/revenue (Bearer STATS_TOKEN). Historical drift observed: ~0.226 USDC counted as attempted between 2026-04-08 and 2026-04-17 with no matching Base mainnet Transfer events to the seller wallet — likely facilitator settlement failures during the early x402 rollout.',

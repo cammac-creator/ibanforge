@@ -62,3 +62,18 @@ describe('GET /stats/rejections', () => {
     expect(((await garbage.json()) as { period_days: number }).period_days).toBe(30);
   });
 });
+
+describe('GET /stats — clean revenue total', () => {
+  it('serves total_revenue_usdc_clean, bounded by the raw total', async () => {
+    const res = await app.request('/stats', auth);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      total_revenue_usdc: number;
+      total_revenue_usdc_clean: number;
+    };
+    expect(typeof body.total_revenue_usdc_clean).toBe('number');
+    // The clean figure excludes the pre-2026-04-18 drift, so it can never
+    // exceed the all-time attempted sum.
+    expect(body.total_revenue_usdc_clean).toBeLessThanOrEqual(body.total_revenue_usdc);
+  });
+});

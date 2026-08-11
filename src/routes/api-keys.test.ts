@@ -137,3 +137,30 @@ describe('/v1/keys/generate — acquisition source (best-effort)', () => {
     expect(rowBad.source).toBeNull();
   });
 });
+
+describe('/v1/admin/activation — per-email activation view', () => {
+  it('rejects without the admin secret', async () => {
+    const app = makeApp();
+    const res = await app.request('/v1/admin/activation');
+    expect(res.status).toBe(401);
+  });
+
+  it('returns the four blocks with a clamped period', async () => {
+    const app = makeApp();
+    const res = await app.request('/v1/admin/activation?days=45', {
+      headers: { 'X-Admin-Secret': 'correct-horse-battery-staple' },
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      clients: unknown[];
+      funnel: { period_days: number };
+      sources: unknown[];
+      cohorts: unknown[];
+    };
+    expect(Array.isArray(body.clients)).toBe(true);
+    expect(Array.isArray(body.sources)).toBe(true);
+    expect(body.cohorts).toHaveLength(8);
+    // Only 30 and 90 are served; anything else falls back to 30.
+    expect(body.funnel.period_days).toBe(30);
+  });
+});

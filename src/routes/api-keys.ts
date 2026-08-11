@@ -3,6 +3,7 @@ import { timingSafeEqual, createHash } from 'node:crypto';
 import { generateApiKey, validateApiKey, getUsage, revokeApiKey, rotateApiKey } from '../lib/api-keys.js';
 import { getStatsDB } from '../lib/db.js';
 import { getClientProfiles, getBotProfiles } from '../lib/stats.js';
+import { getActivation } from '../lib/activation.js';
 import { notifyPurchaseTelegram } from '../lib/notify.js';
 import { sendApiKeyEmail, isEmailConfigured } from '../lib/email.js';
 
@@ -621,6 +622,21 @@ apiKeys.get('/v1/admin/client-profiles', (c) => {
     months_by_key: monthsByKey,
     quota_warned_by_key: warnedByKey,
   });
+});
+
+/**
+ * The activation picture the dashboard's Clients view reads: everything
+ * aggregated per EMAIL (a buyer's pack lives on a separate key whose monthly
+ * counter stays at zero — any per-key reading shows a paying customer as
+ * unused). Two periods only: the dashboard's own selector offers 30 and 90.
+ */
+apiKeys.get('/v1/admin/activation', (c) => {
+  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
+  const daysParam = parseInt(c.req.query('days') ?? '30', 10);
+  const days = daysParam === 90 ? 90 : 30;
+  return c.json(getActivation(days));
 });
 
 /**
