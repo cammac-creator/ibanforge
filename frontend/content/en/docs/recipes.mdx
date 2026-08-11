@@ -26,7 +26,7 @@ from ibanforge import IBANforge
 client = IBANforge(api_key="ifk_your_key")
 result = client.validate("DE89370400440532013000")
 print(result["valid"], result["bic"]["code"], result["bank_code_check"]["status"])
-# True COBADEFF verified
+# True COBADEFFXXX verified
 ```
 
 Or plain `requests`:
@@ -59,7 +59,7 @@ const res = await fetch("https://api.ibanforge.com/v1/iban/validate", {
 });
 const data = await res.json();
 console.log(data.valid, data.bic?.code, data.bank_code_check?.status);
-// true COBADEFF verified
+// true COBADEFFXXX verified
 ```
 
 The official SDK (`npm install @ibanforge/sdk`) wraps the same call with types.
@@ -131,7 +131,7 @@ The response the recipes print (production answer, abridged):
 ```json
 {
   "valid": true,
-  "bic": { "code": "COBADEFF", "bank_name": "COMMERZBANK Aktiengesellschaft", "city": "Frankfurt am Main" },
+  "bic": { "code": "COBADEFFXXX", "bank_name": "Commerzbank", "city": "Köln" },
   "bank_code_check": {
     "value": "37040044",
     "status": "verified",

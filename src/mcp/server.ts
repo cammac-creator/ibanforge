@@ -62,9 +62,9 @@ Supports 89 countries including all SEPA/EEA countries, Switzerland, UK, and 50+
 
 next_steps is ordered advice derived from the result: what blocks a payment first, what merely enriches it after. Branch on the code field, not on the prose, and relay the do field to the user. bank_code_not_allocated means stop; verify_payee_name means carry on and let a beneficiary name check decide.
 
-Example: input 'DE89370400440532013000' → { valid: true, country: { code: 'DE', name: 'Germany' }, bban: { bank_code: '37040044', account_number: '0532013000' }, bic: { code: 'COBADEFF', bank_name: 'COMMERZBANK Aktiengesellschaft', city: 'Frankfurt am Main' }, issuer: { type: 'bank', name: 'COMMERZBANK Aktiengesellschaft' }, ... }
+Example: input 'DE89370400440532013000' → { valid: true, country: { code: 'DE', name: 'Germany' }, bban: { bank_code: '37040044', account_number: '0532013000' }, bic: { code: 'COBADEFFXXX', bank_name: 'Commerzbank', city: 'Köln' }, issuer: { type: 'bank', name: 'Commerzbank' }, ... }
 
-The BIC is normalised to 8 characters. Ask for the branch with lookup_bic if you need the 11-character form.
+For German IBANs the BIC is the Bundesbank register's exact 11-character form (branch included), because the BIC8 prefix of Sparkassen and cooperative banks names their shared Landesbank, not the account-holding bank. Elsewhere the BIC is normalised to 8 characters; ask for the branch with lookup_bic if you need the 11-character form.
 
 Cost: $0.005 USDC per call via x402 micropayment on Base L2.`,
     inputSchema: {

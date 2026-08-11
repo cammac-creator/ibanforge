@@ -100,7 +100,7 @@ api.ibanforge.com"):
 
 | Prompt | Expect |
 |---|---|
-| `Validate IBAN DE89370400440532013000` | valid=true, bank = Commerzbank (COBADEFF), SEPA member |
+| `Validate IBAN DE89370400440532013000` | valid=true, bank = Commerzbank (COBADEFFXXX), SEPA member |
 | `Look up BIC ABOCCNBJXXX` | Agricultural Bank of China, Beijing, address incl. romanized line |
 | `Screen FR7630006000011234567890189` | a risk score 0-100 + factors |
 

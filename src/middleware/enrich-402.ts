@@ -127,7 +127,7 @@ const DISCOVERY: Array<{ match: (m: string, p: string) => boolean; data: BazaarD
             iban: 'DE89370400440532013000',
             valid: true,
             country: { code: 'DE', name: 'Germany' },
-            bic: { code: 'COBADEFF', bank_name: 'COMMERZBANK Aktiengesellschaft', city: 'Frankfurt am Main' },
+            bic: { code: 'COBADEFFXXX', bank_name: 'Commerzbank', city: 'Köln' },
           },
         ],
         count: 2,

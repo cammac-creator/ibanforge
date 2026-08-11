@@ -70,10 +70,14 @@ describe('validate_iban: the documented shape is the returned shape', () => {
     }
   });
 
-  it('shows an 8-character BIC in its example, as the service normalises', () => {
-    expect(result.bic?.code).toHaveLength(8);
-    const example = STDIO.slice(STDIO.indexOf("'validate_iban'"), STDIO.indexOf("'validate_iban'") + 3000);
-    expect(example).not.toContain('COBADEFFXXX');
+  it('shows the register 11-character BIC in its German example, as the service now serves', () => {
+    // Until 2026-08-11 the service normalised every BIC to 8 characters and this
+    // test pinned that. For Germany the truth inverted: the BIC8 prefix of a
+    // Sparkasse names the shared Landesbank, so the register's 11-character
+    // form is the honest answer, and the documented example must match it.
+    expect(result.bic?.code).toBe('COBADEFFXXX');
+    expect(STDIO).toContain("bic: { code: 'COBADEFFXXX'");
+    expect(STDIO).not.toContain("bic: { code: 'COBADEFF'");
   });
 });
 

@@ -21,13 +21,25 @@ function check(iban: string) {
 
 describe('bank_code_check', () => {
   it('reports verified, and says the answer came from an exact register key', () => {
-    // Commerzbank, the canonical German example IBAN.
+    // Commerzbank, the canonical German example IBAN. The BIC is the register's
+    // exact 11-character form, not the composite BIC8.
     const r = check('DE89370400440532013000');
     expect(r.bank_code_check).toBeDefined();
     expect(r.bank_code_check!.value).toBe('37040044');
     expect(r.bank_code_check!.status).toBe('verified');
     expect(r.bank_code_check!.match).toBe('register');
-    expect(r.bic?.code).toBe('COBADEFF');
+    expect(r.bic?.code).toBe('COBADEFFXXX');
+  });
+
+  it('serves the register BIC of the account-holding bank, not the BIC8 of the shared Landesbank', () => {
+    // The failure a German integrator measured before dropping the API: for
+    // Sparkassen, the first eight characters of the BIC belong to the shared
+    // clearing Landesbank. BLZ 55350010 is a Sparkasse whose register BIC is
+    // MALADE51WOR; MALADE51 alone names a different institution entirely.
+    const r = check('DE95553500100000005017');
+    expect(r.bank_code_check!.status).toBe('verified');
+    expect(r.bic?.code).toBe('MALADE51WOR');
+    expect(r.bic?.bank_name).toBe('Rheinhessen Sparkasse');
   });
 
   it('separates "absent from our reference data" from "we have no data here"', () => {

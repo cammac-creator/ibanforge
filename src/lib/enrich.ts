@@ -243,6 +243,21 @@ export function enrichResult(result: IBANValidationResult): void {
   const hit = lookupByCountryBank(cc, bankCode);
   result.bic = hit ? { code: hit.code, bank_name: hit.bank_name, city: hit.city } : null;
 
+  // Germany: the Bundesbank register carries the exact 11-character BIC per
+  // BLZ, so serve it over the composite BIC8 fallback. The fallback resolves
+  // the first eight characters, and for Sparkassen and cooperative banks those
+  // eight name the shared clearing institution — the Landesbank — not the bank
+  // holding the account. A German integrator measured the failure precisely
+  // (BLZ 55350010 is a Sparkasse with BIC MALADE51WOR, while MALADE51 alone is
+  // the Landesbank) and dropped the API over it. Register truth first; the
+  // composite stays as the fallback for the 2 of 3,506 BLZ without a BIC.
+  if (cc === 'DE') {
+    const reg = lookupBlz(bankCode);
+    if (reg?.bic) {
+      result.bic = { code: reg.bic, bank_name: reg.name, city: reg.town };
+    }
+  }
+
   // Issuer classification — BIC8 exact match, then institution-name fallback
   if (result.bic) {
     // 'bank' is the fallback for every BIC8 the curated set does not name, which
