@@ -78,6 +78,19 @@ interface LogAgg {
   paywall_hits: number;
 }
 
+/**
+ * Datetimes in these tables come in two shapes: SQLite defaults write
+ * 'YYYY-MM-DD HH:MM:SS' (UTC, no marker) while application inserts store full
+ * ISO strings. Normalizing here is what keeps mondayOf() from producing an
+ * Invalid Date on the second shape (a double-Z crashed this module's first
+ * production run).
+ */
+function parseSqlUtc(sql: string): Date {
+  const iso = sql.includes('T') ? sql : sql.replace(' ', 'T');
+  const marked = /(Z|[+-]\d\d:?\d\d)$/.test(iso) ? iso : `${iso}Z`;
+  return new Date(marked);
+}
+
 function median(values: number[]): number | null {
   if (values.length === 0) return null;
   const sorted = [...values].sort((a, z) => a - z);
@@ -87,12 +100,13 @@ function median(values: number[]): number | null {
 }
 
 function hoursBetween(fromSql: string, toSql: string): number {
-  return (new Date(`${toSql.replace(' ', 'T')}Z`).getTime() - new Date(`${fromSql.replace(' ', 'T')}Z`).getTime()) / 3_600_000;
+  return (parseSqlUtc(toSql).getTime() - parseSqlUtc(fromSql).getTime()) / 3_600_000;
 }
 
 /** Monday (UTC) of the week containing the given SQL datetime. */
-function mondayOf(sqlDate: string): string {
-  const d = new Date(`${sqlDate.replace(' ', 'T')}Z`);
+function mondayOf(sqlDate: string): string | null {
+  const d = parseSqlUtc(sqlDate);
+  if (Number.isNaN(d.getTime())) return null;
   const shift = (d.getUTCDay() + 6) % 7; // Mon=0 … Sun=6
   d.setUTCDate(d.getUTCDate() - shift);
   return d.toISOString().slice(0, 10);
@@ -148,7 +162,7 @@ export function getActivation(days = 30): ActivationResponse {
   }
 
   const nowMs = Date.now();
-  const ageDays = (sql: string) => (nowMs - new Date(`${sql.replace(' ', 'T')}Z`).getTime()) / 86_400_000;
+  const ageDays = (sql: string) => (nowMs - parseSqlUtc(sql).getTime()) / 86_400_000;
 
   const clients: ActivationClient[] = [];
   for (const [email, list] of byEmail) {
@@ -218,7 +232,7 @@ export function getActivation(days = 30): ActivationResponse {
 
   // ---- funnel: signups of the period, each step = "ever reached that state"
   const cutoffMs = nowMs - days * 86_400_000;
-  const inPeriod = clients.filter((c) => new Date(`${c.signup_at.replace(' ', 'T')}Z`).getTime() >= cutoffMs);
+  const inPeriod = clients.filter((c) => parseSqlUtc(c.signup_at).getTime() >= cutoffMs);
   const called = inPeriod.filter((c) => c.first_call_at !== null);
   const limited = inPeriod.filter(
     (c) => c.paywall_hits > 0 || (c.free_quota > 0 && c.free_used_month >= c.free_quota),
@@ -263,7 +277,7 @@ export function getActivation(days = 30): ActivationResponse {
   const sources = [...bySource.values()].sort((a, z) => z.signups - a.signups);
 
   // ---- cohorts: last 8 full ISO weeks (current week included), all clients
-  const currentMonday = mondayOf(new Date(nowMs).toISOString().replace('T', ' ').slice(0, 19));
+  const currentMonday = mondayOf(new Date(nowMs).toISOString())!;
   const weekStarts: string[] = [];
   for (let i = 7; i >= 0; i--) {
     const d = new Date(`${currentMonday}T00:00:00Z`);
@@ -274,7 +288,8 @@ export function getActivation(days = 30): ActivationResponse {
     weekStarts.map((w) => [w, { signups: 0, called: 0, paid: 0 }]),
   );
   for (const c of clients) {
-    const bucket = cohortMap.get(mondayOf(c.signup_at));
+    const monday = mondayOf(c.signup_at);
+    const bucket = monday ? cohortMap.get(monday) : undefined;
     if (!bucket) continue;
     bucket.signups += 1;
     if (c.first_call_at !== null) bucket.called += 1;

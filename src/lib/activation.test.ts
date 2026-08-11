@@ -38,7 +38,11 @@ beforeAll(() => {
   // SLEEPER: bought a pack 20 days ago, never called since day 18.
   insKey.run(`${PFX}_s_paid`, `${PFX}_s_paid`, SLEEPER, daysAgo(20), null, 1000, 1000, null);
   // FRESH: signed up yesterday (Wednesday-independent), no call yet, no source.
-  insKey.run(`${PFX}_f_free`, `${PFX}_f_free`, FRESH, daysAgo(1), 200, null, null, null);
+  // created_at deliberately in FULL ISO form (T, millis, Z): production rows
+  // written by application code carry this format while SQLite defaults write
+  // 'YYYY-MM-DD HH:MM:SS' — the aggregation must survive both (it crashed on
+  // the double-Z parse the first night it ran).
+  insKey.run(`${PFX}_f_free`, `${PFX}_f_free`, FRESH, new Date(now - 86_400_000).toISOString(), 200, null, null, null);
   // INTERNAL: must never appear.
   insKey.run(`${PFX}_i_free`, `${PFX}_i_free`, INTERNAL, daysAgo(5), 200, null, null, null);
 
