@@ -9,6 +9,7 @@ import {
   type AcquisitionCohortRow,
 } from '@/components/dashboard/acquisition-panel';
 import { Heatmap } from '@/components/dashboard/heatmap';
+import { WeeklyDigestCard, type DigestEntry } from '@/components/dashboard/weekly-digest-card';
 import { ErrorTable } from '@/components/dashboard/error-table';
 import { InfoDot } from '@/components/dashboard/info-dot';
 import { RevenueCard } from '@/components/dashboard/revenue-card';
@@ -221,7 +222,7 @@ export default async function DashboardPage({
     ? (periodParam as ValidPeriod)
     : 30;
 
-  const [statsRes, historyRes, funnelRes, activationRes, errorsRes, hourlyRes, eventsRes, crm] = await Promise.all([
+  const [statsRes, historyRes, funnelRes, activationRes, errorsRes, hourlyRes, eventsRes, digestRes, crm] = await Promise.all([
     fetchJSON<StatsResponse>('/stats', statsHeaders),
     fetchJSON<HistoryEntry[]>(`/stats/history?period=${period}`, statsHeaders),
     fetchJSON<{ rows?: BusinessFunnelDay[] }>(`/stats/business-funnel?period=${period}`, statsHeaders),
@@ -236,6 +237,9 @@ export default async function DashboardPage({
       `/stats/events?period=${period}`,
       statsHeaders,
     ),
+    ADMIN_SECRET
+      ? fetchJSON<{ digests: DigestEntry[] }>('/v1/admin/digest?limit=8', { 'X-Admin-Secret': ADMIN_SECRET })
+      : Promise.resolve({ ok: false, status: 0, data: null } satisfies Fetched<{ digests: DigestEntry[] }>),
     // The CRM payloads, alongside the rest rather than after it. Null when
     // ADMIN_SECRET is unset or the API is unreachable, which is the same
     // condition the leads section already draws its own empty state for.
@@ -330,6 +334,9 @@ export default async function DashboardPage({
     <div className="flex flex-col gap-6">
       {/* 0. Live health + collection freshness witness */}
       <LiveHealthStrip lastWriteAt={stats.last_write_at} />
+
+      {/* 0b. Monday auto-written digest (hidden until the first one lands) */}
+      <WeeklyDigestCard digests={digestRes.data?.digests ?? []} />
 
       {/* 1. KPI row — the four numbers that matter */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
