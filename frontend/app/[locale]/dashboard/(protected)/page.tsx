@@ -1,6 +1,13 @@
 import { StackedBarChart } from '@/components/stacked-bar-chart';
 import { StatCardV2 } from '@/components/dashboard/stat-card-v2';
 import { BusinessFunnelChart, type BusinessFunnelDay } from '@/components/dashboard/business-funnel-chart';
+import { ClientsTable, type ActivationClientRow } from '@/components/dashboard/clients-table';
+import { ActivationFunnel, type ActivationFunnelData } from '@/components/dashboard/activation-funnel';
+import {
+  AcquisitionPanel,
+  type AcquisitionSourceRow,
+  type AcquisitionCohortRow,
+} from '@/components/dashboard/acquisition-panel';
 import { Heatmap } from '@/components/dashboard/heatmap';
 import { ErrorTable } from '@/components/dashboard/error-table';
 import { InfoDot } from '@/components/dashboard/info-dot';
@@ -39,7 +46,15 @@ interface StatsResponse {
     bic_lookup: { total: number; found_count: number; hit_rate: number };
   };
   total_revenue_usdc: number;
+  total_revenue_usdc_clean: number;
   top_countries: Array<{ country: string; count: number }>;
+}
+
+interface ActivationData {
+  clients: ActivationClientRow[];
+  funnel: ActivationFunnelData;
+  sources: AcquisitionSourceRow[];
+  cohorts: AcquisitionCohortRow[];
 }
 
 interface HistoryEntry {
@@ -53,19 +68,6 @@ interface HistoryEntry {
   s3xx: number;
   s4xx: number;
   s5xx: number;
-}
-
-interface KeyRow {
-  key_prefix: string;
-  email: string;
-  monthly_limit: number | null;
-  active: number;
-  created_at: string;
-  used: number;
-}
-interface KeysResponse {
-  month: string;
-  keys: KeyRow[];
 }
 
 interface ErrorsResponse {
@@ -90,24 +92,6 @@ async function getJSON<T>(path: string, headers: HeadersInit): Promise<T | null>
   } catch {
     return null;
   }
-}
-
-// ---------------------------------------------------------------- lead helpers
-function daysSince(isoDate: string): number {
-  return Math.floor((Date.now() - new Date(isoDate).getTime()) / 86_400_000);
-}
-function classify(row: KeyRow): { label: string; color: string; bg: string } {
-  const limit = row.monthly_limit ?? 200;
-  const isPilot = limit > 200;
-  const isSilent = row.used === 0;
-  const isAtRisk = limit > 0 && row.used / limit >= 0.8;
-  const created = daysSince(row.created_at);
-  if (!row.active) return { label: 'inactive', color: '#71717a', bg: '#27272a' };
-  if (isPilot && isSilent && created >= 3) return { label: 'silent', color: '#f59e0b', bg: '#451a03' };
-  if (isPilot && isSilent) return { label: 'pending', color: '#a78bfa', bg: '#2e1065' };
-  if (isAtRisk) return { label: 'at-risk', color: '#ef4444', bg: '#450a0a' };
-  if (row.used > 0) return { label: 'active', color: '#22c55e', bg: '#052e16' };
-  return { label: 'unused', color: '#71717a', bg: '#27272a' };
 }
 
 // ---------------------------------------------------------------- contact base
@@ -209,11 +193,15 @@ export default async function DashboardPage({
     ? (periodParam as ValidPeriod)
     : 30;
 
-  const [stats, history, funnel, keysData, errors, hourly, crm] = await Promise.all([
+  const [stats, history, funnel, activation, errors, hourly, crm] = await Promise.all([
     getJSON<StatsResponse>('/stats', statsHeaders),
     getJSON<HistoryEntry[]>(`/stats/history?period=${period}`, statsHeaders),
     getJSON<{ rows?: BusinessFunnelDay[] }>(`/stats/business-funnel?period=${period}`, statsHeaders),
-    ADMIN_SECRET ? getJSON<KeysResponse>('/v1/admin/keys', { 'X-Admin-Secret': ADMIN_SECRET }) : Promise.resolve(null),
+    // Per-email activation: the clients table, human funnel, sources and
+    // cohorts all read this one payload. Only 30 and 90 are served upstream.
+    ADMIN_SECRET
+      ? getJSON<ActivationData>(`/v1/admin/activation?days=${period === 90 ? 90 : 30}`, { 'X-Admin-Secret': ADMIN_SECRET })
+      : Promise.resolve(null),
     getJSON<ErrorsResponse>(`/stats/errors?period=${period}`, statsHeaders),
     getJSON<HourlyResponse>(`/stats/hourly?period=${period}`, statsHeaders),
     // The CRM payloads, alongside the rest rather than after it. Null when
@@ -260,27 +248,17 @@ export default async function DashboardPage({
   const ibanValid = stats.by_type?.iban_validate?.valid_count ?? 0;
   const successRate = ibanTotal > 0 ? ((ibanValid / ibanTotal) * 100).toFixed(1) : '—';
 
-  // --- Leads / pilots
+  // --- Clients (per-email activation payload)
   //
-  // "Pilot" has a SECOND, different definition in the CRM:
-  // lib/crm/build-contacts.ts (isPilot) requires
-  // `credits_total == null && monthly_limit >= 5000` before it sets a key
-  // aside as an evaluation. So an unpaid key at, say, 1000/month is a pilot to
-  // this KPI and an ordinary client to the CRM cards, and one at 5000 is a
-  // pilot here and absent from those cards entirely. Both rules pre-date the
-  // page that put them side by side; the divergence is known, not a bug, and
-  // moving either threshold moves figures the owner reads daily.
-  const allKeys = keysData?.keys ?? [];
-  const pilots = allKeys
-    // The outreach keys we minted at launch are unused by construction, so
-    // every one of them landed in "silent pilots to chase" and stayed there.
-    // A dozen names nobody was ever waiting on, presented as opportunities
-    // going cold, for 111 days, plus a KPI card counting them.
-    .filter((k) => !SEEDED_PILOT_RE.test(k.email))
-    .filter((k) => (k.monthly_limit ?? 200) > 200)
-    .sort((a, b) => b.used - a.used);
-  const activePilots = pilots.filter((k) => k.used > 0).length;
-  const silentPilots = pilots.filter((k) => k.used === 0 && daysSince(k.created_at) >= 3);
+  // "Pilot" keeps its historical meaning here — an elevated free quota
+  // (> 200/month) granted for an evaluation. The CRM has a SECOND, stricter
+  // definition (lib/crm/build-contacts.ts isPilot: monthly_limit >= 5000);
+  // both pre-date this page and the divergence is known, not a bug.
+  const activationClients = (activation?.clients ?? []).filter((c) => !SEEDED_PILOT_RE.test(c.email));
+  const pilotClients = activationClients.filter((c) => c.free_quota > 200);
+  const activePilots = pilotClients.filter((c) => c.first_call_at !== null).length;
+  const payingClients = activationClients.filter((c) => c.packs > 0);
+  const toChase = activationClients.filter((c) => c.status === 'dormant' || c.status === 'silent');
 
   // --- Quality
   const ibanErrRate = errors?.error_rate?.iban_validate?.rate ?? 0;
@@ -316,11 +294,11 @@ export default async function DashboardPage({
         />
         <StatCardV2
           title={t('stats.totalRevenue')}
-          value={`$${(stats.total_revenue_usdc ?? 0).toFixed(4)}`}
+          value={`$${(stats.total_revenue_usdc_clean ?? stats.total_revenue_usdc ?? 0).toFixed(4)}`}
           trend={revTrendPct ? { direction: revTrend, label: t('stats.vsYesterday', { percent: revTrendPct }) } : undefined}
           sparkline={revenueSparkline}
           accentColor="#22c55e"
-          hint="Revenu USDC réellement perçu (x402), cumulé. L'historique avant le 17 avril contient des revenus fantômes non corrigés, donc le cumul est surestimé."
+          hint="Revenu USDC x402 tenté, compté depuis le 18 avril 2026 — la dérive fantôme du premier déploiement (paiements vérifiés jamais réglés on-chain) est exclue du cumul. Source réglée on-chain : la carte Revenu plus bas."
         />
         <StatCardV2
           title={t('stats.successRate')}
@@ -330,15 +308,25 @@ export default async function DashboardPage({
           hint="% d'IBAN jugés valides parmi ceux soumis à /v1/iban/validate. Un taux bas = beaucoup d'IBAN mal formés en entrée."
         />
         <StatCardV2
-          title="Clients pilotes"
-          value={String(pilots.length)}
-          trend={pilots.length > 0 ? { direction: activePilots > 0 ? 'up' : 'neutral', label: `${activePilots} actifs` } : undefined}
+          title="Payants / pilotes"
+          value={`${payingClients.length} / ${pilotClients.length}`}
+          trend={
+            payingClients.length > 0
+              ? {
+                  direction: payingClients.some((c) => c.status === 'paying') ? 'up' : 'neutral',
+                  label: `${payingClients.filter((c) => c.status === 'paying').length} actifs`,
+                }
+              : undefined
+          }
           accentColor="#a855f7"
-          hint="Clés à quota relevé (> 200/mois). « actifs » = ont déjà appelé l'API ce mois. Les silencieux sont listés ci-dessous."
+          hint={`Payants = clients ayant acheté au moins un pack de crédits (${payingClients.filter((c) => c.status === 'paying').length} encore actifs, ${payingClients.filter((c) => c.status === 'dormant').length} endormis). Pilotes = quota gratuit relevé > 200/mois, dont ${activePilots} ont déjà appelé. Détail dans la table Clients.`}
         />
       </div>
 
-      {/* 2. Conversion funnel — where the money leaks (primacy) */}
+      {/* 2. Human activation funnel — the conversion picture (primacy) */}
+      {activation && <ActivationFunnel funnel={activation.funnel} />}
+
+      {/* 2b. HTTP conversion funnel — machine demand */}
       <div className={card}>
         <div className="mb-4 flex items-center gap-2">
           <p className={sectionTitle}>Funnel de conversion — {period} jours</p>
@@ -363,92 +351,19 @@ export default async function DashboardPage({
       {/* 3. Contact base — the podium, the relationship figures, the campaigns */}
       {crm && <ContactBase crm={crm} locale={locale} />}
 
-      {/* 4. Leads — silent pilots to chase (primacy) */}
-      <div className={card}>
-        <div className="mb-4 flex items-center justify-between gap-2">
-          <p className={sectionTitle}>Clients & leads{keysData ? ` — ${keysData.month}` : ''}</p>
-          {silentPilots.length > 0 && (
-            <span className="rounded-full bg-amber-500/10 px-2.5 py-0.5 text-xs font-semibold text-amber-400">
-              {silentPilots.length} à relancer
-            </span>
-          )}
-        </div>
-
-        {!keysData ? (
+      {/* 4. Clients — per email, credits first */}
+      {!activation ? (
+        <div className={card}>
           <div className="flex h-24 items-center justify-center text-sm text-[var(--fg-5)]">
-            ADMIN_SECRET non configuré — gestion des clés indisponible.
+            ADMIN_SECRET non configuré — vue clients indisponible.
           </div>
-        ) : (
-          <>
-            {silentPilots.length > 0 && (
-              <div className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
-                <p className="mb-2 text-xs font-medium text-amber-300">⚠ Pilotes silencieux (clé créée, jamais utilisée ≥ 3 j) — à relancer</p>
-                <ul className="space-y-1">
-                  {silentPilots.map((k) => (
-                    <li key={k.key_prefix} className="text-xs text-amber-200">
-                      <span className="font-mono text-amber-400">{k.key_prefix}</span> — {k.email}{' '}
-                      <span className="text-amber-500/60">({daysSince(k.created_at)} j)</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {pilots.length === 0 ? (
-              <div className="flex h-24 items-center justify-center text-sm text-[var(--fg-5)]">Aucun client pilote pour l’instant.</div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-[var(--ink-4)] text-left text-xs uppercase tracking-wide text-[var(--fg-4)]">
-                      <th className="pb-2 font-medium">Client</th>
-                      <th className="pb-2 font-medium">Créé</th>
-                      <th className="pb-2 font-medium">Usage</th>
-                      <th className="pb-2 font-medium">Statut</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pilots.map((k) => {
-                      const limit = k.monthly_limit ?? 200;
-                      const pct = limit > 0 ? Math.round((k.used / limit) * 100) : 0;
-                      const status = classify(k);
-                      return (
-                        <tr key={k.key_prefix} className="border-b border-[var(--ink-4)]/50 last:border-0">
-                          <td className="py-3">
-                            <div className="flex flex-col">
-                              <span className="max-w-[260px] truncate text-[var(--fg-1)]">{k.email}</span>
-                              <span className="font-mono text-[10px] text-[var(--fg-5)]">{k.key_prefix}</span>
-                            </div>
-                          </td>
-                          <td className="py-3 text-xs text-[var(--fg-3)]">{daysSince(k.created_at)} j</td>
-                          <td className="py-3">
-                            <div className="flex items-center gap-3">
-                              <span className="w-24 font-mono text-xs text-[var(--fg-2)]">
-                                {fmt(k.used, locale)} / {fmt(limit, locale)}
-                              </span>
-                              <div className="h-1.5 max-w-[120px] flex-1 overflow-hidden rounded-full bg-[var(--ink-4)]/60">
-                                <div className="h-full rounded-full" style={{ width: `${Math.min(pct, 100)}%`, backgroundColor: status.color }} />
-                              </div>
-                            </div>
-                          </td>
-                          <td className="py-3">
-                            <span
-                              className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
-                              style={{ color: status.color, backgroundColor: status.bg }}
-                            >
-                              {status.label}
-                            </span>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </>
-        )}
-      </div>
+        </div>
+      ) : (
+        <>
+          <ClientsTable clients={activation.clients} locale={locale} />
+          <AcquisitionPanel sources={activation.sources} cohorts={activation.cohorts} locale={locale} />
+        </>
+      )}
 
       {/* 5. Revenue (live USDC wallet) */}
       <RevenueCard />
@@ -511,7 +426,7 @@ export default async function DashboardPage({
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
         <StatCardV2 title="Taux erreur IBAN" value={`${ibanErrRate.toFixed(2)}%`} sparkline={ibanErrTrend} accentColor="#ef4444" hint="% de /v1/iban/validate renvoyant invalide, sur la période." />
         <StatCardV2 title="Taux miss BIC" value={`${bicMissRate.toFixed(2)}%`} sparkline={bicMissTrend} accentColor="#eab308" hint="% de /v1/bic/:code sans correspondance, sur la période." />
-        <StatCardV2 title="Pilotes silencieux" value={String(silentPilots.length)} accentColor="#f59e0b" hint="Clés pilotes créées mais jamais utilisées depuis ≥ 3 jours — opportunités de relance." />
+        <StatCardV2 title="À relancer" value={String(toChase.length)} accentColor="#f59e0b" hint="Payants endormis (plus d'appel depuis 14 j) + inscrits jamais activés depuis ≥ 3 jours. Le détail est dans la bannière de la table Clients." />
       </div>
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <ErrorTable
