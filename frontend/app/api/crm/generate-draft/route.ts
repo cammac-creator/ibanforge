@@ -38,8 +38,16 @@ async function enrichWithUsageFacts(body: unknown): Promise<unknown> {
     if (mine.length === 0) return body;
 
     const num = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
-    const usedMonth = mine.reduce((a, k) => a + num(k.used), 0);
-    const quota = mine.reduce((a, k) => a + (num(k.monthly_limit) || 200), 0);
+    // Paid keys live outside the free monthly counter: their calls burn
+    // prepaid credits, so `used` stays at 0 and a free-tier-only reading
+    // produces the exact wrong mail (upselling the pack they already bought —
+    // which is what happened on the first live control of this route).
+    const freeKeys = mine.filter((k) => !num(k.paid));
+    const paidKeys = mine.filter((k) => num(k.paid));
+    const usedMonth = freeKeys.reduce((a, k) => a + num(k.used), 0);
+    const quota = freeKeys.reduce((a, k) => a + (num(k.monthly_limit) || 200), 0);
+    const creditsTotal = paidKeys.reduce((a, k) => a + num(k.credits_total), 0);
+    const creditsLeft = paidKeys.reduce((a, k) => a + num(k.credits_remaining), 0);
     const created = mine
       .map((k) => String(k.created_at ?? ''))
       .filter(Boolean)
@@ -72,7 +80,12 @@ async function enrichWithUsageFacts(body: unknown): Promise<unknown> {
     const lines = [
       "API usage facts for this contact, from live IBANforge data. Ground the mail in them, use ONLY these facts, copy numbers exactly, never infer beyond them:",
       `- keys: ${mine.length}${created ? ` (first created ${created})` : ''}${sources.length ? `, signup source: ${sources.join(', ')}` : ''}`,
-      `- this month: ${usedMonth} of ${quota} free calls used${usedMonth >= quota ? ' (quota reached)' : ''}${paywall ? `, ${paywall} refused at the paywall` : ''}`,
+      paidKeys.length
+        ? `- PAYING CUSTOMER: bought a prepaid credit pack of ${creditsTotal} calls; ${creditsLeft} credits remaining (${creditsTotal - creditsLeft} already consumed). Do not sell them what they already own; thank them and help them get value from it.`
+        : '',
+      freeKeys.length
+        ? `- free tier this month: ${usedMonth} of ${quota} calls used${usedMonth >= quota ? ' (quota reached)' : ''}${paywall ? `, ${paywall} refused at the paywall` : ''}${paidKeys.length ? ' (before they bought the pack)' : ''}`
+        : '',
       total90 ? `- last 90 days: ${total90} successful calls; endpoints: ${top(byEndpoint, 4).map(([p, n]) => `${p} (${n})`).join(', ')}` : '- no successful call yet',
       byCountry.size ? `- countries checked: ${top(byCountry, 6).map(([c, n]) => `${c} (${n})`).join(', ')}` : '',
       agents.size ? `- stack: ${top(agents, 2).map(([u]) => u).join(', ')}` : '',
