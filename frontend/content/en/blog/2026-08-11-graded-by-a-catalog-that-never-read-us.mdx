@@ -1,0 +1,46 @@
+---
+title: "Graded 6.2/100 by a catalog that had never read us — what happened when it did"
+description: "IBANforge sat in the API Evangelist catalog since May with close to the worst score the instrument can produce, bulk-imported and never fetched. Then we submitted ourselves, Kin Lane re-read everything by hand, two of his findings shipped as fixes the same day — and the third cut the other way."
+date: "2026-08-11"
+---
+
+On 28 May 2026, IBANforge entered the [API Evangelist catalog](https://providers.apievangelist.com/providers/ibanforge/) without our knowledge: bulk-registered from a public list, with a single documentation pointer and nothing else. Nothing was ever fetched. Every contract-derived facet read 0.0, and the published numbers were a **Kin Score of 6.2** (band: *minimal*) and an **Agent Readiness of 0.0** (band: *human-only*).
+
+In other words: for ten weeks, one of the most respected API catalogs in the world told every reader — human or machine — that IBANforge was barely an API at all. We only learned this because we submitted ourselves to the catalog's [public inbox](https://github.com/api-search/inbox/issues/3) in August. Kin Lane's reply opened with a sentence we did not expect:
+
+> "Thanks for this — it's the most artifact-complete submission the inbox has had, and it turned up a problem on our side rather than yours."
+
+## What a real re-read looks like
+
+What followed was the most thorough independent audit this API has received. Every claim was fetched, not taken on trust — both hosts were probed with a control path first, to prove the 200s were real answers rather than a catch-all handler. The verified list:
+
+- **OpenAPI 3.1** — 18 paths, 18 operations, `operationId` on all of them
+- **apis.json** (specificationVersion 0.16) and the **RFC 9727 api-catalog** linkset
+- **llms.txt** on both hosts
+- **A2A agent card** — every required field present, including the `capabilities` object that fails 41 of the 65 agent cards he surveyed
+- **MCP over Streamable HTTP** — a full unauthenticated handshake: `initialize`, `tools/list`, and a real `tools/call` that returned a complete paid response
+- **x402 discovery** — 5 priced endpoints on Base L2
+
+The profile was then rebuilt from harvested artifacts, each traceable to a URL and a fetch date, and [pushed publicly](https://github.com/api-evangelist/ibanforge). Marketing claims were read and deliberately *not* carried into the profile as fact — a policy we wish more catalogs had.
+
+## Two findings, fixed the same day
+
+The re-read surfaced two real defects on our side.
+
+**Our agent card declared the wrong protocol generation.** It was written against A2A 0.3.0; the current release is 1.0. We migrated it the same day — following the normative proto rather than just bumping the string: versions are Major.Minor, `url`/`transport`/`version` consolidate into `supportedInterfaces`, and the extended-card flag moved into `capabilities`. The 0.3-era flat fields stay alongside deliberately, because the crawlers reading the card today still look there.
+
+**Three enums in our OpenAPI carried a literal `null` against `type: "string"`.** The root cause was more embarrassing than the symptom: the spec declares OpenAPI 3.1, but still carried 42 `nullable: true` keywords — a 3.0-only spelling that 3.1 silently ignores. That exact shape crashes the most common linter in the ecosystem. All 42 were converted to proper type arrays the same day; `spectral:oas` against [our live spec](https://api.ibanforge.com/openapi.json) now returns nothing.
+
+Both fixes were deployed and verified in production within hours of the review, and [reported back on the issue](https://github.com/api-search/inbox/issues/3) with before/after evidence.
+
+## The third finding cut the other way
+
+The review swept every provider profile in the catalog for x402 — the HTTP-native payment protocol our paid endpoints speak — and found **zero other instances across 3,767 MCP servers and 86 agent cards**. The catalog's scoring rubric has no check for machine-payable APIs yet, so this earns us nothing today. But the detail he singled out is the part we care about: we declare `x402Payment` as a `securityScheme` carried on the operations themselves, which means **the price is readable from the contract**, not only from a well-known file. That is the shape the future Kin Score check will be built against.
+
+Two days later, an unrelated data point landed in the same direction: the maintainer of a curated x402 directory merged our listing with the note that our paid routes answer both x402 dialects at once — "exactly the pattern more of the ecosystem should copy."
+
+## What we take from this
+
+Third-party records about your API rot silently, and the worst ones are produced by pipelines that never fetch anything. The only durable defense is the boring one: publish verifiable artifacts at standard paths — an honest OpenAPI document, an agent card, apis.json, llms.txt, a catalog linkset — and let anyone who actually reads them reproduce every claim. The one grader who did read them rebuilt our record from scratch, found two real bugs we are glad to be rid of, and identified the one bet we made that nobody else has made yet.
+
+The full exchange is public: [the submission and review](https://github.com/api-search/inbox/issues/3), [the rebuilt profile](https://github.com/api-evangelist/ibanforge), and [our data-sources page](/docs/data-sources) if you want to verify our claims yourself — which is rather the point.

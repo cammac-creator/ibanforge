@@ -235,6 +235,33 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
         </div>
       </section>
 
+      {/* ── Independently reviewed ────────────────────────────────────────── */}
+      <section className="border-t px-4 py-16 w-full" style={{ borderColor: 'var(--hairline)' }}>
+        <div className="max-w-3xl mx-auto flex flex-col items-center text-center gap-4">
+          <span className="eyebrow">{t('reviewed.label')}</span>
+          <blockquote className="text-lg sm:text-xl font-medium tracking-tight text-balance" style={{ letterSpacing: '-0.01em' }}>
+            “{t('reviewed.quote')}”
+          </blockquote>
+          <p className="text-sm text-muted-foreground max-w-xl text-balance">{t('reviewed.context')}</p>
+          <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs">
+            <a
+              href="https://github.com/api-search/inbox/issues/3"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline underline-offset-4 decoration-[var(--ink-5)] text-[var(--fg-4)] hover:text-[var(--fg-2)] transition-colors"
+            >
+              {t('reviewed.linkReview')}
+            </a>
+            <Link
+              href={`/${locale}/blog/2026-08-11-graded-by-a-catalog-that-never-read-us`}
+              className="underline underline-offset-4 decoration-[var(--ink-5)] text-[var(--fg-4)] hover:text-[var(--fg-2)] transition-colors"
+            >
+              {t('reviewed.linkStory')}
+            </Link>
+          </div>
+        </div>
+      </section>
+
       {/* ── Final CTA ─────────────────────────────────────────────────────── */}
       <section
         className="flex flex-col items-center text-center px-4 py-32 gap-6 border-t"

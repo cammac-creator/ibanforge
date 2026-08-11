@@ -1,0 +1,47 @@
+---
+title: "Noté 6,2/100 par un catalogue qui ne nous avait jamais lus — ce qui s'est passé quand il l'a fait"
+description: "IBANforge dormait dans le catalogue API Evangelist depuis mai avec presque la pire note possible, importé en masse et jamais consulté. Puis on s'est soumis nous-mêmes, Kin Lane a tout relu à la main, deux de ses constats sont devenus des correctifs le jour même — et le troisième jouait en notre faveur."
+date: "2026-08-11"
+---
+
+Le 28 mai 2026, IBANforge est entré dans le [catalogue API Evangelist](https://providers.apievangelist.com/providers/ibanforge/) à notre insu : enregistré en masse depuis une liste publique, avec un seul lien de documentation et rien d'autre. Rien n'a jamais été consulté. Chaque facette dérivée du contrat lisait 0,0, et les chiffres publiés étaient un **Kin Score de 6,2** (bande : *minimal*) et un **Agent Readiness de 0,0** (bande : *human-only*, « réservé aux humains »).
+
+Autrement dit : pendant dix semaines, l'un des catalogues d'API les plus respectés au monde a raconté à chaque lecteur — humain ou machine — qu'IBANforge était à peine une API. Nous ne l'avons appris qu'en nous soumettant nous-mêmes à son [inbox publique](https://github.com/api-search/inbox/issues/3) en août. La réponse de Kin Lane s'ouvrait sur une phrase inattendue :
+
+> « Thanks for this — it's the most artifact-complete submission the inbox has had, and it turned up a problem on our side rather than yours. »
+> (« Merci — c'est la soumission la plus complète en artefacts que l'inbox ait reçue, et elle a révélé un problème de notre côté plutôt que du vôtre. »)
+
+## À quoi ressemble une vraie relecture
+
+Ce qui a suivi est l'audit indépendant le plus complet que cette API ait reçu. Chaque affirmation a été consultée, pas crue sur parole — les deux hôtes ont d'abord été sondés avec un chemin de contrôle, pour prouver que les 200 étaient de vraies réponses et non un gestionnaire fourre-tout. La liste vérifiée :
+
+- **OpenAPI 3.1** — 18 chemins, 18 opérations, `operationId` partout
+- **apis.json** (specificationVersion 0.16) et le linkset **api-catalog RFC 9727**
+- **llms.txt** sur les deux hôtes
+- **Carte d'agent A2A** — tous les champs requis présents, y compris l'objet `capabilities` qui fait échouer 41 des 65 cartes d'agent qu'il a examinées
+- **MCP en Streamable HTTP** — une poignée de main complète sans authentification : `initialize`, `tools/list`, et un vrai `tools/call` qui a rendu une réponse payante complète
+- **Découverte x402** — 5 endpoints tarifés sur Base L2
+
+Le profil a ensuite été reconstruit à partir des artefacts récoltés, chacun traçable à une URL et une date de consultation, et [publié](https://github.com/api-evangelist/ibanforge). Les affirmations marketing ont été lues et délibérément *non* reportées dans le profil comme des faits — une politique qu'on souhaiterait à plus de catalogues.
+
+## Deux constats, corrigés le jour même
+
+La relecture a mis au jour deux vrais défauts de notre côté.
+
+**Notre carte d'agent déclarait la mauvaise génération du protocole.** Elle était écrite contre A2A 0.3.0 ; la version courante est 1.0. Nous l'avons migrée le jour même — en suivant le proto normatif plutôt qu'en changeant juste le numéro : les versions sont en Majeure.Mineure, `url`/`transport`/`version` se consolident dans `supportedInterfaces`, et le drapeau de carte étendue a déménagé dans `capabilities`. Les champs plats de l'ère 0.3 restent à côté, délibérément : les robots qui lisent la carte aujourd'hui regardent encore là.
+
+**Trois énumérations de notre OpenAPI portaient un `null` littéral contre `type: "string"`.** La cause racine était plus embarrassante que le symptôme : la spec se déclare OpenAPI 3.1 mais portait encore 42 mots-clés `nullable: true` — une graphie propre à 3.0 que 3.1 ignore en silence. C'est exactement la forme qui fait planter le linter le plus répandu de l'écosystème. Les 42 ont été convertis en vrais tableaux de types le jour même ; `spectral:oas` sur [notre spec en production](https://api.ibanforge.com/openapi.json) ne rend plus rien.
+
+Les deux correctifs ont été déployés et vérifiés en production dans les heures qui ont suivi la revue, puis [rapportés sur l'issue](https://github.com/api-search/inbox/issues/3) avec les preuves avant/après.
+
+## Le troisième constat jouait dans l'autre sens
+
+La revue a balayé tous les profils du catalogue à la recherche de x402 — le protocole de paiement natif HTTP que parlent nos endpoints payants — et a trouvé **zéro autre cas sur 3 767 serveurs MCP et 86 cartes d'agent**. La grille de notation du catalogue n'a pas encore de case pour les API payables par des machines, donc cela ne nous rapporte rien aujourd'hui. Mais le détail qu'il a relevé est celui qui nous importe : nous déclarons `x402Payment` comme `securityScheme` porté par les opérations elles-mêmes, ce qui rend **le prix lisible depuis le contrat**, pas seulement depuis un fichier well-known. C'est la forme contre laquelle le futur contrôle du Kin Score sera construit.
+
+Deux jours plus tard, un signal indépendant est arrivé dans la même direction : le mainteneur d'un annuaire x402 a fusionné notre ajout en notant que nos routes payantes répondent aux deux dialectes x402 à la fois — « exactement le modèle que l'écosystème devrait copier ».
+
+## Ce qu'on en retient
+
+Les fiches tierces sur votre API pourrissent en silence, et les pires sont produites par des chaînes qui ne consultent jamais rien. La seule défense durable est la plus ennuyeuse : publier des artefacts vérifiables aux chemins standards — un document OpenAPI honnête, une carte d'agent, apis.json, llms.txt, un linkset de catalogue — et laisser quiconque les lit vraiment reproduire chaque affirmation. Le seul évaluateur qui les a lus a reconstruit notre fiche de zéro, trouvé deux vrais bugs dont nous sommes contents d'être débarrassés, et identifié le seul pari que nous avons fait que personne d'autre n'a encore fait.
+
+L'échange complet est public : [la soumission et la revue](https://github.com/api-search/inbox/issues/3), [le profil reconstruit](https://github.com/api-evangelist/ibanforge), et [notre page des sources de données](/docs/data-sources) si vous voulez vérifier nos affirmations vous-même — ce qui est précisément l'idée.

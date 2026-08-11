@@ -1,0 +1,47 @@
+---
+title: "Mit 6,2/100 benotet — von einem Katalog, der uns nie gelesen hatte. Was geschah, als er es tat"
+description: "IBANforge lag seit Mai im API-Evangelist-Katalog mit fast der schlechtesten möglichen Note: massenimportiert, nie abgerufen. Dann reichten wir uns selbst ein, Kin Lane las alles von Hand nach, zwei seiner Befunde wurden noch am selben Tag zu Fixes — und der dritte sprach für uns."
+date: "2026-08-11"
+---
+
+Am 28. Mai 2026 gelangte IBANforge ohne unser Wissen in den [API-Evangelist-Katalog](https://providers.apievangelist.com/providers/ibanforge/): massenregistriert aus einer öffentlichen Liste, mit einem einzigen Dokumentationslink und sonst nichts. Nichts wurde je abgerufen. Jede vertragsabgeleitete Facette stand auf 0,0, und die veröffentlichten Zahlen waren ein **Kin Score von 6,2** (Band: *minimal*) und eine **Agent Readiness von 0,0** (Band: *human-only*).
+
+Mit anderen Worten: Zehn Wochen lang erzählte einer der angesehensten API-Kataloge der Welt jedem Leser — Mensch oder Maschine —, IBANforge sei kaum eine API. Wir erfuhren davon erst, als wir uns im August selbst bei der [öffentlichen Inbox](https://github.com/api-search/inbox/issues/3) einreichten. Kin Lanes Antwort begann mit einem Satz, den wir nicht erwartet hatten:
+
+> „Thanks for this — it's the most artifact-complete submission the inbox has had, and it turned up a problem on our side rather than yours."
+> („Danke — das ist die artefakt-vollständigste Einreichung, die die Inbox je erhalten hat, und sie hat ein Problem auf unserer Seite aufgedeckt, nicht auf Ihrer.")
+
+## Wie eine echte Nachprüfung aussieht
+
+Was folgte, war das gründlichste unabhängige Audit, das diese API je erhalten hat. Jede Behauptung wurde abgerufen, nichts auf Treu und Glauben übernommen — beide Hosts wurden zuerst mit einem Kontrollpfad angetestet, um zu beweisen, dass die 200er echte Antworten sind und kein Catch-all-Handler. Die verifizierte Liste:
+
+- **OpenAPI 3.1** — 18 Pfade, 18 Operationen, `operationId` überall
+- **apis.json** (specificationVersion 0.16) und das **RFC-9727-api-catalog**-Linkset
+- **llms.txt** auf beiden Hosts
+- **A2A-Agentenkarte** — alle Pflichtfelder vorhanden, einschließlich des `capabilities`-Objekts, an dem 41 der 65 von ihm untersuchten Agentenkarten scheitern
+- **MCP über Streamable HTTP** — ein vollständiger unauthentifizierter Handshake: `initialize`, `tools/list` und ein echter `tools/call`, der eine vollständige kostenpflichtige Antwort lieferte
+- **x402-Discovery** — 5 bepreiste Endpoints auf Base L2
+
+Das Profil wurde anschließend aus den geernteten Artefakten neu aufgebaut, jedes rückführbar auf eine URL und ein Abrufdatum, und [öffentlich publiziert](https://github.com/api-evangelist/ibanforge). Marketing-Aussagen wurden gelesen und bewusst *nicht* als Fakten ins Profil übernommen — eine Politik, die man mehr Katalogen wünschte.
+
+## Zwei Befunde, am selben Tag behoben
+
+Die Nachprüfung brachte zwei echte Mängel auf unserer Seite ans Licht.
+
+**Unsere Agentenkarte deklarierte die falsche Protokollgeneration.** Sie war gegen A2A 0.3.0 geschrieben; aktuell ist 1.0. Wir migrierten sie noch am selben Tag — dem normativen Proto folgend statt nur die Zahl zu erhöhen: Versionen sind Major.Minor, `url`/`transport`/`version` konsolidieren sich in `supportedInterfaces`, und das Extended-Card-Flag zog in `capabilities` um. Die flachen Felder der 0.3-Ära bleiben bewusst daneben stehen: Die Crawler, die die Karte heute lesen, schauen noch dort.
+
+**Drei Enums in unserer OpenAPI trugen ein literales `null` gegen `type: "string"`.** Die Wurzel war peinlicher als das Symptom: Die Spec deklariert OpenAPI 3.1, trug aber noch 42 `nullable: true`-Schlüsselwörter — eine reine 3.0-Schreibweise, die 3.1 stillschweigend ignoriert. Genau diese Form lässt den verbreitetsten Linter des Ökosystems abstürzen. Alle 42 wurden am selben Tag in echte Typ-Arrays umgewandelt; `spectral:oas` gegen [unsere Live-Spec](https://api.ibanforge.com/openapi.json) meldet nichts mehr.
+
+Beide Fixes wurden binnen Stunden nach dem Review deployt, in Produktion verifiziert und [auf dem Issue zurückgemeldet](https://github.com/api-search/inbox/issues/3), mit Vorher/Nachher-Belegen.
+
+## Der dritte Befund sprach für uns
+
+Das Review durchsuchte jedes Provider-Profil des Katalogs nach x402 — dem HTTP-nativen Zahlungsprotokoll unserer kostenpflichtigen Endpoints — und fand **null andere Instanzen über 3.767 MCP-Server und 86 Agentenkarten hinweg**. Die Bewertungsrubrik des Katalogs hat noch keine Prüfung für maschinenzahlbare APIs, heute bringt uns das also nichts. Aber das Detail, das er hervorhob, ist das, worauf es uns ankommt: Wir deklarieren `x402Payment` als `securityScheme` direkt auf den Operationen, womit **der Preis aus dem Vertrag lesbar ist**, nicht nur aus einer Well-known-Datei. Gegen genau diese Form wird die künftige Kin-Score-Prüfung gebaut.
+
+Zwei Tage später landete ein unabhängiges Signal in derselben Richtung: Der Betreuer eines kuratierten x402-Verzeichnisses nahm unseren Eintrag auf — mit der Anmerkung, unsere bezahlten Routen beantworteten beide x402-Dialekte zugleich, „exactly the pattern more of the ecosystem should copy".
+
+## Was wir daraus mitnehmen
+
+Dritteinträge über Ihre API verrotten lautlos, und die schlimmsten stammen aus Pipelines, die nie etwas abrufen. Die einzige dauerhafte Verteidigung ist die langweiligste: verifizierbare Artefakte an Standardpfaden publizieren — ein ehrliches OpenAPI-Dokument, eine Agentenkarte, apis.json, llms.txt, ein Katalog-Linkset — und jeden, der sie wirklich liest, jede Behauptung reproduzieren lassen. Der eine Prüfer, der sie las, baute unseren Eintrag von Grund auf neu, fand zwei echte Bugs, die wir gern los sind, und identifizierte die eine Wette, die wir gemacht haben und sonst niemand.
+
+Der vollständige Austausch ist öffentlich: [Einreichung und Review](https://github.com/api-search/inbox/issues/3), [das neu aufgebaute Profil](https://github.com/api-evangelist/ibanforge) und [unsere Datenquellen-Seite](/docs/data-sources), falls Sie unsere Angaben selbst prüfen wollen — was genau der Punkt ist.

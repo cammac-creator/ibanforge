@@ -160,6 +160,13 @@
       "privacyLabel": "Privacy by default",
       "privacyValue": "IBANs never stored · self-deleting telemetry",
       "privacyNote": "Erased 30 days after you leave — DPA clause 4.7"
+    },
+    "reviewed": {
+      "label": "Independently reviewed",
+      "quote": "The most artifact-complete submission the inbox has had.",
+      "context": "Kin Lane rebuilt IBANforge's API Evangelist profile from fetched artifacts in August 2026 — and found our x402 support to be the first across the 3,767 MCP servers in his catalog.",
+      "linkReview": "Read the public review",
+      "linkStory": "The full story"
     }
   },
   "pricing": {

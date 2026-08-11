@@ -160,6 +160,13 @@
       "privacyLabel": "Privacy als Standard",
       "privacyValue": "IBANs nie gespeichert · selbstlöschende Telemetrie",
       "privacyNote": "Gelöscht 30 Tage nach Kündigung — DPA Klausel 4.7"
+    },
+    "reviewed": {
+      "label": "Unabhängig geprüft",
+      "quote": "The most artifact-complete submission the inbox has had.",
+      "context": "Kin Lane hat IBANforges API-Evangelist-Profil im August 2026 aus abgerufenen Artefakten neu aufgebaut — unser x402 erwies sich dabei als das erste unter den 3.767 MCP-Servern seines Katalogs.",
+      "linkReview": "Das öffentliche Review lesen",
+      "linkStory": "Die ganze Geschichte"
     }
   },
   "pricing": {

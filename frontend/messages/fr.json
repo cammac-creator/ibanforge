@@ -160,6 +160,13 @@
       "privacyLabel": "Privacy par défaut",
       "privacyValue": "IBAN jamais stockés · télémétrie auto-supprimée",
       "privacyNote": "Effacée 30 jours après votre départ — DPA clause 4.7"
+    },
+    "reviewed": {
+      "label": "Relu indépendamment",
+      "quote": "The most artifact-complete submission the inbox has had.",
+      "context": "Kin Lane a reconstruit la fiche API Evangelist d'IBANforge à partir des artefacts consultés, en août 2026 — et notre x402 s'est révélé le premier parmi les 3 767 serveurs MCP de son catalogue.",
+      "linkReview": "Lire la revue publique",
+      "linkStory": "L'histoire complète"
     }
   },
   "pricing": {
