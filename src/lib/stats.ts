@@ -859,7 +859,7 @@ const BILLABLE_RULES: Array<{ method: string; pathStartsWith: string }> = [
   { method: 'GET', pathStartsWith: '/v1/ch/clearing/' },
 ];
 
-function buildBillableFilter(): { sql: string; params: string[] } {
+export function buildBillableFilter(): { sql: string; params: string[] } {
   // (method = ? AND path LIKE ?) OR (method = ? AND path LIKE ?) ...
   const clauses = BILLABLE_RULES.map(() => '(method = ? AND path LIKE ?)').join(' OR ');
   const params: string[] = [];

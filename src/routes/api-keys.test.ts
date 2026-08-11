@@ -193,3 +193,55 @@ describe('POST /v1/admin/events — manual annotations', () => {
     getStatsDB().prepare(`DELETE FROM events WHERE label = 'admin-events-route-fixture'`).run();
   });
 });
+
+describe('/v1/admin/weekly-facts + /v1/admin/digest — Monday digest plumbing', () => {
+  const headers = { 'Content-Type': 'application/json', 'X-Admin-Secret': 'correct-horse-battery-staple' };
+
+  it('facts endpoint requires the secret and serves the WoW block', async () => {
+    const app = makeApp();
+    expect((await app.request('/v1/admin/weekly-facts')).status).toBe(401);
+    const res = await app.request('/v1/admin/weekly-facts', { headers });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { week: string; requests: { current: number; previous: number } };
+    expect(body.week).toMatch(/^\d{4}-W\d{2}$/);
+    expect(typeof body.requests.current).toBe('number');
+  });
+
+  it('digest POST upserts by week (re-running the cron never duplicates)', async () => {
+    const app = makeApp();
+    const week = '1999-W01'; // far outside any real listing window
+    const post = (body_fr: string) =>
+      app.request('/v1/admin/digest', { method: 'POST', headers, body: JSON.stringify({ week, body_fr }) });
+    expect((await post('premier jet')).status).toBe(201);
+    expect((await post('version corrigée')).status).toBe(201);
+    const { getStatsDB } = await import('../lib/db.js');
+    const rows = getStatsDB().prepare('SELECT body_fr FROM weekly_digest WHERE week = ?').all(week) as Array<{ body_fr: string }>;
+    expect(rows).toHaveLength(1);
+    expect(rows[0].body_fr).toBe('version corrigée');
+    getStatsDB().prepare('DELETE FROM weekly_digest WHERE week = ?').run(week);
+  });
+
+  it('digest POST rejects a malformed week or empty body', async () => {
+    const app = makeApp();
+    const bad = await app.request('/v1/admin/digest', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ week: 'lundi', body_fr: 'x' }),
+    });
+    expect(bad.status).toBe(400);
+    const empty = await app.request('/v1/admin/digest', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ week: '2026-W01', body_fr: '  ' }),
+    });
+    expect(empty.status).toBe(400);
+  });
+
+  it('digest GET lists rows newest week first', async () => {
+    const app = makeApp();
+    const res = await app.request('/v1/admin/digest?limit=3', { headers });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { digests: Array<{ week: string }> };
+    expect(Array.isArray(body.digests)).toBe(true);
+  });
+});

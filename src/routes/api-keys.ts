@@ -5,6 +5,7 @@ import { getStatsDB } from '../lib/db.js';
 import { getClientProfiles, getBotProfiles } from '../lib/stats.js';
 import { getActivation } from '../lib/activation.js';
 import { recordEvent } from '../lib/events.js';
+import { getWeeklyFacts, saveWeeklyDigest, getWeeklyDigests } from '../lib/weekly-facts.js';
 import { notifyPurchaseTelegram } from '../lib/notify.js';
 import { sendApiKeyEmail, isEmailConfigured } from '../lib/email.js';
 
@@ -661,6 +662,54 @@ apiKeys.post('/v1/admin/events', async (c) => {
   }
   recordEvent('manual', label);
   return c.json({ recorded: true }, 201);
+});
+
+/**
+ * The Monday digest's raw material: every WoW delta pre-computed in tested
+ * TS (lib/weekly-facts.ts). The VPS writer copies these numbers verbatim
+ * into French prose — one admin secret on the VPS covers the whole flow.
+ */
+apiKeys.get('/v1/admin/weekly-facts', (c) => {
+  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
+  return c.json(getWeeklyFacts());
+});
+
+/**
+ * Digest storage. POST upserts by ISO week so the cron can re-run safely;
+ * GET feeds the dashboard card, newest week first.
+ */
+apiKeys.post('/v1/admin/digest', async (c) => {
+  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
+  let body: { week?: unknown; body_fr?: unknown; facts_json?: unknown };
+  try {
+    body = await c.req.json<{ week?: unknown; body_fr?: unknown; facts_json?: unknown }>();
+  } catch {
+    return c.json({ error: 'invalid_json' }, 400);
+  }
+  const week = typeof body.week === 'string' ? body.week.trim() : '';
+  const bodyFr = typeof body.body_fr === 'string' ? body.body_fr.trim() : '';
+  if (!/^\d{4}-W\d{2}$/.test(week)) {
+    return c.json({ error: 'invalid_week', message: 'week must look like 2026-W32' }, 400);
+  }
+  if (!bodyFr) {
+    return c.json({ error: 'body_required', message: 'body_fr must be non-empty' }, 400);
+  }
+  const factsJson = typeof body.facts_json === 'string' ? body.facts_json : JSON.stringify(body.facts_json ?? null);
+  saveWeeklyDigest(week, bodyFr, factsJson);
+  return c.json({ saved: true, week }, 201);
+});
+
+apiKeys.get('/v1/admin/digest', (c) => {
+  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
+  const limitParam = parseInt(c.req.query('limit') ?? '8', 10);
+  const limit = Number.isNaN(limitParam) ? 8 : limitParam;
+  return c.json({ digests: getWeeklyDigests(limit) });
 });
 
 /**
