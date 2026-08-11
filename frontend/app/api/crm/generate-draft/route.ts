@@ -77,6 +77,10 @@ async function enrichWithUsageFacts(body: unknown): Promise<unknown> {
       byCountry.size ? `- countries checked: ${top(byCountry, 6).map(([c, n]) => `${c} (${n})`).join(', ')}` : '',
       agents.size ? `- stack: ${top(agents, 2).map(([u]) => u).join(', ')}` : '',
       'Product facts you may cite, nothing else: free tier 200 requests/month; batch endpoint up to 100 IBANs per call; prepaid credit packs from $5 per 1,000 calls, credits never expire; German BICs come straight from the Bundesbank register (11 characters, branch included); code examples: ibanforge.com/docs/recipes',
+      // The writer guessed "Uwe" from a schaefer-uwe.com domain on the first
+      // live control. A guessed name that lands wrong opens the mail on an
+      // insult, so the default is no name at all.
+      'Address rule: unless a personal name appears in the brief above, do not guess one (never from the email domain); open with a plain Hi.',
     ].filter(Boolean);
 
     return { ...b, context: `${b.context}\n\n${lines.join('\n')}` };
