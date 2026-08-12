@@ -942,8 +942,10 @@ export interface ClientProfile {
   distinct_ips: number;
   /** 24 UTC buckets. The shape of the day says more about a customer than a timezone field would. */
   hours: number[];
-  /** Calls per day over the window, oldest first. */
-  days: Array<{ day: string; count: number }>;
+  /** Calls per day over the window, oldest first. `bad` = HTTP 400 that day —
+   * what lets the panel say "38 % of this week's calls were bad input, last
+   * week 4 %" instead of one flat window-wide ratio. */
+  days: Array<{ day: string; count: number; bad?: number }>;
   /** What their inputs got rejected for, busiest first. */
   reject_reasons: Array<{ reason: string; count: number }>;
 }
@@ -1075,12 +1077,14 @@ export function getClientProfiles(days = 90): Record<string, ClientProfile> {
   }
   for (const r of db
     .prepare(
-      `SELECT key_prefix, date(created_at) day, COUNT(*) count FROM request_log
+      `SELECT key_prefix, date(created_at) day, COUNT(*) count,
+              SUM(CASE WHEN status = 400 THEN 1 ELSE 0 END) bad
+       FROM request_log
        WHERE key_prefix IS NOT NULL AND created_at >= date('now', ?)
        GROUP BY key_prefix, day ORDER BY key_prefix, day`,
     )
-    .all(since) as Array<{ key_prefix: string; day: string; count: number }>) {
-    ensure(r.key_prefix).days.push({ day: r.day, count: r.count });
+    .all(since) as Array<{ key_prefix: string; day: string; count: number; bad: number }>) {
+    ensure(r.key_prefix).days.push({ day: r.day, count: r.count, bad: r.bad });
   }
 
   // The countries only exist for rows operations could be attributed to, so a
