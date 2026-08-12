@@ -111,6 +111,43 @@ export function ClientsApp({ dossiers, locale, windowDays = 90 }: { dossiers: Cl
   const totalRequests = dossiers.reduce((s, d) => s + d.requests, 0);
   const distinctCountries = new Set(dossiers.flatMap((d) => d.countries.map((c) => c.code))).size;
 
+  // The day's gesture: the single most valuable thing this page can point at
+  // right now, computed, with its reason. Blocked outranks everything (money
+  // stopped by us), then a paying customer surging (say thanks / help), then
+  // the hottest former customer (one mail can wake 200 historical calls).
+  const gesture = (() => {
+    const blocked = dossiers.filter((d) => d.verdict === 'blocked').sort((a, b) => b.usedAllTime - a.usedAllTime)[0];
+    if (blocked)
+      return {
+        icon: '⛔',
+        text: `${blocked.company ?? blocked.email} est arrêté sur un refus`,
+        why: 'le seul état où c\'est NOUS qui les perdons',
+        id: blocked.id,
+        filter: 'blocked' as Filter,
+      };
+    const surging = dossiers
+      .filter((d) => d.activation?.status === 'paying' && d.verdict === 'rising')
+      .sort((a, b) => b.requests - a.requests)[0];
+    if (surging)
+      return {
+        icon: '💰',
+        text: `${surging.company ?? surging.email} (payant) est en pleine montée`,
+        why: 'un merci du fondateur pendant la lune de miel',
+        id: surging.id,
+        filter: 'rising' as Filter,
+      };
+    const former = dossiers.filter((d) => d.verdict === 'former').sort((a, b) => b.usedAllTime - a.usedAllTime)[0];
+    if (former && former.usedAllTime >= 50)
+      return {
+        icon: '🕰',
+        text: `${former.company ?? former.email} a fait ${former.usedAllTime.toLocaleString('fr-CH')} appels puis a disparu`,
+        why: 'un ancien client se réveille mieux qu\'un inconnu se convainc',
+        id: former.id,
+        filter: 'former' as Filter,
+      };
+    return null;
+  })();
+
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -127,6 +164,21 @@ export function ClientsApp({ dossiers, locale, windowDays = 90 }: { dossiers: Cl
           </div>
         ))}
       </div>
+
+      {gesture && (
+        <button
+          type="button"
+          onClick={() => {
+            setFilter(gesture.filter);
+            setOpenId(gesture.id);
+          }}
+          className="flex w-full flex-wrap items-baseline gap-x-2 rounded-xl border border-[var(--amber-500)]/30 bg-[var(--amber-500)]/[0.06] px-4 py-2.5 text-left hover:bg-[var(--amber-500)]/10"
+        >
+          <span className="text-[13px] font-semibold text-[var(--amber-400)]">{gesture.icon} Le geste du jour</span>
+          <span className="min-w-0 text-[13.5px] text-[var(--fg-1)]">{gesture.text}</span>
+          <span className="text-[12.5px] text-[var(--fg-4)]">— {gesture.why} · ouvrir son dossier →</span>
+        </button>
+      )}
 
       <div className="flex flex-wrap items-center gap-2">
         <button
