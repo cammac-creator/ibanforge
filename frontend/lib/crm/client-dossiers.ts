@@ -1,4 +1,6 @@
 import { INTERNAL_RE, type ActivationClientRow, type KeyRow, type MessageRow, type ProspectRow } from './build-contacts';
+import { chipForStatus, type BusinessChip } from './business';
+import { heatFromFacts, type Heat } from './heat';
 
 /** One row of /v1/admin/client-profiles. Mirrors ClientProfile in src/lib/stats.ts. */
 export interface ClientProfileRow {
@@ -361,6 +363,44 @@ export async function fetchClientProfiles(days = 90): Promise<ProfilesPayload> {
     monthsByKey: j.months_by_key ?? {},
     quotaWarnedByKey: j.quota_warned_by_key ?? {},
   };
+}
+
+/**
+ * The same chip the Contacts list wears, derived from the dossier's joined
+ * activation row — one table, two pages, no second truth.
+ */
+export function chipOfDossier(d: ClientDossier): BusinessChip | null {
+  const a = d.activation;
+  if (a?.status === 'paying') return chipForStatus('paying');
+  if (a?.status === 'dormant') return chipForStatus('dormant');
+  if (a?.status === 'at-limit') return chipForStatus('at-limit');
+  if (d.keys.some((k) => k.plan === 'free' && (k.monthlyLimit ?? 0) >= 5000)) return chipForStatus('pilot');
+  return null;
+}
+
+/**
+ * The dossier's heat, through the shared arithmetic. The conversation terms
+ * are fed from the mail counters this page holds; silence and ball-in-court
+ * belong to the Contacts page's situation and stay out rather than being
+ * approximated into disagreement.
+ */
+export function heatOfDossier(d: ClientDossier, now: Date): Heat {
+  const dayAt = (offset: number) => new Date(now.getTime() - offset * DAY_MS).toISOString().slice(0, 10);
+  const inWindow = (from: number, to: number) => {
+    const a = dayAt(from);
+    const b = dayAt(to);
+    return d.days.reduce((s2, x) => (x.day >= a && x.day < b ? s2 + x.count : s2), 0);
+  };
+  return heatFromFacts({
+    packs: d.keys.filter((k) => k.plan === 'credits').length,
+    dormant: d.activation?.status === 'dormant',
+    atLimit: d.activation?.status === 'at-limit',
+    last7: inWindow(7, 0),
+    prev7: inWindow(14, 7),
+    messageCount: d.mails.sent + d.mails.received,
+    silenceDays: null,
+    ballWithUs: false,
+  });
 }
 
 export type SortKey = 'requests' | 'freshness' | 'name';

@@ -29,6 +29,11 @@ const CHIP: Record<string, BusinessChip> = {
 /** Same threshold as build-contacts' isPilot: the CRM's own pilot definition. */
 const PILOT_LIMIT = 5000;
 
+/** The chip for one status word — the Clients dossiers read the same table. */
+export function chipForStatus(status: keyof typeof CHIP): BusinessChip {
+  return CHIP[status];
+}
+
 export function chipOf(c: Contact): BusinessChip | null {
   const b = c.business;
   if (b) {

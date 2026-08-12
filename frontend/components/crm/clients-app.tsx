@@ -1,7 +1,10 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { sortDossiers, type ClientDossier, type SortKey, type Verdict } from '@/lib/crm/client-dossiers';
+import { chipOfDossier, heatOfDossier, sortDossiers, type ClientDossier, type SortKey, type Verdict } from '@/lib/crm/client-dossiers';
+import { flameOf } from '@/lib/crm/heat';
+import { fold } from '@/lib/crm/mail-rows';
+import { contactsHref } from '@/lib/crm/deep-link';
 import { ClientDossierPanel } from './client-dossier-panel';
 import { flag, relativeDays } from './dossier-bits';
 
@@ -68,14 +71,15 @@ export function ClientsApp({ dossiers, locale }: { dossiers: ClientDossier[]; lo
   }, [dossiers]);
 
   const view = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    // Folded on both sides, like the Contacts search: "societe" finds Société.
+    const q = fold(query.trim());
     const filtered = dossiers.filter((d) => {
       if (filter === 'used' && d.requests === 0) return false;
       if (filter !== 'all' && filter !== 'used' && d.verdict !== filter) return false;
       if (!q) return true;
       return (
-        d.email.toLowerCase().includes(q) ||
-        (d.company ?? '').toLowerCase().includes(q) ||
+        fold(d.email).includes(q) ||
+        fold(d.company ?? '').includes(q) ||
         d.countries.some((c) => c.code.toLowerCase() === q) ||
         d.keys.some((k) => k.prefix.toLowerCase().includes(q))
       );
@@ -184,8 +188,16 @@ export function ClientsApp({ dossiers, locale }: { dossiers: ClientDossier[]; lo
                   }`}
                 >
                   <span className="w-full min-w-0 md:w-[26%]">
-                    <span className="block truncate text-sm font-medium text-[var(--fg-1)]">
+                    <span className="flex items-center gap-1.5">
+                    {(() => { const chip = chipOfDossier(d); return chip ? (
+                      <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide" style={{ color: chip.color, backgroundColor: chip.bg }}>{chip.label}</span>
+                    ) : null; })()}
+                    <span className="block min-w-0 truncate text-sm font-medium text-[var(--fg-1)]">
                       {d.company ?? d.email.split('@')[1]}
+                    </span>
+                    {(() => { const f = flameOf(heatOfDossier(d, new Date()).score); return f ? (
+                      <span className={`shrink-0 text-[11px] ${f.dim ? 'opacity-45' : ''}`}>{f.glyph}</span>
+                    ) : null; })()}
                     </span>
                     <span className="block truncate font-mono text-[12px] text-[var(--fg-4)]">{d.email}</span>
                   </span>
@@ -214,8 +226,26 @@ export function ClientsApp({ dossiers, locale }: { dossiers: ClientDossier[]; lo
                           .map((c) => `${flag(c.code)} ${c.code}`)
                           .join('  ')}
                   </span>
-                  <span className="w-14 text-right text-[12px] text-[var(--fg-4)]">
-                    {d.mails.sent + d.mails.received > 0 ? `✉ ${d.mails.sent + d.mails.received}` : '—'}
+                  <span className="w-14 text-right text-[12px]">
+                    {d.mails.sent + d.mails.received > 0 ? (
+                      <a
+                        href={contactsHref(locale, d.id)}
+                        onClick={(e) => e.stopPropagation()}
+                        title="Ouvrir son fil dans Contacts"
+                        className="text-amber-400 hover:underline"
+                      >
+                        ✉ {d.mails.sent + d.mails.received}
+                      </a>
+                    ) : (
+                      <a
+                        href={contactsHref(locale, d.id)}
+                        onClick={(e) => e.stopPropagation()}
+                        title="Écrire dans Contacts"
+                        className="text-[var(--fg-4)] hover:text-amber-400"
+                      >
+                        ✉ écrire
+                      </a>
+                    )}
                     {d.mails.hasDraft && <span className="ml-1 text-[var(--warn)]">•</span>}
                   </span>
                 </button>

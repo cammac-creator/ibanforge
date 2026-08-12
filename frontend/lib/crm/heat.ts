@@ -30,42 +30,61 @@ function callsIn(c: Contact, fromDaysAgo: number, toDaysAgo: number): number {
   return c.usage.days.reduce((a, d) => (d.day >= from && d.day < to ? a + d.count : a), 0);
 }
 
-export function heatOf(c: Contact, s: Situation | undefined): Heat {
+export interface HeatFacts {
+  packs: number;
+  dormant: boolean;
+  atLimit: boolean;
+  last7: number;
+  prev7: number;
+  messageCount: number;
+  silenceDays: number | null;
+  ballWithUs: boolean;
+}
+
+/**
+ * The shared arithmetic: the Contacts list and the Clients dossiers must
+ * score identically or the flame means two different things on two tabs.
+ */
+export function heatFromFacts(f: HeatFacts): Heat {
   const parts: HeatPart[] = [];
   const add = (label: string, points: number) => {
     if (points !== 0) parts.push({ label, points });
   };
 
-  const b = c.business;
-  if (b && b.packs > 0) {
-    add(b.packs > 1 ? `${b.packs} packs de crédits achetés` : 'A acheté un pack de crédits', 40);
-    if (b.status === 'dormant') add('Payant sans appel depuis 14 j', -15);
+  if (f.packs > 0) {
+    add(f.packs > 1 ? `${f.packs} packs de crédits achetés` : 'A acheté un pack de crédits', 40);
+    if (f.dormant) add('Payant sans appel depuis 14 j', -15);
   }
-
-  // Recent API activity, from the per-day series the dossier chart reads.
-  const last7 = callsIn(c, 7, 0);
-  if (last7 >= 500) add(`${last7} appels sur 7 j`, 30);
-  else if (last7 >= 100) add(`${last7} appels sur 7 j`, 22);
-  else if (last7 >= 10) add(`${last7} appels sur 7 j`, 14);
-  else if (last7 > 0) add(`${last7} appel${last7 > 1 ? 's' : ''} sur 7 j`, 7);
-
-  const prev7 = callsIn(c, 14, 7);
-  if (last7 > prev7 && prev7 > 0) add('Usage en hausse sur 7 j', 8);
-  if (prev7 >= 10 && last7 === 0) add('Usage éteint cette semaine', -8);
-
-  // The conversation, from the same situation the band reads.
-  if (s && s.messageCount > 0) {
-    if (s.silenceDays !== null && s.silenceDays <= 7) add('Conversation active (≤ 7 j)', 15);
+  if (f.last7 >= 500) add(`${f.last7} appels sur 7 j`, 30);
+  else if (f.last7 >= 100) add(`${f.last7} appels sur 7 j`, 22);
+  else if (f.last7 >= 10) add(`${f.last7} appels sur 7 j`, 14);
+  else if (f.last7 > 0) add(`${f.last7} appel${f.last7 > 1 ? 's' : ''} sur 7 j`, 7);
+  if (f.last7 > f.prev7 && f.prev7 > 0) add('Usage en hausse sur 7 j', 8);
+  if (f.prev7 >= 10 && f.last7 === 0) add('Usage éteint cette semaine', -8);
+  if (f.messageCount > 0) {
+    if (f.silenceDays !== null && f.silenceDays <= 7) add('Conversation active (≤ 7 j)', 15);
     else add('Une conversation existe', 5);
-    if (s.ballInCourt === 'us') add('Il attend ta réponse', 5);
-    if (s.silenceDays !== null && s.silenceDays > 21) add('Silence de plus de 3 semaines', -5);
+    if (f.ballWithUs) add('Il attend ta réponse', 5);
+    if (f.silenceDays !== null && f.silenceDays > 21) add('Silence de plus de 3 semaines', -5);
   }
-
-  // The wall is the conversion moment: someone at their limit is deciding.
-  if (b && b.status === 'at-limit') add('Au quota ou refusé au paywall', 10);
+  if (f.atLimit) add('Au quota ou refusé au paywall', 10);
 
   const raw = parts.reduce((a, p) => a + p.points, 0);
   return { score: Math.max(0, Math.min(100, raw)), parts };
+}
+
+export function heatOf(c: Contact, s: Situation | undefined): Heat {
+  const b = c.business;
+  return heatFromFacts({
+    packs: b?.packs ?? 0,
+    dormant: b?.status === 'dormant',
+    atLimit: b?.status === 'at-limit',
+    last7: callsIn(c, 7, 0),
+    prev7: callsIn(c, 14, 7),
+    messageCount: s?.messageCount ?? 0,
+    silenceDays: s?.silenceDays ?? null,
+    ballWithUs: s?.ballInCourt === 'us',
+  });
 }
 
 /** The list's flame: loud past 70, faint past 40, silent below. */
