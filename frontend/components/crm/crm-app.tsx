@@ -181,14 +181,17 @@ export function CrmApp({
     <div className="grid min-w-0 grid-cols-1 gap-0 lg:grid-cols-[296px_1fr]">
       {/* First column, and a sibling of the thread rather than anything inside
           it: on a desktop the day's queue stays on screen while the operator
-          moves from contact to contact. Below lg the two columns stack, the
-          list first; the queue scrolls away with the page there, so what
-          survives on a phone is first place, not permanence. */}
+          moves from contact to contact. Below lg the page shows ONE screen at
+          a time, native-mail style: the list, or the open thread with a back
+          control — stacking both made the phone scroll through the whole
+          queue before reaching the conversation. */}
+      <div className={selected ? 'hidden lg:flex lg:flex-col' : 'flex flex-col'}>
       <MailList
         input={{ contacts: view, situations, snoozed }}
         selectedId={selectedId}
         onSelect={open}
       />
+      </div>
       {/* Positioned, so the writing sheet can float over its foot. Whichever of
           the two is rendered, it is the only absolutely positioned thing in
           here, and without this it would anchor itself to the page instead.
@@ -198,8 +201,17 @@ export function CrmApp({
           a constant, so nothing enforces the pair; change this padding and
           that constant must change with it. */}
       <div
-        className={`relative flex min-w-0 ${PANE_HEIGHT} flex-col rounded-xl border border-[var(--ink-4)]/60 bg-[var(--ink-2)]/40 p-4`}
+        className={`relative min-w-0 ${PANE_HEIGHT} flex-col rounded-xl border border-[var(--ink-4)]/60 bg-[var(--ink-2)]/40 p-4 ${selected ? 'flex' : 'hidden lg:flex'}`}
       >
+        {selected && (
+          <button
+            type="button"
+            onClick={() => setSelectedId(null)}
+            className="mb-2 self-start rounded-lg border border-[var(--ink-4)] px-2.5 py-1 text-[13px] text-[var(--fg-2)] hover:text-[var(--fg-1)] lg:hidden"
+          >
+            ← Contacts
+          </button>
+        )}
         {!selected ? (
           // "dans la liste", not "à gauche": below the lg breakpoint the list
           // sits above this pane, not beside it.

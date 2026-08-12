@@ -403,7 +403,7 @@ export function ReplySheet({
     <div
       id="reply-sheet"
       style={{ height: REPLY_SHEET_PX }}
-      className="absolute inset-x-0 bottom-0 z-10 flex flex-col rounded-b-xl border-t border-[var(--ink-4)] bg-[var(--ink-2)] p-3 shadow-[0_-10px_24px_-8px_rgba(0,0,0,0.65)]"
+      className="fixed inset-x-0 bottom-0 z-50 flex flex-col border-t border-[var(--ink-4)] bg-[var(--ink-2)] p-3 shadow-[0_-10px_24px_-8px_rgba(0,0,0,0.65)] max-lg:rounded-t-xl lg:absolute lg:z-10 lg:rounded-b-xl lg:rounded-t-none"
     >
       <div className="mb-1.5 flex shrink-0 items-center justify-between gap-2">
         <span className="min-w-0 truncate text-[12px] text-[var(--fg-3)]">

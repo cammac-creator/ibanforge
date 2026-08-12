@@ -40,6 +40,34 @@ function snoozeTarget(): string {
  * only offers "lu". Every action refreshes the server payload afterwards —
  * the row's disappearance from the filter IS the confirmation.
  */
+export async function rowAction(
+  row: MailRow,
+  kind: 'snooze' | 'archive' | 'read',
+): Promise<boolean> {
+  async function post(url: string, body: unknown): Promise<boolean> {
+    try {
+      const r = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      return r.ok;
+    } catch {
+      return false;
+    }
+  }
+  if (kind === 'snooze' && row.prospectId) {
+    return post('/api/crm/prospect-status', { id: row.prospectId, wakeUpAt: snoozeTarget() });
+  }
+  if (kind === 'archive' && row.prospectId) {
+    return post('/api/crm/prospect-status', { id: row.prospectId, status: 'archive' });
+  }
+  if (kind === 'read' && row.email) {
+    return post('/api/crm/thread-read', { email: row.email });
+  }
+  return false;
+}
+
 function RowActions({
   row,
   onDone,
@@ -170,6 +198,36 @@ export function MailList({
     setPreview(null);
   }
 
+  // Touch swipe: left = snooze (needs a prospect row), right = mark read
+  // (needs an unread thread). 64px of travel commits; less snaps back. Held
+  // as (id, dx) so only the touched row translates.
+  const touch = useRef<{ id: string; x: number } | null>(null);
+  const [drag, setDrag] = useState<{ id: string; dx: number } | null>(null);
+
+  function onTouchStart(id: string, e: React.TouchEvent) {
+    touch.current = { id, x: e.touches[0].clientX };
+  }
+  function onTouchMove(e: React.TouchEvent) {
+    if (!touch.current) return;
+    const dx = e.touches[0].clientX - touch.current.x;
+    if (Math.abs(dx) > 8) setDrag({ id: touch.current.id, dx: Math.max(-96, Math.min(96, dx)) });
+  }
+  async function onTouchEnd() {
+    const d = drag;
+    touch.current = null;
+    setDrag(null);
+    if (!d || Math.abs(d.dx) < 64) return;
+    const row = rows.find((r) => r.id === d.id);
+    if (!row) return;
+    const kind = d.dx < 0 ? 'snooze' : 'read';
+    if (kind === 'snooze' && !row.prospectId) return;
+    if (kind === 'read' && !row.unread) return;
+    setBusy(true);
+    const ok = await rowAction(row, kind);
+    setBusy(false);
+    if (ok) router.refresh();
+  }
+
   return (
     <div className="flex min-w-0 flex-col border-r border-[var(--ink-4)]/60 bg-[var(--ink-2)]/40">
       <div className="border-b border-[var(--ink-4)]/60 focus-within:border-[var(--amber-500)]/50">
@@ -240,6 +298,10 @@ export function MailList({
                   onClick={() => onSelect(r.id)}
                   onMouseEnter={(e) => armPreview(r.id, e)}
                   onMouseLeave={disarmPreview}
+                  onTouchStart={(e) => onTouchStart(r.id, e)}
+                  onTouchMove={onTouchMove}
+                  onTouchEnd={onTouchEnd}
+                  style={drag?.id === r.id ? { transform: `translateX(${drag.dx}px)`, transition: 'none' } : undefined}
                   aria-pressed={on}
                   className={[
                     'block w-full border-l-2 px-3.5 py-2.5 text-left',
