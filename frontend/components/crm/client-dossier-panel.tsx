@@ -55,7 +55,20 @@ export function ClientDossierPanel({ d, locale }: { d: ClientDossier; locale: st
         <Stat label="Rejets" value={`${errRate} %`} hint={`${d.badInput} en 400`} />
         <Stat label="Latence p95" value={`${d.p95Ms} ms`} hint={`${d.avgMs} ms en moyenne`} />
         <Stat label="Machines" value={String(d.distinctIps)} hint="empreintes IP" />
-        <Stat label="Dernier appel" value={relativeDays(d.daysSinceLastCall)} hint={d.firstCallAt ? `depuis le ${d.firstCallAt.slice(0, 10)}` : undefined} />
+        <Stat
+          label="Dernier appel"
+          value={d.daysSinceLastCall == null && d.usedAllTime > 0 ? 'rien sur 90 j' : relativeDays(d.daysSinceLastCall)}
+          hint={
+            // The unbounded first call when the activation join has it; the
+            // window-scoped first_seen used to claim a March customer started
+            // in June.
+            d.firstCallEver
+              ? `1er appel le ${d.firstCallEver.slice(0, 10)}`
+              : d.firstCallAt
+                ? `vu depuis le ${d.firstCallAt.slice(0, 10)} (fenêtre 90 j)`
+                : undefined
+          }
+        />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">

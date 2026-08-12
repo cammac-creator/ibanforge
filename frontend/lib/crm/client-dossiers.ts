@@ -1,4 +1,4 @@
-import { INTERNAL_RE, type KeyRow, type MessageRow, type ProspectRow } from './build-contacts';
+import { INTERNAL_RE, type ActivationClientRow, type KeyRow, type MessageRow, type ProspectRow } from './build-contacts';
 
 /** One row of /v1/admin/client-profiles. Mirrors ClientProfile in src/lib/stats.ts. */
 export interface ClientProfileRow {
@@ -33,6 +33,13 @@ export interface DossierInput {
   monthsByKey: Record<string, Array<{ month: string; count: number }>>;
   quotaWarnedByKey: Record<string, string[]>;
   now: Date;
+  /**
+   * The per-email activation verdicts (same payload the Contacts page joins).
+   * Optional: without it the page degrades to window-only facts — but the
+   * unbounded first_call_at is what lets "depuis le…" stop lying about
+   * customers older than the profile window.
+   */
+  activation?: ActivationClientRow[];
 }
 
 /**
@@ -42,7 +49,7 @@ export interface DossierInput {
  * but one of them is silence we caused and can undo. A real customer once sat
  * dormant for days and nobody knew it was because they had hit the wall.
  */
-export type Verdict = 'blocked' | 'struggling' | 'dormant' | 'rising' | 'active' | 'silent';
+export type Verdict = 'blocked' | 'struggling' | 'dormant' | 'rising' | 'active' | 'former' | 'silent';
 
 export interface DossierKey {
   prefix: string;
@@ -96,6 +103,12 @@ export interface ClientDossier {
   };
   quotaWarned: boolean;
   verdict: Verdict;
+  /** Sum of the keys' all-time counters — what the 90-day window cannot see. */
+  usedAllTime: number;
+  /** Unbounded first call, from the activation join; null when unknown. */
+  firstCallEver: string | null;
+  /** The activation row for this address, when the join succeeded. */
+  activation: ActivationClientRow | null;
 }
 
 /**
@@ -112,10 +125,12 @@ function parseUtc(raw: string | null | undefined): Date | null {
 
 const DAY_MS = 86_400_000;
 
-/** The most recent of a set of SQLite instants, comparable as strings. */
+/** The most recent of a set of instants. Compared PARSED: the stored strings
+ * mix the SQL and ISO shapes, and 'T' versus ' ' is not a time ordering. */
 function latest(values: Array<string | null>): string | null {
   const present = values.filter((v): v is string => v != null);
-  return present.length ? present.reduce((a, b) => (a >= b ? a : b)) : null;
+  if (!present.length) return null;
+  return present.reduce((a, b) => ((parseUtc(a)?.getTime() ?? 0) >= (parseUtc(b)?.getTime() ?? 0) ? a : b));
 }
 
 /**
@@ -170,14 +185,23 @@ function windowTotal(days: Array<{ day: string; count: number }>, now: Date, off
 }
 
 function decideVerdict(d: ClientDossier, now: Date): Verdict {
-  if (d.requests === 0) return 'silent';
+  // Nothing in the window is two different truths: a customer who called
+  // before the window is a FORMER customer, not someone who never existed —
+  // eight real addresses (two at their full 200 calls) read as "Muet ·
+  // jamais" until this branch.
+  if (d.requests === 0) return d.usedAllTime > 0 ? 'former' : 'silent';
   // The last thing that happened to them was being turned away, and nothing
   // has gone right since. Deliberately NOT "their quota is full right now":
   // raising a customer's quota clears that condition without telling the
   // customer anything, which is exactly how a blocked customer once sat
   // unnoticed for days. The wall they walked away from is the fact that
   // matters, and only a successful call of their own can clear it.
-  if (d.lastRefusalAt && (!d.lastSuccessAt || d.lastRefusalAt >= d.lastSuccessAt)) return 'blocked';
+  if (
+    d.lastRefusalAt &&
+    (!d.lastSuccessAt ||
+      (parseUtc(d.lastRefusalAt)?.getTime() ?? 0) >= (parseUtc(d.lastSuccessAt)?.getTime() ?? 0))
+  )
+    return 'blocked';
   if (d.requests >= 20 && d.badInput / d.requests > 0.3) return 'struggling';
   if (d.daysSinceLastCall != null && d.daysSinceLastCall > 14) return 'dormant';
   const last7 = windowTotal(d.days, now, 0);
@@ -188,6 +212,9 @@ function decideVerdict(d: ClientDossier, now: Date): Verdict {
 
 export function buildDossiers(input: DossierInput): ClientDossier[] {
   const { now } = input;
+
+  const activationByEmail = new Map<string, ActivationClientRow>();
+  for (const a of input.activation ?? []) activationByEmail.set(a.email.toLowerCase(), a);
 
   const prospectByEmail = new Map<string, ProspectRow>();
   for (const p of input.prospects) {
@@ -243,7 +270,12 @@ export function buildDossiers(input: DossierInput): ClientDossier[] {
       website: prospectByEmail.get(id)?.website ?? null,
       country: prospectByEmail.get(id)?.country ?? null,
       whatTheyDo: prospectByEmail.get(id)?.what_they_do ?? null,
-      signedUpAt: keys.map((k) => k.created_at).sort()[0],
+      // Ordered on parsed instants, not on raw strings: created_at mixes the
+      // SQL and ISO shapes in production (one pilot holds both), and a bare
+      // string sort ranks 'T' against ' ' instead of time against time.
+      signedUpAt: keys
+        .map((k) => k.created_at)
+        .sort((a, b) => (parseUtc(a)?.getTime() ?? 0) - (parseUtc(b)?.getTime() ?? 0))[0],
       keys: keys.map((k) => ({
         prefix: k.key_prefix,
         createdAt: k.created_at,
@@ -286,6 +318,9 @@ export function buildDossiers(input: DossierInput): ClientDossier[] {
       },
       quotaWarned: keys.some((k) => (input.quotaWarnedByKey[k.key_prefix] ?? []).length > 0),
       verdict: 'silent',
+      usedAllTime: keys.reduce((s2, k) => s2 + (k.used_all_time ?? 0), 0),
+      firstCallEver: activationByEmail.get(id)?.first_call_at ?? null,
+      activation: activationByEmail.get(id) ?? null,
     };
     dossier.verdict = decideVerdict(dossier, now);
     out.push(dossier);

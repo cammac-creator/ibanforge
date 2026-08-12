@@ -16,6 +16,7 @@ const VERDICTS: Array<{ key: Verdict; label: string; one: string; colour: string
   { key: 'rising', label: 'En montée', one: 'En montée', colour: 'var(--ok)', why: 'volume en nette hausse sur 7 jours' },
   { key: 'active', label: 'Actifs', one: 'Actif', colour: 'var(--info)', why: 'appellent régulièrement' },
   { key: 'dormant', label: 'Dormants', one: 'Dormant', colour: 'var(--fg-4)', why: 'plus rien depuis plus de 14 jours' },
+  { key: 'former', label: 'Anciens', one: 'Ancien client', colour: 'var(--violet, #a78bfa)', why: 'ont réellement appelé par le passé, plus rien sur la fenêtre affichée' },
   { key: 'silent', label: 'Muets', one: 'Muet', colour: 'var(--fg-5)', why: 'une clé, jamais utilisée' },
 ];
 
@@ -201,7 +202,9 @@ export function ClientsApp({ dossiers, locale }: { dossiers: ClientDossier[]; lo
                     <MiniSpark days={d.days} />
                   </span>
                   <span className="w-auto text-[13px] text-[var(--fg-3)] md:w-[12%]">
-                    {relativeDays(d.daysSinceLastCall)}
+                    {d.daysSinceLastCall == null && d.usedAllTime > 0
+                      ? `rien sur 90 j · ${d.usedAllTime.toLocaleString('fr-CH')} avant`
+                      : relativeDays(d.daysSinceLastCall)}
                   </span>
                   <span className="min-w-0 flex-1 truncate font-mono text-[12px] text-[var(--fg-3)]">
                     {d.countries.length === 0

@@ -314,3 +314,50 @@ describe('denseDays', () => {
     expect(out.every((d) => d.count === 0)).toBe(true);
   });
 });
+
+describe('K1 — honest dates (former verdict, parsed ordering, unbounded first call)', () => {
+  it('a customer with all-time calls but nothing in the window is FORMER, never silent', () => {
+    const d = buildDossiers({
+      ...base,
+      keys: [keyRow('old@alpha.example.net', { key_prefix: 'ifk_old', used_all_time: 200 })],
+      // No profile at all: their activity predates the 90-day window.
+    })[0];
+    expect(d.verdict).toBe('former');
+    expect(d.usedAllTime).toBe(200);
+  });
+
+  it('signedUpAt orders parsed instants across the two real-world date shapes', () => {
+    const d = buildDossiers({
+      ...base,
+      keys: [
+        // ISO shape, earlier instant; raw string sort would rank the SQL
+        // shape first because ' ' < 'T' at position 10.
+        keyRow('mix@alpha.example.net', { key_prefix: 'ifk_a', created_at: '2026-07-01T06:00:00.000Z' }),
+        keyRow('mix@alpha.example.net', { key_prefix: 'ifk_b', created_at: '2026-07-01 09:00:00' }),
+      ],
+    })[0];
+    expect(d.signedUpAt).toBe('2026-07-01T06:00:00.000Z');
+  });
+
+  it('the unbounded first call from the activation join replaces the windowed one', () => {
+    const d = buildDossiers({
+      ...base,
+      keys: [keyRow('march@alpha.example.net', { key_prefix: 'ifk_m', used_all_time: 50 })],
+      profiles: { ifk_m: profile({ key_prefix: 'ifk_m', first_seen: '2026-06-20 09:00:00', total: 5, ok: 5 }) },
+      activation: [
+        {
+          email: 'march@alpha.example.net',
+          status: 'active',
+          source: 'direct',
+          credits_total: 0,
+          credits_remaining: 0,
+          packs: 0,
+          first_call_at: '2026-03-04 08:12:00',
+          calls_90d: 5,
+        },
+      ],
+    })[0];
+    expect(d.firstCallEver).toBe('2026-03-04 08:12:00');
+    expect(d.activation?.source).toBe('direct');
+  });
+});

@@ -29,6 +29,7 @@ export default async function ClientsPage() {
     monthsByKey: profiles.monthsByKey,
     quotaWarnedByKey: profiles.quotaWarnedByKey,
     now: new Date(),
+    activation: data.activation,
   });
 
   return (
