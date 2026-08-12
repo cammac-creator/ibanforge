@@ -131,36 +131,6 @@ function RowActions({
   );
 }
 
-/** The 300 ms hover preview: scan the list without losing the open thread. */
-function PreviewCard({ row, top }: { row: MailRow; top: number }) {
-  const flame = flameOf(row.heat);
-  return (
-    <div
-      className="pointer-events-none fixed z-40 w-72 rounded-xl border border-[var(--ink-5)] bg-[var(--ink-1)]/98 p-3 shadow-xl shadow-black/50"
-      style={{ left: 304, top: Math.min(top, typeof window !== 'undefined' ? window.innerHeight - 180 : top) }}
-    >
-      <div className="flex items-center gap-2">
-        <p className="min-w-0 truncate text-sm font-semibold text-[var(--fg-1)]">{row.who}</p>
-        {row.chip && (
-          <span
-            className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold uppercase"
-            style={{ color: row.chip.color, backgroundColor: row.chip.bg }}
-          >
-            {row.chip.label}
-          </span>
-        )}
-        {flame && <span className="shrink-0 text-[11px]">{flame.glyph} {row.heat}</span>}
-      </div>
-      <p className="mt-1 truncate text-[13px] text-[var(--fg-2)]">{row.subject}</p>
-      {row.preview && <p className="mt-0.5 line-clamp-2 text-[12.5px] text-[var(--fg-3)]">{row.preview}</p>}
-      <div className="mt-2 flex items-baseline justify-between gap-2 border-t border-[var(--ink-4)]/60 pt-1.5">
-        {row.next && <p className="min-w-0 truncate text-[12px] text-amber-300">→ {row.next}</p>}
-        {row.age && <p className="shrink-0 text-[11.5px] tabular-nums text-[var(--fg-3)]">{row.age}</p>}
-      </div>
-    </div>
-  );
-}
-
 export function MailList({
   input,
   selectedId,
@@ -179,24 +149,9 @@ export function MailList({
   // Both rules live in searchRows; this component only holds the input's state.
   const [q, setQ] = useState('');
   const [busy, setBusy] = useState(false);
-  // Hover preview: armed after 300 ms of rest on a row, torn down on leave.
-  // Held as (id, top) so the card can position itself beside the exact row.
-  const [preview, setPreview] = useState<{ id: string; top: number } | null>(null);
-  const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const filters = mailFilters(input);
   const rows = searchRows(mailRows(input, active), q);
-  const previewRow = preview ? rows.find((r) => r.id === preview.id) : null;
-
-  function armPreview(id: string, e: React.MouseEvent<HTMLElement>) {
-    const top = e.currentTarget.getBoundingClientRect().top;
-    if (hoverTimer.current) clearTimeout(hoverTimer.current);
-    hoverTimer.current = setTimeout(() => setPreview({ id, top }), 300);
-  }
-  function disarmPreview() {
-    if (hoverTimer.current) clearTimeout(hoverTimer.current);
-    setPreview(null);
-  }
 
   // Touch swipe: left = snooze (needs a prospect row), right = mark read
   // (needs an unread thread). 64px of travel commits; less snaps back. Held
@@ -270,7 +225,7 @@ export function MailList({
         })}
       </div>
 
-      <div className={`min-h-0 flex-1 overflow-y-auto py-1.5 ${busy ? 'opacity-60' : ''}`} onMouseLeave={disarmPreview}>
+      <div className={`min-h-0 flex-1 overflow-y-auto py-1.5 ${busy ? 'opacity-60' : ''}`}>
         {rows.length === 0 ? (
           // Two different absences: a filter can be empty, and a search can
           // empty a filter that is not. Blaming the filter while a query
@@ -296,8 +251,6 @@ export function MailList({
                 <button
                   type="button"
                   onClick={() => onSelect(r.id)}
-                  onMouseEnter={(e) => armPreview(r.id, e)}
-                  onMouseLeave={disarmPreview}
                   onTouchStart={(e) => onTouchStart(r.id, e)}
                   onTouchMove={onTouchMove}
                   onTouchEnd={onTouchEnd}
@@ -371,7 +324,6 @@ export function MailList({
           })
         )}
       </div>
-      {previewRow && preview && <PreviewCard row={previewRow} top={preview.top} />}
     </div>
   );
 }
