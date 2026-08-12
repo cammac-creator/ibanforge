@@ -215,6 +215,16 @@ export function getStatsDB(): DatabaseType.Database {
         label TEXT NOT NULL
       );
       CREATE INDEX IF NOT EXISTS idx_events_date ON events(created_at);
+      -- One cached French thread summary per counterpart address. thread_key
+      -- fingerprints the thread state it was written against (message count +
+      -- last message date), so a new message naturally invalidates the cache
+      -- without any TTL bookkeeping.
+      CREATE TABLE IF NOT EXISTS thread_summaries (
+        email TEXT PRIMARY KEY,
+        thread_key TEXT NOT NULL,
+        summary_fr TEXT NOT NULL,
+        created_at TEXT DEFAULT (datetime('now'))
+      );
       -- One row per ISO week: the Monday-morning auto-written digest the
       -- dashboard shows and Telegram delivers. Upserted by week so the cron
       -- can be re-run without duplicating.

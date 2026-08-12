@@ -245,3 +245,43 @@ describe('/v1/admin/weekly-facts + /v1/admin/digest — Monday digest plumbing',
     expect(Array.isArray(body.digests)).toBe(true);
   });
 });
+
+describe('/v1/admin/thread-summary — cached French thread summaries', () => {
+  const headers = { 'Content-Type': 'application/json', 'X-Admin-Secret': 'correct-horse-battery-staple' };
+
+  it('misses on unknown email, upserts, hits on matching key, misses on a changed key', async () => {
+    const app = makeApp();
+    const email = 'summary-probe@alpha.example.net';
+    const miss = await app.request(`/v1/admin/thread-summary?email=${encodeURIComponent(email)}&key=k1`, { headers });
+    expect(miss.status).toBe(200);
+    expect(((await miss.json()) as { summary: unknown }).summary).toBeNull();
+
+    const post = await app.request('/v1/admin/thread-summary', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ email, thread_key: 'k1', summary_fr: 'Il attend le pricing entreprise.' }),
+    });
+    expect(post.status).toBe(201);
+
+    const hit = await app.request(`/v1/admin/thread-summary?email=${encodeURIComponent(email)}&key=k1`, { headers });
+    const hitBody = (await hit.json()) as { summary: { summary_fr: string } | null };
+    expect(hitBody.summary?.summary_fr).toContain('pricing');
+
+    // A new message moves the key: the stale summary must not be served.
+    const stale = await app.request(`/v1/admin/thread-summary?email=${encodeURIComponent(email)}&key=k2`, { headers });
+    expect(((await stale.json()) as { summary: unknown }).summary).toBeNull();
+
+    const { getStatsDB } = await import('../lib/db.js');
+    getStatsDB().prepare('DELETE FROM thread_summaries WHERE email = ?').run(email);
+  });
+
+  it('rejects an empty summary or missing key', async () => {
+    const app = makeApp();
+    const bad = await app.request('/v1/admin/thread-summary', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ email: 'x@alpha.example.net', thread_key: '', summary_fr: '  ' }),
+    });
+    expect(bad.status).toBe(400);
+  });
+});

@@ -703,6 +703,52 @@ apiKeys.post('/v1/admin/digest', async (c) => {
   return c.json({ saved: true, week }, 201);
 });
 
+/**
+ * Cached French thread summaries ("où on en est"), one per counterpart
+ * address. `key` fingerprints the thread state the summary was written
+ * against; a mismatch is a miss, so the frontend regenerates exactly when a
+ * message has arrived or left and never on a timer.
+ */
+apiKeys.get('/v1/admin/thread-summary', (c) => {
+  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
+  const email = (c.req.query('email') ?? '').trim().toLowerCase();
+  const key = (c.req.query('key') ?? '').trim();
+  if (!email || !key) {
+    return c.json({ error: 'invalid_query', message: 'email and key are required' }, 400);
+  }
+  const row = getStatsDB()
+    .prepare('SELECT thread_key, summary_fr, created_at FROM thread_summaries WHERE email = ?')
+    .get(email) as { thread_key: string; summary_fr: string; created_at: string } | undefined;
+  return c.json({ summary: row && row.thread_key === key ? row : null });
+});
+
+apiKeys.post('/v1/admin/thread-summary', async (c) => {
+  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
+  let body: { email?: unknown; thread_key?: unknown; summary_fr?: unknown };
+  try {
+    body = await c.req.json<{ email?: unknown; thread_key?: unknown; summary_fr?: unknown }>();
+  } catch {
+    return c.json({ error: 'invalid_json' }, 400);
+  }
+  const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
+  const key = typeof body.thread_key === 'string' ? body.thread_key.trim() : '';
+  const summary = typeof body.summary_fr === 'string' ? body.summary_fr.trim() : '';
+  if (!email || !key || !summary) {
+    return c.json({ error: 'invalid_body', message: 'email, thread_key and summary_fr are required' }, 400);
+  }
+  getStatsDB()
+    .prepare(
+      `INSERT INTO thread_summaries (email, thread_key, summary_fr) VALUES (?, ?, ?)
+       ON CONFLICT(email) DO UPDATE SET thread_key = excluded.thread_key, summary_fr = excluded.summary_fr, created_at = datetime('now')`,
+    )
+    .run(email, key, summary.slice(0, 2000));
+  return c.json({ saved: true }, 201);
+});
+
 apiKeys.get('/v1/admin/digest', (c) => {
   if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
     return c.json({ error: 'unauthorized' }, 401);
