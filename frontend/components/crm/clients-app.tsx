@@ -95,9 +95,9 @@ export function ClientsApp({ dossiers, locale }: { dossiers: ClientDossier[]; lo
           { l: 'À débloquer', v: String(counts.blocked), h: 'arrêtés sur un refus' },
         ].map((s) => (
           <div key={s.l} className="rounded-xl border border-[var(--ink-4)]/60 bg-[var(--ink-2)]/60 px-4 py-3">
-            <div className="text-[10px] uppercase tracking-wider text-[var(--fg-5)]">{s.l}</div>
+            <div className="text-[12px] uppercase tracking-wider text-[var(--fg-5)]">{s.l}</div>
             <div className="font-mono text-2xl tabular-nums text-[var(--fg-1)]">{s.v}</div>
-            <div className="text-[11px] text-[var(--fg-4)]">{s.h}</div>
+            <div className="text-[12px] text-[var(--fg-4)]">{s.h}</div>
           </div>
         ))}
       </div>
@@ -106,7 +106,7 @@ export function ClientsApp({ dossiers, locale }: { dossiers: ClientDossier[]; lo
         <button
           onClick={() => setFilter('used')}
           title="Les adresses qui ont appelé au moins une fois"
-          className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+          className={`rounded-full px-3 py-1 text-[13px] font-medium transition-colors ${
             filter === 'used' ? 'bg-[var(--ink-5)] text-white' : 'text-[var(--fg-4)] hover:text-[var(--fg-2)]'
           }`}
         >
@@ -114,7 +114,7 @@ export function ClientsApp({ dossiers, locale }: { dossiers: ClientDossier[]; lo
         </button>
         <button
           onClick={() => setFilter('all')}
-          className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+          className={`rounded-full px-3 py-1 text-[13px] font-medium transition-colors ${
             filter === 'all' ? 'bg-[var(--ink-5)] text-white' : 'text-[var(--fg-4)] hover:text-[var(--fg-2)]'
           }`}
         >
@@ -125,7 +125,7 @@ export function ClientsApp({ dossiers, locale }: { dossiers: ClientDossier[]; lo
             key={v.key}
             onClick={() => setFilter(filter === v.key ? 'all' : v.key)}
             title={v.why}
-            className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+            className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-[13px] font-medium transition-colors ${
               filter === v.key ? 'bg-[var(--ink-5)] text-white' : 'text-[var(--fg-4)] hover:text-[var(--fg-2)]'
             }`}
           >
@@ -138,14 +138,14 @@ export function ClientsApp({ dossiers, locale }: { dossiers: ClientDossier[]; lo
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Nom, adresse, clé, pays…"
-            className="w-48 rounded-md border border-[var(--ink-4)] bg-[var(--ink-1)] px-2.5 py-1 text-xs text-[var(--fg-1)] placeholder:text-[var(--fg-5)] focus:border-[var(--amber-500)]/50 focus:outline-none"
+            className="w-48 rounded-md border border-[var(--ink-4)] bg-[var(--ink-1)] px-2.5 py-1 text-[13px] text-[var(--fg-1)] placeholder:text-[var(--fg-5)] focus:border-[var(--amber-500)]/50 focus:outline-none"
           />
           <span className="flex items-center gap-0.5 rounded-md border border-[var(--ink-4)] p-0.5">
             {SORTS.map((s) => (
               <button
                 key={s.key}
                 onClick={() => setSort(s.key)}
-                className={`rounded px-2 py-1 text-[11px] font-medium transition-colors ${
+                className={`rounded px-2 py-1 text-[12px] font-medium transition-colors ${
                   sort === s.key ? 'bg-[var(--ink-4)] text-white' : 'text-[var(--fg-4)] hover:text-[var(--fg-2)]'
                 }`}
               >
@@ -157,7 +157,7 @@ export function ClientsApp({ dossiers, locale }: { dossiers: ClientDossier[]; lo
       </div>
 
       <div className="overflow-hidden rounded-xl border border-[var(--ink-4)]/60 bg-[var(--ink-2)]/40">
-        <div className="hidden items-center gap-3 border-b border-[var(--ink-4)] px-4 py-2 text-[10px] uppercase tracking-wider text-[var(--fg-5)] md:flex">
+        <div className="hidden items-center gap-3 border-b border-[var(--ink-4)] px-4 py-2 text-[12px] uppercase tracking-wider text-[var(--fg-5)] md:flex">
           <span className="w-[26%]">Client</span>
           <span className="w-[13%]">État</span>
           <span className="w-[12%] text-right">Requêtes</span>
@@ -186,11 +186,11 @@ export function ClientsApp({ dossiers, locale }: { dossiers: ClientDossier[]; lo
                     <span className="block truncate text-sm font-medium text-[var(--fg-1)]">
                       {d.company ?? d.email.split('@')[1]}
                     </span>
-                    <span className="block truncate font-mono text-[11px] text-[var(--fg-4)]">{d.email}</span>
+                    <span className="block truncate font-mono text-[12px] text-[var(--fg-4)]">{d.email}</span>
                   </span>
                   <span className="flex w-auto items-center gap-1.5 md:w-[13%]">
                     <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: v.colour }} />
-                    <span className="truncate text-xs" style={{ color: v.colour }}>
+                    <span className="truncate text-[13px]" style={{ color: v.colour }}>
                       {v.one}
                     </span>
                   </span>
@@ -200,10 +200,10 @@ export function ClientsApp({ dossiers, locale }: { dossiers: ClientDossier[]; lo
                   <span className="w-auto md:w-[10%]">
                     <MiniSpark days={d.days} />
                   </span>
-                  <span className="w-auto text-xs text-[var(--fg-3)] md:w-[12%]">
+                  <span className="w-auto text-[13px] text-[var(--fg-3)] md:w-[12%]">
                     {relativeDays(d.daysSinceLastCall)}
                   </span>
-                  <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-[var(--fg-3)]">
+                  <span className="min-w-0 flex-1 truncate font-mono text-[12px] text-[var(--fg-3)]">
                     {d.countries.length === 0
                       ? '—'
                       : d.countries
@@ -211,7 +211,7 @@ export function ClientsApp({ dossiers, locale }: { dossiers: ClientDossier[]; lo
                           .map((c) => `${flag(c.code)} ${c.code}`)
                           .join('  ')}
                   </span>
-                  <span className="w-14 text-right text-[11px] text-[var(--fg-4)]">
+                  <span className="w-14 text-right text-[12px] text-[var(--fg-4)]">
                     {d.mails.sent + d.mails.received > 0 ? `✉ ${d.mails.sent + d.mails.received}` : '—'}
                     {d.mails.hasDraft && <span className="ml-1 text-[var(--warn)]">•</span>}
                   </span>

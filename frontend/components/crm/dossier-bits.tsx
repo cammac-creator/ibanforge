@@ -24,7 +24,7 @@ export function relativeDays(days: number | null): string {
 export function Section({ title, note, children }: { title: string; note?: string; children: React.ReactNode }) {
   return (
     <section className="min-w-0">
-      <h4 className="mb-2 flex items-baseline gap-2 text-[11px] font-semibold uppercase tracking-wider text-[var(--fg-4)]">
+      <h4 className="mb-2 flex items-baseline gap-2 text-[12px] font-semibold uppercase tracking-wider text-[var(--fg-4)]">
         {title}
         {note && <span className="font-normal normal-case tracking-normal text-[var(--fg-5)]">{note}</span>}
       </h4>
@@ -34,7 +34,7 @@ export function Section({ title, note, children }: { title: string; note?: strin
 }
 
 export function Empty({ children }: { children: React.ReactNode }) {
-  return <p className="text-xs italic text-[var(--fg-5)]">{children}</p>;
+  return <p className="text-[13px] italic text-[var(--fg-5)]">{children}</p>;
 }
 
 /** A labelled proportional bar. `max` is the row that defines full width. */
@@ -43,13 +43,13 @@ export function Bar({ label, value, max, tone = 'amber' }: { label: string; valu
   const color = tone === 'amber' ? 'var(--amber-500)' : 'var(--info)';
   return (
     <div className="flex items-center gap-2 py-[3px]">
-      <span className="w-40 shrink-0 truncate font-mono text-[11px] text-[var(--fg-3)]" title={label}>
+      <span className="w-40 shrink-0 truncate font-mono text-[12px] text-[var(--fg-3)]" title={label}>
         {label}
       </span>
       <span className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-[var(--ink-4)]">
         <span className="block h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: color }} />
       </span>
-      <span className="w-10 shrink-0 text-right font-mono text-[11px] tabular-nums text-[var(--fg-2)]">{value}</span>
+      <span className="w-10 shrink-0 text-right font-mono text-[12px] tabular-nums text-[var(--fg-2)]">{value}</span>
     </div>
   );
 }
@@ -92,7 +92,7 @@ export function HoursStrip({ hours }: { hours: number[] }) {
           />
         ))}
       </div>
-      <div className="mt-1 flex justify-between font-mono text-[9px] text-[var(--fg-5)]">
+      <div className="mt-1 flex justify-between font-mono text-[12px] text-[var(--fg-5)]">
         <span>00h</span>
         <span>06h</span>
         <span>12h</span>
@@ -106,9 +106,9 @@ export function HoursStrip({ hours }: { hours: number[] }) {
 export function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
     <div className="rounded-lg border border-[var(--ink-4)]/60 bg-[var(--ink-1)]/60 px-3 py-2">
-      <div className="text-[10px] uppercase tracking-wider text-[var(--fg-5)]">{label}</div>
+      <div className="text-[12px] uppercase tracking-wider text-[var(--fg-5)]">{label}</div>
       <div className="font-mono text-base tabular-nums text-[var(--fg-1)]">{value}</div>
-      {hint && <div className="text-[10px] text-[var(--fg-4)]">{hint}</div>}
+      {hint && <div className="text-[12px] text-[var(--fg-4)]">{hint}</div>}
     </div>
   );
 }

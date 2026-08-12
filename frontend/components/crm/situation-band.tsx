@@ -38,11 +38,11 @@ export function SituationBand({ situation: s }: { situation: Situation }) {
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <span className="text-[10px] font-bold uppercase tracking-wide" style={{ color: b.fg }}>
+          <span className="text-[12px] font-bold uppercase tracking-wide" style={{ color: b.fg }}>
             {b.label}
           </span>
           {silence !== null && (
-            <span className="text-xs text-[var(--fg-2)]">
+            <span className="text-[13px] text-[var(--fg-2)]">
               silence depuis <strong>{silence} j</strong>
             </span>
           )}
@@ -51,12 +51,12 @@ export function SituationBand({ situation: s }: { situation: Situation }) {
             clears AA on the two dark tints (4.69:1, 4.68:1) but drops to
             3.92:1 on the lighter 'none' band, so the same line passed or
             failed depending on the ball state. --fg-3 clears all three. */}
-        <span className="text-[10px] text-[var(--fg-3)]">
+        <span className="text-[12px] text-[var(--fg-3)]">
           {firstContact ? `1er contact ${firstContact} · ` : ''}
           {s.messageCount} message{s.messageCount > 1 ? 's' : ''}
         </span>
       </div>
-      <p className="mt-1.5 text-[11px] text-amber-300">→ {NEXT_ACTION_LABEL[s.nextAction]}</p>
+      <p className="mt-1.5 text-[12px] text-amber-300">→ {NEXT_ACTION_LABEL[s.nextAction]}</p>
     </div>
   );
 }

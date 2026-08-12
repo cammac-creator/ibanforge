@@ -54,7 +54,7 @@ export function MailList({
           onChange={(e) => setQ(e.target.value)}
           placeholder="Rechercher…"
           aria-label="Rechercher un contact"
-          className="w-full min-w-0 bg-transparent px-4 py-2 text-[12.5px] text-[var(--fg-1)] placeholder:text-[var(--fg-3)] focus:outline-none"
+          className="w-full min-w-0 bg-transparent px-4 py-2 text-[13.5px] text-[var(--fg-1)] placeholder:text-[var(--fg-3)] focus:outline-none"
         />
       </div>
       <div className="flex flex-wrap gap-4 border-b border-[var(--ink-4)]/60 px-4 pt-3">
@@ -71,7 +71,7 @@ export function MailList({
               // replaces, and the state is otherwise carried by colour alone.
               aria-pressed={on}
               className={[
-                'border-b-2 pb-[9px] text-[12.5px] whitespace-nowrap',
+                'border-b-2 pb-[9px] text-[13.5px] whitespace-nowrap',
                 on ? 'font-semibold' : '',
                 accent
                   ? 'text-[var(--amber-500)]'
@@ -96,7 +96,7 @@ export function MailList({
           // Two different absences: a filter can be empty, and a search can
           // empty a filter that is not. Blaming the filter while a query
           // stands would send the operator to the wrong control.
-          <p className="px-4 py-6 text-center text-[12.5px] text-[var(--fg-3)]">
+          <p className="px-4 py-6 text-center text-[13.5px] text-[var(--fg-3)]">
             {q.trim() ? 'Aucun contact ne correspond.' : 'Rien dans ce filtre.'}
           </p>
         ) : (
@@ -130,7 +130,7 @@ export function MailList({
                       only thing a 296px column can do with it. */}
                   <span
                     title={r.who}
-                    className={`min-w-0 truncate text-[13px] text-[var(--fg-1)] ${
+                    className={`min-w-0 truncate text-sm text-[var(--fg-1)] ${
                       r.unread || on ? 'font-semibold' : ''
                     }`}
                   >
@@ -142,7 +142,7 @@ export function MailList({
                       list's dot carried. Nothing becomes visible. */}
                   {r.unread && <span className="sr-only">Réponse non lue</span>}
                   <span
-                    className={`shrink-0 text-[11.5px] tabular-nums ${
+                    className={`shrink-0 text-[13.5px] tabular-nums ${
                       r.urgent ? 'text-[var(--amber-500)]' : 'text-[var(--fg-3)]'
                     }`}
                   >
@@ -150,13 +150,13 @@ export function MailList({
                   </span>
                 </span>
                 <span
-                  className={`mt-0.5 block truncate text-xs ${
+                  className={`mt-0.5 block truncate text-[13px] ${
                     r.unread ? 'font-medium text-[var(--fg-1)]' : 'text-[var(--fg-2)]'
                   }`}
                 >
                   {r.subject}
                 </span>
-                <span className="mt-px block truncate text-[11.5px] text-[var(--fg-3)]">
+                <span className="mt-px block truncate text-[13.5px] text-[var(--fg-3)]">
                   {r.preview}
                 </span>
               </button>

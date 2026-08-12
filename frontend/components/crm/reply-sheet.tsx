@@ -17,8 +17,13 @@ import { PANEL_PADDING_PX } from './panel-padding';
  * subject line, four rows and a button row can honestly be. A pinned height
  * also means the sheet never grows over more of the thread when a translation
  * or a check appears: the inside scrolls instead.
+ *
+ * Re-posed when the CRM type scale was raised for readability (owner's call):
+ * the body is `text-sm leading-[22px]` (the explicit line height is what keeps
+ * this sum in integers), so four rows are 88 where they were 80, and the
+ * subject went to text-sm, 30px against 26. 216 + 8 + 4 = 228.
  */
-export const REPLY_SHEET_PX = 216;
+export const REPLY_SHEET_PX = 228;
 
 /**
  * How much of the panel's scrolling region the sheet hides: its own height,
@@ -319,12 +324,12 @@ export function ReplySheet({
    * so a note inside it could be out of view while the armed button is not.
    */
   const forcedNote = g.forcedNote && (
-    <p className="mt-2 shrink-0 text-[11px] font-medium leading-snug text-red-300">⚠️ {g.forcedNote}</p>
+    <p className="mt-2 shrink-0 text-[12px] font-medium leading-snug text-red-300">⚠️ {g.forcedNote}</p>
   );
   const note = msg && (
     <p
       role={msg.bad ? 'alert' : 'status'}
-      className={`mt-2 shrink-0 text-[11px] ${msg.bad ? 'text-red-400' : 'text-[var(--fg-2)]'}`}
+      className={`mt-2 shrink-0 text-[12px] ${msg.bad ? 'text-red-400' : 'text-[var(--fg-2)]'}`}
     >
       {msg.text}
     </p>
@@ -335,7 +340,7 @@ export function ReplySheet({
     // address is missing. This one says what it costs here: there is nothing to
     // answer into, and no button to press.
     return (
-      <p className="mt-3 shrink-0 border-t border-[var(--ink-4)]/60 pt-3 text-[11px] text-amber-300">
+      <p className="mt-3 shrink-0 border-t border-[var(--ink-4)]/60 pt-3 text-[12px] text-amber-300">
         Réponse impossible tant que l’adresse n’est pas vérifiée.
       </p>
     );
@@ -354,7 +359,7 @@ export function ReplySheet({
             // in this state, and aria-controls pointing at an absent id is an
             // invalid reference rather than a hint.
             aria-expanded={false}
-            className="min-w-0 flex-1 truncate rounded-lg border border-[var(--ink-4)] bg-[var(--ink-0)] px-3 py-1.5 text-left text-xs text-[var(--fg-3)] hover:border-amber-500/40 hover:text-[var(--fg-2)]"
+            className="min-w-0 flex-1 truncate rounded-lg border border-[var(--ink-4)] bg-[var(--ink-0)] px-3 py-1.5 text-left text-[13px] text-[var(--fg-3)] hover:border-amber-500/40 hover:text-[var(--fg-2)]"
           >
             {/* Folded text is not lost text: say it is there and unsent. The
                 subject is prefilled by construction, so it says nothing about
@@ -370,7 +375,7 @@ export function ReplySheet({
             type="button"
             onClick={send}
             disabled={!canSend}
-            className={`shrink-0 rounded-lg border px-4 py-1.5 text-xs font-semibold disabled:opacity-50 ${
+            className={`shrink-0 rounded-lg border px-4 py-1.5 text-[13px] font-semibold disabled:opacity-50 ${
               g.forced
                 ? 'border-red-500/60 text-red-300 hover:bg-red-500/15'
                 : 'border-green-600/50 text-green-400 hover:bg-green-600/15'
@@ -401,7 +406,7 @@ export function ReplySheet({
       className="absolute inset-x-0 bottom-0 z-10 flex flex-col rounded-b-xl border-t border-[var(--ink-4)] bg-[var(--ink-2)] p-3 shadow-[0_-10px_24px_-8px_rgba(0,0,0,0.65)]"
     >
       <div className="mb-1.5 flex shrink-0 items-center justify-between gap-2">
-        <span className="min-w-0 truncate text-[11px] text-[var(--fg-3)]">
+        <span className="min-w-0 truncate text-[12px] text-[var(--fg-3)]">
           Réponse à {c.company || c.email}, depuis {c.account}
         </span>
         <button
@@ -409,7 +414,7 @@ export function ReplySheet({
           onClick={() => onOpenChange(false)}
           aria-expanded
           aria-controls="reply-sheet"
-          className="shrink-0 cursor-pointer text-[11px] text-[var(--fg-3)] underline underline-offset-2 hover:text-[var(--fg-1)]"
+          className="shrink-0 cursor-pointer text-[12px] text-[var(--fg-3)] underline underline-offset-2 hover:text-[var(--fg-1)]"
         >
           replier
         </button>
@@ -420,7 +425,7 @@ export function ReplySheet({
           onChange={(e) => setSubject(e.target.value)}
           placeholder="Objet"
           aria-label="Objet de la réponse"
-          className="mb-2 w-full min-w-0 rounded-lg border border-[var(--ink-4)] bg-[var(--ink-0)] px-3 py-1 text-xs text-[var(--fg-1)] focus:border-amber-500/40 focus:outline-none"
+          className="mb-2 w-full min-w-0 rounded-lg border border-[var(--ink-4)] bg-[var(--ink-0)] px-3 py-1 text-sm text-[var(--fg-1)] focus:border-amber-500/40 focus:outline-none"
         />
         {/* Empty on mount, and focused: nothing steals focus from a page being
             read, since this node does not exist until Répondre is clicked.
@@ -434,7 +439,7 @@ export function ReplySheet({
           rows={4}
           placeholder="Écris ta réponse."
           aria-label="Corps de la réponse"
-          className="w-full min-w-0 rounded-lg border border-[var(--ink-4)] bg-[var(--ink-0)] p-3 text-xs leading-relaxed text-[var(--fg-1)] focus:border-amber-500/40 focus:outline-none"
+          className="w-full min-w-0 rounded-lg border border-[var(--ink-4)] bg-[var(--ink-0)] p-3 text-sm leading-[22px] text-[var(--fg-1)] focus:border-amber-500/40 focus:outline-none"
         />
         {fr && (
           /*
@@ -448,10 +453,10 @@ export function ReplySheet({
            * since the node is never unmounted between two non-null values.
            */
           <details key={fr} open className="mt-1">
-            <summary className="cursor-pointer text-[10px] text-blue-400">
+            <summary className="cursor-pointer text-[12px] text-blue-400">
               Traduction FR (pour toi seul, jamais envoyée)
             </summary>
-            <p className="mt-1 whitespace-pre-wrap text-[11px] text-[var(--fg-3)] wrap-anywhere">{fr}</p>
+            <p className="mt-1 whitespace-pre-wrap text-[12px] text-[var(--fg-3)] wrap-anywhere">{fr}</p>
           </details>
         )}
         {/* The report is handed over whole apart from its issue list: what is
@@ -466,7 +471,7 @@ export function ReplySheet({
           type="button"
           onClick={propose}
           disabled={busy !== false}
-          className="text-xs text-[var(--fg-3)] underline underline-offset-2 hover:text-[var(--fg-1)] disabled:no-underline disabled:opacity-50"
+          className="text-[13px] text-[var(--fg-3)] underline underline-offset-2 hover:text-[var(--fg-1)] disabled:no-underline disabled:opacity-50"
         >
           {busy === 'gen' ? '… proposition' : 'Proposer un texte'}
         </button>
@@ -485,7 +490,7 @@ export function ReplySheet({
             // counted and never shown, so a fresh sheet renders no list at all
             // and this would otherwise point at an id absent from the DOM.
             aria-describedby={shown.length > 0 ? checksId : undefined}
-            className={`rounded-lg px-4 py-1.5 text-xs font-semibold text-white disabled:opacity-50 ${
+            className={`rounded-lg px-4 py-1.5 text-[13px] font-semibold text-white disabled:opacity-50 ${
               g.forced ? 'bg-red-600 hover:bg-red-500' : 'bg-green-600 hover:bg-green-500'
             }`}
           >

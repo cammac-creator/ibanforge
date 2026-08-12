@@ -229,7 +229,7 @@ export function GuardrailChecks({
       {report.issues.map((i) => (
         <li
           key={i.code}
-          className={`text-[11px] leading-snug ${
+          className={`text-[12px] leading-snug ${
             i.level === 'blocking' ? 'text-red-400' : 'text-amber-300'
           }`}
         >
@@ -239,7 +239,7 @@ export function GuardrailChecks({
         </li>
       ))}
       {forcedNote && (
-        <li className="text-[11px] font-medium leading-snug text-red-300">⚠️ {forcedNote}</li>
+        <li className="text-[12px] font-medium leading-snug text-red-300">⚠️ {forcedNote}</li>
       )}
     </ul>
   );
@@ -288,7 +288,7 @@ export function OverrideButton({
       // Fill and text colour only between the two states. No weight change:
       // bolder text is wider text, and a width change is the very movement
       // this toggle exists to avoid.
-      className={`rounded-lg border border-red-500/40 text-xs hover:bg-red-500/20 ${
+      className={`rounded-lg border border-red-500/40 text-[13px] hover:bg-red-500/20 ${
         dense ? 'px-3 py-1' : 'px-3 py-1.5'
       } ${pressed ? 'bg-red-500/20 text-red-100' : 'text-red-300'}`}
     >

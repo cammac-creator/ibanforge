@@ -36,7 +36,7 @@ export function ProspectStatusBadge({ status }: { status: string }) {
   if (!s) return null;
   return (
     <span
-      className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase"
+      className="shrink-0 rounded-full px-2 py-0.5 text-[12px] font-semibold uppercase"
       style={{ color: s.color, backgroundColor: s.bg }}
     >
       {s.label}
@@ -95,7 +95,7 @@ export function ProspectStatusControl({
   return (
     // first:* for the prospect whose dossier holds nothing else: this control
     // is then the first child, and its separator would rule off nothing.
-    <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-[var(--ink-4)]/60 pt-3 text-[11px] first:mt-0 first:border-t-0 first:pt-0">
+    <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-[var(--ink-4)]/60 pt-3 text-[12px] first:mt-0 first:border-t-0 first:pt-0">
       <span className="text-[var(--fg-3)]">Classer :</span>
       <button
         type="button"

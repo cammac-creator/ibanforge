@@ -20,21 +20,21 @@ export function ClientDossierPanel({ d, locale }: { d: ClientDossier; locale: st
             href={d.website}
             target="_blank"
             rel="noreferrer noopener"
-            className="text-xs text-[var(--amber-400)] underline-offset-2 hover:underline"
+            className="text-[13px] text-[var(--amber-400)] underline-offset-2 hover:underline"
           >
             {d.website.replace(/^https?:\/\//, '')} ↗
           </a>
         )}
         {d.country && (
-          <span className="text-xs text-[var(--fg-4)]">
+          <span className="text-[13px] text-[var(--fg-4)]">
             {flag(d.country)} {d.country}
           </span>
         )}
-        {d.whatTheyDo && <span className="text-xs italic text-[var(--fg-4)]">{d.whatTheyDo}</span>}
+        {d.whatTheyDo && <span className="text-[13px] italic text-[var(--fg-4)]">{d.whatTheyDo}</span>}
       </div>
 
       {d.verdict === 'blocked' && (
-        <div className="mb-5 rounded-lg border border-[var(--err)]/40 bg-[var(--err)]/10 px-3 py-2 text-xs text-[var(--fg-2)]">
+        <div className="mb-5 rounded-lg border border-[var(--err)]/40 bg-[var(--err)]/10 px-3 py-2 text-[13px] text-[var(--fg-2)]">
           <span className="font-semibold text-[var(--err)]">Ils se sont arrêtés sur un refus.</span>{' '}
           Dernier appel servi le {d.lastSuccessAt?.slice(0, 10) ?? '—'}, dernier refus le{' '}
           {d.lastRefusalAt?.slice(0, 10) ?? '—'}, et rien depuis. Relever leur quota ne les prévient pas :
@@ -42,7 +42,7 @@ export function ClientDossierPanel({ d, locale }: { d: ClientDossier; locale: st
         </div>
       )}
       {d.verdict === 'struggling' && (
-        <div className="mb-5 rounded-lg border border-[var(--warn)]/40 bg-[var(--warn)]/10 px-3 py-2 text-xs text-[var(--fg-2)]">
+        <div className="mb-5 rounded-lg border border-[var(--warn)]/40 bg-[var(--warn)]/10 px-3 py-2 text-[13px] text-[var(--fg-2)]">
           <span className="font-semibold text-[var(--warn)]">Leur intégration bute.</span> Plus de 30 % de leurs
           appels sont rejetés. Regardez « Ce qui leur est refusé » plus bas : c&apos;est souvent un format d&apos;entrée,
           pas une panne.
@@ -82,7 +82,7 @@ export function ClientDossierPanel({ d, locale }: { d: ClientDossier; locale: st
                 {d.countries.slice(0, 14).map((c) => (
                   <span
                     key={c.code}
-                    className="rounded border border-[var(--ink-5)] bg-[var(--ink-2)] px-1.5 py-0.5 font-mono text-[11px] text-[var(--fg-2)]"
+                    className="rounded border border-[var(--ink-5)] bg-[var(--ink-2)] px-1.5 py-0.5 font-mono text-[12px] text-[var(--fg-2)]"
                     title={`${c.count} contrôles`}
                   >
                     {flag(c.code)} {c.code}
@@ -91,7 +91,7 @@ export function ClientDossierPanel({ d, locale }: { d: ClientDossier; locale: st
                 ))}
               </div>
               {topCountry && attributed > 0 && (
-                <p className="text-[11px] text-[var(--fg-4)]">
+                <p className="text-[12px] text-[var(--fg-4)]">
                   {Math.round((topCountry.count / attributed) * 100)} % de leurs contrôles portent sur{' '}
                   <span className="text-[var(--fg-2)]">{topCountry.code}</span>.
                 </p>
@@ -116,12 +116,12 @@ export function ClientDossierPanel({ d, locale }: { d: ClientDossier; locale: st
           ) : (
             <div className="space-y-1">
               {d.userAgents.slice(0, 4).map((u) => (
-                <div key={u.ua} className="truncate font-mono text-[11px] text-[var(--fg-3)]" title={u.ua}>
+                <div key={u.ua} className="truncate font-mono text-[12px] text-[var(--fg-3)]" title={u.ua}>
                   {u.ua} <span className="text-[var(--fg-5)]">· {u.count}</span>
                 </div>
               ))}
               {d.clientKinds.length > 0 && (
-                <div className="pt-1 text-[11px] text-[var(--fg-4)]">
+                <div className="pt-1 text-[12px] text-[var(--fg-4)]">
                   {d.clientKinds.map((k) => `${k.kind} (${k.count})`).join(' · ')}
                 </div>
               )}
@@ -148,12 +148,12 @@ export function ClientDossierPanel({ d, locale }: { d: ClientDossier; locale: st
               return (
                 <div key={k.prefix} className="rounded-lg border border-[var(--ink-4)]/60 bg-[var(--ink-1)]/60 px-3 py-2">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="font-mono text-[11px] text-[var(--fg-2)]">{k.prefix}</span>
+                    <span className="font-mono text-[12px] text-[var(--fg-2)]">{k.prefix}</span>
                     <span className="flex items-center gap-1.5">
-                      <span className="rounded border border-[var(--ink-5)] px-1 py-px text-[10px] uppercase text-[var(--fg-4)]">
+                      <span className="rounded border border-[var(--ink-5)] px-1 py-px text-[12px] uppercase text-[var(--fg-4)]">
                         {k.plan === 'credits' ? 'crédits' : k.plan === 'paid' ? 'payant' : 'gratuit'}
                       </span>
-                      {!k.active && <span className="text-[10px] text-[var(--err)]">révoquée</span>}
+                      {!k.active && <span className="text-[12px] text-[var(--err)]">révoquée</span>}
                     </span>
                   </div>
                   <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-[var(--ink-4)]">
@@ -162,19 +162,19 @@ export function ClientDossierPanel({ d, locale }: { d: ClientDossier; locale: st
                       style={{ width: `${pct}%`, backgroundColor: pct >= 100 ? 'var(--err)' : pct >= 80 ? 'var(--warn)' : 'var(--ok)' }}
                     />
                   </div>
-                  <div className="mt-1 flex justify-between font-mono text-[10px] text-[var(--fg-4)]">
+                  <div className="mt-1 flex justify-between font-mono text-[12px] text-[var(--fg-4)]">
                     <span>
                       {used} / {limit} {k.creditsTotal != null ? 'crédits' : 'ce mois'}
                     </span>
                     <span>créée le {k.createdAt.slice(0, 10)}</span>
                   </div>
                   {k.quotaWarnedMonths.length > 0 && (
-                    <div className="mt-1 text-[10px] text-[var(--warn)]">
+                    <div className="mt-1 text-[12px] text-[var(--warn)]">
                       Avertie à 80 % en {k.quotaWarnedMonths.join(', ')}
                     </div>
                   )}
                   {k.months.length > 1 && (
-                    <div className="mt-1 font-mono text-[10px] text-[var(--fg-5)]">
+                    <div className="mt-1 font-mono text-[12px] text-[var(--fg-5)]">
                       {k.months.map((m) => `${m.month.slice(5)} : ${m.count}`).join('  ·  ')}
                     </div>
                   )}
@@ -188,7 +188,7 @@ export function ClientDossierPanel({ d, locale }: { d: ClientDossier; locale: st
           {d.mails.sent + d.mails.received === 0 ? (
             <Empty>Jamais contacté.</Empty>
           ) : (
-            <div className="space-y-1 text-[11px] text-[var(--fg-3)]">
+            <div className="space-y-1 text-[12px] text-[var(--fg-3)]">
               <div>
                 <span className="font-mono text-[var(--fg-2)]">{d.mails.sent}</span> envoyé
                 {d.mails.sent > 1 ? 's' : ''} ·{' '}
@@ -204,13 +204,13 @@ export function ClientDossierPanel({ d, locale }: { d: ClientDossier; locale: st
             </div>
           )}
           {d.mails.hasDraft && (
-            <div className="mt-2 rounded border border-[var(--warn)]/40 bg-[var(--warn)]/10 px-2 py-1 text-[11px] text-[var(--warn)]">
+            <div className="mt-2 rounded border border-[var(--warn)]/40 bg-[var(--warn)]/10 px-2 py-1 text-[12px] text-[var(--warn)]">
               Un brouillon attend d&apos;être envoyé.
             </div>
           )}
           <Link
             href={contactsHref(locale, d.id)}
-            className="mt-2 inline-block text-[11px] text-[var(--amber-400)] underline-offset-2 hover:underline"
+            className="mt-2 inline-block text-[12px] text-[var(--amber-400)] underline-offset-2 hover:underline"
           >
             Ouvrir le fil dans Contacts →
           </Link>

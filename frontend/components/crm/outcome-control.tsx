@@ -40,7 +40,7 @@ export function OutcomeBadge({ sourcing }: { sourcing: ProspectSourcing }) {
   const until = sourcing.wakeUpAt ? ` jusqu'au ${sourcing.wakeUpAt}` : '';
   return (
     <span
-      className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold"
+      className="shrink-0 rounded-full px-2 py-0.5 text-[12px] font-semibold"
       style={{ color: o.color, backgroundColor: `${o.color}22` }}
       title={sourcing.outcomeNote ?? undefined}
     >
@@ -113,7 +113,7 @@ export function OutcomeControl({ sourcing }: { sourcing: ProspectSourcing }) {
   const dateMissing = !!chosen?.needsDate && !/^\d{4}-\d{2}-\d{2}$/.test(wakeUpAt);
 
   return (
-    <div className="mt-3 border-t border-[var(--ink-4)]/60 pt-3 text-[11px]">
+    <div className="mt-3 border-t border-[var(--ink-4)]/60 pt-3 text-[12px]">
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-[var(--fg-3)]">Où ça en est :</span>
         {OUTCOMES.map((o) => {

@@ -18,24 +18,24 @@ export function BotDossierPanel({ b }: { b: BotDossier }) {
   return (
     <div className="border-t border-[var(--ink-4)] bg-[var(--ink-1)]/40 px-4 py-5">
       <div className="mb-5 flex flex-wrap items-baseline gap-x-4 gap-y-1">
-        <span className="min-w-0 break-all font-mono text-[11px] text-[var(--fg-3)]">{b.userAgent}</span>
+        <span className="min-w-0 break-all font-mono text-[12px] text-[var(--fg-3)]">{b.userAgent}</span>
         {b.homepage && (
           <a
             href={b.homepage}
             target="_blank"
             rel="noreferrer noopener"
-            className="shrink-0 text-xs text-[var(--amber-400)] underline-offset-2 hover:underline"
+            className="shrink-0 text-[13px] text-[var(--amber-400)] underline-offset-2 hover:underline"
           >
             {b.homepage.replace(/^https?:\/\//, '')} ↗
           </a>
         )}
         {b.clientKind && (
-          <span className="shrink-0 text-xs text-[var(--fg-4)]">{KIND_LABEL[b.clientKind] ?? b.clientKind}</span>
+          <span className="shrink-0 text-[13px] text-[var(--fg-4)]">{KIND_LABEL[b.clientKind] ?? b.clientKind}</span>
         )}
       </div>
 
       {b.verdict === 'servi' && (
-        <div className="mb-5 rounded-lg border border-[var(--warn)]/40 bg-[var(--warn)]/10 px-3 py-2 text-xs text-[var(--fg-2)]">
+        <div className="mb-5 rounded-lg border border-[var(--warn)]/40 bg-[var(--warn)]/10 px-3 py-2 text-[13px] text-[var(--fg-2)]">
           <span className="font-semibold text-[var(--warn)]">Le mur payant l&apos;a laissé passer.</span>{' '}
           {b.billableOk} appel{b.billableOk > 1 ? 's' : ''} sur un endpoint facturé, sans clé API. Cela peut être un
           règlement x402 accepté, ou un appel servi gratuitement : le journal des requêtes ne distingue pas les deux.
@@ -43,21 +43,21 @@ export function BotDossierPanel({ b }: { b: BotDossier }) {
         </div>
       )}
       {b.verdict === 'perdu' && (
-        <div className="mb-5 rounded-lg border border-[var(--warn)]/40 bg-[var(--warn)]/10 px-3 py-2 text-xs text-[var(--fg-2)]">
+        <div className="mb-5 rounded-lg border border-[var(--warn)]/40 bg-[var(--warn)]/10 px-3 py-2 text-[13px] text-[var(--fg-2)]">
           <span className="font-semibold text-[var(--warn)]">Il cherche ce que nous ne servons pas.</span> {missRate} %
           de ses appels finissent en 404. Les chemins ci-dessous sont ce qu&apos;un annuaire attend de nous : les
           servir, c&apos;est gagner l&apos;inscription sans rien demander à personne.
         </div>
       )}
       {b.verdict === 'sonde' && (
-        <div className="mb-5 rounded-lg border border-[var(--ink-5)] bg-[var(--ink-2)]/60 px-3 py-2 text-xs text-[var(--fg-3)]">
+        <div className="mb-5 rounded-lg border border-[var(--ink-5)] bg-[var(--ink-2)]/60 px-3 py-2 text-[13px] text-[var(--fg-3)]">
           <span className="font-semibold text-[var(--fg-2)]">Sonde, pas client.</span> {refusalRate} % de ses appels
           sont refusés et il revient quand même. Son volume gonfle le graphique du tunnel sans rien vouloir dire de la
           demande réelle.
         </div>
       )}
       {b.verdict === 'parti' && (
-        <div className="mb-5 rounded-lg border border-[var(--ink-5)] bg-[var(--ink-2)]/60 px-3 py-2 text-xs text-[var(--fg-3)]">
+        <div className="mb-5 rounded-lg border border-[var(--ink-5)] bg-[var(--ink-2)]/60 px-3 py-2 text-[13px] text-[var(--fg-3)]">
           <span className="font-semibold text-[var(--fg-2)]">Il ne passe plus.</span> Rien depuis{' '}
           {relativeDays(b.daysSinceLastCall)}. Pour un annuaire, cesser de nous visiter est le premier signe d&apos;un
           déréférencement.

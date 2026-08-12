@@ -80,7 +80,7 @@ function Bubble({ m, counterpartLabel }: { m: Message; counterpartLabel?: string
           // is what actually keeps the page from widening. min-w-0 lets the
           // bubble shrink; overflow-wrap inherits, so subject, body and quote
           // are all covered here.
-          'min-w-0 max-w-[78%] rounded-xl px-3 py-2 text-xs leading-relaxed wrap-anywhere',
+          'min-w-0 max-w-[78%] rounded-xl px-3 py-2 text-sm leading-relaxed wrap-anywhere',
           robot
             ? 'rounded-bl-sm bg-[var(--ink-3)] text-[var(--fg-2)]'
             : mine
@@ -92,13 +92,13 @@ function Bubble({ m, counterpartLabel }: { m: Message; counterpartLabel?: string
             on composited pixels, --fg-4 at 10px gives 4.28:1 on the blue tint
             and 3.94:1 on the amber, both under AA. This row carries the date
             and the 'date inconnue' fallback. */}
-        <div className="mb-1 flex flex-wrap items-center gap-2 text-[10px] text-[var(--fg-3)]">
+        <div className="mb-1 flex flex-wrap items-center gap-2 text-[12px] text-[var(--fg-3)]">
           <span className={robot ? 'text-[var(--fg-3)]' : mine ? 'text-amber-400' : 'text-blue-400'}>
             {mine ? 'toi' : (counterpartLabel ?? 'lui')}
           </span>
           {robot && (
             <span
-              className="rounded bg-[var(--ink-5)] px-1.5 py-0.5 text-[9px] font-medium text-[var(--fg-2)]"
+              className="rounded bg-[var(--ink-5)] px-1.5 py-0.5 text-[12px] font-medium text-[var(--fg-2)]"
               title="Accusé de réception, relance de guichet ou enquête de satisfaction. Ce message ne compte ni comme une réponse ni comme une balle dans ton camp."
             >
               ⚙ automatique · ne compte pas comme une réponse
@@ -111,7 +111,7 @@ function Bubble({ m, counterpartLabel }: { m: Message; counterpartLabel?: string
           )}
           {validLang && (
             <span
-              className="rounded bg-violet-500/15 px-1.5 py-0.5 text-[9px] text-violet-300"
+              className="rounded bg-violet-500/15 px-1.5 py-0.5 text-[12px] text-violet-300"
               title={hasFr ? 'Traduit automatiquement en français' : 'Langue détectée du message'}
             >
               🌐 {(m.lang && LANG_LABEL[m.lang]) || m.lang}
@@ -129,7 +129,7 @@ function Bubble({ m, counterpartLabel }: { m: Message; counterpartLabel?: string
               aria-expanded={showQuoted}
               // --fg-3: this is an interactive control, and at --fg-4 it sat at
               // 3.94:1 on the amber tint, dimmer than the quote it reveals.
-              className="mt-1.5 cursor-pointer text-[10px] text-[var(--fg-3)] underline underline-offset-2 hover:text-[var(--fg-2)]"
+              className="mt-1.5 cursor-pointer text-[12px] text-[var(--fg-3)] underline underline-offset-2 hover:text-[var(--fg-2)]"
             >
               {showQuoted ? `▾ masquer ${quotedLabel}` : `▸ afficher ${quotedLabel}`}
             </button>
@@ -145,7 +145,7 @@ function Bubble({ m, counterpartLabel }: { m: Message; counterpartLabel?: string
               // toggle can be genuinely new content. The quote stays visually
               // secondary through the left rule, the italics and the 10px size
               // rather than through contrast.
-              <p className="mt-1 whitespace-pre-wrap border-l-2 border-[var(--ink-5)] pl-2 text-[10px] italic text-[var(--fg-3)]">
+              <p className="mt-1 whitespace-pre-wrap border-l-2 border-[var(--ink-5)] pl-2 text-[12px] italic text-[var(--fg-3)]">
                 {quoted}
               </p>
             )}
@@ -158,7 +158,7 @@ function Bubble({ m, counterpartLabel }: { m: Message; counterpartLabel?: string
             // No aria-expanded here: this swaps one rendering of the message for
             // another, it does not reveal a region. The label already says which
             // way it will go.
-            className="mt-1 block cursor-pointer text-[10px] text-violet-400 underline underline-offset-2 hover:text-violet-300"
+            className="mt-1 block cursor-pointer text-[12px] text-violet-400 underline underline-offset-2 hover:text-violet-300"
           >
             {showOriginal ? 'voir la traduction' : 'voir l’original'}
           </button>

@@ -22,22 +22,19 @@ import { PANEL_PADDING_PX } from './panel-padding';
 /**
  * How tall the open sheet is, in pixels.
  *
- * The reply sheet's 216 plus two differences, not one. The body is the obvious
+ * The reply sheet's 228 plus two differences, not one. The body is the obvious
  * one: an answer is written in four rows and a mail nobody asked for has always
- * had six. Both textareas carry the same `text-xs leading-relaxed`, so a row is
- * 12px at 1.625, and two of them come to 40 rounded up. Rounded up and not
- * down, because a browser rounds the used line height and rounding down is what
- * clips the sixth row.
+ * had six. Both textareas carry `text-sm leading-[22px]` since the CRM type
+ * scale was raised — the explicit 22px line is what keeps two extra rows an
+ * exact 44 with nothing for the browser to round, where the old 12px-at-1.625
+ * rows needed a round-up note to avoid clipping the sixth row.
  *
- * The subject field is the second, and it was the one this constant missed. It
- * is `py-1.5 text-sm` here, inherited from the dock this sheet grew out of,
- * against `py-1 text-xs` on the reply side: 6 + 20 + 6 plus two borders is 34px
- * where the compact form is 4 + 16 + 4 plus two borders, 26px. Eight pixels the
- * sum did not carry, so 216 + 40 came to 256 and the sixth row of the textarea
- * was clipped from the moment the sheet opened, which is exactly the failure
- * the rounding above was written to avoid.
+ * The subject field is the second. It is `py-1.5 text-sm` here, inherited from
+ * the dock this sheet grew out of, against `py-1 text-sm` on the reply side:
+ * 6 + 20 + 6 plus two borders is 34px where the compact form is 4 + 20 + 4
+ * plus two borders, 30px. Four pixels the reply base does not carry.
  *
- * 216 + 40 + 8 = 264.
+ * 228 + 44 + 4 = 276.
  *
  * What this holds is the resting content: a subject line, six rows and the
  * button row. The translation and the check list are the scrolling content by
@@ -53,7 +50,7 @@ import { PANEL_PADDING_PX } from './panel-padding';
  * window the first cap did not cover. A sheet that floats over the panel has
  * neither failure to prevent, so both caps are gone with the dock.
  */
-export const OUTBOUND_SHEET_PX = 264;
+export const OUTBOUND_SHEET_PX = 276;
 
 /**
  * How tall the sheet stands while the operator is choosing an angle.
@@ -78,30 +75,34 @@ export const OUTBOUND_SHEET_PX = 264;
  * with one-line hints at this sheet's width:
  *
  *   1 border + 8 padding
- *   + 16.5 header line (text-[11px] on the p itself, so its own strut)
+ *   + 16.5 header line (text-[12px] on the p itself, so its own strut)
  *   + 6 header margin (mb-1.5)
  *   + 3 angle buttons at 55.75 each: 6 + 6 padding (py-1.5), 24 title line,
- *     2 hint margin (mt-0.5), 13.75 hint line (text-[10px] leading-snug
+ *     2 hint margin (mt-0.5), 13.75 hint line (text-[12px] leading-snug
  *     1.375), 4 margin (mb-1), summing to 167.25
  *   + 26.5 footer row (1 + 1 border, 4 + 4 padding, one 16.5 line)
  *   + 8 padding + 1 border
  *   = 234.25 for the panel, plus its mb-2 of 8 = 242.25 of room.
  *
  * The title line is 24 and not 16.5, which is where the first version of this
- * sum went wrong by three struts: the `text-[11px]` sits on a span INSIDE the
+ * sum went wrong by three struts: the `text-[12px]` sits on a span INSIDE the
  * button, while the line box cannot be shorter than the block's own strut, and
  * the button inherits 16px through the preflight's `font: inherit` with its
  * line-height of 1.5. No ancestor down to the button sets a font size.
  *
- * Chrome, term by term: 1 top border, 12 + 12 padding (p-3), 16.5 header line,
- * 6 header margin (mb-1.5), 8 + 30 for the pinned button row (mt-2), = 85.5.
+ * Chrome, term by term: 1 top border, 12 + 12 padding (p-3), 18 header line,
+ * 6 header margin (mb-1.5), 8 + 30 for the pinned button row (mt-2), = 87.
  *
- * 85.5 + 242.25 = 327.75, rounded UP to 328 because rounding down is what
+ * 87 + 249.375 = 336.375, rounded UP to 337 because rounding down is what
  * clips the third angle. A second hint line or a fourth angle would overflow
  * by its own height and scroll inside: the guarantee is sized to what the
  * upstream promises, not to what it might misbehave into.
+ *
+ * (All three lines above re-measured when the CRM type scale was raised:
+ * the header and footer struts went from 16.5 to 18 with text-[12px], the
+ * hint line from 13.75 to 15.125 with text-[11px].)
  */
-export const OUTBOUND_SHEET_ANGLES_PX = 328;
+export const OUTBOUND_SHEET_ANGLES_PX = 337;
 
 /**
  * How much of the panel's scrolling region the sheet hides: its RESTING
@@ -632,12 +633,12 @@ export function OutboundSheet({
    * that is about to ignore a rule.
    */
   const forcedNote = g.forcedNote && (
-    <p className="mt-2 shrink-0 text-[11px] font-medium leading-snug text-red-300">⚠️ {g.forcedNote}</p>
+    <p className="mt-2 shrink-0 text-[12px] font-medium leading-snug text-red-300">⚠️ {g.forcedNote}</p>
   );
   const note = msg && (
     <p
       role={msg.bad ? 'alert' : 'status'}
-      className={`mt-2 shrink-0 text-[11px] ${msg.bad ? 'text-red-400' : 'text-[var(--fg-2)]'}`}
+      className={`mt-2 shrink-0 text-[12px] ${msg.bad ? 'text-red-400' : 'text-[var(--fg-2)]'}`}
     >
       {msg.text}
     </p>
@@ -648,7 +649,7 @@ export function OutboundSheet({
     // says the address is missing. This one says what it costs here: there is
     // nothing to write into, and no button to press.
     return (
-      <p className="mt-3 shrink-0 border-t border-[var(--ink-4)]/60 pt-3 text-[11px] text-amber-300">
+      <p className="mt-3 shrink-0 border-t border-[var(--ink-4)]/60 pt-3 text-[12px] text-amber-300">
         Envoi impossible tant que l’adresse n’est pas vérifiée.
       </p>
     );
@@ -667,7 +668,7 @@ export function OutboundSheet({
             // this state, and aria-controls pointing at an absent id is an
             // invalid reference rather than a hint.
             aria-expanded={false}
-            className="min-w-0 flex-1 truncate rounded-lg border border-[var(--ink-4)] bg-[var(--ink-0)] px-3 py-1.5 text-left text-xs text-[var(--fg-3)] hover:border-amber-500/40 hover:text-[var(--fg-2)]"
+            className="min-w-0 flex-1 truncate rounded-lg border border-[var(--ink-4)] bg-[var(--ink-0)] px-3 py-1.5 text-left text-[13px] text-[var(--fg-3)] hover:border-amber-500/40 hover:text-[var(--fg-2)]"
           >
             {/* Folded text is not lost text: say it is there and unsaved. */}
             {hasText ? '✏️ Message en cours, ni enregistré ni envoyé' : `Écrire à ${c.company || c.email}`}
@@ -682,7 +683,7 @@ export function OutboundSheet({
               startGeneration();
             }}
             disabled={busy !== false}
-            className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs font-medium text-amber-300 hover:bg-amber-500/20 disabled:opacity-50"
+            className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-[13px] font-medium text-amber-300 hover:bg-amber-500/20 disabled:opacity-50"
           >
             {genLabel}
           </button>
@@ -699,7 +700,7 @@ export function OutboundSheet({
                 loadReadyMail();
               }}
               disabled={busy !== false}
-              className="rounded-lg border border-[var(--ink-5)] px-3 py-1.5 text-xs text-[var(--fg-2)] hover:bg-[var(--ink-4)] disabled:opacity-50"
+              className="rounded-lg border border-[var(--ink-5)] px-3 py-1.5 text-[13px] text-[var(--fg-2)] hover:bg-[var(--ink-4)] disabled:opacity-50"
             >
               📄 Mail pré-rédigé
             </button>
@@ -732,7 +733,7 @@ export function OutboundSheet({
       className="absolute inset-x-0 bottom-0 z-10 flex flex-col rounded-b-xl border-t border-[var(--ink-4)] bg-[var(--ink-2)] p-3 shadow-[0_-10px_24px_-8px_rgba(0,0,0,0.65)]"
     >
       <div className="mb-1.5 flex shrink-0 items-center justify-between gap-2">
-        <span className="min-w-0 truncate text-[11px] text-[var(--fg-3)]">
+        <span className="min-w-0 truncate text-[12px] text-[var(--fg-3)]">
           À {c.company || c.email}, depuis {c.account}
         </span>
         <button
@@ -740,7 +741,7 @@ export function OutboundSheet({
           onClick={() => onOpenChange(false)}
           aria-expanded
           aria-controls="outbound-sheet"
-          className="shrink-0 cursor-pointer text-[11px] text-[var(--fg-3)] underline underline-offset-2 hover:text-[var(--fg-1)]"
+          className="shrink-0 cursor-pointer text-[12px] text-[var(--fg-3)] underline underline-offset-2 hover:text-[var(--fg-1)]"
         >
           replier
         </button>
@@ -754,7 +755,7 @@ export function OutboundSheet({
           <div className="mb-2 rounded-lg border border-amber-500/25 bg-amber-500/5 p-2">
             {step.kind === 'choose' ? (
               <>
-                <p className="mb-1.5 text-[11px] font-medium text-amber-300">
+                <p className="mb-1.5 text-[12px] font-medium text-amber-300">
                   Quel angle pour cette relance ?
                 </p>
                 {step.angles.map((a, i) => (
@@ -772,24 +773,24 @@ export function OutboundSheet({
                     disabled={busy !== false}
                     className="mb-1 block w-full rounded-md px-2 py-1.5 text-left transition-colors hover:bg-amber-500/10 disabled:opacity-50"
                   >
-                    <span className="text-[11px] font-semibold text-amber-300">{a.title}</span>
+                    <span className="text-[12px] font-semibold text-amber-300">{a.title}</span>
                     {/* The way out, named. It is the one angle the VPS
                         guarantees, and the operator has to be able to see
                         that it is the one that closes the conversation
                         rather than another attempt to open it. */}
                     {a.isExit && (
-                      <span className="ml-1.5 text-[10px] text-[var(--fg-3)]">
+                      <span className="ml-1.5 text-[12px] text-[var(--fg-3)]">
                         (porte de sortie)
                       </span>
                     )}
-                    <span className="mt-0.5 block text-[10px] leading-snug text-[var(--fg-3)]">
+                    <span className="mt-0.5 block text-[12px] leading-snug text-[var(--fg-3)]">
                       {a.hint}
                     </span>
                   </button>
                 ))}
               </>
             ) : (
-              <p role="alert" className="mb-1.5 text-[11px] leading-snug text-amber-300">
+              <p role="alert" className="mb-1.5 text-[12px] leading-snug text-amber-300">
                 {step.reason} Tu peux générer sans angle, ou écrire toi-même.
               </p>
             )}
@@ -800,7 +801,7 @@ export function OutboundSheet({
                 type="button"
                 onClick={() => void generate()}
                 disabled={busy !== false}
-                className="rounded-md border border-[var(--ink-5)] px-2 py-1 text-[11px] text-[var(--fg-2)] hover:bg-[var(--ink-4)] disabled:opacity-50"
+                className="rounded-md border border-[var(--ink-5)] px-2 py-1 text-[12px] text-[var(--fg-2)] hover:bg-[var(--ink-4)] disabled:opacity-50"
               >
                 Générer sans angle
               </button>
@@ -818,7 +819,7 @@ export function OutboundSheet({
                 type="button"
                 onClick={() => setStep(null)}
                 disabled={busy !== false}
-                className="text-[11px] text-[var(--fg-3)] underline underline-offset-2 hover:text-[var(--fg-1)] disabled:no-underline disabled:opacity-50"
+                className="text-[12px] text-[var(--fg-3)] underline underline-offset-2 hover:text-[var(--fg-1)] disabled:no-underline disabled:opacity-50"
               >
                 annuler
               </button>
@@ -841,7 +842,7 @@ export function OutboundSheet({
           rows={6}
           placeholder="Écris, ou fais générer une relance."
           aria-label="Corps du message"
-          className="w-full min-w-0 rounded-lg border border-[var(--ink-4)] bg-[var(--ink-0)] p-3 text-xs leading-relaxed text-[var(--fg-1)] focus:border-amber-500/40 focus:outline-none"
+          className="w-full min-w-0 rounded-lg border border-[var(--ink-4)] bg-[var(--ink-0)] p-3 text-sm leading-[22px] text-[var(--fg-1)] focus:border-amber-500/40 focus:outline-none"
         />
         {fr && (
           /*
@@ -857,10 +858,10 @@ export function OutboundSheet({
            * non-null values and React would not re-apply the attribute.
            */
           <details key={fr} open className="mt-1">
-            <summary className="cursor-pointer text-[10px] text-blue-400">
+            <summary className="cursor-pointer text-[12px] text-blue-400">
               Traduction FR (pour toi seul, jamais envoyée)
             </summary>
-            <p className="mt-1 whitespace-pre-wrap text-[11px] text-[var(--fg-3)] wrap-anywhere">{fr}</p>
+            <p className="mt-1 whitespace-pre-wrap text-[12px] text-[var(--fg-3)] wrap-anywhere">{fr}</p>
           </details>
         )}
         <GuardrailChecks id={checksId} report={g.report} subject={subject} body={body} />
@@ -870,7 +871,7 @@ export function OutboundSheet({
           type="button"
           onClick={startGeneration}
           disabled={busy !== false}
-          className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs font-medium text-amber-300 hover:bg-amber-500/20 disabled:opacity-50"
+          className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-[13px] font-medium text-amber-300 hover:bg-amber-500/20 disabled:opacity-50"
         >
           {genLabel}
         </button>
@@ -881,7 +882,7 @@ export function OutboundSheet({
             type="button"
             onClick={loadReadyMail}
             disabled={busy !== false}
-            className="rounded-lg border border-[var(--ink-5)] px-3 py-1.5 text-xs text-[var(--fg-2)] hover:bg-[var(--ink-4)] disabled:opacity-50"
+            className="rounded-lg border border-[var(--ink-5)] px-3 py-1.5 text-[13px] text-[var(--fg-2)] hover:bg-[var(--ink-4)] disabled:opacity-50"
           >
             📄 Mail pré-rédigé
           </button>
@@ -890,7 +891,7 @@ export function OutboundSheet({
           type="button"
           onClick={saveDraft}
           disabled={!canSaveDraft}
-          className="rounded-lg border border-[var(--ink-5)] px-3 py-1.5 text-xs text-[var(--fg-2)] hover:bg-[var(--ink-4)] disabled:opacity-50"
+          className="rounded-lg border border-[var(--ink-5)] px-3 py-1.5 text-[13px] text-[var(--fg-2)] hover:bg-[var(--ink-4)] disabled:opacity-50"
         >
           {busy === 'draft' ? '…' : '📝 Brouillon'}
         </button>
@@ -911,7 +912,7 @@ export function OutboundSheet({
             // above and the override button both say in text.
             disabled={!canSend}
             aria-describedby={g.report.issues.length > 0 ? checksId : undefined}
-            className={`rounded-lg px-4 py-1.5 text-xs font-semibold text-white disabled:opacity-50 ${
+            className={`rounded-lg px-4 py-1.5 text-[13px] font-semibold text-white disabled:opacity-50 ${
               g.forced ? 'bg-red-600 hover:bg-red-500' : 'bg-green-600 hover:bg-green-500'
             }`}
           >

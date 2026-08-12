@@ -220,7 +220,7 @@ export function DraftCard({
     // unbroken token in a draft body would otherwise set a min-content floor
     // that widens the whole page.
     <div className="min-w-0 rounded-lg border border-dashed border-amber-500/40 bg-amber-500/5 p-3 wrap-anywhere">
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px]">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px]">
         <span className="font-semibold text-amber-400">📝 brouillon, en attente de ta relecture</span>
         {stamp && (
           <span className="text-[var(--fg-3)]" title={draft.msg_date ?? undefined}>
@@ -235,7 +235,7 @@ export function DraftCard({
             value={subject}
             onChange={(e) => setSubject(e.target.value)}
             aria-label="Objet du brouillon"
-            className="w-full min-w-0 rounded-lg border border-[var(--ink-4)] bg-[var(--ink-0)] px-3 py-1.5 text-xs text-[var(--fg-1)] focus:border-amber-500/40 focus:outline-none"
+            className="w-full min-w-0 rounded-lg border border-[var(--ink-4)] bg-[var(--ink-0)] px-3 py-1.5 text-[13px] text-[var(--fg-1)] focus:border-amber-500/40 focus:outline-none"
             placeholder="Objet"
           />
           <textarea
@@ -243,22 +243,22 @@ export function DraftCard({
             onChange={(e) => setBody(e.target.value)}
             rows={10}
             aria-label="Corps du brouillon"
-            className="w-full min-w-0 rounded-lg border border-[var(--ink-4)] bg-[var(--ink-0)] p-3 text-xs leading-relaxed text-[var(--fg-1)] focus:border-amber-500/40 focus:outline-none"
+            className="w-full min-w-0 rounded-lg border border-[var(--ink-4)] bg-[var(--ink-0)] p-3 text-sm leading-[22px] text-[var(--fg-1)] focus:border-amber-500/40 focus:outline-none"
           />
         </div>
       ) : (
         <>
-          <p className="mt-1.5 text-xs font-medium text-[var(--fg-1)]">{subject || '(sans objet)'}</p>
+          <p className="mt-1.5 text-[13px] font-medium text-[var(--fg-1)]">{subject || '(sans objet)'}</p>
           {/* Reading view only. `reading.text` may be the French translation,
               which is never what leaves: the send path reads `body`, the state
               the textarea edits. draftReading() owns that distinction and
               flags it, so the badge below can say so plainly. */}
-          <p className="mt-0.5 whitespace-pre-wrap text-[11px] leading-relaxed text-[var(--fg-3)]">
+          <p className="mt-0.5 whitespace-pre-wrap text-[12px] leading-relaxed text-[var(--fg-3)]">
             {reading.text}
           </p>
           {reading.canTranslate && (
             <div className="mt-1.5 flex flex-wrap items-center gap-2">
-              <span className="rounded bg-[var(--ink-4)] px-1.5 py-0.5 text-[10px] text-[var(--fg-3)]">
+              <span className="rounded bg-[var(--ink-4)] px-1.5 py-0.5 text-[12px] text-[var(--fg-3)]">
                 {reading.isTranslation
                   ? '🌐 traduction française · le mail partira en ' +
                     (draft.lang ?? 'langue d’origine')
@@ -267,7 +267,7 @@ export function DraftCard({
               <button
                 type="button"
                 onClick={() => setShowOriginal(!showOriginal)}
-                className="text-[10px] text-[var(--fg-3)] underline decoration-dotted underline-offset-2 hover:text-[var(--fg-1)]"
+                className="text-[12px] text-[var(--fg-3)] underline decoration-dotted underline-offset-2 hover:text-[var(--fg-1)]"
               >
                 {showOriginal ? 'voir la traduction' : 'voir l’original'}
               </button>
@@ -292,7 +292,7 @@ export function DraftCard({
           // blocked button would rest the whole safety on one onClick guard.
           disabled={!sendable || g.blocked}
           aria-describedby={g.report.issues.length > 0 ? checksId : undefined}
-          className={`rounded-lg px-3 py-1 text-xs font-semibold text-white transition-colors disabled:opacity-50 ${
+          className={`rounded-lg px-3 py-1 text-[13px] font-semibold text-white transition-colors disabled:opacity-50 ${
             g.forced ? 'bg-red-600 hover:bg-red-500' : 'bg-green-600 hover:bg-green-500'
           }`}
         >
@@ -311,7 +311,7 @@ export function DraftCard({
             type="button"
             onClick={save}
             disabled={locked || !subject.trim() || !body.trim()}
-            className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-xs font-medium text-amber-300 hover:bg-amber-500/20 disabled:opacity-50"
+            className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-[13px] font-medium text-amber-300 hover:bg-amber-500/20 disabled:opacity-50"
           >
             {busy === 'save' ? '… enregistrement' : '💾 Enregistrer'}
           </button>
@@ -320,7 +320,7 @@ export function DraftCard({
             type="button"
             onClick={() => setEditing(true)}
             disabled={locked}
-            className="rounded-lg border border-[var(--ink-5)] px-3 py-1 text-xs font-medium text-[var(--fg-2)] hover:bg-[var(--ink-4)] disabled:opacity-50"
+            className="rounded-lg border border-[var(--ink-5)] px-3 py-1 text-[13px] font-medium text-[var(--fg-2)] hover:bg-[var(--ink-4)] disabled:opacity-50"
           >
             ✏️ Modifier
           </button>
@@ -338,7 +338,7 @@ export function DraftCard({
           type="button"
           onClick={discard}
           disabled={busy !== false}
-          className="rounded-lg px-3 py-1 text-xs text-[var(--fg-3)] hover:text-red-400 disabled:opacity-50"
+          className="rounded-lg px-3 py-1 text-[13px] text-[var(--fg-3)] hover:text-red-400 disabled:opacity-50"
         >
           {busy === 'del' ? '…' : '🗑 Supprimer'}
         </button>
@@ -348,7 +348,7 @@ export function DraftCard({
         // did, and at least one of them says not to click again.
         <p
           role={msg.bad ? 'alert' : 'status'}
-          className={`mt-2 text-[11px] ${msg.bad ? 'text-red-400' : 'text-[var(--fg-2)]'}`}
+          className={`mt-2 text-[12px] ${msg.bad ? 'text-red-400' : 'text-[var(--fg-2)]'}`}
         >
           {msg.text}
         </p>

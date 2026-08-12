@@ -50,7 +50,7 @@ function Field({ label, value }: { label: string; value: string | null }) {
   if (!value) return null;
   return (
     <div className="min-w-0">
-      <p className="text-[10px] uppercase tracking-wide text-[var(--fg-3)]">{label}</p>
+      <p className="text-[12px] uppercase tracking-wide text-[var(--fg-3)]">{label}</p>
       <p className="mt-0.5 wrap-anywhere text-sm text-[var(--fg-2)]">{value}</p>
     </div>
   );
@@ -93,13 +93,13 @@ export function ContactIdentity({ contact: c }: { contact: Contact }) {
                 href={c.website}
                 target="_blank"
                 rel="noreferrer"
-                className="shrink-0 text-xs text-amber-400 hover:underline"
+                className="shrink-0 text-[13px] text-amber-400 hover:underline"
               >
                 site ↗
               </a>
             )}
           </div>
-          <p className="mt-0.5 wrap-anywhere text-xs text-[var(--fg-3)]">
+          <p className="mt-0.5 wrap-anywhere text-[13px] text-[var(--fg-3)]">
             {c.email || 'pas d’email vérifié'}
             {c.country ? ` · ${c.country}` : ''}
             {segment ? ` · ${segment}` : ''}
@@ -152,7 +152,7 @@ export function ContactDetail({ contact: c }: { contact: Contact }) {
         // left beside the quota.
         <div className="flex w-full min-w-0 flex-col items-start gap-2 sm:flex-row sm:items-center sm:gap-4">
           <div>
-            <p className="text-[10px] uppercase tracking-wide text-[var(--fg-3)]">
+            <p className="text-[12px] uppercase tracking-wide text-[var(--fg-3)]">
               {c.apiKey.paid ? 'Crédits' : 'Quota'}
             </p>
             <p className="font-mono text-sm text-[var(--fg-2)]">
@@ -183,7 +183,7 @@ export function ContactDetail({ contact: c }: { contact: Contact }) {
 
           {blocks.signal && (
             <div className="min-w-0 rounded-lg border border-[var(--ok)]/20 bg-[var(--ok)]/5 px-3 py-2">
-              <p className="text-[10px] uppercase tracking-wide text-[var(--ok)]">Signal d’achat</p>
+              <p className="text-[12px] uppercase tracking-wide text-[var(--ok)]">Signal d’achat</p>
               {sourcing.buyingSignal && (
                 <p className="mt-0.5 wrap-anywhere text-sm text-[var(--fg-1)]">{sourcing.buyingSignal}</p>
               )}
@@ -192,7 +192,7 @@ export function ContactDetail({ contact: c }: { contact: Contact }) {
                   href={sourcing.signalSourceUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="mt-1 inline-block text-[11px] text-[var(--ok)] hover:underline"
+                  className="mt-1 inline-block text-[12px] text-[var(--ok)] hover:underline"
                 >
                   preuve ↗
                 </a>
@@ -202,7 +202,7 @@ export function ContactDetail({ contact: c }: { contact: Contact }) {
 
           {blocks.contact && (
           <div className="min-w-0 rounded-lg border border-[var(--ink-4)] bg-[var(--ink-0)]/50 px-3 py-2">
-            <p className="text-[10px] uppercase tracking-wide text-[var(--fg-3)]">Contact</p>
+            <p className="text-[12px] uppercase tracking-wide text-[var(--fg-3)]">Contact</p>
             {(sourcing.contactName || sourcing.contactRole) && (
               <p className="mt-0.5 wrap-anywhere text-sm text-[var(--fg-1)]">
                 {sourcing.contactName || 'nom inconnu'}
@@ -210,7 +210,7 @@ export function ContactDetail({ contact: c }: { contact: Contact }) {
               </p>
             )}
             {c.email ? (
-              <p className="wrap-anywhere text-xs text-[var(--fg-3)]">
+              <p className="wrap-anywhere text-[13px] text-[var(--fg-3)]">
                 {c.email}
                 {sourcing.emailSourceUrl && (
                   <>
@@ -230,7 +230,7 @@ export function ContactDetail({ contact: c }: { contact: Contact }) {
                 )}
               </p>
             ) : (
-              <p className="wrap-anywhere text-xs text-amber-400">
+              <p className="wrap-anywhere text-[13px] text-amber-400">
                 Pas d’email vérifié, à enrichir (on ne devine jamais une adresse).
                 {/* The source link used to live only in the branch above, so a
                     prospect with a proof URL and no address lost the one lead
@@ -251,7 +251,7 @@ export function ContactDetail({ contact: c }: { contact: Contact }) {
               </p>
             )}
             {sourcing.personalizationHook && (
-              <p className="mt-1 wrap-anywhere text-[11px] text-[var(--fg-3)]">
+              <p className="mt-1 wrap-anywhere text-[12px] text-[var(--fg-3)]">
                 <span className="text-[var(--fg-2)]">Accroche :</span> {sourcing.personalizationHook}
               </p>
             )}

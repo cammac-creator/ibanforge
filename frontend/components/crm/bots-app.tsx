@@ -90,9 +90,9 @@ export function BotsApp({ bots }: { bots: BotDossier[] }) {
           { l: 'Appels dans le vide', v: lost404.toLocaleString('fr-CH'), h: '404 servis à des annuaires' },
         ].map((s) => (
           <div key={s.l} className="rounded-xl border border-[var(--ink-4)]/60 bg-[var(--ink-2)]/60 px-4 py-3">
-            <div className="text-[10px] uppercase tracking-wider text-[var(--fg-5)]">{s.l}</div>
+            <div className="text-[12px] uppercase tracking-wider text-[var(--fg-5)]">{s.l}</div>
             <div className="font-mono text-2xl tabular-nums text-[var(--fg-1)]">{s.v}</div>
-            <div className="text-[11px] text-[var(--fg-4)]">{s.h}</div>
+            <div className="text-[12px] text-[var(--fg-4)]">{s.h}</div>
           </div>
         ))}
       </div>
@@ -100,7 +100,7 @@ export function BotsApp({ bots }: { bots: BotDossier[] }) {
       <div className="flex flex-wrap items-center gap-2">
         <button
           onClick={() => setFilter('all')}
-          className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+          className={`rounded-full px-3 py-1 text-[13px] font-medium transition-colors ${
             filter === 'all' ? 'bg-[var(--ink-5)] text-white' : 'text-[var(--fg-4)] hover:text-[var(--fg-2)]'
           }`}
         >
@@ -111,7 +111,7 @@ export function BotsApp({ bots }: { bots: BotDossier[] }) {
             key={v.key}
             onClick={() => setFilter(filter === v.key ? 'all' : v.key)}
             title={v.why}
-            className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+            className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-[13px] font-medium transition-colors ${
               filter === v.key ? 'bg-[var(--ink-5)] text-white' : 'text-[var(--fg-4)] hover:text-[var(--fg-2)]'
             }`}
           >
@@ -124,14 +124,14 @@ export function BotsApp({ bots }: { bots: BotDossier[] }) {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Agent, domaine, chemin…"
-            className="w-48 rounded-md border border-[var(--ink-4)] bg-[var(--ink-1)] px-2.5 py-1 text-xs text-[var(--fg-1)] placeholder:text-[var(--fg-5)] focus:border-[var(--amber-500)]/50 focus:outline-none"
+            className="w-48 rounded-md border border-[var(--ink-4)] bg-[var(--ink-1)] px-2.5 py-1 text-[13px] text-[var(--fg-1)] placeholder:text-[var(--fg-5)] focus:border-[var(--amber-500)]/50 focus:outline-none"
           />
           <span className="flex items-center gap-0.5 rounded-md border border-[var(--ink-4)] p-0.5">
             {SORTS.map((s) => (
               <button
                 key={s.key}
                 onClick={() => setSort(s.key)}
-                className={`rounded px-2 py-1 text-[11px] font-medium transition-colors ${
+                className={`rounded px-2 py-1 text-[12px] font-medium transition-colors ${
                   sort === s.key ? 'bg-[var(--ink-4)] text-white' : 'text-[var(--fg-4)] hover:text-[var(--fg-2)]'
                 }`}
               >
@@ -143,7 +143,7 @@ export function BotsApp({ bots }: { bots: BotDossier[] }) {
       </div>
 
       <div className="overflow-hidden rounded-xl border border-[var(--ink-4)]/60 bg-[var(--ink-2)]/40">
-        <div className="hidden items-center gap-3 border-b border-[var(--ink-4)] px-4 py-2 text-[10px] uppercase tracking-wider text-[var(--fg-5)] md:flex">
+        <div className="hidden items-center gap-3 border-b border-[var(--ink-4)] px-4 py-2 text-[12px] uppercase tracking-wider text-[var(--fg-5)] md:flex">
           <span className="w-[30%]">Agent</span>
           <span className="w-[12%]">État</span>
           <span className="w-[11%] text-right">Requêtes</span>
@@ -170,13 +170,13 @@ export function BotsApp({ bots }: { bots: BotDossier[] }) {
                 >
                   <span className="w-full min-w-0 md:w-[30%]">
                     <span className="block truncate text-sm font-medium text-[var(--fg-1)]">{b.label}</span>
-                    <span className="block truncate font-mono text-[11px] text-[var(--fg-4)]">
+                    <span className="block truncate font-mono text-[12px] text-[var(--fg-4)]">
                       {b.homepage?.replace(/^https?:\/\//, '') ?? b.clientKind ?? '—'}
                     </span>
                   </span>
                   <span className="flex w-auto items-center gap-1.5 md:w-[12%]">
                     <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: v.colour }} />
-                    <span className="truncate text-xs" style={{ color: v.colour }}>
+                    <span className="truncate text-[13px]" style={{ color: v.colour }}>
                       {v.one}
                     </span>
                   </span>
@@ -186,14 +186,14 @@ export function BotsApp({ bots }: { bots: BotDossier[] }) {
                   <span className="w-auto md:w-[10%]">
                     <MiniSpark days={b.days} />
                   </span>
-                  <span className="w-auto text-xs text-[var(--fg-3)] md:w-[12%]">
+                  <span className="w-auto text-[13px] text-[var(--fg-3)] md:w-[12%]">
                     {relativeDays(b.daysSinceLastCall)}
                   </span>
-                  <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-[var(--fg-3)]">
+                  <span className="min-w-0 flex-1 truncate font-mono text-[12px] text-[var(--fg-3)]">
                     {b.endpoints[0]?.path ?? '—'}
                   </span>
                   <span
-                    className="w-14 text-right font-mono text-[11px] tabular-nums"
+                    className="w-14 text-right font-mono text-[12px] tabular-nums"
                     style={{ color: b.notFound > 0 ? 'var(--warn)' : 'var(--fg-5)' }}
                   >
                     {b.notFound > 0 ? b.notFound.toLocaleString('fr-CH') : '—'}
@@ -209,7 +209,7 @@ export function BotsApp({ bots }: { bots: BotDossier[] }) {
       {view.length > shown.length && (
         <button
           onClick={() => setShowAll(true)}
-          className="w-full rounded-xl border border-[var(--ink-4)]/60 bg-[var(--ink-2)]/40 py-2.5 text-xs font-medium text-[var(--fg-3)] transition-colors hover:bg-[var(--ink-3)]/50 hover:text-[var(--fg-1)]"
+          className="w-full rounded-xl border border-[var(--ink-4)]/60 bg-[var(--ink-2)]/40 py-2.5 text-[13px] font-medium text-[var(--fg-3)] transition-colors hover:bg-[var(--ink-3)]/50 hover:text-[var(--fg-1)]"
         >
           Afficher les {view.length - shown.length} agents suivants
         </button>
@@ -217,7 +217,7 @@ export function BotsApp({ bots }: { bots: BotDossier[] }) {
       {showAll && view.length > VISIBLE && (
         <button
           onClick={() => setShowAll(false)}
-          className="w-full py-1 text-xs text-[var(--fg-5)] transition-colors hover:text-[var(--fg-3)]"
+          className="w-full py-1 text-[13px] text-[var(--fg-5)] transition-colors hover:text-[var(--fg-3)]"
         >
           Replier
         </button>
