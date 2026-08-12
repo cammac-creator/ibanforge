@@ -1,7 +1,7 @@
 import { enrichEmail } from '@/lib/company-enrichment';
 import { threadIsUnread } from '@/lib/thread-unread';
 import { signedUpRecently } from './new-signup';
-import type { Contact, Message, Outcome, ProspectSourcing, ReadyMail } from './types';
+import type { BusinessInfo, Contact, Message, Outcome, ProspectSourcing, ReadyMail } from './types';
 // One definition of our mailboxes: the send path validates against this list,
 // so a second copy here could drift and make a contact unsendable.
 import { COLD_ACCOUNT, WARM_ACCOUNT } from './sending-account';
@@ -114,6 +114,18 @@ export interface ActivityRow {
   days: Array<{ day: string; count: number }>;
 }
 
+/** One row of /v1/admin/activation's clients block, as the CRM consumes it. */
+export interface ActivationClientRow {
+  email: string;
+  status: BusinessInfo['status'];
+  source: string;
+  credits_total: number;
+  credits_remaining: number;
+  packs: number;
+  first_call_at: string | null;
+  calls_90d: number;
+}
+
 export interface BuildInput {
   keys: KeyRow[];
   prospects: ProspectRow[];
@@ -122,6 +134,13 @@ export interface BuildInput {
   /** Last read instant per lowercased counterpart address. */
   reads: Record<string, string>;
   months: string[];
+  /**
+   * Optional: the page renders without it (badges and business filters simply
+   * absent), which is also the deploy-order story — the frontend may ship
+   * before the API serves the endpoint, and a fetch failure must not take the
+   * whole CRM down with it.
+   */
+  activation?: ActivationClientRow[];
 }
 
 /**
@@ -290,6 +309,19 @@ export function buildContacts(input: BuildInput, now: Date = new Date()): Contac
     else keysByAddress.set(id, [row]);
   }
 
+  const businessByEmail = new Map<string, BusinessInfo>();
+  for (const a of input.activation ?? []) {
+    businessByEmail.set(a.email.toLowerCase(), {
+      status: a.status,
+      source: a.source,
+      creditsTotal: a.credits_total,
+      creditsRemaining: a.credits_remaining,
+      packs: a.packs,
+      firstCallAt: a.first_call_at,
+      calls90d: a.calls_90d,
+    });
+  }
+
   const out: Contact[] = [];
   const claimed = new Set<string>();
 
@@ -361,6 +393,7 @@ export function buildContacts(input: BuildInput, now: Date = new Date()): Contac
         endpoints: input.activityByKey[row.key_prefix]?.endpoints ?? [],
       },
       ...(matching ? { sourcing: sourcingOf(matching) } : {}),
+      ...(businessByEmail.has(id) ? { business: businessByEmail.get(id) } : {}),
     });
   }
 
@@ -391,6 +424,7 @@ export function buildContacts(input: BuildInput, now: Date = new Date()): Contac
       account: COLD_ACCOUNT,
       sourcing: sourcingOf(p),
       readyMail: readyMailOf(p),
+      ...(id && businessByEmail.has(id) ? { business: businessByEmail.get(id) } : {}),
     });
   }
 
@@ -404,12 +438,13 @@ const ADMIN_SECRET = process.env.ADMIN_SECRET || '';
 export async function fetchCrmData(): Promise<BuildInput | null> {
   if (!ADMIN_SECRET) return null;
   const h = { headers: { 'X-Admin-Secret': ADMIN_SECRET }, cache: 'no-store' as const };
-  const [k, p, m, a, tr] = await Promise.all([
+  const [k, p, m, a, tr, act] = await Promise.all([
     fetch(`${API_URL}/v1/admin/keys`, h).then((r) => (r.ok ? r.json() : null)).catch(() => null),
     fetch(`${API_URL}/v1/admin/prospects`, h).then((r) => (r.ok ? r.json() : null)).catch(() => null),
     fetch(`${API_URL}/v1/admin/email-messages`, h).then((r) => (r.ok ? r.json() : null)).catch(() => null),
     fetch(`${API_URL}/v1/admin/client-activity`, h).then((r) => (r.ok ? r.json() : null)).catch(() => null),
     fetch(`${API_URL}/v1/admin/thread-reads`, h).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+    fetch(`${API_URL}/v1/admin/activation?days=90`, h).then((r) => (r.ok ? r.json() : null)).catch(() => null),
   ]);
   if (!k && !p) return null;
   return {
@@ -419,5 +454,6 @@ export async function fetchCrmData(): Promise<BuildInput | null> {
     activityByKey: (a?.by_key ?? {}) as Record<string, ActivityRow>,
     reads: (tr?.reads ?? {}) as Record<string, string>,
     months: (k?.months ?? []) as string[],
+    ...(act?.clients ? { activation: act.clients as ActivationClientRow[] } : {}),
   };
 }

@@ -345,3 +345,54 @@ describe('searchRows', () => {
     expect(searchRows(rows, 'societe')).toEqual([]);
   });
 });
+
+describe('business filters and shelves', () => {
+  function withBiz(c: Contact, status: 'paying' | 'dormant' | 'active', packs: number): Contact {
+    return {
+      ...c,
+      business: {
+        status,
+        source: 'direct',
+        creditsTotal: packs * 5000,
+        creditsRemaining: 2400,
+        packs,
+        firstCallAt: null,
+        calls90d: 12,
+      },
+    };
+  }
+
+  it('Payants counts every pack owner, dormant included — never the used counter', () => {
+    const buyerAwake = withBiz(client('a@alpha.example.net', 'Alpha', []), 'paying', 1);
+    const buyerAsleep = withBiz(client('b@alpha.example.net', 'Beta', []), 'dormant', 2);
+    const free = withBiz(client('c@alpha.example.net', 'Gamma', []), 'active', 0);
+    const input: RowsInput = {
+      contacts: [buyerAwake, buyerAsleep, free],
+      situations: {},
+      snoozed: {},
+    };
+    const paying = mailFilters(input).find((f) => f.key === 'paying');
+    expect(paying?.count).toBe(2);
+    const rows = mailRows(input, 'paying').map((r) => r.id);
+    expect(rows).toContain('a@alpha.example.net');
+    expect(rows).toContain('b@alpha.example.net');
+    expect(rows).not.toContain('c@alpha.example.net');
+    const dormant = mailRows(input, 'dormant').map((r) => r.id);
+    expect(dormant).toEqual(['b@alpha.example.net']);
+  });
+
+  it('reply rows carry shelves in the sort order; other filters carry none', () => {
+    const unreadNow = { ...client('u@alpha.example.net', 'U', [message('in', 'Hi', 'x', '2026-08-12 08:00')]), unread: true };
+    const old = client('o@alpha.example.net', 'O', [message('in', 'Old', 'y', '2026-08-01 08:00')]);
+    const fresh = client('f@alpha.example.net', 'F', [message('in', 'New', 'z', '2026-08-11 08:00')]);
+    const situations: Record<string, Situation> = {
+      'u@alpha.example.net': { ballInCourt: 'us', silenceDays: 0, firstContactAt: null, messageCount: 1, nextAction: 'reply', hasEverReplied: false, lastOutboundAt: null } as unknown as Situation,
+      'o@alpha.example.net': { ballInCourt: 'us', silenceDays: 11, firstContactAt: null, messageCount: 1, nextAction: 'reply', hasEverReplied: false, lastOutboundAt: null } as unknown as Situation,
+      'f@alpha.example.net': { ballInCourt: 'us', silenceDays: 1, firstContactAt: null, messageCount: 1, nextAction: 'reply', hasEverReplied: false, lastOutboundAt: null } as unknown as Situation,
+    };
+    const input: RowsInput = { contacts: [unreadNow, old, fresh], situations, snoozed: {} };
+    const rows = mailRows(input, 'reply');
+    expect(rows.map((r) => r.group)).toEqual(['urgent', 'urgent', 'later']);
+    expect(mailRows(input, 'all').every((r) => r.group === null)).toBe(true);
+  });
+});

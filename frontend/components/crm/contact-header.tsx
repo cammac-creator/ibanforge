@@ -1,4 +1,5 @@
 import { UsageChart } from '@/components/dashboard/usage-chart';
+import { chipOf } from '@/lib/crm/business';
 import type { Contact, ProspectSourcing } from '@/lib/crm/types';
 import { OutcomeBadge, OutcomeControl } from './outcome-control';
 import { ProspectStatusBadge, ProspectStatusControl } from './prospect-status';
@@ -79,6 +80,7 @@ function Field({ label, value }: { label: string; value: string | null }) {
 export function ContactIdentity({ contact: c }: { contact: Contact }) {
   const sourcing = c.sourcing;
   const segment = sourcing?.segment ? (SEGMENT[sourcing.segment] ?? sourcing.segment) : null;
+  const chip = chipOf(c);
 
   return (
     <div className="min-w-0 border-b border-[var(--ink-4)]/60 pb-2">
@@ -88,6 +90,14 @@ export function ContactIdentity({ contact: c }: { contact: Contact }) {
             <h2 className="min-w-0 wrap-anywhere text-lg font-semibold text-white">
               {c.company || c.email || 'Sans nom'}
             </h2>
+            {chip && (
+              <span
+                className="shrink-0 rounded px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wide"
+                style={{ color: chip.color, backgroundColor: chip.bg }}
+              >
+                {chip.label}
+              </span>
+            )}
             {c.website && (
               <a
                 href={c.website}

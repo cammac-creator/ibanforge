@@ -1,8 +1,9 @@
 import { isArchived } from './archived';
 import { ballWithUs, followupDue, neverContacted } from './buckets';
+import { chipOf, replyGroupOf, type BusinessChip, type ReplyGroup } from './business';
 import type { Contact, Message, Situation } from './types';
 
-export type MailFilterKey = 'reply' | 'followup' | 'new' | 'clients' | 'all';
+export type MailFilterKey = 'reply' | 'followup' | 'new' | 'paying' | 'dormant' | 'clients' | 'all';
 
 export interface RowsInput {
   contacts: Contact[];
@@ -18,6 +19,10 @@ export interface MailRow {
   age: string;
   urgent: boolean;
   unread: boolean;
+  /** The one business word the row carries (chipOf), or null for calm rows. */
+  chip: BusinessChip | null;
+  /** Shelf inside the reply filter; null on every other filter. */
+  group: ReplyGroup | null;
   /**
    * What searchRows matches: the company and the address, in one string, which
    * is exactly what the deleted contact list's search matched. `who` cannot
@@ -61,6 +66,11 @@ const FILTERS: Array<{
     urgent: false,
     test: (c) => c.kind === 'client' && c.apiKey.isNew,
   },
+  // Both business filters read the activation join, never the monthly `used`
+  // counter: packs is what makes a buyer a buyer (their paid key's counter
+  // stays at zero by construction), and dormant is the API's own verdict.
+  { key: 'paying', label: 'Payants', urgent: false, test: (c) => (c.business?.packs ?? 0) > 0 },
+  { key: 'dormant', label: 'Endormis', urgent: false, test: (c) => c.business?.status === 'dormant' },
   { key: 'clients', label: 'Clients', urgent: false, test: (c) => c.kind === 'client' },
   { key: 'all', label: 'Tous', urgent: false, test: () => true },
 ];
@@ -106,7 +116,7 @@ function ageLabel(s: Situation | undefined): string {
   return `${days} j`;
 }
 
-function toRow(c: Contact, s: Situation | undefined, urgent: boolean): MailRow {
+function toRow(c: Contact, s: Situation | undefined, urgent: boolean, grouped: boolean): MailRow {
   return {
     id: c.id,
     // The email is the fallback, not a placeholder: an address is something the
@@ -116,6 +126,12 @@ function toRow(c: Contact, s: Situation | undefined, urgent: boolean): MailRow {
     preview: lastWith(c.messages, 'snippet') ?? '',
     age: ageLabel(s),
     urgent,
+    chip: chipOf(c),
+    // Groups are bands over the reply sort, not a second ordering: unread
+    // first then longest silence already lays the rows out urgent → week →
+    // later, so the shelf labels can only ever cut that sequence, never
+    // contradict it.
+    group: grouped ? replyGroupOf(c.unread, s?.silenceDays ?? null) : null,
     // Projected on every filter, not just "À répondre", so a thread nobody has
     // opened reads the same wherever it is met. `crm-app.tsx` already clears the
     // flag optimistically the moment a row is opened, machinery that had been
@@ -206,5 +222,5 @@ export function mailRows(input: RowsInput, active: MailFilterKey): MailRow[] {
     return byId(a, b);
   });
 
-  return sorted.map((c) => toRow(c, input.situations[c.id], filter.urgent));
+  return sorted.map((c) => toRow(c, input.situations[c.id], filter.urgent, active === 'reply'));
 }

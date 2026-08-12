@@ -8,6 +8,7 @@ import {
   type MailFilterKey,
   type RowsInput,
 } from '@/lib/crm/mail-rows';
+import { REPLY_GROUP_LABEL } from '@/lib/crm/business';
 
 /**
  * The left column. Holds no rule of its own: it asks mail-rows.ts what the
@@ -100,11 +101,20 @@ export function MailList({
             {q.trim() ? 'Aucun contact ne correspond.' : 'Rien dans ce filtre.'}
           </p>
         ) : (
-          rows.map((r) => {
+          rows.map((r, i) => {
             const on = r.id === selectedId;
+            // A shelf label above the first row of each group. The rows arrive
+            // already ordered urgent → week → later (see mail-rows), so this
+            // only ever cuts the sequence.
+            const shelf = r.group && r.group !== rows[i - 1]?.group ? REPLY_GROUP_LABEL[r.group] : null;
             return (
+              <div key={r.id}>
+              {shelf && (
+                <p className="border-b border-[var(--ink-4)]/40 bg-white/[0.02] px-3.5 py-1 text-[10.5px] font-medium uppercase tracking-[0.12em] text-[var(--fg-3)]">
+                  {shelf}
+                </p>
+              )}
               <button
-                key={r.id}
                 type="button"
                 onClick={() => onSelect(r.id)}
                 // Which row is open is otherwise said by a tint and a border
@@ -123,6 +133,14 @@ export function MailList({
                 ].join(' ')}
               >
                 <span className="flex items-baseline justify-between gap-2.5">
+                  {r.chip && (
+                    <span
+                      className="shrink-0 self-center rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide"
+                      style={{ color: r.chip.color, backgroundColor: r.chip.bg }}
+                    >
+                      {r.chip.label}
+                    </span>
+                  )}
                   {/* min-w-0 as well as truncate: a flex child will not shrink
                       below its content without it, and `who` falls back to the
                       email address, which is one unbreakable token. The title
@@ -160,6 +178,7 @@ export function MailList({
                   {r.preview}
                 </span>
               </button>
+              </div>
             );
           })
         )}

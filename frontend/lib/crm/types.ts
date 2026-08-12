@@ -78,6 +78,26 @@ export interface ReadyMail {
   recommendedLang: 'fr' | 'en';
 }
 
+/**
+ * The API's per-email activation verdict, joined into the CRM so the list can
+ * finally tell a paying customer from a cold prospect at a glance. Same
+ * vocabulary as /v1/admin/activation — never recomputed here, because the
+ * dashboard reads the same endpoint and two computations would disagree.
+ */
+export type BusinessStatus = 'new' | 'active' | 'at-limit' | 'paying' | 'dormant' | 'silent';
+
+export interface BusinessInfo {
+  status: BusinessStatus;
+  /** Signup source recorded on key creation ('direct' when none). */
+  source: string;
+  creditsTotal: number;
+  creditsRemaining: number;
+  /** Paid credit keys owned by this address. */
+  packs: number;
+  firstCallAt: string | null;
+  calls90d: number;
+}
+
 export interface ContactBase {
   /** Lowercased email — the join key for messages and read state. */
   id: string;
@@ -92,6 +112,8 @@ export interface ContactBase {
   unread: boolean;
   /** Mailbox to send from for this contact. */
   account: string;
+  /** Absent on prospects without a key, and when the activation fetch failed. */
+  business?: BusinessInfo;
 }
 
 export type Contact =
