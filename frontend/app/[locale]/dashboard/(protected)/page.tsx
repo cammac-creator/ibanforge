@@ -10,6 +10,8 @@ import {
 } from '@/components/dashboard/acquisition-panel';
 import { Heatmap } from '@/components/dashboard/heatmap';
 import { WeeklyDigestCard, type DigestEntry } from '@/components/dashboard/weekly-digest-card';
+import { StatusByPathTable, type StatusByPathRow } from '@/components/dashboard/status-by-path-table';
+import { ChannelsPanel, type ChannelRow } from '@/components/dashboard/channels-panel';
 import { ErrorTable } from '@/components/dashboard/error-table';
 import { InfoDot } from '@/components/dashboard/info-dot';
 import { RevenueCard } from '@/components/dashboard/revenue-card';
@@ -222,7 +224,7 @@ export default async function DashboardPage({
     ? (periodParam as ValidPeriod)
     : 30;
 
-  const [statsRes, historyRes, funnelRes, activationRes, errorsRes, hourlyRes, eventsRes, digestRes, crm] = await Promise.all([
+  const [statsRes, historyRes, funnelRes, activationRes, errorsRes, hourlyRes, eventsRes, digestRes, statusByPathRes, sourcesRes, patternsRes, crm] = await Promise.all([
     fetchJSON<StatsResponse>('/stats', statsHeaders),
     fetchJSON<HistoryEntry[]>(`/stats/history?period=${period}`, statsHeaders),
     fetchJSON<{ rows?: BusinessFunnelDay[] }>(`/stats/business-funnel?period=${period}`, statsHeaders),
@@ -240,6 +242,9 @@ export default async function DashboardPage({
     ADMIN_SECRET
       ? fetchJSON<{ digests: DigestEntry[] }>('/v1/admin/digest?limit=8', { 'X-Admin-Secret': ADMIN_SECRET })
       : Promise.resolve({ ok: false, status: 0, data: null } satisfies Fetched<{ digests: DigestEntry[] }>),
+    fetchJSON<{ rows: StatusByPathRow[] }>(`/stats/status-by-path?period=${period}`, statsHeaders),
+    fetchJSON<{ by_client_kind: ChannelRow[] }>(`/stats/sources?period=${period}`, statsHeaders),
+    fetchJSON<{ geo_trend: Array<Record<string, number | string>> }>(`/stats/patterns?period=${period}`, statsHeaders),
     // The CRM payloads, alongside the rest rather than after it. Null when
     // ADMIN_SECRET is unset or the API is unreachable, which is the same
     // condition the leads section already draws its own empty state for.
@@ -321,8 +326,22 @@ export default async function DashboardPage({
   const ibanRows = errors?.top_invalid_ibans ?? [];
   const bicRows = errors?.top_missing_bics ?? [];
 
-  // --- Top countries (all-time, from /stats)
-  const topCountries = (stats.top_countries ?? []).slice(0, 6);
+  // --- Top countries: summed from the period's geo trend; the all-time list
+  // from /stats is only the fallback when patterns are unavailable. The old
+  // card mixed a period-scoped page with an all-time ranking and admitted it
+  // in its own tooltip.
+  const geoTrend = patternsRes.data?.geo_trend ?? [];
+  const byCountryPeriod = new Map<string, number>();
+  for (const row of geoTrend) {
+    for (const [k, v] of Object.entries(row)) {
+      if (k === 'date' || typeof v !== 'number') continue;
+      byCountryPeriod.set(k, (byCountryPeriod.get(k) ?? 0) + v);
+    }
+  }
+  const countriesArePeriodScoped = byCountryPeriod.size > 0;
+  const topCountries = countriesArePeriodScoped
+    ? [...byCountryPeriod.entries()].map(([country, count]) => ({ country, count })).sort((a, z) => z.count - a.count).slice(0, 6)
+    : (stats.top_countries ?? []).slice(0, 6);
   const maxCountry = topCountries[0]?.count ?? 1;
 
   const heatmapData = hourly?.heatmap ?? [];
@@ -460,8 +479,11 @@ export default async function DashboardPage({
 
         <div className={card}>
           <div className="mb-4 flex items-center gap-2">
-            <p className={sectionTitle}>Top pays (cumulé)</p>
-            <InfoDot>Déduit du code pays ISO de l’IBAN/BIC validé. « XX » = BIC test/internal. Cumulé depuis le début (non filtré par période).</InfoDot>
+            <p className={sectionTitle}>{countriesArePeriodScoped ? `Top pays — ${period} jours` : 'Top pays (cumulé)'}</p>
+            <InfoDot>
+              Déduit du code pays ISO de l’IBAN/BIC validé. « XX » = BIC test/internal.
+              {countriesArePeriodScoped ? ' Filtré sur la période affichée.' : ' Cumulé depuis le début (patterns indisponibles).'}
+            </InfoDot>
           </div>
           {topCountries.length > 0 ? (
             <div className="space-y-2.5">
@@ -520,7 +542,30 @@ export default async function DashboardPage({
         />
       </div>
 
-      {/* 8. Activity heatmap — when the traffic happens */}
+      {/* 8. Channels + per-endpoint statuses (formerly dormant endpoints) */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        {!sourcesRes.ok ? (
+          <FetchFailed name="Canaux d'accès" status={sourcesRes.status} />
+        ) : (
+          <ChannelsPanel rows={sourcesRes.data?.by_client_kind ?? []} periodDays={period} />
+        )}
+        <div className={card}>
+          <div className="mb-4 flex items-center gap-2">
+            <p className={sectionTitle}>Statuts par endpoint — {period} jours</p>
+            <InfoDot>
+              Chaque path avec sa répartition 2xx/3xx/4xx/5xx et sa latence. Survole une barre pour le détail par code
+              HTTP avec son explication métier.
+            </InfoDot>
+          </div>
+          {!statusByPathRes.ok ? (
+            <FetchFailed name="Statuts par endpoint" status={statusByPathRes.status} />
+          ) : (
+            <StatusByPathTable rows={(statusByPathRes.data?.rows ?? []).slice(0, 12)} />
+          )}
+        </div>
+      </div>
+
+      {/* 9. Activity heatmap — when the traffic happens */}
       <Heatmap data={heatmapData} />
     </div>
   );
