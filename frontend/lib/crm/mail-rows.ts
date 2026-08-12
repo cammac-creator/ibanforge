@@ -2,6 +2,7 @@ import { isArchived } from './archived';
 import { ballWithUs, followupDue, neverContacted } from './buckets';
 import { chipOf, replyGroupOf, type BusinessChip, type ReplyGroup } from './business';
 import { heatOf } from './heat';
+import { NEXT_ACTION_LABEL } from './situation';
 import type { Contact, Message, Situation } from './types';
 
 export type MailFilterKey = 'reply' | 'followup' | 'new' | 'paying' | 'dormant' | 'clients' | 'all';
@@ -26,6 +27,11 @@ export interface MailRow {
   group: ReplyGroup | null;
   /** Heat score 0-100 (lib/crm/heat.ts) — the flame and the business sorts read it. */
   heat: number;
+  /** Prospect row id when one exists — the quick snooze/archive gestures need it. */
+  prospectId: string | null;
+  email: string;
+  /** Next-action label for the hover preview card. */
+  next: string | null;
   /**
    * What searchRows matches: the company and the address, in one string, which
    * is exactly what the deleted contact list's search matched. `who` cannot
@@ -141,32 +147,47 @@ function toRow(c: Contact, s: Situation | undefined, urgent: boolean, grouped: b
     // flag optimistically the moment a row is opened, machinery that had been
     // left running with nothing on the other end of it.
     unread: c.unread,
-    // The same expression the deleted list matched, character for character.
-    search: `${c.company ?? ''} ${c.email}`,
+    prospectId: c.sourcing?.prospectId ?? null,
+    email: c.email,
+    next: s ? NEXT_ACTION_LABEL[s.nextAction] : null,
+    // Folded at build time, matched folded: name, address, and the whole
+    // thread's subjects and snippets, so "batch" finds the batch conversation.
+    search: fold(
+      `${c.company ?? ''} ${c.email} ${c.messages.map((m) => `${m.subject ?? ''} ${m.snippet ?? ''}`).join(' ')}`,
+    ),
   };
+}
+
+/**
+ * Fold a string for matching: lowercase, accents stripped. Normalised on BOTH
+ * sides — a folded haystack against a raw query silently un-matches every
+ * accented search, the exact SQLite LOWER/LIKE lesson learned elsewhere.
+ */
+export function fold(s: string): string {
+  return s
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
 }
 
 /**
  * Narrow rows to the ones matching the operator's query.
  *
- * This is the search field the deleted contact list carried, and its behaviour
- * is reproduced rather than reinvented: the query is trimmed and lowercased,
- * the row's company and address are lowercased, and the test is a substring
- * match. Nothing else. In particular no accent folding, because the original
- * had none: "Société" is found by "société" or "SOCIÉTÉ", not by "societe".
+ * Two deliberate widenings over the original list's search: accents fold
+ * ("societe" now finds "Société"), and the haystack includes every subject
+ * and snippet of the thread, so "batch" retrieves the conversation about
+ * batching without remembering who it was with.
  *
  * It narrows rows and never counters. mailFilters() does not read the query,
  * so the counted filters hold still while the operator types; a count that
- * dropped to zero on every keystroke would stop being a way to navigate. The
- * deleted list had to state that in a comment; here it is true by
- * construction, since this runs after mailRows() and touches nothing else.
+ * dropped to zero on every keystroke would stop being a way to navigate.
  *
  * A blank or whitespace query returns the rows untouched.
  */
 export function searchRows(rows: MailRow[], query: string): MailRow[] {
-  const term = query.trim().toLowerCase();
+  const term = fold(query.trim());
   if (!term) return rows;
-  return rows.filter((r) => r.search.toLowerCase().includes(term));
+  return rows.filter((r) => r.search.includes(term));
 }
 
 export function mailFilters(input: RowsInput): MailFilter[] {

@@ -338,11 +338,15 @@ describe('searchRows', () => {
     expect(searchRows(rows, '   ')).toEqual(rows);
   });
 
-  it('ignores case, as the field it reproduces did', () => {
-    // Accented capitals included: the original lowercased both sides and did
-    // nothing else, so "SOCIÉTÉ" finds "Société" while "societe" finds nothing.
+  it('ignores case AND folds accents — both sides, per the A6 ruling', () => {
+    // The original matched lowercase only, so "societe" found nothing and the
+    // operator had to type the accent. Folding is normalised on both sides:
+    // a folded haystack against a raw accented query would silently un-match.
     expect(searchRows(rows, 'SOCIÉTÉ ALPHA').map((r) => r.id)).toEqual(['alpha@example.com']);
-    expect(searchRows(rows, 'societe')).toEqual([]);
+    // The haystack now includes thread content, so "societe" may legitimately
+    // surface other rows whose messages mention the word; what the ruling
+    // guarantees is that the accentless query finds the accented company.
+    expect(searchRows(rows, 'societe').map((r) => r.id)).toContain('alpha@example.com');
   });
 });
 

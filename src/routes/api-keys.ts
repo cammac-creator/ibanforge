@@ -1000,12 +1000,25 @@ apiKeys.post('/v1/admin/prospects/update', async (c) => {
 
   const hasStatus = body.status !== undefined;
   const hasOutcome = body.outcome !== undefined;
-  if (!hasStatus && !hasOutcome) {
-    return c.json({ error: 'invalid_body', message: 'Expected at least one of status, outcome' }, 400);
+  // A bare wakeUpAt is the list's quick-snooze gesture: "hide this until".
+  // It deliberately records NO outcome — a snooze is a scheduling act, not a
+  // judgement about the relationship, and reusing pas_maintenant for it would
+  // teach the outcome data a lesson nobody meant.
+  const hasBareWake = !hasOutcome && body.wakeUpAt !== undefined;
+  if (!hasStatus && !hasOutcome && !hasBareWake) {
+    return c.json({ error: 'invalid_body', message: 'Expected at least one of status, outcome, wakeUpAt' }, 400);
   }
 
   const sets: string[] = [];
   const args: Array<string | null> = [];
+
+  if (hasBareWake) {
+    if (typeof body.wakeUpAt !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(body.wakeUpAt)) {
+      return c.json({ error: 'invalid_wake_up_at', message: 'wakeUpAt must be YYYY-MM-DD' }, 400);
+    }
+    sets.push('wake_up_at = ?');
+    args.push(body.wakeUpAt);
+  }
 
   if (hasStatus) {
     const allowed = ['a_mailer', 'a_enrichir', 'archive', 'rejete'];

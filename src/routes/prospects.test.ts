@@ -357,3 +357,33 @@ describe('/v1/admin/prospects — em dashes scrubbed from mail prose on seed', (
     expect(p.fit_reason).toBe('kept as-is — internal note');
   });
 });
+
+describe('POST /v1/admin/prospects/update — wake_up_at alone (quick snooze)', () => {
+  it('accepts a snooze without status or outcome and stores the date', async () => {
+    const { getStatsDB } = await import('../lib/db.js');
+    const db = getStatsDB();
+    db.prepare(
+      `INSERT OR REPLACE INTO prospects (id, company, status) VALUES ('snooze-fx-1', 'Société Alpha', 'a_mailer')`,
+    ).run();
+    const res = await makeApp().request('/v1/admin/prospects/update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Secret': SECRET },
+      body: JSON.stringify({ id: 'snooze-fx-1', wakeUpAt: '2027-01-15' }),
+    });
+    expect(res.status).toBe(200);
+    const row = db.prepare(`SELECT wake_up_at FROM prospects WHERE id = 'snooze-fx-1'`).get() as {
+      wake_up_at: string | null;
+    };
+    expect(row.wake_up_at).toBe('2027-01-15');
+    db.prepare(`DELETE FROM prospects WHERE id = 'snooze-fx-1'`).run();
+  });
+
+  it('rejects a malformed date', async () => {
+    const res = await makeApp().request('/v1/admin/prospects/update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Secret': SECRET },
+      body: JSON.stringify({ id: 'whatever', wakeUpAt: 'lundi prochain' }),
+    });
+    expect(res.status).toBe(400);
+  });
+});
