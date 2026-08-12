@@ -24,11 +24,21 @@ async function enrichWithUsageFacts(body: unknown): Promise<unknown> {
   if (!to || typeof b.context !== 'string') return body;
   try {
     const headers = { 'X-Admin-Secret': adminSecret };
-    const [keysRes, profRes] = await Promise.all([
+    const [keysRes, profRes, notesRes] = await Promise.all([
       fetch(`${apiUrl}/v1/admin/keys`, { headers, signal: AbortSignal.timeout(6000) }),
       fetch(`${apiUrl}/v1/admin/client-profiles?days=90`, { headers, signal: AbortSignal.timeout(6000) }),
+      fetch(`${apiUrl}/v1/admin/contact-notes?email=${encodeURIComponent(to)}`, {
+        headers,
+        signal: AbortSignal.timeout(6000),
+      }).catch(() => null),
     ]);
     if (!keysRes.ok || !profRes.ok) return body;
+    const operatorNotes =
+      notesRes?.ok === true
+        ? ((((await notesRes.json()) as { notes?: Array<{ note: string; created_at: string }> }).notes ?? [])
+            .slice(0, 6)
+            .map((n) => `${n.created_at.slice(0, 10)}: ${n.note}`))
+        : [];
     const keys = (((await keysRes.json()) as { keys?: unknown }).keys ?? []) as Array<Record<string, unknown>>;
     const profiles = (((await profRes.json()) as { profiles?: unknown }).profiles ?? {}) as Record<
       string,
@@ -89,6 +99,9 @@ async function enrichWithUsageFacts(body: unknown): Promise<unknown> {
       total90 ? `- last 90 days: ${total90} successful calls; endpoints: ${top(byEndpoint, 4).map(([p, n]) => `${p} (${n})`).join(', ')}` : '- no successful call yet',
       byCountry.size ? `- countries checked: ${top(byCountry, 6).map(([c, n]) => `${c} (${n})`).join(', ')}` : '',
       agents.size ? `- stack: ${top(agents, 2).map(([u]) => u).join(', ')}` : '',
+      operatorNotes.length
+        ? `- Operator notes on this contact (private ground truth, use them to personalize, never quote them verbatim): ${operatorNotes.join(' | ')}`
+        : '',
       'Product facts you may cite, nothing else: free tier 200 requests/month; batch endpoint up to 100 IBANs per call; prepaid credit packs from $5 per 1,000 calls, credits never expire; German BICs come straight from the Bundesbank register (11 characters, branch included); code examples: ibanforge.com/docs/recipes',
       // The writer guessed "Uwe" from a schaefer-uwe.com domain on the first
       // live control. A guessed name that lands wrong opens the mail on an

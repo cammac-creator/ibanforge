@@ -4,6 +4,7 @@ import { heatOf } from '@/lib/crm/heat';
 import type { Contact, ProspectSourcing, Situation } from '@/lib/crm/types';
 import { OutcomeBadge, OutcomeControl } from './outcome-control';
 import { ProspectStatusBadge, ProspectStatusControl } from './prospect-status';
+import { ContactNotes } from './contact-notes';
 
 /** Segment labels, lifted from the prospect page so the wording does not drift. */
 const SEGMENT: Record<string, string> = {
@@ -305,6 +306,12 @@ export function ContactDetail({ contact: c, situation }: { contact: Contact; sit
           status={c.sourcing.status}
           hasEmail={!!c.email}
         />
+      )}
+
+      {c.email && (
+        <div className="mt-3">
+          <ContactNotes email={c.email} />
+        </div>
       )}
 
       {/* Anything carrying a prospect row can hold an outcome, client included:

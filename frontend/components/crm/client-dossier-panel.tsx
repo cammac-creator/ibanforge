@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { chipOfDossier, heatOfDossier, qualityTrend, type ClientDossier } from '@/lib/crm/client-dossiers';
 import { contactsHref } from '@/lib/crm/deep-link';
 import { Bar, Empty, HoursStrip, Section, Sparkbars, Stat, flag, relativeDays } from './dossier-bits';
+import { ContactNotes } from './contact-notes';
 
 /**
  * One dossier, two homes. `full` is the inline accordion under a row, with
@@ -80,6 +81,10 @@ export function ClientDossierPanel({
         >
           ✉ Ouvrir son fil dans Contacts
         </Link>
+      </div>
+
+      <div className="mb-4">
+        <ContactNotes email={d.email} />
       </div>
 
       {/* A blocked customer deserves the cause and the gesture, not just the
