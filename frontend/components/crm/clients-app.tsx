@@ -185,13 +185,13 @@ export function ClientsApp({ dossiers, locale, windowDays = 90 }: { dossiers: Cl
       <div className="flex items-start gap-4">
       <div className="min-w-0 flex-1 overflow-hidden rounded-xl border border-[var(--ink-4)]/60 bg-[var(--ink-2)]/40">
         <div className="hidden items-center gap-3 border-b border-[var(--ink-4)] px-4 py-2 text-[12px] uppercase tracking-wider text-[var(--fg-5)] md:flex">
-          <span className="w-[26%]">Client</span>
-          <span className="w-[13%]">État</span>
-          <span className="w-[12%] text-right">Requêtes ({windowDays} j)</span>
-          <span className="w-[10%]">30 jours</span>
-          <span className="w-[12%]">Dernier appel</span>
-          <span className="flex-1">Pays contrôlés</span>
-          <span className="w-14 text-right">Mails</span>
+          <span className="w-[24%]">Client</span>
+          <span className="w-[12%]">État</span>
+          <span className="w-[10%] text-right">Requêtes ({windowDays} j)</span>
+          <span className="w-24 shrink-0">30 jours</span>
+          <span className="w-[13%]">Dernier appel</span>
+          <span className="min-w-0 flex-1">Pays contrôlés</span>
+          <span className="w-14 shrink-0 text-right">Mails</span>
         </div>
 
         {view.length === 0 ? (
@@ -209,7 +209,7 @@ export function ClientsApp({ dossiers, locale, windowDays = 90 }: { dossiers: Cl
                     open ? 'bg-[var(--ink-3)]/60' : 'hover:bg-[var(--ink-3)]/40'
                   }`}
                 >
-                  <span className="w-full min-w-0 md:w-[26%]">
+                  <span className="w-full min-w-0 md:w-[24%]">
                     <span className="flex items-center gap-1.5">
                     {(() => { const chip = chipOfDossier(d); return chip ? (
                       <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide" style={{ color: chip.color, backgroundColor: chip.bg }}>{chip.label}</span>
@@ -223,19 +223,19 @@ export function ClientsApp({ dossiers, locale, windowDays = 90 }: { dossiers: Cl
                     </span>
                     <span className="block truncate font-mono text-[12px] text-[var(--fg-4)]">{d.email}</span>
                   </span>
-                  <span className="flex w-auto items-center gap-1.5 md:w-[13%]">
+                  <span className="flex w-auto items-center gap-1.5 md:w-[12%]">
                     <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: v.colour }} />
                     <span className="truncate text-[13px]" style={{ color: v.colour }}>
                       {v.one}
                     </span>
                   </span>
-                  <span className="w-auto text-right font-mono text-sm tabular-nums text-[var(--fg-1)] md:w-[12%]">
+                  <span className="w-auto text-right font-mono text-sm tabular-nums text-[var(--fg-1)] md:w-[10%]">
                     {d.requests.toLocaleString('fr-CH')}
                   </span>
-                  <span className="w-auto md:w-[10%]">
+                  <span className="w-auto shrink-0 md:w-24">
                     <MiniSpark days={d.days} />
                   </span>
-                  <span className="w-auto text-[13px] text-[var(--fg-3)] md:w-[12%]">
+                  <span className="w-auto truncate text-[13px] text-[var(--fg-3)] md:w-[13%]">
                     {d.daysSinceLastCall == null && d.usedAllTime > 0
                       ? `rien sur ${windowDays} j · ${d.usedAllTime.toLocaleString('fr-CH')} avant`
                       : relativeDays(d.daysSinceLastCall)}
@@ -289,22 +289,17 @@ export function ClientsApp({ dossiers, locale, windowDays = 90 }: { dossiers: Cl
         return opened ? (
           <aside className="hidden w-[440px] shrink-0 xl:block">
             <div className="sticky top-4 max-h-[calc(100vh-2rem)] overflow-y-auto rounded-xl border border-[var(--ink-4)]/60 bg-[var(--ink-2)]/40">
-              <div className="flex items-center justify-between border-b border-[var(--ink-4)]/60 px-4 py-2">
-                <p className="text-[12px] uppercase tracking-wider text-[var(--fg-4)]">
-                  Dossier · <span className="normal-case text-[var(--fg-2)]">{opened.company ?? opened.email}</span>
-                </p>
-                <span className="flex items-center gap-2">
-                  <span className="text-[11px] text-[var(--fg-5)]">↑↓ pour naviguer</span>
-                  <button
-                    type="button"
-                    onClick={() => setOpenId(null)}
-                    className="rounded border border-[var(--ink-5)] px-1.5 text-[12px] text-[var(--fg-3)] hover:text-[var(--fg-1)]"
-                  >
-                    ✕
-                  </button>
-                </span>
+              <div className="flex items-center justify-between border-b border-[var(--ink-4)]/60 px-3.5 py-1.5">
+                <span className="text-[11px] uppercase tracking-wider text-[var(--fg-5)]">Dossier · ↑↓ pour naviguer</span>
+                <button
+                  type="button"
+                  onClick={() => setOpenId(null)}
+                  className="rounded border border-[var(--ink-5)] px-1.5 text-[12px] text-[var(--fg-3)] hover:text-[var(--fg-1)]"
+                >
+                  ✕
+                </button>
               </div>
-              <ClientDossierPanel d={opened} locale={locale} windowDays={windowDays} />
+              <ClientDossierPanel d={opened} locale={locale} windowDays={windowDays} variant="rail" />
             </div>
           </aside>
         ) : null;
