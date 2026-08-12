@@ -1,6 +1,7 @@
 import { UsageChart } from '@/components/dashboard/usage-chart';
 import { chipOf } from '@/lib/crm/business';
-import type { Contact, ProspectSourcing } from '@/lib/crm/types';
+import { heatOf } from '@/lib/crm/heat';
+import type { Contact, ProspectSourcing, Situation } from '@/lib/crm/types';
 import { OutcomeBadge, OutcomeControl } from './outcome-control';
 import { ProspectStatusBadge, ProspectStatusControl } from './prospect-status';
 
@@ -146,12 +147,33 @@ export function ContactIdentity({ contact: c }: { contact: Contact }) {
  * and it is fully visible without scrolling in the case that needs it most, a
  * cold prospect, whose thread is empty by definition.
  */
-export function ContactDetail({ contact: c }: { contact: Contact }) {
+export function ContactDetail({ contact: c, situation }: { contact: Contact; situation?: Situation }) {
   const sourcing = c.sourcing;
   const blocks = sourcing ? blocksOf(sourcing, !!c.email) : null;
+  // The same arithmetic the list's flame reads, printed in full: a score the
+  // operator cannot audit is a score they will rightly ignore.
+  const heat = heatOf(c, situation);
 
   return (
     <div className="mb-3 min-w-0 border-b border-[var(--ink-4)]/60 pb-3">
+      {heat.parts.length > 0 && (
+        <div className="mb-3 flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
+          <p className="text-[11px] uppercase tracking-wide text-[var(--fg-3)]">
+            Chaleur <span className="font-mono text-sm text-amber-400">{heat.score}</span>/100
+          </p>
+          <p className="min-w-0 text-[12.5px] text-[var(--fg-3)]">
+            {heat.parts.map((p, i) => (
+              <span key={p.label}>
+                {i > 0 ? ' · ' : ''}
+                {p.label}{' '}
+                <span className={p.points > 0 ? 'text-[var(--ok)]' : 'text-[var(--red,#ef4444)]'}>
+                  {p.points > 0 ? `+${p.points}` : p.points}
+                </span>
+              </span>
+            ))}
+          </p>
+        </div>
+      )}
       {c.kind === 'client' && (
         // No shrink-0, and this stacks below sm. Measured at a 375px viewport:
         // with shrink-0 the block held its 526px preferred width, the flex row

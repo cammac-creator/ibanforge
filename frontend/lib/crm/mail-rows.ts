@@ -1,6 +1,7 @@
 import { isArchived } from './archived';
 import { ballWithUs, followupDue, neverContacted } from './buckets';
 import { chipOf, replyGroupOf, type BusinessChip, type ReplyGroup } from './business';
+import { heatOf } from './heat';
 import type { Contact, Message, Situation } from './types';
 
 export type MailFilterKey = 'reply' | 'followup' | 'new' | 'paying' | 'dormant' | 'clients' | 'all';
@@ -23,6 +24,8 @@ export interface MailRow {
   chip: BusinessChip | null;
   /** Shelf inside the reply filter; null on every other filter. */
   group: ReplyGroup | null;
+  /** Heat score 0-100 (lib/crm/heat.ts) — the flame and the business sorts read it. */
+  heat: number;
   /**
    * What searchRows matches: the company and the address, in one string, which
    * is exactly what the deleted contact list's search matched. `who` cannot
@@ -132,6 +135,7 @@ function toRow(c: Contact, s: Situation | undefined, urgent: boolean, grouped: b
     // later, so the shelf labels can only ever cut that sequence, never
     // contradict it.
     group: grouped ? replyGroupOf(c.unread, s?.silenceDays ?? null) : null,
+    heat: heatOf(c, s).score,
     // Projected on every filter, not just "À répondre", so a thread nobody has
     // opened reads the same wherever it is met. `crm-app.tsx` already clears the
     // flag optimistically the moment a row is opened, machinery that had been
@@ -197,6 +201,12 @@ export function mailRows(input: RowsInput, active: MailFilterKey): MailRow[] {
       if (gap !== 0) return gap;
       return byId(a, b);
     }
+    if (active === 'clients' || active === 'paying' || active === 'dormant') {
+      // Money views rank by heat: the client burning credits outranks the one
+      // whose last mail happens to be newer. Date breaks ties.
+      const heatGap = heatOf(b, input.situations[b.id]).score - heatOf(a, input.situations[a.id]).score;
+      if (heatGap !== 0) return heatGap;
+    }
     if (active === 'all') {
       // A prospect never written to leads "Tous", ahead of the recency order.
       // This is the gesture "who have I never written to": it was a named
@@ -212,6 +222,10 @@ export function mailRows(input: RowsInput, active: MailFilterKey): MailRow[] {
       const coldA = neverContacted(a, input.situations[a.id], input.snoozed[a.id] ?? false);
       const coldB = neverContacted(b, input.situations[b.id], input.snoozed[b.id] ?? false);
       if (coldA !== coldB) return coldA ? -1 : 1;
+      // Inside each half, heat first: the warm half ranks like the money
+      // views, and the never-contacted half puts the hottest lead on top.
+      const heatGap = heatOf(b, input.situations[b.id]).score - heatOf(a, input.situations[a.id]).score;
+      if (heatGap !== 0) return heatGap;
     }
     const dateA = lastWith(a.messages, 'msg_date') ?? '';
     const dateB = lastWith(b.messages, 'msg_date') ?? '';

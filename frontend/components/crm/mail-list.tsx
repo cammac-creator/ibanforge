@@ -9,6 +9,7 @@ import {
   type RowsInput,
 } from '@/lib/crm/mail-rows';
 import { REPLY_GROUP_LABEL } from '@/lib/crm/business';
+import { flameOf } from '@/lib/crm/heat';
 
 /**
  * The left column. Holds no rule of its own: it asks mail-rows.ts what the
@@ -159,6 +160,17 @@ export function MailList({
                       is written here invisibly, in the words the deleted
                       list's dot carried. Nothing becomes visible. */}
                   {r.unread && <span className="sr-only">Réponse non lue</span>}
+                  {(() => {
+                    const flame = flameOf(r.heat);
+                    return flame ? (
+                      <span
+                        className={`shrink-0 text-[11px] ${flame.dim ? 'opacity-45' : ''}`}
+                        title={`Chaleur ${r.heat}/100 — détail dans le dossier`}
+                      >
+                        {flame.glyph}
+                      </span>
+                    ) : null;
+                  })()}
                   <span
                     className={`shrink-0 text-[13.5px] tabular-nums ${
                       r.urgent ? 'text-[var(--amber-500)]' : 'text-[var(--fg-3)]'

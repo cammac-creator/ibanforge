@@ -241,7 +241,7 @@ export function CrmApp({
               }
               className="mt-3 min-h-0 flex-1 overflow-y-auto pr-1"
             >
-              <ContactDetail contact={selected} />
+              <ContactDetail contact={selected} situation={situation} />
               <Thread
                 messages={selected.messages}
                 // Without this the contact's bubbles are labelled 'lui'. An
