@@ -5,9 +5,18 @@ import { buildDossiers, fetchClientProfiles } from '@/lib/crm/client-dossiers';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ClientsPage() {
+const WINDOWS = [30, 90, 365] as const;
+
+export default async function ClientsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const locale = await getLocale();
-  const [data, profiles] = await Promise.all([fetchCrmData(), fetchClientProfiles(90)]);
+  const params = await searchParams;
+  const daysParam = Number(params.days ?? 90);
+  const windowDays = (WINDOWS as readonly number[]).includes(daysParam) ? daysParam : 90;
+  const [data, profiles] = await Promise.all([fetchCrmData(), fetchClientProfiles(windowDays)]);
 
   if (!data) {
     return (
@@ -29,6 +38,7 @@ export default async function ClientsPage() {
     monthsByKey: profiles.monthsByKey,
     quotaWarnedByKey: profiles.quotaWarnedByKey,
     now: new Date(),
+    windowDays,
     activation: data.activation,
   });
 
@@ -39,8 +49,24 @@ export default async function ClientsPage() {
         <p className="mt-0.5 text-sm text-[var(--fg-4)]">
           Ce que chaque client fait réellement de l&apos;API. Cliquez une ligne pour ouvrir son dossier.
         </p>
+        <nav className="mt-2 flex items-center gap-1.5 text-[13px]">
+          <span className="text-[var(--fg-5)]">Fenêtre :</span>
+          {WINDOWS.map((w) => (
+            <a
+              key={w}
+              href={`?days=${w}`}
+              className={`rounded-full px-2.5 py-0.5 ${
+                w === windowDays
+                  ? 'bg-[var(--ink-5)] font-semibold text-white'
+                  : 'text-[var(--fg-4)] hover:text-[var(--fg-2)]'
+              }`}
+            >
+              {w} j
+            </a>
+          ))}
+        </nav>
       </header>
-      <ClientsApp dossiers={dossiers} locale={locale} />
+      <ClientsApp dossiers={dossiers} locale={locale} windowDays={windowDays} />
     </div>
   );
 }

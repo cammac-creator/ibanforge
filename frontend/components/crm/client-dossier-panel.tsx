@@ -5,7 +5,7 @@ import type { ClientDossier } from '@/lib/crm/client-dossiers';
 import { contactsHref } from '@/lib/crm/deep-link';
 import { Bar, Empty, HoursStrip, Section, Sparkbars, Stat, flag, relativeDays } from './dossier-bits';
 
-export function ClientDossierPanel({ d, locale }: { d: ClientDossier; locale: string }) {
+export function ClientDossierPanel({ d, locale, windowDays = 90 }: { d: ClientDossier; locale: string; windowDays?: number }) {
   const errRate = d.requests > 0 ? Math.round(((d.badInput + d.serverError) / d.requests) * 100) : 0;
   const topCountry = d.countries[0];
   const attributed = d.countries.reduce((s, c) => s + c.count, 0);
@@ -57,7 +57,7 @@ export function ClientDossierPanel({ d, locale }: { d: ClientDossier; locale: st
         <Stat label="Machines" value={String(d.distinctIps)} hint="empreintes IP" />
         <Stat
           label="Dernier appel"
-          value={d.daysSinceLastCall == null && d.usedAllTime > 0 ? 'rien sur 90 j' : relativeDays(d.daysSinceLastCall)}
+          value={d.daysSinceLastCall == null && d.usedAllTime > 0 ? `rien sur ${windowDays} j` : relativeDays(d.daysSinceLastCall)}
           hint={
             // The unbounded first call when the activation join has it; the
             // window-scoped first_seen used to claim a March customer started
@@ -65,7 +65,7 @@ export function ClientDossierPanel({ d, locale }: { d: ClientDossier; locale: st
             d.firstCallEver
               ? `1er appel le ${d.firstCallEver.slice(0, 10)}`
               : d.firstCallAt
-                ? `vu depuis le ${d.firstCallAt.slice(0, 10)} (fenêtre 90 j)`
+                ? `vu depuis le ${d.firstCallAt.slice(0, 10)} (fenêtre ${windowDays} j)`
                 : undefined
           }
         />

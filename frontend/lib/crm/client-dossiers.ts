@@ -35,6 +35,8 @@ export interface DossierInput {
   monthsByKey: Record<string, Array<{ month: string; count: number }>>;
   quotaWarnedByKey: Record<string, string[]>;
   now: Date;
+  /** Profile window in days — every windowed figure and label follows it. */
+  windowDays?: number;
   /**
    * The per-email activation verdicts (same payload the Contacts page joins).
    * Optional: without it the page degrades to window-only facts — but the
@@ -214,6 +216,9 @@ function decideVerdict(d: ClientDossier, now: Date): Verdict {
 
 export function buildDossiers(input: DossierInput): ClientDossier[] {
   const { now } = input;
+  // Sparkbars stay readable: past 90 days a bar per day is noise, so the
+  // drawn span caps while the counters keep the true window.
+  const drawnSpan = Math.min(input.windowDays ?? 90, 90);
 
   const activationByEmail = new Map<string, ActivationClientRow>();
   for (const a of input.activation ?? []) activationByEmail.set(a.email.toLowerCase(), a);
@@ -310,7 +315,7 @@ export function buildDossiers(input: DossierInput): ClientDossier[] {
       clientKinds: mergeCounts(profiles.map((p) => p.client_kinds ?? []), 'kind'),
       rejectReasons: mergeCounts(profiles.map((p) => p.reject_reasons ?? []), 'reason'),
       hours,
-      days: denseDays(mergeCounts(profiles.map((p) => p.days ?? []), 'day'), now),
+      days: denseDays(mergeCounts(profiles.map((p) => p.days ?? []), 'day'), now, drawnSpan),
       mails: {
         sent: thread.filter((m) => m.direction === 'out').length,
         received: thread.filter((m) => m.direction === 'in').length,

@@ -57,7 +57,7 @@ function MiniSpark({ days }: { days: Array<{ day: string; count: number }> }) {
  */
 type Filter = Verdict | 'all' | 'used';
 
-export function ClientsApp({ dossiers, locale }: { dossiers: ClientDossier[]; locale: string }) {
+export function ClientsApp({ dossiers, locale, windowDays = 90 }: { dossiers: ClientDossier[]; locale: string; windowDays?: number }) {
   const [sort, setSort] = useState<SortKey>('requests');
   const [filter, setFilter] = useState<Filter>('used');
   const [query, setQuery] = useState('');
@@ -95,7 +95,7 @@ export function ClientsApp({ dossiers, locale }: { dossiers: ClientDossier[]; lo
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[
           { l: 'Clients', v: String(dossiers.length), h: `${dossiers.filter((d) => d.requests > 0).length} ont appelé` },
-          { l: 'Requêtes cumulées', v: totalRequests.toLocaleString('fr-CH'), h: '90 derniers jours' },
+          { l: 'Requêtes cumulées', v: totalRequests.toLocaleString('fr-CH'), h: `${windowDays} derniers jours` },
           { l: 'Pays contrôlés', v: String(distinctCountries), h: 'tous clients confondus' },
           { l: 'À débloquer', v: String(counts.blocked), h: 'arrêtés sur un refus' },
         ].map((s) => (
@@ -165,7 +165,7 @@ export function ClientsApp({ dossiers, locale }: { dossiers: ClientDossier[]; lo
         <div className="hidden items-center gap-3 border-b border-[var(--ink-4)] px-4 py-2 text-[12px] uppercase tracking-wider text-[var(--fg-5)] md:flex">
           <span className="w-[26%]">Client</span>
           <span className="w-[13%]">État</span>
-          <span className="w-[12%] text-right">Requêtes</span>
+          <span className="w-[12%] text-right">Requêtes ({windowDays} j)</span>
           <span className="w-[10%]">30 jours</span>
           <span className="w-[12%]">Dernier appel</span>
           <span className="flex-1">Pays contrôlés</span>
@@ -215,7 +215,7 @@ export function ClientsApp({ dossiers, locale }: { dossiers: ClientDossier[]; lo
                   </span>
                   <span className="w-auto text-[13px] text-[var(--fg-3)] md:w-[12%]">
                     {d.daysSinceLastCall == null && d.usedAllTime > 0
-                      ? `rien sur 90 j · ${d.usedAllTime.toLocaleString('fr-CH')} avant`
+                      ? `rien sur ${windowDays} j · ${d.usedAllTime.toLocaleString('fr-CH')} avant`
                       : relativeDays(d.daysSinceLastCall)}
                   </span>
                   <span className="min-w-0 flex-1 truncate font-mono text-[12px] text-[var(--fg-3)]">
@@ -249,7 +249,7 @@ export function ClientsApp({ dossiers, locale }: { dossiers: ClientDossier[]; lo
                     {d.mails.hasDraft && <span className="ml-1 text-[var(--warn)]">•</span>}
                   </span>
                 </button>
-                {open && <ClientDossierPanel d={d} locale={locale} />}
+                {open && <ClientDossierPanel d={d} locale={locale} windowDays={windowDays} />}
               </div>
             );
           })
