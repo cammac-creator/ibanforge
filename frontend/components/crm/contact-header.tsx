@@ -207,9 +207,16 @@ export function ContactDetail({ contact: c, situation }: { contact: Contact; sit
         // which makes this the first child and its top margin a stray gap.
         <div className="mt-3 flex min-w-0 flex-col gap-3 first:mt-0">
           {blocks.fit && (
-            <div className="grid min-w-0 gap-3 sm:grid-cols-2">
-              <Field label="Ce qu’ils font" value={sourcing.whatTheyDo} />
-              <Field label="Pourquoi IBANforge leur sert" value={sourcing.fitReason} />
+            <div className="min-w-0">
+              {sourcing.source === 'auto-enrich' && (
+                <p className="mb-1 inline-block rounded bg-violet-500/12 px-1.5 py-0.5 text-[11px] font-medium text-violet-300">
+                  ✨ déduit du site par l&rsquo;IA, à confirmer
+                </p>
+              )}
+              <div className="grid min-w-0 gap-3 sm:grid-cols-2">
+                <Field label="Ce qu’ils font" value={sourcing.whatTheyDo} />
+                <Field label="Pourquoi IBANforge leur sert" value={sourcing.fitReason} />
+              </div>
             </div>
           )}
 
