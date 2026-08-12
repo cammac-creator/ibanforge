@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { chipOfDossier, heatOfDossier, sortDossiers, type ClientDossier, type SortKey, type Verdict } from '@/lib/crm/client-dossiers';
 import { flameOf } from '@/lib/crm/heat';
 import { fold } from '@/lib/crm/mail-rows';
@@ -87,6 +87,27 @@ export function ClientsApp({ dossiers, locale, windowDays = 90 }: { dossiers: Cl
     return sortDossiers(filtered, sort);
   }, [dossiers, filter, query, sort]);
 
+  // Arrow keys walk the visible list while a dossier is open — the inspector
+  // stays put, the selection moves. Guarded on an open dossier and on the
+  // event not landing in an input, so the search field keeps its cursor keys.
+  useEffect(() => {
+    if (!openId) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return;
+      const i = view.findIndex((d) => d.id === openId);
+      if (i === -1) return;
+      const next = view[e.key === 'ArrowDown' ? i + 1 : i - 1];
+      if (next) {
+        e.preventDefault();
+        setOpenId(next.id);
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [openId, view]);
+
   const totalRequests = dossiers.reduce((s, d) => s + d.requests, 0);
   const distinctCountries = new Set(dossiers.flatMap((d) => d.countries.map((c) => c.code))).size;
 
@@ -161,7 +182,8 @@ export function ClientsApp({ dossiers, locale, windowDays = 90 }: { dossiers: Cl
         </span>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-[var(--ink-4)]/60 bg-[var(--ink-2)]/40">
+      <div className="flex items-start gap-4">
+      <div className="min-w-0 flex-1 overflow-hidden rounded-xl border border-[var(--ink-4)]/60 bg-[var(--ink-2)]/40">
         <div className="hidden items-center gap-3 border-b border-[var(--ink-4)] px-4 py-2 text-[12px] uppercase tracking-wider text-[var(--fg-5)] md:flex">
           <span className="w-[26%]">Client</span>
           <span className="w-[13%]">État</span>
@@ -249,11 +271,44 @@ export function ClientsApp({ dossiers, locale, windowDays = 90 }: { dossiers: Cl
                     {d.mails.hasDraft && <span className="ml-1 text-[var(--warn)]">•</span>}
                   </span>
                 </button>
-                {open && <ClientDossierPanel d={d} locale={locale} windowDays={windowDays} />}
+                {open && (
+                  <div className="xl:hidden">
+                    <ClientDossierPanel d={d} locale={locale} windowDays={windowDays} />
+                  </div>
+                )}
               </div>
             );
           })
         )}
+      </div>
+      {/* The inspector rail: the list never jumps, ↑↓ walks it, and comparing
+          two customers becomes two keypresses instead of two scrolls. Hidden
+          below xl, where the inline accordion above keeps working. */}
+      {(() => {
+        const opened = openId ? view.find((d) => d.id === openId) : null;
+        return opened ? (
+          <aside className="hidden w-[440px] shrink-0 xl:block">
+            <div className="sticky top-4 max-h-[calc(100vh-2rem)] overflow-y-auto rounded-xl border border-[var(--ink-4)]/60 bg-[var(--ink-2)]/40">
+              <div className="flex items-center justify-between border-b border-[var(--ink-4)]/60 px-4 py-2">
+                <p className="text-[12px] uppercase tracking-wider text-[var(--fg-4)]">
+                  Dossier · <span className="normal-case text-[var(--fg-2)]">{opened.company ?? opened.email}</span>
+                </p>
+                <span className="flex items-center gap-2">
+                  <span className="text-[11px] text-[var(--fg-5)]">↑↓ pour naviguer</span>
+                  <button
+                    type="button"
+                    onClick={() => setOpenId(null)}
+                    className="rounded border border-[var(--ink-5)] px-1.5 text-[12px] text-[var(--fg-3)] hover:text-[var(--fg-1)]"
+                  >
+                    ✕
+                  </button>
+                </span>
+              </div>
+              <ClientDossierPanel d={opened} locale={locale} windowDays={windowDays} />
+            </div>
+          </aside>
+        ) : null;
+      })()}
       </div>
     </div>
   );
