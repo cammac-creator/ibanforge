@@ -11,6 +11,7 @@ import { MailList } from './mail-list';
 import { OUTBOUND_SHEET_COVER_PX, OutboundSheet } from './outbound-sheet';
 import { REPLY_SHEET_COVER_PX, ReplySheet } from './reply-sheet';
 import { SituationBand } from './situation-band';
+import { ThreadSummary } from './thread-summary';
 import { Thread } from './thread';
 
 /**
@@ -220,6 +221,17 @@ export function CrmApp({
               <div className="mt-3">
                 <SituationBand situation={situation} />
               </div>
+            )}
+            {/* Pinned with the band, not scrolled with the thread: the whole
+                point is to spare the re-read, so it must be visible before
+                any scrolling happens. Only earns its pixels on real threads. */}
+            {selected.messages.length >= 4 && selected.email && (
+              <ThreadSummary
+                key={selected.id}
+                email={selected.email}
+                company={selected.company}
+                messages={selected.messages}
+              />
             )}
             {/* The room the open sheet covers, handed back as scroll space.
                 The sheet floats, so this region keeps its full height, but the

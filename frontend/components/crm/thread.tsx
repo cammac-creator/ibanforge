@@ -175,6 +175,22 @@ function Bubble({ m, counterpartLabel }: { m: Message; counterpartLabel?: string
  * plain node, so a Server Component can be passed straight through this client
  * boundary.
  */
+/** "aujourd'hui", "hier", or "lundi 11 août" — the shelf between two days. */
+function dayLabel(sqlDate: string | null | undefined): string | null {
+  if (!sqlDate) return null;
+  const d = new Date(sqlDate.includes('T') ? sqlDate : `${sqlDate.replace(' ', 'T')}Z`);
+  if (Number.isNaN(d.getTime())) return null;
+  const today = new Date();
+  const startOf = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const gap = Math.round((startOf(today) - startOf(d)) / 86_400_000);
+  if (gap === 0) return 'aujourd’hui';
+  if (gap === 1) return 'hier';
+  return d.toLocaleDateString('fr-CH', { weekday: 'long', day: 'numeric', month: 'long' });
+}
+
+/** Everything older than the last KEEP_RECENT messages folds behind one line. */
+const KEEP_RECENT = 6;
+
 export function Thread({
   messages,
   counterpartLabel,
@@ -202,11 +218,62 @@ export function Thread({
       </p>
     );
   }
+  return <ThreadBody messages={messages} counterpartLabel={counterpartLabel} draftSlot={draftSlot} />;
+}
+
+function ThreadBody({
+  messages,
+  counterpartLabel,
+  draftSlot,
+}: {
+  messages: Message[];
+  counterpartLabel?: string;
+  draftSlot?: ReactNode;
+}) {
+  // Folded by default past KEEP_RECENT: reopening a long thread should cost a
+  // glance. State lives here so switching contacts re-folds naturally (the
+  // parent keys nothing on us, but messages.length changing resets nothing —
+  // hence the explicit reset when the fold no longer applies).
+  const [unfolded, setUnfolded] = useState(false);
+  const foldable = messages.length > KEEP_RECENT + 2;
+  const hidden = foldable && !unfolded ? messages.slice(0, messages.length - KEEP_RECENT) : [];
+  const shown = foldable && !unfolded ? messages.slice(messages.length - KEEP_RECENT) : messages;
+
+  let lastDay: string | null = null;
+  const withSeparators: ReactNode[] = [];
+  for (let i = 0; i < shown.length; i += 1) {
+    const m = shown[i];
+    const day = dayLabel(m.msg_date);
+    if (day && day !== lastDay) {
+      lastDay = day;
+      withSeparators.push(
+        <div key={`sep-${m.msg_date}-${i}`} className="flex items-center gap-3 py-0.5">
+          <span className="h-px flex-1 bg-[var(--ink-4)]/60" />
+          <span className="text-[11px] uppercase tracking-[0.12em] text-[var(--fg-3)]">{day}</span>
+          <span className="h-px flex-1 bg-[var(--ink-4)]/60" />
+        </div>,
+      );
+    }
+    withSeparators.push(<Bubble key={m.id ?? `m-${i}`} m={m} counterpartLabel={counterpartLabel} />);
+  }
+
   return (
     <div className="flex flex-col gap-2.5">
-      {messages.map((m, i) => (
-        <Bubble key={m.id ?? i} m={m} counterpartLabel={counterpartLabel} />
-      ))}
+      {hidden.length > 0 && (
+        <button
+          type="button"
+          onClick={() => setUnfolded(true)}
+          className="mx-auto rounded-full border border-[var(--ink-4)] px-3 py-1 text-[12px] text-[var(--fg-3)] hover:border-[var(--fg-3)] hover:text-[var(--fg-1)]"
+        >
+          ▸ {hidden.length} message{hidden.length > 1 ? 's' : ''} précédent{hidden.length > 1 ? 's' : ''}
+          {(() => {
+            const from = dayLabel(hidden[0]?.msg_date);
+            const to = dayLabel(hidden.at(-1)?.msg_date);
+            return from && to ? ` (${from} → ${to})` : '';
+          })()}
+        </button>
+      )}
+      {withSeparators}
       {draftSlot}
     </div>
   );
