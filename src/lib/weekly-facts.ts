@@ -77,17 +77,32 @@ export function getWeeklyFacts(now: Date = new Date()): WeeklyFacts {
 
   const billable = buildBillableFilter();
 
+  // Business counters (billable_ok, paywall_hits) exclude internal keys the
+  // same way the business funnel does — probe traffic once inflated a week by
+  // hundreds of calls and the digest read the probe's silence as a collapse.
+  // Anonymous traffic (NULL prefix) stays counted: x402 demand is market
+  // signal. `requests` and `server_errors` stay raw on purpose, they are
+  // technical metrics.
+  const internalPrefixes = (
+    db.prepare('SELECT key_prefix, email FROM api_keys').all() as Array<{ key_prefix: string; email: string }>
+  )
+    .filter((k) => isInternalEmail(k.email))
+    .map((k) => k.key_prefix);
+  const notInternal = internalPrefixes.length
+    ? `AND (key_prefix IS NULL OR key_prefix NOT IN (${internalPrefixes.map(() => '?').join(',')}))`
+    : '';
+
   const reqWindow = (start: string, end: string) =>
     db
       .prepare(
         `SELECT COUNT(*) AS requests,
-           SUM(CASE WHEN status >= 200 AND status < 300 AND (${billable.sql}) THEN 1 ELSE 0 END) AS billable_ok,
-           SUM(CASE WHEN status IN (402, 429) THEN 1 ELSE 0 END) AS paywall_hits,
+           SUM(CASE WHEN status >= 200 AND status < 300 AND (${billable.sql}) ${notInternal} THEN 1 ELSE 0 END) AS billable_ok,
+           SUM(CASE WHEN status IN (402, 429) ${notInternal} THEN 1 ELSE 0 END) AS paywall_hits,
            SUM(CASE WHEN status >= 500 THEN 1 ELSE 0 END) AS server_errors
          FROM request_log
          WHERE created_at >= ? AND created_at < ?`,
       )
-      .get(...billable.params, start, end) as {
+      .get(...billable.params, ...internalPrefixes, ...internalPrefixes, start, end) as {
       requests: number;
       billable_ok: number | null;
       paywall_hits: number | null;

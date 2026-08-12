@@ -24,7 +24,7 @@ const OUTCOMES: readonly string[] = ['en_discussion', 'pas_maintenant', 'pas_int
  * narrow: his bare address is not a test account.
  */
 export const INTERNAL_RE =
-  /(@ibanforge\.com|@ibanforge\.internal|@example\.com|@test\.|test-|-test|smoke|audit|^ca-[a-z]+-?\d*@proton\.me|^credits-buyer$|^stripe-buyer$|^playground|cammac@bluewin\.ch|cam@ogens\.ch|ptibootch@|gpt-store@|claudealainmartin06\+)/i;
+  /(@ibanforge\.com|@ibanforge\.internal|@ibf-internal\.dev|-probe@|@example\.com|@test\.|test-|-test|smoke|audit|^ca-[a-z]+-?\d*@proton\.me|^credits-buyer$|^stripe-buyer$|^playground|cammac@bluewin\.ch|cam@ogens\.ch|ptibootch@|gpt-store@|claudealainmartin06\+)/i;
 
 /**
  * The outreach keys minted at launch, one per company we meant to approach.
