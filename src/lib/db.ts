@@ -215,6 +215,17 @@ export function getStatsDB(): DatabaseType.Database {
         label TEXT NOT NULL
       );
       CREATE INDEX IF NOT EXISTS idx_events_date ON events(created_at);
+      -- Dated free-text notes per contact address — the operator's working
+      -- memory ("migrating from iban.com, decision in September"). Read back
+      -- into every AI draft brief, so what the operator knows, the writer
+      -- knows.
+      CREATE TABLE IF NOT EXISTS contact_notes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        email TEXT NOT NULL,
+        note TEXT NOT NULL,
+        created_at TEXT DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_contact_notes_email ON contact_notes(email);
       -- One cached French thread summary per counterpart address. thread_key
       -- fingerprints the thread state it was written against (message count +
       -- last message date), so a new message naturally invalidates the cache

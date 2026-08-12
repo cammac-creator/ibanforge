@@ -749,6 +749,53 @@ apiKeys.post('/v1/admin/thread-summary', async (c) => {
   return c.json({ saved: true }, 201);
 });
 
+/**
+ * The operator's working memory, one dated note at a time. Read back into
+ * every AI draft brief: what the operator knows, the writer knows.
+ */
+apiKeys.get('/v1/admin/contact-notes', (c) => {
+  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
+  const email = (c.req.query('email') ?? '').trim().toLowerCase();
+  if (!email) return c.json({ error: 'invalid_query', message: 'email is required' }, 400);
+  const notes = getStatsDB()
+    .prepare('SELECT id, note, created_at FROM contact_notes WHERE email = ? ORDER BY id DESC LIMIT 50')
+    .all(email);
+  return c.json({ notes });
+});
+
+apiKeys.post('/v1/admin/contact-notes', async (c) => {
+  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
+  let body: { email?: unknown; note?: unknown };
+  try {
+    body = await c.req.json<{ email?: unknown; note?: unknown }>();
+  } catch {
+    return c.json({ error: 'invalid_json' }, 400);
+  }
+  const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
+  const note = typeof body.note === 'string' ? body.note.trim() : '';
+  if (!email || !note) {
+    return c.json({ error: 'invalid_body', message: 'email and a non-empty note are required' }, 400);
+  }
+  const r = getStatsDB()
+    .prepare('INSERT INTO contact_notes (email, note) VALUES (?, ?)')
+    .run(email, note.slice(0, 1000));
+  return c.json({ saved: true, id: Number(r.lastInsertRowid) }, 201);
+});
+
+apiKeys.delete('/v1/admin/contact-notes', (c) => {
+  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
+  const id = parseInt(c.req.query('id') ?? '', 10);
+  if (Number.isNaN(id)) return c.json({ error: 'invalid_query', message: 'id is required' }, 400);
+  const r = getStatsDB().prepare('DELETE FROM contact_notes WHERE id = ?').run(id);
+  return c.json({ deleted: r.changes });
+});
+
 apiKeys.get('/v1/admin/digest', (c) => {
   if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
     return c.json({ error: 'unauthorized' }, 401);

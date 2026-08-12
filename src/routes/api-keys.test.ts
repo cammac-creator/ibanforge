@@ -285,3 +285,47 @@ describe('/v1/admin/thread-summary — cached French thread summaries', () => {
     expect(bad.status).toBe(400);
   });
 });
+
+describe('/v1/admin/contact-notes — the operator working memory', () => {
+  const headers = { 'Content-Type': 'application/json', 'X-Admin-Secret': 'correct-horse-battery-staple' };
+  const EMAIL = 'notes-probe@alpha.example.net';
+
+  it('adds, lists (newest first) and deletes a note', async () => {
+    const app = makeApp();
+    const a = await app.request('/v1/admin/contact-notes', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ email: EMAIL, note: 'migre depuis iban.com, décision en septembre' }),
+    });
+    expect(a.status).toBe(201);
+    const b = await app.request('/v1/admin/contact-notes', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ email: EMAIL, note: 'veut le VoP' }),
+    });
+    expect(b.status).toBe(201);
+
+    const list = await app.request(`/v1/admin/contact-notes?email=${encodeURIComponent(EMAIL)}`, { headers });
+    const notes = ((await list.json()) as { notes: Array<{ id: number; note: string }> }).notes;
+    expect(notes.length).toBe(2);
+    expect(notes[0].note).toContain('VoP');
+
+    const del = await app.request(`/v1/admin/contact-notes?id=${notes[0].id}`, { method: 'DELETE', headers });
+    expect(del.status).toBe(200);
+    const after = await app.request(`/v1/admin/contact-notes?email=${encodeURIComponent(EMAIL)}`, { headers });
+    expect(((await after.json()) as { notes: unknown[] }).notes.length).toBe(1);
+
+    const { getStatsDB } = await import('../lib/db.js');
+    getStatsDB().prepare('DELETE FROM contact_notes WHERE email = ?').run(EMAIL);
+  });
+
+  it('rejects an empty note', async () => {
+    const app = makeApp();
+    const res = await app.request('/v1/admin/contact-notes', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ email: EMAIL, note: '   ' }),
+    });
+    expect(res.status).toBe(400);
+  });
+});
