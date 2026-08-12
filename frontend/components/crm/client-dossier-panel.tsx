@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import type { ClientDossier } from '@/lib/crm/client-dossiers';
+import { qualityTrend, type ClientDossier } from '@/lib/crm/client-dossiers';
 import { contactsHref } from '@/lib/crm/deep-link';
 import { Bar, Empty, HoursStrip, Section, Sparkbars, Stat, flag, relativeDays } from './dossier-bits';
 
@@ -9,9 +9,52 @@ export function ClientDossierPanel({ d, locale, windowDays = 90 }: { d: ClientDo
   const errRate = d.requests > 0 ? Math.round(((d.badInput + d.serverError) / d.requests) * 100) : 0;
   const topCountry = d.countries[0];
   const attributed = d.countries.reduce((s, c) => s + c.count, 0);
+  const quality = qualityTrend(d, new Date());
 
   return (
     <div className="border-t border-[var(--ink-4)] bg-[var(--ink-1)]/40 px-4 py-5">
+      {/* A blocked customer deserves the cause and the gesture, not just the
+          word: the last thing that happened to them was a refusal, and the
+          operator's next move starts here. */}
+      {d.verdict === 'blocked' && (
+        <div className="mb-4 rounded-lg border border-red-500/35 bg-red-500/[0.07] px-3 py-2.5">
+          <p className="text-[13.5px] text-red-200">
+            ⛔ <b>Arrêté sur un refus</b>
+            {d.lastRefusalAt ? ` le ${d.lastRefusalAt.slice(0, 10)}` : ''} — depuis :{' '}
+            {d.authOrQuota > 0 ? `${d.authOrQuota} refus quota/auth (401/429)` : ''}
+            {d.authOrQuota > 0 && d.paywall > 0 ? ' · ' : ''}
+            {d.paywall > 0 ? `${d.paywall} paywall (402)` : ''}
+            {d.rejectReasons[0] ? ` · motif dominant : ${d.rejectReasons[0].reason}` : ''}
+          </p>
+          <div className="mt-1.5 flex flex-wrap gap-2">
+            <Link
+              href={contactsHref(locale, d.id)}
+              className="rounded-md border border-red-400/40 px-2.5 py-1 text-[12.5px] text-red-200 hover:bg-red-500/10"
+            >
+              ✉ Ouvrir son fil et débloquer
+            </Link>
+            {d.keys.some((k) => k.plan === 'free') && (
+              <span className="rounded-md border border-[var(--ink-5)] px-2.5 py-1 text-[12.5px] text-[var(--fg-4)]" title="Le relèvement de quota se fait pour l'instant côté API (admin). Dis-le moi dans le terminal et je le fais.">
+                Relever le quota → demande-le moi
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+      {/* Quality, dated: a flat window ratio can't tell a regressing
+          integration from an old stable wart — the week-on-week split can. */}
+      {quality && (quality.thisWeekPct >= 10 || quality.prevWeekPct >= 10) && (
+        <p className="mb-4 rounded-lg border border-amber-500/25 bg-amber-500/[0.06] px-3 py-2 text-[13px] text-amber-200">
+          ⚠ Qualité : <b>{quality.thisWeekPct} %</b> de bad input cette semaine, contre{' '}
+          <b>{quality.prevWeekPct} %</b> la semaine d'avant
+          {quality.topReason ? <> · motif principal : <span className="font-mono">{quality.topReason}</span></> : null}
+          {quality.thisWeekPct > quality.prevWeekPct + 5
+            ? ' — une intégration qui régresse, un mail d’aide vaut le coup.'
+            : quality.thisWeekPct < quality.prevWeekPct - 5
+              ? ' — en amélioration.'
+              : ''}
+        </p>
+      )}
       {/* Identity line */}
       <div className="mb-5 flex flex-wrap items-baseline gap-x-4 gap-y-1">
         <span className="font-mono text-sm text-[var(--fg-2)]">{d.email}</span>

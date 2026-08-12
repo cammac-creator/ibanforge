@@ -23,7 +23,7 @@ export interface ClientProfileRow {
   client_kinds: Array<{ kind: string; count: number }>;
   distinct_ips: number;
   hours: number[];
-  days: Array<{ day: string; count: number }>;
+  days: Array<{ day: string; count: number; bad?: number }>;
   reject_reasons: Array<{ reason: string; count: number }>;
 }
 
@@ -97,7 +97,7 @@ export interface ClientDossier {
   clientKinds: Array<{ kind: string; count: number }>;
   rejectReasons: Array<{ reason: string; count: number }>;
   hours: number[];
-  days: Array<{ day: string; count: number }>;
+  days: Array<{ day: string; count: number; bad?: number }>;
   mails: {
     sent: number;
     received: number;
@@ -146,16 +146,17 @@ function latest(values: Array<string | null>): string | null {
  * axis makes a burst look like a burst.
  */
 export function denseDays(
-  days: Array<{ day: string; count: number }>,
+  days: Array<{ day: string; count: number; bad?: number }>,
   now: Date,
   span = 90,
-): Array<{ day: string; count: number }> {
-  const known = new Map(days.map((d) => [d.day, d.count]));
+): Array<{ day: string; count: number; bad?: number }> {
+  const known = new Map(days.map((d) => [d.day, d]));
   const end = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
-  const out: Array<{ day: string; count: number }> = [];
+  const out: Array<{ day: string; count: number; bad?: number }> = [];
   for (let i = span - 1; i >= 0; i--) {
     const day = new Date(end - i * DAY_MS).toISOString().slice(0, 10);
-    out.push({ day, count: known.get(day) ?? 0 });
+    const k = known.get(day);
+    out.push({ day, count: k?.count ?? 0, ...(k?.bad != null ? { bad: k.bad } : {}) });
   }
   return out;
 }
@@ -315,7 +316,23 @@ export function buildDossiers(input: DossierInput): ClientDossier[] {
       clientKinds: mergeCounts(profiles.map((p) => p.client_kinds ?? []), 'kind'),
       rejectReasons: mergeCounts(profiles.map((p) => p.reject_reasons ?? []), 'reason'),
       hours,
-      days: denseDays(mergeCounts(profiles.map((p) => p.days ?? []), 'day'), now, drawnSpan),
+      days: denseDays(
+        (() => {
+          const byDay = new Map<string, { count: number; bad: number }>();
+          for (const p of profiles)
+            for (const x of p.days ?? []) {
+              const cur = byDay.get(x.day) ?? { count: 0, bad: 0 };
+              cur.count += x.count;
+              cur.bad += x.bad ?? 0;
+              byDay.set(x.day, cur);
+            }
+          return [...byDay.entries()]
+            .sort((a, b) => (a[0] < b[0] ? -1 : 1))
+            .map(([day, v]) => ({ day, count: v.count, bad: v.bad }));
+        })(),
+        now,
+        drawnSpan,
+      ),
       mails: {
         sent: thread.filter((m) => m.direction === 'out').length,
         received: thread.filter((m) => m.direction === 'in').length,
@@ -406,6 +423,39 @@ export function heatOfDossier(d: ClientDossier, now: Date): Heat {
     silenceDays: null,
     ballWithUs: false,
   });
+}
+
+/**
+ * Bad-input share, this week against the one before, from the per-day bad
+ * counts the profiles now carry. Null when either window has fewer than 5
+ * calls: a ratio on three calls is noise wearing a percent sign.
+ */
+export function qualityTrend(
+  d: ClientDossier,
+  now: Date,
+): { thisWeekPct: number; prevWeekPct: number; topReason: string | null } | null {
+  const dayAt = (offset: number) => new Date(now.getTime() - offset * DAY_MS).toISOString().slice(0, 10);
+  const win = (from: number, to: number) => {
+    const a = dayAt(from);
+    const b = dayAt(to);
+    let calls = 0;
+    let bad = 0;
+    for (const x of d.days) {
+      if (x.day >= a && x.day < b) {
+        calls += x.count;
+        bad += x.bad ?? 0;
+      }
+    }
+    return { calls, bad };
+  };
+  const cur = win(7, 0);
+  const prev = win(14, 7);
+  if (cur.calls < 5 || prev.calls < 5) return null;
+  return {
+    thisWeekPct: Math.round((cur.bad / cur.calls) * 100),
+    prevWeekPct: Math.round((prev.bad / prev.calls) * 100),
+    topReason: d.rejectReasons[0]?.reason ?? null,
+  };
 }
 
 export type SortKey = 'requests' | 'freshness' | 'name';
