@@ -131,19 +131,28 @@ function RowActions({
   );
 }
 
+const CONFIDENCE_BADGE: Record<string, { label: string; cls: string }> = {
+  high: { label: 'haute', cls: 'text-[var(--ok,#22c55e)]' },
+  medium: { label: 'moy.', cls: 'text-[var(--amber-500)]' },
+  low: { label: 'faible', cls: 'text-[var(--err,#ef4444)]' },
+};
+
 export function MailList({
   input,
   selectedId,
   onSelect,
+  initialFilter,
 }: {
   input: RowsInput;
   selectedId: string | null;
   onSelect: (id: string) => void;
+  /** Deep-linked landing filter (e.g. the Prospects nav entry). */
+  initialFilter?: MailFilterKey;
 }) {
   const router = useRouter();
   // 'reply' rather than 'all': the column opens on what the day owes. Local
   // state, because nothing outside this column needs to know which filter is on.
-  const [active, setActive] = useState<MailFilterKey>('reply');
+  const [active, setActive] = useState<MailFilterKey>(initialFilter ?? 'reply');
   // The query narrows the rows below and never the counted filters: those read
   // the unnarrowed input, so the counts hold still while the operator types.
   // Both rules live in searchRows; this component only holds the input's state.
@@ -299,13 +308,19 @@ export function MailList({
                         {flame.glyph}
                       </span>
                     )}
-                    <span
-                      className={`shrink-0 text-[13.5px] tabular-nums group-hover:invisible ${
-                        r.urgent ? 'text-[var(--amber-500)]' : 'text-[var(--fg-3)]'
-                      }`}
-                    >
-                      {r.age}
-                    </span>
+                    {active === 'prospect' && r.confidence ? (
+                      <span className={`shrink-0 text-[12px] group-hover:invisible ${CONFIDENCE_BADGE[r.confidence].cls}`}>
+                        {CONFIDENCE_BADGE[r.confidence].label}
+                      </span>
+                    ) : (
+                      <span
+                        className={`shrink-0 text-[13.5px] tabular-nums group-hover:invisible ${
+                          r.urgent ? 'text-[var(--amber-500)]' : 'text-[var(--fg-3)]'
+                        }`}
+                      >
+                        {r.age}
+                      </span>
+                    )}
                   </span>
                   <span
                     className={`mt-0.5 block truncate text-[13px] ${

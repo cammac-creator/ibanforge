@@ -10,5 +10,5 @@ import { redirect } from 'next/navigation';
  */
 export default async function ProspectsPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
-  redirect(`/${locale}/dashboard/contacts`);
+  redirect(`/${locale}/dashboard/contacts?vue=prospection`);
 }

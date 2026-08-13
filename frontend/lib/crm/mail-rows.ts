@@ -5,7 +5,7 @@ import { heatOf } from './heat';
 import { NEXT_ACTION_LABEL } from './situation';
 import type { Contact, Message, Situation } from './types';
 
-export type MailFilterKey = 'reply' | 'followup' | 'new' | 'paying' | 'dormant' | 'clients' | 'all';
+export type MailFilterKey = 'reply' | 'followup' | 'new' | 'paying' | 'dormant' | 'clients' | 'prospect' | 'all';
 
 export interface RowsInput {
   contacts: Contact[];
@@ -32,6 +32,8 @@ export interface MailRow {
   email: string;
   /** Next-action label for the hover preview card. */
   next: string | null;
+  /** Sourcing confidence, shown on the prospecting filter in place of the age. */
+  confidence: 'high' | 'medium' | 'low' | null;
   /**
    * What searchRows matches: the company and the address, in one string, which
    * is exactly what the deleted contact list's search matched. `who` cannot
@@ -80,6 +82,9 @@ const FILTERS: Array<{
   // stays at zero by construction), and dormant is the API's own verdict.
   { key: 'paying', label: 'Payants', urgent: false, test: (c) => (c.business?.packs ?? 0) > 0 },
   { key: 'dormant', label: 'Endormis', urgent: false, test: (c) => c.business?.status === 'dormant' },
+  // The prospecting queue: everyone never written to, the "who do I open
+  // with today" view. Same predicate as the overview's sendable-stock figure.
+  { key: 'prospect', label: 'À prospecter', urgent: false, test: neverContacted },
   { key: 'clients', label: 'Clients', urgent: false, test: (c) => c.kind === 'client' },
   { key: 'all', label: 'Tous', urgent: false, test: () => true },
 ];
@@ -148,6 +153,10 @@ function toRow(c: Contact, s: Situation | undefined, urgent: boolean, grouped: b
     // left running with nothing on the other end of it.
     unread: c.unread,
     prospectId: c.sourcing?.prospectId ?? null,
+    confidence:
+      c.sourcing?.confidence === 'high' || c.sourcing?.confidence === 'medium' || c.sourcing?.confidence === 'low'
+        ? c.sourcing.confidence
+        : null,
     email: c.email,
     next: s ? NEXT_ACTION_LABEL[s.nextAction] : null,
     // Folded at build time, matched folded: name, address, and the whole
@@ -220,6 +229,15 @@ export function mailRows(input: RowsInput, active: MailFilterKey): MailRow[] {
       const gap =
         (input.situations[b.id]?.silenceDays ?? 0) - (input.situations[a.id]?.silenceDays ?? 0);
       if (gap !== 0) return gap;
+      return byId(a, b);
+    }
+    if (active === 'prospect') {
+      const rank = (c: Contact) =>
+        c.sourcing?.confidence === 'high' ? 3 : c.sourcing?.confidence === 'medium' ? 2 : c.sourcing?.confidence === 'low' ? 1 : 0;
+      const confGap = rank(b) - rank(a);
+      if (confGap !== 0) return confGap;
+      const heatGap = heatOf(b, input.situations[b.id]).score - heatOf(a, input.situations[a.id]).score;
+      if (heatGap !== 0) return heatGap;
       return byId(a, b);
     }
     if (active === 'clients' || active === 'paying' || active === 'dormant') {

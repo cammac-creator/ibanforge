@@ -400,3 +400,19 @@ describe('business filters and shelves', () => {
     expect(mailRows(input, 'all').every((r) => r.group === null)).toBe(true);
   });
 });
+
+describe('the prospecting queue (À prospecter)', () => {
+  it('ranks never-contacted prospects by confidence, and exposes it on the row', () => {
+    const low = prospect('low@alpha.example.net', 'Basse', []);
+    const high = prospect('high@alpha.example.net', 'Haute', []);
+    if (low.kind === 'prospect') low.sourcing.confidence = 'low';
+    if (high.kind === 'prospect') high.sourcing.confidence = 'high';
+    const situations: Record<string, Situation> = {
+      'low@alpha.example.net': situation({ nextAction: 'first_mail' }),
+      'high@alpha.example.net': situation({ nextAction: 'first_mail' }),
+    };
+    const rows = mailRows({ contacts: [low, high], situations, snoozed: {} }, 'prospect');
+    expect(rows.map((r) => r.id)).toEqual(['high@alpha.example.net', 'low@alpha.example.net']);
+    expect(rows[0].confidence).toBe('high');
+  });
+});

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { CLIENT_PARAM, contactIdFromParam } from '@/lib/crm/deep-link';
+import type { MailFilterKey } from '@/lib/crm/mail-rows';
 import { intentOf } from '@/lib/crm/intent';
 import type { Contact, Message, Situation } from '@/lib/crm/types';
 import { ContactDetail, ContactIdentity } from './contact-header';
@@ -86,6 +87,10 @@ export function CrmApp({
     searchParams.get(CLIENT_PARAM),
     contacts.map((c) => c.id),
   );
+  // ?vue=prospection lands the column on the prospecting queue — the nav's
+  // Prospects entry survives the page merge as this deep link.
+  const initialFilter: MailFilterKey | undefined =
+    searchParams.get('vue') === 'prospection' ? 'prospect' : undefined;
   const [selectedId, setSelectedId] = useState<string | null>(linked);
   const [readLocal, setReadLocal] = useState<Set<string>>(new Set());
   // Owned here rather than in the sheets: opening one decides how much scroll
@@ -190,6 +195,7 @@ export function CrmApp({
         input={{ contacts: view, situations, snoozed }}
         selectedId={selectedId}
         onSelect={open}
+        initialFilter={initialFilter}
       />
       </div>
       {/* Positioned, so the writing sheet can float over its foot. Whichever of
