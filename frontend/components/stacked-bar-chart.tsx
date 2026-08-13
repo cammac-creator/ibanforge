@@ -128,23 +128,19 @@ export function StackedBarChart({ data, bars, band, markers }: StackedBarChartPr
             ))}
           </Bar>
         ))}
-        {[...markersByDate.entries()].map(([day, label]) => (
-          <ReferenceLine
-            key={day}
-            x={day}
-            stroke="#a78bfa"
-            strokeDasharray="4 3"
-            strokeOpacity={0.7}
-            label={{
-              value: label.length > 22 ? `${label.slice(0, 22)}…` : label,
-              position: 'top',
-              fill: '#a78bfa',
-              fontSize: 10,
-            }}
-          />
+        {/* Bare dashed lines: on-chart labels overlapped into an unreadable
+            smear the day three deploys landed in one week. The words live in
+            the legend line below the chart instead. */}
+        {[...markersByDate.entries()].map(([day]) => (
+          <ReferenceLine key={day} x={day} stroke="#a78bfa" strokeDasharray="4 3" strokeOpacity={0.7} />
         ))}
       </ComposedChart>
       </ResponsiveContainer>
+      {markersByDate.size > 0 && (
+        <p className="mt-2 text-[11px] leading-snug text-violet-300/80">
+          ⚑ {[...markersByDate.entries()].map(([day, label]) => `${day.slice(8, 10)}/${day.slice(5, 7)} ${label}`).join(' · ')}
+        </p>
+      )}
       {lastIsPartial && (
         <p className="mt-2 text-[11px] leading-snug text-[var(--fg-4)]">
           La dernière barre = <strong className="text-[var(--fg-3)]">aujourd&apos;hui</strong>, jour en

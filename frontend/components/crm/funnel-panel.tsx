@@ -102,9 +102,9 @@ export function FunnelPanel({
           comme réponse ni comme rupture de relance. Attention aux petits effectifs : sur une
           quinzaine d’envois, zéro réponse ne prouve pas grand-chose.
         </p>
-        <Table title="Par segment" rows={bySegment} />
-        <Table title="Par campagne" rows={byCampaign} />
-        <Table title="Par confiance du sourcing" rows={byConfidence} />
+        <Table title="Par segment" hint="Le type de prospect (fintech, éditeur, migration, agents IA) : où tes mails convertissent le mieux." rows={bySegment} />
+        <Table title="Par campagne" hint="Chaque vague d'envoi que tu as lancée : ce qu'elle a produit du stock jusqu'aux conversions." rows={byCampaign} />
+        <Table title="Par confiance du sourcing" hint="La qualité estimée de l'adresse au moment du sourcing : vérifie que les « haute confiance » répondent mieux, sinon le sourcing se trompe." rows={byConfidence} />
         <Table
           title="Par pays"
           hint="Libellés normalisés à la lecture. Les lignes dont le texte ne nomme aucun pays sont regroupées, jamais retirées."

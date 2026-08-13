@@ -1,6 +1,7 @@
 'use client';
 
 import { useTranslations } from 'next-intl';
+import { InfoDot } from './info-dot';
 
 interface HeatmapDataPoint {
   day: number;  // 0 = Monday … 6 = Sunday
@@ -43,7 +44,15 @@ export function Heatmap({ data }: HeatmapProps) {
   return (
     <div className="bg-gradient-to-br from-[var(--ink-2)] to-[var(--ink-2)]/60 border border-[var(--ink-4)]/60 rounded-xl p-4">
       <div className="mb-3">
-        <p className="text-sm font-semibold text-white">{t('title')}</p>
+        <p className="flex items-center gap-2 text-sm font-semibold text-white">
+          {t('title')}
+          <InfoDot>
+            Chaque case = un jour de la semaine × une heure (UTC). Plus la case est jaune, plus il y a
+            eu de requêtes à ce moment-là sur la période. À quoi ça sert : voir QUAND tes clients
+            travaillent (un pic à 9 h lun-ven = des intégrations européennes en journée ; une nappe
+            continue = des robots), et choisir tes heures d&apos;envoi de mails ou de maintenance.
+          </InfoDot>
+        </p>
         <p className="text-xs text-[var(--fg-4)] mt-0.5">{t('subtitle')}</p>
       </div>
 

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
+import { InfoDot } from './info-dot';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://ibanforge-production.up.railway.app';
 const LOCALE_TAG: Record<string, string> = { en: 'en-US', fr: 'fr-CH', de: 'de-CH' };
@@ -126,6 +127,14 @@ export function LiveHealthStrip({ lastWriteAt }: { lastWriteAt?: string | null }
         <span className="text-sm font-semibold text-white">
           {loading ? t('monitoring.checking') : online ? t('monitoring.apiOnline') : t('monitoring.apiOffline')}
         </span>
+        <InfoDot>
+          La santé de l&apos;API, mesurée depuis TON navigateur toutes les 60 s. « Réponse » = le temps
+          aller-retour d&apos;un appel /health (vert &lt; 100 ms). « Uptime » = depuis combien de temps le
+          serveur tourne sans redémarrer. « Base BIC » = le nombre d&apos;entrées banques servies. «
+          Dernière écriture stats » = le témoin de collecte : si les stats n&apos;enregistrent plus
+          depuis 30 min en journée, un bandeau rouge te prévient que les zéros des graphiques ne sont
+          pas fiables.
+        </InfoDot>
       </div>
 
       <div className="hidden h-6 w-px bg-[var(--ink-4)] sm:block" />

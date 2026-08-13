@@ -409,6 +409,11 @@ export default async function DashboardPage({
             Seules les requêtes sur les endpoints facturables (IBAN / BIC / CH clearing) avec la bonne méthode HTTP. Le bruit (scanner, robots, discovery) est exclu, ainsi que les clés internes (tes tests, les audits Claude, le playground) — le funnel ne mesure que la demande réelle du marché.
             <br />
             <br />
+            <strong>Différence avec « Requêtes HTTP » plus bas</strong> : ce graphe-ci = la DEMANDE (qui utilise le
+            produit) ; l&apos;autre = l&apos;ATTENTION (tout ce qui touche le serveur, bruit compris). Quand l&apos;autre
+            monte sans celui-ci, des machines regardent mais n&apos;utilisent pas.
+            <br />
+            <br />
             <strong className="text-[var(--ok)]">Paid success</strong> = l’agent a payé (x402) ou utilisé sa clé et reçu 2xx.
             <br />
             <strong className="text-amber-400">Paywall hit</strong> = agent intéressé mais sans auth → 402. C’est là que se joue la conversion.
@@ -456,7 +461,20 @@ export default async function DashboardPage({
         <div className={card}>
           <div className="mb-4 flex items-center gap-2">
             <p className={sectionTitle}>Requêtes HTTP — {period} jours</p>
-            <InfoDot>Total des requêtes par jour, toutes routes (y compris scanner, discovery). Surveille la pente et surtout les 5xx (rouge).</InfoDot>
+            <InfoDot>
+              <strong>Tout ce qui frappe à la porte du serveur</strong> : vraies validations, mais aussi robots,
+              scanners, handshakes MCP, pages de découverte, 404. C&apos;est un thermomètre d&apos;ATTENTION, pas de
+              business — un pic ici sans pic dans le « Funnel de conversion » (juste au-dessus) = du bruit machine,
+              pas des clients. Exemple réel : le 12/08, 14 765 requêtes ici mais ~350 métier — 97 % de curiosité.
+              <br />
+              <br />
+              <strong className="text-[var(--fg-2)]">Zone grise « Attendu »</strong> = la plage min-max des 8 dernières
+              mêmes journées de semaine (un mercredi se compare aux 8 mercredis précédents). Une barre qui sort de la
+              zone est vraiment inhabituelle ; dedans, c&apos;est une variation normale.
+              <br />
+              <strong className="text-violet-300">Traits pointillés violets</strong> = les événements (déploiements,
+              notes) listés sous le graphe — pour relier « ça a bougé » à « voilà ce qu&apos;on a fait ce jour-là ».
+            </InfoDot>
           </div>
           {!historyRes.ok ? (
             <FetchFailed name="Requêtes HTTP" status={historyRes.status} />
