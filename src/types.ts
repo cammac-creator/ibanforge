@@ -29,6 +29,8 @@ type HonoEnv = {
     apiKeyAuthenticated: boolean;
     apiKeyPrefix: string | null;
     paywallCause?: PaywallCause;
+    /** Set by the MCP route when the request carries tools/call invocations, so the stats middleware can split real usage from discovery handshakes. */
+    mcpToolCall?: boolean;
   };
 };
 

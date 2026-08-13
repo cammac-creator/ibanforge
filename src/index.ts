@@ -156,7 +156,10 @@ app.use('*', async (c, next) => {
       'x-real-ip': c.req.header('x-real-ip') ?? null,
     });
     const keyPrefix = c.get('apiKeyPrefix') ?? null;
-    recordRequest(c.req.method, path, c.res.status, performance.now() - start, clientKind, hashIp(ip), userAgent, keyPrefix);
+    // MCP tool invocations record under a virtual path so the dashboards can
+    // finally split real MCP usage from discovery handshakes.
+    const recordedPath = path === '/mcp' && c.get('mcpToolCall') ? '/mcp:tools-call' : path;
+    recordRequest(c.req.method, recordedPath, c.res.status, performance.now() - start, clientKind, hashIp(ip), userAgent, keyPrefix);
   }
 });
 

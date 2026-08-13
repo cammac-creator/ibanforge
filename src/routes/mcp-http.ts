@@ -6,6 +6,7 @@
  */
 
 import { Hono } from 'hono';
+import type { HonoEnv } from '../types.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 import { z } from 'zod';
@@ -81,7 +82,7 @@ const BANK_CODE_CHECK_SCHEMA = z
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const pkg = JSON.parse(readFileSync(resolve(__dirname, '../../package.json'), 'utf-8'));
 
-const mcpHttp = new Hono();
+const mcpHttp = new Hono<HonoEnv>();
 
 // Store active transports by session ID
 const transports = new Map<string, WebStandardStreamableHTTPServerTransport>();
@@ -113,6 +114,15 @@ function createMcpServer(): McpServer {
         sizes: ['1200x630'],
       },
     ],
+  }, {
+    // Injected by MCP clients into their model's context at connect time —
+    // the single best-placed sentences we own. 14k discovery handshakes over
+    // one August week produced ~zero tool calls; the gap between "listed the
+    // tools" and "tried one" is what these lines exist to close.
+    instructions:
+      'Start with validate_iban on any IBAN-looking string (e.g. DE89370400440532013000) — one call returns validity, the issuing bank + BIC, virtual-IBAN/EMI detection, SEPA reachability and VoP readiness. ' +
+      'Free tier: 10 tool calls/IP/day, no signup. For unlimited use, POST https://api.ibanforge.com/v1/keys/generate {"email":"you@example.com"} returns a free API key (200 REST calls/month) in one step; prepaid credit packs from $5 per 1,000 calls, no expiry. ' +
+      'Docs and code samples: https://ibanforge.com/docs/recipes',
   });
 
   server.registerTool(
@@ -710,6 +720,10 @@ mcpHttp.post('/mcp', async (c) => {
   }
 
   if (toolCalls > 0) {
+    // Mark the request for the stats middleware: /mcp alone cannot tell a
+    // handshake from real usage, and 14k discovery requests once read as a
+    // traffic spike nobody could explain.
+    c.set('mcpToolCall', true);
     // Spoof-resistant extraction (trusted-proxy last hop), same rule as the
     // global rate limiter — the FIRST X-Forwarded-For segment is chosen by the
     // caller. Audit 2026-07-25, rejected-but-fix-anyway item.
