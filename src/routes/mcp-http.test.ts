@@ -86,10 +86,15 @@ async function rpc(app: ReturnType<typeof makeApp>, sessionId: string, method: s
 }
 
 describe('GET /mcp (no session) — discovery hint', () => {
-  it('returns a JSON quickstart envelope', async () => {
+  it('answers 405 per the streamable-http spec, with the quickstart as body', async () => {
+    // The status is the fix for a real incident: answering 200 made SSE
+    // clients treat the JSON as a broken stream and retry in a tight loop,
+    // ~45k GETs in one day. 405 stops the loop; the body keeps the endpoint
+    // self-explaining for a human.
     const app = makeApp();
     const res = await app.request('/mcp');
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(405);
+    expect(res.headers.get('allow')).toContain('POST');
     const body = await res.json() as Record<string, unknown>;
     expect(body.protocol).toBe('mcp');
     expect(body.transport).toBe('streamable-http');

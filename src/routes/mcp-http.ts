@@ -789,8 +789,15 @@ mcpHttp.get('/mcp', async (c) => {
   const transport = sessionId ? transports.get(sessionId) : undefined;
 
   if (!transport) {
-    // No session: this is either an agent/dev probing the endpoint with a browser
-    // or curl. Return a discoverable JSON hint instead of an opaque "No active session".
+    // No session: either a dev probing with curl, or an SSE client trying to
+    // open the server→client stream. The MCP streamable-http spec answers 405
+    // here when the server offers no standalone SSE stream — and the status is
+    // load-bearing: this endpoint used to answer 200 with this same JSON, and
+    // SSE clients treated that as a broken stream to retry at once, no backoff.
+    // One looping client produced ~45k GETs in a day, ten times the API's whole
+    // organic traffic. A 405 tells them to stop; the JSON body keeps the
+    // endpoint discoverable for the human with a browser.
+    c.header('Allow', 'POST, DELETE');
     return c.json(
       {
         protocol: 'mcp',
@@ -822,7 +829,7 @@ mcpHttp.get('/mcp', async (c) => {
         server_card: 'https://api.ibanforge.com/.well-known/mcp/server-card.json',
         registry: 'https://registry.modelcontextprotocol.io/v0/servers?search=ibanforge',
       },
-      200,
+      405,
     );
   }
 
