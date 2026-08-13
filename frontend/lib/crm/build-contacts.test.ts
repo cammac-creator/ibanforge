@@ -730,6 +730,7 @@ describe('buildContacts', () => {
       outcome: null,
       outcomeNote: null,
       wakeUpAt: null,
+      createdAt: null,
       outcomeAt: null,
     });
   });

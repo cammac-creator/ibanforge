@@ -57,6 +57,8 @@ export interface ProspectSourcing {
   /** Sourcing state: where finding and contacting them got to. */
   status: string;
   source: string | null;
+  /** When the row entered the base — the reservoir gauge dates the last harvest with it. */
+  createdAt: string | null;
   /**
    * Where the RELATIONSHIP got to, which no value of `status` can express.
    * Null means nothing has been recorded, which is not a negative outcome.

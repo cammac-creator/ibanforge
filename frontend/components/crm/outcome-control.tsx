@@ -149,7 +149,7 @@ export function OutcomeControl({ sourcing }: { sourcing: ProspectSourcing }) {
       {chosen && (
         <div className="mt-2 space-y-2 rounded-lg border border-[var(--ink-4)] bg-[var(--ink-1)] p-2">
           {chosen.needsDate && (
-            <label className="flex items-center gap-2 text-[var(--fg-2)]">
+            <label className="flex flex-wrap items-center gap-2 text-[var(--fg-2)]">
               Recontacter le
               <input
                 type="date"
@@ -157,6 +157,22 @@ export function OutcomeControl({ sourcing }: { sourcing: ProspectSourcing }) {
                 onChange={(e) => setWakeUpAt(e.target.value)}
                 className="rounded border border-[var(--ink-4)] bg-[var(--ink-0)] px-2 py-1 text-[var(--fg-1)]"
               />
+              {/* The three sleeps the doctrine actually uses; the field stays
+                  for the rare "call me back on the 3rd" with a real date. */}
+              {[7, 30, 90].map((days) => (
+                <button
+                  key={days}
+                  type="button"
+                  onClick={() => {
+                    const d = new Date();
+                    d.setDate(d.getDate() + days);
+                    setWakeUpAt(localDay(d));
+                  }}
+                  className="cursor-pointer rounded-full bg-[var(--ink-4)] px-2 py-0.5 text-[var(--fg-2)] hover:text-[var(--fg-1)]"
+                >
+                  +{days} j
+                </button>
+              ))}
             </label>
           )}
           <input

@@ -97,6 +97,7 @@ export interface ProspectRow {
   outcome_note?: string | null;
   wake_up_at?: string | null;
   outcome_at?: string | null;
+  created_at?: string | null;
   mail_subject_en: string | null;
   mail_body_en: string | null;
   mail_subject_fr: string | null;
@@ -218,6 +219,7 @@ function sourcingOf(r: ProspectRow): ProspectSourcing {
     confidence: r.confidence,
     status: r.status,
     source: r.source,
+    createdAt: r.created_at ?? null,
     // Validated on the way in rather than trusted: the column is free TEXT and
     // an unknown value reaching the UI would render a blank badge.
     outcome: OUTCOMES.includes(r.outcome as Outcome) ? (r.outcome as Outcome) : null,

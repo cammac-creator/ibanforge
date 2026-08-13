@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isSnoozed, localDay, snoozedMap } from './snooze';
+import { isSnoozed, localDay, snoozedMap, wokeMap } from './snooze';
 import type { Contact, ProspectSourcing } from './types';
 
 const sourcing = (over: Partial<ProspectSourcing> = {}): ProspectSourcing => ({
@@ -19,6 +19,7 @@ const sourcing = (over: Partial<ProspectSourcing> = {}): ProspectSourcing => ({
   outcome: null,
   outcomeNote: null,
   wakeUpAt: null,
+  createdAt: null,
   outcomeAt: null,
   ...over,
 });
@@ -117,5 +118,40 @@ describe('snoozedMap', () => {
       usage: { series: [], months: [], days: [], endpoints: [] },
     };
     expect(snoozedMap([client], new Date(2026, 6, 28))['c@example.net']).toBe(false);
+  });
+});
+
+describe('wokeMap', () => {
+  it('flags a wake date that has arrived and is inside the return window', () => {
+    const now = new Date(2026, 7, 13, 10, 0); // 2026-08-13
+    const map = wokeMap(
+      [
+        prospect('today@example.net', '2026-08-13'),
+        prospect('recent@example.net', '2026-08-01'),
+        prospect('future@example.net', '2026-09-15'),
+        prospect('stale@example.net', '2026-07-20'),
+        prospect('never@example.net', null),
+      ],
+      now,
+    );
+    // On the wake day itself the contact is awake AND marked as returning.
+    expect(map['today@example.net']).toBe(true);
+    expect(map['recent@example.net']).toBe(true);
+    // Still asleep: not woken. Mutually exclusive with snoozedMap by design.
+    expect(map['future@example.net']).toBe(false);
+    // Past the window the badge goes quiet on its own.
+    expect(map['stale@example.net']).toBe(false);
+    expect(map['never@example.net']).toBe(false);
+  });
+
+  it('expires exactly WAKE_WINDOW_DAYS after the wake date', () => {
+    // The window is the last WAKE_WINDOW_DAYS calendar days, wake day itself
+    // included: woken on the 31st still shows on the 13th (13 days later),
+    // woken on the 30th (14 days later) has gone quiet.
+    const now = new Date(2026, 7, 13, 10, 0);
+    const edge = wokeMap([prospect('edge@example.net', '2026-07-31')], now);
+    const gone = wokeMap([prospect('gone@example.net', '2026-07-30')], now);
+    expect(edge['edge@example.net']).toBe(true);
+    expect(gone['gone@example.net']).toBe(false);
   });
 });

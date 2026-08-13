@@ -36,6 +36,7 @@ function base(kind: 'client' | 'prospect', business?: BusinessInfo): Contact {
         outcome: null,
         outcomeNote: null,
         wakeUpAt: null,
+        createdAt: null,
         outcomeAt: null,
       },
       readyMail: null,

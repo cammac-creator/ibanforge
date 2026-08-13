@@ -31,7 +31,7 @@ export default async function ContactsPage() {
 
   // One reading of the base, and the only one this page makes. Nothing below
   // derives a figure of its own.
-  const { contacts, situations, snoozed, active, ballWithUs, followupDue, sentToday } =
+  const { contacts, situations, snoozed, woke, active, ballWithUs, followupDue, sentToday } =
     crmSnapshot(data);
 
   return (
@@ -66,6 +66,7 @@ export default async function ContactsPage() {
         contacts={contacts}
         situations={situations}
         snoozed={snoozed}
+        woke={woke}
         sentToday={sentToday}
       />
     </div>

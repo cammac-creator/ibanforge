@@ -20,7 +20,8 @@ import { TopUsersToday } from '@/components/dashboard/top-users-today';
 import { FunnelPanel } from '@/components/crm/funnel-panel';
 import { fetchCrmData, SEEDED_PILOT_RE, type BuildInput } from '@/lib/crm/build-contacts';
 import { BY_CAMPAIGN, BY_CONFIDENCE, BY_COUNTRY, BY_SEGMENT, funnelBy } from '@/lib/crm/funnel';
-import { sendableStock } from '@/lib/crm/priority';
+import { reservoir } from '@/lib/crm/priority';
+import { ReservoirCard } from '@/components/dashboard/reservoir-card';
 import { FOLLOWUP_DAYS } from '@/lib/crm/situation';
 import { crmSnapshot } from '@/lib/crm/snapshot';
 import { topUsers } from '@/lib/crm/top-users';
@@ -148,7 +149,7 @@ function ContactBase({ crm, locale }: { crm: BuildInput; locale: string }) {
   // What is actually left to write to, which the "Prospects" total does not
   // say: a total that reads as a reserve when the high confidence reserve is
   // empty is worse than no figure at all.
-  const stock = sendableStock(snap.active);
+  const tank = reservoir(snap.active);
 
   // Computed from the contacts already built, so the funnel can never disagree
   // with the figures beside it. Archived rows are excluded like everywhere else.
@@ -186,12 +187,7 @@ function ContactBase({ crm, locale }: { crm: BuildInput; locale: string }) {
           accentColor="#eab308"
           hint="Clés gratuites qui appellent réellement l’API, candidats à la conversion."
         />
-        <StatCardV2
-          title="À écrire"
-          value={String(stock.byConfidence.high ?? 0)}
-          accentColor={stock.byConfidence.high ? '#14b8a6' : '#ef4444'}
-          hint={`Prospects en confiance haute, avec une adresse, jamais écrits. Vivier total encore envoyable : ${stock.total} (dont ${stock.byConfidence.medium ?? 0} moyenne, ${stock.byConfidence.low ?? 0} faible). Sur ${snap.prospects} prospects au total.`}
-        />
+        <ReservoirCard reservoir={tank} todayUtc={snap.todayUtc} />
         <StatCardV2
           title="Clients"
           value={String(snap.clients)}

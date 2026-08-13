@@ -39,6 +39,7 @@ const sourcing = (status: string): ProspectSourcing => ({
   outcome: null,
   outcomeNote: null,
   wakeUpAt: null,
+  createdAt: null,
   outcomeAt: null,
 });
 

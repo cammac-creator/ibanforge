@@ -278,6 +278,17 @@ export function MailList({
                   ].join(' ')}
                 >
                   <span className="flex items-baseline justify-between gap-2.5">
+                    {/* The return of a sleeper: its wake date arrived. Ahead of
+                        the business chip because the date is why the row is
+                        here today, whatever else the row is. */}
+                    {r.woke && (
+                      <span
+                        title="Sa date de réveil est arrivée"
+                        className="shrink-0 self-center rounded bg-violet-500/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-violet-300"
+                      >
+                        ⏰ réveillé
+                      </span>
+                    )}
                     {r.chip && (
                       <span
                         className="shrink-0 self-center rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide"

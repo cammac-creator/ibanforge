@@ -51,3 +51,32 @@ export function snoozedMap(contacts: Contact[], now: Date): Record<string, boole
   }
   return out;
 }
+
+/**
+ * How long a returned sleeper keeps its "réveillé" badge. Past this window the
+ * flag goes quiet on its own: a row nobody acted on for two weeks has become
+ * ordinary work again, and a badge that never expires stops meaning anything.
+ */
+export const WAKE_WINDOW_DAYS = 14;
+
+/**
+ * Recently woken: the wake date has arrived and is still inside the return
+ * window. This is the other half of the snooze gesture — a contact put to
+ * sleep with a date comes back, and without this flag it would come back
+ * naked, indistinguishable from a row that was merely never dealt with.
+ *
+ * Same shape and same clock discipline as snoozedMap, and mutually exclusive
+ * with it by construction: snoozed needs wakeUpAt > today, woke needs <= today.
+ */
+export function wokeMap(contacts: Contact[], now: Date): Record<string, boolean> {
+  const today = localDay(now);
+  const floor = new Date(now);
+  floor.setDate(floor.getDate() - WAKE_WINDOW_DAYS);
+  const floorDay = localDay(floor);
+  const out: Record<string, boolean> = {};
+  for (const c of contacts) {
+    const wake = c.kind === 'prospect' ? c.sourcing.wakeUpAt : c.sourcing?.wakeUpAt;
+    out[c.id] = !!wake && wake <= today && wake > floorDay;
+  }
+  return out;
+}

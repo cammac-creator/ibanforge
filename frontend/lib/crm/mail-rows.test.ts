@@ -51,6 +51,7 @@ function sourcing(id: string, status: string): ProspectSourcing {
     outcome: null,
     outcomeNote: null,
     wakeUpAt: null,
+    createdAt: null,
     outcomeAt: null,
   };
 }
@@ -414,5 +415,34 @@ describe('the prospecting queue (À prospecter)', () => {
     const rows = mailRows({ contacts: [low, high], situations, snoozed: {} }, 'prospect');
     expect(rows.map((r) => r.id)).toEqual(['high@alpha.example.net', 'low@alpha.example.net']);
     expect(rows[0].confidence).toBe('high');
+  });
+
+  it('puts a returned sleeper first, ahead of the confidence order, and flags the row', () => {
+    // The wake date is WHY the row is back today: "call me back in September"
+    // arrived. It outranks the standing confidence sort, or the snooze gesture
+    // would bury its own result under fresher high-confidence rows.
+    const high = prospect('high@alpha.example.net', 'Haute', []);
+    const woken = prospect('woken@alpha.example.net', 'Réveillée', []);
+    if (high.kind === 'prospect') high.sourcing.confidence = 'high';
+    if (woken.kind === 'prospect') {
+      woken.sourcing.confidence = 'low';
+      woken.sourcing.wakeUpAt = '2026-08-10';
+    }
+    const situations: Record<string, Situation> = {
+      'high@alpha.example.net': situation({ nextAction: 'first_mail' }),
+      'woken@alpha.example.net': situation({ nextAction: 'first_mail' }),
+    };
+    const rows = mailRows(
+      {
+        contacts: [high, woken],
+        situations,
+        snoozed: {},
+        woke: { 'woken@alpha.example.net': true },
+      },
+      'prospect',
+    );
+    expect(rows.map((r) => r.id)).toEqual(['woken@alpha.example.net', 'high@alpha.example.net']);
+    expect(rows[0].woke).toBe(true);
+    expect(rows[1].woke).toBe(false);
   });
 });

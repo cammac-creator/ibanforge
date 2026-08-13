@@ -11,6 +11,12 @@ export interface RowsInput {
   contacts: Contact[];
   situations: Record<string, Situation | undefined>;
   snoozed: Record<string, boolean>;
+  /**
+   * Recently-woken sleepers (lib/crm/snooze.ts wokeMap), computed by the page
+   * against the same clock as `snoozed`. Optional because only the CRM page
+   * carries the gesture; absent means nobody is waking up.
+   */
+  woke?: Record<string, boolean>;
 }
 
 export interface MailRow {
@@ -34,6 +40,8 @@ export interface MailRow {
   next: string | null;
   /** Sourcing confidence, shown on the prospecting filter in place of the age. */
   confidence: 'high' | 'medium' | 'low' | null;
+  /** A sleeper whose wake date just arrived — the list marks the return. */
+  woke: boolean;
   /**
    * What searchRows matches: the company and the address, in one string, which
    * is exactly what the deleted contact list's search matched. `who` cannot
@@ -130,7 +138,13 @@ function ageLabel(s: Situation | undefined): string {
   return `${days} j`;
 }
 
-function toRow(c: Contact, s: Situation | undefined, urgent: boolean, grouped: boolean): MailRow {
+function toRow(
+  c: Contact,
+  s: Situation | undefined,
+  urgent: boolean,
+  grouped: boolean,
+  woke: boolean,
+): MailRow {
   return {
     id: c.id,
     // The email is the fallback, not a placeholder: an address is something the
@@ -153,6 +167,7 @@ function toRow(c: Contact, s: Situation | undefined, urgent: boolean, grouped: b
     // left running with nothing on the other end of it.
     unread: c.unread,
     prospectId: c.sourcing?.prospectId ?? null,
+    woke,
     confidence:
       c.sourcing?.confidence === 'high' || c.sourcing?.confidence === 'medium' || c.sourcing?.confidence === 'low'
         ? c.sourcing.confidence
@@ -216,6 +231,15 @@ export function mailRows(input: RowsInput, active: MailFilterKey): MailRow[] {
   if (!filter) return [];
 
   const sorted = [...pick(input, active)].sort((a, b) => {
+    // A returned sleeper leads the two queues where its date means "now":
+    // the prospecting queue ("call me back in September" has arrived) and the
+    // follow-up queue. It was put to sleep WITH a date; the date outranks the
+    // standing order, or the wake gesture would bury its own result.
+    if (active === 'prospect' || active === 'followup') {
+      const wokeA = input.woke?.[a.id] ?? false;
+      const wokeB = input.woke?.[b.id] ?? false;
+      if (wokeA !== wokeB) return wokeA ? -1 : 1;
+    }
     if (active === 'reply') {
       // Unread wins outright, ahead of silence. Both rules existed before this
       // module and only one of them survived the first draft, which inverted the
@@ -275,5 +299,7 @@ export function mailRows(input: RowsInput, active: MailFilterKey): MailRow[] {
     return byId(a, b);
   });
 
-  return sorted.map((c) => toRow(c, input.situations[c.id], filter.urgent, active === 'reply'));
+  return sorted.map((c) =>
+    toRow(c, input.situations[c.id], filter.urgent, active === 'reply', input.woke?.[c.id] ?? false),
+  );
 }

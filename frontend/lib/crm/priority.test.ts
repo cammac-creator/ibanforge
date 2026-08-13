@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { byPriority, priorityOf, sendableStock } from './priority';
+import { byPriority, priorityOf, reservoir, sendableStock } from './priority';
 import type { Contact, Message, ProspectSourcing, Situation } from './types';
 
 /** Same conventions as buckets.test.ts: invented addresses on example.net. */
@@ -29,6 +29,7 @@ const sourcing = (over: Partial<ProspectSourcing> = {}): ProspectSourcing => ({
   outcome: null,
   outcomeNote: null,
   wakeUpAt: null,
+  createdAt: null,
   outcomeAt: null,
   ...over,
 });
@@ -248,5 +249,45 @@ describe('sendableStock', () => {
 
   it('returns zeroes on an empty list', () => {
     expect(sendableStock([]).total).toBe(0);
+  });
+});
+
+describe('reservoir', () => {
+  const drafted = { subjectEn: 'Hello', bodyEn: 'Hi', subjectFr: null, bodyFr: null, recommendedLang: null };
+
+  it('narrows ready to rows whose mail is actually drafted', () => {
+    const withMail = { ...prospect('ready@example.net', { createdAt: '2026-07-28 09:00:00' }), readyMail: drafted };
+    const noMail = prospect('bare@example.net', { createdAt: '2026-07-10 09:00:00' });
+    const r = reservoir([withMail, noMail]);
+    expect(r.ready).toBe(1);
+    expect(r.addressable).toBe(2);
+  });
+
+  it('counts the address-less rows as the enrichment queue', () => {
+    const r = reservoir([
+      { ...prospect('no-address@example.net'), email: '' },
+      prospect('fine@example.net'),
+    ]);
+    expect(r.toEnrich).toBe(1);
+    expect(r.addressable).toBe(1);
+  });
+
+  it('dates the harvest from sourced rows only, never from auto-enrich', () => {
+    // Auto-enrich rows are inbound signups the machine files. Counting them
+    // would keep the gauge reading "fresh" while the outbound pipe rusts —
+    // the exact blindness the gauge exists to end.
+    const r = reservoir([
+      prospect('old@example.net', { source: 'campagne-x', createdAt: '2026-07-28 09:00:00' }),
+      prospect('signup@example.net', { source: 'auto-enrich', createdAt: '2026-08-13T10:00:00Z' }),
+    ]);
+    expect(r.lastHarvestDay).toBe('2026-07-28');
+  });
+
+  it('drops written-to and archived rows from the stock, like sendableStock', () => {
+    const r = reservoir([
+      prospect('written@example.net', {}, [msg('out', '2026-07-01T10:00')]),
+      prospect('shelved@example.net', { status: 'archive' }),
+    ]);
+    expect(r.ready + r.addressable + r.toEnrich).toBe(0);
   });
 });

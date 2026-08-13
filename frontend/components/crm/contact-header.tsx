@@ -148,7 +148,16 @@ export function ContactIdentity({ contact: c }: { contact: Contact }) {
  * and it is fully visible without scrolling in the case that needs it most, a
  * cold prospect, whose thread is empty by definition.
  */
-export function ContactDetail({ contact: c, situation }: { contact: Contact; situation?: Situation }) {
+export function ContactDetail({
+  contact: c,
+  situation,
+  woke = false,
+}: {
+  contact: Contact;
+  situation?: Situation;
+  /** Computed by the page (lib/crm/snooze.ts wokeMap) — never derived here. */
+  woke?: boolean;
+}) {
   const sourcing = c.sourcing;
   const blocks = sourcing ? blocksOf(sourcing, !!c.email) : null;
   // The same arithmetic the list's flame reads, printed in full: a score the
@@ -157,6 +166,15 @@ export function ContactDetail({ contact: c, situation }: { contact: Contact; sit
 
   return (
     <div className="mb-3 min-w-0 border-b border-[var(--ink-4)]/60 pb-3">
+      {/* The context a returned sleeper carries: WHY it is back today. The
+          note was written at the moment the contact was put aside, which is
+          the moment the operator knew the reason best. */}
+      {woke && sourcing?.wakeUpAt && (
+        <p className="mb-3 rounded-lg border border-violet-500/30 bg-violet-500/10 px-3 py-2 text-[12.5px] text-violet-200">
+          ⏰ <b>De retour</b> : mis de côté jusqu&apos;au {sourcing.wakeUpAt}
+          {sourcing.outcomeNote ? <> — « {sourcing.outcomeNote} »</> : null}
+        </p>
+      )}
       {heat.parts.length > 0 && (
         <div className="mb-3 flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
           <p className="text-[11px] uppercase tracking-wide text-[var(--fg-3)]">

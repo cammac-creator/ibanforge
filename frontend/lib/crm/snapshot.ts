@@ -3,7 +3,7 @@ import { ballWithUs as isBallWithUs, followupDue as isFollowupDue } from './buck
 import { buildContacts, type BuildInput } from './build-contacts';
 import { countSentToday } from './sent-today';
 import { situationOf } from './situation';
-import { snoozedMap } from './snooze';
+import { snoozedMap, wokeMap } from './snooze';
 import type { Contact, Situation } from './types';
 
 /**
@@ -31,6 +31,8 @@ export interface CrmSnapshot {
   situations: Record<string, Situation>;
   /** Keyed by Contact.id: asleep until a date, on the snapshot's calendar day. */
   snoozed: Record<string, boolean>;
+  /** Keyed by Contact.id: wake date arrived within the return window. */
+  woke: Record<string, boolean>;
   /** The snapshot's instant as a UTC day, which is the day the podium reads. */
   todayUtc: string;
   /** What the CRM still counts as live. Every count below reads this, or a predicate. */
@@ -80,6 +82,7 @@ export function crmSnapshot(data: BuildInput, now: Date = new Date()): CrmSnapsh
   // against the server's calendar day once, rather than each component asking
   // the runtime what day it is and two of them disagreeing across midnight.
   const snoozed = snoozedMap(contacts, now);
+  const woke = wokeMap(contacts, now);
 
   const todayUtc = now.toISOString().slice(0, 10);
 
@@ -128,6 +131,7 @@ export function crmSnapshot(data: BuildInput, now: Date = new Date()): CrmSnapsh
     contacts,
     situations,
     snoozed,
+    woke,
     todayUtc,
     active,
     ballWithUs,

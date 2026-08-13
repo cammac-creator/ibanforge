@@ -105,6 +105,7 @@ describe('heatOf — a score that always shows its arithmetic', () => {
         outcome: null,
         outcomeNote: null,
         wakeUpAt: null,
+        createdAt: null,
         outcomeAt: null,
       },
       readyMail: null,

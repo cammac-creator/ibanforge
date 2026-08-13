@@ -64,6 +64,7 @@ export function CrmApp({
   contacts,
   situations,
   snoozed,
+  woke = {},
   sentToday,
 }: {
   contacts: Contact[];
@@ -75,6 +76,8 @@ export function CrmApp({
    * recomputed in the browser is a hydration mismatch waiting for midnight.
    */
   snoozed: Record<string, boolean>;
+  /** Sleepers whose wake date just arrived — same clock, same reason. */
+  woke?: Record<string, boolean>;
   /** Real outbound mails dated today, counted by the page against one clock. */
   sentToday: number;
 }) {
@@ -192,7 +195,7 @@ export function CrmApp({
           queue before reaching the conversation. */}
       <div className={selected ? 'hidden lg:flex lg:flex-col' : 'flex flex-col'}>
       <MailList
-        input={{ contacts: view, situations, snoozed }}
+        input={{ contacts: view, situations, snoozed, woke }}
         selectedId={selectedId}
         onSelect={open}
         initialFilter={initialFilter}
@@ -271,7 +274,7 @@ export function CrmApp({
               }
               className="mt-3 min-h-0 flex-1 overflow-y-auto pr-1"
             >
-              <ContactDetail contact={selected} situation={situation} />
+              <ContactDetail contact={selected} situation={situation} woke={woke[selected.id]} />
               <Thread
                 messages={selected.messages}
                 // Without this the contact's bubbles are labelled 'lui'. An

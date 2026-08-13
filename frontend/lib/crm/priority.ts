@@ -145,3 +145,53 @@ export function sendableStock(contacts: Contact[]): { total: number; byConfidenc
   }
   return { total, byConfidence };
 }
+
+/**
+ * Below this many ready-to-send mails the reservoir is low and the harvest is
+ * due. The owner's standing rule; what was always missing was a thermometer —
+ * the reservoir once hit zero and nothing said so. The VPS daily check applies
+ * the same threshold to its Telegram alarm.
+ */
+export const RESERVOIR_LOW = 10;
+
+export interface Reservoir {
+  /** Address AND a written mail AND never written to: sendable today. */
+  ready: number;
+  /** Address, never written to — sendableStock's total: the wider stock. */
+  addressable: number;
+  /** No address at all: the enrichment queue. */
+  toEnrich: number;
+  /** YYYY-MM-DD of the newest sourced row (auto-enrich excluded), or null. */
+  lastHarvestDay: string | null;
+}
+
+/**
+ * The prospecting reservoir, in one reading. Same exclusions as sendableStock
+ * (archived out, already-written out); `ready` narrows to rows whose mail is
+ * actually drafted, because "22 to write to" with zero drafted mails is a
+ * reserve on paper only. The harvest date ignores auto-enrich rows: those are
+ * inbound signups the machine files, not sourcing output, and counting them
+ * would keep the gauge reading "fresh" while the outbound pipe rusts.
+ */
+export function reservoir(contacts: Contact[]): Reservoir {
+  let ready = 0;
+  let addressable = 0;
+  let toEnrich = 0;
+  let lastHarvestDay: string | null = null;
+  for (const c of contacts) {
+    if (c.kind !== 'prospect') continue;
+    if (c.sourcing.status === 'archive') continue;
+    if (c.sourcing.source !== 'auto-enrich' && c.sourcing.createdAt) {
+      const day = c.sourcing.createdAt.slice(0, 10);
+      if (!lastHarvestDay || day > lastHarvestDay) lastHarvestDay = day;
+    }
+    if (!c.email) {
+      toEnrich += 1;
+      continue;
+    }
+    if (c.messages.length > 0) continue;
+    addressable += 1;
+    if (c.readyMail) ready += 1;
+  }
+  return { ready, addressable, toEnrich, lastHarvestDay };
+}
