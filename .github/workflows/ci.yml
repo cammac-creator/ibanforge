@@ -31,6 +31,14 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      # Without the table the 34 official Vocalink vectors skip, and they are the
+      # only thing exercising the fourteen exceptions — two of which were only
+      # got right because the vectors disagreed with the prose. Non-blocking: a
+      # rotted upstream link must not fail the build, it just costs coverage,
+      # which the step below says out loud instead of hiding.
+      - name: Fetch the UK modulus table (optional)
+        run: npm run db:seed-uk || echo "::warning::UK modulus table unavailable — its 34 official vectors will SKIP in this run"
+
       - name: Test
         run: npm run test
 

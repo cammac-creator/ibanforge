@@ -58,6 +58,9 @@ const TOOLS: Tool[] = [
       'sepa { member, schemes, vop_required, vop_participant — is the recipient bank listed as ready in the EPC VoP register }, next_steps (recommended follow-ups with reasons), ' +
       'risk_indicators { issuer_type, country_risk, test_bic, sepa_reachable, vop_coverage }, ' +
       'and for CH/LI: clearing { iid, name, type, sic, qr_iid }. ' +
+      'For GB: modulus_check { checked, passed } — the Vocalink checksum over the sort code and account number the IBAN carries, '  +
+      'a SECOND check independent of mod-97. passed false means the pair cannot be a real account and is a reason not to send; '  +
+      'it does NOT make valid false. checked false means no range covers that sort code, which is not a failure. ' +
       'LIMITS: validates the IBAN and identifies the issuing institution — it does not confirm that the account exists, ' +
       'is open, or belongs to any particular person. Verify the payee by name before sending funds. ' +
       'COST: 0.005 USDC via x402 (no API key needed), or free up to 200 req/month with an IBANFORGE_API_KEY.',
@@ -147,6 +150,23 @@ const TOOLS: Tool[] = [
             test_bic: { type: 'boolean' },
             sepa_reachable: { type: 'boolean' },
             vop_coverage: { type: 'boolean' },
+          },
+        },
+        modulus_check: {
+          type: 'object',
+          description:
+            'UK modulus check when country is GB (absent otherwise). Checksum only: it does not prove the account exists or name its holder.',
+          properties: {
+            checked: {
+              type: 'boolean',
+              description: 'False when no published range covers the sort code, in which case no check was possible.',
+            },
+            passed: {
+              type: ['boolean', 'null'],
+              description: 'False means the sort code and account number cannot be a real pair. Never makes valid false.',
+            },
+            source: { type: 'string' },
+            table_fetched_on: { type: 'string' },
           },
         },
         clearing: {

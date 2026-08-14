@@ -63,8 +63,15 @@ export interface UkModulusResult {
   passed: boolean | null;
   /** Provenance, so a caller can see the claim is not ours to invent. */
   source: string;
-  /** The day the table was harvested, so a stale server is visible. */
-  as_of: string;
+  /**
+   * The day WE fetched the table, not the day Vocalink published it.
+   *
+   * Named for what it is rather than reusing `as_of`, which everywhere else
+   * in these responses means the date the source register itself carries. It
+   * answers "how stale is this server", which is the question that matters
+   * for a table refreshed at image build.
+   */
+  table_fetched_on: string;
 }
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -133,7 +140,12 @@ function weightedTotal(digits: number[], weights: number[], doubleAlternate: boo
  * Run one row of the table. Returns null when the row cannot decide — today only
  * exception 6, where a foreign-currency account is explicitly not checkable.
  */
-function runRow(row: WeightRow, sortCode: string, account: string, subs: Record<string, string>): boolean | null {
+function runRow(
+  row: WeightRow,
+  sortCode: string,
+  account: string,
+  subs: Record<string, string>,
+): boolean | null {
   const ex = row.exception;
   const acc = account.split('').map(Number);
   let weights = [...row.weights];
@@ -227,7 +239,10 @@ export function checkUkModulus(sortCode: string, accountNumber: string): UkModul
   if (!/^\d{6}$/.test(sortCode) || !/^\d{8}$/.test(accountNumber)) return null;
 
   const rows = t.rows.filter((r) => sortCode >= r.start && sortCode <= r.end);
-  const base: Omit<UkModulusResult, 'checked' | 'passed'> = { source: SOURCE_LABEL, as_of: t.harvested };
+  const base: Omit<UkModulusResult, 'checked' | 'passed'> = {
+    source: SOURCE_LABEL,
+    table_fetched_on: t.harvested,
+  };
 
   // No range covers the code. Vocalink's instruction is to presume the pair
   // valid, so we report that no check was possible rather than inventing one.
@@ -241,7 +256,11 @@ export function checkUkModulus(sortCode: string, accountNumber: string): UkModul
   if (first.exception === 14) {
     const passed = runRow(first, sortCode, accountNumber, t.substitutions);
     if (passed === null) return { checked: false, passed: null, ...base };
-    return { checked: true, passed: passed || exception14(first, sortCode, accountNumber), ...base };
+    return {
+      checked: true,
+      passed: passed || exception14(first, sortCode, accountNumber),
+      ...base,
+    };
   }
 
   const firstResult = runRow(first, sortCode, accountNumber, t.substitutions);
@@ -266,5 +285,9 @@ export function checkUkModulus(sortCode: string, accountNumber: string): UkModul
 
   const secondResult = runRow(second, sortCode, accountNumber, t.substitutions);
   if (secondResult === null) return { checked: true, passed: firstResult, ...base };
-  return { checked: true, passed: eitherPasses ? firstResult || secondResult : firstResult && secondResult, ...base };
+  return {
+    checked: true,
+    passed: eitherPasses ? firstResult || secondResult : firstResult && secondResult,
+    ...base,
+  };
 }

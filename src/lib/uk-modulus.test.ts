@@ -86,10 +86,12 @@ describe.skipIf(!ukModulusAvailable())('the UK modulus check, against the offici
     expect(checkUkModulus('12345a', '12345678')).toBeNull();
   });
 
-  it('names its source and the day the table was harvested', () => {
+  it('names its source and the day WE fetched the table', () => {
     const r = checkUkModulus('089999', '66374958');
     expect(r?.source).toContain('Vocalink');
-    expect(r?.as_of).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    // Deliberately not called as_of: elsewhere in these responses as_of is the
+    // date the source register itself carries, and this is our fetch date.
+    expect(r?.table_fetched_on).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 });
 

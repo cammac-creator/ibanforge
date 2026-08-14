@@ -1008,14 +1008,15 @@ const buildSpec = () => ({
                   'True when the pair satisfies the checksum for that sorting code, false when it cannot be a real account, null when checked is false.',
               },
               source: { type: 'string', example: 'Vocalink modulus weight table (published for Pay.UK)' },
-              as_of: {
+              table_fetched_on: {
                 type: 'string',
                 format: 'date',
-                description: 'The day the reference table was harvested, so a stale server is visible.',
+                description:
+                  'The day we fetched the reference table, so a stale server is visible. Not the day Vocalink published it, which is why it is not called as_of like the register dates elsewhere in this response.',
                 example: '2026-08-14',
               },
             },
-            required: ['checked', 'passed', 'source', 'as_of'],
+            required: ['checked', 'passed', 'source', 'table_fetched_on'],
           },
           next_steps: NEXT_STEPS_SCHEMA,
         },
