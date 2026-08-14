@@ -413,15 +413,16 @@ const APIS_JSON = {
   tags: ['iban', 'bic', 'sepa', 'compliance', 'banking', 'fintech', 'mcp', 'x402'],
   created: '2026-04-01',
   modified: new Date().toISOString().slice(0, 10),
-  specificationVersion: '0.16',
+  specificationVersion: '0.21',
   apis: [
     {
+      aid: 'ibanforge:ibanforge-api',
       name: 'IBANforge API',
       description:
         'REST + MCP + x402. Free tier: 200 requests/month with an emailed key; the HTTP MCP transport answers 10 free tool calls per IP per day with no key at all.',
       humanURL: 'https://ibanforge.com',
       baseURL: 'https://api.ibanforge.com',
-      tags: ['iban-validation', 'bic-lookup', 'swiss-clearing', 'verification-of-payee'],
+      tags: ['iban-validation', 'bic-lookup', 'swiss-clearing', 'verification-of-payee', 'uk-modulus'],
       properties: [
         { type: 'OpenAPI', url: 'https://api.ibanforge.com/openapi.json' },
         { type: 'MCP-Server', url: 'https://api.ibanforge.com/mcp' },
@@ -433,6 +434,38 @@ const APIS_JSON = {
       ],
       contact: [{ FN: 'IBANforge support', email: 'support@ibanforge.com' }],
     },
+  ],
+  // The operating contract, one file per question an integrator or an agent
+  // asks before committing: what may I do unattended, what does it cost, what
+  // are the limits, how do failures look, what happens when something is
+  // retired. All of it was already true and already written for humans; an
+  // agent choosing between APIs cannot read a pricing page.
+  common: [
+    { type: 'Website', url: 'https://ibanforge.com' },
+    { type: 'Documentation', url: 'https://ibanforge.com/docs' },
+    { type: 'Authentication', url: 'https://api.ibanforge.com/auth.md' },
+    { type: 'AgenticAccess', url: 'https://api.ibanforge.com/agentic-access.yml' },
+    { type: 'AgentCard', url: 'https://api.ibanforge.com/.well-known/agent-card.json' },
+    { type: 'MCPServer', url: 'https://api.ibanforge.com/mcp' },
+    { type: 'Skills', url: 'https://api.ibanforge.com/skills/index.yml' },
+    { type: 'RateLimits', url: 'https://api.ibanforge.com/rate-limits.yml' },
+    { type: 'ErrorSemantics', url: 'https://api.ibanforge.com/error-semantics.yml' },
+    { type: 'Plans', url: 'https://api.ibanforge.com/plans.yml' },
+    { type: 'FinOps', url: 'https://api.ibanforge.com/finops.yml' },
+    { type: 'Pricing', url: 'https://ibanforge.com/pricing' },
+    { type: 'DeprecationPolicy', url: 'https://api.ibanforge.com/deprecation-policy.md' },
+    { type: 'Roadmap', url: 'https://api.ibanforge.com/roadmap.md' },
+    { type: 'Changelog', url: 'https://ibanforge.com/changelog' },
+    { type: 'StatusPage', url: 'https://ibanforge.com/status' },
+    { type: 'SecurityTxt', url: 'https://api.ibanforge.com/.well-known/security.txt' },
+    { type: 'VulnerabilityDisclosure', url: 'https://api.ibanforge.com/.well-known/security.txt' },
+    { type: 'APICatalog', url: 'https://api.ibanforge.com/.well-known/api-catalog' },
+    { type: 'LlmsText', url: 'https://api.ibanforge.com/llms.txt' },
+    { type: 'TermsOfService', url: 'https://ibanforge.com/en/legal/terms' },
+    { type: 'PrivacyPolicy', url: 'https://ibanforge.com/en/legal/privacy' },
+    { type: 'DataProcessingAgreement', url: 'https://ibanforge.com/en/legal/dpa' },
+    { type: 'SourceCode', url: 'https://github.com/cammac-creator/ibanforge' },
+    { type: 'Blog', url: 'https://ibanforge.com/en/blog' },
   ],
   maintainers: [{ FN: 'IBANforge', email: 'support@ibanforge.com' }],
 };

@@ -20,6 +20,7 @@ import { testIban } from './routes/test-iban.js';
 import { landing } from './routes/landing.js';
 import { openapi } from './routes/openapi.js';
 import { discovery } from './routes/discovery.js';
+import { artifacts } from './routes/artifacts.js';
 import { ogImage } from './routes/og-image.js';
 import { mcpHttp } from './routes/mcp-http.js';
 import { mcpCard } from './routes/mcp-card.js';
@@ -96,6 +97,22 @@ app.use('*', async (c, next) => {
   await next();
   c.header('X-Powered-By', 'IBANforge');
   c.header('X-API-Version', pkg.version);
+  // Idempotency-Key, echoed rather than enforced.
+  //
+  // Every screening endpoint is a pure read: it returns a verdict about an
+  // identifier and creates nothing, so a repeat is already harmless and a
+  // replay cache would guard an effect that does not exist. Clients and agent
+  // frameworks still send the header as a matter of course, and reflecting it
+  // lets their own retry bookkeeping match request to response unchanged. The
+  // one operation where a repeat is not free, buying credits, is guarded by
+  // the payment rail itself: a settlement can only be redeemed once.
+  //
+  // Reflected only after validation. Echoing an unchecked client string into a
+  // response header is how header injection gets in.
+  const idempotencyKey = c.req.header('Idempotency-Key');
+  if (idempotencyKey && /^[A-Za-z0-9._:-]{1,255}$/.test(idempotencyKey)) {
+    c.header('Idempotency-Key', idempotencyKey);
+  }
   c.header('X-Content-Type-Options', 'nosniff');
   c.header('X-Frame-Options', 'DENY');
   c.header('Referrer-Policy', 'strict-origin-when-cross-origin');
@@ -504,6 +521,7 @@ app.route('/', demo);
 app.route('/', testIban);
 app.route('/', openapi);
 app.route('/', discovery);
+app.route('/', artifacts);
 app.route('/', ogImage);
 app.route('/', mcpHttp);
 app.route('/', mcpCard);
