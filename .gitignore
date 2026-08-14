@@ -34,3 +34,6 @@ scripts/x402-pay.mjs
 # Worktrees de sessions parallèles Claude Code — jamais dans le dépôt
 .claude/
 .exam.mjs
+
+# UK modulus weight table — fetched at build/boot from Vocalink, never redistributed
+data/uk-modulus.json

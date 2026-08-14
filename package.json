@@ -42,7 +42,8 @@
     "admin": "tsx scripts/admin-keys.ts",
     "db:seed-blz": "tsx scripts/seed-blz.ts",
     "db:seed-national": "tsx scripts/seed-national.ts",
-    "reco-baseline": "tsx scripts/reco-baseline.ts"
+    "reco-baseline": "tsx scripts/reco-baseline.ts",
+    "db:seed-uk": "tsx scripts/seed-uk-modulus.ts"
   },
   "dependencies": {
     "@coinbase/x402": "^2.1.0",

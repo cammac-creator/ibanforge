@@ -6,8 +6,21 @@ COPY package.json package-lock.json ./
 RUN npm ci
 
 COPY src/ src/
+COPY scripts/ scripts/
 COPY tsconfig.json ./
 RUN npx tsc
+
+# UK modulus weight table, fetched from Vocalink rather than committed: it is
+# published for implementers without a written redistribution right, so it must
+# not enter the public repository nor the npm package. It also lands OUTSIDE
+# data/, which Railway mounts a volume over at runtime.
+#
+# Non-blocking on purpose. The download links are content-hashed and rotate; a
+# rotted link must cost the UK check, never the deploy. The runtime treats an
+# absent table as "not supported", the same way a missing register degrades.
+RUN mkdir -p reference && \
+    UK_MODULUS_PATH=/app/reference/uk-modulus.json npx tsx scripts/seed-uk-modulus.ts \
+    || echo "WARNING: UK modulus table unavailable at build time; GB modulus checking will be off"
 
 FROM node:22-slim
 
@@ -17,6 +30,7 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 
 COPY --from=builder /app/dist/ dist/
+COPY --from=builder /app/reference/ reference/
 COPY src/db/bic_data.json dist/db/bic_data.json
 COPY src/db/nl-psp.json dist/db/nl-psp.json
 
@@ -34,6 +48,8 @@ EXPOSE 3000
 
 ENV NODE_ENV=production
 ENV PORT=3000
+# Outside data/, which the Railway volume masks at runtime.
+ENV UK_MODULUS_PATH=/app/reference/uk-modulus.json
 
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
   CMD node -e "fetch('http://localhost:3000/health').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"
