@@ -558,6 +558,57 @@ interface AcceptEntry {
   [key: string]: unknown;
 }
 
+/**
+ * The concrete path, turned back into the parameterised template the catalog
+ * groups by. Without it every BIC ever probed would be catalogued as its own
+ * resource.
+ */
+function routeTemplateOf(path: string): string {
+  if (path.startsWith('/v1/bic/')) return '/v1/bic/:code';
+  if (path.startsWith('/v1/ch/clearing/')) return '/v1/ch/clearing/:iid';
+  return path;
+}
+
+/**
+ * The top-level `extensions.bazaar` block, which is what the Agentic Market
+ * ingestion actually reads.
+ *
+ * Why this exists, measured on 14/08/2026 against Coinbase's own validator
+ * (agentic.market/validate): every transport and payment check passed, the
+ * discovery info was correctly recovered from the v1 `outputSchema`, and the
+ * run still ended on "discovery request validation failed: resource must
+ * start with 'https://'". The v1 fallback reconstructs the info but not a
+ * usable resource, so nothing is ever catalogued. Emitting the block at the
+ * root, with an absolute resource and the route template, gives the ingester
+ * the record directly instead of asking it to infer one.
+ *
+ * Purely additive: x402 clients read `accepts`, and an unknown sibling key is
+ * ignored by every parser in the wild, so a paying integration cannot break on
+ * it. The shape mirrors the SDK's own buildBazaarExtensionFromDiscoveryInfo.
+ */
+function buildBazaarExtensions(method: string, path: string): Record<string, unknown> | null {
+  const d = findDiscovery(method, path);
+  if (!d) return null;
+  return {
+    bazaar: {
+      resource: `https://api.ibanforge.com${path}`,
+      routeTemplate: routeTemplateOf(path),
+      info: {
+        input: buildInputBlock(d),
+        // Wrapped as {type, example} here, unlike the v1 outputSchema where the
+        // extractor does the wrapping itself. The validator reads this one.
+        output: { type: 'json', example: markExample(d.outputExample) },
+      },
+      schema: {
+        $schema: 'https://json-schema.org/draft/2020-12/schema',
+        type: 'object',
+        properties: { input: { type: 'object' }, output: { type: 'object' } },
+        required: ['input'],
+      },
+    },
+  };
+}
+
 function injectOutputSchema(method: string, path: string, accept: AcceptEntry): AcceptEntry {
   const discovery = findDiscovery(method, path);
   if (!discovery) return accept;
@@ -704,6 +755,11 @@ export function enrich402Middleware(): MiddlewareHandler<HonoEnv> {
         paywallCause,
       );
       enriched.accepts = patchedAccepts;
+      // Never overwrite an extensions block the SDK already produced.
+      if (!enriched.extensions) {
+        const ext = buildBazaarExtensions(method, url.pathname);
+        if (ext) enriched.extensions = ext;
+      }
 
       c.res = new Response(JSON.stringify(enriched, null, 2), {
         status: 402,
@@ -737,11 +793,13 @@ export function enrich402Middleware(): MiddlewareHandler<HonoEnv> {
     const accepts = pricing ? [injectOutputSchema(method, url.pathname, baseAccept)] : [];
 
     const fallbackCause = c.get('paywallCause');
+    const fallbackExt = buildBazaarExtensions(method, url.pathname);
     const body = stripFreeTierWhenExhausted(
       {
         x402Version: 1,
         error: 'payment_required',
         accepts,
+        ...(fallbackExt ? { extensions: fallbackExt } : {}),
         ...buildAccessRamp(),
         ...causeFields(fallbackCause),
       },

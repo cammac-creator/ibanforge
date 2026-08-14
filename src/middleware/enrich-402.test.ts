@@ -176,3 +176,45 @@ describe('enrich402Middleware — the exhausted client must not be handed a way 
     expect(body.free_tier?.signup).toContain('/v1/keys/generate');
   });
 });
+
+describe('the Bazaar discovery block the catalog ingester reads', () => {
+  it('ships extensions.bazaar at the ROOT, with an absolute https resource', async () => {
+    // Measured against Coinbase's own validator on 14/08/2026: every transport
+    // and payment check passed, the info block was recovered from the v1
+    // outputSchema, and the run still died on "resource must start with
+    // 'https://'". The root block is what carries a usable resource.
+    const app = new Hono();
+    app.use('*', enrich402Middleware());
+    app.post('/v1/iban/validate', () => new Response('{}', {
+      status: 402,
+      headers: { 'Content-Type': 'application/json' },
+    }));
+
+    const res = await app.request('/v1/iban/validate', { method: 'POST' });
+    const body = await res.json();
+    const bazaar = body.extensions?.bazaar;
+    expect(bazaar).toBeDefined();
+    expect(bazaar.resource.startsWith('https://')).toBe(true);
+    expect(bazaar.info.input.type).toBe('http');
+    expect(bazaar.info.input.method).toBe('POST');
+    // The validator's advisory: consumers need a response example.
+    expect(bazaar.info.output.type).toBe('json');
+    expect(bazaar.info.output.example).toBeDefined();
+    expect(bazaar.schema.required).toContain('input');
+  });
+
+  it('groups a parameterised route under its template, not the probed value', async () => {
+    // Without this, every BIC ever probed would be catalogued as its own resource.
+    const app = new Hono();
+    app.use('*', enrich402Middleware());
+    app.get('/v1/bic/:code', () => new Response('{}', {
+      status: 402,
+      headers: { 'Content-Type': 'application/json' },
+    }));
+
+    const res = await app.request('/v1/bic/COBADEFFXXX');
+    const bazaar = (await res.json()).extensions?.bazaar;
+    expect(bazaar.routeTemplate).toBe('/v1/bic/:code');
+    expect(bazaar.resource).toBe('https://api.ibanforge.com/v1/bic/COBADEFFXXX');
+  });
+});
