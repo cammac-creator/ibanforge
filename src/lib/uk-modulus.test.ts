@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { checkUkModulus, ukModulusAvailable } from './uk-modulus.js';
+import { validateIBAN } from './iban.js';
+import { enrichResult } from './enrich.js';
 
 /**
  * The 34 test cases published in section 3.1 of the Vocalink specification
@@ -88,5 +90,63 @@ describe.skipIf(!ukModulusAvailable())('the UK modulus check, against the offici
     const r = checkUkModulus('089999', '66374958');
     expect(r?.source).toContain('Vocalink');
     expect(r?.as_of).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+});
+
+/**
+ * The wiring, which is a separate risk from the algorithm. A GB BBAN is
+ * 4!a6!n8!n, so the sorting code sits in branch_code and NOT in bank_code, which
+ * holds the four-letter mnemonic — reading the wrong field would hand the check
+ * four letters and silently answer "not covered" for every UK IBAN. Only an
+ * end-to-end assertion catches that.
+ */
+function gbIban(bank: string, sortCode: string, account: string): string {
+  const rearranged = `${bank}${sortCode}${account}GB00`;
+  const numeric = rearranged
+    .split('')
+    .map((c) => (/[A-Z]/.test(c) ? String(c.charCodeAt(0) - 55) : c))
+    .join('');
+  let remainder = 0;
+  for (const d of numeric) remainder = (remainder * 10 + Number(d)) % 97;
+  return `GB${String(98 - remainder).padStart(2, '0')}${bank}${sortCode}${account}`;
+}
+
+describe.skipIf(!ukModulusAvailable())('a validated GB IBAN carries the modulus verdict', () => {
+  const check = (sortCode: string, account: string) => {
+    const result = validateIBAN(gbIban('ABCD', sortCode, account));
+    enrichResult(result);
+    return result;
+  };
+
+  it('reads the sorting code from branch_code and passes a good pair', () => {
+    // The SWIFT IBAN Registry's own GB example, which is also a real modulus pass.
+    const result = validateIBAN('GB29NWBK60161331926819');
+    enrichResult(result);
+    expect(result.bban?.branch_code).toBe('601613');
+    expect(result.modulus_check?.checked).toBe(true);
+    expect(result.modulus_check?.passed).toBe(true);
+  });
+
+  it('keeps a modulus failure out of `valid` and raises a blocking next step instead', () => {
+    // Official vector 29. The IBAN is structurally perfect under ISO 13616 —
+    // conflating the two would tell a caller their input was malformed when what
+    // is actually wrong is the account it names.
+    const result = check('089999', '66374959');
+    expect(result.valid).toBe(true);
+    expect(result.modulus_check?.passed).toBe(false);
+    expect(result.next_steps?.map((s) => s.code)).toContain('modulus_check_failed');
+  });
+
+  it('stays silent about a sorting code no range covers', () => {
+    const result = check('000000', '12345678');
+    expect(result.modulus_check?.checked).toBe(false);
+    expect(result.modulus_check?.passed).toBeNull();
+    expect(result.next_steps?.map((s) => s.code)).not.toContain('modulus_check_failed');
+  });
+
+  it('leaves non-GB IBANs untouched', () => {
+    const result = validateIBAN('CH1000230000000012345');
+    enrichResult(result);
+    expect(result.modulus_check).toBeUndefined();
   });
 });

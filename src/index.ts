@@ -344,6 +344,7 @@ Both \`/v1/bic/:code\` and \`/v1/ch/clearing/:iid\` use **URL path parameters** 
 - Validating IBANs at checkout, payout, or before a SEPA transfer
 - Resolving BIC/SWIFT from an IBAN automatically
 - Detecting Swiss BC-Nummer / IID for routing
+- Catching an impossible UK account before a payout: validating a GB IBAN also runs the Vocalink modulus checksum over the sort code and account number it carries, in the same call and at no extra cost (\`modulus_check\`). mod-97 alone passes on GB pairs no bank could have issued.
 - Detecting EMIs / virtual IBANs (Wise, Revolut, Mercury, Modulr, etc.)
 - Pre-flight VoP participant check before October 2025 SEPA deadline
 - Pay-per-call agent workflows without human onboarding (x402 USDC)
@@ -352,7 +353,8 @@ Both \`/v1/bic/:code\` and \`/v1/ch/clearing/:iid\` use **URL path parameters** 
 
 - Full account ownership verification (use SEPA VoP itself or AIS providers)
 - KYC / identity proofing (use a regulated open-banking aggregator)
-- US ABA, UK sort codes, BSB, PIX (non-IBAN systems out of scope)
+- Standalone UK sort-code lookup or bank-name resolution from a sort code (we run the modulus checksum on a GB IBAN, we do not serve the UK directory)
+- US ABA, BSB, PIX (non-IBAN systems out of scope)
 - Regulated AML/CFT obligations (use Refinitiv, ComplyAdvantage, etc.)
 
 ## Documentation

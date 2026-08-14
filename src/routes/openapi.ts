@@ -949,6 +949,35 @@ const buildSpec = () => ({
             required: ['issuer_type', 'country_risk', 'test_bic', 'sepa_reachable', 'sepa_reachable_scope', 'vop_coverage'],
           },
           bank_code_check: BANK_CODE_CHECK_SCHEMA,
+          modulus_check: {
+            type: 'object',
+            description:
+              'UK modulus check on the sorting code and account number a GB IBAN carries — present for GB only, and included at no extra cost in the 0.005 USDC validation. ' +
+              'A second checksum, independent of mod-97: the IBAN check digits prove the string was transcribed correctly, this proves the pair is one the owning institution could have issued. ' +
+              'A GB IBAN can pass mod-97 and still name an account no bank could have opened, which is what this catches before a payout. ' +
+              'passed false NEVER makes the IBAN invalid — read valid and modulus_check.passed as two separate facts. ' +
+              'Checksum only: it does not say the account exists, name its holder, or resolve a bank from a sort code.',
+            properties: {
+              checked: {
+                type: 'boolean',
+                description:
+                  'Whether the published table covers this sorting code. False means no check was possible, not a failed one — Vocalink instructs that such a pair be presumed valid.',
+              },
+              passed: {
+                type: ['boolean', 'null'],
+                description:
+                  'True when the pair satisfies the checksum for that sorting code, false when it cannot be a real account, null when checked is false.',
+              },
+              source: { type: 'string', example: 'Vocalink modulus weight table (published for Pay.UK)' },
+              as_of: {
+                type: 'string',
+                format: 'date',
+                description: 'The day the reference table was harvested, so a stale server is visible.',
+                example: '2026-08-14',
+              },
+            },
+            required: ['checked', 'passed', 'source', 'as_of'],
+          },
           next_steps: NEXT_STEPS_SCHEMA,
         },
       },

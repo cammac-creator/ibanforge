@@ -13,6 +13,7 @@ import { getCountryRisk } from './countries.js';
 import { lookupClearingByBankCode } from './ch-clearing.js';
 import { blzRegisterAvailable, lookupBlz } from './de-blz.js';
 import { checkVop } from './compliance.js';
+import { checkUkModulus } from './uk-modulus.js';
 import type { BankCodeCheck, IBANValidationResult, RegisterInstitution } from '../types.js';
 import { nextSteps } from './next-steps.js';
 
@@ -344,6 +345,22 @@ export function enrichResult(result: IBANValidationResult): void {
     } else {
       result.clearing = null;
     }
+  }
+
+  // United Kingdom: a GB IBAN carries the sorting code and the account number
+  // whole, so the national checksum over the pair can be run on what we already
+  // parsed — no extra input, no extra call. mod97 proved the string was
+  // transcribed correctly; this proves the pair is one the owning institution
+  // could have issued, which is a different and stronger claim.
+  //
+  // The sorting code lives in branch_code, not bank_code: a GB BBAN is
+  // 4!a6!n8!n, so bank_code holds the four-letter institution mnemonic.
+  //
+  // Silent when the reference table is not loaded, rather than reporting a check
+  // that did not happen.
+  if (cc === 'GB' && result.bban.branch_code) {
+    const modulus = checkUkModulus(result.bban.branch_code, result.bban.account_number);
+    if (modulus) result.modulus_check = modulus;
   }
 
   // Last, so every field it reasons about is already populated.

@@ -65,6 +65,18 @@ export function nextSteps(result: IBANValidationResult): NextStep[] {
     });
   }
 
+  // A GB pair the owning institution could not have issued. Blocking, and on the
+  // same footing as an unallocated bank code: both say the destination cannot
+  // exist, rather than that we failed to find it. The IBAN's own check digits
+  // pass in this case, which is exactly why it is worth saying out loud.
+  if (result.modulus_check?.passed === false) {
+    steps.push({
+      code: 'modulus_check_failed',
+      do: 'Do not send. The account number fails the UK checksum for this sorting code, so the pair cannot be a real account. Ask the beneficiary to confirm both.',
+      because: 'modulus_check.passed is false against the Vocalink modulus weight table',
+    });
+  }
+
   // The code is allocated and being withdrawn. Not a reason to stop, a reason to
   // update the beneficiary before the transition period ends. This is the
   // merged-bank case, which only a national register can answer.

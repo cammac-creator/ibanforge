@@ -1,6 +1,9 @@
 /**
  * IBANforge — Unified types for IBAN validation + BIC lookup
  */
+import type { UkModulusResult } from './lib/uk-modulus.js';
+
+export type { UkModulusResult };
 
 // --- Hono context variables ---
 
@@ -202,6 +205,16 @@ export interface IBANValidationResult {
     vop_coverage: boolean;
   };
   bank_code_check?: BankCodeCheck;
+  /**
+   * UK modulus check on the sorting code and account number a GB IBAN carries.
+   * Present for GB only, and only while the reference table is loaded.
+   *
+   * A second checksum, independent of mod97: the IBAN check digits prove correct
+   * transcription, this proves the pair is one the owning institution could have
+   * issued. `passed: false` means the account cannot exist; it never makes the
+   * IBAN itself invalid, so `valid` is untouched.
+   */
+  modulus_check?: UkModulusResult;
   /**
    * What to do next, derived from this result. Ordered: what blocks a payment
    * comes before what merely enriches it. See lib/next-steps.ts.
