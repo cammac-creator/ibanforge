@@ -34,6 +34,12 @@ jobs:
       - name: Test
         run: npm run test
 
+      # Governance that runs. The OpenAPI document is generated from code, so
+      # the only way it cannot drift from the ruleset we publish at
+      # https://api.ibanforge.com/rules.yml is to regenerate and lint it here.
+      - name: Lint the OpenAPI contract
+        run: npm run openapi:lint
+
   frontend:
     runs-on: ubuntu-latest
     steps:

@@ -265,6 +265,10 @@ const buildSpec = () => ({
         description:
           'FREE pure-format IBAN check: ISO 13616 mod-97 checksum, country-specific length, and BBAN parsing. No payment, no API key, no quota (global rate limit only). Does NOT touch the BIC, SEPA, VoP, sanctions, or Swiss clearing databases — use POST /v1/iban/validate ($0.005) when you need the full enrichment. Ideal for pre-filtering malformed IBANs before paying for validation.',
         tags: ['Free'],
+        // Explicitly no authentication, which is a different statement from
+        // omitting the field: an agent reading the contract can tell 'free' from
+        // 'the author forgot to say'.
+        security: [],
         parameters: [
           {
             name: 'iban',
@@ -300,6 +304,10 @@ const buildSpec = () => ({
         description:
           'FREE metadata endpoint: lists every supported IBAN country with its IBAN length, SEPA membership, and whether a BBAN structure breakdown and example IBAN are available. Use GET /v1/iban/structure/{country} for the full per-country template.',
         tags: ['Free'],
+        // Explicitly no authentication, which is a different statement from
+        // omitting the field: an agent reading the contract can tell 'free' from
+        // 'the author forgot to say'.
+        security: [],
         responses: {
           '200': {
             description: 'List of supported countries',
@@ -331,6 +339,7 @@ const buildSpec = () => ({
               },
             },
           },
+          '429': { description: 'Rate limit exceeded. Honour the Retry-After header; see https://api.ibanforge.com/rate-limits.yml' },
         },
       },
     },
@@ -341,6 +350,10 @@ const buildSpec = () => ({
         description:
           'FREE metadata endpoint: returns the IBAN structural template for a country — total IBAN length, BBAN field positions (bank code / branch code / account number, 0-indexed within the BBAN), SEPA membership + schemes + VoP obligation, and a canonical example IBAN to copy-paste. Use it when an agent needs to know the IBAN format for a country before crafting a validation call.',
         tags: ['Free'],
+        // Explicitly no authentication, which is a different statement from
+        // omitting the field: an agent reading the contract can tell 'free' from
+        // 'the author forgot to say'.
+        security: [],
         parameters: [
           {
             name: 'country',
@@ -424,6 +437,10 @@ const buildSpec = () => ({
         summary: 'Generate a free API key',
         description: 'Generates a free API key with 200 requests/month quota (batch validation counts 1 request per IBAN). One key per email per day.',
         tags: ['API Keys'],
+        // Explicitly no authentication, which is a different statement from
+        // omitting the field: an agent reading the contract can tell 'free' from
+        // 'the author forgot to say'.
+        security: [],
         requestBody: {
           required: true,
           content: {
@@ -465,6 +482,10 @@ const buildSpec = () => ({
         description:
           'Lists the available prepaid credit bundles with prices. Buy a bundle once via x402 (POST /v1/credits/buy/{bundle}) and receive an API key preloaded with N credits (1 credit = 1 validation/lookup; batch validation debits 1 credit per IBAN) — credits never expire. Card checkout is also available at https://ibanforge.com/pricing.',
         tags: ['Credits'],
+        // Explicitly no authentication, which is a different statement from
+        // omitting the field: an agent reading the contract can tell 'free' from
+        // 'the author forgot to say'.
+        security: [],
         responses: {
           '200': {
             description: 'Available bundles',
@@ -494,6 +515,7 @@ const buildSpec = () => ({
               },
             },
           },
+          '429': { description: 'Rate limit exceeded. Honour the Retry-After header; see https://api.ibanforge.com/rate-limits.yml' },
         },
       },
     },
@@ -562,6 +584,10 @@ const buildSpec = () => ({
         description:
           'Free. Generates structurally valid test IBANs whose bank codes are drawn from the national registers we serve (CH, DE, AT, BE) — unlike the usual generators, whose checksum-valid IBANs carry arbitrary codes no register allocated. Account digits are random and belong to nobody. Each item ships with the proof: our own bank_code_check answer for that IBAN.',
         tags: ['Free'],
+        // Explicitly no authentication, which is a different statement from
+        // omitting the field: an agent reading the contract can tell 'free' from
+        // 'the author forgot to say'.
+        security: [],
         parameters: [
           {
             name: 'country',
@@ -615,6 +641,10 @@ const buildSpec = () => ({
         summary: 'Free demo results',
         description: 'Returns example IBAN and BIC validation results. No payment required.',
         tags: ['Free'],
+        // Explicitly no authentication, which is a different statement from
+        // omitting the field: an agent reading the contract can tell 'free' from
+        // 'the author forgot to say'.
+        security: [],
         responses: {
           '200': {
             description: 'Demo results',
@@ -644,6 +674,7 @@ const buildSpec = () => ({
               },
             },
           },
+          '500': { description: 'Internal error. Safe to retry: this endpoint is read-only and changes nothing.' },
         },
       },
     },
@@ -653,6 +684,10 @@ const buildSpec = () => ({
         summary: 'Health check',
         description: 'Returns API health status, uptime, and basic statistics.',
         tags: ['Free'],
+        // Explicitly no authentication, which is a different statement from
+        // omitting the field: an agent reading the contract can tell 'free' from
+        // 'the author forgot to say'.
+        security: [],
         responses: {
           '200': {
             description: 'Health status',
@@ -662,6 +697,7 @@ const buildSpec = () => ({
               },
             },
           },
+          '500': { description: 'Internal error. Safe to retry: this endpoint is read-only and changes nothing.' },
         },
       },
     },
@@ -736,6 +772,9 @@ const buildSpec = () => ({
         description:
           'Model Context Protocol endpoint — Streamable HTTP transport, JSON-RPC 2.0 over POST. Exposes the same capabilities as this REST API as 5 MCP tools: validate_iban, batch_validate_iban, lookup_bic, check_compliance, lookup_ch_clearing. Flow: POST an `initialize` request, then `tools/list` and `tools/call` (include the returned Mcp-Session-Id header on follow-up calls). Also available as a stdio server via `npx -y ibanforge-mcp`. This path speaks MCP, not the REST conventions documented elsewhere in this spec.',
         tags: ['MCP'],
+        // Anonymous is a supported alternative here, not an oversight: the HTTP
+        // MCP transport answers a daily free allowance with no credential.
+        security: [{}, { apiKey: [] }],
         externalDocs: {
           description: 'MCP setup guide (Claude Desktop, Cursor, HTTP transport)',
           url: 'https://ibanforge.com/docs/mcp',
@@ -1257,4 +1296,8 @@ openapi.get('/openapi.json', (c) => {
   return c.json(specCache);
 });
 
-export { openapi };
+// buildSpec is exported for the contract linter (scripts/dump-openapi.ts).
+// Governance is only worth something if it runs: the document is generated from
+// code, so the only way it cannot drift from its own ruleset is for CI to
+// regenerate it and lint the regenerated copy on every push.
+export { openapi, buildSpec };

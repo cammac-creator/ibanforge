@@ -1,0 +1,69 @@
+# Contract governance ruleset — IBANforge
+#
+# Run on every push (see .github/workflows/ci.yml) against the document
+# regenerated from source, not against a checked-in copy that could drift.
+#
+# The standard OpenAPI ruleset is the floor. The rules below are the promises
+# we make on top of it, and each exists because breaking it would cost a caller
+# something concrete — an agent that cannot branch on a failure, a client that
+# cannot tell which credential an endpoint wants, a tool generator with no name
+# to give a method.
+extends: ['spectral:oas']
+
+rules:
+  # An agent picks the operation to call from its description. A summary alone
+  # says what it is named, not when to reach for it.
+  operation-description: error
+
+  # Code generators name methods from operationId. Without one they invent a
+  # name from the path, and the name changes when the path does.
+  operation-operationId: error
+  operation-operationId-unique: error
+
+  # Every endpoint must say which credential it accepts. This API takes two very
+  # different ones (a bearer key, or an x402 payment header) and an agent that
+  # cannot see which applies has to discover it by getting rejected.
+  ibanforge-operation-security:
+    description: Every operation must declare its security requirements.
+    message: '{{path}} does not declare `security` — a caller cannot tell how to authenticate.'
+    severity: error
+    given: $.paths[*][get,post,put,patch,delete]
+    then:
+      field: security
+      function: truthy
+
+  # A 200 with no schema tells a machine nothing about what comes back.
+  ibanforge-success-schema:
+    description: A 2xx JSON response must describe its body.
+    message: '{{path}} returns JSON with no schema.'
+    severity: error
+    given: $.paths[*][*].responses[?(@property.match(/^2\d\d$/))].content['application/json']
+    then:
+      field: schema
+      function: truthy
+
+  # Failure modes are part of the contract. An operation that documents only its
+  # happy path leaves a caller to discover the rest in production.
+  ibanforge-documents-failure:
+    description: Every operation must document at least one non-2xx response.
+    message: '{{path}} documents no failure response.'
+    severity: error
+    given: $.paths[*][get,post,put,patch,delete].responses
+    then:
+      function: schema
+      functionOptions:
+        schema:
+          type: object
+          # At least one key outside the 2xx range.
+          propertyNames: true
+          not:
+            propertyNames:
+              pattern: '^2\d\d$'
+
+  # Tags drive how the contract is split for directories and SDK generators.
+  operation-tags: error
+
+  # A contact route matters more than usual here: the audience is largely
+  # unattended agents whose operator has to be able to reach a human.
+  info-contact: error
+  info-description: error

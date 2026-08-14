@@ -454,6 +454,8 @@ const APIS_JSON = {
     { type: 'FinOps', url: 'https://api.ibanforge.com/finops.yml' },
     { type: 'Pricing', url: 'https://ibanforge.com/pricing' },
     { type: 'DeprecationPolicy', url: 'https://api.ibanforge.com/deprecation-policy.md' },
+    { type: 'Rules', url: 'https://api.ibanforge.com/rules.yml' },
+    { type: 'Conformance', url: 'https://api.ibanforge.com/conformance.yml' },
     { type: 'Roadmap', url: 'https://api.ibanforge.com/roadmap.md' },
     { type: 'Changelog', url: 'https://ibanforge.com/changelog' },
     { type: 'StatusPage', url: 'https://ibanforge.com/status' },

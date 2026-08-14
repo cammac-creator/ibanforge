@@ -96,7 +96,7 @@ operations:
         reason: Spends real funds. An agent holding a funded wallet must not
           top up its own balance without an explicit mandate.
         effect: payment
-      - operation: POST /v1/keys
+      - operation: POST /v1/keys/generate
         reason: Mints a credential bound to an email address.
         effect: credential
 
@@ -435,7 +435,7 @@ Authorization: Bearer ifk_xxxxxxxx
 
 - Free tier: ${FREE_MONTHLY} requests per month against an emailed key.
 - Prepaid credits: one payment, one key, no expiry.
-- Mint one: \`POST /v1/keys\` with an email address.
+- Mint one: \`POST /v1/keys/generate\` with an email address.
 - Check remaining allowance: \`GET /v1/keys/usage\`.
 
 The key goes in the \`Authorization\` header only. It is never accepted in a
@@ -570,6 +570,114 @@ A 404 is an answer about the identifier, not a fault. Read
 from "absent from our reference data".
 `;
 
+// ──────────────────────────────────────────────────────────────────────────────
+// Governance. Published because a ruleset nobody can read is a claim; this one
+// runs in CI on every push, against the document regenerated from source rather
+// than a checked-in copy that could drift.
+// ──────────────────────────────────────────────────────────────────────────────
+const RULES = `# Contract governance — IBANforge
+specification: rules
+version: '1.0'
+updated: '2026-08-14'
+
+linter: spectral
+ruleset: https://github.com/cammac-creator/ibanforge/blob/main/.spectral.yaml
+extends: spectral:oas
+enforcement:
+  where: CI, on every push and pull request to main
+  workflow: https://github.com/cammac-creator/ibanforge/blob/main/.github/workflows/ci.yml
+  target: >-
+    The OpenAPI document regenerated from source at lint time, not a committed
+    copy. The document is built from code so it cannot drift from the deployed
+    server; the cost is that only a regenerated copy is worth linting.
+  on_failure: The build fails. A contract that breaks the ruleset does not ship.
+  current_status: passing, zero findings
+
+house_rules:
+  - id: ibanforge-operation-security
+    severity: error
+    rule: Every operation declares 'security', and a free endpoint declares the
+      empty array rather than omitting the field.
+    why: Omitting it and meaning "free" are indistinguishable to a machine. This
+      API accepts two very different credentials, and an agent that cannot see
+      which applies discovers it by being rejected.
+  - id: ibanforge-success-schema
+    severity: error
+    rule: Every 2xx JSON response describes its body.
+    why: A 200 with no schema tells a code generator nothing.
+  - id: ibanforge-documents-failure
+    severity: error
+    rule: Every operation documents at least one non-2xx response, and only ones
+      it can actually return.
+    why: Failure modes are part of the contract. Endpoints exempt from the rate
+      limiter do not claim a 429 they cannot produce.
+  - id: operation-description / operation-operationId / operation-tags
+    severity: error
+    rule: Standard OpenAPI hygiene, raised from warning to error.
+    why: An agent picks an operation from its description; a generator names the
+      method from its operationId.
+
+versioning: https://api.ibanforge.com/deprecation-policy.md
+`;
+
+const CONFORMANCE = `# Conformance — IBANforge
+# The specifications this API implements, and how to verify each claim
+# yourself. Every entry below is checkable from outside.
+specification: conformance
+version: '1.0'
+updated: '2026-08-14'
+
+standards:
+  - name: OpenAPI
+    version: '3.1.0'
+    verify: https://api.ibanforge.com/openapi.json
+  - name: ISO 13616 (IBAN)
+    role: The validation the API performs.
+    verify: https://api.ibanforge.com/v1/iban/structure
+  - name: ISO 9362 (BIC)
+    role: BIC format validation and lookup.
+  - name: Model Context Protocol
+    transport: Streamable HTTP
+    verify: https://api.ibanforge.com/mcp
+    note: A sessionless GET answers 405 with an Allow header, per the transport spec.
+  - name: A2A agent card
+    verify: https://api.ibanforge.com/.well-known/agent-card.json
+  - name: x402
+    network: eip155:8453
+    verify: https://api.ibanforge.com/.well-known/x402
+  - name: apis.json
+    version: '0.21'
+    verify: https://api.ibanforge.com/apis.json
+  - name: RFC 9727 (api-catalog)
+    verify: https://api.ibanforge.com/.well-known/api-catalog
+  - name: RFC 9116 (security.txt)
+    verify: https://api.ibanforge.com/.well-known/security.txt
+  - name: RFC 8594 (Sunset header) and RFC 9745 (Deprecation header)
+    role: How a retiring endpoint announces itself.
+    note: Committed to in the deprecation policy. No endpoint is deprecated today,
+      so no live example exists to point at.
+  - name: IETF RateLimit header fields
+    verify: Any response carries RateLimit-Limit, RateLimit-Remaining and RateLimit-Reset.
+
+data_provenance:
+  principle: >-
+    Every claim about an institution names the register it came from and the day
+    that register was read, in the response itself. Where no register backs an
+    answer, the field says so rather than guessing.
+  fields:
+    - bank_code_check.register and bank_code_check.as_of
+    - bank_code_check.authoritative, which alone licenses reading an absence as
+      "allocated to nobody"
+    - modulus_check.source and modulus_check.as_of
+    - issuer.classification, which separates an identification from a fallback
+
+not_claimed:
+  - PCI DSS, SOC 2 or ISO 27001 certification. None held.
+  - Account ownership verification, Verification of Payee execution, or KYC.
+    We report whether a bank participates in VoP; we do not run the name check.
+  - Regulated AML/CFT screening. Sanctions screening here is at bank level.
+`;
+
 const ROADMAP = `# Roadmap — IBANforge
 
 **Updated:** 2026-08-14
@@ -615,6 +723,8 @@ const YAML_FILES: Record<string, string> = {
   'error-semantics': ERROR_SEMANTICS,
   plans: PLANS,
   finops: FINOPS,
+  rules: RULES,
+  conformance: CONFORMANCE,
   'skills/index': SKILLS_INDEX,
 };
 

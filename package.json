@@ -43,7 +43,9 @@
     "db:seed-blz": "tsx scripts/seed-blz.ts",
     "db:seed-national": "tsx scripts/seed-national.ts",
     "reco-baseline": "tsx scripts/reco-baseline.ts",
-    "db:seed-uk": "tsx scripts/seed-uk-modulus.ts"
+    "db:seed-uk": "tsx scripts/seed-uk-modulus.ts",
+    "openapi:dump": "tsx scripts/dump-openapi.ts",
+    "openapi:lint": "npm run openapi:dump && npx --yes @stoplight/spectral-cli@6 lint openapi.generated.json --ruleset .spectral.yaml"
   },
   "dependencies": {
     "@coinbase/x402": "^2.1.0",

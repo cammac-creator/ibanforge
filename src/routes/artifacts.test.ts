@@ -43,6 +43,8 @@ describe('the published operating artifacts', () => {
     'error-semantics',
     'plans',
     'finops',
+    'rules',
+    'conformance',
     'skills/index',
   ];
   const markdownFiles = [
@@ -140,6 +142,8 @@ describe('apis.json', () => {
       'ErrorSemantics',
       'Plans',
       'DeprecationPolicy',
+      'Rules',
+      'Conformance',
       'Skills',
     ]) {
       expect(types).toContain(required);
