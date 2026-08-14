@@ -22,6 +22,7 @@ import { fetchCrmData, SEEDED_PILOT_RE, type BuildInput } from '@/lib/crm/build-
 import { BY_CAMPAIGN, BY_CONFIDENCE, BY_COUNTRY, BY_SEGMENT, funnelBy } from '@/lib/crm/funnel';
 import { reservoir } from '@/lib/crm/priority';
 import { ReservoirCard } from '@/components/dashboard/reservoir-card';
+import { VisibilityPanel, type SurfaceStatus } from '@/components/dashboard/visibility-panel';
 import { FOLLOWUP_DAYS } from '@/lib/crm/situation';
 import { crmSnapshot } from '@/lib/crm/snapshot';
 import { topUsers } from '@/lib/crm/top-users';
@@ -220,7 +221,7 @@ export default async function DashboardPage({
     ? (periodParam as ValidPeriod)
     : 30;
 
-  const [statsRes, historyRes, funnelRes, activationRes, errorsRes, hourlyRes, eventsRes, digestRes, statusByPathRes, sourcesRes, patternsRes, crm] = await Promise.all([
+  const [statsRes, historyRes, funnelRes, activationRes, errorsRes, hourlyRes, eventsRes, digestRes, statusByPathRes, sourcesRes, patternsRes, visibilityRes, crm] = await Promise.all([
     fetchJSON<StatsResponse>('/stats', statsHeaders),
     fetchJSON<HistoryEntry[]>(`/stats/history?period=${period}`, statsHeaders),
     fetchJSON<{ rows?: BusinessFunnelDay[] }>(`/stats/business-funnel?period=${period}`, statsHeaders),
@@ -244,6 +245,10 @@ export default async function DashboardPage({
     // The CRM payloads, alongside the rest rather than after it. Null when
     // ADMIN_SECRET is unset or the API is unreachable, which is the same
     // condition the leads section already draws its own empty state for.
+    // The listing watch: one row per directory, filled by the daily VPS probe.
+    ADMIN_SECRET
+      ? fetchJSON<{ surfaces: SurfaceStatus[] }>('/v1/admin/visibility', { 'X-Admin-Secret': ADMIN_SECRET })
+      : Promise.resolve({ ok: false, status: 0, data: null } satisfies Fetched<{ surfaces: SurfaceStatus[] }>),
     fetchCrmData(),
   ]);
 
@@ -429,6 +434,9 @@ export default async function DashboardPage({
       </div>
 
       {/* 3. Contact base — the podium, the relationship figures, the campaigns */}
+      {visibilityRes.data?.surfaces && (
+        <VisibilityPanel surfaces={visibilityRes.data.surfaces} />
+      )}
       {crm && <ContactBase crm={crm} locale={locale} />}
 
       {/* 4. Clients — per email, credits first */}

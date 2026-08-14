@@ -5,6 +5,7 @@ import { getStatsDB } from '../lib/db.js';
 import { getClientProfiles, getBotProfiles } from '../lib/stats.js';
 import { getActivation } from '../lib/activation.js';
 import { recordEvent } from '../lib/events.js';
+import { getVisibility, recordVisibility, isVisibilityState } from '../lib/visibility.js';
 import { getWeeklyFacts, saveWeeklyDigest, getWeeklyDigests } from '../lib/weekly-facts.js';
 import { notifyPurchaseTelegram } from '../lib/notify.js';
 import { sendApiKeyEmail, isEmailConfigured } from '../lib/email.js';
@@ -662,6 +663,46 @@ apiKeys.post('/v1/admin/events', async (c) => {
   }
   recordEvent('manual', label);
   return c.json({ recorded: true }, 201);
+});
+
+/**
+ * The listing watch. A VPS probe walks the directories daily and posts what it
+ * saw; the overview reads it back. Getting listed is a one-off effort, staying
+ * listed is nobody's job, and a purge is silent.
+ */
+apiKeys.get('/v1/admin/visibility', (c) => {
+  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
+  return c.json({ surfaces: getVisibility() });
+});
+
+apiKeys.post('/v1/admin/visibility', async (c) => {
+  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
+  let body: { checks?: unknown };
+  try {
+    body = await c.req.json<{ checks?: unknown }>();
+  } catch {
+    return c.json({ error: 'invalid_json' }, 400);
+  }
+  if (!Array.isArray(body.checks) || body.checks.length === 0) {
+    return c.json({ error: 'invalid_body', message: 'Expected { checks: [{surface, state}] }' }, 400);
+  }
+  let saved = 0;
+  for (const raw of body.checks) {
+    const c2 = raw as { surface?: unknown; state?: unknown; detail?: unknown; url?: unknown };
+    if (typeof c2.surface !== 'string' || !isVisibilityState(c2.state)) continue;
+    recordVisibility({
+      surface: c2.surface,
+      state: c2.state,
+      detail: typeof c2.detail === 'string' ? c2.detail : null,
+      url: typeof c2.url === 'string' ? c2.url : null,
+    });
+    saved += 1;
+  }
+  return c.json({ saved }, 201);
 });
 
 /**

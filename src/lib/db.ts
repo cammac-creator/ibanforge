@@ -215,6 +215,18 @@ export function getStatsDB(): DatabaseType.Database {
         label TEXT NOT NULL
       );
       CREATE INDEX IF NOT EXISTS idx_events_date ON events(created_at);
+      -- Where we are listed, checked daily by a VPS probe. Getting listed is a
+      -- one-off effort; staying listed is nobody's job, and a directory purge
+      -- is silent. One row per surface per day, so a re-run corrects rather
+      -- than duplicates and "last seen present" stays trustworthy.
+      CREATE TABLE IF NOT EXISTS visibility_checks (
+        surface    TEXT NOT NULL,
+        checked_on TEXT NOT NULL,
+        state      TEXT NOT NULL CHECK (state IN ('present','absent','error')),
+        detail     TEXT,
+        url        TEXT,
+        PRIMARY KEY (surface, checked_on)
+      );
       -- Dated free-text notes per contact address — the operator's working
       -- memory ("migrating from iban.com, decision in September"). Read back
       -- into every AI draft brief, so what the operator knows, the writer
