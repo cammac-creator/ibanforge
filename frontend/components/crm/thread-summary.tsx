@@ -27,12 +27,25 @@ export function ThreadSummary({
 }) {
   const key = threadKeyOf(messages);
   const [text, setText] = useState<string | null>(null);
-  const [state, setState] = useState<'idle' | 'loading' | 'failed'>('idle');
+  // 'loading', not 'idle': the effect below fires on mount without fail, so
+  // starting idle would be a state the component is never actually in.
+  const [state, setState] = useState<'idle' | 'loading' | 'failed'>('loading');
+
+  // Reset while rendering, not in the effect. Setting state synchronously
+  // inside an effect makes React render once with the stale summary and again
+  // with the cleared one, and on a thread switch that stale frame shows the
+  // PREVIOUS contact's summary under the new contact's name. This is React's
+  // own "adjust state when a prop changes" pattern: it re-renders before
+  // anything is painted, so the wrong pairing never reaches the screen.
+  const [renderedKey, setRenderedKey] = useState(key);
+  if (key !== renderedKey) {
+    setRenderedKey(key);
+    setText(null);
+    setState('loading');
+  }
 
   useEffect(() => {
     let cancelled = false;
-    setText(null);
-    setState('loading');
     (async () => {
       try {
         const hit = await fetch(
@@ -87,7 +100,7 @@ export function ThreadSummary({
           <span className="font-semibold">📌 Où on en est</span> · {text}
         </p>
       ) : (
-        <p className="text-[12px] text-violet-300/60">📌 Résumé du fil en cours d'écriture…</p>
+        <p className="text-[12px] text-violet-300/60">📌 Résumé du fil en cours d&apos;écriture…</p>
       )}
     </div>
   );

@@ -98,7 +98,7 @@ export function ClientDossierPanel({
             {d.authOrQuota > 0 && d.paywall > 0 ? ' · ' : ''}
             {d.paywall > 0 ? `${d.paywall} paywall (402)` : ''}
             {d.rejectReasons[0] ? ` · motif : ${d.rejectReasons[0].reason}` : ''}.
-            Dernier appel servi le {d.lastSuccessAt?.slice(0, 10) ?? '—'}. Tant qu'ils n'ont pas réussi un appel,
+            Dernier appel servi le {d.lastSuccessAt?.slice(0, 10) ?? '—'}. Tant qu&apos;ils n&apos;ont pas réussi un appel,
             ils croient leur compte fermé.
           </p>
           {d.keys.some((k) => k.plan === 'free') && (
@@ -110,8 +110,8 @@ export function ClientDossierPanel({
       )}
       {d.verdict === 'struggling' && (
         <div className="mb-4 rounded-lg border border-[var(--warn)]/40 bg-[var(--warn)]/10 px-3 py-2 text-[13px] leading-snug text-[var(--fg-2)]">
-          <span className="font-semibold text-[var(--warn)]">Leur intégration bute</span> — plus de 30 % d'appels
-          rejetés. Voir « Ce qui leur est refusé » : souvent un format d'entrée, pas une panne.
+          <span className="font-semibold text-[var(--warn)]">Leur intégration bute</span> — plus de 30 % d&apos;appels
+          rejetés. Voir « Ce qui leur est refusé » : souvent un format d&apos;entrée, pas une panne.
         </div>
       )}
       {quality && (quality.thisWeekPct >= 10 || quality.prevWeekPct >= 10) && (

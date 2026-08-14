@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { byPriority, priorityOf, reservoir, sendableStock } from './priority';
-import type { Contact, Message, ProspectSourcing, Situation } from './types';
+import type { Contact, Message, ProspectSourcing, ReadyMail, Situation } from './types';
 
 /** Same conventions as buckets.test.ts: invented addresses on example.net. */
 
@@ -253,7 +253,16 @@ describe('sendableStock', () => {
 });
 
 describe('reservoir', () => {
-  const drafted = { subjectEn: 'Hello', bodyEn: 'Hi', subjectFr: null, bodyFr: null, recommendedLang: null };
+  // recommendedLang is 'fr' | 'en', never null — a drafted mail always has a
+  // language picked. reservoir() only asks whether a draft exists, so the value
+  // is arbitrary here, but the fixture still has to be a shape the type allows.
+  const drafted: ReadyMail = {
+    subjectEn: 'Hello',
+    bodyEn: 'Hi',
+    subjectFr: null,
+    bodyFr: null,
+    recommendedLang: 'en',
+  };
 
   it('narrows ready to rows whose mail is actually drafted', () => {
     const withMail = { ...prospect('ready@example.net', { createdAt: '2026-07-28 09:00:00' }), readyMail: drafted };
