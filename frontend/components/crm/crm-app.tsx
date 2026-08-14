@@ -246,9 +246,14 @@ export function CrmApp({
             {/* Pinned with the band, not scrolled with the thread: the whole
                 point is to spare the re-read, so it must be visible before
                 any scrolling happens. Only earns its pixels on real threads. */}
+            {/* Prefixed keys, deliberately: these three siblings each remount
+                on contact change via the id, but React requires keys to be
+                unique AMONG siblings. Three brothers sharing `selected.id`
+                broke reconciliation and stacked zombie summary cards, one per
+                contact switch, each frozen on the previous thread's text. */}
             {selected.messages.length >= 4 && selected.email && (
               <ThreadSummary
-                key={selected.id}
+                key={`summary-${selected.id}`}
                 email={selected.email}
                 company={selected.company}
                 messages={selected.messages}
@@ -315,7 +320,7 @@ export function CrmApp({
                 they cover differs. */}
             {intent === 'reply' ? (
               <ReplySheet
-                key={selected.id}
+                key={`reply-${selected.id}`}
                 contact={selected}
                 situation={situation}
                 // The page's count, forwarded untouched: the guardrail that caps
@@ -326,7 +331,7 @@ export function CrmApp({
               />
             ) : (
               <OutboundSheet
-                key={selected.id}
+                key={`outbound-${selected.id}`}
                 contact={selected}
                 situation={situation}
                 sentToday={sentToday}
