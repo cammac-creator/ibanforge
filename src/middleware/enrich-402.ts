@@ -301,7 +301,10 @@ const PRICING: EndpointPricing[] = [
     match: (m, p) => m === 'POST' && p === '/v1/iban/validate',
     price_usdc: 0.005,
     description:
-      'Validate a single IBAN (ISO 13616 mod-97) and resolve BIC, country, EMI/vIBAN classification, SEPA + VoP flags, and Swiss BC-Nummer for CH/LI accounts.',
+      // The register check is the claim that separates this from a checksum
+      // pass, and a registry operator told us it was invisible from the
+      // discovery document — it lived only in settled responses. Surfaced.
+      'Validate a single IBAN (ISO 13616 mod-97) and resolve BIC, country, EMI/vIBAN classification, SEPA + VoP flags, and Swiss BC-Nummer for CH/LI accounts. Domestic bank codes are verified against the national registers we mirror (with as-of dates), not just checksummed.',
     inputSchema: {
       type: 'object',
       required: ['iban'],
