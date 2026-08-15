@@ -32,11 +32,20 @@ function frDay(iso: string): string {
 
 export function OrphanMailPanel({ orphans }: { orphans: OrphanMailRow[] }) {
   const pending = orphans.filter((o) => !o.resolved);
+  // Replies are shown, first contacts are folded away behind a count.
+  //
+  // Measured on the first real run: fifteen unattached messages, of which one
+  // was a customer waiting on an answer and the rest were release notices and
+  // payout receipts. Showing all fifteen would bury the one that mattered, and a
+  // panel that is mostly noise stops being read — the same failure as not having
+  // one. A reply is somebody answering something we sent; that is the line worth
+  // putting in front of the eye.
+  const replies = pending.filter((o) => o.kind === 'reply');
+  const others = pending.length - replies.length;
+
   // Nothing waiting is the normal state, and a panel that renders an empty box
   // every day trains the eye to skip the whole column.
-  if (pending.length === 0) return null;
-
-  const replies = pending.filter((o) => o.kind === 'reply').length;
+  if (replies.length === 0) return null;
 
   return (
     <div className="rounded-xl border border-amber-500/40 bg-gradient-to-br from-amber-500/[0.07] to-[var(--ink-2)]/60 p-5">
@@ -44,13 +53,10 @@ export function OrphanMailPanel({ orphans }: { orphans: OrphanMailRow[] }) {
         <h2 className="text-sm font-semibold text-white">Courrier à rattacher</h2>
         <p className="text-[13px] text-[var(--fg-3)]">
           <span className="font-semibold text-amber-400">
-            {pending.length} message{pending.length > 1 ? 's' : ''}
+            {replies.length} réponse{replies.length > 1 ? 's' : ''} à un de nos fils
           </span>
-          {replies > 0 && (
-            <span className="text-amber-400">
-              {' '}
-              · {replies} réponse{replies > 1 ? 's' : ''} à un de nos fils
-            </span>
+          {others > 0 && (
+            <span> · {others} premier{others > 1 ? 's' : ''} contact{others > 1 ? 's' : ''} en attente</span>
           )}
         </p>
         <InfoDot>
@@ -58,12 +64,15 @@ export function OrphanMailPanel({ orphans }: { orphans: OrphanMailRow[] }) {
           l&apos;expéditeur n&apos;est ni un détenteur de clé ni un prospect connu. C&apos;est ce qui
           arrive quand un client répond depuis une autre adresse que celle de sa clé : sans ce
           panneau, le message n&apos;apparaît nulle part. « Réponse » veut dire qu&apos;il répond à
-          quelque chose qu&apos;on a envoyé, donc que quelqu&apos;un attend.
+          quelque chose qu&apos;on a envoyé, donc que quelqu&apos;un attend. Les premiers contacts
+          sont comptés mais pas listés : au premier relevé, quatorze des quinze messages étaient des
+          avis de publication npm et des reçus Stripe, et les afficher aurait enterré le seul qui
+          comptait.
         </InfoDot>
       </div>
 
       <ul className="divide-y divide-[var(--ink-4)]/50">
-        {pending.map((o) => (
+        {replies.map((o) => (
           <li key={o.id} className="py-2.5">
             <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
               <span
