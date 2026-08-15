@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { apiKeys } from './api-keys.js';
+import { getStatsDB } from '../lib/db.js';
 import { Hono } from 'hono';
 
 function makeApp() {
@@ -327,5 +328,69 @@ describe('/v1/admin/contact-notes — the operator working memory', () => {
       body: JSON.stringify({ email: EMAIL, note: '   ' }),
     });
     expect(res.status).toBe(400);
+  });
+});
+
+describe('/v1/admin/keys — a prepaid customer is not a dormant one', () => {
+  const admin = { 'X-Admin-Secret': 'correct-horse-battery-staple' };
+  const P = 'ifk_testcred';
+
+  function seed(creditsTotal: number, creditsRemaining: number, calls: number): void {
+    const db = getStatsDB();
+    db.prepare('DELETE FROM api_keys WHERE key_prefix = ?').run(P);
+    db.prepare('DELETE FROM request_log WHERE key_prefix = ?').run(P);
+    db.prepare(
+      `INSERT INTO api_keys (key_hash, key_prefix, email, monthly_limit, credits_remaining, credits_total)
+       VALUES (?, ?, ?, NULL, ?, ?)`,
+    ).run(`hash-${P}`, P, 'acme@example.com', creditsRemaining, creditsTotal);
+    const insert = db.prepare(
+      "INSERT INTO request_log (method, path, status, key_prefix, created_at) VALUES ('POST', '/v1/iban/batch', 200, ?, datetime('now'))",
+    );
+    for (let i = 0; i < calls; i++) insert.run(P);
+  }
+
+  function clean(): void {
+    const db = getStatsDB();
+    db.prepare('DELETE FROM api_keys WHERE key_prefix = ?').run(P);
+    db.prepare('DELETE FROM request_log WHERE key_prefix = ?').run(P);
+  }
+
+  async function readKey(): Promise<Record<string, unknown>> {
+    const res = await makeApp().request('/v1/admin/keys', { headers: admin });
+    const body = (await res.json()) as { keys: Array<Record<string, unknown>> };
+    return body.keys.find((k) => k.key_prefix === P)!;
+  }
+
+  it('counts credits spent as usage, not as silence', async () => {
+    // The defect this pins: a credit key writes no api_usage row, because the
+    // middleware takes the decrementCredits branch instead. Reading only that
+    // ledger showed a customer who had just spent 3,373 units as one who had
+    // never called, on the very screen used to decide who to contact.
+    seed(5000, 1627, 12);
+    const key = await readKey();
+    expect(key.used_all_time).toBe(3373);
+    expect(key.credits_used).toBe(3373);
+    clean();
+  });
+
+  it('draws the sparkline from the call log when the quota ledger is silent', async () => {
+    seed(5000, 1627, 12);
+    const key = await readKey();
+    expect(key.series_unit).toBe('calls');
+    expect((key.series as number[]).at(-1)).toBe(12);
+    // A month must be named, otherwise the CRM reads the customer as never seen.
+    expect(key.last_active_month).toBe(new Date().toISOString().slice(0, 7));
+    clean();
+  });
+
+  it('never reports negative usage when a refund overshoots', async () => {
+    // refundCredit clamps at credits_total, but a row edited by hand or an old
+    // migration could still hold remaining > total. Reporting -50 units used
+    // would be worse than reporting zero.
+    seed(1000, 1050, 0);
+    const key = await readKey();
+    expect(key.credits_used).toBe(0);
+    expect(key.used_all_time).toBe(0);
+    clean();
   });
 });

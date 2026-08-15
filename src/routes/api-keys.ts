@@ -306,13 +306,33 @@ apiKeys.get('/v1/admin/keys', (c) => {
   // pack) from a free key — the previous SELECT exposed neither, so the two were
   // indistinguishable. used_all_time / last_active_month / used_prev power the
   // activation, recency and trend indicators. All read-only.
+  //
+  // TWO LEDGERS, AND ONLY ONE WAS READ
+  //
+  // api_usage is the MONTHLY-QUOTA ledger: incrementUsage writes it, and only
+  // for keys that have a monthly_limit. A credit key takes the other branch in
+  // the middleware — decrementCredits — which touches credits_remaining and
+  // nothing else. So every prepaid customer read as `used_all_time: 0`, and the
+  // dashboard showed a customer who had just spent 3,373 units as one who had
+  // never called.
+  //
+  // Fixed on the READ side on purpose. Making decrementCredits also write
+  // api_usage would put credits into the table the monthly quota is enforced
+  // against, and a credit key falls back to DEFAULT_MONTHLY_LIMIT when
+  // monthly_limit is NULL — one future reader of that row away from capping a
+  // 5,000-credit pack at 200 calls a month. Reading both ledgers needs no
+  // migration and no backfill: credits_total - credits_remaining is already the
+  // exact all-time figure.
   const rows = db.prepare(
     `SELECT k.key_hash, k.key_prefix, k.email, k.monthly_limit, k.active, k.created_at,
             k.credits_total, k.credits_remaining,
             CASE WHEN k.stripe_session_id IS NOT NULL THEN 1 ELSE 0 END AS paid,
             COALESCE(u.count, 0) AS used,
             COALESCE(p.count, 0) AS used_prev,
-            COALESCE(t.total, 0) AS used_all_time,
+            COALESCE(t.total, 0)
+              + MAX(COALESCE(k.credits_total, 0) - COALESCE(k.credits_remaining, 0), 0)
+              AS used_all_time,
+            MAX(COALESCE(k.credits_total, 0) - COALESCE(k.credits_remaining, 0), 0) AS credits_used,
             lam.last_active_month AS last_active_month,
             COALESCE(es.mail_count, 0) AS mail_count,
             COALESCE(es.received, 0) AS mail_received,
@@ -348,10 +368,53 @@ apiKeys.get('/v1/admin/keys', (c) => {
     }
     m.set(u.month, u.count);
   }
+
+  // Same blind spot as used_all_time, one level down: a credit key writes no
+  // api_usage row, so its sparkline was a flat zero and last_active_month was
+  // null — the CRM read an active customer as dormant.
+  //
+  // request_log carries key_prefix on every authenticated call and covers both
+  // payment modes, so it fills the gap for keys api_usage never saw. It counts
+  // CALLS where api_usage counts billed units, and the two differ on batch (one
+  // call can bill a hundred). That is why it only fills in where the quota
+  // ledger is silent, rather than replacing it: mixing the units inside a single
+  // series would make two customers incomparable without saying so.
+  const callRows = db
+    .prepare(
+      `SELECT key_prefix, substr(created_at, 1, 7) AS month, COUNT(*) AS calls
+         FROM request_log
+        WHERE key_prefix IS NOT NULL AND created_at >= ?
+        GROUP BY 1, 2`,
+    )
+    .all(`${months[0]}-01`) as Array<{ key_prefix: string; month: string; calls: number }>;
+  const byPrefix = new Map<string, Map<string, number>>();
+  for (const r of callRows) {
+    let m = byPrefix.get(r.key_prefix);
+    if (!m) {
+      m = new Map();
+      byPrefix.set(r.key_prefix, m);
+    }
+    m.set(r.month, r.calls);
+  }
+
   const keys = rows.map((r) => {
-    const m = byHash.get(r.key_hash);
-    const series = months.map((mo) => m?.get(mo) ?? 0);
-    const out: Record<string, unknown> = { ...r, series };
+    const quota = byHash.get(r.key_hash);
+    const calls = byPrefix.get(String(r.key_prefix));
+    const useCalls = !quota && !!calls;
+    const source = useCalls ? calls : quota;
+    const series = months.map((mo) => source?.get(mo) ?? 0);
+    const out: Record<string, unknown> = {
+      ...r,
+      series,
+      // Says which ledger the series came from, so a reader never has to guess
+      // whether a number is billed units or HTTP calls.
+      series_unit: useCalls ? 'calls' : 'units',
+    };
+    // Only when the quota ledger has nothing to say, so a monthly key keeps its
+    // own answer.
+    if (!r.last_active_month && calls?.size) {
+      out.last_active_month = [...calls.keys()].sort().pop();
+    }
     delete out.key_hash; // internal join key, never exposed
     return out;
   });
