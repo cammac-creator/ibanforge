@@ -227,6 +227,24 @@ export function getStatsDB(): DatabaseType.Database {
         url        TEXT,
         PRIMARY KEY (surface, checked_on)
       );
+      -- Mail about IBANforge from an address the CRM cannot attach to anyone.
+      -- The sync only fetches threads for known addresses, so a customer who
+      -- answers from a different address than the one his key is registered
+      -- under vanishes: the reply arrives, and nothing says a message was set
+      -- aside. Keyed by source message id so a daily re-run corrects instead of
+      -- duplicating; the resolved flag is what lets the queue empty rather than
+      -- grow without end.
+      CREATE TABLE IF NOT EXISTS orphan_mail (
+        id          TEXT PRIMARY KEY,
+        sender      TEXT NOT NULL,
+        subject     TEXT,
+        snippet     TEXT,
+        msg_date    TEXT NOT NULL,
+        kind        TEXT NOT NULL CHECK (kind IN ('reply','first_contact')),
+        resolved    INTEGER NOT NULL DEFAULT 0,
+        resolved_as TEXT
+      );
+      CREATE INDEX IF NOT EXISTS idx_orphan_pending ON orphan_mail(resolved, msg_date);
       -- Dated free-text notes per contact address — the operator's working
       -- memory ("migrating from iban.com, decision in September"). Read back
       -- into every AI draft brief, so what the operator knows, the writer

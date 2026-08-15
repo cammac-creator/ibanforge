@@ -23,6 +23,7 @@ import { BY_CAMPAIGN, BY_CONFIDENCE, BY_COUNTRY, BY_SEGMENT, funnelBy } from '@/
 import { reservoir } from '@/lib/crm/priority';
 import { ReservoirCard } from '@/components/dashboard/reservoir-card';
 import { VisibilityPanel, type SurfaceStatus } from '@/components/dashboard/visibility-panel';
+import { OrphanMailPanel, type OrphanMailRow } from '@/components/dashboard/orphan-mail-panel';
 import { FOLLOWUP_DAYS } from '@/lib/crm/situation';
 import { crmSnapshot } from '@/lib/crm/snapshot';
 import { topUsers } from '@/lib/crm/top-users';
@@ -221,7 +222,7 @@ export default async function DashboardPage({
     ? (periodParam as ValidPeriod)
     : 30;
 
-  const [statsRes, historyRes, funnelRes, activationRes, errorsRes, hourlyRes, eventsRes, digestRes, statusByPathRes, sourcesRes, patternsRes, visibilityRes, crm] = await Promise.all([
+  const [statsRes, historyRes, funnelRes, activationRes, errorsRes, hourlyRes, eventsRes, digestRes, statusByPathRes, sourcesRes, patternsRes, visibilityRes, orphanRes, crm] = await Promise.all([
     fetchJSON<StatsResponse>('/stats', statsHeaders),
     fetchJSON<HistoryEntry[]>(`/stats/history?period=${period}`, statsHeaders),
     fetchJSON<{ rows?: BusinessFunnelDay[] }>(`/stats/business-funnel?period=${period}`, statsHeaders),
@@ -249,6 +250,11 @@ export default async function DashboardPage({
     ADMIN_SECRET
       ? fetchJSON<{ surfaces: SurfaceStatus[] }>('/v1/admin/visibility', { 'X-Admin-Secret': ADMIN_SECRET })
       : Promise.resolve({ ok: false, status: 0, data: null } satisfies Fetched<{ surfaces: SurfaceStatus[] }>),
+    // Mail the CRM cannot attach to anyone. Same posture as the listing watch:
+    // no admin secret means no panel, not a broken page.
+    ADMIN_SECRET
+      ? fetchJSON<{ orphans: OrphanMailRow[] }>('/v1/admin/orphan-mail', { 'X-Admin-Secret': ADMIN_SECRET })
+      : Promise.resolve({ ok: false, status: 0, data: null } satisfies Fetched<{ orphans: OrphanMailRow[] }>),
     fetchCrmData(),
   ]);
 
@@ -434,6 +440,7 @@ export default async function DashboardPage({
       </div>
 
       {/* 3. Contact base — the podium, the relationship figures, the campaigns */}
+      {orphanRes.data?.orphans && <OrphanMailPanel orphans={orphanRes.data.orphans} />}
       {visibilityRes.data?.surfaces && (
         <VisibilityPanel surfaces={visibilityRes.data.surfaces} />
       )}

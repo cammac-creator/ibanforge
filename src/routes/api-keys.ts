@@ -6,6 +6,7 @@ import { getClientProfiles, getBotProfiles } from '../lib/stats.js';
 import { getActivation } from '../lib/activation.js';
 import { recordEvent } from '../lib/events.js';
 import { getVisibility, recordVisibility, isVisibilityState } from '../lib/visibility.js';
+import { getOrphans, recordOrphan, resolveOrphan, countPendingOrphans, isOrphanKind } from '../lib/orphan-mail.js';
 import { getWeeklyFacts, saveWeeklyDigest, getWeeklyDigests } from '../lib/weekly-facts.js';
 import { notifyPurchaseTelegram } from '../lib/notify.js';
 import { sendApiKeyEmail, isEmailConfigured } from '../lib/email.js';
@@ -766,6 +767,76 @@ apiKeys.post('/v1/admin/visibility', async (c) => {
     saved += 1;
   }
   return c.json({ saved }, 201);
+});
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Mail the CRM cannot attach to anyone.
+//
+// The sync fetches threads for known addresses only, so a customer answering
+// from an address other than the one his key is registered under disappears.
+// These routes carry the set-aside messages to a place they will be seen; the
+// attaching itself stays a human decision.
+// ──────────────────────────────────────────────────────────────────────────────
+apiKeys.get('/v1/admin/orphan-mail', (c) => {
+  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
+  const includeResolved = c.req.query('all') === '1';
+  return c.json({ orphans: getOrphans(includeResolved), pending: countPendingOrphans() });
+});
+
+apiKeys.post('/v1/admin/orphan-mail', async (c) => {
+  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
+  let body: { messages?: unknown };
+  try {
+    body = await c.req.json<{ messages?: unknown }>();
+  } catch {
+    return c.json({ error: 'invalid_json' }, 400);
+  }
+  if (!Array.isArray(body.messages)) {
+    return c.json(
+      { error: 'invalid_body', message: 'Expected { messages: [{id, sender, msg_date, kind}] }' },
+      400,
+    );
+  }
+  let saved = 0;
+  for (const raw of body.messages) {
+    const m = raw as Record<string, unknown>;
+    // Skipped rather than rejected: one malformed row in a nightly batch must
+    // not cost the whole run, and the sync has no way to retry a 400.
+    if (typeof m.id !== 'string' || typeof m.sender !== 'string') continue;
+    if (typeof m.msg_date !== 'string' || !isOrphanKind(m.kind)) continue;
+    recordOrphan({
+      id: m.id,
+      sender: m.sender,
+      subject: typeof m.subject === 'string' ? m.subject : null,
+      snippet: typeof m.snippet === 'string' ? m.snippet : null,
+      msg_date: m.msg_date,
+      kind: m.kind,
+    });
+    saved += 1;
+  }
+  return c.json({ saved, pending: countPendingOrphans() }, 201);
+});
+
+apiKeys.post('/v1/admin/orphan-mail/resolve', async (c) => {
+  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
+  let body: { id?: unknown; attached_to?: unknown };
+  try {
+    body = await c.req.json<{ id?: unknown; attached_to?: unknown }>();
+  } catch {
+    return c.json({ error: 'invalid_json' }, 400);
+  }
+  if (typeof body.id !== 'string') {
+    return c.json({ error: 'invalid_body', message: 'Expected { id, attached_to? }' }, 400);
+  }
+  const ok = resolveOrphan(body.id, typeof body.attached_to === 'string' ? body.attached_to : null);
+  if (!ok) return c.json({ error: 'not_found' }, 404);
+  return c.json({ resolved: body.id, pending: countPendingOrphans() });
 });
 
 /**
