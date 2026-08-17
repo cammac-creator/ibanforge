@@ -69,19 +69,22 @@ These return non-200 HTTP status codes.
 
 ### 402 Payment Required
 
-Returned when the `X-PAYMENT` header is missing, expired, or invalid. The response includes payment instructions:
+Returned when the payment header is missing, expired, or invalid (`PAYMENT-SIGNATURE` for x402 v2, `X-PAYMENT` for v1). The response includes payment instructions:
 
 ```json
 {
-  "error": "Payment Required",
-  "accepts": {
-    "scheme": "exact",
-    "network": "base",
-    "maxAmountRequired": "2000",
-    "resource": "https://api.ibanforge.com/v1/iban/validate",
-    "payTo": "0x...",
-    "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
-  }
+  "x402Version": 2,
+  "error": "payment_required",
+  "resource": { "url": "https://api.ibanforge.com/v1/iban/validate" },
+  "accepts": [
+    {
+      "scheme": "exact",
+      "network": "eip155:8453",
+      "amount": "5000",
+      "payTo": "0x...",
+      "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+    }
+  ]
 }
 ```
 

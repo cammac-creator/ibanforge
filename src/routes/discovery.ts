@@ -80,21 +80,31 @@ const PAID_ENDPOINTS: PricedEndpoint[] = [
   },
 ];
 
+/**
+ * The payment options for one endpoint, in the x402 v2 shape the paywall
+ * actually serves: `amount` rather than v1's `maxAmountRequired`, and the
+ * network in CAIP-2 rather than the bare name `base`.
+ *
+ * This document used to answer v1 while the live 402 answered v2, which is
+ * worse than either — an agent that reads the discovery document and then
+ * calls the endpoint got two different contracts for the same resource.
+ *
+ * `resource` stays a CONCRETE URL, and stays outside `accepts`: in v2 an
+ * accepts entry carries payment terms only, and `extra` is EIP-712 signing
+ * material rather than a place for metadata.
+ */
 function buildAccepts(endpoint: PricedEndpoint, walletAddress: string) {
-  // x402 v0.1 spec: amount in atomic units. USDC has 6 decimals.
+  // Amount in atomic units. USDC has 6 decimals.
   const atomicAmount = Math.round(endpoint.price_usdc * 1_000_000).toString();
   return [
     {
       scheme: 'exact',
-      network: NETWORK,
-      maxAmountRequired: atomicAmount,
-      resource: `https://api.ibanforge.com${endpoint.examplePath ?? endpoint.path}`,
-      description: endpoint.description,
-      mimeType: 'application/json',
+      network: NETWORK_CHAIN_ID,
+      amount: atomicAmount,
+      asset: USDC_BASE,
       payTo: walletAddress,
       maxTimeoutSeconds: 60,
-      asset: USDC_BASE,
-      extra: { name: 'USDC', version: '2' },
+      extra: { name: 'USD Coin', version: '2' },
     },
   ];
 }
@@ -111,7 +121,7 @@ const x402Document: Handler = (c) => {
   const walletAddress = process.env.WALLET_ADDRESS ?? '0x0000000000000000000000000000000000000000';
 
   return c.json({
-    x402Version: 1,
+    x402Version: 2,
     name: 'IBANforge',
     description:
       `IBAN validation, BIC/SWIFT lookup, Swiss clearing & compliance API. ${F.claim.bic} BIC entries (${F.claim.lei} LEI-enriched via GLEIF), ${F.claim.chClearing} Swiss BC-Nummer from SIX, 89 countries, 85 EMI/vIBAN issuer classifications, refreshed monthly.`,
@@ -119,7 +129,10 @@ const x402Document: Handler = (c) => {
     documentation: 'https://ibanforge.com/docs',
     pricing: 'https://ibanforge.com/pricing',
     openapi: 'https://api.ibanforge.com/openapi.json',
-    network: NETWORK,
+    // CAIP-2 is how x402 v2 names a network; the bare name is kept alongside
+    // because plenty of readers still look for "base" and both are true.
+    network: NETWORK_CHAIN_ID,
+    network_name: NETWORK,
     chain_id: NETWORK_CHAIN_ID,
     asset: {
       address: USDC_BASE,
@@ -141,6 +154,11 @@ const x402Document: Handler = (c) => {
     endpoints: PAID_ENDPOINTS.map((ep) => ({
       ...ep,
       atomic_amount: Math.round(ep.price_usdc * 1_000_000).toString(),
+      // A URL an agent can call as-is. It moved out of `accepts` when this
+      // document went to v2 (a v2 accepts entry is payment terms only), but it
+      // has to stay somewhere: it is what makes the parameterised endpoints
+      // reachable instead of a listing of ":code".
+      resource: `https://api.ibanforge.com${ep.examplePath ?? ep.path}`,
       accepts: buildAccepts(ep, walletAddress),
     })),
     free_endpoints: [
@@ -166,7 +184,12 @@ const x402Document: Handler = (c) => {
       x402: {
         scheme: 'exact',
         protocol: 'x402',
-        version: 1,
+        version: 2,
+        // v1 clients are not turned away: the paywall reads an X-PAYMENT
+        // signature as readily as a v2 PAYMENT-SIGNATURE one. Only the
+        // announcement moved.
+        accepts_legacy_v1_payments: true,
+        payment_header: 'PAYMENT-SIGNATURE',
         docs: 'https://x402.org',
       },
     },

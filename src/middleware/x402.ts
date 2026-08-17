@@ -3,6 +3,7 @@ import { createRequire } from 'node:module';
 import type { HonoEnv } from '../types.js';
 import { datasetFacts } from '../lib/dataset-facts.js';
 import { BANK_CODE_CHECK_SCHEMA as BANK_CODE_CHECK_OPENAPI , NEXT_STEPS_SCHEMA as NEXT_STEPS_OPENAPI } from '../lib/bank-code-schema.js';
+import { buildBazaarInfo, discoveryForRoute, routeTemplateOf } from '../lib/x402-discovery.js';
 
 const require = createRequire(import.meta.url);
 const pkg = require('../../package.json') as { version: string };
@@ -278,16 +279,7 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
               bodyType: 'json',
               inputSchema: ibanInputSchema,
               outputSchema: ibanOutputSchema,
-              info: {
-                input: {
-                  type: 'http',
-                  method: 'POST',
-                  bodyType: 'json',
-                  body: { iban: 'CH10 0023 0000 0000 1234 5' },
-                  discoverable: true,
-                },
-                output: { type: 'json' },
-              },
+              // `info` is filled from the shared discovery table below.
             },
           },
         },
@@ -343,16 +335,6 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
                   valid_count: { type: 'number', description: 'Number of valid IBANs.' },
                   cost_usdc: { type: 'number', description: 'Actual USDC charged for this call.' },
                 },
-              },
-              info: {
-                input: {
-                  type: 'http',
-                  method: 'POST',
-                  bodyType: 'json',
-                  body: { ibans: ['CH1000230000000012345', 'DE89370400440532013000'] },
-                  discoverable: true,
-                },
-                output: { type: 'json' },
               },
             },
           },
@@ -415,15 +397,6 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
                   },
                   address_available: { type: 'boolean' },
                 },
-              },
-              info: {
-                input: {
-                  type: 'http',
-                  method: 'GET',
-                  pathParams: { code: 'UBSWCHZH80A' },
-                  discoverable: true,
-                },
-                output: { type: 'json' },
               },
             },
           },
@@ -523,16 +496,6 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
                     },
                   },
                 },
-              },
-              info: {
-                input: {
-                  type: 'http',
-                  method: 'POST',
-                  bodyType: 'json',
-                  body: { iban: 'GB29NWBK60161331926819' },
-                  discoverable: true,
-                },
-                output: { type: 'json' },
               },
             },
           },
@@ -668,19 +631,55 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
                   valid_on: { type: 'string' },
                 },
               },
-              info: {
-                input: {
-                  type: 'http',
-                  method: 'GET',
-                  pathParams: { iid: '00230' },
-                  discoverable: true,
-                },
-                output: { type: 'json' },
-              },
             },
           },
         },
       };
+
+      // Every route gets the same three things, derived from its key rather
+      // than repeated eight times, so a route added later cannot forget them.
+      //
+      // `resource` is the one that matters. Without it the SDK falls back to
+      // adapter.getUrl(), which is `c.req.url` — and Railway terminates TLS
+      // then forwards over plain HTTP, so the v2 PAYMENT-REQUIRED header went
+      // out announcing `http://api.ibanforge.com/...`. That is verbatim the
+      // string Coinbase's own validator rejected on 14/08/2026: "discovery
+      // request validation failed: resource must start with 'https://' when
+      // protocol type is http". The 14/08 pass checked the v1 body's
+      // accepts[0].resource, which was https, and never decoded the header.
+      //
+      // It advertises the URL actually requested, never the `:code` template.
+      // Catalog grouping does not need the template here — the Bazaar
+      // extension emits its own `routeTemplate` field — and a template in a
+      // field agents treat as callable has already cost us: the discovery
+      // document listed /v1/bic/:code, agents called it literally, the route
+      // read ":code" as a BIC and answered 400, and two of five priced
+      // resources were unbuyable from May to 30/07/2026.
+      const SERVICE_NAME = 'IBANforge'; // max 32 chars, printable ASCII (SDK schema)
+      const TAGS = ['iban', 'bic', 'sepa', 'compliance', 'banking']; // max 5, 32 chars each
+      const ICON_URL = 'https://ibanforge.com/logo.svg';
+      const requestPath = new URL(c.req.url).pathname;
+
+      for (const [key, config] of Object.entries(routes)) {
+        const [routeMethod, routeTemplate] = key.split(' ');
+        // Only the matching route's config is ever consulted, but resolving it
+        // per route keeps every entry describing itself truthfully.
+        const isCurrent = routeMethod === c.req.method && routeTemplateOf(requestPath) === routeTemplate;
+        const path = isCurrent ? requestPath : routeTemplate;
+        const entry = config as { extensions?: { bazaar?: Record<string, unknown> } } & Record<string, unknown>;
+        Object.assign(entry, {
+          resource: `https://api.ibanforge.com${path}`,
+          serviceName: SERVICE_NAME,
+          tags: TAGS,
+          iconUrl: ICON_URL,
+        });
+        // How to call the route and what a real answer looks like, from the
+        // shared table so the header and the 402 body cannot disagree.
+        const discovery = discoveryForRoute(key);
+        if (discovery && entry.extensions?.bazaar) {
+          entry.extensions.bazaar.info = buildBazaarInfo(discovery);
+        }
+      }
 
       // Create CDP facilitator client
       const cdpKeyId = process.env.CDP_API_KEY_ID;

@@ -329,7 +329,7 @@ curl -s -X POST https://api.ibanforge.com/v1/iban/compliance \\
 
 Response includes a \`compliance\` object with: \`risk_score\` (0-100), \`risk_level\` ("low"/"medium"/"elevated"/"high"/"critical"), \`sanctions\` (OFAC matched list + FATF status), \`reachability\` (SEPA Instant/SCT/SDD), \`vop\` participant status, and \`flags\` (e.g. sanctioned_country, fatf_grey_list, emi_issuer, no_vop) — plus the full validate enrichment and a \`meta\` provenance block.
 
-**Note for unauthenticated probes**: any of the above paid endpoints called WITHOUT \`Authorization\` or x402 \`X-PAYMENT\` header returns HTTP 402 with a discovery envelope (price, payTo, asset, network, outputSchema). This is by design and lets x402-aware clients auto-pay. Pass \`{}\` as body on POSTs — it WILL return 402, not 400.
+**Note for unauthenticated probes**: any of the above paid endpoints called WITHOUT \`Authorization\` or an x402 payment header returns HTTP 402 with a discovery envelope (x402 v2: price, payTo, asset, CAIP-2 network, and the Bazaar discovery block). The same requirements travel base64-encoded in the \`PAYMENT-REQUIRED\` response header. This is by design and lets x402-aware clients auto-pay. Pass \`{}\` as body on POSTs — it WILL return 402, not 400. Payment header: \`PAYMENT-SIGNATURE\` (v2); a v1 \`X-PAYMENT\` signature is still accepted.
 
 ### 6. /v1/iban/format — free pre-flight (no auth, no payment)
 
@@ -440,7 +440,11 @@ import { getIban, getIbansArray } from './lib/request-helpers.js';
 
 function isAuthenticatedProbe(c: { req: { header: (n: string) => string | undefined } }): boolean {
   const auth = c.req.header('authorization');
-  const payment = c.req.header('x-payment');
+  // Both dialects. `x-payment` is v1; `payment-signature` is v2 and is what
+  // every current client sends — a v2 payer was missing this gate entirely,
+  // so a malformed body reached the paywall and got charged instead of being
+  // handed the 400 that says which field is wrong.
+  const payment = c.req.header('payment-signature') ?? c.req.header('x-payment');
   return Boolean(payment) || Boolean(auth?.toLowerCase().startsWith('bearer '));
 }
 

@@ -69,19 +69,22 @@ Ces erreurs renvoient des codes de statut HTTP non-200.
 
 ### 402 Payment Required
 
-Renvoye lorsque l'en-tete `X-PAYMENT` est manquant, expire ou invalide. La reponse inclut les instructions de paiement :
+Renvoye lorsque l'en-tete de paiement est manquant, expire ou invalide (`PAYMENT-SIGNATURE` pour x402 v2, `X-PAYMENT` pour la v1). La reponse inclut les instructions de paiement :
 
 ```json
 {
-  "error": "Payment Required",
-  "accepts": {
-    "scheme": "exact",
-    "network": "base",
-    "maxAmountRequired": "2000",
-    "resource": "https://api.ibanforge.com/v1/iban/validate",
-    "payTo": "0x...",
-    "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
-  }
+  "x402Version": 2,
+  "error": "payment_required",
+  "resource": { "url": "https://api.ibanforge.com/v1/iban/validate" },
+  "accepts": [
+    {
+      "scheme": "exact",
+      "network": "eip155:8453",
+      "amount": "5000",
+      "payTo": "0x...",
+      "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+    }
+  ]
 }
 ```
 

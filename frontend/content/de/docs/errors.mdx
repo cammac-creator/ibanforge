@@ -69,19 +69,22 @@ Diese geben HTTP-Statuscodes ungleich 200 zurück.
 
 ### 402 Payment Required
 
-Wird zurückgegeben, wenn der `X-PAYMENT`-Header fehlt, abgelaufen oder ungültig ist. Die Antwort enthält Zahlungsanweisungen:
+Wird zurückgegeben, wenn der Zahlungs-Header fehlt, abgelaufen oder ungültig ist (`PAYMENT-SIGNATURE` für x402 v2, `X-PAYMENT` für v1). Die Antwort enthält Zahlungsanweisungen:
 
 ```json
 {
-  "error": "Payment Required",
-  "accepts": {
-    "scheme": "exact",
-    "network": "base",
-    "maxAmountRequired": "2000",
-    "resource": "https://api.ibanforge.com/v1/iban/validate",
-    "payTo": "0x...",
-    "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
-  }
+  "x402Version": 2,
+  "error": "payment_required",
+  "resource": { "url": "https://api.ibanforge.com/v1/iban/validate" },
+  "accepts": [
+    {
+      "scheme": "exact",
+      "network": "eip155:8453",
+      "amount": "5000",
+      "payTo": "0x...",
+      "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+    }
+  ]
 }
 ```
 

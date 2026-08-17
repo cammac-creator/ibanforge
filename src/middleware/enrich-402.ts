@@ -1,291 +1,18 @@
 import type { MiddlewareHandler } from 'hono';
 import type { HonoEnv, PaywallCause } from '../types.js';
 import { datasetFacts } from '../lib/dataset-facts.js';
+import { buildBazaarInfo, findDiscovery, markExample, routeTemplateOf } from '../lib/x402-discovery.js';
 
 /** Dataset sizes, read once and rounded down so a claim cannot outlive its data. */
 const F = datasetFacts();
 
-
 const USDC_BASE = '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913';
-const NETWORK = 'base';
-
-// Per-route Bazaar discovery payload following the v1 recipe documented in
-// the CDP Discord #x402 channel by @CyberSapper:
-//   - outputSchema.input.body (NOT JSON Schema): example values the v1
-//     facilitator's extractBodyInfo() reads to display the request shape
-//   - outputSchema.input.bodyType: "json" for POST endpoints
-//   - outputSchema.input.schema: optional JSON Schema kept alongside body for
-//     x402scan strict validation
-//   - outputSchema.output: BARE example object, NOT wrapped {type, example} —
-//     v1's extractDiscoveryInfoV1 wraps the whole thing as example itself.
-//
-// Without this, the CDP Bazaar catalog rejects the discovery extension with
-// EXTENSION-RESPONSES → {bazaar:{status:"rejected"}} and agentic.market never
-// indexes the service. With this, indexing happens within ~1-2 hours of the
-// next successful settlement.
-
-interface BazaarDiscovery {
-  inputBody?: Record<string, unknown>;
-  inputPathParams?: Record<string, unknown>;
-  inputQueryParams?: Record<string, unknown>;
-  inputMethod: 'GET' | 'POST';
-  bodyType?: 'json';
-  inputJsonSchema?: Record<string, unknown>;
-  outputExample: Record<string, unknown>;
-}
-
-const DISCOVERY: Array<{ match: (m: string, p: string) => boolean; data: BazaarDiscovery }> = [
-  {
-    match: (m, p) => m === 'POST' && p === '/v1/iban/validate',
-    data: {
-      inputMethod: 'POST',
-      bodyType: 'json',
-      inputBody: { iban: 'CH1000230000000012345' },
-      inputJsonSchema: {
-        type: 'object',
-        required: ['iban'],
-        properties: {
-          iban: {
-            type: 'string',
-            description: 'IBAN to validate (spaces and lowercase accepted).',
-            minLength: 15,
-            maxLength: 34,
-          },
-        },
-      },
-      // Real API response for the input above (captured from prod), cost shown at the x402 rate.
-      outputExample: {
-        iban: 'CH1000230000000012345',
-        valid: true,
-        country: { code: 'CH', name: 'Switzerland' },
-        check_digits: '10',
-        bban: { bank_code: '00230', account_number: '000000012345' },
-        sepa: { member: true, schemes: ['SCT', 'SDD'], vop_required: false },
-        formatted: 'CH10 0023 0000 0000 1234 5',
-        bic: { code: 'UBSWCHZH', bank_name: 'UBS Switzerland AG', city: 'Zürich' },
-        issuer: { type: 'bank', name: 'UBS Switzerland AG', classification: 'default' },
-        risk_indicators: {
-          issuer_type: 'bank',
-          country_risk: 'standard',
-          test_bic: false,
-          sepa_reachable: true,
-          sepa_reachable_scope: 'country',
-          vop_coverage: false,
-        },
-        bank_code_check: {
-          value: '00230',
-          status: 'verified',
-          match: 'register',
-          register: 'SIX BankMaster (Swiss IID / BC-Nummer register)',
-          authoritative: true,
-          as_of: '2026-07',
-        },
-        clearing: {
-          iid: '00230',
-          name: 'UBS Switzerland AG',
-          type: 'bank',
-          town: 'Zürich',
-          sic: true,
-          instant_payments_chf: true,
-          eurosic: true,
-          qr_iid: null,
-        },
-        cost_usdc: 0.005,
-      },
-    },
-  },
-  {
-    match: (m, p) => m === 'POST' && p === '/v1/iban/batch',
-    data: {
-      inputMethod: 'POST',
-      bodyType: 'json',
-      inputBody: { ibans: ['CH1000230000000012345', 'DE89370400440532013000'] },
-      inputJsonSchema: {
-        type: 'object',
-        required: ['ibans'],
-        properties: {
-          ibans: {
-            type: 'array',
-            items: { type: 'string' },
-            minItems: 1,
-            maxItems: 100,
-            description: 'Array of 1 to 100 IBAN strings.',
-          },
-        },
-      },
-      // Real response shape (per-result fields trimmed; each result carries the
-      // same enrichment as /v1/iban/validate). count/valid_count, not "summary".
-      outputExample: {
-        results: [
-          {
-            iban: 'CH1000230000000012345',
-            valid: true,
-            country: { code: 'CH', name: 'Switzerland' },
-            bic: { code: 'UBSWCHZH', bank_name: 'UBS Switzerland AG', city: 'Zürich' },
-          },
-          {
-            iban: 'DE89370400440532013000',
-            valid: true,
-            country: { code: 'DE', name: 'Germany' },
-            bic: { code: 'COBADEFFXXX', bank_name: 'Commerzbank', city: 'Köln' },
-          },
-        ],
-        count: 2,
-        valid_count: 2,
-        cost_usdc: 0.004,
-      },
-    },
-  },
-  {
-    match: (m, p) => m === 'GET' && /^\/v1\/bic\/[^/]+$/.test(p),
-    data: {
-      inputMethod: 'GET',
-      inputPathParams: { code: 'UBSWCHZH80A' },
-      // Real API response for the input above (captured from prod, trimmed).
-      outputExample: {
-        bic: 'UBSWCHZH80A',
-        bic8: 'UBSWCHZH',
-        bic11: 'UBSWCHZH80A',
-        found: true,
-        valid_format: true,
-        institution: 'UBS Switzerland AG',
-        country: { code: 'CH', name: 'Switzerland' },
-        city: 'Zurich',
-        address: {
-          type: 'registered',
-          street: 'Bahnhofstrasse 45',
-          post_code: '8001',
-          city: 'Zurich',
-          country: 'CH',
-          source: 'GLEIF',
-        },
-        address_available: true,
-        branch_code: '80A',
-        lei: '549300WOIFUSNYH0FL22',
-        lei_status: 'ACTIVE',
-        is_test_bic: false,
-        source: 'gleif',
-      },
-    },
-  },
-  {
-    match: (m, p) => m === 'GET' && /^\/v1\/ch\/clearing\/[^/]+$/.test(p),
-    data: {
-      inputMethod: 'GET',
-      inputPathParams: { iid: '00230' },
-      // Real API response for the input above (captured from prod, trimmed).
-      outputExample: {
-        iid: '00230',
-        found: true,
-        institution: { name: 'UBS Switzerland AG', type: 'bank', iid_type: 'headquarters', headquarters_iid: '00230' },
-        address: { street: 'Bahnhofstrasse', building_number: '45', post_code: '8098', town: 'Zürich', country: 'CH' },
-        bic: 'UBSWCHZH80A',
-        payment_services: {
-          sic: true,
-          rtgs_chf: true,
-          instant_payments_chf: true,
-          eurosic: true,
-          lsv_bdd_chf: true,
-          lsv_bdd_eur: true,
-        },
-        sic_iid: '002301',
-        qr_iid: null,
-      },
-    },
-  },
-  {
-    match: (m, p) => m === 'POST' && p === '/v1/iban/compliance',
-    data: {
-      inputMethod: 'POST',
-      bodyType: 'json',
-      inputBody: { iban: 'CH1000230000000012345' },
-      inputJsonSchema: {
-        type: 'object',
-        required: ['iban'],
-        properties: {
-          iban: { type: 'string', description: 'IBAN to triage.', minLength: 15, maxLength: 34 },
-        },
-      },
-      // Real API response for the input above (captured from prod, trimmed —
-      // the full response also carries the complete /v1/iban/validate enrichment).
-      outputExample: {
-        iban: 'CH1000230000000012345',
-        valid: true,
-        country: { code: 'CH', name: 'Switzerland' },
-        bic: { code: 'UBSWCHZH', bank_name: 'UBS Switzerland AG', city: 'Zürich' },
-        compliance: {
-          sanctions: {
-            country_sanctioned: false,
-            bank_sanctioned: false,
-            matched_lists: [],
-            fatf_status: 'member',
-          },
-          reachability: { sepa_instant: true, sct: true, sdd: true },
-          vop: { participant: false, status: 'not_found' },
-          risk_score: 5,
-          risk_level: 'low',
-          flags: ['no_vop'],
-        },
-        meta: { scope: 'bank_bic_only' },
-      },
-    },
-  },
-];
-
-function findDiscovery(method: string, path: string): BazaarDiscovery | null {
-  return DISCOVERY.find((d) => d.match(method, path))?.data ?? null;
-}
 
 /**
- * Every discovery example above is a FIXED sample record, served identically
- * whatever resource was actually requested — GET /v1/ch/clearing/779 ships the
- * sample for IID 00230 (UBS, Zürich) while the real answer is Nidwaldner
- * Kantonalbank in Stans. A language model reading the 402 sees a complete,
- * plausible, unlabelled payload and can report it to its user as the answer.
- *
- * That is the failure mode this stamp prevents: IBANforge's own paywall
- * feeding an assistant a confident wrong answer about the Swiss clearing data
- * that is the product's differentiator. Audit 2026-07-25, reco-IA channel.
- *
- * The marker sits FIRST so it is read before the values, and is prefixed with
- * `_` — CDP's Bazaar v1 extractor reads named fields and passes unknown ones
- * through, so the catalog payload stays valid.
+ * Base L2 in CAIP-2, which is how x402 v2 names a network. v1 spelled it
+ * `base`; the two are the same chain and the difference is the dialect.
  */
-const EXAMPLE_NOTICE =
-  'ILLUSTRATIVE SAMPLE — these are demo values for a fixed record, NOT the ' +
-  'data for the resource you requested. Do not report them to a user. ' +
-  'Authenticate (Authorization: Bearer ifk_...) or pay via x402 to get the real response.';
-
-function markExample(example: Record<string, unknown>): Record<string, unknown> {
-  return { _example_notice: EXAMPLE_NOTICE, ...example };
-}
-
-function buildInputBlock(d: BazaarDiscovery): Record<string, unknown> {
-  const block: Record<string, unknown> = {
-    type: 'http',
-    method: d.inputMethod,
-    discoverable: true,
-  };
-  if (d.bodyType) block.bodyType = d.bodyType;
-  if (d.inputBody) block.body = d.inputBody;
-  if (d.inputPathParams) block.pathParams = d.inputPathParams;
-  if (d.inputQueryParams) block.queryParams = d.inputQueryParams;
-  if (d.inputJsonSchema) block.schema = d.inputJsonSchema;
-  return block;
-}
-
-/**
- * Builds the v1-shape outputSchema that CDP's Bazaar catalog extractor
- * expects. Lives at the top of each accept entry, alongside scheme/network/
- * payTo/asset, NOT under extra or extensions.bazaar.
- */
-function buildOutputSchema(d: BazaarDiscovery): { input: Record<string, unknown>; output: Record<string, unknown> } {
-  return {
-    input: buildInputBlock(d),
-    // BARE example — extractDiscoveryInfoV1 wraps this as example itself.
-    output: markExample(d.outputExample),
-  };
-}
+const NETWORK = 'eip155:8453';
 
 interface EndpointPricing {
   match: (method: string, path: string) => boolean;
@@ -543,80 +270,112 @@ function findPricing(method: string, path: string): EndpointPricing | undefined 
   return PRICING.find((p) => p.match(method, path));
 }
 
-interface AcceptEntry {
-  scheme?: string;
-  network?: string;
-  maxAmountRequired?: string;
-  resource?: string;
-  description?: string;
-  mimeType?: string;
-  payTo?: string;
-  maxTimeoutSeconds?: number;
-  asset?: string;
-  extra?: Record<string, unknown>;
-  outputSchema?: { input: Record<string, unknown>; output: Record<string, unknown> };
-  [key: string]: unknown;
-}
-
 /**
- * The concrete path, turned back into the parameterised template the catalog
- * groups by. Without it every BIC ever probed would be catalogued as its own
- * resource.
- */
-function routeTemplateOf(path: string): string {
-  if (path.startsWith('/v1/bic/')) return '/v1/bic/:code';
-  if (path.startsWith('/v1/ch/clearing/')) return '/v1/ch/clearing/:iid';
-  return path;
-}
-
-/**
- * The top-level `extensions.bazaar` block, which is what the Agentic Market
- * ingestion actually reads.
+ * The x402 v2 announcement the SDK already produced, decoded from the
+ * `PAYMENT-REQUIRED` header.
  *
- * Why this exists, measured on 14/08/2026 against Coinbase's own validator
- * (agentic.market/validate): every transport and payment check passed, the
- * discovery info was correctly recovered from the v1 `outputSchema`, and the
- * run still ended on "discovery request validation failed: resource must
- * start with 'https://'". The v1 fallback reconstructs the info but not a
- * usable resource, so nothing is ever catalogued. Emitting the block at the
- * root, with an absolute resource and the route template, gives the ingester
- * the record directly instead of asking it to infer one.
- *
- * Purely additive: x402 clients read `accepts`, and an unknown sibling key is
- * ignored by every parser in the wild, so a paying integration cannot break on
- * it. The shape mirrors the SDK's own buildBazaarExtensionFromDiscoveryInfo.
+ * This is the machine half of the 402 body, and reading it back rather than
+ * rebuilding it is the whole point: until 17/08/2026 the body was assembled
+ * here by hand and announced x402 v1 (`maxAmountRequired`, network `base`)
+ * while the header on the very same response announced v2 (`amount`, network
+ * `eip155:8453`). Two answers to "what do I owe you" for one resource. A
+ * payment surface cannot have a second opinion.
  */
-function buildBazaarExtensions(method: string, path: string): Record<string, unknown> | null {
-  const d = findDiscovery(method, path);
-  if (!d) return null;
-  return {
-    bazaar: {
-      resource: `https://api.ibanforge.com${path}`,
-      routeTemplate: routeTemplateOf(path),
-      info: {
-        input: buildInputBlock(d),
-        // Wrapped as {type, example} here, unlike the v1 outputSchema where the
-        // extractor does the wrapping itself. The validator reads this one.
-        output: { type: 'json', example: markExample(d.outputExample) },
-      },
-      schema: {
-        $schema: 'https://json-schema.org/draft/2020-12/schema',
-        type: 'object',
-        properties: { input: { type: 'object' }, output: { type: 'object' } },
-        required: ['input'],
-      },
-    },
-  };
-}
-
-function injectOutputSchema(method: string, path: string, accept: AcceptEntry): AcceptEntry {
-  const discovery = findDiscovery(method, path);
-  if (!discovery) return accept;
-  // Only inject if it's missing — never overwrite a more authoritative source.
-  if (!accept.outputSchema) {
-    accept.outputSchema = buildOutputSchema(discovery);
+function safeJson(text: string): Record<string, unknown> | null {
+  try {
+    const parsed = JSON.parse(text) as unknown;
+    return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : null;
+  } catch {
+    return null;
   }
-  return accept;
+}
+
+function decodePaymentRequired(header: string | null): Record<string, unknown> | null {
+  if (!header) return null;
+  try {
+    const decoded = JSON.parse(Buffer.from(header, 'base64').toString('utf8')) as unknown;
+    if (!decoded || typeof decoded !== 'object') return null;
+    const announcement = decoded as Record<string, unknown>;
+    return Array.isArray(announcement.accepts) ? announcement : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * A v2 announcement for a route the x402 middleware does not gate, so the 402
+ * still says what it costs and how to pay it.
+ *
+ * In production every paid route carries the header, so this is the safety net
+ * rather than the path — but a 402 that cannot quote a price is a dead end,
+ * and this file exists because we shipped exactly that once.
+ */
+function buildFallbackAnnouncement(
+  method: string,
+  path: string,
+  walletAddress: string,
+): Record<string, unknown> | null {
+  const pricing = findPricing(method, path);
+  if (!pricing) return null;
+
+  const announcement: Record<string, unknown> = {
+    x402Version: 2,
+    resource: {
+      // The URL actually requested, same as the SDK announces on the gated
+      // routes. A `:code` template here would be published as callable and is
+      // not: it answers 400.
+      url: `https://api.ibanforge.com${path}`,
+      description: pricing.description,
+      mimeType: 'application/json',
+    },
+    accepts: [
+      {
+        scheme: 'exact',
+        network: NETWORK,
+        amount: Math.round(pricing.price_usdc * 1_000_000).toString(),
+        asset: USDC_BASE,
+        payTo: walletAddress,
+        maxTimeoutSeconds: 60,
+        // The EIP-712 domain the payer signs against, and nothing else. v1
+        // carried our inputSchema and outputExample in here too; in v2 `extra`
+        // is signing material, so discovery data belongs in extensions.bazaar.
+        extra: { name: 'USD Coin', version: '2' },
+      },
+    ],
+  };
+
+  const discovery = findDiscovery(method, path);
+  if (discovery) {
+    announcement.extensions = {
+      bazaar: {
+        discoverable: true,
+        // What a catalog groups on, so /v1/bic/:code stays one resource
+        // instead of one per BIC ever probed. The SDK emits this field itself
+        // on the gated routes; the fallback matches it rather than being a
+        // lesser stand-in.
+        routeTemplate: routeTemplateOf(path),
+        ...(discovery.bodyType ? { bodyType: discovery.bodyType } : {}),
+        ...(pricing.inputSchema ? { inputSchema: pricing.inputSchema } : {}),
+        info: buildBazaarInfo(discovery),
+      },
+    };
+  } else if (pricing.outputExample) {
+    // Credit bundles have no captured sample response, only the shape of the
+    // key they mint, so they get the example without the rest.
+    announcement.extensions = {
+      bazaar: {
+        discoverable: true,
+        bodyType: 'json',
+        ...(pricing.inputSchema ? { inputSchema: pricing.inputSchema } : {}),
+        info: {
+          input: { type: 'http', method, bodyType: 'json', body: {}, discoverable: true },
+          output: { type: 'json', example: markExample(pricing.outputExample) },
+        },
+      },
+    };
+  }
+
+  return announcement;
 }
 
 /**
@@ -646,6 +405,10 @@ function buildAccessRamp(): Record<string, unknown> {
       protocol_docs: 'https://x402.org',
       discovery: 'https://api.ibanforge.com/.well-known/x402',
       bazaar: 'https://api.cdp.coinbase.com/platform/v2/x402/discovery/resources',
+      // Both dialects settle. We announce v2; the route still honours a v1
+      // X-PAYMENT signature, so an older client that already holds v1
+      // requirements is not locked out.
+      payment_header: 'PAYMENT-SIGNATURE (x402 v2) — X-PAYMENT (v1) is still accepted',
     },
     documentation: 'https://ibanforge.com/docs',
     terms: 'https://ibanforge.com/legal/terms — using the API constitutes acceptance',
@@ -653,18 +416,6 @@ function buildAccessRamp(): Record<string, unknown> {
   };
 }
 
-/**
- * Enriches HTTP 402 responses to be both machine-readable (x402 v0.1 spec compliant)
- * AND human-readable. Agents need the `accepts` array to automate payment;
- * humans need the message + free_tier instructions.
- *
- * Two paths:
- *   1. Body empty / {} → build a full 402 from pricing config (legacy fallback
- *      for routes that aren't gated by the @x402/hono middleware).
- *   2. Body has `accepts` from x402 middleware → patch each accept entry to
- *      add `outputSchema` (CyberSapper recipe) at the top level so the CDP
- *      Bazaar v1 catalog extractor indexes the service.
- */
 /**
  * When the api-key middleware flagged WHY this request fell through to the
  * paywall (exhausted quota/credits, broken key), surface it prominently:
@@ -710,100 +461,62 @@ function stripFreeTierWhenExhausted(
   return rest;
 }
 
+/**
+ * Turns a 402 into something both a payment client and a person can act on.
+ *
+ * The machine half is the x402 v2 announcement the SDK put in the
+ * `PAYMENT-REQUIRED` header, decoded back into the body — agents that never
+ * look at headers, and the language models that read our 402s as
+ * documentation, both get the real requirements. The human half is the access
+ * ramp: the free key, the credit packs, the pay-per-call rail.
+ *
+ * Only `error` is deliberately not mirrored. The header carries the SDK's
+ * prose ("Payment required"); the body keeps `payment_required`, which is the
+ * error code we publish in llms.txt and in the error table agents branch on.
+ */
 export function enrich402Middleware(): MiddlewareHandler<HonoEnv> {
   return async (c, next) => {
     await next();
 
     if (c.res.status !== 402) return;
 
-    const cloned = c.res.clone();
-    const text = await cloned.text();
-
     const url = new URL(c.req.url);
     const method = c.req.method;
-    const pricing = findPricing(method, url.pathname);
     const walletAddress = process.env.WALLET_ADDRESS ?? '0x0000000000000000000000000000000000000000';
 
-    // Path 2: existing 402 with an `accepts` body — patch accepts with
-    // outputSchema AND add the human/agent access ramp around it.
-    if (text && text.trim() !== '' && text.trim() !== '{}') {
-      let parsed: { accepts?: AcceptEntry[]; [key: string]: unknown };
-      try {
-        parsed = JSON.parse(text);
-      } catch {
-        return; // not JSON, leave alone
+    let announcement = decodePaymentRequired(c.res.headers.get('payment-required'));
+
+    if (!announcement) {
+      const existing = (await c.res.clone().text()).trim();
+      if (existing === '' || existing === '{}') {
+        announcement = buildFallbackAnnouncement(method, url.pathname, walletAddress);
+      } else {
+        // Something upstream wrote a body. If it quotes payment terms, those
+        // terms are the announcement and we only add the ramp around them.
+        // Anything else is another middleware's considered 402 and we leave
+        // its explanation alone rather than overwriting it with ours.
+        const parsed = safeJson(existing);
+        if (!parsed || !Array.isArray(parsed.accepts)) return;
+        announcement = parsed;
+        if (!parsed.extensions) {
+          const fallback = buildFallbackAnnouncement(method, url.pathname, walletAddress);
+          if (fallback?.extensions) parsed.extensions = fallback.extensions;
+        }
       }
-      if (!Array.isArray(parsed.accepts) || parsed.accepts.length === 0) return;
-
-      const patchedAccepts = parsed.accepts.map((a) =>
-        injectOutputSchema(method, url.pathname, { ...a }),
-      );
-
-      // Spread `parsed` first to keep any field the x402 SDK produced
-      // (x402Version, error, …); the ramp's fields then take precedence.
-      // `accepts` is never part of buildAccessRamp() — reassigned explicitly
-      // so the outputSchema injection stays intact.
-      const paywallCause = c.get('paywallCause');
-      const enriched: Record<string, unknown> = stripFreeTierWhenExhausted(
-        {
-          x402Version: 1,
-          error: 'payment_required',
-          ...parsed,
-          ...buildAccessRamp(),
-          ...causeFields(paywallCause),
-        },
-        paywallCause,
-      );
-      enriched.accepts = patchedAccepts;
-      // Never overwrite an extensions block the SDK already produced.
-      if (!enriched.extensions) {
-        const ext = buildBazaarExtensions(method, url.pathname);
-        if (ext) enriched.extensions = ext;
-      }
-
-      c.res = new Response(JSON.stringify(enriched, null, 2), {
-        status: 402,
-        headers: c.res.headers,
-      });
-      c.res.headers.set('Content-Type', 'application/json');
-      return;
     }
 
-    // Path 1: empty body — build full 402 (legacy fallback)
-    const baseAccept: AcceptEntry = pricing
-      ? {
-          scheme: 'exact',
-          network: NETWORK,
-          maxAmountRequired: Math.round(pricing.price_usdc * 1_000_000).toString(),
-          resource: `https://api.ibanforge.com${url.pathname}`,
-          description: pricing.description,
-          mimeType: 'application/json',
-          payTo: walletAddress,
-          maxTimeoutSeconds: 60,
-          asset: USDC_BASE,
-          extra: {
-            name: 'USDC',
-            version: '2',
-            ...(pricing.inputSchema ? { inputSchema: pricing.inputSchema } : {}),
-            ...(pricing.outputExample ? { outputExample: markExample(pricing.outputExample) } : {}),
-          },
-        }
-      : {};
-
-    const accepts = pricing ? [injectOutputSchema(method, url.pathname, baseAccept)] : [];
-
-    const fallbackCause = c.get('paywallCause');
-    const fallbackExt = buildBazaarExtensions(method, url.pathname);
+    // An empty 402 on a route we cannot price still gets the access ramp: the
+    // caller learns how to obtain a key or buy credits. A bare `{}` is the
+    // dead end this middleware exists to prevent.
+    const paywallCause = c.get('paywallCause');
     const body = stripFreeTierWhenExhausted(
       {
-        x402Version: 1,
+        ...(announcement ?? {}),
         error: 'payment_required',
-        accepts,
-        ...(fallbackExt ? { extensions: fallbackExt } : {}),
         ...buildAccessRamp(),
-        ...causeFields(fallbackCause),
+        ...causeFields(paywallCause),
       },
-      fallbackCause,
+      paywallCause,
     );
 
     c.res = new Response(JSON.stringify(body, null, 2), {

@@ -108,3 +108,27 @@ describe('ensureWalletConfigured', () => {
     expect(() => ensureWalletConfigured()).not.toThrow();
   });
 });
+
+/**
+ * We announce x402 v2 and tell the world, in /.well-known/x402, that a v1
+ * payment still settles (`accepts_legacy_v1_payments: true`). That promise is
+ * not ours to keep — it belongs to @x402/hono, which reads the v2
+ * `PAYMENT-SIGNATURE` header and falls back to v1's `X-PAYMENT`.
+ *
+ * It is the fact that makes the migration safe: a client holding v1
+ * requirements from before 17/08/2026 can still pay. So it is checked here
+ * rather than assumed, because the day an SDK bump drops the fallback we
+ * should learn it from a red build and not from a payer who cannot pay.
+ */
+describe('the promise that a v1 payment still settles', () => {
+  it('is kept by the installed @x402/hono, which reads both payment headers', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { createRequire } = await import('node:module');
+    const require = createRequire(import.meta.url);
+    const entry = require.resolve('@x402/hono');
+    const source = readFileSync(entry, 'utf8');
+
+    expect(source, 'v2 payment header').toContain('payment-signature');
+    expect(source, 'v1 payment header — dropping this locks out older clients').toContain('x-payment');
+  });
+});

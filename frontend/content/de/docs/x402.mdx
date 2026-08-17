@@ -37,20 +37,37 @@ HTTP/1.1 402 Payment Required
 
 ```json
 {
-  "error": "Payment Required",
-  "accepts": {
-    "scheme": "exact",
-    "network": "base",
-    "maxAmountRequired": "5000",
-    "resource": "https://api.ibanforge.com/v1/iban/validate",
+  "x402Version": 2,
+  "error": "payment_required",
+  "resource": {
+    "url": "https://api.ibanforge.com/v1/iban/validate",
     "description": "IBAN validation — $0.005 USDC",
-    "mimeType": "application/json",
-    "payTo": "0x...",
-    "maxTimeoutSeconds": 300,
-    "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
-  }
+    "mimeType": "application/json"
+  },
+  "accepts": [
+    {
+      "scheme": "exact",
+      "network": "eip155:8453",
+      "amount": "5000",
+      "asset": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      "payTo": "0x...",
+      "maxTimeoutSeconds": 60,
+      "extra": { "name": "USD Coin", "version": "2" }
+    }
+  ]
 }
 ```
+
+The same requirements travel in the `PAYMENT-REQUIRED` response header, base64
+encoded. Clients that read the header and clients that read the body get the
+same terms.
+
+Amounts are atomic units: USDC has 6 decimals, so `"5000"` is $0.005. The
+network is CAIP-2 — `eip155:8453` is Base mainnet.
+
+> **Older v1 clients still settle.** We announce v2, but the paywall accepts a
+> v1 `X-PAYMENT` signature as readily as a v2 `PAYMENT-SIGNATURE` one, so an
+> integration written against the v1 shape keeps working.
 
 Diese Antwort teilt Ihrem Client genau mit, was zu zahlen ist, wohin und auf welchem Netzwerk (Base L2).
 
