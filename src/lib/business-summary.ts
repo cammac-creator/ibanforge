@@ -150,6 +150,14 @@ function accountLabel(email: string): string {
 /** How many paying accounts the payload lists before it starts counting instead. */
 export const MAX_LISTED_ACCOUNTS = 12;
 
+/**
+ * Floor for "regular user". Two calls spread over two months is not a habit,
+ * and a list that calls it one buries the accounts that are. Seen on the first
+ * production run: a key with a couple of lifetime calls sat in the same list
+ * as one with hundreds.
+ */
+export const STEADY_MIN_CALLS = 10;
+
 export interface CreditAccount {
   key_prefix: string;
   domain: string;
@@ -284,7 +292,7 @@ export function buildBusinessSummary(input: {
         _live: recent.some((n) => n > 0),
       };
     })
-    .filter((s) => s.months_active >= 2 && s._live)
+    .filter((s) => s.months_active >= 2 && s._live && s.used_all_time >= STEADY_MIN_CALLS)
     .map(({ _live, ...s }) => s)
     .sort((a, b) => b.used_all_time - a.used_all_time);
 

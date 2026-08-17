@@ -152,6 +152,15 @@ describe('steady unpaid users', () => {
     expect(s.steady_unpaid).toHaveLength(0);
   });
 
+  it('ignores a trickle of calls spread over two months', () => {
+    // A key with a couple of lifetime calls is not a habit, and listing it
+    // beside one with hundreds is how the useful name gets buried.
+    const s = summary([
+      key({ email: 'trickle@alpha.example.net', used: 1, used_all_time: 2, series: [0, 0, 0, 1, 0, 1] }),
+    ]);
+    expect(s.steady_unpaid).toHaveLength(0);
+  });
+
   it('ignores a single-month burst', () => {
     const s = summary([
       key({ email: 'once@alpha.example.net', used: 40, used_all_time: 40, series: [0, 0, 0, 0, 0, 40] }),
