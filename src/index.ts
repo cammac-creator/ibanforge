@@ -82,6 +82,22 @@ app.use('*', cors({
   // Both must be listed: a browser client sending a header absent from this
   // list is stopped at the preflight, so the paid call never leaves the page.
   allowHeaders: ['Content-Type', 'Authorization', 'PAYMENT-SIGNATURE', 'X-Payment', 'X-API-Key'],
+  // Without exposeHeaders a browser caller can read only the six CORS-safelisted
+  // response headers, so every signal we take care to send back — how much quota
+  // is left, why a key was refused, what a batch was charged — was invisible to
+  // JavaScript. The server looked like it answered; the page saw nothing. Only
+  // client-facing signalling is listed: X-Frame-Options and friends are for the
+  // browser itself, not for the caller's code.
+  exposeHeaders: [
+    'X-Quota-Used', 'X-Quota-Limit', 'X-Quota-Remaining', 'X-Quota-Month',
+    'X-Quota-Charged', 'X-Quota-Required', 'X-Quota-Exhausted',
+    'X-Quota-Insufficient', 'X-Quota-Reset-Hint', 'X-Quota-Notice',
+    'X-Credits-Remaining', 'X-Credits-Total', 'X-Credits-Charged',
+    'X-Credits-Required', 'X-Credits-Exhausted', 'X-Credits-Insufficient',
+    'X-Credits-Topup-Hint',
+    'X-API-Key-Invalid', 'X-API-Version',
+    'X-RateLimit-Limit', 'X-RateLimit-Remaining', 'X-RateLimit-Reset',
+  ],
 }));
 // Hono's logger prints `url.slice(url.indexOf('/', 8))` — the query string
 // INCLUDED — and Railway persists stdout. So `GET /v1/iban/format?iban=CH93…`

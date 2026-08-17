@@ -84,6 +84,24 @@ curl https://api.ibanforge.com/v1/keys/usage \
 }
 ```
 
+## Surveiller votre quota
+
+Chaque réponse authentifiée porte vos compteurs, en cas de succès comme de
+refus, pour que vous puissiez réagir avant le mur plutôt qu'au moment où vous
+le heurtez :
+
+```
+X-Quota-Used: 47
+X-Quota-Limit: 200
+X-Quota-Remaining: 153
+X-Quota-Month: 2026-05
+```
+
+Les chiffres sont le solde une fois la requête réglée : un appel rejeté en 4xx
+est remboursé, et ces en-têtes tiennent déjà compte du remboursement. Si vous
+préférez interroger plutôt que lire des en-têtes, `GET /v1/keys/usage` renvoie
+les mêmes nombres, et c'est gratuit.
+
 ## Lorsque votre quota est depasse
 
 Votre intégration ne tombe **pas** sur un cul-de-sac. Une fois les 200 requêtes mensuelles épuisées, l'API répond `402 Payment Required` (x402) plutôt qu'un 429 sec, avec des en-têtes qui disent exactement ce qui s'est passé :

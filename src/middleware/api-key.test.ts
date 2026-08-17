@@ -324,3 +324,59 @@ describe('apiKeyMiddleware — paywall cause surfaced in the 402 body', () => {
     expect(body.message).toContain('Authentication or payment required');
   });
 });
+
+describe('apiKeyMiddleware — telling a successful caller where it stands', () => {
+  // These headers used to be set ONLY on a refusal, so a client could not see
+  // itself approaching the wall: it learned at the moment it hit it. A customer
+  // building a "warn me at N% of quota" guard had nothing to read on a 200.
+  it('reports quota on a SUCCESSFUL call, not only on a refused one', async () => {
+    const key = generateApiKey(`hdr-ok-${RUN_ID}@example.com`)!.api_key;
+    const app = makeApp();
+    const res = await app.request('/v1/iban/validate', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ iban: 'DE89370400440532013000' }),
+    });
+    expect(res.status).toBe(200);
+    expect(res.headers.get('X-Quota-Used')).toBe('1');
+    expect(res.headers.get('X-Quota-Limit')).toBe('200');
+    expect(res.headers.get('X-Quota-Remaining')).toBe('199');
+    expect(res.headers.get('X-Quota-Month')).toMatch(/^\d{4}-\d{2}$/);
+  });
+
+  // The subtle half. The slot is taken before the handler runs and handed back
+  // when it answers 4xx, so a header written before next() advertises a balance
+  // the caller does not actually owe. It must be written after the refund.
+  it('publishes the balance AFTER a 4xx refund, not the amount briefly charged', async () => {
+    const key = generateApiKey(`hdr-refund-${RUN_ID}@example.com`)!.api_key;
+    const { keyHash } = validateApiKey(key);
+    const app = new Hono<HonoEnv>();
+    app.use('/v1/*', apiKeyMiddleware());
+    app.route('/', ibanBatch);
+
+    // 101 IBANs bills the capped 100, then the handler rejects the batch.
+    const res = await app.request('/v1/iban/batch', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ibans: Array(101).fill('DE89370400440532013000') }),
+    });
+    expect(res.status).toBe(400);
+    expect(res.headers.get('X-Quota-Used')).toBe('0');
+    expect(res.headers.get('X-Quota-Remaining')).toBe('200');
+    // And the header told the truth about the ledger.
+    expect(getUsage(keyHash).used).toBe(0);
+  });
+
+  it('reports the credit balance on a successful prepaid call', async () => {
+    const key = generateCreditKey(`hdr-credits-${RUN_ID}@example.com`, 1000)!.api_key;
+    const app = makeApp();
+    const res = await app.request('/v1/iban/validate', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ iban: 'DE89370400440532013000' }),
+    });
+    expect(res.status).toBe(200);
+    expect(res.headers.get('X-Credits-Total')).toBe('1000');
+    expect(res.headers.get('X-Credits-Remaining')).toBe('999');
+  });
+});

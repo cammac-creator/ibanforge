@@ -84,6 +84,24 @@ curl https://api.ibanforge.com/v1/keys/usage \
 }
 ```
 
+## Ihr Kontingent im Blick behalten
+
+Jede authentifizierte Antwort traegt Ihre Zaehler mit, bei Erfolg wie bei
+Ablehnung, damit Sie handeln koennen bevor Sie an die Grenze stossen und nicht
+erst dann:
+
+```
+X-Quota-Used: 47
+X-Quota-Limit: 200
+X-Quota-Remaining: 153
+X-Quota-Month: 2026-05
+```
+
+Die Zahlen sind der Stand nach Abschluss der Anfrage: ein mit 4xx abgelehnter
+Aufruf wird erstattet, und diese Header beruecksichtigen die Erstattung bereits.
+Wer lieber abfragt als Header liest: `GET /v1/keys/usage` liefert dieselben
+Zahlen, kostenlos.
+
 ## Wenn Ihr Kontingent erschoepft ist
 
 Ihre Integration landet **nicht** in einer Sackgasse. Sind die 200 monatlichen Anfragen aufgebraucht, antwortet die API mit `402 Payment Required` (x402) statt einem harten 429 — mit Hinweis-Headern, die genau sagen, was passiert ist:

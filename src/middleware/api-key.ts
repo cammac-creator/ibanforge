@@ -11,6 +11,28 @@ import { maybeSendQuotaWarning } from '../lib/quota-notice.js';
  *   2. X-API-Key: ifk_xxx                  (de-facto standard for many agents/SDKs)
  *   3. ?api_key=ifk_xxx                    (query param — last resort, used by curl/CLI examples)
  */
+/**
+ * Tell a successful caller where it stands.
+ *
+ * 🚨 These used to be set ONLY when a request was refused, so a client could
+ * not see it approaching the wall — it learned at the moment it hit it. A
+ * customer building a "warn me at N% of quota" guard had nothing to read, and
+ * the 80% warning e-mail exists precisely because the response carried nothing.
+ *
+ * Set AFTER the handler runs, and after any 4xx refund, so the figure is the
+ * balance the caller actually has left. Setting it before `next()` would
+ * publish a slot that gets handed straight back.
+ */
+function setQuotaHeaders(
+  c: Parameters<MiddlewareHandler<HonoEnv>>[0],
+  q: { used: number; limit: number; month: string },
+): void {
+  c.header('X-Quota-Used', String(q.used));
+  c.header('X-Quota-Limit', String(q.limit));
+  c.header('X-Quota-Remaining', String(Math.max(q.limit - q.used, 0)));
+  c.header('X-Quota-Month', q.month);
+}
+
 function extractKey(c: Parameters<MiddlewareHandler<HonoEnv>>[0]): string | null {
   const auth = c.req.header('Authorization');
   if (auth?.startsWith('Bearer ifk_')) return auth.slice(7);
@@ -111,15 +133,19 @@ export function apiKeyMiddleware(): MiddlewareHandler<HonoEnv> {
         await next();
         return;
       }
-      c.header('X-Credits-Remaining', String(remaining));
       c.header('X-Credits-Total', String(creditsTotal ?? 0));
       if (units > 1) c.header('X-Credits-Charged', String(units));
       c.set('apiKeyAuthenticated', true);
       await next();
       // Refund credits on 4xx client errors (mirror monthly quota behavior).
+      // Same reason as the quota headers below: the balance is published after
+      // the refund, otherwise it advertises credits that were handed back.
+      let left = remaining;
       if (c.res.status >= 400 && c.res.status < 500) {
         refundCredit(keyHash, units);
+        left = remaining + units;
       }
+      c.header('X-Credits-Remaining', String(left));
       return;
     }
 
@@ -186,8 +212,11 @@ export function apiKeyMiddleware(): MiddlewareHandler<HonoEnv> {
     // attacker could burn a key's monthly quota for free by spamming invalid
     // payloads. 5xx is NOT refunded — we charge for server-side failures to
     // avoid hiding infrastructure problems.
+    let used = quota.used;
     if (c.res.status >= 400 && c.res.status < 500) {
       decrementQuota(keyHash, units);
+      used = Math.max(quota.used - units, 0);
     }
+    setQuotaHeaders(c, { used, limit: quota.limit, month: quota.month });
   };
 }

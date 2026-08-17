@@ -84,6 +84,23 @@ curl https://api.ibanforge.com/v1/keys/usage \
 }
 ```
 
+## Watching your quota
+
+Every authenticated response carries your counters, on success as well as on
+refusal, so you can act before you reach the wall rather than when you hit it:
+
+```
+X-Quota-Used: 47
+X-Quota-Limit: 200
+X-Quota-Remaining: 153
+X-Quota-Month: 2026-05
+```
+
+The figures are the balance after the request settled: a call rejected with a
+4xx is refunded, and these headers already reflect the refund. If you prefer
+polling to reading headers, `GET /v1/keys/usage` returns the same numbers, and
+it is free.
+
 ## When you exceed the quota
 
 Your integration does **not** hit a hard dead-end. Once the 200 monthly requests are used up, the API answers `402 Payment Required` (x402) instead of a blunt 429, with hint headers telling you exactly what happened:
