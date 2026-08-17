@@ -24,8 +24,14 @@ Keine Registrierung. Keine API-Schlüssel. Keine Ratenlimits. Sie zahlen nur, wa
 | Endpunkt | Kosten pro Anfrage |
 |---|---|
 | `POST /v1/iban/validate` | $0.005 USDC |
-| `POST /v1/iban/batch` | $0.020 USDC |
+| `POST /v1/iban/batch` | $0.002 USDC pro IBAN (1 IBAN = $0.002, 100 = $0.20) |
 | `GET /v1/bic/:code` | $0.003 USDC |
+| `POST /v1/iban/compliance` | $0.02 USDC |
+| `GET /v1/ch/clearing/:iid` | $0.003 USDC |
+
+Der Batch-Preis gilt pro IBAN und wird nach der Größe der gesendeten Liste
+berechnet: ein Batch mit einer einzigen IBAN kostet $0.002, nicht den Preis
+eines vollen Batches.
 
 ## Die 402-Antwort
 

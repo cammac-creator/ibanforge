@@ -24,8 +24,13 @@ No signup. No API keys. No rate limits. You only pay for what you use.
 | Endpoint | Cost per request |
 |---|---|
 | `POST /v1/iban/validate` | $0.005 USDC |
-| `POST /v1/iban/batch` | $0.020 USDC |
+| `POST /v1/iban/batch` | $0.002 USDC per IBAN (1 IBAN = $0.002, 100 = $0.20) |
 | `GET /v1/bic/:code` | $0.003 USDC |
+| `POST /v1/iban/compliance` | $0.02 USDC |
+| `GET /v1/ch/clearing/:iid` | $0.003 USDC |
+
+The batch price is per IBAN and billed on the size of the list you send, so a
+one-IBAN batch costs $0.002, not the price of a full batch.
 
 ## The 402 response
 

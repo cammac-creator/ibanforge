@@ -1,5 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { ensureWalletConfigured, isSellingRoute } from './x402.js';
+import {
+  MAX_RESOURCE_DESCRIPTION,
+  buildRouteTable,
+  capDescription,
+  ensureWalletConfigured,
+  isSellingRoute,
+} from './x402.js';
 
 /**
  * Security audit 2026-07-25, finding 1: the x402 middleware skipped the paywall
@@ -130,5 +136,59 @@ describe('the promise that a v1 payment still settles', () => {
 
     expect(source, 'v2 payment header').toContain('payment-signature');
     expect(source, 'v1 payment header — dropping this locks out older clients').toContain('x-payment');
+  });
+});
+
+/**
+ * The defect this guards against did not look like a bug. Every route was
+ * announced, correctly priced, discoverable and documented — and one of them
+ * could not be paid, because its description ran to 616 characters and
+ * Coinbase's facilitator rejects a payment payload that carries one longer
+ * than 512. The error names no field: `'paymentPayload' is invalid`.
+ *
+ * /v1/bic/:code was in that state for months. Settlement campaigns, an
+ * escalation to the CDP Discord and a GitHub issue all went past it, because
+ * the route table lived inside a closure no test could reach.
+ */
+describe('every priced route stays payable', () => {
+  const TABLE = () => buildRouteTable('0x0000000000000000000000000000000000000001', 'GET', '/v1/bic/COBADEFFXXX');
+
+  it('describes itself within the facilitator payload limit', () => {
+    for (const [route, config] of Object.entries(TABLE())) {
+      const { description } = config as { description?: string };
+      expect(typeof description, route).toBe('string');
+      expect(description!.length, `${route} description is ${description!.length} chars`)
+        .toBeLessThanOrEqual(MAX_RESOURCE_DESCRIPTION);
+    }
+  });
+
+  it('finds routes to check, so an empty table cannot pass silently', () => {
+    expect(Object.keys(TABLE()).length).toBeGreaterThanOrEqual(5);
+  });
+
+  it('caps a description that grows past the limit rather than losing the sale', () => {
+    const long = 'x'.repeat(MAX_RESOURCE_DESCRIPTION + 200);
+    expect(capDescription(long).length).toBeLessThanOrEqual(MAX_RESOURCE_DESCRIPTION);
+    expect(capDescription('short')).toBe('short');
+  });
+
+  it('announces the requested URL over https, never the :code template', () => {
+    const bic = TABLE()['GET /v1/bic/:code'] as { resource: string };
+    expect(bic.resource).toBe('https://api.ibanforge.com/v1/bic/COBADEFFXXX');
+    for (const [route, config] of Object.entries(TABLE())) {
+      const { resource } = config as { resource: string };
+      expect(resource.startsWith('https://'), route).toBe(true);
+    }
+  });
+
+  it('keeps serviceName and tags inside the schema the SDK enforces', () => {
+    // zod rejects past these bounds, and a rejected schema means no 402 at all.
+    for (const [route, config] of Object.entries(TABLE())) {
+      const { serviceName, tags } = config as { serviceName: string; tags: string[] };
+      expect(serviceName.length, route).toBeLessThanOrEqual(32);
+      expect(/^[\x20-\x7e]+$/.test(serviceName), route).toBe(true);
+      expect(tags.length, route).toBeLessThanOrEqual(5);
+      for (const tag of tags) expect(tag.length, `${route} tag ${tag}`).toBeLessThanOrEqual(32);
+    }
   });
 });
