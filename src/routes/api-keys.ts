@@ -22,7 +22,10 @@ import { sendApiKeyEmail, isEmailConfigured } from '../lib/email.js';
 // Pricing is enforced by the x402 middleware on /v1/credits/buy/:bundle.
 // If the agent paid → x402 lets the request through → handler creates
 // a fresh credit key with `credits` credits and returns it.
-const BUNDLES: Record<string, { credits: number; price_usdc: number }> = {
+// Exported so the business summary's own price table can be tested against
+// this one. A pack price that drifts here without drifting there would make
+// the weekly revenue line quietly wrong.
+export const BUNDLES: Record<string, { credits: number; price_usdc: number }> = {
   '1k': { credits: 1000, price_usdc: 5 },
   '5k': { credits: 5000, price_usdc: 20 },
   '25k': { credits: 25000, price_usdc: 80 },

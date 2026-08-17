@@ -263,6 +263,27 @@ adminRevenue.get('/admin/revenue', async (c) => {
     if (day) byDay[day] = (byDay[day] ?? 0) + t.value_usdc;
   }
 
+  // Our own settlements land in this wallet like anyone else's. Test campaigns
+  // (lighting up a catalog, bisecting a facilitator rejection) can therefore
+  // BE the whole of a week's "revenue", and reporting that as income is how a
+  // debugging session gets read as traction.
+  //
+  // The addresses live in env, not here: this repo is public, and pinning our
+  // operational payer wallet in it would let anyone label our test traffic
+  // on-chain. Unset means "cannot tell", which the caller must print as such —
+  // reporting the full amount as external is the error this exists to stop.
+  const internalPayers = new Set(
+    (process.env.X402_INTERNAL_PAYERS ?? '')
+      .split(',')
+      .map((a) => a.trim().toLowerCase())
+      .filter(Boolean),
+  );
+  const isInternalPayer = (addr: string) => internalPayers.has(addr.trim().toLowerCase());
+  const internalUsdc = internalPayers.size
+    ? cached.filter((t) => isInternalPayer(t.from_addr)).reduce((s, t) => s + t.value_usdc, 0)
+    : 0;
+  const round6 = (v: number) => Math.round(v * 1e6) / 1e6;
+
   const recent = cached.slice(0, 20).map((t) => ({
     hash: t.hash,
     from: t.from_addr,
@@ -281,7 +302,13 @@ adminRevenue.get('/admin/revenue', async (c) => {
     contract: USDC_BASE_CONTRACT,
     balance_usdc: await fetchBalanceUsdc(wallet),
     total_received_usdc: totalUsdc,
+    internal_payers_configured: internalPayers.size > 0,
+    received_internal_usdc: internalPayers.size ? round6(internalUsdc) : null,
+    received_external_usdc: internalPayers.size ? round6(totalUsdc - internalUsdc) : null,
     transaction_count: cached.length,
+    internal_transaction_count: internalPayers.size
+      ? cached.filter((t) => isInternalPayer(t.from_addr)).length
+      : null,
     scanned_this_call: txs.length,
     block_range: {
       from: Number(startBlock),

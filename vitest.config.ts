@@ -2,7 +2,11 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
-    include: ['src/**/*.test.ts'],
+    // scripts/ is included on purpose: the weekly report's window logic is
+    // written here, and it is exactly the kind of code nobody opens for months
+    // (a one-day comparison window published a huge jump on a flat week). Untested
+    // scripts are still shipped behaviour.
+    include: ['src/**/*.test.ts', 'scripts/**/*.test.ts'],
     // Fichiers de test exécutés en série, dans un seul process.
     //
     // Pourquoi : plusieurs suites écrivent dans la MÊME base de stats
