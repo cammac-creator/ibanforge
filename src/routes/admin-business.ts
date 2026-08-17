@@ -174,7 +174,32 @@ adminBusiness.get('/admin/business-summary', (c) => {
       .all(since) as ClientCall[]
   ).filter((r) => !internalPrefixes.has(r.key_prefix));
 
+  // Watchdog for the daily lifecycle radar (quota reached, pack left idle).
+  // That alert already exists, but a scheduler that quietly stops firing looks
+  // exactly like a week with nothing to report — so the weekly report carries
+  // the radar's own last run and says when it has gone stale.
+  let radarLastRun: string | null = null;
+  try {
+    const row = db
+      .prepare("SELECT value FROM kv_state WHERE key = 'lifecycle_radar_state'")
+      .get() as { value: string } | undefined;
+    if (row) radarLastRun = (JSON.parse(row.value) as { last_run_at?: string }).last_run_at ?? null;
+  } catch {
+    // Table absent before the radar's first run, or a corrupt row: reported as
+    // "never seen" rather than crashing the whole summary.
+  }
+  const hoursSinceRadar =
+    radarLastRun != null
+      ? Math.round(((Date.now() - Date.parse(radarLastRun)) / 3_600_000) * 10) / 10
+      : null;
+
   return c.json({
+    radar: {
+      last_run_at: radarLastRun,
+      hours_since: hoursSinceRadar,
+      // The radar runs daily; past 48 h something is wrong with the scheduler.
+      stale: hoursSinceRadar == null || hoursSinceRadar > 48,
+    },
     ...buildBusinessSummary({
       keys,
       traffic: {

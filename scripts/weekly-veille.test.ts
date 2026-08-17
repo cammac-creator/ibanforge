@@ -144,6 +144,24 @@ describe('the conversion block', () => {
   it('says so plainly when the endpoint is down', () => {
     expect(conversionSection(null)).toContain('indisponible');
   });
+
+  it('reports a daily radar that has gone silent', () => {
+    // A stopped scheduler reads exactly like a quiet week. It must not.
+    const out = conversionSection({
+      ...summary,
+      radar: { last_run_at: '2026-03-01T00:00:00Z', hours_since: 300, stale: true },
+    });
+    expect(out).toContain('Radar quotidien MUET');
+    expect(out).toContain('300 h');
+  });
+
+  it('stays quiet about the radar while it is running', () => {
+    const out = conversionSection({
+      ...summary,
+      radar: { last_run_at: '2026-03-01T00:00:00Z', hours_since: 12, stale: false },
+    });
+    expect(out).not.toContain('MUET');
+  });
 });
 
 describe('the traffic block', () => {

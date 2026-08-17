@@ -79,6 +79,7 @@ type Stats = {
 /** Shape of GET /admin/business-summary (src/routes/admin-business.ts). */
 type BusinessSummary = {
   window_days: number;
+  radar?: { last_run_at: string | null; hours_since: number | null; stale: boolean };
   credits: {
     sold_credits: number;
     sold_usd: number;
@@ -229,6 +230,19 @@ export function conversionSection(b: BusinessSummary | null): string {
     `• Palier gratuit : ${b.keys.external} clés externes · ${b.keys.never_called} jamais appelée(s)` +
       ` · ${b.keys.active_this_month} active(s) ce mois · ${b.keys.at_cap_this_month} au plafond`,
   );
+
+  // The daily alert on "a key just hit its cap" lives in the API process. A
+  // scheduler that has quietly stopped looks exactly like a calm week, so its
+  // silence has to be reported rather than assumed benign.
+  if (b.radar?.stale) {
+    lines.push(
+      '• ⚠️ Radar quotidien MUET : ' +
+        (b.radar.last_run_at
+          ? `dernier tour il y a ${b.radar.hours_since} h`
+          : 'aucun tour enregistré') +
+        ' — les alertes plafond atteint et pack inutilisé ne partent plus',
+    );
+  }
   return lines.join('\n');
 }
 
