@@ -258,13 +258,21 @@ export function statsSection(
     );
   }
 
-  lines.push(
-    `• Appels payants : ${n(w.paid)}` +
-      (b
-        ? ` — ${b.clients.distinct} client(s) distinct(s) sur ${b.clients.active_days} jour(s) actif(s)` +
-          (b.clients.top_share_pct >= 80 ? `, dont ${b.clients.top_share_pct}% par un seul` : '')
-        : ''),
-  );
+  // 🚨 Two different populations, and merging them would repeat the mistake
+  // this report exists to stop. `paid` counts billed OPERATIONS from the daily
+  // stats (a batch of a hundred bills a hundred); the client figures count
+  // authenticated CALLS in the request log, free tier included. Writing
+  // "N paid calls — M distinct clients" would claim those M clients made those
+  // N calls, which is not what either number says.
+  lines.push(`• Appels payants (opérations facturées) : ${n(w.paid)}`);
+  if (b) {
+    lines.push(
+      `• Clients authentifiés : ${b.clients.distinct} sur ${b.clients.active_days} jour(s) actif(s)` +
+        (b.clients.top_share_pct >= 50
+          ? `, dont ${b.clients.top_share_pct}% des appels par un seul`
+          : ''),
+    );
+  }
 
   // Two rails, and the small one used to be the only one reported.
   const revLine = `• Revenu x402 (appels réglés) : $${w.rev.toFixed(3)} (${w.revDelta})`;

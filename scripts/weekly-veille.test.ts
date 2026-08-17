@@ -153,10 +153,20 @@ describe('the traffic block', () => {
     expect(out).toContain('402 émis : 300');
   });
 
-  it('shows how concentrated a weekly total is', () => {
+  it('shows how concentrated the week was', () => {
     const out = statsSection(emptyStats, weekly(days(Array(14).fill(10))), summary, null);
-    expect(out).toContain('2 client(s) distinct(s) sur 3 jour(s) actif(s)');
-    expect(out).toContain('88% par un seul');
+    expect(out).toContain('Clients authentifiés : 2 sur 3 jour(s) actif(s)');
+    expect(out).toContain('88% des appels par un seul');
+  });
+
+  it('does not attribute billed operations to the authenticated-client count', () => {
+    // Billed operations come from the daily stats and count units; the client
+    // figures come from the request log and count calls. Putting them on one
+    // line would claim those clients made those operations.
+    const out = statsSection(emptyStats, weekly(days(Array(14).fill(10))), summary, null);
+    const paidLine = out.split('\n').find((l) => l.includes('Appels payants'));
+    expect(paidLine).toBeDefined();
+    expect(paidLine).not.toContain('client');
   });
 
   it('separates catalog reads from real API traffic', () => {
