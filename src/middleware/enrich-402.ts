@@ -423,6 +423,26 @@ function buildAccessRamp(): Record<string, unknown> {
  * this, an authenticated-but-exhausted client reads the generic 402 as
  * "you are anonymous" and never learns what actually happened.
  */
+/**
+ * The announcement's own error, when it describes a payment that was ATTEMPTED
+ * and refused rather than one that was never made.
+ *
+ * A second 402 after a signature was sent means something rejected it, and the
+ * SDK says what in the header it re-issues. Overwriting `error` with the
+ * generic code and stopping there leaves the payer staring at "payment
+ * required" for a payment they just made. Found the hard way on 17/08/2026:
+ * /v1/bic/:code answers 402 to a valid signature, and the reason — the CDP
+ * facilitator refusing the payload — was legible only by base64-decoding a
+ * response header.
+ */
+const GENERIC_402 = /^payment[ _]required$/i;
+
+function paymentErrorField(announcement: Record<string, unknown> | null): Record<string, unknown> {
+  const error = announcement?.error;
+  if (typeof error !== 'string' || error.trim() === '' || GENERIC_402.test(error.trim())) return {};
+  return { payment_error: error };
+}
+
 function causeFields(cause: PaywallCause | undefined): Record<string, unknown> {
   if (!cause) return {};
   return { cause, message: cause.detail };
@@ -473,6 +493,10 @@ function stripFreeTierWhenExhausted(
  * Only `error` is deliberately not mirrored. The header carries the SDK's
  * prose ("Payment required"); the body keeps `payment_required`, which is the
  * error code we publish in llms.txt and in the error table agents branch on.
+ * When that prose says something other than "you have not paid" — a rejected
+ * signature, a facilitator that refused the payload — it is surfaced beside
+ * the code as `payment_error`, because a payer who tried and failed needs the
+ * reason and should not have to base64-decode a response header to find it.
  */
 export function enrich402Middleware(): MiddlewareHandler<HonoEnv> {
   return async (c, next) => {
@@ -513,6 +537,7 @@ export function enrich402Middleware(): MiddlewareHandler<HonoEnv> {
       {
         ...(announcement ?? {}),
         error: 'payment_required',
+        ...paymentErrorField(announcement),
         ...buildAccessRamp(),
         ...causeFields(paywallCause),
       },

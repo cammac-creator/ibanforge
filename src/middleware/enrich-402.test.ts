@@ -324,3 +324,49 @@ describe('the body is the header, not a second opinion', () => {
     }
   });
 });
+
+/**
+ * A 402 answering a payment that was actually made has to say why it was
+ * refused. On 17/08/2026 /v1/bic/:code did exactly that — rejected a valid
+ * signature — and the body said only `payment_required`, so the reason (the
+ * CDP facilitator refusing the payload) was reachable only by base64-decoding
+ * a response header.
+ */
+describe('a refused payment says why', () => {
+  function appAnnouncing(error: string) {
+    const announcement = {
+      x402Version: 2,
+      error,
+      resource: { url: 'https://api.ibanforge.com/v1/iban/validate' },
+      accepts: [{ scheme: 'exact', network: 'eip155:8453', amount: '5000' }],
+    };
+    const header = Buffer.from(JSON.stringify(announcement)).toString('base64');
+    const app = new Hono();
+    app.use('*', enrich402Middleware());
+    app.post('/v1/iban/validate', () => new Response('{}', {
+      status: 402,
+      headers: { 'Content-Type': 'application/json', 'payment-required': header },
+    }));
+    return app;
+  }
+
+  async function bodyOf(app: Hono) {
+    const res = await app.request('/v1/iban/validate', { method: 'POST' });
+    return (await res.json()) as { error: string; payment_error?: string };
+  }
+
+  it('surfaces the refusal beside the code agents branch on', async () => {
+    const body = await bodyOf(appAnnouncing('Facilitator verify failed (400): invalid payload'));
+    expect(body.error).toBe('payment_required');
+    expect(body.payment_error).toBe('Facilitator verify failed (400): invalid payload');
+  });
+
+  it('stays quiet when nobody tried to pay', async () => {
+    // "Payment required" is the SDK saying the request was simply unpaid.
+    // Repeating it as a failure would cry wolf on every anonymous probe.
+    for (const generic of ['Payment required', 'payment_required', '']) {
+      const body = await bodyOf(appAnnouncing(generic));
+      expect(body.payment_error, generic).toBeUndefined();
+    }
+  });
+});
