@@ -406,7 +406,7 @@ landing.get('/', (c) => {
 <span class="c"># Or pay per call with x402 — no key needed</span>
 <span class="g">curl</span> -X POST https://api.ibanforge.com/v1/iban/validate \\
   -H <span class="s">"Content-Type: application/json"</span> \\
-  -H <span class="s">"X-Payment: &lt;x402-payment-header&gt;"</span> \\
+  -H <span class="s">"PAYMENT-SIGNATURE: &lt;x402-payment-header&gt;"</span> \\
   -d <span class="s">'{"iban": "DE89370400440532013000"}'</span></div>
       <div class="qs-code" data-lang="js"><span class="k">const</span> res = <span class="k">await</span> <span class="f">fetch</span>(<span class="s">'https://api.ibanforge.com/v1/iban/validate'</span>, {
   method: <span class="s">'POST'</span>,

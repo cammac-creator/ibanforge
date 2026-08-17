@@ -809,8 +809,12 @@ const buildSpec = () => ({
       x402Payment: {
         type: 'apiKey',
         in: 'header',
-        name: 'X-Payment',
-        description: 'x402 USDC micropayment token',
+        // A security scheme can only name one header, so it names the one we
+        // announce. v1's X-Payment still settles and is documented below
+        // rather than dropped, because clients written against it still work.
+        name: 'PAYMENT-SIGNATURE',
+        description:
+          'x402 USDC micropayment signature (protocol v2). Clients holding v1 payment requirements may send the same signature as X-Payment; both are accepted.',
       },
       apiKey: {
         type: 'http',

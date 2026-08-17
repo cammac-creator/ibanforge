@@ -233,7 +233,10 @@ codes:
     status: 402
     retryable: true
     meaning: An x402-payable endpoint called without payment. The body carries the
-      full payment requirements; retry with an X-PAYMENT header.
+      full payment requirements (x402 v2), and so does the PAYMENT-REQUIRED
+      response header; retry with a PAYMENT-SIGNATURE header. A v1 X-PAYMENT
+      signature is still accepted. When a payment WAS sent and refused, the
+      reason is in payment_error.
   - code: not_found
     status: 404
     retryable: false
@@ -421,7 +424,9 @@ without a human being present for the first two.
 
 Call the endpoint. It answers \`402\` with the payment requirements: price,
 \`payTo\` address, asset, network, and the output schema. Pay, retry with the
-\`X-PAYMENT\` header, get the answer.
+\`PAYMENT-SIGNATURE\` header, get the answer. The requirements are x402 v2 and
+travel both in the body and, base64 encoded, in the \`PAYMENT-REQUIRED\`
+response header. A v1 \`X-PAYMENT\` signature is still accepted.
 
 - Discovery document: \`https://api.ibanforge.com/.well-known/x402\`
 - Network: Base (\`eip155:8453\`), asset USDC

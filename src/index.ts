@@ -77,7 +77,10 @@ app.use('*', cors({
   allowMethods: ['GET', 'POST', 'OPTIONS'],
   // X-API-Key is a documented auth header (api-key middleware accepts it), so it
   // must be allowed through CORS preflight or browser callers can't use it.
-  allowHeaders: ['Content-Type', 'Authorization', 'X-Payment', 'X-API-Key'],
+  // PAYMENT-SIGNATURE is the x402 v2 payment header and X-Payment the v1 one.
+  // Both must be listed: a browser client sending a header absent from this
+  // list is stopped at the preflight, so the paid call never leaves the page.
+  allowHeaders: ['Content-Type', 'Authorization', 'PAYMENT-SIGNATURE', 'X-Payment', 'X-API-Key'],
 }));
 // Hono's logger prints `url.slice(url.indexOf('/', 8))` — the query string
 // INCLUDED — and Railway persists stdout. So `GET /v1/iban/format?iban=CH93…`
