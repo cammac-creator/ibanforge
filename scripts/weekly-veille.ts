@@ -333,7 +333,7 @@ Recherche sur le WEB les développements RÉCENTS (cette semaine / ce mois) qui 
 2. Concurrents (iban.com, IBANAPI… : prix, pannes, features, trous)
 3. Distribution (nouveaux registres MCP, marketplaces, awesome-lists, bazaar x402)
 4. Demande/leads (discussions Reddit/HN/StackOverflow "validate IBAN/get BIC", appels d'offres)
-5. Écosystème agents/x402 (frameworks adoptant MCP, AP2, USDC/Base)
+5. Écosystème agents/x402 — en particulier les canaux plateformes où naissent des agents DÉJÀ PAYEURS : Amazon Bedrock AgentCore Payments (découverte via le Bazaar x402 monté dans son Gateway — nous y sommes indexés), Cloudflare wallet handles, Coinbase CDP Agentic Wallets. Signale toute NOUVELLE surface de découverte branchée sur un wallet, et tout signal d'acheteur venu de ces canaux.
 6. Contenu/SEO (mots-clés, pages comparatives, newsletters fintech)
 7. Partenariats/intégrations (ERP type Odoo, compta, PSP, vendors compliance)
 8. Pricing/monétisation

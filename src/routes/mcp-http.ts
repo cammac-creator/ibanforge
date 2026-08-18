@@ -128,6 +128,7 @@ function createMcpServer(): McpServer {
       // repeat creations from one network go through mailbox verification.
       'Free tier: 10 tool calls/IP/day, no signup. For sustained use, POST https://api.ibanforge.com/v1/keys/generate {"email":"you@example.com"} issues a free API key (200 REST calls/month, one per developer — repeat creations from the same network require e-mail verification); prepaid credit packs from $5 per 1,000 calls, no expiry. ' +
       'Missing data, wrong result, or something blocking you from paying? Call send_feedback — a human reads every report. ' +
+      'Paying as an agent (wallet, USDC on Base, one $5 payment for 1,000 calls): https://ibanforge.com/docs/pay-as-an-agent — ' +
       'Docs and code samples: https://ibanforge.com/docs/recipes',
   });
 

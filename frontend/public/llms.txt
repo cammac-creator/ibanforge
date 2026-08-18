@@ -24,6 +24,7 @@ Function-calling (Chat Completions / Responses): wire tools to the OpenAPI at /o
 
 ### Pay-per-call without an API key (x402, USDC on Base L2)
 GET https://api.ibanforge.com/.well-known/x402 returns the full catalog. Any agent with a Base wallet can discover, pay, and call.
+Zero to first payment in 3 steps (wallet with budget → USDC on Base → one $5 payment for 1,000 credits): https://ibanforge.com/docs/pay-as-an-agent
 
 ## 5 MCP tools
 - validate_iban — validate one IBAN + enrich (BIC, issuer EMI/vIBAN, SEPA, VoP, risk, Swiss bc_nummer). Cost: $0.005

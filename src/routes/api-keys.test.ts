@@ -487,8 +487,12 @@ describe('POST /v1/keys/generate — per-network creation guard', () => {
   it('first key from a network stays one-step; the second demands a mailbox code; the code unlocks it', async () => {
     delete process.env.IBANFORGE_ADMIN_TEST_KEYS;
     const app = makeApp();
-    const ip = `198.51.100.${(Date.now() % 200) + 1}`;
-    const suffix = Date.now();
+    // Two octets derived from the clock: the creation counter persists in the
+    // DB across runs, so a colliding fixture IP would inherit a previous
+    // run's count and flip the first expectation.
+    const ts = Date.now();
+    const ip = `198.51.${(ts % 240) + 1}.${(Math.floor(ts / 240) % 240) + 1}`;
+    const suffix = ts;
 
     const first = await gen(app, `guard-a-${suffix}@alpha-corp.example.net`, ip);
     expect(first.status).toBe(201);
@@ -513,8 +517,11 @@ describe('POST /v1/keys/generate — per-network creation guard', () => {
   it('refuses the fourth key of the day from one network with 429 and a paid path', async () => {
     delete process.env.IBANFORGE_ADMIN_TEST_KEYS;
     const app = makeApp();
-    const ip = `198.51.100.${(Date.now() % 200) + 2}`;
-    const suffix = Date.now() + 1;
+    // Same clock-derived scheme as above, offset into another /16 so the two
+    // tests can never share a counter whatever the interleaving.
+    const ts = Date.now();
+    const ip = `198.52.${(ts % 240) + 1}.${(Math.floor(ts / 240) % 240) + 1}`;
+    const suffix = ts + 1;
     const { createVerificationChallenge } = await import('../lib/key-creation-guard.js');
 
     expect((await gen(app, `cap-1-${suffix}@alpha-corp.example.net`, ip)).status).toBe(201);

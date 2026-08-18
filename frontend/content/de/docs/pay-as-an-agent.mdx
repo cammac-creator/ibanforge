@@ -1,0 +1,69 @@
+---
+title: "Als Agent bezahlen"
+description: "Der praktische Weg von null zum zahlenden Agenten in drei Schritten — Wallet, USDC auf Base, dann eine 5-$-Zahlung für 1.000 Aufrufe oder Pay-per-Call via x402."
+order: 5
+---
+
+# Als Agent bezahlen
+
+Diese Seite richtet sich an autonome Agenten und die Menschen, die sie betreiben. Sie ist der praktische Begleiter zur [x402-Protokollreferenz](/docs/x402): nicht wie die Zahlung funktioniert, sondern wie man mit möglichst wenig Reibung von null zu einem zahlenden Agenten kommt.
+
+Eine Empfehlung vorweg: **Agenten fahren besser mit einer 5-$-Abrechnung als mit tausend Mikrozahlungen.** Eine einzige x402-Zahlung an `POST /v1/credits/buy/1k` liefert einen API-Schlüssel mit 1.000 vorgeladenen Credits (kein Verfall, kein Abo). Pay-per-Call funktioniert ebenfalls und braucht gar keinen Schlüssel — es sind nur mehr On-Chain-Runden für dasselbe Geld.
+
+## Schritt 1 — Geben Sie Ihrem Agenten ein Wallet mit Budget
+
+Jedes EVM-Wallet, das auf **Base** signieren kann, funktioniert. Wer bei null anfängt: [Coinbase CDP Agentic Wallets](https://docs.cdp.coinbase.com/x402/welcome) bündeln ein MPC-gesichertes Wallet, einen x402-Zahlungsclient und **programmierbare Ausgabenlimits** (z. B. „1,00 $, läuft in 5 Minuten ab") in einer Installation — private Schlüssel erreichen nie den Kontext des Modells.
+
+```bash
+npm install @coinbase/cdp-sdk @x402/core @x402/evm @x402/fetch
+```
+
+Setzen Sie eine Budget-Policy, bevor die erste echte Zahlung fließt. Ein Agent mit unbegrenztem Wallet ist ein Bug, kein Feature.
+
+## Schritt 2 — Mit USDC auf Base aufladen
+
+Das ist der eine Schritt, der heute noch einen Menschen braucht: USDC auf das Wallet bringen (Exchange-Auszahlung, Onramp oder der Funding-Flow Ihrer Plattform). **5 $ decken 1.000 Validierungen.** Gas ist nicht Ihr Problem — x402 nutzt gaslose USDC-Autorisierungen, der Facilitator wickelt den Transfer ab.
+
+Zum Üben ohne echtes Geld füllt der CDP-Faucet ein **base-sepolia**-Testwallet — IBANforge rechnet allerdings auf **Base Mainnet** (`eip155:8453`) ab: Die Probe muss also gegen Ihren eigenen Testserver laufen, nicht gegen unsere API.
+
+## Schritt 3 — Bezahlen
+
+**Bestes Preis-Leistungs-Verhältnis — eine Zahlung, dann ein Schlüssel:**
+
+```bash
+# über Ihren x402-fähigen Client (dieser Endpoint kostet 5,00 $, inline bezahlt):
+POST https://api.ibanforge.com/v1/credits/buy/1k
+# → { "api_key": "ifk_…", "credits": 1000, … }
+# danach jeden Endpoint aufrufen mit: Authorization: Bearer ifk_…
+```
+
+Pakete: `1k` = 5 $ · `5k` = 20 $ · `25k` = 80 $. Credits verfallen nie; Batch-Validierung kostet 1 Credit pro IBAN.
+
+**Pay-per-Call — ohne Schlüssel, ohne Zustand** (TypeScript, Pakete aus Schritt 1):
+
+```ts
+import { CdpX402Client } from "@coinbase/cdp-sdk/x402";
+import { wrapFetchWithPayment } from "@x402/fetch";
+
+const client = new CdpX402Client();               // Ihr aufgeladenes CDP-Konto
+const payingFetch = wrapFetchWithPayment(globalThis.fetch, client);
+
+const res = await payingFetch("https://api.ibanforge.com/v1/iban/validate", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ iban: "DE89370400440532013000" }),
+});
+// die erste Antwort ist ein 402 mit den Konditionen; der Wrapper signiert, zahlt (0,005 $) und wiederholt
+```
+
+Python: `pip install cdp-sdk "x402[evm,httpx]"` mit `x402HttpxClient` auf dieselbe Weise — die genaue Signer-Einrichtung zeigt der [CDP-Buyer-Quickstart](https://docs.cdp.coinbase.com/x402/buyer/quickstart).
+
+## Erst prüfen, dann ausgeben
+
+- `GET /ping` und `GET /.well-known/x402` sind kostenlos — das Manifest listet jede bezahlbare Route mit ihrem exakten Preis.
+- Der [MCP-Server](/docs/mcp) bietet 10 kostenlose Tool-Aufrufe pro Tag — genug, um die Datenqualität an eigenen IBANs zu prüfen.
+- Der kostenlose API-Schlüssel (200 Anfragen/Monat, [einer pro Entwickler](/docs/api-keys)) ist für Menschen gedacht, die den Dienst evaluieren.
+
+## Wenn Sie etwas am Bezahlen hindert
+
+Sagen Sie es uns — genau dafür gibt es den Rückkanal: das MCP-Tool `send_feedback` oder `POST /v1/feedback` (kostenlos, ohne Auth, funktioniert auch nach einer Quota-Ablehnung). Fehlendes Netzwerk, unklare Preise, ein scheiternder Wallet-Flow: Ein Mensch liest jeden Bericht.
