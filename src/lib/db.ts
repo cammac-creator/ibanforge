@@ -381,6 +381,46 @@ export function getStatsDB(): DatabaseType.Database {
       );
       CREATE INDEX IF NOT EXISTS idx_verification_sends_ip ON verification_sends(ip_hash, created_at);
       CREATE INDEX IF NOT EXISTS idx_verification_sends_email ON verification_sends(email_hash, created_at);
+      -- Community radar: forum/issue threads worth answering (CRM "Forums" tab).
+      -- URL is the dedup key: a thread the operator dismissed or answered must
+      -- never resurrect as 'new' on the next scan (INSERT OR IGNORE semantics).
+      CREATE TABLE IF NOT EXISTS forum_threads (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        url TEXT NOT NULL UNIQUE,
+        source TEXT NOT NULL,
+        title TEXT NOT NULL,
+        excerpt TEXT,
+        lang TEXT NOT NULL DEFAULT 'en',
+        score INTEGER NOT NULL DEFAULT 0,
+        score_detail TEXT,
+        activity TEXT,
+        thread_created_at TEXT,
+        status TEXT NOT NULL DEFAULT 'new',
+        planned_for TEXT,
+        draft TEXT,
+        summary_fr TEXT,
+        posted_url TEXT,
+        notes TEXT,
+        first_seen TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_forum_threads_status ON forum_threads(status, score);
+      -- Marketplace presence: where IBANforge is listed / absent / pending.
+      -- Definitions (name, urls, auto) come from code and are re-upserted at
+      -- each tick; status/detail/checked_at come from checks; notes and the
+      -- status of auto=0 rows belong to the operator and are never overwritten.
+      CREATE TABLE IF NOT EXISTS marketplace_checks (
+        slug TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        url TEXT NOT NULL,
+        action_url TEXT,
+        status TEXT NOT NULL DEFAULT 'unknown',
+        detail TEXT,
+        auto INTEGER NOT NULL DEFAULT 1,
+        checked_at TEXT,
+        notes TEXT,
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
     `);
     // Track request provenance: distinguish MCP HTTP / MCP stdio / REST direct / bot / web
     const reqCols = (statsDB.prepare("PRAGMA table_info(request_log)").all() as Array<{ name: string }>).map(r => r.name);

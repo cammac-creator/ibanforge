@@ -17,6 +17,7 @@ import { stats } from './routes/stats.js';
 import { adminBusiness } from './routes/admin-business.js';
 import { adminRevenue } from './routes/admin-revenue.js';
 import { adminScanners } from './routes/admin-scanners.js';
+import { adminForums } from './routes/admin-forums.js';
 import { demo } from './routes/demo.js';
 import { testIban } from './routes/test-iban.js';
 import { landing } from './routes/landing.js';
@@ -41,6 +42,7 @@ import { rateLimitMiddleware } from './middleware/rate-limit.js';
 import { recordRequest, classifyClient, hashIp, extractClientIp, purgeOldRequestLog, purgeTerminatedKeyTelemetry } from './lib/stats.js';
 import { purgeExpiredVerifications } from './lib/key-creation-guard.js';
 import { startLifecycleRadar } from './lib/lifecycle-radar-server.js';
+import { startForumRadar } from './lib/forum-radar-server.js';
 import { recordEvent } from './lib/events.js';
 import { bicGuardMiddleware, iidGuardMiddleware } from './middleware/identifier-guard.js';
 import { notFoundHandler } from './lib/not-found.js';
@@ -558,6 +560,7 @@ app.route('/', stats);
 app.route('/', adminRevenue);
 app.route('/', adminBusiness);
 app.route('/', adminScanners);
+app.route('/', adminForums);
 app.route('/', demo);
 app.route('/', testIban);
 app.route('/', openapi);
@@ -619,6 +622,10 @@ setInterval(() => {
 // Daily commercial lifecycle radar, in-process — the customer ledger must not
 // transit an external CI runner (see lifecycle-radar-server.ts).
 startLifecycleRadar(port);
+
+// Daily community radar: scored forum/issue threads + marketplace presence
+// for the CRM "Forums" tab (see forum-radar-server.ts).
+startForumRadar();
 
 // Graceful shutdown
 function gracefulShutdown(signal: string) {
