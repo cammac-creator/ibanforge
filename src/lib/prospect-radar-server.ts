@@ -176,6 +176,7 @@ export async function runProspectBackfill(
       .filter((p) => (misses[p.id] ?? 0) < MAX_ENRICH_MISSES)
       .slice(0, opts.enrichLimit ?? ENRICH_PER_RUN);
 
+    const gaveUpOn: string[] = [];
     for (const p of enrichables) {
       report.enriched.tried++;
       try {
@@ -195,12 +196,24 @@ export async function runProspectBackfill(
           }
         } else {
           misses[p.id] = (misses[p.id] ?? 0) + 1;
+          // The moment a row crosses the cap is the ONE time to say so:
+          // otherwise it just sits address-less forever with no explanation.
+          if (misses[p.id] === MAX_ENRICH_MISSES) gaveUpOn.push(`${p.company} (${p.website})`);
         }
       } catch (err) {
         report.errors.push(`enrich ${p.id}: ${err instanceof Error ? err.message : String(err)}`);
       }
     }
     kvSet(KV_MISSES, JSON.stringify(misses));
+    if (gaveUpOn.length > 0) {
+      try {
+        await sendTelegramShort(
+          `🔍 Prospects sans adresse publiée après ${MAX_ENRICH_MISSES} passes, à traiter à la main ou écarter :\n${gaveUpOn.join('\n')}`,
+        );
+      } catch (err) {
+        report.errors.push(`telegram: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
 
     // -- 2. mails (freshly enriched rows above are already eligible) --------
     const draftables = db
