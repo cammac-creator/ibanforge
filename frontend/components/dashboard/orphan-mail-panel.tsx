@@ -1,4 +1,5 @@
 import { InfoDot } from './info-dot';
+import { AttachOrphanControl } from './attach-orphan';
 
 /**
  * Mail about IBANforge from an address the CRM cannot attach to anyone.
@@ -96,6 +97,7 @@ export function OrphanMailPanel({ orphans }: { orphans: OrphanMailRow[] }) {
             {o.snippet && (
               <p className="mt-0.5 line-clamp-2 text-[12px] text-[var(--fg-4)]">{o.snippet}</p>
             )}
+            <AttachOrphanControl orphanId={o.id} sender={o.sender} />
           </li>
         ))}
       </ul>

@@ -19,6 +19,7 @@ import { getActivation } from '../lib/activation.js';
 import { recordEvent } from '../lib/events.js';
 import { getVisibility, recordVisibility, isVisibilityState } from '../lib/visibility.js';
 import { getOrphans, recordOrphan, resolveOrphan, countPendingOrphans, isOrphanKind } from '../lib/orphan-mail.js';
+import { addAlias, listAliases, loadAliasMap, toCanonical } from '../lib/email-aliases.js';
 import { getWeeklyFacts, saveWeeklyDigest, getWeeklyDigests } from '../lib/weekly-facts.js';
 import { notifyPurchaseTelegram } from '../lib/notify.js';
 import { sendApiKeyEmail, sendKeyVerificationEmail, isEmailConfigured } from '../lib/email.js';
@@ -616,12 +617,16 @@ apiKeys.post('/v1/admin/email-summary', async (c) => {
   const str = (v: unknown): string | null => (typeof v === 'string' && v.length ? v.slice(0, 500) : null);
   const num = (v: unknown): number => (Number.isFinite(Number(v)) ? Number(v) : 0);
 
+  // Safety net: a caller that forgot the alias table still lands the row on
+  // the canonical address (the VPS sync merges alias rows BEFORE posting; this
+  // catches any other path so an alias can never split a customer in two).
+  const aliasMap = loadAliasMap();
   const tx = db.transaction((rows: EmailSummaryInput[]) => {
     let n = 0;
     for (const r of rows) {
       if (!r || typeof r.email !== 'string' || !r.email.includes('@')) continue;
       upsert.run({
-        email: r.email.trim().toLowerCase(),
+        email: toCanonical(r.email, aliasMap),
         mail_count: num(r.mail_count),
         received: num(r.received),
         sent: num(r.sent),
@@ -694,11 +699,13 @@ apiKeys.post('/v1/admin/email-messages', async (c) => {
     `UPDATE prospects SET status = 'contacte', updated_at = datetime('now')
      WHERE lower(contact_email) = ? AND status IN ('a_mailer', 'a_enrichir')`,
   );
+  const aliasMap = loadAliasMap();
   const tx = db.transaction((rows: EmailMessageInput[]) => {
     let n = 0;
     for (const r of rows) {
       if (!r || typeof r.id !== 'string' || typeof r.customer_email !== 'string' || !r.customer_email.includes('@')) continue;
-      const email = r.customer_email.trim().toLowerCase();
+      // Alias-resolved so a second address can never split a thread in two.
+      const email = toCanonical(r.customer_email, aliasMap);
       // 'draft' = a CRM-native draft awaiting review in the dashboard. It lives
       // in the same table so the thread UI can show it in place, but it must
       // never count as real correspondence (no prospect status flip below).
@@ -1035,6 +1042,36 @@ apiKeys.post('/v1/admin/orphan-mail', async (c) => {
     saved += 1;
   }
   return c.json({ saved, pending: countPendingOrphans() }, 201);
+});
+
+/**
+ * Address aliases (lot B2): the "attach this mail to that customer" gesture.
+ * The list is read by the VPS sync at each run to widen its known-address net
+ * and merge alias threads into the canonical customer.
+ */
+apiKeys.get('/v1/admin/email-aliases', (c) => {
+  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
+  return c.json({ aliases: listAliases() });
+});
+
+apiKeys.post('/v1/admin/email-aliases', async (c) => {
+  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
+  let body: { alias?: unknown; canonical?: unknown };
+  try {
+    body = await c.req.json<{ alias?: unknown; canonical?: unknown }>();
+  } catch {
+    return c.json({ error: 'invalid_json' }, 400);
+  }
+  if (typeof body.alias !== 'string' || typeof body.canonical !== 'string') {
+    return c.json({ error: 'invalid_body', message: 'Expected { alias, canonical }' }, 400);
+  }
+  const res = addAlias(body.alias, body.canonical);
+  if (!res.ok) return c.json({ error: 'invalid_alias', message: res.reason }, 400);
+  return c.json({ aliases: listAliases() });
 });
 
 apiKeys.post('/v1/admin/orphan-mail/resolve', async (c) => {
