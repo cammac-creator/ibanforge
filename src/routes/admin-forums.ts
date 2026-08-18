@@ -28,7 +28,7 @@ function isAdminAuthorized(provided: string | undefined): boolean {
 }
 
 const THREAD_STATUSES = new Set(['new', 'to_answer', 'drafted', 'planned', 'posted', 'dismissed']);
-const THREAD_SOURCES = new Set(['stackoverflow', 'money_se', 'github', 'hn', 'reddit', 'manual']);
+const THREAD_SOURCES = new Set(['stackoverflow', 'money_se', 'github', 'hn', 'reddit', 'discourse', 'odoo', 'manual']);
 
 adminForums.get('/v1/admin/forum-threads', (c) => {
   if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {

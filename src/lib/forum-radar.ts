@@ -26,7 +26,7 @@
 
 export interface ThreadCandidate {
   url: string;
-  source: 'stackoverflow' | 'money_se' | 'github' | 'hn' | 'reddit';
+  source: 'stackoverflow' | 'money_se' | 'github' | 'hn' | 'reddit' | 'discourse' | 'odoo';
   title: string;
   excerpt: string;
   activity: string; // human summary: "27 pts · 10 rép. · 66 441 vues"
@@ -80,6 +80,8 @@ export const PLATFORM_LIMITS: Record<string, { max: number | null; comfy: number
   github: { max: 65_536, comfy: 2_500 },
   reddit: { max: 10_000, comfy: 2_500 },
   hn: { max: null, comfy: 2_000 },
+  discourse: { max: 32_000, comfy: 2_500 },
+  odoo: { max: null, comfy: 2_500 },
   manual: { max: null, comfy: 3_000 },
 };
 
@@ -139,10 +141,33 @@ function iso(epochSeconds: unknown): string {
   return n > 0 ? new Date(n * 1000).toISOString().slice(0, 10) : '';
 }
 
-export function finalizeCandidate(c: ThreadCandidate): ScoredThread | null {
+/**
+ * A recent thread is a live conversation: the asker is still waiting and an
+ * answer lands as help, not archaeology. Evergreens keep their base score
+ * (they are the surfaces assistants read) but freshness moves ahead of them.
+ */
+export function recencyBonus(threadCreatedAt: string, now: number): number {
+  if (!threadCreatedAt) return 0;
+  const t = Date.parse(threadCreatedAt);
+  if (!Number.isFinite(t)) return 0;
+  const days = (now - t) / 86_400_000;
+  if (days < 0) return 0;
+  if (days <= 7) return 25;
+  if (days <= 30) return 15;
+  if (days <= 90) return 8;
+  return 0;
+}
+
+export function finalizeCandidate(c: ThreadCandidate, now: number = Date.now()): ScoredThread | null {
   const { score, detail } = scoreThread(c.title, c.excerpt);
   if (score < MIN_SCORE) return null;
-  return { ...c, score, scoreDetail: detail, lang: detectLang(`${c.title} ${c.excerpt}`) };
+  const fresh = recencyBonus(c.threadCreatedAt, now);
+  return {
+    ...c,
+    score: Math.min(100, score + fresh),
+    scoreDetail: fresh > 0 ? `${detail} · récent(+${fresh})` : detail,
+    lang: detectLang(`${c.title} ${c.excerpt}`),
+  };
 }
 
 // --- Stack Exchange -------------------------------------------------------
@@ -238,6 +263,51 @@ export function parsePullpush(payload: unknown): ThreadCandidate[] {
     activity: `r/${i.subreddit ?? '?'} · ${i.score ?? 0} pts · ${i.num_comments ?? 0} comm.`,
     threadCreatedAt: iso(i.created_utc),
   }));
+}
+
+// --- Discourse forums (n8n, ERPNext/Frappe, Retool… all expose /search.json) ---
+
+interface DiscourseTopic {
+  id?: number;
+  title?: string;
+  slug?: string;
+  created_at?: string;
+  posts_count?: number;
+}
+
+export function parseDiscourse(payload: unknown, host: string): ThreadCandidate[] {
+  const topics = ((payload as { topics?: DiscourseTopic[] })?.topics ?? []).filter((t) => t.id && t.title && t.slug);
+  return topics.map((t) => ({
+    url: `https://${host}/t/${t.slug}/${t.id}`,
+    source: 'discourse' as const,
+    title: stripHtml(String(t.title)),
+    excerpt: '',
+    activity: `${host} · ${t.posts_count ?? 0} msg`,
+    threadCreatedAt: String(t.created_at ?? '').slice(0, 10),
+  }));
+}
+
+// --- Odoo forum (custom HTML; the slug doubles as a readable title) ---------
+
+export function parseOdooSearch(html: string): ThreadCandidate[] {
+  const seen = new Set<string>();
+  const out: ThreadCandidate[] = [];
+  const re = /\/forum\/help-1\/([a-z0-9][a-z0-9-]*)-(\d{4,})/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(html)) !== null) {
+    const url = `https://www.odoo.com/forum/help-1/${m[1]}-${m[2]}`;
+    if (seen.has(url)) continue;
+    seen.add(url);
+    out.push({
+      url,
+      source: 'odoo',
+      title: m[1].replace(/-/g, ' '),
+      excerpt: '',
+      activity: 'forum Odoo',
+      threadCreatedAt: '', // the search page carries no date; no recency bonus
+    });
+  }
+  return out;
 }
 
 // ---------------------------------------------------------------------------

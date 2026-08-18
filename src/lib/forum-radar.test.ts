@@ -6,10 +6,13 @@ import {
   detectLang,
   finalizeCandidate,
   interpretCheck,
+  parseDiscourse,
   parseGitHubIssues,
   parseHN,
+  parseOdooSearch,
   parsePullpush,
   parseStackExchange,
+  recencyBonus,
   repoOfUrl,
   scoreThread,
   type MarketplaceDef,
@@ -24,6 +27,52 @@ describe('PLATFORM_LIMITS — chaque source a sa limite', () => {
     expect(PLATFORM_LIMITS.stackoverflow.max).toBe(30_000);
     expect(PLATFORM_LIMITS.github.max).toBe(65_536);
     expect(PLATFORM_LIMITS.hn.max).toBeNull();
+  });
+});
+
+describe('recencyBonus — les fils récents passent devant', () => {
+  const now = Date.parse('2026-08-18T12:00:00Z');
+  it('gradue : +25 la semaine, +15 le mois, +8 le trimestre, 0 au-delà', () => {
+    expect(recencyBonus('2026-08-15', now)).toBe(25);
+    expect(recencyBonus('2026-08-01', now)).toBe(15);
+    expect(recencyBonus('2026-06-15', now)).toBe(8);
+    expect(recencyBonus('2019-01-01', now)).toBe(0);
+  });
+  it('0 sur date vide, invalide ou future', () => {
+    expect(recencyBonus('', now)).toBe(0);
+    expect(recencyBonus('n/a', now)).toBe(0);
+    expect(recencyBonus('2027-01-01', now)).toBe(0);
+  });
+  it('finalizeCandidate additionne et trace le bonus, plafonné à 100', () => {
+    const t = finalizeCandidate(
+      { url: 'https://x', source: 'github', title: 'IBAN validation with BIC lookup', excerpt: 'validate please', activity: '', threadCreatedAt: '2026-08-16' },
+      now,
+    );
+    expect(t?.scoreDetail).toContain('récent(+25)');
+    expect(t?.score).toBeLessThanOrEqual(100);
+  });
+});
+
+describe('parseDiscourse / parseOdooSearch — les nouveaux forums', () => {
+  it('Discourse : reconstruit les URLs de topics', () => {
+    const [c] = parseDiscourse(
+      { topics: [{ id: 56496, title: 'IBAN number isn&#39;t valid', slug: 'iban-number-isnt-valid', created_at: '2019-12-01T00:00:00Z', posts_count: 5 }] },
+      'discuss.frappe.io',
+    );
+    expect(c.url).toBe('https://discuss.frappe.io/t/iban-number-isnt-valid/56496');
+    expect(c.title).toBe("IBAN number isn't valid");
+    expect(c.activity).toContain('discuss.frappe.io');
+  });
+  it('Odoo : extrait les fils du HTML, dédupliqués, slug humanisé', () => {
+    const html = 'x href="/forum/help-1/how-to-use-sepa-direct-debit-sdd-205846" y /forum/help-1/how-to-use-sepa-direct-debit-sdd-205846 z /forum/help-1/tag/foo';
+    const out = parseOdooSearch(html);
+    expect(out).toHaveLength(1);
+    expect(out[0].url).toBe('https://www.odoo.com/forum/help-1/how-to-use-sepa-direct-debit-sdd-205846');
+    expect(out[0].title).toBe('how to use sepa direct debit sdd');
+  });
+  it('payloads vides tolérés', () => {
+    expect(parseDiscourse({}, 'x')).toEqual([]);
+    expect(parseOdooSearch('<html>rien</html>')).toEqual([]);
   });
 });
 

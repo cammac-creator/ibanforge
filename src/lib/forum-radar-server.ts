@@ -19,8 +19,10 @@ import {
   MIN_SCORE,
   finalizeCandidate,
   interpretCheck,
+  parseDiscourse,
   parseGitHubIssues,
   parseHN,
+  parseOdooSearch,
   parsePullpush,
   parseStackExchange,
   repoOfUrl,
@@ -46,6 +48,7 @@ export interface ScanReport {
   marketplaces: { checked: number; skipped: number };
   drafts: { generated: number; failed: number };
   watch: { checked: number; flagged: number };
+  autodetect: { checked: number; found: number };
   events: number;
   errors: string[];
 }
@@ -145,11 +148,17 @@ const THREAD_SOURCES: ThreadSource[] = [
     name: 'stackexchange',
     fetchAll: async (since) => {
       const out: ThreadCandidate[] = [];
-      // filter=withbody so the scorer sees the question text, not the title alone.
+      // filter=withbody so the scorer sees the question text, not the title
+      // alone. The SE API has no OR, hence one query per phrase; the daily
+      // budget (8 calls) stays far under the 300/day unauthenticated quota.
       const qs = [
         `/questions?order=desc&sort=creation&tagged=iban&site=stackoverflow&pagesize=20&fromdate=${since}&filter=withbody`,
+        `/questions?order=desc&sort=creation&tagged=sepa&site=stackoverflow&pagesize=20&fromdate=${since}&filter=withbody`,
         `/search/advanced?order=desc&sort=creation&q=%22bic%20from%20iban%22&site=stackoverflow&pagesize=20&fromdate=${since}&filter=withbody`,
         `/search/advanced?order=desc&sort=creation&q=%22verification%20of%20payee%22&site=stackoverflow&pagesize=20&fromdate=${since}&filter=withbody`,
+        `/search/advanced?order=desc&sort=creation&q=%22qr-iban%22&site=stackoverflow&pagesize=20&fromdate=${since}&filter=withbody`,
+        `/search/advanced?order=desc&sort=creation&q=%22swift%20code%22&site=stackoverflow&pagesize=20&fromdate=${since}&filter=withbody`,
+        `/search/advanced?order=desc&sort=creation&q=%22virtual%20iban%22&site=stackoverflow&pagesize=20&fromdate=${since}&filter=withbody`,
         `/search/advanced?order=desc&sort=creation&q=iban&site=money&pagesize=20&fromdate=${since}&filter=withbody`,
       ];
       for (const q of qs) out.push(...(await seQuery(q)));
@@ -164,7 +173,11 @@ const THREAD_SOURCES: ThreadSource[] = [
         `"IBAN validation" is:issue state:open created:>${sinceISO}`,
         `"verification of payee" is:issue created:>${sinceISO}`,
         `"QR-IBAN" is:issue created:>${sinceISO}`,
+        `"QR-IID" is:issue created:>${sinceISO}`,
         `IBAN BIC lookup is:issue state:open created:>${sinceISO}`,
+        `"virtual iban" is:issue created:>${sinceISO}`,
+        `"swift code" lookup is:issue state:open created:>${sinceISO}`,
+        `bankleitzahl is:issue created:>${sinceISO}`,
       ];
       for (let i = 0; i < queries.length; i++) {
         if (i > 0) await sleep(GITHUB_SPACING_MS);
@@ -185,7 +198,7 @@ const THREAD_SOURCES: ThreadSource[] = [
     name: 'hackernews',
     fetchAll: async (since) => {
       const out: ThreadCandidate[] = [];
-      for (const q of ['IBAN', '"verification of payee"']) {
+      for (const q of ['IBAN', '"verification of payee"', '"SEPA instant"']) {
         const { status, body } = await fetchText(
           `https://hn.algolia.com/api/v1/search?query=${encodeURIComponent(q)}&tags=story&hitsPerPage=15&numericFilters=created_at_i>${since}`,
         );
@@ -198,11 +211,53 @@ const THREAD_SOURCES: ThreadSource[] = [
   {
     name: 'reddit-archive',
     fetchAll: async (since) => {
-      const { status, body } = await fetchText(
-        `https://api.pullpush.io/reddit/search/submission/?q=iban%20validation&size=15&after=${since}`,
-      );
-      if (status !== 200) throw new Error(`pullpush HTTP ${status}`);
-      return parsePullpush(JSON.parse(body));
+      const out: ThreadCandidate[] = [];
+      for (const q of ['iban validation', 'verify iban', 'virtual iban']) {
+        const { status, body } = await fetchText(
+          `https://api.pullpush.io/reddit/search/submission/?q=${encodeURIComponent(q)}&size=15&after=${since}`,
+        );
+        if (status !== 200) throw new Error(`pullpush HTTP ${status}`);
+        out.push(...parsePullpush(JSON.parse(body)));
+      }
+      return out;
+    },
+  },
+  {
+    // Discourse forums all expose /search.json; one generic fetcher, several
+    // communities where an answer can actually be posted.
+    name: 'discourse',
+    fetchAll: async () => {
+      const out: ThreadCandidate[] = [];
+      const targets: Array<[string, string]> = [
+        ['community.n8n.io', 'IBAN'],
+        ['discuss.frappe.io', 'IBAN validation'],
+        ['discuss.frappe.io', 'bank account validation'],
+        ['community.retool.com', 'IBAN'],
+      ];
+      for (const [host, q] of targets) {
+        const { status, body } = await fetchText(
+          `https://${host}/search.json?q=${encodeURIComponent(q)}`,
+          'application/json',
+        );
+        if (status !== 200) throw new Error(`${host} HTTP ${status}`);
+        out.push(...parseDiscourse(JSON.parse(body), host));
+      }
+      return out;
+    },
+  },
+  {
+    name: 'odoo-forum',
+    fetchAll: async () => {
+      const out: ThreadCandidate[] = [];
+      for (const q of ['IBAN', 'SEPA direct debit']) {
+        const { status, body } = await fetchText(
+          `https://www.odoo.com/forum/help-1?search=${encodeURIComponent(q)}`,
+          'text/html',
+        );
+        if (status !== 200) throw new Error(`odoo HTTP ${status}`);
+        out.push(...parseOdooSearch(body));
+      }
+      return out;
     },
   },
 ];
@@ -265,6 +320,77 @@ async function scanThreads(report: ScanReport): Promise<void> {
       }
     } catch (err) {
       report.errors.push(`${source.name}: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Posted-reply autodetection — the operator never ticks "answered" by hand
+// ---------------------------------------------------------------------------
+
+/** Our public identities per platform. GitHub is fixed; the Stack Exchange
+ *  numeric user id only exists once the account is created (env-configured). */
+const GITHUB_LOGIN = process.env.FORUM_GITHUB_LOGIN ?? 'cammac-creator';
+
+async function detectPostedReplies(report: ScanReport): Promise<void> {
+  const db = getStatsDB();
+  const soUserId = process.env.SO_USER_ID ?? '';
+  const rows = db
+    .prepare(
+      `SELECT id, url, source FROM forum_threads
+       WHERE status IN ('new', 'to_answer', 'drafted', 'planned')
+         AND source IN ('github', 'stackoverflow', 'money_se')`,
+    )
+    .all() as Array<{ id: number; url: string; source: string }>;
+
+  const markPosted = db.prepare(
+    `UPDATE forum_threads
+       SET status = 'posted', posted_url = ?, posted_at = COALESCE(posted_at, ?),
+           updated_at = datetime('now')
+     WHERE id = ?`,
+  );
+
+  for (const row of rows) {
+    try {
+      if (row.source === 'github') {
+        const m = /github\.com\/([^/]+)\/([^/]+)\/issues\/(\d+)/.exec(row.url);
+        if (!m) continue;
+        const { status, body } = await fetchText(
+          `https://api.github.com/repos/${m[1]}/${m[2]}/issues/${m[3]}/comments?per_page=100`,
+          'application/vnd.github+json',
+          githubHeaders(),
+        );
+        if (status !== 200) throw new Error(`GitHub HTTP ${status}`);
+        const comments = JSON.parse(body) as Array<{
+          user?: { login?: string };
+          html_url?: string;
+          created_at?: string;
+        }>;
+        const mine = comments.find((c) => (c.user?.login ?? '').toLowerCase() === GITHUB_LOGIN.toLowerCase());
+        report.autodetect.checked++;
+        if (mine) {
+          markPosted.run(mine.html_url ?? row.url, mine.created_at ?? new Date().toISOString(), row.id);
+          report.autodetect.found++;
+        }
+        continue;
+      }
+      // Stack Exchange needs the account's numeric id; silently manual until set.
+      if (!soUserId) continue;
+      const qm = /questions\/(\d+)/.exec(row.url);
+      if (!qm) continue;
+      const site = row.source === 'money_se' ? 'money' : 'stackoverflow';
+      const { status, body } = await fetchText(`${SE_BASE}/questions/${qm[1]}/answers?site=${site}&pagesize=50`);
+      if (status !== 200) throw new Error(`SE HTTP ${status}`);
+      const answers = (JSON.parse(body) as { items?: Array<{ owner?: { user_id?: number }; answer_id?: number }> })
+        .items ?? [];
+      const mine = answers.find((a) => String(a.owner?.user_id ?? '') === soUserId);
+      report.autodetect.checked++;
+      if (mine?.answer_id) {
+        markPosted.run(`https://${site === 'money' ? 'money.stackexchange' : 'stackoverflow'}.com/a/${mine.answer_id}`, new Date().toISOString(), row.id);
+        report.autodetect.found++;
+      }
+    } catch (err) {
+      report.errors.push(`autodetect #${row.id}: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 }
@@ -558,6 +684,7 @@ export async function runScan(what: 'threads' | 'marketplaces' | 'all' = 'all', 
     marketplaces: { checked: 0, skipped: 0 },
     drafts: { generated: 0, failed: 0 },
     watch: { checked: 0, flagged: 0 },
+    autodetect: { checked: 0, found: 0 },
     events: 0,
     errors: [],
   };
@@ -573,6 +700,9 @@ export async function runScan(what: 'threads' | 'marketplaces' | 'all' = 'all', 
       // Drafts come right after discovery so a thread never sits in the tab
       // without its reply text (the operator asked for no Generate button).
       await backfillDrafts(report);
+      // Autodetection runs before the watch so a freshly detected reply gets
+      // its baseline in the same pass.
+      await detectPostedReplies(report);
       await watchPostedThreads(report);
     }
     if (what !== 'threads') await scanMarketplaces(report, force);

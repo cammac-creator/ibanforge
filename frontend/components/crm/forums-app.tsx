@@ -51,6 +51,8 @@ const CHAR_LIMITS: Record<string, { max: number | null; comfy: number }> = {
   github: { max: 65_536, comfy: 2_500 },
   reddit: { max: 10_000, comfy: 2_500 },
   hn: { max: null, comfy: 2_000 },
+  discourse: { max: 32_000, comfy: 2_500 },
+  odoo: { max: null, comfy: 2_500 },
   manual: { max: null, comfy: 3_000 },
 };
 
@@ -107,8 +109,17 @@ const SOURCE_LABELS: Record<string, string> = {
   github: 'GitHub',
   hn: 'Hacker News',
   reddit: 'Reddit',
+  discourse: 'Forum (Discourse)',
+  odoo: 'Forum Odoo',
   manual: 'Manuel',
 };
+
+/** A thread younger than two weeks is a live conversation. */
+function isRecent(dateStr: string | null): boolean {
+  if (!dateStr) return false;
+  const t = Date.parse(dateStr);
+  return Number.isFinite(t) && Date.now() - t < 14 * 86_400_000;
+}
 
 const LANG_LABELS: Record<string, string> = { en: 'EN', de: 'DE', fr: 'FR' };
 
@@ -445,6 +456,11 @@ export function ForumsApp() {
                     💬 réponse reçue
                   </span>
                 )}
+                {isRecent(t.thread_created_at) && t.status !== 'posted' && t.status !== 'dismissed' && (
+                  <span className="rounded border border-emerald-500/40 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-400">
+                    récent
+                  </span>
+                )}
                 {postedToday.has(t.source) && t.status !== 'posted' && t.status !== 'dismissed' && (
                   <span
                     className="rounded border border-[var(--ink-4)] px-1.5 py-0.5 text-[10px] text-[var(--fg-4)]"
@@ -640,9 +656,13 @@ export function ForumsApp() {
                       setEdit((x) => ({ ...x, posted_url: e.target.value, status: e.target.value ? 'posted' : x.status }));
                       setDirty(true);
                     }}
-                    placeholder="collée ici une fois publiée"
+                    placeholder="détectée automatiquement au prochain scan"
                     className="mt-1 w-full rounded-lg border border-[var(--ink-4)] bg-[var(--ink-0)]/60 p-2 text-sm text-[var(--fg-2)] placeholder:text-[var(--fg-4)]"
                   />
+                  <span className="mt-0.5 block text-[10px] normal-case text-[var(--fg-4)]">
+                    Le radar détecte tout seul tes réponses GitHub (et Stack Overflow dès que le compte existe) : rien à
+                    cocher. Ce champ n&apos;est qu&apos;un secours.
+                  </span>
                 </label>
               </div>
 
