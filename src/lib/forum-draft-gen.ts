@@ -141,7 +141,9 @@ export async function generateDraft(t: DraftInput): Promise<GeneratedDraft | nul
     },
     body: JSON.stringify({
       model: 'claude-sonnet-5',
-      max_tokens: 2000,
+      // 250 words fit well under 2000, but verbose action-style threads hit
+      // that ceiling in production (stop_reason=max_tokens); headroom is cheap.
+      max_tokens: 3000,
       system: DRAFT_SYSTEM,
       messages: [{ role: 'user', content: buildUserPrompt(t) }],
     }),
