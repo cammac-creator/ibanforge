@@ -202,7 +202,6 @@ export function ForumsApp() {
       lang: t.lang,
       draft: t.draft ?? '',
       summary_fr: t.summary_fr ?? '',
-      planned_for: t.planned_for ?? '',
       posted_url: t.posted_url ?? '',
       notes: t.notes ?? '',
     });
@@ -383,13 +382,12 @@ export function ForumsApp() {
                 </span>
                 <span className="ml-auto text-[11px] text-[var(--fg-4)]">
                   {STATUS_LABELS[t.status] ?? t.status}
-                  {t.planned_for ? ` · ${t.planned_for}` : ''}
                 </span>
               </div>
               <p className="mt-1.5 line-clamp-2 text-sm font-medium text-[var(--fg-2)]">{t.title}</p>
               <p className="mt-1 text-[11px] text-[var(--fg-4)]">
                 {t.activity ?? ''}
-                {t.thread_created_at ? ` · ${t.thread_created_at}` : ''}
+                {t.thread_created_at ? ` · posté ${t.thread_created_at}` : ''}
               </p>
             </button>
           ))}
@@ -414,8 +412,9 @@ export function ForumsApp() {
                     {selected.title} ↗
                   </a>
                   <p className="mt-1 text-[11px] text-[var(--fg-4)]">
-                    {SOURCE_LABELS[selected.source] ?? selected.source} · {selected.activity ?? ''} · pertinence{' '}
-                    {selected.score} ({selected.score_detail ?? ''})
+                    {SOURCE_LABELS[selected.source] ?? selected.source}
+                    {selected.thread_created_at ? ` · posté le ${selected.thread_created_at}` : ''} ·{' '}
+                    {selected.activity ?? ''} · pertinence {selected.score} ({selected.score_detail ?? ''})
                   </p>
                 </div>
               </div>
@@ -489,7 +488,7 @@ export function ForumsApp() {
                 </button>
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-3">
+              <div className="grid gap-3 sm:grid-cols-2">
                 <label className="text-[11px] font-medium uppercase tracking-wide text-[var(--fg-4)]">
                   Statut
                   <select
@@ -506,18 +505,6 @@ export function ForumsApp() {
                       </option>
                     ))}
                   </select>
-                </label>
-                <label className="text-[11px] font-medium uppercase tracking-wide text-[var(--fg-4)]">
-                  Planifié pour
-                  <input
-                    type="date"
-                    value={String(edit.planned_for ?? '')}
-                    onChange={(e) => {
-                      setEdit((x) => ({ ...x, planned_for: e.target.value, status: e.target.value ? 'planned' : x.status }));
-                      setDirty(true);
-                    }}
-                    className="mt-1 w-full rounded-lg border border-[var(--ink-4)] bg-[var(--ink-0)]/60 p-2 text-sm text-[var(--fg-2)]"
-                  />
                 </label>
                 <label className="text-[11px] font-medium uppercase tracking-wide text-[var(--fg-4)]">
                   URL de ma réponse
