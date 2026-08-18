@@ -56,7 +56,7 @@ export interface ScanReport {
 
 /** Short operator ping, same channel the lifecycle radar uses. Throws on failure
  *  so callers can keep send-before-save semantics. Silently no-ops unconfigured. */
-async function sendTelegramShort(text: string): Promise<boolean> {
+export async function sendTelegramShort(text: string): Promise<boolean> {
   const token = process.env.TELEGRAM_BOT_TOKEN ?? '';
   const chat = process.env.TELEGRAM_CHAT_ID ?? '';
   if (!token || !chat) return false;
@@ -81,7 +81,7 @@ function ensureKvTable(): void {
   `);
 }
 
-function kvGet(key: string): string | undefined {
+export function kvGet(key: string): string | undefined {
   ensureKvTable();
   const row = getStatsDB().prepare('SELECT value FROM kv_state WHERE key = ?').get(key) as
     | { value: string }
@@ -89,7 +89,7 @@ function kvGet(key: string): string | undefined {
   return row?.value;
 }
 
-function kvSet(key: string, value: string): void {
+export function kvSet(key: string, value: string): void {
   ensureKvTable();
   getStatsDB()
     .prepare(

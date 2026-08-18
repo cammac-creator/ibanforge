@@ -22,6 +22,7 @@ import { getOrphans, recordOrphan, resolveOrphan, countPendingOrphans, isOrphanK
 import { addAlias, listAliases, loadAliasMap, toCanonical } from '../lib/email-aliases.js';
 import { getWeeklyFacts, saveWeeklyDigest, getWeeklyDigests } from '../lib/weekly-facts.js';
 import { notifyPurchaseTelegram } from '../lib/notify.js';
+import { isProspectBackfillRunning, lastProspectBackfillReport, runProspectBackfill } from '../lib/prospect-radar-server.js';
 import { sendApiKeyEmail, sendKeyVerificationEmail, isEmailConfigured } from '../lib/email.js';
 
 // Bundle credits — prepaid pools sized for the 3 typical agent stacks.
@@ -1582,6 +1583,31 @@ apiKeys.post('/v1/admin/prospects/update', async (c) => {
     .prepare(`UPDATE prospects SET ${sets.join(', ')}, updated_at = datetime('now') WHERE id = ?`)
     .run(...args, body.id);
   return c.json({ updated: r.changes });
+});
+
+/**
+ * Kick the prospect enrichment backfill NOW instead of waiting for its 6 h
+ * cadence — fire-and-forget, same posture as POST /v1/admin/forum-scan. The
+ * manual limits are wider than the cadence's: this is the catch-up gesture.
+ */
+apiKeys.post('/v1/admin/prospects/backfill', (c) => {
+  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
+  if (isProspectBackfillRunning()) {
+    return c.json({ started: false, reason: 'already_running' });
+  }
+  void runProspectBackfill({ enrichLimit: 12, draftLimit: 12 }).catch((err) =>
+    console.error('[prospect-radar] manual run failed:', err instanceof Error ? err.message : err),
+  );
+  return c.json({ started: true });
+});
+
+apiKeys.get('/v1/admin/prospects/backfill', (c) => {
+  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
+  return c.json({ running: isProspectBackfillRunning(), ...lastProspectBackfillReport() });
 });
 
 // ---------------------------------------------------------------------------

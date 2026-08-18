@@ -43,6 +43,7 @@ import { recordRequest, classifyClient, hashIp, extractClientIp, purgeOldRequest
 import { purgeExpiredVerifications } from './lib/key-creation-guard.js';
 import { startLifecycleRadar } from './lib/lifecycle-radar-server.js';
 import { startForumRadar } from './lib/forum-radar-server.js';
+import { startProspectRadar } from './lib/prospect-radar-server.js';
 import { recordEvent } from './lib/events.js';
 import { bicGuardMiddleware, iidGuardMiddleware } from './middleware/identifier-guard.js';
 import { notFoundHandler } from './lib/not-found.js';
@@ -626,6 +627,10 @@ startLifecycleRadar(port);
 // Daily community radar: scored forum/issue threads + marketplace presence
 // for the CRM "Forums" tab (see forum-radar-server.ts).
 startForumRadar();
+
+// Prospect enrichment radar: published own-domain addresses + EN/FR draft
+// mails for the harvest's leftovers (see prospect-radar-server.ts).
+startProspectRadar();
 
 // Graceful shutdown
 function gracefulShutdown(signal: string) {

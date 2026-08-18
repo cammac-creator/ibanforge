@@ -21,7 +21,7 @@ import { validateIBAN } from './iban.js';
 import { enrichResult } from './enrich.js';
 import { lookup as lookupBic } from './bic-lookup.js';
 
-const PRODUCT_FACTS = [
+export const PRODUCT_FACTS = [
   'Free tier: 200 requests/month, no card required.',
   'POST /v1/iban/validate returns bic, bank_code_check (does the national bank code exist in its register, with institution name/address where the register provides them), sepa.schemes (SCT/SDD reachability) and sepa.vop_participant (is the resolved institution listed VoP-ready in the EPC register).',
   'National registers refreshed monthly: SIX BankMaster (CH/LI, includes QR-IID 30000-31999 and merger redirects), Bundesbank (DE), OeNB (AT), NBB (BE), plus GLEIF BIC-to-LEI open data.',
