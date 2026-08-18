@@ -22,7 +22,6 @@ import { fetchCrmData, SEEDED_PILOT_RE, type BuildInput } from '@/lib/crm/build-
 import { BY_CAMPAIGN, BY_CONFIDENCE, BY_COUNTRY, BY_SEGMENT, funnelBy } from '@/lib/crm/funnel';
 import { reservoir } from '@/lib/crm/priority';
 import { ReservoirCard } from '@/components/dashboard/reservoir-card';
-import { VisibilityPanel, type SurfaceStatus } from '@/components/dashboard/visibility-panel';
 import { OrphanMailPanel, type OrphanMailRow } from '@/components/dashboard/orphan-mail-panel';
 import { FOLLOWUP_DAYS } from '@/lib/crm/situation';
 import { crmSnapshot } from '@/lib/crm/snapshot';
@@ -222,7 +221,7 @@ export default async function DashboardPage({
     ? (periodParam as ValidPeriod)
     : 30;
 
-  const [statsRes, historyRes, funnelRes, activationRes, errorsRes, hourlyRes, eventsRes, digestRes, statusByPathRes, sourcesRes, patternsRes, visibilityRes, orphanRes, crm] = await Promise.all([
+  const [statsRes, historyRes, funnelRes, activationRes, errorsRes, hourlyRes, eventsRes, digestRes, statusByPathRes, sourcesRes, patternsRes, orphanRes, crm] = await Promise.all([
     fetchJSON<StatsResponse>('/stats', statsHeaders),
     fetchJSON<HistoryEntry[]>(`/stats/history?period=${period}`, statsHeaders),
     fetchJSON<{ rows?: BusinessFunnelDay[] }>(`/stats/business-funnel?period=${period}`, statsHeaders),
@@ -243,15 +242,9 @@ export default async function DashboardPage({
     fetchJSON<{ rows: StatusByPathRow[] }>(`/stats/status-by-path?period=${period}`, statsHeaders),
     fetchJSON<{ by_client_kind: ChannelRow[] }>(`/stats/sources?period=${period}`, statsHeaders),
     fetchJSON<{ geo_trend: Array<Record<string, number | string>> }>(`/stats/patterns?period=${period}`, statsHeaders),
-    // The CRM payloads, alongside the rest rather than after it. Null when
-    // ADMIN_SECRET is unset or the API is unreachable, which is the same
-    // condition the leads section already draws its own empty state for.
-    // The listing watch: one row per directory, filled by the daily VPS probe.
-    ADMIN_SECRET
-      ? fetchJSON<{ surfaces: SurfaceStatus[] }>('/v1/admin/visibility', { 'X-Admin-Secret': ADMIN_SECRET })
-      : Promise.resolve({ ok: false, status: 0, data: null } satisfies Fetched<{ surfaces: SurfaceStatus[] }>),
-    // Mail the CRM cannot attach to anyone. Same posture as the listing watch:
-    // no admin secret means no panel, not a broken page.
+    // Mail the CRM cannot attach to anyone. No admin secret means no panel,
+    // not a broken page. (The listing watch moved to Forums → Vitrines on
+    // 18/08/2026; this page no longer duplicates it.)
     ADMIN_SECRET
       ? fetchJSON<{ orphans: OrphanMailRow[] }>('/v1/admin/orphan-mail', { 'X-Admin-Secret': ADMIN_SECRET })
       : Promise.resolve({ ok: false, status: 0, data: null } satisfies Fetched<{ orphans: OrphanMailRow[] }>),
@@ -441,9 +434,6 @@ export default async function DashboardPage({
 
       {/* 3. Contact base — the podium, the relationship figures, the campaigns */}
       {orphanRes.data?.orphans && <OrphanMailPanel orphans={orphanRes.data.orphans} />}
-      {visibilityRes.data?.surfaces && (
-        <VisibilityPanel surfaces={visibilityRes.data.surfaces} />
-      )}
       {crm && <ContactBase crm={crm} locale={locale} />}
 
       {/* 4. Clients — per email, credits first */}

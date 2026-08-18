@@ -172,6 +172,10 @@ export function ForumsApp() {
   const [busy, setBusy] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  // Two rooms under one roof: the threads to answer, and the shop windows
+  // (marketplaces & annuaires). The windows used to live as a page footer,
+  // which buried them; they now hold a full pane of their own.
+  const [pane, setPane] = useState<'threads' | 'markets'>('threads');
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const say = useCallback((msg: string) => {
@@ -351,32 +355,81 @@ export function ForumsApp() {
       {/* Header line, same grammar as the Contacts tab. */}
       <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
         <h1 className="text-base font-semibold text-white">Forums</h1>
-        <p className="text-sm text-[var(--fg-3)]">
-          <span className="text-amber-400">
-            {activeCount} fil{activeCount > 1 ? 's' : ''} à traiter
-          </span>
-          {' · '}
-          {counts.posted ?? 0} répondu{(counts.posted ?? 0) > 1 ? 's' : ''}
-          {' · '}
-          {scan?.last_scan_at ? `dernier scan ${scan.last_scan_at.slice(0, 16).replace('T', ' ')}` : 'jamais scanné'}
-          {scan?.scanning ? ' · scan en cours…' : ''}
-        </p>
+        {pane === 'threads' ? (
+          <p className="text-sm text-[var(--fg-3)]">
+            <span className="text-amber-400">
+              {activeCount} fil{activeCount > 1 ? 's' : ''} à traiter
+            </span>
+            {' · '}
+            {counts.posted ?? 0} répondu{(counts.posted ?? 0) > 1 ? 's' : ''}
+            {' · '}
+            {scan?.last_scan_at ? `dernier scan ${scan.last_scan_at.slice(0, 16).replace('T', ' ')}` : 'jamais scanné'}
+            {scan?.scanning ? ' · scan en cours…' : ''}
+          </p>
+        ) : (
+          <p className="text-sm text-[var(--fg-3)]">
+            <span className="text-emerald-400">
+              {markets.filter((m) => m.status === 'listed').length} listé
+              {markets.filter((m) => m.status === 'listed').length > 1 ? 's' : ''}
+            </span>
+            {' · '}
+            {markets.filter((m) => m.status === 'absent' || m.status === 'pending' || m.status === 'unknown').length} à
+            conquérir
+            {scan?.scanning ? ' · vérification en cours…' : ''}
+          </p>
+        )}
         <div className="flex w-full items-center gap-2 sm:ml-auto sm:w-auto">
-          <button
-            onClick={() => void runScan('threads')}
-            disabled={busy !== null || scan?.scanning === true}
-            className="flex-1 rounded border border-[var(--ink-4)] px-3 py-2.5 text-xs font-medium text-[var(--fg-2)] transition-colors hover:bg-[var(--ink-4)]/50 disabled:opacity-40 sm:flex-none sm:py-1.5"
-          >
-            Scanner les forums
-          </button>
-          <button
-            onClick={() => void runScan('marketplaces')}
-            disabled={busy !== null || scan?.scanning === true}
-            className="flex-1 rounded border border-[var(--ink-4)] px-3 py-2.5 text-xs font-medium text-[var(--fg-2)] transition-colors hover:bg-[var(--ink-4)]/50 disabled:opacity-40 sm:flex-none sm:py-1.5"
-          >
-            Vérifier les marketplaces
-          </button>
+          {pane === 'threads' ? (
+            <button
+              onClick={() => void runScan('threads')}
+              disabled={busy !== null || scan?.scanning === true}
+              className="flex-1 rounded border border-[var(--ink-4)] px-3 py-2.5 text-xs font-medium text-[var(--fg-2)] transition-colors hover:bg-[var(--ink-4)]/50 disabled:opacity-40 sm:flex-none sm:py-1.5"
+            >
+              Scanner les forums
+            </button>
+          ) : (
+            <button
+              onClick={() => void runScan('marketplaces')}
+              disabled={busy !== null || scan?.scanning === true}
+              className="flex-1 rounded border border-[var(--ink-4)] px-3 py-2.5 text-xs font-medium text-[var(--fg-2)] transition-colors hover:bg-[var(--ink-4)]/50 disabled:opacity-40 sm:flex-none sm:py-1.5"
+            >
+              Vérifier maintenant
+            </button>
+          )}
         </div>
+      </div>
+
+      {/* The two panes, one thumb-sized switch. The Vitrines badge counts the
+          status changes of the last 7 days so a lost listing pulls the eye. */}
+      <div className="flex items-center gap-1 self-start rounded-lg border border-[var(--ink-4)] p-1">
+        {(
+          [
+            { key: 'threads' as const, label: `💬 Fils de discussion (${activeCount})` },
+            { key: 'markets' as const, label: '🏪 Vitrines & annuaires' },
+          ]
+        ).map((p) => {
+          const recentChanges =
+            p.key === 'markets'
+              ? marketEvents.filter((e) => Date.now() - Date.parse(e.created_at) < 7 * 86_400_000).length
+              : 0;
+          return (
+            <button
+              key={p.key}
+              onClick={() => setPane(p.key)}
+              className={[
+                'flex items-center gap-1.5 rounded px-3 py-2 text-xs font-medium transition-colors sm:py-1.5',
+                pane === p.key ? 'bg-[var(--ink-4)] text-white' : 'text-[var(--fg-4)] hover:text-[var(--fg-2)]',
+              ].join(' ')}
+            >
+              {p.label}
+              {recentChanges > 0 && (
+                <span className="rounded-full border border-amber-500/40 bg-amber-500/15 px-1.5 text-[10px] font-semibold text-amber-300">
+                  {recentChanges}
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
       {toast && (
@@ -384,7 +437,7 @@ export function ForumsApp() {
           {toast}
         </div>
       )}
-      {postedToday.size > 0 && (
+      {pane === 'threads' && postedToday.size > 0 && (
         <div className="rounded-lg border border-[var(--ink-4)] bg-[var(--ink-2)]/60 px-3 py-2 text-xs text-[var(--fg-3)]">
           ⏸ Déjà posté aujourd&apos;hui sur {[...postedToday].map((s) => SOURCE_LABELS[s] ?? s).join(', ')} — la règle
           anti-spam : jamais deux posts le même jour sur la même plateforme. Les autres fils de cette plateforme
@@ -396,7 +449,7 @@ export function ForumsApp() {
           Chargement impossible ({loadError}) : API injoignable ou secrets absents.
         </div>
       )}
-      {scan?.last_report && scan.last_report.errors.length > 0 && !scan.scanning && (
+      {pane === 'threads' && scan?.last_report && scan.last_report.errors.length > 0 && !scan.scanning && (
         <div className="rounded-lg border border-[var(--ink-4)] bg-[var(--ink-2)]/60 px-3 py-2 text-xs text-[var(--fg-3)]">
           Dernier scan : {scan.last_report.threads.inserted} nouveau(x) fil(s),{' '}
           {scan.last_report.drafts?.generated ?? 0} brouillon(s) généré(s), {scan.last_report.marketplaces.checked}{' '}
@@ -404,6 +457,8 @@ export function ForumsApp() {
         </div>
       )}
 
+      {pane === 'threads' && (
+        <>
       {/* Status filter chips: one thumb-scrollable row on phones. */}
       <div className="flex items-center gap-1.5 overflow-x-auto whitespace-nowrap pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:flex-wrap sm:whitespace-normal">
         {[
@@ -705,14 +760,40 @@ export function ForumsApp() {
           )}
         </div>
       </div>
+        </>
+      )}
 
-      {/* Marketplace presence */}
-      <div className="mt-2 flex min-w-0 flex-col gap-2">
+      {/* Marketplace presence — its own pane since 18/08, no longer a footer. */}
+      {pane === 'markets' && (
+      <div className="flex min-w-0 flex-col gap-3">
         <div className="flex items-baseline gap-2.5">
           <h2 className="text-sm font-semibold text-white">Marketplaces &amp; annuaires</h2>
           <p className="text-xs text-[var(--fg-4)]">
             où IBANforge est visible, où il manque : vérifié automatiquement par le radar quotidien
           </p>
+        </div>
+
+        {/* The state of the shop windows at a glance, before the detail. */}
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {(
+            [
+              { status: 'listed', hint: 'IBANforge y est visible' },
+              { status: 'pending', hint: 'soumission déposée, en attente' },
+              { status: 'absent', hint: 'pas encore présent : à conquérir' },
+              { status: 'unknown', hint: 'la sonde n’a pas pu conclure' },
+            ] as const
+          ).map(({ status, hint }) => {
+            const badge = PRESENCE_BADGE[status];
+            const n = markets.filter((m) => m.status === status).length;
+            return (
+              <div key={status} className="rounded-xl border border-[var(--ink-4)]/60 bg-[var(--ink-2)]/60 px-3 py-2.5" title={hint}>
+                <span className={`inline-block rounded border px-1.5 py-0.5 text-[10px] font-semibold ${badge.cls}`}>
+                  {badge.label}
+                </span>
+                <div className="mt-1 font-mono text-xl tabular-nums text-[var(--fg-1)]">{n}</div>
+              </div>
+            );
+          })}
         </div>
         {/* Phone layout: stacked cards; the table needs a real screen. */}
         <div className="flex flex-col gap-2 sm:hidden">
@@ -842,6 +923,7 @@ export function ForumsApp() {
           </div>
         )}
       </div>
+      )}
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { denseDays } from './client-dossiers';
+import { calendarDaysSince, denseDays } from './client-dossiers';
 
 /** One row of /v1/admin/bot-profiles. Mirrors BotProfile in src/lib/stats.ts. */
 export interface BotProfileRow {
@@ -71,7 +71,6 @@ export interface BotDossier {
   verdict: BotVerdict;
 }
 
-const DAY_MS = 86_400_000;
 
 function parseUtc(raw: string | null | undefined): Date | null {
   if (!raw) return null;
@@ -114,7 +113,7 @@ export function buildBots(profiles: Record<string, BotProfileRow>, now: Date): B
       clientKind: p.client_kind,
       firstSeenAt: first ? first.toISOString() : null,
       lastSeenAt: last ? last.toISOString() : null,
-      daysSinceLastCall: last ? Math.floor((now.getTime() - last.getTime()) / DAY_MS) : null,
+      daysSinceLastCall: last ? calendarDaysSince(last, now) : null,
       requests: p.total,
       ok: p.ok,
       paywall: p.paywall,

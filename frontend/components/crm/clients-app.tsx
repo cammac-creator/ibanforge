@@ -2,35 +2,22 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { chipOfDossier, heatOfDossier, sortDossiers, type ClientDossier, type SortKey, type Verdict } from '@/lib/crm/client-dossiers';
+import {
+  chipOfDossier,
+  heatOfDossier,
+  sortDossiers,
+  SORT_DEFAULT_DIR,
+  type ClientDossier,
+  type SortDir,
+  type SortKey,
+  type Verdict,
+} from '@/lib/crm/client-dossiers';
 import { flameOf } from '@/lib/crm/heat';
 import { fold } from '@/lib/crm/mail-rows';
 import { contactsHref } from '@/lib/crm/deep-link';
-import { ClientDossierPanel } from './client-dossier-panel';
+import { ClientDossierModal } from './client-dossier-modal';
+import { VERDICTS, VERDICT_BY_KEY } from './verdict-meta';
 import { flag, relativeDays } from './dossier-bits';
-
-/**
- * The verdict vocabulary, in the order it is offered as a filter: what needs
- * doing first, then what is merely true. `blocked` leads because it is the only
- * one that describes a customer we are actively losing.
- */
-const VERDICTS: Array<{ key: Verdict; label: string; one: string; colour: string; why: string }> = [
-  { key: 'blocked', label: 'Bloqués', one: 'Bloqué', colour: 'var(--err)', why: 'le dernier échange a été un refus, et rien depuis' },
-  { key: 'struggling', label: 'En difficulté', one: 'En difficulté', colour: 'var(--warn)', why: 'plus de 30 % de leurs appels sont rejetés' },
-  { key: 'rising', label: 'En montée', one: 'En montée', colour: 'var(--ok)', why: 'volume en nette hausse sur 7 jours' },
-  { key: 'active', label: 'Actifs', one: 'Actif', colour: 'var(--info)', why: 'appellent régulièrement' },
-  { key: 'dormant', label: 'Dormants', one: 'Dormant', colour: 'var(--fg-4)', why: 'plus rien depuis plus de 14 jours' },
-  { key: 'former', label: 'Anciens', one: 'Ancien client', colour: 'var(--violet, #a78bfa)', why: 'ont réellement appelé par le passé, plus rien sur la fenêtre affichée' },
-  { key: 'silent', label: 'Muets', one: 'Muet', colour: 'var(--fg-5)', why: 'une clé, jamais utilisée' },
-];
-
-const VERDICT_BY_KEY = Object.fromEntries(VERDICTS.map((v) => [v.key, v])) as Record<Verdict, (typeof VERDICTS)[number]>;
-
-const SORTS: Array<{ key: SortKey; label: string }> = [
-  { key: 'requests', label: 'Requêtes' },
-  { key: 'freshness', label: 'Fraîcheur' },
-  { key: 'name', label: 'Nom' },
-];
 
 function MiniSpark({ days }: { days: Array<{ day: string; count: number }> }) {
   if (days.length === 0) return <span className="inline-block h-5 w-20" />;
@@ -58,12 +45,25 @@ function MiniSpark({ days }: { days: Array<{ day: string; count: number }> }) {
  */
 type Filter = Verdict | 'all' | 'used';
 
+/** Column order mirrors the row layout; every header sorts (ask of 18/08). */
+const HEADERS: Array<{ key: SortKey; label: string; width: string; right?: boolean }> = [
+  { key: 'state', label: 'État', width: 'md:w-[12%]' },
+  { key: 'requests', label: 'Requêtes', width: 'md:w-[10%]', right: true },
+  { key: 'last30', label: '30 jours', width: 'md:w-24' },
+  { key: 'freshness', label: 'Dernier appel', width: 'md:w-[13%]' },
+  { key: 'countries', label: 'Pays contrôlés', width: 'md:min-w-0 md:flex-1' },
+  { key: 'mails', label: 'Mails', width: 'md:w-14', right: true },
+];
+
 export function ClientsApp({ dossiers, locale, windowDays = 90 }: { dossiers: ClientDossier[]; locale: string; windowDays?: number }) {
   // Freshness first: the operator's default question is "who moved lately?",
   // not "who is biggest?" (explicit ask, 18/08/2026).
   const [sort, setSort] = useState<SortKey>('freshness');
+  const [dir, setDir] = useState<SortDir>(SORT_DEFAULT_DIR.freshness);
   const [filter, setFilter] = useState<Filter>('used');
   const [query, setQuery] = useState('');
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [stateMenuOpen, setStateMenuOpen] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
 
   // ⌘K deep link: /clients?open=<email> lands with that dossier open. Filter
@@ -101,11 +101,11 @@ export function ClientsApp({ dossiers, locale, windowDays = 90 }: { dossiers: Cl
         d.keys.some((k) => k.prefix.toLowerCase().includes(q))
       );
     });
-    return sortDossiers(filtered, sort);
-  }, [dossiers, filter, query, sort]);
+    return sortDossiers(filtered, sort, dir);
+  }, [dossiers, filter, query, sort, dir]);
 
-  // Arrow keys walk the visible list while a dossier is open — the inspector
-  // stays put, the selection moves. Guarded on an open dossier and on the
+  // Arrow keys walk the visible list while a dossier is open — the modal
+  // stays put, the subject changes. Guarded on an open dossier and on the
   // event not landing in an input, so the search field keeps its cursor keys.
   useEffect(() => {
     if (!openId) return;
@@ -128,48 +128,30 @@ export function ClientsApp({ dossiers, locale, windowDays = 90 }: { dossiers: Cl
   const totalRequests = dossiers.reduce((s, d) => s + d.requests, 0);
   const distinctCountries = new Set(dossiers.flatMap((d) => d.countries.map((c) => c.code))).size;
 
-  // The day's gesture: the single most valuable thing this page can point at
-  // right now, computed, with its reason. Blocked outranks everything (money
-  // stopped by us), then a paying customer surging (say thanks / help), then
-  // the hottest former customer (one mail can wake 200 historical calls).
-  const gesture = (() => {
-    const blocked = dossiers.filter((d) => d.verdict === 'blocked').sort((a, b) => b.usedAllTime - a.usedAllTime)[0];
-    if (blocked)
-      return {
-        icon: '⛔',
-        text: `${blocked.company ?? blocked.email} est arrêté sur un refus`,
-        why: 'le seul état où c\'est NOUS qui les perdons',
-        id: blocked.id,
-        filter: 'blocked' as Filter,
-      };
-    const surging = dossiers
-      .filter((d) => d.activation?.status === 'paying' && d.verdict === 'rising')
-      .sort((a, b) => b.requests - a.requests)[0];
-    if (surging)
-      return {
-        icon: '💰',
-        text: `${surging.company ?? surging.email} (payant) est en pleine montée`,
-        why: 'un merci du fondateur pendant la lune de miel',
-        id: surging.id,
-        filter: 'rising' as Filter,
-      };
-    const former = dossiers.filter((d) => d.verdict === 'former').sort((a, b) => b.usedAllTime - a.usedAllTime)[0];
-    if (former && former.usedAllTime >= 50)
-      return {
-        icon: '🕰',
-        text: `${former.company ?? former.email} a fait ${former.usedAllTime.toLocaleString('fr-CH')} appels puis a disparu`,
-        why: 'un ancien client se réveille mieux qu\'un inconnu se convainc',
-        id: former.id,
-        filter: 'former' as Filter,
-      };
-    return null;
-  })();
+  function onHeader(key: SortKey) {
+    if (sort === key) setDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    else {
+      setSort(key);
+      setDir(SORT_DEFAULT_DIR[key]);
+    }
+  }
+
+  const arrowOf = (key: SortKey) => (sort === key ? (dir === 'asc' ? ' ▲' : ' ▼') : '');
+  const filterMeta = filter !== 'all' && filter !== 'used' ? VERDICT_BY_KEY[filter] : null;
+  const usedCount = dossiers.filter((d) => d.requests > 0).length;
+
+  const headerBtn = (active: boolean) =>
+    `shrink-0 rounded px-1 py-0.5 text-left transition-colors hover:text-[var(--fg-2)] ${
+      active ? 'text-[var(--fg-2)]' : ''
+    }`;
+
+  const opened = openId ? (view.find((d) => d.id === openId) ?? dossiers.find((d) => d.id === openId) ?? null) : null;
 
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[
-          { l: 'Clients', v: String(dossiers.length), h: `${dossiers.filter((d) => d.requests > 0).length} ont appelé` },
+          { l: 'Clients', v: String(dossiers.length), h: `${usedCount} ont appelé` },
           { l: 'Requêtes cumulées', v: totalRequests.toLocaleString('fr-CH'), h: `${windowDays} derniers jours` },
           { l: 'Pays contrôlés', v: String(distinctCountries), h: 'tous clients confondus' },
           { l: 'À débloquer', v: String(counts.blocked), h: 'arrêtés sur un refus' },
@@ -182,101 +164,158 @@ export function ClientsApp({ dossiers, locale, windowDays = 90 }: { dossiers: Cl
         ))}
       </div>
 
-      {gesture && (
-        <button
-          type="button"
-          onClick={() => {
-            setFilter(gesture.filter);
-            setOpenId(gesture.id);
-          }}
-          className="flex w-full flex-wrap items-baseline gap-x-2 rounded-xl border border-[var(--amber-500)]/30 bg-[var(--amber-500)]/[0.06] px-4 py-2.5 text-left hover:bg-[var(--amber-500)]/10"
-        >
-          <span className="text-[13px] font-semibold text-[var(--amber-400)]">{gesture.icon} Le geste du jour</span>
-          <span className="min-w-0 text-[13.5px] text-[var(--fg-1)]">{gesture.text}</span>
-          <span className="text-[12.5px] text-[var(--fg-4)]">— {gesture.why} · ouvrir son dossier →</span>
-        </button>
-      )}
-
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          onClick={() => setFilter('used')}
-          title="Les adresses qui ont appelé au moins une fois"
-          className={`rounded-full px-3 py-1 text-[13px] font-medium transition-colors ${
-            filter === 'used' ? 'bg-[var(--ink-5)] text-white' : 'text-[var(--fg-4)] hover:text-[var(--fg-2)]'
-          }`}
-        >
-          Ont appelé <span className="tabular-nums">{dossiers.filter((d) => d.requests > 0).length}</span>
-        </button>
-        <button
-          onClick={() => setFilter('all')}
-          className={`rounded-full px-3 py-1 text-[13px] font-medium transition-colors ${
-            filter === 'all' ? 'bg-[var(--ink-5)] text-white' : 'text-[var(--fg-4)] hover:text-[var(--fg-2)]'
-          }`}
-        >
-          Tous <span className="tabular-nums">{dossiers.length}</span>
-        </button>
-        {VERDICTS.filter((v) => counts[v.key] > 0).map((v) => (
-          <button
-            key={v.key}
-            onClick={() => setFilter(filter === v.key ? 'all' : v.key)}
-            title={v.why}
-            className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-[13px] font-medium transition-colors ${
-              filter === v.key ? 'bg-[var(--ink-5)] text-white' : 'text-[var(--fg-4)] hover:text-[var(--fg-2)]'
-            }`}
-          >
-            <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: v.colour }} />
-            {v.label} <span className="tabular-nums">{counts[v.key]}</span>
-          </button>
-        ))}
-        <span className="flex w-full items-center gap-2 sm:ml-auto sm:w-auto">
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Nom, adresse, clé, pays…"
-            className="min-w-0 flex-1 rounded-md border border-[var(--ink-4)] bg-[var(--ink-1)] px-2.5 py-1.5 text-base text-[var(--fg-1)] placeholder:text-[var(--fg-5)] focus:border-[var(--amber-500)]/50 focus:outline-none sm:w-48 sm:flex-none sm:py-1 sm:text-[13px]"
-          />
-          <span className="flex items-center gap-0.5 rounded-md border border-[var(--ink-4)] p-0.5">
-            {SORTS.map((s) => (
+      <div className="relative min-w-0 overflow-hidden rounded-xl border border-[var(--ink-4)]/60 bg-[var(--ink-2)]/40">
+        {/* Every control lives in the header row itself: click a column to
+            sort it (again to flip), click État to filter, click the lens to
+            search. On phones the row thumb-scrolls; the old pill bar is gone. */}
+        <div className="flex items-center gap-3 overflow-x-auto whitespace-nowrap border-b border-[var(--ink-4)] px-4 py-2 text-[11.5px] uppercase tracking-wider text-[var(--fg-5)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <span className="flex w-auto shrink-0 items-center gap-1 md:w-[24%] md:shrink">
+            <button type="button" onClick={() => onHeader('name')} className={headerBtn(sort === 'name')} title="Trier par nom">
+              Client{arrowOf('name')}
+            </button>
+            {searchOpen || query ? (
+              <span className="flex items-center gap-1">
+                <input
+                  autoFocus
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  onBlur={() => {
+                    if (!query.trim()) setSearchOpen(false);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape') {
+                      setQuery('');
+                      setSearchOpen(false);
+                    }
+                  }}
+                  placeholder="Nom, adresse, clé, pays…"
+                  className="w-40 rounded border border-[var(--ink-4)] bg-[var(--ink-1)] px-1.5 py-0.5 text-base normal-case tracking-normal text-[var(--fg-1)] placeholder:text-[var(--fg-5)] focus:border-[var(--amber-500)]/50 focus:outline-none sm:text-[12px]"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setQuery('');
+                    setSearchOpen(false);
+                  }}
+                  aria-label="Effacer la recherche"
+                  className="rounded px-1 text-[var(--fg-4)] hover:text-[var(--fg-2)]"
+                >
+                  ✕
+                </button>
+              </span>
+            ) : (
               <button
-                key={s.key}
-                onClick={() => setSort(s.key)}
-                className={`rounded px-2 py-1 text-[12px] font-medium transition-colors ${
-                  sort === s.key ? 'bg-[var(--ink-4)] text-white' : 'text-[var(--fg-4)] hover:text-[var(--fg-2)]'
+                type="button"
+                onClick={() => setSearchOpen(true)}
+                aria-label="Rechercher dans les clients"
+                title="Rechercher (nom, adresse, clé, pays)"
+                className="rounded px-1 text-[12px] text-[var(--fg-5)] hover:text-[var(--fg-2)]"
+              >
+                🔍
+              </button>
+            )}
+          </span>
+
+          {HEADERS.map((h) =>
+            h.key === 'state' ? (
+              <button
+                key={h.key}
+                type="button"
+                onClick={() => setStateMenuOpen((o) => !o)}
+                title="Filtrer par état (le tri par gravité est dans le menu)"
+                className={`flex w-auto shrink-0 items-center gap-1 rounded px-1 py-0.5 text-left transition-colors hover:text-[var(--fg-2)] md:w-[12%] ${
+                  sort === 'state' || filterMeta || filter === 'all' ? 'text-[var(--fg-2)]' : ''
                 }`}
               >
-                {s.label}
+                {filterMeta && (
+                  <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: filterMeta.colour }} />
+                )}
+                <span className="truncate">
+                  {filterMeta ? `État · ${filterMeta.label}` : filter === 'all' ? 'État · tous' : 'État'}
+                  {arrowOf('state')}
+                </span>
+                <span aria-hidden className="text-[9px]">
+                  ▾
+                </span>
               </button>
-            ))}
-          </span>
-        </span>
-      </div>
-
-      <div className="flex items-start gap-4">
-      <div className="min-w-0 flex-1 overflow-hidden rounded-xl border border-[var(--ink-4)]/60 bg-[var(--ink-2)]/40">
-        <div className="hidden items-center gap-3 border-b border-[var(--ink-4)] px-4 py-2 text-[12px] uppercase tracking-wider text-[var(--fg-5)] md:flex">
-          <span className="w-[24%]">Client</span>
-          <span className="w-[12%]">État</span>
-          <span className="w-[10%] text-right">Requêtes ({windowDays} j)</span>
-          <span className="w-24 shrink-0">30 jours</span>
-          <span className="w-[13%]">Dernier appel</span>
-          <span className="min-w-0 flex-1">Pays contrôlés</span>
-          <span className="w-14 shrink-0 text-right">Mails</span>
+            ) : (
+              <button
+                key={h.key}
+                type="button"
+                onClick={() => onHeader(h.key)}
+                title="Trier sur cette colonne (re-cliquer inverse)"
+                className={`${headerBtn(sort === h.key)} w-auto ${h.width} ${h.right ? 'md:text-right' : ''} ${h.key === 'last30' ? 'md:shrink-0' : ''}`}
+              >
+                {h.key === 'requests' ? `Requêtes (${windowDays} j)` : h.label}
+                {arrowOf(h.key)}
+              </button>
+            ),
+          )}
         </div>
+
+        {stateMenuOpen && (
+          <>
+            <div className="fixed inset-0 z-20" onClick={() => setStateMenuOpen(false)} aria-hidden />
+            <div className="absolute left-3 top-11 z-30 w-72 overflow-hidden rounded-lg border border-[var(--ink-4)] bg-[var(--ink-1)] shadow-2xl md:left-[24%]">
+              <button
+                type="button"
+                onClick={() => {
+                  onHeader('state');
+                  setStateMenuOpen(false);
+                }}
+                className="flex w-full items-center gap-2 border-b border-[var(--ink-4)]/60 px-3 py-2 text-left text-[12.5px] text-[var(--fg-3)] hover:bg-[var(--ink-3)]/60"
+              >
+                ⇅ Trier par gravité {sort === 'state' ? (dir === 'asc' ? '▲' : '▼') : ''}
+              </button>
+              {(
+                [
+                  { key: 'used' as Filter, label: 'Ont appelé', n: usedCount, why: 'les adresses qui ont appelé au moins une fois', colour: null },
+                  { key: 'all' as Filter, label: 'Tous', n: dossiers.length, why: 'toutes les adresses, clés muettes comprises', colour: null },
+                  ...VERDICTS.filter((v) => counts[v.key] > 0).map((v) => ({
+                    key: v.key as Filter,
+                    label: v.label,
+                    n: counts[v.key],
+                    why: v.why,
+                    colour: v.colour as string | null,
+                  })),
+                ] as Array<{ key: Filter; label: string; n: number; why: string; colour: string | null }>
+              ).map((item) => (
+                <button
+                  key={item.key}
+                  type="button"
+                  title={item.why}
+                  onClick={() => {
+                    setFilter(item.key);
+                    setStateMenuOpen(false);
+                  }}
+                  className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] transition-colors hover:bg-[var(--ink-3)]/60 ${
+                    filter === item.key ? 'bg-[var(--ink-3)]/80 text-white' : 'text-[var(--fg-2)]'
+                  }`}
+                >
+                  {item.colour ? (
+                    <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: item.colour }} />
+                  ) : (
+                    <span className="h-1.5 w-1.5 shrink-0" />
+                  )}
+                  <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                  <span className="font-mono text-[12px] tabular-nums text-[var(--fg-4)]">{item.n}</span>
+                </button>
+              ))}
+            </div>
+          </>
+        )}
 
         {view.length === 0 ? (
           <p className="px-4 py-8 text-center text-sm text-[var(--fg-4)]">Aucun client ne correspond.</p>
         ) : (
           view.map((d) => {
             const v = VERDICT_BY_KEY[d.verdict];
-            const open = openId === d.id;
             return (
               <div key={d.id} className="border-b border-[var(--ink-4)]/60 last:border-b-0">
                 <button
-                  onClick={() => setOpenId(open ? null : d.id)}
-                  aria-expanded={open}
-                  className={`flex w-full flex-wrap items-center gap-3 px-4 py-2.5 text-left transition-colors md:flex-nowrap ${
-                    open ? 'bg-[var(--ink-3)]/60' : 'hover:bg-[var(--ink-3)]/40'
-                  }`}
+                  onClick={() => setOpenId(d.id)}
+                  aria-haspopup="dialog"
+                  className="flex w-full flex-wrap items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-[var(--ink-3)]/40 md:flex-nowrap"
                 >
                   <span className="w-full min-w-0 md:w-[24%]">
                     <span className="flex items-center gap-1.5">
@@ -340,40 +379,15 @@ export function ClientsApp({ dossiers, locale, windowDays = 90 }: { dossiers: Cl
                     {d.mails.hasDraft && <span className="ml-1 text-[var(--warn)]">•</span>}
                   </span>
                 </button>
-                {open && (
-                  <div className="xl:hidden">
-                    <ClientDossierPanel d={d} locale={locale} windowDays={windowDays} />
-                  </div>
-                )}
               </div>
             );
           })
         )}
       </div>
-      {/* The inspector rail: the list never jumps, ↑↓ walks it, and comparing
-          two customers becomes two keypresses instead of two scrolls. Hidden
-          below xl, where the inline accordion above keeps working. */}
-      {(() => {
-        const opened = openId ? view.find((d) => d.id === openId) : null;
-        return opened ? (
-          <aside className="hidden w-[440px] shrink-0 xl:block">
-            <div className="sticky top-4 max-h-[calc(100vh-2rem)] overflow-y-auto rounded-xl border border-[var(--ink-4)]/60 bg-[var(--ink-2)]/40">
-              <div className="flex items-center justify-between border-b border-[var(--ink-4)]/60 px-3.5 py-1.5">
-                <span className="text-[11px] uppercase tracking-wider text-[var(--fg-5)]">Dossier · ↑↓ pour naviguer</span>
-                <button
-                  type="button"
-                  onClick={() => setOpenId(null)}
-                  className="rounded border border-[var(--ink-5)] px-1.5 text-[12px] text-[var(--fg-3)] hover:text-[var(--fg-1)]"
-                >
-                  ✕
-                </button>
-              </div>
-              <ClientDossierPanel d={opened} locale={locale} windowDays={windowDays} variant="rail" />
-            </div>
-          </aside>
-        ) : null;
-      })()}
-      </div>
+
+      {opened && (
+        <ClientDossierModal d={opened} locale={locale} windowDays={windowDays} onClose={() => setOpenId(null)} />
+      )}
     </div>
   );
 }

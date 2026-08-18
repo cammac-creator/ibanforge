@@ -120,7 +120,7 @@ export interface ClientDossier {
  * that straight to `new Date` reads it as local time, which silently shifts
  * every freshness figure by the server's offset.
  */
-function parseUtc(raw: string | null | undefined): Date | null {
+export function parseUtc(raw: string | null | undefined): Date | null {
   if (!raw) return null;
   const iso = raw.includes('T') ? raw : raw.replace(' ', 'T');
   const d = new Date(/[Z+]|-\d\d:\d\d$/.test(iso) ? iso : `${iso}Z`);
@@ -128,6 +128,23 @@ function parseUtc(raw: string | null | undefined): Date | null {
 }
 
 const DAY_MS = 86_400_000;
+
+/**
+ * Calendar days between two instants, in the operator's timezone. A sliding
+ * 24 h window is NOT what "aujourd'hui" means: a call made yesterday at 23:00
+ * stayed labelled "aujourd'hui" until 23:00 tonight. Freshness labels follow
+ * the wall calendar in Europe/Zurich, whatever timezone the server runs in.
+ */
+const ZURICH_DAY = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Europe/Zurich',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+
+export function calendarDaysSince(from: Date, now: Date): number {
+  return Math.round((Date.parse(ZURICH_DAY.format(now)) - Date.parse(ZURICH_DAY.format(from))) / DAY_MS);
+}
 
 /** The most recent of a set of instants. Compared PARSED: the stored strings
  * mix the SQL and ISO shapes, and 'T' versus ' ' is not a time ordering. */
@@ -304,7 +321,7 @@ export function buildDossiers(input: DossierInput): ClientDossier[] {
       serverError: sum((p) => p.server_error),
       firstCallAt: firstCall ? firstCall.toISOString() : null,
       lastCallAt: lastCall ? lastCall.toISOString() : null,
-      daysSinceLastCall: lastCall ? Math.floor((now.getTime() - lastCall.getTime()) / DAY_MS) : null,
+      daysSinceLastCall: lastCall ? calendarDaysSince(lastCall, now) : null,
       avgMs: totalReq > 0 ? Math.round(weighted / totalReq) : 0,
       p95Ms: profiles.reduce((m, p) => Math.max(m, p.p95_ms), 0),
       lastSuccessAt: latest(profiles.map((p) => p.last_success_at)),
@@ -458,18 +475,66 @@ export function qualityTrend(
   };
 }
 
-export type SortKey = 'requests' | 'freshness' | 'name';
+/** Every column of the Clients table sorts; these are their keys. */
+export type SortKey = 'name' | 'state' | 'requests' | 'last30' | 'freshness' | 'countries' | 'mails';
+export type SortDir = 'asc' | 'desc';
 
-/** Returns a new array: the caller's list order is the React key order. */
-export function sortDossiers(list: ClientDossier[], key: SortKey): ClientDossier[] {
-  const copy = [...list];
-  if (key === 'requests') return copy.sort((a, b) => b.requests - a.requests || a.email.localeCompare(b.email));
-  if (key === 'name') return copy.sort((a, b) => (a.company ?? a.email).localeCompare(b.company ?? b.email));
-  // Freshness: most recent first. Never-called addresses go last rather than
-  // first, which is what sorting a null as 0 would have done.
-  return copy.sort((a, b) => {
-    const at = a.lastCallAt ? Date.parse(a.lastCallAt) : -Infinity;
-    const bt = b.lastCallAt ? Date.parse(b.lastCallAt) : -Infinity;
-    return bt - at || a.email.localeCompare(b.email);
-  });
+/** What the FIRST click on a header means: the reading a person wants first. */
+export const SORT_DEFAULT_DIR: Record<SortKey, SortDir> = {
+  name: 'asc',
+  state: 'asc', // gravity first: blocked before silent
+  requests: 'desc',
+  last30: 'desc',
+  freshness: 'desc', // most recent first
+  countries: 'desc',
+  mails: 'desc',
+};
+
+/** Verdict gravity, the order the old filter pills stood in. */
+const VERDICT_RANK: Record<Verdict, number> = {
+  blocked: 0,
+  struggling: 1,
+  rising: 2,
+  active: 3,
+  dormant: 4,
+  former: 5,
+  silent: 6,
+};
+
+/** Calls over the last 30 drawn days — the column the mini sparkline shows. */
+export function last30Of(d: ClientDossier): number {
+  return d.days.slice(-30).reduce((s, x) => s + x.count, 0);
+}
+
+/**
+ * Returns a new array: the caller's list order is the React key order.
+ * `dir` flips the column's natural ascending order; addresses that never
+ * called sort last under `freshness` in BOTH directions — "jamais" is an
+ * absence, not a very old date that inverting should promote.
+ */
+export function sortDossiers(list: ClientDossier[], key: SortKey, dir: SortDir = SORT_DEFAULT_DIR[key]): ClientDossier[] {
+  const asc = (a: ClientDossier, b: ClientDossier): number => {
+    switch (key) {
+      case 'name':
+        return (a.company ?? a.email).localeCompare(b.company ?? b.email);
+      case 'state':
+        return VERDICT_RANK[a.verdict] - VERDICT_RANK[b.verdict];
+      case 'requests':
+        return a.requests - b.requests;
+      case 'last30':
+        return last30Of(a) - last30Of(b);
+      case 'freshness':
+        return (a.lastCallAt ? Date.parse(a.lastCallAt) : 0) - (b.lastCallAt ? Date.parse(b.lastCallAt) : 0);
+      case 'countries':
+        return a.countries.length - b.countries.length;
+      case 'mails':
+        return a.mails.sent + a.mails.received - (b.mails.sent + b.mails.received);
+    }
+  };
+  const sign = dir === 'desc' ? -1 : 1;
+  const called = key === 'freshness' ? list.filter((d) => d.lastCallAt != null) : [...list];
+  const never = key === 'freshness' ? list.filter((d) => d.lastCallAt == null) : [];
+  called.sort((a, b) => sign * asc(a, b) || a.email.localeCompare(b.email));
+  never.sort((a, b) => a.email.localeCompare(b.email));
+  return [...called, ...never];
 }

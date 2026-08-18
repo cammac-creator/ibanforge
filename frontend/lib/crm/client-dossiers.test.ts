@@ -178,6 +178,19 @@ describe('buildDossiers', () => {
     });
     expect(out[0].daysSinceLastCall).toBe(3);
   });
+
+  it('follows the wall calendar, not a sliding 24 h window', () => {
+    // Last call yesterday 23:50 Zurich time (21:50 UTC), viewed this morning:
+    // that is "hier", even though fewer than 24 hours have passed. The old
+    // floor((now-last)/DAY_MS) kept such a call labelled "aujourd'hui" until
+    // the same hour tonight — the exact complaint of 18/08/2026.
+    const out = buildDossiers({
+      ...base,
+      keys: [keyRow('g@example.net', { key_prefix: 'ifk_g' })],
+      profiles: { ifk_g: profile({ key_prefix: 'ifk_g', total: 1, last_seen: '2026-07-29 21:50:00' }) },
+    });
+    expect(out[0].daysSinceLastCall).toBe(1);
+  });
 });
 
 describe('the verdict, which is the point of the page', () => {
@@ -292,6 +305,46 @@ describe('sortDossiers', () => {
     const list = [a, b, c];
     sortDossiers(list, 'requests');
     expect(list.map((d) => d.email)).toEqual(['a@example.net', 'b@example.net', 'c@example.net']);
+  });
+
+  it('flips when asked: a second click reads the column the other way', () => {
+    expect(sortDossiers([a, b, c], 'requests', 'asc').map((d) => d.email)).toEqual([
+      'a@example.net',
+      'c@example.net',
+      'b@example.net',
+    ]);
+  });
+
+  it('keeps the never-seen last even when freshness is inverted', () => {
+    // "jamais" is an absence, not a very old date that inverting promotes.
+    expect(sortDossiers([a, b, c], 'freshness', 'asc').map((d) => d.email)).toEqual([
+      'b@example.net',
+      'a@example.net',
+      'c@example.net',
+    ]);
+  });
+
+  it('sorts by state gravity, blocked before silent', () => {
+    const blocked = { ...a, verdict: 'blocked' as const };
+    const silent = { ...b, verdict: 'silent' as const };
+    const active = { ...c, verdict: 'active' as const };
+    expect(sortDossiers([silent, active, blocked], 'state').map((d) => d.verdict)).toEqual([
+      'blocked',
+      'active',
+      'silent',
+    ]);
+  });
+
+  it('sorts by the last-30-days volume the sparkline column shows', () => {
+    const quiet = { ...a, days: [{ day: '2026-07-29', count: 1 }] };
+    const busy = { ...b, days: [{ day: '2026-07-28', count: 40 }, { day: '2026-07-29', count: 40 }] };
+    expect(sortDossiers([quiet, busy], 'last30').map((d) => d.email)).toEqual(['b@example.net', 'a@example.net']);
+  });
+
+  it('sorts by mail volume', () => {
+    const chatty = { ...a, mails: { ...a.mails, sent: 3, received: 2 } };
+    const mute = { ...b, mails: { ...b.mails, sent: 0, received: 0 } };
+    expect(sortDossiers([mute, chatty], 'mails').map((d) => d.email)).toEqual(['a@example.net', 'b@example.net']);
   });
 });
 
