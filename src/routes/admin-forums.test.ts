@@ -109,7 +109,10 @@ describe('forum-marketplaces', () => {
     const slugs = data.marketplaces.map((m) => m.slug);
     expect(slugs).toContain('cdp-bazaar');
     expect(slugs).toContain('cline-marketplace');
-    expect(data.marketplaces.find((m) => m.slug === 'glama')?.auto).toBe(0);
+    // glama graduated from a manual row to a probed one on 18/08/2026;
+    // postman is the surface that still has no reliable probe.
+    expect(data.marketplaces.find((m) => m.slug === 'glama')?.auto).toBe(1);
+    expect(data.marketplaces.find((m) => m.slug === 'postman')?.auto).toBe(0);
   });
 
   it('PATCH accepte notes et statut, refuse un statut invalide', async () => {
