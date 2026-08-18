@@ -5,6 +5,7 @@ import type { Contact, ProspectSourcing, Situation } from '@/lib/crm/types';
 import { OutcomeBadge, OutcomeControl } from './outcome-control';
 import { ProspectStatusBadge, ProspectStatusControl } from './prospect-status';
 import { ContactNotes } from './contact-notes';
+import { ActivityChart } from './activity-chart';
 
 /** Segment labels, lifted from the prospect page so the wording does not drift. */
 const SEGMENT: Record<string, string> = {
@@ -329,6 +330,25 @@ export function ContactDetail({
       {c.email && (
         <div className="mt-3">
           <ContactNotes email={c.email} />
+        </div>
+      )}
+
+      {/* What they DO with the API, right where you answer what they SAY.
+          Clients only, and only once they have actually called: an empty chart
+          on a pure prospect would be noise. */}
+      {c.kind === 'client' && (c.usage.days.some((x) => x.count > 0) || c.usage.series.some((n) => n > 0)) && (
+        <div className="mt-3 rounded-lg border border-[var(--ink-4)]/60 bg-[var(--ink-1)]/40 p-3">
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-[var(--fg-4)]">
+            Activité API
+          </p>
+          <ActivityChart
+            a={{
+              email: c.email,
+              uid: c.id,
+              days: c.usage.days,
+              months: c.usage.months.map((m, i) => ({ month: m, count: c.usage.series[i] ?? 0 })),
+            }}
+          />
         </div>
       )}
 

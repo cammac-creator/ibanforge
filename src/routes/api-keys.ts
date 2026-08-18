@@ -800,6 +800,43 @@ apiKeys.get('/v1/admin/client-activity', (c) => {
 });
 
 /**
+ * Raise the monthly limit of one key — the missing gesture behind the CRM's
+ * "blocked" banner. Bounded on purpose (never unlimited: this is a relief
+ * valve, not a tap), journaled in `events`, effective on the customer's very
+ * next request because validateApiKey re-reads monthly_limit each call.
+ */
+apiKeys.post('/v1/admin/keys/raise-limit', async (c) => {
+  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
+  let body: { key_prefix?: unknown; monthly_limit?: unknown };
+  try {
+    body = await c.req.json<{ key_prefix?: unknown; monthly_limit?: unknown }>();
+  } catch {
+    return c.json({ error: 'invalid_json' }, 400);
+  }
+  const keyPrefix = typeof body.key_prefix === 'string' ? body.key_prefix.trim() : '';
+  const limit = typeof body.monthly_limit === 'number' ? Math.floor(body.monthly_limit) : NaN;
+  if (!/^ifk_[a-f0-9]{8}$/.test(keyPrefix)) {
+    return c.json({ error: 'invalid_input', message: 'key_prefix attendu (ifk_xxxxxxxx)' }, 400);
+  }
+  if (!Number.isFinite(limit) || limit < 100 || limit > 20_000) {
+    return c.json({ error: 'invalid_input', message: 'monthly_limit borné à [100, 20000]' }, 400);
+  }
+  const db = getStatsDB();
+  const before = db.prepare('SELECT monthly_limit, email FROM api_keys WHERE key_prefix = ?').get(keyPrefix) as
+    | { monthly_limit: number | null; email: string }
+    | undefined;
+  if (!before) return c.json({ error: 'not_found' }, 404);
+  db.prepare('UPDATE api_keys SET monthly_limit = ? WHERE key_prefix = ?').run(limit, keyPrefix);
+  db.prepare(`INSERT INTO events (kind, label) VALUES ('manual', ?)`).run(
+    `quota relevé via CRM : ${keyPrefix} ${before.monthly_limit ?? 200} → ${limit}/mois`,
+  );
+  console.log(`[admin] raise-limit ${keyPrefix}: ${before.monthly_limit ?? 200} -> ${limit}`);
+  return c.json({ key_prefix: keyPrefix, previous_limit: before.monthly_limit ?? 200, monthly_limit: limit });
+});
+
+/**
  * Hour-by-hour activity of ONE customer over the last 24 h, all their keys
  * combined — the finest scale of the Clients activity chart. Buckets are UTC
  * (SQLite stores UTC); the client renders them in local time. Fetched lazily

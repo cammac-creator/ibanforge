@@ -5,7 +5,16 @@ import { heatOf } from './heat';
 import { NEXT_ACTION_LABEL } from './situation';
 import type { Contact, Message, Situation } from './types';
 
-export type MailFilterKey = 'reply' | 'followup' | 'new' | 'paying' | 'dormant' | 'clients' | 'prospect' | 'all';
+export type MailFilterKey =
+  | 'reply'
+  | 'followup'
+  | 'new'
+  | 'paying'
+  | 'dormant'
+  | 'drafts'
+  | 'clients'
+  | 'prospect'
+  | 'all';
 
 export interface RowsInput {
   contacts: Contact[];
@@ -90,6 +99,9 @@ const FILTERS: Array<{
   // stays at zero by construction), and dormant is the API's own verdict.
   { key: 'paying', label: 'Payants', urgent: false, test: (c) => (c.business?.packs ?? 0) > 0 },
   { key: 'dormant', label: 'Endormis', urgent: false, test: (c) => c.business?.status === 'dormant' },
+  // A draft written and never sent is a follow-up that silently never left:
+  // this queue makes every waiting draft countable and findable.
+  { key: 'drafts', label: 'Brouillons', urgent: false, test: (c) => c.draft !== null },
   // The prospecting queue: everyone never written to, the "who do I open
   // with today" view. Same predicate as the overview's sendable-stock figure.
   { key: 'prospect', label: 'À prospecter', urgent: false, test: neverContacted },

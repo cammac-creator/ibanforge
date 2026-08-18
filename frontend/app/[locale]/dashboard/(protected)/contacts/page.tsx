@@ -1,4 +1,5 @@
 import { CrmApp } from '@/components/crm/crm-app';
+import { FreshnessBadge } from '@/components/crm/freshness-badge';
 import { fetchCrmData } from '@/lib/crm/build-contacts';
 import { SOFT_CAP } from '@/lib/crm/sent-today';
 import { crmSnapshot } from '@/lib/crm/snapshot';
@@ -59,7 +60,21 @@ export default async function ContactsPage() {
           <span className={sentToday >= SOFT_CAP ? 'text-amber-400' : undefined}>
             {sentToday} envoyé{sentToday > 1 ? 's' : ''} aujourd’hui
           </span>
+          {(() => {
+            const drafts = contacts.filter((c) => c.draft !== null).length;
+            return drafts > 0 ? (
+              <>
+                {' · '}
+                <span className="text-amber-400">
+                  ✎ {drafts} brouillon{drafts > 1 ? 's' : ''} en attente
+                </span>
+              </>
+            ) : null;
+          })()}
         </p>
+        <span className="ml-auto">
+          <FreshnessBadge fetchedAtIso={new Date().toISOString()} />
+        </span>
       </div>
 
       <CrmApp

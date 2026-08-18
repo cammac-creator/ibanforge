@@ -1,5 +1,6 @@
 import { getLocale } from 'next-intl/server';
 import { ClientsApp } from '@/components/crm/clients-app';
+import { FreshnessBadge } from '@/components/crm/freshness-badge';
 import { fetchCrmData } from '@/lib/crm/build-contacts';
 import { buildDossiers, fetchClientProfiles } from '@/lib/crm/client-dossiers';
 
@@ -45,7 +46,12 @@ export default async function ClientsPage({
   return (
     <div className="space-y-5">
       <header>
-        <h1 className="text-xl font-semibold text-[var(--fg-1)]">Clients</h1>
+        <div className="flex flex-wrap items-baseline gap-x-3">
+          <h1 className="text-xl font-semibold text-[var(--fg-1)]">Clients</h1>
+          <span className="ml-auto">
+            <FreshnessBadge fetchedAtIso={new Date().toISOString()} />
+          </span>
+        </div>
         <p className="mt-0.5 text-sm text-[var(--fg-4)]">
           Ce que chaque client fait réellement de l&apos;API. Cliquez une ligne pour ouvrir son dossier.
         </p>

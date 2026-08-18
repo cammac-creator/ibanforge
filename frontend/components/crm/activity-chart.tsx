@@ -1,7 +1,17 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import type { ClientDossier } from '@/lib/crm/client-dossiers';
+
+/** The chart is a guest in two homes (Clients dossier, Contacts thread), so
+ *  its input is the minimal series shape rather than a full ClientDossier. */
+export interface ActivityInput {
+  email: string;
+  /** Identity of the subject; a change resets the lazily-fetched 24 h data. */
+  uid: string;
+  days: Array<{ day: string; count: number; bad?: number }>;
+  /** Aggregated monthly series (persistent counters, outlive log retention). */
+  months: Array<{ month: string; count: number }>;
+}
 
 /**
  * One customer's call volume, at the scale the question needs: a year of
@@ -37,7 +47,7 @@ interface BarPoint {
 const dayKeyUTC = (t: number): string => new Date(t).toISOString().slice(0, 10);
 const DAY_MS = 86_400_000;
 
-function daysBars(days: ClientDossier['days'], span: number): BarPoint[] {
+function daysBars(days: ActivityInput['days'], span: number): BarPoint[] {
   const known = new Map(days.map((x) => [x.day, x]));
   const out: BarPoint[] = [];
   const today = Date.now();
@@ -51,7 +61,7 @@ function daysBars(days: ClientDossier['days'], span: number): BarPoint[] {
 }
 
 /** ISO-week bars (13 weeks, Monday keys) folded from the daily series. */
-function weeksBars(days: ClientDossier['days']): BarPoint[] {
+function weeksBars(days: ActivityInput['days']): BarPoint[] {
   const mondayOf = (t: number): number => {
     const d = new Date(t);
     const dow = (d.getUTCDay() + 6) % 7; // Monday=0
@@ -76,13 +86,11 @@ function weeksBars(days: ClientDossier['days']): BarPoint[] {
   return out;
 }
 
-/** Twelve calendar months from the persistent per-key counters. */
-function monthsBars(keys: ClientDossier['keys']): BarPoint[] {
+/** Twelve calendar months from the aggregated monthly series. */
+function monthsBars(months: ActivityInput['months']): BarPoint[] {
   const sums = new Map<string, number>();
-  for (const k of keys) {
-    for (const m of k.months ?? []) {
-      sums.set(m.month, (sums.get(m.month) ?? 0) + m.count);
-    }
+  for (const m of months) {
+    sums.set(m.month, (sums.get(m.month) ?? 0) + m.count);
   }
   const out: BarPoint[] = [];
   const now = new Date();
@@ -115,7 +123,8 @@ function hoursBars(fetched: Array<{ hour: string; count: number; bad: number }>)
   return out;
 }
 
-export function ActivityChart({ d }: { d: ClientDossier }) {
+export function ActivityChart({ a }: { a: ActivityInput }) {
+  const d = a;
   const [scale, setScale] = useState<Scale>('d30');
   const [hours, setHours] = useState<Array<{ hour: string; count: number; bad: number }> | null>(null);
   const [hoursState, setHoursState] = useState<'idle' | 'loading' | 'error'>('idle');
@@ -133,16 +142,16 @@ export function ActivityChart({ d }: { d: ClientDossier }) {
       .catch(() => setHoursState('error'));
   }, [scale, hours, hoursState, d.email]);
 
-  // A new dossier means new series; drop the fetched hours of the old one.
+  // A new subject means new series; drop the fetched hours of the old one.
   useEffect(() => {
     setHours(null);
     setHoursState('idle');
-  }, [d.id]);
+  }, [d.uid]);
 
   const bars = useMemo<BarPoint[]>(() => {
     switch (scale) {
       case 'months':
-        return monthsBars(d.keys);
+        return monthsBars(d.months);
       case 'weeks':
         return weeksBars(d.days);
       case 'd30':
@@ -152,7 +161,7 @@ export function ActivityChart({ d }: { d: ClientDossier }) {
       case 'h24':
         return hours ? hoursBars(hours) : [];
     }
-  }, [scale, d.keys, d.days, hours]);
+  }, [scale, d.months, d.days, hours]);
 
   const total = bars.reduce((s, b) => s + b.count, 0);
   const totalBad = bars.reduce((s, b) => s + b.bad, 0);
