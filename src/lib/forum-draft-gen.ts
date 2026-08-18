@@ -39,8 +39,12 @@ ${PRODUCT_FACTS}
 8. Never criticise a person; correcting a factual claim is fine.
 9. If the operator notes say "no product mention" (or the thread is not a problem the API solves), produce pure expertise with zero product mention and no disclosure line.
 
-Return STRICT JSON, nothing else:
-{"draft": "<the reply in the thread's language>", "summary_fr": "<2-3 French sentences for the operator: what the thread asks, and the angle of this reply>"}`;
+Return EXACTLY this structure, nothing before or after (the markers are parsed literally; JSON would break on multiline text):
+===DRAFT===
+<the reply in the thread's language, plain markdown>
+===SUMMARY_FR===
+<2-3 French sentences for the operator: what the thread asks, and the angle of this reply>
+===END===`;
 
 export interface DraftInput {
   title: string;
@@ -56,7 +60,23 @@ export interface GeneratedDraft {
   summaryFr: string;
 }
 
-/** Walk to the balanced closing brace so a chatty preamble cannot break parsing. */
+/**
+ * Primary parser: the ===DRAFT===/===SUMMARY_FR=== marker format. JSON was
+ * the first attempt and failed in production on the very first real batch:
+ * a multi-paragraph markdown draft carries literal newlines inside the JSON
+ * string, which JSON.parse rejects (5 of 6 drafts failed exactly there).
+ * Delimiters have no escaping problem at all.
+ */
+export function parseMarkedOutput(text: string): { draft: string; summaryFr: string } | null {
+  const m = /===DRAFT===\s*([\s\S]*?)\s*===SUMMARY_FR===\s*([\s\S]*?)\s*(?:===END===|$)/.exec(text);
+  if (!m) return null;
+  const draft = m[1].trim();
+  const summaryFr = m[2].trim();
+  if (!draft || !summaryFr) return null;
+  return { draft, summaryFr };
+}
+
+/** Fallback parser kept for a model that answers in JSON anyway (single-line). */
 export function extractJson(text: string): { draft?: unknown; summary_fr?: unknown } | null {
   const start = text.indexOf('{');
   if (start === -1) return null;
@@ -121,7 +141,7 @@ export async function generateDraft(t: DraftInput): Promise<GeneratedDraft | nul
     },
     body: JSON.stringify({
       model: 'claude-sonnet-5',
-      max_tokens: 1200,
+      max_tokens: 2000,
       system: DRAFT_SYSTEM,
       messages: [{ role: 'user', content: buildUserPrompt(t) }],
     }),
@@ -131,11 +151,21 @@ export async function generateDraft(t: DraftInput): Promise<GeneratedDraft | nul
     const detail = await res.text().catch(() => '');
     throw new Error(`Anthropic HTTP ${res.status}: ${detail.slice(0, 120)}`);
   }
-  const data = (await res.json()) as { content?: Array<{ type: string; text?: string }> };
+  const data = (await res.json()) as {
+    content?: Array<{ type: string; text?: string }>;
+    stop_reason?: string;
+  };
   const text = (data.content ?? []).map((c) => c.text ?? '').join('');
-  const parsed = extractJson(text);
-  if (!parsed || typeof parsed.draft !== 'string' || typeof parsed.summary_fr !== 'string') {
-    throw new Error(`generation returned no parseable JSON (${text.slice(0, 80)})`);
+  if (!text.trim()) {
+    throw new Error(`generation returned empty text (stop_reason=${data.stop_reason ?? '?'})`);
   }
-  return { draft: stripDashes(parsed.draft.trim()), summaryFr: stripDashes(parsed.summary_fr.trim()) };
+  const marked = parseMarkedOutput(text);
+  if (marked) {
+    return { draft: stripDashes(marked.draft), summaryFr: stripDashes(marked.summaryFr) };
+  }
+  const parsed = extractJson(text);
+  if (parsed && typeof parsed.draft === 'string' && typeof parsed.summary_fr === 'string') {
+    return { draft: stripDashes(parsed.draft.trim()), summaryFr: stripDashes(parsed.summary_fr.trim()) };
+  }
+  throw new Error(`generation output unparseable (stop_reason=${data.stop_reason ?? '?'}, ${text.slice(0, 60)})`);
 }

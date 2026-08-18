@@ -1,5 +1,32 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { buildUserPrompt, extractJson, generateDraft, stripDashes, DRAFT_SYSTEM } from './forum-draft-gen.js';
+import {
+  buildUserPrompt,
+  extractJson,
+  generateDraft,
+  parseMarkedOutput,
+  stripDashes,
+  DRAFT_SYSTEM,
+} from './forum-draft-gen.js';
+
+describe('parseMarkedOutput — le format qui survit au multiligne', () => {
+  it('extrait un brouillon markdown multi-paragraphes (là où JSON.parse cassait en prod)', () => {
+    const out = parseMarkedOutput(
+      '===DRAFT===\nFirst paragraph.\n\n1. a list item\n2. another\n\nLast line.\n===SUMMARY_FR===\nLe fil demande X. On répond Y.\n===END===',
+    );
+    expect(out?.draft).toContain('1. a list item');
+    expect(out?.draft.endsWith('Last line.')).toBe(true);
+    expect(out?.summaryFr).toBe('Le fil demande X. On répond Y.');
+  });
+  it('tolère l’absence de ===END=== (sortie coupée après le résumé)', () => {
+    const out = parseMarkedOutput('===DRAFT===\ntext\n===SUMMARY_FR===\nrésumé');
+    expect(out).toEqual({ draft: 'text', summaryFr: 'résumé' });
+  });
+  it('rend null si une section manque ou est vide', () => {
+    expect(parseMarkedOutput('===DRAFT===\nonly draft')).toBeNull();
+    expect(parseMarkedOutput('===DRAFT===\n===SUMMARY_FR===\nrésumé')).toBeNull();
+    expect(parseMarkedOutput('plain text')).toBeNull();
+  });
+});
 
 describe('extractJson — tolère le bavardage autour du JSON', () => {
   it('extrait un objet propre', () => {
@@ -70,5 +97,9 @@ describe('DRAFT_SYSTEM — la doctrine tient ses invariants', () => {
     expect(DRAFT_SYSTEM).toContain('disclosure: I built ibanforge.com');
     expect(DRAFT_SYSTEM).toContain('honest alternative');
     expect(DRAFT_SYSTEM).toContain('200 requests/month');
+  });
+  it('demande le format à marqueurs, pas du JSON', () => {
+    expect(DRAFT_SYSTEM).toContain('===DRAFT===');
+    expect(DRAFT_SYSTEM).toContain('===SUMMARY_FR===');
   });
 });
