@@ -12,6 +12,7 @@
  * are spaced 7 s apart, which keeps a daily tick far under the ceiling.
  */
 import { getStatsDB } from './db.js';
+import { generateDraft } from './forum-draft-gen.js';
 import {
   MARKETPLACES,
   finalizeCandidate,
@@ -40,6 +41,7 @@ export interface ScanReport {
   finished_at: string;
   threads: { inserted: number; seen: number; refreshed: number };
   marketplaces: { checked: number; skipped: number };
+  drafts: { generated: number; failed: number };
   errors: string[];
 }
 
@@ -226,6 +228,66 @@ async function scanThreads(report: ScanReport): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// Draft backfill — every workable thread must carry its reply draft
+// ---------------------------------------------------------------------------
+
+/** Cost guard: at most N generations per scan; the daily tick catches up. */
+const DRAFTS_PER_SCAN = 6;
+
+async function backfillDrafts(report: ScanReport): Promise<void> {
+  const db = getStatsDB();
+  const rows = db
+    .prepare(
+      `SELECT id, url, source, title, excerpt, lang, notes
+       FROM forum_threads
+       WHERE (draft IS NULL OR draft = '')
+         AND status NOT IN ('dismissed', 'posted')
+       ORDER BY score DESC, first_seen DESC
+       LIMIT ?`,
+    )
+    .all(DRAFTS_PER_SCAN) as Array<{
+    id: number;
+    url: string;
+    source: string;
+    title: string;
+    excerpt: string | null;
+    lang: string;
+    notes: string | null;
+  }>;
+
+  for (const row of rows) {
+    try {
+      const out = await generateDraft({
+        title: row.title,
+        excerpt: row.excerpt ?? '',
+        url: row.url,
+        lang: row.lang,
+        source: row.source,
+        notes: row.notes ?? '',
+      });
+      if (out === null) {
+        report.errors.push('drafts: ANTHROPIC_API_KEY absente — génération sautée');
+        return;
+      }
+      // The operator's seeded summary wins over a generated one; a hand-edited
+      // draft never reaches this loop (the WHERE keeps filled drafts out).
+      db.prepare(
+        `UPDATE forum_threads
+           SET draft = ?,
+               summary_fr = COALESCE(NULLIF(summary_fr, ''), ?),
+               status = CASE WHEN status = 'new' THEN 'drafted' ELSE status END,
+               updated_at = datetime('now')
+         WHERE id = ?`,
+      ).run(out.draft, out.summaryFr, row.id);
+      report.drafts.generated++;
+    } catch (err) {
+      report.drafts.failed++;
+      report.errors.push(`draft #${row.id}: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Marketplace checks
 // ---------------------------------------------------------------------------
 
@@ -329,6 +391,7 @@ export async function runScan(what: 'threads' | 'marketplaces' | 'all' = 'all', 
     finished_at: '',
     threads: { inserted: 0, seen: 0, refreshed: 0 },
     marketplaces: { checked: 0, skipped: 0 },
+    drafts: { generated: 0, failed: 0 },
     errors: [],
   };
   if (scanning) {
@@ -338,7 +401,12 @@ export async function runScan(what: 'threads' | 'marketplaces' | 'all' = 'all', 
   }
   scanning = true;
   try {
-    if (what !== 'marketplaces') await scanThreads(report);
+    if (what !== 'marketplaces') {
+      await scanThreads(report);
+      // Drafts come right after discovery so a thread never sits in the tab
+      // without its reply text (the operator asked for no Generate button).
+      await backfillDrafts(report);
+    }
     if (what !== 'threads') await scanMarketplaces(report, force);
   } finally {
     scanning = false;

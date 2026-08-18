@@ -51,6 +51,7 @@ interface ScanInfo {
     finished_at: string;
     threads: { inserted: number; seen: number; refreshed: number };
     marketplaces: { checked: number; skipped: number };
+    drafts?: { generated: number; failed: number };
     errors: string[];
   } | null;
 }
@@ -234,37 +235,6 @@ export function ForumsApp() {
     [selected, edit, say],
   );
 
-  const generate = useCallback(async () => {
-    if (!selected) return;
-    setBusy('generate');
-    try {
-      const r = await fetch('/api/crm/forum-draft', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: selected.title,
-          excerpt: selected.excerpt ?? '',
-          url: selected.url,
-          lang: edit.lang ?? selected.lang,
-          source: selected.source,
-          notes: edit.notes ?? '',
-        }),
-      });
-      const data = (await r.json()) as { draft?: string; summary_fr?: string; message?: string };
-      if (!r.ok) {
-        say(data.message ?? 'Génération impossible.');
-        return;
-      }
-      setEdit((e) => ({ ...e, draft: data.draft ?? '', summary_fr: data.summary_fr ?? '', status: 'drafted' }));
-      setDirty(true);
-      say('Brouillon généré, relis puis enregistre.');
-    } catch {
-      say('Génération impossible (réseau).');
-    } finally {
-      setBusy(null);
-    }
-  }, [selected, edit.lang, edit.notes, say]);
-
   const runScan = useCallback(
     async (what: 'threads' | 'marketplaces') => {
       setBusy(what);
@@ -356,7 +326,8 @@ export function ForumsApp() {
       )}
       {scan?.last_report && scan.last_report.errors.length > 0 && !scan.scanning && (
         <div className="rounded-lg border border-[var(--ink-4)] bg-[var(--ink-2)]/60 px-3 py-2 text-xs text-[var(--fg-3)]">
-          Dernier scan : {scan.last_report.threads.inserted} nouveau(x) fil(s), {scan.last_report.marketplaces.checked}{' '}
+          Dernier scan : {scan.last_report.threads.inserted} nouveau(x) fil(s),{' '}
+          {scan.last_report.drafts?.generated ?? 0} brouillon(s) généré(s), {scan.last_report.marketplaces.checked}{' '}
           place(s) vérifiée(s) · sondes en échec : {scan.last_report.errors.join(' · ')}
         </div>
       )}
@@ -508,13 +479,6 @@ export function ForumsApp() {
                   className="rounded bg-amber-500 px-3 py-1.5 text-xs font-semibold text-black transition-colors hover:bg-amber-400 disabled:opacity-40"
                 >
                   Copier le brouillon
-                </button>
-                <button
-                  onClick={() => void generate()}
-                  disabled={busy !== null}
-                  className="rounded border border-[var(--ink-4)] px-3 py-1.5 text-xs font-medium text-[var(--fg-2)] transition-colors hover:bg-[var(--ink-4)]/50 disabled:opacity-40"
-                >
-                  {busy === 'generate' ? 'Génération…' : 'Générer (IA, ton solutionneur)'}
                 </button>
                 <button
                   onClick={() => void save()}
