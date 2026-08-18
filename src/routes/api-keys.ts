@@ -800,6 +800,33 @@ apiKeys.get('/v1/admin/client-activity', (c) => {
 });
 
 /**
+ * Hour-by-hour activity of ONE customer over the last 24 h, all their keys
+ * combined — the finest scale of the Clients activity chart. Buckets are UTC
+ * (SQLite stores UTC); the client renders them in local time. Fetched lazily
+ * when the operator picks the 24 h scale, so it stays out of the page load.
+ */
+apiKeys.get('/v1/admin/client-hours', (c) => {
+  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
+  const email = (c.req.query('email') ?? '').trim().toLowerCase();
+  if (!email) return c.json({ error: 'invalid_input', message: 'email requis' }, 400);
+  const rows = getStatsDB()
+    .prepare(
+      `SELECT strftime('%Y-%m-%dT%H:00', r.created_at) AS hour,
+              COUNT(*) AS count,
+              SUM(CASE WHEN r.status >= 400 THEN 1 ELSE 0 END) AS bad
+       FROM request_log r
+       WHERE r.created_at >= datetime('now', '-24 hours')
+         AND r.key_prefix IN (SELECT key_prefix FROM api_keys WHERE LOWER(email) = ?)
+       GROUP BY hour
+       ORDER BY hour`,
+    )
+    .all(email) as Array<{ hour: string; count: number; bad: number }>;
+  return c.json({ email, hours: rows });
+});
+
+/**
  * Everything the Clients tab needs about each customer's API use, in one call:
  * volume and verdict mix, endpoints, countries checked, latency they actually
  * experience, the shape of their day, their stack, and how many machines call.

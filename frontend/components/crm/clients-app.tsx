@@ -58,7 +58,9 @@ function MiniSpark({ days }: { days: Array<{ day: string; count: number }> }) {
 type Filter = Verdict | 'all' | 'used';
 
 export function ClientsApp({ dossiers, locale, windowDays = 90 }: { dossiers: ClientDossier[]; locale: string; windowDays?: number }) {
-  const [sort, setSort] = useState<SortKey>('requests');
+  // Freshness first: the operator's default question is "who moved lately?",
+  // not "who is biggest?" (explicit ask, 18/08/2026).
+  const [sort, setSort] = useState<SortKey>('freshness');
   const [filter, setFilter] = useState<Filter>('used');
   const [query, setQuery] = useState('');
   const [openId, setOpenId] = useState<string | null>(null);

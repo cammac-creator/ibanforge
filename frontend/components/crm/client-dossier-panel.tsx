@@ -5,6 +5,7 @@ import { chipOfDossier, heatOfDossier, qualityTrend, type ClientDossier } from '
 import { contactsHref } from '@/lib/crm/deep-link';
 import { Bar, Empty, HoursStrip, Section, Sparkbars, Stat, flag, relativeDays } from './dossier-bits';
 import { ContactNotes } from './contact-notes';
+import { ActivityChart } from './activity-chart';
 
 /**
  * One dossier, two homes. `full` is the inline accordion under a row, with
@@ -85,6 +86,13 @@ export function ClientDossierPanel({
 
       <div className="mb-4">
         <ContactNotes email={d.email} />
+      </div>
+
+      {/* The activity curve, at the scale the question needs (months → 24 h). */}
+      <div className="mb-4">
+        <Section title="Activité" note="refus en rouge">
+          <ActivityChart d={d} />
+        </Section>
       </div>
 
       {/* A blocked customer deserves the cause and the gesture, not just the
