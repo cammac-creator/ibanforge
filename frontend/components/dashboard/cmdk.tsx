@@ -22,25 +22,22 @@ export function CommandPalette() {
   const [rows, setRows] = useState<IndexRow[] | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
-  const load = useCallback(async () => {
-    if (rows !== null) return;
-    try {
-      const r = await fetch('/api/crm/search-index');
-      if (!r.ok) return;
-      const data = (await r.json()) as { rows?: IndexRow[] };
-      setRows(data.rows ?? []);
-    } catch {
-      setRows([]);
-    }
-  }, [rows]);
+  const close = useCallback(() => {
+    setOpen(false);
+    setQ('');
+  }, []);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         setOpen((o) => !o);
+        setQ('');
       }
-      if (e.key === 'Escape') setOpen(false);
+      if (e.key === 'Escape') {
+        setOpen(false);
+        setQ('');
+      }
     }
     window.addEventListener('keydown', onKey);
     const onOpen = () => setOpen(true);
@@ -51,13 +48,30 @@ export function CommandPalette() {
     };
   }, []);
 
+  // The index loads on first open. Everything in this effect is asynchronous
+  // (fetch then setState), which is the shape the strict hooks rule expects.
+  useEffect(() => {
+    if (!open || rows !== null) return;
+    let cancelled = false;
+    fetch('/api/crm/search-index')
+      .then(async (r) => {
+        const data = r.ok ? ((await r.json()) as { rows?: IndexRow[] }) : {};
+        if (!cancelled) setRows(data.rows ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) setRows([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, rows]);
+
   useEffect(() => {
     if (open) {
-      void load();
-      setQ('');
-      setTimeout(() => inputRef.current?.focus(), 30);
+      const t = setTimeout(() => inputRef.current?.focus(), 30);
+      return () => clearTimeout(t);
     }
-  }, [open, load]);
+  }, [open]);
 
   const hits = useMemo(() => {
     if (!rows) return [];
@@ -84,7 +98,7 @@ export function CommandPalette() {
   return (
     <div
       className="fixed inset-0 z-[100] flex items-start justify-center bg-black/50 p-4 pt-[12vh]"
-      onClick={() => setOpen(false)}
+      onClick={close}
     >
       <div
         className="w-full max-w-lg overflow-hidden rounded-xl border border-[var(--ink-4)] bg-[var(--ink-1)] shadow-2xl"

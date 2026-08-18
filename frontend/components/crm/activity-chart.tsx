@@ -127,26 +127,38 @@ export function ActivityChart({ a }: { a: ActivityInput }) {
   const d = a;
   const [scale, setScale] = useState<Scale>('d30');
   const [hours, setHours] = useState<Array<{ hour: string; count: number; bad: number }> | null>(null);
-  const [hoursState, setHoursState] = useState<'idle' | 'loading' | 'error'>('idle');
+  const [hoursError, setHoursError] = useState(false);
+
+  // A new subject means new series; drop the fetched hours of the old one.
+  // Render-phase compare, the React-sanctioned shape for prop-driven resets
+  // (a setState inside an effect body trips the cascading-render lint rule).
+  const [prevUid, setPrevUid] = useState(d.uid);
+  if (prevUid !== d.uid) {
+    setPrevUid(d.uid);
+    setHours(null);
+    setHoursError(false);
+  }
+
+  // "Loading" is derived, never stored: the effect below only performs the
+  // async fetch, so no state is set synchronously inside it.
+  const hoursLoading = scale === 'h24' && hours === null && !hoursError;
 
   useEffect(() => {
-    if (scale !== 'h24' || hours !== null || hoursState === 'loading') return;
-    setHoursState('loading');
+    if (scale !== 'h24' || hours !== null || hoursError) return;
+    let cancelled = false;
     fetch(`/api/crm/client-hours?email=${encodeURIComponent(d.email)}`)
       .then(async (r) => {
         if (!r.ok) throw new Error(String(r.status));
         const data = (await r.json()) as { hours?: Array<{ hour: string; count: number; bad: number }> };
-        setHours(data.hours ?? []);
-        setHoursState('idle');
+        if (!cancelled) setHours(data.hours ?? []);
       })
-      .catch(() => setHoursState('error'));
-  }, [scale, hours, hoursState, d.email]);
-
-  // A new subject means new series; drop the fetched hours of the old one.
-  useEffect(() => {
-    setHours(null);
-    setHoursState('idle');
-  }, [d.uid]);
+      .catch(() => {
+        if (!cancelled) setHoursError(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [scale, hours, hoursError, d.email]);
 
   const bars = useMemo<BarPoint[]>(() => {
     switch (scale) {
@@ -189,9 +201,9 @@ export function ActivityChart({ a }: { a: ActivityInput }) {
         </span>
       </div>
 
-      {scale === 'h24' && hoursState === 'loading' ? (
+      {hoursLoading ? (
         <p className="py-6 text-center text-[12.5px] text-[var(--fg-4)]">Chargement des dernières 24 h…</p>
-      ) : scale === 'h24' && hoursState === 'error' ? (
+      ) : scale === 'h24' && hoursError ? (
         <p className="py-6 text-center text-[12.5px] text-[var(--fg-4)]">
           Échelle 24 h indisponible (API injoignable) — réessaie en repassant sur l&apos;échelle.
         </p>
