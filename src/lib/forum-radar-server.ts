@@ -13,6 +13,7 @@
  */
 import { getStatsDB } from './db.js';
 import { generateDraft, translateToFr } from './forum-draft-gen.js';
+import { recordVisibility, type VisibilityState } from './visibility.js';
 import {
   DISMISSED_REPO_MALUS,
   MARKETPLACES,
@@ -582,6 +583,34 @@ export function ensureMarketplaceRows(): void {
   }
 }
 
+/**
+ * Bridge to the overview's visibility panel. Two watches told two different
+ * stories (the VPS probe said "catalogue 8400+" while the radar counted the
+ * real 15k-row catalog, and the day's wins — Aegis, Cline — never appeared),
+ * so the radar now publishes its checks into visibility_checks too. Shared
+ * surfaces reuse the probe's exact names so rows refresh instead of
+ * duplicating; radar-only surfaces appear under new names; the VPS probe
+ * keeps the surfaces the radar does not cover (modulus UK, public-apis…).
+ */
+const VISIBILITY_SURFACE: Record<string, string> = {
+  'cdp-bazaar': 'CDP x402 discovery',
+  'npm-mcp': 'npm ibanforge-mcp',
+  'mcp-registry': 'registre MCP officiel',
+  'awesome-x402': 'awesome-x402',
+  'api-evangelist': 'apis.io / API Evangelist',
+  aegis: 'Aegis (registre de confiance)',
+  'cline-marketplace': 'Cline MCP Marketplace',
+  'apis-guru': 'APIs.guru',
+  'mcp-so': 'mcp.so',
+  'x402-list': 'x402-list.com',
+};
+
+function visibilityStateOf(status: string): VisibilityState {
+  if (status === 'listed') return 'present';
+  if (status === 'absent' || status === 'dead' || status === 'pending') return 'absent';
+  return 'error';
+}
+
 const BAZAAR_PAGE_LIMIT = 500;
 const BAZAAR_MAX_PAGES = 60;
 
@@ -657,6 +686,14 @@ async function scanMarketplaces(report: ScanReport, force = false): Promise<void
            SET status = ?, detail = ?, checked_at = datetime('now'), updated_at = datetime('now')
          WHERE slug = ?`,
       ).run(out.status, out.detail, def.slug);
+      const surface = VISIBILITY_SURFACE[def.slug];
+      if (surface) {
+        try {
+          recordVisibility({ surface, state: visibilityStateOf(out.status), detail: out.detail, url: def.url });
+        } catch {
+          /* the overview panel is a mirror; a failed write must not fail the check */
+        }
+      }
       report.marketplaces.checked++;
     } catch (err) {
       // Keep the last known status; a probe failure is not an absence.
