@@ -14,13 +14,16 @@
 import { getStatsDB } from './db.js';
 import { generateDraft, translateToFr } from './forum-draft-gen.js';
 import {
+  DISMISSED_REPO_MALUS,
   MARKETPLACES,
+  MIN_SCORE,
   finalizeCandidate,
   interpretCheck,
   parseGitHubIssues,
   parseHN,
   parsePullpush,
   parseStackExchange,
+  repoOfUrl,
   type MarketplaceDef,
   type ScoredThread,
   type ThreadCandidate,
@@ -42,7 +45,26 @@ export interface ScanReport {
   threads: { inserted: number; seen: number; refreshed: number };
   marketplaces: { checked: number; skipped: number };
   drafts: { generated: number; failed: number };
+  watch: { checked: number; flagged: number };
+  events: number;
   errors: string[];
+}
+
+/** Short operator ping, same channel the lifecycle radar uses. Throws on failure
+ *  so callers can keep send-before-save semantics. Silently no-ops unconfigured. */
+async function sendTelegramShort(text: string): Promise<boolean> {
+  const token = process.env.TELEGRAM_BOT_TOKEN ?? '';
+  const chat = process.env.TELEGRAM_CHAT_ID ?? '';
+  if (!token || !chat) return false;
+  const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'User-Agent': 'ibanforge-backend' },
+    signal: AbortSignal.timeout(20_000),
+    body: JSON.stringify({ chat_id: chat, text: text.slice(0, 3900), disable_web_page_preview: true }),
+  });
+  const body = (await res.json().catch(() => ({ ok: false }))) as { ok: boolean; description?: string };
+  if (!body.ok) throw new Error(`Telegram: ${body.description ?? res.status}`);
+  return true;
 }
 
 function ensureKvTable(): void {
@@ -207,9 +229,23 @@ function upsertThread(t: ScoredThread): 'inserted' | 'refreshed' | 'known' {
   return upd.changes === 1 ? 'refreshed' : 'known';
 }
 
+/** Repos whose backlog the operator dismissed twice: their new items get a malus. */
+function dismissedRepoSet(): Set<string> {
+  const rows = getStatsDB()
+    .prepare(`SELECT url FROM forum_threads WHERE status = 'dismissed'`)
+    .all() as Array<{ url: string }>;
+  const counts = new Map<string, number>();
+  for (const r of rows) {
+    const repo = repoOfUrl(r.url);
+    if (repo) counts.set(repo, (counts.get(repo) ?? 0) + 1);
+  }
+  return new Set([...counts.entries()].filter(([, n]) => n >= 2).map(([repo]) => repo));
+}
+
 async function scanThreads(report: ScanReport): Promise<void> {
   const sinceEpoch = Math.floor(Date.now() / 1000) - LOOKBACK_DAYS * 86400;
   const sinceISO = new Date(Date.now() - LOOKBACK_DAYS * 86400 * 1000).toISOString().slice(0, 10);
+  const mutedRepos = dismissedRepoSet();
   for (const source of THREAD_SOURCES) {
     try {
       const candidates = await source.fetchAll(sinceEpoch, sinceISO);
@@ -217,12 +253,108 @@ async function scanThreads(report: ScanReport): Promise<void> {
       for (const c of candidates) {
         const scored = finalizeCandidate(c);
         if (!scored) continue;
+        const repo = repoOfUrl(scored.url);
+        if (repo && mutedRepos.has(repo)) {
+          scored.score = Math.max(0, scored.score - DISMISSED_REPO_MALUS);
+          scored.scoreDetail = `${scored.scoreDetail} · repo écarté ×2 (-${DISMISSED_REPO_MALUS})`;
+          if (scored.score < MIN_SCORE) continue;
+        }
         const res = upsertThread(scored);
         if (res === 'inserted') report.threads.inserted++;
         if (res === 'refreshed') report.threads.refreshed++;
       }
     } catch (err) {
       report.errors.push(`${source.name}: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Reply watch — a posted thread that moves again deserves attention
+// ---------------------------------------------------------------------------
+
+interface WatchState {
+  gh_comments?: number;
+  so_activity?: number;
+  so_score?: number;
+  checked_at?: string;
+}
+
+async function watchPostedThreads(report: ScanReport): Promise<void> {
+  const db = getStatsDB();
+  const rows = db
+    .prepare(
+      `SELECT id, url, source, title, posted_url, watch_state FROM forum_threads
+       WHERE status = 'posted' AND posted_url IS NOT NULL AND posted_url != ''`,
+    )
+    .all() as Array<{ id: number; url: string; source: string; title: string; posted_url: string; watch_state: string | null }>;
+
+  for (const row of rows) {
+    try {
+      let state: WatchState = {};
+      try {
+        state = row.watch_state ? (JSON.parse(row.watch_state) as WatchState) : {};
+      } catch {
+        state = {};
+      }
+      let fresh: WatchState | null = null;
+      let news = '';
+
+      if (row.source === 'github') {
+        const m = /github\.com\/([^/]+)\/([^/]+)\/issues\/(\d+)/.exec(row.url);
+        if (!m) continue;
+        const { status, body } = await fetchText(
+          `https://api.github.com/repos/${m[1]}/${m[2]}/issues/${m[3]}`,
+          'application/vnd.github+json',
+          githubHeaders(),
+        );
+        if (status !== 200) throw new Error(`GitHub HTTP ${status}`);
+        const issue = JSON.parse(body) as { comments?: number };
+        const comments = issue.comments ?? 0;
+        fresh = { ...state, gh_comments: comments, checked_at: new Date().toISOString() };
+        // First watch pass only records the baseline; growth after that rings.
+        if (typeof state.gh_comments === 'number' && comments > state.gh_comments) {
+          news = `${comments - state.gh_comments} nouveau(x) commentaire(s)`;
+        }
+      } else if (row.source === 'stackoverflow' || row.source === 'money_se') {
+        const site = row.source === 'money_se' ? 'money' : 'stackoverflow';
+        const qm = /questions\/(\d+)/.exec(row.url);
+        if (!qm) continue;
+        const { status, body } = await fetchText(
+          `${SE_BASE}/questions/${qm[1]}?site=${site}&filter=default`,
+        );
+        if (status !== 200) throw new Error(`SE HTTP ${status}`);
+        const q = (JSON.parse(body) as { items?: Array<{ last_activity_date?: number }> }).items?.[0];
+        const activity = q?.last_activity_date ?? 0;
+        fresh = { ...state, so_activity: activity, checked_at: new Date().toISOString() };
+        const am = /\/a\/(\d+)/.exec(row.posted_url);
+        if (am) {
+          const ans = await fetchText(`${SE_BASE}/answers/${am[1]}?site=${site}`);
+          if (ans.status === 200) {
+            const a = (JSON.parse(ans.body) as { items?: Array<{ score?: number }> }).items?.[0];
+            if (typeof a?.score === 'number') fresh.so_score = a.score;
+          }
+        }
+        if (typeof state.so_activity === 'number' && activity > state.so_activity) {
+          news = 'nouvelle activité sur le fil';
+        }
+      } else {
+        continue; // hn/reddit/manual: nothing reliable to watch yet
+      }
+
+      report.watch.checked++;
+      if (news) {
+        // Send BEFORE saving the new baseline: a failed ping retries next tick.
+        await sendTelegramShort(`💬 Forums IBANforge : ${news} après ta réponse\n${row.title.slice(0, 90)}\n${row.url}`);
+        db.prepare(
+          `UPDATE forum_threads SET watch_state = ?, needs_attention = 1, updated_at = datetime('now') WHERE id = ?`,
+        ).run(JSON.stringify(fresh), row.id);
+        report.watch.flagged++;
+      } else if (fresh) {
+        db.prepare(`UPDATE forum_threads SET watch_state = ? WHERE id = ?`).run(JSON.stringify(fresh), row.id);
+      }
+    } catch (err) {
+      report.errors.push(`watch #${row.id}: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 }
@@ -364,19 +496,36 @@ async function runOneCheck(def: MarketplaceDef): Promise<{ status: string; detai
 async function scanMarketplaces(report: ScanReport, force = false): Promise<void> {
   ensureMarketplaceRows();
   const db = getStatsDB();
-  const rows = db.prepare('SELECT slug, checked_at FROM marketplace_checks').all() as Array<{
+  const rows = db.prepare('SELECT slug, status, checked_at FROM marketplace_checks').all() as Array<{
     slug: string;
+    status: string;
     checked_at: string | null;
   }>;
-  const byslug = new Map(rows.map((r) => [r.slug, r.checked_at]));
+  const byslug = new Map(rows.map((r) => [r.slug, r]));
   for (const def of MARKETPLACES) {
     if (def.kind === 'manual') continue;
-    if (!force && !checkDue(def, byslug.get(def.slug) ?? null)) {
+    const prev = byslug.get(def.slug);
+    if (!force && !checkDue(def, prev?.checked_at ?? null)) {
       report.marketplaces.skipped++;
       continue;
     }
     try {
       const out = await runOneCheck(def);
+      // A status TRANSITION is the news the watch exists for. The very first
+      // resolution (from 'unknown') is a baseline, not an event.
+      if (prev && prev.status !== out.status && prev.status !== 'unknown') {
+        db.prepare(
+          `INSERT INTO marketplace_events (slug, from_status, to_status, detail) VALUES (?, ?, ?, ?)`,
+        ).run(def.slug, prev.status, out.status, out.detail);
+        report.events++;
+        try {
+          await sendTelegramShort(
+            `📊 Marketplace IBANforge : ${def.name}\n${prev.status} → ${out.status}\n${out.detail}\n${def.url}`,
+          );
+        } catch (err) {
+          report.errors.push(`event telegram ${def.slug}: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      }
       db.prepare(
         `UPDATE marketplace_checks
            SET status = ?, detail = ?, checked_at = datetime('now'), updated_at = datetime('now')
@@ -408,6 +557,8 @@ export async function runScan(what: 'threads' | 'marketplaces' | 'all' = 'all', 
     threads: { inserted: 0, seen: 0, refreshed: 0 },
     marketplaces: { checked: 0, skipped: 0 },
     drafts: { generated: 0, failed: 0 },
+    watch: { checked: 0, flagged: 0 },
+    events: 0,
     errors: [],
   };
   if (scanning) {
@@ -422,6 +573,7 @@ export async function runScan(what: 'threads' | 'marketplaces' | 'all' = 'all', 
       // Drafts come right after discovery so a thread never sits in the tab
       // without its reply text (the operator asked for no Generate button).
       await backfillDrafts(report);
+      await watchPostedThreads(report);
     }
     if (what !== 'threads') await scanMarketplaces(report, force);
   } finally {

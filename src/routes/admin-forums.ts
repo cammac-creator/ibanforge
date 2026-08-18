@@ -43,7 +43,8 @@ adminForums.get('/v1/admin/forum-threads', (c) => {
   const rows = db
     .prepare(
       `SELECT * FROM forum_threads ${where}
-       ORDER BY CASE status WHEN 'new' THEN 0 WHEN 'to_answer' THEN 1 WHEN 'drafted' THEN 2
+       ORDER BY needs_attention DESC,
+                CASE status WHEN 'new' THEN 0 WHEN 'to_answer' THEN 1 WHEN 'drafted' THEN 2
                             WHEN 'planned' THEN 3 WHEN 'posted' THEN 4 ELSE 5 END,
                 score DESC, first_seen DESC
        LIMIT ?`,
@@ -144,10 +145,16 @@ adminForums.patch('/v1/admin/forum-threads/:id', async (c) => {
   if (typeof body.status === 'string' && THREAD_STATUSES.has(body.status)) {
     sets.push('status = ?');
     vals.push(body.status);
+    // The daily-guardrail clock starts at the FIRST transition to posted.
+    if (body.status === 'posted') sets.push(`posted_at = COALESCE(posted_at, datetime('now'))`);
   }
   if (typeof body.lang === 'string' && ['en', 'de', 'fr'].includes(body.lang)) {
     sets.push('lang = ?');
     vals.push(body.lang);
+  }
+  if (body.needs_attention === 0 || body.needs_attention === 1) {
+    sets.push('needs_attention = ?');
+    vals.push(body.needs_attention);
   }
   takeStr('draft', 10_000);
   takeStr('draft_fr', 10_000);
@@ -171,14 +178,18 @@ adminForums.get('/v1/admin/forum-marketplaces', (c) => {
     return c.json({ error: 'unauthorized' }, 401);
   }
   ensureMarketplaceRows();
-  const rows = getStatsDB()
+  const db = getStatsDB();
+  const rows = db
     .prepare(
       `SELECT * FROM marketplace_checks
        ORDER BY CASE status WHEN 'absent' THEN 0 WHEN 'pending' THEN 1 WHEN 'unknown' THEN 2
                             WHEN 'listed' THEN 3 WHEN 'manual' THEN 4 ELSE 5 END, name`,
     )
     .all();
-  return c.json({ marketplaces: rows, scan: lastScanInfo() });
+  const events = db
+    .prepare(`SELECT * FROM marketplace_events ORDER BY created_at DESC, id DESC LIMIT 10`)
+    .all();
+  return c.json({ marketplaces: rows, events, scan: lastScanInfo() });
 });
 
 adminForums.patch('/v1/admin/forum-marketplaces/:slug', async (c) => {

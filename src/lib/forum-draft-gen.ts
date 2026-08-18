@@ -17,6 +17,10 @@
  * starting point, not the publication.
  */
 
+import { validateIBAN } from './iban.js';
+import { enrichResult } from './enrich.js';
+import { lookup as lookupBic } from './bic-lookup.js';
+
 const PRODUCT_FACTS = [
   'Free tier: 200 requests/month, no card required.',
   'POST /v1/iban/validate returns bic, bank_code_check (does the national bank code exist in its register, with institution name/address where the register provides them), sepa.schemes (SCT/SDD reachability) and sepa.vop_participant (is the resolved institution listed VoP-ready in the EPC register).',
@@ -38,6 +42,7 @@ ${PRODUCT_FACTS}
 7. Typography: NEVER use em dashes or en dashes anywhere. Use commas, colons or parentheses. Short sentences.
 8. Never criticise a person; correcting a factual claim is fine.
 9. If the operator notes say "no product mention" (or the thread is not a problem the API solves), produce pure expertise with zero product mention and no disclosure line.
+10. When the brief carries VERIFIED LIVE DATA or figures in the operator notes, copy those codes and figures EXACTLY as given (they were resolved against the real database); never round, rename or paraphrase them, and cite only what is shown.
 
 Return EXACTLY this structure, nothing before or after (the markers are parsed literally; JSON would break on multiline text):
 ===DRAFT===
@@ -125,13 +130,61 @@ export function stripDashes(s: string): string {
   return s.replace(/\s*[—–]\s*/g, ', ');
 }
 
+const IBAN_RE = /\b([A-Z]{2}\d{2}[A-Z0-9]{10,30})\b/;
+const BIC_RE = /\b([A-Z]{4}[A-Z]{2}[A-Z0-9]{2}(?:[A-Z0-9]{3})?)\b/;
+
+/**
+ * When the thread names a concrete IBAN or BIC, resolve it against OUR live
+ * database (in-process, no HTTP, no payment) and hand the generator verified
+ * facts to copy exactly. This is what turns a generic reply into a
+ * demonstrative one: the answer contains the very data the asker is missing.
+ * Best-effort by design: any miss just omits the block.
+ */
+export function buildVerifiedFacts(text: string): string {
+  const lines: string[] = [];
+  try {
+    const ibanMatch = IBAN_RE.exec(text.replace(/\s+/g, ' '));
+    if (ibanMatch) {
+      const result = validateIBAN(ibanMatch[1]);
+      if (result.valid) {
+        enrichResult(result);
+        const bits: string[] = [`IBAN ${result.iban}: valid`];
+        if (result.bban?.bank_code) bits.push(`bank code ${result.bban.bank_code}`);
+        if (result.bic?.code) bits.push(`resolves to BIC ${result.bic.code}${result.bic.bank_name ? ` (${result.bic.bank_name})` : ''}`);
+        if (result.sepa?.schemes?.length) bits.push(`SEPA schemes: ${result.sepa.schemes.join('/')}`);
+        if (typeof result.sepa?.vop_participant === 'boolean') bits.push(`vop_participant: ${result.sepa.vop_participant}`);
+        lines.push(bits.join(' · '));
+      } else {
+        lines.push(`IBAN ${ibanMatch[1]}: INVALID per mod-97/structure check`);
+      }
+    }
+    // A BIC candidate that is not just the embedded part of the IBAN above.
+    const bicMatch = BIC_RE.exec(text);
+    if (bicMatch && (!ibanMatch || !ibanMatch[1].includes(bicMatch[1]))) {
+      const row = lookupBic(bicMatch[1]);
+      if (row) {
+        lines.push(
+          `BIC ${bicMatch[1]}: found in our register — ${[row.institution, row.city, row.country_code].filter(Boolean).join(', ')}${row.lei ? `, LEI ${row.lei}` : ''}`,
+        );
+      }
+    }
+  } catch {
+    return '';
+  }
+  return lines.length
+    ? `VERIFIED LIVE DATA (resolved right now against the production database; copy exactly, cite only this):\n${lines.join('\n')}`
+    : '';
+}
+
 export function buildUserPrompt(t: DraftInput): string {
+  const verified = buildVerifiedFacts(`${t.title}\n${t.excerpt}`);
   return [
     `Platform: ${t.source}`,
     `Thread URL: ${t.url || '(none)'}`,
     `lang: ${t.lang}`,
     `Title: ${t.title}`,
     t.excerpt ? `Thread excerpt:\n${t.excerpt}` : 'Thread excerpt: (none, judge from the title)',
+    verified,
     t.notes ? `Operator notes (private context, never quote them): ${t.notes}` : '',
   ]
     .filter(Boolean)

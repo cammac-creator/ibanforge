@@ -1,12 +1,33 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
   buildUserPrompt,
+  buildVerifiedFacts,
   extractJson,
   generateDraft,
   parseMarkedOutput,
   stripDashes,
   DRAFT_SYSTEM,
 } from './forum-draft-gen.js';
+
+describe('buildVerifiedFacts — les données réelles injectées dans le brouillon', () => {
+  it('résout un IBAN valide contre la vraie base (BIC, schémas SEPA)', () => {
+    const out = buildVerifiedFacts('My IBAN DE89370400440532013000 fails in your lib');
+    expect(out).toContain('VERIFIED LIVE DATA');
+    expect(out).toContain('DE89370400440532013000: valid');
+    expect(out).toContain('COBADEFF');
+  });
+  it('signale un IBAN structurellement invalide', () => {
+    expect(buildVerifiedFacts('check DE00000000000000000099 please')).toContain('INVALID');
+  });
+  it('résout un BIC nu contre le registre', () => {
+    const out = buildVerifiedFacts('No data for bic OROACY2LXXX');
+    expect(out).toContain('OROACY2LXXX: found in our register');
+    expect(out).toContain('ORO PAY');
+  });
+  it('rend une chaîne vide quand le fil ne cite ni IBAN ni BIC', () => {
+    expect(buildVerifiedFacts('how do I validate bank accounts in general?')).toBe('');
+  });
+});
 
 describe('parseMarkedOutput — le format qui survit au multiligne', () => {
   it('extrait les trois sections (réponse, traduction FR, résumé)', () => {
@@ -28,7 +49,7 @@ describe('parseMarkedOutput — le format qui survit au multiligne', () => {
   });
   it('tolère l’absence de ===END=== (sortie coupée après le résumé)', () => {
     const out = parseMarkedOutput('===DRAFT===\ntext\n===SUMMARY_FR===\nrésumé');
-    expect(out).toEqual({ draft: 'text', summaryFr: 'résumé' });
+    expect(out).toEqual({ draft: 'text', draftFr: '', summaryFr: 'résumé' });
   });
   it('rend null si une section manque ou est vide', () => {
     expect(parseMarkedOutput('===DRAFT===\nonly draft')).toBeNull();

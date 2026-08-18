@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   MIN_SCORE,
   MARKETPLACES,
+  PLATFORM_LIMITS,
   detectLang,
   finalizeCandidate,
   interpretCheck,
@@ -9,9 +10,31 @@ import {
   parseHN,
   parsePullpush,
   parseStackExchange,
+  repoOfUrl,
   scoreThread,
   type MarketplaceDef,
 } from './forum-radar.js';
+
+describe('PLATFORM_LIMITS — chaque source a sa limite', () => {
+  it('couvre toutes les sources de fils avec un plafond de bon goût', () => {
+    for (const src of ['stackoverflow', 'money_se', 'github', 'reddit', 'hn', 'manual']) {
+      expect(PLATFORM_LIMITS[src], src).toBeDefined();
+      expect(PLATFORM_LIMITS[src].comfy).toBeGreaterThan(0);
+    }
+    expect(PLATFORM_LIMITS.stackoverflow.max).toBe(30_000);
+    expect(PLATFORM_LIMITS.github.max).toBe(65_536);
+    expect(PLATFORM_LIMITS.hn.max).toBeNull();
+  });
+});
+
+describe('repoOfUrl — la clé du malus anti-backlog', () => {
+  it('extrait owner/repo en minuscules des URLs GitHub', () => {
+    expect(repoOfUrl('https://github.com/Metasfresh/metasfresh/issues/13338')).toBe('metasfresh/metasfresh');
+  });
+  it('null hors GitHub', () => {
+    expect(repoOfUrl('https://stackoverflow.com/questions/1')).toBeNull();
+  });
+});
 
 describe('scoreThread — un score lisible, jamais opaque', () => {
   it('score fort sur une vraie douleur produit (BIC depuis IBAN)', () => {

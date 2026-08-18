@@ -422,12 +422,29 @@ export function getStatsDB(): DatabaseType.Database {
         notes TEXT,
         updated_at TEXT NOT NULL DEFAULT (datetime('now'))
       );
+      -- Presence CHANGES are the news a watch exists for (a silent delisting
+      -- must ring, not wait to be noticed). Append-only.
+      CREATE TABLE IF NOT EXISTS marketplace_events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        slug TEXT NOT NULL,
+        from_status TEXT NOT NULL,
+        to_status TEXT NOT NULL,
+        detail TEXT,
+        created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_marketplace_events_at ON marketplace_events(created_at);
     `);
     // Forums tab: the reply is WRITTEN in the thread's language but READ in
     // French — two texts, two columns (draft = what gets copied/posted,
     // draft_fr = the faithful translation shown to the operator).
     const ftCols = (statsDB.prepare('PRAGMA table_info(forum_threads)').all() as Array<{ name: string }>).map((r) => r.name);
     if (ftCols.length && !ftCols.includes('draft_fr')) statsDB.exec('ALTER TABLE forum_threads ADD COLUMN draft_fr TEXT');
+    // Reply watch: the radar re-reads posted threads; a reply after ours flips
+    // needs_attention and pings Telegram. posted_at feeds the one-post-per-
+    // platform-per-day guardrail in the UI.
+    if (ftCols.length && !ftCols.includes('watch_state')) statsDB.exec('ALTER TABLE forum_threads ADD COLUMN watch_state TEXT');
+    if (ftCols.length && !ftCols.includes('needs_attention')) statsDB.exec('ALTER TABLE forum_threads ADD COLUMN needs_attention INTEGER NOT NULL DEFAULT 0');
+    if (ftCols.length && !ftCols.includes('posted_at')) statsDB.exec('ALTER TABLE forum_threads ADD COLUMN posted_at TEXT');
     // Track request provenance: distinguish MCP HTTP / MCP stdio / REST direct / bot / web
     const reqCols = (statsDB.prepare("PRAGMA table_info(request_log)").all() as Array<{ name: string }>).map(r => r.name);
     if (!reqCols.includes('client_kind')) {

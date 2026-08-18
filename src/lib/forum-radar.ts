@@ -67,6 +67,32 @@ const KEYWORDS: Array<{ re: RegExp; weight: number; label: string }> = [
 /** A candidate below this score is search noise and is never inserted. */
 export const MIN_SCORE = 30;
 
+/**
+ * Per-platform reply length limits, in characters. `max` is the hard platform
+ * ceiling (posting above it fails or truncates); `comfy` is the etiquette
+ * ceiling above which a forum reply starts reading like a blog post. Sources:
+ * Stack Exchange bodies cap at 30 000, GitHub comments at 65 536, Reddit
+ * comments at 10 000; HN has no documented cap, so only etiquette applies.
+ */
+export const PLATFORM_LIMITS: Record<string, { max: number | null; comfy: number }> = {
+  stackoverflow: { max: 30_000, comfy: 2_500 },
+  money_se: { max: 30_000, comfy: 2_500 },
+  github: { max: 65_536, comfy: 2_500 },
+  reddit: { max: 10_000, comfy: 2_500 },
+  hn: { max: null, comfy: 2_000 },
+  manual: { max: null, comfy: 3_000 },
+};
+
+/** "owner/repo" for a GitHub thread URL, null elsewhere. Dismissing two
+ *  threads of the same repo teaches the radar to stop surfacing its backlog. */
+export function repoOfUrl(url: string): string | null {
+  const m = /^https:\/\/github\.com\/([^/]+\/[^/]+)\//.exec(url);
+  return m ? m[1].toLowerCase() : null;
+}
+
+/** Score malus applied to threads of a repo the operator already dismissed twice. */
+export const DISMISSED_REPO_MALUS = 25;
+
 export function scoreThread(title: string, excerpt: string): { score: number; detail: string } {
   const hay = `${title}\n${excerpt}`.toLowerCase();
   let score = 0;

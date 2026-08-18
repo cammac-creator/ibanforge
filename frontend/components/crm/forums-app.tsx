@@ -29,8 +29,41 @@ interface ForumThread {
   summary_fr: string | null;
   posted_url: string | null;
   notes: string | null;
+  needs_attention: number;
+  posted_at: string | null;
   first_seen: string;
   updated_at: string;
+}
+
+interface MarketplaceEvent {
+  id: number;
+  slug: string;
+  from_status: string;
+  to_status: string;
+  detail: string | null;
+  created_at: string;
+}
+
+/** Mirror of the backend PLATFORM_LIMITS: hard platform cap + etiquette cap. */
+const CHAR_LIMITS: Record<string, { max: number | null; comfy: number }> = {
+  stackoverflow: { max: 30_000, comfy: 2_500 },
+  money_se: { max: 30_000, comfy: 2_500 },
+  github: { max: 65_536, comfy: 2_500 },
+  reddit: { max: 10_000, comfy: 2_500 },
+  hn: { max: null, comfy: 2_000 },
+  manual: { max: null, comfy: 3_000 },
+};
+
+function charCounter(len: number, source: string): { text: string; cls: string; over: boolean } {
+  const lim = CHAR_LIMITS[source] ?? CHAR_LIMITS.manual;
+  const maxTxt = lim.max ? `${lim.max.toLocaleString('fr-CH')}` : 'sans limite dure';
+  if (lim.max && len > lim.max) {
+    return { text: `${len.toLocaleString('fr-CH')} / ${maxTxt} car. — DÉPASSE la limite`, cls: 'text-red-400', over: true };
+  }
+  if (len > lim.comfy) {
+    return { text: `${len.toLocaleString('fr-CH')} car. (${maxTxt}) — long pour un forum`, cls: 'text-amber-400', over: false };
+  }
+  return { text: `${len.toLocaleString('fr-CH')} car. (max ${maxTxt})`, cls: 'text-[var(--fg-4)]', over: false };
 }
 
 interface Marketplace {
@@ -120,6 +153,7 @@ export function ForumsApp() {
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [scan, setScan] = useState<ScanInfo | null>(null);
   const [markets, setMarkets] = useState<Marketplace[]>([]);
+  const [marketEvents, setMarketEvents] = useState<MarketplaceEvent[]>([]);
   const [filter, setFilter] = useState<string>('active');
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [edit, setEdit] = useState<Partial<ForumThread>>({});
@@ -154,8 +188,9 @@ export function ForumsApp() {
     try {
       const r = await fetch('/api/crm/forum-marketplaces');
       if (!r.ok) return;
-      const data = (await r.json()) as { marketplaces: Marketplace[] };
+      const data = (await r.json()) as { marketplaces: Marketplace[]; events?: MarketplaceEvent[] };
       setMarkets(data.marketplaces ?? []);
+      setMarketEvents(data.events ?? []);
     } catch {
       /* the threads error banner already covers connectivity */
     }
@@ -208,7 +243,23 @@ export function ForumsApp() {
       notes: t.notes ?? '',
     });
     setDirty(false);
+    // Opening a flagged thread acknowledges the "someone replied" badge.
+    if (t.needs_attention === 1) {
+      setThreads((all) => all.map((x) => (x.id === t.id ? { ...x, needs_attention: 0 } : x)));
+      void fetch(`/api/crm/forum-threads?id=${t.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ needs_attention: 0 }),
+      }).catch(() => undefined);
+    }
   }, []);
+
+  // One post per platform per day: the sources that already got one today
+  // (UTC dates on both sides, close enough for a guardrail).
+  const postedToday = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    return new Set(threads.filter((t) => (t.posted_at ?? '').slice(0, 10) === today).map((t) => t.source));
+  }, [threads]);
 
   const save = useCallback(
     async (extra?: Partial<ForumThread>) => {
@@ -320,6 +371,13 @@ export function ForumsApp() {
           {toast}
         </div>
       )}
+      {postedToday.size > 0 && (
+        <div className="rounded-lg border border-[var(--ink-4)] bg-[var(--ink-2)]/60 px-3 py-2 text-xs text-[var(--fg-3)]">
+          ⏸ Déjà posté aujourd&apos;hui sur {[...postedToday].map((s) => SOURCE_LABELS[s] ?? s).join(', ')} — la règle
+          anti-spam : jamais deux posts le même jour sur la même plateforme. Les autres fils de cette plateforme
+          attendent demain.
+        </div>
+      )}
       {loadError && (
         <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300">
           Chargement impossible ({loadError}) : API injoignable ou secrets absents.
@@ -382,6 +440,19 @@ export function ForumsApp() {
                 <span className="rounded border border-[var(--ink-4)] px-1 py-0.5 font-mono text-[9px] text-[var(--fg-4)]">
                   {LANG_LABELS[t.lang] ?? t.lang}
                 </span>
+                {t.needs_attention === 1 && (
+                  <span className="rounded border border-amber-500/40 bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-300">
+                    💬 réponse reçue
+                  </span>
+                )}
+                {postedToday.has(t.source) && t.status !== 'posted' && t.status !== 'dismissed' && (
+                  <span
+                    className="rounded border border-[var(--ink-4)] px-1.5 py-0.5 text-[10px] text-[var(--fg-4)]"
+                    title="Un post est déjà parti aujourd'hui sur cette plateforme : attendre demain."
+                  >
+                    ⏸ demain
+                  </span>
+                )}
                 <span className="ml-auto text-[11px] text-[var(--fg-4)]">
                   {STATUS_LABELS[t.status] ?? t.status}
                 </span>
@@ -441,60 +512,92 @@ export function ForumsApp() {
                 />
               </label>
 
-              {(edit.lang ?? selected.lang) !== 'fr' && (
-                <label className="text-[11px] font-medium uppercase tracking-wide text-[var(--fg-4)]">
-                  Réponse en français (pour te relire — ce texte n&apos;est PAS celui qui part)
+              {(edit.lang ?? selected.lang) !== 'fr' ? (
+                <>
+                  {/* French first and big: this is what the operator READS.
+                      The target-language text is real but secondary, folded. */}
+                  <label className="text-[11px] font-medium uppercase tracking-wide text-amber-400/90">
+                    Réponse — en français, pour te relire
+                    <textarea
+                      value={String(edit.draft_fr ?? '')}
+                      onChange={(e) => {
+                        setEdit((x) => ({ ...x, draft_fr: e.target.value }));
+                        setDirty(true);
+                      }}
+                      rows={12}
+                      placeholder="La traduction française arrive automatiquement (radar quotidien, ou « Scanner les forums »)."
+                      className="mt-1 w-full rounded-lg border border-[var(--ink-4)] bg-[var(--ink-0)]/80 p-3 text-[15px] leading-relaxed text-[var(--fg-2)] placeholder:text-[var(--fg-4)] focus:border-amber-500/50 focus:outline-none"
+                    />
+                  </label>
+
+                  <details className="rounded-lg border border-[var(--ink-4)]/60 bg-[var(--ink-0)]/40">
+                    <summary className="cursor-pointer select-none px-3 py-2 text-[11px] font-medium uppercase tracking-wide text-[var(--fg-4)] hover:text-[var(--fg-2)]">
+                      Version {LANG_LABELS[String(edit.lang ?? selected.lang)] ?? '?'} — celle que le bouton copie ·{' '}
+                      <span className={charCounter(String(edit.draft ?? '').length, selected.source).cls}>
+                        {charCounter(String(edit.draft ?? '').length, selected.source).text}
+                      </span>
+                    </summary>
+                    <div className="px-3 pb-3">
+                      <div className="mb-1.5 flex items-center gap-2 text-[11px] text-[var(--fg-4)]">
+                        Langue du correspondant :
+                        <select
+                          value={String(edit.lang ?? selected.lang)}
+                          onChange={(e) => {
+                            setEdit((x) => ({ ...x, lang: e.target.value }));
+                            setDirty(true);
+                          }}
+                          className="rounded border border-[var(--ink-4)] bg-[var(--ink-0)] px-1.5 py-0.5 text-[11px] text-[var(--fg-2)]"
+                        >
+                          <option value="en">EN</option>
+                          <option value="de">DE</option>
+                          <option value="fr">FR</option>
+                        </select>
+                      </div>
+                      <textarea
+                        value={String(edit.draft ?? '')}
+                        onChange={(e) => {
+                          setEdit((x) => ({ ...x, draft: e.target.value }));
+                          setDirty(true);
+                        }}
+                        rows={8}
+                        placeholder="Le texte prêt à coller sur la plateforme, dans la langue du fil."
+                        className="w-full rounded-lg border border-[var(--ink-4)] bg-[var(--ink-0)]/60 p-2 font-mono text-xs leading-relaxed text-[var(--fg-3)] placeholder:text-[var(--fg-4)] focus:border-amber-500/50 focus:outline-none"
+                      />
+                    </div>
+                  </details>
+                </>
+              ) : (
+                <label className="text-[11px] font-medium uppercase tracking-wide text-amber-400/90">
+                  Réponse (le fil est en français — ce texte est celui qui part)
                   <textarea
-                    value={String(edit.draft_fr ?? '')}
+                    value={String(edit.draft ?? '')}
                     onChange={(e) => {
-                      setEdit((x) => ({ ...x, draft_fr: e.target.value }));
+                      setEdit((x) => ({ ...x, draft: e.target.value }));
                       setDirty(true);
                     }}
-                    rows={9}
-                    placeholder="La traduction française arrive automatiquement (radar quotidien, ou « Scanner les forums »)."
-                    className="mt-1 w-full rounded-lg border border-[var(--ink-4)] bg-[var(--ink-0)]/60 p-2 text-sm leading-relaxed text-[var(--fg-2)] placeholder:text-[var(--fg-4)] focus:border-amber-500/50 focus:outline-none"
+                    rows={12}
+                    placeholder="Le texte prêt à coller sur la plateforme."
+                    className="mt-1 w-full rounded-lg border border-[var(--ink-4)] bg-[var(--ink-0)]/80 p-3 text-[15px] leading-relaxed text-[var(--fg-2)] placeholder:text-[var(--fg-4)] focus:border-amber-500/50 focus:outline-none"
                   />
+                  <span className={`mt-1 block normal-case ${charCounter(String(edit.draft ?? '').length, selected.source).cls}`}>
+                    {charCounter(String(edit.draft ?? '').length, selected.source).text}
+                  </span>
                 </label>
               )}
-
-              <label className="text-[11px] font-medium uppercase tracking-wide text-[var(--fg-4)]">
-                <span className="flex items-center gap-2">
-                  {(edit.lang ?? selected.lang) === 'fr' ? 'Réponse (le fil est en français)' : 'Version qui sera copiée'}
-                  <select
-                    value={String(edit.lang ?? selected.lang)}
-                    onChange={(e) => {
-                      setEdit((x) => ({ ...x, lang: e.target.value }));
-                      setDirty(true);
-                    }}
-                    className="rounded border border-[var(--ink-4)] bg-[var(--ink-0)] px-1.5 py-0.5 text-[11px] text-[var(--fg-2)]"
-                  >
-                    <option value="en">EN</option>
-                    <option value="de">DE</option>
-                    <option value="fr">FR</option>
-                  </select>
-                  <span className="normal-case text-[var(--fg-4)]">(langue du correspondant)</span>
-                </span>
-                <textarea
-                  value={String(edit.draft ?? '')}
-                  onChange={(e) => {
-                    setEdit((x) => ({ ...x, draft: e.target.value }));
-                    setDirty(true);
-                  }}
-                  rows={(edit.lang ?? selected.lang) === 'fr' ? 10 : 6}
-                  placeholder="Le texte prêt à coller sur la plateforme, dans la langue du fil."
-                  className="mt-1 w-full rounded-lg border border-[var(--ink-4)] bg-[var(--ink-0)]/60 p-2 font-mono text-xs leading-relaxed text-[var(--fg-2)] placeholder:text-[var(--fg-4)] focus:border-amber-500/50 focus:outline-none"
-                />
-              </label>
 
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   onClick={async () => {
-                    const ok = await copyToClipboard(String(edit.draft ?? ''));
-                    say(
-                      ok
-                        ? `Réponse copiée (version ${LANG_LABELS[String(edit.lang ?? selected.lang)] ?? ''}).`
-                        : 'Copie refusée par le navigateur.',
-                    );
+                    const text = String(edit.draft ?? '');
+                    const cc = charCounter(text.length, selected.source);
+                    const ok = await copyToClipboard(text);
+                    if (!ok) {
+                      say('Copie refusée par le navigateur.');
+                    } else if (cc.over) {
+                      say(`⚠ Copié, mais le texte DÉPASSE la limite de ${SOURCE_LABELS[selected.source] ?? selected.source} — raccourcis avant de poster.`);
+                    } else {
+                      say(`Réponse copiée (version ${LANG_LABELS[String(edit.lang ?? selected.lang)] ?? ''}).`);
+                    }
                   }}
                   disabled={!String(edit.draft ?? '').trim()}
                   className="rounded bg-amber-500 px-3 py-1.5 text-xs font-semibold text-black transition-colors hover:bg-amber-400 disabled:opacity-40"
@@ -651,6 +754,27 @@ export function ForumsApp() {
             </tbody>
           </table>
         </div>
+        {marketEvents.length > 0 && (
+          <div className="rounded-xl border border-[var(--ink-4)]/60 bg-[var(--ink-2)]/60 p-3">
+            <p className="mb-2 text-[10px] font-medium uppercase tracking-wide text-[var(--fg-4)]">
+              Derniers changements détectés (aussi notifiés sur Telegram)
+            </p>
+            <ul className="flex flex-col gap-1.5">
+              {marketEvents.map((e) => {
+                const name = markets.find((m) => m.slug === e.slug)?.name ?? e.slug;
+                return (
+                  <li key={e.id} className="text-xs text-[var(--fg-3)]">
+                    <span className="font-mono text-[10px] text-[var(--fg-4)]">
+                      {e.created_at.slice(0, 16).replace('T', ' ')}
+                    </span>{' '}
+                    <span className="text-[var(--fg-2)]">{name}</span> : {e.from_status} → {e.to_status}
+                    {e.detail ? ` (${e.detail})` : ''}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
       </div>
     </div>
   );
