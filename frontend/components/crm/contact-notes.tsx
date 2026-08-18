@@ -80,7 +80,7 @@ export function ContactNotes({ email }: { email: string }) {
           }}
           rows={1}
           placeholder="Noter un fait… (⌘⏎ pour enregistrer)"
-          className="min-w-0 flex-1 resize-y rounded-md border border-[var(--ink-4)] bg-[var(--ink-0)] px-2.5 py-1.5 text-[13px] leading-snug text-[var(--fg-1)] placeholder:text-[var(--fg-5)] focus:border-[var(--amber-500)]/50 focus:outline-none"
+          className="min-w-0 flex-1 resize-y rounded-md border border-[var(--ink-4)] bg-[var(--ink-0)] px-2.5 py-1.5 text-base leading-snug text-[var(--fg-1)] placeholder:text-[var(--fg-5)] focus:border-[var(--amber-500)]/50 focus:outline-none sm:text-[13px]"
         />
         <button
           type="button"

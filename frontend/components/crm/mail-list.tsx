@@ -200,7 +200,7 @@ export function MailList({
           onChange={(e) => setQ(e.target.value)}
           placeholder="Rechercher (nom, adresse, contenu)…"
           aria-label="Rechercher un contact"
-          className="w-full min-w-0 bg-transparent px-4 py-2 text-[13.5px] text-[var(--fg-1)] placeholder:text-[var(--fg-3)] focus:outline-none"
+          className="w-full min-w-0 bg-transparent px-4 py-2 text-base text-[var(--fg-1)] placeholder:text-[var(--fg-3)] focus:outline-none sm:text-[13.5px]"
         />
       </div>
       <div className="flex flex-wrap gap-x-4 gap-y-0 border-b border-[var(--ink-4)]/60 px-4 pt-3">

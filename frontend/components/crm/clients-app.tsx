@@ -213,12 +213,12 @@ export function ClientsApp({ dossiers, locale, windowDays = 90 }: { dossiers: Cl
             {v.label} <span className="tabular-nums">{counts[v.key]}</span>
           </button>
         ))}
-        <span className="ml-auto flex items-center gap-2">
+        <span className="flex w-full items-center gap-2 sm:ml-auto sm:w-auto">
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Nom, adresse, clé, pays…"
-            className="w-48 rounded-md border border-[var(--ink-4)] bg-[var(--ink-1)] px-2.5 py-1 text-[13px] text-[var(--fg-1)] placeholder:text-[var(--fg-5)] focus:border-[var(--amber-500)]/50 focus:outline-none"
+            className="min-w-0 flex-1 rounded-md border border-[var(--ink-4)] bg-[var(--ink-1)] px-2.5 py-1.5 text-base text-[var(--fg-1)] placeholder:text-[var(--fg-5)] focus:border-[var(--amber-500)]/50 focus:outline-none sm:w-48 sm:flex-none sm:py-1 sm:text-[13px]"
           />
           <span className="flex items-center gap-0.5 rounded-md border border-[var(--ink-4)] p-0.5">
             {SORTS.map((s) => (

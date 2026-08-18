@@ -24,7 +24,7 @@ import { PANEL_PADDING_PX } from './panel-padding';
  *
  * The reply sheet's 228 plus two differences, not one. The body is the obvious
  * one: an answer is written in four rows and a mail nobody asked for has always
- * had six. Both textareas carry `text-sm leading-[22px]` since the CRM type
+ * had six. Both textareas carry `text-base leading-[22px] sm:text-sm` since the CRM type
  * scale was raised — the explicit 22px line is what keeps two extra rows an
  * exact 44 with nothing for the browser to round, where the old 12px-at-1.625
  * rows needed a round-up note to avoid clipping the sixth row.
@@ -831,7 +831,7 @@ export function OutboundSheet({
           onChange={(e) => setSubject(e.target.value)}
           placeholder="Objet"
           aria-label="Objet du message"
-          className="mb-2 w-full min-w-0 rounded-lg border border-[var(--ink-4)] bg-[var(--ink-0)] px-3 py-1.5 text-sm text-[var(--fg-1)] focus:border-amber-500/40 focus:outline-none"
+          className="mb-2 w-full min-w-0 rounded-lg border border-[var(--ink-4)] bg-[var(--ink-0)] px-3 py-1.5 text-base text-[var(--fg-1)] focus:border-amber-500/40 focus:outline-none sm:text-sm"
         />
         {/* min-w-0 is load-bearing on a textarea: `cols` gives it an intrinsic
             minimum width that w-full does not remove, and that minimum would
@@ -842,7 +842,7 @@ export function OutboundSheet({
           rows={6}
           placeholder="Écris, ou fais générer une relance."
           aria-label="Corps du message"
-          className="w-full min-w-0 rounded-lg border border-[var(--ink-4)] bg-[var(--ink-0)] p-3 text-sm leading-[22px] text-[var(--fg-1)] focus:border-amber-500/40 focus:outline-none"
+          className="w-full min-w-0 rounded-lg border border-[var(--ink-4)] bg-[var(--ink-0)] p-3 text-base leading-[22px] sm:text-sm text-[var(--fg-1)] focus:border-amber-500/40 focus:outline-none"
         />
         {fr && (
           /*

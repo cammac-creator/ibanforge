@@ -19,7 +19,7 @@ import { PANEL_PADDING_PX } from './panel-padding';
  * or a check appears: the inside scrolls instead.
  *
  * Re-posed when the CRM type scale was raised for readability (owner's call):
- * the body is `text-sm leading-[22px]` (the explicit line height is what keeps
+ * the body is `text-base leading-[22px] sm:text-sm` (the explicit line height is what keeps
  * this sum in integers), so four rows are 88 where they were 80, and the
  * subject went to text-sm, 30px against 26. 216 + 8 + 4 = 228.
  */
@@ -425,7 +425,7 @@ export function ReplySheet({
           onChange={(e) => setSubject(e.target.value)}
           placeholder="Objet"
           aria-label="Objet de la réponse"
-          className="mb-2 w-full min-w-0 rounded-lg border border-[var(--ink-4)] bg-[var(--ink-0)] px-3 py-1 text-sm text-[var(--fg-1)] focus:border-amber-500/40 focus:outline-none"
+          className="mb-2 w-full min-w-0 rounded-lg border border-[var(--ink-4)] bg-[var(--ink-0)] px-3 py-1 text-base text-[var(--fg-1)] focus:border-amber-500/40 focus:outline-none sm:text-sm"
         />
         {/* Empty on mount, and focused: nothing steals focus from a page being
             read, since this node does not exist until Répondre is clicked.
@@ -439,7 +439,7 @@ export function ReplySheet({
           rows={4}
           placeholder="Écris ta réponse."
           aria-label="Corps de la réponse"
-          className="w-full min-w-0 rounded-lg border border-[var(--ink-4)] bg-[var(--ink-0)] p-3 text-sm leading-[22px] text-[var(--fg-1)] focus:border-amber-500/40 focus:outline-none"
+          className="w-full min-w-0 rounded-lg border border-[var(--ink-4)] bg-[var(--ink-0)] p-3 text-base leading-[22px] sm:text-sm text-[var(--fg-1)] focus:border-amber-500/40 focus:outline-none"
         />
         {fr && (
           /*
