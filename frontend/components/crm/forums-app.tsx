@@ -244,6 +244,8 @@ export function ForumsApp() {
 
   const select = useCallback((t: ForumThread) => {
     setSelectedId(t.id);
+    // Phone layout swaps list for detail; land the user at the top of it.
+    if (typeof window !== 'undefined' && window.innerWidth < 1024) window.scrollTo({ top: 0 });
     setEdit({
       status: t.status,
       lang: t.lang,
@@ -359,18 +361,18 @@ export function ForumsApp() {
           {scan?.last_scan_at ? `dernier scan ${scan.last_scan_at.slice(0, 16).replace('T', ' ')}` : 'jamais scanné'}
           {scan?.scanning ? ' · scan en cours…' : ''}
         </p>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="flex w-full items-center gap-2 sm:ml-auto sm:w-auto">
           <button
             onClick={() => void runScan('threads')}
             disabled={busy !== null || scan?.scanning === true}
-            className="rounded border border-[var(--ink-4)] px-3 py-1.5 text-xs font-medium text-[var(--fg-2)] transition-colors hover:bg-[var(--ink-4)]/50 disabled:opacity-40"
+            className="flex-1 rounded border border-[var(--ink-4)] px-3 py-2.5 text-xs font-medium text-[var(--fg-2)] transition-colors hover:bg-[var(--ink-4)]/50 disabled:opacity-40 sm:flex-none sm:py-1.5"
           >
             Scanner les forums
           </button>
           <button
             onClick={() => void runScan('marketplaces')}
             disabled={busy !== null || scan?.scanning === true}
-            className="rounded border border-[var(--ink-4)] px-3 py-1.5 text-xs font-medium text-[var(--fg-2)] transition-colors hover:bg-[var(--ink-4)]/50 disabled:opacity-40"
+            className="flex-1 rounded border border-[var(--ink-4)] px-3 py-2.5 text-xs font-medium text-[var(--fg-2)] transition-colors hover:bg-[var(--ink-4)]/50 disabled:opacity-40 sm:flex-none sm:py-1.5"
           >
             Vérifier les marketplaces
           </button>
@@ -402,8 +404,8 @@ export function ForumsApp() {
         </div>
       )}
 
-      {/* Status filter chips. */}
-      <div className="flex flex-wrap items-center gap-1.5">
+      {/* Status filter chips: one thumb-scrollable row on phones. */}
+      <div className="flex items-center gap-1.5 overflow-x-auto whitespace-nowrap pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:flex-wrap sm:whitespace-normal">
         {[
           { key: 'active', label: `À traiter (${activeCount})` },
           ...STATUS_ORDER.map((s) => ({ key: s, label: `${STATUS_LABELS[s]} (${counts[s] ?? 0})` })),
@@ -425,8 +427,8 @@ export function ForumsApp() {
       </div>
 
       <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
-        {/* Thread list */}
-        <div className="flex min-w-0 flex-col gap-2">
+        {/* Thread list — on phones it yields the screen to the detail pane. */}
+        <div className={`${selected ? 'hidden lg:flex' : 'flex'} min-w-0 flex-col gap-2`}>
           {visible.length === 0 && (
             <div className="rounded-xl border border-[var(--ink-4)]/60 bg-[var(--ink-2)]/60 p-6 text-center text-sm text-[var(--fg-3)]">
               Rien dans ce filtre. Lance « Scanner les forums » pour remplir la liste.
@@ -483,13 +485,19 @@ export function ForumsApp() {
         </div>
 
         {/* Detail pane */}
-        <div className="min-w-0">
+        <div className={`${selected ? 'block' : 'hidden lg:block'} min-w-0`}>
           {!selected ? (
             <div className="rounded-xl border border-[var(--ink-4)]/60 bg-[var(--ink-2)]/60 p-8 text-center text-sm text-[var(--fg-3)]">
               Choisis un fil à gauche : lien, résumé FR, brouillon à copier et suivi vivent ici.
             </div>
           ) : (
             <div className="flex flex-col gap-3 rounded-xl border border-[var(--ink-4)]/60 bg-[var(--ink-2)]/60 p-4">
+              <button
+                onClick={() => setSelectedId(null)}
+                className="-mx-1 flex w-fit items-center gap-1 rounded px-2 py-1.5 text-sm font-medium text-amber-400 lg:hidden"
+              >
+                ← Retour aux fils
+              </button>
               <div className="flex items-start gap-2">
                 <div className="min-w-0">
                   <a
@@ -524,7 +532,7 @@ export function ForumsApp() {
                   }}
                   rows={2}
                   placeholder="Ce que demande le fil, et l'angle de notre réponse."
-                  className="mt-1 w-full rounded-lg border border-[var(--ink-4)] bg-[var(--ink-0)]/60 p-2 text-sm text-[var(--fg-2)] placeholder:text-[var(--fg-4)] focus:border-amber-500/50 focus:outline-none"
+                  className="mt-1 w-full rounded-lg border border-[var(--ink-4)] bg-[var(--ink-0)]/60 p-2 text-base text-[var(--fg-2)] placeholder:text-[var(--fg-4)] focus:border-amber-500/50 focus:outline-none sm:text-sm"
                 />
               </label>
 
@@ -542,7 +550,7 @@ export function ForumsApp() {
                       }}
                       rows={12}
                       placeholder="La traduction française arrive automatiquement (radar quotidien, ou « Scanner les forums »)."
-                      className="mt-1 w-full rounded-lg border border-[var(--ink-4)] bg-[var(--ink-0)]/80 p-3 text-[15px] leading-relaxed text-[var(--fg-2)] placeholder:text-[var(--fg-4)] focus:border-amber-500/50 focus:outline-none"
+                      className="mt-1 w-full rounded-lg border border-[var(--ink-4)] bg-[var(--ink-0)]/80 p-3 text-[16px] leading-relaxed text-[var(--fg-2)] placeholder:text-[var(--fg-4)] focus:border-amber-500/50 focus:outline-none sm:text-[15px]"
                     />
                   </label>
 
@@ -562,7 +570,7 @@ export function ForumsApp() {
                             setEdit((x) => ({ ...x, lang: e.target.value }));
                             setDirty(true);
                           }}
-                          className="rounded border border-[var(--ink-4)] bg-[var(--ink-0)] px-1.5 py-0.5 text-[11px] text-[var(--fg-2)]"
+                          className="rounded border border-[var(--ink-4)] bg-[var(--ink-0)] px-1.5 py-0.5 text-base text-[var(--fg-2)] sm:text-[11px]"
                         >
                           <option value="en">EN</option>
                           <option value="de">DE</option>
@@ -577,7 +585,7 @@ export function ForumsApp() {
                         }}
                         rows={8}
                         placeholder="Le texte prêt à coller sur la plateforme, dans la langue du fil."
-                        className="w-full rounded-lg border border-[var(--ink-4)] bg-[var(--ink-0)]/60 p-2 font-mono text-xs leading-relaxed text-[var(--fg-3)] placeholder:text-[var(--fg-4)] focus:border-amber-500/50 focus:outline-none"
+                        className="w-full rounded-lg border border-[var(--ink-4)] bg-[var(--ink-0)]/60 p-2 font-mono text-base leading-relaxed text-[var(--fg-3)] placeholder:text-[var(--fg-4)] focus:border-amber-500/50 focus:outline-none sm:text-xs"
                       />
                     </div>
                   </details>
@@ -593,7 +601,7 @@ export function ForumsApp() {
                     }}
                     rows={12}
                     placeholder="Le texte prêt à coller sur la plateforme."
-                    className="mt-1 w-full rounded-lg border border-[var(--ink-4)] bg-[var(--ink-0)]/80 p-3 text-[15px] leading-relaxed text-[var(--fg-2)] placeholder:text-[var(--fg-4)] focus:border-amber-500/50 focus:outline-none"
+                    className="mt-1 w-full rounded-lg border border-[var(--ink-4)] bg-[var(--ink-0)]/80 p-3 text-[16px] leading-relaxed text-[var(--fg-2)] placeholder:text-[var(--fg-4)] focus:border-amber-500/50 focus:outline-none sm:text-[15px]"
                   />
                   <span className={`mt-1 block normal-case ${charCounter(String(edit.draft ?? '').length, selected.source).cls}`}>
                     {charCounter(String(edit.draft ?? '').length, selected.source).text}
@@ -616,14 +624,14 @@ export function ForumsApp() {
                     }
                   }}
                   disabled={!String(edit.draft ?? '').trim()}
-                  className="rounded bg-amber-500 px-3 py-1.5 text-xs font-semibold text-black transition-colors hover:bg-amber-400 disabled:opacity-40"
+                  className="flex-1 rounded bg-amber-500 px-3 py-2.5 text-sm font-semibold text-black transition-colors hover:bg-amber-400 disabled:opacity-40 sm:flex-none sm:py-1.5 sm:text-xs"
                 >
                   Copier la réponse ({LANG_LABELS[String(edit.lang ?? selected.lang)] ?? '?'})
                 </button>
                 <button
                   onClick={() => void save()}
                   disabled={busy !== null || !dirty}
-                  className="rounded border border-emerald-500/40 px-3 py-1.5 text-xs font-medium text-emerald-400 transition-colors hover:bg-emerald-500/10 disabled:opacity-40"
+                  className="flex-1 rounded border border-emerald-500/40 px-3 py-2.5 text-sm font-medium text-emerald-400 transition-colors hover:bg-emerald-500/10 disabled:opacity-40 sm:flex-none sm:py-1.5 sm:text-xs"
                 >
                   {busy === 'save' ? 'Enregistrement…' : dirty ? 'Enregistrer' : 'Enregistré ✓'}
                 </button>
@@ -638,7 +646,7 @@ export function ForumsApp() {
                       setEdit((x) => ({ ...x, status: e.target.value }));
                       setDirty(true);
                     }}
-                    className="mt-1 w-full rounded-lg border border-[var(--ink-4)] bg-[var(--ink-0)]/60 p-2 text-sm text-[var(--fg-2)]"
+                    className="mt-1 w-full rounded-lg border border-[var(--ink-4)] bg-[var(--ink-0)]/60 p-2 text-base text-[var(--fg-2)] sm:text-sm"
                   >
                     {STATUS_ORDER.map((s) => (
                       <option key={s} value={s}>
@@ -657,7 +665,7 @@ export function ForumsApp() {
                       setDirty(true);
                     }}
                     placeholder="détectée automatiquement au prochain scan"
-                    className="mt-1 w-full rounded-lg border border-[var(--ink-4)] bg-[var(--ink-0)]/60 p-2 text-sm text-[var(--fg-2)] placeholder:text-[var(--fg-4)]"
+                    className="mt-1 w-full rounded-lg border border-[var(--ink-4)] bg-[var(--ink-0)]/60 p-2 text-base text-[var(--fg-2)] placeholder:text-[var(--fg-4)] sm:text-sm"
                   />
                   <span className="mt-0.5 block text-[10px] normal-case text-[var(--fg-4)]">
                     Le radar détecte tout seul tes réponses GitHub (et Stack Overflow dès que le compte existe) : rien à
@@ -676,7 +684,7 @@ export function ForumsApp() {
                   }}
                   rows={2}
                   placeholder="Contexte privé (jamais publié) : vérifs faites, angle, précautions."
-                  className="mt-1 w-full rounded-lg border border-[var(--ink-4)] bg-[var(--ink-0)]/60 p-2 text-sm text-[var(--fg-2)] placeholder:text-[var(--fg-4)] focus:border-amber-500/50 focus:outline-none"
+                  className="mt-1 w-full rounded-lg border border-[var(--ink-4)] bg-[var(--ink-0)]/60 p-2 text-base text-[var(--fg-2)] placeholder:text-[var(--fg-4)] focus:border-amber-500/50 focus:outline-none sm:text-sm"
                 />
               </label>
 
@@ -706,7 +714,45 @@ export function ForumsApp() {
             où IBANforge est visible, où il manque : vérifié automatiquement par le radar quotidien
           </p>
         </div>
-        <div className="overflow-x-auto rounded-xl border border-[var(--ink-4)]/60 bg-[var(--ink-2)]/60">
+        {/* Phone layout: stacked cards; the table needs a real screen. */}
+        <div className="flex flex-col gap-2 sm:hidden">
+          {markets.map((m) => {
+            const badge = PRESENCE_BADGE[m.status] ?? PRESENCE_BADGE.unknown;
+            return (
+              <div key={m.slug} className="rounded-xl border border-[var(--ink-4)]/60 bg-[var(--ink-2)]/60 p-3">
+                <div className="flex items-center gap-2">
+                  <span className={`inline-block rounded border px-1.5 py-0.5 text-[10px] font-semibold ${badge.cls}`}>
+                    {badge.label}
+                  </span>
+                  <a
+                    href={m.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="min-w-0 flex-1 truncate text-sm font-medium text-[var(--fg-2)] underline decoration-[var(--ink-4)] underline-offset-2"
+                  >
+                    {m.name}
+                  </a>
+                  {m.action_url && m.action_url !== m.url && (
+                    <a href={m.action_url} target="_blank" rel="noopener noreferrer" className="shrink-0 text-[11px] text-amber-400/80">
+                      agir ↗
+                    </a>
+                  )}
+                </div>
+                {m.detail && <p className="mt-1.5 text-xs text-[var(--fg-3)]">{m.detail}</p>}
+                <p className="mt-1 font-mono text-[10px] text-[var(--fg-4)]">
+                  vérifié {m.checked_at ? m.checked_at.slice(0, 16).replace('T', ' ') : 'jamais'}
+                </p>
+              </div>
+            );
+          })}
+          {markets.length === 0 && (
+            <div className="rounded-xl border border-[var(--ink-4)]/60 bg-[var(--ink-2)]/60 p-4 text-center text-sm text-[var(--fg-3)]">
+              Liste vide : lance « Vérifier les marketplaces ».
+            </div>
+          )}
+        </div>
+
+        <div className="hidden overflow-x-auto rounded-xl border border-[var(--ink-4)]/60 bg-[var(--ink-2)]/60 sm:block">
           <table className="w-full min-w-[640px] text-left text-sm">
             <thead>
               <tr className="border-b border-[var(--ink-4)]/60 text-[10px] uppercase tracking-wide text-[var(--fg-4)]">
@@ -758,7 +804,7 @@ export function ForumsApp() {
                           if (e.target.value !== (m.notes ?? '')) void saveMarketNotes(m.slug, e.target.value);
                         }}
                         placeholder="note…"
-                        className="w-full min-w-[140px] rounded border border-transparent bg-transparent p-1 text-xs text-[var(--fg-3)] placeholder:text-[var(--fg-4)]/60 focus:border-[var(--ink-4)] focus:bg-[var(--ink-0)]/60 focus:outline-none"
+                        className="w-full min-w-[140px] rounded border border-transparent bg-transparent p-1 text-base text-[var(--fg-3)] placeholder:text-[var(--fg-4)]/60 focus:border-[var(--ink-4)] focus:bg-[var(--ink-0)]/60 focus:outline-none sm:text-xs"
                       />
                     </td>
                   </tr>

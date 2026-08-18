@@ -34,22 +34,22 @@ export function TopNav() {
   ];
 
   return (
-    <div className="flex items-center justify-between border-b border-[var(--ink-4)] bg-[var(--ink-0)] px-4 py-3">
-      {/* Logo + tabs */}
-      <div className="flex items-center gap-5">
+    <div className="flex items-center justify-between gap-2 border-b border-[var(--ink-4)] bg-[var(--ink-0)] px-3 py-3 sm:px-4">
+      {/* Logo + tabs — the tab row thumb-scrolls on phones instead of wrapping. */}
+      <div className="flex min-w-0 items-center gap-3 sm:gap-5">
         <div className="flex shrink-0 items-center gap-2">
           <span className="inline-flex h-6 w-6 select-none items-center justify-center rounded bg-amber-500 text-[10px] font-black tracking-tight text-amber-foreground">
             IF
           </span>
-          <span className="text-sm font-semibold text-white">IBANforge</span>
+          <span className="hidden text-sm font-semibold text-white md:inline">IBANforge</span>
         </div>
-        <nav className="flex items-center gap-1">
+        <nav className="flex items-center gap-1 overflow-x-auto whitespace-nowrap [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {TABS.map((tab) => (
             <Link
               key={tab.key}
               href={tab.href}
               className={[
-                'rounded px-3 py-1.5 text-sm font-medium transition-colors',
+                'shrink-0 rounded px-3 py-2 text-sm font-medium transition-colors sm:py-1.5',
                 tab.active
                   ? 'bg-[var(--ink-4)] text-white'
                   : 'text-[var(--fg-4)] hover:bg-[var(--ink-4)]/50 hover:text-[var(--fg-2)]',
@@ -61,8 +61,9 @@ export function TopNav() {
         </nav>
       </div>
 
-      {/* Right: period pills (overview only) + back link */}
-      <div className="flex items-center gap-3">
+      {/* Right: period pills (overview only) + back link — desktop only, the
+          phone gives every pixel to the tabs. */}
+      <div className="hidden shrink-0 items-center gap-3 md:flex">
         {onOverview && (
           <div className="flex items-center gap-1">
             {PERIODS.map((p) => (
