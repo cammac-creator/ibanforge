@@ -12,7 +12,7 @@
  * are spaced 7 s apart, which keeps a daily tick far under the ceiling.
  */
 import { getStatsDB } from './db.js';
-import { generateDraft } from './forum-draft-gen.js';
+import { generateDraft, translateToFr } from './forum-draft-gen.js';
 import {
   MARKETPLACES,
   finalizeCandidate,
@@ -236,11 +236,14 @@ const DRAFTS_PER_SCAN = 6;
 
 async function backfillDrafts(report: ScanReport): Promise<void> {
   const db = getStatsDB();
+  // Two kinds of missing text: no draft at all (full generation), or a draft
+  // that lacks its French mirror (translate it, NEVER regenerate: the draft
+  // may be validated or hand-edited and must survive verbatim).
   const rows = db
     .prepare(
-      `SELECT id, url, source, title, excerpt, lang, notes
+      `SELECT id, url, source, title, excerpt, lang, notes, draft
        FROM forum_threads
-       WHERE (draft IS NULL OR draft = '')
+       WHERE (draft IS NULL OR draft = '' OR draft_fr IS NULL OR draft_fr = '')
          AND status NOT IN ('dismissed', 'posted')
        ORDER BY score DESC, first_seen DESC
        LIMIT ?`,
@@ -253,10 +256,22 @@ async function backfillDrafts(report: ScanReport): Promise<void> {
     excerpt: string | null;
     lang: string;
     notes: string | null;
+    draft: string | null;
   }>;
 
   for (const row of rows) {
     try {
+      const hasDraft = Boolean(row.draft && row.draft.trim());
+      if (hasDraft) {
+        const fr = row.lang === 'fr' ? row.draft : await translateToFr(row.draft as string);
+        if (fr === null) {
+          report.errors.push('drafts: ANTHROPIC_API_KEY absente — traduction sautée');
+          return;
+        }
+        db.prepare(`UPDATE forum_threads SET draft_fr = ?, updated_at = datetime('now') WHERE id = ?`).run(fr, row.id);
+        report.drafts.generated++;
+        continue;
+      }
       const out = await generateDraft({
         title: row.title,
         excerpt: row.excerpt ?? '',
@@ -269,16 +284,17 @@ async function backfillDrafts(report: ScanReport): Promise<void> {
         report.errors.push('drafts: ANTHROPIC_API_KEY absente — génération sautée');
         return;
       }
-      // The operator's seeded summary wins over a generated one; a hand-edited
-      // draft never reaches this loop (the WHERE keeps filled drafts out).
+      // The operator's seeded summary wins over a generated one. draft_fr may
+      // come back empty on the JSON fallback path; the next tick translates it.
       db.prepare(
         `UPDATE forum_threads
            SET draft = ?,
+               draft_fr = ?,
                summary_fr = COALESCE(NULLIF(summary_fr, ''), ?),
                status = CASE WHEN status = 'new' THEN 'drafted' ELSE status END,
                updated_at = datetime('now')
          WHERE id = ?`,
-      ).run(out.draft, out.summaryFr, row.id);
+      ).run(out.draft, out.draftFr, out.summaryFr, row.id);
       report.drafts.generated++;
     } catch (err) {
       report.drafts.failed++;

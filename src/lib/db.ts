@@ -398,6 +398,7 @@ export function getStatsDB(): DatabaseType.Database {
         status TEXT NOT NULL DEFAULT 'new',
         planned_for TEXT,
         draft TEXT,
+        draft_fr TEXT,
         summary_fr TEXT,
         posted_url TEXT,
         notes TEXT,
@@ -422,6 +423,11 @@ export function getStatsDB(): DatabaseType.Database {
         updated_at TEXT NOT NULL DEFAULT (datetime('now'))
       );
     `);
+    // Forums tab: the reply is WRITTEN in the thread's language but READ in
+    // French — two texts, two columns (draft = what gets copied/posted,
+    // draft_fr = the faithful translation shown to the operator).
+    const ftCols = (statsDB.prepare('PRAGMA table_info(forum_threads)').all() as Array<{ name: string }>).map((r) => r.name);
+    if (ftCols.length && !ftCols.includes('draft_fr')) statsDB.exec('ALTER TABLE forum_threads ADD COLUMN draft_fr TEXT');
     // Track request provenance: distinguish MCP HTTP / MCP stdio / REST direct / bot / web
     const reqCols = (statsDB.prepare("PRAGMA table_info(request_log)").all() as Array<{ name: string }>).map(r => r.name);
     if (!reqCols.includes('client_kind')) {

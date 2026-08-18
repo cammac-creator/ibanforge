@@ -25,6 +25,7 @@ interface ForumThread {
   status: string;
   planned_for: string | null;
   draft: string | null;
+  draft_fr: string | null;
   summary_fr: string | null;
   posted_url: string | null;
   notes: string | null;
@@ -201,6 +202,7 @@ export function ForumsApp() {
       status: t.status,
       lang: t.lang,
       draft: t.draft ?? '',
+      draft_fr: t.draft_fr ?? '',
       summary_fr: t.summary_fr ?? '',
       posted_url: t.posted_url ?? '',
       notes: t.notes ?? '',
@@ -439,9 +441,25 @@ export function ForumsApp() {
                 />
               </label>
 
+              {(edit.lang ?? selected.lang) !== 'fr' && (
+                <label className="text-[11px] font-medium uppercase tracking-wide text-[var(--fg-4)]">
+                  Réponse en français (pour te relire — ce texte n&apos;est PAS celui qui part)
+                  <textarea
+                    value={String(edit.draft_fr ?? '')}
+                    onChange={(e) => {
+                      setEdit((x) => ({ ...x, draft_fr: e.target.value }));
+                      setDirty(true);
+                    }}
+                    rows={9}
+                    placeholder="La traduction française arrive automatiquement (radar quotidien, ou « Scanner les forums »)."
+                    className="mt-1 w-full rounded-lg border border-[var(--ink-4)] bg-[var(--ink-0)]/60 p-2 text-sm leading-relaxed text-[var(--fg-2)] placeholder:text-[var(--fg-4)] focus:border-amber-500/50 focus:outline-none"
+                  />
+                </label>
+              )}
+
               <label className="text-[11px] font-medium uppercase tracking-wide text-[var(--fg-4)]">
                 <span className="flex items-center gap-2">
-                  Brouillon de réponse
+                  {(edit.lang ?? selected.lang) === 'fr' ? 'Réponse (le fil est en français)' : 'Version qui sera copiée'}
                   <select
                     value={String(edit.lang ?? selected.lang)}
                     onChange={(e) => {
@@ -462,7 +480,7 @@ export function ForumsApp() {
                     setEdit((x) => ({ ...x, draft: e.target.value }));
                     setDirty(true);
                   }}
-                  rows={10}
+                  rows={(edit.lang ?? selected.lang) === 'fr' ? 10 : 6}
                   placeholder="Le texte prêt à coller sur la plateforme, dans la langue du fil."
                   className="mt-1 w-full rounded-lg border border-[var(--ink-4)] bg-[var(--ink-0)]/60 p-2 font-mono text-xs leading-relaxed text-[var(--fg-2)] placeholder:text-[var(--fg-4)] focus:border-amber-500/50 focus:outline-none"
                 />
@@ -472,12 +490,16 @@ export function ForumsApp() {
                 <button
                   onClick={async () => {
                     const ok = await copyToClipboard(String(edit.draft ?? ''));
-                    say(ok ? 'Brouillon copié.' : 'Copie refusée par le navigateur.');
+                    say(
+                      ok
+                        ? `Réponse copiée (version ${LANG_LABELS[String(edit.lang ?? selected.lang)] ?? ''}).`
+                        : 'Copie refusée par le navigateur.',
+                    );
                   }}
                   disabled={!String(edit.draft ?? '').trim()}
                   className="rounded bg-amber-500 px-3 py-1.5 text-xs font-semibold text-black transition-colors hover:bg-amber-400 disabled:opacity-40"
                 >
-                  Copier le brouillon
+                  Copier la réponse ({LANG_LABELS[String(edit.lang ?? selected.lang)] ?? '?'})
                 </button>
                 <button
                   onClick={() => void save()}

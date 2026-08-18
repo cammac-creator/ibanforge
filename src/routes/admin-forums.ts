@@ -86,13 +86,14 @@ adminForums.post('/v1/admin/forum-threads', async (c) => {
   db.prepare(
     `INSERT INTO forum_threads
        (url, source, title, excerpt, lang, score, score_detail, activity, thread_created_at,
-        status, planned_for, draft, summary_fr, posted_url, notes)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        status, planned_for, draft, draft_fr, summary_fr, posted_url, notes)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(url) DO UPDATE SET
        title = excluded.title,
        status = excluded.status,
        planned_for = COALESCE(excluded.planned_for, forum_threads.planned_for),
        draft = COALESCE(excluded.draft, forum_threads.draft),
+       draft_fr = COALESCE(excluded.draft_fr, forum_threads.draft_fr),
        summary_fr = COALESCE(excluded.summary_fr, forum_threads.summary_fr),
        posted_url = COALESCE(excluded.posted_url, forum_threads.posted_url),
        notes = COALESCE(excluded.notes, forum_threads.notes),
@@ -110,6 +111,7 @@ adminForums.post('/v1/admin/forum-threads', async (c) => {
     status,
     s('planned_for', 10),
     s('draft'),
+    s('draft_fr'),
     s('summary_fr', 2000),
     s('posted_url', 500),
     s('notes', 2000),
@@ -148,6 +150,7 @@ adminForums.patch('/v1/admin/forum-threads/:id', async (c) => {
     vals.push(body.lang);
   }
   takeStr('draft', 10_000);
+  takeStr('draft_fr', 10_000);
   takeStr('summary_fr', 2000);
   takeStr('planned_for', 10);
   takeStr('posted_url', 500);
