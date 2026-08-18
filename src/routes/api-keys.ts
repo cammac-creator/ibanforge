@@ -2,14 +2,24 @@ import { Hono } from 'hono';
 import { timingSafeEqual, createHash } from 'node:crypto';
 import { generateApiKey, validateApiKey, getUsage, revokeApiKey, rotateApiKey } from '../lib/api-keys.js';
 import { getStatsDB } from '../lib/db.js';
-import { getClientProfiles, getBotProfiles } from '../lib/stats.js';
+import { getClientProfiles, getBotProfiles, extractClientIp } from '../lib/stats.js';
+import { isDisposableDomain } from '../lib/disposable-domains.js';
+import {
+  DAILY_KEY_CREATION_LIMIT,
+  VERIFY_WINDOW_DAYS,
+  keyCreationSource,
+  countKeyCreations,
+  recordKeyCreation,
+  createVerificationChallenge,
+  checkVerificationCode,
+} from '../lib/key-creation-guard.js';
 import { getActivation } from '../lib/activation.js';
 import { recordEvent } from '../lib/events.js';
 import { getVisibility, recordVisibility, isVisibilityState } from '../lib/visibility.js';
 import { getOrphans, recordOrphan, resolveOrphan, countPendingOrphans, isOrphanKind } from '../lib/orphan-mail.js';
 import { getWeeklyFacts, saveWeeklyDigest, getWeeklyDigests } from '../lib/weekly-facts.js';
 import { notifyPurchaseTelegram } from '../lib/notify.js';
-import { sendApiKeyEmail, isEmailConfigured } from '../lib/email.js';
+import { sendApiKeyEmail, sendKeyVerificationEmail, isEmailConfigured } from '../lib/email.js';
 
 // Bundle credits — prepaid pools sized for the 3 typical agent stacks.
 // Pricing keeps a fair per-call rate (cheaper than retail x402) so agents
@@ -76,11 +86,73 @@ apiKeys.post('/v1/keys/generate', async (c) => {
   }
 
   // Block disposable / fictional domains unless explicitly allowed (CI tests).
-  if (process.env.IBANFORGE_ADMIN_TEST_KEYS !== 'true' && BLOCKED_EMAIL_DOMAINS.test(email)) {
+  // Two layers: the historical exact-TLD regex, plus the curated suffix +
+  // brand-substring library — the 2026-08-17 signup wave used
+  // tempmail.edu.ge, a suffix the regex could not carry.
+  if (
+    process.env.IBANFORGE_ADMIN_TEST_KEYS !== 'true' &&
+    (BLOCKED_EMAIL_DOMAINS.test(email) || isDisposableDomain(email))
+  ) {
     return c.json({
       error: 'disposable_email',
       message: 'Free tier requires a real email address. example.com, mailinator and other disposable domains are blocked.',
     }, 400);
+  }
+
+  // Per-NETWORK creation guard. The per-email one-per-day rule below is
+  // useless against invented addresses (41 keys in 19 s, each with a fresh
+  // random gmail, 2026-08-17) — so the network is the unit that pays:
+  //   - first key in a week: instant, unchanged ("one step" is the bet);
+  //   - second key onwards: prove you can read the mailbox (6-digit code);
+  //   - more than DAILY_KEY_CREATION_LIMIT in 24h: come back tomorrow.
+  // Fail-open when the IP is unknown: bricking signups on a header change
+  // would cost more than a farm does. The burst still shows on the radar.
+  const clientIp = extractClientIp({
+    'x-forwarded-for': c.req.header('x-forwarded-for') ?? null,
+    'x-real-ip': c.req.header('x-real-ip') ?? null,
+  });
+  const creationSource = keyCreationSource(clientIp);
+  if (creationSource && process.env.IBANFORGE_ADMIN_TEST_KEYS !== 'true') {
+    if (countKeyCreations(creationSource, 24) >= DAILY_KEY_CREATION_LIMIT) {
+      return c.json({
+        error: 'key_creation_limit',
+        message:
+          `At most ${DAILY_KEY_CREATION_LIMIT} free keys per network per day — existing keys keep working. ` +
+          'Need more capacity today? Prepaid credits are instant ($5 per 1,000, POST /v1/credits/buy/1k) ' +
+          'and x402 pay-per-call needs no key at all.',
+      }, 429);
+    }
+    if (countKeyCreations(creationSource, 24 * VERIFY_WINDOW_DAYS) >= 1) {
+      const code = typeof (body as { code?: unknown }).code === 'string' ? String((body as { code?: unknown }).code).trim() : '';
+      if (!code) {
+        const challenge = createVerificationChallenge(email.trim().toLowerCase(), creationSource);
+        const sent = await sendKeyVerificationEmail({ to: email.trim().toLowerCase(), code: challenge });
+        if (!sent) {
+          return c.json({
+            error: 'verification_unavailable',
+            message: 'A verification mail could not be sent right now. Try again in a few minutes.',
+          }, 503);
+        }
+        return c.json({
+          error: 'verification_required',
+          message:
+            'A key was already issued from this network recently, so this one needs a verified mailbox: ' +
+            `we sent a 6-digit code to ${email.trim().toLowerCase()}. ` +
+            'Repeat this request within 15 minutes as {"email": "...", "code": "123456"}.',
+        }, 403);
+      }
+      const check = checkVerificationCode(email.trim().toLowerCase(), code);
+      if (!check.ok) {
+        return c.json({
+          error: 'verification_failed',
+          reason: check.reason,
+          message:
+            check.reason === 'expired' || check.reason === 'no_challenge'
+              ? 'This code is no longer valid — request a key again without a code to receive a fresh one.'
+              : 'Wrong code. Check the most recent mail; the challenge locks after 5 attempts.',
+        }, 403);
+      }
+    }
   }
 
   // Acquisition channel, carried by our own outbound links (?src=npm, the n8n
@@ -99,6 +171,8 @@ apiKeys.post('/v1/keys/generate', async (c) => {
       message: 'Only one API key can be generated per email per day. Try again tomorrow.',
     }, 429);
   }
+
+  if (creationSource) recordKeyCreation(creationSource);
 
   return c.json({
     api_key: result.api_key,

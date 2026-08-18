@@ -117,9 +117,9 @@ describe('POST /mcp — full handshake', () => {
     const listResp = await rpc(app, sessionId, 'tools/list');
     expect(listResp.error).toBeUndefined();
     const tools = (listResp.result as { tools: Array<{ name: string; outputSchema?: unknown; inputSchema?: unknown }> }).tools;
-    expect(tools).toHaveLength(5);
+    expect(tools).toHaveLength(6);
 
-    const expectedNames = ['validate_iban', 'batch_validate_iban', 'lookup_bic', 'check_compliance', 'lookup_ch_clearing'];
+    const expectedNames = ['validate_iban', 'batch_validate_iban', 'lookup_bic', 'check_compliance', 'lookup_ch_clearing', 'send_feedback'];
     for (const expected of expectedNames) {
       const tool = tools.find((t) => t.name === expected);
       expect(tool, `tool ${expected} should be registered`).toBeDefined();

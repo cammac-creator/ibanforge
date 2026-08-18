@@ -672,3 +672,22 @@ describe('getBotProfiles', () => {
     expect(getBotProfiles(90, 1)['synthbot-onehit/1.0']).toBeDefined();
   });
 });
+
+describe('getStats — internal/cohort exclusion', () => {
+  it('drops operations billed to an internal-labeled key from the public aggregates', async () => {
+    // A regrouped abuse cohort (…@cohorte.invalid) once pushed a country to
+    // the all-time #1 spot on the public stats page. Its operations must not
+    // shape public numbers; anonymous rows (no key_prefix) must keep counting.
+    const { generateApiKey } = await import('./api-keys.js');
+    const prefix = generateApiKey(`cohorte-stats-${Date.now()}@cohorte.invalid`)!.key_prefix;
+
+    const before = getStats().by_type.iban_validate.total;
+
+    recordOperation('iban_validate', 'SM', true, 0.005, undefined, prefix);
+    recordOperation('iban_validate', 'SM', true, 0.005);
+
+    const after = getStats().by_type.iban_validate.total;
+    // Only the anonymous one may count.
+    expect(after - before).toBe(1);
+  });
+});

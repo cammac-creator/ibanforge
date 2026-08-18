@@ -540,10 +540,34 @@ export function getSourceStats(days: number): SourceStatsResponse {
 // artefact. Historical rows predate the column and are NULL, so the predicate
 // includes all of them.
 
-function typeStats(type: OperationType): { total: number; success_count: number } {
+/**
+ * Operations billed to internal-labeled keys — our own tests, probes, and
+ * regrouped abuse cohorts (…@cohorte.invalid). Public aggregates drop them
+ * for the same reason the business funnel does: 7,449 farmed validations
+ * once made ES the all-time #1 country on the public stats page. Anonymous
+ * rows (key_prefix NULL) stay counted — they are the x402 demand signal.
+ */
+function internalOpPrefixes(): string[] {
+  return (
+    getStatsDB().prepare('SELECT key_prefix, email FROM api_keys').all() as Array<{
+      key_prefix: string;
+      email: string;
+    }>
+  )
+    .filter((k) => isInternalEmail(k.email))
+    .map((k) => k.key_prefix);
+}
+
+function excludePrefixClause(excluded: string[]): string {
+  if (excluded.length === 0) return '';
+  return ` AND (key_prefix IS NULL OR key_prefix NOT IN (${excluded.map(() => '?').join(',')}))`;
+}
+
+function typeStats(type: OperationType, excluded: string[] = []): { total: number; success_count: number } {
   const row = getStatsDB().prepare(
-    'SELECT COUNT(*) as total, COALESCE(SUM(success), 0) as success_count FROM operations WHERE operation_type = ? AND reject_reason IS NULL'
-  ).get(type) as { total: number; success_count: number };
+    'SELECT COUNT(*) as total, COALESCE(SUM(success), 0) as success_count FROM operations WHERE operation_type = ? AND reject_reason IS NULL' +
+      excludePrefixClause(excluded)
+  ).get(type, ...excluded) as { total: number; success_count: number };
   return row;
 }
 
@@ -557,9 +581,10 @@ function rate(total: number, success: number): number {
 export function getStats(): StatsOverview {
   const db = getStatsDB();
 
-  const ibanVal = typeStats('iban_validate');
-  const ibanBatch = typeStats('iban_batch');
-  const bicLookup = typeStats('bic_lookup');
+  const excluded = internalOpPrefixes();
+  const ibanVal = typeStats('iban_validate', excluded);
+  const ibanBatch = typeStats('iban_batch', excluded);
+  const bicLookup = typeStats('bic_lookup', excluded);
 
   const totalOps = ibanVal.total + ibanBatch.total + bicLookup.total;
 
@@ -576,8 +601,10 @@ export function getStats(): StatsOverview {
   ).get() as { total: number };
 
   const topCountries = db.prepare(
-    'SELECT country_code as country, COUNT(*) as count FROM operations WHERE country_code IS NOT NULL GROUP BY country_code ORDER BY count DESC LIMIT 10'
-  ).all() as Array<{ country: string; count: number }>;
+    'SELECT country_code as country, COUNT(*) as count FROM operations WHERE country_code IS NOT NULL' +
+      excludePrefixClause(excluded) +
+      ' GROUP BY country_code ORDER BY count DESC LIMIT 10'
+  ).all(...excluded) as Array<{ country: string; count: number }>;
 
   const last7 = db.prepare(
     "SELECT date, SUM(total) as total, SUM(revenue_usdc) as revenue FROM daily_stats WHERE date >= date('now', '-7 days') GROUP BY date ORDER BY date DESC"

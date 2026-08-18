@@ -359,6 +359,20 @@ export function getStatsDB(): DatabaseType.Database {
         sent_at  TEXT DEFAULT (datetime('now')),
         PRIMARY KEY (key_hash, month)
       );
+      CREATE TABLE IF NOT EXISTS key_creations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        ip_hash TEXT NOT NULL,
+        created_at TEXT DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_key_creations_ip ON key_creations(ip_hash, created_at);
+      CREATE TABLE IF NOT EXISTS pending_verifications (
+        email TEXT PRIMARY KEY,
+        code_hash TEXT NOT NULL,
+        ip_hash TEXT,
+        attempts INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT DEFAULT (datetime('now')),
+        expires_at TEXT NOT NULL
+      );
     `);
     // Track request provenance: distinguish MCP HTTP / MCP stdio / REST direct / bot / web
     const reqCols = (statsDB.prepare("PRAGMA table_info(request_log)").all() as Array<{ name: string }>).map(r => r.name);

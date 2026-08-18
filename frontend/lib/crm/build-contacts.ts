@@ -22,6 +22,12 @@ const OUTCOMES: readonly string[] = ['en_discussion', 'pas_maintenant', 'pas_int
  * were sitting in the new-customer list beside genuine signups, which is
  * exactly where a false positive costs the most. The plus term is deliberately
  * narrow: his bare address is not a test account.
+ *
+ * Mirrors INTERNAL_EMAIL_RE in src/lib/internal-accounts.ts, with ONE
+ * deliberate asymmetry: @cohorte\.invalid (regrouped abuse cohorts, e.g. the
+ * 2026-08-17 key farm) is internal on the API side — dropped from funnel and
+ * public stats — but intentionally ABSENT here so the cohort keeps ONE
+ * visible dossier in the clients tab instead of vanishing.
  */
 export const INTERNAL_RE =
   /(@ibanforge\.com|@ibanforge\.internal|@ibf-internal\.dev|-probe@|@example\.com|@test\.|test-|-test|smoke|audit|^ca-[a-z]+-?\d*@proton\.me|^credits-buyer$|^stripe-buyer$|^playground|cammac@bluewin\.ch|cam@ogens\.ch|ptibootch@|gpt-store@|claudealainmartin06\+)/i;

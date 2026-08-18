@@ -69,6 +69,51 @@ function ensureFeedbackTable() {
 ensureFeedbackTable();
 
 /**
+ * Shared insert behind POST /v1/feedback and the MCP send_feedback tool.
+ * The MCP path has no HTTP context in the tool callback, so ipHash is null
+ * there — the column is nullable for exactly that reason.
+ */
+export function recordFeedbackRow(p: {
+  tx_hash?: string | null;
+  endpoint?: string | null;
+  error_type: string;
+  expected?: unknown;
+  got?: unknown;
+  notes?: string | null;
+  contact?: string | null;
+  agent?: string | null;
+  ipHash: string | null;
+}): number {
+  const info = getStatsDB()
+    .prepare(
+      `INSERT INTO feedback (tx_hash, endpoint, error_type, expected, got, notes, contact, agent, ip_hash)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .run(
+      p.tx_hash ?? null,
+      p.endpoint ?? null,
+      p.error_type,
+      p.expected !== undefined ? JSON.stringify(p.expected) : null,
+      p.got !== undefined ? JSON.stringify(p.got) : null,
+      p.notes ?? null,
+      p.contact ?? null,
+      p.agent ?? null,
+      p.ipHash,
+    );
+  return Number(info.lastInsertRowid);
+}
+
+/** Error types a report may carry — shared with the MCP tool's schema. */
+export const FEEDBACK_ERROR_TYPES = [
+  'wrong_validation',
+  'stale_bic',
+  'missing_data',
+  'incorrect_classification',
+  'latency',
+  'other',
+] as const;
+
+/**
  * POST /v1/feedback — free, no auth, no payment
  *
  * Lets agents and humans report incorrect data, missing entries, latency
@@ -125,32 +170,27 @@ feedback.post('/v1/feedback', async (c) => {
     c.req.header('x-real-ip') ??
     'unknown';
 
-  const db = getStatsDB();
-  const stmt = db.prepare(
-    `INSERT INTO feedback (tx_hash, endpoint, error_type, expected, got, notes, contact, agent, ip_hash)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  );
-  const info = stmt.run(
-    body.tx_hash ?? null,
-    body.endpoint ?? null,
-    errorType,
-    body.expected !== undefined ? JSON.stringify(body.expected) : null,
-    body.got !== undefined ? JSON.stringify(body.got) : null,
-    body.notes ?? null,
-    body.contact ?? null,
-    body.agent ?? null,
-    hashIp(ip),
-  );
+  const rowId = recordFeedbackRow({
+    tx_hash: body.tx_hash ?? null,
+    endpoint: body.endpoint ?? null,
+    error_type: errorType,
+    expected: body.expected,
+    got: body.got,
+    notes: body.notes ?? null,
+    contact: body.contact ?? null,
+    agent: body.agent ?? null,
+    ipHash: hashIp(ip),
+  });
 
   return c.json(
     {
       ok: true,
-      id: info.lastInsertRowid,
+      id: rowId,
       message:
         'Feedback received. We review reports daily; if a refund is owed for tx_hash, you will receive it on-chain within 72h.',
       status: 'open',
       next_steps: {
-        check_status: `GET /v1/feedback/${info.lastInsertRowid}`,
+        check_status: `GET /v1/feedback/${rowId}`,
         documentation: 'https://ibanforge.com/docs#feedback',
       },
     },

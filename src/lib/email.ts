@@ -138,6 +138,31 @@ export async function sendQuotaWarningEmail(p: QuotaWarningInput & { to: string 
 }
 
 /**
+ * 6-digit code for the second-key-per-network verification step. Plain and
+ * short on purpose: the reader may be an agent parsing the mailbox — the code
+ * appears alone on its own line so a regex finds it without heuristics.
+ */
+export async function sendKeyVerificationEmail(p: { to: string; code: string }): Promise<boolean> {
+  const subject = `${p.code} is your IBANforge verification code`;
+  const text =
+    `Your IBANforge verification code:\n\n${p.code}\n\n` +
+    `Valid for 15 minutes. Repeat your key request with {"email": "...", "code": "${p.code}"}.\n\n` +
+    `You received this because a second API key was requested from your network today. ` +
+    `If that was not you, ignore this mail — no key was created.\n\nIBANforge`;
+  const html = `<!DOCTYPE html><html><body style="margin:0;background:#0f0f13;padding:28px;font-family:-apple-system,Segoe UI,Roboto,sans-serif;color:#d4d4d8">
+  <div style="max-width:560px;margin:0 auto;background:#16161b;border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:30px 32px">
+    <div style="font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:#71717a;font-family:monospace">IBANforge</div>
+    <h1 style="color:#fafafa;font-size:22px;margin:10px 0 6px">Your verification code</h1>
+    <p style="font-size:32px;letter-spacing:.3em;font-family:monospace;color:#fafafa;margin:18px 0">${p.code}</p>
+    <p style="color:#a1a1aa;font-size:14px;margin:0 0 10px">Valid 15 minutes. Repeat your key request with <code style="color:#fafafa">{"email": "...", "code": "${p.code}"}</code>.</p>
+    <p style="color:#71717a;font-size:12px;margin:14px 0 0">You received this because a second API key was requested from your network today. If that was not you, ignore this mail — no key was created.</p>
+  </div></body></html>`;
+  const ok = await sendViaRelay({ to: p.to, subject, text, html });
+  if (!ok) console.error('[email] verification code not delivered to', p.to);
+  return ok;
+}
+
+/**
  * Editor/OEM subscription welcome — same delivery mechanics as
  * sendApiKeyEmail but worded for a monthly allowance that renews, not a
  * prepaid credit pool.

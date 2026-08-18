@@ -472,3 +472,81 @@ describe('POST /v1/admin/keys/relabel — regroup abuse cohorts', () => {
     expect(untouched.email).toBe(`real-${suffix}@example.com`);
   });
 });
+
+describe('POST /v1/keys/generate — per-network creation guard', () => {
+  // The guard is skipped when IBANFORGE_ADMIN_TEST_KEYS is set (the rest of
+  // the suite generates keys freely), so these tests unset it and identify
+  // themselves through X-Forwarded-For instead.
+  const gen = (app: Hono, email: string, ip: string, code?: string) =>
+    app.request('/v1/keys/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': ip },
+      body: JSON.stringify(code ? { email, code } : { email }),
+    });
+
+  it('first key from a network stays one-step; the second demands a mailbox code; the code unlocks it', async () => {
+    delete process.env.IBANFORGE_ADMIN_TEST_KEYS;
+    const app = makeApp();
+    const ip = `198.51.100.${(Date.now() % 200) + 1}`;
+    const suffix = Date.now();
+
+    const first = await gen(app, `guard-a-${suffix}@alpha-corp.example.net`, ip);
+    expect(first.status).toBe(201);
+
+    // No mail relay is configured in tests, so the route cannot deliver the
+    // code and answers 503 (fail-CLOSED: a second key never slips through
+    // unverified just because mail is down). In production the relay is set
+    // and this leg answers 403 verification_required with the code mailed.
+    const second = await gen(app, `guard-b-${suffix}@alpha-corp.example.net`, ip);
+    expect(second.status).toBe(503);
+    expect(((await second.json()) as { error: string }).error).toBe('verification_unavailable');
+
+    // Read the code straight from the challenge we just planted (the mail
+    // relay is unset in tests). checkVerificationCode consumes it, so plant a
+    // fresh one exactly like the route did.
+    const { createVerificationChallenge } = await import('../lib/key-creation-guard.js');
+    const code = createVerificationChallenge(`guard-b-${suffix}@alpha-corp.example.net`, 'test');
+    const unlocked = await gen(app, `guard-b-${suffix}@alpha-corp.example.net`, ip, code);
+    expect(unlocked.status).toBe(201);
+  });
+
+  it('refuses the fourth key of the day from one network with 429 and a paid path', async () => {
+    delete process.env.IBANFORGE_ADMIN_TEST_KEYS;
+    const app = makeApp();
+    const ip = `198.51.100.${(Date.now() % 200) + 2}`;
+    const suffix = Date.now() + 1;
+    const { createVerificationChallenge } = await import('../lib/key-creation-guard.js');
+
+    expect((await gen(app, `cap-1-${suffix}@alpha-corp.example.net`, ip)).status).toBe(201);
+    for (const n of [2, 3]) {
+      const email = `cap-${n}-${suffix}@alpha-corp.example.net`;
+      const code = createVerificationChallenge(email, 'test');
+      expect((await gen(app, email, ip, code)).status).toBe(201);
+    }
+
+    const fourth = await gen(app, `cap-4-${suffix}@alpha-corp.example.net`, ip);
+    expect(fourth.status).toBe(429);
+    const body = (await fourth.json()) as { error: string; message: string };
+    expect(body.error).toBe('key_creation_limit');
+    expect(body.message).toContain('credits');
+  });
+
+  it('keeps disposable suffixes out at creation — the wave used tempmail.edu.ge', async () => {
+    delete process.env.IBANFORGE_ADMIN_TEST_KEYS;
+    const app = makeApp();
+    const res = await gen(app, `x-${Date.now()}@tempmail.edu.ge`, '198.51.100.250');
+    expect(res.status).toBe(400);
+    expect(((await res.json()) as { error: string }).error).toBe('disposable_email');
+  });
+
+  it('fails open when no client IP is resolvable — a header change must never brick signups', async () => {
+    delete process.env.IBANFORGE_ADMIN_TEST_KEYS;
+    const app = makeApp();
+    const res = await app.request('/v1/keys/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: `noip-${Date.now()}@alpha-corp.example.net` }),
+    });
+    expect(res.status).toBe(201);
+  });
+});

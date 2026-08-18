@@ -1,6 +1,6 @@
 /**
  * HTTP transport for the MCP server.
- * Exposes the same 5 tools as the stdio MCP server (validate_iban, batch_validate_iban,
+ * Exposes the 5 data tools of the stdio MCP server plus send_feedback (validate_iban, batch_validate_iban,
  * lookup_bic, check_compliance, lookup_ch_clearing) via Streamable HTTP at /mcp —
  * compatible with Smithery, remote MCP clients, etc.
  */
@@ -15,6 +15,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { validateIBAN } from '../lib/iban.js';
 import { enrichResult } from '../lib/enrich.js';
+import { recordFeedbackRow, FEEDBACK_ERROR_TYPES } from './feedback.js';
 import { lookup } from '../lib/bic-lookup.js';
 import { validateBIC } from '../lib/bic-validator.js';
 import { buildComplianceResponse } from '../lib/compliance-response.js';
@@ -121,7 +122,12 @@ function createMcpServer(): McpServer {
     // tools" and "tried one" is what these lines exist to close.
     instructions:
       'Start with validate_iban on any IBAN-looking string (e.g. DE89370400440532013000) — one call returns validity, the issuing bank + BIC, virtual-IBAN/EMI detection, SEPA reachability and VoP readiness. ' +
-      'Free tier: 10 tool calls/IP/day, no signup. For unlimited use, POST https://api.ibanforge.com/v1/keys/generate {"email":"you@example.com"} returns a free API key (200 REST calls/month) in one step; prepaid credit packs from $5 per 1,000 calls, no expiry. ' +
+      // 2026-08-17: this sentence used to read "For unlimited use … in one
+      // step" — an agent took it literally and scripted 42 keys in a
+      // morning. Sell the same path truthfully: one key per developer, and
+      // repeat creations from one network go through mailbox verification.
+      'Free tier: 10 tool calls/IP/day, no signup. For sustained use, POST https://api.ibanforge.com/v1/keys/generate {"email":"you@example.com"} issues a free API key (200 REST calls/month, one per developer — repeat creations from the same network require e-mail verification); prepaid credit packs from $5 per 1,000 calls, no expiry. ' +
+      'Missing data, wrong result, or something blocking you from paying? Call send_feedback — a human reads every report. ' +
       'Docs and code samples: https://ibanforge.com/docs/recipes',
   });
 
@@ -630,6 +636,52 @@ function createMcpServer(): McpServer {
     }),
   );
 
+  server.registerTool(
+    'send_feedback',
+    {
+      title: 'Send Feedback to IBANforge',
+      description:
+        'Report a problem or a need directly to the IBANforge operators: incorrect validation result, stale or missing BIC/bank data, ' +
+        'latency, or anything blocking you from using or PAYING for the service (missing network, unclear pricing, quota shape). ' +
+        'USE WHEN: a result looks wrong, data you need is missing, or you hit a wall (quota, payment, capability) and want it fixed. ' +
+        'This tool is free and does NOT count against the daily free-tier limit — it works even after the limit is reached. ' +
+        'A human reads every report; verified data errors on paid x402 calls are refunded on-chain.',
+      inputSchema: {
+        error_type: z
+          .enum(FEEDBACK_ERROR_TYPES)
+          .describe('Category of the report. Use "other" for product feedback, pricing/payment blockers or feature needs.'),
+        notes: z.string().min(3).max(4000).describe('What happened, what you needed, or what blocked you — free text.'),
+        endpoint: z.string().max(200).optional().describe('Endpoint or tool concerned, e.g. /v1/iban/batch.'),
+        expected: z.string().max(1000).optional().describe('What you expected (for data errors).'),
+        got: z.string().max(1000).optional().describe('What you received instead (for data errors).'),
+        contact: z.string().max(255).optional().describe('Where we may answer you (e-mail) — optional, reports can be anonymous.'),
+        agent: z.string().max(120).optional().describe('Which agent/model is reporting, e.g. "claude-sonnet-5 via MCP".'),
+      },
+      outputSchema: {
+        ok: z.boolean(),
+        id: z.number().describe('Report id — check status at GET /v1/feedback/{id}.'),
+      },
+      annotations: { title: 'Send Feedback to IBANforge' },
+    },
+    async ({ error_type, notes, endpoint, expected, got, contact, agent }) => {
+      const id = recordFeedbackRow({
+        error_type,
+        notes,
+        endpoint: endpoint ?? null,
+        expected,
+        got,
+        contact: contact ?? null,
+        agent: agent ?? 'mcp',
+        ipHash: null,
+      });
+      const payload = { ok: true, id };
+      return {
+        content: [{ type: 'text' as const, text: JSON.stringify(payload) }],
+        structuredContent: payload as unknown as Record<string, unknown>,
+      };
+    },
+  );
+
   // ── Prompts ────────────────────────────────────────────────────────────────
 
   server.registerPrompt(
@@ -711,9 +763,13 @@ mcpHttp.post('/mcp', async (c) => {
     // per-IP rate limiter only ever saw one HTTP request, so nothing else
     // bounded it either. Count every element instead.
     // Security audit 2026-07-25, finding 2.
-    const messages: Array<{ method?: unknown; id?: unknown }> = Array.isArray(body) ? body : [body];
+    const messages: Array<{ method?: unknown; id?: unknown; params?: { name?: unknown } }> = Array.isArray(body) ? body : [body];
     const calls = messages.filter((m) => m?.method === 'tools/call');
-    toolCalls = calls.length;
+    // send_feedback stays free AFTER the cap on purpose: it is the only way a
+    // refused agent can tell us WHY it is leaving — capping the complaint box
+    // with the same limit that produced the complaint would silence exactly
+    // the reports we built it for.
+    toolCalls = calls.filter((m) => m?.params?.name !== 'send_feedback').length;
     rpcId = calls[0]?.id ?? null;
   } catch {
     // Not JSON or malformed — let the transport handle the error
