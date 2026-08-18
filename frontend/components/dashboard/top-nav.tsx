@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useTranslations, useLocale } from 'next-intl';
+import { CommandPalette } from './cmdk';
 
 const PERIODS = [7, 30, 90];
 
@@ -60,6 +61,17 @@ export function TopNav() {
           ))}
         </nav>
       </div>
+
+      {/* Search everywhere: ⌘K on a keyboard, this button on a thumb. */}
+      <button
+        type="button"
+        onClick={() => window.dispatchEvent(new Event('ibf-open-cmdk'))}
+        title="Rechercher un client ou un contact (⌘K)"
+        className="shrink-0 rounded px-2 py-2 text-[var(--fg-4)] transition-colors hover:bg-[var(--ink-4)]/50 hover:text-[var(--fg-2)] sm:py-1.5"
+      >
+        🔍
+      </button>
+      <CommandPalette />
 
       {/* Right: period pills (overview only) + back link — desktop only, the
           phone gives every pixel to the tabs. */}

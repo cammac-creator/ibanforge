@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { chipOfDossier, heatOfDossier, sortDossiers, type ClientDossier, type SortKey, type Verdict } from '@/lib/crm/client-dossiers';
 import { flameOf } from '@/lib/crm/heat';
 import { fold } from '@/lib/crm/mail-rows';
@@ -64,6 +65,20 @@ export function ClientsApp({ dossiers, locale, windowDays = 90 }: { dossiers: Cl
   const [filter, setFilter] = useState<Filter>('used');
   const [query, setQuery] = useState('');
   const [openId, setOpenId] = useState<string | null>(null);
+
+  // ⌘K deep link: /clients?open=<email> lands with that dossier open. Filter
+  // widens to 'all' so a silent-key customer is not hidden by the default view.
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    const wanted = searchParams.get('open')?.toLowerCase();
+    if (!wanted) return;
+    const hit = dossiers.find((d) => d.id === wanted || d.email.toLowerCase() === wanted);
+    if (hit) {
+      setFilter('all');
+      setOpenId(hit.id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const counts = useMemo(() => {
     const c = {} as Record<Verdict, number>;
