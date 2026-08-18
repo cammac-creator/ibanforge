@@ -41,6 +41,7 @@
  */
 
 import { pathToFileURL } from 'node:url';
+import { runDiscoverabilityCanary } from './discoverability-canary.js';
 
 const API_BASE = process.env.IBANFORGE_API_BASE ?? 'https://api.ibanforge.com';
 const STATS_TOKEN = process.env.STATS_TOKEN ?? '';
@@ -531,6 +532,17 @@ async function main(): Promise<void> {
     recoBlock = `🤖 RECOMMANDABILITÉ IA\n(mesure indisponible cette semaine : ${(err as Error).message})`;
   }
 
+  // Piste C (18/08) : sonder l'API déployée comme un crawler de registre.
+  // Le x402 tourne en free mode partout sauf en prod, donc AUCUN test ne
+  // peut attraper une régression du « 402 universel » — seul ce canari le voit.
+  console.log('[veille] running discoverability canary…');
+  let canaryBlock: string;
+  try {
+    canaryBlock = await runDiscoverabilityCanary();
+  } catch (err) {
+    canaryBlock = `🕯️ CANARI DÉCOUVRABILITÉ\n(canari indisponible cette semaine : ${(err as Error).message})`;
+  }
+
   const report = [
     `🔔 VEILLE IBANFORGE — ${frDate()}`,
     `Semaine ${w.range}`,
@@ -542,6 +554,8 @@ async function main(): Promise<void> {
     researchBlock,
     '',
     recoBlock,
+    '',
+    canaryBlock,
     '',
     '— Dory · veille auto hebdomadaire',
   ].join('\n');
