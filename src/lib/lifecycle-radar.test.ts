@@ -55,6 +55,7 @@ describe('classifiers', () => {
       'gpt-store@openai.com',
       'ca-alice@proton.me',
       'ca-bot-42@proton.me',
+      'ferme-espagnole@cohorte.invalid',
       '',
     ]) {
       expect(isInternal(e), e).toBe(true);

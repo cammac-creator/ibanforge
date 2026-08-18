@@ -4,6 +4,7 @@ import { apiKeyMiddleware } from './api-key.js';
 import { ibanValidate } from '../routes/iban-validate.js';
 import { ibanBatch } from '../routes/iban-batch.js';
 import { generateApiKey, generateCreditKey, validateApiKey, getUsage, checkAndIncrementQuota } from '../lib/api-keys.js';
+import { getStatsDB } from '../lib/db.js';
 import type { HonoEnv } from '../types.js';
 
 function makeApp() {
@@ -294,6 +295,11 @@ describe('apiKeyMiddleware — paywall cause surfaced in the 402 body', () => {
     // A daily cron cannot catch a client that burns 190 of 200 calls in 12
     // minutes (2026-07-23, funnel audit). The trigger has to be in-request.
     const key = generateApiKey(`quota80-mw-${RUN_ID}@example.com`, 10)!.api_key;
+    // Backdate past the too-new guard: a key younger than 24h is deliberately
+    // never mailed (invented-address waves cross 80% minutes after signup).
+    getStatsDB()
+      .prepare("UPDATE api_keys SET created_at = datetime('now', '-3 days') WHERE key_hash = ?")
+      .run(validateApiKey(key).keyHash);
     const app = makeApp();
     const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
 

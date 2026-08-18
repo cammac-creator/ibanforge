@@ -293,6 +293,63 @@ apiKeys.post('/v1/admin/keys/import', async (c) => {
   return c.json({ imported: true, key_prefix: keyPrefix, email: email.trim().toLowerCase(), monthly_limit: monthlyLimit ?? 200 }, 201);
 });
 
+/**
+ * Regroup a set of keys under one synthetic contact address.
+ *
+ * The CRM builds one dossier per address, so relabeling N abuse keys to a
+ * single cohort contact collapses N fake "customers" into one named row —
+ * without deleting anything: usage history, quotas and key hashes stay
+ * untouched, only the display identity changes.
+ *
+ * Conventions for the cohort address:
+ *  - use an UNROUTABLE TLD (e.g. cohort-name@cohorte.invalid) so no automated
+ *    mail can ever target the cohort (quota-notice refuses those outright);
+ *  - 'cohorte.invalid' is also on the lifecycle radar's internal list, so a
+ *    regrouped key can never resurface as a commercial lead.
+ *
+ * Reversibility: the response returns the previous (key_prefix, email) pairs.
+ * The caller stores that mapping BEFORE relying on the new labels.
+ */
+apiKeys.post('/v1/admin/keys/relabel', async (c) => {
+  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
+
+  const body = (await c.req.json().catch(() => null)) as {
+    key_prefixes?: unknown;
+    email?: unknown;
+  } | null;
+  const prefixes = Array.isArray(body?.key_prefixes)
+    ? body.key_prefixes.filter((p): p is string => typeof p === 'string' && p.length > 0)
+    : [];
+  const email = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : '';
+
+  if (prefixes.length === 0 || prefixes.length > 200) {
+    return c.json({ error: 'key_prefixes must be a non-empty array (max 200)' }, 400);
+  }
+  if (!email.includes('@')) {
+    return c.json({ error: 'email must contain @' }, 400);
+  }
+
+  const db = getStatsDB();
+  const read = db.prepare('SELECT key_prefix, email FROM api_keys WHERE key_prefix = ?');
+  const write = db.prepare('UPDATE api_keys SET email = ? WHERE key_prefix = ?');
+
+  const previous: Array<{ key_prefix: string; email: string }> = [];
+  const notFound: string[] = [];
+  for (const prefix of prefixes) {
+    const rows = read.all(prefix) as Array<{ key_prefix: string; email: string }>;
+    if (rows.length === 0) {
+      notFound.push(prefix);
+      continue;
+    }
+    previous.push(...rows);
+    write.run(email, prefix);
+  }
+
+  return c.json({ relabeled: previous.length, email, not_found: notFound, previous });
+});
+
 apiKeys.get('/v1/admin/keys', (c) => {
   if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
     return c.json({ error: 'unauthorized' }, 401);

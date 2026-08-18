@@ -302,6 +302,21 @@ export function refundCredit(keyHash: string, units = 1): void {
 export const QUOTA_NOTICE_RATIO = 0.8;
 
 /**
+ * Age of a key in hours, from api_keys.created_at (stored in UTC by
+ * datetime('now')). null when the key or the timestamp is missing — callers
+ * must treat null as "unknown", not as "old".
+ */
+export function getKeyAgeHours(keyHash: string): number | null {
+  const row = getStatsDB()
+    .prepare('SELECT created_at FROM api_keys WHERE key_hash = ?')
+    .get(keyHash) as { created_at?: string } | undefined;
+  if (!row?.created_at) return null;
+  const t = Date.parse(row.created_at.replace(' ', 'T') + 'Z');
+  if (Number.isNaN(t)) return null;
+  return (Date.now() - t) / 3_600_000;
+}
+
+/**
  * Claim the right to warn this key once for this month. Returns true exactly
  * once per (key, month): the PRIMARY KEY makes the second caller a no-op, so a
  * burst of calls above the threshold cannot produce a burst of emails.

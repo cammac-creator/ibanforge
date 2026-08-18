@@ -394,3 +394,81 @@ describe('/v1/admin/keys — a prepaid customer is not a dormant one', () => {
     clean();
   });
 });
+
+describe('POST /v1/admin/keys/relabel — regroup abuse cohorts', () => {
+  it('rejects requests without the admin secret', async () => {
+    const app = makeApp();
+    const res = await app.request('/v1/admin/keys/relabel', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key_prefixes: ['ifk_whatever'], email: 'c@cohorte.invalid' }),
+    });
+    expect(res.status).toBe(401);
+  });
+
+  it('rejects an empty prefix list and an address without @', async () => {
+    const app = makeApp();
+    for (const body of [
+      { key_prefixes: [], email: 'c@cohorte.invalid' },
+      { key_prefixes: ['ifk_x'], email: 'not-an-address' },
+    ]) {
+      const res = await app.request('/v1/admin/keys/relabel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Secret': 'correct-horse-battery-staple' },
+        body: JSON.stringify(body),
+      });
+      expect(res.status).toBe(400);
+    }
+  });
+
+  it('relabels listed keys, returns the previous mapping, and lists unknown prefixes', async () => {
+    const app = makeApp();
+    const db = getStatsDB();
+    const suffix = Date.now();
+
+    // Two invented farm keys + one bystander that must NOT be touched.
+    const gen = async (email: string) => {
+      const res = await app.request('/v1/keys/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const json = (await res.json()) as { key_prefix: string };
+      return json.key_prefix;
+    };
+    const farm1 = await gen(`aaaa-${suffix}@example.com`);
+    const farm2 = await gen(`bbbb-${suffix}@example.com`);
+    const bystander = await gen(`real-${suffix}@example.com`);
+
+    const res = await app.request('/v1/admin/keys/relabel', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Secret': 'correct-horse-battery-staple' },
+      body: JSON.stringify({
+        key_prefixes: [farm1, farm2, 'ifk_absent000'],
+        email: 'cohorte-test@cohorte.invalid',
+      }),
+    });
+    expect(res.status).toBe(200);
+    const json = (await res.json()) as {
+      relabeled: number;
+      not_found: string[];
+      previous: Array<{ key_prefix: string; email: string }>;
+    };
+    expect(json.relabeled).toBe(2);
+    expect(json.not_found).toEqual(['ifk_absent000']);
+    // The previous mapping is the undo path — it must carry the old addresses.
+    expect(json.previous.map((p) => p.email).sort()).toEqual(
+      [`aaaa-${suffix}@example.com`, `bbbb-${suffix}@example.com`].sort(),
+    );
+
+    const relabeled = db
+      .prepare('SELECT email FROM api_keys WHERE key_prefix IN (?, ?)')
+      .all(farm1, farm2) as Array<{ email: string }>;
+    expect(relabeled.every((r) => r.email === 'cohorte-test@cohorte.invalid')).toBe(true);
+
+    const untouched = db.prepare('SELECT email FROM api_keys WHERE key_prefix = ?').get(bystander) as {
+      email: string;
+    };
+    expect(untouched.email).toBe(`real-${suffix}@example.com`);
+  });
+});

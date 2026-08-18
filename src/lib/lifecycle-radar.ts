@@ -98,7 +98,10 @@ export function emailDomain(email: string): string {
   return at === -1 ? '' : email.slice(at + 1).trim().toLowerCase();
 }
 
-const INTERNAL_DOMAINS = ['ibanforge.com', 'example.com', 'example.org'];
+// 'cohorte.invalid' is the synthetic contact domain for abuse cohorts
+// regrouped via POST /v1/admin/keys/relabel — .invalid can never receive
+// mail, and a farmed key must never resurface as a commercial lead.
+const INTERNAL_DOMAINS = ['ibanforge.com', 'example.com', 'example.org', 'cohorte.invalid'];
 // Operator accounts, held as sha256 prefixes: this repo is public and must
 // not carry a personal address in the clear (the class that keeps coming
 // back). Extend privately via RADAR_INTERNAL_EMAILS (comma-separated, env).
