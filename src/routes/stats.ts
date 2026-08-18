@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { timingSafeEqual } from 'node:crypto';
 import { getStats, getStatsHistory, getHourlyStats, getErrorStats, getPatternStats, getStatusByPath, getBusinessFunnel, getSourceStats, getRejectionStats } from '../lib/stats.js';
 import { getEvents } from '../lib/events.js';
 import { getEntryCount } from '../lib/bic-lookup.js';
@@ -9,11 +10,19 @@ const stats = new Hono();
  * Stats endpoints are protected by a bearer token (STATS_TOKEN env var).
  * The frontend dashboard passes this token when fetching stats.
  * If STATS_TOKEN is not set, stats are disabled (returns 403).
+ *
+ * Constant-time compare: a plain `===` short-circuits on the first differing
+ * byte and leaks the token's length. This file was the only one of the four
+ * STATS_TOKEN guards using `===` (admin-business/-scanners/-revenue already
+ * used timingSafeEqual), and /stats is exempt from the rate limiter, so it
+ * was the softest of the group. Mirror the others.
  */
 function checkAuth(authHeader: string | undefined): boolean {
   const token = process.env.STATS_TOKEN;
-  if (!token) return false;
-  return authHeader === `Bearer ${token}`;
+  if (!token || !authHeader) return false;
+  const expected = Buffer.from(`Bearer ${token}`);
+  const got = Buffer.from(authHeader);
+  return expected.length === got.length && timingSafeEqual(expected, got);
 }
 
 stats.get('/stats', (c) => {

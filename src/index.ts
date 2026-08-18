@@ -5,6 +5,7 @@ import { Hono } from 'hono';
 import { compress } from 'hono/compress';
 import { cors } from 'hono/cors';
 import { logger } from 'hono/logger';
+import { bodyLimit } from 'hono/body-limit';
 import { ibanValidate } from './routes/iban-validate.js';
 import { ibanFormat } from './routes/iban-format.js';
 import { ibanBatch } from './routes/iban-batch.js';
@@ -38,6 +39,7 @@ import { stripeSuccess } from './routes/stripe-success.js';
 import { ibanStructure } from './routes/iban-structure.js';
 import { rateLimitMiddleware } from './middleware/rate-limit.js';
 import { recordRequest, classifyClient, hashIp, extractClientIp, purgeOldRequestLog, purgeTerminatedKeyTelemetry } from './lib/stats.js';
+import { purgeExpiredVerifications } from './lib/key-creation-guard.js';
 import { startLifecycleRadar } from './lib/lifecycle-radar-server.js';
 import { recordEvent } from './lib/events.js';
 import { bicGuardMiddleware, iidGuardMiddleware } from './middleware/identifier-guard.js';
@@ -163,6 +165,16 @@ app.use('*', async (c, next) => {
   }
 });
 app.use('*', rateLimitMiddleware());
+// Cap request body size. Without this, c.req.json() buffers the whole body in
+// memory before any auth/validation — a single multi-hundred-MB POST could OOM
+// the small Railway container. 256 KB is ~12x the largest legitimate payload
+// (a 100-IBAN batch is ~5 KB, a Stripe webhook ~15 KB) while turning a memory
+// DoS into a clean 413. Placed after the rate limiter so a flood is throttled
+// before we even read the body.
+app.use('*', bodyLimit({
+  maxSize: 256 * 1024,
+  onError: (c) => c.json({ error: 'payload_too_large', message: 'Request body exceeds 256 KB.' }, 413),
+}));
 app.use('*', compress());
 
 // Track all HTTP requests for dashboard analytics
@@ -587,6 +599,7 @@ try {
   if (purged > 0) console.log(`Retention: purged ${purged} request_log rows older than 12 months`);
   const purgedTerminated = purgeTerminatedKeyTelemetry(30);
   if (purgedTerminated > 0) console.log(`Retention: purged ${purgedTerminated} request_log rows of terminated keys (DPA 4.7)`);
+  purgeExpiredVerifications();
 } catch (err) {
   console.error('Retention purge failed at boot:', err);
 }
@@ -594,6 +607,7 @@ setInterval(() => {
   try {
     purgeOldRequestLog(12);
     purgeTerminatedKeyTelemetry(30);
+    purgeExpiredVerifications();
   } catch (err) {
     console.error('Retention purge failed:', err);
   }

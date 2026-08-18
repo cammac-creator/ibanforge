@@ -556,4 +556,25 @@ describe('POST /v1/keys/generate — per-network creation guard', () => {
     });
     expect(res.status).toBe(201);
   });
+
+  it('stops mailing verification codes to the same address after the daily cap (anti-bombing)', async () => {
+    delete process.env.IBANFORGE_ADMIN_TEST_KEYS;
+    const app = makeApp();
+    const ts = Date.now();
+    const ip = `198.53.${(ts % 240) + 1}.${(Math.floor(ts / 240) % 240) + 1}`;
+    // One real key on this network so the second-key verification branch fires.
+    expect((await gen(app, `bomb-owner-${ts}@alpha-corp.example.net`, ip)).status).toBe(201);
+
+    const victim = `victim-${ts}@bank.example.net`;
+    const { VERIFICATION_SENDS_PER_EMAIL_DAY } = await import('../lib/key-creation-guard.js');
+    // The mail relay is unset in tests, so each allowed attempt answers 503
+    // (verification_unavailable) — but it still counts as a send.
+    for (let i = 0; i < VERIFICATION_SENDS_PER_EMAIL_DAY; i++) {
+      expect((await gen(app, victim, ip)).status).toBe(503);
+    }
+    // One more request for the same victim is refused BEFORE any mail: 429.
+    const capped = await gen(app, victim, ip);
+    expect(capped.status).toBe(429);
+    expect(((await capped.json()) as { error: string }).error).toBe('verification_rate_limited');
+  });
 });

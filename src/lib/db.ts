@@ -373,6 +373,14 @@ export function getStatsDB(): DatabaseType.Database {
         created_at TEXT DEFAULT (datetime('now')),
         expires_at TEXT NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS verification_sends (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        ip_hash TEXT,
+        email_hash TEXT NOT NULL,
+        created_at TEXT DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_verification_sends_ip ON verification_sends(ip_hash, created_at);
+      CREATE INDEX IF NOT EXISTS idx_verification_sends_email ON verification_sends(email_hash, created_at);
     `);
     // Track request provenance: distinguish MCP HTTP / MCP stdio / REST direct / bot / web
     const reqCols = (statsDB.prepare("PRAGMA table_info(request_log)").all() as Array<{ name: string }>).map(r => r.name);

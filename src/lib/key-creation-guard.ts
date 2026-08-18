@@ -28,6 +28,20 @@ export const VERIFY_WINDOW_DAYS = 7;
 export const VERIFICATION_TTL_MINUTES = 15;
 export const VERIFICATION_MAX_ATTEMPTS = 5;
 
+/**
+ * Verification codes are mailed to an address the CALLER supplies, so the send
+ * path is a mail-bombing vector: the daily key-creation cap only counts
+ * SUCCESSFUL creations (recordKeyCreation), while a code is mailed on the
+ * challenge branch that returns 403 before ever creating a key. So the send is
+ * bounded here instead, on its own append-only ledger:
+ *   - per RECIPIENT: nobody needs a 4th code in a day — this kills targeting
+ *     one victim's inbox;
+ *   - per SOURCE: generous enough for a shared NAT (an office/university sits
+ *     behind one public IP) yet a hard ceiling on a distributed spray.
+ */
+export const VERIFICATION_SENDS_PER_EMAIL_DAY = 3;
+export const VERIFICATION_SENDS_PER_SOURCE_DAY = 15;
+
 /** Collapse an IPv6 address to its /64 prefix; IPv4 passes through. */
 export function normalizeIpForGuard(ip: string): string {
   if (!ip.includes(':')) return ip;
@@ -59,6 +73,60 @@ export function recordKeyCreation(source: string): void {
 
 function sha256(s: string): string {
   return createHash('sha256').update(s).digest('hex');
+}
+
+/**
+ * May we mail a verification code for this (source, recipient) right now?
+ * Both windows are 24h. Returns the reason so the caller can answer precisely.
+ */
+export type ChallengeSendCheck = { ok: true } | { ok: false; reason: 'recipient' | 'source' };
+export function challengeSendAllowed(source: string | null, email: string): ChallengeSendCheck {
+  const db = getStatsDB();
+  const toEmail = (
+    db
+      .prepare("SELECT COUNT(*) AS n FROM verification_sends WHERE email_hash = ? AND created_at >= datetime('now', '-24 hours')")
+      .get(sha256(email.trim().toLowerCase())) as { n: number }
+  ).n;
+  if (toEmail >= VERIFICATION_SENDS_PER_EMAIL_DAY) return { ok: false, reason: 'recipient' };
+  // A null source (unknown IP) cannot be rate-limited by source, only by
+  // recipient — same fail-open stance as the creation guard. In prod Railway
+  // always supplies the IP, so source is never null there.
+  if (source) {
+    const fromSource = (
+      db
+        .prepare("SELECT COUNT(*) AS n FROM verification_sends WHERE ip_hash = ? AND created_at >= datetime('now', '-24 hours')")
+        .get(source) as { n: number }
+    ).n;
+    if (fromSource >= VERIFICATION_SENDS_PER_SOURCE_DAY) return { ok: false, reason: 'source' };
+  }
+  return { ok: true };
+}
+
+/**
+ * Log a code send (append-only) and opportunistically purge: old send rows
+ * (past the 24h counting window) and expired pending challenges, so neither
+ * table grows without bound between the daily retention runs.
+ */
+export function recordVerificationSend(source: string | null, email: string): void {
+  const db = getStatsDB();
+  db.prepare('INSERT INTO verification_sends (ip_hash, email_hash) VALUES (?, ?)').run(
+    source,
+    sha256(email.trim().toLowerCase()),
+  );
+  db.prepare("DELETE FROM verification_sends WHERE created_at < datetime('now', '-2 days')").run();
+  db.prepare("DELETE FROM pending_verifications WHERE expires_at < datetime('now')").run();
+}
+
+/**
+ * Retention backstop for the two verification tables, in case no send happens
+ * to trigger the opportunistic purge above. Called from the daily cron.
+ * Returns the number of rows removed.
+ */
+export function purgeExpiredVerifications(): number {
+  const db = getStatsDB();
+  const a = db.prepare("DELETE FROM verification_sends WHERE created_at < datetime('now', '-2 days')").run().changes;
+  const b = db.prepare("DELETE FROM pending_verifications WHERE expires_at < datetime('now')").run().changes;
+  return a + b;
 }
 
 /**

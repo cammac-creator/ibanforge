@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { getStatsDB } from '../lib/db.js';
-import { hashIp } from '../lib/stats.js';
+import { hashIp, extractClientIp } from '../lib/stats.js';
 
 const feedback = new Hono();
 
@@ -73,6 +73,18 @@ ensureFeedbackTable();
  * The MCP path has no HTTP context in the tool callback, so ipHash is null
  * there — the column is nullable for exactly that reason.
  */
+/**
+ * Field caps for a feedback row. POST /v1/feedback is unauthenticated and had
+ * no length bound (unlike email-messages, which clips): a caller could store
+ * arbitrarily large strings, ~100/min, and grow stats.sqlite unchecked. The
+ * MCP tool already caps via its zod schema; this is defence in depth on BOTH
+ * write paths.
+ */
+function clip(s: string | null | undefined, max: number): string | null {
+  if (s == null) return null;
+  return s.length > max ? s.slice(0, max) : s;
+}
+
 export function recordFeedbackRow(p: {
   tx_hash?: string | null;
   endpoint?: string | null;
@@ -90,18 +102,35 @@ export function recordFeedbackRow(p: {
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
-      p.tx_hash ?? null,
-      p.endpoint ?? null,
+      clip(p.tx_hash, 120),
+      clip(p.endpoint, 200),
       p.error_type,
-      p.expected !== undefined ? JSON.stringify(p.expected) : null,
-      p.got !== undefined ? JSON.stringify(p.got) : null,
-      p.notes ?? null,
-      p.contact ?? null,
-      p.agent ?? null,
+      p.expected !== undefined ? clip(JSON.stringify(p.expected), 2000) : null,
+      p.got !== undefined ? clip(JSON.stringify(p.got), 2000) : null,
+      clip(p.notes, 4000),
+      clip(p.contact, 255),
+      clip(p.agent, 120),
       p.ipHash,
     );
   return Number(info.lastInsertRowid);
 }
+
+/**
+ * How many feedback rows this source inserted in the last `hours`. Powers the
+ * per-source insert quota on the unauthenticated POST route, so a single
+ * source cannot flood the table faster than the global 100/min would allow
+ * over a sustained window.
+ */
+export function countRecentFeedback(ipHash: string, hours: number): number {
+  return (
+    getStatsDB()
+      .prepare("SELECT COUNT(*) AS n FROM feedback WHERE ip_hash = ? AND created_at >= datetime('now', ?)")
+      .get(ipHash, `-${hours} hours`) as { n: number }
+  ).n;
+}
+
+/** Max feedback rows one source may insert per hour (flood cap). */
+export const FEEDBACK_INSERTS_PER_SOURCE_HOUR = 20;
 
 /** Error types a report may carry — shared with the MCP tool's schema. */
 export const FEEDBACK_ERROR_TYPES = [
@@ -165,10 +194,23 @@ feedback.post('/v1/feedback', async (c) => {
     );
   }
 
+  // Spoof-resistant (trusted last hop), same rule as the rest of the app —
+  // the previous first-XFF-segment read was caller-controlled, which also
+  // undermined the per-source quota below.
   const ip =
-    c.req.header('x-forwarded-for')?.split(',')[0]?.trim() ??
-    c.req.header('x-real-ip') ??
-    'unknown';
+    extractClientIp({
+      'x-forwarded-for': c.req.header('x-forwarded-for') ?? null,
+      'x-real-ip': c.req.header('x-real-ip') ?? null,
+    }) ?? 'unknown';
+  const ipHash = hashIp(ip);
+
+  // Per-source insert quota: bound how fast one source can grow the table.
+  if (ipHash && countRecentFeedback(ipHash, 1) >= FEEDBACK_INSERTS_PER_SOURCE_HOUR) {
+    return c.json({
+      error: 'feedback_rate_limited',
+      message: `At most ${FEEDBACK_INSERTS_PER_SOURCE_HOUR} feedback reports per hour. Try again later.`,
+    }, 429);
+  }
 
   const rowId = recordFeedbackRow({
     tx_hash: body.tx_hash ?? null,
@@ -179,7 +221,7 @@ feedback.post('/v1/feedback', async (c) => {
     notes: body.notes ?? null,
     contact: body.contact ?? null,
     agent: body.agent ?? null,
-    ipHash: hashIp(ip),
+    ipHash,
   });
 
   return c.json(

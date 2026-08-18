@@ -7,6 +7,11 @@ import {
   createVerificationChallenge,
   checkVerificationCode,
   VERIFICATION_MAX_ATTEMPTS,
+  challengeSendAllowed,
+  recordVerificationSend,
+  purgeExpiredVerifications,
+  VERIFICATION_SENDS_PER_EMAIL_DAY,
+  VERIFICATION_SENDS_PER_SOURCE_DAY,
 } from './key-creation-guard.js';
 import { getStatsDB } from './db.js';
 
@@ -82,5 +87,55 @@ describe('verification challenge', () => {
       expect(checkVerificationCode(email, first).ok).toBe(false);
     }
     expect(checkVerificationCode(email, second)).toEqual({ ok: true });
+  });
+});
+
+describe('verification send limits (mail-bombing guard)', () => {
+  it('caps sends per recipient — nobody needs a 4th code in a day', () => {
+    const src = `send-src-${RUN}-a`;
+    const email = `victim-${RUN}@bank.example.net`;
+    for (let i = 0; i < VERIFICATION_SENDS_PER_EMAIL_DAY; i++) {
+      expect(challengeSendAllowed(src, email)).toEqual({ ok: true });
+      recordVerificationSend(src, email);
+    }
+    // Even from a DIFFERENT source, the recipient is now protected.
+    expect(challengeSendAllowed(`${src}-other`, email)).toEqual({ ok: false, reason: 'recipient' });
+  });
+
+  it('caps sends per source — bounds a distributed spray', () => {
+    const src = `send-src-${RUN}-b`;
+    // Fresh address each time so the recipient cap never fires first.
+    for (let i = 0; i < VERIFICATION_SENDS_PER_SOURCE_DAY; i++) {
+      const email = `spray-${RUN}-${i}@example.net`;
+      expect(challengeSendAllowed(src, email)).toEqual({ ok: true });
+      recordVerificationSend(src, email);
+    }
+    expect(challengeSendAllowed(src, `spray-${RUN}-final@example.net`)).toEqual({ ok: false, reason: 'source' });
+  });
+
+  it('a null source is still bounded by the recipient cap (fail-open on source only)', () => {
+    const email = `nullsrc-${RUN}@example.net`;
+    for (let i = 0; i < VERIFICATION_SENDS_PER_EMAIL_DAY; i++) {
+      expect(challengeSendAllowed(null, email)).toEqual({ ok: true });
+      recordVerificationSend(null, email);
+    }
+    expect(challengeSendAllowed(null, email)).toEqual({ ok: false, reason: 'recipient' });
+  });
+
+  it('purges expired pending challenges and stale send rows', () => {
+    const db = getStatsDB();
+    const email = `purge-${RUN}@example.net`;
+    // Insert directly in the target state — recordVerificationSend would itself
+    // purge the expired pending row and defeat what we mean to test.
+    db.prepare(
+      "INSERT INTO pending_verifications (email, code_hash, ip_hash, attempts, created_at, expires_at) VALUES (?, 'h', 'src', 0, datetime('now','-20 minutes'), datetime('now','-1 minute'))",
+    ).run(email);
+    db.prepare(
+      "INSERT INTO verification_sends (ip_hash, email_hash, created_at) VALUES ('purge-src', 'eh', datetime('now','-3 days'))",
+    ).run();
+    const removed = purgeExpiredVerifications();
+    expect(removed).toBeGreaterThanOrEqual(2);
+    expect(db.prepare('SELECT COUNT(*) AS n FROM pending_verifications WHERE email = ?').get(email)).toEqual({ n: 0 });
+    expect(db.prepare("SELECT COUNT(*) AS n FROM verification_sends WHERE ip_hash = 'purge-src'").get()).toEqual({ n: 0 });
   });
 });

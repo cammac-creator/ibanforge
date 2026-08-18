@@ -12,6 +12,8 @@ import {
   recordKeyCreation,
   createVerificationChallenge,
   checkVerificationCode,
+  challengeSendAllowed,
+  recordVerificationSend,
 } from '../lib/key-creation-guard.js';
 import { getActivation } from '../lib/activation.js';
 import { recordEvent } from '../lib/events.js';
@@ -125,6 +127,22 @@ apiKeys.post('/v1/keys/generate', async (c) => {
     if (countKeyCreations(creationSource, 24 * VERIFY_WINDOW_DAYS) >= 1) {
       const code = typeof (body as { code?: unknown }).code === 'string' ? String((body as { code?: unknown }).code).trim() : '';
       if (!code) {
+        // Bound the code SEND before issuing/mailing it. The daily creation cap
+        // above counts successes only, so without this a caller with one key on
+        // the network could loop generate with fresh addresses and mail a code
+        // to an arbitrary third party on every call (bounded only by the global
+        // 100/min). Cap per recipient (anti-bombing) and per source.
+        const sendCheck = challengeSendAllowed(creationSource, email.trim().toLowerCase());
+        if (!sendCheck.ok) {
+          return c.json({
+            error: 'verification_rate_limited',
+            message:
+              sendCheck.reason === 'recipient'
+                ? 'Too many verification codes were requested for this address today. Try again tomorrow, or use the most recent code you already received.'
+                : 'Too many verification codes were requested from this network today. Existing keys keep working; prepaid credits are instant (POST /v1/credits/buy/1k) and x402 needs no key.',
+          }, 429);
+        }
+        recordVerificationSend(creationSource, email.trim().toLowerCase());
         const challenge = createVerificationChallenge(email.trim().toLowerCase(), creationSource);
         const sent = await sendKeyVerificationEmail({ to: email.trim().toLowerCase(), code: challenge });
         if (!sent) {
