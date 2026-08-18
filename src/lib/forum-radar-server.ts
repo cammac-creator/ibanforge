@@ -71,13 +71,28 @@ function kvSet(key: string, value: string): void {
     .run(key, value);
 }
 
-async function fetchText(url: string, accept = 'application/json'): Promise<{ status: number; body: string }> {
+async function fetchText(
+  url: string,
+  accept = 'application/json',
+  extraHeaders: Record<string, string> = {},
+): Promise<{ status: number; body: string }> {
   const res = await fetch(url, {
-    headers: { 'User-Agent': 'ibanforge-radar/1.0', Accept: accept },
+    headers: { 'User-Agent': 'ibanforge-radar/1.0', Accept: accept, ...extraHeaders },
     signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
   });
   const body = await res.text().catch(() => '');
   return { status: res.status, body };
+}
+
+/**
+ * GitHub's search API refuses unauthenticated calls from datacenter IPs
+ * (observed: 403 from Railway on the very first tick). An optional read-only
+ * GITHUB_TOKEN in the environment unlocks the source; without it the source
+ * fails soft and the scan report says so.
+ */
+function githubHeaders(): Record<string, string> {
+  const token = process.env.GITHUB_TOKEN ?? '';
+  return token ? { Authorization: `Bearer ${token}`, 'X-GitHub-Api-Version': '2022-11-28' } : {};
 }
 
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
@@ -132,8 +147,11 @@ const THREAD_SOURCES: ThreadSource[] = [
         const { status, body } = await fetchText(
           `https://api.github.com/search/issues?per_page=20&q=${encodeURIComponent(queries[i])}`,
           'application/vnd.github+json',
+          githubHeaders(),
         );
-        if (status !== 200) throw new Error(`GitHub HTTP ${status}`);
+        if (status !== 200) {
+          throw new Error(`GitHub HTTP ${status}${process.env.GITHUB_TOKEN ? '' : ' (GITHUB_TOKEN absent — source désactivée)'}`);
+        }
         out.push(...parseGitHubIssues(JSON.parse(body)));
       }
       return out;
