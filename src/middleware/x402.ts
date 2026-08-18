@@ -670,6 +670,31 @@ export function buildRouteTable(
       entry.extensions.bazaar.info = buildBazaarInfo(discovery);
     }
   }
+
+  // Piste A — the "universal 402". A trust-registry crawler probes a resource
+  // with a bare GET; on our POST routes that fell through to Hono's 405, read as
+  // "does not speak x402" → Aegis "treat with caution". Expose a synthetic entry
+  // for the probe's method, cloned from the canonical route (already enriched
+  // above) so the 402 still announces the REAL method and price. Done after the
+  // enrichment loop on purpose: the clone inherits the canonical bazaar.info
+  // (input.method: POST), which a fresh discoveryForRoute() on the synthetic key
+  // could not provide.
+  //   Safe against accidental capture: a GET carrying a payment reaches no
+  //   handler (405), and @x402/hono settles only a response < 400 (settle-after-
+  //   2xx, verified in its source) — so nothing is ever charged for a method we
+  //   do not serve. Selling routes are excluded: a probe must never be quoted
+  //   the purchase flow. Only static paths qualify (param routes are GET and a
+  //   bare probe already method-matches them).
+  const canonicalKey = Object.keys(routes).find((k) => {
+    const sp = k.indexOf(' ');
+    const km = k.slice(0, sp);
+    const kp = k.slice(sp + 1);
+    return kp === requestPath && km !== requestMethod && !kp.includes(':') && !isSellingRoute(km, kp);
+  });
+  if (canonicalKey) {
+    const synthKey = `${requestMethod} ${requestPath}`;
+    if (!routes[synthKey]) routes[synthKey] = routes[canonicalKey];
+  }
   return routes;
 }
 

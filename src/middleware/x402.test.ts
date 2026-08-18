@@ -192,3 +192,40 @@ describe('every priced route stays payable', () => {
     }
   });
 });
+
+/**
+ * Piste A — the "universal 402". Trust registries (Aegis & co) probe a resource
+ * with a bare GET; on our POST routes that fell through to Hono's 405, which
+ * they read as "does not speak x402" → "treat with caution". A mismatched-method
+ * probe on a payable route must instead be quoted a 402 that announces the real
+ * method. Verified end-to-end by external curl after deploy (x402 is free-mode
+ * in tests, so the HTTP status can't be asserted here — only the route table).
+ */
+describe('mismatched-method probe still gets quoted (piste A)', () => {
+  const wallet = '0x0000000000000000000000000000000000000001';
+
+  it('exposes a payable synthetic entry for a GET probe on a POST route', () => {
+    const table = buildRouteTable(wallet, 'GET', '/v1/iban/validate');
+    expect(table['POST /v1/iban/validate'], 'canonical POST entry stays').toBeDefined();
+    const synth = table['GET /v1/iban/validate'] as { accepts?: unknown; resource?: string } | undefined;
+    expect(synth, 'synthetic GET entry makes requiresPayment() true').toBeDefined();
+    expect(synth!.accepts, 'probe entry is payable').toBeDefined();
+    expect(synth!.resource).toBe('https://api.ibanforge.com/v1/iban/validate');
+  });
+
+  it('covers batch and compliance the same way', () => {
+    for (const p of ['/v1/iban/batch', '/v1/iban/compliance']) {
+      expect(buildRouteTable(wallet, 'GET', p)[`GET ${p}`], p).toBeDefined();
+    }
+  });
+
+  it('never quotes the credit-sale route to a probe (selling routes excluded)', () => {
+    expect(buildRouteTable(wallet, 'GET', '/v1/credits/buy/1k')['GET /v1/credits/buy/1k']).toBeUndefined();
+  });
+
+  it('adds nothing when the method already matches', () => {
+    const table = buildRouteTable(wallet, 'POST', '/v1/iban/validate');
+    const posts = Object.keys(table).filter((k) => k === 'POST /v1/iban/validate');
+    expect(posts.length).toBe(1);
+  });
+});

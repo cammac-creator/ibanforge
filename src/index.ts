@@ -508,16 +508,6 @@ app.post('/v1/iban/batch', async (c, next) => {
   }
   await next();
 });
-// ⚠️ ORDRE D'ENREGISTREMENT LOAD-BEARING — ne pas déplacer.
-// Ces deux gardes doivent rester ICI : avant le middleware x402 (l. ~505,
-// volontaire — on ne facture pas une entrée malformée) et avant les
-// `app.route()` des routes payantes. Elles répondent 400 sans appeler next(),
-// donc elles sont le SEUL endroit où naissent les 400 de format servis en
-// production, et le seul où le comptage des rejets se déclenche vraiment.
-// Corps des réponses et comptage : voir src/middleware/identifier-guard.ts.
-app.get('/v1/bic/:code', bicGuardMiddleware());
-app.get('/v1/ch/clearing/:iid', iidGuardMiddleware());
-
 // Enrich empty 402 responses with human-readable instructions
 app.use('/v1/*', enrich402Middleware());
 
@@ -536,6 +526,19 @@ app.use('/v1/*', apiKeyMiddleware());
 
 // x402 payment middleware (only on paid routes, skipped if API key valid)
 app.use('/v1/*', createX402Middleware());
+
+// ⚠️ ORDRE LOAD-BEARING — ces gardes de format sont montés APRÈS x402 (piste A,
+// 18/08). Un GET nu d'un crawler de confiance (Aegis & co) sur ces routes doit
+// recevoir le 402 — l'invitation à payer, la preuve qu'on « parle x402 » — et
+// non un 400 lu comme « service cassé ». x402 s'exécute d'abord : une sonde
+// anonyme reçoit le 402 et n'atteint jamais ces gardes. Un appelant PAYÉ ou
+// authentifié franchit x402 (verify/skip) puis atteint le garde, qui répond 400
+// sur une entrée malformée — et @x402/hono ne règle jamais un statut >= 400
+// (settle-after-2xx, vérifié dans sa source), donc un 400 n'est jamais encaissé.
+// C'est toujours ici, et nulle part ailleurs, que naissent les 400 de format et
+// le comptage des rejets. Détail : voir src/middleware/identifier-guard.ts.
+app.get('/v1/bic/:code', bicGuardMiddleware());
+app.get('/v1/ch/clearing/:iid', iidGuardMiddleware());
 
 // Paid routes
 app.route('/', ibanValidate);
