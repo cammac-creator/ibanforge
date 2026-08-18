@@ -107,7 +107,10 @@ export async function draftOne(p: ProspectForMail): Promise<ProspectMail | null>
     headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
     body: JSON.stringify({
       model: 'claude-sonnet-5',
-      max_tokens: 1500,
+      // 130 words x2 languages fits far under 1500, yet the first production
+      // run still hit stop_reason=max_tokens — same lesson as the forum
+      // drafts: headroom is cheap, truncation costs a whole generation.
+      max_tokens: 3000,
       system: PROSPECT_MAIL_SYSTEM,
       messages: [{ role: 'user', content: buildProspectMailPrompt(p) }],
     }),

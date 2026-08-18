@@ -435,9 +435,13 @@ export const MARKETPLACES: MarketplaceDef[] = [
   {
     slug: 'glama',
     name: 'Glama (annuaire MCP)',
-    url: 'https://glama.ai/mcp/servers',
-    kind: 'manual',
-    cadenceHours: 0,
+    url: 'https://glama.ai/mcp/servers?query=ibanforge',
+    // Probed via Glama's public API (verified live 18/08/2026: our MCP server
+    // is indexed there, description and env schema included).
+    kind: 'http_contains',
+    checkTarget: 'https://glama.ai/api/mcp/v1/servers?query=ibanforge&first=5',
+    marker: 'ibanforge',
+    cadenceHours: 24,
   },
   {
     slug: 'postman',
@@ -448,10 +452,15 @@ export const MARKETPLACES: MarketplaceDef[] = [
   },
   {
     slug: 'apis-io',
-    name: 'apis.io',
-    url: 'https://apis.io',
-    kind: 'manual',
-    cadenceHours: 0,
+    name: 'apis.io / API Evangelist',
+    // Kin Lane keeps one public repo per provider; ours re-ingests
+    // https://api.ibanforge.com/apis.json. The raw apis.yml is the stable
+    // probe (the site itself is a client-rendered SPA a curl cannot read).
+    url: 'https://github.com/api-evangelist/ibanforge',
+    kind: 'raw_contains',
+    checkTarget: 'https://raw.githubusercontent.com/api-evangelist/ibanforge/main/apis.yml',
+    marker: 'ibanforge',
+    cadenceHours: 24,
   },
   {
     slug: 'agentic-market',

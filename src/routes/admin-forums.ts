@@ -210,9 +210,15 @@ adminForums.patch('/v1/admin/forum-marketplaces/:slug', async (c) => {
     vals.push(body.notes.slice(0, 2000));
   }
   // Manual rows carry an operator-set status; automated rows are the radar's.
+  // A hand-set status IS a verification, so it stamps checked_at — otherwise
+  // the row keeps reading "vérifié jamais" forever in the Vitrines pane.
   if (typeof body.status === 'string' && ['listed', 'absent', 'pending', 'dead', 'manual'].includes(body.status)) {
-    sets.push('status = ?');
+    sets.push('status = ?', `checked_at = datetime('now')`);
     vals.push(body.status);
+  }
+  if (typeof body.detail === 'string') {
+    sets.push('detail = ?');
+    vals.push(body.detail.slice(0, 500));
   }
   if (!sets.length) return c.json({ error: 'no_supported_field' }, 400);
   sets.push(`updated_at = datetime('now')`);
