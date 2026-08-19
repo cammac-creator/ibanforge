@@ -44,6 +44,7 @@ import { purgeExpiredVerifications } from './lib/key-creation-guard.js';
 import { startLifecycleRadar } from './lib/lifecycle-radar-server.js';
 import { startForumRadar } from './lib/forum-radar-server.js';
 import { startProspectRadar } from './lib/prospect-radar-server.js';
+import { startCohortRadar } from './lib/cohort-radar-server.js';
 import { recordEvent } from './lib/events.js';
 import { bicGuardMiddleware, iidGuardMiddleware } from './middleware/identifier-guard.js';
 import { notFoundHandler } from './lib/not-found.js';
@@ -631,6 +632,10 @@ startForumRadar();
 // Prospect enrichment radar: published own-domain addresses + EN/FR draft
 // mails for the harvest's leftovers (see prospect-radar-server.ts).
 startProspectRadar();
+
+// Signup cohort radar: collapses a burst of automated signups into one CRM
+// dossier and off the monthly reset (see cohort-radar-server.ts).
+startCohortRadar();
 
 // Graceful shutdown
 function gracefulShutdown(signal: string) {

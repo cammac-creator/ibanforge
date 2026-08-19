@@ -182,6 +182,12 @@ export interface ApiKeyValidation {
   /** When set, the key is a credit-based bundle key (NOT monthly subscription). */
   creditsRemaining?: number;
   creditsTotal?: number;
+  /**
+   * When true the monthly allowance does not start over on the 1st: the ceiling
+   * is measured against usage across ALL months, so an allowance already spent
+   * stays spent. Set on keys regrouped as one automated cohort.
+   */
+  noRecredit?: boolean;
 }
 
 /**
@@ -243,8 +249,18 @@ export function validateApiKey(key: string): ApiKeyValidation {
   if (!key.startsWith(KEY_PREFIX)) return { valid: false, keyHash: '', monthlyLimit: DEFAULT_MONTHLY_LIMIT };
   const keyHash = hashKey(key);
   const row = getStatsDB()
-    .prepare('SELECT email, monthly_limit, credits_remaining, credits_total FROM api_keys WHERE key_hash = ? AND active = 1')
-    .get(keyHash) as { email: string; monthly_limit: number | null; credits_remaining: number | null; credits_total: number | null } | undefined;
+    .prepare(
+      'SELECT email, monthly_limit, credits_remaining, credits_total, no_recredit FROM api_keys WHERE key_hash = ? AND active = 1',
+    )
+    .get(keyHash) as
+    | {
+        email: string;
+        monthly_limit: number | null;
+        credits_remaining: number | null;
+        credits_total: number | null;
+        no_recredit: number | null;
+      }
+    | undefined;
   if (!row) return { valid: false, keyHash, monthlyLimit: DEFAULT_MONTHLY_LIMIT };
   return {
     valid: true,
@@ -253,6 +269,7 @@ export function validateApiKey(key: string): ApiKeyValidation {
     monthlyLimit: row.monthly_limit ?? DEFAULT_MONTHLY_LIMIT,
     creditsRemaining: row.credits_remaining ?? undefined,
     creditsTotal: row.credits_total ?? undefined,
+    noRecredit: row.no_recredit === 1,
   };
 }
 
@@ -341,6 +358,13 @@ export function checkAndIncrementQuota(
   keyHash: string,
   monthlyLimit: number = DEFAULT_MONTHLY_LIMIT,
   units = 1,
+  /**
+   * When true, the ceiling is compared against usage summed over ALL months
+   * rather than the current one, so the allowance does not start over on the
+   * 1st. Usage is still written to the current month's row, which keeps every
+   * existing per-month reading (CRM, stats, notices) unchanged.
+   */
+  noRecredit = false,
 ): {
   allowed: boolean;
   used: number;
@@ -364,18 +388,26 @@ export function checkAndIncrementQuota(
   const row = db.prepare('SELECT count FROM api_usage WHERE key_hash = ? AND month = ?').get(keyHash, month) as {
     count: number;
   };
-  if (row.count + units > monthlyLimit) {
+  // What the ceiling is measured against. Normally the current month; for a key
+  // opted out of the monthly reset, every month it has ever used.
+  const measured = noRecredit
+    ? (db.prepare('SELECT COALESCE(SUM(count), 0) AS n FROM api_usage WHERE key_hash = ?').get(keyHash) as { n: number }).n
+    : row.count;
+  if (measured + units > monthlyLimit) {
     return {
       allowed: false,
-      used: row.count,
+      used: measured,
       limit: monthlyLimit,
-      remaining: Math.max(0, monthlyLimit - row.count),
+      remaining: Math.max(0, monthlyLimit - measured),
       month,
       crossedNoticeThreshold: false,
     };
   }
   db.prepare('UPDATE api_usage SET count = count + ? WHERE key_hash = ? AND month = ?').run(units, keyHash, month);
-  const used = row.count + units;
+  // Reported on the same basis the ceiling was checked against, so `used` and
+  // `remaining` stay coherent with the refusal above. Identical to the old
+  // `row.count + units` for every key on the normal monthly basis.
+  const used = measured + units;
   const threshold = Math.ceil(monthlyLimit * QUOTA_NOTICE_RATIO);
   return {
     allowed: true,
@@ -385,7 +417,7 @@ export function checkAndIncrementQuota(
     month,
     // A batch can leap over the threshold without landing on it, hence the
     // before/after comparison rather than an equality on `used`.
-    crossedNoticeThreshold: row.count < threshold && used >= threshold,
+    crossedNoticeThreshold: measured < threshold && used >= threshold,
   };
 }
 

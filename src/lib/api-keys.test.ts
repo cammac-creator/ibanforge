@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { generateApiKey, validateApiKey, checkAndIncrementQuota, getUsage, decrementQuota, revokeApiKey, rotateApiKey, recordQuotaNotice } from './api-keys.js';
 import { buildQuotaWarningEmail } from './email.js';
+import { getStatsDB } from './db.js';
 
 // Use a unique suffix per test run to avoid rate-limit conflicts across runs
 const RUN_ID = Date.now();
@@ -60,6 +61,30 @@ describe('API Keys', () => {
     expect(q.allowed).toBe(true);
     expect(q.used).toBe(1);
     expect(q.remaining).toBe(199);
+  });
+
+  it('measures the ceiling against every month once the monthly reset is off', () => {
+    const result = generateApiKey(`norecredit-${RUN_ID}@example.com`);
+    const v = validateApiKey(result!.api_key);
+    const db = getStatsDB();
+    // Stand in for an allowance already spent in an earlier month.
+    db.prepare('INSERT INTO api_usage (key_hash, month, count) VALUES (?, ?, ?)').run(v.keyHash, '2000-01', 200);
+
+    // On the normal monthly basis the new month starts clean.
+    expect(checkAndIncrementQuota(v.keyHash, 200, 1, false).allowed).toBe(true);
+
+    // Opted out of the reset, the same key is already at its ceiling.
+    const q = checkAndIncrementQuota(v.keyHash, 200, 1, true);
+    expect(q.allowed).toBe(false);
+    expect(q.used).toBeGreaterThanOrEqual(200);
+    expect(q.remaining).toBe(0);
+  });
+
+  it('reads the opt-out flag back through validateApiKey', () => {
+    const result = generateApiKey(`norecredit-flag-${RUN_ID}@example.com`);
+    expect(validateApiKey(result!.api_key).noRecredit).toBe(false);
+    getStatsDB().prepare('UPDATE api_keys SET no_recredit = 1 WHERE key_prefix = ?').run(result!.key_prefix);
+    expect(validateApiKey(result!.api_key).noRecredit).toBe(true);
   });
 
   it('returns usage stats', () => {

@@ -362,9 +362,20 @@ export function getStatsDB(): DatabaseType.Database {
       CREATE TABLE IF NOT EXISTS key_creations (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         ip_hash TEXT NOT NULL,
-        created_at TEXT DEFAULT (datetime('now'))
+        created_at TEXT DEFAULT (datetime('now')),
+        -- The client library string and the minted key's prefix, captured at
+        -- creation time. A single automated client rotating its network address
+        -- keeps the same library string, so it is the field that links otherwise
+        -- unrelated creations into one cohort; the prefix ties a creation row to
+        -- its key so a matched cohort can be regrouped and flagged.
+        user_agent TEXT,
+        key_prefix TEXT
       );
       CREATE INDEX IF NOT EXISTS idx_key_creations_ip ON key_creations(ip_hash, created_at);
+      -- NOTE: the index on user_agent is created further down, AFTER the ALTER
+      -- that adds the column. Creating it here would run before that migration
+      -- on a database predating the column, throw "no such column", and abort
+      -- the whole schema init.
       CREATE TABLE IF NOT EXISTS pending_verifications (
         email TEXT PRIMARY KEY,
         code_hash TEXT NOT NULL,
@@ -468,6 +479,26 @@ export function getStatsDB(): DatabaseType.Database {
     if (!reqCols.includes('key_prefix')) {
       statsDB.exec('ALTER TABLE request_log ADD COLUMN key_prefix TEXT');
       statsDB.exec('CREATE INDEX IF NOT EXISTS idx_request_log_key_prefix ON request_log(key_prefix)');
+    }
+    // key_creations gained the client library string and minted prefix after the
+    // table already existed in production; add them forward-only. Rows written
+    // before this migration keep NULL for both.
+    const kcCols = (statsDB.prepare('PRAGMA table_info(key_creations)').all() as Array<{ name: string }>).map((r) => r.name);
+    if (kcCols.length && !kcCols.includes('user_agent')) {
+      statsDB.exec('ALTER TABLE key_creations ADD COLUMN user_agent TEXT');
+    }
+    if (kcCols.length && !kcCols.includes('key_prefix')) {
+      statsDB.exec('ALTER TABLE key_creations ADD COLUMN key_prefix TEXT');
+    }
+    // Unconditional and last: the column exists by now on both paths (fresh
+    // CREATE TABLE above, or the ALTER just run).
+    statsDB.exec('CREATE INDEX IF NOT EXISTS idx_key_creations_ua ON key_creations(user_agent, created_at)');
+    // Opt a key out of the monthly quota reset: with this set, the ceiling is
+    // measured against lifetime usage instead of the current month, so a key
+    // that has already spent its allowance stays spent across month boundaries.
+    // Default 0 preserves the normal monthly behaviour for every existing key.
+    if (!keyCols.includes('no_recredit')) {
+      statsDB.exec('ALTER TABLE api_keys ADD COLUMN no_recredit INTEGER NOT NULL DEFAULT 0');
     }
     // CRM timeline: French translation + detected language of foreign messages.
     const msgCols = (statsDB.prepare('PRAGMA table_info(email_messages)').all() as Array<{ name: string }>).map((r) => r.name);

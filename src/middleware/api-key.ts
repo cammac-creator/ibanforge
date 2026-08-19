@@ -78,7 +78,7 @@ export function apiKeyMiddleware(): MiddlewareHandler<HonoEnv> {
     }
 
 
-    const { valid, keyHash, email, monthlyLimit, creditsRemaining, creditsTotal } = validateApiKey(key);
+    const { valid, keyHash, email, monthlyLimit, creditsRemaining, creditsTotal, noRecredit } = validateApiKey(key);
 
     if (!valid) {
       // A key WAS supplied but doesn't validate (typo, truncation, revoked).
@@ -150,7 +150,7 @@ export function apiKeyMiddleware(): MiddlewareHandler<HonoEnv> {
     }
 
     // Monthly subscription path (existing behavior).
-    const quota = checkAndIncrementQuota(keyHash, monthlyLimit, units);
+    const quota = checkAndIncrementQuota(keyHash, monthlyLimit, units, noRecredit);
 
     if (!quota.allowed) {
       // Quota exhausted — or too small for this batch (all-or-nothing, nothing

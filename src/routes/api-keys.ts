@@ -23,6 +23,7 @@ import { addAlias, listAliases, loadAliasMap, toCanonical } from '../lib/email-a
 import { getWeeklyFacts, saveWeeklyDigest, getWeeklyDigests } from '../lib/weekly-facts.js';
 import { notifyPurchaseTelegram } from '../lib/notify.js';
 import { isProspectBackfillRunning, lastProspectBackfillReport, runProspectBackfill } from '../lib/prospect-radar-server.js';
+import { isCohortScanRunning, lastCohortReport, runCohortScan } from '../lib/cohort-radar-server.js';
 import { getCompanyProfiles, upsertCompanyProfile, type ProfileSource } from '../lib/company-profiles.js';
 import { sendApiKeyEmail, sendKeyVerificationEmail, isEmailConfigured } from '../lib/email.js';
 
@@ -193,7 +194,7 @@ apiKeys.post('/v1/keys/generate', async (c) => {
     }, 429);
   }
 
-  if (creationSource) recordKeyCreation(creationSource);
+  if (creationSource) recordKeyCreation(creationSource, c.req.header('user-agent') ?? null, result.key_prefix);
 
   return c.json({
     api_key: result.api_key,
@@ -413,11 +414,16 @@ apiKeys.post('/v1/admin/keys/relabel', async (c) => {
   const body = (await c.req.json().catch(() => null)) as {
     key_prefixes?: unknown;
     email?: unknown;
+    no_recredit?: unknown;
   } | null;
   const prefixes = Array.isArray(body?.key_prefixes)
     ? body.key_prefixes.filter((p): p is string => typeof p === 'string' && p.length > 0)
     : [];
   const email = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : '';
+  // Optional and tri-state: absent leaves the flag untouched (a relabel must
+  // not silently change quota behaviour), true opts the keys out of the monthly
+  // reset, false puts them back on it — which is what makes this reversible.
+  const noRecredit = typeof body?.no_recredit === 'boolean' ? body.no_recredit : null;
 
   if (prefixes.length === 0 || prefixes.length > 200) {
     return c.json({ error: 'key_prefixes must be a non-empty array (max 200)' }, 400);
@@ -427,22 +433,32 @@ apiKeys.post('/v1/admin/keys/relabel', async (c) => {
   }
 
   const db = getStatsDB();
-  const read = db.prepare('SELECT key_prefix, email FROM api_keys WHERE key_prefix = ?');
+  // no_recredit travels in `previous` too: restoring the mapping restores the
+  // quota behaviour along with the address, so the whole call stays undoable.
+  const read = db.prepare('SELECT key_prefix, email, no_recredit FROM api_keys WHERE key_prefix = ?');
   const write = db.prepare('UPDATE api_keys SET email = ? WHERE key_prefix = ?');
+  const writeFlag = db.prepare('UPDATE api_keys SET no_recredit = ? WHERE key_prefix = ?');
 
-  const previous: Array<{ key_prefix: string; email: string }> = [];
+  const previous: Array<{ key_prefix: string; email: string; no_recredit: number }> = [];
   const notFound: string[] = [];
   for (const prefix of prefixes) {
-    const rows = read.all(prefix) as Array<{ key_prefix: string; email: string }>;
+    const rows = read.all(prefix) as Array<{ key_prefix: string; email: string; no_recredit: number | null }>;
     if (rows.length === 0) {
       notFound.push(prefix);
       continue;
     }
-    previous.push(...rows);
+    previous.push(...rows.map((r) => ({ ...r, no_recredit: r.no_recredit ?? 0 })));
     write.run(email, prefix);
+    if (noRecredit !== null) writeFlag.run(noRecredit ? 1 : 0, prefix);
   }
 
-  return c.json({ relabeled: previous.length, email, not_found: notFound, previous });
+  return c.json({
+    relabeled: previous.length,
+    email,
+    no_recredit: noRecredit,
+    not_found: notFound,
+    previous,
+  });
 });
 
 apiKeys.get('/v1/admin/keys', (c) => {
@@ -1609,6 +1625,31 @@ apiKeys.get('/v1/admin/prospects/backfill', (c) => {
     return c.json({ error: 'unauthorized' }, 401);
   }
   return c.json({ running: isProspectBackfillRunning(), ...lastProspectBackfillReport() });
+});
+
+/**
+ * Signup cohort radar: run it now rather than waiting for the hourly tick, and
+ * read what the last pass did. The scan only ever relabels and changes the quota
+ * basis, both reversible via POST /v1/admin/keys/relabel with the saved mapping.
+ */
+apiKeys.post('/v1/admin/cohort-scan', (c) => {
+  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
+  if (isCohortScanRunning()) {
+    return c.json({ started: false, reason: 'already_running' });
+  }
+  void runCohortScan().catch((err) =>
+    console.error('[cohort-radar] manual run failed:', err instanceof Error ? err.message : err),
+  );
+  return c.json({ started: true });
+});
+
+apiKeys.get('/v1/admin/cohort-scan', (c) => {
+  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
+  return c.json({ running: isCohortScanRunning(), ...lastCohortReport() });
 });
 
 /**

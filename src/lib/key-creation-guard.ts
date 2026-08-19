@@ -64,10 +64,24 @@ export function countKeyCreations(source: string, hours: number): number {
   return row.n;
 }
 
-/** Record a successful creation; opportunistically prune rows older than 30 days. */
-export function recordKeyCreation(source: string): void {
+/**
+ * Record a successful creation; opportunistically prune rows older than 30 days.
+ * `userAgent` (the client library string) and `keyPrefix` (the minted key) are
+ * captured so the same automated client rotating its network address can still
+ * be linked into one cohort by its stable library string, and a matched cohort
+ * traced back to its keys. Both default to null (older call sites, tests).
+ */
+export function recordKeyCreation(
+  source: string,
+  userAgent: string | null = null,
+  keyPrefix: string | null = null,
+): void {
   const db = getStatsDB();
-  db.prepare('INSERT INTO key_creations (ip_hash) VALUES (?)').run(source);
+  db.prepare('INSERT INTO key_creations (ip_hash, user_agent, key_prefix) VALUES (?, ?, ?)').run(
+    source,
+    userAgent ? userAgent.slice(0, 256) : null,
+    keyPrefix ?? null,
+  );
   db.prepare("DELETE FROM key_creations WHERE created_at < datetime('now', '-30 days')").run();
 }
 

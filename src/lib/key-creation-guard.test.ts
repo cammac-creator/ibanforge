@@ -47,6 +47,26 @@ describe('creation counting', () => {
     expect(countKeyCreations(src, 24)).toBe(1);
     expect(countKeyCreations(src, 24 * 7)).toBe(2);
   });
+
+  it('stores the client library string and minted prefix when given', () => {
+    const src = `guard-ua-${RUN}`;
+    recordKeyCreation(src, 'demo-http-client/9.9.9', 'ifk_testpref1');
+    const row = getStatsDB()
+      .prepare('SELECT user_agent, key_prefix FROM key_creations WHERE ip_hash = ? ORDER BY id DESC LIMIT 1')
+      .get(src) as { user_agent: string | null; key_prefix: string | null };
+    expect(row.user_agent).toBe('demo-http-client/9.9.9');
+    expect(row.key_prefix).toBe('ifk_testpref1');
+  });
+
+  it('keeps the older two-argument shape working — both new fields default to null', () => {
+    const src = `guard-legacy-${RUN}`;
+    recordKeyCreation(src);
+    const row = getStatsDB()
+      .prepare('SELECT user_agent, key_prefix FROM key_creations WHERE ip_hash = ? ORDER BY id DESC LIMIT 1')
+      .get(src) as { user_agent: string | null; key_prefix: string | null };
+    expect(row.user_agent).toBeNull();
+    expect(row.key_prefix).toBeNull();
+  });
 });
 
 describe('verification challenge', () => {
