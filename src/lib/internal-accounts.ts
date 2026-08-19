@@ -13,7 +13,7 @@ export const INTERNAL_EMAIL_RE =
   // The .internal/.dev probe domains slipped through this filter for weeks:
   // three probe keys read as "clients" and inflated one week's billable count
   // enough to trigger a -76% scare in the first Monday digest.
-  /(@ibanforge\.com|@ibanforge\.internal|@ibf-internal\.dev|@cohorte\.invalid|-probe@|@example\.com|@test\.|test-|-test|smoke|audit|^ca-[a-z]+-?\d*@proton\.me|^credits-buyer$|^stripe-buyer$|^playground|cammac@bluewin\.ch|cam@ogens\.ch|ptibootch@|gpt-store@)/i;
+  /(@ibanforge\.com|@ibanforge\.internal|@ibf-internal\.dev|@cohorte\.invalid|-probe@|@example\.com|@test\.|test-|-test|smoke|audit|^ca-[a-z]+-?\d*@proton\.me|^credits-buyer$|^stripe-buyer$|^playground|cammac@bluewin\.ch|cam@ogens\.ch|ptibootch@|gpt-store@|claudealainmartin06\+)/i;
 
 export function isInternalEmail(email: string | null | undefined): boolean {
   return email != null && INTERNAL_EMAIL_RE.test(email);
