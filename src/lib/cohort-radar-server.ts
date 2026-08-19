@@ -72,13 +72,27 @@ function loadCreations(): CreationRow[] {
     .filter((r) => !isInternalEmail((r as { email: string }).email)) as CreationRow[];
 }
 
-/** Collapse one cohort into a single dossier and take it off the monthly reset. */
+/**
+ * Collapse one cohort into a single dossier and take it off the monthly reset.
+ * Each key's previous address is written to `cohort_relabels` first, in the same
+ * transaction, so a wrong match can always be undone — the radar has no caller
+ * to hand the mapping back to, unlike the manual relabel endpoint.
+ */
 function applyCohort(cohort: Cohort, day: string): string {
   const db = getStatsDB();
   const address = cohortAddress(cohort.userAgent, day);
+  const readEmail = db.prepare('SELECT key_prefix, email FROM api_keys WHERE key_prefix = ?');
+  const saveUndo = db.prepare(
+    'INSERT INTO cohort_relabels (key_prefix, old_email, address) VALUES (?, ?, ?)',
+  );
   const write = db.prepare('UPDATE api_keys SET email = ?, no_recredit = 1 WHERE key_prefix = ?');
   const tx = db.transaction(() => {
-    for (const prefix of cohort.keyPrefixes) write.run(address, prefix);
+    for (const prefix of cohort.keyPrefixes) {
+      const before = readEmail.get(prefix) as { key_prefix: string; email: string } | undefined;
+      if (!before) continue; // key vanished between scan and apply — skip, don't invent
+      saveUndo.run(before.key_prefix, before.email, address);
+      write.run(address, prefix);
+    }
   });
   tx();
   return address;
@@ -125,17 +139,27 @@ export async function runCohortScan(now: Date = new Date()): Promise<CohortRadar
       }
     }
 
+    // Persist the report BEFORE the Telegram call. sendTelegramShort throws on
+    // failure; if it did so after these writes, a pass that already relabelled
+    // keys would leave no trace at all (and the undo trail in cohort_relabels
+    // would be the only record of what was touched).
+    kvSet(KV_LAST_REPORT, JSON.stringify(report));
+    kvSet(KV_LAST_RUN, report.finished_at);
+
     if (report.cohorts.length > 0) {
       const lines = report.cohorts.map(
         (c) => `• ${c.keys} inscriptions regroupées — ${c.user_agent.slice(0, 40)} (${c.address})`,
       );
-      await sendTelegramShort(
-        `IBANforge · inscriptions automatiques regroupées\n${lines.join('\n')}\nQuota mensuel non reconduit. Réversible depuis le CRM.`,
-      );
+      try {
+        await sendTelegramShort(
+          `IBANforge · inscriptions automatiques regroupées\n${lines.join('\n')}\nQuota mensuel non reconduit. Annulable via le mapping (POST /v1/admin/keys/relabel).`,
+        );
+      } catch (err) {
+        // A missed notification must not lose the pass: the report is already saved.
+        report.errors.push(`telegram: ${err instanceof Error ? err.message : String(err)}`);
+        kvSet(KV_LAST_REPORT, JSON.stringify(report));
+      }
     }
-
-    kvSet(KV_LAST_REPORT, JSON.stringify(report));
-    kvSet(KV_LAST_RUN, report.finished_at);
     return report;
   } finally {
     running = false;
@@ -154,6 +178,25 @@ export function lastCohortReport(): { last_run_at: string | null; report: Cohort
 
 export function isCohortScanRunning(): boolean {
   return running;
+}
+
+/**
+ * The undo trail: what each key's address was before the radar rewrote it.
+ * To reverse a wrong match, feed these (key_prefix, old_email) pairs back to
+ * POST /v1/admin/keys/relabel with no_recredit:false.
+ */
+export function getCohortRelabels(
+  address?: string,
+): Array<{ key_prefix: string; old_email: string; address: string; created_at: string }> {
+  const db = getStatsDB();
+  if (address) {
+    return db
+      .prepare('SELECT key_prefix, old_email, address, created_at FROM cohort_relabels WHERE address = ? ORDER BY created_at DESC')
+      .all(address) as Array<{ key_prefix: string; old_email: string; address: string; created_at: string }>;
+  }
+  return db
+    .prepare('SELECT key_prefix, old_email, address, created_at FROM cohort_relabels ORDER BY created_at DESC LIMIT 500')
+    .all() as Array<{ key_prefix: string; old_email: string; address: string; created_at: string }>;
 }
 
 /** Hourly tick, first pass a few minutes after boot. Never throws upward. */

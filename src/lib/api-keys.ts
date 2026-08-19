@@ -219,9 +219,17 @@ export function rotateApiKey(
   const db = getStatsDB();
   const oldHash = hashKey(oldKey);
   const row = db
-    .prepare('SELECT email, monthly_limit, credits_remaining, credits_total FROM api_keys WHERE key_hash = ? AND active = 1')
+    .prepare(
+      'SELECT email, monthly_limit, credits_remaining, credits_total, no_recredit FROM api_keys WHERE key_hash = ? AND active = 1',
+    )
     .get(oldHash) as
-    | { email: string; monthly_limit: number | null; credits_remaining: number | null; credits_total: number | null }
+    | {
+        email: string;
+        monthly_limit: number | null;
+        credits_remaining: number | null;
+        credits_total: number | null;
+        no_recredit: number | null;
+      }
     | undefined;
   if (!row) return null;
 
@@ -230,9 +238,15 @@ export function rotateApiKey(
   const keyPrefix = rawKey.slice(0, 12);
 
   const tx = db.transaction(() => {
+    // Carry the opt-out flag across — without it, a key the cohort radar took
+    // off the monthly reset would clear itself in one self-service /rotate call.
     db.prepare(
-      'INSERT INTO api_keys (key_hash, key_prefix, email, monthly_limit, credits_remaining, credits_total) VALUES (?, ?, ?, ?, ?, ?)',
-    ).run(newHash, keyPrefix, row.email, row.monthly_limit, row.credits_remaining, row.credits_total);
+      'INSERT INTO api_keys (key_hash, key_prefix, email, monthly_limit, credits_remaining, credits_total, no_recredit) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    ).run(newHash, keyPrefix, row.email, row.monthly_limit, row.credits_remaining, row.credits_total, row.no_recredit ?? 0);
+    // Move the usage ledger to the new key hash too. Otherwise the lifetime sum
+    // (and the plain monthly count) restart at zero on rotation — which would
+    // make rotation a one-call quota reset for anyone, flagged or not.
+    db.prepare('UPDATE api_usage SET key_hash = ? WHERE key_hash = ?').run(newHash, oldHash);
     db.prepare("UPDATE api_keys SET active = 0, deactivated_at = datetime('now') WHERE key_hash = ?").run(oldHash);
   });
   tx();
@@ -438,11 +452,16 @@ export function getUsage(
  * Decrement the quota counter for this key+month. Used to refund consumed
  * slots when the underlying request failed with a client error (4xx) — we
  * should not punish callers for malformed input by eating their quota.
+ *
+ * `month` should be the one the increment was billed to (the caller passes
+ * `quota.month`): a refund at 00:00 on the 1st for a call billed at 23:59 on the
+ * 31st must land on the OLD month's row, not create a −1-then-clamped-to-0 on the
+ * fresh one. For a key on the lifetime basis that difference is permanent.
  */
-export function decrementQuota(keyHash: string, units = 1): void {
+export function decrementQuota(keyHash: string, units = 1, month?: string): void {
   const db = getStatsDB();
-  const month = new Date().toISOString().slice(0, 7);
+  const m = month ?? new Date().toISOString().slice(0, 7);
   db.prepare(
     'UPDATE api_usage SET count = MAX(count - ?, 0) WHERE key_hash = ? AND month = ?',
-  ).run(units, keyHash, month);
+  ).run(units, keyHash, m);
 }

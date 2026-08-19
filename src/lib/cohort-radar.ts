@@ -103,7 +103,39 @@ export interface Cohort {
  * Rows without a client library string are skipped entirely: with nothing to
  * link them, grouping them would mean grouping strangers together.
  */
+/** SQLite datetime('now') writes "YYYY-MM-DD HH:MM:SS" in UTC; the space must
+ *  become a T (and the zone be explicit) or Date reads it as local time and the
+ *  window silently shifts by the machine's offset. Returns NaN on a bad value. */
+function toMs(created_at: string): number {
+  return new Date(`${created_at.replace(' ', 'T')}Z`).getTime();
+}
+
+/**
+ * Does any SLIDING window of `hours` hold at least `minKeys` of these
+ * timestamps? Returns the tightest matching window (they are tried narrowest
+ * first, a tight burst being the stronger signal).
+ *
+ * Anchoring on the current tick instead — [now−15min, now] — would miss a
+ * five-signup burst that finished twenty minutes before the hourly pass, and
+ * that burst would then also fall under the wider thresholds. A slide over the
+ * loaded history catches it whenever it happened.
+ */
+function burstWindow(sortedMs: number[], windows: CohortWindow[]): CohortWindow | null {
+  for (const w of windows) {
+    const span = w.hours * 60 * 60 * 1000;
+    let lo = 0;
+    for (let hi = 0; hi < sortedMs.length; hi++) {
+      while (sortedMs[hi] - sortedMs[lo] > span) lo++;
+      if (hi - lo + 1 >= w.minKeys) return w;
+    }
+  }
+  return null;
+}
+
 export function findCohorts(rows: CreationRow[], now: Date, windows: CohortWindow[] = COHORT_WINDOWS): Cohort[] {
+  const maxHours = Math.max(...windows.map((w) => w.hours));
+  const since = now.getTime() - maxHours * 60 * 60 * 1000;
+
   const usable = rows.filter(
     (r): r is CreationRow & { user_agent: string; key_prefix: string; email: string } =>
       typeof r.user_agent === 'string' &&
@@ -111,47 +143,49 @@ export function findCohorts(rows: CreationRow[], now: Date, windows: CohortWindo
       typeof r.key_prefix === 'string' &&
       r.key_prefix.length > 0 &&
       typeof r.email === 'string' &&
-      r.email.includes('@'),
+      r.email.includes('@') &&
+      !Number.isNaN(toMs(r.created_at)) &&
+      toMs(r.created_at) >= since,
   );
 
-  const found = new Map<string, Cohort>();
-  for (const window of windows) {
-    const since = new Date(now.getTime() - window.hours * 60 * 60 * 1000);
-    const byClient = new Map<string, Array<(typeof usable)[number]>>();
-    for (const row of usable) {
-      // SQLite datetime('now') writes "YYYY-MM-DD HH:MM:SS" in UTC; the space
-      // has to become a T (and the zone be explicit) or Date parses it as local
-      // time and the window silently shifts by the machine's offset.
-      const at = new Date(`${row.created_at.replace(' ', 'T')}Z`);
-      if (Number.isNaN(at.getTime()) || at < since) continue;
-      const list = byClient.get(row.user_agent);
-      if (list) list.push(row);
-      else byClient.set(row.user_agent, [row]);
-    }
-
-    for (const [userAgent, group] of byClient) {
-      if (group.length < window.minKeys) continue;
-      const machineMade = group.filter((r) => looksMachineMade(localPartOf(r.email))).length;
-      const ratio = machineMade / group.length;
-      if (ratio < MIN_MACHINE_SHAPE_RATIO) continue;
-
-      // A client can trip several windows at once; keep the widest match, which
-      // carries the most keys.
-      const existing = found.get(userAgent);
-      if (existing && existing.keyPrefixes.length >= group.length) continue;
-      const times = group.map((r) => r.created_at).sort();
-      found.set(userAgent, {
-        userAgent,
-        keyPrefixes: [...new Set(group.map((r) => r.key_prefix))],
-        windowHours: window.hours,
-        machineShapeRatio: Math.round(ratio * 100) / 100,
-        firstSeen: times[0],
-        lastSeen: times[times.length - 1],
-      });
-    }
+  const byClient = new Map<string, Array<(typeof usable)[number]>>();
+  for (const row of usable) {
+    const list = byClient.get(row.user_agent);
+    if (list) list.push(row);
+    else byClient.set(row.user_agent, [row]);
   }
 
-  return [...found.values()].sort((a, b) => b.keyPrefixes.length - a.keyPrefixes.length);
+  const found: Cohort[] = [];
+  for (const [userAgent, group] of byClient) {
+    // The whole group's shape decides IF this is a cohort: same client, a burst,
+    // and a machine-made majority. The shared quality bar guards against a busy
+    // but human client.
+    const machine = group.filter((r) => looksMachineMade(localPartOf(r.email)));
+    const ratio = machine.length / group.length;
+    if (ratio < MIN_MACHINE_SHAPE_RATIO) continue;
+
+    const window = burstWindow(
+      group.map((r) => toMs(r.created_at)).sort((a, b) => a - b),
+      windows,
+    );
+    if (!window) continue;
+
+    // But only the machine-shaped addresses are actually regrouped: the human
+    // minority inside a poisoned or shared-client batch keeps its own dossier
+    // and its normal monthly quota. Precision over recall — missing part of a
+    // burst is cheap, catching a real customer is not.
+    const machineTimes = machine.map((r) => r.created_at).sort();
+    found.push({
+      userAgent,
+      keyPrefixes: [...new Set(machine.map((r) => r.key_prefix))],
+      windowHours: window.hours,
+      machineShapeRatio: Math.round(ratio * 100) / 100,
+      firstSeen: machineTimes[0],
+      lastSeen: machineTimes[machineTimes.length - 1],
+    });
+  }
+
+  return found.sort((a, b) => b.keyPrefixes.length - a.keyPrefixes.length);
 }
 
 /**

@@ -76,17 +76,39 @@ describe('findCohorts', () => {
     expect(findCohorts(rows, NOW)).toEqual([]);
   });
 
-  it('tolerates a minority of ordinary-looking addresses inside a real burst', () => {
+  it('regroups only the machine-shaped addresses, sparing the human minority', () => {
+    const human = row(5, 'demo-http-client/9.9', 'marie.duval@alpha.example.net', 'ifk_human');
     const rows = [
-      row(1, 'demo-http-client/9.9', 'pwwhqjpghlvj@gmail.com'),
-      row(2, 'demo-http-client/9.9', 'koulnvwrgccu@yahoo.com'),
-      row(3, 'demo-http-client/9.9', 'ugmicpdrqxca@outlook.com'),
-      row(4, 'demo-http-client/9.9', 'gfdrroavihgz@icloud.com'),
-      row(5, 'demo-http-client/9.9', 'marie.duval@alpha.example.net'),
+      row(1, 'demo-http-client/9.9', 'pwwhqjpghlvj@gmail.com', 'ifk_m1'),
+      row(2, 'demo-http-client/9.9', 'koulnvwrgccu@yahoo.com', 'ifk_m2'),
+      row(3, 'demo-http-client/9.9', 'ugmicpdrqxca@outlook.com', 'ifk_m3'),
+      row(4, 'demo-http-client/9.9', 'gfdrroavihgz@icloud.com', 'ifk_m4'),
+      human,
     ];
     const cohorts = findCohorts(rows, NOW);
     expect(cohorts).toHaveLength(1);
+    // The group of 5 triggers (ratio 0.8), but only the 4 machine-shaped keys
+    // are regrouped — the human's key is NOT in the cohort.
+    expect(cohorts[0].keyPrefixes).toHaveLength(4);
+    expect(cohorts[0].keyPrefixes).not.toContain('ifk_human');
     expect(cohorts[0].machineShapeRatio).toBe(0.8);
+  });
+
+  it('does not sweep a legitimate signup into a poisoned generic-client batch', () => {
+    // An adversary reads the public repo and mints 8 machine-shaped keys under a
+    // common client string; a real customer signs up under the same client in
+    // the same window. Only the machine-shaped keys are regrouped.
+    const legit = row(3, 'axios/1.6.0', 'nicolas.perret@alpha.example.net', 'ifk_legit');
+    const rows = [
+      ...Array.from({ length: 8 }, (_, i) =>
+        row(i + 1, 'axios/1.6.0', `pwwhqjpghlv${String.fromCharCode(97 + i)}@gmail.com`, `ifk_p${i}`),
+      ),
+      legit,
+    ];
+    const cohorts = findCohorts(rows, NOW);
+    expect(cohorts).toHaveLength(1);
+    expect(cohorts[0].keyPrefixes).not.toContain('ifk_legit');
+    expect(cohorts[0].keyPrefixes).toHaveLength(8);
   });
 
   it('does not group different clients together', () => {
@@ -110,6 +132,18 @@ describe('findCohorts', () => {
     expect(cohorts).toHaveLength(1);
     expect(cohorts[0].windowHours).toBe(24);
     expect(cohorts[0].keyPrefixes).toHaveLength(8);
+  });
+
+  it('catches a tight burst that finished well before the tick (sliding window)', () => {
+    // Five signups in ten minutes, but they ended three hours before this pass.
+    // Anchored to now it would be invisible; a slide over the history sees it.
+    const rows = Array.from({ length: 5 }, (_, i) =>
+      row(180 + i * 2, 'late-client/1.0', `pwwhqjpghlv${String.fromCharCode(97 + i)}@gmail.com`, `ifk_late${i}`),
+    );
+    const cohorts = findCohorts(rows, NOW);
+    expect(cohorts).toHaveLength(1);
+    expect(cohorts[0].windowHours).toBe(0.25);
+    expect(cohorts[0].keyPrefixes).toHaveLength(5);
   });
 
   it('ignores rows with nothing to link them by', () => {

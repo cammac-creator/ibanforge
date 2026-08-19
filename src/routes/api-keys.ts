@@ -23,7 +23,7 @@ import { addAlias, listAliases, loadAliasMap, toCanonical } from '../lib/email-a
 import { getWeeklyFacts, saveWeeklyDigest, getWeeklyDigests } from '../lib/weekly-facts.js';
 import { notifyPurchaseTelegram } from '../lib/notify.js';
 import { isProspectBackfillRunning, lastProspectBackfillReport, runProspectBackfill } from '../lib/prospect-radar-server.js';
-import { isCohortScanRunning, lastCohortReport, runCohortScan } from '../lib/cohort-radar-server.js';
+import { isCohortScanRunning, lastCohortReport, runCohortScan, getCohortRelabels } from '../lib/cohort-radar-server.js';
 import { getCompanyProfiles, upsertCompanyProfile, type ProfileSource } from '../lib/company-profiles.js';
 import { sendApiKeyEmail, sendKeyVerificationEmail, isEmailConfigured } from '../lib/email.js';
 
@@ -1650,6 +1650,18 @@ apiKeys.get('/v1/admin/cohort-scan', (c) => {
     return c.json({ error: 'unauthorized' }, 401);
   }
   return c.json({ running: isCohortScanRunning(), ...lastCohortReport() });
+});
+
+/**
+ * The radar's undo trail: (key_prefix, old_email) for every key it regrouped.
+ * To reverse a match, feed these back to POST /v1/admin/keys/relabel with the
+ * old_email and no_recredit:false. Optional ?address= narrows to one cohort.
+ */
+apiKeys.get('/v1/admin/cohort-relabels', (c) => {
+  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
+  return c.json({ relabels: getCohortRelabels(c.req.query('address')) });
 });
 
 /**

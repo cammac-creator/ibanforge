@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { runCohortScan } from './cohort-radar-server.js';
+import { runCohortScan, getCohortRelabels } from './cohort-radar-server.js';
 import { generateApiKey, validateApiKey, checkAndIncrementQuota } from './api-keys.js';
 import { recordKeyCreation } from './key-creation-guard.js';
 import { getStatsDB } from './db.js';
@@ -33,6 +33,7 @@ afterAll(() => {
   for (const prefix of created) {
     db.prepare('DELETE FROM api_keys WHERE key_prefix = ?').run(prefix);
     db.prepare('DELETE FROM key_creations WHERE key_prefix = ?').run(prefix);
+    db.prepare('DELETE FROM cohort_relabels WHERE key_prefix = ?').run(prefix);
   }
 });
 
@@ -53,6 +54,19 @@ describe('cohort radar, end to end', () => {
     for (const r of rows) {
       expect(r.email).toBe(mine!.address);
       expect(r.no_recredit).toBe(1);
+    }
+  });
+
+  it('saves an undo trail so a match is reversible', async () => {
+    // The first pass already regrouped the burst; the mapping must record each
+    // key's real previous address, not the synthetic one.
+    const trail = getCohortRelabels();
+    const mine = trail.filter((r) => created.slice(0, MACHINE.length).includes(r.key_prefix));
+    expect(mine.length).toBe(MACHINE.length);
+    for (const r of mine) {
+      expect(r.old_email).toContain('@alpha.example.net');
+      expect(r.old_email).not.toContain('@cohorte.invalid');
+      expect(r.address).toContain('@cohorte.invalid');
     }
   });
 

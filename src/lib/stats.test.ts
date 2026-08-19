@@ -691,3 +691,38 @@ describe('getStats — internal/cohort exclusion', () => {
     expect(after - before).toBe(1);
   });
 });
+
+describe('getCohortFootprint', () => {
+  it('reads only cohort keys and shows what they would distort', async () => {
+    const { getCohortFootprint } = await import('./stats.js');
+    const db = getStatsDB();
+    const stamp = Date.now();
+    const addr = `study-cohort-${stamp}@cohorte.invalid`;
+    // A regrouped cohort key plus its validations, all on one country.
+    const key = generateApiKey(addr);
+    db.prepare('UPDATE api_keys SET email = ? WHERE key_prefix = ?').run(addr, key!.key_prefix);
+    for (let i = 0; i < 5; i++) recordOperation('iban_validate', 'BE', true, 0, undefined, key!.key_prefix);
+
+    const fp = getCohortFootprint();
+    const mine = fp.cohorts.find((c) => c.address === addr);
+    expect(mine).toBeDefined();
+    expect(mine!.keys).toBe(1);
+    expect(mine!.units).toBeGreaterThanOrEqual(5);
+    expect(mine!.top_countries[0].country).toBe('BE');
+    expect(fp.totals.keys).toBeGreaterThanOrEqual(1);
+
+    // The distortion, checked directly rather than via the top-8 list (whose
+    // membership depends on whatever else the shared test DB has accumulated):
+    // BE counts more when the cohort is folded in than when it is excluded.
+    const beWith = (db.prepare("SELECT COUNT(*) n FROM operations WHERE country_code = 'BE'").get() as { n: number }).n;
+    const beWithout = (
+      db
+        .prepare("SELECT COUNT(*) n FROM operations WHERE country_code = 'BE' AND key_prefix IS NOT ?")
+        .get(key!.key_prefix) as { n: number }
+    ).n;
+    expect(beWith).toBeGreaterThan(beWithout);
+
+    db.prepare('DELETE FROM operations WHERE key_prefix = ?').run(key!.key_prefix);
+    db.prepare('DELETE FROM api_keys WHERE key_prefix = ?').run(key!.key_prefix);
+  });
+});

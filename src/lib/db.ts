@@ -493,6 +493,19 @@ export function getStatsDB(): DatabaseType.Database {
     // Unconditional and last: the column exists by now on both paths (fresh
     // CREATE TABLE above, or the ALTER just run).
     statsDB.exec('CREATE INDEX IF NOT EXISTS idx_key_creations_ua ON key_creations(user_agent, created_at)');
+    // Undo trail for the cohort radar: what each key's address was before the
+    // radar rewrote it. The manual relabel endpoint returns this mapping in its
+    // response, but the automatic radar has no caller to hand it to — so a wrong
+    // match would be irreversible without persisting it here.
+    statsDB.exec(`
+      CREATE TABLE IF NOT EXISTS cohort_relabels (
+        key_prefix TEXT NOT NULL,
+        old_email TEXT NOT NULL,
+        address TEXT NOT NULL,
+        created_at TEXT DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS idx_cohort_relabels_addr ON cohort_relabels(address, created_at);
+    `);
     // Opt a key out of the monthly quota reset: with this set, the ceiling is
     // measured against lifetime usage instead of the current month, so a key
     // that has already spent its allowance stays spent across month boundaries.

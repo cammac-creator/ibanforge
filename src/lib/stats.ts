@@ -1588,3 +1588,133 @@ export function purgeTerminatedKeyTelemetry(days: number = 30): number {
     .run(days, ...PLACEHOLDER_EMAILS).changes;
   return purged;
 }
+
+/**
+ * Footprint of the regrouped signup cohorts — the study view.
+ *
+ * The business aggregates drop @cohorte.invalid keys on purpose (a farmed batch
+ * once made a country the all-time #1). This function does the opposite: it
+ * looks ONLY at those keys, so the two cohorts, useful precisely because they
+ * are known and bounded, can be read as a case study of what an automated
+ * signup burst does to every indicator — without any of it touching the real
+ * numbers.
+ *
+ * Everything here is derived from the same rows the business views exclude:
+ * operations (one per validation, carries the country), api_keys (the cohort
+ * address and mint date), key_creations (the client library string).
+ */
+export interface CohortFootprint {
+  cohorts: Array<{
+    address: string;
+    keys: number;
+    /** Validations attributed to the cohort (operations rows). */
+    units: number;
+    first_seen: string | null;
+    last_seen: string | null;
+    top_countries: Array<{ country: string; count: number }>;
+    by_type: Array<{ type: string; count: number }>;
+    top_client: string | null;
+  }>;
+  /** Per-day validation counts across all cohorts — shows the bursts. */
+  timeline: Array<{ day: string; count: number }>;
+  /** What the public country ranking would look like WITH the cohorts folded
+   *  back in, next to the real one WITHOUT them — the pollution, made visible. */
+  countries_with: Array<{ country: string; count: number }>;
+  countries_without: Array<{ country: string; count: number }>;
+  totals: { cohorts: number; keys: number; units: number };
+}
+
+export function getCohortFootprint(): CohortFootprint {
+  const db = getStatsDB();
+  const cohortKeys = db
+    .prepare("SELECT key_prefix, email FROM api_keys WHERE email LIKE '%@cohorte.invalid'")
+    .all() as Array<{ key_prefix: string; email: string }>;
+
+  const byAddress = new Map<string, string[]>();
+  for (const k of cohortKeys) {
+    const list = byAddress.get(k.email);
+    if (list) list.push(k.key_prefix);
+    else byAddress.set(k.email, [k.key_prefix]);
+  }
+  const allPrefixes = cohortKeys.map((k) => k.key_prefix);
+
+  const cohorts = [...byAddress.entries()]
+    .map(([address, prefixes]) => {
+      const ph = prefixes.map(() => '?').join(',');
+      const span = db
+        .prepare(
+          `SELECT MIN(created_at) first_seen, MAX(created_at) last_seen, COUNT(*) units
+             FROM operations WHERE key_prefix IN (${ph})`,
+        )
+        .get(...prefixes) as { first_seen: string | null; last_seen: string | null; units: number };
+      const top_countries = db
+        .prepare(
+          `SELECT country_code country, COUNT(*) count FROM operations
+             WHERE key_prefix IN (${ph}) AND country_code IS NOT NULL
+             GROUP BY country_code ORDER BY count DESC LIMIT 5`,
+        )
+        .all(...prefixes) as Array<{ country: string; count: number }>;
+      const by_type = db
+        .prepare(
+          `SELECT operation_type type, COUNT(*) count FROM operations
+             WHERE key_prefix IN (${ph}) GROUP BY operation_type ORDER BY count DESC`,
+        )
+        .all(...prefixes) as Array<{ type: string; count: number }>;
+      const client = db
+        .prepare(
+          `SELECT user_agent ua, COUNT(*) n FROM key_creations
+             WHERE key_prefix IN (${ph}) AND user_agent IS NOT NULL
+             GROUP BY user_agent ORDER BY n DESC LIMIT 1`,
+        )
+        .get(...prefixes) as { ua: string; n: number } | undefined;
+      return {
+        address,
+        keys: prefixes.length,
+        units: span.units,
+        first_seen: span.first_seen,
+        last_seen: span.last_seen,
+        top_countries,
+        by_type,
+        top_client: client?.ua ?? null,
+      };
+    })
+    .sort((a, b) => b.units - a.units);
+
+  const timeline =
+    allPrefixes.length === 0
+      ? []
+      : (db
+          .prepare(
+            `SELECT date(created_at) day, COUNT(*) count FROM operations
+               WHERE key_prefix IN (${allPrefixes.map(() => '?').join(',')})
+               GROUP BY day ORDER BY day`,
+          )
+          .all(...allPrefixes) as Array<{ day: string; count: number }>);
+
+  // The country ranking both ways. "without" is what the public page shows
+  // today; "with" folds the cohorts back in — the difference is the distortion.
+  const countries_without = db
+    .prepare(
+      'SELECT country_code country, COUNT(*) count FROM operations WHERE country_code IS NOT NULL' +
+        excludePrefixClause(allPrefixes) +
+        ' GROUP BY country_code ORDER BY count DESC LIMIT 8',
+    )
+    .all(...allPrefixes) as Array<{ country: string; count: number }>;
+  const countries_with = db
+    .prepare(
+      "SELECT country_code country, COUNT(*) count FROM operations WHERE country_code IS NOT NULL GROUP BY country_code ORDER BY count DESC LIMIT 8",
+    )
+    .all() as Array<{ country: string; count: number }>;
+
+  return {
+    cohorts,
+    timeline,
+    countries_with,
+    countries_without,
+    totals: {
+      cohorts: cohorts.length,
+      keys: allPrefixes.length,
+      units: cohorts.reduce((s, c) => s + c.units, 0),
+    },
+  };
+}

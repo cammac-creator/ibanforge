@@ -87,6 +87,22 @@ describe('API Keys', () => {
     expect(validateApiKey(result!.api_key).noRecredit).toBe(true);
   });
 
+  it('rotation cannot be used to clear the opt-out flag or reset usage', () => {
+    const result = generateApiKey(`norecredit-rotate-${RUN_ID}@example.com`);
+    const v = validateApiKey(result!.api_key);
+    const db = getStatsDB();
+    db.prepare('UPDATE api_keys SET no_recredit = 1 WHERE key_prefix = ?').run(result!.key_prefix);
+    checkAndIncrementQuota(v.keyHash, 200, 50, true); // 50 units already spent
+
+    const rotated = rotateApiKey(result!.api_key);
+    const nv = validateApiKey(rotated!.api_key);
+    // The flag survives the rotation...
+    expect(nv.noRecredit).toBe(true);
+    // ...and so does the usage: the new key sees the 50 already spent, not 0.
+    const q = checkAndIncrementQuota(nv.keyHash, 200, 1, true);
+    expect(q.used).toBeGreaterThanOrEqual(51);
+  });
+
   it('returns usage stats', () => {
     const result = generateApiKey(`usage-${RUN_ID}@example.com`);
     const v = validateApiKey(result!.api_key);

@@ -214,7 +214,10 @@ export function apiKeyMiddleware(): MiddlewareHandler<HonoEnv> {
     // avoid hiding infrastructure problems.
     let used = quota.used;
     if (c.res.status >= 400 && c.res.status < 500) {
-      decrementQuota(keyHash, units);
+      // Refund onto the month the increment was billed to, not the wall-clock
+      // month now — they differ across a month boundary and the mismatch is
+      // permanent for a key on the lifetime basis.
+      decrementQuota(keyHash, units, quota.month);
       used = Math.max(quota.used - units, 0);
     }
     setQuotaHeaders(c, { used, limit: quota.limit, month: quota.month });

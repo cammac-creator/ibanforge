@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { timingSafeEqual } from 'node:crypto';
-import { getStats, getStatsHistory, getHourlyStats, getErrorStats, getPatternStats, getStatusByPath, getBusinessFunnel, getSourceStats, getRejectionStats } from '../lib/stats.js';
+import { getStats, getStatsHistory, getHourlyStats, getErrorStats, getPatternStats, getStatusByPath, getBusinessFunnel, getSourceStats, getRejectionStats, getCohortFootprint } from '../lib/stats.js';
 import { getEvents } from '../lib/events.js';
 import { getEntryCount } from '../lib/bic-lookup.js';
 
@@ -134,6 +134,22 @@ stats.get('/stats/business-funnel', (c) => {
     if (isNaN(days)) days = 30;
     days = Math.max(1, Math.min(90, days));
     return c.json({ period_days: days, rows: getBusinessFunnel(days) });
+  } catch {
+    return c.json({ error: 'stats_unavailable' }, 500);
+  }
+});
+
+/**
+ * Study view of the regrouped signup cohorts: what the two known bursts did to
+ * every indicator, read from the rows the business views exclude. Off the public
+ * page on purpose — surfaced only in the dashboard's discreet case-study panel.
+ */
+stats.get('/stats/cohort-footprint', (c) => {
+  if (!checkAuth(c.req.header('Authorization'))) {
+    return c.json({ error: 'unauthorized', message: 'Stats require authentication.' }, 403);
+  }
+  try {
+    return c.json(getCohortFootprint());
   } catch {
     return c.json({ error: 'stats_unavailable' }, 500);
   }
