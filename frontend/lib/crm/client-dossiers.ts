@@ -27,6 +27,17 @@ export interface ClientProfileRow {
   reject_reasons: Array<{ reason: string; count: number }>;
 }
 
+/** One row of /v1/admin/company-profiles — the enrichment radar's identity
+ *  table for signups the prospecting list never knew (19/08/2026). */
+export interface CompanyProfileRow {
+  email: string;
+  company: string | null;
+  website: string | null;
+  country: string | null;
+  what_they_do: string | null;
+  source: string;
+}
+
 export interface DossierInput {
   keys: KeyRow[];
   prospects: ProspectRow[];
@@ -34,6 +45,8 @@ export interface DossierInput {
   profiles: Record<string, ClientProfileRow>;
   monthsByKey: Record<string, Array<{ month: string; count: number }>>;
   quotaWarnedByKey: Record<string, string[]>;
+  /** Fallback identity behind the richer prospect rows; optional. */
+  companyProfiles?: Record<string, CompanyProfileRow>;
   now: Date;
   /** Profile window in days — every windowed figure and label follows it. */
   windowDays?: number;
@@ -288,13 +301,22 @@ export function buildDossiers(input: DossierInput): ClientDossier[] {
     const hours = Array(24).fill(0) as number[];
     for (const p of profiles) for (let h = 0; h < 24; h++) hours[h] += p.hours?.[h] ?? 0;
 
+    // Identity: the prospect row wins field by field (it was researched by a
+    // person), the enriched company profile fills every hole — an empty
+    // string counts as a hole, several prospect rows carry them.
+    const prospect = prospectByEmail.get(id);
+    const enriched = input.companyProfiles?.[id];
+    const pick = (...vals: Array<string | null | undefined>): string | null => {
+      for (const v of vals) if (v != null && v.trim() !== '') return v;
+      return null;
+    };
     const dossier: ClientDossier = {
       id,
       email: keys[0].email,
-      company: prospectByEmail.get(id)?.company ?? null,
-      website: prospectByEmail.get(id)?.website ?? null,
-      country: prospectByEmail.get(id)?.country ?? null,
-      whatTheyDo: prospectByEmail.get(id)?.what_they_do ?? null,
+      company: pick(prospect?.company, enriched?.company),
+      website: pick(prospect?.website, enriched?.website),
+      country: pick(prospect?.country, enriched?.country),
+      whatTheyDo: pick(prospect?.what_they_do, enriched?.what_they_do),
       // Ordered on parsed instants, not on raw strings: created_at mixes the
       // SQL and ISO shapes in production (one pilot holds both), and a bare
       // string sort ranks 'T' against ' ' instead of time against time.
@@ -408,6 +430,18 @@ export async function fetchClientProfiles(days = 90): Promise<ProfilesPayload> {
  * The same chip the Contacts list wears, derived from the dossier's joined
  * activation row — one table, two pages, no second truth.
  */
+/** The enrichment radar's identity table, keyed by lowercase email. */
+export async function fetchCompanyProfiles(): Promise<Record<string, CompanyProfileRow>> {
+  if (!ADMIN_SECRET) return {};
+  const r = await fetch(`${API_URL}/v1/admin/company-profiles`, {
+    headers: { 'X-Admin-Secret': ADMIN_SECRET },
+    cache: 'no-store',
+  }).catch(() => null);
+  if (!r?.ok) return {};
+  const j = (await r.json().catch(() => null)) as { profiles?: Record<string, CompanyProfileRow> } | null;
+  return j?.profiles ?? {};
+}
+
 export function chipOfDossier(d: ClientDossier): BusinessChip | null {
   const a = d.activation;
   if (a?.status === 'paying') return chipForStatus('paying');

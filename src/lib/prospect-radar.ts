@@ -172,6 +172,77 @@ export interface ProspectMail {
   bodyFr: string;
 }
 
+// ------------------------------------------------------- describing a site
+
+/**
+ * The useful text of a page, for a describe prompt: title, meta description,
+ * then the visible body with markup stripped — capped, because a pricing
+ * page's tail adds tokens, not identity.
+ */
+export function pageGist(html: string, cap = 1600): string {
+  const title = /<title[^>]*>([^<]{1,200})/i.exec(html)?.[1] ?? '';
+  const meta =
+    /<meta[^>]+name=["']description["'][^>]*content=["']([^"']{1,400})/i.exec(html)?.[1] ??
+    /<meta[^>]+content=["']([^"']{1,400})["'][^>]*name=["']description["']/i.exec(html)?.[1] ??
+    /<meta[^>]+property=["']og:description["'][^>]*content=["']([^"']{1,400})/i.exec(html)?.[1] ??
+    '';
+  const body = html
+    .replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>|<noscript[\s\S]*?<\/noscript>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&[a-z#0-9]+;/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return [title && `TITLE: ${title.trim()}`, meta && `META: ${meta.trim()}`, body && `BODY: ${body}`]
+    .filter(Boolean)
+    .join('\n')
+    .slice(0, cap);
+}
+
+/**
+ * One factual sentence about a company, in French — the language every
+ * existing profile in the CRM already speaks.
+ */
+export const DESCRIBE_SYSTEM = `You identify what a company does from its website text, for an internal CRM.
+
+Rules:
+1. Output FRENCH. One or two factual sentences (max 260 characters total) describing what the company does and for whom. No marketing adjectives, no guessing beyond the text.
+2. If the text does not clearly identify a real organisation's activity (parked domain, login-only page, mailbox provider, error page), output UNKNOWN for DESC.
+3. COMPANY = the organisation's name as the site states it (short). COUNTRY = ISO 3166-1 alpha-2 if the text makes it clear, else UNKNOWN.
+4. No em dashes or en dashes anywhere.
+
+Output STRICTLY in this format:
+===COMPANY===
+(name or UNKNOWN)
+===COUNTRY===
+(two-letter code or UNKNOWN)
+===DESC===
+(the French description, or UNKNOWN)
+===END===`;
+
+export function buildDescribePrompt(siteUrl: string, gist: string): string {
+  return `Website: ${siteUrl}\n\n${gist}`;
+}
+
+export interface SiteDescription {
+  company: string | null;
+  country: string | null;
+  desc: string | null;
+}
+
+export function parseDescribeOutput(text: string): SiteDescription | null {
+  const grab = (name: string, next: string): string | null => {
+    const m = text.match(new RegExp(`===${name}===\\s*([\\s\\S]*?)\\s*===${next}===`));
+    if (!m) return null;
+    const v = m[1].trim();
+    return !v || /^unknown$/i.test(v) ? null : v;
+  };
+  const company = grab('COMPANY', 'COUNTRY');
+  const country = grab('COUNTRY', 'DESC');
+  const desc = grab('DESC', 'END');
+  if (!text.includes('===DESC===')) return null;
+  return { company, country: country && /^[A-Za-z]{2}$/.test(country) ? country.toUpperCase() : null, desc };
+}
+
 /**
  * Marker format, never JSON: a multi-line body inside a JSON string is exactly
  * the failure mode that killed 5 of 6 forum generations in production.

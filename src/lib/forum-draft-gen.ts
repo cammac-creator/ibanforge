@@ -20,6 +20,7 @@
 import { validateIBAN } from './iban.js';
 import { enrichResult } from './enrich.js';
 import { lookup as lookupBic } from './bic-lookup.js';
+import { customerContextBlock } from './company-profiles.js';
 
 export const PRODUCT_FACTS = [
   'Free tier: 200 requests/month, no card required.',
@@ -213,7 +214,10 @@ export async function generateDraft(t: DraftInput): Promise<GeneratedDraft | nul
       // that ceiling in production (stop_reason=max_tokens); headroom is cheap.
       max_tokens: 3000,
       system: DRAFT_SYSTEM,
-      messages: [{ role: 'user', content: buildUserPrompt(t) }],
+      // The customer-base block gives the reply real-world grounding (what
+      // kind of pipelines actually hit this problem); the block itself
+      // forbids naming any customer, and every draft is human-reviewed.
+      messages: [{ role: 'user', content: buildUserPrompt(t) + customerContextBlock() }],
     }),
     signal: AbortSignal.timeout(60_000),
   });

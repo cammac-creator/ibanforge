@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   buildProspectMailPrompt,
   extractEmails,
+  pageGist,
+  parseDescribeOutput,
   parseProspectMail,
   pickEmail,
   recommendedLang,
@@ -96,6 +98,43 @@ Deux paragraphes.
 
   it('returns null when a section is missing, never a half-mail', () => {
     expect(parseProspectMail('===SUBJECT_EN===\nx\n===BODY_EN===\ny\n===END===')).toBe(null);
+  });
+});
+
+describe('pageGist — the useful text of a page', () => {
+  it('keeps title, meta description and stripped body, drops scripts', () => {
+    const gist = pageGist(`<html><head><title>Société Alpha</title>
+      <meta name="description" content="Validation de paiements pour PME.">
+      <script>var hidden = "nope";</script></head>
+      <body><h1>Alpha</h1><p>Nous validons des virements.</p></body></html>`);
+    expect(gist).toContain('TITLE: Société Alpha');
+    expect(gist).toContain('META: Validation de paiements pour PME.');
+    expect(gist).toContain('Nous validons des virements.');
+    expect(gist).not.toContain('hidden');
+  });
+
+  it('caps the output so a long page stays a short prompt', () => {
+    expect(pageGist(`<body>${'mot '.repeat(5000)}</body>`).length).toBeLessThanOrEqual(1600);
+  });
+});
+
+describe('parseDescribeOutput', () => {
+  it('reads the three sections and normalises UNKNOWN to null', () => {
+    const out = parseDescribeOutput(
+      '===COMPANY===\nSociété Alpha\n===COUNTRY===\nch\n===DESC===\nValide des virements pour PME.\n===END===',
+    );
+    expect(out).toEqual({ company: 'Société Alpha', country: 'CH', desc: 'Valide des virements pour PME.' });
+    const unknown = parseDescribeOutput('===COMPANY===\nUNKNOWN\n===COUNTRY===\nUNKNOWN\n===DESC===\nUNKNOWN\n===END===');
+    expect(unknown).toEqual({ company: null, country: null, desc: null });
+  });
+
+  it('rejects a malformed country instead of storing garbage', () => {
+    const out = parseDescribeOutput('===COMPANY===\nX\n===COUNTRY===\nSuisse\n===DESC===\nY\n===END===');
+    expect(out?.country).toBe(null);
+  });
+
+  it('returns null when the marker frame is absent', () => {
+    expect(parseDescribeOutput('just prose, no markers')).toBe(null);
   });
 });
 

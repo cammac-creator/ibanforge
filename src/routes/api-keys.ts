@@ -23,6 +23,7 @@ import { addAlias, listAliases, loadAliasMap, toCanonical } from '../lib/email-a
 import { getWeeklyFacts, saveWeeklyDigest, getWeeklyDigests } from '../lib/weekly-facts.js';
 import { notifyPurchaseTelegram } from '../lib/notify.js';
 import { isProspectBackfillRunning, lastProspectBackfillReport, runProspectBackfill } from '../lib/prospect-radar-server.js';
+import { getCompanyProfiles, upsertCompanyProfile, type ProfileSource } from '../lib/company-profiles.js';
 import { sendApiKeyEmail, sendKeyVerificationEmail, isEmailConfigured } from '../lib/email.js';
 
 // Bundle credits — prepaid pools sized for the 3 typical agent stacks.
@@ -1597,7 +1598,7 @@ apiKeys.post('/v1/admin/prospects/backfill', (c) => {
   if (isProspectBackfillRunning()) {
     return c.json({ started: false, reason: 'already_running' });
   }
-  void runProspectBackfill({ enrichLimit: 12, draftLimit: 12 }).catch((err) =>
+  void runProspectBackfill({ enrichLimit: 12, draftLimit: 12, clientLimit: 12 }).catch((err) =>
     console.error('[prospect-radar] manual run failed:', err instanceof Error ? err.message : err),
   );
   return c.json({ started: true });
@@ -1608,6 +1609,50 @@ apiKeys.get('/v1/admin/prospects/backfill', (c) => {
     return c.json({ error: 'unauthorized' }, 401);
   }
   return c.json({ running: isProspectBackfillRunning(), ...lastProspectBackfillReport() });
+});
+
+/**
+ * Customer activity profiles (who they are, what they do) — the enrichment
+ * radar and the 19/08 audit write here; the Clients/Contacts dossiers read
+ * it as the fallback behind prospect rows.
+ */
+apiKeys.get('/v1/admin/company-profiles', (c) => {
+  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
+  return c.json({ profiles: getCompanyProfiles() });
+});
+
+apiKeys.post('/v1/admin/company-profiles', async (c) => {
+  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
+  let body: { profiles?: unknown };
+  try {
+    body = await c.req.json<{ profiles?: unknown }>();
+  } catch {
+    return c.json({ error: 'invalid_json' }, 400);
+  }
+  if (!Array.isArray(body.profiles)) {
+    return c.json({ error: 'invalid_body', message: 'Expected { profiles: [...] }' }, 400);
+  }
+  const allowedSources: ProfileSource[] = ['site', 'ua', 'audit', 'manual', 'unresolvable'];
+  let upserted = 0;
+  for (const raw of body.profiles as Array<Record<string, unknown>>) {
+    const email = typeof raw.email === 'string' ? raw.email.trim().toLowerCase() : '';
+    const source = allowedSources.includes(raw.source as ProfileSource) ? (raw.source as ProfileSource) : 'manual';
+    if (!email || !email.includes('@')) continue;
+    upsertCompanyProfile({
+      email,
+      company: typeof raw.company === 'string' ? raw.company : null,
+      website: typeof raw.website === 'string' ? raw.website : null,
+      country: typeof raw.country === 'string' ? raw.country : null,
+      whatTheyDo: typeof raw.what_they_do === 'string' ? raw.what_they_do : null,
+      source,
+    });
+    upserted++;
+  }
+  return c.json({ upserted });
 });
 
 // ---------------------------------------------------------------------------

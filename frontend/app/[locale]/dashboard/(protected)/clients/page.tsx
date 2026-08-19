@@ -2,7 +2,7 @@ import { getLocale } from 'next-intl/server';
 import { ClientsApp } from '@/components/crm/clients-app';
 import { FreshnessBadge } from '@/components/crm/freshness-badge';
 import { fetchCrmData } from '@/lib/crm/build-contacts';
-import { buildDossiers, fetchClientProfiles } from '@/lib/crm/client-dossiers';
+import { buildDossiers, fetchClientProfiles, fetchCompanyProfiles } from '@/lib/crm/client-dossiers';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,7 +17,11 @@ export default async function ClientsPage({
   const params = await searchParams;
   const daysParam = Number(params.days ?? 90);
   const windowDays = (WINDOWS as readonly number[]).includes(daysParam) ? daysParam : 90;
-  const [data, profiles] = await Promise.all([fetchCrmData(), fetchClientProfiles(windowDays)]);
+  const [data, profiles, companyProfiles] = await Promise.all([
+    fetchCrmData(),
+    fetchClientProfiles(windowDays),
+    fetchCompanyProfiles(),
+  ]);
 
   if (!data) {
     return (
@@ -38,6 +42,7 @@ export default async function ClientsPage({
     profiles: profiles.profiles,
     monthsByKey: profiles.monthsByKey,
     quotaWarnedByKey: profiles.quotaWarnedByKey,
+    companyProfiles,
     now: new Date(),
     windowDays,
     activation: data.activation,
