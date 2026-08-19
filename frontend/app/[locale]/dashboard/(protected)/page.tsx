@@ -23,6 +23,7 @@ import { BY_CAMPAIGN, BY_CONFIDENCE, BY_COUNTRY, BY_SEGMENT, funnelBy } from '@/
 import { reservoir } from '@/lib/crm/priority';
 import { ReservoirCard } from '@/components/dashboard/reservoir-card';
 import { OrphanMailPanel, type OrphanMailRow } from '@/components/dashboard/orphan-mail-panel';
+import { CohortStudyPanel, type CohortFootprint } from '@/components/dashboard/cohort-study-panel';
 import { FOLLOWUP_DAYS } from '@/lib/crm/situation';
 import { crmSnapshot } from '@/lib/crm/snapshot';
 import { topUsers } from '@/lib/crm/top-users';
@@ -221,7 +222,7 @@ export default async function DashboardPage({
     ? (periodParam as ValidPeriod)
     : 30;
 
-  const [statsRes, historyRes, funnelRes, activationRes, errorsRes, hourlyRes, eventsRes, digestRes, statusByPathRes, sourcesRes, patternsRes, orphanRes, crm] = await Promise.all([
+  const [statsRes, historyRes, funnelRes, activationRes, errorsRes, hourlyRes, eventsRes, digestRes, statusByPathRes, sourcesRes, patternsRes, cohortFootprintRes, orphanRes, crm] = await Promise.all([
     fetchJSON<StatsResponse>('/stats', statsHeaders),
     fetchJSON<HistoryEntry[]>(`/stats/history?period=${period}`, statsHeaders),
     fetchJSON<{ rows?: BusinessFunnelDay[] }>(`/stats/business-funnel?period=${period}`, statsHeaders),
@@ -242,6 +243,8 @@ export default async function DashboardPage({
     fetchJSON<{ rows: StatusByPathRow[] }>(`/stats/status-by-path?period=${period}`, statsHeaders),
     fetchJSON<{ by_client_kind: ChannelRow[] }>(`/stats/sources?period=${period}`, statsHeaders),
     fetchJSON<{ geo_trend: Array<Record<string, number | string>> }>(`/stats/patterns?period=${period}`, statsHeaders),
+    // Study view of the regrouped cohorts — discreet, folded shut, rendered last.
+    fetchJSON<CohortFootprint>('/stats/cohort-footprint', statsHeaders),
     // Mail the CRM cannot attach to anyone. No admin secret means no panel,
     // not a broken page. (The listing watch moved to Forums → Vitrines on
     // 18/08/2026; this page no longer duplicates it.)
@@ -586,6 +589,9 @@ export default async function DashboardPage({
 
       {/* 9. Activity heatmap — when the traffic happens */}
       <Heatmap data={heatmapData} />
+
+      {/* 10. Case study — the cohorts' footprint. Discreet, folded shut, last. */}
+      <CohortStudyPanel data={cohortFootprintRes.data} />
     </div>
   );
 }
