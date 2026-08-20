@@ -37,7 +37,21 @@ const BARS = [
   { key: 'server_error', color: '#ef4444', label: 'Server error (5xx)' },
 ] as const;
 
-type Row = BusinessFunnelDay & { total: number; conversion: number };
+// Amber, matching the cohort study panel, and set apart from the five funnel
+// colours so the marker never reads as a funnel category.
+const COHORT_COLOR = '#d0a548';
+
+type Row = BusinessFunnelDay & {
+  total: number;
+  conversion: number;
+  /** Real cohort validations that day (kept out of `total`). */
+  cohort_units: number;
+  /** Height of the marker only — a reduced, funnel-relative scale, never the
+   *  real count (that would be ~10× the funnel and flatten it). */
+  cohort_scaled: number;
+  /** Transparent gap under the marker so it floats clear of the funnel. */
+  cohort_gap: number;
+};
 
 function CustomTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ payload: Row }>; label?: string }) {
   if (!active || !payload || payload.length === 0) return null;
@@ -74,16 +88,53 @@ function CustomTooltip({ active, payload, label }: { active?: boolean; payload?:
       ) : (
         <div className="text-[var(--fg-4)] text-[11px]">Aucune requête métier ce jour-là.</div>
       )}
+      {row.cohort_units > 0 && (
+        <div className="mt-1.5 flex items-center gap-2 border-t border-[var(--ink-4)] pt-1.5">
+          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: COHORT_COLOR }} />
+          <span className="text-[var(--fg-3)]">Cohortes (hors funnel)</span>
+          <span className="ml-auto font-mono tabular-nums" style={{ color: COHORT_COLOR }}>
+            {row.cohort_units.toLocaleString('fr-CH').replace(/ /g, ' ')}
+          </span>
+        </div>
+      )}
     </div>
   );
 }
 
-export function BusinessFunnelChart({ data, markers }: { data: BusinessFunnelDay[]; markers?: ChartMarker[] }) {
-  const rows: Row[] = data.map((d) => {
+export function BusinessFunnelChart({
+  data,
+  markers,
+  cohortByDate,
+}: {
+  data: BusinessFunnelDay[];
+  markers?: ChartMarker[];
+  /** date (YYYY-MM-DD) → real cohort validations that day. */
+  cohortByDate?: Record<string, number>;
+}) {
+  const cohort = cohortByDate ?? {};
+  const cohortValues = Object.values(cohort).filter((n) => n > 0);
+  const maxCohort = cohortValues.length ? Math.max(...cohortValues) : 0;
+
+  const base = data.map((d) => {
     const total = d.success + d.paywall + d.auth_or_quota + d.bad_input + d.server_error;
     const conversion = total > 0 ? (d.success / total) * 100 : 0;
     return { ...d, total, conversion };
   });
+  const maxFunnel = Math.max(1, ...base.map((r) => r.total));
+
+  const rows: Row[] = base.map((r) => {
+    const units = cohort[r.date] ?? 0;
+    // The marker rides a reduced scale (a cohort day at most ~18% of the tallest
+    // funnel bar) and stays proportional BETWEEN cohort days, with a floor so a
+    // small one is still visible. The true count lives in the tooltip only.
+    const cohort_scaled =
+      units > 0 && maxCohort > 0 ? Math.max(maxFunnel * 0.03, (units / maxCohort) * maxFunnel * 0.18) : 0;
+    // A transparent spacer between the funnel and the marker, so the amber
+    // pill floats clear of the orange paywall band instead of blending into it.
+    const cohort_gap = units > 0 ? maxFunnel * 0.05 : 0;
+    return { ...r, cohort_units: units, cohort_scaled, cohort_gap };
+  });
+  const hasCohort = rows.some((r) => r.cohort_units > 0);
 
   if (rows.length === 0) {
     return (
@@ -146,6 +197,23 @@ export function BusinessFunnelChart({ data, markers }: { data: BusinessFunnelDay
             ))}
           </Bar>
         ))}
+        {/* Transparent spacer, then the marker on top — the pill floats clear
+            of the funnel. Both stacked LAST and excluded from `total`, so
+            conversion and the funnel figures are untouched; the real count is in
+            the tooltip. The marker's height is a reduced scale, not the count. */}
+        {hasCohort && (
+          <Bar dataKey="cohort_gap" stackId="funnel" fill="transparent" legendType="none" isAnimationActive={false} />
+        )}
+        {hasCohort && (
+          <Bar
+            dataKey="cohort_scaled"
+            name="Cohortes (hors funnel · repère)"
+            fill={COHORT_COLOR}
+            stackId="funnel"
+            radius={[2, 2, 2, 2]}
+            isAnimationActive={false}
+          />
+        )}
         {[...markersByDate.entries()].map(([day]) => (
           <ReferenceLine key={day} x={day} stroke="#a78bfa" strokeDasharray="4 3" strokeOpacity={0.7} />
         ))}
@@ -154,6 +222,16 @@ export function BusinessFunnelChart({ data, markers }: { data: BusinessFunnelDay
       {markersByDate.size > 0 && (
         <p className="mt-2 text-[11px] leading-snug text-violet-300/80">
           ⚑ {[...markersByDate.entries()].map(([day, label]) => `${day.slice(8, 10)}/${day.slice(5, 7)} ${label}`).join(' · ')}
+        </p>
+      )}
+      {hasCohort && (
+        <p className="mt-2 flex items-start gap-1.5 text-[11px] leading-snug text-[var(--fg-4)]">
+          <span className="mt-0.5 h-2 w-2 shrink-0 rounded-sm" style={{ backgroundColor: COHORT_COLOR, opacity: 0.7 }} />
+          <span>
+            Le repère ambré marque les jours d&apos;<strong className="text-[var(--fg-3)]">inscriptions
+            automatiques regroupées</strong> — validations exclues du funnel, à échelle réduite (le volume
+            réel, jusqu&apos;à ~10× la hauteur du graphe, s&apos;affiche au survol).
+          </span>
         </p>
       )}
       {lastIsPartial && (

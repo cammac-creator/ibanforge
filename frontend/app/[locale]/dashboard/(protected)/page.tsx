@@ -278,6 +278,10 @@ export default async function DashboardPage({
   const history = historyRes.data;
   const hist = history ?? [];
   const funnelRows = funnelRes.data?.rows ?? [];
+  // Cohort validations per day, for the discreet marker on the funnel chart.
+  const cohortByDate: Record<string, number> = Object.fromEntries(
+    (cohortFootprintRes.data?.timeline ?? []).map((d) => [d.day, d.count]),
+  );
   const errors = errorsRes.data;
   const hourly = hourlyRes.data;
   const chartMarkers: ChartMarker[] = (eventsRes.data?.events ?? []).map((e) => ({
@@ -431,7 +435,7 @@ export default async function DashboardPage({
         {!funnelRes.ok ? (
           <FetchFailed name="Funnel métier" status={funnelRes.status} />
         ) : (
-          <BusinessFunnelChart data={funnelRows} markers={chartMarkers} />
+          <BusinessFunnelChart data={funnelRows} markers={chartMarkers} cohortByDate={cohortByDate} />
         )}
       </div>
 
