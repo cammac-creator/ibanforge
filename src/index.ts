@@ -646,3 +646,15 @@ function gracefulShutdown(signal: string) {
 
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
+// Safety net. The x402 SDK kicks off a facilitator sync when the paywall is
+// constructed and detaches that promise on routes that require no payment, so
+// with the default Node behavior a CDP outage turns any anonymous hit on a
+// free /v1/* route into a process crash — and Railway stops restarting after
+// 3 failures, taking paying key holders down with it. Log and stay up.
+process.on('unhandledRejection', (reason) => {
+  console.error(
+    '[unhandledRejection]',
+    reason instanceof Error ? (reason.stack ?? reason.message) : reason,
+  );
+});

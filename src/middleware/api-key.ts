@@ -190,8 +190,9 @@ export function apiKeyMiddleware(): MiddlewareHandler<HonoEnv> {
     // client that burns nearly its whole monthly allowance in a matter of
     // minutes (a real, measured case), so the warning is triggered by the very
     // call that crosses 80%.
-    // Fire-and-forget: the customer's request must never wait on SMTP, and
-    // maybeSendQuotaWarning is written not to throw.
+    // Fire-and-forget: the customer's request must never wait on SMTP. The
+    // notice bookkeeping touches the DB, so a lock or an in-flight shutdown
+    // can reject — that must land in the log, never as an unhandled rejection.
     if (quota.crossedNoticeThreshold && email) {
       c.header('X-Quota-Notice', 'threshold-crossed');
       void maybeSendQuotaWarning({
@@ -201,7 +202,9 @@ export function apiKeyMiddleware(): MiddlewareHandler<HonoEnv> {
         used: quota.used,
         limit: quota.limit,
         month: quota.month,
-      });
+      }).catch((err) =>
+        console.error('[quota-notice] warning failed:', err instanceof Error ? err.message : err),
+      );
     }
 
     c.set('apiKeyAuthenticated', true);
