@@ -698,6 +698,144 @@ export function buildRouteTable(
   return routes;
 }
 
+// ─── The paywall, built once ─────────────────────────────────────────────────
+//
+// Until 20/08/2026 everything below — four dynamic imports, an
+// HTTPFacilitatorClient, an x402ResourceServer, and `paymentMiddleware()` —
+// was rebuilt inside the handler, on EVERY request under /v1/*. Two costs, one
+// of them fatal:
+//
+//  1. `paymentMiddleware()` fires `httpServer.initialize()` — a
+//     `GET {facilitator}/supported` — from its constructor. So every anonymous
+//     request amplified 1:1 into an outbound call to Coinbase (audit A2 §C1.3).
+//  2. On a route that requires no payment the SDK returns `next()` without ever
+//     awaiting that promise. When the facilitator was unreachable the rejection
+//     had no handler, and Node 22 kills the process for an unhandled rejection
+//     — after which Railway gives up at 3 restarts. A CDP outage therefore took
+//     the whole service down, paying API-key holders included (audit A2 §C1.1).
+//
+// The facilitator client and the resource server are now created once and
+// reused; the facilitator handshake happens once, lazily, and ONLY on a request
+// that actually needs a quote. Two things are deliberately NOT hoisted:
+//
+//  - The route table stays per-request. It has to: `resource` must announce the
+//    URL actually requested (a `:code` template published as callable already
+//    cost us two unbuyable routes), and the synthetic "universal 402" entry for
+//    a mismatched-method probe is derived from the request.
+//  - The handshake is not awaited at boot, nor on free routes. Awaiting it at
+//    boot would turn a facilitator outage into a 503 on `/v1/iban/format` —
+//    trading a crash for an outage on routes that never needed CDP at all.
+type HonoX402Module = typeof import('@x402/hono');
+type CoreServerModule = typeof import('@x402/core/server');
+type ResourceServer = InstanceType<CoreServerModule['x402ResourceServer']>;
+type HTTPResourceServer = InstanceType<CoreServerModule['x402HTTPResourceServer']>;
+type RoutesArg = ConstructorParameters<CoreServerModule['x402HTTPResourceServer']>[1];
+
+interface X402Paywall {
+  hono: HonoX402Module;
+  core: CoreServerModule;
+  server: ResourceServer;
+  /** True once `GET /supported` has succeeded for this server. */
+  facilitatorSynced: boolean;
+  /** In-flight handshake, shared by concurrent requests; cleared on failure. */
+  facilitatorSync: Promise<void> | null;
+}
+
+/**
+ * Keyed by the configuration it was built from, so a change of wallet or
+ * facilitator (tests, a rotated CDP key read from a fresh env) rebuilds instead
+ * of silently serving a stale payee.
+ */
+let paywallCache: { signature: string; promise: Promise<X402Paywall> } | null = null;
+
+function paywallSignature(walletAddress: string): string {
+  return [
+    walletAddress,
+    process.env.CDP_API_KEY_ID ?? '',
+    // The secret itself never goes into a cache key — only whether one is set.
+    process.env.CDP_API_KEY_SECRET ? 'cdp' : '',
+    process.env.FACILITATOR_URL ?? '',
+  ].join('|');
+}
+
+// The wallet is NOT baked in here: prices and payTo are resolved per request by
+// buildRouteTable, so the shared server stays request-agnostic.
+async function buildPaywall(): Promise<X402Paywall> {
+  const hono = await import('@x402/hono');
+  const core = await import('@x402/core/server');
+  const { ExactEvmScheme } = await import('@x402/evm/exact/server');
+  const { bazaarResourceServerExtension } = await import('@x402/extensions');
+
+  const cdpKeyId = process.env.CDP_API_KEY_ID;
+  const cdpKeySecret = process.env.CDP_API_KEY_SECRET;
+
+  let facilitatorClient: InstanceType<CoreServerModule['HTTPFacilitatorClient']>;
+  if (cdpKeyId && cdpKeySecret) {
+    const { createFacilitatorConfig } = await import('@coinbase/x402');
+    facilitatorClient = new core.HTTPFacilitatorClient(createFacilitatorConfig(cdpKeyId, cdpKeySecret));
+  } else {
+    facilitatorClient = new core.HTTPFacilitatorClient({
+      url: process.env.FACILITATOR_URL || 'https://x402.org/facilitator',
+    });
+  }
+
+  // Build x402 resource server with EVM scheme (like official example)
+  const server = new core.x402ResourceServer(facilitatorClient);
+  server.register('eip155:*', new ExactEvmScheme());
+  // Register the Bazaar discovery extension so each route ships its
+  // inputSchema/outputSchema to facilitator catalogs (Coinbase CDP, x402.org)
+  // and AI agents can find IBANforge automatically.
+  server.registerExtension(bazaarResourceServerExtension);
+
+  return { hono, core, server, facilitatorSynced: false, facilitatorSync: null };
+}
+
+function getPaywall(walletAddress: string): Promise<X402Paywall> {
+  const signature = paywallSignature(walletAddress);
+  const cached = paywallCache;
+  if (cached && cached.signature === signature) return cached.promise;
+  const promise = buildPaywall().catch((err: unknown) => {
+    // Never cache a failure: the next request must be free to try again.
+    if (paywallCache?.signature === signature) paywallCache = null;
+    throw err;
+  });
+  paywallCache = { signature, promise };
+  return promise;
+}
+
+/**
+ * The facilitator handshake, run at most once per process.
+ *
+ * `x402HTTPResourceServer.initialize()` fetches the supported payment kinds
+ * into the SHARED resource server and validates this request's route table
+ * against them — the exact call the SDK used to make from every
+ * `paymentMiddleware()` construction. On failure the latch is cleared so the
+ * next paid request retries, which is the SDK's own behaviour.
+ */
+async function syncFacilitator(paywall: X402Paywall, httpServer: HTTPResourceServer): Promise<void> {
+  if (paywall.facilitatorSynced) return;
+  if (!paywall.facilitatorSync) {
+    paywall.facilitatorSync = httpServer.initialize().then(
+      () => {
+        paywall.facilitatorSynced = true;
+      },
+      (err: unknown) => {
+        paywall.facilitatorSync = null;
+        throw err;
+      },
+    );
+  }
+  await paywall.facilitatorSync;
+}
+
+/**
+ * Test seam: drop the memoized paywall so the next request rebuilds it.
+ * Used by src/app.test.ts, which swaps facilitators between cases.
+ */
+export function resetX402Paywall(): void {
+  paywallCache = null;
+}
+
 export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
   return async (c, next) => {
     // Dev bypass
@@ -751,10 +889,9 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
     }
 
     try {
-      const { paymentMiddleware } = await import('@x402/hono');
-      const { x402ResourceServer, HTTPFacilitatorClient } = await import('@x402/core/server');
-      const { ExactEvmScheme } = await import('@x402/evm/exact/server');
-      const { bazaarResourceServerExtension } = await import('@x402/extensions');
+      // Memoized: four dynamic imports, the facilitator client and the resource
+      // server, built on the first request under /v1/* and reused after that.
+      const paywall = await getPaywall(walletAddress);
 
       const routes = buildRouteTable(walletAddress, c.req.method, new URL(c.req.url).pathname);
       // The safety net, run once on the way out. See capDescription: it must
@@ -765,34 +902,38 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
         if (typeof entry.description === 'string') entry.description = capDescription(entry.description);
       }
 
-      // Create CDP facilitator client
-      const cdpKeyId = process.env.CDP_API_KEY_ID;
-      const cdpKeySecret = process.env.CDP_API_KEY_SECRET;
+      const httpServer = new paywall.core.x402HTTPResourceServer(paywall.server, routes as RoutesArg);
+      const context = {
+        adapter: new paywall.hono.HonoAdapter(c),
+        path: c.req.path,
+        method: c.req.method,
+      };
 
-      let facilitatorClient: InstanceType<typeof HTTPFacilitatorClient>;
-
-      if (cdpKeyId && cdpKeySecret) {
-        const { createFacilitatorConfig } = await import('@coinbase/x402');
-        const config = createFacilitatorConfig(cdpKeyId, cdpKeySecret);
-        facilitatorClient = new HTTPFacilitatorClient(config);
-      } else {
-        facilitatorClient = new HTTPFacilitatorClient({
-          url: process.env.FACILITATOR_URL || 'https://x402.org/facilitator',
-        });
+      // Answered by the SDK's own matcher on the SDK's own route table, so this
+      // cannot drift from what the paywall would have decided a line later.
+      if (!httpServer.requiresPayment(context)) {
+        await next();
+        return;
       }
 
-      // Build x402 resource server with EVM scheme (like official example)
-      const x402Server = new x402ResourceServer(facilitatorClient);
-      x402Server.register('eip155:*', new ExactEvmScheme());
-      // Register the Bazaar discovery extension so each route ships its
-      // inputSchema/outputSchema to facilitator catalogs (Coinbase CDP, x402.org)
-      // and AI agents can find IBANforge automatically.
-      x402Server.registerExtension(bazaarResourceServerExtension);
+      // Only a request that will actually be quoted may wait on the
+      // facilitator. This is the line that keeps a CDP outage off the free
+      // routes instead of spreading it to them.
+      try {
+        await syncFacilitator(paywall, httpServer);
+      } catch (err) {
+        // Same triage the SDK applies to its own boot sync: a facilitator that
+        // ANSWERED badly is a 502 naming the reason; anything else falls
+        // through to the 503 below.
+        const facilitatorError = paywall.core.getFacilitatorResponseError(err);
+        if (facilitatorError) return c.json({ error: facilitatorError.message }, 502);
+        throw err;
+      }
 
-      const middleware = paymentMiddleware(
-        routes as Parameters<typeof paymentMiddleware>[0],
-        x402Server,
-      );
+      // `false` = do not let the SDK run its own facilitator sync: we just did
+      // it, once, above. This is the parameter whose default fired the
+      // detached `GET /supported` from every construction.
+      const middleware = paywall.hono.paymentMiddlewareFromHTTPServer(httpServer, undefined, undefined, false);
       return middleware(c, next);
     } catch (err) {
       console.error('[x402] Middleware error:', err);

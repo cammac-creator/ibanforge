@@ -1,9 +1,9 @@
-import { readFileSync } from 'node:fs';
 import { Hono } from 'hono';
 import { describe, expect, it } from 'vitest';
 import { artifacts } from './artifacts.js';
 import { discovery } from './discovery.js';
 import { openapi } from './openapi.js';
+import { buildApp } from '../app.js';
 
 /**
  * The point of these tests is not that the files exist — it is that apis.json
@@ -21,19 +21,22 @@ app.route('/', artifacts);
 app.route('/', openapi);
 
 /**
- * Two promised paths are registered on the root app in index.ts rather than in
- * a router, and index.ts starts a listening server on import so it cannot be
- * mounted here. Asserting on its source is uglier than mounting it and far
- * better than dropping them from the check: they are the two most-fetched
- * discovery files we publish.
+ * Some promised paths (/llms.txt) are registered on the root app rather than in
+ * a router. They used to be checked by scanning index.ts as TEXT, because
+ * index.ts starts a listening server on import and could not be mounted here —
+ * so the check verified that a string appeared in a file, not that a URL
+ * answered. Since the assembly was extracted into `buildApp()` (src/app.ts,
+ * which starts nothing on import), they are fetched for real like every other
+ * entry.
  */
-const INDEX_SOURCE = readFileSync(new URL('../index.ts', import.meta.url), 'utf8');
-const SERVED_BY_ROOT_APP: Record<string, string> = {
-  '/llms.txt': "app.get('/llms.txt'",
-};
+const rootApp = buildApp();
 
 async function get(path: string): Promise<Response> {
-  return app.request(`https://api.ibanforge.com${path}`);
+  const url = `https://api.ibanforge.com${path}`;
+  const res = await app.request(url);
+  // Not served by the three routers mounted above → ask the full application,
+  // which is where the root-level discovery files live.
+  return res.status === 404 ? rootApp.request(url) : res;
 }
 
 describe('the published operating artifacts', () => {
@@ -121,11 +124,6 @@ describe('apis.json', () => {
       const path = entry.url.replace('https://api.ibanforge.com', '');
       // The MCP endpoint answers 405 to a sessionless GET by design.
       if (path === '/mcp') continue;
-      const registeredOnRoot = SERVED_BY_ROOT_APP[path];
-      if (registeredOnRoot) {
-        if (!INDEX_SOURCE.includes(registeredOnRoot)) broken.push(`${entry.type} -> ${entry.url}`);
-        continue;
-      }
       const res = await get(path);
       if (res.status === 404) broken.push(`${entry.type} -> ${entry.url}`);
     }
