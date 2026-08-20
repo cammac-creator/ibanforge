@@ -34,10 +34,28 @@ export function generateApiKey(
  * of the monthly subscription model. Created after a successful x402 payment
  * on /v1/credits/buy. No daily-rate-limit on creation (the payment already
  * provided abuse-resistance).
+ *
+ * 🚨 `paymentRef` is what makes this rail survivable, and it is the reason the
+ * card rail was safe while this one was not. `generateStripeKey` has always
+ * written the raw key to `raw_key_one_time_view` and keyed it on the checkout
+ * session, so a buyer whose success page never loaded can still fetch the key
+ * once. This path stored NOTHING: the $5-to-$80 key existed only inside the
+ * HTTP response, and a connection dropped after settlement left a buyer who
+ * had paid and had nothing — with no way for us to hand it back either, since
+ * we keep only the hash. It now behaves like the card rail:
+ *
+ *   - the raw key is retrievable exactly once, via GET /v1/credits/recover/:ref;
+ *   - a second call carrying the SAME settlement mints nothing and returns the
+ *     first key's prefix, so one payment can never become two packs.
+ *
+ * `paymentRef` stays optional so a caller with no payment header (free mode,
+ * tests, dev bypass) still gets a key — just not a recoverable one, which is
+ * correct: nothing was paid.
  */
 export function generateCreditKey(
   email: string | null,
   credits: number,
+  paymentRef?: string | null,
 ): { api_key: string; key_prefix: string; credits: number } {
   const db = getStatsDB();
   const rawKey = KEY_PREFIX + randomBytes(32).toString('hex');
@@ -48,9 +66,27 @@ export function generateCreditKey(
   // bundle behind one.
   const storedEmail = email && email.includes('@') ? email : 'credits-buyer';
   db.prepare(
-    'INSERT INTO api_keys (key_hash, key_prefix, email, monthly_limit, credits_remaining, credits_total) VALUES (?, ?, ?, NULL, ?, ?)',
-  ).run(keyHash, keyPrefix, storedEmail, credits, credits);
+    'INSERT INTO api_keys (key_hash, key_prefix, email, monthly_limit, credits_remaining, credits_total, x402_payment_ref, raw_key_one_time_view) VALUES (?, ?, ?, NULL, ?, ?, ?, ?)',
+  ).run(keyHash, keyPrefix, storedEmail, credits, credits, paymentRef ?? null, paymentRef ? rawKey : null);
   return { api_key: rawKey, key_prefix: keyPrefix, credits };
+}
+
+/**
+ * The pack this settlement already bought, if it bought one.
+ *
+ * Kept separate from `generateCreditKey` so that function keeps returning a key
+ * and only a key — the caller asks "was this already paid for?" before asking
+ * for a mint, instead of every existing call site having to handle a null key.
+ *
+ * One settlement, one pack: without this check a buyer replaying a request
+ * whose response they never saw would be handed a SECOND $80 pack for a single
+ * payment.
+ */
+export function findCreditKeyByPaymentRef(paymentRef: string): { key_prefix: string } | null {
+  const row = getStatsDB()
+    .prepare('SELECT key_prefix FROM api_keys WHERE x402_payment_ref = ?')
+    .get(paymentRef) as { key_prefix: string } | undefined;
+  return row ?? null;
 }
 
 /**
@@ -171,6 +207,32 @@ export function consumeOneTimeKey(
     credits_remaining: row.credits_remaining,
     monthly_limit: row.monthly_limit,
     email: row.email === 'stripe-buyer' || row.email === 'oem-subscriber' ? null : row.email,
+  };
+}
+
+/**
+ * The x402 twin of consumeOneTimeKey: read the raw key for a settlement ONCE,
+ * then null the column. Same one-shot discipline and the same reason for it —
+ * the reference travels in logs and retries, so the window must close after a
+ * single read.
+ */
+export function consumeOneTimeKeyByPaymentRef(
+  paymentRef: string,
+): { api_key: string; credits_total: number | null; credits_remaining: number | null } | null {
+  const db = getStatsDB();
+  const row = db
+    .prepare(
+      'SELECT raw_key_one_time_view, credits_total, credits_remaining FROM api_keys WHERE x402_payment_ref = ? AND raw_key_one_time_view IS NOT NULL AND active = 1',
+    )
+    .get(paymentRef) as
+    | { raw_key_one_time_view: string; credits_total: number | null; credits_remaining: number | null }
+    | undefined;
+  if (!row) return null;
+  db.prepare('UPDATE api_keys SET raw_key_one_time_view = NULL WHERE x402_payment_ref = ?').run(paymentRef);
+  return {
+    api_key: row.raw_key_one_time_view,
+    credits_total: row.credits_total,
+    credits_remaining: row.credits_remaining,
   };
 }
 

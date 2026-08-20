@@ -14,8 +14,11 @@ import { creditsBuy } from './credits-buy.js';
 import { apiKeys } from './api-keys.js';
 import { ibanValidate } from './iban-validate.js';
 import { apiKeyMiddleware } from '../middleware/api-key.js';
+import { stripeRetrieve } from './stripe-retrieve.js';
 import { generateApiKey, generateCreditKey, validateApiKey, decrementCredits, refundCredit } from '../lib/api-keys.js';
-import { closeAll } from '../lib/db.js';
+import { closeAll, getStatsDB } from '../lib/db.js';
+import { CREDITS_PURCHASE_TYPE, getStats } from '../lib/stats.js';
+import { createHash } from 'node:crypto';
 import type { HonoEnv } from '../types.js';
 
 afterAll(() => {
@@ -231,5 +234,166 @@ describe('apiKeyMiddleware — credit-bundle path', () => {
     });
     expect(res2.headers.get('x-credits-exhausted')).toBe('true');
     expect(res2.headers.get('x-credits-topup-hint')).toContain('1k');
+  });
+});
+
+/**
+ * Audit A2 — a $5-to-$80 key that existed only in one HTTP response.
+ *
+ * The card rail has always written the raw key to `raw_key_one_time_view` and
+ * keyed it on the checkout session, so a buyer whose success page never loaded
+ * can still fetch it once. The x402 rail stored nothing: settle succeeds, the
+ * connection drops, and the buyer has paid for a key nobody can hand back —
+ * we keep only its hash. Both rails now behave the same way.
+ */
+describe('a credit pack bought with USDC survives a lost response', () => {
+  function appWithRecovery() {
+    const app = new Hono<HonoEnv>();
+    app.route('/', stripeRetrieve);
+    app.route('/', creditsBuy);
+    return app;
+  }
+
+  // A payment header the way a v2 client sends it, and the reference the buyer
+  // can recompute from it without us.
+  function payment(seed: string): { header: string; ref: string } {
+    const header = Buffer.from(`payment-payload-${seed}`).toString('base64');
+    return { header, ref: createHash('sha256').update(header).digest('hex').slice(0, 32) };
+  }
+
+  it('hands the key back exactly once to whoever made the payment', async () => {
+    const { header, ref } = payment(`recover-${Date.now()}`);
+    const app = appWithRecovery();
+
+    const bought = (await (
+      await app.request('/v1/credits/buy/5k', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'payment-signature': header },
+        body: '{}',
+      })
+    ).json()) as { api_key: string; recovery_url: string };
+    expect(bought.api_key).toMatch(/^ifk_[a-f0-9]{64}$/);
+    expect(bought.recovery_url).toContain(`/v1/credits/recover/${ref}`);
+
+    // The buyer never saw that body. They hash the request they sent and ask.
+    const first = await app.request(`/v1/credits/recover/${ref}`);
+    expect(first.status).toBe(200);
+    const recovered = (await first.json()) as { api_key: string; credits_total: number };
+    expect(recovered.api_key).toBe(bought.api_key);
+    expect(recovered.credits_total).toBe(5000);
+    // …and the key it recovers actually works.
+    expect(validateApiKey(recovered.api_key).creditsRemaining).toBe(5000);
+
+    // Exactly once: the window closes behind them.
+    expect((await app.request(`/v1/credits/recover/${ref}`)).status).toBe(404);
+  });
+
+  /**
+   * The other half of the same loss: a buyer who retries the request whose
+   * response they lost must not be handed a SECOND pack for one payment.
+   */
+  it('never mints twice for one settlement', async () => {
+    const { header, ref } = payment(`once-${Date.now()}`);
+    const app = appWithRecovery();
+    const opts = {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'payment-signature': header },
+      body: '{}',
+    };
+
+    const first = (await (await app.request('/v1/credits/buy/25k', opts)).json()) as {
+      api_key: string;
+      key_prefix: string;
+    };
+    const replay = await app.request('/v1/credits/buy/25k', opts);
+    const second = (await replay.json()) as { api_key?: string; key_prefix: string; idempotent: boolean };
+
+    expect(second.idempotent).toBe(true);
+    expect(second.api_key).toBeUndefined();
+    expect(second.key_prefix).toBe(first.key_prefix);
+    expect(
+      (getStatsDB().prepare('SELECT COUNT(*) AS n FROM api_keys WHERE x402_payment_ref = ?').get(ref) as { n: number }).n,
+    ).toBe(1);
+  });
+
+  it('refuses a reference that is not one of ours', async () => {
+    const app = appWithRecovery();
+    expect((await app.request('/v1/credits/recover/not-a-hash')).status).toBe(400);
+    expect((await app.request(`/v1/credits/recover/${'a'.repeat(32)}`)).status).toBe(404);
+  });
+
+  /**
+   * No payment header means nothing was paid (free mode, dev bypass). A key is
+   * still issued — but nothing recoverable is stored, because storing a raw key
+   * for a payment that never happened would be a plaintext key with no owner.
+   */
+  it('stores nothing recoverable when nothing was paid', () => {
+    const k = generateCreditKey(null, 1000);
+    const row = getStatsDB()
+      .prepare('SELECT raw_key_one_time_view, x402_payment_ref FROM api_keys WHERE key_prefix = ?')
+      .get(k.key_prefix) as { raw_key_one_time_view: string | null; x402_payment_ref: string | null };
+    expect(row.raw_key_one_time_view).toBeNull();
+    expect(row.x402_payment_ref).toBeNull();
+  });
+});
+
+/**
+ * Audit B2 — the sale itself was invisible. Consumption endpoints have always
+ * recorded what they collected; the routes that SELL recorded nothing, so the
+ * largest ticket on the USDC rail left no trace in daily_stats and every
+ * revenue reading understated the business by exactly the amount that mattered.
+ */
+describe('a pack sale is booked as revenue', () => {
+  function revenueToday(): number {
+    const row = getStatsDB()
+      .prepare("SELECT COALESCE(SUM(revenue_usdc), 0) AS r FROM daily_stats WHERE date = date('now') AND operation_type = ?")
+      .get(CREDITS_PURCHASE_TYPE) as { r: number };
+    return row.r;
+  }
+
+  it('records what was actually collected when the pack was paid for', async () => {
+    const app = new Hono<HonoEnv>();
+    app.route('/', creditsBuy);
+    const before = revenueToday();
+    const header = Buffer.from(`paid-${Date.now()}`).toString('base64');
+    await app.request('/v1/credits/buy/25k', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'payment-signature': header },
+      body: '{}',
+    });
+    expect(revenueToday() - before).toBeCloseTo(80, 6);
+  });
+
+  it('records zero when the pack was handed over for free', async () => {
+    const app = new Hono<HonoEnv>();
+    app.route('/', creditsBuy);
+    const before = revenueToday();
+    // No payment header: explicit free mode or the dev bypass. The pack exists,
+    // no money moved, and a dashboard must never show money that did not move.
+    await app.request('/v1/credits/buy/1k', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: '{}',
+    });
+    expect(revenueToday()).toBeCloseTo(before, 6);
+  });
+
+  /**
+   * A purchase is not a validation. `getStats()` builds total_operations and
+   * by_type from the three named types in the `operations` table, so booking
+   * revenue here must not move a single usage counter.
+   */
+  it('adds revenue without inflating any usage counter', async () => {
+    const app = new Hono<HonoEnv>();
+    app.route('/', creditsBuy);
+    const opsBefore = getStats().total_operations;
+    const revenueBefore = getStats().total_revenue_usdc;
+    await app.request('/v1/credits/buy/5k', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'payment-signature': Buffer.from(`ops-${Date.now()}`).toString('base64') },
+      body: '{}',
+    });
+    expect(getStats().total_operations).toBe(opsBefore);
+    expect(getStats().total_revenue_usdc - revenueBefore).toBeCloseTo(20, 6);
   });
 });

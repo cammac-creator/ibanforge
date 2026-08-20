@@ -2,6 +2,8 @@ import type { MiddlewareHandler } from 'hono';
 import type { HonoEnv, PaywallCause } from '../types.js';
 import { datasetFacts } from '../lib/dataset-facts.js';
 import { buildBazaarInfo, findDiscovery, markExample, routeTemplateOf } from '../lib/x402-discovery.js';
+import { canonicalPaidPath } from './x402.js';
+import { ENTRY_PAYMENT_LINK, PRICING_PAGE } from '../lib/payment-links.js';
 
 /** Dataset sizes, read once and rounded down so a claim cannot outlive its data. */
 const F = datasetFacts();
@@ -396,7 +398,35 @@ function buildAccessRamp(): Record<string, unknown> {
     },
     credit_packs: {
       description: 'Prepaid credits — never expire, lower per-call cost than retail',
-      pay_by_card: 'https://api.ibanforge.com/#pricing',
+      // 🚨 This field used to be an HTML anchor — `https://api.ibanforge.com/#pricing`
+      // — which is the exact failure mode `src/lib/payment-links.ts` names as the
+      // reason it exists: "the 402 paywall could advertise pay_by_card while
+      // pointing at an HTML anchor a machine client never renders". The 25/07
+      // card-first fix reached only the "key exhausted" branch, through
+      // `paywallCause.detail`; the anonymous branch — the overwhelming majority
+      // of 402s served — kept the anchor. So the one rail with a measured
+      // conversion (a wall, then a pack bought under two minutes later) was
+      // reaching well under one percent of the callers who saw a wall.
+      //
+      // Same constant as every other card surface (dashboard, e-mails,
+      // /STRIPE_PAYMENT_LINK_* redirects), never a URL retyped here. The
+      // Editor/OEM link is deliberately absent from payment-links.ts — it is a
+      // private link sent in conversation — so importing from that module
+      // cannot leak it.
+      pay_by_card: ENTRY_PAYMENT_LINK,
+      // Added, not renamed: `pay_by_card` keeps its name and its meaning (one
+      // clickable checkout), and the field below carries the other half of
+      // what the anchor used to gesture at. Catalog ingesters read named
+      // fields and pass unknown ones through, so nothing that reads this body
+      // today stops working.
+      //
+      // `CARD_CHECKOUT_HINT` — the prose form of the same offer — is
+      // deliberately NOT repeated here. On the exhausted-allowance branch it
+      // is already the body's `message` (written by api-key.ts into
+      // paywallCause.detail), and stating one offer twice in one response
+      // reads worse to a language model than stating it once. The prices it
+      // quotes are in `pricing` just below.
+      pay_by_card_all_packs: PRICING_PAGE,
       pay_by_usdc: 'POST /v1/credits/buy/1k|5k|25k — list: GET /v1/credits/bundles',
       pricing: '1k = $5 · 5k = $20 (-20%) · 25k = $80 (-36%)',
     },
@@ -500,6 +530,23 @@ function stripFreeTierWhenExhausted(
  */
 export function enrich402Middleware(): MiddlewareHandler<HonoEnv> {
   return async (c, next) => {
+    // A paid resource asked for with a trailing slash never reached a handler:
+    // Hono routes strictly, so it answered 404 (POST) or 405 (GET) — a mute
+    // wall where the price should have been. Sent back to the canonical path
+    // with 308, which preserves method AND body, so the replay produces the
+    // real 402 from the route that can actually serve it afterwards.
+    //
+    // Done HERE rather than in the x402 middleware because this is the first
+    // middleware mounted under /v1/*: the api-key middleware sits between the
+    // two and bills quota before delegating, refunding only on 4xx, so a 308
+    // issued after it would charge a key holder twice for one slashed call.
+    const canonical = canonicalPaidPath(c.req.method, new URL(c.req.url).pathname);
+    if (canonical) {
+      const url = new URL(c.req.url);
+      url.pathname = canonical;
+      return c.redirect(url.pathname + url.search, 308);
+    }
+
     await next();
 
     if (c.res.status !== 402) return;

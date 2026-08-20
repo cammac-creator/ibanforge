@@ -9,6 +9,14 @@
  * asked for it). It is deliberately SEPARATE from any email/Resend setup —
  * IBANforge email must not go through openswissdata infrastructure.
  */
+/**
+ * How long the owner alert may hold the Stripe webhook's response.
+ *
+ * Exported so a test can assert the bound exists rather than trusting a
+ * literal buried in a fetch call.
+ */
+export const NOTIFY_TIMEOUT_MS = 3_000;
+
 export async function notifyPurchaseTelegram(p: {
   amountUsd: number;
   bundle: string;
@@ -47,6 +55,16 @@ export async function notifyPurchaseTelegram(p: {
         'User-Agent': 'ibanforge-backend', // some WAFs 403 the default node/undici UA
       },
       body: JSON.stringify({ chat_id: chat, text, disable_web_page_preview: true }),
+      // 🚨 This call sits INSIDE the Stripe webhook's response path, and Stripe
+      // gives up on a webhook at ~10 s. Without a bound, undici's ~300 s
+      // ceiling applies: Telegram hanging would push the webhook past Stripe's
+      // patience, Stripe would retry, and the retry takes the idempotent path —
+      // which mints nothing and therefore notifies nothing. The purchase alert
+      // would be lost for good, because there is exactly one attempt by
+      // construction. 3 s is far below Stripe's limit and far above a healthy
+      // Telegram round trip; a notification is worth waiting three seconds for
+      // and not one second more.
+      signal: AbortSignal.timeout(NOTIFY_TIMEOUT_MS),
     });
     if (!res.ok) {
       console.error('[notify] telegram failed', res.status, await res.text().catch(() => ''));

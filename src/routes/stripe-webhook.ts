@@ -37,6 +37,34 @@ export const STRIPE_BUNDLES: Record<string, { credits: number; price_usd: number
 // not prepaid credits.
 export const STRIPE_OEM_PLAN = { monthly_limit: OEM_MONTHLY_LIMIT, price_usd: 149 };
 
+/**
+ * The events that mint a key.
+ *
+ * 🚨 `checkout.session.async_payment_succeeded` is the second one, and it was
+ * missing — a dormant trap that costs nothing today and costs everything the
+ * day SEPA Direct Debit or TWINT is enabled on a Payment Link. On those
+ * methods `checkout.session.completed` fires with `payment_status: 'unpaid'`,
+ * which the guard below correctly refuses to mint on; Stripe then sends
+ * `async_payment_succeeded` days later when the money actually lands. Without
+ * it in this set, that event fell through to `ignored_event_type` and answered
+ * 200: money collected, no key created, no error anywhere. The buyer is left
+ * with a receipt and nothing to call the API with, and nothing in our logs
+ * looks wrong.
+ *
+ * Both events mint through the SAME barrier — `generateStripeKey` is
+ * idempotent on `stripe_session_id`, and the two events carry the same
+ * session — so a session that somehow produced both (a card checkout that also
+ * emitted an async success) mints exactly once. The second one sees
+ * `api_key: null`, which is also what suppresses the duplicate owner alert.
+ *
+ * `async_payment_failed` is deliberately NOT here: it must be recorded and
+ * ignored, never minted on.
+ */
+const MINTING_EVENTS: ReadonlySet<string> = new Set([
+  'checkout.session.completed',
+  'checkout.session.async_payment_succeeded',
+]);
+
 let _stripe: Stripe | null = null;
 function getStripe(): Stripe {
   if (!_stripe) {
@@ -99,7 +127,7 @@ export function processStripeEvent(
     };
   }
 
-  if (event.type !== 'checkout.session.completed') {
+  if (!MINTING_EVENTS.has(event.type)) {
     db.prepare('INSERT INTO processed_webhooks (stripe_event_id, event_type) VALUES (?, ?)')
       .run(event.id, event.type);
     return { status: 200, body: { received: true, ignored_event_type: event.type } };
@@ -110,7 +138,8 @@ export function processStripeEvent(
   // Guard against async payment methods (SEPA Debit, ACH, etc.) where
   // checkout.session.completed fires BEFORE the payment is actually settled.
   // For card payments (Payment Links default) this is always 'paid'. For async
-  // methods, Stripe fires checkout.session.async_payment_succeeded later.
+  // methods, Stripe fires checkout.session.async_payment_succeeded later —
+  // which is now handled above, so this branch is a wait, not a dead end.
   if (session.payment_status && session.payment_status !== 'paid') {
     db.prepare('INSERT INTO processed_webhooks (stripe_event_id, event_type) VALUES (?, ?)')
       .run(event.id, event.type);

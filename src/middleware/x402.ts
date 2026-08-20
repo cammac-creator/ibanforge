@@ -3,7 +3,8 @@ import { createRequire } from 'node:module';
 import type { HonoEnv } from '../types.js';
 import { datasetFacts } from '../lib/dataset-facts.js';
 import { BANK_CODE_CHECK_SCHEMA as BANK_CODE_CHECK_OPENAPI , NEXT_STEPS_SCHEMA as NEXT_STEPS_OPENAPI } from '../lib/bank-code-schema.js';
-import { buildBazaarInfo, discoveryForRoute, routeTemplateOf } from '../lib/x402-discovery.js';
+import { buildBazaarInfo, discoveryForRoute, findDiscovery, routeTemplateOf } from '../lib/x402-discovery.js';
+import { getIbansArray } from '../lib/request-helpers.js';
 
 const require = createRequire(import.meta.url);
 const pkg = require('../../package.json') as { version: string };
@@ -56,6 +57,93 @@ export function ensureWalletConfigured(): void {
  */
 export function isSellingRoute(method: string, path: string): boolean {
   return method === 'POST' && /^\/v1\/credits\/buy\/[^/]+\/?$/.test(path);
+}
+
+// ─── Batch pricing ───────────────────────────────────────────────────────────
+
+/** Batch rate, decided 11/07/2026: 1 credit = 1 IBAN validated. Not a knob. */
+export const BATCH_PRICE_PER_IBAN = 0.002;
+/** The handler refuses anything larger (400 batch_too_large). */
+export const BATCH_MAX_IBANS = 100;
+
+/**
+ * What a batch call is quoted, from the body the handler will read.
+ *
+ * 🚨 Two bugs lived in the four lines this replaces, and they pull in opposite
+ * directions — fixing either one alone makes the other worse.
+ *
+ *  1. **The quote lied by a factor of 50.** A probe with no body (bare GET,
+ *     empty POST) produced `n = 0`, which fell through to `count = 100` and a
+ *     $0.20 quote, while every catalog we publish announces the per-IBAN rate
+ *     ($0.002 — see the `/.well-known/x402` table, `price_usdc: 0.002`). An
+ *     agent that budgets on the catalog and is then billed 50× at the door
+ *     refuses SILENTLY: it is the one place where our own offer makes a
+ *     solvent, willing buyer fail. A body-less quote is now the 1-IBAN
+ *     minimum, which is both the true floor and the announced number.
+ *
+ *  2. **The count was read case-sensitively.** This read `body.ibans` verbatim
+ *     while the handler reads it through `getIbansArray`, which is
+ *     case-insensitive because agents uppercase acronyms. So `{"IBANS":[…100…]}`
+ *     priced as `n = 0`. That was harmless only as long as `n = 0` meant "charge
+ *     the cap"; the moment the quote drops to the minimum it becomes a 100×
+ *     under-charge. Both sides now parse the body the same way.
+ *
+ * `n = 0` after a SUCCESSFUL body read is safe to quote at the minimum: the
+ * handler, reading the same body with the same helper, answers 400 — and
+ * @x402/hono settles only a response < 400, so nothing is ever collected for it.
+ * A body that could not be read at all is a different case and keeps the cap
+ * (see the caller's catch): there, we know nothing, so we must not under-quote.
+ */
+export function batchQuoteFor(body: unknown): string {
+  const arr = getIbansArray(body as Record<string, unknown> | null | undefined);
+  const n = Array.isArray(arr) ? arr.length : 0;
+  const count = n < 1 ? 1 : Math.min(n, BATCH_MAX_IBANS);
+  return '$' + (count * BATCH_PRICE_PER_IBAN).toFixed(3);
+}
+
+// ─── Trailing slash ──────────────────────────────────────────────────────────
+
+/**
+ * The canonical path for a paid route reached with a trailing slash, or null.
+ *
+ * Hono routes strictly, so `/v1/iban/validate/` matched nothing: a POST fell
+ * through to 404 and a bare GET to 405 (audit C2, R2). Both are mute walls. An
+ * agent whose URL builder normalises with a trailing slash — a common default —
+ * concludes the resource is broken or does not speak x402, and a trust-registry
+ * crawler records the same. Neither ever sees the price.
+ *
+ * Answering 402 on the slashed path would be worse than the wall: no handler is
+ * mounted there, so a client that paid would be charged for a 404. The honest
+ * answer is the one HTTP already has — 308 keeps the method AND the body, so a
+ * POST with a payment header replays intact on the canonical path and gets the
+ * real 402 (then the real response) from the route that can actually serve it.
+ *
+ * Only paid routes are redirected. Anything else keeps whatever Hono decided:
+ * this is a payment-surface fix, not a global routing change (`strict: false`
+ * on the Hono instance would have fixed these five paths by changing path
+ * matching for every route in the app, admin and discovery included).
+ *
+ * Decided here, next to the route table it is derived from; APPLIED in
+ * enrich-402, which is the first middleware mounted under `/v1/*`. That
+ * placement is not cosmetic: the api-key middleware sits between the two and
+ * increments quota BEFORE calling the next handler, refunding only on a 4xx.
+ * A 308 issued after it would bill the redirect and then bill the replay —
+ * one slashed call costing an API-key holder two units of allowance.
+ */
+export function canonicalPaidPath(method: string, path: string): string | null {
+  if (!path.endsWith('/')) return null;
+  const stripped = path.replace(/\/+$/, '');
+  if (stripped === '') return null;
+  // The five consumption routes, matched through the same table the discovery
+  // document and the 402 body use, so a route added there is covered here too.
+  // Method-agnostic on purpose: a bare GET on a POST resource is exactly the
+  // trust-registry probe the universal 402 exists to answer, and it can only
+  // answer it on the canonical path.
+  if (findDiscovery('GET', stripped) || findDiscovery('POST', stripped)) return stripped;
+  // The three purchase routes. A GET is deliberately NOT redirected: a probe
+  // must never be walked into the purchase flow.
+  if (isSellingRoute(method, stripped)) return stripped;
+  return null;
 }
 
 /**
@@ -280,17 +368,15 @@ export function buildRouteTable(
         // Dynamic price: $0.002 per IBAN, so a 1-IBAN call settles $0.002
         // (not the old flat $0.20 = 100× overcharge). x402 awaits this
         // function with the request context; we read the batch size from
-        // the parsed body. Fail-safe: if the body can't be read, fall back
-        // to the $0.20 cap rather than under-charging.
+        // the parsed body — see batchQuoteFor for why a body-less quote is the
+        // 1-IBAN minimum and why the count must be read case-insensitively.
         price: async (context: { adapter?: { getBody?: () => unknown } }): Promise<string> => {
           try {
-            const body = (await context.adapter?.getBody?.()) as Record<string, unknown> | undefined;
-            const arr = (body?.ibans ?? body?.iban_list ?? body?.list) as unknown;
-            const n = Array.isArray(arr) ? arr.length : 0;
-            // Clamp to [1, 100]; 0/unknown → cap so we never under-charge.
-            const count = n >= 1 && n <= 100 ? n : 100;
-            return '$' + (count * 0.002).toFixed(3);
+            return batchQuoteFor(await context.adapter?.getBody?.());
           } catch {
+            // The body could not be read AT ALL. Unlike an empty body, this
+            // tells us nothing about the batch size, so the cap is the only
+            // safe quote: under-quoting here would serve 100 IBANs for one.
             return '$0.20';
           }
         },
@@ -298,7 +384,7 @@ export function buildRouteTable(
         maxTimeoutSeconds: 60,
       },
       description:
-        `Validate up to 100 IBANs in one call at $0.002 per IBAN (2.5x cheaper per IBAN than single calls at $0.005, and one settlement instead of N). Use for CSV cleanup, customer DB dedup, or pre-flight payout list triage. ${TRUST_TAG_BATCH}.`,
+        `Validate up to 100 IBANs in one call at $0.002 per IBAN (2.5x cheaper per IBAN than single calls at $0.005, and one settlement instead of N). A quote asked for without a body is the 1-IBAN minimum, $0.002 — the same figure the catalog lists. Use for CSV cleanup, customer DB dedup, or pre-flight payout list triage. ${TRUST_TAG_BATCH}.`,
       mimeType: 'application/json',
       extensions: {
         bazaar: {
@@ -758,6 +844,85 @@ function paywallSignature(walletAddress: string): string {
   ].join('|');
 }
 
+// ─── Facilitator timeouts ────────────────────────────────────────────────────
+//
+// `HTTPFacilitatorClient` issues its three calls with a bare `fetch` — no
+// `signal`, no timeout, and no way to pass one: its constructor reads only
+// `url` and `createAuthHeaders` (verified in @x402/core's bundle). The
+// effective ceiling is therefore undici's, ~300 s. A facilitator that accepts
+// the connection and then says nothing makes a PAID request hang for five
+// minutes, and the v2 settle is blocking before the response leaves, so the
+// buyer waits for verify + handler + settle (audit A2 §C1.2).
+//
+// We cannot abort the underlying socket without forking the SDK, so we bound
+// the WAIT instead of the connection: the call races a timer, and the loser is
+// abandoned. That leaves at most one dangling socket per timed-out call for the
+// rest of undici's own timeout — a bounded leak, traded against a request path
+// that can no longer hang for minutes.
+//
+// 🚨 The abandoned promise MUST keep a handler. An unobserved rejection is
+// exactly what killed the process on 20/08 (§C1.1) and burned Railway's three
+// restarts; a "fix" for a hang that reintroduces that crash is a net loss.
+const FACILITATOR_TIMEOUTS = {
+  /** Handshake. Off the paid path (see syncFacilitator) but must not wedge it. */
+  supported: 10_000,
+  /** Before the handler runs. Nothing has been served, so failing fast is free. */
+  verify: 10_000,
+  /**
+   * After the handler ran. The most generous of the three ON PURPOSE: every
+   * route announces `maxTimeoutSeconds: 60`, and abandoning a settle that the
+   * facilitator is still processing means the buyer is charged and gets an
+   * error. Do not tighten this to match verify.
+   */
+  settle: 30_000,
+} as const;
+
+export class FacilitatorTimeoutError extends Error {
+  constructor(operation: string, ms: number) {
+    super(`Facilitator ${operation} did not answer within ${ms}ms`);
+    this.name = 'FacilitatorTimeoutError';
+  }
+}
+
+/**
+ * Bound one facilitator call. The losing promise is silenced, never dropped.
+ */
+export function withFacilitatorTimeout<T>(
+  call: Promise<T>,
+  operation: keyof typeof FACILITATOR_TIMEOUTS,
+): Promise<T> {
+  const ms = FACILITATOR_TIMEOUTS[operation];
+  // Attached BEFORE the race: if the SDK call rejects after we stopped waiting,
+  // this is the handler that keeps Node from killing the process.
+  call.catch(() => {});
+  let timer: NodeJS.Timeout | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new FacilitatorTimeoutError(operation, ms)), ms);
+    // Never hold the event loop open on our own accounting.
+    timer.unref?.();
+  });
+  return Promise.race([call, deadline]).finally(() => {
+    if (timer) clearTimeout(timer);
+  }) as Promise<T>;
+}
+
+/** The same client, with each of its three calls bounded in time. */
+function boundFacilitator<T extends { verify: unknown; settle: unknown; getSupported: unknown }>(
+  client: T,
+): T {
+  const verify = client.verify as (...args: unknown[]) => Promise<unknown>;
+  const settle = client.settle as (...args: unknown[]) => Promise<unknown>;
+  const getSupported = client.getSupported as (...args: unknown[]) => Promise<unknown>;
+  // Own properties, so the prototype methods stay intact for anything the SDK
+  // reaches for that we did not wrap (createAuthHeaders, toJsonSafe, url…).
+  return Object.assign(client, {
+    verify: (...args: unknown[]) => withFacilitatorTimeout(verify.apply(client, args), 'verify'),
+    settle: (...args: unknown[]) => withFacilitatorTimeout(settle.apply(client, args), 'settle'),
+    getSupported: (...args: unknown[]) =>
+      withFacilitatorTimeout(getSupported.apply(client, args), 'supported'),
+  });
+}
+
 // The wallet is NOT baked in here: prices and payTo are resolved per request by
 // buildRouteTable, so the shared server stays request-agnostic.
 async function buildPaywall(): Promise<X402Paywall> {
@@ -780,7 +945,7 @@ async function buildPaywall(): Promise<X402Paywall> {
   }
 
   // Build x402 resource server with EVM scheme (like official example)
-  const server = new core.x402ResourceServer(facilitatorClient);
+  const server = new core.x402ResourceServer(boundFacilitator(facilitatorClient));
   server.register('eip155:*', new ExactEvmScheme());
   // Register the Bazaar discovery extension so each route ships its
   // inputSchema/outputSchema to facilitator catalogs (Coinbase CDP, x402.org)

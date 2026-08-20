@@ -2,6 +2,11 @@ import { describe, it, expect } from 'vitest';
 import type Stripe from 'stripe';
 import { processStripeEvent } from './stripe-webhook.js';
 import { consumeOneTimeKey, validateApiKey, OEM_MONTHLY_LIMIT } from '../lib/api-keys.js';
+import { getStatsDB } from '../lib/db.js';
+
+function keyCount(): number {
+  return (getStatsDB().prepare('SELECT COUNT(*) AS n FROM api_keys').get() as { n: number }).n;
+}
 
 // Build a minimal Stripe.Event shape — processStripeEvent only reads:
 //   event.id, event.type, event.data.object.metadata.bundle,
@@ -271,5 +276,102 @@ describe('consumeOneTimeKey', () => {
     );
     const result = consumeOneTimeKey(sessionId);
     expect(result?.email).toBeNull();
+  });
+});
+
+/**
+ * Audit A2 — the dormant trap. Today every Payment Link is card-only, so
+ * `checkout.session.completed` always arrives with `payment_status: 'paid'`
+ * and this never fires. The day SEPA Direct Debit or TWINT is switched on, it
+ * fires on every purchase: `completed` arrives `unpaid` (correctly refused
+ * below), and the money lands days later with
+ * `checkout.session.async_payment_succeeded` — which used to fall through to
+ * `ignored_event_type` and answer 200. Money collected, no key minted, no
+ * error raised, nothing in the logs looking wrong.
+ */
+describe('async payment methods — the day SEPA/TWINT is enabled', () => {
+  it('waits rather than minting when the completed session is not paid yet', () => {
+    const sessionId = `cs_test_async_${Date.now()}`;
+    const result = processStripeEvent(
+      mockEvent({ id: `evt_async_pending_${Date.now()}`, bundle: '5k', sessionId, paymentStatus: 'unpaid' }),
+    );
+    expect(result.status).toBe(200);
+    expect(result.body.pending).toBe(true);
+    expect(result.body.key_prefix).toBeUndefined();
+    expect(result.notify).toBeUndefined();
+  });
+
+  it('mints when the money actually lands', () => {
+    const stamp = Date.now();
+    const sessionId = `cs_test_async_ok_${stamp}`;
+    // 1. Checkout completes, unpaid — nothing minted.
+    processStripeEvent(
+      mockEvent({ id: `evt_a1_${stamp}`, bundle: '5k', sessionId, paymentStatus: 'unpaid' }),
+    );
+    // 2. Days later, the debit clears.
+    const settled = processStripeEvent(
+      mockEvent({
+        id: `evt_a2_${stamp}`,
+        type: 'checkout.session.async_payment_succeeded',
+        bundle: '5k',
+        sessionId,
+        paymentStatus: 'paid',
+      }),
+    );
+    expect(settled.status).toBe(200);
+    expect(settled.body.credits_minted).toBe(5000);
+    expect(settled.body.key_prefix).toMatch(/^ifk_/);
+    // The buyer gets the key, and the owner gets the alert — once.
+    expect(settled.notify?.credits).toBe(5000);
+    const key = consumeOneTimeKey(sessionId);
+    expect(key?.api_key).toMatch(/^ifk_[a-f0-9]{64}$/);
+    expect(key?.credits_total).toBe(5000);
+  });
+
+  /**
+   * Stripe retries a webhook for three days. The replay must go through the
+   * same `stripe_session_id` barrier the card path uses: one settlement, one
+   * key, one owner alert.
+   */
+  it('mints exactly once however often Stripe replays it', () => {
+    const stamp = Date.now();
+    const sessionId = `cs_test_async_replay_${stamp}`;
+    const before = keyCount();
+
+    const first = processStripeEvent(
+      mockEvent({ id: `evt_r1_${stamp}`, type: 'checkout.session.async_payment_succeeded', bundle: '1k', sessionId }),
+    );
+    // Same event id again — the processed_webhooks barrier.
+    const sameEvent = processStripeEvent(
+      mockEvent({ id: `evt_r1_${stamp}`, type: 'checkout.session.async_payment_succeeded', bundle: '1k', sessionId }),
+    );
+    // A DIFFERENT event id on the same session — the stripe_session_id barrier,
+    // which is the one that matters when `completed` and
+    // `async_payment_succeeded` both arrive paid.
+    const sameSession = processStripeEvent(
+      mockEvent({ id: `evt_r2_${stamp}`, bundle: '1k', sessionId }),
+    );
+
+    expect(keyCount() - before).toBe(1);
+    expect(first.notify?.rawKey).toMatch(/^ifk_/);
+    expect(sameEvent.body.idempotent).toBe(true);
+    expect(sameEvent.notify).toBeUndefined();
+    expect(sameSession.notify).toBeUndefined();
+    expect(sameSession.body.key_prefix).toBe(first.body.key_prefix);
+  });
+
+  it('records a failed async payment and mints nothing', () => {
+    const stamp = Date.now();
+    const before = keyCount();
+    const result = processStripeEvent(
+      mockEvent({
+        id: `evt_failed_${stamp}`,
+        type: 'checkout.session.async_payment_failed',
+        bundle: '25k',
+        sessionId: `cs_test_failed_${stamp}`,
+      }),
+    );
+    expect(result.body.ignored_event_type).toBe('checkout.session.async_payment_failed');
+    expect(keyCount()).toBe(before);
   });
 });

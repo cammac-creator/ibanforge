@@ -2,6 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import { Hono } from 'hono';
 import { enrich402Middleware } from './enrich-402.js';
+import { ENTRY_PAYMENT_LINK, PAYMENT_LINKS, PRICING_PAGE } from '../lib/payment-links.js';
 import type { HonoEnv, PaywallCause } from '../types.js';
 
 /**
@@ -125,7 +126,12 @@ describe('enrich402Middleware', () => {
     const body = await res.json();
     // new credit_packs rail
     expect(body.credit_packs).toBeDefined();
-    expect(body.credit_packs.pay_by_card).toBe('https://api.ibanforge.com/#pricing');
+    // 🚨 This assertion used to demand the HTML anchor, and so locked in the
+    // bug: an anonymous 402 — the overwhelming majority of them — pointed a
+    // machine client at `https://api.ibanforge.com/#pricing`, a fragment no
+    // agent renders. It is now the live Stripe checkout, from the same
+    // constant every other card surface uses.
+    expect(body.credit_packs.pay_by_card).toBe(ENTRY_PAYMENT_LINK);
     expect(body.credit_packs.pay_by_usdc).toContain('/v1/credits/buy');
     expect(body.credit_packs.pricing).toContain('$5');
     // message now names the packs rail
@@ -368,5 +374,170 @@ describe('a refused payment says why', () => {
       const body = await bodyOf(appAnnouncing(generic));
       expect(body.payment_error, generic).toBeUndefined();
     }
+  });
+});
+
+/**
+ * Audit B2, recommendation 1. The one payment rail with a measured conversion
+ * — a caller hits the wall, buys a pack under two minutes later — was reaching
+ * a fraction of a percent of the callers who saw a wall.
+ *
+ * The clickable Stripe link entered the 402 body through exactly ONE path:
+ * `CARD_CHECKOUT_HINT`, written into `paywallCause.detail` by the api-key
+ * middleware, i.e. only for a caller holding a valid key that had run out of
+ * allowance. Every other 402 — every anonymous one, which is nearly all of
+ * them — got the generic ramp, whose `pay_by_card` was an HTML anchor with a
+ * fragment. That is verbatim the failure `src/lib/payment-links.ts` documents
+ * as its own reason for existing; the 25/07 fix landed on one branch out of
+ * two, and left the frequent one behind.
+ */
+describe('every 402 carries a card link a machine can follow', () => {
+  function anonymous402(path = '/v1/iban/validate') {
+    const app = new Hono<HonoEnv>();
+    app.use('*', enrich402Middleware());
+    app.post(path, () => new Response('{}', { status: 402, headers: { 'Content-Type': 'application/json' } }));
+    return app.request(path, { method: 'POST', body: '{}' });
+  }
+
+  it('quotes the live checkout, not an HTML fragment, with no key involved', async () => {
+    const body = (await (await anonymous402()).json()) as {
+      credit_packs: Record<string, unknown>;
+      cause?: unknown;
+    };
+    // No paywallCause: this is the anonymous branch, the one that was broken.
+    expect(body.cause).toBeUndefined();
+
+    expect(body.credit_packs.pay_by_card).toBe(ENTRY_PAYMENT_LINK);
+    expect(body.credit_packs.pay_by_card).toMatch(/^https:\/\/buy\.stripe\.com\//);
+    // The precise regression: a fragment is not a checkout.
+    expect(body.credit_packs.pay_by_card).not.toContain('#pricing');
+    expect(body.credit_packs.pay_by_card_all_packs).toBe(PRICING_PAGE);
+    // The prose form of the same offer is NOT repeated here: on the
+    // exhausted-allowance branch it is already the body's `message`, and one
+    // offer stated twice in one response reads worse than stated once.
+    expect(body.credit_packs.card_checkout).toBeUndefined();
+  });
+
+  it('says the same thing on every paid route, not just the one', async () => {
+    for (const path of ['/v1/iban/validate', '/v1/iban/batch', '/v1/iban/compliance', '/v1/credits/buy/5k']) {
+      const body = (await (await anonymous402(path)).json()) as {
+        credit_packs: { pay_by_card: string };
+      };
+      expect(body.credit_packs.pay_by_card, path).toBe(ENTRY_PAYMENT_LINK);
+    }
+  });
+
+  /**
+   * The constraint that makes this change safe to ship: catalogs and x402
+   * clients read `accepts` and the resource block, and a rename or a removal
+   * there is a broken contract, not an improvement. The ramp lives beside
+   * those, never inside them.
+   */
+  it('leaves the machine half of the body untouched', async () => {
+    const body = (await (await anonymous402()).json()) as {
+      accepts: Array<Record<string, unknown>>;
+      resource: { url: string; description: string };
+      error: string;
+      free_tier: Record<string, unknown>;
+      x402: Record<string, unknown>;
+      credit_packs: Record<string, unknown>;
+    };
+    expect(body.error).toBe('payment_required');
+    expect(body.accepts).toHaveLength(1);
+    expect(Object.keys(body.accepts[0]).sort()).toEqual(
+      ['amount', 'asset', 'extra', 'maxTimeoutSeconds', 'network', 'payTo', 'scheme'].sort(),
+    );
+    expect(body.accepts[0].amount).toBe('5000');
+    expect(body.resource.url).toBe('https://api.ibanforge.com/v1/iban/validate');
+    // Every field the ramp published before is still published, under its own
+    // name — the two card fields were ADDED next to them.
+    for (const key of ['description', 'pay_by_card', 'pay_by_usdc', 'pricing']) {
+      expect(Object.keys(body.credit_packs), key).toContain(key);
+    }
+    expect(body.free_tier.signup).toContain('/v1/keys/generate');
+    expect(body.x402.discovery).toContain('/.well-known/x402');
+  });
+
+  /**
+   * The private Editor/OEM Payment Link is sold in conversation and must never
+   * appear on a public surface. It is not in payment-links.ts at all, which is
+   * what makes importing from that module safe — this test says so out loud so
+   * nobody adds it there later.
+   */
+  it('publishes only the three public pack links', async () => {
+    const raw = await (await anonymous402()).text();
+    const links = raw.match(/https:\/\/buy\.stripe\.com\/[A-Za-z0-9]+/g) ?? [];
+    expect(links.length).toBeGreaterThan(0);
+    for (const link of links) {
+      expect(Object.values(PAYMENT_LINKS as Record<string, string>)).toContain(link);
+    }
+  });
+});
+
+/**
+ * Audit C2, R2. `/v1/iban/validate/` — the same resource, with the trailing
+ * slash a URL normaliser adds by default — answered 404 on POST and 405 on a
+ * bare GET. Both are mute: an agent reads "broken" or "does not speak x402" and
+ * a trust registry records the same, and neither ever sees the price.
+ *
+ * 308 rather than 402, deliberately: no handler is mounted on the slashed path,
+ * so quoting a price there would charge a payer for a 404. 308 preserves the
+ * method AND the body, so the replay lands on the route that can serve it.
+ */
+describe('a paid route reached with a trailing slash is not a dead end', () => {
+  function appWithPaidRoutes() {
+    const app = new Hono<HonoEnv>();
+    app.use('/v1/*', enrich402Middleware());
+    app.post('/v1/iban/validate', () => new Response('{}', { status: 402 }));
+    app.post('/v1/iban/batch', () => new Response('{}', { status: 402 }));
+    app.get('/v1/bic/:code', () => new Response('{}', { status: 402 }));
+    app.post('/v1/credits/buy/:bundle', () => new Response('{}', { status: 402 }));
+    return app;
+  }
+
+  it.each([
+    ['POST', '/v1/iban/validate/', '/v1/iban/validate'],
+    ['GET', '/v1/iban/validate/', '/v1/iban/validate'],
+    ['POST', '/v1/iban/batch/', '/v1/iban/batch'],
+    ['GET', '/v1/bic/UBSWCHZH80A/', '/v1/bic/UBSWCHZH80A'],
+    ['POST', '/v1/iban/compliance/', '/v1/iban/compliance'],
+    ['GET', '/v1/ch/clearing/230/', '/v1/ch/clearing/230'],
+    ['POST', '/v1/credits/buy/1k/', '/v1/credits/buy/1k'],
+  ])('%s %s is sent to %s with a method-preserving redirect', async (method, from, to) => {
+    const res = await appWithPaidRoutes().request(from, { method, body: method === 'POST' ? '{}' : undefined });
+    expect(res.status).toBe(308);
+    expect(res.headers.get('location')).toBe(to);
+  });
+
+  it('keeps the query string, so a keyed or referred call is not silently stripped', async () => {
+    const res = await appWithPaidRoutes().request('/v1/iban/validate/?api_key=ifk_x', { method: 'POST', body: '{}' });
+    expect(res.headers.get('location')).toBe('/v1/iban/validate?api_key=ifk_x');
+  });
+
+  it('leaves the canonical paths exactly as they were', async () => {
+    const res = await appWithPaidRoutes().request('/v1/iban/validate', { method: 'POST', body: '{}' });
+    expect(res.status).toBe(402);
+  });
+
+  /**
+   * Free and non-paid routes are NOT touched. This is a payment-surface fix,
+   * not a global routing change: `strict: false` on the Hono instance would
+   * have altered matching for every route in the app, admin and discovery
+   * included.
+   */
+  it('does not redirect a path that sells nothing', async () => {
+    const app = new Hono<HonoEnv>();
+    app.use('/v1/*', enrich402Middleware());
+    app.get('/v1/iban/format', () => new Response('{}', { status: 200 }));
+    for (const path of ['/v1/iban/format/', '/v1/keys/generate/', '/v1/credits/bundles/']) {
+      const res = await app.request(path, { method: 'GET' });
+      expect(res.status, path).not.toBe(308);
+    }
+  });
+
+  /** A GET must never be walked into the purchase flow — probes do not buy. */
+  it('does not redirect a bare GET onto a selling route', async () => {
+    const res = await appWithPaidRoutes().request('/v1/credits/buy/1k/', { method: 'GET' });
+    expect(res.status).not.toBe(308);
   });
 });

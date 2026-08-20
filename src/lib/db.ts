@@ -513,6 +513,22 @@ export function getStatsDB(): DatabaseType.Database {
     if (!keyCols.includes('no_recredit')) {
       statsDB.exec('ALTER TABLE api_keys ADD COLUMN no_recredit INTEGER NOT NULL DEFAULT 0');
     }
+    // x402 settlement reference — what stripe_session_id is for the card rail,
+    // for the USDC one. A credit pack bought with x402 costs up to $80 and used
+    // to exist only in the HTTP response that announced it: lose that response
+    // and the buyer had paid for a key nobody could ever hand back. This is the
+    // handle `raw_key_one_time_view` is retrieved by on that rail
+    // (GET /v1/credits/recover/:ref) and the guard that stops one settlement
+    // minting two packs.
+    //
+    // Deliberately NOT stored in stripe_session_id, even though the column
+    // exists and would have worked: `src/routes/api-keys.ts` reads
+    // `stripe_session_id IS NOT NULL` as "paid by card", so reusing it would
+    // have booked USDC revenue as Stripe revenue in the CRM.
+    if (!keyCols.includes('x402_payment_ref')) {
+      statsDB.exec('ALTER TABLE api_keys ADD COLUMN x402_payment_ref TEXT');
+      statsDB.exec('CREATE INDEX IF NOT EXISTS idx_api_keys_x402_ref ON api_keys(x402_payment_ref)');
+    }
     // CRM timeline: French translation + detected language of foreign messages.
     const msgCols = (statsDB.prepare('PRAGMA table_info(email_messages)').all() as Array<{ name: string }>).map((r) => r.name);
     if (msgCols.length && !msgCols.includes('snippet_fr')) statsDB.exec('ALTER TABLE email_messages ADD COLUMN snippet_fr TEXT');

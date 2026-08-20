@@ -1,10 +1,13 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   MAX_RESOURCE_DESCRIPTION,
   buildRouteTable,
   capDescription,
   ensureWalletConfigured,
   isSellingRoute,
+  batchQuoteFor,
+  canonicalPaidPath,
+  withFacilitatorTimeout,
 } from './x402.js';
 
 /**
@@ -227,5 +230,162 @@ describe('mismatched-method probe still gets quoted (piste A)', () => {
     const table = buildRouteTable(wallet, 'POST', '/v1/iban/validate');
     const posts = Object.keys(table).filter((k) => k === 'POST /v1/iban/validate');
     expect(posts.length).toBe(1);
+  });
+});
+
+/**
+ * Audit C2, R1 — the only place where our own offer makes a solvent, willing
+ * buyer fail.
+ *
+ * `/v1/iban/batch` was quoted 200 000 atomic units ($0.20) at the door while
+ * every catalog announced the per-IBAN rate ($0.002). A bounded-budget agent
+ * (AgentCore) compares the two and refuses; Coinbase's `discover_x402_services`
+ * filters on the catalog price and then gets billed 50× it; Aegis scores
+ * exactly this gap as `price_honest`. None of them tells us — they just leave.
+ */
+describe('the batch quote says what the catalog says', () => {
+  const IBAN = 'CH1000230000000012345';
+
+  it('quotes the 1-IBAN minimum to a probe that sends no batch', () => {
+    // A bare discovery probe: no body at all, or an empty one. This used to
+    // fall through to `count = 100` and quote the $0.20 cap.
+    expect(batchQuoteFor(undefined)).toBe('$0.002');
+    expect(batchQuoteFor({})).toBe('$0.002');
+    expect(batchQuoteFor({ ibans: [] })).toBe('$0.002');
+  });
+
+  it('matches the amount published in the discovery document', () => {
+    // src/routes/discovery.ts publishes price_usdc 0.002 for this route, i.e.
+    // 2 000 atomic USDC units. The door must ask for the same number.
+    const atomic = Math.round(Number(batchQuoteFor({}).slice(1)) * 1_000_000);
+    expect(atomic).toBe(2000);
+  });
+
+  /**
+   * 🚨 The guard that must not be dropped. The old code read `body.ibans`
+   * verbatim while the handler reads it through `getIbansArray`, which is
+   * case-insensitive because agents uppercase acronyms. That mismatch was
+   * harmless only while an unrecognised body meant "charge the cap"; the
+   * moment the quote drops to the minimum it becomes a 100× under-charge —
+   * 100 IBANs validated for the price of one.
+   */
+  it('counts the batch the same way the handler will', () => {
+    expect(batchQuoteFor({ IBANS: [IBAN, IBAN] })).toBe('$0.004');
+    expect(batchQuoteFor({ Iban_List: [IBAN, IBAN, IBAN] })).toBe('$0.006');
+    expect(batchQuoteFor({ ibans: Array(100).fill(IBAN) })).toBe('$0.200');
+  });
+
+  it('charges per IBAN, at the rate decided 11/07', () => {
+    for (const n of [1, 2, 7, 50, 100]) {
+      expect(batchQuoteFor({ ibans: Array(n).fill(IBAN) })).toBe('$' + (n * 0.002).toFixed(3));
+    }
+  });
+
+  it('never quotes above the cap, whatever the caller claims to be sending', () => {
+    expect(batchQuoteFor({ ibans: Array(5000).fill(IBAN) })).toBe('$0.200');
+  });
+});
+
+/**
+ * Audit C2, R2 — the trailing slash. `/v1/iban/validate/` answered 404 (POST)
+ * or 405 (bare GET): a mute wall where the price should be.
+ */
+describe('paid routes reached with a trailing slash have a canonical form', () => {
+  it.each([
+    ['POST', '/v1/iban/validate/', '/v1/iban/validate'],
+    ['GET', '/v1/iban/validate/', '/v1/iban/validate'],
+    ['POST', '/v1/iban/batch/', '/v1/iban/batch'],
+    ['POST', '/v1/iban/compliance/', '/v1/iban/compliance'],
+    ['GET', '/v1/bic/UBSWCHZH80A/', '/v1/bic/UBSWCHZH80A'],
+    ['GET', '/v1/ch/clearing/230/', '/v1/ch/clearing/230'],
+    ['POST', '/v1/credits/buy/25k/', '/v1/credits/buy/25k'],
+  ])('%s %s → %s', (method, path, expected) => {
+    expect(canonicalPaidPath(method, path)).toBe(expected);
+  });
+
+  it('leaves a canonical path alone', () => {
+    for (const path of ['/v1/iban/validate', '/v1/bic/UBSWCHZH80A', '/v1/credits/buy/1k']) {
+      expect(canonicalPaidPath('POST', path)).toBeNull();
+    }
+  });
+
+  it('ignores paths that sell nothing — this is not a global routing change', () => {
+    for (const path of ['/v1/iban/format/', '/v1/iban/structure/CH/', '/v1/credits/bundles/', '/health/', '/']) {
+      expect(canonicalPaidPath('GET', path), path).toBeNull();
+    }
+  });
+
+  it('never walks a bare GET into the purchase flow', () => {
+    expect(canonicalPaidPath('GET', '/v1/credits/buy/1k/')).toBeNull();
+  });
+});
+
+/**
+ * Audit A2 §C1.2 — `HTTPFacilitatorClient` issues verify/settle/supported with
+ * a bare `fetch`: no signal, no timeout, and no way to pass one. The effective
+ * ceiling is undici's ~300 s, and the v2 settle blocks before the response
+ * leaves, so a facilitator that accepts the connection and then says nothing
+ * makes a PAID request hang for minutes.
+ */
+describe('a silent facilitator cannot hold a paid request for minutes', () => {
+  it.each([
+    ['verify', 10_000],
+    ['supported', 10_000],
+    ['settle', 30_000],
+  ] as const)('gives up on %s after %dms instead of undici’s ~300 s', async (operation, budget) => {
+    vi.useFakeTimers();
+    try {
+      const never = new Promise<string>(() => {});
+      const bounded = withFacilitatorTimeout(never, operation);
+      const outcome = bounded.then(
+        () => 'answered',
+        (e: Error) => e.message,
+      );
+
+      // One millisecond short of the budget: still waiting, as it must be —
+      // abandoning a settle the facilitator is still working on charges the
+      // buyer and delivers nothing.
+      await vi.advanceTimersByTimeAsync(budget - 1);
+      let settled = false;
+      void outcome.then(() => { settled = true; });
+      await Promise.resolve();
+      expect(settled).toBe(false);
+
+      await vi.advanceTimersByTimeAsync(1);
+      expect(await outcome).toMatch(/did not answer within/);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('is transparent when the facilitator answers in time', async () => {
+    await expect(withFacilitatorTimeout(Promise.resolve('supported'), 'supported')).resolves.toBe('supported');
+    await expect(withFacilitatorTimeout(Promise.reject(new Error('402 boom')), 'verify')).rejects.toThrow('402 boom');
+  });
+
+  /**
+   * 🚨 The detail that decides whether this fix is worth anything. A promise we
+   * stopped waiting on still rejects later; an unobserved rejection is exactly
+   * what killed the process on 20/08 and burned Railway's three restarts. A
+   * cure for a hang that reintroduces the crash is a net loss.
+   */
+  it('keeps a handler on the call it abandoned', async () => {
+    const unhandled: unknown[] = [];
+    const onUnhandled = (reason: unknown) => unhandled.push(reason);
+    process.on('unhandledRejection', onUnhandled);
+    try {
+      let rejectLate: (e: Error) => void = () => {};
+      const late = new Promise<never>((_, rej) => { rejectLate = rej; });
+      const bounded = withFacilitatorTimeout(late, 'verify');
+      // Stop waiting on it, then let the underlying call fail afterwards.
+      const raced = bounded.catch(() => 'timed out');
+      rejectLate(new Error('facilitator died after we gave up'));
+      await raced;
+      // Two turns of the microtask + macrotask queues is where Node reports one.
+      await new Promise((r) => setTimeout(r, 50));
+      expect(unhandled).toEqual([]);
+    } finally {
+      process.off('unhandledRejection', onUnhandled);
+    }
   });
 });

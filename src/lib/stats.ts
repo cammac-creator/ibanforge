@@ -364,6 +364,40 @@ export function recordOperation(
 }
 
 /**
+ * The `daily_stats.operation_type` under which a prepaid pack sale is booked.
+ *
+ * NOT an `OperationType`: a purchase is not a validation, and the distinction
+ * is load-bearing. `getStats()` builds `total_operations` and `by_type` from
+ * three named types read out of the `operations` table, so this row adds
+ * revenue to the daily line WITHOUT inflating any usage counter.
+ */
+export const CREDITS_PURCHASE_TYPE = 'credits_purchase';
+
+/**
+ * Book the sale of a prepaid credit pack.
+ *
+ * 🚨 The consumption endpoints have always recorded what they collected. The
+ * routes that SELL recorded nothing at all — so the single largest ticket we
+ * can take on the USDC rail ($5 to $80, against $0.002–$0.02 per call) left no
+ * trace in `daily_stats`, and every revenue reading understated the business by
+ * exactly the amount that mattered most. Audit B2.
+ *
+ * `settled` is false when no payment header was presented (explicit free mode,
+ * dev bypass): the pack was handed over, but nothing was collected, and a
+ * dashboard must never show money that did not move. Same rule as
+ * `computeRevenue` applies to every other endpoint.
+ */
+export function recordCreditsPurchase(bundle: string, priceUsdc: number, settled: boolean): void {
+  try {
+    upsertDaily().run(CREDITS_PURCHASE_TYPE, 1, 1, settled ? priceUsdc : 0);
+  } catch (err) {
+    // Same discipline as every other writer here: a broken stats DB must never
+    // turn a completed purchase into a 500, but it must be visible in the log.
+    console.error('[stats] recordCreditsPurchase failed:', err, { bundle });
+  }
+}
+
+/**
  * Un rejet de format n'atteint jamais recordOperation : les routes renvoient
  * 400 avant. Sans cette fonction, un rejet n'existe que comme un statut 400
  * anonyme dans request_log, et on ne peut pas dire ce qu'il faudrait tolérer.
@@ -663,7 +697,7 @@ export function getStats(): StatsOverview {
     total_revenue_usdc_clean: Math.round(revenueClean.total * 1000000) / 1000000,
     total_revenue_attempted_usdc: Math.round(revenue.total * 1000000) / 1000000,
     revenue_note:
-      'total_revenue_usdc and total_revenue_attempted_usdc both reflect the SUM of revenue_usdc in daily_stats — these are x402 calls that PASSED the payment middleware verify step, NOT a confirmation of on-chain settlement. Authoritative settled USDC is /admin/revenue (Bearer STATS_TOKEN). Historical drift observed: ~0.226 USDC counted as attempted between 2026-04-08 and 2026-04-17 with no matching Base mainnet Transfer events to the seller wallet — likely facilitator settlement failures during the early x402 rollout.',
+      'ATTEMPTED, NOT COLLECTED — total_revenue_usdc is a misnomer kept for contract stability: it and total_revenue_attempted_usdc are the SAME number, the SUM of revenue_usdc in daily_stats. A row is written when a call PASSED the payment middleware verify step; nothing here observes the chain, so a settle that failed AFTER verify still counts and can only inflate this figure — it structurally over-counts and never under-counts. Do not read it as earnings. The authoritative settled USDC is /admin/revenue (Bearer STATS_TOKEN), which reads Base mainnet Transfer events to the seller wallet. Scope: x402 pay-per-call AND prepaid credit packs bought with USDC (operation_type credits_purchase, added 2026-08-20 — before that date pack sales are missing from this sum entirely). Card purchases are NOT here: Stripe money never touches the wallet and is not USDC. Historical drift observed: ~0.226 USDC counted as attempted between 2026-04-08 and 2026-04-17 with no matching on-chain Transfer — likely facilitator settlement failures during the early x402 rollout; total_revenue_usdc_clean excludes that window.',
     top_countries: topCountries,
     last_7_days: last7,
   };

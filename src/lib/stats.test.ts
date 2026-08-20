@@ -1,5 +1,5 @@
 import { describe, it, expect, afterAll, beforeEach } from 'vitest';
-import { recordOperation, recordBatch, recordRequest, recordRejection, getRejectionStats, getStats, getQuickStats, getStatsHistory, getStatusByPath, getBusinessFunnel, getClientProfiles, getBotProfiles, classifyClient, extractClientIp, normalizeRequestPath } from './stats.js';
+import { CREDITS_PURCHASE_TYPE, recordOperation, recordBatch, recordRequest, recordRejection, getRejectionStats, getStats, getQuickStats, getStatsHistory, getStatusByPath, getBusinessFunnel, getClientProfiles, getBotProfiles, classifyClient, extractClientIp, normalizeRequestPath } from './stats.js';
 import { generateApiKey } from './api-keys.js';
 import { closeAll, getStatsDB } from './db.js';
 import type { RejectReason } from './input-normalize.js';
@@ -724,5 +724,54 @@ describe('getCohortFootprint', () => {
 
     db.prepare('DELETE FROM operations WHERE key_prefix = ?').run(key!.key_prefix);
     db.prepare('DELETE FROM api_keys WHERE key_prefix = ?').run(key!.key_prefix);
+  });
+});
+
+/**
+ * Audit B2 — `total_revenue_usdc` is not revenue.
+ *
+ * A row is written when a call PASSED the payment middleware's verify step.
+ * Nothing here observes the chain, so a settle that failed AFTER verify still
+ * counts: the figure structurally over-counts and can never under-count. The
+ * ~0.226 USDC of April drift is exactly that, and it is still in the sum.
+ *
+ * The field is NOT removed. `/stats` is read by machines and by the site's
+ * stats bar; dropping a field to fix a caption is a broken contract traded for
+ * a smaller problem. What has to be unambiguous is the note beside it — which
+ * is the only thing a reader has to tell "attempted" from "earned".
+ */
+describe('the revenue figure says what it is', () => {
+  it('keeps every field the /stats contract already publishes', () => {
+    const s = getStats() as unknown as Record<string, unknown>;
+    for (const field of [
+      'total_revenue_usdc',
+      'total_revenue_usdc_clean',
+      'total_revenue_attempted_usdc',
+      'revenue_note',
+      'total_operations',
+      'by_type',
+    ]) {
+      expect(Object.keys(s), field).toContain(field);
+    }
+  });
+
+  it('names the over-count, the authoritative source, and what is in scope', () => {
+    const note = getStats().revenue_note;
+    // Attempted, not collected — stated before anything else.
+    expect(note).toMatch(/ATTEMPTED, NOT COLLECTED/);
+    // The direction of the error, which is the part a reader must not guess.
+    expect(note).toMatch(/over-count/i);
+    expect(note).toMatch(/never under-count/i);
+    // Where the truth lives instead.
+    expect(note).toContain('/admin/revenue');
+    // What the number covers, now that pack sales are booked too — and what it
+    // does not (card money never touches the wallet and is not USDC).
+    expect(note).toContain(CREDITS_PURCHASE_TYPE);
+    expect(note).toMatch(/Stripe money never touches the wallet/);
+  });
+
+  it('reports attempted and total as the same number, since they are', () => {
+    const s = getStats();
+    expect(s.total_revenue_usdc).toBe(s.total_revenue_attempted_usdc);
   });
 });
