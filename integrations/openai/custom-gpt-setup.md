@@ -14,12 +14,16 @@ sanctions/risk — directly in chat.
 
 - A ChatGPT account that can **create GPTs** (Plus/Team/Enterprise).
 - An IBANforge API key (`ifk_...`) for the Action auth — generate one:
-  `curl -X POST https://api.ibanforge.com/v1/keys/generate -H 'Content-Type: application/json' -d '{"email":"you@example.com"}'`
+  `curl -X POST https://api.ibanforge.com/v1/keys/generate -H 'Content-Type: application/json' -d '{"email":"you@company.com"}'`
   (free tier = 200 req/month; the GPT's traffic bills against this key).
+  Use a real address: `example.com` and the other disposable domains are
+  refused by the signup guard.
 - **To publish publicly** to the GPT Store you also need (not required for
   private/link use):
-  - a **privacy policy URL** — ⚠️ currently missing (`ibanforge.com/privacy` →
-    404). Add one before publishing publicly.
+  - a **privacy policy URL** — we have one, paste
+    `https://ibanforge.com/en/legal/privacy`. (The short form
+    `ibanforge.com/privacy` is **not** a valid URL for this field: it
+    redirects to `/en/privacy`, which 404s. Always paste the `/legal/` path.)
   - a **verified builder profile** (verify the `ibanforge.com` domain or your
     name in ChatGPT → Settings → Builder profile).
 
@@ -35,8 +39,11 @@ sanctions/risk — directly in chat.
      simplest and matches the spec's security scheme — both verified working.)
    - **Schema** → **Import from URL** →
      `https://api.ibanforge.com/openapi.json`
-     (11 operations, all with `operationId`, servers preset to production).
-   - Leave **Privacy policy** blank for private use; required to publish.
+     (every operation carries an `operationId` and the servers are preset to
+     production — 18 operations on the spec served today, and the count grows
+     as endpoints ship, so check the import rather than a number written here).
+   - Leave **Privacy policy** blank for private use; to publish, paste
+     `https://ibanforge.com/en/legal/privacy`.
 4. Test in the preview pane (see "Smoke test" below), then **Create** →
    **Only me** (private) or **Anyone with a link** / **GPT Store** (needs the
    prerequisites above).
@@ -90,8 +97,15 @@ Rules:
 Validate IBAN DE89 3704 0044 0532 0130 00
 Look up BIC COBADEFFXXX
 Screen this IBAN for sanctions & risk: FR7630006000011234567890189
-Is this Swiss IBAN SEPA-reachable? CH9300762011623852957
+Is this Swiss IBAN SEPA-reachable? CH1000230000000012345
 ```
+
+> The Swiss starter deliberately uses `CH10 0023 0000 0000 1234 5`: its bank
+> code is in the SIX register, so the answer carries the BIC and the Swiss
+> clearing block — the two things that make this GPT worth installing. The
+> older starter used `CH9300762011623852957`, whose bank code `00762` answers
+> `bank_code_check.status: "not_in_register"` with a null BIC. Correct, and a
+> terrible first impression.
 
 ## Smoke test (in the GPT preview)
 

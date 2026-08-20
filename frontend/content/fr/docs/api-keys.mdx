@@ -8,45 +8,121 @@ order: 1
 
 IBANforge propose une **offre gratuite** via des cles API — 200 requetes/mois sur tous les endpoints. Aucune carte bancaire, aucun portefeuille crypto requis. Pour des volumes plus eleves, vous pouvez utiliser les [micropaiements x402](/docs/x402).
 
-## Generer une cle API gratuite
+## Générer une clé API gratuite
 
-Envoyez une requete POST a `/v1/keys/generate` avec votre adresse email :
+Envoyez une requête POST à `/v1/keys/generate` avec votre adresse email :
 
 ```bash
 curl -X POST https://api.ibanforge.com/v1/keys/generate \
   -H "Content-Type: application/json" \
-  -d '{"email": "vous@exemple.com"}'
+  -d '{"email": "you@company.com"}'
 ```
 
-### Reponse
+Utilisez une vraie adresse. Les domaines jetables ou fictifs (`example.com`,
+`mailinator.com` et le reste de la liste habituelle) sont refusés avec
+`400 disposable_email`.
+
+### Réponse (`201 Created`)
 
 ```json
 {
-  "key": "ifk_live_xxxxxxxxxxxxxxxxxxxx",
-  "email": "vous@exemple.com",
-  "tier": "free",
-  "quota": {
-    "requests_per_month": 200,
-    "used": 0,
-    "resets_at": "2026-05-01T00:00:00.000Z"
-  }
+  "api_key": "ifk_3f9c1a7e2b5d40c8…",
+  "key_prefix": "ifk_3f9c1a7e",
+  "email": "you@company.com",
+  "monthly_limit": 200,
+  "message": "Save this key — it will not be shown again.",
+  "terms_url": "https://ibanforge.com/legal/terms"
 }
 ```
 
-Votre cle commence par `ifk_` (IBANforge Key). **Conservez-la en securite** — elle ne sera plus affichee.
+- `api_key` est le secret : `ifk_` suivi de 64 caractères hexadécimaux. **Conservez-le en lieu sûr**, il ne sera plus affiché.
+- `key_prefix` en est les 8 premiers caractères. Il peut être journalisé sans risque, et c'est lui que le support vous demandera pour identifier une clé.
 
-## Utiliser votre cle API
+## Si la demande de clé est refusée
 
-Transmettez la cle dans l'en-tete `Authorization` en tant que token Bearer :
+La première clé d'un réseau reste instantanée. Au-delà, deux gardes protègent
+l'offre gratuite contre la fabrication de clés en série, et toutes deux
+répondent avec un champ `error` lisible par une machine.
+
+### `403 verification_required` : confirmez votre boîte mail
+
+Ce cas survient dès qu'une clé a déjà été émise depuis votre réseau récemment
+(NAT partagé d'un bureau, université, VPN, opérateur mobile, ou simplement vous
+qui demandez une deuxième clé). L'API envoie alors un **code à 6 chiffres** à
+l'adresse indiquée et répond :
+
+```json
+{
+  "error": "verification_required",
+  "message": "A key was already issued from this network recently, so this one needs a verified mailbox: we sent a 6-digit code to you@company.com. Repeat this request within 15 minutes as {\"email\": \"...\", \"code\": \"123456\"}."
+}
+```
+
+Renvoyez **la même requête avec un champ `code`** dans les 15 minutes :
+
+```bash
+curl -X POST https://api.ibanforge.com/v1/keys/generate \
+  -H "Content-Type: application/json" \
+  -d '{"email": "you@company.com", "code": "123456"}'
+```
+
+Un code correct renvoie le `201` habituel et la clé. Un code faux renvoie
+`403 verification_failed` avec un champ `reason` :
+
+| `reason` | Ce que ça veut dire | Quoi faire |
+|---|---|---|
+| `wrong_code` | Les chiffres ne correspondent pas | Réessayez avec le code du dernier mail reçu. Le défi se verrouille après 5 tentatives. |
+| `expired` | Plus de 15 minutes se sont écoulées | Redemandez une clé **sans** `code` pour en recevoir un nouveau. |
+| `no_challenge` | Aucun code en attente pour cette adresse | Idem : redemandez sans `code`. |
+| `too_many_attempts` | 5 codes faux. Une fois verrouillé, le défi refuse aussi le bon code | Redemandez sans `code` pour repartir sur un nouveau défi. |
+
+Ne renvoyez pas la requête sans `code` juste pour réessayer : cela envoie un
+nouveau code à chaque fois, et le nombre de codes envoyés à une même adresse
+par jour est plafonné.
+
+### `429` : trop de clés demandées
+
+```json
+{
+  "error": "key_creation_limit",
+  "message": "At most 3 free keys per network per day — existing keys keep working. Need more capacity today? Prepaid credits are instant ($5 per 1,000, POST /v1/credits/buy/1k) and x402 pay-per-call needs no key at all."
+}
+```
+
+`rate_limited` (une clé par adresse et par jour) et `verification_rate_limited`
+(trop de codes demandés) sont les deux autres `429` de cet endpoint. Dans les
+trois cas : **les clés que vous détenez déjà continuent de fonctionner**, les
+crédits prépayés sont instantanés, et le [paiement à l'appel x402](/docs/x402)
+ne demande aucune clé.
+
+### Les autres refus
+
+| Statut | `error` | Cause |
+|---|---|---|
+| `400` | `invalid_json` | Le corps n'est pas du JSON valide |
+| `400` | `invalid_email` | Ce n'est pas une adresse `local@domaine.tld` |
+| `400` | `disposable_email` | Domaine fictif ou jetable (`example.com`, `mailinator.com`, …) |
+| `503` | `verification_unavailable` | Le mail de vérification n'a pas pu partir. Réessayez dans quelques minutes, ou écrivez à [support@ibanforge.com](mailto:support@ibanforge.com). |
+
+Rien de tout cela ne s'applique aux deux voies payantes : les packs de crédits
+prépayés et le paiement à l'appel x402 n'émettent aucune clé gratuite et ne
+passent par aucune vérification.
+
+## Utiliser votre clé API
+
+Transmettez la clé dans l'en-tête `Authorization` en tant que token Bearer :
 
 ```bash
 curl -X POST https://api.ibanforge.com/v1/iban/validate \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer ifk_live_xxxxxxxxxxxxxxxxxxxx" \
+  -H "Authorization: Bearer ifk_3f9c1a7e2b5d40c8…" \
   -d '{"iban": "CH10 0023 0000 0000 1234 5"}'
 ```
 
-La cle fonctionne sur tous les endpoints payants :
+`X-API-Key: ifk_…` fonctionne aussi, si l'en-tête Bearer est malcommode dans
+votre client.
+
+La clé fonctionne sur tous les endpoints payants :
 - `POST /v1/iban/validate`
 - `POST /v1/iban/batch`
 - `GET /v1/bic/:code`
@@ -63,26 +139,28 @@ La cle fonctionne sur tous les endpoints payants :
 
 Les 200 requetes gratuites sont partagees entre tous les endpoints et se reinitalisent le 1er de chaque mois. **La validation par lot compte 1 requete par IBAN** — un lot de 50 IBANs consomme 50 requetes (ou 50 credits prepayes), la meme regle que le prix x402 par IBAN.
 
-## Verifier votre consommation
+## Vérifier votre consommation
 
 ```bash
 curl https://api.ibanforge.com/v1/keys/usage \
-  -H "Authorization: Bearer ifk_live_xxxxxxxxxxxxxxxxxxxx"
+  -H "Authorization: Bearer ifk_3f9c1a7e2b5d40c8…"
 ```
 
-### Reponse
+### Réponse (`200 OK`)
 
 ```json
 {
-  "tier": "free",
-  "quota": {
-    "requests_per_month": 200,
-    "used": 47,
-    "remaining": 153,
-    "resets_at": "2026-05-01T00:00:00.000Z"
-  }
+  "used": 47,
+  "limit": 200,
+  "remaining": 153,
+  "month": "2026-08",
+  "key_prefix": "ifk_3f9c1a7e"
 }
 ```
+
+`month` est le mois calendaire auquel se rapportent les compteurs (`YYYY-MM`),
+et ils se réinitialisent le 1er. Cet endpoint est gratuit et ne consomme pas de
+quota.
 
 ## Surveiller votre quota
 
@@ -94,7 +172,7 @@ le heurtez :
 X-Quota-Used: 47
 X-Quota-Limit: 200
 X-Quota-Remaining: 153
-X-Quota-Month: 2026-05
+X-Quota-Month: 2026-08
 ```
 
 Les chiffres sont le solde une fois la requête réglée : un appel rejeté en 4xx
@@ -110,7 +188,7 @@ Votre intégration ne tombe **pas** sur un cul-de-sac. Une fois les 200 requête
 X-Quota-Exhausted: true
 X-Quota-Used: 200
 X-Quota-Limit: 200
-X-Quota-Month: 2026-07
+X-Quota-Month: 2026-08
 ```
 
 Le corps du 402 liste vos trois options, lisibles par machine :

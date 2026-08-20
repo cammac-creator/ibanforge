@@ -126,7 +126,10 @@ function createMcpServer(): McpServer {
       // step" — an agent took it literally and scripted 42 keys in a
       // morning. Sell the same path truthfully: one key per developer, and
       // repeat creations from one network go through mailbox verification.
-      'Free tier: 10 tool calls/IP/day, no signup. For sustained use, POST https://api.ibanforge.com/v1/keys/generate {"email":"you@example.com"} issues a free API key (200 REST calls/month, one per developer — repeat creations from the same network require e-mail verification); prepaid credit packs from $5 per 1,000 calls, no expiry. ' +
+      // The example address has to pass the signup guard: example.com is on
+      // the disposable-domain blocklist, so the literal copy of the previous
+      // wording ("you@example.com") answered 400 disposable_email.
+      'Free tier: 10 tool calls/IP/day, no signup. For sustained use, POST https://api.ibanforge.com/v1/keys/generate {"email":"you@company.com"} issues a free API key (200 REST calls/month, one per developer — repeat creations from the same network require e-mail verification); prepaid credit packs from $5 per 1,000 calls, no expiry. ' +
       'Missing data, wrong result, or something blocking you from paying? Call send_feedback — a human reads every report. ' +
       'Paying as an agent (wallet, USDC on Base, one $5 payment for 1,000 calls): https://ibanforge.com/docs/pay-as-an-agent — ' +
       'Docs and code samples: https://ibanforge.com/docs/recipes',
@@ -877,7 +880,7 @@ mcpHttp.get('/mcp', async (c) => {
         tools: ['validate_iban', 'batch_validate_iban', 'lookup_bic', 'lookup_ch_clearing', 'check_compliance'],
         free_tier: {
           mcp_daily_limit: MCP_DAILY_LIMIT,
-          rest_api_signup: 'POST /v1/keys/generate {"email":"you@example.com"} for 200 req/month',
+          rest_api_signup: 'POST /v1/keys/generate {"email":"you@company.com"} for 200 req/month',
         },
         x402: 'https://api.ibanforge.com/.well-known/x402',
         documentation: 'https://ibanforge.com/docs',

@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
+import { routeKeyFailure } from '@/lib/api-key-failure';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://api.ibanforge.com';
 
@@ -20,7 +21,27 @@ interface KeyResponse {
   message: string;
 }
 
-type Stage = 'form' | 'loading' | 'success' | 'error';
+/**
+ * `verify` is the step the 2026-08-17 anti-farm guard made mandatory and that
+ * this dialog could not play until 2026-08-20.
+ *
+ * From the second key issued on a network, `POST /v1/keys/generate` answers
+ * `403 verification_required`, mails a 6-digit code and asks for the SAME
+ * request again with a `code` field. The dialog used to render that English
+ * JSON instruction as a raw error string with a single "Try again" button that
+ * re-POSTed without a code: every press mailed a fresh code, burned one of the
+ * few daily sends allowed per recipient, and landed on the same wall. Anyone
+ * behind a shared office NAT, a VPN or a carrier CGNAT — and anyone asking for
+ * a second key — could not obtain one from the web at all.
+ */
+type Stage = 'form' | 'verify' | 'success' | 'error';
+
+/**
+ * Refusals we can phrase ourselves, in the visitor's language. Anything not
+ * listed here keeps falling back to the API's own `message`, which is written
+ * to be useful even when we have no translation for it.
+ */
+type Failure = { error?: unknown; reason?: unknown; message?: unknown };
 
 export function ApiKeyDialogProvider({ children }: { children: ReactNode }) {
   const t = useTranslations('apiKeyDialog');
@@ -28,16 +49,23 @@ export function ApiKeyDialogProvider({ children }: { children: ReactNode }) {
   const locale = useLocale();
   const [isOpen, setIsOpen] = useState(false);
   const [stage, setStage] = useState<Stage>('form');
+  const [busy, setBusy] = useState(false);
   const [email, setEmail] = useState('');
+  const [code, setCode] = useState('');
   const [result, setResult] = useState<KeyResponse | null>(null);
   const [error, setError] = useState<string>('');
+  /** Inline warning shown above the field of the step the visitor is on. */
+  const [notice, setNotice] = useState<string>('');
   const [copied, setCopied] = useState(false);
 
   const reset = useCallback(() => {
     setStage('form');
+    setBusy(false);
     setEmail('');
+    setCode('');
     setResult(null);
     setError('');
+    setNotice('');
     setCopied(false);
   }, []);
 
@@ -64,37 +92,92 @@ export function ApiKeyDialogProvider({ children }: { children: ReactNode }) {
     };
   }, [isOpen, close]);
 
-  const submit = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!email.trim()) return;
-    setStage('loading');
-    setError('');
-    try {
-      // Best-effort acquisition attribution: forward the ?src= our outbound
-      // links carry (npm README, n8n node, directories). Absent → omitted.
-      const src =
-        typeof window !== 'undefined'
-          ? new URLSearchParams(window.location.search).get('src')
-          : null;
-      const r = await fetch(`${API_BASE}/v1/keys/generate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim(), ...(src ? { source: src } : {}) }),
-      });
-      if (!r.ok) {
-        const body = await r.json().catch(() => ({}));
-        const msg = body?.message || body?.error || `HTTP ${r.status}`;
-        setError(msg);
-        setStage('error');
+  /**
+   * Apply the routing decision. The decision itself lives in
+   * `lib/api-key-failure.ts` so it can be unit-tested without a DOM; here we
+   * only translate it and move the dialog.
+   */
+  const handleFailure = useCallback(
+    (status: number, body: Failure) => {
+      const route = routeKeyFailure(body.error, body.reason);
+
+      if (route.step === 'verify') {
+        if (route.notice === null) setCode('');
+        setNotice(route.notice ? t(route.notice) : '');
+        setStage('verify');
         return;
       }
-      const data = (await r.json()) as KeyResponse;
-      setResult(data);
-      setStage('success');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+
+      if (route.step === 'form') {
+        setCode('');
+        setNotice(t(route.notice));
+        setStage('form');
+        return;
+      }
+
+      // Unknown refusals keep falling back to the API's own message: it is
+      // written to be actionable, and an English sentence beats an empty one.
+      const fallback =
+        (typeof body.message === 'string' && body.message) ||
+        (typeof body.error === 'string' && body.error) ||
+        `HTTP ${status}`;
+      setError(route.message ? t(route.message) : fallback);
       setStage('error');
-    }
+    },
+    [t],
+  );
+
+  const requestKey = useCallback(
+    async (verificationCode?: string) => {
+      setBusy(true);
+      setNotice('');
+      setError('');
+      try {
+        // Best-effort acquisition attribution: forward the ?src= our outbound
+        // links carry (npm README, n8n node, directories). Absent → omitted.
+        const src =
+          typeof window !== 'undefined'
+            ? new URLSearchParams(window.location.search).get('src')
+            : null;
+        const r = await fetch(`${API_BASE}/v1/keys/generate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: email.trim().toLowerCase(),
+            ...(verificationCode ? { code: verificationCode } : {}),
+            ...(src ? { source: src } : {}),
+          }),
+        });
+        const body = await r.json().catch(() => ({}));
+        if (!r.ok) {
+          handleFailure(r.status, body as Failure);
+          return;
+        }
+        setResult(body as KeyResponse);
+        setStage('success');
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+        setStage('error');
+      } finally {
+        setBusy(false);
+      }
+    },
+    [email, handleFailure],
+  );
+
+  const submitEmail = (e: FormEvent) => {
+    e.preventDefault();
+    if (busy || !email.trim()) return;
+    void requestKey();
+  };
+
+  const submitCode = (e: FormEvent) => {
+    e.preventDefault();
+    // Never re-POST without a code from here: that would mail a fresh code and
+    // spend one of the few daily sends allowed per recipient.
+    const digits = code.replace(/\D/g, '');
+    if (busy || digits.length !== 6) return;
+    void requestKey(digits);
   };
 
   const copyKey = async () => {
@@ -141,8 +224,8 @@ export function ApiKeyDialogProvider({ children }: { children: ReactNode }) {
               ✕
             </button>
 
-            {(stage === 'form' || stage === 'loading') && (
-              <form onSubmit={submit}>
+            {stage === 'form' && (
+              <form onSubmit={submitEmail}>
                 <div
                   className="font-mono text-xs uppercase tracking-caps mb-2"
                   style={{ color: 'var(--amber-400)' }}
@@ -159,20 +242,36 @@ export function ApiKeyDialogProvider({ children }: { children: ReactNode }) {
                 <p className="text-sm mb-6" style={{ color: 'var(--fg-3)', lineHeight: 1.6 }}>
                   {t('subtitle')}
                 </p>
+                {notice && (
+                  <p
+                    role="alert"
+                    className="text-sm mb-4 rounded-md px-3 py-2"
+                    style={{
+                      color: 'var(--warn)',
+                      background: 'var(--ink-2)',
+                      border: '1px solid var(--ink-4)',
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    {notice}
+                  </p>
+                )}
                 <label
+                  htmlFor="apikey-email"
                   className="font-sans text-xs font-medium uppercase tracking-caps mb-1.5 block"
                   style={{ color: 'var(--fg-3)' }}
                 >
                   {t('emailLabel')}
                 </label>
                 <input
+                  id="apikey-email"
                   type="email"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder={t('emailPlaceholder')}
                   autoFocus
-                  disabled={stage === 'loading'}
+                  disabled={busy}
                   className="w-full px-3 py-2.5 font-mono text-sm rounded-md border outline-none mb-5"
                   style={{
                     background: 'var(--ink-2)',
@@ -180,8 +279,8 @@ export function ApiKeyDialogProvider({ children }: { children: ReactNode }) {
                     color: 'var(--fg-1)',
                   }}
                 />
-                <Button type="submit" disabled={stage === 'loading'} className="w-full">
-                  {stage === 'loading' ? t('submitting') : t('submit')}
+                <Button type="submit" disabled={busy} className="w-full">
+                  {busy ? t('submitting') : t('submit')}
                 </Button>
                 <p className="mt-3 text-[11px] leading-relaxed" style={{ color: 'var(--fg-3, #71717a)' }}>
                   {t.rich('termsNotice', {
@@ -197,6 +296,93 @@ export function ApiKeyDialogProvider({ children }: { children: ReactNode }) {
                     ),
                   })}
                 </p>
+              </form>
+            )}
+
+            {stage === 'verify' && (
+              <form onSubmit={submitCode}>
+                <div
+                  className="font-mono text-xs uppercase tracking-caps mb-2"
+                  style={{ color: 'var(--amber-400)' }}
+                >
+                  IBANforge · {t('verify.eyebrow')}
+                </div>
+                <h2
+                  id="apikey-title"
+                  className="font-sans font-bold mb-3"
+                  style={{ fontSize: 26, color: 'var(--fg-1)', letterSpacing: '-0.02em' }}
+                >
+                  {t('verify.title')}
+                </h2>
+                <p className="text-sm mb-2" style={{ color: 'var(--fg-3)', lineHeight: 1.6 }}>
+                  {t('verify.subtitle', { email: email.trim().toLowerCase() })}
+                </p>
+                <p className="text-xs mb-5" style={{ color: 'var(--fg-4)', lineHeight: 1.55 }}>
+                  {t('verify.why')}
+                </p>
+                {notice && (
+                  <p
+                    role="alert"
+                    className="text-sm mb-4 rounded-md px-3 py-2"
+                    style={{
+                      color: 'var(--warn)',
+                      background: 'var(--ink-2)',
+                      border: '1px solid var(--ink-4)',
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    {notice}
+                  </p>
+                )}
+                <label
+                  htmlFor="apikey-code"
+                  className="font-sans text-xs font-medium uppercase tracking-caps mb-1.5 block"
+                  style={{ color: 'var(--fg-3)' }}
+                >
+                  {t('verify.codeLabel')}
+                </label>
+                <input
+                  id="apikey-code"
+                  type="text"
+                  required
+                  value={code}
+                  onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  placeholder="123456"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  pattern="[0-9]{6}"
+                  maxLength={6}
+                  autoFocus
+                  disabled={busy}
+                  className="w-full px-3 py-2.5 font-mono rounded-md border outline-none mb-5"
+                  style={{
+                    background: 'var(--ink-2)',
+                    borderColor: 'var(--ink-4)',
+                    color: 'var(--fg-1)',
+                    fontSize: 20,
+                    letterSpacing: '0.35em',
+                  }}
+                />
+                <Button
+                  type="submit"
+                  disabled={busy || code.replace(/\D/g, '').length !== 6}
+                  className="w-full"
+                >
+                  {busy ? t('verify.submitting') : t('verify.submit')}
+                </Button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCode('');
+                    setNotice('');
+                    setStage('form');
+                  }}
+                  disabled={busy}
+                  className="mt-3 w-full text-xs underline underline-offset-2"
+                  style={{ color: 'var(--fg-3)', background: 'none', border: 'none', cursor: 'pointer' }}
+                >
+                  {t('verify.changeEmail')}
+                </button>
               </form>
             )}
 
@@ -281,7 +467,14 @@ export function ApiKeyDialogProvider({ children }: { children: ReactNode }) {
                 <p className="text-sm mb-5" style={{ color: 'var(--fg-2)', lineHeight: 1.55 }}>
                   {error}
                 </p>
-                <Button onClick={() => setStage('form')} variant="secondary">
+                <Button
+                  onClick={() => {
+                    setNotice('');
+                    setCode('');
+                    setStage('form');
+                  }}
+                  variant="secondary"
+                >
                   {t('retry')}
                 </Button>
               </div>

@@ -60,7 +60,6 @@
       }
     },
     "features": {
-      "heading": "Everything you need",
       "0": {
         "badge": "Swiss clearing — exclusive",
         "title": "BC-Nummer / QR-IID",
@@ -90,7 +89,8 @@
         "badge": "x402 — agent payments",
         "title": "Agents pay per call",
         "description": "Autonomous agents can pay per request in USDC via x402 — no account, no checkout. Humans keep the free key or card credits; agents get their own rail."
-      }
+      },
+      "heading": "Everything you need"
     },
     "endpoints": {
       "0": {
@@ -423,7 +423,8 @@
       "label": "Response"
     },
     "docsPrompt": "Want to use this in your code?",
-    "docsLink": "See the docs →"
+    "docsLink": "See the docs →",
+    "getKey": "Get a free key"
   },
   "dashboard": {
     "header": {
@@ -738,6 +739,10 @@
       "advanced": "Advanced",
       "registers": "Bank registers",
       "more": "More"
+    },
+    "keyCta": {
+      "prompt": "Prefer a form to a curl command? Same key, two clicks, no card.",
+      "button": "Get a free key"
     }
   },
   "blog": {
@@ -810,7 +815,28 @@
     "errorTitle": "Error",
     "errorHeadline": "Could not generate the key",
     "retry": "Try again",
-    "close": "Close"
+    "close": "Close",
+    "verify": {
+      "eyebrow": "Mailbox check",
+      "title": "Check your inbox",
+      "subtitle": "We just sent a 6-digit code to {email}. Enter it below to finish. It stays valid for 15 minutes.",
+      "why": "A key was already issued from your network recently (a shared office connection, a VPN, or an earlier key of yours), so we confirm the mailbox before issuing another one.",
+      "codeLabel": "6-digit code",
+      "submit": "Confirm and get my key",
+      "submitting": "Checking…",
+      "changeEmail": "Use a different email address",
+      "wrongCode": "That code does not match. Check the most recent mail. The code locks after 5 attempts.",
+      "locked": "Too many wrong attempts. Ask for a key again to receive a new code.",
+      "expired": "That code has expired. Ask for a key again and we will send you a fresh one."
+    },
+    "errors": {
+      "invalidEmail": "Please enter a valid email address, for example you@company.com.",
+      "disposableEmail": "The free tier needs a real address. Placeholder and throwaway domains such as example.com or mailinator.com are refused.",
+      "verificationRateLimited": "Too many verification codes were requested. Try again tomorrow, or use the most recent code you received. Keys you already hold keep working, and prepaid credits need no verification.",
+      "verificationUnavailable": "We could not send the verification mail right now. Try again in a few minutes, or write to support@ibanforge.com.",
+      "keyCreationLimit": "This network has reached its daily limit of free keys. Keys you already hold keep working. Prepaid credits are instant, and x402 pay-per-call needs no key at all.",
+      "rateLimited": "A key was already issued to this address today. Try again tomorrow, or use prepaid credits, which are instant."
+    }
   },
   "agents": {
     "eyebrow": "For AI Agents",

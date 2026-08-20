@@ -31,7 +31,7 @@ console.log(r.clearing?.iid);    // '00230' (Swiss BC-Nummer, CH/LI only)
 ## Get a free key in one line
 
 ```typescript
-const key = await IBANforge.generateApiKey('you@example.com'); // 200 req/month
+const key = await IBANforge.generateApiKey('you@company.com'); // 200 req/month
 const client = new IBANforge({ apiKey: key.api_key });
 ```
 

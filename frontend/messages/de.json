@@ -60,7 +60,6 @@
       }
     },
     "features": {
-      "heading": "Alles, was Sie brauchen",
       "0": {
         "badge": "Schweizer Clearing — exklusiv",
         "title": "BC-Nummer / QR-IID",
@@ -90,7 +89,8 @@
         "badge": "x402 — Agenten-Zahlungen",
         "title": "Agenten zahlen pro Aufruf",
         "description": "Autonome Agenten zahlen pro Anfrage in USDC über x402 — ohne Konto, ohne Checkout. Menschen nutzen den Gratis-Key oder Kartenguthaben; Agenten haben ihre eigene Schiene."
-      }
+      },
+      "heading": "Alles, was Sie brauchen"
     },
     "endpoints": {
       "0": {
@@ -423,7 +423,8 @@
       "label": "Antwort"
     },
     "docsPrompt": "Möchten Sie dies in Ihrem Code verwenden?",
-    "docsLink": "Zur Dokumentation →"
+    "docsLink": "Zur Dokumentation →",
+    "getKey": "Kostenlosen Key holen"
   },
   "dashboard": {
     "header": {
@@ -738,6 +739,10 @@
       "advanced": "Erweitert",
       "registers": "Bankregister",
       "more": "Weitere"
+    },
+    "keyCta": {
+      "prompt": "Lieber ein Formular als ein curl-Kommando? Derselbe Schlüssel, zwei Klicks, ohne Karte.",
+      "button": "Kostenlosen Key holen"
     }
   },
   "blog": {
@@ -810,7 +815,28 @@
     "errorTitle": "Fehler",
     "errorHeadline": "Schlüssel konnte nicht erstellt werden",
     "retry": "Erneut versuchen",
-    "close": "Schliessen"
+    "close": "Schliessen",
+    "verify": {
+      "eyebrow": "Bestätigung",
+      "title": "Schauen Sie in Ihr Postfach",
+      "subtitle": "Wir haben soeben einen 6-stelligen Code an {email} geschickt. Geben Sie ihn unten ein, um abzuschliessen. Er bleibt 15 Minuten gültig.",
+      "why": "Aus Ihrem Netzwerk wurde kürzlich bereits ein Schlüssel ausgestellt (gemeinsam genutzter Büroanschluss, VPN, oder ein früherer Schlüssel von Ihnen). Deshalb bestätigen wir das Postfach, bevor wir einen weiteren ausstellen.",
+      "codeLabel": "6-stelliger Code",
+      "submit": "Bestätigen und Schlüssel erhalten",
+      "submitting": "Wird geprüft…",
+      "changeEmail": "Andere E-Mail-Adresse verwenden",
+      "wrongCode": "Dieser Code stimmt nicht. Prüfen Sie die neueste Mail. Nach 5 Versuchen sperrt der Code.",
+      "locked": "Zu viele Fehlversuche. Fordern Sie einen Schlüssel erneut an, um einen neuen Code zu erhalten.",
+      "expired": "Dieser Code ist abgelaufen. Fordern Sie einen Schlüssel erneut an, wir schicken Ihnen einen neuen."
+    },
+    "errors": {
+      "invalidEmail": "Bitte geben Sie eine gültige E-Mail-Adresse ein, zum Beispiel you@company.com.",
+      "disposableEmail": "Das kostenlose Kontingent braucht eine echte Adresse. Wegwerf- und Platzhalter-Domains wie example.com oder mailinator.com werden abgelehnt.",
+      "verificationRateLimited": "Es wurden zu viele Bestätigungscodes angefordert. Versuchen Sie es morgen erneut, oder verwenden Sie den zuletzt erhaltenen Code. Bereits ausgestellte Schlüssel funktionieren weiter, und Prepaid-Guthaben braucht keine Bestätigung.",
+      "verificationUnavailable": "Die Bestätigungsmail konnte gerade nicht versandt werden. Versuchen Sie es in einigen Minuten erneut, oder schreiben Sie an support@ibanforge.com.",
+      "keyCreationLimit": "Dieses Netzwerk hat sein Tageslimit an kostenlosen Schlüsseln erreicht. Bereits ausgestellte Schlüssel funktionieren weiter. Prepaid-Guthaben ist sofort verfügbar, und x402 Pay-per-Call braucht überhaupt keinen Schlüssel.",
+      "rateLimited": "Für diese Adresse wurde heute bereits ein Schlüssel ausgestellt. Versuchen Sie es morgen erneut, oder nutzen Sie Prepaid-Guthaben, das sofort verfügbar ist."
+    }
   },
   "agents": {
     "eyebrow": "Für KI-Agenten",

@@ -20,7 +20,7 @@ points de découverte qu'utilisent les agents IA et les devs qui les intègrent.
 | Server name                  | `IBANforge`                                                                       |
 | Author / GitHub              | `cammac-creator`                                                                  |
 | Repository URL               | `https://github.com/cammac-creator/ibanforge`                                     |
-| npm package                  | `ibanforge-mcp` (version publiée : 1.4.0)                                                                   |
+| npm package                  | `ibanforge-mcp` — relire la version publiée avant de coller : `npm view ibanforge-mcp version` (1.4.3 au 20.08.2026) |
 | Install command              | `npx -y ibanforge-mcp` (Claude Code : `claude mcp add ibanforge npx -- -y ibanforge-mcp`)                                                            |
 | Categories / Tags            | `finance`, `banking`, `compliance`, `iban`, `bic`, `sepa`, `x402`, `payments`     |
 | Short description (1 line)   | `IBAN validation, BIC/SWIFT lookup, Swiss BC-Nummer, SEPA + VoP and compliance risk scoring for AI agents.` |

@@ -5,6 +5,7 @@ import { useTranslations, useLocale } from "next-intl"
 import Link from "next/link"
 import { Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { GetKeyButton } from "@/components/api-key-dialog"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { StatusDot } from "@/components/ui/status-dot"
@@ -194,16 +195,21 @@ export default function PlaygroundPage() {
         )}
       </div>
 
-      {/* Docs link */}
-      <p className="text-center text-sm text-muted-foreground">
-        {t("docsPrompt")}{" "}
-        <Link
-          href={`/${locale}/docs`}
-          className="text-amber-500 underline underline-offset-4 transition-colors hover:text-amber-400"
-        >
-          {t("docsLink")}
-        </Link>
-      </p>
+      {/* Peak of intent. The visitor has just watched the API answer on their
+          own input; until 2026-08-20 the only exit here was "See the docs",
+          which sends the most convinced reader off to read instead of to
+          build. The key comes first now, the docs stay one click away. */}
+      <div className="flex flex-col items-center gap-3 text-center">
+        <p className="text-sm text-muted-foreground">{t("docsPrompt")}</p>
+        <div className="flex flex-col items-center gap-3 sm:flex-row">
+          <GetKeyButton variant="amber" className="px-6">
+            {t("getKey")}
+          </GetKeyButton>
+          <Button variant="outline" className="px-6" render={<Link href={`/${locale}/docs`} />}>
+            {t("docsLink")}
+          </Button>
+        </div>
+      </div>
     </div>
   )
 }

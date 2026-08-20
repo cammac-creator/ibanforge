@@ -62,7 +62,7 @@ Get a free API key:
 ```bash
 curl -X POST https://api.ibanforge.com/v1/keys/generate \
   -H "Content-Type: application/json" \
-  -d '{"email":"you@example.com"}'
+  -d '{"email":"you@company.com"}'
 ```
 
 ## Examples

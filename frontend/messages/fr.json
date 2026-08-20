@@ -60,7 +60,6 @@
       }
     },
     "features": {
-      "heading": "Tout ce qu'il vous faut",
       "0": {
         "badge": "Clearing suisse — exclusif",
         "title": "BC-Nummer / QR-IID",
@@ -90,7 +89,8 @@
         "badge": "x402 — paiement agents",
         "title": "Les agents paient à l’appel",
         "description": "Les agents autonomes paient à la requête en USDC via x402 — sans compte, sans checkout. Les humains gardent la clé gratuite ou les crédits carte ; les agents ont leur propre rail."
-      }
+      },
+      "heading": "Tout ce qu'il vous faut"
     },
     "endpoints": {
       "0": {
@@ -423,7 +423,8 @@
       "label": "Réponse"
     },
     "docsPrompt": "Vous souhaitez utiliser ceci dans votre code ?",
-    "docsLink": "Voir la documentation →"
+    "docsLink": "Voir la documentation →",
+    "getKey": "Obtenir une clé gratuite"
   },
   "dashboard": {
     "header": {
@@ -738,6 +739,10 @@
       "advanced": "Avancé",
       "registers": "Registres bancaires",
       "more": "Autres"
+    },
+    "keyCta": {
+      "prompt": "Vous préférez un formulaire à une commande curl ? Même clé, deux clics, sans carte bancaire.",
+      "button": "Obtenir une clé gratuite"
     }
   },
   "blog": {
@@ -810,7 +815,28 @@
     "errorTitle": "Erreur",
     "errorHeadline": "Impossible de créer la clé",
     "retry": "Réessayer",
-    "close": "Fermer"
+    "close": "Fermer",
+    "verify": {
+      "eyebrow": "Vérification",
+      "title": "Regardez votre boîte mail",
+      "subtitle": "Nous venons d'envoyer un code à 6 chiffres à {email}. Saisissez-le ci-dessous pour terminer. Il reste valable 15 minutes.",
+      "why": "Une clé a déjà été émise depuis votre réseau récemment (connexion de bureau partagée, VPN, ou une clé que vous aviez déjà), nous confirmons donc la boîte mail avant d'en émettre une autre.",
+      "codeLabel": "Code à 6 chiffres",
+      "submit": "Confirmer et obtenir ma clé",
+      "submitting": "Vérification…",
+      "changeEmail": "Utiliser une autre adresse email",
+      "wrongCode": "Ce code ne correspond pas. Vérifiez le dernier mail reçu. Le code se verrouille après 5 tentatives.",
+      "locked": "Trop de tentatives incorrectes. Redemandez une clé pour recevoir un nouveau code.",
+      "expired": "Ce code a expiré. Redemandez une clé et nous vous en enverrons un nouveau."
+    },
+    "errors": {
+      "invalidEmail": "Saisissez une adresse email valide, par exemple you@company.com.",
+      "disposableEmail": "L'offre gratuite demande une vraie adresse. Les domaines jetables ou fictifs comme example.com ou mailinator.com sont refusés.",
+      "verificationRateLimited": "Trop de codes de vérification ont été demandés. Réessayez demain, ou utilisez le dernier code reçu. Les clés que vous détenez déjà continuent de fonctionner, et les crédits prépayés ne demandent aucune vérification.",
+      "verificationUnavailable": "Le mail de vérification n'a pas pu partir. Réessayez dans quelques minutes, ou écrivez à support@ibanforge.com.",
+      "keyCreationLimit": "Ce réseau a atteint sa limite quotidienne de clés gratuites. Les clés que vous détenez déjà continuent de fonctionner. Les crédits prépayés sont instantanés, et le paiement à l'appel x402 ne demande aucune clé.",
+      "rateLimited": "Une clé a déjà été émise pour cette adresse aujourd'hui. Réessayez demain, ou passez par les crédits prépayés, qui sont instantanés."
+    }
   },
   "agents": {
     "eyebrow": "Pour les agents IA",

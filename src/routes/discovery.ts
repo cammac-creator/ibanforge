@@ -177,7 +177,10 @@ const x402Document: Handler = (c) => {
       api_key: {
         scheme: 'bearer',
         token_prefix: 'ifk_',
-        signup: 'POST /v1/keys/generate with body {"email":"you@example.com"}',
+        // The address in this example must PASS the free-tier signup guard.
+        // "you@example.com" did not: example.com is on the disposable-domain
+        // blocklist, so every agent that copied this line literally got a 400.
+        signup: 'POST /v1/keys/generate with body {"email":"you@company.com"}',
         free_tier_quota: 200,
         free_tier_period: 'month',
       },

@@ -15,25 +15,95 @@ Send a POST request to `/v1/keys/generate` with your email address:
 ```bash
 curl -X POST https://api.ibanforge.com/v1/keys/generate \
   -H "Content-Type: application/json" \
-  -d '{"email": "you@example.com"}'
+  -d '{"email": "you@company.com"}'
 ```
 
-### Response
+Use a real address. Placeholder and throwaway domains (`example.com`,
+`mailinator.com` and the rest of the usual list) are refused with
+`400 disposable_email`.
+
+### Response (`201 Created`)
 
 ```json
 {
-  "key": "ifk_live_xxxxxxxxxxxxxxxxxxxx",
-  "email": "you@example.com",
-  "tier": "free",
-  "quota": {
-    "requests_per_month": 200,
-    "used": 0,
-    "resets_at": "2026-05-01T00:00:00.000Z"
-  }
+  "api_key": "ifk_3f9c1a7e2b5d40c8…",
+  "key_prefix": "ifk_3f9c1a7e",
+  "email": "you@company.com",
+  "monthly_limit": 200,
+  "message": "Save this key — it will not be shown again.",
+  "terms_url": "https://ibanforge.com/legal/terms"
 }
 ```
 
-Your key starts with `ifk_` (IBANforge Key). **Store it securely** — it will not be shown again.
+- `api_key` is the secret: `ifk_` followed by 64 hexadecimal characters. **Store it securely**, it will not be shown again.
+- `key_prefix` is its first 8 characters. It is safe to log and it is what our support will ask for to identify a key.
+
+## If the key request is refused
+
+The first key from a given network is instant. Beyond that, two guards protect
+the free tier from bulk key farming, and both answer with a machine-readable
+`error` field.
+
+### `403 verification_required`: confirm your mailbox
+
+This lands whenever a key was already issued from your network recently (a
+shared office NAT, a university, a VPN, a mobile carrier, or simply you asking
+for a second key). The API mails a **6-digit code** to the address you supplied
+and answers:
+
+```json
+{
+  "error": "verification_required",
+  "message": "A key was already issued from this network recently, so this one needs a verified mailbox: we sent a 6-digit code to you@company.com. Repeat this request within 15 minutes as {\"email\": \"...\", \"code\": \"123456\"}."
+}
+```
+
+Send the **same request again with a `code` field** within 15 minutes:
+
+```bash
+curl -X POST https://api.ibanforge.com/v1/keys/generate \
+  -H "Content-Type: application/json" \
+  -d '{"email": "you@company.com", "code": "123456"}'
+```
+
+A correct code returns the usual `201` and the key. A wrong one returns
+`403 verification_failed` with a `reason` field:
+
+| `reason` | What it means | What to do |
+|---|---|---|
+| `wrong_code` | The digits do not match | Retry with the code from the most recent mail. The challenge locks after 5 attempts. |
+| `expired` | More than 15 minutes elapsed | Ask for a key again **without** a `code` to receive a fresh one. |
+| `no_challenge` | No pending code for this address | Same: ask again without a `code`. |
+| `too_many_attempts` | 5 wrong codes. Once locked, the challenge refuses the right code too | Ask again without a `code` to start a new challenge. |
+
+Do not resend the request without a `code` just to retry: that mails a new code
+every time, and the number of codes we send to one address per day is capped.
+
+### `429`: you asked for too many keys
+
+```json
+{
+  "error": "key_creation_limit",
+  "message": "At most 3 free keys per network per day — existing keys keep working. Need more capacity today? Prepaid credits are instant ($5 per 1,000, POST /v1/credits/buy/1k) and x402 pay-per-call needs no key at all."
+}
+```
+
+`rate_limited` (one key per address per day) and `verification_rate_limited`
+(too many codes requested) are the two other `429`s on this endpoint. In all
+three cases: **keys you already hold keep working**, prepaid credits are
+instant, and [x402 pay-per-call](/docs/x402) needs no key at all.
+
+### The other refusals
+
+| Status | `error` | Cause |
+|---|---|---|
+| `400` | `invalid_json` | The body is not valid JSON |
+| `400` | `invalid_email` | Not a `local@domain.tld` address |
+| `400` | `disposable_email` | Placeholder or throwaway domain (`example.com`, `mailinator.com`, …) |
+| `503` | `verification_unavailable` | The verification mail could not be sent. Try again in a few minutes, or write to [support@ibanforge.com](mailto:support@ibanforge.com). |
+
+None of this applies to the two paid rails: prepaid credit packs and x402
+pay-per-call issue no free key and go through no verification.
 
 ## Using your API key
 
@@ -42,9 +112,11 @@ Pass the key in the `Authorization` header as a Bearer token:
 ```bash
 curl -X POST https://api.ibanforge.com/v1/iban/validate \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer ifk_live_xxxxxxxxxxxxxxxxxxxx" \
+  -H "Authorization: Bearer ifk_3f9c1a7e2b5d40c8…" \
   -d '{"iban": "CH10 0023 0000 0000 1234 5"}'
 ```
+
+`X-API-Key: ifk_…` works too, if a Bearer header is awkward in your client.
 
 The key works on all paid endpoints:
 - `POST /v1/iban/validate`
@@ -67,22 +139,23 @@ The 200 free requests are shared across all endpoints and reset on the 1st of ea
 
 ```bash
 curl https://api.ibanforge.com/v1/keys/usage \
-  -H "Authorization: Bearer ifk_live_xxxxxxxxxxxxxxxxxxxx"
+  -H "Authorization: Bearer ifk_3f9c1a7e2b5d40c8…"
 ```
 
-### Response
+### Response (`200 OK`)
 
 ```json
 {
-  "tier": "free",
-  "quota": {
-    "requests_per_month": 200,
-    "used": 47,
-    "remaining": 153,
-    "resets_at": "2026-05-01T00:00:00.000Z"
-  }
+  "used": 47,
+  "limit": 200,
+  "remaining": 153,
+  "month": "2026-08",
+  "key_prefix": "ifk_3f9c1a7e"
 }
 ```
+
+`month` is the calendar month the counters belong to (`YYYY-MM`), and they
+reset on the 1st. This endpoint is free and does not consume quota.
 
 ## Watching your quota
 
@@ -93,7 +166,7 @@ refusal, so you can act before you reach the wall rather than when you hit it:
 X-Quota-Used: 47
 X-Quota-Limit: 200
 X-Quota-Remaining: 153
-X-Quota-Month: 2026-05
+X-Quota-Month: 2026-08
 ```
 
 The figures are the balance after the request settled: a call rejected with a
@@ -109,7 +182,7 @@ Your integration does **not** hit a hard dead-end. Once the 200 monthly requests
 X-Quota-Exhausted: true
 X-Quota-Used: 200
 X-Quota-Limit: 200
-X-Quota-Month: 2026-07
+X-Quota-Month: 2026-08
 ```
 
 The 402 body lists your three options in machine-readable form:
