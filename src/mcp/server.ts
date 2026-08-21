@@ -30,7 +30,7 @@ const server = new McpServer({
   title: 'IBANforge',
   version: pkg.version,
   description:
-    `IBAN validation, BIC/SWIFT lookup, Swiss clearing, SEPA compliance and risk indicators. ${F.claim.bic} BIC entries (${F.claim.lei} LEI-enriched via GLEIF), ${F.claim.chClearing} Swiss BC-Nummer from SIX, 89 countries, refreshed monthly.`,
+    `IBAN validation, BIC/SWIFT lookup, Swiss clearing, SEPA compliance and risk indicators. ${F.claim.bic} BIC entries (${F.claim.lei} LEI-enriched via GLEIF), ${F.claim.chClearing} Swiss BC-Nummer from SIX, ${F.claim.countries} countries, refreshed monthly.`,
   websiteUrl: 'https://ibanforge.com',
   icons: [
     {
@@ -61,7 +61,7 @@ Returns: { valid, country: { code, name }, check_digits, bban: { bank_code, bran
 
 When valid is false the object carries { valid: false, error, error_detail } and none of the enrichment fields. bic is null when no BBAN-to-BIC mapping exists for the bank code. IMPORTANT — bic: null does not mean the bank code is wrong. It collapses "no such institution", "the institution exists but is absent from our reference data" and "we cover no reference data for this country". Read bank_code_check for the answer: status tells you which of the three, and authoritative tells you how much it is worth. Only where authoritative is true (today CH and LI against the SIX BankMaster, and DE against the Bundesbank Bankleitzahlendatei) does not_in_register mean the bank code is not allocated; everywhere else treat it as UNAVAILABLE and let the downstream name check decide. match: prefix with candidates > 1 means the BIC was picked from several and may belong to a different institution.  branch_code is present only for countries whose BBAN defines one; clearing is present only for CH and LI when the IID is in the SIX BankMaster. modulus_check is present only for GB: it runs the Vocalink modulus checksum over the sort code and account number the IBAN carries, which is a SECOND and independent check — a GB IBAN can pass mod-97 and still name an account no bank could have issued. passed false means the pair cannot be a real account and is a reason not to send; it does NOT make valid false, so read the two separately. checked false means the published table covers no range for that sort code, in which case Vocalink instructs that the pair be presumed valid — it is not a failed check. Checksum only: it does not prove the account exists or name its holder.
 
-Supports 89 countries including all SEPA/EEA countries, Switzerland, UK, and 50+ non-SEPA countries.
+Supports ${F.claim.countries} countries including all SEPA/EEA countries, Switzerland, UK, and 50+ non-SEPA countries.
 
 next_steps is ordered advice derived from the result: what blocks a payment first, what merely enriches it after. Branch on the code field, not on the prose, and relay the do field to the user. bank_code_not_allocated means stop; verify_payee_name means carry on and let a beneficiary name check decide.
 
@@ -483,7 +483,7 @@ server.registerResource(
   'ibanforge://countries',
   {
     title: 'Supported Countries',
-    description: 'List of all 89 countries supported by IBANforge with IBAN length, SEPA membership, VoP status, and country risk classification.',
+    description: `List of all ${F.claim.countries} countries supported by IBANforge with IBAN length, SEPA membership, VoP status, and country risk classification.`,
     mimeType: 'application/json',
   },
   async () => ({

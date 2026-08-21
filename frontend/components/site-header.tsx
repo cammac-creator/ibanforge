@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { useState } from "react"
+import { usePathname } from "next/navigation"
 import { useLocale, useTranslations } from "next-intl"
 import { Menu, X } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -11,6 +12,7 @@ export function SiteHeader() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const t = useTranslations("header")
   const locale = useLocale()
+  const pathname = usePathname()
 
   const navLinks = [
     { href: `/${locale}/agents`, label: t("nav.agents") },
@@ -37,7 +39,13 @@ export function SiteHeader() {
             <Link
               key={link.href}
               href={link.href}
-              className="px-3 py-1.5 rounded-md text-sm text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+              // Without this a screen reader reads the whole menu with no way
+              // to tell which entry is the page already open. The visual
+              // treatment says it to everyone else; this says it to them.
+              aria-current={pathname === link.href ? 'page' : undefined}
+              className={`px-3 py-1.5 rounded-md text-sm transition-colors hover:bg-muted/50 hover:text-foreground ${
+                pathname === link.href ? 'text-foreground' : 'text-muted-foreground'
+              }`}
             >
               {link.label}
             </Link>

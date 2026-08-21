@@ -16,6 +16,7 @@
  * the retention purges and the shutdown handlers.
  */
 import { createRequire } from 'node:module';
+import { datasetFacts } from './lib/dataset-facts.js';
 import { Hono } from 'hono';
 import { compress } from 'hono/compress';
 import { cors } from 'hono/cors';
@@ -104,9 +105,14 @@ function buildLlmsTxt(): string {
   const bicCount = getEntryCount().toLocaleString('en-US');
   const chCount = getChClearingCount().toLocaleString('en-US');
   const leiCount = getLeiEnrichedCount().toLocaleString('en-US');
+  // Read, not written. This file states out loud that its counts are generated
+  // live from the serving database, and the country total was a literal — so
+  // that sentence was false for one of the numbers it covered. A claim about
+  // being measured has to be measured.
+  const countryCount = datasetFacts().claim.countries;
   return `# IBANforge
 
-> Pre-payout screening for AI agents — check the bank behind a counterparty IBAN before you send funds. IBAN validation, BIC/SWIFT lookup, Swiss clearing, sanctions and compliance risk scoring, designed for AI agents and developers. ${bicCount} BIC entries (${leiCount} LEI-enriched via GLEIF; additional rows from SWIFT directory, Bundesbank, SIX, NBP, EBA Step2 SCT), ${chCount} Swiss BC-Nummer from SIX, 89 countries, 85 EMI/vIBAN issuer classifications. Counts in this file are generated live from the serving database.
+> Pre-payout screening for AI agents — check the bank behind a counterparty IBAN before you send funds. IBAN validation, BIC/SWIFT lookup, Swiss clearing, sanctions and compliance risk scoring, designed for AI agents and developers. ${bicCount} BIC entries (${leiCount} LEI-enriched via GLEIF; additional rows from SWIFT directory, Bundesbank, SIX, NBP, EBA Step2 SCT), ${chCount} Swiss BC-Nummer from SIX, ${countryCount} countries, 85 EMI/vIBAN issuer classifications. Counts in this file are generated live from the serving database.
 
 ## Instructions for LLM agents
 
@@ -154,7 +160,7 @@ This single call exercises the 3 USPs (Swiss BC-Nummer, EMI/vIBAN classification
 - POST /v1/iban/compliance — full compliance check ($0.02 USDC)
 - GET /v1/ch/clearing/:iid — Swiss clearing lookup ($0.003 USDC)
 - GET /v1/iban/format?iban=... — free format check (mod-97 + structure)
-- GET /v1/iban/structure[/:country] — free IBAN templates for 89 countries
+- GET /v1/iban/structure[/:country] — free IBAN templates for ${countryCount} countries
 - GET /v1/credits/bundles — free, list prepaid credit bundles
 - POST /v1/credits/buy/:bundle — buy credits via x402 (1k=$5, 5k=$20, 25k=$80)
 - POST /v1/feedback — free, report incorrect data or claim x402 refunds
@@ -239,7 +245,7 @@ Returns: format check + country + BBAN parsed + \`upgrade_to_full_validation\` h
 curl -s 'https://api.ibanforge.com/v1/iban/structure/CH'
 \`\`\`
 
-Returns the IBAN structural template for the country: total IBAN length (21 for CH), BBAN field positions (bank_code, branch_code, account_number with their 0-indexed start + length within the BBAN), SEPA membership + scheme list + VoP obligation flag, and a canonical example IBAN you can copy-paste to test. **Use this when an agent needs to know the IBAN format for a country before crafting a validation call** — saves a Wikipedia roundtrip. List all 89 countries: \`GET /v1/iban/structure\`.
+Returns the IBAN structural template for the country: total IBAN length (21 for CH), BBAN field positions (bank_code, branch_code, account_number with their 0-indexed start + length within the BBAN), SEPA membership + scheme list + VoP obligation flag, and a canonical example IBAN you can copy-paste to test. **Use this when an agent needs to know the IBAN format for a country before crafting a validation call** — saves a Wikipedia roundtrip. List all ${countryCount} countries: \`GET /v1/iban/structure\`.
 
 ## URL parameter substitution
 

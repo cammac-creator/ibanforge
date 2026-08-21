@@ -774,7 +774,8 @@
     "copy": "Copy",
     "copied": "Copied!",
     "copyCode": "Copy code",
-    "somethingWentWrong": "Something went wrong"
+    "somethingWentWrong": "Something went wrong",
+    "skipToContent": "Skip to content"
   },
   "errors": {
     "notFound": {
