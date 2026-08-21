@@ -20,6 +20,7 @@ function reset() {
   const db = getStatsDB();
   db.prepare('DELETE FROM request_log WHERE key_prefix LIKE ?').run('ifk_kl%');
   db.prepare('DELETE FROM api_keys WHERE email LIKE ?').run('%@example.com');
+  db.prepare('DELETE FROM api_keys WHERE email LIKE ?').run('%@alpha.example.net');
 }
 
 function key(prefix: string, opts: { paid?: number | null; total?: number; left?: number; email?: string } = {}) {
@@ -173,9 +174,29 @@ describe('killLineState', () => {
    * ever minted. So they measure the DELTA a fixture causes, which is the only
    * assertion that stays true whatever else is in there.
    */
+  it('does not count our own accounts towards the floor', () => {
+    // example.com is an internal domain. A pilot key, the operator's own
+    // address or a test fixture must never help the project pass its own
+    // survival test: that would be passing on our own money.
+    const before = killLineState().floor.paying;
+    key(PFX, { paid: 20_000, total: 25_000, email: 'acme@example.com' });
+    expect(killLineState().floor.paying).toBe(before);
+  });
+
+  it('counts a purchase with no stored amount, from its credits alone', () => {
+    // Production holds almost no amount_paid_minor: the column is recent.
+    // Filtering on it reported zero paying customers against a floor of three.
+    const before = killLineState().floor;
+    key(PFX, { paid: null, total: 5_000, left: 1_000, email: 'ops@alpha.example.net' });
+    const after = killLineState().floor;
+    expect(after.paying).toBe(before.paying + 1);
+    expect(after.revenue_minor).toBeGreaterThan(before.revenue_minor);
+    expect(after.revenue_partly_deduced).toBe(true);
+  });
+
   it('does not count a flagged cohort key as a paying customer', () => {
     const before = killLineState().floor;
-    key(PFX, { paid: 20_000, email: 'flagged@example.com' });
+    key(PFX, { paid: 20_000, total: 25_000, email: 'flagged@alpha.example.net' });
     getStatsDB().prepare('UPDATE api_keys SET no_recredit = 1 WHERE key_prefix = ?').run(PFX);
     const after = killLineState().floor;
     expect(after.paying).toBe(before.paying);
@@ -184,15 +205,22 @@ describe('killLineState', () => {
 
   it('counts a customer once, however many keys they hold', () => {
     const before = killLineState().floor.paying;
-    key(PFX, { paid: 2_000, email: 'twokeys@example.com' });
-    key('ifk_klb', { paid: 2_000, email: 'twokeys@example.com' });
+    key(PFX, { paid: 2_000, total: 5_000, email: 'twokeys@alpha.example.net' });
+    key('ifk_klb', { paid: 2_000, total: 5_000, email: 'twokeys@alpha.example.net' });
     expect(killLineState().floor.paying).toBe(before + 1);
   });
 
   it('adds both purchases of one customer to the revenue', () => {
     const before = killLineState().floor.revenue_minor;
-    key(PFX, { paid: 2_000, email: 'twopays@example.com' });
-    key('ifk_klb', { paid: 500, email: 'twopays@example.com' });
+    key(PFX, { paid: 2_000, total: 5_000, email: 'twopays@alpha.example.net' });
+    key('ifk_klb', { paid: 500, total: 1_000, email: 'twopays@alpha.example.net' });
     expect(killLineState().floor.revenue_minor).toBe(before + 2_500);
+  });
+
+  it('marks the revenue as exact when every amount was actually stored', () => {
+    // A stored USD charge always wins over the pack table; only then may the
+    // figure be reported without the estimate caveat.
+    const s = killLineState();
+    expect(typeof s.floor.revenue_partly_deduced).toBe('boolean');
   });
 });
