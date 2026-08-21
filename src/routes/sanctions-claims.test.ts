@@ -75,11 +75,18 @@ describe('sanctions coverage claims match the shipped database', () => {
       .map((r) => r.source_list.toUpperCase()),
   );
 
-  it('the database holds OFAC and EU, and neither UN nor SECO', () => {
+  it('the database holds OFAC, EU and UN, and not SECO', () => {
     // Pinned as ground truth so the rest of the file has something to compare
     // against. If a feed is genuinely added, this is the assertion to change
     // first, before any copy.
-    expect([...shipped].sort()).toEqual(['EU', 'OFAC']);
+    //
+    // UN joined on 21/08/2026, and not because a feed was added: the refresh
+    // script used to discard any listed BIC absent from our own directory, and
+    // all 5 the UN list carries were in that case. Lifting that filter — the
+    // fix for the EU list losing half its coverage the same way — made the UN
+    // rows appear. The claim string is now derived from this table rather than
+    // retyped, so the two cannot drift apart again.
+    expect([...shipped].sort()).toEqual(['EU', 'OFAC', 'UN']);
   });
 
   it('no served surface names a sanctions authority we do not screen', () => {

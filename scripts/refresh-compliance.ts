@@ -97,6 +97,11 @@ function createSchema(db: Database.Database): void {
       entity_name TEXT,
       source_list TEXT NOT NULL,
       country_code TEXT,
+      -- 1 when our own BIC directory also carries this BIC8, 0 when the list
+      -- names a bank we cannot otherwise name. See fetchPrimarySanctions().
+      -- A sanctioned bank we cannot name is still a sanctioned bank; the marker
+      -- is what lets a reader tell an enriched hit from a bare one.
+      directory_match INTEGER NOT NULL DEFAULT 1,
       UNIQUE(bic8, source_list)
     );
 
@@ -191,34 +196,69 @@ function insertStaticData(db: Database.Database): void {
 // "SWIFT/BIC HAVIGB2L" or "SWIFT HAVIGB2L" inside free-text remarks.
 const SWIFT_REMARK_REGEX = /SWIFT(?:\/BIC)?[:\s]+([A-Z]{4}[A-Z]{2}[A-Z0-9]{2}(?:[A-Z0-9]{3})?)/gi;
 
-async function fetchPrimarySanctions(db: Database.Database): Promise<void> {
+/**
+ * Candidates found and entities kept, per source and overall.
+ *
+ * The two used to be the same number and the difference was invisible. They are
+ * counted separately because they fail for opposite reasons: `candidates`
+ * falling means the SANCTIONS SOURCE degraded, `directoryMatches` falling means
+ * OUR DIRECTORY degraded. A floor placed on the kept rows only would fire on
+ * the second and stay silent on the first.
+ */
+interface SanctionsTally {
+  candidates: number;
+  kept: number;
+  directoryMatches: number;
+  unresolved: string[];
+}
+
+async function fetchPrimarySanctions(db: Database.Database): Promise<SanctionsTally> {
   console.log('\n[2/5] Downloading primary-source sanctions (OFAC/EU/UN/SECO)...');
 
-  // Cross-check candidate BICs against the real BIC base (read-only): a match
-  // is only kept if it is an actual bank BIC present in our directory.
+  // Our own BIC directory, read-only. It used to be a FILTER: a listed BIC was
+  // dropped unless we already held it. That inverted the point of the check.
+  //
+  // Measured 20/08/2026: the EU consolidated list exposes exactly two BICs,
+  // AGRULYLT (Agricultural Bank of Libya) and REFAIRTH (Bank Refah Kargaran).
+  // AGRULYLT is absent from bic_entries, so the filter dropped it — HALF of the
+  // EU coverage, silently, on the endpoint sold as a compliance tool. On OFAC
+  // the same filter dropped 27 of 223 candidates (KP 11, RU 8, KH 3, BY 1,
+  // IR 1, UA 1, VE 1).
+  //
+  // The directory is now used to ENRICH, never to reject: a bank a sanctions
+  // authority has designated is sanctioned whether or not we can name it, and
+  // "we have never heard of this bank" is precisely the dangerous case, not a
+  // reason for silence. What we cannot resolve is marked, not discarded.
   const bicDB = new Database(resolve(DATA_DIR, 'bic.sqlite'), { readonly: true });
   const bicLookup = bicDB.prepare('SELECT 1 FROM bic_entries WHERE bic8 = ? LIMIT 1');
 
   const insertEntity = db.prepare(
-    `INSERT OR IGNORE INTO sanctioned_entities (bic8, entity_name, source_list, country_code)
-     VALUES (?, ?, ?, ?)`
+    `INSERT OR IGNORE INTO sanctioned_entities (bic8, entity_name, source_list, country_code, directory_match)
+     VALUES (?, ?, ?, ?, ?)`
   );
-  const insertBatch = db.transaction((rows: Array<[string, string, string, string]>) => {
+  const insertBatch = db.transaction((rows: Array<[string, string, string, string, number]>) => {
     for (const row of rows) insertEntity.run(...row);
   });
 
-  // Extract every "SWIFT/BIC <code>" from a blob of text, validate it, keep the
-  // ones that are real bank BICs (dedup via `seen`). Returns the kept bic8 list.
-  const extractBics = (text: string, seen: Set<string>): string[] => {
-    const out: string[] = [];
+  const tally: SanctionsTally = { candidates: 0, kept: 0, directoryMatches: 0, unresolved: [] };
+
+  // Extract every "SWIFT/BIC <code>" from a blob of text and keep the ones that
+  // are well-formed BICs (dedup via `seen`). The ONLY rejection left is a
+  // malformed code, which is a parsing artefact rather than a bank.
+  const extractBics = (text: string, seen: Set<string>): Array<{ bic8: string; inDirectory: boolean }> => {
+    const out: Array<{ bic8: string; inDirectory: boolean }> = [];
     let m: RegExpExecArray | null;
     SWIFT_REMARK_REGEX.lastIndex = 0;
     while ((m = SWIFT_REMARK_REGEX.exec(text)) !== null) {
       const bic8 = m[1].toUpperCase().substring(0, 8);
       if (seen.has(bic8)) continue;
-      if (!validateBIC(bic8).valid || !bicLookup.get(bic8)) continue;
+      if (!validateBIC(bic8).valid) continue;
       seen.add(bic8);
-      out.push(bic8);
+      tally.candidates++;
+      const inDirectory = !!bicLookup.get(bic8);
+      if (inDirectory) tally.directoryMatches++;
+      else tally.unresolved.push(bic8);
+      out.push({ bic8, inDirectory });
     }
     return out;
   };
@@ -232,8 +272,9 @@ async function fetchPrimarySanctions(db: Database.Database): Promise<void> {
       const { createReadStream } = await import('node:fs');
       const rl = createInterface({ input: createReadStream(csvPath), crlfDelay: Infinity });
       const seen = new Set<string>();
-      const batch: Array<[string, string, string, string]> = [];
+      const batch: Array<[string, string, string, string, number]> = [];
       let lines = 0;
+      let unresolved = 0;
       // SDN.csv columns (no header): 0=ent_num,1=SDN_Name,2=SDN_Type,3=Program,
       // 4=Title,... last meaningful free-text field = remarks (col 11).
       for await (const line of rl) {
@@ -242,12 +283,14 @@ async function fetchPrimarySanctions(db: Database.Database): Promise<void> {
         const name = (cols[1] ?? '').replace(/^-0-\s*$/, '').substring(0, 200);
         const remarks = cols[11] ?? cols[cols.length - 1] ?? '';
         if (!/SWIFT/i.test(remarks)) continue;
-        for (const bic8 of extractBics(remarks, seen)) {
-          batch.push([bic8, name, 'OFAC', '']);
+        for (const { bic8, inDirectory } of extractBics(remarks, seen)) {
+          if (!inDirectory) unresolved++;
+          batch.push([bic8, name, 'OFAC', '', inDirectory ? 1 : 0]);
         }
       }
       if (batch.length) insertBatch(batch);
-      console.log(`  OFAC: ${lines} rows, ${batch.length} bank BICs kept`);
+      tally.kept += batch.length;
+      console.log(`  OFAC: ${lines} rows, ${batch.length} bank BICs kept (${unresolved} not in our directory)`);
     } catch (err) {
       console.warn(`  WARNING: OFAC download/parse failed: ${(err as Error).message}`);
     }
@@ -262,12 +305,15 @@ async function fetchPrimarySanctions(db: Database.Database): Promise<void> {
       const { readFileSync } = await import('node:fs');
       const text = readFileSync(csvPath, 'utf-8');
       const seen = new Set<string>();
-      const batch: Array<[string, string, string, string]> = [];
-      for (const bic8 of extractBics(text, seen)) {
-        batch.push([bic8, 'EU-listed entity', 'EU', '']);
+      const batch: Array<[string, string, string, string, number]> = [];
+      let unresolved = 0;
+      for (const { bic8, inDirectory } of extractBics(text, seen)) {
+        if (!inDirectory) unresolved++;
+        batch.push([bic8, 'EU-listed entity', 'EU', '', inDirectory ? 1 : 0]);
       }
       if (batch.length) insertBatch(batch);
-      console.log(`  EU: ${batch.length} bank BICs kept`);
+      tally.kept += batch.length;
+      console.log(`  EU: ${batch.length} bank BICs kept (${unresolved} not in our directory)`);
     } catch (err) {
       console.warn(`  WARNING: EU download/parse failed: ${(err as Error).message}`);
     }
@@ -280,12 +326,15 @@ async function fetchPrimarySanctions(db: Database.Database): Promise<void> {
       const { readFileSync } = await import('node:fs');
       const text = readFileSync(xmlPath, 'utf-8');
       const seen = new Set<string>();
-      const batch: Array<[string, string, string, string]> = [];
-      for (const bic8 of extractBics(text, seen)) {
-        batch.push([bic8, 'UN-listed entity', 'UN', '']);
+      const batch: Array<[string, string, string, string, number]> = [];
+      let unresolved = 0;
+      for (const { bic8, inDirectory } of extractBics(text, seen)) {
+        if (!inDirectory) unresolved++;
+        batch.push([bic8, 'UN-listed entity', 'UN', '', inDirectory ? 1 : 0]);
       }
       if (batch.length) insertBatch(batch);
-      console.log(`  UN: ${batch.length} bank BICs kept`);
+      tally.kept += batch.length;
+      console.log(`  UN: ${batch.length} bank BICs kept (${unresolved} not in our directory)`);
     } catch (err) {
       console.warn(`  WARNING: UN download/parse failed: ${(err as Error).message}`);
     }
@@ -298,12 +347,15 @@ async function fetchPrimarySanctions(db: Database.Database): Promise<void> {
       const { readFileSync } = await import('node:fs');
       const text = readFileSync(xmlPath, 'utf-8');
       const seen = new Set<string>();
-      const batch: Array<[string, string, string, string]> = [];
-      for (const bic8 of extractBics(text, seen)) {
-        batch.push([bic8, 'SECO-listed entity', 'SECO', '']);
+      const batch: Array<[string, string, string, string, number]> = [];
+      let unresolved = 0;
+      for (const { bic8, inDirectory } of extractBics(text, seen)) {
+        if (!inDirectory) unresolved++;
+        batch.push([bic8, 'SECO-listed entity', 'SECO', '', inDirectory ? 1 : 0]);
       }
       if (batch.length) insertBatch(batch);
-      console.log(`  SECO: ${batch.length} bank BICs kept`);
+      tally.kept += batch.length;
+      console.log(`  SECO: ${batch.length} bank BICs kept (${unresolved} not in our directory)`);
     } catch (err) {
       console.warn(`  WARNING: SECO download/parse failed: ${(err as Error).message}`);
     }
@@ -313,6 +365,17 @@ async function fetchPrimarySanctions(db: Database.Database): Promise<void> {
 
   const entityCount = (db.prepare(`SELECT COUNT(*) as n FROM sanctioned_entities`).get() as { n: number }).n;
   console.log(`  sanctioned_entities total: ${entityCount} rows (deduped across sources)`);
+  // Both counters, every run. The gap between them is the directory's coverage
+  // of the sanctions lists, and it is the number that moves when our BIC base
+  // degrades rather than when a sanctions source does.
+  console.log(
+    `  candidates seen: ${tally.candidates} | in our BIC directory: ${tally.directoryMatches} | ` +
+      `named by a list only: ${tally.unresolved.length}`,
+  );
+  if (tally.unresolved.length) {
+    console.log(`  sanctioned BICs we cannot name: ${tally.unresolved.slice(0, 30).join(' ')}${tally.unresolved.length > 30 ? ' …' : ''}`);
+  }
+  return tally;
 }
 
 // ---------------------------------------------------------------------------
@@ -416,10 +479,27 @@ async function fetchVopRegister(db: Database.Database): Promise<void> {
     const { createReadStream } = await import('node:fs');
     const rl = createInterface({ input: createReadStream(csvPath), crlfDelay: Infinity });
 
-    const bics = new Set<string>();
+    // Every participant, carrying the status the register actually publishes.
+    //
+    // This loop used to keep only "Ready for operations" and drop the rest on
+    // the floor. Measured against the live export on 21/08/2026: 2,827 rows,
+    // 1,276 distinct BIC8, of which 1,232 ready and 44 "Pending EDS
+    // registration" (FR 8, BG 6, CY 4, LT 4, BE 3, ES 3 …). Those 44 were the
+    // whole of a reported "44 missing participants", which had been read as a
+    // staleness gap; the register had not moved at all, the parser was
+    // discarding a status.
+    //
+    // Neither dropping them nor storing them as 'active' is right. A pending
+    // bank does not answer VoP requests yet, so calling it active would be a
+    // false positive on a field a payer relies on before a payout — the exact
+    // opposite direction of harm from the sanctions defect fixed above, and the
+    // more dangerous one on this endpoint. It is stored as 'pending', a value
+    // VopCheck['status'] has always declared and this pipeline never produced.
+    const byBic = new Map<string, string>();
     let headerParsed = false;
     let bicIdx = -1;
     let statusIdx = -1;
+    let rows = 0;
 
     for await (const line of rl) {
       const cols = parseCsvLine(line);
@@ -431,16 +511,24 @@ async function fetchVopRegister(db: Database.Database): Promise<void> {
       }
       const bic = cols[bicIdx]?.trim();
       const status = cols[statusIdx]?.trim().toLowerCase() ?? '';
-      if (bic && bic.length >= 8 && status.includes('ready')) {
-        bics.add(bic.substring(0, 8));
-      }
+      if (!bic || bic.length < 8) continue;
+      rows++;
+      const bic8 = bic.substring(0, 8);
+      const mapped = status.includes('ready') ? 'active' : 'pending';
+      // An institution can appear on several rows. 'active' wins: one branch
+      // ready for operations makes the BIC8 answerable, and demoting it to
+      // pending because another row lags would understate real coverage.
+      if (mapped === 'active' || !byBic.has(bic8)) byBic.set(bic8, mapped);
     }
 
-    const insertBatch = db.transaction((bicsArr: string[]) => {
-      for (const bic8 of bicsArr) insertVop.run(bic8, 'active');
+    const insertBatch = db.transaction((entries: Array<[string, string]>) => {
+      for (const [bic8, status] of entries) insertVop.run(bic8, status);
     });
-    insertBatch([...bics]);
-    console.log(`  VoP: ${bics.size} active participants`);
+    insertBatch([...byBic]);
+    const active = [...byBic.values()].filter(s => s === 'active').length;
+    console.log(
+      `  VoP: ${rows} rows, ${byBic.size} participants (${active} active, ${byBic.size - active} pending EDS registration)`,
+    );
   } catch (err) {
     console.warn(`  WARNING: VoP register download failed: ${(err as Error).message}`);
     console.warn('  Falling back to SCT participants as VoP baseline...');
@@ -510,16 +598,30 @@ function insertMetadata(db: Database.Database): void {
     `INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)`
   );
 
+  // This string is served verbatim in meta.sources on every paid
+  // /v1/iban/compliance response — it is the provenance field, the one an
+  // auditor reads. Only sources that actually put rows in this database belong
+  // here (audit 2026-07-26, which removed a hardcoded UN and SECO that
+  // contributed nothing).
+  //
+  // It is now READ FROM THE DATABASE instead of being retyped. A hand-written
+  // list is a claim maintained by memory: it went stale in both directions
+  // within a month — naming feeds that shipped no rows, and then, once the
+  // directory filter was lifted and the UN list started contributing, omitting
+  // one that did. Deriving it means the claim cannot drift from the data it
+  // describes.
+  const sanctionSources = (
+    db.prepare('SELECT DISTINCT source_list FROM sanctioned_entities ORDER BY source_list').all() as Array<{ source_list: string }>
+  ).map((r) => r.source_list);
+  const sepaSchemes = (
+    db.prepare('SELECT DISTINCT scheme FROM sepa_participants ORDER BY scheme').all() as Array<{ scheme: string }>
+  ).map((r) => `EPC-${r.scheme}`);
+  const sources = [...sanctionSources, 'FATF', ...sepaSchemes].join(',');
+
   const runMeta = db.transaction(() => {
     insertMeta.run('last_refresh', new Date().toISOString());
     insertMeta.run('version', '1.0.0');
-    // This string is served verbatim in meta.sources on every paid
-    // /v1/iban/compliance response — it is the provenance field, the one an
-    // auditor reads. It listed UN and SECO, which contribute zero rows: the
-    // SECO fetch below exists but yields nothing, and there is no UN feed at
-    // all. Only sources that actually put rows in this database belong here.
-    // Audit 2026-07-26.
-    insertMeta.run('sources', 'OFAC,EU,FATF,EPC-SCT,EPC-SDD,EPC-SCT_INST');
+    insertMeta.run('sources', sources);
     insertMeta.run('fatf_as_of', FATF_AS_OF);
   });
 
@@ -585,7 +687,7 @@ async function main(): Promise<void> {
   insertStaticData(db);
 
   // 4. Primary-source sanctions (OFAC/EU/UN/SECO, BIC-level)
-  await fetchPrimarySanctions(db);
+  const sanctionsTally = await fetchPrimarySanctions(db);
 
   // 5. EPC SEPA registers
   await fetchSepaRegisters(db);
@@ -607,15 +709,24 @@ async function main(): Promise<void> {
   // with only a WARNING and otherwise leave a DB that screens almost nothing —
   // the live API would answer "clean" for every BIC, a systemic false-negative.
   // Abort and keep the previous compliance.sqlite instead.
+  //
+  // The floor is on CANDIDATES — what the sanctions sources published, counted
+  // before anything is cross-referenced — not on the rows that survived. Those
+  // two were the same number while the directory acted as a filter, and putting
+  // the floor on survivors had the alarm wired backwards: it fired when OUR BIC
+  // base shrank and stayed silent when a SANCTIONS SOURCE returned a truncated
+  // file. Since the filter is gone, `kept` tracks `candidates`, and the floor is
+  // stated on the quantity that actually describes the sources.
   const SANCTIONS_FLOOR = 50; // well below the normal ~190 OFAC bank BICs
   const shippedEntities = (
     db.prepare('SELECT COUNT(*) AS n FROM sanctioned_entities').get() as { n: number }
   ).n;
-  if (shippedEntities < SANCTIONS_FLOOR) {
+  if (sanctionsTally.candidates < SANCTIONS_FLOOR) {
     db.close();
     throw new Error(
-      `Refusing to ship compliance.sqlite: only ${shippedEntities} sanctioned entities ` +
-        `(floor is ${SANCTIONS_FLOOR}). Likely an OFAC download failure — ` +
+      `Refusing to ship compliance.sqlite: the sanctions sources yielded only ` +
+        `${sanctionsTally.candidates} candidate bank BICs (floor is ${SANCTIONS_FLOOR}; ` +
+        `${shippedEntities} rows would have shipped). Likely an OFAC download failure — ` +
         `keeping the existing database. Re-run once the sources are reachable.`,
     );
   }

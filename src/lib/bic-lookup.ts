@@ -250,6 +250,40 @@ export interface BankLookupHit {
   city: string | null;
   match: 'register' | 'prefix';
   candidates?: number;
+  /** Human name of the dataset the row naming this institution came from. */
+  source: string | null;
+  /** Year-month that dataset was last refreshed. */
+  as_of: string | null;
+}
+
+/**
+ * Human names for the `source` column of bic_entries.
+ *
+ * The BIC block was the only served field with no provenance at all, while
+ * `bank_code_check` carries `register` / `authoritative` / `as_of` and
+ * `modulus_check` carries `source` / `table_fetched_on`. That mattered because
+ * the sources are not equivalent: measured 20/08/2026, 67.4 % of rows come from
+ * a redistributed SWIFT directory scrape and 32.3 % from GLEIF, and telling
+ * those apart is exactly what an auditor or an agent weighing an answer wants.
+ *
+ * Names, not codes: `swiftcodes` means nothing to a caller, and shortening it
+ * to "SWIFT" would claim a direct feed from SWIFT that we do not have.
+ */
+const SOURCE_NAMES: Record<string, string> = {
+  gleif: 'GLEIF LEI-to-BIC mapping',
+  swiftcodes: 'Redistributed SWIFT BIC directory (PeterNotenboom/SwiftCodes, MIT)',
+  bundesbank: 'Deutsche Bundesbank Bankleitzahlendatei',
+  six_group: 'SIX BankMaster (Swiss IID register)',
+  nbp: 'Narodowy Bank Polski',
+  eba_step2: 'EBA Clearing STEP2 SCT participant list',
+};
+
+/** The curated map is our own assembly, and says so rather than borrowing a registry's name. */
+const CURATED_MAP_SOURCE = 'IBANforge curated bank-code map';
+
+function sourceName(source: string | null | undefined): string | null {
+  if (!source) return null;
+  return SOURCE_NAMES[source] ?? source;
 }
 
 const bicCache = new LRUCache<BICRow | null>(2000);
@@ -345,13 +379,13 @@ export function lookupByCountryBank(
     let bankName = entry.bank_name ?? null;
     let cityName = entry.city ?? null;
 
-    // Enrich from SQLite if bic_data.json has incomplete details
-    if (!bankName || !cityName) {
-      const dbRow = lookup(bic8);
-      if (dbRow) {
-        bankName = bankName || dbRow.institution;
-        cityName = cityName || dbRow.city;
-      }
+    // The row is now read unconditionally rather than only to fill a missing
+    // name or city, because it is also where the provenance comes from. The
+    // lookup is LRU-cached, so the extra reads collapse onto the hot BIC8s.
+    const dbRow = lookup(bic8);
+    if (dbRow) {
+      bankName = bankName || dbRow.institution;
+      cityName = cityName || dbRow.city;
     }
 
     return {
@@ -359,6 +393,11 @@ export function lookupByCountryBank(
       bank_name: bankName,
       city: cityName,
       match: 'register',
+      // The curated map decided WHICH institution this bank code belongs to; a
+      // directory row only supplied its details. Crediting GLEIF for a pairing
+      // the map made would overstate what the registry actually says.
+      source: CURATED_MAP_SOURCE,
+      as_of: getReferenceAsOf() || null,
     };
   }
 
@@ -374,10 +413,10 @@ export function lookupByCountryBank(
       // Measured 28/07/2026 over the 308 prefixes actually reachable through
       // this fallback: gleif-first changes zero answers versus today, so this
       // pins current behaviour rather than altering it.
-      "SELECT bic8, institution, city FROM bic_entries WHERE country_code = ? AND bic8 LIKE ? ORDER BY (source = 'gleif') DESC, bic8 LIMIT 1",
+      "SELECT bic8, institution, city, source, updated_at FROM bic_entries WHERE country_code = ? AND bic8 LIKE ? ORDER BY (source = 'gleif') DESC, bic8 LIMIT 1",
     )
     .get(countryCode, bankCode + '%') as
-    | { bic8: string; institution: string | null; city: string | null }
+    | { bic8: string; institution: string | null; city: string | null; source: string | null; updated_at: string | null }
     | undefined;
 
   if (!row) return null;
@@ -392,7 +431,17 @@ export function lookupByCountryBank(
     .prepare('SELECT COUNT(DISTINCT bic8) AS n FROM bic_entries WHERE country_code = ? AND bic8 LIKE ?')
     .get(countryCode, bankCode + '%') as { n: number };
 
-  return { code: row.bic8, bank_name: row.institution, city: row.city, match: 'prefix', candidates: n };
+  return {
+    code: row.bic8,
+    bank_name: row.institution,
+    city: row.city,
+    match: 'prefix',
+    candidates: n,
+    // Here the directory really is the source: the prefix search read this row
+    // out of it, with no curated pairing involved.
+    source: sourceName(row.source),
+    as_of: (row.updated_at ?? '').slice(0, 7) || null,
+  };
 }
 
 /**

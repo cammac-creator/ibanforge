@@ -147,6 +147,16 @@ export interface IBANValidationResult {
     code: string;
     bank_name: string | null;
     city: string | null;
+    /**
+     * Which dataset named this institution, in the same spirit as
+     * `bank_code_check.register` and `modulus_check.source`. This block was the
+     * only served field carrying no provenance at all, while two thirds of the
+     * directory comes from a redistributed SWIFT scrape and one third from
+     * GLEIF — a distinction an auditor weighing the answer needs.
+     */
+    source?: string | null;
+    /** Year-month that dataset was last refreshed. Null rather than invented. */
+    as_of?: string | null;
   } | null;
   sepa?: {
     member: boolean;
@@ -374,17 +384,44 @@ export interface SanctionsCheck {
   bank_sanctioned: boolean;
   matched_lists: string[];
   fatf_status: 'member' | 'suspended' | 'grey_list' | 'black_list' | 'non_member';
+  /**
+   * Whether a bank was actually screened.
+   *
+   * `bank_sanctioned: false` used to mean two different things: "we looked this
+   * institution up on the lists and it is clean" and "no institution resolved
+   * from this IBAN, so nothing was looked up at all". Only the first is
+   * reassuring, and the payload was identical. This field separates them.
+   *
+   * Named `bank_screened` rather than `screened` on purpose: the country and
+   * FATF axes of this same object ARE screened without a BIC, so a bare
+   * `screened: false` here would itself be a false statement.
+   *
+   * When false, `bank_sanctioned` and `matched_lists` carry no information —
+   * do not branch on them.
+   */
+  bank_screened: boolean;
 }
 
 export interface ReachabilityCheck {
   sepa_instant: boolean;
   sct: boolean;
   sdd: boolean;
+  /**
+   * False when no institution resolved, so the three booleans above are
+   * defaults rather than findings. The EPC registers are keyed by BIC8; with no
+   * BIC there is no key and no lookup happened.
+   */
+  screened: boolean;
 }
 
 export interface VopCheck {
   participant: boolean;
   status: 'active' | 'pending' | 'inactive' | 'not_found';
+  /**
+   * False when no institution resolved. `status: 'not_found'` then describes
+   * the absence of a query, not the absence of a registration.
+   */
+  screened: boolean;
 }
 
 /**
@@ -452,6 +489,26 @@ export interface ChClearingEntry {
   };
   sic_iid: string | null;
   qr_iid: string | null;
+  /**
+   * Where a non-null `qr_iid` comes from. Two inferences of different strength
+   * must not be served at the same standard.
+   *
+   * - `register` — SIX publishes this exact pairing: a BankMaster row in the
+   *   QR range names this IID as its institution. A fact.
+   * - `headquarters` — inferred. The IID is a branch, and the QR-IID belongs to
+   *   its head office (`headquarters_iid`). SIX allocates QR-IIDs per
+   *   institution, so this is sound, but it is a deduction and it says so.
+   *
+   * Null whenever `qr_iid` is null.
+   */
+  qr_iid_source: 'register' | 'headquarters' | null;
+  /**
+   * Every QR-IID of the institution, when SIX has allocated more than one.
+   * Present only in that case; `qr_iid` then carries the lowest of them, so a
+   * caller reading only the scalar still gets a real, published QR-IID rather
+   * than a silently truncated set. Measured 20/08/2026: 2 institutions of 224.
+   */
+  qr_iids?: string[];
   /** True when the looked-up IID is a QR-IID (SIX QR-bill range 30000–31999). */
   is_qr_iid: boolean;
   valid_on: string;
@@ -487,6 +544,14 @@ export interface ChClearingLookupResult {
   };
   sic_iid?: string | null;
   qr_iid?: string | null;
+  /**
+   * Where `qr_iid` comes from — `register` when SIX publishes the pairing,
+   * `headquarters` when it is inherited from the institution's head office.
+   * Null when `qr_iid` is null. See ChClearingEntry for the full note.
+   */
+  qr_iid_source?: 'register' | 'headquarters' | null;
+  /** Every QR-IID of the institution, when SIX allocated more than one. */
+  qr_iids?: string[];
   /** Present (true) only when the looked-up IID is a QR-IID (30000–31999). */
   is_qr_iid?: boolean;
   valid_on?: string;
@@ -507,6 +572,14 @@ export interface ChClearingSummary {
   instant_payments_chf: boolean;
   eurosic: boolean;
   qr_iid: string | null;
+  /**
+   * Where `qr_iid` comes from — `register` when SIX publishes the pairing,
+   * `headquarters` when it is inherited from the institution's head office.
+   * Null when `qr_iid` is null. See ChClearingEntry for the full note.
+   */
+  qr_iid_source: 'register' | 'headquarters' | null;
+  /** Every QR-IID of the institution, when SIX allocated more than one. */
+  qr_iids?: string[];
   /** Present (true) only for QR-IBANs (bank code in the QR-IID range 30000–31999). */
   is_qr_iid?: boolean;
 }

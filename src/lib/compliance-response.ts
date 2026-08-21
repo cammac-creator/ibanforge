@@ -85,9 +85,9 @@ export function buildComplianceResponse(iban: string): ComplianceResponse {
     // could not read: here we HAVE a valid IBAN and cannot check it, so the
     // honest answer is elevated-and-say-so, not unassessable.
     compliance = {
-      sanctions: { country_sanctioned: false, bank_sanctioned: false, matched_lists: [], fatf_status: 'non_member' },
-      reachability: { sepa_instant: false, sct: false, sdd: false },
-      vop: { participant: false, status: 'not_found' },
+      sanctions: { country_sanctioned: false, bank_sanctioned: false, matched_lists: [], fatf_status: 'non_member', bank_screened: false },
+      reachability: { sepa_instant: false, sct: false, sdd: false, screened: false },
+      vop: { participant: false, status: 'not_found', screened: false },
       risk_score: 50,
       risk_level: 'elevated',
       flags: ['compliance_data_unavailable'],

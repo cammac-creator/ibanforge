@@ -23,24 +23,33 @@ export function checkSanctions(countryCode: string, bic8: string | null): Sancti
     bank_sanctioned: bankSanctions.length > 0,
     matched_lists: bankSanctions.map(r => r.source_list),
     fatf_status: (fatfRow?.status as SanctionsCheck['fatf_status']) ?? 'non_member',
+    // The country and FATF axes answered; the bank axis only did if there was a
+    // bank to ask about. See the field note in types.ts.
+    bank_screened: bic8 !== null,
   };
 }
 
 export function checkReachability(bic8: string | null): ReachabilityCheck {
-  if (!bic8) return { sepa_instant: false, sct: false, sdd: false };
+  if (!bic8) return { sepa_instant: false, sct: false, sdd: false, screened: false };
   const db = getComplianceDB();
   if (!_checkReachability) _checkReachability = db.prepare('SELECT scheme FROM sepa_participants WHERE bic8 = ?');
   const rows = _checkReachability.all(bic8) as { scheme: string }[];
   const schemes = new Set(rows.map(r => r.scheme));
-  return { sepa_instant: schemes.has('SCT_INST'), sct: schemes.has('SCT'), sdd: schemes.has('SDD') };
+  return { sepa_instant: schemes.has('SCT_INST'), sct: schemes.has('SCT'), sdd: schemes.has('SDD'), screened: true };
 }
 
 export function checkVop(bic8: string | null): VopCheck {
-  if (!bic8) return { participant: false, status: 'not_found' };
+  if (!bic8) return { participant: false, status: 'not_found', screened: false };
   const db = getComplianceDB();
   if (!_checkVop) _checkVop = db.prepare('SELECT status FROM vop_participants WHERE bic8 = ?');
   const row = _checkVop.get(bic8) as { status: string } | undefined;
-  return { participant: !!row, status: (row?.status as VopCheck['status']) ?? 'not_found' };
+  const status = (row?.status as VopCheck['status']) ?? 'not_found';
+  // `participant` answers "does this bank answer VoP requests today", so only
+  // an active registration counts. The register also publishes institutions
+  // "Pending EDS registration"; they are carried with that status rather than
+  // omitted, but reporting them as participants would tell a payer a name check
+  // is available before it is.
+  return { participant: status === 'active', status, screened: true };
 }
 
 /**
@@ -96,8 +105,25 @@ export function calculateRiskScore(
   // We could not confirm it, which is not the same accusation. Enough to move
   // the level, not enough to pretend we know.
   if (bankCode === 'unverified') { score += 10; flags.push('bank_code_unverified'); }
-  if (!reachability.sepa_instant) { score += 5; flags.push('no_sepa_instant'); }
-  if (!vop.participant) { score += 5; flags.push('no_vop'); }
+  // The two reachability penalties below are only meaningful when a bank was
+  // actually screened. With no resolved institution the EPC registers were
+  // never queried, so `sepa_instant: false` and `participant: false` are
+  // defaults, not findings — adding 10 points for them was scoring the absence
+  // of a check as if it were the result of one. That is the same defect
+  // `unassessableCompliance()` fixed for invalid IBANs, one layer down, and the
+  // same doctrine as `issuer_type: null` and `authoritative: false`.
+  //
+  // `no_bank_resolved` carries no weight on purpose. The fact it names is
+  // already scored, once, by `bank_code_unverified` (+10) or
+  // `bank_code_not_allocated` (+40); a second weight for the same fact would be
+  // double-counting, and inventing one merely to keep scores from moving would
+  // reintroduce a number that means "we did not check".
+  if (!reachability.screened || !vop.screened) {
+    flags.push('no_bank_resolved');
+  } else {
+    if (!reachability.sepa_instant) { score += 5; flags.push('no_sepa_instant'); }
+    if (!vop.participant) { score += 5; flags.push('no_vop'); }
+  }
 
   score = Math.min(score, 100);
   const risk_level: ScoredRiskLevel =
@@ -122,9 +148,9 @@ export function calculateRiskScore(
  */
 export function unassessableCompliance(): ComplianceResult {
   return {
-    sanctions: { country_sanctioned: false, bank_sanctioned: false, matched_lists: [], fatf_status: 'non_member' },
-    reachability: { sepa_instant: false, sct: false, sdd: false },
-    vop: { participant: false, status: 'not_found' },
+    sanctions: { country_sanctioned: false, bank_sanctioned: false, matched_lists: [], fatf_status: 'non_member', bank_screened: false },
+    reachability: { sepa_instant: false, sct: false, sdd: false, screened: false },
+    vop: { participant: false, status: 'not_found', screened: false },
     risk_score: null,
     risk_level: 'unassessable',
     flags: ['iban_invalid'],

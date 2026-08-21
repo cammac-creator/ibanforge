@@ -242,7 +242,9 @@ export function enrichResult(result: IBANValidationResult): void {
 
   // BIC lookup
   const hit = lookupByCountryBank(cc, bankCode);
-  result.bic = hit ? { code: hit.code, bank_name: hit.bank_name, city: hit.city } : null;
+  result.bic = hit
+    ? { code: hit.code, bank_name: hit.bank_name, city: hit.city, source: hit.source, as_of: hit.as_of }
+    : null;
 
   // Germany: the Bundesbank register carries the exact 11-character BIC per
   // BLZ, so serve it over the composite BIC8 fallback. The fallback resolves
@@ -255,7 +257,15 @@ export function enrichResult(result: IBANValidationResult): void {
   if (cc === 'DE') {
     const reg = lookupBlz(bankCode);
     if (reg?.bic) {
-      result.bic = { code: reg.bic, bank_name: reg.name, city: reg.town };
+      // Provenance follows the answer: this BIC comes from the national
+      // register, not from the directory the fallback would have read.
+      result.bic = {
+        code: reg.bic,
+        bank_name: reg.name,
+        city: reg.town,
+        source: NATIONAL_REGISTERS.DE,
+        as_of: getReferenceAsOf() || null,
+      };
     }
   }
 
@@ -338,6 +348,12 @@ export function enrichResult(result: IBANValidationResult): void {
         instant_payments_chf: clearing.payment_services.instant_payments_chf,
         eurosic: clearing.payment_services.eurosic,
         qr_iid: clearing.qr_iid,
+        // An ordinary Swiss IBAN used to answer `qr_iid: null` unconditionally,
+        // because SIX only publishes the pairing on the QR row. The reverse
+        // index in ch-clearing.ts resolves it; `qr_iid_source` distinguishes the
+        // pairing SIX publishes from the one inherited from a head office.
+        qr_iid_source: clearing.qr_iid_source,
+        ...(clearing.qr_iids ? { qr_iids: clearing.qr_iids } : {}),
         // QR-IBAN: the BBAN carries a QR-IID (30000–31999); iid above is the
         // institution's standard IID, qr_iid the one from the IBAN.
         ...(clearing.is_qr_iid ? { is_qr_iid: true } : {}),

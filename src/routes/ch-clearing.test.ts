@@ -62,7 +62,13 @@ describe('GET /v1/ch/clearing/:iid', () => {
     expect(body.found).toBe(true);
     expect(body.iid).toBe('09000');
     expect(body.institution.name).toBe('PostFinance AG');
-    expect(body.qr_iid).toBeNull();
+    // A standard IID now resolves the institution's QR-IID through the reverse
+    // index, labelled with where it came from. This used to assert null, which
+    // pinned the gap rather than the rule: SIX publishes the pairing on the QR
+    // row only, so every ordinary Swiss lookup answered null while the value
+    // sat two rows away.
+    expect(body.qr_iid).toBe('30000');
+    expect(body.qr_iid_source).toBe('register');
     expect(body).not.toHaveProperty('is_qr_iid');
     expect(body).not.toHaveProperty('note');
   });

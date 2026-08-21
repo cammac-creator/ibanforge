@@ -94,6 +94,13 @@ chClearing.get('/v1/ch/clearing/:iid', (c) => {
     payment_services: entry.payment_services,
     sic_iid: entry.sic_iid,
     qr_iid: entry.qr_iid,
+    // Never serve the QR-IID without saying how it was obtained. A standard IID
+    // now resolves one through the reverse index, and for a branch that value is
+    // INFERRED from its head office — presenting that as a published SIX pairing
+    // on the endpoint most likely to be used for QR-bill work would be exactly
+    // the overclaim the rest of this API is built to avoid.
+    qr_iid_source: entry.qr_iid_source,
+    ...(entry.qr_iids ? { qr_iids: entry.qr_iids } : {}),
     valid_on: entry.valid_on,
     cost_usdc: c.get('apiKeyAuthenticated') ? 0 : COST_USDC,
     processing_ms: processingMs,

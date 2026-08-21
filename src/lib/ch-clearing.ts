@@ -15,12 +15,68 @@ import type { ChClearingEntry, ChInstitutionType, ChIidType } from '../types.js'
 
 let _stmtByIid: Database.Statement | null = null;
 let _stmtCount: Database.Statement | null = null;
+let _qrByMaster: Map<string, string[]> | null = null;
 
 function stmtByIid() {
   if (!_stmtByIid) {
     _stmtByIid = getBicDB().prepare('SELECT * FROM ch_clearing WHERE iid = ? LIMIT 1');
   }
   return _stmtByIid;
+}
+
+/**
+ * The QR-IID index, read backwards: institution IID -> its QR-IID(s).
+ *
+ * ## Why this exists
+ *
+ * SIX publishes the pairing in one direction only. A BankMaster row in the
+ * QR range (30000–31999) names the institution's standard IID in its `qr_iid`
+ * column; no standard row carries a QR-IID. Verified over the whole table on
+ * 20/08/2026: 226 QR rows point at a master, and `qr_iid` is empty on 100 % of
+ * the 1,165 standard rows.
+ *
+ * The consequence was that an ordinary Swiss IBAN always answered
+ * `qr_iid: null`, even when its bank holds one two rows away — on the product's
+ * headline claim ("the deepest Swiss clearing data"), and on the exact question
+ * a customer issuing a QR-bill has to answer. Reading the same column in the
+ * other direction fixes it with no new source: 224 institutions and 885 rows
+ * gain a QR-IID.
+ *
+ * ## What this index does NOT do
+ *
+ * It maps masters only. Head-office inheritance for the 659 branches is applied
+ * at read time and labelled `headquarters`, never folded in here — the two are
+ * different claims and must not arrive at the caller looking alike.
+ */
+function qrByMaster(): Map<string, string[]> {
+  if (_qrByMaster) return _qrByMaster;
+  const index = new Map<string, string[]>();
+  try {
+    const rows = getBicDB()
+      .prepare("SELECT iid, qr_iid FROM ch_clearing WHERE qr_iid IS NOT NULL AND TRIM(qr_iid) <> ''")
+      .all() as Array<{ iid: string; qr_iid: string }>;
+    for (const row of rows) {
+      // Only rows in the QR range describe a QR-IID. Anything else is a
+      // standard row that already carries its own value, handled at read time.
+      if (!isQrIidRange(row.iid)) continue;
+      const master = normalizeIid(row.qr_iid);
+      // Two rows in the range point at themselves (institutions whose only IID
+      // is a QR-IID). Indexing those would map a QR-IID onto itself and make a
+      // QR row look like a standard one holding a QR-IID.
+      if (master === row.iid) continue;
+      const list = index.get(master);
+      if (list) list.push(row.iid);
+      else index.set(master, [row.iid]);
+    }
+    // Sorted so the scalar `qr_iid` served from a multi-valued entry is stable
+    // across runs rather than dependent on row order.
+    for (const list of index.values()) list.sort();
+  } catch {
+    // No clearing table means no index. An empty map degrades to the previous
+    // behaviour (qr_iid stays null) instead of throwing on every lookup.
+    return (_qrByMaster = new Map());
+  }
+  return (_qrByMaster = index);
 }
 
 /**
@@ -150,17 +206,56 @@ function rowToEntry(row: ChClearingRow): ChClearingEntry {
     // fall back to the row's own IID rather than inventing one.
     const masterIid = row.qr_iid ? row.qr_iid.padStart(5, '0') : row.iid;
     return {
-      ...buildEntry(row, masterIid, row.iid),
+      ...buildEntry(row, masterIid, row.iid, 'register'),
       is_qr_iid: true,
       headquarters_iid: masterIid,
     };
   }
-  // Standard rows: the qr_iid column is never populated today (verified over
-  // the full BankMaster); keep it zero-padded if SIX ever ships one.
-  return buildEntry(row, row.iid, row.qr_iid ? row.qr_iid.padStart(5, '0') : null);
+
+  // Standard rows. SIX populates the qr_iid column on QR rows only — it is
+  // empty on all 1,165 standard rows (verified over the full BankMaster,
+  // 20/08/2026) — so the value is resolved through the reverse index instead.
+  // The column is still read first, in case SIX ever starts shipping it.
+  if (row.qr_iid && row.qr_iid.trim() !== '') {
+    return buildEntry(row, row.iid, row.qr_iid.padStart(5, '0'), 'register');
+  }
+
+  const index = qrByMaster();
+
+  // Published: a QR row names this exact IID as its institution.
+  const own = index.get(row.iid);
+  if (own?.length) return withQrIids(buildEntry(row, row.iid, own[0], 'register'), own);
+
+  // Inferred: this IID is a branch and its head office holds the QR-IID. SIX
+  // allocates QR-IIDs per institution, so the branch is reachable under it —
+  // but this is a deduction, not a published pairing, and `qr_iid_source` says
+  // so. Serving it unlabelled would hold two inferences of different strength
+  // to the same standard.
+  const hq = row.headquarters_iid ? normalizeIid(row.headquarters_iid) : null;
+  if (hq && hq !== row.iid) {
+    const inherited = index.get(hq);
+    if (inherited?.length) return withQrIids(buildEntry(row, row.iid, inherited[0], 'headquarters'), inherited);
+  }
+
+  return buildEntry(row, row.iid, null, null);
 }
 
-function buildEntry(row: ChClearingRow, iid: string, qrIid: string | null): ChClearingEntry {
+/**
+ * Attach the full QR-IID set when SIX has allocated more than one to the same
+ * institution (2 of 224, measured 20/08/2026). The scalar keeps the lowest, so
+ * a caller reading only `qr_iid` still gets a real published value rather than
+ * a silent truncation of the set.
+ */
+function withQrIids(entry: ChClearingEntry, all: string[]): ChClearingEntry {
+  return all.length > 1 ? { ...entry, qr_iids: all } : entry;
+}
+
+function buildEntry(
+  row: ChClearingRow,
+  iid: string,
+  qrIid: string | null,
+  qrIidSource: 'register' | 'headquarters' | null,
+): ChClearingEntry {
   return {
     iid,
     name: row.name,
@@ -185,6 +280,7 @@ function buildEntry(row: ChClearingRow, iid: string, qrIid: string | null): ChCl
     },
     sic_iid: row.sic_iid,
     qr_iid: qrIid,
+    qr_iid_source: qrIid ? qrIidSource : null,
     is_qr_iid: false,
     valid_on: row.valid_on ?? '',
     concatenation: row.concatenation === 1,
@@ -251,4 +347,5 @@ export function getChClearingCount(): number {
 export function resetChClearingStatements(): void {
   _stmtByIid = null;
   _stmtCount = null;
+  _qrByMaster = null;
 }

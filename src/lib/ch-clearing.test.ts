@@ -222,7 +222,6 @@ describe('Swiss BC-Nummer Clearing Lookup', () => {
     it('standard lookup (09000) is untouched by the QR presentation swap', () => {
       const pf = lookupClearing('09000');
       expect(pf!.iid).toBe('09000');
-      expect(pf!.qr_iid).toBeNull();
       expect(pf!.is_qr_iid).toBe(false);
     });
 
@@ -232,11 +231,44 @@ describe('Swiss BC-Nummer Clearing Lookup', () => {
       expect(ubs!.qr_iid).toBe('30005');
       expect(ubs!.is_qr_iid).toBe(true);
     });
+  });
 
-    it('UBS has no qr_iid', () => {
+  // QR-IID, read backwards
+  //
+  // These four replace a pair of assertions that pinned the defect instead of
+  // the rule: 'PostFinance has no qr_iid' and 'UBS has no qr_iid' were true
+  // only because SIX publishes the pairing on the QR row alone, so every
+  // ordinary Swiss IBAN answered qr_iid: null while the value sat two rows
+  // away. See the reverse index in ch-clearing.ts.
+
+  describe('QR-IID reverse resolution', () => {
+    it('a standard IID carries the QR-IID SIX pairs with it, marked as published', () => {
+      const pf = lookupClearing('09000');
+      expect(pf!.qr_iid).toBe('30000');
+      expect(pf!.qr_iid_source).toBe('register');
+      expect(pf!.is_qr_iid).toBe(false);
+    });
+
+    it('a branch inherits its head office QR-IID, and says the value is inferred', () => {
+      const branch = lookupClearing('00231');
+      expect(branch!.headquarters_iid).toBe('00230');
+      expect(branch!.qr_iid).toBe('30005');
+      // The whole point of the field: this pairing is a deduction, and a caller
+      // must be able to tell it from the published one above.
+      expect(branch!.qr_iid_source).toBe('headquarters');
+    });
+
+    it('an institution holding several QR-IIDs exposes all of them, lowest as the scalar', () => {
       const ubs = lookupClearing('00230');
-      expect(ubs!.qr_iid).toBeNull();
-      expect(ubs!.is_qr_iid).toBe(false);
+      expect(ubs!.qr_iid).toBe('30005');
+      expect(ubs!.qr_iid_source).toBe('register');
+      expect(ubs!.qr_iids).toEqual(['30005', '30308']);
+    });
+
+    it('an institution with no QR-IID stays null on both fields, never guessed', () => {
+      const snb = lookupClearing('00100');
+      expect(snb!.qr_iid).toBeNull();
+      expect(snb!.qr_iid_source).toBeNull();
     });
   });
 
