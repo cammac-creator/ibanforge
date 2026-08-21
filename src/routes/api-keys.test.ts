@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { apiKeys } from './api-keys.js';
 import { getStatsDB } from '../lib/db.js';
+import { generateApiKey } from '../lib/api-keys.js';
 import { Hono } from 'hono';
 
 function makeApp() {
@@ -576,5 +577,88 @@ describe('POST /v1/keys/generate — per-network creation guard', () => {
     const capped = await gen(app, victim, ip);
     expect(capped.status).toBe(429);
     expect(((await capped.json()) as { error: string }).error).toBe('verification_rate_limited');
+  });
+});
+
+/**
+ * The self-service report. Auth is the key itself, so what matters is that a
+ * holder can never reach another holder's rows, and that a hostile window
+ * parameter cannot turn the endpoint into a full-table scan.
+ *
+ * Keys are minted through the library rather than through /v1/admin/keys: the
+ * route is rate-limited on purpose (the anti-farm guard of 18/08), and three
+ * mints in a row trip it — which is the guard working, not a test to weaken.
+ *
+ * Addresses are invented. This repository is public.
+ */
+describe('/v1/keys/report — the customer reads their own key', () => {
+  function mintKey(email: string): string {
+    const db = getStatsDB();
+    // A same-day key for this address would make generateApiKey return null.
+    db.prepare('DELETE FROM api_keys WHERE email = ?').run(email);
+    const made = generateApiKey(email);
+    if (!made) throw new Error(`could not mint a test key for ${email}`);
+    return made.api_key;
+  }
+
+  it('refuses a request with no key', async () => {
+    const res = await makeApp().request('/v1/keys/report');
+    expect(res.status).toBe(401);
+  });
+
+  it('refuses a key that does not exist', async () => {
+    const res = await makeApp().request('/v1/keys/report', {
+      headers: { Authorization: 'Bearer ifk_nope_nope_nope' },
+    });
+    expect(res.status).toBe(401);
+  });
+
+  it('answers a valid key with its own usage and report', async () => {
+    const key = mintKey('acme@example.com');
+    const res = await makeApp().request('/v1/keys/report', { headers: { Authorization: `Bearer ${key}` } });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      key_prefix: string;
+      usage: { used: number; month: string };
+      report: { total: number; footprint: { unusual: boolean | null } };
+    };
+    expect(body.key_prefix).toBe(key.slice(0, 12));
+    expect(body.usage.month).toMatch(/^\d{4}-\d{2}$/);
+    // A key minted a second ago has no history — and no history is not a
+    // clean bill of health.
+    expect(body.report.footprint.unusual).toBeNull();
+  });
+
+  it('shows a holder their own calls and never a neighbour key rows', async () => {
+    const mine = mintKey('acme@example.com');
+    const theirs = mintKey('ops@alpha.example.net');
+    const db = getStatsDB();
+    db.prepare(
+      `INSERT INTO request_log (method, path, status, response_ms, hour, day_of_week, key_prefix)
+       VALUES ('POST', '/v1/iban/validate', 200, 12, 10, 2, ?)`,
+    ).run(theirs.slice(0, 12));
+
+    const res = await makeApp().request('/v1/keys/report', { headers: { Authorization: `Bearer ${mine}` } });
+    const body = (await res.json()) as { report: { total: number } };
+    // The neighbour's call must not appear in my report.
+    expect(body.report.total).toBe(0);
+  });
+
+  it('clamps an absurd window instead of scanning the whole table', async () => {
+    const key = mintKey('acme@example.com');
+    const res = await makeApp().request('/v1/keys/report?days=99999', {
+      headers: { Authorization: `Bearer ${key}` },
+    });
+    const body = (await res.json()) as { report: { window_days: number } };
+    expect(body.report.window_days).toBe(365);
+  });
+
+  it('falls back to the default window when days is not a number', async () => {
+    const key = mintKey('acme@example.com');
+    const res = await makeApp().request('/v1/keys/report?days=drop-table', {
+      headers: { Authorization: `Bearer ${key}` },
+    });
+    const body = (await res.json()) as { report: { window_days: number } };
+    expect(body.report.window_days).toBe(30);
   });
 });

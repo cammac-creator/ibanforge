@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { timingSafeEqual, createHash } from 'node:crypto';
 import { generateApiKey, validateApiKey, getUsage, revokeApiKey, rotateApiKey } from '../lib/api-keys.js';
 import { getStatsDB } from '../lib/db.js';
+import { getKeyReport } from '../lib/key-report.js';
 import { getClientProfiles, getBotProfiles, extractClientIp } from '../lib/stats.js';
 import { isDisposableDomain } from '../lib/disposable-domains.js';
 import {
@@ -14,6 +15,7 @@ import {
   checkVerificationCode,
   challengeSendAllowed,
   recordVerificationSend,
+  markVerificationOutcome,
 } from '../lib/key-creation-guard.js';
 import { getActivation } from '../lib/activation.js';
 import { recordEvent } from '../lib/events.js';
@@ -146,9 +148,12 @@ apiKeys.post('/v1/keys/generate', async (c) => {
                 : 'Too many verification codes were requested from this network today. Existing keys keep working; prepaid credits are instant (POST /v1/credits/buy/1k) and x402 needs no key.',
           }, 429);
         }
-        recordVerificationSend(creationSource, email.trim().toLowerCase());
+        const sendId = recordVerificationSend(creationSource, email.trim().toLowerCase());
         const challenge = createVerificationChallenge(email.trim().toLowerCase(), creationSource);
         const sent = await sendKeyVerificationEmail({ to: email.trim().toLowerCase(), code: challenge });
+        // The outcome is written whichever way it went: a refusal that leaves
+        // no trace is exactly how this channel failed unnoticed for three days.
+        markVerificationOutcome(sendId, sent);
         if (!sent) {
           return c.json({
             error: 'verification_unavailable',
@@ -276,6 +281,43 @@ apiKeys.get('/v1/keys/usage', (c) => {
 
   const usage = getUsage(keyHash, monthlyLimit);
   return c.json({ ...usage, key_prefix: key.slice(0, 12) });
+});
+
+/**
+ * The customer's own report: their traffic, their failures, their footprint.
+ *
+ * Same auth as `/v1/keys/usage` — the key itself — and the prefix is derived
+ * from the presented key rather than read from the request, so a caller can
+ * only ever obtain their own rows.
+ *
+ * Why this exists: a key holder could see four numbers and nothing that
+ * explained a failure. Every "why did my call fail" had to become an email, so
+ * the ones who did not write stayed stuck in silence. The heavy lifting is in
+ * `getKeyReport`; this route is auth plus a window clamp.
+ */
+apiKeys.get('/v1/keys/report', (c) => {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader?.startsWith('Bearer ifk_')) {
+    return c.json({ error: 'missing_key', message: 'Provide your API key via Authorization: Bearer ifk_xxx' }, 401);
+  }
+
+  const key = authHeader.slice(7);
+  const { valid, keyHash, monthlyLimit } = validateApiKey(key);
+
+  if (!valid) {
+    return c.json({ error: 'invalid_key', message: 'API key not found or inactive' }, 401);
+  }
+
+  // Clamped, not trusted: an unbounded window is a full-table scan any holder
+  // could ask for repeatedly.
+  const requested = Number(c.req.query('days') ?? 30);
+  const windowDays = Number.isFinite(requested) ? Math.min(Math.max(Math.trunc(requested), 1), 365) : 30;
+
+  return c.json({
+    key_prefix: key.slice(0, 12),
+    usage: getUsage(keyHash, monthlyLimit),
+    report: getKeyReport(key.slice(0, 12), windowDays),
+  });
 });
 
 /**
