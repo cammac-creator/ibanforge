@@ -1,8 +1,8 @@
 import { Hono } from 'hono';
 import type { HonoEnv } from '../types.js';
-import { buildComplianceResponse } from '../lib/compliance-response.js';
+import { buildComplianceResponse, buildBicComplianceResponse } from '../lib/compliance-response.js';
 import { recordOperation } from '../lib/stats.js';
-import { getIban, computeRevenue } from '../lib/request-helpers.js';
+import { getIban, getBic, computeRevenue } from '../lib/request-helpers.js';
 
 const ibanCompliance = new Hono<HonoEnv>();
 
@@ -17,8 +17,46 @@ ibanCompliance.post('/v1/iban/compliance', async (c) => {
   }
 
   const iban = getIban(body);
-  if (!iban || typeof iban !== 'string' || iban.trim() === '') {
-    return c.json({ error: 'invalid_request', message: "Request body must include an 'iban' field (case-insensitive)." }, 400);
+  const bic = getBic(body);
+
+  const hasIban = typeof iban === 'string' && iban.trim() !== '';
+  const hasBic = typeof bic === 'string' && bic.trim() !== '';
+
+  if (hasIban && hasBic) {
+    // Refuse rather than pick. The two can disagree — an IBAN resolves to its
+    // own BIC — and silently preferring one would report a screen of an
+    // institution the caller did not ask about.
+    return c.json(
+      {
+        error: 'invalid_request',
+        message: "Send either 'iban' or 'bic', not both: they can designate different institutions.",
+      },
+      400,
+    );
+  }
+
+  // Screening keyed on a BIC. This exists because the IBAN path cannot reach
+  // the banks in countries whose bank code is numeric and whose curated map is
+  // empty — a designated bank was in our sanctions table and unreachable by
+  // any IBAN. See buildBicComplianceResponse().
+  if (hasBic) {
+    const screened = buildBicComplianceResponse(bic.trim());
+    if ('error' in screened) {
+      recordOperation('iban_compliance', null, false, 0, 'bic', c.get('apiKeyPrefix'));
+      return c.json(screened, 400);
+    }
+    const processingMs = Math.round((performance.now() - start) * 100) / 100;
+    const revenue = computeRevenue(c, 0.02);
+    recordOperation('iban_compliance', screened.country.code, true, revenue, undefined, c.get('apiKeyPrefix'));
+    return c.json({
+      ...screened,
+      cost_usdc: c.get('apiKeyAuthenticated') ? 0 : 0.02,
+      processing_ms: processingMs,
+    });
+  }
+
+  if (!hasIban) {
+    return c.json({ error: 'invalid_request', message: "Request body must include an 'iban' or a 'bic' field (case-insensitive)." }, 400);
   }
 
   // One shared assembly for REST and both MCP transports. See

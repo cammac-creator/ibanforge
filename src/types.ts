@@ -309,7 +309,61 @@ export interface BICLookupResult {
   lei_status: string | null;
   is_test_bic: boolean;
   source: string | null;
+  /**
+   * Bank-level sanctions screen on this BIC8.
+   *
+   * Present on every answer, including `found: false`. That combination is the
+   * reason the block exists: a bank a sanctions authority has designated but
+   * our directory cannot name used to come back as a plain "not found", which
+   * is the most reassuring answer this endpoint can give about the least
+   * reassuring institution it knows. Measured 21/08/2026, 33 designated BICs
+   * were in exactly that position.
+   *
+   * This is a WARNING, not a compliance report: it says nothing about the
+   * country, FATF, or a beneficiary. Full screening is /v1/iban/compliance.
+   */
+  sanctions: {
+    /** False when the sanctions database could not be read; `listed` is then null. */
+    screened: boolean;
+    /** Null when not screened — never `false`, which would be a claim we cannot make. */
+    listed: boolean | null;
+    /** Which lists matched, e.g. ["OFAC"], ["EU"]. Empty when clean or unscreened. */
+    matched_lists: string[];
+  };
   note?: string;
+  cost_usdc: number;
+  processing_ms?: number;
+}
+
+/**
+ * Compliance screening keyed on a BIC instead of an IBAN.
+ *
+ * Why this exists: the IBAN path resolves a bank code to a BIC, and in the
+ * countries whose bank code is purely numeric and whose curated map is empty
+ * that resolution CANNOT happen — 19 such countries, Libya among them. So a
+ * bank the EU has designated (AGRULYLT, Agricultural Bank of Libya) was
+ * present in the sanctions table, correct, and unreachable: no Libyan IBAN
+ * could ever produce its BIC. Inventing a bank-code map for those countries
+ * would be fabricating a register; accepting the BIC the caller already holds
+ * costs nothing and is honest.
+ *
+ * It is also a better input than an IBAN for this endpoint: a BIC carries its
+ * own country in positions 5-6, so every axis answers without any resolution
+ * step at all.
+ */
+export interface BicComplianceResponse {
+  bic: string;
+  bic8: string;
+  valid_format: boolean;
+  /**
+   * Whether our BIC directory can name this institution. **Independent of the
+   * screening result** — `found: false` with `bank_sanctioned: true` is a real
+   * and important combination, not a contradiction.
+   */
+  found: boolean;
+  institution: string | null;
+  country: { code: string; name: string };
+  compliance: ComplianceResult;
   cost_usdc: number;
   processing_ms?: number;
 }

@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type { HonoEnv } from '../types.js';
 import { validateBIC } from '../lib/bic-validator.js';
 import { lookup } from '../lib/bic-lookup.js';
+import { screenBicSanctions } from '../lib/compliance.js';
 import { hasNonLatinScript } from '../lib/gleif-address.js';
 import { classifyBicInput } from '../lib/input-normalize.js';
 import { recordOperation, recordRejection } from '../lib/stats.js';
@@ -69,6 +70,7 @@ bicLookup.get('/v1/bic/:code', (c) => {
 
   const row = lookup(validation.bic11!);
   const found = row !== null;
+  const sanctions = screenBicSanctions(validation.bic8!);
 
   const errorDetail = found ? undefined : validation.bic;
   const revenue = computeRevenue(c, COST_USDC);
@@ -124,13 +126,23 @@ bicLookup.get('/v1/bic/:code', (c) => {
     lei_status: row?.lei_status ?? null,
     is_test_bic: validation.is_test_bic!,
     source: row?.source ?? null,
+    // Screened on every answer, found or not. See the field note in types.ts:
+    // answering a plain "not found" about a bank a sanctions authority has
+    // designated is the most reassuring thing this endpoint can say about the
+    // least reassuring institution it knows.
+    sanctions,
     cost_usdc: c.get('apiKeyAuthenticated') ? 0 : COST_USDC,
     processing_ms: Math.round((performance.now() - start) * 100) / 100,
   };
 
   if (!found) {
-    result.note =
-      'BIC format valid but not found in database. Data sourced from GLEIF — coverage may be partial.';
+    // The wording depends on WHY we hold nothing. "Coverage may be partial" is
+    // a fair description of a gap in a directory; it is a dangerously calm way
+    // to describe a designated bank.
+    result.note = sanctions.listed
+      ? 'This BIC is named on a sanctions list but is absent from our BIC directory, so we cannot identify the institution. ' +
+        'Absence here is a gap in our directory, NOT a clean screening result. Screen it with POST /v1/iban/compliance {"bic": "..."}.'
+      : 'BIC format valid but not found in database. Data sourced from GLEIF — coverage may be partial.';
   }
 
   return c.json(result);

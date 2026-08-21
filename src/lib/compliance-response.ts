@@ -1,9 +1,12 @@
 import { getCountryRisk } from './countries.js';
 import { buildComplianceResult, type BankCodeConfidence, unassessableCompliance } from './compliance.js';
 import { getComplianceMeta, type ComplianceMeta } from './compliance-db.js';
-import { enrichResult } from './enrich.js';
+import { enrichResult, isTestBic } from './enrich.js';
 import { validateIBAN } from './iban.js';
-import type { ComplianceResult, IBANValidationResult } from '../types.js';
+import { validateBIC } from './bic-validator.js';
+import { lookup } from './bic-lookup.js';
+import { classifyIssuer } from './issuers.js';
+import type { BicComplianceResponse, ComplianceResult, IBANValidationResult } from '../types.js';
 
 /**
  * The one place a compliance response is assembled.
@@ -95,4 +98,68 @@ export function buildComplianceResponse(iban: string): ComplianceResponse {
   }
 
   return { ...result, compliance, meta: getComplianceMeta() };
+}
+
+/** What the caller must be told when the BIC itself is malformed. */
+export interface BicComplianceRejection {
+  error: 'invalid_bic_format';
+  message: string;
+}
+
+/**
+ * Screen a BIC directly, for the banks no IBAN can reach.
+ *
+ * Same scorer, same lists, same disclaimer as the IBAN path — only the way the
+ * institution is identified differs, and here it is identified by the caller
+ * rather than resolved by us. See BicComplianceResponse in types.ts for why
+ * that route has to exist.
+ */
+export function buildBicComplianceResponse(
+  bic: string,
+): (BicComplianceResponse & { meta: ComplianceMeta }) | BicComplianceRejection {
+  const validation = validateBIC(bic);
+  if (!validation.valid || !validation.bic8 || !validation.country_code) {
+    return {
+      error: 'invalid_bic_format',
+      message: 'BIC must be 8 or 11 characters in ISO 9362 form, e.g. UBSWCHZH or COBADEFFXXX.',
+    };
+  }
+
+  const bic8 = validation.bic8;
+  const countryCode = validation.country_code;
+  // The directory is consulted to NAME the institution, never to decide whether
+  // to screen it. A miss here is a gap in our coverage, not an absence of risk.
+  const row = lookup(bic8);
+  const known = classifyIssuer(bic8, row?.institution ?? undefined);
+  const issuerType = known?.type ?? 'bank';
+  const countryRisk = getCountryRisk(countryCode);
+
+  let compliance: ComplianceResult;
+  try {
+    // `bankCode` stays at its default: there is no bank code in play, so there
+    // is nothing to confirm or deny about one. Scoring it as 'unverified' would
+    // penalise the caller for a check this input does not involve.
+    compliance = buildComplianceResult(true, countryCode, bic8, issuerType, countryRisk, isTestBic(bic8));
+  } catch {
+    compliance = {
+      sanctions: { country_sanctioned: false, bank_sanctioned: false, matched_lists: [], fatf_status: 'non_member', bank_screened: false },
+      reachability: { sepa_instant: false, sct: false, sdd: false, screened: false },
+      vop: { participant: false, status: 'not_found', screened: false },
+      risk_score: 50,
+      risk_level: 'elevated',
+      flags: ['compliance_data_unavailable'],
+    };
+  }
+
+  return {
+    bic: validation.bic,
+    bic8,
+    valid_format: true,
+    found: row !== null,
+    institution: row?.institution ?? null,
+    country: { code: countryCode, name: row?.country_name ?? countryCode },
+    compliance,
+    meta: getComplianceMeta(),
+    cost_usdc: 0,
+  };
 }

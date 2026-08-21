@@ -191,3 +191,38 @@ describe('GET /v1/bic/:code — instrumentation des rejets (phase 1 : on compte,
     expect(totalRejections()).toBe(before);
   });
 });
+
+describe('GET /v1/bic/:code — sanctions warning', () => {
+  const app = makeApp();
+
+  it('warns on a designated bank our directory cannot name', async () => {
+    const res = await app.request('/v1/bic/AGRULYLT', { headers: { 'X-Dev-Skip': 'true' } });
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(res.status).toBe(200);
+    // Both at once: we hold no directory row, AND the bank is designated.
+    expect(body.found).toBe(false);
+    const s = body.sanctions as Record<string, unknown>;
+    expect(s.screened).toBe(true);
+    expect(s.listed).toBe(true);
+    expect(s.matched_lists).toContain('EU');
+    // The old note called this "coverage may be partial", which is a calm way
+    // to describe a sanctioned bank.
+    expect(body.note).toContain('sanctions list');
+    expect(body.note).not.toContain('coverage may be partial');
+  });
+
+  it('reports a clean bank as screened and clean', async () => {
+    const res = await app.request('/v1/bic/COBADEFF', { headers: { 'X-Dev-Skip': 'true' } });
+    const body = (await res.json()) as Record<string, unknown>;
+    const s = body.sanctions as Record<string, unknown>;
+    expect(s.screened).toBe(true);
+    expect(s.listed).toBe(false);
+    expect(s.matched_lists).toEqual([]);
+  });
+
+  it('keeps the ordinary not-found wording for a BIC nobody has designated', async () => {
+    const res = await app.request('/v1/bic/AAAAGB2L', { headers: { 'X-Dev-Skip': 'true' } });
+    const body = (await res.json()) as Record<string, unknown>;
+    if (body.found === false) expect(body.note).toContain('coverage may be partial');
+  });
+});

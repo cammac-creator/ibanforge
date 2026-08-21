@@ -29,6 +29,38 @@ export function checkSanctions(countryCode: string, bic8: string | null): Sancti
   };
 }
 
+/**
+ * The bank axis of the sanctions screen, on its own, for a caller that has a
+ * BIC rather than an IBAN.
+ *
+ * Kept separate from checkSanctions() because that one also answers about the
+ * COUNTRY, and a BIC lookup has no business asserting country-level sanctions
+ * or a FATF status — the caller asked about an institution.
+ *
+ * `listed: null` when the compliance database could not be consulted. A
+ * sanctions screen that fails must never read as "clean": that is the whole
+ * defect this file spent 21/08/2026 removing, and re-introducing it on a
+ * cheaper endpoint would be no better.
+ */
+export interface BicSanctionsScreen {
+  /** False when the sanctions database could not be read. Nothing below counts. */
+  screened: boolean;
+  /** Null when `screened` is false — never `false`, which would be a claim. */
+  listed: boolean | null;
+  matched_lists: string[];
+}
+
+export function screenBicSanctions(bic8: string): BicSanctionsScreen {
+  try {
+    const db = getComplianceDB();
+    if (!_checkSanctionedBank) _checkSanctionedBank = db.prepare('SELECT source_list FROM sanctioned_entities WHERE bic8 = ?');
+    const rows = _checkSanctionedBank.all(bic8) as { source_list: string }[];
+    return { screened: true, listed: rows.length > 0, matched_lists: rows.map(r => r.source_list) };
+  } catch {
+    return { screened: false, listed: null, matched_lists: [] };
+  }
+}
+
 export function checkReachability(bic8: string | null): ReachabilityCheck {
   if (!bic8) return { sepa_instant: false, sct: false, sdd: false, screened: false };
   const db = getComplianceDB();

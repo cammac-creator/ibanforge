@@ -52,6 +52,17 @@ export function getIban(body: Record<string, unknown> | null | undefined): strin
   return pickField<string>(body, ['iban']);
 }
 
+/**
+ * The BIC an agent may send to /v1/iban/compliance instead of an IBAN.
+ *
+ * `swift` is accepted as an alias because that is what half the industry calls
+ * the same string, and an agent that guesses the wrong one should not get a
+ * 400 for a synonym.
+ */
+export function getBic(body: Record<string, unknown> | null | undefined): string | undefined {
+  return pickField<string>(body, ['bic', 'swift', 'bic_code', 'swift_code']);
+}
+
 export function getIbansArray(
   body: Record<string, unknown> | null | undefined,
 ): unknown[] | undefined {

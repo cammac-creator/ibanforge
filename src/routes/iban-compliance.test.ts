@@ -117,3 +117,62 @@ describe('POST /v1/iban/compliance', () => {
     expect(bban.bank_code).toBe('AAAA');
   });
 });
+
+/**
+ * The BIC input, at the HTTP surface.
+ *
+ * The library-level behaviour is pinned in src/lib/bic-compliance.test.ts; what
+ * these add is the routing decision, which is where an agent's request actually
+ * lands — including the case where it sends both fields.
+ */
+describe('POST /v1/iban/compliance with a bic instead of an iban', () => {
+  async function screen(payload: Record<string, unknown>) {
+    const res = await app.request('/v1/iban/compliance', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Dev-Skip': 'true' },
+      body: JSON.stringify(payload),
+    });
+    return { status: res.status, body: (await res.json()) as Record<string, unknown> };
+  }
+
+  it('screens a designated bank that no IBAN could ever resolve', async () => {
+    const { status, body } = await screen({ bic: 'AGRULYLT' });
+    expect(status).toBe(200);
+    expect(body.found).toBe(false);
+    const s = (body.compliance as Record<string, unknown>).sanctions as Record<string, unknown>;
+    expect(s.bank_sanctioned).toBe(true);
+    expect(s.matched_lists).toContain('EU');
+  });
+
+  it('accepts the swift alias, because half the industry calls it that', async () => {
+    const { status, body } = await screen({ swift: 'AGRULYLT' });
+    expect(status).toBe(200);
+    expect(((body.compliance as Record<string, unknown>).sanctions as Record<string, unknown>).bank_sanctioned).toBe(true);
+  });
+
+  it('refuses both fields at once rather than silently picking one', async () => {
+    // They can designate different institutions, and choosing would report a
+    // screen of a bank the caller did not ask about.
+    const { status, body } = await screen({ iban: 'DE89370400440532013000', bic: 'AGRULYLT' });
+    expect(status).toBe(400);
+    expect(body.error).toBe('invalid_request');
+  });
+
+  it('rejects a malformed bic', async () => {
+    const { status, body } = await screen({ bic: 'NOPE' });
+    expect(status).toBe(400);
+    expect(body.error).toBe('invalid_bic_format');
+  });
+
+  it('still requires one of the two', async () => {
+    const { status } = await screen({});
+    expect(status).toBe(400);
+  });
+
+  it('leaves the IBAN path untouched', async () => {
+    const { status, body } = await screen({ iban: 'DE89370400440532013000' });
+    expect(status).toBe(200);
+    expect(body.valid).toBe(true);
+    expect((body.compliance as Record<string, unknown>).risk_score).toBe(0);
+  });
+});
