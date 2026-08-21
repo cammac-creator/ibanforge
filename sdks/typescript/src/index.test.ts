@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   IBANforge,
@@ -29,10 +31,16 @@ let fetchMock: ReturnType<typeof vi.fn>;
 beforeEach(() => {
   fetchMock = vi.fn();
   vi.stubGlobal('fetch', fetchMock);
+  // Since 1.4.3 the client falls back to the environment for both of these.
+  // A developer machine (or a sibling test) that has them set would otherwise
+  // silently change what every assertion below is measuring.
+  vi.stubEnv('IBANFORGE_API_BASE', '');
+  vi.stubEnv('IBANFORGE_API_KEY', '');
 });
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
   vi.restoreAllMocks();
 });
 
@@ -58,7 +66,51 @@ describe('IBANforge — construction & base URL', () => {
   it('defaults to the public production base URL', async () => {
     fetchMock.mockResolvedValue(jsonResponse({ valid: true }));
     await new IBANforge().formatIban('CH93');
-    expect(calledUrl()).toMatch(/^https?:\/\/[^/]+\/v1\/iban\/format/);
+    expect(calledUrl()).toBe('https://api.ibanforge.com/v1/iban/format?iban=CH93');
+  });
+
+  it('falls back to IBANFORGE_API_BASE, and explicit config still wins', async () => {
+    vi.stubEnv('IBANFORGE_API_BASE', 'http://127.0.0.1:3300');
+    fetchMock.mockResolvedValue(jsonResponse({ valid: true }));
+
+    await new IBANforge().formatIban('CH93');
+    expect(calledUrl(0)).toBe('http://127.0.0.1:3300/v1/iban/format?iban=CH93');
+
+    await new IBANforge({ baseUrl: 'https://staging.example.test' }).formatIban('CH93');
+    expect(calledUrl(1)).toBe('https://staging.example.test/v1/iban/format?iban=CH93');
+  });
+
+  it('falls back to IBANFORGE_API_KEY for auth', async () => {
+    vi.stubEnv('IBANFORGE_API_KEY', 'ifk_from_env');
+    fetchMock.mockResolvedValue(jsonResponse({ valid: true }));
+    await new IBANforge().validateIban('CH93');
+    expect((calledInit().headers as Record<string, string>).Authorization).toBe('Bearer ifk_from_env');
+  });
+});
+
+describe('package version', () => {
+  /**
+   * RELEASING.md asks for one number in six places, two of them in this
+   * package: `package.json` and the `VERSION` the User-Agent is built from.
+   * Bumping one and forgetting the other publishes a package that lies about
+   * itself in every request log — and `npm ci` in CI refuses a lockfile whose
+   * version disagrees with the manifest, which is the failure that has already
+   * cost this repo two red pipelines.
+   */
+  const here = dirname(new URL(import.meta.url).pathname);
+  const read = (f: string) => JSON.parse(readFileSync(join(here, '..', f), 'utf8'));
+
+  it('is the same in package.json, package-lock.json and the User-Agent', async () => {
+    const manifest = read('package.json').version;
+    const lock = read('package-lock.json');
+
+    fetchMock.mockResolvedValue(jsonResponse({ status: 'ok' }));
+    await new IBANforge().health();
+    const ua = (calledInit().headers as Record<string, string>)['User-Agent'];
+
+    expect(ua).toBe(`ibanforge-ts/${manifest}`);
+    expect(lock.version).toBe(manifest);
+    expect(lock.packages?.['']?.version).toBe(manifest);
   });
 });
 
@@ -162,6 +214,48 @@ describe('IBANforge — HTTP status → typed error mapping', () => {
     expect((err.body as { message: string }).message).toBe('bad iban');
     expect(err.message).toBe('bad iban');
   });
+
+  it('lifts the error slug onto err.code so branching needs no cast', async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse({ error: 'invalid_key', message: 'API key not found or inactive' }, { status: 401 }),
+    );
+    const err = (await new IBANforge({ apiKey: 'ifk_wrong' }).usage().catch((e) => e)) as AuthError;
+    expect(err.code).toBe('invalid_key');
+    expect(err.status).toBe(401);
+  });
+
+  it('leaves code undefined when the body carries no slug', async () => {
+    fetchMock.mockResolvedValue(jsonResponse('plain text failure', { status: 500 }));
+    const err = (await new IBANforge().health().catch((e) => e)) as APIError;
+    expect(err.code).toBeUndefined();
+  });
+});
+
+describe('IBANforge — free reference endpoints', () => {
+  const cases: Array<[string, (c: IBANforge) => Promise<unknown>, string]> = [
+    ['ibanStructures', (c) => c.ibanStructures(), '/v1/iban/structure'],
+    ['ibanStructure', (c) => c.ibanStructure('CH'), '/v1/iban/structure/CH'],
+    ['creditBundles', (c) => c.creditBundles(), '/v1/credits/bundles'],
+    ['demo', (c) => c.demo(), '/v1/demo'],
+  ];
+
+  for (const [name, call, path] of cases) {
+    it(`${name} GETs ${path}`, async () => {
+      fetchMock.mockResolvedValue(jsonResponse({}));
+      await call(new IBANforge());
+      expect(calledInit().method).toBe('GET');
+      expect(calledUrl()).toBe(`https://api.ibanforge.com${path}`);
+    });
+  }
+
+  it('testIban passes country and count, and omits an empty query', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ test_ibans: [] }));
+    await new IBANforge().testIban();
+    expect(calledUrl(0)).toBe('https://api.ibanforge.com/v1/test-iban');
+
+    await new IBANforge().testIban({ country: 'CH', count: 3 });
+    expect(calledUrl(1)).toBe('https://api.ibanforge.com/v1/test-iban?country=CH&count=3');
+  });
 });
 
 describe('IBANforge — network & timeout failures', () => {
@@ -193,5 +287,19 @@ describe('IBANforge — client-side preconditions', () => {
     await IBANforge.generateApiKey('dev@example.test', { baseUrl: 'https://example.test' });
     expect(calledUrl()).toBe('https://example.test/v1/keys/generate');
     expect(JSON.parse(calledInit().body as string)).toEqual({ email: 'dev@example.test' });
+  });
+
+  it('generateApiKey sends the mailbox code when one is given, and never as a config field', async () => {
+    // The 18/08 signup guard answers 403 on a second key from the same network
+    // and mails a six-digit code; the retry is the SAME call plus `code`.
+    fetchMock.mockResolvedValue(jsonResponse({ api_key: 'ifk_x', key_prefix: 'ifk_x' }));
+    await IBANforge.generateApiKey('dev@example.test', {
+      baseUrl: 'https://example.test',
+      code: '123456',
+    });
+    expect(JSON.parse(calledInit().body as string)).toEqual({
+      email: 'dev@example.test',
+      code: '123456',
+    });
   });
 });

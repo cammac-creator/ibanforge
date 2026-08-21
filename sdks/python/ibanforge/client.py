@@ -6,25 +6,38 @@ Usage:
 
     # Free format check (no key needed)
     client = IBANforge()
-    out = client.format_iban("CH9300762011623852957")
+    out = client.format_iban("CH1000230000000012345")
 
     # Authenticated calls (required for paid endpoints unless you go x402)
     client = IBANforge(api_key="ifk_...")
-    out = client.validate_iban("CH9300762011623852957")
+    out = client.validate_iban("CH1000230000000012345")
 
     # Generate a free key in 1 line
-    key = IBANforge.generate_api_key("you@example.com")
+    key = IBANforge.generate_api_key("you@company.com")
     client = IBANforge(api_key=key["api_key"])
+
+⚠️ The IBAN above is not decoration. ``CH9300762011623852957`` — the SWIFT
+registry's illustration, which every quickstart reaches for — carries a bank
+code no institution holds, so it comes back with ``bic: None`` and
+``clearing: None``. Reading ``out["bic"]["bank_name"]`` on it raises
+``TypeError``, which is precisely how the 1.3.3 quickstart shipped. Use a
+register-allocated code, or ``test_iban()``, which mints one with its proof.
 
 The client raises typed exceptions from `ibanforge.exceptions` — catch the
 specific class you care about (PaymentRequiredError, QuotaExhaustedError,
 InvalidInputError, AuthError, RateLimitError, APIError) or the base
-IBANforgeError to catch them all.
+IBANforgeError to catch them all. Each carries ``.status``, ``.code`` (the
+API's error slug) and the parsed ``.body``.
+
+Note: a malformed IBAN is NOT an exception. It comes back 200 with
+``{"valid": False, "error": "checksum_failed"}`` — exceptions are for transport
+and authorization failures.
 """
 
 from __future__ import annotations
 
-from typing import Any, Iterable, Optional, Union
+import os
+from typing import Any, Dict, Iterable, Optional, Union
 
 import httpx
 
@@ -41,12 +54,17 @@ from .types import (
     APIKey,
     APIKeyUsage,
     BICLookupResult,
+    CreditBundleList,
     CHClearingResult,
     ComplianceResult,
+    DemoResult,
     HealthInfo,
     IBANBatchResult,
     IBANFormatResult,
+    IBANStructure,
+    IBANStructureList,
     IBANValidationResult,
+    TestIbanResult,
 )
 
 from ._version import __version__
@@ -54,6 +72,23 @@ from ._version import __version__
 DEFAULT_BASE_URL = "https://api.ibanforge.com"
 DEFAULT_TIMEOUT = 30.0
 USER_AGENT = f"ibanforge-python/{__version__}"
+
+
+def resolve_base_url(base_url: Optional[str] = None) -> str:
+    """Explicit argument, then ``IBANFORGE_API_BASE``, then production.
+
+    Read at call time, never bound as a default argument: Python evaluates
+    defaults once at import, so ``base_url=DEFAULT_BASE_URL`` would freeze the
+    environment as it stood when the module was first imported — and no test,
+    and no process that configures itself late, could move it afterwards.
+    """
+    return (base_url or os.environ.get("IBANFORGE_API_BASE") or DEFAULT_BASE_URL).rstrip("/")
+
+
+def resolve_api_key(api_key: Optional[str] = None) -> Optional[str]:
+    """Explicit argument, then ``IBANFORGE_API_KEY`` — the same variable the
+    MCP server reads, so one setting configures both."""
+    return api_key or os.environ.get("IBANFORGE_API_KEY") or None
 
 
 def _raise_for_status(res: httpx.Response) -> None:
@@ -102,15 +137,15 @@ class IBANforge:
         self,
         api_key: Optional[str] = None,
         *,
-        base_url: str = DEFAULT_BASE_URL,
+        base_url: Optional[str] = None,
         timeout: float = DEFAULT_TIMEOUT,
         user_agent: str = USER_AGENT,
     ) -> None:
-        self.base_url = base_url.rstrip("/")
-        self.api_key = api_key
+        self.base_url = resolve_base_url(base_url)
+        self.api_key = resolve_api_key(api_key)
         headers = {"User-Agent": user_agent}
-        if api_key:
-            headers["Authorization"] = f"Bearer {api_key}"
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
         self._client = httpx.Client(base_url=self.base_url, timeout=timeout, headers=headers)
 
     # ---- context manager ----
@@ -197,23 +232,78 @@ class IBANforge:
         _raise_for_status(res)
         return res.json()
 
+    # ---- Reference data (all FREE, no key needed) ----
+
+    def iban_structures(self) -> IBANStructureList:
+        """Every country the API can parse, with its IBAN length. FREE."""
+        res = self._client.get("/v1/iban/structure")
+        _raise_for_status(res)
+        return res.json()
+
+    def iban_structure(self, country: str) -> IBANStructure:
+        """One country's BBAN template — field offsets, lengths, charsets. FREE."""
+        res = self._client.get(f"/v1/iban/structure/{country}")
+        _raise_for_status(res)
+        return res.json()
+
+    def test_iban(
+        self, country: Optional[str] = None, count: Optional[int] = None
+    ) -> TestIbanResult:
+        """Test IBANs whose bank code is REALLY allocated, with the register row
+        that proves it. FREE.
+
+        Use this instead of the SWIFT registry's illustration for fixtures and
+        demos: that one's bank code belongs to nobody, so every enrichment field
+        comes back None and your test looks like the API failed.
+        """
+        params: Dict[str, Any] = {}
+        if country is not None:
+            params["country"] = country
+        if count is not None:
+            params["count"] = count
+        res = self._client.get("/v1/test-iban", params=params)
+        _raise_for_status(res)
+        return res.json()
+
+    def credit_bundles(self) -> CreditBundleList:
+        """Prepaid credit packs and their per-call price. FREE to list."""
+        res = self._client.get("/v1/credits/bundles")
+        _raise_for_status(res)
+        return res.json()
+
+    def demo(self) -> DemoResult:
+        """Worked examples of every endpoint, no key and no payment. FREE."""
+        res = self._client.get("/v1/demo")
+        _raise_for_status(res)
+        return res.json()
+
     # ---- API keys ----
 
     @staticmethod
     def generate_api_key(
         email: str,
         *,
-        base_url: str = DEFAULT_BASE_URL,
+        base_url: Optional[str] = None,
         timeout: float = DEFAULT_TIMEOUT,
+        code: Optional[str] = None,
     ) -> APIKey:
         """Create a free API key (200 requests/month).
 
         The key is shown ONCE — store it securely. After the monthly quota the
         IBANforge API falls back to advertising x402 payment requirements; the
         same key continues to work next month.
+
+        Use a mailbox you can read: fictional and disposable domains
+        (``example.com``, ``mailinator``…) are refused with ``disposable_email``.
+        A SECOND key from the same network within seven days answers 403
+        ``verification_required`` and mails a six-digit code — call again with
+        ``code=`` to claim it.
         """
-        with httpx.Client(base_url=base_url.rstrip("/"), timeout=timeout) as cl:
-            res = cl.post("/v1/keys/generate", json={"email": email})
+        payload: Dict[str, Any] = {"email": email}
+        if code:
+            payload["code"] = code
+        with httpx.Client(base_url=resolve_base_url(base_url), timeout=timeout) as cl:
+            res = cl.post("/v1/keys/generate", json=payload)
             _raise_for_status(res)
             return res.json()
 

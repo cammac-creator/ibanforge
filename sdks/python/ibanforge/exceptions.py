@@ -6,12 +6,23 @@ from typing import Any
 
 
 class IBANforgeError(Exception):
-    """Base class for all IBANforge SDK errors."""
+    """Base class for all IBANforge SDK errors.
+
+    Attributes:
+        status: the HTTP status, when the failure came from the API.
+        body: the parsed response body (a dict for every JSON error).
+        code: the API's machine-readable slug — ``invalid_key``,
+            ``disposable_email``, ``verification_required``, ``rate_limited``…
+            Lifted out of ``body`` so an agent can branch on one attribute
+            instead of digging through a body that may not be a dict.
+    """
 
     def __init__(self, message: str, *, status: int | None = None, body: Any | None = None) -> None:
         super().__init__(message)
         self.status = status
         self.body = body
+        slug = body.get("error") if isinstance(body, dict) else None
+        self.code = slug if isinstance(slug, str) else None
 
 
 class AuthError(IBANforgeError):

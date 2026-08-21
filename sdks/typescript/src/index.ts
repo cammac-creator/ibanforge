@@ -1,33 +1,58 @@
 /**
  * IBANforge — official TypeScript/JavaScript SDK.
  *
- * Mirrors the Python SDK: API-key auth, typed error hierarchy, and full
- * endpoint coverage (validate, batch, bic, ch-clearing, compliance, format,
- * usage, key generation). Response shapes are kept in lock-step with the
- * server's src/types.ts.
+ * Mirrors the Python SDK: API-key auth, typed error hierarchy, and coverage of
+ * every public endpoint (validate, batch, bic, ch-clearing, compliance, format,
+ * structures, test IBANs, demo, credit bundles, usage, key generation).
+ * Response shapes are kept in lock-step with the server's src/types.ts.
  *
  *   import { IBANforge } from '@ibanforge/sdk';
  *
  *   // Free format check (no key needed)
- *   const out = await new IBANforge().formatIban('CH9300762011623852957');
+ *   const out = await new IBANforge().formatIban('CH1000230000000012345');
  *
  *   // Authenticated calls (required for paid endpoints unless you go x402)
  *   const client = new IBANforge({ apiKey: 'ifk_...' });
- *   const r = await client.validateIban('CH9300762011623852957');
+ *   const r = await client.validateIban('CH1000230000000012345');
  *
  *   // Generate a free key in 1 line
- *   const key = await IBANforge.generateApiKey('you@example.com');
+ *   const key = await IBANforge.generateApiKey('you@company.com');
+ *
+ * ⚠️ The IBAN above is not decoration. `CH9300762011623852957` — the SWIFT
+ * registry's illustration, which every quickstart reaches for — carries a bank
+ * code no institution holds, so it comes back with `bic: null` and
+ * `clearing: null`. Demonstrating BIC or Swiss clearing on it prints
+ * `undefined`, which is exactly how the 1.3.3 README shipped for six weeks.
+ * Use a register-allocated code, or GET /v1/test-iban, which mints one.
  */
 
-const VERSION = '1.3.3';
+const VERSION = '1.4.3';
 const DEFAULT_BASE_URL = 'https://api.ibanforge.com';
+
+/**
+ * Read an env var without assuming there is an environment: this package runs
+ * in browsers and edge runtimes where `process` is simply not defined, and an
+ * unguarded read there throws at import time.
+ */
+function readEnv(name: string): string | undefined {
+  const proc = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process;
+  return proc?.env?.[name];
+}
 
 // ─── Config ──────────────────────────────────────────────────────────────────
 
 export interface IBANforgeConfig {
-  /** ifk_* API key. Required for paid endpoints (unless paying per-call via x402). */
+  /**
+   * ifk_* API key. Required for paid endpoints (unless paying per-call via
+   * x402). Falls back to the `IBANFORGE_API_KEY` environment variable — the
+   * same name the MCP server reads, so one variable configures both.
+   */
   apiKey?: string;
-  /** Override the API base URL (default https://api.ibanforge.com). */
+  /**
+   * Override the API base URL (default https://api.ibanforge.com). Falls back
+   * to `IBANFORGE_API_BASE`, which is what points the SDK at a local server in
+   * tests and at a staging deployment in CI.
+   */
   baseUrl?: string;
   /** Per-request timeout in ms (default 30000). */
   timeoutMs?: number;
@@ -38,11 +63,21 @@ export interface IBANforgeConfig {
 export class IBANforgeError extends Error {
   readonly status?: number;
   readonly body?: unknown;
+  /**
+   * The API's machine-readable error slug (`invalid_key`, `disposable_email`,
+   * `verification_required`, `rate_limited`, …), lifted out of the response
+   * body. `body` stays `unknown` on purpose — it is caller-supplied JSON — so
+   * without this an agent had to cast before it could branch, and every
+   * documented example was a type assertion that no copy-paste survives.
+   */
+  readonly code?: string;
   constructor(message: string, status?: number, body?: unknown) {
     super(message);
     this.name = 'IBANforgeError';
     this.status = status;
     this.body = body;
+    const slug = body && typeof body === 'object' ? (body as Record<string, unknown>).error : undefined;
+    this.code = typeof slug === 'string' ? slug : undefined;
   }
 }
 /** 401 / 403 — missing or invalid API key. */
@@ -82,16 +117,64 @@ export class APIError extends IBANforgeError {
 
 export interface Country { code: string; name: string }
 export interface BBAN { bank_code: string; branch_code?: string; account_number: string }
-export interface BIC { code: string; bank_name: string | null; city: string | null }
-export interface Issuer { type: 'bank' | 'digital_bank' | 'emi' | 'payment_institution'; name: string }
-export interface SEPA { member: boolean; schemes: Array<'SCT' | 'SDD' | 'SCT_INST'>; vop_required: boolean }
+export interface BIC {
+  code: string;
+  bank_name: string | null;
+  city: string | null;
+  /** Which directory this row came from (GLEIF, SIX, a curated map, …). */
+  source?: string;
+  /** Month the source was last refreshed. */
+  as_of?: string;
+}
+export interface Issuer {
+  type: 'bank' | 'digital_bank' | 'emi' | 'payment_institution';
+  name: string;
+  classification?: string;
+}
+export interface SEPA {
+  member: boolean;
+  schemes: Array<'SCT' | 'SDD' | 'SCT_INST'>;
+  vop_required: boolean;
+  /** null when the institution is unknown — absence of data, not a "no". */
+  vop_participant?: boolean | null;
+}
 export interface RiskIndicators {
-  issuer_type: string;
+  issuer_type: string | null;
   country_risk: 'standard' | 'elevated' | 'high';
   test_bic: boolean;
   sepa_reachable: boolean;
+  /** 'country' when reachability is inferred from the zone, not the institution. */
+  sepa_reachable_scope?: string;
   vop_coverage: boolean;
 }
+
+/**
+ * Is this bank code actually allocated in the national register?
+ *
+ * The product's sharpest answer, and the one competitors get wrong: an IBAN can
+ * pass mod-97 and still name a bank that does not exist. `status:
+ * 'not_in_register'` with `authoritative: true` means do not send — openiban
+ * calls the same IBAN outright invalid, which is a different (and wrong) claim.
+ */
+export interface BankCodeCheck {
+  value: string;
+  status: 'verified' | 'not_in_register' | 'unknown' | 'no_register';
+  match: string | null;
+  register: string | null;
+  /** true only when the register is the country's official one. */
+  authoritative: boolean;
+  institution?: Record<string, string | null>;
+  as_of?: string;
+}
+
+/** What the API suggests doing next, given this exact verdict. */
+export interface NextStep {
+  code: string;
+  do: string;
+  because: string;
+  action?: string;
+}
+
 export interface Clearing {
   iid: string;
   name: string;
@@ -101,6 +184,9 @@ export interface Clearing {
   instant_payments_chf: boolean;
   eurosic: boolean;
   qr_iid: string | null;
+  qr_iid_source?: string;
+  /** An institution can hold several QR-IIDs; `qr_iid` is the first. */
+  qr_iids?: string[];
 }
 
 export interface IBANValidationResult {
@@ -110,11 +196,15 @@ export interface IBANValidationResult {
   country?: Country;
   check_digits?: string;
   bban?: BBAN;
+  /** null when no directory knows the bank code — check `bank_code_check`. */
   bic?: BIC | null;
   issuer?: Issuer;
   sepa?: SEPA;
   risk_indicators?: RiskIndicators;
+  bank_code_check?: BankCodeCheck;
+  /** Swiss/Liechtenstein IBANs only, and only when the IID is allocated. */
   clearing?: Clearing | null;
+  next_steps?: NextStep[];
   error?: string;
   error_detail?: string;
   cost_usdc: number;
@@ -147,14 +237,19 @@ export interface BICLookupResult {
   bic11?: string;
   found: boolean;
   valid_format: boolean;
+  /** The bank's name. Named `institution` here, `bic.bank_name` on validate. */
   institution: string | null;
   country?: Country;
   city: string | null;
+  /** Registered address, when GLEIF carries one. */
+  address?: Record<string, string | null>;
+  address_available?: boolean;
   branch_code?: string;
   branch_info?: string | null;
   lei: string | null;
   lei_status?: string | null;
   is_test_bic?: boolean;
+  source?: string;
   cost_usdc?: number;
   processing_ms?: number;
 }
@@ -172,17 +267,31 @@ export interface CHClearingResult {
   };
   sic_iid?: string | null;
   qr_iid?: string | null;
+  qr_iid_source?: string;
+  qr_iids?: string[];
   valid_on?: string;
   note?: string;
   error?: string;
   message?: string;
   cost_usdc?: number;
+  processing_ms?: number;
 }
 
 export interface Compliance {
-  sanctions: { country_sanctioned: boolean; bank_sanctioned: boolean; matched_lists: string[]; fatf_status: string };
-  reachability: { sepa_instant: boolean; sct: boolean; sdd: boolean };
-  vop: { participant: boolean; status: string };
+  /**
+   * `bank_screened: false` means the screening did not run (no bank could be
+   * identified), never that the bank came back clean. Same for the other
+   * `screened` flags: absence of a verdict, not a favourable one.
+   */
+  sanctions: {
+    country_sanctioned: boolean;
+    bank_sanctioned: boolean;
+    matched_lists: string[];
+    fatf_status: string;
+    bank_screened?: boolean;
+  };
+  reachability: { sepa_instant: boolean; sct: boolean; sdd: boolean; screened?: boolean };
+  vop: { participant: boolean; status: string; screened?: boolean };
   /** null when the IBAN did not validate: there was nothing to score. */
   risk_score: number | null;
   /**
@@ -201,6 +310,9 @@ export interface ComplianceMeta {
   sanctions_as_of: string | null;
   fatf_as_of: string | null;
   sources: string | null;
+  country_risk_as_of?: string | null;
+  /** Says in prose why `risk_indicators.country_risk` and `fatf_status` can disagree. */
+  country_risk_scope?: string;
 }
 
 /**
@@ -215,19 +327,31 @@ export interface ComplianceResult extends IBANValidationResult {
 }
 
 export interface APIKey {
+  /** Shown once, never again. Store it before the process exits. */
   api_key: string;
   key_prefix: string;
   email?: string;
   monthly_limit?: number;
   message?: string;
+  terms_url?: string;
 }
 
+/**
+ * GET /v1/keys/usage.
+ *
+ * ⚠️ Renamed in 1.4.3, because 1.3.3 declared fields the API has never sent:
+ * `monthly_limit` / `used_this_month` were `limit` / `used` on the wire.
+ * TypeScript could not catch it — the shape was simply invented — so the code
+ * compiled and printed `undefined`.
+ */
 export interface APIKeyUsage {
   key_prefix: string;
-  email?: string;
-  monthly_limit: number;
-  used_this_month: number;
+  /** Calls consumed this calendar month. */
+  used: number;
+  /** Monthly quota for this key (200 on the free tier). */
+  limit: number;
   remaining: number;
+  /** 'YYYY-MM' of the quota window. */
   month: string;
 }
 
@@ -238,6 +362,78 @@ export interface HealthInfo {
   bic_database_entries: number;
   ch_clearing_entries?: number;
   bic_data_last_updated?: string;
+  databases?: Record<string, string>;
+}
+
+/** GET /v1/iban/structure — every country the API can parse. Free. */
+export interface IBANStructureList {
+  total: number;
+  countries: Array<{
+    code: string;
+    name: string;
+    iban_length: number;
+    sepa_member: boolean;
+    has_bban_structure: boolean;
+    has_example: boolean;
+  }>;
+  endpoint_per_country: string;
+  cost_usdc?: number;
+}
+
+/** GET /v1/iban/structure/:country — one country's BBAN template. Free. */
+export interface IBANStructure {
+  country: Country;
+  iban_length: number;
+  bban_length: number;
+  bban: Record<string, { start: number; length: number; charset: string }>;
+  bban_pattern: string;
+  sepa?: SEPA;
+  example_iban?: string;
+  /** Warns that the registry's example may carry an unallocated bank code. */
+  example_iban_note?: string;
+  notes?: string;
+  upgrade_hint?: string;
+  cost_usdc?: number;
+}
+
+/**
+ * GET /v1/test-iban — structurally valid IBANs whose BANK CODE is real
+ * (drawn from the national register we serve) and whose account digits are
+ * random. The `proof` block carries the register row, so a reviewer can check
+ * the claim instead of believing it.
+ */
+export interface TestIbanResult {
+  test_ibans: Array<{
+    iban: string;
+    formatted: string;
+    country: string;
+    proof: { bank_code_check: BankCodeCheck; bic?: BIC | null };
+    note: string;
+  }>;
+  disclaimer: string;
+  docs?: string;
+  cost_usdc?: number;
+}
+
+/** GET /v1/credits/bundles — prepaid packs, free to list. */
+export interface CreditBundleList {
+  bundles: Array<{
+    slug: string;
+    credits: number;
+    price_usdc: number;
+    price_per_call_usdc: number;
+    buy_endpoint: string;
+  }>;
+  payment_method: string;
+  documentation?: string;
+}
+
+/** GET /v1/demo — worked examples, no key, no payment. */
+export interface DemoResult {
+  message: string;
+  iban_examples?: IBANValidationResult[];
+  bic_examples?: BICLookupResult[];
+  compliance_example?: unknown;
 }
 
 // ─── Internal: map HTTP status → typed error ─────────────────────────────────
@@ -269,8 +465,11 @@ export class IBANforge {
   private readonly timeoutMs: number;
 
   constructor(config: IBANforgeConfig = {}) {
-    this.baseUrl = (config.baseUrl || DEFAULT_BASE_URL).replace(/\/+$/, '');
-    this.apiKey = config.apiKey;
+    // Explicit config wins, then the environment, then production. Resolved per
+    // instance rather than at module load so a test (or a process that sets the
+    // variable late) is not fighting an import-time snapshot.
+    this.baseUrl = (config.baseUrl || readEnv('IBANFORGE_API_BASE') || DEFAULT_BASE_URL).replace(/\/+$/, '');
+    this.apiKey = config.apiKey ?? readEnv('IBANFORGE_API_KEY');
     this.timeoutMs = config.timeoutMs ?? 30_000;
   }
 
@@ -352,11 +551,62 @@ export class IBANforge {
     return this.get(`/v1/ch/clearing/${encodeURIComponent(String(iid))}`);
   }
 
+  // ---- Reference data (all FREE, no key needed) ----
+
+  /** Every country the API can parse, with its IBAN length. FREE. */
+  ibanStructures(): Promise<IBANStructureList> {
+    return this.get('/v1/iban/structure');
+  }
+
+  /** One country's BBAN template — field offsets, lengths, charsets. FREE. */
+  ibanStructure(country: string): Promise<IBANStructure> {
+    return this.get(`/v1/iban/structure/${encodeURIComponent(country)}`);
+  }
+
+  /**
+   * Test IBANs whose bank code is REALLY allocated, with the register row that
+   * proves it. FREE.
+   *
+   * Use this instead of the SWIFT registry's illustration for fixtures and
+   * demos: that one's bank code belongs to nobody, so every enrichment field
+   * comes back null and your test looks like the API failed.
+   */
+  testIban(options: { country?: string; count?: number } = {}): Promise<TestIbanResult> {
+    const q = new URLSearchParams();
+    if (options.country) q.set('country', options.country);
+    if (options.count !== undefined) q.set('count', String(options.count));
+    const suffix = q.toString();
+    return this.get(`/v1/test-iban${suffix ? `?${suffix}` : ''}`);
+  }
+
+  /** Prepaid credit packs and their per-call price. FREE to list. */
+  creditBundles(): Promise<CreditBundleList> {
+    return this.get('/v1/credits/bundles');
+  }
+
+  /** Worked examples of every endpoint, no key and no payment. FREE. */
+  demo(): Promise<DemoResult> {
+    return this.get('/v1/demo');
+  }
+
   // ---- API keys ----
 
-  /** Create a free API key (200 requests/month). The key is shown ONCE. */
-  static async generateApiKey(email: string, config: { baseUrl?: string; timeoutMs?: number } = {}): Promise<APIKey> {
-    return new IBANforge(config).post('/v1/keys/generate', { email });
+  /**
+   * Create a free API key (200 requests/month). The key is shown ONCE.
+   *
+   * Use a real mailbox: fictional and disposable domains (`example.com`,
+   * `mailinator`, …) are refused with `disposable_email`. A second key from the
+   * same network within seven days answers 403 `verification_required` and
+   * mails a six-digit code — repeat the call as `{ email, code }` to claim it.
+   */
+  static async generateApiKey(
+    email: string,
+    config: { baseUrl?: string; timeoutMs?: number; code?: string } = {},
+  ): Promise<APIKey> {
+    const { code, ...clientConfig } = config;
+    const body: { email: string; code?: string } = { email };
+    if (code) body.code = code;
+    return new IBANforge(clientConfig).post('/v1/keys/generate', body);
   }
 
   /** Current month's quota usage for the configured API key. */

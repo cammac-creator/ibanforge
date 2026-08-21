@@ -10,8 +10,11 @@ Quick start:
 
     from ibanforge import IBANforge
     client = IBANforge(api_key="ifk_...")
-    out = client.validate_iban("CH9300762011623852957")
+    out = client.validate_iban("CH1000230000000012345")
     print(out["valid"], (out.get("bic") or {}).get("bank_name"))
+
+`api_key` and `base_url` fall back to the IBANFORGE_API_KEY and
+IBANFORGE_API_BASE environment variables — the same names the MCP server reads.
 
 For asyncio (FastAPI, langchain async, fan-out concurrency):
 

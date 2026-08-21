@@ -1,0 +1,2169 @@
+{
+  "_comment": [
+    "Real IBANforge API responses, replayed by the README-execution test of BOTH SDKs.",
+    "This file is DATA, never hand-edited: run `node sdks/fixtures/record.mjs <base-url>`.",
+    "`--check` re-plays every request and fails on any difference — that is the pre-publish gate.",
+    "Every call listed here is one a README block actually makes. Adding a call to a README",
+    "without adding it here makes the stub answer 599 and the test fail, on purpose.",
+    "Recorded against a server in IBANFORGE_FREE_MODE=true, so `cost_usdc` reads 0 here; production charges the price listed in the README table. No README asserts on it.",
+    "`used_by` says which README(s) exercise the call. Each SDK's test asserts both directions: nothing it uses is unlisted, nothing listed for it goes unused."
+  ],
+  "recorded_at": "2026-08-21T05:34:53.406Z",
+  "recorded_against": "local server, IBANFORGE_FREE_MODE=true",
+  "api_version": "1.4.3",
+  "calls": [
+    {
+      "name": "keys-generate",
+      "why": "the one-line free key. The address must survive our own disposable-domain guard. Recorded FIRST: the key it returns authenticates every call below, so recording needs no key handed in. `--check` skips it — a second creation from the same network is legitimately guarded (403/429), not drift.",
+      "first_run_only": true,
+      "used_by": [
+        "typescript",
+        "python"
+      ],
+      "request": {
+        "method": "POST",
+        "path": "/v1/keys/generate",
+        "body": {
+          "email": "you@company.com"
+        }
+      },
+      "response": {
+        "status": 201,
+        "body": {
+          "api_key": "ifk_REDACTED",
+          "key_prefix": "ifk_REDACTED",
+          "email": "you@company.com",
+          "monthly_limit": 200,
+          "message": "Save this key — it will not be shown again.",
+          "terms_url": "https://ibanforge.com/legal/terms"
+        }
+      }
+    },
+    {
+      "name": "format-ok",
+      "why": "quickstart, both SDKs — the free pre-flight check, no key",
+      "used_by": [
+        "typescript",
+        "python"
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/v1/iban/format",
+        "query": {
+          "iban": "CH1000230000000012345"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "iban": "CH1000230000000012345",
+          "formatted": "CH10 0023 0000 0000 1234 5",
+          "valid": true,
+          "country": {
+            "code": "CH",
+            "name": "Switzerland"
+          },
+          "check_digits": "10",
+          "bban": {
+            "bank_code": "00230",
+            "account_number": "000000012345"
+          },
+          "upgrade_to_full_validation": "POST /v1/iban/validate ($0.005) — adds BIC, SEPA, VoP, sanctions, Swiss BC-Nummer."
+        }
+      }
+    },
+    {
+      "name": "format-checksum-failed",
+      "why": "a bad IBAN is a 200 with valid:false, NOT an exception — the trap the old Python README got wrong",
+      "used_by": [
+        "typescript",
+        "python"
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/v1/iban/format",
+        "query": {
+          "iban": "CH93007620116238529XX"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "iban": "CH93007620116238529XX",
+          "valid": false,
+          "error": "checksum_failed",
+          "error_detail": "Modulo 97 check returned 95, expected 1.",
+          "upgrade_to_full_validation": "POST /v1/iban/validate ($0.005) — adds BIC, SEPA, VoP, sanctions, Swiss BC-Nummer."
+        }
+      }
+    },
+    {
+      "name": "validate-verified",
+      "why": "quickstart, both SDKs — BIC + Swiss clearing + bank_code_check on a register-allocated code",
+      "used_by": [
+        "typescript",
+        "python"
+      ],
+      "request": {
+        "method": "POST",
+        "path": "/v1/iban/validate",
+        "body": {
+          "iban": "CH1000230000000012345"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "iban": "CH1000230000000012345",
+          "valid": true,
+          "country": {
+            "code": "CH",
+            "name": "Switzerland"
+          },
+          "check_digits": "10",
+          "bban": {
+            "bank_code": "00230",
+            "account_number": "000000012345"
+          },
+          "sepa": {
+            "member": true,
+            "schemes": [
+              "SCT",
+              "SDD"
+            ],
+            "vop_required": false,
+            "vop_participant": false
+          },
+          "formatted": "CH10 0023 0000 0000 1234 5",
+          "cost_usdc": 0,
+          "bic": {
+            "code": "UBSWCHZH",
+            "bank_name": "UBS Switzerland AG",
+            "city": "Zürich",
+            "source": "IBANforge curated bank-code map",
+            "as_of": "2026-08"
+          },
+          "issuer": {
+            "type": "bank",
+            "name": "UBS Switzerland AG",
+            "classification": "default"
+          },
+          "risk_indicators": {
+            "issuer_type": "bank",
+            "country_risk": "standard",
+            "test_bic": false,
+            "sepa_reachable": true,
+            "sepa_reachable_scope": "country",
+            "vop_coverage": false
+          },
+          "bank_code_check": {
+            "value": "00230",
+            "status": "verified",
+            "match": "register",
+            "register": "SIX BankMaster (Swiss IID / BC-Nummer register)",
+            "authoritative": true,
+            "institution": {
+              "name": "UBS Switzerland AG",
+              "street": "Bahnhofstrasse 45",
+              "post_code": "8098",
+              "town": "Zürich",
+              "country": "CH"
+            },
+            "as_of": "2026-08"
+          },
+          "clearing": {
+            "iid": "00230",
+            "name": "UBS Switzerland AG",
+            "type": "bank",
+            "town": "Zürich",
+            "sic": true,
+            "instant_payments_chf": true,
+            "eurosic": true,
+            "qr_iid": "30005",
+            "qr_iid_source": "register",
+            "qr_iids": [
+              "30005",
+              "30308"
+            ]
+          },
+          "next_steps": [
+            {
+              "code": "screen_compliance",
+              "do": "Screen the institution against sanctions, FATF status and VoP reachability before the transfer. That endpoint reads the same bank-code verdict as this one, so it will not score an unconfirmed code as an ordinary bank.",
+              "because": "bank_code_check.status is verified, so there is an institution to screen",
+              "action": "POST /v1/iban/compliance"
+            }
+          ],
+          "processing_ms": 125.76
+        }
+      }
+    },
+    {
+      "name": "validate-not-in-register",
+      "why": "the differentiator block: structurally valid, bank code held by nobody",
+      "used_by": [
+        "typescript",
+        "python"
+      ],
+      "request": {
+        "method": "POST",
+        "path": "/v1/iban/validate",
+        "body": {
+          "iban": "CH9300762011623852957"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "iban": "CH9300762011623852957",
+          "valid": true,
+          "country": {
+            "code": "CH",
+            "name": "Switzerland"
+          },
+          "check_digits": "93",
+          "bban": {
+            "bank_code": "00762",
+            "account_number": "011623852957"
+          },
+          "sepa": {
+            "member": true,
+            "schemes": [
+              "SCT",
+              "SDD"
+            ],
+            "vop_required": false,
+            "vop_participant": null
+          },
+          "formatted": "CH93 0076 2011 6238 5295 7",
+          "cost_usdc": 0,
+          "bic": null,
+          "risk_indicators": {
+            "issuer_type": null,
+            "country_risk": "standard",
+            "test_bic": false,
+            "sepa_reachable": true,
+            "sepa_reachable_scope": "country",
+            "vop_coverage": false
+          },
+          "bank_code_check": {
+            "value": "00762",
+            "status": "not_in_register",
+            "match": null,
+            "register": "SIX BankMaster (Swiss IID / BC-Nummer register)",
+            "authoritative": true,
+            "as_of": "2026-08"
+          },
+          "clearing": null,
+          "next_steps": [
+            {
+              "code": "bank_code_not_allocated",
+              "do": "Do not send. The bank code is absent from the national register, so no institution holds this account.",
+              "because": "bank_code_check.status is not_in_register and authoritative is true (SIX BankMaster (Swiss IID / BC-Nummer register))"
+            }
+          ],
+          "processing_ms": 18.91
+        }
+      }
+    },
+    {
+      "name": "validate-de",
+      "why": "the async fan-out block of the Python README validates this one alongside the CH IBAN",
+      "used_by": [
+        "python"
+      ],
+      "request": {
+        "method": "POST",
+        "path": "/v1/iban/validate",
+        "body": {
+          "iban": "DE89370400440532013000"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "iban": "DE89370400440532013000",
+          "valid": true,
+          "country": {
+            "code": "DE",
+            "name": "Germany"
+          },
+          "check_digits": "89",
+          "bban": {
+            "bank_code": "37040044",
+            "account_number": "0532013000"
+          },
+          "sepa": {
+            "member": true,
+            "schemes": [
+              "SCT",
+              "SDD",
+              "SCT_INST"
+            ],
+            "vop_required": true,
+            "vop_participant": true
+          },
+          "formatted": "DE89 3704 0044 0532 0130 00",
+          "cost_usdc": 0,
+          "bic": {
+            "code": "COBADEFFXXX",
+            "bank_name": "Commerzbank",
+            "city": "Köln",
+            "source": "Deutsche Bundesbank Bankleitzahlendatei",
+            "as_of": "2026-08"
+          },
+          "issuer": {
+            "type": "bank",
+            "name": "Commerzbank",
+            "classification": "default"
+          },
+          "risk_indicators": {
+            "issuer_type": "bank",
+            "country_risk": "standard",
+            "test_bic": false,
+            "sepa_reachable": true,
+            "sepa_reachable_scope": "country",
+            "vop_coverage": true
+          },
+          "bank_code_check": {
+            "value": "37040044",
+            "status": "verified",
+            "match": "register",
+            "register": "Deutsche Bundesbank Bankleitzahlendatei",
+            "authoritative": true,
+            "institution": {
+              "name": "Commerzbank",
+              "street": null,
+              "post_code": "50447",
+              "town": "Köln",
+              "country": "DE"
+            },
+            "as_of": "2026-08"
+          },
+          "next_steps": [
+            {
+              "code": "screen_compliance",
+              "do": "Screen the institution against sanctions, FATF status and VoP reachability before the transfer. That endpoint reads the same bank-code verdict as this one, so it will not score an unconfirmed code as an ordinary bank.",
+              "because": "bank_code_check.status is verified, so there is an institution to screen",
+              "action": "POST /v1/iban/compliance"
+            }
+          ],
+          "processing_ms": 47.99
+        }
+      }
+    },
+    {
+      "name": "batch",
+      "why": "batch block, both SDKs",
+      "used_by": [
+        "typescript",
+        "python"
+      ],
+      "request": {
+        "method": "POST",
+        "path": "/v1/iban/batch",
+        "body": {
+          "ibans": [
+            "CH1000230000000012345",
+            "DE89370400440532013000"
+          ]
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "results": [
+            {
+              "iban": "CH1000230000000012345",
+              "valid": true,
+              "country": {
+                "code": "CH",
+                "name": "Switzerland"
+              },
+              "check_digits": "10",
+              "bban": {
+                "bank_code": "00230",
+                "account_number": "000000012345"
+              },
+              "sepa": {
+                "member": true,
+                "schemes": [
+                  "SCT",
+                  "SDD"
+                ],
+                "vop_required": false,
+                "vop_participant": false
+              },
+              "formatted": "CH10 0023 0000 0000 1234 5",
+              "cost_usdc": 0,
+              "bic": {
+                "code": "UBSWCHZH",
+                "bank_name": "UBS Switzerland AG",
+                "city": "Zürich",
+                "source": "IBANforge curated bank-code map",
+                "as_of": "2026-08"
+              },
+              "issuer": {
+                "type": "bank",
+                "name": "UBS Switzerland AG",
+                "classification": "default"
+              },
+              "risk_indicators": {
+                "issuer_type": "bank",
+                "country_risk": "standard",
+                "test_bic": false,
+                "sepa_reachable": true,
+                "sepa_reachable_scope": "country",
+                "vop_coverage": false
+              },
+              "bank_code_check": {
+                "value": "00230",
+                "status": "verified",
+                "match": "register",
+                "register": "SIX BankMaster (Swiss IID / BC-Nummer register)",
+                "authoritative": true,
+                "institution": {
+                  "name": "UBS Switzerland AG",
+                  "street": "Bahnhofstrasse 45",
+                  "post_code": "8098",
+                  "town": "Zürich",
+                  "country": "CH"
+                },
+                "as_of": "2026-08"
+              },
+              "clearing": {
+                "iid": "00230",
+                "name": "UBS Switzerland AG",
+                "type": "bank",
+                "town": "Zürich",
+                "sic": true,
+                "instant_payments_chf": true,
+                "eurosic": true,
+                "qr_iid": "30005",
+                "qr_iid_source": "register",
+                "qr_iids": [
+                  "30005",
+                  "30308"
+                ]
+              },
+              "next_steps": [
+                {
+                  "code": "screen_compliance",
+                  "do": "Screen the institution against sanctions, FATF status and VoP reachability before the transfer. That endpoint reads the same bank-code verdict as this one, so it will not score an unconfirmed code as an ordinary bank.",
+                  "because": "bank_code_check.status is verified, so there is an institution to screen",
+                  "action": "POST /v1/iban/compliance"
+                }
+              ]
+            },
+            {
+              "iban": "DE89370400440532013000",
+              "valid": true,
+              "country": {
+                "code": "DE",
+                "name": "Germany"
+              },
+              "check_digits": "89",
+              "bban": {
+                "bank_code": "37040044",
+                "account_number": "0532013000"
+              },
+              "sepa": {
+                "member": true,
+                "schemes": [
+                  "SCT",
+                  "SDD",
+                  "SCT_INST"
+                ],
+                "vop_required": true,
+                "vop_participant": true
+              },
+              "formatted": "DE89 3704 0044 0532 0130 00",
+              "cost_usdc": 0,
+              "bic": {
+                "code": "COBADEFFXXX",
+                "bank_name": "Commerzbank",
+                "city": "Köln",
+                "source": "Deutsche Bundesbank Bankleitzahlendatei",
+                "as_of": "2026-08"
+              },
+              "issuer": {
+                "type": "bank",
+                "name": "Commerzbank",
+                "classification": "default"
+              },
+              "risk_indicators": {
+                "issuer_type": "bank",
+                "country_risk": "standard",
+                "test_bic": false,
+                "sepa_reachable": true,
+                "sepa_reachable_scope": "country",
+                "vop_coverage": true
+              },
+              "bank_code_check": {
+                "value": "37040044",
+                "status": "verified",
+                "match": "register",
+                "register": "Deutsche Bundesbank Bankleitzahlendatei",
+                "authoritative": true,
+                "institution": {
+                  "name": "Commerzbank",
+                  "street": null,
+                  "post_code": "50447",
+                  "town": "Köln",
+                  "country": "DE"
+                },
+                "as_of": "2026-08"
+              },
+              "next_steps": [
+                {
+                  "code": "screen_compliance",
+                  "do": "Screen the institution against sanctions, FATF status and VoP reachability before the transfer. That endpoint reads the same bank-code verdict as this one, so it will not score an unconfirmed code as an ordinary bank.",
+                  "because": "bank_code_check.status is verified, so there is an institution to screen",
+                  "action": "POST /v1/iban/compliance"
+                }
+              ]
+            }
+          ],
+          "count": 2,
+          "valid_count": 2,
+          "cost_usdc": 0,
+          "processing_ms": 77.63
+        }
+      }
+    },
+    {
+      "name": "bic-lookup",
+      "why": "BIC lookup block, both SDKs",
+      "used_by": [
+        "typescript",
+        "python"
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/v1/bic/UBSWCHZH80A"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "bic": "UBSWCHZH80A",
+          "bic8": "UBSWCHZH",
+          "bic11": "UBSWCHZH80A",
+          "found": true,
+          "valid_format": true,
+          "institution": "UBS Switzerland AG",
+          "country": {
+            "code": "CH",
+            "name": "Switzerland"
+          },
+          "city": "Zurich",
+          "address": {
+            "type": "registered",
+            "street": "Bahnhofstrasse 45",
+            "post_code": "8001",
+            "region": "CH-ZH",
+            "city": "Zurich",
+            "country": "CH",
+            "romanized": "Bahnhofstrasse 45",
+            "romanization": "original_latin",
+            "source": "GLEIF",
+            "language": "en",
+            "as_of": "2025-12-29"
+          },
+          "address_available": true,
+          "branch_code": "80A",
+          "branch_info": null,
+          "lei": "549300WOIFUSNYH0FL22",
+          "lei_status": "ACTIVE",
+          "is_test_bic": false,
+          "source": "gleif",
+          "cost_usdc": 0,
+          "processing_ms": 0.61
+        }
+      }
+    },
+    {
+      "name": "bic-invalid-format",
+      "why": "typed-error block: the one 4xx a reader can reproduce without a wallet",
+      "used_by": [
+        "typescript",
+        "python"
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/v1/bic/NOTABIC"
+      },
+      "response": {
+        "status": 400,
+        "body": {
+          "error": "invalid_bic_format",
+          "message": "BIC code must be 8 or 11 alphanumeric characters"
+        }
+      }
+    },
+    {
+      "name": "ch-clearing",
+      "why": "Swiss clearing block, both SDKs",
+      "used_by": [
+        "typescript",
+        "python"
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/v1/ch/clearing/230"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "iid": "00230",
+          "found": true,
+          "institution": {
+            "name": "UBS Switzerland AG",
+            "type": "bank",
+            "iid_type": "headquarters",
+            "headquarters_iid": "00230"
+          },
+          "address": {
+            "street": "Bahnhofstrasse",
+            "building_number": "45",
+            "post_code": "8098",
+            "town": "Zürich",
+            "country": "CH"
+          },
+          "bic": "UBSWCHZH80A",
+          "payment_services": {
+            "sic": true,
+            "rtgs_chf": true,
+            "instant_payments_chf": true,
+            "eurosic": true,
+            "lsv_bdd_chf": true,
+            "lsv_bdd_eur": true
+          },
+          "sic_iid": "002301",
+          "qr_iid": "30005",
+          "qr_iid_source": "register",
+          "qr_iids": [
+            "30005",
+            "30308"
+          ],
+          "valid_on": "2026-08-03",
+          "cost_usdc": 0,
+          "processing_ms": 0.06
+        }
+      }
+    },
+    {
+      "name": "compliance",
+      "why": "compliance block — the score lives under compliance.*, never at top level",
+      "used_by": [
+        "typescript",
+        "python"
+      ],
+      "request": {
+        "method": "POST",
+        "path": "/v1/iban/compliance",
+        "body": {
+          "iban": "GB29NWBK60161331926819"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "iban": "GB29NWBK60161331926819",
+          "valid": true,
+          "country": {
+            "code": "GB",
+            "name": "United Kingdom"
+          },
+          "check_digits": "29",
+          "bban": {
+            "bank_code": "NWBK",
+            "account_number": "31926819",
+            "branch_code": "601613"
+          },
+          "sepa": {
+            "member": true,
+            "schemes": [
+              "SCT",
+              "SDD"
+            ],
+            "vop_required": false,
+            "vop_participant": false
+          },
+          "formatted": "GB29 NWBK 6016 1331 9268 19",
+          "cost_usdc": 0,
+          "bic": {
+            "code": "NWBKGB2L",
+            "bank_name": "NatWest",
+            "city": "London",
+            "source": "IBANforge curated bank-code map",
+            "as_of": "2026-08"
+          },
+          "issuer": {
+            "type": "bank",
+            "name": "NatWest",
+            "classification": "default"
+          },
+          "risk_indicators": {
+            "issuer_type": "bank",
+            "country_risk": "standard",
+            "test_bic": false,
+            "sepa_reachable": true,
+            "sepa_reachable_scope": "country",
+            "vop_coverage": false
+          },
+          "bank_code_check": {
+            "value": "NWBK",
+            "status": "verified",
+            "match": "register",
+            "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+            "authoritative": false,
+            "as_of": "2026-08"
+          },
+          "modulus_check": {
+            "checked": true,
+            "passed": true,
+            "source": "Vocalink modulus weight table (published for Pay.UK)",
+            "table_fetched_on": "2026-08-14"
+          },
+          "next_steps": [
+            {
+              "code": "screen_compliance",
+              "do": "Screen the institution against sanctions, FATF status and VoP reachability before the transfer. That endpoint reads the same bank-code verdict as this one, so it will not score an unconfirmed code as an ordinary bank.",
+              "because": "bank_code_check.status is verified, so there is an institution to screen",
+              "action": "POST /v1/iban/compliance"
+            }
+          ],
+          "compliance": {
+            "sanctions": {
+              "country_sanctioned": false,
+              "bank_sanctioned": false,
+              "matched_lists": [],
+              "fatf_status": "member",
+              "bank_screened": true
+            },
+            "reachability": {
+              "sepa_instant": false,
+              "sct": true,
+              "sdd": true,
+              "screened": true
+            },
+            "vop": {
+              "participant": false,
+              "status": "not_found",
+              "screened": true
+            },
+            "risk_score": 10,
+            "risk_level": "low",
+            "flags": [
+              "no_sepa_instant",
+              "no_vop"
+            ]
+          },
+          "meta": {
+            "scope": "bank_bic_only",
+            "disclaimer": "Informational triage only — NOT a regulated AML/CFT product. Sanctions screening is performed at the BANK (BIC8) level: it flags the holding institution, NOT the beneficiary / account-holder name. Most sanctions designations target persons and companies, which this does not screen. Use a regulated provider (Refinitiv, ComplyAdvantage, etc.) for name-level KYC/AML obligations.",
+            "sanctions_as_of": "2026-08-21T04:57:05.198Z",
+            "fatf_as_of": "2026-06",
+            "sources": "EU,OFAC,UN,FATF,EPC-SCT,EPC-SCT_INST,EPC-SDD",
+            "country_risk_as_of": "2026-07",
+            "country_risk_scope": "risk_indicators.country_risk is a separate editorial AML axis (offshore centres, conflict zones, EBA-flagged jurisdictions) layered ON TOP of compliance.sanctions.fatf_status, not a restatement of it. The two can disagree on a country by design; each carries its own review date."
+          },
+          "processing_ms": 30.36
+        }
+      }
+    },
+    {
+      "name": "keys-usage-wrong-key",
+      "why": "typed-error block: a mistyped key is a 401 AuthError. Listed BEFORE keys-usage: the stub takes the first match.",
+      "used_by": [
+        "typescript",
+        "python"
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/v1/keys/usage",
+        "headers": {
+          "Authorization": "Bearer ifk_wrong"
+        }
+      },
+      "response": {
+        "status": 401,
+        "body": {
+          "error": "invalid_key",
+          "message": "API key not found or inactive"
+        }
+      }
+    },
+    {
+      "name": "keys-usage",
+      "why": "usage() block — the real shape is {used, limit, remaining}, not {monthly_limit, used_this_month}",
+      "needs_key": true,
+      "used_by": [
+        "typescript",
+        "python"
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/v1/keys/usage"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "used": 10,
+          "limit": 200,
+          "remaining": 190,
+          "month": "2026-08",
+          "key_prefix": "ifk_REDACTED"
+        }
+      }
+    },
+    {
+      "name": "health",
+      "why": "health() block",
+      "used_by": [
+        "typescript",
+        "python"
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/health"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "status": "ok",
+          "version": "1.4.3",
+          "uptime_seconds": 1,
+          "bic_database_entries": 121716,
+          "ch_clearing_entries": 1165,
+          "bic_data_last_updated": "2026-08-01 04:16:12",
+          "databases": {
+            "bic": "ok",
+            "stats": "ok",
+            "compliance": "ok"
+          }
+        }
+      }
+    },
+    {
+      "name": "iban-structures",
+      "why": "new in 1.4.x: the free country list",
+      "used_by": [
+        "typescript",
+        "python"
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/v1/iban/structure"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "total": 89,
+          "countries": [
+            {
+              "code": "AD",
+              "name": "Andorra",
+              "iban_length": 24,
+              "sepa_member": true,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "AE",
+              "name": "United Arab Emirates",
+              "iban_length": 23,
+              "sepa_member": false,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "AL",
+              "name": "Albania",
+              "iban_length": 28,
+              "sepa_member": false,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "AT",
+              "name": "Austria",
+              "iban_length": 20,
+              "sepa_member": true,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "AZ",
+              "name": "Azerbaijan",
+              "iban_length": 28,
+              "sepa_member": false,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "BA",
+              "name": "Bosnia and Herzegovina",
+              "iban_length": 20,
+              "sepa_member": false,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "BE",
+              "name": "Belgium",
+              "iban_length": 16,
+              "sepa_member": true,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "BG",
+              "name": "Bulgaria",
+              "iban_length": 22,
+              "sepa_member": true,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "BH",
+              "name": "Bahrain",
+              "iban_length": 22,
+              "sepa_member": false,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "BI",
+              "name": "Burundi",
+              "iban_length": 27,
+              "sepa_member": false,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "BR",
+              "name": "Brazil",
+              "iban_length": 29,
+              "sepa_member": false,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "BY",
+              "name": "Belarus",
+              "iban_length": 28,
+              "sepa_member": false,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "CH",
+              "name": "Switzerland",
+              "iban_length": 21,
+              "sepa_member": true,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "CR",
+              "name": "Costa Rica",
+              "iban_length": 22,
+              "sepa_member": false,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "CY",
+              "name": "Cyprus",
+              "iban_length": 28,
+              "sepa_member": true,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "CZ",
+              "name": "Czech Republic",
+              "iban_length": 24,
+              "sepa_member": true,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "DE",
+              "name": "Germany",
+              "iban_length": 22,
+              "sepa_member": true,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "DJ",
+              "name": "Djibouti",
+              "iban_length": 27,
+              "sepa_member": false,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "DK",
+              "name": "Denmark",
+              "iban_length": 18,
+              "sepa_member": true,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "DO",
+              "name": "Dominican Republic",
+              "iban_length": 28,
+              "sepa_member": false,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "EE",
+              "name": "Estonia",
+              "iban_length": 20,
+              "sepa_member": true,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "EG",
+              "name": "Egypt",
+              "iban_length": 29,
+              "sepa_member": false,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "ES",
+              "name": "Spain",
+              "iban_length": 24,
+              "sepa_member": true,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "FI",
+              "name": "Finland",
+              "iban_length": 18,
+              "sepa_member": true,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "FK",
+              "name": "Falkland Islands",
+              "iban_length": 18,
+              "sepa_member": false,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "FO",
+              "name": "Faroe Islands",
+              "iban_length": 18,
+              "sepa_member": true,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "FR",
+              "name": "France",
+              "iban_length": 27,
+              "sepa_member": true,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "GB",
+              "name": "United Kingdom",
+              "iban_length": 22,
+              "sepa_member": true,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "GE",
+              "name": "Georgia",
+              "iban_length": 22,
+              "sepa_member": false,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "GI",
+              "name": "Gibraltar",
+              "iban_length": 23,
+              "sepa_member": true,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "GL",
+              "name": "Greenland",
+              "iban_length": 18,
+              "sepa_member": true,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "GR",
+              "name": "Greece",
+              "iban_length": 27,
+              "sepa_member": true,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "GT",
+              "name": "Guatemala",
+              "iban_length": 28,
+              "sepa_member": false,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "HN",
+              "name": "Honduras",
+              "iban_length": 28,
+              "sepa_member": false,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "HR",
+              "name": "Croatia",
+              "iban_length": 21,
+              "sepa_member": true,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "HU",
+              "name": "Hungary",
+              "iban_length": 28,
+              "sepa_member": true,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "IE",
+              "name": "Ireland",
+              "iban_length": 22,
+              "sepa_member": true,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "IL",
+              "name": "Israel",
+              "iban_length": 23,
+              "sepa_member": false,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "IQ",
+              "name": "Iraq",
+              "iban_length": 23,
+              "sepa_member": false,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "IS",
+              "name": "Iceland",
+              "iban_length": 26,
+              "sepa_member": true,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "IT",
+              "name": "Italy",
+              "iban_length": 27,
+              "sepa_member": true,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "JO",
+              "name": "Jordan",
+              "iban_length": 30,
+              "sepa_member": false,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "KW",
+              "name": "Kuwait",
+              "iban_length": 30,
+              "sepa_member": false,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "KZ",
+              "name": "Kazakhstan",
+              "iban_length": 20,
+              "sepa_member": false,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "LB",
+              "name": "Lebanon",
+              "iban_length": 28,
+              "sepa_member": false,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "LC",
+              "name": "Saint Lucia",
+              "iban_length": 32,
+              "sepa_member": false,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "LI",
+              "name": "Liechtenstein",
+              "iban_length": 21,
+              "sepa_member": true,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "LT",
+              "name": "Lithuania",
+              "iban_length": 20,
+              "sepa_member": true,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "LU",
+              "name": "Luxembourg",
+              "iban_length": 20,
+              "sepa_member": true,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "LV",
+              "name": "Latvia",
+              "iban_length": 21,
+              "sepa_member": true,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "LY",
+              "name": "Libya",
+              "iban_length": 25,
+              "sepa_member": false,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "MC",
+              "name": "Monaco",
+              "iban_length": 27,
+              "sepa_member": true,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "MD",
+              "name": "Moldova",
+              "iban_length": 24,
+              "sepa_member": false,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "ME",
+              "name": "Montenegro",
+              "iban_length": 22,
+              "sepa_member": false,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "MK",
+              "name": "North Macedonia",
+              "iban_length": 19,
+              "sepa_member": false,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "MN",
+              "name": "Mongolia",
+              "iban_length": 20,
+              "sepa_member": false,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "MR",
+              "name": "Mauritania",
+              "iban_length": 27,
+              "sepa_member": false,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "MT",
+              "name": "Malta",
+              "iban_length": 31,
+              "sepa_member": true,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "MU",
+              "name": "Mauritius",
+              "iban_length": 30,
+              "sepa_member": false,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "NI",
+              "name": "Nicaragua",
+              "iban_length": 28,
+              "sepa_member": false,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "NL",
+              "name": "Netherlands",
+              "iban_length": 18,
+              "sepa_member": true,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "NO",
+              "name": "Norway",
+              "iban_length": 15,
+              "sepa_member": true,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "OM",
+              "name": "Oman",
+              "iban_length": 23,
+              "sepa_member": false,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "PK",
+              "name": "Pakistan",
+              "iban_length": 24,
+              "sepa_member": false,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "PL",
+              "name": "Poland",
+              "iban_length": 28,
+              "sepa_member": true,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "PS",
+              "name": "Palestine",
+              "iban_length": 29,
+              "sepa_member": false,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "PT",
+              "name": "Portugal",
+              "iban_length": 25,
+              "sepa_member": true,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "QA",
+              "name": "Qatar",
+              "iban_length": 29,
+              "sepa_member": false,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "RO",
+              "name": "Romania",
+              "iban_length": 24,
+              "sepa_member": true,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "RS",
+              "name": "Serbia",
+              "iban_length": 22,
+              "sepa_member": false,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "RU",
+              "name": "Russia",
+              "iban_length": 33,
+              "sepa_member": false,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "SA",
+              "name": "Saudi Arabia",
+              "iban_length": 24,
+              "sepa_member": false,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "SC",
+              "name": "Seychelles",
+              "iban_length": 31,
+              "sepa_member": false,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "SD",
+              "name": "Sudan",
+              "iban_length": 18,
+              "sepa_member": false,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "SE",
+              "name": "Sweden",
+              "iban_length": 24,
+              "sepa_member": true,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "SI",
+              "name": "Slovenia",
+              "iban_length": 19,
+              "sepa_member": true,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "SK",
+              "name": "Slovakia",
+              "iban_length": 24,
+              "sepa_member": true,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "SM",
+              "name": "San Marino",
+              "iban_length": 27,
+              "sepa_member": true,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "SO",
+              "name": "Somalia",
+              "iban_length": 23,
+              "sepa_member": false,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "ST",
+              "name": "Sao Tome and Principe",
+              "iban_length": 25,
+              "sepa_member": false,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "SV",
+              "name": "El Salvador",
+              "iban_length": 28,
+              "sepa_member": false,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "TL",
+              "name": "East Timor",
+              "iban_length": 23,
+              "sepa_member": false,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "TN",
+              "name": "Tunisia",
+              "iban_length": 24,
+              "sepa_member": false,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "TR",
+              "name": "Türkiye",
+              "iban_length": 26,
+              "sepa_member": false,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "UA",
+              "name": "Ukraine",
+              "iban_length": 29,
+              "sepa_member": false,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "VA",
+              "name": "Vatican City",
+              "iban_length": 22,
+              "sepa_member": true,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "VG",
+              "name": "British Virgin Islands",
+              "iban_length": 24,
+              "sepa_member": false,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "XK",
+              "name": "Kosovo",
+              "iban_length": 20,
+              "sepa_member": false,
+              "has_bban_structure": true,
+              "has_example": true
+            },
+            {
+              "code": "YE",
+              "name": "Yemen",
+              "iban_length": 30,
+              "sepa_member": false,
+              "has_bban_structure": true,
+              "has_example": true
+            }
+          ],
+          "endpoint_per_country": "GET /v1/iban/structure/:country",
+          "cost_usdc": 0
+        }
+      }
+    },
+    {
+      "name": "iban-structure-ch",
+      "why": "new in 1.4.x: one country's BBAN template",
+      "used_by": [
+        "typescript",
+        "python"
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/v1/iban/structure/CH"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "country": {
+            "code": "CH",
+            "name": "Switzerland"
+          },
+          "iban_length": 21,
+          "bban_length": 17,
+          "bban": {
+            "bank_code": {
+              "start": 0,
+              "length": 5,
+              "charset": "5!n"
+            },
+            "account_number": {
+              "start": 5,
+              "length": 12,
+              "charset": "12!c"
+            }
+          },
+          "bban_pattern": "5!n12!c",
+          "sepa": {
+            "member": true,
+            "schemes": [
+              "SCT",
+              "SDD"
+            ],
+            "vop_required": false
+          },
+          "example_iban": "CH9300762011623852957",
+          "example_iban_note": "Illustration from the SWIFT IBAN Registry. Its bank code is not guaranteed to be allocated, so this IBAN may come back bank_code_check.status not_in_register from POST /v1/iban/validate. That is the example being fictional, not a gap in our data.",
+          "notes": "BBAN positions are 0-indexed within the BBAN portion of the IBAN (after country code + check digits).",
+          "upgrade_hint": "Try the canonical example: GET /v1/iban/format?iban=CH9300762011623852957  or  POST /v1/iban/validate (with full enrichment, $0.005)",
+          "cost_usdc": 0
+        }
+      }
+    },
+    {
+      "name": "test-iban",
+      "why": "new in 1.4.x: a test IBAN whose bank code is REALLY allocated, with its proof",
+      "used_by": [
+        "typescript",
+        "python"
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/v1/test-iban",
+        "query": {
+          "country": "CH"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "test_ibans": [
+            {
+              "iban": "CH4208704626920706430",
+              "formatted": "CH42 0870 4626 9207 0643 0",
+              "country": "CH",
+              "proof": {
+                "bank_code_check": {
+                  "value": "08704",
+                  "status": "verified",
+                  "match": "register",
+                  "register": "SIX BankMaster (Swiss IID / BC-Nummer register)",
+                  "authoritative": true,
+                  "institution": {
+                    "name": "AEK BANK 1826 Genossenschaft",
+                    "street": "Hofstettenstrasse 2",
+                    "post_code": "3601",
+                    "town": "Thun",
+                    "country": "CH"
+                  },
+                  "as_of": "2026-08"
+                },
+                "bic": {
+                  "code": "AEKTCH22",
+                  "bank_name": "AEK BANK 1826 Genossenschaft",
+                  "city": "Thun",
+                  "source": "IBANforge curated bank-code map",
+                  "as_of": "2026-08"
+                }
+              },
+              "note": "Structurally valid test IBAN with a REAL, register-allocated bank code. The account digits are random — this is NOT a real account. Safe for demos, fixtures and integration tests."
+            }
+          ],
+          "disclaimer": "Bank codes are real (drawn from the national registers we serve); account digits are random and belong to nobody. Do not send money to these.",
+          "docs": "https://ibanforge.com/tools/test-iban",
+          "cost_usdc": 0
+        }
+      }
+    },
+    {
+      "name": "credit-bundles",
+      "why": "new in 1.4.x: prepaid packs, the way past the x402 pre-funding wall",
+      "used_by": [
+        "typescript",
+        "python"
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/v1/credits/bundles"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "bundles": [
+            {
+              "slug": "1k",
+              "credits": 1000,
+              "price_usdc": 5,
+              "price_per_call_usdc": 0.005,
+              "buy_endpoint": "POST /v1/credits/buy/1k"
+            },
+            {
+              "slug": "5k",
+              "credits": 5000,
+              "price_usdc": 20,
+              "price_per_call_usdc": 0.004,
+              "buy_endpoint": "POST /v1/credits/buy/5k"
+            },
+            {
+              "slug": "25k",
+              "credits": 25000,
+              "price_usdc": 80,
+              "price_per_call_usdc": 0.0032,
+              "buy_endpoint": "POST /v1/credits/buy/25k"
+            }
+          ],
+          "payment_method": "x402 USDC on Base mainnet",
+          "documentation": "https://ibanforge.com/agents#credits"
+        }
+      }
+    },
+    {
+      "name": "demo",
+      "why": "new in 1.4.x: free worked examples, no key",
+      "used_by": [
+        "typescript",
+        "python"
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/v1/demo"
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "message": "Demo — these results are free. Use POST /v1/iban/validate, POST /v1/iban/batch, GET /v1/bic/:code, or POST /v1/iban/compliance for your own queries.",
+          "iban_examples": [
+            {
+              "label": "UK — NatWest",
+              "iban": "GB29NWBK60161331926819",
+              "valid": true,
+              "country": {
+                "code": "GB",
+                "name": "United Kingdom"
+              },
+              "check_digits": "29",
+              "bban": {
+                "bank_code": "NWBK",
+                "account_number": "31926819",
+                "branch_code": "601613"
+              },
+              "sepa": {
+                "member": true,
+                "schemes": [
+                  "SCT",
+                  "SDD"
+                ],
+                "vop_required": false,
+                "vop_participant": false
+              },
+              "formatted": "GB29 NWBK 6016 1331 9268 19",
+              "cost_usdc": 0.005,
+              "bic": {
+                "code": "NWBKGB2L",
+                "bank_name": "NatWest",
+                "city": "London",
+                "source": "IBANforge curated bank-code map",
+                "as_of": "2026-08"
+              },
+              "issuer": {
+                "type": "bank",
+                "name": "NatWest",
+                "classification": "default"
+              },
+              "risk_indicators": {
+                "issuer_type": "bank",
+                "country_risk": "standard",
+                "test_bic": false,
+                "sepa_reachable": true,
+                "sepa_reachable_scope": "country",
+                "vop_coverage": false
+              },
+              "bank_code_check": {
+                "value": "NWBK",
+                "status": "verified",
+                "match": "register",
+                "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+                "authoritative": false,
+                "as_of": "2026-08"
+              },
+              "modulus_check": {
+                "checked": true,
+                "passed": true,
+                "source": "Vocalink modulus weight table (published for Pay.UK)",
+                "table_fetched_on": "2026-08-14"
+              },
+              "next_steps": [
+                {
+                  "code": "screen_compliance",
+                  "do": "Screen the institution against sanctions, FATF status and VoP reachability before the transfer. That endpoint reads the same bank-code verdict as this one, so it will not score an unconfirmed code as an ordinary bank.",
+                  "because": "bank_code_check.status is verified, so there is an institution to screen",
+                  "action": "POST /v1/iban/compliance"
+                }
+              ]
+            },
+            {
+              "label": "Germany — Commerzbank",
+              "iban": "DE89370400440532013000",
+              "valid": true,
+              "country": {
+                "code": "DE",
+                "name": "Germany"
+              },
+              "check_digits": "89",
+              "bban": {
+                "bank_code": "37040044",
+                "account_number": "0532013000"
+              },
+              "sepa": {
+                "member": true,
+                "schemes": [
+                  "SCT",
+                  "SDD",
+                  "SCT_INST"
+                ],
+                "vop_required": true,
+                "vop_participant": true
+              },
+              "formatted": "DE89 3704 0044 0532 0130 00",
+              "cost_usdc": 0.005,
+              "bic": {
+                "code": "COBADEFFXXX",
+                "bank_name": "Commerzbank",
+                "city": "Köln",
+                "source": "Deutsche Bundesbank Bankleitzahlendatei",
+                "as_of": "2026-08"
+              },
+              "issuer": {
+                "type": "bank",
+                "name": "Commerzbank",
+                "classification": "default"
+              },
+              "risk_indicators": {
+                "issuer_type": "bank",
+                "country_risk": "standard",
+                "test_bic": false,
+                "sepa_reachable": true,
+                "sepa_reachable_scope": "country",
+                "vop_coverage": true
+              },
+              "bank_code_check": {
+                "value": "37040044",
+                "status": "verified",
+                "match": "register",
+                "register": "Deutsche Bundesbank Bankleitzahlendatei",
+                "authoritative": true,
+                "institution": {
+                  "name": "Commerzbank",
+                  "street": null,
+                  "post_code": "50447",
+                  "town": "Köln",
+                  "country": "DE"
+                },
+                "as_of": "2026-08"
+              },
+              "next_steps": [
+                {
+                  "code": "screen_compliance",
+                  "do": "Screen the institution against sanctions, FATF status and VoP reachability before the transfer. That endpoint reads the same bank-code verdict as this one, so it will not score an unconfirmed code as an ordinary bank.",
+                  "because": "bank_code_check.status is verified, so there is an institution to screen",
+                  "action": "POST /v1/iban/compliance"
+                }
+              ]
+            },
+            {
+              "label": "Switzerland — Credit Suisse",
+              "iban": "CH5604835012345678009",
+              "valid": true,
+              "country": {
+                "code": "CH",
+                "name": "Switzerland"
+              },
+              "check_digits": "56",
+              "bban": {
+                "bank_code": "04835",
+                "account_number": "012345678009"
+              },
+              "sepa": {
+                "member": true,
+                "schemes": [
+                  "SCT",
+                  "SDD"
+                ],
+                "vop_required": false,
+                "vop_participant": false
+              },
+              "formatted": "CH56 0483 5012 3456 7800 9",
+              "cost_usdc": 0.005,
+              "bic": {
+                "code": "CRESCHZZ",
+                "bank_name": "UBS Switzerland AG (formerly Credit Suisse)",
+                "city": "Zürich",
+                "source": "IBANforge curated bank-code map",
+                "as_of": "2026-08"
+              },
+              "issuer": {
+                "type": "bank",
+                "name": "UBS Switzerland AG (formerly Credit Suisse)",
+                "classification": "default"
+              },
+              "risk_indicators": {
+                "issuer_type": "bank",
+                "country_risk": "standard",
+                "test_bic": false,
+                "sepa_reachable": true,
+                "sepa_reachable_scope": "country",
+                "vop_coverage": false
+              },
+              "bank_code_check": {
+                "value": "04835",
+                "status": "verified",
+                "match": "register",
+                "register": "SIX BankMaster (Swiss IID / BC-Nummer register)",
+                "authoritative": true,
+                "institution": {
+                  "name": "UBS Switzerland AG",
+                  "street": "Bahnhofstrasse 45",
+                  "post_code": "8098",
+                  "town": "Zürich",
+                  "country": "CH"
+                },
+                "as_of": "2026-08"
+              },
+              "clearing": {
+                "iid": "00230",
+                "name": "UBS Switzerland AG",
+                "type": "bank",
+                "town": "Zürich",
+                "sic": true,
+                "instant_payments_chf": true,
+                "eurosic": true,
+                "qr_iid": "30005",
+                "qr_iid_source": "register",
+                "qr_iids": [
+                  "30005",
+                  "30308"
+                ]
+              },
+              "next_steps": [
+                {
+                  "code": "screen_compliance",
+                  "do": "Screen the institution against sanctions, FATF status and VoP reachability before the transfer. That endpoint reads the same bank-code verdict as this one, so it will not score an unconfirmed code as an ordinary bank.",
+                  "because": "bank_code_check.status is verified, so there is an institution to screen",
+                  "action": "POST /v1/iban/compliance"
+                }
+              ]
+            },
+            {
+              "label": "France — Credit Agricole",
+              "iban": "FR7630006000011234567890189",
+              "valid": true,
+              "country": {
+                "code": "FR",
+                "name": "France"
+              },
+              "check_digits": "76",
+              "bban": {
+                "bank_code": "30006",
+                "account_number": "1234567890189",
+                "branch_code": "00001"
+              },
+              "sepa": {
+                "member": true,
+                "schemes": [
+                  "SCT",
+                  "SDD",
+                  "SCT_INST"
+                ],
+                "vop_required": true,
+                "vop_participant": true
+              },
+              "formatted": "FR76 3000 6000 0112 3456 7890 189",
+              "cost_usdc": 0.005,
+              "bic": {
+                "code": "AGRIFRPP",
+                "bank_name": "CREDIT AGRICOLE SA",
+                "city": "MONTROUGE",
+                "source": "IBANforge curated bank-code map",
+                "as_of": "2026-08"
+              },
+              "issuer": {
+                "type": "bank",
+                "name": "CREDIT AGRICOLE SA",
+                "classification": "default"
+              },
+              "risk_indicators": {
+                "issuer_type": "bank",
+                "country_risk": "standard",
+                "test_bic": false,
+                "sepa_reachable": true,
+                "sepa_reachable_scope": "country",
+                "vop_coverage": true
+              },
+              "bank_code_check": {
+                "value": "30006",
+                "status": "verified",
+                "match": "register",
+                "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+                "authoritative": false,
+                "as_of": "2026-08"
+              },
+              "next_steps": [
+                {
+                  "code": "screen_compliance",
+                  "do": "Screen the institution against sanctions, FATF status and VoP reachability before the transfer. That endpoint reads the same bank-code verdict as this one, so it will not score an unconfirmed code as an ordinary bank.",
+                  "because": "bank_code_check.status is verified, so there is an institution to screen",
+                  "action": "POST /v1/iban/compliance"
+                }
+              ]
+            }
+          ],
+          "bic_examples": [
+            {
+              "label": "UBS — Switzerland",
+              "bic": "UBSWCHZH",
+              "bic8": "UBSWCHZH",
+              "bic11": "UBSWCHZHXXX",
+              "found": true,
+              "institution": "UBS SWITZERLAND AG",
+              "country": {
+                "code": "CH",
+                "name": "Switzerland"
+              },
+              "city": "ZURICH",
+              "lei": null,
+              "cost_usdc": 0.003
+            },
+            {
+              "label": "BNP Paribas — France",
+              "bic": "BNPAFRPP",
+              "bic8": "BNPAFRPP",
+              "bic11": "BNPAFRPPXXX",
+              "found": true,
+              "institution": "BNP PARIBAS",
+              "country": {
+                "code": "FR",
+                "name": "France"
+              },
+              "city": "PARIS",
+              "lei": "R0MUWSFPU8MPRO8K5P83",
+              "cost_usdc": 0.003
+            }
+          ],
+          "compliance_example": {
+            "description": "Full compliance check for DE89370400440532013000 (Commerzbank, Germany)",
+            "endpoint": "POST /v1/iban/compliance",
+            "cost": "$0.02 USDC per call",
+            "result": {
+              "iban": "DE89370400440532013000",
+              "valid": true,
+              "country": {
+                "code": "DE",
+                "name": "Germany"
+              },
+              "check_digits": "89",
+              "bban": {
+                "bank_code": "37040044",
+                "account_number": "0532013000"
+              },
+              "sepa": {
+                "member": true,
+                "schemes": [
+                  "SCT",
+                  "SDD",
+                  "SCT_INST"
+                ],
+                "vop_required": true,
+                "vop_participant": true
+              },
+              "formatted": "DE89 3704 0044 0532 0130 00",
+              "cost_usdc": 0.02,
+              "bic": {
+                "code": "COBADEFFXXX",
+                "bank_name": "Commerzbank",
+                "city": "Köln",
+                "source": "Deutsche Bundesbank Bankleitzahlendatei",
+                "as_of": "2026-08"
+              },
+              "issuer": {
+                "type": "bank",
+                "name": "Commerzbank",
+                "classification": "default"
+              },
+              "risk_indicators": {
+                "issuer_type": "bank",
+                "country_risk": "standard",
+                "test_bic": false,
+                "sepa_reachable": true,
+                "sepa_reachable_scope": "country",
+                "vop_coverage": true
+              },
+              "bank_code_check": {
+                "value": "37040044",
+                "status": "verified",
+                "match": "register",
+                "register": "Deutsche Bundesbank Bankleitzahlendatei",
+                "authoritative": true,
+                "institution": {
+                  "name": "Commerzbank",
+                  "street": null,
+                  "post_code": "50447",
+                  "town": "Köln",
+                  "country": "DE"
+                },
+                "as_of": "2026-08"
+              },
+              "next_steps": [
+                {
+                  "code": "screen_compliance",
+                  "do": "Screen the institution against sanctions, FATF status and VoP reachability before the transfer. That endpoint reads the same bank-code verdict as this one, so it will not score an unconfirmed code as an ordinary bank.",
+                  "because": "bank_code_check.status is verified, so there is an institution to screen",
+                  "action": "POST /v1/iban/compliance"
+                }
+              ],
+              "compliance": {
+                "sanctions": {
+                  "country_sanctioned": false,
+                  "bank_sanctioned": false,
+                  "matched_lists": [],
+                  "fatf_status": "member",
+                  "bank_screened": true
+                },
+                "reachability": {
+                  "sepa_instant": true,
+                  "sct": true,
+                  "sdd": true,
+                  "screened": true
+                },
+                "vop": {
+                  "participant": true,
+                  "status": "active",
+                  "screened": true
+                },
+                "risk_score": 0,
+                "risk_level": "low",
+                "flags": []
+              },
+              "meta": {
+                "scope": "bank_bic_only",
+                "disclaimer": "Informational triage only — NOT a regulated AML/CFT product. Sanctions screening is performed at the BANK (BIC8) level: it flags the holding institution, NOT the beneficiary / account-holder name. Most sanctions designations target persons and companies, which this does not screen. Use a regulated provider (Refinitiv, ComplyAdvantage, etc.) for name-level KYC/AML obligations.",
+                "sanctions_as_of": "2026-08-21T04:57:05.198Z",
+                "fatf_as_of": "2026-06",
+                "sources": "EU,OFAC,UN,FATF,EPC-SCT,EPC-SCT_INST,EPC-SDD",
+                "country_risk_as_of": "2026-07",
+                "country_risk_scope": "risk_indicators.country_risk is a separate editorial AML axis (offshore centres, conflict zones, EBA-flagged jurisdictions) layered ON TOP of compliance.sanctions.fatf_status, not a restatement of it. The two can disagree on a country by design; each carries its own review date."
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

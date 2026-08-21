@@ -1,6 +1,6 @@
 {
   "name": "@ibanforge/sdk",
-  "version": "1.3.3",
+  "version": "1.4.3",
   "description": "Official TypeScript SDK for the IBANforge API — IBAN validation, BIC/SWIFT lookup, Swiss BC-Nummer, SEPA/VoP and compliance risk scoring, with API-key auth, typed errors and x402 support.",
   "type": "module",
   "main": "dist/index.js",

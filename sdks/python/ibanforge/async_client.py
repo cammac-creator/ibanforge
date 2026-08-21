@@ -12,15 +12,18 @@ Usage:
 
     async def main():
         async with AsyncIBANforge(api_key="ifk_...") as ibanforge:
-            out = await ibanforge.validate_iban("CH9300762011623852957")
+            out = await ibanforge.validate_iban("CH1000230000000012345")
             print(out["valid"])
 
     asyncio.run(main())
+
+Configuration falls back to the environment exactly like the sync client:
+``IBANFORGE_API_KEY`` and ``IBANFORGE_API_BASE``.
 """
 
 from __future__ import annotations
 
-from typing import Any, Iterable, Optional, Union
+from typing import Any, Dict, Iterable, Optional, Union
 
 import httpx
 
@@ -33,22 +36,28 @@ from .exceptions import (
     QuotaExhaustedError,
     RateLimitError,
 )
+from .client import DEFAULT_BASE_URL, DEFAULT_TIMEOUT, resolve_api_key, resolve_base_url
 from .types import (
     APIKey,
     APIKeyUsage,
     BICLookupResult,
+    CreditBundleList,
     CHClearingResult,
     ComplianceResult,
+    DemoResult,
     HealthInfo,
     IBANBatchResult,
     IBANFormatResult,
+    IBANStructure,
+    IBANStructureList,
     IBANValidationResult,
+    TestIbanResult,
 )
 
 from ._version import __version__
 
-DEFAULT_BASE_URL = "https://api.ibanforge.com"
-DEFAULT_TIMEOUT = 30.0
+__all__ = ["AsyncIBANforge", "DEFAULT_BASE_URL", "DEFAULT_TIMEOUT"]
+
 USER_AGENT = f"ibanforge-python/{__version__}"
 
 
@@ -92,15 +101,15 @@ class AsyncIBANforge:
         self,
         api_key: Optional[str] = None,
         *,
-        base_url: str = DEFAULT_BASE_URL,
+        base_url: Optional[str] = None,
         timeout: float = DEFAULT_TIMEOUT,
         user_agent: str = USER_AGENT,
     ) -> None:
-        self.base_url = base_url.rstrip("/")
-        self.api_key = api_key
+        self.base_url = resolve_base_url(base_url)
+        self.api_key = resolve_api_key(api_key)
         headers = {"User-Agent": user_agent}
-        if api_key:
-            headers["Authorization"] = f"Bearer {api_key}"
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
         self._client = httpx.AsyncClient(
             base_url=self.base_url, timeout=timeout, headers=headers
         )
@@ -151,15 +160,60 @@ class AsyncIBANforge:
         _raise_for_status(res)
         return res.json()
 
+    # ---- Reference data (all FREE, no key needed) ----
+
+    async def iban_structures(self) -> IBANStructureList:
+        """Every country the API can parse, with its IBAN length. FREE."""
+        res = await self._client.get("/v1/iban/structure")
+        _raise_for_status(res)
+        return res.json()
+
+    async def iban_structure(self, country: str) -> IBANStructure:
+        """One country's BBAN template — field offsets, lengths, charsets. FREE."""
+        res = await self._client.get(f"/v1/iban/structure/{country}")
+        _raise_for_status(res)
+        return res.json()
+
+    async def test_iban(
+        self, country: Optional[str] = None, count: Optional[int] = None
+    ) -> TestIbanResult:
+        """Test IBANs with a REAL, register-allocated bank code, and the proof. FREE."""
+        params: Dict[str, Any] = {}
+        if country is not None:
+            params["country"] = country
+        if count is not None:
+            params["count"] = count
+        res = await self._client.get("/v1/test-iban", params=params)
+        _raise_for_status(res)
+        return res.json()
+
+    async def credit_bundles(self) -> CreditBundleList:
+        """Prepaid credit packs and their per-call price. FREE to list."""
+        res = await self._client.get("/v1/credits/bundles")
+        _raise_for_status(res)
+        return res.json()
+
+    async def demo(self) -> DemoResult:
+        """Worked examples of every endpoint, no key and no payment. FREE."""
+        res = await self._client.get("/v1/demo")
+        _raise_for_status(res)
+        return res.json()
+
     @staticmethod
     async def generate_api_key(
         email: str,
         *,
-        base_url: str = DEFAULT_BASE_URL,
+        base_url: Optional[str] = None,
         timeout: float = DEFAULT_TIMEOUT,
+        code: Optional[str] = None,
     ) -> APIKey:
-        async with httpx.AsyncClient(base_url=base_url.rstrip("/"), timeout=timeout) as cl:
-            res = await cl.post("/v1/keys/generate", json={"email": email})
+        """Create a free API key (200 requests/month). See the sync client for
+        the disposable-domain and mailbox-verification rules."""
+        payload: Dict[str, Any] = {"email": email}
+        if code:
+            payload["code"] = code
+        async with httpx.AsyncClient(base_url=resolve_base_url(base_url), timeout=timeout) as cl:
+            res = await cl.post("/v1/keys/generate", json=payload)
             _raise_for_status(res)
             return res.json()
 
