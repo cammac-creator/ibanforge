@@ -91,7 +91,7 @@
           "host": ["{{baseUrl}}"],
           "path": ["v1", "iban", "compliance"]
         },
-        "description": "Pre-flight compliance triage before a SEPA / cross-border payment: sanctions screening (OFAC / EU / UN / SECO), FATF jurisdiction flag, SEPA Instant reachability, VoP participation. Returns a 0-100 risk score. Cost: $0.02."
+        "description": "Pre-flight compliance triage before a SEPA / cross-border payment: sanctions screening (OFAC / EU / UN), FATF jurisdiction flag, SEPA Instant reachability, VoP participation. Returns a 0-100 risk score. Cost: $0.02."
       }
     },
     {

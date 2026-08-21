@@ -62,7 +62,7 @@
     },
     {
       "name": "check_compliance",
-      "description": "Pre-flight compliance triage on an IBAN: bank-BIC-level sanctions screening (OFAC, EU) + FATF jurisdiction flag + SEPA Instant reachability + VoP (EU 2024/886) participant + risk score 0-100. No UN or SECO list is screened. Informational, not a regulated AML/CFT product. Cost: $0.02 USDC.",
+      "description": "Pre-flight compliance triage on an IBAN: bank-BIC-level sanctions screening (OFAC, EU, UN) + FATF jurisdiction flag + SEPA Instant reachability + VoP (EU 2024/886) participant + risk score 0-100. The UN axis is thin (a handful of bank BICs); no SECO (Swiss) list is screened. Informational, not a regulated AML/CFT product. Cost: $0.02 USDC.",
       "inputSchema": {
         "type": "object",
         "properties": {
