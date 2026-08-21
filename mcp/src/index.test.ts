@@ -16,7 +16,6 @@
  * The API is stubbed on localhost, which keeps the test hermetic and lets us
  * pin the payload the schema is checked against.
  */
-import { spawn } from 'node:child_process';
 import { createServer, type Server as HttpServer } from 'node:http';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';

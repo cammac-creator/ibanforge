@@ -150,7 +150,27 @@ describe('homme mort — un cron muet finit par crier, un cron vivant se tait', 
     const savedBeat = kvGet(beatKey);
     const savedState = kvGet(`ops:state:${alertKey}`);
     const savedSent = kvGet(`ops:sent:${alertKey}`);
+
     try {
+      /**
+       * 🚨 Les comptes ci-dessous portent sur TOUT ce que la sonde a envoyé,
+       * alors que `checkHeartbeats()` parcourt CHAQUE cron et CHAQUE radar.
+       * Ne remettre à neuf que `refresh-bic` laissait donc les autres décider
+       * du résultat : sur une base locale où plus rien ne bat, ils alertaient
+       * au premier passage — le compte montait et le test échouait — puis se
+       * taisaient aux suivants, puisque l'alerte se déclenche sur une
+       * TRANSITION et qu'ils étaient désormais ouverts. D'où un test qui
+       * échouait une fois puis passait : la pire forme d'échec, celle qu'on
+       * apprend à relancer au lieu de lire.
+       *
+       * Ce passage à vide les fait toutes transiter une bonne fois. Après lui,
+       * seule notre sonde peut encore parler. On ne touche aucun battement
+       * étranger : en fabriquer un ferait mentir l'homme mort de la prochaine
+       * session, ce que l'en-tête de ce fichier interdit.
+       */
+      await checkHeartbeats();
+      sent.length = 0;
+
       // Repartir d'une sonde neuve, sinon l'état d'une session précédente décide.
       kvSet(`ops:state:${alertKey}`, JSON.stringify({ fails: 0, firing: false }));
       kvSet(`ops:sent:${alertKey}`, '0');

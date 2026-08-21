@@ -156,7 +156,6 @@ describe('purgeTerminatedKeyTelemetry (DPA clause 4.7)', () => {
   });
 
   it('keeps telemetry inside the 30-day window, and of active keys', () => {
-    const db = getStatsDB();
     const recent = `ifk_dpa_rec${RUN}`.slice(0, 12);
     const live = `ifk_dpa_liv${RUN}`.slice(0, 12);
     const now = new Date().toISOString().replace('T', ' ').slice(0, 19);

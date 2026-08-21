@@ -64,7 +64,7 @@ describe('enrich402Middleware', () => {
   it('enriches empty 402 responses with helpful body', async () => {
     const app = new Hono();
     app.use('*', enrich402Middleware());
-    app.get('/test', (c) => {
+    app.get('/test', (_c) => {
       return new Response('{}', {
         status: 402,
         headers: {

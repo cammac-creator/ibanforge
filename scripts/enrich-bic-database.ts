@@ -514,6 +514,8 @@ async function main(): Promise<void> {
 
 main().catch((err) => {
   console.error('Fatal:', err);
-  try { rmSync(TMP_DIR, { recursive: true, force: true }); } catch {}
+  // Best effort on the way out: we are already failing, and a temp directory
+  // that will not delete must not replace the real error with its own.
+  try { rmSync(TMP_DIR, { recursive: true, force: true }); } catch { /* nothing left to do */ }
   process.exit(1);
 });

@@ -252,6 +252,9 @@ async function runBlock(block: Block): Promise<unknown[]> {
         `Quickstart blocks must contain no type annotations and no \`as\` assertions — ` +
         `a snippet a reader cannot paste into a REPL is a snippet with a step missing.\n` +
         `--- block ---\n${block.code}`,
+      // Keep the parser's own error attached: the message above says WHICH
+      // block failed, only the cause says where in it.
+      { cause: err },
     );
   }
   await fn(...names.map((n) => (sdk as Record<string, unknown>)[n]), fakeConsole);

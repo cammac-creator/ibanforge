@@ -19,7 +19,6 @@
  * stored: keeping them would turn an explicit "nobody holds this code" into a
  * bank named VRIJ, the exact inversion of what the register says.
  */
-import { readFileSync } from 'node:fs';
 import Database from 'better-sqlite3';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
