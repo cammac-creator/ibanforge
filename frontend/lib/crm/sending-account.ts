@@ -19,15 +19,34 @@
 
 /** Mailbox used for a contact we have never emailed. */
 export const COLD_ACCOUNT = 'claude-alain@ibanforge.com';
-/** Mailbox that carries the existing warm threads. */
-export const WARM_ACCOUNT = 'cammac@bluewin.ch';
+/**
+ * Mailbox that carries the existing warm threads.
+ *
+ * A personal address, so it is read from CRM_WARM_ACCOUNT rather than
+ * committed to this public repository. Absent, only the cold mailbox is
+ * recognised as ours, and a warm draft falls back to it — the same fallback
+ * this module already applies to any address it does not recognise, so the
+ * failure mode is one we already handle rather than a new one.
+ */
+export function warmAccount(): string {
+  return (process.env.CRM_WARM_ACCOUNT ?? '').trim().toLowerCase();
+}
 
-export const OUR_MAILBOXES: readonly string[] = [COLD_ACCOUNT, WARM_ACCOUNT];
+/**
+ * Read at call time, not at import: the value comes from the environment, and
+ * a module-level constant would freeze whatever was set when the bundle was
+ * first evaluated — which is how a test, or a server restarted before its
+ * variables were in place, ends up asserting against an empty mailbox.
+ */
+export function ourMailboxes(): readonly string[] {
+  const warm = warmAccount();
+  return warm ? [COLD_ACCOUNT, warm] : [COLD_ACCOUNT];
+}
 
 function ours(value: string | null | undefined): string | null {
   if (typeof value !== 'string') return null;
   const normalized = value.trim().toLowerCase();
-  return OUR_MAILBOXES.includes(normalized) ? normalized : null;
+  return ourMailboxes().includes(normalized) ? normalized : null;
 }
 
 /**

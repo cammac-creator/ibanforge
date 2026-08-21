@@ -1,5 +1,5 @@
 import { enrichEmail } from '@/lib/company-enrichment';
-import { INTERNAL_RE, type KeyRow } from './build-contacts';
+import { isInternalAccount, type KeyRow } from './build-contacts';
 
 /**
  * One rung of the podium. Lives here rather than beside the card that draws it
@@ -66,7 +66,7 @@ export function topUsers(
 
   const todayByEmail = new Map<string, TopUserToday>();
   for (const row of keys) {
-    if (INTERNAL_RE.test(row.email)) continue;
+    if (isInternalAccount(row.email)) continue;
     const count = activityByKey[row.key_prefix]?.days.find((d) => d.day === todayUtc)?.count ?? 0;
     if (count > 0) collect(todayByEmail, row, count, 'today');
   }
@@ -75,7 +75,7 @@ export function topUsers(
   if (top.length < 3) {
     const monthByEmail = new Map<string, TopUserToday>();
     for (const row of keys) {
-      if (INTERNAL_RE.test(row.email)) continue;
+      if (isInternalAccount(row.email)) continue;
       if (todayByEmail.has(row.email.toLowerCase())) continue;
       if (row.used > 0) collect(monthByEmail, row, row.used, 'month');
     }

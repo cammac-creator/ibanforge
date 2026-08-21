@@ -1159,7 +1159,7 @@ describe('buildContacts', () => {
       keys: [keyRow('alpha@example.net')],
       messages: [msgRow('alpha@example.net')],
     });
-    expect(warm[0].account).toBe('cammac@bluewin.ch');
+    expect(warm[0].account).toBe('<CRM_WARM_ACCOUNT>');
   });
 
   it('exposes the ready-made mail of a prospect and nothing when there is no body', () => {
@@ -1514,7 +1514,7 @@ import type { Contact, Message, ProspectSourcing, ReadyMail } from './types';
 /** Mailbox used for a contact we have never emailed. */
 const COLD_ACCOUNT = 'claude-alain@ibanforge.com';
 /** Mailbox that carries the existing warm threads. */
-const WARM_ACCOUNT = 'cammac@bluewin.ch';
+const WARM_ACCOUNT = '<CRM_WARM_ACCOUNT>';
 
 /**
  * Internal, test and founder-owned addresses never appear in the CRM. Lifted
@@ -1522,7 +1522,7 @@ const WARM_ACCOUNT = 'cammac@bluewin.ch';
  * Note it also swallows example.com, which is why fixtures use example.net.
  */
 export const INTERNAL_RE =
-  /(@ibanforge\.com|@example\.com|@test\.|test-|-test|smoke|audit|^ca-[a-z]+-?\d*@proton\.me|^credits-buyer$|^stripe-buyer$|^playground|cammac@bluewin\.ch|cam@ogens\.ch|ptibootch@|gpt-store@)/i;
+  /(@ibanforge\.com|@example\.com|@test\.|test-|-test|smoke|audit|^ca-[a-z]+-?\d*@proton\.me|^credits-buyer$|^stripe-buyer$|^playground|<CRM_WARM_ACCOUNT>|<mailbox-2>|<mailbox-3>@)/i;
 
 /**
  * Monthly quota from which an unpaid key is an evaluation pilot rather than a

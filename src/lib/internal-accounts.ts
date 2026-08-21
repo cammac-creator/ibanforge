@@ -13,10 +13,34 @@ export const INTERNAL_EMAIL_RE =
   // The .internal/.dev probe domains slipped through this filter for weeks:
   // three probe keys read as "clients" and inflated one week's billable count
   // enough to trigger a -76% scare in the first Monday digest.
-  /(@ibanforge\.com|@ibanforge\.internal|@ibf-internal\.dev|@cohorte\.invalid|-probe@|@example\.com|@test\.|test-|-test|smoke|audit|^ca-[a-z]+-?\d*@proton\.me|^credits-buyer$|^stripe-buyer$|^playground|cammac@bluewin\.ch|cam@ogens\.ch|ptibootch@|gpt-store@|claudealainmartin06\+)/i;
+  /(@ibanforge\.com|@ibanforge\.internal|@ibf-internal\.dev|@cohorte\.invalid|-probe@|@example\.com|@test\.|test-|-test|smoke|audit|^ca-[a-z]+-?\d*@proton\.me|^credits-buyer$|^stripe-buyer$|^playground)/i;
+
+/**
+ * The founder's own mailboxes, which are personal addresses and therefore must
+ * not be committed to a public repository — CLAUDE.md names that class
+ * explicitly, and it had come back seven times before this one.
+ *
+ * Read from CRM_INTERNAL_EMAILS, comma separated. A fragment matches anywhere
+ * in the address, so both a whole mailbox and a plus-tag prefix work, exactly
+ * like the patterns they replaced.
+ *
+ * Absent, the list is empty and those accounts stop being filtered: they then
+ * show up as customers in stats and funnel. That is deliberately visible
+ * rather than silent — a filter that fails closed would hide real traffic
+ * instead, which is the harder failure to notice.
+ */
+function personalFragments(): string[] {
+  return (process.env.CRM_INTERNAL_EMAILS ?? '')
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+}
 
 export function isInternalEmail(email: string | null | undefined): boolean {
-  return email != null && INTERNAL_EMAIL_RE.test(email);
+  if (email == null) return false;
+  if (INTERNAL_EMAIL_RE.test(email)) return true;
+  const lower = email.toLowerCase();
+  return personalFragments().some((f) => lower.includes(f));
 }
 
 /**

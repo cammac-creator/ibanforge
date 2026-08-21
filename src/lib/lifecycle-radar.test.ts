@@ -41,11 +41,12 @@ describe('classifiers', () => {
   it('flags internal / test accounts', () => {
     for (const e of [
       'me@ibanforge.com',
+      // The founder's own mailboxes used to be listed here as literals. They
+      // are personal addresses and this repository is public, so they moved to
+      // CRM_INTERNAL_EMAILS; the mechanism has its own test in
+      // internal-accounts.test.ts. This list keeps only the generic patterns.
       'demo@example.com',
       'x@example.org',
-      'cammac@bluewin.ch',
-      'ptibootch@gmail.com',
-      'cam@ogens.ch',
       'playground@acme.com',
       'workflow-test@acme.com',
       'test-42@acme.com',

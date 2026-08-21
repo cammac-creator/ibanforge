@@ -1,16 +1,29 @@
-import { describe, it, expect } from 'vitest';
-import { sendingAccount, OUR_MAILBOXES } from './sending-account';
+import { afterAll, beforeAll, describe, it, expect } from 'vitest';
+import { warmAccount, sendingAccount, ourMailboxes } from './sending-account';
+
+// The warm mailbox is a personal address, so it lives in CRM_WARM_ACCOUNT
+// rather than in this public repository. The test supplies its own value: it
+// exercises the wiring, and the real address is nobody's business here.
+const TEST_WARM = 'warm@personal.invalid';
+const saved = process.env.CRM_WARM_ACCOUNT;
+beforeAll(() => {
+  process.env.CRM_WARM_ACCOUNT = TEST_WARM;
+});
+afterAll(() => {
+  if (saved === undefined) delete process.env.CRM_WARM_ACCOUNT;
+  else process.env.CRM_WARM_ACCOUNT = saved;
+});
 
 describe('sendingAccount', () => {
   it('uses the mailbox the contact is filed under when the draft says nothing', () => {
     expect(sendingAccount(null, 'claude-alain@ibanforge.com')).toBe('claude-alain@ibanforge.com');
-    expect(sendingAccount('', 'cammac@bluewin.ch')).toBe('cammac@bluewin.ch');
+    expect(sendingAccount('', warmAccount())).toBe(warmAccount());
   });
 
   it('lets a draft pin a different one of OUR mailboxes', () => {
     // A reply to a warm thread must leave from the mailbox that carries it,
     // even if the contact would otherwise default to the cold one.
-    expect(sendingAccount('cammac@bluewin.ch', 'claude-alain@ibanforge.com')).toBe('cammac@bluewin.ch');
+    expect(sendingAccount(warmAccount(), 'claude-alain@ibanforge.com')).toBe(warmAccount());
   });
 
   it('refuses a recipient address masquerading as the sending account', () => {
@@ -24,14 +37,14 @@ describe('sendingAccount', () => {
   });
 
   it('is case and whitespace insensitive, since the field is hand-filled', () => {
-    expect(sendingAccount('  Claude-Alain@IBANforge.com ', 'cammac@bluewin.ch')).toBe(
+    expect(sendingAccount('  Claude-Alain@IBANforge.com ', warmAccount())).toBe(
       'claude-alain@ibanforge.com',
     );
   });
 
   it('never returns something outside our mailboxes, whatever it is handed', () => {
     for (const junk of ['nope', 'x@y.z', '@', 'claude-alain@ibanforge.com.evil.test', undefined]) {
-      expect(OUR_MAILBOXES).toContain(sendingAccount(junk, 'claude-alain@ibanforge.com'));
+      expect(ourMailboxes()).toContain(sendingAccount(junk, 'claude-alain@ibanforge.com'));
     }
   });
 

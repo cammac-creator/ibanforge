@@ -1,14 +1,27 @@
-import { describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   buildContacts,
   INTERNAL_RE,
+  isInternalAccount,
   SEEDED_PILOT_RE,
   type BuildInput,
   type KeyRow,
   type MessageRow,
   type ProspectRow,
 } from './build-contacts';
+import { warmAccount } from './sending-account';
 import type { Contact } from './types';
+
+// Same reason as sending-account.test.ts: the warm mailbox is configured, not
+// committed. Supply a value so the account assertions have something to check.
+const savedWarm = process.env.CRM_WARM_ACCOUNT;
+beforeAll(() => {
+  process.env.CRM_WARM_ACCOUNT = 'warm@personal.invalid';
+});
+afterAll(() => {
+  if (savedWarm === undefined) delete process.env.CRM_WARM_ACCOUNT;
+  else process.env.CRM_WARM_ACCOUNT = savedWarm;
+});
 
 // example.net is reserved for documentation (RFC 2606) like example.com, but
 // INTERNAL_RE deliberately swallows example.com, so any fixture that must reach
@@ -125,11 +138,21 @@ describe('INTERNAL_RE', () => {
     expect(INTERNAL_RE.test('nextsteps-probe@ibanforge.internal')).toBe(true);
   });
 
-  it("swallows the founder's own plus-addressed test accounts", () => {
-    expect(INTERNAL_RE.test('claudealainmartin06+relaytest0725@gmail.com')).toBe(true);
-    expect(INTERNAL_RE.test('claudealainmartin06+batchtest0711@gmail.com')).toBe(true);
-    // His real address is not a test account and must still come through.
-    expect(INTERNAL_RE.test('claudealainmartin06@gmail.com')).toBe(false);
+  it("swallows the founder's own accounts, which are configured, not committed", () => {
+    // These are personal addresses and this repository is public, so they live
+    // in CRM_INTERNAL_EMAILS rather than in INTERNAL_RE. The regex alone must
+    // NOT match them; isInternalAccount, which reads the variable, must.
+    const previous = process.env.CRM_INTERNAL_EMAILS;
+    process.env.CRM_INTERNAL_EMAILS = 'owner@personal.invalid, tagged+';
+    try {
+      expect(INTERNAL_RE.test('owner@personal.invalid')).toBe(false);
+      expect(isInternalAccount('owner@personal.invalid')).toBe(true);
+      expect(isInternalAccount('tagged+audit@mail.invalid')).toBe(true);
+      expect(isInternalAccount('a-real-customer@acme.example.net')).toBe(false);
+    } finally {
+      if (previous === undefined) delete process.env.CRM_INTERNAL_EMAILS;
+      else process.env.CRM_INTERNAL_EMAILS = previous;
+    }
   });
 
   it('leaves a genuine customer alone', () => {
@@ -401,7 +424,9 @@ describe('buildContacts', () => {
       keys: [keyRow('alpha@example.net')],
       messages: [msgRow('alpha@example.net')],
     });
-    expect(warm[0].account).toBe('cammac@bluewin.ch');
+    // Asserted against the constant: the value is a personal mailbox read
+    // from CRM_WARM_ACCOUNT, and must not be written into this repository.
+    expect(warm[0].account).toBe(warmAccount());
   });
 
   it('exposes the ready-made mail of a prospect and nothing when there is no body', () => {

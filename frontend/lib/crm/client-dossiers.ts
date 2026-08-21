@@ -1,4 +1,4 @@
-import { INTERNAL_RE, type ActivationClientRow, type KeyRow, type MessageRow, type ProspectRow } from './build-contacts';
+import { isInternalAccount, type ActivationClientRow, type KeyRow, type MessageRow, type ProspectRow } from './build-contacts';
 import { chipForStatus, type BusinessChip } from './business';
 import { heatFromFacts, type Heat } from './heat';
 
@@ -270,7 +270,7 @@ export function buildDossiers(input: DossierInput): ClientDossier[] {
 
   const byAddress = new Map<string, KeyRow[]>();
   for (const k of input.keys) {
-    if (INTERNAL_RE.test(k.email)) continue;
+    if (isInternalAccount(k.email)) continue;
     const id = k.email.toLowerCase();
     const arr = byAddress.get(id);
     if (arr) arr.push(k);

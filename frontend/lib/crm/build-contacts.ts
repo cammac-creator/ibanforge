@@ -4,7 +4,7 @@ import { signedUpRecently } from './new-signup';
 import type { BusinessInfo, Contact, Message, Outcome, ProspectSourcing, ReadyMail } from './types';
 // One definition of our mailboxes: the send path validates against this list,
 // so a second copy here could drift and make a contact unsendable.
-import { COLD_ACCOUNT, WARM_ACCOUNT } from './sending-account';
+import { COLD_ACCOUNT, warmAccount } from './sending-account';
 
 /** The outcome values the UI knows how to draw. Anything else reads as none. */
 const OUTCOMES: readonly string[] = ['en_discussion', 'pas_maintenant', 'pas_interesse', 'mauvaise_personne'];
@@ -30,7 +30,30 @@ const OUTCOMES: readonly string[] = ['en_discussion', 'pas_maintenant', 'pas_int
  * visible dossier in the clients tab instead of vanishing.
  */
 export const INTERNAL_RE =
-  /(@ibanforge\.com|@ibanforge\.internal|@ibf-internal\.dev|-probe@|@example\.com|@test\.|test-|-test|smoke|audit|^ca-[a-z]+-?\d*@proton\.me|^credits-buyer$|^stripe-buyer$|^playground|cammac@bluewin\.ch|cam@ogens\.ch|ptibootch@|gpt-store@|claudealainmartin06\+)/i;
+  /(@ibanforge\.com|@ibanforge\.internal|@ibf-internal\.dev|-probe@|@example\.com|@test\.|test-|-test|smoke|audit|^ca-[a-z]+-?\d*@proton\.me|^credits-buyer$|^stripe-buyer$|^playground)/i;
+
+/**
+ * The founder's own mailboxes, kept out of this public repository (CLAUDE.md
+ * forbids that class, and it had returned seven times). Comma separated in
+ * CRM_INTERNAL_EMAILS; a fragment matches anywhere in the address. Absent, the
+ * accounts simply stop being hidden — visible rather than silent.
+ *
+ * Mirrors personalFragments() in src/lib/internal-accounts.ts.
+ */
+function personalFragments(): string[] {
+  return (process.env.CRM_INTERNAL_EMAILS ?? '')
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+/** INTERNAL_RE plus the addresses that may not be committed. */
+export function isInternalAccount(email: string | null | undefined): boolean {
+  if (email == null) return false;
+  if (INTERNAL_RE.test(email)) return true;
+  const lower = email.toLowerCase();
+  return personalFragments().some((f) => lower.includes(f));
+}
 
 /**
  * The outreach keys minted at launch, one per company we meant to approach.
@@ -310,7 +333,7 @@ export function buildContacts(input: BuildInput, now: Date = new Date()): Contac
   // and the id below is the join key, the selection key and the React key.
   const keysByAddress = new Map<string, KeyRow[]>();
   for (const row of input.keys) {
-    if (INTERNAL_RE.test(row.email)) continue;
+    if (isInternalAccount(row.email)) continue;
     const id = row.email.toLowerCase();
     const group = keysByAddress.get(id);
     if (group) group.push(row);
@@ -382,7 +405,7 @@ export function buildContacts(input: BuildInput, now: Date = new Date()): Contac
       messages,
       draft,
       unread: threadIsUnread(messages, input.reads[id]),
-      account: messages.length > 0 ? WARM_ACCOUNT : COLD_ACCOUNT,
+      account: messages.length > 0 ? warmAccount() : COLD_ACCOUNT,
       apiKey: {
         keyPrefix: row.key_prefix,
         paid: isPaid,

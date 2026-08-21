@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { INTERNAL_EMAIL_RE, isInternalEmail } from './internal-accounts.js';
@@ -26,5 +26,31 @@ describe('internal accounts', () => {
     const frontOnly = [...frontParts].filter((p) => !backParts.has(p));
     expect(backOnly).toEqual(['@cohorte\\.invalid']);
     expect(frontOnly).toEqual([]);
+  });
+});
+
+describe('personal mailboxes come from the environment, never from the repository', () => {
+  const saved = process.env.CRM_INTERNAL_EMAILS;
+  afterEach(() => {
+    if (saved === undefined) delete process.env.CRM_INTERNAL_EMAILS;
+    else process.env.CRM_INTERNAL_EMAILS = saved;
+  });
+
+  it('matches a configured mailbox, and a plus-tag prefix, case-insensitively', () => {
+    process.env.CRM_INTERNAL_EMAILS = 'owner@personal.invalid, tagged+';
+    expect(isInternalEmail('owner@personal.invalid')).toBe(true);
+    expect(isInternalEmail('OWNER@Personal.Invalid')).toBe(true);
+    expect(isInternalEmail('tagged+audit@mail.invalid')).toBe(true);
+    expect(isInternalEmail('someone-else@personal.invalid')).toBe(false);
+  });
+
+  it('degrades visibly when unset: those accounts read as customers', () => {
+    // Chosen over failing closed on purpose. An empty list over-counts, which
+    // shows up as unexpected customers in the funnel; a closed filter would
+    // hide real traffic instead, and that is the failure nobody notices.
+    delete process.env.CRM_INTERNAL_EMAILS;
+    expect(isInternalEmail('owner@personal.invalid')).toBe(false);
+    // The generic patterns keep working with or without the variable.
+    expect(isInternalEmail('smoke@acme.example.net')).toBe(true);
   });
 });
