@@ -85,11 +85,21 @@ type BusinessSummary = {
     sold_credits: number;
     sold_usd: number;
     sold_usd_is_estimate: boolean;
+    /** Accounts whose dollars came from the price table, not the processor. */
+    sold_usd_deduced_accounts: number;
     consumed_credits: number;
     consumption_pct: number;
     paying_accounts: number;
     idle_accounts: number;
-    accounts: Array<{ key_prefix: string; domain: string; sold: number; consumed: number; pct: number }>;
+    accounts: Array<{
+      key_prefix: string;
+      domain: string;
+      sold: number;
+      consumed: number;
+      pct: number;
+      usd: number;
+      amount_source: 'measured' | 'deduced';
+    }>;
     accounts_omitted: number;
   };
   keys: {

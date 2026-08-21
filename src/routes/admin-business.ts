@@ -75,6 +75,7 @@ adminBusiness.get('/admin/business-summary', (c) => {
     .prepare(
       `SELECT k.key_hash, k.key_prefix, k.email, k.monthly_limit,
               k.credits_total, k.credits_remaining,
+              k.amount_paid_minor, k.amount_paid_currency,
               COALESCE(u.count, 0) AS used,
               COALESCE(t.total, 0)
                 + MAX(COALESCE(k.credits_total, 0) - COALESCE(k.credits_remaining, 0), 0)
@@ -91,6 +92,8 @@ adminBusiness.get('/admin/business-summary', (c) => {
     monthly_limit: number | null;
     credits_total: number | null;
     credits_remaining: number | null;
+    amount_paid_minor: number | null;
+    amount_paid_currency: string | null;
     used: number;
     used_all_time: number;
   }>;
@@ -130,6 +133,8 @@ adminBusiness.get('/admin/business-summary', (c) => {
       monthly_limit: r.monthly_limit,
       credits_total: r.credits_total,
       credits_remaining: r.credits_remaining,
+      amount_paid_minor: r.amount_paid_minor,
+      amount_paid_currency: r.amount_paid_currency,
       used: r.used,
       used_all_time: r.used_all_time,
       series: months.map((mo) => source?.get(mo) ?? 0),

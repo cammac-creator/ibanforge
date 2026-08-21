@@ -16,6 +16,9 @@ function key(over: Partial<BusinessKeyRow> = {}): BusinessKeyRow {
     monthly_limit: null,
     credits_total: null,
     credits_remaining: null,
+    // Default NULL, like every row minted before the amount was recorded.
+    amount_paid_minor: null,
+    amount_paid_currency: null,
     used: 0,
     used_all_time: 0,
     series: [0, 0, 0, 0, 0, 0],
@@ -254,5 +257,68 @@ describe('concentration', () => {
     expect(s.clients.distinct).toBe(2);
     expect(s.clients.active_days).toBe(6);
     expect(s.clients.top_share_pct).toBe(90);
+  });
+});
+
+/**
+ * The price table answers "what does this pack cost today", never "what did
+ * this customer pay". A price change, a discount or a partial refund makes it
+ * wrong retroactively across the whole history, and nothing in the report would
+ * show it. So a stored amount wins, and a deduction has to say so.
+ */
+describe('credit revenue prefers what was charged over what the table says', () => {
+  const paid = (over = {}) =>
+    key({
+      key_prefix: 'ifk_test0002',
+      // Not the default @example.com, which the internal filter drops.
+      email: 'buyer@alpha.example.net',
+      credits_total: 1000,
+      credits_remaining: 1000,
+      ...over,
+    });
+
+  it('uses the stored amount when there is one, even when it differs from the table', () => {
+    // 1000 credits list at $5. This buyer was charged $3.50 (a discount the
+    // table knows nothing about); the report must show what was taken.
+    const s = summary([paid({ amount_paid_minor: 350, amount_paid_currency: 'usd' })]);
+    expect(s.credits.sold_usd).toBe(3.5);
+    expect(s.credits.accounts[0].amount_source).toBe('measured');
+    expect(s.credits.sold_usd_deduced_accounts).toBe(0);
+  });
+
+  it('falls back to the table for older rows, and counts them as deduced', () => {
+    const s = summary([paid()]);
+    expect(s.credits.sold_usd).toBe(CREDIT_PACK_USD[1000]);
+    expect(s.credits.accounts[0].amount_source).toBe('deduced');
+    expect(s.credits.sold_usd_deduced_accounts).toBe(1);
+  });
+
+  it('does not read a foreign-currency amount as dollars', () => {
+    // Treating 350 minor units of another currency as $3.50 would invent a
+    // rate and a date. The table answers instead, and says it did.
+    const s = summary([paid({ amount_paid_minor: 350, amount_paid_currency: 'eur' })]);
+    expect(s.credits.sold_usd).toBe(CREDIT_PACK_USD[1000]);
+    expect(s.credits.accounts[0].amount_source).toBe('deduced');
+  });
+
+  /**
+   * The two flags answer different questions and must not merge: one is "the
+   * table did not know this pack size", the other is "the table answered at
+   * all". A measured amount on an unknown pack size is exact AND measured.
+   */
+  it('keeps the pro-rata estimate flag separate from the deduced count', () => {
+    const odd = paid({ credits_total: 3000, credits_remaining: 3000 });
+    expect(summary([odd]).credits.sold_usd_is_estimate).toBe(true);
+
+    const measuredOdd = paid({
+      credits_total: 3000,
+      credits_remaining: 3000,
+      amount_paid_minor: 1200,
+      amount_paid_currency: 'usd',
+    });
+    const s = summary([measuredOdd]);
+    expect(s.credits.sold_usd).toBe(12);
+    expect(s.credits.sold_usd_is_estimate).toBe(false);
+    expect(s.credits.sold_usd_deduced_accounts).toBe(0);
   });
 });

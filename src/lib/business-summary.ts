@@ -35,6 +35,13 @@ export interface BusinessKeyRow {
   monthly_limit: number | null;
   credits_total: number | null;
   credits_remaining: number | null;
+  /**
+   * What the card processor actually reported, in minor units, with its
+   * currency. NULL on every row minted before this was recorded, and on any
+   * payment the processor did not price for us.
+   */
+  amount_paid_minor: number | null;
+  amount_paid_currency: string | null;
   /** Calls billed this calendar month. */
   used: number;
   used_all_time: number;
@@ -92,6 +99,34 @@ export function creditPackUsd(credits: number): { usd: number; exact: boolean } 
   );
   const rate = CREDIT_PACK_USD[nearest] / nearest;
   return { usd: Math.round(credits * rate * 100) / 100, exact: false };
+}
+
+/** Where a dollar figure came from, so a deduction is never read as a receipt. */
+export type AmountSource = 'measured' | 'deduced';
+
+/**
+ * Dollars for one account, preferring what was actually charged.
+ *
+ * The price table above is a DEDUCTION: it answers "what does this pack cost
+ * today", not "what did this customer pay". Any price change, discount or
+ * partial refund makes it wrong retroactively, across the whole history, with
+ * nothing to show that it went wrong. So a stored amount always wins, and the
+ * fallback says out loud that it is a fallback.
+ *
+ * Only a USD amount counts as measured. Converting another currency here would
+ * mean inventing a rate and a date, which is the same class of error the stored
+ * column exists to end.
+ */
+export function accountUsd(k: {
+  credits_total: number | null;
+  amount_paid_minor: number | null;
+  amount_paid_currency: string | null;
+}): { usd: number; source: AmountSource; exact: boolean } {
+  if (k.amount_paid_minor != null && (k.amount_paid_currency ?? '').toLowerCase() === 'usd') {
+    return { usd: Math.round(k.amount_paid_minor) / 100, source: 'measured', exact: true };
+  }
+  const deduced = creditPackUsd(k.credits_total ?? 0);
+  return { usd: deduced.usd, source: 'deduced', exact: deduced.exact };
 }
 
 // ---------------------------------------------------------------------------
@@ -164,6 +199,9 @@ export interface CreditAccount {
   sold: number;
   consumed: number;
   pct: number;
+  usd: number;
+  /** 'deduced' means the price table answered, not the processor. */
+  amount_source: AmountSource;
 }
 
 export interface SteadyUnpaid {
@@ -180,7 +218,10 @@ export interface BusinessSummary {
   credits: {
     sold_credits: number;
     sold_usd: number;
+    /** A pack size the price table does not know, priced pro rata. */
     sold_usd_is_estimate: boolean;
+    /** Paying accounts whose dollars came from the table, not the processor. */
+    sold_usd_deduced_accounts: number;
     consumed_credits: number;
     consumption_pct: number;
     paying_accounts: number;
@@ -240,20 +281,29 @@ export function buildBusinessSummary(input: {
   let soldCredits = 0;
   let soldUsd = 0;
   let estimated = false;
+  let deducedAccounts = 0;
   const accounts: CreditAccount[] = [];
   for (const k of paying) {
     const sold = k.credits_total ?? 0;
     const consumed = Math.max(sold - (k.credits_remaining ?? sold), 0);
-    const price = creditPackUsd(sold);
+    const price = accountUsd(k);
     soldCredits += sold;
     soldUsd += price.usd;
+    // Kept meaning exactly what it meant before: a pack size the price table
+    // does not know, priced pro rata. It is NOT the same statement as "this
+    // figure came from the table rather than the processor", which is counted
+    // separately — collapsing the two would lose the distinction this column
+    // was added to create.
     if (!price.exact) estimated = true;
+    if (price.source === 'deduced') deducedAccounts++;
     accounts.push({
       key_prefix: k.key_prefix,
       domain: accountLabel(k.email),
       sold,
       consumed,
       pct: pct(consumed, sold),
+      usd: price.usd,
+      amount_source: price.source,
     });
   }
   accounts.sort((a, b) => b.sold - a.sold);
@@ -315,6 +365,11 @@ export function buildBusinessSummary(input: {
       sold_credits: soldCredits,
       sold_usd: Math.round(soldUsd * 100) / 100,
       sold_usd_is_estimate: estimated,
+      // How many of the paying accounts contributed a figure the price table
+      // produced rather than the processor. Every historical row is one, since
+      // nothing was stored before; it should fall toward zero as new payments
+      // land, and a rise means the write path stopped working.
+      sold_usd_deduced_accounts: deducedAccounts,
       consumed_credits: consumedCredits,
       consumption_pct: pct(consumedCredits, soldCredits),
       paying_accounts: paying.length,
