@@ -98,6 +98,49 @@ export interface StripePurchaseNotify {
   monthlyLimit?: number;
 }
 
+/**
+ * Persist what Stripe says was ACTUALLY collected, on the key this session
+ * minted, at the moment Stripe announces it.
+ *
+ * Audit B2: the amount was never stored. `credits_total` was kept and the
+ * dollar figure re-derived from the pack price table whenever a report needed
+ * it. A derived amount is retroactive by construction: the day a price moves,
+ * a promotion runs, or a partial refund lands, every past purchase is restated
+ * to a number no buyer ever paid, and nothing in the data shows it changed.
+ *
+ * Three deliberate choices:
+ *
+ *  - **Minor units, verbatim.** `amount_total` is what Stripe charged, in the
+ *    currency's smallest unit (2000 = $20.00). We store the provider's own
+ *    number rather than a converted one so the row can always be checked
+ *    against the Stripe dashboard without arithmetic in between.
+ *  - **A missing amount stays NULL.** `amount_total` is nullable on the Stripe
+ *    type. Coercing it to 0 would record "this buyer paid nothing", which is a
+ *    measurement; NULL says we were not told, which is the truth.
+ *  - **`amount_paid_minor IS NULL` in the WHERE.** First write wins, and a
+ *    second event for the same session can never overwrite it. This is not
+ *    theoretical: `checkout.session.async_payment_succeeded` carries a
+ *    DIFFERENT event id for the SAME session, so it clears the
+ *    processed_webhooks barrier, reaches an idempotent mint, and reaches here.
+ */
+function recordAmountPaid(session: Stripe.Checkout.Session): {
+  amount_paid_minor: number;
+  amount_paid_currency: string;
+} | null {
+  const minor = session.amount_total;
+  const currency = session.currency;
+  if (minor == null || currency == null) return null;
+
+  getStatsDB()
+    .prepare(
+      `UPDATE api_keys SET amount_paid_minor = ?, amount_paid_currency = ?
+         WHERE stripe_session_id = ? AND amount_paid_minor IS NULL`,
+    )
+    .run(minor, currency, session.id);
+
+  return { amount_paid_minor: minor, amount_paid_currency: currency };
+}
+
 export function processStripeEvent(
   event: Stripe.Event,
 ): { status: number; body: Record<string, unknown>; notify?: StripePurchaseNotify } {
@@ -158,6 +201,8 @@ export function processStripeEvent(
         ? session.subscription
         : (session.subscription?.id ?? null);
     const mint = generateOemKey(email, STRIPE_OEM_PLAN.monthly_limit, session.id, subscriptionId);
+    // After the mint: the row must exist for the amount to land on it.
+    const paid = recordAmountPaid(session);
 
     db.prepare('INSERT INTO processed_webhooks (stripe_event_id, event_type) VALUES (?, ?)')
       .run(event.id, event.type);
@@ -183,6 +228,7 @@ export function processStripeEvent(
         plan: 'oem',
         monthly_limit: mint.monthly_limit,
         key_prefix: mint.key_prefix,
+        ...(paid ?? {}),
       },
       notify,
     };
@@ -199,6 +245,8 @@ export function processStripeEvent(
 
   const email = session.customer_email ?? session.customer_details?.email ?? null;
   const mintResult = generateStripeKey(email, bundleConfig.credits, session.id);
+  // After the mint: the row must exist for the amount to land on it.
+  const paid = recordAmountPaid(session);
 
   db.prepare('INSERT INTO processed_webhooks (stripe_event_id, event_type) VALUES (?, ?)')
     .run(event.id, event.type);
@@ -224,6 +272,7 @@ export function processStripeEvent(
       bundle,
       credits_minted: bundleConfig.credits,
       key_prefix: mintResult.key_prefix,
+      ...(paid ?? {}),
     },
     notify,
   };

@@ -8,6 +8,11 @@ import {
   batchQuoteFor,
   canonicalPaidPath,
   withFacilitatorTimeout,
+  facilitatorTimeoutMs,
+  unconfirmedSettlementBody,
+  FacilitatorTimeoutError,
+  boundFacilitator,
+  runInSettlementSlot,
 } from './x402.js';
 
 /**
@@ -329,9 +334,9 @@ describe('paid routes reached with a trailing slash have a canonical form', () =
  */
 describe('a silent facilitator cannot hold a paid request for minutes', () => {
   it.each([
-    ['verify', 10_000],
-    ['supported', 10_000],
-    ['settle', 30_000],
+    ['verify', 5_000],
+    ['supported', 5_000],
+    ['settle', 6_000],
   ] as const)('gives up on %s after %dms instead of undici’s ~300 s', async (operation, budget) => {
     vi.useFakeTimers();
     try {
@@ -387,5 +392,177 @@ describe('a silent facilitator cannot hold a paid request for minutes', () => {
     } finally {
       process.off('unhandledRejection', onUnhandled);
     }
+  });
+});
+
+/**
+ * A budget only bounds a hang while the process is alive to enforce it.
+ *
+ * `gracefulShutdown` drains in-flight requests for DRAIN_TIMEOUT_MS = 8_000
+ * (`src/index.ts:111`) and then severs what is left, so a facilitator budget
+ * above the drain is unreachable at exactly the moment it matters: the buyer
+ * gets a dropped connection instead of an answer. The 8_000 is duplicated as a
+ * literal here on purpose: it is module-local in `src/index.ts`, and importing
+ * that file to read it would boot the server and every radar with it.
+ */
+describe('the facilitator budget outlives no shutdown', () => {
+  const OPERATIONS = ['supported', 'verify', 'settle'] as const;
+  const DRAIN_TIMEOUT_MS = 8_000;
+
+  it.each(OPERATIONS)('leaves the drain room to flush the %s failure', (operation) => {
+    expect(facilitatorTimeoutMs(operation)).toBeLessThan(DRAIN_TIMEOUT_MS);
+  });
+
+  it('still gives settle the most room of the three', () => {
+    // The reason the old 30 s existed survives the tightening: giving up on a
+    // settle the facilitator is still processing may charge the buyer for an
+    // answer we cannot confirm, so settle must never be the first to fold.
+    expect(facilitatorTimeoutMs('settle')).toBeGreaterThan(facilitatorTimeoutMs('verify'));
+    expect(facilitatorTimeoutMs('settle')).toBeGreaterThan(facilitatorTimeoutMs('supported'));
+  });
+
+  it('starts with no configuration at all', () => {
+    vi.stubEnv('X402_SETTLE_TIMEOUT_MS', undefined as unknown as string);
+    vi.stubEnv('X402_VERIFY_TIMEOUT_MS', undefined as unknown as string);
+    try {
+      expect(facilitatorTimeoutMs('settle')).toBe(6_000);
+      expect(facilitatorTimeoutMs('verify')).toBe(5_000);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it('lets an operator who would rather wait raise the ceiling', () => {
+    vi.stubEnv('X402_SETTLE_TIMEOUT_MS', '25000');
+    try {
+      expect(facilitatorTimeoutMs('settle')).toBe(25_000);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  /**
+   * 🚨 `setTimeout(NaN)` fires IMMEDIATELY. A typo in a Railway variable would
+   * turn every settlement into an instant timeout, the exact failure this
+   * whole mechanism exists to prevent, introduced by its own configuration.
+   */
+  it.each(['abc', '', '   ', '0', '-1', 'NaN', '10s'])(
+    'refuses %o rather than turning every settle into an instant timeout',
+    (bad) => {
+      vi.stubEnv('X402_SETTLE_TIMEOUT_MS', bad);
+      try {
+        expect(facilitatorTimeoutMs('settle')).toBe(6_000);
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    },
+  );
+});
+
+/**
+ * The doctrine, applied to money: a settlement whose outcome never came back is
+ * UNKNOWN, not refused. `screenBicSanctions` answers `listed: null` rather than
+ * `listed: false` when the database could not be read; a settle we stopped
+ * waiting on gets the same treatment, because the payment may well be on-chain.
+ */
+describe('an unconfirmed settlement never reads as a refusal', () => {
+  const body = unconfirmedSettlementBody(new FacilitatorTimeoutError('settle', 6_000), 6_000);
+
+  it('claims nothing about whether the buyer paid', () => {
+    // `false` here would assert the money did not move. We do not know that.
+    expect(body.settlement.paid).toBeNull();
+    expect(body.settlement.paid).not.toBe(false);
+    expect(body.settlement.confirmation_received).toBe(false);
+    expect(body.settlement.authoritative).toBe(false);
+  });
+
+  it('never dresses a timeout up as a receipt', () => {
+    expect(JSON.stringify(body)).not.toMatch(/"(success|settled|paid)":\s*true/);
+    expect(body.error).toBe('settlement_unconfirmed');
+  });
+
+  /**
+   * 🚨 The whole reason this is not a 402. An x402 client reads 402 as "attach
+   * a payment and retry", so answering 402 to a buyer who may already have been
+   * charged is an invitation to pay twice.
+   */
+  it('warns against re-sending rather than asking for payment', () => {
+    expect(body.message).toMatch(/do not re-send/i);
+    expect(body.message).toMatch(/twice/i);
+    expect(body.message).not.toMatch(/payment required/i);
+  });
+
+  /**
+   * 🚨 On a route that SELLS a pack the handler minted the key BEFORE settle
+   * ran, and its response carried the one-time recovery URL. This 502 replaces
+   * that response, so omitting the URL here would destroy the recovery path in
+   * the exact case where the buyer may already have paid for the key.
+   */
+  it('hands back the recovery URL its own 502 replaced', () => {
+    const sold = unconfirmedSettlementBody(new FacilitatorTimeoutError('settle', 6_000), 6_000, 'deadbeef');
+    expect(sold.recovery_url).toBe('https://api.ibanforge.com/v1/credits/recover/deadbeef');
+    expect(sold.recovery_note).toMatch(/once/i);
+  });
+
+  it('offers no recovery URL when nothing was minted to recover', () => {
+    // A per-call paid route creates nothing; a recovery link would be a dead end.
+    expect(unconfirmedSettlementBody(new FacilitatorTimeoutError('settle', 6_000), 6_000, null))
+      .not.toHaveProperty('recovery_url');
+    expect(body).not.toHaveProperty('recovery_url');
+  });
+});
+
+/**
+ * The wiring, not the pieces.
+ *
+ * Everything above tests `withFacilitatorTimeout` and `unconfirmedSettlementBody`
+ * in isolation, and all of it stays green even if the two never meet. What makes
+ * the 502 reachable is that the AsyncLocalStorage context survives from the
+ * middleware's `run()`, through the SDK's awaits, into the settle wrapper. If it
+ * does not, `getStore()` is undefined, the flag never sets, and the buyer
+ * silently gets the SDK's bare 402 back.
+ */
+describe('a timed-out settle reaches the response builder', () => {
+  function fakeClient(settleImpl: () => Promise<unknown>) {
+    return boundFacilitator({
+      verify: async () => 'verified',
+      settle: settleImpl,
+      getSupported: async () => 'supported',
+    });
+  }
+
+  it('marks the request slot when settle times out', async () => {
+    vi.useFakeTimers();
+    try {
+      const client = fakeClient(() => new Promise(() => {}));
+      const { slot, out } = runInSettlementSlot(() =>
+        (client.settle as () => Promise<unknown>)().catch((e: unknown) => e),
+      );
+      await vi.advanceTimersByTimeAsync(facilitatorTimeoutMs('settle'));
+      await out;
+
+      expect(slot.unconfirmed).toBeInstanceOf(FacilitatorTimeoutError);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('leaves the slot clean when the facilitator answers', async () => {
+    const client = fakeClient(async () => ({ success: true }));
+    const { slot, out } = runInSettlementSlot(() => (client.settle as () => Promise<unknown>)());
+    await out;
+    // A settlement that came back is not an unknown one.
+    expect(slot.unconfirmed).toBeNull();
+  });
+
+  it('leaves the slot clean when the facilitator REFUSES', async () => {
+    const client = fakeClient(() => Promise.reject(new Error('insufficient funds')));
+    const { slot, out } = runInSettlementSlot(() =>
+      (client.settle as () => Promise<unknown>)().catch((e: unknown) => e),
+    );
+    await out;
+    // A refusal is a known outcome: the SDK's 402 is the honest answer there,
+    // and dressing it as "unknown" would be the mirror-image lie.
+    expect(slot.unconfirmed).toBeNull();
   });
 });

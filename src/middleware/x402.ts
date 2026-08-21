@@ -1,10 +1,16 @@
 import type { MiddlewareHandler } from 'hono';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { createRequire } from 'node:module';
 import type { HonoEnv } from '../types.js';
 import { datasetFacts } from '../lib/dataset-facts.js';
 import { BANK_CODE_CHECK_SCHEMA as BANK_CODE_CHECK_OPENAPI , NEXT_STEPS_SCHEMA as NEXT_STEPS_OPENAPI } from '../lib/bank-code-schema.js';
 import { buildBazaarInfo, discoveryForRoute, findDiscovery, routeTemplateOf } from '../lib/x402-discovery.js';
 import { getIbansArray } from '../lib/request-helpers.js';
+// Read-only reuse: the SAME digest the purchase route derives a recovery ref
+// from, so an unconfirmed settlement can hand back the recovery URL its own
+// 502 would otherwise discard. Imported, never redefined: two hashes that had
+// to agree would eventually stop agreeing.
+import { settlementRef } from '../routes/credits-buy.js';
 
 const require = createRequire(import.meta.url);
 const pkg = require('../../package.json') as { version: string };
@@ -863,19 +869,67 @@ function paywallSignature(walletAddress: string): string {
 // 🚨 The abandoned promise MUST keep a handler. An unobserved rejection is
 // exactly what killed the process on 20/08 (§C1.1) and burned Railway's three
 // restarts; a "fix" for a hang that reintroduces that crash is a net loss.
-const FACILITATOR_TIMEOUTS = {
+//
+// ─── Why every default is under eight seconds ────────────────────────────────
+//
+// A budget only bounds a hang while the process is alive to enforce it. At
+// SIGTERM `gracefulShutdown` drains in-flight requests for DRAIN_TIMEOUT_MS =
+// 8_000 (`src/index.ts:111`) and then cuts what is left. A settle budget of
+// 30 s was therefore unreachable at exactly the moment it mattered most: the
+// socket was severed at 8 s and the buyer got NOTHING: no receipt, no error,
+// no way to tell a refusal from a redeploy. A clear "we do not know" beats a
+// dropped connection, so each default leaves the failure response ~2 s of the
+// drain window to be serialized and flushed before the deadline closes it.
+//
+// The earlier reasoning for a generous settle is preserved, not discarded, and
+// it is the reason settle stays the most generous of the three: every route
+// announces `maxTimeoutSeconds: 60`, and giving up on a settle the facilitator
+// is still processing means the buyer may be charged for an answer we then
+// cannot confirm. An operator who would rather wait than answer "unknown"
+// raises X402_SETTLE_TIMEOUT_MS, knowing that any value above the drain is
+// only honoured while no shutdown is in progress.
+const FACILITATOR_TIMEOUT_DEFAULTS = {
   /** Handshake. Off the paid path (see syncFacilitator) but must not wedge it. */
-  supported: 10_000,
+  supported: 5_000,
   /** Before the handler runs. Nothing has been served, so failing fast is free. */
-  verify: 10_000,
-  /**
-   * After the handler ran. The most generous of the three ON PURPOSE: every
-   * route announces `maxTimeoutSeconds: 60`, and abandoning a settle that the
-   * facilitator is still processing means the buyer is charged and gets an
-   * error. Do not tighten this to match verify.
-   */
-  settle: 30_000,
+  verify: 5_000,
+  /** After the handler ran, and money may already be moving. See above. */
+  settle: 6_000,
 } as const;
+
+type FacilitatorOperation = keyof typeof FACILITATOR_TIMEOUT_DEFAULTS;
+
+const FACILITATOR_TIMEOUT_ENV: Record<FacilitatorOperation, string> = {
+  supported: 'X402_SUPPORTED_TIMEOUT_MS',
+  verify: 'X402_VERIFY_TIMEOUT_MS',
+  settle: 'X402_SETTLE_TIMEOUT_MS',
+};
+
+/**
+ * The budget for one facilitator call, read from the environment at call time.
+ *
+ * Read lazily, never memoized into a module constant: the defaults must hold
+ * with no configuration at all (the service starts on a bare env), and a test
+ * that stubs the variable must not be racing a value frozen at import.
+ *
+ * 🚨 Anything that is not a finite, strictly positive number falls back to the
+ * default. This is a money path and `setTimeout(NaN)` fires IMMEDIATELY, so a
+ * typo in a Railway variable would otherwise turn every settle into an instant
+ * timeout, which is the one failure this whole block exists to avoid.
+ */
+export function facilitatorTimeoutMs(operation: FacilitatorOperation): number {
+  const fallback = FACILITATOR_TIMEOUT_DEFAULTS[operation];
+  const raw = process.env[FACILITATOR_TIMEOUT_ENV[operation]];
+  if (raw == null || raw.trim() === '') return fallback;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    console.warn(
+      `[x402] ${FACILITATOR_TIMEOUT_ENV[operation]}=${raw} is not a positive number of milliseconds. Using ${fallback}ms.`,
+    );
+    return fallback;
+  }
+  return parsed;
+}
 
 export class FacilitatorTimeoutError extends Error {
   constructor(operation: string, ms: number) {
@@ -889,9 +943,9 @@ export class FacilitatorTimeoutError extends Error {
  */
 export function withFacilitatorTimeout<T>(
   call: Promise<T>,
-  operation: keyof typeof FACILITATOR_TIMEOUTS,
+  operation: FacilitatorOperation,
 ): Promise<T> {
-  const ms = FACILITATOR_TIMEOUTS[operation];
+  const ms = facilitatorTimeoutMs(operation);
   // Attached BEFORE the race: if the SDK call rejects after we stopped waiting,
   // this is the handler that keeps Node from killing the process.
   call.catch(() => {});
@@ -906,8 +960,101 @@ export function withFacilitatorTimeout<T>(
   }) as Promise<T>;
 }
 
+// ─── A settlement we could not confirm is UNKNOWN, never refused ─────────────
+//
+// When `processSettlement` throws something that is not a FacilitatorResponseError
+// the SDK logs it and answers a bare `402 {}` (@x402/hono, the catch around
+// processSettlement). For a REFUSAL that is right. For our timeout it is the
+// same lie the compliance side spent 21/08 removing: `screenBicSanctions`
+// answers `listed: null` and never `listed: false`, because a screen that could
+// not run must not read as a clean one. A settle we stopped waiting on is a
+// settlement whose outcome we do not know (the payment may well be on-chain)
+// and `402` states the opposite of that: "payment required".
+//
+// 🚨 402 is not merely imprecise here, it is the dangerous answer. An x402
+// client treats 402 as the signal to attach a payment and retry, so answering
+// 402 to a buyer who may already have paid is an invitation to pay twice. The
+// honest answer is 5xx: the FACILITATOR failed us, the caller did nothing
+// wrong, and nothing about it tells an agent to re-send money. 502 is the code
+// this same file already gives a facilitator that answered badly on the
+// handshake, so the two failure modes stay consistent.
+//
+// The flag has to be request-scoped: the facilitator client is memoized for the
+// whole process, so a module-level boolean would leak one request's timeout
+// onto another's response under concurrency.
+export interface SettlementSlot {
+  unconfirmed: FacilitatorTimeoutError | null;
+}
+const settlementSlot = new AsyncLocalStorage<SettlementSlot>();
+
+/**
+ * Test seam for the one link that has no other observable effect: the
+ * AsyncLocalStorage context must survive from the `run()` below, through the
+ * SDK's awaits, into the settle wrapper in `boundFacilitator`. If it does not,
+ * `getStore()` returns undefined, the flag never sets, and the buyer silently
+ * receives the SDK's bare 402 while every unit test on the body builder stays
+ * green. Exercised by x402.test.ts against a fake facilitator.
+ */
+export function runInSettlementSlot<T>(fn: () => T): { slot: SettlementSlot; out: T } {
+  const slot: SettlementSlot = { unconfirmed: null };
+  const out = settlementSlot.run(slot, fn);
+  return { slot, out };
+}
+
+/**
+ * The body served when a settlement's outcome is unknown.
+ *
+ * Mirrors the shape of `screenBicSanctions`: a `*_received: false` that says
+ * the check did not happen, and the claim itself left `null` rather than
+ * `false`. `paid: false` here would assert the buyer was not charged, which is
+ * exactly what we do not know.
+ */
+export function unconfirmedSettlementBody(
+  err: FacilitatorTimeoutError,
+  ms: number,
+  recoveryRef?: string | null,
+): {
+  error: string;
+  message: string;
+  settlement: { confirmation_received: false; paid: null; authoritative: false; timeout_ms: number };
+  recovery_url?: string;
+  recovery_note?: string;
+} {
+  return {
+    error: 'settlement_unconfirmed',
+    message:
+      `The payment facilitator did not confirm settlement within ${ms}ms. ` +
+      'Your payment may or may not have settled on-chain: this is not a refusal, and it is not a receipt. ' +
+      'Do NOT re-send the payment before checking whether the transfer reached the payTo address, ' +
+      'or you may be charged twice.',
+    settlement: {
+      // The confirmation never arrived...
+      confirmation_received: false,
+      // ...so we make no claim either way. Never `false`.
+      paid: null,
+      // Nothing on-chain was observed to back this answer.
+      authoritative: false,
+      timeout_ms: ms,
+    },
+    // 🚨 On a route that SELLS a pack, the handler already minted the key before
+    // settle ran, and its response carried the one-time recovery URL. This 502
+    // replaces that response, so without the line below we would destroy the
+    // very recovery path the buyer needs precisely in the case where they may
+    // have paid. The ref is the same digest credits-buy.ts computes, so the
+    // recovery endpoint answers to it unchanged.
+    ...(recoveryRef
+      ? {
+          recovery_url: `https://api.ibanforge.com/v1/credits/recover/${recoveryRef}`,
+          recovery_note:
+            'If your payment did settle, the key it bought already exists. Fetch it ONCE at recovery_url. ' +
+            'Buying again would pay a second time for a pack you may already own.',
+        }
+      : {}),
+  };
+}
+
 /** The same client, with each of its three calls bounded in time. */
-function boundFacilitator<T extends { verify: unknown; settle: unknown; getSupported: unknown }>(
+export function boundFacilitator<T extends { verify: unknown; settle: unknown; getSupported: unknown }>(
   client: T,
 ): T {
   const verify = client.verify as (...args: unknown[]) => Promise<unknown>;
@@ -917,7 +1064,16 @@ function boundFacilitator<T extends { verify: unknown; settle: unknown; getSuppo
   // reaches for that we did not wrap (createAuthHeaders, toJsonSafe, url…).
   return Object.assign(client, {
     verify: (...args: unknown[]) => withFacilitatorTimeout(verify.apply(client, args), 'verify'),
-    settle: (...args: unknown[]) => withFacilitatorTimeout(settle.apply(client, args), 'settle'),
+    settle: (...args: unknown[]) =>
+      withFacilitatorTimeout(settle.apply(client, args), 'settle').catch((err: unknown) => {
+        // Record, then rethrow untouched: the SDK still runs its own failure
+        // path, we only remember WHY it is about to answer 402.
+        if (err instanceof FacilitatorTimeoutError) {
+          const slot = settlementSlot.getStore();
+          if (slot) slot.unconfirmed = err;
+        }
+        throw err;
+      }),
     getSupported: (...args: unknown[]) =>
       withFacilitatorTimeout(getSupported.apply(client, args), 'supported'),
   });
@@ -1099,7 +1255,35 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
       // it, once, above. This is the parameter whose default fired the
       // detached `GET /supported` from every construction.
       const middleware = paywall.hono.paymentMiddlewareFromHTTPServer(httpServer, undefined, undefined, false);
-      return middleware(c, next);
+
+      // Run the paywall inside a request-scoped slot so a settle that timed out
+      // can be told apart from a settle that was refused. Both leave the SDK
+      // answering `402 {}`; only one of them means "we do not know".
+      const slot: SettlementSlot = { unconfirmed: null };
+      const outcome = await settlementSlot.run(slot, () => middleware(c, next));
+      if (!slot.unconfirmed) return outcome;
+
+      // Replace the SDK's bare 402. Clearing c.res first is the SDK's own idiom
+      // and it matters: Hono's `res` setter copies headers from the response it
+      // replaces, and the 402 carries none we want to keep.
+      const ms = facilitatorTimeoutMs('settle');
+      console.error(
+        `[x402] Settlement outcome unknown after ${ms}ms. Answering 502, not 402. ` +
+          'The payment may have settled on-chain; it must not be re-requested blindly.',
+        slot.unconfirmed.message,
+      );
+      // Only a SELLING route mints something recoverable. On a per-call paid
+      // route nothing was created, so there is nothing to point the buyer at.
+      const recoveryRef = isSellingRoute(c.req.method, new URL(c.req.url).pathname)
+        ? settlementRef(c)
+        : null;
+      const body = JSON.stringify(unconfirmedSettlementBody(slot.unconfirmed, ms, recoveryRef));
+      c.res = undefined;
+      c.res = new Response(body, {
+        status: 502,
+        headers: { 'content-type': 'application/json; charset=UTF-8' },
+      });
+      return;
     } catch (err) {
       console.error('[x402] Middleware error:', err);
       if (process.env.NODE_ENV === 'production') {

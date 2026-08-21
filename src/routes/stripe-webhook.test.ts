@@ -20,6 +20,9 @@ function mockEvent(opts: {
   email?: string | null;
   sessionId?: string;
   paymentStatus?: 'paid' | 'unpaid' | 'no_payment_required';
+  /** Stripe minor units: 2000 = $20.00. `null` = Stripe told us nothing. */
+  amountTotal?: number | null;
+  currency?: string | null;
 }): Stripe.Event {
   return {
     id: opts.id,
@@ -31,9 +34,23 @@ function mockEvent(opts: {
         customer_email: opts.email ?? null,
         customer_details: opts.email ? { email: opts.email } : null,
         payment_status: opts.paymentStatus ?? 'paid',
+        amount_total: opts.amountTotal === undefined ? 2000 : opts.amountTotal,
+        currency: opts.currency === undefined ? 'usd' : opts.currency,
       },
     },
   } as unknown as Stripe.Event;
+}
+
+/** What the database actually holds for a checkout session. */
+function storedAmount(sessionId: string): {
+  amount_paid_minor: number | null;
+  amount_paid_currency: string | null;
+} | undefined {
+  return getStatsDB()
+    .prepare(
+      'SELECT amount_paid_minor, amount_paid_currency FROM api_keys WHERE stripe_session_id = ?',
+    )
+    .get(sessionId) as { amount_paid_minor: number | null; amount_paid_currency: string | null } | undefined;
 }
 
 describe('processStripeEvent — checkout.session.completed', () => {
@@ -87,6 +104,8 @@ function mockOemEvent(opts: {
   email?: string | null;
   sessionId?: string;
   subscriptionId?: string | null;
+  amountTotal?: number | null;
+  currency?: string | null;
 }): Stripe.Event {
   return {
     id: opts.id,
@@ -100,6 +119,8 @@ function mockOemEvent(opts: {
         payment_status: 'paid',
         mode: 'subscription',
         subscription: opts.subscriptionId ?? `sub_test_${opts.id}`,
+        amount_total: opts.amountTotal === undefined ? 14900 : opts.amountTotal,
+        currency: opts.currency === undefined ? 'usd' : opts.currency,
       },
     },
   } as unknown as Stripe.Event;
@@ -196,6 +217,128 @@ describe('processStripeEvent — idempotency', () => {
     expect(second.body.key_prefix).toBeUndefined();
     // First call's key was minted, second call did not return a new one
     expect(typeof firstPrefix).toBe('string');
+  });
+});
+
+/**
+ * Audit B2: the amount collected by card was never stored. Reports re-derived
+ * it from the pack price table, which makes every historical figure a function
+ * of TODAY's prices: change one, and the past silently restates itself to a
+ * number no buyer ever paid.
+ */
+describe('the amount collected is measured, never re-derived', () => {
+  it('stores what Stripe says was charged, in Stripe’s own minor units', () => {
+    const run = Date.now();
+    const sessionId = `cs_test_amount_${run}`;
+    const result = processStripeEvent(
+      mockEvent({
+        id: `evt_amount_${run}`,
+        bundle: '5k',
+        sessionId,
+        email: `acme-${run}@example.com`,
+        amountTotal: 2000,
+        currency: 'usd',
+      }),
+    );
+
+    expect(result.body.amount_paid_minor).toBe(2000);
+    expect(storedAmount(sessionId)).toEqual({ amount_paid_minor: 2000, amount_paid_currency: 'usd' });
+  });
+
+  it('records the currency beside the amount rather than assuming USD', () => {
+    const run = Date.now();
+    const sessionId = `cs_test_currency_${run}`;
+    processStripeEvent(
+      mockEvent({ id: `evt_currency_${run}`, bundle: '1k', sessionId, amountTotal: 4500, currency: 'eur' }),
+    );
+    // A minor-unit integer without its currency is not an amount. The pack
+    // table's implicit USD is exactly the assumption this column removes.
+    expect(storedAmount(sessionId)).toEqual({ amount_paid_minor: 4500, amount_paid_currency: 'eur' });
+  });
+
+  it('keeps a discounted price instead of the list price of the pack', () => {
+    const run = Date.now();
+    const sessionId = `cs_test_discount_${run}`;
+    // A coupon on the $20 pack. The old reconstruction would have reported 20.
+    processStripeEvent(
+      mockEvent({ id: `evt_discount_${run}`, bundle: '5k', sessionId, amountTotal: 1500 }),
+    );
+    expect(storedAmount(sessionId)?.amount_paid_minor).toBe(1500);
+  });
+
+  /**
+   * 🚨 Zero is a measurement, NULL is "we were not told". Coercing a missing
+   * amount to 0 would record that the buyer paid nothing.
+   */
+  it('leaves the amount NULL when Stripe announces none, never 0', () => {
+    const run = Date.now();
+    const sessionId = `cs_test_noamount_${run}`;
+    const result = processStripeEvent(
+      mockEvent({ id: `evt_noamount_${run}`, bundle: '1k', sessionId, amountTotal: null, currency: null }),
+    );
+
+    expect(result.body.amount_paid_minor).toBeUndefined();
+    const row = storedAmount(sessionId);
+    expect(row?.amount_paid_minor).toBeNull();
+    expect(row?.amount_paid_minor).not.toBe(0);
+    expect(row?.amount_paid_currency).toBeNull();
+  });
+
+  /**
+   * The path the `amount_paid_minor IS NULL` guard exists for.
+   *
+   * A plain Stripe retry short-circuits on processed_webhooks and never gets
+   * here. `checkout.session.async_payment_succeeded` is different: a NEW event
+   * id for the SAME session, so it clears that barrier, hits an idempotent
+   * mint, and reaches the amount write. First value observed must win.
+   */
+  it('never lets a later event for the same session overwrite the amount', () => {
+    const run = Date.now();
+    const sessionId = `cs_test_async_${run}`;
+
+    processStripeEvent(
+      mockEvent({ id: `evt_async_a_${run}`, bundle: '5k', sessionId, amountTotal: 2000 }),
+    );
+    expect(storedAmount(sessionId)?.amount_paid_minor).toBe(2000);
+
+    const second = processStripeEvent(
+      mockEvent({
+        id: `evt_async_b_${run}`,
+        type: 'checkout.session.async_payment_succeeded',
+        bundle: '5k',
+        sessionId,
+        amountTotal: 9999,
+        currency: 'chf',
+      }),
+    );
+    expect(second.status).toBe(200);
+    // The mint was idempotent and so was the amount.
+    expect(storedAmount(sessionId)).toEqual({ amount_paid_minor: 2000, amount_paid_currency: 'usd' });
+  });
+
+  it('measures the subscription checkout too, not just credit packs', () => {
+    const run = Date.now();
+    const sessionId = `cs_test_oem_amount_${run}`;
+    const result = processStripeEvent(
+      mockOemEvent({ id: `evt_oem_amount_${run}`, sessionId, amountTotal: 14900 }),
+    );
+    expect(result.body.amount_paid_minor).toBe(14900);
+    expect(storedAmount(sessionId)).toEqual({ amount_paid_minor: 14900, amount_paid_currency: 'usd' });
+  });
+
+  /**
+   * The migration is additive and re-runnable: a key minted through a path that
+   * carries no payment session keeps NULL columns, and nothing backfills them
+   * with a guess. "We do not know" survives.
+   */
+  it('leaves a key that never went through Stripe unmeasured', () => {
+    const row = getStatsDB()
+      .prepare(
+        `SELECT amount_paid_minor FROM api_keys
+           WHERE stripe_session_id IS NULL AND amount_paid_minor IS NOT NULL LIMIT 1`,
+      )
+      .get();
+    expect(row).toBeUndefined();
   });
 });
 

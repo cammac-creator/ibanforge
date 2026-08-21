@@ -337,6 +337,29 @@ export function getStatsDB(): DatabaseType.Database {
       statsDB.exec('ALTER TABLE api_keys ADD COLUMN deactivated_at TEXT');
       statsDB.exec("UPDATE api_keys SET deactivated_at = datetime('now') WHERE active = 0 AND deactivated_at IS NULL");
     }
+    // What the buyer was ACTUALLY charged, as the payment provider reported it,
+    // in the provider's own minor units (Stripe amount_total: 2000 = $20.00).
+    // Added 2026-08-21 (audit B2): until now the only trace of a card purchase
+    // was credits_total, and the dollar figure was re-derived from the pack
+    // price table (src/lib/business-summary.ts). That derivation is silently
+    // retroactive: change a price, run a promotion, refund half, and every
+    // past purchase is restated to a number nobody ever paid.
+    //
+    // 🚨 Deliberately NOT backfilled. Rows written before this column stay
+    // NULL, because "we do not know" is the truth for them: writing the
+    // inferred amount would make a guess indistinguishable from a measurement
+    // for every future reader. Same reason `listed` stays null in a sanctions
+    // screen that could not run.
+    if (!keyCols.includes('amount_paid_minor')) {
+      statsDB.exec('ALTER TABLE api_keys ADD COLUMN amount_paid_minor INTEGER');
+    }
+    // ISO 4217, lowercase as Stripe sends it ("usd"). Stored beside the amount
+    // rather than assumed: a minor-unit integer without its currency is not an
+    // amount, and the pack table's implicit USD is exactly the assumption this
+    // column exists to stop making.
+    if (!keyCols.includes('amount_paid_currency')) {
+      statsDB.exec('ALTER TABLE api_keys ADD COLUMN amount_paid_currency TEXT');
+    }
     // Idempotency log for Stripe webhooks — Stripe retries up to 3 days.
     // Insert AFTER successful key mint; presence of stripe_event_id here means
     // "we've already minted for this event, don't do it again".
