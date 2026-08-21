@@ -926,7 +926,12 @@
     "last90": "Letzte 90 Tage",
     "barsHint": "Ein Balken pro Tag — grün: keine Serverfehler, bernstein: vereinzelte 5xx, rot: >1 % Serverfehler.",
     "noData": "keine Daten",
-    "method": "Methode: Erfolgsrate = Anteil der Anfragen ohne 5xx-Serverfehler, berechnet aus dem Produktions-Request-Log (Client-Fehler wie 402/404 sind erwartetes API-Verhalten und zählen nicht gegen die Verfügbarkeit). Seite aktualisiert sich alle 5 Minuten. Schriftliche SLAs sind in Editor/OEM-Vereinbarungen erhältlich."
+    "method": "Methode: Erfolgsrate = Anteil der Anfragen ohne 5xx-Serverfehler, berechnet aus dem Produktions-Request-Log (Client-Fehler wie 402/404 sind erwartetes API-Verhalten und zählen nicht gegen die Verfügbarkeit). Seite aktualisiert sich alle 5 Minuten. Schriftliche SLAs sind in Editor/OEM-Vereinbarungen erhältlich.",
+    "latencyTitle": "Bediente Antwortzeit",
+    "latencyP50": "Median",
+    "latencyP95": "95. Perzentil",
+    "latencyNote": "Gemessen am Produktionsverkehr der letzten 30 Tage, abgelehnte Anfragen ausgenommen: Eine in einer Millisekunde abgewiesene Anfrage belegt keine Geschwindigkeit. Tage mit zu wenig bedientem Verkehr bleiben unberücksichtigt, statt ein Perzentil aus einer Handvoll Messungen zu erhalten.",
+    "latencyNoData": "zu wenig bedienter Verkehr zum Messen"
   },
   "changelog": {
     "title": "Changelog",

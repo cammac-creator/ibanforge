@@ -8,6 +8,9 @@ interface DayStat {
   date: string;
   total_requests: number;
   s5xx: number;
+  /** Served latency for the day. null when the day had too few served requests. */
+  p50_ms: number | null;
+  p95_ms: number | null;
 }
 
 interface StatusData {
@@ -44,8 +47,23 @@ async function getStatusData(): Promise<StatusData> {
         next: { revalidate: 300 },
       });
       if (res.ok) {
-        const rows = (await res.json()) as Array<{ date: string; total_requests: number; s5xx: number }>;
-        days = rows.map((r) => ({ date: r.date, total_requests: r.total_requests ?? 0, s5xx: r.s5xx ?? 0 }));
+        const rows = (await res.json()) as Array<{
+          date: string;
+          total_requests: number;
+          s5xx: number;
+          p50_ms?: number | null;
+          p95_ms?: number | null;
+        }>;
+        days = rows.map((r) => ({
+          date: r.date,
+          total_requests: r.total_requests ?? 0,
+          s5xx: r.s5xx ?? 0,
+          // ?? null, never ?? 0: a missing measurement is not a zero-millisecond
+          // response. On a page customers are invited to trust, a fabricated
+          // figure is worse than an admitted gap.
+          p50_ms: r.p50_ms ?? null,
+          p95_ms: r.p95_ms ?? null,
+        }));
       }
     } catch {
       days = [];
@@ -90,6 +108,25 @@ export default async function StatusPage({ params }: { params: Promise<{ locale:
     });
   }
 
+  /**
+   * The typical day of the window, not the average of the days.
+   *
+   * A median over the daily percentiles: one bad afternoon should show up as
+   * one bad day on the bar chart, not silently raise the headline figure that
+   * a prospect reads. Days with no measurement are skipped rather than counted
+   * as zero.
+   */
+  function medianOf(pick: (d: DayStat) => number | null, window: number): number | null {
+    const vals = data.days
+      .slice(-window)
+      .map(pick)
+      .filter((v): v is number => v != null)
+      .sort((a, b) => a - b);
+    return vals.length ? vals[Math.floor(vals.length / 2)] : null;
+  }
+  const p50 = medianOf((d) => d.p50_ms, 30);
+  const p95 = medianOf((d) => d.p95_ms, 30);
+
   const windows: { label: string; value: string | null }[] = [
     { label: t("w7"), value: successRate(data.days, 7) },
     { label: t("w30"), value: successRate(data.days, 30) },
@@ -125,6 +162,26 @@ export default async function StatusPage({ params }: { params: Promise<{ locale:
           </div>
         ))}
       </div>
+
+      <h2 className="mt-12 font-heading text-lg font-semibold">{t("latencyTitle")}</h2>
+      <div className="mt-4 grid grid-cols-2 gap-px rounded-lg border border-border bg-border overflow-hidden">
+        {[
+          { label: t("latencyP50"), value: p50 },
+          { label: t("latencyP95"), value: p95 },
+        ].map((m) => (
+          <div key={m.label} className="bg-card p-4">
+            <p className="font-heading text-2xl font-semibold tabular-nums">
+              {m.value === null ? (
+                <span className="text-base font-normal text-muted-foreground">{t("latencyNoData")}</span>
+              ) : (
+                `${m.value} ms`
+              )}
+            </p>
+            <p className="mt-1 text-xs uppercase tracking-wider text-muted-foreground">{m.label}</p>
+          </div>
+        ))}
+      </div>
+      <p className="mt-2 text-sm text-muted-foreground">{t("latencyNote")}</p>
 
       <h2 className="mt-12 font-heading text-lg font-semibold">{t("last90")}</h2>
       <p className="mt-1 text-sm text-muted-foreground">{t("barsHint")}</p>

@@ -722,6 +722,16 @@ export function getStatsHistory(days: number = 7): Array<{
   /** min over up to 8 prior same-weekday totals — null under 3 samples. */
   expected_min: number | null;
   expected_max: number | null;
+  /**
+   * Served latency for the day, in milliseconds. Percentiles and not a mean:
+   * one slow outlier moves a mean and moves no customer's experience.
+   *
+   * `null` rather than 0 on a day with too few measured requests — a
+   * percentile over three samples is noise wearing a number's clothes, and on
+   * a public status page a made-up figure is worse than a gap.
+   */
+  p50_ms: number | null;
+  p95_ms: number | null;
 }> {
   const db = getStatsDB();
   // Business operations from daily_stats
@@ -758,6 +768,45 @@ export function getStatsHistory(days: number = 7): Array<{
     WHERE created_at >= datetime('now', '-' || ? || ' days')
     GROUP BY date(created_at)
   `).all(days + 56) as Array<{ date: string; total_requests: number; s2xx: number; s3xx: number; s4xx: number; s5xx: number }>;
+
+  /**
+   * Daily median and 95th percentile of served latency.
+   *
+   * Computed with window functions rather than by pulling every response_ms
+   * into JS: the row count grows without bound and this feeds a page that
+   * revalidates every five minutes.
+   *
+   * Only SERVED requests count. A 402 answered in two milliseconds because the
+   * paywall refused it is not evidence that the service is fast, and letting
+   * refusals into this figure would make the number improve every time a key
+   * farm hammers the door.
+   */
+  const MIN_SAMPLES_FOR_PERCENTILE = 20;
+  const latRows = db.prepare(`
+    WITH ranked AS (
+      SELECT date(created_at) AS d, response_ms,
+             ROW_NUMBER() OVER (PARTITION BY date(created_at) ORDER BY response_ms) AS rn,
+             COUNT(*)     OVER (PARTITION BY date(created_at)) AS n
+        FROM request_log
+       WHERE response_ms IS NOT NULL
+         AND status < 400
+         AND created_at >= datetime('now', '-' || ? || ' days')
+    )
+    SELECT d AS date, n,
+           MAX(CASE WHEN rn = MAX(1, CAST(n * 0.50 AS INTEGER)) THEN response_ms END) AS p50,
+           MAX(CASE WHEN rn = MAX(1, CAST(n * 0.95 AS INTEGER)) THEN response_ms END) AS p95
+      FROM ranked
+     GROUP BY d
+  `).all(days) as Array<{ date: string; n: number; p50: number | null; p95: number | null }>;
+
+  const latMap = new Map(
+    latRows.map(r => [
+      r.date,
+      r.n >= MIN_SAMPLES_FOR_PERCENTILE
+        ? { p50: r.p50 ?? null, p95: r.p95 ?? null }
+        : { p50: null, p95: null },
+    ]),
+  );
 
   const reqMap = new Map(reqRows.map(r => [r.date, r]));
 
@@ -803,6 +852,8 @@ export function getStatsHistory(days: number = 7): Array<{
       s5xx: req?.s5xx ?? 0,
       expected_min: b.min,
       expected_max: b.max,
+      p50_ms: latMap.get(date)?.p50 ?? null,
+      p95_ms: latMap.get(date)?.p95 ?? null,
     };
   });
 }

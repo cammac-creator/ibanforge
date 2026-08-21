@@ -926,7 +926,12 @@
     "last90": "Last 90 days",
     "barsHint": "One bar per day — green: no server errors, amber: isolated 5xx, red: >1% server errors.",
     "noData": "no data",
-    "method": "Method: success rate = share of requests answered without a 5xx server error, computed from the production request log (client errors like 402/404 are expected API behavior and do not count against availability). Page refreshes every 5 minutes. Written SLAs are available in Editor/OEM agreements."
+    "method": "Method: success rate = share of requests answered without a 5xx server error, computed from the production request log (client errors like 402/404 are expected API behavior and do not count against availability). Page refreshes every 5 minutes. Written SLAs are available in Editor/OEM agreements.",
+    "latencyTitle": "Served response time",
+    "latencyP50": "Median",
+    "latencyP95": "95th percentile",
+    "latencyNote": "Measured on production traffic over the last 30 days, refused requests excluded: a call the paywall turned away in a millisecond is not evidence of speed. Days with too few served requests are left out rather than given a percentile drawn from a handful of samples.",
+    "latencyNoData": "not enough served traffic to measure"
   },
   "changelog": {
     "title": "Changelog",

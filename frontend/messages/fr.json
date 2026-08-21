@@ -926,7 +926,12 @@
     "last90": "90 derniers jours",
     "barsHint": "Une barre par jour — vert : aucune erreur serveur, ambre : 5xx isolées, rouge : >1 % d'erreurs serveur.",
     "noData": "pas de données",
-    "method": "Méthode : taux de succès = part des requêtes servies sans erreur serveur 5xx, calculé depuis le journal de requêtes de production (les erreurs client comme 402/404 sont un comportement attendu de l'API et ne comptent pas contre la disponibilité). Page rafraîchie toutes les 5 minutes. Des SLA écrits sont disponibles dans les accords Editor/OEM."
+    "method": "Méthode : taux de succès = part des requêtes servies sans erreur serveur 5xx, calculé depuis le journal de requêtes de production (les erreurs client comme 402/404 sont un comportement attendu de l'API et ne comptent pas contre la disponibilité). Page rafraîchie toutes les 5 minutes. Des SLA écrits sont disponibles dans les accords Editor/OEM.",
+    "latencyTitle": "Temps de réponse servi",
+    "latencyP50": "Médiane",
+    "latencyP95": "95e centile",
+    "latencyNote": "Mesuré sur le trafic de production des 30 derniers jours, appels refusés exclus : une requête écartée en une milliseconde par le mur payant ne prouve aucune rapidité. Les journées trop creuses sont laissées de côté plutôt que de recevoir un centile tiré d'une poignée de mesures.",
+    "latencyNoData": "trafic servi insuffisant pour mesurer"
   },
   "changelog": {
     "title": "Changelog",

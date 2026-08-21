@@ -1,7 +1,8 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest';
 import { Hono } from 'hono';
 import { stats } from './stats.js';
-import { recordRejection } from '../lib/stats.js';
+import { recordRejection, getStatsHistory } from '../lib/stats.js';
+import { getStatsDB } from '../lib/db.js';
 import type { RejectionRow } from '../lib/stats.js';
 
 const app = new Hono();
@@ -119,5 +120,70 @@ describe('GET /stats/history — expected weekday band', () => {
       expect('expected_min' in row).toBe(true);
       expect('expected_max' in row).toBe(true);
     }
+  });
+});
+
+/**
+ * Served latency on the public status page.
+ *
+ * Percentiles and not a mean: one slow outlier moves a mean and moves nobody's
+ * experience. And a percentile over a handful of samples is noise wearing a
+ * number's clothes, which on a page customers are invited to trust is worse
+ * than an honest gap.
+ */
+describe('getStatsHistory — served latency', () => {
+  const PFX = 'ifk_lattest';
+
+  function log(status: number, ms: number, ago = 0) {
+    getStatsDB()
+      .prepare(
+        `INSERT INTO request_log (method, path, status, response_ms, created_at, hour, day_of_week, key_prefix)
+         VALUES ('POST', '/v1/iban/validate', ?, ?, datetime('now', ?), 12, 3, ?)`,
+      )
+      .run(status, ms, `-${ago} days`, PFX);
+  }
+
+  beforeEach(() => {
+    getStatsDB().prepare('DELETE FROM request_log WHERE key_prefix = ?').run(PFX);
+  });
+
+  /**
+   * These measure the EFFECT of a fixture, not an absolute value: the
+   * development database already holds today's real traffic, so asserting a
+   * number would only ever describe whatever else happens to be in there.
+   */
+  it('never lets a refused request make the service look fast', () => {
+    // A 402 answered in one millisecond by the paywall is not evidence of
+    // speed. Counting it would improve the figure every time a farm knocks.
+    const before = getStatsHistory(1).at(-1)?.p50_ms ?? null;
+    for (let i = 0; i < 200; i++) log(402, 1);
+    const after = getStatsHistory(1).at(-1)?.p50_ms ?? null;
+    expect(after).toBe(before);
+  });
+
+  it('does not report a percentile for a day with too few served requests', () => {
+    // The guard itself, on a day far enough back to be empty.
+    const rows = getStatsHistory(90);
+    for (const r of rows) {
+      if (r.p50_ms == null) continue;
+      // Any day that DOES carry a figure must have had the traffic for it.
+      expect(r.total_requests).toBeGreaterThanOrEqual(20);
+    }
+  });
+
+  it('measures served requests once there are enough of them', () => {
+    for (let i = 0; i < 100; i++) log(200, 20 + (i % 5));
+    const rows = getStatsHistory(1);
+    const today = rows[rows.length - 1];
+    expect(today.p50_ms).toBeGreaterThan(0);
+    expect(today.p95_ms).toBeGreaterThanOrEqual(today.p50_ms as number);
+  });
+
+  it('puts the p95 above the median when a tail exists', () => {
+    for (let i = 0; i < 95; i++) log(200, 10);
+    for (let i = 0; i < 20; i++) log(200, 900);
+    const rows = getStatsHistory(1);
+    const today = rows[rows.length - 1];
+    expect(today.p50_ms).toBeLessThan(today.p95_ms as number);
   });
 });
