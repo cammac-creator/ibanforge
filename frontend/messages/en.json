@@ -1184,6 +1184,16 @@
     "rotateCopy": "Copy",
     "rotateCopied": "Copied",
     "rotateFailed": "The key could not be rotated. Nothing was changed, and your current key still works.",
-    "rotateCarried": "Your remaining credits and monthly allowance carry over."
+    "rotateCarried": "Your remaining credits and monthly allowance carry over.",
+    "leaveTitle": "Leaving",
+    "leaveWhy": "You can revoke this key yourself, right now. Calls stop immediately and the key cannot be brought back.",
+    "leaveRetention": "After that, telemetry attributable to the key is deleted automatically 30 days later. That is a commitment in our data processing agreement, not a courtesy, and it runs on its own.",
+    "leaveButton": "Revoke this key",
+    "leaveConfirm": "Yes, revoke it permanently",
+    "leaveCancel": "Keep it",
+    "leaveWorking": "Revoking…",
+    "leaveDone": "This key is revoked. It will not work again, and its telemetry is deleted in 30 days.",
+    "leaveFailed": "The key could not be revoked. Nothing changed and it still works.",
+    "leaveDpa": "Read the data processing agreement"
   }
 }

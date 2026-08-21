@@ -1184,6 +1184,16 @@
     "rotateCopy": "Copier",
     "rotateCopied": "Copié",
     "rotateFailed": "La clé n'a pas pu être renouvelée. Rien n'a changé, votre clé actuelle fonctionne toujours.",
-    "rotateCarried": "Vos crédits restants et votre quota mensuel sont conservés."
+    "rotateCarried": "Vos crédits restants et votre quota mensuel sont conservés.",
+    "leaveTitle": "Partir",
+    "leaveWhy": "Vous pouvez révoquer cette clé vous-même, tout de suite. Les appels s'arrêtent immédiatement et la clé ne peut pas être rétablie.",
+    "leaveRetention": "Ensuite, les données de télémétrie rattachées à la clé sont supprimées automatiquement 30 jours plus tard. C'est un engagement de notre accord de traitement des données, pas une faveur, et il s'exécute tout seul.",
+    "leaveButton": "Révoquer cette clé",
+    "leaveConfirm": "Oui, la révoquer définitivement",
+    "leaveCancel": "La garder",
+    "leaveWorking": "Révocation…",
+    "leaveDone": "Cette clé est révoquée. Elle ne fonctionnera plus, et ses données de télémétrie seront supprimées dans 30 jours.",
+    "leaveFailed": "La clé n'a pas pu être révoquée. Rien n'a changé, elle fonctionne toujours.",
+    "leaveDpa": "Lire l'accord de traitement des données"
   }
 }

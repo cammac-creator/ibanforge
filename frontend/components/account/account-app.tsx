@@ -201,7 +201,83 @@ function Rotate({ apiKey, alarmed }: { apiKey: string; alarmed: boolean }) {
   );
 }
 
-export function AccountApp() {
+/**
+ * The way out.
+ *
+ * Revocation, the 30-day deletion and the DPA clause behind it all existed
+ * already: `/v1/keys/revoke` is self-service and authenticated by the key
+ * itself, and `purgeTerminatedKeyTelemetry` runs on its own and is watched.
+ * None of it was ever said to the customer, so the whole exit path was real
+ * and invisible — the same shape as this page being reachable from no link at
+ * all a few hours ago.
+ *
+ * Nothing here changes a policy. It states, where a customer can act on it,
+ * what the product already does.
+ */
+function Leave({ apiKey, locale }: { apiKey: string; locale: string }) {
+  const t = useTranslations("account");
+  const [phase, setPhase] = useState<"idle" | "confirm" | "working" | "done" | "failed">("idle");
+
+  async function revoke() {
+    setPhase("working");
+    try {
+      const res = await fetch(`${API_URL}/v1/keys/revoke`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${apiKey}` },
+      });
+      setPhase(res.ok ? "done" : "failed");
+    } catch {
+      setPhase("failed");
+    }
+  }
+
+  if (phase === "done") {
+    return (
+      <div className="rounded-lg border px-4 py-3">
+        <p className="text-sm">{t("leaveDone")}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-lg border px-4 py-3">
+      <h3 className="text-sm font-semibold">{t("leaveTitle")}</h3>
+      <p className="mt-1 text-sm text-muted-foreground">{t("leaveWhy")}</p>
+      <p className="mt-1 text-sm text-muted-foreground">{t("leaveRetention")}</p>
+      {phase === "failed" && <p className="mt-2 text-sm">{t("leaveFailed")}</p>}
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        {phase === "confirm" ? (
+          <>
+            <button
+              type="button"
+              onClick={revoke}
+              className="rounded-md border border-destructive px-4 py-2 text-sm font-medium text-destructive"
+            >
+              {t("leaveConfirm")}
+            </button>
+            <button type="button" onClick={() => setPhase("idle")} className="rounded-md border px-4 py-2 text-sm">
+              {t("leaveCancel")}
+            </button>
+          </>
+        ) : (
+          <button
+            type="button"
+            disabled={phase === "working"}
+            onClick={() => setPhase("confirm")}
+            className="rounded-md border px-4 py-2 text-sm text-muted-foreground hover:text-foreground disabled:opacity-50"
+          >
+            {phase === "working" ? t("leaveWorking") : t("leaveButton")}
+          </button>
+        )}
+        <a href={`/${locale}/legal/dpa`} className="text-sm text-muted-foreground underline underline-offset-2">
+          {t("leaveDpa")}
+        </a>
+      </div>
+    </div>
+  );
+}
+
+export function AccountApp({ locale }: { locale: string }) {
   const t = useTranslations("account");
   const [key, setKey] = useState("");
   const [state, setState] = useState<State>({ kind: "idle" });
@@ -346,6 +422,7 @@ export function AccountApp() {
           </section>
 
           <Rotate apiKey={key.trim()} alarmed={d.report.footprint.unusual === true} />
+          <Leave apiKey={key.trim()} locale={locale} />
         </div>
       )}
     </div>

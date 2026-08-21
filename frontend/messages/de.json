@@ -1184,6 +1184,16 @@
     "rotateCopy": "Kopieren",
     "rotateCopied": "Kopiert",
     "rotateFailed": "Der Schlüssel konnte nicht erneuert werden. Es wurde nichts geändert, Ihr aktueller Schlüssel funktioniert weiterhin.",
-    "rotateCarried": "Ihr Restguthaben und Ihr Monatskontingent bleiben erhalten."
+    "rotateCarried": "Ihr Restguthaben und Ihr Monatskontingent bleiben erhalten.",
+    "leaveTitle": "Beenden",
+    "leaveWhy": "Sie können diesen Schlüssel selbst widerrufen, sofort. Aufrufe enden unmittelbar und der Schlüssel lässt sich nicht wiederherstellen.",
+    "leaveRetention": "Danach werden die dem Schlüssel zurechenbaren Telemetriedaten 30 Tage später automatisch gelöscht. Das ist eine Zusage aus unserem Auftragsverarbeitungsvertrag, kein Entgegenkommen, und sie läuft von selbst.",
+    "leaveButton": "Diesen Schlüssel widerrufen",
+    "leaveConfirm": "Ja, endgültig widerrufen",
+    "leaveCancel": "Behalten",
+    "leaveWorking": "Wird widerrufen…",
+    "leaveDone": "Dieser Schlüssel ist widerrufen. Er funktioniert nicht mehr, und seine Telemetriedaten werden in 30 Tagen gelöscht.",
+    "leaveFailed": "Der Schlüssel konnte nicht widerrufen werden. Es wurde nichts geändert, er funktioniert weiterhin.",
+    "leaveDpa": "Auftragsverarbeitungsvertrag lesen"
   }
 }
