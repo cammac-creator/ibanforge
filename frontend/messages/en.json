@@ -1167,6 +1167,17 @@
     "footprintUnknown": "No calls yet, so there is nothing to judge.",
     "footprintHint": "Networks are counted from salted hashes. We never store the addresses themselves.",
     "rotateHint": "A key can be rotated or revoked at any time from the API, without contacting us.",
-    "docsLink": "See the endpoint in the docs"
+    "docsLink": "See the endpoint in the docs",
+    "rotateTitle": "Rotate this key",
+    "rotateWhy": "Issues a fresh key and revokes this one immediately. Calls using the old key stop at once, so change it in your application first, or right after.",
+    "rotateButton": "Rotate my key",
+    "rotateConfirm": "Yes, revoke the old key",
+    "rotateCancel": "Cancel",
+    "rotateWorking": "Rotating…",
+    "rotateDone": "Here is your new key. It is shown once and never again.",
+    "rotateCopy": "Copy",
+    "rotateCopied": "Copied",
+    "rotateFailed": "The key could not be rotated. Nothing was changed, and your current key still works.",
+    "rotateCarried": "Your remaining credits and monthly allowance carry over."
   }
 }

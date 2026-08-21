@@ -1167,6 +1167,17 @@
     "footprintUnknown": "Aucun appel pour l'instant : rien à juger.",
     "footprintHint": "Les réseaux sont comptés à partir d'empreintes salées. Les adresses elles-mêmes ne sont jamais conservées.",
     "rotateHint": "Une clé se renouvelle ou se révoque à tout moment depuis l'API, sans nous contacter.",
-    "docsLink": "Voir l'endpoint dans la documentation"
+    "docsLink": "Voir l'endpoint dans la documentation",
+    "rotateTitle": "Renouveler cette clé",
+    "rotateWhy": "Émet une nouvelle clé et révoque celle-ci immédiatement. Les appels avec l'ancienne clé s'arrêtent aussitôt : changez-la dans votre application avant, ou juste après.",
+    "rotateButton": "Renouveler ma clé",
+    "rotateConfirm": "Oui, révoquer l'ancienne clé",
+    "rotateCancel": "Annuler",
+    "rotateWorking": "Renouvellement…",
+    "rotateDone": "Voici votre nouvelle clé. Elle s'affiche une seule fois.",
+    "rotateCopy": "Copier",
+    "rotateCopied": "Copié",
+    "rotateFailed": "La clé n'a pas pu être renouvelée. Rien n'a changé, votre clé actuelle fonctionne toujours.",
+    "rotateCarried": "Vos crédits restants et votre quota mensuel sont conservés."
   }
 }

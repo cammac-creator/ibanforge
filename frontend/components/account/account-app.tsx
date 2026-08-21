@@ -101,6 +101,106 @@ function Days({ days, span }: { days: Array<{ day: string; count: number; failed
   );
 }
 
+/**
+ * The rotation panel.
+ *
+ * It exists because of what the footprint section says right above it. Telling
+ * a customer "more networks than a single deployment usually shows" and then
+ * offering them nothing to do about it is worse than saying nothing: it raises
+ * an alarm and hands over no lever. `/v1/keys/rotate` has been available all
+ * along, authenticated by the key itself, and it was reachable only by curl.
+ *
+ * Guarded behind an explicit confirmation because it is destructive and
+ * immediate: the old key stops working the instant the new one is minted.
+ */
+function Rotate({ apiKey, alarmed }: { apiKey: string; alarmed: boolean }) {
+  const t = useTranslations("account");
+  const [phase, setPhase] = useState<"idle" | "confirm" | "working" | "done" | "failed">("idle");
+  const [fresh, setFresh] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  async function rotate() {
+    setPhase("working");
+    try {
+      const res = await fetch(`${API_URL}/v1/keys/rotate`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${apiKey}` },
+      });
+      if (!res.ok) {
+        setPhase("failed");
+        return;
+      }
+      const body = (await res.json()) as { api_key?: string };
+      if (!body.api_key) {
+        // A 200 with no key is not a success. Never report one.
+        setPhase("failed");
+        return;
+      }
+      setFresh(body.api_key);
+      setPhase("done");
+    } catch {
+      setPhase("failed");
+    }
+  }
+
+  if (phase === "done" && fresh) {
+    return (
+      <div className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-4 py-3">
+        <p className="text-sm font-medium">{t("rotateDone")}</p>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <code className="min-w-0 flex-1 break-all rounded bg-background px-3 py-2 font-mono text-sm">{fresh}</code>
+          <button
+            type="button"
+            onClick={() => {
+              navigator.clipboard?.writeText(fresh).then(
+                () => setCopied(true),
+                () => setCopied(false),
+              );
+            }}
+            className="rounded-md border px-3 py-2 text-sm"
+          >
+            {copied ? t("rotateCopied") : t("rotateCopy")}
+          </button>
+        </div>
+        <p className="mt-2 text-xs text-muted-foreground">{t("rotateCarried")}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`rounded-lg border px-4 py-3 ${alarmed ? "border-amber-500/40 bg-amber-500/10" : "bg-card"}`}>
+      <h3 className="text-sm font-semibold">{t("rotateTitle")}</h3>
+      <p className="mt-1 text-sm text-muted-foreground">{t("rotateWhy")}</p>
+      {phase === "failed" && <p className="mt-2 text-sm">{t("rotateFailed")}</p>}
+      <div className="mt-3 flex flex-wrap gap-2">
+        {phase === "confirm" ? (
+          <>
+            <button
+              type="button"
+              onClick={rotate}
+              className="rounded-md bg-amber-600 px-4 py-2 text-sm font-medium text-white"
+            >
+              {t("rotateConfirm")}
+            </button>
+            <button type="button" onClick={() => setPhase("idle")} className="rounded-md border px-4 py-2 text-sm">
+              {t("rotateCancel")}
+            </button>
+          </>
+        ) : (
+          <button
+            type="button"
+            disabled={phase === "working"}
+            onClick={() => setPhase("confirm")}
+            className="rounded-md border px-4 py-2 text-sm font-medium disabled:opacity-50"
+          >
+            {phase === "working" ? t("rotateWorking") : t("rotateButton")}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function AccountApp() {
   const t = useTranslations("account");
   const [key, setKey] = useState("");
@@ -245,7 +345,7 @@ export function AccountApp() {
             </div>
           </section>
 
-          <p className="text-sm text-muted-foreground">{t("rotateHint")}</p>
+          <Rotate apiKey={key.trim()} alarmed={d.report.footprint.unusual === true} />
         </div>
       )}
     </div>

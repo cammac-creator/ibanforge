@@ -1167,6 +1167,17 @@
     "footprintUnknown": "Noch keine Aufrufe, also nichts zu beurteilen.",
     "footprintHint": "Netzwerke werden aus gesalzenen Prüfsummen gezählt. Die Adressen selbst werden nie gespeichert.",
     "rotateHint": "Ein Schlüssel lässt sich jederzeit über die API erneuern oder widerrufen, ohne uns zu kontaktieren.",
-    "docsLink": "Endpunkt in der Dokumentation ansehen"
+    "docsLink": "Endpunkt in der Dokumentation ansehen",
+    "rotateTitle": "Diesen Schlüssel erneuern",
+    "rotateWhy": "Erstellt einen neuen Schlüssel und widerruft diesen sofort. Aufrufe mit dem alten Schlüssel enden unmittelbar: Tauschen Sie ihn vorher in Ihrer Anwendung aus, oder direkt danach.",
+    "rotateButton": "Schlüssel erneuern",
+    "rotateConfirm": "Ja, alten Schlüssel widerrufen",
+    "rotateCancel": "Abbrechen",
+    "rotateWorking": "Wird erneuert…",
+    "rotateDone": "Hier ist Ihr neuer Schlüssel. Er wird nur dieses eine Mal angezeigt.",
+    "rotateCopy": "Kopieren",
+    "rotateCopied": "Kopiert",
+    "rotateFailed": "Der Schlüssel konnte nicht erneuert werden. Es wurde nichts geändert, Ihr aktueller Schlüssel funktioniert weiterhin.",
+    "rotateCarried": "Ihr Restguthaben und Ihr Monatskontingent bleiben erhalten."
   }
 }
