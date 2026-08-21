@@ -65,14 +65,14 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@types/better-sqlite3": "^7.6.0",
-    "@types/node": "^20.17.0",
-    "eslint": "^10.1.0",
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/node": "^26.2.0",
+    "eslint": "^10.8.1",
     "prettier": "^3.4.0",
     "tsx": "^4.19.0",
     "typescript": "^5.7.0",
     "typescript-eslint": "^8.65.0",
-    "vitest": "^3.0.0",
+    "vitest": "^4.1.10",
     "xlsx": "^0.18.5"
   },
   "bin": {
