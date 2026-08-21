@@ -4,6 +4,7 @@ import { getEntryCount, getLastUpdated } from '../lib/bic-lookup.js';
 import { getChClearingCount } from '../lib/ch-clearing.js';
 import { getStatsDB } from '../lib/db.js';
 import { getComplianceDB } from '../lib/compliance-db.js';
+import { ukModulusStatus, type UkModulusStatus } from '../lib/uk-modulus.js';
 
 const require = createRequire(import.meta.url);
 const pkg = require('../../package.json') as { version: string };
@@ -39,6 +40,26 @@ function probeDatabases(): { bic: number; chClearing: number; lastUpdated: strin
   return { bic: bicEntries, chClearing, lastUpdated };
 }
 
+/**
+ * The UK modulus table is OPTIONAL, and this endpoint must keep saying so.
+ *
+ * It is fetched at image build and the Dockerfile lets that step fail without
+ * failing the build, because a rotted download link must cost the UK check and
+ * never the deploy. So its absence is a degraded feature, not an outage: if it
+ * could turn /health red, Railway would pull a perfectly healthy container out
+ * of rotation over a check that is allowed to be missing.
+ *
+ * Hence its own guard. `ukModulusStatus()` swallows its own read errors today,
+ * but this endpoint must not depend on that staying true.
+ */
+function probeUkModulus(): UkModulusStatus {
+  try {
+    return ukModulusStatus();
+  } catch {
+    return { available: false, fetched_on: null, age_days: null, stale: null };
+  }
+}
+
 health.get('/health', (c) => {
   try {
     const db = probeDatabases();
@@ -54,6 +75,12 @@ health.get('/health', (c) => {
       ch_clearing_entries: db.chClearing,
       bic_data_last_updated: db.lastUpdated,
       databases: { bic: 'ok', stats: 'ok', compliance: 'ok' },
+      // ADDED beside the contract, nothing renamed. `stale` is what alerting
+      // hangs off: the table refreshes only at image build, so without a deploy
+      // it ages with no signal anywhere. The daily probe watches `checked:
+      // true`, which a six-month-old table satisfies just as well as a fresh
+      // one, while answering wrongly for every sorting code reallocated since.
+      uk_modulus: probeUkModulus(),
     });
   } catch {
     return c.json({ status: 'error', message: 'health_check_failed' }, 503);

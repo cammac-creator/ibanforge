@@ -103,6 +103,61 @@ export function ukModulusAvailable(): boolean {
   return load() !== null;
 }
 
+/**
+ * Days after which the table counts as stale.
+ *
+ * Vocalink publishes on a roughly six-weekly cycle, so 60 days means a refresh
+ * has been missed rather than merely being due. The number is deliberately
+ * generous: this flag exists to catch a table that stopped refreshing, not to
+ * fire every cycle.
+ */
+export const UK_MODULUS_STALE_AFTER_DAYS = 60;
+
+export interface UkModulusStatus {
+  available: boolean;
+  /** The day WE fetched it, not the day Vocalink published. Null with no table. */
+  fetched_on: string | null;
+  age_days: number | null;
+  /**
+   * `null`, never `false`, when there is no table or its date will not parse.
+   *
+   * Same doctrine as `listed: null` in the sanctions screen and
+   * `authoritative: false` in enrichment: a freshness check that could not run
+   * must not read as a freshness check that passed. An absent table is not a
+   * fresh one.
+   */
+  stale: boolean | null;
+}
+
+/**
+ * How stale this server's copy of the table is.
+ *
+ * The table is fetched at Docker build time and never again, so without a
+ * deploy it ages silently: the daily probe watches `checked: true`, which only
+ * proves the table is PRESENT. A copy frozen six months ago answers every
+ * probe exactly like a fresh one, and the answers it gives are wrong for every
+ * sorting code reallocated since.
+ */
+export function ukModulusStatus(now: Date = new Date()): UkModulusStatus {
+  const t = load();
+  if (t === null) return { available: false, fetched_on: null, age_days: null, stale: null };
+
+  const harvested = Date.parse(`${t.harvested}T00:00:00Z`);
+  if (Number.isNaN(harvested)) {
+    // A table whose date we cannot read is still usable for checking; it is its
+    // AGE that is unknown, so only the age-derived fields go null.
+    return { available: true, fetched_on: t.harvested, age_days: null, stale: null };
+  }
+
+  const ageDays = Math.floor((now.getTime() - harvested) / 86_400_000);
+  return {
+    available: true,
+    fetched_on: t.harvested,
+    age_days: ageDays,
+    stale: ageDays > UK_MODULUS_STALE_AFTER_DAYS,
+  };
+}
+
 /** Reset cached state (tests, or after a refresh). */
 export function resetUkModulus(): void {
   table = null;

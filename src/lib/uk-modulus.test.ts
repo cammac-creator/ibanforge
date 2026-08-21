@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { checkUkModulus, ukModulusAvailable } from './uk-modulus.js';
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import {
+  checkUkModulus,
+  resetUkModulus,
+  ukModulusAvailable,
+  ukModulusStatus,
+  UK_MODULUS_STALE_AFTER_DAYS,
+  type UkModulusStatus,
+} from './uk-modulus.js';
 import { validateIBAN } from './iban.js';
 import { enrichResult } from './enrich.js';
 
@@ -150,5 +160,94 @@ describe.skipIf(!ukModulusAvailable())('a validated GB IBAN carries the modulus 
     const result = validateIBAN('CH1000230000000012345');
     enrichResult(result);
     expect(result.modulus_check).toBeUndefined();
+  });
+});
+
+/**
+ * The table is fetched at image build and never again, so between deploys it
+ * ages with nothing watching. The daily probe checks `checked: true`, which a
+ * six-month-old table satisfies exactly like a fresh one while answering wrongly
+ * for every sorting code reallocated since. Freshness had to become readable
+ * before anything could alert on it.
+ *
+ * These run against a synthetic table rather than the harvested one, so they
+ * also run in CI, where the real table is absent by design.
+ */
+describe('ukModulusStatus — a table that stopped refreshing', () => {
+  function statusFor(harvested: string | null, now: Date): UkModulusStatus {
+    const dir = mkdtempSync(join(tmpdir(), 'ibanforge-uk-'));
+    const path = join(dir, 'uk-modulus.json');
+    if (harvested !== null) {
+      writeFileSync(
+        path,
+        JSON.stringify({
+          harvested,
+          source: 'synthetic table for tests',
+          rows: [
+            {
+              start: '000000',
+              end: '999999',
+              algorithm: 'MOD10',
+              weights: [0, 0, 0, 0, 0, 0, 1, 2, 1, 2, 1, 2, 1, 2],
+              exception: null,
+            },
+          ],
+          substitutions: {},
+        }),
+      );
+    }
+    const previous = process.env.UK_MODULUS_PATH;
+    process.env.UK_MODULUS_PATH = path;
+    resetUkModulus();
+    try {
+      return ukModulusStatus(now);
+    } finally {
+      if (previous === undefined) delete process.env.UK_MODULUS_PATH;
+      else process.env.UK_MODULUS_PATH = previous;
+      // Drop the synthetic table so the suites above keep seeing the real one.
+      resetUkModulus();
+    }
+  }
+
+  const NOW = new Date('2026-08-21T09:00:00Z');
+
+  it('reports the fetch day and the age in days', () => {
+    const s = statusFor('2026-08-14', NOW);
+    expect(s.available).toBe(true);
+    expect(s.fetched_on).toBe('2026-08-14');
+    expect(s.age_days).toBe(7);
+    expect(s.stale).toBe(false);
+  });
+
+  it('is not stale ON the threshold, and stale one day past it', () => {
+    const onThreshold = new Date(NOW);
+    onThreshold.setUTCDate(onThreshold.getUTCDate() - UK_MODULUS_STALE_AFTER_DAYS);
+    const justPast = new Date(onThreshold);
+    justPast.setUTCDate(justPast.getUTCDate() - 1);
+    const iso = (d: Date) => d.toISOString().slice(0, 10);
+
+    expect(statusFor(iso(onThreshold), NOW).stale).toBe(false);
+    expect(statusFor(iso(justPast), NOW).stale).toBe(true);
+  });
+
+  /**
+   * `null`, never `false`. Same doctrine as `listed: null` in the sanctions
+   * screen: a freshness check that could not run must not read like one that
+   * passed, or the flag alerting hangs off would go permanently quiet on the
+   * exact servers that have no table at all.
+   */
+  it('says nothing rather than "fresh" when there is no table', () => {
+    const s = statusFor(null, NOW);
+    expect(s.available).toBe(false);
+    expect(s.fetched_on).toBeNull();
+    expect(s.age_days).toBeNull();
+    expect(s.stale).toBeNull();
+  });
+
+  it('keeps a table whose date will not parse usable, with its age unknown', () => {
+    const s = statusFor('not-a-date', NOW);
+    expect(s.available).toBe(true);
+    expect(s.age_days).toBeNull();
+    expect(s.stale).toBeNull();
   });
 });

@@ -99,3 +99,60 @@ describe('/health', () => {
     expect(await healthWithBrokenDb(envVar, fileName)).toBe(503);
   });
 });
+
+/**
+ * The UK modulus table refreshes ONLY at image build. Between deploys it ages
+ * with nothing watching: the daily probe checks that a verdict comes back, which
+ * a six-month-old table does just as convincingly as a fresh one, while
+ * answering wrongly for every sorting code reallocated since. Making the age
+ * readable here is what lets anything alert on it.
+ */
+describe('/health — freshness of the UK modulus table', () => {
+  /** A run whose table path points at a file that does not exist. */
+  async function healthWithoutUkTable(): Promise<{ status: number; body: Record<string, unknown> }> {
+    vi.resetModules();
+    process.env.UK_MODULUS_PATH = join(mkdtempSync(join(tmpdir(), 'ibanforge-uk-')), 'absent.json');
+    const [{ health: freshHealth }, db, compliance] = await Promise.all([
+      import('./health.js'),
+      import('../lib/db.js'),
+      import('../lib/compliance-db.js'),
+    ]);
+    const isolated = new Hono();
+    isolated.route('/', freshHealth);
+    try {
+      const res = await isolated.request('/health');
+      return { status: res.status, body: (await res.json()) as Record<string, unknown> };
+    } finally {
+      db.closeAll();
+      compliance.closeComplianceDB();
+    }
+  }
+
+  it('exposes the age of the table beside the rest', async () => {
+    const body = (await (await app.request('/health')).json()) as Record<string, unknown>;
+    // Shape only, no value: the table is absent in CI by design (fetched at
+    // image build, never committed), so asserting a date here would make this
+    // test pass locally and fail in the pipeline.
+    expect(Object.keys(body)).toContain('uk_modulus');
+    expect(Object.keys(body.uk_modulus as object)).toEqual(
+      expect.arrayContaining(['available', 'fetched_on', 'age_days', 'stale']),
+    );
+  });
+
+  /**
+   * The one that matters. The Dockerfile lets the table download fail without
+   * failing the build, on purpose: a rotted link must cost the UK check and
+   * never the deploy. If its absence could turn this endpoint red, Railway
+   * would evict a healthy container over a dataset allowed to be missing —
+   * turning a degraded feature into an outage.
+   */
+  it('stays green with no table at all, and says so instead of claiming fresh', async () => {
+    const { status, body } = await healthWithoutUkTable();
+    expect(status).toBe(200);
+    expect(body.status).toBe('ok');
+    const uk = body.uk_modulus as Record<string, unknown>;
+    expect(uk.available).toBe(false);
+    // null, not false: a freshness check that could not run has not passed.
+    expect(uk.stale).toBeNull();
+  });
+});
