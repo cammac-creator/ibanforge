@@ -393,7 +393,7 @@ function buildAccessRamp(): Record<string, unknown> {
       '(200 req/month), prepaid credit packs (card or USDC), or pay-per-call via x402.',
     free_tier: {
       description: '200 requests/month — no credit card, no subscription',
-      signup: 'POST /v1/keys/generate with body {"email":"you@example.com"}',
+      signup: 'POST /v1/keys/generate with body {"email":"you@company.com"}',
       usage: 'Add header: Authorization: Bearer ifk_your_key_here',
     },
     credit_packs: {

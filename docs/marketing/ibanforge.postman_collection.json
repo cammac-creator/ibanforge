@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "IBANforge API",
-    "description": "IBAN validation, BIC/SWIFT lookup, Swiss clearing and compliance risk scoring — for AI agents and developers.\n\n## Getting started\n1. The **Demo** request needs no key — run it first to check the collection works.\n2. For the paid endpoints, set the `apiKey` collection variable. Get a free key (200 requests/month) by calling `POST /v1/keys/generate {\"email\":\"you@example.com\"}`, or buy prepaid credits at https://api.ibanforge.com/#pricing\n3. Beyond the free tier, calls are pay-per-use in USDC via the x402 protocol — see https://api.ibanforge.com/.well-known/x402\n\nOpenAPI: https://api.ibanforge.com/openapi.json · MCP server: `npx -y ibanforge-mcp`",
+    "description": "IBAN validation, BIC/SWIFT lookup, Swiss clearing and compliance risk scoring — for AI agents and developers.\n\n## Getting started\n1. The **Demo** request needs no key — run it first to check the collection works.\n2. For the paid endpoints, set the `apiKey` collection variable. Get a free key (200 requests/month) by calling `POST /v1/keys/generate {\"email\":\"you@company.com\"}`, or buy prepaid credits at https://api.ibanforge.com/#pricing\n3. Beyond the free tier, calls are pay-per-use in USDC via the x402 protocol — see https://api.ibanforge.com/.well-known/x402\n\nOpenAPI: https://api.ibanforge.com/openapi.json · MCP server: `npx -y ibanforge-mcp`",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {

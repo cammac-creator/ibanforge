@@ -43,7 +43,7 @@ Zero to first payment in 3 steps (wallet with budget → USDC on Base → one $5
 - GET  /v1/iban/structure[/{country}] — free IBAN templates for 89 countries (no auth)
 - GET  /v1/credits/bundles — free, list prepaid credit bundles
 - GET  /v1/demo — free example validations
-- POST /v1/keys/generate {"email":"you@example.com"} — free API key (200 req/month)
+- POST /v1/keys/generate {"email":"you@company.com"} — free API key (200 req/month)
 
 ## How to pay (3 rails, no dead-ends)
 - Free tier: POST /v1/keys/generate → Authorization: Bearer ifk_... (200 req/month)

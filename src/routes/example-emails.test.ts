@@ -59,26 +59,18 @@ const HISTORY = new Set(['CHANGELOG.md']);
  */
 const KNOWN_DEBT = new Set(
   [
+    // Left: `src/app.ts` was being rewritten in a parallel session, and the
+    // three SDK files ship in one npm + PyPI batch of their own. Everything
+    // else on this list was fixed the same night and removed from it.
     'src/app.ts',
-    'src/middleware/enrich-402.ts',
-    'frontend/public/llms.txt',
-    'frontend/public/llms-full.txt',
-    'README.md',
     'sdks/python/README.md',
     'sdks/python/ibanforge/client.py',
     'sdks/typescript/src/index.ts',
-    // The three locales of this post publish the SAME quickstart the Python
-    // README does, each with its own refused address (you@ / vous@ / sie@
-    // example.com). Found by this test, not by the audit that preceded it.
-    'frontend/content/en/blog/2026-04-29-python-sdk-released.mdx',
-    'frontend/content/fr/blog/2026-04-29-python-sdk-released.mdx',
-    'frontend/content/de/blog/2026-04-29-python-sdk-released.mdx',
-    'integrations/openai/developer-onramp.md',
     // ⚠️ This one is listed for the human reader, not for the extractor: the
     // Postman collection carries the address inside an escaped JSON string
-    // (`{\"email\":\"…\"}`), which none of the patterns below match. Removing
-    // it from this list will NOT put the file under guard — fix the file and
-    // widen a pattern, or it stays uncovered either way.
+    // (`{\"email\":\"…\"}`), which none of the patterns below match. Its
+    // address IS fixed; the file stays listed because removing it would not
+    // put it under guard either way — that needs a wider pattern.
     'docs/marketing/ibanforge.postman_collection.json',
   ].map((p) => p.split('/').join(sep)),
 );

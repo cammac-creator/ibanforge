@@ -17,7 +17,7 @@ Wenn Sie noch keinen API-Key haben, generieren Sie ihn im selben Skript:
 ```python
 from ibanforge import IBANforge
 
-key = IBANforge.generate_api_key("sie@example.com")
+key = IBANforge.generate_api_key("sie@company.com")
 client = IBANforge(api_key=key["api_key"])
 
 result = client.validate_iban("CH9300762011623852957")

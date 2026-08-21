@@ -22,7 +22,7 @@ IBANforge is a compliance-grade API built for AI agents and developers. It valid
 Three rails, pick what fits — agents never hit a dead-end:
 
 **Free tier (API key):**
-- POST /v1/keys/generate {"email":"you@example.com"} → use `Authorization: Bearer ifk_...`
+- POST /v1/keys/generate {"email":"you@company.com"} → use `Authorization: Bearer ifk_...`
 - 200 requests/month
 
 **Credit packs (card or USDC, never expire):**

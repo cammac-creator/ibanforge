@@ -14,7 +14,7 @@ aimed at the people who actually buy API access: developers building agents.
 
 ```bash
 curl -X POST https://api.ibanforge.com/v1/keys/generate \
-  -H 'Content-Type: application/json' -d '{"email":"you@example.com"}'
+  -H 'Content-Type: application/json' -d '{"email":"you@company.com"}'
 ```
 
 The MCP server exposes **5 tools** (verified live): `validate_iban`,

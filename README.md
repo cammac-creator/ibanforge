@@ -99,7 +99,7 @@ The Python SDK ships with sync + async clients, typed exception classes, and a f
 from ibanforge import IBANforge
 
 # 1-line free key (200 req/month, no signup form)
-key = IBANforge.generate_api_key("you@example.com")
+key = IBANforge.generate_api_key("you@company.com")
 
 with IBANforge(api_key=key["api_key"]) as client:
     out = client.validate_iban("CH1000230000000012345")
