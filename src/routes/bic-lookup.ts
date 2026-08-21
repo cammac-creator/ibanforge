@@ -1,13 +1,25 @@
 import { Hono } from 'hono';
 import type { HonoEnv } from '../types.js';
 import { validateBIC } from '../lib/bic-validator.js';
-import { lookup } from '../lib/bic-lookup.js';
+import { lookup, sharedBic8Stats } from '../lib/bic-lookup.js';
 import { screenBicSanctions } from '../lib/compliance.js';
 import { hasNonLatinScript } from '../lib/gleif-address.js';
 import { classifyBicInput } from '../lib/input-normalize.js';
 import { recordOperation, recordRejection } from '../lib/stats.js';
 import { computeRevenue } from '../lib/request-helpers.js';
 import type { BICLookupResult } from '../types.js';
+import type { SharedBic8Stats } from '../lib/bic-lookup.js';
+
+/**
+ * The served payload, plus what we hold under a BIC8 that resolves no single
+ * institution.
+ *
+ * Declared here rather than on BICLookupResult on purpose: several agents were
+ * editing src/types.ts the morning this landed, and a shared type file is the
+ * worst place to take a lock for one route's optional field. Fold it into
+ * BICLookupResult when the tree is quiet — nothing else depends on it.
+ */
+type BicLookupPayload = BICLookupResult & { shared_bic8?: SharedBic8Stats };
 
 const COST_USDC = 0.003;
 
@@ -71,6 +83,9 @@ bicLookup.get('/v1/bic/:code', (c) => {
   const row = lookup(validation.bic11!);
   const found = row !== null;
   const sanctions = screenBicSanctions(validation.bic8!);
+  // Only consulted when no single institution resolved: this is what we still
+  // hold under the BIC8, so a miss can stop claiming we know nothing.
+  const shared = found ? null : sharedBic8Stats(validation.bic8!);
 
   const errorDetail = found ? undefined : validation.bic;
   const revenue = computeRevenue(c, COST_USDC);
@@ -91,7 +106,7 @@ bicLookup.get('/v1/bic/:code', (c) => {
       ? 'gleif_english'
       : 'unavailable';
 
-  const result: BICLookupResult = {
+  const result: BicLookupPayload = {
     bic: validation.bic,
     bic8: validation.bic8!,
     bic11: validation.bic11!,
@@ -131,18 +146,47 @@ bicLookup.get('/v1/bic/:code', (c) => {
     // designated is the most reassuring thing this endpoint can say about the
     // least reassuring institution it knows.
     sanctions,
+    ...(shared ? { shared_bic8: shared } : {}),
     cost_usdc: c.get('apiKeyAuthenticated') ? 0 : COST_USDC,
     processing_ms: Math.round((performance.now() - start) * 100) / 100,
   };
 
   if (!found) {
-    // The wording depends on WHY we hold nothing. "Coverage may be partial" is
-    // a fair description of a gap in a directory; it is a dangerously calm way
-    // to describe a designated bank.
-    result.note = sanctions.listed
-      ? 'This BIC is named on a sanctions list but is absent from our BIC directory, so we cannot identify the institution. ' +
-        'Absence here is a gap in our directory, NOT a clean screening result. Screen it with POST /v1/iban/compliance {"bic": "..."}.'
-      : 'BIC format valid but not found in database. Data sourced from GLEIF — coverage may be partial.';
+    // Composed from parts rather than chosen between branches: a BIC8 can be
+    // both shared AND designated, and an if/else would silently drop one of the
+    // two facts. Sanctions come first — it is the one that stops a payment.
+    const parts: string[] = [];
+
+    // The designation itself, stated without any claim about our coverage —
+    // that claim belongs below and depends on what we actually hold. An earlier
+    // draft asserted "absent from our BIC directory" here and then announced
+    // the rows we hold two sentences later: a BIC8 can be shared AND
+    // designated (measured: it happens), so the two facts have to be told by
+    // parts that cannot contradict each other.
+    if (sanctions.listed) {
+      parts.push(
+        'This BIC is named on a sanctions list. A missing directory record is a gap in our coverage, ' +
+          'NOT a clean screening result. Screen it with POST /v1/iban/compliance {"bic": "..."}.',
+      );
+    }
+
+    if (shared) {
+      // We hold the code; what we cannot do is name ONE holder. Saying so beats
+      // "not found", and beats naming a bank picked by row order.
+      parts.push(
+        `No head-office (XXX) record exists for this BIC8, but the directory holds ${shared.entries} ` +
+          `${shared.entries === 1 ? 'entry' : 'entries'} under it, covering ${shared.institutions} ` +
+          `distinct ${shared.institutions === 1 ? 'institution' : 'institutions'}. ` +
+          'A shared BIC8 identifies the clearing institution, not the account holder: supply the full ' +
+          '11-character BIC including its branch code to resolve one of them. We do not pick one for you.',
+      );
+    } else if (sanctions.listed) {
+      parts.push('We hold no record under this BIC8, so we cannot name the institution behind it.');
+    } else {
+      parts.push('BIC format valid but not found in database. Data sourced from GLEIF — coverage may be partial.');
+    }
+
+    result.note = parts.join(' ');
   }
 
   return c.json(result);

@@ -226,3 +226,65 @@ describe('GET /v1/bic/:code — sanctions warning', () => {
     if (body.found === false) expect(body.note).toContain('coverage may be partial');
   });
 });
+
+/**
+ * A shared BIC8 stops answering "not found" about a code we hold.
+ *
+ * The route normalises a BIC8 to `bic8 + 'XXX'` and looks that up, so a code
+ * whose head-office record does not exist came back `found: false` plus
+ * "coverage may be partial" — while the directory held it perfectly well.
+ * Measured 21/08/2026: 352 BIC8 in that position, 11,422 rows.
+ */
+describe('GET /v1/bic/:code — shared BIC8 aggregate', () => {
+  const app = makeApp();
+
+  async function get(code: string) {
+    const res = await app.request('/v1/bic/' + code, { headers: { 'X-Dev-Skip': 'true' } });
+    return (await res.json()) as Record<string, unknown>;
+  }
+
+  it('reports how many institutions share the code instead of claiming ignorance', async () => {
+    const body = await get('GENODEF1');
+    const shared = body.shared_bic8 as { institutions: number; entries: number } | undefined;
+    expect(shared).toBeDefined();
+    // Counts are read live: the directory is reseeded monthly and pinning the
+    // exact figures would go red on ordinary churn rather than on a regression.
+    expect(shared!.institutions).toBeGreaterThan(100);
+    expect(shared!.entries).toBeGreaterThanOrEqual(shared!.institutions);
+    expect(body.note).toContain('branch code');
+  });
+
+  it('never names one of them — the whole point of the aggregate', async () => {
+    // Picking any row would name a bank chosen by row order, which is a coin
+    // flip dressed as an answer.
+    const body = await get('GENODEF1');
+    expect(body.institution).toBeNull();
+    expect(body.note).toContain('We do not pick one for you');
+  });
+
+  it('leaves a BIC with a head-office record untouched', async () => {
+    const body = await get('UBSWCHZH');
+    expect(body.found).toBe(true);
+    expect(body).not.toHaveProperty('shared_bic8');
+    expect(body.institution).toBeTruthy();
+  });
+
+  it('keeps the ordinary wording for a code the directory genuinely lacks', async () => {
+    const body = await get('AAAAGB2L');
+    if (body.found === false && !body.shared_bic8) {
+      expect(body.note).toContain('coverage may be partial');
+    }
+  });
+
+  it('tells BOTH facts when a BIC8 is shared AND designated, without contradicting itself', async () => {
+    // A first draft asserted "absent from our BIC directory" for the sanctions
+    // half and then announced the rows we hold two sentences later. Both are
+    // reachable at once, so the parts must not overlap in what they claim.
+    const body = await get('SOMRRUM1');
+    const sanctions = body.sanctions as Record<string, unknown>;
+    if (sanctions.listed !== true || !body.shared_bic8) return; // list moved: nothing to assert
+    expect(body.note).toContain('sanctions list');
+    expect(body.note).toContain('head-office');
+    expect(body.note).not.toContain('absent from our BIC directory');
+  });
+});

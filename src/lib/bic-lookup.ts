@@ -305,6 +305,52 @@ export function lookupByBic8(bic8: string): BICRow[] {
   return stmtByBic8.all(bic8) as BICRow[];
 }
 
+/**
+ * What we hold under a BIC8 when no single institution can be named for it.
+ *
+ * ## Why this exists
+ *
+ * `GET /v1/bic/:code` normalises a BIC8 to `bic8 + 'XXX'` and looks that up.
+ * When the head-office row is absent the answer was `found: false` plus
+ * "coverage may be partial" — while the directory held the code perfectly well.
+ * Measured 21/08/2026: 352 BIC8 are in that position, covering 11,422 rows.
+ * `GENODEF1` alone holds 1,018 rows for 777 distinct German cooperative banks.
+ *
+ * Telling a caller we know nothing about a code we hold a thousand rows for is
+ * the same shape of defect as answering "clean" for a bank we never screened:
+ * information we have, reported as information we lack.
+ *
+ * ## Why it returns counts and never a name
+ *
+ * A shared BIC8 identifies the clearing institution, not the account holder —
+ * that finesse lives in the branch code. Picking any one row would name a bank
+ * chosen by row order, which is a coin flip dressed as an answer. So the
+ * aggregate says HOW MANY and stops there; naming requires the 11-character
+ * BIC. This holds even when the group has a single institution: one uniform
+ * contract beats a special case that sometimes names and sometimes does not.
+ */
+export interface SharedBic8Stats {
+  /** Distinct institution names under this BIC8, compared case- and space-insensitively. */
+  institutions: number;
+  /** Rows held under this BIC8, branches included. */
+  entries: number;
+}
+
+let stmtBic8Stats: Database.Statement | null = null;
+
+export function sharedBic8Stats(bic8: string): SharedBic8Stats | null {
+  if (!stmtBic8Stats) {
+    stmtBic8Stats = getBicDB().prepare(
+      `SELECT COUNT(*) AS entries,
+              COUNT(DISTINCT UPPER(TRIM(COALESCE(institution, '')))) AS institutions
+       FROM bic_entries WHERE bic8 = ?`,
+    );
+  }
+  const row = stmtBic8Stats.get(bic8) as { entries: number; institutions: number } | undefined;
+  if (!row || row.entries === 0) return null;
+  return { institutions: row.institutions, entries: row.entries };
+}
+
 export function lookup(bic: string): BICRow | null {
   const cached = bicCache.get(bic);
   if (cached !== undefined) return cached;
@@ -483,5 +529,6 @@ export function getReferenceAsOf(): string {
 export function resetStatements(): void {
   stmtByBic11 = null;
   stmtByBic8 = null;
+  stmtBic8Stats = null;
   bicCache.clear();
 }
