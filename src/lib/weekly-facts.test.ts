@@ -40,6 +40,40 @@ afterAll(() => {
   db.prepare(`DELETE FROM api_keys WHERE key_hash LIKE '${PFX}%'`).run();
 });
 
+describe('getWeeklyFacts — survives a table with more internal keys than SQLite takes parameters', () => {
+  const BULK = `${PFX}_bulk`;
+
+  afterAll(() => {
+    const db = getStatsDB();
+    db.prepare(`DELETE FROM api_keys WHERE key_hash LIKE '${BULK}%'`).run();
+  });
+
+  it('still answers with 2500 internal keys on file', () => {
+    // The exclusion used to bind one parameter per internal key, twice over,
+    // so the digest started throwing "too many SQL variables" somewhere past
+    // a thousand of them. Production is far below that, but the threshold is
+    // a function of table size and a burst of automated signups is exactly
+    // when a weekly digest must not go dark. 2500 clears the 2000 ceiling
+    // measured on better-sqlite3 11 and 13 alike.
+    const db = getStatsDB();
+    const ins = db.prepare(
+      `INSERT INTO api_keys (key_hash, key_prefix, email, created_at, active, monthly_limit)
+       VALUES (?, ?, ?, '2026-08-05 09:00:00', 1, 200)`,
+    );
+    db.transaction(() => {
+      for (let i = 0; i < 2500; i++) {
+        ins.run(`${BULK}${i}`, `${BULK}${i}`, `probe-${i}@ibanforge.internal`);
+      }
+    })();
+
+    expect(() => getWeeklyFacts(NOW)).not.toThrow();
+    // And the exclusion still excludes: none of those 2500 may be counted as
+    // a signup, or the fix would have traded a crash for a wrong number.
+    const f = getWeeklyFacts(NOW);
+    expect(f.signups.current).toBeLessThan(2500);
+  });
+});
+
 describe('getWeeklyFacts — WoW deltas computed in tested TS, never by the writer', () => {
   it('windows on the last FULL Monday–Sunday week and labels it in ISO form', () => {
     const f = getWeeklyFacts(NOW);

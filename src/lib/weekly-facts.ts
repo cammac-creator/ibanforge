@@ -1,6 +1,6 @@
 import { getStatsDB } from './db.js';
 import { buildBillableFilter } from './stats.js';
-import { isInternalEmail } from './internal-accounts.js';
+import { isInternalEmail, registerInternalEmailFn } from './internal-accounts.js';
 
 /**
  * Everything the Monday digest writer is allowed to say, computed HERE in
@@ -83,14 +83,22 @@ export function getWeeklyFacts(now: Date = new Date()): WeeklyFacts {
   // Anonymous traffic (NULL prefix) stays counted: x402 demand is market
   // signal. `requests` and `server_errors` stay raw on purpose, they are
   // technical metrics.
-  const internalPrefixes = (
-    db.prepare('SELECT key_prefix, email FROM api_keys').all() as Array<{ key_prefix: string; email: string }>
-  )
-    .filter((k) => isInternalEmail(k.email))
-    .map((k) => k.key_prefix);
-  const notInternal = internalPrefixes.length
-    ? `AND (key_prefix IS NULL OR key_prefix NOT IN (${internalPrefixes.map(() => '?').join(',')}))`
-    : '';
+  // The exclusion used to be an IN list with one bound parameter per internal
+  // key, interpolated twice — so the statement carried 2N parameters and threw
+  // "too many SQL variables" past SQLite's 2000-parameter ceiling (measured on
+  // both better-sqlite3 11 and 13). Production sits far below that today, but
+  // the ceiling is a function of how many keys exist, which only ever grows:
+  // a burst of automated signups is precisely the moment the weekly digest
+  // must not go dark.
+  //
+  // The rule stays in TypeScript — INTERNAL_EMAIL_RE is the single source of
+  // truth and must not be re-expressed as LIKE patterns that would drift from
+  // it. It is exposed to SQLite as a function instead, so the filter becomes a
+  // subquery with zero parameters, whatever the number of keys.
+  registerInternalEmailFn(db);
+  const notInternal =
+    'AND (key_prefix IS NULL OR key_prefix NOT IN ' +
+    '(SELECT key_prefix FROM api_keys WHERE is_internal_email(email)))';
 
   const reqWindow = (start: string, end: string) =>
     db
@@ -102,7 +110,7 @@ export function getWeeklyFacts(now: Date = new Date()): WeeklyFacts {
          FROM request_log
          WHERE created_at >= ? AND created_at < ?`,
       )
-      .get(...billable.params, ...internalPrefixes, ...internalPrefixes, start, end) as {
+      .get(...billable.params, start, end) as {
       requests: number;
       billable_ok: number | null;
       paywall_hits: number | null;
