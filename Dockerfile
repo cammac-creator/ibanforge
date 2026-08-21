@@ -3,7 +3,13 @@ FROM node:22-slim AS builder
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-RUN npm ci
+# --ignore-scripts: better-sqlite3 13 ships one Node-API prebuild per platform
+# instead of one per ABI, and declares `gypfile: false` — but that flag lives in
+# the package, not in the lockfile, so `npm ci` still runs node-gyp and fails on
+# a slim image with no Python. `npm install` does not, which is why this only
+# shows up in the container. Nothing in the production tree needs an install
+# script: the only one is a console.log.
+RUN npm ci --ignore-scripts
 
 COPY src/ src/
 COPY scripts/ scripts/
@@ -27,7 +33,7 @@ FROM node:22-slim
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev
+RUN npm ci --omit=dev --ignore-scripts
 
 COPY --from=builder /app/dist/ dist/
 COPY --from=builder /app/reference/ reference/
