@@ -10,7 +10,7 @@ import {
   calendarDaysSince,
   type ClientDossier,
 } from '@/lib/crm/client-dossiers';
-import { contactsHref } from '@/lib/crm/deep-link';
+import { botsHref, contactsHref } from '@/lib/crm/deep-link';
 import { Bar, Empty, HoursStrip, Section, Stat, flag, relativeDays } from './dossier-bits';
 import { ContactNotes } from './contact-notes';
 import { ActivityChart } from './activity-chart';
@@ -347,12 +347,20 @@ export function ClientDossierModal({
             )}
 
             {d.userAgents.length > 0 && (
-              <Section title="Leur pile technique">
+              <Section title="Leur pile technique" note="cliquer ouvre l'agent dans Clients Bot">
                 <div className="space-y-1">
+                  {/* Each agent links to the anonymous side. The tool a customer
+                      automates with is very often the one that probed us without
+                      a key first, and that crossing is only visible from here. */}
                   {d.userAgents.slice(0, 4).map((u) => (
-                    <div key={u.ua} className="truncate font-mono text-[12px] text-[var(--fg-3)]" title={u.ua}>
+                    <a
+                      key={u.ua}
+                      href={botsHref(locale, u.ua)}
+                      title={`${u.ua} — voir cet agent côté Clients Bot`}
+                      className="block truncate font-mono text-[12px] text-[var(--fg-3)] hover:text-amber-400 hover:underline"
+                    >
                       {u.ua} <span className="text-[var(--fg-5)]">· {u.count}</span>
-                    </div>
+                    </a>
                   ))}
                   {d.clientKinds.length > 0 && (
                     <div className="pt-1 text-[12px] text-[var(--fg-4)]">

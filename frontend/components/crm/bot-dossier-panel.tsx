@@ -1,6 +1,8 @@
 'use client';
 
 import type { BotDossier } from '@/lib/crm/bot-dossiers';
+import type { ClientCrossing } from '@/lib/crm/agent-bridge';
+import { clientsHref } from '@/lib/crm/deep-link';
 import { Bar, Empty, HoursStrip, Section, Sparkbars, Stat, relativeDays } from './dossier-bits';
 
 const KIND_LABEL: Record<string, string> = {
@@ -11,7 +13,15 @@ const KIND_LABEL: Record<string, string> = {
   web: 'navigateur',
 };
 
-export function BotDossierPanel({ b }: { b: BotDossier }) {
+export function BotDossierPanel({
+  b,
+  crossings = [],
+  locale = 'fr',
+}: {
+  b: BotDossier;
+  crossings?: ClientCrossing[];
+  locale?: string;
+}) {
   const refusalRate = b.requests > 0 ? Math.round(((b.paywall + b.badInput) / b.requests) * 100) : 0;
   const missRate = b.requests > 0 ? Math.round((b.notFound / b.requests) * 100) : 0;
 
@@ -33,6 +43,38 @@ export function BotDossierPanel({ b }: { b: BotDossier }) {
           <span className="shrink-0 text-[13px] text-[var(--fg-4)]">{KIND_LABEL[b.clientKind] ?? b.clientKind}</span>
         )}
       </div>
+
+      {/* The crossing into the Clients tab. An agent string is a HINT, never a
+          lock — `python-requests` is shared by thousands of unrelated people —
+          so the wording says "same tool", never "same caller", and an
+          approximate crossing is labelled as such rather than silently mixed
+          in with the identical ones. */}
+      {crossings.length > 0 && (
+        <div className="mb-5 rounded-lg border border-[var(--ink-5)] bg-[var(--ink-2)]/60 px-3 py-2 text-[13px] text-[var(--fg-3)]">
+          <span className="font-semibold text-[var(--fg-2)]">Le même outil sert aussi des clients identifiés.</span>{' '}
+          {crossings.map((c, i) => (
+            <span key={c.clientId}>
+              {i > 0 && ' · '}
+              <a
+                href={clientsHref(locale, c.clientId)}
+                title={
+                  c.kind === 'exact'
+                    ? `Chaîne d'agent identique · ${c.clientCalls.toLocaleString('fr-CH')} appels avec clé`
+                    : `Même outil, version différente · ${c.clientCalls.toLocaleString('fr-CH')} appels avec clé`
+                }
+                className="text-[var(--amber-400)] underline-offset-2 hover:underline"
+              >
+                {c.label}
+              </a>
+              {c.kind === 'family' && <span className="text-[var(--fg-5)]"> (variante)</span>}
+            </span>
+          ))}
+          <span className="block pt-1 text-[12px] text-[var(--fg-5)]">
+            Une chaîne d&apos;agent rapproche, elle n&apos;identifie pas : un outil courant est partagé par des
+            appelants sans rapport entre eux.
+          </span>
+        </div>
+      )}
 
       {b.verdict === 'servi' && (
         <div className="mb-5 rounded-lg border border-[var(--warn)]/40 bg-[var(--warn)]/10 px-3 py-2 text-[13px] text-[var(--fg-2)]">

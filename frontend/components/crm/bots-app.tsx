@@ -1,7 +1,10 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { sortBots, type BotDossier, type BotSortKey, type BotVerdict } from '@/lib/crm/bot-dossiers';
+import { clientsForBot } from '@/lib/crm/agent-bridge';
+import { AGENT_PARAM } from '@/lib/crm/deep-link';
 import { BotDossierPanel } from './bot-dossier-panel';
 import { relativeDays } from './dossier-bits';
 
@@ -44,7 +47,24 @@ function MiniSpark({ days }: { days: Array<{ day: string; count: number }> }) {
   );
 }
 
-export function BotsApp({ bots }: { bots: BotDossier[] }) {
+/** What the bridge needs of a customer. Kept minimal so the Clients page can
+ *  hand over a projection instead of whole dossiers. */
+export interface BridgeClient {
+  id: string;
+  email: string;
+  company?: string | null;
+  userAgents: Array<{ ua: string; count: number }>;
+}
+
+export function BotsApp({
+  bots,
+  clients = [],
+  locale = 'fr',
+}: {
+  bots: BotDossier[];
+  clients?: BridgeClient[];
+  locale?: string;
+}) {
   const [sort, setSort] = useState<BotSortKey>('requests');
   const [filter, setFilter] = useState<BotVerdict | 'all'>('all');
   const [query, setQuery] = useState('');
@@ -53,6 +73,35 @@ export function BotsApp({ bots }: { bots: BotDossier[] }) {
   // twenty-five thousand pixels tall, where the dozen that matter were
   // indistinguishable from the tail. Nothing is hidden, only folded.
   const [showAll, setShowAll] = useState(false);
+
+  // Deep link from the Clients tab: /clients-bot?ua=<agent> lands with that
+  // dossier open. The agent string is the dossier's primary key and is compared
+  // verbatim — folding case here would open the wrong row, or none.
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    const wanted = searchParams.get(AGENT_PARAM);
+    if (!wanted) return;
+    const hit = bots.find((b) => b.id === wanted);
+    if (hit) {
+      // The agent may sit below the fold or outside the current filter; widen
+      // and unfold so the link never lands on a page that looks empty.
+      setFilter('all');
+      setShowAll(true);
+      setOpenId(hit.id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Computed once per bot list, not per render of an open panel.
+  const crossingsByBot = useMemo(() => {
+    const m = new Map<string, ReturnType<typeof clientsForBot>>();
+    if (clients.length === 0) return m;
+    for (const b of bots) {
+      const hits = clientsForBot(b.id, clients);
+      if (hits.length > 0) m.set(b.id, hits);
+    }
+    return m;
+  }, [bots, clients]);
 
   const counts = useMemo(() => {
     const c = {} as Record<BotVerdict, number>;
@@ -199,7 +248,7 @@ export function BotsApp({ bots }: { bots: BotDossier[] }) {
                     {b.notFound > 0 ? b.notFound.toLocaleString('fr-CH') : '—'}
                   </span>
                 </button>
-                {open && <BotDossierPanel b={b} />}
+                {open && <BotDossierPanel b={b} crossings={crossingsByBot.get(b.id) ?? []} locale={locale} />}
               </div>
             );
           })
