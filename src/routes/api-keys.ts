@@ -3,6 +3,7 @@ import { timingSafeEqual, createHash } from 'node:crypto';
 import { generateApiKey, validateApiKey, getUsage, revokeApiKey, rotateApiKey } from '../lib/api-keys.js';
 import { getStatsDB } from '../lib/db.js';
 import { getKeyReport } from '../lib/key-report.js';
+import { exportPaidState } from '../lib/backup.js';
 import { getClientProfiles, getBotProfiles, extractClientIp } from '../lib/stats.js';
 import { isDisposableDomain } from '../lib/disposable-domains.js';
 import {
@@ -295,6 +296,33 @@ apiKeys.get('/v1/keys/usage', (c) => {
  * the ones who did not write stayed stuck in silence. The heavy lifting is in
  * `getKeyReport`; this route is auth plus a window clamp.
  */
+/**
+ * A dump of what customers paid for.
+ *
+ * There is no backup of `stats.sqlite` at all: it lives on one Railway volume,
+ * and it holds the keys, the quotas and the prepaid balances. Losing that
+ * volume means every customer loses access they already paid for, with no way
+ * to give it back or even to know who was owed what.
+ *
+ * 🚨 The response is customer data — addresses and key hashes. Admin secret
+ * only, and a dump must never be committed, attached to a public page, or
+ * written anywhere inside the repository.
+ *
+ * Restoring is deliberately NOT an endpoint. A restore is destructive-adjacent
+ * and rare; it belongs in someone's hands with the file in front of them, not
+ * behind an HTTP route that a leaked secret could reach.
+ */
+apiKeys.get('/v1/admin/backup', (c) => {
+  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
+  const payload = exportPaidState(new Date().toISOString());
+  return c.json(payload, 200, {
+    // Named so a file on disk says what it is and when it was taken.
+    'Content-Disposition': `attachment; filename="ibanforge-paid-state-${payload.taken_at.slice(0, 10)}.json"`,
+  });
+});
+
 apiKeys.get('/v1/keys/report', (c) => {
   const authHeader = c.req.header('Authorization');
   if (!authHeader?.startsWith('Bearer ifk_')) {

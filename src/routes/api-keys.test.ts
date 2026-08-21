@@ -662,3 +662,44 @@ describe('/v1/keys/report — the customer reads their own key', () => {
     expect(body.report.window_days).toBe(30);
   });
 });
+
+/**
+ * The backup endpoint. It hands out customer data, so the only thing that
+ * really matters is that it never answers without the admin secret.
+ */
+describe('/v1/admin/backup', () => {
+  it('refuses a request with no secret', async () => {
+    const res = await makeApp().request('/v1/admin/backup');
+    expect(res.status).toBe(401);
+  });
+
+  it('refuses a wrong secret of the same length', async () => {
+    // Same length, different content: the case a naive length check would let
+    // through, and the reason the comparison is timing-safe.
+    const wrong = 'wrong-horse-battery-stapleXX'.padEnd('correct-horse-battery-staple'.length, 'X');
+    expect(wrong.length).toBe('correct-horse-battery-staple'.length);
+    const res = await makeApp().request('/v1/admin/backup', {
+      headers: { 'X-Admin-Secret': wrong },
+    });
+    expect(res.status).toBe(401);
+  });
+
+  it('answers a valid secret with a stamped, countable dump', async () => {
+    const res = await makeApp().request('/v1/admin/backup', {
+      headers: { 'X-Admin-Secret': 'correct-horse-battery-staple' },
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      format: number;
+      taken_at: string;
+      counts: { api_keys: number; api_usage: number };
+      api_keys: unknown[];
+    };
+    expect(body.format).toBe(1);
+    expect(body.taken_at).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    // The declared count must match what is actually in the payload: a dump
+    // that says 300 and carries 200 is the failure nobody notices until the
+    // day it is restored.
+    expect(body.counts.api_keys).toBe(body.api_keys.length);
+  });
+});
