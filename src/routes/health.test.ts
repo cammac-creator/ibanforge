@@ -156,3 +156,34 @@ describe('/health — freshness of the UK modulus table', () => {
     expect(uk.stale).toBeNull();
   });
 });
+
+/**
+ * /health takes no authentication. Anything it returns is public, so it may
+ * carry product figures (database size, version) and never real activity data.
+ *
+ * The verification-mail probe is one query away from being a live signup
+ * counter, which is exactly what it reported for a few minutes on 21/08 before
+ * this test existed. It publishes a state and nothing that can be counted.
+ */
+describe('GET /health — a public endpoint must not leak activity volume', () => {
+  it('reports the verification channel as a state, never as a count', async () => {
+    const res = await app.request('/health');
+    const body = (await res.json()) as { verification_mail?: Record<string, unknown> };
+    const probe = body.verification_mail;
+    expect(probe).toBeTruthy();
+    expect(['ok', 'degraded', 'unknown']).toContain(probe!.state);
+    // The volume must not be reachable, under any spelling.
+    for (const forbidden of ['attempted', 'refused', 'sent', 'count', 'total', 'refused_ratio']) {
+      expect(probe).not.toHaveProperty(forbidden);
+    }
+  });
+
+  it('exposes no numeric field that could be a traffic count', async () => {
+    const res = await app.request('/health');
+    const body = (await res.json()) as { verification_mail: Record<string, unknown> };
+    const numeric = Object.entries(body.verification_mail).filter(([, v]) => typeof v === 'number');
+    // window_hours is a fixed constant, not a measurement. Nothing else may be
+    // a number here — a number on this endpoint is a number a competitor reads.
+    expect(numeric.map(([k]) => k)).toEqual(['window_hours']);
+  });
+});

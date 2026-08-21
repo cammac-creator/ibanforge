@@ -5,7 +5,7 @@ import { getChClearingCount } from '../lib/ch-clearing.js';
 import { getStatsDB } from '../lib/db.js';
 import { getComplianceDB } from '../lib/compliance-db.js';
 import { ukModulusStatus, type UkModulusStatus } from '../lib/uk-modulus.js';
-import { verificationDelivery, type VerificationDelivery } from '../lib/key-creation-guard.js';
+import { verificationDelivery } from '../lib/key-creation-guard.js';
 
 const require = createRequire(import.meta.url);
 const pkg = require('../../package.json') as { version: string };
@@ -65,18 +65,40 @@ function probeUkModulus(): UkModulusStatus {
  * How the verification-code channel is doing, guarded like the UK table above.
  *
  * Same reasoning: a mail channel in trouble is a degraded feature, never a
- * reason to have a healthy container pulled out of rotation. `refused_ratio`
- * stays null when nothing was attempted — no traffic is not a clean channel.
+ * reason to have a healthy container pulled out of rotation.
  *
  * Why it belongs in a health response at all: verification is the ONLY one of
  * our four outbound messages whose failure blocks a customer, and it is the one
  * with no second path. Before this, a holder stuck at that step was invisible.
+ *
+ * 🚨 NO VOLUME IS PUBLISHED HERE. /health takes no authentication, so the raw
+ * count of codes sent in 24 h would tell anyone — competitors included — how
+ * many people are signing up per day. That is real activity data and it does
+ * not belong on a public surface; only the shape of the failure does. The
+ * counts stay readable internally through `verificationDelivery()`.
+ *
+ * Below MIN_JUDGEABLE_SENDS the state is 'unknown' rather than a ratio: one
+ * refusal out of one send is not a 100% failure rate, it is a sample too small
+ * to mean anything — and publishing that ratio would leak the volume it was
+ * computed from.
  */
-function probeVerificationMail(): VerificationDelivery {
+const MIN_JUDGEABLE_SENDS = 5;
+
+/** Degraded above this share of refusals, once there is enough to judge. */
+const DEGRADED_REFUSAL_RATIO = 0.5;
+
+function probeVerificationMail(): { window_hours: number; state: 'ok' | 'degraded' | 'unknown' } {
   try {
-    return verificationDelivery(24);
+    const d = verificationDelivery(24);
+    if (d.attempted < MIN_JUDGEABLE_SENDS || d.refused_ratio == null) {
+      return { window_hours: d.window_hours, state: 'unknown' };
+    }
+    return {
+      window_hours: d.window_hours,
+      state: d.refused_ratio > DEGRADED_REFUSAL_RATIO ? 'degraded' : 'ok',
+    };
   } catch {
-    return { window_hours: 24, attempted: 0, refused: 0, refused_ratio: null };
+    return { window_hours: 24, state: 'unknown' };
   }
 }
 
@@ -96,7 +118,8 @@ health.get('/health', (c) => {
       bic_data_last_updated: db.lastUpdated,
       databases: { bic: 'ok', stats: 'ok', compliance: 'ok' },
       // The one outbound message whose failure blocks a customer, and the one
-      // with no fallback path. Reported, never used to fail the check.
+      // with no fallback path. Reported as a STATE and never as a volume:
+      // this endpoint is public. Never used to fail the check.
       verification_mail: probeVerificationMail(),
       // ADDED beside the contract, nothing renamed. `stale` is what alerting
       // hangs off: the table refreshes only at image build, so without a deploy
