@@ -17,6 +17,8 @@ import { startLifecycleRadar } from './lib/lifecycle-radar-server.js';
 import { startForumRadar } from './lib/forum-radar-server.js';
 import { startProspectRadar } from './lib/prospect-radar-server.js';
 import { startCohortRadar } from './lib/cohort-radar-server.js';
+import { startOpsProbes } from './lib/ops-probes.js';
+import { opsFail } from './lib/ops-alert.js';
 import { recordEvent } from './lib/events.js';
 
 // Fail-fast: refuse to start in production without wallet config
@@ -60,7 +62,13 @@ setInterval(() => {
     purgeTerminatedKeyTelemetry(30);
     purgeExpiredVerifications();
   } catch (err) {
-    console.error('Retention purge failed:', err);
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('Retention purge failed:', msg);
+    // Seuil 2 : la purge tourne toutes les 24 h et porte un engagement DPA
+    // (clause 4.7). Deux échecs = 48 h de données qui auraient dû disparaître,
+    // et c'est le seul angle mort de l'audit B3 dont la conséquence est
+    // juridique. Un `console.error` seul ne prévient personne.
+    void opsFail('retention:purge', `Purge de rétention en échec : ${msg}`, 2);
   }
 }, 24 * 60 * 60 * 1000).unref();
 
@@ -79,6 +87,13 @@ startProspectRadar();
 // Signup cohort radar: collapses a burst of automated signups into one CRM
 // dossier and off the monthly reset (see cohort-radar-server.ts).
 startCohortRadar();
+
+// Sondes OPS horaires : hommes morts (crons GitHub + les 4 radars, lus dans
+// kv_state sans jamais l'écrire), remplissage du volume, taux de 5xx, âge des
+// listes de sanctions. Audit B3 (20/08/2026) : les 15 automatisations sont
+// fail-soft mais aucune n'avait de sonde de vie — une panne et une semaine
+// calme produisaient exactement le même silence.
+startOpsProbes();
 
 // ─── Drained shutdown ────────────────────────────────────────────────────────
 //
@@ -149,4 +164,22 @@ process.on('unhandledRejection', (reason) => {
     '[unhandledRejection]',
     reason instanceof Error ? (reason.stack ?? reason.message) : reason,
   );
+  // 97c0f9a a rendu la panne du facilitator SURVIVABLE — et donc INVISIBLE :
+  // avant, Railway redémarrait et l'indisponibilité se remarquait ; depuis, le
+  // service répond normalement pendant que les règlements x402 échouent en
+  // silence. Cette ligne rend le signal que le correctif de résilience a
+  // supprimé. Seuil 3 : un hoquet réseau isolé ne réveille personne.
+  //
+  // ⚠️ Le filtre ne contient PAS `verify`, que le design B3 proposait. Ce mot
+  // apparaît dans des rejets qui n'ont rien à voir avec le paiement — « unable
+  // to verify the first certificate » sur n'importe quel appel sortant (les
+  // radars appellent Anthropic, GitHub, Telegram), et nos propres chemins de
+  // vérification d'e-mail ou de BIC. Le seuil borne la fréquence, pas
+  // l'étiquette : trois incidents TLS d'un radar produiraient une alerte
+  // intitulée « côté paiement », c'est-à-dire une alerte qui ment. Les trois
+  // termes restants ne désignent que le chemin x402.
+  const msg = reason instanceof Error ? reason.message : String(reason);
+  if (/facilitator|x402|settle/i.test(msg)) {
+    void opsFail('x402:facilitator', `Rejet non géré côté paiement : ${msg}`, 3);
+  }
 });

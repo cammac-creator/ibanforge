@@ -7,6 +7,9 @@ on:
 
 permissions:
   contents: write
+  # Lecture des jobs du run : c'est ce qui permet à l'alerte d'échec de nommer
+  # l'ÉTAPE qui a cassé au lieu de dire « quelque chose a échoué ».
+  actions: read
 
 jobs:
   refresh:
@@ -34,6 +37,34 @@ jobs:
           else
             echo "changed=true" >> $GITHUB_OUTPUT
           fi
+      # Homme mort : dire au backend que ce cron est bien passé.
+      #
+      # `if: success()` est le point entier — un run échoué NE DOIT PAS pointer,
+      # sinon la sonde de vie confirmerait la vie d'une automatisation morte.
+      #
+      # ⚠️ Placé AVANT le push : un push sur `main` déclenche le redéploiement
+      # Railway, et un battement envoyé après taperait sur une API en cours de
+      # redémarrage — curl échoue, aucun battement, et 9 jours plus tard la
+      # sonde crie sur un workflow qui a parfaitement fonctionné.
+      # Ici le refresh ET la porte des claims ont déjà réussi : le travail est
+      # prouvé, qu'il y ait quelque chose à commiter ou non.
+      - name: Heartbeat
+        if: success()
+        env:
+          HEARTBEAT_TOKEN: ${{ secrets.HEARTBEAT_TOKEN }}
+        run: |
+          if [ -z "$HEARTBEAT_TOKEN" ]; then
+            echo "::warning::HEARTBEAT_TOKEN absent — heartbeat non envoyé"
+            exit 0
+          fi
+          for i in 1 2 3; do
+            curl -fsS -X POST \
+              -H "x-heartbeat-token: $HEARTBEAT_TOKEN" \
+              "https://api.ibanforge.com/internal/heartbeat/refresh-compliance" && exit 0
+            sleep 20
+          done
+          echo "::warning::heartbeat KO après 3 tentatives (non bloquant)"
+
       - name: Commit and push
         if: steps.changes.outputs.changed == 'true'
         run: |
@@ -43,3 +74,36 @@ jobs:
           git commit -m "chore(compliance): weekly data refresh [automated]"
           git pull --rebase
           git push
+
+      # Failure notification — même motif que refresh-bic.yml. Ici la
+      # conséquence est facturée : sans refresh, `check_compliance` continue de
+      # vendre 0,02 $ un score calculé sur des listes qui vieillissent, sous une
+      # étiquette « pre-payout screening ». La sonde `compliance:age` du backend
+      # (src/lib/ops-probes.ts) est le filet qui attrape le cas « le cron n'a
+      # même pas démarré », que cette alerte-ci ne peut structurellement pas voir.
+      - name: Tell Telegram if anything above failed
+        if: failure()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "${TELEGRAM_BOT_TOKEN:-}" ] || [ -z "${TELEGRAM_CHAT_ID:-}" ]; then
+            echo "::warning::secrets Telegram absents — alerte non envoyée"
+            exit 0
+          fi
+          # `gh api` écrit son corps d'erreur sur STDOUT : sans le `if`, un 404
+          # ou un jeton sans droit `actions: read` collerait une blob JSON dans
+          # le message d'alerte au lieu du nom de l'étape.
+          STEP=""
+          if RAW=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/jobs" \
+                     --jq '.jobs[].steps[] | select(.conclusion=="failure") | .name' 2>/dev/null); then
+            STEP=$(printf '%s' "$RAW" | head -3 | paste -sd, -)
+          fi
+          [ -z "$STEP" ] && STEP="(étape inconnue — voir le run)"
+          MSG=$(printf '%s\nÉtape : %s\nConséquence : les listes de sanctions N’ONT PAS été rafraîchies ; elles vieillissent en prod.\n%s' \
+                  "🔴 IBANforge — le workflow « ${GITHUB_WORKFLOW} » a ÉCHOUÉ" "$STEP" "$RUN_URL")
+          curl -sS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -d chat_id="${TELEGRAM_CHAT_ID}" \
+            --data-urlencode "text=${MSG}" >/dev/null

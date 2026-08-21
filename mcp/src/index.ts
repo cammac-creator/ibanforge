@@ -2,12 +2,20 @@
 /**
  * IBANforge MCP Server
  *
- * Exposes 5 tools backed by the IBANforge HTTP API (api.ibanforge.com):
+ * Exposes 6 tools backed by the IBANforge HTTP API (api.ibanforge.com):
  *   - validate_iban
  *   - batch_validate_iban
  *   - lookup_bic
  *   - lookup_ch_clearing
  *   - check_compliance
+ *   - send_feedback
+ *
+ * `send_feedback` was HTTP-only until 21/08/2026 (audit B3): npm is the main
+ * distribution channel, so the agent that hits the quota wall or cannot prefund
+ * an x402 payment had no way at all to say "I could not pay you" — the complaint
+ * box was open only on the transport desktop clients do not use.
+ * `scripts/mcp-parity.test.ts` now compares the three surfaces and fails on any
+ * new divergence.
  *
  * Authentication is optional — anonymous calls hit the free demo endpoints
  * or the rate-limited public surface. For production use, set IBANFORGE_API_KEY
@@ -29,9 +37,11 @@ const pkg = require('../package.json') as { version: string };
 const API_BASE = process.env.IBANFORGE_API_BASE ?? 'https://api.ibanforge.com';
 const API_KEY = process.env.IBANFORGE_API_KEY;
 
-// Same hints as the remote server (src/routes/mcp-http.ts): all five tools are
-// pure reads against our own API. Without readOnlyHint, MCP clients ask the
+// Same hints as the remote server (src/routes/mcp-http.ts): the five DATA tools
+// are pure reads against our own API. Without readOnlyHint, MCP clients ask the
 // user to confirm every single call — a real usage tax on the busiest channel.
+// `send_feedback` is deliberately NOT in this set: it is the one tool that
+// writes, and it is the one call that deserves its confirmation.
 const READ_ONLY = {
   readOnlyHint: true,
   idempotentHint: true,
@@ -457,6 +467,54 @@ const TOOLS: Tool[] = [
       required: ['iban', 'valid', 'compliance'],
     },
   },
+  {
+    name: 'send_feedback',
+    title: 'Send Feedback to IBANforge',
+    // PAS de READ_ONLY ici : c'est le seul outil de ce serveur qui ÉCRIT.
+    // Le déclarer read-only ferait sauter la confirmation utilisateur sur la
+    // seule opération de ce serveur qui en mérite une.
+    annotations: { title: 'Send Feedback to IBANforge' },
+    description:
+      'Report a problem or a need directly to the IBANforge operators: incorrect validation result, stale or missing BIC/bank data, ' +
+      'latency, or anything blocking you from using or PAYING for the service (missing network, unclear pricing, quota shape). ' +
+      'USE WHEN: a result looks wrong, data you need is missing, or you hit a wall (quota, payment, capability) and want it fixed. ' +
+      'This tool is free and does NOT count against the daily free-tier limit — it works even after the limit is reached. ' +
+      'A human reads every report; verified data errors on paid x402 calls are refunded on-chain.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        error_type: {
+          type: 'string',
+          // ⚠️ Cette liste est le miroir de FEEDBACK_ERROR_TYPES
+          // (src/routes/feedback.ts) : ce paquet est publié séparément et ne
+          // peut pas importer depuis src/. `scripts/mcp-parity.test.ts`
+          // compare les deux et casse si elles divergent.
+          enum: ['wrong_validation', 'stale_bic', 'missing_data', 'incorrect_classification', 'latency', 'other'],
+          description: 'Category of the report. Use "other" for product feedback, pricing/payment blockers or feature needs.',
+        },
+        notes: {
+          type: 'string',
+          minLength: 3,
+          maxLength: 4000,
+          description: 'What happened, what you needed, or what blocked you — free text.',
+        },
+        endpoint: { type: 'string', maxLength: 200, description: 'Endpoint or tool concerned, e.g. /v1/iban/batch.' },
+        expected: { type: 'string', maxLength: 1000, description: 'What you expected (for data errors).' },
+        got: { type: 'string', maxLength: 1000, description: 'What you received instead (for data errors).' },
+        contact: { type: 'string', maxLength: 255, description: 'Where we may answer you (e-mail) — optional, reports can be anonymous.' },
+        agent: { type: 'string', maxLength: 120, description: 'Which agent/model is reporting, e.g. "claude-sonnet-5 via MCP".' },
+      },
+      required: ['error_type', 'notes'],
+    },
+    outputSchema: {
+      type: 'object',
+      properties: {
+        ok: { type: 'boolean' },
+        id: { type: 'number', description: 'Report id — check status at GET /v1/feedback/{id}.' },
+      },
+      required: ['ok', 'id'],
+    },
+  },
 ];
 
 interface JsonRecord {
@@ -646,6 +704,35 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         return relay(result);
       }
 
+      case 'send_feedback': {
+        if (typeof a.error_type !== 'string' || typeof a.notes !== 'string' || a.notes.trim().length < 3) {
+          return fail({
+            error: 'invalid_input',
+            message: 'Arguments `error_type` (string) and `notes` (at least 3 characters) are required.',
+          });
+        }
+        // Relayé vers POST /v1/feedback plutôt qu'écrit ici : c'est ce qui donne
+        // à cet outil le MÊME plafond que la route publique (quota par source,
+        // 20 rapports/heure) et le même hachage d'IP. Un outil gratuit et ouvert
+        // qui écrirait en base sans plafond serait une boîte à spam ; et un
+        // plafond réimplémenté dans le paquet npm serait un second chiffre à
+        // tenir d'accord avec le premier.
+        const result = await apiCall('POST', '/v1/feedback', {
+          error_type: a.error_type,
+          notes: a.notes,
+          endpoint: a.endpoint,
+          expected: a.expected,
+          got: a.got,
+          contact: a.contact,
+          agent: typeof a.agent === 'string' && a.agent ? a.agent : 'mcp-npm',
+        });
+        if (result._error) return fail(result);
+        // La route répond {ok, id, message, status, next_steps} ; le contrat de
+        // l'outil est {ok, id} sur les trois surfaces. On réduit ici, sinon la
+        // parité tiendrait sur les noms et mentirait sur la forme.
+        return out({ ok: true, id: result.id });
+      }
+
       default:
         return fail({ error: 'unknown_tool', message: `Tool "${name}" is not implemented.` });
     }
@@ -662,4 +749,4 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 const transport = new StdioServerTransport();
 await server.connect(transport);
 
-process.stderr.write('IBANforge MCP server ready (stdio). 5 tools exposed.\n');
+process.stderr.write('IBANforge MCP server ready (stdio). 6 tools exposed.\n');

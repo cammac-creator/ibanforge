@@ -14,6 +14,10 @@ import { getComplianceMeta } from '../lib/compliance-db.js';
 import { lookupClearingByBankCode, normalizeIid, getChClearingCount } from '../lib/ch-clearing.js';
 import { buildCountriesPayload, buildPricingPayload, buildValidateAndExplainPrompt } from '../lib/mcp-resources.js';
 import { datasetFacts } from '../lib/dataset-facts.js';
+// send_feedback : même insertion et mêmes clips de longueur que la route
+// publique POST /v1/feedback et que le transport HTTP — une seule écriture,
+// une seule liste de catégories.
+import { recordFeedbackRow, FEEDBACK_ERROR_TYPES, FEEDBACK_INSERTS_PER_SOURCE_HOUR } from '../routes/feedback.js';
 
 /** Dataset sizes, read once and rounded down so a claim cannot outlive its data. */
 const F = datasetFacts();
@@ -384,6 +388,91 @@ Cost: $0.003 USDC per call via x402 micropayment on Base L2.`,
 
     return {
       content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
+    };
+  },
+);
+
+/**
+ * Le plafond d'écriture de `send_feedback` sur CE transport.
+ *
+ * Les trois surfaces MCP n'ont pas la même serrure, parce qu'elles n'ont pas la
+ * même porte :
+ *   - le paquet npm (mcp/src/index.ts) relaie POST /v1/feedback, et hérite donc
+ *     du quota par source déjà posé sur cette route (20 insertions/heure) ;
+ *   - le transport HTTP (src/routes/mcp-http.ts) est derrière le limiteur global
+ *     par IP de l'application (100 req/min) ;
+ *   - ce serveur-ci écrit en base SANS aucun HTTP au-dessus : ni IP, ni
+ *     limiteur, ni quota. Copier le corps de la surface HTTP tel quel ouvrirait
+ *     une écriture illimitée dans `feedback`.
+ *
+ * D'où ce compteur glissant, sur LE MÊME nombre que la route publique — un seul
+ * chiffre à changer si le plafond bouge. Il est en mémoire et non en base : un
+ * serveur stdio sert un seul client local, et le redémarrer est un geste de
+ * l'utilisateur, pas un contournement (les clips de longueur de
+ * `recordFeedbackRow`, eux, tiennent quoi qu'il arrive).
+ */
+const feedbackWrites: number[] = [];
+
+function feedbackQuotaAvailable(): boolean {
+  const cutoff = Date.now() - 3600_000;
+  while (feedbackWrites.length > 0 && feedbackWrites[0] < cutoff) feedbackWrites.shift();
+  return feedbackWrites.length < FEEDBACK_INSERTS_PER_SOURCE_HOUR;
+}
+
+server.registerTool(
+  'send_feedback',
+  {
+    title: 'Send Feedback to IBANforge',
+    description:
+      'Report a problem or a need directly to the IBANforge operators: incorrect validation result, stale or missing BIC/bank data, ' +
+      'latency, or anything blocking you from using or PAYING for the service (missing network, unclear pricing, quota shape). ' +
+      'USE WHEN: a result looks wrong, data you need is missing, or you hit a wall (quota, payment, capability) and want it fixed. ' +
+      'This tool is free and does NOT count against the daily free-tier limit — it works even after the limit is reached. ' +
+      'A human reads every report; verified data errors on paid x402 calls are refunded on-chain.',
+    inputSchema: {
+      error_type: z
+        .enum(FEEDBACK_ERROR_TYPES)
+        .describe('Category of the report. Use "other" for product feedback, pricing/payment blockers or feature needs.'),
+      notes: z.string().min(3).max(4000).describe('What happened, what you needed, or what blocked you — free text.'),
+      endpoint: z.string().max(200).optional().describe('Endpoint or tool concerned, e.g. /v1/iban/batch.'),
+      expected: z.string().max(1000).optional().describe('What you expected (for data errors).'),
+      got: z.string().max(1000).optional().describe('What you received instead (for data errors).'),
+      contact: z.string().max(255).optional().describe('Where we may answer you (e-mail) — optional, reports can be anonymous.'),
+      agent: z.string().max(120).optional().describe('Which agent/model is reporting, e.g. "claude-sonnet-5 via MCP".'),
+    },
+    outputSchema: {
+      ok: z.boolean(),
+      id: z.number().describe('Report id — check status at GET /v1/feedback/{id}.'),
+    },
+    annotations: { title: 'Send Feedback to IBANforge' },
+  },
+  async ({ error_type, notes, endpoint, expected, got, contact, agent }) => {
+    if (!feedbackQuotaAvailable()) {
+      // `isError` et PAS de structuredContent : un refus ne peut pas satisfaire
+      // `required: [ok, id]`, et c'est la branche que la spec réserve pour ça.
+      const refusal = {
+        error: 'feedback_rate_limited',
+        message: `At most ${FEEDBACK_INSERTS_PER_SOURCE_HOUR} feedback reports per hour on this transport. Try again later.`,
+      };
+      return { content: [{ type: 'text' as const, text: JSON.stringify(refusal) }], isError: true };
+    }
+    const id = recordFeedbackRow({
+      error_type,
+      notes,
+      endpoint: endpoint ?? null,
+      expected,
+      got,
+      contact: contact ?? null,
+      // `agent` distingue les transports dans la table : un rapport arrivé par
+      // le serveur embarqué n'a ni IP ni clé, c'est la seule provenance qu'on ait.
+      agent: agent ?? 'mcp-stdio',
+      ipHash: null,
+    });
+    feedbackWrites.push(Date.now());
+    const payload = { ok: true, id };
+    return {
+      content: [{ type: 'text' as const, text: JSON.stringify(payload) }],
+      structuredContent: payload as unknown as Record<string, unknown>,
     };
   },
 );

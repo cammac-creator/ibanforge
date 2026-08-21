@@ -4,7 +4,7 @@
  * `dist/index.js`.
  *
  * These tests exist because of a bug that no unit test could have caught. All
- * five tools declare an `outputSchema`; none of them returned
+ * every tool declares an `outputSchema`; none of them returned
  * `structuredContent`. The spec says a tool that declares the first must
  * provide the second, and conformant clients enforce it — the official Python
  * SDK raises `RuntimeError: Tool <name> has an output schema but did not
@@ -39,12 +39,27 @@ const BIC_PAYLOAD = {
 let api: HttpServer;
 let apiBase: string;
 let client: Client;
+/** Raw bodies the tool POSTed to /v1/feedback, so the relayed shape can be asserted. */
+const feedbackBodies: string[] = [];
 
 beforeAll(async () => {
   api = createServer((req, res) => {
     res.setHeader('content-type', 'application/json');
     if (req.url?.startsWith('/v1/bic/')) {
       res.writeHead(200).end(JSON.stringify(BIC_PAYLOAD));
+      return;
+    }
+    // send_feedback relays to the real route rather than writing anything of
+    // its own — that relay is what gives it the route's per-source quota. The
+    // stub answers the route's real shape (201, extra fields the tool drops).
+    if (req.url === '/v1/feedback' && req.method === 'POST') {
+      feedbackBodies.push('');
+      let raw = '';
+      req.on('data', (chunk) => { raw += String(chunk); });
+      req.on('end', () => {
+        feedbackBodies[feedbackBodies.length - 1] = raw;
+        res.writeHead(201).end(JSON.stringify({ ok: true, id: 4242, message: 'Feedback received.', status: 'open', next_steps: {} }));
+      });
       return;
     }
     res.writeHead(404).end(JSON.stringify({ error: 'not_found' }));
@@ -70,9 +85,12 @@ afterAll(async () => {
 });
 
 describe('every tool declaring an outputSchema honours it', () => {
-  it('exposes five tools, all of them declaring an output schema', async () => {
+  it('exposes six tools, all of them declaring an output schema', async () => {
     const { tools } = await client.listTools();
-    expect(tools).toHaveLength(5);
+    // Six depuis le 21/08/2026 : `send_feedback` a rejoint les 5 outils de
+    // donnée (audit B3 — le paquet npm était la seule surface sans boîte à
+    // réclamations, alors que c'est le canal de distribution principal).
+    expect(tools).toHaveLength(6);
     for (const t of tools) {
       expect(t.outputSchema, `${t.name} declares no outputSchema`).toBeDefined();
     }
@@ -94,6 +112,45 @@ describe('every tool declaring an outputSchema honours it', () => {
     const content = res.content as Array<{ type: string; text: string }>;
     expect(content[0].type).toBe('text');
     expect(JSON.parse(content[0].text)).toMatchObject({ bic: 'UBSWCHZH80A' });
+  });
+});
+
+describe('send_feedback: the complaint box is open on the npm package too', () => {
+  /**
+   * Until 21/08/2026 this tool existed only on the HTTP transport. npm is the
+   * main distribution channel, so the agent that hit the quota wall or could
+   * not prefund an x402 payment had no way at all to say "I could not pay you"
+   * (audit B3). `scripts/mcp-parity.test.ts` keeps the three surfaces aligned;
+   * this test checks that THIS surface actually works on the wire.
+   */
+  it('relays the report to POST /v1/feedback and answers the {ok, id} contract', async () => {
+    const before = feedbackBodies.length;
+    const res = await client.callTool({
+      name: 'send_feedback',
+      arguments: { error_type: 'stale_bic', notes: 'Bank merged last year, the name is out of date.', endpoint: '/v1/bic/UBSWCHZH80A' },
+    });
+
+    expect(res.isError).toBeFalsy();
+    // The route answers {ok, id, message, status, next_steps}; the tool contract
+    // is {ok, id} on all three surfaces. Parity on names would be worthless if
+    // the shapes disagreed.
+    expect(res.structuredContent).toEqual({ ok: true, id: 4242 });
+    expect(feedbackBodies.length, 'the tool did not call the route at all').toBe(before + 1);
+    const sent = JSON.parse(feedbackBodies[feedbackBodies.length - 1]) as Record<string, unknown>;
+    expect(sent.error_type).toBe('stale_bic');
+    expect(sent.endpoint).toBe('/v1/bic/UBSWCHZH80A');
+    // Provenance: a report arriving through the npm package has no IP and no
+    // key, so the agent field is the only thing that says where it came from.
+    expect(sent.agent).toBe('mcp-npm');
+  });
+
+  it('refuses an empty report locally rather than spending a round trip', async () => {
+    const before = feedbackBodies.length;
+    const res = await client.callTool({ name: 'send_feedback', arguments: { error_type: 'other', notes: 'x' } });
+
+    expect(res.isError).toBe(true);
+    expect(res.structuredContent).toBeUndefined();
+    expect(feedbackBodies.length, 'a rejected input must not reach the route').toBe(before);
   });
 });
 

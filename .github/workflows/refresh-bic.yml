@@ -8,6 +8,9 @@ on:
 
 permissions:
   contents: write
+  # Lecture des jobs du run : c'est ce qui permet à l'alerte d'échec de nommer
+  # l'ÉTAPE qui a cassé au lieu de dire « quelque chose a échoué ».
+  actions: read
 
 jobs:
   refresh:
@@ -51,8 +54,49 @@ jobs:
       - name: Refresh Austrian and Belgian registers
         run: npm run db:seed-national
 
+      # THE GATE. GLEIF and the enrichment sources have no sanity floor of their
+      # own (unlike the CH/DE/AT/BE seeders), and `npm run test` only asserts
+      # `toBeGreaterThan(0)` on this table — a source answering with a truncated
+      # file would commit silently, and Railway deploys on push. This step
+      # compares the freshly seeded database against the one committed at HEAD
+      # and refuses the commit on an abnormal delta (exit 0 = OK, non-zero =
+      # refused; see the CLI contract at the top of scripts/refresh-diff.ts).
+      # It runs BEFORE the test suite so a data problem is reported as a data
+      # problem, not as an unrelated test failure.
+      - name: Quality diff against the committed database
+        run: npx tsx scripts/refresh-diff.ts
+
       - name: Run tests
         run: npm run test
+
+      # Homme mort : dire au backend que ce cron est bien passé.
+      #
+      # `if: success()` est le point entier — un run échoué NE DOIT PAS pointer,
+      # sinon la sonde de vie confirmerait la vie d'une automatisation morte.
+      #
+      # ⚠️ Placé AVANT le push, pas après : un push sur `main` déclenche le
+      # redéploiement Railway, et une étape de battement placée en dernier
+      # taperait sur une API en cours de redémarrage — curl échoue, aucun
+      # battement, et 35 jours plus tard la sonde crie sur un workflow qui a
+      # parfaitement fonctionné. Le faux positif tue la confiance dans la sonde
+      # plus vite que le faux négatif. À ce point du job, les seeds, le contrôle
+      # qualité et les tests ont tous réussi : le travail est prouvé.
+      - name: Heartbeat
+        if: success()
+        env:
+          HEARTBEAT_TOKEN: ${{ secrets.HEARTBEAT_TOKEN }}
+        run: |
+          if [ -z "$HEARTBEAT_TOKEN" ]; then
+            echo "::warning::HEARTBEAT_TOKEN absent — heartbeat non envoyé"
+            exit 0
+          fi
+          for i in 1 2 3; do
+            curl -fsS -X POST \
+              -H "x-heartbeat-token: $HEARTBEAT_TOKEN" \
+              "https://api.ibanforge.com/internal/heartbeat/refresh-bic" && exit 0
+            sleep 20
+          done
+          echo "::warning::heartbeat KO après 3 tentatives (non bloquant)"
 
       - name: Commit updated database
         run: |
@@ -66,3 +110,40 @@ jobs:
             git pull --rebase
             git push
           fi
+
+      # Failure notification. GitHub's default only emails whoever last edited
+      # the cron, and it is individually disableable: refresh-bic failed on
+      # 2026-05-01 AND 2026-06-01 with nobody acting for two months. The same
+      # secrets are already used by weekly-veille.yml.
+      #
+      # This is the "it failed" half. The "it never ran" half — which no failure
+      # notification can ever cover — is the Heartbeat step above.
+      - name: Tell Telegram if anything above failed
+        if: failure()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "${TELEGRAM_BOT_TOKEN:-}" ] || [ -z "${TELEGRAM_CHAT_ID:-}" ]; then
+            echo "::warning::secrets Telegram absents — alerte non envoyée"
+            exit 0
+          fi
+          # Nommer l'étape qui a cassé : sans elle l'alerte dit « quelque chose
+          # a échoué » et il faut ouvrir le run pour savoir quoi. Best-effort —
+          # si l'API refuse, on envoie le reste plutôt que rien.
+          # `gh api` écrit son corps d'erreur sur STDOUT : sans le `if`, un 404
+          # ou un jeton sans droit `actions: read` collerait une blob JSON dans
+          # le message d'alerte au lieu du nom de l'étape.
+          STEP=""
+          if RAW=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/jobs" \
+                     --jq '.jobs[].steps[] | select(.conclusion=="failure") | .name' 2>/dev/null); then
+            STEP=$(printf '%s' "$RAW" | head -3 | paste -sd, -)
+          fi
+          [ -z "$STEP" ] && STEP="(étape inconnue — voir le run)"
+          MSG=$(printf '%s\nÉtape : %s\nConséquence : la base BIC N’A PAS été rafraîchie ; la version précédente reste servie.\n%s' \
+                  "🔴 IBANforge — le workflow « ${GITHUB_WORKFLOW} » a ÉCHOUÉ" "$STEP" "$RUN_URL")
+          curl -sS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -d chat_id="${TELEGRAM_CHAT_ID}" \
+            --data-urlencode "text=${MSG}" >/dev/null
