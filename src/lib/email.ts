@@ -42,6 +42,10 @@ export async function sendApiKeyEmail(p: {
     `       -H "content-type: application/json" -d '{"iban":"CH1000230000000012345"}'\n\n` +
     `Check your balance any time:\n` +
     `  curl -H "Authorization: Bearer ${p.rawKey}" https://api.ibanforge.com/v1/credits/balance\n\n` +
+    `Or read everything your key did, in one page:\n` +
+    `  https://ibanforge.com/en/account\n` +
+    `  Your usage, what failed and why, and the networks it was called from.\n` +
+    `  Your key stays in your browser: it is sent to the API and nowhere else.\n\n` +
     `Docs: https://ibanforge.com/docs\n` +
     `Terms: https://ibanforge.com/legal/terms (unused card-paid packs: 14-day refund)\n` +
     `Keep this key safe — it will not be shown again.\n\nIBANforge`;
@@ -61,6 +65,8 @@ export async function sendApiKeyEmail(p: {
      -X POST https://api.ibanforge.com/v1/iban/validate \\
      -H "content-type: application/json" \\
      -d '{"iban":"CH1000230000000012345"}'</pre>
+    <p style="font-size:14px;margin:0 0 10px"><a href="https://ibanforge.com/en/account" style="color:#fbbf24;text-decoration:none">See everything your key did →</a></p>
+    <p style="color:#71717a;font-size:12px;margin:0 0 22px">Usage, failures with their cause, and the networks your key was called from. The key stays in your browser.</p>
     <p style="font-size:14px;margin:0"><a href="https://ibanforge.com/docs" style="color:#fbbf24;text-decoration:none">Read the docs →</a> &nbsp;·&nbsp; <a href="https://ibanforge.com/legal/terms" style="color:#fbbf24;text-decoration:none">Terms →</a></p>
     <hr style="border:none;border-top:1px solid rgba(255,255,255,.06);margin:24px 0 14px">
     <p style="color:#52525b;font-size:12px;margin:0">IBANforge · pre-payout screening for AI agents · <a href="https://ibanforge.com" style="color:#71717a">ibanforge.com</a> · governed by the <a href="https://ibanforge.com/legal/terms" style="color:#71717a">Terms of Service</a></p>
@@ -101,6 +107,8 @@ export function buildQuotaWarningEmail(p: QuotaWarningInput): { subject: string;
     `  1,000 credits  $5   ${PAYMENT_LINKS['1k']}\n` +
     `  5,000 credits  $20  ${PAYMENT_LINKS['5k']}\n` +
     ` 25,000 credits  $80  ${PAYMENT_LINKS['25k']}\n\n` +
+    `See where those calls went: https://ibanforge.com/en/account\n` +
+    `Your usage, what failed and why. The key stays in your browser.\n\n` +
     `Credits never expire and carry no subscription. All packs: ${PRICING_PAGE}\n` +
     `Paying in USDC instead? POST /v1/credits/buy/1k|5k|25k, or per call via x402.\n\n` +
     `Need a higher monthly allowance or an embedding licence? Reply to this email.\n\nIBANforge`;
@@ -117,6 +125,7 @@ export function buildQuotaWarningEmail(p: QuotaWarningInput): { subject: string;
       <p style="margin:0"><a href="${PAYMENT_LINKS['25k']}" style="color:#fbbf24;text-decoration:none">25,000 credits — $80 →</a></p>
     </div>
     <p style="color:#71717a;font-size:13px;margin:0 0 6px">Credits never expire, no subscription. Paying in USDC instead? <code>POST /v1/credits/buy/1k|5k|25k</code>.</p>
+    <p style="font-size:13px;margin:14px 0 0"><a href="https://ibanforge.com/en/account" style="color:#fbbf24;text-decoration:none">See where those calls went →</a> <span style="color:#71717a">Your usage and what failed, with the cause.</span></p>
     <p style="color:#a1a1aa;font-size:13px;margin:14px 0 0">Need a higher monthly allowance or an embedding licence? Just reply.</p>
     <hr style="border:none;border-top:1px solid rgba(255,255,255,.06);margin:24px 0 14px">
     <p style="color:#52525b;font-size:12px;margin:0">IBANforge · <a href="${PRICING_PAGE}" style="color:#71717a">all packs</a></p>
@@ -178,6 +187,7 @@ export async function sendOemKeyEmail(p: {
     `Welcome to IBANforge Editor / OEM.\n\n` +
     `API key: ${p.rawKey}\n` +
     `Plan: Editor / OEM subscription (${limit} requests/month, resets on the 1st)\n` +
+    `Your key at a glance: https://ibanforge.com/en/account\n` +
     `SLA: https://ibanforge.com/en/legal/sla\n` +
     `DPA: https://ibanforge.com/en/legal/dpa\n` +
     `Terms: https://ibanforge.com/en/legal/terms\n\n` +

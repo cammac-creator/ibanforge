@@ -520,6 +520,30 @@ const buildSpec = () => ({
         },
       },
     },
+    '/v1/keys/report': {
+      get: {
+        operationId: 'getApiKeyReport',
+        summary: 'Read everything this key did',
+        description:
+          'Self-service report for the presented key: daily traffic, endpoints called, what failed with a plain-language cause and a suggested fix, and how many distinct networks the key was called from. Authentication is the key itself, and the report only ever covers that key. A human-readable version of the same data is at https://ibanforge.com/en/account. ' +
+          'The footprint reports `unusual: null`, never false, for a key with no traffic: a key that has never been called has not passed a leak check, it has nothing to judge.',
+        tags: ['API Keys'],
+        security: [{ apiKey: [] }],
+        parameters: [
+          {
+            name: 'days',
+            in: 'query',
+            required: false,
+            description: 'Window in days, clamped to 1..365. Defaults to 30.',
+            schema: { type: 'integer', minimum: 1, maximum: 365, default: 30 },
+          },
+        ],
+        responses: {
+          '200': { description: 'Usage, traffic shape, failures with their cause, and network footprint' },
+          '401': { description: 'Missing or invalid API key' },
+        },
+      },
+    },
     '/v1/credits/bundles': {
       get: {
         operationId: 'listCreditBundles',
