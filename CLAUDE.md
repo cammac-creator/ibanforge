@@ -153,11 +153,18 @@ npm run mcp          # Start MCP server for AI agents
 ## Deployment
 
 - Push to `main` triggers Railway auto-deploy (l'API Hono)
-- ⚠️ **Le frontend Vercel ne se met PAS en ligne tout seul.** Un push produit un
-  déploiement de production joignable sur son URL `vercel.app`, mais
-  `ibanforge.com` est un alias figé : il ne bouge qu'après un
-  `vercel alias set` manuel, sur l'apex **et** sur `www`. Un push n'expose donc
-  rien aux visiteurs, ce qui en fait le banc d'essai avant promotion.
+- ⚠️ **Le frontend Vercel ne se met PAS en ligne tout seul, et la cause n'est pas
+  celle qu'on croyait.** Mesuré le 21/08/2026 : le déploiement de production EST
+  à jour côté Vercel — `vercel promote` le refuse avec « already the current
+  production deployment ». Ce sont les **domaines** qui sont détournés : un
+  `vercel alias set` les épingle sur un déploiement précis, et cet épinglage
+  **écrase l'assignation de production**. Le workaround est donc devenu la cause,
+  et il se ré-arme à chaque fois qu'on l'applique.
+  → En attendant de le retirer : `vercel alias set <url-du-déploiement>
+  ibanforge.com` **et** `www.ibanforge.com`. Retour arrière : `vercel rollback`.
+  → Pour en finir : retirer l'épinglage pour que les domaines suivent la
+  production nativement. C'est la décision de Claude-Alain, elle supprime le banc
+  d'essai avant publication.
 - ⚠️ **Aucun preview Vercel ne peut servir le dashboard.** L'environnement
   Preview n'a ni `SESSION_SECRET` ni `ADMIN_SECRET` (Production seulement) :
   pas de session, pas de données. Faire relire une UI de dashboard passe donc
