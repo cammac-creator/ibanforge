@@ -217,4 +217,22 @@ describe('verificationDelivery', () => {
     markVerificationOutcome(recordVerificationSend('n', 'd@example.com'), true);
     expect(verificationDelivery(24).refused_ratio).toBe(0.5);
   });
+
+  it('marks the row it was handed, not a neighbouring one', () => {
+    // recordVerificationSend runs two DELETEs after its INSERT. If the id came
+    // from anywhere but the INSERT's own result, this would mark the wrong row
+    // and quietly corrupt the ratio reported in /health.
+    const first = recordVerificationSend('n', 'acme@example.com');
+    const second = recordVerificationSend('n', 'ops@alpha.example.net');
+    expect(second).toBeGreaterThan(first);
+    markVerificationOutcome(second, false);
+
+    const db = getStatsDB();
+    const rows = db
+      .prepare('SELECT id, relay_accepted FROM verification_sends ORDER BY id')
+      .all() as Array<{ id: number; relay_accepted: number | null }>;
+    const marked = rows.filter((r) => r.relay_accepted !== null);
+    expect(marked).toHaveLength(1);
+    expect(marked[0].id).toBe(second);
+  });
 });

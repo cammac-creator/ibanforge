@@ -62,14 +62,25 @@ function Stat({ label, value, hint }: { label: string; value: string; hint?: str
   );
 }
 
-/** A bar per day of the window, gaps filled here — the browser owns the calendar. */
+/**
+ * A bar per day of the window, gaps filled here.
+ *
+ * ⚠️ The axis is built in UTC, deliberately. The server groups on
+ * `date(created_at)`, which SQLite evaluates in UTC, so a browser walking back
+ * through LOCAL days produces keys that miss. For a reader in Zurich the
+ * mismatch is invisible most of the day and then eats a bar: a call made at
+ * 00:30 local is 22:30 UTC on the previous day, so the server files it under
+ * yesterday while a local axis looks for it under today.
+ *
+ * Matching the server's calendar is the only way the two agree. The day labels
+ * are UTC too, which is what an API caller reading their own traffic expects.
+ */
 function Days({ days, span }: { days: Array<{ day: string; count: number; failed: number }>; span: number }) {
   const known = new Map(days.map((d) => [d.day, d]));
   const cells: Array<{ key: string; count: number; failed: number }> = [];
+  const todayUtc = Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate());
   for (let i = span - 1; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    const key = d.toISOString().slice(0, 10);
+    const key = new Date(todayUtc - i * 86_400_000).toISOString().slice(0, 10);
     const hit = known.get(key);
     cells.push({ key, count: hit?.count ?? 0, failed: hit?.failed ?? 0 });
   }
