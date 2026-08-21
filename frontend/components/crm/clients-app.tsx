@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
+  callsToday,
   chipOfDossier,
   heatOfDossier,
   sortDossiers,
@@ -47,8 +48,12 @@ type Filter = Verdict | 'all' | 'used';
 
 /** Column order mirrors the row layout; every header sorts (ask of 18/08). */
 const HEADERS: Array<{ key: SortKey; label: string; width: string; right?: boolean }> = [
-  { key: 'state', label: 'État', width: 'md:w-[12%]' },
-  { key: 'requests', label: 'Requêtes', width: 'md:w-[10%]', right: true },
+  // État lost its 12% and its coloured dot on 21/08: the word already carries
+  // the colour, so the dot repeated it and paid for the repetition in width.
+  { key: 'state', label: 'État', width: 'md:w-[8%]' },
+  // Requêtes now carries two figures — today over the window total — so it
+  // takes back the width État gave up.
+  { key: 'requests', label: 'Requêtes', width: 'md:w-[13%]', right: true },
   { key: 'last30', label: '30 jours', width: 'md:w-24' },
   { key: 'freshness', label: 'Dernier appel', width: 'md:w-[13%]' },
   { key: 'countries', label: 'Pays contrôlés', width: 'md:min-w-0 md:flex-1' },
@@ -169,7 +174,7 @@ export function ClientsApp({ dossiers, locale, windowDays = 90 }: { dossiers: Cl
             sort it (again to flip), click État to filter, click the lens to
             search. On phones the row thumb-scrolls; the old pill bar is gone. */}
         <div className="flex items-center gap-3 overflow-x-auto whitespace-nowrap border-b border-[var(--ink-4)] px-4 py-2 text-[11.5px] uppercase tracking-wider text-[var(--fg-5)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          <span className="flex w-auto shrink-0 items-center gap-1 md:w-[24%] md:shrink">
+          <span className="flex w-auto shrink-0 items-center gap-1 md:w-[27%] md:shrink">
             <button type="button" onClick={() => onHeader('name')} className={headerBtn(sort === 'name')} title="Trier par nom">
               Client{arrowOf('name')}
             </button>
@@ -246,7 +251,7 @@ export function ClientsApp({ dossiers, locale, windowDays = 90 }: { dossiers: Cl
                 title="Trier sur cette colonne (re-cliquer inverse)"
                 className={`${headerBtn(sort === h.key)} w-auto ${h.width} ${h.right ? 'md:text-right' : ''} ${h.key === 'last30' ? 'md:shrink-0' : ''}`}
               >
-                {h.key === 'requests' ? `Requêtes (${windowDays} j)` : h.label}
+                {h.key === 'requests' ? `Requêtes (jour / ${windowDays} j)` : h.label}
                 {arrowOf(h.key)}
               </button>
             ),
@@ -256,7 +261,7 @@ export function ClientsApp({ dossiers, locale, windowDays = 90 }: { dossiers: Cl
         {stateMenuOpen && (
           <>
             <div className="fixed inset-0 z-20" onClick={() => setStateMenuOpen(false)} aria-hidden />
-            <div className="absolute left-3 top-11 z-30 w-72 overflow-hidden rounded-lg border border-[var(--ink-4)] bg-[var(--ink-1)] shadow-2xl md:left-[24%]">
+            <div className="absolute left-3 top-11 z-30 w-72 overflow-hidden rounded-lg border border-[var(--ink-4)] bg-[var(--ink-1)] shadow-2xl md:left-[27%]">
               <button
                 type="button"
                 onClick={() => {
@@ -310,6 +315,7 @@ export function ClientsApp({ dossiers, locale, windowDays = 90 }: { dossiers: Cl
         ) : (
           view.map((d) => {
             const v = VERDICT_BY_KEY[d.verdict];
+            const todayCalls = callsToday(d.days, new Date());
             return (
               <div key={d.id} className="border-b border-[var(--ink-4)]/60 last:border-b-0">
                 <button
@@ -317,28 +323,43 @@ export function ClientsApp({ dossiers, locale, windowDays = 90 }: { dossiers: Cl
                   aria-haspopup="dialog"
                   className="flex w-full flex-wrap items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-[var(--ink-3)]/40 md:flex-nowrap"
                 >
-                  <span className="w-full min-w-0 md:w-[24%]">
+                  {/* The address is the identity line, not the subtitle (ask of
+                      21/08). Most customers sign up from a free mailbox, so the
+                      domain alone said "gmail.com" over and over and told the
+                      operator nothing about WHO called. The company name, when
+                      we know one, moves underneath as the gloss it always was. */}
+                  <span className="w-full min-w-0 md:w-[27%]">
                     <span className="flex items-center gap-1.5">
                     {(() => { const chip = chipOfDossier(d); return chip ? (
                       <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide" style={{ color: chip.color, backgroundColor: chip.bg }}>{chip.label}</span>
                     ) : null; })()}
-                    <span className="block min-w-0 truncate text-sm font-medium text-[var(--fg-1)]">
-                      {d.company ?? d.email.split('@')[1]}
+                    <span className="block min-w-0 truncate text-sm font-medium text-[var(--fg-1)]" title={d.email}>
+                      {d.email}
                     </span>
                     {(() => { const f = flameOf(heatOfDossier(d, new Date()).score); return f ? (
                       <span className={`shrink-0 text-[11px] ${f.dim ? 'opacity-45' : ''}`}>{f.glyph}</span>
                     ) : null; })()}
                     </span>
-                    <span className="block truncate font-mono text-[12px] text-[var(--fg-4)]">{d.email}</span>
+                    {d.company && (
+                      <span className="block truncate text-[12px] text-[var(--fg-4)]">{d.company}</span>
+                    )}
                   </span>
-                  <span className="flex w-auto items-center gap-1.5 md:w-[12%]">
-                    <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: v.colour }} />
+                  <span className="flex w-auto items-center md:w-[8%]">
                     <span className="truncate text-[13px]" style={{ color: v.colour }}>
                       {v.one}
                     </span>
                   </span>
-                  <span className="w-auto text-right font-mono text-sm tabular-nums text-[var(--fg-1)] md:w-[10%]">
-                    {d.requests.toLocaleString('fr-CH')}
+                  {/* Two figures, one column: today, then the window total.
+                      "Combien aujourd'hui" and "combien en tout" were the two
+                      questions the single number could not answer at once. */}
+                  <span className="w-auto text-right font-mono text-sm tabular-nums md:w-[13%]">
+                    {todayCalls > 0 ? (
+                      <span className="text-[var(--fg-1)]">{todayCalls.toLocaleString('fr-CH')}</span>
+                    ) : (
+                      <span className="text-[var(--fg-4)]">0</span>
+                    )}
+                    <span className="text-[var(--fg-4)]"> / </span>
+                    <span className="text-[12px] text-[var(--fg-3)]">{d.requests.toLocaleString('fr-CH')}</span>
                   </span>
                   <span className="w-auto shrink-0 md:w-24">
                     <MiniSpark days={d.days} />
@@ -348,13 +369,20 @@ export function ClientsApp({ dossiers, locale, windowDays = 90 }: { dossiers: Cl
                       ? `rien sur ${windowDays} j · ${d.usedAllTime.toLocaleString('fr-CH')} avant`
                       : relativeDays(d.daysSinceLastCall)}
                   </span>
-                  <span className="min-w-0 flex-1 truncate font-mono text-[12px] text-[var(--fg-3)]">
+                  {/* Three flags, then an ellipsis. Five filled the row without
+                      being read: past the third the eye stops counting and the
+                      column only says "several". The full list stays one click
+                      away in the dossier. */}
+                  <span
+                    className="min-w-0 flex-1 truncate font-mono text-[12px] text-[var(--fg-3)]"
+                    title={d.countries.length > 3 ? d.countries.map((c) => c.code).join(' ') : undefined}
+                  >
                     {d.countries.length === 0
                       ? '—'
                       : d.countries
-                          .slice(0, 5)
+                          .slice(0, 3)
                           .map((c) => `${flag(c.code)} ${c.code}`)
-                          .join('  ')}
+                          .join('  ') + (d.countries.length > 3 ? ' …' : '')}
                   </span>
                   <span className="w-14 text-right text-[12px]">
                     {d.mails.sent + d.mails.received > 0 ? (
@@ -364,7 +392,7 @@ export function ClientsApp({ dossiers, locale, windowDays = 90 }: { dossiers: Cl
                         title="Ouvrir son fil dans Contacts"
                         className="text-amber-400 hover:underline"
                       >
-                        ✉ {d.mails.sent + d.mails.received}
+                        {d.mails.sent + d.mails.received}
                       </a>
                     ) : (
                       <a
@@ -373,7 +401,7 @@ export function ClientsApp({ dossiers, locale, windowDays = 90 }: { dossiers: Cl
                         title="Écrire dans Contacts"
                         className="text-[var(--fg-4)] hover:text-amber-400"
                       >
-                        ✉ écrire
+                        écrire
                       </a>
                     )}
                     {d.mails.hasDraft && <span className="ml-1 text-[var(--warn)]">•</span>}

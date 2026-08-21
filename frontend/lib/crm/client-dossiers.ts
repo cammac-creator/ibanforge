@@ -207,6 +207,23 @@ function mergeCounts<T extends string>(
     .map(([label, count]) => ({ [labelKey]: label, count }) as { count: number } & Record<T, string>);
 }
 
+/**
+ * Calls made today, on the Europe/Zurich wall calendar.
+ *
+ * Deliberately NOT the last 24 h: the operator opens this page in the morning
+ * and asks "what has moved since I went to bed", not "what happened since this
+ * time yesterday". Same reasoning as `calendarDaysSince`, and the same day
+ * boundary, so the two never disagree on the screen.
+ */
+export function callsToday(days: Array<{ day: string; count: number }>, now: Date): number {
+  const today = ZURICH_DAY.format(now);
+  let sum = 0;
+  for (const d of days) {
+    if (d.day === today) sum += d.count;
+  }
+  return sum;
+}
+
 /** Calls inside the window ending at `now`, `offsetDays` windows back. */
 function windowTotal(days: Array<{ day: string; count: number }>, now: Date, offsetDays: number): number {
   const end = now.getTime() - offsetDays * 7 * DAY_MS;
