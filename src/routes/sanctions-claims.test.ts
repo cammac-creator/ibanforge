@@ -69,12 +69,13 @@ function walk(dir: string, out: string[] = []): string[] {
   return out;
 }
 
-describe('sanctions coverage claims match the shipped database', () => {
-  const shipped = new Set(
-    (getComplianceDB().prepare('SELECT DISTINCT source_list FROM sanctioned_entities').all() as Array<{ source_list: string }>)
-      .map((r) => r.source_list.toUpperCase()),
-  );
+/** The authorities the shipped database actually carries. Ground truth for both directions. */
+const shipped = new Set(
+  (getComplianceDB().prepare('SELECT DISTINCT source_list FROM sanctioned_entities').all() as Array<{ source_list: string }>)
+    .map((r) => r.source_list.toUpperCase()),
+);
 
+describe('sanctions coverage claims match the shipped database', () => {
   it('the database holds OFAC, EU and UN, and not SECO', () => {
     // Pinned as ground truth so the rest of the file has something to compare
     // against. If a feed is genuinely added, this is the assertion to change
@@ -162,5 +163,104 @@ describe('served copy claims only what the product can prove', () => {
     }
 
     expect(offenders, `Surfaces promising a check we do not perform:\n${offenders.join('\n')}`).toEqual([]);
+  });
+});
+
+/**
+ * The mirror image of the guard above: a surface must not name FEWER lists than
+ * we screen either.
+ *
+ * ## Why the same file needs the opposite assertion
+ *
+ * The guard above only catches a surface that claims an authority we do not
+ * have. It is blind to the other drift, and on 21/08/2026 that drift was the
+ * live one: lifting the importer filter made the UN axis return entries, so
+ * every surface that had honestly said "OFAC" or "OFAC + EU" the day before
+ * became an under-declaration overnight. Commit 08e72bf fixed three of them by
+ * hand (SUBMISSIONS.md, the Postman collection, the MCP descriptor) and added
+ * no test, which is the exact shape of the 923413e mistake this file was
+ * written to end.
+ *
+ * Under-declaring is cheaper than over-declaring, but it is not free: a buyer
+ * comparing us against a competitor reads the smaller list and walks, and an
+ * assistant summarising the product tells its user we do not screen UN.
+ *
+ * ## Why the pinned list, rather than scanning the repo
+ *
+ * Over-declaring is a defect anywhere, so the guard above may sweep the whole
+ * tree. Under-declaring is only a defect on a surface that sets out to state
+ * WHICH lists are screened. Dozens of served strings legitimately name OFAC
+ * alone as the spine of the data or as a one-element example, and sweeping
+ * would flag every one of them. So the surfaces that make the coverage claim
+ * are pinned here by name; adding a new one is a deliberate act.
+ *
+ * ## Why it is asserted line by line
+ *
+ * A file-level "names all three somewhere" assertion stays green when a single
+ * one of the five claim lines in compliance.mdx is rewritten back to "(OFAC)".
+ * Every line that names a screened authority must therefore carry the full set
+ * itself. One test per surface, so a regression reports which surface drifted
+ * rather than one opaque failure.
+ */
+describe('no served surface names fewer sanctions lists than we screen', () => {
+  /**
+   * Surfaces whose job is to state the screened set. All three locales of each
+   * doc: leaving de/fr behind is drift of its own, and the guard above already
+   * treats "in any of the three languages" as the standard.
+   */
+  const COVERAGE_SURFACES = [
+    'frontend/content/en/docs/data-sources.mdx',
+    'frontend/content/de/docs/data-sources.mdx',
+    'frontend/content/fr/docs/data-sources.mdx',
+    'frontend/content/en/docs/compliance.mdx',
+    'frontend/content/de/docs/compliance.mdx',
+    'frontend/content/fr/docs/compliance.mdx',
+    'src/mcp/server.ts',
+    'src/routes/openapi.ts',
+  ];
+
+  /**
+   * What makes a line a coverage claim. Case-sensitive on purpose: the French
+   * article "un" and the German conjunction "und" are not the Security Council,
+   * and "SECONDARY" is not the Swiss authority.
+   *
+   * A bare "EU" does not trigger a claim by itself, because in this codebase it
+   * is far more often the jurisdiction than the list ("EU high-risk third
+   * countries", "EU Instant Payments Regulation"). It still counts inside a run.
+   */
+  const CLAIM_TRIGGER = /\b(OFAC|UN|SECO)\b/;
+
+  /** A run of authorities written as a set, e.g. "OFAC, EU, UN" or "EU,OFAC,UN". */
+  const RUN = /\b(OFAC|EU|UN|SECO)\b(?:\s*[,/+]\s*\b(?:OFAC|EU|UN|SECO)\b)+/g;
+
+  /**
+   * `matched_lists` shows what a single hit looks like, so `["OFAC"]` is a
+   * correct example and not a claim about coverage. It is the only exemption,
+   * and it is narrow on purpose.
+   */
+  const EXAMPLE_FIELD = 'matched_lists';
+
+  it.each(COVERAGE_SURFACES)('%s names every list the database holds', (rel) => {
+    const text = readFileSync(join(ROOT, rel), 'utf8');
+    const offenders: string[] = [];
+    let claims = 0;
+
+    text.split('\n').forEach((line, i) => {
+      if (!CLAIM_TRIGGER.test(line) || line.includes(EXAMPLE_FIELD)) return;
+      claims++;
+      const complete = [...line.matchAll(RUN)].some((m) => {
+        const named = new Set(m[0].split(/[,/+]/).map((s) => s.trim()));
+        return named.size === shipped.size && [...shipped].every((a) => named.has(a));
+      });
+      if (!complete) offenders.push(`  line ${i + 1}: ${line.trim().slice(0, 140)}`);
+    });
+
+    // A surface that stopped claiming anything at all is the same failure with
+    // the evidence removed, so silence does not pass either.
+    expect(claims, `${rel} no longer states which sanctions lists are screened`).toBeGreaterThan(0);
+    expect(
+      offenders,
+      `${rel} names a sanctions list set smaller than the shipped ${[...shipped].sort().join(', ')}:\n${offenders.join('\n')}`,
+    ).toEqual([]);
   });
 });

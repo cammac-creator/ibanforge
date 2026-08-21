@@ -178,7 +178,7 @@ const buildSpec = () => ({
         operationId: 'complianceCheck',
         summary: 'Full IBAN compliance check',
         description:
-          'Validates an IBAN and returns everything from /v1/iban/validate PLUS a full compliance layer: sanctions screening (OFAC), FATF status, SEPA Instant reachability, VoP participant check, and a composite risk score (0-100). Costs $0.02 USDC via x402.',
+          'Validates an IBAN and returns everything from /v1/iban/validate PLUS a full compliance layer: sanctions screening (OFAC, EU, UN), FATF status, SEPA Instant reachability, VoP participant check, and a composite risk score (0-100). Costs $0.02 USDC via x402.',
         tags: ['Compliance'],
         security: [{ x402Payment: [] }, { apiKey: [] }],
         requestBody: {
@@ -435,7 +435,18 @@ const buildSpec = () => ({
       post: {
         operationId: 'generateApiKey',
         summary: 'Generate a free API key',
-        description: 'Generates a free API key with 200 requests/month quota (batch validation counts 1 request per IBAN). One key per email per day.',
+        // The mailbox-verification step (in force since 2026-08-18) is described
+        // here because this document is how machines learn the endpoint. It used
+        // to exist only in the HTTP MCP `instructions` field, so a client
+        // generated from this spec could not send the code and did not expect the
+        // 403: it looped or gave up on a step the product answers in one retry.
+        description:
+          'Generates a free API key with 200 requests/month quota (batch validation counts 1 request per IBAN). ' +
+          'The first key issued to a network is instant. A repeat creation from the same network within 7 days ' +
+          'must prove the mailbox is readable: that call answers 403 "verification_required" and mails a 6-digit ' +
+          'code to the address supplied, and the SAME request is then repeated with a "code" field within 15 ' +
+          'minutes. At most 3 keys per network per day. A caller that cannot receive mail does not need this ' +
+          'endpoint at all: prepaid credits (POST /v1/credits/buy/1k) and x402 pay-per-call need no key.',
         tags: ['API Keys'],
         // Explicitly no authentication, which is a different statement from
         // omitting the field: an agent reading the contract can tell 'free' from
@@ -447,9 +458,22 @@ const buildSpec = () => ({
             'application/json': {
               schema: {
                 type: 'object',
+                // "code" is deliberately NOT in `required`: the first key of a
+                // network never needs one, and every client generated against
+                // this spec before 2026-08 posts {email} alone. Requiring it
+                // would be a breaking change wearing an additive costume.
                 required: ['email'],
                 properties: {
                   email: { type: 'string', format: 'email', description: 'Email address for key registration' },
+                  code: {
+                    type: 'string',
+                    pattern: '^[0-9]{6}$',
+                    example: '123456',
+                    description:
+                      'Optional. The 6-digit code mailed after a 403 "verification_required". Repeat the same ' +
+                      'request with it within 15 minutes; omit it to be mailed a fresh one. The challenge locks ' +
+                      'after 5 wrong attempts.',
+                  },
                 },
               },
             },
@@ -457,8 +481,29 @@ const buildSpec = () => ({
         },
         responses: {
           '201': { description: 'API key generated (shown only once)' },
-          '429': { description: 'Rate limited — one key per email per day' },
-          '400': { description: 'Invalid email' },
+          '400': {
+            description:
+              'Body rejected before any key was considered. "error" is "invalid_json", "invalid_email", or ' +
+              '"disposable_email" (the free tier needs a real, non-disposable mailbox).',
+          },
+          '403': {
+            description:
+              'The mailbox must be verified. "verification_required": a 6-digit code was just mailed, repeat this ' +
+              'exact request with "code" within 15 minutes. "verification_failed": the code was wrong or expired, ' +
+              'and "reason" says which ("wrong_code", "expired", "no_challenge", "too_many_attempts"); request ' +
+              'again without "code" to be sent a fresh one.',
+          },
+          '429': {
+            description:
+              'Too many creations. "key_creation_limit": at most 3 free keys per network per day. ' +
+              '"verification_rate_limited": too many codes were mailed to this address or from this network today. ' +
+              '"rate_limited": one key per email per day. Existing keys keep working in every case.',
+          },
+          '503': {
+            description:
+              '"verification_unavailable": the verification mail could not be sent right now, so no key was ' +
+              'issued and no code is pending. Retry in a few minutes.',
+          },
         },
       },
     },
