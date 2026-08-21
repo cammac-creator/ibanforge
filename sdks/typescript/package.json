@@ -42,7 +42,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/cammac-creator/ibanforge",
+    "url": "git+https://github.com/cammac-creator/ibanforge.git",
     "directory": "sdks/typescript"
   },
   "bugs": {

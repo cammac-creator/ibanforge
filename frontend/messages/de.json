@@ -36,7 +36,8 @@
       "privacy": "Datenschutz",
       "dpa": "AVV (DPA)",
       "imprint": "Impressum",
-      "compare": "Vergleich"
+      "compare": "Vergleich",
+      "account": "Ihr Schlüssel"
     },
     "copyright": "© {year} IBANforge.",
     "dataLine": "Daten: GLEIF · SIX · Bundesbank · EBA — monatlich aktualisiert"

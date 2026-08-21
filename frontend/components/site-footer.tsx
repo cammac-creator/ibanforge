@@ -25,6 +25,11 @@ export function SiteFooter() {
         { href: "https://github.com/cammac-creator/ibanforge", label: t("link.github"), external: true },
         { href: `/${locale}/docs/mcp`, label: t("link.mcp") },
         { href: `/${locale}/status`, label: t("link.apiStatus") },
+        // Next to API Status on purpose: both answer "is it working" — one for
+        // the service, one for the caller's own key. Without a link here the
+        // page was reachable only from an email, so a customer who deleted it
+        // had no way back and search engines had none either.
+        { href: `/${locale}/account`, label: t("link.account") },
         { href: `/${locale}/changelog`, label: t("link.changelog") },
         { href: "mailto:support@ibanforge.com", label: t("link.support"), external: true },
       ],

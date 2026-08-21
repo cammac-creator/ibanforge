@@ -36,7 +36,8 @@
       "privacy": "Confidentialité",
       "dpa": "DPA",
       "imprint": "Mentions légales",
-      "compare": "Comparatif"
+      "compare": "Comparatif",
+      "account": "Votre clé"
     },
     "copyright": "© {year} IBANforge.",
     "dataLine": "Données : GLEIF · SIX · Bundesbank · EBA — actualisées chaque mois"
