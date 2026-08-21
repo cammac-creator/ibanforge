@@ -217,6 +217,12 @@ describe('no served surface names fewer sanctions lists than we screen', () => {
     'frontend/content/fr/docs/compliance.mdx',
     'src/mcp/server.ts',
     'src/routes/openapi.ts',
+    // The home page's trust bar and its neighbours live here, not in the TSX,
+    // which only renders t('trust.sanctionsValue'). It is the most seen surface
+    // of the lot and it was the last one still naming a single authority.
+    'frontend/messages/en.json',
+    'frontend/messages/de.json',
+    'frontend/messages/fr.json',
   ];
 
   /**
@@ -230,8 +236,16 @@ describe('no served surface names fewer sanctions lists than we screen', () => {
    */
   const CLAIM_TRIGGER = /\b(OFAC|UN|SECO)\b/;
 
-  /** A run of authorities written as a set, e.g. "OFAC, EU, UN" or "EU,OFAC,UN". */
-  const RUN = /\b(OFAC|EU|UN|SECO)\b(?:\s*[,/+]\s*\b(?:OFAC|EU|UN|SECO)\b)+/g;
+  /**
+   * A run of authorities written as a set, e.g. "OFAC, EU, UN" or "EU,OFAC,UN".
+   *
+   * The middle dot is in the separator list because it is the separator the
+   * site's own trust bar uses for every other value it shows. Without it, a
+   * claim written correctly in the house typography would be reported as an
+   * under-declaration, which is a false alarm the guard would eventually be
+   * silenced for.
+   */
+  const RUN = /\b(OFAC|EU|UN|SECO)\b(?:\s*[,/+·]\s*\b(?:OFAC|EU|UN|SECO)\b)+/g;
 
   /**
    * `matched_lists` shows what a single hit looks like, so `["OFAC"]` is a
@@ -249,7 +263,7 @@ describe('no served surface names fewer sanctions lists than we screen', () => {
       if (!CLAIM_TRIGGER.test(line) || line.includes(EXAMPLE_FIELD)) return;
       claims++;
       const complete = [...line.matchAll(RUN)].some((m) => {
-        const named = new Set(m[0].split(/[,/+]/).map((s) => s.trim()));
+        const named = new Set(m[0].split(/[,/+·]/).map((s) => s.trim()));
         return named.size === shipped.size && [...shipped].every((a) => named.has(a));
       });
       if (!complete) offenders.push(`  line ${i + 1}: ${line.trim().slice(0, 140)}`);
