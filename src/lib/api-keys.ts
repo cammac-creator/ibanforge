@@ -410,6 +410,29 @@ export function getKeyAgeHours(keyHash: string): number | null {
 }
 
 /**
+ * Whether this key has been marked as belonging to a key farm.
+ *
+ * `no_recredit` is set by the cohort radar when a burst of keys is recognised
+ * as one operator. The flag already stops the monthly re-credit; it should also
+ * stop the mail, and until now it did not.
+ *
+ * What that cost, measured on 19/08/2026: a cohort was relabelled to
+ * `@cohorte.invalid` and so became unroutable, but a farm key not yet grouped
+ * still passed every filter, and the verification path mailed invented
+ * addresses at a reputable domain. Nearly every incoming message in the
+ * business mailbox over those three days was our own bounce.
+ *
+ * Returns false when the key is unknown: a caller must not be able to silence
+ * mail by presenting a hash that does not exist.
+ */
+export function isNoRecredit(keyHash: string): boolean {
+  const row = getStatsDB()
+    .prepare('SELECT no_recredit FROM api_keys WHERE key_hash = ?')
+    .get(keyHash) as { no_recredit?: number } | undefined;
+  return row?.no_recredit === 1;
+}
+
+/**
  * Claim the right to warn this key once for this month. Returns true exactly
  * once per (key, month): the PRIMARY KEY makes the second caller a no-op, so a
  * burst of calls above the threshold cannot produce a burst of emails.

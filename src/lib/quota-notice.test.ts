@@ -75,3 +75,42 @@ describe('maybeSendQuotaWarning', () => {
     expect(await maybeSendQuotaWarning(input(keyHash, 'holder@alpha-corp.example.net', '2030-03'))).toBe('already_notified');
   });
 });
+
+/**
+ * The cohort guard. Added 21/08 after the mail audit: `no_recredit` already
+ * stopped the monthly re-credit for a farm key, but nothing stopped the mail,
+ * so a farm key not yet relabelled to `@cohorte.invalid` still got written to.
+ */
+describe('maybeSendQuotaWarning — flagged cohorts', () => {
+  function flag(keyHash: string): void {
+    getStatsDB().prepare('UPDATE api_keys SET no_recredit = 1 WHERE key_hash = ?').run(keyHash);
+  }
+
+  it('does not mail a key the cohort radar has flagged', async () => {
+    const keyHash = makeAgedKey(`qn-farm-${RUN_ID}@example.com`);
+    flag(keyHash);
+    const outcome = await maybeSendQuotaWarning(input(keyHash, `qn-farm-${RUN_ID}@example.com`, '2026-08'));
+    expect(outcome).toBe('flagged_cohort');
+  });
+
+  it('refuses before claiming the monthly lock, so the warning is not burned', async () => {
+    const email = `qn-farm2-${RUN_ID}@example.com`;
+    const keyHash = makeAgedKey(email);
+    flag(keyHash);
+    await maybeSendQuotaWarning(input(keyHash, email, '2026-08'));
+    // Un-flag and retry: if the lock had been claimed, this would come back
+    // 'already_notified' and the key would have lost its single warning.
+    getStatsDB().prepare('UPDATE api_keys SET no_recredit = 0 WHERE key_hash = ?').run(keyHash);
+    const second = await maybeSendQuotaWarning(input(keyHash, email, '2026-08'));
+    expect(second).not.toBe('already_notified');
+  });
+
+  it('still mails a key that is not flagged', async () => {
+    const email = `qn-ok-${RUN_ID}@example.com`;
+    const keyHash = makeAgedKey(email);
+    const outcome = await maybeSendQuotaWarning(input(keyHash, email, '2026-08'));
+    // No SMTP in tests, so the send fails — but it got PAST the cohort guard,
+    // which is what this asserts.
+    expect(outcome).toBe('send_failed');
+  });
+});

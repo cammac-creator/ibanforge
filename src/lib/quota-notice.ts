@@ -1,4 +1,4 @@
-import { recordQuotaNotice, clearQuotaNotice, getKeyAgeHours } from './api-keys.js';
+import { recordQuotaNotice, clearQuotaNotice, getKeyAgeHours, isNoRecredit } from './api-keys.js';
 import { sendQuotaWarningEmail } from './email.js';
 import { isUnroutableEmail } from './disposable-domains.js';
 
@@ -14,6 +14,7 @@ export type QuotaNoticeOutcome =
   | 'no_contact'
   | 'send_failed'
   | 'unroutable_contact'
+  | 'flagged_cohort'
   | 'too_new';
 
 /**
@@ -54,6 +55,12 @@ export async function maybeSendQuotaWarning(p: {
   // costs sender reputation. Checked before the once-per-month lock so the
   // lock is never burned on an address we would not have mailed anyway.
   if (isUnroutableEmail(p.email)) return 'unroutable_contact';
+  // A key the cohort radar has flagged is a farm key: the address on it was
+  // invented, and mailing it costs our sending reputation and buys nothing.
+  // The domain filter above catches a cohort once it has been relabelled to
+  // `@cohorte.invalid`; this catches one that has not been relabelled yet,
+  // which is precisely the case the domain filter let through on 19/08.
+  if (isNoRecredit(p.keyHash)) return 'flagged_cohort';
   const ageHours = getKeyAgeHours(p.keyHash);
   if (ageHours != null && ageHours < MIN_KEY_AGE_HOURS) return 'too_new';
   if (!recordQuotaNotice(p.keyHash, p.month)) return 'already_notified';

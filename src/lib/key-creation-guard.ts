@@ -121,14 +121,62 @@ export function challengeSendAllowed(source: string | null, email: string): Chal
  * (past the 24h counting window) and expired pending challenges, so neither
  * table grows without bound between the daily retention runs.
  */
-export function recordVerificationSend(source: string | null, email: string): void {
+export function recordVerificationSend(source: string | null, email: string): number {
   const db = getStatsDB();
-  db.prepare('INSERT INTO verification_sends (ip_hash, email_hash) VALUES (?, ?)').run(
+  const info = db.prepare('INSERT INTO verification_sends (ip_hash, email_hash) VALUES (?, ?)').run(
     source,
     sha256(email.trim().toLowerCase()),
   );
   db.prepare("DELETE FROM verification_sends WHERE created_at < datetime('now', '-2 days')").run();
   db.prepare("DELETE FROM pending_verifications WHERE expires_at < datetime('now')").run();
+  return Number(info.lastInsertRowid);
+}
+
+/**
+ * Record what the relay did with a verification code.
+ *
+ * `accepted` is what the relay said, not what the mailbox did: a 200 means
+ * queued, and the hard bounce arrives later by a path nothing here can see.
+ * Recording it anyway is the difference between a failure rate we can watch
+ * and the silence that let three days of bounces go uncounted.
+ */
+export function markVerificationOutcome(id: number, accepted: boolean): void {
+  if (!Number.isFinite(id) || id <= 0) return;
+  getStatsDB().prepare('UPDATE verification_sends SET relay_accepted = ? WHERE id = ?').run(accepted ? 1 : 0, id);
+}
+
+export interface VerificationDelivery {
+  window_hours: number;
+  attempted: number;
+  refused: number;
+  /** Share refused by the relay, 0..1. `null` when nothing was attempted. */
+  refused_ratio: number | null;
+}
+
+/**
+ * How the verification channel is doing, over the last `hours`.
+ *
+ * Rows with a NULL outcome are counted as attempted but never as refused:
+ * an unknown outcome is not a success and not a failure, and inventing either
+ * would be the same mistake as calling a relay 200 a delivery.
+ */
+export function verificationDelivery(hours = 24): VerificationDelivery {
+  const row = getStatsDB()
+    .prepare(
+      `SELECT COUNT(*) attempted,
+              SUM(CASE WHEN relay_accepted = 0 THEN 1 ELSE 0 END) refused
+         FROM verification_sends
+        WHERE created_at >= datetime('now', ?)`,
+    )
+    .get(`-${hours} hours`) as { attempted: number; refused: number | null };
+  const attempted = row?.attempted ?? 0;
+  const refused = row?.refused ?? 0;
+  return {
+    window_hours: hours,
+    attempted,
+    refused,
+    refused_ratio: attempted === 0 ? null : refused / attempted,
+  };
 }
 
 /**

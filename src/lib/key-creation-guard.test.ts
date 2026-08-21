@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import {
   normalizeIpForGuard,
   keyCreationSource,
@@ -9,6 +9,8 @@ import {
   VERIFICATION_MAX_ATTEMPTS,
   challengeSendAllowed,
   recordVerificationSend,
+  markVerificationOutcome,
+  verificationDelivery,
   purgeExpiredVerifications,
   VERIFICATION_SENDS_PER_EMAIL_DAY,
   VERIFICATION_SENDS_PER_SOURCE_DAY,
@@ -157,5 +159,62 @@ describe('verification send limits (mail-bombing guard)', () => {
     expect(removed).toBeGreaterThanOrEqual(2);
     expect(db.prepare('SELECT COUNT(*) AS n FROM pending_verifications WHERE email = ?').get(email)).toEqual({ n: 0 });
     expect(db.prepare("SELECT COUNT(*) AS n FROM verification_sends WHERE ip_hash = 'purge-src'").get()).toEqual({ n: 0 });
+  });
+});
+
+/**
+ * The verification channel now records what the relay did with each code.
+ * Before 21/08 it recorded only that a code had been sent, so a channel
+ * refusing everything looked exactly like a channel working perfectly.
+ */
+describe('verificationDelivery', () => {
+  beforeEach(() => {
+    getStatsDB().prepare('DELETE FROM verification_sends').run();
+  });
+
+  it('reports nothing to judge when nothing was attempted', () => {
+    const d = verificationDelivery(24);
+    expect(d.attempted).toBe(0);
+    // null, not 0: an idle channel has not proven itself healthy.
+    expect(d.refused_ratio).toBeNull();
+  });
+
+  it('counts a refusal recorded against its own send', () => {
+    const id = recordVerificationSend('net-hash', 'acme@example.com');
+    markVerificationOutcome(id, false);
+    const d = verificationDelivery(24);
+    expect(d.attempted).toBe(1);
+    expect(d.refused).toBe(1);
+    expect(d.refused_ratio).toBe(1);
+  });
+
+  it('does not count an accepted send as refused', () => {
+    markVerificationOutcome(recordVerificationSend('net-hash', 'acme@example.com'), true);
+    const d = verificationDelivery(24);
+    expect(d.refused).toBe(0);
+    expect(d.refused_ratio).toBe(0);
+  });
+
+  it('counts an unknown outcome as attempted but never as refused', () => {
+    // A row written before the column existed, or a crash between the two writes.
+    recordVerificationSend('net-hash', 'acme@example.com');
+    const d = verificationDelivery(24);
+    expect(d.attempted).toBe(1);
+    expect(d.refused).toBe(0);
+  });
+
+  it('ignores an id that never existed rather than touching another row', () => {
+    markVerificationOutcome(recordVerificationSend('net-hash', 'acme@example.com'), true);
+    markVerificationOutcome(0, false);
+    markVerificationOutcome(-1, false);
+    expect(verificationDelivery(24).refused).toBe(0);
+  });
+
+  it('mixes outcomes into a ratio', () => {
+    markVerificationOutcome(recordVerificationSend('n', 'a@example.com'), false);
+    markVerificationOutcome(recordVerificationSend('n', 'b@example.com'), false);
+    markVerificationOutcome(recordVerificationSend('n', 'c@example.com'), true);
+    markVerificationOutcome(recordVerificationSend('n', 'd@example.com'), true);
+    expect(verificationDelivery(24).refused_ratio).toBe(0.5);
   });
 });

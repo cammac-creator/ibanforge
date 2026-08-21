@@ -5,6 +5,7 @@ import { getChClearingCount } from '../lib/ch-clearing.js';
 import { getStatsDB } from '../lib/db.js';
 import { getComplianceDB } from '../lib/compliance-db.js';
 import { ukModulusStatus, type UkModulusStatus } from '../lib/uk-modulus.js';
+import { verificationDelivery, type VerificationDelivery } from '../lib/key-creation-guard.js';
 
 const require = createRequire(import.meta.url);
 const pkg = require('../../package.json') as { version: string };
@@ -60,6 +61,25 @@ function probeUkModulus(): UkModulusStatus {
   }
 }
 
+/**
+ * How the verification-code channel is doing, guarded like the UK table above.
+ *
+ * Same reasoning: a mail channel in trouble is a degraded feature, never a
+ * reason to have a healthy container pulled out of rotation. `refused_ratio`
+ * stays null when nothing was attempted — no traffic is not a clean channel.
+ *
+ * Why it belongs in a health response at all: verification is the ONLY one of
+ * our four outbound messages whose failure blocks a customer, and it is the one
+ * with no second path. Before this, a holder stuck at that step was invisible.
+ */
+function probeVerificationMail(): VerificationDelivery {
+  try {
+    return verificationDelivery(24);
+  } catch {
+    return { window_hours: 24, attempted: 0, refused: 0, refused_ratio: null };
+  }
+}
+
 health.get('/health', (c) => {
   try {
     const db = probeDatabases();
@@ -75,6 +95,9 @@ health.get('/health', (c) => {
       ch_clearing_entries: db.chClearing,
       bic_data_last_updated: db.lastUpdated,
       databases: { bic: 'ok', stats: 'ok', compliance: 'ok' },
+      // The one outbound message whose failure blocks a customer, and the one
+      // with no fallback path. Reported, never used to fail the check.
+      verification_mail: probeVerificationMail(),
       // ADDED beside the contract, nothing renamed. `stale` is what alerting
       // hangs off: the table refreshes only at image build, so without a deploy
       // it ages with no signal anywhere. The daily probe watches `checked:

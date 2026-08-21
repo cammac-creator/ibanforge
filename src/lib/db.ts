@@ -471,6 +471,18 @@ export function getStatsDB(): DatabaseType.Database {
     // Forums tab: the reply is WRITTEN in the thread's language but READ in
     // French — two texts, two columns (draft = what gets copied/posted,
     // draft_fr = the faithful translation shown to the operator).
+    // Whether the relay ACCEPTED the code for delivery. Deliberately not named
+    // `delivered`: a 200 from the relay means "queued", never "arrived" — the
+    // hard bounce lands thirty seconds later in a mailbox nobody reads. Added
+    // 2026-08-21, after three days in which our own bounces were nearly every
+    // incoming message in the business mailbox and nothing counted them.
+    // NULL means "outcome unknown" (rows written before this column existed),
+    // and must never be read as success.
+    const vsCols = (statsDB.prepare('PRAGMA table_info(verification_sends)').all() as Array<{ name: string }>).map((r) => r.name);
+    if (vsCols.length && !vsCols.includes('relay_accepted')) {
+      statsDB.exec('ALTER TABLE verification_sends ADD COLUMN relay_accepted INTEGER');
+    }
+
     const ftCols = (statsDB.prepare('PRAGMA table_info(forum_threads)').all() as Array<{ name: string }>).map((r) => r.name);
     if (ftCols.length && !ftCols.includes('draft_fr')) statsDB.exec('ALTER TABLE forum_threads ADD COLUMN draft_fr TEXT');
     // Reply watch: the radar re-reads posted threads; a reply after ours flips
