@@ -634,11 +634,26 @@ export function getStats(): StatsOverview {
     "SELECT COALESCE(SUM(revenue_usdc), 0) as total FROM daily_stats WHERE date >= '2026-04-18'"
   ).get() as { total: number };
 
+  // `days` is the field that makes this table usable for a decision, and its
+  // absence made the raw counts actively misleading. A country seen 426 times
+  // across two days is one caller in a burst; a country seen 494 times across
+  // fifty days is a customer with the product wired in. Ranking coverage work
+  // on `count` alone puts the burst first. `first_seen`/`last_seen` separate a
+  // country that is still active from one that stopped months ago.
   const topCountries = db.prepare(
-    'SELECT country_code as country, COUNT(*) as count FROM operations WHERE country_code IS NOT NULL' +
+    'SELECT country_code as country, COUNT(*) as count,' +
+      " COUNT(DISTINCT date(created_at)) as days," +
+      ' MIN(date(created_at)) as first_seen, MAX(date(created_at)) as last_seen' +
+      ' FROM operations WHERE country_code IS NOT NULL' +
       excludePrefixClause(excluded) +
-      ' GROUP BY country_code ORDER BY count DESC LIMIT 10'
-  ).all(...excluded) as Array<{ country: string; count: number }>;
+      ' GROUP BY country_code ORDER BY count DESC LIMIT 30'
+  ).all(...excluded) as Array<{
+    country: string;
+    count: number;
+    days: number;
+    first_seen: string;
+    last_seen: string;
+  }>;
 
   const last7 = db.prepare(
     "SELECT date, SUM(total) as total, SUM(revenue_usdc) as revenue FROM daily_stats WHERE date >= date('now', '-7 days') GROUP BY date ORDER BY date DESC"
