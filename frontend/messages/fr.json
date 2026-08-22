@@ -40,7 +40,7 @@
       "account": "Votre clé"
     },
     "copyright": "© {year} IBANforge.",
-    "dataLine": "Données : GLEIF · SIX · Bundesbank · EBA — actualisées chaque mois"
+    "dataLine": "Données : annuaire SWIFT · GLEIF · Bundesbank · SIX · EBA · NBP (mensuel) · OFAC · UN · UE · EPC (hebdomadaire)"
   },
   "home": {
     "metadata": {

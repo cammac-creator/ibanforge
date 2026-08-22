@@ -56,9 +56,19 @@ britannique, jamais le déploiement.
 
 ## Ce que les surfaces publiques annoncent
 
-- Pied de page : « GLEIF · SIX · Bundesbank · EBA ». **Quatre sur treize.**
-- Accueil et `/llms.txt` : GLEIF, annuaire SWIFT, Bundesbank, SIX, NBP, EBA
-  Step2 — plus complet que le pied de page.
+- Pied de page, **corrigé le 22/08/2026** : il citait quatre sources sur treize et
+  leur attribuait à toutes un rafraîchissement mensuel. Il nomme désormais les six
+  registres bancaires **et** les listes de sanctions, chaque groupe avec **sa vraie
+  cadence** — mensuelle pour les données bancaires (`refresh-bic.yml`, `0 3 1 * *`),
+  hebdomadaire pour les sanctions et les registres EPC (`refresh-compliance.yml`,
+  `0 3 * * 0`). Les deux cadences sont vérifiées sur les exécutions réelles.
+- ⚠️ **Deux sources sont volontairement absentes du pied de page** :
+  **SECO**, parce que son flux ne rapporte rien (voir plus haut), et **le GAFI**,
+  parce que ses listes sont **statiques** — maintenues à la main dans
+  `src/lib/compliance-static.ts` et datées par `FATF_AS_OF`. Le workflow les
+  réinsère chaque semaine, ce qui n'est pas la même chose que les rafraîchir.
+  Les ranger sous « hebdomadaire » aurait été faux.
+- Accueil et `/llms.txt` : GLEIF, annuaire SWIFT, Bundesbank, SIX, NBP, EBA Step2.
 - **Aucune licence n'est nommée sur aucune surface publique.**
 
 ## Ce qui reste à faire, par ordre de risque
@@ -66,8 +76,7 @@ britannique, jamais le déploiement.
 1. **Établir les licences marquées ❌ et ⚠️** auprès de chaque émetteur. C'est
    le seul point qui porte un risque réel, et il ne se règle pas en lisant ce
    fichier : il faut aller voir les conditions publiées.
-2. **Aligner le pied de page** sur ce que le produit utilise vraiment, ou
-   assumer qu'il ne cite que les principales et le dire (« notamment »).
+2. ✅ **Pied de page aligné le 22/08/2026** — voir la section ci-dessus.
 3. **Décider si les licences doivent être publiées.** Pour un acheteur qui
    passe par un service achats, une page qui nomme ses sources et leurs
    conditions est un argument ; son absence est une question de plus à traiter
