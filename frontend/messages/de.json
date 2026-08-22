@@ -40,7 +40,7 @@
       "account": "Ihr Schlüssel"
     },
     "copyright": "© {year} IBANforge.",
-    "dataLine": "Daten: SWIFT-Verzeichnis · GLEIF · Bundesbank · SIX · EBA · NBP (monatlich) · OFAC · UN · EU · EPC (wöchentlich)"
+    "dataLine": "Daten: GLEIF · Bundesbank · SIX · EBA · NBP · SwiftCodes/MIT (monatlich) · OFAC · UN · EU · EPC (wöchentlich)"
   },
   "home": {
     "metadata": {
