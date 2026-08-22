@@ -59,6 +59,38 @@ describe('enrichResult', () => {
       expect(result.bic!.address!.city).toBe('Frankfurt am Main');
     });
 
+    it('never lets a branch BIC inherit the head office address or LEI', () => {
+      // BLZ 10010424 is Aareal Bank's Berlin branch, BIC AARBDE5W100; the head
+      // office AARBDE5WXXX carries "Paulinenstraße 15, Wiesbaden" and a LEI.
+      // Serving those beside bank_name would state the branch is registered at
+      // an address it is not — the same institution-confusion that cost this
+      // API a German integrator over Sparkassen BIC8s, one field lower.
+      //
+      // Safe today because the seed-time guard leaves branch rows without a
+      // street. Pinned here because the failure would be silent: any future
+      // BIC8 fallback in the lookup would resolve the head-office row instead.
+      const result = validateIBAN('DE24100104240532013000');
+      enrichResult(result);
+
+      expect(result.bic!.code).toBe('AARBDE5W100');
+      expect(result.bic!.lei ?? null).toBeNull();
+      expect(result.bic!.address ?? null).toBeNull();
+    });
+
+    it('keeps the register LEI and the directory LEI as separate claims', () => {
+      // Austria is the only country where both are populated: the OeNB names
+      // the holder of the bank code, GLEIF names the entity behind the resolved
+      // BIC. They agree here, and the test asserts the register's value is not
+      // dropped when the directory also has one — a caller who wants the
+      // authority on the code they asked about needs it to still be there.
+      const result = validateIBAN('AT580010000234573201');
+      enrichResult(result);
+
+      const registerLei = result.bank_code_check?.institution?.lei;
+      expect(registerLei).toMatch(/^[A-Z0-9]{20}$/);
+      expect(result.bic!.lei).toMatch(/^[A-Z0-9]{20}$/);
+    });
+
     it('leaves lei and address absent rather than empty when the BIC is unresolved', () => {
       // A country with no reference data must not gain a hollow address block:
       // `{street: null, ...}` reads as "we looked and the bank has none".

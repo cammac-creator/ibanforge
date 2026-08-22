@@ -199,6 +199,16 @@ export interface IBANValidationResult {
      * of those rows carry a LEI. Density is very uneven by country (GB 78 % of
      * rows, IT 9 %), so absence here is normal and means exactly "GLEIF has no
      * LEI on this BIC", never "this institution has none".
+     *
+     * ⚠️ A response can carry TWO LEIs, and they answer different questions.
+     * `bank_code_check.institution.lei` is what the national register publishes
+     * about the holder of THIS bank code (only the OeNB publishes one today).
+     * This one is GLEIF's LEI for the entity behind the RESOLVED BIC. They agree
+     * on every Austrian code measured 22/08/2026, and they are still not the
+     * same claim: a register naming a code holder and a directory naming a BIC
+     * holder can legitimately diverge where a group holds the code and a
+     * subsidiary holds the BIC. Prefer the register's when both are present —
+     * it is the authority on the code you asked about.
      */
     lei?: string | null;
     lei_status?: string | null;
