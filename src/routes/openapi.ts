@@ -921,7 +921,43 @@ const buildSpec = () => ({
             properties: {
               code: { type: 'string', example: 'NWBKGB2L' },
               bank_name: { type: ['string', 'null'] },
-              city: { type: ['string', 'null'] },
+              city: {
+                type: ['string', 'null'],
+                description:
+                  'Where the consulted register places THIS bank code. May differ from address.city, which is the legal seat — both true, different questions.',
+              },
+              source: { type: ['string', 'null'], description: 'Which dataset named this institution.' },
+              as_of: { type: ['string', 'null'], description: 'Year-month that dataset was last refreshed.' },
+              lei: {
+                type: ['string', 'null'],
+                example: '851WYGNLUQLFZBSYGB56',
+                description:
+                  'Legal Entity Identifier, read from the same directory row /v1/bic/:code serves. Null means GLEIF publishes no LEI for this BIC, never that the institution has none.',
+              },
+              lei_status: { type: ['string', 'null'], example: 'ACTIVE' },
+              address: {
+                type: ['object', 'null'],
+                description:
+                  'Registered / head-office address (GLEIF, CC0). Entity-level, not per-branch. Always dated by its own as_of, which is the entity last filing and is usually OLDER than the as_of above.',
+                properties: {
+                  type: { type: 'string', enum: ['registered'] },
+                  street: { type: ['string', 'null'], example: 'Kaiserstraße 16' },
+                  post_code: { type: ['string', 'null'], example: '60311' },
+                  region: { type: ['string', 'null'], example: 'DE-HE' },
+                  city: { type: ['string', 'null'], example: 'Frankfurt am Main' },
+                  country: { type: 'string', example: 'DE' },
+                  romanized: { type: ['string', 'null'] },
+                  romanization: {
+                    type: 'string',
+                    enum: ['original_latin', 'gleif_english', 'unavailable'],
+                    description:
+                      'unavailable means the entity filed a non-Latin address and GLEIF ships no official Latin form. No transliteration is invented.',
+                  },
+                  source: { type: 'string', example: 'GLEIF' },
+                  language: { type: ['string', 'null'], example: 'de' },
+                  as_of: { type: ['string', 'null'], example: '2026-02-24' },
+                },
+              },
             },
             required: ['code', 'bank_name', 'city'],
           },

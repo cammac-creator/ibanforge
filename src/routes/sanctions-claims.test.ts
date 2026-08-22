@@ -245,7 +245,18 @@ describe('no served surface names fewer sanctions lists than we screen', () => {
    * under-declaration, which is a false alarm the guard would eventually be
    * silenced for.
    */
-  const RUN = /\b(OFAC|EU|UN|SECO)\b(?:\s*[,/+·]\s*\b(?:OFAC|EU|UN|SECO)\b)+/g;
+  const RUN = /\b(OFAC|EU|UE|UN|SECO)\b(?:\s*[,/+·]\s*\b(?:OFAC|EU|UE|UN|SECO)\b)+/g;
+
+  /**
+   * `UE` is how French writes the European Union, and the guard fired on the
+   * French footer for spelling it correctly — an under-declaration reported
+   * where none existed. Folded rather than added to `shipped`: the database
+   * ships one EU list, not two, so `UE` must satisfy the EU requirement and
+   * must not let a surface pass by naming both forms and no UN. Deliberately
+   * one-way and case-sensitive: no locale writes something else `UE`.
+   */
+  const ALIASES: Record<string, string> = { UE: 'EU' };
+  const canonical = (a: string) => ALIASES[a] ?? a;
 
   /**
    * `matched_lists` shows what a single hit looks like, so `["OFAC"]` is a
@@ -263,7 +274,7 @@ describe('no served surface names fewer sanctions lists than we screen', () => {
       if (!CLAIM_TRIGGER.test(line) || line.includes(EXAMPLE_FIELD)) return;
       claims++;
       const complete = [...line.matchAll(RUN)].some((m) => {
-        const named = new Set(m[0].split(/[,/+·]/).map((s) => s.trim()));
+        const named = new Set(m[0].split(/[,/+·]/).map((s) => canonical(s.trim())));
         return named.size === shipped.size && [...shipped].every((a) => named.has(a));
       });
       if (!complete) offenders.push(`  line ${i + 1}: ${line.trim().slice(0, 140)}`);

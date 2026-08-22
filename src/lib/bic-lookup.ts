@@ -5,6 +5,7 @@ import { getBicDB } from './db.js';
 import { LRUCache } from './cache.js';
 import type Database from 'better-sqlite3';
 import { lookupFiInstitution } from './fi-register.js';
+import { hasNonLatinScript } from './gleif-address.js';
 import { allocatedCodes, nationalRegisterAvailable, normaliseCode } from './national-registers.js';
 import { nlPspEntries } from './nl-psp.js';
 
@@ -521,6 +522,61 @@ export function countryHasReferenceData(countryCode: string): boolean {
  */
 export function getReferenceAsOf(): string {
   return (getLastUpdated() ?? '').slice(0, 7);
+}
+
+/** The registered-address block, exactly as `/v1/bic/:code` has always built it. */
+export interface RegisteredAddress {
+  type: 'registered';
+  street: string | null;
+  post_code: string | null;
+  region: string | null;
+  city: string | null;
+  country: string;
+  romanized: string | null;
+  romanization: 'original_latin' | 'gleif_english' | 'unavailable';
+  source: string;
+  language: string | null;
+  as_of: string | null;
+}
+
+/**
+ * Build the registered-address block from a `bic_entries` row.
+ *
+ * Extracted from the route rather than copied into the second caller. Two
+ * endpoints reading the same table through two hand-written mappings is how
+ * they drift, and the drift shows up as one endpoint quietly claiming a
+ * romanization the other refuses.
+ *
+ * No branch guard here on purpose: the guard is applied at SEED time
+ * (`addressMatchesBic` in src/db/seed.ts), so a row that reaches this function
+ * has already earned its address. Adding a second guard at serve time would
+ * either duplicate that rule or, worse, disagree with it.
+ */
+export function registeredAddress(
+  row: Pick<
+    BICRow,
+    'street' | 'address_en' | 'post_code' | 'region' | 'city' | 'address_source' | 'address_lang' | 'address_as_of'
+  > | null,
+  countryCode: string,
+): RegisteredAddress | null {
+  if (!row || !(row.street || row.address_en)) return null;
+  // Decided from the ACTUAL script of the stored street, not the GLEIF language
+  // tag, which marks Greek/Arabic entities 'el'/'ar' even when they filed an
+  // already-Latin address.
+  const nonLatin = hasNonLatinScript(row.street);
+  return {
+    type: 'registered',
+    street: row.street,
+    post_code: row.post_code,
+    region: row.region,
+    city: row.city,
+    country: countryCode,
+    romanized: nonLatin ? (row.address_en ?? null) : (row.street ?? row.address_en ?? null),
+    romanization: !nonLatin ? 'original_latin' : row.address_en ? 'gleif_english' : 'unavailable',
+    source: row.address_source ?? 'GLEIF',
+    language: row.address_lang,
+    as_of: row.address_as_of,
+  };
 }
 
 /**

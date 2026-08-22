@@ -116,6 +116,35 @@ export interface BankCodeCheck {
   as_of: string;
 }
 
+/**
+ * Registered / head-office address as GLEIF files it (CC0).
+ *
+ * Entity-level, never per-branch: the branch guard runs at seed time
+ * (`addressMatchesBic`), so a directory row that carries an address has already
+ * earned it. Shared verbatim by `/v1/bic/:code` and `/v1/iban/validate` — one
+ * shape from one builder, so the two endpoints cannot drift apart on the same
+ * row.
+ */
+export interface RegisteredAddressBlock {
+  type: 'registered';
+  street: string | null;
+  post_code: string | null;
+  region: string | null;
+  city: string | null;
+  country: string;
+  /**
+   * Latin reading: GLEIF's official English alternative for non-Latin entities,
+   * or the address itself when already Latin. Null when the entity is non-Latin
+   * and GLEIF ships no official Latin form — a transliteration is never invented.
+   */
+  romanized: string | null;
+  romanization: 'original_latin' | 'gleif_english' | 'unavailable';
+  source: string;
+  language: string | null;
+  /** When the entity last filed this address. Often much older than the BIC set. */
+  as_of: string | null;
+}
+
 /** What a national bank-code register publishes about an allocated institution. */
 export interface RegisterInstitution {
   name: string;
@@ -143,6 +172,7 @@ export interface IBANValidationResult {
     branch_code?: string;
     account_number: string;
   };
+  /** @see RegisteredAddressBlock */
   bic?: {
     code: string;
     bank_name: string | null;
@@ -157,6 +187,41 @@ export interface IBANValidationResult {
     source?: string | null;
     /** Year-month that dataset was last refreshed. Null rather than invented. */
     as_of?: string | null;
+    /**
+     * Legal Entity Identifier of the resolved institution, and whether GLEIF
+     * still considers it active.
+     *
+     * The directory has carried these since the first GLEIF seed, and
+     * `/v1/bic/:code` has always served them, while this block stopped at the
+     * city — so a caller who validated an IBAN had to pay a second lookup for a
+     * field already read out of the same row. Measured 22/08/2026: of the 89
+     * countries whose example resolves a BIC, 55 reach a directory row and 47
+     * of those rows carry a LEI. Density is very uneven by country (GB 78 % of
+     * rows, IT 9 %), so absence here is normal and means exactly "GLEIF has no
+     * LEI on this BIC", never "this institution has none".
+     */
+    lei?: string | null;
+    lei_status?: string | null;
+    /**
+     * Registered / head-office address, entity-level and NOT per-branch, built
+     * by the same helper `/v1/bic/:code` uses.
+     *
+     * ⚠️ Always carries its own `source` and `as_of`, and they are not the
+     * `as_of` above: the BIC reference set is refreshed monthly, while a GLEIF
+     * address is only as fresh as the entity's last filing — commonly a year
+     * old. Serving the address without its date would make it look as current
+     * as the bank name beside it.
+     *
+     * ⚠️ `address.city` may legitimately differ from `city` above, and the
+     * difference is information rather than a defect. `city` is where the
+     * consulted register places THIS bank code; `address.city` is where the
+     * legal entity is registered. German BLZ 37040044 resolves to Commerzbank
+     * in Köln while the entity's registered seat is Frankfurt am Main — both
+     * true, one per bank code, the other per legal entity. A consumer picking
+     * one should pick by which question it is answering, not by which looks
+     * more precise.
+     */
+    address?: RegisteredAddressBlock | null;
   } | null;
   sepa?: {
     member: boolean;

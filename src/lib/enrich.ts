@@ -4,7 +4,13 @@
  * Centralizes the enrichment logic used by routes, batch, and MCP.
  */
 
-import { lookupByCountryBank, countryHasReferenceData, getReferenceAsOf } from './bic-lookup.js';
+import {
+  lookupByCountryBank,
+  countryHasReferenceData,
+  getReferenceAsOf,
+  lookupByBic11,
+  registeredAddress,
+} from './bic-lookup.js';
 import { classifyIssuer } from './issuers.js';
 import { lookupFiInstitution } from './fi-register.js';
 import { lookupNationalCode, nationalRegisterAvailable } from './national-registers.js';
@@ -266,6 +272,32 @@ export function enrichResult(result: IBANValidationResult): void {
         source: NATIONAL_REGISTERS.DE,
         as_of: getReferenceAsOf() || null,
       };
+    }
+  }
+
+  // The directory row behind the resolved BIC, for the fields this block used
+  // to drop on the floor.
+  //
+  // Until now `validate` answered code / bank_name / city and stopped, while
+  // `/v1/bic/:code` served the LEI and the registered address off the very same
+  // row — so a caller who validated an IBAN paid a second lookup for data
+  // already fetched. Nothing new is downloaded here: `bic_entries` has carried
+  // `lei`, `lei_status`, `street`, `post_code`, `region` and `address_en` since
+  // the first GLEIF seed.
+  //
+  // The lookup is by BIC11, so a branch code resolves the branch's own row.
+  // No branch guard is needed at this layer — it runs at seed time — and adding
+  // one here would risk disagreeing with it.
+  if (result.bic?.code) {
+    const code = result.bic.code;
+    const row = lookupByBic11(code.length === 8 ? `${code}XXX` : code);
+    if (row) {
+      result.bic.lei = row.lei ?? null;
+      result.bic.lei_status = row.lei_status ?? null;
+      // Dated and sourced by the shared builder. An address that arrives beside
+      // a monthly-refreshed bank name reads as equally current; it usually is
+      // not, and `as_of` is what stops that reading.
+      result.bic.address = registeredAddress(row, cc);
     }
   }
 

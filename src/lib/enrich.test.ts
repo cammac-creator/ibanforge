@@ -27,6 +27,51 @@ describe('enrichResult', () => {
     expect(result.risk_indicators!.vop_coverage).toBe(true);
   });
 
+  describe('bic.lei / bic.address — the directory fields validate used to drop', () => {
+    it('serves the LEI off the same row /v1/bic/:code reads', () => {
+      const result = validateIBAN('DE89370400440532013000');
+      enrichResult(result);
+
+      expect(result.bic!.lei).toMatch(/^[A-Z0-9]{20}$/);
+      expect(result.bic!.lei_status).toBeTruthy();
+    });
+
+    it('never serves an address without its own source and date', () => {
+      // The address is entity-level GLEIF data whose freshness is unrelated to
+      // the monthly BIC refresh beside it. Undated, it reads as current.
+      const result = validateIBAN('DE89370400440532013000');
+      enrichResult(result);
+
+      const addr = result.bic!.address!;
+      expect(addr.source).toBeTruthy();
+      expect(addr.as_of).toBeTruthy();
+      expect(addr.type).toBe('registered');
+    });
+
+    it('lets the register city and the registered seat disagree', () => {
+      // BLZ 37040044 is Commerzbank in Köln; the legal entity is seated in
+      // Frankfurt. Both are true and answer different questions, so this test
+      // pins that we do NOT quietly overwrite one with the other.
+      const result = validateIBAN('DE89370400440532013000');
+      enrichResult(result);
+
+      expect(result.bic!.city).toBe('Köln');
+      expect(result.bic!.address!.city).toBe('Frankfurt am Main');
+    });
+
+    it('leaves lei and address absent rather than empty when the BIC is unresolved', () => {
+      // A country with no reference data must not gain a hollow address block:
+      // `{street: null, ...}` reads as "we looked and the bank has none".
+      const result = validateIBAN('MT84MALT011000012345MTLCAST001S');
+      enrichResult(result);
+
+      if (!result.bic?.code) {
+        expect(result.bic?.lei ?? null).toBeNull();
+        expect(result.bic?.address ?? null).toBeNull();
+      }
+    });
+  });
+
   describe('sepa.vop_participant (bank-level EPC VoP readiness)', () => {
     it('is a boolean when an institution was resolved', () => {
       // Not pinned to a specific bank being "ready": the EPC register is

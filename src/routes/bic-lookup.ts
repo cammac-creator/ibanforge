@@ -1,9 +1,8 @@
 import { Hono } from 'hono';
 import type { HonoEnv } from '../types.js';
 import { validateBIC } from '../lib/bic-validator.js';
-import { lookup, sharedBic8Stats } from '../lib/bic-lookup.js';
+import { lookup, registeredAddress, sharedBic8Stats } from '../lib/bic-lookup.js';
 import { screenBicSanctions } from '../lib/compliance.js';
-import { hasNonLatinScript } from '../lib/gleif-address.js';
 import { classifyBicInput } from '../lib/input-normalize.js';
 import { recordOperation, recordRejection } from '../lib/stats.js';
 import { computeRevenue } from '../lib/request-helpers.js';
@@ -91,20 +90,10 @@ bicLookup.get('/v1/bic/:code', (c) => {
   const revenue = computeRevenue(c, COST_USDC);
   recordOperation('bic_lookup', validation.country_code ?? null, found, revenue, errorDetail, c.get('apiKeyPrefix'));
 
-  // Provenance of the Latin reading, decided from the ACTUAL script of the
-  // stored street — not the GLEIF language tag, which marks Greek/Arabic
-  // entities 'el'/'ar' even when they filed an already-Latin address. We never
-  // fabricate a transliteration: a genuinely non-Latin address with no official
-  // English variant is reported as 'unavailable'.
-  const streetIsNonLatin = hasNonLatinScript(row?.street);
-  const romanizedReading = streetIsNonLatin
-    ? (row?.address_en ?? null)
-    : (row?.street ?? row?.address_en ?? null);
-  const romanization: 'original_latin' | 'gleif_english' | 'unavailable' = !streetIsNonLatin
-    ? 'original_latin'
-    : row?.address_en
-      ? 'gleif_english'
-      : 'unavailable';
+  // Built by the shared helper so /v1/iban/validate cannot serve a different
+  // shape from the same row. The romanization rule (decided from the actual
+  // script of the stored street, never from the GLEIF language tag) lives there.
+  const address = registeredAddress(row, validation.country_code!);
 
   const result: BicLookupPayload = {
     bic: validation.bic,
@@ -118,23 +107,8 @@ bicLookup.get('/v1/bic/:code', (c) => {
       name: row?.country_name ?? validation.country_code!,
     },
     city: row?.city ?? null,
-    address:
-      row && (row.street || row.address_en)
-        ? {
-            type: 'registered' as const,
-            street: row.street,
-            post_code: row.post_code,
-            region: row.region,
-            city: row.city,
-            country: validation.country_code!,
-            romanized: romanizedReading,
-            romanization,
-            source: row.address_source ?? 'GLEIF',
-            language: row.address_lang,
-            as_of: row.address_as_of,
-          }
-        : null,
-    address_available: !!(row && (row.street || row.address_en)),
+    address,
+    address_available: address !== null,
     branch_code: validation.branch_code!,
     branch_info: row?.branch_info ?? null,
     lei: row?.lei ?? null,
