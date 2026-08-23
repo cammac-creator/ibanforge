@@ -549,7 +549,7 @@ const GLAMA_MANIFEST = {
     `Swiss BC-Nummer clearing with payment-rail participation, sanctions screening (OFAC) ` +
     `at bank level, SEPA and VoP reachability, and a 0-100 risk score. ` +
     `${F.claim.bic} BIC entries (${F.claim.lei} LEI-enriched via GLEIF; further rows from the ` +
-    `SWIFT directory, Bundesbank, SIX and EBA STEP2 SCT), ${F.claim.chClearing} Swiss clearing ` +
+    `SwiftCodes (MIT), Bundesbank, SIX and EBA STEP2 SCT), ${F.claim.chClearing} Swiss clearing ` +
     `entries from the SIX BankMaster refreshed monthly, ${F.claim.countries} countries. ` +
     `MCP-native over HTTP and stdio, x402 micropayments on Base L2, free tier.`,
   homepage: 'https://ibanforge.com',

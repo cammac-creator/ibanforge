@@ -74,7 +74,7 @@
       "2": {
         "badge": "89 Länder · 121K BICs",
         "title": "IBAN-Validierung & BIC-Lookup",
-        "description": "ISO-13616-Mod-97-Validierung mit vollständiger BBAN-Analyse in 89 Ländern — gestützt auf über 121.000 BIC-Einträge aus GLEIF, SWIFT-Verzeichnis, Bundesbank, SIX, NBP und EBA Step2."
+        "description": "ISO-13616-Mod-97-Validierung mit vollständiger BBAN-Analyse in 89 Ländern — gestützt auf über 121.000 BIC-Einträge aus GLEIF, SwiftCodes (MIT), Bundesbank, SIX, NBP und EBA Step2."
       },
       "3": {
         "badge": "EMI / vIBAN",
@@ -151,7 +151,7 @@
     },
     "trust": {
       "dataLabel": "Datenquellen",
-      "dataValue": "GLEIF · SIX BankMaster · SWIFT-Verzeichnis · Bundesbank · EBA STEP2 · NBP",
+      "dataValue": "GLEIF · SIX BankMaster · SwiftCodes (MIT) · Bundesbank · EBA STEP2 · NBP",
       "dataNote": "Monatlich aktualisiert",
       "sanctionsLabel": "Sanktionsprüfung",
       "sanctionsValue": "OFAC · EU · UN + FATF",
@@ -211,7 +211,7 @@
         "path": "/v1/bic/:code",
         "cost": "$0.003",
         "costLabel": "pro Aufruf",
-        "description": "BIC/SWIFT-Code in der konsolidierten BIC-Datenbank nachschlagen (GLEIF, SWIFT-Verzeichnis, Bundesbank, SIX, NBP)"
+        "description": "BIC/SWIFT-Code in der konsolidierten BIC-Datenbank nachschlagen (GLEIF, SwiftCodes (MIT), Bundesbank, SIX, NBP)"
       },
       "3": {
         "method": "POST",

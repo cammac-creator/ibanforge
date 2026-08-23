@@ -74,7 +74,7 @@
       "2": {
         "badge": "89 countries · 121K BICs",
         "title": "IBAN validation & BIC lookup",
-        "description": "ISO 13616 mod-97 validation with full BBAN parsing across 89 countries — backed by 121k+ BIC entries from GLEIF, the SWIFT directory, Bundesbank, SIX, NBP and EBA Step2."
+        "description": "ISO 13616 mod-97 validation with full BBAN parsing across 89 countries — backed by 121k+ BIC entries from GLEIF, SwiftCodes (MIT), Bundesbank, SIX, NBP and EBA Step2."
       },
       "3": {
         "badge": "EMI / vIBAN",
@@ -151,7 +151,7 @@
     },
     "trust": {
       "dataLabel": "Data sources",
-      "dataValue": "GLEIF · SIX BankMaster · SWIFT directory · Bundesbank · EBA STEP2 · NBP",
+      "dataValue": "GLEIF · SIX BankMaster · SwiftCodes (MIT) · Bundesbank · EBA STEP2 · NBP",
       "dataNote": "Refreshed monthly",
       "sanctionsLabel": "Sanctions screening",
       "sanctionsValue": "OFAC · EU · UN + FATF",
