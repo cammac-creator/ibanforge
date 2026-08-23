@@ -15,13 +15,70 @@ mensuel (`getEntryCount()`, jamais un nombre écrit à la main).
 
 | Source | Lignes | Licence | Établie ? |
 |---|---:|---|---|
-| PeterNotenboom/SwiftCodes | 82 085 | MIT | ✅ dépôt public, licence dans le dépôt |
-| GLEIF (BIC↔LEI) | 39 265 | CC0 déclaré par GLEIF | ⚠️ à re-vérifier à la source |
-| EBA Clearing STEP2 SCT | 183 | fichier de participants publié | ❌ non établie |
-| Deutsche Bundesbank (Bankleitzahlendatei) | 143 | « gratuit, usage libre » | ⚠️ reprise du relevé d'avril, non re-vérifiée |
+| PeterNotenboom/SwiftCodes | 82 085 | MIT | ✅ licence dans le dépôt |
+| GLEIF (BIC↔LEI) | 39 265 | **CC0** | ✅ **vérifié à la source le 23/08/2026** |
+| Deutsche Bundesbank (Bankleitzahlendatei) | 143 | usage professionnel autorisé, **attribution obligatoire**, sans modification | ✅ **vérifié le 23/08/2026** — deux réserves ci-dessous |
+| SIX BankMaster (clearing suisse) | 1 165 | « may be used freely » | ✅ **vérifié le 23/08/2026** |
+| SIX Group (BIC) | 19 | même publication que le BankMaster | ⚠️ à confirmer séparément |
+| EBA Clearing STEP2 SCT | 183 | fichier de participants publié | ❌ non établie — page 403 le 23/08 |
 | NBP (Pologne) | 21 | publication publique | ❌ non établie |
-| SIX Group (BIC) | 19 | « usage libre » | ⚠️ idem |
-| SIX BankMaster (clearing suisse) | 1 165 | « usage libre » | ⚠️ idem |
+
+### Ce qui a été lu, mot pour mot
+
+Relevé le **23/08/2026**. Chaque ligne porte la phrase citée et l'URL, pour que le
+prochain lecteur puisse contredire plutôt que refaire.
+
+**GLEIF — CC0.** ✅
+> « The data on GLEIF's website is provided under a Creative Commons (CC0) license. »
+> — <https://www.gleif.org/en/about/open-data>
+
+Aucune obligation d'attribution n'est énoncée. CC0 est une renonciation au droit
+d'auteur, pas une licence à conditions.
+
+**SIX BankMaster — usage libre.** ✅
+> « All the details published in the Bank Master Data are based on information
+> provided by the respective banks/institutions. **Information in the Download
+> Bank Master may be used freely.** SIX assumes no responsibility for the
+> completeness of this information, nor for any damages from actions taken based
+> on this information. SIX reserves the express right to change or delete this
+> information from its website at any time. »
+> — *Record description bank master V3.0*, daté 03/2023, marqué « Sensitivity:
+> C1 Public », page 3 :
+> <https://www.six-group.com/dam/download/banking-services/interbank-clearing/en/bc_bank_master/bankmaster-v3-record-description-en.pdf>
+
+🚨 **Piège majeur, à ne pas rejouer.** Les *conditions générales du site* SIX
+disent l'**inverse** :
+> « The entire content of the SIX website is protected by copyright law.
+> Consequently, presentations, brochures, flyers, graphics, texts, designs,
+> charts, etc., may not be reproduced or reused in any way or used for commercial
+> purposes. » — <https://www.six-group.com/en/services/legal/terms-of-use.html>
+
+Cette clause énumère du **contenu éditorial** (brochures, textes, graphiques),
+et la page de téléchargement du Bank Master ne publie, elle, aucune condition.
+**La condition qui gouverne la donnée est celle du document qui accompagne la
+donnée**, pas celle du site qui l'héberge. Un balayage qui s'arrête aux CGU
+conclut à l'interdiction et fait retirer une source parfaitement utilisable.
+
+**Deutsche Bundesbank — autorisé, sous deux conditions.** ✅
+> « It is free for you to store, forward or reproduce information created by the
+> Deutsche Bundesbank for your personal or **business** use. The information must
+> not be changed or falsified. » — attribution demandée : **« Quelle: Deutsche
+> Bundesbank »**
+> — <https://www.bundesbank.de/de/startseite/benutzerhinweise/nutzungsbedingungen-fuer-den-allgemeinen-gebrauch-der-website-763554>
+
+⚠️ **Deux réserves, à trancher par Claude-Alain, pas par moi :**
+1. **L'attribution demandée est une formule exacte** — « Quelle: Deutsche
+   Bundesbank ». Nos surfaces écrivent « Bundesbank ». Proche, pas identique.
+2. **« must not be changed or falsified »** : nous ne falsifions rien, mais nous
+   reformatons (import en base, service via API, BIC recomposé). Savoir si cela
+   compte comme une modification est une question à poser à la Bundesbank, pas à
+   résoudre en lisant la phrase une deuxième fois.
+
+⚠️ **La restriction commerciale de la Bundesbank ne s'applique PAS aux données.**
+La phrase « Eine darüber hinausgehende Nutzung für kommerzielle Zwecke … ist
+nicht zulässig » figure dans la section **images et vidéos**. La confondre avec
+la règle sur les données ferait retirer une source utilisable — symétrique du
+piège SIX ci-dessus.
 
 ## Ce qui alimente `compliance.sqlite`
 
@@ -73,9 +130,13 @@ britannique, jamais le déploiement.
 
 ## Ce qui reste à faire, par ordre de risque
 
-1. **Établir les licences marquées ❌ et ⚠️** auprès de chaque émetteur. C'est
-   le seul point qui porte un risque réel, et il ne se règle pas en lisant ce
-   fichier : il faut aller voir les conditions publiées.
+1. **Établir les licences encore marquées ❌.** Quatre sur treize sont établies
+   depuis le 23/08 (SwiftCodes, GLEIF, Bundesbank, SIX BankMaster). Restent
+   **EBA Clearing** (la page des participants rend 403 à une lecture
+   automatisée — passer par un navigateur), **NBP**, **OFAC**, **ONU**, **UE**,
+   **EPC** et le **GAFI**. Les cinq derniers sont des publications
+   d'autorités : leur statut est probablement permissif, ce qui n'est pas la
+   même chose qu'établi.
 2. ✅ **Pied de page aligné le 22/08/2026** — voir la section ci-dessus.
 3. **Décider si les licences doivent être publiées.** Pour un acheteur qui
    passe par un service achats, une page qui nomme ses sources et leurs
