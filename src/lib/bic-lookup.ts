@@ -392,6 +392,19 @@ export function getChClearingCount(): number {
   return (getBicDB().prepare('SELECT COUNT(*) as cnt FROM ch_clearing').get() as { cnt: number }).cnt;
 }
 
+/**
+ * Every distinct BIC8 in the directory, for counting what the issuer
+ * classifier actually covers.
+ *
+ * Self-description only, never a lookup path: it returns ~48k rows and is read
+ * once at module load by datasetFacts().
+ */
+export function allBic8(): Array<{ bic8: string; institution: string | null }> {
+  return getBicDB()
+    .prepare('SELECT DISTINCT bic8, institution FROM bic_entries')
+    .all() as Array<{ bic8: string; institution: string | null }>;
+}
+
 /** Number of BIC entries carrying an LEI (GLEIF-enriched). Same self-description purpose. */
 export function getLeiEnrichedCount(): number {
   return (

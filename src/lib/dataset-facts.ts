@@ -1,4 +1,5 @@
-import { getChClearingCount, getEntryCount, getLeiEnrichedCount } from './bic-lookup.js';
+import { allBic8, getChClearingCount, getEntryCount, getLeiEnrichedCount } from './bic-lookup.js';
+import { classifyIssuer } from './issuers.js';
 import { IBAN_LENGTHS } from './countries.js';
 
 /**
@@ -47,6 +48,21 @@ export interface DatasetFacts {
   chClearing: number;
   ibanCountries: number;
   /**
+   * BIC8 the issuer classifier names as something other than a plain bank,
+   * counted from the TABLES ONLY — `classifyIssuer(bic8)` without an
+   * institution name, so the name-prefix heuristic never fires.
+   *
+   * ⚠️ That restriction is the point. Passing the name in raises the count from
+   * 960 to 1,031 (measured 23/08/2026), and those extra 71 come from prefix
+   * matching on normalised names — the same loose matching that could label a
+   * real bank as an EMI. A deterministic table hit is a claim we can defend;
+   * a heuristic hit is not, and only one of the two belongs on a public
+   * surface.
+   */
+  issuerClassified: number;
+  /** Of those, the ones that really are EMIs or neobanks — see `claim.issuers`. */
+  emiOrNeobank: number;
+  /**
    * Understated, human-readable claims. Use in descriptions, marketing copy,
    * tool descriptions and discovery documents — anywhere the number is a claim
    * rather than a reading.
@@ -60,6 +76,19 @@ export interface DatasetFacts {
     chClearing: string;
     /** e.g. "89" — exact, because it is a closed list, not a growing dataset. */
     countries: string;
+    /**
+     * e.g. "900+". Non-bank issuer classifications, ALL types together.
+     *
+     * 🚨 Do not label this "EMI/vIBAN". Served surfaces said "85 EMI/vIBAN
+     * issuer classifications" — understated by a factor of eleven, and
+     * mislabelled: 437 of the 960 are payment institutions, which are neither
+     * e-money institutions nor virtual-IBAN issuers. Use this figure with
+     * wording that names the three types, or use `emiOnly` under the narrower
+     * label. Never the big number under the narrow label.
+     */
+    issuers: string;
+    /** e.g. "500+" — EMIs and neobanks only, for the narrower claim. */
+    emiOnly: string;
   };
 }
 
@@ -76,16 +105,33 @@ export function datasetFacts(): DatasetFacts {
   const leiEnriched = getLeiEnrichedCount();
   const chClearing = getChClearingCount();
   const ibanCountries = Object.keys(IBAN_LENGTHS).length;
+
+  // ~23 ms over ~48k distinct BIC8, paid once at module load. The alternative
+  // is what was there before: a literal nobody could check, wrong by a factor
+  // of eleven, on two surfaces read by AI agents.
+  let issuerClassified = 0;
+  let emiOrNeobank = 0;
+  for (const row of allBic8()) {
+    const hit = classifyIssuer(row.bic8);
+    if (!hit) continue;
+    issuerClassified++;
+    if (hit.type === 'emi' || hit.type === 'digital_bank') emiOrNeobank++;
+  }
+
   cached = {
     bicEntries,
     leiEnriched,
     chClearing,
     ibanCountries,
+    issuerClassified,
+    emiOrNeobank,
     claim: {
       bic: `${group(floorTo(bicEntries, 1_000))}+`,
       lei: `${group(floorTo(leiEnriched, 1_000))}+`,
       chClearing: `${group(floorTo(chClearing, 100))}+`,
       countries: String(ibanCountries),
+      issuers: `${group(floorTo(issuerClassified, 100))}+`,
+      emiOnly: `${group(floorTo(emiOrNeobank, 100))}+`,
     },
   };
   return cached;

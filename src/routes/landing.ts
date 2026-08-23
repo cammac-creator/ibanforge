@@ -3,6 +3,7 @@ import { Hono } from 'hono';
 import { html, raw } from 'hono/html';
 import { createRequire } from 'node:module';
 import { PAYMENT_LINKS } from '../lib/payment-links.js';
+import { datasetFacts } from '../lib/dataset-facts.js';
 
 const require = createRequire(import.meta.url);
 const pkg = require('../../package.json') as { version: string };
@@ -285,7 +286,7 @@ landing.get('/', (c) => {
         <div class="feat-card">
           <div class="feat-icon feat-icon-rose"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
           <h3>Compliance &amp; Risk Scoring</h3>
-          <p>Sanctions screening (OFAC), FATF status, composite risk score 0&ndash;100, 85 EMI/neobank classifications, Swiss clearing data.</p>
+          <p>Sanctions screening (OFAC), FATF status, composite risk score 0&ndash;100, ${datasetFacts().claim.emiOnly} EMI/neobank classifications, Swiss clearing data.</p>
         </div>
         <div class="feat-card">
           <div class="feat-icon feat-icon-purple"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M12 2a4 4 0 0 0-4 4c0 2 2 3 2 6h8c0-3 2-4 2-6a4 4 0 0 0-4-4z"/><rect x="9" y="12" width="6" height="4" rx="1"/><path d="M10 16v1a2 2 0 1 0 4 0v-1"/></svg></div>

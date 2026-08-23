@@ -110,9 +110,16 @@ function buildLlmsTxt(): string {
   // that sentence was false for one of the numbers it covered. A claim about
   // being measured has to be measured.
   const countryCount = datasetFacts().claim.countries;
+  // Same defect, found 23/08/2026 one number over: "85 EMI/vIBAN issuer
+  // classifications" was a literal in a file that promises live counts, and it
+  // was wrong in BOTH directions at once — understated (the tables name 960)
+  // and mislabelled (437 of those are payment institutions, neither e-money
+  // issuers nor virtual-IBAN providers). Measured, and the wording now names
+  // what it counts.
+  const issuerCount = datasetFacts().claim.issuers;
   return `# IBANforge
 
-> Pre-payout screening for AI agents — check the bank behind a counterparty IBAN before you send funds. IBAN validation, BIC/SWIFT lookup, Swiss clearing, sanctions and compliance risk scoring, designed for AI agents and developers. ${bicCount} BIC entries (${leiCount} LEI-enriched via GLEIF; additional rows from SwiftCodes (MIT), Bundesbank, SIX, NBP, EBA Step2 SCT), ${chCount} Swiss BC-Nummer from SIX, ${countryCount} countries, 85 EMI/vIBAN issuer classifications. Counts in this file are generated live from the serving database.
+> Pre-payout screening for AI agents — check the bank behind a counterparty IBAN before you send funds. IBAN validation, BIC/SWIFT lookup, Swiss clearing, sanctions and compliance risk scoring, designed for AI agents and developers. ${bicCount} BIC entries (${leiCount} LEI-enriched via GLEIF; additional rows from SwiftCodes (MIT), Bundesbank, SIX, NBP, EBA Step2 SCT), ${chCount} Swiss BC-Nummer from SIX, ${countryCount} countries, ${issuerCount} non-bank issuer classifications (EMI, payment institutions, digital banks). Counts in this file are generated live from the serving database.
 
 ## Instructions for LLM agents
 
