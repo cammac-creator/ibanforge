@@ -25,18 +25,52 @@ class BBAN(TypedDict, total=False):
     account_number: str
 
 
+class RegisteredAddress(TypedDict, total=False):
+    """Registered / head-office address as GLEIF files it.
+
+    Was ``Any`` on every result that carried it, so no field name was
+    discoverable and no reader could tell ``romanization`` was a closed set.
+    Spelled out once and shared, because the API builds it from one helper.
+    """
+
+    type: str  # always "registered"
+    street: Optional[str]
+    post_code: Optional[str]
+    region: Optional[str]
+    city: Optional[str]
+    country: str
+    # Latin reading: GLEIF's official English form for a non-Latin entity, or
+    # the address itself when already Latin. None when the entity is non-Latin
+    # and GLEIF ships no Latin form — a transliteration is never invented.
+    romanized: Optional[str]
+    romanization: str  # original_latin | gleif_english | unavailable
+    source: str
+    language: Optional[str]
+    # When the entity last filed this address. Frequently a year old, and NOT
+    # the `as_of` on the BIC beside it, which dates the monthly refresh.
+    as_of: Optional[str]
+
+
 class BIC(TypedDict, total=False):
-    # /v1/iban/validate returns the compact form below. The richer fields
-    # (lei, address, branch_info) are only on the dedicated /v1/bic/:code
-    # endpoint — see BICLookupResult.
-    #
     # ⚠️ `bank_name`, not `bankName`. The 1.3.3 README published the camelCase
     # spelling; every reader who copy-pasted it got a KeyError on line 3.
     code: str
     bank_name: Optional[str]
+    # Where the consulted register places THIS bank code. May legitimately
+    # differ from address["city"], the legal seat: German BLZ 37040044 resolves
+    # to Commerzbank in Köln while the entity is registered in Frankfurt. Both
+    # true, different questions.
     city: Optional[str]
     source: str  # which directory this row came from
     as_of: str  # month the source was last refreshed
+    # Served by /v1/iban/validate since 1.4.4. Before that these lived only on
+    # /v1/bic/:code, so a caller paid a second lookup for fields the first call
+    # had already read. None means GLEIF publishes no LEI for this BIC, never
+    # that the institution has none.
+    lei: Optional[str]
+    lei_status: Optional[str]
+    # None for a branch BIC: only head-office rows carry a registered address.
+    address: Optional[RegisteredAddress]
 
 
 class Issuer(TypedDict, total=False):
@@ -159,7 +193,7 @@ class BICLookupResult(TypedDict, total=False):
     institution: Optional[str]
     country: Country
     city: Optional[str]
-    address: Any  # registered address, when GLEIF carries one
+    address: Optional[RegisteredAddress]
     address_available: bool
     branch_code: str
     branch_info: Optional[str]

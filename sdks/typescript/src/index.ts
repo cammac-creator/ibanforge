@@ -117,14 +117,63 @@ export class APIError extends IBANforgeError {
 
 export interface Country { code: string; name: string }
 export interface BBAN { bank_code: string; branch_code?: string; account_number: string }
+/**
+ * Registered / head-office address as GLEIF files it.
+ *
+ * Was typed `Record<string, string | null>` on the lookup result, which type
+ * checks but tells a caller nothing: neither `type` nor `romanization` is a
+ * free string, and no field name was discoverable. Spelled out here and shared
+ * by both results, because the API builds it from one helper.
+ */
+export interface RegisteredAddress {
+  type: 'registered';
+  street: string | null;
+  post_code: string | null;
+  region: string | null;
+  city: string | null;
+  country: string;
+  /**
+   * Latin reading: GLEIF's official English form for a non-Latin entity, or the
+   * address itself when already Latin. Null when the entity is non-Latin and
+   * GLEIF ships no Latin form — a transliteration is never invented.
+   */
+  romanized: string | null;
+  romanization: 'original_latin' | 'gleif_english' | 'unavailable';
+  source: string;
+  language: string | null;
+  /**
+   * When the entity last filed this address. Frequently a year old, and NOT the
+   * `as_of` on the BIC beside it — that one dates the monthly directory refresh.
+   */
+  as_of: string | null;
+}
+
 export interface BIC {
   code: string;
   bank_name: string | null;
+  /**
+   * Where the consulted register places THIS bank code. May legitimately differ
+   * from `address.city`, which is the legal seat: German BLZ 37040044 resolves
+   * to Commerzbank in Köln while the entity is registered in Frankfurt. Both
+   * true, different questions.
+   */
   city: string | null;
   /** Which directory this row came from (GLEIF, SIX, a curated map, …). */
   source?: string;
   /** Month the source was last refreshed. */
   as_of?: string;
+  /**
+   * Legal Entity Identifier of the resolved institution.
+   *
+   * Served by `/v1/iban/validate` since 1.4.4 — before that it lived only on
+   * `/v1/bic/:code`, so callers paid a second lookup for a field the first call
+   * had already read. Null means GLEIF publishes no LEI for this BIC, never
+   * that the institution has none.
+   */
+  lei?: string | null;
+  lei_status?: string | null;
+  /** Null for a branch BIC: only head-office rows carry a registered address. */
+  address?: RegisteredAddress | null;
 }
 export interface Issuer {
   type: 'bank' | 'digital_bank' | 'emi' | 'payment_institution';
@@ -241,8 +290,8 @@ export interface BICLookupResult {
   institution: string | null;
   country?: Country;
   city: string | null;
-  /** Registered address, when GLEIF carries one. */
-  address?: Record<string, string | null>;
+  /** Registered address, when GLEIF carries one. @see RegisteredAddress */
+  address?: RegisteredAddress | null;
   address_available?: boolean;
   branch_code?: string;
   branch_info?: string | null;
