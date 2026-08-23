@@ -12,7 +12,11 @@ import { nlPspEntries } from './nl-psp.js';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 // ---------------------------------------------------------------------------
-// bic_data.json — static bank_code → BIC mapping (6907 entries, 40+ countries)
+// bic_data.json — static bank_code → BIC mapping. Recounted 23/08/2026:
+// 24,069 entries across 75 countries, not the "6907 entries, 40+ countries"
+// this line claimed — stale by a factor of three, and the kind of number that
+// gets quoted outward. scripts/audit/curated-map-consistency.test.ts now pins
+// a floor so the prose cannot drift that far from the file again.
 // Format: { "COUNTRY:bank_code": { bic, bank_name?, city? } }
 // ---------------------------------------------------------------------------
 
