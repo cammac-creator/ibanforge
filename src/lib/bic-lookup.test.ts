@@ -1,6 +1,13 @@
 import { describe, it, expect, afterAll } from 'vitest';
-import { lookup, lookupByBic8, lookupByBic11, getEntryCount } from './bic-lookup.js';
-import { closeAll } from './db.js';
+import {
+  lookup,
+  lookupByBic8,
+  lookupByBic11,
+  getEntryCount,
+  getLastUpdated,
+  getReferenceAsOf,
+} from './bic-lookup.js';
+import { getBicDB, closeAll } from './db.js';
 
 afterAll(() => {
   closeAll();
@@ -75,5 +82,36 @@ describe('lookup (generic)', () => {
   it('returns null for an input that is neither 8 nor 11 chars', () => {
     const row = lookup('UBSW');
     expect(row).toBeNull();
+  });
+});
+
+describe('getLastUpdated — cached, and still the right answer', () => {
+  it('agrees with the query it replaces', () => {
+    // The cache exists because MAX(updated_at) has no index and scans ~121k
+    // rows: 12.6 ms measured 23/08/2026, called twice per enrichment. Speed is
+    // worthless if the value drifts, so pin it against the live query.
+    const direct = (
+      getBicDB().prepare('SELECT MAX(updated_at) AS v FROM bic_entries').get() as { v: string | null }
+    ).v;
+    expect(getLastUpdated()).toBe(direct);
+    expect(getLastUpdated()).toBe(direct); // second call comes from the cache
+  });
+
+  it('derives as_of as the year-month of that date', () => {
+    const full = getLastUpdated();
+    expect(getReferenceAsOf()).toBe((full ?? '').slice(0, 7));
+    expect(getReferenceAsOf()).toMatch(/^\d{4}-\d{2}$/);
+  });
+
+  it('answers in well under a millisecond once warm', () => {
+    // The regression this guards is a caller reintroducing the scan — for
+    // instance by clearing the cache in the hot path. The threshold is loose
+    // on purpose: it must fail on a full scan (12 ms) and pass on anything
+    // sane, on any machine.
+    getLastUpdated();
+    const t0 = process.hrtime.bigint();
+    for (let i = 0; i < 500; i++) getLastUpdated();
+    const perCall = Number(process.hrtime.bigint() - t0) / 1e6 / 500;
+    expect(perCall, `${perCall.toFixed(3)} ms per call — the table scan is back`).toBeLessThan(0.5);
   });
 });

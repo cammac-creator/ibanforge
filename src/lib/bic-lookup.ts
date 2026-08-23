@@ -401,9 +401,35 @@ export function getLeiEnrichedCount(): number {
   ).cnt;
 }
 
+/**
+ * Cached because the query behind it is a full table scan and the answer
+ * changes once a month.
+ *
+ * `MAX(updated_at)` has no index to walk — the only indexes on bic_entries are
+ * bic8, bic11, lei and country_code — so SQLite reads all ~121k rows. Measured
+ * 23/08/2026: **12.6 ms per call**, and enrichResult() called it TWICE per
+ * validation, so 25 of the 28 ms an enrichment cost were spent re-deriving the
+ * string "2026-08". It is the single most expensive thing in the hot path, and
+ * it is a constant.
+ *
+ * ⚠️ Safe only because bic.sqlite is READ-ONLY at runtime (see CLAUDE.md): the
+ * monthly refresh ships a new database and a new deployment. If that ever
+ * changes to an in-place refresh, this cache goes stale silently — which is why
+ * resetStatements() clears it alongside the prepared statements.
+ *
+ * `undefined` means "not read yet"; `null` is a real answer (empty table), and
+ * conflating the two would make an empty database re-scan on every call.
+ */
+let lastUpdatedCache: string | null | undefined;
+
 export function getLastUpdated(): string | null {
-  const row = getBicDB().prepare('SELECT MAX(updated_at) as last_updated FROM bic_entries').get() as { last_updated: string | null };
-  return row.last_updated;
+  if (lastUpdatedCache === undefined) {
+    const row = getBicDB()
+      .prepare('SELECT MAX(updated_at) as last_updated FROM bic_entries')
+      .get() as { last_updated: string | null };
+    lastUpdatedCache = row.last_updated;
+  }
+  return lastUpdatedCache;
 }
 
 /**
@@ -591,4 +617,7 @@ export function resetStatements(): void {
   stmtByBic8 = null;
   stmtBic8Stats = null;
   bicCache.clear();
+  // Cleared with the statements: it is derived from the same database, so a
+  // caller swapping databases must not keep the previous one's refresh date.
+  lastUpdatedCache = undefined;
 }
