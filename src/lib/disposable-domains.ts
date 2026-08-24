@@ -10,9 +10,10 @@
  *  - INVENTED addresses (random-string@gmail.com): the domain is perfectly
  *    reputable, the mailbox does not exist, and every send bounces off the
  *    provider. No domain list can catch those — that is what the key-age
- *    guard in quota-notice is for. (Measured 2026-08-17: 36 quota warnings
- *    bounced off invented gmail addresses in one afternoon; a disposable
- *    list alone would have let 40 of the 42 signups through.)
+ *    guard in quota-notice is for. (Measured on a real signup wave: a whole
+ *    afternoon of quota warnings bounced off invented gmail addresses, and a
+ *    disposable list alone would have let nearly every signup of that wave
+ *    through.)
  *
  * The list below is a curated starter, not an exhaustive database: public
  * lists run to thousands of domains and rot quickly. Extend it as abuse is

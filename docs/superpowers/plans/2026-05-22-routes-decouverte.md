@@ -86,7 +86,7 @@ const pkg = require('../../package.json') as { version: string };
 
 // MCP server card. Served at the canonical /.well-known/mcp/server-card.json
 // and at the /.well-known/mcp.json and /mcp.json aliases that agent/MCP
-// directory crawlers request (~135 hits/month previously landed in 404).
+// directory crawlers request (a steady monthly stream previously landed in 404).
 const MCP_SERVER_CARD = {
   name: 'IBANforge',
   description:
@@ -277,7 +277,7 @@ Par ce bloc :
 // /.well-known/agents.json — A2A agent discovery (emerging standard).
 // Served at the canonical path and at the agent.json / agents.json /
 // agent-directory.json aliases that directory crawlers request
-// (~182 hits/month previously landed in 404).
+// (a steady monthly stream previously landed in 404).
 // ──────────────────────────────────────────────────────────────────────────────
 
 const AGENT_MANIFEST = {
@@ -400,7 +400,7 @@ Par :
 
 ```ts
 // /agents.txt — plain-text discovery index (llms.txt-style), requested by
-// directory crawlers (~53 hits/month previously landed in 404).
+// directory crawlers (a modest monthly stream previously landed in 404).
 const AGENTS_TXT = `# IBANforge — agent & API discovery
 
 IBAN validation, BIC/SWIFT lookup, Swiss clearing and compliance risk

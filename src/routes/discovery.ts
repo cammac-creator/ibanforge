@@ -114,7 +114,7 @@ function buildAccepts(endpoint: PricedEndpoint, walletAddress: string) {
 // ──────────────────────────────────────────────────────────────────────────────
 
 // The `.json` suffix is what agent-tools.cloud, agent-discover-indexer and
-// three others reach for: 457 hits over the ninety days to 30/07. Same handler
+// three others reach for: a steady stream of hits across ninety days. Same handler
 // rather than a redirect, because an x402 client that follows a 301 on its
 // discovery document is not guaranteed to keep reading.
 const x402Document: Handler = (c) => {
@@ -235,7 +235,7 @@ discovery.get('/.well-known/oauth-protected-resource/mcp', (c) =>
 
 // RFC 9728 inserts the well-known segment before the resource path, which the
 // route above already serves. Plenty of MCP clients append it instead, and on
-// 2026-07-28 that spelling was requested 1,021 times by 90 distinct IPs and
+// one single day that spelling was requested over and over by dozens of distinct IPs and
 // answered 404. A 404 there is worse than unhelpful: the client cannot tell
 // "this server needs no OAuth" from "this server is broken".
 discovery.get('/mcp/.well-known/oauth-protected-resource', (c) =>
@@ -250,7 +250,7 @@ discovery.get('/mcp/.well-known/oauth-protected-resource', (c) =>
 // /.well-known/agents.json — A2A agent discovery (emerging standard).
 // Served at the canonical path and at the agent.json / agents.json /
 // agent-directory.json aliases that directory crawlers request
-// (~182 hits/month previously landed in 404). The singular agent.json alias
+// (a steady monthly stream previously landed in 404). The singular agent.json alias
 // intentionally serves the same A2A manifest — better than a 404.
 // ──────────────────────────────────────────────────────────────────────────────
 
@@ -301,7 +301,7 @@ for (const path of [
 // Foundation). Until 2026-08 this path served AGENT_MANIFEST, whose shape is
 // the late ai-plugin.json dialect: every A2A client failed at parse time on
 // the five REQUIRED fields (protocolVersion, version, skills,
-// defaultInputModes, defaultOutputModes). 411 hits / 104 distinct IPs a month
+// defaultInputModes, defaultOutputModes). a steady monthly stream from dozens of distinct IPs
 // were fetching a document none of them could read.
 //
 // Honesty note: IBANforge is a tool-style API, not a conversational A2A
@@ -503,7 +503,7 @@ for (const path of ['/apis.json', '/.well-known/apis.json']) {
 }
 
 // /agents.txt — plain-text discovery index (llms.txt-style), requested by
-// directory crawlers (~53 hits/month previously landed in 404).
+// directory crawlers (a modest monthly stream previously landed in 404).
 const AGENTS_TXT = `# IBANforge — agent & API discovery
 
 IBAN validation, BIC/SWIFT lookup, Swiss clearing and compliance risk
@@ -529,7 +529,7 @@ discovery.get('/agents.txt', (c) =>
 
 // ──────────────────────────────────────────────────────────────────────────────
 // /.well-known/glama.json — the manifest glama.ai fetches to (re)ingest a
-// server. It was requested 181 times by 45 distinct IPs on 2026-07-28 and
+// server. It was requested repeatedly by dozens of distinct IPs in a single day and
 // answered 404, while glama's own API still served `tools: []` and a frozen
 // "39K+ entries / 75+ countries" description that has since been observed
 // resurfacing inside AI-written summaries of the product.
@@ -571,7 +571,7 @@ const GLAMA_MANIFEST = {
 
 discovery.get('/.well-known/glama.json', (c) => c.json(GLAMA_MANIFEST));
 
-// /.well-known/security.txt — RFC 9116. Probed by 16 distinct IPs; several
+// /.well-known/security.txt — RFC 9116. Probed by a steady trickle of distinct IPs; several
 // directory scorers treat its absence as a maturity signal.
 const SECURITY_TXT = `Contact: mailto:security@ibanforge.com
 Preferred-Languages: en, fr, de
@@ -588,7 +588,7 @@ discovery.get('/.well-known/security.txt', (c) =>
 // href="STRIPE_PAYMENT_LINK_*" anchors between 2026-05-12 and 2026-06-19,
 // rewritten only by client-side JS — which crawlers never run. The HTML is
 // fixed, but the URLs live on in caches: on 2026-07-28 the three paths were
-// still drawing ~90 distinct IPs each. A 301 both rescues that traffic and
+// still drawing dozens of distinct IPs each. A 301 both rescues that traffic and
 // tells the indexes holding the bad URL where the real one is.
 // ──────────────────────────────────────────────────────────────────────────────
 
@@ -610,7 +610,7 @@ for (const lang of ['en', 'de', 'fr']) {
 // ──────────────────────────────────────────────────────────────────────────────
 
 // Sibling of the oauth probe fixed above: clients that append the well-known
-// segment to /mcp ask for both. 1,021 hits / 90 distinct IPs.
+// segment to /mcp ask for both. A heavy stream from dozens of distinct IPs.
 discovery.get('/mcp/.well-known/mcp', (c) =>
   c.json({
     name: 'IBANforge',
@@ -621,18 +621,18 @@ discovery.get('/mcp/.well-known/mcp', (c) =>
 );
 
 // OpenAPI under the two names tooling reaches for besides /openapi.json.
-// 13 and 9 distinct IPs.
+// A handful of distinct IPs each.
 discovery.get('/swagger.json', (c) => c.redirect('/openapi.json', 301));
 discovery.get('/api/openapi.json', (c) => c.redirect('/openapi.json', 301));
 
 // /sse is the pre-streamable MCP transport; /mcp. is a client-side bug that
-// leaves the trailing dot on. 14 and 23 distinct IPs. 308 keeps the method, so
+// leaves the trailing dot on. A steady trickle of distinct IPs. 308 keeps the method, so
 // a JSON-RPC POST survives the hop instead of degrading to GET.
 discovery.get('/sse', (c) => c.redirect('/mcp', 308));
 discovery.all('/mcp.', (c) => c.redirect('/mcp', 308));
 
 // Not agent discovery, but the two largest plain 404s on the service: 366 and
-// 36 distinct IPs. Both exist on the www host.
+// Dozens of distinct IPs. Both exist on the www host.
 discovery.get('/favicon.ico', (c) => c.redirect('https://ibanforge.com/favicon.ico', 301));
 discovery.get('/sitemap.xml', (c) => c.redirect('https://ibanforge.com/sitemap.xml', 301));
 
@@ -642,7 +642,7 @@ discovery.get('/sitemap.xml', (c) => c.redirect('https://ibanforge.com/sitemap.x
 // ──────────────────────────────────────────────────────────────────────────────
 
 // The largest single 404 left on the service, and it was never a missing page:
-// APIHub-HealthCheck POSTs the API root, 3,469 times. 404 tells a health
+// APIHub-HealthCheck POSTs the API root relentlessly. 404 tells a health
 // checker the API is not there; 405 with Allow tells it the API is there and
 // the verb was wrong, which is what actually happened. GET and HEAD fall
 // through to the landing page, which is mounted after this router.
@@ -655,15 +655,15 @@ discovery.on(['POST', 'PUT', 'PATCH', 'DELETE'], '/', (c) =>
 );
 
 // RFC 9116 puts security.txt under /.well-known; a copy at the root would be a
-// second thing to keep in step with the first. 83 hits, one scanner.
+// second thing to keep in step with the first. A steady stream, one scanner.
 discovery.get('/security.txt', (c) => c.redirect('/.well-known/security.txt', 301));
 
 // Clients that assume every API lives under /api. 308 keeps the method, so a
-// JSON-RPC POST survives. 76 hits across five agents.
+// JSON-RPC POST survives. A modest stream across a handful of agents.
 discovery.all('/api/mcp', (c) => c.redirect('/mcp', 308));
 
 // NOT served, deliberately: /.well-known/oauth-authorization-server and its
-// /mcp sibling, 1,164 hits from aisec-registry. RFC 8414 metadata describes an
+// /mcp sibling, a heavy stream from aisec-registry. RFC 8414 metadata describes an
 // OAuth authorization server, and we do not run one — authentication here is an
 // API key or an x402 payment, which is what the protected-resource document
 // already says. Publishing a document there would misrepresent us to a security

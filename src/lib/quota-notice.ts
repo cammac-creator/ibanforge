@@ -21,7 +21,7 @@ export type QuotaNoticeOutcome =
  * A key younger than this never gets automated mail. A signup wave with
  * invented addresses (reputable domain, nonexistent mailbox — the pattern no
  * disposable-domain list can catch) crosses the 80% threshold within minutes
- * of creation; 36 warnings bounced that way in one afternoon (2026-08-17).
+ * of creation; a whole afternoon of warnings once bounced off such a wave.
  * A real developer who burns quota on day one loses only the mail, not the
  * signal: every authenticated response carries the X-Quota-* headers.
  */

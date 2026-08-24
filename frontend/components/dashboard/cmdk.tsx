@@ -4,8 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocale } from 'next-intl';
 
 /**
- * ⌘K: from "I'm thinking of Raison" to their file in two keystrokes, from any
- * tab. The index is deliberately thin (name, domain, email — no messages, no
+ * ⌘K: from "I'm thinking of Société Alpha" to their file in two keystrokes,
+ * from any tab. The index is deliberately thin (name, domain, email — no messages, no
  * series) so the first keypress is instant; each hit offers its two homes:
  * the conversation (Contacts) and the usage file (Clients).
  */

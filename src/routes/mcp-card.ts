@@ -11,7 +11,7 @@ const pkg = require('../../package.json') as { version: string };
 
 // MCP server card. Served at the canonical /.well-known/mcp/server-card.json
 // and at the /.well-known/mcp.json and /mcp.json aliases that agent/MCP
-// directory crawlers request (~135 hits/month previously landed in 404).
+// directory crawlers request (a steady monthly stream previously landed in 404).
 const MCP_SERVER_CARD = {
   name: 'IBANforge',
   description:

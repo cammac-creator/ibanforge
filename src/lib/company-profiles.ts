@@ -90,8 +90,9 @@ export const GENERIC_EMAIL_DOMAINS = new Set([
 
 /**
  * The website a polite client advertises inside its own User-Agent —
- * "Y-CARE/7.0.3 (+https://y-care.be)" named a customer whose gmail address
- * said nothing. The `+URL` convention is the crawler-politeness idiom.
+ * "AlphaCare/7.0.3 (+https://care.alpha.example.net)" names the company
+ * behind a signup whose gmail address said nothing. The `+URL` convention
+ * is the crawler-politeness idiom.
  */
 export function uaWebsite(ua: string): string | null {
   const m = /\+(https?:\/\/[^\s;)]+)/.exec(ua);

@@ -45,7 +45,7 @@ describe('company-profiles — identity table', () => {
 
 describe('uaWebsite — the identity a polite User-Agent advertises', () => {
   it('extracts the +URL convention and ignores UAs without one', () => {
-    expect(uaWebsite('Y-CARE/7.0.3.49 (+https://y-care.example)')).toBe('https://y-care.example');
+    expect(uaWebsite('AlphaCare/7.0.3.49 (+https://care.alpha.example.net)')).toBe('https://care.alpha.example.net');
     expect(uaWebsite('ibanforge-radar/1.0 (+https://ibanforge.com)')).toBe('https://ibanforge.com');
     expect(uaWebsite('python-requests/2.32.5')).toBe(null);
     expect(uaWebsite('Mozilla/5.0 (Macintosh)')).toBe(null);
