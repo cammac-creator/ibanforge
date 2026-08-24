@@ -89,3 +89,53 @@ describe('a BIC lookup never answers a bare "not found" about a designated bank'
     if (!shape.screened) expect(shape.listed).toBeNull();
   });
 });
+
+/**
+ * The name axis, added 24/08/2026.
+ *
+ * The refresh script populated sanctioned_entities ONLY from "SWIFT/BIC …"
+ * tokens in the lists' free text. Designated banks whose entry carries no
+ * token — Bank Saderat Iran and Bank Melli Iran among them, both designated
+ * "all offices worldwide" — answered bank_sanctioned:false while our own
+ * directory held their SEPA branches under exactly those names. The name
+ * axis joins SDN entity names against bic_entries.institution.
+ *
+ * The axis is gated by GEOGRAPHY (SDN addresses + program country) because a
+ * name alone accuses too much: ungated, it matched the designated
+ * AGRICULTURAL DEVELOPMENT BANK to unrelated homonyms in Nepal, China,
+ * Trinidad and Ghana. Both directions are pinned here so neither the recall
+ * nor the precision half of the fix can silently regress.
+ */
+describe('the name axis reaches banks the SWIFT tokens never named', () => {
+  it('flags Bank Saderat Iran, Paris — designated worldwide, no SWIFT token in its SDN entry', () => {
+    const r = buildBicComplianceResponse('SDINFRP1');
+    if ('error' in r) throw new Error('should validate');
+    expect(r.compliance.sanctions.bank_sanctioned).toBe(true);
+    expect(r.compliance.sanctions.matched_lists).toContain('OFAC');
+    expect(['high', 'critical']).toContain(r.compliance.risk_level);
+  });
+
+  it('flags the Hamburg BRANCH via the word-boundary prefix match', () => {
+    const r = buildBicComplianceResponse('SIHRDEH1');
+    if ('error' in r) throw new Error('should validate');
+    expect(r.compliance.sanctions.bank_sanctioned).toBe(true);
+    expect(r.compliance.sanctions.matched_lists).toContain('OFAC');
+  });
+
+  it('does NOT flag the Kuwaiti homonym of a designated Lebanese entity', () => {
+    // BAYT AL-MAL (Hizballah, LB) shares its exact name with an unrelated
+    // Kuwaiti institution. The geographic gate is what keeps the name axis
+    // from accusing it; if this starts failing, precision broke.
+    const s = screenBicSanctions('BAYTKWK1');
+    expect(s.listed).not.toBe(true);
+  });
+
+  it('does NOT flag the homonymous agricultural development banks', () => {
+    // The designated AGRICULTURAL DEVELOPMENT BANK is not the Chinese, the
+    // Nepalese, the Trinidadian nor the Ghanaian bank of the same name.
+    for (const bic of ['ADBNCNBJ', 'ADBLNPKA', 'ADEVTTP1']) {
+      const s = screenBicSanctions(bic);
+      expect(s.listed, bic).not.toBe(true);
+    }
+  });
+});

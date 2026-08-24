@@ -196,6 +196,12 @@ function insertStaticData(db: Database.Database): void {
 // "SWIFT/BIC HAVIGB2L" or "SWIFT HAVIGB2L" inside free-text remarks.
 const SWIFT_REMARK_REGEX = /SWIFT(?:\/BIC)?[:\s]+([A-Z]{4}[A-Z]{2}[A-Z0-9]{2}(?:[A-Z0-9]{3})?)/gi;
 
+// Shared normalization for the name axis: uppercase, punctuation to spaces,
+// whitespace collapsed. Deliberately blunt — both sides go through it, and a
+// blunt rule applied to both is safer than a clever rule applied to one.
+const normalizeEntityName = (s: string): string =>
+  s.toUpperCase().replace(/[^A-Z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+
 /**
  * Candidates found and entities kept, per source and overall.
  *
@@ -277,11 +283,48 @@ async function fetchPrimarySanctions(db: Database.Database): Promise<SanctionsTa
       let unresolved = 0;
       // SDN.csv columns (no header): 0=ent_num,1=SDN_Name,2=SDN_Type,3=Program,
       // 4=Title,... last meaningful free-text field = remarks (col 11).
+      // normalized name -> aggregated entity, for the name axis below.
+      const entityNames = new Map<
+        string,
+        { name: string; ents: Set<string>; worldwide: boolean; programCC: Set<string> }
+      >();
+      // Country programs -> the country they anchor. UKRAINE-EO programs
+      // target Russian and Crimean actors, hence both RU and UA.
+      const PROGRAM_COUNTRIES: Array<[RegExp, string[]]> = [
+        [/IRAN|IFSR|IRGC/, ['IR']], [/CUBA/, ['CU']], [/DPRK/, ['KP']],
+        [/SYRIA/, ['SY']], [/VENEZUELA/, ['VE']], [/BELARUS/, ['BY']],
+        [/RUSSIA|PEESA/, ['RU']], [/UKRAINE-EO/, ['RU', 'UA']],
+        [/NICARAGUA/, ['NI']], [/SOUTH SUDAN/, ['SS']], [/DARFUR/, ['SD']],
+        [/YEMEN/, ['YE']], [/LIBYA/, ['LY']], [/IRAQ/, ['IQ']],
+        [/SOMALIA/, ['SO']], [/LEBANON/, ['LB']], [/ZIMBABWE/, ['ZW']],
+        [/MALI/, ['ML']], [/BURMA/, ['MM']], [/TALIBAN|AFGHANISTAN/, ['AF']],
+      ];
       for await (const line of rl) {
         lines++;
         const cols = parseCsvLine(line);
         const name = (cols[1] ?? '').replace(/^-0-\s*$/, '').substring(0, 200);
         const remarks = cols[11] ?? cols[cols.length - 1] ?? '';
+        // SDN_Type (col 2) is "individual" / "vessel" / "aircraft", or "-0-"
+        // for an entity. Only entities can be banks.
+        const sdnType = (cols[2] ?? '').trim().toLowerCase();
+        if (name && sdnType !== 'individual' && sdnType !== 'vessel' && sdnType !== 'aircraft') {
+          const norm = normalizeEntityName(name);
+          if (norm) {
+            let e = entityNames.get(norm);
+            if (!e) entityNames.set(norm, (e = { name, ents: new Set(), worldwide: false, programCC: new Set() }));
+            e.ents.add((cols[0] ?? '').trim());
+            // "all offices worldwide" in the remarks (Saderat, Melli) is the
+            // designation itself saying geography does not bound it.
+            if (/all (?:offices|branches) worldwide/i.test(remarks)) e.worldwide = true;
+            // The sanctions PROGRAM names the anchor country ADD.csv can omit:
+            // Banco Nacional de Cuba's address rows list Zurich, Madrid, Tokyo
+            // and Panama — every office EXCEPT Havana. Program "CUBA" says CU.
+            const program = cols[3] ?? '';
+            for (const [re, ccs] of PROGRAM_COUNTRIES) {
+              if (re.test(program)) for (const cc of ccs) e.programCC.add(cc);
+            }
+          }
+        }
         if (!/SWIFT/i.test(remarks)) continue;
         for (const { bic8, inDirectory } of extractBics(remarks, seen)) {
           if (!inDirectory) unresolved++;
@@ -291,6 +334,151 @@ async function fetchPrimarySanctions(db: Database.Database): Promise<SanctionsTa
       if (batch.length) insertBatch(batch);
       tally.kept += batch.length;
       console.log(`  OFAC: ${lines} rows, ${batch.length} bank BICs kept (${unresolved} not in our directory)`);
+
+      // ---- Name axis: designated entities OUR OWN directory knows by name ----
+      //
+      // The SWIFT-token axis above only sees banks whose SDN *remarks* carry a
+      // "SWIFT/BIC …" token. Plenty of designated banks carry none — including
+      // Bank Saderat Iran and Bank Melli Iran, both designated "all offices
+      // worldwide" — while bic_entries holds their SEPA branches under exactly
+      // those names. Without this axis, a compliance query for one of those
+      // branches answered bank_sanctioned:false with a straight face: the
+      // maximum false negative on the endpoint's core promise.
+      //
+      // Match rule, two INDEPENDENT gates — both must pass:
+      //
+      // 1. NAME. The directory institution name must EQUAL the SDN entity
+      //    name, or extend it at a word boundary ("BANK SADERAT IRAN HAMBURG
+      //    BRANCH" extends "BANK SADERAT IRAN" — same legal entity, its
+      //    branch). One direction only: a directory name that is a PREFIX of
+      //    an SDN name is NOT matched — that direction generalizes ("SBERBANK"
+      //    would claim every "SBERBANK OF …" entry). Names under 8 chars or
+      //    without a space are skipped as too generic.
+      //
+      // 2. GEOGRAPHY. The BIC's country (chars 5-6) must appear among the SDN
+      //    entity's addresses (ADD.csv), unless the designation itself says
+      //    "all offices worldwide" (Saderat, Melli). A name alone accuses too
+      //    much: the first ungated run matched the designated AGRICULTURAL
+      //    DEVELOPMENT BANK to unrelated homonyms in Nepal, China, Trinidad
+      //    and Ghana, and Hezbollah's BAYT AL-MAL (LB) to an unrelated Kuwaiti
+      //    homonym. On a compliance endpoint a false accusation is the
+      //    mirror-image failure of the false negative this axis exists to fix.
+      //    If ADD.csv cannot be read, the axis degrades to worldwide-marked
+      //    entities only — it narrows, never widens.
+      //
+      // Honest caps, logged below: this axis reads OFAC only (the EU/UN/SECO
+      // parsers see their files as blobs, not rows), and SDN aliases (ALT.csv)
+      // are not read — both understate, never overstate.
+      let addCountries: Map<string, Set<string>> | null = null;
+      try {
+        const addPath = resolve(TMP_DIR, 'ofac_add.csv');
+        await downloadFile('https://www.treasury.gov/ofac/downloads/add.csv', addPath);
+        const rlAdd = createInterface({ input: createReadStream(addPath), crlfDelay: Infinity });
+        // English country name (normalized) -> ISO2, built from Intl the way
+        // the rest of the codebase does, plus the OFAC spellings Intl lacks.
+        const nameToIso = new Map<string, string>();
+        const dn = new Intl.DisplayNames(['en'], { type: 'region' });
+        // Deprecated ISO2 codes whose CLDR label collides with a live country:
+        // SU labels as "Russia" and, iterated after RU, would silently win the
+        // reverse map — Bank Rossiya then "lives" in a country no BIC carries.
+        const DEPRECATED_ISO2 = new Set(['SU', 'AN', 'BU', 'CS', 'DD', 'FX', 'NT', 'TP', 'YD', 'YU', 'ZR']);
+        for (let a = 65; a <= 90; a++) {
+          for (let b = 65; b <= 90; b++) {
+            const cc = String.fromCharCode(a) + String.fromCharCode(b);
+            if (DEPRECATED_ISO2.has(cc)) continue;
+            const label = dn.of(cc);
+            if (label && label !== cc) nameToIso.set(normalizeEntityName(label), cc);
+          }
+        }
+        // OFAC's own spellings that Intl's English labels miss.
+        for (const [alias, cc] of [
+          ['KOREA NORTH', 'KP'], ['NORTH KOREA', 'KP'], ['KOREA SOUTH', 'KR'],
+          ['BURMA', 'MM'], ['RUSSIAN FEDERATION', 'RU'], ['SYRIAN ARAB REPUBLIC', 'SY'],
+          ['IRAN ISLAMIC REPUBLIC OF', 'IR'], ['VENEZUELA BOLIVARIAN REPUBLIC', 'VE'],
+          ['CZECH REPUBLIC', 'CZ'], ['TURKIYE', 'TR'], ['TURKEY', 'TR'],
+          ['UNITED KINGDOM', 'GB'], ['BOSNIA AND HERZEGOVINA', 'BA'],
+          ['BAHAMAS THE', 'BS'], ['GAMBIA THE', 'GM'], ['VIRGIN ISLANDS BRITISH', 'VG'],
+          ['CURACAO', 'CW'], ['MACAU', 'MO'], ['LAOS', 'LA'],
+          // Pre-2010 addresses OFAC never updated. The former NA also covered
+          // SX and BQ — mapping to CW understates, never overstates.
+          ['NETHERLANDS ANTILLES', 'CW'],
+          ['COTE D IVOIRE', 'CI'], ['CABO VERDE', 'CV'],
+          ['CONGO DEMOCRATIC REPUBLIC OF THE', 'CD'], ['CONGO REPUBLIC OF THE', 'CG'],
+          ['PALESTINIAN', 'PS'], ['WEST BANK', 'PS'], ['REGION WEST BANK', 'PS'],
+          ['GAZA', 'PS'], ['REGION GAZA', 'PS'],
+        ] as const) {
+          nameToIso.set(alias, cc);
+        }
+        addCountries = new Map();
+        // ADD.csv columns (no header): 0=ent_num, 1=add_num, 2=address,
+        // 3=city/state/zip, 4=country, 5=remarks.
+        for await (const line of rlAdd) {
+          const cols = parseCsvLine(line);
+          const ent = (cols[0] ?? '').trim();
+          const iso = nameToIso.get(normalizeEntityName(cols[4] ?? ''));
+          if (!ent || !iso) continue;
+          let set = addCountries.get(ent);
+          if (!set) addCountries.set(ent, (set = new Set()));
+          set.add(iso);
+        }
+      } catch (err) {
+        console.warn(
+          `  WARNING: OFAC ADD.csv unavailable (${(err as Error).message}) — ` +
+            `name axis degrades to "all offices worldwide" entities only`
+        );
+      }
+      const byFirstWord = new Map<string, Array<{ norm: string; bic8: string }>>();
+      const dirStmt = bicDB.prepare(
+        `SELECT DISTINCT bic8, institution FROM bic_entries WHERE institution IS NOT NULL AND institution != ''`
+      );
+      for (const r of dirStmt.iterate() as IterableIterator<{ bic8: string; institution: string }>) {
+        const norm = normalizeEntityName(r.institution);
+        if (!norm) continue;
+        const fw = norm.split(' ')[0];
+        let arr = byFirstWord.get(fw);
+        if (!arr) byFirstWord.set(fw, (arr = []));
+        arr.push({ norm, bic8: r.bic8 });
+      }
+      const nameBatch: Array<[string, string, string, string, number]> = [];
+      const nameSeen = new Set<string>();
+      const droppedByGeo: string[] = [];
+      let namesMatched = 0;
+      for (const [norm, entity] of entityNames) {
+        if (norm.length < 8 || !norm.includes(' ')) continue;
+        const bucket = byFirstWord.get(norm.split(' ')[0]);
+        if (!bucket) continue;
+        const sdnCountries = new Set<string>(entity.programCC);
+        for (const ent of entity.ents) {
+          for (const cc of addCountries?.get(ent) ?? []) sdnCountries.add(cc);
+        }
+        let hit = false;
+        for (const d of bucket) {
+          if (d.norm !== norm && !d.norm.startsWith(norm + ' ')) continue;
+          const bicCountry = d.bic8.substring(4, 6);
+          if (!entity.worldwide && !sdnCountries.has(bicCountry)) {
+            droppedByGeo.push(`${d.bic8}(${entity.name})`);
+            continue;
+          }
+          hit = true;
+          if (!nameSeen.has(d.bic8)) {
+            nameSeen.add(d.bic8);
+            nameBatch.push([d.bic8, entity.name, 'OFAC', '', 1]);
+          }
+        }
+        if (hit) namesMatched++;
+      }
+      if (nameBatch.length) insertBatch(nameBatch);
+      tally.kept += nameBatch.length;
+      console.log(
+        `  OFAC name axis: ${entityNames.size} entity names read, ${namesMatched} matched in our directory ` +
+          `-> ${nameBatch.length} BICs beyond the SWIFT tokens (OFAC only; ALT.csv aliases not read)`
+      );
+      if (droppedByGeo.length) {
+        console.log(
+          `  name axis, name matched but country outside the SDN addresses (kept OUT): ` +
+            `${droppedByGeo.slice(0, 20).join(' ')}${droppedByGeo.length > 20 ? ' …' : ''}`
+        );
+      }
     } catch (err) {
       console.warn(`  WARNING: OFAC download/parse failed: ${(err as Error).message}`);
     }
