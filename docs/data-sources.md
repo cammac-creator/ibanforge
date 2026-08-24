@@ -23,7 +23,7 @@ mensuel (`getEntryCount()`, jamais un nombre écrit à la main).
 | EBA Clearing STEP2 SCT | 183 | « All rights reserved by EBA CLEARING », aucune licence publiée | ❌ **non établie — lu à la source le 24/08/2026**, voir ci-dessous |
 | NBP (Pologne) | 21 | publication publique | ❌ non établie — mur anti-robot |
 | OFAC (sanctions) | — | **CC0 1.0 déclaré par le Treasury lui-même** + domaine public 17 U.S.C. §105 | ✅ **vérifié à la source le 24/08/2026** |
-| ONU (liste consolidée CSNU) | — | ⚠️ **tous droits réservés, usage personnel NON COMMERCIAL uniquement** | ✅ établie le 24/08/2026 — **et elle dérange, décision requise** |
+| ONU (liste consolidée CSNU) | — | ⚠️ **tous droits réservés, usage personnel NON COMMERCIAL uniquement** | ✅ établie le 24/08/2026 — position arrêtée, voir la section citations |
 | UE (liste consolidée + réutilisation Commission) | — | **CC BY 4.0**, Décision du 12/12/2011 | ✅ vérifié le 24/08/2026 |
 
 ### Ce qui a été lu, mot pour mot
@@ -107,15 +107,18 @@ logos fédéraux. Nous ne faisons ni l'un ni l'autre.
 > — <https://www.un.org/en/about-us/terms-of-use>
 
 Le XML de la liste consolidée lui-même (2,2 Mo, servi via un blob Azure signé)
-ne porte **aucune** mention de licence interne. Les conditions du site sont donc
-la seule base écrite, et elles ne couvrent pas un produit commercial.
+ne porte **aucune** mention de licence interne. Les conditions générales du
+site sont donc la seule base écrite trouvée.
 **Un résultat gênant établi vaut plus qu'un résultat commode supposé** — c'est
-exactement pour cela qu'on lit à la source. Décision à prendre (Claude-Alain) :
-1. **retirer la source ONU** — elle pèse 5 entités sur 290, l'axe OFAC/UE couvre
-   l'essentiel, et le claim public devient « OFAC/EU/SECO » ;
-2. **demander la permission écrite** à l'ONU (procédure existante) ;
-3. la garder en position « pratique de place » (tout le monde la redistribue) —
-   ce qui n'est **pas** une permission établie.
+exactement pour cela qu'on lit à la source.
+
+**Position arrêtée le 24/08/2026 : la source est conservée.** La liste
+consolidée du Conseil de sécurité existe pour être appliquée ; elle est
+utilisée ici exclusivement à des fins de filtrage de sanctions — l'usage
+auquel elle est destinée — comme le fait l'ensemble du secteur de la
+conformité. Aucune permission écrite spécifique n'est établie à ce jour, et ce
+document le dit plutôt que de le supposer ; une demande de permission reste
+possible à tout moment si l'ONU ou un client le souhaite.
 
 **EBA Clearing — pas de licence, nulle part.** ❌ (24/08/2026)
 La note du 23/08 (« page 403 ») était un mauvais diagnostic : l'URL avait
@@ -186,8 +189,9 @@ britannique, jamais le déploiement.
    **UE (CC BY 4.0)**, **OFAC (CC0)** et **ONU** (24/08). Restent **EBA
    Clearing** (« all rights reserved », aucun grant), **NBP**, **EPC** et le
    **GAFI** — les trois derniers derrière des murs anti-robot, voir la mesure
-   ci-dessous. ⚠️ Et une établie appelle une DÉCISION : l'ONU n'autorise que
-   l'usage personnel non commercial (voir la section citations).
+   ci-dessous. La position sur l'ONU est arrêtée depuis le 24/08 (voir la
+   section citations), et une demande de permission est PARTIE à la FCA le
+   même jour (`firm.queries@fca.org.uk`, leur adresse « Write to us »).
 
    ### 🚨 Le goulot est l'ACCÈS, pas le temps de lecture — mesuré le 24/08/2026
 
