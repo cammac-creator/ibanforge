@@ -158,6 +158,14 @@ export function processStripeEvent(
   if (event.type === 'customer.subscription.deleted') {
     const sub = event.data.object as Stripe.Subscription;
     const deactivatedPrefix = deactivateBySubscription(sub.id);
+    if (!deactivatedPrefix) {
+      // Nothing to deactivate YET. Stripe guarantees no delivery order, so
+      // this cancellation can land BEFORE the checkout.session.completed
+      // that mints the key — and the idempotency barrier would eat Stripe's
+      // replay of this event, leaving that key immortal. The tombstone makes
+      // the order irrelevant: a later mint against this subscription refuses.
+      db.prepare('INSERT OR IGNORE INTO dead_subscriptions (subscription_id) VALUES (?)').run(sub.id);
+    }
     db.prepare('INSERT INTO processed_webhooks (stripe_event_id, event_type) VALUES (?, ?)')
       .run(event.id, event.type);
     return {
@@ -183,7 +191,18 @@ export function processStripeEvent(
   // For card payments (Payment Links default) this is always 'paid'. For async
   // methods, Stripe fires checkout.session.async_payment_succeeded later —
   // which is now handled above, so this branch is a wait, not a dead end.
-  if (session.payment_status && session.payment_status !== 'paid') {
+  //
+  // 'no_payment_required' is NOT a wait: Stripe emits it for a session
+  // settled at zero (100% promo, subscription trial) — cases where no
+  // async_payment_succeeded will EVER follow. Waiting on it was the exact
+  // trap the MINTING_EVENTS comment describes: legitimate transaction
+  // concluded, no key, no error anywhere. Dormant until the first promo
+  // code or OEM trial exists, and silent the day one does.
+  if (
+    session.payment_status &&
+    session.payment_status !== 'paid' &&
+    session.payment_status !== 'no_payment_required'
+  ) {
     db.prepare('INSERT INTO processed_webhooks (stripe_event_id, event_type) VALUES (?, ?)')
       .run(event.id, event.type);
     return {
@@ -200,6 +219,26 @@ export function processStripeEvent(
       typeof session.subscription === 'string'
         ? session.subscription
         : (session.subscription?.id ?? null);
+    // The other half of the tombstone (see customer.subscription.deleted):
+    // if the cancellation was delivered first, minting here would create the
+    // immortal key that no later event will ever kill.
+    if (
+      subscriptionId &&
+      db.prepare('SELECT 1 FROM dead_subscriptions WHERE subscription_id = ?').get(subscriptionId)
+    ) {
+      db.prepare('INSERT INTO processed_webhooks (stripe_event_id, event_type) VALUES (?, ?)')
+        .run(event.id, event.type);
+      return {
+        status: 200,
+        body: {
+          received: true,
+          event_id: event.id,
+          plan: 'oem',
+          skipped: 'subscription_already_canceled',
+          subscription: subscriptionId,
+        },
+      };
+    }
     const mint = generateOemKey(email, STRIPE_OEM_PLAN.monthly_limit, session.id, subscriptionId);
     // After the mint: the row must exist for the amount to land on it.
     const paid = recordAmountPaid(session);
@@ -296,9 +335,23 @@ stripeWebhook.post('/v1/stripe/webhook', async (c) => {
 
   const rawBody = await c.req.text();
 
+  // Outside the signature try: getStripe() throwing on a missing env var is a
+  // CONFIG state, and echoing its message published the variable's name to
+  // any anonymous caller. 503 also makes Stripe retry once the config is
+  // fixed, where a 400 dropped the event for good.
+  let stripe: Stripe;
+  try {
+    stripe = getStripe();
+  } catch {
+    return c.json(
+      { error: 'webhook_not_configured', message: 'Webhook processing is temporarily unavailable.' },
+      503,
+    );
+  }
+
   let event: Stripe.Event;
   try {
-    event = getStripe().webhooks.constructEvent(rawBody, sig, secret);
+    event = stripe.webhooks.constructEvent(rawBody, sig, secret);
   } catch (err) {
     return c.json({ error: 'invalid_signature', message: (err as Error).message }, 400);
   }

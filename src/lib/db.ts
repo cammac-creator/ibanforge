@@ -3,6 +3,7 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { resetStatements } from './bic-lookup.js';
+import { resetNationalRegisterStatements } from './national-registers.js';
 import { resetStatsStatements } from './stats.js';
 import { closeComplianceDB } from './compliance-db.js';
 import { resetChClearingStatements } from './ch-clearing.js';
@@ -369,6 +370,18 @@ export function getStatsDB(): DatabaseType.Database {
         event_type TEXT NOT NULL,
         processed_at TEXT DEFAULT (datetime('now'))
       );
+
+      -- Tombstones for the out-of-order webhook race: Stripe guarantees no
+      -- delivery order, so customer.subscription.deleted can land BEFORE the
+      -- checkout.session.completed that mints the key. The deleted handler
+      -- found nothing to deactivate, the completed handler then minted a live
+      -- OEM key tied to a dead subscription, and the idempotency barrier ate
+      -- Stripe's replay of the deleted — an immortal key, invisible in logs.
+      -- A subscription id recorded here refuses any later mint against it.
+      CREATE TABLE IF NOT EXISTS dead_subscriptions (
+        subscription_id TEXT PRIMARY KEY,
+        recorded_at TEXT DEFAULT (datetime('now'))
+      );
     `);
     // One row per (key, month) once the holder has been warned they are near
     // the monthly ceiling. The PRIMARY KEY is the idempotency guarantee: a
@@ -621,6 +634,7 @@ export function closeAll(): void {
     bicDB = null;
     resetStatements();
     resetChClearingStatements();
+    resetNationalRegisterStatements();
   }
   if (statsDB) {
     statsDB.close();

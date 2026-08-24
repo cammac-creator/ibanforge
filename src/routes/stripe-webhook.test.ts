@@ -518,3 +518,65 @@ describe('async payment methods — the day SEPA/TWINT is enabled', () => {
     expect(keyCount()).toBe(before);
   });
 });
+
+describe('out-of-order delivery — the tombstone', () => {
+  // Stripe guarantees no delivery order. Before the tombstone, a
+  // customer.subscription.deleted landing BEFORE its checkout.session.completed
+  // found nothing to deactivate, the completed then minted a LIVE key against
+  // the dead subscription, and the idempotency barrier ate Stripe's replay of
+  // the deleted — an immortal key, invisible in every log.
+  it('refuses to mint an OEM key for a subscription whose cancellation arrived first', () => {
+    const run = Date.now();
+    const subId = `sub_test_dead_${run}`;
+    const before = keyCount();
+
+    const deleted = processStripeEvent(
+      mockSubscriptionDeleted({ id: `evt_del_first_${run}`, subscriptionId: subId }),
+    );
+    expect(deleted.status).toBe(200);
+    expect(deleted.body.key_deactivated).toBe(false);
+
+    const completed = processStripeEvent(
+      mockOemEvent({ id: `evt_oem_late_${run}`, sessionId: `cs_test_late_${run}`, subscriptionId: subId }),
+    );
+    expect(completed.status).toBe(200);
+    expect(completed.body.skipped).toBe('subscription_already_canceled');
+    expect(keyCount()).toBe(before);
+  });
+
+  it('still mints and deactivates normally when the order is normal', () => {
+    const run = Date.now();
+    const subId = `sub_test_ordered_${run}`;
+    const minted = processStripeEvent(
+      mockOemEvent({ id: `evt_oem_ord_${run}`, sessionId: `cs_test_ord_${run}`, subscriptionId: subId }),
+    );
+    expect(minted.body.key_prefix).toMatch(/^ifk_/);
+
+    const deleted = processStripeEvent(
+      mockSubscriptionDeleted({ id: `evt_del_ord_${run}`, subscriptionId: subId }),
+    );
+    expect(deleted.body.key_deactivated).toBe(minted.body.key_prefix);
+  });
+});
+
+describe('no_payment_required is a settlement, not a wait', () => {
+  // Stripe emits it for a session settled at zero — 100% promo, subscription
+  // trial. No async_payment_succeeded will EVER follow, so parking these as
+  // "pending" was a legitimate transaction concluded with no key and no error
+  // anywhere. Dormant until the first promo code exists.
+  it('mints on payment_status no_payment_required', () => {
+    const run = Date.now();
+    const result = processStripeEvent(
+      mockEvent({
+        id: `evt_npr_${run}`,
+        bundle: '1k',
+        sessionId: `cs_test_npr_${run}`,
+        email: `npr-${run}@example.com`,
+        paymentStatus: 'no_payment_required',
+        amountTotal: 0,
+      }),
+    );
+    expect(result.body.pending).toBeUndefined();
+    expect(result.body.credits_minted).toBe(1000);
+  });
+});
