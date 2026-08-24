@@ -51,6 +51,21 @@ async function downloadFile(url: string, dest: string): Promise<void> {
   await pipeline(Readable.fromWeb(res.body as import('stream/web').ReadableStream), fileStream);
 }
 
+// Same transport as downloadFile, for pages we only need to READ (the EBA
+// participants page). A browser User-Agent because that host bot-walls the
+// default fetch UA while serving curl-with-UA fine (measured 24/08/2026).
+async function fetchText(url: string): Promise<string> {
+  const res = await fetch(url, {
+    signal: AbortSignal.timeout(60_000),
+    headers: {
+      'User-Agent':
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0 Safari/537.36',
+    },
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
+  return res.text();
+}
+
 function parseCsvLine(line: string, sep = ','): string[] {
   const result: string[] = [];
   let current = '';
@@ -381,26 +396,54 @@ async function importEbaStep2(db: Database.Database): Promise<number> {
 
   const xlsxPath = resolve(TMP_DIR, 'eba_step2_sct.xlsx');
 
-  // EBA publishes the file on the 5th of each month with filename `YYYYMM05-...xlsx`,
-  // but uploads it into the WordPress folder of the *previous* month
-  // (e.g., the file dated 2026-05-05 lives at /2026/04/...). We try both
-  // conventions just in case EBA's upload policy changes.
-  const now = new Date();
+  // The authoritative way to find the file is the participants PAGE, which
+  // embeds the current download link. Guessing the URL from dates broke
+  // quietly on 2026-08: the filename day is NOT stable (20260805… one month,
+  // 20260804… the next), so a day-05-only guess falls back to a month-old
+  // file and the refresh looks green while shipping stale data. Scrape
+  // first; keep the date guessing only as a fallback for the day the page
+  // moves or bot-walls the runner.
   const candidates: string[] = [];
+  try {
+    const pageUrl = 'https://www.ebaclearing.eu/services-sepa-payments/step2-sct/participants/';
+    const html = await fetchText(pageUrl);
+    // The page links the file RELATIVE (/wp-content/…) — an absolute-only
+    // regex found nothing and the fallback quietly took over.
+    const links = [
+      ...html.matchAll(
+        /(?:https?:\/\/www\.ebaclearing\.eu)?\/wp-content\/uploads\/[^"'\s]*SCT-Reachable-PSP-List[^"'\s]*\.xlsx/gi
+      ),
+    ].map((m) => (m[0].startsWith('http') ? m[0] : `https://www.ebaclearing.eu${m[0]}`));
+    if (links.length) {
+      candidates.push(...new Set(links));
+      console.log(`  participants page names the file: ${links[0]}`);
+    } else {
+      console.warn('  WARNING: participants page served but no XLSX link found — falling back to date guessing');
+    }
+  } catch (err) {
+    console.warn(`  WARNING: participants page unreadable (${(err as Error).message}) — falling back to date guessing`);
+  }
+
+  // Fallback: EBA names the file `YYYYMMDD-…` near the start of the month and
+  // uploads it into the WordPress folder of the SAME or the PREVIOUS month.
+  // Days observed in the wild: 05 (most months) and 04 (2026-08).
+  const now = new Date();
   for (let i = 0; i < 12; i++) {
-    const fileDate = new Date(now.getFullYear(), now.getMonth() - i, 5);
-    const fileYY = fileDate.getFullYear();
-    const fileMM = String(fileDate.getMonth() + 1).padStart(2, '0');
-    const filename = `${fileYY}${fileMM}05-SCT-Reachable-PSP-List_CUG.xlsx`;
+    for (const day of [5, 4]) {
+      const fileDate = new Date(now.getFullYear(), now.getMonth() - i, day);
+      const fileYY = fileDate.getFullYear();
+      const fileMM = String(fileDate.getMonth() + 1).padStart(2, '0');
+      const filename = `${fileYY}${fileMM}${String(day).padStart(2, '0')}-SCT-Reachable-PSP-List_CUG.xlsx`;
 
-    // Pattern 1: previous month's folder (current EBA convention)
-    const folder = new Date(fileYY, fileDate.getMonth() - 1, 5);
-    const folderYY = folder.getFullYear();
-    const folderMM = String(folder.getMonth() + 1).padStart(2, '0');
-    candidates.push(`https://www.ebaclearing.eu/wp-content/uploads/${folderYY}/${folderMM}/${filename}`);
+      // Pattern 1: previous month's folder (current EBA convention)
+      const folder = new Date(fileYY, fileDate.getMonth() - 1, 5);
+      const folderYY = folder.getFullYear();
+      const folderMM = String(folder.getMonth() + 1).padStart(2, '0');
+      candidates.push(`https://www.ebaclearing.eu/wp-content/uploads/${folderYY}/${folderMM}/${filename}`);
 
-    // Pattern 2: same-month folder (fallback)
-    candidates.push(`https://www.ebaclearing.eu/wp-content/uploads/${fileYY}/${fileMM}/${filename}`);
+      // Pattern 2: same-month folder (fallback)
+      candidates.push(`https://www.ebaclearing.eu/wp-content/uploads/${fileYY}/${fileMM}/${filename}`);
+    }
   }
 
   let downloadedFrom = '';
