@@ -656,7 +656,7 @@ export function getStats(): StatsOverview {
   }>;
 
   const last7 = db.prepare(
-    "SELECT date, SUM(total) as total, SUM(revenue_usdc) as revenue FROM daily_stats WHERE date >= date('now', '-7 days') GROUP BY date ORDER BY date DESC"
+    "SELECT date, SUM(total) as total, SUM(revenue_usdc) as revenue FROM daily_stats WHERE date >= date('now', '-6 days') GROUP BY date ORDER BY date DESC"
   ).all() as Array<{ date: string; total: number; revenue: number }>;
 
   // Total HTTP requests (all traffic)
@@ -761,7 +761,7 @@ export function getStatsHistory(days: number = 7): Array<{
     WHERE date >= date('now', '-' || ? || ' days')
     GROUP BY date
     ORDER BY date ASC
-  `).all(days) as Array<{
+  `).all(days - 1) as Array<{
     date: string;
     iban_validate: number;
     iban_batch: number;
@@ -843,7 +843,12 @@ export function getStatsHistory(days: number = 7): Array<{
 
   // Merge: all dates from both sources, then slice back to the requested
   // period so the widened band window stays internal.
-  const cutoff = new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
+  //
+  // "N days" means N calendar dates, today included — so the bound is N-1
+  // days back. `>= date('now', '-N days')` reads naturally but keeps N+1
+  // dates, and the off-by-one stayed invisible until the database had rows
+  // on every date of a window: a 7-day status page then grew an 8th column.
+  const cutoff = new Date(Date.now() - (days - 1) * 86_400_000).toISOString().slice(0, 10);
   const allDates = [...new Set([...opsRows.map(r => r.date), ...reqRows.map(r => r.date)])]
     .filter(d => d >= cutoff)
     .sort();
@@ -1571,7 +1576,7 @@ export function getPatternStats(days: number = 30): PatternStatsResponse {
     WHERE date >= date('now', '-' || ? || ' days')
     GROUP BY date
     ORDER BY date ASC
-  `).all(days) as Array<{ date: string; iban_validate: number; iban_batch: number; bic_lookup: number }>;
+  `).all(days - 1) as Array<{ date: string; iban_validate: number; iban_batch: number; bic_lookup: number }>;
 
   // Top 5 countries by volume
   const topCountriesRows = db.prepare(`
