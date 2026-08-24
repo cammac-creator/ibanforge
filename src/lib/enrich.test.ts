@@ -48,6 +48,19 @@ describe('enrichResult', () => {
       expect(addr.type).toBe('registered');
     });
 
+    it('stamps the address with the SEAT country, not the IBAN country', () => {
+      // FR bank code 11668 resolves to BERLMCMC — Edmond de Rothschild,
+      // seated in MONACO. The address block used to inherit the caller's
+      // IBAN country ('FR'), so a Monegasque street went out labelled FR
+      // while /v1/bic/BERLMCMC labelled the same row MC. The address block
+      // must locate the address it carries.
+      const result = validateIBAN('FR5211668000010000000010147');
+      enrichResult(result);
+
+      expect(result.bic!.code).toBe('BERLMCMC');
+      expect(result.bic!.address!.country).toBe('MC');
+    });
+
     it('lets the register city and the registered seat disagree', () => {
       // BLZ 37040044 is Commerzbank in Köln; the legal entity is seated in
       // Frankfurt. Both are true and answer different questions, so this test

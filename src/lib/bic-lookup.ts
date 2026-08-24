@@ -598,9 +598,16 @@ export interface RegisteredAddress {
 export function registeredAddress(
   row: Pick<
     BICRow,
-    'street' | 'address_en' | 'post_code' | 'region' | 'city' | 'address_source' | 'address_lang' | 'address_as_of'
+    | 'country_code'
+    | 'street'
+    | 'address_en'
+    | 'post_code'
+    | 'region'
+    | 'city'
+    | 'address_source'
+    | 'address_lang'
+    | 'address_as_of'
   > | null,
-  countryCode: string,
 ): RegisteredAddress | null {
   if (!row || !(row.street || row.address_en)) return null;
   // Decided from the ACTUAL script of the stored street, not the GLEIF language
@@ -613,7 +620,13 @@ export function registeredAddress(
     post_code: row.post_code,
     region: row.region,
     city: row.city,
-    country: countryCode,
+    // The ROW's country, never the caller's. The validate route used to pass
+    // the IBAN's country here, and for the curated pairings that cross a
+    // border (FR bank codes resolving to Monaco BICs, e.g. FR:11668 ->
+    // BERLMCMC) the Monegasque seat address went out stamped country:'FR' —
+    // while /v1/bic/:code labelled the SAME row 'MC'. An address block must
+    // locate the address it carries.
+    country: row.country_code,
     romanized: nonLatin ? (row.address_en ?? null) : (row.street ?? row.address_en ?? null),
     romanization: !nonLatin ? 'original_latin' : row.address_en ? 'gleif_english' : 'unavailable',
     source: row.address_source ?? 'GLEIF',

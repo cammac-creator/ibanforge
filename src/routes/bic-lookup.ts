@@ -93,7 +93,7 @@ bicLookup.get('/v1/bic/:code', (c) => {
   // Built by the shared helper so /v1/iban/validate cannot serve a different
   // shape from the same row. The romanization rule (decided from the actual
   // script of the stored street, never from the GLEIF language tag) lives there.
-  const address = registeredAddress(row, validation.country_code!);
+  const address = registeredAddress(row);
 
   const result: BicLookupPayload = {
     bic: validation.bic,

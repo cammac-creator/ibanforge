@@ -131,6 +131,13 @@ export interface RegisteredAddressBlock {
   post_code: string | null;
   region: string | null;
   city: string | null;
+  /**
+   * The country of the ADDRESS — the BIC row's own country, which can
+   * legitimately differ from the IBAN's country: some curated bank-code
+   * pairings cross a border (an FR bank code resolving to a Monaco-seated
+   * BIC). A reader locating the seat must read this field, never assume the
+   * IBAN's country.
+   */
   country: string;
   /**
    * Latin reading: GLEIF's official English alternative for non-Latin entities,

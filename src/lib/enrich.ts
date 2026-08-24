@@ -301,7 +301,7 @@ export function enrichResult(result: IBANValidationResult): void {
       // Dated and sourced by the shared builder. An address that arrives beside
       // a monthly-refreshed bank name reads as equally current; it usually is
       // not, and `as_of` is what stops that reading.
-      result.bic.address = registeredAddress(row, cc);
+      result.bic.address = registeredAddress(row);
     }
   }
 
