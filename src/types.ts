@@ -216,6 +216,13 @@ export interface IBANValidationResult {
      * holder can legitimately diverge where a group holds the code and a
      * subsidiary holds the BIC. Prefer the register's when both are present —
      * it is the authority on the code you asked about.
+     *
+     * Provenance: BOTH fields come from GLEIF, always — even when the
+     * sibling `source` names a national register (the German path sets
+     * `source: 'Deutsche Bundesbank Bankleitzahlendatei'`, and that register
+     * publishes no LEIs at all). `source` dates the bank-code pairing;
+     * the LEI rides in from the GLEIF row behind the resolved BIC, on the
+     * monthly GLEIF cadence, like the address block beside it.
      */
     lei?: string | null;
     lei_status?: string | null;

@@ -15,6 +15,7 @@ import { statfs } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { getStatsDB } from './db.js';
 import { getComplianceMeta } from './compliance-db.js';
+import { FATF_AS_OF } from './compliance-static.js';
 import { opsFail, opsOk, checkHeartbeats } from './ops-alert.js';
 
 /**
@@ -133,12 +134,47 @@ async function probeComplianceAge(): Promise<void> {
   }
 }
 
+/**
+ * Les listes FATF sont maintenues À LA MAIN (compliance-static.ts) et datées
+ * par FATF_AS_OF. Leur seule garde était un console.warn dans le script de
+ * refresh — un run CI VERT, que ni l'alerte Telegram (déclenchée sur failure
+ * seulement) ni le heartbeat ne voyaient. Et la sonde compliance:age ne
+ * surveille que sanctions_as_of, que le cron hebdo re-tamponne à chaque run,
+ * y compris quand il ré-embarque des listes FATF périmées.
+ *
+ * Cadence FATF : trois plénières par an (février, juin, octobre). À plus de
+ * cinq mois, une plénière a forcément été manquée — la sonde échoue et le
+ * canal d'alerte existant s'en charge.
+ */
+async function probeFatfAge(): Promise<void> {
+  try {
+    const asOf = new Date(`${FATF_AS_OF}-01T00:00:00Z`);
+    const ageDays = (Date.now() - asOf.getTime()) / 86_400_000;
+    if (!Number.isFinite(ageDays)) {
+      await opsFail('compliance:fatf-age', `FATF_AS_OF illisible: ${FATF_AS_OF}`);
+      return;
+    }
+    if (ageDays > 150) {
+      await opsFail(
+        'compliance:fatf-age',
+        `Listes FATF datées de ${FATF_AS_OF} (${Math.round(ageDays)} j) — une plénière est passée. ` +
+          `Recalibrer compliance-static.ts et bump FATF_AS_OF.`,
+      );
+    } else {
+      await opsOk('compliance:fatf-age', `Listes FATF de ${FATF_AS_OF} (${Math.round(ageDays)} j).`);
+    }
+  } catch (err) {
+    console.error('[ops-probe] fatf age:', err instanceof Error ? err.message : err);
+  }
+}
+
 /** Tick horaire unique : toutes les sondes + les hommes morts. */
 async function tick(): Promise<void> {
   await checkHeartbeats();
   await probeVolume();
   await probeServerErrors();
   await probeComplianceAge();
+  await probeFatfAge();
 }
 
 const TICK_MS = 60 * 60 * 1000;
