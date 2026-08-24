@@ -20,8 +20,11 @@ mensuel (`getEntryCount()`, jamais un nombre écrit à la main).
 | Deutsche Bundesbank (Bankleitzahlendatei) | 143 | usage professionnel autorisé, **attribution obligatoire**, sans modification | ✅ **vérifié le 23/08/2026** — deux réserves ci-dessous |
 | SIX BankMaster (clearing suisse) | 1 165 | « may be used freely » | ✅ **vérifié le 23/08/2026** |
 | SIX Group (BIC) | 19 | même publication que le BankMaster | ⚠️ à confirmer séparément |
-| EBA Clearing STEP2 SCT | 183 | fichier de participants publié | ❌ non établie — page 403 le 23/08 |
-| NBP (Pologne) | 21 | publication publique | ❌ non établie |
+| EBA Clearing STEP2 SCT | 183 | « All rights reserved by EBA CLEARING », aucune licence publiée | ❌ **non établie — lu à la source le 24/08/2026**, voir ci-dessous |
+| NBP (Pologne) | 21 | publication publique | ❌ non établie — mur anti-robot |
+| OFAC (sanctions) | — | **CC0 1.0 déclaré par le Treasury lui-même** + domaine public 17 U.S.C. §105 | ✅ **vérifié à la source le 24/08/2026** |
+| ONU (liste consolidée CSNU) | — | ⚠️ **tous droits réservés, usage personnel NON COMMERCIAL uniquement** | ✅ établie le 24/08/2026 — **et elle dérange, décision requise** |
+| UE (liste consolidée + réutilisation Commission) | — | **CC BY 4.0**, Décision du 12/12/2011 | ✅ vérifié le 24/08/2026 |
 
 ### Ce qui a été lu, mot pour mot
 
@@ -80,6 +83,54 @@ nicht zulässig » figure dans la section **images et vidéos**. La confondre av
 la règle sur les données ferait retirer une source utilisable — symétrique du
 piège SIX ci-dessus.
 
+**OFAC — CC0 1.0, déclaré par le Treasury pour CE dataset.** ✅ (24/08/2026)
+> « Copyright protection under this title is not available for any work of the
+> United States Government » — 17 U.S.C. §105
+> — <https://www.govinfo.gov/content/pkg/USCODE-2023-title17/html/USCODE-2023-title17-chap1-sec105.htm>
+
+Et surtout, la déclaration **propre au dataset** : l'inventaire machine du
+Treasury (obligatoire sous l'OPEN Government Data Act) porte pour la liste SDN
+`"license": "http://creativecommons.org/publicdomain/zero/1.0/"` —
+<https://www.treasury.gov/jsonfiles/data.json>, relayé par
+<https://catalog.data.gov/dataset/specially-designated-nationals-sdn-and-blocked-persons-list>.
+Seules réserves (usa.gov) : ne pas suggérer d'endossement, ne pas utiliser les
+logos fédéraux. Nous ne faisons ni l'un ni l'autre.
+
+**ONU — établie, et c'est la réponse qui dérange.** ⚠️ (24/08/2026)
+> « None of the materials provided on this web site may be used, reproduced or
+> transmitted, in whole or in part, in any form or by any means […] without
+> permission in writing from the publisher. »
+> — <https://www.un.org/en/about-us/copyright>
+> « The United Nations grants permission to Users to […] download and copy the
+> information, documents and materials […] for the User's **personal,
+> non-commercial** use »
+> — <https://www.un.org/en/about-us/terms-of-use>
+
+Le XML de la liste consolidée lui-même (2,2 Mo, servi via un blob Azure signé)
+ne porte **aucune** mention de licence interne. Les conditions du site sont donc
+la seule base écrite, et elles ne couvrent pas un produit commercial.
+**Un résultat gênant établi vaut plus qu'un résultat commode supposé** — c'est
+exactement pour cela qu'on lit à la source. Décision à prendre (Claude-Alain) :
+1. **retirer la source ONU** — elle pèse 5 entités sur 290, l'axe OFAC/UE couvre
+   l'essentiel, et le claim public devient « OFAC/EU/SECO » ;
+2. **demander la permission écrite** à l'ONU (procédure existante) ;
+3. la garder en position « pratique de place » (tout le monde la redistribue) —
+   ce qui n'est **pas** une permission établie.
+
+**EBA Clearing — pas de licence, nulle part.** ❌ (24/08/2026)
+La note du 23/08 (« page 403 ») était un mauvais diagnostic : l'URL avait
+changé. La liste vit à
+<https://www.ebaclearing.eu/services-sepa-payments/step2-sct/participants/> et
+le fichier réel est un XLSX « STEP2 SCT Reachable PSPs List » (~8 700 entrées,
+en-têtes BIC / nom / commentaire, aucune clause de droits dans le fichier).
+La seule mention trouvée sur tout le site :
+> « All rights reserved by EBA CLEARING »
+> — <https://www.ebaclearing.eu/legal-and-disclaimer/>
+
+« Tous droits réservés » sans grant publié = pas de permission établie. Même
+classe de décision que l'ONU, en moins restrictif (rien n'interdit, rien
+n'autorise) : écrire à EBA CLEARING, ou retirer, ou documenter l'incertitude.
+
 ## Ce qui alimente `compliance.sqlite`
 
 | Source | Contenu | URL de rafraîchissement |
@@ -130,11 +181,13 @@ britannique, jamais le déploiement.
 
 ## Ce qui reste à faire, par ordre de risque
 
-1. **Établir les licences encore marquées ❌.** Quatre sur treize sont établies
-   depuis le 23/08 (SwiftCodes, GLEIF, Bundesbank, SIX BankMaster). Restent
-   **EBA Clearing**, **NBP**, **OFAC**, **ONU**, **UE**, **EPC** et le
-   **GAFI**. Les cinq derniers sont des publications d'autorités : leur statut
-   est probablement permissif, ce qui n'est pas la même chose qu'établi.
+1. **Établir les licences encore marquées ❌.** Sept sur treize sont établies
+   au 24/08 : SwiftCodes, GLEIF, Bundesbank, SIX BankMaster (23/08), puis
+   **UE (CC BY 4.0)**, **OFAC (CC0)** et **ONU** (24/08). Restent **EBA
+   Clearing** (« all rights reserved », aucun grant), **NBP**, **EPC** et le
+   **GAFI** — les trois derniers derrière des murs anti-robot, voir la mesure
+   ci-dessous. ⚠️ Et une établie appelle une DÉCISION : l'ONU n'autorise que
+   l'usage personnel non commercial (voir la section citations).
 
    ### 🚨 Le goulot est l'ACCÈS, pas le temps de lecture — mesuré le 24/08/2026
 
