@@ -92,12 +92,12 @@ POST https://api.ibanforge.com/v1/iban/compliance
 | `sanctions.country_sanctioned` | Le pays de l'IBAN fait l'objet d'un programme de sanctions global (p. ex. RU, BY, IR). |
 | `sanctions.bank_sanctioned` | La banque teneuse de compte (BIC8) est désignée sur une liste de sanctions criblée (OFAC, EU, UN). |
 | `sanctions.matched_lists` | Les listes concernées, p. ex. `["OFAC"]`. Vide si rien ne matche. |
-| `sanctions.fatf_status` | Position FATF du pays : `member`, `increased_monitoring` (liste grise), `high_risk` (liste noire) ou `none`. |
+| `sanctions.fatf_status` | Position FATF du pays : `member`, `grey_list`, `black_list`, `suspended` (RU depuis 2023) ou `non_member`. |
 | `reachability` | Joignabilité de la banque via SEPA SCT, SDD et SCT Inst (registres EPC). |
 | `vop` | Participation à la Verification of Payee et son statut — obligatoire en zone euro depuis octobre 2025. |
 | `risk_score` | Agrégat 0–100. Plus c'est haut, plus c'est risqué. |
-| `risk_level` | `low` (0–29), `medium` (30–59), `high` (60–100). |
-| `flags` | Les raisons du score, lisibles par machine, p. ex. `["country_sanctioned", "fatf_high_risk"]`. |
+| `risk_level` | `low` (0–19), `medium` (20–39), `elevated` (40–59), `high` (60–79), `critical` (80–100) — ou `unassessable` quand le contrôle lui-même n'a pas pu tourner. |
+| `flags` | Les raisons du score, lisibles par machine, p. ex. `["sanctioned_country", "fatf_black_list"]` — chaque nom de flag correspond exactement à la ligne de score qu'il explique (`sanctioned_bank`, `test_bic`, `bank_code_not_allocated`, `no_vop`, …). |
 
 Un IBAN d'un pays sanctionné (p. ex. la Russie) renvoie `risk_level: "high"` avec un score de 60+ et des flags explicites — essayez-le dans le [playground](/playground).
 
@@ -115,7 +115,7 @@ Le champ `meta.scope` indique `bank_bic_only`, et c'est exactement ça : le scre
 
 ## Cas d'usage
 
-- **Triage avant paiement** — bloquer ou escalader `high`, revoir `medium`, laisser passer `low`.
+- **Triage avant paiement** — bloquer `critical`, escalader `high`, revoir `elevated` et `medium`, laisser passer `low`. Traiter `unassessable` comme non contrôlé, jamais comme propre.
 - **Garde-fous d'agents** — un agent MCP contrôle la conformité avant d'initier tout virement (outil `check_compliance`).
 - **Screening à l'onboarding** — signaler les IBAN de fournisseurs ou clients tenus par des banques désignées avant le premier versement.
 

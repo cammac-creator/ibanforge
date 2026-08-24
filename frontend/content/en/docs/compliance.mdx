@@ -92,12 +92,12 @@ POST https://api.ibanforge.com/v1/iban/compliance
 | `sanctions.country_sanctioned` | The IBAN country appears on a comprehensive sanctions program (e.g. RU, BY, IR). |
 | `sanctions.bank_sanctioned` | The holding bank (BIC8) is designated on a screened sanctions list (OFAC, EU, UN). |
 | `sanctions.matched_lists` | Which lists matched, e.g. `["OFAC"]`. Empty when clean. |
-| `sanctions.fatf_status` | FATF standing of the country: `member`, `increased_monitoring` (grey list), `high_risk` (black list), or `none`. |
+| `sanctions.fatf_status` | FATF standing of the country: `member`, `grey_list`, `black_list`, `suspended` (RU since 2023), or `non_member`. |
 | `reachability` | Whether the bank is reachable via SEPA SCT, SDD and SCT Inst (EPC registers). |
 | `vop` | Verification of Payee participation and status — required in the euro area since October 2025. |
 | `risk_score` | 0–100 aggregate. Higher = riskier. |
-| `risk_level` | `low` (0–29), `medium` (30–59), `high` (60–100). |
-| `flags` | Machine-readable reasons behind the score, e.g. `["country_sanctioned", "fatf_high_risk"]`. |
+| `risk_level` | `low` (0–19), `medium` (20–39), `elevated` (40–59), `high` (60–79), `critical` (80–100) — or `unassessable` when the screen itself could not run. |
+| `flags` | Machine-readable reasons behind the score, e.g. `["sanctioned_country", "fatf_black_list"]` — every flag name matches the score line it explains (`sanctioned_bank`, `test_bic`, `bank_code_not_allocated`, `no_vop`, …). |
 
 A sanctioned-country IBAN (e.g. Russia) returns `risk_level: "high"` with a score of 60+ and explicit flags — try it in the [playground](/playground).
 
@@ -115,7 +115,7 @@ The `meta.scope` field says `bank_bic_only`, and it means it: screening is perfo
 
 ## Use cases
 
-- **Pre-flight payment triage** — block or escalate `high`, review `medium`, pass `low`.
+- **Pre-flight payment triage** — block `critical`, escalate `high`, review `elevated` and `medium`, pass `low`. Treat `unassessable` as unscreened, never as clean.
 - **Agent guardrails** — an MCP agent checks compliance before initiating any transfer (`check_compliance` tool).
 - **Onboarding screening** — flag supplier or customer IBANs held at designated banks before first payout.
 

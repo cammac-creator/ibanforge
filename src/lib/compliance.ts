@@ -114,7 +114,14 @@ export function calculateRiskScore(
   const flags: string[] = [];
 
   if (sanctions.country_sanctioned) { score += 50; flags.push('sanctioned_country'); }
-  if (sanctions.bank_sanctioned) { score += 50; flags.push('sanctioned_bank'); }
+  // 80, not 50: a DIRECT designation of the bank is the gravest single fact
+  // this endpoint can establish, and 80 is the 'critical' floor. At 50, a
+  // designated bank in a clean country peaked at 60 ('high') while a
+  // NONEXISTENT test BIC in a grey-list country scored 70 — the score ranked
+  // an OFAC-designated bank below a bank that does not exist, and a client
+  // whose hard-block policy was keyed on 'critical' would wave the designated
+  // bank through to manual review.
+  if (sanctions.bank_sanctioned) { score += 80; flags.push('sanctioned_bank'); }
   if (sanctions.fatf_status === 'black_list') { score += 30; flags.push('fatf_black_list'); }
   if (sanctions.fatf_status === 'grey_list') { score += 20; flags.push('fatf_grey_list'); }
   // A SUSPENDED membership (RU since Feb 2023) is a disciplinary signal, not

@@ -92,12 +92,12 @@ POST https://api.ibanforge.com/v1/iban/compliance
 | `sanctions.country_sanctioned` | Das IBAN-Land unterliegt einem umfassenden Sanktionsprogramm (z. B. RU, BY, IR). |
 | `sanctions.bank_sanctioned` | Die kontoführende Bank (BIC8) steht auf einer geprüften Sanktionsliste (OFAC, EU, UN). |
 | `sanctions.matched_lists` | Welche Listen zutreffen, z. B. `["OFAC"]`. Leer, wenn sauber. |
-| `sanctions.fatf_status` | FATF-Einstufung des Landes: `member`, `increased_monitoring` (graue Liste), `high_risk` (schwarze Liste) oder `none`. |
+| `sanctions.fatf_status` | FATF-Einstufung des Landes: `member`, `grey_list`, `black_list`, `suspended` (RU seit 2023) oder `non_member`. |
 | `reachability` | Erreichbarkeit der Bank über SEPA SCT, SDD und SCT Inst (EPC-Register). |
 | `vop` | Teilnahme an der Verification of Payee und deren Status — im Euroraum seit Oktober 2025 verpflichtend. |
 | `risk_score` | Aggregat 0–100. Höher = riskanter. |
-| `risk_level` | `low` (0–29), `medium` (30–59), `high` (60–100). |
-| `flags` | Maschinenlesbare Gründe hinter dem Score, z. B. `["country_sanctioned", "fatf_high_risk"]`. |
+| `risk_level` | `low` (0–19), `medium` (20–39), `elevated` (40–59), `high` (60–79), `critical` (80–100) — oder `unassessable`, wenn die Prüfung selbst nicht laufen konnte. |
+| `flags` | Maschinenlesbare Gründe hinter dem Score, z. B. `["sanctioned_country", "fatf_black_list"]` — jeder Flag-Name entspricht exakt der Score-Zeile, die er erklärt (`sanctioned_bank`, `test_bic`, `bank_code_not_allocated`, `no_vop`, …). |
 
 Eine IBAN aus einem sanktionierten Land (z. B. Russland) liefert `risk_level: "high"` mit einem Score von 60+ und expliziten Flags — probieren Sie es im [Playground](/playground) aus.
 
@@ -115,7 +115,7 @@ Das Feld `meta.scope` sagt `bank_bic_only`, und genau das ist gemeint: Die Prüf
 
 ## Anwendungsfälle
 
-- **Triage vor der Zahlung** — `high` blockieren oder eskalieren, `medium` prüfen, `low` durchlassen.
+- **Triage vor der Zahlung** — `critical` blockieren, `high` eskalieren, `elevated` und `medium` prüfen, `low` durchlassen. `unassessable` gilt als ungeprüft, niemals als sauber.
 - **Leitplanken für Agenten** — ein MCP-Agent prüft die Compliance, bevor er eine Überweisung anstößt (Tool `check_compliance`).
 - **Screening beim Onboarding** — Lieferanten- oder Kunden-IBANs bei gelisteten Banken vor der ersten Auszahlung markieren.
 
