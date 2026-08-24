@@ -59,7 +59,7 @@
     "better-sqlite3": "^13.0.3",
     "hono": "^4.12.27",
     "iban-core": "npm:ibanforge@^2.1.0",
-    "nodemailer": "^9.0.1",
+    "nodemailer": "^9.0.5",
     "stripe": "^22.5.0",
     "zod": "^4.4.3"
   },
