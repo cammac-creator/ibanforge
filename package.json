@@ -69,11 +69,11 @@
     "@types/node": "^26.2.0",
     "eslint": "^10.8.1",
     "prettier": "^3.4.0",
-    "tsx": "^4.19.0",
+    "tsx": "^4.23.12",
     "typescript": "^5.7.0",
     "typescript-eslint": "^8.65.0",
     "vitest": "^3.0.0",
-    "xlsx": "^0.18.5"
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "bin": {
     "ibanforge-mcp": "dist/mcp/server.js"
