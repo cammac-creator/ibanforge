@@ -49,6 +49,21 @@ let tableChecked = false;
 let tablePresent = false;
 
 /**
+ * Same lifecycle discipline as resetStatements() in bic-lookup.ts, and wired
+ * into closeAll() the same way. Without it, a statement prepared on a closed
+ * connection kept throwing, the catch in lookupNationalCode ate the throw and
+ * answered null — which enrich turned into `not_in_register` with
+ * `authoritative: true`: real AT/BE banks denied with full confidence, from a
+ * plumbing failure. The table-presence memo resets with it: it describes the
+ * same database.
+ */
+export function resetNationalRegisterStatements(): void {
+  stmt = null;
+  tableChecked = false;
+  tablePresent = false;
+}
+
+/**
  * A database built before this seeder ran has no table. Answering "no register"
  * is the safe failure: the country degrades to the composite map it used
  * before, rather than every lookup throwing or, worse, every code reading as
