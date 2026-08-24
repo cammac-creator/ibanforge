@@ -245,7 +245,7 @@ class Sanctions(TypedDict, total=False):
     country_sanctioned: bool
     bank_sanctioned: bool
     matched_lists: List[str]
-    fatf_status: str  # member | grey_list | black_list | non_member
+    fatf_status: str  # member | grey_list | black_list | suspended | non_member
     # False means the screening did NOT run (no bank could be identified),
     # never that the bank came back clean.
     bank_screened: bool

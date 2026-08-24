@@ -1225,7 +1225,7 @@ const buildSpec = () => ({
               country_sanctioned: { type: 'boolean' },
               bank_sanctioned: { type: 'boolean' },
               matched_lists: { type: 'array', items: { type: 'string' }, example: ['OFAC'] },
-              fatf_status: { type: 'string', enum: ['member', 'grey_list', 'black_list', 'non_member'] },
+              fatf_status: { type: 'string', enum: ['member', 'grey_list', 'black_list', 'suspended', 'non_member'] },
             },
           },
           reachability: {
