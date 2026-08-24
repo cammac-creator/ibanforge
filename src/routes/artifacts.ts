@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { RATE_LIMIT } from '../middleware/rate-limit.js';
 
 /**
  * Machine-readable operating artifacts: what an agent is allowed to do without
@@ -21,7 +22,9 @@ import { Hono } from 'hono';
 export const artifacts = new Hono();
 
 const FREE_MONTHLY = 200;
-const RATE_PER_MIN = parseInt(process.env.RATE_LIMIT_PER_MIN ?? '100', 10);
+// The guarded value the middleware actually enforces — never a second parse
+// of the env var, which could publish "NaN" into a machine-readable contract.
+const RATE_PER_MIN = RATE_LIMIT;
 const MCP_FREE_DAILY = 10;
 
 

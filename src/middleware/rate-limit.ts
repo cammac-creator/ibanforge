@@ -1,7 +1,23 @@
 import type { MiddlewareHandler } from 'hono';
 import { extractClientIp } from '../lib/stats.js';
 
-const LIMIT = parseInt(process.env.RATE_LIMIT_PER_MIN ?? '100', 10);
+// Guarded like facilitatorTimeoutMs() in x402.ts, and for the same reason: a
+// Railway variable set to a non-number (or to an EMPTY string, which `??`
+// does not catch) must not silently turn the only per-IP flood control into
+// `count > NaN` — always false, limiter inert, headers reading "NaN".
+// Exported for /.well-known/rate-limits.yml (src/routes/artifacts.ts): the
+// published contract must interpolate the SAME guarded value the middleware
+// enforces, not re-parse the env var and risk publishing "NaN".
+export const RATE_LIMIT = ((): number => {
+  const raw = process.env.RATE_LIMIT_PER_MIN;
+  if (raw === undefined || raw === '') return 100;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    console.warn(`[rate-limit] RATE_LIMIT_PER_MIN=${raw} is not a positive number. Using 100.`);
+    return 100;
+  }
+  return Math.floor(parsed);
+})();
 const WINDOW_MS = 60_000; // 1 minute
 const CLEANUP_INTERVAL_MS = 5 * 60_000; // 5 minutes
 
@@ -72,14 +88,14 @@ export function rateLimitMiddleware(): MiddlewareHandler {
     }
 
     win.count += 1;
-    const remaining = Math.max(0, LIMIT - win.count);
+    const remaining = Math.max(0, RATE_LIMIT - win.count);
     const resetSec = Math.ceil(win.resetAt / 1000);
     const resetDelta = Math.max(1, Math.ceil((win.resetAt - now) / 1000));
 
     // Legacy triple, kept because existing clients read it. X-RateLimit-Reset
     // is a unix timestamp here, which is why the IETF header below is NOT an
     // alias: the standard spells Reset as delta-seconds.
-    c.header('X-RateLimit-Limit', String(LIMIT));
+    c.header('X-RateLimit-Limit', String(RATE_LIMIT));
     c.header('X-RateLimit-Remaining', String(remaining));
     c.header('X-RateLimit-Reset', String(resetSec));
 
@@ -88,11 +104,11 @@ export function rateLimitMiddleware(): MiddlewareHandler {
     // standard field names: the 2026-07-28 channel audit found api-evangelist
     // reporting `rate_limit_signal: false` while the server was already sending
     // the X-prefixed triple on every limited route.
-    c.header('RateLimit-Limit', String(LIMIT));
+    c.header('RateLimit-Limit', String(RATE_LIMIT));
     c.header('RateLimit-Remaining', String(remaining));
     c.header('RateLimit-Reset', String(resetDelta));
 
-    if (win.count > LIMIT) {
+    if (win.count > RATE_LIMIT) {
       const retryAfter = Math.ceil((win.resetAt - now) / 1000);
       c.header('Retry-After', String(retryAfter));
       return c.json(
