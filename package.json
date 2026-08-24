@@ -72,7 +72,7 @@
     "tsx": "^4.23.12",
     "typescript": "^5.7.0",
     "typescript-eslint": "^8.65.0",
-    "vitest": "^3.0.0",
+    "vitest": "^4.1.11",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "bin": {
