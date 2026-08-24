@@ -132,11 +132,37 @@ britannique, jamais le déploiement.
 
 1. **Établir les licences encore marquées ❌.** Quatre sur treize sont établies
    depuis le 23/08 (SwiftCodes, GLEIF, Bundesbank, SIX BankMaster). Restent
-   **EBA Clearing** (la page des participants rend 403 à une lecture
-   automatisée — passer par un navigateur), **NBP**, **OFAC**, **ONU**, **UE**,
-   **EPC** et le **GAFI**. Les cinq derniers sont des publications
-   d'autorités : leur statut est probablement permissif, ce qui n'est pas la
-   même chose qu'établi.
+   **EBA Clearing**, **NBP**, **OFAC**, **ONU**, **UE**, **EPC** et le
+   **GAFI**. Les cinq derniers sont des publications d'autorités : leur statut
+   est probablement permissif, ce qui n'est pas la même chose qu'établi.
+
+   ### 🚨 Le goulot est l'ACCÈS, pas le temps de lecture — mesuré le 24/08/2026
+
+   Ces pages sont publiques et gratuites, et pourtant la moitié se refuse à
+   toute lecture programmatique. Relevé en interrogeant chaque URL avec un
+   User-Agent de navigateur réel :
+
+   | Page de conditions | Mesure du 24/08 |
+   |---|---|
+   | Commission européenne | ✅ lue — **CC BY 4.0**, Décision du 12/12/2011 |
+   | GAFI (`fatf-gafi.org/en/pages/terms-and-conditions.html`) | ❌ **403**, y compris avec un UA de navigateur |
+   | EPC (`europeanpaymentscouncil.eu/terms-use`) | ❌ **403**, idem |
+   | NBP (`nbp.pl/en/terms-of-use/`) | ❌ **mur anti-robot servi en 200** |
+   | OFAC / Treasury | ⏳ joignable, la bonne page de conditions reste à situer |
+   | EBA Clearing | ⏳ site joignable en 200 ; c'est l'URL de la page participants qui a changé, **pas** un 403 comme noté le 23/08 |
+
+   ⚠️ **Un 200 n'est pas une preuve d'accès.** `nbp.pl/en/terms-of-use/` répond
+   200 et sert un écran de détection de robot. Vérifier le CONTENU, jamais le
+   code de statut : c'est exactement l'erreur que la règle « ne jamais annoncer
+   sans la preuve » existe pour attraper.
+
+   ⚠️ **Le contournement par archive n'existe pas ici** : `web.archive.org` est
+   bloqué au niveau du harnais, pas du site.
+
+   **Conséquence pour l'arbitrage :** un mur anti-robot ne dépend pas du modèle
+   qui interroge. Aucune montée en puissance ne débloque ces quatre pages —
+   seul un navigateur le fait. Les ranger parmi les tâches « à faire faire par
+   un agent plus capable » serait une erreur de diagnostic.
 2. ✅ **Pied de page aligné le 22/08/2026** — voir la section ci-dessus.
 3. **Décider si les licences doivent être publiées.** Pour un acheteur qui
    passe par un service achats, une page qui nomme ses sources et leurs
