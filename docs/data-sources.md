@@ -222,6 +222,42 @@ britannique, jamais le déploiement.
    conditions est un argument ; son absence est une question de plus à traiter
    par mail.
 
+## Piste GB — instruite le 24/08/2026, les deux sources sont « permission d'abord »
+
+Le Royaume-Uni est le seul pays où une source nouvelle paierait vraiment (le
+plus gros usage réel, zéro donnée d'institution autoritative — seul le modulus
+Vocalink tourne). Les deux candidates ont été lues à la source :
+
+**Bank of England / PRA — « List of Banks ».** Un CSV mensuel, ~300 banques
+agréées, colonnes Firm Name / FRN / **LEI** (donc joignable à notre base GLEIF
+sans heuristique de noms). Techniquement idéal. Mais **aucune mention de
+licence** ni sur la page ni dans le fichier, et les conditions générales du
+site disent :
+> « You may (and unless otherwise specifically stated, such as in the case of
+> the Rulebook and the Database […]) download, display or print the Resources
+> for personal use or internal use within an individual organisation for
+> **non-commercial purposes**. »
+> — <https://www.bankofengland.co.uk/legal>
+
+L'exception Open Government Licence du site vise la **Database statistique**
+(« Reproduction of data in the Database is subject to the terms of the UK Open
+Government Licence ») — pas les listes de firmes. Défaut = non commercial.
+
+**FCA — Financial Services Register.** Les conditions générales interdisent
+explicitement notre cas :
+> « You must not use data from this site to provide a **data feed** to any
+> comparison table or any other website without our written permission. »
+> — <https://www.fca.org.uk/legal>
+
+L'API du registre a peut-être ses propres conditions (la leçon SIX/Bundesbank :
+la bonne règle n'est pas dans les CGU générales) — mais la page développeur
+(`register.fca.org.uk/Developer/s/`) est une application Salesforce qui ne rend
+**rien** sans JavaScript : à lire dans un navigateur, comme GAFI/EPC/NBP.
+
+**Conclusion : la piste GB passe par une demande de permission écrite**, pas
+par un import. Deux brouillons de demande sont prêts (FCA et BoE) — l'envoi est
+la voix de Claude-Alain.
+
 ## Sources écartées, et pourquoi
 
 | Source | Motif |
