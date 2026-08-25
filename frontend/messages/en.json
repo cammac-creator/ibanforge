@@ -191,13 +191,11 @@
         "eyebrow": "Quench",
         "title": "Quenched in compliance.",
         "noMatch": "no match ✓",
-        "ofac": "OFAC SDN",
-        "eu": "EU consolidated list",
-        "un": "UN Security Council",
+        "lists": "OFAC · EU · UN",
         "fatf": "FATF · member",
         "sepa": "SEPA reachable ✓",
         "risk": "risk_level: low",
-        "copy": "/v1/iban/compliance screens the bank BIC against the OFAC, EU and UN lists, checks the FATF standing, SEPA and VoP reachability — distilled into a 0–100 risk score."
+        "copy": "/v1/iban/compliance screens the bank BIC against the sanctions lists (OFAC, EU, UN), checks the FATF standing, SEPA and VoP reachability — distilled into a 0–100 risk score."
       },
       "stamp": {
         "eyebrow": "Stamp",

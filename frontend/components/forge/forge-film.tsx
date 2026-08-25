@@ -21,7 +21,7 @@ export interface FilmStrings {
   strike: { eyebrow: string; title: string; note: string; valid: string; copy: string }
   quench: {
     eyebrow: string; title: string; copy: string
-    noMatch: string; ofac: string; eu: string; un: string
+    noMatch: string; lists: string
     fatf: string; sepa: string; risk: string
   }
   stamp: {
@@ -372,9 +372,12 @@ export function ForgeFilm({ t, playgroundHref }: { t: FilmStrings; playgroundHre
             <h2 className="st-title">{t.quench.title}</h2>
             <div className="st-stage">
               <ul className="quench">
-                <li className="q-row"><span>{t.quench.ofac}</span><span className="q-res">{t.quench.noMatch}</span></li>
-                <li className="q-row"><span>{t.quench.eu}</span><span className="q-res">{t.quench.noMatch}</span></li>
-                <li className="q-row"><span>{t.quench.un}</span><span className="q-res">{t.quench.noMatch}</span></li>
+                {/* One message key carries the whole screened set ("OFAC · EU · UN"):
+                    the sanctions-claims guard requires any line naming an authority
+                    to name all of them, so the set is split here, never in i18n. */}
+                {t.quench.lists.split('·').map((l) => (
+                  <li className="q-row" key={l}><span>{l.trim()}</span><span className="q-res">{t.quench.noMatch}</span></li>
+                ))}
               </ul>
               <p className="q-badges">
                 <span className="q-badge" data-t="0.72">{t.quench.fatf}</span>

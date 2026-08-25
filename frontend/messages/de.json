@@ -191,13 +191,11 @@
         "eyebrow": "Abschrecken",
         "title": "In Compliance abgeschreckt.",
         "noMatch": "kein Treffer ✓",
-        "ofac": "OFAC SDN",
-        "eu": "Konsolidierte EU-Liste",
-        "un": "UN-Sicherheitsrat",
+        "lists": "OFAC · EU · UN",
         "fatf": "FATF · Mitglied",
         "sepa": "SEPA erreichbar ✓",
         "risk": "risk_level: low",
-        "copy": "/v1/iban/compliance prüft den Bank-BIC gegen die OFAC-, EU- und UN-Listen, den FATF-Status sowie SEPA- und VoP-Erreichbarkeit — destilliert in einen Risikoscore von 0–100."
+        "copy": "/v1/iban/compliance prüft den Bank-BIC gegen die Sanktionslisten (OFAC, EU, UN), dazu FATF-Status sowie SEPA- und VoP-Erreichbarkeit — destilliert in einen Risikoscore von 0–100."
       },
       "stamp": {
         "eyebrow": "Prägung",

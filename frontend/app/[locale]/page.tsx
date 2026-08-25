@@ -79,8 +79,7 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
     },
     quench: {
       eyebrow: t('film.quench.eyebrow'), title: t('film.quench.title'), copy: t('film.quench.copy'),
-      noMatch: t('film.quench.noMatch'), ofac: t('film.quench.ofac'),
-      eu: t('film.quench.eu'), un: t('film.quench.un'),
+      noMatch: t('film.quench.noMatch'), lists: t('film.quench.lists'),
       fatf: t('film.quench.fatf'), sepa: t('film.quench.sepa'), risk: t('film.quench.risk'),
     },
     stamp: {

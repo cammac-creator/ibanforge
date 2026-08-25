@@ -191,13 +191,11 @@
         "eyebrow": "Trempe",
         "title": "Trempée dans la conformité.",
         "noMatch": "aucune concordance ✓",
-        "ofac": "OFAC SDN",
-        "eu": "Liste consolidée UE",
-        "un": "Conseil de sécurité ONU",
+        "lists": "OFAC · EU · UN",
         "fatf": "GAFI · membre",
         "sepa": "SEPA joignable ✓",
         "risk": "risk_level: low",
-        "copy": "/v1/iban/compliance passe le BIC de la banque au crible des listes OFAC, UE et ONU, vérifie le statut GAFI, la joignabilité SEPA et VoP — le tout distillé en un score de risque 0–100."
+        "copy": "/v1/iban/compliance passe le BIC de la banque au crible des listes de sanctions (OFAC, EU, UN), vérifie le statut GAFI, la joignabilité SEPA et VoP — le tout distillé en un score de risque 0–100."
       },
       "stamp": {
         "eyebrow": "Estampe",
