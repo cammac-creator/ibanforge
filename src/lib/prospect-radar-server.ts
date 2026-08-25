@@ -116,18 +116,23 @@ export async function enrichOne(website: string): Promise<{ email: string; sourc
 }
 
 /** Shared Anthropic call for this radar's generations. Null without a key. */
-async function callAnthropic(system: string, user: string): Promise<string | null> {
+async function callAnthropic(
+  system: string,
+  user: string,
+): Promise<{ text: string; stopReason: string } | null> {
   const apiKey = process.env.ANTHROPIC_API_KEY ?? '';
   if (!apiKey) return null;
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
     body: JSON.stringify({
-      // 130 words x2 languages fits far under 1500, yet the first production
-      // run still hit stop_reason=max_tokens — same lesson as the forum
-      // drafts: headroom is cheap, truncation costs a whole generation.
+      // The model's thinking block spends the SAME max_tokens budget as the
+      // answer, and the customer-context block lengthens that thinking: at
+      // 3000 the ctenifaktur draft came back truncated before ===END=== on
+      // every 6h run while an isolated repro (no context block) parsed fine.
+      // Headroom is cheap, truncation costs a whole generation.
       model: 'claude-sonnet-5',
-      max_tokens: 3000,
+      max_tokens: 6000,
       system,
       messages: [{ role: 'user', content: user }],
     }),
@@ -139,24 +144,39 @@ async function callAnthropic(system: string, user: string): Promise<string | nul
   }
   const data = (await res.json()) as { content?: Array<{ type: string; text?: string }>; stop_reason?: string };
   const text = (data.content ?? []).map((c) => c.text ?? '').join('');
-  if (!text.trim()) throw new Error(`generation empty (stop_reason=${data.stop_reason ?? '?'})`);
-  return text;
+  const stopReason = data.stop_reason ?? '?';
+  if (!text.trim()) throw new Error(`generation empty (stop_reason=${stopReason})`);
+  return { text, stopReason };
 }
 
 /** One Anthropic call, one EN+FR mail. Null when no API key is configured. */
 export async function draftOne(p: ProspectForMail): Promise<ProspectMail | null> {
   // The customer-base context sharpens the hook; the block itself forbids
   // naming any customer in the output.
-  const text = await callAnthropic(PROSPECT_MAIL_SYSTEM, buildProspectMailPrompt(p) + customerContextBlock());
-  if (text == null) return null;
-  const mail = parseProspectMail(text);
-  if (!mail) throw new Error('mail generation unparseable');
-  return {
-    subjectEn: stripDashes(mail.subjectEn),
-    bodyEn: stripDashes(mail.bodyEn),
-    subjectFr: stripDashes(mail.subjectFr),
-    bodyFr: stripDashes(mail.bodyFr),
-  };
+  const user = buildProspectMailPrompt(p) + customerContextBlock();
+  // One immediate retry: a malformed generation is usually transient, and
+  // without it the prospect stays stuck a full 6h cycle for one bad sample.
+  for (let attempt = 1; ; attempt++) {
+    const out = await callAnthropic(PROSPECT_MAIL_SYSTEM, user);
+    if (out == null) return null;
+    const mail = parseProspectMail(out.text);
+    if (mail) {
+      return {
+        subjectEn: stripDashes(mail.subjectEn),
+        bodyEn: stripDashes(mail.bodyEn),
+        subjectFr: stripDashes(mail.subjectFr),
+        bodyFr: stripDashes(mail.bodyFr),
+      };
+    }
+    // The tail is our own generated text about a public prospect — loggable,
+    // and the only artifact that says WHY the markers were missing.
+    console.warn(
+      `[prospect-radar] draft ${p.id} unparseable (attempt ${attempt}, stop_reason=${out.stopReason}, len=${out.text.length}) tail: ${JSON.stringify(out.text.slice(-160))}`,
+    );
+    if (attempt >= 2) {
+      throw new Error(`mail generation unparseable (stop_reason=${out.stopReason})`);
+    }
+  }
 }
 
 /**
@@ -182,10 +202,10 @@ export async function describeSite(siteUrl: string): Promise<SiteDescription | n
     }
   }
   if (gist.length < 40) return null;
-  const text = await callAnthropic(DESCRIBE_SYSTEM, buildDescribePrompt(siteUrl, gist));
-  if (text == null) return null;
-  const parsed = parseDescribeOutput(text);
-  if (!parsed) throw new Error('describe output unparseable');
+  const out = await callAnthropic(DESCRIBE_SYSTEM, buildDescribePrompt(siteUrl, gist));
+  if (out == null) return null;
+  const parsed = parseDescribeOutput(out.text);
+  if (!parsed) throw new Error(`describe output unparseable (stop_reason=${out.stopReason})`);
   return {
     company: parsed.company ? stripDashes(parsed.company) : null,
     country: parsed.country,
