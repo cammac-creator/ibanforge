@@ -105,7 +105,7 @@ Read the first fields carefully — the semantics are deliberate:
 | `is_qr_iid` | `true` — set only when the queried identifier is in the QR range, so an agent does not have to know the SIX range convention |
 | `note` | the same statement in prose, for an LLM reading the payload |
 | `qr_iid_source` | `register` when SIX publishes the pairing itself, `headquarters` when it is inherited from the institution's head office (see below) |
-| `sic_iid` | the 6-digit SIC participant number of the row that answered |
+| `sic_iid` | the 6-digit SIC participant number **of the QR row itself** (`300240`), not of the standard IID shown above — that one is `063000`, and a standard-IID lookup returns it |
 | `valid_on` | the BankMaster snapshot the answer is valid on — institutions merge, so pin your expectations to it |
 
 **Pricing.** $0.003 per call with x402, or one unit of the free tier with an API key. The capture above is an unauthenticated x402-priced call, hence `cost_usdc: 0.003`; on a key covered by its monthly quota the same field comes back `0`.

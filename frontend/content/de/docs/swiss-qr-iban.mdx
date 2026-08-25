@@ -105,7 +105,7 @@ Lesen Sie die ersten Felder genau — ihre Semantik ist Absicht:
 | `is_qr_iid` | `true` — nur gesetzt, wenn die angefragte Kennung im QR-Bereich liegt, damit ein Agent die SIX-Bereichskonvention nicht kennen muss |
 | `note` | dieselbe Aussage in Prosa, für ein LLM, das die Antwort liest |
 | `qr_iid_source` | `register`, wenn SIX die Zuordnung selbst veröffentlicht; `headquarters`, wenn sie vom Hauptsitz geerbt ist (siehe unten) |
-| `sic_iid` | die sechsstellige SIC-Teilnehmernummer der antwortenden Zeile |
+| `sic_iid` | die sechsstellige SIC-Teilnehmernummer **der QR-Zeile selbst** (`300240`), nicht die der oben gezeigten gewöhnlichen IID — diese lautet `063000` und wird bei einem Lookup auf die gewöhnliche IID zurückgegeben |
 | `valid_on` | der BankMaster-Stand, für den die Antwort gilt — Institute fusionieren, verankern Sie Ihre Erwartungen daran |
 
 **Preis.** 0,003 $ pro Aufruf per x402, oder eine Einheit des kostenlosen Kontingents mit einem API-Key. Die obige Aufzeichnung ist ein nicht authentifizierter, per x402 bepreister Aufruf — daher `cost_usdc: 0.003`; mit einem Key innerhalb seines Monatskontingents kommt dasselbe Feld als `0` zurück.

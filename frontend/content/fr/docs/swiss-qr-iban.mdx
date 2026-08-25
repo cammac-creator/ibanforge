@@ -105,7 +105,7 @@ Lisez les premiers champs attentivement, leur sémantique est délibérée :
 | `is_qr_iid` | `true` — posé uniquement quand l'identifiant interrogé est dans la plage QR, pour qu'un agent n'ait pas à connaître la convention de plages de SIX |
 | `note` | la même chose en prose, pour un LLM qui lit la réponse |
 | `qr_iid_source` | `register` quand SIX publie l'appariement lui-même, `headquarters` quand il est hérité du siège de l'établissement (voir plus bas) |
-| `sic_iid` | le numéro de participant SIC à 6 chiffres de la ligne qui a répondu |
+| `sic_iid` | le numéro de participant SIC à 6 chiffres **de la ligne QR elle-même** (`300240`), et non celui du clearing ordinaire affiché plus haut — ce dernier vaut `063000`, et c'est lui que renvoie un lookup sur l'IID ordinaire |
 | `valid_on` | l'instantané BankMaster sur lequel la réponse est valable — les établissements fusionnent, arrimez-y vos attentes |
 
 **Tarif.** 0,003 $ par appel en x402, ou une unité du palier gratuit avec une clé d'API. La capture ci-dessus est un appel non authentifié tarifé en x402, d'où `cost_usdc: 0.003` ; avec une clé couverte par son quota mensuel, le même champ revient à `0`.
