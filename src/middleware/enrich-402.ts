@@ -432,6 +432,13 @@ function buildAccessRamp(): Record<string, unknown> {
     },
     x402: {
       description: 'Pay per call with USDC on Base L2 (machine-to-machine)',
+      // The measured last metre: thousands of 402s a week reach callers whose
+      // wallet is not funded (or not created) at the moment the wall appears,
+      // and this body carried every rail EXCEPT the "I have no wallet yet"
+      // path. /docs/pay-as-an-agent (live, linked from llms.txt and the MCP
+      // instructions) walks that path in 3 steps — the 402 itself was the one
+      // surface that never mentioned it.
+      wallet_setup: 'https://ibanforge.com/docs/pay-as-an-agent — create and fund an agent wallet, then make your first paid call (3 steps)',
       protocol_docs: 'https://x402.org',
       discovery: 'https://api.ibanforge.com/.well-known/x402',
       bazaar: 'https://api.cdp.coinbase.com/platform/v2/x402/discovery/resources',
