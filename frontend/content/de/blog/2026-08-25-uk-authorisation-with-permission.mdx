@@ -1,0 +1,44 @@
+---
+title: "Wir haben die Bank of England gefragt, bevor wir ihre Liste ausliefern. Sie hat Ja gesagt."
+description: "Der PRA-Zulassungsstatus ist jetzt Teil jedes britischen Lookups — per LEI verknüpft, auf das Vereinigte Königreich begrenzt, mit der von der Bank verlangten Quellenangabe. Ausserdem neu: die Schweizer QR-IBAN-Referenzseite und ein 402, das endlich den Weg zeigt."
+date: "2026-08-25"
+---
+
+Das Vereinigte Königreich war der Sonderfall in unserem [Quellenverzeichnis](/de/docs/data-sources): das Land mit der stärksten realen Nutzung dieser API — und der einzige grosse Markt, für den wir keinerlei autoritative Institutsdaten servierten. Die naheliegende Quelle gab es die ganze Zeit: Die Bank of England veröffentlicht monatlich eine **List of PRA-regulated Banks**, ein sauberes CSV mit Firmennamen, FRN-Nummern und LEIs. Was fehlte, war das Recht, sie zu nutzen: Die Website-Bedingungen der Bank erlauben standardmässig nur persönliche oder interne, nicht kommerzielle Nutzung, und die Liste selbst trägt keine Lizenz.
+
+Unsere Regel für solche Fälle steht im Verzeichnis: **Eine vermutete Lizenz ist schlimmer als eine unbekannte.** Also haben wir der Bank geschrieben und genau beschrieben, was wir vorhaben — die Monatsliste als Referenzquelle in einer kommerziellen API, mit Quellenangabe. Das Engagement-and-Enquiries-Team antwortete innerhalb eines Tages: kein Einwand gegen die beschriebene Nutzung, sofern die Quellenangabe an die Bank of England erhalten bleibt, zusammen mit dem Monat der Liste.
+
+Diese Bedingung ist jetzt Teil des Produkts.
+
+## Was ein britischer Lookup jetzt antwortet
+
+Jeder `GET /v1/bic/:code` auf einen britischen BIC — und jede validierte GB-IBAN, deren Bank aufgelöst wird — trägt einen `pra_authorisation`-Block, wenn das Institut auf der aktuellen Liste steht. Aus der ausgelieferten Datenbank erfasst:
+
+```json
+"pra_authorisation": {
+  "authorised": true,
+  "firm_name": "HSBC UK Bank Plc",
+  "frn": "765112",
+  "section": "uk_incorporated",
+  "basis": "lei",
+  "source": "Bank of England, List of Banks",
+  "list_month": "2026-08"
+}
+```
+
+Vier Designentscheidungen, offen benannt:
+
+- **Die Verknüpfung läuft über den LEI, nie über Namensähnlichkeit.** Die Liste veröffentlicht den Legal Entity Identifier jeder Firma, unsere GLEIF-Daten ebenso. Namensabgleich zwischen Registern ist die Geburtsstätte von Phantomtreffern; eine Verknüpfung über einen Identifikator hält oder hält nicht.
+- **Der Block ist auf GB- und GI-BICs begrenzt.** Für Zweigstellen nennt die Liste den LEI des *Hauptsitzes* — und ein Hauptsitz-LEI hängt an den BICs der ganzen Gruppe, weltweit. Ohne die Begrenzung hätte die Verknüpfung auf über tausend nicht-britischen BICs eine britische Zulassung behauptet — vor der Auslieferung an den echten Daten gemessen, dann begrenzt.
+- **Er antwortet nie `authorised: false`.** Die Präambel der Liste sagt selbst, dass sie das Financial Services Register nicht ersetzt. Das Fehlen einer Firma in unserer Kopie eines Monats-Schnappschusses ist das Fehlen einer Aussage, kein Befund.
+- **Die Quellenangabe trägt den Monat, und ein Test erzwingt das.** „Bank of England (List of Banks, 2026-08)" steht im Footer, in den Docs und auf den maschinenlesbaren Oberflächen, wobei der Monat aus den geladenen Daten gelesen wird. Lädt ein künftiger Refresh eine neue Liste und eine Oberfläche zeigt noch den alten Monat, schlägt der Build fehl. Die Erlaubnis kam mit einer Bedingung; die Bedingung ist jetzt Infrastruktur.
+
+Die Liste wird monatlich über denselben Workflow aufgefrischt wie unsere übrigen Register.
+
+## Ebenfalls diese Woche ausgeliefert
+
+- **[Schweizer QR-IBAN und QR-IID, die Referenzseite](/de/docs/swiss-qr-iban)** (EN/FR/DE). Die Schweiz führt einen eigenen QR-IID-Bereich für QR-Rechnungs-IBANs, und wer ihn mit der gewöhnlichen Clearing-Nummer verwechselt, lässt Zahlungen scheitern. Die Seite deckt beide Richtungen ab — inklusive der Frage, die sonst keine API beantwortet: *Welche QR-IID hält die Bank hinter dieser gewöhnlichen IBAN?*
+- **Das 402 zeigt jetzt den Weg hinein.** Jede Payment-required-Antwort trägt `wallet_setup`, einen Link auf [Bezahlen als Agent](/de/docs/pay-as-an-agent) — der Dreischritt vom fehlenden Wallet zum ersten bezahlten Aufruf. Eine Antwort, die „Zahlung erforderlich" sagt, sollte das Wie nicht einer Suchmaschine überlassen.
+- **Eine neue Startseite.** Die Pipeline erzählt als Schmiede — Glühen, Schlag, Abschrecken, Prägung, Auslieferung — als scrollgesteuerter Film. Vollständig lesbar ohne JavaScript, denn ein guter Teil unserer Leser sind keine Menschen.
+
+Ein Datum im Blick zu behalten: Das Rulebook v1.1 des EPC-Verification-of-Payee-Schemas und seine API-Spezifikationen treten am **20. September 2026** in Kraft — der regulatorische Hintergrund steht auf [/docs/vop](/de/docs/vop).

@@ -1,0 +1,44 @@
+---
+title: "Nous avons demandé à la Bank of England avant de servir sa liste. Elle a dit oui."
+description: "Le statut d'agrément PRA fait désormais partie de chaque lookup britannique — jointure par LEI, borné au Royaume-Uni, servi avec l'attribution demandée par la Banque. Aussi : la page de référence QR-IBAN suisse, et un 402 qui montre enfin le chemin."
+date: "2026-08-25"
+---
+
+Le Royaume-Uni était l'anomalie de notre [inventaire des sources](/fr/docs/data-sources) : le pays où cette API est le plus réellement utilisée, et le seul grand marché où nous ne servions aucune donnée d'institution autoritative. La source évidente existait pourtant depuis toujours — la Bank of England publie chaque mois une **List of PRA-regulated Banks**, un CSV propre avec noms de firmes, numéros FRN et identifiants LEI. Ce qui n'existait pas, c'était le droit de l'utiliser : les conditions du site de la Banque limitent par défaut à un usage interne non commercial, et la liste elle-même ne porte aucune licence.
+
+Notre règle pour ces cas est écrite dans l'inventaire : **une licence supposée est pire qu'une licence inconnue**. Nous avons donc écrit à la Banque en décrivant exactement l'usage visé — la liste mensuelle comme source de référence dans une API commerciale, avec attribution. Le service Engagement and Enquiries a répondu en un jour : aucune objection à l'usage décrit, à condition de maintenir l'attribution à la Bank of England, avec le mois de la liste.
+
+Cette condition fait maintenant partie du produit.
+
+## Ce qu'un lookup britannique répond désormais
+
+Chaque `GET /v1/bic/:code` sur un BIC britannique — et chaque IBAN GB validé dont la banque est résolue — porte un bloc `pra_authorisation` quand l'institution figure sur la liste courante. Capturé sur la base livrée :
+
+```json
+"pra_authorisation": {
+  "authorised": true,
+  "firm_name": "HSBC UK Bank Plc",
+  "frn": "765112",
+  "section": "uk_incorporated",
+  "basis": "lei",
+  "source": "Bank of England, List of Banks",
+  "list_month": "2026-08"
+}
+```
+
+Quatre décisions de conception, dites franchement :
+
+- **La jointure se fait par LEI, jamais par ressemblance de noms.** La liste publie l'identifiant LEI de chaque firme, et nos données GLEIF aussi. Le rapprochement par noms entre registres est la fabrique des fausses concordances ; une jointure par identifiant tient ou ne tient pas.
+- **Le bloc est borné aux BIC GB et GI.** Pour les succursales, la liste donne le LEI du *siège* — et un LEI de siège est rattaché aux BIC de tout le groupe, dans le monde entier. Sans la borne, la jointure aurait revendiqué un agrément britannique sur plus d'un millier de BIC non britanniques — mesuré sur les données réelles avant la mise en service, puis borné.
+- **Il ne répond jamais `authorised: false`.** Le préambule de la liste dit lui-même qu'elle ne remplace pas le Financial Services Register. L'absence d'une firme de notre copie d'un instantané mensuel est l'absence d'une affirmation, pas un constat.
+- **L'attribution porte le mois, et un test l'impose.** « Bank of England (List of Banks, 2026-08) » figure au pied de page, dans les docs et sur les surfaces lisibles par machine, le mois étant lu depuis les données chargées. Si un rafraîchissement futur charge une nouvelle liste et qu'une surface affiche encore l'ancien mois, le build échoue. La permission venait avec une condition ; la condition est devenue de l'infrastructure.
+
+La liste se rafraîchit chaque mois par le même workflow que nos autres registres.
+
+## Livré aussi cette semaine
+
+- **[QR-IBAN et QR-IID suisses, la page de référence](/fr/docs/swiss-qr-iban)** (EN/FR/DE). La Suisse réserve une plage QR-IID dédiée aux IBAN de QR-factures, et la confondre avec le numéro de clearing ordinaire fait échouer des paiements. La page couvre les deux sens — y compris la question qu'aucune autre API ne sert : *quel QR-IID détient la banque derrière cet IBAN ordinaire ?*
+- **Le 402 montre désormais le chemin.** Chaque réponse « payment required » porte `wallet_setup`, un lien vers [payer en tant qu'agent](/fr/docs/pay-as-an-agent) — le parcours en trois étapes du « pas de wallet » au premier appel payé. La réponse qui dit « paiement requis » ne devrait pas laisser à un moteur de recherche la question du comment.
+- **Une nouvelle page d'accueil.** Le pipeline raconté comme une forge — chauffe, frappe, trempe, estampe, livraison — en un film piloté par le défilement. Entièrement lisible sans JavaScript, parce qu'une bonne part de nos lecteurs ne sont pas des humains.
+
+Une date à garder en vue : le rulebook v1.1 du schéma Verification of Payee de l'EPC et ses spécifications d'API entrent en vigueur le **20 septembre 2026** — le contexte réglementaire est sur [/docs/vop](/fr/docs/vop).
