@@ -7,10 +7,22 @@ import { getRejectionStats } from '../lib/stats.js';
 import type { HonoEnv } from '../types.js';
 
 /**
- * Composition identique à src/index.ts : la garde est enregistrée en premier
- * sur le même chemin, la route est montée ensuite. C'est CETTE composition qui
- * tourne en production, et c'est elle qui rendait les gardes des routes
- * inatteignables — instrumenter les seules routes comptait zéro.
+ * Composition PARTIELLE : la garde est enregistrée en premier sur le même
+ * chemin, la route est montée ensuite. C'est cet appariement garde↔route qui
+ * rendait les gardes des routes inatteignables — instrumenter les seules routes
+ * comptait zéro.
+ *
+ * ⚠️ Ce fichier disait « composition identique à src/index.ts ». Ce n'est plus
+ * vrai depuis piste A (18/08) : l'app réelle (`src/app.ts`) monte le middleware
+ * x402 AVANT ces gardes. Il manque donc ici la moitié qui décide du statut
+ * public — une sonde anonyme sur `/v1/bic/{code}` reçoit 402 en production,
+ * jamais le 400 asserté ci-dessous. Les 400 vérifiés ici sont ceux d'un
+ * appelant AUTHENTIFIÉ, seul cas qui atteint les gardes en production.
+ *
+ * Ne pas lire ce fichier comme le contrat public des deux routes : monter les
+ * gardes avant x402 casserait les sondes d'annuaires sans faire rougir un seul
+ * test d'ici. Ce contrat-là est verrouillé dans `src/app.test.ts` §3, contre
+ * l'app réelle. Ce fichier reste la référence du COMPTAGE des rejets.
  *
  * Ce que ce fichier verrouille, et qu'aucun test de route seule ne peut voir :
  * le total des rejets bouge d'EXACTEMENT 1 par requête rejetée. À 0, les

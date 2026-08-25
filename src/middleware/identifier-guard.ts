@@ -2,12 +2,30 @@
  * Gardes de format des deux identifiants d'entrée — et le comptage des rejets.
  *
  * Pourquoi ces gardes vivent dans un middleware et pas seulement dans les
- * routes : montées dans src/index.ts, elles s'exécutent AVANT le middleware
- * x402 (volontaire — on ne facture pas une entrée malformée) et répondent 400
- * sans appeler `next()`. Le handler de route n'est donc jamais atteint pour une
- * entrée rejetée, et les gardes des routes sont, dans l'app montée, du code
- * mort. C'est ici, et nulle part ailleurs, que naissent les 400 de format
- * servis en production.
+ * routes : montées dans src/app.ts, elles répondent 400 sans appeler `next()`.
+ * Le handler de route n'est donc jamais atteint pour une entrée rejetée, et les
+ * gardes des routes sont, dans l'app montée, du code mort. C'est ici, et nulle
+ * part ailleurs, que naissent les 400 de format servis en production.
+ *
+ * ⚠️ CORRECTION (25/08/2026) — ce commentaire affirmait que les gardes
+ * s'exécutent « AVANT le middleware x402 (volontaire — on ne facture pas une
+ * entrée malformée) ». C'est FAUX depuis piste A (18/08) : `src/app.ts` les
+ * monte APRÈS x402, délibérément, et le dit dans son propre commentaire
+ * (lignes ~564-575). Conséquence mesurée sur l'app réelle le 25/08 :
+ *
+ *   - sonde ANONYME sur `/v1/bic/{code}` ou `%7Bcode%7D` → 402 avec `accepts`,
+ *     jamais 400 : elle n'atteint JAMAIS ces gardes ;
+ *   - appelant AUTHENTIFIÉ (clé ifk_ ou paiement) → franchit x402, atteint la
+ *     garde, reçoit le 400 ci-dessous.
+ *
+ * Les 400 `placeholder_literal` ne sont donc PAS ce que voient les annuaires —
+ * ils ne concernent qu'un appelant déjà passé la porte. Ne pas « corriger » ce
+ * fichier pour rendre 402 aux gabarits : c'est déjà le comportement servi, et
+ * le faire ici le retirerait au seul appelant à qui le 400 est utile.
+ * Contrat verrouillé dans `src/app.test.ts` §3, contre l'app réelle.
+ *
+ * On ne facture toujours pas une entrée malformée : @x402/hono ne règle jamais
+ * un statut >= 400 (settle-after-2xx), donc le 400 rendu ici n'est pas encaissé.
  *
  * D'où l'extraction : ces compteurs sont les seuls qui se déclenchent vraiment,
  * et `recordRejection` avale ses erreurs. Laissés inline dans un index.ts que

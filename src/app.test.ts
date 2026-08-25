@@ -281,6 +281,82 @@ describe('the 402 an indexer reads', () => {
     // The synthetic entry announces the REAL price of the POST route.
     expect(body.accepts[0].amount).toBe('5000');
   });
+
+  // ─── The OpenAPI-template probe, on the two parameterised GET routes ────────
+  //
+  // A directory that probes before it lists (Aegis & co) substitutes nothing
+  // into `/v1/bic/{code}` and calls the template literally. Answering 400 there
+  // reads as "this resource is broken" on 2 of our 5 paid routes; answering 402
+  // reads as "payable resource, alive". The second is what we serve.
+  //
+  // 🚨 The ONLY thing that produces it is the mount ORDER in app.ts: the x402
+  // middleware (line ~562) runs BEFORE the format guards (lines ~574-575), so
+  // an anonymous probe is quoted and never reaches the guard. Move the guards
+  // one line up and every one of those probes becomes a 400 again.
+  //
+  // That regression is invisible to `identifier-guard.test.ts`: it composes a
+  // bare `new Hono()` with the guards and the routes and NO x402 middleware, so
+  // it asserts 400 by construction and stays green either way. Its header
+  // comment still claims that composition is "identique à src/index.ts", which
+  // has not been true since piste A (18/08) — see the note there. This is the
+  // only place the production contract is checked against the real app.
+  const TEMPLATE_PROBES = [
+    ['/v1/bic/%7Bcode%7D', '3000'],
+    ['/v1/bic/{code}', '3000'],
+    ['/v1/ch/clearing/%7Biid%7D', '3000'],
+    ['/v1/ch/clearing/{iid}', '3000'],
+  ] as const;
+
+  it.each(TEMPLATE_PROBES)(
+    'quotes %s instead of calling it a malformed request (piste A)',
+    async (path, amount) => {
+      const res = await req(path);
+
+      expect(res.status, `${path} must be payable, not broken`).toBe(402);
+      const body = (await res.json()) as {
+        error: string;
+        accepts: Array<{ scheme: string; network: string; amount: string; payTo: string }>;
+      };
+
+      // Status alone is not the contract: a 402 with no requirements is a dead
+      // end a directory can neither pay nor rank. The requirements are the point.
+      expect(body.accepts, `${path} must carry payment requirements`).toHaveLength(1);
+      expect(body.accepts[0]).toMatchObject({
+        scheme: 'exact',
+        network: 'eip155:8453',
+        amount,
+        payTo: WALLET,
+      });
+      expect(body.error).toBe('payment_required');
+    },
+  );
+
+  it('still answers 400 to an authenticated caller — a quote is for probes, not for typos', async () => {
+    // The other half of the contract, and the reason the guards were kept
+    // rather than deleted: a caller who is PAST the paywall sent a real
+    // request, and the useful answer is what is wrong with it, not a bill they
+    // have already settled.
+    const key = generateCreditKey(null, 50);
+    const auth = { Authorization: `Bearer ${key.api_key}` };
+
+    const placeholder = await req('/v1/bic/%7Bcode%7D', { headers: auth });
+    expect(placeholder.status).toBe(400);
+    expect((await placeholder.json()) as { error: string }).toMatchObject({
+      error: 'placeholder_literal',
+    });
+
+    const badBic = await req('/v1/bic/!!!', { headers: auth });
+    expect(badBic.status).toBe(400);
+    expect((await badBic.json()) as { error: string }).toMatchObject({
+      error: 'invalid_bic_format',
+    });
+
+    const badIid = await req('/v1/ch/clearing/abc', { headers: auth });
+    expect(badIid.status).toBe(400);
+    expect((await badIid.json()) as { error: string }).toMatchObject({
+      error: 'invalid_iid_format',
+    });
+  });
 });
 
 // ─── 4. The switches that must keep working ──────────────────────────────────
