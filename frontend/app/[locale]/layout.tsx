@@ -1,6 +1,6 @@
 import { NextIntlClientProvider, hasLocale } from "next-intl";
 import { notFound } from "next/navigation";
-import { Inter, JetBrains_Mono } from "next/font/google";
+import { Inter, JetBrains_Mono, Bebas_Neue, Oswald } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import { routing } from "@/i18n/routing";
 import { ConditionalShell } from "@/components/conditional-shell";
@@ -14,6 +14,20 @@ const inter = Inter({
 
 const jetbrainsMono = JetBrains_Mono({
   variable: "--font-jetbrains-mono",
+  subsets: ["latin"],
+});
+
+// The forge identity: Bebas for the caps (IBAN, display titles), Oswald for
+// the lowercase "forge" — Bebas ships no lowercase at all.
+const bebas = Bebas_Neue({
+  weight: "400",
+  variable: "--font-bebas",
+  subsets: ["latin"],
+});
+
+const oswald = Oswald({
+  weight: ["500", "600"],
+  variable: "--font-oswald",
   subsets: ["latin"],
 });
 
@@ -98,7 +112,7 @@ export default async function LocaleLayout({ children, params }: Props) {
   return (
     <html
       lang={locale}
-      className={`${inter.variable} ${jetbrainsMono.variable} h-full`}
+      className={`${inter.variable} ${jetbrainsMono.variable} ${bebas.variable} ${oswald.variable} h-full`}
       suppressHydrationWarning
     >
       <head>

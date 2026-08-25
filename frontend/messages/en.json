@@ -168,6 +168,64 @@
       "context": "Kin Lane rebuilt IBANforge's API Evangelist profile from fetched artifacts in August 2026 — and found our x402 support to be the first across the 3,767 MCP servers in his catalog.",
       "linkReview": "Read the public review",
       "linkStory": "The full story"
+    },
+    "film": {
+      "cue": "Scroll to forge",
+      "heat": {
+        "eyebrow": "Heat",
+        "title": "Raw data enters the forge.",
+        "copy": "One POST to /v1/iban/validate. The string is parsed against its ISO 13616 country structure — country, check digits, bank code, account — across 89 countries.",
+        "country": "country · Switzerland",
+        "check": "check digits · 10",
+        "bank": "bank code · 00230",
+        "account": "account · 000000012345"
+      },
+      "strike": {
+        "eyebrow": "Strike",
+        "title": "The mod-97 strike.",
+        "note": "move CH10 to the end · convert letters (C→12, H→17)",
+        "valid": "✓ CHECKSUM VALID",
+        "copy": "Rearranged, letters converted, divided by 97. Remainder 1 — or the metal is scrap. The ISO 13616 checksum, exact and instant."
+      },
+      "quench": {
+        "eyebrow": "Quench",
+        "title": "Quenched in compliance.",
+        "noMatch": "no match ✓",
+        "ofac": "OFAC SDN",
+        "eu": "EU consolidated list",
+        "un": "UN Security Council",
+        "fatf": "FATF · member",
+        "sepa": "SEPA reachable ✓",
+        "risk": "risk_level: low",
+        "copy": "/v1/iban/compliance screens the bank BIC against the OFAC, EU and UN lists, checks the FATF standing, SEPA and VoP reachability — distilled into a 0–100 risk score."
+      },
+      "stamp": {
+        "eyebrow": "Stamp",
+        "title": "Stamped with identity.",
+        "iid": "IID",
+        "sic": "SIC",
+        "eurosic": "euroSIC",
+        "instant": "CHF instant",
+        "copy": "The institution behind the number: BIC, bank name, city — plus the Swiss exclusive, every BC-Nummer from the SIX BankMaster with SIC, euroSIC and CHF instant-payment participation."
+      },
+      "ship": {
+        "eyebrow": "Ship",
+        "title": "Shipped in 0.41 ms.",
+        "head": "application/json · 0.41 ms server",
+        "tryLive": "Try it live in the playground",
+        "copy": "One POST, one answer — forged, quenched, stamped. This is the exact response you get back."
+      }
+    },
+    "agentsRail": {
+      "heading": "Agents get their own rail",
+      "sub": "This page speaks robot too — every claim above is machine-readable, and every endpoint is payable without a human in the loop.",
+      "illoAlt": "A robotic arm dropping one glowing coin into a payment slot",
+      "mcpTitle": "MCP-native",
+      "mcpBody": "5 tools, no signup. Claude, Cursor and any MCP agent install in one line:",
+      "x402Title": "x402 micropayments",
+      "x402Body": "Autonomous agents pay per request in USDC — no account, no checkout, settlement on-chain.",
+      "docsTitle": "Machine-readable docs",
+      "docsBody": "OpenAPI spec, structured data and a plain-text summary built for crawlers and agents."
     }
   },
   "pricing": {

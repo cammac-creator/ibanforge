@@ -168,6 +168,64 @@
       "context": "Kin Lane a reconstruit la fiche API Evangelist d'IBANforge à partir des artefacts consultés, en août 2026 — et notre x402 s'est révélé le premier parmi les 3 767 serveurs MCP de son catalogue.",
       "linkReview": "Lire la revue publique",
       "linkStory": "L'histoire complète"
+    },
+    "film": {
+      "cue": "Défilez pour forger",
+      "heat": {
+        "eyebrow": "Chauffe",
+        "title": "La donnée brute entre dans la forge.",
+        "copy": "Un POST vers /v1/iban/validate. La chaîne est analysée selon sa structure pays ISO 13616 — pays, clé de contrôle, code banque, compte — sur 89 pays.",
+        "country": "pays · Suisse",
+        "check": "clé de contrôle · 10",
+        "bank": "code banque · 00230",
+        "account": "compte · 000000012345"
+      },
+      "strike": {
+        "eyebrow": "Frappe",
+        "title": "La frappe mod-97.",
+        "note": "CH10 déplacé à la fin · lettres converties (C→12, H→17)",
+        "valid": "✓ SOMME DE CONTRÔLE VALIDE",
+        "copy": "Réarrangée, lettres converties, divisée par 97. Reste 1 — ou le métal part au rebut. La somme de contrôle ISO 13616, exacte et instantanée."
+      },
+      "quench": {
+        "eyebrow": "Trempe",
+        "title": "Trempée dans la conformité.",
+        "noMatch": "aucune concordance ✓",
+        "ofac": "OFAC SDN",
+        "eu": "Liste consolidée UE",
+        "un": "Conseil de sécurité ONU",
+        "fatf": "GAFI · membre",
+        "sepa": "SEPA joignable ✓",
+        "risk": "risk_level: low",
+        "copy": "/v1/iban/compliance passe le BIC de la banque au crible des listes OFAC, UE et ONU, vérifie le statut GAFI, la joignabilité SEPA et VoP — le tout distillé en un score de risque 0–100."
+      },
+      "stamp": {
+        "eyebrow": "Estampe",
+        "title": "Estampillée à son identité.",
+        "iid": "IID",
+        "sic": "SIC",
+        "eurosic": "euroSIC",
+        "instant": "Instantané CHF",
+        "copy": "L'institution derrière le numéro : BIC, nom de banque, ville — plus l'exclusivité suisse, chaque BC-Nummer du SIX BankMaster avec sa participation SIC, euroSIC et paiements instantanés CHF."
+      },
+      "ship": {
+        "eyebrow": "Livraison",
+        "title": "Livrée en 0,41 ms.",
+        "head": "application/json · 0,41 ms serveur",
+        "tryLive": "Essayez en direct dans le playground",
+        "copy": "Un POST, une réponse — forgée, trempée, estampillée. Voici la réponse exacte que vous recevez."
+      }
+    },
+    "agentsRail": {
+      "heading": "Les agents ont leur propre rail",
+      "sub": "Cette page parle aussi robot — chaque affirmation ci-dessus est lisible par machine, et chaque endpoint est payable sans humain dans la boucle.",
+      "illoAlt": "Un bras robotique dépose une pièce incandescente dans une fente de paiement",
+      "mcpTitle": "MCP natif",
+      "mcpBody": "5 outils, sans inscription. Claude, Cursor et tout agent MCP s'installent en une ligne :",
+      "x402Title": "Micropaiements x402",
+      "x402Body": "Les agents autonomes paient à la requête en USDC — sans compte, sans checkout, règlement on-chain.",
+      "docsTitle": "Docs lisibles par machine",
+      "docsBody": "Spécification OpenAPI, données structurées et résumé en texte brut, pensés pour les crawlers et les agents."
     }
   },
   "pricing": {

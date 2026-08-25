@@ -28,9 +28,10 @@ export function SiteHeader() {
         {/* Logo */}
         <Link
           href={`/${locale}`}
-          className="flex items-center gap-2 font-bold text-lg tracking-tight"
+          className="flex items-center gap-2.5"
         >
-          <span className="text-primary font-mono">IBANforge</span>
+          <span className="brand-mark" aria-hidden="true" />
+          <span className="brand-word text-xl">IBAN<em>forge</em></span>
         </Link>
 
         {/* Desktop nav */}

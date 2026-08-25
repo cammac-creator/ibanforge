@@ -168,6 +168,64 @@
       "context": "Kin Lane hat IBANforges API-Evangelist-Profil im August 2026 aus abgerufenen Artefakten neu aufgebaut — unser x402 erwies sich dabei als das erste unter den 3.767 MCP-Servern seines Katalogs.",
       "linkReview": "Das öffentliche Review lesen",
       "linkStory": "Die ganze Geschichte"
+    },
+    "film": {
+      "cue": "Scrollen und schmieden",
+      "heat": {
+        "eyebrow": "Glut",
+        "title": "Rohdaten betreten die Schmiede.",
+        "copy": "Ein POST an /v1/iban/validate. Die Zeichenkette wird gegen ihre ISO-13616-Länderstruktur geprüft — Land, Prüfziffern, Bankcode, Konto — in 89 Ländern.",
+        "country": "Land · Schweiz",
+        "check": "Prüfziffern · 10",
+        "bank": "Bankcode · 00230",
+        "account": "Konto · 000000012345"
+      },
+      "strike": {
+        "eyebrow": "Schlag",
+        "title": "Der Mod-97-Schlag.",
+        "note": "CH10 ans Ende · Buchstaben umgewandelt (C→12, H→17)",
+        "valid": "✓ PRÜFSUMME GÜLTIG",
+        "copy": "Umgestellt, Buchstaben umgewandelt, durch 97 geteilt. Rest 1 — oder das Metall ist Ausschuss. Die ISO-13616-Prüfsumme, exakt und sofort."
+      },
+      "quench": {
+        "eyebrow": "Abschrecken",
+        "title": "In Compliance abgeschreckt.",
+        "noMatch": "kein Treffer ✓",
+        "ofac": "OFAC SDN",
+        "eu": "Konsolidierte EU-Liste",
+        "un": "UN-Sicherheitsrat",
+        "fatf": "FATF · Mitglied",
+        "sepa": "SEPA erreichbar ✓",
+        "risk": "risk_level: low",
+        "copy": "/v1/iban/compliance prüft den Bank-BIC gegen die OFAC-, EU- und UN-Listen, den FATF-Status sowie SEPA- und VoP-Erreichbarkeit — destilliert in einen Risikoscore von 0–100."
+      },
+      "stamp": {
+        "eyebrow": "Prägung",
+        "title": "Mit Identität geprägt.",
+        "iid": "IID",
+        "sic": "SIC",
+        "eurosic": "euroSIC",
+        "instant": "CHF Instant",
+        "copy": "Die Institution hinter der Nummer: BIC, Bankname, Ort — plus die Schweizer Exklusivität: jede BC-Nummer aus dem SIX BankMaster mit SIC-, euroSIC- und CHF-Instant-Teilnahme."
+      },
+      "ship": {
+        "eyebrow": "Versand",
+        "title": "Geliefert in 0,41 ms.",
+        "head": "application/json · 0,41 ms Server",
+        "tryLive": "Live im Playground testen",
+        "copy": "Ein POST, eine Antwort — geschmiedet, abgeschreckt, geprägt. Genau diese Antwort erhalten Sie zurück."
+      }
+    },
+    "agentsRail": {
+      "heading": "Agenten bekommen ihre eigene Schiene",
+      "sub": "Diese Seite spricht auch Roboter — jede Aussage oben ist maschinenlesbar, und jeder Endpoint ist ohne Menschen in der Schleife bezahlbar.",
+      "illoAlt": "Ein Roboterarm wirft eine glühende Münze in einen Zahlungsschlitz",
+      "mcpTitle": "MCP-nativ",
+      "mcpBody": "5 Tools, keine Anmeldung. Claude, Cursor und jeder MCP-Agent installieren in einer Zeile:",
+      "x402Title": "x402-Mikrozahlungen",
+      "x402Body": "Autonome Agenten zahlen pro Anfrage in USDC — kein Konto, kein Checkout, Settlement on-chain.",
+      "docsTitle": "Maschinenlesbare Doku",
+      "docsBody": "OpenAPI-Spezifikation, strukturierte Daten und eine Klartext-Zusammenfassung für Crawler und Agenten."
     }
   },
   "pricing": {
