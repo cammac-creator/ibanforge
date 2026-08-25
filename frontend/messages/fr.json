@@ -40,7 +40,7 @@
       "account": "Votre clé"
     },
     "copyright": "© {year} IBANforge.",
-    "dataLine": "Données : GLEIF · Bundesbank · SIX · EBA · NBP · SwiftCodes/MIT (mensuel) · OFAC · UN · UE · EPC (hebdomadaire)"
+    "dataLine": "Données : GLEIF · Bundesbank · SIX · EBA · NBP · SwiftCodes/MIT · Bank of England (List of Banks, 2026-08) — mensuel · OFAC · UN · UE · EPC — hebdomadaire"
   },
   "home": {
     "metadata": {
@@ -151,7 +151,7 @@
     },
     "trust": {
       "dataLabel": "Sources de données",
-      "dataValue": "GLEIF · SIX BankMaster · SwiftCodes (MIT) · Bundesbank · EBA STEP2 · NBP",
+      "dataValue": "GLEIF · SIX BankMaster · SwiftCodes (MIT) · Bundesbank · EBA STEP2 · NBP · Bank of England (List of Banks, 2026-08)",
       "dataNote": "Actualisées chaque mois",
       "sanctionsLabel": "Screening sanctions",
       "sanctionsValue": "OFAC · EU · UN + FATF",

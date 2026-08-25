@@ -54,6 +54,20 @@ jobs:
       - name: Refresh Austrian and Belgian registers
         run: npm run db:seed-national
 
+      # Bank of England, "List of PRA-regulated Banks". Used under a written
+      # permission whose condition is attribution to the Bank TOGETHER WITH the
+      # month of the list, so the month has to be re-read every month — a stale
+      # `list_month` is a licence breach, not a freshness bug.
+      #
+      # This one does NOT fail the job. The list is published a few days into
+      # the month while this cron runs on the 1st, so a miss on the newest file
+      # is the normal state here; the seeder walks back two months, and if
+      # nothing parses it logs and exits 0 with the previous table untouched —
+      # the same doctrine the Dockerfile applies to Vocalink. It never drops the
+      # table before it holds a complete parse.
+      - name: Refresh the Bank of England PRA List of Banks
+        run: npm run db:seed-pra
+
       # THE GATE. GLEIF and the enrichment sources have no sanity floor of their
       # own (unlike the CH/DE/AT/BE seeders), and `npm run test` only asserts
       # `toBeGreaterThan(0)` on this table — a source answering with a truncated

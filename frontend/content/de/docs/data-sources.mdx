@@ -28,6 +28,16 @@ Was das Register über das Institut veröffentlicht, wird in `bank_code_check.in
 
 Die Niederlande werden zusätzlich gegen die Liste IBAN-ausgebender Zahlungsdienstleister der Betaalvereniging geprüft (`issuer.iban_issuer`): Ein Code, dessen Inhaber dort fehlt, behält seinen Namen, verliert aber den Typ `bank` — den BIC-Inhaber zu nennen ist ein Fakt; ihn zur Bank Ihrer Gegenpartei zu erklären wäre eine Vermutung.
 
+## Vereinigtes Königreich — PRA-Erlaubnis zum Einlagengeschäft
+
+Quelle: **Bank of England (List of Banks, 2026-08)**, die monatliche Liste der Institute, denen die Prudential Regulation Authority das Einlagengeschäft erlaubt. Genutzt mit der schriftlichen Erlaubnis der Bank of England, deren Bedingung die Nennung der Bank **zusammen mit dem Monat der Liste** ist — deshalb trägt jeder `pra_authorisation`-Block ein `list_month`, gelesen aus den geladenen Daten und nie von Hand geschrieben.
+
+Sie steht bewusst **nicht** in der Registertabelle oben. Sie ist eine Liste zugelassener Institute (Name, FRN, LEI), keine Zuteilung von Bankcodes: Sie kann einen GB-Bankcode also niemals `authoritative: true` machen. Sie beantwortet eine andere Frage: Darf das Institut hinter dieser IBAN nach PRA-Erlaubnis Einlagen entgegennehmen?
+
+- **Verknüpft allein über die LEI, nie über Namen.** Die Liste veröffentlicht je Institut eine LEI, das BIC-Verzeichnis je Eintrag ebenfalls. Namensähnlichkeit ist genau der Weg, auf dem eine Bank die Erlaubnis einer anderen trägt.
+- **Begrenzt auf die Rechtsordnung, die die Erlaubnis abdeckt.** Der Zweigstellen-Abschnitt veröffentlicht die LEI der *Hauptniederlassung* — der Mutter im Ausland —, die GLEIF jedem BIC dieser Einheit weltweit zuordnet. Der Block wird deshalb nur für GB-BICs ausgeliefert (und GI für den Gibraltar-Abschnitt); eine LEI-Verknüpfung ohne Geltungsbereich würde eine britische Einlagenerlaubnis auf einem BIC aus Frankfurt oder Tokio verkünden.
+- **Vorhanden bei Treffer, sonst abwesend — nie `authorised: false`.** Die Liste deckt nur das Einlagengeschäft ab und sagt in ihrer eigenen Präambel, dass sie das Financial Services Register nicht ersetzt. Ein fehlendes Institut kann eine Wertpapierfirma, ein E-Geld-Institut oder eine Credit Union sein.
+
 ## Compliance-Signale
 
 | Signal | Quelle | Aktualisierung |

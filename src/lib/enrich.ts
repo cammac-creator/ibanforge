@@ -20,6 +20,7 @@ import { lookupClearingByBankCode } from './ch-clearing.js';
 import { blzRegisterAvailable, lookupBlz } from './de-blz.js';
 import { checkVop } from './compliance.js';
 import { checkUkModulus } from './uk-modulus.js';
+import { praAuthorisationByLei } from './pra-banks.js';
 import type { BankCodeCheck, IBANValidationResult, RegisterInstitution } from '../types.js';
 import { nextSteps } from './next-steps.js';
 
@@ -413,6 +414,23 @@ export function enrichResult(result: IBANValidationResult): void {
   if (cc === 'GB' && result.bban.branch_code) {
     const modulus = checkUkModulus(result.bban.branch_code, result.bban.account_number);
     if (modulus) result.modulus_check = modulus;
+  }
+
+  // United Kingdom, second answer: is the institution behind this IBAN one the
+  // PRA authorises to accept deposits?
+  //
+  // Joined on the LEI the directory row already carries — never on the firm
+  // name, which is how "Alpha Bank Example Plc" ends up wearing the licence of
+  // "Alpha Bank Example (Europe) SA". `cc` is passed as the jurisdiction of the
+  // claim: for a GB IBAN it is GB by construction, and the same guard inside
+  // praAuthorisationByLei is what stops the branch section's head-office LEI
+  // from authorising the parent's own foreign BICs.
+  //
+  // Silent on a miss. The list is one permission out of many and says so in its
+  // own preamble; an absence is not a finding.
+  if (cc === 'GB' && result.bic?.lei) {
+    const pra = praAuthorisationByLei(result.bic.lei, cc);
+    if (pra) result.pra_authorisation = pra;
   }
 
   // Last, so every field it reasons about is already populated.

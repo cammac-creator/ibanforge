@@ -28,6 +28,16 @@ Partout ailleurs, les codes banque se résolvent contre notre carte composite : 
 
 Les Pays-Bas passent en plus par la liste des prestataires émetteurs d'IBAN de la Betaalvereniging (`issuer.iban_issuer`) : un code dont le détenteur n'y figure pas garde son nom mais perd son type `bank` — nommer le détenteur du BIC est un fait, en faire la banque de votre contrepartie serait une supposition.
 
+## Royaume-Uni — agrément PRA à recevoir des dépôts
+
+Source : **Bank of England (List of Banks, 2026-08)**, la liste mensuelle des établissements que la Prudential Regulation Authority agrée pour recevoir des dépôts. Utilisée avec la permission écrite de la Bank of England, dont la condition est l'attribution à la Bank **et au mois de publication de la liste** — c'est pourquoi chaque bloc `pra_authorisation` porte `list_month`, lu de la donnée chargée et jamais écrit à la main.
+
+Elle ne figure délibérément **pas** dans le tableau des registres ci-dessus. C'est une liste d'établissements agréés (nom, FRN, LEI), pas une allocation de codes banque : elle ne peut donc jamais rendre un code banque GB `authoritative: true`. Elle répond à une autre question : l'établissement derrière cet IBAN est-il agréé par la PRA pour recevoir des dépôts ?
+
+- **Jointure par LEI uniquement, jamais par nom.** La liste publie un LEI par établissement, l'annuaire BIC en porte un par entrée. La similarité de noms est exactement la façon dont une banque se retrouve à porter l'agrément d'une autre.
+- **Limitée à la juridiction que l'agrément couvre.** La section des succursales publie le LEI du *siège* — la maison mère à l'étranger — que GLEIF rattache à tous les BIC détenus par cette entité dans le monde. Le bloc n'est donc servi que pour les BIC GB (et GI pour la section Gibraltar) ; une jointure LEI sans portée annoncerait un agrément britannique sur un BIC de Francfort ou de Tokyo.
+- **Présent en cas de correspondance, absent sinon — jamais `authorised: false`.** La liste ne couvre que la réception de dépôts et dit elle-même en préambule qu'elle ne remplace pas le Financial Services Register. Un établissement qui n'y figure pas peut être une entreprise d'investissement, un établissement de monnaie électronique ou une credit union.
+
 ## Signaux de conformité
 
 | Signal | Source | Rafraîchissement |

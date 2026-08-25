@@ -2,8 +2,9 @@
  * IBANforge — Unified types for IBAN validation + BIC lookup
  */
 import type { UkModulusResult } from './lib/uk-modulus.js';
+import type { PraAuthorisation } from './lib/pra-banks.js';
 
-export type { UkModulusResult };
+export type { UkModulusResult, PraAuthorisation };
 
 // --- Hono context variables ---
 
@@ -314,6 +315,16 @@ export interface IBANValidationResult {
    * IBAN itself invalid, so `valid` is untouched.
    */
   modulus_check?: UkModulusResult;
+  /**
+   * The Bank of England's "List of PRA-regulated Banks" names the holder of the
+   * resolved BIC's LEI. GB only, joined on LEI and never on names.
+   *
+   * Present only on a match: the list covers deposit-taking alone and says of
+   * itself that it does not supersede the Financial Services Register, so an
+   * absence is not evidence of anything and produces no block rather than
+   * `authorised: false`. See lib/pra-banks.ts for the licence and the join rule.
+   */
+  pra_authorisation?: PraAuthorisation;
   /**
    * What to do next, derived from this result. Ordered: what blocks a payment
    * comes before what merely enriches it. See lib/next-steps.ts.

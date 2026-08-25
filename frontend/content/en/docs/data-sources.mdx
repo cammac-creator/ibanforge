@@ -28,6 +28,16 @@ Everywhere else, bank codes resolve against our composite map: **121k+ BIC entri
 
 The Netherlands additionally checks the Betaalvereniging list of IBAN-issuing providers (`issuer.iban_issuer`): a code whose holder is not on that list keeps its name but loses its `bank` type — naming the BIC holder is a fact, calling it your counterparty's bank would be a guess.
 
+## United Kingdom — PRA deposit-taking authorisation
+
+Source: **Bank of England (List of Banks, 2026-08)**, the monthly list of firms the Prudential Regulation Authority authorises to accept deposits. Used with the Bank of England's written permission, whose condition is attribution to the Bank **together with the month of the list** — which is why every `pra_authorisation` block carries `list_month`, read from the loaded data rather than written by hand.
+
+This is deliberately **not** in the register table above. It is a list of authorised firms (name, FRN, LEI), not an allocation of bank codes, so it can never make a GB bank code `authoritative: true`. What it answers is a different question: is the institution behind this IBAN one the PRA lets take deposits?
+
+- **Matched on LEI only, never on names.** The list publishes an LEI per firm; the BIC directory carries one per entry. Name similarity is how one bank ends up wearing another's licence.
+- **Scoped to the jurisdiction the authorisation covers.** The branch section publishes the *head office* LEI — the parent abroad — which GLEIF maps to every BIC that parent owns worldwide. The block is therefore served only for GB BICs (and GI for the Gibraltar section); a bare LEI join would announce a UK deposit authorisation on a Frankfurt or Tokyo BIC.
+- **Present on a match, absent otherwise — never `authorised: false`.** The list covers deposit-taking alone and states in its own preamble that it does not supersede the Financial Services Register. A firm missing from it may be an investment firm, an e-money institution or a credit union.
+
 ## Compliance signals
 
 | Signal | Source | Refresh |

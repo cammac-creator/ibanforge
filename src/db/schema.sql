@@ -68,6 +68,31 @@ CREATE INDEX IF NOT EXISTS idx_ch_clearing_bic ON ch_clearing(bic);
 CREATE INDEX IF NOT EXISTS idx_ch_clearing_hq ON ch_clearing(headquarters_iid);
 CREATE INDEX IF NOT EXISTS idx_ch_clearing_name ON ch_clearing(name);
 
+-- Bank of England "List of PRA-regulated Banks" (pra_banks table in bic.sqlite
+-- — read-only at runtime). Seeded by scripts/seed-pra-banks.ts.
+--
+-- Used under written permission from the Bank of England (25/08/2026), whose
+-- one condition is attribution to the Bank of England TOGETHER WITH the month
+-- of the list. `list_month` is therefore a stored column, not a derived value:
+-- every served surface reads the month from here.
+
+CREATE TABLE IF NOT EXISTS pra_banks (
+  frn        TEXT NOT NULL,       -- Firm Reference Number
+  firm_name  TEXT NOT NULL,
+  lei        TEXT,                -- NULL when the list publishes none, or an unusable one
+  section    TEXT NOT NULL,       -- uk_incorporated | non_uk_branch | gibraltar_branch | eea_sro_branch
+  -- 'lei' or 'head_office_lei' — the branch section publishes the PARENT's LEI,
+  -- which GLEIF shares with every BIC that parent owns worldwide. Carried so a
+  -- consumer can see how far the identifier reaches.
+  lei_basis  TEXT NOT NULL,
+  list_month TEXT NOT NULL,       -- 'YYYY-MM', read from the file's own preamble
+  source     TEXT NOT NULL DEFAULT 'Bank of England',
+  updated_at TEXT DEFAULT (datetime('now')),
+  PRIMARY KEY (frn, section)
+);
+
+CREATE INDEX IF NOT EXISTS idx_pra_banks_lei ON pra_banks(lei);
+
 -- Stats database (stats.sqlite — read-write):
 
 CREATE TABLE IF NOT EXISTS operations (

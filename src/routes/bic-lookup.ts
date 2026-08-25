@@ -3,6 +3,7 @@ import type { HonoEnv } from '../types.js';
 import { validateBIC } from '../lib/bic-validator.js';
 import { lookup, registeredAddress, sharedBic8Stats } from '../lib/bic-lookup.js';
 import { screenBicSanctions } from '../lib/compliance.js';
+import { praAuthorisationByLei, type PraAuthorisation } from '../lib/pra-banks.js';
 import { classifyBicInput } from '../lib/input-normalize.js';
 import { recordOperation, recordRejection } from '../lib/stats.js';
 import { computeRevenue } from '../lib/request-helpers.js';
@@ -18,7 +19,16 @@ import type { SharedBic8Stats } from '../lib/bic-lookup.js';
  * worst place to take a lock for one route's optional field. Fold it into
  * BICLookupResult when the tree is quiet — nothing else depends on it.
  */
-type BicLookupPayload = BICLookupResult & { shared_bic8?: SharedBic8Stats };
+type BicLookupPayload = BICLookupResult & {
+  shared_bic8?: SharedBic8Stats;
+  /**
+   * Same reasoning as shared_bic8 above: declared beside its usage rather than
+   * in the shared types file. The IBAN path needs it on IBANValidationResult,
+   * so the interface itself lives in lib/pra-banks.ts and both surfaces import
+   * the one definition.
+   */
+  pra_authorisation?: PraAuthorisation;
+};
 
 const COST_USDC = 0.003;
 
@@ -95,6 +105,12 @@ bicLookup.get('/v1/bic/:code', (c) => {
   // script of the stored street, never from the GLEIF language tag) lives there.
   const address = registeredAddress(row);
 
+  // Bank of England, List of Banks — joined on the LEI this row already carries,
+  // scoped to the BIC's own country. See lib/pra-banks.ts: the branch section
+  // publishes the head office's LEI, so an unscoped join would announce a UK
+  // deposit authorisation on the parent's foreign BICs.
+  const pra = praAuthorisationByLei(row?.lei, validation.country_code);
+
   const result: BicLookupPayload = {
     bic: validation.bic,
     bic8: validation.bic8!,
@@ -120,6 +136,7 @@ bicLookup.get('/v1/bic/:code', (c) => {
     // designated is the most reassuring thing this endpoint can say about the
     // least reassuring institution it knows.
     sanctions,
+    ...(pra ? { pra_authorisation: pra } : {}),
     ...(shared ? { shared_bic8: shared } : {}),
     cost_usdc: c.get('apiKeyAuthenticated') ? 0 : COST_USDC,
     processing_ms: Math.round((performance.now() - start) * 100) / 100,

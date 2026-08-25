@@ -60,6 +60,7 @@ import { recordRequest, classifyClient, hashIp, extractClientIp } from './lib/st
 import { bicGuardMiddleware, iidGuardMiddleware } from './middleware/identifier-guard.js';
 import { notFoundHandler } from './lib/not-found.js';
 import { getEntryCount, getChClearingCount, getLeiEnrichedCount } from './lib/bic-lookup.js';
+import { getPraBanksCount, praAttribution } from './lib/pra-banks.js';
 import { getIban, getIbansArray } from './lib/request-helpers.js';
 
 import type { HonoEnv } from './types.js';
@@ -117,9 +118,29 @@ function buildLlmsTxt(): string {
   // issuers nor virtual-IBAN providers). Measured, and the wording now names
   // what it counts.
   const issuerCount = datasetFacts().claim.issuers;
+  // Bank of England, List of Banks. Both the count and the month are read from
+  // the serving database: the month is not decoration, it is the condition the
+  // Bank attached to its permission (25/08/2026), and a literal month here
+  // would be a licence breach the first time the list is refreshed.
+  const praCount = getPraBanksCount();
+  const praCredit = praAttribution();
+  const praLine = praCredit
+    ? `\n- **UK deposit-taking authorisation:** a GB IBAN or a GB BIC whose LEI appears in the PRA's list of authorised banks comes back with \`pra_authorisation\` (firm name, FRN, list month). ${praCount.toLocaleString('en-US')} firms. Matched on LEI only, never on names, and absent rather than negative when there is no match — the list covers deposit-taking alone and does not supersede the Financial Services Register.`
+    : '';
+  const praSourceLine = praCredit
+    ? `- UK deposit-taking authorisation: ${praCredit}, used with the Bank of England's written permission`
+    : '- UK deposit-taking authorisation: not currently loaded';
   return `# IBANforge
 
 > Pre-payout screening for AI agents — check the bank behind a counterparty IBAN before you send funds. IBAN validation, BIC/SWIFT lookup, Swiss clearing, sanctions and compliance risk scoring, designed for AI agents and developers. ${bicCount} BIC entries (${leiCount} LEI-enriched via GLEIF; additional rows from SwiftCodes (MIT), Bundesbank, SIX, NBP, EBA Step2 SCT), ${chCount} Swiss BC-Nummer from SIX, ${countryCount} countries, ${issuerCount} non-bank issuer classifications (EMI, payment institutions, digital banks). Counts in this file are generated live from the serving database.
+
+## Data sources and attribution
+
+- BIC directory: GLEIF (LEI-enriched), SwiftCodes (MIT), Bundesbank, SIX, NBP, EBA Step2 SCT
+- Swiss clearing: SIX BankMaster (BC-Nummer / IID)
+- National bank-code registers: Deutsche Bundesbank, Oesterreichische Nationalbank, Banque nationale de Belgique, Finance Finland
+${praSourceLine}
+- Compliance signals: OFAC, EU, UN, FATF, EPC (Verification of Payee)
 
 ## Instructions for LLM agents
 
@@ -268,7 +289,7 @@ Both \`/v1/bic/:code\` and \`/v1/ch/clearing/:iid\` use **URL path parameters** 
 - Validating IBANs at checkout, payout, or before a SEPA transfer
 - Resolving BIC/SWIFT from an IBAN automatically
 - Detecting Swiss BC-Nummer / IID for routing
-- Catching an impossible UK account before a payout: validating a GB IBAN also runs the Vocalink modulus checksum over the sort code and account number it carries, in the same call and at no extra cost (\`modulus_check\`). mod-97 alone passes on GB pairs no bank could have issued.
+- Catching an impossible UK account before a payout: validating a GB IBAN also runs the Vocalink modulus checksum over the sort code and account number it carries, in the same call and at no extra cost (\`modulus_check\`). mod-97 alone passes on GB pairs no bank could have issued.${praLine}
 - Detecting EMIs / virtual IBANs (Wise, Revolut, Mercury, Modulr, etc.)
 - Pre-flight VoP participant check before October 2025 SEPA deadline
 - Pay-per-call agent workflows without human onboarding (x402 USDC)
@@ -277,7 +298,7 @@ Both \`/v1/bic/:code\` and \`/v1/ch/clearing/:iid\` use **URL path parameters** 
 
 - Full account ownership verification (use SEPA VoP itself or AIS providers)
 - KYC / identity proofing (use a regulated open-banking aggregator)
-- Standalone UK sort-code lookup or bank-name resolution from a sort code (we run the modulus checksum on a GB IBAN, we do not serve the UK directory)
+- Standalone UK sort-code lookup or bank-name resolution from a sort code (we run the modulus checksum on a GB IBAN and we can say whether the resolved institution is PRA-authorised to take deposits, but we do not serve the UK sort-code directory)
 - US ABA, BSB, PIX (non-IBAN systems out of scope)
 - Regulated AML/CFT obligations (use Refinitiv, ComplyAdvantage, etc.)
 

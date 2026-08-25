@@ -8,6 +8,11 @@ IBANforge is a compliance-grade API built for AI agents and developers. It valid
 
 121k+ BIC entries (39k+ LEI-enriched via GLEIF) · 1,100+ Swiss BC-Nummern (SIX) · 89 countries · 85 EMI/vIBAN issuer classifications. Live counts: https://api.ibanforge.com/llms.txt
 
+## Data sources and attribution
+
+GLEIF · SIX BankMaster · SwiftCodes (MIT) · Deutsche Bundesbank · Oesterreichische Nationalbank · Banque nationale de Belgique · Finance Finland · NBP · EBA STEP2 · OFAC · EU · UN · FATF · EPC.
+UK deposit-taking authorisation: Bank of England (List of Banks, 2026-08), used with the Bank of England's written permission. The month of the list in force is served live at https://api.ibanforge.com/llms.txt
+
 ## Core Capabilities
 
 1. **IBAN Validation** — ISO 13616 MOD-97 checksum, BBAN structure parsing, 89 countries

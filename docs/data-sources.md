@@ -25,6 +25,7 @@ mensuel (`getEntryCount()`, jamais un nombre écrit à la main).
 | OFAC (sanctions) | — | **CC0 1.0 déclaré par le Treasury lui-même** + domaine public 17 U.S.C. §105 | ✅ **vérifié à la source le 24/08/2026** |
 | ONU (liste consolidée CSNU) | — | ⚠️ **tous droits réservés, usage personnel NON COMMERCIAL uniquement** | ✅ établie le 24/08/2026 — position arrêtée, voir la section citations |
 | UE (liste consolidée + réutilisation Commission) | — | **CC BY 4.0**, Décision du 12/12/2011 | ✅ vérifié le 24/08/2026 |
+| Bank of England — List of PRA-regulated Banks (table `pra_banks`) | 281 au 2026-08 | permission écrite du 25/08/2026, **attribution à la Bank of England ET au mois de la liste obligatoire** | ✅ **accordée le 25/08/2026 — ingérée le 25/08/2026**, voir ci-dessous |
 
 ### Ce qui a été lu, mot pour mot
 
@@ -180,7 +181,18 @@ britannique, jamais le déploiement.
   réinsère chaque semaine, ce qui n'est pas la même chose que les rafraîchir.
   Les ranger sous « hebdomadaire » aurait été faux.
 - Accueil et `/llms.txt` : GLEIF, annuaire SWIFT, Bundesbank, SIX, NBP, EBA Step2.
-- **Aucune licence n'est nommée sur aucune surface publique.**
+- **Une seule attribution nommée, et elle est contractuelle** (posée le
+  25/08/2026, en même temps que la donnée) : « Bank of England (List of Banks,
+  \<mois\>) ». Elle figure sur le pied de page et le bandeau d'accueil dans les
+  trois langues, sur les trois `llms.txt` (API + `frontend/public/llms.txt` +
+  `frontend/public/llms-full.txt`) et dans les trois pages
+  `docs/data-sources.mdx`. Sur le `llms.txt` de l'API le mois est **lu de la
+  base** (`praAttribution()`), sur les fichiers statiques il est **épinglé par
+  un test de garde** (`src/routes/pra-attribution.test.ts`) qui compare la
+  chaîne écrite au `list_month` réellement chargé — sans quoi le mois pourrirait
+  en silence au premier rafraîchissement, ce qui serait une violation de la
+  permission et pas un simple défaut de fraîcheur.
+- **Aucune autre licence n'est nommée sur aucune surface publique.**
 
 ## Ce qui reste à faire, par ordre de risque
 
@@ -277,10 +289,34 @@ référence dans le service d'API**, avec attribution à la Bank of England
 conditionnelle et son périmètre est précis — un usage qui sortirait de cette
 description (revente du fichier brut, par exemple) n'est pas couvert.
 
-⚠️ **L'ingestion n'est pas encore faite.** Le jour où elle se fait,
-l'attribution (« Source: Bank of England, List of Banks, [mois] ») se pose
-sur les surfaces publiques **en même temps** que la donnée, pas après :
-c'est la condition du oui.
+✅ **Ingestion faite le 25/08/2026, avec l'attribution posée dans le même
+commit** — c'était la condition du oui, pas une étape suivante.
+
+- `scripts/seed-pra-banks.ts` (`npm run db:seed-pra`) télécharge
+  `banks-list-YYMM.csv`, remonte jusqu'à deux mois en arrière si le mois courant
+  n'est pas encore publié, et **abandonne sans rien casser** (log + sortie 0,
+  table intacte) si le téléchargement, le parse ou le plancher de cohérence
+  échoue — même doctrine que Vocalink plus haut. Il ne droppe jamais la table
+  avant d'avoir un parse complet en main.
+- Table `pra_banks` dans `data/bic.sqlite` : 281 établissements en 2026-08,
+  quatre sections (`uk_incorporated` 148, `non_uk_branch` 120,
+  `gibraltar_branch` 6, `eea_sro_branch` 7). Le mois est **lu du préambule du
+  fichier** (« List of PRA-regulated Banks as at  01 August 2026 », deux espaces
+  après « at »), jamais de l'horloge : une attribution au mauvais mois est la
+  seule erreur irrattrapable de ce chantier.
+- Servi dans `pra_authorisation` sur `/v1/bic/:code` et sur la validation d'un
+  IBAN GB. **Jointure par LEI uniquement, jamais par nom.**
+- 🚨 **La section des succursales publie le LEI du SIÈGE** (son en-tête de
+  colonne le dit : « Head Office LEI »), et GLEIF rattache ce LEI à tous les BIC
+  de la maison mère dans le monde. Mesuré sur la base réelle au moment de
+  l'ingestion : une jointure LEI sans portée touchait **1 100 lignes BIC hors
+  GB/GI** — autant de réponses payantes annonçant un agrément britannique sur un
+  BIC de Francfort ou de Tokyo. Le bloc n'est donc servi que pour les BIC **GB**
+  (plus **GI** pour la section Gibraltar).
+- **Aucune branche négative.** Le préambule du fichier dit lui-même qu'il « does
+  not supersede the Financial Service Register », et la liste ne couvre qu'un
+  agrément (recevoir des dépôts). Une absence ne produit **aucun bloc**, jamais
+  `authorised: false`.
 
 La FCA, elle, a accusé réception le 24/08 (dossier ouvert, réponse de fond
 promise sous 2 jours ouvrés) — son registre des firmes est un périmètre
