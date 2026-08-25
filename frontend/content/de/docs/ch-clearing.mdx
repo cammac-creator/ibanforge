@@ -107,7 +107,7 @@ Stillgelegte oder unbekannte IIDs liefern `found: false` mit HTTP 200 — ein ec
 
 ## QR-IBAN-Erkennung
 
-Schweizer QR-IBANs tragen eine IID im Bereich **30000–31999** an den Positionen 5–9. Wenn Sie eine QR-IBAN über `/v1/iban/validate` validieren, löst die Clearing-Anreicherung die QR-IID zum ausgebenden Institut auf. Gewöhnliche Zahlungen dürfen nie an eine QR-IBAN gehen — sie vor der Auszahlung zu erkennen, verhindert zurückgewiesene Überweisungen.
+Schweizer QR-IBANs tragen eine IID im Bereich **30000–31999** an den Positionen 5–9. Wenn Sie eine QR-IBAN über `/v1/iban/validate` validieren, löst die Clearing-Anreicherung die QR-IID zum ausgebenden Institut auf. Gewöhnliche Zahlungen dürfen nie an eine QR-IBAN gehen — sie vor der Auszahlung zu erkennen, verhindert zurückgewiesene Überweisungen. Der vollständige Weg — die QR-IID erkennen, sie auflösen und die Rückwärtssuche von einer gewöhnlichen Schweizer IBAN aus — steht auf [Schweizer QR-IBAN & QR-IID](/docs/swiss-qr-iban).
 
 ## Ausprobieren
 

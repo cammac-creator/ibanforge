@@ -107,7 +107,7 @@ Les IID retirés ou inconnus renvoient `found: false` avec un HTTP 200 — c'est
 
 ## Détection des QR-IBAN
 
-Les QR-IBAN suisses portent un IID dans la plage **30000–31999** en positions 5 à 9. Si vous validez un QR-IBAN via `/v1/iban/validate`, l'enrichissement clearing résout le QR-IID vers l'institution émettrice. Un paiement ordinaire ne doit jamais partir vers un QR-IBAN — les détecter avant le versement évite des virements rejetés.
+Les QR-IBAN suisses portent un IID dans la plage **30000–31999** en positions 5 à 9. Si vous validez un QR-IBAN via `/v1/iban/validate`, l'enrichissement clearing résout le QR-IID vers l'institution émettrice. Un paiement ordinaire ne doit jamais partir vers un QR-IBAN — les détecter avant le versement évite des virements rejetés. Le parcours complet — reconnaître le QR-IID, le résoudre, et la recherche inverse depuis un IBAN suisse ordinaire — se trouve sur [QR-IBAN suisse & QR-IID](/docs/swiss-qr-iban).
 
 ## À essayer
 

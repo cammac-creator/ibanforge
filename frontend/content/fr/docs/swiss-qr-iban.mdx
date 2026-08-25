@@ -1,0 +1,279 @@
+---
+title: "QR-IBAN suisse & QR-IID"
+description: "API de validation de QR-IBAN suisse : reconnaître un QR-IBAN à son QR-IID (30000–31999), résoudre ce QR-IID vers l'établissement émetteur en un appel, et lire le bloc clearing SIX renvoyé pour tout IBAN CH/LI — plus la classification des IBAN virtuels pour le travail amont de l'art. 22(3) AMLR."
+order: 13
+---
+
+# API de validation de QR-IBAN suisse — résoudre un QR-IID
+
+Une facture QR suisse porte un **QR-IBAN**, et un QR-IBAN n'est pas un IBAN suisse ordinaire sous un autre nom. Il identifie son établissement par une **plage de numéros distincte**, la plage QR-IID `30000–31999` que SIX réserve à l'émission de factures QR. Le même établissement répond donc à deux identifiants à la fois, et prendre l'un pour l'autre est la manière la plus courante de faire rejeter une coordonnée de paiement parfaitement correcte.
+
+Cette page est la référence pour les trois questions qui en découlent : **comment reconnaître un QR-IBAN**, **comment résoudre son QR-IID vers un établissement nommé**, et **ce qu'une validation CH/LI renvoie sans qu'on le demande**. Toutes les réponses ci-dessous ont été capturées sur les données SIX BankMaster livrées avec l'API, aucune n'a été écrite à la main.
+
+## Un établissement, deux identifiants
+
+Les positions 5 à 9 d'un IBAN suisse portent l'identifiant d'établissement (IID, aussi appelé numéro de clearing ou BC-Nummer). Pour les factures QR munies d'une **référence QR**, SIX attribue à l'établissement un second identifiant pris dans la plage réservée — et les deux nombres n'ont aucun lien, ni arithmétique ni de préfixe :
+
+| Établissement | Clearing ordinaire (BC-Nummer) | QR-IID |
+|---|---|---|
+| PostFinance AG | `09000` | `30000` |
+| Valiant Bank AG | `06300` | `30024` |
+| UBS Switzerland AG | `00230` | `30005`, `30308` |
+
+Trois conséquences, dans l'ordre où elles mordent :
+
+1. **Un QR-IID cherché dans une table de numéros de clearing ne donne rien.** Conclure de cette absence que le QR-IBAN est mal formé revient à rejeter une instruction correcte — la panne la plus fréquente des intégrations de paiement suisses.
+2. **C'est la plage qui décide du type de référence, pas la facture.** Un IBAN dont l'IID tombe entre `30000` et `31999` exige une référence QR structurée ; un IBAN ordinaire accepte une référence créancier ou un message libre. Intervertir les deux fait refuser l'instruction à la soumission.
+3. **Un établissement peut détenir plusieurs QR-IID.** UBS en a deux. Un code qui suppose une valeur unique tronque l'ensemble en silence.
+
+Sur les 1,100+ entrées de clearing suisses que nous livrons depuis le SIX BankMaster, 231 se trouvent dans la plage QR et 224 d'entre elles portent un BIC — mesuré sur le rafraîchissement 2026-08, et ce décompte bouge au gré des fusions et des changements de participation. Un identifiant de la plage QR derrière lequel il n'y a aucun établissement est une vraie réponse, pas une erreur : l'API répond `found: false`.
+
+## Étape 1 — reconnaître le QR-IBAN (gratuit)
+
+`GET /v1/iban/format` décompose un IBAN sans rien consulter, et ne coûte rien :
+
+```bash
+curl "https://api.ibanforge.com/v1/iban/format?iban=CH5530024123000889012"
+```
+
+```json
+{
+  "iban": "CH5530024123000889012",
+  "formatted": "CH55 3002 4123 0008 8901 2",
+  "valid": true,
+  "check_digits": "55",
+  "country": { "code": "CH", "name": "Switzerland" },
+  "bban": { "bank_code": "30024", "account_number": "123000889012" },
+  "upgrade_to_full_validation": "POST /v1/iban/validate ($0.005) — adds BIC, SEPA, VoP, sanctions, Swiss BC-Nummer."
+}
+```
+
+`bank_code` vaut `30024` : dans la plage, donc c'est un QR-IBAN. La clé de contrôle est bonne, la structure est bonne — et vous ignorez toujours quel établissement l'a émis. Cela demande un registre.
+
+## Étape 2 — lookup de QR-IID (`GET /v1/ch/clearing/:iid`)
+
+Le point d'entrée clearing accepte directement un QR-IID et fait pour vous la traduction entre les deux plages :
+
+```bash
+curl https://api.ibanforge.com/v1/ch/clearing/30024 \
+  -H "Authorization: Bearer ifk_live_xxxxxxxxxxxxxxxxxxxx"
+```
+
+```json
+{
+  "iid": "06300",
+  "found": true,
+  "institution": {
+    "name": "Valiant Bank AG",
+    "type": "bank",
+    "iid_type": "other",
+    "headquarters_iid": "06300"
+  },
+  "address": {
+    "street": "Bundesplatz",
+    "building_number": "4",
+    "post_code": "3001",
+    "town": "Bern",
+    "country": "CH"
+  },
+  "bic": "VABECH22XXX",
+  "payment_services": {
+    "sic": true,
+    "rtgs_chf": true,
+    "instant_payments_chf": true,
+    "eurosic": true,
+    "lsv_bdd_chf": false,
+    "lsv_bdd_eur": false
+  },
+  "sic_iid": "300240",
+  "qr_iid": "30024",
+  "qr_iid_source": "register",
+  "valid_on": "2026-08-03",
+  "cost_usdc": 0.003,
+  "processing_ms": 0.06,
+  "is_qr_iid": true,
+  "note": "IID 30024 is a QR-IID (QR-bill range 30000–31999) of Valiant Bank AG; the institution's standard IID is 06300."
+}
+```
+
+Lisez les premiers champs attentivement, leur sémantique est délibérée :
+
+| Champ | Sur un lookup de QR-IID |
+|---|---|
+| `iid` | le numéro de clearing **ordinaire** de l'établissement (`06300`), jamais celui que vous avez interrogé. Vous renvoyer votre propre question vous laisserait la traduction sur les bras |
+| `qr_iid` | le QR-IID sur lequel portait la question (`30024`) |
+| `is_qr_iid` | `true` — posé uniquement quand l'identifiant interrogé est dans la plage QR, pour qu'un agent n'ait pas à connaître la convention de plages de SIX |
+| `note` | la même chose en prose, pour un LLM qui lit la réponse |
+| `qr_iid_source` | `register` quand SIX publie l'appariement lui-même, `headquarters` quand il est hérité du siège de l'établissement (voir plus bas) |
+| `sic_iid` | le numéro de participant SIC à 6 chiffres de la ligne qui a répondu |
+| `valid_on` | l'instantané BankMaster sur lequel la réponse est valable — les établissements fusionnent, arrimez-y vos attentes |
+
+**Tarif.** 0,003 $ par appel en x402, ou une unité du palier gratuit avec une clé d'API. La capture ci-dessus est un appel non authentifié tarifé en x402, d'où `cost_usdc: 0.003` ; avec une clé couverte par son quota mensuel, le même champ revient à `0`.
+
+Un identifiant de la plage QR que SIX ne liste pas renvoie `found: false` avec `error: "clearing_not_found"` et un HTTP 200 — un résultat de recherche, pas un échec.
+
+## Le sens inverse — quel QR-IID cette banque détient-elle ?
+
+SIX ne publie l'appariement que dans un sens : la ligne QR nomme l'établissement, aucune ligne ordinaire ne nomme son QR-IID. Nous l'indexons à l'envers, si bien qu'un IBAN suisse **ordinaire** répond lui aussi à la question — celle que se pose réellement une entreprise qui se met à émettre des factures QR. Voici le bloc `clearing` renvoyé pour l'IBAN UBS ordinaire `CH1000230000000012345` :
+
+```json
+{
+  "iid": "00230",
+  "name": "UBS Switzerland AG",
+  "type": "bank",
+  "town": "Zürich",
+  "sic": true,
+  "instant_payments_chf": true,
+  "eurosic": true,
+  "qr_iid": "30005",
+  "qr_iid_source": "register",
+  "qr_iids": ["30005", "30308"]
+}
+```
+
+Deux champs portent l'honnêteté de cette réponse :
+
+- **`qr_iids`** apparaît quand SIX a attribué plus d'un QR-IID au même établissement. Le scalaire `qr_iid` garde le plus petit, pour qu'un code qui ne lit que ce champ obtienne quand même une valeur publiée plutôt qu'une troncature silencieuse.
+- **`qr_iid_source`** sépare deux affirmations de force différente. `register` est un appariement publié par SIX. `headquarters` signifie que la ligne est une succursale et que le QR-IID appartient à son siège — une déduction, solide puisque SIX attribue par établissement, mais une déduction. Servir les deux sans étiquette les tiendrait au même standard, ce qu'elles ne méritent pas.
+
+## Étape 3 — valider le QR-IBAN de bout en bout (`POST /v1/iban/validate`)
+
+Pour CH et LI, un seul appel de validation embarque le bloc clearing. Pas de seconde requête, pas de découpage des positions 5 à 9 à faire soi-même :
+
+```bash
+curl -X POST https://api.ibanforge.com/v1/iban/validate \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer ifk_live_xxxxxxxxxxxxxxxxxxxx" \
+  -d '{"iban": "CH5530024123000889012"}'
+```
+
+```json
+{
+  "iban": "CH5530024123000889012",
+  "valid": true,
+  "country": { "code": "CH", "name": "Switzerland" },
+  "check_digits": "55",
+  "bban": { "bank_code": "30024", "account_number": "123000889012" },
+  "sepa": { "member": true, "schemes": ["SCT", "SDD"], "vop_required": false, "vop_participant": false },
+  "formatted": "CH55 3002 4123 0008 8901 2",
+  "bic": {
+    "code": "VABECH22",
+    "bank_name": "Valiant Bank AG",
+    "city": "Bern",
+    "source": "IBANforge curated bank-code map",
+    "as_of": "2026-08",
+    "lei": "529900Z7NMGN5XV0RV34",
+    "lei_status": "ACTIVE"
+  },
+  "issuer": { "type": "bank", "name": "Valiant Bank AG", "classification": "default" },
+  "risk_indicators": {
+    "issuer_type": "bank",
+    "country_risk": "standard",
+    "test_bic": false,
+    "sepa_reachable": true,
+    "sepa_reachable_scope": "country",
+    "vop_coverage": false
+  },
+  "bank_code_check": {
+    "value": "30024",
+    "status": "verified",
+    "match": "register",
+    "register": "SIX BankMaster (Swiss IID / BC-Nummer register)",
+    "authoritative": true,
+    "institution": {
+      "name": "Valiant Bank AG",
+      "street": "Bundesplatz 4",
+      "post_code": "3001",
+      "town": "Bern",
+      "country": "CH"
+    },
+    "as_of": "2026-08"
+  },
+  "clearing": {
+    "iid": "06300",
+    "name": "Valiant Bank AG",
+    "type": "bank",
+    "town": "Bern",
+    "sic": true,
+    "instant_payments_chf": true,
+    "eurosic": true,
+    "qr_iid": "30024",
+    "qr_iid_source": "register",
+    "is_qr_iid": true
+  },
+  "cost_usdc": 0.005,
+  "processing_ms": 0.53
+}
+```
+
+*(Le bloc `bic.address` issu de GLEIF et le tableau `next_steps` sont omis ci-dessus pour la longueur ; les deux figurent dans la réponse réelle.)*
+
+`bank_code_check.authoritative: true` dit que le verdict vient de l'autorité d'attribution elle-même — le SIX BankMaster, et non un annuaire BIC qui mentionne au passage des banques suisses. `is_qr_iid: true` dans `clearing` marque l'IBAN comme QR-IBAN, tandis que `iid` porte déjà le numéro ordinaire de l'établissement.
+
+## Classification des IBAN virtuels et identification des utilisateurs finaux (art. 22(3) AMLR)
+
+Le même bloc `issuer` qui affiche `bank` pour Valiant est celui qui signale ailleurs un émetteur d'**IBAN virtuels**. Cela dépasse la Suisse, à cause d'une obligation européenne précise.
+
+**Ce que dit le règlement.** L'article 22(3) du règlement (UE) [2024/1624](https://eur-lex.europa.eu/eli/reg/2024/1624/oj/fra) — l'AMLR, applicable à partir du 10 juillet 2027 — impose aux établissements de crédit et aux établissements financiers d'obtenir les informations permettant d'identifier et de vérifier l'identité des personnes physiques ou morales **qui utilisent les IBAN virtuels qu'ils émettent**, ainsi que le compte bancaire ou de paiement associé. L'établissement qui tient le compte vers lequel un vIBAN redirige doit pouvoir obtenir cette information de l'établissement émetteur sans délai, et en tout état de cause dans les cinq jours ouvrables suivant sa demande.
+
+**Ce que cela implique en pratique.** Les deux côtés d'un montage vIBAN ont besoin de savoir *qui a émis l'identifiant qu'ils tiennent en main* avant de pouvoir agir. Rien dans cet article ne fait d'une API de validation d'IBAN une partie à ce devoir — et rien ici ne constitue un conseil juridique — mais la première étape, purement factuelle, est un problème de classification : quel établissement se trouve derrière cet IBAN, et de quel type d'établissement s'agit-il ?
+
+**Ce que notre API apporte.** `issuer.type` est un signal structurel, et `issuer.classification` dit ce qu'il vaut :
+
+| `issuer.type` | Signification | Pertinence vIBAN |
+|---|---|---|
+| `bank` | établissement de crédit traditionnel | émission de vIBAN possible, mais ce n'est pas la norme |
+| `digital_bank` | néobanque | élevée — ces acteurs émettent des vIBAN couramment |
+| `emi` | établissement de monnaie électronique (EMI) | élevée — la catégorie d'émetteurs de vIBAN dominante |
+| `payment_institution` | établissement de paiement | élevée |
+| `null` | aucun établissement n'a pu être étayé (par exemple le code banque n'est pas sur une liste nationale de fournisseurs émetteurs d'IBAN) | inconnue, et la réponse le dit au lieu de deviner |
+
+| `issuer.classification` | Comment le lire |
+|---|---|
+| `curated` | identification positive issue de listes EMI / néobanques / établissements de paiement tenues à jour. Vous pouvez compter dessus |
+| `default` | le type est retombé sur `bank` parce que la plupart des porteurs de BIC sont des banques. À traiter comme une présomption, pas comme un constat |
+
+Cette même classification alimente le score de risque de [`POST /v1/iban/compliance`](/docs/compliance) : un émetteur `emi` ajoute 10 points et le flag `emi_issuer`, un `payment_institution` en ajoute 15 avec le flag `payment_institution_issuer`. Voici les deux blocs que cet appel ajoute par-dessus la validation ci-dessus, capturés sur le même QR-IBAN suisse :
+
+```json
+{
+  "compliance": {
+    "sanctions": {
+      "country_sanctioned": false,
+      "bank_sanctioned": false,
+      "matched_lists": [],
+      "fatf_status": "member",
+      "bank_screened": true
+    },
+    "reachability": { "sepa_instant": false, "sct": true, "sdd": false, "screened": true },
+    "vop": { "participant": false, "status": "not_found", "screened": true },
+    "risk_score": 10,
+    "risk_level": "low",
+    "flags": ["no_sepa_instant", "no_vop"]
+  },
+  "meta": {
+    "scope": "bank_bic_only",
+    "disclaimer": "Informational triage only — NOT a regulated AML/CFT product. Sanctions screening is performed at the BANK (BIC8) level: it flags the holding institution, NOT the beneficiary / account-holder name. Most sanctions designations target persons and companies, which this does not screen. Use a regulated provider (Refinitiv, ComplyAdvantage, etc.) for name-level KYC/AML obligations.",
+    "sanctions_as_of": "2026-08-24T15:52:44.509Z",
+    "fatf_as_of": "2026-06",
+    "sources": "EU,OFAC,UN,FATF,EPC-SCT,EPC-SCT_INST,EPC-SDD"
+  }
+}
+```
+
+Ce `meta.disclaimer` n'est pas un ornement et il n'est pas adouci ici : il s'agit d'un **tri informatif, pas d'un produit AML/CFT réglementé**. Le filtrage des sanctions s'opère au niveau de la banque (BIC8) sur les données OFAC, EU et UN — il signale l'établissement teneur, jamais le nom du bénéficiaire ou du titulaire. C'est un signal amont qui dit quel type d'établissement se tient derrière un identifiant ; l'identification des utilisateurs finaux au titre de l'art. 22(3) se joue chez l'établissement émetteur, avec des moyens que nous ne détenons ni ne remplaçons.
+
+## Les limites, dites franchement
+
+- **L'établissement, jamais le compte ni son titulaire.** Un QR-IID résolu nomme l'établissement émetteur. Il ne dit rien des douze chiffres qui le suivent dans l'IBAN, ni de la personne qui détient ce compte.
+- **Le type de référence est une règle, pas une prédiction.** Nous vous disons qu'un IBAN se trouve dans la plage QR et appelle donc une référence QR structurée. Qu'une instruction donnée soit acceptée en aval dépend de la banque du débiteur et de la référence elle-même.
+- **Fraîcheur mensuelle, toujours datée.** Le SIX BankMaster est rafraîchi chaque mois et chaque réponse clearing porte son `valid_on`. Un QR-IID valable il y a un an peut être redirigé aujourd'hui.
+- **`qr_iid_source: "headquarters"` est une déduction.** Solide, étiquetée, et jamais présentée comme un appariement publié par SIX.
+
+## Pour continuer
+
+- [Clearing suisse (BC-Nummer)](/docs/ch-clearing) — la référence complète du point d'entrée, la participation aux systèmes, la sémantique de `found: false`
+- [Valider un IBAN](/docs/iban-validate) — le contrat de réponse complet, `issuer` et `bank_code_check` compris
+- [Contrôle de conformité](/docs/compliance) — sanctions, GAFI, VoP et le score de risque 0–100
+- [Sources de données et provenance](/docs/data-sources) — quel registre répond pour quel pays, et ce que signifie une absence
+- [Résoudre un QR-IID : quel établissement se cache derrière un QR-IBAN suisse ?](/blog/2026-07-29-resolve-qr-iid-swiss-qr-iban) — la version narrative, avec les pannes concrètes

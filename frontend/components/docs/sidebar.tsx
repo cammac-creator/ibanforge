@@ -28,7 +28,7 @@ const groups: DocGroup[] = [
   {
     labelKey: "registers",
     icon: <Landmark className="size-4" />,
-    slugs: ["blz-check", "at-bank-codes", "be-bank-codes", "fi-bank-codes"],
+    slugs: ["swiss-qr-iban", "blz-check", "at-bank-codes", "be-bank-codes", "fi-bank-codes"],
   },
   {
     labelKey: "advanced",

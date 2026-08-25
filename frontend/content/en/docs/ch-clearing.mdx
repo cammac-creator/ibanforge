@@ -107,7 +107,7 @@ Discontinued or unknown IIDs return `found: false` with HTTP 200 — a real look
 
 ## QR-IBAN detection
 
-Swiss QR-IBANs carry an IID in the **30000–31999** range in positions 5–9. If you validate a QR-IBAN via `/v1/iban/validate`, the clearing enrichment resolves the QR-IID to the issuing institution. Regular payments must not be sent to a QR-IBAN — detecting them before payout avoids rejected transfers.
+Swiss QR-IBANs carry an IID in the **30000–31999** range in positions 5–9. If you validate a QR-IBAN via `/v1/iban/validate`, the clearing enrichment resolves the QR-IID to the issuing institution. Regular payments must not be sent to a QR-IBAN — detecting them before payout avoids rejected transfers. The full walkthrough — recognising the QR-IID, resolving it, and the reverse lookup from an ordinary Swiss IBAN — is on [Swiss QR-IBAN & QR-IID](/docs/swiss-qr-iban).
 
 ## Try it
 
