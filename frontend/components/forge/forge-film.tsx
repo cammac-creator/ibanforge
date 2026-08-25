@@ -279,13 +279,19 @@ export function ForgeFilm({ t, playgroundHref }: { t: FilmStrings; playgroundHre
           el.classList.toggle("on", p >= parseFloat(el.getAttribute("data-t") || "1"))
         })
         updaters[i](p)
-        // Crossfade: a scene fades in on arrival and out on exit, so no
-        // station ever waits half-cut at the viewport edge.
-        if (s.inner) {
-          const fIn = ease(sub(p, 0, 0.1))
-          const fOut = 1 - ease(sub(p, 0.9, 1))
-          s.inner.style.opacity = Math.min(fIn, fOut).toFixed(3)
-          s.inner.style.transform = `translateY(${((1 - fIn) * 34 - (1 - fOut) * 26).toFixed(1)}px)`
+        // Presence crossfade, anchored on the pin's REAL viewport position:
+        // full opacity through the whole pinned scrub, and overlapping fade
+        // curves across the 100vh hand-off glide (incoming turns visible at
+        // 40% entered while outgoing only dies at 75% gone) — the screen
+        // never shows an empty station, and no title waits half-cut.
+        if (s.inner && s.pin) {
+          const r = s.pin.getBoundingClientRect().top / vh
+          const f = r > 0
+            ? 1 - clamp01((r - 0.25) / 0.35)
+            : 1 - clamp01((-r - 0.4) / 0.35)
+          s.inner.style.opacity = f.toFixed(3)
+          s.inner.style.transform =
+            `translateY(${(r > 0 ? (1 - f) * 30 : (1 - f) * -22).toFixed(1)}px)`
         }
       })
 

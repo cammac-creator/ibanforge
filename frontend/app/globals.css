@@ -459,7 +459,11 @@
 .forge .wordmark .lt { display: inline-block; color: var(--hot); }
 /* « forge » is ONE span: gradient runs across the word, and a clip on the
    animated element itself survives its compositing layer — a parent's does not. */
-.forge .wordmark .fw { display: inline-block; letter-spacing: 0; font-family: var(--font-oswald); font-weight: 500; font-size: 0.985em; background: linear-gradient(100deg, var(--amber-500) 15%, var(--err) 95%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+/* The padding/negative-margin pair keeps the descender of « g » INSIDE the
+   painted box: with background-clip:text WebKit only paints the gradient
+   within the border box, and the tight line-height leaves the descender
+   outside it — transparent, so the glyph reads amputated (seen on Safari). */
+.forge .wordmark .fw { display: inline-block; letter-spacing: 0; font-family: var(--font-oswald); font-weight: 500; font-size: 0.985em; padding: 0.06em 0.05em 0.28em; margin: -0.06em -0.05em -0.28em; background: linear-gradient(100deg, var(--amber-500) 15%, var(--err) 95%); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .forge .mark { display: inline-block; flex: none; aspect-ratio: 284 / 320; background: url("/brand/anvil-mark.png") center / contain no-repeat; }
 .forge .hero h1 { position: relative; z-index: 1; font-size: clamp(1.25rem, 3.1vw, 2.1rem); font-weight: 600; letter-spacing: -0.02em; margin-top: clamp(1.2rem, 3vh, 2rem); }
 .forge .hero h1 em { font-style: normal; background: var(--fember-grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
@@ -630,6 +634,6 @@
 /* Site-wide brand lockup (header) — the anvil + IBAN/forge two-tone. */
 .brand-mark { display: inline-block; flex: none; aspect-ratio: 284 / 320; height: 1.7em; background: url("/brand/anvil-mark.png") center / contain no-repeat; }
 .brand-word { font-family: var(--font-bebas); font-weight: 400; letter-spacing: 0.03em; color: var(--fg-1); line-height: 1; }
-.brand-word em { font-style: normal; font-family: var(--font-oswald); font-weight: 500; font-size: 0.985em; background: linear-gradient(100deg, var(--amber-500) 15%, #EF4444 95%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.brand-word em { display: inline-block; font-style: normal; font-family: var(--font-oswald); font-weight: 500; font-size: 0.985em; padding: 0.06em 0.05em 0.28em; margin: -0.06em -0.05em -0.28em; background: linear-gradient(100deg, var(--amber-500) 15%, #EF4444 95%); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .forge .btn-ghost-link { display: inline-block; border: 1px solid var(--fst-3); color: var(--hot); border-radius: 8px; padding: 0.7rem 1.4rem; font-weight: 600; font-size: 0.9rem; text-decoration: none; transition: border-color var(--dur-2) var(--ease-std); }
 .forge .btn-ghost-link:hover { border-color: rgba(245, 158, 11, 0.5); }
