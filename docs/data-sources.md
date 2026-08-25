@@ -259,8 +259,32 @@ la bonne règle n'est pas dans les CGU générales) — mais la page développeu
 **rien** sans JavaScript : à lire dans un navigateur, comme GAFI/EPC/NBP.
 
 **Conclusion : la piste GB passe par une demande de permission écrite**, pas
-par un import. Deux brouillons de demande sont prêts (FCA et BoE) — l'envoi est
-la voix de Claude-Alain.
+par un import. Les deux demandes sont parties le 24/08/2026.
+
+### ✅ 25/08/2026 — la Bank of England a accordé la permission
+
+Réponse du service Engagement and Enquiries de la Bank of England, reçue le
+25/08/2026 :
+
+> « The information is publicly available on the Bank's website, and we have
+> no objection to the use you describe, provided appropriate attribution to
+> the Bank of England is maintained. »
+
+Le périmètre couvert est celui décrit dans la demande et repris mot pour mot
+dans leur réponse : la **List of Banks mensuelle de la PRA comme source de
+référence dans le service d'API**, avec attribution à la Bank of England
+**et au mois de publication de la liste**. La permission est donc
+conditionnelle et son périmètre est précis — un usage qui sortirait de cette
+description (revente du fichier brut, par exemple) n'est pas couvert.
+
+⚠️ **L'ingestion n'est pas encore faite.** Le jour où elle se fait,
+l'attribution (« Source: Bank of England, List of Banks, [mois] ») se pose
+sur les surfaces publiques **en même temps** que la donnée, pas après :
+c'est la condition du oui.
+
+La FCA, elle, a accusé réception le 24/08 (dossier ouvert, réponse de fond
+promise sous 2 jours ouvrés) — son registre des firmes est un périmètre
+distinct de la liste des banques, les deux démarches restent utiles.
 
 ## Sources écartées, et pourquoi
 
