@@ -65,7 +65,21 @@ describe('validate_iban: the documented shape is the returned shape', () => {
   });
 
   it('documents every key the enriched payload actually carries', () => {
-    for (const key of ['valid', 'country', 'check_digits', 'bban', 'bic', 'sepa', 'issuer', 'risk_indicators']) {
+    // psd_registration joined the list when the EBA register landed: it is a
+    // key the enriched payload can carry, so the contract has to name it. The
+    // 700-character window above is deliberately not widened to fit it — the
+    // Returns block staying terse enough to read is the point of the slice.
+    for (const key of [
+      'valid',
+      'country',
+      'check_digits',
+      'bban',
+      'bic',
+      'sepa',
+      'issuer',
+      'psd_registration',
+      'risk_indicators',
+    ]) {
       expect(returns, `Returns block omits "${key}"`).toContain(key);
     }
   });

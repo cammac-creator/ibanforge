@@ -62,6 +62,12 @@ import { notFoundHandler } from './lib/not-found.js';
 import { getEntryCount, getChClearingCount, getLeiEnrichedCount } from './lib/bic-lookup.js';
 import { getPraBanksCount, praAttribution } from './lib/pra-banks.js';
 import { getBdeListDate, getBdeMfiCount, getEcbListDate, getEcbMfiCount } from './lib/official-identity.js';
+import {
+  PSD_SERVED_COUNTRIES,
+  getPsdCountryCount,
+  getPsdEntityCount,
+  psdAttribution,
+} from './lib/psd-register.js';
 import { getIban, getIbansArray } from './lib/request-helpers.js';
 
 import type { HonoEnv } from './types.js';
@@ -155,6 +161,20 @@ function buildLlmsTxt(): string {
   ]
     .filter(Boolean)
     .join('\n');
+  // EBA PSD2 register. Same rule as the PRA list: the count and the copy date
+  // are read from the serving database, because the licence is "provided the
+  // source is acknowledged" and a hardcoded date is a stale acknowledgement.
+  // The served-country list is read from the code that enforces it, so this
+  // line cannot claim a country the lookup declines.
+  const psdCount = getPsdEntityCount();
+  const psdCountries = getPsdCountryCount();
+  const psdCredit = psdAttribution();
+  const psdLine = psdCredit
+    ? `\n- **EU payment/e-money authorisation:** an IBAN whose bank code is registered to an authorised payment or e-money institution comes back with \`psd_registration\` (entity type, name, competent authority, source, as-of). ${psdCount.toLocaleString('en-US')} authorised entities across ${psdCountries} countries. Joined on country + national reference code, and served only for ${PSD_SERVED_COUNTRIES.join(', ')} — the register carries no BIC and no LEI, and elsewhere it files authorisations under company or tax numbers that are not the code an IBAN carries. Absent rather than negative when there is no match.`
+    : '';
+  const psdSourceLine = psdCredit
+    ? `- EU payment/e-money authorisation: ${psdCredit}, reproduced with attribution per the EBA legal notice`
+    : '- EU payment/e-money authorisation: not currently loaded';
   return `# IBANforge
 
 > Pre-payout screening for AI agents — check the bank behind a counterparty IBAN before you send funds. IBAN validation, BIC/SWIFT lookup, Swiss clearing, sanctions and compliance risk scoring, designed for AI agents and developers. ${bicCount} BIC entries (${leiCount} LEI-enriched via GLEIF; additional rows from SwiftCodes (MIT), Bundesbank, SIX, NBP, EBA Step2 SCT), ${chCount} Swiss BC-Nummer from SIX, ${countryCount} countries, ${issuerCount} non-bank issuer classifications (EMI, payment institutions, digital banks). Counts in this file are generated live from the serving database.
@@ -166,6 +186,7 @@ function buildLlmsTxt(): string {
 - National bank-code registers: Deutsche Bundesbank, Oesterreichische Nationalbank, Banque nationale de Belgique, Finance Finland
 ${praSourceLine}
 ${identitySourceLines}
+${psdSourceLine}
 - Compliance signals: OFAC, EU, UN, FATF, EPC (Verification of Payee)
 
 ## Instructions for LLM agents
@@ -316,6 +337,7 @@ Both \`/v1/bic/:code\` and \`/v1/ch/clearing/:iid\` use **URL path parameters** 
 - Resolving BIC/SWIFT from an IBAN automatically
 - Detecting Swiss BC-Nummer / IID for routing
 - Catching an impossible UK account before a payout: validating a GB IBAN also runs the Vocalink modulus checksum over the sort code and account number it carries, in the same call and at no extra cost (\`modulus_check\`). mod-97 alone passes on GB pairs no bank could have issued.${praLine}${identityLine}
+- Catching an impossible UK account before a payout: validating a GB IBAN also runs the Vocalink modulus checksum over the sort code and account number it carries, in the same call and at no extra cost (\`modulus_check\`). mod-97 alone passes on GB pairs no bank could have issued.${praLine}${psdLine}
 - Detecting EMIs / virtual IBANs (Wise, Revolut, Mercury, Modulr, etc.)
 - Pre-flight VoP participant check before October 2025 SEPA deadline
 - Pay-per-call agent workflows without human onboarding (x402 USDC)

@@ -1029,7 +1029,7 @@ const buildSpec = () => ({
           issuer: {
             type: 'object',
             description:
-              'Issuer classification for the institution behind the IBAN. Useful for vIBAN detection and KYC enrichment. Only present when the IBAN is valid and the BIC is resolved.',
+              'Issuer classification for the institution behind the IBAN. Useful for vIBAN detection and KYC enrichment. Present when the IBAN is valid and either the BIC resolved or an official register names the holder of the bank code (see psd_registration).',
             properties: {
               type: {
                 type: ['string', 'null'],
@@ -1043,9 +1043,9 @@ const buildSpec = () => ({
               },
               classification: {
                 type: 'string',
-                enum: ['curated', 'default'],
+                enum: ['curated', 'register', 'default'],
                 description:
-                  "Whether the type was established or assumed. curated = the BIC8 is in the issuer set, so this is an identification. default = nothing is on file and 'bank' is the fallback, which covers 42,195 of 43,199 distinct BIC8 (97.7%, recounted 29/07/2026; the count drifts at every monthly refresh). When sizing exposure to virtual IBANs, count only curated.",
+                  "Whether the type was established or assumed. curated = the BIC8 is in the issuer set, so this is an identification. register = an official register names the holder of this bank code and says what it is; also an identification, and one that carries a date and an issuing authority in the psd_registration block beside it. It only ever replaces a default, never a curated verdict. default = nothing is on file and 'bank' is the fallback, which covers 42,195 of 43,199 distinct BIC8 (97.7%, recounted 29/07/2026; the count drifts at every monthly refresh). When sizing exposure to virtual IBANs, count curated and register, never default.",
               },
               iban_issuer: {
                 type: 'string',
@@ -1055,6 +1055,40 @@ const buildSpec = () => ({
               },
             },
             required: ['type', 'name', 'classification'],
+          },
+          psd_registration: {
+            type: 'object',
+            description:
+              "The EBA's PSD2 register of payment and electronic money institutions naming the holder of this bank code. Joined on country + national reference code, and served ONLY for countries where that code was measured to be the one the IBAN actually carries — today Spain alone. The register carries no BIC and no LEI, and in 29 of its 30 countries it files authorisations under a company or tax number from an unrelated register (a Polish NIP, a French SIREN, a Dutch DNB reference), so joining those to a bank code would attach a real institution's authorisation to an unrelated bank. Absent on a miss: there is no negative form, because the register's own disclaimer states that an institution omitted from it is authorised all the same.",
+            properties: {
+              registered: {
+                type: 'boolean',
+                description: 'Always true. There is no negative form of this block.',
+              },
+              entity_type: {
+                type: 'string',
+                enum: ['payment_institution', 'emi', 'aisp', 'exempted_emi', 'exempted_payment_institution'],
+                description:
+                  "The register's own category. emi = electronic money institution, payment_institution = authorised PI, aisp = account information service provider (reads accounts, issues nothing), exempted_emi / exempted_payment_institution = small operators waived FROM authorisation, which is not a licence. Only emi and payment_institution move issuer.type.",
+              },
+              name: { type: 'string', description: 'Institution name as the register publishes it.' },
+              country: { type: 'string', description: 'ISO country of residence, as the register publishes it.' },
+              competent_authority: {
+                type: 'string',
+                description: "The national authority that filed the authorisation, e.g. 'ES_BE' for Banco de España.",
+              },
+              source: {
+                type: 'string',
+                description:
+                  'Attribution required by the EBA legal notice ("Reproduction of all EBA material on this site is authorised, provided the source is acknowledged"). Always present.',
+              },
+              as_of: {
+                type: 'string',
+                description:
+                  'Date of the golden copy this row came from (YYYY-MM-DD), read from the EBA manifest and never from a clock. Always present.',
+              },
+            },
+            required: ['registered', 'entity_type', 'name', 'country', 'competent_authority', 'source', 'as_of'],
           },
           risk_indicators: {
             type: 'object',
