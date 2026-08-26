@@ -1,0 +1,60 @@
+---
+title: "Wie man eine US-Routing-Number validiert, und wo die Prüfziffer endet"
+description: "Die ABA-Prüfziffer sind zehn Zeilen Code, und wir liefern den Algorithmus mit durchgerechnetem Beispiel. Der ehrliche Teil kommt danach: Die meisten Bankcode-Systeme ausserhalb der IBAN-Welt haben gar keine Prüfziffer — echte Validierung heisst also Register, und jedes Register dieses Terrains trägt Lizenzbedingungen, die entscheiden, was ein Datenprodukt ausliefern darf."
+date: "2026-08-26"
+---
+
+Wir verkaufen IBAN-Validierung, und der grösste Zahlungsmarkt der Welt verwendet keine IBANs. Man fragt uns oft genug nach US-Routing-Numbers, dass die ehrlichen Antworten eine Seite verdienen: wie Sie eine selbst kostenlos prüfen, was diese Prüfung aussagt und was nicht, und warum der Teil, den Sie nicht selbst erledigen können, eine Lizenzfrage ist, bevor er eine technische Frage wird.
+
+## Die Prüfziffer, die Sie heute implementieren können
+
+Eine ABA-Routing-Number hat neun Ziffern. Die neunte ist eine Prüfziffer über die ersten acht, mit den Gewichten 3, 7 und 1 im Wechsel. Nehmen Sie `021000021`, eine vielfach publizierte New Yorker Routing-Number:
+
+```
+Ziffern:   0  2  1  0  0  0  0  2  1
+Gewichte:  3  7  1  3  7  1  3  7  1
+Produkte:  0 14  1  0  0  0  0 14  1   → Summe = 30
+```
+
+Die Summe muss durch 10 teilbar sein. Dreissig ist es: Die Zeichenkette ist in sich konsistent. Als Code:
+
+```ts
+function abaChecksumOk(rtn: string): boolean {
+  if (!/^\d{9}$/.test(rtn)) return false;
+  const w = [3, 7, 1, 3, 7, 1, 3, 7, 1];
+  const sum = [...rtn].reduce((s, d, i) => s + Number(d) * w[i], 0);
+  return sum % 10 === 0;
+}
+```
+
+Dazu kommt ein billiger Strukturtest: Die ersten beiden Ziffern bilden das Routing-Symbol der Federal Reserve, und nur bestimmte Bereiche sind vergeben. Eine Zeichenkette, die beides besteht, ist *plausibel*. Mehr nicht.
+
+## Was die Prüfziffer nicht sagen kann
+
+Dieselben drei Dinge, die ein bestandener mod-97 über eine IBAN nicht sagt — plus eines:
+
+1. **Existenz.** Eine prüfziffernkonforme Routing-Number kann zu keinem Institut gehören. Die Ziffern sind konsistent; vergeben wurden sie nie.
+2. **Identität.** Die Prüfziffer nennt die Bank nicht und fängt darum den Zahlendreher nicht, der aus einem realen Institut ein anderes reales Institut macht.
+3. **Frische.** US-Banken fusionieren laufend, Routing-Numbers werden stillgelegt oder neu vergeben. Eine Nummer, die in Ihrer Datenbank von 2023 stimmte, kann heute tot sein.
+4. **Das Rail.** Dasselbe Institut kann für ACH und für Fedwire unterschiedliche Routing-Numbers verwenden. Eine Nummer, die «validiert», kann trotzdem die falsche für genau die Zahlung sein, die Sie senden wollen.
+
+Alles auf dieser Liste braucht ein Register, keinen Algorithmus.
+
+## Die unbequeme Geographie der Nicht-IBAN-Validierung
+
+Hier kommt der Teil, den die Content-Fabriken zu Routing-Numbers auslassen. Wir haben Forschungszeit in sechs grosse Nicht-IBAN-Systeme gesteckt und die Primärbedingungen jedes Registers gelesen — das Muster kehrt die IBAN-Welt um:
+
+- **USA** — die Prüfziffer ist öffentlich (siehe oben), aber die Bedingungen des offiziellen Verzeichnisses beschränken Weiterverkauf und Weiterverbreitung, und das öffentliche Nachschlagewerkzeug ist bewusst gedeckelt, die Speicherung der Ergebnisse eingeschränkt.
+- **Kanada** — Transit-Nummern haben **keine Prüfziffer**. Die Institutsdatei ist herunterladbar, aber kommerzielle Reproduktion verlangt die Erlaubnis des Herausgebers.
+- **Australien** — BSB-Nummern haben **keine Prüfziffer**. Die BSB-Datei ist öffentlich; die zugehörige API untersteht wesentlich anderen Bedingungen — Datei und API sind keine austauschbaren Quellen.
+- **Indien** — IFSC-Codes haben **keine Prüfziffer**. Die Zentralbank publiziert die Listen, hinter Vorkehrungen, die eine Massenerfassung unzuverlässig machen.
+- **Japan** — Zengin-Bank- und -Filialcodes haben **keine Prüfziffer**, und die Daten auf Filialebene sind jährlich lizenziert; die Nutzung innerhalb eines Drittdienstes verlangt ausdrücklich eine separate Vereinbarung.
+- **Mexiko** — die CLABE trägt zwar eine Prüfziffer, doch die offizielle Spezifikation des Algorithmus wird an SPEI-Teilnehmer verteilt statt zur allgemeinen Wiederverwendung publiziert.
+
+In der IBAN-Welt leistet der öffentliche Algorithmus die Hauptarbeit, die Register ergänzen den Rest. In der Nicht-IBAN-Welt haben vier dieser sechs Systeme gar keinen Algorithmus: **Das Register ist das ganze Produkt** — und jedes dieser Register kommt mit Bedingungen, die entscheiden, was zu einer API umgebaut werden darf.
+
+## Warum wir das heute nicht verkaufen
+
+Unsere Regel, in der IBAN-Welt gelernt und überall beibehalten: Wir liefern einen Datenblock aus, wenn wir seine Quelle, seine Lizenz und sein Aktualisierungsdatum nennen können — und wenn die Bedingungen des Herausgebers einer bezahlten API das Ausliefern tatsächlich erlauben. Für die Systeme oben gehen wir den langsamen Weg: die Herausgeber direkt und schriftlich fragen, so wie wir [die Bank of England gefragt haben](/de/blog/2026-08-25-uk-authorisation-with-permission), bevor wir britische Autorisierungsdaten auslieferten.
+
+Heute validiert IBANforge also IBANs gegen nationale Register und löst BICs auf; es validiert weder Routing-Numbers noch Transit-Nummern, BSBs oder IFSCs. Wenn Ihr Anwendungsfall diese Abdeckung braucht, [schreiben Sie uns](mailto:claude-alain@ibanforge.com?subject=Non-IBAN%20coverage), welche Länder für Sie zählen — die Reihenfolge, in der wir Genehmigungen verfolgen, entscheidet sich genau an diesen Nachrichten. Und wenn ein Anbieter Ihnen eines dieser Länder bereits verkauft, kennen Sie jetzt die zwei Fragen an ihn: *welches Register, unter welcher Lizenz?*

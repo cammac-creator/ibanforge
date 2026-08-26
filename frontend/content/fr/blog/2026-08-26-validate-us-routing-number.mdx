@@ -1,0 +1,60 @@
+---
+title: "Comment valider un routing number américain, et où s'arrête le checksum"
+description: "Le chiffre de contrôle ABA tient en dix lignes de code, et nous vous donnons l'algorithme avec un exemple calculé. La partie honnête vient après : la plupart des systèmes de codes bancaires hors IBAN n'ont aucun chiffre de contrôle, donc valider vraiment exige un registre — et chaque registre de ce monde-là porte des conditions de licence qui décident de ce qu'un produit de données peut servir."
+date: "2026-08-26"
+---
+
+Nous vendons de la validation d'IBAN, et le plus grand marché de paiement du monde n'utilise pas d'IBAN. On nous interroge assez souvent sur les routing numbers américains pour que les réponses honnêtes méritent une page : comment en vérifier un vous-même gratuitement, ce que cette vérification dit et ne dit pas, et pourquoi la partie que vous ne pouvez pas faire vous-même est une question de licence avant d'être une question technique.
+
+## Le checksum que vous pouvez implémenter aujourd'hui
+
+Un routing number ABA fait neuf chiffres. Le neuvième est un chiffre de contrôle sur les huit premiers, avec les poids 3, 7 et 1 en boucle. Prenez `021000021`, un routing number new-yorkais largement publié :
+
+```
+chiffres : 0  2  1  0  0  0  0  2  1
+poids :    3  7  1  3  7  1  3  7  1
+produits : 0 14  1  0  0  0  0 14  1   → somme = 30
+```
+
+La somme doit être divisible par 10. Trente l'est : la chaîne est cohérente avec elle-même. En code :
+
+```ts
+function abaChecksumOk(rtn: string): boolean {
+  if (!/^\d{9}$/.test(rtn)) return false;
+  const w = [3, 7, 1, 3, 7, 1, 3, 7, 1];
+  const sum = [...rtn].reduce((s, d, i) => s + Number(d) * w[i], 0);
+  return sum % 10 === 0;
+}
+```
+
+Il existe aussi un contrôle structurel bon marché : les deux premiers chiffres forment le symbole de routage de la Réserve fédérale, et seules certaines plages sont attribuées. Une chaîne qui passe les deux est *plausible*. C'est tout.
+
+## Ce que le checksum ne peut pas vous dire
+
+Les trois mêmes choses qu'un mod-97 réussi ne dit pas d'un IBAN, plus une :
+
+1. **L'existence.** Un routing number au checksum valide peut n'appartenir à aucun établissement. Les chiffres sont cohérents ; personne ne les a jamais attribués.
+2. **L'identité.** Le checksum ne nomme pas la banque, donc il ne rattrape pas l'inversion de chiffres qui transforme un établissement réel en un autre établissement réel.
+3. **La fraîcheur.** Les banques américaines fusionnent sans cesse et des routing numbers sont retirés ou réattribués. Un numéro juste dans votre base de 2023 peut être mort aujourd'hui.
+4. **Le rail.** Le même établissement peut utiliser des routing numbers différents pour l'ACH et pour Fedwire. Un numéro qui « valide » peut rester le mauvais numéro pour le paiement que vous allez envoyer.
+
+Tout ce qui figure sur cette liste exige un registre, pas un algorithme.
+
+## La géographie inconfortable de la validation hors IBAN
+
+Voici la partie que les usines à contenu sur les routing numbers sautent. Nous avons passé du temps de recherche sur six grands systèmes hors IBAN, en lisant les conditions primaires de chaque registre, et le motif inverse le monde IBAN :
+
+- **États-Unis** — le chiffre de contrôle est public (ci-dessus), mais les conditions du répertoire officiel restreignent la revente et la redistribution, et l'outil public de consultation est volontairement plafonné, avec un stockage des résultats restreint.
+- **Canada** — les numéros de transit n'ont **aucun chiffre de contrôle**. Le fichier des institutions financières se télécharge, mais la reproduction commerciale exige la permission de l'éditeur.
+- **Australie** — les BSB n'ont **aucun chiffre de contrôle**. Le fichier BSB est public ; l'API associée relève de conditions sensiblement différentes, donc le fichier et l'API ne sont pas des sources interchangeables.
+- **Inde** — les codes IFSC n'ont **aucun chiffre de contrôle**. La banque centrale publie les listes, derrière des dispositifs qui rendent la collecte en masse peu fiable.
+- **Japon** — les codes banque et agence Zengin n'ont **aucun chiffre de contrôle**, et la donnée au niveau agence est sous licence annuelle, l'usage au sein d'un service tiers étant nommément soumis à un accord séparé.
+- **Mexique** — la CLABE porte bien un chiffre de contrôle, mais la spécification officielle de l'algorithme est distribuée aux participants SPEI plutôt que publiée pour réutilisation générale.
+
+Dans le monde IBAN, l'algorithme public fait le gros du travail et les registres ajoutent le reste. Dans le monde hors IBAN, quatre de ces six systèmes n'ont aucun algorithme : **le registre est tout le produit**, et chacun de ces registres vient avec des conditions qui décident de ce qui peut être reconstruit en API.
+
+## Pourquoi nous ne vendons pas cela aujourd'hui
+
+Notre règle, apprise dans le monde IBAN et gardée partout : nous servons un bloc de données quand nous pouvons nommer sa source, sa licence et sa date de fraîcheur — et quand les conditions de l'éditeur permettent réellement à une API payante de le servir. Pour les systèmes ci-dessus, nous prenons le chemin lent : demander directement aux éditeurs, par écrit, comme nous avons [demandé à la Bank of England](/fr/blog/2026-08-25-uk-authorisation-with-permission) avant de servir les données d'autorisation britanniques.
+
+Aujourd'hui, IBANforge valide donc des IBAN contre des registres nationaux et résout des BIC ; il ne valide ni routing numbers, ni numéros de transit, ni BSB, ni IFSC. Si votre cas d'usage a besoin de cette couverture, [dites-le-nous](mailto:claude-alain@ibanforge.com?subject=Non-IBAN%20coverage) en nommant les pays qui comptent pour vous — l'ordre dans lequel nous poursuivons les permissions se décide exactement sur ces messages. Et si un fournisseur vous vend déjà l'un de ces pays, vous connaissez désormais les deux questions à lui poser : *quel registre, sous quelle licence ?*

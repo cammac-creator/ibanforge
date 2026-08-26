@@ -1,0 +1,60 @@
+---
+title: "How to validate a US routing number, and where the checksum stops"
+description: "The ABA check digit takes ten lines of code and we give you the algorithm with a worked example. The honest part comes after: most non-IBAN bank code systems have no check digit at all, so real validation means a register — and every register in this space has licence terms that decide what a data product may ship."
+date: "2026-08-26"
+---
+
+We sell IBAN validation, and the world's largest payment market does not use IBANs. People ask us about US routing numbers often enough that the honest answers deserve a page: how to check one yourself for free, what that check does and does not tell you, and why the part you cannot do yourself is a licensing question before it is a technical one.
+
+## The checksum you can implement today
+
+An ABA routing number is nine digits. The ninth is a check digit over the first eight, with weights 3, 7 and 1 repeating. Take `021000021`, a widely published New York routing number:
+
+```
+digits:   0  2  1  0  0  0  0  2  1
+weights:  3  7  1  3  7  1  3  7  1
+products: 0 14  1  0  0  0  0 14  1   → sum = 30
+```
+
+The sum must be divisible by 10. Thirty is, so the string is internally consistent. In code:
+
+```ts
+function abaChecksumOk(rtn: string): boolean {
+  if (!/^\d{9}$/.test(rtn)) return false;
+  const w = [3, 7, 1, 3, 7, 1, 3, 7, 1];
+  const sum = [...rtn].reduce((s, d, i) => s + Number(d) * w[i], 0);
+  return sum % 10 === 0;
+}
+```
+
+There is also a cheap structural check: the first two digits are the Federal Reserve routing symbol, and only certain ranges are assigned. A string that passes both is *plausible*. That is all.
+
+## What the checksum cannot tell you
+
+The same three things a mod-97 pass cannot tell you about an IBAN, plus one:
+
+1. **Existence.** A checksum-valid routing number may belong to no institution. The digits are consistent; nobody ever allocated them.
+2. **Identity.** The checksum will not name the bank, so it cannot catch the transposition that turns one real institution into a different real institution.
+3. **Freshness.** US banks merge constantly and routing numbers are retired or reassigned. A number that was good in your 2023 database can be dead today.
+4. **Rail.** The same institution can use different routing numbers for ACH and for Fedwire. A number that "validates" can still be the wrong number for the payment you are about to send.
+
+Everything on that list needs a register, not an algorithm.
+
+## The uncomfortable geography of non-IBAN validation
+
+Here is the part the routing-number content mills skip. We spent research time on six major non-IBAN systems, reading the primary terms of each register, and the pattern inverts the IBAN world:
+
+- **United States** — the check digit is public (above), but the authoritative directory's terms restrict resale and redistribution, and the public lookup tool is deliberately capped, with storage of results restricted.
+- **Canada** — transit numbers have **no check digit**. The financial institutions file is downloadable, but commercial reproduction requires permission from the publisher.
+- **Australia** — BSB numbers have **no check digit**. The BSB file is publicly downloadable; the associated API is governed by materially different terms, so the file and the API are not interchangeable sources.
+- **India** — IFSC codes have **no check digit**. The central bank publishes the lists, behind measures that make bulk collection unreliable.
+- **Japan** — Zengin bank and branch codes have **no check digit**, and the branch-level data is licensed annually, with use inside a third-party service named as requiring a separate agreement.
+- **Mexico** — CLABE does carry a check digit, but the authoritative specification of the algorithm is distributed to SPEI participants rather than published for general reuse.
+
+In the IBAN world, the public algorithm does most of the work and registers add the rest. In the non-IBAN world, four of these six systems have no algorithm at all: **the register is the entire product**, and every one of these registers comes with terms that decide what may be rebuilt into an API.
+
+## Why we do not sell this today
+
+Our rule, learned in the IBAN world and kept everywhere: we ship a data block when we can name its source, its licence and its refresh date — and when the publisher's terms genuinely allow a paid API to serve it. For the systems above, we are doing this the slow way: asking the publishers directly, in writing, the same way we [asked the Bank of England](/blog/2026-08-25-uk-authorisation-with-permission) before shipping UK authorisation data.
+
+So today, IBANforge validates IBANs against national registers and resolves BICs; it does not validate routing numbers, transit numbers, BSBs or IFSCs. If your use case needs that coverage, [tell us](mailto:claude-alain@ibanforge.com?subject=Non-IBAN%20coverage) which countries matter to you — the order in which we pursue permissions is decided by exactly these messages. And if a vendor already sells you one of these countries, you now know the two questions to ask: *which register, under which licence?*

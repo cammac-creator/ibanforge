@@ -1,0 +1,85 @@
+---
+title: "Die ISO-20022-Adress-Deadline und der Ausweg über den BIC"
+description: "November 2026 ist real: Die SPS 2026 treten am 14. in Kraft, Fedwire folgt am 16., und das letzte SIC-Release mit unstrukturierten Adressen schliesst am 20. Was die Regeln tatsächlich verlangen, ist kleiner als die verkaufte Panik — und die Spezifikationen nennen den Ausweg selbst. Wir haben zwei Dinge geliefert: einen strukturierten postal_address-Block auf BIC-Antworten und einen kostenlosen Konformitätsprüfer."
+date: "2026-08-26"
+---
+
+Eine Marketingwelle erklärt Zahlungsteams derzeit, ihre Überweisungen würden ab November 2026 wegen der Adressen scheitern. Die Daten stimmen. Der Geltungsbereich ist deutlich kleiner als das Verkaufsargument — und die Spezifikationen beschreiben selbst einen Ausweg, den niemand in den Pitches zitiert.
+
+## Die echten Daten
+
+Drei Netzwerke verschärfen ihre Adressregeln innerhalb einer Woche:
+
+- **14. November 2026** — die Swiss Payment Standards 2026 treten in Kraft (SIX, SPS 2026 v2.3, publiziert am 20.02.2026).
+- **16. November 2026** — Produktionsdatum von Fedwire für dieselbe Familie von Änderungen.
+- **20. November 2026** — letztes SIC-Release, das unstrukturierte Adressen akzeptiert.
+
+Wenn Sie in einem Anbieter-Deck den «22. November 2026» gesehen haben, fragen Sie nach der Quelle. Wir haben gesucht: Kein Primärdokument trägt dieses Datum. Der plausibelste Ursprung sind die Schweizer Business Rules *2025*, gültig ab dem 22. November **2025** — ein um ein Jahr verrutschtes Datum, von Folie zu Folie kopiert.
+
+## Was die Regeln tatsächlich verlangen
+
+Für die Adresse eines **Finanzinstituts** in einer Zahlungsnachricht verlangen die Regeln zur strukturierten Adresse weit weniger als einen vollständigen Postdatensatz: Ort und Land, und nur dann, **wenn kein BIC den Agenten identifiziert**. Dieser letzte Halbsatz wiegt schwerer als alles andere im Regelwerk, denn die Schweizer Implementation Guidelines schreiben wörtlich, dass *die Adresse weiterhin durch ein anderes Element wie den BIC ersetzt werden kann*.
+
+Lesen Sie das mit den Augen eines Installateurs: Der günstigste Weg, die Adress-Deadline für Agentenblöcke zu erfüllen, ist, gar keine Adresse zu senden — sondern den BIC. Einen Bankcode zu seinem BIC aufzulösen ist das Tagesgeschäft eines IBAN- und BIC-Datenprodukts. Die Deadline schafft weniger eine neue Pflicht, als dass sie den Preis dafür erhöht, *den BIC nicht zu kennen*.
+
+Der wirklich schwierige Teil der Migration — die Postadressen Ihrer **Kunden** und Gegenparteien zu strukturieren — ist das Terrain der Adressverifikation (postalische Referenzdaten, Länderformate). Wir behaupten nicht, das zu können, und keine Bankdaten-API sollte es.
+
+## Was wir geliefert haben
+
+Zwei additive Bausteine, heute live.
+
+**1. Ein `postal_address`-Block auf BIC-Antworten.** Überall dort, wo unsere Register mindestens Ort und Land liefern können — das deckt 99,3 % der von uns servierten BICs — tragen `GET /v1/bic/{code}` und `POST /v1/iban/validate` die Adresse jetzt im ISO-20022-Vokabular, mit Herkunftsangabe pro Block. Ein Schweizer Institut kommt vollständig strukturiert aus dem SIX-Register zurück:
+
+```json
+"postal_address": {
+  "strt_nm": "Mingerstrasse",
+  "bldg_nb": "20",
+  "pst_cd": "3030",
+  "twn_nm": "Bern",
+  "ctry": "CH",
+  "format": "structured",
+  "source": "SIX BankMaster (Swiss IID register)",
+  "as_of": "2026-08-03"
+}
+```
+
+Ein britisches Institut, angereichert über GLEIF, kommt hybrid zurück — strukturiert, wo der Legal-Entity-Datensatz strukturiert ist, als Adresszeilen, wo nicht:
+
+```json
+"postal_address": {
+  "pst_cd": "E14 5HP",
+  "twn_nm": "LONDON",
+  "ctry": "GB",
+  "adr_line": ["1 CHURCHILL PLACE"],
+  "format": "hybrid",
+  "source": "GLEIF",
+  "as_of": "2026-04-13"
+}
+```
+
+Hält ein Register nur eine zu einer einzigen Zeichenkette verketteten Strasse, servieren wir sie als `adr_line` und raten nie eine Aufteilung in `strt_nm` + `bldg_nb`. Eine falsche Aufteilung sieht konformer aus als eine ehrliche Zeile — und validiert schlechter.
+
+**2. Ein kostenloser Konformitätsprüfer: `POST /v1/address/check`.** Sie senden eine bereits strukturierte Adresse, nennen ein Schema — `sps`, `hvps_plus` oder `fedwire` — und erhalten einen Befund pro Regel, jeder mit Dokument und Datum der Quelle. Es ist reine Regelauswertung ohne Datenbankzugriff, und genau darum kostenlos. Hier eine echte Produktionsantwort, auf einen Befund gekürzt:
+
+```json
+{
+  "scheme": "sps",
+  "conforms": false,
+  "findings": [
+    {
+      "rule": "adr_line_no_repeat",
+      "verdict": "fail",
+      "detail": "AdrLine \"8001 Zurich\" repeats PstCd and TwnNm.",
+      "source": "SIX, Swiss Implementation Guidelines for the ISO 20022 Payment Standard — Credit Transfer (pain.001), SPS 2026 v2.3, valid from 14 November 2026 (published 20.02.2026), ch. 3.11 table 9."
+    }
+  ]
+}
+```
+
+Ein Schema fehlt bewusst: Wer `cbpr+` anfragt, erhält eine begründete Ablehnung, keine Vermutung. Die CBPR+-Usage-Guidelines liegen hinter SWIFTs zugangsbeschränkter MyStandards-Plattform; ein «CBPR+-konform»-Abzeichen aus Regeln, die wir nicht zitieren können, wäre Theater. Die drei Schemata, die wir prüfen, sind publiziert, datiert und auf jedem Befund zitiert.
+
+## Was wir Ihnen nicht erzählen werden
+
+Wir werden Ihnen nicht erzählen, November 2026 sei ein Notfall, aus dem man sich mit einem Abzeichen freikauft. Für Agentenadressen ist die ehrliche Checkliste kurz: den BIC der Gegenpartei kennen, ihn senden, und wo trotzdem eine Adresse mitgeht, Ort und Land strukturiert übergeben. Die ersten beiden Punkte sind ein Lookup, den wir Ihnen längst verkaufen. Der dritte ist jetzt ein kostenloser Endpoint.
+
+Die Dokumentationsseite — [ISO 20022 strukturierte Adressen](/de/docs/structured-addresses) — enthält die vollständigen Regeltabellen, die Unterschiede pro Schema und die Primärquellen mit ihren Daten.
