@@ -160,6 +160,26 @@ describe('POST /v1/iban/validate with a payment reference', () => {
     expect(json.reference_check?.pairing).toBe('ok');
   });
 
+  it('survives a non-string reference_type instead of 500ing a paid call', async () => {
+    // This body is unvalidated JSON and the field picker casts rather than
+    // checks, so a numeric hint used to reach String.prototype.trim. An
+    // unusable hint must degrade to "no hint" — never to a 500 on a route the
+    // caller has already paid for.
+    const res = await makeApp().request('/v1/iban/validate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        iban: 'CH4431999123000889012',
+        reference: '210000000003139471430009017',
+        reference_type: 123,
+      }),
+    });
+    expect(res.status).toBe(200);
+    const json = (await res.json()) as { reference_check?: { scheme: string; pairing: string } };
+    expect(json.reference_check?.scheme).toBe('qrr');
+    expect(json.reference_check?.pairing).toBe('ok');
+  });
+
   it('always names the document behind the verdict', async () => {
     const json = await call({
       iban: 'CH4431999123000889012',

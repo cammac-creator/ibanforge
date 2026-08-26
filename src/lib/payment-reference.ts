@@ -236,7 +236,10 @@ const TYPE_ALIASES: Record<string, ReferenceScheme> = {
 
 /** Resolve a caller-supplied type string, or null when it names nothing. */
 export function resolveReferenceType(input: string | undefined | null): ReferenceScheme | null {
-  if (!input) return null;
+  // Defensive on the type as well as the value: callers hand this straight from
+  // unvalidated JSON bodies, where a `reference_type: 123` would otherwise reach
+  // String.prototype.trim and throw. An unusable hint is "no hint", never a 500.
+  if (!input || typeof input !== 'string') return null;
   return TYPE_ALIASES[input.trim().toLowerCase()] ?? null;
 }
 

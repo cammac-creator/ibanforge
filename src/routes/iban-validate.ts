@@ -48,7 +48,16 @@ ibanValidate.post('/v1/iban/validate', async (c) => {
   // `not_applicable` when there is none.
   const reference = getReference(body);
   if (typeof reference === 'string' && reference.trim() !== '') {
-    result.reference_check = buildReferenceCheck(result, reference, getReferenceType(body) ?? null);
+    // `pickField` casts with `as T` and validates nothing, so both fields need
+    // a real typeof guard here — this body is unvalidated JSON, and a numeric
+    // reference_type would otherwise reach String.prototype.trim and 500 a
+    // route the caller has already paid for.
+    const referenceType = getReferenceType(body);
+    result.reference_check = buildReferenceCheck(
+      result,
+      reference,
+      typeof referenceType === 'string' ? referenceType : null,
+    );
   }
 
   const postedPrice = result.cost_usdc;
