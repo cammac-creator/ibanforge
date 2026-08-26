@@ -84,12 +84,13 @@ afterAll(async () => {
 });
 
 describe('every tool declaring an outputSchema honours it', () => {
-  it('exposes six tools, all of them declaring an output schema', async () => {
+  it('exposes seven tools, all of them declaring an output schema', async () => {
     const { tools } = await client.listTools();
     // Six depuis le 21/08/2026 : `send_feedback` a rejoint les 5 outils de
     // donnée (audit B3 — le paquet npm était la seule surface sans boîte à
     // réclamations, alors que c'est le canal de distribution principal).
-    expect(tools).toHaveLength(6);
+    // Sept depuis le 26/08/2026 : `validate_payment_reference`.
+    expect(tools).toHaveLength(7);
     for (const t of tools) {
       expect(t.outputSchema, `${t.name} declares no outputSchema`).toBeDefined();
     }

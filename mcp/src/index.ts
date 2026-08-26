@@ -817,9 +817,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           });
           const block = (full as JsonRecord).reference_check;
           // Relay the whole answer when the block is missing rather than an
-          // empty object: an invalid IBAN still produced a real response, and
-          // swallowing it would hide the reason.
-          return relay(block ?? full);
+          // empty object: an invalid IBAN, or a 402, still produced a real
+          // response, and swallowing it would hide the reason. The narrowing is
+          // explicit because `reference_check` is `unknown` here — `block ?? full`
+          // widens to `{}` and loses the index signature `relay` needs.
+          return relay(block !== null && typeof block === 'object' ? (block as JsonRecord) : full);
         }
         const query = new URLSearchParams({ reference: a.reference });
         if (typeof a.reference_type === 'string') query.set('reference_type', a.reference_type);

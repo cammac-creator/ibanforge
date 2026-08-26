@@ -68,3 +68,21 @@ export function getIbansArray(
 ): unknown[] | undefined {
   return pickField<unknown[]>(body, ['ibans', 'iban_list', 'list']);
 }
+
+/**
+ * The structured payment reference an agent may send alongside an IBAN.
+ *
+ * Read through the same case-insensitive picker as `iban`, and for the same
+ * reason: the two fields arrive in one body, and a caller who writes `Reference`
+ * beside a working `IBAN` would otherwise get a silent no-op — the IBAN
+ * validates, the reference block simply never appears, and nothing says why.
+ */
+export function getReference(body: Record<string, unknown> | null | undefined): string | undefined {
+  return pickField<string>(body, ['reference', 'payment_reference', 'creditor_reference']);
+}
+
+export function getReferenceType(
+  body: Record<string, unknown> | null | undefined,
+): string | undefined {
+  return pickField<string>(body, ['reference_type', 'type']);
+}

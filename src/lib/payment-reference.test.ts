@@ -144,6 +144,25 @@ describe('Norwegian KID and Swedish OCR are recognised, never judged', () => {
     expect(validatePaymentReference('12345678', 'kid').source).toMatch(/Bits AS/);
     expect(validatePaymentReference('12345678', 'ocr').source).toMatch(/Bankgirot/);
   });
+
+  it('does not tell the caller their KID "looks like" another scheme', () => {
+    // The detector structurally never proposes kid or ocr, so an unguarded
+    // "your string looks like X, not the Y you asked for" fired on EVERY
+    // ordinary KID lookup — an artefact of the candidate list presented as a
+    // fact about the string, sitting right beside the sentence this feature
+    // exists to state honestly.
+    for (const scheme of ['kid', 'ocr'] as const) {
+      const note = validatePaymentReference('12345678', scheme).note;
+      expect(note, scheme).not.toMatch(/looks like/i);
+      expect(note, scheme).not.toMatch(/VIITENUMERO|OGM|QRR/);
+    }
+  });
+
+  it('keeps the contradiction warning where it is a real contradiction', () => {
+    // The guard must not silence the honest case: RF is detectable, so asking
+    // for QRR on an RF string is a genuine disagreement worth reporting.
+    expect(validatePaymentReference('RF18539007547034', 'qrr').note).toMatch(/looks like RF/);
+  });
 });
 
 describe('scheme detection and its ambiguities', () => {
@@ -160,6 +179,24 @@ describe('scheme detection and its ambiguities', () => {
     expect(result.scheme).toBe('ogm');
     expect(result.also_valid_as?.scheme).toBe('viitenumero');
     expect(result.note).toMatch(/also a legal length/);
+  });
+
+  it('reports a VALID Finnish reading behind an invalid OGM verdict', () => {
+    // The asymmetric direction, and the dangerous one: a caller reading only
+    // `valid` on a good Finnish reference of twelve digits gets "false".
+    // `also_valid_as` is the field that stops that being the whole story.
+    const body = '01080681718';
+    const fi = body + String(viitenumeroCheckDigit(body));
+    expect(fi).toHaveLength(12);
+    const result = validatePaymentReference(fi);
+    expect(result.scheme).toBe('ogm');
+    expect(result.valid).toBe(false);
+    expect(result.also_valid_as).toEqual({
+      scheme: 'viitenumero',
+      valid: true,
+      check_digit_expected: fi[11],
+    });
+    expect(result.note).toMatch(/checks out as valid/);
   });
 
   it('obeys an explicit type but says when it contradicts the string', () => {

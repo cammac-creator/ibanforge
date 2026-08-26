@@ -78,16 +78,25 @@ function handle(
 
   const result = validatePaymentReference(parsed.data.reference, parsed.data.reference_type);
 
-  // Free endpoint, so revenue is 0. The scheme rides in the country slot: these
-  // references are national conventions, and knowing WHICH one is asked about is
-  // the only useful dimension this endpoint has.
+  // Free endpoint, so revenue is 0.
+  //
+  // The country slot stays NULL, and it is tempting to put the scheme there
+  // because a scheme IS the useful dimension of this endpoint. It must not go
+  // there: `operations.country_code` is aggregated by several type-agnostic
+  // queries in lib/stats.ts (`topCountries` on /stats, and the top-5 in the
+  // dashboard) which GROUP BY that column across every operation type. A scheme
+  // written there would surface as a country, and `/stats` would publicly list
+  // `qrr` and `viitenumero` next to CH and DE.
+  //
+  // The scheme rides in `error_detail` instead, which is safe because every
+  // reader of that column filters on a specific `operation_type` first.
   try {
     recordOperation(
       'reference_validate',
-      result.scheme,
+      null,
       result.valid === true,
       0,
-      result.scheme === null ? 'unrecognised' : undefined,
+      result.scheme ?? 'unrecognised',
       c.get('apiKeyPrefix'),
     );
   } catch {

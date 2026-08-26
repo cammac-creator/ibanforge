@@ -148,6 +148,18 @@ describe('POST /v1/iban/validate with a payment reference', () => {
     expect(json.reference_check?.pairing).toBe('not_applicable');
   });
 
+  it('reads the reference field case-insensitively, like the iban beside it', async () => {
+    // Both fields arrive in one body. `iban` has always been case-insensitive,
+    // so a caller writing `Reference` next to a working `IBAN` would otherwise
+    // get a silent no-op: the IBAN validates, the block never appears, and
+    // nothing says why.
+    const json = await call({
+      IBAN: 'CH4431999123000889012',
+      Reference: '210000000003139471430009017',
+    });
+    expect(json.reference_check?.pairing).toBe('ok');
+  });
+
   it('always names the document behind the verdict', async () => {
     const json = await call({
       iban: 'CH4431999123000889012',

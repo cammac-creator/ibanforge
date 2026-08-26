@@ -247,6 +247,16 @@ export function resolveReferenceType(input: string | undefined | null): Referenc
  * scheme down. Every other numeric length is shared, because these schemes are
  * national conventions that were never coordinated with each other.
  */
+/**
+ * The schemes `detectSchemes` is able to propose from a string alone.
+ *
+ * `kid` and `ocr` are absent on purpose and permanently: nothing in a run of
+ * digits says Norway or Sweden, and guessing would attribute every Finnish
+ * reference to three countries at once. They are reachable only through an
+ * explicit `reference_type`.
+ */
+export const DETECTABLE_SCHEMES: readonly ReferenceScheme[] = ['rf', 'qrr', 'ogm', 'viitenumero'];
+
 export function detectSchemes(reference: string): ReferenceScheme[] {
   if (RF_PATTERN.test(reference)) return ['rf'];
   if (!DIGITS_ONLY.test(reference)) return [];
@@ -378,7 +388,15 @@ export function validatePaymentReference(
     // A hint that contradicts the string is reported, not obeyed silently: the
     // caller's metadata and the caller's string disagree, and only they can say
     // which one is wrong.
-    if (detected.length > 0 && !detected.includes(requested)) {
+    //
+    // Guarded by DETECTABLE_SCHEMES, and that guard is the whole point. The
+    // detector structurally never proposes `kid` or `ocr` — a country cannot be
+    // read off a run of digits — so an unguarded test is ALWAYS true for those
+    // two, and every ordinary KID lookup came back saying the string "looks like
+    // VIITENUMERO, not the KID you asked for". That is an artefact of the
+    // candidate list, not a fact about the string, and it sat right beside the
+    // one sentence this feature exists to state honestly.
+    if (DETECTABLE_SCHEMES.includes(requested) && detected.length > 0 && !detected.includes(requested)) {
       return {
         ...result,
         note: `${result.note} Note: the string looks like ${detected[0].toUpperCase()}, not the ${requested.toUpperCase()} you asked for — the verdict above judges it as ${requested.toUpperCase()}, as requested.`,

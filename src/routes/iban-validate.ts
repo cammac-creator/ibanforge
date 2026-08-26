@@ -3,7 +3,7 @@ import type { HonoEnv } from '../types.js';
 import { validateIBAN } from '../lib/iban.js';
 import { enrichResult } from '../lib/enrich.js';
 import { recordOperation } from '../lib/stats.js';
-import { getIban, computeRevenue } from '../lib/request-helpers.js';
+import { getIban, getReference, getReferenceType, computeRevenue } from '../lib/request-helpers.js';
 import { buildReferenceCheck } from '../lib/payment-reference.js';
 import type { IBANValidationResult } from '../types.js';
 
@@ -46,10 +46,9 @@ ibanValidate.post('/v1/iban/validate', async (c) => {
   // independent, and a caller fixing a typo still wants to know their reference
   // is sound. Only the PAIRING needs a parsed BBAN, and it reports
   // `not_applicable` when there is none.
-  const reference = body.reference;
+  const reference = getReference(body);
   if (typeof reference === 'string' && reference.trim() !== '') {
-    const referenceType = typeof body.reference_type === 'string' ? body.reference_type : null;
-    result.reference_check = buildReferenceCheck(result, reference, referenceType);
+    result.reference_check = buildReferenceCheck(result, reference, getReferenceType(body) ?? null);
   }
 
   const postedPrice = result.cost_usdc;
