@@ -54,6 +54,38 @@ const NEXT_STEPS_SCHEMA = z
   .optional()
   .describe('Ordered advice derived from THIS result: what blocks a payment first, what merely enriches it after. Branch on `code`, never on the prose. `because` names the field that produced the step so the advice is auditable. Empty for an IBAN that failed validation.');
 
+/**
+ * The official identity a central bank publishes for the resolved code.
+ *
+ * Declared here and attached to every tool whose result can carry it, for the
+ * reason spelled out above NEXT_STEPS_SCHEMA: the SDK validates output against
+ * the declared schema and Zod SILENTLY STRIPS what the schema does not name. A
+ * block left out here would vanish from `structuredContent` without an error —
+ * and this one carries licence conditions (`source`, `free_of_charge`) that
+ * both publishers require to accompany the data on every access.
+ */
+const OFFICIAL_IDENTITY_SCHEMA = z
+  .object({
+    name: z.string().describe("The institution's name as the publisher writes it."),
+    lei: z.string().nullable(),
+    address: z.string().nullable().describe('One-line registered address as published.'),
+    category: z.string(),
+    matched_by: z.string().describe('lei | national_code'),
+    source: z.string().describe('The publisher, cited as their licence requires. Relay it.'),
+    free_of_charge: z
+      .string()
+      .describe(
+        'Both publishers require buyers to be told, on every access, that the data is available free of charge from their own website. Relay it with the answer; do not strip it.',
+      ),
+    attribution: z.string().optional().describe('The Banco de Espana citation formula, verbatim. Spanish blocks only.'),
+    as_of: z.string().describe('Date of the list this row came from. Both lists are republished every business day.'),
+    authoritative: z.boolean().describe('Always false. Neither publisher allocates bank codes.'),
+  })
+  .optional()
+  .describe(
+    'Who a central bank says holds the resolved code (ECB by LEI and for FR bank codes, Banco de Espana for ES). Present only on a match — absence is not a negative. INFORMATIONAL ONLY: it never changes valid or bank_code_check, because both publishers relay rather than allocate.',
+  );
+
 const BANK_CODE_CHECK_SCHEMA = z
   .object({
     value: z.string(),
@@ -198,6 +230,7 @@ function createMcpServer(): McpServer {
           vop_coverage: z.boolean(),
         }).optional(),
         bank_code_check: BANK_CODE_CHECK_SCHEMA,
+        official_identity: OFFICIAL_IDENTITY_SCHEMA,
         next_steps: NEXT_STEPS_SCHEMA,
         clearing: z.object({
           iid: z.string(),
@@ -270,6 +303,7 @@ function createMcpServer(): McpServer {
             vop_coverage: z.boolean(),
           }).optional(),
           bank_code_check: BANK_CODE_CHECK_SCHEMA,
+          official_identity: OFFICIAL_IDENTITY_SCHEMA,
           next_steps: NEXT_STEPS_SCHEMA,
           clearing: z.object({
             iid: z.string(),
@@ -427,6 +461,7 @@ function createMcpServer(): McpServer {
           vop_coverage: z.boolean(),
         }).optional(),
         bank_code_check: BANK_CODE_CHECK_SCHEMA,
+        official_identity: OFFICIAL_IDENTITY_SCHEMA,
         next_steps: NEXT_STEPS_SCHEMA,
         compliance: z.object({
           sanctions: z.object({

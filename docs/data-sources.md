@@ -359,6 +359,21 @@ inhabituelle, et c'est elle qui a dicté la forme du bloc servi.
 > they access** the information taken from this website, that the information
 > **may be obtained free of charge** through this website. »
 
+🚨 **L'octroi commence par « Subject to the exception below »** — clause lue
+jusqu'au bout le 26/08/2026, parce qu'une licence dont on ne lit que les
+conditions et pas l'exception n'est pas une licence lue. L'exception ne nous
+concerne pas :
+
+> « **As an exception to the above**, any reproduction, publication or reprint,
+> in whole or in part, of **documents that bear the name of their authors**, such
+> as ECB Working Papers and ECB Occasional Papers, in the form of a different
+> publication (whether printed or produced electronically) is permitted only
+> with the explicit prior written authorisation of the ECB or the authors. »
+
+Elle vise les **publications signées** (Working Papers, Occasional Papers). La
+liste quotidienne des IFM est un jeu de données statistique sans auteur : elle
+tombe dans l'octroi libre, sous les quatre conditions ci-dessus.
+
 **Banco de España** — https://www.bde.es/wbe/en/pie/aviso-legal/ :
 
 > « Any distribution or reproduction of information disseminated on the Banco de

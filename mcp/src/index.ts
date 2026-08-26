@@ -71,6 +71,9 @@ const TOOLS: Tool[] = [
       'For GB: modulus_check { checked, passed } — the Vocalink checksum over the sort code and account number the IBAN carries, '  +
       'a SECOND check independent of mod-97. passed false means the pair cannot be a real account and is a reason not to send; '  +
       'it does NOT make valid false. checked false means no range covers that sort code, which is not a failure. ' +
+      'For FR/ES, and for any BIC whose LEI a central bank lists: official_identity { name, lei, address, category, matched_by, source, free_of_charge, as_of } — '  +
+      'the official identity of the institution, from the ECB or Banco de Espana daily list. Informational only: it never changes valid or bank_code_check. '  +
+      'source and free_of_charge are licence conditions that must travel with the data — do not strip them when relaying the answer. ' +
       'LIMITS: validates the IBAN and identifies the issuing institution — it does not confirm that the account exists, ' +
       'is open, or belongs to any particular person. Verify the payee by name before sending funds. ' +
       'COST: 0.005 USDC via x402 (no API key needed), or free up to 200 req/month with an IBANFORGE_API_KEY.',
@@ -177,6 +180,27 @@ const TOOLS: Tool[] = [
             },
             source: { type: 'string' },
             table_fetched_on: { type: 'string' },
+          },
+        },
+        official_identity: {
+          type: 'object',
+          description:
+            'The official identity a central bank publishes for the institution behind the resolved code (ECB by LEI and for FR bank codes, Banco de Espana for ES). Present only on a match — absence is not a negative. Informational only: it never changes valid or bank_code_check, because both publishers relay rather than allocate.',
+          properties: {
+            name: { type: 'string', description: "The institution's name as the publisher writes it." },
+            lei: { type: ['string', 'null'] },
+            address: { type: ['string', 'null'], description: 'One-line registered address as published.' },
+            category: { type: 'string' },
+            matched_by: { type: 'string', enum: ['lei', 'national_code'] },
+            source: { type: 'string', description: 'The publisher, cited as their licence requires.' },
+            free_of_charge: {
+              type: 'string',
+              description:
+                'Both publishers require buyers to be told, on every access, that the data is available free of charge from their own website. Relay it with the answer; do not strip it.',
+            },
+            attribution: { type: 'string', description: 'The Banco de Espana citation formula, verbatim. Spanish blocks only.' },
+            as_of: { type: 'string', description: 'Date of the list this row came from. Both lists are republished every business day.' },
+            authoritative: { type: 'boolean', description: 'Always false. Neither publisher allocates bank codes.' },
           },
         },
         clearing: {
