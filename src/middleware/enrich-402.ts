@@ -429,6 +429,12 @@ function buildAccessRamp(): Record<string, unknown> {
       pay_by_card_all_packs: PRICING_PAGE,
       pay_by_usdc: 'POST /v1/credits/buy/1k|5k|25k — list: GET /v1/credits/bundles',
       pricing: '1k = $5 · 5k = $20 (-20%) · 25k = $80 (-36%)',
+      // ECB/Banco de España licence condition: a buyer must be told, before
+      // paying, that the underlying data is free at its official source. The
+      // 402 IS the machine buyer's pre-payment screen, so the notice lives
+      // here — phrased as what the fee actually buys.
+      data_note:
+        'The public registers behind this API are available free of charge from their official publishers (see https://ibanforge.com/docs/data-sources). The fee pays for validation logic, aggregation, freshness and API delivery.',
     },
     x402: {
       description: 'Pay per call with USDC on Base L2 (machine-to-machine)',

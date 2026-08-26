@@ -67,3 +67,7 @@ Python: `pip install cdp-sdk "x402[evm,httpx]"` mit `x402HttpxClient` auf diesel
 ## Wenn Sie etwas am Bezahlen hindert
 
 Sagen Sie es uns — genau dafür gibt es den Rückkanal: das MCP-Tool `send_feedback` oder `POST /v1/feedback` (kostenlos, ohne Auth, funktioniert auch nach einer Quota-Ablehnung). Fehlendes Netzwerk, unklare Preise, ein scheiternder Wallet-Flow: Ein Mensch liest jeden Bericht.
+
+## Wofür die Gebühr bezahlt
+
+Die öffentlichen Register hinter dieser API sind bei ihren offiziellen Herausgebern kostenlos erhältlich — die vollständige Liste samt Lizenzen steht auf der Seite [Datenquellen](/docs/data-sources). Was Sie bezahlen: die Validierungslogik, die Aggregation eines Dutzends Register in eine einzige Antwort, die Aktualität und die API selbst.

@@ -363,6 +363,7 @@
       "heading": "Drei Zahlungswege",
       "subtitle": "Kostenlos starten, bei Bedarf vorauszahlen — oder Ihr Agent zahlt pro Aufruf.",
       "termsNotice": "Käufe und API-Nutzung unterliegen den <terms>Nutzungsbedingungen</terms>. Ungenutzte, per Karte bezahlte Pakete sind 14 Tage lang erstattungsfähig.",
+      "dataNotice": "Die öffentlichen Referenzdaten hinter dieser API - die Listen der EZB und der Banco de España, die List of Banks der Bank of England und die übrigen auf unserer Seite <sources>Datenquellen</sources> genannten Register - sind bei ihren offiziellen Herausgebern kostenlos erhältlich. Was Sie bezahlen: die Validierungslogik, die Aggregation, die Aktualität und die API selbst.",
       "x402": {
         "tag": "x402 · ohne Anmeldung",
         "title": "Pay-per-Call",

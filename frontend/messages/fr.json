@@ -363,6 +363,7 @@
       "heading": "Trois façons de payer",
       "subtitle": "Commencez gratuitement, prépayez en grandissant — ou laissez votre agent payer à l’appel.",
       "termsNotice": "Les achats et l'utilisation de l'API sont régis par les <terms>Conditions d'utilisation</terms>. Les packs payés par carte et non utilisés sont remboursables pendant 14 jours.",
+      "dataNotice": "Les données publiques de référence derrière cette API - listes de la BCE et du Banco de España, List of Banks de la Bank of England et les autres registres nommés sur notre page <sources>sources de données</sources> - sont disponibles gratuitement auprès de leurs éditeurs officiels. Ce que vous payez : la logique de validation, l'agrégation, la fraîcheur et l'API elle-même.",
       "x402": {
         "tag": "x402 · sans inscription",
         "title": "Paiement à l’appel",

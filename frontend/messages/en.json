@@ -363,6 +363,7 @@
       "heading": "Three ways to pay",
       "subtitle": "Start free, prepay as you grow — or let your agent pay per call.",
       "termsNotice": "Purchases and API use are governed by the <terms>Terms of Service</terms>. Unused card-paid packs are refundable for 14 days.",
+      "dataNotice": "The public reference data behind this API - the ECB and Banco de España lists, the Bank of England List of Banks and the other registers named on our <sources>data sources</sources> page - is available free of charge from its official publishers. What you pay for is the validation logic, the aggregation, the freshness and the API itself.",
       "x402": {
         "tag": "x402 · no signup",
         "title": "Pay per call",

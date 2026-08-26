@@ -172,6 +172,18 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
             ),
           })}
         </p>
+        {/* Licence condition (ECB, Banco de España): buyers must be told, before
+            they pay, that the underlying data is free at its official source.
+            Framed as what it truly is — you pay for the product, not the data. */}
+        <p className="mt-2 text-center text-xs text-muted-foreground">
+          {t.rich('rails.dataNotice', {
+            sources: (chunks) => (
+              <Link href={`/${locale}/docs/data-sources`} className="underline underline-offset-2 hover:text-foreground">
+                {chunks}
+              </Link>
+            ),
+          })}
+        </p>
       </section>
 
       {/* ── Pricing table ─────────────────────────────────────────────────── */}
