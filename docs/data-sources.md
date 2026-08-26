@@ -216,9 +216,9 @@ britannique, jamais le déploiement.
    | Page de conditions | Mesure du 24/08 |
    |---|---|
    | Commission européenne | ✅ lue — **CC BY 4.0**, Décision du 12/12/2011 |
-   | GAFI (`fatf-gafi.org/en/pages/terms-and-conditions.html`) | ❌ **403**, y compris avec un UA de navigateur |
-   | EPC (`europeanpaymentscouncil.eu/terms-use`) | ❌ **403**, idem |
-   | NBP (`nbp.pl/en/terms-of-use/`) | ❌ **mur anti-robot servi en 200** |
+   | GAFI (`fatf-gafi.org/en/pages/terms-and-conditions.html`) | ✅ **lu le 26/08 via le navigateur de Claude-Alain** — data : commercial permis avec attribution |
+   | EPC (`europeanpaymentscouncil.eu/terms-use`) | ✅ **lu le 26/08 (navigateur C-A)** — non commercial par défaut → lettre |
+   | NBP (`nbp.pl/en/terms-of-use/`) | ✅ **lu le 26/08 (navigateur C-A)** — personnel non commercial → couvert par la lettre EWIB |
    | OFAC / Treasury | ⏳ joignable, la bonne page de conditions reste à situer |
    | EBA Clearing | ⏳ site joignable en 200 ; c'est l'URL de la page participants qui a changé, **pas** un 403 comme noté le 23/08 |
 
@@ -462,6 +462,53 @@ espagnols étaient notés comme si l'on ne savait rien d'eux. Un établissement 
 crédit n'est pas touché. Épinglé par un test, parce que c'est une surface
 **payante** et qu'un score qui bouge en silence se remarque chez le client
 avant de se remarquer ici.
+
+## ✅ 26/08/2026 — les quatre pages murées, lues par Claude-Alain (captures/collages navigateur)
+
+Les murs anti-robots (403 GAFI/EPC, mur NBP, SPA FCA) sont tombés par le bon
+outil : le navigateur de Claude-Alain. Quatre verdicts, cités mot pour mot.
+
+**GAFI / FATF — ✅ EXPLOITABLE, usage commercial expressément permis.**
+> « Permitted Use – Except where additional restrictions apply as stated
+> above, you can extract from, download, copy, adapt, print, distribute,
+> share and embed data for any purpose, **even for commercial use**. You
+> must give appropriate credit to the FATF by using the citation associated
+> with the relevant data, or, if no specific citation is available […]:
+> FATF (year), (dataset name), (data source) DOI or URL (accessed on (date)). »
+> — Terms, Conditions and Disclaimers, section 2 « Data », fatf-gafi.org, lu le 26/08/2026
+
+Conditions : attribution au format ci-dessus, à RÉPERCUTER en cascade dans
+toute sous-licence ; jamais le logo ; jamais d'implication d'endossement.
+Le contenu écrit (hors data) est en CC BY 4.0. Attribution posée le 26/08
+sur les pages data-sources publiques (3 langues).
+
+**EPC — ❌ NON COMMERCIAL par défaut → permission d'abord.**
+> « In principle, the information contained in this website can be
+> reproduced, redistributed and transmitted for **non-commercial purposes**,
+> as long as the EPC as its source is acknowledged. »
+> — Disclaimer, europeanpaymentscouncil.eu, lu le 26/08/2026
+
+Vérifié le même jour : les CSV des registres (sct, sct_inst, sdd_core, vop)
+ne portent AUCUNE condition interne — le disclaimer du site gouverne.
+Les rulebooks exigent une approbation écrite préalable (nous ne les
+reproduisons pas). → Demande de permission à écrire à secretariat@epc-cep.eu
+(adresse publiée dans le disclaimer), sur le modèle Bank of England.
+Les registres EPC alimentent aujourd'hui sepa/vop_participant : statut à
+clarifier par la lettre, position documentée ici en attendant.
+
+**NBP — ❌ usage personnel NON COMMERCIAL.**
+> « Narodowy Bank Polski makes no objections to saving files, copying pages
+> in full or in part or making printouts for personal use, provided that
+> they do not serve commercial purposes. »
+> — Terms of Use, § 1.6, nbp.pl, lu le 26/08/2026
+
+Nos 21 lignes NBP dans bic.sqlite ne sont pas couvertes par ce texte. La
+demande déjà envoyée au helpdesk NBP (26/08, au sujet d'EWIB) couvre la
+question ; si la réponse est négative, retirer les 21 lignes.
+
+**FCA Developer — la page des conditions API reste illisible (SPA), mais
+l'Accessibility Statement livre un canal : RegisterAPISupport@fca.org.uk.**
+La réponse de fond au dossier ouvert (#212491959) reste la voie principale.
 
 ## Sources écartées, et pourquoi
 
