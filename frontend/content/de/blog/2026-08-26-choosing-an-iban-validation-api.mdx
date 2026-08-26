@@ -1,0 +1,96 @@
+---
+title: "IBAN-Validierungs-API auswählen: worauf es beim Vergleich wirklich ankommt"
+description: "Die Mod-97-Prüfziffer sind ein Dutzend Zeilen Code und überall dieselben — sie kann also nicht das sein, was man kauft. Sechs Kriterien, die IBAN-Validierungs-APIs tatsächlich unterscheiden, was IBANforge auf jedes davon antwortet, und die zwei Stellen, an denen unsere Antwort bewusst enger ausfällt als möglich."
+date: "2026-08-26"
+---
+
+Beim einfachen Teil sind sich alle IBAN-Validierungs-APIs einig. ISO 13616 definiert eine Mod-97-Prüfung über die umgestellte IBAN; dieser Test umfasst ein Dutzend Zeilen in jeder Sprache, und in jedem Ökosystem gibt es eine kostenlose Bibliothek dafür. Wenn Ihre Frage bei *erfüllt diese Zeichenkette die Prüfziffer* endet, müssen Sie nichts kaufen.
+
+Die Entscheidung fällt also anderswo. Was folgt, ist das Raster, das wir anlegen würden, wenn wir Käufer statt Verkäufer wären. Etablierte Anbieter gibt es in diesem Markt — AbstractAPI, IBAN.com, IBANAPI und API Ninjas unter anderen — und dieser Beitrag schreibt ihnen bewusst keine konkreten Eigenschaften zu: lesen Sie ihre eigenen Seiten und legen Sie das Raster an, statt der Zusammenfassung eines Wettbewerbers zu folgen.
+
+## 1. Prüfziffer oder Abgleich mit einem echten Register
+
+Eine gültige Prüfziffer sagt, dass die Ziffern in sich stimmig sind. Sie sagt nichts über die Frage, auf die es ankommt: Wurde die in der IBAN enthaltene Bankleitzahl jemals einem Institut zugeteilt? Eine erfundene IBAN besteht die Mod-97-Prüfung mühelos.
+
+Die Frage an einen Anbieter lautet deshalb: **Welche Länder prüfen Sie gegen ein nationales Register, und was bedeutet dort ein Fehltreffer?** Hier unsere eigene Antwort, in der Form, in der wir sie ausliefern. Eine deutsche IBAN, gekürzt auf das entscheidende Feld:
+
+```json
+"bank_code_check": {
+  "value": "37040044",
+  "status": "verified",
+  "match": "register",
+  "register": "Deutsche Bundesbank Bankleitzahlendatei",
+  "authoritative": true,
+  "institution": { "name": "Commerzbank", "post_code": "50447", "town": "Köln", "country": "DE" },
+  "as_of": "2026-08"
+}
+```
+
+Und nun die ehrliche Hälfte. Nur wenige Länder veröffentlichen überhaupt ein maßgebliches Zuteilungsregister. Heute sind das CH und LI (SIX BankMaster), DE (Deutsche Bundesbank), AT (OeNB), BE (BNB) und FI — dort werden Codes an Banken*gruppen* vergeben, ein Treffer wiegt also weniger, und die Antwort sagt das auch. Überall sonst, Frankreich eingeschlossen, sieht dasselbe Feld so aus:
+
+```json
+"bank_code_check": {
+  "value": "20041",
+  "status": "verified",
+  "match": "register",
+  "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+  "authoritative": false,
+  "as_of": "2026-08"
+}
+```
+
+Gleicher `status`, anderer Beweiswert — genau deshalb ist `authoritative` ein eigenes Feld und keine Fußnote in der Dokumentation. Wo es `true` ist, heißt `not_in_register`, dass die Bankleitzahl nicht vergeben ist: ein starker Grund, eine Zahlung zu stoppen. Wo es `false` ist, beweist ein Fehltreffer nichts und darf nicht als Ablehnung gelesen werden. Die Tabelle Land für Land, und was ein Fehltreffer dort jeweils bedeutet, steht unter [Datenquellen und Provenienz](/de/docs/data-sources).
+
+## 2. Was zurückkommt — und wer jeden Block veröffentlicht hat
+
+Zweite Achse: der Inhalt der Antwort, und der Teil, den man beim Vergleichen am ehesten überspringt — **woher jeder Block stammt und von wann er ist**. Ein aufgelöster BIC, ein LEI, eine Sitzadresse sind nur so viel wert wie ihr Herausgeber und ihr Datum.
+
+Unsere Regel: eine Quelle und ein Datum pro Block, nicht eines pro Antwort. Dieselbe französische IBAN trägt zusätzlich:
+
+```json
+"official_identity": {
+  "name": "La Banque Postale",
+  "lei": "96950066U5XAAIRCPA78",
+  "address": "115 RUE DE SÈVRES, 75275 PARIS CEDEX 06",
+  "category": "Credit Institution",
+  "matched_by": "national_code",
+  "source": "European Central Bank, list of monetary financial institutions (free at ecb.europa.eu)",
+  "free_of_charge": "This information may be obtained free of charge from the ECB website at ecb.europa.eu.",
+  "as_of": "2026-08-25",
+  "authoritative": false
+}
+```
+
+Drei Details verdienen Aufmerksamkeit. `matched_by` sagt, *wie* die Zeile erreicht wurde, denn ein Join über eine nationale Bankleitzahl und ein Join über einen LEI sind nicht gleich belastbar. `authoritative` steht auf `false`, obwohl der Herausgeber eine Zentralbank ist — die [EZB-Liste der monetären Finanzinstitute](https://www.ecb.europa.eu/stats/financial_corporations/list_of_financial_institutions/html/index.en.html) gibt weiter, was nationale Behörden melden, sie vergibt selbst keine Codes. Und `free_of_charge` ist eine Lizenzbedingung, keine Zierde: die zugrunde liegenden Register sind an ihrer amtlichen Quelle kostenlos, Käufer müssen bei jedem Zugriff darauf hingewiesen werden, der Hinweis reist deshalb im Block mit. Wer die Antwort weitergibt, gibt diese Felder mit.
+
+Für das Vereinigte Königreich kommt ein vierter Blocktyp hinzu — die Einlagenzulassung, mit schriftlicher Erlaubnis der Bank of England genutzt und mit dem Monat der Liste versehen. Das ist [ein eigener Beitrag](/de/blog/2026-08-25-uk-authorisation-with-permission).
+
+## 3. Compliance-Signale, und wo sie enden
+
+Hier geht ein Vergleich am leichtesten schief, weil die Wörter groß und der Geltungsbereich klein sind. Bei uns: Sanktionsprüfung **auf Bankebene, über den BIC8**, gegen OFAC, EU und UN; Länderlisten aus FATF und der EU-Liste der Hochrisiko-Drittländer; SEPA-Erreichbarkeit und Teilnahme an der Verification of Payee aus den EPC-Registern.
+
+Die Grenzen, so nüchtern wie möglich: es ist keine namensbasierte Prüfung, es ist kein reguliertes Geldwäsche-Produkt, und es ist Vorabtriage statt Entscheidung. Wir identifizieren das Institut hinter einer IBAN — nie das Konto und nie dessen Inhaber. Ein Anbieter, dessen Compliance-Seite diese Linie nicht für Sie zieht, überlässt Ihnen die Entdeckung beim ersten falsch negativen Treffer, also im teuersten denkbaren Moment.
+
+Ein Datum zum Vormerken: das EPC-Regelwerk zur Verification of Payee und seine API-Spezifikationen gelten ab dem **20. September 2026**.
+
+## 4. Aktualität, pro Quelle gemessen
+
+„Regelmäßig aktualisiert“ ist keine Spezifikation. Die Kadenz hängt vom Herausgeber ab und sollte pro Feld lesbar sein, nicht pro Produkt: unsere nationalen Register erneuern sich monatlich, die Compliance- und SEPA-Feeds wöchentlich, die Identitätslisten der Zentralbanken täglich. Daher steht `as_of` in jedem Block und nicht im Header — ein monatliches Register und eine tägliche Liste in derselben Antwort dürfen sich ihre Frische nicht gegenseitig ausleihen.
+
+## 5. Wie eine Maschine hereinkommt
+
+Ist der Aufrufer ein Agent statt eines Backends, wiegt der Zugangsweg so schwer wie die Daten. Drei Fragen: ein nativer MCP-Server oder eine HTTP-API, die jemand erst umhüllen muss? Kann pro Aufruf bezahlt werden, ohne dass ein Mensch ein Konto eröffnet? Und sagt eine kostenpflichtige Antwort ihren Preis und den Weg dorthin — oder verweigert sie bloß?
+
+Wir antworten mit einem nativen MCP-Server, x402-Mikrozahlungen auf Base L2 und einem 402, der Preis, Schema und den Weg zu einer gedeckten Wallet trägt. Das ist eine Wette auf die Richtung des Marktes, keine Behauptung, dass jeder das heute braucht.
+
+## 6. Die Form des Preises, nicht nur der Preis
+
+Die Preisgestaltung nimmt hier einige wenige Formen an: Monatsabo mit Anfragekontingent, gestufte Credit-Pakete, oder Tarife, bei denen bestimmte Antwortfelder der bezahlten Stufe vorbehalten sind. Was passt, hängt davon ab, ob Ihr Volumen gleichmäßig oder stoßweise anfällt — und ob das Feld, das Sie wirklich brauchen, in der Stufe liegt, die Sie zahlen können.
+
+Bei uns: ein kostenloser Schlüssel mit 200 Anfragen im Monat, Prepaid-Pakete ohne Verfall (1 000 Credits für 5 $, 5 000 für 20 $, 25 000 für 80 $), oder Bezahlung pro Aufruf von 0,003 bis 0,02 $ in USDC ganz ohne Konto. Jedes Feld ist in jeder Stufe enthalten; wir sperren weder LEI noch Adresse hinter einen Tarif.
+
+## Wo wir aufhören
+
+Wir decken 89 Länder strukturell ab, aber `authoritative: true` sind fünf Länder und ein bisschen, nicht die Welt; die Sanktionsprüfung bleibt auf Bankebene; und unsere ungewöhnliche Schweizer Tiefe — bis hin zur QR-IID-Frage, die sonst niemand per API beantwortet, siehe [Schweizer QR-IBAN und QR-IID](/de/docs/swiss-qr-iban) — gibt es nicht überall.
+
+Der schnellste Test all dessen, unseres eingeschlossen, ist eine echte IBAN zu senden und die Felder einzeln zu lesen. Das [Playground](/de/playground) tut genau das, und das Raster oben ist dasselbe, das wir Ihnen zum Benoten hinhalten würden.

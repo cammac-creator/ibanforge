@@ -1,0 +1,96 @@
+---
+title: "Choosing an IBAN validation API: what is actually worth comparing"
+description: "The mod-97 checksum is the same few lines of code in every product on the market, so it cannot be the thing you buy. Six criteria that genuinely separate IBAN validation APIs, what IBANforge answers on each, and the two where our answer is deliberately narrower than it could be."
+date: "2026-08-26"
+---
+
+Every IBAN validation API agrees on the easy part. ISO 13616 defines a mod-97 checksum over the rearranged IBAN: a dozen lines of code in any language, with a free library in every ecosystem. If all you need is *does this string satisfy the checksum*, you do not need to buy anything.
+
+So the decision has to be made on everything else. Below is the grid we would use if we were buying rather than selling. Established providers exist here — AbstractAPI, IBAN.com, IBANAPI and API Ninjas among them — and this post attributes no specific behaviour to any of them: read their own pages, and apply the grid rather than anyone's summary of a competitor.
+
+## 1. Checksum, or a check against a real register
+
+A valid checksum says the digits are internally consistent. It says nothing about whether the bank code carried inside the IBAN was ever allocated to an institution. A fabricated IBAN can pass mod-97 all day.
+
+The question to ask a vendor is therefore: **which countries do you check against a national register, and what does an absence mean there?** Here is our own answer to that, in the shape we serve it. A German IBAN, trimmed to the field that matters:
+
+```json
+"bank_code_check": {
+  "value": "37040044",
+  "status": "verified",
+  "match": "register",
+  "register": "Deutsche Bundesbank Bankleitzahlendatei",
+  "authoritative": true,
+  "institution": { "name": "Commerzbank", "post_code": "50447", "town": "Köln", "country": "DE" },
+  "as_of": "2026-08"
+}
+```
+
+And now the honest half. Only some countries publish an authoritative allocation register at all. Today that list is CH and LI (SIX BankMaster), DE (Deutsche Bundesbank), AT (OeNB), BE (BNB) and FI — where codes are allocated to banking *groups*, so even a hit is a weaker claim and the response says so. Everywhere else, including France, the same field looks like this:
+
+```json
+"bank_code_check": {
+  "value": "20041",
+  "status": "verified",
+  "match": "register",
+  "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+  "authoritative": false,
+  "as_of": "2026-08"
+}
+```
+
+Same `status`, different worth — which is exactly why `authoritative` is its own field rather than a footnote in the docs. Where it is `true`, `not_in_register` means the code is not allocated and is a strong reason to stop a payment. Where it is `false`, an absence proves nothing and should not be read as a rejection. The full country-by-country table, and what an absence means in each, is on [data sources & provenance](/en/docs/data-sources).
+
+## 2. What comes back — and who published each part
+
+The second axis is the payload — and the part easiest to skip when comparing: **where each block came from, and when**. A resolved BIC, an LEI and a registered address are worth only what their publisher and their date make them worth.
+
+Our rule is one source and one date per block, not one per response. The same French IBAN carries:
+
+```json
+"official_identity": {
+  "name": "La Banque Postale",
+  "lei": "96950066U5XAAIRCPA78",
+  "address": "115 RUE DE SÈVRES, 75275 PARIS CEDEX 06",
+  "category": "Credit Institution",
+  "matched_by": "national_code",
+  "source": "European Central Bank, list of monetary financial institutions (free at ecb.europa.eu)",
+  "free_of_charge": "This information may be obtained free of charge from the ECB website at ecb.europa.eu.",
+  "as_of": "2026-08-25",
+  "authoritative": false
+}
+```
+
+Three things worth noticing. `matched_by` says *how* the row was reached, because a join on a national bank code and a join on an LEI are not equally strong. `authoritative` is `false` even though the publisher is a central bank, because the [ECB list of monetary financial institutions](https://www.ecb.europa.eu/stats/financial_corporations/list_of_financial_institutions/html/index.en.html) relays what national authorities report rather than allocating codes itself. And `free_of_charge` is a licence condition, not decoration: the underlying registers are free at their official source, buyers must be told so on each access, so the notice travels inside the block. Relay the answer, relay those fields.
+
+The United Kingdom adds a fourth block: deposit-taking authorisation, used with the Bank of England's written permission and carrying the month of the list. That story is [its own post](/en/blog/2026-08-25-uk-authorisation-with-permission).
+
+## 3. Compliance signals, and where they stop
+
+Sanctions and country-risk fields are where a comparison goes wrong most easily: the words are large and the scope is small. Ours: sanctions screening is **bank-level, on the BIC8**, against OFAC, EU and UN; country lists from FATF and the EU high-risk third-country list; SEPA reachability and Verification of Payee readiness from the EPC participant registers.
+
+The limits, stated as plainly as we can: it is not name-level screening, it is not a regulated AML product, and it is pre-flight triage rather than a decision. We identify the institution behind an IBAN — never the account, never its holder. Any vendor whose compliance page does not draw that line for you is leaving you to discover it on a false negative, which is the most expensive moment possible.
+
+One date to hold: the EPC Verification of Payee scheme rulebook and its API specifications take effect on **20 September 2026**.
+
+## 4. Freshness, measured per source
+
+"Updated regularly" is not a specification. Cadence differs by publisher and should be readable per field, not per product: our national registers refresh monthly, the compliance and SEPA feeds weekly, the central-bank identity lists daily. Hence `as_of` inside each block rather than in a header — a monthly register and a daily list in one response must not borrow each other's freshness.
+
+## 5. How a machine gets in
+
+If the caller is an agent rather than a backend, the access model matters as much as the data. Three questions: a native MCP server, or an HTTP API someone must wrap? Can a caller pay per call without a human opening an account? And does a paywalled response say what it costs and how to pay, or merely refuse?
+
+We answer with a native MCP server, x402 micropayments on Base L2, and a 402 carrying the price, the schema and the path to a funded wallet. A bet on where this is going, not a claim that everyone needs it today.
+
+## 6. Price shape, not just price
+
+Pricing in this category takes a handful of shapes — a monthly subscription with a request quota, tiered credit bundles, and plans where certain response fields are reserved for the paid tier. Which one fits depends on whether your volume is steady or bursty, and on whether the field you actually need sits in the tier you can afford.
+
+Ours: a free key with 200 requests a month, prepaid packs that do not expire (1,000 credits for $5, 5,000 for $20, 25,000 for $80), or pay-per-call from $0.003 to $0.02 in USDC with no account at all. Every field is in every tier; we do not gate the LEI or the address behind a plan.
+
+## Where we stop
+
+We cover 89 countries structurally, but `authoritative: true` is five countries and change, not the world; sanctions screening is bank-level; and our unusual Swiss depth — down to the QR-IID question nobody else answers by API, on [Swiss QR-IBAN & QR-IID](/en/docs/swiss-qr-iban) — does not exist everywhere.
+
+The fastest test of any of this, ours included, is to send a real IBAN and read the fields one by one. The [playground](/en/playground) does that, and the grid above is the one we would hand you to grade us with.

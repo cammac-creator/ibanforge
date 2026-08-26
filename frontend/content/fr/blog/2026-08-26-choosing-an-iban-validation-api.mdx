@@ -1,0 +1,96 @@
+---
+title: "Choisir une API de validation d'IBAN : ce qu'il faut vraiment comparer"
+description: "La clé mod-97 fait une douzaine de lignes de code et elle est identique chez tout le monde — ce n'est donc pas elle que l'on achète. Six critères qui séparent réellement les API de validation d'IBAN, ce qu'IBANforge répond sur chacun, et les deux où notre réponse est volontairement plus étroite qu'elle pourrait l'être."
+date: "2026-08-26"
+---
+
+Sur la partie facile, toutes les API de validation d'IBAN sont d'accord. ISO 13616 définit une clé mod-97 calculée sur l'IBAN réarrangé : une douzaine de lignes dans n'importe quel langage, avec une bibliothèque gratuite dans tous les écosystèmes. Si votre besoin s'arrête à *cette chaîne satisfait-elle la clé de contrôle*, vous n'avez rien à acheter.
+
+La décision se joue donc ailleurs. Voici la grille que nous utiliserions en acheteurs plutôt qu'en vendeurs. Des acteurs établis existent sur ce marché — AbstractAPI, IBAN.com, IBANAPI ou API Ninjas — et ce billet ne leur attribue aucun comportement précis : lisez leurs pages, et appliquez la grille plutôt que le résumé qu'un concurrent en fait.
+
+## 1. Clé de contrôle, ou vérification contre un vrai registre
+
+Une clé valide indique que les chiffres sont cohérents entre eux. Elle ne dit rien de la question qui compte : le code banque porté par l'IBAN a-t-il jamais été attribué ? Un IBAN fabriqué passe le mod-97 sans difficulté.
+
+La question à poser à un fournisseur est donc : **quels pays vérifiez-vous contre un registre national, et que signifie une absence dans chacun ?** Notre réponse, dans la forme où nous la servons — un IBAN allemand, réduit au champ qui compte :
+
+```json
+"bank_code_check": {
+  "value": "37040044",
+  "status": "verified",
+  "match": "register",
+  "register": "Deutsche Bundesbank Bankleitzahlendatei",
+  "authoritative": true,
+  "institution": { "name": "Commerzbank", "post_code": "50447", "town": "Köln", "country": "DE" },
+  "as_of": "2026-08"
+}
+```
+
+Et maintenant la moitié honnête. Peu de pays publient un registre d'attribution faisant autorité : CH et LI (SIX BankMaster), DE (Deutsche Bundesbank), AT (OeNB), BE (BNB) et FI — où les codes vont à des *groupes* bancaires, si bien qu'une correspondance y vaut moins, et la réponse le dit. Partout ailleurs, France comprise, le même champ ressemble à ceci :
+
+```json
+"bank_code_check": {
+  "value": "20041",
+  "status": "verified",
+  "match": "register",
+  "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+  "authoritative": false,
+  "as_of": "2026-08"
+}
+```
+
+Même `status`, valeur probante différente — d'où un champ `authoritative` à part entière plutôt qu'une note de bas de page. Là où il vaut `true`, `not_in_register` signifie que le code n'est pas attribué : une bonne raison d'arrêter un paiement. Là où il vaut `false`, une absence ne prouve rien et ne doit pas être lue comme un refus. Le tableau pays par pays est sur [sources et provenance](/fr/docs/data-sources).
+
+## 2. Ce qui revient — et qui a publié chaque bloc
+
+Deuxième axe : le contenu de la réponse, et la partie qu'on oublie de comparer — **d'où vient chaque bloc et de quand il date**. Un BIC résolu, un LEI, une adresse de siège ne valent que leur éditeur et leur date.
+
+Notre règle : une source et une date par bloc, pas une par réponse. Le même IBAN français porte aussi :
+
+```json
+"official_identity": {
+  "name": "La Banque Postale",
+  "lei": "96950066U5XAAIRCPA78",
+  "address": "115 RUE DE SÈVRES, 75275 PARIS CEDEX 06",
+  "category": "Credit Institution",
+  "matched_by": "national_code",
+  "source": "European Central Bank, list of monetary financial institutions (free at ecb.europa.eu)",
+  "free_of_charge": "This information may be obtained free of charge from the ECB website at ecb.europa.eu.",
+  "as_of": "2026-08-25",
+  "authoritative": false
+}
+```
+
+Trois détails comptent. `matched_by` dit *comment* la ligne a été atteinte : une jointure sur un code banque national et une sur un LEI n'ont pas la même solidité. `authoritative` vaut `false` bien que l'éditeur soit une banque centrale — la [liste BCE des institutions financières monétaires](https://www.ecb.europa.eu/stats/financial_corporations/list_of_financial_institutions/html/index.en.html) relaie ce que les autorités nationales déclarent, elle n'attribue rien. Et `free_of_charge` est une condition de licence, pas une décoration : les registres sont gratuits à leur source officielle, l'acheteur doit en être informé à chaque accès, la mention voyage donc dans le bloc. Qui relaie la réponse relaie ces champs.
+
+Pour le Royaume-Uni s'ajoute un quatrième bloc : l'agrément de réception de dépôts, utilisé avec l'autorisation écrite de la Bank of England et portant le mois de la liste. C'est [un billet à part](/fr/blog/2026-08-25-uk-authorisation-with-permission).
+
+## 3. Signaux de conformité, et où ils s'arrêtent
+
+C'est l'endroit où une comparaison dérape le plus facilement : les mots sont grands et le périmètre petit. Chez nous : le criblage de sanctions est **au niveau de la banque, sur le BIC8**, contre OFAC, UE et ONU ; les listes pays viennent du GAFI et de la liste européenne des pays tiers à haut risque ; l'accessibilité SEPA et la participation à la Vérification du bénéficiaire viennent des registres de l'EPC.
+
+Les limites, dites platement : ce n'est pas un criblage nominatif, pas un produit LCB-FT réglementé, et c'est un tri en amont plutôt qu'une décision. Nous identifions l'établissement derrière un IBAN — jamais le compte, jamais son titulaire. Un fournisseur dont la page conformité ne trace pas cette ligne vous la laisse découvrir sur un faux négatif — au moment le plus coûteux possible.
+
+Une date à retenir : le rulebook EPC Verification of Payee et ses spécifications d'API s'appliquent au **20 septembre 2026**.
+
+## 4. Fraîcheur, mesurée par source
+
+« Mis à jour régulièrement » n'est pas une spécification. La cadence dépend de l'éditeur et se lit par champ, pas par produit : registres nationaux mensuels, flux conformité et SEPA hebdomadaires, listes d'identité des banques centrales quotidiennes. D'où `as_of` dans chaque bloc et non dans un en-tête — un registre mensuel et une liste quotidienne réunis dans une même réponse ne doivent pas s'emprunter leur fraîcheur.
+
+## 5. Comment une machine entre
+
+Si l'appelant est un agent et non un back-end, le mode d'accès pèse autant que la donnée. Trois questions : un serveur MCP natif, ou une API HTTP à emballer soi-même ? Peut-on payer à l'appel sans qu'un humain ouvre un compte ? Et une réponse payante dit-elle son prix et la marche à suivre, ou se contente-t-elle de refuser ?
+
+Nous répondons par un serveur MCP natif, des micropaiements x402 sur Base L2, et un 402 qui porte le prix, le schéma et le chemin vers un portefeuille approvisionné. Un pari sur la direction du marché, pas une affirmation que tout le monde en a besoin aujourd'hui.
+
+## 6. La forme du prix, pas seulement le prix
+
+La tarification prend ici quelques formes : abonnement mensuel avec quota de requêtes, paliers de crédits, ou plans réservant certains champs à l'offre payante. Le bon choix dépend de la régularité de votre volume et du palier où se trouve le champ dont vous avez besoin.
+
+Chez nous : une clé gratuite à 200 requêtes par mois, des packs prépayés qui n'expirent pas (1 000 crédits pour 5 $, 5 000 pour 20 $, 25 000 pour 80 $), ou le paiement à l'appel de 0,003 à 0,02 $ en USDC sans compte. Tous les champs sont dans tous les paliers ; ni le LEI ni l'adresse ne sont derrière un abonnement.
+
+## Où nous nous arrêtons
+
+Nous couvrons 89 pays structurellement, mais `authoritative: true` tient en cinq pays et des poussières ; le criblage reste au niveau banque ; et notre profondeur suisse inhabituelle — jusqu'à la question du QR-IID que personne d'autre ne traite par API, sur [QR-IBAN et QR-IID suisses](/fr/docs/swiss-qr-iban) — n'existe pas partout.
+
+Le test le plus rapide, le nôtre compris, consiste à envoyer un vrai IBAN et à lire les champs un par un. Le [playground](/fr/playground) fait cela, et la grille ci-dessus est celle que nous vous tendrions pour nous noter.

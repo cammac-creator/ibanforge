@@ -1,0 +1,121 @@
+---
+title: "Lookup BIC/SWIFT bien fait : d'un code à une identité vérifiable"
+description: "Un lookup qui renvoie un nom de banque a fait un quart du travail. Ce qu'une recherche BIC/SWIFT sérieuse doit répondre — l'entité juridique derrière le nom, l'adresse avec sa date de dépôt, le BIC8 partagé compté plutôt que deviné, l'agrément réglementaire là où il existe — avec de vraies réponses capturées."
+date: "2026-08-26"
+---
+
+La plupart des API de lookup BIC répondent à la même question : *à qui appartient ce code ?* Elles renvoient un nom, un pays, une ville, et c'est le produit. C'est une réponse utile, et c'est un quart du travail — parce qu'un nom n'est pas une identité, une ville n'est pas une adresse, et un grand nombre de BIC n'appartiennent à aucun établissement en particulier.
+
+Voici ce qu'un lookup BIC devrait répondre, illustré par des réponses capturées depuis la base livrée le 26 août 2026. Toutes les charges utiles ci-dessous sont réelles, et réduites uniquement là où c'est signalé.
+
+## Le nom, et l'entité juridique derrière
+
+Les noms d'établissements sont instables. Chaque annuaire les écrit à sa façon, ils changent à la moindre fusion, et rapprocher deux enregistrements par ressemblance de nom est la manière la plus sûre de faire porter à une banque l'histoire d'une autre. Un identifiant n'a pas ce défaut : le [Legal Entity Identifier](https://www.gleif.org/en/about-lei/introducing-the-legal-entity-identifier-lei) est un code de 20 caractères qui correspond ou ne correspond pas.
+
+Le LEI n'est donc pas chez nous un champ d'enrichissement optionnel : c'est la clé de jointure à laquelle tout le reste est accroché. `GET /v1/bic/BARCGB22`, réduit :
+
+```json
+{
+  "bic8": "BARCGB22",
+  "bic11": "BARCGB22XXX",
+  "found": true,
+  "institution": "BARCLAYS BANK PLC",
+  "country": { "code": "GB", "name": "United Kingdom" },
+  "lei": "G5GSEF7VJP5I7OUK5573",
+  "lei_status": "ACTIVE"
+}
+```
+
+`lei_status` compte autant que `lei`. Un LEI peut se périmer ; un enregistrement périmé est un signal réel sur une contrepartie, et c'est un signal sur lequel on ne peut agir que s'il est servi plutôt que supposé.
+
+## L'adresse, avec sa date de dépôt
+
+La même réponse porte l'adresse du siège enregistré — et, dans le même objet, sa provenance et sa date :
+
+```json
+"address": {
+  "type": "registered",
+  "street": "1 CHURCHILL PLACE",
+  "post_code": "E14 5HP",
+  "region": "GB-LND",
+  "city": "LONDON",
+  "country": "GB",
+  "romanized": "1 CHURCHILL PLACE",
+  "romanization": "original_latin",
+  "source": "GLEIF",
+  "language": "en",
+  "as_of": "2026-04-13"
+}
+```
+
+Une adresse sans date est une affirmation sans date de péremption imprimée dessus. `as_of` est la date de dépôt de l'enregistrement, pas la date à laquelle nous en avons rafraîchi notre copie — ce sont deux faits différents, et les confondre nous flatterait. `romanization` indique si la forme latine que vous lisez est l'originale ou une translittération : c'est la différence entre citer une banque et la paraphraser.
+
+## Le BIC8 partagé : compter, pas deviner
+
+C'est le point que la plupart des lookups traitent mal, discrètement. Un BIC8 n'identifie pas toujours un établissement unique. Le secteur coopératif allemand en est l'exemple le plus net : des milliers de banques indépendantes partagent une poignée de préfixes BIC8 et ne se distinguent que par le code d'agence en positions 9 à 11.
+
+Demandez l'un d'eux en BIC8 nu et il n'existe pas de réponse unique honnête. La nôtre refuse d'en inventer une :
+
+```json
+{
+  "bic8": "GENODEF1",
+  "found": false,
+  "institution": null,
+  "shared_bic8": { "institutions": 777, "entries": 1018 },
+  "note": "No head-office (XXX) record exists for this BIC8, but the directory holds 1018 entries under it, covering 777 distinct institutions. A shared BIC8 identifies the clearing institution, not the account holder: supply the full 11-character BIC including its branch code to resolve one of them. We do not pick one for you."
+}
+```
+
+Deux comportements sont refusés là. Le premier : nommer la ligne que la base a rendue en premier — une banque plausible, choisie par ordre de tri, sans rien qui la signale comme une supposition. Le second : répondre un « introuvable » sec alors que nous détenons un millier d'enregistrements sous ce code, ce qui dit à l'appelant que nous ne savons rien quand en réalité nous savons beaucoup, sauf la seule chose demandée. Compter est le milieu honnête : *voici la taille de l'ambiguïté, voici comment la lever.* Ces effectifs bougent à chaque rafraîchissement mensuel, raison pour laquelle ils sont calculés à l'appel plutôt qu'écrits dans une page.
+
+Fournissez le code d'agence et l'ambiguïté s'effondre :
+
+```json
+{
+  "bic11": "GENODEF1M04",
+  "found": true,
+  "institution": "Hausbank München eG Bank für Haus- und Grundbesitz",
+  "city": "München",
+  "lei": "529900EDWLRSBBNPOK20",
+  "lei_status": "ACTIVE",
+  "official_identity": {
+    "name": "Hausbank München eG Bank für Haus- und Grundbesitz",
+    "lei": "529900EDWLRSBBNPOK20",
+    "address": "Sonnenstraße 13, Postfach 1, 80331 München",
+    "category": "Credit Institution",
+    "matched_by": "lei",
+    "source": "European Central Bank, list of monetary financial institutions (free at ecb.europa.eu)",
+    "free_of_charge": "This information may be obtained free of charge from the ECB website at ecb.europa.eu.",
+    "as_of": "2026-08-25",
+    "authoritative": false
+  }
+}
+```
+
+`official_identity`, c'est l'établissement tel qu'une banque centrale le publie, atteint par le LEI. Le bloc est délibérément additif : il n'écrase jamais le champ `institution` de notre annuaire, parce qu'un appelant qui compare les deux a besoin de voir les deux. Il est aussi `authoritative: false` à dessein — la BCE relaie ce que les autorités nationales déclarent, elle n'attribue rien. Et `free_of_charge` est une condition de licence plutôt qu'une politesse : la liste sous-jacente est gratuite à sa source officielle, l'acheteur doit en être informé à chaque accès, la mention voyage donc dans le bloc. Qui relaie le bloc relaie ces champs.
+
+## L'agrément, là où un régulateur le publie
+
+Identité et permission sont deux questions distinctes. Savoir *qui* est un établissement ne dit pas ce qu'il a le droit de faire. Là où un régulateur publie la réponse, un lookup devrait la porter — et la porter avec sa provenance. `BARCGB22` de nouveau :
+
+```json
+"pra_authorisation": {
+  "authorised": true,
+  "firm_name": "Barclays Bank Plc",
+  "frn": "122702",
+  "section": "uk_incorporated",
+  "basis": "lei",
+  "source": "Bank of England, List of Banks",
+  "list_month": "2026-08"
+}
+```
+
+`basis: "lei"` dit que la jointure a été faite sur l'identifiant, jamais sur une ressemblance de nom. `list_month` est une condition de la permission qui nous a été accordée pour utiliser la liste : il voyage donc dans chaque bloc. Et le champ ne répond jamais `authorised: false` : la liste ne couvre que la réception de dépôts et son propre préambule précise qu'elle ne se substitue pas au Financial Services Register — une absence est donc l'absence d'une affirmation, pas un constat. [Comment nous avons demandé cette permission](/fr/blog/2026-08-25-uk-authorisation-with-permission) est un billet à part.
+
+## Ce sur quoi tout cela repose
+
+121k+ entrées BIC, assemblées à partir de GLEIF, de l'annuaire SWIFT public, de SIX, d'EBA STEP2 SCT, de la Bundesbank (Quelle: Deutsche Bundesbank) et de la NBP, rafraîchies mensuellement — et par-dessus, les listes d'identité quotidiennes des banques centrales et les flux hebdomadaires de sanctions et de SEPA. Chaque lookup BIC est criblé contre OFAC, UE et ONU, que l'annuaire détienne un enregistrement ou non : un simple « introuvable » sur un établissement désigné serait la chose la plus rassurante que ce point d'entrée puisse dire du code le moins rassurant qu'il connaisse.
+
+Quel registre a répondu, ce que vaut une absence, et à quelle cadence chaque source bouge : [sources et provenance](/fr/docs/data-sources). Le pays où notre annuaire va le plus loin est la Suisse, jusqu'à la participation aux systèmes de clearing et à l'attribution du QR-IID — voir [QR-IBAN et QR-IID suisses](/fr/docs/swiss-qr-iban).
+
+Essayez n'importe quel BIC ci-dessus, ou le vôtre, dans le [playground](/fr/playground), et lisez les champs plutôt que le titre. C'est tout l'argument.

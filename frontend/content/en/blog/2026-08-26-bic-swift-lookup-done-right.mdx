@@ -1,0 +1,121 @@
+---
+title: "BIC/SWIFT lookup done right: from a code to a verifiable identity"
+description: "A lookup that returns a bank name has done a quarter of the job. What a serious BIC/SWIFT lookup answers — the legal entity behind the name, the address with its filing date, the shared BIC8 counted rather than guessed, the regulatory authorisation where one exists — with real captured responses."
+date: "2026-08-26"
+---
+
+Most BIC lookup APIs answer the same question: *whose code is this?* They return a name, a country, a city, and that is the product. It is a useful answer and it is a quarter of the job, because a name is not an identity, a city is not an address, and a great many BICs do not belong to one institution at all.
+
+Here is what we think a BIC lookup should answer, illustrated with responses captured from the shipped database on 26 August 2026. Every payload below is real and trimmed only where marked.
+
+## The name, and the legal entity behind it
+
+Institution names are unstable. They are written differently by every directory, they change on a merger, and matching two records by name similarity is how one bank ends up wearing another's history. An identifier does not have that problem: the [Legal Entity Identifier](https://www.gleif.org/en/about-lei/introducing-the-legal-entity-identifier-lei) is a 20-character code that either matches or does not.
+
+So the LEI is not an optional enrichment field in our answers — it is the join key everything else hangs from. `GET /v1/bic/BARCGB22`, trimmed:
+
+```json
+{
+  "bic8": "BARCGB22",
+  "bic11": "BARCGB22XXX",
+  "found": true,
+  "institution": "BARCLAYS BANK PLC",
+  "country": { "code": "GB", "name": "United Kingdom" },
+  "lei": "G5GSEF7VJP5I7OUK5573",
+  "lei_status": "ACTIVE"
+}
+```
+
+`lei_status` matters as much as `lei`. An LEI can lapse; a lapsed registration is a real signal about a counterparty, and it is one you can only act on if the field is served rather than assumed.
+
+## The address, with the date it was filed
+
+The same response carries the registered head-office address — and, in the same object, where it came from and when it was last filed:
+
+```json
+"address": {
+  "type": "registered",
+  "street": "1 CHURCHILL PLACE",
+  "post_code": "E14 5HP",
+  "region": "GB-LND",
+  "city": "LONDON",
+  "country": "GB",
+  "romanized": "1 CHURCHILL PLACE",
+  "romanization": "original_latin",
+  "source": "GLEIF",
+  "language": "en",
+  "as_of": "2026-04-13"
+}
+```
+
+An address without a date is a claim with no expiry printed on it. `as_of` is the filing date of that record, not the date we refreshed our copy — those are different facts and conflating them would flatter us. `romanization` says whether the Latin form you are reading is the original or a transliteration, which is the difference between quoting a bank and paraphrasing it.
+
+## The shared BIC8: count, do not guess
+
+This is the part most lookups get quietly wrong. A BIC8 does not always identify one institution. Germany's cooperative sector is the clearest case: thousands of independent banks share a handful of BIC8 prefixes and are distinguished only by the branch code in positions 9–11.
+
+Ask for one of those as a bare BIC8 and there is no honest single answer. Ours refuses to invent one:
+
+```json
+{
+  "bic8": "GENODEF1",
+  "found": false,
+  "institution": null,
+  "shared_bic8": { "institutions": 777, "entries": 1018 },
+  "note": "No head-office (XXX) record exists for this BIC8, but the directory holds 1018 entries under it, covering 777 distinct institutions. A shared BIC8 identifies the clearing institution, not the account holder: supply the full 11-character BIC including its branch code to resolve one of them. We do not pick one for you."
+}
+```
+
+Two behaviours are being refused there. The first is naming whichever row the database returned first — a plausible bank, chosen by row order, with nothing marking it as a guess. The second is answering a flat "not found" while holding a thousand records under the code, which tells the caller we know nothing when in fact we know a great deal, just not the one thing they asked for. Counting is the honest middle: *here is the size of the ambiguity, here is how to resolve it.* Those counts move at every monthly refresh, which is why they are computed per call rather than written into a page.
+
+Supply the branch code and the ambiguity collapses:
+
+```json
+{
+  "bic11": "GENODEF1M04",
+  "found": true,
+  "institution": "Hausbank München eG Bank für Haus- und Grundbesitz",
+  "city": "München",
+  "lei": "529900EDWLRSBBNPOK20",
+  "lei_status": "ACTIVE",
+  "official_identity": {
+    "name": "Hausbank München eG Bank für Haus- und Grundbesitz",
+    "lei": "529900EDWLRSBBNPOK20",
+    "address": "Sonnenstraße 13, Postfach 1, 80331 München",
+    "category": "Credit Institution",
+    "matched_by": "lei",
+    "source": "European Central Bank, list of monetary financial institutions (free at ecb.europa.eu)",
+    "free_of_charge": "This information may be obtained free of charge from the ECB website at ecb.europa.eu.",
+    "as_of": "2026-08-25",
+    "authoritative": false
+  }
+}
+```
+
+`official_identity` is the institution as a central bank publishes it, reached by LEI. It is deliberately additive: it never overwrites the directory's own `institution` field, because a caller comparing the two needs to see both. It is also `authoritative: false` on purpose — the ECB relays what national authorities report, it does not allocate anything. And `free_of_charge` is a licence condition rather than a courtesy: the underlying list is free at its official source, buyers must be told so on each access, so the notice travels inside the block. Relay the block, relay those fields.
+
+## Authorisation, where a regulator publishes one
+
+Identity and permission are different questions. Knowing *who* an institution is does not tell you what it is allowed to do. Where a regulator publishes the answer, a lookup should carry it — and carry it with its provenance. `BARCGB22` again:
+
+```json
+"pra_authorisation": {
+  "authorised": true,
+  "firm_name": "Barclays Bank Plc",
+  "frn": "122702",
+  "section": "uk_incorporated",
+  "basis": "lei",
+  "source": "Bank of England, List of Banks",
+  "list_month": "2026-08"
+}
+```
+
+`basis: "lei"` says the join was made on the identifier, never on name similarity. `list_month` is a condition of the permission we were granted to use the list, so it ships with every block. And the field never answers `authorised: false`: the list covers deposit-taking alone and states in its own preamble that it does not supersede the Financial Services Register, so an absence is the absence of a claim rather than a finding. The [full story of asking for that permission](/en/blog/2026-08-25-uk-authorisation-with-permission) is its own post.
+
+## What the whole thing rests on
+
+121k+ BIC entries, assembled from GLEIF, the public SWIFT directory, SIX, EBA STEP2 SCT, Quelle: Deutsche Bundesbank, and NBP data, refreshed monthly — and, layered on top, the daily central-bank identity lists and the weekly sanctions and SEPA feeds. Every BIC lookup is screened against OFAC, EU and UN whether or not the directory holds a record, because a plain "not found" about a designated institution would be the most reassuring thing this endpoint could say about the least reassuring code it knows.
+
+Which register answered, what an absence means there, and how often each source moves: [data sources & provenance](/en/docs/data-sources). The country where our directory goes deepest is Switzerland, down to clearing participation and the QR-IID allocation — see [Swiss QR-IBAN & QR-IID](/en/docs/swiss-qr-iban).
+
+Try any BIC above, or your own, in the [playground](/en/playground) and read the fields rather than the headline. That is the whole argument.
