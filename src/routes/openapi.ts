@@ -47,7 +47,7 @@ const buildSpec = () => ({
         operationId: 'validateIBAN',
         summary: 'Validate a single IBAN',
         description:
-          'Validates an IBAN and returns parsed components including country, check digits, BBAN, and optional BIC lookup. Costs 0.005 USDC via x402.',
+          'Validates an IBAN and returns parsed components including country, check digits, BBAN, and optional BIC lookup. Costs 0.005 USDC via x402. Pass an optional `reference` to add `reference_check`: the reference checksum verdict AND whether the reference may legally travel with this account under the Swiss Payment Standards (QRR requires a QR-IBAN, ISO 11649/SCOR forbids one).',
         tags: ['IBAN'],
         security: [{ x402Payment: [] }, { apiKey: [] }],
         requestBody: {
@@ -62,6 +62,18 @@ const buildSpec = () => ({
                     type: 'string',
                     description: 'IBAN to validate (spaces allowed, will be normalized)',
                     example: 'GB29NWBK60161331926819',
+                  },
+                  reference: {
+                    type: 'string',
+                    description:
+                      'Optional structured payment reference. When present the response carries a `reference_check` block with the checksum verdict and, for CH/LI accounts, the QRR/SCOR pairing verdict. Free-standing checksum validation is available at no cost on GET /v1/reference/validate.',
+                    example: '210000000003139471430009017',
+                  },
+                  reference_type: {
+                    type: 'string',
+                    description:
+                      'Optional scheme hint for an ambiguous reference. `scor` and `rf` both mean ISO 11649.',
+                    enum: ['rf', 'scor', 'qrr', 'ogm', 'vcs', 'viitenumero', 'kid', 'ocr'],
                   },
                 },
               },
@@ -294,6 +306,88 @@ const buildSpec = () => ({
             },
           },
           '400': { description: 'Missing ?iban= query parameter, or IBAN shorter than 15 / longer than 34 characters' },
+        },
+      },
+    },
+    '/v1/reference/validate': {
+      get: {
+        operationId: 'validatePaymentReference',
+        summary: 'Free structured payment reference check',
+        description:
+          'FREE checksum validation for structured payment references: RF Creditor Reference (ISO 11649, "SCOR" in Swiss Payment Standards, mod 97-10), Swiss QR reference ("QRR", 27 digits, modulo 10 recursive), Belgian OGM/VCS (12 digits, modulo 97 with a remainder of 0 written 97) and Finnish viitenumero (4-20 digits, weights 7-3-1 from the right). Norwegian KID and Swedish OCR are RECOGNISED but answer `valid: null` with `status: unverifiable_without_creditor_config` — their modulus type and length are configured per creditor account by the beneficiary bank, so no generic checker can judge them and answering `false` would reject valid references. Every answer that names a scheme carries the document publishing the rule and its date. For the PAIRING verdict — whether a reference may legally travel with a given IBAN — use POST /v1/iban/validate with a `reference` field.',
+        tags: ['Free'],
+        // Explicitly no authentication, which is a different statement from
+        // omitting the field: an agent reading the contract can tell 'free' from
+        // 'the author forgot to say'.
+        security: [],
+        parameters: [
+          {
+            name: 'reference',
+            in: 'query',
+            required: true,
+            description: 'Reference as printed. Spaces, slashes and the Belgian +++…+++ wrapper are stripped.',
+            schema: { type: 'string', minLength: 4, maxLength: 64, example: 'RF18539007547034' },
+          },
+          {
+            name: 'reference_type',
+            in: 'query',
+            required: false,
+            description:
+              'Optional scheme hint, used when the string alone is ambiguous — a bare 12-digit string is both a Belgian OGM and a legal Finnish length. If it contradicts the string, the answer judges as asked and says so in `note`.',
+            schema: {
+              type: 'string',
+              enum: ['rf', 'scor', 'qrr', 'ogm', 'vcs', 'viitenumero', 'kid', 'ocr'],
+            },
+          },
+        ],
+        responses: {
+          '200': {
+            description:
+              'Reference verdict. `valid` is true, false, or null when the scheme cannot be checked without the creditor bank configuration.',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/PaymentReferenceResult' },
+              },
+            },
+          },
+          '400': { description: 'Missing ?reference= query parameter, or shorter than 4 / longer than 64 characters' },
+        },
+      },
+      post: {
+        operationId: 'validatePaymentReferencePost',
+        summary: 'Free structured payment reference check (JSON body)',
+        description:
+          'Same contract as the GET, with the reference in a JSON body — convenient for references carrying characters awkward to url-encode.',
+        tags: ['Free'],
+        security: [],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['reference'],
+                properties: {
+                  reference: { type: 'string', minLength: 4, maxLength: 64, example: '+++010/8068/17183+++' },
+                  reference_type: {
+                    type: 'string',
+                    enum: ['rf', 'scor', 'qrr', 'ogm', 'vcs', 'viitenumero', 'kid', 'ocr'],
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': {
+            description: 'Reference verdict',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/PaymentReferenceResult' },
+              },
+            },
+          },
+          '400': { description: 'Missing reference, or malformed JSON body' },
         },
       },
     },
@@ -993,6 +1087,10 @@ const buildSpec = () => ({
             enum: ['invalid_format', 'unsupported_country', 'wrong_length', 'checksum_failed'],
           },
           error_detail: { type: 'string' },
+          reference_check: {
+            allOf: [{ $ref: '#/components/schemas/ReferenceCheckBlock' }],
+            description: 'Present ONLY when the request carried a `reference` field.',
+          },
           cost_usdc: { type: 'number', example: 0.005 },
           processing_ms: { type: 'number' },
           sepa: {
@@ -1163,6 +1261,96 @@ const buildSpec = () => ({
             required: ['checked', 'passed', 'source', 'table_fetched_on'],
           },
           next_steps: NEXT_STEPS_SCHEMA,
+        },
+      },
+      PaymentReferenceResult: {
+        type: 'object',
+        required: ['reference', 'scheme', 'valid', 'status', 'source', 'note'],
+        properties: {
+          reference: {
+            type: 'string',
+            description: 'Normalized: uppercase, separators removed',
+            example: 'RF18539007547034',
+          },
+          scheme: {
+            type: 'string',
+            nullable: true,
+            enum: ['rf', 'qrr', 'ogm', 'viitenumero', 'kid', 'ocr'],
+            description: 'Null when no supported scheme matches the string',
+          },
+          valid: {
+            type: 'boolean',
+            nullable: true,
+            description:
+              'null is a REAL answer, not a missing one: the scheme was recognised and cannot be checked without the creditor bank configuration (KID, OCR). Never present null to a user as invalid.',
+          },
+          status: {
+            type: 'string',
+            enum: ['checked', 'unverifiable_without_creditor_config', 'unrecognised'],
+          },
+          check_digit_expected: {
+            type: 'string',
+            description:
+              'A STRING, so a two-digit value beginning with zero survives — an OGM remainder of 3 is "03", and a remainder of 0 is written "97".',
+            example: '18',
+          },
+          also_valid_as: {
+            type: 'object',
+            description:
+              'The second reading of an ambiguous string, with its own verdict. A bare 12-digit reference is both a Belgian OGM and a legal Finnish length.',
+            properties: {
+              scheme: { type: 'string', example: 'viitenumero' },
+              valid: { type: 'boolean' },
+              check_digit_expected: { type: 'string' },
+            },
+          },
+          source: {
+            type: 'string',
+            nullable: true,
+            description:
+              'The document that publishes the rule. Null only when no scheme matched, so no rule was applied. Relay it: it is what makes the verdict auditable.',
+          },
+          as_of: {
+            type: 'string',
+            description: 'YYYY-MM of that document — the date it carries, never a future validity date',
+            example: '2023-10',
+          },
+          note: { type: 'string', description: 'What was checked, and what was not' },
+          pairing_verdict: {
+            type: 'string',
+            description: 'Pointer to POST /v1/iban/validate for the QRR/SCOR pairing verdict',
+          },
+        },
+      },
+      ReferenceCheckBlock: {
+        type: 'object',
+        description:
+          'Served inside POST /v1/iban/validate when a `reference` was supplied. Carries TWO independent verdicts: `valid` (the reference checksum) and `pairing` (whether it may legally travel with this account). A reference can be arithmetically valid and still illegal on that IBAN, and the reverse. Each verdict names its own document.',
+        required: ['reference', 'scheme', 'valid', 'status', 'source', 'pairing', 'note'],
+        properties: {
+          reference: { type: 'string', example: '210000000003139471430009017' },
+          scheme: { type: 'string', nullable: true, enum: ['rf', 'qrr', 'ogm', 'viitenumero', 'kid', 'ocr'] },
+          valid: { type: 'boolean', nullable: true },
+          status: {
+            type: 'string',
+            enum: ['checked', 'unverifiable_without_creditor_config', 'unrecognised'],
+          },
+          check_digit_expected: { type: 'string' },
+          also_valid_as: { type: 'object' },
+          source: { type: 'string', nullable: true, description: 'Provenance of the CHECKSUM verdict' },
+          as_of: { type: 'string', example: '2026-02' },
+          pairing: {
+            type: 'string',
+            enum: ['ok', 'qrr_requires_qr_iban', 'scor_forbidden_with_qr_iban', 'not_applicable'],
+            description:
+              'Per the Swiss Implementation Guidelines a QRR reference may only be used with a QR-IBAN (institution identifier in the SIX range 30000-31999), and an ISO 11649 (SCOR) reference may not. `not_applicable` outside CH/LI, where there is no QR-IBAN to pair against — including for a valid RF reference, whose own checksum verdict is unaffected.',
+          },
+          pairing_source: {
+            type: 'string',
+            description: 'Provenance of the PAIRING verdict — a DIFFERENT document from `source`',
+          },
+          pairing_as_of: { type: 'string', example: '2026-02' },
+          note: { type: 'string' },
         },
       },
       IBANFormatResult: {

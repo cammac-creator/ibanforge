@@ -37,6 +37,7 @@ A request without a valid key or payment gets a `402` response with machine-read
 | `/v1/bic/:code` | GET | $0.003 | Look up a BIC/SWIFT code |
 | `/v1/iban/compliance` | POST | $0.02 | Sanctions, FATF, SEPA/VoP reachability + 0–100 risk score |
 | `/v1/ch/clearing/:iid` | GET | $0.003 | Swiss BC-Nummer / IID lookup (SIX BankMaster) |
+| `/v1/reference/validate` | GET/POST | Free | Payment reference checksum (RF/ISO 11649, Swiss QRR, Belgian OGM, Finnish viitenumero) |
 | `/v1/demo` | GET | Free | Example validations (no payment needed) |
 | `/health` | GET | Free | Service health check |
 

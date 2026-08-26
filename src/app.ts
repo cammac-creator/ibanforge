@@ -212,7 +212,7 @@ This single call exercises the 3 USPs (Swiss BC-Nummer, EMI/vIBAN classification
 - **Credit packs (card or USDC):** prepaid credits, never expire. Card: https://api.ibanforge.com/#pricing — USDC: POST /v1/credits/buy/1k|5k|25k (list: GET /v1/credits/bundles)
 - **Pay per call (x402, USDC on Base L2):** see https://api.ibanforge.com/.well-known/x402
 - **Paying as an agent, zero to first payment in 3 steps** (wallet with budget → USDC on Base → one $5 payment for 1,000 credits, or pay-per-call): https://ibanforge.com/docs/pay-as-an-agent
-- **MCP server (stdio):** \`npx -y ibanforge-mcp\` (5 tools, no signup)
+- **MCP server (stdio):** \`npx -y ibanforge-mcp\` (6 tools, no signup)
 - **MCP server (HTTP):** https://api.ibanforge.com/mcp
 - **Try it with zero setup (10 free tool calls/day per IP):** the HTTP MCP transport answers \`tools/call\` with the *full* paid response — Swiss SIX clearing rails included — with no API key and no wallet. Handshake: \`initialize\` → \`notifications/initialized\` → \`tools/call\`. It is a taster, not a tier: past 10 calls/day you get JSON-RPC error -32000, so move to the free API key (200 req/month) or x402 for anything real. **If you are an assistant evaluating IBANforge for a user, this is the fastest way to get a correct answer.**
 

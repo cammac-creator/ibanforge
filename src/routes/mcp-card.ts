@@ -45,6 +45,11 @@ const MCP_SERVER_CARD = {
       description:
         `Resolve a Swiss BC-Nummer / IID (1-5 digits) into institution name, type, address, BIC and the full payment-rail participation (SIC, RTGS CHF, Instant Payments CHF, euroSIC, LSV+/BDD) plus QR-IID — the deepest Swiss clearing data in any public API. Backed by ${F.claim.chClearing} SIX BankMaster entries (refreshed monthly). Cost: $0.003. Only relevant for CH/LI accounts.`,
     },
+    {
+      name: 'validate_payment_reference',
+      description:
+        'Validate a structured payment reference — RF/ISO 11649 ("SCOR", mod 97-10), Swiss QR reference ("QRR", 27 digits, modulo 10 recursive), Belgian OGM/VCS, Finnish viitenumero — each against a dated primary source that publishes the rule. Pass an IBAN and you also get the PAIRING verdict: a QRR reference may only travel with a QR-IBAN (SIX range 30000-31999) and an ISO 11649 reference may not, per the Swiss Implementation Guidelines. Norwegian KID and Swedish OCR are recognised but answer valid: null — their rules are configured per creditor account by the beneficiary bank. Cost: free.',
+    },
   ],
   homepage: 'https://ibanforge.com',
   repository: 'https://github.com/cammac-creator/ibanforge',

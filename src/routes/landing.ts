@@ -38,7 +38,7 @@ landing.get('/', (c) => {
     "mainEntity":[
       {"@type":"Question","name":"What is IBANforge?","acceptedAnswer":{"@type":"Answer","text":"IBANforge is a REST API for IBAN validation, BIC/SWIFT lookup, and compliance risk scoring. It covers 89 countries with 121K+ BIC entries from public sources (GLEIF, SwiftCodes (MIT), Bundesbank, SIX, NBP), 38K of which are LEI-enriched via GLEIF."}},
       {"@type":"Question","name":"How much does IBANforge cost?","acceptedAnswer":{"@type":"Answer","text":"IBANforge offers a free tier with 200 requests per month using an API key. Beyond that, pay $0.002 to $0.02 per call using USDC micropayments via the x402 protocol. No subscription required."}},
-      {"@type":"Question","name":"Can AI agents use IBANforge?","acceptedAnswer":{"@type":"Answer","text":"Yes. IBANforge is MCP-native with 5 tools for AI agents: validate_iban, batch_validate_iban, lookup_bic, check_compliance, and lookup_ch_clearing. Compatible with Claude, GPT, and any MCP client."}},
+      {"@type":"Question","name":"Can AI agents use IBANforge?","acceptedAnswer":{"@type":"Answer","text":"Yes. IBANforge is MCP-native with 6 tools for AI agents: validate_iban, batch_validate_iban, lookup_bic, check_compliance, lookup_ch_clearing, and validate_payment_reference. Compatible with Claude, GPT, and any MCP client."}},
       {"@type":"Question","name":"What countries does IBANforge support?","acceptedAnswer":{"@type":"Answer","text":"IBANforge supports 89 countries with full BBAN parsing, SEPA membership detection, Verification of Payee (VoP) reachability status, and country-level risk classification."}}
     ]
   });
@@ -291,7 +291,7 @@ landing.get('/', (c) => {
         <div class="feat-card">
           <div class="feat-icon feat-icon-purple"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M12 2a4 4 0 0 0-4 4c0 2 2 3 2 6h8c0-3 2-4 2-6a4 4 0 0 0-4-4z"/><rect x="9" y="12" width="6" height="4" rx="1"/><path d="M10 16v1a2 2 0 1 0 4 0v-1"/></svg></div>
           <h3>MCP Native</h3>
-          <p>5 tools for AI agents via Model Context Protocol. Works with Claude, GPT, and any MCP client.</p>
+          <p>6 tools for AI agents via Model Context Protocol. Works with Claude, GPT, and any MCP client.</p>
         </div>
         <div class="feat-card">
           <div class="feat-icon feat-icon-cyan"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M2 12h4l3-9 6 18 3-9h4"/></svg></div>
@@ -448,7 +448,7 @@ console.<span class="f">log</span>(result);
         <div class="mcp-icon"><svg width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M12 2a4 4 0 0 0-4 4c0 2 2 3 2 6h8c0-3 2-4 2-6a4 4 0 0 0-4-4z"/><rect x="9" y="12" width="6" height="4" rx="1"/><path d="M10 16v1a2 2 0 1 0 4 0v-1"/></svg></div>
         <div>
           <h3>AI Agents? Use MCP</h3>
-          <p>Add IBANforge to your agent with <code>npm run mcp</code> &mdash; exposes 5 tools via stdio transport. Compatible with Claude Desktop, Cursor, and any MCP client.</p>
+          <p>Add IBANforge to your agent with <code>npm run mcp</code> &mdash; exposes 6 tools via stdio transport. Compatible with Claude Desktop, Cursor, and any MCP client.</p>
         </div>
       </div>
       <div class="footer-links">

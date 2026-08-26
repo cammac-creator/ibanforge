@@ -2,12 +2,13 @@
 /**
  * IBANforge MCP Server
  *
- * Exposes 6 tools backed by the IBANforge HTTP API (api.ibanforge.com):
+ * Exposes 7 tools backed by the IBANforge HTTP API (api.ibanforge.com):
  *   - validate_iban
  *   - batch_validate_iban
  *   - lookup_bic
  *   - lookup_ch_clearing
  *   - check_compliance
+ *   - validate_payment_reference
  *   - send_feedback
  *
  * `send_feedback` was HTTP-only until 21/08/2026 (audit B3): npm is the main
@@ -403,6 +404,78 @@ const TOOLS: Tool[] = [
     },
   },
   {
+    name: 'validate_payment_reference',
+    title: 'Validate Payment Reference',
+    annotations: { title: 'Validate Payment Reference', ...READ_ONLY },
+    description:
+      'Validate a structured payment reference and, when an IBAN is supplied, decide whether the two may legally travel together. ' +
+      'USE WHEN: assembling a payment instruction from an invoice, a QR-bill or a remittance advice; whenever a Swiss IBAN and a reference appear together; ' +
+      'or when the user pastes an "RF..." string, a 27-digit number, or a +++123/4567/89012+++ block. ' +
+      'DO NOT USE to validate the IBAN itself — that is validate_iban. ' +
+      'SCHEMES: RF Creditor Reference (ISO 11649, "SCOR" in Swiss Payment Standards, mod 97-10); Swiss QR reference ("QRR", 27 digits, modulo 10 recursive); Belgian OGM/VCS (12 digits, modulo 97, a remainder of 0 written 97); Finnish viitenumero (4-20 digits, weights 7-3-1 from the right). ' +
+      'Norwegian KID and Swedish OCR are RECOGNISED but never judged: they answer valid: null with status unverifiable_without_creditor_config, because modulus type and length are configured per creditor account by the beneficiary bank. NEVER relay those to a user as "invalid". ' +
+      'AMBIGUITY: only a leading "RF" and a 27-digit length pin a scheme down. A bare 12-digit string is both a Belgian OGM and a legal Finnish length, so the more specific reading is returned and the other appears in also_valid_as. Pass reference_type when you know the country. ' +
+      'THE PAIRING RULE: pass an iban and you also get a pairing verdict. Per the Swiss Implementation Guidelines a QRR reference may ONLY be used with a QR-IBAN (institution identifier in the SIX range 30000-31999), and an ISO 11649 reference may NOT be used with one. Outside CH and LI, pairing is not_applicable. ' +
+      'valid and pairing are INDEPENDENT verdicts — a reference can be arithmetically valid and still illegal on that account. Relay source/as_of: they make the verdict auditable. ' +
+      'COST: free without an iban (routed to GET /v1/reference/validate). WITH an iban it is routed to POST /v1/iban/validate and costs 0.005 USDC, which also returns the full IBAN enrichment — the pairing verdict is what that call buys.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        reference: {
+          type: 'string',
+          description:
+            'The reference as printed. Spaces, slashes and the Belgian +++...+++ wrapper are stripped. Examples: "RF18539007547034", "210000000003139471430009017", "+++010/8068/17183+++".',
+        },
+        reference_type: {
+          type: 'string',
+          enum: ['rf', 'scor', 'qrr', 'ogm', 'vcs', 'viitenumero', 'kid', 'ocr'],
+          description: 'Optional scheme hint, used when the string alone is ambiguous.',
+        },
+        iban: {
+          type: 'string',
+          description:
+            'Optional creditor IBAN this reference would travel with. Supply it for the pairing verdict; that path is billed at 0.005 USDC.',
+        },
+      },
+      required: ['reference'],
+    },
+    outputSchema: {
+      type: 'object',
+      description:
+        'Reference verdict. Without an iban this is the free checksum answer; with one it is the reference_check block of a full IBAN validation.',
+      properties: {
+        reference: { type: 'string', description: 'Normalized: uppercase, separators removed.' },
+        scheme: {
+          type: 'string',
+          enum: ['rf', 'qrr', 'ogm', 'viitenumero', 'kid', 'ocr'],
+          description: 'Null when no supported scheme matches.',
+        },
+        valid: {
+          type: 'boolean',
+          description:
+            'null means recognised but uncheckable without the creditor bank configuration (KID, OCR). Never report null as false.',
+        },
+        status: { type: 'string', enum: ['checked', 'unverifiable_without_creditor_config', 'unrecognised'] },
+        check_digit_expected: {
+          type: 'string',
+          description: 'A STRING, so a two-digit value beginning with zero survives ("03", "97").',
+        },
+        also_valid_as: { type: 'object', description: 'The second reading of an ambiguous string, with its own verdict.' },
+        source: { type: 'string', description: 'The document publishing the rule. Relay it.' },
+        as_of: { type: 'string', description: 'YYYY-MM of that document.' },
+        note: { type: 'string' },
+        pairing: {
+          type: 'string',
+          enum: ['ok', 'qrr_requires_qr_iban', 'scor_forbidden_with_qr_iban', 'not_applicable'],
+          description: 'Present only when an iban was supplied.',
+        },
+        pairing_source: { type: 'string', description: 'A DIFFERENT document from source.' },
+        pairing_as_of: { type: 'string' },
+      },
+      required: ['reference', 'scheme', 'valid', 'status', 'source', 'note'],
+    },
+  },
+  {
     name: 'check_compliance',
     title: 'Compliance Check',
     annotations: { title: 'Compliance Check', ...READ_ONLY },
@@ -728,6 +801,32 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         return relay(result);
       }
 
+      case 'validate_payment_reference': {
+        if (typeof a.reference !== 'string' || !a.reference.trim()) {
+          return out({ error: 'invalid_input', message: 'Argument `reference` must be a non-empty string.' });
+        }
+        // Two rails, because the pairing verdict is the paid half. Without an
+        // IBAN there is nothing to pair against, so the free endpoint answers
+        // in full; with one, the block rides inside the IBAN validation that
+        // already carries the SIX register — and that call is billed.
+        if (typeof a.iban === 'string' && a.iban.trim()) {
+          const full = await apiCall('POST', '/v1/iban/validate', {
+            iban: a.iban,
+            reference: a.reference,
+            ...(typeof a.reference_type === 'string' ? { reference_type: a.reference_type } : {}),
+          });
+          const block = (full as JsonRecord).reference_check;
+          // Relay the whole answer when the block is missing rather than an
+          // empty object: an invalid IBAN still produced a real response, and
+          // swallowing it would hide the reason.
+          return relay(block ?? full);
+        }
+        const query = new URLSearchParams({ reference: a.reference });
+        if (typeof a.reference_type === 'string') query.set('reference_type', a.reference_type);
+        const result = await apiCall('GET', `/v1/reference/validate?${query.toString()}`);
+        return relay(result);
+      }
+
       case 'send_feedback': {
         if (typeof a.error_type !== 'string' || typeof a.notes !== 'string' || a.notes.trim().length < 3) {
           return fail({
@@ -773,4 +872,4 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 const transport = new StdioServerTransport();
 await server.connect(transport);
 
-process.stderr.write('IBANforge MCP server ready (stdio). 6 tools exposed.\n');
+process.stderr.write('IBANforge MCP server ready (stdio). 7 tools exposed.\n');

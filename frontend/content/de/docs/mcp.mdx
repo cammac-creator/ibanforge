@@ -1,6 +1,6 @@
 ---
 title: "MCP-Integration"
-description: "IBANforge mit Claude, Cursor und jedem MCP-Agenten verbinden: das npm-Paket ibanforge-mcp, ein gehosteter Endpoint ohne Installation, fünf Tools und Ergebnisse, die sagen, was als Nächstes zu tun ist."
+description: "IBANforge mit Claude, Cursor und jedem MCP-Agenten verbinden: das npm-Paket ibanforge-mcp, ein gehosteter Endpoint ohne Installation, sechs Tools und Ergebnisse, die sagen, was als Nächstes zu tun ist."
 order: 5
 ---
 
@@ -40,7 +40,7 @@ claude mcp add ibanforge -e IBANFORGE_API_KEY=ifk_ihr_schluessel -- npx -y ibanf
 
 Der Schlüssel ist optional und kostenlos: [hier erstellen](/) mit einer E-Mail-Adresse (200 Anfragen/Monat, ohne Karte). Ohne Schlüssel startet der Server trotzdem, und kostenpflichtige Tools antworten mit x402-Zahlungsanweisungen, die ein Agent mit USDC auf Base pro Aufruf begleichen kann.
 
-Nach dem Speichern den Client neu starten. Fünf IBANforge-Tools erscheinen im Tool-Menü.
+Nach dem Speichern den Client neu starten. Sechs IBANforge-Tools erscheinen im Tool-Menü.
 
 ## Option 2 — der gehostete Endpoint (nichts zu installieren)
 
@@ -52,7 +52,7 @@ Streamable-HTTP-Transport, **10 kostenlose Tool-Aufrufe pro IP und Tag**, ganz o
 
 Im offiziellen MCP-Registry ist der Server als `io.github.cammac-creator/ibanforge` gelistet.
 
-## Die fünf Tools
+## Die sechs Tools
 
 ### validate_iban
 
@@ -94,6 +94,16 @@ Vollständige Vorprüfung in einem Aufruf: Sanktionsprüfung auf dem aufgelöste
 { "iban": "CH1000230000000012345" }
 ```
 
+### validate_payment_reference
+
+Validiert eine strukturierte Zahlungsreferenz — RF/ISO 11649 (`SCOR`), Schweizer QR-Referenz (`QRR`), belgische OGM/VCS, finnische viitenumero — und entscheidet, sobald eine `iban` mitgegeben wird, ob beide zusammen reisen dürfen. Kostenlos; derselbe Vertrag wie `GET /v1/reference/validate`, ergänzt um das Zuordnungsurteil.
+
+`valid` und `pairing` sind **unabhängig**: Eine Referenz kann arithmetisch gültig und auf diesem Konto dennoch unzulässig sein. Die norwegische KID und die schwedische OCR antworten mit `valid: null` — ihre Regeln werden pro Gläubigerkonto von der Bank des Begünstigten konfiguriert — und dürfen nie als „ungültig" weitergegeben werden.
+
+```json
+{ "reference": "210000000003139471430009017", "iban": "CH4431999123000889012" }
+```
+
 ## Ergebnisse, die sagen, was als Nächstes zu tun ist
 
 Jedes Validierungsergebnis trägt ein geordnetes Feld `next_steps`: Was eine Zahlung blockiert, kommt zuerst, was sie nur anreichert, danach. Jeder Eintrag hat einen stabilen `code` zum Verzweigen, einen `do`-Satz, den der Agent weitergeben kann, und ein `because`, das das Antwortfeld nennt, aus dem der Rat entstand — der Rat ist prüfbar statt geglaubt. `bank_code_not_allocated` heißt Stopp; `verify_payee_name` heißt weitermachen und eine Empfängernamen-Prüfung entscheiden lassen.
@@ -128,7 +138,7 @@ Jedes Validierungsergebnis trägt ein geordnetes Feld `next_steps`: Was eine Zah
 ## Hinweise
 
 - Das npm-Paket ist ein schlanker Client für `api.ibanforge.com`: Die Daten leben serverseitig, nichts herunterzuladen, und Ergebnisse spiegeln stets die letzte Registeraktualisierung.
-- Alle fünf Tools liefern dasselbe JSON wie die REST-API, als Text und als MCP-`structuredContent`.
+- Alle sechs Tools liefern dasselbe JSON wie die REST-API, als Text und als MCP-`structuredContent`.
 - Releases erscheinen auf [npm](https://www.npmjs.com/package/ibanforge-mcp) und werden ins MCP-Registry gespiegelt.
 
 Siehe auch: [Rezepte](/docs/recipes) · [Was „verified" bedeutet](/docs/iban-validate) · [Datenquellen](/docs/data-sources)

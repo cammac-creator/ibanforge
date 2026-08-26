@@ -91,6 +91,7 @@ const CONTRACT_TOOLS = [
   'lookup_ch_clearing',
   'send_feedback',
   'validate_iban',
+  'validate_payment_reference',
 ];
 
 /**
