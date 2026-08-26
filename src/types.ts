@@ -346,6 +346,7 @@ export interface IBANValidationResult {
    * conditions this block carries on every access.
    */
   official_identity?: OfficialIdentity;
+  /**
    * The EBA PSD2 register naming the holder of this bank code as an authorised
    * payment or e-money institution. Present only for countries where the
    * register's national reference code is demonstrably the bank code the IBAN
