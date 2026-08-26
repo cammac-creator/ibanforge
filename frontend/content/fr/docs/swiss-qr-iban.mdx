@@ -210,6 +210,108 @@ curl -X POST https://api.ibanforge.com/v1/iban/validate \
 
 `bank_code_check.authoritative: true` dit que le verdict vient de l'autorité d'attribution elle-même — le SIX BankMaster, et non un annuaire BIC qui mentionne au passage des banques suisses. `is_qr_iid: true` dans `clearing` marque l'IBAN comme QR-IBAN, tandis que `iid` porte déjà le numéro ordinaire de l'établissement.
 
+## Étape 4 — apparier la référence et le compte (`reference_check`)
+
+Reconnaître un QR-IBAN ne fait que la moitié du travail. L'autre moitié, c'est la **référence imprimée à côté**, et les Swiss Payment Standards rendent les deux indissociables :
+
+> Une référence **QRR** (la référence QR structurée) **ne peut être utilisée qu'en combinaison avec un QR-IBAN**. Une **référence créancier ISO 11649** — `SCOR` dans les Swiss Payment Standards — **ne doit pas être utilisée avec un QR-IBAN**.
+>
+> — SIX, *Swiss Implementation Guidelines Credit Transfer (pain.001)*, SPS 2026 v2.3, document daté du 20.02.2026, en vigueur au 14 novembre 2026 ; et SIX, *Swiss Implementation Guidelines for the QR-bill* v2.4 § 4.3.2 : *« Use of the Creditor Reference (ISO 11649) presupposes that an IBAN has been used. A QR-IBAN cannot be used. »*
+
+Les guidelines marquent les violations de cette règle des codes d'erreur CH16 et CH17. Nous nommons ces codes parce qu'ils figurent dans la colonne des guidelines elles-mêmes ; **nous n'en citons pas le libellé**, qui vit dans un document de status report que nous n'avons pas lu. La réponse renvoie donc à « the Swiss Implementation Guidelines (SPS) » et s'arrête là.
+
+Passez une `reference` à `POST /v1/iban/validate` et la réponse gagne un bloc `reference_check` qui porte **deux verdicts indépendants** :
+
+| Verdict | Ce à quoi il répond |
+|---|---|
+| `valid` | La référence satisfait-elle sa propre règle de chiffre de contrôle ? |
+| `pairing` | A-t-elle le droit de voyager avec **ce** compte ? |
+
+Les deux ne bougent pas ensemble. Une référence peut être arithmétiquement parfaite et rester illicite sur cet IBAN — c'est précisément le cas que la règle existe pour attraper.
+
+### Les quatre issues d'appariement
+
+| `pairing` | Signification |
+|---|---|
+| `ok` | La combinaison est permise |
+| `qrr_requires_qr_iban` | Une référence QR a été donnée pour un IBAN ordinaire |
+| `scor_forbidden_with_qr_iban` | Une référence ISO 11649 a été donnée pour un QR-IBAN |
+| `not_applicable` | Compte hors CH/LI, ou schéma que la règle suisse ne couvre pas |
+
+**Une référence QR sur le QR-IBAN auquel elle appartient :**
+
+```bash
+curl -X POST https://api.ibanforge.com/v1/iban/validate \
+  -H "Content-Type: application/json" \
+  -d '{"iban":"CH4431999123000889012","reference":"210000000003139471430009017"}'
+```
+
+```json
+{
+  "reference_check": {
+    "reference": "210000000003139471430009017",
+    "scheme": "qrr",
+    "valid": true,
+    "status": "checked",
+    "check_digit_expected": "7",
+    "source": "SIX Swiss Implementation Guidelines for the QR-bill v2.4 (document dated 24.02.2026, valid from 14 November 2026), Annex B \"Check digit calculation by modulo 10 recursive\".",
+    "as_of": "2026-02",
+    "pairing": "ok",
+    "pairing_as_of": "2026-02"
+  }
+}
+```
+
+**La même référence sur un IBAN suisse ordinaire — la panne que ce bloc existe pour attraper :**
+
+```json
+{
+  "reference_check": {
+    "scheme": "qrr",
+    "valid": true,
+    "pairing": "qrr_requires_qr_iban",
+    "note": "… Pairing: IID 04835 is outside the SIX QR range 30000–31999, so this is an ordinary IBAN, and a QRR reference may only be used in combination with a QR-IBAN per the Swiss Implementation Guidelines (SPS). Either use the creditor's QR-IBAN or send this payment without a QRR reference."
+  }
+}
+```
+
+`valid` vaut toujours `true`. La référence est bonne ; c'est la **combinaison** qui ne l'est pas. Un code qui ne lit que `valid` expédie cette instruction et se la fait refuser à la soumission.
+
+Hors de Suisse et du Liechtenstein, `pairing` vaut `not_applicable` — il n'y a aucun QR-IBAN contre lequel apparier, et répondre `ok` affirmerait un contrôle qui n'a jamais tourné. Le verdict de checksum de la référence, lui, n'est pas affecté : une référence RF valide est valide partout.
+
+### Les checksums de référence, seuls, sont gratuits
+
+L'arithmétique est une commodité publiée, elle ne coûte donc rien :
+
+```bash
+curl "https://api.ibanforge.com/v1/reference/validate?reference=RF18539007547034"
+```
+
+```json
+{
+  "reference": "RF18539007547034",
+  "scheme": "rf",
+  "valid": true,
+  "status": "checked",
+  "check_digit_expected": "18",
+  "source": "Finance Finland, \"Structure of the RF Creditor Reference (ISO 11649)\", October 2023 (check-digit algorithm); SIX Swiss Implementation Guidelines for the QR-bill v2.4 § 2.12.2, valid from 14 November 2026 (structure).",
+  "as_of": "2023-10"
+}
+```
+
+Quatre schémas sont contrôlés arithmétiquement, chacun contre un document primaire qui publie la règle gratuitement :
+
+| Schéma | Règle | Source |
+|---|---|---|
+| **RF / ISO 11649** (`SCOR`) | mod 97-10 — la même arithmétique qu'un chiffre de contrôle d'IBAN | Finance Finland, oct. 2023 |
+| **Référence QR suisse** (`QRR`) | 27 chiffres, modulo 10 récursif | SIX IG QR-facture v2.4, annexe B |
+| **OGM/VCS belge** | 12 chiffres, modulo 97 sur les dix premiers, un reste de 0 s'écrivant 97 | Febelfin v3.3, 01-02-2019 |
+| **Viitenumero finlandais** | 4 à 20 chiffres, poids 7-3-1 depuis la droite | Finance Finland, 1er nov. 2009 |
+
+**Le KID norvégien et l'OCR suédois sont reconnus, jamais jugés.** Ils répondent `valid: null` avec `status: "unverifiable_without_creditor_config"`, parce que le type de modulus et la longueur admise sont configurés **par compte créancier** par la banque du bénéficiaire : ce ne sont pas des propriétés de la chaîne. Répondre `false` rejetterait des références parfaitement bonnes, donc nous ne le faisons pas. Ne relayez jamais un `null` à un utilisateur comme « invalide » — relayez que le contrôle exige la configuration de la banque du créancier.
+
+**Une ambiguïté mérite d'être connue.** Seuls un `RF` initial et une longueur de 27 chiffres désignent un schéma sans équivoque. Une chaîne de 12 chiffres nue est simultanément un OGM belge et une longueur finlandaise licite : la réponse donne donc la lecture la plus spécifique et signale l'autre dans `also_valid_as`. Passez `reference_type` quand vous connaissez le pays.
+
 ## Classification des IBAN virtuels et identification des utilisateurs finaux (art. 22(3) AMLR)
 
 Le même bloc `issuer` qui affiche `bank` pour Valiant est celui qui signale ailleurs un émetteur d'**IBAN virtuels**. Cela dépasse la Suisse, à cause d'une obligation européenne précise.
@@ -267,6 +369,9 @@ Ce `meta.disclaimer` n'est pas un ornement et il n'est pas adouci ici : il s'agi
 
 - **L'établissement, jamais le compte ni son titulaire.** Un QR-IID résolu nomme l'établissement émetteur. Il ne dit rien des douze chiffres qui le suivent dans l'IBAN, ni de la personne qui détient ce compte.
 - **Le type de référence est une règle, pas une prédiction.** Nous vous disons qu'un IBAN se trouve dans la plage QR et appelle donc une référence QR structurée. Qu'une instruction donnée soit acceptée en aval dépend de la banque du débiteur et de la référence elle-même.
+- **Un checksum de référence ne prouve pas que la référence est la bonne.** `valid: true` dit que les chiffres sont cohérents entre eux ; il ne dit rien sur la correspondance entre cette référence et la facture que le créancier attend de lettrer.
+- **Deux schémas que nous refusons délibérément de juger.** Le KID norvégien et l'OCR suédois sont configurés par compte créancier par la banque du bénéficiaire. Nous reconnaissons le format et nous nous arrêtons là, plutôt que de fabriquer un verdict que nous ne pouvons pas soutenir.
+- **CH16 / CH17 sont nommés, jamais cités.** Les codes figurent dans les guidelines ; leur libellé vit dans un document de status report que nous n'avons pas consulté.
 - **Fraîcheur mensuelle, toujours datée.** Le SIX BankMaster est rafraîchi chaque mois et chaque réponse clearing porte son `valid_on`. Un QR-IID valable il y a un an peut être redirigé aujourd'hui.
 - **`qr_iid_source: "headquarters"` est une déduction.** Solide, étiquetée, et jamais présentée comme un appariement publié par SIX.
 

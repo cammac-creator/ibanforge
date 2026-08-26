@@ -210,6 +210,108 @@ curl -X POST https://api.ibanforge.com/v1/iban/validate \
 
 `bank_code_check.authoritative: true` says the verdict came from the allocation authority itself — the SIX BankMaster, not a BIC directory that happens to mention Swiss banks. `is_qr_iid: true` inside `clearing` marks the IBAN as a QR-IBAN, while `iid` already carries the institution's standard number.
 
+## Step 4 — pair the reference with the account (`reference_check`)
+
+Recognising a QR-IBAN is only half the job. The other half is the **reference printed beside it**, and Swiss Payment Standards make the two inseparable:
+
+> A **QRR** reference (the structured QR reference) **may only be used in combination with a QR-IBAN**. An **ISO 11649 Creditor Reference** — `SCOR` in Swiss Payment Standards — **must not be used together with a QR-IBAN**.
+>
+> — SIX, *Swiss Implementation Guidelines Credit Transfer (pain.001)*, SPS 2026 v2.3, document dated 20.02.2026, valid from 14 November 2026; and SIX, *Swiss Implementation Guidelines for the QR-bill* v2.4 § 4.3.2: *"Use of the Creditor Reference (ISO 11649) presupposes that an IBAN has been used. A QR-IBAN cannot be used."*
+
+The guidelines mark violations of this rule with the error codes CH16 and CH17. We name the codes because they appear in the guidelines' own column; **we do not quote their wording**, which lives in a status-report document we have not read. The answer therefore refers to "the Swiss Implementation Guidelines (SPS)" and stops there.
+
+Pass a `reference` to `POST /v1/iban/validate` and the response grows a `reference_check` block carrying **two independent verdicts**:
+
+| Verdict | What it answers |
+|---|---|
+| `valid` | Does the reference satisfy its own check-digit rule? |
+| `pairing` | May it legally travel with **this** account? |
+
+They do not move together. A reference can be arithmetically perfect and still be illegal on that IBAN — which is exactly the case the rule exists to catch.
+
+### The four pairing outcomes
+
+| `pairing` | Meaning |
+|---|---|
+| `ok` | The combination is permitted |
+| `qrr_requires_qr_iban` | A QR reference was given for an ordinary IBAN |
+| `scor_forbidden_with_qr_iban` | An ISO 11649 reference was given for a QR-IBAN |
+| `not_applicable` | Not a CH/LI account, or a scheme the Swiss rule does not cover |
+
+**A QR reference on the QR-IBAN it belongs to:**
+
+```bash
+curl -X POST https://api.ibanforge.com/v1/iban/validate \
+  -H "Content-Type: application/json" \
+  -d '{"iban":"CH4431999123000889012","reference":"210000000003139471430009017"}'
+```
+
+```json
+{
+  "reference_check": {
+    "reference": "210000000003139471430009017",
+    "scheme": "qrr",
+    "valid": true,
+    "status": "checked",
+    "check_digit_expected": "7",
+    "source": "SIX Swiss Implementation Guidelines for the QR-bill v2.4 (document dated 24.02.2026, valid from 14 November 2026), Annex B \"Check digit calculation by modulo 10 recursive\".",
+    "as_of": "2026-02",
+    "pairing": "ok",
+    "pairing_as_of": "2026-02"
+  }
+}
+```
+
+**The same reference on an ordinary Swiss IBAN — the failure this endpoint exists to catch:**
+
+```json
+{
+  "reference_check": {
+    "scheme": "qrr",
+    "valid": true,
+    "pairing": "qrr_requires_qr_iban",
+    "note": "… Pairing: IID 04835 is outside the SIX QR range 30000–31999, so this is an ordinary IBAN, and a QRR reference may only be used in combination with a QR-IBAN per the Swiss Implementation Guidelines (SPS). Either use the creditor's QR-IBAN or send this payment without a QRR reference."
+  }
+}
+```
+
+`valid` is still `true`. The reference is fine; the **combination** is not. Code that reads only `valid` ships this instruction and gets it refused at submission.
+
+Outside CH and LI, `pairing` is `not_applicable` — there is no QR-IBAN to pair against, and reporting `ok` would assert a check that was never run. The reference's own checksum verdict is unaffected: a valid RF reference is valid everywhere.
+
+### The reference checksums alone are free
+
+The arithmetic is a published commodity, so it costs nothing:
+
+```bash
+curl "https://api.ibanforge.com/v1/reference/validate?reference=RF18539007547034"
+```
+
+```json
+{
+  "reference": "RF18539007547034",
+  "scheme": "rf",
+  "valid": true,
+  "status": "checked",
+  "check_digit_expected": "18",
+  "source": "Finance Finland, \"Structure of the RF Creditor Reference (ISO 11649)\", October 2023 (check-digit algorithm); SIX Swiss Implementation Guidelines for the QR-bill v2.4 § 2.12.2, valid from 14 November 2026 (structure).",
+  "as_of": "2023-10"
+}
+```
+
+Four schemes are checked arithmetically, each against a primary document that publishes the rule free of charge:
+
+| Scheme | Rule | Source |
+|---|---|---|
+| **RF / ISO 11649** (`SCOR`) | mod 97-10 — the same arithmetic as an IBAN check digit | Finance Finland, Oct. 2023 |
+| **Swiss QR reference** (`QRR`) | 27 digits, modulo 10 recursive | SIX QR-bill IG v2.4, Annex B |
+| **Belgian OGM/VCS** | 12 digits, modulo 97 on the first ten, a remainder of 0 written 97 | Febelfin v3.3, 01-02-2019 |
+| **Finnish viitenumero** | 4–20 digits, weights 7-3-1 from the right | Finance Finland, 1 Nov. 2009 |
+
+**Norwegian KID and Swedish OCR are recognised, never judged.** They answer `valid: null` with `status: "unverifiable_without_creditor_config"`, because the modulus type and the accepted length are configured **per creditor account** by the beneficiary's bank and are not a property of the string. Answering `false` would reject perfectly good references, so we do not. Do not relay a `null` to a user as "invalid" — relay that the check needs the creditor bank's configuration.
+
+**One ambiguity is worth knowing about.** Only a leading `RF` and a 27-digit length pin a scheme down. A bare 12-digit string is simultaneously a Belgian OGM and a legal Finnish length, so the answer gives the more specific reading and reports the other in `also_valid_as`. Pass `reference_type` when you know the country.
+
 ## Virtual IBAN classification & end-user identification (AMLR Art. 22(3))
 
 The same `issuer` block that reads `bank` for Valiant is what flags a **virtual IBAN** issuer elsewhere. This matters beyond Switzerland, because of one specific European obligation.
@@ -267,6 +369,9 @@ That `meta.disclaimer` is not decoration and it is not softened here: this is **
 
 - **Institution, never the account or its holder.** A resolved QR-IID names the issuing institution. It says nothing about the twelve digits that follow it in the IBAN, nor about who holds that account.
 - **The reference type is a rule, not a prediction.** We tell you an IBAN sits in the QR range and therefore takes a structured QR reference. Whether a given instruction is accepted downstream depends on the debtor's bank and the reference itself.
+- **A reference checksum is not proof the reference is the right one.** `valid: true` says the digits are internally consistent; it says nothing about whether that reference matches the invoice the creditor is expecting to reconcile.
+- **Two schemes we deliberately do not judge.** Norwegian KID and Swedish OCR are configured per creditor account by the beneficiary's bank. We recognise the format and stop there, rather than manufacture a verdict we cannot support.
+- **CH16 / CH17 are named, never quoted.** The codes appear in the guidelines; their wording lives in a status-report document we have not consulted.
 - **Monthly freshness, always stamped.** The SIX BankMaster is refreshed monthly and every clearing answer carries `valid_on`. A QR-IID valid a year ago may be redirected today.
 - **`qr_iid_source: "headquarters"` is a deduction.** Sound, labelled, and never presented as a published SIX pairing.
 

@@ -5,8 +5,9 @@ import type { UkModulusResult } from './lib/uk-modulus.js';
 import type { PraAuthorisation } from './lib/pra-banks.js';
 import type { OfficialIdentity } from './lib/official-identity.js';
 import type { PsdRegistration } from './lib/psd-register.js';
+import type { ReferenceCheckBlock } from './lib/payment-reference.js';
 
-export type { UkModulusResult, PraAuthorisation, PsdRegistration };
+export type { UkModulusResult, PraAuthorisation, PsdRegistration, ReferenceCheckBlock };
 
 // --- Hono context variables ---
 
@@ -44,7 +45,7 @@ export type { HonoEnv };
 
 // --- Operation tracking ---
 
-export type OperationType = 'iban_validate' | 'iban_batch' | 'bic_lookup' | 'iban_compliance' | 'ch_clearing_lookup' | 'iban_format';
+export type OperationType = 'iban_validate' | 'iban_batch' | 'bic_lookup' | 'iban_compliance' | 'ch_clearing_lookup' | 'iban_format' | 'reference_validate';
 
 // --- IBAN Validation ---
 
@@ -360,6 +361,18 @@ export interface IBANValidationResult {
    */
   next_steps?: NextStep[];
   clearing?: ChClearingSummary | null;
+  /**
+   * Verdict on a structured payment reference passed alongside the IBAN, and on
+   * whether the two may legally travel together.
+   *
+   * Present ONLY when the caller supplied a `reference`, and set by the
+   * /v1/iban/validate handler rather than by `enrichResult` — batch validation
+   * and several MCP tools share that enrichment path, and a block appearing
+   * there would be silently stripped by output schemas that do not name it.
+   *
+   * @see lib/payment-reference.ts
+   */
+  reference_check?: ReferenceCheckBlock;
   formatted?: string;
   error?: 'invalid_format' | 'unsupported_country' | 'wrong_length' | 'checksum_failed' | 'invalid_check_digits' | 'invalid_bban_structure';
   error_detail?: string;

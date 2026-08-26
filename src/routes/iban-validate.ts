@@ -3,7 +3,8 @@ import type { HonoEnv } from '../types.js';
 import { validateIBAN } from '../lib/iban.js';
 import { enrichResult } from '../lib/enrich.js';
 import { recordOperation } from '../lib/stats.js';
-import { getIban, computeRevenue } from '../lib/request-helpers.js';
+import { getIban, getReference, getReferenceType, computeRevenue } from '../lib/request-helpers.js';
+import { buildReferenceCheck } from '../lib/payment-reference.js';
 import type { IBANValidationResult } from '../types.js';
 
 const ibanValidate = new Hono<HonoEnv>();
@@ -35,6 +36,29 @@ ibanValidate.post('/v1/iban/validate', async (c) => {
   const result: IBANValidationResult = validateIBAN(iban);
 
   enrichResult(result);
+
+  // Optional structured payment reference. Attached HERE and not inside
+  // enrichResult: that path is shared with batch validation and with several MCP
+  // tools whose output schemas do not name this block, and Zod would strip it
+  // there without raising anything.
+  //
+  // The reference is judged even when the IBAN is invalid — the two answers are
+  // independent, and a caller fixing a typo still wants to know their reference
+  // is sound. Only the PAIRING needs a parsed BBAN, and it reports
+  // `not_applicable` when there is none.
+  const reference = getReference(body);
+  if (typeof reference === 'string' && reference.trim() !== '') {
+    // `pickField` casts with `as T` and validates nothing, so both fields need
+    // a real typeof guard here — this body is unvalidated JSON, and a numeric
+    // reference_type would otherwise reach String.prototype.trim and 500 a
+    // route the caller has already paid for.
+    const referenceType = getReferenceType(body);
+    result.reference_check = buildReferenceCheck(
+      result,
+      reference,
+      typeof referenceType === 'string' ? referenceType : null,
+    );
+  }
 
   const postedPrice = result.cost_usdc;
   if (c.get('apiKeyAuthenticated')) {

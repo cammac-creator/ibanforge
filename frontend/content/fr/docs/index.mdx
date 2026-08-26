@@ -37,6 +37,7 @@ Une requête sans clé valide ni paiement reçoit une réponse `402` avec des in
 | `/v1/bic/:code` | GET | $0.003 | Rechercher un code BIC/SWIFT |
 | `/v1/iban/compliance` | POST | $0.02 | Sanctions, FATF, joignabilité SEPA/VoP + score de risque 0–100 |
 | `/v1/ch/clearing/:iid` | GET | $0.003 | Recherche BC-Nummer / IID suisse (SIX BankMaster) |
+| `/v1/reference/validate` | GET/POST | Gratuit | Checksum de reference de paiement (RF/ISO 11649, QRR suisse, OGM belge, viitenumero finlandais) |
 | `/v1/demo` | GET | Gratuit | Exemples de validation (sans paiement) |
 | `/health` | GET | Gratuit | Verification de l'etat du service |
 

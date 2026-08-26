@@ -1,6 +1,6 @@
 ---
 title: "MCP Integration"
-description: "Connect IBANforge to Claude, Cursor and any MCP agent: the ibanforge-mcp npm package, a hosted endpoint with nothing to install, five tools, and results that say what to do next."
+description: "Connect IBANforge to Claude, Cursor and any MCP agent: the ibanforge-mcp npm package, a hosted endpoint with nothing to install, six tools, and results that say what to do next."
 order: 5
 ---
 
@@ -40,7 +40,7 @@ claude mcp add ibanforge -e IBANFORGE_API_KEY=ifk_your_key -- npx -y ibanforge-m
 
 The key is optional and free: [create one](/) with an email address (200 requests/month, no card). Without a key the server still starts, and paid tools answer with x402 payment instructions that an agent holding USDC on Base can settle per call.
 
-After saving, restart the client. Five IBANforge tools appear in the tools menu.
+After saving, restart the client. Six IBANforge tools appear in the tools menu.
 
 ## Option 2 — the hosted endpoint (nothing to install)
 
@@ -52,7 +52,7 @@ Streamable HTTP transport, **10 free tool calls per IP per day**, no key at all:
 
 On the official MCP registry the server is listed as `io.github.cammac-creator/ibanforge`.
 
-## The five tools
+## The six tools
 
 ### validate_iban
 
@@ -94,6 +94,16 @@ Full pre-check in one call: sanctions screening on the resolved bank BIC, FATF s
 { "iban": "CH1000230000000012345" }
 ```
 
+### validate_payment_reference
+
+Validate a structured payment reference — RF/ISO 11649 (`SCOR`), Swiss QR reference (`QRR`), Belgian OGM/VCS, Finnish viitenumero — and, when an `iban` is supplied, decide whether the two may legally travel together. Free; same contract as `GET /v1/reference/validate` plus the pairing verdict.
+
+`valid` and `pairing` are **independent**: a reference can be arithmetically valid and still illegal on that account. Norwegian KID and Swedish OCR answer `valid: null` — their rules are configured per creditor account by the beneficiary bank — and must never be relayed as "invalid".
+
+```json
+{ "reference": "210000000003139471430009017", "iban": "CH4431999123000889012" }
+```
+
 ## Results that say what to do next
 
 Every validation result carries an ordered `next_steps` field: what blocks a payment comes first, what merely enriches it after. Each entry has a stable `code` to branch on, a `do` sentence the agent can relay, and a `because` naming the response field that produced it, so the advice is auditable rather than taken on trust. `bank_code_not_allocated` means stop; `verify_payee_name` means carry on and let a beneficiary name check decide.
@@ -128,7 +138,7 @@ Every validation result carries an ordered `next_steps` field: what blocks a pay
 ## Notes
 
 - The npm package is a thin client for `api.ibanforge.com`: the data lives server-side, there is nothing to download, and results always reflect the latest register refresh.
-- All five tools return the same JSON as the REST API, both as text and as MCP `structuredContent`.
+- All six tools return the same JSON as the REST API, both as text and as MCP `structuredContent`.
 - Releases are published on [npm](https://www.npmjs.com/package/ibanforge-mcp) and mirrored to the MCP registry.
 
 Related: [Recipes](/docs/recipes) · [What "verified" means](/docs/iban-validate) · [Data sources](/docs/data-sources)
