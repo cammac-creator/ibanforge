@@ -104,6 +104,7 @@ describe('GET /mcp (no session) — discovery hint', () => {
       'lookup_bic',
       'lookup_ch_clearing',
       'check_compliance',
+      'validate_payment_reference',
     ]);
   });
 });
@@ -117,9 +118,9 @@ describe('POST /mcp — full handshake', () => {
     const listResp = await rpc(app, sessionId, 'tools/list');
     expect(listResp.error).toBeUndefined();
     const tools = (listResp.result as { tools: Array<{ name: string; outputSchema?: unknown; inputSchema?: unknown }> }).tools;
-    expect(tools).toHaveLength(6);
+    expect(tools).toHaveLength(7);
 
-    const expectedNames = ['validate_iban', 'batch_validate_iban', 'lookup_bic', 'check_compliance', 'lookup_ch_clearing', 'send_feedback'];
+    const expectedNames = ['validate_iban', 'batch_validate_iban', 'lookup_bic', 'check_compliance', 'lookup_ch_clearing', 'send_feedback', 'validate_payment_reference'];
     for (const expected of expectedNames) {
       const tool = tools.find((t) => t.name === expected);
       expect(tool, `tool ${expected} should be registered`).toBeDefined();
@@ -139,6 +140,58 @@ describe('POST /mcp — full handshake', () => {
     expect(callResult.structuredContent, 'paid tools must return structuredContent for SDK runtime validation').toBeDefined();
     expect(callResult.structuredContent!.iban).toBe('DE89370400440532013000');
     expect(callResult.structuredContent!.valid).toBe(true);
+  });
+
+  /**
+   * The Zod trap, checked on both shapes this tool can return.
+   *
+   * `validate_payment_reference` answers a plain checksum result without an
+   * IBAN and a pairing block with one, and the SDK validates BOTH against a
+   * single declared outputSchema. Zod strips what the schema does not name and
+   * drops `structuredContent` entirely when a required field is missing — with
+   * no error anywhere. These two assertions are what makes that visible.
+   */
+  it('tools/call validate_payment_reference keeps structuredContent without an IBAN', async () => {
+    const app = makeApp();
+    const sessionId = await initialize(app);
+    const callResp = await rpc(app, sessionId, 'tools/call', {
+      name: 'validate_payment_reference',
+      arguments: { reference: 'RF18539007547034' },
+    });
+    expect(callResp.error).toBeUndefined();
+    const result = callResp.result as { structuredContent?: Record<string, unknown> };
+    expect(result.structuredContent, 'schema mismatch silently drops this').toBeDefined();
+    expect(result.structuredContent!.scheme).toBe('rf');
+    expect(result.structuredContent!.valid).toBe(true);
+    // The provenance must survive the schema — it is the point of the feature.
+    expect(result.structuredContent!.source).toBeTruthy();
+    expect(result.structuredContent!.as_of).toBe('2023-10');
+  });
+
+  it('tools/call validate_payment_reference keeps the pairing fields with an IBAN', async () => {
+    const app = makeApp();
+    const sessionId = await initialize(app);
+    const callResp = await rpc(app, sessionId, 'tools/call', {
+      name: 'validate_payment_reference',
+      arguments: { reference: '210000000003139471430009017', iban: 'CH5204835012345671000' },
+    });
+    expect(callResp.error).toBeUndefined();
+    const result = callResp.result as { structuredContent?: Record<string, unknown> };
+    expect(result.structuredContent).toBeDefined();
+    expect(result.structuredContent!.pairing).toBe('qrr_requires_qr_iban');
+    expect(result.structuredContent!.pairing_source).toBeTruthy();
+  });
+
+  it('tools/call validate_payment_reference answers null, never false, for a KID', async () => {
+    const app = makeApp();
+    const sessionId = await initialize(app);
+    const callResp = await rpc(app, sessionId, 'tools/call', {
+      name: 'validate_payment_reference',
+      arguments: { reference: '12345678', reference_type: 'kid' },
+    });
+    const result = callResp.result as { structuredContent?: Record<string, unknown> };
+    expect(result.structuredContent!.valid).toBeNull();
+    expect(result.structuredContent!.status).toBe('unverifiable_without_creditor_config');
   });
 
   it('tools/call lookup_bic returns structuredContent on a valid BIC', async () => {

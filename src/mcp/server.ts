@@ -12,6 +12,7 @@ import { validateBIC } from '../lib/bic-validator.js';
 import { buildComplianceResponse } from '../lib/compliance-response.js';
 import { lookupClearingByBankCode, normalizeIid, getChClearingCount } from '../lib/ch-clearing.js';
 import { buildCountriesPayload, buildPricingPayload, buildValidateAndExplainPrompt } from '../lib/mcp-resources.js';
+import { validatePaymentReference, buildReferenceCheck } from '../lib/payment-reference.js';
 import { datasetFacts } from '../lib/dataset-facts.js';
 // send_feedback : même insertion et mêmes clips de longueur que la route
 // publique POST /v1/feedback et que le transport HTTP — une seule écriture,
@@ -287,6 +288,81 @@ Cost: $0.02 USDC per call via x402 micropayment on Base L2.`,
     const combined = { ...buildComplianceResponse(iban), cost_usdc: 0.02 };
     return {
       content: [{ type: 'text' as const, text: JSON.stringify(combined, null, 2) }],
+    };
+  },
+);
+
+server.registerTool(
+  'validate_payment_reference',
+  {
+    title: 'Validate Payment Reference',
+    description: `Validate a structured payment reference (RF/ISO 11649, Swiss QR reference, Belgian OGM/VCS, Finnish viitenumero) and, when an IBAN is supplied, decide whether the two may legally travel together.
+
+When to use: an agent is assembling a payment instruction and has a reference from an invoice, a QR-bill or a remittance advice, and needs to know whether it is well-formed BEFORE submitting. Also use it whenever you have a Swiss IBAN and a reference: the pairing rule is the part most integrations get wrong.
+When NOT to use: to validate the IBAN itself, use validate_iban. This tool checks the REFERENCE.
+
+Behavior: read-only, no network calls, no side effects. Pure arithmetic against published check-digit rules, plus one range check against the SIX QR-IID allocation for the pairing verdict.
+
+Schemes and their published rules:
+- RF Creditor Reference (ISO 11649, "SCOR" in Swiss Payment Standards) — mod 97-10, the same arithmetic as an IBAN check digit.
+- Swiss QR reference ("QRR") — 27 numeric characters, the last a modulo-10-recursive check digit.
+- Belgian OGM/VCS — 12 digits, the last two a modulo-97 check on the first ten, a remainder of 0 written 97.
+- Finnish viitenumero — 4 to 20 digits, weights 7-3-1 applied from right to left.
+- Norwegian KID and Swedish OCR — RECOGNISED, never judged. They answer valid: null with status 'unverifiable_without_creditor_config', because the modulus type and the accepted length are configured per creditor account by the beneficiary's bank and are not a property of the string. Do not report these to a user as invalid; report that the check needs the creditor's bank configuration.
+
+Scheme detection: only two signals are unambiguous — a leading "RF", and a 27-digit length. Every other numeric length is shared between national conventions that were never coordinated. A bare 12-digit string is both a Belgian OGM and a legal Finnish length, so the tool answers with the more specific reading and reports the other in also_valid_as. Pass reference_type when you know the country.
+
+THE PAIRING RULE (the part no checksum library reproduces): pass an iban and you also get a pairing verdict. Per the Swiss Implementation Guidelines, a QRR reference may ONLY be used with a QR-IBAN (an institution identifier in the SIX range 30000-31999), and an ISO 11649 reference may NOT be used with one. Outside CH and LI there is no QR-IBAN to pair against, so pairing is 'not_applicable' — including for a valid RF reference, whose own checksum verdict is unaffected.
+
+Returns: { reference, scheme, valid (true | false | null), status, check_digit_expected?, also_valid_as?, source, as_of, note, pairing?, pairing_source?, pairing_as_of? }
+
+IMPORTANT — valid and pairing are INDEPENDENT verdicts. A reference can be arithmetically valid and still be illegal on that account, and a malformed reference can sit on exactly the right kind of account. Read both.
+
+Every answer that names a scheme carries the document that publishes the rule and its date. Relay them: they are what makes the verdict auditable.
+
+Example: input reference '210000000003139471430009017', iban 'CH4431999123000889012' → { scheme: 'qrr', valid: true, pairing: 'ok' }. Same reference with an ordinary Swiss IBAN → { valid: true, pairing: 'qrr_requires_qr_iban' }.
+
+Cost: free. The checksums are published commodities; the paid surface is POST /v1/iban/validate, which returns this same pairing block alongside the full IBAN enrichment.`,
+    inputSchema: {
+      reference: z
+        .string()
+        .trim()
+        .min(4, 'Reference is too short')
+        .max(64, 'Reference is too long')
+        .describe(
+          "The payment reference as printed. Spaces, slashes and the Belgian +++...+++ wrapper are stripped automatically. Examples: 'RF18539007547034', '21 00000 00003 13947 14300 09017', '+++010/8068/17183+++', '1234561'.",
+        ),
+      reference_type: z
+        .string()
+        .optional()
+        .describe(
+          "Optional scheme hint, used when the string alone is ambiguous. One of 'rf' (or 'scor'), 'qrr', 'ogm' (or 'vcs'), 'viitenumero', 'kid', 'ocr'. If it contradicts the string, the tool judges as asked and says so in the note.",
+        ),
+      iban: z
+        .string()
+        .trim()
+        .optional()
+        .describe(
+          "Optional. The creditor IBAN this reference would travel with. Supply it to get the pairing verdict — that is the reason to use this tool over a local checksum library. Example: 'CH4431999123000889012'.",
+        ),
+    },
+    annotations: {
+      title: 'Validate Payment Reference',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+  },
+  async ({ reference, reference_type, iban }) => {
+    // With an IBAN the pairing verdict is available, so the richer block is
+    // returned; without one there is nothing to pair against and the plain
+    // checksum answer is the honest whole answer.
+    const payload = iban
+      ? buildReferenceCheck(validateIBAN(iban), reference, reference_type ?? null)
+      : validatePaymentReference(reference, reference_type ?? null);
+    return {
+      content: [{ type: 'text' as const, text: JSON.stringify(payload, null, 2) }],
     };
   },
 );

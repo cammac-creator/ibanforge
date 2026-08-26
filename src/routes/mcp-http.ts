@@ -1,8 +1,8 @@
 /**
  * HTTP transport for the MCP server.
- * Exposes the 5 data tools of the stdio MCP server plus send_feedback (validate_iban, batch_validate_iban,
- * lookup_bic, check_compliance, lookup_ch_clearing) via Streamable HTTP at /mcp —
- * compatible with Smithery, remote MCP clients, etc.
+ * Exposes the 6 data tools of the stdio MCP server plus send_feedback (validate_iban, batch_validate_iban,
+ * lookup_bic, check_compliance, lookup_ch_clearing, validate_payment_reference) via Streamable HTTP at
+ * /mcp — compatible with Smithery, remote MCP clients, etc.
  */
 
 import { Hono } from 'hono';
@@ -20,6 +20,7 @@ import { lookup } from '../lib/bic-lookup.js';
 import { validateBIC } from '../lib/bic-validator.js';
 import { buildComplianceResponse } from '../lib/compliance-response.js';
 import { lookupClearingByBankCode, normalizeIid } from '../lib/ch-clearing.js';
+import { validatePaymentReference, buildReferenceCheck } from '../lib/payment-reference.js';
 import { extractClientIp } from '../lib/stats.js';
 import { buildCountriesPayload, buildPricingPayload, buildValidateAndExplainPrompt } from '../lib/mcp-resources.js';
 import { datasetFacts } from '../lib/dataset-facts.js';
@@ -527,6 +528,77 @@ function createMcpServer(): McpServer {
   );
 
   server.registerTool(
+    'validate_payment_reference',
+    {
+      title: 'Validate Payment Reference',
+      description:
+        'Validate a structured payment reference and, when an IBAN is supplied, decide whether the two may legally travel together. ' +
+        'USE WHEN: assembling a payment instruction from an invoice, a QR-bill or a remittance advice; whenever a Swiss IBAN and a reference appear together (the pairing rule is what most integrations get wrong); ' +
+        'or when the user pastes an "RF..." string, a 27-digit number, a +++123/4567/89012+++ block, or asks whether a payment reference is correct. ' +
+        'DO NOT USE to validate the IBAN itself — that is validate_iban. ' +
+        'SCHEMES: RF Creditor Reference (ISO 11649, "SCOR" in Swiss Payment Standards, mod 97-10); Swiss QR reference ("QRR", 27 digits, modulo 10 recursive); Belgian OGM/VCS (12 digits, modulo 97, a remainder of 0 written 97); Finnish viitenumero (4-20 digits, weights 7-3-1 from the right). ' +
+        'Norwegian KID and Swedish OCR are RECOGNISED but never judged: they answer valid: null with status unverifiable_without_creditor_config, because modulus type and length are configured per creditor account by the beneficiary bank and are not a property of the string. NEVER relay those to a user as "invalid" — say the check needs the creditor bank configuration. ' +
+        'AMBIGUITY: only a leading "RF" and a 27-digit length pin a scheme down. A bare 12-digit string is both a Belgian OGM and a legal Finnish length, so the more specific reading is returned and the other appears in also_valid_as. Pass reference_type when you know the country. ' +
+        'THE PAIRING RULE — the part no checksum library reproduces: pass an iban and you also get a pairing verdict. Per the Swiss Implementation Guidelines a QRR reference may ONLY be used with a QR-IBAN (institution identifier in the SIX range 30000-31999), and an ISO 11649 reference may NOT be used with one. Outside CH and LI, pairing is not_applicable — there is no QR-IBAN to pair against — and that does not affect the reference\'s own checksum verdict. ' +
+        'IMPORTANT: valid and pairing are INDEPENDENT. A reference can be arithmetically valid and still illegal on that account. Read both, and relay source/as_of — they are what makes the verdict auditable. ' +
+        'FREE: the checksums are published commodities. The paid surface is POST /v1/iban/validate, which returns this same pairing block with the full IBAN enrichment.',
+      inputSchema: {
+        reference: z.string().describe('The reference as printed; spaces, slashes and the +++…+++ wrapper are stripped'),
+        reference_type: z
+          .string()
+          .optional()
+          .describe("Optional hint: rf | scor | qrr | ogm | vcs | viitenumero | kid | ocr"),
+        iban: z.string().optional().describe('Optional creditor IBAN — supply it to get the pairing verdict'),
+      },
+      // 🚨 Every field the handler can emit MUST be named here. The SDK
+      // validates output against this schema and Zod SILENTLY STRIPS what it
+      // does not name, so an omitted field vanishes from structuredContent with
+      // no error at all — including `source`, which carries the provenance this
+      // whole feature is built on. See the note above NEXT_STEPS_SCHEMA.
+      outputSchema: {
+        reference: z.string().describe('Normalized: uppercase, separators removed.'),
+        scheme: z.string().nullable().describe('rf | qrr | ogm | viitenumero | kid | ocr, or null when nothing matched.'),
+        valid: z
+          .boolean()
+          .nullable()
+          .describe('null means the scheme was recognised and cannot be checked without the creditor bank configuration. Never report null as false.'),
+        status: z.string().describe('checked | unverifiable_without_creditor_config | unrecognised'),
+        check_digit_expected: z
+          .string()
+          .optional()
+          .describe('A STRING, so a two-digit value beginning with zero survives (OGM remainder 3 is "03", remainder 0 is "97").'),
+        also_valid_as: z
+          .object({
+            scheme: z.string(),
+            valid: z.boolean(),
+            check_digit_expected: z.string().optional(),
+          })
+          .optional()
+          .describe('The second reading of an ambiguous string, with its own verdict.'),
+        source: z.string().nullable().describe('The document publishing the rule. Null only when no scheme matched. Relay it.'),
+        as_of: z.string().optional().describe('YYYY-MM of that document.'),
+        note: z.string().describe('What was checked, and what was not.'),
+        pairing: z
+          .string()
+          .optional()
+          .describe('Present only when an iban was supplied: ok | qrr_requires_qr_iban | scor_forbidden_with_qr_iban | not_applicable'),
+        pairing_source: z.string().optional().describe('The document publishing the pairing rule — a DIFFERENT one from source.'),
+        pairing_as_of: z.string().optional(),
+      },
+      annotations: { title: 'Validate Payment Reference', ...READ_ONLY_ANNOTATIONS },
+    },
+    async ({ reference, reference_type, iban }) => {
+      const payload = iban
+        ? buildReferenceCheck(validateIBAN(iban), reference, reference_type ?? null)
+        : validatePaymentReference(reference, reference_type ?? null);
+      return {
+        content: [{ type: 'text' as const, text: JSON.stringify(payload, null, 2) }],
+        structuredContent: payload as unknown as Record<string, unknown>,
+      };
+    },
+  );
+
+  server.registerTool(
     'lookup_ch_clearing',
     {
       title: 'Swiss Clearing Lookup',
@@ -912,7 +984,7 @@ mcpHttp.get('/mcp', async (c) => {
           claude_code_cli: 'claude mcp add ibanforge --transport http https://api.ibanforge.com/mcp',
           curl_initialize: `curl -X POST https://api.ibanforge.com/mcp -H 'Content-Type: application/json' -H 'Accept: application/json,text/event-stream' -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"curl","version":"1"}}}' -i`,
         },
-        tools: ['validate_iban', 'batch_validate_iban', 'lookup_bic', 'lookup_ch_clearing', 'check_compliance'],
+        tools: ['validate_iban', 'batch_validate_iban', 'lookup_bic', 'lookup_ch_clearing', 'check_compliance', 'validate_payment_reference'],
         free_tier: {
           mcp_daily_limit: MCP_DAILY_LIMIT,
           rest_api_signup: 'POST /v1/keys/generate {"email":"you@company.com"} for 200 req/month',

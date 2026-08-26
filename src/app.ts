@@ -24,6 +24,7 @@ import { logger } from 'hono/logger';
 import { bodyLimit } from 'hono/body-limit';
 import { ibanValidate } from './routes/iban-validate.js';
 import { ibanFormat } from './routes/iban-format.js';
+import { referenceValidate } from './routes/reference-validate.js';
 import { ibanBatch } from './routes/iban-batch.js';
 import { bicLookup } from './routes/bic-lookup.js';
 import { ibanCompliance } from './routes/iban-compliance.js';
@@ -655,6 +656,7 @@ export function buildApp(): Hono<HonoEnv> {
 
   // Free routes
   app.route('/', ibanFormat);
+  app.route('/', referenceValidate);
   app.route('/', ibanStructure);
   app.route('/', health);
   app.route('/', stats);
