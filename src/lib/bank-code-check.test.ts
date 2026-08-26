@@ -211,3 +211,61 @@ describe('bank_code_check.institution — what the register publishes, no more',
     expect(r.bank_code_check?.institution).toBeUndefined();
   });
 });
+
+/**
+ * Latvia and Gibraltar: crediting the authority that published the rule.
+ *
+ * Both national authorities publish that IBAN positions 5-8 ARE the first four
+ * characters of the institution's BIC — Latvijas Banka for the Latvian IBAN,
+ * the Gibraltar Financial Services Commission in Guidance Note 07. Both codes
+ * already resolved before that rule was named; what these tests pin is that the
+ * answer stops crediting our own assembly for a pairing a central bank
+ * published, and that it does not thereby become authoritative.
+ */
+describe('structural bank-code rules (LV, GI)', () => {
+  /** Fixture accounts, checksum-correct and owned by nobody. */
+  function iban(cc: string, bban: string): string {
+    const rearranged = (bban + cc + '00')
+      .split('')
+      .map((c) => (/[A-Z]/.test(c) ? String(c.charCodeAt(0) - 55) : c))
+      .join('');
+    let rem = 0;
+    for (const ch of rearranged) rem = (rem * 10 + Number(ch)) % 97;
+    return cc + String(98 - rem).padStart(2, '0') + bban;
+  }
+
+  it('credits Latvijas Banka for a Latvian code that is a BIC prefix', () => {
+    const r = check(iban('LV', 'HABA0551017882234'));
+    expect(r.bank_code_check?.register).toMatch(/Latvijas Banka/);
+    expect(r.bank_code_check?.register).toMatch(/structural rule published by/);
+  });
+
+  it('credits the GFSC for a Gibraltar code that is a BIC prefix', () => {
+    const r = check(iban('GI', 'RBOS000000001234567'));
+    expect(r.bank_code_check?.register).toMatch(/Gibraltar Financial Services Commission/);
+  });
+
+  it('does not become authoritative on the strength of a published rule', () => {
+    // The rule says how to READ the IBAN. It does not say the BIC it points at
+    // was allocated, and it does not make our directory exhaustive — so it
+    // cannot license a `not_in_register` verdict off a coverage gap.
+    for (const b of [iban('LV', 'HABA0551017882234'), iban('GI', 'RBOS000000001234567')]) {
+      expect(check(b).bank_code_check?.authoritative).toBe(false);
+    }
+  });
+
+  it('says how many institutions the rule alone leaves standing', () => {
+    // GI 'RBOS' matches two BIC8. A caller told "this is the bank" deserves to
+    // know the published rule did not single it out on its own.
+    const r = check(iban('GI', 'RBOS000000001234567'));
+    expect(r.bank_code_check?.candidates).toBeGreaterThan(1);
+  });
+
+  it('falls back to the composite map when the rule does not explain the pairing', () => {
+    // The SWIFT IBAN Registry's Latvian example uses the literal 'BANK', which
+    // no institution holds. Nothing resolves, so there is no pairing for the
+    // rule to have produced and no authority to credit for one.
+    const r = check('LV80BANK0000435195001');
+    expect(r.bank_code_check?.register).not.toMatch(/Latvijas Banka/);
+  });
+});

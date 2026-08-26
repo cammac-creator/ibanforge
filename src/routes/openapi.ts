@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { createRequire } from 'node:module';
 import { getEntryCount } from '../lib/bic-lookup.js';
-import { BANK_CODE_CHECK_SCHEMA , NEXT_STEPS_SCHEMA } from '../lib/bank-code-schema.js';
+import { BANK_CODE_CHECK_SCHEMA , NEXT_STEPS_SCHEMA, OFFICIAL_IDENTITY_SCHEMA } from '../lib/bank-code-schema.js';
 
 const openapi = new Hono();
 
@@ -1097,6 +1097,7 @@ const buildSpec = () => ({
             required: ['issuer_type', 'country_risk', 'test_bic', 'sepa_reachable', 'sepa_reachable_scope', 'vop_coverage'],
           },
           bank_code_check: BANK_CODE_CHECK_SCHEMA,
+          official_identity: OFFICIAL_IDENTITY_SCHEMA,
           modulus_check: {
             type: 'object',
             description:
@@ -1210,6 +1211,7 @@ const buildSpec = () => ({
           lei_status: { type: ['string', 'null'] },
           is_test_bic: { type: 'boolean' },
           source: { type: ['string', 'null'] },
+          official_identity: OFFICIAL_IDENTITY_SCHEMA,
           note: { type: 'string' },
           cost_usdc: { type: 'number', example: 0.003 },
           processing_ms: { type: 'number' },

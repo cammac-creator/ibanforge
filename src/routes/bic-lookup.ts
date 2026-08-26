@@ -4,6 +4,7 @@ import { validateBIC } from '../lib/bic-validator.js';
 import { lookup, registeredAddress, sharedBic8Stats } from '../lib/bic-lookup.js';
 import { screenBicSanctions } from '../lib/compliance.js';
 import { praAuthorisationByLei, type PraAuthorisation } from '../lib/pra-banks.js';
+import { officialIdentityByLei, type OfficialIdentity } from '../lib/official-identity.js';
 import { classifyBicInput } from '../lib/input-normalize.js';
 import { recordOperation, recordRejection } from '../lib/stats.js';
 import { computeRevenue } from '../lib/request-helpers.js';
@@ -28,6 +29,12 @@ type BicLookupPayload = BICLookupResult & {
    * the one definition.
    */
   pra_authorisation?: PraAuthorisation;
+  /**
+   * Same placement reasoning again: the interface lives in
+   * lib/official-identity.ts so this route and the IBAN path serve one
+   * definition, and the optional field is declared beside its usage.
+   */
+  official_identity?: OfficialIdentity;
 };
 
 const COST_USDC = 0.003;
@@ -111,6 +118,17 @@ bicLookup.get('/v1/bic/:code', (c) => {
   // deposit authorisation on the parent's foreign BICs.
   const pra = praAuthorisationByLei(row?.lei, validation.country_code);
 
+  // European Central Bank, daily list of monetary financial institutions —
+  // joined on the LEI this row already carries. Unlike the PRA block there is
+  // no country scope: this states who the LEI holder IS, not what it is
+  // authorised to do somewhere, and a legal name does not change with which of
+  // an entity's BICs was asked about. See lib/official-identity.ts.
+  //
+  // Additive only. It does not touch `found`, `institution` or any existing
+  // field — a caller comparing our directory name against the central bank's
+  // must be able to see both, not one silently overwritten by the other.
+  const identity = officialIdentityByLei(row?.lei);
+
   const result: BicLookupPayload = {
     bic: validation.bic,
     bic8: validation.bic8!,
@@ -137,6 +155,7 @@ bicLookup.get('/v1/bic/:code', (c) => {
     // least reassuring institution it knows.
     sanctions,
     ...(pra ? { pra_authorisation: pra } : {}),
+    ...(identity ? { official_identity: identity } : {}),
     ...(shared ? { shared_bic8: shared } : {}),
     cost_usdc: c.get('apiKeyAuthenticated') ? 0 : COST_USDC,
     processing_ms: Math.round((performance.now() - start) * 100) / 100,

@@ -43,6 +43,7 @@
     "db:seed-blz": "tsx scripts/seed-blz.ts",
     "db:seed-national": "tsx scripts/seed-national.ts",
     "db:seed-pra": "tsx scripts/seed-pra-banks.ts",
+    "db:seed-mfi": "tsx scripts/seed-ecb-mfi.ts",
     "reco-baseline": "tsx scripts/reco-baseline.ts",
     "db:seed-uk": "tsx scripts/seed-uk-modulus.ts",
     "openapi:dump": "tsx scripts/dump-openapi.ts",

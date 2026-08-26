@@ -356,6 +356,27 @@ export function sharedBic8Stats(bic8: string): SharedBic8Stats | null {
   return { institutions: row.institutions, entries: row.entries };
 }
 
+let stmtPrefixCount: Database.Statement | null = null;
+
+/**
+ * How many distinct BIC8 in this country begin with `prefix`.
+ *
+ * Only used where a national authority PUBLISHES that the IBAN's bank-code
+ * positions are the BIC's first four characters (LV, GI — see
+ * STRUCTURAL_BIC_PREFIX_RULE in enrich.ts). The rule says how to read the IBAN;
+ * it does not promise the reading lands on exactly one institution. `RBOS` in
+ * Gibraltar matches both RBOSGI21 and RBOSGIGI, so a caller told "this is the
+ * bank" deserves to know the rule alone did not single it out.
+ */
+export function bic8CountForPrefix(countryCode: string, prefix: string): number {
+  if (!stmtPrefixCount) {
+    stmtPrefixCount = getBicDB().prepare(
+      'SELECT COUNT(DISTINCT bic8) AS cnt FROM bic_entries WHERE country_code = ? AND bic8 LIKE ?',
+    );
+  }
+  return (stmtPrefixCount.get(countryCode, prefix + '%') as { cnt: number }).cnt;
+}
+
 export function lookup(bic: string): BICRow | null {
   const cached = bicCache.get(bic);
   if (cached !== undefined) return cached;
@@ -642,6 +663,7 @@ export function resetStatements(): void {
   stmtByBic11 = null;
   stmtByBic8 = null;
   stmtBic8Stats = null;
+  stmtPrefixCount = null;
   bicCache.clear();
   // Cleared with the statements: it is derived from the same database, so a
   // caller swapping databases must not keep the previous one's refresh date.

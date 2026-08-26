@@ -68,6 +68,22 @@ jobs:
       - name: Refresh the Bank of England PRA List of Banks
         run: npm run db:seed-pra
 
+      # ECB daily MFI list + Banco de España MFI list — the official identity
+      # (name, LEI, registered address) behind a resolved code.
+      #
+      # Also does NOT fail the job, and for a sharper reason than the PRA step:
+      # the ECB file exists on BUSINESS DAYS ONLY and is date-stamped in its own
+      # URL, so a cron landing on a weekend or a Frankfurt holiday finds nothing
+      # at the newest name. The seeder walks back four days and, if none answers,
+      # leaves the table exactly as it was — dated with the day the list was
+      # actually published, never with today.
+      #
+      # Both licences require telling buyers on EVERY access that the data is
+      # free at the source, so a stale table is safe here (it keeps its own
+      # date) while a wrongly dated one is not.
+      - name: Refresh the ECB and Banco de España MFI lists
+        run: npm run db:seed-mfi
+
       # THE GATE. GLEIF and the enrichment sources have no sanity floor of their
       # own (unlike the CH/DE/AT/BE seeders), and `npm run test` only asserts
       # `toBeGreaterThan(0)` on this table — a source answering with a truncated

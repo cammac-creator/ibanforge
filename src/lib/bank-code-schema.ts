@@ -30,7 +30,11 @@ export const BANK_CODE_CHECK_SCHEMA = {
       description:
         'register: exact key in the reference set, deterministic. prefix: the bic8 LIKE fallback, reachable only in the 30 countries whose bank code may open on a letter (a BIC8 always does) — check candidates.',
     },
-    register: { type: ['string', 'null'], description: 'Name of the reference set consulted.' },
+    register: {
+      type: ['string', 'null'],
+      description:
+        'Name of the reference set consulted. For LV and GI it names a published structural rule instead — Latvijas Banka and the Gibraltar Financial Services Commission (Guidance Note 07) both publish that IBAN positions 5-8 ARE the first four characters of the institution\'s BIC. That is a documented rule rather than our own assembly, but it says how to READ the IBAN, not that the BIC it points at was allocated, so authoritative stays false.',
+    },
     authoritative: {
       type: 'boolean',
       description:
@@ -39,7 +43,7 @@ export const BANK_CODE_CHECK_SCHEMA = {
     candidates: {
       type: 'integer',
       description:
-        'BIC8 the prefix search matched. Present only for match=prefix. Greater than 1 means the returned BIC is one of several and may belong to a different institution than the account does.',
+        'BIC8 the search matched. Present for match=prefix, and for the LV/GI structural rule when the published rule alone leaves more than one BIC8 standing. Greater than 1 means the returned BIC is one of several and may belong to a different institution than the account does.',
     },
     retired: {
       type: 'boolean',
@@ -93,4 +97,55 @@ export const NEXT_STEPS_SCHEMA = {
     },
     required: ['code', 'do', 'because'],
   },
+};
+
+/**
+ * The JSON Schema fragment describing `official_identity`, written once.
+ *
+ * Same reasoning as BANK_CODE_CHECK_SCHEMA above: the field appears on two
+ * endpoints, and a hand-copied second description would drift. Here drift would
+ * be worse than usual — the description is where a caller learns that this block
+ * is informational and carries licence conditions, and a copy that lost either
+ * point would invite exactly the reading both publishers forbid.
+ */
+export const OFFICIAL_IDENTITY_SCHEMA = {
+  type: 'object' as const,
+  description:
+    'The official identity a central bank publishes for the institution behind the code we resolved: legal name, LEI, registered address, and the publisher\'s own category. ' +
+    'Sources: the European Central Bank\'s daily list of monetary financial institutions (reached by LEI, and by the five-digit French code banque, which is what a French RIAD code contains), and the Banco de España\'s list of Spanish MFIs (reached by the four-digit supervisory code it publishes bare). ' +
+    'PURELY INFORMATIONAL. It never changes `valid` and never changes `bank_code_check` — neither publisher allocates bank codes, both relay what national authorities report, and the Banco de España\'s terms forbid presenting its data as having legal or evidentiary effect. ' +
+    'Present only on a match: an institution absent from a list produces no block at all, never a negative one, because absence from these lists is not evidence about the institution. ' +
+    'Both publishers permit this reuse on conditions that travel with the data, which is why `source`, `free_of_charge` and `as_of` are always present.',
+  properties: {
+    name: { type: 'string', description: 'The institution\'s name as the publisher writes it. May differ from `institution` / `bic.bank_name`, which come from the BIC directory — both are served so the two can be compared rather than one silently overwriting the other.', example: 'Alpha Bank Example, S.A.' },
+    lei: { type: ['string', 'null'], description: 'Null where the publisher lists none, which is common for money market funds and branches.' },
+    address: { type: ['string', 'null'], description: 'One-line registered address as published. Null when the publisher gives none.' },
+    category: { type: 'string', description: 'The publisher\'s classification.', example: 'Credit Institution' },
+    matched_by: {
+      type: 'string',
+      enum: ['lei', 'national_code'],
+      description: 'lei: joined on the LEI the resolved BIC row carries — exact, and unscoped by country because a legal identity does not change with which of an entity\'s BICs was asked about. national_code: joined on the bank code the publisher itself publishes (FR five digits, ES four digits).',
+    },
+    source: { type: 'string', description: 'The publisher, cited as both licences require.', example: 'European Central Bank, list of monetary financial institutions (free at ecb.europa.eu)' },
+    free_of_charge: {
+      type: 'string',
+      description: 'Both publishers require that buyers of a product incorporating their data be told, on EVERY access, that the information is available free of charge from the publisher\'s own website. This API is sold, so that notice ships inside every block rather than living on a documentation page.',
+    },
+    attribution: {
+      type: 'string',
+      description: 'The citation formula the Banco de España requires, reproduced verbatim. Spanish blocks only — the ECB asks to be cited as the source, which `source` does.',
+      example: 'Own elaboration based on data from the Banco de España website (www.bde.es)',
+    },
+    as_of: {
+      type: 'string',
+      format: 'date',
+      description: 'Date of the list this row came from, read from the published file and never from a clock. Both lists are republished every business day.',
+    },
+    authoritative: {
+      type: 'boolean',
+      enum: [false],
+      description: 'Always false. Both publishers relay; neither allocates bank codes, and the attribution of a code remains the national authority\'s. Read `bank_code_check.authoritative` for the verdict that can be branched on.',
+    },
+  },
+  required: ['name', 'lei', 'address', 'category', 'matched_by', 'source', 'free_of_charge', 'as_of', 'authoritative'],
 };

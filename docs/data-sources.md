@@ -26,6 +26,8 @@ mensuel (`getEntryCount()`, jamais un nombre écrit à la main).
 | ONU (liste consolidée CSNU) | — | ⚠️ **tous droits réservés, usage personnel NON COMMERCIAL uniquement** | ✅ établie le 24/08/2026 — position arrêtée, voir la section citations |
 | UE (liste consolidée + réutilisation Commission) | — | **CC BY 4.0**, Décision du 12/12/2011 | ✅ vérifié le 24/08/2026 |
 | Bank of England — List of PRA-regulated Banks (table `pra_banks`) | 281 au 2026-08 | permission écrite du 25/08/2026, **attribution à la Bank of England ET au mois de la liste obligatoire** | ✅ **accordée le 25/08/2026 — ingérée le 25/08/2026**, voir ci-dessous |
+| BCE — liste quotidienne des IFM (table `ecb_mfi`) | 5 374 au 2026-08-25 | usage libre, **citation de la BCE** + **mention « gratuit à la source » à CHAQUE accès** dès que l'information est vendue | ✅ **lue à la source le 26/08/2026 — ingérée le 26/08/2026**, voir ci-dessous |
+| Banco de España — liste des IFM espagnoles (table `bde_mfi`) | 238 au 2026-08-25 | reproduction « faithfully, without any manipulation », **citation du Banco de España** + **même mention « gratuit à la source » à chaque mise à disposition** | ✅ **lue à la source le 26/08/2026 — ingérée le 26/08/2026**, voir ci-dessous |
 
 ### Ce qui a été lu, mot pour mot
 
@@ -334,3 +336,128 @@ distinct de la liste des banques, les deux démarches restent utiles.
 `sqlite3 data/bic.sqlite "SELECT source, COUNT(*) FROM bic_entries GROUP BY source"`
 et `sqlite3 data/compliance.sqlite "SELECT source_list, COUNT(*) FROM sanctioned_entities GROUP BY source_list"`
 donnent les deux tableaux du haut.
+
+
+---
+
+## BCE + Banco de España — l'identité officielle (`official_identity`)
+
+**Statut : ✅ licences lues à la source le 26/08/2026, ingestion faite le même
+jour.** Les deux publient quotidiennement ; les deux imposent la même condition
+inhabituelle, et c'est elle qui a dicté la forme du bloc servi.
+
+### Ce qui a été lu, mot pour mot
+
+**BCE** — https://www.ecb.europa.eu/services/disclaimer/html/index.en.html :
+
+> « When such information is distributed or reproduced, it must appear
+> accurately and the ECB must be cited as the source. »
+
+> « Where the information is incorporated in documents that are sold (regardless
+> of the medium), the natural or legal person publishing the information must
+> inform buyers, both before they pay any subscription or fee **and each time
+> they access** the information taken from this website, that the information
+> **may be obtained free of charge** through this website. »
+
+**Banco de España** — https://www.bde.es/wbe/en/pie/aviso-legal/ :
+
+> « Any distribution or reproduction of information disseminated on the Banco de
+> España website shall be carried out **faithfully, without any manipulation or
+> alteration of the content**, and the Banco de España shall always be cited as
+> the source. »
+
+> « When such information is incorporated into documents or other media that are
+> to be sold or transferred for consideration, the individual or legal entity
+> publishing or disseminating the information by whatever means, shall inform
+> buyers and/or transferees that the information **may be obtained free of
+> charge** from the Banco de España website, both before they pay any
+> subscription or fee **and on each occasion** that the information taken from
+> the Banco de España website is made available to them. »
+
+> « The Banco de España shall not be liable for any loss or damage resulting
+> from decisions taken on the basis of the information published on this site. »
+
+🚨 **Écart assumé par rapport au cadrage initial du chantier**, qui réservait la
+mention « gratuit à la source » à la BCE : le Banco de España impose exactement
+le même devoir, dans les mêmes termes, dès que la donnée est vendue. L'API est
+vendue. Les **deux** blocs portent donc la mention, chacun pointant vers son
+propre site.
+
+### Ce que ça impose au code
+
+- La mention ne peut pas vivre sur une page de documentation : « à chaque
+  accès » veut dire **dans chaque bloc de chaque réponse**. `source`,
+  `free_of_charge` et `as_of` sont donc des champs **non optionnels** de
+  `OfficialIdentity`, et `src/lib/official-identity.ts` en est le seul
+  constructeur.
+- Un test sérialise chaque bloc possible et échoue s'il manque la phrase, la
+  source ou la date (`src/lib/official-identity.test.ts`). Il porte sur la
+  **phrase**, pas sur le nom du champ : un renommage qui perdrait la mention ne
+  peut pas le passer.
+- `authoritative` est typé **littéral `false`** : `authoritative: true` est une
+  erreur de compilation, pas une remarque de revue. Les deux publient en
+  **relais** — l'attribution des codes reste aux autorités nationales — et le
+  Banco de España décline toute valeur probatoire.
+- Le bloc est **purement informationnel et additif** : il ne touche ni `valid`
+  ni `bank_code_check`. Un test le verrouille explicitement. Faire passer l'une
+  de ces deux sources par `NATIONAL_REGISTERS` (dans `src/lib/enrich.ts`) aurait
+  posé `authoritative: true` et transformé une absence en `not_in_register` —
+  une affirmation qu'aucun des deux ne soutient.
+
+### Ingestion
+
+- `scripts/seed-ecb-mfi.ts` (`npm run db:seed-mfi`) alimente les deux tables et,
+  comme le seeder PRA, **abandonne sans rien casser** (log + sortie 0, table
+  intacte) sur échec de téléchargement, de parse ou de plancher de cohérence.
+- **BCE** : `mfi_csv_YYMMDD.csv`, **UTF-16LE avec BOM, séparateur tabulation**,
+  CRLF — malgré l'extension `.csv`. Lu en UTF-8 le fichier se découpe quand même
+  en champs : la panne est silencieuse, d'où le contrôle d'en-tête sur les 14
+  colonnes attendues. Publié **les jours ouvrés seulement** ; le seeder remonte
+  jusqu'à 4 jours. Un fichier absent répond **404 avec ~97 Ko de page d'erreur
+  HTML**, donc le test est `response.ok`, jamais la taille.
+- **`list_date` ne vient jamais de l'horloge.** Côté BCE c'est la date du nom du
+  fichier qui a répondu 200 ; côté Banco de España c'est l'en-tête HTTP
+  `Last-Modified` (le fichier n'est daté ni dedans ni dans son URL) — et **si
+  cet en-tête manque, l'ingestion est abandonnée** plutôt que datée du jour.
+- **Banco de España** : CSV virgule, UTF-8 BOM, chaque champ **rembourré de
+  centaines d'espaces** (export à largeur fixe déguisé en CSV). Un code non
+  trimé ne joint rien, silencieusement et pour toujours.
+
+### La jointure, et ce qui a été refusé
+
+- **Par LEI** (`/v1/bic/:code`) : sans portée pays, **contrairement à
+  `pra_authorisation`**. Ce bloc dit **qui est** le titulaire du LEI, pas ce
+  qu'il a le droit de faire quelque part ; une identité légale ne change pas
+  selon le BIC par lequel on est entré. Le fan-out est réel et va dans l'autre
+  sens : mesuré le 26/08/2026, 232 des LEI de la liste portent **plusieurs
+  BIC8** (un seul en couvre 42, dans autant de pays), donc une ligne répond
+  légitimement à beaucoup de lookups. Aucune ambiguïté inverse : le fichier ne
+  contient **aucun LEI en double**.
+- **FR** : le code RIAD est `FR` + le **code banque à 5 chiffres** (`FR30004` =
+  BNP Paribas — vérifié aussi sur Société Générale, LCL, La Banque Postale). La
+  colonne `national_bank_code` n'est remplie **que** pour les lignes FR.
+- 🚨 **La forme ne suffit pas, le pays est obligatoire.** Sur le fichier réel,
+  1 240 lignes allemandes et 569 polonaises ont la **même forme** `XX` +
+  5 chiffres — et `DE07802` est une Bausparkasse dont le BLZ est 60430000, pas
+  07802. Servir le nom d'un établissement allemand derrière un IBAN français,
+  sur un appel payant, est exactement ce que ce garde-fou empêche.
+- **ES** : la colonne `SUPERVISORY CODE` du Banco de España publie le **code
+  banque à 4 chiffres nu** (0182 = BBVA). Quatre lignes publient des codes du
+  type `FI2680` — des fonds monétaires, pas des banques : filtrées par
+  `/^\d{4}$/`. Corroboration utile : 227 des codes RIAD espagnols de la BCE
+  coïncident avec ceux du Banco de España, mais c'est bien le Banco de España
+  qui publie l'espace de codes et dont la formule d'attribution est reproduite.
+- ❌ **Portugal non implémenté** : l'heuristique de mapping qui circule n'est
+  documentée nulle part par la BCE. Une règle non documentée n'a pas sa place
+  derrière une réponse payante.
+- 🚨 Deux lignes portent `E$` en pays (la BCE elle-même et la BEI) : ce n'est
+  pas un code ISO. Stocké tel quel, aucune contrainte `CHECK` sur la colonne, et
+  aucun chemin par code national ne peut l'atteindre.
+
+### Attribution servie
+
+Le crédit vit **dans la base**, jamais en dur : `getEcbMfiCount()`,
+`getBdeMfiCount()`, `getEcbListDate()` et `getBdeListDate()` alimentent
+`/llms.txt`. La formule espagnole est reproduite mot pour mot :
+
+> Own elaboration based on data from the Banco de España website (www.bde.es)

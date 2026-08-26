@@ -10,6 +10,7 @@ import {
   getReferenceAsOf,
   lookup,
   registeredAddress,
+  bic8CountForPrefix,
 } from './bic-lookup.js';
 import { classifyIssuer } from './issuers.js';
 import { lookupFiInstitution } from './fi-register.js';
@@ -21,6 +22,7 @@ import { blzRegisterAvailable, lookupBlz } from './de-blz.js';
 import { checkVop } from './compliance.js';
 import { checkUkModulus } from './uk-modulus.js';
 import { praAuthorisationByLei } from './pra-banks.js';
+import { officialIdentityByNationalCode } from './official-identity.js';
 import type { BankCodeCheck, IBANValidationResult, RegisterInstitution } from '../types.js';
 import { nextSteps } from './next-steps.js';
 
@@ -167,6 +169,59 @@ function askNationalRegister(
 const COMPOSITE_REGISTER = 'IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)';
 
 /**
+ * Countries whose own authority PUBLISHES that the IBAN's bank-code positions
+ * are the first four characters of the institution's BIC.
+ *
+ * This is not a register and it is not our own inference — it is a documented
+ * structural rule, which is a strictly better provenance than "assembled from
+ * BIC directories" for the pairing it explains. Latvijas Banka publishes it for
+ * the Latvian IBAN (positions 5-8), and the Gibraltar Financial Services
+ * Commission publishes the same rule in Guidance Note 07.
+ *
+ * ## Why `authoritative` stays false
+ *
+ * The rule tells you how to READ the IBAN. It does not tell you the BIC it
+ * points at was ever allocated, and it does not make our directory exhaustive.
+ * Setting `authoritative: true` here would license a `not_in_register` verdict
+ * — "this code is not allocated, do not send" — off a coverage gap. That is the
+ * exact overclaim NATIONAL_REGISTERS above is documented to require real
+ * ingestion for, and no amount of published structure substitutes for it.
+ *
+ * ## Why it only relabels a pairing we already made
+ *
+ * Both countries already resolve through the curated map and did so before this
+ * rule was named: LV `HABA` → HABALV22, GI `TNOV` → TNOVGIGI. Nothing in the
+ * verdict changes. What changes is that the answer stops crediting our own
+ * assembly for a pairing a central bank published, and starts saying how many
+ * institutions the rule alone actually singles out.
+ */
+const STRUCTURAL_BIC_PREFIX_RULE: Record<string, string> = {
+  LV: 'structural rule published by Latvijas Banka (IBAN positions 5-8 are the first four characters of the BIC)',
+  GI: 'structural rule published by the Gibraltar Financial Services Commission (Guidance Note 07: IBAN positions 5-8 are the first four characters of the BIC)',
+};
+
+/**
+ * Does the published structural rule explain this pairing?
+ *
+ * Requires all three: the country publishes the rule, the bank code is the four
+ * letters the rule speaks about, and the BIC we actually resolved really does
+ * begin with it. The third condition is what keeps this honest — crediting a
+ * rule for a pairing the rule does not produce would be a worse citation than
+ * the vague one it replaces.
+ */
+function structuralPrefixRule(
+  cc: string,
+  bankCode: string,
+  resolvedBic: string | null | undefined,
+): { register: string; candidates: number } | null {
+  const register = STRUCTURAL_BIC_PREFIX_RULE[cc];
+  if (!register || !resolvedBic) return null;
+  if (!/^[A-Z]{4}$/.test(bankCode)) return null;
+  if (!resolvedBic.toUpperCase().startsWith(bankCode)) return null;
+  return { register, candidates: bic8CountForPrefix(cc, bankCode) };
+}
+
+/**
  * Decide the bank-code verdict, and be explicit about how much it is worth.
  *
  * For CH and LI the register answers on its own: an allocated IID identifies a
@@ -177,7 +232,10 @@ const COMPOSITE_REGISTER = 'IBANforge composite bank-code map (assembled from BI
 function checkBankCode(
   cc: string,
   bankCode: string,
-  hit: { match: 'register' | 'prefix'; candidates?: number } | null,
+  // `code` joined the shape for the LV/GI structural rule: crediting a
+  // published rule for a pairing requires checking the rule actually produces
+  // it, and that check is `resolvedBic.startsWith(bankCode)`.
+  hit: { match: 'register' | 'prefix'; candidates?: number; code: string } | null,
   bban?: string,
 ): BankCodeCheck {
   const as_of = getReferenceAsOf();
@@ -212,6 +270,23 @@ function checkBankCode(
   }
 
   if (hit) {
+    // LV and GI: credit the authority that published the rule, not our own
+    // assembly. See STRUCTURAL_BIC_PREFIX_RULE — the verdict is unchanged,
+    // `authoritative` stays false, and `candidates` says how many institutions
+    // the rule alone leaves standing.
+    const structural = structuralPrefixRule(cc, bankCode, hit.code);
+    if (structural) {
+      return {
+        value: bankCode,
+        status: 'verified',
+        match: hit.match,
+        register: structural.register,
+        authoritative: false,
+        ...(structural.candidates > 1 ? { candidates: structural.candidates } : {}),
+        as_of,
+      };
+    }
+
     return {
       value: bankCode,
       status: 'verified',
@@ -432,6 +507,21 @@ export function enrichResult(result: IBANValidationResult): void {
     const pra = praAuthorisationByLei(result.bic.lei, cc);
     if (pra) result.pra_authorisation = pra;
   }
+
+  // France and Spain: who does the central bank say holds this bank code?
+  //
+  // Placed AFTER checkBankCode on purpose, and reading nothing it wrote. This
+  // block is additive identity, not a verdict: `valid` and `bank_code_check`
+  // must come out byte-identical whether or not a list is loaded. Routing
+  // either source through NATIONAL_REGISTERS above would have set
+  // `authoritative: true` and turned an absence into `not_in_register` — a
+  // claim neither publisher supports, and one the Banco de España's terms
+  // explicitly forbid.
+  //
+  // Silent on a miss, like pra_authorisation: neither list allocates the code
+  // space, so absence from it is not evidence the code is unallocated.
+  const identity = officialIdentityByNationalCode(cc, bankCode);
+  if (identity) result.official_identity = identity;
 
   // Last, so every field it reasons about is already populated.
   result.next_steps = nextSteps(result);

@@ -61,6 +61,7 @@ import { bicGuardMiddleware, iidGuardMiddleware } from './middleware/identifier-
 import { notFoundHandler } from './lib/not-found.js';
 import { getEntryCount, getChClearingCount, getLeiEnrichedCount } from './lib/bic-lookup.js';
 import { getPraBanksCount, praAttribution } from './lib/pra-banks.js';
+import { getBdeListDate, getBdeMfiCount, getEcbListDate, getEcbMfiCount } from './lib/official-identity.js';
 import { getIban, getIbansArray } from './lib/request-helpers.js';
 
 import type { HonoEnv } from './types.js';
@@ -130,6 +131,30 @@ function buildLlmsTxt(): string {
   const praSourceLine = praCredit
     ? `- UK deposit-taking authorisation: ${praCredit}, used with the Bank of England's written permission`
     : '- UK deposit-taking authorisation: not currently loaded';
+  // Official identity (ECB + Banco de España). Counts AND dates come from the
+  // serving database: both lists are republished every business day, so a
+  // literal here is stale within the week — and the date is half of what makes
+  // the claim honest. The free-of-charge sentences are not marketing: both
+  // licences require telling buyers, on every access, that the data is
+  // available for nothing at the source.
+  const ecbCount = getEcbMfiCount();
+  const bdeCount = getBdeMfiCount();
+  const ecbDate = getEcbListDate();
+  const bdeDate = getBdeListDate();
+  const identityLine =
+    ecbDate || bdeDate
+      ? `\n- **Official identity of the institution:** where a central bank publishes the holder of the code we resolved, the answer carries \`official_identity\` — legal name, LEI, registered address, category, and the date of the list it came from. Reached by LEI on any BIC lookup, and by the national bank code for FR and ES. Informational only: it never changes \`valid\` or \`bank_code_check\`, because the publishers relay rather than allocate. Absent rather than negative when there is no match.`
+      : '';
+  const identitySourceLines = [
+    ecbDate
+      ? `- Official identity (LEI, FR bank code): European Central Bank, list of monetary financial institutions, ${ecbCount.toLocaleString('en-US')} institutions, list of ${ecbDate}. This information may be obtained free of charge from ecb.europa.eu.`
+      : null,
+    bdeDate
+      ? `- Official identity (ES bank code): Banco de España, list of MFIs, ${bdeCount.toLocaleString('en-US')} institutions, list of ${bdeDate}. Own elaboration based on data from the Banco de España website (www.bde.es). This information may be obtained free of charge from www.bde.es.`
+      : null,
+  ]
+    .filter(Boolean)
+    .join('\n');
   return `# IBANforge
 
 > Pre-payout screening for AI agents — check the bank behind a counterparty IBAN before you send funds. IBAN validation, BIC/SWIFT lookup, Swiss clearing, sanctions and compliance risk scoring, designed for AI agents and developers. ${bicCount} BIC entries (${leiCount} LEI-enriched via GLEIF; additional rows from SwiftCodes (MIT), Bundesbank, SIX, NBP, EBA Step2 SCT), ${chCount} Swiss BC-Nummer from SIX, ${countryCount} countries, ${issuerCount} non-bank issuer classifications (EMI, payment institutions, digital banks). Counts in this file are generated live from the serving database.
@@ -140,6 +165,7 @@ function buildLlmsTxt(): string {
 - Swiss clearing: SIX BankMaster (BC-Nummer / IID)
 - National bank-code registers: Deutsche Bundesbank, Oesterreichische Nationalbank, Banque nationale de Belgique, Finance Finland
 ${praSourceLine}
+${identitySourceLines}
 - Compliance signals: OFAC, EU, UN, FATF, EPC (Verification of Payee)
 
 ## Instructions for LLM agents
@@ -289,7 +315,7 @@ Both \`/v1/bic/:code\` and \`/v1/ch/clearing/:iid\` use **URL path parameters** 
 - Validating IBANs at checkout, payout, or before a SEPA transfer
 - Resolving BIC/SWIFT from an IBAN automatically
 - Detecting Swiss BC-Nummer / IID for routing
-- Catching an impossible UK account before a payout: validating a GB IBAN also runs the Vocalink modulus checksum over the sort code and account number it carries, in the same call and at no extra cost (\`modulus_check\`). mod-97 alone passes on GB pairs no bank could have issued.${praLine}
+- Catching an impossible UK account before a payout: validating a GB IBAN also runs the Vocalink modulus checksum over the sort code and account number it carries, in the same call and at no extra cost (\`modulus_check\`). mod-97 alone passes on GB pairs no bank could have issued.${praLine}${identityLine}
 - Detecting EMIs / virtual IBANs (Wise, Revolut, Mercury, Modulr, etc.)
 - Pre-flight VoP participant check before October 2025 SEPA deadline
 - Pay-per-call agent workflows without human onboarding (x402 USDC)

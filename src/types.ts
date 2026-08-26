@@ -3,6 +3,7 @@
  */
 import type { UkModulusResult } from './lib/uk-modulus.js';
 import type { PraAuthorisation } from './lib/pra-banks.js';
+import type { OfficialIdentity } from './lib/official-identity.js';
 
 export type { UkModulusResult, PraAuthorisation };
 
@@ -325,6 +326,19 @@ export interface IBANValidationResult {
    * `authorised: false`. See lib/pra-banks.ts for the licence and the join rule.
    */
   pra_authorisation?: PraAuthorisation;
+  /**
+   * The official identity a central bank publishes for the institution behind
+   * this IBAN's bank code: legal name, LEI, registered address, category.
+   *
+   * FR reads the ECB's daily MFI list (its RIAD code is the code banque); ES
+   * reads the Banco de España's list (its SUPERVISORY CODE column is the
+   * four-digit bank code). Present only on a match, and purely informational —
+   * it never changes `valid` or `bank_code_check`, because neither publisher
+   * allocates bank codes and the Banco de España's terms forbid presenting its
+   * data as having legal effect. See lib/official-identity.ts for the licence
+   * conditions this block carries on every access.
+   */
+  official_identity?: OfficialIdentity;
   /**
    * What to do next, derived from this result. Ordered: what blocks a payment
    * comes before what merely enriches it. See lib/next-steps.ts.
