@@ -61,7 +61,12 @@ import { bicGuardMiddleware, iidGuardMiddleware } from './middleware/identifier-
 import { notFoundHandler } from './lib/not-found.js';
 import { getEntryCount, getChClearingCount, getLeiEnrichedCount } from './lib/bic-lookup.js';
 import { getPraBanksCount, praAttribution } from './lib/pra-banks.js';
-import { PSD_SERVED_COUNTRIES, getPsdEntityCount, psdAttribution } from './lib/psd-register.js';
+import {
+  PSD_SERVED_COUNTRIES,
+  getPsdCountryCount,
+  getPsdEntityCount,
+  psdAttribution,
+} from './lib/psd-register.js';
 import { getIban, getIbansArray } from './lib/request-helpers.js';
 
 import type { HonoEnv } from './types.js';
@@ -137,9 +142,10 @@ function buildLlmsTxt(): string {
   // The served-country list is read from the code that enforces it, so this
   // line cannot claim a country the lookup declines.
   const psdCount = getPsdEntityCount();
+  const psdCountries = getPsdCountryCount();
   const psdCredit = psdAttribution();
   const psdLine = psdCredit
-    ? `\n- **EU payment/e-money authorisation:** an IBAN whose bank code is registered to an authorised payment or e-money institution comes back with \`psd_registration\` (entity type, name, competent authority, source, as-of). ${psdCount.toLocaleString('en-US')} authorised entities across 30 countries. Joined on country + national reference code, and served only for ${PSD_SERVED_COUNTRIES.join(', ')} — the register carries no BIC and no LEI, and elsewhere it files authorisations under company or tax numbers that are not the code an IBAN carries. Absent rather than negative when there is no match.`
+    ? `\n- **EU payment/e-money authorisation:** an IBAN whose bank code is registered to an authorised payment or e-money institution comes back with \`psd_registration\` (entity type, name, competent authority, source, as-of). ${psdCount.toLocaleString('en-US')} authorised entities across ${psdCountries} countries. Joined on country + national reference code, and served only for ${PSD_SERVED_COUNTRIES.join(', ')} — the register carries no BIC and no LEI, and elsewhere it files authorisations under company or tax numbers that are not the code an IBAN carries. Absent rather than negative when there is no match.`
     : '';
   const psdSourceLine = psdCredit
     ? `- EU payment/e-money authorisation: ${psdCredit}, reproduced with attribution per the EBA legal notice`

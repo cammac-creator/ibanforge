@@ -196,6 +196,28 @@ export function getPsdEntityCount(): number {
 }
 
 /**
+ * How many countries the loaded copy covers.
+ *
+ * Live, like getPsdEntityCount(), and for the same reason: /llms.txt is a file
+ * that promises its numbers are generated from the serving database, and a
+ * literal "30 countries" there would be the exact defect that was found in that
+ * file twice already — a hardcoded figure sitting inside a sentence claiming to
+ * be measured.
+ */
+export function getPsdCountryCount(): number {
+  if (!ready()) return 0;
+  try {
+    return (
+      getBicDB().prepare('SELECT COUNT(DISTINCT country) AS cnt FROM psd_entities').get() as {
+        cnt: number;
+      }
+    ).cnt;
+  } catch {
+    return 0;
+  }
+}
+
+/**
  * Date of the loaded golden copy, 'YYYY-MM-DD'. Null when nothing is loaded.
  * Read from the rows, never from a clock.
  */

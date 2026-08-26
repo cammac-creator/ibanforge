@@ -271,6 +271,84 @@ describe('enrichResult serves psd_registration for a Spanish EMI IBAN', () => {
   });
 });
 
+describe('the priced compliance call moves, deliberately and only where it should', () => {
+  /**
+   * Measured on the shipped database, before and after this ingestion:
+   *
+   *   ES..6702 (an authorised EMI)  null -> emi,  score 10 -> 20, low -> medium
+   *   ES..6802 (an authorised PI)   null -> payment_institution, 10 -> 25
+   *   ES..2100 (CaixaBank, a bank)  unchanged: bank, score 0, low, no flags
+   *
+   * That is the product premise working, not a regression: an EMI-issued IBAN
+   * carries counterparty risk a bank one does not, and until now Spanish
+   * e-money IBANs were scored as though nothing were known about them. It is
+   * pinned here because it is a PAID surface — a silent score change is the
+   * kind of thing a customer notices before we do.
+   */
+  const emi = rowsFor('ES', 'emi')[0];
+
+  it.skipIf(!loaded || !emi)('flags a Spanish EMI IBAN that used to score as unknown', async () => {
+    const { buildComplianceResult } = await import('./compliance.js');
+    const result = validateIBAN(esIban(emi.national_reference_code));
+    enrichResult(result);
+    const compliance = buildComplianceResult(
+      result.valid,
+      'ES',
+      result.bic?.code?.slice(0, 8) ?? null,
+      result.risk_indicators!.issuer_type ?? '',
+      result.risk_indicators!.country_risk,
+      false,
+    );
+    expect(result.risk_indicators!.issuer_type).toBe('emi');
+    expect(compliance.flags).toContain('emi_issuer');
+  });
+
+  it.skipIf(!loaded)('leaves a Spanish credit institution scoring exactly as before', async () => {
+    const { buildComplianceResult } = await import('./compliance.js');
+    const result = validateIBAN(esIban('2100'));
+    enrichResult(result);
+    const compliance = buildComplianceResult(
+      result.valid,
+      'ES',
+      result.bic?.code?.slice(0, 8) ?? null,
+      result.risk_indicators!.issuer_type ?? '',
+      result.risk_indicators!.country_risk,
+      false,
+    );
+    expect(compliance.flags).not.toContain('emi_issuer');
+    expect(compliance.flags).not.toContain('payment_institution_issuer');
+  });
+});
+
+describe('next_steps never contradicts the block beside it', () => {
+  const emi = rowsFor('ES', 'emi')[0];
+
+  it.skipIf(!loaded || !emi)('stops calling the code absent once the register names its holder', () => {
+    // The bank code resolves no BIC, so bank_code_check still says
+    // not_in_register — correct, that table is the BIC directory. But saying
+    // "absent from our reference data" beside a psd_registration naming the
+    // institution, its authority and the copy date is a plain contradiction.
+    const result = validateIBAN(esIban(emi.national_reference_code));
+    enrichResult(result);
+    expect(result.psd_registration).toBeDefined();
+
+    const step = result.next_steps!.find((s) => s.code === 'verify_payee_name');
+    expect(step, 'the name check should still fire — an EMI is where it matters most').toBeDefined();
+    expect(step!.because).not.toContain('absent from our reference data');
+    expect(step!.because).toContain('psd_registration names the holder');
+    expect(step!.because).toContain(getPsdAsOf()!);
+  });
+
+  it.skipIf(!loaded)('keeps the original wording where no register spoke', () => {
+    // The reworded branch must not leak onto every other unresolved bank code.
+    const result = validateIBAN('SE4550000000058398257466');
+    enrichResult(result);
+    const step = result.next_steps?.find((s) => s.code === 'verify_payee_name');
+    if (!step) return;
+    expect(step.because).toContain('not proven absent from the country');
+  });
+});
+
 describe('no regression to classifications that already existed', () => {
   it.skipIf(!loaded)('a Spanish bank IBAN gains no block and keeps its issuer', () => {
     // 2100 is CaixaBank — a credit institution, in the 0xxx-3xxx range this

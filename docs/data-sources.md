@@ -443,6 +443,24 @@ exactement la coïncidence de nom que `pra-banks.ts` refuse de joindre.
   0xxx-3xxx (invariant dur — c'est celui dont l'échec produirait un faux
   positif payant). Un refresh qui dégrade la correspondance rougit.
 
+⚠️ **Le score de `/v1/iban/compliance` bouge pour ces IBAN, volontairement.**
+`calculateRiskScore` ajoute +10 pour `emi` et +15 pour `payment_institution`.
+Mesuré avant/après sur la base réelle :
+
+| IBAN | avant | après |
+|---|---|---|
+| ES…6702 (EMI agréé) | `issuer_type: null`, score 10, `low` | `emi`, score 20, `medium`, flag `emi_issuer` |
+| ES…6802 (EP agréé) | `issuer_type: null`, score 10, `low` | `payment_institution`, score 25, `medium` |
+| ES…2100 (CaixaBank) | `bank`, score 0, `low` | **inchangé** |
+
+C'est la prémisse du produit qui fonctionne, pas une régression : un IBAN émis
+par un établissement de monnaie électronique porte un risque de contrepartie
+qu'un IBAN bancaire n'a pas, et jusqu'ici les IBAN de monnaie électronique
+espagnols étaient notés comme si l'on ne savait rien d'eux. Un établissement de
+crédit n'est pas touché. Épinglé par un test, parce que c'est une surface
+**payante** et qu'un score qui bouge en silence se remarque chez le client
+avant de se remarquer ici.
+
 ## Sources écartées, et pourquoi
 
 | Source | Motif |

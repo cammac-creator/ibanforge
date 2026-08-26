@@ -56,12 +56,24 @@ export function nextSteps(result: IBANValidationResult): NextStep[] {
       because: `bank_code_check.status is not_in_register and authoritative is true (${check.register ?? 'national register'})`,
     });
   } else if (check && check.status !== 'verified') {
+    // An EU register may have named the holder even when the BIC directory did
+    // not. Saying "absent from our reference data" beside a psd_registration
+    // block that names the institution, its competent authority and the date of
+    // the copy is a plain contradiction — and the wrong half is this one, since
+    // the register is the better source. The step still fires: an EMI-issued
+    // IBAN is exactly where the account holder and the IBAN holder diverge, so
+    // a name check matters MORE here, not less. Only the reasoning changes.
+    const psd = result.psd_registration;
     steps.push({
       code: 'verify_payee_name',
-      do: 'Treat this as unavailable rather than invalid, and let a beneficiary name check decide before releasing funds.',
-      because:
-        `bank_code_check.status is ${check.status} with authoritative false, ` +
-        'so the bank code is absent from our reference data, not proven absent from the country',
+      do: psd
+        ? 'Confirm the beneficiary name before releasing funds. The register names who holds this bank code, but not who holds the account behind it.'
+        : 'Treat this as unavailable rather than invalid, and let a beneficiary name check decide before releasing funds.',
+      because: psd
+        ? `bank_code_check.status is ${check.status}, but psd_registration names the holder ` +
+          `(${psd.name}, ${psd.entity_type}) from ${psd.source} as of ${psd.as_of}`
+        : `bank_code_check.status is ${check.status} with authoritative false, ` +
+          'so the bank code is absent from our reference data, not proven absent from the country',
     });
   }
 
