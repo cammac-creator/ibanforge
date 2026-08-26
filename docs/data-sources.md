@@ -322,6 +322,127 @@ La FCA, elle, a accusé réception le 24/08 (dossier ouvert, réponse de fond
 promise sous 2 jours ouvrés) — son registre des firmes est un périmètre
 distinct de la liste des banques, les deux démarches restent utiles.
 
+## EBA — registre PSD2 des établissements de paiement et de monnaie électronique
+
+Ingéré le 26/08/2026. La « copie d'or » que l'EBA republie chaque jour :
+329 122 entités, dont 4 416 agréments utiles sur 30 pays.
+
+**Licence.** « Reproduction of all EBA material on this site is authorised,
+provided the source is acknowledged » — <https://www.eba.europa.eu/legal-notice>.
+L'attribution est la condition, donc `source` et `as_of` sont des **colonnes
+stockées** servies sur chaque surface, jamais des littéraux : la copie change
+tous les jours, une date écrite en dur est une attribution périmée dès le
+lendemain.
+
+**Intégrité — la seule source du corpus qui se prouve.** Le manifeste
+(`euclid.eba.europa.eu/register/api/filemetadata`) publie le SHA-256 du ZIP du
+jour, et le ZIP contient un second SHA-256 pour le JSON qu'il transporte. Le
+seeder vérifie **les deux**. Un écart laisse `psd_entities` intacte et sort en 0
+— même doctrine que la PRA : un téléchargement tronqué ne remplace jamais de
+bonnes lignes.
+
+**Volumétrie.** Le JSON pèse 217 Mo une fois décompressé, ce qui exclut un
+`JSON.parse`. Le seeder scanne le flux d'inflate en comptant les accolades et
+n'émet qu'une entité à la fois (`DepthTwoScanner`). Il ne s'appuie pas sur
+l'indentation : un reformatage en amont viderait silencieusement un lecteur
+ligne à ligne.
+
+**Ce qui est gardé.** 5 types sur 9. `PSD_AG` (322 467 agents, 98 % du fichier)
+n'émet pas d'IBAN ; `PSD_BR` (succursales) ne porte **aucun** code national —
+mesuré : 0 sur 244, la jointure serait impossible par construction ;
+`PSD_EXC` et `PSD_ENL` ne sont pas des agréments.
+
+| type EBA | stocké comme | lignes |
+|---|---|---|
+| `PSD_EPI` | `exempted_payment_institution` | 2 758 |
+| `PSD_PI` | `payment_institution` | 1 014 |
+| `PSD_EMI` | `emi` | 427 |
+| `PSD_AISP` | `aisp` | 129 |
+| `PSD_EEMI` | `exempted_emi` | 88 |
+
+### 🚨 Le fichier n'a NI BIC NI LEI — et un seul pays est servi
+
+Vérifié exhaustivement sur les 217 Mo : les entités portent treize clés de
+propriétés, **aucune n'est un identifiant que cette API sait déjà joindre**. La
+seule jointure candidate vers un IBAN est donc `pays + code national de
+référence` — or ce code est celui sous lequel l'autorité nationale classe un
+agrément, ce qui n'est presque jamais le code que porte l'IBAN du pays.
+
+Mesuré pays par pays contre les codes banques que nous détenons déjà (carte
+curée, BLZ Bundesbank, registres AT/BE) :
+
+| pays | lignes | largeur code IBAN | conformité de format | recouvrement | verdict |
+|---|---|---|---|---|---|
+| **ES** | 112 | 4 | **100 %** | 1, et il concorde | ✅ **SERVI** |
+| PT | 17 | 4 | 82 % | 0 | écarté |
+| HR | 21 | 7 | 19 % | 0 | écarté |
+| PL | 2 449 | 8 | 0 % | 0 | écarté — NIP (10 chiffres) |
+| NL | 226 | 4 | 0 % | 0 | écarté — référence DNB `R203521` |
+| CZ / SK | 179 / 16 | 4 | 0 % | 0 | écarté — IČO (8 chiffres) |
+| LT | 178 | 5 | 0 % | 0 | écarté — `LB000237` |
+| FR | 130 | 5 | 0 % | 0 | écarté — SIREN (9 chiffres) |
+| DE | 95 | 8 | 0 % | 0 | écarté — n° BaFin (6 chiffres), pas la BLZ |
+| MT / IE | 91 / 70 | 4 | 0 % | 0 | écarté — `C106255`, `C58301` |
+| IT | 80 | 5 | 0 % | 0 | écarté — codice fiscale (11) |
+| CY | 52 | 3 | 0 % | 0 | écarté — `115.1.2.5` |
+| LU | 39 | 3 | 0 % | 0 | écarté — `Z00000035` |
+| AT | 9 | 5 | 0 % | 0 | écarté — n° FMA `481488x` |
+| SE, FI, DK, BE, NO, LV, EE, HU, BG, RO, GR, SI, IS, LI | — | — | 0 % | 0 | écarté — n° d'entreprise ou fiscal |
+
+**Pourquoi l'Espagne est démontrée, et pas seulement plausible :**
+
+1. Les 112 codes espagnols font **exactement 4 chiffres**, la largeur qu'un
+   IBAN ES porte en positions 1-4.
+2. Les plages suivent les types **sans exception** : 67xx = les 12 `PSD_EMI`,
+   68xx/69xx = les établissements de paiement et AISP, 86xx-88xx = des entités
+   dont les noms publiés se terminent **tous** par « E.F.C. » (Establecimiento
+   Financiero de Crédito). Ce dernier point est décisif : il est confirmé par le
+   texte du registre lui-même, sans référence à nos données. C'est bien le
+   **código de entidad du Banco de España** qui est publié ici.
+3. Les banques espagnoles vivent en 0xxx-3xxx. **Zéro** des 112 codes PSD n'y
+   entre — les plages sont disjointes, donc ce registre ne peut pas décrire une
+   banque comme un établissement de paiement.
+4. Le seul code présent des deux côtés concorde : 6717 = « BNEXT ELECTRONIC
+   ISSUER, E.D.E. » ici et `BNXTESM2` dans notre carte curée, construite
+   indépendamment. L'autre clé espagnole hors plage bancaire que nous
+   détenions, 6723 (Modulr Finance B.V. Sucursal en España), est absente pour
+   une raison **structurelle et non contradictoire** : c'est une *succursale*,
+   et les succursales sont des lignes `PSD_BR`, qui ne portent aucun code.
+
+Le Portugal est le meilleur candidat suivant et reste écarté : 4 chiffres, la
+bonne largeur, mais 17 entités, aucun recouvrement, et des codes éparpillés sur
+1800/32xx/75xx/81xx/82xx/87xx au lieu de la plage réservée unique que montre
+l'Espagne. **Plausible n'est pas démontré.** Malte est écarté pour une raison
+plus tranchante : un code banque maltais *est* une abréviation à 4 lettres du
+nom de l'établissement, donc les deux abréviations MFSA qui « matchent » sont
+exactement la coïncidence de nom que `pra-banks.ts` refuse de joindre.
+
+### Ce qui est servi
+
+- `scripts/seed-eba-psd.ts` (`npm run db:seed-psd`), branché sur
+  **`refresh-bic.yml`** (mensuel) et non sur le `refresh-compliance.yml`
+  hebdomadaire : `psd_entities` vit dans `data/bic.sqlite`, or le workflow
+  hebdomadaire ne stage que `data/compliance.sqlite`. L'y mettre reviendrait
+  soit à courser l'autre job sur le même fichier, soit — pire, parce que c'est
+  silencieux — à semer une table jamais commitée.
+- Bloc `psd_registration` sur la validation d'un IBAN : `entity_type`, `name`,
+  `country`, `competent_authority`, `source`, `as_of`. **`source` et `as_of`
+  sont obligatoires et verrouillés par un test** qui parcourt tous les codes
+  servis, pas un échantillon : un bloc sans source est une infraction à la
+  licence, pas un champ manquant.
+- `issuer.type` peut être **rempli, jamais écrasé** : seule une classification
+  `default` — une hypothèse, pas un constat — cède la place, et la nouvelle
+  valeur `classification: 'register'` dit d'où vient le verdict. Seuls `emi` et
+  `payment_institution` bougent un type d'émetteur ; un AISP n'émet rien et les
+  deux types « exempted » sont des **dispenses** d'agrément, pas des agréments.
+- **Aucune branche négative.** Le disclaimer du registre dit lui-même qu'il
+  « has no legal significance » et qu'un établissement omis reste agréé. Une
+  absence ne produit **aucun bloc**, jamais `registered: false`.
+- La mesure est encodée en test contre la table semée : conformité de format
+  espagnole ≥ 95 % (seuil), et **zéro** code PSD dans la plage bancaire
+  0xxx-3xxx (invariant dur — c'est celui dont l'échec produirait un faux
+  positif payant). Un refresh qui dégrade la correspondance rougit.
+
 ## Sources écartées, et pourquoi
 
 | Source | Motif |

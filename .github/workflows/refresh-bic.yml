@@ -68,6 +68,22 @@ jobs:
       - name: Refresh the Bank of England PRA List of Banks
         run: npm run db:seed-pra
 
+      # EBA register of payment and e-money institutions (the PSD2 "golden
+      # copy"). It belongs in THIS workflow rather than the weekly
+      # refresh-compliance one for the same reason the Swiss clearing seeder
+      # does: psd_entities lives in data/bic.sqlite, and refresh-compliance.yml
+      # only ever stages data/compliance.sqlite. Running it there would either
+      # race this job on the same file or — worse, because it fails silently —
+      # seed a table that is never committed at all.
+      #
+      # This one does NOT fail the job either. The seeder verifies TWO SHA-256
+      # digests (the ZIP against the EBA's manifest, the inflated JSON against
+      # the checksum shipped inside the archive) and has a sanity floor; any of
+      # them failing leaves the previous table standing and exits 0. A register
+      # that is not serving today must not turn a build red.
+      - name: Refresh the EBA register of payment and e-money institutions
+        run: npm run db:seed-psd
+
       # THE GATE. GLEIF and the enrichment sources have no sanity floor of their
       # own (unlike the CH/DE/AT/BE seeders), and `npm run test` only asserts
       # `toBeGreaterThan(0)` on this table — a source answering with a truncated

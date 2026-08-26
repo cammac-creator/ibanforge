@@ -8,6 +8,7 @@ import { resetStatsStatements } from './stats.js';
 import { closeComplianceDB } from './compliance-db.js';
 import { resetChClearingStatements } from './ch-clearing.js';
 import { resetPraBanksStatements } from './pra-banks.js';
+import { resetPsdRegisterStatements } from './psd-register.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
@@ -637,6 +638,7 @@ export function closeAll(): void {
     resetChClearingStatements();
     resetNationalRegisterStatements();
     resetPraBanksStatements();
+    resetPsdRegisterStatements();
   }
   if (statsDB) {
     statsDB.close();

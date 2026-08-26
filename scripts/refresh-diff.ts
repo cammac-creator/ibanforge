@@ -96,6 +96,8 @@ interface Counts {
   chClearing: number;
   deBlz: number;
   national: Map<string, number>;
+  psd: number;
+  psdByCountry: Map<string, number>;
 }
 
 function read(path: string): Counts {
@@ -126,6 +128,13 @@ function read(path: string): Counts {
     chClearing: scalar('SELECT COUNT(*) AS n FROM ch_clearing'),
     deBlz: scalar('SELECT COUNT(*) AS n FROM de_blz'),
     national: group('SELECT country AS k, COUNT(*) AS n FROM national_bank_codes GROUP BY country'),
+    psd: scalar('SELECT COUNT(*) AS n FROM psd_entities'),
+    // Per country as well as in total: the EBA copy is one file for 30
+    // competent authorities, so a national feed that stops arriving shrinks one
+    // country to zero while the total barely moves. Spain is the country this
+    // data is actually served for, and it is 112 of 4,416 rows — a drop there
+    // would hide entirely inside a tolerance on the total.
+    psdByCountry: group('SELECT country AS k, COUNT(*) AS n FROM psd_entities GROUP BY country'),
   };
   db.close();
   return counts;
@@ -183,6 +192,8 @@ try {
   compare('ch_clearing', before.chClearing, after.chClearing);
   compare('de_blz', before.deBlz, after.deBlz);
   compareMaps('national_bank_codes', before.national, after.national);
+  compare('psd_entities', before.psd, after.psd);
+  compareMaps('psd_entities country', before.psdByCountry, after.psdByCountry);
 
   console.log(`bic_entries: ${before.total} -> ${after.total}`);
   console.log(`sources: ${[...after.bySource].map(([k, n]) => `${k}=${n}`).join(' ')}`);

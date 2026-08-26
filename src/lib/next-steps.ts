@@ -107,14 +107,20 @@ export function nextSteps(result: IBANValidationResult): NextStep[] {
     });
   }
 
-  // 3. Population signals. Only on a curated identification: 'bank' is the
-  //    fallback for 97.9% of BIC8, so reading a default as "not an EMI" would
-  //    be the overclaim that issuer.classification exists to prevent.
-  if (issuer?.classification === 'curated' && issuer.type !== 'bank') {
+  // 3. Population signals. Only on an identification — 'bank' is the fallback
+  //    for 97.9% of BIC8, so reading a default as "not an EMI" would be the
+  //    overclaim that issuer.classification exists to prevent.
+  //
+  //    `register` counts alongside `curated`: it means an official register
+  //    names the holder of this bank code and says what it is, which is the
+  //    same kind of finding as a hand-verified BIC8 pairing and carries a date
+  //    and an authority on top. Leaving it out would have ingested the EBA
+  //    register and then withheld the one signal it exists to produce.
+  if ((issuer?.classification === 'curated' || issuer?.classification === 'register') && issuer.type !== 'bank') {
     steps.push({
       code: 'expect_virtual_iban',
       do: 'Expect a virtual IBAN. Account holder and IBAN holder often differ here, so weight the name check accordingly.',
-      because: `issuer.type is ${issuer.type} from a curated identification, not the bank default`,
+      because: `issuer.type is ${issuer.type} from a ${issuer.classification === 'register' ? 'register' : 'curated'} identification, not the bank default`,
     });
   }
 

@@ -3,8 +3,9 @@
  */
 import type { UkModulusResult } from './lib/uk-modulus.js';
 import type { PraAuthorisation } from './lib/pra-banks.js';
+import type { PsdRegistration } from './lib/psd-register.js';
 
-export type { UkModulusResult, PraAuthorisation };
+export type { UkModulusResult, PraAuthorisation, PsdRegistration };
 
 // --- Hono context variables ---
 
@@ -281,11 +282,17 @@ export interface IBANValidationResult {
     /**
      * Whether the type was established or assumed.
      * - `curated` — the BIC8 is in the issuer set; this is an identification.
+     * - `register` — an official register names the holder of this bank code and
+     *   says what it is. Also an identification, and a better-sourced one: it
+     *   carries a date and an issuing authority. Today this is the EBA PSD2
+     *   register, and the `psd_registration` block beside it holds the
+     *   provenance. Only ever *replaces* `default` — a curated identification is
+     *   never overridden.
      * - `default` — nothing is on file, so 'bank' is what we fall back to. True
-     *   most of the time and never established. Count only `curated` when
-     *   sizing exposure to virtual IBANs.
+     *   most of the time and never established. Count only `curated` and
+     *   `register` when sizing exposure to virtual IBANs.
      */
-    classification: 'curated' | 'default';
+    classification: 'curated' | 'register' | 'default';
   };
   risk_indicators?: {
     /**
@@ -325,6 +332,14 @@ export interface IBANValidationResult {
    * `authorised: false`. See lib/pra-banks.ts for the licence and the join rule.
    */
   pra_authorisation?: PraAuthorisation;
+  /**
+   * The EBA PSD2 register naming the holder of this bank code as an authorised
+   * payment or e-money institution. Present only for countries where the
+   * register's national reference code is demonstrably the bank code the IBAN
+   * carries — see lib/psd-register.ts for the country-by-country measurement.
+   * Absent on a miss; there is no negative form.
+   */
+  psd_registration?: PsdRegistration;
   /**
    * What to do next, derived from this result. Ordered: what blocks a payment
    * comes before what merely enriches it. See lib/next-steps.ts.

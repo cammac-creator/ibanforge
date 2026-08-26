@@ -186,7 +186,7 @@ function createMcpServer(): McpServer {
           classification: z
             .string()
             .describe(
-              'curated | default. Whether the type was established or assumed. curated = the BIC8 is in the issuer set, so this is an identification. default = nothing is on file and "bank" is the fallback, which covers 97.9% of BIC8 (measured 29/07/2026). Count only curated when sizing virtual-IBAN exposure.',
+              'curated | register | default. Whether the type was established or assumed. curated = the BIC8 is in the issuer set, so this is an identification. register = an official register names the holder of this bank code and says what it is; it carries a date and an authority in psd_registration, and it only ever replaces a default. default = nothing is on file and "bank" is the fallback, which covers 97.9% of BIC8 (measured 29/07/2026). Count curated and register when sizing virtual-IBAN exposure, never default.',
             ),
         }).optional(),
         risk_indicators: z.object({

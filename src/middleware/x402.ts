@@ -285,8 +285,9 @@ export function buildRouteTable(
           name: { type: 'string' },
           classification: {
             type: 'string',
-            enum: ['curated', 'default'],
-            description: "curated = identified from the issuer set; default = 'bank' fallback, 97.9% of BIC8.",
+            enum: ['curated', 'register', 'default'],
+            description:
+              "curated = identified from the issuer set; register = an official register names the holder of this bank code (see psd_registration for its source and date); default = 'bank' fallback, 97.9% of BIC8.",
           },
         },
       },

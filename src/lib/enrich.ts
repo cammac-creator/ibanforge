@@ -21,6 +21,7 @@ import { blzRegisterAvailable, lookupBlz } from './de-blz.js';
 import { checkVop } from './compliance.js';
 import { checkUkModulus } from './uk-modulus.js';
 import { praAuthorisationByLei } from './pra-banks.js';
+import { psdRegistrationByBankCode, type PsdEntityType } from './psd-register.js';
 import type { BankCodeCheck, IBANValidationResult, RegisterInstitution } from '../types.js';
 import { nextSteps } from './next-steps.js';
 
@@ -59,6 +60,23 @@ const NATIONAL_REGISTERS: Record<string, string> = {
   FI: 'Finance Finland monetary institution codes (allocated to banking groups, not individual institutions)',
   AT: 'Oesterreichische Nationalbank SEPA-Zahlungsverkehrs-Verzeichnis',
   BE: 'Banque nationale de Belgique, bank identification codes (Protocol Secretariat)',
+};
+
+/**
+ * EBA PSD2 register types that map onto an issuer type, and the ones that
+ * deliberately do not.
+ *
+ * `aisp` is absent because an account information service provider reads
+ * accounts and issues none. `exempted_emi` and `exempted_payment_institution`
+ * are absent because they are waivers from authorisation, granted to operators
+ * below a volume threshold — the opposite of a licence to issue, and 2,758 of
+ * the register's 4,416 authorised entities are exempted Polish ones. Reading
+ * either as an issuer type would be the overclaim `classification` exists to
+ * prevent.
+ */
+const PSD_TYPE_TO_ISSUER: Partial<Record<PsdEntityType, 'emi' | 'payment_institution'>> = {
+  emi: 'emi',
+  payment_institution: 'payment_institution',
 };
 
 /**
@@ -337,6 +355,57 @@ export function enrichResult(result: IBANValidationResult): void {
       const listed = lookupNlPsp(bankCode);
       result.issuer.iban_issuer = listed ? 'confirmed' : 'not_listed';
       if (!listed && result.issuer.classification === 'default') result.issuer.type = null;
+    }
+  }
+
+  // Europe: does the EBA's PSD2 register name the holder of this bank code as
+  // an authorised payment or e-money institution?
+  //
+  // Joined on country + national reference code, because there is nothing else
+  // to join on: measured over the whole 217 MB golden copy, the file carries no
+  // BIC and no LEI for any entity. And in 29 of its 30 countries that reference
+  // code is a company or tax number from an unrelated space — a Polish NIP, a
+  // French SIREN, a Dutch DNB reference — so joining it to a bank code would
+  // hand a real institution's authorisation to whatever bank shared the digits.
+  // Only countries where the code was MEASURED to be the one the IBAN carries
+  // are served; today that is Spain alone. See lib/psd-register.ts.
+  //
+  // Silent on a miss. The register's own disclaimer says an institution
+  // omitted from it is authorised all the same, so an absence is not a finding.
+  const psd = psdRegistrationByBankCode(cc, bankCode);
+  if (psd) {
+    result.psd_registration = psd;
+
+    // The issuer type is FILLED, never overridden. A curated classification is
+    // a hand-verified BIC8 pairing and stays exactly as it was — which is what
+    // makes this incapable of regressing an existing identification. Only the
+    // 'bank' fallback gives way, and it is an assumption rather than a finding.
+    //
+    // Two of the five register types map to an issuer type, and they map to
+    // themselves rather than upward: an e-money institution is 'emi', a payment
+    // institution is 'payment_institution'. The other three deliberately do
+    // not. An AISP only reads accounts and issues nothing; the two exempted
+    // types are waivers FROM authorisation granted to small operators, and
+    // reading a waiver as a licence would be the overclaim this whole file
+    // guards against.
+    const issuerType = PSD_TYPE_TO_ISSUER[psd.entity_type];
+    if (issuerType) {
+      if (!result.issuer) {
+        // Spain's payment institutions hold numeric bank codes, and no Spanish
+        // BIC8 begins with digits — so 110 of the 112 resolve no BIC at all and
+        // would otherwise be described by nothing. The register is a better
+        // source for "who holds this code" than the silence it replaces: it
+        // names the institution, dates the answer and says which authority
+        // granted it. `psd_registration` beside it carries that provenance.
+        result.issuer = { type: issuerType, name: psd.name, classification: 'register' };
+      } else if (result.issuer.classification === 'default') {
+        result.issuer.type = issuerType;
+        result.issuer.classification = 'register';
+        // 'Unknown' is what the fallback writes when the directory row carried
+        // no institution name. The register has one; anything else it already
+        // had is left alone.
+        if (result.issuer.name === 'Unknown') result.issuer.name = psd.name;
+      }
     }
   }
 
