@@ -1,0 +1,218 @@
+---
+title: "Adresses structurées ISO 20022"
+description: "Les règles d'adresse structurée de novembre 2026, rail par rail, avec les documents dont elles sortent — plus les deux endpoints : un postal_address ISO 20022 sur chaque BIC pour lequel nous pouvons en servir un, et un contrôleur de conformité gratuit pour une adresse que vous avez déjà structurée."
+order: 14
+---
+
+# Adresses structurées ISO 20022 — ce qui change vraiment en novembre 2026
+
+Trois rails de paiement cessent d'accepter une adresse postale entièrement non structurée en novembre 2026. Cette page énonce ce que chacun exige, en citant le document dont la règle sort, puis montre les deux choses que cette API fait à ce sujet.
+
+Elle énonce aussi, sans détour, ce que cette API **ne fait pas**. Cette partie compte plus que le reste, parce que l'échéance est surtout un problème que cette API ne peut pas résoudre — et une page qui brouillerait la frontière vous coûterait un fichier de paiement rejeté en novembre.
+
+## L'échéance, rail par rail
+
+| Date | Ce qui se passe | Source |
+|---|---|---|
+| **14 novembre 2026** | Entrée en vigueur des Swiss Payment Standards 2026 — Business Rules v3.3, Implementation Guidelines Credit Transfer v2.3, QR-facture v2.4 | SIX |
+| **16 novembre 2026** | Mise en production du Fedwire Funds Service ; bascule les 14–15 novembre | Federal Reserve Financial Services |
+| **20 novembre 2026** | Dernière release SIC qui traite encore un ordre de paiement portant une adresse non structurée | SIX |
+| **R2026.NOV** | Version T2 / RTGS en production en novembre 2026 | Banque centrale européenne |
+
+Deux remarques sur ce tableau.
+
+**Il n'a pas de ligne CBPR+, et c'est délibéré.** Le guide d'usage CBPR+ et le *PMPG November 2026 postal address guidance* — le document que la Réserve fédérale désigne elle-même comme sa référence amont — sont tous deux publiés sur swift.com. Tout ce qui figure sur cette page vient d'un document qui a été téléchargé et lu ; rien n'y vient d'un document qui ne l'a pas été. Nous n'imprimons donc pas de date CBPR+, et le contrôleur ci-dessous n'a pas de schéma `cbpr+`.
+
+**Méfiez-vous d'une date qui a l'air juste et ne l'est pas.** Le *22 novembre* est une vraie échéance — de **2025** : c'est l'entrée en vigueur de SPS 2025 et la fin de la coexistence MT/MX. Ce n'est pas une date de 2026, et un plan de migration qui la décale d'un an planifie contre rien.
+
+## Ce que les règles demandent à une adresse d'agent : une ville et un pays
+
+Le fait le plus utile de ces règles, pour qui construit un logiciel de paiement, c'est le peu qu'elles exigent d'une adresse d'**établissement financier**.
+
+La table de champs suisse pour la `PostalAddress` d'un *Creditor Agent* n'offre exactement que trois éléments : `TwnNm` (Must be used), `Ctry` (Must be used) et `AdrLine` (max 2). `StrtNm`, `BldgNb` et `PstCd` n'apparaissent dans ce guide que sous *Creditor* et *Ultimate Debtor* — jamais sous un agent. La Réserve fédérale dit la même chose en prose pour son propre rail : *« require town name and country »*.
+
+Donc : **une adresse d'agent, c'est un nom, une ville et un pays. Pas une rue.**
+
+### Et elle n'est souvent pas exigée du tout
+
+Deux des trois corpus conditionnent l'adresse d'agent à l'absence du BIC.
+
+*La Suisse* énumère les façons d'identifier un *Creditor Agent*, et l'adresse complète y est une option parmi d'autres — le BIC en étant une autre, et la recommandée pour les paiements transfrontaliers.
+
+*T2 / HVPS+* énonce la même mécanique sous forme de règle de validation : si `BICFI` est absent, alors `Name` **et** `PostalAddress` doivent être présents. Elle s'applique à `DbtrAgt`, `CdtrAgt`, aux agents intermédiaires et aux agents instructeurs précédents.
+
+La Réserve fédérale, elle, n'énonce **pas** ce déclencheur. Sa page confirme que le changement atteint les agents — *« for all parties and agents across all message types »* — ce qui est compatible avec la mécanique conditionnelle sans en être une attestation. Deux rails l'énoncent, un ne l'énonce pas ; cette page n'écrit pas que les trois disent la même chose.
+
+## Le retournement — et c'est le vrai propos de cette page
+
+Relisez une fois de plus les business rules suisses : *« depending on the payment type, it remains also possible to replace the address with another element like the BIC. »*
+
+Cette phrase retourne tout le problème. Si vous tenez un code de compensation et aucun BIC, vous êtes dans la branche de la règle qui exige un nom et une adresse complète. Si vous tenez le **BIC**, cette obligation ne vous concerne pas du tout.
+
+Ce qui veut dire que la question utile en novembre 2026 n'est souvent pas *« comment structurer l'adresse de cet agent ? »* mais **« comment obtenir le BIC de cet agent pour n'avoir jamais à le faire ? »** — et résoudre un code de compensation national en BIC est ce que cette API fait depuis toujours :
+
+- **IID / BC-Nummer suisse** → [`GET /v1/ch/clearing/:iid`](/fr/docs/ch-clearing)
+- **Bankleitzahl allemande** → [`bank_code_check` sur un IBAN validé](/fr/docs/blz-check)
+- **Code banque autrichien** → [même bloc](/fr/docs/at-bank-codes)
+- **N'importe quel IBAN** → [`POST /v1/iban/validate` résout le BIC](/fr/docs/iban-to-bic)
+
+Pas de code nouveau, pas d'endpoint nouveau, pas d'abonnement nouveau. Si le BIC se résout, l'exigence d'adresse sur cet agent disparaît.
+
+## `postal_address` — le siège au vocabulaire ISO 20022
+
+Chaque réponse qui porte déjà une adresse d'établissement la porte désormais aussi comme une `PostalAddress` ISO 20022, avec les noms de balises de la norme, pour que vous puissiez la reporter dans un `pain.001` ou un `pacs.008` sans table de traduction.
+
+C'est **additif**. Le bloc `address` existant est intact et reste l'enregistrement complet, non tronqué.
+
+### Un établissement suisse : `structured`
+
+```bash
+curl https://api.ibanforge.com/v1/bic/POFICHBE
+```
+
+```json
+{
+  "postal_address": {
+    "strt_nm": "Mingerstrasse",
+    "bldg_nb": "20",
+    "pst_cd": "3030",
+    "twn_nm": "Bern",
+    "ctry": "CH",
+    "format": "structured",
+    "source": "SIX BankMaster (Swiss IID register)",
+    "as_of": "2026-08-03"
+  }
+}
+```
+
+`StrtNm` et `BldgNb` sont remplis ici parce que le **registre SIX BankMaster les publie en deux colonnes distinctes**. C'est la seule source de cette base qui le fasse.
+
+### Un établissement issu de GLEIF : `hybrid`
+
+```bash
+curl https://api.ibanforge.com/v1/bic/BUKBGB22
+```
+
+```json
+{
+  "postal_address": {
+    "pst_cd": "E14 5HP",
+    "twn_nm": "LONDON",
+    "ctry": "GB",
+    "adr_line": ["1 CHURCHILL PLACE"],
+    "format": "hybrid",
+    "source": "GLEIF",
+    "as_of": "2026-04-13"
+  }
+}
+```
+
+Pas de `strt_nm` — et c'est la décision de conception à comprendre avant de consommer le champ.
+
+GLEIF publie une adresse comme une liste de lignes que nous stockons concaténées en une seule chaîne. Numéro, étage, nom d'immeuble et quartier peuvent y être mélangés. **Découper cela en `StrtNm` et `BldgNb` serait une invention**, et une invention est exactement ce qu'un rail de paiement rejette. La ligne sort donc en `AdrLine`, qui est le format hybride que les règles autorisent explicitement, et `format` vous dit lequel des deux vous avez reçu.
+
+Lisez `strt_nm: undefined` comme *« la source a publié une seule ligne concaténée »*, jamais comme *« cet établissement n'a pas de rue »*.
+
+### Une ville et un pays seuls : complet, pas dégradé
+
+```json
+{
+  "postal_address": {
+    "twn_nm": "ZURICH",
+    "ctry": "CH",
+    "format": "structured",
+    "source": "Redistributed SWIFT BIC directory (PeterNotenboom/SwiftCodes, MIT)",
+    "as_of": null
+  }
+}
+```
+
+C'est la forme que prend la majeure partie de l'annuaire et — d'après la section ci-dessus — c'est exactement ce que les règles demandent d'une adresse d'agent. Une ville et un pays ne sont pas une réponse partielle ici. C'est la réponse.
+
+Mesuré sur la base livrée le 26 août 2026 : **99,3 % des lignes de l'annuaire portent une ville**, contre environ 30 % qui portent une rue. Re-mesurez avant de citer le chiffre — la base est rafraîchie chaque mois et il dérive.
+
+### Deux règles de provenance qui ne bougeront pas
+
+`source` nomme le jeu de données dont l'adresse sort, et il peut légitimement différer de `address.source` : un établissement suisse est servi depuis le registre SIX pendant que le bloc historique reste GLEIF. Quand les deux registres divergent — les deux peuvent publier un siège réel et différent pour le même établissement — vous voyez les deux et vous tranchez.
+
+`as_of` est la date à laquelle **la source** a énoncé cette adresse pour la dernière fois. Il vaut `null` quand le jeu de données n'en publie aucune. Ce n'est jamais la date de rafraîchissement de notre base, et jamais une lecture d'horloge : une adresse datée d'aujourd'hui depuis un fichier déposé l'an dernier serait une affirmation fausse sur le registre.
+
+Le même bloc apparaît sur l'objet `bic` de [`POST /v1/iban/validate`](/fr/docs/iban-validate), construit par le même code, de sorte que les deux endpoints ne peuvent pas se contredire sur la même ligne.
+
+## `POST /v1/address/check` — contrôle de conformité gratuit
+
+L'autre moitié. Vous avez structuré une adresse ; ceci vous dit si elle satisfait les règles d'un rail donné, règle par règle, avec le document dont chaque règle sort.
+
+Il ne lit aucune de nos bases. C'est pour cela qu'il est gratuit.
+
+```bash
+curl -X POST https://api.ibanforge.com/v1/address/check \
+  -H "Content-Type: application/json" \
+  -d '{
+    "scheme": "sps",
+    "address": {
+      "twn_nm": "Zurich",
+      "ctry": "ch",
+      "pst_cd": "8001",
+      "adr_tp": "ADDR",
+      "adr_line": ["Bahnhofstrasse 45", "8001 Zurich"]
+    }
+  }'
+```
+
+```json
+{
+  "scheme": "sps",
+  "conforms": false,
+  "findings": [
+    { "rule": "twn_nm_required", "verdict": "pass", "detail": "TwnNm is present (\"Zurich\")." },
+    { "rule": "ctry_required", "verdict": "pass", "detail": "Ctry is present (\"ch\")." },
+    { "rule": "ctry_iso3166", "verdict": "fail", "detail": "Ctry \"ch\" is not two uppercase letters." },
+    { "rule": "adr_tp_forbidden", "verdict": "fail", "detail": "AdrTp \"ADDR\" was supplied. SPS marks Address Type \"N — Must not be sent\"." },
+    { "rule": "adr_line_max_2", "verdict": "pass", "detail": "2 AdrLine supplied, within the maximum of 2." },
+    { "rule": "adr_line_max_length_70", "verdict": "pass", "detail": "Every AdrLine is at most 70 characters." },
+    { "rule": "adr_line_no_repeat", "verdict": "fail", "detail": "\"8001 Zurich\" repeats PstCd + TwnNm. SPS: \"Data already provided in another element must not be repeated.\"" }
+  ]
+}
+```
+
+Chaque finding porte aussi un champ `source`, élidé ci-dessus pour la largeur — il nomme le document et sa date, pour que vous puissiez transmettre le verdict à qui a produit l'adresse.
+
+### Les règles, et à quel rail chacune appartient
+
+| Règle | sps | hvps_plus | fedwire |
+|---|---|---|---|
+| `twn_nm_required` — inconditionnel | oui | — | oui |
+| `ctry_required` — inconditionnel | oui | — | oui |
+| `twn_nm_ctry_required_if_no_adr_line` — conditionnel | — | oui | — |
+| `ctry_iso3166` — deux majuscules, code attribué | oui | oui | oui |
+| `adr_tp_forbidden` — Address Type « Must not be sent » | oui | — | — |
+| `adr_line_max_2` | oui | — | oui |
+| `adr_line_max_length_70` | oui | — | oui |
+| `adr_line_no_repeat` | oui | — | — |
+
+Un tiret signifie que le document consulté pour ce rail n'énonce rien sur le sujet. Il ne signifie pas que la règle est inversée, et nous n'importons pas la règle d'un rail voisin pour combler le trou — le silence est rapporté comme un silence.
+
+`verdict` a trois valeurs, pas deux. `not_applicable` marque une règle dont la précondition n'est pas remplie — une règle sur `AdrLine` pour une adresse sans `AdrLine`. C'est une vraie réponse, pas un `pass` de politesse, et `conforms` n'en tient pas compte.
+
+### Pourquoi un paramètre `scheme` et pas un booléen « conforme »
+
+Parce que les trois rails divergent réellement, et qu'un booléen unique devrait en choisir un et le cacher :
+
+- `TwnNm` + `Ctry` sont **inconditionnels** pour SPS et Fedwire, et **conditionnels** pour T2 / HVPS+ — exigés seulement quand `AddressLine` est absente.
+- `AdrLine` est plafonné à **2** par SPS et Fedwire, plafonné à **rien** dans l'appendice de validation T2, et autorisé jusqu'à **7** en ISO 20022 de base.
+- `AdrTp` est **interdit** par SPS et non mentionné par les deux autres.
+
+Et `cbpr+` ne fait pas partie des schémas, exprès. Ses règles n'ont pu être lues depuis aucune source publique. Envoyer `"scheme": "cbpr+"` renvoie un `400` qui le dit, plutôt qu'un verdict qu'il aurait fallu inventer.
+
+## Ce que ceci ne fait pas
+
+Trois limites, énoncées ici pour que personne ne les découvre en novembre.
+
+**Ceci ne règle pas une migration d'adresses clients.** L'essentiel du changement de novembre 2026 porte sur les adresses des **parties** à un paiement — `Dbtr`, `Cdtr`, `UltmtDbtr`, `UltmtCdtr`. C'est votre propre carnet d'adresses clients : cette API n'en détient aucune donnée et n'avance rien à son sujet. Si on vous dit qu'une API IBAN et BIC va régler cette migration pour vous, on vous vend quelque chose qu'on n'a pas.
+
+**Ceci ne transforme pas une adresse en texte libre en adresse structurée.** Passer de `« ul. Sokolska 34, 40-086 Katowice »` à `StrtNm` / `BldgNb` / `PstCd` / `TwnNm` demande des référentiels postaux nationaux sur quelque 250 pays. C'est le métier de Loqate, Smarty et de l'Address Validation API de Google. Nous n'en détenons aucun, et une supposition sans somme de contrôle sur un nom de rue vaut moins que pas de réponse.
+
+**Ceci ne certifie pas une conformité CBPR+.** Aucune source publique ne permet à quiconque de le faire honnêtement aujourd'hui. Le contrôleur nomme le rail contre lequel il juge, et chaque finding nomme son document.
+
+Ce qui reste après ces trois soustractions est petit, et c'est réel : la forme ISO 20022 d'un siège d'établissement que nous détenons déjà, un contrôle de règles que vous pouvez lancer gratuitement, et — la partie qui vaut le plus — le rappel que résoudre un code de compensation en BIC supprime souvent l'obligation d'adresse purement et simplement.

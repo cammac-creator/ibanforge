@@ -1,7 +1,8 @@
 import { Hono } from 'hono';
 import { createRequire } from 'node:module';
 import { getEntryCount } from '../lib/bic-lookup.js';
-import { BANK_CODE_CHECK_SCHEMA , NEXT_STEPS_SCHEMA, OFFICIAL_IDENTITY_SCHEMA } from '../lib/bank-code-schema.js';
+import { BANK_CODE_CHECK_SCHEMA , NEXT_STEPS_SCHEMA, OFFICIAL_IDENTITY_SCHEMA, POSTAL_ADDRESS_SCHEMA } from '../lib/bank-code-schema.js';
+import { ADDRESS_SCHEMES, CBPR_NOTE } from '../lib/address-conformity.js';
 
 const openapi = new Hono();
 
@@ -294,6 +295,104 @@ const buildSpec = () => ({
             },
           },
           '400': { description: 'Missing ?iban= query parameter, or IBAN shorter than 15 / longer than 34 characters' },
+        },
+      },
+    },
+    '/v1/address/check': {
+      post: {
+        operationId: 'checkPostalAddress',
+        summary: 'Free ISO 20022 postal-address conformity check',
+        description:
+          'FREE rule check on a postal address YOU have already structured, for the November 2026 structured-address deadlines (SPS 2026 in force 14 Nov 2026, last SIC release accepting unstructured addresses 20 Nov 2026, Fedwire production 16 Nov 2026, T2 R2026.NOV). Pure rule evaluation — it reads no database, which is why it is free. Every finding names the document the rule comes from, with its date. ' +
+          `Schemes: ${ADDRESS_SCHEMES.join(', ')}. ` +
+          CBPR_NOTE +
+          ' It does NOT parse or normalise a free-text address into a structured one — that needs national postal reference data we do not hold.',
+        tags: ['Free'],
+        // Explicitly no authentication, same statement as /v1/iban/format:
+        // 'free', not 'the author forgot to say'.
+        security: [],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['scheme', 'address'],
+                properties: {
+                  scheme: {
+                    type: 'string',
+                    enum: [...ADDRESS_SCHEMES],
+                    description:
+                      "The payment scheme whose rules to apply. 'hvps+' is accepted as a spelling of 'hvps_plus'. 'cbpr+' is refused with an explanation rather than answered with a guess.",
+                    example: 'sps',
+                  },
+                  address: {
+                    type: 'object',
+                    additionalProperties: false,
+                    description:
+                      'The ISO 20022 PostalAddress elements you intend to send, in ISO tag vocabulary. An unknown property is rejected rather than ignored, so a caller who writes `town` instead of `twn_nm` is told rather than handed a green verdict on an address nobody looked at.',
+                    properties: {
+                      twn_nm: { type: 'string', example: 'Zurich' },
+                      ctry: { type: 'string', example: 'CH' },
+                      pst_cd: { type: 'string', example: '8001' },
+                      strt_nm: { type: 'string', example: 'Bahnhofstrasse' },
+                      bldg_nb: { type: 'string', example: '45' },
+                      adr_tp: { type: 'string', description: 'Address Type. Forbidden by SPS ("N — Must not be sent").' },
+                      adr_line: { type: 'array', items: { type: 'string' } },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          '200': {
+            description:
+              'Conformity verdict. One finding per rule evaluated, passing or failing, so a caller can see what was checked and not only what broke.',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  required: ['scheme', 'conforms', 'findings', 'note'],
+                  properties: {
+                    scheme: { type: 'string', enum: [...ADDRESS_SCHEMES] },
+                    conforms: {
+                      type: 'boolean',
+                      description:
+                        'True when no finding failed. Rules that did not apply do not count against it.',
+                    },
+                    findings: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        required: ['rule', 'verdict', 'detail', 'source'],
+                        properties: {
+                          rule: { type: 'string', example: 'adr_line_no_repeat' },
+                          verdict: {
+                            type: 'string',
+                            enum: ['pass', 'fail', 'not_applicable'],
+                            description:
+                              'not_applicable marks a rule whose precondition is not met — an AdrLine rule on an address with no AdrLine. It is a real answer, not a polite pass.',
+                          },
+                          detail: { type: 'string' },
+                          source: {
+                            type: 'string',
+                            description: 'The document the rule comes from, with its date.',
+                          },
+                        },
+                      },
+                    },
+                    note: { type: 'string', description: 'Why no cbpr+ scheme is offered. Served on every answer.' },
+                  },
+                },
+              },
+            },
+          },
+          '400': {
+            description:
+              "Malformed body, unknown address element, unknown scheme, or scheme 'cbpr+' — which is refused with the reason.",
+          },
         },
       },
     },
@@ -1239,6 +1338,7 @@ const buildSpec = () => ({
             },
           },
           address_available: { type: 'boolean' },
+          postal_address: POSTAL_ADDRESS_SCHEMA,
           branch_code: { type: 'string', example: 'XXX' },
           branch_info: { type: ['string', 'null'] },
           lei: { type: ['string', 'null'] },

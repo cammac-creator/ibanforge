@@ -6,6 +6,8 @@ import { screenBicSanctions } from '../lib/compliance.js';
 import { praAuthorisationByLei, type PraAuthorisation } from '../lib/pra-banks.js';
 import { officialIdentityByLei, type OfficialIdentity } from '../lib/official-identity.js';
 import { classifyBicInput } from '../lib/input-normalize.js';
+import { lookupClearingSeatByBic } from '../lib/ch-clearing.js';
+import { toIso20022PostalAddress, type Iso20022PostalAddress } from '../lib/postal-address.js';
 import { recordOperation, recordRejection } from '../lib/stats.js';
 import { computeRevenue } from '../lib/request-helpers.js';
 import type { BICLookupResult } from '../types.js';
@@ -35,6 +37,13 @@ type BicLookupPayload = BICLookupResult & {
    * definition, and the optional field is declared beside its usage.
    */
   official_identity?: OfficialIdentity;
+  /**
+   * The same seat, in ISO 20022 `PostalAddress` vocabulary. Purely ADDITIVE:
+   * `address` above is untouched and remains the full, untruncated record.
+   * Declared here for the same reason as the three fields above — see
+   * src/lib/postal-address.ts for what may and may not be filled.
+   */
+  postal_address?: Iso20022PostalAddress;
 };
 
 const COST_USDC = 0.003;
@@ -129,6 +138,13 @@ bicLookup.get('/v1/bic/:code', (c) => {
   // must be able to see both, not one silently overwritten by the other.
   const identity = officialIdentityByLei(row?.lei);
 
+  // The ISO 20022 form of the seat, for the November 2026 structured-address
+  // rules. Additive: it adds a vocabulary, never a fact — everything below is
+  // read from the same row `address` came from, plus the SIX BankMaster row
+  // when one resolves unambiguously for this BIC (the only source we hold with
+  // StrtNm and BldgNb really apart). Null whenever we cannot fill TwnNm+Ctry.
+  const postalAddress = toIso20022PostalAddress(row, lookupClearingSeatByBic(validation.bic11!));
+
   const result: BicLookupPayload = {
     bic: validation.bic,
     bic8: validation.bic8!,
@@ -154,6 +170,7 @@ bicLookup.get('/v1/bic/:code', (c) => {
     // designated is the most reassuring thing this endpoint can say about the
     // least reassuring institution it knows.
     sanctions,
+    ...(postalAddress ? { postal_address: postalAddress } : {}),
     ...(pra ? { pra_authorisation: pra } : {}),
     ...(identity ? { official_identity: identity } : {}),
     ...(shared ? { shared_bic8: shared } : {}),

@@ -149,3 +149,54 @@ export const OFFICIAL_IDENTITY_SCHEMA = {
   },
   required: ['name', 'lei', 'address', 'category', 'matched_by', 'source', 'free_of_charge', 'as_of', 'authoritative'],
 };
+
+/**
+ * The JSON Schema fragment describing `postal_address`, written once for the
+ * two surfaces that serve it (`/v1/bic/:code` and the `bic` block of
+ * `/v1/iban/validate`).
+ *
+ * The description carries the one thing a machine must not get wrong: `strt_nm`
+ * and `bldg_nb` appear ONLY when the source publishes them apart, so their
+ * absence means "the source gave one concatenated line", never "this
+ * institution has no street".
+ */
+export const POSTAL_ADDRESS_SCHEMA = {
+  type: 'object' as const,
+  description:
+    'The institution seat expressed as an ISO 20022 PostalAddress, for the November 2026 structured-address rules (SPS 2026 in force 14 Nov 2026, Fedwire production 16 Nov 2026, T2 R2026.NOV). Purely additive — the `address` block beside it is unchanged and keeps the full untruncated street. Present only when TwnNm and Ctry can both be filled; absent fields are absent, never guessed.',
+  properties: {
+    strt_nm: {
+      type: 'string',
+      description:
+        'StrtNm. Present ONLY when the source really separates street from number — in practice the SIX BankMaster register for Swiss and Liechtenstein institutions. Its absence means the source published one concatenated line (which is then served as adr_line), NOT that the institution has no street.',
+    },
+    bldg_nb: { type: 'string', description: 'BldgNb. Same condition as strt_nm — never split out of a joined line.' },
+    pst_cd: { type: 'string', description: 'PstCd.' },
+    twn_nm: { type: 'string', description: 'TwnNm. Mandatory in SPS and Fedwire; always present when this block is.' },
+    ctry: { type: 'string', description: 'Ctry, ISO 3166-1 alpha-2.', example: 'CH' },
+    adr_line: {
+      type: 'array',
+      items: { type: 'string', maxLength: 70 },
+      maxItems: 2,
+      description:
+        'AdrLine, at most 2 lines of at most 70 characters, never repeating a value already served in a structured element above. A concatenated street line goes here rather than into strt_nm. Omitted rather than truncated when the line cannot fit in two lines — the full line stays in the `address` block.',
+    },
+    format: {
+      type: 'string',
+      enum: ['structured', 'hybrid'],
+      description:
+        'structured: every element served has its own ISO 20022 element, no AdrLine. hybrid: structured elements plus at most two AdrLine. Derived from the block, so it cannot disagree with the fields it labels.',
+    },
+    source: {
+      type: 'string',
+      description: 'The dataset this address came from, named as its publisher names it. It can differ from `address.source`: a Swiss institution is served from the SIX register while `address` stays GLEIF.',
+      example: 'SIX BankMaster (Swiss IID register)',
+    },
+    as_of: {
+      type: ['string', 'null'],
+      description:
+        'When the SOURCE last stated this address (a SIX validity date, a GLEIF filing date). Null when the dataset publishes none — never a clock read, and never the date our database was refreshed.',
+    },
+  },
+  required: ['twn_nm', 'ctry', 'format', 'source', 'as_of'],
+};

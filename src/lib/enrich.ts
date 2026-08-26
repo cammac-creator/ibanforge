@@ -17,7 +17,8 @@ import { lookupFiInstitution } from './fi-register.js';
 import { lookupNationalCode, nationalRegisterAvailable } from './national-registers.js';
 import { lookupNlPsp } from './nl-psp.js';
 import { getCountryRisk } from './countries.js';
-import { lookupClearingByBankCode } from './ch-clearing.js';
+import { lookupClearingByBankCode, lookupClearingSeatByBic } from './ch-clearing.js';
+import { toIso20022PostalAddress, type Iso20022PostalAddress } from './postal-address.js';
 import { blzRegisterAvailable, lookupBlz } from './de-blz.js';
 import { checkVop } from './compliance.js';
 import { checkUkModulus } from './uk-modulus.js';
@@ -26,6 +27,15 @@ import { officialIdentityByNationalCode } from './official-identity.js';
 import { psdRegistrationByBankCode, type PsdEntityType } from './psd-register.js';
 import type { BankCodeCheck, IBANValidationResult, RegisterInstitution } from '../types.js';
 import { nextSteps } from './next-steps.js';
+
+/**
+ * The `bic` block of a validation result, widened with the ISO 20022 postal
+ * address. Declared here, beside its only usage, rather than in src/types.ts —
+ * see the note at the assignment site.
+ */
+type BicBlockWithPostalAddress = NonNullable<IBANValidationResult['bic']> & {
+  postal_address?: Iso20022PostalAddress;
+};
 
 /**
  * A BIC is a test/internal institution if the second character of the
@@ -396,6 +406,20 @@ export function enrichResult(result: IBANValidationResult): void {
       // a monthly-refreshed bank name reads as equally current; it usually is
       // not, and `as_of` is what stops that reading.
       result.bic.address = registeredAddress(row);
+
+      // The same seat in ISO 20022 `PostalAddress` vocabulary, for the November
+      // 2026 structured-address rules. Strictly additive — `address` above is
+      // untouched — and built by the one shared constructor, so /v1/bic/:code
+      // and this path cannot serve a different shape for the same row.
+      //
+      // Declared as a local intersection rather than on the shared
+      // IBANValidationResult: same reasoning as `shared_bic8` and
+      // `official_identity` in routes/bic-lookup.ts — a shared type file is the
+      // worst place to take a lock for one optional field.
+      const postalAddress = toIso20022PostalAddress(row, lookupClearingSeatByBic(row.bic11));
+      if (postalAddress) {
+        (result.bic as BicBlockWithPostalAddress).postal_address = postalAddress;
+      }
     }
   }
 

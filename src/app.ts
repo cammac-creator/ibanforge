@@ -55,6 +55,7 @@ import { stripeWebhook } from './routes/stripe-webhook.js';
 import { stripeRetrieve } from './routes/stripe-retrieve.js';
 import { stripeSuccess } from './routes/stripe-success.js';
 import { ibanStructure } from './routes/iban-structure.js';
+import { addressCheck } from './routes/address-check.js';
 import { rateLimitMiddleware } from './middleware/rate-limit.js';
 import { recordRequest, classifyClient, hashIp, extractClientIp } from './lib/stats.js';
 import { bicGuardMiddleware, iidGuardMiddleware } from './middleware/identifier-guard.js';
@@ -656,6 +657,9 @@ export function buildApp(): Hono<HonoEnv> {
   // Free routes
   app.route('/', ibanFormat);
   app.route('/', ibanStructure);
+  // Pure rule evaluation over an address the caller supplies — it reads no
+  // database of ours, which is exactly why it is free.
+  app.route('/', addressCheck);
   app.route('/', health);
   app.route('/', stats);
   app.route('/', adminRevenue);

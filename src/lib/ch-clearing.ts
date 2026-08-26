@@ -324,6 +324,102 @@ export function lookupClearingByBankCode(
 }
 
 /**
+ * The seat address of a SIX BankMaster row, with `street` and `building_number`
+ * still SEPARATED — which is the whole point of this lookup.
+ *
+ * SIX is the only register this repository embeds that publishes a real
+ * StrtNm / BldgNb split. Every other address we hold (GLEIF above all) is a
+ * concatenated line, and turning such a line into StrtNm would be an invention.
+ * See src/lib/postal-address.ts, which is the only consumer.
+ */
+export interface ChClearingSeatAddress {
+  /** The IID of the row the address was read from — provenance, not decoration. */
+  iid: string;
+  street: string | null;
+  building_number: string | null;
+  post_code: string | null;
+  town: string | null;
+  country: string;
+  /** SIX validity date of that BankMaster row ('YYYY-MM-DD'). */
+  valid_on: string | null;
+}
+
+let _stmtByBic: Database.Statement | null = null;
+
+function stmtByBic() {
+  if (!_stmtByBic) {
+    // idx_ch_clearing_bic exists; the column stores BIC11 on all 1,125 rows
+    // that carry one (verified 26/08/2026).
+    _stmtByBic = getBicDB().prepare('SELECT * FROM ch_clearing WHERE bic = ?');
+  }
+  return _stmtByBic;
+}
+
+function addressKey(r: ChClearingRow): string {
+  return [r.street, r.building_number, r.post_code, r.town, r.country].map((v) => v ?? '').join('|');
+}
+
+/**
+ * Resolve a BIC to the SIX seat address — and decline in the three cases where
+ * BankMaster cannot honestly answer.
+ *
+ * **1. Swiss and Liechtenstein institutions only.** BankMaster is the register
+ * of the Swiss payment system, not a world directory, and it carries 75 rows
+ * for foreign euroSIC/correspondent participants (measured 26/08/2026: 18 DE,
+ * 10 AT, 7 LU, 6 GB, and a handful more). For those, SIX is not the allocation
+ * authority — it holds a counterparty record. The failure this guard prevents
+ * was measured, not imagined: NDEAFIHH resolved to a BankMaster row whose town
+ * column reads "Nordea-Helsinki", a postal designation, which would have gone
+ * out as a Finnish bank's `TwnNm` in preference to what GLEIF publishes. The
+ * BIC's own country (ISO 9362 characters 5-6) must agree too — same reasoning
+ * as `addressMatchesBic()` in gleif-address.ts, and the same failure mode.
+ *
+ * **2. A BIC11 is not a key in BankMaster.** 225 of the 626 BIC11s in the table
+ * appear on several rows, because a cantonal bank registers every branch under
+ * the same BIC (ZKBKCHZZ80A: 59 rows). When any row is a head office
+ * (`iid_type = 1`), only head-office rows are considered.
+ *
+ * **3. If the surviving rows still disagree on the address, return null.** We
+ * hold the data, we simply cannot name ONE seat — the same refusal
+ * `/v1/bic/:code` already makes for a shared BIC8. Serving the first row would
+ * be picking an address by row order. The case is real: HELNCH22XXX carries
+ * three head-office rows across St. Gallen and Basel.
+ */
+export function lookupClearingSeatByBic(bic: string): ChClearingSeatAddress | null {
+  const normalized = bic.trim().toUpperCase();
+  const bic11 = normalized.length === 8 ? `${normalized}XXX` : normalized;
+  if (bic11.length !== 11) return null;
+
+  const bicCountry = bic11.slice(4, 6);
+  if (bicCountry !== 'CH' && bicCountry !== 'LI') return null;
+
+  const rows = (stmtByBic().all(bic11) as ChClearingRow[]).filter((r) => {
+    // Null means Switzerland here, the same default the column carries and
+    // `rowToEntry` applies — 26 rows, all domestic.
+    const country = r.country ?? 'CH';
+    return country === bicCountry;
+  });
+  if (rows.length === 0) return null;
+
+  const hq = rows.filter((r) => r.iid_type === 1);
+  const candidates = hq.length > 0 ? hq : rows;
+
+  const distinct = new Set(candidates.map(addressKey));
+  if (distinct.size > 1) return null;
+
+  const row = candidates[0]!;
+  return {
+    iid: row.iid,
+    street: row.street,
+    building_number: row.building_number,
+    post_code: row.post_code,
+    town: row.town,
+    country: row.country ?? 'CH',
+    valid_on: row.valid_on,
+  };
+}
+
+/**
  * Get the headquarters entry for a given clearing entry.
  */
 export function getHeadquarters(entry: ChClearingEntry): ChClearingEntry | null {
@@ -347,5 +443,6 @@ export function getChClearingCount(): number {
 export function resetChClearingStatements(): void {
   _stmtByIid = null;
   _stmtCount = null;
+  _stmtByBic = null;
   _qrByMaster = null;
 }

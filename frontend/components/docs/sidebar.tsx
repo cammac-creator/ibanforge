@@ -23,7 +23,7 @@ const groups: DocGroup[] = [
   {
     labelKey: "endpoints",
     icon: <Zap className="size-4" />,
-    slugs: ["iban-validate", "iban-batch", "bic-lookup", "iban-to-bic", "compliance", "ch-clearing", "vop"],
+    slugs: ["iban-validate", "iban-batch", "bic-lookup", "iban-to-bic", "compliance", "ch-clearing", "vop", "structured-addresses"],
   },
   {
     labelKey: "registers",
