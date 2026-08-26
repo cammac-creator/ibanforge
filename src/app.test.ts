@@ -147,6 +147,29 @@ describe('the facilitator handshake happens once, not on every request', () => {
     expect(supportedCalls, 'a free route must never reach the payment rail').toBe(0);
   });
 
+  it('serves POST /v1/address/check for free, with the paywall armed and nobody paying', async () => {
+    // The FREE claim on that route is published — in the OpenAPI contract
+    // (security: []), in /llms.txt under free_forever, and on three docs pages.
+    // Its own route test mounts the handler on a bare Hono with no middleware,
+    // and the integration probes ran in IBANFORGE_FREE_MODE, where a PAID route
+    // is free too. Neither can see a paywall. This one can: paidMode() is armed
+    // by beforeEach, the path sits under `app.use('/v1/*', createX402Middleware())`,
+    // and no payment header is sent.
+    const app = buildApp();
+    await app.request('https://api.ibanforge.com/v1/bic/COBADEFFXXX', { headers: H });
+    supportedCalls = 0;
+
+    const res = await app.request('https://api.ibanforge.com/v1/address/check', {
+      method: 'POST',
+      headers: { ...H, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ scheme: 'sps', address: { twn_nm: 'Zurich', ctry: 'CH' } }),
+    });
+
+    expect(res.status, 'a published free route must not answer 402').toBe(200);
+    expect((await res.json()) as { conforms: boolean }).toMatchObject({ conforms: true });
+    expect(supportedCalls, 'a free route must never reach the payment rail').toBe(0);
+  });
+
   it('does not call the facilitator when an API key already authenticates', async () => {
     const key = generateCreditKey(null, 50);
     const res = await req('/v1/iban/validate', {

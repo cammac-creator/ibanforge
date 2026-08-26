@@ -111,7 +111,7 @@ No `strt_nm` — and this is the design decision to understand before you consum
 
 GLEIF publishes an address as a list of lines that we store joined into one string. House number, floor, building name and district can all be in there together. **Splitting that into `StrtNm` and `BldgNb` would be a guess**, and a guess is exactly what a payment rail bounces. So the line goes out as `AdrLine`, which is the hybrid format the rules explicitly allow, and `format` tells you which of the two you got.
 
-Read `strt_nm: undefined` as *"the source published one concatenated line"*, never as *"this institution has no street"*.
+Read an **absent** `strt_nm` as *"the source published one concatenated line"*, never as *"this institution has no street"*.
 
 ### A town and a country alone: complete, not degraded
 

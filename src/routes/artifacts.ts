@@ -85,6 +85,13 @@ operations:
       - operation: GET /v1/iban/structure/{country}
         cost_usd: 0
         effect: read
+      - operation: POST /v1/address/check
+        cost_usd: 0
+        effect: read
+        note: Checks an ISO 20022 postal address you have already structured
+          against one payment scheme (sps, hvps_plus, fedwire), rule by rule,
+          each finding naming the document it comes from. No cbpr+ scheme -
+          its rules are not publicly citable.
       - operation: GET /v1/demo
         cost_usd: 0
         effect: read
@@ -318,6 +325,7 @@ plans:
 free_forever:
   - GET /v1/iban/format
   - GET /v1/iban/structure/{country}
+  - POST /v1/address/check
   - GET /v1/demo
   - GET /health
   - GET /stats

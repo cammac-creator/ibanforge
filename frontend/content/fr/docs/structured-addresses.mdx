@@ -111,7 +111,7 @@ Pas de `strt_nm` — et c'est la décision de conception à comprendre avant de 
 
 GLEIF publie une adresse comme une liste de lignes que nous stockons concaténées en une seule chaîne. Numéro, étage, nom d'immeuble et quartier peuvent y être mélangés. **Découper cela en `StrtNm` et `BldgNb` serait une invention**, et une invention est exactement ce qu'un rail de paiement rejette. La ligne sort donc en `AdrLine`, qui est le format hybride que les règles autorisent explicitement, et `format` vous dit lequel des deux vous avez reçu.
 
-Lisez `strt_nm: undefined` comme *« la source a publié une seule ligne concaténée »*, jamais comme *« cet établissement n'a pas de rue »*.
+Lisez un `strt_nm` **absent** comme *« la source a publié une seule ligne concaténée »*, jamais comme *« cet établissement n'a pas de rue »*.
 
 ### Une ville et un pays seuls : complet, pas dégradé
 

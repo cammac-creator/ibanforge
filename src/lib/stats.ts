@@ -523,7 +523,7 @@ export function getSourceStats(days: number): SourceStatsResponse {
     SELECT
       COALESCE(client_kind, 'api') AS client_kind,
       COUNT(*) AS total,
-      SUM(CASE WHEN status = 200 AND path LIKE '/v1/%' AND path != '/v1/iban/format' THEN 1 ELSE 0 END) AS paid_calls,
+      SUM(CASE WHEN status = 200 AND path LIKE '/v1/%' AND path NOT IN ('/v1/iban/format', '/v1/address/check') THEN 1 ELSE 0 END) AS paid_calls,
       SUM(CASE WHEN status = 402 THEN 1 ELSE 0 END) AS paywall_hits,
       SUM(CASE WHEN status >= 400 AND status != 402 THEN 1 ELSE 0 END) AS errors,
       ROUND(AVG(response_ms), 1) AS avg_response_ms
@@ -541,7 +541,7 @@ export function getSourceStats(days: number): SourceStatsResponse {
       SUM(CASE WHEN status = 200 THEN 1 ELSE 0 END) AS success
     FROM request_log
     WHERE created_at >= datetime('now', ?)
-      AND path LIKE '/v1/%' AND path != '/v1/iban/format'
+      AND path LIKE '/v1/%' AND path NOT IN ('/v1/iban/format', '/v1/address/check')
     GROUP BY path, COALESCE(client_kind, 'api')
     ORDER BY total DESC
     LIMIT 50

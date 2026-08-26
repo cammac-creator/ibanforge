@@ -111,7 +111,7 @@ Kein `strt_nm` — und das ist die Entwurfsentscheidung, die man verstehen sollt
 
 GLEIF veröffentlicht eine Adresse als Liste von Zeilen, die wir zu einer einzigen Zeichenkette zusammengefügt speichern. Hausnummer, Stockwerk, Gebäudename und Stadtteil können darin gemeinsam stehen. **Das in `StrtNm` und `BldgNb` zu zerlegen wäre geraten**, und geraten ist genau das, was eine Zahlungsschiene zurückweist. Die Zeile geht deshalb als `AdrLine` hinaus — das hybride Format, das die Regeln ausdrücklich erlauben — und `format` sagt Ihnen, welches der beiden Sie erhalten haben.
 
-Lesen Sie `strt_nm: undefined` als *"die Quelle hat eine einzige zusammengefügte Zeile veröffentlicht"*, niemals als *"dieses Institut hat keine Strasse"*.
+Lesen Sie ein **fehlendes** `strt_nm` als *"die Quelle hat eine einzige zusammengefügte Zeile veröffentlicht"*, niemals als *"dieses Institut hat keine Strasse"*.
 
 ### Nur Ort und Land: vollständig, nicht reduziert
 
