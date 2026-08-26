@@ -40,7 +40,7 @@
       "account": "Your key"
     },
     "copyright": "© {year} IBANforge.",
-    "dataLine": "Data: GLEIF · Bundesbank · SIX · EBA · NBP · SwiftCodes/MIT · Bank of England (List of Banks, 2026-08) — monthly · OFAC · UN · EU · EPC — weekly"
+    "dataLine": "Data: GLEIF · Quelle: Deutsche Bundesbank · SIX · EBA · NBP · SwiftCodes/MIT · Bank of England (List of Banks, 2026-08) — monthly · OFAC · UN · EU · EPC — weekly"
   },
   "home": {
     "metadata": {

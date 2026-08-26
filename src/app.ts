@@ -181,9 +181,9 @@ function buildLlmsTxt(): string {
 
 ## Data sources and attribution
 
-- BIC directory: GLEIF (LEI-enriched), SwiftCodes (MIT), Bundesbank, SIX, NBP, EBA Step2 SCT
+- BIC directory: GLEIF (LEI-enriched), SwiftCodes (MIT), Quelle: Deutsche Bundesbank, SIX, NBP, EBA Step2 SCT
 - Swiss clearing: SIX BankMaster (BC-Nummer / IID)
-- National bank-code registers: Deutsche Bundesbank, Oesterreichische Nationalbank, Banque nationale de Belgique, Finance Finland
+- National bank-code registers: Deutsche Bundesbank (attribution wording per its terms: Quelle: Deutsche Bundesbank), Oesterreichische Nationalbank, Banque nationale de Belgique, Finance Finland
 ${praSourceLine}
 ${identitySourceLines}
 ${psdSourceLine}
