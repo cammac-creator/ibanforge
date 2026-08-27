@@ -80,7 +80,19 @@ export function DraftCard({
   const sendable = !locked && !!contact.email && !!subject.trim() && !!body.trim();
   // `contact.messages` is correspondence only, drafts excluded, so this card is
   // never compared against the very row it is showing.
-  const g = useGuardrails({ subject, body, sentToday, situation, messages: contact.messages, sendable });
+  // `kind` for the same reason the messages are handed over: this card sends,
+  // so it must judge a draft exactly as the sheet that wrote it did. A draft
+  // written to an institution and reviewed here would otherwise meet the cold
+  // prospecting rule set on the second screen only.
+  const g = useGuardrails({
+    subject,
+    body,
+    sentToday,
+    situation,
+    messages: contact.messages,
+    sendable,
+    kind: contact.kind,
+  });
 
   /**
    * Both halves of a send failure in one sentence.

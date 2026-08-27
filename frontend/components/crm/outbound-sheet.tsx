@@ -251,7 +251,18 @@ export function OutboundSheet({
   const sendable = !!c.email && filled && busy === false;
   // `situation` and not an intent: useGuardrails derives the intent itself, so
   // the app reads it in one place and has no second answer to drift.
-  const g = useGuardrails({ subject, body, sentToday, situation: s, messages: c.messages, sendable });
+  // Passed for completeness rather than for effect: crm-app never routes an
+  // institution here. Handing it over anyway means the day one does, the rules
+  // follow the recipient instead of following which sheet happened to open.
+  const g = useGuardrails({
+    subject,
+    body,
+    sentToday,
+    situation: s,
+    messages: c.messages,
+    sendable,
+    kind: c.kind,
+  });
 
   /**
    * Ask before replacing text the operator typed and has not saved anywhere.

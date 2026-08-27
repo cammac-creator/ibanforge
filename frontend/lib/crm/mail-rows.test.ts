@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { mailFilters, mailRows, searchRows, type RowsInput } from './mail-rows';
-import type { Contact, Message, ProspectSourcing, Situation } from './types';
+import type { Contact, InstitutionInfo, Message, ProspectSourcing, Situation } from './types';
 
 function message(direction: Message['direction'], subject: string, snippet: string, msg_date: string): Message {
   return { direction, msg_date, subject, snippet, counterparty: 'acme@example.com' };
@@ -444,5 +444,140 @@ describe('the prospecting queue (À prospecter)', () => {
     expect(rows.map((r) => r.id)).toEqual(['woken@alpha.example.net', 'high@alpha.example.net']);
     expect(rows[0].woke).toBe(true);
     expect(rows[1].woke).toBe(false);
+  });
+});
+
+/**
+ * The Correspondances filter.
+ *
+ * Institutions are invented, as everything in this file is: this repository is
+ * public and no real authority, bank, scheme or supplier may be named here,
+ * fixtures included.
+ */
+function institution(
+  id: string,
+  org: string,
+  messages: Message[],
+  over: Partial<InstitutionInfo> = {},
+  unread = false,
+): Contact {
+  return {
+    kind: 'institution',
+    id,
+    email: id,
+    company: org,
+    country: 'CH',
+    website: null,
+    messages,
+    draft: null,
+    unread,
+    account: 'desk@example.com',
+    institution: {
+      org,
+      category: 'autorite',
+      country: 'CH',
+      role: null,
+      website: null,
+      dossier: null,
+      ...over,
+    },
+  };
+}
+
+const registry = institution('registry@alpha.example.net', 'Autorité Alpha', [
+  message('out', 'Demande de permission', 'Nous souhaitons citer votre registre', '2026-07-02'),
+  message('in', 'Re: Demande de permission', 'Votre demande est enregistrée', '2026-07-25'),
+]);
+const scheme = institution(
+  'scheme@beta.example.net',
+  'Réseau Beta',
+  [message('out', 'Question réglementaire', 'Une question sur le format', '2026-07-10')],
+  { category: 'reseau_paiement', dossier: 'Conditions de redistribution des données' },
+  true,
+);
+
+const withInstitutions: RowsInput = {
+  contacts: [alpha, beta, registry, scheme],
+  situations: {
+    ...input.situations,
+    'registry@alpha.example.net': situation({ ballInCourt: 'us', silenceDays: 5 }),
+    'scheme@beta.example.net': situation({ ballInCourt: 'them', silenceDays: 17 }),
+  },
+  snoozed: {},
+};
+
+describe('the Correspondances filter', () => {
+  it('holds every institution and nothing else', () => {
+    const rows = mailRows(withInstitutions, 'institution');
+    expect(rows.map((r) => r.id).sort()).toEqual(['registry@alpha.example.net', 'scheme@beta.example.net']);
+  });
+
+  it('counts exactly what it shows, like every other filter', () => {
+    for (const filter of mailFilters(withInstitutions)) {
+      expect(mailRows(withInstitutions, filter.key)).toHaveLength(filter.count);
+    }
+  });
+
+  // The two commercial queues. A correspondent in "Clients" would corrupt a
+  // head count the owner reads; one in "À prospecter" would invite a cold pitch
+  // to a supervisor, which is the more expensive of the two mistakes.
+  it('keeps institutions out of the client and prospecting queues', () => {
+    expect(mailRows(withInstitutions, 'clients').map((r) => r.id)).not.toContain('registry@alpha.example.net');
+    expect(mailRows(withInstitutions, 'prospect').map((r) => r.id)).not.toContain('registry@alpha.example.net');
+  });
+
+  it('keeps them in Tous, where everything is', () => {
+    expect(mailRows(withInstitutions, 'all').map((r) => r.id)).toContain('registry@alpha.example.net');
+  });
+
+  it('keeps a waiting institution in À répondre, which is the point of the whole feature', () => {
+    // An authority that answered and is waiting on us is the most expensive
+    // thing on this page to forget, and that filter asks about the thread
+    // rather than about who is on the other end of it.
+    expect(mailRows(withInstitutions, 'reply').map((r) => r.id)).toContain('registry@alpha.example.net');
+  });
+
+  it('carries a draft into the drafts queue like anybody else', () => {
+    const drafting = {
+      ...withInstitutions,
+      contacts: [{ ...registry, draft: message('draft', 'Réponse', 'En cours', '2026-07-26') } as Contact],
+    };
+    expect(mailRows(drafting, 'drafts').map((r) => r.id)).toEqual(['registry@alpha.example.net']);
+  });
+
+  it('says the category in the row chip, in French', () => {
+    const rows = mailRows(withInstitutions, 'institution');
+    const byId = Object.fromEntries(rows.map((r) => [r.id, r]));
+    expect(byId['registry@alpha.example.net'].chip?.label).toBe('autorité');
+    expect(byId['scheme@beta.example.net'].chip?.label).toBe('réseau de paiement');
+  });
+
+  it('shows a category nobody foresaw as itself rather than swallowing it', () => {
+    // Underscores are a storage convention, not a word: the chip reads as prose.
+    const odd = institution('desk@gamma.example.net', 'Institut Gamma', [], { category: 'banque_regionale' });
+    const rows = mailRows({ contacts: [odd], situations: {}, snoozed: {} }, 'institution');
+    expect(rows[0].chip?.label).toBe('banque regionale');
+  });
+
+  it('caps a very long category rather than pushing the name off the row', () => {
+    const odd = institution('desk@gamma.example.net', 'Institut Gamma', [], {
+      category: 'commission de surveillance des marchés',
+    });
+    const rows = mailRows({ contacts: [odd], situations: {}, snoozed: {} }, 'institution');
+    expect(rows[0].chip?.label.length).toBeLessThanOrEqual(16);
+    expect(rows[0].chip?.label.endsWith('…')).toBe(true);
+  });
+
+  // Unread first: "which of these answered" is the question this filter is
+  // opened with. Heat is deliberately not consulted — it is zero for every
+  // correspondent, so it would leave the order to the tiebreak.
+  it('puts an unread answer first, whatever the dates say', () => {
+    const rows = mailRows(withInstitutions, 'institution');
+    expect(rows.map((r) => r.id)).toEqual(['scheme@beta.example.net', 'registry@alpha.example.net']);
+  });
+
+  it('finds a correspondent by its file line, which is what the operator remembers', () => {
+    const rows = searchRows(mailRows(withInstitutions, 'institution'), 'redistribution');
+    expect(rows.map((r) => r.id)).toEqual(['scheme@beta.example.net']);
   });
 });

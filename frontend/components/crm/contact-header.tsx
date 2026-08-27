@@ -217,6 +217,31 @@ export function ContactDetail({
         </div>
       )}
 
+      {/* The correspondent's file, and the counterpart of the client block
+          above rather than an addition to it: the two are mutually exclusive by
+          construction, so this never stacks under a quota gauge.
+
+          The file line is what the answer generator is grounded in, so it is
+          shown where the answer is written. Reading "we asked them for
+          permission to redistribute their register" three centimetres above the
+          composer is the difference between answering a clerk and re-reading
+          four months of thread first. The block is skipped entirely when the
+          register holds neither a desk nor a file line: an empty box saying
+          nothing is worse than the identity strip alone. */}
+      {c.kind === 'institution' && (c.institution.role || c.institution.dossier) && (
+        <div className="min-w-0 rounded-lg border border-sky-500/20 bg-sky-500/5 px-3 py-2">
+          <p className="text-[12px] uppercase tracking-wide text-sky-300">Correspondance institutionnelle</p>
+          {c.institution.role && (
+            <p className="mt-0.5 wrap-anywhere text-sm text-[var(--fg-1)]">{c.institution.role}</p>
+          )}
+          {c.institution.dossier && (
+            <p className="mt-1 wrap-anywhere text-[13px] text-[var(--fg-2)]">
+              <span className="text-[var(--fg-3)]">Dossier :</span> {c.institution.dossier}
+            </p>
+          )}
+        </div>
+      )}
+
       {sourcing && blocks?.any && (
         // Grouping taken from the prospect page rather than invented: why they
         // are a fit, then the buying signal with its proof, then the human to

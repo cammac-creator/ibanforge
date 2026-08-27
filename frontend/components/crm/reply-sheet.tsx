@@ -82,6 +82,43 @@ function replySubject(messages: Message[]): string {
 }
 
 /**
+ * What the generator is told about a written exchange with an institution.
+ *
+ * Two situations under one roof, and the difference is one line of instruction
+ * rather than a second code path: when a thread exists it IS the brief, exactly
+ * as it is for a customer's answer; when there is none this is the first
+ * written request to that institution and the file line is all there is to
+ * write from.
+ *
+ * The register is stated explicitly because nothing else in this app would set
+ * it. Every other brief in the CRM describes a commercial conversation, and the
+ * writer upstream is the same writer: without this it would open a letter to a
+ * financial supervisor the way it opens a mail to a lead.
+ *
+ * `dossier` is the ground truth. It is the operator's own one-line statement of
+ * what we are asking that institution for, and it is the only thing in here
+ * that cannot be derived from anything else.
+ */
+function institutionalBrief(c: Extract<Contact, { kind: 'institution' }>): string {
+  const i = c.institution;
+  const hasThread = c.messages.length > 0;
+  return [
+    `Institution: ${i.org}`,
+    `Type of institution: ${i.category}`,
+    i.country ? `Country: ${i.country}` : '',
+    i.role ? `Desk or role addressed: ${i.role}` : '',
+    i.dossier ? `What we are asking them for (our file with them): ${i.dossier}` : '',
+    'This is written correspondence with an institution, not a commercial mail. Formal register, plain sentences, no marketing, no product pitch, no call to action, no unsubscribe line. Say what is being asked, on what basis, and what answer is expected.',
+    hasThread
+      ? 'They wrote last and are waiting on you. Answer every question their mail asks, each one explicitly, before anything else. Keep the file reference and any case number they used.'
+      : 'There is no correspondence yet: this is the FIRST written request to this institution. State plainly who IBANforge is, exactly what is being requested, why, and ask for a written answer.',
+    hasThread ? `Thread so far:\n${threadTail(c.messages)}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
+/**
  * Answering somebody who wrote to us, and nothing else.
  *
  * The composer this splits away from walks the operator through an angle, a
@@ -160,7 +197,15 @@ export function ReplySheet({
   const sendable = !!c.email && filled && busy === false;
   // `situation` and not an intent: useGuardrails derives the intent itself, so
   // the app reads it in one place and has no second answer to drift.
-  const g = useGuardrails({ subject, body, sentToday, situation: s, messages: c.messages, sendable });
+  const g = useGuardrails({
+    subject,
+    body,
+    sentToday,
+    situation: s,
+    messages: c.messages,
+    sendable,
+    kind: c.kind,
+  });
   const canSend = sendable && !g.blocked;
 
   /**
@@ -199,6 +244,7 @@ export function ReplySheet({
    * /api/crm/generate-draft. See lib/crm/redaction-rules.ts.
    */
   function brief(): string {
+    if (c.kind === 'institution') return institutionalBrief(c);
     return [
       `Contact: ${c.company || c.email}`,
       c.sourcing?.whatTheyDo ? `What they do: ${c.sourcing.whatTheyDo}` : '',
@@ -223,6 +269,24 @@ export function ReplySheet({
           // thread in the recipient's mailbox.
           subject: subject.trim() || c.messages.at(-1)?.subject || 'IBANforge',
           context: brief(),
+          // What the recipient IS, so the server can ground the mail in the
+          // right facts. The usage enrichment behind /api/crm/generate-draft is
+          // keyed on an API key: an institution holds none, so without this
+          // flag the whole enrichment returns the body untouched and the letter
+          // is written knowing nothing about IBANforge at all. The identity
+          // block that replaces it lives server-side, in one place, for the
+          // same reason the redaction rules do.
+          ...(c.kind === 'institution'
+            ? {
+                contact_kind: 'institution' as const,
+                institution: {
+                  org: c.institution.org,
+                  category: c.institution.category,
+                  country: c.institution.country,
+                  dossier: c.institution.dossier,
+                },
+              }
+            : {}),
           // Not a follow-up. That mode asks for two or three sentences carrying
           // one new angle and no recap, which is the discipline of a mail
           // nobody asked for, and the opposite of answering questions.
@@ -323,6 +387,19 @@ export function ReplySheet({
    * appear; and the check list here sits in the part of the sheet that scrolls,
    * so a note inside it could be out of view while the armed button is not.
    */
+  /**
+   * A first written request to an institution is not a reply, and the sheet
+   * says so in every place it names what is being written.
+   *
+   * Words only: same sheet, same checks, same send path. "Répondre à" printed
+   * over an empty thread reads as a tool that has lost the conversation rather
+   * than as one that knows there is none, and this is the one contact kind that
+   * reaches this sheet with nothing above it.
+   */
+  const firstLetter = c.kind === 'institution' && c.messages.length === 0;
+  const target = replyTarget(c);
+  const who = c.company || c.email;
+
   const forcedNote = g.forcedNote && (
     <p className="mt-2 shrink-0 text-[12px] font-medium leading-snug text-red-300">⚠️ {g.forcedNote}</p>
   );
@@ -364,7 +441,13 @@ export function ReplySheet({
             {/* Folded text is not lost text: say it is there and unsent. The
                 subject is prefilled by construction, so it says nothing about
                 whether there is work in progress. Only the body does. */}
-            {body.trim() ? '✏️ Réponse en cours, pas encore envoyée' : `Répondre à ${replyTarget(c)}`}
+            {body.trim()
+              ? firstLetter
+                ? '✏️ Demande en cours, pas encore envoyée'
+                : '✏️ Réponse en cours, pas encore envoyée'
+              : firstLetter
+                ? `Écrire à ${target}`
+                : `Répondre à ${target}`}
           </button>
           {/* The real send, and off at rest, since an empty body blocks. Off as
               well while a check stands: what the check says is one click away,
@@ -407,7 +490,7 @@ export function ReplySheet({
     >
       <div className="mb-1.5 flex shrink-0 items-center justify-between gap-2">
         <span className="min-w-0 truncate text-[12px] text-[var(--fg-3)]">
-          Réponse à {c.company || c.email}, depuis {c.account}
+          {firstLetter ? 'Première demande à' : 'Réponse à'} {who}, depuis {c.account}
         </span>
         <button
           type="button"
@@ -424,7 +507,7 @@ export function ReplySheet({
           value={subject}
           onChange={(e) => setSubject(e.target.value)}
           placeholder="Objet"
-          aria-label="Objet de la réponse"
+          aria-label={firstLetter ? 'Objet de la demande' : 'Objet de la réponse'}
           className="mb-2 w-full min-w-0 rounded-lg border border-[var(--ink-4)] bg-[var(--ink-0)] px-3 py-1 text-base text-[var(--fg-1)] focus:border-amber-500/40 focus:outline-none sm:text-sm"
         />
         {/* Empty on mount, and focused: nothing steals focus from a page being
@@ -437,8 +520,8 @@ export function ReplySheet({
           value={body}
           onChange={(e) => setBody(e.target.value)}
           rows={4}
-          placeholder="Écris ta réponse."
-          aria-label="Corps de la réponse"
+          placeholder={firstLetter ? 'Écris ta demande.' : 'Écris ta réponse.'}
+          aria-label={firstLetter ? 'Corps de la demande' : 'Corps de la réponse'}
           className="w-full min-w-0 rounded-lg border border-[var(--ink-4)] bg-[var(--ink-0)] p-3 text-base leading-[22px] sm:text-sm text-[var(--fg-1)] focus:border-amber-500/40 focus:outline-none"
         />
         {fr && (

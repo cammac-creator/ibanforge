@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { BLOCK_LABEL, checkDraft, EM_DASH } from '@/lib/crm/guardrails';
 import { intentOf } from '@/lib/crm/intent';
 import { lastOutbound } from '@/lib/crm/repeat';
-import type { GuardrailReport, Message, Situation } from '@/lib/crm/types';
+import type { Contact, GuardrailReport, Message, Situation } from '@/lib/crm/types';
 
 /**
  * The pre-send checks as the operator meets them, shared by the two places a
@@ -92,6 +92,7 @@ export function useGuardrails({
   situation,
   messages,
   sendable,
+  kind,
 }: {
   subject: string;
   body: string;
@@ -112,6 +113,19 @@ export function useGuardrails({
    */
   messages: Message[];
   sendable: boolean;
+  /**
+   * What the recipient IS, which decides the rule set as much as the thread
+   * does. Only 'institution' changes anything: it puts the checks on the reply
+   * road whatever the situation says, so the daily prospecting cap cannot block
+   * a regulatory letter and no opt-out line is ever asked of one. See intent.ts.
+   *
+   * Handed to every surface that can send, never to one of them. This module's
+   * whole reason for existing is that a rule present on one send path and
+   * absent from the other is a documented way around it, and that cuts both
+   * ways: a check that fires on the draft card and not in the sheet would
+   * refuse the same letter on one screen and pass it on the next.
+   */
+  kind?: Contact['kind'];
 }): Guarded {
   const [overrideFor, setOverrideFor] = useState<string | null>(null);
 
@@ -121,7 +135,7 @@ export function useGuardrails({
   // Which rule set applies, decided once for both surfaces. Derived rather than
   // passed in: an absent situation answers `outbound`, which keeps every
   // guardrail armed, so a surface that forgets to hand one down loses no check.
-  const intent = intentOf(situation);
+  const intent = intentOf(situation, kind);
   // Held apart from the report below so that typing, which changes `body` on
   // every keystroke, does not walk the whole thread again each time.
   const previous = useMemo(() => lastOutbound(messages) ?? undefined, [messages]);

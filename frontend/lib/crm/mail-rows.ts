@@ -14,6 +14,7 @@ export type MailFilterKey =
   | 'drafts'
   | 'clients'
   | 'prospect'
+  | 'institution'
   | 'all';
 
 export interface RowsInput {
@@ -106,6 +107,24 @@ const FILTERS: Array<{
   // with today" view. Same predicate as the overview's sendable-stock figure.
   { key: 'prospect', label: 'À prospecter', urgent: false, test: neverContacted },
   { key: 'clients', label: 'Clients', urgent: false, test: (c) => c.kind === 'client' },
+  /**
+   * The written correspondence with institutions: authorities, central banks,
+   * payment schemes, registries, suppliers. The answer to "where is the reply
+   * to the permission letter we sent them", which nothing else on this page
+   * could answer, since these threads sat in no filter but "Tous".
+   *
+   * What this key is NOT is as deliberate as what it is. An institution enters
+   * neither "Clients" nor "À prospecter": the first tests the kind, and the
+   * second reads neverContacted, which requires a prospect, so a supervisor can
+   * never appear in a queue of cold first mails. Nor does it reach the two
+   * money filters, which read the activation join a correspondent has no row in.
+   *
+   * It DOES stay in "À répondre" and "Relances", and that is the point rather
+   * than an oversight: an authority that answered and is waiting on us is the
+   * most expensive thing on this page to forget, and those two predicates ask
+   * about the thread, not about who is on the other end.
+   */
+  { key: 'institution', label: 'Correspondances', urgent: false, test: (c) => c.kind === 'institution' },
   { key: 'all', label: 'Tous', urgent: false, test: () => true },
 ];
 
@@ -150,6 +169,13 @@ function ageLabel(s: Situation | undefined): string {
   return `${days} j`;
 }
 
+/** What a correspondent adds to the search haystack, and nothing for anyone else. */
+function institutionSearch(c: Contact): string {
+  if (c.kind !== 'institution') return '';
+  const i = c.institution;
+  return [i.category, i.role ?? '', i.dossier ?? ''].join(' ');
+}
+
 function toRow(
   c: Contact,
   s: Situation | undefined,
@@ -188,8 +214,13 @@ function toRow(
     next: s ? NEXT_ACTION_LABEL[s.nextAction] : null,
     // Folded at build time, matched folded: name, address, and the whole
     // thread's subjects and snippets, so "batch" finds the batch conversation.
+    //
+    // A correspondent adds its category and its file line. That is what the
+    // operator actually remembers about an authority months later — "the
+    // registry we asked about redistribution" — rather than the desk's address
+    // or the subject a clerk chose.
     search: fold(
-      `${c.company ?? ''} ${c.email} ${c.messages.map((m) => `${m.subject ?? ''} ${m.snippet ?? ''}`).join(' ')}`,
+      `${c.company ?? ''} ${c.email} ${institutionSearch(c)} ${c.messages.map((m) => `${m.subject ?? ''} ${m.snippet ?? ''}`).join(' ')}`,
     ),
   };
 }
@@ -275,6 +306,14 @@ export function mailRows(input: RowsInput, active: MailFilterKey): MailRow[] {
       const heatGap = heatOf(b, input.situations[b.id]).score - heatOf(a, input.situations[a.id]).score;
       if (heatGap !== 0) return heatGap;
       return byId(a, b);
+    }
+    if (active === 'institution') {
+      // Unread first, then the date fall-through below. Heat is deliberately
+      // not consulted: it scores calls, packs and quotas, so it is zero for
+      // every correspondent, and ranking on it would leave the order to the
+      // tiebreak. "Which of these answered, and which answered longest ago"
+      // is the whole question this filter is opened with.
+      if (a.unread !== b.unread) return a.unread ? -1 : 1;
     }
     if (active === 'clients' || active === 'paying' || active === 'dormant') {
       // Money views rank by heat: the client burning credits outranks the one
