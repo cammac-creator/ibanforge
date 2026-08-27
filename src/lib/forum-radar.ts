@@ -436,10 +436,11 @@ export const MARKETPLACES: MarketplaceDef[] = [
     slug: 'glama',
     name: 'Glama (annuaire MCP)',
     url: 'https://glama.ai/mcp/servers?query=ibanforge',
-    // Probed via Glama's public API (verified live 18/08/2026: our MCP server
-    // is indexed there, description and env schema included).
+    // Probed via the search page's server-rendered HTML. Glama's public API
+    // (api/mcp/v1/servers) started answering 401 on 27/08/2026 — auth became
+    // required — while the HTML search still carries the listing server-side.
     kind: 'http_contains',
-    checkTarget: 'https://glama.ai/api/mcp/v1/servers?query=ibanforge&first=5',
+    checkTarget: 'https://glama.ai/mcp/servers?query=ibanforge',
     marker: 'ibanforge',
     cadenceHours: 24,
   },
