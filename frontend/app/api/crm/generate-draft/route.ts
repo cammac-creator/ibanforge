@@ -15,13 +15,115 @@ import { applyRedactionRules, parseRedactionRules } from '@/lib/crm/redaction-ru
  * Best-effort by design: any miss (no admin credentials, unknown email, API
  * down) returns the body untouched and the draft is merely less specific.
  */
+/**
+ * What the product IS, in the words a draft is allowed to use.
+ *
+ * One constant because two readers need it and they must not drift: a customer
+ * mail cites it to be concrete, and a letter to an institution cites it to say
+ * who is writing. The commercial road reaches it through the usage facts below;
+ * the institutional road has no usage to speak of and reaches it directly.
+ */
+const PRODUCT_FACTS =
+  'Product facts you may cite, nothing else: free tier 200 requests/month; batch endpoint up to 100 IBANs per call; prepaid credit packs from $5 per 1,000 calls, credits never expire; German BICs come straight from the Bundesbank register (11 characters, branch included); code examples: ibanforge.com/docs/recipes';
+
+/**
+ * The writer guessed a first name off a domain on the first live control of
+ * this route. A guessed name that lands wrong opens the mail on an insult, and
+ * it is worse in a letter to a desk than in a mail to a lead.
+ */
+const ADDRESS_RULE =
+  'Address rule: unless a personal name appears in the brief above, do not guess one (never from the email domain); open with a plain Hi.';
+
+/** The operator's private notes on one address, newest first, best-effort. */
+async function operatorNotesFor(to: string, apiUrl: string, adminSecret: string): Promise<string[]> {
+  if (!apiUrl || !adminSecret) return [];
+  try {
+    const res = await fetch(`${apiUrl}/v1/admin/contact-notes?email=${encodeURIComponent(to)}`, {
+      headers: { 'X-Admin-Secret': adminSecret },
+      signal: AbortSignal.timeout(6000),
+    });
+    if (!res.ok) return [];
+    const notes = ((await res.json()) as { notes?: Array<{ note: string; created_at: string }> }).notes ?? [];
+    return notes.slice(0, 6).map((n) => `${n.created_at.slice(0, 10)}: ${n.note}`);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Ground a letter to an institution in what IBANforge is and what we are asking
+ * that institution for.
+ *
+ * It exists because the usage enrichment below cannot serve this case at all:
+ * that one is keyed on API keys, and `if (mine.length === 0) return body` means
+ * an address holding no key receives NOTHING. An authority holds no key by
+ * definition, so without this branch the single most consequential mail the CRM
+ * writes — a request for permission to redistribute somebody's register — would
+ * be generated with no idea who is writing or why.
+ *
+ * The facts are the identity, the file line and the operator's own notes. No
+ * numbers are invented and no register is named here: what we are asking for
+ * comes from `dossier`, which the operator wrote.
+ *
+ * `institutional: true` is added to the body HERE rather than in the composer.
+ * The upstream VPS reads it to pick its own writing mode, and a flag the client
+ * has to remember is a flag one send path forgets. The server sets it exactly
+ * when it has treated the request as institutional, so the two cannot disagree.
+ */
+async function enrichInstitutional(
+  b: Record<string, unknown>,
+  to: string,
+  apiUrl: string,
+  adminSecret: string,
+): Promise<unknown> {
+  const inst = (typeof b.institution === 'object' && b.institution !== null ? b.institution : {}) as Record<
+    string,
+    unknown
+  >;
+  const str = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
+  const org = str(inst.org);
+  const category = str(inst.category);
+  const country = str(inst.country);
+  const dossier = str(inst.dossier);
+
+  // Best-effort and never fatal: a notes endpoint that is down costs
+  // personalisation, not the letter. The identity block below is written either
+  // way, which is the whole difference with the commercial road.
+  const notes = await operatorNotesFor(to, apiUrl, adminSecret);
+
+  const lines = [
+    'You are writing WRITTEN CORRESPONDENCE on behalf of IBANforge to an institution. Ground the letter in the facts below, use ONLY these facts, and never invent a legal basis, a reference number or a deadline:',
+    '- Who is writing: IBANforge, a Swiss commercial API that validates IBANs and looks up BIC/SWIFT codes for software companies and payment providers.',
+    '- How IBANforge treats public data: registers are cited with attribution and with the date of the extract, and permission is asked IN WRITING before any datum from a source is served to customers. That is why this letter exists; say so plainly rather than apologising for it.',
+    org ? `- Institution addressed: ${org}${category ? ` (${category})` : ''}${country ? `, ${country}` : ''}` : '',
+    dossier ? `- Our file with them, in the operator's own words: ${dossier}` : '',
+    notes.length
+      ? `- Operator notes on this correspondent (private ground truth, use them to be precise, never quote them verbatim): ${notes.join(' | ')}`
+      : '',
+    PRODUCT_FACTS,
+    ADDRESS_RULE,
+  ].filter(Boolean);
+
+  return {
+    ...b,
+    context: `${String(b.context)}\n\n${lines.join('\n')}`,
+    institutional: true,
+  };
+}
+
 async function enrichWithUsageFacts(body: unknown): Promise<unknown> {
   const apiUrl = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || '';
   const adminSecret = process.env.ADMIN_SECRET || '';
-  if (!apiUrl || !adminSecret || typeof body !== 'object' || body === null) return body;
+  if (typeof body !== 'object' || body === null) return body;
   const b = body as Record<string, unknown>;
   const to = typeof b.to === 'string' ? b.to.trim().toLowerCase() : '';
   if (!to || typeof b.context !== 'string') return body;
+  // Before the admin credentials are required, and before anything reads a
+  // key: the institutional facts are mostly static, so this branch works on a
+  // deployment where the admin API is unreachable, and it must — that letter
+  // has no second source of context to fall back on.
+  if (b.contact_kind === 'institution') return enrichInstitutional(b, to, apiUrl, adminSecret);
+  if (!apiUrl || !adminSecret) return body;
   try {
     const headers = { 'X-Admin-Secret': adminSecret };
     const [keysRes, profRes, notesRes] = await Promise.all([
@@ -102,11 +204,8 @@ async function enrichWithUsageFacts(body: unknown): Promise<unknown> {
       operatorNotes.length
         ? `- Operator notes on this contact (private ground truth, use them to personalize, never quote them verbatim): ${operatorNotes.join(' | ')}`
         : '',
-      'Product facts you may cite, nothing else: free tier 200 requests/month; batch endpoint up to 100 IBANs per call; prepaid credit packs from $5 per 1,000 calls, credits never expire; German BICs come straight from the Bundesbank register (11 characters, branch included); code examples: ibanforge.com/docs/recipes',
-      // The writer guessed "Uwe" from a schaefer-uwe.com domain on the first
-      // live control. A guessed name that lands wrong opens the mail on an
-      // insult, so the default is no name at all.
-      'Address rule: unless a personal name appears in the brief above, do not guess one (never from the email domain); open with a plain Hi.',
+      PRODUCT_FACTS,
+      ADDRESS_RULE,
     ].filter(Boolean);
 
     return { ...b, context: `${b.context}\n\n${lines.join('\n')}` };
