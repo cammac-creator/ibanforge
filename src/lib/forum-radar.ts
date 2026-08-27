@@ -428,9 +428,13 @@ export const MARKETPLACES: MarketplaceDef[] = [
     slug: 'x402-list',
     name: 'x402-list.com',
     url: 'https://x402-list.com',
-    kind: 'dead_watch',
-    checkTarget: 'https://x402-list.com',
-    cadenceHours: 168,
+    // Died once, then came back as a real directory (dead-watch caught the
+    // resurrection on 27/08/2026). Submitted the same evening through their
+    // /submit form; the machine-readable catalogue is the honest probe.
+    kind: 'http_contains',
+    checkTarget: 'https://x402-list.com/api/v1/services',
+    marker: 'ibanforge',
+    cadenceHours: 24,
   },
   {
     slug: 'glama',
