@@ -85,11 +85,15 @@ export function recordOrphan(input: OrphanInput): void {
 }
 
 /**
- * The queue, unresolved first and newest first within that.
+ * The queue, unresolved first and OLDEST first within each kind.
  *
  * Replies come before first contacts: a reply is answering something we sent, so
- * somebody is waiting. `limit` keeps a runaway sync from turning the panel into
- * a wall.
+ * somebody is waiting. Oldest first because this is a queue, not an inbox — the
+ * message that has waited longest is the one to deal with, and `limit` (which
+ * keeps a runaway sync from turning the panel into a wall) must cut the NEWEST
+ * rows, never the ones the wait has made urgent. Newest-first here once meant
+ * that past `limit` pending rows, the oldest were exactly the silently absent
+ * ones.
  */
 export function getOrphans(includeResolved = false, limit = 40): OrphanMail[] {
   const where = includeResolved ? '' : 'WHERE resolved = 0';
@@ -99,7 +103,7 @@ export function getOrphans(includeResolved = false, limit = 40): OrphanMail[] {
          FROM orphan_mail ${where}
         ORDER BY resolved ASC,
                  CASE kind WHEN 'reply' THEN 0 ELSE 1 END ASC,
-                 msg_date DESC
+                 msg_date ASC
         LIMIT ?`,
     )
     .all(limit) as OrphanMail[];

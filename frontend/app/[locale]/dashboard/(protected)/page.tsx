@@ -249,8 +249,8 @@ export default async function DashboardPage({
     // not a broken page. (The listing watch moved to Forums → Vitrines on
     // 18/08/2026; this page no longer duplicates it.)
     ADMIN_SECRET
-      ? fetchJSON<{ orphans: OrphanMailRow[] }>('/v1/admin/orphan-mail', { 'X-Admin-Secret': ADMIN_SECRET })
-      : Promise.resolve({ ok: false, status: 0, data: null } satisfies Fetched<{ orphans: OrphanMailRow[] }>),
+      ? fetchJSON<{ orphans: OrphanMailRow[]; pending: number }>('/v1/admin/orphan-mail', { 'X-Admin-Secret': ADMIN_SECRET })
+      : Promise.resolve({ ok: false, status: 0, data: null } satisfies Fetched<{ orphans: OrphanMailRow[]; pending: number }>),
     fetchCrmData(),
   ]);
 
@@ -440,7 +440,9 @@ export default async function DashboardPage({
       </div>
 
       {/* 3. Contact base — the podium, the relationship figures, the campaigns */}
-      {orphanRes.data?.orphans && <OrphanMailPanel orphans={orphanRes.data.orphans} />}
+      {orphanRes.data?.orphans && (
+        <OrphanMailPanel orphans={orphanRes.data.orphans} totalPending={orphanRes.data.pending} />
+      )}
       {crm && <ContactBase crm={crm} locale={locale} />}
 
       {/* 4. Clients — per email, credits first */}
