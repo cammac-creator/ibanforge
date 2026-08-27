@@ -171,6 +171,42 @@ describe('funnelBy', () => {
     expect(rows.reduce((n, r) => n + r.stock, 0)).toBe(1);
   });
 
+  // The geography cut is the one cut that reads the contact rather than the
+  // sourcing block, which is exactly why an institution reaches it: it has a
+  // country like anybody else. Every row of this table is a commercial funnel
+  // — stock, mailed, replied, converted — so one supervisor filed in CH would
+  // inflate Switzerland's stock and depress its conversion, and the number the
+  // owner reads to decide where to prospect would be wrong by however many
+  // authorities happen to sit in that country.
+  it('leaves institutions out of the geography, whatever country they carry', () => {
+    const supervisor: Contact = {
+      kind: 'institution',
+      id: 'registry@alpha.example.net',
+      email: 'registry@alpha.example.net',
+      company: 'Autorité Alpha',
+      country: 'CH',
+      website: null,
+      messages: [out('2026-07-01'), inb('2026-07-20')],
+      draft: null,
+      unread: false,
+      account: 'crm@example.net',
+      institution: {
+        org: 'Autorité Alpha',
+        category: 'autorite',
+        country: 'CH',
+        role: null,
+        website: null,
+        dossier: 'Permission de citer le registre',
+      },
+    };
+    expect(BY_COUNTRY(supervisor)).toBeNull();
+    // And through the aggregation, not only through the key function: one
+    // prospect in, one prospect counted.
+    const rows = funnelBy([prospect('a@example.net', [], {}, 'Suisse'), supervisor], BY_COUNTRY);
+    expect(rows.reduce((n, r) => n + r.stock, 0)).toBe(1);
+    expect(rows.map((r) => r.key)).toEqual(['CH']);
+  });
+
   it('returns nothing for an empty list', () => {
     expect(funnelBy([], BY_SEGMENT)).toEqual([]);
   });

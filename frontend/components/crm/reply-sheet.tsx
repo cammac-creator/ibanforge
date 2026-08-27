@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { confirmedSent, generatedDraft, readAnswer, reasonOf, withReason } from '@/lib/crm/api-result';
 import { isAutomated } from '@/lib/crm/automated';
+import { institutionalBrief } from '@/lib/crm/institutional-brief';
 import { threadTail } from '@/lib/crm/thread-tail';
 import type { Contact, Message, Situation } from '@/lib/crm/types';
 import { GuardrailChecks, OverrideButton, useGuardrails } from './guardrails-ui';
@@ -79,43 +80,6 @@ function replySubject(messages: Message[]): string {
     return /^re\s*:/i.test(s) ? s : `Re: ${s}`;
   }
   return '';
-}
-
-/**
- * What the generator is told about a written exchange with an institution.
- *
- * Two situations under one roof, and the difference is one line of instruction
- * rather than a second code path: when a thread exists it IS the brief, exactly
- * as it is for a customer's answer; when there is none this is the first
- * written request to that institution and the file line is all there is to
- * write from.
- *
- * The register is stated explicitly because nothing else in this app would set
- * it. Every other brief in the CRM describes a commercial conversation, and the
- * writer upstream is the same writer: without this it would open a letter to a
- * financial supervisor the way it opens a mail to a lead.
- *
- * `dossier` is the ground truth. It is the operator's own one-line statement of
- * what we are asking that institution for, and it is the only thing in here
- * that cannot be derived from anything else.
- */
-function institutionalBrief(c: Extract<Contact, { kind: 'institution' }>): string {
-  const i = c.institution;
-  const hasThread = c.messages.length > 0;
-  return [
-    `Institution: ${i.org}`,
-    `Type of institution: ${i.category}`,
-    i.country ? `Country: ${i.country}` : '',
-    i.role ? `Desk or role addressed: ${i.role}` : '',
-    i.dossier ? `What we are asking them for (our file with them): ${i.dossier}` : '',
-    'This is written correspondence with an institution, not a commercial mail. Formal register, plain sentences, no marketing, no product pitch, no call to action, no unsubscribe line. Say what is being asked, on what basis, and what answer is expected.',
-    hasThread
-      ? 'They wrote last and are waiting on you. Answer every question their mail asks, each one explicitly, before anything else. Keep the file reference and any case number they used.'
-      : 'There is no correspondence yet: this is the FIRST written request to this institution. State plainly who IBANforge is, exactly what is being requested, why, and ask for a written answer.',
-    hasThread ? `Thread so far:\n${threadTail(c.messages)}` : '',
-  ]
-    .filter(Boolean)
-    .join('\n');
 }
 
 /**
@@ -378,16 +342,6 @@ export function ReplySheet({
   }
 
   /**
-   * Said wherever the send button is, folded or not: red alone tells a
-   * colour-blind operator nothing about a send that is about to ignore a rule.
-   *
-   * Held here rather than handed to GuardrailChecks, which is the other two
-   * surfaces' way of showing it, for two reasons of this one. The folded bar
-   * has a send button and no check list, so the note would have nowhere to
-   * appear; and the check list here sits in the part of the sheet that scrolls,
-   * so a note inside it could be out of view while the armed button is not.
-   */
-  /**
    * A first written request to an institution is not a reply, and the sheet
    * says so in every place it names what is being written.
    *
@@ -400,6 +354,16 @@ export function ReplySheet({
   const target = replyTarget(c);
   const who = c.company || c.email;
 
+  /**
+   * Said wherever the send button is, folded or not: red alone tells a
+   * colour-blind operator nothing about a send that is about to ignore a rule.
+   *
+   * Held here rather than handed to GuardrailChecks, which is the other two
+   * surfaces' way of showing it, for two reasons of this one. The folded bar
+   * has a send button and no check list, so the note would have nowhere to
+   * appear; and the check list here sits in the part of the sheet that scrolls,
+   * so a note inside it could be out of view while the armed button is not.
+   */
   const forcedNote = g.forcedNote && (
     <p className="mt-2 shrink-0 text-[12px] font-medium leading-snug text-red-300">⚠️ {g.forcedNote}</p>
   );

@@ -104,7 +104,15 @@ export function upsertInstitutionalContact(
   if (!org) return { ok: false, reason: "l'organisation est requise" };
   const category = opt(input.category, 40);
   if (!category) return { ok: false, reason: 'la catégorie est requise' };
-  const country = typeof input.country === 'string' ? input.country.trim().toUpperCase().slice(0, 2) : '';
+  // Validated, never truncated: this column feeds the letter generator as a
+  // stated fact. Silently slicing free text minted plausible-but-wrong codes
+  // ("Suisse" → "SU", which is not Switzerland), served on the file header
+  // and cited in outgoing institutional mail.
+  const countryRaw = typeof input.country === 'string' ? input.country.trim() : '';
+  if (countryRaw && !/^[a-z]{2}$/i.test(countryRaw)) {
+    return { ok: false, reason: 'pays : code ISO à 2 lettres attendu (ex. CH), ou vide' };
+  }
+  const country = countryRaw.toUpperCase();
 
   getStatsDB()
     .prepare(

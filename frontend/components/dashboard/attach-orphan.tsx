@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { INSTITUTION_CATEGORIES } from '@/lib/crm/business';
 import { suggestFor, type PersonRow } from '@/lib/crm/orphan-suggest';
+import { loadAliases, loadIndex } from '@/lib/crm/people-index';
 
 /**
  * The three gestures that let the orphan queue empty:
@@ -31,41 +32,9 @@ import { suggestFor, type PersonRow } from '@/lib/crm/orphan-suggest';
  * before it is confirmed.
  */
 
-// Module-level caches: one fetch per browser session, shared by every control.
-// They survive soft navigations, so a person added to the CRM mid-session only
-// appears after a hard reload — accepted, because suggestions and warnings are
-// advisory and degrade to free typing. A failed fetch nulls the slot so the
-// next control (or this one, reopened) retries instead of caching the miss.
-let indexPromise: Promise<PersonRow[]> | null = null;
-let aliasesPromise: Promise<Map<string, string>> | null = null;
-
-function loadIndex(): Promise<PersonRow[]> {
-  indexPromise ??= fetch('/api/crm/search-index')
-    .then(async (r) => {
-      if (!r.ok) throw new Error(`index HTTP ${r.status}`);
-      const data = (await r.json()) as { rows?: PersonRow[] };
-      return data.rows ?? [];
-    })
-    .catch((e: unknown) => {
-      indexPromise = null;
-      throw e instanceof Error ? e : new Error('index');
-    });
-  return indexPromise;
-}
-
-function loadAliases(): Promise<Map<string, string>> {
-  aliasesPromise ??= fetch('/api/crm/email-aliases')
-    .then(async (r) => {
-      if (!r.ok) throw new Error(`aliases HTTP ${r.status}`);
-      const data = (await r.json()) as { aliases?: Array<{ alias: string; canonical: string }> };
-      return new Map((data.aliases ?? []).map((a) => [a.alias, a.canonical]));
-    })
-    .catch((e: unknown) => {
-      aliasesPromise = null;
-      throw e instanceof Error ? e : new Error('aliases');
-    });
-  return aliasesPromise;
-}
+// The index and alias caches live in lib/crm/people-index.ts: the correspondent
+// form asks the same index the same question, and two copies would mean two
+// fetches and two chances to drop the retry-on-failure behaviour.
 
 type Mode = 'closed' | 'attach' | 'institution' | 'dismiss';
 type Busy = 'idle' | 'busy' | 'error';
@@ -95,8 +64,14 @@ export function AttachOrphanControl({ orphanId, sender }: { orphanId: string; se
     { kind: 'attached'; to: string } | { kind: 'registered'; org: string } | { kind: 'dismissed' } | null
   >(null);
 
+  // Both roads need the index, and for opposite reasons. "Attach" reads it to
+  // SUGGEST a canonical address and to flag one it does not know. "Institution"
+  // reads it to WARN: an address the CRM already holds as a client or a prospect
+  // is one the correspondent register cannot really claim, and filing it twice
+  // is how the same desk ends up with two identities. Loading it for the first
+  // mode only meant the more expensive of the two mistakes was the unguarded one.
   useEffect(() => {
-    if (mode !== 'attach' || rows !== null) return;
+    if ((mode !== 'attach' && mode !== 'institution') || rows !== null) return;
     let alive = true;
     loadIndex().then(
       (r) => alive && setRows(r),
@@ -114,7 +89,7 @@ export function AttachOrphanControl({ orphanId, sender }: { orphanId: string; se
   if (done?.kind === 'attached') {
     return (
       <p aria-live="polite" className="mt-1 text-[12px] text-emerald-400">
-        ✓ {sender} rattaché à {done.to} — son fil complet remonte au prochain passage de la synchro (horaire).
+        ✓ {sender} rattaché à {done.to} — son fil complet remonte au prochain passage de la synchro (au plus 15 min).
       </p>
     );
   }
@@ -123,9 +98,15 @@ export function AttachOrphanControl({ orphanId, sender }: { orphanId: string; se
     // {to}", which would print the sender's own address as the thing it was
     // attached to — true and unreadable. Nothing was merged here: an address
     // was given a name and a file of its own.
+    // "Retrouve-le sous Correspondances" was true and premature: the register
+    // now holds the address, but the thread is filed against it by the VPS sync,
+    // so nothing is under that tab until the next run. An operator who clicks
+    // through immediately, finds an empty file and concludes the register did
+    // not work is exactly the road back to the orphan queue.
     return (
       <p aria-live="polite" className="mt-1 text-[12px] text-sky-300">
-        ✓ {sender} enregistré comme correspondant ({done.org}) — retrouve-le sous « Correspondances ».
+        ✓ {sender} enregistré comme correspondant ({done.org}) — son fil, cette réponse comprise, remonte au
+        prochain passage de la synchro (au plus 15 min), sous « Correspondances ».
       </p>
     );
   }
@@ -154,10 +135,19 @@ export function AttachOrphanControl({ orphanId, sender }: { orphanId: string; se
         </button>
         <button
           type="button"
-          onClick={() => setMode('institution')}
+          onClick={() => {
+            setMode('institution');
+            // Same retry as the alias road, and now that this mode reads the
+            // index it needs it for the same reason: a failure left in place
+            // would freeze the double-identity warnings off for good.
+            if (rows === 'failed') setRows(null);
+          }}
           className="rounded border border-sky-500/40 px-2 py-1 text-[12px] font-medium text-sky-300 hover:bg-sky-500/10"
         >
-          Rattacher à un correspondant…
+          {/* Not "rattacher": nothing is attached to anything here. The sender
+              IS the file being opened, and a verb that says otherwise is what
+              sent this gesture looking for a customer to merge into. */}
+          Enregistrer comme correspondant…
         </button>
         <button
           type="button"
@@ -202,6 +192,19 @@ export function AttachOrphanControl({ orphanId, sender }: { orphanId: string; se
     const chosenCategory = category === FREE_CATEGORY ? customCategory.trim() : category;
     const cleanedOrg = org.trim();
     const ready = !!cleanedOrg && !!chosenCategory;
+    // The word the operator picked, not the value the column stores. Looked up
+    // rather than run through the row chip's helper, which caps its label with
+    // an ellipsis: right for a 296px column, wrong for a sentence being read
+    // before a confirmation.
+    const categoryLabel =
+      category === FREE_CATEGORY
+        ? customCategory.trim()
+        : (INSTITUTION_CATEGORIES.find((c) => c.value === category)?.label ?? category);
+    // The sender as the index stores addresses. Both warnings below are
+    // advisory: they never disable the button, because the index can lag and an
+    // authority that also holds a key is a real, if rare, thing to file.
+    const senderKey = sender.trim().toLowerCase();
+    const known = Array.isArray(rows) ? rows.find((r) => r.email === senderKey) : undefined;
     const field =
       'min-w-0 flex-1 rounded border border-[var(--ink-4)] bg-[var(--ink-0)] px-2 py-1.5 text-base text-[var(--fg-1)] placeholder:text-[var(--fg-5)] focus:border-sky-500/50 focus:outline-none sm:max-w-[220px] sm:text-[12.5px]';
 
@@ -260,13 +263,22 @@ export function AttachOrphanControl({ orphanId, sender }: { orphanId: string; se
           <input
             type="text"
             autoComplete="off"
-            aria-label="Pays (facultatif)"
+            aria-label="Pays, code ISO à 2 lettres (facultatif)"
             value={country}
             onChange={(e) => {
               setCountry(e.target.value);
+              // Disarming here too. Every other field does it, and the one that
+              // did not was the field most likely to be corrected last: the
+              // armed sentence would have been confirming a country nobody had
+              // read back.
+              setArmed(false);
               clearFailure();
             }}
-            placeholder="pays (facultatif)…"
+            // The API refuses anything that is not two letters rather than
+            // slicing it, so the field says the shape it wants and cannot hold
+            // more than it: "Suisse" typed here used to be stored as "SU".
+            maxLength={2}
+            placeholder="pays ISO-2 (CH, DE…) — facultatif"
             className={field}
           />
           <button
@@ -322,9 +334,26 @@ export function AttachOrphanControl({ orphanId, sender }: { orphanId: string; se
           </button>
         </div>
         <div aria-live="polite">
+          {/* An address the CRM already holds under a commercial identity. The
+              register would accept it, and the row would then never appear
+              under "Correspondances": the mail rows cede a claimed address to
+              the client or prospect file. Said before the confirmation, not
+              after, because after it there is nothing left to decide. */}
+          {knownAlias ? (
+            <p className="mt-1 text-[11.5px] text-amber-300">
+              ⚠ {sender} est déjà rattaché au client {knownAlias} — l&apos;enregistrer comme correspondant
+              créerait une double identité.
+            </p>
+          ) : (
+            known && (
+              <p className="mt-1 text-[11.5px] text-amber-300">
+                ⚠ {sender} est déjà connu du CRM comme {known.kind === 'client' ? 'client' : 'prospect'}.
+              </p>
+            )
+          )}
           {armed && (
             <p className="mt-1.5 text-[12px] text-sky-200">
-              Enregistrer <strong>{sender}</strong> sous <strong>{cleanedOrg}</strong> ({chosenCategory}). Reclique
+              Enregistrer <strong>{sender}</strong> sous <strong>{cleanedOrg}</strong> ({categoryLabel}). Reclique
               pour confirmer.
             </p>
           )}

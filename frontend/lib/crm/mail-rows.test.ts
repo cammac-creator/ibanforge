@@ -569,8 +569,10 @@ describe('the Correspondances filter', () => {
   });
 
   // Unread first: "which of these answered" is the question this filter is
-  // opened with. Heat is deliberately not consulted — it is zero for every
-  // correspondent, so it would leave the order to the tiebreak.
+  // opened with. Heat is deliberately not consulted — not because it is zero
+  // here (conversation facts score whatever the kind is) but because it measures
+  // a commercial temperature, which says nothing about which authority to
+  // answer first.
   it('puts an unread answer first, whatever the dates say', () => {
     const rows = mailRows(withInstitutions, 'institution');
     expect(rows.map((r) => r.id)).toEqual(['scheme@beta.example.net', 'registry@alpha.example.net']);
@@ -579,5 +581,37 @@ describe('the Correspondances filter', () => {
   it('finds a correspondent by its file line, which is what the operator remembers', () => {
     const rows = searchRows(mailRows(withInstitutions, 'institution'), 'redistribution');
     expect(rows.map((r) => r.id)).toEqual(['scheme@beta.example.net']);
+  });
+
+  // Its own input rather than an addition to `withInstitutions`: that fixture is
+  // asserted exactly, id by id, and by a loop comparing every filter's count to
+  // its rows. A contact added there to prove something else would silently be
+  // proving it against two broken assertions.
+  const pending = institution('pending@delta.example.net', 'Registre Delta', [
+    message('out', 'Demande de permission', 'Nous souhaitons citer votre registre', '2026-07-01'),
+  ]);
+  const waitingOnThem: RowsInput = {
+    contacts: [pending],
+    situations: {
+      'pending@delta.example.net': situation({ ballInCourt: 'them', silenceDays: 24, followupDue: true }),
+    },
+    snoozed: {},
+  };
+
+  // Asserted rather than assumed. A letter to an authority that got no answer
+  // is the single most forgettable thing in this CRM — nobody is chasing it —
+  // and "Relances" is the only queue that would ever surface it. The filter
+  // asks about the thread and not about the kind, which is what makes this
+  // work; a kind test added there one day would break exactly here.
+  it('puts an institution whose follow-up is due in Relances', () => {
+    expect(mailRows(waitingOnThem, 'followup').map((r) => r.id)).toEqual(['pending@delta.example.net']);
+  });
+
+  // The money views. A correspondent has no key, so it carries no activation
+  // join at all and both predicates decline it — but they decline it by reading
+  // `business`, not by testing the kind, so this is pinned rather than trusted.
+  it('keeps institutions out of the money queues', () => {
+    expect(mailRows(waitingOnThem, 'paying')).toHaveLength(0);
+    expect(mailRows(waitingOnThem, 'dormant')).toHaveLength(0);
   });
 });

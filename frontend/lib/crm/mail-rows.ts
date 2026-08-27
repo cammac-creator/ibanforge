@@ -98,8 +98,12 @@ const FILTERS: Array<{
   // Both business filters read the activation join, never the monthly `used`
   // counter: packs is what makes a buyer a buyer (their paid key's counter
   // stays at zero by construction), and dormant is the API's own verdict.
-  { key: 'paying', label: 'Payants', urgent: false, test: (c) => (c.business?.packs ?? 0) > 0 },
-  { key: 'dormant', label: 'Endormis', urgent: false, test: (c) => c.business?.status === 'dormant' },
+  // The kind guard is load-bearing, not decorative: institutions only lack a
+  // `business` block because build-contacts happens not to join activation for
+  // them today. The day that changes, a supervisor must still never land in a
+  // money queue.
+  { key: 'paying', label: 'Payants', urgent: false, test: (c) => c.kind === 'client' && (c.business?.packs ?? 0) > 0 },
+  { key: 'dormant', label: 'Endormis', urgent: false, test: (c) => c.kind === 'client' && c.business?.status === 'dormant' },
   // A draft written and never sent is a follow-up that silently never left:
   // this queue makes every waiting draft countable and findable.
   { key: 'drafts', label: 'Brouillons', urgent: false, test: (c) => c.draft !== null },
@@ -309,9 +313,13 @@ export function mailRows(input: RowsInput, active: MailFilterKey): MailRow[] {
     }
     if (active === 'institution') {
       // Unread first, then the date fall-through below. Heat is deliberately
-      // not consulted: it scores calls, packs and quotas, so it is zero for
-      // every correspondent, and ranking on it would leave the order to the
-      // tiebreak. "Which of these answered, and which answered longest ago"
+      // not consulted, and NOT because it is zero here: heatFromFacts scores
+      // conversation facts that have nothing to do with the kind — an active
+      // exchange, a ball in our court, a long silence — so a correspondent we
+      // write to regularly carries a real score. It is not consulted because
+      // that score measures a COMMERCIAL temperature, how close somebody is to
+      // buying, and no arrangement of it says anything about which authority to
+      // answer first. "Which of these answered, and which answered longest ago"
       // is the whole question this filter is opened with.
       if (a.unread !== b.unread) return a.unread ? -1 : 1;
     }

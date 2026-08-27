@@ -176,7 +176,14 @@ export function ContactDetail({
           {sourcing.outcomeNote ? <> — « {sourcing.outcomeNote} »</> : null}
         </p>
       )}
-      {heat.parts.length > 0 && (
+      {/* Never on a correspondent's file. Heat is a commercial temperature —
+          how close somebody is to buying — and it is NOT zero for an
+          institution: an exchange under way and a ball in our court score on
+          their own, so a supervisor we are writing to regularly would be
+          served a "Chaleur 25/100" band. There is no reading of that number
+          that means anything about an authority, and printing it invites the
+          one act this whole kind exists to prevent. */}
+      {c.kind !== 'institution' && heat.parts.length > 0 && (
         <div className="mb-3 flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1">
           <p className="text-[11px] uppercase tracking-wide text-[var(--fg-3)]">
             Chaleur <span className="font-mono text-sm text-amber-400">{heat.score}</span>/100

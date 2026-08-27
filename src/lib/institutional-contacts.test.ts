@@ -90,6 +90,23 @@ describe('the registry of institutions we write to', () => {
     clean();
   });
 
+  it('refuses a country that is not a two-letter code instead of truncating it', () => {
+    clean();
+    // "Suisse".slice(0, 2) is "SU", which is not Switzerland. A stored country
+    // is cited as a fact in outgoing institutional mail, so free text is
+    // refused loudly rather than minted into a plausible wrong code.
+    const res = upsertInstitutionalContact({
+      email: BETA,
+      org: 'Réseau Beta',
+      category: 'reseau_paiement',
+      country: 'Suisse',
+    });
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.reason).toContain('ISO');
+    expect(mine()).toHaveLength(0);
+    clean();
+  });
+
   it('refuses an address that is not one', () => {
     const res = upsertInstitutionalContact({ email: 'pas-une-adresse', org: 'Autorité Alpha', category: 'autorite' });
     expect(res.ok).toBe(false);
