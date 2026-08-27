@@ -1,7 +1,15 @@
 import { enrichEmail } from '@/lib/company-enrichment';
 import { threadIsUnread } from '@/lib/thread-unread';
 import { signedUpRecently } from './new-signup';
-import type { BusinessInfo, Contact, Message, Outcome, ProspectSourcing, ReadyMail } from './types';
+import type {
+  BusinessInfo,
+  Contact,
+  InstitutionInfo,
+  Message,
+  Outcome,
+  ProspectSourcing,
+  ReadyMail,
+} from './types';
 // One definition of our mailboxes: the send path validates against this list,
 // so a second copy here could drift and make a contact unsendable.
 import { COLD_ACCOUNT, warmAccount } from './sending-account';
@@ -156,6 +164,29 @@ export interface ActivationClientRow {
   calls_90d: number;
 }
 
+/**
+ * One row of /v1/admin/institutional-contacts: an address the operator
+ * registered by hand, because nothing about an authority can be derived from a
+ * key or from a prospect list. The address is the whole point — once it is
+ * known, `email_messages` files the whole thread against it on its own, with no
+ * knowledge of `kind` on either side of the sync.
+ */
+export interface InstitutionalContactRow {
+  email: string;
+  org: string;
+  /** Free TEXT, as stored. See InstitutionInfo in types.ts. */
+  category: string;
+  country: string | null;
+  role: string | null;
+  website: string | null;
+  dossier: string | null;
+  /**
+   * Optional on the wire for the same deploy-order reason as the prospect
+   * outcome columns: Vercel and Railway ship independently.
+   */
+  created_at?: string | null;
+}
+
 export interface BuildInput {
   keys: KeyRow[];
   prospects: ProspectRow[];
@@ -171,6 +202,12 @@ export interface BuildInput {
    * whole CRM down with it.
    */
   activation?: ActivationClientRow[];
+  /**
+   * Optional for the same reason as `activation`, and it matters more here: the
+   * endpoint is new, so the frontend WILL run for a while against an API that
+   * answers 404. Absent, the CRM is exactly the CRM it was, minus one filter.
+   */
+  institutions?: InstitutionalContactRow[];
 }
 
 /**
@@ -459,23 +496,94 @@ export function buildContacts(input: BuildInput, now: Date = new Date()): Contac
     });
   }
 
+  /**
+   * The institutional correspondents: authorities, central banks, payment
+   * schemes, registries, suppliers. Third and last, so the two commercial
+   * identities win the address whenever there is a contest — a supplier who
+   * also holds an API key is a customer first, and demoting them to a
+   * correspondent would take them out of the money views.
+   *
+   * `isInternalAccount` is deliberately NOT applied here, unlike in the key
+   * loop. That regex matches `audit`, `smoke` and `test-` ANYWHERE in an
+   * address, which is a sane net over machine-minted keys and a trap over a
+   * hand-registered one: a supervisory desk on an `audit@` address is exactly
+   * the correspondent this feature exists for, and it would vanish without a
+   * word. These rows are typed in one at a time by the operator; there is no
+   * volume of noise to filter.
+   *
+   * No `business` block either, at any point. The activation join is keyed on
+   * key holders, and an institution that reached this loop holds no key by
+   * construction (the client loop claimed those addresses first). Attaching one
+   * would be attaching somebody else's row.
+   */
+  for (const row of input.institutions ?? []) {
+    const id = typeof row.email === 'string' ? row.email.trim().toLowerCase() : '';
+    // An address is the only join key a correspondent has: no address, no
+    // thread, nothing to write to, so the row is not a contact at all.
+    if (!id) continue;
+    if (claimed.has(id)) continue; // already emitted as a client
+    if (emitted.has(id)) continue; // already emitted as a prospect, or listed twice
+    emitted.add(id);
+    const { messages, draft } = threadOf(id);
+    const institution: InstitutionInfo = {
+      org: row.org,
+      category: row.category,
+      country: row.country ?? null,
+      role: row.role ?? null,
+      website: row.website ?? null,
+      dossier: row.dossier ?? null,
+    };
+
+    out.push({
+      kind: 'institution',
+      id,
+      email: row.email,
+      // The organisation IS the name here. There is no person to fall back to
+      // and nothing to enrich from: enrichEmail guesses a company from a
+      // domain, and a guess is the wrong answer about a named authority.
+      company: row.org || row.email,
+      country: institution.country,
+      website: institution.website,
+      messages,
+      draft,
+      unread: threadIsUnread(messages, input.reads[id]),
+      // Always the company mailbox, never the warm personal one, and this is
+      // the one place that rule is stated. A request for a data permission or
+      // a regulatory question is written by IBANforge the company; an answer
+      // arriving at a personal address later is a filing problem, not a
+      // formality. It also cannot be empty, which warmAccount() can be when
+      // CRM_WARM_ACCOUNT is unset.
+      account: COLD_ACCOUNT,
+      institution,
+    });
+  }
+
   return out;
 }
 
 const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 const ADMIN_SECRET = process.env.ADMIN_SECRET || '';
 
-/** Fetch the five admin payloads. Returns null when the API is unreachable. */
+/**
+ * Fetch the admin payloads. Returns null when the API is unreachable.
+ *
+ * Every call swallows its own failure, and only the keys and prospects are
+ * load-bearing: the rest degrade to an absent block rather than taking the
+ * whole CRM down. That is the deploy story as much as a robustness one — this
+ * page and the API ship from two different platforms, so the frontend always
+ * runs for a while against an API that does not serve its newest endpoint yet.
+ */
 export async function fetchCrmData(): Promise<BuildInput | null> {
   if (!ADMIN_SECRET) return null;
   const h = { headers: { 'X-Admin-Secret': ADMIN_SECRET }, cache: 'no-store' as const };
-  const [k, p, m, a, tr, act] = await Promise.all([
+  const [k, p, m, a, tr, act, inst] = await Promise.all([
     fetch(`${API_URL}/v1/admin/keys`, h).then((r) => (r.ok ? r.json() : null)).catch(() => null),
     fetch(`${API_URL}/v1/admin/prospects`, h).then((r) => (r.ok ? r.json() : null)).catch(() => null),
     fetch(`${API_URL}/v1/admin/email-messages`, h).then((r) => (r.ok ? r.json() : null)).catch(() => null),
     fetch(`${API_URL}/v1/admin/client-activity`, h).then((r) => (r.ok ? r.json() : null)).catch(() => null),
     fetch(`${API_URL}/v1/admin/thread-reads`, h).then((r) => (r.ok ? r.json() : null)).catch(() => null),
     fetch(`${API_URL}/v1/admin/activation?days=90`, h).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+    fetch(`${API_URL}/v1/admin/institutional-contacts`, h).then((r) => (r.ok ? r.json() : null)).catch(() => null),
   ]);
   if (!k && !p) return null;
   return {
@@ -486,5 +594,6 @@ export async function fetchCrmData(): Promise<BuildInput | null> {
     reads: (tr?.reads ?? {}) as Record<string, string>,
     months: (k?.months ?? []) as string[],
     ...(act?.clients ? { activation: act.clients as ActivationClientRow[] } : {}),
+    ...(inst?.contacts ? { institutions: inst.contacts as InstitutionalContactRow[] } : {}),
   };
 }

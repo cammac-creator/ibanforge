@@ -100,6 +100,36 @@ export interface BusinessInfo {
   calls90d: number;
 }
 
+/**
+ * An institutional correspondent: an authority, a central bank, a payment
+ * scheme, a registry, a supplier. Somebody we send WRITTEN REQUESTS to (a data
+ * permission, a regulatory question) and whose answers have to be findable
+ * months later, next to the letter that provoked them.
+ *
+ * Nothing here is a sales field, and that is the point. There is no confidence
+ * score, no buying signal and no segment, because none of those mean anything
+ * about a supervisor: the file is `dossier`, one line saying what we are asking
+ * them for, and it is what the answer generator is grounded in.
+ *
+ * `category` is free TEXT on the wire, exactly as the API stores it. The usual
+ * values (autorite, banque_centrale, reseau_paiement, registre, fournisseur,
+ * autre) are the ones the UI knows how to name; anything else displays as
+ * itself rather than being rejected, so the operator can file a correspondent
+ * the vocabulary did not foresee instead of being stopped by a dropdown.
+ */
+export interface InstitutionInfo {
+  /** The organisation, as it should be written to. Never empty. */
+  org: string;
+  /** Free TEXT. See the note above on why this is not an enum. */
+  category: string;
+  country: string | null;
+  /** The desk or job title on the other end, when we know one. */
+  role: string | null;
+  website: string | null;
+  /** What we are asking them for, in one line. The generator's ground truth. */
+  dossier: string | null;
+}
+
 export interface ContactBase {
   /** Lowercased email — the join key for messages and read state. */
   id: string;
@@ -130,6 +160,26 @@ export type Contact =
       kind: 'prospect';
       sourcing: ProspectSourcing;
       readyMail: ReadyMail | null;
+    })
+  | (ContactBase & {
+      kind: 'institution';
+      institution: InstitutionInfo;
+      /**
+       * Declared, always undefined, and load-bearing rather than tidy-up bait.
+       *
+       * `sourcing` is optional on the client member and required on the
+       * prospect one, so `c.sourcing` reads off the union as
+       * `ProspectSourcing | undefined` and half a dozen call sites do exactly
+       * that (funnel.ts, mail-rows.ts, priority.ts, snooze.ts, the header, the
+       * reply sheet). A third member that simply omitted the property would
+       * make every one of those a type error, and the fix each time would be a
+       * `kind` test that says nothing — an institution has no sourcing because
+       * nobody sourced it, which is precisely what `undefined` means here.
+       *
+       * Deleting this line does not simplify anything; it moves the same fact
+       * into six narrowings.
+       */
+      sourcing?: undefined;
     });
 
 export type NextAction = 'first_mail' | 'reply' | 'followup' | 'firm_offer' | 'wait';

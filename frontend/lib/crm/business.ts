@@ -26,6 +26,57 @@ const CHIP: Record<string, BusinessChip> = {
   prospect: { label: 'prospect', color: '#a78bfa', bg: 'rgba(167,139,250,.10)' },
 };
 
+/**
+ * The usual categories of an institutional correspondent, in the words the
+ * dashboard speaks. The stored column is free TEXT (see InstitutionInfo), so
+ * this is a naming table and never a whitelist: a category nobody foresaw
+ * displays as itself rather than being swallowed.
+ *
+ * Exported because the "new correspondent" form offers exactly these values as
+ * its shortcuts, and a second list there would drift from the one the chips
+ * read the day a category is added.
+ */
+export const INSTITUTION_CATEGORIES: ReadonlyArray<{ value: string; label: string }> = [
+  { value: 'autorite', label: 'autorité' },
+  { value: 'banque_centrale', label: 'banque centrale' },
+  { value: 'reseau_paiement', label: 'réseau de paiement' },
+  { value: 'registre', label: 'registre' },
+  { value: 'fournisseur', label: 'fournisseur' },
+  { value: 'autre', label: 'institution' },
+];
+
+/**
+ * How wide a chip is allowed to be, in characters.
+ *
+ * The chip renders `shrink-0` beside the contact's name in a 296px column, so a
+ * long category does not wrap or truncate: it pushes the name off the row. The
+ * cap is on the free-text road only — every named category above is inside it.
+ */
+const CHIP_MAX = 16;
+
+const INSTITUTION_COLOR = { color: '#38bdf8', bg: 'rgba(56,189,248,.12)' };
+
+/**
+ * The one word a correspondent's row carries: what kind of institution it is.
+ *
+ * Deliberately shaped as a BusinessChip and returned through chipOf rather than
+ * drawn by its own component. The list and the contact header each render "the
+ * chip" once, from one shape, so a correspondent looks like it belongs on the
+ * same screen instead of introducing a second badge vocabulary. The colour is
+ * the only thing that separates it from the commercial chips, which is the
+ * distinction worth making at a glance.
+ */
+export function institutionChip(category: string): BusinessChip {
+  const raw = (category ?? '').trim();
+  const known = INSTITUTION_CATEGORIES.find((c) => c.value === raw.toLowerCase());
+  if (known) return { label: known.label, ...INSTITUTION_COLOR };
+  // Underscores are a storage convention, not a word: `reseau_paiement` typed
+  // by hand under another name still reads as prose here.
+  const shown = raw.replace(/_/g, ' ');
+  const label = !shown ? 'institution' : shown.length > CHIP_MAX ? `${shown.slice(0, CHIP_MAX - 1)}…` : shown;
+  return { label, ...INSTITUTION_COLOR };
+}
+
 /** Same threshold as build-contacts' isPilot: the CRM's own pilot definition. */
 const PILOT_LIMIT = 5000;
 
@@ -35,6 +86,11 @@ export function chipForStatus(status: keyof typeof CHIP): BusinessChip {
 }
 
 export function chipOf(c: Contact): BusinessChip | null {
+  // First, ahead of every business word. What an authority IS outranks any
+  // activation verdict that could somehow be attached to it, and build-contacts
+  // attaches none by construction. Placed here rather than last so that a
+  // stray join can never dress a supervisor as a paying customer.
+  if (c.kind === 'institution') return institutionChip(c.institution.category);
   const b = c.business;
   if (b) {
     if (b.status === 'paying') return CHIP.paying;

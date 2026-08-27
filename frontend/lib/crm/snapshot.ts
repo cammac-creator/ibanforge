@@ -45,6 +45,13 @@ export interface CrmSnapshot {
   asleep: number;
   prospects: number;
   clients: number;
+  /**
+   * Live institutional correspondents. Counted so that `active` still adds up:
+   * it is the sum of the three, and without this line a reader checking
+   * `clients + prospects` against it would find a gap and take it for a bug.
+   * No money and no funnel figure reads this set.
+   */
+  institutions: number;
   /** Real outbound mails dated today. The day's cadence, against the caps. */
   sentToday: number;
   /** Stripe pack revenue of the live client set, in USD. */
@@ -112,11 +119,20 @@ export function crmSnapshot(data: BuildInput, now: Date = new Date()): CrmSnapsh
   // is the Stripe pack revenue, and the two are complementary, not duplicates.
   let prospects = 0;
   let clients = 0;
+  let institutions = 0;
   let revenueUsd = 0;
   let freeActive = 0;
   for (const c of active) {
     if (c.kind === 'prospect') {
       prospects += 1;
+      continue;
+    }
+    // Before the client count, not after it. An authority is neither a customer
+    // nor a lead: counted as one it would inflate "clients" on the overview, a
+    // figure the owner reads daily, and it would then be asked for a revenue
+    // and a free-tier verdict it can never have.
+    if (c.kind === 'institution') {
+      institutions += 1;
       continue;
     }
     clients += 1;
@@ -139,6 +155,7 @@ export function crmSnapshot(data: BuildInput, now: Date = new Date()): CrmSnapsh
     asleep,
     prospects,
     clients,
+    institutions,
     sentToday,
     revenueUsd,
     freeActive,
