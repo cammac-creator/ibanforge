@@ -475,7 +475,8 @@
     "vibanNote": "IBAN virtuel / EMI — un signal de conformité qu'un simple contrôle mod-97 ne donne pas.",
     "error": {
       "unexpected": "Erreur inattendue de l'API.",
-      "network": "Impossible de contacter l'API. Vérifiez votre connexion ou réessayez ultérieurement."
+      "network": "Impossible de contacter l'API. Vérifiez votre connexion ou réessayez ultérieurement.",
+      "unavailable": "Le playground est momentanément indisponible. C'est de notre côté, pas du vôtre ; l'API elle-même fonctionne. Réessayez dans un instant."
     },
     "result": {
       "label": "Réponse"

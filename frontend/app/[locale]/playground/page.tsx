@@ -71,7 +71,11 @@ export default function PlaygroundPage() {
         setResults((r) => ({ ...r, [mode]: data }))
         setSeq((s) => s + 1)
       } else {
+        // Known codes come first: a raw route message must never reach the
+        // visitor untranslated (a hardcoded English sentence once did, on the
+        // French page).
         const msg =
+          (data?.error === "playground_unavailable" && t("error.unavailable")) ||
           (typeof data?.message === "string" && data.message) ||
           (typeof data?.error === "string" && data.error) ||
           t("error.unexpected")

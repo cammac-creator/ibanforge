@@ -475,7 +475,8 @@
     "vibanNote": "Virtuelle IBAN / EMI — ein Compliance-Signal, das eine reine mod-97-Prüfung nicht liefert.",
     "error": {
       "unexpected": "Unerwarteter Fehler von der API.",
-      "network": "Die API ist nicht erreichbar. Bitte überprüfen Sie Ihre Verbindung oder versuchen Sie es später erneut."
+      "network": "Die API ist nicht erreichbar. Bitte überprüfen Sie Ihre Verbindung oder versuchen Sie es später erneut.",
+      "unavailable": "Der Playground ist vorübergehend nicht verfügbar. Das liegt an uns, nicht an Ihnen; die API selbst läuft. Bitte versuchen Sie es gleich noch einmal."
     },
     "result": {
       "label": "Antwort"

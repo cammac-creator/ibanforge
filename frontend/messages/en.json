@@ -475,7 +475,8 @@
     "vibanNote": "Virtual IBAN / EMI — a compliance signal a mod-97 check cannot give.",
     "error": {
       "unexpected": "Unexpected error from the API.",
-      "network": "Could not reach the API. Please check your connection or try again later."
+      "network": "Could not reach the API. Please check your connection or try again later.",
+      "unavailable": "The playground is temporarily unavailable. This is on our side, not yours; the API itself is up. Please try again in a moment."
     },
     "result": {
       "label": "Response"

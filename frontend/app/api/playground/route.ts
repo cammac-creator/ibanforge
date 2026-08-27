@@ -47,11 +47,19 @@ export async function POST(req: NextRequest) {
     const ms = Date.now() - start;
     const data = await res.json();
 
-    // If x402 payment required, show a helpful message
+    // A 402 here means OUR server-side key was absent, revoked or out of
+    // quota — never something the visitor can fix. Serve a translatable code
+    // (the page maps it), and put the diagnosis where it belongs: the logs.
+    // This exact failure once surfaced as a raw English sentence on the FR
+    // page, with nothing anywhere saying whether the key was dead or missing.
     if (res.status === 402) {
+      console.error(
+        `[playground] 402 from ${apiPath} — key ${PLAYGROUND_API_KEY ? 'set' : 'MISSING'}` +
+          `${res.headers.get('X-API-Key-Invalid') === 'true' ? ', REJECTED as invalid (revoked?)' : ''}` +
+          `${res.headers.get('X-Quota-Remaining') === '0' ? ', quota exhausted' : ''}`,
+      );
       return NextResponse.json({
-        error: 'payment_required',
-        message: 'This endpoint requires payment. The playground needs a PLAYGROUND_API_KEY configured.',
+        error: 'playground_unavailable',
         _playground_ms: ms,
       });
     }
