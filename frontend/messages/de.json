@@ -37,7 +37,8 @@
       "dpa": "AVV (DPA)",
       "imprint": "Impressum",
       "compare": "Vergleich",
-      "account": "Ihr Schlüssel"
+      "account": "Ihr Schlüssel",
+      "sources": "Quellen & Genehmigungen"
     },
     "copyright": "© {year} IBANforge.",
     "dataLine": "Daten: GLEIF · Quelle: Deutsche Bundesbank · SIX · EBA · NBP · SwiftCodes/MIT · Bank of England (List of Banks, 2026-08) — monatlich · OFAC · UN · EU · EPC — wöchentlich"
@@ -68,7 +69,7 @@
       },
       "1": {
         "badge": "MCP-nativ — agentenbereit",
-        "title": "5 Tools, ohne Anmeldung",
+        "title": "7 Tools, ohne Anmeldung",
         "description": "Nativer Model-Context-Protocol-Server (stdio + HTTP). Claude, Cursor und jeder MCP-Agent installieren in einer Zeile: npx -y ibanforge-mcp."
       },
       "2": {
@@ -125,7 +126,19 @@
         "description": "Schweizer BC-Nummer-Suche (SIX BankMaster)"
       },
       "heading": "Endpoints und Preise",
-      "subtitle": "Starten Sie mit 200 Gratis-Anfragen pro Monat. Zahlen Sie erst, wenn Sie wachsen — per Karte oder in USDC."
+      "subtitle": "Starten Sie mit 200 Gratis-Anfragen pro Monat. Zahlen Sie erst, wenn Sie wachsen — per Karte oder in USDC.",
+      "5": {
+        "method": "GET",
+        "path": "/v1/reference/validate",
+        "cost": "Kostenlos",
+        "description": "Zahlungsreferenz-Prüfung: RF/ISO 11649, Schweizer QRR, belgische OGM, finnische viitenumero — belegte Verdikte"
+      },
+      "6": {
+        "method": "POST",
+        "path": "/v1/address/check",
+        "cost": "Kostenlos",
+        "description": "ISO-20022-Adressregeln (SPS, T2, Fedwire) vor den Umstellungen im November 2026"
+      }
     },
     "quickStart": {
       "heading": "Schnellstart",
@@ -219,7 +232,7 @@
       "sub": "Diese Seite spricht auch Roboter — jede Aussage oben ist maschinenlesbar, und jeder Endpoint ist ohne Menschen in der Schleife bezahlbar.",
       "illoAlt": "Ein Roboterarm wirft eine glühende Münze in einen Zahlungsschlitz",
       "mcpTitle": "MCP-nativ",
-      "mcpBody": "5 Tools, keine Anmeldung. Claude, Cursor und jeder MCP-Agent installieren in einer Zeile:",
+      "mcpBody": "7 Tools, keine Anmeldung. Claude, Cursor und jeder MCP-Agent installieren in einer Zeile:",
       "x402Title": "x402-Mikrozahlungen",
       "x402Body": "Autonome Agenten zahlen pro Anfrage in USDC — kein Konto, kein Checkout, Settlement on-chain.",
       "docsTitle": "Maschinenlesbare Doku",
@@ -286,7 +299,7 @@
     },
     "free": {
       "title": "Kostenlose Endpoints",
-      "description": "<demo>GET /v1/demo</demo> und <health>GET /health</health> sind immer kostenlos — keine Zahlung erforderlich.",
+      "description": "<demo>GET /v1/demo</demo>, <health>GET /health</health>, <refs>/v1/reference/validate</refs> (Zahlungsreferenzen: RF, Schweizer QRR, belgische OGM, finnische viitenumero — mit belegten Verdikten) und <addr>POST /v1/address/check</addr> (ISO-20022-Adressregeln für SPS, T2 und Fedwire) sind immer kostenlos — ohne Schlüssel, ohne Zahlung.",
       "demo": "GET /v1/demo",
       "health": "GET /health",
       "playgroundLink": "Im Playground testen →"
@@ -913,7 +926,7 @@
       "mcp": {
         "badge": "Weg 1 · MCP",
         "title": "Nativer MCP-Server",
-        "description": "In Claude Desktop, Cursor oder Cline einbinden. 5 Tools automatisch erkannt. Ideal für Desktop-Agenten und IDE-Assistenten.",
+        "description": "In Claude Desktop, Cursor oder Cline einbinden. 7 Tools automatisch erkannt. Ideal für Desktop-Agenten und IDE-Assistenten.",
         "tradeoff": "Stdio oder HTTP · npm oder Remote"
       },
       "apiKey": {
@@ -932,7 +945,7 @@
     "mcp": {
       "eyebrow": "Weg 1 · MCP",
       "heading": "In Claude Desktop, Cursor oder Cline installieren",
-      "description": "Der IBANforge MCP-Server stellt 5 Tools für Ihren KI-Client bereit. Zwei Transporte: stdio über npm-Paket oder remote streamable-HTTP.",
+      "description": "Der IBANforge MCP-Server stellt 7 Tools für Ihren KI-Client bereit. Zwei Transporte: stdio über npm-Paket oder remote streamable-HTTP.",
       "claudeLabel": "Stdio · Claude Desktop",
       "claudePath": "Hinzufügen zu ~/Library/Application Support/Claude/claude_desktop_config.json (macOS) oder %APPDATA%/Claude/claude_desktop_config.json (Windows).",
       "httpLabel": "HTTP · Remote-Endpunkt",
@@ -1131,7 +1144,7 @@
         },
         "agents": {
           "label": "KI-Agenten (MCP, autonome Zahlung)",
-          "ibanforge": "Nativer MCP-Server (5 Tools) + x402-Zahlung in USDC — ein Agent zahlt ohne Konto",
+          "ibanforge": "Nativer MCP-Server (7 Tools) + x402-Zahlung in USDC — ein Agent zahlt ohne Konto",
           "ibancom": "Nein",
           "ibanapi": "Nein",
           "libs": "Nein (eine Bibliothek, kein Dienst)"
@@ -1253,5 +1266,81 @@
     "leaveDone": "Dieser Schlüssel ist widerrufen. Er funktioniert nicht mehr, und seine Telemetriedaten werden in 30 Tagen gelöscht.",
     "leaveFailed": "Der Schlüssel konnte nicht widerrufen werden. Es wurde nichts geändert, er funktioniert weiterhin.",
     "leaveDpa": "Auftragsverarbeitungsvertrag lesen"
+  },
+  "sources": {
+    "meta": {
+      "title": "Quellen & Genehmigungen",
+      "description": "Aus welchen Registern jede IBANforge-Antwort stammt, unter welchen Lizenzen und Genehmigungen, und wie jede Bedingung in der Antwort selbst eingehalten wird."
+    },
+    "eyebrow": "Provenienz",
+    "hero": {
+      "title": "Jede Antwort nennt ihre Quelle",
+      "description": "Bankdaten sind genau so viel wert wie das Register, aus dem sie stammen. Deshalb trägt jede IBANforge-Antwort den Namen und das Datum des Referenzbestands, der sie erzeugt hat — und wo ein Herausgeber Bedingungen stellt, werden sie im Produkt eingehalten: die meisten reisen in der Antwort selbst mit, der Rest lebt in der Dokumentation, die sie beschreibt."
+    },
+    "principle": {
+      "title": "Drei Gewohnheiten, durch Tests gesichert",
+      "items": {
+        "0": {
+          "title": "Benannt und datiert",
+          "body": "Antworten tragen source- und as_of-Felder, die aus den geladenen Daten gelesen werden, nie von Hand geschrieben. Eine Behauptung, gemessen zu sein, muss gemessen werden."
+        },
+        "1": {
+          "title": "Abwesend, nie geraten",
+          "body": "Wenn ein Register nicht antwortet, ist das Feld null oder fehlt. Eine Abwesenheit ist eine Information, und jede Doku-Seite erklärt, was sie für dieses Register bedeutet."
+        },
+        "2": {
+          "title": "Bei jedem Push bewacht",
+          "body": "Tests brechen den Build, wenn eine servierte Zahl über den Live-Zählwert steigt, wenn eine Oberfläche eine Behörde nennt, die die mitgelieferten Daten nicht mehr stützen, oder wenn irgendeine Sprache eine Prüfung auf Kontoebene verspricht."
+        }
+      }
+    },
+    "written": {
+      "title": "Mit schriftlicher Genehmigung",
+      "sub": "Wo wir gefragt haben und der Herausgeber geantwortet hat.",
+      "boe": {
+        "name": "Bank of England — List of Banks (PRA)",
+        "body": "Genutzt mit schriftlicher Genehmigung der Bank of England (August 2026). Ihre Bedingung — Namensnennung zusammen mit dem Monat der Liste — reist in jedem pra_authorisation-Block mit, gelesen aus den geladenen Daten, damit eine Aktualisierung nie einen veralteten Vermerk zurücklässt."
+      }
+    },
+    "licences": {
+      "title": "Öffentliche Lizenzen, buchstabengetreu eingehalten",
+      "sub": "Wo die Bedingungen des Herausgebers die Weiterverwendung erlauben, wird die Bedingung eingehalten — in der Antwort, wo sie an servierte Daten gebunden ist, sonst in der Dokumentation.",
+      "items": {
+        "0": {
+          "name": "Europäische Bankenaufsichtsbehörde",
+          "body": "Der rechtliche Hinweis der EBA erlaubt die Vervielfältigung „provided the source is acknowledged“. Die PSD-Registerdaten tragen deshalb Quelle und Kopierdatum auf jeder Antwort — und werden nur dort serviert, wo die Verknüpfung zum Bankcode eines IBAN bewiesen ist, heute also Spanien."
+        },
+        "1": {
+          "name": "FATF",
+          "body": "Die FATF erlaubt die kommerzielle Nutzung ihrer Länderlisten mit Namensnennung. Die exakte Attributionszeile steht in unserer Quellen-Dokumentation, und die Pflicht wandert zur Weiterverwendung der daraus abgeleiteten Felder dieser API weiter."
+        },
+        "2": {
+          "name": "Deutsche Bundesbank",
+          "body": "Die Bankleitzahlendatei wird mit der Attribution im Wortlaut des Registers selbst genutzt — „Quelle: Deutsche Bundesbank“ — und monatlich aktualisiert."
+        },
+        "3": {
+          "name": "Europäische Zentralbank & Banco de España",
+          "body": "Beide MFI-Listen verlangen, Nutzern zu sagen, dass die Daten an der Quelle kostenlos verfügbar sind. Jeder official_identity-Block sagt das deshalb ausdrücklich: free_of_charge ist eine Lizenzbedingung, serviert als Feld."
+        }
+      }
+    },
+    "registers": {
+      "title": "Nationale Register, konsultiert und benannt",
+      "body": "Die Schweiz und Liechtenstein lösen gegen SIX BankMaster auf, Deutschland gegen die Bundesbank, Österreich gegen die OeNB, Belgien gegen die Banque nationale de Belgique, Finnland gegen Finance Finland — jeder Treffer nennt sein Register in bank_code_check.register und datiert es in as_of. Wo kein nationales Register konsultiert wird, antwortet die zusammengesetzte BIC-Karte, und die Antwort sagt, dass sie nicht massgeblich ist.",
+      "link": "Die lange Fassung, Register für Register"
+    },
+    "honest": {
+      "title": "Was wir nicht behaupten",
+      "items": {
+        "0": "Keine Kontoinhaber-Prüfung: die Validierung beweist Struktur, Prüfsumme und die Institution hinter dem Code — nie, dass ein Konto existiert oder wem es gehört.",
+        "1": "Das Sanktions-Screening arbeitet auf Bankebene (BIC8), nicht auf Namensebene, und die Compliance-Antwort wiederholt das selbst. Es ist kein reguliertes AML/CFT-Produkt.",
+        "2": "Kein „CBPR+-Konformität“-Boolean: diese Richtlinie ist für automatisierte Leser unerreichbar, und ein Verdikt, das ein ungelesenes Dokument zitiert, wäre geraten. Die Adressprüfung sagt das bei jeder Antwort.",
+        "3": "Diese Seite listet nur, was gesichert ist. Sie wächst, wenn Herausgeber antworten — nie vor ihnen."
+      }
+    },
+    "cta": {
+      "docs": "Datenquellen und Provenienz, die lange Fassung",
+      "changelog": "Was sich geändert hat, datiert: das Changelog"
+    }
   }
 }

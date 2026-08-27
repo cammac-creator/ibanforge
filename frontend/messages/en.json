@@ -37,7 +37,8 @@
       "dpa": "DPA",
       "imprint": "Legal notice",
       "compare": "Compare",
-      "account": "Your key"
+      "account": "Your key",
+      "sources": "Sources & permissions"
     },
     "copyright": "© {year} IBANforge.",
     "dataLine": "Data: GLEIF · Quelle: Deutsche Bundesbank · SIX · EBA · NBP · SwiftCodes/MIT · Bank of England (List of Banks, 2026-08) — monthly · OFAC · UN · EU · EPC — weekly"
@@ -68,7 +69,7 @@
       },
       "1": {
         "badge": "MCP-native — agent ready",
-        "title": "5 tools, no signup",
+        "title": "7 tools, no signup",
         "description": "Native Model Context Protocol server (stdio + HTTP). Claude, Cursor and any MCP agent install in one line: npx -y ibanforge-mcp."
       },
       "2": {
@@ -125,7 +126,19 @@
         "description": "Swiss BC-Nummer lookup (SIX BankMaster)"
       },
       "heading": "Endpoints & pricing",
-      "subtitle": "Start free with 200 requests a month. Pay as you grow — by card or in USDC."
+      "subtitle": "Start free with 200 requests a month. Pay as you grow — by card or in USDC.",
+      "5": {
+        "method": "GET",
+        "path": "/v1/reference/validate",
+        "cost": "Free",
+        "description": "Payment reference check: RF/ISO 11649, Swiss QRR, Belgian OGM, Finnish viitenumero — sourced verdicts"
+      },
+      "6": {
+        "method": "POST",
+        "path": "/v1/address/check",
+        "cost": "Free",
+        "description": "ISO 20022 address rules (SPS, T2, Fedwire) ahead of the November 2026 changes"
+      }
     },
     "quickStart": {
       "heading": "Quick start",
@@ -219,7 +232,7 @@
       "sub": "This page speaks robot too — every claim above is machine-readable, and every endpoint is payable without a human in the loop.",
       "illoAlt": "A robotic arm dropping one glowing coin into a payment slot",
       "mcpTitle": "MCP-native",
-      "mcpBody": "5 tools, no signup. Claude, Cursor and any MCP agent install in one line:",
+      "mcpBody": "7 tools, no signup. Claude, Cursor and any MCP agent install in one line:",
       "x402Title": "x402 micropayments",
       "x402Body": "Autonomous agents pay per request in USDC — no account, no checkout, settlement on-chain.",
       "docsTitle": "Machine-readable docs",
@@ -286,7 +299,7 @@
     },
     "free": {
       "title": "Free endpoints",
-      "description": "<demo>GET /v1/demo</demo> and <health>GET /health</health> are always free — no payment required.",
+      "description": "<demo>GET /v1/demo</demo>, <health>GET /health</health>, <refs>/v1/reference/validate</refs> (payment references: RF, Swiss QRR, Belgian OGM, Finnish viitenumero — with sourced verdicts) and <addr>POST /v1/address/check</addr> (ISO 20022 address rules for SPS, T2 and Fedwire) are always free — no key, no payment.",
       "demo": "GET /v1/demo",
       "health": "GET /health",
       "playgroundLink": "Try in playground →"
@@ -913,7 +926,7 @@
       "mcp": {
         "badge": "Path 1 · MCP",
         "title": "Native MCP server",
-        "description": "Drop into Claude Desktop, Cursor, or Cline. 5 tools auto-discovered. Best for desktop agents and IDE assistants.",
+        "description": "Drop into Claude Desktop, Cursor, or Cline. 7 tools auto-discovered. Best for desktop agents and IDE assistants.",
         "tradeoff": "Stdio or HTTP · npm or remote"
       },
       "apiKey": {
@@ -932,12 +945,12 @@
     "mcp": {
       "eyebrow": "Path 1 · MCP",
       "heading": "Install in Claude Desktop, Cursor or Cline",
-      "description": "The IBANforge MCP server exposes 5 tools to your AI client. Two transports: stdio via npm package or remote streamable-HTTP.",
+      "description": "The IBANforge MCP server exposes 7 tools to your AI client. Two transports: stdio via npm package or remote streamable-HTTP.",
       "claudeLabel": "Stdio · Claude Desktop",
       "claudePath": "Add to ~/Library/Application Support/Claude/claude_desktop_config.json (macOS) or %APPDATA%/Claude/claude_desktop_config.json (Windows).",
       "httpLabel": "HTTP · remote endpoint",
       "httpDescription": "Point any MCP-compatible client to:",
-      "toolsHeading": "5 tools available"
+      "toolsHeading": "7 tools available"
     },
     "apiKey": {
       "eyebrow": "Path 2 · Free key",
@@ -1131,7 +1144,7 @@
         },
         "agents": {
           "label": "AI agents (MCP, autonomous payment)",
-          "ibanforge": "Native MCP server (5 tools) + x402 pay-per-call in USDC — an agent can pay without an account",
+          "ibanforge": "Native MCP server (7 tools) + x402 pay-per-call in USDC — an agent can pay without an account",
           "ibancom": "No",
           "ibanapi": "No",
           "libs": "No (a library, not a service)"
@@ -1253,5 +1266,81 @@
     "leaveDone": "This key is revoked. It will not work again, and its telemetry is deleted in 30 days.",
     "leaveFailed": "The key could not be revoked. Nothing changed and it still works.",
     "leaveDpa": "Read the data processing agreement"
+  },
+  "sources": {
+    "meta": {
+      "title": "Sources & permissions",
+      "description": "Which registers every IBANforge answer comes from, under which licences and permissions, and how each condition is honoured inside the response itself."
+    },
+    "eyebrow": "Provenance",
+    "hero": {
+      "title": "Every answer names its source",
+      "description": "Bank data is worth exactly as much as the register it comes from. That is why every IBANforge response carries the name and the date of the reference set that produced it — and where a publisher attaches conditions, they are honoured in the product: most travel inside the response itself, the rest live in the documentation that describes it."
+    },
+    "principle": {
+      "title": "Three habits, enforced by tests",
+      "items": {
+        "0": {
+          "title": "Named and dated",
+          "body": "Responses carry source and as_of fields read from the loaded data, never written by hand. A claim about being measured has to be measured."
+        },
+        "1": {
+          "title": "Absent, never guessed",
+          "body": "When a register does not answer, the field is null or absent. An absence is information, and each docs page spells out what it means for that register."
+        },
+        "2": {
+          "title": "Guarded on every push",
+          "body": "Tests fail the build if a served figure drifts above the live count, if a surface names an authority the shipped data no longer supports, or if any language promises account-level verification."
+        }
+      }
+    },
+    "written": {
+      "title": "With written permission",
+      "sub": "Where we asked, and the publisher answered.",
+      "boe": {
+        "name": "Bank of England — List of Banks (PRA)",
+        "body": "Used with the Bank of England's written permission (August 2026). Its condition — attribution together with the month of the list — travels inside every pra_authorisation block, read from the loaded data so a refresh can never leave a stale credit behind."
+      }
+    },
+    "licences": {
+      "title": "Public licences, honoured to the letter",
+      "sub": "Where the publisher's own terms authorise reuse, the condition is honoured — inside the response where it binds to served data, in the documentation otherwise.",
+      "items": {
+        "0": {
+          "name": "European Banking Authority",
+          "body": "The EBA's legal notice authorises reproduction “provided the source is acknowledged”. The PSD register data therefore carries its source and copy date on every answer — and it is served only where the join to an IBAN's bank code is proven, which today means Spain."
+        },
+        "1": {
+          "name": "FATF",
+          "body": "The FATF permits commercial use of its country-list data with credit. The exact attribution line is published in our data-sources documentation, and the requirement carries onward to reuse of this API's FATF-derived fields."
+        },
+        "2": {
+          "name": "Deutsche Bundesbank",
+          "body": "The Bankleitzahl file is used with the attribution in the register's own wording — “Quelle: Deutsche Bundesbank” — and refreshed monthly."
+        },
+        "3": {
+          "name": "European Central Bank & Banco de España",
+          "body": "Both MFI lists require telling users the data is available free of charge at the source. Every official_identity block therefore says so explicitly: free_of_charge is a licence condition served as a field."
+        }
+      }
+    },
+    "registers": {
+      "title": "National registers, consulted and named",
+      "body": "Switzerland and Liechtenstein resolve against SIX BankMaster, Germany against the Bundesbank, Austria against the OeNB, Belgium against the Banque nationale de Belgique, Finland against Finance Finland — each hit names its register in bank_code_check.register and dates it in as_of. Where no national register is consulted, the composite BIC map answers instead, and the response says it is not authoritative.",
+      "link": "The long version, register by register"
+    },
+    "honest": {
+      "title": "What we do not claim",
+      "items": {
+        "0": "No account-holder verification: validation proves structure, checksum and the institution behind the code — never that an account exists or who holds it.",
+        "1": "Sanctions screening is at bank level (BIC8), not name level, and the compliance response repeats this itself. It is not a regulated AML/CFT product.",
+        "2": "No “CBPR+ conformity” boolean: that guideline is unreachable to automated readers, and a verdict quoting an unread document would be a guess. The address check says so on every answer.",
+        "3": "This page lists only what is settled. It grows as publishers answer — never ahead of them."
+      }
+    },
+    "cta": {
+      "docs": "Data sources & provenance, the long version",
+      "changelog": "What changed, dated: the changelog"
+    }
   }
 }

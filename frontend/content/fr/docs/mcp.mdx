@@ -1,6 +1,6 @@
 ---
 title: "Intégration MCP"
-description: "Connecter IBANforge à Claude, Cursor et tout agent MCP : le paquet npm ibanforge-mcp, un endpoint hébergé sans installation, six outils, et des résultats qui disent quoi faire ensuite."
+description: "Connecter IBANforge à Claude, Cursor et tout agent MCP : le paquet npm ibanforge-mcp, un endpoint hébergé sans installation, sept outils, et des résultats qui disent quoi faire ensuite."
 order: 5
 ---
 
@@ -52,7 +52,7 @@ Transport HTTP streamable, **10 appels d'outils gratuits par IP et par jour**, s
 
 Sur le registre MCP officiel, le serveur est listé sous `io.github.cammac-creator/ibanforge`.
 
-## Les six outils
+## Les sept outils
 
 ### validate_iban
 
@@ -104,6 +104,14 @@ Valide une référence de paiement structurée — RF/ISO 11649 (`SCOR`), réfé
 { "reference": "210000000003139471430009017", "iban": "CH4431999123000889012" }
 ```
 
+### check_postal_address
+
+Contrôle une adresse postale ISO 20022 structurée contre les règles publiées d'un rail de paiement — `sps` (Swiss Payment Standards), `hvps_plus` (T2) ou `fedwire` — règle par règle, chaque constat citant le document et sa date de validité. Gratuit ; même contrat que `POST /v1/address/check`. Il n'y a volontairement pas de schéma `cbpr+` : cette directive est inaccessible aux lecteurs automatisés, et le champ `note` de la réponse le rappelle à chaque appel.
+
+```json
+{ "scheme": "sps", "address": { "strt_nm": "Bahnhofstrasse", "bldg_nb": "45", "pst_cd": "8001", "twn_nm": "Zurich", "ctry": "CH" } }
+```
+
 ## Des résultats qui disent quoi faire ensuite
 
 Chaque résultat de validation porte un champ `next_steps` ordonné : ce qui bloque un paiement d'abord, ce qui l'enrichit ensuite. Chaque entrée a un `code` stable sur lequel brancher, une phrase `do` que l'agent peut relayer, et un `because` qui nomme le champ de la réponse qui l'a produite — le conseil est auditable au lieu d'être cru sur parole. `bank_code_not_allocated` veut dire stop ; `verify_payee_name` veut dire continuer et laisser trancher un contrôle du nom du bénéficiaire.
@@ -138,7 +146,7 @@ Chaque résultat de validation porte un champ `next_steps` ordonné : ce qui blo
 ## Notes
 
 - Le paquet npm est un client léger de `api.ibanforge.com` : la donnée vit côté serveur, rien à télécharger, et les résultats reflètent toujours le dernier rafraîchissement des registres.
-- Les six outils rendent le même JSON que l'API REST, en texte et en `structuredContent` MCP.
+- Les sept outils rendent le même JSON que l'API REST, en texte et en `structuredContent` MCP.
 - Les versions sont publiées sur [npm](https://www.npmjs.com/package/ibanforge-mcp) et reflétées sur le registre MCP.
 
 Voir aussi : [Recettes](/docs/recipes) · [Ce que « verified » veut dire](/docs/iban-validate) · [Sources des données](/docs/data-sources)

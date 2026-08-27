@@ -87,6 +87,7 @@ function countOf(id: SurfaceId, kind: 'registerResource' | 'registerPrompt'): nu
 const CONTRACT_TOOLS = [
   'batch_validate_iban',
   'check_compliance',
+  'check_postal_address',
   'lookup_bic',
   'lookup_ch_clearing',
   'send_feedback',

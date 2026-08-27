@@ -15,7 +15,7 @@ describe('mcpCard — MCP server card + discovery aliases', () => {
     const body = (await res.json()) as { name: string; tools: unknown[] };
     expect(body.name).toBe('IBANforge');
     expect(Array.isArray(body.tools)).toBe(true);
-    expect(body.tools).toHaveLength(6);
+    expect(body.tools).toHaveLength(7);
   });
 
   it('serves the same card on the /.well-known/mcp.json alias', async () => {

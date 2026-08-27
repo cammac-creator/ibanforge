@@ -16,7 +16,7 @@ import {
 // the EN default.
 
 const FEATURE_COUNT = 6
-const ENDPOINT_COUNT = 5
+const ENDPOINT_COUNT = 7
 
 /* Ambient ember particles — the logo's rising bars, scattered. Static SVG
    markup as trusted constants; the drift animation is CSS, js+motion gated. */

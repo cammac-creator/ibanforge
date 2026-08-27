@@ -1,6 +1,8 @@
 {
   "$schema": "https://glama.ai/mcp/schemas/server.json",
-  "maintainers": ["cammac-creator"],
+  "maintainers": [
+    "cammac-creator"
+  ],
   "name": "IBANforge",
   "description": "Pre-payout screening for AI agents — check the bank behind a counterparty IBAN before you send funds: IBAN validation, BIC/SWIFT lookup, Swiss BC-Nummer clearing, sanctions screening (OFAC) + SEPA/VoP reachability and risk scoring. 121k+ BIC entries (39k+ LEI-enriched via GLEIF; additional rows from SWIFT directory, Bundesbank, SIX, NBP, EBA Step2 SCT), 1,100+ Swiss clearing entries from SIX BankMaster (refreshed monthly), 89 countries. MCP-native + x402 micropayments on Base L2, free tier.",
   "homepage": "https://ibanforge.com",
@@ -48,6 +50,14 @@
     {
       "name": "lookup_ch_clearing",
       "description": "Look up a Swiss BC-Nummer / IID with full payment-rail participation (SIC, euroSIC, CHF instant), QR-IID and institution type — 1,100+ entries from SIX BankMaster ($0.003)"
+    },
+    {
+      "name": "validate_payment_reference",
+      "description": "Validate a structured payment reference — RF/ISO 11649, Swiss QRR, Belgian OGM/VCS, Finnish viitenumero — with the QRR↔QR-IBAN pairing verdict when an IBAN is supplied (free)"
+    },
+    {
+      "name": "check_postal_address",
+      "description": "Check a structured ISO 20022 postal address against SPS (SIX), HVPS+/T2 or Fedwire rules ahead of the November 2026 changes — every finding cites its source document (free)"
     }
   ]
 }

@@ -2,13 +2,14 @@
 /**
  * IBANforge MCP Server
  *
- * Exposes 7 tools backed by the IBANforge HTTP API (api.ibanforge.com):
+ * Exposes 8 tools backed by the IBANforge HTTP API (api.ibanforge.com):
  *   - validate_iban
  *   - batch_validate_iban
  *   - lookup_bic
  *   - lookup_ch_clearing
  *   - check_compliance
  *   - validate_payment_reference
+ *   - check_postal_address
  *   - send_feedback
  *
  * `send_feedback` was HTTP-only until 21/08/2026 (audit B3): npm is the main
@@ -476,6 +477,70 @@ const TOOLS: Tool[] = [
     },
   },
   {
+    name: 'check_postal_address',
+    title: 'Check ISO 20022 Postal Address',
+    annotations: { title: 'Check ISO 20022 Postal Address', ...READ_ONLY },
+    description:
+      "Check a structured ISO 20022 postal address against a payment rail's published address rules, rule by rule, each verdict citing the document it comes from. " +
+      'USE WHEN: assembling a payment instruction (pain.001, a Fedwire message, a T2 transfer) with a creditor or debtor address, to learn whether the rail accepts it BEFORE submitting. The November 2026 changes (SIC 20.11, Fedwire 16.11, T2 R2026.NOV) remove the fully unstructured address option — this check tells you whether an address survives them. ' +
+      'DO NOT USE to verify that a street or town EXISTS: this checks conformity with the message format rules, not postal reality. ' +
+      "SCHEMES: 'sps' (Swiss Payment Standards, SIX), 'hvps_plus' (HVPS+ / T2, ECB), 'fedwire' (Federal Reserve). There is deliberately NO 'cbpr+' scheme: that guideline sits behind swift.com, unreachable to automated readers, and a conformity boolean quoting an unread document would be a guess dressed as a verdict — the note field restates this on every answer. " +
+      'VERDICTS per finding: pass, fail, not_applicable — the last marks a rule whose precondition is not met and never counts as a pass. conforms is true when no finding failed. ' +
+      "IMPORTANT: relay each finding's source string — it names the exact document, version and validity date the rule is quoted from. That is what makes the verdict auditable. " +
+      'COST: free (routed to POST /v1/address/check). The paid surface is the postal_address block that lookup_bic and validate_iban return for the resolved institution.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        scheme: {
+          type: 'string',
+          enum: ['sps', 'hvps_plus', 'fedwire'],
+          description: "Which rail's rules to check against.",
+        },
+        address: {
+          type: 'object',
+          description: 'The ISO 20022 PostalAddress under test, in ISO tag vocabulary (snake_cased).',
+          properties: {
+            twn_nm: { type: 'string', description: 'TwnNm — town name.' },
+            ctry: { type: 'string', description: 'Ctry — ISO 3166-1 alpha-2 country code.' },
+            pst_cd: { type: 'string', description: 'PstCd — postal code.' },
+            strt_nm: { type: 'string', description: 'StrtNm — street name.' },
+            bldg_nb: { type: 'string', description: 'BldgNb — building number.' },
+            adr_tp: { type: 'string', description: 'AdrTp — address type (SPS forbids sending it).' },
+            adr_line: { type: 'array', items: { type: 'string' }, description: 'AdrLine — free-text lines of the hybrid address.' },
+          },
+        },
+      },
+      required: ['scheme', 'address'],
+    },
+    outputSchema: {
+      type: 'object',
+      description: 'Rule-by-rule conformity verdict for one rail.',
+      properties: {
+        scheme: { type: 'string', enum: ['sps', 'hvps_plus', 'fedwire'] },
+        conforms: {
+          type: 'boolean',
+          description: 'True when no finding failed. not_applicable findings never count against it.',
+        },
+        findings: {
+          type: 'array',
+          description: 'One entry per rule of the scheme, in a stable order.',
+          items: {
+            type: 'object',
+            properties: {
+              rule: { type: 'string', description: 'Stable identifier, safe to branch on.' },
+              verdict: { type: 'string', enum: ['pass', 'fail', 'not_applicable'] },
+              detail: { type: 'string', description: 'What was looked at and what was concluded.' },
+              source: { type: 'string', description: 'The document the rule comes from, with its date. Relay it.' },
+            },
+            required: ['rule', 'verdict', 'detail', 'source'],
+          },
+        },
+        note: { type: 'string', description: "Why 'cbpr+' is not on the menu. Served on every answer." },
+      },
+      required: ['scheme', 'conforms', 'findings', 'note'],
+    },
+  },
+  {
     name: 'check_compliance',
     title: 'Compliance Check',
     annotations: { title: 'Compliance Check', ...READ_ONLY },
@@ -795,7 +860,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'check_compliance': {
         if (typeof a.iban !== 'string' || !a.iban.trim()) {
-          return out({ error: 'invalid_input', message: 'Argument `iban` must be a non-empty string.' });
+          return fail({ error: 'invalid_input', message: 'Argument `iban` must be a non-empty string.' });
         }
         const result = await apiCall('POST', '/v1/iban/compliance', { iban: a.iban });
         return relay(result);
@@ -803,7 +868,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       case 'validate_payment_reference': {
         if (typeof a.reference !== 'string' || !a.reference.trim()) {
-          return out({ error: 'invalid_input', message: 'Argument `reference` must be a non-empty string.' });
+          return fail({ error: 'invalid_input', message: 'Argument `reference` must be a non-empty string.' });
         }
         // Two rails, because the pairing verdict is the paid half. Without an
         // IBAN there is nothing to pair against, so the free endpoint answers
@@ -826,6 +891,17 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const query = new URLSearchParams({ reference: a.reference });
         if (typeof a.reference_type === 'string') query.set('reference_type', a.reference_type);
         const result = await apiCall('GET', `/v1/reference/validate?${query.toString()}`);
+        return relay(result);
+      }
+
+      case 'check_postal_address': {
+        if (typeof a.scheme !== 'string' || !a.scheme.trim()) {
+          return fail({ error: 'invalid_input', message: 'Argument `scheme` must be one of sps, hvps_plus, fedwire.' });
+        }
+        if (a.address === null || typeof a.address !== 'object' || Array.isArray(a.address)) {
+          return fail({ error: 'invalid_input', message: 'Argument `address` must be an object of ISO 20022 tags (twn_nm, ctry, pst_cd, strt_nm, bldg_nb, adr_tp, adr_line[]).' });
+        }
+        const result = await apiCall('POST', '/v1/address/check', { scheme: a.scheme, address: a.address });
         return relay(result);
       }
 
@@ -874,4 +950,4 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 const transport = new StdioServerTransport();
 await server.connect(transport);
 
-process.stderr.write('IBANforge MCP server ready (stdio). 7 tools exposed.\n');
+process.stderr.write('IBANforge MCP server ready (stdio). 8 tools exposed.\n');

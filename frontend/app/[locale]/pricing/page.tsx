@@ -243,6 +243,16 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
                     {chunks}
                   </code>
                 ),
+                refs: (chunks) => (
+                  <code className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded">
+                    {chunks}
+                  </code>
+                ),
+                addr: (chunks) => (
+                  <code className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded">
+                    {chunks}
+                  </code>
+                ),
               })}
             </p>
           </div>

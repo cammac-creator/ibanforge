@@ -105,6 +105,7 @@ describe('GET /mcp (no session) — discovery hint', () => {
       'lookup_ch_clearing',
       'check_compliance',
       'validate_payment_reference',
+      'check_postal_address',
     ]);
   });
 });
@@ -118,9 +119,9 @@ describe('POST /mcp — full handshake', () => {
     const listResp = await rpc(app, sessionId, 'tools/list');
     expect(listResp.error).toBeUndefined();
     const tools = (listResp.result as { tools: Array<{ name: string; outputSchema?: unknown; inputSchema?: unknown }> }).tools;
-    expect(tools).toHaveLength(7);
+    expect(tools).toHaveLength(8);
 
-    const expectedNames = ['validate_iban', 'batch_validate_iban', 'lookup_bic', 'check_compliance', 'lookup_ch_clearing', 'send_feedback', 'validate_payment_reference'];
+    const expectedNames = ['validate_iban', 'batch_validate_iban', 'lookup_bic', 'check_compliance', 'lookup_ch_clearing', 'send_feedback', 'validate_payment_reference', 'check_postal_address'];
     for (const expected of expectedNames) {
       const tool = tools.find((t) => t.name === expected);
       expect(tool, `tool ${expected} should be registered`).toBeDefined();
@@ -180,6 +181,44 @@ describe('POST /mcp — full handshake', () => {
     expect(result.structuredContent).toBeDefined();
     expect(result.structuredContent!.pairing).toBe('qrr_requires_qr_iban');
     expect(result.structuredContent!.pairing_source).toBeTruthy();
+  });
+
+  it('tools/call check_postal_address keeps findings and their sources through the schema', async () => {
+    const app = makeApp();
+    const sessionId = await initialize(app);
+    const callResp = await rpc(app, sessionId, 'tools/call', {
+      name: 'check_postal_address',
+      arguments: {
+        scheme: 'sps',
+        address: { strt_nm: 'Bahnhofstrasse', bldg_nb: '45', pst_cd: '8001', twn_nm: 'Zurich', ctry: 'CH' },
+      },
+    });
+    expect(callResp.error).toBeUndefined();
+    const result = callResp.result as { structuredContent?: Record<string, unknown> };
+    expect(result.structuredContent, 'schema mismatch silently drops this').toBeDefined();
+    expect(result.structuredContent!.conforms).toBe(true);
+    const findings = result.structuredContent!.findings as Array<Record<string, unknown>>;
+    expect(findings.length).toBeGreaterThan(0);
+    // The provenance must survive the schema — it is the point of the feature.
+    for (const f of findings) {
+      expect(f.source, `finding ${String(f.rule)} lost its source`).toBeTruthy();
+      expect(f.detail, `finding ${String(f.rule)} lost its detail`).toBeTruthy();
+    }
+    expect(result.structuredContent!.note).toBeTruthy();
+  });
+
+  it('tools/call check_postal_address fails a townless SPS address, with the rule named', async () => {
+    const app = makeApp();
+    const sessionId = await initialize(app);
+    const callResp = await rpc(app, sessionId, 'tools/call', {
+      name: 'check_postal_address',
+      arguments: { scheme: 'sps', address: { strt_nm: 'Bahnhofstrasse', ctry: 'CH' } },
+    });
+    expect(callResp.error).toBeUndefined();
+    const result = callResp.result as { structuredContent?: Record<string, unknown> };
+    expect(result.structuredContent!.conforms).toBe(false);
+    const findings = result.structuredContent!.findings as Array<{ rule: string; verdict: string }>;
+    expect(findings.find((f) => f.rule === 'twn_nm_required')?.verdict).toBe('fail');
   });
 
   it('tools/call validate_payment_reference answers null, never false, for a KID', async () => {

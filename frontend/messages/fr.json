@@ -37,7 +37,8 @@
       "dpa": "DPA",
       "imprint": "Mentions légales",
       "compare": "Comparatif",
-      "account": "Votre clé"
+      "account": "Votre clé",
+      "sources": "Sources et permissions"
     },
     "copyright": "© {year} IBANforge.",
     "dataLine": "Données : GLEIF · Quelle: Deutsche Bundesbank · SIX · EBA · NBP · SwiftCodes/MIT · Bank of England (List of Banks, 2026-08) — mensuel · OFAC · UN · UE · EPC — hebdomadaire"
@@ -68,7 +69,7 @@
       },
       "1": {
         "badge": "MCP-native — pour agents",
-        "title": "5 outils, sans inscription",
+        "title": "7 outils, sans inscription",
         "description": "Serveur Model Context Protocol natif (stdio + HTTP). Claude, Cursor et tout agent MCP s’installent en une ligne : npx -y ibanforge-mcp."
       },
       "2": {
@@ -125,7 +126,19 @@
         "description": "Recherche BC-Numéro suisse (SIX BankMaster)"
       },
       "heading": "Endpoints et tarifs",
-      "subtitle": "Commencez avec 200 requêtes gratuites par mois. Payez à mesure que vous grandissez — par carte ou en USDC."
+      "subtitle": "Commencez avec 200 requêtes gratuites par mois. Payez à mesure que vous grandissez — par carte ou en USDC.",
+      "5": {
+        "method": "GET",
+        "path": "/v1/reference/validate",
+        "cost": "Gratuit",
+        "description": "Contrôle de référence de paiement : RF/ISO 11649, QRR suisse, OGM belge, viitenumero finlandais — verdicts sourcés"
+      },
+      "6": {
+        "method": "POST",
+        "path": "/v1/address/check",
+        "cost": "Gratuit",
+        "description": "Règles d'adresses ISO 20022 (SPS, T2, Fedwire) avant les échéances de novembre 2026"
+      }
     },
     "quickStart": {
       "heading": "Démarrage rapide",
@@ -219,7 +232,7 @@
       "sub": "Cette page parle aussi robot — chaque affirmation ci-dessus est lisible par machine, et chaque endpoint est payable sans humain dans la boucle.",
       "illoAlt": "Un bras robotique dépose une pièce incandescente dans une fente de paiement",
       "mcpTitle": "MCP natif",
-      "mcpBody": "5 outils, sans inscription. Claude, Cursor et tout agent MCP s'installent en une ligne :",
+      "mcpBody": "7 outils, sans inscription. Claude, Cursor et tout agent MCP s'installent en une ligne :",
       "x402Title": "Micropaiements x402",
       "x402Body": "Les agents autonomes paient à la requête en USDC — sans compte, sans checkout, règlement on-chain.",
       "docsTitle": "Docs lisibles par machine",
@@ -286,7 +299,7 @@
     },
     "free": {
       "title": "Endpoints gratuits",
-      "description": "<demo>GET /v1/demo</demo> et <health>GET /health</health> sont toujours gratuits — aucun paiement requis.",
+      "description": "<demo>GET /v1/demo</demo>, <health>GET /health</health>, <refs>/v1/reference/validate</refs> (références de paiement : RF, QRR suisse, OGM belge, viitenumero finlandais — verdicts sourcés) et <addr>POST /v1/address/check</addr> (règles d'adresses ISO 20022 pour SPS, T2 et Fedwire) sont toujours gratuits — sans clé ni paiement.",
       "demo": "GET /v1/demo",
       "health": "GET /health",
       "playgroundLink": "Essayer dans le playground →"
@@ -913,7 +926,7 @@
       "mcp": {
         "badge": "Voie 1 · MCP",
         "title": "Serveur MCP natif",
-        "description": "Branchez-le sur Claude Desktop, Cursor ou Cline. 5 outils auto-découverts. Idéal pour les agents desktop et les assistants IDE.",
+        "description": "Branchez-le sur Claude Desktop, Cursor ou Cline. 7 outils auto-découverts. Idéal pour les agents desktop et les assistants IDE.",
         "tradeoff": "Stdio ou HTTP · npm ou distant"
       },
       "apiKey": {
@@ -932,12 +945,12 @@
     "mcp": {
       "eyebrow": "Voie 1 · MCP",
       "heading": "Installer dans Claude Desktop, Cursor ou Cline",
-      "description": "Le serveur MCP IBANforge expose 5 outils à votre client IA. Deux transports : stdio via package npm ou HTTP streamable distant.",
+      "description": "Le serveur MCP IBANforge expose 7 outils à votre client IA. Deux transports : stdio via package npm ou HTTP streamable distant.",
       "claudeLabel": "Stdio · Claude Desktop",
       "claudePath": "Ajouter à ~/Library/Application Support/Claude/claude_desktop_config.json (macOS) ou %APPDATA%/Claude/claude_desktop_config.json (Windows).",
       "httpLabel": "HTTP · endpoint distant",
       "httpDescription": "Pointez n'importe quel client MCP compatible vers :",
-      "toolsHeading": "5 outils disponibles"
+      "toolsHeading": "7 outils disponibles"
     },
     "apiKey": {
       "eyebrow": "Voie 2 · Clé gratuite",
@@ -1131,7 +1144,7 @@
         },
         "agents": {
           "label": "Agents IA (MCP, paiement autonome)",
-          "ibanforge": "Serveur MCP natif (5 outils) + paiement x402 en USDC : un agent paie sans compte",
+          "ibanforge": "Serveur MCP natif (7 outils) + paiement x402 en USDC : un agent paie sans compte",
           "ibancom": "Non",
           "ibanapi": "Non",
           "libs": "Non (une bibliothèque, pas un service)"
@@ -1253,5 +1266,81 @@
     "leaveDone": "Cette clé est révoquée. Elle ne fonctionnera plus, et ses données de télémétrie seront supprimées dans 30 jours.",
     "leaveFailed": "La clé n'a pas pu être révoquée. Rien n'a changé, elle fonctionne toujours.",
     "leaveDpa": "Lire l'accord de traitement des données"
+  },
+  "sources": {
+    "meta": {
+      "title": "Sources et permissions",
+      "description": "De quels registres vient chaque réponse d'IBANforge, sous quelles licences et permissions, et comment chaque condition est honorée dans la réponse elle-même."
+    },
+    "eyebrow": "Provenance",
+    "hero": {
+      "title": "Chaque réponse cite sa source",
+      "description": "Une donnée bancaire vaut exactement ce que vaut le registre dont elle sort. C'est pourquoi chaque réponse d'IBANforge porte le nom et la date du jeu de référence qui l'a produite — et quand un éditeur attache des conditions, elles sont honorées dans le produit : la plupart voyagent dans la réponse elle-même, le reste vit dans la documentation qui la décrit."
+    },
+    "principle": {
+      "title": "Trois habitudes, verrouillées par des tests",
+      "items": {
+        "0": {
+          "title": "Nommée et datée",
+          "body": "Les réponses portent des champs source et as_of lus dans les données chargées, jamais écrits à la main. Une affirmation qui se dit mesurée doit être mesurée."
+        },
+        "1": {
+          "title": "Absente, jamais devinée",
+          "body": "Quand un registre ne répond pas, le champ est null ou absent. Une absence est une information, et chaque page de doc précise ce qu'elle signifie pour ce registre."
+        },
+        "2": {
+          "title": "Gardée à chaque push",
+          "body": "Des tests cassent le build si un chiffre servi dépasse le compte réel, si une surface nomme une autorité que les données embarquées ne soutiennent plus, ou si une langue promet une vérification au niveau du compte."
+        }
+      }
+    },
+    "written": {
+      "title": "Avec permission écrite",
+      "sub": "Là où nous avons demandé, et où l'éditeur a répondu.",
+      "boe": {
+        "name": "Bank of England — List of Banks (PRA)",
+        "body": "Utilisée avec la permission écrite de la Bank of England (août 2026). Sa condition — l'attribution accompagnée du mois de la liste — voyage dans chaque bloc pra_authorisation, lue dans les données chargées pour qu'un rafraîchissement ne laisse jamais une attribution périmée."
+      }
+    },
+    "licences": {
+      "title": "Des licences publiques, honorées à la lettre",
+      "sub": "Là où les conditions de l'éditeur autorisent la réutilisation, la condition est honorée — dans la réponse quand elle s'attache à la donnée servie, dans la documentation sinon.",
+      "items": {
+        "0": {
+          "name": "Autorité bancaire européenne",
+          "body": "La mention légale de l'EBA autorise la reproduction « provided the source is acknowledged ». Les données du registre PSD portent donc leur source et leur date de copie sur chaque réponse — et ne sont servies que là où la jointure vers le code banque d'un IBAN est prouvée, c'est-à-dire aujourd'hui l'Espagne."
+        },
+        "1": {
+          "name": "GAFI",
+          "body": "Le GAFI permet l'usage commercial de ses listes de pays à condition d'en citer la source. La ligne d'attribution exacte est publiée dans notre documentation des sources, et l'exigence se transmet à la réutilisation des champs de cette API qui en dérivent."
+        },
+        "2": {
+          "name": "Deutsche Bundesbank",
+          "body": "Le fichier des Bankleitzahlen est utilisé avec l'attribution dans les termes du registre lui-même — « Quelle: Deutsche Bundesbank » — et rafraîchi chaque mois."
+        },
+        "3": {
+          "name": "Banque centrale européenne et Banco de España",
+          "body": "Les deux listes d'IFM exigent de dire aux utilisateurs que la donnée est disponible gratuitement à la source. Chaque bloc official_identity le dit donc explicitement : free_of_charge est une condition de licence servie comme un champ."
+        }
+      }
+    },
+    "registers": {
+      "title": "Des registres nationaux, consultés et nommés",
+      "body": "La Suisse et le Liechtenstein se résolvent contre SIX BankMaster, l'Allemagne contre la Bundesbank, l'Autriche contre l'OeNB, la Belgique contre la Banque nationale de Belgique, la Finlande contre Finance Finland — chaque correspondance nomme son registre dans bank_code_check.register et le date dans as_of. Là où aucun registre national n'est consulté, la carte BIC composite répond à la place, et la réponse dit qu'elle ne fait pas autorité.",
+      "link": "La version longue, registre par registre"
+    },
+    "honest": {
+      "title": "Ce que nous ne prétendons pas",
+      "items": {
+        "0": "Pas de vérification du titulaire : la validation prouve la structure, la somme de contrôle et l'institution derrière le code — jamais qu'un compte existe ni qui le détient.",
+        "1": "Le filtrage sanctions est au niveau de la banque (BIC8), pas du nom, et la réponse compliance le répète elle-même. Ce n'est pas un produit AML/CFT réglementé.",
+        "2": "Pas de booléen « conformité CBPR+ » : cette directive est inaccessible aux lecteurs automatisés, et un verdict citant un document non lu serait une devinette. Le contrôle d'adresse le dit à chaque réponse.",
+        "3": "Cette page ne liste que ce qui est acquis. Elle s'allonge à mesure que les éditeurs répondent — jamais avant eux."
+      }
+    },
+    "cta": {
+      "docs": "Sources de données et provenance, la version longue",
+      "changelog": "Ce qui a changé, daté : le changelog"
+    }
   }
 }

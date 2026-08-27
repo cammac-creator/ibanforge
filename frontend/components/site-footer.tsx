@@ -37,6 +37,7 @@ export function SiteFooter() {
     {
       title: t("column.legal"),
       links: [
+        { href: `/${locale}/sources`, label: t("link.sources") },
         { href: `/${locale}/legal/terms`, label: t("link.terms") },
         { href: `/${locale}/legal/privacy`, label: t("link.privacy") },
         { href: `/${locale}/legal/dpa`, label: t("link.dpa") },

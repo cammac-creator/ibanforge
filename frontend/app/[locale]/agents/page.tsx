@@ -116,6 +116,16 @@ const TOOLS = [
     price: "$0.02",
     description: "Pre-flight risk triage: sanctions (OFAC), FATF, SEPA Instant, VoP. Returns risk_score 0-100.",
   },
+  {
+    name: "validate_payment_reference",
+    price: "Free",
+    description: "Payment reference checksums — RF/ISO 11649, Swiss QRR, Belgian OGM, Finnish viitenumero — each judged against the dated document that publishes the rule. Add an IBAN for the QRR↔QR-IBAN pairing verdict.",
+  },
+  {
+    name: "check_postal_address",
+    price: "Free",
+    description: "ISO 20022 postal address rules for SPS, T2 and Fedwire ahead of the November 2026 changes — every finding cites its source document.",
+  },
 ];
 
 export default async function AgentsPage({

@@ -10,6 +10,8 @@ order: 0
 
 IBANforge is a fast, reliable API for **IBAN validation** and **BIC/SWIFT lookup**. It covers 89 countries with real-time checksum verification, BBAN structure parsing, enriched institution data from GLEIF, **SEPA compliance info**, **issuer classification** (bank vs. EMI/neobank), **sanctions & compliance screening** with a 0–100 risk score, and exclusive **Swiss clearing (BC-Nummer)** data from SIX BankMaster.
 
+> **Start free, without even a key.** Two endpoints solve a whole problem at no cost: [`/v1/reference/validate`](/docs/swiss-qr-iban) checks payment references (RF/ISO 11649, Swiss QRR, Belgian OGM, Finnish viitenumero) with a sourced verdict, and [`/v1/address/check`](/docs/structured-addresses) checks a structured ISO 20022 address against the SPS, T2 or Fedwire rules ahead of the November 2026 changes.
+
 ## Base URL
 
 ```
@@ -38,6 +40,7 @@ A request without a valid key or payment gets a `402` response with machine-read
 | `/v1/iban/compliance` | POST | $0.02 | Sanctions, FATF, SEPA/VoP reachability + 0–100 risk score |
 | `/v1/ch/clearing/:iid` | GET | $0.003 | Swiss BC-Nummer / IID lookup (SIX BankMaster) |
 | `/v1/reference/validate` | GET/POST | Free | Payment reference checksum (RF/ISO 11649, Swiss QRR, Belgian OGM, Finnish viitenumero) |
+| `/v1/address/check` | POST | Free | ISO 20022 postal address conformity (SPS, HVPS+/T2, Fedwire), every finding sourced |
 | `/v1/demo` | GET | Free | Example validations (no payment needed) |
 | `/health` | GET | Free | Service health check |
 

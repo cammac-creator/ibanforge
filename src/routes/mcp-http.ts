@@ -1,8 +1,8 @@
 /**
  * HTTP transport for the MCP server.
- * Exposes the 6 data tools of the stdio MCP server plus send_feedback (validate_iban, batch_validate_iban,
- * lookup_bic, check_compliance, lookup_ch_clearing, validate_payment_reference) via Streamable HTTP at
- * /mcp — compatible with Smithery, remote MCP clients, etc.
+ * Exposes the 7 data tools of the stdio MCP server plus send_feedback (validate_iban, batch_validate_iban,
+ * lookup_bic, check_compliance, lookup_ch_clearing, validate_payment_reference, check_postal_address) via
+ * Streamable HTTP at /mcp — compatible with Smithery, remote MCP clients, etc.
  */
 
 import { Hono } from 'hono';
@@ -21,6 +21,7 @@ import { validateBIC } from '../lib/bic-validator.js';
 import { buildComplianceResponse } from '../lib/compliance-response.js';
 import { lookupClearingByBankCode, normalizeIid } from '../lib/ch-clearing.js';
 import { validatePaymentReference, buildReferenceCheck } from '../lib/payment-reference.js';
+import { checkPostalAddress, ADDRESS_SCHEMES, type AddressScheme } from '../lib/address-conformity.js';
 import { extractClientIp } from '../lib/stats.js';
 import { buildCountriesPayload, buildPricingPayload, buildValidateAndExplainPrompt } from '../lib/mcp-resources.js';
 import { datasetFacts } from '../lib/dataset-facts.js';
@@ -599,6 +600,64 @@ function createMcpServer(): McpServer {
   );
 
   server.registerTool(
+    'check_postal_address',
+    {
+      title: 'Check ISO 20022 Postal Address',
+      description:
+        "Check a structured ISO 20022 postal address against a payment rail's published address rules, rule by rule, each verdict citing the document it comes from. " +
+        'USE WHEN: assembling a payment instruction (pain.001, a Fedwire message, a T2 transfer) with a creditor or debtor address, to learn whether the rail accepts it BEFORE submitting. The November 2026 changes (SIC 20.11, Fedwire 16.11, T2 R2026.NOV) remove the fully unstructured address option — this check tells you whether an address survives them. ' +
+        'DO NOT USE to verify that a street or town EXISTS: this checks conformity with the message format rules, not postal reality. ' +
+        "SCHEMES: 'sps' (Swiss Payment Standards, SIX), 'hvps_plus' (HVPS+ / T2, ECB), 'fedwire' (Federal Reserve). There is deliberately NO 'cbpr+' scheme: that guideline sits behind swift.com, unreachable to automated readers, and a conformity boolean quoting an unread document would be a guess dressed as a verdict — the note field restates this on every answer. " +
+        'VERDICTS: pass, fail, and not_applicable — the last marks a rule whose precondition is not met and never counts as a pass. conforms is true when no finding failed. ' +
+        'IMPORTANT: relay each finding\'s source string — it names the exact document, version and validity date the rule is quoted from. They are what makes the verdict auditable. ' +
+        'FREE: the rules are published commodities. The paid surface is the postal_address block that /v1/bic and /v1/iban/validate return for the resolved institution.',
+      inputSchema: {
+        scheme: z
+          .enum(ADDRESS_SCHEMES as [AddressScheme, ...AddressScheme[]])
+          .describe("Which rail's rules to check against: sps | hvps_plus | fedwire"),
+        address: z
+          .object({
+            twn_nm: z.string().optional().describe('TwnNm — town name'),
+            ctry: z.string().optional().describe('Ctry — ISO 3166-1 alpha-2 country code'),
+            pst_cd: z.string().optional().describe('PstCd — postal code'),
+            strt_nm: z.string().optional().describe('StrtNm — street name'),
+            bldg_nb: z.string().optional().describe('BldgNb — building number'),
+            adr_tp: z.string().optional().describe('AdrTp — address type (SPS forbids sending it)'),
+            adr_line: z.array(z.string()).optional().describe('AdrLine — free-text lines of the hybrid address'),
+          })
+          .strict()
+          .describe('The ISO 20022 PostalAddress under test, in ISO tag vocabulary (snake_cased).'),
+      },
+      // 🚨 Every field the handler can emit MUST be named here — the SDK
+      // silently strips what the output schema does not name, `source` and
+      // `detail` included, which are the whole point of the findings.
+      outputSchema: {
+        scheme: z.string().describe('sps | hvps_plus | fedwire — the rule set that was applied.'),
+        conforms: z.boolean().describe('True when no finding failed. not_applicable findings never count against it.'),
+        findings: z
+          .array(
+            z.object({
+              rule: z.string().describe('Stable identifier, safe to branch on.'),
+              verdict: z.string().describe('pass | fail | not_applicable'),
+              detail: z.string().describe('What was looked at and what was concluded.'),
+              source: z.string().describe('The document the rule comes from, with its date. Relay it.'),
+            }),
+          )
+          .describe('One entry per rule of the scheme, in a stable order.'),
+        note: z.string().describe("Why 'cbpr+' is not on the menu. Served on every answer."),
+      },
+      annotations: { title: 'Check ISO 20022 Postal Address', ...READ_ONLY_ANNOTATIONS },
+    },
+    async ({ scheme, address }) => {
+      const payload = checkPostalAddress(scheme, address);
+      return {
+        content: [{ type: 'text' as const, text: JSON.stringify(payload, null, 2) }],
+        structuredContent: payload as unknown as Record<string, unknown>,
+      };
+    },
+  );
+
+  server.registerTool(
     'lookup_ch_clearing',
     {
       title: 'Swiss Clearing Lookup',
@@ -984,7 +1043,7 @@ mcpHttp.get('/mcp', async (c) => {
           claude_code_cli: 'claude mcp add ibanforge --transport http https://api.ibanforge.com/mcp',
           curl_initialize: `curl -X POST https://api.ibanforge.com/mcp -H 'Content-Type: application/json' -H 'Accept: application/json,text/event-stream' -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"curl","version":"1"}}}' -i`,
         },
-        tools: ['validate_iban', 'batch_validate_iban', 'lookup_bic', 'lookup_ch_clearing', 'check_compliance', 'validate_payment_reference'],
+        tools: ['validate_iban', 'batch_validate_iban', 'lookup_bic', 'lookup_ch_clearing', 'check_compliance', 'validate_payment_reference', 'check_postal_address'],
         free_tier: {
           mcp_daily_limit: MCP_DAILY_LIMIT,
           rest_api_signup: 'POST /v1/keys/generate {"email":"you@company.com"} for 200 req/month',

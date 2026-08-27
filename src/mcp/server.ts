@@ -13,6 +13,7 @@ import { buildComplianceResponse } from '../lib/compliance-response.js';
 import { lookupClearingByBankCode, normalizeIid, getChClearingCount } from '../lib/ch-clearing.js';
 import { buildCountriesPayload, buildPricingPayload, buildValidateAndExplainPrompt } from '../lib/mcp-resources.js';
 import { validatePaymentReference, buildReferenceCheck } from '../lib/payment-reference.js';
+import { checkPostalAddress, ADDRESS_SCHEMES, type AddressScheme } from '../lib/address-conformity.js';
 import { datasetFacts } from '../lib/dataset-facts.js';
 // send_feedback : même insertion et mêmes clips de longueur que la route
 // publique POST /v1/feedback et que le transport HTTP — une seule écriture,
@@ -361,6 +362,59 @@ Cost: free. The checksums are published commodities; the paid surface is POST /v
     const payload = iban
       ? buildReferenceCheck(validateIBAN(iban), reference, reference_type ?? null)
       : validatePaymentReference(reference, reference_type ?? null);
+    return {
+      content: [{ type: 'text' as const, text: JSON.stringify(payload, null, 2) }],
+    };
+  },
+);
+
+server.registerTool(
+  'check_postal_address',
+  {
+    title: 'Check ISO 20022 Postal Address',
+    description: `Check a structured ISO 20022 postal address against a payment rail's published address rules, rule by rule, each verdict citing the document it comes from.
+
+When to use: an agent is assembling a payment instruction (pain.001, a Fedwire message, a T2 transfer) and holds a creditor or debtor address, and needs to know whether the rail will accept it BEFORE submitting. The November 2026 changes (SIC 20.11, Fedwire 16.11, T2 R2026.NOV) remove the fully unstructured address option, so this check is what tells you whether an address survives them.
+When NOT to use: to verify that a street or town EXISTS — this tool checks conformity with the message format rules, not postal reality. Address verification services do that; this does not.
+
+Schemes: 'sps' (Swiss Payment Standards, SIX), 'hvps_plus' (HVPS+ / T2, ECB), 'fedwire' (Federal Reserve). There is deliberately NO 'cbpr+' scheme: the CBPR+ usage guideline is published behind swift.com, which is unreachable to automated readers, and a conformity boolean quoting a document nobody here has read would be a guess dressed as a verdict. The response's note field restates this on every answer.
+
+Behavior: read-only, no network calls, pure rule evaluation. Findings carry three verdicts: pass, fail, and not_applicable — the last is a real answer marking a rule whose precondition is not met, and it never counts as a pass.
+
+Returns: { scheme, conforms, findings: [{ rule, verdict, detail, source }], note }. conforms is true when no finding failed.
+
+IMPORTANT — relay the source strings when reporting to a user: each names the exact document, version and validity date the rule is quoted from (e.g. "SIX, Swiss Implementation Guidelines … SPS 2026 v2.3, valid from 14 November 2026, ch. 3.11 table 9."). They are what makes the verdict auditable.
+
+Example: input scheme 'sps', address { strt_nm: 'Bahnhofstrasse', bldg_nb: '45', pst_cd: '8001', twn_nm: 'Zurich', ctry: 'CH' } → { conforms: true, findings: [7 rules, each sourced] }. Dropping twn_nm flips twn_nm_required to fail and conforms to false.
+
+Cost: free. The rules are published commodities; the paid surface is the postal_address block that /v1/bic and /v1/iban/validate return for the resolved institution.`,
+    inputSchema: {
+      scheme: z
+        .enum(ADDRESS_SCHEMES as [AddressScheme, ...AddressScheme[]])
+        .describe("Which rail's rules to check against: 'sps' (Swiss, SIX), 'hvps_plus' (T2, ECB) or 'fedwire' (Federal Reserve)."),
+      address: z
+        .object({
+          twn_nm: z.string().optional().describe('TwnNm — town name.'),
+          ctry: z.string().optional().describe('Ctry — ISO 3166-1 alpha-2 country code.'),
+          pst_cd: z.string().optional().describe('PstCd — postal code.'),
+          strt_nm: z.string().optional().describe('StrtNm — street name.'),
+          bldg_nb: z.string().optional().describe('BldgNb — building number.'),
+          adr_tp: z.string().optional().describe('AdrTp — address type. SPS forbids sending it; supply it to see that rule fire.'),
+          adr_line: z.array(z.string()).optional().describe('AdrLine — free-text lines, the hybrid-address remainder. Rails cap their number and length.'),
+        })
+        .strict()
+        .describe('The ISO 20022 PostalAddress under test, in ISO tag vocabulary (snake_cased).'),
+    },
+    annotations: {
+      title: 'Check ISO 20022 Postal Address',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+  },
+  async ({ scheme, address }) => {
+    const payload = checkPostalAddress(scheme, address);
     return {
       content: [{ type: 'text' as const, text: JSON.stringify(payload, null, 2) }],
     };

@@ -14,6 +14,9 @@ Official **Model Context Protocol (MCP) server** for [IBANforge](https://ibanfor
 | `lookup_bic`          | Lookup BIC/SWIFT against 121k+ BIC entries (39k+ LEI-enriched via GLEIF)                                                  | 0.003       |
 | `lookup_ch_clearing`  | Lookup Swiss BC-Nummer / IID against 1,100+ SIX BankMaster entries — full rail participation (SIC, euroSIC, CHF instant) + QR-IID | 0.003       |
 | `check_compliance`    | Full compliance check: IBAN + sanctions (OFAC) + SEPA Instant + VoP + risk score (0-100)                                 | 0.02        |
+| `validate_payment_reference` | Validate a structured payment reference — RF/ISO 11649 ("SCOR"), Swiss QR reference ("QRR"), Belgian OGM/VCS, Finnish viitenumero — each against the dated document that publishes the rule. Supply an IBAN to get the QRR↔QR-IBAN pairing verdict (billed as one `validate_iban` call) | free |
+| `check_postal_address` | Check a structured ISO 20022 postal address against SPS (SIX), HVPS+ (T2) or Fedwire rules ahead of the November 2026 changes — every finding cites its source document and date | free |
+| `send_feedback`       | Report incorrect data, or claim the refund the x402 terms promise when a paid answer was wrong                            | free        |
 
 ## Installation
 
