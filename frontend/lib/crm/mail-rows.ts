@@ -3,7 +3,7 @@ import { ballWithUs, followupDue, neverContacted } from './buckets';
 import { chipOf, replyGroupOf, type BusinessChip, type ReplyGroup } from './business';
 import { heatOf } from './heat';
 import { nextActionLabel } from './situation';
-import type { Contact, Message, Situation } from './types';
+import type { Contact, Message, NextAction, Situation } from './types';
 
 export type MailFilterKey =
   | 'reply'
@@ -14,6 +14,7 @@ export type MailFilterKey =
   | 'drafts'
   | 'clients'
   | 'prospect'
+  | 'prospects'
   | 'institution'
   | 'all';
 
@@ -31,6 +32,13 @@ export interface RowsInput {
 
 export interface MailRow {
   id: string;
+  /**
+   * What the contact IS, carried onto the row so the table can paint its
+   * colour rail without re-opening the union. Three kinds, three colours: the
+   * one thing every row says about itself even when it carries no chip, since
+   * chips are deliberately rare (see business.ts).
+   */
+  kind: Contact['kind'];
   who: string;
   subject: string;
   preview: string;
@@ -48,6 +56,18 @@ export interface MailRow {
   email: string;
   /** Next-action label for the hover preview card. */
   next: string | null;
+  /**
+   * The raw state `next` is a naming of, null when the page built no situation
+   * for this contact.
+   *
+   * Carried as well as the label because the table's Statut column needs both
+   * a SHORT name for the same five states and a tone, and neither can be read
+   * back off a French sentence. Tone in particular must not be taken from
+   * `urgent`: that is a property of the active filter, so under the reply tile
+   * every row would go amber at once and the colour would stop meaning
+   * anything.
+   */
+  nextAction: NextAction | null;
   /** Sourcing confidence, shown on the prospecting filter in place of the age. */
   confidence: 'high' | 'medium' | 'low' | null;
   /** A sleeper whose wake date just arrived — the list marks the return. */
@@ -107,10 +127,25 @@ const FILTERS: Array<{
   // A draft written and never sent is a follow-up that silently never left:
   // this queue makes every waiting draft countable and findable.
   { key: 'drafts', label: 'Brouillons', urgent: false, test: (c) => c.draft !== null },
-  // The prospecting queue: everyone never written to, the "who do I open
-  // with today" view. Same predicate as the overview's sendable-stock figure.
+  // The prospecting QUEUE: everyone never written to, the "who do I open with
+  // today" view. Same predicate as the overview's sendable-stock figure.
+  //
+  // ⚠ Singular. Its neighbour `prospects` (plural, below) is the POPULATION,
+  // everyone whose kind is prospect, written or not. Two different questions
+  // one letter apart; the toolbar puts them in two different groups on
+  // purpose, this one as a refining chip and the plural as a segment.
   { key: 'prospect', label: 'À prospecter', urgent: false, test: neverContacted },
   { key: 'clients', label: 'Clients', urgent: false, test: (c) => c.kind === 'client' },
+  /**
+   * The prospect POPULATION, the counterpart of `clients` and `institution`:
+   * everyone of that kind, whatever the state of their thread.
+   *
+   * ⚠ Plural. `prospect` (singular, above) is the never-contacted queue and is
+   * a strict subset of this one. The segment needs the whole population, or
+   * "Prospects" would silently hide every prospect already written to — which
+   * is most of them once a campaign has run.
+   */
+  { key: 'prospects', label: 'Prospects', urgent: false, test: (c) => c.kind === 'prospect' },
   /**
    * The written correspondence with institutions: authorities, central banks,
    * payment schemes, registries, suppliers. The answer to "where is the reply
@@ -132,20 +167,36 @@ const FILTERS: Array<{
   { key: 'all', label: 'Tous', urgent: false, test: () => true },
 ];
 
-function pick(input: RowsInput, key: MailFilterKey): Contact[] {
-  const filter = FILTERS.find((f) => f.key === key);
-  if (!filter) return [];
+/** Every key there is, in the order the filters are declared above. */
+export const MAIL_FILTER_KEYS: MailFilterKey[] = FILTERS.map((f) => f.key);
+
+/**
+ * The contacts satisfying EVERY key handed in — one predicate per key, joined
+ * by AND. One key is the old single-filter reading; several is the toolbar's,
+ * where a population, a work queue and a refining chip narrow each other.
+ *
+ * `bare` is "nothing is being asked of this view": the whole base, no queue, no
+ * chip. Archived rows surface there and nowhere else. They were set aside on
+ * purpose, and one reappearing in a work filter undoes the gesture. Today every
+ * predicate enforces that on its own (ballWithUs and followupDue test
+ * isArchived themselves, "new" and "clients" require a kind only a
+ * non-archivable contact can have), so this line decides nothing yet: it states
+ * the rule once, filter-side, so a further filter or a widened predicate cannot
+ * lose it by omission.
+ *
+ * An unknown key yields nothing rather than being skipped: skipping would
+ * WIDEN the answer, which is the dangerous direction for a queue of people to
+ * write to.
+ */
+function pickBy(input: RowsInput, keys: MailFilterKey[], bare: boolean): Contact[] {
+  const chosen = keys.map((k) => FILTERS.find((f) => f.key === k));
+  if (chosen.some((f) => f === undefined)) return [];
+  const tests = chosen.filter((f) => f !== undefined);
   return input.contacts.filter((c) => {
     const s = input.situations[c.id];
-    // Archived rows surface only under "Tous". They were set aside on purpose,
-    // and one reappearing in a work filter undoes the gesture. Today every
-    // predicate enforces that on its own (ballWithUs and followupDue test
-    // isArchived themselves, "new" and "clients" require a kind only a
-    // non-archivable contact can have), so this line decides nothing yet: it
-    // states the rule once, filter-side, so a sixth filter or a widened
-    // predicate cannot lose it by omission.
-    if (key !== 'all' && isArchived(c, s)) return false;
-    return filter.test(c, s, input.snoozed[c.id] ?? false);
+    if (!bare && isArchived(c, s)) return false;
+    const snoozed = input.snoozed[c.id] ?? false;
+    return tests.every((f) => f.test(c, s, snoozed));
   });
 }
 
@@ -164,12 +215,21 @@ function lastWith(messages: Message[], field: 'subject' | 'snippet' | 'msg_date'
  * a UTC server and a browser in Zurich would print two different labels for the
  * same row.
  */
+/**
+ * What `age` says of a message dated today. Typographic apostrophe, as the
+ * page's own context line writes it: two glyphs for the same word on one screen
+ * read as a mistake.
+ *
+ * Exported so the table's abbreviated form can RECOGNISE this label instead of
+ * spelling the French a second time and un-matching the day somebody fixes the
+ * apostrophe here.
+ */
+export const AGE_TODAY = 'aujourd’hui';
+
 function ageLabel(s: Situation | undefined): string {
   const days = s?.silenceDays;
   if (days === null || days === undefined) return '';
-  // Typographic apostrophe, as the page's own context line writes it: two
-  // glyphs for the same word on one screen read as a mistake.
-  if (days <= 0) return 'aujourd’hui';
+  if (days <= 0) return AGE_TODAY;
   return `${days} j`;
 }
 
@@ -189,6 +249,7 @@ function toRow(
 ): MailRow {
   return {
     id: c.id,
+    kind: c.kind,
     // The email is the fallback, not a placeholder: an address is something the
     // operator can act on, whereas "sans nom" is not.
     who: c.company || c.email,
@@ -216,6 +277,7 @@ function toRow(
         : null,
     email: c.email,
     next: s ? nextActionLabel(s.nextAction, c.kind) : null,
+    nextAction: s?.nextAction ?? null,
     // Folded at build time, matched folded: name, address, and the whole
     // thread's subjects and snippets, so "batch" finds the batch conversation.
     //
@@ -261,11 +323,21 @@ export function searchRows(rows: MailRow[], query: string): MailRow[] {
   return rows.filter((r) => r.search.includes(term));
 }
 
+/**
+ * One count per key, each read against the WHOLE base rather than against
+ * whatever the toolbar currently shows.
+ *
+ * Deliberate, and the reason the tiles can be trusted: "À répondre 9" means
+ * nine threads are waiting on us, full stop. A count that moved when a segment
+ * was pressed would say "nine among the clients", which is a different sentence
+ * and one nobody asked. It is also what makes "Brouillons only when > 0" a
+ * well-defined rule instead of a flicker.
+ */
 export function mailFilters(input: RowsInput): MailFilter[] {
   return FILTERS.map((f) => ({
     key: f.key,
     label: f.label,
-    count: pick(input, f.key).length,
+    count: pickBy(input, [f.key], f.key === 'all').length,
   }));
 }
 
@@ -273,11 +345,68 @@ function byId(a: Contact, b: Contact): number {
   return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
 }
 
-export function mailRows(input: RowsInput, active: MailFilterKey): MailRow[] {
-  const filter = FILTERS.find((f) => f.key === active);
-  if (!filter) return [];
+/**
+ * What the toolbar is asking for: three independent axes, exactly as the
+ * approved layout draws them.
+ *
+ * One population at all times (the segmented control cannot be empty), at most
+ * one work queue (the counted tiles, which toggle) and at most one refining
+ * chip. They narrow each other — "the clients whose follow-up is due" is one
+ * question the old single-key list could not ask at all.
+ */
+export interface RowSelection {
+  /** The segmented control: 'all' | 'clients' | 'prospects' | 'institution'. */
+  population: MailFilterKey;
+  /** A pressed work tile, or nothing. */
+  work?: MailFilterKey | null;
+  /** A pressed refining chip, or nothing. */
+  refine?: MailFilterKey | null;
+}
 
-  const sorted = [...pick(input, active)].sort((a, b) => {
+/**
+ * Which single key decides the ORDER, the urgency accent and the reply shelves
+ * when several are active.
+ *
+ * The narrowest wins, and narrowest here means "the one that answers a
+ * question": a pressed tile is the day's work, then a chip, and the population
+ * only if neither is pressed. Pressing "À répondre" while standing on Clients
+ * must still sort unread-first — that ordering is the whole value of the queue,
+ * and it would be lost if the population decided.
+ */
+function dominantKey(sel: RowSelection): MailFilterKey {
+  return sel.work ?? sel.refine ?? sel.population;
+}
+
+/**
+ * The rows the toolbar's current state selects.
+ *
+ * Additive to mailRows rather than a replacement: every predicate, every
+ * comparator and every projection below is the same code the single-key
+ * reading uses, so the counted tiles and the composed table cannot drift.
+ * `selectedRows(input, { population: 'all', work: k })` is `mailRows(input, k)`
+ * for every k, and a test pins exactly that.
+ */
+export function selectedRows(input: RowsInput, sel: RowSelection): MailRow[] {
+  const keys = [sel.population, sel.work, sel.refine].filter((k): k is MailFilterKey => !!k);
+  const active = dominantKey(sel);
+  if (!FILTERS.some((f) => f.key === active)) return [];
+  // "Nothing is being asked": the whole base, no queue, no chip. Written as
+  // "every key is 'all'" rather than "population is 'all' and the other two are
+  // empty", so that asking for 'all' twice stays the same question as asking
+  // for it once — which is what makes the bridge to mailRows hold for EVERY
+  // key, 'all' included. See pickBy.
+  const bare = keys.every((k) => k === 'all');
+  return project(input, order(input, pickBy(input, keys, bare), active), active);
+}
+
+export function mailRows(input: RowsInput, active: MailFilterKey): MailRow[] {
+  if (!FILTERS.some((f) => f.key === active)) return [];
+  return project(input, order(input, pickBy(input, [active], active === 'all'), active), active);
+}
+
+/** The one ordering, read by both readings above. */
+function order(input: RowsInput, contacts: Contact[], active: MailFilterKey): Contact[] {
+  return [...contacts].sort((a, b) => {
     // A returned sleeper leads the two queues where its date means "now":
     // the prospecting queue ("call me back in September" has arrived) and the
     // follow-up queue. It was put to sleep WITH a date; the date outranks the
@@ -329,7 +458,11 @@ export function mailRows(input: RowsInput, active: MailFilterKey): MailRow[] {
       const heatGap = heatOf(b, input.situations[b.id]).score - heatOf(a, input.situations[a.id]).score;
       if (heatGap !== 0) return heatGap;
     }
-    if (active === 'all') {
+    // 'prospects' rides with 'all' rather than falling through to recency, and
+    // for the reason spelled out below: a prospect never written to has no
+    // message, so recency alone sinks the entire point of the segment to the
+    // bottom of its own list.
+    if (active === 'all' || active === 'prospects') {
       // A prospect never written to leads "Tous", ahead of the recency order.
       // This is the gesture "who have I never written to": it was a named
       // filter ("Jamais contactés") on the deleted list, and with the five
@@ -357,8 +490,20 @@ export function mailRows(input: RowsInput, active: MailFilterKey): MailRow[] {
     if (dateA !== dateB) return dateA < dateB ? 1 : -1;
     return byId(a, b);
   });
+}
 
-  return sorted.map((c) =>
+/**
+ * The one projection, read by both readings above.
+ *
+ * `urgent` and the reply shelves are properties of the ACTIVE key, never of the
+ * contact — see the note on FILTERS. Under the composed reading that key is the
+ * dominant one, so "the clients whose reply is due" wears the accent and the
+ * shelves exactly as the plain reply queue does.
+ */
+function project(input: RowsInput, contacts: Contact[], active: MailFilterKey): MailRow[] {
+  const filter = FILTERS.find((f) => f.key === active);
+  if (!filter) return [];
+  return contacts.map((c) =>
     toRow(c, input.situations[c.id], filter.urgent, active === 'reply', input.woke?.[c.id] ?? false),
   );
 }

@@ -140,3 +140,56 @@ const INSTITUTION_ACTION_LABEL: Record<NextAction, string> = {
 export function nextActionLabel(action: NextAction, kind?: Contact['kind']): string {
   return kind === 'institution' ? INSTITUTION_ACTION_LABEL[action] : NEXT_ACTION_LABEL[action];
 }
+
+/**
+ * The same five states again, in the two or three words a table column can
+ * hold.
+ *
+ * A third NAMING and not a third taxonomy — the same distinction the
+ * institution table above already makes. The Statut column of the contacts
+ * table is about nine characters wide; "Rien à faire, en attente de sa
+ * réponse" is a banner sentence, written to be read once while deciding what
+ * to send, and it neither fits nor wants to be scanned two hundred times down
+ * a column. Shortening it at the call site would be the start of a fourth
+ * vocabulary, so it is done here, once, beside the other two.
+ *
+ * The kinds differ where the long labels differ, and only there: `first_mail`
+ * and `firm_offer` are the two that instruct the wrong act when said to
+ * somebody writing to a supervisor.
+ */
+const SHORT_ACTION_LABEL: Record<NextAction, string> = {
+  first_mail: 'Premier mail',
+  reply: 'À répondre',
+  followup: 'Relance due',
+  firm_offer: 'Offre ferme',
+  wait: 'En attente',
+};
+
+const SHORT_INSTITUTION_ACTION_LABEL: Record<NextAction, string> = {
+  first_mail: 'Demande à écrire',
+  reply: 'À répondre',
+  followup: 'Relance due',
+  firm_offer: 'En attente',
+  wait: 'En attente',
+};
+
+export function shortActionLabel(action: NextAction, kind?: Contact['kind']): string {
+  return kind === 'institution' ? SHORT_INSTITUTION_ACTION_LABEL[action] : SHORT_ACTION_LABEL[action];
+}
+
+/**
+ * Whether this state is something to DO today, which is what earns a row the
+ * accent colour in the Statut column.
+ *
+ * Two of the five: the ball is ours, or our own mail has gone unanswered past
+ * the threshold. `first_mail` is work too, but it is standing stock rather than
+ * something that became due — a hundred cold prospects painting a column amber
+ * would drown the nine threads that actually wait on an answer.
+ *
+ * Deliberately NOT the row's `urgent` flag: that one is a property of the
+ * active filter (see mail-rows.ts), so under the reply tile it is true for
+ * every row at once.
+ */
+export function isPressing(action: NextAction): boolean {
+  return action === 'reply' || action === 'followup';
+}

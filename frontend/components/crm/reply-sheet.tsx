@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { confirmedSent, generatedDraft, readAnswer, reasonOf, withReason } from '@/lib/crm/api-result';
 import { isAutomated } from '@/lib/crm/automated';
@@ -112,6 +112,7 @@ export function ReplySheet({
   sentToday,
   open,
   onOpenChange,
+  onDirtyChange,
 }: {
   contact: Contact;
   /**
@@ -135,6 +136,14 @@ export function ReplySheet({
    */
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /**
+   * Whether there is an answer being written that has not been sent.
+   *
+   * The caller keys this sheet on the contact, so a change of contact destroys
+   * whatever is in it; this is what lets the caller ask first. A boolean and
+   * nothing more: the text stays here, and no draft is persisted per contact.
+   */
+  onDirtyChange?: (dirty: boolean) => void;
 }) {
   const router = useRouter();
   /**
@@ -153,6 +162,21 @@ export function ReplySheet({
   const [msg, setMsg] = useState<{ text: string; bad: boolean } | null>(null);
 
   const filled = !!subject.trim() && !!body.trim();
+
+  /**
+   * Told upwards, so the caller can ask before a change of contact throws it
+   * away. The body alone, exactly as the folded bar reads it: the subject is
+   * prefilled by construction and says nothing about work in progress.
+   */
+  const dirty = !!body.trim();
+  useEffect(() => {
+    onDirtyChange?.(dirty);
+  }, [dirty, onDirtyChange]);
+  // Separate from the report above, and cleanup-only: folded into that effect,
+  // the cleanup would flip the flag false and true again on every keystroke,
+  // and any read landing between the two would see a clean sheet.
+  useEffect(() => () => onDirtyChange?.(false), [onDirtyChange]);
+
   /**
    * Could this be sent at all, the checks aside. None of the checks asks
    * whether anything was written by the operator rather than by the prefill,
@@ -438,10 +462,14 @@ export function ReplySheet({
   }
 
   return (
-    // Over the foot of the panel, not inside its column: the thread above keeps
-    // every pixel it had, and the panel gives back the room this covers as
-    // scroll space. See REPLY_SHEET_COVER_PX. Rounded at the bottom so the
-    // corners do not poke out of the panel's own rounding.
+    // Over the foot of the drawer, not inside its column: the thread above
+    // keeps every pixel it had, and the drawer gives back the room this covers
+    // as scroll space. See REPLY_SHEET_COVER_PX.
+    //
+    // Absolute at every width, where this used to be viewport-fixed below lg.
+    // Fixed was right while the thread WAS the small screen; the drawer is 460px
+    // wide from the sm breakpoint up, and a viewport-wide bar under a 460px
+    // drawer hangs out of it on every window between sm and lg.
     //
     // A column of three: what is being answered, then the answer, then the
     // buttons. Only the middle scrolls, so a translation or a check can never
@@ -450,7 +478,7 @@ export function ReplySheet({
     <div
       id="reply-sheet"
       style={{ height: REPLY_SHEET_PX }}
-      className="fixed inset-x-0 bottom-0 z-50 flex flex-col border-t border-[var(--ink-4)] bg-[var(--ink-2)] p-3 shadow-[0_-10px_24px_-8px_rgba(0,0,0,0.65)] max-lg:rounded-t-xl lg:absolute lg:z-10 lg:rounded-b-xl lg:rounded-t-none"
+      className="absolute inset-x-0 bottom-0 z-10 flex flex-col border-t border-[var(--ink-4)] bg-[var(--ink-2)] p-3 shadow-[0_-10px_24px_-8px_rgba(0,0,0,0.65)]"
     >
       <div className="mb-1.5 flex shrink-0 items-center justify-between gap-2">
         <span className="min-w-0 truncate text-[12px] text-[var(--fg-3)]">

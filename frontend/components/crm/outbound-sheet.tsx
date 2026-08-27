@@ -170,6 +170,7 @@ export function OutboundSheet({
   sentToday,
   open,
   onOpenChange,
+  onDirtyChange,
 }: {
   contact: Contact;
   /** Undefined only if the page failed to derive one; the goal line is dropped then. */
@@ -194,6 +195,14 @@ export function OutboundSheet({
    */
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /**
+   * Whether there is a mail being written that has not been sent.
+   *
+   * The caller keys this sheet on the contact, so a change of contact destroys
+   * whatever is in it; this is what lets the caller ask first. A boolean and
+   * nothing more: the text stays here, and no draft is persisted per contact.
+   */
+  onDirtyChange?: (dirty: boolean) => void;
 }) {
   const router = useRouter();
   const [subject, setSubject] = useState('');
@@ -240,6 +249,24 @@ export function OutboundSheet({
    * protect.
    */
   const hasText = !!subject.trim() || !!body.trim();
+
+  /**
+   * The same question, told upwards, so the caller can ask before a change of
+   * contact throws the text away.
+   *
+   * `hasText` and not `filled`, for the reason above: a body with no subject is
+   * still work in progress. It reads clean again the moment the text stops
+   * being at risk: both roads out of this sheet — send() and saveDraft() —
+   * empty the two fields on a confirmed success, so nothing is asked about a
+   * mail that has already left or that is now sitting in the thread as a card.
+   */
+  useEffect(() => {
+    onDirtyChange?.(hasText);
+  }, [hasText, onDirtyChange]);
+  // Separate from the report above, and cleanup-only: folded into that effect,
+  // the cleanup would flip the flag false and true again on every keystroke,
+  // and any read landing between the two would see a clean sheet.
+  useEffect(() => () => onDirtyChange?.(false), [onDirtyChange]);
 
   /**
    * Could this be sent at all, the checks aside. It is what stops a blank mail,
@@ -744,7 +771,7 @@ export function OutboundSheet({
       // short sentence that fits the resting region, and growing for it would
       // cover thread for nothing. See OUTBOUND_SHEET_ANGLES_PX.
       style={{ height: step?.kind === 'choose' ? OUTBOUND_SHEET_ANGLES_PX : OUTBOUND_SHEET_PX }}
-      className="fixed inset-x-0 bottom-0 z-50 flex flex-col border-t border-[var(--ink-4)] bg-[var(--ink-2)] p-3 shadow-[0_-10px_24px_-8px_rgba(0,0,0,0.65)] max-lg:rounded-t-xl lg:absolute lg:z-10 lg:rounded-b-xl lg:rounded-t-none"
+      className="absolute inset-x-0 bottom-0 z-10 flex flex-col border-t border-[var(--ink-4)] bg-[var(--ink-2)] p-3 shadow-[0_-10px_24px_-8px_rgba(0,0,0,0.65)]"
     >
       <div className="mb-1.5 flex shrink-0 items-center justify-between gap-2">
         <span className="min-w-0 truncate text-[12px] text-[var(--fg-3)]">

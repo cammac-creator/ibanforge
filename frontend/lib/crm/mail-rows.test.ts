@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { mailFilters, mailRows, searchRows, type RowsInput } from './mail-rows';
+import {
+  MAIL_FILTER_KEYS,
+  mailFilters,
+  mailRows,
+  searchRows,
+  selectedRows,
+  type RowsInput,
+} from './mail-rows';
+import { POPULATION_KEYS } from './table-view';
 import type { Contact, InstitutionInfo, Message, ProspectSourcing, Situation } from './types';
 
 function message(direction: Message['direction'], subject: string, snippet: string, msg_date: string): Message {
@@ -318,6 +326,307 @@ describe('never-contacted rows under Tous', () => {
       'beta@example.com',
       'epsilon@example.com',
     ]);
+  });
+});
+
+/**
+ * The population segment, which is NOT the prospecting queue.
+ *
+ * `prospect` (singular) is everyone never written to; `prospects` (plural) is
+ * everyone of that kind. One letter apart and a strict subset, so the two are
+ * pinned against each other by a fixture where they differ.
+ */
+describe('the Prospects population', () => {
+  const written = prospect('written@alpha.example.net', 'Société Iota', [
+    message('out', 'Prise de contact', 'Premier mail parti', '2026-07-05'),
+  ]);
+  const never = prospect('never@alpha.example.net', 'Société Kappa', []);
+  const population: RowsInput = {
+    contacts: [written, never, alpha],
+    situations: {
+      'written@alpha.example.net': situation({ ballInCourt: 'them', silenceDays: 3 }),
+      'never@alpha.example.net': situation({ nextAction: 'first_mail' }),
+      'alpha@example.com': situation({ ballInCourt: 'us', silenceDays: 2 }),
+    },
+    snoozed: {},
+  };
+
+  it('holds every prospect, written to or not, and no client', () => {
+    expect(mailRows(population, 'prospects').map((r) => r.id).sort()).toEqual([
+      'never@alpha.example.net',
+      'written@alpha.example.net',
+    ]);
+  });
+
+  it('is strictly wider than the À prospecter queue, which is the whole point', () => {
+    // The regression this guards: wiring the segment to the queue would hide
+    // every prospect already written to — most of them once a campaign has run.
+    expect(mailRows(population, 'prospect').map((r) => r.id)).toEqual(['never@alpha.example.net']);
+  });
+
+  it('keeps a prospect never written to at the head of its own segment', () => {
+    // It has no message, so recency alone would sink the segment's whole point
+    // to the bottom of the segment's own list.
+    expect(mailRows(population, 'prospects').map((r) => r.id)[0]).toBe('never@alpha.example.net');
+  });
+
+  it('counts what it shows, like every other filter', () => {
+    for (const filter of mailFilters(population)) {
+      expect(mailRows(population, filter.key)).toHaveLength(filter.count);
+    }
+  });
+});
+
+/**
+ * A base where EVERY key holds somebody.
+ *
+ * `wide` is four contacts and it leaves four keys — Payants, Endormis,
+ * Brouillons, Correspondances — empty on BOTH sides of the parity loop below,
+ * where the assertion then reads `[] === []` and would survive a composed
+ * reading that silently dropped every row of those keys. This fixture is what
+ * makes each iteration of that loop compare something, and a test right after
+ * it refuses to let a key fall back to empty unnoticed.
+ *
+ * Deliberately holds NO archived row. The parity between a filtered ordering
+ * and the composed reading of the same keys is exact only while `bare` agrees
+ * on both sides, and `bare` is what decides whether archived rows surface (see
+ * pickBy): add an archived prospect here and the population×work identity below
+ * starts failing for reasons that have nothing to do with what it pins.
+ */
+const buyer: Contact = {
+  ...client('buyer@alpha.example.net', 'Société Lambda', [
+    message('in', 'Question', 'Une question sur le batch', '2026-08-01'),
+  ]),
+  business: {
+    status: 'paying' as const,
+    source: 'direct',
+    creditsTotal: 5000,
+    creditsRemaining: 1200,
+    packs: 2,
+    firstCallAt: null,
+    calls90d: 40,
+  },
+};
+const sleeping: Contact = {
+  ...client('quiet@alpha.example.net', 'Société Xi', [
+    message('out', 'Des nouvelles', 'Ta clé n’a plus servi depuis un moment', '2026-05-02'),
+  ]),
+  business: {
+    status: 'dormant' as const,
+    source: 'direct',
+    creditsTotal: 1000,
+    creditsRemaining: 1000,
+    packs: 0,
+    firstCallAt: null,
+    calls90d: 0,
+  },
+};
+const drafted: Contact = {
+  ...client('pending@alpha.example.net', 'Société Omicron', [
+    message('out', 'Suivi', 'Je reviens vers vous la semaine prochaine', '2026-06-15'),
+  ]),
+  draft: message('draft', 'Suivi', 'Brouillon écrit et jamais parti', '2026-08-03'),
+};
+const desk = institution('desk@alpha.example.net', 'Autorité Rho', [
+  message('out', 'Demande de permission', 'Nous souhaitons citer vos données', '2026-07-11'),
+]);
+
+const rich: RowsInput = {
+  contacts: [alpha, beta, newClient, cold, buyer, sleeping, drafted, desk],
+  situations: {
+    'alpha@example.com': situation({ ballInCourt: 'us', silenceDays: 2 }),
+    'beta@example.com': situation({ followupDue: true, silenceDays: 40 }),
+    'gamma@example.com': situation({}),
+    'delta@example.com': situation({ nextAction: 'first_mail' }),
+    'buyer@alpha.example.net': situation({ ballInCourt: 'them', silenceDays: 1, messageCount: 1 }),
+    'quiet@alpha.example.net': situation({ silenceDays: 90, messageCount: 1 }),
+    'pending@alpha.example.net': situation({ silenceDays: 20, messageCount: 1 }),
+    'desk@alpha.example.net': situation({ ballInCourt: 'them', silenceDays: 12, messageCount: 1 }),
+  },
+  snoozed: {},
+};
+
+/**
+ * The toolbar's composed reading. Three axes narrow each other, where the list
+ * this replaces could only ever ask one question at a time.
+ */
+describe('selectedRows', () => {
+  it('has a fixture that leaves no key empty, so the parity loop compares something', () => {
+    // The guard on the guard. Without it the loop below can go green while
+    // asserting nothing at all: on a fixture nobody satisfies, both sides
+    // return [] and every regression in the composed reading of that key slips
+    // through. Fails the day a key is added and `rich` is not extended for it.
+    const empty = MAIL_FILTER_KEYS.filter((key) => mailRows(rich, key).length === 0);
+    expect(empty).toEqual([]);
+  });
+
+  it('is the single-key reading when the population is the whole base', () => {
+    // THE invariant of the redesign: the tiles advertise absolute counts, and
+    // those counts have to be the rows the composed table then shows. Asserted
+    // over every key rather than a chosen few, so a key added later is covered
+    // the day it is declared, and over two populations rather than one — the
+    // narrow fixture keeps the original coverage, the rich one is what makes
+    // Payants, Endormis, Brouillons and Correspondances actually compare rows.
+    for (const base of [wide, rich]) {
+      for (const key of MAIL_FILTER_KEYS) {
+        expect(selectedRows(base, { population: 'all', work: key })).toEqual(mailRows(base, key));
+      }
+      expect(selectedRows(base, { population: 'all' })).toEqual(mailRows(base, 'all'));
+    }
+  });
+
+  it('is the single-key reading for a population pressed alone', () => {
+    // The other half of the bridge, unpinned until now: it holds today only
+    // because both readings funnel through the same pickBy/order/project, and
+    // nothing said so. Read from the toolbar's own list of segments, so a
+    // fifth one is covered the day it is declared there.
+    for (const key of POPULATION_KEYS) {
+      expect(selectedRows(rich, { population: key })).toEqual(mailRows(rich, key));
+    }
+  });
+
+  it('intersects a population with a queue without inventing an order of its own', () => {
+    // What "the axes narrow each other" has to mean, said as an identity: the
+    // composed rows are the queue's own rows kept to the members of the
+    // population, IN THE QUEUE'S ORDER. Both halves matter — dropping rows and
+    // re-sorting them are the two ways this could break — and the ordering half
+    // holds because order() reads per-contact data plus the dominant key, with
+    // byId as the last tiebreak, so sorting a subset is filtering the sorted
+    // whole.
+    for (const population of POPULATION_KEYS) {
+      const inside = new Set(mailRows(rich, population).map((r) => r.id));
+      for (const work of MAIL_FILTER_KEYS) {
+        expect(selectedRows(rich, { population, work }).map((r) => r.id)).toEqual(
+          mailRows(rich, work)
+            .filter((r) => inside.has(r.id))
+            .map((r) => r.id),
+        );
+      }
+    }
+  });
+
+  it('intersects the population with the work queue', () => {
+    // beta is the only follow-up due and it is a client; the segment must keep
+    // it and the correspondents' segment must not.
+    expect(selectedRows(withInstitutions, { population: 'clients', work: 'followup' }).map((r) => r.id))
+      .toEqual(['beta@example.com']);
+    expect(selectedRows(withInstitutions, { population: 'institution', work: 'followup' })).toEqual([]);
+  });
+
+  it('intersects all three axes at once', () => {
+    const buyer = {
+      ...client('buyer@alpha.example.net', 'Société Lambda', [
+        message('in', 'Question', 'Une question sur le batch', '2026-08-01'),
+      ]),
+      business: {
+        status: 'paying' as const,
+        source: 'direct',
+        creditsTotal: 5000,
+        creditsRemaining: 1200,
+        packs: 1,
+        firstCallAt: null,
+        calls90d: 40,
+      },
+    };
+    const three: RowsInput = {
+      contacts: [buyer, alpha],
+      situations: {
+        'buyer@alpha.example.net': situation({ ballInCourt: 'us', silenceDays: 1 }),
+        'alpha@example.com': situation({ ballInCourt: 'us', silenceDays: 2 }),
+      },
+      snoozed: {},
+    };
+    // Both are clients waiting on an answer; only one of them ever bought.
+    expect(selectedRows(three, { population: 'all', work: 'reply' }).map((r) => r.id)).toEqual([
+      'alpha@example.com',
+      'buyer@alpha.example.net',
+    ]);
+    expect(
+      selectedRows(three, { population: 'clients', work: 'reply', refine: 'paying' }).map((r) => r.id),
+    ).toEqual(['buyer@alpha.example.net']);
+  });
+
+  it('lets the pressed queue decide the order, not the segment it stands on', () => {
+    // "Clients" sorts by heat; "À répondre" sorts unread first. Pressing the
+    // tile while standing on the segment must keep the queue's ordering, or the
+    // queue loses the one thing it is opened for. Handed in in the wrong order
+    // so sort stability cannot fake the answer.
+    const quiet = client('quiet@alpha.example.net', 'Société Mu', [
+      message('in', 'Bonjour', 'Merci pour le retour', '2026-08-02'),
+    ]);
+    const shouting = {
+      ...client('loud@alpha.example.net', 'Société Nu', [
+        message('in', 'Urgent', 'Nous attendons', '2026-08-01'),
+      ]),
+      unread: true,
+    };
+    const two: RowsInput = {
+      contacts: [quiet, shouting],
+      situations: {
+        'quiet@alpha.example.net': situation({ ballInCourt: 'us', silenceDays: 0 }),
+        'loud@alpha.example.net': situation({ ballInCourt: 'us', silenceDays: 0 }),
+      },
+      snoozed: {},
+    };
+    expect(selectedRows(two, { population: 'clients', work: 'reply' }).map((r) => r.id)).toEqual([
+      'loud@alpha.example.net',
+      'quiet@alpha.example.net',
+    ]);
+    // …and the accent follows the queue too, not the segment.
+    expect(selectedRows(two, { population: 'clients', work: 'reply' }).every((r) => r.urgent)).toBe(true);
+    expect(selectedRows(two, { population: 'clients' }).some((r) => r.urgent)).toBe(false);
+  });
+
+  it('shows an archived contact only when nothing at all is being asked', () => {
+    // The rule the single-key reading states as `key !== 'all'`. Composed, the
+    // equivalent is "the whole base, no queue, no chip" — a segment alone is
+    // already a question, and a row set aside on purpose must not answer it.
+    const archived = prospect('omega@example.com', 'Société Omega', [], 'archive');
+    const withArchived: RowsInput = {
+      contacts: [archived, alpha],
+      situations: {
+        'alpha@example.com': situation({ ballInCourt: 'us', silenceDays: 2 }),
+        'omega@example.com': situation({ nextAction: 'first_mail' }),
+      },
+      snoozed: {},
+    };
+    expect(selectedRows(withArchived, { population: 'all' }).map((r) => r.id)).toContain(
+      'omega@example.com',
+    );
+    expect(selectedRows(withArchived, { population: 'prospects' }).map((r) => r.id)).not.toContain(
+      'omega@example.com',
+    );
+    expect(selectedRows(withArchived, { population: 'all', refine: 'prospect' }).map((r) => r.id))
+      .not.toContain('omega@example.com');
+  });
+});
+
+describe('what the table reads off a row', () => {
+  it('carries the kind, so the colour rail never re-opens the union', () => {
+    expect(mailRows(wide, 'all').find((r) => r.id === 'delta@example.com')?.kind).toBe('prospect');
+    expect(mailRows(wide, 'all').find((r) => r.id === 'alpha@example.com')?.kind).toBe('client');
+  });
+
+  it('carries the raw next action beside its French label', () => {
+    // Both, because the Statut column needs a SHORT name and a tone, and
+    // neither can be read back off a sentence. Its own situation rather than
+    // the shared fixture's, whose nextAction is the helper's default.
+    const waiting: RowsInput = {
+      contacts: [alpha],
+      situations: {
+        'alpha@example.com': situation({ ballInCourt: 'us', silenceDays: 2, nextAction: 'reply' }),
+      },
+      snoozed: {},
+    };
+    const row = mailRows(waiting, 'reply')[0];
+    expect(row?.nextAction).toBe('reply');
+    expect(row?.next).toBe('Il attend ta réponse');
+  });
+
+  it('leaves the action null when the page built no situation', () => {
+    const orphan: RowsInput = { contacts: [alpha], situations: {}, snoozed: {} };
+    expect(mailRows(orphan, 'all')[0]?.nextAction).toBeNull();
+    expect(mailRows(orphan, 'all')[0]?.next).toBeNull();
   });
 });
 
