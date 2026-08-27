@@ -23,6 +23,12 @@ import { recordEvent } from '../lib/events.js';
 import { getVisibility, recordVisibility, isVisibilityState } from '../lib/visibility.js';
 import { getOrphans, recordOrphan, resolveOrphan, countPendingOrphans, isOrphanKind } from '../lib/orphan-mail.js';
 import { addAlias, listAliases, loadAliasMap, toCanonical } from '../lib/email-aliases.js';
+import {
+  deleteInstitutionalContact,
+  listInstitutionalContacts,
+  upsertInstitutionalContact,
+  type InstitutionalContactInput,
+} from '../lib/institutional-contacts.js';
 import { getWeeklyFacts, saveWeeklyDigest, getWeeklyDigests } from '../lib/weekly-facts.js';
 import { notifyPurchaseTelegram } from '../lib/notify.js';
 import { isProspectBackfillRunning, lastProspectBackfillReport, runProspectBackfill } from '../lib/prospect-radar-server.js';
@@ -1160,6 +1166,65 @@ apiKeys.post('/v1/admin/email-aliases', async (c) => {
   const res = addAlias(body.alias, body.canonical);
   if (!res.ok) return c.json({ error: 'invalid_alias', message: res.reason }, 400);
   return c.json({ aliases: listAliases() });
+});
+
+/**
+ * Institutional correspondents: the authorities, central banks, payment
+ * networks and suppliers we write to for reuse permissions and regulatory
+ * questions.
+ *
+ * They are neither customers nor prospects, so nothing in the CRM knew their
+ * addresses, and their answers fell into orphan mail waiting for a human to
+ * recognise the sender. This registry ends that: like the alias list two blocks
+ * up, it is read by the VPS sync at each run to widen its net of known
+ * addresses — same role, other population.
+ *
+ * Write-side only. The threads stay in email_messages, attached by lowercase
+ * address, which is why the registry keys on the lowercase address too.
+ */
+apiKeys.get('/v1/admin/institutional-contacts', (c) => {
+  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
+  return c.json({ contacts: listInstitutionalContacts() });
+});
+
+apiKeys.post('/v1/admin/institutional-contacts', async (c) => {
+  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
+  let body: unknown;
+  try {
+    body = await c.req.json<unknown>();
+  } catch {
+    return c.json({ error: 'invalid_json' }, 400);
+  }
+  // `null` and `[]` are valid JSON: reading a field off them throws, and the
+  // caller would get a 500 where the contract promises a 400.
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return c.json({ error: 'invalid_input', message: 'Corps attendu : un contact { email, org, category, ... }' }, 400);
+  }
+  const res = upsertInstitutionalContact(body as InstitutionalContactInput);
+  if (!res.ok) return c.json({ error: 'invalid_input', message: res.reason }, 400);
+  return c.json({ contacts: listInstitutionalContacts() });
+});
+
+apiKeys.post('/v1/admin/institutional-contacts/delete', async (c) => {
+  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
+  let body: { email?: unknown };
+  try {
+    body = await c.req.json<{ email?: unknown }>();
+  } catch {
+    return c.json({ error: 'invalid_json' }, 400);
+  }
+  const email = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : '';
+  if (!email) return c.json({ error: 'invalid_input', message: 'email requis' }, 400);
+  // Absence is the 404 above, so `deleted` can only ever be 1 here. It is kept
+  // as a count to read like /v1/admin/email-messages/delete.
+  if (!deleteInstitutionalContact(email)) return c.json({ error: 'not_found' }, 404);
+  return c.json({ deleted: 1, contacts: listInstitutionalContacts() });
 });
 
 apiKeys.post('/v1/admin/orphan-mail/resolve', async (c) => {

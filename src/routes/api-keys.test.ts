@@ -703,3 +703,81 @@ describe('/v1/admin/backup', () => {
     expect(body.counts.api_keys).toBe(body.api_keys.length);
   });
 });
+
+/**
+ * The institutional correspondents registry. It holds who an address belongs
+ * to and which dossier it answers, so the endpoints matter as much for what
+ * they refuse (no secret, no organisation) as for what they store.
+ */
+describe('/v1/admin/institutional-contacts', () => {
+  const ADMIN = { 'Content-Type': 'application/json', 'X-Admin-Secret': 'correct-horse-battery-staple' };
+  const ALPHA = 'registry@alpha.example.net';
+
+  const post = (path: string, body: unknown, headers: Record<string, string> = ADMIN) =>
+    makeApp().request(path, { method: 'POST', headers, body: JSON.stringify(body) });
+
+  async function purge() {
+    const { ensureInstitutionalTable } = await import('../lib/institutional-contacts.js');
+    ensureInstitutionalTable();
+    getStatsDB().prepare(`DELETE FROM institutional_contacts WHERE email LIKE '%@alpha.example.net'`).run();
+  }
+
+  it('refuses all three endpoints without the admin secret', async () => {
+    // The registry names who we are asking things of. It answers nobody else.
+    expect((await makeApp().request('/v1/admin/institutional-contacts')).status).toBe(401);
+    const json = { 'Content-Type': 'application/json' };
+    expect((await post('/v1/admin/institutional-contacts', { email: ALPHA }, json)).status).toBe(401);
+    expect((await post('/v1/admin/institutional-contacts/delete', { email: ALPHA }, json)).status).toBe(401);
+  });
+
+  it('lists the registry for an authorised caller', async () => {
+    const res = await makeApp().request('/v1/admin/institutional-contacts', {
+      headers: { 'X-Admin-Secret': 'correct-horse-battery-staple' },
+    });
+    expect(res.status).toBe(200);
+    const json = (await res.json()) as { contacts: unknown[] };
+    expect(Array.isArray(json.contacts)).toBe(true);
+  });
+
+  it('stores a correspondent and hands back the updated list', async () => {
+    await purge();
+    const res = await post('/v1/admin/institutional-contacts', {
+      email: ' Registry@Alpha.Example.NET ',
+      org: 'Autorité Alpha',
+      category: 'autorite',
+      country: 'ch',
+      dossier: 'Réutilisation des données publiées',
+    });
+    expect(res.status).toBe(200);
+    const { contacts } = (await res.json()) as { contacts: Array<Record<string, string | null>> };
+    const row = contacts.find((r) => r.email === ALPHA)!;
+    expect(row.org).toBe('Autorité Alpha');
+    expect(row.country).toBe('CH');
+    await purge();
+  });
+
+  it('answers 400 in French rather than storing a nameless row', async () => {
+    const res = await post('/v1/admin/institutional-contacts', { email: ALPHA, org: '', category: 'autorite' });
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string; message: string };
+    expect(body.error).toBe('invalid_input');
+    expect(body.message).toContain('organisation');
+  });
+
+  it('answers 400 on a body that is not an object, instead of crashing', async () => {
+    expect((await post('/v1/admin/institutional-contacts', null)).status).toBe(400);
+    expect((await post('/v1/admin/institutional-contacts', [{ email: ALPHA }])).status).toBe(400);
+  });
+
+  it('deletes a known address and reports a miss on an unknown one', async () => {
+    await purge();
+    await post('/v1/admin/institutional-contacts', { email: ALPHA, org: 'Autorité Alpha', category: 'autorite' });
+    const del = await post('/v1/admin/institutional-contacts/delete', { email: ALPHA.toUpperCase() });
+    expect(del.status).toBe(200);
+    const body = (await del.json()) as { deleted: number; contacts: Array<{ email: string }> };
+    expect(body.deleted).toBe(1);
+    expect(body.contacts.some((r) => r.email === ALPHA)).toBe(false);
+    // A second delete must not pretend to have removed anything.
+    expect((await post('/v1/admin/institutional-contacts/delete', { email: ALPHA })).status).toBe(404);
+  });
+});
