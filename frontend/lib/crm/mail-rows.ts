@@ -2,7 +2,6 @@ import { isArchived } from './archived';
 import { ballWithUs, followupDue, neverContacted } from './buckets';
 import { chipOf, replyGroupOf, type BusinessChip, type ReplyGroup } from './business';
 import { heatOf } from './heat';
-import { wonByOutreach } from './outreach';
 import { nextActionLabel } from './situation';
 import type { Contact, Message, NextAction, Situation } from './types';
 
@@ -73,16 +72,6 @@ export interface MailRow {
   confidence: 'high' | 'medium' | 'low' | null;
   /** A sleeper whose wake date just arrived — the list marks the return. */
   woke: boolean;
-  /**
-   * Won by outbound prospecting: we wrote to them before they minted a key.
-   * See lib/crm/outreach.ts for the rule and why it needs that causal proof.
-   *
-   * Decided here, once per row, rather than in the table: the rule walks the
-   * whole thread, the table re-renders on every keystroke and every hover, and
-   * the contact sheet would otherwise have to answer the same question a second
-   * way. Same reasoning as `chip` and `heat` above.
-   */
-  wonByOutreach: boolean;
   /**
    * What searchRows matches: the company and the address, in one string, which
    * is exactly what the deleted contact list's search matched. `who` cannot
@@ -282,7 +271,6 @@ function toRow(
     unread: c.unread,
     prospectId: c.sourcing?.prospectId ?? null,
     woke,
-    wonByOutreach: wonByOutreach(c),
     confidence:
       c.sourcing?.confidence === 'high' || c.sourcing?.confidence === 'medium' || c.sourcing?.confidence === 'low'
         ? c.sourcing.confidence

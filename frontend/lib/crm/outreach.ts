@@ -79,16 +79,29 @@ export function wonByOutreach(c: Contact): boolean {
   // A key holder, paid or free alike. The badge answers "did prospecting win
   // them", which quota tier they landed on is a different question.
   if (c.kind !== 'client') return false;
-  const sourcing = c.sourcing;
+  return wonByOutreachFrom(c.sourcing, c.apiKey.createdAt, c.messages);
+}
+
+/**
+ * The same rule on bare facts, for the pages that hold rows rather than
+ * `Contact`s — the Clients page joins keys, prospects and messages itself.
+ * One implementation, so the badge can never say yes on one page and no on
+ * the other for the same customer.
+ */
+export function wonByOutreachFrom(
+  sourcing: { source: string | null } | null | undefined,
+  keyCreatedAt: string | null | undefined,
+  messages: ReadonlyArray<{ direction: string; msg_date: string | null }>,
+): boolean {
   // No dossier at all: nobody ever sourced them, so nobody can have won them.
   if (!sourcing) return false;
   // Clause 1 above: the machine's dossier for an organic arrival.
   if (sourcing.source === AUTO_ENRICH) return false;
-  const keyAt = parseDate(c.apiKey.createdAt);
+  const keyAt = parseDate(keyCreatedAt);
   // Undatable key: there is no "before" to be on the right side of. A prospect
   // that never converted has no key either and stops here.
   if (keyAt === null) return false;
-  return c.messages.some((m) => {
+  return messages.some((m) => {
     if (m.direction !== 'out') return false;
     const at = parseDate(m.msg_date);
     return at !== null && at.getTime() < keyAt.getTime();

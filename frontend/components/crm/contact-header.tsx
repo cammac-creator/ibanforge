@@ -1,9 +1,8 @@
 import { UsageChart } from '@/components/dashboard/usage-chart';
 import { chipOf } from '@/lib/crm/business';
 import { heatOf } from '@/lib/crm/heat';
-import { AUTO_ENRICH, wonByOutreach } from '@/lib/crm/outreach';
+import { AUTO_ENRICH } from '@/lib/crm/outreach';
 import type { Contact, ProspectSourcing, Situation } from '@/lib/crm/types';
-import { ConquestChip } from './conquest-chip';
 import { OutcomeBadge, OutcomeControl } from './outcome-control';
 import { ProspectStatusBadge, ProspectStatusControl } from './prospect-status';
 import { ContactNotes } from './contact-notes';
@@ -103,12 +102,6 @@ export function ContactIdentity({ contact: c }: { contact: Contact }) {
                 {chip.label}
               </span>
             )}
-            {/* Full size here, unlike the row: the sheet is where the operator
-                stops to read, and "this one came from my own prospecting" is
-                the thing the whole outbound effort is judged on. Computed from
-                the contact rather than passed down as a prop, because this
-                header is also opened from places that hold no MailRow. */}
-            {wonByOutreach(c) && <ConquestChip />}
             {c.website && (
               <a
                 href={c.website}

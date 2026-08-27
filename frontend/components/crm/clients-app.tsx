@@ -17,6 +17,7 @@ import { flameOf } from '@/lib/crm/heat';
 import { fold } from '@/lib/crm/mail-rows';
 import { contactsHref } from '@/lib/crm/deep-link';
 import { ClientDossierModal } from './client-dossier-modal';
+import { ConquestChip } from './conquest-chip';
 import { VERDICTS, VERDICT_BY_KEY } from './verdict-meta';
 import { flag, relativeDays } from './dossier-bits';
 
@@ -333,6 +334,7 @@ export function ClientsApp({ dossiers, locale, windowDays = 90 }: { dossiers: Cl
                     {(() => { const chip = chipOfDossier(d); return chip ? (
                       <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide" style={{ color: chip.color, backgroundColor: chip.bg }}>{chip.label}</span>
                     ) : null; })()}
+                    {d.wonByOutreach && <ConquestChip compact />}
                     <span className="block min-w-0 truncate text-sm font-medium text-[var(--fg-1)]" title={d.email}>
                       {d.email}
                     </span>

@@ -414,3 +414,49 @@ describe('K1 — honest dates (former verdict, parsed ordering, unbounded first 
     expect(d.activation?.source).toBe('direct');
   });
 });
+
+describe('the conquest verdict on a dossier', () => {
+  // Wiring only. Each clause of the rule is pinned in isolation over in
+  // outreach.test.ts; what this pins is that the Clients page actually ASKS,
+  // with the joins it builds itself: the prospect row as the sourcing, the
+  // thread as the messages, and the FIRST key as the signup instant.
+  const dossierOf = (over: Partial<DossierInput>) =>
+    buildDossiers({ ...base, keys: [keyRow('d@alpha.example.net')], ...over })[0];
+
+  it('says won when a hand-sourced dossier holds an outbound mail predating the key', () => {
+    const d = dossierOf({
+      prospects: [prospectRow('d@alpha.example.net', { source: 'campagne-fixture' })],
+      messages: [msg('d@alpha.example.net', { msg_date: '2026-06-11T08:30:00Z' })],
+    });
+    expect(d.wonByOutreach).toBe(true);
+  });
+
+  it('never crowns the machine-filed dossier of an organic signup', () => {
+    const d = dossierOf({
+      prospects: [prospectRow('d@alpha.example.net', { source: 'auto-enrich' })],
+      messages: [msg('d@alpha.example.net', { msg_date: '2026-06-11T08:30:00Z' })],
+    });
+    expect(d.wonByOutreach).toBe(false);
+  });
+
+  it('does not count a mail sent after the key — onboarding wins nobody', () => {
+    const d = dossierOf({
+      prospects: [prospectRow('d@alpha.example.net', { source: 'campagne-fixture' })],
+      messages: [msg('d@alpha.example.net', { msg_date: '2026-07-21T12:08:00Z' })],
+    });
+    expect(d.wonByOutreach).toBe(false);
+  });
+
+  it('measures against the FIRST key: a later second key must not re-open the question', () => {
+    const d = dossierOf({
+      keys: [
+        keyRow('d@alpha.example.net'),
+        keyRow('d@alpha.example.net', { key_prefix: 'ifk_second', created_at: '2026-07-25 10:00:00' }),
+      ],
+      prospects: [prospectRow('d@alpha.example.net', { source: 'campagne-fixture' })],
+      // After the first key, before the second: support mail, not a conquest.
+      messages: [msg('d@alpha.example.net', { msg_date: '2026-07-10T12:00:00Z' })],
+    });
+    expect(d.wonByOutreach).toBe(false);
+  });
+});

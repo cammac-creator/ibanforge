@@ -1,6 +1,7 @@
 import { isInternalAccount, type ActivationClientRow, type KeyRow, type MessageRow, type ProspectRow } from './build-contacts';
 import { chipForStatus, type BusinessChip } from './business';
 import { heatFromFacts, type Heat } from './heat';
+import { wonByOutreachFrom } from './outreach';
 
 /** One row of /v1/admin/client-profiles. Mirrors ClientProfile in src/lib/stats.ts. */
 export interface ClientProfileRow {
@@ -126,6 +127,8 @@ export interface ClientDossier {
   firstCallEver: string | null;
   /** The activation row for this address, when the join succeeded. */
   activation: ActivationClientRow | null;
+  /** Won by outbound prospecting — the causal rule of outreach.ts, verbatim. */
+  wonByOutreach: boolean;
 }
 
 /**
@@ -327,6 +330,13 @@ export function buildDossiers(input: DossierInput): ClientDossier[] {
       for (const v of vals) if (v != null && v.trim() !== '') return v;
       return null;
     };
+    // Ordered on parsed instants, not on raw strings: created_at mixes the
+    // SQL and ISO shapes in production (one pilot holds both), and a bare
+    // string sort ranks 'T' against ' ' instead of time against time.
+    const signedUpAt = keys
+      .map((k) => k.created_at)
+      .sort((a, b) => (parseUtc(a)?.getTime() ?? 0) - (parseUtc(b)?.getTime() ?? 0))[0];
+
     const dossier: ClientDossier = {
       id,
       email: keys[0].email,
@@ -334,12 +344,7 @@ export function buildDossiers(input: DossierInput): ClientDossier[] {
       website: pick(prospect?.website, enriched?.website),
       country: pick(prospect?.country, enriched?.country),
       whatTheyDo: pick(prospect?.what_they_do, enriched?.what_they_do),
-      // Ordered on parsed instants, not on raw strings: created_at mixes the
-      // SQL and ISO shapes in production (one pilot holds both), and a bare
-      // string sort ranks 'T' against ' ' instead of time against time.
-      signedUpAt: keys
-        .map((k) => k.created_at)
-        .sort((a, b) => (parseUtc(a)?.getTime() ?? 0) - (parseUtc(b)?.getTime() ?? 0))[0],
+      signedUpAt,
       keys: keys.map((k) => ({
         prefix: k.key_prefix,
         createdAt: k.created_at,
@@ -401,6 +406,9 @@ export function buildDossiers(input: DossierInput): ClientDossier[] {
       usedAllTime: keys.reduce((s2, k) => s2 + (k.used_all_time ?? 0), 0),
       firstCallEver: activationByEmail.get(id)?.first_call_at ?? null,
       activation: activationByEmail.get(id) ?? null,
+      // The signup instant is the FIRST key: the mail must predate the moment
+      // they arrived, and a later second key must not re-open the question.
+      wonByOutreach: wonByOutreachFrom(prospect ?? null, signedUpAt, thread),
     };
     dossier.verdict = decideVerdict(dossier, now);
     out.push(dossier);

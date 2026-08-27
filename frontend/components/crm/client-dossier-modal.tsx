@@ -12,6 +12,7 @@ import {
 } from '@/lib/crm/client-dossiers';
 import { botsHref, contactsHref } from '@/lib/crm/deep-link';
 import { Bar, Empty, HoursStrip, Section, Stat, flag, relativeDays } from './dossier-bits';
+import { ConquestChip } from './conquest-chip';
 import { ContactNotes } from './contact-notes';
 import { ActivityChart } from './activity-chart';
 import { RaiseLimitControl } from './raise-limit-control';
@@ -168,6 +169,7 @@ export function ClientDossierModal({
                     {chip.label}
                   </span>
                 )}
+                {d.wonByOutreach && <ConquestChip />}
                 {heat.score >= 40 && (
                   <span
                     className="shrink-0 text-[12px]"
