@@ -1,6 +1,6 @@
 import { formatDay } from '@/lib/crm/format';
-import { NEXT_ACTION_LABEL } from '@/lib/crm/situation';
-import type { Situation } from '@/lib/crm/types';
+import { nextActionLabel } from '@/lib/crm/situation';
+import type { Contact, Situation } from '@/lib/crm/types';
 
 /**
  * The band answers, in one glance, the three questions asked on opening a
@@ -25,8 +25,13 @@ const BALL = {
   none: { label: 'Jamais contacté', fg: '#a1a1aa', bg: '#27272a', border: '#3f3f46' },
 } as const;
 
-export function SituationBand({ situation: s }: { situation: Situation }) {
+export function SituationBand({ situation: s, kind }: { situation: Situation; kind?: Contact['kind'] }) {
   const b = BALL[s.ballInCourt];
+  // "Jamais contacté" is the prospecting word for the same fact, and this band
+  // sits directly above a sheet that calls it a first written request. Nothing
+  // else about the band changes: the ball, the silence and the counts are facts
+  // about the thread, not about who is on the other end of it.
+  const ballLabel = kind === 'institution' && s.ballInCourt === 'none' ? 'Pas encore écrit' : b.label;
   // A message sent today is not a silence, and "silence depuis 0 j" reads as a
   // bug. The thread below already carries the date of the last message.
   const silence = s.silenceDays !== null && s.silenceDays > 0 ? s.silenceDays : null;
@@ -39,7 +44,7 @@ export function SituationBand({ situation: s }: { situation: Situation }) {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <span className="text-[12px] font-bold uppercase tracking-wide" style={{ color: b.fg }}>
-            {b.label}
+            {ballLabel}
           </span>
           {silence !== null && (
             <span className="text-[13px] text-[var(--fg-2)]">
@@ -56,7 +61,7 @@ export function SituationBand({ situation: s }: { situation: Situation }) {
           {s.messageCount} message{s.messageCount > 1 ? 's' : ''}
         </span>
       </div>
-      <p className="mt-1.5 text-[12px] text-amber-300">→ {NEXT_ACTION_LABEL[s.nextAction]}</p>
+      <p className="mt-1.5 text-[12px] text-amber-300">→ {nextActionLabel(s.nextAction, kind)}</p>
     </div>
   );
 }

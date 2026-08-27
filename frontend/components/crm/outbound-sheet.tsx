@@ -13,7 +13,7 @@ import {
   type ProposedAngle,
 } from '@/lib/crm/api-result';
 import { canLoadReadyMail } from '@/lib/crm/ready-mail';
-import { NEXT_ACTION_LABEL } from '@/lib/crm/situation';
+import { nextActionLabel } from '@/lib/crm/situation';
 import { threadTail } from '@/lib/crm/thread-tail';
 import type { Contact, Situation } from '@/lib/crm/types';
 import { GuardrailChecks, OverrideButton, useGuardrails } from './guardrails-ui';
@@ -362,7 +362,10 @@ export function OutboundSheet({
       `Contact: ${c.company || c.email}`,
       c.sourcing?.whatTheyDo ? `What they do: ${c.sourcing.whatTheyDo}` : '',
       c.sourcing?.personalizationHook ? `Hook: ${c.sourcing.personalizationHook}` : '',
-      s ? `Goal: ${NEXT_ACTION_LABEL[s.nextAction]}` : '',
+      // Through the function like every other reader, though crm-app never
+      // routes an institution here: one way of naming a state, so a surface
+      // cannot pick the wrong vocabulary by forgetting the question exists.
+      s ? `Goal: ${nextActionLabel(s.nextAction, c.kind)}` : '',
       // Verbatim, both fields: the operator chose this angle by reading these
       // very words, so anything reworded here would steer a draft they did not
       // choose. Em dashes are scrubbed upstream, on all three fields.

@@ -250,7 +250,7 @@ export function CrmApp({
             <ContactIdentity contact={selected} />
             {situation && (
               <div className="mt-3">
-                <SituationBand situation={situation} />
+                <SituationBand situation={situation} kind={selected.kind} />
               </div>
             )}
             {/* Pinned with the band, not scrolled with the thread: the whole

@@ -2,7 +2,7 @@ import { isArchived } from './archived';
 import { ballWithUs, followupDue, neverContacted } from './buckets';
 import { chipOf, replyGroupOf, type BusinessChip, type ReplyGroup } from './business';
 import { heatOf } from './heat';
-import { NEXT_ACTION_LABEL } from './situation';
+import { nextActionLabel } from './situation';
 import type { Contact, Message, Situation } from './types';
 
 export type MailFilterKey =
@@ -211,7 +211,7 @@ function toRow(
         ? c.sourcing.confidence
         : null,
     email: c.email,
-    next: s ? NEXT_ACTION_LABEL[s.nextAction] : null,
+    next: s ? nextActionLabel(s.nextAction, c.kind) : null,
     // Folded at build time, matched folded: name, address, and the whole
     // thread's subjects and snippets, so "batch" finds the batch conversation.
     //
