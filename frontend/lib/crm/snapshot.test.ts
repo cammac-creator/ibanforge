@@ -196,4 +196,44 @@ describe('crmSnapshot', () => {
     expect(snap.sentToday).toBe(0);
     expect(snap.revenueUsd).toBe(0);
   });
+
+  /**
+   * The head count, with a third kind in the base.
+   *
+   * `clients` sits on the overview and the owner reads it daily. An authority
+   * counted there would inflate it, and it would then be asked for a revenue
+   * and a free-tier verdict it can never have. `active` still adds up to the
+   * three, which is what keeps a reader from taking the difference for a bug.
+   */
+  it('counts institutions apart, and never as clients', () => {
+    const snap = crmSnapshot(
+      {
+        keys: [keyRow('ops@alpha.example.net', { used_all_time: 12 })],
+        prospects: [prospectRow('p1', 'lead@alpha.example.net')],
+        messages: [],
+        activityByKey: {},
+        reads: {},
+        months: [],
+        institutions: [
+          {
+            email: 'registry@alpha.example.net',
+            org: 'Autorité Alpha',
+            category: 'autorite',
+            country: 'CH',
+            role: null,
+            website: null,
+            dossier: null,
+          },
+        ],
+      },
+      NOW,
+    );
+    expect(snap.clients).toBe(1);
+    expect(snap.prospects).toBe(1);
+    expect(snap.institutions).toBe(1);
+    expect(snap.active).toHaveLength(3);
+    expect(snap.clients + snap.prospects + snap.institutions).toBe(snap.active.length);
+    // No money is ever attributed to a correspondent.
+    expect(snap.revenueUsd).toBe(0);
+  });
 });

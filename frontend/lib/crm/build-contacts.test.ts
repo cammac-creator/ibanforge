@@ -5,6 +5,7 @@ import {
   isInternalAccount,
   SEEDED_PILOT_RE,
   type BuildInput,
+  type InstitutionalContactRow,
   type KeyRow,
   type MessageRow,
   type ProspectRow,
@@ -818,5 +819,146 @@ describe('buildContacts', () => {
     ];
     buildContacts({ ...base, prospects: [prospectRow('p17', 'lead17@example.net')], messages });
     expect(messages.map((m) => m.subject)).toEqual(['second', 'first']);
+  });
+});
+
+/**
+ * The institutional correspondents: the third emission loop.
+ *
+ * Every fixture here is invented. `alpha.example.net` is the reserved
+ * documentation domain this file already uses, and no real authority, bank,
+ * scheme or supplier is named anywhere: the register is filled at runtime,
+ * through the API, and this repository is public.
+ */
+const instRow = (email: string, over: Partial<InstitutionalContactRow> = {}): InstitutionalContactRow => ({
+  email,
+  org: 'Autorité Alpha',
+  category: 'autorite',
+  country: 'CH',
+  role: null,
+  website: null,
+  dossier: null,
+  ...over,
+});
+
+/** Narrow to an institution, failing loudly rather than silently skipping. */
+function asInstitution(contact: Contact) {
+  if (contact.kind !== 'institution') throw new Error(`expected an institution, got ${contact.kind}`);
+  return contact;
+}
+
+describe('buildContacts, institutional correspondents', () => {
+  it('emits one contact per registered address, with the organisation as its name', () => {
+    const out = buildContacts({
+      ...base,
+      institutions: [instRow('registry@alpha.example.net', { role: 'Service des registres' })],
+    });
+    const inst = asInstitution(out[0]);
+    expect(out).toHaveLength(1);
+    expect(inst.id).toBe('registry@alpha.example.net');
+    expect(inst.company).toBe('Autorité Alpha');
+    expect(inst.institution.category).toBe('autorite');
+    expect(inst.institution.role).toBe('Service des registres');
+    // The company mailbox, never the warm personal one: a written request to an
+    // institution is written by IBANforge, and this account is never empty.
+    expect(inst.account).toBe('claude-alain@ibanforge.com');
+  });
+
+  it('carries the thread that arrived on that address, and its unread state', () => {
+    const out = buildContacts({
+      ...base,
+      institutions: [instRow('registry@alpha.example.net')],
+      messages: [
+        msgRow('registry@alpha.example.net', { direction: 'out', msg_date: '2026-07-01T10:00', subject: 'Demande' }),
+        msgRow('registry@alpha.example.net', { direction: 'in', msg_date: '2026-07-20T10:00', subject: 'Réponse' }),
+      ],
+    });
+    const inst = asInstitution(out[0]);
+    expect(inst.messages.map((m) => m.subject)).toEqual(['Demande', 'Réponse']);
+    expect(inst.unread).toBe(true);
+  });
+
+  it('lowercases the address, which is the join key the mail sync files against', () => {
+    const out = buildContacts({ ...base, institutions: [instRow('Registry@Alpha.Example.NET')] });
+    expect(out[0].id).toBe('registry@alpha.example.net');
+  });
+
+  // The three exclusion rules, one test each. Together they say: a commercial
+  // identity always wins the address, and the register can never split one
+  // contact in two.
+  it('leaves an address that already emitted as a client alone', () => {
+    const out = buildContacts({
+      ...base,
+      keys: [keyRow('ops@alpha.example.net')],
+      institutions: [instRow('ops@alpha.example.net', { org: 'Fournisseur Alpha', category: 'fournisseur' })],
+    });
+    expect(out).toHaveLength(1);
+    expect(out[0].kind).toBe('client');
+  });
+
+  it('leaves an address that already emitted as a prospect alone', () => {
+    const out = buildContacts({
+      ...base,
+      prospects: [prospectRow('p1', 'lead@alpha.example.net')],
+      institutions: [instRow('lead@alpha.example.net')],
+    });
+    expect(out).toHaveLength(1);
+    expect(out[0].kind).toBe('prospect');
+  });
+
+  it('emits one contact when the register lists the same address twice', () => {
+    const out = buildContacts({
+      ...base,
+      institutions: [instRow('registry@alpha.example.net'), instRow('registry@alpha.example.net', { org: 'Doublon' })],
+    });
+    expect(out).toHaveLength(1);
+    expect(out[0].company).toBe('Autorité Alpha');
+  });
+
+  it('drops a row with no address, which has no thread and nothing to write to', () => {
+    const out = buildContacts({ ...base, institutions: [instRow('  ')] });
+    expect(out).toHaveLength(0);
+  });
+
+  /**
+   * The rule this one pins is an omission, so nothing else would catch it
+   * breaking. INTERNAL_RE matches "audit" ANYWHERE in an address, which is a
+   * sane net over machine-minted keys and a trap over a desk the operator
+   * registered by hand: a supervisory address is exactly what this feature
+   * exists for, and applying the filter would make it vanish without a word.
+   */
+  it('does not apply the internal-address filter to a hand-registered correspondent', () => {
+    expect(isInternalAccount('audit@alpha.example.net')).toBe(true);
+    const out = buildContacts({ ...base, institutions: [instRow('audit@alpha.example.net')] });
+    expect(out).toHaveLength(1);
+    expect(out[0].kind).toBe('institution');
+  });
+
+  it('never attaches a business block, whatever the activation payload says', () => {
+    const out = buildContacts({
+      ...base,
+      institutions: [instRow('registry@alpha.example.net')],
+      activation: [
+        {
+          email: 'registry@alpha.example.net',
+          status: 'paying',
+          source: 'direct',
+          credits_total: 1000,
+          credits_remaining: 900,
+          packs: 1,
+          first_call_at: null,
+          calls_90d: 0,
+        },
+      ],
+    });
+    expect(out[0].business).toBeUndefined();
+  });
+
+  // The deploy story: Vercel and Railway ship independently, so this page runs
+  // for a while against an API that answers 404 on the new endpoint.
+  it('is the CRM it was when the register is absent', () => {
+    const out = buildContacts({ ...base, keys: [keyRow('ops@alpha.example.net')] });
+    expect(out).toHaveLength(1);
+    expect(out[0].kind).toBe('client');
   });
 });

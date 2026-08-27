@@ -1,19 +1,28 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { INSTITUTION_CATEGORIES } from '@/lib/crm/business';
 import { suggestFor, type PersonRow } from '@/lib/crm/orphan-suggest';
 
 /**
- * The two gestures that let the orphan queue empty:
+ * The three gestures that let the orphan queue empty:
  *
  * - "this orphan IS that customer" — registers the sender as an alias of the
  *   canonical address (honoured by the write endpoints and the VPS sync's
  *   known-address net), then resolves the orphan. From the next sync run the
  *   sender's whole thread folds into the customer's file, forever.
+ * - "this is an institution writing to us" — registers the SENDER itself as an
+ *   institutional correspondent, then resolves the orphan against its own
+ *   address. No alias: nothing is being merged into anything, an authority is
+ *   its own file. This is the road that was missing, and it was the expensive
+ *   one: the comment below used to name "an authority answering one of our
+ *   permission letters" as an example of mail to DISMISS, so the one answer
+ *   worth keeping forever was filed as noise, and the next mail from the same
+ *   desk arrived just as unknown.
  * - "this is nobody's mail" — resolves the orphan with no alias, for the mail
- *   that is legitimately not a customer (an authority answering one of our
- *   permission letters, a newsletter). Without this exit the queue could only
- *   grow, and a queue that cannot reach zero stops being read.
+ *   that is legitimately nobody's (a newsletter, an automatic notice). Without
+ *   this exit the queue could only grow, and a queue that cannot reach zero
+ *   stops being read.
  *
  * The canonical address is picked from the CRM's people index, not recalled
  * from memory: the operator is looking at an UNKNOWN address, so the one thing
@@ -58,8 +67,11 @@ function loadAliases(): Promise<Map<string, string>> {
   return aliasesPromise;
 }
 
-type Mode = 'closed' | 'attach' | 'dismiss';
+type Mode = 'closed' | 'attach' | 'institution' | 'dismiss';
 type Busy = 'idle' | 'busy' | 'error';
+
+/** Free-category sentinel: the select offers it, the input under it carries it. */
+const FREE_CATEGORY = '__libre__';
 
 export function AttachOrphanControl({ orphanId, sender }: { orphanId: string; sender: string }) {
   const [mode, setMode] = useState<Mode>('closed');
@@ -75,7 +87,13 @@ export function AttachOrphanControl({ orphanId, sender }: { orphanId: string; se
   const [message, setMessage] = useState('');
   const [rows, setRows] = useState<PersonRow[] | 'failed' | null>(null);
   const [knownAlias, setKnownAlias] = useState<string | null>(null);
-  const [done, setDone] = useState<{ kind: 'attached'; to: string } | { kind: 'dismissed' } | null>(null);
+  const [org, setOrg] = useState('');
+  const [category, setCategory] = useState(INSTITUTION_CATEGORIES[0].value);
+  const [customCategory, setCustomCategory] = useState('');
+  const [country, setCountry] = useState('');
+  const [done, setDone] = useState<
+    { kind: 'attached'; to: string } | { kind: 'registered'; org: string } | { kind: 'dismissed' } | null
+  >(null);
 
   useEffect(() => {
     if (mode !== 'attach' || rows !== null) return;
@@ -97,6 +115,17 @@ export function AttachOrphanControl({ orphanId, sender }: { orphanId: string; se
     return (
       <p aria-live="polite" className="mt-1 text-[12px] text-emerald-400">
         ✓ {sender} rattaché à {done.to} — son fil complet remonte au prochain passage de la synchro (horaire).
+      </p>
+    );
+  }
+  if (done?.kind === 'registered') {
+    // Its own sentence, and not the 'attached' one. That one says "rattaché à
+    // {to}", which would print the sender's own address as the thing it was
+    // attached to — true and unreadable. Nothing was merged here: an address
+    // was given a name and a file of its own.
+    return (
+      <p aria-live="polite" className="mt-1 text-[12px] text-sky-300">
+        ✓ {sender} enregistré comme correspondant ({done.org}) — retrouve-le sous « Correspondances ».
       </p>
     );
   }
@@ -122,6 +151,13 @@ export function AttachOrphanControl({ orphanId, sender }: { orphanId: string; se
           className="rounded border border-amber-500/40 px-2 py-1 text-[12px] font-medium text-amber-400 hover:bg-amber-500/10"
         >
           Rattacher à un client…
+        </button>
+        <button
+          type="button"
+          onClick={() => setMode('institution')}
+          className="rounded border border-sky-500/40 px-2 py-1 text-[12px] font-medium text-sky-300 hover:bg-sky-500/10"
+        >
+          Rattacher à un correspondant…
         </button>
         <button
           type="button"
@@ -162,11 +198,150 @@ export function AttachOrphanControl({ orphanId, sender }: { orphanId: string; se
     return data;
   }
 
+  if (mode === 'institution') {
+    const chosenCategory = category === FREE_CATEGORY ? customCategory.trim() : category;
+    const cleanedOrg = org.trim();
+    const ready = !!cleanedOrg && !!chosenCategory;
+    const field =
+      'min-w-0 flex-1 rounded border border-[var(--ink-4)] bg-[var(--ink-0)] px-2 py-1.5 text-base text-[var(--fg-1)] placeholder:text-[var(--fg-5)] focus:border-sky-500/50 focus:outline-none sm:max-w-[220px] sm:text-[12.5px]';
+
+    return (
+      <div className="mt-1.5">
+        <p className="mb-1.5 text-[12px] text-[var(--fg-3)]">
+          Enregistrer <strong>{sender}</strong> comme correspondant institutionnel — autorité, banque centrale,
+          réseau, registre, fournisseur. Son fil aura son propre dossier.
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            type="text"
+            autoComplete="off"
+            aria-label="Nom de l’institution"
+            value={org}
+            onChange={(e) => {
+              setOrg(e.target.value);
+              setArmed(false);
+              clearFailure();
+            }}
+            placeholder="nom de l’institution…"
+            className={field}
+          />
+          <select
+            aria-label="Catégorie"
+            value={category}
+            onChange={(e) => {
+              setCategory(e.target.value);
+              setArmed(false);
+              clearFailure();
+            }}
+            className={field}
+          >
+            {INSTITUTION_CATEGORIES.map((c) => (
+              <option key={c.value} value={c.value}>
+                {c.label}
+              </option>
+            ))}
+            <option value={FREE_CATEGORY}>autre catégorie (à écrire)…</option>
+          </select>
+          {category === FREE_CATEGORY && (
+            <input
+              type="text"
+              autoComplete="off"
+              aria-label="Catégorie à écrire"
+              value={customCategory}
+              onChange={(e) => {
+                setCustomCategory(e.target.value);
+                setArmed(false);
+                clearFailure();
+              }}
+              placeholder="catégorie…"
+              className={field}
+            />
+          )}
+          <input
+            type="text"
+            autoComplete="off"
+            aria-label="Pays (facultatif)"
+            value={country}
+            onChange={(e) => {
+              setCountry(e.target.value);
+              clearFailure();
+            }}
+            placeholder="pays (facultatif)…"
+            className={field}
+          />
+          <button
+            type="button"
+            disabled={busy === 'busy' || !ready}
+            onClick={async () => {
+              // Same two-click arming as the alias road, for the same reason:
+              // the second click has to be a decision, and a plain double-click
+              // must not count as both.
+              if (!armed) {
+                setArmed(true);
+                armedAtRef.current = Date.now();
+                return;
+              }
+              if (Date.now() - armedAtRef.current < 400) return;
+              setBusy('busy');
+              try {
+                // The register FIRST, the queue second. If the second call
+                // fails the correspondent is already known — the address is
+                // what makes the whole thread come back — and the orphan is
+                // still in a queue the operator can act on again. The other
+                // order would resolve the orphan and lose the address on a
+                // failure, which is unrecoverable from this screen.
+                await post('/api/crm/institutional-contacts', {
+                  email: sender,
+                  org: cleanedOrg,
+                  category: chosenCategory,
+                  country: country.trim() || null,
+                });
+                // attached_to is the sender itself: it IS the canonical
+                // address of this file, so `resolved_as` records the truth
+                // rather than a merge that never happened.
+                await post('/api/crm/orphan-resolve', { id: orphanId, attached_to: sender });
+                setDone({ kind: 'registered', org: cleanedOrg });
+              } catch (e) {
+                setMessage(e instanceof Error ? e.message : 'échec');
+                setBusy('error');
+                setArmed(false);
+              }
+            }}
+            className={`rounded border px-2.5 py-1.5 text-[12px] font-medium disabled:opacity-40 ${
+              armed ? 'border-sky-400 bg-sky-500/15 text-sky-200' : 'border-sky-500/50 text-sky-300 hover:bg-sky-500/10'
+            }`}
+          >
+            {busy === 'busy' ? 'Enregistrement…' : armed ? 'Oui, enregistrer' : 'Enregistrer'}
+          </button>
+          <button
+            type="button"
+            onClick={reset}
+            className="rounded px-1.5 py-1 text-[12px] text-[var(--fg-4)] hover:text-[var(--fg-2)]"
+          >
+            annuler
+          </button>
+        </div>
+        <div aria-live="polite">
+          {armed && (
+            <p className="mt-1.5 text-[12px] text-sky-200">
+              Enregistrer <strong>{sender}</strong> sous <strong>{cleanedOrg}</strong> ({chosenCategory}). Reclique
+              pour confirmer.
+            </p>
+          )}
+          {busy === 'error' && <p className="mt-1 text-[12px] text-red-300">échec : {message}</p>}
+        </div>
+      </div>
+    );
+  }
+
   if (mode === 'dismiss') {
     return (
       <div className="mt-1.5 flex flex-wrap items-center gap-2">
         <span className="text-[12px] text-[var(--fg-3)]">
-          Classer ce mail sans le relier à personne (autorité, avis automatique…) ?
+          {/* "autorité" used to be the example given here, which sent the one
+              answer worth keeping down the dismissal road. It now has its own
+              button, so the examples name what is genuinely nobody's mail. */}
+          Classer ce mail sans le relier à personne (newsletter, avis automatique…) ?
         </span>
         <button
           type="button"

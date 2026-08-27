@@ -181,6 +181,92 @@ describe('POST /api/crm/generate-draft, the follow-up mode on the wire', () => {
   });
 });
 
+/**
+ * The institutional road, checked on the wire for the same reason the redaction
+ * rules are: what matters is the bytes the VPS receives.
+ *
+ * It is the one road where the enrichment MUST fire without any admin
+ * credentials. The commercial one is keyed on API keys and returns the body
+ * untouched when the address holds none, which an authority never does, so
+ * without a branch of its own the single most consequential letter this CRM
+ * writes would go out knowing nothing about who is writing it. No admin
+ * environment is stubbed in this file, so these tests run in exactly the
+ * degraded state that used to produce nothing at all.
+ *
+ * Fixtures invented, as everywhere in this repository: no real authority,
+ * scheme or supplier is named, here or in a comment.
+ */
+describe('POST /api/crm/generate-draft, correspondence with an institution', () => {
+  const institutional = (over: Record<string, unknown> = {}) => ({
+    ...draft('registry@alpha.example.net'),
+    contact_kind: 'institution',
+    institution: {
+      org: 'Autorité Alpha',
+      category: 'autorite',
+      country: 'CH',
+      dossier: 'Permission de citer leur registre',
+    },
+    ...over,
+  });
+
+  it('flags the request institutional, server-side, so no send path can forget it', async () => {
+    await post(institutional());
+
+    expect(captured!.body).toHaveProperty('institutional', true);
+    // The composer's own fields travel untouched beside it.
+    expect(captured!.body).toMatchObject({ contact_kind: 'institution', to: 'registry@alpha.example.net' });
+  });
+
+  it('grounds the letter in who IBANforge is and how it treats public data', async () => {
+    await post(institutional());
+    const context = String(captured!.body.context);
+
+    expect(context.startsWith(BRIEF)).toBe(true);
+    expect(context).toContain('WRITTEN CORRESPONDENCE');
+    expect(context).toContain('Swiss commercial API');
+    expect(context).toContain('permission is asked IN WRITING');
+    // The identity block and the address rule the commercial road also carries.
+    expect(context).toContain('free tier 200 requests/month');
+    expect(context).toContain('do not guess one');
+  });
+
+  it('carries the institution and the operator’s file line into the brief', async () => {
+    await post(institutional());
+    const context = String(captured!.body.context);
+
+    expect(context).toContain('Autorité Alpha (autorite), CH');
+    expect(context).toContain('Permission de citer leur registre');
+  });
+
+  it('still writes the identity block when the register row carries nothing but a name', async () => {
+    await post(institutional({ institution: { org: 'Institut Gamma' } }));
+    const context = String(captured!.body.context);
+
+    expect(captured!.body).toHaveProperty('institutional', true);
+    expect(context).toContain('Institut Gamma');
+    expect(context).toContain('Swiss commercial API');
+  });
+
+  it('leaves an ordinary commercial draft exactly as it was', async () => {
+    await post(draft('someone@example.net'));
+
+    expect(captured!.body).not.toHaveProperty('institutional');
+    expect(captured!.body.context).toBe(BRIEF);
+  });
+
+  it('still obeys a redaction rule on the institutional road', async () => {
+    // The rules are applied before the enrichment, so the instruction has to
+    // survive the rewrite that appends the facts. A confidentiality clause does
+    // not stop applying because the recipient is an authority.
+    vi.stubEnv('CRM_DRAFT_REDACTION_RULES', 'alpha.example.net=Acme');
+    await post(institutional());
+    const context = String(captured!.body.context);
+
+    expect(context).toContain('IMPORTANT: never mention "Acme" anywhere.');
+    expect(context).toContain('Swiss commercial API');
+  });
+});
+
 describe('POST /api/crm/generate-draft, the paths around it', () => {
   it('answers 503 and calls nobody when the shared secret is missing', async () => {
     vi.stubEnv('CRM_DRAFT_SECRET', '');

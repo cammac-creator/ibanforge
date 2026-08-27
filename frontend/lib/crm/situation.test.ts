@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { situationOf } from './situation';
-import type { Message } from './types';
+import { NEXT_ACTION_LABEL, nextActionLabel, situationOf } from './situation';
+import type { Message, NextAction } from './types';
 
 // Offset-free on purpose, like the msg_date values the API stores. Both operands
 // of every subtraction below are parsed in the runner's zone, so the local offset
@@ -224,5 +224,49 @@ describe('situationOf', () => {
       // a robot cannot pull a deliberately archived prospect back into view.
       expect(s.messageCount).toBe(1);
     });
+  });
+});
+
+/**
+ * The five states are facts about a thread and do not change with the
+ * recipient. What they are CALLED does, and two of the commercial names
+ * instruct the wrong act when the other end is an institution — which is why
+ * this is pinned rather than left to be noticed on screen.
+ */
+describe('nextActionLabel', () => {
+  const ACTIONS: NextAction[] = ['first_mail', 'reply', 'followup', 'firm_offer', 'wait'];
+
+  it('is the commercial wording for a client, a prospect, and an unstated kind', () => {
+    for (const a of ACTIONS) {
+      expect(nextActionLabel(a, 'client')).toBe(NEXT_ACTION_LABEL[a]);
+      expect(nextActionLabel(a, 'prospect')).toBe(NEXT_ACTION_LABEL[a]);
+      expect(nextActionLabel(a)).toBe(NEXT_ACTION_LABEL[a]);
+    }
+  });
+
+  /**
+   * An institution reaches `firm_offer` by the ordinary road: they answered
+   * once, we wrote back, no follow-up is due yet. The band would have printed
+   * "Envoyer une offre ferme datée" directly above the composer — a dated
+   * commercial offer to a financial supervisor.
+   */
+  it('never tells the operator to send a firm offer to an institution', () => {
+    expect(nextActionLabel('firm_offer', 'institution')).toBe('En attente de leur réponse écrite');
+    expect(nextActionLabel('firm_offer', 'institution')).not.toContain('offre');
+  });
+
+  /**
+   * Every correspondent is in this state on the day it is registered, and the
+   * sheet three centimetres below says "Première demande à". One screen must
+   * not carry two vocabularies for one act.
+   */
+  it('calls an unwritten institutional thread a request, not a first cold mail', () => {
+    expect(nextActionLabel('first_mail', 'institution')).toBe('Première demande à écrire');
+  });
+
+  it('says something for every state rather than falling through to blank', () => {
+    for (const a of ACTIONS) {
+      expect(nextActionLabel(a, 'institution')).toBeTruthy();
+    }
   });
 });

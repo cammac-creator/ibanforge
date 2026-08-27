@@ -13,6 +13,7 @@ import {
 import { REPLY_GROUP_LABEL } from '@/lib/crm/business';
 import { flameOf } from '@/lib/crm/heat';
 import { localDay } from '@/lib/crm/snooze';
+import { NewInstitutionForm } from './new-institution';
 
 /**
  * The left column. Holds no rule of its own: it asks mail-rows.ts what the
@@ -234,13 +235,25 @@ export function MailList({
         })}
       </div>
 
+      {/* Only under Correspondances. Registering an address is the gesture that
+          filter is FOR — nothing else on this page can make an institution's
+          thread appear — and it would be noise above the day's reply queue. */}
+      {active === 'institution' && <NewInstitutionForm />}
+
       <div className={`min-h-0 flex-1 overflow-y-auto py-1.5 ${busy ? 'opacity-60' : ''}`}>
         {rows.length === 0 ? (
           // Two different absences: a filter can be empty, and a search can
           // empty a filter that is not. Blaming the filter while a query
           // stands would send the operator to the wrong control.
           <p className="px-4 py-6 text-center text-[13.5px] text-[var(--fg-3)]">
-            {q.trim() ? 'Aucun contact ne correspond.' : 'Rien dans ce filtre.'}
+            {q.trim()
+              ? 'Aucun contact ne correspond.'
+              : active === 'institution'
+                ? // Naming the way out rather than the emptiness: this filter is
+                  // empty until an address is registered, and the control that
+                  // registers one is directly above this line.
+                  'Aucun correspondant enregistré. Ajoute une adresse pour que son fil remonte ici.'
+                : 'Rien dans ce filtre.'}
           </p>
         ) : (
           rows.map((r, i) => {

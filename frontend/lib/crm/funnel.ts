@@ -142,8 +142,18 @@ export const BY_CONFIDENCE = (c: Contact) => {
  * Rows whose stored text names no country land in one visible bucket rather
  * than vanishing: a breakdown that silently drops a tenth of its rows claims a
  * completeness it does not have. See country.ts.
+ *
+ * Institutional correspondents are the one exclusion, and it is this cut's
+ * particular hazard rather than a general rule. The three cuts above read the
+ * sourcing block, which an institution has none of, so they skip it on their
+ * own; this one reads `country`, which build-contacts fills for a correspondent
+ * from what the operator typed. Left in, a supervisory authority would carry
+ * `stock` and `replied` counts into the table that answers "where is the
+ * business", and a permission letter answered by a registry would read as a
+ * lead that replied. It is not one, and the mail is not outreach.
  */
 export const BY_COUNTRY = (c: Contact) => {
+  if (c.kind === 'institution') return null;
   const r = resolveCountry(c.country);
   return { key: r.code ?? '??', label: r.label };
 };

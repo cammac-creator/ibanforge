@@ -92,8 +92,12 @@ export function CrmApp({
   );
   // ?vue=prospection lands the column on the prospecting queue — the nav's
   // Prospects entry survives the page merge as this deep link.
+  // ?vue=correspondances does the same for the institutional filter, so a link
+  // in a note or a bookmark can land straight on "where are the answers from
+  // the authorities" without a click on a filter whose name has to be recalled.
+  const vue = searchParams.get('vue');
   const initialFilter: MailFilterKey | undefined =
-    searchParams.get('vue') === 'prospection' ? 'prospect' : undefined;
+    vue === 'prospection' ? 'prospect' : vue === 'correspondances' ? 'institution' : undefined;
   const [selectedId, setSelectedId] = useState<string | null>(linked);
   const [readLocal, setReadLocal] = useState<Set<string>>(new Set());
   // Owned here rather than in the sheets: opening one decides how much scroll
@@ -145,8 +149,14 @@ export function CrmApp({
    * nowhere else in this tree: the sheet that is rendered and the room the
    * thread reserves for it have to agree, and two readings are two answers
    * waiting to disagree.
+   *
+   * The kind is handed over as well as the situation, and it is what keeps an
+   * institution off the prospecting sheet even before its first letter: see
+   * intent.ts. OutboundSheet asks for an angle and offers a pre-written pitch,
+   * which is not a thing to put in front of somebody about to write to a
+   * financial supervisor.
    */
-  const intent = intentOf(situation);
+  const intent = intentOf(situation, selected?.kind);
 
   // The scrolling region holds the dossier and then the thread, oldest message
   // first, so its natural resting place is the top: the dossier. What the
@@ -240,7 +250,7 @@ export function CrmApp({
             <ContactIdentity contact={selected} />
             {situation && (
               <div className="mt-3">
-                <SituationBand situation={situation} />
+                <SituationBand situation={situation} kind={selected.kind} />
               </div>
             )}
             {/* Pinned with the band, not scrolled with the thread: the whole

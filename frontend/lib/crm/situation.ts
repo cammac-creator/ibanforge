@@ -1,5 +1,5 @@
 import { isAutomated } from './automated';
-import type { Message, NextAction, Situation } from './types';
+import type { Contact, Message, NextAction, Situation } from './types';
 
 /** Days of silence after which an unanswered outbound becomes a followup. */
 export const FOLLOWUP_DAYS = 10;
@@ -100,3 +100,43 @@ export const NEXT_ACTION_LABEL: Record<NextAction, string> = {
   firm_offer: 'Envoyer une offre ferme datée',
   wait: 'Rien à faire, en attente de sa réponse',
 };
+
+/**
+ * The same five states, said to somebody about to write to an institution.
+ *
+ * `situationOf` reads messages and nothing else, which is right: who holds the
+ * ball and how long the silence has run are facts about a thread, and they do
+ * not change because the other end is a supervisor. What changes is what to
+ * CALL the next move, and two of the five labels above are not merely off, they
+ * instruct the wrong act:
+ *
+ *   - `first_mail` says "premier mail à écrire" over a correspondent with no
+ *     thread — which is every correspondent on the day it is registered — three
+ *     centimetres above a sheet that deliberately says "Première demande à".
+ *     One screen, two vocabularies, and the prospecting one wins because it is
+ *     the one in the coloured band.
+ *   - `firm_offer` says "envoyer une offre ferme datée". An institution reaches
+ *     that state by the ordinary road: they answered once, we wrote back, and
+ *     no follow-up is due yet. Telling the operator to send a dated commercial
+ *     offer to a financial supervisor is the same failure as landing them on
+ *     the prospecting composer, wearing a different hat.
+ *
+ * A naming table and not a second derivation: the state still comes from one
+ * place, and only its French name is chosen here.
+ */
+const INSTITUTION_ACTION_LABEL: Record<NextAction, string> = {
+  first_mail: 'Première demande à écrire',
+  reply: 'Ils attendent ta réponse',
+  followup: 'Relance de la demande due',
+  firm_offer: 'En attente de leur réponse écrite',
+  wait: 'Rien à faire, en attente de leur réponse',
+};
+
+/**
+ * What to do next, in the words the recipient calls for. Read through this
+ * function rather than off the map, so a surface cannot pick the wrong
+ * vocabulary by forgetting the question exists.
+ */
+export function nextActionLabel(action: NextAction, kind?: Contact['kind']): string {
+  return kind === 'institution' ? INSTITUTION_ACTION_LABEL[action] : NEXT_ACTION_LABEL[action];
+}
