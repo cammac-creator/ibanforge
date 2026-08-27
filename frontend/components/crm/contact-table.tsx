@@ -14,6 +14,7 @@ import { REPLY_GROUP_LABEL } from '@/lib/crm/business';
 import { flameOf } from '@/lib/crm/heat';
 import { localDay } from '@/lib/crm/snooze';
 import { kindWord, railColorOf, rowStatus, shortAge } from '@/lib/crm/table-view';
+import { ConquestChip } from './conquest-chip';
 import { CrmToolbar } from './crm-toolbar';
 import { NewInstitutionForm } from './new-institution';
 
@@ -407,6 +408,14 @@ export function ContactTable({
                           {r.chip.label}
                         </span>
                       )}
+                      {/* Won by our own outbound mail. After the business chip
+                          rather than before it, unlike the wake badge above:
+                          that one leads because the date is why the row is in
+                          today's queue, whereas this is a permanent fact about
+                          where the customer came from and must not push the
+                          day's state aside. `compact` because the row is dense
+                          — the name truncates, this never does. */}
+                      {r.wonByOutreach && <ConquestChip compact />}
                       {flame && (
                         <span
                           className={`shrink-0 text-[11px] ${flame.dim ? 'opacity-45' : ''}`}

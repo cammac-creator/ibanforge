@@ -628,6 +628,45 @@ describe('what the table reads off a row', () => {
     expect(mailRows(orphan, 'all')[0]?.nextAction).toBeNull();
     expect(mailRows(orphan, 'all')[0]?.next).toBeNull();
   });
+
+  it('carries the conquest verdict, decided once per row', () => {
+    // Wiring only. Each clause of the rule is pinned in isolation over in
+    // outreach.test.ts; what this pins is that the row actually ASKS, and that
+    // the answer is neither hardcoded nor defaulted — `alpha` fails the rule
+    // (no dossier, and its key predates its mail) and reads false on the row.
+    const won: Contact = {
+      kind: 'client',
+      id: 'gamma@example.com',
+      email: 'gamma@example.com',
+      company: 'Société Gamma',
+      country: 'CH',
+      website: null,
+      messages: [message('out', 'Prise de contact', 'Bonjour', '2026-07-01')],
+      draft: null,
+      unread: false,
+      account: 'desk@example.com',
+      apiKey: {
+        keyPrefix: 'ifk_test',
+        paid: false,
+        creditsTotal: null,
+        creditsRemaining: null,
+        monthlyLimit: 200,
+        usedAllTime: 4,
+        lastActiveMonth: '2026-07',
+        // Minted after the outbound mail above: the causal proof.
+        createdAt: '2026-07-20 09:00:00',
+        isNew: false,
+      },
+      usage: { series: [], months: [], days: [], endpoints: [] },
+      sourcing: sourcing('gamma@example.com', 'contacte'),
+    };
+    const rows = mailRows(
+      { contacts: [alpha, won], situations: {}, snoozed: {} },
+      'all',
+    );
+    expect(rows.find((r) => r.id === 'gamma@example.com')?.wonByOutreach).toBe(true);
+    expect(rows.find((r) => r.id === 'alpha@example.com')?.wonByOutreach).toBe(false);
+  });
 });
 
 describe('searchRows', () => {

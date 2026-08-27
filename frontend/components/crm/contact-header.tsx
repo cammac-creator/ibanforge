@@ -1,7 +1,9 @@
 import { UsageChart } from '@/components/dashboard/usage-chart';
 import { chipOf } from '@/lib/crm/business';
 import { heatOf } from '@/lib/crm/heat';
+import { AUTO_ENRICH, wonByOutreach } from '@/lib/crm/outreach';
 import type { Contact, ProspectSourcing, Situation } from '@/lib/crm/types';
+import { ConquestChip } from './conquest-chip';
 import { OutcomeBadge, OutcomeControl } from './outcome-control';
 import { ProspectStatusBadge, ProspectStatusControl } from './prospect-status';
 import { ContactNotes } from './contact-notes';
@@ -101,6 +103,12 @@ export function ContactIdentity({ contact: c }: { contact: Contact }) {
                 {chip.label}
               </span>
             )}
+            {/* Full size here, unlike the row: the sheet is where the operator
+                stops to read, and "this one came from my own prospecting" is
+                the thing the whole outbound effort is judged on. Computed from
+                the contact rather than passed down as a prop, because this
+                header is also opened from places that hold no MailRow. */}
+            {wonByOutreach(c) && <ConquestChip />}
             {c.website && (
               <a
                 href={c.website}
@@ -260,7 +268,7 @@ export function ContactDetail({
         <div className="mt-3 flex min-w-0 flex-col gap-3 first:mt-0">
           {blocks.fit && (
             <div className="min-w-0">
-              {sourcing.source === 'auto-enrich' && (
+              {sourcing.source === AUTO_ENRICH && (
                 <p className="mb-1 inline-block rounded bg-violet-500/12 px-1.5 py-0.5 text-[11px] font-medium text-violet-300">
                   ✨ déduit du site par l&rsquo;IA, à confirmer
                 </p>

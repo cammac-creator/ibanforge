@@ -1,3 +1,4 @@
+import { AUTO_ENRICH } from './outreach';
 import type { Contact, Situation } from './types';
 
 /**
@@ -181,7 +182,7 @@ export function reservoir(contacts: Contact[]): Reservoir {
   for (const c of contacts) {
     if (c.kind !== 'prospect') continue;
     if (c.sourcing.status === 'archive') continue;
-    if (c.sourcing.source !== 'auto-enrich' && c.sourcing.createdAt) {
+    if (c.sourcing.source !== AUTO_ENRICH && c.sourcing.createdAt) {
       const day = c.sourcing.createdAt.slice(0, 10);
       if (!lastHarvestDay || day > lastHarvestDay) lastHarvestDay = day;
     }

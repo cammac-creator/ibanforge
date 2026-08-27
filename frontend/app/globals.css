@@ -362,6 +362,99 @@
   animation: pg-shimmer 1.6s linear infinite;
 }
 
+/* ──────────────────────────────────────────────────────────────────────────
+   CRM — the "Conquête" chip: a client our own outbound mail went and got
+   (lib/crm/outreach.ts holds the rule; components/crm/conquest-chip.tsx draws
+   the markup).
+
+   Written here as plain CSS rather than as Tailwind arbitrary values, and that
+   is the load-bearing reason for this block existing at all: Tailwind drops an
+   arbitrary value it cannot resolve WITHOUT SAYING SO, and a keyframe it never
+   sees referenced is not emitted. A shimmer that silently stops being a shimmer
+   in the production bundle is the exact failure this avoids.
+
+   Gold, and deliberately not the amber the rest of the CRM speaks: the
+   `endormi` chip is #f59e0b on a bare amber wash with no border, so a chip that
+   merely leaned gold would read as "dormant" at a glance in a dense row. Three
+   things separate them even in a still frame — a pale gold text well above
+   amber-500, a visible gold border (no business chip has one), and the ✨ glyph,
+   which no other chip carries.
+   ────────────────────────────────────────────────────────────────────────── */
+.crm-conquest {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(253, 224, 71, 0.45);
+  background-color: rgba(250, 204, 21, 0.11);
+  color: #fde68a;
+}
+
+/* The sweep. A pseudo-element rather than a background on the chip itself, so
+   the reduced-motion rule below can remove the moving part outright and leave
+   the gold intact. Over the label, not behind it: a narrow translucent highlight
+   crossing the text is what makes it read as a reflection rather than as a
+   loading skeleton. */
+.crm-conquest::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: linear-gradient(
+    100deg,
+    transparent 42%,
+    rgba(255, 246, 214, 0.5) 50%,
+    transparent 58%
+  );
+  background-size: 200% 100%;
+  background-repeat: no-repeat;
+  /* ~2.8s: slow enough to be a glint rather than a throb. The band is 16% of a
+     200% image, so most of the cycle is off the chip — the pause between two
+     passes is what keeps a permanently-badged row from twitching. */
+  animation: crm-conquest-shine 2.8s linear infinite;
+}
+
+@keyframes crm-conquest-shine {
+  0% {
+    background-position: -160% 0;
+  }
+  100% {
+    background-position: 160% 0;
+  }
+}
+
+/* Same period as the sweep, so the two never drift apart into two rhythms. */
+.crm-conquest-spark {
+  display: inline-block;
+  animation: crm-conquest-spark 2.8s ease-in-out infinite;
+}
+
+@keyframes crm-conquest-spark {
+  0%,
+  70%,
+  100% {
+    opacity: 0.7;
+    transform: scale(1);
+  }
+  80% {
+    opacity: 1;
+    transform: scale(1.22);
+  }
+}
+
+/* Static gold, no motion at all. The global guard above already neutralises
+   durations, but neutralising a sweep leaves it frozen mid-chip as a stray
+   pale band; the moving part has to go, not merely stop. Placed after that
+   guard on purpose — and these selectors outrank its `*` regardless. */
+@media (prefers-reduced-motion: reduce) {
+  .crm-conquest::after {
+    display: none;
+  }
+  .crm-conquest-spark {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}
+
 /* Dark mode — default theme.
    Phase 3 merge: every shadcn variable now points at the maison tokens
    (ink ramp / warm fg / amber) so there is ONE color system. Values are
