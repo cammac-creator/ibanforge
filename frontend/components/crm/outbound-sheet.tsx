@@ -208,6 +208,15 @@ export function OutboundSheet({
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
   const [fr, setFr] = useState<string | null>(null);
+  /**
+   * The work-height mode, on the operator's demand ("trop petite pour
+   * travailler agréablement", 28/08). Expanded, the sheet stands at
+   * min(85%, 720px) of the panel and the body grows from six rows to sixteen.
+   * The scroll reserve stays blind to it, exactly as it is to the angles
+   * growth above: the reserve protects a reading nobody is doing while they
+   * are writing, and the sheet is back at rest the moment it folds.
+   */
+  const [expanded, setExpanded] = useState(false);
   const [busy, setBusy] = useState<false | 'gen' | 'send' | 'draft' | 'angles'>(false);
   const [msg, setMsg] = useState<{ text: string; bad: boolean } | null>(null);
   /**
@@ -329,10 +338,18 @@ export function OutboundSheet({
     if (!confirmReplace(nextBody, 'Le mail pré-rédigé')) return;
     setSubject(nextSubject);
     setBody(nextBody);
-    setFr(null);
+    // The radar writes every ready mail in BOTH languages, and the French half
+    // exists for exactly one reader: the operator. Loading the English mail
+    // used to throw it away, which left the one screen built for judging a
+    // draft without the text its judge actually reads. When the mail itself is
+    // the French one there is nothing to translate.
+    setFr(useFr ? null : (c.readyMail.bodyFr ?? null));
     setMsg(null);
     // An angle chosen for a mail that is no longer the one being written.
     setStep(null);
+    // A whole pre-written mail plus its translation is a reading job, not a
+    // glance: open the room it needs instead of making the operator ask.
+    setExpanded(true);
     g.clear();
   }
 
@@ -769,23 +786,40 @@ export function OutboundSheet({
       id="outbound-sheet"
       // Grown only while the angles are actually on offer: a failed step is a
       // short sentence that fits the resting region, and growing for it would
-      // cover thread for nothing. See OUTBOUND_SHEET_ANGLES_PX.
-      style={{ height: step?.kind === 'choose' ? OUTBOUND_SHEET_ANGLES_PX : OUTBOUND_SHEET_PX }}
+      // cover thread for nothing. See OUTBOUND_SHEET_ANGLES_PX. The expanded
+      // mode wins over both: it is taller than the angles panel needs.
+      style={{
+        height: expanded
+          ? 'min(85%, 720px)'
+          : step?.kind === 'choose'
+            ? OUTBOUND_SHEET_ANGLES_PX
+            : OUTBOUND_SHEET_PX,
+      }}
       className="absolute inset-x-0 bottom-0 z-10 flex flex-col border-t border-[var(--ink-4)] bg-[var(--ink-2)] p-3 shadow-[0_-10px_24px_-8px_rgba(0,0,0,0.65)]"
     >
       <div className="mb-1.5 flex shrink-0 items-center justify-between gap-2">
         <span className="min-w-0 truncate text-[12px] text-[var(--fg-3)]">
           À {c.company || c.email}, depuis {c.account}
         </span>
-        <button
-          type="button"
-          onClick={() => onOpenChange(false)}
-          aria-expanded
-          aria-controls="outbound-sheet"
-          className="shrink-0 cursor-pointer text-[12px] text-[var(--fg-3)] underline underline-offset-2 hover:text-[var(--fg-1)]"
-        >
-          replier
-        </button>
+        <div className="flex shrink-0 items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setExpanded((e) => !e)}
+            aria-pressed={expanded}
+            className="cursor-pointer text-[12px] text-[var(--fg-3)] underline underline-offset-2 hover:text-[var(--fg-1)]"
+          >
+            {expanded ? '⤡ réduire' : '⤢ agrandir'}
+          </button>
+          <button
+            type="button"
+            onClick={() => onOpenChange(false)}
+            aria-expanded
+            aria-controls="outbound-sheet"
+            className="cursor-pointer text-[12px] text-[var(--fg-3)] underline underline-offset-2 hover:text-[var(--fg-1)]"
+          >
+            replier
+          </button>
+        </div>
       </div>
       <div ref={region} className="min-h-0 flex-1 overflow-y-auto">
         {/* Above the two fields rather than between them: this is a step that
@@ -880,7 +914,7 @@ export function OutboundSheet({
         <textarea
           value={body}
           onChange={(e) => setBody(e.target.value)}
-          rows={6}
+          rows={expanded ? 16 : 6}
           placeholder="Écris, ou fais générer une relance."
           aria-label="Corps du message"
           className="w-full min-w-0 rounded-lg border border-[var(--ink-4)] bg-[var(--ink-0)] p-3 text-base leading-[22px] sm:text-sm text-[var(--fg-1)] focus:border-amber-500/40 focus:outline-none"

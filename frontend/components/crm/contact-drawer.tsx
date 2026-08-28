@@ -126,7 +126,11 @@ export function ContactDrawer({
       inert={!open}
       className={[
         'fixed inset-y-0 right-0 z-[90] w-full border-l border-[var(--ink-4)] bg-[var(--ink-2)]',
-        'shadow-[-18px_0_44px_rgba(0,0,0,0.5)] sm:w-[min(460px,92%)]',
+        // 640 and not the original 460: the drawer is where mails are read and
+        // written, and at 460 the composer was "trop petite pour travailler
+        // agréablement" (owner, 28/08). Still a drawer, the table stays visible
+        // beside it on a desktop; 94% keeps a sliver of context on tablets.
+        'shadow-[-18px_0_44px_rgba(0,0,0,0.5)] sm:w-[min(640px,94%)]',
         'transition-transform duration-[220ms] ease-out motion-reduce:transition-none',
         open ? 'translate-x-0' : 'pointer-events-none translate-x-full',
       ].join(' ')}

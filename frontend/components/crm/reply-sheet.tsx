@@ -160,6 +160,13 @@ export function ReplySheet({
   const [fr, setFr] = useState<string | null>(null);
   const [busy, setBusy] = useState<false | 'gen' | 'send'>(false);
   const [msg, setMsg] = useState<{ text: string; bad: boolean } | null>(null);
+  /**
+   * The work-height mode, same contract as the outbound sheet's: expanded, the
+   * sheet stands at min(85%, 720px) of the panel and the answer grows from
+   * four rows to fourteen. The scroll reserve stays blind to it — it protects
+   * a reading nobody is doing while they are writing.
+   */
+  const [expanded, setExpanded] = useState(false);
 
   const filled = !!subject.trim() && !!body.trim();
 
@@ -467,8 +474,8 @@ export function ReplySheet({
     // as scroll space. See REPLY_SHEET_COVER_PX.
     //
     // Absolute at every width, where this used to be viewport-fixed below lg.
-    // Fixed was right while the thread WAS the small screen; the drawer is 460px
-    // wide from the sm breakpoint up, and a viewport-wide bar under a 460px
+    // Fixed was right while the thread WAS the small screen; the drawer is 640px
+    // wide from the sm breakpoint up, and a viewport-wide bar under a 640px
     // drawer hangs out of it on every window between sm and lg.
     //
     // A column of three: what is being answered, then the answer, then the
@@ -477,22 +484,32 @@ export function ReplySheet({
     // this replaces.
     <div
       id="reply-sheet"
-      style={{ height: REPLY_SHEET_PX }}
+      style={{ height: expanded ? 'min(85%, 720px)' : REPLY_SHEET_PX }}
       className="absolute inset-x-0 bottom-0 z-10 flex flex-col border-t border-[var(--ink-4)] bg-[var(--ink-2)] p-3 shadow-[0_-10px_24px_-8px_rgba(0,0,0,0.65)]"
     >
       <div className="mb-1.5 flex shrink-0 items-center justify-between gap-2">
         <span className="min-w-0 truncate text-[12px] text-[var(--fg-3)]">
           {firstLetter ? 'Première demande à' : 'Réponse à'} {who}, depuis {c.account}
         </span>
-        <button
-          type="button"
-          onClick={() => onOpenChange(false)}
-          aria-expanded
-          aria-controls="reply-sheet"
-          className="shrink-0 cursor-pointer text-[12px] text-[var(--fg-3)] underline underline-offset-2 hover:text-[var(--fg-1)]"
-        >
-          replier
-        </button>
+        <div className="flex shrink-0 items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setExpanded((e) => !e)}
+            aria-pressed={expanded}
+            className="cursor-pointer text-[12px] text-[var(--fg-3)] underline underline-offset-2 hover:text-[var(--fg-1)]"
+          >
+            {expanded ? '⤡ réduire' : '⤢ agrandir'}
+          </button>
+          <button
+            type="button"
+            onClick={() => onOpenChange(false)}
+            aria-expanded
+            aria-controls="reply-sheet"
+            className="cursor-pointer text-[12px] text-[var(--fg-3)] underline underline-offset-2 hover:text-[var(--fg-1)]"
+          >
+            replier
+          </button>
+        </div>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto">
         <input
@@ -511,7 +528,7 @@ export function ReplySheet({
           autoFocus
           value={body}
           onChange={(e) => setBody(e.target.value)}
-          rows={4}
+          rows={expanded ? 14 : 4}
           placeholder={firstLetter ? 'Écris ta demande.' : 'Écris ta réponse.'}
           aria-label={firstLetter ? 'Corps de la demande' : 'Corps de la réponse'}
           className="w-full min-w-0 rounded-lg border border-[var(--ink-4)] bg-[var(--ink-0)] p-3 text-base leading-[22px] sm:text-sm text-[var(--fg-1)] focus:border-amber-500/40 focus:outline-none"
