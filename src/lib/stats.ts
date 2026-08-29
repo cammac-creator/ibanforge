@@ -402,14 +402,30 @@ export function recordCreditsPurchase(bundle: string, priceUsdc: number, settled
  * 400 avant. Sans cette fonction, un rejet n'existe que comme un statut 400
  * anonyme dans request_log, et on ne peut pas dire ce qu'il faudrait tolérer.
  * On stocke la CATÉGORIE, jamais la valeur soumise (DPA).
+ *
+ * 🚨 `keyPrefix` n'est pas décoratif : sans lui, la colonne restait NULL sur
+ * TOUTES les lignes de rejet, alors que le lecteur par clé (getClientProfiles,
+ * panneau « ce pour quoi leurs entrées sont refusées ») filtre
+ * `key_prefix IS NOT NULL AND reject_reason IS NOT NULL`. Les deux conditions
+ * étaient mutuellement exclusives : le panneau était vide par construction, et
+ * le restait quel que soit le volume de rejets servis. On le passe donc depuis
+ * chaque appelant, exactement comme `recordOperation` reçoit déjà
+ * `c.get('apiKeyPrefix')`.
+ *
+ * Reste NULL quand personne n'est authentifié — un rejet anonyme est un fait,
+ * pas un trou.
  */
-export function recordRejection(type: OperationType, reason: RejectReason): void {
+export function recordRejection(
+  type: OperationType,
+  reason: RejectReason,
+  keyPrefix?: string | null,
+): void {
   try {
     const db = getStatsDB();
     const now = new Date();
     db.prepare(
-      'INSERT INTO operations (operation_type, country_code, success, hour, day_of_week, reject_reason) VALUES (?, NULL, 0, ?, ?, ?)',
-    ).run(type, now.getUTCHours(), (now.getUTCDay() + 6) % 7, reason);
+      'INSERT INTO operations (operation_type, country_code, success, hour, day_of_week, reject_reason, key_prefix) VALUES (?, NULL, 0, ?, ?, ?, ?)',
+    ).run(type, now.getUTCHours(), (now.getUTCDay() + 6) % 7, reason, keyPrefix ?? null);
   } catch (err) {
     console.error('[stats] recordRejection failed:', err);
   }
@@ -1748,8 +1764,14 @@ export function getCohortFootprint(): CohortFootprint {
       const ph = prefixes.map(() => '?').join(',');
       const span = db
         .prepare(
+          // `reject_reason IS NULL` : règle de la voie séparée (voir le bloc
+          // « Rejection rows share the `operations` table » plus haut). Ces
+          // trois lectures filtrent sur key_prefix, qui était NULL sur toute
+          // ligne de rejet — le filtre manquant ne se voyait pas. Depuis que
+          // les rejets portent leur clé, sans lui un rejet compterait comme une
+          // unité consommée par la cohorte.
           `SELECT MIN(created_at) first_seen, MAX(created_at) last_seen, COUNT(*) units
-             FROM operations WHERE key_prefix IN (${ph})`,
+             FROM operations WHERE key_prefix IN (${ph}) AND reject_reason IS NULL`,
         )
         .get(...prefixes) as { first_seen: string | null; last_seen: string | null; units: number };
       const top_countries = db
@@ -1762,7 +1784,8 @@ export function getCohortFootprint(): CohortFootprint {
       const by_type = db
         .prepare(
           `SELECT operation_type type, COUNT(*) count FROM operations
-             WHERE key_prefix IN (${ph}) GROUP BY operation_type ORDER BY count DESC`,
+             WHERE key_prefix IN (${ph}) AND reject_reason IS NULL
+             GROUP BY operation_type ORDER BY count DESC`,
         )
         .all(...prefixes) as Array<{ type: string; count: number }>;
       const client = db
@@ -1792,6 +1815,7 @@ export function getCohortFootprint(): CohortFootprint {
           .prepare(
             `SELECT date(created_at) day, COUNT(*) count FROM operations
                WHERE key_prefix IN (${allPrefixes.map(() => '?').join(',')})
+                 AND reject_reason IS NULL
                GROUP BY day ORDER BY day`,
           )
           .all(...allPrefixes) as Array<{ day: string; count: number }>);

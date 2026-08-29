@@ -42,6 +42,12 @@
  * Phase 1 : on compte, on ne change aucun comportement. Les statuts et les
  * corps de réponse ci-dessous sont ceux d'avant l'instrumentation, au caractère
  * près.
+ *
+ * 📎 `c.get('apiKeyPrefix')` est LISIBLE ici, et c'est un fait d'ordre de
+ * montage : `src/app.ts` pose `app.use('/v1/*', apiKeyMiddleware())` AVANT les
+ * `app.get` qui montent ces gardes, donc l'attribution de la clé a déjà eu lieu
+ * quand une garde répond 400. Déplacer ces gardes au-dessus du middleware de
+ * clé rendrait silencieusement tous les rejets anonymes.
  */
 
 import type { MiddlewareHandler } from 'hono';
@@ -77,7 +83,7 @@ export function bicGuardMiddleware(): MiddlewareHandler<HonoEnv, BIC_PATH> {
     // message instead of the generic format error, so the agent can
     // self-correct.
     if (rejection === 'placeholder_literal') {
-      recordRejection('bic_lookup', rejection);
+      recordRejection('bic_lookup', rejection, c.get('apiKeyPrefix'));
       return c.json(
         {
           error: 'placeholder_literal',
@@ -90,7 +96,7 @@ export function bicGuardMiddleware(): MiddlewareHandler<HonoEnv, BIC_PATH> {
     }
 
     if (rejection !== null) {
-      recordRejection('bic_lookup', rejection);
+      recordRejection('bic_lookup', rejection, c.get('apiKeyPrefix'));
       return c.json(
         { error: 'invalid_bic_format', message: 'BIC code must be 8 or 11 alphanumeric characters' },
         400,
@@ -108,7 +114,7 @@ export function iidGuardMiddleware(): MiddlewareHandler<HonoEnv, IID_PATH> {
     const rejection = classifyIidInput(iid);
 
     if (rejection === 'placeholder_literal') {
-      recordRejection('ch_clearing_lookup', rejection);
+      recordRejection('ch_clearing_lookup', rejection, c.get('apiKeyPrefix'));
       return c.json(
         {
           error: 'placeholder_literal',
@@ -121,7 +127,7 @@ export function iidGuardMiddleware(): MiddlewareHandler<HonoEnv, IID_PATH> {
     }
 
     if (rejection !== null) {
-      recordRejection('ch_clearing_lookup', rejection);
+      recordRejection('ch_clearing_lookup', rejection, c.get('apiKeyPrefix'));
       return c.json({ error: 'invalid_iid_format', message: 'IID must be a 1-5 digit number.' }, 400);
     }
 

@@ -32,7 +32,7 @@ chClearing.get('/v1/ch/clearing/:iid', (c) => {
   const rejection = classifyIidInput(rawIid);
 
   if (rejection === 'placeholder_literal') {
-    recordRejection('ch_clearing_lookup', rejection);
+    recordRejection('ch_clearing_lookup', rejection, c.get('apiKeyPrefix'));
     return c.json(
       {
         error: 'placeholder_literal',
@@ -47,7 +47,7 @@ chClearing.get('/v1/ch/clearing/:iid', (c) => {
   // Validate format (1-5 digits) — la condition est portée par le classifieur,
   // qui rend null sur exactement le même ensemble que /^\d{1,5}$/.
   if (rejection !== null) {
-    recordRejection('ch_clearing_lookup', rejection);
+    recordRejection('ch_clearing_lookup', rejection, c.get('apiKeyPrefix'));
     return c.json(
       {
         error: 'invalid_iid_format',

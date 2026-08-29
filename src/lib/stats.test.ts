@@ -340,6 +340,37 @@ describe('recordRejection', () => {
     // The rejection is not lost — it is readable through its own lane.
     expect(rejectionCount() - beforeRejected).toBe(1);
   });
+
+  // The defect this guards: recordRejection inserted no key_prefix at all,
+  // while the per-key reader selects on `key_prefix IS NOT NULL AND
+  // reject_reason IS NOT NULL`. Two conditions that could never hold together,
+  // so the customer panel's "what their inputs get rejected for" was empty by
+  // construction and stayed empty at any rejection volume.
+  it('attaches the rejection to the key that caused it (per-key lane)', () => {
+    const key = generateApiKey(`reject-owner-${Date.now()}@acme.example.net`);
+    expect(key).not.toBeNull();
+    const prefix = key!.key_prefix;
+
+    // A served call for the same key, so the assertion below reads a profile the
+    // request_log built rather than one create-on-demand invented.
+    recordRequest('GET', '/v1/bic/:code', 400, 4, 'api', null, null, prefix);
+    recordRejection('bic_lookup', 'too_short', prefix);
+
+    const profile = getClientProfiles(90)[prefix];
+    expect(profile).toBeDefined();
+    expect(profile.reject_reasons.find((r) => r.reason === 'too_short')?.count).toBe(1);
+  });
+
+  it('leaves the key NULL when nobody was authenticated', () => {
+    const before = getStatsDB()
+      .prepare('SELECT COUNT(*) n FROM operations WHERE reject_reason IS NOT NULL AND key_prefix IS NULL')
+      .get() as { n: number };
+    recordRejection('bic_lookup', 'too_long');
+    const after = getStatsDB()
+      .prepare('SELECT COUNT(*) n FROM operations WHERE reject_reason IS NOT NULL AND key_prefix IS NULL')
+      .get() as { n: number };
+    expect(after.n - before.n).toBe(1);
+  });
 });
 
 describe('classifyClient', () => {

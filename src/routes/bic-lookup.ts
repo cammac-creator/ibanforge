@@ -63,7 +63,7 @@ bicLookup.get('/v1/bic/:code', (c) => {
   const rejection = classifyBicInput(code);
 
   if (rejection === 'placeholder_literal') {
-    recordRejection('bic_lookup', rejection);
+    recordRejection('bic_lookup', rejection, c.get('apiKeyPrefix'));
     return c.json(
       {
         error: 'placeholder_literal',
@@ -76,7 +76,7 @@ bicLookup.get('/v1/bic/:code', (c) => {
   }
 
   if (rejection !== null) {
-    recordRejection('bic_lookup', rejection);
+    recordRejection('bic_lookup', rejection, c.get('apiKeyPrefix'));
     return c.json(
       {
         error: 'invalid_bic_format',
@@ -92,7 +92,7 @@ bicLookup.get('/v1/bic/:code', (c) => {
     // Passe la garde de format mais viole la forme ISO 9362 (ex. 12345678, qui
     // n'a pas [A-Z]{4} en tête). Sans ce compteur, ces 400 n'apparaîtraient
     // dans aucune catégorie et le total des rejets serait sous-estimé.
-    recordRejection('bic_lookup', 'invalid_bic_shape');
+    recordRejection('bic_lookup', 'invalid_bic_shape', c.get('apiKeyPrefix'));
     return c.json(
       {
         error: 'invalid_bic_format',
