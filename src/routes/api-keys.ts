@@ -292,8 +292,9 @@ apiKeys.get('/v1/keys/usage', (c) => {
   // for contract stability — the published SDK types all three fields as numbers
   // — but the truth travels with it: `basis` names which ceiling actually
   // governs, and the balance that governs it is served alongside. Without this,
-  // the day the observation counter landed, a 5,000-credit customer began
-  // reading `remaining: -3173` on their own usage endpoint.
+  // the day the observation counter landed, any pack holder past the free-tier
+  // allowance began reading a NEGATIVE `remaining` on their own usage endpoint —
+  // a shortfall against a ceiling nothing was ever going to enforce.
   const isCreditKey = typeof creditsRemaining === 'number';
   return c.json({
     ...usage,
