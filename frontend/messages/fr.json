@@ -1002,7 +1002,8 @@
     "latencyTitle": "Temps de réponse servi",
     "latencyP50": "Médiane",
     "latencyP95": "95e centile",
-    "latencyNote": "Mesuré sur le trafic de production des 30 derniers jours, appels refusés exclus : une requête écartée en une milliseconde par le mur payant ne prouve aucune rapidité. Les journées trop creuses sont laissées de côté plutôt que de recevoir un centile tiré d'une poignée de mesures.",
+    "latencyP99": "99e centile",
+    "latencyNote": "Mesuré sur le trafic de production des 30 derniers jours, appels refusés exclus : une requête écartée en une milliseconde par le mur payant ne prouve aucune rapidité. Les journées trop creuses sont laissées de côté plutôt que de recevoir un centile tiré d'une poignée de mesures. Le 99e centile garde sa propre barre, plus haute : en dessous de cent mesures dans la journée, il n'y a pas de 99e centile à publier, seulement le 95e sous un autre nom.",
     "latencyNoData": "trafic servi insuffisant pour mesurer"
   },
   "changelog": {

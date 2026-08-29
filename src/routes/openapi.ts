@@ -1027,6 +1027,26 @@ const buildSpec = () => ({
                       date: { type: 'string', format: 'date' },
                       total: { type: 'integer' },
                       revenue: { type: 'number' },
+                      // Percentiles and not a mean: one slow outlier moves a
+                      // mean and moves nobody's experience. SERVED requests
+                      // only — a 402 the paywall refused in a millisecond is
+                      // not evidence of speed, and counting refusals would
+                      // improve the figure every time a key farm knocks.
+                      p50_ms: {
+                        type: ['integer', 'null'],
+                        description:
+                          'Median served latency for the day, in milliseconds. Null below 20 measured requests: a percentile over a handful of samples is noise, and a gap is more honest than a made-up figure.',
+                      },
+                      p95_ms: {
+                        type: ['integer', 'null'],
+                        description: '95th percentile of served latency. Same 20-sample floor as p50_ms.',
+                      },
+                      p99_ms: {
+                        type: ['integer', 'null'],
+                        description:
+                          'The tail: 99th percentile of served latency, which is what a caller making thousands of requests is exposed to and what a timeout budget should be set from. ' +
+                          'Its floor is 100 measured requests, not 20, and that is arithmetic rather than caution: the rank n*0.99 lands on the same row as n*0.95 at 20 samples, so a lower floor would publish the p95 twice under two names. Null below it.',
+                      },
                     },
                     required: ['date', 'total', 'revenue'],
                   },
