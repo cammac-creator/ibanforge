@@ -74,6 +74,13 @@ export function isNudgeDisabled(): boolean {
  * The anti-repetition clause is on EMAIL, not on key_prefix: three unused keys
  * behind one mailbox are one person (see the table comment in ./db.ts).
  *
+ * lower() on both sides, and it is load-bearing. Only the free-tier and admin
+ * mints normalise the address; a Stripe key stores whatever `customer_details`
+ * carried. Compared raw, a mailbox holding one key as `Ops@` and one as `ops@`
+ * would not match its own marker, `claimNudge` would succeed on the second key
+ * (different prefix), and the same human would get the message twice, which is
+ * the one thing this pass promises never to do.
+ *
  * Exclusions are applied in JS afterwards, not in SQL, exactly like
  * loadCreations() in ./cohort-radar-server.ts: the internal-account rule is one
  * regexp with an env-driven tail, and expressing it as a bound IN-list is what
@@ -92,7 +99,7 @@ function loadNudgeCandidates(): NudgeCandidateRow[] {
         WHERE k.active = 1
           AND k.created_at <= datetime('now', ?)
           AND k.created_at >= datetime('now', ?)
-          AND NOT EXISTS (SELECT 1 FROM activation_nudges n WHERE n.email = k.email)
+          AND NOT EXISTS (SELECT 1 FROM activation_nudges n WHERE lower(n.email) = lower(k.email))
         ORDER BY k.created_at DESC`,
     )
     .all(`-${NUDGE_MIN_AGE_HOURS} hours`, `-${NUDGE_MAX_AGE_DAYS} days`) as Array<
@@ -163,8 +170,11 @@ function createFounderDraftIfAbsent(canonicalEmail: string, now: Date): boolean 
   const db = getStatsDB();
   // Any existing message at all, in either direction, means this is not a
   // silent new signup: a thread exists and a generated draft has no place in it.
+  // lower() on the stored side for the same reason as the nudge marker: the
+  // ingester normalises through toCanonical today, and a guard that only works
+  // while every writer remembers to is a guard waiting to fail.
   const existing = db
-    .prepare('SELECT 1 FROM email_messages WHERE customer_email = ? LIMIT 1')
+    .prepare('SELECT 1 FROM email_messages WHERE lower(customer_email) = ? LIMIT 1')
     .get(canonicalEmail);
   if (existing) return false;
 
@@ -201,7 +211,7 @@ function claimNudge(email: string, keyPrefix: string): boolean {
   const res = getStatsDB()
     .prepare(
       `INSERT INTO activation_nudges (key_prefix, email, sent_at, delivered)
-       VALUES (?, ?, datetime('now'), 0)
+       VALUES (?, lower(?), datetime('now'), 0)
        ON CONFLICT(key_prefix) DO NOTHING`,
     )
     .run(keyPrefix, email);

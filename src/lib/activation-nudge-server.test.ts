@@ -27,8 +27,15 @@ const FRESH = `fresh-${RUN}@${DOMAIN}`;
 const INTERNAL = `ops-${RUN}@ibanforge.com`;
 const PILOT = `alpha-${RUN}-pilot@${DOMAIN}`;
 const WITH_THREAD = `threaded-${RUN}@${DOMAIN}`;
+/**
+ * The same human, twice, in the two spellings the database really holds: the
+ * free-tier mint lowercases, a Stripe key stores whatever customer_details
+ * carried. One person must still get one message.
+ */
+const MIXED_LOWER = `mixed-${RUN}@${DOMAIN}`;
+const MIXED_UPPER = `Mixed-${RUN}@${DOMAIN}`;
 
-const emails = [SILENT, CALLED, FRESH, INTERNAL, PILOT, WITH_THREAD];
+const emails = [SILENT, CALLED, FRESH, INTERNAL, PILOT, WITH_THREAD, MIXED_LOWER, MIXED_UPPER];
 const prefixes = new Map<string, string>();
 
 function mint(email: string, ageHours: number): string {
@@ -52,6 +59,13 @@ beforeAll(() => {
   mint(INTERNAL, 72); // our own mailbox           -> excluded
   mint(PILOT, 72); // pilot convention             -> excluded
   mint(WITH_THREAD, 46); // in the window, but already has a thread -> no draft
+  // One human, two spellings -> exactly one nudge. The LOWERCASE key is the
+  // newer of the two on purpose: candidates are served newest first, so this is
+  // the order in which the marker gets written lowercase and the still-unclaimed
+  // key is the mixed-case one. The reverse order hides the bug behind the
+  // primary key on key_prefix and the test would pass over a broken guard.
+  mint(MIXED_UPPER, 72);
+  mint(MIXED_LOWER, 71);
 
   db.prepare(
     `INSERT INTO request_log (method, path, status, key_prefix, created_at)
@@ -216,6 +230,20 @@ describe('the nudge is claimed once and only once', () => {
     const second = await runActivationPass();
     expect(second.nudged.filter((n) => n.email === SILENT)).toEqual([]);
     expect(getNudgeLedger(1000).filter((r) => r.email === SILENT)).toHaveLength(1);
+  });
+
+  it('treats two spellings of one address as one person', async () => {
+    // Two passes, because within a single pass the per-address collapse in
+    // selectNudgeCandidates already hides the bug. The hole was in the SQL that
+    // asks "have we written to this address before": compared raw, the marker
+    // written as `mixed-…` did not match the key stored as `Mixed-…`, and the
+    // second pass mailed the same human a second time.
+    await runActivationPass();
+    await runActivationPass();
+    const forThisHuman = getNudgeLedger(1000).filter(
+      (r) => r.email.toLowerCase() === MIXED_LOWER.toLowerCase(),
+    );
+    expect(forThisHuman).toHaveLength(1);
   });
 
   it('never nudges an address that called, is too young, internal or a pilot', async () => {
