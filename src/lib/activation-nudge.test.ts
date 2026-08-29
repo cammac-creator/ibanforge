@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   NUDGE_MAX_PER_PASS,
+  buildFounderDraft,
+  draftId,
   isExcludedFromOutreach,
   neverCalled,
   selectNudgeCandidates,
@@ -104,5 +106,28 @@ describe('selectNudgeCandidates', () => {
     );
     expect(selectNudgeCandidates(many)).toHaveLength(NUDGE_MAX_PER_PASS);
     expect(selectNudgeCandidates(many, 3)).toHaveLength(3);
+  });
+});
+
+describe('the founder draft', () => {
+  it('uses the CRM draft id, case-insensitive on the address', () => {
+    expect(draftId('Ops@Alpha.Example.Net')).toBe(draftId('ops@alpha.example.net'));
+    expect(draftId('ops@alpha.example.net')).toMatch(/^draft-[0-9a-f]{32}$/);
+  });
+
+  it('asks both questions and offers help, without a pitch', () => {
+    const { subject, body } = buildFounderDraft();
+    expect(subject).toBeTruthy();
+    expect(body).toContain('What are you trying to do with it?');
+    expect(body).toContain('How did you find us?');
+    expect(body).toContain('Claude-Alain Martin');
+    expect(body.toLowerCase()).not.toContain('credits');
+    expect(body.toLowerCase()).not.toContain('$');
+  });
+
+  it('carries no em or en dash', () => {
+    const { subject, body } = buildFounderDraft();
+    expect(/[—–]/.test(subject)).toBe(false);
+    expect(/[—–]/.test(body)).toBe(false);
   });
 });

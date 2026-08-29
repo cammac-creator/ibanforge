@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { Hono } from 'hono';
 import { getStatsDB } from './db.js';
 import { generateApiKey } from './api-keys.js';
+import { draftId } from './activation-nudge.js';
 import { getNudgeLedger, lastActivationReport, runActivationPass } from './activation-nudge-server.js';
 import { apiKeys } from '../routes/api-keys.js';
 
@@ -25,8 +26,9 @@ const CALLED = `caller-${RUN}@${DOMAIN}`;
 const FRESH = `fresh-${RUN}@${DOMAIN}`;
 const INTERNAL = `ops-${RUN}@ibanforge.com`;
 const PILOT = `alpha-${RUN}-pilot@${DOMAIN}`;
+const WITH_THREAD = `threaded-${RUN}@${DOMAIN}`;
 
-const emails = [SILENT, CALLED, FRESH, INTERNAL, PILOT];
+const emails = [SILENT, CALLED, FRESH, INTERNAL, PILOT, WITH_THREAD];
 const prefixes = new Map<string, string>();
 
 function mint(email: string, ageHours: number): string {
@@ -43,14 +45,23 @@ beforeAll(() => {
   const db = getStatsDB();
   mint(SILENT, 72); // old enough, never called  -> the one candidate
   mint(CALLED, 72); // old enough, but has called -> excluded
-  mint(FRESH, 3); // called never, but too young  -> excluded
+  // Inside the 48 h draft window, near its old edge on purpose: drafts are
+  // served oldest first, so these two are examined whatever else a developer
+  // database happens to hold. Still under the nudge threshold, so still no mail.
+  mint(FRESH, 47); // never called, but too young to nudge -> draft only
   mint(INTERNAL, 72); // our own mailbox           -> excluded
   mint(PILOT, 72); // pilot convention             -> excluded
+  mint(WITH_THREAD, 46); // in the window, but already has a thread -> no draft
 
   db.prepare(
     `INSERT INTO request_log (method, path, status, key_prefix, created_at)
      VALUES ('POST', '/v1/iban/validate', 200, ?, datetime('now', '-1 hour'))`,
   ).run(prefixes.get(CALLED));
+
+  db.prepare(
+    `INSERT INTO email_messages (id, customer_email, direction, msg_date, subject)
+     VALUES (?, ?, 'in', ?, 'Existing conversation')`,
+  ).run(`inbound-${RUN}`, WITH_THREAD, new Date().toISOString().slice(0, 16));
 });
 
 afterAll(() => {
@@ -64,6 +75,7 @@ afterAll(() => {
     }
     db.prepare('DELETE FROM email_messages WHERE customer_email = ?').run(email);
   }
+  db.prepare('DELETE FROM email_messages WHERE id = ?').run(`inbound-${RUN}`);
 });
 
 describe('the daily first-call pass', () => {
@@ -76,8 +88,65 @@ describe('the daily first-call pass', () => {
     expect(mine).toEqual([]);
     expect(getNudgeLedger(1000).filter((r) => r.email.includes(String(RUN)))).toEqual([]);
 
-    // The selection still ran, and it found one of our five fixtures.
+    // The selection still ran, and it found exactly one of our six fixtures.
     expect(report.nudge_candidates).toBeGreaterThanOrEqual(1);
+  });
+
+  it('writes a founder draft for a new signup with no thread yet', async () => {
+    await runActivationPass();
+    const draft = getStatsDB()
+      .prepare('SELECT id, direction, subject, body FROM email_messages WHERE customer_email = ?')
+      .get(FRESH) as { id: string; direction: string; subject: string; body: string } | undefined;
+    expect(draft).toBeDefined();
+    expect(draft!.id).toBe(draftId(FRESH));
+    expect(draft!.direction).toBe('draft');
+    expect(draft!.body).toContain('How did you find us?');
+  });
+
+  it('never writes a draft where a conversation already exists', async () => {
+    await runActivationPass();
+    const rows = getStatsDB()
+      .prepare('SELECT direction FROM email_messages WHERE customer_email = ?')
+      .all(WITH_THREAD) as Array<{ direction: string }>;
+    expect(rows.map((r) => r.direction)).toEqual(['in']);
+  });
+
+  it('never writes a draft for an internal or pilot address', async () => {
+    await runActivationPass();
+    for (const email of [INTERNAL, PILOT]) {
+      const row = getStatsDB()
+        .prepare('SELECT 1 AS hit FROM email_messages WHERE customer_email = ?')
+        .get(email);
+      expect(row, `${email} must stay out of the CRM drafts`).toBeUndefined();
+    }
+  });
+
+  it('never overwrites a draft a human has edited', async () => {
+    const db = getStatsDB();
+    db.prepare('UPDATE email_messages SET body = ? WHERE id = ?').run(
+      'Edited by hand, must survive every pass.',
+      draftId(FRESH),
+    );
+    await runActivationPass();
+    const after = db
+      .prepare('SELECT body FROM email_messages WHERE id = ?')
+      .get(draftId(FRESH)) as { body: string };
+    expect(after.body).toBe('Edited by hand, must survive every pass.');
+  });
+
+  it('is idempotent: repeated passes create nothing more', async () => {
+    const count = () =>
+      (
+        getStatsDB()
+          .prepare(
+            `SELECT COUNT(*) AS n FROM email_messages WHERE customer_email LIKE ? AND direction = 'draft'`,
+          )
+          .get(`%-${RUN}@%`) as { n: number }
+      ).n;
+    const before = count();
+    await runActivationPass();
+    await runActivationPass();
+    expect(count()).toBe(before);
   });
 
   it('publishes a readable report for the admin endpoint', async () => {
@@ -86,6 +155,7 @@ describe('the daily first-call pass', () => {
     expect(last_run_at).toBeTruthy();
     expect(report).not.toBeNull();
     expect(typeof report!.nudge_candidates).toBe('number');
+    expect(typeof report!.drafts_created).toBe('number');
     expect(report!.errors).toEqual([]);
   });
 });
@@ -151,7 +221,7 @@ describe('the nudge is claimed once and only once', () => {
   it('never nudges an address that called, is too young, internal or a pilot', async () => {
     await runActivationPass();
     const written = new Set(getNudgeLedger(1000).map((r) => r.email));
-    for (const email of [CALLED, FRESH, INTERNAL, PILOT]) {
+    for (const email of [CALLED, FRESH, INTERNAL, PILOT, WITH_THREAD]) {
       expect(written.has(email), `${email} must never receive a nudge`).toBe(false);
     }
   });

@@ -1,14 +1,20 @@
 /**
  * The first-call machine, decision half.
  *
- * A key created at least 48 h ago that has never made a call gets exactly one
- * message, ever, carrying the 30-second path.
+ * Two things happen once a day, and only one of them ever leaves on its own:
  *
- * Everything here is pure: windows, exclusions, predicates, selection. The
- * database, the mail relay and the cadence live in
+ *   1. NUDGE (automatic). A key created at least 48 h ago that has never made a
+ *      call gets exactly one message, ever, carrying the 30-second path.
+ *   2. FOUNDER DRAFT (never sent alone). A key created in the last day or two
+ *      gets a CRM draft written in the founder's voice, waiting in the
+ *      dashboard for Claude-Alain to read, edit and send by hand.
+ *
+ * Everything here is pure: predicates, selection, draft composition, draft id.
+ * The database, the mail relay and the cadence live in
  * ./activation-nudge-server.ts, the same split the cohort and lifecycle radars
  * already use.
  */
+import { createHash } from 'node:crypto';
 import { isInternalEmail } from './internal-accounts.js';
 
 // ---------------------------------------------------------------------------
@@ -33,6 +39,12 @@ export const NUDGE_MAX_AGE_DAYS = 30;
  * over a few days instead, newest first, where the message is truest.
  */
 export const NUDGE_MAX_PER_PASS = 25;
+
+/** How far back the founder draft looks. Wider than a day so a missed pass (redeploy, restart) still catches its keys; the "no existing thread" guard is what makes it idempotent, not the window. */
+export const DRAFT_LOOKBACK_HOURS = 48;
+
+/** Ceiling per pass, same reasoning as the nudge: drafts are cheap, but a hundred of them at once turns the CRM into a queue nobody reads. */
+export const DRAFT_MAX_PER_PASS = 25;
 
 // ---------------------------------------------------------------------------
 // Exclusions
@@ -114,4 +126,47 @@ export function selectNudgeCandidates(
     out.push(row);
   }
   return out;
+}
+
+// ---------------------------------------------------------------------------
+// The founder draft
+// ---------------------------------------------------------------------------
+
+/**
+ * Same id the CRM uses for its own drafts (frontend/app/api/crm/draft-message):
+ * one draft per address, so nothing ever piles up. Reproduced here rather than
+ * imported because the frontend is a separate build; the two must stay in step.
+ */
+export function draftId(email: string): string {
+  return `draft-${createHash('md5').update(email.trim().toLowerCase()).digest('hex')}`;
+}
+
+export interface FounderDraft {
+  subject: string;
+  body: string;
+}
+
+/**
+ * The founder's own note, one day in. It is the message with by far the best
+ * answer rate, and the point of this pass is to make it systematic without
+ * making it automatic: what is created here is a DRAFT, and nothing in this
+ * codebase can send it.
+ *
+ * Two questions, one of which ("how did you find us") is the acquisition
+ * question that was until now asked by hand or not at all. Short, no product
+ * pitch, no link farm: the reply is the goal, not the click.
+ */
+export function buildFounderDraft(): FounderDraft {
+  const body =
+    `Hello,\n\n` +
+    `I am Claude-Alain Martin, I build IBANforge. You created an API key yesterday,\n` +
+    `so this is a note from a person and not from a sequence.\n\n` +
+    `Two questions, and a one-line answer to either is genuinely useful to me:\n\n` +
+    `  1. What are you trying to do with it?\n` +
+    `  2. How did you find us?\n\n` +
+    `And an offer: if the first integration is fiddly, send me the call you are\n` +
+    `making and I will tell you what comes back and why. I read every reply myself.\n\n` +
+    `Claude-Alain Martin\n` +
+    `IBANforge`;
+  return { subject: 'Two questions about your IBANforge key', body };
 }

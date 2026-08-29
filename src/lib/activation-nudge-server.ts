@@ -1,18 +1,28 @@
 /**
  * The first-call machine, I/O half: reads the key ledger, sends the one nudge,
- * and runs itself once a day inside the API process.
+ * writes the founder draft, and runs itself once a day inside the API process.
  *
  * Same shape as the cohort and lifecycle radars (an hourly tick that asks kv
  * whether a run is due, so the daily cadence survives a redeploy without ever
  * double-firing after one) and the same contract: nothing here may throw into
  * the server, and nothing here runs on a request path.
  *
- * Kill switch: ACTIVATION_NUDGE_DISABLED=1 stops the sending half.
+ * What leaves on its own, and what does not:
+ *   - the activation nudge is SENT, at most once per address, ever;
+ *   - the founder draft is only WRITTEN, into the CRM, for Claude-Alain to
+ *     read, edit and send by hand. No code path in this repository sends it.
+ *
+ * Kill switch: ACTIVATION_NUDGE_DISABLED=1 stops the sending half. Drafts keep
+ * being written, because nothing leaves the building when a draft is created.
  */
 import { getStatsDB } from './db.js';
 import { kvGet, kvSet } from './forum-radar-server.js';
 import { isEmailConfigured, sendActivationNudgeEmail } from './email.js';
+import { loadAliasMap, toCanonical } from './email-aliases.js';
+import { buildFounderDraft, draftId } from './activation-nudge.js';
 import {
+  DRAFT_LOOKBACK_HOURS,
+  DRAFT_MAX_PER_PASS,
   NUDGE_MAX_AGE_DAYS,
   NUDGE_MAX_PER_PASS,
   NUDGE_MIN_AGE_HOURS,
@@ -42,6 +52,9 @@ export interface ActivationPassReport {
   nudges_sent: number;
   nudges_failed: number;
   nudged: Array<{ email: string; key_prefix: string; delivered: boolean }>;
+  draft_candidates: number;
+  drafts_created: number;
+  drafted: string[];
   errors: string[];
 }
 
@@ -107,9 +120,71 @@ function loadNudgeCandidates(): NudgeCandidateRow[] {
   return kept.map((r) => ({ ...r, logged_calls: called.has(r.key_prefix) ? 1 : 0 }));
 }
 
+/**
+ * Addresses whose first key is a day or two old, for the founder draft.
+ *
+ * OLDEST first, the opposite of the nudge. A signup drops out of this window
+ * for good once it passes DRAFT_LOOKBACK_HOURS, so serving the newest first is
+ * how the oldest starve: on a busy couple of days they would be pushed past the
+ * per-pass ceiling every time and fall off the edge never having been written
+ * about. Closest to the edge goes first.
+ */
+function loadDraftCandidates(): Array<{ email: string; created_at: string }> {
+  const rows = getStatsDB()
+    .prepare(
+      `SELECT k.email, k.created_at
+         FROM api_keys k
+        WHERE k.active = 1
+          AND k.created_at >= datetime('now', ?)
+        ORDER BY k.created_at ASC`,
+    )
+    .all(`-${DRAFT_LOOKBACK_HOURS} hours`) as Array<{ email: string; created_at: string }>;
+  return rows.filter((r) => !isExcludedFromOutreach(r.email));
+}
+
 // ---------------------------------------------------------------------------
 // Writing
 // ---------------------------------------------------------------------------
+
+/**
+ * Writes the founder draft for one address, and refuses in three cases: an
+ * existing conversation of any direction, an existing draft under the same id,
+ * or a race between the two.
+ *
+ * ON CONFLICT DO NOTHING, deliberately the opposite of the ingest endpoint
+ * (POST /v1/admin/email-messages upserts, because a re-sync must refresh a
+ * message). Here an existing draft may be one Claude-Alain has already edited,
+ * and overwriting his text with a generated one is the single worst thing this
+ * pass could do.
+ *
+ * Returns true only when a row was actually created.
+ */
+function createFounderDraftIfAbsent(canonicalEmail: string, now: Date): boolean {
+  const db = getStatsDB();
+  // Any existing message at all, in either direction, means this is not a
+  // silent new signup: a thread exists and a generated draft has no place in it.
+  const existing = db
+    .prepare('SELECT 1 FROM email_messages WHERE customer_email = ? LIMIT 1')
+    .get(canonicalEmail);
+  if (existing) return false;
+
+  const { subject, body } = buildFounderDraft();
+  const res = db
+    .prepare(
+      `INSERT INTO email_messages (id, customer_email, direction, msg_date, subject, snippet, body, counterparty)
+       VALUES (?, ?, 'draft', ?, ?, ?, ?, '')
+       ON CONFLICT(id) DO NOTHING`,
+    )
+    .run(
+      draftId(canonicalEmail),
+      canonicalEmail,
+      now.toISOString().slice(0, 16),
+      subject.slice(0, 500),
+      body.replace(/\s+/g, ' ').trim().slice(0, 280),
+      body.slice(0, 6000),
+    );
+  return res.changes > 0;
+}
 
 /**
  * Claims the single nudge for an address BEFORE the mail is attempted.
@@ -151,6 +226,9 @@ export async function runActivationPass(now: Date = new Date()): Promise<Activat
     nudges_sent: 0,
     nudges_failed: 0,
     nudged: [],
+    draft_candidates: 0,
+    drafts_created: 0,
+    drafted: [],
     errors: [],
   };
   if (running) {
@@ -159,6 +237,7 @@ export async function runActivationPass(now: Date = new Date()): Promise<Activat
   }
   running = true;
   try {
+    // --- 1. The nudge -----------------------------------------------------
     const candidates = selectNudgeCandidates(loadNudgeCandidates(), NUDGE_MAX_PER_PASS);
     report.nudge_candidates = candidates.length;
 
@@ -184,6 +263,33 @@ export async function runActivationPass(now: Date = new Date()): Promise<Activat
         } catch (err) {
           report.errors.push(`nudge ${cand.key_prefix}: ${err instanceof Error ? err.message : String(err)}`);
         }
+      }
+    }
+
+    // --- 2. The founder draft --------------------------------------------
+    const aliasMap = loadAliasMap();
+    const seen = new Set<string>();
+    const draftRows = loadDraftCandidates();
+    for (const row of draftRows) {
+      // The ceiling counts drafts WRITTEN, not addresses looked at. An address
+      // that already has a thread costs one indexed SELECT and nothing else, so
+      // letting it eat a slot would let a backlog of already-handled customers
+      // crowd out the new signup this pass exists for.
+      if (report.drafts_created >= DRAFT_MAX_PER_PASS) break;
+      // Alias-resolved like the ingest endpoint, or a second address would
+      // split the thread in two and the "already has a thread" guard would
+      // miss the half it does not know about.
+      const canonical = toCanonical(row.email.trim().toLowerCase(), aliasMap);
+      if (seen.has(canonical)) continue;
+      seen.add(canonical);
+      report.draft_candidates++;
+      try {
+        if (createFounderDraftIfAbsent(canonical, now)) {
+          report.drafts_created++;
+          report.drafted.push(canonical);
+        }
+      } catch (err) {
+        report.errors.push(`draft ${canonical}: ${err instanceof Error ? err.message : String(err)}`);
       }
     }
 
