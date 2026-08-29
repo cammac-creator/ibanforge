@@ -1,10 +1,34 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import { Hono } from 'hono';
+
+/**
+ * A hermetic stats database, and it is load-bearing, not hygiene: the pass
+ * under test is CAPPED (NUDGE_MAX_PER_PASS newest-first candidates), and the
+ * long-lived developer database holds thousands of leftover keys from earlier
+ * suite runs inside the very age window this suite antedates its fixtures
+ * into. On such a base the cap is eaten by strangers and the one address this
+ * suite promises to claim never reaches the pass — measured at 6,331 window
+ * candidates the day this hoist was added. The env must be set before any
+ * import touches db.js, whose path constant is read at module load; hence
+ * vi.hoisted, not beforeAll.
+ */
+const HERMETIC_DB = vi.hoisted(() => {
+  const path = `${process.env.TMPDIR ?? '/tmp'}/ibf-nudge-hermetic-${process.pid}-${Date.now()}.sqlite`;
+  process.env.STATS_DB_PATH = path;
+  return path;
+});
+
 import { getStatsDB } from './db.js';
 import { generateApiKey } from './api-keys.js';
 import { draftId } from './activation-nudge.js';
 import { getNudgeLedger, lastActivationReport, runActivationPass } from './activation-nudge-server.js';
 import { apiKeys } from '../routes/api-keys.js';
+import { rmSync } from 'node:fs';
+
+afterAll(() => {
+  // Three files: SQLite in WAL mode keeps -shm and -wal beside the base.
+  for (const suffix of ['', '-shm', '-wal']) rmSync(`${HERMETIC_DB}${suffix}`, { force: true });
+});
 
 /**
  * End to end against the real stats database, the way cohort-radar-server.test
