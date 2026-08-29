@@ -10,6 +10,7 @@ import {
 } from './first-call.js';
 import { validateIBAN } from './iban.js';
 import { buildActivationNudgeEmail, buildApiKeyEmail, buildFreeKeyEmail } from './email.js';
+import * as emailModule from './email.js';
 
 /**
  * Fixtures are invented (CLAUDE.md): a key shape that is real in form and
@@ -87,13 +88,34 @@ describe('buildFirstCallText / buildFirstCallHtml', () => {
 const DASHES = /[—–]/;
 
 describe('outgoing message bodies carry no em or en dash', () => {
-  const cases = [
-    ['free key delivery', buildFreeKeyEmail({ rawKey: FAKE_KEY, monthlyLimit: 200 })],
-    ['purchase delivery', buildApiKeyEmail({ rawKey: FAKE_KEY, credits: 1000, bundle: '1k' })],
-    ['activation nudge', buildActivationNudgeEmail({ keyPrefix: FAKE_PREFIX })],
-  ] as const;
+  /**
+   * One fixture per builder email.ts exports, and the completeness is LOCKED:
+   * a hand-kept list is how the rule held on three builders while a fourth
+   * shipped dashes unswept. Add a builder to email.ts and this map must gain a
+   * fixture, or the lock test below names the omission.
+   */
+  const fixtures: Record<string, { subject: string; text: string; html: string }> = {
+    buildFreeKeyEmail: buildFreeKeyEmail({ rawKey: FAKE_KEY, monthlyLimit: 200 }),
+    buildApiKeyEmail: buildApiKeyEmail({ rawKey: FAKE_KEY, credits: 1000, bundle: '1k' }),
+    buildActivationNudgeEmail: buildActivationNudgeEmail({ keyPrefix: FAKE_PREFIX }),
+    buildQuotaWarningEmail: emailModule.buildQuotaWarningEmail({
+      used: 160,
+      limit: 200,
+      month: '2026-08',
+      keyPrefix: FAKE_PREFIX,
+    }),
+  };
 
-  it.each(cases)('%s', (_name, mail) => {
+  it('the sweep covers every builder the module exports', () => {
+    const exported = Object.keys(emailModule)
+      .filter((name) => /^build[A-Za-z]*Email$/.test(name))
+      .sort();
+    expect(exported, 'a mail builder has no dash fixture — add it to `fixtures` above').toEqual(
+      Object.keys(fixtures).sort(),
+    );
+  });
+
+  it.each(Object.entries(fixtures))('%s', (_name, mail) => {
     expect(DASHES.test(mail.subject), `subject: ${mail.subject}`).toBe(false);
     expect(DASHES.test(mail.text), 'text part').toBe(false);
     expect(DASHES.test(mail.html), 'html part').toBe(false);

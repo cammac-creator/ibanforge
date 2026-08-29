@@ -19,6 +19,7 @@ const HERMETIC_DB = vi.hoisted(() => {
 });
 
 import { getStatsDB } from './db.js';
+import { ensureAliasTable } from './email-aliases.js';
 import { generateApiKey } from './api-keys.js';
 import { draftId } from './activation-nudge.js';
 import { getNudgeLedger, lastActivationReport, runActivationPass } from './activation-nudge-server.js';
@@ -58,8 +59,15 @@ const WITH_THREAD = `threaded-${RUN}@${DOMAIN}`;
  */
 const MIXED_LOWER = `mixed-${RUN}@${DOMAIN}`;
 const MIXED_UPPER = `Mixed-${RUN}@${DOMAIN}`;
+/** Silent and old enough, but the founder already WROTE to them ('out' row). */
+const TALKED = `talked-${RUN}@${DOMAIN}`;
+/** Silent and old enough, but the key was minted BY US (issued_by_us = 1). */
+const ISSUED = `handed-${RUN}@${DOMAIN}`;
+/** One declared person behind two addresses (email_aliases row). */
+const ALIAS_CANON = `canon-${RUN}@${DOMAIN}`;
+const ALIAS_OTHER = `other-${RUN}@${DOMAIN}`;
 
-const emails = [SILENT, CALLED, FRESH, INTERNAL, PILOT, WITH_THREAD, MIXED_LOWER, MIXED_UPPER];
+const emails = [SILENT, CALLED, FRESH, INTERNAL, PILOT, WITH_THREAD, MIXED_LOWER, MIXED_UPPER, TALKED, ISSUED, ALIAS_CANON, ALIAS_OTHER];
 const prefixes = new Map<string, string>();
 
 function mint(email: string, ageHours: number): string {
@@ -100,6 +108,25 @@ beforeAll(() => {
     `INSERT INTO email_messages (id, customer_email, direction, msg_date, subject)
      VALUES (?, ?, 'in', ?, 'Existing conversation')`,
   ).run(`inbound-${RUN}`, WITH_THREAD, new Date().toISOString().slice(0, 16));
+
+  // The founder already wrote to this one — a real 'out' row, not a draft.
+  mint(TALKED, 72);
+  db.prepare(
+    `INSERT INTO email_messages (id, customer_email, direction, msg_date, subject)
+     VALUES (?, ?, 'out', ?, 'A personal note')`,
+  ).run(`outbound-${RUN}`, TALKED, new Date().toISOString().slice(0, 16));
+
+  // A key we minted and handed over: the flag, not the address, says so.
+  mint(ISSUED, 72);
+  db.prepare('UPDATE api_keys SET issued_by_us = 1 WHERE key_prefix = ?').run(prefixes.get(ISSUED));
+
+  // One person, two addresses, declared by the operator: one nudge, ever.
+  // The alias table self-creates on first READ (ensureAliasTable inside
+  // loadAliasMap); a hermetic base has never been read, so create it first.
+  ensureAliasTable();
+  mint(ALIAS_CANON, 72);
+  mint(ALIAS_OTHER, 71);
+  db.prepare('INSERT INTO email_aliases (alias, canonical) VALUES (?, ?)').run(ALIAS_OTHER, ALIAS_CANON);
 });
 
 afterAll(() => {
@@ -114,6 +141,8 @@ afterAll(() => {
     db.prepare('DELETE FROM email_messages WHERE customer_email = ?').run(email);
   }
   db.prepare('DELETE FROM email_messages WHERE id = ?').run(`inbound-${RUN}`);
+  db.prepare('DELETE FROM email_messages WHERE id = ?').run(`outbound-${RUN}`);
+  db.prepare('DELETE FROM email_aliases WHERE alias = ?').run(ALIAS_OTHER);
 });
 
 describe('the daily first-call pass', () => {
@@ -270,12 +299,20 @@ describe('the nudge is claimed once and only once', () => {
     expect(forThisHuman).toHaveLength(1);
   });
 
-  it('never nudges an address that called, is too young, internal or a pilot', async () => {
+  it('never nudges an address that called, is too young, internal, a pilot, already written to, or holding a key we minted', async () => {
     await runActivationPass();
     const written = new Set(getNudgeLedger(1000).map((r) => r.email));
-    for (const email of [CALLED, FRESH, INTERNAL, PILOT, WITH_THREAD]) {
+    for (const email of [CALLED, FRESH, INTERNAL, PILOT, WITH_THREAD, TALKED, ISSUED]) {
       expect(written.has(email), `${email} must never receive a nudge`).toBe(false);
     }
+  });
+
+  it('treats two ALIASED addresses as one person', async () => {
+    // The operator declared them equivalent; the draft half already honoured
+    // it, and one aliased human once got two nudges in a single pass.
+    await runActivationPass();
+    const written = getNudgeLedger(1000).filter((r) => r.email === ALIAS_CANON || r.email === ALIAS_OTHER);
+    expect(written, 'one declared person must hold exactly one nudge').toHaveLength(1);
   });
 
   it('reports what it did behind X-Admin-Secret, and nothing without it', async () => {

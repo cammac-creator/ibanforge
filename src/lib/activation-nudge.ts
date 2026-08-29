@@ -55,8 +55,12 @@ export const DRAFT_MAX_PER_PASS = 25;
  *
  * The shared filter matches anchored shapes (`test-`, `-test`, `@test.`,
  * `-probe@`, `smoke`, `audit`). Outbound needs the blunt version: any address
- * carrying `test`, `probe` or `smoke` anywhere, plus the `-pilot@` convention
- * used for pilot accounts (there is no `issued_by_us` column to read).
+ * carrying `test`, `probe` or `smoke` anywhere, plus the `-pilot@` convention.
+ * The pattern is the belt; the `issued_by_us` column is the braces, read in
+ * `selectNudgeCandidates` below — a key the operator minted for somebody says
+ * so at mint time whatever its address looks like, and telling that person
+ * "your key was created and never used" would be false twice over: they did
+ * not create it, and the mail that carried it is the reason it exists.
  *
  * The asymmetry is on purpose. Excluding someone by mistake costs one useful
  * message never sent. Including a probe by mistake costs credibility, in the
@@ -86,6 +90,8 @@ export interface NudgeCandidateRow {
   credits_used: number;
   /** Rows in request_log for this prefix, whatever their status. */
   logged_calls: number;
+  /** 1 when the operator minted this key for its holder. See the clause below. */
+  issued_by_us: number;
 }
 
 /**
@@ -113,16 +119,44 @@ export function neverCalled(row: NudgeCandidateRow): boolean {
 export function selectNudgeCandidates(
   rows: NudgeCandidateRow[],
   limit: number = NUDGE_MAX_PER_PASS,
+  opts: {
+    /**
+     * Alias resolution, injected by the server pass. The dedupe and the
+     * blocked-set below compare CANONICAL addresses: the operator who declared
+     * "this address IS that customer" has said they are one person, and one
+     * person gets one message — the founder-draft half of the pass already
+     * resolves aliases, and a rule that holds on one half of a file and not
+     * the other is how the same human got two nudges in one pass.
+     */
+    canonicalOf?: (email: string) => string;
+    /**
+     * Canonical addresses this pass must stay away from: everyone already in
+     * the nudge ledger under ANY of their addresses, and everyone with real
+     * correspondence (an 'in' or 'out' row). The founder has talked to the
+     * second group — an automated "you never tried" under his signature, after
+     * his own mail, reads as a sequence and says so about every other message.
+     * An unsent draft does not count: no human contact has happened yet.
+     */
+    blocked?: ReadonlySet<string>;
+  } = {},
 ): NudgeCandidateRow[] {
+  const canonicalOf = opts.canonicalOf ?? ((e: string) => e);
+  const blocked = opts.blocked ?? new Set<string>();
   const seen = new Set<string>();
   const out: NudgeCandidateRow[] = [];
   for (const row of [...rows].sort((a, b) => (a.created_at < b.created_at ? 1 : -1))) {
     if (out.length >= limit) break;
     const email = row.email.trim().toLowerCase();
-    if (seen.has(email)) continue;
+    // The operator minted this key for its holder: the mail that carried it is
+    // the reason it exists, and "your key was never used" would blame the
+    // recipient for our own gesture. Declared at mint time, never inferred.
+    if (row.issued_by_us) continue;
+    const canon = canonicalOf(email);
+    if (blocked.has(canon)) continue;
+    if (seen.has(canon)) continue;
     if (isExcludedFromOutreach(email)) continue;
     if (!neverCalled(row)) continue;
-    seen.add(email);
+    seen.add(canon);
     out.push(row);
   }
   return out;

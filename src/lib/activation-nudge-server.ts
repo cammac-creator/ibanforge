@@ -92,7 +92,8 @@ function loadNudgeCandidates(): NudgeCandidateRow[] {
     .prepare(
       `SELECT k.key_prefix, k.email, k.created_at,
               COALESCE(u.total, 0) AS usage_units,
-              MAX(COALESCE(k.credits_total, 0) - COALESCE(k.credits_remaining, 0), 0) AS credits_used
+              MAX(COALESCE(k.credits_total, 0) - COALESCE(k.credits_remaining, 0), 0) AS credits_used,
+              COALESCE(k.issued_by_us, 0) AS issued_by_us
          FROM api_keys k
          LEFT JOIN (SELECT key_hash, SUM(count) AS total FROM api_usage GROUP BY key_hash) u
                 ON u.key_hash = k.key_hash
@@ -207,6 +208,30 @@ function createFounderDraftIfAbsent(canonicalEmail: string, now: Date): boolean 
  *
  * Returns false when another pass already claimed this address.
  */
+/**
+ * Canonical addresses the nudge half must never write to.
+ *
+ * Two sources, one set. Everyone already CLAIMED in the ledger, resolved
+ * through the alias map — the SQL NOT EXISTS in loadNudgeCandidates compares
+ * raw addresses and cannot know that two spellings are one declared person.
+ * And everyone with real CORRESPONDENCE, an 'in' or 'out' row: the founder has
+ * talked to them, and an automated "you never tried" arriving after his own
+ * mail, under his own signature, unmasks every message as a sequence. Drafts
+ * are deliberately not correspondence — an unsent founder draft is our
+ * intention, not a contact the recipient ever saw.
+ */
+function loadNudgeBlockedSet(canonicalOf: (email: string) => string): Set<string> {
+  const db = getStatsDB();
+  const blocked = new Set<string>();
+  const claimed = db.prepare('SELECT email FROM activation_nudges').all() as Array<{ email: string }>;
+  for (const r of claimed) blocked.add(canonicalOf(r.email));
+  const talked = db
+    .prepare(`SELECT DISTINCT customer_email AS email FROM email_messages WHERE direction IN ('in', 'out')`)
+    .all() as Array<{ email: string }>;
+  for (const r of talked) blocked.add(canonicalOf(r.email));
+  return blocked;
+}
+
 function claimNudge(email: string, keyPrefix: string): boolean {
   const res = getStatsDB()
     .prepare(
@@ -247,8 +272,18 @@ export async function runActivationPass(now: Date = new Date()): Promise<Activat
   }
   running = true;
   try {
+    // Loaded once for BOTH halves of the pass. The alias map is what makes
+    // "one person, one message" true across the addresses the operator has
+    // declared equivalent — resolving it for the draft half only is how one
+    // aliased human got two nudges in a single pass.
+    const aliasMap = loadAliasMap();
+    const canonicalOf = (e: string) => toCanonical(e.trim().toLowerCase(), aliasMap);
+
     // --- 1. The nudge -----------------------------------------------------
-    const candidates = selectNudgeCandidates(loadNudgeCandidates(), NUDGE_MAX_PER_PASS);
+    const candidates = selectNudgeCandidates(loadNudgeCandidates(), NUDGE_MAX_PER_PASS, {
+      canonicalOf,
+      blocked: loadNudgeBlockedSet(canonicalOf),
+    });
     report.nudge_candidates = candidates.length;
 
     if (isNudgeDisabled()) {
@@ -277,7 +312,6 @@ export async function runActivationPass(now: Date = new Date()): Promise<Activat
     }
 
     // --- 2. The founder draft --------------------------------------------
-    const aliasMap = loadAliasMap();
     const seen = new Set<string>();
     const draftRows = loadDraftCandidates();
     for (const row of draftRows) {

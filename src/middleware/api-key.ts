@@ -151,7 +151,18 @@ export function apiKeyMiddleware(): MiddlewareHandler<HonoEnv> {
       // a credit key is turned away by its balance, above, and by nothing else.
       // Nothing is billed twice either — the debit stays the single
       // decrementCredits call.
-      const observedMonth = recordMonthlyObservation(keyHash, units);
+      // Guarded, because this write sits BETWEEN the debit and the answer:
+      // stats.sqlite has writers outside this process (admin scripts), and a
+      // BUSY here would charge the credit and then fail the very call it paid
+      // for. A lost observation costs one unit on a chart; it is logged and
+      // accepted. The debit above stays unguarded on purpose — money, not
+      // telemetry.
+      let observedMonth: string | null = null;
+      try {
+        observedMonth = recordMonthlyObservation(keyHash, units);
+      } catch (err) {
+        console.error('[stats] monthly observation failed:', err instanceof Error ? err.message : err);
+      }
       await next();
       // Refund credits on 4xx client errors (mirror monthly quota behavior).
       // Same reason as the quota headers below: the balance is published after
@@ -161,8 +172,17 @@ export function apiKeyMiddleware(): MiddlewareHandler<HonoEnv> {
         refundCredit(keyHash, units);
         // The observation is refunded on the SAME month the increment landed
         // on, for the reason decrementQuota documents: across a month boundary
-        // the two differ, and the drift is permanent.
-        decrementQuota(keyHash, units, observedMonth);
+        // the two differ, and the drift is permanent. Skipped when the
+        // increment itself failed above — refunding an observation that never
+        // landed would double-shrink the month. Guarded like the increment:
+        // the customer's 4xx answer must not become a 500 over telemetry.
+        if (observedMonth !== null) {
+          try {
+            decrementQuota(keyHash, units, observedMonth);
+          } catch (err) {
+            console.error('[stats] observation refund failed:', err instanceof Error ? err.message : err);
+          }
+        }
         left = remaining + units;
       }
       c.header('X-Credits-Remaining', String(left));

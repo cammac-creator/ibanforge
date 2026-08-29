@@ -17,6 +17,7 @@ function row(p: Partial<NudgeCandidateRow> & { email: string }): NudgeCandidateR
     usage_units: 0,
     credits_used: 0,
     logged_calls: 0,
+    issued_by_us: 0,
     ...p,
   };
 }
@@ -80,6 +81,46 @@ describe('selectNudgeCandidates', () => {
     ]);
     expect(picked).toHaveLength(1);
     expect(picked[0].key_prefix).toBe('ifk_dup_1');
+  });
+
+  it('never nudges a key the operator minted, whatever its address looks like', () => {
+    // The mail that carried the key is the reason it exists. "Your key was
+    // created and never used" would be false twice over for its recipient —
+    // the flag is declared at mint time, so no address pattern is needed.
+    const picked = selectNudgeCandidates([
+      row({ email: 'cto@acme.example.com', issued_by_us: 1 }),
+      row({ email: 'real@alpha.example.net' }),
+    ]);
+    expect(picked.map((r) => r.email)).toEqual(['real@alpha.example.net']);
+  });
+
+  it('collapses two aliased addresses into one person', () => {
+    // The operator declared "this address IS that customer". The draft half of
+    // the pass already honours it; this pins that the nudge half does too.
+    const canonicalOf = (e: string) => (e === 'second@alpha.example.net' ? 'first@alpha.example.net' : e);
+    const picked = selectNudgeCandidates(
+      [
+        row({ email: 'first@alpha.example.net', key_prefix: 'ifk_alias_1', created_at: '2026-08-25 08:00:00' }),
+        row({ email: 'second@alpha.example.net', key_prefix: 'ifk_alias_2', created_at: '2026-08-24 08:00:00' }),
+      ],
+      25,
+      { canonicalOf },
+    );
+    expect(picked).toHaveLength(1);
+    expect(picked[0].key_prefix).toBe('ifk_alias_1');
+  });
+
+  it('stays away from anyone in the blocked set, resolved canonically', () => {
+    // The founder already wrote to them, or another of their addresses already
+    // holds the one nudge: an automated "you never tried" after his own mail
+    // unmasks every message as a sequence.
+    const canonicalOf = (e: string) => (e === 'alias@alpha.example.net' ? 'talked@alpha.example.net' : e);
+    const picked = selectNudgeCandidates(
+      [row({ email: 'alias@alpha.example.net' }), row({ email: 'fresh@alpha.example.net' })],
+      25,
+      { canonicalOf, blocked: new Set(['talked@alpha.example.net']) },
+    );
+    expect(picked.map((r) => r.email)).toEqual(['fresh@alpha.example.net']);
   });
 
   it('drops internal, probe and pilot addresses', () => {

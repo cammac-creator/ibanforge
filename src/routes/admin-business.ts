@@ -78,9 +78,13 @@ adminBusiness.get('/admin/business-summary', (c) => {
               k.credits_total, k.credits_remaining,
               k.amount_paid_minor, k.amount_paid_currency,
               COALESCE(u.count, 0) AS used,
-              COALESCE(t.total, 0)
-                + MAX(COALESCE(k.credits_total, 0) - COALESCE(k.credits_remaining, 0), 0)
-                AS used_all_time
+              -- One ledger per key kind, never the sum: since the credit path
+              -- also writes api_usage (as an observation), adding the two
+              -- counted every prepaid unit twice. Same CASE as /v1/admin/keys.
+              CASE WHEN k.credits_total IS NOT NULL
+                   THEN MAX(COALESCE(k.credits_total, 0) - COALESCE(k.credits_remaining, 0), 0)
+                   ELSE COALESCE(t.total, 0)
+              END AS used_all_time
          FROM api_keys k
          LEFT JOIN api_usage u ON u.key_hash = k.key_hash AND u.month = ?
          LEFT JOIN (SELECT key_hash, SUM(count) AS total FROM api_usage GROUP BY key_hash) t
