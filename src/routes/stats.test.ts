@@ -160,6 +160,205 @@ describe('GET /stats/history — expected weekday band', () => {
 });
 
 /**
+ * Daily traffic split by caller nature.
+ *
+ * The whole table hangs on one property: the six natures partition the day, so
+ * they must add up to `total`. A reader who can add up the columns can trust
+ * the split; one who cannot has no way to tell a missing bucket from a quiet
+ * channel.
+ */
+describe('GET /stats/traffic-trend', () => {
+  // A day of its own, for the same reason the percentile tests own theirs:
+  // these assert EXACT per-nature counts, and today's row is shared with every
+  // other fixture in this file. Days 5 and 6 are taken above.
+  const DAY_AGO = 9;
+  const CLIENT_PFX = 'ifk_trendclient';
+  const INTERNAL_PFX = 'ifk_trendcohort';
+
+  function log(opts: {
+    status?: number;
+    kind?: string | null;
+    key?: string | null;
+    ip?: string | null;
+    path?: string;
+  }) {
+    getStatsDB()
+      .prepare(
+        `INSERT INTO request_log (method, path, status, response_ms, created_at, hour, day_of_week, client_kind, ip_hash, key_prefix)
+         VALUES ('GET', ?, ?, 5, datetime('now', ?), 12, 3, ?, ?, ?)`,
+      )
+      .run(
+        opts.path ?? '/v1/demo',
+        opts.status ?? 200,
+        `-${DAY_AGO} days`,
+        opts.kind ?? null,
+        opts.ip ?? null,
+        opts.key ?? null,
+      );
+  }
+
+  const theDay = new Date(Date.now() - DAY_AGO * 86_400_000).toISOString().slice(0, 10);
+
+  type TrendDay = {
+    date: string;
+    total: number;
+    with_key: number;
+    agent: number;
+    declared_bot: number;
+    browser: number;
+    anonymous_api: number;
+    internal: number;
+    not_found: number;
+    paywall: number;
+    server_error: number;
+    distinct_ips: number;
+  };
+
+  async function fetchDay(): Promise<TrendDay> {
+    const res = await app.request('/stats/traffic-trend?period=30', auth);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { period_days: number; days: TrendDay[] };
+    return body.days.find((d) => d.date === theDay)!;
+  }
+
+  /**
+   * The hermetic database isolates the rows; it does not isolate the ENV.
+   * isInternalEmail also honours CRM_INTERNAL_EMAILS, a comma-separated list of
+   * fragments matched anywhere in an address — so a machine that has it set to
+   * something overlapping the customer fixture would move that key into
+   * `internal` and turn `with_key` red for reasons that have nothing to do with
+   * this code. Pinned empty here, restored after.
+   */
+  const PREVIOUS_FRAGMENTS = process.env.CRM_INTERNAL_EMAILS;
+
+  afterAll(() => {
+    if (PREVIOUS_FRAGMENTS === undefined) delete process.env.CRM_INTERNAL_EMAILS;
+    else process.env.CRM_INTERNAL_EMAILS = PREVIOUS_FRAGMENTS;
+  });
+
+  beforeAll(() => {
+    process.env.CRM_INTERNAL_EMAILS = '';
+    const db = getStatsDB();
+    db.prepare("DELETE FROM request_log WHERE date(created_at) = date('now', ?)").run(`-${DAY_AGO} days`);
+    // Two keys with contrasting addresses: one customer, one of ours. The
+    // cohort suffix is what makes the second internal — see INTERNAL_EMAIL_RE.
+    db.prepare('INSERT INTO api_keys (key_hash, key_prefix, email) VALUES (?, ?, ?)').run(
+      'hash-trend-client',
+      CLIENT_PFX,
+      'client-alpha@alpha.example.net',
+    );
+    db.prepare('INSERT INTO api_keys (key_hash, key_prefix, email) VALUES (?, ?, ?)').run(
+      'hash-trend-cohort',
+      INTERNAL_PFX,
+      'burst-0001@cohorte.invalid',
+    );
+
+    // Customers (3). One of them declares a browser user agent: if the query
+    // ever forgot `key_prefix IS NULL` on the keyless branches, this row would
+    // be counted twice and the sum invariant would catch it.
+    log({ key: CLIENT_PFX, ip: 'ip-a' });
+    log({ key: CLIENT_PFX, kind: 'api', ip: 'ip-a' });
+    log({ key: CLIENT_PFX, kind: 'web', ip: 'ip-b' });
+    // Ours (2) — same shape as a customer, told apart only by the address.
+    log({ key: INTERNAL_PFX, kind: 'api', ip: 'ip-b' });
+    log({ key: INTERNAL_PFX, kind: 'mcp_http', ip: 'ip-b' });
+    // Agents (2), one of them turned away at the paywall.
+    log({ kind: 'mcp_http', ip: 'ip-c' });
+    log({ kind: 'mcp_stdio', status: 402, ip: 'ip-c' });
+    // A crawler that says so (1).
+    log({ kind: 'bot', ip: 'ip-c' });
+    // Browsers (2) — one reading a page, one sweeping for a file we never
+    // served. Same nature, and only the status tells them apart.
+    log({ kind: 'web', ip: 'ip-c' });
+    log({ kind: 'web', status: 404, path: '/package.json', ip: 'ip-c' });
+    // Anonymous API (2). The second predates the client_kind column and so
+    // carries NULL, not 'api' — it must still be counted somewhere, which is
+    // what the terminal ELSE of the CASE guarantees.
+    log({ kind: 'api', status: 500, ip: null });
+    log({ kind: null, ip: null });
+  });
+
+  it('requires the same Bearer STATS_TOKEN as the other /stats/* routes', async () => {
+    const res = await app.request('/stats/traffic-trend');
+    expect(res.status).toBe(403);
+    expect(((await res.json()) as { error: string }).error).toBe('unauthorized');
+  });
+
+  it('refuses a wrong token', async () => {
+    const res = await app.request('/stats/traffic-trend', {
+      headers: { Authorization: 'Bearer nope' },
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it('splits the day into six natures that add up to the total', async () => {
+    const day = await fetchDay();
+    expect(day.total).toBe(12);
+    expect(day.with_key).toBe(3);
+    expect(day.internal).toBe(2);
+    expect(day.agent).toBe(2);
+    expect(day.declared_bot).toBe(1);
+    expect(day.browser).toBe(2);
+    expect(day.anonymous_api).toBe(2);
+    // The invariant itself, stated as the reader would check it.
+    expect(
+      day.with_key + day.internal + day.agent + day.declared_bot + day.browser + day.anonymous_api,
+    ).toBe(day.total);
+  });
+
+  it('counts our own keys as internal and never as customers', async () => {
+    const day = await fetchDay();
+    // Two of the internal rows are an api call and an MCP call; neither may
+    // reappear in with_key or agent. The named column is the whole point —
+    // subtracting them silently is what this endpoint refuses to do.
+    expect(day.internal).toBe(2);
+    expect(day.with_key).toBe(3);
+    expect(day.agent).toBe(2);
+  });
+
+  it('reports not_found, paywall and server_error ACROSS the natures, not beside them', async () => {
+    const day = await fetchDay();
+    // The 404 was issued by a `web` caller: it is inside `browser` AND inside
+    // `not_found`. Anyone adding the status columns to the natures would get
+    // 15 instead of 12 — which is exactly the misreading the comments guard.
+    expect(day.not_found).toBe(1);
+    expect(day.paywall).toBe(1);
+    expect(day.server_error).toBe(1);
+    expect(day.browser).toBe(2);
+    expect(day.not_found + day.paywall + day.server_error).toBeLessThan(day.total);
+  });
+
+  it('counts distinct IPs and ignores the rows that carry none', async () => {
+    const day = await fetchDay();
+    // Three hashes over ten rows, plus two rows with no IP at all: COUNT
+    // DISTINCT skips NULL, so those two add nothing rather than a phantom.
+    expect(day.distinct_ips).toBe(3);
+  });
+
+  it('clamps the period to [1, 90] and falls back to 30 on an unreadable one', async () => {
+    const clamped = await app.request('/stats/traffic-trend?period=999', auth);
+    expect(((await clamped.json()) as { period_days: number }).period_days).toBe(90);
+
+    const floored = await app.request('/stats/traffic-trend?period=0', auth);
+    expect(((await floored.json()) as { period_days: number }).period_days).toBe(1);
+
+    const garbage = await app.request('/stats/traffic-trend?period=abc', auth);
+    expect(((await garbage.json()) as { period_days: number }).period_days).toBe(30);
+
+    const omitted = await app.request('/stats/traffic-trend', auth);
+    expect(((await omitted.json()) as { period_days: number }).period_days).toBe(30);
+  });
+
+  it('honours the period: a day outside the window is not served', async () => {
+    // The fixture day sits 9 days back, so a 7-day window must not reach it —
+    // and a 1-day window is today alone, never yesterday.
+    const res = await app.request('/stats/traffic-trend?period=7', auth);
+    const body = (await res.json()) as { days: TrendDay[] };
+    expect(body.days.some((d) => d.date === theDay)).toBe(false);
+  });
+});
+
+/**
  * Served latency on the public status page.
  *
  * Percentiles and not a mean: one slow outlier moves a mean and moves nobody's
