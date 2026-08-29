@@ -221,7 +221,23 @@ describe('GET /stats/traffic-trend', () => {
     return body.days.find((d) => d.date === theDay)!;
   }
 
+  /**
+   * The hermetic database isolates the rows; it does not isolate the ENV.
+   * isInternalEmail also honours CRM_INTERNAL_EMAILS, a comma-separated list of
+   * fragments matched anywhere in an address — so a machine that has it set to
+   * something overlapping the customer fixture would move that key into
+   * `internal` and turn `with_key` red for reasons that have nothing to do with
+   * this code. Pinned empty here, restored after.
+   */
+  const PREVIOUS_FRAGMENTS = process.env.CRM_INTERNAL_EMAILS;
+
+  afterAll(() => {
+    if (PREVIOUS_FRAGMENTS === undefined) delete process.env.CRM_INTERNAL_EMAILS;
+    else process.env.CRM_INTERNAL_EMAILS = PREVIOUS_FRAGMENTS;
+  });
+
   beforeAll(() => {
+    process.env.CRM_INTERNAL_EMAILS = '';
     const db = getStatsDB();
     db.prepare("DELETE FROM request_log WHERE date(created_at) = date('now', ?)").run(`-${DAY_AGO} days`);
     // Two keys with contrasting addresses: one customer, one of ours. The
