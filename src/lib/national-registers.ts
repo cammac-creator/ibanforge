@@ -51,8 +51,8 @@ let tablePresent = false;
 /**
  * Same lifecycle discipline as resetStatements() in bic-lookup.ts, and wired
  * into closeAll() the same way. Without it, a statement prepared on a closed
- * connection kept throwing, the catch in lookupNationalCode ate the throw and
- * answered null — which enrich turned into `not_in_register` with
+ * connection kept throwing, the catch lookupNationalCode carried at the time
+ * ate the throw and answered null — which enrich turned into `not_in_register` with
  * `authoritative: true`: real AT/BE banks denied with full confidence, from a
  * plumbing failure. The table-presence memo resets with it: it describes the
  * same database.
@@ -109,30 +109,31 @@ export function lookupNationalCode(cc: string, bankCode: string): NationalCodeEn
   if (!ready()) return null;
   const code = normaliseCode(cc, bankCode);
   if (!code) return null;
-  try {
-    if (!stmt) {
-      // SELECT * with defensive mapping, not an explicit column list: a
-      // database seeded before the address columns existed must degrade to
-      // nulls, not turn every Austrian lookup into a caught error that reads
-      // as "no register" and silently drops the authority claim.
-      stmt = getBicDB().prepare(
-        'SELECT * FROM national_bank_codes WHERE country = ? AND code = ?',
-      );
-    }
-    const row = stmt.get(cc, code) as Record<string, unknown> | undefined;
-    if (!row) return null;
-    return {
-      code: String(row.code),
-      name: String(row.name),
-      bic: (row.bic as string | null | undefined) ?? null,
-      street: (row.street as string | null | undefined) ?? null,
-      post_code: (row.post_code as string | null | undefined) ?? null,
-      town: (row.town as string | null | undefined) ?? null,
-      lei: (row.lei as string | null | undefined) ?? null,
-    };
-  } catch {
-    return null;
+  // No catch around the query, and that is the point: these two countries are
+  // authoritative, so a null out of here becomes not_in_register with reason
+  // not_allocated — "do not send". A catch { return null } made a corrupt page
+  // or a schema drift produce that sentence about real AT/BE banks with full
+  // confidence (the resetNationalRegisterStatements() docstring above records
+  // the first bite; the 29/08/2026 adversarial review reproduced the class on
+  // Bulgaria). A query failure now escapes, like lookupBlz: every caller sits
+  // under a guard that converts it into status unavailable / reason
+  // lookup_failed, authority dropped. Schema drift stays harmless a different
+  // way — SELECT * with defensive mapping degrades missing columns to nulls
+  // instead of raising.
+  if (!stmt) {
+    stmt = getBicDB().prepare('SELECT * FROM national_bank_codes WHERE country = ? AND code = ?');
   }
+  const row = stmt.get(cc, code) as Record<string, unknown> | undefined;
+  if (!row) return null;
+  return {
+    code: String(row.code),
+    name: String(row.name),
+    bic: (row.bic as string | null | undefined) ?? null,
+    street: (row.street as string | null | undefined) ?? null,
+    post_code: (row.post_code as string | null | undefined) ?? null,
+    town: (row.town as string | null | undefined) ?? null,
+    lei: (row.lei as string | null | undefined) ?? null,
+  };
 }
 
 /** Every allocated code for a country, for pruning curated keys that contradict it. */

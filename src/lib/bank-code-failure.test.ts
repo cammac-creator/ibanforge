@@ -20,7 +20,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
  * `not_in_register`.
  */
 
-const failing = { lookup: false, referenceData: false, noData: false, deRegister: false };
+const failing = {
+  lookup: false,
+  referenceData: false,
+  noData: false,
+  deRegister: false,
+  bgRegister: false,
+  nationalRegister: false,
+};
 
 vi.mock('./bic-lookup.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./bic-lookup.js')>();
@@ -52,6 +59,33 @@ vi.mock('./de-blz.js', async (importOriginal) => {
   };
 });
 
+// Bulgaria and Austria/Belgium are authoritative: a swallowed failure there
+// once became not_in_register + not_allocated — "do not send" — about the
+// Bulgarian central bank's own code (29/08/2026 adversarial review, reproduced
+// by overwriting the table's root page). The lookups now throw; these mocks
+// are that broken read.
+vi.mock('./bg-bae.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./bg-bae.js')>();
+  return {
+    ...actual,
+    lookupBgBankCode: (code: string) => {
+      if (failing.bgRegister) throw new Error('SqliteError: database disk image is malformed');
+      return actual.lookupBgBankCode(code);
+    },
+  };
+});
+
+vi.mock('./national-registers.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./national-registers.js')>();
+  return {
+    ...actual,
+    lookupNationalCode: (cc: string, code: string) => {
+      if (failing.nationalRegister) throw new Error('SqliteError: database disk image is malformed');
+      return actual.lookupNationalCode(cc, code);
+    },
+  };
+});
+
 const { enrichResult } = await import('./enrich.js');
 const { validateIBAN } = await import('./iban.js');
 
@@ -70,6 +104,8 @@ beforeEach(() => {
   failing.referenceData = false;
   failing.noData = false;
   failing.deRegister = false;
+  failing.bgRegister = false;
+  failing.nationalRegister = false;
 });
 
 describe('an unreadable reference set is reported, never ruled on', () => {
@@ -138,6 +174,28 @@ describe('an unreadable reference set is reported, never ruled on', () => {
     // Not `bank_code_not_allocated`, which is the "do not send" step.
     expect(codes).toContain('verify_payee_name');
     expect(codes).not.toContain('bank_code_not_allocated');
+  });
+
+  it('a broken Bulgarian register read is unavailable, never an authoritative denial', () => {
+    // The exact case the 29/08/2026 review reproduced with a corrupt page: the
+    // table answers the availability probe, then the real query raises. On an
+    // authoritative country the swallowed version of this became
+    // not_in_register + not_allocated about the central bank's own code.
+    failing.bgRegister = true;
+    const r = check('BG80BNBG96611020345678');
+    expect(r.bank_code_check!.status).toBe('unavailable');
+    expect(r.bank_code_check!.reason).toBe('lookup_failed');
+    expect(r.bank_code_check!.authoritative).toBe(false);
+    expect(r.bic).toBeNull();
+    expect(r.next_steps?.map((s) => s.code)).not.toContain('bank_code_not_allocated');
+  });
+
+  it('a broken Austrian register read is unavailable, never an authoritative denial', () => {
+    failing.nationalRegister = true;
+    const r = check('AT311200000012345678');
+    expect(r.bank_code_check!.status).toBe('unavailable');
+    expect(r.bank_code_check!.reason).toBe('lookup_failed');
+    expect(r.bank_code_check!.authoritative).toBe(false);
   });
 
   it('keeps a national register verdict that DID answer, rather than discarding it', () => {

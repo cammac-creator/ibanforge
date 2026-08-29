@@ -112,7 +112,12 @@ export type BankCodeReason =
   | 'lookup_failed';
 
 export interface BankCodeCheck {
-  /** The bank code taken from the BBAN, echoed so the caller can log it. */
+  /**
+   * The code the verdict is really about. Normally the BBAN's bank code as
+   * carried; where the reference set's grain differs it is the code actually
+   * consulted — Finland's variable-length institution prefix, Iceland's
+   * two-digit bank within its four-digit bank+branch field.
+   */
   value: string;
   /**
    * - `verified` — the bank code resolves to an institution we can name.
@@ -253,8 +258,11 @@ export interface IBANValidationResult {
      * by the first integration that reads the JSON.
      *
      * - `national_register` — the country's own register publishes this BIC for
-     *   this bank code. Today: Germany, where the Bundesbank Bankleitzahlendatei
-     *   carries the exact 11-character BIC per BLZ. Settlement-grade.
+     *   this bank code. Today: Germany, Austria, Belgium and Bulgaria — the
+     *   Bundesbank Bankleitzahlendatei carries the exact 11-character BIC per
+     *   BLZ, and the OeNB, NBB and BNB BAE registers publish the institution's
+     *   BIC per bank code. Settlement-grade, except where the register itself
+     *   marks the code retired (see `authoritative` below).
      * - `curated_map` — our own maintained bank-code map made the pairing. It is
      *   an exact key and it is usually right; it is not an allocation record,
      *   and no authority stands behind it.
@@ -262,12 +270,12 @@ export interface IBANValidationResult {
      *   where a bank code may open on a letter, and it can match several
      *   institutions at once; `bank_code_check.candidates` says how many.
      *
-     * ## Why the honest answer is "advisory outside DE"
+     * ## Why the honest answer is "advisory outside a register"
      *
      * Only one of the three is a register of allocations, and saying so plainly
-     * is worth more than a field that flatters the other two. Coverage may grow
-     * — several registers we already ingest publish a BIC per code — and this
-     * field is what will make that growth visible without a re-read of the docs.
+     * is worth more than a field that flatters the other two. Coverage grows by
+     * ingestion — DE, then AT, BE and BG — and this field is what makes that
+     * growth visible without a re-read of the docs.
      */
     basis?: BicBasis;
     /**
@@ -275,7 +283,10 @@ export interface IBANValidationResult {
      * by a single table, so the two cannot drift into disagreeing — the same
      * rule as `postal_address.format`, and the fix for the class of defect where
      * one field says "Bundesbank" while its neighbour says the answer is not
-     * authoritative.
+     * authoritative. One carve-out: a code the register itself marks as retired
+     * keeps its `national_register` basis and answers `false` here — the
+     * register is withdrawing the code, so the settlement licence goes with it;
+     * read `bank_code_check.retired` and `superseded_by`.
      *
      * ⚠️ Not the same claim as `bank_code_check.authoritative`, which is about
      * the BANK CODE: whether a national register was consulted about its

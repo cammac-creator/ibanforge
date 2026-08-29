@@ -1,9 +1,28 @@
-import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from 'vitest';
 import { Hono } from 'hono';
+
+/**
+ * A hermetic stats database, same idiom as activation-nudge-server.test.ts and
+ * load-bearing for the same reason: this file asserts EXACT percentiles on
+ * specific calendar days, and the long-lived developer database holds real
+ * rows on any date — enough stray 200s five and six days back to move a p95
+ * and conjure a p99 below its sample floor (measured 29/08/2026). The first
+ * fix deleted those days from the shared database, which destroys real
+ * developer history; owning a private file destroys nothing. The env must be
+ * set before any import touches db.js, whose path constant is read at module
+ * load; hence vi.hoisted, not beforeAll.
+ */
+const HERMETIC_DB = vi.hoisted(() => {
+  const path = `${process.env.TMPDIR ?? '/tmp'}/ibf-stats-hermetic-${process.pid}-${Date.now()}.sqlite`;
+  process.env.STATS_DB_PATH = path;
+  return path;
+});
+
 import { stats } from './stats.js';
 import { recordRejection, getStatsHistory } from '../lib/stats.js';
 import { getStatsDB } from '../lib/db.js';
 import type { RejectionRow } from '../lib/stats.js';
+import { rmSync } from 'node:fs';
 
 const app = new Hono();
 app.route('/', stats);
@@ -18,6 +37,8 @@ beforeAll(() => {
 afterAll(() => {
   if (PREVIOUS === undefined) delete process.env.STATS_TOKEN;
   else process.env.STATS_TOKEN = PREVIOUS;
+  // Three files: SQLite in WAL mode keeps -shm and -wal beside the base.
+  for (const suffix of ['', '-shm', '-wal']) rmSync(`${HERMETIC_DB}${suffix}`, { force: true });
 });
 
 const auth = { headers: { Authorization: `Bearer ${TOKEN}` } };
@@ -81,10 +102,17 @@ describe('GET /stats — clean revenue total', () => {
 
 describe('GET /stats — freshness witness', () => {
   it('serves last_write_at so the dashboard can tell a dead collector from a quiet day', async () => {
+    // The hermetic database starts empty, so this test writes the row the
+    // witness must notice — which is also the honest shape of the claim: the
+    // witness reflects writes, not the accident of a shared file's history.
+    getStatsDB()
+      .prepare(
+        `INSERT INTO request_log (method, path, status, response_ms, created_at, hour, day_of_week)
+         VALUES ('GET', '/freshness-witness-fixture', 200, 1, datetime('now'), 12, 3)`,
+      )
+      .run();
     const res = await app.request('/stats', auth);
     const body = (await res.json()) as { last_write_at: string | null };
-    // The local DB always has request_log rows (the suite itself writes some),
-    // so the witness must be a datetime string, not undefined.
     expect(typeof body.last_write_at).toBe('string');
   });
 });
@@ -109,6 +137,14 @@ describe('GET /stats/events', () => {
 
 describe('GET /stats/history — expected weekday band', () => {
   it('every entry carries expected_min/expected_max fields (null when history is short)', async () => {
+    // The history is data-driven, not a calendar spine: an empty hermetic
+    // database serves an empty array. One row today gives it one entry.
+    getStatsDB()
+      .prepare(
+        `INSERT INTO request_log (method, path, status, response_ms, created_at, hour, day_of_week)
+         VALUES ('GET', '/weekday-band-fixture', 200, 1, datetime('now'), 12, 3)`,
+      )
+      .run();
     const res = await app.request('/stats/history?period=7', auth);
     const body = (await res.json()) as Array<{
       date: string;
@@ -148,9 +184,9 @@ describe('getStatsHistory — served latency', () => {
   });
 
   /**
-   * These measure the EFFECT of a fixture, not an absolute value: the
-   * development database already holds today's real traffic, so asserting a
-   * number would only ever describe whatever else happens to be in there.
+   * These measure the EFFECT of a fixture, not an absolute value: today's row
+   * is shared with whatever else this suite writes, so asserting a number
+   * would describe the neighbours as much as the fixture.
    */
   it('never lets a refused request make the service look fast', () => {
     // A 402 answered in one millisecond by the paywall is not evidence of
@@ -198,13 +234,11 @@ describe('getStatsHistory — served latency', () => {
   /**
    * These two run on PAST days, unlike the ones above, because they assert
    * EXACT percentiles and today's row is shared with whatever the rest of the
-   * suite logs. A past day is not automatically clean either: the long-lived
-   * development database holds real rows on any calendar date (measured
-   * 29/08/2026 — five and six days back carried enough stray 200s to move the
-   * p95 and conjure a p99 out of thin air). The prefix delete in `beforeEach`
-   * cannot see those rows, so each test takes OWNERSHIP of its day and purges
-   * it wholesale first. Nothing else in the suite writes past-dated rows, so
-   * the purge races with nobody.
+   * suite logs. The database is hermetic (see the hoist at the top — the
+   * shared developer file held real rows on any calendar date, which is how
+   * these assertions first went red), and each test still purges the day it
+   * owns: cheap insurance against a rerun on the same file and against any
+   * future fixture that antedates rows.
    */
   function ownDay(n: number): string {
     getStatsDB()

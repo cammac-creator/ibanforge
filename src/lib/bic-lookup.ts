@@ -256,6 +256,13 @@ export interface BankLookupHit {
   city: string | null;
   match: 'register' | 'prefix';
   candidates?: number;
+  /**
+   * The code actually consulted, when it is not the caller's positional slice.
+   * Iceland is the one case today: the curated key is the two-digit bank grain
+   * of the four-digit bank+branch field, and the verdict must name the code it
+   * is really about — the Finnish `value` motif, one layer down.
+   */
+  checked?: string;
   /** Human name of the dataset the row naming this institution came from. */
   source: string | null;
   /** Year-month that dataset was last refreshed. */
@@ -509,8 +516,11 @@ export function lookupByCountryBank(
   // wins over the bank-grain one. Strategy 2 cannot rescue Iceland either:
   // a bic8 never opens on a digit, so the prefix search is structurally empty
   // for every numeric-code country.
+  let checkedCode: string | undefined;
   if (!entry && countryCode === 'IS') {
-    entry = data[`IS:${bankCode.slice(0, 2)}`];
+    const bankGrain = bankCode.slice(0, 2);
+    entry = data[`IS:${bankGrain}`];
+    if (entry) checkedCode = bankGrain;
   }
 
   if (entry) {
@@ -532,6 +542,7 @@ export function lookupByCountryBank(
       code: bic8,
       bank_name: bankName,
       city: cityName,
+      ...(checkedCode ? { checked: checkedCode } : {}),
       match: 'register',
       // The curated map decided WHICH institution this bank code belongs to; a
       // directory row only supplied its details. Crediting GLEIF for a pairing

@@ -64,3 +64,56 @@ describe('the BIC block says where it comes from', () => {
     expect(r.bic).toBeNull();
   });
 });
+
+describe('a retired code keeps its provenance and loses its licence', () => {
+  /**
+   * The Bankleitzahlendatei still publishes the BIC of a retired BLZ, and the
+   * pairing really is the register's — but the register is saying "stop using
+   * this code", sometimes naming a successor whose row carries a DIFFERENT
+   * BIC. Serving authoritative: true there licensed settling against a code
+   * the register itself withdrew (74 rows when the 29/08/2026 review measured
+   * it). Both IBANs are mod-97 valid over real retired BLZ.
+   */
+  function enriched(iban: string) {
+    const r = validateIBAN(iban);
+    expect(r.valid).toBe(true);
+    enrichResult(r);
+    return r;
+  }
+
+  it('retired without a successor: national_register basis, authoritative false', () => {
+    const r = enriched('DE09200698820000000001');
+    expect(r.bank_code_check?.retired).toBe(true);
+    expect(r.bic?.basis).toBe('national_register');
+    expect(r.bic?.authoritative).toBe(false);
+  });
+
+  it('retired with a successor on a different BIC: same withdrawal', () => {
+    const r = enriched('DE78130610880000000001');
+    expect(r.bank_code_check?.retired).toBe(true);
+    expect(r.bank_code_check?.superseded_by).toBeTruthy();
+    expect(r.bic?.basis).toBe('national_register');
+    expect(r.bic?.authoritative).toBe(false);
+  });
+
+  it('a live BLZ keeps the settlement licence', () => {
+    const r = enriched('DE89370400440532013000');
+    expect(r.bank_code_check?.retired).toBeUndefined();
+    expect(r.bic?.basis).toBe('national_register');
+    expect(r.bic?.authoritative).toBe(true);
+  });
+});
+
+describe('Iceland names the code its verdict is really about', () => {
+  it('serves the two-digit bank grain as value, not the four-digit slice', () => {
+    // The curated key is the bank (01 = Landsbankinn); the IBAN field carries
+    // bank + branch. Serving value: "0133" would imply the branch digits were
+    // checked — the Finnish `value` motif applies one country over.
+    const r = validateIBAN('IS280133260076543589621599');
+    expect(r.valid).toBe(true);
+    enrichResult(r);
+    expect(r.bic?.code).toBe('NBIIISRE');
+    expect(r.bank_code_check?.value).toBe('01');
+    expect(r.bank_code_check?.authoritative).toBe(false);
+  });
+});

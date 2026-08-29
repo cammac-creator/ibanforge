@@ -329,7 +329,7 @@ function decideBankCode(
   // `code` joined the shape for the LV/GI structural rule: crediting a
   // published rule for a pairing requires checking the rule actually produces
   // it, and that check is `resolvedBic.startsWith(bankCode)`.
-  hit: { match: 'register' | 'prefix'; candidates?: number; code: string } | null,
+  hit: { match: 'register' | 'prefix'; candidates?: number; code: string; checked?: string } | null,
   bban: string | undefined,
   /**
    * A reference lookup this verdict would have read already failed. Consulted
@@ -394,7 +394,11 @@ function decideBankCode(
     }
 
     return {
-      value: bankCode,
+      // The code the lookup really consulted: normally the positional slice,
+      // but Iceland answers at the two-digit bank grain of its four-digit
+      // field, and the verdict must name what it is about — the same honesty
+      // `value` already has for Finland one branch up.
+      value: hit.checked ?? bankCode,
       status: 'verified',
       match: hit.match,
       register: COMPOSITE_REGISTER,
@@ -482,7 +486,7 @@ function decideBankCode(
 function checkBankCode(
   cc: string,
   bankCode: string,
-  hit: { match: 'register' | 'prefix'; candidates?: number; code: string } | null,
+  hit: { match: 'register' | 'prefix'; candidates?: number; code: string; checked?: string } | null,
   bban: string | undefined,
   /** A reference lookup feeding this verdict already failed; see enrichResult. */
   lookupFailed: boolean,
@@ -533,8 +537,18 @@ const BIC_BASIS_IS_AUTHORITATIVE: Record<BicBasis, boolean> = {
   directory_prefix: false,
 };
 
-function bicProvenance(basis: BicBasis): { basis: BicBasis; authoritative: boolean } {
-  return { basis, authoritative: BIC_BASIS_IS_AUTHORITATIVE[basis] };
+function bicProvenance(
+  basis: BicBasis,
+  opts?: { retired?: boolean },
+): { basis: BicBasis; authoritative: boolean } {
+  // A code the register itself marks as retired is the one carve-out from the
+  // table: the provenance stays true — the pairing IS the register's — but the
+  // register is telling you not to use this code any more, so the settlement
+  // licence is withdrawn. The details live one block over, in
+  // bank_code_check.retired and superseded_by. Found by the 29/08/2026
+  // adversarial review: 74 retired German BLZ answered "safe to settle
+  // against" with the successor row sometimes carrying a different BIC.
+  return { basis, authoritative: opts?.retired ? false : BIC_BASIS_IS_AUTHORITATIVE[basis] };
 }
 
 /**
@@ -605,8 +619,9 @@ export function enrichResult(result: IBANValidationResult): void {
           as_of: getReferenceAsOf() || null,
           // The one basis that licenses settling against the BIC: the
           // Bankleitzahlendatei publishes it per BLZ, so this pairing is the
-          // register's, not ours.
-          ...bicProvenance('national_register'),
+          // register's, not ours. Unless the register marks the BLZ retired —
+          // then the licence goes with it; see bicProvenance.
+          ...bicProvenance('national_register', { retired: reg.retired }),
         };
       }
     } catch {

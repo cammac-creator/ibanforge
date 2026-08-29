@@ -146,6 +146,9 @@ describe('lookupByCountryBank — Iceland answers at the bank grain', () => {
     // was reachable at all.
     const hit = lookupByCountryBank('IS', '0133');
     expect(hit?.code).toBe('NBIIISRE');
+    // And the hit says which code it really consulted, so the verdict can
+    // serve it as `value` instead of implying the branch digits were checked.
+    expect(hit?.checked).toBe('01');
   });
 
   it('still answers nothing for a bank the map does not carry', () => {

@@ -124,37 +124,47 @@ export function bgBaeRegisterAvailable(): boolean {
  * Null means no institution does — the register allocates the space, so this is
  * a finding and not a coverage gap. The branch digits of the IBAN are
  * deliberately not consulted; see the file note.
+ *
+ * ## Why this THROWS on a broken read instead of catching
+ *
+ * Bulgaria is authoritative: a null out of here becomes not_in_register with
+ * reason not_allocated — the one answer the API documents as "do not send".
+ * A catch { return null } made a corrupt page or a schema drift produce that
+ * exact sentence about the Bulgarian central bank's own code, with full
+ * confidence and no field hinting at the fault (found by the 29/08/2026
+ * adversarial review, reproduced by overwriting the table's root page). So the
+ * query failure is allowed to escape, like lookupBlz and
+ * lookupClearingByBankCode: every caller sits under a guard that converts it
+ * into status unavailable / reason lookup_failed, authority dropped. Only the
+ * absence of the table (ready() above) is a quiet null — a database from
+ * before the seeder existed degrades to the composite map, non-authoritative.
  */
 export function lookupBgBankCode(bankCode: string): BgBankCode | null {
   if (!ready()) return null;
   const code = (bankCode ?? '').trim().toUpperCase();
   if (!/^[A-Z]{4}$/.test(code)) return null;
-  try {
-    if (!headStmt) {
-      headStmt = getBicDB().prepare(
-        // Head-office rows first (they are the ones carrying a BIC), then the
-        // register's own order. Both keys matter: without the BIC key a branch
-        // row published before the head office would name a branch as the
-        // holder of the bank code, and without `ordinal` the tie between two
-        // head-office rows is undefined.
-        `SELECT bank_code, name, bae, bic, as_of FROM bg_bae
-          WHERE bank_code = ?
-          ORDER BY (bic IS NULL), ordinal
-          LIMIT 1`,
-      );
-    }
-    const row = headStmt.get(code) as BgRow | undefined;
-    if (!row) return null;
-    return {
-      bank_code: row.bank_code,
-      name: row.name,
-      bae: row.bae,
-      bic: row.bic ?? null,
-      as_of: row.as_of,
-    };
-  } catch {
-    return null;
+  if (!headStmt) {
+    headStmt = getBicDB().prepare(
+      // Head-office rows first (they are the ones carrying a BIC), then the
+      // register's own order. Both keys matter: without the BIC key a branch
+      // row published before the head office would name a branch as the
+      // holder of the bank code, and without `ordinal` the tie between two
+      // head-office rows is undefined.
+      `SELECT bank_code, name, bae, bic, as_of FROM bg_bae
+        WHERE bank_code = ?
+        ORDER BY (bic IS NULL), ordinal
+        LIMIT 1`,
+    );
   }
+  const row = headStmt.get(code) as BgRow | undefined;
+  if (!row) return null;
+  return {
+    bank_code: row.bank_code,
+    name: row.name,
+    bae: row.bae,
+    bic: row.bic ?? null,
+    as_of: row.as_of,
+  };
 }
 
 /** Number of BAE codes held, for truthful self-description surfaces. */
