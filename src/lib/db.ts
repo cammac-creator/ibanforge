@@ -11,6 +11,7 @@ import { resetPraBanksStatements } from './pra-banks.js';
 import { resetOfficialIdentityStatements } from './official-identity.js';
 import { resetPsdRegisterStatements } from './psd-register.js';
 import { resetBgBaeStatements } from './bg-bae.js';
+import { resetBlzStatements } from './de-blz.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
@@ -686,6 +687,10 @@ export function closeAll(): void {
     resetOfficialIdentityStatements();
     resetPsdRegisterStatements();
     resetBgBaeStatements();
+    // Last of the register modules to be wired in: a prepared statement kept
+    // across a close would answer from a dead connection on the next German
+    // lookup after a reseed.
+    resetBlzStatements();
   }
   if (statsDB) {
     statsDB.close();

@@ -116,3 +116,47 @@ describe('openapi.ts serves the same vocabulary', () => {
     for (const t of tokens) expect(SERVED_FLAGS, t).toContain(t);
   });
 });
+
+/**
+ * The two enums a regulated pilot asked for by name, added 29/08/2026:
+ * `bank_code_check.reason` and `bic.basis`. Same class guard, opposite
+ * direction: prose on these table rows backticks neighbouring field names and
+ * status values too, so instead of proving documented ⊆ served, this proves
+ * served ⊆ documented — a value the code can emit that the row does not name
+ * is exactly how a machine-readable vocabulary rots.
+ */
+const typesSrc = read('src/types.ts');
+
+function unionValues(typeName: string): string[] {
+  const start = typesSrc.indexOf(`export type ${typeName}`);
+  expect(start, `${typeName} must exist in src/types.ts`).toBeGreaterThanOrEqual(0);
+  const body = typesSrc.slice(start, typesSrc.indexOf(';', start));
+  return [...body.matchAll(/'([a-z0-9_]+)'/g)].map((m) => m[1]);
+}
+
+const SERVED_REASONS = unionValues('BankCodeReason');
+const SERVED_BASES = unionValues('BicBasis');
+
+describe.each(['en', 'de', 'fr'])('docs/iban-validate.mdx (%s) names every served enum value', (lang) => {
+  const mdx = read(`frontend/content/${lang}/docs/iban-validate.mdx`);
+  const lines = mdx.split('\n');
+  const row = (needle: string): string => {
+    const l = lines.find((x) => x.startsWith('|') && x.includes(needle));
+    expect(l, `table row for ${needle}`).toBeTruthy();
+    return l!;
+  };
+
+  it('the reason row names all six reasons', () => {
+    expect(SERVED_REASONS.length).toBe(6);
+    // Anchored on the field CELL: the status row cites `reason` in prose and
+    // would be found first on a bare substring.
+    const r = row('| `reason` |');
+    for (const v of SERVED_REASONS) expect(r, v).toContain(`\`${v}\``);
+  });
+
+  it('the basis row names all three bases', () => {
+    expect(SERVED_BASES.length).toBe(3);
+    const r = row('| `basis` |');
+    for (const v of SERVED_BASES) expect(r, v).toContain(`\`${v}\``);
+  });
+});
