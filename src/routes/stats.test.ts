@@ -196,15 +196,20 @@ describe('getStatsHistory — served latency', () => {
    * regulated pilot customer, in those words: the p99, not the median.
    */
   /**
-   * These two run on PAST days, unlike the ones above.
-   *
-   * Today's row is shared with whatever the rest of the suite and the
-   * development database already logged, which is fine for "did this figure
-   * move" but useless for asserting an exact sample count. `beforeEach` deletes
-   * every row of this prefix on every date, so a day in the past holds exactly
-   * what the test put there and nothing else.
+   * These two run on PAST days, unlike the ones above, because they assert
+   * EXACT percentiles and today's row is shared with whatever the rest of the
+   * suite logs. A past day is not automatically clean either: the long-lived
+   * development database holds real rows on any calendar date (measured
+   * 29/08/2026 — five and six days back carried enough stray 200s to move the
+   * p95 and conjure a p99 out of thin air). The prefix delete in `beforeEach`
+   * cannot see those rows, so each test takes OWNERSHIP of its day and purges
+   * it wholesale first. Nothing else in the suite writes past-dated rows, so
+   * the purge races with nobody.
    */
-  function dayAgo(n: number): string {
+  function ownDay(n: number): string {
+    getStatsDB()
+      .prepare("DELETE FROM request_log WHERE date(created_at) = date('now', ?)")
+      .run(`-${n} days`);
     return new Date(Date.now() - n * 86_400_000).toISOString().slice(0, 10);
   }
   const row = (date: string) => getStatsHistory(8).find((r) => r.date === date)!;
@@ -215,10 +220,11 @@ describe('getStatsHistory — served latency', () => {
     // calls, and the slowest one in a hundred is what sets its timeout budget —
     // which is why a regulated pilot customer asked for this figure in those
     // words: the p99, not the median.
+    const day6 = ownDay(6);
     for (let i = 0; i < 189; i++) log(200, 10, 6);
     for (let i = 0; i < 8; i++) log(200, 100, 6);
     for (let i = 0; i < 3; i++) log(200, 900, 6);
-    const day = row(dayAgo(6));
+    const day = row(day6);
     expect(day.p95_ms).toBe(100);
     expect(day.p99_ms).toBe(900);
   });
@@ -228,8 +234,9 @@ describe('getStatsHistory — served latency', () => {
     // to 19, which is exactly where n*0.95 truncates to. Sharing the p50/p95
     // floor of 20 would publish the p95 twice, once labelled p99 — on the one
     // figure a customer asked for BECAUSE the median flatters us.
+    const day5 = ownDay(5);
     for (let i = 0; i < 25; i++) log(200, 30, 5);
-    const day = row(dayAgo(5));
+    const day = row(day5);
     expect(day.p95_ms).not.toBeNull();
     expect(day.p99_ms).toBeNull();
   });
