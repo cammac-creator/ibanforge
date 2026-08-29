@@ -1,4 +1,5 @@
 import { isArchived } from './archived';
+import { isClosed } from './closed';
 import type { Contact, Situation } from './types';
 
 /**
@@ -36,9 +37,16 @@ import type { Contact, Situation } from './types';
  * Deliberately blind to the snooze. Someone who writes while asleep has
  * overtaken their own "call me in September", and burying that message would
  * hide the one event that proves the snooze wrong.
+ *
+ * NOT blind to a closed dossier, and the two rules do not conflict: isClosed
+ * carries its own version of the same doctrine. A human inbound dated after
+ * the « pas intéressé » / « mauvaise personne » verdict reopens the dossier
+ * inside isClosed itself, so the one event that proves the verdict wrong is
+ * never buried — while a support robot's acknowledgement, which proves
+ * nothing, cannot resurrect a thread the operator deliberately closed.
  */
 export function ballWithUs(c: Contact, s: Situation | undefined): boolean {
-  return !isArchived(c, s) && s?.ballInCourt === 'us';
+  return !isArchived(c, s) && !isClosed(c) && s?.ballInCourt === 'us';
 }
 
 /**
@@ -48,7 +56,7 @@ export function ballWithUs(c: Contact, s: Situation | undefined): boolean {
  * to be dismissed by hand, which is exactly the cycle it exists to break.
  */
 export function followupDue(c: Contact, s: Situation | undefined, snoozed: boolean = false): boolean {
-  return !snoozed && !isArchived(c, s) && s?.followupDue === true;
+  return !snoozed && !isArchived(c, s) && !isClosed(c) && s?.followupDue === true;
 }
 
 /**
@@ -83,5 +91,5 @@ export function dueToday(c: Contact, s: Situation | undefined, snoozed: boolean 
  * what must not resurface before that date.
  */
 export function neverContacted(c: Contact, s: Situation | undefined, snoozed: boolean = false): boolean {
-  return !snoozed && c.kind === 'prospect' && !isArchived(c, s) && s?.nextAction === 'first_mail';
+  return !snoozed && c.kind === 'prospect' && !isArchived(c, s) && !isClosed(c) && s?.nextAction === 'first_mail';
 }

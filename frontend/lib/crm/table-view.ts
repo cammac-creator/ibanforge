@@ -38,7 +38,11 @@ export const POPULATION_KEYS: readonly MailFilterKey[] = [
  * The refining chips, quiet by design: they narrow whatever the segment and the
  * tile already selected. At most one is pressed.
  */
-export const REFINE_KEYS: readonly MailFilterKey[] = ['new', 'paying', 'dormant', 'prospect'];
+// 'closed' is a chip and not a work tile on purpose: the day's tiles count
+// what is OWED, and a closed dossier is the one thing that no longer is. The
+// chip is the retrieval path — narrow any population to the dossiers the
+// terminal verdicts took out of the queues.
+export const REFINE_KEYS: readonly MailFilterKey[] = ['new', 'paying', 'dormant', 'prospect', 'closed'];
 
 /**
  * The segment's own word for a key, where the filter's label was written for a

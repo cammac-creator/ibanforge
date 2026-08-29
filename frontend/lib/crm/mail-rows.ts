@@ -1,5 +1,6 @@
 import { isArchived } from './archived';
 import { ballWithUs, followupDue, neverContacted } from './buckets';
+import { isClosed } from './closed';
 import { chipOf, replyGroupOf, type BusinessChip, type ReplyGroup } from './business';
 import { heatOf } from './heat';
 import { nextActionLabel } from './situation';
@@ -16,6 +17,7 @@ export type MailFilterKey =
   | 'prospect'
   | 'prospects'
   | 'institution'
+  | 'closed'
   | 'all';
 
 export interface RowsInput {
@@ -72,6 +74,13 @@ export interface MailRow {
   confidence: 'high' | 'medium' | 'low' | null;
   /** A sleeper whose wake date just arrived — the list marks the return. */
   woke: boolean;
+  /**
+   * A dossier closed by a terminal verdict (« pas intéressé » /
+   * « mauvaise personne »), still standing — a newer human inbound clears it
+   * inside isClosed. The badge is the row's only explanation of why it sits
+   * under « Classés » and not in the day's queues.
+   */
+  closed: boolean;
   /**
    * What searchRows matches: the company and the address, in one string, which
    * is exactly what the deleted contact list's search matched. `who` cannot
@@ -164,6 +173,10 @@ const FILTERS: Array<{
    * about the thread, not about who is on the other end.
    */
   { key: 'institution', label: 'Correspondances', urgent: false, test: (c) => c.kind === 'institution' },
+  // The retrieval half of the closing gesture: a dossier the verdicts above
+  // removed from the day's queues must stay one click away, or closing a row
+  // starts to feel like deleting it and the gesture stops being used.
+  { key: 'closed', label: 'Classés', urgent: false, test: (c) => isClosed(c) },
   { key: 'all', label: 'Tous', urgent: false, test: () => true },
 ];
 
@@ -271,6 +284,7 @@ function toRow(
     unread: c.unread,
     prospectId: c.sourcing?.prospectId ?? null,
     woke,
+    closed: isClosed(c),
     confidence:
       c.sourcing?.confidence === 'high' || c.sourcing?.confidence === 'medium' || c.sourcing?.confidence === 'low'
         ? c.sourcing.confidence

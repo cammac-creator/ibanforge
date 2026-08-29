@@ -431,9 +431,24 @@ const drafted: Contact = {
 const desk = institution('desk@alpha.example.net', 'Autorité Rho', [
   message('out', 'Demande de permission', 'Nous souhaitons citer vos données', '2026-07-11'),
 ]);
+/**
+ * A dossier closed by a terminal verdict. Their message is last, so WITHOUT
+ * the verdict this row would sit in « À répondre » — which is exactly what
+ * the 'closed' chip's parity run needs to prove it no longer does.
+ */
+const judged: Contact = (() => {
+  const c = prospect('sigma@example.com', 'Société Sigma', [
+    message('out', 'Présentation', 'Voici notre API', '2026-06-01'),
+    message('in', 'Re: Présentation', 'Merci, mais non', '2026-06-10'),
+  ]);
+  return {
+    ...c,
+    sourcing: { ...c.sourcing!, outcome: 'pas_interesse' as const, outcomeAt: '2026-06-12' },
+  } as Contact;
+})();
 
 const rich: RowsInput = {
-  contacts: [alpha, beta, newClient, cold, buyer, sleeping, drafted, desk],
+  contacts: [alpha, beta, newClient, cold, buyer, sleeping, drafted, desk, judged],
   situations: {
     'alpha@example.com': situation({ ballInCourt: 'us', silenceDays: 2 }),
     'beta@example.com': situation({ followupDue: true, silenceDays: 40 }),
@@ -443,6 +458,7 @@ const rich: RowsInput = {
     'quiet@alpha.example.net': situation({ silenceDays: 90, messageCount: 1 }),
     'pending@alpha.example.net': situation({ silenceDays: 20, messageCount: 1 }),
     'desk@alpha.example.net': situation({ ballInCourt: 'them', silenceDays: 12, messageCount: 1 }),
+    'sigma@example.com': situation({ ballInCourt: 'us', silenceDays: 45, messageCount: 2 }),
   },
   snoozed: {},
 };

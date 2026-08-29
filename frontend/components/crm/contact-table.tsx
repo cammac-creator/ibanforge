@@ -399,6 +399,18 @@ export function ContactTable({
                           <span aria-hidden>⏰</span>
                         </span>
                       )}
+                      {/* A closed dossier met outside its own filter (under
+                          Tous, Prospects…) must say why it is not in the day's
+                          queues, or the operator re-reads a thread he already
+                          judged. */}
+                      {r.closed && (
+                        <span
+                          title="Dossier classé (pas intéressé / mauvaise personne) — un nouveau message de sa part le rouvrira"
+                          className="shrink-0 self-center rounded bg-zinc-500/15 px-1 py-0.5 text-[9.5px] font-bold uppercase tracking-wide text-zinc-400"
+                        >
+                          classé
+                        </span>
+                      )}
                       {r.chip && (
                         <span
                           className="shrink-0 self-center rounded px-1.5 py-0.5 text-[9.5px] font-bold uppercase tracking-wide"
