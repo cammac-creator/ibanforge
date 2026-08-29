@@ -372,7 +372,7 @@ export default async function DashboardPage({
           trend={callsTrendPct ? { direction: callsTrend, label: t('stats.vsYesterday', { percent: callsTrendPct }) } : undefined}
           sparkline={callsSparkline}
           accentColor="#f59e0b"
-          hint="Opérations métier facturables du jour (validate + batch + bic_lookup). Exclut le bruit (4xx/5xx, /mcp, scanners)."
+          hint="Opérations servies du jour (validate + batch + bic_lookup), avec OU sans clé : les essais réussis du playground public comptent ici — y compris ceux d'un crawler qui soumet des IBAN bien formés. L'onglet Clients ne compte que les appels portés par une clé : un écart entre les deux est donc normal, pas une incohérence (constaté le 29/08 : 32 ici, 1 côté clients, les 31 autres = playground). Exclut les refus 4xx/5xx et les outils MCP, qui n'enregistrent pas d'opération."
         />
         <StatCardV2
           title={t('stats.totalRevenue')}
