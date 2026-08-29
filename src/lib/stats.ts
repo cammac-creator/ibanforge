@@ -1451,9 +1451,9 @@ function homepageFromUserAgent(ua: string): string | null {
  * caller look like it had left and been replaced — whereas a crawler's UA is
  * stable for as long as it exists.
  *
- * `minRequests` is a noise floor: 1,532 distinct agents called in the last 90
- * days and the great majority came once. Serving all of them would bury the
- * forty that matter.
+ * `minRequests` is a noise floor: distinct agents number in the thousands over
+ * a 90-day window and the great majority came exactly once. Serving all of
+ * them would bury the few dozen that matter.
  */
 export function getBotProfiles(days = 90, minRequests = 5): Record<string, BotProfile> {
   const db = getStatsDB();
