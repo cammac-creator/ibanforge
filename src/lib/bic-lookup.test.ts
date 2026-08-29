@@ -3,6 +3,7 @@ import {
   lookup,
   lookupByBic8,
   lookupByBic11,
+  lookupByCountryBank,
   getEntryCount,
   getLastUpdated,
   getReferenceAsOf,
@@ -113,5 +114,42 @@ describe('getLastUpdated — cached, and still the right answer', () => {
     for (let i = 0; i < 500; i++) getLastUpdated();
     const perCall = Number(process.hrtime.bigint() - t0) / 1e6 / 500;
     expect(perCall, `${perCall.toFixed(3)} ms per call — the table scan is back`).toBeLessThan(0.5);
+  });
+});
+
+/**
+ * Two countries whose keys were unreachable from their own IBANs, measured
+ * 29/08/2026 over the entire code space of each.
+ */
+describe('lookupByCountryBank — Monaco stays Monegasque', () => {
+  it('resolves a Monegasque CIB under its own country key', () => {
+    // The CIB space is allocated by the Banque de France for both countries,
+    // and for years the fourteen Monegasque institutions were keyed under FR:
+    // only — reachable from a French IBAN, invisible from a Monegasque one.
+    const hit = lookupByCountryBank('MC', '12739');
+    expect(hit?.code).toBe('CFMOMCMX');
+    expect(hit?.match).toBe('register');
+  });
+
+  it('never borrows a French pairing for a Monegasque IBAN', () => {
+    // FR:30004 exists in the map. A fallback MC->FR would resolve a French
+    // BIC for a Monegasque account — cross-border by construction, and wrong
+    // for every institution that operates on both sides.
+    expect(lookupByCountryBank('MC', '30004')).toBeNull();
+  });
+});
+
+describe('lookupByCountryBank — Iceland answers at the bank grain', () => {
+  it('reaches the two-digit key from the four-digit bank code', () => {
+    // 0133: bank 01 (Landsbankinn), branch 33. The curated keys are two
+    // digits; the IBAN carries four. Before the truncation, no Icelandic key
+    // was reachable at all.
+    const hit = lookupByCountryBank('IS', '0133');
+    expect(hit?.code).toBe('NBIIISRE');
+  });
+
+  it('still answers nothing for a bank the map does not carry', () => {
+    // 99 is held by nobody; the truncation must widen reach, not certainty.
+    expect(lookupByCountryBank('IS', '9933')).toBeNull();
   });
 });

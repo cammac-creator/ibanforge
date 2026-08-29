@@ -498,7 +498,20 @@ export function lookupByCountryBank(
   // Strategy 1: exact key lookup in bic_data.json
   const data = getBicData();
   const key = `${countryCode}:${bankCode}`;
-  const entry = data[key];
+  let entry = data[key];
+
+  // Iceland allocates the two LEADING digits of the four-digit bank code to
+  // the institution and the trailing two to the branch, and the curated map
+  // keys its four commercial banks at that two-digit grain. Without the
+  // truncation no Icelandic key is reachable from any IBAN at all — measured
+  // at 0% over the entire code space on 29/08/2026, while the four banks sat
+  // correctly named in the map. Exact key first, so a future branch-grain key
+  // wins over the bank-grain one. Strategy 2 cannot rescue Iceland either:
+  // a bic8 never opens on a digit, so the prefix search is structurally empty
+  // for every numeric-code country.
+  if (!entry && countryCode === 'IS') {
+    entry = data[`IS:${bankCode.slice(0, 2)}`];
+  }
 
   if (entry) {
     // Normalize BIC to 8 chars (strip branch suffix if present)
