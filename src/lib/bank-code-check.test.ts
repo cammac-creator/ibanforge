@@ -191,6 +191,57 @@ describe('bank_code_check.reason — why an answer is not verified', () => {
   });
 });
 
+/**
+ * "Is your derived BIC authoritative enough to store and settle against, or
+ * advisory only?"
+ *
+ * The question a regulated pilot customer put in writing, and the answer had to
+ * move from the documentation into the payload: a caveat on a docs page is a
+ * caveat the first integration to read the JSON never sees.
+ */
+describe('bic.basis — where the pairing came from, and what it licenses', () => {
+  it('calls the German pairing what it is: the register publishing a BIC per bank code', () => {
+    const r = check('DE89370400440532013000');
+    expect(r.bic!.basis).toBe('national_register');
+    expect(r.bic!.authoritative).toBe(true);
+  });
+
+  it('does not promote our own curated pairing to a register one', () => {
+    const r = check('FR7630006000011234567890189');
+    expect(r.bic!.basis).toBe('curated_map');
+    expect(r.bic!.authoritative).toBe(false);
+  });
+
+  it('marks the prefix fallback as the weakest basis of the three', () => {
+    const r = check('NL53ETPW0123456789');
+    expect(r.bic!.basis).toBe('directory_prefix');
+    expect(r.bic!.authoritative).toBe(false);
+  });
+
+  it('keeps the two authoritative flags apart, because they answer different questions', () => {
+    // Switzerland is where they visibly differ, and where collapsing them would
+    // mislead: SIX confirms the IID is allocated, so bank_code_check is
+    // authoritative — while the BIC beside it still comes from our curated map
+    // and must not be settled against on the strength of that verdict.
+    const r = check('CH5604835012345678009');
+    expect(r.bank_code_check!.authoritative).toBe(true);
+    expect(r.bic!.basis).toBe('curated_map');
+    expect(r.bic!.authoritative).toBe(false);
+  });
+
+  it('derives the flag from the basis rather than carrying two independent claims', () => {
+    for (const iban of [
+      'DE89370400440532013000',
+      'FR7630006000011234567890189',
+      'NL53ETPW0123456789',
+      'CH5604835012345678009',
+    ]) {
+      const bic = check(iban).bic!;
+      expect(bic.authoritative).toBe(bic.basis === 'national_register');
+    }
+  });
+});
+
 describe('issuer classification says whether it identified or assumed', () => {
   it('marks a curated identification as such', () => {
     // N26, Bankleitzahl 10011001.

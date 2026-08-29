@@ -1151,6 +1151,22 @@ const buildSpec = () => ({
               },
               source: { type: ['string', 'null'], description: 'Which dataset named this institution.' },
               as_of: { type: ['string', 'null'], description: 'Year-month that dataset was last refreshed.' },
+              basis: {
+                type: 'string',
+                enum: ['national_register', 'curated_map', 'directory_prefix'],
+                description:
+                  'WHERE the bank code to BIC pairing came from, and therefore what may be done with the BIC. ' +
+                  'national_register: the country\'s own register publishes this BIC for this bank code — today Germany, whose Bankleitzahlendatei carries the exact 11-character BIC per BLZ. ' +
+                  'curated_map: our maintained bank-code map made the pairing on an exact key. Usually right, and not an allocation record. ' +
+                  'directory_prefix: the bic8 LIKE fallback, which can match several institutions at once — read bank_code_check.candidates. ' +
+                  'Answers the settlement question directly: only national_register is settlement-grade, so outside DE a derived BIC is advisory and should be confirmed with the beneficiary or your bank before it becomes a stored routing instruction.',
+              },
+              authoritative: {
+                type: 'boolean',
+                description:
+                  'Whether this BIC may be stored and settled against. Derived from `basis` by a single table, so the two cannot disagree. ' +
+                  'NOT the same claim as bank_code_check.authoritative, which is about the BANK CODE — whether a national register was consulted about its existence. Switzerland is where they visibly differ: the SIX BankMaster answers authoritatively that an IID is allocated, while the BIC beside it still comes from our curated map.',
+              },
               lei: {
                 type: ['string', 'null'],
                 example: '851WYGNLUQLFZBSYGB56',

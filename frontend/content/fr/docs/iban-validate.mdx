@@ -58,7 +58,9 @@ POST https://api.ibanforge.com/v1/iban/validate
   "bic": {
     "code": "UBSWCHZH",
     "bank_name": "UBS Switzerland AG",
-    "city": "Zürich"
+    "city": "Zürich",
+    "basis": "curated_map",
+    "authoritative": false
   },
   "sepa": {
     "member": true,
@@ -156,6 +158,8 @@ POST https://api.ibanforge.com/v1/iban/validate
 | `code` | `string` | Code BIC/SWIFT (8 caracteres) |
 | `bank_name` | `string \| null` | Nom de l'etablissement financier |
 | `city` | `string \| null` | Ville de l'etablissement |
+| `basis` | `string` | D'où vient l'appariement code banque → BIC. `national_register` — le registre national du pays publie ce BIC pour ce code banque (aujourd'hui DE, via la Bankleitzahlendatei de la Bundesbank) ; `curated_map` — notre carte de codes banque maintenue, une clé exacte et non un acte d'attribution ; `directory_prefix` — le repli par préfixe de BIC, qui peut correspondre à plusieurs établissements (voir `bank_code_check.candidates`) |
+| `authoritative` | `boolean` | Ce BIC peut-il être stocké et servir à régler. Dérivé de `basis`, `true` uniquement pour `national_register`. Voir la section « Régler contre ce BIC, ou le traiter comme indicatif ? » ci-dessous |
 
 **Objet `sepa` :**
 
@@ -212,6 +216,18 @@ POST https://api.ibanforge.com/v1/iban/validate
 **Une défaillance de notre côté est signalée par `unavailable`, jamais par un verdict.** Lorsque les données de référence ne peuvent pas être lues — base illisible, table absente après un déploiement raté, requête qui expire — la réponse est `status: "unavailable"` avec `reason: "lookup_failed"` et `register: null`. Ce n'est jamais `not_in_register` : ce verdict signifie « aucun établissement ne détient ce code », et une panne chez nous n'est pas une preuve sur votre bénéficiaire. C'est `reason` qui sépare les deux situations en un seul jeton : `lookup_failed` et `national_register_unavailable` sont à nous de réparer, tout le reste est une affirmation sur le code. Tous se traitent pareil : continuez, et laissez un contrôle du nom du bénéficiaire trancher.
 
 **Rien de tout cela ne confirme que le compte existe, est ouvert, ou appartient à une personne donnée.** Un IBAN structurellement valide nommant un établissement réel peut être fabriqué. Pour vérifier le bénéficiaire, utilisez la Verification of Payee des banques (`sepa.vop_required` indique quand elle est exigée) ou un contrôle du nom auprès de votre contrepartie — chaque fois qu'une réponse laisse ce vide ouvert, `next_steps` le dit explicitement.
+
+### Régler contre ce BIC, ou le traiter comme indicatif ?
+
+Le BIC de la réponse est **dérivé** du code banque que porte l'IBAN, et ce que vaut cette dérivation dépend entièrement de ce qui l'a produite. `bic.basis` dit laquelle, et `bic.authoritative` en tire le seul booléen sur lequel un moteur de paiement peut brancher :
+
+- **`basis: "national_register"`, `authoritative: true`** — le registre national du pays publie ce BIC pour ce code banque. Aujourd'hui, c'est l'**Allemagne** : la Bankleitzahlendatei de la Bundesbank porte le BIC exact à 11 caractères par BLZ. C'est ce même registre qui fait qu'une Sparkasse allemande se résout vers son propre BIC et non vers le BIC8 de la Landesbank partagée — le champ nomme cet appariement, il ne le crée pas. Stockable, et utilisable pour régler.
+- **`basis: "curated_map"`, `authoritative: false`** — c'est notre propre carte de codes banque qui a fait l'appariement, sur une clé exacte. Juste la plupart du temps, et ce n'est pas un acte d'attribution : aucune autorité ne le garantit.
+- **`basis: "directory_prefix"`, `authoritative: false`** — le repli par préfixe de BIC. Il peut correspondre à plusieurs établissements à la fois ; `bank_code_check.candidates` dit combien, et `next_steps` lève `bic_is_advisory` dès qu'ils sont plus d'un.
+
+**Hors d'une base `national_register`, traitez le BIC comme indicatif** : bon pour l'affichage, l'enrichissement et une indication de routage, à confirmer auprès du bénéficiaire ou de votre banque avant d'en faire une instruction de règlement stockée.
+
+> `bic.authoritative` et `bank_code_check.authoritative` répondent à **deux questions différentes**, et la Suisse est l'endroit où l'écart se voit. Le SIX BankMaster affirme de façon autoritaire que le code banque est attribué — `bank_code_check.authoritative: true` — tandis que le BIC à côté vient toujours de notre carte curatée, donc `bic.authoritative` vaut `false`. Le premier porte sur l'existence du code, le second sur l'appariement qui a produit le BIC.
 
 ### IBAN invalide (200)
 

@@ -64,7 +64,7 @@ const TOOLS: Tool[] = [
       'or pastes any string starting with two letters and digits (e.g., "DE89...", "CH93...", "FR76..."). ' +
       'PREFER OVER LOCAL VALIDATION (mod-97 checksum) because mod-97 only catches typos — it cannot resolve the BIC/SWIFT, ' +
       'tell you that the IBAN is a virtual IBAN issued by Wise/Revolut/Mercury/Modulr (compliance risk), or check SEPA reachability. ' +
-      'RETURNS: valid (boolean), country { code, name }, bic { code, bank_name, city }, ' +
+      'RETURNS: valid (boolean), country { code, name }, bic { code, bank_name, city, basis, authoritative — basis says where the bank code to BIC pairing came from, and outside a national_register pairing the BIC is advisory rather than something to settle against }, ' +
       'issuer { type: bank | digital_bank | emi | payment_institution | null when unsubstantiated, name, classification }, ' +
       'bank_code_check { status, authoritative — read authoritative to know how much a "verified" is worth; reason — one token saying WHY an answer is not verified, and in particular whether the code is denied by a register or whether we simply could not answer }, ' +
       'sepa { member, schemes, vop_required, vop_participant — is the recipient bank listed as ready in the EPC VoP register }, next_steps (recommended follow-ups with reasons), ' +
@@ -114,11 +114,24 @@ const TOOLS: Tool[] = [
         },
         bic: {
           type: 'object',
-          description: 'Resolved BIC/SWIFT (when BBAN→BIC mapping exists). null if unresolved.',
+          description:
+            'Resolved BIC/SWIFT (when BBAN→BIC mapping exists). null if unresolved. ' +
+            'Read basis before storing it as a routing instruction: only a national_register pairing is settlement-grade.',
           properties: {
             code: { type: 'string' },
             bank_name: { type: 'string' },
             city: { type: 'string' },
+            basis: {
+              type: 'string',
+              enum: ['national_register', 'curated_map', 'directory_prefix'],
+              description:
+                'Where the bank code to BIC pairing came from. national_register: the country register publishes this BIC for this bank code (today DE, Bundesbank Bankleitzahlendatei) — settlement-grade. curated_map: our maintained map, exact key, not an allocation record. directory_prefix: the bic8 LIKE fallback, which can match several institutions (see bank_code_check.candidates). Outside national_register the BIC is ADVISORY.',
+            },
+            authoritative: {
+              type: 'boolean',
+              description:
+                'Whether this BIC may be stored and settled against. Derived from basis. NOT bank_code_check.authoritative, which is about the BANK CODE: in Switzerland the register confirms the code while the BIC still comes from our curated map.',
+            },
           },
         },
         issuer: {

@@ -235,6 +235,57 @@ describe('POST /mcp — full handshake', () => {
     expect(check.authoritative).toBe(false);
   });
 
+  /**
+   * The settlement question, asked over MCP.
+   *
+   * `bic.basis` is the field that says whether a derived BIC may be stored and
+   * settled against or is advisory only. An agent that cannot see it has no way
+   * to tell a register pairing from a prefix guess — and Zod strips undeclared
+   * fields from `structuredContent` without an error, which is exactly how a
+   * field can be documented, served over REST and invisible to every agent.
+   */
+  it('tools/call validate_iban keeps bic.basis through the schema', async () => {
+    const app = makeApp();
+    const sessionId = await initialize(app);
+    const callResp = await rpc(
+      app,
+      sessionId,
+      'tools/call',
+      // Germany: the one basis today that licenses settling against the BIC.
+      { name: 'validate_iban', arguments: { iban: 'DE89370400440532013000' } },
+      2,
+      '203.0.113.11',
+    );
+    expect(callResp.error).toBeUndefined();
+    const result = callResp.result as { structuredContent?: Record<string, unknown> };
+    const bic = result.structuredContent!.bic as Record<string, unknown>;
+    expect(bic.basis, 'stripped by the output schema').toBe('national_register');
+    expect(bic.authoritative).toBe(true);
+  });
+
+  it('tools/call batch_validate_iban keeps bic.basis through its own schema', async () => {
+    // The batch tool declares its `bic` block separately from validate_iban, so
+    // "the field is in the schema" has to be proved twice. A strip is silent by
+    // construction: the only way to see one is to look at structuredContent.
+    const app = makeApp();
+    const sessionId = await initialize(app);
+    const callResp = await rpc(
+      app,
+      sessionId,
+      'tools/call',
+      { name: 'batch_validate_iban', arguments: { ibans: ['DE89370400440532013000'] } },
+      2,
+      '203.0.113.12',
+    );
+    expect(callResp.error).toBeUndefined();
+    const result = callResp.result as { structuredContent?: { results?: Array<Record<string, unknown>> } };
+    const first = result.structuredContent!.results![0];
+    const bic = first.bic as Record<string, unknown>;
+    expect(bic.basis, 'stripped by the batch output schema').toBe('national_register');
+    const check = first.bank_code_check as Record<string, unknown>;
+    expect(check.status).toBe('verified');
+  });
+
   it('tools/call check_postal_address keeps findings and their sources through the schema', async () => {
     const app = makeApp();
     const sessionId = await initialize(app);

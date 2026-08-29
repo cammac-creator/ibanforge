@@ -163,6 +163,19 @@ export interface BIC {
   /** Month the source was last refreshed. */
   as_of?: string;
   /**
+   * Where the bank code → BIC pairing came from. `source` names the dataset;
+   * this says what KIND of source it is, which is the half a payment engine can
+   * branch on. Only `national_register` is settlement-grade.
+   */
+  basis?: 'national_register' | 'curated_map' | 'directory_prefix';
+  /**
+   * Whether this BIC may be stored and settled against. Derived from `basis`.
+   * NOT `bank_code_check.authoritative`, which answers whether a register was
+   * consulted about the BANK CODE — in Switzerland it confirms the code while
+   * this BIC still comes from the curated map.
+   */
+  authoritative?: boolean;
+  /**
    * Legal Entity Identifier of the resolved institution.
    *
    * Served by `/v1/iban/validate` since 1.4.4 — before that it lived only on

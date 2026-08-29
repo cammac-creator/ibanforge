@@ -96,6 +96,12 @@ export type OperationType = 'iban_validate' | 'iban_batch' | 'bic_lookup' | 'iba
  * The last two are the ones that pay for this field. They are the states where
  * a caller most needs to know the answer describes US and not their payee.
  */
+/**
+ * The kinds of source a derived BIC can come from, worst to best in what they
+ * license. See the `basis` field on the `bic` block for the full note.
+ */
+export type BicBasis = 'directory_prefix' | 'curated_map' | 'national_register';
+
 export type BankCodeReason =
   | 'not_allocated'
   | 'absent_from_reference_data'
@@ -231,6 +237,52 @@ export interface IBANValidationResult {
     code: string;
     bank_name: string | null;
     city: string | null;
+    /**
+     * WHERE the bank code → BIC pairing came from, and therefore what may be
+     * done with the BIC.
+     *
+     * ## The question this answers
+     *
+     * "Is your derived BIC authoritative enough to store and settle against, or
+     * advisory only?" — asked in writing by a regulated pilot customer, and until
+     * now answerable only from the documentation. A field that is read by a
+     * machine and acted on by a payment engine has to carry its own weight in
+     * the payload; a caveat living on a docs page is a caveat that gets stripped
+     * by the first integration that reads the JSON.
+     *
+     * - `national_register` — the country's own register publishes this BIC for
+     *   this bank code. Today: Germany, where the Bundesbank Bankleitzahlendatei
+     *   carries the exact 11-character BIC per BLZ. Settlement-grade.
+     * - `curated_map` — our own maintained bank-code map made the pairing. It is
+     *   an exact key and it is usually right; it is not an allocation record,
+     *   and no authority stands behind it.
+     * - `directory_prefix` — the `bic8 LIKE bank_code%` fallback. Reachable only
+     *   where a bank code may open on a letter, and it can match several
+     *   institutions at once; `bank_code_check.candidates` says how many.
+     *
+     * ## Why the honest answer is "advisory outside DE"
+     *
+     * Only one of the three is a register of allocations, and saying so plainly
+     * is worth more than a field that flatters the other two. Coverage may grow
+     * — several registers we already ingest publish a BIC per code — and this
+     * field is what will make that growth visible without a re-read of the docs.
+     */
+    basis?: BicBasis;
+    /**
+     * Whether this BIC may be stored and settled against. DERIVED from `basis`
+     * by a single table, so the two cannot drift into disagreeing — the same
+     * rule as `postal_address.format`, and the fix for the class of defect where
+     * one field says "Bundesbank" while its neighbour says the answer is not
+     * authoritative.
+     *
+     * ⚠️ Not the same claim as `bank_code_check.authoritative`, which is about
+     * the BANK CODE: whether a national register was consulted about its
+     * existence. This one is about the BIC: whether the pairing that produced it
+     * comes from that register too. Switzerland is where they visibly differ —
+     * the SIX BankMaster answers authoritatively that an IID is allocated, while
+     * the BIC beside it still comes from our curated map.
+     */
+    authoritative?: boolean;
     /**
      * Which dataset named this institution, in the same spirit as
      * `bank_code_check.register` and `modulus_check.source`. This block was the

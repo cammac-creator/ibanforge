@@ -26,7 +26,7 @@ import { checkUkModulus } from './uk-modulus.js';
 import { praAuthorisationByLei } from './pra-banks.js';
 import { officialIdentityByNationalCode } from './official-identity.js';
 import { psdRegistrationByBankCode, type PsdEntityType } from './psd-register.js';
-import type { BankCodeCheck, IBANValidationResult, RegisterInstitution } from '../types.js';
+import type { BankCodeCheck, BicBasis, IBANValidationResult, RegisterInstitution } from '../types.js';
 import { nextSteps } from './next-steps.js';
 
 /**
@@ -449,6 +449,31 @@ function safeReferenceAsOf(): string {
 }
 
 /**
+ * Which kinds of source license storing a BIC and settling against it.
+ *
+ * ONE table, and `authoritative` is read out of it rather than written beside
+ * the basis at each call site. The class of defect this forecloses is already
+ * documented one screen up, on COMPOSITE_REGISTER: a field naming a real
+ * register while the flag next to it said the answer was not authoritative —
+ * two halves of the same object contradicting each other on the exact point at
+ * issue. A derived boolean cannot do that.
+ *
+ * Only the national register is true today, and the flat answer "advisory
+ * outside DE" is worth more than a field that flatters the other two. Adding a
+ * country here means its register publishes the BIC per bank code AND that we
+ * read it — not that our pairing happens to agree with one.
+ */
+const BIC_BASIS_IS_AUTHORITATIVE: Record<BicBasis, boolean> = {
+  national_register: true,
+  curated_map: false,
+  directory_prefix: false,
+};
+
+function bicProvenance(basis: BicBasis): { basis: BicBasis; authoritative: boolean } {
+  return { basis, authoritative: BIC_BASIS_IS_AUTHORITATIVE[basis] };
+}
+
+/**
  * Enrich a valid IBAN result with BIC lookup, issuer classification,
  * and risk indicators. Mutates the result object in place.
  */
@@ -479,7 +504,19 @@ export function enrichResult(result: IBANValidationResult): void {
     lookupFailed = true;
   }
   result.bic = hit
-    ? { code: hit.code, bank_name: hit.bank_name, city: hit.city, source: hit.source, as_of: hit.as_of }
+    ? {
+        code: hit.code,
+        bank_name: hit.bank_name,
+        city: hit.city,
+        source: hit.source,
+        as_of: hit.as_of,
+        // `source` names the dataset; `basis` says what KIND of source it is,
+        // which is the half a payment engine can branch on. The prefix fallback
+        // and an exact curated key are both advisory, and they are advisory for
+        // different reasons — one may have matched several institutions, the
+        // other is our own assembly — so they stay separate values.
+        ...bicProvenance(hit.match === 'prefix' ? 'directory_prefix' : 'curated_map'),
+      }
     : null;
 
   // Germany: the Bundesbank register carries the exact 11-character BIC per
@@ -502,6 +539,10 @@ export function enrichResult(result: IBANValidationResult): void {
           city: reg.town,
           source: NATIONAL_REGISTERS.DE,
           as_of: getReferenceAsOf() || null,
+          // The one basis that licenses settling against the BIC: the
+          // Bankleitzahlendatei publishes it per BLZ, so this pairing is the
+          // register's, not ours.
+          ...bicProvenance('national_register'),
         };
       }
     } catch {

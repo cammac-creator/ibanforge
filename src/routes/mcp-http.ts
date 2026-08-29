@@ -88,6 +88,34 @@ const OFFICIAL_IDENTITY_SCHEMA = z
     'Who a central bank says holds the resolved code (ECB by LEI and for FR bank codes, Banco de Espana for ES). Present only on a match — absence is not a negative. INFORMATIONAL ONLY: it never changes valid or bank_code_check, because both publishers relay rather than allocate.',
   );
 
+/**
+ * Where a derived BIC came from, declared once for the three tools that serve
+ * one.
+ *
+ * Same trap as NEXT_STEPS_SCHEMA above, and this field is the worst one to lose
+ * to it: an agent that cannot see the basis has no way to tell a register
+ * pairing from a prefix guess, and the guess is the one it must not settle
+ * against. Zod strips what the schema does not name, silently.
+ */
+const BIC_BASIS_SCHEMA = z
+  .string()
+  .optional()
+  .describe(
+    'Where the bank code to BIC pairing came from, and therefore what may be done with the BIC. ' +
+      'national_register (the country register publishes this BIC for this bank code — today DE, via the Bundesbank Bankleitzahlendatei; settlement-grade) | ' +
+      'curated_map (our maintained bank-code map, exact key, usually right and not an allocation record) | ' +
+      'directory_prefix (the bic8 LIKE fallback, which can match several institutions — read bank_code_check.candidates). ' +
+      'Outside a national_register basis the BIC is ADVISORY: confirm it with the beneficiary or the bank before storing it as a routing instruction.',
+  );
+
+const BIC_AUTHORITATIVE_SCHEMA = z
+  .boolean()
+  .optional()
+  .describe(
+    'Whether this BIC may be stored and settled against. Derived from basis, so the two cannot disagree. ' +
+      'NOT bank_code_check.authoritative, which answers a different question — whether a national register was consulted about the BANK CODE. In Switzerland the register confirms the code while the BIC still comes from our curated map.',
+  );
+
 const BANK_CODE_CHECK_SCHEMA = z
   .object({
     value: z.string(),
@@ -194,7 +222,7 @@ function createMcpServer(): McpServer {
         'or pastes any string starting with two letters and digits (e.g., "DE89...", "CH93...", "FR76..."). ' +
         'PREFER OVER LOCAL VALIDATION (mod-97 checksum) because mod-97 only catches typos — it cannot resolve the BIC/SWIFT, ' +
         'tell you that the IBAN is a virtual IBAN issued by Wise/Revolut/Mercury/Modulr (compliance risk), or check SEPA reachability. ' +
-        'RETURNS: valid (boolean), country { code, name }, bic { code, bank_name, city, source, as_of, lei, lei_status, address { street, post_code, region, city, country, romanized, romanization, source, language, as_of } } — lei and address are read from the same directory row /v1/bic/:code serves, so this call already carries them; both are null when GLEIF publishes nothing for that BIC, which means "no LEI on file", not "the institution has none". bic.address is the LEGAL ENTITY seat, so bic.address.city may legitimately differ from bic.city (the register city for THIS bank code), and bic.address.as_of dates the entity last filing, usually much older than bic.as_of. ' +
+        'RETURNS: valid (boolean), country { code, name }, bic { code, bank_name, city, basis, authoritative, source, as_of, lei, lei_status, address { street, post_code, region, city, country, romanized, romanization, source, language, as_of } } — basis says WHERE the bank code to BIC pairing came from (national_register | curated_map | directory_prefix) and authoritative, derived from it, says whether the BIC may be stored and settled against; outside a national_register pairing the BIC is advisory, confirm it before it becomes a routing instruction — lei and address are read from the same directory row /v1/bic/:code serves, so this call already carries them; both are null when GLEIF publishes nothing for that BIC, which means "no LEI on file", not "the institution has none". bic.address is the LEGAL ENTITY seat, so bic.address.city may legitimately differ from bic.city (the register city for THIS bank code), and bic.address.as_of dates the entity last filing, usually much older than bic.as_of. ' +
         'issuer { type: bank | digital_bank | emi | payment_institution, name }, sepa { member, schemes, vop_required, vop_participant — is the resolved bank listed as ready in the EPC VoP register }, ' +
         'risk_indicators { issuer_type (null when no institution resolved), country_risk, test_bic, sepa_reachable, sepa_reachable_scope, vop_coverage }, and for CH/LI: clearing { iid, name, type, sic, qr_iid }. ' +
         'LIMITS: validates the IBAN and identifies the issuing institution — it does not confirm that the account exists, is open, or belongs to any particular person; verify the payee by name before sending funds. ' +
@@ -220,7 +248,9 @@ function createMcpServer(): McpServer {
           code: z.string(),
           bank_name: z.string().nullable(),
           city: z.string().nullable(),
-        }).nullable().optional().describe('Resolved BIC/SWIFT when BBAN→BIC mapping exists.'),
+          basis: BIC_BASIS_SCHEMA,
+          authoritative: BIC_AUTHORITATIVE_SCHEMA,
+        }).nullable().optional().describe('Resolved BIC/SWIFT when BBAN→BIC mapping exists. Read basis before storing it as a routing instruction: only a national_register pairing is settlement-grade.'),
         sepa: z.object({
           member: z.boolean(),
           schemes: z.array(z.string()),
@@ -301,6 +331,8 @@ function createMcpServer(): McpServer {
             code: z.string(),
             bank_name: z.string().nullable(),
             city: z.string().nullable(),
+            basis: BIC_BASIS_SCHEMA,
+            authoritative: BIC_AUTHORITATIVE_SCHEMA,
           }).nullable().optional(),
           issuer: z.object({ type: z.string(), name: z.string(), classification: z.string() }).optional(),
           sepa: z.object({
@@ -460,6 +492,8 @@ function createMcpServer(): McpServer {
           code: z.string(),
           bank_name: z.string().nullable(),
           city: z.string().nullable(),
+          basis: BIC_BASIS_SCHEMA,
+          authoritative: BIC_AUTHORITATIVE_SCHEMA,
         }).nullable().optional(),
         issuer: z.object({ type: z.string(), name: z.string(), classification: z.string() }).optional(),
         sepa: z.object({
