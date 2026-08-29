@@ -24,6 +24,26 @@ export const BANK_CODE_CHECK_SCHEMA = {
       description:
         'verified: resolves to an institution we can name. not_in_register: it does not, in reference data we do hold for this country — actionable as non-existence ONLY when authoritative is true. unavailable: we hold no reference data for this country, so no opinion.',
     },
+    reason: {
+      type: 'string',
+      enum: [
+        'not_allocated',
+        'absent_from_reference_data',
+        'no_reference_data_for_country',
+        'register_names_no_holder',
+        'national_register_unavailable',
+        'lookup_failed',
+      ],
+      description:
+        'WHY the verdict is not verified, as one token to branch on. Present on every not_in_register and every unavailable; absent on verified. ' +
+        'not_allocated: a national register denies the code — the only value that licenses "do not send", and it appears only with authoritative true. ' +
+        'absent_from_reference_data: our composite map does not carry it, which says nothing about the country\'s own register because we did not consult one. ' +
+        'no_reference_data_for_country: we hold nothing at all for this country. ' +
+        'register_names_no_holder: the national register defines this code space and publishes no holder for it — silence, not a denial. ' +
+        'national_register_unavailable: the country HAS a register we normally decide against and it could not be consulted for this call, so the verdict beside it comes from the composite map and carries composite weight. ' +
+        'lookup_failed: the reference lookup could not run at all (timeout, unreadable database, missing table). ' +
+        'The last two describe US, never your beneficiary: neither is evidence about the account, and neither may be escalated into a refusal.',
+    },
     match: {
       type: ['string', 'null'],
       enum: ['register', 'prefix', null],

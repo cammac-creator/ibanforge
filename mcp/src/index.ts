@@ -66,7 +66,7 @@ const TOOLS: Tool[] = [
       'tell you that the IBAN is a virtual IBAN issued by Wise/Revolut/Mercury/Modulr (compliance risk), or check SEPA reachability. ' +
       'RETURNS: valid (boolean), country { code, name }, bic { code, bank_name, city }, ' +
       'issuer { type: bank | digital_bank | emi | payment_institution | null when unsubstantiated, name, classification }, ' +
-      'bank_code_check { status, authoritative — read authoritative to know how much a "verified" is worth }, ' +
+      'bank_code_check { status, authoritative — read authoritative to know how much a "verified" is worth; reason — one token saying WHY an answer is not verified, and in particular whether the code is denied by a register or whether we simply could not answer }, ' +
       'sepa { member, schemes, vop_required, vop_participant — is the recipient bank listed as ready in the EPC VoP register }, next_steps (recommended follow-ups with reasons), ' +
       'risk_indicators { issuer_type, country_risk, test_bic, sepa_reachable, vop_coverage }, ' +
       'and for CH/LI: clearing { iid, name, type, sic, qr_iid }. ' +
@@ -137,7 +137,8 @@ const TOOLS: Tool[] = [
         bank_code_check: {
           type: 'object',
           description:
-            'Whether the bank code resolves in reference data. Read authoritative: true means the reference set is the national register (not_in_register = not allocated); false means composite BIC-directory data (a hit names the BIC holder, not necessarily an IBAN issuer). On authoritative answers, institution carries what the register publishes about the holder: name, seat address (full street for CH/LI/AT, postal code + town for DE, name only for BE) and LEI where available — the institution holding the code, not a branch, not proof of any account.',
+            'Whether the bank code resolves in reference data. Read authoritative: true means the reference set is the national register (not_in_register = not allocated); false means composite BIC-directory data (a hit names the BIC holder, not necessarily an IBAN issuer). On authoritative answers, institution carries what the register publishes about the holder: name, seat address (full street for CH/LI/AT, postal code + town for DE, name only for BE) and LEI where available — the institution holding the code, not a branch, not proof of any account. ' +
+            'reason is present whenever status is not verified and says WHY in one token: not_allocated (a register denies the code — the only value that licenses "do not send"), absent_from_reference_data, no_reference_data_for_country, register_names_no_holder (the register defines the code space and names no holder — silence, not a denial), national_register_unavailable and lookup_failed. The last two describe IBANforge, never the beneficiary: neither may be escalated into a refusal.',
         },
         next_steps: {
           type: 'array',

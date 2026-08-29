@@ -290,6 +290,7 @@ function decideBankCode(
     return {
       value: verdict.value ?? bankCode,
       status: 'unavailable',
+      reason: 'register_names_no_holder',
       match: null,
       register: national,
       authoritative: false,
@@ -300,6 +301,7 @@ function decideBankCode(
     return {
       value: verdict.value ?? bankCode,
       status: verdict.allocated ? 'verified' : 'not_in_register',
+      ...(verdict.allocated ? {} : { reason: 'not_allocated' as const }),
       match: verdict.allocated ? 'register' : null,
       register: national,
       authoritative: true,
@@ -348,6 +350,7 @@ function decideBankCode(
     return {
       value: bankCode,
       status: 'unavailable',
+      reason: 'lookup_failed',
       match: null,
       register: null,
       authoritative: false,
@@ -355,10 +358,23 @@ function decideBankCode(
     };
   }
 
+  // A country whose register we normally decide against, reaching this line,
+  // reached it because that register could not be consulted — `national` is
+  // set and `askNationalRegister` returned nothing. The status below is
+  // unchanged (a composite miss is a composite miss, and it already carries
+  // `authoritative: false`), but the reason must not say "absent from our
+  // reference data" when the reference data that decides this country was
+  // never read.
+  const registerDown = !!national;
   const hasData = countryHasReferenceData(cc);
   return {
     value: bankCode,
     status: hasData ? 'not_in_register' : 'unavailable',
+    reason: registerDown
+      ? 'national_register_unavailable'
+      : hasData
+        ? 'absent_from_reference_data'
+        : 'no_reference_data_for_country',
     match: null,
     register: hasData ? COMPOSITE_REGISTER : null,
     authoritative: false,
@@ -414,6 +430,7 @@ function checkBankCode(
     return {
       value: bankCode,
       status: 'unavailable',
+      reason: 'lookup_failed',
       match: null,
       register: null,
       authoritative: false,

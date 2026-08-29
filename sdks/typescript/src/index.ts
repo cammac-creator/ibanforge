@@ -207,7 +207,25 @@ export interface RiskIndicators {
  */
 export interface BankCodeCheck {
   value: string;
-  status: 'verified' | 'not_in_register' | 'unknown' | 'no_register';
+  /**
+   * `unknown` and `no_register` were in this union and have never been served
+   * by the API: the third state has always been `unavailable`. A typed client
+   * switching on the documented values fell through on every real one.
+   */
+  status: 'verified' | 'not_in_register' | 'unavailable';
+  /**
+   * Why the verdict is not `verified`, present on every other status. The one
+   * value that licenses stopping a payment is `not_allocated`, and it only ever
+   * comes with `authoritative: true`. `national_register_unavailable` and
+   * `lookup_failed` describe IBANforge, not the beneficiary.
+   */
+  reason?:
+    | 'not_allocated'
+    | 'absent_from_reference_data'
+    | 'no_reference_data_for_country'
+    | 'register_names_no_holder'
+    | 'national_register_unavailable'
+    | 'lookup_failed';
   match: string | null;
   register: string | null;
   /** true only when the register is the country's official one. */

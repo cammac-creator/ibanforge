@@ -20,7 +20,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
  * `not_in_register`.
  */
 
-const failing = { lookup: false, referenceData: false };
+const failing = { lookup: false, referenceData: false, noData: false, deRegister: false };
 
 vi.mock('./bic-lookup.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./bic-lookup.js')>();
@@ -33,8 +33,22 @@ vi.mock('./bic-lookup.js', async (importOriginal) => {
     },
     countryHasReferenceData: (cc: string) => {
       if (failing.referenceData) throw new Error('SqliteError: database disk image is malformed');
+      if (failing.noData) return false;
       return actual.countryHasReferenceData(cc);
     },
+  };
+});
+
+// The German register is loaded from a table the Dockerfile is allowed to build
+// without: a database made before the seeder existed has no `de_blz`. Germany
+// then degrades to the composite map, and the answer that comes back is a
+// composite answer wearing no sign of it.
+vi.mock('./de-blz.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./de-blz.js')>();
+  return {
+    ...actual,
+    blzRegisterAvailable: () => (failing.deRegister ? false : actual.blzRegisterAvailable()),
+    lookupBlz: (blz: string) => (failing.deRegister ? null : actual.lookupBlz(blz)),
   };
 });
 
@@ -54,6 +68,8 @@ const FABRICATED_FR = 'FR1499999000010123456789A42';
 beforeEach(() => {
   failing.lookup = false;
   failing.referenceData = false;
+  failing.noData = false;
+  failing.deRegister = false;
 });
 
 describe('an unreadable reference set is reported, never ruled on', () => {
@@ -65,6 +81,7 @@ describe('an unreadable reference set is reported, never ruled on', () => {
     failing.lookup = true;
     const r = check(FABRICATED_FR);
     expect(r.bank_code_check!.status).toBe('unavailable');
+    expect(r.bank_code_check!.reason).toBe('lookup_failed');
     // No register may be cited for a consultation that did not happen.
     expect(r.bank_code_check!.register).toBeNull();
     expect(r.bank_code_check!.authoritative).toBe(false);
@@ -79,7 +96,32 @@ describe('an unreadable reference set is reported, never ruled on', () => {
     failing.referenceData = true;
     const r = check(FABRICATED_FR);
     expect(r.bank_code_check!.status).toBe('unavailable');
+    expect(r.bank_code_check!.reason).toBe('lookup_failed');
     expect(r.bank_code_check!.register).toBeNull();
+  });
+
+  it('says the national register was unavailable rather than blaming our map', () => {
+    // Germany decides against the Bundesbank table, which the image is allowed
+    // to build without. Falling back to the composite map is the right
+    // behaviour and the status stays what a composite miss has always been —
+    // but "absent from our reference data" would describe a consultation that
+    // never happened. One token separates the degradation from the finding.
+    failing.deRegister = true;
+    const r = check('DE44999999990532013000');
+    expect(r.bank_code_check!.status).toBe('not_in_register');
+    expect(r.bank_code_check!.authoritative).toBe(false);
+    expect(r.bank_code_check!.reason).toBe('national_register_unavailable');
+  });
+
+  it('keeps no_reference_data_for_country for a country we really hold nothing for', () => {
+    // Reachable in code, not reachable against today's database: every IBAN
+    // country currently has at least one row or one curated key. Asserted
+    // through the seam so the value cannot rot into a lie for the next country
+    // added without data.
+    failing.noData = true;
+    const r = check(FABRICATED_FR);
+    expect(r.bank_code_check!.status).toBe('unavailable');
+    expect(r.bank_code_check!.reason).toBe('no_reference_data_for_country');
   });
 
   it('still returns a whole result, so one bad row cannot take a batch of 100 down', () => {

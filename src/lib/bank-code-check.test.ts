@@ -133,6 +133,64 @@ describe('bank_code_check', () => {
   });
 });
 
+/**
+ * The second question, which `status` alone cannot answer.
+ *
+ * A payout engine reading this response has to separate "this bank code does not
+ * exist" from "we could not answer just now" — the first stops a payment, the
+ * second must not. `status` + `authoritative` let that be RECONSTRUCTED; `reason`
+ * makes it one token to branch on, and one that never has to be parsed out of
+ * `register`, a prose string that gains sources every month.
+ */
+describe('bank_code_check.reason — why an answer is not verified', () => {
+  it('says not_allocated only where a register actually denies the code', () => {
+    const r = check('DE44999999990532013000');
+    expect(r.bank_code_check!.status).toBe('not_in_register');
+    expect(r.bank_code_check!.authoritative).toBe(true);
+    expect(r.bank_code_check!.reason).toBe('not_allocated');
+  });
+
+  it('says absent_from_reference_data where we consulted only our own map', () => {
+    const r = check('FR1499999000010123456789A42');
+    expect(r.bank_code_check!.status).toBe('not_in_register');
+    expect(r.bank_code_check!.authoritative).toBe(false);
+    expect(r.bank_code_check!.reason).toBe('absent_from_reference_data');
+  });
+
+  it('says register_names_no_holder where the register is silent rather than negative', () => {
+    // The Finnish 72-78 band: the document defines the code length and lists no
+    // holder. Silence is not a denial, and the reason has to say which it is.
+    const r = check('FI2972000110000000');
+    expect(r.bank_code_check!.status).toBe('unavailable');
+    expect(r.bank_code_check!.reason).toBe('register_names_no_holder');
+  });
+
+  it('explains nothing on a verified answer, because there is nothing to explain', () => {
+    for (const iban of ['DE89370400440532013000', 'CH5604835012345678009', 'NL53ETPW0123456789']) {
+      const c = check(iban).bank_code_check!;
+      expect(c.status).toBe('verified');
+      expect(c.reason).toBeUndefined();
+    }
+  });
+
+  it('never lets an unavailable answer carry the one reason that licenses a stop', () => {
+    // The contract in one line: `not_allocated` is the only value a caller may
+    // act on as non-existence, and `unavailable` means we did not decide. The
+    // two must never meet on the same object.
+    for (const iban of [
+      'FI2972000110000000',
+      'FR1499999000010123456789A42',
+      'DE44999999990532013000',
+      'CH8499999012345678901',
+    ]) {
+      const c = check(iban).bank_code_check!;
+      if (c.status === 'unavailable') expect(c.reason).not.toBe('not_allocated');
+      if (c.reason === 'not_allocated') expect(c.authoritative).toBe(true);
+      if (c.status !== 'verified') expect(c.reason).toBeDefined();
+    }
+  });
+});
+
 describe('issuer classification says whether it identified or assumed', () => {
   it('marks a curated identification as such', () => {
     // N26, Bankleitzahl 10011001.

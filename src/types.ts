@@ -67,6 +67,43 @@ export type OperationType = 'iban_validate' | 'iban_batch' | 'bic_lookup' | 'iba
  * the code is not allocated. That is what `authoritative`
  * marks, and it is the flag to branch on.
  */
+/**
+ * WHY a bank-code verdict is not `verified`, as one token to branch on.
+ *
+ * `status` says which of three boxes the answer is in; `authoritative` says how
+ * much the box is worth. Between them a caller can still not tell the two
+ * questions apart that decide whether a payout run stops or continues: does
+ * this bank code not exist, or could we not answer just now? Both used to
+ * arrive as the same pair of fields, and reconstructing the difference took
+ * reading `register`, a prose string that changes wording as sources are added.
+ *
+ * One token, stable, and never inferred from prose:
+ *
+ * - `not_allocated` — a national register denies the code. The only value that
+ *   licenses "do not send"; it appears only with `authoritative: true`.
+ * - `absent_from_reference_data` — our composite map does not carry it. Says
+ *   nothing about the country's own register, which we did not consult.
+ * - `no_reference_data_for_country` — we hold nothing at all for this country.
+ * - `register_names_no_holder` — the national register defines this code space
+ *   and publishes no holder for it. Silence, not a denial.
+ * - `national_register_unavailable` — the country HAS a register we normally
+ *   decide against, and it could not be consulted for this call. The verdict
+ *   beside it comes from the composite map and carries composite weight.
+ * - `lookup_failed` — the reference lookup could not run at all: a timeout, an
+ *   unreadable database, a table missing after a bad deploy. Ours to fix, and
+ *   never evidence about the beneficiary.
+ *
+ * The last two are the ones that pay for this field. They are the states where
+ * a caller most needs to know the answer describes US and not their payee.
+ */
+export type BankCodeReason =
+  | 'not_allocated'
+  | 'absent_from_reference_data'
+  | 'no_reference_data_for_country'
+  | 'register_names_no_holder'
+  | 'national_register_unavailable'
+  | 'lookup_failed';
+
 export interface BankCodeCheck {
   /** The bank code taken from the BBAN, echoed so the caller can log it. */
   value: string;
@@ -85,6 +122,12 @@ export interface BankCodeCheck {
    *   does; see `candidates` for how many institutions the prefix matched.
    */
   match: 'register' | 'prefix' | null;
+  /**
+   * Why the verdict is not `verified`. Present on every `not_in_register` and
+   * every `unavailable`, absent on `verified` — a positive answer has no
+   * missing half to explain. See BankCodeReason.
+   */
+  reason?: BankCodeReason;
   /** Human name of the reference set that was consulted. */
   register: string | null;
   /** True only where that reference set is the national register. */

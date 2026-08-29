@@ -96,6 +96,19 @@ const BANK_CODE_CHECK_SCHEMA = z
       .describe(
         'verified | not_in_register | unavailable. A separate verdict on the bank code, so bic:null stops meaning three different things.',
       ),
+    reason: z
+      .string()
+      .optional()
+      .describe(
+        'WHY the verdict is not verified, as one token to branch on. Absent when status is verified. ' +
+          'not_allocated (a national register denies the code — the only value that licenses "do not send") | ' +
+          'absent_from_reference_data (our composite map does not carry it; the country register was not consulted) | ' +
+          'no_reference_data_for_country | ' +
+          'register_names_no_holder (the register defines the code space and publishes no holder — silence, not a denial) | ' +
+          'national_register_unavailable (the register this country is normally decided against could not be consulted) | ' +
+          'lookup_failed (the lookup could not run: timeout, unreadable database). ' +
+          'The last two describe IBANforge, never the beneficiary. Never escalate either into a refusal.',
+      ),
     match: z.string().nullable().describe('register (exact key) | prefix (bic8 LIKE heuristic) | null'),
     register: z.string().nullable(),
     authoritative: z
