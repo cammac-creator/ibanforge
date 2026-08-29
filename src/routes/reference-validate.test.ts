@@ -14,7 +14,7 @@ import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { buildApp } from '../app.js';
 import { resetX402Paywall } from '../middleware/x402.js';
-import { closeAll } from '../lib/db.js';
+import { closeAll, getStatsDB } from '../lib/db.js';
 
 // Our own bucket in the process-wide in-memory rate limiter. TEST-NET-2.
 const IP = '198.51.100.77';
@@ -174,5 +174,30 @@ describe('the free endpoint contract', () => {
       expect(body.source, q).toBeTruthy();
       expect(body.as_of, q).toMatch(/^\d{4}-\d{2}$/);
     }
+  });
+
+  /**
+   * The call is there in the source. What was never checked is that it is
+   * REACHED in the assembled app — the failure mode identifier-guard.ts
+   * documents at length: green suite, clean deploy, zero rows after seven days,
+   * discovered at the count. Free does not mean unmeasured.
+   */
+  it('books an operation for a free answer, with its scheme and no country', async () => {
+    const rows = () =>
+      getStatsDB()
+        .prepare('SELECT country_code, success, error_detail FROM operations WHERE operation_type = ?')
+        .all('reference_validate') as Array<{ country_code: string | null; success: number; error_detail: string | null }>;
+
+    const before = rows().length;
+    await req('/v1/reference/validate?reference=RF18539007547034');
+    const after = rows();
+
+    expect(after.length - before).toBe(1);
+    const written = after[after.length - 1];
+    expect(written.error_detail).toBe('rf');
+    expect(written.success).toBe(1);
+    // Deliberate: a scheme in the country slot would be listed as a country on
+    // the public /stats page, which groups that column across every type.
+    expect(written.country_code).toBeNull();
   });
 });

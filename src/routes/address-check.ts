@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import type { HonoEnv } from '../types.js';
+import { recordOperation } from '../lib/stats.js';
 import {
   ADDRESS_SCHEMES,
   CBPR_NOTE,
@@ -124,7 +125,45 @@ addressCheck.post('/v1/address/check', async (c) => {
   }
 
   const address: AddressToCheck = parsed.data.address;
-  return c.json(checkPostalAddress(normalized as AddressScheme, address));
+  const result = checkPostalAddress(normalized as AddressScheme, address);
+
+  // Free endpoint, so revenue is 0 — and it stays free. What was missing is not
+  // a price but a MEASUREMENT: this endpoint is named on every buying surface
+  // and recorded nothing at all, so its demand existed only as anonymous 200s in
+  // request_log, indistinguishable from any other path. "Is anyone asking for
+  // this?" had no answer for the two endpoints we give away.
+  //
+  // `conforms` is the success axis: a non-conforming address is a served,
+  // correct answer, but it is the axis worth watching — a scheme that almost
+  // never conforms is a scheme whose rules callers cannot satisfy.
+  //
+  // The scheme rides in `error_detail` for the same reason as
+  // /v1/reference/validate: `operations.country_code` is aggregated by
+  // type-agnostic queries (topCountries on the PUBLIC /stats page), so a scheme
+  // written there would be listed as a country.
+  //
+  // 🚨 And the country slot stays NULL even though `Ctry` IS a country here,
+  // unlike the reference schemes. Two reasons, and the second is the one that
+  // decides it:
+  //
+  //   - `address.ctry` is submitted text the schema caps at 10 characters and
+  //     never checks, so most of what arrives is not an ISO 3166 code at all;
+  //   - shape-checking it would not be enough. topCountries on /stats is PUBLIC
+  //     and deliberately keeps anonymous rows, because for the paid endpoints
+  //     they are the x402 demand signal. This endpoint has no paywall and no
+  //     key, so a well-formed 'ES' repeated by anyone would walk straight into
+  //     the all-time public ranking for free. That ranking has already been
+  //     distorted once, by farmed validations that at least had to get past a
+  //     price. A free door must not be a cheaper way in.
+  //
+  // The scheme is the dimension this endpoint is about anyway, and it is kept.
+  try {
+    recordOperation('address_check', null, result.conforms, 0, normalized, c.get('apiKeyPrefix'));
+  } catch {
+    // stats failure must not break the response
+  }
+
+  return c.json(result);
 });
 
 export { addressCheck };

@@ -1,6 +1,11 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterAll } from 'vitest';
 import { Hono } from 'hono';
 import { addressCheck } from './address-check.js';
+import { closeAll, getStatsDB } from '../lib/db.js';
+
+afterAll(() => {
+  closeAll();
+});
 
 function app() {
   const a = new Hono();
@@ -92,5 +97,52 @@ describe('POST /v1/address/check (free, no payment)', () => {
     expect(json.conforms).toBe(false);
     const findings = json.findings as Array<{ rule: string; verdict: string }>;
     expect(findings.find((f) => f.rule === 'adr_line_max_2')?.verdict).toBe('fail');
+  });
+});
+
+/**
+ * The endpoint is named on every buying surface and used to record nothing at
+ * all, so its demand existed only as anonymous 200s in request_log — no way to
+ * tell it apart from any other path, and no answer to "is anyone asking for
+ * this?". Free it stays; measured it now is.
+ */
+describe('POST /v1/address/check — the demand for a free endpoint is measurable', () => {
+  const rows = (): Array<{ country_code: string | null; success: number; error_detail: string | null }> =>
+    getStatsDB()
+      .prepare('SELECT country_code, success, error_detail FROM operations WHERE operation_type = ?')
+      .all('address_check') as Array<{ country_code: string | null; success: number; error_detail: string | null }>;
+
+  it('books one operation per served answer, carrying the scheme and the verdict', async () => {
+    const before = rows().length;
+    await post({
+      scheme: 'sps',
+      address: { strt_nm: 'Bahnhofstrasse', bldg_nb: '45', pst_cd: '8001', twn_nm: 'Zurich', ctry: 'CH' },
+    });
+    // 'CHE' is not ISO 3166 alpha-2: the answer is served, and it does not
+    // conform. Also the shape of country the caller most often sends.
+    await post({ scheme: 'HVPS+', address: { twn_nm: 'Zurich', ctry: 'CHE' } });
+
+    const after = rows();
+    expect(after.length - before).toBe(2);
+    const written = after.slice(-2);
+    expect(written.map((r) => r.error_detail)).toEqual(['sps', 'hvps_plus']);
+    // A non-conforming address is a served answer, and the axis worth watching.
+    expect(written.map((r) => r.success)).toEqual([1, 0]);
+  });
+
+  it('never lets a submitted country reach the public country ranking', async () => {
+    // topCountries on /stats is public and keeps anonymous rows. This door has
+    // no paywall and no key, so a country written here would be a free way into
+    // an all-time public ranking that has been distorted once already.
+    await post({ scheme: 'fedwire', address: { twn_nm: 'Zurich', ctry: 'CH' } });
+    for (const r of rows()) expect(r.country_code).toBeNull();
+  });
+
+  it('records nothing when the request was refused', async () => {
+    const before = rows().length;
+    await post({ scheme: 'cbpr+', address: { twn_nm: 'Zurich', ctry: 'CH' } });
+    await post({ scheme: 'invented', address: { twn_nm: 'Zurich' } });
+    await post({ scheme: 'sps' });
+    expect(rows().length).toBe(before);
   });
 });

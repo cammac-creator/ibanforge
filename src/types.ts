@@ -45,7 +45,7 @@ export type { HonoEnv };
 
 // --- Operation tracking ---
 
-export type OperationType = 'iban_validate' | 'iban_batch' | 'bic_lookup' | 'iban_compliance' | 'ch_clearing_lookup' | 'iban_format' | 'reference_validate';
+export type OperationType = 'iban_validate' | 'iban_batch' | 'bic_lookup' | 'iban_compliance' | 'ch_clearing_lookup' | 'iban_format' | 'reference_validate' | 'address_check';
 
 // --- IBAN Validation ---
 
