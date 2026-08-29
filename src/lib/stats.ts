@@ -763,6 +763,18 @@ export function getStatsHistory(days: number = 7): Array<{
    */
   p50_ms: number | null;
   p95_ms: number | null;
+  /**
+   * The tail, published because a median is not what an integrator is exposed
+   * to. A payout run makes thousands of calls: the slowest one in a hundred is
+   * the one that shapes a timeout budget, and quoting a median instead answers
+   * a question nobody asked.
+   *
+   * Its own floor of 100 samples, and null below it. Not caution — arithmetic:
+   * this percentile is the rank `n * 0.99`, so at 20 samples it lands on the
+   * same row as the p95 beside it. A "p99" that is the p95 wearing a different
+   * label is precisely the number this field exists to stop publishing.
+   */
+  p99_ms: number | null;
 }> {
   const db = getStatsDB();
   // Business operations from daily_stats
@@ -813,6 +825,17 @@ export function getStatsHistory(days: number = 7): Array<{
    * farm hammers the door.
    */
   const MIN_SAMPLES_FOR_PERCENTILE = 20;
+  /**
+   * The p99 gets its OWN floor, and it is not timidity.
+   *
+   * The rank here is `n * 0.99` truncated. At 20 samples that is row 19 — the
+   * exact row `n * 0.95` lands on. Publishing both under one floor would serve
+   * the p95 twice, once labelled p99, on the surface where a customer asked for
+   * the tail specifically because the median flatters us. Below a hundred
+   * measurements there is no ninety-ninth percentile to report, so the honest
+   * answer is the gap the page already knows how to render.
+   */
+  const MIN_SAMPLES_FOR_P99 = 100;
   const latRows = db.prepare(`
     WITH ranked AS (
       SELECT date(created_at) AS d, response_ms,
@@ -825,17 +848,21 @@ export function getStatsHistory(days: number = 7): Array<{
     )
     SELECT d AS date, n,
            MAX(CASE WHEN rn = MAX(1, CAST(n * 0.50 AS INTEGER)) THEN response_ms END) AS p50,
-           MAX(CASE WHEN rn = MAX(1, CAST(n * 0.95 AS INTEGER)) THEN response_ms END) AS p95
+           MAX(CASE WHEN rn = MAX(1, CAST(n * 0.95 AS INTEGER)) THEN response_ms END) AS p95,
+           MAX(CASE WHEN rn = MAX(1, CAST(n * 0.99 AS INTEGER)) THEN response_ms END) AS p99
       FROM ranked
      GROUP BY d
-  `).all(days) as Array<{ date: string; n: number; p50: number | null; p95: number | null }>;
+  `).all(days) as Array<{ date: string; n: number; p50: number | null; p95: number | null; p99: number | null }>;
 
   const latMap = new Map(
     latRows.map(r => [
       r.date,
-      r.n >= MIN_SAMPLES_FOR_PERCENTILE
-        ? { p50: r.p50 ?? null, p95: r.p95 ?? null }
-        : { p50: null, p95: null },
+      {
+        ...(r.n >= MIN_SAMPLES_FOR_PERCENTILE
+          ? { p50: r.p50 ?? null, p95: r.p95 ?? null }
+          : { p50: null, p95: null }),
+        p99: r.n >= MIN_SAMPLES_FOR_P99 ? (r.p99 ?? null) : null,
+      },
     ]),
   );
 
@@ -890,6 +917,7 @@ export function getStatsHistory(days: number = 7): Array<{
       expected_max: b.max,
       p50_ms: latMap.get(date)?.p50 ?? null,
       p95_ms: latMap.get(date)?.p95 ?? null,
+      p99_ms: latMap.get(date)?.p99 ?? null,
     };
   });
 }

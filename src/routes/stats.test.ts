@@ -186,4 +186,51 @@ describe('getStatsHistory — served latency', () => {
     const today = rows[rows.length - 1];
     expect(today.p50_ms).toBeLessThan(today.p95_ms as number);
   });
+
+  /**
+   * The tail, which is what an integrator is actually exposed to.
+   *
+   * A payout run makes thousands of calls; the slowest one in a hundred sets
+   * the timeout budget, and a median answers a question nobody asked. Published
+   * on the status page beside the other two — asked for in writing by a
+   * regulated pilot customer, in those words: the p99, not the median.
+   */
+  /**
+   * These two run on PAST days, unlike the ones above.
+   *
+   * Today's row is shared with whatever the rest of the suite and the
+   * development database already logged, which is fine for "did this figure
+   * move" but useless for asserting an exact sample count. `beforeEach` deletes
+   * every row of this prefix on every date, so a day in the past holds exactly
+   * what the test put there and nothing else.
+   */
+  function dayAgo(n: number): string {
+    return new Date(Date.now() - n * 86_400_000).toISOString().slice(0, 10);
+  }
+  const row = (date: string) => getStatsHistory(8).find((r) => r.date === date)!;
+
+  it('separates the tail from the p95 instead of restating it', () => {
+    // 200 samples, shaped so the two percentiles cannot coincide: the p95 lands
+    // on rank 190 and the p99 on rank 198. A payout run makes thousands of
+    // calls, and the slowest one in a hundred is what sets its timeout budget —
+    // which is why a regulated pilot customer asked for this figure in those
+    // words: the p99, not the median.
+    for (let i = 0; i < 189; i++) log(200, 10, 6);
+    for (let i = 0; i < 8; i++) log(200, 100, 6);
+    for (let i = 0; i < 3; i++) log(200, 900, 6);
+    const day = row(dayAgo(6));
+    expect(day.p95_ms).toBe(100);
+    expect(day.p99_ms).toBe(900);
+  });
+
+  it('reports no p99 below a hundred samples, where it would only repeat the p95', () => {
+    // The arithmetic this floor exists for: at n=20 the rank n*0.99 truncates
+    // to 19, which is exactly where n*0.95 truncates to. Sharing the p50/p95
+    // floor of 20 would publish the p95 twice, once labelled p99 — on the one
+    // figure a customer asked for BECAUSE the median flatters us.
+    for (let i = 0; i < 25; i++) log(200, 30, 5);
+    const day = row(dayAgo(5));
+    expect(day.p95_ms).not.toBeNull();
+    expect(day.p99_ms).toBeNull();
+  });
 });

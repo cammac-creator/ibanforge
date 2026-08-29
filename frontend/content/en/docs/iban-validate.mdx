@@ -58,7 +58,9 @@ POST https://api.ibanforge.com/v1/iban/validate
   "bic": {
     "code": "UBSWCHZH",
     "bank_name": "UBS Switzerland AG",
-    "city": "Zürich"
+    "city": "Zürich",
+    "basis": "curated_map",
+    "authoritative": false
   },
   "sepa": {
     "member": true,
@@ -156,6 +158,8 @@ POST https://api.ibanforge.com/v1/iban/validate
 | `code` | `string` | BIC/SWIFT code (8 characters) |
 | `bank_name` | `string \| null` | Financial institution name |
 | `city` | `string \| null` | City of the institution |
+| `basis` | `string` | Where the bank code to BIC pairing came from. `national_register` — the country's own register publishes this BIC for this bank code (today DE, via the Bundesbank Bankleitzahlendatei); `curated_map` — our maintained bank-code map, an exact key and not an allocation record; `directory_prefix` — the BIC-prefix fallback, which can match several institutions (see `bank_code_check.candidates`) |
+| `authoritative` | `boolean` | Whether this BIC may be stored and settled against. Derived from `basis`, `true` only for `national_register`. See "Settle against it, or treat it as advisory?" below |
 
 **`sepa` object:**
 
@@ -182,7 +186,8 @@ POST https://api.ibanforge.com/v1/iban/validate
 | Field | Type | Description |
 |---|---|---|
 | `value` | `string` | The bank code taken from the BBAN, echoed for your logs |
-| `status` | `string` | `verified` — the code resolves to an institution we can name; `not_in_register` — it does not, in reference data we hold for this country; `unavailable` — we hold no reference data for this country, no opinion |
+| `status` | `string` | `verified` — the code resolves to an institution we can name; `not_in_register` — it does not, in reference data we hold for this country; `unavailable` — no opinion, either because we hold no reference data for this country or because we could not answer just now (see `reason`) |
+| `reason` | `string?` | Why the verdict is not `verified`. Present on every `not_in_register` and every `unavailable`, absent on `verified`. `not_allocated` — a national register denies the code, and this is the only value that licenses "do not send"; `absent_from_reference_data` — our composite map does not carry it, which says nothing about the country's own register; `no_reference_data_for_country`; `register_names_no_holder` — the register defines this code space and publishes no holder, which is silence and not a denial; `national_register_unavailable` — the register this country is normally decided against could not be consulted, so the verdict beside it carries composite weight; `lookup_failed` — the lookup could not run at all. The last two describe us, never your beneficiary |
 | `match` | `string \| null` | `register` — exact key in the reference set (deterministic); `prefix` — fallback BIC-prefix search, possible only where bank codes are letters; check `candidates` |
 | `register` | `string \| null` | Human name of the reference set consulted |
 | `authoritative` | `boolean` | `true` only where the reference set IS the national register — see below |
@@ -208,7 +213,21 @@ POST https://api.ibanforge.com/v1/iban/validate
 - **`authoritative: true`** — the reference set is the national register itself. Today: **CH and LI** (SIX BankMaster), **DE** (Bundesbank Bankleitzahlendatei), **FI** (Finance Finland codes — allocated to banking groups, so a hit confirms the group), **AT** (OeNB directory), **BE** (BNB code list). In these countries, `not_in_register` means the code is **not allocated** — a strong reason to stop a payment.
 - **`authoritative: false`** — the reference set is our composite bank-code map, assembled from BIC directories. A hit names who holds the matching BIC; it does **not** prove that this institution issues IBANs. Where bank codes are letter-based, `match: "prefix"` with `candidates > 1` means the answer is indicative only.
 
+**A failure on our side is reported as `unavailable`, never as a verdict.** When the reference data cannot be read — an unreadable database, a table missing after a bad deploy, a lookup that times out — the answer is `status: "unavailable"` with `reason: "lookup_failed"` and `register: null`. It is never `not_in_register`, because that verdict means "no institution holds this code" and an outage on our side is not evidence about your beneficiary. `reason` is what separates the two situations in one token: `lookup_failed` and `national_register_unavailable` are ours to fix, everything else is a statement about the code. All of them call for the same handling: carry on, and let a payee name check decide.
+
 **None of this confirms that the account exists, is open, or belongs to a particular person.** A structurally valid IBAN naming a real institution can still be fabricated. For payee verification use the banks' own Verification of Payee flow (`sepa.vop_required` tells you when it is mandated) or a name check with your counterparty — whenever a response leaves that gap open, `next_steps` says so explicitly.
+
+### Settle against it, or treat it as advisory?
+
+The BIC in the response is **derived** from the bank code the IBAN carries, and how much that derivation is worth depends entirely on what produced it. `bic.basis` says which, and `bic.authoritative` turns that into the one boolean a payment engine can branch on:
+
+- **`basis: "national_register"`, `authoritative: true`** — the country's own register publishes this BIC for this bank code. Today that is **Germany**: the Bundesbank Bankleitzahlendatei carries the exact 11-character BIC per BLZ. That same register is why a German Sparkasse resolves to its own BIC rather than to the shared Landesbank BIC8 — the field labels that pairing, it does not create it. Safe to store and settle against.
+- **`basis: "curated_map"`, `authoritative: false`** — our own maintained bank-code map made the pairing on an exact key. Usually right, and not an allocation record: no authority stands behind it.
+- **`basis: "directory_prefix"`, `authoritative: false`** — the BIC-prefix fallback. It can match several institutions at once; `bank_code_check.candidates` says how many, and `next_steps` raises `bic_is_advisory` when it is more than one.
+
+**Outside a `national_register` basis, treat the BIC as advisory**: fine for display, enrichment and routing hints, and to be confirmed with the beneficiary or your bank before it becomes a stored settlement instruction.
+
+> `bic.authoritative` and `bank_code_check.authoritative` answer **different questions**, and Switzerland is where they visibly differ. The SIX BankMaster answers authoritatively that the bank code is allocated — `bank_code_check.authoritative: true` — while the BIC beside it still comes from our curated map, so `bic.authoritative` is `false`. The first is about the code's existence, the second about the pairing that produced the BIC.
 
 ### Invalid IBAN (200)
 

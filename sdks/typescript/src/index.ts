@@ -163,6 +163,19 @@ export interface BIC {
   /** Month the source was last refreshed. */
   as_of?: string;
   /**
+   * Where the bank code → BIC pairing came from. `source` names the dataset;
+   * this says what KIND of source it is, which is the half a payment engine can
+   * branch on. Only `national_register` is settlement-grade.
+   */
+  basis?: 'national_register' | 'curated_map' | 'directory_prefix';
+  /**
+   * Whether this BIC may be stored and settled against. Derived from `basis`.
+   * NOT `bank_code_check.authoritative`, which answers whether a register was
+   * consulted about the BANK CODE — in Switzerland it confirms the code while
+   * this BIC still comes from the curated map.
+   */
+  authoritative?: boolean;
+  /**
    * Legal Entity Identifier of the resolved institution.
    *
    * Served by `/v1/iban/validate` since 1.4.4 — before that it lived only on
@@ -207,7 +220,25 @@ export interface RiskIndicators {
  */
 export interface BankCodeCheck {
   value: string;
-  status: 'verified' | 'not_in_register' | 'unknown' | 'no_register';
+  /**
+   * `unknown` and `no_register` were in this union and have never been served
+   * by the API: the third state has always been `unavailable`. A typed client
+   * switching on the documented values fell through on every real one.
+   */
+  status: 'verified' | 'not_in_register' | 'unavailable';
+  /**
+   * Why the verdict is not `verified`, present on every other status. The one
+   * value that licenses stopping a payment is `not_allocated`, and it only ever
+   * comes with `authoritative: true`. `national_register_unavailable` and
+   * `lookup_failed` describe IBANforge, not the beneficiary.
+   */
+  reason?:
+    | 'not_allocated'
+    | 'absent_from_reference_data'
+    | 'no_reference_data_for_country'
+    | 'register_names_no_holder'
+    | 'national_register_unavailable'
+    | 'lookup_failed';
   match: string | null;
   register: string | null;
   /** true only when the register is the country's official one. */

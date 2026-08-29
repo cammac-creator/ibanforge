@@ -67,6 +67,49 @@ export type OperationType = 'iban_validate' | 'iban_batch' | 'bic_lookup' | 'iba
  * the code is not allocated. That is what `authoritative`
  * marks, and it is the flag to branch on.
  */
+/**
+ * WHY a bank-code verdict is not `verified`, as one token to branch on.
+ *
+ * `status` says which of three boxes the answer is in; `authoritative` says how
+ * much the box is worth. Between them a caller can still not tell the two
+ * questions apart that decide whether a payout run stops or continues: does
+ * this bank code not exist, or could we not answer just now? Both used to
+ * arrive as the same pair of fields, and reconstructing the difference took
+ * reading `register`, a prose string that changes wording as sources are added.
+ *
+ * One token, stable, and never inferred from prose:
+ *
+ * - `not_allocated` — a national register denies the code. The only value that
+ *   licenses "do not send"; it appears only with `authoritative: true`.
+ * - `absent_from_reference_data` — our composite map does not carry it. Says
+ *   nothing about the country's own register, which we did not consult.
+ * - `no_reference_data_for_country` — we hold nothing at all for this country.
+ * - `register_names_no_holder` — the national register defines this code space
+ *   and publishes no holder for it. Silence, not a denial.
+ * - `national_register_unavailable` — the country HAS a register we normally
+ *   decide against, and it could not be consulted for this call. The verdict
+ *   beside it comes from the composite map and carries composite weight.
+ * - `lookup_failed` — the reference lookup could not run at all: a timeout, an
+ *   unreadable database, a table missing after a bad deploy. Ours to fix, and
+ *   never evidence about the beneficiary.
+ *
+ * The last two are the ones that pay for this field. They are the states where
+ * a caller most needs to know the answer describes US and not their payee.
+ */
+/**
+ * The kinds of source a derived BIC can come from, worst to best in what they
+ * license. See the `basis` field on the `bic` block for the full note.
+ */
+export type BicBasis = 'directory_prefix' | 'curated_map' | 'national_register';
+
+export type BankCodeReason =
+  | 'not_allocated'
+  | 'absent_from_reference_data'
+  | 'no_reference_data_for_country'
+  | 'register_names_no_holder'
+  | 'national_register_unavailable'
+  | 'lookup_failed';
+
 export interface BankCodeCheck {
   /** The bank code taken from the BBAN, echoed so the caller can log it. */
   value: string;
@@ -85,6 +128,12 @@ export interface BankCodeCheck {
    *   does; see `candidates` for how many institutions the prefix matched.
    */
   match: 'register' | 'prefix' | null;
+  /**
+   * Why the verdict is not `verified`. Present on every `not_in_register` and
+   * every `unavailable`, absent on `verified` — a positive answer has no
+   * missing half to explain. See BankCodeReason.
+   */
+  reason?: BankCodeReason;
   /** Human name of the reference set that was consulted. */
   register: string | null;
   /** True only where that reference set is the national register. */
@@ -188,6 +237,52 @@ export interface IBANValidationResult {
     code: string;
     bank_name: string | null;
     city: string | null;
+    /**
+     * WHERE the bank code → BIC pairing came from, and therefore what may be
+     * done with the BIC.
+     *
+     * ## The question this answers
+     *
+     * "Is your derived BIC authoritative enough to store and settle against, or
+     * advisory only?" — asked in writing by a regulated pilot customer, and until
+     * now answerable only from the documentation. A field that is read by a
+     * machine and acted on by a payment engine has to carry its own weight in
+     * the payload; a caveat living on a docs page is a caveat that gets stripped
+     * by the first integration that reads the JSON.
+     *
+     * - `national_register` — the country's own register publishes this BIC for
+     *   this bank code. Today: Germany, where the Bundesbank Bankleitzahlendatei
+     *   carries the exact 11-character BIC per BLZ. Settlement-grade.
+     * - `curated_map` — our own maintained bank-code map made the pairing. It is
+     *   an exact key and it is usually right; it is not an allocation record,
+     *   and no authority stands behind it.
+     * - `directory_prefix` — the `bic8 LIKE bank_code%` fallback. Reachable only
+     *   where a bank code may open on a letter, and it can match several
+     *   institutions at once; `bank_code_check.candidates` says how many.
+     *
+     * ## Why the honest answer is "advisory outside DE"
+     *
+     * Only one of the three is a register of allocations, and saying so plainly
+     * is worth more than a field that flatters the other two. Coverage may grow
+     * — several registers we already ingest publish a BIC per code — and this
+     * field is what will make that growth visible without a re-read of the docs.
+     */
+    basis?: BicBasis;
+    /**
+     * Whether this BIC may be stored and settled against. DERIVED from `basis`
+     * by a single table, so the two cannot drift into disagreeing — the same
+     * rule as `postal_address.format`, and the fix for the class of defect where
+     * one field says "Bundesbank" while its neighbour says the answer is not
+     * authoritative.
+     *
+     * ⚠️ Not the same claim as `bank_code_check.authoritative`, which is about
+     * the BANK CODE: whether a national register was consulted about its
+     * existence. This one is about the BIC: whether the pairing that produced it
+     * comes from that register too. Switzerland is where they visibly differ —
+     * the SIX BankMaster answers authoritatively that an IID is allocated, while
+     * the BIC beside it still comes from our curated map.
+     */
+    authoritative?: boolean;
     /**
      * Which dataset named this institution, in the same spirit as
      * `bank_code_check.register` and `modulus_check.source`. This block was the

@@ -11,6 +11,12 @@ interface DayStat {
   /** Served latency for the day. null when the day had too few served requests. */
   p50_ms: number | null;
   p95_ms: number | null;
+  /**
+   * The tail, and the figure an integrator running a payout batch is actually
+   * exposed to. Its own floor of 100 measured requests, so it goes null on days
+   * the p95 still reports — that gap is the honest answer, not a defect.
+   */
+  p99_ms: number | null;
 }
 
 interface StatusData {
@@ -53,6 +59,7 @@ async function getStatusData(): Promise<StatusData> {
           s5xx: number;
           p50_ms?: number | null;
           p95_ms?: number | null;
+          p99_ms?: number | null;
         }>;
         days = rows.map((r) => ({
           date: r.date,
@@ -63,6 +70,7 @@ async function getStatusData(): Promise<StatusData> {
           // figure is worse than an admitted gap.
           p50_ms: r.p50_ms ?? null,
           p95_ms: r.p95_ms ?? null,
+          p99_ms: r.p99_ms ?? null,
         }));
       }
     } catch {
@@ -126,6 +134,12 @@ export default async function StatusPage({ params }: { params: Promise<{ locale:
   }
   const p50 = medianOf((d) => d.p50_ms, 30);
   const p95 = medianOf((d) => d.p95_ms, 30);
+  // Published beside the other two because the median is not what an
+  // integrator meets: a payout batch makes thousands of calls, and the slowest
+  // one in a hundred is the one that sets its timeout budget. Days without
+  // enough traffic to have a ninety-ninth percentile contribute nothing here
+  // rather than a number borrowed from the p95.
+  const p99 = medianOf((d) => d.p99_ms, 30);
 
   const windows: { label: string; value: string | null }[] = [
     { label: t("w7"), value: successRate(data.days, 7) },
@@ -164,10 +178,11 @@ export default async function StatusPage({ params }: { params: Promise<{ locale:
       </div>
 
       <h2 className="mt-12 font-heading text-lg font-semibold">{t("latencyTitle")}</h2>
-      <div className="mt-4 grid grid-cols-2 gap-px rounded-lg border border-border bg-border overflow-hidden">
+      <div className="mt-4 grid grid-cols-3 gap-px rounded-lg border border-border bg-border overflow-hidden">
         {[
           { label: t("latencyP50"), value: p50 },
           { label: t("latencyP95"), value: p95 },
+          { label: t("latencyP99"), value: p99 },
         ].map((m) => (
           <div key={m.label} className="bg-card p-4">
             <p className="font-heading text-2xl font-semibold tabular-nums">

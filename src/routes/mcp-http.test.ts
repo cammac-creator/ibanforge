@@ -71,13 +71,29 @@ async function initialize(app: ReturnType<typeof makeApp>): Promise<string> {
   return sessionId!;
 }
 
-async function rpc(app: ReturnType<typeof makeApp>, sessionId: string, method: string, params: Record<string, unknown> = {}, id = 2): Promise<JsonRpcResponse> {
+/**
+ * `clientIp` exists because the free tier is 10 tool calls per IP per day and
+ * this file is at the cap. Unset, every test shares the 'unknown' bucket, so
+ * adding an eleventh `tools/call` anywhere makes a DIFFERENT test fail with a
+ * rate-limit error — a confusing failure that says nothing about the code under
+ * test. A documentation address (RFC 5737 TEST-NET-3) gives one test its own
+ * allowance without loosening the limiter.
+ */
+async function rpc(
+  app: ReturnType<typeof makeApp>,
+  sessionId: string,
+  method: string,
+  params: Record<string, unknown> = {},
+  id = 2,
+  clientIp?: string,
+): Promise<JsonRpcResponse> {
   const res = await app.request('/mcp', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'Accept': 'application/json, text/event-stream',
       'mcp-session-id': sessionId,
+      ...(clientIp ? { 'x-real-ip': clientIp } : {}),
     },
     body: JSON.stringify({ jsonrpc: '2.0', id, method, params }),
   });
@@ -181,6 +197,93 @@ describe('POST /mcp — full handshake', () => {
     expect(result.structuredContent).toBeDefined();
     expect(result.structuredContent!.pairing).toBe('qrr_requires_qr_iban');
     expect(result.structuredContent!.pairing_source).toBeTruthy();
+  });
+
+  /**
+   * The reason an agent branches on has to reach the agent.
+   *
+   * `bank_code_check.reason` separates "this bank code does not exist" from "we
+   * could not answer just now" — the distinction a regulated pilot customer
+   * required in writing before moving to production. Over MCP that distinction
+   * survives only if the field is named in the tool's outputSchema: Zod strips
+   * what the schema does not declare, silently and without an error, so a field
+   * added to the response and forgotten here would be documented, served over
+   * REST, and invisible to every agent.
+   *
+   * Asserted on `structuredContent`, which is the payload the strip applies to.
+   */
+  it('tools/call validate_iban keeps bank_code_check.reason through the schema', async () => {
+    const app = makeApp();
+    const sessionId = await initialize(app);
+    const callResp = await rpc(
+      app,
+      sessionId,
+      'tools/call',
+      // Valid mod-97, fabricated bank code, composite-map country.
+      { name: 'validate_iban', arguments: { iban: 'FR1499999000010123456789A42' } },
+      2,
+      '203.0.113.10',
+    );
+    expect(callResp.error).toBeUndefined();
+    const result = callResp.result as { structuredContent?: Record<string, unknown> };
+    expect(result.structuredContent, 'schema mismatch silently drops this').toBeDefined();
+    const check = result.structuredContent!.bank_code_check as Record<string, unknown>;
+    expect(check.status).toBe('not_in_register');
+    expect(check.reason, 'stripped by the output schema').toBe('absent_from_reference_data');
+    // The half that must never be inferred: a non-authoritative miss is not a
+    // denial, and the reason an agent reads must not let it become one.
+    expect(check.authoritative).toBe(false);
+  });
+
+  /**
+   * The settlement question, asked over MCP.
+   *
+   * `bic.basis` is the field that says whether a derived BIC may be stored and
+   * settled against or is advisory only. An agent that cannot see it has no way
+   * to tell a register pairing from a prefix guess — and Zod strips undeclared
+   * fields from `structuredContent` without an error, which is exactly how a
+   * field can be documented, served over REST and invisible to every agent.
+   */
+  it('tools/call validate_iban keeps bic.basis through the schema', async () => {
+    const app = makeApp();
+    const sessionId = await initialize(app);
+    const callResp = await rpc(
+      app,
+      sessionId,
+      'tools/call',
+      // Germany: the one basis today that licenses settling against the BIC.
+      { name: 'validate_iban', arguments: { iban: 'DE89370400440532013000' } },
+      2,
+      '203.0.113.11',
+    );
+    expect(callResp.error).toBeUndefined();
+    const result = callResp.result as { structuredContent?: Record<string, unknown> };
+    const bic = result.structuredContent!.bic as Record<string, unknown>;
+    expect(bic.basis, 'stripped by the output schema').toBe('national_register');
+    expect(bic.authoritative).toBe(true);
+  });
+
+  it('tools/call batch_validate_iban keeps bic.basis through its own schema', async () => {
+    // The batch tool declares its `bic` block separately from validate_iban, so
+    // "the field is in the schema" has to be proved twice. A strip is silent by
+    // construction: the only way to see one is to look at structuredContent.
+    const app = makeApp();
+    const sessionId = await initialize(app);
+    const callResp = await rpc(
+      app,
+      sessionId,
+      'tools/call',
+      { name: 'batch_validate_iban', arguments: { ibans: ['DE89370400440532013000'] } },
+      2,
+      '203.0.113.12',
+    );
+    expect(callResp.error).toBeUndefined();
+    const result = callResp.result as { structuredContent?: { results?: Array<Record<string, unknown>> } };
+    const first = result.structuredContent!.results![0];
+    const bic = first.bic as Record<string, unknown>;
+    expect(bic.basis, 'stripped by the batch output schema').toBe('national_register');
+    const check = first.bank_code_check as Record<string, unknown>;
+    expect(check.status).toBe('verified');
   });
 
   it('tools/call check_postal_address keeps findings and their sources through the schema', async () => {

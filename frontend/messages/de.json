@@ -1002,7 +1002,8 @@
     "latencyTitle": "Bediente Antwortzeit",
     "latencyP50": "Median",
     "latencyP95": "95. Perzentil",
-    "latencyNote": "Gemessen am Produktionsverkehr der letzten 30 Tage, abgelehnte Anfragen ausgenommen: Eine in einer Millisekunde abgewiesene Anfrage belegt keine Geschwindigkeit. Tage mit zu wenig bedientem Verkehr bleiben unberücksichtigt, statt ein Perzentil aus einer Handvoll Messungen zu erhalten.",
+    "latencyP99": "99. Perzentil",
+    "latencyNote": "Gemessen am Produktionsverkehr der letzten 30 Tage, abgelehnte Anfragen ausgenommen: Eine in einer Millisekunde abgewiesene Anfrage belegt keine Geschwindigkeit. Tage mit zu wenig bedientem Verkehr bleiben unberücksichtigt, statt ein Perzentil aus einer Handvoll Messungen zu erhalten. Das 99. Perzentil hat eine eigene, höhere Schwelle: Unter hundert Messungen an einem Tag gibt es kein 99. Perzentil zu berichten, sondern nur das 95. unter anderem Namen.",
     "latencyNoData": "zu wenig bedienter Verkehr zum Messen"
   },
   "changelog": {

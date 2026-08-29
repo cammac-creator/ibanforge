@@ -1002,7 +1002,8 @@
     "latencyTitle": "Served response time",
     "latencyP50": "Median",
     "latencyP95": "95th percentile",
-    "latencyNote": "Measured on production traffic over the last 30 days, refused requests excluded: a call the paywall turned away in a millisecond is not evidence of speed. Days with too few served requests are left out rather than given a percentile drawn from a handful of samples.",
+    "latencyP99": "99th percentile",
+    "latencyNote": "Measured on production traffic over the last 30 days, refused requests excluded: a call the paywall turned away in a millisecond is not evidence of speed. Days with too few served requests are left out rather than given a percentile drawn from a handful of samples. The 99th percentile keeps a higher bar of its own: below a hundred measurements in a day there is no ninety-ninth percentile to report, only the 95th under another name.",
     "latencyNoData": "not enough served traffic to measure"
   },
   "changelog": {

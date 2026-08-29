@@ -1027,6 +1027,26 @@ const buildSpec = () => ({
                       date: { type: 'string', format: 'date' },
                       total: { type: 'integer' },
                       revenue: { type: 'number' },
+                      // Percentiles and not a mean: one slow outlier moves a
+                      // mean and moves nobody's experience. SERVED requests
+                      // only — a 402 the paywall refused in a millisecond is
+                      // not evidence of speed, and counting refusals would
+                      // improve the figure every time a key farm knocks.
+                      p50_ms: {
+                        type: ['integer', 'null'],
+                        description:
+                          'Median served latency for the day, in milliseconds. Null below 20 measured requests: a percentile over a handful of samples is noise, and a gap is more honest than a made-up figure.',
+                      },
+                      p95_ms: {
+                        type: ['integer', 'null'],
+                        description: '95th percentile of served latency. Same 20-sample floor as p50_ms.',
+                      },
+                      p99_ms: {
+                        type: ['integer', 'null'],
+                        description:
+                          'The tail: 99th percentile of served latency, which is what a caller making thousands of requests is exposed to and what a timeout budget should be set from. ' +
+                          'Its floor is 100 measured requests, not 20, and that is arithmetic rather than caution: the rank n*0.99 lands on the same row as n*0.95 at 20 samples, so a lower floor would publish the p95 twice under two names. Null below it.',
+                      },
                     },
                     required: ['date', 'total', 'revenue'],
                   },
@@ -1131,6 +1151,22 @@ const buildSpec = () => ({
               },
               source: { type: ['string', 'null'], description: 'Which dataset named this institution.' },
               as_of: { type: ['string', 'null'], description: 'Year-month that dataset was last refreshed.' },
+              basis: {
+                type: 'string',
+                enum: ['national_register', 'curated_map', 'directory_prefix'],
+                description:
+                  'WHERE the bank code to BIC pairing came from, and therefore what may be done with the BIC. ' +
+                  'national_register: the country\'s own register publishes this BIC for this bank code — today Germany, whose Bankleitzahlendatei carries the exact 11-character BIC per BLZ. ' +
+                  'curated_map: our maintained bank-code map made the pairing on an exact key. Usually right, and not an allocation record. ' +
+                  'directory_prefix: the bic8 LIKE fallback, which can match several institutions at once — read bank_code_check.candidates. ' +
+                  'Answers the settlement question directly: only national_register is settlement-grade, so outside DE a derived BIC is advisory and should be confirmed with the beneficiary or your bank before it becomes a stored routing instruction.',
+              },
+              authoritative: {
+                type: 'boolean',
+                description:
+                  'Whether this BIC may be stored and settled against. Derived from `basis` by a single table, so the two cannot disagree. ' +
+                  'NOT the same claim as bank_code_check.authoritative, which is about the BANK CODE — whether a national register was consulted about its existence. Switzerland is where they visibly differ: the SIX BankMaster answers authoritatively that an IID is allocated, while the BIC beside it still comes from our curated map.',
+              },
               lei: {
                 type: ['string', 'null'],
                 example: '851WYGNLUQLFZBSYGB56',
