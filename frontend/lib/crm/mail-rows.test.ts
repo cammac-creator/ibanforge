@@ -35,6 +35,7 @@ function client(id: string, company: string, messages: Message[], isNew = false)
       usedAllTime: 4,
       lastActiveMonth: '2026-07',
       createdAt: '2026-01-01',
+      issuedByUs: false,
       isNew,
     },
     usage: { series: [], months: [], days: [], endpoints: [] },

@@ -422,9 +422,9 @@ apiKeys.post('/v1/admin/keys', async (c) => {
     return c.json({ error: 'unauthorized' }, 401);
   }
 
-  let body: { email?: unknown; monthly_limit?: unknown };
+  let body: { email?: unknown; monthly_limit?: unknown; issued_by_us?: unknown };
   try {
-    body = await c.req.json<{ email?: unknown; monthly_limit?: unknown }>();
+    body = await c.req.json<{ email?: unknown; monthly_limit?: unknown; issued_by_us?: unknown }>();
   } catch {
     return c.json({ error: 'invalid_json' }, 400);
   }
@@ -435,7 +435,13 @@ apiKeys.post('/v1/admin/keys', async (c) => {
   }
 
   const monthlyLimit = typeof body.monthly_limit === 'number' ? body.monthly_limit : undefined;
-  const result = generateApiKey(email.trim().toLowerCase(), monthlyLimit);
+  // Optional, and false unless the caller says otherwise: a key minted here is
+  // usually one WE hand over (a pilot, a demo, a key for someone who asked by
+  // mail), but this endpoint is also how a key gets created on a customer's
+  // behalf during a support exchange. Only the operator knows which, so it is
+  // declared rather than inferred from the route.
+  const issuedByUs = body.issued_by_us === true;
+  const result = generateApiKey(email.trim().toLowerCase(), monthlyLimit, undefined, issuedByUs);
   if (!result) {
     return c.json({ error: 'rate_limited' }, 429);
   }
@@ -445,6 +451,7 @@ apiKeys.post('/v1/admin/keys', async (c) => {
     key_prefix: result.key_prefix,
     email: email.trim().toLowerCase(),
     monthly_limit: monthlyLimit ?? 200,
+    issued_by_us: issuedByUs,
   }, 201);
 });
 
@@ -597,7 +604,7 @@ apiKeys.get('/v1/admin/keys', (c) => {
   // observation counter, which api_usage will never hold.
   const rows = db.prepare(
     `SELECT k.key_hash, k.key_prefix, k.email, k.monthly_limit, k.active, k.created_at,
-            k.credits_total, k.credits_remaining,
+            k.credits_total, k.credits_remaining, k.issued_by_us,
             CASE WHEN k.stripe_session_id IS NOT NULL THEN 1 ELSE 0 END AS paid,
             COALESCE(u.count, 0) AS used,
             COALESCE(p.count, 0) AS used_prev,

@@ -27,6 +27,7 @@ function client(days: Array<{ day: string; count: number }>, business?: Business
       usedAllTime: 50,
       lastActiveMonth: null,
       createdAt: '2026-06-01',
+      issuedByUs: false,
       isNew: false,
     },
     usage: { series: [], months: [], days, endpoints: [] },

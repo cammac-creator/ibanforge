@@ -11,7 +11,7 @@ import type { Contact } from './types';
  * number nobody can afford to inflate, since it is the one that says whether
  * the outbound effort is worth continuing.
  *
- * It broke twice over, and each break is a clause below.
+ * It broke three times over, and each break is a clause below.
  *
  * 1. **Every organic signup carries a dossier.** A script files an
  *    `auto-enrich` prospect row AFTER an inbound signup, to enrich a company
@@ -31,6 +31,17 @@ import type { Contact } from './types';
  * customer support, onboarding or an upsell — real correspondence, but it did
  * not win anybody, and counting it would quietly re-admit every organic client
  * the moment we answered their first question.
+ *
+ * 3. **We minted the key ourselves.** A batch of evaluation pilots was
+ *    fabricated here one spring and mailed out, and their intended recipients
+ *    never called once. The causal proof holds perfectly on them and means
+ *    nothing: of course a mail predates the key — it is the mail that CARRIED
+ *    the key, and we wrote both sides of it. Every one of them wore the badge.
+ *    A key we issued is never evidence that prospecting won anybody, however
+ *    the thread is dated, which is why this clause is checked and not derived:
+ *    `issued_by_us` is declared at mint time (api_keys, see src/lib/db.ts) and
+ *    is the only thing that can tell a key we handed over from one a customer
+ *    asked for.
  *
  * ## Precision of the comparison
  *
@@ -69,30 +80,41 @@ function parseDate(raw: string | null | undefined): Date | null {
 /**
  * Whether this contact is a customer our own outbound mail went and got.
  *
- * Four clauses, all required, in the order that makes the cheapest test fail
- * first. Anything missing — no key, no dossier, a machine-filed dossier, no
- * outbound mail predating the key — is a `false`, never a maybe: the badge this
- * feeds is a claim about causality, and a claim of that kind is either proven
- * on the thread or not made.
+ * Five clauses, all required, in the order that makes the cheapest test fail
+ * first. Anything missing — no key, a key we minted ourselves, no dossier, a
+ * machine-filed dossier, no outbound mail predating the key — is a `false`,
+ * never a maybe: the badge this feeds is a claim about causality, and a claim
+ * of that kind is either proven on the thread or not made.
  */
 export function wonByOutreach(c: Contact): boolean {
   // A key holder, paid or free alike. The badge answers "did prospecting win
   // them", which quota tier they landed on is a different question.
   if (c.kind !== 'client') return false;
-  return wonByOutreachFrom(c.sourcing, c.apiKey.createdAt, c.messages);
+  return wonByOutreachFrom(c.sourcing, c.apiKey.createdAt, c.messages, c.apiKey.issuedByUs);
 }
 
 /**
  * The same rule on bare facts, for the pages that hold rows rather than
  * `Contact`s — the Clients page joins keys, prospects and messages itself.
  * One implementation, so the badge can never say yes on one page and no on
- * the other for the same customer.
+ * the other for the same customer. That is also why `issuedByUs` is a parameter
+ * here rather than a check each caller does for itself.
+ *
+ * `issuedByUs` defaults to false, and that default is the pre-deploy state, not
+ * an opinion: the API and this frontend ship independently, so for a while the
+ * field is simply absent from the payload. Absent means "unmarked", which is
+ * the behaviour this rule had before the flag existed.
  */
 export function wonByOutreachFrom(
   sourcing: { source: string | null } | null | undefined,
   keyCreatedAt: string | null | undefined,
   messages: ReadonlyArray<{ direction: string; msg_date: string | null }>,
+  issuedByUs = false,
 ): boolean {
+  // Clause 3 above: we made the key. The causal proof would hold and would
+  // still prove nothing — the mail that "predates" it is the one that carried
+  // it. Checked first because it is the cheapest and the most absolute.
+  if (issuedByUs) return false;
   // No dossier at all: nobody ever sourced them, so nobody can have won them.
   if (!sourcing) return false;
   // Clause 1 above: the machine's dossier for an organic arrival.

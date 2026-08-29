@@ -564,6 +564,29 @@ export function getStatsDB(): DatabaseType.Database {
     if (!keyCols.includes('no_recredit')) {
       statsDB.exec('ALTER TABLE api_keys ADD COLUMN no_recredit INTEGER NOT NULL DEFAULT 0');
     }
+    // Did WE mint this key, or did its holder ask for it?
+    //
+    // The distinction has no effect on quota, billing or auth. It exists for one
+    // reading that was wrong without it: the Conquest badge, which claims an
+    // outbound mail WON a customer. A key we fabricated and handed over
+    // ourselves has a mail predating it by construction — we wrote the mail that
+    // carried it — so a batch of evaluation pilots minted one spring, never used
+    // by the people they were addressed to, all wore the badge. The one number
+    // nobody can afford to inflate is the one that says whether prospecting is
+    // worth continuing.
+    //
+    // Backfilled by PATTERN, never by a list of addresses: '-pilot@' is the
+    // convention those keys were named with (same regex the dashboard already
+    // filters pilots by), and '@cohorte.invalid' is the synthetic contact domain
+    // the cohort radar assigns — an address we wrote ourselves is not somebody
+    // we won. Anything else stays 0: "we do not know" is not "they came on
+    // their own", and forward-only keys carry the flag from their creation.
+    if (!keyCols.includes('issued_by_us')) {
+      statsDB.exec('ALTER TABLE api_keys ADD COLUMN issued_by_us INTEGER NOT NULL DEFAULT 0');
+      statsDB.exec(
+        "UPDATE api_keys SET issued_by_us = 1 WHERE email LIKE '%-pilot@%' OR email LIKE '%@cohorte.invalid'",
+      );
+    }
     // x402 settlement reference — what stripe_session_id is for the card rail,
     // for the USDC one. A credit pack bought with x402 costs up to $80 and used
     // to exist only in the HTTP response that announced it: lose that response

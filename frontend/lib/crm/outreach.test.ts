@@ -32,9 +32,15 @@ function sourcing(source: string | null): ProspectSourcing {
 }
 
 function client(
-  opts: { keyCreatedAt: string | null; messages: Message[]; source?: string | null; withSourcing?: boolean },
+  opts: {
+    keyCreatedAt: string | null;
+    messages: Message[];
+    source?: string | null;
+    withSourcing?: boolean;
+    issuedByUs?: boolean;
+  },
 ): Contact {
-  const { keyCreatedAt, messages, source = 'sourcing-manuel', withSourcing = true } = opts;
+  const { keyCreatedAt, messages, source = 'sourcing-manuel', withSourcing = true, issuedByUs = false } = opts;
   return {
     kind: 'client',
     id: 'acme@example.com',
@@ -55,6 +61,7 @@ function client(
       usedAllTime: 12,
       lastActiveMonth: '2026-08',
       createdAt: keyCreatedAt,
+      issuedByUs,
       isNew: false,
     },
     usage: { series: [], months: [], days: [], endpoints: [] },
@@ -110,6 +117,31 @@ describe('wonByOutreach', () => {
       messages: [message('out', '2026-06-11T08:30:00Z')],
     });
     expect(wonByOutreach(c)).toBe(false);
+  });
+
+  it('is false for a key we minted ourselves, however the thread is dated', () => {
+    // The batch of evaluation pilots: fabricated here, mailed out, never called
+    // once by the people they were addressed to. Every other clause passes —
+    // there is a dossier, it is not machine-filed, and an outbound mail predates
+    // the key — because the mail IS the one that carried the key. Only this
+    // clause keeps them out of the conquest count.
+    const c = client({
+      keyCreatedAt: '2026-06-20T09:00:00Z',
+      issuedByUs: true,
+      messages: [message('out', '2026-06-11T08:30:00Z')],
+    });
+    expect(wonByOutreach(c)).toBe(false);
+  });
+
+  it('still counts a real conquest whose key the customer minted', () => {
+    // The flag must not swallow the badge whole: the same thread, on a key
+    // nobody handed over, is exactly what the rule is for.
+    const c = client({
+      keyCreatedAt: '2026-06-20T09:00:00Z',
+      issuedByUs: false,
+      messages: [message('out', '2026-06-11T08:30:00Z')],
+    });
+    expect(wonByOutreach(c)).toBe(true);
   });
 
   it('is false for a prospect that never converted', () => {

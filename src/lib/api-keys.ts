@@ -8,10 +8,16 @@ function hashKey(key: string): string {
   return createHash('sha256').update(key).digest('hex');
 }
 
+/**
+ * `issuedByUs` marks a key WE minted and handed over, as opposed to one its
+ * holder asked for. It changes nothing about quota, billing or auth — see the
+ * migration in lib/db.ts for the single reading it exists to correct.
+ */
 export function generateApiKey(
   email: string,
   monthlyLimit?: number,
   source?: string,
+  issuedByUs = false,
 ): { api_key: string; key_prefix: string } | null {
   const db = getStatsDB();
   const existing = db
@@ -24,8 +30,8 @@ export function generateApiKey(
   const keyPrefix = rawKey.slice(0, 12);
 
   db.prepare(
-    'INSERT INTO api_keys (key_hash, key_prefix, email, monthly_limit, source) VALUES (?, ?, ?, ?, ?)',
-  ).run(keyHash, keyPrefix, email, monthlyLimit ?? null, source ?? null);
+    'INSERT INTO api_keys (key_hash, key_prefix, email, monthly_limit, source, issued_by_us) VALUES (?, ?, ?, ?, ?, ?)',
+  ).run(keyHash, keyPrefix, email, monthlyLimit ?? null, source ?? null, issuedByUs ? 1 : 0);
   return { api_key: rawKey, key_prefix: keyPrefix };
 }
 

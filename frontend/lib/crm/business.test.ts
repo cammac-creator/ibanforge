@@ -54,6 +54,7 @@ function base(kind: 'client' | 'prospect', business?: BusinessInfo): Contact {
       usedAllTime: 4,
       lastActiveMonth: null,
       createdAt: '2026-01-01',
+      issuedByUs: false,
       isNew: false,
     },
     usage: { series: [], months: [], days: [], endpoints: [] },

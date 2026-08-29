@@ -77,6 +77,7 @@ const apiKey: ClientKeyInfo = {
   usedAllTime: 0,
   lastActiveMonth: null,
   createdAt: null,
+  issuedByUs: false,
   isNew: false,
 };
 

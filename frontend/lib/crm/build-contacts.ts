@@ -103,6 +103,14 @@ export interface KeyRow {
   credits_total: number | null;
   credits_remaining: number | null;
   paid: number;
+  /**
+   * 1 when we minted the key ourselves. Optional on the wire for the same
+   * deploy-order reason as the prospect outcome columns: Vercel and Railway ship
+   * independently, so this frontend runs for a while against an API that does
+   * not serve the column yet. Absent degrades to "unmarked", which is the
+   * behaviour every reader had before the flag existed.
+   */
+  issued_by_us?: number | null;
   series: number[];
 }
 
@@ -452,6 +460,7 @@ export function buildContacts(input: BuildInput, now: Date = new Date()): Contac
         usedAllTime: row.used_all_time,
         lastActiveMonth: row.last_active_month,
         createdAt: row.created_at ?? null,
+        issuedByUs: row.issued_by_us === 1,
         isNew,
       },
       usage: {

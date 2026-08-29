@@ -88,6 +88,70 @@ describe('/v1/admin/keys — admin auth (timing-safe)', () => {
   });
 });
 
+/**
+ * Who minted the key. Nothing about quota or billing turns on it; the Conquest
+ * badge does — a key we fabricated and handed over cannot have been won by the
+ * mail that carried it.
+ */
+describe('/v1/admin/keys — issued_by_us', () => {
+  const admin = { 'Content-Type': 'application/json', 'X-Admin-Secret': 'correct-horse-battery-staple' };
+
+  async function mint(email: string, body: Record<string, unknown>): Promise<string> {
+    const res = await makeApp().request('/v1/admin/keys', {
+      method: 'POST',
+      headers: admin,
+      body: JSON.stringify({ email, ...body }),
+    });
+    expect(res.status).toBe(201);
+    return ((await res.json()) as { key_prefix: string }).key_prefix;
+  }
+
+  async function listed(prefix: string): Promise<number> {
+    const res = await makeApp().request('/v1/admin/keys', { headers: admin });
+    const body = (await res.json()) as { keys: Array<{ key_prefix: string; issued_by_us: number }> };
+    return body.keys.find((k) => k.key_prefix === prefix)!.issued_by_us;
+  }
+
+  it('is off unless the operator says otherwise, and travels back out on the listing', async () => {
+    const ours = await mint(`ours-${Date.now()}@example.com`, { issued_by_us: true });
+    const theirs = await mint(`theirs-${Date.now()}@example.com`, {});
+    expect(await listed(ours)).toBe(1);
+    expect(await listed(theirs)).toBe(0);
+  });
+
+  it('backfills by pattern, and the column defaults to "not ours"', () => {
+    const db = getStatsDB();
+    const col = (
+      db.prepare('PRAGMA table_info(api_keys)').all() as Array<{ name: string; dflt_value: string | null }>
+    ).find((c) => c.name === 'issued_by_us');
+    expect(col).toBeDefined();
+    expect(col!.dflt_value).toBe('0');
+
+    // The migration runs once per database, so the RULE is re-applied here to
+    // two freshly minted rows rather than re-running the boot path. Patterns
+    // only: this repo is public and a backfill must never carry an address.
+    const stamp = Date.now();
+    const seeded = generateApiKey(`alpha-${stamp}-pilot@alpha.example.net`);
+    const organic = generateApiKey(`ops-${stamp}@alpha.example.net`);
+    expect(seeded).not.toBeNull();
+    expect(organic).not.toBeNull();
+    expect(flag(seeded!.key_prefix)).toBe(0);
+
+    db.exec("UPDATE api_keys SET issued_by_us = 1 WHERE email LIKE '%-pilot@%' OR email LIKE '%@cohorte.invalid'");
+
+    expect(flag(seeded!.key_prefix)).toBe(1);
+    expect(flag(organic!.key_prefix)).toBe(0);
+  });
+
+  function flag(prefix: string): number {
+    return (
+      getStatsDB().prepare('SELECT issued_by_us FROM api_keys WHERE key_prefix = ?').get(prefix) as {
+        issued_by_us: number;
+      }
+    ).issued_by_us;
+  }
+});
+
 describe('/v1/admin/keys GET — listing', () => {
   it('unauthorized without secret', async () => {
     const app = makeApp();

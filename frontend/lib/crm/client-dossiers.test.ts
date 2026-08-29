@@ -459,4 +459,43 @@ describe('the conquest verdict on a dossier', () => {
     });
     expect(d.wonByOutreach).toBe(false);
   });
+
+  it('never crowns a key we minted and handed over ourselves', () => {
+    const d = dossierOf({
+      keys: [keyRow('d@alpha.example.net', { issued_by_us: 1 })],
+      prospects: [prospectRow('d@alpha.example.net', { source: 'campagne-fixture' })],
+      messages: [msg('d@alpha.example.net', { msg_date: '2026-06-11T08:30:00Z' })],
+    });
+    expect(d.wonByOutreach).toBe(false);
+  });
+
+  it('reads the flag off the SIGNUP key, not off a later one', () => {
+    // A pack minted for a customer who found us on their own does not make
+    // their arrival ours; nor does a later self-service key launder a pilot.
+    const d = dossierOf({
+      keys: [
+        keyRow('d@alpha.example.net'),
+        keyRow('d@alpha.example.net', {
+          key_prefix: 'ifk_second',
+          created_at: '2026-07-25 10:00:00',
+          issued_by_us: 1,
+        }),
+      ],
+      prospects: [prospectRow('d@alpha.example.net', { source: 'campagne-fixture' })],
+      messages: [msg('d@alpha.example.net', { msg_date: '2026-06-11T08:30:00Z' })],
+    });
+    expect(d.wonByOutreach).toBe(true);
+  });
+
+  it('treats an API that does not serve the column yet as unmarked', () => {
+    // Vercel and Railway ship independently: for a while the field is simply
+    // absent. Absent must behave exactly as the rule did before it existed.
+    const { issued_by_us: _omitted, ...withoutColumn } = keyRow('d@alpha.example.net', { issued_by_us: 1 });
+    const d = dossierOf({
+      keys: [withoutColumn as KeyRow],
+      prospects: [prospectRow('d@alpha.example.net', { source: 'campagne-fixture' })],
+      messages: [msg('d@alpha.example.net', { msg_date: '2026-06-11T08:30:00Z' })],
+    });
+    expect(d.wonByOutreach).toBe(true);
+  });
 });

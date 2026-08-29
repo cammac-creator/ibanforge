@@ -22,6 +22,12 @@ export interface ClientKeyInfo {
   /** When the key was minted, as stored. */
   createdAt: string | null;
   /**
+   * Whether WE minted this key and handed it over, rather than its holder
+   * asking for it. Nothing about quota or billing turns on it — see the
+   * third clause of lib/crm/outreach.ts, the one reading it exists to correct.
+   */
+  issuedByUs: boolean;
+  /**
    * Whether that is recent enough to still be a new customer. Decided once,
    * server-side, against one clock: see lib/crm/new-signup.ts. A boolean rather
    * than a date so the client never re-derives it and disagrees with the server.

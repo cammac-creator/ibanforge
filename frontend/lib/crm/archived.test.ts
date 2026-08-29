@@ -57,6 +57,7 @@ const client = (status: string): Contact => ({
     usedAllTime: 12,
     lastActiveMonth: '2026-07',
     createdAt: null,
+    issuedByUs: false,
     isNew: false,
   },
   usage: { series: [], months: [], days: [], endpoints: [] },

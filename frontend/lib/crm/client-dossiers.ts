@@ -333,9 +333,10 @@ export function buildDossiers(input: DossierInput): ClientDossier[] {
     // Ordered on parsed instants, not on raw strings: created_at mixes the
     // SQL and ISO shapes in production (one pilot holds both), and a bare
     // string sort ranks 'T' against ' ' instead of time against time.
-    const signedUpAt = keys
-      .map((k) => k.created_at)
-      .sort((a, b) => (parseUtc(a)?.getTime() ?? 0) - (parseUtc(b)?.getTime() ?? 0))[0];
+    const signupKey = [...keys].sort(
+      (a, b) => (parseUtc(a.created_at)?.getTime() ?? 0) - (parseUtc(b.created_at)?.getTime() ?? 0),
+    )[0];
+    const signedUpAt = signupKey.created_at;
 
     const dossier: ClientDossier = {
       id,
@@ -408,7 +409,11 @@ export function buildDossiers(input: DossierInput): ClientDossier[] {
       activation: activationByEmail.get(id) ?? null,
       // The signup instant is the FIRST key: the mail must predate the moment
       // they arrived, and a later second key must not re-open the question.
-      wonByOutreach: wonByOutreachFrom(prospect ?? null, signedUpAt, thread),
+      // `issued_by_us` is read off that SAME key, for the same reason: a pack
+      // we later minted for a customer who found us on their own does not
+      // retroactively make their arrival ours, and a pilot we fabricated is not
+      // laundered into a conquest by a second key they asked for afterwards.
+      wonByOutreach: wonByOutreachFrom(prospect ?? null, signedUpAt, thread, signupKey.issued_by_us === 1),
     };
     dossier.verdict = decideVerdict(dossier, now);
     out.push(dossier);

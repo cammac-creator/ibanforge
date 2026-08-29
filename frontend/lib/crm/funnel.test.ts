@@ -60,7 +60,7 @@ const client = (id: string, usedAllTime = 100, messages: Message[] = [], withSou
   draft: null,
   unread: false,
   account: 'crm@example.net',
-  apiKey: { keyPrefix: 'k', paid: false, creditsTotal: null, creditsRemaining: null, monthlyLimit: 1000, usedAllTime, lastActiveMonth: '2026-07', createdAt: null, isNew: false },
+  apiKey: { keyPrefix: 'k', paid: false, creditsTotal: null, creditsRemaining: null, monthlyLimit: 1000, usedAllTime, lastActiveMonth: '2026-07', createdAt: null, issuedByUs: false, isNew: false },
   usage: { series: [], months: [], days: [], endpoints: [] },
   ...(withSourcing ? { sourcing: sourcing() } : {}),
 });
