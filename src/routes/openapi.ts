@@ -704,11 +704,20 @@ const buildSpec = () => ({
       get: {
         operationId: 'getApiKeyUsage',
         summary: 'Check API key usage',
-        description: 'Returns current month usage and remaining quota for the provided API key.',
+        description:
+          'Returns current month usage and remaining quota for the provided API key. ' +
+          '`basis` says which ceiling actually governs the key: "monthly" for a free or subscription key, ' +
+          '"credits" for a prepaid bundle. On a bundle key, `used` counts the calls billed this month for ' +
+          'information only — nothing is enforced against `limit`/`remaining`, and the balance that can turn a ' +
+          'call away is served alongside as `credits_remaining` / `credits_total`.',
         tags: ['API Keys'],
         security: [{ apiKey: [] }],
         responses: {
-          '200': { description: 'Usage statistics for the current month' },
+          '200': {
+            description:
+              'Usage for the current month: used, limit, remaining, month, key_prefix, basis — plus ' +
+              'credits_remaining, credits_total and an explanatory note when basis is "credits"',
+          },
           '401': { description: 'Missing or invalid API key' },
         },
       },
@@ -719,7 +728,8 @@ const buildSpec = () => ({
         summary: 'Read everything this key did',
         description:
           'Self-service report for the presented key: daily traffic, endpoints called, what failed with a plain-language cause and a suggested fix, and how many distinct networks the key was called from. Authentication is the key itself, and the report only ever covers that key. A human-readable version of the same data is at https://ibanforge.com/en/account. ' +
-          'The footprint reports `unusual: null`, never false, for a key with no traffic: a key that has never been called has not passed a leak check, it has nothing to judge.',
+          'The footprint reports `unusual: null`, never false, for a key with no traffic: a key that has never been called has not passed a leak check, it has nothing to judge. ' +
+          'Its `usage` block is the one GET /v1/keys/usage serves, `basis` included.',
         tags: ['API Keys'],
         security: [{ apiKey: [] }],
         parameters: [

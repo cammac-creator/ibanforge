@@ -273,6 +273,41 @@ apiKeys.get('/v1/credits/balance', (c) => {
   });
 });
 
+/**
+ * The monthly block a key holder is served, on every surface that serves one.
+ *
+ * A credit key's monthly row is an OBSERVATION (see recordMonthlyObservation),
+ * and `limit` is the default nothing is enforced against for it. The three
+ * numeric fields stay in place for contract stability — the published SDK types
+ * them as numbers — but the truth travels with them: `basis` names which ceiling
+ * actually governs, and the balance that governs it is served alongside.
+ * Without this, the day the observation counter landed, any pack holder past the
+ * free-tier allowance began reading a NEGATIVE `remaining` — a shortfall against
+ * a ceiling nothing was ever going to enforce.
+ *
+ * One helper, and not a block copied into each route, precisely because there
+ * are two: /v1/keys/usage and /v1/keys/report both answer the holder's own key,
+ * and a holder must not read one figure on one and another on the other.
+ */
+function usageBlock(v: ReturnType<typeof validateApiKey>): Record<string, unknown> {
+  const usage = getUsage(v.keyHash, v.monthlyLimit);
+  const isCreditKey = typeof v.creditsRemaining === 'number';
+  return {
+    ...usage,
+    basis: isCreditKey ? 'credits' : 'monthly',
+    ...(isCreditKey
+      ? {
+          credits_remaining: v.creditsRemaining,
+          credits_total: v.creditsTotal ?? 0,
+          note:
+            'This key draws on a prepaid credit bundle. `used` counts the calls billed this month, for information only — ' +
+            'nothing is enforced against `limit`/`remaining`. What can turn a call away is credits_remaining. ' +
+            'Full balance: GET /v1/credits/balance.',
+        }
+      : {}),
+  };
+}
+
 apiKeys.get('/v1/keys/usage', (c) => {
   const authHeader = c.req.header('Authorization');
   if (!authHeader?.startsWith('Bearer ifk_')) {
@@ -280,37 +315,13 @@ apiKeys.get('/v1/keys/usage', (c) => {
   }
 
   const key = authHeader.slice(7);
-  const { valid, keyHash, monthlyLimit, creditsRemaining, creditsTotal } = validateApiKey(key);
+  const validation = validateApiKey(key);
 
-  if (!valid) {
+  if (!validation.valid) {
     return c.json({ error: 'invalid_key', message: 'API key not found or inactive' }, 401);
   }
 
-  const usage = getUsage(keyHash, monthlyLimit);
-  // A credit key's monthly row is an OBSERVATION (see recordMonthlyObservation),
-  // and `limit` is the default nothing is enforced against for it. Left in place
-  // for contract stability — the published SDK types all three fields as numbers
-  // — but the truth travels with it: `basis` names which ceiling actually
-  // governs, and the balance that governs it is served alongside. Without this,
-  // the day the observation counter landed, any pack holder past the free-tier
-  // allowance began reading a NEGATIVE `remaining` on their own usage endpoint —
-  // a shortfall against a ceiling nothing was ever going to enforce.
-  const isCreditKey = typeof creditsRemaining === 'number';
-  return c.json({
-    ...usage,
-    key_prefix: key.slice(0, 12),
-    basis: isCreditKey ? 'credits' : 'monthly',
-    ...(isCreditKey
-      ? {
-          credits_remaining: creditsRemaining,
-          credits_total: creditsTotal ?? 0,
-          note:
-            'This key draws on a prepaid credit bundle. `used` counts the calls billed this month, for information only — ' +
-            'nothing is enforced against `limit`/`remaining`. What can turn a call away is credits_remaining. ' +
-            'Full balance: GET /v1/credits/balance.',
-        }
-      : {}),
-  });
+  return c.json({ ...usageBlock(validation), key_prefix: key.slice(0, 12) });
 });
 
 /**
@@ -359,9 +370,9 @@ apiKeys.get('/v1/keys/report', (c) => {
   }
 
   const key = authHeader.slice(7);
-  const { valid, keyHash, monthlyLimit } = validateApiKey(key);
+  const validation = validateApiKey(key);
 
-  if (!valid) {
+  if (!validation.valid) {
     return c.json({ error: 'invalid_key', message: 'API key not found or inactive' }, 401);
   }
 
@@ -372,7 +383,10 @@ apiKeys.get('/v1/keys/report', (c) => {
 
   return c.json({
     key_prefix: key.slice(0, 12),
-    usage: getUsage(keyHash, monthlyLimit),
+    // The same block /v1/keys/usage serves, helper and all: this endpoint is
+    // that one's successor surface, not a lesser one, and a credit holder must
+    // not read a negative allowance here after it was closed there.
+    usage: usageBlock(validation),
     report: getKeyReport(key.slice(0, 12), windowDays),
   });
 });

@@ -309,21 +309,32 @@ describe('a credit key is counted in its month, and never capped by it', () => {
     expect(validateApiKey(k.api_key).creditsRemaining).toBe(150);
   });
 
-  it('tells its holder that the monthly figures govern nothing', async () => {
+  // BOTH holder-facing surfaces, in one test on purpose: /v1/keys/report is the
+  // successor of /v1/keys/usage, and a fix applied to one of the two is a
+  // negative allowance still served on the other.
+  it('tells its holder on every surface that the monthly figures govern nothing', async () => {
     const app = makeAppWithCredits();
-    const k = generateCreditKey(null, 5000);
-    await app.request('/v1/iban/validate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${k.api_key}` },
-      body: JSON.stringify({ iban: 'CH9300762011623852957' }),
-    });
-    const res = await app.request('/v1/keys/usage', {
-      headers: { Authorization: `Bearer ${k.api_key}` },
-    });
-    const body = (await res.json()) as Record<string, unknown>;
-    expect(body.used).toBe(1);
-    expect(body.basis).toBe('credits');
-    expect(body.credits_remaining).toBe(4999);
+    const k = generateCreditKey(null, 400);
+    const auth = { Authorization: `Bearer ${k.api_key}` };
+    // Past the default free-tier allowance, which is what makes `remaining` go
+    // negative if a route forgets the distinction.
+    for (let i = 0; i < 205; i++) {
+      await app.request('/v1/iban/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...auth },
+        body: JSON.stringify({ iban: 'CH9300762011623852957' }),
+      });
+    }
+
+    for (const path of ['/v1/keys/usage', '/v1/keys/report']) {
+      const res = await app.request(path, { headers: auth });
+      const body = (await res.json()) as Record<string, unknown>;
+      const usage = (path === '/v1/keys/usage' ? body : body.usage) as Record<string, unknown>;
+      expect(usage.used, path).toBe(205);
+      expect(usage.basis, path).toBe('credits');
+      expect(usage.credits_remaining, path).toBe(195);
+      expect(String(usage.note), path).toContain('credits_remaining');
+    }
   });
 });
 
