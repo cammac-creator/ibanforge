@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { timingSafeEqual } from 'node:crypto';
-import { getStats, getStatsHistory, getHourlyStats, getErrorStats, getPatternStats, getStatusByPath, getBusinessFunnel, getSourceStats, getRejectionStats, getCohortFootprint } from '../lib/stats.js';
+import { getStats, getStatsHistory, getHourlyStats, getErrorStats, getPatternStats, getStatusByPath, getBusinessFunnel, getSourceStats, getRejectionStats, getCohortFootprint, getTrafficTrend } from '../lib/stats.js';
 import { getEvents } from '../lib/events.js';
 import { getEntryCount } from '../lib/bic-lookup.js';
 
@@ -215,6 +215,32 @@ stats.get('/stats/sources', (c) => {
     if (isNaN(days)) days = 30;
     days = Math.max(1, Math.min(90, days));
     return c.json(getSourceStats(days));
+  } catch {
+    return c.json({ error: 'stats_unavailable' }, 500);
+  }
+});
+
+/**
+ * Daily traffic split by caller nature, with the status series that qualify it.
+ *
+ * ⚠️ `days[].not_found`, `.paywall` and `.server_error` cut ACROSS the six
+ * natures; only the natures add up to `total`. That is not a detail of the
+ * payload but the point of the endpoint: `browser` read alone is misleading,
+ * because a vulnerability scanner declares a Chrome user agent and is stored
+ * as `web`. Its 404 series is what tells it apart from a human — so any view
+ * fed by this route must render not_found beside the natures.
+ */
+stats.get('/stats/traffic-trend', (c) => {
+  if (!checkAuth(c.req.header('Authorization'))) {
+    return c.json({ error: 'unauthorized', message: 'Stats require authentication.' }, 403);
+  }
+
+  try {
+    const periodParam = c.req.query('period');
+    let days = periodParam ? parseInt(periodParam, 10) : 30;
+    if (isNaN(days)) days = 30;
+    days = Math.max(1, Math.min(90, days));
+    return c.json({ period_days: days, days: getTrafficTrend(days) });
   } catch {
     return c.json({ error: 'stats_unavailable' }, 500);
   }

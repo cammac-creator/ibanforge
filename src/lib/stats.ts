@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import type Database from 'better-sqlite3';
 import { getStatsDB } from './db.js';
-import { isInternalEmail } from './internal-accounts.js';
+import { isInternalEmail, registerInternalEmailFn } from './internal-accounts.js';
 import type { RejectReason } from './input-normalize.js';
 import type { OperationType, StatsOverview, HourlyStatsResponse, ErrorStatsResponse, PatternStatsResponse } from '../types.js';
 
@@ -571,6 +571,131 @@ export function getSourceStats(days: number): SourceStatsResponse {
     by_client_kind: byKind,
     paid_endpoints_breakdown: breakdown,
   };
+}
+
+/**
+ * One day of traffic, split by WHO called — six mutually exclusive natures
+ * whose sum is `total` — with three status series read across them.
+ */
+export interface TrafficTrendDay {
+  date: string;
+  /** Every request logged that day. The six natures below partition it. */
+  total: number;
+  /** Customers: a key was presented, and it is not one of ours. */
+  with_key: number;
+  /** Keyless callers, by the classification `classifyClient` stored at write time. */
+  agent: number;
+  declared_bot: number;
+  browser: number;
+  anonymous_api: number;
+  /**
+   * Traffic billed to keys we minted ourselves — audits, probes, regrouped
+   * signup cohorts. Named and counted rather than dropped: every other
+   * business view subtracts this volume, and a volume that disappears without
+   * a line of its own is one nobody can check.
+   */
+  internal: number;
+  /**
+   * ⚠️ These three CUT ACROSS the six natures — they are statuses, not a
+   * seventh, eighth and ninth category. Adding them to the natures counts the
+   * same requests twice.
+   *
+   * `not_found` is the reason this view exists. A nature read alone lies:
+   * a vulnerability scanner announces a Chrome user agent, so it is stored as
+   * `web` and shows up as `browser` — indistinguishable from a human reading
+   * the landing page. What gives it away is the 404 series beside it, because
+   * it sweeps for things we never served (/etc/passwd, /WEB-INF/web.xml,
+   * /package.json). Measured 30/08/2026. Any surface built on this function
+   * must show `not_found` next to the natures, never on its own tab.
+   */
+  not_found: number;
+  paywall: number;
+  server_error: number;
+  /** COUNT(DISTINCT ip_hash), which skips NULLs: a day logged without IPs reports 0, not 1. */
+  distinct_ips: number;
+}
+
+/**
+ * Daily traffic split by caller nature — the shape of the door, day by day.
+ *
+ * One grouped query, not one per day: the window reaches 90 days and this
+ * feeds a dashboard panel.
+ *
+ * The natures come out of a single CASE with a terminal ELSE rather than six
+ * independent predicates, so the partition is exhaustive by construction. Six
+ * separate SUM(...) conditions would let a future client_kind fall through
+ * every branch and quietly break the sum == total invariant that makes the
+ * table readable.
+ *
+ * `internal` uses is_internal_email(), the same rule as the funnel and the
+ * weekly digest, exposed to SQLite as a function — see weekly-facts.ts: an
+ * IN-list carries one bound parameter per internal key and blows past SQLite's
+ * parameter ceiling exactly when a burst of automated signups makes the view
+ * most worth reading.
+ */
+export function getTrafficTrend(days: number = 30): TrafficTrendDay[] {
+  const db = getStatsDB();
+  registerInternalEmailFn(db);
+  // Clamped here too, not only in the route: this is also called directly.
+  // Math.trunc(NaN) stays NaN, which would sail through Math.max/min into the
+  // SQL window '-NaN days' and silently return nothing.
+  const requested = Math.trunc(days);
+  const span = Number.isFinite(requested) ? Math.max(1, Math.min(90, requested)) : 30;
+
+  // `created_at >= date('now', ...)` and not datetime(): the bound must land on
+  // a calendar boundary, because the rows are grouped by calendar date. With a
+  // rolling instant, a 30-day period grows a 31st, partial column — the same
+  // off-by-one getStatsHistory carries a comment about, invisible until the
+  // database has rows on every date of the window.
+  const rows = db
+    .prepare(
+      `WITH classified AS (
+         SELECT
+           date(created_at) AS d,
+           status,
+           ip_hash,
+           CASE
+             WHEN key_prefix IN (SELECT key_prefix FROM api_keys WHERE is_internal_email(email))
+               THEN 'internal'
+             WHEN key_prefix IS NOT NULL THEN 'with_key'
+             -- Below here key_prefix IS NULL, so a keyed browser call cannot
+             -- also land in the browser bucket: the natures stay exclusive.
+             -- COALESCE rather than a bare client_kind: NULL = 'api' is NULL,
+             -- never true, so rows predating the column (added by migration,
+             -- so the old ones carry NULL) only land in anonymous_api by
+             -- falling off the end. Saying it here makes it the intent rather
+             -- than a lucky consequence of the ELSE.
+             WHEN COALESCE(client_kind, 'api') IN ('mcp_http', 'mcp_stdio') THEN 'agent'
+             WHEN COALESCE(client_kind, 'api') = 'bot' THEN 'declared_bot'
+             WHEN COALESCE(client_kind, 'api') = 'web' THEN 'browser'
+             ELSE 'anonymous_api'
+           END AS nature
+         FROM request_log
+         WHERE created_at >= date('now', ?)
+       )
+       SELECT d AS date,
+              COUNT(*) AS total,
+              SUM(nature = 'with_key') AS with_key,
+              SUM(nature = 'agent') AS agent,
+              SUM(nature = 'declared_bot') AS declared_bot,
+              SUM(nature = 'browser') AS browser,
+              SUM(nature = 'anonymous_api') AS anonymous_api,
+              SUM(nature = 'internal') AS internal,
+              SUM(status = 404) AS not_found,
+              SUM(status = 402) AS paywall,
+              SUM(status >= 500) AS server_error,
+              COUNT(DISTINCT ip_hash) AS distinct_ips
+         FROM classified
+        GROUP BY d
+        ORDER BY d ASC`,
+    )
+    // N days means N calendar dates, today included — hence N-1 days back.
+    .all(`-${span - 1} days`) as TrafficTrendDay[];
+
+  // A day with no traffic is absent rather than zero-filled, like
+  // getStatsHistory: this table is driven by the data, not by a calendar
+  // spine, and its consumer knows it.
+  return rows;
 }
 
 // ---------------------------------------------------------------------------
