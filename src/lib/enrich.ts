@@ -21,6 +21,7 @@ import { getCountryRisk } from './countries.js';
 import { lookupClearingByBankCode, lookupClearingSeatByBic } from './ch-clearing.js';
 import { toIso20022PostalAddress, type Iso20022PostalAddress } from './postal-address.js';
 import { blzRegisterAvailable, lookupBlz } from './de-blz.js';
+import { bgBaeRegisterAvailable, getBgAsOf, lookupBgBankCode } from './bg-bae.js';
 import { checkVop } from './compliance.js';
 import { checkUkModulus } from './uk-modulus.js';
 import { praAuthorisationByLei } from './pra-banks.js';
@@ -48,6 +49,16 @@ export function isTestBic(bicCode: string | null | undefined): boolean {
 }
 
 /**
+ * The Bulgarian register, named as the licence requires it to be named.
+ *
+ * Written out rather than abbreviated on purpose: "BNB" already means the
+ * Banque nationale de Belgique everywhere else in this codebase, and two
+ * central banks behind one abbreviation is how a Belgian answer ends up wearing
+ * a Bulgarian credit.
+ */
+const BG_REGISTER_NAME = 'Bulgarian National Bank, BAE register';
+
+/**
  * Countries whose bank code we check against the national register itself
  * rather than against a composite map, and where an absence is therefore
  * evidence that the code is not allocated.
@@ -73,6 +84,16 @@ const NATIONAL_REGISTERS: Record<string, string> = {
   FI: 'Finance Finland monetary institution codes (allocated to banking groups, not individual institutions)',
   AT: 'Oesterreichische Nationalbank SEPA-Zahlungsverkehrs-Verzeichnis',
   BE: 'Banque nationale de Belgique, bank identification codes (Protocol Secretariat)',
+  // Bulgaria says what the claim covers, like Finland does. A BAE code is the
+  // NOTE: the bare name lives in BG_REGISTER_NAME below — the caveat qualifies
+  // the VERDICT, and repeating it beside a BIC would attach it to a field it
+  // says nothing about.
+  // bank code AND the branch digits (IBAN positions 5-12); the register
+  // allocates the four-letter bank-code space exhaustively, but 28 of its 36
+  // banks publish a single branch code while one publishes 63, so only the bank
+  // code is verified. Spelled out in full: "BNB" already means the Banque
+  // nationale de Belgique one line above.
+  BG: `${BG_REGISTER_NAME} (bank code, IBAN positions 5-8; branch digits are not separately verified)`,
 };
 
 /**
@@ -111,6 +132,16 @@ function askNationalRegister(
   inconclusive?: true;
   /** What the register publishes about the allocated institution. */
   institution?: RegisterInstitution;
+  /**
+   * Year-month the REGISTER itself states, when it publishes one of its own.
+   *
+   * Most registers are re-read on our monthly cycle and the database refresh
+   * date is the honest answer for them. The Bulgarian one is republished on
+   * request rather than on a calendar and carries its own effective date, so
+   * dating it with our refresh month would claim a freshness its publisher
+   * never stated — and that date is half of the attribution its terms require.
+   */
+  as_of?: string;
 } | null {
   if (cc === 'CH' || cc === 'LI') {
     const hit = lookupClearingByBankCode(bankCode);
@@ -158,6 +189,36 @@ function askNationalRegister(
         country: cc,
         ...(hit.lei ? { lei: hit.lei } : {}),
       },
+    };
+  }
+  if (cc === 'BG') {
+    // Same safe failure as Germany: no table means no ground truth, so decline
+    // authority rather than reading every Bulgarian code as unallocated.
+    if (!bgBaeRegisterAvailable()) return null;
+    // The four-letter bank code only. The IBAN's branch digits are NOT passed:
+    // the register allocates the bank-code space exhaustively, but does not
+    // enumerate every bank's branches to the same standard, so denying on the
+    // branch would be a denial off a coverage gap. See lib/bg-bae.ts.
+    // Dated from the register on the negative branch too: a denial a caller
+    // will act on has to say how current the list behind it is, and the
+    // database refresh month would overstate that.
+    const registerDate = getBgAsOf()?.slice(0, 7);
+    const hit = lookupBgBankCode(bankCode);
+    if (!hit) return { allocated: false, as_of: registerDate };
+    return {
+      allocated: true,
+      institution: {
+        name: hit.name,
+        // Names only, as the register publishes them — the same honest shape as
+        // Belgium. Nulls here are what Bulgaria publishes, not missing data on
+        // our side, and inventing an address would be the distortion the
+        // Bulgarian National Bank's terms forbid.
+        street: null,
+        post_code: null,
+        town: null,
+        country: 'BG',
+      },
+      as_of: hit.as_of.slice(0, 7),
     };
   }
   if (cc === 'DE') {
@@ -294,7 +355,7 @@ function decideBankCode(
       match: null,
       register: national,
       authoritative: false,
-      as_of,
+      as_of: verdict.as_of ?? as_of,
     };
   }
   if (national && verdict) {
@@ -308,7 +369,9 @@ function decideBankCode(
       ...(verdict.retired ? { retired: true as const } : {}),
       ...(verdict.successor ? { superseded_by: verdict.successor } : {}),
       ...(verdict.institution ? { institution: verdict.institution } : {}),
-      as_of,
+      // The register's own date where it publishes one, our refresh month
+      // otherwise. See the `as_of` note on the verdict shape above.
+      as_of: verdict.as_of ?? as_of,
     };
   }
 
@@ -551,6 +614,41 @@ export function enrichResult(result: IBANValidationResult): void {
       // fall back to the composite map: a Germany that cannot consult the
       // Bundesbank has no opinion, and must not manufacture one.
       lookupFailed = true;
+    }
+  }
+
+  // Bulgaria: the register publishes the head-office BIC beside the BAE code,
+  // so serve it over the composite fallback for the same reason Germany does.
+  //
+  // The fallback here is not merely less precise, it is a coin flip: a Bulgarian
+  // bank code is four letters, so `bic8 LIKE 'BNBG%'` matches every BIC8 opening
+  // on them — three of them for the central bank alone — and the pick is decided
+  // by an ORDER BY rather than by anything about the account. The register names
+  // one, and it is the institution the code is allocated to.
+  //
+  // Dated and credited from the loaded rows: the Bulgarian National Bank's terms
+  // require the source to be cited, and a provenance written by hand beside a
+  // value read from the database is how the two drift apart.
+  if (cc === 'BG') {
+    const reg = lookupBgBankCode(bankCode);
+    if (reg?.bic) {
+      result.bic = {
+        code: reg.bic,
+        // Verbatim, in Cyrillic, as the register writes it. Transliterating
+        // would be the alteration its terms forbid.
+        bank_name: reg.name,
+        // The register publishes no town. Taken from the directory row for the
+        // BIC the register named — same division of labour the curated map
+        // documents: one source decides WHICH institution holds the code, the
+        // directory only supplies its details.
+        city: lookup(`${reg.bic}XXX`)?.city ?? null,
+        // The bare register name: the caveat NATIONAL_REGISTERS.BG carries is
+        // about the bank-code verdict, not about this BIC.
+        source: BG_REGISTER_NAME,
+        // Year-month, as this field is documented. The full effective date the
+        // licence attribution needs lives in bgAttribution().
+        as_of: reg.as_of.slice(0, 7),
+      };
     }
   }
 

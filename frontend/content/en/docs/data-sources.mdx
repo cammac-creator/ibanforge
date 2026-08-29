@@ -1,6 +1,6 @@
 ---
 title: "Data Sources & Provenance"
-description: "Where every answer comes from: the six national registers, the composite BIC map, the sanctions and SEPA feeds, their refresh cadence, and what an absence means in each."
+description: "Where every answer comes from: the seven national registers, the composite BIC map, the sanctions and SEPA feeds, their refresh cadence, and what an absence means in each."
 order: 6
 ---
 
@@ -19,8 +19,13 @@ In these countries, the reference set consulted **is** the national register: `n
 | **AT** | Oesterreichische Nationalbank, SEPA-Zahlungsverkehrs-Verzeichnis | monthly (source republishes daily) | full seat address, BIC, LEI |
 | **BE** | Banque nationale de Belgique, bank identification codes | monthly | name in up to four languages — the file publishes no addresses; reserved slots (*VRIJ*, *Onbeschikbaar*) are treated as unallocated |
 | **FI** | Finance Finland, monetary institution codes | on republication | codes are allocated to **banking groups**, not institutions — a hit confirms the group, so the positive claim is weaker and the response says so |
+| **BG** | Bulgarian National Bank, BAE register | re-read monthly (the register itself is republished **on request**, not on a calendar — `as_of` carries its own effective date, not ours) | name only, in Cyrillic as published, plus the head-office BIC. The verdict is made on the **four-letter bank code** (IBAN positions 5-8): a BAE code also covers the branch digits in positions 9-12, but the register does not enumerate every bank's branches to one standard, so branch digits are never used to deny |
 
 What the register publishes about the allocated institution is served in `bank_code_check.institution` — name, seat address to the depth the register carries, LEI where available. Absent fields are `null`, never guessed.
+
+Bulgaria is the newest of these and arrives with the monthly refresh: until the first run loads the register, the country degrades to the composite map and `authoritative` stays `false` — the answer never claims a register it is not holding. The dated way to tell is `bank_code_check.register`, which only names the Bulgarian National Bank once the rows are there.
+
+Bulgarian data is reproduced with the Bulgarian National Bank's written permission (27/08/2026) under its site terms, whose conditions are that the source be cited and the data not be altered or distorted. Both travel with the answer: `bank_code_check.register` names the Bulgarian National Bank, `as_of` carries the register's own effective date, and institution names are served verbatim in Cyrillic rather than transliterated. **Reuse of the Bulgarian fields carries the same conditions onward.** Unlike the Bundesbank file, this register publishes no deletion flag and no successor code — a closed provider simply disappears from it, so a Bulgarian `not_in_register` never comes with a re-papering hint.
 
 ## The composite BIC map — where `authoritative: false`
 

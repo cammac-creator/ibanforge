@@ -54,6 +54,21 @@ jobs:
       - name: Refresh Austrian and Belgian registers
         run: npm run db:seed-national
 
+      # The Bulgarian National Bank's BAE register. Same reason as the German
+      # one: bank_code_check.authoritative is only honest while the register is
+      # current, and the seeder refuses to replace a good table with a short
+      # download or with one whose bank codes collapsed.
+      #
+      # ⚠️ Two things a reader of a red run needs to know. First, bnb.bg guards
+      # the workbook endpoint with a firewall that answers a REFUSAL WITH HTTP
+      # 200 and a 746-byte error page, so the seeder validates the content and
+      # not the status; a policy change there shows up as "could not be
+      # downloaded", never as an empty table. Second, a download failure exits 0
+      # and leaves the table standing — only a FORMAT change throws, because
+      # that is the one a human has to read.
+      - name: Refresh the Bulgarian BAE register
+        run: npm run db:seed-bg
+
       # Bank of England, "List of PRA-regulated Banks". Used under a written
       # permission whose condition is attribution to the Bank TOGETHER WITH the
       # month of the list, so the month has to be re-read every month — a stale

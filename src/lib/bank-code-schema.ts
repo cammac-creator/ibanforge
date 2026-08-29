@@ -58,7 +58,7 @@ export const BANK_CODE_CHECK_SCHEMA = {
     authoritative: {
       type: 'boolean',
       description:
-        'True only where that reference set is the national register: today CH and LI against the SIX BankMaster, DE against the Bundesbank Bankleitzahlendatei, FI against the Finance Finland monetary institution list, AT against the Oesterreichische Nationalbank SEPA-Zahlungsverkehrs-Verzeichnis, and BE against the Banque nationale de Belgique bank identification codes. This is the flag to branch on: everywhere else an absence is evidence of absence from our data, not of non-existence. One asymmetry worth knowing: CH, LI, DE, AT and BE allocate codes to individual institutions, while FI allocates prefixes to banking groups, so a Finnish verified confirms the group and its BIC rather than one specific bank. The negative direction carries full weight in all six.',
+        'True only where that reference set is the national register: today CH and LI against the SIX BankMaster, DE against the Bundesbank Bankleitzahlendatei, FI against the Finance Finland monetary institution list, AT against the Oesterreichische Nationalbank SEPA-Zahlungsverkehrs-Verzeichnis, BE against the Banque nationale de Belgique bank identification codes, and BG against the Bulgarian National Bank BAE register. This is the flag to branch on: everywhere else an absence is evidence of absence from our data, not of non-existence. Two asymmetries worth knowing: FI allocates prefixes to banking groups rather than to institutions, so a Finnish verified confirms the group and its BIC rather than one specific bank; and a Bulgarian BAE code covers IBAN positions 5-12 (bank code AND branch digits) while the verdict is made on the four-letter bank code alone, because the register does not enumerate every bank branch to one standard. The negative direction carries full weight in all seven.',
     },
     candidates: {
       type: 'integer',
@@ -77,7 +77,7 @@ export const BANK_CODE_CHECK_SCHEMA = {
     institution: {
       type: 'object',
       description:
-        'What the national register publishes about the allocated institution. Present only on an authoritative answer — composite-map hits stay bare (naming a BIC holder is the bic block, and its address would imply a register that was not consulted). Depth varies by register: SIX (CH/LI) and the OeNB (AT) publish the full seat address, the Bundesbank (DE) publishes postal code and town only, the BNB (BE) publishes names alone; Finland stays without this block, its codes belong to banking groups. Absent fields are null, never guessed. This is the institution allocated the BANK CODE — not a branch, and not proof of any account.',
+        'What the national register publishes about the allocated institution. Present only on an authoritative answer — composite-map hits stay bare (naming a BIC holder is the bic block, and its address would imply a register that was not consulted). Depth varies by register: SIX (CH/LI) and the OeNB (AT) publish the full seat address, the Bundesbank (DE) publishes postal code and town only, the Banque nationale de Belgique (BE) and the Bulgarian National Bank (BG) publish names alone; Finland stays without this block, its codes belong to banking groups. Names are served exactly as the register writes them, which for BG means Cyrillic — transliterating would be an alteration its terms forbid. Absent fields are null, never guessed. This is the institution allocated the BANK CODE — not a branch, and not proof of any account.',
       properties: {
         name: { type: 'string' },
         street: {
@@ -94,7 +94,11 @@ export const BANK_CODE_CHECK_SCHEMA = {
       },
       required: ['name', 'street', 'post_code', 'town', 'country'],
     },
-    as_of: { type: 'string', description: 'Year-month the consulted reference set was last refreshed.' },
+    as_of: {
+      type: 'string',
+      description:
+        'Year-month the consulted reference set was last refreshed. Where the register publishes an effective date of its own it is that date, not ours: the Bulgarian BAE register is republished on request rather than on a calendar, so dating it with our monthly refresh would overstate how current it is.',
+    },
   },
   required: ['value', 'status', 'match', 'register', 'authoritative', 'as_of'],
 };

@@ -42,6 +42,7 @@
     "admin": "tsx scripts/admin-keys.ts",
     "db:seed-blz": "tsx scripts/seed-blz.ts",
     "db:seed-national": "tsx scripts/seed-national.ts",
+    "db:seed-bg": "tsx scripts/seed-bg-bae.ts",
     "db:seed-pra": "tsx scripts/seed-pra-banks.ts",
     "db:seed-mfi": "tsx scripts/seed-ecb-mfi.ts",
     "db:seed-psd": "tsx scripts/seed-eba-psd.ts",

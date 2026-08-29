@@ -62,8 +62,9 @@ export type OperationType = 'iban_validate' | 'iban_batch' | 'bic_lookup' | 'iba
  * IBAN countries our reference data is a composite map assembled from BIC
  * directories, not the national bank-code register, so an absence there is
  * evidence of nothing more than absence. Switzerland and Liechtenstein are
- * checked against the register itself (SIX BankMaster) and Germany against the
- * Bundesbank Bankleitzahlendatei, and only there does `not_in_register` mean
+ * checked against the register itself (SIX BankMaster), Germany against the
+ * Bundesbank Bankleitzahlendatei and Bulgaria against the Bulgarian National
+ * Bank's BAE register, and only there does `not_in_register` mean
  * the code is not allocated. That is what `authoritative`
  * marks, and it is the flag to branch on.
  */
@@ -159,7 +160,8 @@ export interface BankCodeCheck {
    * on purpose (naming a BIC holder is the `bic` block's job, and promoting
    * its address here would imply a register we did not consult). Depth varies
    * by register — SIX and the OeNB publish full street addresses, the
-   * Bundesbank publishes postal code and town only, the BNB publishes names
+   * Bundesbank publishes postal code and town only, the Banque nationale de
+   * Belgique and the Bulgarian National Bank publish names
    * alone. Absent fields are null, never guessed. Finland stays without this
    * block entirely: its codes are allocated to banking groups, and a group
    * has no branch address to publish.
