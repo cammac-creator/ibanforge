@@ -17,6 +17,7 @@ import { startLifecycleRadar } from './lib/lifecycle-radar-server.js';
 import { startForumRadar } from './lib/forum-radar-server.js';
 import { startProspectRadar } from './lib/prospect-radar-server.js';
 import { startCohortRadar } from './lib/cohort-radar-server.js';
+import { startActivationNudge } from './lib/activation-nudge-server.js';
 import { startOpsProbes } from './lib/ops-probes.js';
 import { opsFail } from './lib/ops-alert.js';
 import { recordEvent } from './lib/events.js';
@@ -87,6 +88,12 @@ startProspectRadar();
 // Signup cohort radar: collapses a burst of automated signups into one CRM
 // dossier and off the monthly reset (see cohort-radar-server.ts).
 startCohortRadar();
+
+// Daily first-call pass: one nudge, ever, to a key that never called, and a
+// founder draft in the CRM for each new signup (see activation-nudge-server.ts).
+// The nudge is the only thing here that leaves on its own; the draft waits for
+// a human. Kill switch: ACTIVATION_NUDGE_DISABLED=1.
+startActivationNudge();
 
 // Sondes OPS horaires : hommes morts (crons GitHub + les 4 radars, lus dans
 // kv_state sans jamais l'écrire), remplissage du volume, taux de 5xx, âge des

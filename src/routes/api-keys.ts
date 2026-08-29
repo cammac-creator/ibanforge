@@ -33,6 +33,13 @@ import { getWeeklyFacts, saveWeeklyDigest, getWeeklyDigests } from '../lib/weekl
 import { notifyPurchaseTelegram } from '../lib/notify.js';
 import { isProspectBackfillRunning, lastProspectBackfillReport, runProspectBackfill } from '../lib/prospect-radar-server.js';
 import { isCohortScanRunning, lastCohortReport, runCohortScan, getCohortRelabels } from '../lib/cohort-radar-server.js';
+import {
+  getNudgeLedger,
+  isActivationPassRunning,
+  isNudgeDisabled,
+  lastActivationReport,
+  runActivationPass,
+} from '../lib/activation-nudge-server.js';
 import { getCompanyProfiles, upsertCompanyProfile, type ProfileSource } from '../lib/company-profiles.js';
 import { sendApiKeyEmail, sendFreeKeyEmail, sendKeyVerificationEmail, isEmailConfigured } from '../lib/email.js';
 
@@ -1818,6 +1825,55 @@ apiKeys.get('/v1/admin/cohort-relabels', (c) => {
     return c.json({ error: 'unauthorized' }, 401);
   }
   return c.json({ relabels: getCohortRelabels(c.req.query('address')) });
+});
+
+/**
+ * The first-call machine, read side: what the daily pass sent, to whom, and
+ * whether the relay took it.
+ *
+ * `ledger` is the durable one-nudge-per-address list; `report` is only the last
+ * pass. A row with `delivered: 0` is an address whose single nudge was claimed
+ * and then not delivered (relay down at that minute). Nothing retries it on its
+ * own, on purpose: at-most-once is what keeps this channel credible. To offer
+ * one a second chance, delete its row and the next pass picks it up again.
+ *
+ * ?limit= caps the ledger (default 200, hard ceiling 1000).
+ */
+apiKeys.get('/v1/admin/activation-nudges', (c) => {
+  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
+  const limit = Number.parseInt(c.req.query('limit') ?? '200', 10);
+  const ledger = getNudgeLedger(Number.isFinite(limit) ? limit : 200);
+  return c.json({
+    running: isActivationPassRunning(),
+    // Both must be true for anything to leave: the kill switch and a relay.
+    nudges_enabled: !isNudgeDisabled(),
+    mail_configured: isEmailConfigured(),
+    kill_switch_env: 'ACTIVATION_NUDGE_DISABLED',
+    sent_total: ledger.length,
+    not_delivered: ledger.filter((r) => r.delivered === 0).length,
+    ledger,
+    ...lastActivationReport(),
+  });
+});
+
+/**
+ * Run the daily pass now instead of waiting for the tick. Same guarantees as
+ * the scheduled run: at most one nudge per address ever, and a founder draft is
+ * written but never sent.
+ */
+apiKeys.post('/v1/admin/activation-nudges/run', (c) => {
+  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
+  if (isActivationPassRunning()) {
+    return c.json({ started: false, reason: 'already_running' });
+  }
+  void runActivationPass().catch((err) =>
+    console.error('[activation-nudge] manual run failed:', err instanceof Error ? err.message : err),
+  );
+  return c.json({ started: true });
 });
 
 /**
