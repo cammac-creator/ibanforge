@@ -8,6 +8,7 @@ import { lookupFiInstitution } from './fi-register.js';
 import { hasNonLatinScript } from './gleif-address.js';
 import { allocatedCodes, nationalRegisterAvailable, normaliseCode } from './national-registers.js';
 import { nlPspEntries } from './nl-psp.js';
+import { bgBaeRegisterAvailable, lookupBgBankCode } from './bg-bae.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -479,6 +480,21 @@ export function lookupByCountryBank(
   countryCode: string,
   bankCode: string,
 ): BankLookupHit | null {
+  // Bulgaria: a bank code the BAE register allocates to nobody resolves to
+  // nothing, whichever strategy would have answered.
+  //
+  // Guarded here rather than pruned at load time like CH, DE, FI, AT and BE,
+  // because a Bulgarian bank code is four LETTERS. Dropping a curated key would
+  // not settle it: `bic8 LIKE 'RZBB%'` resurrects the same institution through
+  // strategy 2, which is exactly why the numeric-code countries could be fixed
+  // with a filter and this one cannot. One guard covers both strategies.
+  //
+  // What it prevents is a single response contradicting itself — bank_code_check
+  // saying the register allocates this code to nobody while the `bic` block
+  // beside it names a bank. RZBB is that case today: Raiffeisenbank left
+  // Bulgaria, the curated map still carries it, the register does not.
+  if (countryCode === 'BG' && bgBaeRegisterAvailable() && !lookupBgBankCode(bankCode)) return null;
+
   // Strategy 1: exact key lookup in bic_data.json
   const data = getBicData();
   const key = `${countryCode}:${bankCode}`;
