@@ -431,6 +431,26 @@ export function getStatsDB(): DatabaseType.Database {
       );
       CREATE INDEX IF NOT EXISTS idx_verification_sends_ip ON verification_sends(ip_hash, created_at);
       CREATE INDEX IF NOT EXISTS idx_verification_sends_email ON verification_sends(email_hash, created_at);
+      -- One row per activation nudge ("your key never made its first call"),
+      -- and it is the anti-repetition ledger, not a log: the daily pass refuses
+      -- any address that already appears here.
+      --
+      -- Keyed by key_prefix so the trace names the exact key, but the SELECT
+      -- that feeds the pass excludes by EMAIL. Someone holding three unused
+      -- free keys is one person, and would otherwise receive three copies of
+      -- the same message on the same morning. Same reasoning as
+      -- src/lib/activation.ts, whose unit is deliberately the address.
+      --
+      -- delivered is written after the relay answers; the row itself is
+      -- inserted BEFORE the send, so a crash mid-flight costs a missed nudge
+      -- and never a duplicate one.
+      CREATE TABLE IF NOT EXISTS activation_nudges (
+        key_prefix TEXT PRIMARY KEY,
+        email      TEXT NOT NULL,
+        sent_at    TEXT NOT NULL DEFAULT (datetime('now')),
+        delivered  INTEGER NOT NULL DEFAULT 0
+      );
+      CREATE INDEX IF NOT EXISTS idx_activation_nudges_email ON activation_nudges(email);
       -- Community radar: forum/issue threads worth answering (CRM "Forums" tab).
       -- URL is the dedup key: a thread the operator dismissed or answered must
       -- never resurrect as 'new' on the next scan (INSERT OR IGNORE semantics).
