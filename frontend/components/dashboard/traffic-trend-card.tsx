@@ -276,7 +276,13 @@ export function TrafficTrendCard({ result }: { result: TrafficTrendResult }) {
               {
                 l: 'Sans clé',
                 v: fmt(s.keyless),
-                h: s.total > 0 ? `${Math.round((s.keyless / s.total) * 100)} % du trafic` : '—',
+                // Naming both exclusions: our own test cohort DOES carry a key,
+                // so a reader counting the four keyless bands against this
+                // percentage would otherwise find it short and mistrust it.
+                h:
+                  s.total > 0
+                    ? `${Math.round((s.keyless / s.total) * 100)} % du trafic — hors clients et hors nos tests`
+                    : '—',
               },
               {
                 l: '404',
