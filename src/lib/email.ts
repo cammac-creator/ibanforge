@@ -1,5 +1,11 @@
 import { PAYMENT_LINKS, PRICING_PAGE } from './payment-links.js';
 import { sendViaRelay, isRelayConfigured } from './mail-transport.js';
+import {
+  ACCOUNT_PAGE,
+  KEY_PLACEHOLDER,
+  buildFirstCallHtml,
+  buildFirstCallText,
+} from './first-call.js';
 
 /**
  * Transactional email for IBANforge — delivers the API key after a Stripe
@@ -24,56 +30,165 @@ export function isEmailConfigured(): boolean {
   return isRelayConfigured();
 }
 
-export async function sendApiKeyEmail(p: {
-  to: string;
+export interface ApiKeyEmailInput {
   rawKey: string;
   credits: number;
   bundle: string;
-}): Promise<boolean> {
+}
+
+/**
+ * Composes the post-purchase key delivery. Pure, so the presence of the raw key
+ * and the shape of the first-call block are asserted in tests.
+ *
+ * The buyer has just paid and is at their most willing minute: this message
+ * therefore leads with the command that works, before balance, docs or terms.
+ * It used to open on a generic "use it as a Bearer token" snippet against a
+ * Swiss IBAN with no expected answer, which told a reader nothing about whether
+ * their call had succeeded.
+ */
+export function buildApiKeyEmail(p: ApiKeyEmailInput): { subject: string; text: string; html: string } {
   const credits = p.credits.toLocaleString('en-US');
 
   const text =
-    `Thanks for your purchase — your IBANforge API key is ready.\n\n` +
+    `Thanks for your purchase. Your IBANforge API key is ready.\n\n` +
     `API key: ${p.rawKey}\n` +
     `Credits: ${credits} (pack ${p.bundle})\n\n` +
-    `Use it as a Bearer token:\n` +
-    `  curl -H "Authorization: Bearer ${p.rawKey}" \\\n` +
-    `       -X POST https://api.ibanforge.com/v1/iban/validate \\\n` +
-    `       -H "content-type: application/json" -d '{"iban":"CH1000230000000012345"}'\n\n` +
-    `Check your balance any time:\n` +
+    buildFirstCallText({ bearer: p.rawKey }) +
+    `\nCheck your balance any time:\n` +
     `  curl -H "Authorization: Bearer ${p.rawKey}" https://api.ibanforge.com/v1/credits/balance\n\n` +
-    `Or read everything your key did, in one page:\n` +
-    `  https://ibanforge.com/en/account\n` +
-    `  Your usage, what failed and why, and the networks it was called from.\n` +
-    `  Your key stays in your browser: it is sent to the API and nowhere else.\n\n` +
     `Docs: https://ibanforge.com/docs\n` +
     `Terms: https://ibanforge.com/legal/terms (unused card-paid packs: 14-day refund)\n` +
-    `Keep this key safe — it will not be shown again.\n\nIBANforge`;
+    `Keep this key safe. It will not be shown again.\n\nIBANforge`;
 
   const html = `<!DOCTYPE html><html><body style="margin:0;background:#0f0f13;padding:28px;font-family:-apple-system,Segoe UI,Roboto,sans-serif;color:#d4d4d8">
   <div style="max-width:560px;margin:0 auto;background:#16161b;border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:30px 32px">
     <div style="font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:#71717a;font-family:monospace">IBANforge</div>
     <h1 style="color:#fafafa;font-size:22px;margin:10px 0 6px">Your API key is ready</h1>
-    <p style="color:#a1a1aa;font-size:15px;margin:0 0 22px">Thanks for your purchase — <b style="color:#fafafa">${credits} credits</b> (pack ${p.bundle}).</p>
+    <p style="color:#a1a1aa;font-size:15px;margin:0 0 22px">Thanks for your purchase: <b style="color:#fafafa">${credits} credits</b> (pack ${p.bundle}).</p>
     <div style="background:#09090b;border:1px solid #27272a;border-radius:10px;padding:14px 16px;margin:0 0 8px">
       <div style="font-size:11px;color:#71717a;font-family:monospace;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Your API key</div>
       <code style="font-family:'JetBrains Mono',monospace;font-size:14px;color:#f59e0b;word-break:break-all">${p.rawKey}</code>
     </div>
-    <p style="color:#71717a;font-size:12px;margin:0 0 22px">Keep it safe — it will not be shown again.</p>
-    <div style="font-size:13px;color:#a1a1aa;margin-bottom:6px">Use it as a Bearer token:</div>
-    <pre style="background:#09090b;border:1px solid #1c1c22;border-radius:10px;padding:14px 16px;font-family:'JetBrains Mono',monospace;font-size:12px;color:#d6d3cc;white-space:pre-wrap;overflow-x:auto;margin:0 0 22px">curl -H "Authorization: Bearer ${p.rawKey}" \\
-     -X POST https://api.ibanforge.com/v1/iban/validate \\
-     -H "content-type: application/json" \\
-     -d '{"iban":"CH1000230000000012345"}'</pre>
-    <p style="font-size:14px;margin:0 0 10px"><a href="https://ibanforge.com/en/account" style="color:#fbbf24;text-decoration:none">See everything your key did →</a></p>
-    <p style="color:#71717a;font-size:12px;margin:0 0 22px">Usage, failures with their cause, and the networks your key was called from. The key stays in your browser.</p>
-    <p style="font-size:14px;margin:0"><a href="https://ibanforge.com/docs" style="color:#fbbf24;text-decoration:none">Read the docs →</a> &nbsp;·&nbsp; <a href="https://ibanforge.com/legal/terms" style="color:#fbbf24;text-decoration:none">Terms →</a></p>
+    <p style="color:#71717a;font-size:12px;margin:0 0 22px">Keep it safe. It will not be shown again.</p>
+    ${buildFirstCallHtml({ bearer: p.rawKey })}
+    <p style="font-size:14px;margin:0"><a href="https://ibanforge.com/docs" style="color:#fbbf24;text-decoration:none">Read the docs</a> &nbsp;&middot;&nbsp; <a href="https://ibanforge.com/legal/terms" style="color:#fbbf24;text-decoration:none">Terms</a></p>
     <hr style="border:none;border-top:1px solid rgba(255,255,255,.06);margin:24px 0 14px">
-    <p style="color:#52525b;font-size:12px;margin:0">IBANforge · pre-payout screening for AI agents · <a href="https://ibanforge.com" style="color:#71717a">ibanforge.com</a> · governed by the <a href="https://ibanforge.com/legal/terms" style="color:#71717a">Terms of Service</a></p>
+    <p style="color:#52525b;font-size:12px;margin:0">IBANforge &middot; pre-payout screening for AI agents &middot; <a href="https://ibanforge.com" style="color:#71717a">ibanforge.com</a> &middot; governed by the <a href="https://ibanforge.com/legal/terms" style="color:#71717a">Terms of Service</a></p>
   </div></body></html>`;
 
-  const ok = await sendViaRelay({ to: p.to, subject: `Your IBANforge API key — ${credits} credits`, text, html });
+  return { subject: `Your IBANforge API key, ${credits} credits`, text, html };
+}
+
+export async function sendApiKeyEmail(p: ApiKeyEmailInput & { to: string }): Promise<boolean> {
+  const { subject, text, html } = buildApiKeyEmail(p);
+  const ok = await sendViaRelay({ to: p.to, subject, text, html });
   if (!ok) console.error('[email] API key not delivered to', p.to);
+  return ok;
+}
+
+export interface FreeKeyEmailInput {
+  rawKey: string;
+  monthlyLimit: number;
+}
+
+/**
+ * Composes the free-tier key delivery, sent at POST /v1/keys/generate.
+ *
+ * Until 2026-08-29 this signup produced no mail at all: the key existed only in
+ * the HTTP response the caller had to catch and keep. That is the exact moment
+ * the funnel loses people, so the key now also arrives in the mailbox with the
+ * one command that proves it works.
+ *
+ * No pricing, no pack links: someone who has not made a first call has nothing
+ * to buy yet, and a purchase prompt here is what makes the whole message read
+ * as a sequence rather than a delivery.
+ */
+export function buildFreeKeyEmail(p: FreeKeyEmailInput): { subject: string; text: string; html: string } {
+  const limit = p.monthlyLimit.toLocaleString('en-US');
+
+  const text =
+    `Your IBANforge API key is ready.\n\n` +
+    `API key: ${p.rawKey}\n` +
+    `Free tier: ${limit} requests per month, reset on the 1st.\n\n` +
+    buildFirstCallText({ bearer: p.rawKey }) +
+    `\nDocs: https://ibanforge.com/docs\n` +
+    `Terms: https://ibanforge.com/legal/terms\n` +
+    `Keep this key safe. It will not be shown again, and we store only its hash.\n\n` +
+    `Something does not work on the first try? Reply to this mail and we look at it with you.\n\nIBANforge`;
+
+  const html = `<!DOCTYPE html><html><body style="margin:0;background:#0f0f13;padding:28px;font-family:-apple-system,Segoe UI,Roboto,sans-serif;color:#d4d4d8">
+  <div style="max-width:560px;margin:0 auto;background:#16161b;border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:30px 32px">
+    <div style="font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:#71717a;font-family:monospace">IBANforge</div>
+    <h1 style="color:#fafafa;font-size:22px;margin:10px 0 6px">Your API key is ready</h1>
+    <p style="color:#a1a1aa;font-size:15px;margin:0 0 22px">Free tier: <b style="color:#fafafa">${limit} requests per month</b>, reset on the 1st.</p>
+    <div style="background:#09090b;border:1px solid #27272a;border-radius:10px;padding:14px 16px;margin:0 0 8px">
+      <div style="font-size:11px;color:#71717a;font-family:monospace;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Your API key</div>
+      <code style="font-family:'JetBrains Mono',monospace;font-size:14px;color:#f59e0b;word-break:break-all">${p.rawKey}</code>
+    </div>
+    <p style="color:#71717a;font-size:12px;margin:0 0 22px">Keep it safe. It will not be shown again, and we store only its hash.</p>
+    ${buildFirstCallHtml({ bearer: p.rawKey })}
+    <p style="color:#a1a1aa;font-size:13px;margin:0 0 14px">Something does not work on the first try? Reply to this mail and we look at it with you.</p>
+    <p style="font-size:14px;margin:0"><a href="https://ibanforge.com/docs" style="color:#fbbf24;text-decoration:none">Read the docs</a> &nbsp;&middot;&nbsp; <a href="https://ibanforge.com/legal/terms" style="color:#fbbf24;text-decoration:none">Terms</a></p>
+    <hr style="border:none;border-top:1px solid rgba(255,255,255,.06);margin:24px 0 14px">
+    <p style="color:#52525b;font-size:12px;margin:0">IBANforge &middot; <a href="https://ibanforge.com" style="color:#71717a">ibanforge.com</a></p>
+  </div></body></html>`;
+
+  return { subject: 'Your IBANforge API key, and the call that proves it works', text, html };
+}
+
+export async function sendFreeKeyEmail(p: FreeKeyEmailInput & { to: string }): Promise<boolean> {
+  const { subject, text, html } = buildFreeKeyEmail(p);
+  const ok = await sendViaRelay({ to: p.to, subject, text, html });
+  if (!ok) console.error('[email] free key not delivered to', p.to);
+  return ok;
+}
+
+export interface ActivationNudgeInput {
+  /** The 12-character prefix of the key that has never been called. */
+  keyPrefix: string;
+}
+
+/**
+ * Composes the one and only "your key never made its first call" message.
+ *
+ * The curl carries KEY_PLACEHOLDER, not a key: free keys are stored hashed and
+ * nothing else, so days after a signup we can name the key by its prefix and
+ * must say plainly that we cannot reprint it. Printing something key-shaped
+ * that is not the key would be the worse move.
+ *
+ * Signed by name, with a real invitation to reply, because that is what this
+ * message is for: the founder's own mail is what gets answers, and this is its
+ * automated, lighter cousin.
+ */
+export function buildActivationNudgeEmail(p: ActivationNudgeInput): { subject: string; text: string; html: string } {
+  const text =
+    `Your IBANforge key has not made its first call yet.\n\n` +
+    `No reproach in that, it usually means the first call is still one copy-paste away.\n` +
+    `Here is that copy-paste.\n\n` +
+    buildFirstCallText({ bearer: KEY_PLACEHOLDER, keyPrefix: p.keyPrefix }) +
+    `\nReply to this email and I will personally help: send me the call you are making\n` +
+    `and I will tell you what comes back and why.\n\n` +
+    `Claude-Alain Martin\nIBANforge`;
+
+  const html = `<!DOCTYPE html><html><body style="margin:0;background:#0f0f13;padding:28px;font-family:-apple-system,Segoe UI,Roboto,sans-serif;color:#d4d4d8">
+  <div style="max-width:560px;margin:0 auto;background:#16161b;border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:30px 32px">
+    <div style="font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:#71717a;font-family:monospace">IBANforge</div>
+    <h1 style="color:#fafafa;font-size:22px;margin:10px 0 6px">Your key has not made its first call yet</h1>
+    <p style="color:#a1a1aa;font-size:15px;margin:0 0 22px">No reproach in that, it usually means the first call is still one copy-paste away. Here is that copy-paste.</p>
+    ${buildFirstCallHtml({ bearer: KEY_PLACEHOLDER, keyPrefix: p.keyPrefix })}
+    <p style="color:#a1a1aa;font-size:14px;margin:0 0 18px">Reply to this email and I will personally help: send me the call you are making and I will tell you what comes back and why.</p>
+    <p style="color:#a1a1aa;font-size:14px;margin:0">Claude-Alain Martin<br><span style="color:#71717a;font-size:12px">IBANforge</span></p>
+    <hr style="border:none;border-top:1px solid rgba(255,255,255,.06);margin:24px 0 14px">
+    <p style="color:#52525b;font-size:12px;margin:0">You received this once, because a key was created on <a href="${ACCOUNT_PAGE}" style="color:#71717a">ibanforge.com</a> and never used. There is no second one.</p>
+  </div></body></html>`;
+
+  return { subject: 'Your IBANforge key has not made its first call yet', text, html };
+}
+
+export async function sendActivationNudgeEmail(p: ActivationNudgeInput & { to: string }): Promise<boolean> {
+  const { subject, text, html } = buildActivationNudgeEmail(p);
+  const ok = await sendViaRelay({ to: p.to, subject, text, html });
+  if (!ok) console.error('[email] activation nudge not delivered to', p.to);
   return ok;
 }
 

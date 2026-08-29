@@ -10,6 +10,16 @@
  * ibanforge.com/stripe/success later.
  */
 import { Hono } from 'hono';
+// One source of truth for the first-call block: the same IBAN, endpoint and
+// expected answer the delivery emails carry. Interpolated into the page at
+// module load, so a change in src/lib/first-call.ts reaches this page too.
+import {
+  ACCOUNT_PAGE,
+  FIRST_CALL_ENDPOINT,
+  FIRST_CALL_EXPECTED_LINE_1,
+  FIRST_CALL_EXPECTED_LINE_2,
+  FIRST_CALL_IBAN,
+} from '../lib/first-call.js';
 
 export const stripeSuccess = new Hono();
 
@@ -122,9 +132,10 @@ stripeSuccess.get('/stripe/success', (c) => {
         statBlock +
         '<div class="stat"><div class="stat-label">Email</div><div class="stat-value" style="font-size:13px">' + (email || '—') + '</div></div>' +
       '</div>' +
-      '<h3 style="font-size:14px;margin-bottom:8px;color:#fafafa">Test it now</h3>' +
-      '<pre>curl -X POST https://api.ibanforge.com/v1/iban/validate \\\n  -H "Authorization: Bearer ' + key + '" \\\n  -H "Content-Type: application/json" \\\n  -d \\'{"iban":"CH1000230000000012345"}\\'</pre>' +
-      '<p class="small">Docs: <a href="https://api.ibanforge.com/openapi.json">openapi.json</a> · <a href="/llms.txt">llms.txt</a> · <a href="/">Home</a> · <a href="https://ibanforge.com/legal/terms">Terms</a> (14-day refund on unused packs)</p>';
+      '<h3 style="font-size:14px;margin-bottom:8px;color:#fafafa">Your first successful call in 30 seconds</h3>' +
+      '<pre>curl -X POST ${FIRST_CALL_ENDPOINT} \\\n  -H "Authorization: Bearer ' + key + '" \\\n  -H "content-type: application/json" \\\n  -d \\'{"iban":"${FIRST_CALL_IBAN}"}\\'</pre>' +
+      '<p class="small">${FIRST_CALL_EXPECTED_LINE_1}<br>${FIRST_CALL_EXPECTED_LINE_2}</p>' +
+      '<p class="small"><a href="${ACCOUNT_PAGE}">Everything this key does, on one page</a> &middot; Docs: <a href="https://api.ibanforge.com/openapi.json">openapi.json</a> &middot; <a href="/llms.txt">llms.txt</a> &middot; <a href="/">Home</a> &middot; <a href="https://ibanforge.com/legal/terms">Terms</a> (14-day refund on unused packs)</p>';
 
     const btn = document.getElementById('copybtn');
     btn.addEventListener('click', function(){

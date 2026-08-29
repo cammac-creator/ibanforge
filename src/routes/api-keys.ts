@@ -34,7 +34,7 @@ import { notifyPurchaseTelegram } from '../lib/notify.js';
 import { isProspectBackfillRunning, lastProspectBackfillReport, runProspectBackfill } from '../lib/prospect-radar-server.js';
 import { isCohortScanRunning, lastCohortReport, runCohortScan, getCohortRelabels } from '../lib/cohort-radar-server.js';
 import { getCompanyProfiles, upsertCompanyProfile, type ProfileSource } from '../lib/company-profiles.js';
-import { sendApiKeyEmail, sendKeyVerificationEmail, isEmailConfigured } from '../lib/email.js';
+import { sendApiKeyEmail, sendFreeKeyEmail, sendKeyVerificationEmail, isEmailConfigured } from '../lib/email.js';
 
 // Bundle credits — prepaid pools sized for the 3 typical agent stacks.
 // Pricing keeps a fair per-call rate (cheaper than retail x402) so agents
@@ -207,6 +207,27 @@ apiKeys.post('/v1/keys/generate', async (c) => {
   }
 
   if (creationSource) recordKeyCreation(creationSource, c.req.header('user-agent') ?? null, result.key_prefix);
+
+  // Deliver the key to the mailbox too, with the command that proves it works.
+  //
+  // Until 2026-08-29 a free signup produced no mail at all: the key lived only
+  // in this response, and the reader who did not catch it had nothing. Most
+  // keys never carry a single call, so the mail is not a courtesy here, it is
+  // the second chance at a first call.
+  //
+  // NOT awaited, exactly like the Stripe rail: a relay that hangs must never
+  // hold a signup open (the transport caps itself at 6s, the caller waits 0).
+  //
+  // Skipped under vitest because example-emails.test.ts drives this very route
+  // with every example address published in the repo; with a relay configured
+  // in the shell, `npm run check` would mail real people documentation samples.
+  if (!process.env.VITEST) {
+    void sendFreeKeyEmail({
+      to: email.trim().toLowerCase(),
+      rawKey: result.api_key,
+      monthlyLimit: 200,
+    }).catch(() => {});
+  }
 
   return c.json({
     api_key: result.api_key,
