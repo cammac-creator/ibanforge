@@ -186,15 +186,13 @@ function buildLlmsTxt(): string {
   // Absent entirely when nothing is loaded: no line at all beats a line naming
   // a register we are not serving.
   const bgCredit = bgAttribution();
-  const nationalRegisterSources = [
-    'Deutsche Bundesbank (attribution wording per its terms: Quelle: Deutsche Bundesbank)',
-    'Oesterreichische Nationalbank',
-    'Banque nationale de Belgique',
-    'Finance Finland',
-    ...(bgCredit
-      ? [`${bgCredit}, ${getBgBankCodeCount()} bank codes, reproduced with attribution per its site terms`]
-      : []),
-  ].join(', ');
+  // On a line of its own rather than inside the comma-separated register list:
+  // the credit is a licence condition and the register's own name carries a
+  // comma, so folding it into that list would make the citation ambiguous
+  // exactly where it has to be exact.
+  const bgSourceLine = bgCredit
+    ? `\n- Bulgarian bank codes: ${bgCredit} — ${getBgBankCodeCount()} bank codes, reproduced with attribution under the Bulgarian National Bank's site terms (source cited, data unaltered)`
+    : '';
   return `# IBANforge
 
 > Pre-payout screening for AI agents — check the bank behind a counterparty IBAN before you send funds. IBAN validation, BIC/SWIFT lookup, Swiss clearing, sanctions and compliance risk scoring, designed for AI agents and developers. ${bicCount} BIC entries (${leiCount} LEI-enriched via GLEIF; additional rows from SwiftCodes (MIT), Bundesbank, SIX, NBP, EBA Step2 SCT), ${chCount} Swiss BC-Nummer from SIX, ${countryCount} countries, ${issuerCount} non-bank issuer classifications (EMI, payment institutions, digital banks). Counts in this file are generated live from the serving database.
@@ -203,7 +201,7 @@ function buildLlmsTxt(): string {
 
 - BIC directory: GLEIF (LEI-enriched), SwiftCodes (MIT), Quelle: Deutsche Bundesbank, SIX, NBP, EBA Step2 SCT
 - Swiss clearing: SIX BankMaster (BC-Nummer / IID)
-- National bank-code registers: ${nationalRegisterSources}
+- National bank-code registers: Deutsche Bundesbank (attribution wording per its terms: Quelle: Deutsche Bundesbank), Oesterreichische Nationalbank, Banque nationale de Belgique, Finance Finland${bgSourceLine}
 ${praSourceLine}
 ${identitySourceLines}
 ${psdSourceLine}

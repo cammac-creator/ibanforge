@@ -23,6 +23,8 @@ In these countries, the reference set consulted **is** the national register: `n
 
 What the register publishes about the allocated institution is served in `bank_code_check.institution` — name, seat address to the depth the register carries, LEI where available. Absent fields are `null`, never guessed.
 
+Bulgaria is the newest of these and arrives with the monthly refresh: until the first run loads the register, the country degrades to the composite map and `authoritative` stays `false` — the answer never claims a register it is not holding. The dated way to tell is `bank_code_check.register`, which only names the Bulgarian National Bank once the rows are there.
+
 Bulgarian data is reproduced with the Bulgarian National Bank's written permission (27/08/2026) under its site terms, whose conditions are that the source be cited and the data not be altered or distorted. Both travel with the answer: `bank_code_check.register` names the Bulgarian National Bank, `as_of` carries the register's own effective date, and institution names are served verbatim in Cyrillic rather than transliterated. **Reuse of the Bulgarian fields carries the same conditions onward.** Unlike the Bundesbank file, this register publishes no deletion flag and no successor code — a closed provider simply disappears from it, so a Bulgarian `not_in_register` never comes with a re-papering hint.
 
 ## The composite BIC map — where `authoritative: false`
