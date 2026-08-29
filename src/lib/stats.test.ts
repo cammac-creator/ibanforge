@@ -380,6 +380,16 @@ describe('classifyClient', () => {
     expect(classifyClient('/mcp', 'Mozilla/5.0 Chrome/120')).toBe('mcp_http');
   });
 
+  // The virtual path app.ts records a tool invocation under, so MCP usage can be
+  // told from a discovery handshake. It is a STORED label, not a request path —
+  // the middleware classifies the real path — but a future reader that
+  // classifies the recorded path instead must land in the same bucket rather
+  // than opening a second MCP row in every channel aggregation.
+  it('classifies the virtual tool-call path as mcp_http too', () => {
+    expect(classifyClient('/mcp:tools-call', 'Mozilla/5.0 Chrome/120')).toBe('mcp_http');
+    expect(classifyClient('/mcp:tools-call', undefined)).toBe('mcp_http');
+  });
+
   it('classifies missing UA as api', () => {
     expect(classifyClient('/v1/iban/validate', undefined)).toBe('api');
     expect(classifyClient('/', undefined)).toBe('api');
