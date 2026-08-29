@@ -11,6 +11,7 @@ import {
   lookup,
   registeredAddress,
   bic8CountForPrefix,
+  type BankLookupHit,
 } from './bic-lookup.js';
 import { classifyIssuer } from './issuers.js';
 import { lookupFiInstitution } from './fi-register.js';
@@ -256,15 +257,27 @@ function structuralPrefixRule(
  * real institution whether or not we also hold a BIC for it, so existence and
  * BIC availability are answered separately instead of being collapsed the way
  * `bic: null` collapsed them.
+ *
+ * Every path out of here is a VERDICT. The guard that stands between this
+ * function and the response is `checkBankCode` below — read its note before
+ * adding a reference lookup anywhere in this file.
  */
-function checkBankCode(
+function decideBankCode(
   cc: string,
   bankCode: string,
   // `code` joined the shape for the LV/GI structural rule: crediting a
   // published rule for a pairing requires checking the rule actually produces
   // it, and that check is `resolvedBic.startsWith(bankCode)`.
   hit: { match: 'register' | 'prefix'; candidates?: number; code: string } | null,
-  bban?: string,
+  bban: string | undefined,
+  /**
+   * A reference lookup this verdict would have read already failed. Consulted
+   * ONLY in the composite fallback at the bottom: a national register that
+   * answered on its own is a better answer than the composite map ever was, and
+   * discarding it because a second source was unreadable would throw away the
+   * only authoritative verdict in the response.
+   */
+  lookupFailed: boolean,
 ): BankCodeCheck {
   const as_of = getReferenceAsOf();
   const national = NATIONAL_REGISTERS[cc];
@@ -326,6 +339,22 @@ function checkBankCode(
     };
   }
 
+  // Nothing resolved. Two very different things can produce that, and only one
+  // of them is an answer: the composite map really has no such code, or the
+  // lookup that would have found it could not run. Asking
+  // countryHasReferenceData() here would answer the first question with the
+  // second one's evidence and publish `not_in_register` off an outage.
+  if (lookupFailed) {
+    return {
+      value: bankCode,
+      status: 'unavailable',
+      match: null,
+      register: null,
+      authoritative: false,
+      as_of,
+    };
+  }
+
   const hasData = countryHasReferenceData(cc);
   return {
     value: bankCode,
@@ -335,6 +364,71 @@ function checkBankCode(
     authoritative: false,
     as_of,
   };
+}
+
+/**
+ * The verdict, with a failure of ours barred from ever wearing its clothes.
+ *
+ * ## The failure this exists to stop
+ *
+ * `not_in_register` is the one answer in this API a caller may act on as
+ * non-existence: on an authoritative country it means "no institution holds
+ * this account, do not send". Every path that produces it reads a database. So
+ * a database that cannot be read — a corrupt file, a table missing after a bad
+ * deploy, a statement that raises mid-query — must not be allowed to arrive at
+ * the caller as anything a payment engine could mistake for a refusal.
+ *
+ * Before this guard the two outcomes of an unreadable reference set were a 500
+ * (the whole request, and in `/v1/iban/batch` the whole batch of 100, lost over
+ * one row) or, worse, silence: a lookup that returns nothing instead of raising
+ * lands on `not_in_register` and reads exactly like a denial.
+ *
+ * `unavailable` is the state the field already carries for "we hold no opinion
+ * here", and it is what a caller is already documented to treat as "let the
+ * downstream name check decide". Mapping our own failure onto it says the true
+ * thing with vocabulary the integrator has already implemented.
+ *
+ * ## Why this is not a silent catch
+ *
+ * Nothing is swallowed: the failure becomes an explicit, machine-readable state
+ * in the payload rather than an exception the caller cannot see. The house rule
+ * this respects is the one against a catch that produces a WRONG answer — and
+ * the wrong answer here would be a refusal we invented.
+ *
+ * `as_of` falls back to the empty string, which is what `getReferenceAsOf()`
+ * already returns when it cannot date the reference set. A failure that cannot
+ * read the data cannot date it either, and inventing a month would be the same
+ * class of lie one field over.
+ */
+function checkBankCode(
+  cc: string,
+  bankCode: string,
+  hit: { match: 'register' | 'prefix'; candidates?: number; code: string } | null,
+  bban: string | undefined,
+  /** A reference lookup feeding this verdict already failed; see enrichResult. */
+  lookupFailed: boolean,
+): BankCodeCheck {
+  try {
+    return decideBankCode(cc, bankCode, hit, bban, lookupFailed);
+  } catch {
+    return {
+      value: bankCode,
+      status: 'unavailable',
+      match: null,
+      register: null,
+      authoritative: false,
+      as_of: safeReferenceAsOf(),
+    };
+  }
+}
+
+/** The reference date, or none — dating the answer must not be what breaks it. */
+function safeReferenceAsOf(): string {
+  try {
+    return getReferenceAsOf();
+  } catch {
+    return '';
+  }
 }
 
 /**
@@ -350,8 +444,23 @@ export function enrichResult(result: IBANValidationResult): void {
   const cc = result.country.code;
   const bankCode = result.bban.bank_code;
 
-  // BIC lookup
-  const hit = lookupByCountryBank(cc, bankCode);
+  // BIC lookup.
+  //
+  // Guarded, and the guard is the point: this call and the German register read
+  // below are the two reference lookups the bank-code verdict is built on. When
+  // one of them cannot run, `lookupFailed` carries that fact to checkBankCode,
+  // which turns it into `unavailable` instead of letting a missing table arrive
+  // as `not_in_register` — a sentence a payment engine reads as "do not send".
+  // `bic: null` beside it is the answer this block already gives for a code it
+  // cannot resolve, and the one the docs already tell callers not to read as a
+  // denial.
+  let lookupFailed = false;
+  let hit: BankLookupHit | null = null;
+  try {
+    hit = lookupByCountryBank(cc, bankCode);
+  } catch {
+    lookupFailed = true;
+  }
   result.bic = hit
     ? { code: hit.code, bank_name: hit.bank_name, city: hit.city, source: hit.source, as_of: hit.as_of }
     : null;
@@ -365,17 +474,25 @@ export function enrichResult(result: IBANValidationResult): void {
   // the Landesbank) and dropped the API over it. Register truth first; the
   // composite stays as the fallback for the 2 of 3,506 BLZ without a BIC.
   if (cc === 'DE') {
-    const reg = lookupBlz(bankCode);
-    if (reg?.bic) {
-      // Provenance follows the answer: this BIC comes from the national
-      // register, not from the directory the fallback would have read.
-      result.bic = {
-        code: reg.bic,
-        bank_name: reg.name,
-        city: reg.town,
-        source: NATIONAL_REGISTERS.DE,
-        as_of: getReferenceAsOf() || null,
-      };
+    try {
+      const reg = lookupBlz(bankCode);
+      if (reg?.bic) {
+        // Provenance follows the answer: this BIC comes from the national
+        // register, not from the directory the fallback would have read.
+        result.bic = {
+          code: reg.bic,
+          bank_name: reg.name,
+          city: reg.town,
+          source: NATIONAL_REGISTERS.DE,
+          as_of: getReferenceAsOf() || null,
+        };
+      }
+    } catch {
+      // The register the German verdict is decided against is unreadable. Flag
+      // it here rather than letting checkBankCode meet the same failure and
+      // fall back to the composite map: a Germany that cannot consult the
+      // Bundesbank has no opinion, and must not manufacture one.
+      lookupFailed = true;
     }
   }
 
@@ -538,7 +655,7 @@ export function enrichResult(result: IBANValidationResult): void {
   // The BBAN, taken from the normalised IBAN rather than reassembled from the
   // parsed parts: Finland resolves on the whole string, and a country whose
   // bank_code slice is not a prefix of the BBAN would silently reassemble wrong.
-  result.bank_code_check = checkBankCode(cc, bankCode, hit, result.iban.slice(4));
+  result.bank_code_check = checkBankCode(cc, bankCode, hit, result.iban.slice(4), lookupFailed);
 
   // Swiss clearing enrichment (CH and LI IBANs)
   if ((cc === 'CH' || cc === 'LI') && result.bban?.bank_code) {
