@@ -238,6 +238,96 @@ describe('apiKeyMiddleware — credit-bundle path', () => {
 });
 
 /**
+ * The blind spot this closes: the credits branch touched credits_remaining and
+ * nothing else, so `api_usage` — the ledger every monthly aggregate reads — held
+ * NOTHING for a prepaid customer. months_by_key, the CRM sparkline and any
+ * "what did they consume in July" understated exactly the customers who pay.
+ *
+ * It is an OBSERVATION counter. Nothing is enforced against it, and nothing is
+ * billed twice: the debit remains the single decrementCredits call.
+ */
+describe('a credit key is counted in its month, and never capped by it', () => {
+  const month = () => new Date().toISOString().slice(0, 7);
+  const monthCount = (rawKey: string): number => {
+    const hash = createHash('sha256').update(rawKey).digest('hex');
+    const row = getStatsDB()
+      .prepare('SELECT count FROM api_usage WHERE key_hash = ? AND month = ?')
+      .get(hash, month()) as { count: number } | undefined;
+    return row?.count ?? 0;
+  };
+
+  it('records what it consumed in the month it consumed it', async () => {
+    const app = makeAppWithCredits();
+    const k = generateCreditKey(null, 100);
+    expect(monthCount(k.api_key)).toBe(0);
+
+    for (let i = 0; i < 3; i++) {
+      const res = await app.request('/v1/iban/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${k.api_key}` },
+        body: JSON.stringify({ iban: 'CH9300762011623852957' }),
+      });
+      expect(res.status).toBe(200);
+    }
+
+    expect(monthCount(k.api_key)).toBe(3);
+    // The debit stayed single: three calls, three credits, not six.
+    expect(validateApiKey(k.api_key).creditsRemaining).toBe(97);
+  });
+
+  it('gives the month back when the call is refunded on a 4xx', async () => {
+    const app = makeAppWithCredits();
+    const k = generateCreditKey(null, 50);
+    const res = await app.request('/v1/iban/validate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${k.api_key}` },
+      body: JSON.stringify({}),
+    });
+    expect(res.status).toBe(400);
+    expect(monthCount(k.api_key)).toBe(0);
+    expect(validateApiKey(k.api_key).creditsRemaining).toBe(50);
+  });
+
+  // The hazard the read-side patch was written to avoid, now that the write
+  // happens: monthly_limit is NULL on a credit key, which falls back to 200. If
+  // this counter were ever consulted as a ceiling, a 5,000-credit pack would be
+  // cut off after 200 calls a month. It is not — the balance is the only wall.
+  it('serves far past the default monthly allowance without ever refusing', async () => {
+    const app = makeAppWithCredits();
+    const k = generateCreditKey(null, 400);
+    for (let i = 0; i < 250; i++) {
+      const res = await app.request('/v1/iban/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${k.api_key}` },
+        body: JSON.stringify({ iban: 'CH9300762011623852957' }),
+      });
+      expect(res.status).toBe(200);
+      // Never the monthly-quota refusal, at any point past the 200th call.
+      expect(res.headers.get('x-quota-exhausted')).toBeNull();
+    }
+    expect(monthCount(k.api_key)).toBe(250);
+    expect(validateApiKey(k.api_key).creditsRemaining).toBe(150);
+  });
+
+  it('tells its holder that the monthly figures govern nothing', async () => {
+    const app = makeAppWithCredits();
+    const k = generateCreditKey(null, 5000);
+    await app.request('/v1/iban/validate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${k.api_key}` },
+      body: JSON.stringify({ iban: 'CH9300762011623852957' }),
+    });
+    const res = await app.request('/v1/keys/usage', {
+      headers: { Authorization: `Bearer ${k.api_key}` },
+    });
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.used).toBe(1);
+    expect(body.basis).toBe('credits');
+    expect(body.credits_remaining).toBe(4999);
+  });
+});
+
+/**
  * Audit A2 — a $5-to-$80 key that existed only in one HTTP response.
  *
  * The card rail has always written the raw key to `raw_key_one_time_view` and

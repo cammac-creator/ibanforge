@@ -1,6 +1,13 @@
 import type { MiddlewareHandler } from 'hono';
 import type { HonoEnv } from '../types.js';
-import { validateApiKey, checkAndIncrementQuota, decrementQuota, decrementCredits, refundCredit } from '../lib/api-keys.js';
+import {
+  validateApiKey,
+  checkAndIncrementQuota,
+  decrementQuota,
+  decrementCredits,
+  refundCredit,
+  recordMonthlyObservation,
+} from '../lib/api-keys.js';
 import { getIbansArray } from '../lib/request-helpers.js';
 import { CARD_CHECKOUT_HINT } from '../lib/payment-links.js';
 import { maybeSendQuotaWarning } from '../lib/quota-notice.js';
@@ -136,6 +143,15 @@ export function apiKeyMiddleware(): MiddlewareHandler<HonoEnv> {
       c.header('X-Credits-Total', String(creditsTotal ?? 0));
       if (units > 1) c.header('X-Credits-Charged', String(units));
       c.set('apiKeyAuthenticated', true);
+      // Count the call against the month as well — an OBSERVATION, never a
+      // ceiling. This branch used to touch credits_remaining and nothing else,
+      // so `api_usage` was silent for every prepaid customer and every aggregate
+      // reading it (CRM months_by_key, monthly sparkline) understated exactly
+      // the customers who pay. No limit is tested here and none ever will be:
+      // a credit key is turned away by its balance, above, and by nothing else.
+      // Nothing is billed twice either — the debit stays the single
+      // decrementCredits call.
+      const observedMonth = recordMonthlyObservation(keyHash, units);
       await next();
       // Refund credits on 4xx client errors (mirror monthly quota behavior).
       // Same reason as the quota headers below: the balance is published after
@@ -143,6 +159,10 @@ export function apiKeyMiddleware(): MiddlewareHandler<HonoEnv> {
       let left = remaining;
       if (c.res.status >= 400 && c.res.status < 500) {
         refundCredit(keyHash, units);
+        // The observation is refunded on the SAME month the increment landed
+        // on, for the reason decrementQuota documents: across a month boundary
+        // the two differ, and the drift is permanent.
+        decrementQuota(keyHash, units, observedMonth);
         left = remaining + units;
       }
       c.header('X-Credits-Remaining', String(left));

@@ -280,14 +280,36 @@ apiKeys.get('/v1/keys/usage', (c) => {
   }
 
   const key = authHeader.slice(7);
-  const { valid, keyHash, monthlyLimit } = validateApiKey(key);
+  const { valid, keyHash, monthlyLimit, creditsRemaining, creditsTotal } = validateApiKey(key);
 
   if (!valid) {
     return c.json({ error: 'invalid_key', message: 'API key not found or inactive' }, 401);
   }
 
   const usage = getUsage(keyHash, monthlyLimit);
-  return c.json({ ...usage, key_prefix: key.slice(0, 12) });
+  // A credit key's monthly row is an OBSERVATION (see recordMonthlyObservation),
+  // and `limit` is the default nothing is enforced against for it. Left in place
+  // for contract stability — the published SDK types all three fields as numbers
+  // — but the truth travels with it: `basis` names which ceiling actually
+  // governs, and the balance that governs it is served alongside. Without this,
+  // the day the observation counter landed, a 5,000-credit customer began
+  // reading `remaining: -3173` on their own usage endpoint.
+  const isCreditKey = typeof creditsRemaining === 'number';
+  return c.json({
+    ...usage,
+    key_prefix: key.slice(0, 12),
+    basis: isCreditKey ? 'credits' : 'monthly',
+    ...(isCreditKey
+      ? {
+          credits_remaining: creditsRemaining,
+          credits_total: creditsTotal ?? 0,
+          note:
+            'This key draws on a prepaid credit bundle. `used` counts the calls billed this month, for information only — ' +
+            'nothing is enforced against `limit`/`remaining`. What can turn a call away is credits_remaining. ' +
+            'Full balance: GET /v1/credits/balance.',
+        }
+      : {}),
+  });
 });
 
 /**
@@ -557,29 +579,32 @@ apiKeys.get('/v1/admin/keys', (c) => {
   //
   // TWO LEDGERS, AND ONLY ONE WAS READ
   //
-  // api_usage is the MONTHLY-QUOTA ledger: incrementUsage writes it, and only
-  // for keys that have a monthly_limit. A credit key takes the other branch in
-  // the middleware — decrementCredits — which touches credits_remaining and
+  // api_usage is the MONTHLY ledger. A credit key used to take the other branch
+  // in the middleware — decrementCredits — which touched credits_remaining and
   // nothing else. So every prepaid customer read as `used_all_time: 0`, and the
-  // dashboard showed a customer who had just spent 3,373 units as one who had
-  // never called.
+  // dashboard showed a customer who had just spent thousands of units as one who
+  // had never called.
   //
-  // Fixed on the READ side on purpose. Making decrementCredits also write
-  // api_usage would put credits into the table the monthly quota is enforced
-  // against, and a credit key falls back to DEFAULT_MONTHLY_LIMIT when
-  // monthly_limit is NULL — one future reader of that row away from capping a
-  // 5,000-credit pack at 200 calls a month. Reading both ledgers needs no
-  // migration and no backfill: credits_total - credits_remaining is already the
-  // exact all-time figure.
+  // 🚨 UPDATED: the credits branch now ALSO writes api_usage, as an observation
+  // counter with no ceiling attached (see recordMonthlyObservation). That fixes
+  // the per-MONTH blindness this read-side patch could never reach — a lifetime
+  // figure cannot say what a customer consumed in July.
+  //
+  // Which makes the old sum a DOUBLE COUNT: `t.total` now carries the very units
+  // `credits_total - credits_remaining` already measures. Hence the CASE. The
+  // credits delta stays the source for a credit key rather than the api_usage
+  // sum, because it is complete: it covers the months that predate the
+  // observation counter, which api_usage will never hold.
   const rows = db.prepare(
     `SELECT k.key_hash, k.key_prefix, k.email, k.monthly_limit, k.active, k.created_at,
             k.credits_total, k.credits_remaining,
             CASE WHEN k.stripe_session_id IS NOT NULL THEN 1 ELSE 0 END AS paid,
             COALESCE(u.count, 0) AS used,
             COALESCE(p.count, 0) AS used_prev,
-            COALESCE(t.total, 0)
-              + MAX(COALESCE(k.credits_total, 0) - COALESCE(k.credits_remaining, 0), 0)
-              AS used_all_time,
+            CASE WHEN k.credits_remaining IS NOT NULL
+                 THEN MAX(COALESCE(k.credits_total, 0) - COALESCE(k.credits_remaining, 0), 0)
+                 ELSE COALESCE(t.total, 0)
+            END AS used_all_time,
             MAX(COALESCE(k.credits_total, 0) - COALESCE(k.credits_remaining, 0), 0) AS credits_used,
             lam.last_active_month AS last_active_month,
             COALESCE(es.mail_count, 0) AS mail_count,
@@ -648,15 +673,23 @@ apiKeys.get('/v1/admin/keys', (c) => {
   const keys = rows.map((r) => {
     const quota = byHash.get(r.key_hash);
     const calls = byPrefix.get(String(r.key_prefix));
-    const useCalls = !quota && !!calls;
-    const source = useCalls ? calls : quota;
-    const series = months.map((mo) => source?.get(mo) ?? 0);
+    // The fallback is decided per MONTH, not per key. Since the credits branch
+    // began writing an observation row, a prepaid customer active before that
+    // change has quota rows for the recent months and none for the older ones —
+    // a per-key choice would draw those older months as flat zeros and read as a
+    // customer who had stopped.
+    const series = months.map((mo) => quota?.get(mo) ?? calls?.get(mo) ?? 0);
+    const fromQuota = months.some((mo) => quota?.get(mo) !== undefined);
+    const fromCalls = months.some((mo) => quota?.get(mo) === undefined && calls?.get(mo) !== undefined);
     const out: Record<string, unknown> = {
       ...r,
       series,
       // Says which ledger the series came from, so a reader never has to guess
-      // whether a number is billed units or HTTP calls.
-      series_unit: useCalls ? 'calls' : 'units',
+      // whether a number is billed units or HTTP calls — the two differ on
+      // batch, where one call bills a hundred. 'mixed' is what the per-month
+      // fallback can now produce, and naming it is the whole point: mixing the
+      // units silently is what would make two customers incomparable.
+      series_unit: fromQuota && fromCalls ? 'mixed' : fromCalls ? 'calls' : 'units',
     };
     // Only when the quota ledger has nothing to say, so a monthly key keeps its
     // own answer.

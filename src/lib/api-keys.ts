@@ -520,6 +520,36 @@ export function checkAndIncrementQuota(
   };
 }
 
+/**
+ * Count a call against this key's month WITHOUT testing any ceiling.
+ *
+ * 🚨 An observation counter, not a quota. A credit key never passes through
+ * `checkAndIncrementQuota` — the middleware takes the `decrementCredits` branch
+ * — so `api_usage` held nothing for it and every aggregate built on that ledger
+ * (the CRM's months_by_key, the monthly sparkline, "how much did this customer
+ * consume in July") read a paying customer as one who had never called.
+ *
+ * Why a separate function rather than a flag on `checkAndIncrementQuota`: that
+ * one's job is to REFUSE, and a credit key's monthly_limit is NULL, which falls
+ * back to DEFAULT_MONTHLY_LIMIT. One future reader away from capping a
+ * 5,000-credit pack at 200 calls a month. There is no ceiling here to be
+ * misread — no limit, no refusal, no notice threshold, no mail. The balance is
+ * still the only thing that can turn a credit call away, and it is debited
+ * exactly once, by decrementCredits.
+ *
+ * Returns the month the units landed on, so a 4xx refund crossing midnight on
+ * the 1st decrements the row it incremented and not the fresh one.
+ */
+export function recordMonthlyObservation(keyHash: string, units = 1): string {
+  const db = getStatsDB();
+  const month = new Date().toISOString().slice(0, 7);
+  db.prepare(
+    'INSERT INTO api_usage (key_hash, month, count) VALUES (?, ?, 0) ON CONFLICT(key_hash, month) DO NOTHING',
+  ).run(keyHash, month);
+  db.prepare('UPDATE api_usage SET count = count + ? WHERE key_hash = ? AND month = ?').run(units, keyHash, month);
+  return month;
+}
+
 export function getUsage(
   keyHash: string,
   monthlyLimit: number = DEFAULT_MONTHLY_LIMIT,
