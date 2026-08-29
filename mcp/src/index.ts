@@ -125,7 +125,7 @@ const TOOLS: Tool[] = [
               type: 'string',
               enum: ['national_register', 'curated_map', 'directory_prefix'],
               description:
-                'Where the bank code to BIC pairing came from. national_register: the country register publishes this BIC for this bank code (today DE, Bundesbank Bankleitzahlendatei) — settlement-grade. curated_map: our maintained map, exact key, not an allocation record. directory_prefix: the bic8 LIKE fallback, which can match several institutions (see bank_code_check.candidates). Outside national_register the BIC is ADVISORY.',
+                'Where the bank code to BIC pairing came from. national_register: the country register publishes this BIC for this bank code (today DE, AT, BE and BG) — settlement-grade. curated_map: our maintained map, exact key, not an allocation record. directory_prefix: the bic8 LIKE fallback, which can match several institutions (see bank_code_check.candidates). Outside national_register the BIC is ADVISORY.',
             },
             authoritative: {
               type: 'boolean',

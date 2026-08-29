@@ -110,3 +110,52 @@ describe('the four registers keep their separate meanings', () => {
     expect(r.bank_code_check?.authoritative).toBe(false);
   });
 });
+
+/**
+ * The register BIC, served and labelled.
+ *
+ * Both tables have carried a BIC per bank code since they were seeded, and
+ * until 29/08/2026 it was read only for the bank-code verdict while the served
+ * BIC still came from the composite map. The IBANs below pin the measured cost
+ * of that split: retired pairings served as truth, and an EMI resolving to
+ * nothing while its BIC sat in our own database.
+ */
+describe('the register BIC wins the served pairing', () => {
+  it.skipIf(noBE)('serves the register BIC where the composite map was stale', () => {
+    // BE 679 belongs to BNP Paribas Fortis; the composite map still said bpost,
+    // its predecessor on the code.
+    const r = check('BE11679123456748');
+    expect(r.bic?.code).toBe('GEBABEBB');
+    expect(r.bic?.basis).toBe('national_register');
+    expect(r.bic?.authoritative).toBe(true);
+    expect(r.bic?.source).toMatch(/Banque nationale de Belgique/);
+  });
+
+  it.skipIf(noBE)('gives an EMI the BIC the register publishes for it', () => {
+    // bunq's Belgian branch: no curated key, and a numeric bank code means the
+    // directory prefix fallback is structurally empty. Before the register BIC
+    // was served, this IBAN resolved to nothing.
+    const r = check('BE79167123456733');
+    expect(r.bic?.code).toBe('BUNQBEB2');
+    expect(r.bic?.basis).toBe('national_register');
+  });
+
+  it.skipIf(noAT)('replaces the retired Austrian pairing', () => {
+    // AT 19510: the register says Liechtensteinische Landesbank (Österreich);
+    // the composite map still said Zürcher Kantonalbank Österreich.
+    const r = check('AT711951000001234567');
+    expect(r.bic?.code).toBe('COPRATWW');
+    expect(r.bic?.basis).toBe('national_register');
+    expect(r.bic?.authoritative).toBe(true);
+  });
+
+  it.skipIf(noBE)('keeps the verdict without inventing a BIC for a row that has none', () => {
+    // BE 102 is allocated — the register names its holder — but publishes no
+    // BIC, and the composite map has no key for it either. Existence and BIC
+    // availability stay separate answers, which is the whole point of the
+    // bank_code_check block.
+    const r = check('BE02102123456740');
+    expect(r.bank_code_check?.status).toBe('verified');
+    expect(r.bic).toBeNull();
+  });
+});

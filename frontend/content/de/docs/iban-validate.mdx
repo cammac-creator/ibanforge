@@ -158,7 +158,7 @@ POST https://api.ibanforge.com/v1/iban/validate
 | `code` | `string` | BIC/SWIFT-Code (8 Zeichen) |
 | `bank_name` | `string \| null` | Name des Finanzinstituts |
 | `city` | `string \| null` | Stadt des Instituts |
-| `basis` | `string` | Woher die Zuordnung Bankcode → BIC stammt. `national_register` — das nationale Register des Landes veröffentlicht diesen BIC für diesen Bankcode (heute DE, über die Bankleitzahlendatei der Bundesbank); `curated_map` — unsere gepflegte Bankcode-Karte, ein exakter Schlüssel und kein Vergabeakt; `directory_prefix` — der BIC-Präfix-Rückfall, der mehrere Institute treffen kann (siehe `bank_code_check.candidates`) |
+| `basis` | `string` | Woher die Zuordnung Bankcode → BIC stammt. `national_register` — das nationale Register des Landes veröffentlicht diesen BIC für diesen Bankcode (heute DE, AT, BE und BG); `curated_map` — unsere gepflegte Bankcode-Karte, ein exakter Schlüssel und kein Vergabeakt; `directory_prefix` — der BIC-Präfix-Rückfall, der mehrere Institute treffen kann (siehe `bank_code_check.candidates`) |
 | `authoritative` | `boolean` | Ob dieser BIC gespeichert und zur Abwicklung verwendet werden darf. Aus `basis` abgeleitet, `true` nur bei `national_register`. Siehe den Abschnitt „Abwickeln oder nur als Hinweis behandeln?" unten |
 
 **`sepa`-Objekt:**
@@ -221,7 +221,7 @@ POST https://api.ibanforge.com/v1/iban/validate
 
 Der BIC in der Antwort ist aus dem Bankcode der IBAN **abgeleitet**, und was diese Ableitung wert ist, hängt vollständig davon ab, was sie erzeugt hat. `bic.basis` sagt, welche Quelle es war, und `bic.authoritative` macht daraus den einen booleschen Wert, auf den eine Zahlungsverarbeitung verzweigen kann:
 
-- **`basis: "national_register"`, `authoritative: true`** — das nationale Register des Landes veröffentlicht diesen BIC für diesen Bankcode. Heute ist das **Deutschland**: Die Bankleitzahlendatei der Bundesbank führt den exakten 11-stelligen BIC je BLZ. Dasselbe Register ist der Grund, weshalb eine deutsche Sparkasse zu ihrem eigenen BIC auflöst und nicht zum BIC8 der gemeinsamen Landesbank — das Feld benennt diese Zuordnung, es erzeugt sie nicht. Speicherbar und zur Abwicklung geeignet.
+- **`basis: "national_register"`, `authoritative: true`** — das nationale Register des Landes veröffentlicht diesen BIC für diesen Bankcode. Heute sind das **Deutschland, Österreich, Belgien und Bulgarien**: Die Bankleitzahlendatei der Bundesbank führt den exakten 11-stelligen BIC je BLZ, und die Register der OeNB, der Belgischen Nationalbank sowie das BAE-Register der Bulgarischen Nationalbank veröffentlichen den BIC des Instituts je Bankcode. Das deutsche Register ist der Grund, weshalb eine Sparkasse zu ihrem eigenen BIC auflöst und nicht zum BIC8 der gemeinsamen Landesbank — das Feld benennt diese Zuordnung, es erzeugt sie nicht. Speicherbar und zur Abwicklung geeignet.
 - **`basis: "curated_map"`, `authoritative: false`** — unsere eigene gepflegte Bankcode-Karte hat die Zuordnung über einen exakten Schlüssel hergestellt. Meistens richtig und kein Vergabeakt: Keine Behörde steht dahinter.
 - **`basis: "directory_prefix"`, `authoritative: false`** — der BIC-Präfix-Rückfall. Er kann mehrere Institute gleichzeitig treffen; `bank_code_check.candidates` sagt wie viele, und `next_steps` meldet `bic_is_advisory`, sobald es mehr als eines ist.
 

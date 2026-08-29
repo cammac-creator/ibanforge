@@ -158,7 +158,7 @@ POST https://api.ibanforge.com/v1/iban/validate
 | `code` | `string` | Code BIC/SWIFT (8 caracteres) |
 | `bank_name` | `string \| null` | Nom de l'etablissement financier |
 | `city` | `string \| null` | Ville de l'etablissement |
-| `basis` | `string` | D'où vient l'appariement code banque → BIC. `national_register` — le registre national du pays publie ce BIC pour ce code banque (aujourd'hui DE, via la Bankleitzahlendatei de la Bundesbank) ; `curated_map` — notre carte de codes banque maintenue, une clé exacte et non un acte d'attribution ; `directory_prefix` — le repli par préfixe de BIC, qui peut correspondre à plusieurs établissements (voir `bank_code_check.candidates`) |
+| `basis` | `string` | D'où vient l'appariement code banque → BIC. `national_register` — le registre national du pays publie ce BIC pour ce code banque (aujourd'hui DE, AT, BE et BG) ; `curated_map` — notre carte de codes banque maintenue, une clé exacte et non un acte d'attribution ; `directory_prefix` — le repli par préfixe de BIC, qui peut correspondre à plusieurs établissements (voir `bank_code_check.candidates`) |
 | `authoritative` | `boolean` | Ce BIC peut-il être stocké et servir à régler. Dérivé de `basis`, `true` uniquement pour `national_register`. Voir la section « Régler contre ce BIC, ou le traiter comme indicatif ? » ci-dessous |
 
 **Objet `sepa` :**
@@ -221,7 +221,7 @@ POST https://api.ibanforge.com/v1/iban/validate
 
 Le BIC de la réponse est **dérivé** du code banque que porte l'IBAN, et ce que vaut cette dérivation dépend entièrement de ce qui l'a produite. `bic.basis` dit laquelle, et `bic.authoritative` en tire le seul booléen sur lequel un moteur de paiement peut brancher :
 
-- **`basis: "national_register"`, `authoritative: true`** — le registre national du pays publie ce BIC pour ce code banque. Aujourd'hui, c'est l'**Allemagne** : la Bankleitzahlendatei de la Bundesbank porte le BIC exact à 11 caractères par BLZ. C'est ce même registre qui fait qu'une Sparkasse allemande se résout vers son propre BIC et non vers le BIC8 de la Landesbank partagée — le champ nomme cet appariement, il ne le crée pas. Stockable, et utilisable pour régler.
+- **`basis: "national_register"`, `authoritative: true`** — le registre national du pays publie ce BIC pour ce code banque. Aujourd'hui, ce sont l'**Allemagne, l'Autriche, la Belgique et la Bulgarie** : la Bankleitzahlendatei de la Bundesbank porte le BIC exact à 11 caractères par BLZ, et les registres de l'OeNB, de la Banque nationale de Belgique et le registre BAE de la Banque nationale bulgare publient le BIC de l'établissement par code banque. C'est le registre allemand qui fait qu'une Sparkasse se résout vers son propre BIC et non vers le BIC8 de la Landesbank partagée — le champ nomme cet appariement, il ne le crée pas. Stockable, et utilisable pour régler.
 - **`basis: "curated_map"`, `authoritative: false`** — c'est notre propre carte de codes banque qui a fait l'appariement, sur une clé exacte. Juste la plupart du temps, et ce n'est pas un acte d'attribution : aucune autorité ne le garantit.
 - **`basis: "directory_prefix"`, `authoritative: false`** — le repli par préfixe de BIC. Il peut correspondre à plusieurs établissements à la fois ; `bank_code_check.candidates` dit combien, et `next_steps` lève `bic_is_advisory` dès qu'ils sont plus d'un.
 

@@ -521,10 +521,11 @@ function safeReferenceAsOf(): string {
  * two halves of the same object contradicting each other on the exact point at
  * issue. A derived boolean cannot do that.
  *
- * Only the national register is true today, and the flat answer "advisory
- * outside DE" is worth more than a field that flatters the other two. Adding a
- * country here means its register publishes the BIC per bank code AND that we
- * read it — not that our pairing happens to agree with one.
+ * Only the national register is true today — served for DE, AT, BE and BG —
+ * and the flat answer "advisory outside a register" is worth more than a field
+ * that flatters the other two. Adding a country here means its register
+ * publishes the BIC per bank code AND that we read it — not that our pairing
+ * happens to agree with one.
  */
 const BIC_BASIS_IS_AUTHORITATIVE: Record<BicBasis, boolean> = {
   national_register: true,
@@ -617,6 +618,38 @@ export function enrichResult(result: IBANValidationResult): void {
     }
   }
 
+  // Austria and Belgium: the same rule as Germany, one register over. Both
+  // tables have carried a BIC per bank code since they were seeded, and until
+  // now it was read only for the bank-code verdict while the served BIC still
+  // came from the composite map. Measured against the registers on 29/08/2026,
+  // that split kept three retired pairings in circulation (two Belgian, one
+  // Austrian) and resolved a dozen Belgian EMIs to nothing while their BIC sat
+  // in our own database. Register truth first; the composite stays as the
+  // fallback for the rows the register publishes without a BIC.
+  if (cc === 'AT' || cc === 'BE') {
+    try {
+      const reg = nationalRegisterAvailable(cc) ? lookupNationalCode(cc, bankCode) : null;
+      if (reg?.bic) {
+        result.bic = {
+          code: reg.bic,
+          bank_name: reg.name,
+          // The OeNB publishes the seat, the NBB publishes names only — so
+          // Belgium takes its city from the directory row for the BIC the
+          // register named, the same division of labour the Bulgarian block
+          // below documents.
+          city: reg.town ?? lookup(`${reg.bic}XXX`)?.city ?? null,
+          source: NATIONAL_REGISTERS[cc],
+          as_of: getReferenceAsOf() || null,
+          // Same licence as the German block above: the register publishes
+          // this BIC per bank code, so the pairing is the register's, not ours.
+          ...bicProvenance('national_register'),
+        };
+      }
+    } catch {
+      lookupFailed = true;
+    }
+  }
+
   // Bulgaria: the register publishes the head-office BIC beside the BAE code,
   // so serve it over the composite fallback for the same reason Germany does.
   //
@@ -630,25 +663,37 @@ export function enrichResult(result: IBANValidationResult): void {
   // require the source to be cited, and a provenance written by hand beside a
   // value read from the database is how the two drift apart.
   if (cc === 'BG') {
-    const reg = lookupBgBankCode(bankCode);
-    if (reg?.bic) {
-      result.bic = {
-        code: reg.bic,
-        // Verbatim, in Cyrillic, as the register writes it. Transliterating
-        // would be the alteration its terms forbid.
-        bank_name: reg.name,
-        // The register publishes no town. Taken from the directory row for the
-        // BIC the register named — same division of labour the curated map
-        // documents: one source decides WHICH institution holds the code, the
-        // directory only supplies its details.
-        city: lookup(`${reg.bic}XXX`)?.city ?? null,
-        // The bare register name: the caveat NATIONAL_REGISTERS.BG carries is
-        // about the bank-code verdict, not about this BIC.
-        source: BG_REGISTER_NAME,
-        // Year-month, as this field is documented. The full effective date the
-        // licence attribution needs lives in bgAttribution().
-        as_of: reg.as_of.slice(0, 7),
-      };
+    try {
+      const reg = lookupBgBankCode(bankCode);
+      if (reg?.bic) {
+        result.bic = {
+          code: reg.bic,
+          // Verbatim, in Cyrillic, as the register writes it. Transliterating
+          // would be the alteration its terms forbid.
+          bank_name: reg.name,
+          // The register publishes no town. Taken from the directory row for the
+          // BIC the register named — same division of labour the curated map
+          // documents: one source decides WHICH institution holds the code, the
+          // directory only supplies its details.
+          city: lookup(`${reg.bic}XXX`)?.city ?? null,
+          // The bare register name: the caveat NATIONAL_REGISTERS.BG carries is
+          // about the bank-code verdict, not about this BIC.
+          source: BG_REGISTER_NAME,
+          // Year-month, as this field is documented. The full effective date the
+          // licence attribution needs lives in bgAttribution().
+          as_of: reg.as_of.slice(0, 7),
+          // The BAE register publishes the head-office BIC per bank code, the
+          // same licence the German and Austrian/Belgian blocks read out of
+          // BIC_BASIS_IS_AUTHORITATIVE. Written here rather than in the block
+          // that shipped it because the two branches landed in parallel.
+          ...bicProvenance('national_register'),
+        };
+      }
+    } catch {
+      // Same failure discipline as the register blocks above: a Bulgaria that
+      // cannot consult the BAE table has no opinion, and must not let the
+      // verdict below manufacture one out of the composite map.
+      lookupFailed = true;
     }
   }
 

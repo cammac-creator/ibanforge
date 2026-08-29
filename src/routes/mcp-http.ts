@@ -102,7 +102,7 @@ const BIC_BASIS_SCHEMA = z
   .optional()
   .describe(
     'Where the bank code to BIC pairing came from, and therefore what may be done with the BIC. ' +
-      'national_register (the country register publishes this BIC for this bank code — today DE, via the Bundesbank Bankleitzahlendatei; settlement-grade) | ' +
+      'national_register (the country register publishes this BIC for this bank code — today DE, AT, BE and BG; settlement-grade) | ' +
       'curated_map (our maintained bank-code map, exact key, usually right and not an allocation record) | ' +
       'directory_prefix (the bic8 LIKE fallback, which can match several institutions — read bank_code_check.candidates). ' +
       'Outside a national_register basis the BIC is ADVISORY: confirm it with the beneficiary or the bank before storing it as a routing instruction.',

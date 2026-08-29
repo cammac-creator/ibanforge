@@ -183,6 +183,11 @@ describe('validate answers Bulgaria from the register', () => {
     expect(r.bic?.bank_name).toBe('Примерна Банка АД');
     expect(r.bic?.source).toBe('Bulgarian National Bank, BAE register');
     expect(r.bic?.as_of).toBe(AS_OF.slice(0, 7));
+    // The pairing is the register's, so `basis` says so and `authoritative`
+    // follows from BIC_BASIS_IS_AUTHORITATIVE — the same labelling the German
+    // and Austrian/Belgian register blocks carry.
+    expect(r.bic?.basis).toBe('national_register');
+    expect(r.bic?.authoritative).toBe(true);
   });
 
   it('reports a bank code held by nobody as not allocated, with full weight', () => {
