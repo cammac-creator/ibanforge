@@ -1,4 +1,3 @@
-import { isAutomated } from './automated';
 import type { Contact, Message, Situation } from './types';
 
 /**
@@ -36,13 +35,10 @@ import type { Contact, Message, Situation } from './types';
  *
  * ## What decides, and what deliberately does not
  *
- * The same exclusions as situationOf, because this predicate must answer about
- * the very thread that put the ball in our court. Drafts are not
- * correspondence. A message with no readable date cannot be placed in the
- * thread, so it cannot be the last of anything. And automated inbound is
- * skipped: a ticket robot answering after a marked thank-you would otherwise
- * become "the last inbound", unmarked, and drag the thread back into the queue
- * — the exact defect automated.ts exists to prevent, wearing a third hat.
+ * Drafts are not correspondence, and a message with no readable date cannot be
+ * placed in the thread, so it cannot be the last of anything. Automated inbound
+ * DOES count, unlike in situationOf, and lastInboundMessage carries the whole
+ * reason why: the safe failure runs the other way once a marker is involved.
  *
  * A plain module with no directive, same as archived.ts, closed.ts and
  * buckets.ts, and for the same reason: the page is a Server Component, the mail
@@ -63,12 +59,32 @@ import type { Contact, Message, Situation } from './types';
  * makes every message of one day share an instant. Thread order is the order
  * build-contacts sorted them in and the order the drawer prints them in, so the
  * message chosen here is the last bubble the operator is looking at.
+ *
+ * ## Why automated inbound is NOT skipped here
+ *
+ * It was, on the reasoning that a ticket robot answering after a marked
+ * thank-you would become "the last inbound", unmarked, and drag the thread
+ * back into the queue. That reasoning is right about the noise and wrong about
+ * the risk, and the 30/08/2026 adversarial review built the case that settles
+ * it: isAutomated matches on TEXT, so a real customer whose mail opens "nous
+ * avons bien reçu votre message" before asking why production returns 500 is
+ * read as a robot. Skipping it here left the old marker standing, the thread
+ * out of « À répondre », out of « Relances » too — and nothing to bring it
+ * back. A false positive that used to cost a mislabelled row now cost the row
+ * itself.
+ *
+ * So the LAST datable inbound decides, robots included. The house rule chooses
+ * for us and is written on archived.ts in the same words: a row shown that
+ * could have been hidden costs one glance, a row hidden that should have been
+ * shown is the failure this CRM exists to prevent. The noise this readmits has
+ * its own answer one file over — a sender rule marks a genuine robot's mail on
+ * arrival, so the thread it walks into is already quiet.
  */
 export function lastInboundMessage(c: Contact): Message | null {
   let best: Message | null = null;
   let bestAt = -Infinity;
   for (const m of c.messages) {
-    if (m.direction !== 'in' || isAutomated(m)) continue;
+    if (m.direction !== 'in') continue;
     if (!m.msg_date) continue;
     const at = new Date(m.msg_date).getTime();
     if (Number.isNaN(at) || at < bestAt) continue;

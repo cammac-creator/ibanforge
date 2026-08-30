@@ -1,3 +1,4 @@
+import { lastInboundNeedsNoReply } from './no-reply';
 import type { Contact, Situation } from './types';
 
 /**
@@ -83,7 +84,13 @@ export function heatOf(c: Contact, s: Situation | undefined): Heat {
     prev7: callsIn(c, 14, 7),
     messageCount: s?.messageCount ?? 0,
     silenceDays: s?.silenceDays ?? null,
-    ballWithUs: s?.ballInCourt === 'us',
+    // Same question buckets.ts ballWithUs answers, and it has to be answered
+    // the same way: the situation alone still says "they spoke last" about a
+    // thank-you the operator has marked, so heat kept adding « Il attend ta
+    // réponse » directly above a drawer band saying there was nothing to do.
+    // heatFromFacts is untouched — its field already means "are they waiting on
+    // us", it is this caller that was computing the fact wrong.
+    ballWithUs: s?.ballInCourt === 'us' && !lastInboundNeedsNoReply(c),
   });
 }
 

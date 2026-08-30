@@ -194,20 +194,38 @@ describe('no-reply senders — the standing rule', () => {
     expect(await sender('', true)).toBe(400);
   });
 
+  it('refuses a rule on an address a person could write from', async () => {
+    // The door the 30/08/2026 review closed. A standing rule marks mail nobody
+    // has read yet: accepted on an ordinary correspondent, it stamped his next
+    // real question as needing no answer and took the thread out of every
+    // queue. A desk address is refused too — support@ answers with a human
+    // often enough — and the per-message gesture remains available for both.
+    expect(await sender('ops@alpha.example.net', true)).toBe(422);
+    expect(await sender('support@alpha.example.net', true)).toBe(422);
+    expect(await sender('no-reply@alpha.example.net', true)).toBe(200);
+    expect(await sender('mailer-daemon@alpha.example.net', true)).toBe(200);
+  });
+
+  it('always allows REMOVING a rule, whatever the address looks like', async () => {
+    // An address that slipped in before the guard, or one whose shape we read
+    // wrong, must never be un-removable.
+    expect(await sender('ops@alpha.example.net', false)).toBe(200);
+  });
+
   it('stores lowercased and lists back', async () => {
-    expect(await sender(`  Ticket-BOT@Alpha.Example.NET `, true)).toBe(200);
+    expect(await sender(`  Notifications@Alpha.Example.NET `, true)).toBe(200);
     const res = await makeApp().request('/v1/admin/no-reply-senders', { headers: admin });
     const { senders } = (await res.json()) as { senders: Array<{ address: string }> };
-    expect(senders.some((s) => s.address === 'ticket-bot@alpha.example.net')).toBe(true);
+    expect(senders.some((s) => s.address === 'notifications@alpha.example.net')).toBe(true);
   });
 
   it('stamps the future inbound of a listed sender, whatever the case', async () => {
-    await sender(`ticket-bot@alpha.example.net`, true);
+    await sender(`notifications@alpha.example.net`, true);
     const marked = `nr-${RUN}-rule-in`;
     const other = `nr-${RUN}-rule-other`;
     await ingest([
       // Same mailbox, shouted: the comparison is on the whole address, folded.
-      { id: marked, customer_email: 'Ticket-Bot@Alpha.Example.net', direction: 'in', msg_date: '2026-08-04T08:00:00Z' },
+      { id: marked, customer_email: 'Notifications@Alpha.Example.net', direction: 'in', msg_date: '2026-08-04T08:00:00Z' },
       // A neighbour in the same domain must stay untouched — the exact case a
       // fragment rule would get wrong.
       { id: other, customer_email: 'ops@alpha.example.net', direction: 'in', msg_date: '2026-08-04T09:00:00Z' },
@@ -217,29 +235,29 @@ describe('no-reply senders — the standing rule', () => {
   });
 
   it('never stamps our own outbound or a draft', async () => {
-    await sender(`ticket-bot@alpha.example.net`, true);
+    await sender(`notifications@alpha.example.net`, true);
     const out = `nr-${RUN}-rule-out`;
     const draft = `nr-${RUN}-rule-draft`;
     await ingest([
-      { id: out, customer_email: 'ticket-bot@alpha.example.net', direction: 'out', msg_date: '2026-08-04T10:00:00Z' },
-      { id: draft, customer_email: 'ticket-bot@alpha.example.net', direction: 'draft', msg_date: '2026-08-04T11:00:00Z' },
+      { id: out, customer_email: 'notifications@alpha.example.net', direction: 'out', msg_date: '2026-08-04T10:00:00Z' },
+      { id: draft, customer_email: 'notifications@alpha.example.net', direction: 'draft', msg_date: '2026-08-04T11:00:00Z' },
     ]);
     expect(stored(out)).toBe(0);
     expect(stored(draft)).toBe(0);
   });
 
   it('stops stamping once the address is removed, and leaves past marks alone', async () => {
-    await sender(`ticket-bot@alpha.example.net`, true);
+    await sender(`notifications@alpha.example.net`, true);
     const before = `nr-${RUN}-rule-before`;
     await ingest([
-      { id: before, customer_email: 'ticket-bot@alpha.example.net', direction: 'in', msg_date: '2026-08-05T08:00:00Z' },
+      { id: before, customer_email: 'notifications@alpha.example.net', direction: 'in', msg_date: '2026-08-05T08:00:00Z' },
     ]);
     expect(stored(before)).toBe(1);
 
-    expect(await sender(`ticket-bot@alpha.example.net`, false)).toBe(200);
+    expect(await sender(`notifications@alpha.example.net`, false)).toBe(200);
     const after = `nr-${RUN}-rule-after`;
     await ingest([
-      { id: after, customer_email: 'ticket-bot@alpha.example.net', direction: 'in', msg_date: '2026-08-05T09:00:00Z' },
+      { id: after, customer_email: 'notifications@alpha.example.net', direction: 'in', msg_date: '2026-08-05T09:00:00Z' },
     ]);
     expect(stored(after)).toBe(0);
     // The old judgement was true about the message it was made on; withdrawing

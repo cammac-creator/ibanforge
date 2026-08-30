@@ -26,6 +26,7 @@ import { addAlias, listAliases, loadAliasMap, toCanonical } from '../lib/email-a
 import {
   listNoReplySenders,
   loadNoReplySenders,
+  isRuleEligibleSender,
   normalizeSenderAddress,
   setNoReplySender,
 } from '../lib/no-reply-senders.js';
@@ -913,7 +914,23 @@ apiKeys.post('/v1/admin/email-messages', async (c) => {
       // no_reply_needed is NOT part of EmailMessageInput on purpose: it is
       // computed here, so no ingester can mark a message by asking.
       const raw = r.customer_email.trim().toLowerCase();
-      const noReply = direction === 'in' && (noReplySenders.has(email) || noReplySenders.has(raw)) ? 1 : 0;
+      // `counterparty` is the address the message actually CAME FROM, and it is
+      // the one the operator sets a rule on — an acknowledgement arrives from
+      // no-reply@authority while the thread is filed under the desk we write
+      // to, so the two differ in precisely the case this rule exists for.
+      // Comparing only the thread key made the intended case never fire while
+      // the dangerous one (an ordinary human correspondent) always did; the
+      // 30/08/2026 review reproduced both halves. The thread key stays in the
+      // comparison for a direct correspondent, where the two are the same
+      // string. `direction === 'in'` is load-bearing here, not tidiness: the
+      // CRM writes OUR OWN sending mailbox into counterparty on outbound rows,
+      // and without the guard a rule could match our own address.
+      const from = normalizeSenderAddress(String(r.counterparty ?? ''));
+      const noReply =
+        direction === 'in' &&
+        (noReplySenders.has(email) || noReplySenders.has(raw) || (from !== '' && noReplySenders.has(from)))
+          ? 1
+          : 0;
       upsert.run({
         id: r.id.slice(0, 200),
         customer_email: email,
@@ -1060,6 +1077,20 @@ apiKeys.post('/v1/admin/no-reply-senders', async (c) => {
   }
   if (typeof body.value !== 'boolean') {
     return c.json({ error: 'invalid_body', message: 'value must be a boolean' }, 400);
+  }
+  // Setting a rule is refused on any address a person could write from; see
+  // isRuleEligibleSender for the case that closed this door. Removing one is
+  // always allowed — an address that slipped in before this guard, or one whose
+  // shape we read wrong, must never be un-removable.
+  if (body.value && !isRuleEligibleSender(address)) {
+    return c.json(
+      {
+        error: 'sender_not_eligible',
+        message:
+          'A standing rule marks mail nobody has read yet, so it is only accepted on addresses that are never a person (no-reply@, notifications@, mailer-daemon@ and the like). Mark this correspondent message by message instead.',
+      },
+      422,
+    );
   }
   setNoReplySender(address, body.value);
   return c.json({ address, value: body.value });

@@ -49,6 +49,20 @@ const ROBOT_SENDER =
   /^(no-?reply|do-?not-?reply|noreply|mailer-daemon|postmaster|bounces?|notifications?|automated)[@+]/i;
 
 /**
+ * Is this address one no human ever writes from?
+ *
+ * Exported because a second consumer needs the SAME judgement: the standing
+ * « rien à répondre » rule marks mail that has not been written yet, so it is
+ * only offered on an address that cannot carry a real question. Mirrored in
+ * src/lib/no-reply-senders.ts, which enforces it server-side — the two sides
+ * cannot import each other; keep them in step.
+ */
+export function isRobotAddress(address: string | null | undefined): boolean {
+  const a = (address ?? '').trim();
+  return a.includes('@') && !a.startsWith('@') && ROBOT_SENDER.test(a);
+}
+
+/**
  * Transactional formulas. Each one was taken from a message actually received,
  * or is the standard wording of the class that message belongs to, and each is
  * checked against the human replies in the same mailbox before being added.

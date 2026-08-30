@@ -121,15 +121,46 @@ describe('lastInboundNeedsNoReply — what the marker answers', () => {
 });
 
 describe('lastInboundNeedsNoReply — what may not clear a marker', () => {
-  it('a robot writing afterwards does not', () => {
-    // Without the isAutomated skip the ticket acknowledgement below becomes
-    // "the last inbound", unmarked, and drags the thread back into the queue
-    // the operator just emptied.
+  it('ANY unmarked inbound clears it, a robot included — the safe failure', () => {
+    // This assertion was the exact opposite until the 30/08/2026 review, which
+    // skipped automated inbound so a ticket acknowledgement could not drag a
+    // just-emptied thread back into the queue. The noise argument was right;
+    // the risk argument beat it. isAutomated matches on TEXT, so a real
+    // customer opening with "nous avons bien reçu votre message" before asking
+    // why production returns 500 reads as a robot — and skipping it left the
+    // OLD marker standing, the thread out of « À répondre », out of
+    // « Relances » too, with nothing to bring it back. A mislabelled row became
+    // a lost one.
+    //
+    // So: any unmarked inbound wins, and the noise it readmits is answered by
+    // the sender rule, which marks a genuine robot's mail on arrival.
     const c = authority([
       msg('in', daysAgo(5), { subject: 'Merci pour votre courrier', marked: true }),
       msg('in', daysAgo(4), { subject: 'Ticket #4471 has been created' }),
     ]);
+    expect(lastInboundNeedsNoReply(c)).toBe(false);
+  });
+
+  it('a marked robot keeps it, which is how the sender rule pays for the above', () => {
+    const c = authority([
+      msg('in', daysAgo(5), { subject: 'Merci pour votre courrier', marked: true }),
+      msg('in', daysAgo(4), { subject: 'Ticket #4471 has been created', marked: true }),
+    ]);
     expect(lastInboundNeedsNoReply(c)).toBe(true);
+  });
+
+  it('a human wrongly read as a robot brings the thread back', () => {
+    // The case that settled it, reproduced: the mail opens with a courtesy
+    // formula AUTO_MARKERS matches, then asks a real question.
+    const c = client([
+      msg('in', daysAgo(5), { subject: 'Merci !', marked: true }),
+      msg('in', daysAgo(1), {
+        subject: 'Erreur 500',
+        snippet:
+          'Bonjour, nous avons bien reçu votre message. En revanche notre integration renvoie 500 depuis hier en production.',
+      }),
+    ]);
+    expect(lastInboundNeedsNoReply(c)).toBe(false);
   });
 
   it('an undatable message does not, in either direction', () => {
@@ -177,15 +208,19 @@ describe('lastInboundMessage — the message the button marks', () => {
     expect(lastInboundNeedsNoReply(marked)).toBe(true);
   });
 
-  it('skips what cannot decide, so the button never marks a robot or a draft', () => {
-    const human = msg('in', daysAgo(6), { subject: 'Merci !' });
+  it('skips what cannot decide — a draft, an undatable row — but not a robot', () => {
+    // The robot IS eligible now, and the button marking it is the point rather
+    // than an accident: the sender rule aside, marking the acknowledgement by
+    // hand is how an operator quiets a thread whose last word is a machine.
+    // A draft and an undatable message stay out, as everywhere else in the CRM.
+    const robot = msg('in', daysAgo(5), { subject: 'This is an automated reply' });
     const c = client([
-      human,
-      msg('in', daysAgo(5), { subject: 'This is an automated reply' }),
+      msg('in', daysAgo(6), { subject: 'Merci !' }),
+      robot,
       msg('draft', daysAgo(4)),
       msg('in', null),
     ]);
-    expect(lastInboundMessage(c)).toBe(human);
+    expect(lastInboundMessage(c)).toBe(robot);
   });
 
   it('is null when there is nothing to mark', () => {

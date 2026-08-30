@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { isRobotAddress } from '@/lib/crm/automated';
 import { lastInboundMessage } from '@/lib/crm/no-reply';
 import type { Contact } from '@/lib/crm/types';
 
@@ -51,7 +52,14 @@ function senderOf(c: Contact, from: string | null): string | null {
   // one carrying null, and `??` would take the empty string as an answer and
   // then refuse to offer the rule at all.
   const address = (from || c.email || '').trim().toLowerCase();
-  return address.includes('@') ? address : null;
+  if (!address.includes('@')) return null;
+  // And only where no human can write from. The 30/08/2026 review reproduced
+  // what the fallback above costs without this line: a rule accepted on an
+  // ordinary correspondent stamped his NEXT message — a real production
+  // incident — as needing no answer, and the thread left every queue with
+  // nothing to bring it back. The API refuses such a rule too (422); refusing
+  // to OFFER it is what keeps the operator from meeting that refusal at all.
+  return isRobotAddress(address) ? address : null;
 }
 
 export function NoReplyControl({ contact: c }: { contact: Contact }) {
@@ -108,7 +116,7 @@ export function NoReplyControl({ contact: c }: { contact: Contact }) {
     }
   }
 
-  async function ruleForSender() {
+  async function ruleForSender(value: boolean = true) {
     if (!sender) return;
     setBusy(true);
     setFailed(null);
@@ -116,7 +124,7 @@ export function NoReplyControl({ contact: c }: { contact: Contact }) {
       const r = await fetch('/api/crm/no-reply-sender', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ address: sender, value: true }),
+        body: JSON.stringify({ address: sender, value }),
       });
       // Read on `ok` alone, and this is the weakest of the three readings here:
       // the endpoint's answer shape is not fixed by the contract, and a rule
@@ -126,7 +134,7 @@ export function NoReplyControl({ contact: c }: { contact: Contact }) {
         setFailed('la règle n’a pas été enregistrée');
         return;
       }
-      setRuleSet(true);
+      setRuleSet(value);
     } catch {
       setFailed('la règle n’a pas été enregistrée');
     } finally {
@@ -198,8 +206,21 @@ export function NoReplyControl({ contact: c }: { contact: Contact }) {
       {ruleSet && sender && (
         // status, not alert: the operator asked for this and is being told it
         // took, which is not an interruption.
+        //
+        // And it carries its own undo, which the per-message marker already had
+        // and this one did not — the wrong way round, since this is the gesture
+        // that reaches messages nobody has read yet. Session-scoped: it undoes
+        // the rule just accepted, which is when a mistake is noticed.
         <p role="status" className="mt-2 wrap-anywhere text-sky-300">
-          Règle enregistrée : les prochains messages de {sender} arriveront marqués.
+          Règle enregistrée : les prochains messages de {sender} arriveront marqués.{' '}
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void ruleForSender(false)}
+            className="cursor-pointer text-[var(--fg-3)] underline underline-offset-2 hover:text-[var(--fg-1)] disabled:cursor-default disabled:opacity-50"
+          >
+            retirer la règle
+          </button>
         </p>
       )}
 

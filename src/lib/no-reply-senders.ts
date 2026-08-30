@@ -24,6 +24,40 @@ export function normalizeSenderAddress(raw: string): string {
   return raw.trim().toLowerCase();
 }
 
+/**
+ * Addresses a standing rule may be set on: the ones that are never a person.
+ *
+ * Mirrors ROBOT_SENDER in frontend/lib/crm/automated.ts, duplicated for the
+ * same reason INTERNAL_EMAIL_RE mirrors the CRM's own pattern — the two sides
+ * cannot import each other — so keep them in step.
+ *
+ * ## Why the rule is refused on anything else
+ *
+ * A standing rule marks mail that has not been written yet, sight unseen. The
+ * 30/08/2026 adversarial review built the case on a live database: a rule
+ * accepted on an ordinary human correspondent stamped his NEXT message — a
+ * real "production returns 500, help" — as needing no answer, which took the
+ * thread out of « À répondre » and out of « Relances », with nothing left to
+ * bring it back. That is the defect automated.ts records as having ALREADY
+ * happened on this mailbox once ("filtering by sender would have thrown away
+ * the human reply"), and a persistent stamp is its worse form.
+ *
+ * Narrowing to addresses that are robots BY SHAPE closes it at the door
+ * instead of guarding every consumer: a desk address a human might one day
+ * answer from can still be marked message by message, which is the gesture
+ * this whole feature is about.
+ */
+const ROBOT_SENDER =
+  /^(no-?reply|do-?not-?reply|noreply|mailer-daemon|postmaster|bounces?|notifications?|automated)[@+]/i;
+
+export function isRuleEligibleSender(rawAddress: string): boolean {
+  const address = normalizeSenderAddress(rawAddress);
+  // An address without a mailbox part is not an address, and a fragment must
+  // never reach the store: see the file note.
+  if (!address.includes('@') || address.startsWith('@')) return false;
+  return ROBOT_SENDER.test(address);
+}
+
 export function listNoReplySenders(): Array<{ address: string; created_at: string }> {
   return getStatsDB()
     .prepare('SELECT address, created_at FROM no_reply_senders ORDER BY created_at DESC')
