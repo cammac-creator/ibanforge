@@ -912,6 +912,10 @@
     }
   },
   "agents": {
+    "meta": {
+      "title": "MCP Server for IBAN Validation — 7 tools, no signup",
+      "description": "Integrate IBANforge in 60 seconds — Claude Desktop, Cursor, Cline. Native MCP server with 7 tools. Free API key (200 req/month, no credit card). Pay-per-call in USDC via x402 on Base L2 — agents pay autonomously."
+    },
     "eyebrow": "For AI Agents",
     "hero": {
       "title": "Built for autonomous agents.",

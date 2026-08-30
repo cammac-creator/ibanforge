@@ -2,7 +2,7 @@
 
 > Pre-payout screening for AI agents — check the bank behind a counterparty IBAN before you send funds. IBAN validation, BIC/SWIFT lookup, Swiss clearing (BC-Nummer / QR-IID / SIX BankMaster — full payment-rail participation, the deepest Swiss clearing data in any public API), EMI/vIBAN classification, SEPA Instant + VoP reachability, and sanctions + risk scoring — exposed natively over MCP and x402 micropayments, no API-key signup required.
 
-121k+ BIC entries (39k+ LEI-enriched via GLEIF) · 1,100+ Swiss BC-Nummern (SIX) · 89 countries · 85 EMI/vIBAN issuer classifications — live counts at https://api.ibanforge.com/llms.txt
+121k+ BIC entries (39k+ LEI-enriched via GLEIF) · 1,100+ Swiss BC-Nummern (SIX) · 89 countries · 900+ non-bank issuer classifications (EMI, payment institutions, digital banks) — live counts at https://api.ibanforge.com/llms.txt
 
 ## Data sources and attribution
 

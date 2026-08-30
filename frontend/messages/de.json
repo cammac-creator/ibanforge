@@ -912,6 +912,10 @@
     }
   },
   "agents": {
+    "meta": {
+      "title": "MCP-Server für IBAN-Prüfung — 7 Tools, ohne Anmeldung",
+      "description": "IBANforge in 60 Sekunden einbinden — Claude Desktop, Cursor, Cline. Nativer MCP-Server mit 7 Tools. Kostenloser API-Schlüssel (200 Anfragen/Monat, ohne Kreditkarte). Bezahlung pro Aufruf in USDC über x402 auf Base L2 — Agenten zahlen eigenständig."
+    },
     "eyebrow": "Für KI-Agenten",
     "hero": {
       "title": "Für autonome Agenten gebaut.",

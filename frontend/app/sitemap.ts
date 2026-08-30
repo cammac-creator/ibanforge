@@ -25,6 +25,18 @@ export default function sitemap(): MetadataRoute.Sitemap {
       { url: `${prefix}/pricing`, lastModified: now, changeFrequency: "monthly", priority: 0.7 },
       { url: `${prefix}/openapi`, lastModified: now, changeFrequency: "monthly", priority: 0.7 },
       { url: `${prefix}/blog`, lastModified: now, changeFrequency: "weekly", priority: 0.6 },
+      // The trust pages. Written, true, linked from the footer, carrying no
+      // noindex — and absent from this hand-kept list, so a crawler that starts
+      // from the sitemap rather than from the links never sees them. Low
+      // priority on purpose: they are the answer to "can I buy from these
+      // people", read once by someone already deciding, not pages we compete on.
+      { url: `${prefix}/changelog`, lastModified: now, changeFrequency: "weekly", priority: 0.5 },
+      { url: `${prefix}/status`, lastModified: now, changeFrequency: "daily", priority: 0.5 },
+      { url: `${prefix}/legal/terms`, lastModified: now, changeFrequency: "yearly", priority: 0.4 },
+      { url: `${prefix}/legal/privacy`, lastModified: now, changeFrequency: "yearly", priority: 0.4 },
+      { url: `${prefix}/legal/dpa`, lastModified: now, changeFrequency: "yearly", priority: 0.4 },
+      { url: `${prefix}/legal/imprint`, lastModified: now, changeFrequency: "yearly", priority: 0.4 },
+      { url: `${prefix}/legal/sla`, lastModified: now, changeFrequency: "yearly", priority: 0.4 },
     );
 
     // Doc pages

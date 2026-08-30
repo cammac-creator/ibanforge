@@ -7,11 +7,32 @@ import { Badge } from "@/components/ui/badge";
 import { EndpointRow } from "@/components/ui/endpoint-row";
 import { StatusDot } from "@/components/ui/status-dot";
 
-export const metadata: Metadata = {
-  title: "For AI Agents — IBANforge MCP + x402 + free API key",
-  description:
-    "Integrate IBANforge in 60 seconds — Claude Desktop, Cursor, Cline. Native MCP server with 5 tools. Free API key (200 req/month, no credit card). Pay-per-call in USDC via x402 on Base L2 — agents pay autonomously.",
-};
+/**
+ * Translated, and correct about what we ship.
+ *
+ * The static `metadata` this replaces said "Native MCP server with 5 tools" in
+ * English on all three locales, while the body of this very page said seven,
+ * in the reader's own language, at six places. The meta line is the one a
+ * search engine quotes and an assistant summarises, so the only sentence a
+ * machine repeated about the page under-sold the product by two tools and
+ * served English to a French or German reader. `export const metadata` cannot
+ * read the locale — that is the whole reason the drift was possible — so this
+ * follows the generateMetadata + getTranslations pattern already in place on
+ * vendors, compare and sources.
+ *
+ * The title now names the question rather than the audience ("MCP Server for
+ * IBAN Validation" rather than "For AI Agents"), because that is what someone
+ * types when they are looking for exactly what this page is.
+ */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: "agents" });
+  return { title: t("meta.title"), description: t("meta.description") };
+}
 
 const MCP_CLAUDE_DESKTOP_JSON = `{
   "mcpServers": {

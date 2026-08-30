@@ -652,9 +652,19 @@ apiKeys.get('/v1/admin/keys', (c) => {
   // credits delta stays the source for a credit key rather than the api_usage
   // sum, because it is complete: it covers the months that predate the
   // observation counter, which api_usage will never hold.
+  //
+  // AND `source`, WHICH NOBODY COULD READ
+  //
+  // The attribution column has existed since the 06/08/2026 campaign: db.ts adds
+  // it, the key-generation route writes it from the `?src=` the signup dialog
+  // forwards. It was never in this SELECT, so no surface could read it, and the
+  // only question the whole campaign existed to answer — which surface produces
+  // the arrivals — had no instrument, for twenty-four days, while the data
+  // accumulated in the table. An instrument that is built and never wired up
+  // reads exactly like one that was never built: silence.
   const rows = db.prepare(
     `SELECT k.key_hash, k.key_prefix, k.email, k.monthly_limit, k.active, k.created_at,
-            k.credits_total, k.credits_remaining, k.issued_by_us,
+            k.credits_total, k.credits_remaining, k.issued_by_us, k.source,
             CASE WHEN k.stripe_session_id IS NOT NULL THEN 1 ELSE 0 END AS paid,
             COALESCE(u.count, 0) AS used,
             COALESCE(p.count, 0) AS used_prev,

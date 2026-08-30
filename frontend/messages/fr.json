@@ -912,6 +912,10 @@
     }
   },
   "agents": {
+    "meta": {
+      "title": "Serveur MCP de validation d’IBAN — 7 outils, sans inscription",
+      "description": "Intégrez IBANforge en 60 secondes — Claude Desktop, Cursor, Cline. Serveur MCP natif à 7 outils. Clé API gratuite (200 requêtes/mois, sans carte). Paiement à l’appel en USDC via x402 sur Base L2 : un agent paie sans compte."
+    },
     "eyebrow": "Pour les agents IA",
     "hero": {
       "title": "Conçu pour les agents autonomes.",
