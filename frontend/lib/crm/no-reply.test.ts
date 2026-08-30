@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { lastInboundMessage, lastInboundNeedsNoReply } from './no-reply';
+import { lastInboundMessage, lastInboundNeedsNoReply, noReplyHolds } from './no-reply';
 import { ballWithUs, followupDue, neverContacted } from './buckets';
 import { situationOf } from './situation';
 import type { Contact, Message } from './types';
@@ -190,6 +190,35 @@ describe('lastInboundMessage — the message the button marks', () => {
 
   it('is null when there is nothing to mark', () => {
     expect(lastInboundMessage(client([msg('out', daysAgo(2))]))).toBeNull();
+  });
+});
+
+describe('noReplyHolds — is the marker doing work right now', () => {
+  const thanked = [
+    msg('out', daysAgo(12), { subject: 'Ta clé' }),
+    msg('in', daysAgo(11), { subject: 'Merci !', marked: true }),
+  ];
+
+  it('is true while the marker is the only thing keeping the thread out of the queue', () => {
+    const c = client(thanked);
+    expect(noReplyHolds(c, situationOf(c.messages, TODAY))).toBe(true);
+  });
+
+  it('is false once we have written back, where the raw predicate stays true', () => {
+    // The distinction the two functions exist for. The marker still belongs to
+    // their message — answering does not un-say what they said — but the row
+    // is now waiting on them like any other, so nothing needs explaining and a
+    // badge here would read as "done" rather than as a reason.
+    const c = client([...thanked, msg('out', daysAgo(10), { subject: 'Avec plaisir' })]);
+    expect(lastInboundNeedsNoReply(c)).toBe(true);
+    expect(noReplyHolds(c, situationOf(c.messages, TODAY))).toBe(false);
+  });
+
+  it('is false with no situation at all', () => {
+    // The page builds one entry per contact id, so an absent one is a
+    // programming error rather than data — and a surface that explains nothing
+    // beats one that explains the wrong thing.
+    expect(noReplyHolds(client(thanked), undefined)).toBe(false);
   });
 });
 

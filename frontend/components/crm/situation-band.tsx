@@ -25,13 +25,43 @@ const BALL = {
   none: { label: 'Jamais contacté', fg: '#a1a1aa', bg: '#27272a', border: '#3f3f46' },
 } as const;
 
-export function SituationBand({ situation: s, kind }: { situation: Situation; kind?: Contact['kind'] }) {
-  const b = BALL[s.ballInCourt];
+/**
+ * The fourth presentation, and the only one that is not a ball state.
+ *
+ * Their message IS the last one, so `ballInCourt` says 'us' and says it
+ * correctly — but the operator has answered the question the band asks by
+ * declaring that message needs no answer. Left alone, the band would shout
+ * « ⚠ À TOI DE JOUER » in red and « Il attend ta réponse » in the same panel
+ * as a pressed « Rien à répondre » button and the sentence saying the thread
+ * has left the queue. That is the defect situation.ts already names in its own
+ * words — one screen, two vocabularies — and the coloured band is the half
+ * that wins.
+ *
+ * Sky, the colour the list badge wears, so the two surfaces say one thing in
+ * one tone.
+ */
+const NO_REPLY = { label: 'RIEN À RÉPONDRE', fg: '#7dd3fc', bg: '#0c4a6e33', border: '#0c4a6e' } as const;
+
+export function SituationBand({
+  situation: s,
+  kind,
+  noReply = false,
+}: {
+  situation: Situation;
+  kind?: Contact['kind'];
+  /**
+   * Computed by the caller through noReplyHolds, never here: this component
+   * ships no JavaScript and holds no rule, and the list's badge reads the very
+   * same function so the drawer and the row cannot disagree.
+   */
+  noReply?: boolean;
+}) {
+  const b = noReply ? NO_REPLY : BALL[s.ballInCourt];
   // "Jamais contacté" is the prospecting word for the same fact, and this band
   // sits directly above a sheet that calls it a first written request. Nothing
   // else about the band changes: the ball, the silence and the counts are facts
   // about the thread, not about who is on the other end of it.
-  const ballLabel = kind === 'institution' && s.ballInCourt === 'none' ? 'Pas encore écrit' : b.label;
+  const ballLabel = !noReply && kind === 'institution' && s.ballInCourt === 'none' ? 'Pas encore écrit' : b.label;
   // A message sent today is not a silence, and "silence depuis 0 j" reads as a
   // bug. The thread below already carries the date of the last message.
   const silence = s.silenceDays !== null && s.silenceDays > 0 ? s.silenceDays : null;
@@ -61,7 +91,13 @@ export function SituationBand({ situation: s, kind }: { situation: Situation; ki
           {s.messageCount} message{s.messageCount > 1 ? 's' : ''}
         </span>
       </div>
-      <p className="mt-1.5 text-[12px] text-amber-300">→ {nextActionLabel(s.nextAction, kind)}</p>
+      {/* The action line goes calm with the band. Amber is the colour of
+          something owed today, and nothing is owed here. */}
+      {noReply ? (
+        <p className="mt-1.5 text-[12px] text-sky-300">→ Rien à faire : leur dernier message n’attend pas de réponse.</p>
+      ) : (
+        <p className="mt-1.5 text-[12px] text-amber-300">→ {nextActionLabel(s.nextAction, kind)}</p>
+      )}
     </div>
   );
 }

@@ -941,3 +941,52 @@ describe('the Correspondances filter', () => {
     expect(mailRows(waitingOnThem, 'dormant')).toHaveLength(0);
   });
 });
+
+/**
+ * « Rien à répondre » through the list, which is the only place the two halves
+ * of the promise meet: the row must LEAVE the reply queue and must STAY
+ * everywhere else. Both are asserted, because the comment on MailRow.noReply
+ * claims the second one and nothing else pins it — a marker that quietly
+ * removed a customer from « Clients » would be the failure this CRM exists to
+ * prevent, wearing the badge that says it is not happening.
+ */
+describe('a marked last inbound', () => {
+  const thanked: Contact = client('thanks@epsilon.example.net', 'Société Epsilon', [
+    message('out', 'Ta clé', 'Elle est prête', '2026-07-01'),
+    { ...message('in', 'Merci !', 'Parfait, merci beaucoup', '2026-07-02'), no_reply_needed: 1 },
+  ]);
+  const marked: RowsInput = {
+    contacts: [thanked],
+    situations: { 'thanks@epsilon.example.net': situation({ ballInCourt: 'us', silenceDays: 3, messageCount: 2 }) },
+    snoozed: {},
+  };
+
+  it('leaves « À répondre » and stays everywhere else', () => {
+    expect(mailRows(marked, 'reply')).toHaveLength(0);
+    expect(mailRows(marked, 'all').map((r) => r.id)).toEqual(['thanks@epsilon.example.net']);
+    expect(mailRows(marked, 'clients').map((r) => r.id)).toEqual(['thanks@epsilon.example.net']);
+  });
+
+  it('wears the badge that says why', () => {
+    expect(mailRows(marked, 'all')[0]?.noReply).toBe(true);
+  });
+
+  it('drops the badge once we have written back, since it would explain nothing', () => {
+    // The row is then waiting on them like any other. Read through the raw
+    // predicate the badge would stay lit for ever on a settled thread and read
+    // as "done" rather than as the reason a row is missing from a queue.
+    const answered: RowsInput = {
+      contacts: [
+        {
+          ...thanked,
+          messages: [...thanked.messages, message('out', 'Avec plaisir', 'Bonne continuation', '2026-07-03')],
+        },
+      ],
+      situations: {
+        'thanks@epsilon.example.net': situation({ ballInCourt: 'them', silenceDays: 2, messageCount: 3 }),
+      },
+      snoozed: {},
+    };
+    expect(mailRows(answered, 'all')[0]?.noReply).toBe(false);
+  });
+});

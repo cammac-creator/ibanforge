@@ -47,7 +47,10 @@ import type { Contact } from '@/lib/crm/types';
  * rule he cannot read before accepting is a rule he cannot refuse.
  */
 function senderOf(c: Contact, from: string | null): string | null {
-  const address = (from ?? c.email ?? '').trim().toLowerCase();
+  // `||` and not `??`: a row carrying an empty counterparty says no more than
+  // one carrying null, and `??` would take the empty string as an answer and
+  // then refuse to offer the rule at all.
+  const address = (from || c.email || '').trim().toLowerCase();
   return address.includes('@') ? address : null;
 }
 

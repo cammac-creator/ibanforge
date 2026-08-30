@@ -1,5 +1,5 @@
 import { isAutomated } from './automated';
-import type { Contact, Message } from './types';
+import type { Contact, Message, Situation } from './types';
 
 /**
  * Exchanges that will not go any further, and the one gesture that ends them.
@@ -88,4 +88,24 @@ export function lastInboundMessage(c: Contact): Message | null {
  */
 export function lastInboundNeedsNoReply(c: Contact): boolean {
   return lastInboundMessage(c)?.no_reply_needed === 1;
+}
+
+/**
+ * Whether the marker is doing work RIGHT NOW: they spoke last, so the thread
+ * would be in « À répondre », and the marker is the only thing keeping it out.
+ *
+ * The predicate above stays true after we write back, which is correct — the
+ * marker belongs to their message, and answering does not un-say what they
+ * said. But it is the wrong question for anything that EXPLAINS the queue. A
+ * thread where they thanked, we answered and we are now waiting on them would
+ * otherwise wear a badge saying "rien à répondre" over a row that is simply
+ * waiting, and the band would say it in a drawer whose thread ends with our own
+ * mail.
+ *
+ * One definition for both surfaces rather than the same conjunction written
+ * twice: the badge in the list and the band in the drawer are read in the same
+ * minute, on the same contact, and two copies of a rule are two rules.
+ */
+export function noReplyHolds(c: Contact, s: Situation | undefined): boolean {
+  return s?.ballInCourt === 'us' && lastInboundNeedsNoReply(c);
 }

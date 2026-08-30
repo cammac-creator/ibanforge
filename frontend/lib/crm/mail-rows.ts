@@ -3,7 +3,7 @@ import { ballWithUs, followupDue, neverContacted } from './buckets';
 import { isClosed } from './closed';
 import { chipOf, replyGroupOf, type BusinessChip, type ReplyGroup } from './business';
 import { heatOf } from './heat';
-import { lastInboundNeedsNoReply } from './no-reply';
+import { noReplyHolds } from './no-reply';
 import { nextActionLabel } from './situation';
 import type { Contact, Message, NextAction, Situation } from './types';
 
@@ -88,6 +88,11 @@ export interface MailRow {
    * why a thread whose last message is theirs is not in « À répondre » — the
    * Statut column still reads it off the situation, which knows nothing of the
    * marker, exactly as it still says « À répondre » on a closed dossier.
+   *
+   * Read through noReplyHolds and not through the raw predicate, so the badge
+   * means one thing: the marker is what is keeping this row out of the queue
+   * today. Once we have written back the row is waiting on them like any other
+   * and the badge would explain nothing while reading as "done".
    *
    * Not a filter key of its own, unlike `closed`. That gesture removes a
    * dossier for good and needed a retrieval chip, or closing a row would feel
@@ -300,7 +305,7 @@ function toRow(
     prospectId: c.sourcing?.prospectId ?? null,
     woke,
     closed: isClosed(c),
-    noReply: lastInboundNeedsNoReply(c),
+    noReply: noReplyHolds(c, s),
     confidence:
       c.sourcing?.confidence === 'high' || c.sourcing?.confidence === 'medium' || c.sourcing?.confidence === 'low'
         ? c.sourcing.confidence

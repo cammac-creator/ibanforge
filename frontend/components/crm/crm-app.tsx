@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { CLIENT_PARAM, contactIdFromParam } from '@/lib/crm/deep-link';
 import type { RowSelection } from '@/lib/crm/mail-rows';
 import { intentOf } from '@/lib/crm/intent';
+import { noReplyHolds } from '@/lib/crm/no-reply';
 import type { Contact, Message, Situation } from '@/lib/crm/types';
 import { ContactDetail, ContactIdentity } from './contact-header';
 import { ContactDrawer, type CloseReason } from './contact-drawer';
@@ -374,7 +375,7 @@ export function CrmApp({
             </div>
             {situation && (
               <div className="mt-3">
-                <SituationBand situation={situation} kind={shown.kind} />
+                <SituationBand situation={situation} kind={shown.kind} noReply={noReplyHolds(shown, situation)} />
               </div>
             )}
             {/* Pinned with the band, not scrolled with the thread: the whole
