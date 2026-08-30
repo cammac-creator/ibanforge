@@ -10,7 +10,7 @@ import {
   type MessageRow,
   type ProspectRow,
 } from './build-contacts';
-import { lastInboundNeedsNoReply } from './no-reply';
+import { lastInboundMessage, lastInboundNeedsNoReply } from './no-reply';
 import { warmAccount } from './sending-account';
 import type { Contact } from './types';
 
@@ -345,6 +345,33 @@ describe('buildContacts', () => {
     });
     expect(out[0].messages.at(-1)?.no_reply_needed).toBe(1);
     expect(lastInboundNeedsNoReply(out[0])).toBe(true);
+  });
+
+  /**
+   * The other half of the same carry, and the half with the nastier failure.
+   *
+   * NoReplyControl marks a message BY ID and returns null when it cannot find
+   * one: `if (!target || !targetId) return null`. So a projection that dropped
+   * `id` would not break the button, it would delete it — no error, no console,
+   * nothing in the drawer, and the report would read exactly like the report
+   * that a badly placed button produces. The two are indistinguishable from the
+   * operator's chair, which is why this one is pinned here rather than left to
+   * the shape.
+   */
+  it('carries the message id the marking gesture needs', () => {
+    const out = buildContacts({
+      ...base,
+      keys: [keyRow('thanks@example.net')],
+      messages: [
+        msgRow('thanks@example.net', {
+          id: 'msg-alpha-1',
+          direction: 'in',
+          msg_date: '2026-07-02T10:00',
+          subject: 'Merci !',
+        }),
+      ],
+    });
+    expect(lastInboundMessage(out[0])?.id).toBe('msg-alpha-1');
   });
 
   it('matches a mixed-case key email with its thread and its read marker', () => {
