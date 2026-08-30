@@ -76,9 +76,14 @@ const NATURE_META: Record<NatureKey, NatureMeta> = {
     gloss: 'appels portant une clé API — nos clients, la seule bande qui paie.',
   },
   agent: {
-    label: 'Agents IA (MCP)',
+    // No "(MCP)" in the label: this bucket is mcp_http PLUS mcp_stdio, and
+    // mcp_stdio is also where classifyClient files declared AI clients calling
+    // our plain REST surface (ChatGPT, Claude, Cursor, Cline and their kin).
+    // Naming a transport the traffic may not use would be a claim, and this
+    // card cannot afford one.
+    label: 'Clients IA',
     color: '#8b5cf6',
-    gloss: 'un assistant nous appelle via MCP, hébergé ou en npm, sans clé.',
+    gloss: 'appels pilotés par un assistant, sans clé — via MCP ou en REST direct.',
   },
   declared_bot: {
     label: 'Robots déclarés',
@@ -96,10 +101,14 @@ const NATURE_META: Record<NatureKey, NatureMeta> = {
     gloss: 'appels REST bruts sans clé : essais, scripts, sondes x402.',
   },
   internal: {
-    label: 'Nos tests',
+    // "Nos tests" was too narrow by half: the API's internal rule also files
+    // regrouped signup cohorts here — outside farms we bundled under one
+    // address, which are somebody else's traffic, not ours. Both belong in
+    // this band (neither is market signal) but the label has to cover both.
+    label: 'Hors marché',
     color: '#52525b',
     outlined: true,
-    gloss: 'notre propre cohorte de test — du volume, pas de la demande.',
+    gloss: 'nos sondes et audits, plus les fermes d’inscriptions regroupées — du volume, pas de la demande.',
   },
 };
 
@@ -328,7 +337,17 @@ export function TrafficTrendCard({ result }: { result: TrafficTrendResult }) {
                   allowDecimals={false}
                   // Same axis for the bars and the 404 line. No second axis:
                   // see the warning at the top of this file.
-                  tickFormatter={(v: number) => (v >= 1000 ? `${Math.round(v / 1000)}k` : String(v))}
+                  //
+                  // One decimal, and it is not decoration: rounding to the
+                  // nearest thousand put TWO different gridlines under the
+                  // label "2k" on the tick ladders this chart actually gets
+                  // (a 1,988 maximum yields 0 / 500 / 1k / 1.5k / 2k, and the
+                  // 1,500 line read "2k"). An axis that repeats a label is an
+                  // axis that cannot be read — on the very axis this card's
+                  // whole argument rests upon.
+                  tickFormatter={(v: number) =>
+                    v >= 1000 ? `${(v / 1000).toFixed(1).replace(/\.0$/, '')}k` : String(v)
+                  }
                 />
                 <Tooltip content={<TrendTooltip />} cursor={{ fill: '#27272a66' }} />
                 {NATURES.map((n) => (

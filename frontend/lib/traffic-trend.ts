@@ -62,22 +62,71 @@ export function naturesTotal(day: TrafficTrendDay): number {
   return sum;
 }
 
+/** A day nobody called on: drawn, at zero, rather than skipped. */
+function emptyDay(date: string): TrafficTrendDay {
+  return {
+    date,
+    total: 0,
+    with_key: 0,
+    agent: 0,
+    declared_bot: 0,
+    browser: 0,
+    anonymous_api: 0,
+    internal: 0,
+    not_found: 0,
+    paywall: 0,
+    server_error: 0,
+    distinct_ips: 0,
+  };
+}
+
 /**
- * The tail of the series covering the last `period` days.
+ * The last `period` days, ONE ROW PER CALENDAR DAY, quiet days included.
+ *
+ * Two rules in one function, and the second is the load-bearing one.
  *
  * Cut by calendar date counted back from today, never by taking the last N
  * rows: the route omits days with no traffic at all, so index slicing would
  * quietly reach further and further back the quieter the server gets — and it
- * would hand "7 jours" a window three weeks wide without saying so. If nothing
- * has been served for three days, the short window must look short.
+ * would hand "7 jours" a window three weeks wide without saying so.
+ *
+ * Then FILL. The route's series is sparse by design (see getTrafficTrend),
+ * recharts' X axis is categorical, and a categorical axis gives one equal slot
+ * per row it receives — so two rows ten days apart are drawn side by side, and
+ * the 404 line slopes gently between them across a stretch nothing ever
+ * measured. Measured on the real series: a 90-day window held barely a third
+ * as many rows as days, one pair of neighbouring bars sat nine days apart, and
+ * the line drew a falling 404 trend through the gap. That is this card's own
+ * lie, inverted: it exists so an isolated sweep cannot read as a wave of
+ * visitors, and a sparse axis made an isolated sweep read as a gradual climb.
+ *
+ * Filling here rather than in the route keeps the payload small and leaves
+ * getStatsHistory's shape untouched; filling here rather than in the component
+ * means the summary tiles, the peak and the chart all see the same days.
  */
 export function sliceToPeriod(
   days: TrafficTrendDay[],
   period: number,
   now: Date = new Date(),
 ): TrafficTrendDay[] {
+  const todayKey = dayKeyUTC(now.getTime());
   const floor = dayKeyUTC(now.getTime() - (period - 1) * DAY_MS);
-  return days.filter((d) => d.date >= floor).sort((a, b) => a.date.localeCompare(b.date));
+  const known = new Map<string, TrafficTrendDay>();
+  for (const d of days) {
+    // A day beyond today is a clock disagreement, not data: keep it rather
+    // than drop it, so the anomaly stays visible instead of vanishing.
+    if (d.date >= floor) known.set(d.date, d);
+  }
+  const out: TrafficTrendDay[] = [];
+  for (let i = 0; i < period; i++) {
+    const key = dayKeyUTC(now.getTime() - (period - 1 - i) * DAY_MS);
+    out.push(known.get(key) ?? emptyDay(key));
+    known.delete(key);
+  }
+  // Anything left is dated after today. Appended rather than discarded, for
+  // the reason above.
+  for (const d of known.values()) if (d.date > todayKey) out.push(d);
+  return out.sort((a, b) => a.date.localeCompare(b.date));
 }
 
 export interface TrendSummary {

@@ -80,13 +80,41 @@ describe('naturesTotal', () => {
 describe('sliceToPeriod', () => {
   const now = new Date('2026-08-30T11:00:00Z');
 
-  it('keeps today and the N-1 days before it', () => {
+  it('keeps today and the N-1 days before it, dropping what falls outside', () => {
     const days = ['2026-08-23', '2026-08-24', '2026-08-29', '2026-08-30'].map((d) => day(d, { browser: 1 }));
-    expect(sliceToPeriod(days, 7, now).map((d) => d.date)).toEqual([
+    const out = sliceToPeriod(days, 7, now);
+    expect(out).toHaveLength(7);
+    expect(out[0].date).toBe('2026-08-24');
+    expect(out[out.length - 1].date).toBe('2026-08-30');
+    // 08-23 is the eighth day back: outside the window, and gone.
+    expect(out.some((d) => d.date === '2026-08-23')).toBe(false);
+    expect(out.filter((d) => d.browser === 1).map((d) => d.date)).toEqual(['2026-08-24', '2026-08-29', '2026-08-30']);
+  });
+
+  it('draws one bar per calendar day, quiet days at zero', () => {
+    // The load-bearing rule. recharts' X axis is categorical: it gives one
+    // equal slot per row it receives, so a sparse series pushes two days ten
+    // apart against each other and lets the 404 line slope across a stretch
+    // nothing measured. Seven days asked for, seven rows out.
+    const days = [day('2026-08-24', { browser: 5, not_found: 5 }), day('2026-08-30', { browser: 5 })];
+    const out = sliceToPeriod(days, 7, now);
+    expect(out.map((d) => d.date)).toEqual([
       '2026-08-24',
+      '2026-08-25',
+      '2026-08-26',
+      '2026-08-27',
+      '2026-08-28',
       '2026-08-29',
       '2026-08-30',
     ]);
+    // The five filled days must be zero everywhere, not merely present: a
+    // filler carrying a stale 404 count would be worse than the gap.
+    for (const d of out.slice(1, 6)) {
+      expect(naturesTotal(d)).toBe(0);
+      expect(d.total).toBe(0);
+      expect(d.not_found).toBe(0);
+      expect(d.distinct_ips).toBe(0);
+    }
   });
 
   it('counts calendar days, not rows: a quiet stretch shortens the window', () => {
@@ -96,20 +124,34 @@ describe('sliceToPeriod', () => {
       ...['2026-07-01', '2026-07-02', '2026-07-03', '2026-07-04', '2026-07-05'].map((d) => day(d, { browser: 5 })),
       day('2026-08-30', { browser: 5 }),
     ];
-    expect(sliceToPeriod(days, 7, now).map((d) => d.date)).toEqual(['2026-08-30']);
+    const out = sliceToPeriod(days, 7, now);
+    expect(out).toHaveLength(7);
+    expect(out.filter((d) => d.total > 0).map((d) => d.date)).toEqual(['2026-08-30']);
+    expect(out.some((d) => d.date.startsWith('2026-07'))).toBe(false);
   });
 
   it('sorts by date, so an out-of-order payload cannot scramble the axis', () => {
     const days = [day('2026-08-30'), day('2026-08-28'), day('2026-08-29')];
-    expect(sliceToPeriod(days, 30, now).map((d) => d.date)).toEqual([
-      '2026-08-28',
-      '2026-08-29',
-      '2026-08-30',
-    ]);
+    const out = sliceToPeriod(days, 30, now);
+    const dates = out.map((d) => d.date);
+    expect([...dates].sort()).toEqual(dates);
+    expect(dates[dates.length - 1]).toBe('2026-08-30');
   });
 
-  it('returns nothing rather than throwing on an empty series', () => {
-    expect(sliceToPeriod([], 30, now)).toEqual([]);
+  it('still draws the window when the series is empty', () => {
+    // An empty payload is a quiet month, not a broken card: 30 bars at zero
+    // say "nothing was served", where nothing at all says "we do not know".
+    const out = sliceToPeriod([], 30, now);
+    expect(out).toHaveLength(30);
+    expect(out.every((d) => d.total === 0)).toBe(true);
+    expect(out[out.length - 1].date).toBe('2026-08-30');
+  });
+
+  it('keeps a future-dated row rather than swallowing it', () => {
+    // A row dated after today means the clocks disagree. Dropping it would
+    // hide the anomaly; the card would rather show something odd than lie.
+    const out = sliceToPeriod([day('2026-09-05', { browser: 3 })], 7, now);
+    expect(out.some((d) => d.date === '2026-09-05')).toBe(true);
   });
 });
 
