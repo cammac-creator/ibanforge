@@ -3,6 +3,7 @@ import { chipOf } from '@/lib/crm/business';
 import { heatOf } from '@/lib/crm/heat';
 import { AUTO_ENRICH } from '@/lib/crm/outreach';
 import type { Contact, ProspectSourcing, Situation } from '@/lib/crm/types';
+import { NoReplyControl } from './no-reply-control';
 import { OutcomeBadge, OutcomeControl } from './outcome-control';
 import { ProspectStatusBadge, ProspectStatusControl } from './prospect-status';
 import { ContactNotes } from './contact-notes';
@@ -388,6 +389,14 @@ export function ContactDetail({
       {/* Anything carrying a prospect row can hold an outcome, client included:
           the row survives the conversion and so does what was learned. */}
       {sourcing && <OutcomeControl sourcing={sourcing} />}
+
+      {/* Outside that guard on purpose, and it is the point of the control
+          rather than a detail of where it sits: a self-service customer and an
+          institutional correspondent carry no prospect row, so the line above
+          renders nothing for them and they had no gesture at all for a
+          thank-you. This one asks about their last message, which every
+          contact has. */}
+      <NoReplyControl contact={c} />
     </div>
   );
 }
