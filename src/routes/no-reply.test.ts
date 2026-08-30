@@ -30,12 +30,16 @@ beforeEach(() => {
   process.env.ADMIN_SECRET = SECRET;
 });
 afterEach(() => {
-  process.env = { ...originalEnv };
   // The suite shares one stats database, serially. The sender table is global
   // state: a row left behind here would stamp another file's ingested messages.
+  //
+  // Cleaned BEFORE the environment is restored, so the connection being emptied
+  // is the one that was polluted — restoring first would point STATS_DB_PATH at
+  // whatever it was outside the run and tidy a different database than this one.
   const db = getStatsDB();
   db.prepare("DELETE FROM no_reply_senders WHERE address LIKE '%alpha.example.net'").run();
   db.prepare('DELETE FROM email_messages WHERE id LIKE ?').run(`nr-${RUN}-%`);
+  process.env = { ...originalEnv };
 });
 
 interface IngestRow {
