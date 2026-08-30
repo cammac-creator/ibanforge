@@ -24,6 +24,12 @@ import { getVisibility, recordVisibility, isVisibilityState } from '../lib/visib
 import { getOrphans, recordOrphan, resolveOrphan, countPendingOrphans, isOrphanKind } from '../lib/orphan-mail.js';
 import { addAlias, listAliases, loadAliasMap, toCanonical } from '../lib/email-aliases.js';
 import {
+  listNoReplySenders,
+  loadNoReplySenders,
+  normalizeSenderAddress,
+  setNoReplySender,
+} from '../lib/no-reply-senders.js';
+import {
   deleteInstitutionalContact,
   listInstitutionalContacts,
   upsertInstitutionalContact,
@@ -854,8 +860,14 @@ apiKeys.post('/v1/admin/email-messages', async (c) => {
   const db = getStatsDB();
   const clip = (v: unknown, n: number): string | null => (typeof v === 'string' && v.length ? v.slice(0, n) : null);
   const upsert = db.prepare(
-    `INSERT INTO email_messages (id, customer_email, direction, msg_date, subject, snippet, snippet_fr, lang, body, counterparty)
-     VALUES (@id, @customer_email, @direction, @msg_date, @subject, @snippet, @snippet_fr, @lang, @body, @counterparty)
+    `INSERT INTO email_messages (id, customer_email, direction, msg_date, subject, snippet, snippet_fr, lang, body, counterparty, no_reply_needed)
+     VALUES (@id, @customer_email, @direction, @msg_date, @subject, @snippet, @snippet_fr, @lang, @body, @counterparty, @no_reply_needed)
+     -- 🚨 no_reply_needed is deliberately ABSENT from the update list below, so
+     -- an omitted column keeps its stored value. Ids are stable md5s and the
+     -- whole mailbox is re-ingested every night: assigning it here would erase
+     -- every hand-placed mark on the next sync, and a sender rule added today
+     -- would retroactively bury months of already-answered threads. Placed at
+     -- insert, never touched again. COALESCE is no help — 0 is not NULL.
      ON CONFLICT(id) DO UPDATE SET
        customer_email = excluded.customer_email, direction = excluded.direction,
        msg_date = excluded.msg_date, subject = excluded.subject,
@@ -877,6 +889,10 @@ apiKeys.post('/v1/admin/email-messages', async (c) => {
      WHERE lower(contact_email) = ? AND status IN ('a_mailer', 'a_enrichir')`,
   );
   const aliasMap = loadAliasMap();
+  // The "always, for this correspondent" rule, read once for the whole batch
+  // like the alias map beside it. Whole addresses, lowercased on both sides;
+  // see the table's comment in db.ts for why a fragment is out of the question.
+  const noReplySenders = loadNoReplySenders();
   const tx = db.transaction((rows: EmailMessageInput[]) => {
     let n = 0;
     for (const r of rows) {
@@ -887,6 +903,17 @@ apiKeys.post('/v1/admin/email-messages', async (c) => {
       // in the same table so the thread UI can show it in place, but it must
       // never count as real correspondence (no prospect status flip below).
       const direction = r.direction === 'out' ? 'out' : r.direction === 'draft' ? 'draft' : 'in';
+      // Only an INBOUND message can be "nothing to answer": our own mail never
+      // put the ball in our court, and a draft is not correspondence at all.
+      //
+      // Matched on BOTH the address as sent and its canonical form: the operator
+      // clicks the rule on the address he sees, and an alias registered later
+      // would otherwise make the rule silently stop firing — the failure mode
+      // nobody would ever report, because its symptom is mail reappearing.
+      // no_reply_needed is NOT part of EmailMessageInput on purpose: it is
+      // computed here, so no ingester can mark a message by asking.
+      const raw = r.customer_email.trim().toLowerCase();
+      const noReply = direction === 'in' && (noReplySenders.has(email) || noReplySenders.has(raw)) ? 1 : 0;
       upsert.run({
         id: r.id.slice(0, 200),
         customer_email: email,
@@ -898,6 +925,7 @@ apiKeys.post('/v1/admin/email-messages', async (c) => {
         lang: clip(r.lang, 8),
         body: clip(r.body, 8000),
         counterparty: clip(r.counterparty, 255),
+        no_reply_needed: noReply,
       });
       if (direction === 'out') markContacted.run(email);
       n++;
@@ -915,7 +943,8 @@ apiKeys.get('/v1/admin/email-messages', (c) => {
   const db = getStatsDB();
   const rows = db
     .prepare(
-      `SELECT id, customer_email, direction, msg_date, subject, snippet, snippet_fr, lang, body, counterparty
+      `SELECT id, customer_email, direction, msg_date, subject, snippet, snippet_fr, lang, body, counterparty,
+              no_reply_needed
        FROM email_messages ORDER BY msg_date ASC`,
     )
     .all();
@@ -944,6 +973,96 @@ apiKeys.post('/v1/admin/email-messages/delete', async (c) => {
   const db = getStatsDB();
   const res = db.prepare(`DELETE FROM email_messages WHERE id = ? AND direction = 'draft'`).run(body.id);
   return c.json({ deleted: res.changes });
+});
+
+/**
+ * « Rien à répondre » — mark ONE inbound message as needing no answer.
+ *
+ * The mark lives on the message rather than on the contact, and that is the
+ * whole point: a thread leaves « À répondre » while its last datable inbound
+ * carries the mark, and comes back by itself the day a new unmarked inbound
+ * arrives. Nothing to expire, nothing to reopen, and it works for contacts who
+ * have no prospect row at all — self-service customers, institutional
+ * correspondence — which the prospect `outcome` values could never reach.
+ *
+ * Only direction = 'in' can be marked, the same way /delete only accepts a
+ * draft: our own outbound never put the ball in our court, and a draft is not
+ * correspondence. An unknown id, an outbound or a draft answers
+ * { updated: 0 } with a 200 — the operation is idempotent, and refusing it
+ * loudly would only teach the UI to treat a no-op as a failure.
+ *
+ * Body: { id, value }. Re-clicking with value:false takes the mark back, which
+ * is how a misplaced one is undone.
+ */
+apiKeys.post('/v1/admin/email-messages/no-reply', async (c) => {
+  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
+  let body: { id?: unknown; value?: unknown };
+  try {
+    body = await c.req.json<{ id?: unknown; value?: unknown }>();
+  } catch {
+    return c.json({ error: 'invalid_json', message: 'Request body must be valid JSON' }, 400);
+  }
+  if (typeof body.id !== 'string' || !body.id) {
+    return c.json({ error: 'invalid_body', message: 'Expected { id: "…", value: true|false }' }, 400);
+  }
+  // Strictly boolean, never coerced: a body whose `value` arrived as the string
+  // "false" or as undefined would otherwise quietly UNMARK a message the
+  // operator meant to mark, and a silent wrong write is the one outcome this
+  // endpoint has no way to show him.
+  if (typeof body.value !== 'boolean') {
+    return c.json({ error: 'invalid_body', message: 'value must be a boolean' }, 400);
+  }
+  const db = getStatsDB();
+  const res = db
+    .prepare(`UPDATE email_messages SET no_reply_needed = ? WHERE id = ? AND direction = 'in'`)
+    .run(body.value ? 1 : 0, body.id);
+  return c.json({ updated: res.changes });
+});
+
+/**
+ * The standing version of the same judgement: every FUTURE inbound message
+ * from this address arrives already marked (applied by
+ * POST /v1/admin/email-messages at insert time).
+ *
+ * Never set as a side effect of marking one message — the UI must ask a second
+ * time. A rule posted silently would bury an authority's next mail, and the
+ * only way to notice would be that nothing ever arrived.
+ *
+ * Removing an address stops the stamping and deliberately leaves already-marked
+ * messages alone: each of those was a judgement about a message that was
+ * true when it was made, and rewriting history here would resurrect threads
+ * that were legitimately settled.
+ */
+apiKeys.get('/v1/admin/no-reply-senders', (c) => {
+  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
+  return c.json({ senders: listNoReplySenders() });
+});
+
+apiKeys.post('/v1/admin/no-reply-senders', async (c) => {
+  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
+  let body: { address?: unknown; value?: unknown };
+  try {
+    body = await c.req.json<{ address?: unknown; value?: unknown }>();
+  } catch {
+    return c.json({ error: 'invalid_json', message: 'Request body must be valid JSON' }, 400);
+  }
+  // A whole address or nothing: an entry without '@' could only be a fragment,
+  // and a fragment is precisely what must never enter this table.
+  const address = typeof body.address === 'string' ? normalizeSenderAddress(body.address) : '';
+  if (!address.includes('@')) {
+    return c.json({ error: 'invalid_body', message: 'Expected { address: "…@…", value: true|false }' }, 400);
+  }
+  if (typeof body.value !== 'boolean') {
+    return c.json({ error: 'invalid_body', message: 'value must be a boolean' }, 400);
+  }
+  setNoReplySender(address, body.value);
+  return c.json({ address, value: body.value });
 });
 
 /**

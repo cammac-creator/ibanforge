@@ -630,6 +630,38 @@ export function getStatsDB(): DatabaseType.Database {
     if (msgCols.length && !msgCols.includes('snippet_fr')) statsDB.exec('ALTER TABLE email_messages ADD COLUMN snippet_fr TEXT');
     if (msgCols.length && !msgCols.includes('lang')) statsDB.exec('ALTER TABLE email_messages ADD COLUMN lang TEXT');
     if (msgCols.length && !msgCols.includes('body')) statsDB.exec('ALTER TABLE email_messages ADD COLUMN body TEXT');
+    // "This one needs no answer" — a thank-you, a read receipt, a ticket bot.
+    //
+    // 🚨 The marker belongs to the MESSAGE, not to the contact, and that is the
+    // whole design. A thread leaves the queues while its LAST datable inbound
+    // carries the mark; the day they write again, the last inbound is a fresh
+    // unmarked one and the thread comes back on its own. No reopening rule to
+    // write, no verdict date to compare against — contrast `outcome_at` below,
+    // which had to buy both. It also works for contacts who have no prospect
+    // row at all (self-service customers, institutional correspondence), since
+    // email_messages is keyed by address and knows nothing of sourcing.
+    //
+    // The four outcome values cannot express this: they describe a COMMERCIAL
+    // relationship, and filing a warm thank-you under "pas_interesse" would be
+    // a lie that then poisons the outcome counters.
+    if (msgCols.length && !msgCols.includes('no_reply_needed')) {
+      statsDB.exec('ALTER TABLE email_messages ADD COLUMN no_reply_needed INTEGER NOT NULL DEFAULT 0');
+    }
+    // Addresses whose future inbound mail is marked on arrival — the "always do
+    // this for this correspondent" rule, applied by POST /v1/admin/email-messages.
+    //
+    // 🚨 Whole-address keys, never fragments. INTERNAL_EMAIL_RE (see
+    // src/lib/internal-accounts.ts) is the cautionary tale: a fragment short
+    // enough to be convenient swallowed whole customer domains, and that
+    // filter mislabelled real accounts for weeks before anyone noticed. Here
+    // the same mistake would bury an authority's mail silently, which is worse
+    // than the problem the rule exists to solve.
+    statsDB.exec(`
+      CREATE TABLE IF NOT EXISTS no_reply_senders (
+        address    TEXT PRIMARY KEY,
+        created_at TEXT DEFAULT (datetime('now'))
+      );
+    `);
     // Where the RELATIONSHIP stands, which `status` cannot say.
     //
     // `status` is a sourcing state: is there an address, is the mail ready, has
