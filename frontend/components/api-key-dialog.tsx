@@ -43,6 +43,59 @@ type Stage = 'form' | 'verify' | 'success' | 'error';
  */
 type Failure = { error?: unknown; reason?: unknown; message?: unknown };
 
+/**
+ * Acquisition attribution: remember `?src=` when it ARRIVES, not when the
+ * visitor finally asks for a key.
+ *
+ * ## Why this exists at all
+ *
+ * The attribution shipped on 06/08/2026 read `window.location.search` inside
+ * the POST handler. That only captures someone who lands on a `?src=` URL and
+ * signs up without ever navigating: one client-side route change and the query
+ * string is gone. Measured on 30/08, once `source` was finally exposed by
+ * /v1/admin/keys — 107 external keys, source empty on every single one. The
+ * column was written by the API, forwarded by this file, and had never held a
+ * value: the only instrument that could say which surface produces arrivals
+ * recorded nothing for twenty-four days, silently, because a missing value and
+ * a value that was never captured look exactly alike.
+ *
+ * ## sessionStorage, and not localStorage
+ *
+ * The right lifetime is the visit. localStorage would attribute a signup made
+ * three weeks later to a link clicked once, which is worse than no attribution:
+ * a wrong number is acted on, an absent one is questioned. A private-mode
+ * browser that throws on storage simply falls back to the live query string,
+ * which is the behaviour we had.
+ */
+const SRC_STORAGE_KEY = 'ibf_src';
+/** The exact shape the API accepts (api-keys.ts), so nothing is stored that would be refused. */
+const SRC_SHAPE = /^[a-z0-9_-]{1,40}$/;
+
+function rememberSource(): void {
+  if (typeof window === 'undefined') return;
+  const raw = new URLSearchParams(window.location.search).get('src');
+  if (!raw) return;
+  const src = raw.trim().toLowerCase();
+  if (!SRC_SHAPE.test(src)) return;
+  try {
+    window.sessionStorage.setItem(SRC_STORAGE_KEY, src);
+  } catch {
+    // Private mode, storage disabled, quota. Attribution is best-effort and
+    // must never be the reason a key request fails.
+  }
+}
+
+function readSource(): string | null {
+  if (typeof window === 'undefined') return null;
+  const live = new URLSearchParams(window.location.search).get('src');
+  if (live && SRC_SHAPE.test(live.trim().toLowerCase())) return live.trim().toLowerCase();
+  try {
+    return window.sessionStorage.getItem(SRC_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
 export function ApiKeyDialogProvider({ children }: { children: ReactNode }) {
   const t = useTranslations('apiKeyDialog');
   const tCommon = useTranslations('common');
@@ -78,6 +131,13 @@ export function ApiKeyDialogProvider({ children }: { children: ReactNode }) {
     reset();
     setIsOpen(true);
   }, [reset]);
+
+  // On arrival, once. This provider sits in the root layout, so it mounts on
+  // the first paint of the landing page — which is the only moment the
+  // referring `?src=` is still in the URL.
+  useEffect(() => {
+    rememberSource();
+  }, []);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -133,12 +193,11 @@ export function ApiKeyDialogProvider({ children }: { children: ReactNode }) {
       setNotice('');
       setError('');
       try {
-        // Best-effort acquisition attribution: forward the ?src= our outbound
-        // links carry (npm README, n8n node, directories). Absent → omitted.
-        const src =
-          typeof window !== 'undefined'
-            ? new URLSearchParams(window.location.search).get('src')
-            : null;
+        // Best-effort acquisition attribution: the ?src= our outbound links
+        // carry (npm README, n8n node, directories), as seen on ARRIVAL rather
+        // than here — see rememberSource above for what reading it here cost.
+        // Absent → omitted.
+        const src = readSource();
         const r = await fetch(`${API_BASE}/v1/keys/generate`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
