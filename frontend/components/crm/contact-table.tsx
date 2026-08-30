@@ -411,6 +411,23 @@ export function ContactTable({
                           classé
                         </span>
                       )}
+                      {/* Their last word needed no answer. Without this the row
+                          reads as an unanswered message that the queues
+                          mysteriously ignore — and the Statut column, which
+                          reads the situation, still says « À répondre ». */}
+                      {r.noReply && (
+                        <span
+                          title="Rien à répondre — leur dernier message ne demande pas de réponse. Un nouveau message de leur part remettra le fil dans la file."
+                          className="shrink-0 self-center rounded bg-sky-500/15 px-1 py-0.5 text-[9.5px] font-bold uppercase tracking-wide text-sky-300"
+                        >
+                          {/* The button's own words, not an abbreviation of
+                              them. The badge is rare enough to afford the three
+                              words, and a second name for one thing is how a
+                              vocabulary starts to drift — see the three
+                              deliberate namings in situation.ts. */}
+                          rien à répondre
+                        </span>
+                      )}
                       {r.chip && (
                         <span
                           className="shrink-0 self-center rounded px-1.5 py-0.5 text-[9.5px] font-bold uppercase tracking-wide"

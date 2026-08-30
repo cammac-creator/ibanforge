@@ -3,6 +3,7 @@ import { ballWithUs, followupDue, neverContacted } from './buckets';
 import { isClosed } from './closed';
 import { chipOf, replyGroupOf, type BusinessChip, type ReplyGroup } from './business';
 import { heatOf } from './heat';
+import { lastInboundNeedsNoReply } from './no-reply';
 import { nextActionLabel } from './situation';
 import type { Contact, Message, NextAction, Situation } from './types';
 
@@ -81,6 +82,20 @@ export interface MailRow {
    * under « Classés » and not in the day's queues.
    */
   closed: boolean;
+  /**
+   * Their last word needs no answer, because the operator said so on that
+   * message (lib/crm/no-reply.ts). The badge is the row's only explanation of
+   * why a thread whose last message is theirs is not in « À répondre » — the
+   * Statut column still reads it off the situation, which knows nothing of the
+   * marker, exactly as it still says « À répondre » on a closed dossier.
+   *
+   * Not a filter key of its own, unlike `closed`. That gesture removes a
+   * dossier for good and needed a retrieval chip, or closing a row would feel
+   * like deleting it; this one hides nothing — the row stays under Tous,
+   * Clients, Correspondances and its own thread, wearing the badge — and it
+   * undoes itself the day they write again.
+   */
+  noReply: boolean;
   /**
    * What searchRows matches: the company and the address, in one string, which
    * is exactly what the deleted contact list's search matched. `who` cannot
@@ -285,6 +300,7 @@ function toRow(
     prospectId: c.sourcing?.prospectId ?? null,
     woke,
     closed: isClosed(c),
+    noReply: lastInboundNeedsNoReply(c),
     confidence:
       c.sourcing?.confidence === 'high' || c.sourcing?.confidence === 'medium' || c.sourcing?.confidence === 'low'
         ? c.sourcing.confidence
