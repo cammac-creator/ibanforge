@@ -76,14 +76,24 @@ const NATURE_META: Record<NatureKey, NatureMeta> = {
     gloss: 'appels portant une clé API — nos clients, la seule bande qui paie.',
   },
   agent: {
-    // No "(MCP)" in the label: this bucket is mcp_http PLUS mcp_stdio, and
+    // Two corrections, both measured on production traffic (30/08/2026), and
+    // both the same class of defect: a band whose name claims more than its
+    // contents.
+    //
+    // No "(MCP)" in the label — the bucket is mcp_http PLUS mcp_stdio, and
     // mcp_stdio is also where classifyClient files declared AI clients calling
     // our plain REST surface (ChatGPT, Claude, Cursor, Cline and their kin).
-    // Naming a transport the traffic may not use would be a claim, and this
-    // card cannot afford one.
+    //
+    // And the gloss must say what actually dominates it: classifyClient files
+    // EVERY call to /mcp as mcp_http, so uptime monitors polling the endpoint
+    // land here beside real assistants — and on the measured traffic the
+    // monitors are the larger half by a wide margin. Read as "assistants using
+    // the API", this band would overstate agent demand the way the browser
+    // band overstates visitors on a scanner's day.
     label: 'Clients IA',
     color: '#8b5cf6',
-    gloss: 'appels pilotés par un assistant, sans clé — via MCP ou en REST direct.',
+    gloss:
+      'appels sans clé sur le point d’entrée MCP ou en REST : de vrais assistants, mais aussi les robots qui surveillent la disponibilité.',
   },
   declared_bot: {
     label: 'Robots déclarés',
