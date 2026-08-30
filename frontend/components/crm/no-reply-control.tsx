@@ -26,13 +26,29 @@ import type { Contact } from '@/lib/crm/types';
  *      false about the person and would corrupt the counters those verdicts
  *      feed.
  *
- * The mark is on the MESSAGE, and the button says so ("leur dernier message").
- * That is what makes it self-undoing: write to us again and the thread is back
- * in the queue with no rule to run. See lib/crm/no-reply.ts.
+ * The mark is on the MESSAGE, and the title says so. That is what makes it
+ * self-undoing: write to us again and the thread is back in the queue with no
+ * rule to run. See lib/crm/no-reply.ts.
  *
  * Its own file rather than a block in contact-header.tsx, same reason as
  * prospect-status.tsx: it is the part that needs a router and local state, so
  * the directive stays out of the header.
+ *
+ * ## Where it renders, and what the first placement cost
+ *
+ * It sits in SituationBand's action line, handed in as that component's
+ * `action` slot. It shipped first at the bottom of ContactDetail — inside the
+ * scrolling region, below the qualification blocks, the notes and the activity
+ * chart — and the operator came back a day later saying he still could not
+ * classify a thank-you. Nothing was broken: both endpoints answered, the
+ * marker persisted, the queues honoured it. He never scrolled that far, and
+ * there was no reason he should have. The question is asked in the pinned band
+ * (« ⚠ À TOI DE JOUER »), so the answer has to be offered there.
+ *
+ * That is also why this file draws no label of its own any more and no longer
+ * explains itself in a paragraph. The band states the situation in colour and
+ * in words on the very line this control sits on, and re-stating it beside
+ * itself is how one screen ends up with two vocabularies.
  */
 
 /**
@@ -143,41 +159,37 @@ export function NoReplyControl({ contact: c }: { contact: Contact }) {
   }
 
   return (
-    <div className="mt-3 border-t border-[var(--ink-4)]/60 pt-3 text-[12px]">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-[var(--fg-3)]">Leur dernier message :</span>
-        <button
-          type="button"
-          disabled={busy}
-          aria-pressed={marked}
-          onClick={() => void send(!marked)}
-          title={
-            marked
-              ? 'Cliquer à nouveau pour retirer ce marqueur'
-              : 'Sort le fil de « À répondre ». S’ils réécrivent, il y revient tout seul.'
-          }
-          className="cursor-pointer rounded-full px-2 py-0.5 font-medium transition-colors disabled:cursor-default disabled:opacity-50"
-          style={
-            marked
-              ? { color: '#7dd3fc', backgroundColor: '#7dd3fc22' }
-              : { color: 'var(--fg-3)', backgroundColor: 'var(--ink-4)' }
-          }
-        >
-          Rien à répondre
-        </button>
-      </div>
-
-      {marked && (
-        <p className="mt-2 text-[var(--fg-3)]">
-          Ce fil n’est plus dans « À répondre ». Un nouveau message de leur part l’y remettra.
-        </p>
-      )}
+    // Right-aligned and narrow: it shares a row with the band's action line,
+    // and the two panels below only ever appear in the breath after a click.
+    <div className="flex max-w-[22rem] shrink-0 flex-col items-end gap-2 text-[12px]">
+      <button
+        type="button"
+        disabled={busy}
+        aria-pressed={marked}
+        onClick={() => void send(!marked)}
+        title={
+          marked
+            ? 'Leur dernier message est marqué comme n’attendant pas de réponse. Cliquer à nouveau pour le retirer.'
+            : 'Leur dernier message n’attend pas de réponse (remerciement, accusé de réception, robot). Sort le fil de « À répondre ». S’ils réécrivent, il y revient tout seul.'
+        }
+        // Outlined rather than filled while it is an offer: it sits on a tinted
+        // band that is already carrying a colour, and a second filled pill
+        // there reads as a second verdict. Filled once pressed, because then it
+        // IS the verdict and the band has turned the same sky to say so.
+        className={`cursor-pointer whitespace-nowrap rounded-full border px-2.5 py-1 font-medium transition-colors disabled:cursor-default disabled:opacity-50 ${
+          marked
+            ? 'border-sky-400/50 bg-sky-400/20 text-sky-200'
+            : 'border-sky-300/35 bg-sky-300/5 text-sky-200/85 hover:border-sky-300/60 hover:bg-sky-300/15'
+        }`}
+      >
+        Rien à répondre
+      </button>
 
       {/* The standing rule, proposed and never applied on its own. The address
           is spelled out because it is often NOT the one on the file: the robot
           writes from one mailbox and the humans from another. */}
       {offerRule && sender && !ruleSet && (
-        <div className="mt-2 rounded-lg border border-[var(--ink-4)] bg-[var(--ink-1)] p-2">
+        <div className="rounded-lg border border-[var(--ink-4)] bg-[var(--ink-1)] p-2 text-left">
           <p className="wrap-anywhere text-[var(--fg-2)]">
             Faire pareil pour ce correspondant à l’avenir ? Tout nouveau message de{' '}
             <b className="text-[var(--fg-1)]">{sender}</b> arrivera déjà marqué.
@@ -211,7 +223,8 @@ export function NoReplyControl({ contact: c }: { contact: Contact }) {
         // and this one did not — the wrong way round, since this is the gesture
         // that reaches messages nobody has read yet. Session-scoped: it undoes
         // the rule just accepted, which is when a mistake is noticed.
-        <p role="status" className="mt-2 wrap-anywhere text-sky-300">
+        // No margin of its own: the column above spaces its children with gap.
+        <p role="status" className="wrap-anywhere text-right text-sky-300">
           Règle enregistrée : les prochains messages de {sender} arriveront marqués.{' '}
           <button
             type="button"
@@ -228,7 +241,7 @@ export function NoReplyControl({ contact: c }: { contact: Contact }) {
           endpoints ship from another platform than this page, so a 404 while
           the API catches up must say so here rather than break the file. */}
       {failed && (
-        <p role="alert" className="mt-2 text-red-400">
+        <p role="alert" className="text-right text-red-400">
           {failed}
         </p>
       )}

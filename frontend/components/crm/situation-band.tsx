@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { formatDay } from '@/lib/crm/format';
 import { nextActionLabel } from '@/lib/crm/situation';
 import type { Contact, Situation } from '@/lib/crm/types';
@@ -46,6 +47,7 @@ export function SituationBand({
   situation: s,
   kind,
   noReply = false,
+  action,
 }: {
   situation: Situation;
   kind?: Contact['kind'];
@@ -55,6 +57,27 @@ export function SituationBand({
    * same function so the drawer and the row cannot disagree.
    */
   noReply?: boolean;
+  /**
+   * The one gesture that answers the line beside it, handed in by the caller.
+   *
+   * A slot rather than an import, so this file keeps holding no rule and no
+   * state; the band still ships no JavaScript of its own and what arrives here
+   * brings its own.
+   *
+   * ## Why the gesture belongs on this line and nowhere else
+   *
+   * It lived at the bottom of ContactDetail, which scrolls, below the
+   * qualification blocks, the notes and the activity chart. It was live in
+   * production for a day and the operator reported he still could not classify
+   * a thank-you: a control nobody scrolls to is a control that does not exist.
+   * The band is where the question is ASKED — « ⚠ À TOI DE JOUER », pinned,
+   * read before anything else — so it is where the answer has to be offered.
+   *
+   * Placed on the action line rather than under it, because the pinned header's
+   * height is already measured against the composer (see crm-app.tsx): a slot
+   * on an existing row costs no pixels until it has something to unfold.
+   */
+  action?: ReactNode;
 }) {
   const b = noReply ? NO_REPLY : BALL[s.ballInCourt];
   // "Jamais contacté" is the prospecting word for the same fact, and this band
@@ -92,12 +115,19 @@ export function SituationBand({
         </span>
       </div>
       {/* The action line goes calm with the band. Amber is the colour of
-          something owed today, and nothing is owed here. */}
-      {noReply ? (
-        <p className="mt-1.5 text-[12px] text-sky-300">→ Rien à faire : leur dernier message n’attend pas de réponse.</p>
-      ) : (
-        <p className="mt-1.5 text-[12px] text-amber-300">→ {nextActionLabel(s.nextAction, kind)}</p>
-      )}
+          something owed today, and nothing is owed here.
+
+          items-start, not items-center: the slot on the right unfolds a panel
+          under itself when the operator accepts a standing rule, and a centred
+          row would drag the sentence down the moment that happens. */}
+      <div className="mt-1.5 flex flex-wrap items-start justify-between gap-x-3 gap-y-1.5">
+        {noReply ? (
+          <p className="text-[12px] text-sky-300">→ Rien à faire : leur dernier message n’attend pas de réponse.</p>
+        ) : (
+          <p className="text-[12px] text-amber-300">→ {nextActionLabel(s.nextAction, kind)}</p>
+        )}
+        {action}
+      </div>
     </div>
   );
 }

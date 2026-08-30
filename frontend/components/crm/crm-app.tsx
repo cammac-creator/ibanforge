@@ -14,6 +14,7 @@ import { DraftCard } from './draft-card';
 import { OUTBOUND_SHEET_COVER_PX, OutboundSheet } from './outbound-sheet';
 import { REPLY_SHEET_COVER_PX, ReplySheet } from './reply-sheet';
 import { SituationBand } from './situation-band';
+import { NoReplyControl } from './no-reply-control';
 import { ThreadSummary } from './thread-summary';
 import { Thread } from './thread';
 
@@ -373,11 +374,30 @@ export function CrmApp({
             <div className="pr-9">
               <ContactIdentity contact={shown} />
             </div>
-            {situation && (
-              <div className="mt-3">
-                <SituationBand situation={situation} kind={shown.kind} noReply={noReplyHolds(shown, situation)} />
-              </div>
-            )}
+            {/* The band, and inside it the one gesture that answers the line it
+                draws. Pinned with the band on purpose: the control shipped a
+                day earlier at the bottom of ContactDetail, in the scrolling
+                region, and the operator reported he still could not classify a
+                thank-you. Nothing was broken — he simply never scrolled to it,
+                and the question is asked up here.
+
+                The fallback exists because losing the gesture entirely is the
+                failure being fixed: a contact with no situation cannot happen
+                (the page builds one per id) and the drawer would still open, so
+                the branch that costs one line is the branch that keeps the
+                button reachable if that ever stops being true. */}
+            <div className="mt-3">
+              {situation ? (
+                <SituationBand
+                  situation={situation}
+                  kind={shown.kind}
+                  noReply={noReplyHolds(shown, situation)}
+                  action={<NoReplyControl contact={shown} />}
+                />
+              ) : (
+                <NoReplyControl contact={shown} />
+              )}
+            </div>
             {/* Pinned with the band, not scrolled with the thread: the whole
                 point is to spare the re-read, so it must be visible before
                 any scrolling happens. Only earns its pixels on real threads. */}
