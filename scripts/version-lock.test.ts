@@ -145,15 +145,15 @@ const SDKS: ReadonlyArray<{ name: string; decls: ReadonlyArray<{ where: string; 
 const TOLERATED: ReadonlyArray<{ sdk: string; expected: string; since: string; why: string }> = [
   {
     sdk: 'TypeScript (@ibanforge/sdk)',
-    expected: '1.3.3',
-    since: '2026-06 (produit passé en 1.4.x)',
-    why: 'Aucun changement fonctionnel du SDK depuis 1.3.3 ; la republication npm est un geste manuel de Claude-Alain.',
+    expected: '1.4.3',
+    since: '2026-08-30 (noyau MCP republié en 1.4.4)',
+    why: "1.4.3 est ce que npm SERT pour ce SDK. Le bump du 30/08 n'a touché que le noyau MCP (septième outil, fail() sur les refus d'entrée, bank_code_check.reason et bic.basis) : le client HTTP n'a pas bougé d'une ligne. Écrire 1.4.4 dans son package.json ferait mentir le dépôt sur ce qui est publié — la dérive exacte que ce fichier existe pour enregistrer plutôt que pour maquiller. Se videra à la prochaine republication.",
   },
   {
     sdk: 'Python (ibanforge)',
-    expected: '1.3.3',
-    since: '2026-06 (produit passé en 1.4.x)',
-    why: 'Idem côté PyPI : rien à republier tant que le client ne change pas.',
+    expected: '1.4.3',
+    since: '2026-08-30 (noyau MCP republié en 1.4.4)',
+    why: 'Idem côté PyPI, et pour la même raison : rien à republier tant que le client ne change pas.',
   },
 ];
 

@@ -3,7 +3,7 @@
   "name": "io.github.cammac-creator/ibanforge",
   "title": "IBANforge",
   "description": "Pre-payout IBAN screening for AI agents: validation, sanctions, Swiss clearing, risk scoring",
-  "version": "1.4.3",
+  "version": "1.4.4",
   "websiteUrl": "https://ibanforge.com",
   "repository": {
     "url": "https://github.com/cammac-creator/ibanforge",
@@ -13,7 +13,7 @@
     {
       "registryType": "npm",
       "identifier": "ibanforge-mcp",
-      "version": "1.4.3",
+      "version": "1.4.4",
       "transport": {
         "type": "stdio"
       }
