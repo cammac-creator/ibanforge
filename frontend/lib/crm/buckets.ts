@@ -1,5 +1,6 @@
 import { isArchived } from './archived';
 import { isClosed } from './closed';
+import { lastInboundNeedsNoReply } from './no-reply';
 import type { Contact, Situation } from './types';
 
 /**
@@ -44,9 +45,17 @@ import type { Contact, Situation } from './types';
  * inside isClosed itself, so the one event that proves the verdict wrong is
  * never buried — while a support robot's acknowledgement, which proves
  * nothing, cannot resurrect a thread the operator deliberately closed.
+ *
+ * The third term answers the case neither of the other two can name: their last
+ * message is real, is from a person, and wants nothing. A thank-you, an
+ * acknowledgement, a desk robot the text rules missed. `ballInCourt` is right
+ * that they spoke last and that is exactly why it cannot decide this one — only
+ * the operator can, message by message, and lastInboundNeedsNoReply reads what
+ * he said. See no-reply.ts for why the marker sits on the message: the thread
+ * comes back on its own the moment they write again, with no reopening rule.
  */
 export function ballWithUs(c: Contact, s: Situation | undefined): boolean {
-  return !isArchived(c, s) && !isClosed(c) && s?.ballInCourt === 'us';
+  return !isArchived(c, s) && !isClosed(c) && !lastInboundNeedsNoReply(c) && s?.ballInCourt === 'us';
 }
 
 /**
@@ -54,6 +63,12 @@ export function ballWithUs(c: Contact, s: Situation | undefined): boolean {
  * asleep until a date. The snooze is the whole point of the outcome
  * 'pas_maintenant': without this term the row would come back every ten days
  * to be dismissed by hand, which is exactly the cycle it exists to break.
+ *
+ * NOT touched by « rien à répondre », and the omission is the point. This
+ * bucket fires when OUR mail has gone unanswered — the ball is in THEIR court,
+ * so the last inbound is not what the row is about, and reading it here would
+ * let a thank-you they sent in June cancel a follow-up owed on a letter sent in
+ * August.
  */
 export function followupDue(c: Contact, s: Situation | undefined, snoozed: boolean = false): boolean {
   return !snoozed && !isArchived(c, s) && !isClosed(c) && s?.followupDue === true;
@@ -89,6 +104,16 @@ export function dueToday(c: Contact, s: Situation | undefined, snoozed: boolean 
  * The snooze is honoured, unlike in ballWithUs: someone who said "come back in
  * September" has not been contacted either, and a cold first mail is precisely
  * what must not resurface before that date.
+ *
+ * « Rien à répondre » is deliberately NOT a term here, and this is not the same
+ * kind of omission as the isArchived term above. That one is redundant by
+ * accident, kept because a rule in another file could loosen; this one cannot
+ * fire at all, and the proof is in the two definitions rather than in a
+ * coincidence: the marker needs a datable non-automated INBOUND message, while
+ * 'first_mail' is the state of a thread holding no such message in either
+ * direction. Pinned by a test in no-reply.test.ts so a widened predicate says
+ * so out loud. Semantically it would be wrong even if it could fire — a
+ * thank-you says nothing about whether a first mail is worth writing.
  */
 export function neverContacted(c: Contact, s: Situation | undefined, snoozed: boolean = false): boolean {
   return !snoozed && c.kind === 'prospect' && !isArchived(c, s) && !isClosed(c) && s?.nextAction === 'first_mail';

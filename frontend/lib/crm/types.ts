@@ -9,6 +9,27 @@ export interface Message {
   lang?: string | null;
   body?: string | null;
   counterparty: string | null;
+  /**
+   * 1 when the operator declared this inbound message needs no answer: a
+   * thank-you, an acknowledgement, a ticket robot. Read by lib/crm/no-reply.ts,
+   * which is where the whole reasoning lives.
+   *
+   * On the MESSAGE and not on the contact, which is the decision of the
+   * feature: the thread leaves the queues while its last inbound carries the
+   * flag, so the day they write again the last inbound is a fresh unmarked one
+   * and the thread comes back by itself. No reopening rule to write, no verdict
+   * date to compare against — closed.ts had to buy both.
+   *
+   * Optional on the wire for the same deploy-order reason as `issued_by_us` on
+   * KeyRow: Vercel and Railway ship independently, so this frontend runs for a
+   * while against an API whose SELECT does not carry the column yet. Absent
+   * degrades to "unmarked", which is every reader's behaviour before the flag
+   * existed. Typed as the INTEGER SQLite stores and compared to 1, the same
+   * reading as `issued_by_us`, so the wire contract is stated here rather than
+   * guessed at each call site: an API serving a JSON boolean instead would
+   * light nothing, visibly and everywhere at once, rather than half-working.
+   */
+  no_reply_needed?: number | null;
 }
 
 export interface ClientKeyInfo {

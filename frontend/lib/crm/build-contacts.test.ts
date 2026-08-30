@@ -10,6 +10,7 @@ import {
   type MessageRow,
   type ProspectRow,
 } from './build-contacts';
+import { lastInboundNeedsNoReply } from './no-reply';
 import { warmAccount } from './sending-account';
 import type { Contact } from './types';
 
@@ -315,6 +316,35 @@ describe('buildContacts', () => {
     expect(out[0].messages).toHaveLength(1);
     expect(out[0].messages[0].subject).toBe('a');
     expect(out[0].draft?.subject).toBe('d');
+  });
+
+  /**
+   * The carry, pinned rather than coded.
+   *
+   * `no_reply_needed` needs no mapping line in buildContacts: MessageRow
+   * extends Message and threadOf hands rows over whole, so every column the
+   * API adds to its SELECT reaches Contact.messages the day it is served. That
+   * is a property of the shape, not a promise — a future refactor that projects
+   * rows field by field would drop the marker in silence, and the only visible
+   * symptom would be a button in the drawer that stops working. Hence a test
+   * on the way through rather than a pass-through nobody needs.
+   */
+  it('carries the no-reply marker through to the rule that reads it', () => {
+    const out = buildContacts({
+      ...base,
+      keys: [keyRow('thanks@example.net')],
+      messages: [
+        msgRow('thanks@example.net', { direction: 'out', msg_date: '2026-07-01T10:00', subject: 'Ta clé' }),
+        msgRow('thanks@example.net', {
+          direction: 'in',
+          msg_date: '2026-07-02T10:00',
+          subject: 'Merci !',
+          no_reply_needed: 1,
+        }),
+      ],
+    });
+    expect(out[0].messages.at(-1)?.no_reply_needed).toBe(1);
+    expect(lastInboundNeedsNoReply(out[0])).toBe(true);
   });
 
   it('matches a mixed-case key email with its thread and its read marker', () => {
