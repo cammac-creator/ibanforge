@@ -62,26 +62,29 @@ export function drawSprite(
 
 /* ---------- geometry ----------
  *
- * Rebalanced 01/09/2026 on the operator's report: the first row sat shoulder
- * to shoulder while the last one gaped. The registry row now spaces by each
- * house's REAL width (the day board's four houses differ), the library gives
- * the row room, and the bottom street gains a lived-in cluster (well, casks,
- * tree, hay) between the forge and the vigil. Coordinates were tuned on the
- * pipeline's layout-preview.png, not in the browser. */
+ * Reflowed 01/09/2026 evening (operator's row plan): the pipeline now reads
+ * as three full streets. Top street = the entry formalities (gate, scribe,
+ * cutter, library) plus a market square where the registry lane used to
+ * stand. Middle street = the registry lane itself with the SIX counter,
+ * court and classifier — every door opens straight onto the street, so the
+ * per-door climb paths died. Bottom street = the border barrier ACROSS the
+ * road, the watchtower, the forge and the vigil. The tower is drawn at 0.82
+ * so its top stays south of the middle street and never masks a door. */
 
 export const REGISTRY_CCS = ['DE', 'AT', 'BE', 'BG', 'NL', 'FI'] as const;
 /** Day-board houses by true width; NL and FI reuse a face mirrored, which the
- * fantasy banner glyphs absorb (nothing readable to mirror). */
+ * fantasy banner glyphs absorb (nothing readable to mirror). At 0.85 the six
+ * of them and the three counters share the middle street without touching. */
+const REG_SCALE = 0.85;
 const REGISTRY_LANE: { sprite: string; cx: number; w: number; flip?: boolean }[] = [
-  { sprite: 'house0', cx: 564, w: 95 },
-  { sprite: 'house1', cx: 643, w: 52 },
-  { sprite: 'house2', cx: 715, w: 80 },
-  { sprite: 'house3', cx: 790, w: 59 },
-  { sprite: 'house1', cx: 852, w: 52, flip: true },
-  { sprite: 'house3', cx: 914, w: 59, flip: true },
+  { sprite: 'house0', cx: 568, w: 95 },
+  { sprite: 'house1', cx: 641, w: 52 },
+  { sprite: 'house2', cx: 707, w: 80 },
+  { sprite: 'house3', cx: 776, w: 59 },
+  { sprite: 'house1', cx: 833, w: 52, flip: true },
+  { sprite: 'house3', cx: 890, w: 59, flip: true },
 ];
-const REGISTRY_BASE = 120;
-const REGISTRY_DOOR_Y = 138;
+const REGISTRY_BASE = 334;
 
 export interface StationGeo {
   id: string;
@@ -112,30 +115,33 @@ export const STATIONS: StationGeo[] = [
   geo('cutter', 'stall-teal', 306, 180, 62, 70, [306, 200], [306, 192]),
   geo('library', 'library', 414, 176, 176, 126, [414, 200], [414, 192], { scale: 0.92 }),
   ...REGISTRY_LANE.map((h, i) =>
-    geo(`reg-${REGISTRY_CCS[i]}`, h.sprite, h.cx, REGISTRY_BASE, h.w, 100,
-      [h.cx, REGISTRY_DOOR_Y], [h.cx, 192], { cc: REGISTRY_CCS[i], flip: h.flip }),
+    geo(`reg-${REGISTRY_CCS[i]}`, h.sprite, h.cx, REGISTRY_BASE, h.w * REG_SCALE, 86,
+      [h.cx, 350], [h.cx, 342], { cc: REGISTRY_CCS[i], flip: h.flip, scale: REG_SCALE }),
   ),
   geo('warehouse', 'warehouse', 84, 106, 132, 104, [120, 98], [120, 76]),
-  geo('classifier', 'house1', 604, 334, 60, 112, [604, 352], [604, 342], { scale: 1.12 }),
-  geo('court', 'house-big', 744, 338, 120, 150, [744, 352], [744, 342]),
-  geo('six', 'house3', 884, 334, 68, 112, [884, 352], [884, 342], { flip: true, scale: 1.12 }),
-  geo('border', 'fence', 430, 350, 104, 46, [430, 352], [430, 342]),
-  geo('tower', 'tower', 170, 332, 74, 170, [188, 344], [188, 342]),
-  geo('forge', 'forge', 430, 488, 152, 126, [430, 506], [430, 498]),
-  geo('archive', 'desk-day', 250, 484, 70, 50, [250, 504], [250, 498]),
+  geo('classifier', 'house1', 248, 334, 66, 112, [248, 352], [248, 342], { scale: 1.12 }),
+  // court at 0.85: full-size its roof crossed into the top street band and
+  // would occlude the hero walking there (painter's order draws it later)
+  geo('court', 'house-big', 356, 338, 102, 128, [356, 352], [356, 342], { scale: 0.85 }),
+  geo('six', 'house3', 470, 334, 76, 112, [470, 352], [470, 342], { flip: true, scale: 1.12 }),
+  // the barrier sits ACROSS the bottom street: the hero passes through it
+  geo('border', 'fence', 280, 506, 104, 46, [280, 498], [280, 498]),
+  geo('tower', 'tower', 380, 496, 64, 140, [380, 504], [380, 498], { scale: 0.82 }),
+  geo('forge', 'forge', 560, 488, 152, 126, [560, 506], [560, 498]),
+  geo('archive', 'desk-day', 140, 484, 70, 50, [140, 502], [140, 498]),
   geo('vigil', 'vigil-booth', 906, 476, 56, 60, [906, 496], [906, 498]),
 ];
 export const stationById = Object.fromEntries(STATIONS.map((s) => [s.id, s]));
 
 /** Where smoke rises (forge chimney is painted into the day sprite). */
-export const CHIMNEYS: [number, number][] = [[482, 390]];
+export const CHIMNEYS: [number, number][] = [[612, 390]];
 /** Where ember particles rise (forge hearth, braziers). */
-export const EMBER_ZONES: [number, number][] = [[412, 472], [228, 490], [170, 172]];
+export const EMBER_ZONES: [number, number][] = [[542, 472], [176, 490], [380, 368]];
 /** Halo lights, daylight-discreet: x, y, radius, strength. */
 export const HALOS: [number, number, number, number][] = [
-  [170, 166, 30, 0.4],    // tower brazier
-  [412, 458, 44, 0.5],    // forge hearth
-  [228, 486, 20, 0.35],   // archive brazier
+  [380, 366, 24, 0.4],    // tower brazier
+  [542, 458, 44, 0.5],    // forge hearth
+  [176, 486, 20, 0.35],   // archive brazier
 ];
 
 const ROAD_BANDS: [number, number, number, number][] = [
@@ -143,12 +149,8 @@ const ROAD_BANDS: [number, number, number, number][] = [
   [920, 180, 24, 174],  // east bend
   [190, 330, 754, 24],  // middle street
   [190, 330, 24, 192],  // west bend
-  [190, 486, 774, 24],  // bottom street
+  [128, 486, 836, 24],  // bottom street (reaches west to the archivist's desk)
   [-4, 64, 908, 24],    // caravan road
-  // one little path per registry door: the shared vertical lane died with the
-  // fixed-step row — the gaps between real-width houses are too narrow to
-  // walk, so the hero now climbs to each door from the street below.
-  ...REGISTRY_LANE.map((h): [number, number, number, number] => [h.cx - 5, 134, 10, 50]),
 ];
 
 /* ---------- static background: ground + streets only ---------- */
@@ -194,26 +196,27 @@ export const SCENERY: Placed[] = [
   ...STATIONS.filter((s) => s.sprite).map((s) => ({
     sprite: s.sprite!, cx: s.cx, base: s.base, scale: s.scale, flip: s.flip, id: s.id,
   })),
-  { sprite: 'signpost', cx: 470, base: 338 },   // border post sign
-  { sprite: 'ember-line', cx: 228, base: 496 }, // archive brazier
+  { sprite: 'signpost', cx: 322, base: 496 },   // border post sign, by the barrier
+  { sprite: 'ember-line', cx: 176, base: 496 }, // archive brazier
   { sprite: 'cart', cx: 172, base: 96 },        // parked caravan cart
   // greenery
   { sprite: 'tree1', cx: 34, base: 152 }, { sprite: 'tree2', cx: 790, base: 486 },
-  { sprite: 'tree1', cx: 62, base: 394 }, { sprite: 'grove', cx: 300, base: 296 },
+  { sprite: 'tree1', cx: 62, base: 394 }, { sprite: 'tree1', cx: 806, base: 162 },
   { sprite: 'tree2', cx: 938, base: 246 }, { sprite: 'tree1', cx: 386, base: 88 },
   { sprite: 'planter-red', cx: 502, base: 184 }, { sprite: 'topiary', cx: 262, base: 194 },
-  { sprite: 'pot-yellow', cx: 148, base: 200 }, { sprite: 'planter2', cx: 668, base: 352 },
-  { sprite: 'ivy', cx: 366, base: 178 },
-  { sprite: 'tuft1', cx: 240, base: 222 }, { sprite: 'tuft2', cx: 500, base: 262 },
-  { sprite: 'tufts2', cx: 640, base: 242 }, { sprite: 'tuft1', cx: 60, base: 302 },
+  { sprite: 'pot-yellow', cx: 148, base: 200 }, { sprite: 'ivy', cx: 366, base: 178 },
+  { sprite: 'tuft1', cx: 150, base: 258 }, { sprite: 'tuft2', cx: 505, base: 395 },
+  { sprite: 'tufts2', cx: 600, base: 440 }, { sprite: 'tuft1', cx: 60, base: 302 },
   { sprite: 'tuft2', cx: 866, base: 384 }, { sprite: 'tufts2', cx: 340, base: 442 },
-  // village life props — the bottom street's lived-in cluster fills what used
-  // to be the map's one empty quarter (operator's report, 01/09)
-  { sprite: 'well', cx: 640, base: 478 },
+  // the market square — the registry lane's old ground, kept alive: grove,
+  // well, planters and hand tools between the caravan road and the top street
+  { sprite: 'grove', cx: 585, base: 165 }, { sprite: 'well', cx: 700, base: 170 },
+  { sprite: 'planter2', cx: 652, base: 178 }, { sprite: 'wheelbarrow', cx: 748, base: 178 },
+  { sprite: 'fence', cx: 852, base: 150 }, { sprite: 'rocks', cx: 120, base: 300 },
+  // village life props on the bottom street
   { sprite: 'barrel-group', cx: 712, base: 470 }, { sprite: 'sacks', cx: 214, base: 90 },
-  { sprite: 'barrel-cart', cx: 500, base: 498 }, { sprite: 'wheelbarrow', cx: 548, base: 502 },
-  { sprite: 'hay', cx: 860, base: 500 }, { sprite: 'fence', cx: 296, base: 328 },
-  { sprite: 'rocks', cx: 352, base: 246 }, { sprite: 'rock-big', cx: 925, base: 522 },
+  { sprite: 'barrel-cart', cx: 438, base: 478 },
+  { sprite: 'hay', cx: 860, base: 500 }, { sprite: 'rock-big', cx: 925, base: 522 },
 ];
 
 /** Station signs drawn after the scenery/actor pass (nothing crosses them). */

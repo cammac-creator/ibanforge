@@ -20,6 +20,7 @@ import {
   type Actor, type StationGeo, type WorldImages,
 } from "./world"
 import { roadRoute } from "@/lib/village/roads"
+import { naturalPath } from "@/lib/village/path"
 import type { StationId, StepOutcome } from "@/lib/village/journey"
 
 export interface NarratedStep {
@@ -69,40 +70,17 @@ const HERO_SPEED = 156
 const COURIER_SPEED = 220
 
 /** Bespoke label spots (logical coords). The registry row staggers two lines
- * so six close-set plaques cannot collide; street-side stations sit on the
- * street's lower half so the courier line at y=192 stays mostly clear. */
+ * on the middle street so six close-set plaques cannot collide; the top-row
+ * stations sit on their street's lower half so the courier line at y=192
+ * stays mostly clear. */
 const LABEL_AT: Record<string, [number, number]> = {
   gate: [80, 203], scribe: [196, 203], cutter: [306, 203], library: [414, 203],
-  "reg-DE": [564, 146], "reg-AT": [643, 163], "reg-BE": [715, 146],
-  "reg-BG": [790, 163], "reg-NL": [852, 146], "reg-FI": [914, 163],
-  warehouse: [160, 56], tower: [143, 350], forge: [430, 518],
-  archive: [250, 516], border: [430, 364], vigil: [906, 510],
-}
-
-/** Rounds the 90° corners of an axis-aligned path into short Bézier arcs, so
- * walks read as natural strolls instead of drill-square turns. */
-function roundPath(pts: [number, number][], r = 14): [number, number][] {
-  if (pts.length < 3) return pts
-  const out: [number, number][] = [pts[0]]
-  for (let i = 1; i < pts.length - 1; i++) {
-    const [px, py] = pts[i - 1], [cx, cy] = pts[i], [nx, ny] = pts[i + 1]
-    const d1 = Math.hypot(cx - px, cy - py) || 1
-    const d2 = Math.hypot(nx - cx, ny - cy) || 1
-    const t1 = Math.min(r, d1 / 2) / d1
-    const t2 = Math.min(r, d2 / 2) / d2
-    const ax = cx - (cx - px) * t1, ay = cy - (cy - py) * t1
-    const bx = cx + (nx - cx) * t2, by = cy + (ny - cy) * t2
-    out.push([ax, ay])
-    for (const q of [0.3, 0.5, 0.7]) {
-      out.push([
-        (1 - q) * (1 - q) * ax + 2 * (1 - q) * q * cx + q * q * bx,
-        (1 - q) * (1 - q) * ay + 2 * (1 - q) * q * cy + q * q * by,
-      ])
-    }
-    out.push([bx, by])
-  }
-  out.push(pts[pts.length - 1])
-  return out
+  "reg-DE": [568, 346], "reg-AT": [641, 361], "reg-BE": [707, 346],
+  "reg-BG": [776, 361], "reg-NL": [833, 346], "reg-FI": [890, 361],
+  // the three counters stagger like the lane: their long names collide flat
+  classifier: [244, 346], court: [360, 362], six: [470, 346],
+  warehouse: [160, 56], tower: [380, 517], forge: [560, 518],
+  archive: [140, 516], border: [280, 518], vigil: [906, 510],
 }
 
 interface Spark { x: number; y: number; vx: number; vy: number; l: number; c: string }
@@ -125,13 +103,15 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
     groundLayer: null as HTMLCanvasElement | null,
     vignetteLayer: null as HTMLCanvasElement | null,
     hero: { x: -30, y: 192, dir: 1, kind: "hero", face: "side", hidden: true } as Actor,
+    // the villagers mill about the market square (the registry lane's old
+    // ground): north of the top street, out of every pipeline lane
     clerks: [0, 1, 2, 3, 4].map((i) => ({
-      x: 70 + i * 26, y: 440 + (i % 3) * 24, dir: 1 as const,
+      x: 560 + i * 62, y: 116 + (i % 3) * 22, dir: 1 as const,
       kind: `clerk${i}` as Actor["kind"],
       wt: i * 1.9, tx: undefined as number | undefined, ty: undefined as number | undefined,
     })),
     watcher: { x: 900, y: 494, dir: -1, kind: "clerk5", face: "down" } as Actor,
-    archivist: { x: 246, y: 506, dir: 1, kind: "clerk4", face: "down" } as Actor,
+    archivist: { x: 126, y: 502, dir: 1, kind: "clerk4", face: "down" } as Actor,
     couriers: [] as { key: number; tip: StationTip; actor: Actor; pts: [number, number][]; i: number }[],
     seenCouriers: new Set<number>(),
     cart: null as { x: number; y: number; dir: 1 | -1 } | null,
@@ -176,7 +156,7 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
         w.pollen = Array.from({ length: 16 }, () => ({
           x: Math.random() * W, y: Math.random() * H, p: Math.random() * 7, s: 0.6 + Math.random() * 0.8,
         }))
-        const BLOOMS: [number, number][] = [[502, 176], [668, 344], [148, 192], [860, 492]]
+        const BLOOMS: [number, number][] = [[502, 176], [652, 170], [148, 192], [860, 492]]
         w.wings = BLOOMS.slice(0, 4).map(([bx, by], i) => ({
           cx: bx, cy: by - 12, p: i * 1.7, c: ["#F472B6", "#FBBF24", "#93C5FD", "#F9A8D4"][i],
         }))
@@ -208,7 +188,7 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
       if (!w.reduced) {
         for (const c of w.clerks) {
           c.wt -= dt / 1000
-          if (c.wt <= 0) { c.wt = 2.5 + Math.random() * 4; c.tx = 56 + Math.random() * 130; c.ty = 428 + Math.random() * 84 }
+          if (c.wt <= 0) { c.wt = 2.5 + Math.random() * 4; c.tx = 540 + Math.random() * 340; c.ty = 104 + Math.random() * 66 }
           const a = c as unknown as Actor
           if (c.tx !== undefined && c.ty !== undefined) {
             const dx = c.tx - c.x, dy = c.ty - c.y, d = Math.hypot(dx, dy)
@@ -249,7 +229,7 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
           for (const [cx, cy] of CHIMNEYS) w.puffs.push({ x: cx, y: cy - 44, a: 0.45, s: 0.55, vy: 0.17 })
         }
         // idle hearth sparkle
-        if (Math.random() < 0.04) w.sparks.push({ x: 392 + (Math.random() - 0.5) * 24, y: 468, vx: (Math.random() - 0.5) * 0.8, vy: -Math.random() * 1.2 - 0.3, l: 30, c: "#FDE68A" })
+        if (Math.random() < 0.04) w.sparks.push({ x: 522 + (Math.random() - 0.5) * 24, y: 468, vx: (Math.random() - 0.5) * 0.8, vy: -Math.random() * 1.2 - 0.3, l: 30, c: "#FDE68A" })
       }
       w.sparks = w.sparks.filter((s) => --s.l > 0); w.sparks.forEach((s) => { s.x += s.vx; s.y += s.vy; s.vy += 0.04 })
       w.puffs = w.puffs.filter((p) => (p.a -= 0.004) > 0); w.puffs.forEach((p) => { p.y -= p.vy; p.s += 0.006 })
@@ -421,7 +401,7 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
   const makeMove = useCallback((genAtStart: number) => {
     const w = world.current
     return async (a: Actor, rawPts: [number, number][], speed: number) => {
-      const pts = w.reduced ? rawPts : roundPath([[a.x, a.y], ...rawPts]).slice(1)
+      const pts = w.reduced ? rawPts : naturalPath([[a.x, a.y], ...rawPts]).slice(1)
       for (const [tx, ty] of pts) {
         if (w.gen !== genAtStart) return false
         if (w.reduced) {
@@ -469,8 +449,6 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
     w.veil = true; w.focus = null
     w.trail = [[w.hero.x, w.hero.y]]
     let anchor: [number, number] = [-28, 192]
-    let inLane = false
-    let laneCx = 0
 
     for (const step of steps) {
       if (w.gen !== gen) return
@@ -493,30 +471,19 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
       if (step.station === "exit") {
         w.focus = null
         setNarr({ who: step.who, text: step.text })
-        if (inLane) { await walk([[laneCx, 192]]); inLane = false; anchor = [laneCx, 192] }
-        if (!(await walk(roadRoute(anchor, [952, 498])))) return
-        await walk([[998, 498]])
+        if (!(await walk([...roadRoute(anchor, [952, 498]), [998, 498]]))) return
         break
       }
 
       if (target) {
-        const wantLane = step.station === "registry"
-        if (inLane && !wantLane) { if (!(await walk([[laneCx, 192]]))) return; inLane = false; anchor = [laneCx, 192] }
-        if (wantLane) {
-          // The shared vertical lane died with the fixed-step row (the real
-          // day houses have real widths and no walkable gaps): each door now
-          // has its own little path up from the top street, so the hero walks
-          // the street to the house's foot and climbs.
-          if (inLane) { if (!(await walk([[laneCx, 192]]))) return; anchor = [laneCx, 192] }
-          if (!(await walk(roadRoute(anchor, [target.cx, 192])))) return
-          if (!(await walk([target.door]))) return
-          inLane = true
-          laneCx = target.cx
-        } else if (anchor[0] !== target.anchor[0] || anchor[1] !== target.anchor[1]) {
-          if (!(await walk(roadRoute(anchor, target.anchor)))) return
-          if (target.door[0] !== target.anchor[0] || target.door[1] !== target.anchor[1]) {
-            if (!(await walk([target.door]))) return
-          }
+        // Every door now opens straight onto a street (the registry lane
+        // moved down to the middle street), so one continuous stroll covers
+        // the road AND the doorstep: the spline blends them into a single
+        // walk instead of a stop-then-shuffle at the anchor.
+        if (anchor[0] !== target.anchor[0] || anchor[1] !== target.anchor[1]) {
+          const pts = roadRoute(anchor, target.anchor)
+          if (target.door[0] !== target.anchor[0] || target.door[1] !== target.anchor[1]) pts.push(target.door)
+          if (!(await walk(pts))) return
           anchor = target.anchor
         }
         w.focus = target
@@ -526,10 +493,10 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
       if (step.station === "gate") w.seals.push({ x: 80, y: 140, sprite: "coin", l: 90 })
       if (step.station === "scribe" && step.outcome === "fail") w.seals.push({ x: 204, y: 116, sprite: "seal-x", l: 110 })
       if (step.station === "registry" && target) w.pulses.push({ x: target.cx, y: target.base - 60, r: 6, l: 40 })
-      if (step.station === "tower") w.pulses.push({ x: 190, y: 200, r: 6, l: 40 })
+      if (step.station === "tower") w.pulses.push({ x: 380, y: 372, r: 6, l: 40 })
       if (step.station === "forge") {
-        for (let i = 0; i < 24; i++) w.sparks.push({ x: 392 + (Math.random() - 0.5) * 36, y: 468, vx: (Math.random() - 0.5) * 1.8, vy: -Math.random() * 2 - 0.5, l: 30 + Math.random() * 20, c: "#FDE68A" })
-        w.seals.push({ x: 410, y: 398, sprite: step.outcome === "fail" ? "seal-x" : "coin", l: 120 })
+        for (let i = 0; i < 24; i++) w.sparks.push({ x: 522 + (Math.random() - 0.5) * 36, y: 468, vx: (Math.random() - 0.5) * 1.8, vy: -Math.random() * 2 - 0.5, l: 30 + Math.random() * 20, c: "#FDE68A" })
+        w.seals.push({ x: 540, y: 398, sprite: step.outcome === "fail" ? "seal-x" : "coin", l: 120 })
       }
       if (!(await sleep(step.holdMs))) return
     }
@@ -538,8 +505,16 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
     onQuestEnd?.()
   }, [makeMove, makeSleep, onQuestEnd])
 
+  // Play each quest id ONCE. The effect also fires when runQuest is recreated
+  // (its onQuestEnd prop is an inline closure upstream, so any page re-render
+  // — the 5s traffic poll included — renews it); without the id guard the
+  // same quest replayed forever on the live site.
+  const playedQuest = useRef(0)
   useEffect(() => {
-    if (quest && quest.steps.length > 0) void runQuest(quest.steps)
+    if (quest && quest.steps.length > 0 && quest.id !== playedQuest.current) {
+      playedQuest.current = quest.id
+      void runQuest(quest.steps)
+    }
   }, [quest, runQuest])
   useEffect(() => { setNarr(idle) }, [idle])
 
@@ -550,7 +525,7 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
     for (const [idx, op] of traffic.entries()) {
       if (w.seenCouriers.has(op.key) || w.couriers.length >= 8) continue
       w.seenCouriers.add(op.key)
-      const pts = roundPath(COURIER_RUNS[op.kind])
+      const pts = naturalPath(COURIER_RUNS[op.kind])
       w.couriers.push({
         key: op.key, tip: op.tip, pts, i: 1,
         actor: {
@@ -590,12 +565,18 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
     w.hero.hidden = true
     if (v.kind === "caravan") {
       line(0)
-      const houseStops = STATIONS.filter((s) => s.cc).map((s) => s.cx)
-      if (!(await rollCart(76, -40, 930, houseStops))) return
+      // leg 1 — arrival on the caravan road, unloading at the warehouse
+      if (!(await rollCart(76, -40, 930, [120]))) return
+      // leg 2 — down the middle street, one delivery at every registry door
+      // (right to left: the descending sort matches the cart's direction)
+      const houseStops = STATIONS.filter((s) => s.cc).map((s) => s.cx).sort((a, b) => b - a)
+      if (!(await rollCart(342, 990, 236, houseStops))) return
       line(1); if (!(await sleep(2800))) return
       line(2)
-      if (!(await rollCart(342, 990, 236, []))) return
-      w.pulses.push({ x: 196, y: 220, r: 8, l: 46 })
+      // leg 3 — the watchlist goes to the watchtower on the bottom street
+      const towerX = stationById["tower"].cx
+      if (!(await rollCart(498, 990, towerX + 56, []))) return
+      w.pulses.push({ x: towerX, y: 400, r: 8, l: 46 })
       if (!(await sleep(2400))) return
     } else if (v.kind === "watch") {
       line(0)
@@ -608,23 +589,27 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
       line(1); if (!(await sleep(2800))) return
     } else {
       line(0)
-      if (!(await move(w.archivist, [[230, 500]], 60))) return
+      if (!(await move(w.archivist, [[160, 500]], 60))) return
       for (let i = 0; i < 6; i++) {
         if (w.gen !== gen) return
-        for (let k = 0; k < 7; k++) w.sparks.push({ x: 222 + (Math.random() - 0.5) * 16, y: 486, vx: (Math.random() - 0.5) * 1.2, vy: -Math.random() * 1.5 - 0.3, l: 26, c: "#E8863C" })
-        w.puffs.push({ x: 222, y: 470, a: 0.5, s: 0.5, vy: 0.18 })
+        for (let k = 0; k < 7; k++) w.sparks.push({ x: 176 + (Math.random() - 0.5) * 16, y: 486, vx: (Math.random() - 0.5) * 1.2, vy: -Math.random() * 1.5 - 0.3, l: 26, c: "#E8863C" })
+        w.puffs.push({ x: 176, y: 470, a: 0.5, s: 0.5, vy: 0.18 })
         if (!(await sleep(600))) return
       }
       line(1); if (!(await sleep(2800))) return
-      if (!(await move(w.archivist, [[246, 506]], 60))) return
+      if (!(await move(w.archivist, [[126, 502]], 60))) return
     }
     if (w.gen !== gen) return
     setNarr(idle)
     onQuestEnd?.()
   }, [idle, makeMove, makeSleep, onQuestEnd])
 
+  const playedVignette = useRef(0)
   useEffect(() => {
-    if (vignette) void runVignette(vignette)
+    if (vignette && vignette.id !== playedVignette.current) {
+      playedVignette.current = vignette.id
+      void runVignette(vignette)
+    }
   }, [vignette, runVignette])
 
   /* ---------- narration portrait ---------- */
@@ -725,7 +710,7 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
             })}
             <span
               className="absolute rounded-md border px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wider"
-              style={{ left: `${(739 / W) * 100}%`, top: "1.2%", transform: "translateX(-50%)",
+              style={{ left: `${(729 / W) * 100}%`, top: `${(230 / H) * 100}%`, transform: "translateX(-50%)",
                 background: "rgba(255,247,228,0.9)", borderColor: "#8A5A28", color: "#6B4A18" }}
             >
               {laneLabel}
