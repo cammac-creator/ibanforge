@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { getStatsDB } from '../lib/db.js';
 import { hashIp, extractClientIp } from '../lib/stats.js';
+import { isAdminAuthorized } from './api-keys.js';
 
 const feedback = new Hono();
 
@@ -262,6 +263,72 @@ feedback.get('/v1/feedback/:id', (c) => {
   }
 
   return c.json(row);
+});
+
+/**
+ * GET /v1/admin/feedback — the reader this loop never had.
+ *
+ * send_feedback has been free (even past the cap) since 21/08/2026, on the
+ * promise printed in the MCP instructions: "a human reads every report". But
+ * the only read paths were the public status probe above and the raw table —
+ * no endpoint listed reports, so nothing could surface them to the human the
+ * promise names. An input channel without a reader is indistinguishable from
+ * no channel: the reports accumulated invisibly, exactly like api_keys.source
+ * did (see the 30/08 attribution finding). This closes the loop.
+ *
+ * Full rows here, unlike the minimal public probe: this side is authenticated
+ * and the notes/expected/got fields are the whole point of reading a report.
+ */
+feedback.get('/v1/admin/feedback', (c) => {
+  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
+  const statusFilter = c.req.query('status');
+  const rawLimit = Number(c.req.query('limit') ?? '50');
+  const limit = Number.isFinite(rawLimit) ? Math.max(1, Math.min(200, Math.floor(rawLimit))) : 50;
+  const db = getStatsDB();
+  const rows = statusFilter
+    ? db
+        .prepare(
+          `SELECT id, created_at, tx_hash, endpoint, error_type, expected, got, notes, contact, agent, status
+           FROM feedback WHERE status = ? ORDER BY created_at DESC, id DESC LIMIT ?`,
+        )
+        .all(statusFilter, limit)
+    : db
+        .prepare(
+          `SELECT id, created_at, tx_hash, endpoint, error_type, expected, got, notes, contact, agent, status
+           FROM feedback ORDER BY created_at DESC, id DESC LIMIT ?`,
+        )
+        .all(limit);
+  const open = (db.prepare(`SELECT COUNT(*) AS n FROM feedback WHERE status = 'open'`).get() as { n: number }).n;
+  return c.json({ open, reports: rows });
+});
+
+/**
+ * POST /v1/admin/feedback/status — mark one report handled (or reopen it).
+ *
+ * Without a "done" gesture the reader above recreates the mailbox failure the
+ * CRM just fixed: a list that only ever grows stops being read. Two states
+ * only, 'open' and 'done' — a triage taxonomy can come the day the volume
+ * asks for one.
+ */
+feedback.post('/v1/admin/feedback/status', async (c) => {
+  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
+  let body: { id?: unknown; status?: unknown };
+  try {
+    body = await c.req.json<{ id?: unknown; status?: unknown }>();
+  } catch {
+    return c.json({ error: 'invalid_json' }, 400);
+  }
+  const id = typeof body.id === 'number' && Number.isInteger(body.id) ? body.id : null;
+  const status = body.status === 'open' || body.status === 'done' ? body.status : null;
+  if (id === null || status === null) {
+    return c.json({ error: 'invalid_body', message: "id must be an integer and status 'open' or 'done'" }, 400);
+  }
+  const info = getStatsDB().prepare('UPDATE feedback SET status = ? WHERE id = ?').run(status, id);
+  return c.json({ updated: info.changes });
 });
 
 export { feedback };

@@ -165,6 +165,31 @@ describe('/health — freshness of the UK modulus table', () => {
  * counter, which is exactly what it reported for a few minutes on 21/08 before
  * this test existed. It publishes a state and nothing that can be counted.
  */
+describe('/health — per-source freshness (the living-tool block)', () => {
+  it('names every register with its own age and stale flag', async () => {
+    const body = (await (await app.request('/health')).json()) as {
+      bic_sources: Array<{ source: string; entries: number; last_updated: string | null; stale: boolean }>;
+    };
+    expect(Array.isArray(body.bic_sources)).toBe(true);
+    expect(body.bic_sources.length).toBeGreaterThan(1);
+    for (const s of body.bic_sources) {
+      expect(typeof s.source).toBe('string');
+      expect(s.entries).toBeGreaterThan(0);
+      expect(typeof s.stale).toBe('boolean');
+    }
+    // The committed database is rebuilt by the monthly cron; if this fails the
+    // repo's own data has aged past the cadence, which is itself the finding.
+    const gleif = body.bic_sources.find((s) => s.source.toLowerCase().includes('gleif'));
+    expect(gleif).toBeTruthy();
+  });
+
+  it('keeps the global freshness fields untouched beside the new block', async () => {
+    const body = (await (await app.request('/health')).json()) as Record<string, unknown>;
+    expect(body.bic_data_last_updated).toBeTruthy();
+    expect(typeof body.bic_database_entries).toBe('number');
+  });
+});
+
 describe('GET /health — a public endpoint must not leak activity volume', () => {
   it('reports the verification channel as a state, never as a count', async () => {
     const res = await app.request('/health');

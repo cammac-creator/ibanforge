@@ -23,6 +23,7 @@ import { toIso20022PostalAddress, type Iso20022PostalAddress } from './postal-ad
 import { blzRegisterAvailable, lookupBlz } from './de-blz.js';
 import { bgBaeRegisterAvailable, getBgAsOf, lookupBgBankCode } from './bg-bae.js';
 import { checkVop } from './compliance.js';
+import { recordDemandGap } from './demand-gaps.js';
 import { checkUkModulus } from './uk-modulus.js';
 import { praAuthorisationByLei } from './pra-banks.js';
 import { officialIdentityByNationalCode } from './official-identity.js';
@@ -872,6 +873,20 @@ export function enrichResult(result: IBANValidationResult): void {
   // parsed parts: Finland resolves on the whole string, and a country whose
   // bank_code slice is not a prefix of the BBAN would silently reassemble wrong.
   result.bank_code_check = checkBankCode(cc, bankCode, hit, result.iban.slice(4), lookupFailed);
+
+  // The demand ledger: a checksum-valid IBAN whose bank code we could not
+  // verify is the traffic telling us which data to plug in next. Recorded on
+  // the CHECKED value (the code the verdict is about — Iceland's bank grain,
+  // Finland's whole string), never on invalid IBANs, whose slices are noise.
+  if (result.valid && result.bank_code_check.status !== 'verified') {
+    const check = result.bank_code_check;
+    recordDemandGap(
+      'bank_code',
+      cc,
+      check.value,
+      check.reason ? `${check.status}:${check.reason}` : check.status,
+    );
+  }
 
   // Swiss clearing enrichment (CH and LI IBANs)
   if ((cc === 'CH' || cc === 'LI') && result.bban?.bank_code) {

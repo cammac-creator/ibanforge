@@ -9,6 +9,7 @@ import { classifyBicInput } from '../lib/input-normalize.js';
 import { lookupClearingSeatByBic } from '../lib/ch-clearing.js';
 import { toIso20022PostalAddress, type Iso20022PostalAddress } from '../lib/postal-address.js';
 import { recordOperation, recordRejection } from '../lib/stats.js';
+import { recordDemandGap } from '../lib/demand-gaps.js';
 import { computeRevenue } from '../lib/request-helpers.js';
 import type { BICLookupResult } from '../types.js';
 import type { SharedBic8Stats } from '../lib/bic-lookup.js';
@@ -115,6 +116,13 @@ bicLookup.get('/v1/bic/:code', (c) => {
   const errorDetail = found ? undefined : validation.bic;
   const revenue = computeRevenue(c, COST_USDC);
   recordOperation('bic_lookup', validation.country_code ?? null, found, revenue, errorDetail, c.get('apiKeyPrefix'));
+  // The demand ledger: an ISO-9362-shaped BIC we do not hold is a directory
+  // gap, aggregated by code so the monthly data decision can follow demand.
+  // Shape-gated twice (validateBIC above, the recorder's own gate), so a
+  // pasted email or path garbage can never reach the table.
+  if (!found) {
+    recordDemandGap('bic', validation.country_code ?? validation.bic11!.slice(4, 6), validation.bic11!, 'not_found');
+  }
 
   // Built by the shared helper so /v1/iban/validate cannot serve a different
   // shape from the same row. The romanization rule (decided from the actual

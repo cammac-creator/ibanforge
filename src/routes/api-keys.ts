@@ -77,7 +77,10 @@ const apiKeys = new Hono();
  * the provided header matches exactly. Length-normalized before timing-safe
  * compare so comparison cost does not leak the secret's length.
  */
-function isAdminAuthorized(provided: string | undefined): boolean {
+// Exported since 01/09/2026: new admin surfaces (demand-gaps, feedback) live
+// in their own route files, and a second copy of a timing-safe comparison is
+// a second place to get it subtly wrong.
+export function isAdminAuthorized(provided: string | undefined): boolean {
   const expected = process.env.ADMIN_SECRET;
   if (!expected || !provided) return false;
   const expectedBuf = Buffer.from(expected, 'utf8');

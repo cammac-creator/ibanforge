@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { Hono } from 'hono';
 import { feedback, recordFeedbackRow, countRecentFeedback, FEEDBACK_INSERTS_PER_SOURCE_HOUR } from './feedback.js';
 import { getStatsDB } from '../lib/db.js';
@@ -78,5 +78,62 @@ describe('POST /v1/feedback — per-source flood quota', () => {
       body: JSON.stringify({ notes: 'genuine report', error_type: 'missing_data' }),
     });
     expect(res.status).toBe(201);
+  });
+});
+
+/**
+ * The reader the loop never had: send_feedback promised "a human reads every
+ * report" while no endpoint could list reports. These pin the admin surface.
+ */
+describe('GET /v1/admin/feedback — the reader', () => {
+  const SECRET = `fb-admin-${RUN}`;
+  const saved = process.env.ADMIN_SECRET;
+  beforeAll(() => {
+    process.env.ADMIN_SECRET = SECRET;
+  });
+  afterAll(() => {
+    if (saved === undefined) delete process.env.ADMIN_SECRET;
+    else process.env.ADMIN_SECRET = saved;
+  });
+
+  it('refuses without the secret — full notes are private', async () => {
+    const app = makeApp();
+    expect((await app.request('/v1/admin/feedback')).status).toBe(401);
+  });
+
+  it('lists newest first with the open count, and status marks a report done', async () => {
+    const app = makeApp();
+    const marker = `admin-read-${RUN}`;
+    const id = recordFeedbackRow({ error_type: 'missing_data', notes: marker, ipHash: null });
+    const res = await app.request('/v1/admin/feedback?limit=200', {
+      headers: { 'X-Admin-Secret': SECRET },
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { open: number; reports: Array<{ id: number; notes: string; status: string }> };
+    const mine = body.reports.find((r) => r.id === id);
+    expect(mine?.notes).toBe(marker);
+    expect(mine?.status).toBe('open');
+    expect(body.open).toBeGreaterThan(0);
+
+    const done = await app.request('/v1/admin/feedback/status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Secret': SECRET },
+      body: JSON.stringify({ id, status: 'done' }),
+    });
+    expect(((await done.json()) as { updated: number }).updated).toBe(1);
+    const after = (await (
+      await app.request(`/v1/admin/feedback?status=done&limit=200`, { headers: { 'X-Admin-Secret': SECRET } })
+    ).json()) as { reports: Array<{ id: number }> };
+    expect(after.reports.some((r) => r.id === id)).toBe(true);
+  });
+
+  it('refuses a status outside the two-state model', async () => {
+    const app = makeApp();
+    const res = await app.request('/v1/admin/feedback/status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Secret': SECRET },
+      body: JSON.stringify({ id: 1, status: 'archived' }),
+    });
+    expect(res.status).toBe(400);
   });
 });

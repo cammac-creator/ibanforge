@@ -13,6 +13,7 @@ import {
 } from '../lib/ch-clearing.js';
 import { classifyIidInput } from '../lib/input-normalize.js';
 import { recordOperation, recordRejection } from '../lib/stats.js';
+import { recordDemandGap } from '../lib/demand-gaps.js';
 import { computeRevenue } from '../lib/request-helpers.js';
 import type { ChClearingLookupResult } from '../types.js';
 
@@ -66,6 +67,9 @@ chClearing.get('/v1/ch/clearing/:iid', (c) => {
 
   if (!entry) {
     recordOperation('ch_clearing_lookup', 'CH', false, revenue, normalizedIid, c.get('apiKeyPrefix'));
+    // The demand ledger: an IID absent from the BankMaster extract we serve.
+    // QR-IIDs and freshly allocated numbers show up here first.
+    recordDemandGap('ch_clearing', 'CH', normalizedIid, 'not_found');
 
     const result: ChClearingLookupResult = {
       iid: normalizedIid,

@@ -34,6 +34,7 @@ import { stats } from './routes/stats.js';
 import { adminBusiness } from './routes/admin-business.js';
 import { adminRevenue } from './routes/admin-revenue.js';
 import { adminScanners } from './routes/admin-scanners.js';
+import demandGaps from './routes/demand-gaps.js';
 import { adminForums } from './routes/admin-forums.js';
 import { demo } from './routes/demo.js';
 import { testIban } from './routes/test-iban.js';
@@ -688,6 +689,7 @@ export function buildApp(): Hono<HonoEnv> {
   app.route('/', adminBusiness);
   app.route('/', adminScanners);
   app.route('/', adminForums);
+  app.route('/', demandGaps);
   app.route('/', demo);
   app.route('/', testIban);
   app.route('/', openapi);

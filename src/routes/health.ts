@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { createRequire } from 'node:module';
-import { getEntryCount, getLastUpdated } from '../lib/bic-lookup.js';
+import { getEntryCount, getLastUpdated, getSourceFreshness, type SourceFreshness } from '../lib/bic-lookup.js';
 import { getChClearingCount } from '../lib/ch-clearing.js';
 import { getStatsDB } from '../lib/db.js';
 import { getComplianceDB } from '../lib/compliance-db.js';
@@ -87,6 +87,19 @@ const MIN_JUDGEABLE_SENDS = 5;
 /** Degraded above this share of refusals, once there is enough to judge. */
 const DEGRADED_REFUSAL_RATIO = 0.5;
 
+/**
+ * Guarded like the two probes above and for the same reason: freshness
+ * reporting is a feature, and a feature's failure must never pull a healthy
+ * container out of rotation.
+ */
+function probeSourceFreshness(): SourceFreshness[] {
+  try {
+    return getSourceFreshness();
+  } catch {
+    return [];
+  }
+}
+
 function probeVerificationMail(): { window_hours: number; state: 'ok' | 'degraded' | 'unknown' } {
   try {
     const d = verificationDelivery(24);
@@ -127,6 +140,16 @@ health.get('/health', (c) => {
       // true`, which a six-month-old table satisfies just as well as a fresh
       // one, while answering wrongly for every sorting code reallocated since.
       uk_modulus: probeUkModulus(),
+      // Per-register freshness, added 01/09/2026 and additive like the two
+      // blocks above. The global date one screen up answers "did the refresh
+      // run"; this answers "did every source survive it" — a register whose
+      // fetch step silently emptied would otherwise rot behind a green
+      // headline, because the newest GLEIF row keeps MAX(updated_at) young.
+      // Deliberately PUBLIC: entry counts per public register are product
+      // facts (the /sources page already names them), not activity data.
+      // Memoised — one scan per process, see getSourceFreshness. Never used
+      // to fail the check: stale data is a degraded feature, not an outage.
+      bic_sources: probeSourceFreshness(),
     });
   } catch {
     return c.json({ status: 'error', message: 'health_check_failed' }, 503);

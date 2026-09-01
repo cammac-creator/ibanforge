@@ -474,6 +474,66 @@ export function getLastUpdated(): string | null {
   return lastUpdatedCache;
 }
 
+export interface SourceFreshness {
+  source: string;
+  entries: number;
+  last_updated: string | null;
+  /** True once this source's newest row is older than the refresh cadence allows. */
+  stale: boolean;
+}
+
+/**
+ * Days a source's newest row may age before /health calls it stale. The
+ * refresh is monthly (1st of the month, ~03:15 UTC); 40 days is one cadence
+ * plus enough slack that a long month with a late run never false-alarms.
+ */
+const SOURCE_STALE_DAYS = 40;
+
+/**
+ * ⚠️ Same safety argument as lastUpdatedCache directly above — read-only
+ * database, monthly refresh ships a new file and a new process — and the same
+ * reset discharges it.
+ */
+let sourceFreshnessCache: SourceFreshness[] | undefined;
+
+/**
+ * Per-source freshness, for /health's living-tool block.
+ *
+ * The global MAX(updated_at) above answers "did the refresh run"; it cannot
+ * answer "did every source survive it". The monthly workflow rebuilds nine
+ * registers with individual sanity floors, and a source whose fetch step was
+ * skipped or emptied would rot invisibly behind a green global date — the
+ * newest GLEIF row would keep the headline fresh while, say, the Austrian
+ * register aged out. One GROUP BY over the source column, memoised for the
+ * life of the process (one ~120k-row scan at first ask, then a constant),
+ * makes each register answer for its own age.
+ *
+ * `stale` is computed at READ time from the cached date, not cached itself:
+ * a process that lives past the threshold must start saying so, and a cached
+ * boolean would keep saying what was true at boot.
+ */
+export function getSourceFreshness(): SourceFreshness[] {
+  if (sourceFreshnessCache === undefined) {
+    sourceFreshnessCache = getBicDB()
+      .prepare(
+        `SELECT COALESCE(source, 'unknown') AS source, COUNT(*) AS entries, MAX(updated_at) AS last_updated
+         FROM bic_entries GROUP BY COALESCE(source, 'unknown') ORDER BY entries DESC`,
+      )
+      .all()
+      .map((r) => {
+        const row = r as { source: string; entries: number; last_updated: string | null };
+        return { source: row.source, entries: row.entries, last_updated: row.last_updated, stale: false };
+      });
+  }
+  const cutoff = Date.now() - SOURCE_STALE_DAYS * 86_400_000;
+  return sourceFreshnessCache.map((s) => ({
+    ...s,
+    // A source with no readable date cannot prove freshness: stale, not benefit
+    // of the doubt — the flag exists to be seen, and "unknown" ages too.
+    stale: s.last_updated === null || new Date(s.last_updated + 'Z').getTime() < cutoff,
+  }));
+}
+
 /**
  * Look up a BIC by country code and BBAN bank code.
  *
@@ -708,4 +768,5 @@ export function resetStatements(): void {
   // Cleared with the statements: it is derived from the same database, so a
   // caller swapping databases must not keep the previous one's refresh date.
   lastUpdatedCache = undefined;
+  sourceFreshnessCache = undefined;
 }
