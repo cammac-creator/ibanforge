@@ -68,6 +68,32 @@ const COURIER_RUNS: Record<TrafficCourier["kind"], [number, number][]> = {
 const HERO_SPEED = 156
 const COURIER_SPEED = 220
 
+/** Rounds the 90° corners of an axis-aligned path into short Bézier arcs, so
+ * walks read as natural strolls instead of drill-square turns. */
+function roundPath(pts: [number, number][], r = 14): [number, number][] {
+  if (pts.length < 3) return pts
+  const out: [number, number][] = [pts[0]]
+  for (let i = 1; i < pts.length - 1; i++) {
+    const [px, py] = pts[i - 1], [cx, cy] = pts[i], [nx, ny] = pts[i + 1]
+    const d1 = Math.hypot(cx - px, cy - py) || 1
+    const d2 = Math.hypot(nx - cx, ny - cy) || 1
+    const t1 = Math.min(r, d1 / 2) / d1
+    const t2 = Math.min(r, d2 / 2) / d2
+    const ax = cx - (cx - px) * t1, ay = cy - (cy - py) * t1
+    const bx = cx + (nx - cx) * t2, by = cy + (ny - cy) * t2
+    out.push([ax, ay])
+    for (const q of [0.3, 0.5, 0.7]) {
+      out.push([
+        (1 - q) * (1 - q) * ax + 2 * (1 - q) * q * cx + q * q * bx,
+        (1 - q) * (1 - q) * ay + 2 * (1 - q) * q * cy + q * q * by,
+      ])
+    }
+    out.push([bx, by])
+  }
+  out.push(pts[pts.length - 1])
+  return out
+}
+
 interface Spark { x: number; y: number; vx: number; vy: number; l: number; c: string }
 interface Puff { x: number; y: number; a: number; s: number; vy: number }
 interface Seal { x: number; y: number; sprite: "coin" | "seal-x"; l: number }
@@ -119,11 +145,12 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
         paintVignette(v.getContext("2d")!)
         w.vignetteLayer = v
         // ambience seeds
-        w.embers = Array.from({ length: 14 }, (_, i) => {
+        w.embers = Array.from({ length: 10 }, (_, i) => {
           const [zx, zy] = EMBER_ZONES[i % EMBER_ZONES.length]
-          return { x: zx + (Math.random() - 0.5) * 40, y: zy - Math.random() * 30, vx: (Math.random() - 0.5) * 0.1, p: Math.random() * 6 }
+          return { x: zx + (Math.random() - 0.5) * 30, y: zy - Math.random() * 24, vx: (Math.random() - 0.5) * 0.1, p: Math.random() * 6 }
         })
-        w.flies = Array.from({ length: 9 }, () => ({ x: Math.random() * W, y: 240 + Math.random() * 280, p: Math.random() * 6 }))
+        // no fireflies in daylight
+        w.flies = []
         setLoaded(true)
       })
       .catch(() => { /* stays on the loading veil; a reload retries */ })
@@ -182,13 +209,12 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
           }
         }
         for (const f of w.flies) { f.x += Math.sin(t / 900 + f.p) * 0.18; f.y += Math.cos(t / 1100 + f.p) * 0.12 }
-        // chimney + forge smoke
-        if (Math.floor(t / 420) !== Math.floor((t - dt) / 420) && w.puffs.length < 26) {
-          for (const [cx, cy] of CHIMNEYS) w.puffs.push({ x: cx + 2, y: cy - 46, a: 0.5, s: 0.5, vy: 0.16 })
-          w.puffs.push({ x: 416, y: 368, a: 0.55, s: 0.7, vy: 0.2 })
+        // forge chimney smoke
+        if (Math.floor(t / 460) !== Math.floor((t - dt) / 460) && w.puffs.length < 18) {
+          for (const [cx, cy] of CHIMNEYS) w.puffs.push({ x: cx, y: cy - 44, a: 0.45, s: 0.55, vy: 0.17 })
         }
-        // idle forge sparkle
-        if (Math.random() < 0.05) w.sparks.push({ x: 410 + (Math.random() - 0.5) * 30, y: 470, vx: (Math.random() - 0.5) * 0.8, vy: -Math.random() * 1.2 - 0.3, l: 30, c: "#FDE68A" })
+        // idle hearth sparkle
+        if (Math.random() < 0.04) w.sparks.push({ x: 392 + (Math.random() - 0.5) * 24, y: 468, vx: (Math.random() - 0.5) * 0.8, vy: -Math.random() * 1.2 - 0.3, l: 30, c: "#FDE68A" })
       }
       w.sparks = w.sparks.filter((s) => --s.l > 0); w.sparks.forEach((s) => { s.x += s.vx; s.y += s.vy; s.vy += 0.04 })
       w.puffs = w.puffs.filter((p) => (p.a -= 0.004) > 0); w.puffs.forEach((p) => { p.y -= p.vy; p.s += 0.006 })
@@ -278,22 +304,35 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
 
       ctx.drawImage(w.vignetteLayer!, 0, 0)
 
-      // crisp labels (screen space)
+      // crisp labels (screen space) — opaque cream plaques, always readable
+      // the canvas is CSS-downscaled to roughly half its backing size, so the
+      // plaques are drawn double: they land at a readable ~13px on screen
       ctx.setTransform(1, 0, 0, 1, 0, 0)
-      ctx.font = "600 13px var(--font-sans, system-ui), sans-serif"
+      ctx.font = "700 26px var(--font-sans, system-ui), sans-serif"
       ctx.textAlign = "center"
       const label = (text: string, lx: number, ly: number) => {
-        const wpx = ctx.measureText(text).width + 12
-        ctx.fillStyle = "rgba(18,16,20,0.72)"; ctx.fillRect(lx - wpx / 2, ly - 13, wpx, 17)
-        ctx.strokeStyle = "rgba(245,158,11,0.55)"; ctx.strokeRect(lx - wpx / 2 + 0.5, ly - 12.5, wpx - 1, 16)
-        ctx.fillStyle = "#FDE68A"; ctx.fillText(text, lx, ly)
+        const wpx = ctx.measureText(text).width + 26
+        ctx.fillStyle = "#FFF7E4"
+        ctx.fillRect(lx - wpx / 2, ly - 25, wpx, 36)
+        ctx.lineWidth = 3
+        ctx.strokeStyle = "#8A5A28"
+        ctx.strokeRect(lx - wpx / 2 + 1.5, ly - 23.5, wpx - 3, 33)
+        ctx.lineWidth = 1
+        ctx.fillStyle = "#4A2E10"
+        ctx.fillText(text, lx, ly + 2)
+      }
+      // plaques sit UNDER the doors; a few get bespoke spots to avoid overlaps
+      const LABEL_AT: Record<string, [number, number]> = {
+        warehouse: [152, 64], tower: [150, 344], forge: [410, 516],
+        archive: [246, 514], border: [438, 366], vigil: [900, 508],
       }
       for (const s of STATIONS) {
-        if (s.cc && !(w.focus && w.focus.id === s.id)) continue
         const txt = labels[s.id]
-        if (txt) label(txt, s.cx * SCALE, (s.by - 6) * SCALE)
+        if (!txt) continue
+        const [lx, ly] = LABEL_AT[s.id] ?? [s.cx, s.base + 10]
+        label(txt, lx * SCALE, ly * SCALE)
       }
-      label(laneLabel, 700 * SCALE, 16 * SCALE)
+      label(laneLabel, 730 * SCALE, 16 * SCALE)
     }
     raf = requestAnimationFrame(frame)
     return () => cancelAnimationFrame(raf)
@@ -318,7 +357,8 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
 
   const makeMove = useCallback((genAtStart: number) => {
     const w = world.current
-    return async (a: Actor, pts: [number, number][], speed: number) => {
+    return async (a: Actor, rawPts: [number, number][], speed: number) => {
+      const pts = w.reduced ? rawPts : roundPath([[a.x, a.y], ...rawPts]).slice(1)
       for (const [tx, ty] of pts) {
         if (w.gen !== genAtStart) return false
         if (w.reduced) {
@@ -405,13 +445,13 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
       }
 
       setNarr({ who: step.who, text: step.text })
-      if (step.station === "gate") w.seals.push({ x: 80, y: 150, sprite: "coin", l: 90 })
-      if (step.station === "scribe" && step.outcome === "fail") w.seals.push({ x: 200, y: 140, sprite: "seal-x", l: 110 })
+      if (step.station === "gate") w.seals.push({ x: 80, y: 140, sprite: "coin", l: 90 })
+      if (step.station === "scribe" && step.outcome === "fail") w.seals.push({ x: 204, y: 116, sprite: "seal-x", l: 110 })
       if (step.station === "registry" && target) w.pulses.push({ x: target.cx, y: target.base - 60, r: 6, l: 40 })
-      if (step.station === "tower") w.pulses.push({ x: 196, y: 200, r: 6, l: 40 })
+      if (step.station === "tower") w.pulses.push({ x: 190, y: 200, r: 6, l: 40 })
       if (step.station === "forge") {
-        for (let i = 0; i < 24; i++) w.sparks.push({ x: 430 + (Math.random() - 0.5) * 40, y: 470, vx: (Math.random() - 0.5) * 1.8, vy: -Math.random() * 2 - 0.5, l: 30 + Math.random() * 20, c: "#FDE68A" })
-        w.seals.push({ x: 410, y: 420, sprite: step.outcome === "fail" ? "seal-x" : "coin", l: 120 })
+        for (let i = 0; i < 24; i++) w.sparks.push({ x: 392 + (Math.random() - 0.5) * 36, y: 468, vx: (Math.random() - 0.5) * 1.8, vy: -Math.random() * 2 - 0.5, l: 30 + Math.random() * 20, c: "#FDE68A" })
+        w.seals.push({ x: 410, y: 398, sprite: step.outcome === "fail" ? "seal-x" : "coin", l: 120 })
       }
       if (!(await sleep(step.holdMs))) return
     }
@@ -432,7 +472,7 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
     for (const [idx, op] of traffic.entries()) {
       if (w.seenCouriers.has(op.key) || w.couriers.length >= 8) continue
       w.seenCouriers.add(op.key)
-      const pts = COURIER_RUNS[op.kind]
+      const pts = roundPath(COURIER_RUNS[op.kind])
       w.couriers.push({
         key: op.key, tip: op.tip, pts, i: 1,
         actor: {
@@ -472,7 +512,8 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
     w.hero.hidden = true
     if (v.kind === "caravan") {
       line(0)
-      if (!(await rollCart(76, -40, 930, REGISTRY_CCS.map((_, i) => 540 + i * 64)))) return
+      const houseStops = STATIONS.filter((s) => s.cc).map((s) => s.cx)
+      if (!(await rollCart(76, -40, 930, houseStops))) return
       line(1); if (!(await sleep(2800))) return
       line(2)
       if (!(await rollCart(342, 990, 236, []))) return

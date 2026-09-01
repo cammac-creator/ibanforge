@@ -64,10 +64,10 @@ export function drawSprite(
 
 export const REGISTRY_CCS = ['DE', 'AT', 'BE', 'BG', 'NL', 'FI'] as const;
 const REGISTRY_SPRITES = ['house0', 'house1', 'house2', 'house3', 'house4', 'house1'];
-const REGISTRY_X0 = 540;
-const REGISTRY_STEP = 64;
+const REGISTRY_X0 = 560;
+const REGISTRY_STEP = 68;
 export const LANE_X = 600;
-export const LANE_DOOR_Y = 134;
+export const LANE_DOOR_Y = 136;
 
 export interface StationGeo {
   id: string;
@@ -90,39 +90,35 @@ function geo(
 }
 
 export const STATIONS: StationGeo[] = [
-  geo('gate', 'house0', 80, 176, 80, 116, [80, 198], [80, 192]),
-  geo('scribe', 'desk', 200, 172, 66, 54, [200, 198], [200, 192]),
-  geo('cutter', 'desk', 306, 172, 66, 54, [306, 198], [306, 192]),
-  geo('library', 'house-big', 430, 168, 100, 146, [430, 198], [430, 192]),
+  geo('gate', 'gate', 80, 180, 84, 116, [80, 200], [80, 192]),
+  geo('scribe', 'stall-red', 204, 178, 64, 74, [204, 200], [204, 192]),
+  geo('cutter', 'stall-teal', 318, 178, 62, 70, [318, 200], [318, 192]),
+  geo('library', 'library', 472, 172, 172, 136, [472, 200], [472, 192]),
   ...REGISTRY_CCS.map((cc, i) =>
     geo(`reg-${cc}`, REGISTRY_SPRITES[i], REGISTRY_X0 + i * REGISTRY_STEP, 118, 62, 116,
       [REGISTRY_X0 + i * REGISTRY_STEP, LANE_DOOR_Y], [LANE_X, 192], cc),
   ),
-  geo('warehouse', 'cart', 62, 84, 76, 60, [104, 84], [104, 84]),
+  geo('warehouse', 'warehouse', 70, 96, 132, 108, [112, 98], [112, 76]),
   geo('six', 'house3', 852, 326, 76, 116, [852, 348], [852, 342]),
   geo('court', 'house-big', 716, 322, 100, 146, [716, 348], [716, 342]),
   geo('classifier', 'house2', 582, 326, 76, 116, [582, 348], [582, 342]),
-  geo('border', 'checkpoint', 438, 344, 100, 100, [438, 352], [438, 342]),
-  geo('tower', 'tower', 190, 326, 70, 176, [202, 344], [202, 342]),
-  geo('forge', 'furnace', 410, 482, 130, 130, [410, 504], [410, 498]),
-  geo('archive', 'desk', 246, 480, 80, 56, [246, 504], [246, 498]),
-  geo('vigil', 'vigil-post', 900, 468, 60, 64, [900, 494], [900, 498]),
+  geo('border', 'fence', 438, 348, 104, 46, [438, 352], [438, 342]),
+  geo('tower', 'tower', 176, 330, 102, 170, [202, 344], [202, 342]),
+  geo('forge', 'forge', 410, 486, 152, 126, [410, 506], [410, 498]),
+  geo('archive', 'desk-day', 246, 482, 70, 50, [246, 504], [246, 498]),
+  geo('vigil', 'vigil-booth', 900, 474, 56, 60, [900, 496], [900, 498]),
 ];
 export const stationById = Object.fromEntries(STATIONS.map((s) => [s.id, s]));
 
-/** Ambience décor: lantern posts along the streets. */
-export const LANTERNS: [number, number][] = [[128, 452], [528, 208], [704, 368], [655, 150]];
-/** Chimneys glued onto roofs (x, base, smoke source). */
-export const CHIMNEYS: [number, number][] = [[455, 96], [733, 212]];
-/** Where ember particles rise. */
-export const EMBER_ZONES: [number, number][] = [[410, 480], [222, 488], [190, 176]];
-/** Halo lights: x, y, radius, strength, flicker phase. */
+/** Where smoke rises (forge chimney is painted into the day sprite). */
+export const CHIMNEYS: [number, number][] = [[462, 386]];
+/** Where ember particles rise (forge hearth, braziers). */
+export const EMBER_ZONES: [number, number][] = [[392, 470], [224, 488], [196, 176]];
+/** Halo lights, daylight-discreet: x, y, radius, strength. */
 export const HALOS: [number, number, number, number][] = [
-  [196, 172, 46, 0.55],   // tower flame
-  [410, 452, 64, 0.6],    // forge
-  [128, 424, 34, 0.45], [528, 180, 34, 0.45], [704, 340, 34, 0.45], [655, 122, 34, 0.45],
-  [900, 442, 26, 0.4],    // vigil
-  [222, 484, 26, 0.4],    // archive brazier
+  [196, 170, 32, 0.4],    // tower brazier
+  [392, 456, 44, 0.5],    // forge hearth
+  [224, 484, 20, 0.35],   // archive brazier
 ];
 
 const ROAD_BANDS: [number, number, number, number][] = [
@@ -141,26 +137,22 @@ const ROAD_BANDS: [number, number, number, number][] = [
  * in one painter's-order pass, so the scenery list below is drawn per frame. */
 
 export function paintGround(ctx: Ctx, img: WorldImages) {
-  // checkered 180°-rotated tiling breaks the visible repetition of the tile
+  // checkered 180°-rotated tiling breaks the visible repetition of the tile;
+  // the step follows the tile's real size (day tile: 160px)
+  // plain tiling: the day tile is organic enough that straight repetition
+  // reads softer than a checkered rotation (whose gradient made a patchwork)
   const g = img.ground;
-  for (let j = 0; j * 256 < H; j++) {
-    for (let i = 0; i * 256 < W; i++) {
-      if ((i + j) % 2 === 0) {
-        ctx.drawImage(g, i * 256, j * 256);
-      } else {
-        ctx.save();
-        ctx.translate(i * 256 + 128, j * 256 + 128);
-        ctx.rotate(Math.PI);
-        ctx.drawImage(g, -128, -128);
-        ctx.restore();
-      }
+  const T = g.width;
+  for (let j = 0; j * T < H; j++) {
+    for (let i = 0; i * T < W; i++) {
+      ctx.drawImage(g, i * T, j * T);
     }
   }
-  // warm-lit streets
+  // worn-earth streets on the pale cobbles (daylight)
   for (const [x, y, w, h] of ROAD_BANDS) {
-    ctx.fillStyle = 'rgba(255,208,130,0.22)';
+    ctx.fillStyle = 'rgba(128,100,70,0.26)';
     ctx.fillRect(x, y, w, h);
-    ctx.fillStyle = 'rgba(255,208,130,0.15)';
+    ctx.fillStyle = 'rgba(96,74,50,0.18)';
     ctx.fillRect(x, y, w, 2);
     ctx.fillRect(x, y + h - 2, w, 2);
   }
@@ -171,30 +163,43 @@ export function paintGround(ctx: Ctx, img: WorldImages) {
 export interface Placed { sprite: string; cx: number; base: number; scale?: number }
 export const SCENERY: Placed[] = [
   ...STATIONS.filter((s) => s.sprite).map((s) => ({ sprite: s.sprite!, cx: s.cx, base: s.base })),
-  { sprite: 'anvil', cx: 458, base: 486 },
-  { sprite: 'embers', cx: 382, base: 496 },
-  { sprite: 'ember-line', cx: 222, base: 492 },
-  ...LANTERNS.map(([x, y]) => ({ sprite: 'lantern', cx: x, base: y })),
-  ...CHIMNEYS.map(([x, y]) => ({ sprite: 'chimney', cx: x, base: y })),
+  { sprite: 'signpost', cx: 478, base: 336 },   // border post sign
+  { sprite: 'ember-line', cx: 224, base: 494 }, // archive brazier
+  { sprite: 'cart', cx: 148, base: 92 },        // parked caravan cart
+  // greenery
+  { sprite: 'tree1', cx: 32, base: 150 }, { sprite: 'tree2', cx: 930, base: 420 },
+  { sprite: 'tree1', cx: 62, base: 392 }, { sprite: 'grove', cx: 300, base: 292 },
+  { sprite: 'tree2', cx: 935, base: 244 }, { sprite: 'tree1', cx: 390, base: 86 },
+  { sprite: 'planter-red', cx: 508, base: 180 }, { sprite: 'topiary', cx: 268, base: 192 },
+  { sprite: 'pot-yellow', cx: 148, base: 198 }, { sprite: 'planter2', cx: 660, base: 350 },
+  { sprite: 'ivy', cx: 428, base: 176 },
+  { sprite: 'tuft1', cx: 240, base: 220 }, { sprite: 'tuft2', cx: 500, base: 260 },
+  { sprite: 'tufts2', cx: 640, base: 240 }, { sprite: 'tuft1', cx: 60, base: 300 },
+  { sprite: 'tuft2', cx: 890, base: 380 }, { sprite: 'tufts2', cx: 340, base: 440 },
+  // village life props
+  { sprite: 'well', cx: 120, base: 470 },
+  { sprite: 'barrel-group', cx: 150, base: 110 }, { sprite: 'sacks', cx: 186, base: 96 },
+  { sprite: 'barrel-cart', cx: 484, base: 496 }, { sprite: 'wheelbarrow', cx: 540, base: 500 },
+  { sprite: 'hay', cx: 58, base: 506 }, { sprite: 'fence', cx: 292, base: 340 },
+  { sprite: 'rocks', cx: 352, base: 244 }, { sprite: 'rock-big', cx: 925, base: 522 },
 ];
 
-/** Station signs, high on the walls — nothing ever passes in front of them,
- * so one draw after the scenery/actor pass is safe. */
+/** Station signs drawn after the scenery/actor pass (nothing crosses them). */
 export function drawSigns(ctx: Ctx, img: WorldImages) {
-  drawSprite(ctx, img, 'coin-sign', 80, 100);             // toll gate
-  drawSprite(ctx, img, 'ingot', 430, 62, { scale: 0.9 }); // library lintel
-  ctx.fillStyle = '#C0392B';                               // Swiss badge (SIX)
-  ctx.fillRect(846, 232, 12, 10);
+  void img;
+  // Swiss cross badge on the SIX house banner
+  ctx.fillStyle = '#C0392B';
+  ctx.fillRect(845, 246, 13, 11);
   ctx.fillStyle = '#FFFFFF';
-  ctx.fillRect(851, 234, 2, 6);
-  ctx.fillRect(848, 236, 8, 2);
+  ctx.fillRect(850, 248, 3, 7);
+  ctx.fillRect(848, 250, 7, 3);
 }
 
 /** Peripheral night vignette, prerendered once at world size. */
 export function paintVignette(ctx: Ctx) {
-  const g = ctx.createRadialGradient(W / 2, H / 2, H * 0.52, W / 2, H / 2, H * 1.0);
-  g.addColorStop(0, 'rgba(8,8,14,0)');
-  g.addColorStop(1, 'rgba(8,8,14,0.24)');
+  const g = ctx.createRadialGradient(W / 2, H / 2, H * 0.56, W / 2, H / 2, H * 1.05);
+  g.addColorStop(0, 'rgba(30,24,14,0)');
+  g.addColorStop(1, 'rgba(30,24,14,0.10)');
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, W, H);
 }
