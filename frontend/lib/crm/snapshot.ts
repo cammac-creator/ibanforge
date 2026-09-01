@@ -1,3 +1,4 @@
+import { accountUsd } from './account-usd';
 import { isArchived } from './archived';
 import { ballWithUs as isBallWithUs, followupDue as isFollowupDue } from './buckets';
 import { buildContacts, type BuildInput } from './build-contacts';
@@ -6,12 +7,6 @@ import { situationOf } from './situation';
 import { snoozedMap, wokeMap } from './snooze';
 import type { Contact, Situation } from './types';
 
-/**
- * Stripe pack price by credit bundle, in USD. A bundle size that is not on the
- * list is worth nothing rather than guessed at: a made-up price in a revenue
- * total is worse than a total that is visibly short.
- */
-const BUNDLE_USD: Record<number, number> = { 1000: 5, 5000: 20, 25000: 80 };
 
 /**
  * One reading of the contact base, taken against one instant.
@@ -56,6 +51,18 @@ export interface CrmSnapshot {
   sentToday: number;
   /** Stripe pack revenue of the live client set, in USD. */
   revenueUsd: number;
+  /**
+   * True when at least one account in that total was priced from the pack size
+   * rather than from what was actually charged (findings DASH-12 and DASH-17,
+   * 2026-09-01). It is the case for EVERY account today: GET /v1/admin/keys
+   * does not serve amount_paid_minor, so the whole figure is a deduction.
+   *
+   * Shown rather than kept quiet: a deduced total is a good enough answer to
+   * "roughly how much came in", and a very bad answer to "what did this
+   * customer pay". A reader who cannot tell which one he is holding will use it
+   * for both.
+   */
+  revenuePartlyDeduced: boolean;
   /** Free keys that actually call the API: the conversion candidates. */
   freeActive: number;
 }
@@ -121,6 +128,7 @@ export function crmSnapshot(data: BuildInput, now: Date = new Date()): CrmSnapsh
   let clients = 0;
   let institutions = 0;
   let revenueUsd = 0;
+  let revenuePartlyDeduced = false;
   let freeActive = 0;
   for (const c of active) {
     if (c.kind === 'prospect') {
@@ -137,7 +145,12 @@ export function crmSnapshot(data: BuildInput, now: Date = new Date()): CrmSnapsh
     }
     clients += 1;
     if (c.apiKey.paid && c.apiKey.creditsTotal != null) {
-      revenueUsd += BUNDLE_USD[c.apiKey.creditsTotal] ?? 0;
+      // What was charged when we have it, the pack price when we do not, and
+      // an unknown bundle priced pro rata rather than dropped to zero. The
+      // whole rule, and the reasons for each half, live in account-usd.ts.
+      const money = accountUsd(c.apiKey);
+      revenueUsd += money.usd;
+      if (money.source === 'deduced') revenuePartlyDeduced = true;
     } else if (!c.apiKey.paid && c.apiKey.usedAllTime > 0) {
       freeActive += 1;
     }
@@ -157,7 +170,10 @@ export function crmSnapshot(data: BuildInput, now: Date = new Date()): CrmSnapsh
     clients,
     institutions,
     sentToday,
-    revenueUsd,
+    // Rounded to the cent: a pro rata price can carry a float tail, and a
+    // revenue line is money, not a measurement.
+    revenueUsd: Math.round(revenueUsd * 100) / 100,
+    revenuePartlyDeduced,
     freeActive,
   };
 }

@@ -207,6 +207,10 @@ describe('buildContacts', () => {
       // the decision itself, taken once server-side against one clock.
       createdAt: '2026-06-01 10:00:00',
       issuedByUs: false,
+      // Null, not absent: GET /v1/admin/keys serves neither column today, and
+      // the revenue rule reads that as "deduce the amount from the pack size".
+      amountPaidMinor: null,
+      amountPaidCurrency: null,
       isNew: false,
     });
     expect(client.usage.series).toEqual([1, 2]);
@@ -1020,3 +1024,22 @@ describe('buildContacts, institutional correspondents', () => {
     expect(out[0].kind).toBe('client');
   });
 });
+
+describe('the charged amount, when the API starts serving it', () => {
+  it('carries amount_paid_minor and its currency onto the key', () => {
+    const out = buildContacts({
+      ...base,
+      keys: [
+        keyRow('alpha@example.net', {
+          credits_total: 5000,
+          credits_remaining: 4000,
+          amount_paid_minor: 1500,
+          amount_paid_currency: 'usd',
+        }),
+      ],
+    });
+    const client = asClient(out[0]);
+    expect(client.apiKey.amountPaidMinor).toBe(1500);
+    expect(client.apiKey.amountPaidCurrency).toBe('usd');
+  });
+})

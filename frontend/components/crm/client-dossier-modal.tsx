@@ -8,6 +8,7 @@ import {
   parseUtc,
   qualityTrend,
   calendarDaysSince,
+  stateOfDossier,
   type ClientDossier,
 } from '@/lib/crm/client-dossiers';
 import { botsHref, contactsHref } from '@/lib/crm/deep-link';
@@ -16,7 +17,7 @@ import { ConquestChip } from './conquest-chip';
 import { ContactNotes } from './contact-notes';
 import { ActivityChart } from './activity-chart';
 import { RaiseLimitControl } from './raise-limit-control';
-import { VERDICT_BY_KEY } from './verdict-meta';
+import { NUANCE_BY_KEY, STATE_BY_KEY } from './verdict-meta';
 
 /**
  * The dossier as a window over the page: click a row, the customer's whole
@@ -103,7 +104,13 @@ export function ClientDossierModal({
   const quality = qualityTrend(d, now);
   const chip = chipOfDossier(d);
   const heat = heatOfDossier(d, now);
-  const verdict = VERDICT_BY_KEY[d.verdict];
+  // The same one-word-plus-precision the table row shows, from the same
+  // function (audit TABS-01 and TABS-09, 2026-09-01). A dossier that read
+  // "Actif" in the list and "Endormi" once opened was the most visible half of
+  // the two-vocabulary defect.
+  const state = stateOfDossier(d);
+  const verdict = STATE_BY_KEY[state.status];
+  const nuance = state.nuance ? NUANCE_BY_KEY[state.nuance] : null;
   const hue = hueOf(d.email);
 
   useEffect(() => {
@@ -210,8 +217,19 @@ export function ClientDossierModal({
             >
               <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: verdict.colour }} />
               {verdict.one}
+              {state.derived ? '°' : ''}
             </span>
-            <span className="min-w-0 flex-1 truncate text-[12px] text-[var(--fg-4)]">{verdict.why}</span>
+            {nuance && (
+              <span
+                className="inline-flex shrink-0 items-center rounded-full border border-[var(--ink-4)] px-2 py-0.5 text-[12px] text-[var(--fg-3)]"
+                title={nuance.why}
+              >
+                {nuance.one}
+              </span>
+            )}
+            <span className="min-w-0 flex-1 truncate text-[12px] text-[var(--fg-4)]">
+              {nuance ? nuance.why : verdict.why}
+            </span>
             <Link
               href={contactsHref(locale, d.id)}
               className="shrink-0 rounded-md border border-[var(--amber-500)]/40 px-2.5 py-1 text-[12.5px] font-medium text-[var(--amber-400)] hover:bg-[var(--amber-500)]/10"

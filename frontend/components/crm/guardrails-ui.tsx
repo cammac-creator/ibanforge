@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { BLOCK_LABEL, checkDraft, EM_DASH } from '@/lib/crm/guardrails';
-import { intentOf } from '@/lib/crm/intent';
+import { intentOf, type Intent } from '@/lib/crm/intent';
 import { lastOutbound } from '@/lib/crm/repeat';
 import type { Contact, GuardrailReport, Message, Situation } from '@/lib/crm/types';
 
@@ -60,6 +60,24 @@ export interface Guarded {
   toggle: () => void;
   /** Drop the grant. Call it whenever the text becomes a different draft. */
   clear: () => void;
+  /**
+   * Which rule set was armed, for the surface to declare to /api/crm/send.
+   *
+   * The route replays the blocking rules on the server (audit TABS-03,
+   * 2026-09-01) and cannot derive this itself: intent comes from the situation
+   * and the contact kind, neither of which crosses the wire. Read here rather
+   * than recomputed in each surface, so the rules the browser applied and the
+   * rules the server applies are decided in one place.
+   */
+  intent: Intent;
+  /**
+   * The blocking codes the operator actually passed over, or an empty list.
+   *
+   * Empty unless the grant is live: a dormant grant covers nothing, exactly as
+   * it covers nothing here. Sent alongside the mail so the server refuses only
+   * what nobody looked at.
+   */
+  forcedCodes: string[];
 }
 
 /**
@@ -204,6 +222,8 @@ export function useGuardrails({
     forcedNote: forced ? `Forçage accordé. Le mail partira malgré : ${blockNames}.` : null,
     toggle: () => setOverrideFor((prev) => (prev === blockKey ? null : blockKey)),
     clear: () => setOverrideFor(null),
+    intent,
+    forcedCodes: forced ? blockers.map((i) => i.code) : [],
   };
 }
 

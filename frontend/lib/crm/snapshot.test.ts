@@ -154,12 +154,47 @@ describe('crmSnapshot', () => {
     expect(snap.freeActive).toBe(1);
   });
 
-  it('gives an unpriced credit bundle no value rather than a wrong one', () => {
+  it('prices an unlisted credit bundle pro rata rather than dropping it', () => {
+    // It used to be worth exactly zero, so a hand-granted pack or a future tier
+    // vanished from the revenue line in silence (DASH-12, DASH-17). A customer
+    // missing from a total is a worse error than an approximate one, as long as
+    // the total says it is approximate.
     const snap = crmSnapshot(
       { ...input, keys: [keyRow('paid@example.net', { credits_total: 777, paid: 1 })] },
       NOW,
     );
-    expect(snap.revenueUsd).toBe(0);
+    expect(snap.revenueUsd).toBeGreaterThan(0);
+    expect(snap.revenuePartlyDeduced).toBe(true);
+  });
+
+  it('prefers what was actually charged over the pack price', () => {
+    // The pack table answers "what does this cost today", never "what did this
+    // customer pay": a discount or a partial refund makes it wrong across the
+    // whole history with nothing to show for it.
+    const snap = crmSnapshot(
+      {
+        ...input,
+        keys: [
+          keyRow('paid@example.net', {
+            credits_total: 5000,
+            paid: 1,
+            amount_paid_minor: 1500,
+            amount_paid_currency: 'usd',
+          }),
+        ],
+      },
+      NOW,
+    );
+    expect(snap.revenueUsd).toBe(15);
+    expect(snap.revenuePartlyDeduced).toBe(false);
+  });
+
+  it('says the total is deduced while the API serves no amount', () => {
+    // The state of production on 2026-09-01: GET /v1/admin/keys carries neither
+    // amount_paid_minor nor its currency, so every figure in this total is a
+    // deduction and the flag has to say so.
+    const snap = crmSnapshot(input, NOW);
+    expect(snap.revenuePartlyDeduced).toBe(true);
   });
 
   /**

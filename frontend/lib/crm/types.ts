@@ -49,6 +49,20 @@ export interface ClientKeyInfo {
    */
   issuedByUs: boolean;
   /**
+   * What was actually charged for this key, in minor units, and its currency.
+   *
+   * Null when the API does not serve it, which is the case today: the revenue
+   * rule then deduces the amount from the pack size and marks the total as
+   * partly deduced. See lib/crm/account-usd.ts.
+   *
+   * Optional rather than required, unlike most of this interface: the whole
+   * point is that the API does not serve it, so "absent" is the truthful state
+   * of the field and not a caller forgetting it. accountUsd() reads absent and
+   * null the same way, and both roads are pinned by a test.
+   */
+  amountPaidMinor?: number | null;
+  amountPaidCurrency?: string | null;
+  /**
    * Whether that is recent enough to still be a new customer. Decided once,
    * server-side, against one clock: see lib/crm/new-signup.ts. A boolean rather
    * than a date so the client never re-derives it and disagrees with the server.

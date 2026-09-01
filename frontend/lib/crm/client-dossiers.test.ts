@@ -499,3 +499,47 @@ describe('the conquest verdict on a dossier', () => {
     expect(d.wonByOutreach).toBe(true);
   });
 });
+
+describe('offBooks — real traffic that is not a customer (TABS-02, TABS-08)', () => {
+  const byId = (input: Partial<DossierInput>) => {
+    const out = new Map<string, ReturnType<typeof buildDossiers>[number]>();
+    for (const d of buildDossiers({ ...base, ...input })) out.set(d.id, d);
+    return out;
+  };
+
+  it('flags a regrouped abuse cohort without hiding it', () => {
+    const rows = byId({ keys: [keyRow('farm-2026-07@cohorte.invalid'), keyRow('a@alpha.example.net')] });
+    // Still there: the page's other job is to say what hits the API, and the
+    // front-end deliberately keeps ONE visible dossier per cohort.
+    expect(rows.has('farm-2026-07@cohorte.invalid')).toBe(true);
+    expect(rows.get('farm-2026-07@cohorte.invalid')?.offBooks).toBe(true);
+    expect(rows.get('a@alpha.example.net')?.offBooks).toBe(false);
+  });
+
+  it('flags the outreach keys we minted ourselves and nobody received', () => {
+    const rows = byId({ keys: [keyRow('alpha-pilot@alpha.example.net')] });
+    expect(rows.get('alpha-pilot@alpha.example.net')?.offBooks).toBe(true);
+  });
+
+  it('leaves a genuine signup from a pilot-shaped company alone', () => {
+    // The hyphen is load-bearing in SEEDED_PILOT_RE: copilot@ is a real address.
+    const rows = byId({ keys: [keyRow('copilot@alpha.example.net')] });
+    expect(rows.get('copilot@alpha.example.net')?.offBooks).toBe(false);
+  });
+
+  it('lets the caller total the window on customers only', () => {
+    // The arithmetic the header cards now do: the farm's traffic is real, and
+    // it is not business, so it is summed apart rather than into the card.
+    const dossiers = buildDossiers({
+      ...base,
+      keys: [keyRow('farm@cohorte.invalid', { key_prefix: 'ifk_farm' }), keyRow('a@alpha.example.net', { key_prefix: 'ifk_a' })],
+      profiles: {
+        ifk_farm: profile({ key_prefix: 'ifk_farm', total: 600 }),
+        ifk_a: profile({ key_prefix: 'ifk_a', total: 40 }),
+      },
+    });
+    const customers = dossiers.filter((d) => !d.offBooks);
+    expect(customers.reduce((s, d) => s + d.requests, 0)).toBe(40);
+    expect(dossiers.filter((d) => d.offBooks).reduce((s, d) => s + d.requests, 0)).toBe(600);
+  });
+});

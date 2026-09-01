@@ -2,8 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createHash } from 'crypto';
 import { isAuthenticated } from '@/lib/auth';
 
-const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || '';
-const ADMIN_SECRET = process.env.ADMIN_SECRET || '';
+/** Read per call, never captured at module load: see send/route.ts. */
+function env() {
+  return {
+    apiUrl: process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || '',
+    adminSecret: process.env.ADMIN_SECRET || '',
+  };
+}
 
 /**
  * CRM-native drafts: one draft per client, stored as an email_messages row
@@ -18,7 +23,8 @@ export async function POST(req: NextRequest) {
   if (!(await isAuthenticated())) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
-  if (!API_URL || !ADMIN_SECRET) {
+  const { apiUrl, adminSecret } = env();
+  if (!apiUrl || !adminSecret) {
     return NextResponse.json({ error: 'not_configured' }, { status: 503 });
   }
   let body: { email?: string; subject?: string; body?: string; account?: string };
@@ -38,13 +44,26 @@ export async function POST(req: NextRequest) {
     msg_date: new Date().toISOString().slice(0, 16),
     subject: body.subject,
     snippet: text.replace(/\s+/g, ' ').trim().slice(0, 280),
-    body: text.slice(0, 6000),
+    /**
+     * 50k, the same ceiling the send path uses (audit TABS-10, 2026-09-01).
+     *
+     * 6000 here against 50000 there meant a long mail could be written, saved,
+     * and come back amputated mid-sentence, with nothing on screen saying so
+     * and the full text already gone from the composer. It is the exact defect
+     * the send route's own comment records having fixed on its side; the draft
+     * side was left behind. A draft past 50k is a different problem.
+     *
+     * ⚠️ This stops the FRONTEND being the one that cuts. The store clips the
+     * column at 8000 of its own accord (src/routes/api-keys.ts, the POST
+     * handler), so that is the real ceiling until it is raised there too.
+     */
+    body: text.slice(0, 50_000),
     counterparty: body.account ?? '',
   };
   try {
-    const r = await fetch(`${API_URL}/v1/admin/email-messages`, {
+    const r = await fetch(`${apiUrl}/v1/admin/email-messages`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Admin-Secret': ADMIN_SECRET },
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Secret': adminSecret },
       body: JSON.stringify({ messages: [msg] }),
       signal: AbortSignal.timeout(15_000),
     });
@@ -59,7 +78,8 @@ export async function DELETE(req: NextRequest) {
   if (!(await isAuthenticated())) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
-  if (!API_URL || !ADMIN_SECRET) {
+  const { apiUrl, adminSecret } = env();
+  if (!apiUrl || !adminSecret) {
     return NextResponse.json({ error: 'not_configured' }, { status: 503 });
   }
   let body: { id?: string };
@@ -72,9 +92,9 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: 'invalid_body', message: 'id requis' }, { status: 400 });
   }
   try {
-    const r = await fetch(`${API_URL}/v1/admin/email-messages/delete`, {
+    const r = await fetch(`${apiUrl}/v1/admin/email-messages/delete`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Admin-Secret': ADMIN_SECRET },
+      headers: { 'Content-Type': 'application/json', 'X-Admin-Secret': adminSecret },
       body: JSON.stringify({ id: body.id }),
       signal: AbortSignal.timeout(15_000),
     });

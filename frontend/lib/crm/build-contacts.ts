@@ -111,6 +111,18 @@ export interface KeyRow {
    * behaviour every reader had before the flag existed.
    */
   issued_by_us?: number | null;
+  /**
+   * What Stripe actually charged, in minor units, and in which currency.
+   *
+   * ⚠️ Optional because GET /v1/admin/keys does NOT serve these two columns
+   * today (checked 2026-09-01): they exist on api_keys and are read by
+   * admin-business and admin-revenue, but not by the CRM payload. Absent, the
+   * revenue rule falls back to the deduced pack price and says so, which is
+   * exactly the degradation it is designed for. The day the SELECT carries
+   * them, the figure becomes measured with no other change.
+   */
+  amount_paid_minor?: number | null;
+  amount_paid_currency?: string | null;
   series: number[];
 }
 
@@ -461,6 +473,8 @@ export function buildContacts(input: BuildInput, now: Date = new Date()): Contac
         lastActiveMonth: row.last_active_month,
         createdAt: row.created_at ?? null,
         issuedByUs: row.issued_by_us === 1,
+        amountPaidMinor: row.amount_paid_minor ?? null,
+        amountPaidCurrency: row.amount_paid_currency ?? null,
         isNew,
       },
       usage: {
@@ -582,17 +596,42 @@ const ADMIN_SECRET = process.env.ADMIN_SECRET || '';
  * page and the API ship from two different platforms, so the frontend always
  * runs for a while against an API that does not serve its newest endpoint yet.
  */
-export async function fetchCrmData(): Promise<BuildInput | null> {
+export interface CrmFetchOptions {
+  /**
+   * Ask for the mail list WITHOUT the bodies.
+   *
+   * Bodies are the bulk of that payload by a wide margin, and a page that only
+   * counts mails or reads their subjects re-downloads every one of them on
+   * every render, plus once more after each gesture through router.refresh()
+   * (audit TABS-12, 2026-09-01). Off by default: Contacts genuinely reads the
+   * bodies, for the thread, the automation filter and the repetition rule, so
+   * this is only for the callers that provably do not.
+   */
+  lightMessages?: boolean;
+  /**
+   * Payloads to skip entirely, for a caller that reads none of them. The
+   * corresponding field comes back empty, exactly as it does when the endpoint
+   * is unreachable, so nothing downstream needs to know.
+   */
+  skip?: ReadonlyArray<'messages' | 'prospects' | 'activity' | 'reads' | 'activation' | 'institutions'>;
+}
+
+export async function fetchCrmData(opts: CrmFetchOptions = {}): Promise<BuildInput | null> {
   if (!ADMIN_SECRET) return null;
   const h = { headers: { 'X-Admin-Secret': ADMIN_SECRET }, cache: 'no-store' as const };
+  const skip = new Set(opts.skip ?? []);
+  const get = (path: string) =>
+    fetch(`${API_URL}${path}`, h).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+  const maybe = (part: NonNullable<CrmFetchOptions['skip']>[number], path: string) =>
+    skip.has(part) ? Promise.resolve(null) : get(path);
   const [k, p, m, a, tr, act, inst] = await Promise.all([
-    fetch(`${API_URL}/v1/admin/keys`, h).then((r) => (r.ok ? r.json() : null)).catch(() => null),
-    fetch(`${API_URL}/v1/admin/prospects`, h).then((r) => (r.ok ? r.json() : null)).catch(() => null),
-    fetch(`${API_URL}/v1/admin/email-messages`, h).then((r) => (r.ok ? r.json() : null)).catch(() => null),
-    fetch(`${API_URL}/v1/admin/client-activity`, h).then((r) => (r.ok ? r.json() : null)).catch(() => null),
-    fetch(`${API_URL}/v1/admin/thread-reads`, h).then((r) => (r.ok ? r.json() : null)).catch(() => null),
-    fetch(`${API_URL}/v1/admin/activation?days=90`, h).then((r) => (r.ok ? r.json() : null)).catch(() => null),
-    fetch(`${API_URL}/v1/admin/institutional-contacts`, h).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+    get('/v1/admin/keys'),
+    maybe('prospects', '/v1/admin/prospects'),
+    maybe('messages', `/v1/admin/email-messages${opts.lightMessages ? '?fields=summary' : ''}`),
+    maybe('activity', '/v1/admin/client-activity'),
+    maybe('reads', '/v1/admin/thread-reads'),
+    maybe('activation', '/v1/admin/activation?days=90'),
+    maybe('institutions', '/v1/admin/institutional-contacts'),
   ]);
   if (!k && !p) return null;
   return {

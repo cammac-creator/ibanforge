@@ -36,13 +36,27 @@ const STATUS_STYLE: Record<ActivationClientRow['status'], { label: string; color
 
 const VISIBLE_ROWS = 25;
 
+/**
+ * DASH-14 (audit 2026-09-01). `sql.replace(' ','T') + 'Z'` is the exact
+ * double-Z that put production at 500 on 2026-08-12: these datetimes come in
+ * TWO shapes — SQLite's 'YYYY-MM-DD HH:MM:SS' and full ISO from application
+ * inserts — and an already-marked string became '…Z Z', i.e. Invalid Date, i.e.
+ * NaN printed in the nudge banner. Mirror of parseSqlUtc in
+ * src/lib/activation.ts; keep the two in step.
+ */
+function parseSqlUtc(sql: string): Date {
+  const iso = sql.includes('T') ? sql : sql.replace(' ', 'T');
+  const marked = /(Z|[+-]\d\d:?\d\d)$/.test(iso) ? iso : `${iso}Z`;
+  return new Date(marked);
+}
+
 function daysSince(sql: string): number {
-  return Math.floor((Date.now() - new Date(`${sql.replace(' ', 'T')}Z`).getTime()) / 86_400_000);
+  return Math.floor((Date.now() - parseSqlUtc(sql).getTime()) / 86_400_000);
 }
 
 /** "3 h" under two days, "5 j" beyond — first-call delay after signup. */
 function delayLabel(fromSql: string, toSql: string): string {
-  const h = (new Date(`${toSql.replace(' ', 'T')}Z`).getTime() - new Date(`${fromSql.replace(' ', 'T')}Z`).getTime()) / 3_600_000;
+  const h = (parseSqlUtc(toSql).getTime() - parseSqlUtc(fromSql).getTime()) / 3_600_000;
   if (h < 1) return '< 1 h';
   if (h < 48) return `${Math.round(h)} h`;
   return `${Math.round(h / 24)} j`;
@@ -65,6 +79,22 @@ export function ClientsTable({ clients, locale }: { clients: ActivationClientRow
   // never called. Seeded outreach keys are unused by construction and were
   // the old table's false "opportunities going cold" — kept out for good.
   const toChase = real.filter((c) => c.status === 'dormant' || c.status === 'silent');
+
+  // DASH-10 (audit 2026-09-01): the banner said "payants endormis + inscrits
+  // jamais activés", but `silent` covers TWO populations — never called, and
+  // called then went quiet for over 14 days. The second is a retention signal,
+  // not an activation one, it was a third of the list, and it was named
+  // nowhere. Naming the three is the whole fix: they need different messages.
+  const dormantPaying = toChase.filter((c) => c.status === 'dormant');
+  const neverCalled = toChase.filter((c) => c.status === 'silent' && c.first_call_at === null);
+  const goneQuiet = toChase.filter((c) => c.status === 'silent' && c.first_call_at !== null);
+  const chaseBreakdown = [
+    dormantPaying.length > 0 ? `${dormantPaying.length} payant${dormantPaying.length > 1 ? 's' : ''} endormi${dormantPaying.length > 1 ? 's' : ''}` : null,
+    neverCalled.length > 0 ? `${neverCalled.length} jamais appelé${neverCalled.length > 1 ? 's' : ''}` : null,
+    goneQuiet.length > 0 ? `${goneQuiet.length} ${goneQuiet.length > 1 ? 'ont appelé puis se sont tus' : 'a appelé puis s\u2019est tu'}` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
 
   const visible = real.slice(0, VISIBLE_ROWS);
   const hidden = real.slice(VISIBLE_ROWS);
@@ -100,7 +130,12 @@ export function ClientsTable({ clients, locale }: { clients: ActivationClientRow
       {toChase.length > 0 && (
         <div className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
           <p className="mb-2 text-xs font-medium text-amber-300">
-            ⚠ Payants endormis et inscrits restés silencieux — à relancer
+            ⚠ À relancer — {chaseBreakdown}
+          </p>
+          <p className="mb-2 text-[11px] text-amber-500/70">
+            « A appelé puis s&rsquo;est tu » est un signal de RÉTENTION, pas d&rsquo;activation : ces clients-là ont
+            déjà vu le produit marcher. Ils n&rsquo;appellent pas la même relance que ceux qui ne l&rsquo;ont jamais
+            essayé.
           </p>
           <ul className="space-y-1">
             {toChase.slice(0, 8).map((c) => (

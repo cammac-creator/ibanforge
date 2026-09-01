@@ -133,7 +133,14 @@ export function BotsApp({
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[
-          { l: 'Agents distincts', v: String(bots.length), h: 'au moins 20 appels sur 90 j' },
+          // The lines are grouped now (TABS-05, TABS-14), so this counts CALLERS
+          // and no longer user agents. The subtitle says which, or the number
+          // and the label would answer two different questions.
+          {
+            l: 'Appelants distincts',
+            v: String(bots.length),
+            h: `${bots.reduce((s2, b) => s2 + (b.members?.length ?? 1), 0)} user agents, ≥ 20 appels / 90 j`,
+          },
           { l: 'Requêtes anonymes', v: totalRequests.toLocaleString('fr-CH'), h: 'sans aucune clé API' },
           { l: 'Passés au travers', v: String(counts.servi), h: 'appel facturé servi sans clé' },
           { l: 'Appels dans le vide', v: lost404.toLocaleString('fr-CH'), h: '404 servis à des annuaires' },
@@ -220,7 +227,9 @@ export function BotsApp({
                   <span className="w-full min-w-0 md:w-[30%]">
                     <span className="block truncate text-sm font-medium text-[var(--fg-1)]">{b.label}</span>
                     <span className="block truncate font-mono text-[12px] text-[var(--fg-4)]">
-                      {b.homepage?.replace(/^https?:\/\//, '') ?? b.clientKind ?? '—'}
+                      {b.members
+                        ? `${b.members.length} version${b.members.length > 1 ? 's' : ''}`
+                        : (b.homepage?.replace(/^https?:\/\//, '') ?? b.clientKind ?? '—')}
                     </span>
                   </span>
                   <span className="flex w-auto items-center gap-1.5 md:w-[12%]">
@@ -248,7 +257,28 @@ export function BotsApp({
                     {b.notFound > 0 ? b.notFound.toLocaleString('fr-CH') : '—'}
                   </span>
                 </button>
-                {open && <BotDossierPanel b={b} crossings={crossingsByBot.get(b.id) ?? []} locale={locale} />}
+                {open && (
+                  <>
+                    {/* The detail the grouping folded away, and the only reason
+                        folding it is safe: which build is calling is useful,
+                        it just has no business being forty lines of the list. */}
+                    {b.members && (
+                      <ul className="border-t border-[var(--ink-4)]/60 bg-[var(--ink-1)]/40 px-4 py-2">
+                        {b.members.map((m) => (
+                          <li key={m.id} className="flex items-baseline gap-3 py-0.5 text-[12px]">
+                            <span className="min-w-0 flex-1 truncate font-mono text-[var(--fg-3)]" title={m.userAgent}>
+                              {m.label}
+                            </span>
+                            <span className="shrink-0 font-mono tabular-nums text-[var(--fg-4)]">
+                              {m.requests.toLocaleString('fr-CH')}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    <BotDossierPanel b={b} crossings={crossingsByBot.get(b.id) ?? []} locale={locale} />
+                  </>
+                )}
               </div>
             );
           })

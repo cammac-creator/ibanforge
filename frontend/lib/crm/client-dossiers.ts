@@ -1,5 +1,6 @@
-import { isInternalAccount, type ActivationClientRow, type KeyRow, type MessageRow, type ProspectRow } from './build-contacts';
+import { isInternalAccount, SEEDED_PILOT_RE, type ActivationClientRow, type KeyRow, type MessageRow, type ProspectRow } from './build-contacts';
 import { chipForStatus, type BusinessChip } from './business';
+import type { BusinessStatus } from './types';
 import { heatFromFacts, type Heat } from './heat';
 import { wonByOutreachFrom } from './outreach';
 
@@ -129,6 +130,21 @@ export interface ClientDossier {
   activation: ActivationClientRow | null;
   /** Won by outbound prospecting — the causal rule of outreach.ts, verbatim. */
   wonByOutreach: boolean;
+  /**
+   * Real traffic, but not a customer. True for the regrouped abuse cohorts and
+   * for the outreach keys we minted ourselves and nobody ever received.
+   *
+   * A flag rather than an exclusion, and that is the whole point (audit
+   * TABS-02 and TABS-08, 2026-09-01). The cohorts are deliberately NOT in the
+   * front-end internal filter, so that a key farm keeps ONE visible dossier
+   * instead of vanishing from a page whose job is to say what hits the API.
+   * What was wrong was arithmetic, not visibility: every header card summed
+   * them in, so "requests over the window" and "countries served" answered a
+   * question about abuse while reading as a question about customers, and the
+   * same page disagreed with the overview and with /stats, which both drop
+   * them. So the row stays reachable and the totals stop counting it.
+   */
+  offBooks: boolean;
 }
 
 /**
@@ -238,6 +254,101 @@ function windowTotal(days: Array<{ day: string; count: number }>, now: Date, off
   }
   return sum;
 }
+
+/**
+ * The four verdict words that ADD something to the API's state vocabulary.
+ *
+ * `active`, `dormant` and `silent` are deliberately absent: those are the API's
+ * own words, and a second rule computing them from a different base is exactly
+ * how one customer came to be "endormi" on one tab and "actif" on the next.
+ * What is left here says something the activation table cannot: that the
+ * silence is that of a customer we USED to have, that they are being turned
+ * away, that their calls are mostly rejected, that their volume is climbing.
+ */
+export type Nuance = 'blocked' | 'struggling' | 'former' | 'rising';
+
+const NUANCE_OF: Partial<Record<Verdict, Nuance>> = {
+  blocked: 'blocked',
+  struggling: 'struggling',
+  former: 'former',
+  rising: 'rising',
+};
+
+/**
+ * Every verdict expressed in the API's vocabulary, for the dossiers the
+ * activation table does not know.
+ *
+ * Only ever used as a FALLBACK, and the answer carries `derived: true` so the
+ * screen can say so and the filters can leave it out. `blocked` maps to
+ * `at-limit` as the nearest true word: the customer walked into a wall, and the
+ * wall is a quota far more often than anything else. The nuance sits beside it
+ * and says the exact thing.
+ */
+const STATUS_OF_VERDICT: Record<Verdict, BusinessStatus> = {
+  blocked: 'at-limit',
+  struggling: 'active',
+  rising: 'active',
+  active: 'active',
+  dormant: 'dormant',
+  former: 'silent',
+  silent: 'silent',
+};
+
+const KNOWN_STATUS = new Set<BusinessStatus>(['new', 'active', 'at-limit', 'paying', 'dormant', 'silent']);
+
+export interface DossierState {
+  /** The one word for this customer's state, in the API's vocabulary. */
+  status: BusinessStatus;
+  /** A precision the API's word cannot carry, or null. Never contradicts it. */
+  nuance: Nuance | null;
+  /**
+   * True when no activation row was served for this address and the status was
+   * read off the window instead. A derived word is shown but never counted: the
+   * whole point of this function is that "endormi" names the same people here
+   * as it does on Contacts, and Contacts can only see addresses the activation
+   * table knows.
+   */
+  derived: boolean;
+}
+
+/**
+ * One vocabulary for one customer (audit TABS-01 and TABS-09, 2026-09-01).
+ *
+ * Before this, two rules decided a customer's state on two different bases and
+ * both wrote their answer on the screen: the activation table, where `dormant`
+ * is reserved for BUYERS gone quiet for a fortnight, and this file's verdict,
+ * where `dormant` meant anybody at all with no call for a fortnight. Clicking
+ * "Endormis" on Contacts and reading the Clients tab gave two different
+ * counts of the same word, and a third of the rows carried a verdict and a chip
+ * that did not say the same thing.
+ *
+ * The API's word now decides, and the verdict is demoted to a precision shown
+ * in second position. Nothing is lost: the four words the verdict knows that
+ * the API does not are exactly the ones it keeps.
+ */
+export function stateOfDossier(d: ClientDossier): DossierState {
+  // Validated on the way out rather than trusted. The status arrives as JSON,
+  // so the type is a claim about the wire and not a fact about it, and a word
+  // nobody foresaw would reach the table as an undefined label and take the
+  // page down with it. An unknown word degrades to the derived road, which is
+  // exactly what it is: something this page could not place.
+  const raw = d.activation?.status;
+  const api = raw != null && KNOWN_STATUS.has(raw) ? raw : null;
+  return {
+    status: api ?? STATUS_OF_VERDICT[d.verdict],
+    nuance: NUANCE_OF[d.verdict] ?? null,
+    derived: api === null,
+  };
+}
+
+/**
+ * The regrouped abuse cohorts. Mirrors the ONE documented asymmetry between
+ * INTERNAL_RE here and INTERNAL_EMAIL_RE on the API side: the API treats these
+ * as internal and drops them from every business view, the front-end keeps them
+ * visible on purpose. See ClientDossier.offBooks for what that costs and how it
+ * is paid for.
+ */
+const COHORT_RE = /@cohorte\.invalid$/i;
 
 function decideVerdict(d: ClientDossier, now: Date): Verdict {
   // Nothing in the window is two different truths: a customer who called
@@ -414,6 +525,13 @@ export function buildDossiers(input: DossierInput): ClientDossier[] {
       // retroactively make their arrival ours, and a pilot we fabricated is not
       // laundered into a conquest by a second key they asked for afterwards.
       wonByOutreach: wonByOutreachFrom(prospect ?? null, signedUpAt, thread, signupKey.issued_by_us === 1),
+      // Both tests are on the ADDRESS, because the address is the only thing
+      // that tells these apart: no quota distinguishes a key we minted for a
+      // company that never used it from one somebody made for themselves, and
+      // a cohort is a cohort whatever it consumed. SEEDED_PILOT_RE is the same
+      // constant the overview filters on, imported rather than rewritten so
+      // the two pages can never drift to two definitions of the same word.
+      offBooks: COHORT_RE.test(id) || SEEDED_PILOT_RE.test(id),
     };
     dossier.verdict = decideVerdict(dossier, now);
     out.push(dossier);

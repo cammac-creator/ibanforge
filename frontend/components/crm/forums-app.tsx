@@ -44,7 +44,16 @@ interface MarketplaceEvent {
   created_at: string;
 }
 
-/** Mirror of the backend PLATFORM_LIMITS: hard platform cap + etiquette cap. */
+/**
+ * The fallback when the API serves no `platform_limits` block (audit TABS-16,
+ * 2026-09-01).
+ *
+ * It used to be the only copy, identical to the byte to the backend's own
+ * PLATFORM_LIMITS and linked to it by nothing, so raising a ceiling on one side
+ * left the composer counting against a limit the poster no longer enforced. The
+ * served table now wins; this stays because Vercel and Railway ship
+ * independently, and a frontend running ahead of its API must still count.
+ */
 const CHAR_LIMITS: Record<string, { max: number | null; comfy: number }> = {
   stackoverflow: { max: 30_000, comfy: 2_500 },
   money_se: { max: 30_000, comfy: 2_500 },
@@ -56,8 +65,55 @@ const CHAR_LIMITS: Record<string, { max: number | null; comfy: number }> = {
   manual: { max: null, comfy: 3_000 },
 };
 
-function charCounter(len: number, source: string): { text: string; cls: string; over: boolean } {
-  const lim = CHAR_LIMITS[source] ?? CHAR_LIMITS.manual;
+type CharLimits = Record<string, { max: number | null; comfy: number }>;
+
+type ThreadSort = 'relevance' | 'date' | 'status';
+
+const SORT_LABELS: Array<{ key: ThreadSort; label: string; title: string }> = [
+  { key: 'relevance', label: 'Pertinence', title: 'l’ordre du radar : ce qui appelle une réponse d’abord' },
+  { key: 'date', label: 'Date du post', title: 'les fils les plus récents en tête' },
+  { key: 'status', label: 'Statut', title: 'regroupés par étape du pipeline' },
+];
+
+/**
+ * Three orders over one list (audit TABS-15, 2026-09-01).
+ *
+ * The order was fixed in SQL and the browser only ever filtered, so "cible les
+ * posts récents" was served indirectly, by a bonus buried in the score. It is a
+ * question about a column, and a column can be sorted.
+ *
+ * `relevance` returns the array untouched: the API's ORDER BY already is that
+ * order, and re-deriving it here would be a second ranking rule one edit away
+ * from disagreeing with the first.
+ */
+function sortThreads(list: ForumThread[], sort: ThreadSort): ForumThread[] {
+  if (sort === 'relevance') return list;
+  const copy = [...list];
+  if (sort === 'date') {
+    // thread_created_at is the post's own date and is what "récent" means;
+    // first_seen, the day the radar noticed it, is the fallback. Undatable rows
+    // sink rather than float: an unknown date is not a fresh one.
+    const at = (t: ForumThread) => {
+      const raw = t.thread_created_at ?? t.first_seen;
+      const ms = raw ? Date.parse(raw) : NaN;
+      return Number.isNaN(ms) ? -Infinity : ms;
+    };
+    return copy.sort((a, b) => at(b) - at(a) || b.score - a.score);
+  }
+  const rank = (t: ForumThread) => {
+    const i = STATUS_ORDER.indexOf(t.status);
+    return i === -1 ? STATUS_ORDER.length : i;
+  };
+  return copy.sort((a, b) => rank(a) - rank(b) || b.score - a.score);
+}
+
+function charCounter(
+  len: number,
+  source: string,
+  served?: CharLimits,
+): { text: string; cls: string; over: boolean } {
+  const table = served ?? CHAR_LIMITS;
+  const lim = table[source] ?? table.manual ?? CHAR_LIMITS.manual;
   const maxTxt = lim.max ? `${lim.max.toLocaleString('fr-CH')}` : 'sans limite dure';
   if (lim.max && len > lim.max) {
     return { text: `${len.toLocaleString('fr-CH')} / ${maxTxt} car. — DÉPASSE la limite`, cls: 'text-red-400', over: true };
@@ -176,21 +232,68 @@ export function ForumsApp() {
   // (marketplaces & annuaires). The windows used to live as a page footer,
   // which buried them; they now hold a full pane of their own.
   const [pane, setPane] = useState<'threads' | 'markets'>('threads');
+  // Pertinence is the order the API already returns, so the default costs
+  // nothing and the two others are the questions the list could not answer
+  // (audit TABS-15, 2026-09-01): "what came out this week" and "where am I in
+  // the pipeline".
+  const [sort, setSort] = useState<ThreadSort>('relevance');
+  // The character ceilings as the API serves them (TABS-16). Undefined until
+  // the first load answers, and undefined again against an API that does not
+  // serve them yet: charCounter falls back to the local table either way.
+  const [limits, setLimits] = useState<CharLimits | undefined>(undefined);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const toastRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  /**
+   * One toast at a time, and none left standing after the component goes
+   * (audit TABS-17, 2026-09-01). The timer used to be posted and forgotten: a
+   * second message inside three seconds was wiped by the first one's timer, and
+   * a component unmounted in between left a setState aimed at nothing.
+   */
   const say = useCallback((msg: string) => {
     setToast(msg);
-    setTimeout(() => setToast(null), 3500);
+    if (toastRef.current) clearTimeout(toastRef.current);
+    toastRef.current = setTimeout(() => {
+      setToast(null);
+      toastRef.current = null;
+    }, 3500);
   }, []);
 
-  const loadThreads = useCallback(async () => {
+  useEffect(
+    () => () => {
+      if (toastRef.current) clearTimeout(toastRef.current);
+    },
+    [],
+  );
+
+  /**
+   * `lean` asks for the list without the long text (audit TABS-18).
+   *
+   * Only the scan poll uses it, and the rows it brings back are merged OVER the
+   * ones already held rather than replacing them: a lean row carries no draft,
+   * and a poll landing mid-edit must not take the draft out from under the
+   * detail pane. A thread the scan has just discovered simply arrives with no
+   * draft yet, which is what it is.
+   */
+  const loadThreads = useCallback(async (lean = false) => {
     try {
-      const r = await fetch('/api/crm/forum-threads');
+      const r = await fetch(`/api/crm/forum-threads${lean ? '?fields=list' : ''}`);
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      const data = (await r.json()) as { threads: ForumThread[]; counts: Record<string, number>; scan: ScanInfo };
-      setThreads(data.threads ?? []);
+      const data = (await r.json()) as {
+        threads: ForumThread[];
+        counts: Record<string, number>;
+        scan: ScanInfo;
+        platform_limits?: CharLimits;
+      };
+      const incoming = data.threads ?? [];
+      setThreads((prev) => {
+        if (!lean) return incoming;
+        const held = new Map(prev.map((t) => [t.id, t]));
+        return incoming.map((t) => ({ ...(held.get(t.id) ?? ({} as ForumThread)), ...t }));
+      });
       setCounts(data.counts ?? {});
       setScan(data.scan ?? null);
+      if (data.platform_limits) setLimits(data.platform_limits);
       setLoadError(null);
       return data.scan;
     } catch (e) {
@@ -221,7 +324,7 @@ export function ForumsApp() {
   useEffect(() => {
     if (scan?.scanning && !pollRef.current) {
       pollRef.current = setInterval(async () => {
-        const s = await loadThreads();
+        const s = await loadThreads(true);
         void loadMarkets();
         if (!s?.scanning && pollRef.current) {
           clearInterval(pollRef.current);
@@ -239,10 +342,14 @@ export function ForumsApp() {
   }, [scan?.scanning, loadThreads, loadMarkets, say]);
 
   const visible = useMemo(() => {
-    if (filter === 'all') return threads;
-    if (filter === 'active') return threads.filter((t) => ACTIVE_STATUSES.has(t.status));
-    return threads.filter((t) => t.status === filter);
-  }, [threads, filter]);
+    const kept =
+      filter === 'all'
+        ? threads
+        : filter === 'active'
+          ? threads.filter((t) => ACTIVE_STATUSES.has(t.status))
+          : threads.filter((t) => t.status === filter);
+    return sortThreads(kept, sort);
+  }, [threads, filter, sort]);
 
   const selected = useMemo(() => threads.find((t) => t.id === selectedId) ?? null, [threads, selectedId]);
 
@@ -479,6 +586,20 @@ export function ForumsApp() {
             {f.label}
           </button>
         ))}
+        <span className="ml-auto flex shrink-0 items-center gap-0.5 rounded-md border border-[var(--ink-4)] p-0.5">
+          {SORT_LABELS.map((s) => (
+            <button
+              key={s.key}
+              onClick={() => setSort(s.key)}
+              title={s.title}
+              className={`rounded px-2 py-0.5 text-[11.5px] font-medium transition-colors ${
+                sort === s.key ? 'bg-[var(--ink-4)] text-white' : 'text-[var(--fg-4)] hover:text-[var(--fg-2)]'
+              }`}
+            >
+              {s.label}
+            </button>
+          ))}
+        </span>
       </div>
 
       <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
@@ -612,8 +733,8 @@ export function ForumsApp() {
                   <details className="rounded-lg border border-[var(--ink-4)]/60 bg-[var(--ink-0)]/40">
                     <summary className="cursor-pointer select-none px-3 py-2 text-[11px] font-medium uppercase tracking-wide text-[var(--fg-4)] hover:text-[var(--fg-2)]">
                       Version {LANG_LABELS[String(edit.lang ?? selected.lang)] ?? '?'} — celle que le bouton copie ·{' '}
-                      <span className={charCounter(String(edit.draft ?? '').length, selected.source).cls}>
-                        {charCounter(String(edit.draft ?? '').length, selected.source).text}
+                      <span className={charCounter(String(edit.draft ?? '').length, selected.source, limits).cls}>
+                        {charCounter(String(edit.draft ?? '').length, selected.source, limits).text}
                       </span>
                     </summary>
                     <div className="px-3 pb-3">
@@ -658,8 +779,8 @@ export function ForumsApp() {
                     placeholder="Le texte prêt à coller sur la plateforme."
                     className="mt-1 w-full rounded-lg border border-[var(--ink-4)] bg-[var(--ink-0)]/80 p-3 text-[16px] leading-relaxed text-[var(--fg-2)] placeholder:text-[var(--fg-4)] focus:border-amber-500/50 focus:outline-none sm:text-[15px]"
                   />
-                  <span className={`mt-1 block normal-case ${charCounter(String(edit.draft ?? '').length, selected.source).cls}`}>
-                    {charCounter(String(edit.draft ?? '').length, selected.source).text}
+                  <span className={`mt-1 block normal-case ${charCounter(String(edit.draft ?? '').length, selected.source, limits).cls}`}>
+                    {charCounter(String(edit.draft ?? '').length, selected.source, limits).text}
                   </span>
                 </label>
               )}
@@ -668,7 +789,7 @@ export function ForumsApp() {
                 <button
                   onClick={async () => {
                     const text = String(edit.draft ?? '');
-                    const cc = charCounter(text.length, selected.source);
+                    const cc = charCounter(text.length, selected.source, limits);
                     const ok = await copyToClipboard(text);
                     if (!ok) {
                       say('Copie refusée par le navigateur.');

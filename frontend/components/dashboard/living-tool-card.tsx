@@ -2,8 +2,8 @@ import { FeedbackDoneButton } from './feedback-done-button';
 
 /**
  * « L'outil vivant » — the three loops through which usage teaches the tool,
- * on one card, so their existence is a fact the operator SEES rather than a
- * property of the codebase.
+ * so their existence is a fact the operator SEES rather than a property of the
+ * codebase.
  *
  * Reads three instruments added 01/09/2026 (see src/lib/demand-gaps.ts for
  * the doctrine): the demand ledger (what was asked that we could not answer,
@@ -13,6 +13,19 @@ import { FeedbackDoneButton } from './feedback-done-button';
  * healthy loop — because its job on a calm day is to prove the loops exist,
  * and on a bad day to name the register, the country or the report that needs
  * a decision.
+ *
+ * ⚠️ ENS-04, corrected 2026-09-01: two of the three loops used to render a
+ * REASSURING GREEN when their reader fell over. `gaps === null` printed
+ * "nothing, no valid request found a closed door" and `feedbackOpen ?? 0`
+ * printed "no open report" — in emerald, on a rotated token. The card built to
+ * enforce "never build an instrument without wiring its reader" was reproducing
+ * the exact failure it denounces. Each loop now takes the HTTP status of its
+ * failed read and says so, and a failed read is never green.
+ *
+ * The `loops` prop exists because the cockpit rebuild of the same day splits
+ * the card in two: freshness belongs with "what is broken", demand and
+ * feedback belong with "what is new". Default is all three, so no caller has
+ * to know about the split.
  *
  * Server component, French like the rest of the dashboard; the only client
  * island is the « traité » button on each report.
@@ -50,6 +63,10 @@ export interface SourceFreshnessEntry {
   stale: boolean;
 }
 
+export type LivingLoop = 'demand' | 'feedback' | 'freshness';
+
+const ALL_LOOPS: LivingLoop[] = ['demand', 'feedback', 'freshness'];
+
 const ERROR_TYPE_FR: Record<string, string> = {
   wrong_validation: 'validation contestée',
   stale_bic: 'BIC périmé',
@@ -59,38 +76,70 @@ const ERROR_TYPE_FR: Record<string, string> = {
   other: 'autre',
 };
 
+/**
+ * What a loop says when its reader failed. Grey and explicit, never green and
+ * never a zero: "we did not manage to look" and "there is nothing" are two
+ * different pieces of news, and only one of them is good.
+ */
+function ReaderDown({ status }: { status: number }) {
+  return (
+    <p className="mt-1.5 text-[12px] text-amber-300">
+      lecteur en échec {status === 0 ? '(API injoignable)' : `(HTTP ${status})`} — cette boucle n’affiche pas
+      « rien », elle n’a pas pu être lue.
+    </p>
+  );
+}
+
+function LoopTitle({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--fg-4)]">{children}</p>
+  );
+}
+
 export function LivingToolCard({
   gaps,
   feedbackOpen,
   reports,
   sources,
+  gapsFailed = null,
+  feedbackFailed = null,
+  sourcesFailed = null,
+  loops = ALL_LOOPS,
+  bare = false,
 }: {
   gaps: DemandGapsPayload | null;
   feedbackOpen: number;
   reports: FeedbackReport[];
   sources: SourceFreshnessEntry[];
+  /** HTTP status of the demand read when it failed; null when it succeeded. */
+  gapsFailed?: number | null;
+  /** HTTP status of the feedback read when it failed; null when it succeeded. */
+  feedbackFailed?: number | null;
+  /** HTTP status of /health when it failed; null when it succeeded. */
+  sourcesFailed?: number | null;
+  /** Which loops to render. Default: all three. */
+  loops?: LivingLoop[];
+  /** Drop the card chrome and the 🌱 heading, to sit inside another block. */
+  bare?: boolean;
 }) {
   const staleSources = sources.filter((s) => s.stale);
   const topCountries = gaps?.by_country.slice(0, 5) ?? [];
   const topCodes = gaps?.top.slice(0, 5) ?? [];
   const openReports = reports.filter((r) => r.status === 'open').slice(0, 3);
+  const shown = ALL_LOOPS.filter((l) => loops.includes(l));
 
-  return (
-    <div className="rounded-xl border border-[var(--ink-4)]/60 bg-gradient-to-br from-[var(--ink-2)] to-[var(--ink-2)]/60 p-5">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-sm font-medium text-[var(--fg-2)]">🌱 L’outil vivant</h2>
-        <p className="text-[11px] text-[var(--fg-4)]">
-          les trois boucles par lesquelles l’usage améliore l’outil
-        </p>
-      </div>
-
-      <div className="mt-3 grid grid-cols-1 gap-4 lg:grid-cols-3">
-        {/* Loop 1 — demand */}
+  const body = (
+    <div
+      className={`grid grid-cols-1 gap-4 ${bare ? '' : 'mt-3'} ${
+        shown.length >= 3 ? 'lg:grid-cols-3' : shown.length === 2 ? 'lg:grid-cols-2' : ''
+      }`}
+    >
+      {shown.includes('demand') && (
         <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--fg-4)]">
-            Demande insatisfaite · 30 j
-          </p>
-          {topCountries.length === 0 ? (
+          <LoopTitle>Demande insatisfaite · 30 j</LoopTitle>
+          {gapsFailed !== null ? (
+            <ReaderDown status={gapsFailed} />
+          ) : topCountries.length === 0 ? (
             <p className="mt-1.5 text-[12px] text-emerald-400">
               Rien — aucune demande valide n’a trouvé porte close.
             </p>
@@ -123,13 +172,14 @@ export function LivingToolCard({
             </p>
           )}
         </div>
+      )}
 
-        {/* Loop 2 — agent feedback */}
+      {shown.includes('feedback') && (
         <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--fg-4)]">
-            Feedback des agents
-          </p>
-          {feedbackOpen === 0 ? (
+          <LoopTitle>Feedback des agents</LoopTitle>
+          {feedbackFailed !== null ? (
+            <ReaderDown status={feedbackFailed} />
+          ) : feedbackOpen === 0 ? (
             <p className="mt-1.5 text-[12px] text-emerald-400">Aucun rapport ouvert.</p>
           ) : (
             <>
@@ -156,13 +206,14 @@ export function LivingToolCard({
             </>
           )}
         </div>
+      )}
 
-        {/* Loop 3 — source freshness */}
+      {shown.includes('freshness') && (
         <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--fg-4)]">
-            Fraîcheur des registres
-          </p>
-          {sources.length === 0 ? (
+          <LoopTitle>Fraîcheur des registres</LoopTitle>
+          {sourcesFailed !== null ? (
+            <ReaderDown status={sourcesFailed} />
+          ) : sources.length === 0 ? (
             <p className="mt-1.5 text-[12px] text-[var(--fg-4)]">indisponible</p>
           ) : staleSources.length === 0 ? (
             <p className="mt-1.5 text-[12px] text-emerald-400">
@@ -183,7 +234,21 @@ export function LivingToolCard({
             </ul>
           )}
         </div>
+      )}
+    </div>
+  );
+
+  if (bare) return body;
+
+  return (
+    <div className="rounded-xl border border-[var(--ink-4)]/60 bg-gradient-to-br from-[var(--ink-2)] to-[var(--ink-2)]/60 p-5">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="text-sm font-medium text-[var(--fg-2)]">🌱 L’outil vivant</h2>
+        <p className="text-[11px] text-[var(--fg-4)]">
+          les boucles par lesquelles l’usage améliore l’outil
+        </p>
       </div>
+      {body}
     </div>
   );
 }

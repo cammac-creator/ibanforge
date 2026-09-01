@@ -19,6 +19,14 @@ export interface AcquisitionCohortRow {
   signups: number;
   called_pct: number;
   paid_pct: number;
+  /**
+   * The ISO week still running. DASH-19 (audit 2026-09-01): drawn like the
+   * seven complete weeks beside it, the current column shows a few hours of
+   * data and reads as a collapse of acquisition every Monday morning. Optional
+   * so the page keeps feeding the payload shape it already types; absent, the
+   * component falls back to comparing the Monday itself.
+   */
+  partial?: boolean;
 }
 
 export function AcquisitionPanel({
@@ -32,6 +40,15 @@ export function AcquisitionPanel({
 }) {
   const maxSignups = Math.max(...sources.map((s) => s.signups), 1);
   const maxCohort = Math.max(...cohorts.map((c) => c.signups), 1);
+  // DASH-19: the week that has not finished yet. The API now says so; when it
+  // does not, the current ISO Monday is derived here so an older payload gets
+  // the same treatment rather than the old, silent one.
+  const currentMonday = (() => {
+    const d = new Date();
+    d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
+    return d.toISOString().slice(0, 10);
+  })();
+  const isPartial = (c: AcquisitionCohortRow) => c.partial ?? c.week_start === currentMonday;
   const weekLabel = (w: string) =>
     new Date(`${w}T00:00:00Z`).toLocaleDateString(locale, { day: '2-digit', month: '2-digit', timeZone: 'UTC' });
 
@@ -79,7 +96,9 @@ export function AcquisitionPanel({
           <InfoDot>
             Chaque colonne = les inscrits d&rsquo;une semaine (lundi affiché). Sous la barre : % ayant fait au moins un
             appel, puis % ayant acheté. À surveiller : un « % appelé » qui glisse vers le bas signale une acquisition
-            qui se vide de sa substance.
+            qui se vide de sa substance. La dernière colonne est la semaine EN COURS : elle est hachurée et marquée
+            « en cours » parce qu&rsquo;elle ne mesure que quelques jours, et la comparer aux semaines pleines fait
+            lire un effondrement là où il n&rsquo;y a qu&rsquo;un lundi.
           </InfoDot>
         </div>
         <div className="flex items-end justify-between gap-2">
@@ -88,11 +107,22 @@ export function AcquisitionPanel({
               <span className="font-mono text-[10px] text-[var(--fg-4)]">{c.signups}</span>
               <div className="flex h-24 w-full max-w-[28px] items-end overflow-hidden rounded bg-[var(--ink-4)]/40">
                 <div
-                  className="w-full rounded-t bg-violet-500/60"
-                  style={{ height: `${(c.signups / maxCohort) * 100}%` }}
+                  className={`w-full rounded-t ${isPartial(c) ? 'bg-violet-500/25' : 'bg-violet-500/60'}`}
+                  style={{
+                    height: `${(c.signups / maxCohort) * 100}%`,
+                    ...(isPartial(c)
+                      ? {
+                          backgroundImage:
+                            'repeating-linear-gradient(45deg, rgba(167,139,250,0.55) 0 3px, transparent 3px 6px)',
+                        }
+                      : {}),
+                  }}
                 />
               </div>
-              <span className="text-[10px] text-[var(--fg-5)]">{weekLabel(c.week_start)}</span>
+              <span className="text-[10px] text-[var(--fg-5)]">
+                {weekLabel(c.week_start)}
+                {isPartial(c) ? ' ⋯' : ''}
+              </span>
               <span className="font-mono text-[10px] text-blue-400" title="% ayant appelé">
                 {c.signups > 0 ? `${c.called_pct}%` : '·'}
               </span>
@@ -104,7 +134,7 @@ export function AcquisitionPanel({
         </div>
         <p className="mt-2 text-right text-[10px] text-[var(--fg-5)]">
           <span className="text-blue-400">bleu</span> = % appelé · <span className="text-emerald-400">vert</span> = %
-          acheté
+          acheté · <span className="text-violet-300">hachuré ⋯</span> = semaine en cours, incomplète
         </p>
       </div>
     </div>

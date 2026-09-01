@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { buildBots, sortBots, type BotProfileRow } from './bot-dossiers';
+import {
+  botLabel,
+  buildBots,
+  groupBots,
+  sortBots,
+  UNREADABLE_LABEL,
+  type BotDossier,
+  type BotProfileRow,
+} from './bot-dossiers';
 
 const NOW = new Date('2026-07-30T09:00:00Z');
 
@@ -112,5 +120,105 @@ describe('sortBots', () => {
     const before = list.map((b) => b.userAgent);
     sortBots(list, 'requests');
     expect(list.map((b) => b.userAgent)).toEqual(before);
+  });
+});
+
+describe('botLabel — an attacker-controlled string is not a name (TABS-05)', () => {
+  it('refuses to print an injection probe as if it were an agent', () => {
+    expect(botLabel('${@print(md5(1))}')).toBe(UNREADABLE_LABEL);
+    expect(botLabel('-1')).toBe(UNREADABLE_LABEL);
+    expect(botLabel("' OR 1=1--")).toBe(UNREADABLE_LABEL);
+  });
+
+  it('leaves an ordinary product name alone', () => {
+    expect(botLabel('Python-urllib/3.11')).toBe('Python-urllib/3.11');
+    expect(botLabel('curl/8.4.0')).toBe('curl/8.4.0');
+  });
+});
+
+describe('groupBots — one line per caller, not per build (TABS-05, TABS-14)', () => {
+  const NOW = new Date('2026-08-20T09:00:00Z');
+  const bot = (ua: string, over: Partial<BotDossier> = {}): BotDossier => ({
+    id: ua,
+    userAgent: ua,
+    label: botLabel(ua),
+    homepage: null,
+    clientKind: null,
+    firstSeenAt: '2026-08-01T00:00:00.000Z',
+    lastSeenAt: '2026-08-19T00:00:00.000Z',
+    daysSinceLastCall: 1,
+    requests: 10,
+    ok: 10,
+    paywall: 0,
+    badInput: 0,
+    notFound: 0,
+    serverError: 0,
+    billableOk: 0,
+    avgMs: 20,
+    distinctIps: 1,
+    endpoints: [],
+    notFoundPaths: [],
+    hours: Array(24).fill(0),
+    days: [],
+    verdict: 'visiteur',
+    ...over,
+  });
+
+  it('folds every generic browser into one line carrying the count', () => {
+    const groups = groupBots(
+      [
+        bot('Mozilla/5.0 (Windows NT 10.0; Win64; x64)'),
+        bot('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)'),
+        bot('Mozilla/5.0 (compatible; Something/1.0)'),
+        bot('SentinelOracle/0.1'),
+      ],
+      NOW,
+    );
+    const browsers = groups.find((g) => g.id === 'groupe:Navigateurs');
+    expect(browsers?.label).toBe('Navigateurs (3)');
+    expect(browsers?.requests).toBe(30);
+    expect(browsers?.members).toHaveLength(3);
+    // The real agent is untouched and gains no layer to click through.
+    const agent = groups.find((g) => g.id === 'SentinelOracle/0.1');
+    expect(agent?.members).toBeUndefined();
+  });
+
+  it('groups a product across its versions and keeps them as detail', () => {
+    const groups = groupBots(
+      [
+        bot('Python-urllib/3.11', { requests: 100, notFound: 90 }),
+        bot('Python-urllib/3.9', { requests: 50, notFound: 45 }),
+      ],
+      NOW,
+    );
+    expect(groups).toHaveLength(1);
+    expect(groups[0].label).toBe('Python-urllib');
+    expect(groups[0].requests).toBe(150);
+    expect(groups[0].members?.map((m) => m.label)).toEqual(['Python-urllib/3.11', 'Python-urllib/3.9']);
+    // The verdict is decided on the merged totals: mostly 404s is 'perdu'.
+    expect(groups[0].verdict).toBe('perdu');
+  });
+
+  it('does not let an old build age into « parti » beside its successor', () => {
+    // The defect TABS-14 names: upgrading minted a new dossier and left the old
+    // one to be reported as a departure.
+    const groups = groupBots(
+      [
+        bot('curl/8.4.0', { lastSeenAt: '2026-08-19T00:00:00.000Z', daysSinceLastCall: 1 }),
+        bot('curl/7.1.0', { lastSeenAt: '2026-06-01T00:00:00.000Z', daysSinceLastCall: 80, verdict: 'parti' }),
+      ],
+      NOW,
+    );
+    expect(groups).toHaveLength(1);
+    expect(groups[0].verdict).not.toBe('parti');
+    expect(groups[0].daysSinceLastCall).toBe(1);
+  });
+
+  it('weights the latency by traffic rather than averaging builds flat', () => {
+    const groups = groupBots(
+      [bot('curl/8.4.0', { requests: 900, avgMs: 10 }), bot('curl/7.1.0', { requests: 100, avgMs: 110 })],
+      NOW,
+    );
+    expect(groups[0].avgMs).toBe(20);
   });
 });

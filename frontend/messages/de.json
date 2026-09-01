@@ -505,6 +505,115 @@
     "getKey": "Kostenlosen Key holen"
   },
   "dashboard": {
+    "overview": {
+      "title": "Übersicht",
+      "periodLead": "Zeitraum {days} Tage",
+      "periodNote": "Der Zeitraum steuert die Kurven, die Fehlerquoten, die Kanäle, die Status pro Endpunkt, die Top-Länder und die Stundenkarte. Er steuert NICHT: den Aktivierungstrichter (die API liefert nur 30 und 90 Tage), die CRM-Zahlen, den Wochenrückblick, die unbediente Nachfrage und die Aktualität der Register.",
+      "actions": {
+        "open": "Öffnen",
+        "write": "Schreiben"
+      },
+      "failed": {
+        "title": "{name}, Abruf fehlgeschlagen",
+        "unreachable": "API nicht erreichbar (Timeout oder Netzwerk).",
+        "token": "HTTP {status}, Token ungültig oder rotiert.",
+        "http": "HTTP {status}.",
+        "noSecret": "ADMIN_SECRET ist nicht gesetzt: die Lesung wurde nie versucht. Das ist eine fehlende Servervariable, keine Störung.",
+        "notZeros": "Dieser Block zeigt keine Nullen: die Daten konnten nicht gelesen werden.",
+        "reader": "Leser fehlgeschlagen (HTTP {status}): das ist kein „nichts“, das ist eine Lesung, die nicht stattgefunden hat.",
+        "readerUnreachable": "Leser fehlgeschlagen (API nicht erreichbar): das ist kein „nichts“, das ist eine Lesung, die nicht stattgefunden hat."
+      },
+      "money": {
+        "title": "Das Geld",
+        "lead": "was eingegangen ist, und was verkauft, aber nicht verbraucht wurde",
+        "packs": "Umsatz Pakete",
+        "packsHint": "Tatsächlicher Umsatz der zahlenden Kunden (per Karte bezahlte Guthabenpakete). x402 lässt sich nicht je Kunde zuordnen und hat deshalb eine eigene Kachel.",
+        "x402": "x402 versucht (kumuliert)",
+        "x402Hint": "x402-USDC-Umsatz, der die Zahlungsprüfung bestanden hat, gezählt seit dem 18. April 2026. Eine kumulierte Zahl, kein Zeitfenster. Was tatsächlich on-chain beglichen wurde, steht auf der Saldokarte weiter unten.",
+        "vsYesterday": "{percent} gegenüber gestern",
+        "unused": "Verkaufte, nicht verbrauchte Credits",
+        "unusedHint": "Summe der verbleibenden Credits auf gekauften Paketen. Diese Zahl beschreibt den Bruch nach dem Kauf: Geld für eine Leistung, die der Kunde noch nicht nutzt.",
+        "clients": "Zahlend / Piloten",
+        "clientsHint": "Zahlend = Kunden mit mindestens einem gekauften Paket, davon rufen {active} noch auf. Piloten = kostenloses Kontingent über 200 pro Monat, davon haben {pilots} bereits aufgerufen.",
+        "buyers": "Wer gekauft hat",
+        "buyersEmpty": "Kein Kauf verzeichnet.",
+        "consumed": "{pct} % der {sold} verkauften Credits wurden verbraucht",
+        "idle": "gesehen vor {days} T",
+        "neverCalled": "nie aufgerufen",
+        "digest": "Der Wochenrückblick (montags ausgeklappt)",
+        "windows": "Zeitfenster: Paketumsatz und zahlende Kunden nach aktuellem CRM-Stand, x402 kumuliert seit dem 18. April, Veränderung gegenüber gestern, Kurve über 7 Tage. Der Zeitraum von {days} Tagen steuert keine dieser vier Zahlen."
+      },
+      "chase": {
+        "title": "Wen heute nachfassen",
+        "lead": "die Morgenliste, das Schwerste zuerst",
+        "empty": "Niemand nachzufassen: kein eingeschlafener Käufer, kein stumm gebliebener Neuzugang.",
+        "more": "und {count} weitere in der Liste",
+        "creditsLeft": "{credits} Credits übrig",
+        "days": "vor {days} T",
+        "ball": "warten auf deine Antwort",
+        "due": "fällige Nachfassungen",
+        "ready": "versandfertige Mails",
+        "freeActive": "aktive Gratisnutzer zum Umwandeln",
+        "crmDown": "Kontaktbasis nicht lesbar: Zähler nicht verfügbar, und das ist keine Null.",
+        "reason": {
+          "paid-dormant": "hat bezahlt, dann geschwiegen",
+          "at-limit": "hat sein Limit erreicht",
+          "gone-quiet": "hat aufgerufen, dann geschwiegen",
+          "never-called": "nie aufgerufen"
+        }
+      },
+      "broken": {
+        "title": "Was kaputt ist",
+        "lead": "grün und einzeilig, wenn alles in Ordnung ist",
+        "verdict": {
+          "ok": "Nichts kaputt: kein Serverfehler, alle Register aktuell, kein Endpunkt mit massenhaften Ablehnungen.",
+          "unknown": "Kein Urteil möglich: mindestens ein Leser hat nicht geantwortet. Das heißt nicht „alles in Ordnung“.",
+          "warn": "Anzusehen: veraltetes Register oder Endpunkt, der die Mehrheit seiner Aufrufe ablehnt.",
+          "alert": "Serverfehler im Gange. Der schuldige Pfad wird unten genannt."
+        },
+        "serverErrors": "5xx:",
+        "refusals": "an der Paywall abgelehnt:",
+        "refusalsHint": "Diese Endpunkte lehnen mehr als die Hälfte ihrer Aufrufe ab. Eine Ablehnung an der Paywall ist gewolltes Verhalten, aber ein solches Verhältnis sagt vor allem, dass die Maschinennachfrage viel häufiger gegen die Wand läuft, als sie zahlt.",
+        "reader": "{name}: konnte nicht gelesen werden (HTTP {status}).",
+        "statusReader": "Status pro Endpunkt",
+        "errorsReader": "Fehlerquoten",
+        "mailUnwired": "Unzustellbare Mails: Quelle nicht angeschlossen. Entwürfe und Versand laufen über den VPS, und ein Bounce erreicht keinen Endpunkt, den diese Seite lesen kann. Der Block sagt also nicht „kein Bounce“, er sagt, dass er es nicht weiß.",
+        "successRate": "IBAN-Erfolgsquote (gesamter Zeitraum)",
+        "successRateHint": "Anteil der als gültig bewerteten IBAN unter den an /v1/iban/validate gesendeten, kumuliert seit Beginn (die API liefert hier kein Zeitfenster). Ziel: 95 %. Kein Veränderungsabzeichen mehr, solange keine echte Veränderung berechnet wird: das alte rote Abzeichen war der Wert selbst und las sich wie ein Einbruch.",
+        "ibanErrorRate": "IBAN-Fehlerquote · {days} T",
+        "ibanErrorRateHint": "Anteil der /v1/iban/validate mit Ergebnis ungültig über {days} Tage. Nicht zu verwechseln mit der Erfolgsquote daneben, die seit Beginn kumuliert ist.",
+        "bicMissRate": "BIC-Trefferausfall · {days} T",
+        "bicMissRateHint": "Anteil der /v1/bic/:code ohne Treffer über {days} Tage: die Nachfrage, die die Datenbank noch nicht bedienen kann."
+      },
+      "fresh": {
+        "title": "Was neu ist",
+        "lead": "Neuzugänge, erste Aufrufe, unbediente Nachfrage",
+        "funnel": "Aktivierungstrichter",
+        "opsToday": "Ausgelieferte Operationen (heute, UTC)",
+        "opsTodayHint": "Heute ausgelieferte Operationen, UTC-Tag (validate + batch + bic_lookup), mit oder ohne Schlüssel. Gezählt werden OPERATIONEN, nicht Aufrufe: ein Stapel von 100 IBAN zählt 100. Erfolgreiche Versuche aus dem öffentlichen Playground zählen hier mit, auch die eines Crawlers mit wohlgeformten IBAN; der Tab Kunden zählt nur Aufrufe mit Schlüssel, eine Abweichung zwischen beiden ist also normal und kein Widerspruch. Ohne 4xx/5xx-Ablehnungen und ohne die MCP-Werkzeuge, die keine Operation aufzeichnen. Achtung: „heute“ ist hier der UTC-Tag, während die Aktualität der Kunden nach dem Kalendertag Europe/Zurich gezählt wird.",
+        "signups": "Neuzugänge der letzten 7 Tage ({count})",
+        "signupsEmpty": "Keine Anmeldung seit einer Woche.",
+        "called": "hat aufgerufen",
+        "notCalled": "noch nicht aufgerufen",
+        "signedUp": "angemeldet vor {days} T"
+      },
+      "details": {
+        "title": "Das Detail über {days} Tage",
+        "lead": "wahr, einmal pro Woche nützlich, nie dringend",
+        "open": "Detail ausklappen: Kurven, Länder, Fehler, Kanäle, Status, Kohorten",
+        "businessFunnel": "Konversionstrichter · {days} Tage",
+        "httpRequests": "HTTP-Anfragen · {days} Tage",
+        "topCountries": "Top-Länder · {days} Tage",
+        "topCountriesAllTime": "Top-Länder (kumuliert)",
+        "topInvalidIbans": "Top ungültige IBAN",
+        "topMissingBics": "Top fehlende BIC",
+        "noIbanError": "Kein IBAN-Fehler im Zeitraum.",
+        "noMissingBic": "Kein fehlender BIC im Zeitraum.",
+        "errorsUnread": "Fehlerquoten nicht lesbar: diese Tabelle ist leer, weil die Lesung fehlgeschlagen ist, nicht weil der Tag perfekt war.",
+        "channels": "Zugangskanäle",
+        "statusByPath": "Status pro Endpunkt · {days} Tage"
+      }
+    },
     "header": {
       "title": "IBANforge Dashboard"
     },
@@ -789,7 +898,7 @@
     },
     "revenue": {
       "title": "Einnahmen & On-Chain-Saldo",
-      "hint": "Live-Saldo des x402-Wallets (USDC auf Base), direkt on-chain gelesen, plus Transaktionsverlauf auf Anfrage. Der Stripe-Kanal (Karte) ist programmiert, aber noch nicht konfiguriert.",
+      "hint": "Was tatsächlich eingenommen wurde, Schiene für Schiene. Kartendollar und on-chain USDC werden nie addiert. Der Wallet-Saldo ist kein Umsatz.",
       "usdcRail": "USDC · x402 · Base",
       "live": "live",
       "liveBalance": "On-Chain-Saldo (live)",
@@ -799,11 +908,7 @@
       "noTx": "Keine Transaktionen im gescannten Zeitraum.",
       "rpcHint": "Der Saldo stammt aus früheren Überweisungen. Für den vollständigen Verlauf einen dedizierten RPC (BASE_RPC_URL) konfigurieren.",
       "error": "Verlauf nicht verfügbar (langsamer RPC oder Timeout).",
-      "partial": "Teil-Scan (RPC-Limit) — Summe evtl. unvollständig.",
-      "stripeRail": "Stripe · Karte",
-      "stripeRailSub": "Kartenzahlungen",
-      "stripeNotConfigured": "Nicht konfiguriert",
-      "stripeHint": "Der Code ist fertig — es fehlt nur die Stripe-Kontokonfiguration (Schlüssel + Payment Links). Siehe docs/business/stripe-setup.md."
+      "partial": "Teil-Scan (RPC-Limit) — Summe evtl. unvollständig."
     }
   },
   "docs": {

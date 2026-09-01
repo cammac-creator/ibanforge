@@ -8,17 +8,19 @@ import {
   heatOfDossier,
   sortDossiers,
   SORT_DEFAULT_DIR,
+  stateOfDossier,
   type ClientDossier,
+  type Nuance,
   type SortDir,
   type SortKey,
-  type Verdict,
 } from '@/lib/crm/client-dossiers';
+import type { BusinessStatus } from '@/lib/crm/types';
+import { searchDossiers, type ClientFilter } from '@/lib/crm/client-search';
 import { flameOf } from '@/lib/crm/heat';
-import { fold } from '@/lib/crm/mail-rows';
 import { contactsHref } from '@/lib/crm/deep-link';
 import { ClientDossierModal } from './client-dossier-modal';
 import { ConquestChip } from './conquest-chip';
-import { VERDICTS, VERDICT_BY_KEY } from './verdict-meta';
+import { NUANCES, NUANCE_BY_KEY, STATES, STATE_BY_KEY } from './verdict-meta';
 import { flag, relativeDays } from './dossier-bits';
 
 function MiniSpark({ days }: { days: Array<{ day: string; count: number }> }) {
@@ -45,7 +47,10 @@ function MiniSpark({ days }: { days: Array<{ day: string; count: number }> }) {
  * real and worth being able to see, but opening the page on them buries the
  * dozen customers who actually exist, so the default view is those who called.
  */
-type Filter = Verdict | 'all' | 'used';
+type Filter = ClientFilter;
+
+/** The words the API owns, for telling a state filter from a precision one. */
+const STATE_KEYS = new Set<string>(STATES.map((s) => s.key));
 
 /** Column order mirrors the row layout; every header sorts (ask of 18/08). */
 const HEADERS: Array<{ key: SortKey; label: string; width: string; right?: boolean }> = [
@@ -86,29 +91,49 @@ export function ClientsApp({ dossiers, locale, windowDays = 90 }: { dossiers: Cl
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const counts = useMemo(() => {
-    const c = {} as Record<Verdict, number>;
-    for (const v of VERDICTS) c[v.key] = 0;
-    for (const d of dossiers) c[d.verdict]++;
-    return c;
+  /**
+   * The dossiers that are customers. Everything counted on this page is counted
+   * here (audit TABS-02 and TABS-08, 2026-09-01): the cards, the État counts,
+   * the "ont appelé" line and the table all read one array, so a figure on this
+   * page cannot disagree with the table beneath it.
+   *
+   * `dossiers` itself is kept for exactly one thing: the ⌘K deep link, which
+   * must still be able to open a farm's dossier on purpose. Its traffic is said
+   * out loud on its own line rather than hidden, because the page's other job
+   * is to say what actually hits the API.
+   */
+  const shown = useMemo(() => dossiers.filter((d) => !d.offBooks), [dossiers]);
+  const offBooks = useMemo(() => {
+    const rows = dossiers.filter((d) => d.offBooks);
+    return { count: rows.length, requests: rows.reduce((s, d) => s + d.requests, 0) };
   }, [dossiers]);
 
-  const view = useMemo(() => {
-    // Folded on both sides, like the Contacts search: "societe" finds Société.
-    const q = fold(query.trim());
-    const filtered = dossiers.filter((d) => {
-      if (filter === 'used' && d.requests === 0) return false;
-      if (filter !== 'all' && filter !== 'used' && d.verdict !== filter) return false;
-      if (!q) return true;
-      return (
-        fold(d.email).includes(q) ||
-        fold(d.company ?? '').includes(q) ||
-        d.countries.some((c) => c.code.toLowerCase() === q) ||
-        d.keys.some((k) => k.prefix.toLowerCase().includes(q))
-      );
-    });
-    return sortDossiers(filtered, sort, dir);
-  }, [dossiers, filter, query, sort, dir]);
+  /**
+   * One count per word, states and precisions alike.
+   *
+   * A DERIVED state is shown on its row but not counted here, and that is the
+   * property that makes "Endormis" name the same people on this page as on
+   * Contacts: Contacts can only see the addresses the activation table serves,
+   * so counting an address it does not know would put this page back to a
+   * second figure for one word. The precisions are counted on every row,
+   * derived or not, because nothing else computes them.
+   */
+  const counts = useMemo(() => {
+    const c: Record<string, number> = {};
+    for (const s of STATES) c[s.key] = 0;
+    for (const n of NUANCES) c[n.key] = 0;
+    for (const d of shown) {
+      const st = stateOfDossier(d);
+      if (!st.derived) c[st.status]++;
+      if (st.nuance) c[st.nuance]++;
+    }
+    return c;
+  }, [shown]);
+
+  // Searching, filtering and the automatic widening live in lib/crm, tested on
+  // their own: see client-search.ts and audit finding TABS-04, 2026-09-01.
+  const searched = useMemo(() => searchDossiers(shown, filter, query), [shown, filter, query]);
+  const view = useMemo(() => sortDossiers(searched.rows, sort, dir), [searched, sort, dir]);
 
   // Arrow keys walk the visible list while a dossier is open — the modal
   // stays put, the subject changes. Guarded on an open dossier and on the
@@ -131,8 +156,8 @@ export function ClientsApp({ dossiers, locale, windowDays = 90 }: { dossiers: Cl
     return () => window.removeEventListener('keydown', onKey);
   }, [openId, view]);
 
-  const totalRequests = dossiers.reduce((s, d) => s + d.requests, 0);
-  const distinctCountries = new Set(dossiers.flatMap((d) => d.countries.map((c) => c.code))).size;
+  const totalRequests = shown.reduce((s, d) => s + d.requests, 0);
+  const distinctCountries = new Set(shown.flatMap((d) => d.countries.map((c) => c.code))).size;
 
   function onHeader(key: SortKey) {
     if (sort === key) setDir((d) => (d === 'asc' ? 'desc' : 'asc'));
@@ -143,8 +168,14 @@ export function ClientsApp({ dossiers, locale, windowDays = 90 }: { dossiers: Cl
   }
 
   const arrowOf = (key: SortKey) => (sort === key ? (dir === 'asc' ? ' ▲' : ' ▼') : '');
-  const filterMeta = filter !== 'all' && filter !== 'used' ? VERDICT_BY_KEY[filter] : null;
-  const usedCount = dossiers.filter((d) => d.requests > 0).length;
+  const filterMeta =
+    filter === 'all' || filter === 'used'
+      ? null
+      : STATE_KEYS.has(filter)
+        ? STATE_BY_KEY[filter as BusinessStatus]
+        : NUANCE_BY_KEY[filter as Nuance];
+
+  const usedCount = shown.filter((d) => d.requests > 0).length;
 
   const headerBtn = (active: boolean) =>
     `shrink-0 rounded px-1 py-0.5 text-left transition-colors hover:text-[var(--fg-2)] ${
@@ -157,7 +188,7 @@ export function ClientsApp({ dossiers, locale, windowDays = 90 }: { dossiers: Cl
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[
-          { l: 'Clients', v: String(dossiers.length), h: `${usedCount} ont appelé` },
+          { l: 'Clients', v: String(shown.length), h: `${usedCount} ont appelé` },
           { l: 'Requêtes cumulées', v: totalRequests.toLocaleString('fr-CH'), h: `${windowDays} derniers jours` },
           { l: 'Pays contrôlés', v: String(distinctCountries), h: 'tous clients confondus' },
           { l: 'À débloquer', v: String(counts.blocked), h: 'arrêtés sur un refus' },
@@ -169,6 +200,18 @@ export function ClientsApp({ dossiers, locale, windowDays = 90 }: { dossiers: Cl
           </div>
         ))}
       </div>
+
+      {/* The figure the cards stopped counting, kept where it can be read but
+          where it cannot be mistaken for business. Silent when there is none:
+          a line that always says zero is a line nobody reads. */}
+      {offBooks.count > 0 && (
+        <p className="text-[12px] text-[var(--fg-5)]">
+          Hors clients : {offBooks.requests.toLocaleString('fr-CH')} requête
+          {offBooks.requests > 1 ? 's' : ''} de trafic de fermes et de clés d&apos;amorçage sur{' '}
+          {offBooks.count} dossier{offBooks.count > 1 ? 's' : ''}, exclues des cartes ci-dessus comme
+          elles le sont de la vue d&apos;ensemble.
+        </p>
+      )}
 
       <div className="relative min-w-0 overflow-hidden rounded-xl border border-[var(--ink-4)]/60 bg-[var(--ink-2)]/40">
         {/* Every control lives in the header row itself: click a column to
@@ -276,14 +319,16 @@ export function ClientsApp({ dossiers, locale, windowDays = 90 }: { dossiers: Cl
               {(
                 [
                   { key: 'used' as Filter, label: 'Ont appelé', n: usedCount, why: 'les adresses qui ont appelé au moins une fois', colour: null },
-                  { key: 'all' as Filter, label: 'Tous', n: dossiers.length, why: 'toutes les adresses, clés muettes comprises', colour: null },
-                  ...VERDICTS.filter((v) => counts[v.key] > 0).map((v) => ({
-                    key: v.key as Filter,
-                    label: v.label,
-                    n: counts[v.key],
-                    why: v.why,
-                    colour: v.colour as string | null,
-                  })),
+                  { key: 'all' as Filter, label: 'Tous', n: shown.length, why: 'toutes les adresses, clés muettes comprises', colour: null },
+                  ...[...STATES, ...NUANCES]
+                    .filter((v) => counts[v.key] > 0)
+                    .map((v) => ({
+                      key: v.key as Filter,
+                      label: v.label,
+                      n: counts[v.key],
+                      why: v.why,
+                      colour: v.colour as string | null,
+                    })),
                 ] as Array<{ key: Filter; label: string; n: number; why: string; colour: string | null }>
               ).map((item) => (
                 <button
@@ -311,11 +356,22 @@ export function ClientsApp({ dossiers, locale, windowDays = 90 }: { dossiers: Cl
           </>
         )}
 
+        {/* Announced, never silent: the lens has stepped outside the État
+            filter because nothing inside it matched. */}
+        {searched.widened && (
+          <p className="border-b border-[var(--ink-4)]/60 px-4 py-1.5 text-[12px] text-[var(--fg-4)]">
+            Rien sous le filtre actif : la recherche porte sur tous les dossiers.
+          </p>
+        )}
         {view.length === 0 ? (
-          <p className="px-4 py-8 text-center text-sm text-[var(--fg-4)]">Aucun client ne correspond.</p>
+          <p className="px-4 py-8 text-center text-sm text-[var(--fg-4)]">
+            Aucun client ne correspond{filter !== 'all' ? ', filtre État compris' : ''}.
+          </p>
         ) : (
           view.map((d) => {
-            const v = VERDICT_BY_KEY[d.verdict];
+            const st = stateOfDossier(d);
+            const word = STATE_BY_KEY[st.status];
+            const nuance = st.nuance ? NUANCE_BY_KEY[st.nuance] : null;
             const todayCalls = callsToday(d.days, new Date());
             return (
               <div key={d.id} className="border-b border-[var(--ink-4)]/60 last:border-b-0">
@@ -346,10 +402,24 @@ export function ClientsApp({ dossiers, locale, windowDays = 90 }: { dossiers: Cl
                       <span className="block truncate text-[12px] text-[var(--fg-4)]">{d.company}</span>
                     )}
                   </span>
-                  <span className="flex w-auto items-center md:w-[8%]">
-                    <span className="truncate text-[13px]" style={{ color: v.colour }}>
-                      {v.one}
+                  {/* One state word, then the precision behind it. Never two
+                      words that could disagree: see stateOfDossier. A derived
+                      word wears a degree sign and says so on hover, because it
+                      was read off the window rather than served by the API. */}
+                  <span className="flex w-auto min-w-0 flex-col md:w-[8%]">
+                    <span
+                      className="truncate text-[13px]"
+                      style={{ color: word.colour }}
+                      title={st.derived ? `${word.why} (déduit de la fenêtre : aucune ligne d’activation)` : word.why}
+                    >
+                      {word.one}
+                      {st.derived ? '°' : ''}
                     </span>
+                    {nuance && (
+                      <span className="truncate text-[11px] text-[var(--fg-4)]" title={nuance.why}>
+                        {nuance.one}
+                      </span>
+                    )}
                   </span>
                   {/* Two figures, one column: today, then the window total.
                       "Combien aujourd'hui" and "combien en tout" were the two

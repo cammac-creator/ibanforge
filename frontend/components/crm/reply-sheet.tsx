@@ -338,7 +338,11 @@ export function ReplySheet({
       const r = await fetch('/api/crm/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ account: c.account, to: c.email, subject, body }),
+        // intent and override are read by /api/crm/send, which replays the
+        // blocking rules server-side (audit TABS-03, 2026-09-01). Declared
+        // rather than guessed there: the route holds neither the thread nor
+        // the grant the operator gave.
+        body: JSON.stringify({ account: c.account, to: c.email, subject, body, intent: g.intent, override: g.forcedCodes }),
       });
       const a = await readAnswer(r);
       if (!confirmedSent(a)) {

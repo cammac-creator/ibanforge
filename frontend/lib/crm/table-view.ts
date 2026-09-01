@@ -42,7 +42,7 @@ export const POPULATION_KEYS: readonly MailFilterKey[] = [
 // what is OWED, and a closed dossier is the one thing that no longer is. The
 // chip is the retrieval path — narrow any population to the dossiers the
 // terminal verdicts took out of the queues.
-export const REFINE_KEYS: readonly MailFilterKey[] = ['new', 'paying', 'dormant', 'prospect', 'closed'];
+export const REFINE_KEYS: readonly MailFilterKey[] = ['new', 'paying', 'at-limit', 'dormant', 'prospect', 'closed'];
 
 /**
  * The segment's own word for a key, where the filter's label was written for a

@@ -505,6 +505,115 @@
     "getKey": "Get a free key"
   },
   "dashboard": {
+    "overview": {
+      "title": "Overview",
+      "periodLead": "{days}-day window",
+      "periodNote": "The window drives the charts, the error rates, the channels, the per-endpoint statuses, the top countries and the hourly map. It does NOT drive: the activation funnel (the API only serves 30 and 90 days), the CRM figures, the weekly digest, unserved demand or register freshness.",
+      "actions": {
+        "open": "Open",
+        "write": "Write"
+      },
+      "failed": {
+        "title": "{name}, fetch failed",
+        "unreachable": "API unreachable (timeout or network).",
+        "token": "HTTP {status}, token invalid or rotated.",
+        "http": "HTTP {status}.",
+        "noSecret": "ADMIN_SECRET is not set: the read was never attempted. That is a missing server variable, not an outage.",
+        "notZeros": "This block is not showing zeros: the data could not be read.",
+        "reader": "reader failed (HTTP {status}): this is not \"nothing\", this is a read that did not happen.",
+        "readerUnreachable": "reader failed (API unreachable): this is not \"nothing\", this is a read that did not happen."
+      },
+      "money": {
+        "title": "The money",
+        "lead": "what came in, and what was sold without being used",
+        "packs": "Pack revenue",
+        "packsHint": "Actual revenue from paying customers (credit packs paid by card). x402 cannot be attributed customer by customer, so it has its own tile.",
+        "x402": "x402 attempted (all time)",
+        "x402Hint": "x402 USDC revenue that passed payment verification, counted since 18 April 2026. This is a running total, not a window. What actually settled on chain is on the balance card below.",
+        "vsYesterday": "{percent} vs yesterday",
+        "unused": "Credits sold, not used",
+        "unusedHint": "Sum of the credits left on purchased packs. This is the figure that describes the break after purchase: money taken for a service the customer is not using yet.",
+        "clients": "Paying / pilots",
+        "clientsHint": "Paying = customers who bought at least one pack, of which {active} still call. Pilots = free quota raised above 200 a month, of which {pilots} have already called.",
+        "buyers": "Who bought",
+        "buyersEmpty": "No purchase on record.",
+        "consumed": "{pct}% of the {sold} credits sold have been used",
+        "idle": "seen {days} d ago",
+        "neverCalled": "never called",
+        "digest": "The week in review (open on Mondays)",
+        "windows": "Windows: pack revenue and paying customers from the CRM as it stands, x402 as a total since 18 April, variation against yesterday, sparkline over 7 days. The {days}-day pill drives none of these four figures."
+      },
+      "chase": {
+        "title": "Who to chase today",
+        "lead": "the morning queue, worst first",
+        "empty": "Nobody to chase: no buyer gone quiet, no signup left mute.",
+        "more": "and {count} more in the queue",
+        "creditsLeft": "{credits} credits left",
+        "days": "{days} d ago",
+        "ball": "waiting on your answer",
+        "due": "follow-ups due",
+        "ready": "mails ready to send",
+        "freeActive": "active free users to convert",
+        "crmDown": "Contact base unreadable: counters unavailable, and that is not a zero.",
+        "reason": {
+          "paid-dormant": "paid, went quiet",
+          "at-limit": "hit their limit",
+          "gone-quiet": "called, then went quiet",
+          "never-called": "never called"
+        }
+      },
+      "broken": {
+        "title": "What is broken",
+        "lead": "green and one line long when all is well",
+        "verdict": {
+          "ok": "Nothing broken: no server error, every register fresh, no endpoint refusing most of its traffic.",
+          "unknown": "No verdict possible: at least one reader did not answer. This is not \"all is well\".",
+          "warn": "Worth a look: a stale register, or an endpoint refusing most of its calls.",
+          "alert": "Server errors in progress. The offending path is named below."
+        },
+        "serverErrors": "5xx:",
+        "refusals": "refused at the paywall:",
+        "refusalsHint": "These endpoints refuse more than half of their calls. A refusal at the paywall is the intended behaviour, but a ratio like this mostly says that machine demand hits the wall far more often than it pays.",
+        "reader": "{name}: could not be read (HTTP {status}).",
+        "statusReader": "Statuses by endpoint",
+        "errorsReader": "Error rates",
+        "mailUnwired": "Undelivered mail: source not wired. Drafts and sends go through the VPS, and a bounce reaches no endpoint this page can read. So this block does not say \"no bounce\", it says it does not know.",
+        "successRate": "IBAN success rate (all time)",
+        "successRateHint": "Share of IBANs judged valid among those submitted to /v1/iban/validate, all time (the API serves no window here). Target: 95%. No variation badge until a real variation is computed: the old red badge was the value itself and read as a collapse.",
+        "ibanErrorRate": "IBAN error rate · {days} d",
+        "ibanErrorRateHint": "Share of /v1/iban/validate returning invalid over {days} days. Not to be confused with the success rate beside it, which is an all-time figure.",
+        "bicMissRate": "BIC miss rate · {days} d",
+        "bicMissRateHint": "Share of /v1/bic/:code with no match over {days} days: the demand the database cannot serve yet."
+      },
+      "fresh": {
+        "title": "What is new",
+        "lead": "signups, first calls, demand we could not serve",
+        "funnel": "Activation funnel",
+        "opsToday": "Operations served (today, UTC)",
+        "opsTodayHint": "Operations served today, UTC day (validate + batch + bic_lookup), with or without a key. These are OPERATIONS, not calls: a batch of 100 IBANs counts as 100. Successful tries from the public playground count here, including those of a crawler submitting well-formed IBANs; the Clients tab only counts calls carried by a key, so a gap between the two is normal rather than an inconsistency. Excludes 4xx/5xx refusals and the MCP tools, which record no operation. Careful: \"today\" here is the UTC day, while customer freshness is counted on the Europe/Zurich calendar.",
+        "signups": "Signups of the last 7 days ({count})",
+        "signupsEmpty": "No signup in the last week.",
+        "called": "has called",
+        "notCalled": "has not called yet",
+        "signedUp": "signed up {days} d ago"
+      },
+      "details": {
+        "title": "The {days}-day detail",
+        "lead": "true, useful once a week, never urgent",
+        "open": "Open the detail: charts, countries, errors, channels, statuses, cohorts",
+        "businessFunnel": "Conversion funnel · {days} days",
+        "httpRequests": "HTTP requests · {days} days",
+        "topCountries": "Top countries · {days} days",
+        "topCountriesAllTime": "Top countries (all time)",
+        "topInvalidIbans": "Top invalid IBANs",
+        "topMissingBics": "Top missing BICs",
+        "noIbanError": "No IBAN error over the period.",
+        "noMissingBic": "No missing BIC over the period.",
+        "errorsUnread": "Error rates unreadable: this table is empty because the read failed, not because the day was perfect.",
+        "channels": "Access channels",
+        "statusByPath": "Statuses by endpoint · {days} days"
+      }
+    },
     "header": {
       "title": "IBANforge Dashboard"
     },
@@ -789,7 +898,7 @@
     },
     "revenue": {
       "title": "Revenue & on-chain balance",
-      "hint": "Live balance of the x402 wallet (USDC on Base) read directly on-chain, plus on-demand transaction history. The Stripe (card) rail is coded but not yet configured.",
+      "hint": "What was actually collected, rail by rail. Card dollars and on-chain USDC are never added together. The wallet balance is not revenue.",
       "usdcRail": "USDC · x402 · Base",
       "live": "live",
       "liveBalance": "On-chain balance (live)",
@@ -799,11 +908,7 @@
       "noTx": "No transactions in the scanned window.",
       "rpcHint": "The balance comes from earlier transfers. For the full history, set a dedicated RPC (BASE_RPC_URL).",
       "error": "History unavailable (slow RPC or timeout).",
-      "partial": "Partial scan (RPC rate limit) — total may be under-reported.",
-      "stripeRail": "Stripe · card",
-      "stripeRailSub": "Card payments",
-      "stripeNotConfigured": "Not configured",
-      "stripeHint": "The code is ready — only the Stripe account config is missing (keys + Payment Links). See docs/business/stripe-setup.md."
+      "partial": "Partial scan (RPC rate limit) — total may be under-reported."
     }
   },
   "docs": {

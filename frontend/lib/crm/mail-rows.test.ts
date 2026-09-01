@@ -422,6 +422,21 @@ const sleeping: Contact = {
     calls90d: 0,
   },
 };
+/** At their monthly ceiling: the state the 'at-limit' queue exists for. */
+const capped: Contact = {
+  ...client('capped@alpha.example.net', 'Société Nu', [
+    message('out', 'Ton plafond', 'Ta clé tape son plafond ce mois-ci', '2026-08-01'),
+  ]),
+  business: {
+    status: 'at-limit' as const,
+    source: 'direct',
+    creditsTotal: 0,
+    creditsRemaining: 0,
+    packs: 0,
+    firstCallAt: '2026-06-01',
+    calls90d: 200,
+  },
+};
 const drafted: Contact = {
   ...client('pending@alpha.example.net', 'Société Omicron', [
     message('out', 'Suivi', 'Je reviens vers vous la semaine prochaine', '2026-06-15'),
@@ -448,7 +463,7 @@ const judged: Contact = (() => {
 })();
 
 const rich: RowsInput = {
-  contacts: [alpha, beta, newClient, cold, buyer, sleeping, drafted, desk, judged],
+  contacts: [alpha, beta, newClient, cold, buyer, sleeping, capped, drafted, desk, judged],
   situations: {
     'alpha@example.com': situation({ ballInCourt: 'us', silenceDays: 2 }),
     'beta@example.com': situation({ followupDue: true, silenceDays: 40 }),
@@ -456,6 +471,7 @@ const rich: RowsInput = {
     'delta@example.com': situation({ nextAction: 'first_mail' }),
     'buyer@alpha.example.net': situation({ ballInCourt: 'them', silenceDays: 1, messageCount: 1 }),
     'quiet@alpha.example.net': situation({ silenceDays: 90, messageCount: 1 }),
+    'capped@alpha.example.net': situation({ silenceDays: 10, messageCount: 1 }),
     'pending@alpha.example.net': situation({ silenceDays: 20, messageCount: 1 }),
     'desk@alpha.example.net': situation({ ballInCourt: 'them', silenceDays: 12, messageCount: 1 }),
     'sigma@example.com': situation({ ballInCourt: 'us', silenceDays: 45, messageCount: 2 }),
@@ -988,5 +1004,64 @@ describe('a marked last inbound', () => {
       snoozed: {},
     };
     expect(mailRows(answered, 'all')[0]?.noReply).toBe(false);
+  });
+});
+
+describe('the follow-up queue is ranked by what a follow-up is worth (TABS-11)', () => {
+  /** Everyone here is overdue: only the ORDER is under test. */
+  const due = (email: string, business?: Contact['business']): Contact => ({
+    ...client(email, 'Société Alpha', [message('out', 'Suivi', 'Des nouvelles ?', '2026-06-01')]),
+    ...(business ? { business } : {}),
+  });
+  const money = (packs: number, calls90d: number): Contact['business'] => ({
+    status: packs > 0 ? ('paying' as const) : ('active' as const),
+    source: 'direct',
+    creditsTotal: packs * 1000,
+    creditsRemaining: packs * 500,
+    packs,
+    firstCallAt: '2026-05-01',
+    calls90d,
+  });
+
+  const buyer = due('buyer@alpha.example.net', money(1, 5));
+  const heavy = due('heavy@alpha.example.net', money(0, 300));
+  const light = due('light@alpha.example.net', money(0, 2));
+  const nobody = due('nobody@alpha.example.net');
+
+  const input: RowsInput = {
+    contacts: [nobody, light, heavy, buyer],
+    situations: {
+      'buyer@alpha.example.net': situation({ followupDue: true, silenceDays: 20, messageCount: 1 }),
+      'heavy@alpha.example.net': situation({ followupDue: true, silenceDays: 20, messageCount: 1 }),
+      'light@alpha.example.net': situation({ followupDue: true, silenceDays: 20, messageCount: 1 }),
+      'nobody@alpha.example.net': situation({ followupDue: true, silenceDays: 20, messageCount: 1 }),
+    },
+    snoozed: {},
+  };
+
+  it('puts the buyer first, then whoever calls the API most', () => {
+    // A queue nobody can empty is only ever read from the top: what is at the
+    // top is the whole of the feature.
+    expect(mailRows(input, 'followup').map((r) => r.id)).toEqual([
+      'buyer@alpha.example.net',
+      'heavy@alpha.example.net',
+      'light@alpha.example.net',
+      'nobody@alpha.example.net',
+    ]);
+  });
+
+  it('counts a buyer as a buyer, not as a stack of packs', () => {
+    // Two packs is not twice the reason to write: the rank is on HAVING bought.
+    const two = { ...buyer, email: 'two@alpha.example.net', id: 'two@alpha.example.net', business: money(2, 0) };
+    const wider: RowsInput = {
+      ...input,
+      contacts: [two as Contact, buyer],
+      situations: {
+        ...input.situations,
+        'two@alpha.example.net': situation({ followupDue: true, silenceDays: 20, messageCount: 1 }),
+      },
+    };
+    // The pack term ties, so the call counter decides: buyer called, two did not.
+    expect(mailRows(wider, 'followup').map((r) => r.id)[0]).toBe('buyer@alpha.example.net');
   });
 });

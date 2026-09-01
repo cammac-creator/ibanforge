@@ -1,7 +1,7 @@
 import { getLocale } from 'next-intl/server';
 import { BotsApp, type BridgeClient } from '@/components/crm/bots-app';
 import { TrafficTrendCard } from '@/components/dashboard/traffic-trend-card';
-import { buildBots, fetchBotProfiles } from '@/lib/crm/bot-dossiers';
+import { buildBots, fetchBotProfiles, groupBots } from '@/lib/crm/bot-dossiers';
 import { fetchCrmData } from '@/lib/crm/build-contacts';
 import { buildDossiers, fetchClientProfiles, fetchCompanyProfiles } from '@/lib/crm/client-dossiers';
 import { fetchTrafficTrend } from '@/lib/traffic-trend';
@@ -18,8 +18,12 @@ export const dynamic = 'force-dynamic';
  */
 async function loadBridgeClients(): Promise<BridgeClient[]> {
   try {
+    // Four fields are read off the result: id, email, company, user agents.
+    // The bridge used to pull the entire admin base for them, mail bodies
+    // included (audit TABS-06, 2026-09-01). Prospects stay because they carry
+    // the company names; everything else is dropped, mails first.
     const [data, profiles, companyProfiles] = await Promise.all([
-      fetchCrmData(),
+      fetchCrmData({ skip: ['messages', 'activity', 'reads', 'activation', 'institutions'] }),
       fetchClientProfiles(90),
       fetchCompanyProfiles(),
     ]);
@@ -56,7 +60,11 @@ export default async function ClientsBotPage() {
     loadBridgeClients(),
     fetchTrafficTrend(90),
   ]);
-  const bots = buildBots(profiles, new Date());
+  // Grouped before the browser ever sees them (audit TABS-05 and TABS-14): one
+  // line per product with the versions kept as detail, and a single line for
+  // every generic browser and scanner.
+  const now = new Date();
+  const bots = groupBots(buildBots(profiles, now), now);
 
   return (
     <div className="space-y-5">

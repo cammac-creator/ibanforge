@@ -1,4 +1,8 @@
 import { InfoDot } from './info-dot';
+// The arithmetic lives in lib/ because the frontend test runner collects
+// lib/**/*.test.ts and app/**/*.test.ts only: a percentage computed inline in
+// JSX is a percentage no test can reach, which is how "300 %" shipped.
+import { medianLabel, stepPercent } from '@/lib/dashboard/activation-funnel-math';
 
 /**
  * The HUMAN funnel: signups of the period, and how far each got. Steps are
@@ -15,21 +19,24 @@ export interface ActivationFunnelData {
   purchased: number;
   median_hours_signup_to_first_call: number | null;
   median_hours_first_call_to_purchase: number | null;
+  /**
+   * Sample size behind each median. Optional so the page can keep feeding this
+   * component the payload shape it already types; absent, the label simply
+   * omits the n rather than inventing one. DASH-20, audit 2026-09-01.
+   */
+  median_n_signup_to_first_call?: number;
+  median_n_first_call_to_purchase?: number;
 }
 
 const STEPS = [
   { key: 'signed_up', label: 'Inscrits', color: '#a78bfa' },
   { key: 'first_call', label: 'Ont appelé', color: '#3b82f6' },
-  { key: 'hit_limit', label: 'Ont touché la limite', color: '#f59e0b' },
+  // DASH-07: the step counts 402/429 refusals SERVED INSIDE THE WINDOW. It used
+  // to lean on the current calendar month's quota counter, so on the 1st it was
+  // zero by construction and climbed back on its own as the month went on.
+  { key: 'hit_limit', label: 'Ont été refusés (402/429)', color: '#f59e0b' },
   { key: 'purchased', label: 'Ont acheté', color: '#22c55e' },
 ] as const;
-
-function medianLabel(hours: number | null): string | null {
-  if (hours === null) return null;
-  if (hours < 1) return '< 1 h';
-  if (hours < 48) return `${Math.round(hours)} h`;
-  return `${Math.round((hours / 24) * 10) / 10} j`;
-}
 
 export function ActivationFunnel({ funnel }: { funnel: ActivationFunnelData }) {
   const max = Math.max(funnel.signed_up, 1);
@@ -40,8 +47,8 @@ export function ActivationFunnel({ funnel }: { funnel: ActivationFunnelData }) {
     purchased: funnel.purchased,
   };
   const medians: Partial<Record<(typeof STEPS)[number]['key'], string | null>> = {
-    first_call: medianLabel(funnel.median_hours_signup_to_first_call),
-    purchased: medianLabel(funnel.median_hours_first_call_to_purchase),
+    first_call: medianLabel(funnel.median_hours_signup_to_first_call, funnel.median_n_signup_to_first_call),
+    purchased: medianLabel(funnel.median_hours_first_call_to_purchase, funnel.median_n_first_call_to_purchase),
   };
 
   return (
@@ -52,17 +59,24 @@ export function ActivationFunnel({ funnel }: { funnel: ActivationFunnelData }) {
         </p>
         <InfoDot>
           Les personnes derrière les clés, pas le trafic : sur les inscrits de la période, combien ont fait un premier
-          appel, touché leur limite (quota ou refus 402/429), puis acheté un pack. Chaque marche est comptée
-          indépendamment sur la même population. Les délais sont des médianes. Comptes internes et clés semées exclus
-          côté API.
+          appel, été refusés faute de paiement ou de quota (402/429), puis acheté un pack. Chaque marche est comptée
+          indépendamment sur la même population, et son pourcentage est donc rapporté aux INSCRITS, jamais à la marche
+          du dessus : deux marches indépendantes n&rsquo;ont pas de rapport d&rsquo;inclusion, et diviser l&rsquo;une
+          par l&rsquo;autre affichait « 300 % » sur « Ont acheté ». Les refus sont ceux servis DANS la fenêtre affichée.
+          Les délais sont des médianes, suivies du nombre de clients sur lequel elles portent. Comptes internes et clés
+          semées exclus côté API.
         </InfoDot>
       </div>
 
       <div className="flex flex-col gap-2">
         {STEPS.map((s, i) => {
           const v = values[s.key];
-          const prev = i > 0 ? values[STEPS[i - 1].key] : null;
-          const pct = prev !== null && prev > 0 ? Math.round((v / prev) * 100) : null;
+          // DASH-06 (audit 2026-09-01): the denominator is the population, not
+          // the step above. These marches are counted independently ("ever
+          // reached that state"), so a client can buy without ever being
+          // refused — and 3 buyers over 1 refusal rendered a literal "300 %"
+          // under a card that documents its own steps as independent.
+          const pct = stepPercent(v, values.signed_up, i);
           const width = Math.max((v / max) * 100, v > 0 ? 3 : 0);
           const med = medians[s.key];
           return (
@@ -78,8 +92,8 @@ export function ActivationFunnel({ funnel }: { funnel: ActivationFunnelData }) {
                   </span>
                 </div>
               </div>
-              <span className="w-28 shrink-0 text-xs text-[var(--fg-5)]">
-                {pct !== null ? `${pct} %` : ' '}
+              <span className="w-44 shrink-0 text-xs text-[var(--fg-5)]">
+                {pct !== null ? `${pct} % des inscrits` : ' '}
                 {med ? ` · ${med}` : ''}
               </span>
             </div>

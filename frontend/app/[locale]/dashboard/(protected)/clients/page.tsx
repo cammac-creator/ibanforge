@@ -17,8 +17,13 @@ export default async function ClientsPage({
   const params = await searchParams;
   const daysParam = Number(params.days ?? 90);
   const windowDays = (WINDOWS as readonly number[]).includes(daysParam) ? daysParam : 90;
+  // Only what buildDossiers reads (audit TABS-12, 2026-09-01). This page counts
+  // mails and shows the last subject; it never renders a body, and it uses
+  // neither the per-key activity, nor the thread reads, nor the institutional
+  // contacts. Asking for all of it made every render carry the whole mailbox,
+  // bodies included, and again after each gesture through router.refresh().
   const [data, profiles, companyProfiles] = await Promise.all([
-    fetchCrmData(),
+    fetchCrmData({ lightMessages: true, skip: ['activity', 'reads', 'institutions'] }),
     fetchClientProfiles(windowDays),
     fetchCompanyProfiles(),
   ]);

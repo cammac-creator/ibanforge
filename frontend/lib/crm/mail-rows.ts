@@ -12,6 +12,7 @@ export type MailFilterKey =
   | 'followup'
   | 'new'
   | 'paying'
+  | 'at-limit'
   | 'dormant'
   | 'drafts'
   | 'clients'
@@ -152,6 +153,21 @@ const FILTERS: Array<{
   // them today. The day that changes, a supervisor must still never land in a
   // money queue.
   { key: 'paying', label: 'Payants', urgent: false, test: (c) => c.kind === 'client' && (c.business?.packs ?? 0) > 0 },
+  /**
+   * The most urgent commercial state on the page, and until 2026-09-01 the only
+   * one with no queue (audit TABS-13). The chip has existed since business.ts
+   * was written, so a customer hitting their ceiling was visible, but only to
+   * somebody who happened to scroll past their row: no filter selected them,
+   * and the ceiling is precisely the moment a free account becomes a sale or a
+   * churn. Beside "Payants" for that reason, and reading the same activation
+   * join rather than a quota computed here.
+   */
+  {
+    key: 'at-limit',
+    label: 'À la limite',
+    urgent: false,
+    test: (c) => c.kind === 'client' && c.business?.status === 'at-limit',
+  },
   { key: 'dormant', label: 'Endormis', urgent: false, test: (c) => c.kind === 'client' && c.business?.status === 'dormant' },
   // A draft written and never sent is a follow-up that silently never left:
   // this queue makes every waiting draft countable and findable.
@@ -487,7 +503,32 @@ function order(input: RowsInput, contacts: Contact[], active: MailFilterKey): Co
       // is the whole question this filter is opened with.
       if (a.unread !== b.unread) return a.unread ? -1 : 1;
     }
-    if (active === 'clients' || active === 'paying' || active === 'dormant') {
+    /**
+     * The follow-up queue is ranked by what a follow-up is worth (audit
+     * TABS-11, 2026-09-01).
+     *
+     * It is structurally impossible to empty: the number of follow-ups due runs
+     * many times the ten mails a day the guardrails allow out, so the operator
+     * will never reach the bottom of it, and the only thing that matters is
+     * which ten are at the top. It had no order at all beyond "the mail I sent
+     * last", which ranks by MY calendar rather than by their interest.
+     *
+     * Money first, in the two forms it takes: somebody who bought a pack, then
+     * somebody whose key is still calling. Both are facts about them. Heat
+     * carries the conversation terms and settles the rest, and the standing
+     * recency order below breaks the remaining ties.
+     */
+    if (active === 'followup') {
+      const packs = (c: Contact) => (c.kind === 'client' ? (c.business?.packs ?? 0) : 0);
+      const packGap = Math.min(packs(b), 1) - Math.min(packs(a), 1);
+      if (packGap !== 0) return packGap;
+      const calls = (c: Contact) => (c.kind === 'client' ? (c.business?.calls90d ?? 0) : 0);
+      const callGap = calls(b) - calls(a);
+      if (callGap !== 0) return callGap;
+      const heatGap = heatOf(b, input.situations[b.id]).score - heatOf(a, input.situations[a.id]).score;
+      if (heatGap !== 0) return heatGap;
+    }
+    if (active === 'clients' || active === 'paying' || active === 'dormant' || active === 'at-limit') {
       // Money views rank by heat: the client burning credits outranks the one
       // whose last mail happens to be newer. Date breaks ties.
       const heatGap = heatOf(b, input.situations[b.id]).score - heatOf(a, input.situations[a.id]).score;
