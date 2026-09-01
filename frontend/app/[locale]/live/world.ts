@@ -72,19 +72,19 @@ export function drawSprite(
  * so its top stays south of the middle street and never masks a door. */
 
 export const REGISTRY_CCS = ['DE', 'AT', 'BE', 'BG', 'NL', 'FI'] as const;
-/** Day-board houses by true width; NL and FI reuse a face mirrored, which the
- * fantasy banner glyphs absorb (nothing readable to mirror). At 0.85 the six
- * of them and the three counters share the middle street without touching. */
-const REG_SCALE = 0.85;
-const REGISTRY_LANE: { sprite: string; cx: number; w: number; flip?: boolean }[] = [
-  { sprite: 'house0', cx: 568, w: 95 },
-  { sprite: 'house1', cx: 641, w: 52 },
-  { sprite: 'house2', cx: 707, w: 80 },
-  { sprite: 'house3', cx: 776, w: 59 },
-  { sprite: 'house1', cx: 833, w: 52, flip: true },
-  { sprite: 'house3', cx: 890, w: 59, flip: true },
+/** The bespoke national houses (01/09 boards): Fachwerk DE, alpine chalet AT,
+ * step-gabled BE, revival BG, canal house NL, red-ochre cottage FI. These
+ * isometric cuts run wide, so the lane is a close shingle: ~16px overlaps,
+ * with per-house bases ordered so no banner hides behind a neighbour (the
+ * house with the bigger base draws in front). */
+const REGISTRY_LANE: { sprite: string; cx: number; w: number; h: number; base: number }[] = [
+  { sprite: 'reg-de', cx: 549, w: 74, h: 76, base: 334 },
+  { sprite: 'reg-at', cx: 614, w: 87, h: 66, base: 337 },
+  { sprite: 'reg-be', cx: 676, w: 70, h: 82, base: 334 },
+  { sprite: 'reg-bg', cx: 736, w: 82, h: 68, base: 334 },
+  { sprite: 'reg-nl', cx: 800, w: 77, h: 98, base: 337 },
+  { sprite: 'reg-fi', cx: 867, w: 90, h: 63, base: 339 },
 ];
-const REGISTRY_BASE = 334;
 
 export interface StationGeo {
   id: string;
@@ -115,33 +115,34 @@ export const STATIONS: StationGeo[] = [
   geo('cutter', 'stall-teal', 306, 180, 62, 70, [306, 200], [306, 192]),
   geo('library', 'library', 414, 176, 176, 126, [414, 200], [414, 192], { scale: 0.92 }),
   ...REGISTRY_LANE.map((h, i) =>
-    geo(`reg-${REGISTRY_CCS[i]}`, h.sprite, h.cx, REGISTRY_BASE, h.w * REG_SCALE, 86,
-      [h.cx, 350], [h.cx, 342], { cc: REGISTRY_CCS[i], flip: h.flip, scale: REG_SCALE }),
+    geo(`reg-${REGISTRY_CCS[i]}`, h.sprite, h.cx, h.base, h.w, h.h,
+      [h.cx, 350], [h.cx, 342], { cc: REGISTRY_CCS[i] }),
   ),
   geo('warehouse', 'warehouse', 84, 106, 132, 104, [120, 98], [120, 76]),
-  geo('classifier', 'house1', 248, 334, 66, 112, [248, 352], [248, 342], { scale: 1.12 }),
-  // court at 0.85: full-size its roof crossed into the top street band and
-  // would occlude the hero walking there (painter's order draws it later)
-  geo('court', 'house-big', 356, 338, 102, 128, [356, 352], [356, 342], { scale: 0.85 }),
-  geo('six', 'house3', 470, 334, 76, 112, [470, 352], [470, 342], { flip: true, scale: 1.12 }),
+  // the three counters wear their bespoke boards too: sorting office with
+  // pigeonholes, columned courthouse, Swiss chalet with its painted flag
+  geo('classifier', 'classifier-b', 270, 334, 100, 76, [270, 352], [270, 342]),
+  geo('court', 'court-b', 366, 336, 118, 88, [366, 352], [366, 342]),
+  geo('six', 'six-b', 460, 338, 100, 92, [460, 352], [460, 342]),
   // the barrier sits ACROSS the bottom street: the hero passes through it
   geo('border', 'fence', 280, 506, 104, 46, [280, 498], [280, 498]),
   geo('tower', 'tower', 380, 496, 64, 140, [380, 504], [380, 498], { scale: 0.82 }),
   geo('forge', 'forge', 560, 488, 152, 126, [560, 506], [560, 498]),
-  geo('archive', 'desk-day', 140, 484, 70, 50, [140, 502], [140, 498]),
+  geo('archive', 'archive-b', 140, 486, 91, 72, [140, 502], [140, 498]),
   geo('vigil', 'vigil-booth', 906, 476, 56, 60, [906, 496], [906, 498]),
 ];
 export const stationById = Object.fromEntries(STATIONS.map((s) => [s.id, s]));
 
 /** Where smoke rises (forge chimney is painted into the day sprite). */
 export const CHIMNEYS: [number, number][] = [[612, 390]];
-/** Where ember particles rise (forge hearth, braziers). */
-export const EMBER_ZONES: [number, number][] = [[542, 472], [176, 490], [380, 368]];
+/** Where ember particles rise (forge hearth, braziers). The archive brazier
+ * is painted into the vault sprite, by its door. */
+export const EMBER_ZONES: [number, number][] = [[542, 472], [133, 480], [380, 368]];
 /** Halo lights, daylight-discreet: x, y, radius, strength. */
 export const HALOS: [number, number, number, number][] = [
   [380, 366, 24, 0.4],    // tower brazier
   [542, 458, 44, 0.5],    // forge hearth
-  [176, 486, 20, 0.35],   // archive brazier
+  [133, 478, 20, 0.35],   // archive brazier
 ];
 
 const ROAD_BANDS: [number, number, number, number][] = [
@@ -197,7 +198,6 @@ export const SCENERY: Placed[] = [
     sprite: s.sprite!, cx: s.cx, base: s.base, scale: s.scale, flip: s.flip, id: s.id,
   })),
   { sprite: 'signpost', cx: 322, base: 496 },   // border post sign, by the barrier
-  { sprite: 'ember-line', cx: 176, base: 496 }, // archive brazier
   { sprite: 'cart', cx: 172, base: 96 },        // parked caravan cart
   // greenery
   { sprite: 'tree1', cx: 34, base: 152 }, { sprite: 'tree2', cx: 790, base: 486 },
@@ -219,20 +219,8 @@ export const SCENERY: Placed[] = [
   { sprite: 'hay', cx: 860, base: 500 }, { sprite: 'rock-big', cx: 925, base: 522 },
 ];
 
-/** Station signs drawn after the scenery/actor pass (nothing crosses them). */
-export function drawSigns(ctx: Ctx, img: WorldImages) {
-  void img;
-  // Swiss cross badge on the SIX house banner (mirrored red day-house: the
-  // banner sits right of centre once flipped; position derived from the
-  // station rather than retyped so a layout move cannot strand it)
-  const six = stationById['six'];
-  const bx = Math.round(six.cx + 8), by = Math.round(six.base - 57);
-  ctx.fillStyle = '#C0392B';
-  ctx.fillRect(bx, by, 13, 11);
-  ctx.fillStyle = '#FFFFFF';
-  ctx.fillRect(bx + 5, by + 2, 3, 7);
-  ctx.fillRect(bx + 3, by + 4, 7, 3);
-}
+/* The hand-painted Swiss cross badge died with the generic SIX house: the
+ * bespoke clearing-house board carries its own painted flag. */
 
 /** Peripheral night vignette, prerendered once at world size. */
 export function paintVignette(ctx: Ctx) {

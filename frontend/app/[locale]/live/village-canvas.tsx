@@ -15,7 +15,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import {
   W, H, SCALE, STATIONS, stationById, REGISTRY_CCS,
-  loadWorldImages, paintGround, paintVignette, drawSprite, drawActor, drawSigns,
+  loadWorldImages, paintGround, paintVignette, drawSprite, drawActor,
   SCENERY, HALOS, EMBER_ZONES, CHIMNEYS,
   type Actor, type StationGeo, type WorldImages,
 } from "./world"
@@ -75,10 +75,10 @@ const COURIER_SPEED = 220
  * stays mostly clear. */
 const LABEL_AT: Record<string, [number, number]> = {
   gate: [80, 203], scribe: [196, 203], cutter: [306, 203], library: [414, 203],
-  "reg-DE": [568, 346], "reg-AT": [641, 361], "reg-BE": [707, 346],
-  "reg-BG": [776, 361], "reg-NL": [833, 346], "reg-FI": [890, 361],
+  "reg-DE": [549, 346], "reg-AT": [614, 361], "reg-BE": [676, 346],
+  "reg-BG": [736, 361], "reg-NL": [800, 346], "reg-FI": [867, 361],
   // the three counters stagger like the lane: their long names collide flat
-  classifier: [244, 346], court: [360, 362], six: [470, 346],
+  classifier: [270, 346], court: [366, 362], six: [460, 346],
   warehouse: [160, 56], tower: [380, 517], forge: [560, 518],
   archive: [140, 516], border: [280, 518], vigil: [906, 510],
 }
@@ -295,7 +295,6 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
       }
       ents.sort((a, b) => a.base - b.base)
       for (const e of ents) e.draw()
-      drawSigns(ctx, img)
 
       // smoke, sparks, embers, fireflies
       for (const p of w.puffs) drawSprite(ctx, img, "smoke", p.x, p.y, { alpha: p.a, scale: p.s })
@@ -589,11 +588,12 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
       line(1); if (!(await sleep(2800))) return
     } else {
       line(0)
-      if (!(await move(w.archivist, [[160, 500]], 60))) return
+      // the burn happens at the brazier painted into the vault sprite's door
+      if (!(await move(w.archivist, [[150, 498]], 60))) return
       for (let i = 0; i < 6; i++) {
         if (w.gen !== gen) return
-        for (let k = 0; k < 7; k++) w.sparks.push({ x: 176 + (Math.random() - 0.5) * 16, y: 486, vx: (Math.random() - 0.5) * 1.2, vy: -Math.random() * 1.5 - 0.3, l: 26, c: "#E8863C" })
-        w.puffs.push({ x: 176, y: 470, a: 0.5, s: 0.5, vy: 0.18 })
+        for (let k = 0; k < 7; k++) w.sparks.push({ x: 133 + (Math.random() - 0.5) * 14, y: 478, vx: (Math.random() - 0.5) * 1.2, vy: -Math.random() * 1.5 - 0.3, l: 26, c: "#E8863C" })
+        w.puffs.push({ x: 133, y: 462, a: 0.5, s: 0.5, vy: 0.18 })
         if (!(await sleep(600))) return
       }
       line(1); if (!(await sleep(2800))) return
@@ -710,7 +710,7 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
             })}
             <span
               className="absolute rounded-md border px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wider"
-              style={{ left: `${(729 / W) * 100}%`, top: `${(230 / H) * 100}%`, transform: "translateX(-50%)",
+              style={{ left: `${(712 / W) * 100}%`, top: `${(226 / H) * 100}%`, transform: "translateX(-50%)",
                 background: "rgba(255,247,228,0.9)", borderColor: "#8A5A28", color: "#6B4A18" }}
             >
               {laneLabel}
