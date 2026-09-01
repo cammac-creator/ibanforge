@@ -24,6 +24,7 @@ export interface WorldImages {
   atlas: HTMLImageElement;
   meta: AtlasMeta;
   ground: HTMLImageElement;
+  grass: HTMLImageElement;
 }
 
 export async function loadWorldImages(base = '/village'): Promise<WorldImages> {
@@ -34,13 +35,14 @@ export async function loadWorldImages(base = '/village'): Promise<WorldImages> {
       img.onerror = reject;
       img.src = src;
     });
-  const [atlas, ground, metaRes] = await Promise.all([
+  const [atlas, ground, grass, metaRes] = await Promise.all([
     load(`${base}/atlas.png`),
     load(`${base}/ground.png`),
+    load(`${base}/grass.png`),
     fetch(`${base}/atlas.json`),
   ]);
   const meta = (await metaRes.json()) as AtlasMeta;
-  return { atlas, meta, ground };
+  return { atlas, meta, ground, grass };
 }
 
 /** Draw a sprite by name, anchored bottom-center at (cx, baseY). */
@@ -74,16 +76,17 @@ export function drawSprite(
 export const REGISTRY_CCS = ['DE', 'AT', 'BE', 'BG', 'NL', 'FI'] as const;
 /** The bespoke national houses (01/09 boards): Fachwerk DE, alpine chalet AT,
  * step-gabled BE, revival BG, canal house NL, red-ochre cottage FI. These
- * isometric cuts run wide, so the lane is a close shingle: ~16px overlaps,
- * with per-house bases ordered so no banner hides behind a neighbour (the
- * house with the bigger base draws in front). */
+ * isometric cuts run wide, so the lane is a close shingle. v7 door-scale
+ * pass: heights re-cut so the six DOORS match each other, and the overlaps
+ * are budgeted per joint (wide over blind walls, slim where a banner hangs)
+ * with bases ordered so no banner ever hides behind a neighbour. */
 const REGISTRY_LANE: { sprite: string; cx: number; w: number; h: number; base: number }[] = [
-  { sprite: 'reg-de', cx: 549, w: 74, h: 76, base: 334 },
-  { sprite: 'reg-at', cx: 614, w: 87, h: 66, base: 337 },
-  { sprite: 'reg-be', cx: 676, w: 70, h: 82, base: 334 },
-  { sprite: 'reg-bg', cx: 736, w: 82, h: 68, base: 334 },
-  { sprite: 'reg-nl', cx: 800, w: 77, h: 98, base: 337 },
-  { sprite: 'reg-fi', cx: 867, w: 90, h: 63, base: 339 },
+  { sprite: 'reg-de', cx: 573, w: 74, h: 76, base: 334 },
+  { sprite: 'reg-at', cx: 624, w: 87, h: 66, base: 338 },
+  { sprite: 'reg-be', cx: 694, w: 70, h: 82, base: 336 },
+  { sprite: 'reg-bg', cx: 742, w: 86, h: 71, base: 339 },
+  { sprite: 'reg-nl', cx: 797, w: 84, h: 108, base: 341 },
+  { sprite: 'reg-fi', cx: 860, w: 103, h: 72, base: 343 },
 ];
 
 export interface StationGeo {
@@ -111,19 +114,22 @@ function geo(
 
 export const STATIONS: StationGeo[] = [
   geo('gate', 'gate', 80, 182, 84, 116, [80, 200], [80, 192]),
-  geo('scribe', 'stall-red', 196, 180, 64, 74, [196, 200], [196, 192]),
-  geo('cutter', 'stall-teal', 306, 180, 62, 70, [306, 200], [306, 192]),
-  geo('library', 'library', 414, 176, 176, 126, [414, 200], [414, 192], { scale: 0.92 }),
+  // the stalls breathe: unglued from the gate, wider apart (operator, 01/09)
+  geo('scribe', 'stall-red', 210, 180, 64, 74, [210, 200], [210, 192]),
+  geo('cutter', 'stall-teal', 330, 180, 62, 70, [330, 200], [330, 192]),
+  // the library moved east onto the old market square, by the well
+  geo('library', 'library', 655, 176, 176, 126, [655, 200], [655, 192], { scale: 0.92 }),
   ...REGISTRY_LANE.map((h, i) =>
     geo(`reg-${REGISTRY_CCS[i]}`, h.sprite, h.cx, h.base, h.w, h.h,
       [h.cx, 350], [h.cx, 342], { cc: REGISTRY_CCS[i] }),
   ),
   geo('warehouse', 'warehouse', 84, 106, 132, 104, [120, 98], [120, 76]),
   // the three counters wear their bespoke boards too: sorting office with
-  // pigeonholes, columned courthouse, Swiss chalet with its painted flag
-  geo('classifier', 'classifier-b', 270, 334, 100, 76, [270, 352], [270, 342]),
-  geo('court', 'court-b', 366, 336, 118, 88, [366, 352], [366, 342]),
-  geo('six', 'six-b', 460, 338, 100, 92, [460, 352], [460, 342]),
+  // pigeonholes, columned courthouse, Swiss chalet with its painted flag —
+  // re-cut on the door scale (v7), the classifier pushed west to breathe
+  geo('classifier', 'classifier-b', 236, 334, 110, 84, [236, 352], [236, 342]),
+  geo('court', 'court-b', 358, 337, 128, 99, [358, 352], [358, 342]),
+  geo('six', 'six-b', 470, 340, 128, 124, [470, 352], [470, 342]),
   // the barrier sits ACROSS the bottom street: the hero passes through it
   geo('border', 'fence', 280, 506, 104, 46, [280, 498], [280, 498]),
   geo('tower', 'tower', 380, 496, 64, 140, [380, 504], [380, 498], { scale: 0.82 }),
@@ -160,35 +166,34 @@ const ROAD_BANDS: [number, number, number, number][] = [
  * in one painter's-order pass, so the scenery list below is drawn per frame. */
 
 export function paintGround(ctx: Ctx, img: WorldImages) {
-  // The tile is pre-flattened at build time (local stone-joint contrast
-  // halved, saturation down, wider 208px period): the operator's report was
-  // that the ground SHOUTED and confused the eye. The checkered 180° rotation
-  // is back on top of that — on the calmed tile it breaks the period without
-  // re-creating the old patchwork. Step follows the tile's real size.
-  const g = img.ground;
+  // v7 ground, the SNES idiom: calm grass everywhere, cobbles ONLY on the
+  // streets. The previous all-stone tiling read as noise however much the
+  // tile was flattened (« toujours un peu brouillon », operator 01/09); the
+  // pale stone tile survives as street paving clipped to the road bands, so
+  // the eye separates walkable paths from ground at a glance.
+  const g = img.grass;
   const T = g.width;
   for (let j = 0; j * T < H; j++) {
-    for (let i = 0; i * T < W; i++) {
-      if ((i + j) % 2 === 1) {
-        ctx.save();
-        ctx.translate(i * T + T / 2, j * T + T / 2);
-        ctx.rotate(Math.PI);
-        ctx.drawImage(g, -T / 2, -T / 2);
-        ctx.restore();
-      } else {
-        ctx.drawImage(g, i * T, j * T);
-      }
-    }
+    for (let i = 0; i * T < W; i++) ctx.drawImage(g, i * T, j * T);
   }
-  // worn-earth streets on the pale cobbles (daylight)
+  const s = img.ground;
+  const S = s.width;
+  ctx.save();
+  ctx.beginPath();
+  for (const [x, y, w, h] of ROAD_BANDS) ctx.rect(x, y, w, h);
+  ctx.clip();
+  for (let j = 0; j * S < H; j++) {
+    for (let i = 0; i * S < W; i++) ctx.drawImage(s, i * S, j * S);
+  }
+  ctx.restore();
+  // a soft dark seam so the paving sits IN the grass instead of on it
+  ctx.fillStyle = 'rgba(96,84,52,0.20)';
   for (const [x, y, w, h] of ROAD_BANDS) {
-    ctx.fillStyle = 'rgba(134,104,72,0.28)';
-    ctx.fillRect(x, y, w, h);
-    ctx.fillStyle = 'rgba(96,74,50,0.18)';
     ctx.fillRect(x, y, w, 2);
     ctx.fillRect(x, y + h - 2, w, 2);
+    ctx.fillRect(x, y, 2, h);
+    ctx.fillRect(x + w - 2, y, 2, h);
   }
-
 }
 
 /** Fixed scenery, merged with actors each frame and sorted by base line. */
@@ -201,18 +206,18 @@ export const SCENERY: Placed[] = [
   { sprite: 'cart', cx: 172, base: 96 },        // parked caravan cart
   // greenery
   { sprite: 'tree1', cx: 34, base: 152 }, { sprite: 'tree2', cx: 790, base: 486 },
-  { sprite: 'tree1', cx: 62, base: 394 }, { sprite: 'tree1', cx: 806, base: 162 },
+  { sprite: 'tree1', cx: 62, base: 394 }, { sprite: 'tree1', cx: 430, base: 158 },
   { sprite: 'tree2', cx: 938, base: 246 }, { sprite: 'tree1', cx: 386, base: 88 },
   { sprite: 'planter-red', cx: 502, base: 184 }, { sprite: 'topiary', cx: 262, base: 194 },
-  { sprite: 'pot-yellow', cx: 148, base: 200 }, { sprite: 'ivy', cx: 366, base: 178 },
+  { sprite: 'pot-yellow', cx: 148, base: 200 }, { sprite: 'ivy', cx: 605, base: 178 },
   { sprite: 'tuft1', cx: 150, base: 258 }, { sprite: 'tuft2', cx: 505, base: 395 },
   { sprite: 'tufts2', cx: 600, base: 440 }, { sprite: 'tuft1', cx: 60, base: 302 },
   { sprite: 'tuft2', cx: 866, base: 384 }, { sprite: 'tufts2', cx: 340, base: 442 },
-  // the market square — the registry lane's old ground, kept alive: grove,
-  // well, planters and hand tools between the caravan road and the top street
-  { sprite: 'grove', cx: 585, base: 165 }, { sprite: 'well', cx: 700, base: 170 },
-  { sprite: 'planter2', cx: 652, base: 178 }, { sprite: 'wheelbarrow', cx: 748, base: 178 },
-  { sprite: 'fence', cx: 852, base: 150 }, { sprite: 'rocks', cx: 120, base: 300 },
+  // the market corner slid east when the library claimed the square's centre
+  // (operator's arrow, 01/09): well and tools now cluster right of it
+  { sprite: 'grove', cx: 500, base: 164 }, { sprite: 'well', cx: 805, base: 174 },
+  { sprite: 'planter2', cx: 745, base: 180 }, { sprite: 'wheelbarrow', cx: 862, base: 176 },
+  { sprite: 'fence', cx: 905, base: 148 }, { sprite: 'rocks', cx: 120, base: 300 },
   // village life props on the bottom street
   { sprite: 'barrel-group', cx: 712, base: 470 }, { sprite: 'sacks', cx: 214, base: 90 },
   { sprite: 'barrel-cart', cx: 438, base: 478 },
@@ -245,6 +250,11 @@ export interface Actor {
   moving?: boolean; hidden?: boolean;
 }
 
+/** Characters draw at 0.75: measured against the boards' doors the old size
+ * towered over every doorway; at 30px the hero matches the SNES convention
+ * (door ≈ hero) and the buildings regain their standing. */
+export const ACTOR_SCALE = 0.75;
+
 export function drawActor(ctx: Ctx, img: WorldImages, a: Actor, t: number, reduced: boolean) {
   if (a.hidden) return;
   const bob = reduced ? 0 : a.moving ? (Math.floor(t / 130) % 2) : (Math.floor(t / 900) % 2) * 0.5;
@@ -261,12 +271,13 @@ export function drawActor(ctx: Ctx, img: WorldImages, a: Actor, t: number, reduc
   ctx.globalAlpha = 0.25;
   ctx.fillStyle = '#0A0A12';
   ctx.beginPath();
-  ctx.ellipse(a.x, a.y + 1.5, 9, 3, 0, 0, Math.PI * 2);
+  ctx.ellipse(a.x, a.y + 1.5, 7, 2.4, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
   drawSprite(ctx, img, name, a.x, a.y, {
     flip: (a.face ?? 'down') === 'side' && a.dir < 0,
     dy: -bob,
+    scale: ACTOR_SCALE,
   });
 }
 

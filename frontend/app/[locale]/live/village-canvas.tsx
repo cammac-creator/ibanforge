@@ -63,7 +63,7 @@ interface Props {
 const COURIER_KINDS = ["cour-a", "cour-b", "cour-c"] as const
 const COURIER_RUNS: Record<TrafficCourier["kind"], [number, number][]> = {
   full: [[-28, 192], [932, 192], [932, 342], [202, 342], [202, 498], [952, 498], [998, 498]],
-  library: [[-28, 192], [430, 192], [-36, 192]],
+  library: [[-28, 192], [655, 192], [-36, 192]],
   fail: [[-28, 192], [200, 192], [-36, 192]],
 }
 const HERO_SPEED = 156
@@ -74,11 +74,11 @@ const COURIER_SPEED = 220
  * stations sit on their street's lower half so the courier line at y=192
  * stays mostly clear. */
 const LABEL_AT: Record<string, [number, number]> = {
-  gate: [80, 203], scribe: [196, 203], cutter: [306, 203], library: [414, 203],
-  "reg-DE": [549, 346], "reg-AT": [614, 361], "reg-BE": [676, 346],
-  "reg-BG": [736, 361], "reg-NL": [800, 346], "reg-FI": [867, 361],
+  gate: [80, 203], scribe: [210, 203], cutter: [330, 203], library: [655, 203],
+  "reg-DE": [573, 346], "reg-AT": [624, 361], "reg-BE": [694, 346],
+  "reg-BG": [742, 361], "reg-NL": [797, 346], "reg-FI": [860, 361],
   // the three counters stagger like the lane: their long names collide flat
-  classifier: [270, 346], court: [366, 362], six: [460, 346],
+  classifier: [236, 346], court: [358, 362], six: [470, 346],
   warehouse: [160, 56], tower: [380, 517], forge: [560, 518],
   archive: [140, 516], border: [280, 518], vigil: [906, 510],
 }
@@ -103,10 +103,10 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
     groundLayer: null as HTMLCanvasElement | null,
     vignetteLayer: null as HTMLCanvasElement | null,
     hero: { x: -30, y: 192, dir: 1, kind: "hero", face: "side", hidden: true } as Actor,
-    // the villagers mill about the market square (the registry lane's old
-    // ground): north of the top street, out of every pipeline lane
+    // the villagers mill about the well-side market corner, east of the
+    // library: north of the top street, out of every pipeline lane
     clerks: [0, 1, 2, 3, 4].map((i) => ({
-      x: 560 + i * 62, y: 116 + (i % 3) * 22, dir: 1 as const,
+      x: 756 + i * 34, y: 114 + (i % 3) * 20, dir: 1 as const,
       kind: `clerk${i}` as Actor["kind"],
       wt: i * 1.9, tx: undefined as number | undefined, ty: undefined as number | undefined,
     })),
@@ -156,7 +156,7 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
         w.pollen = Array.from({ length: 16 }, () => ({
           x: Math.random() * W, y: Math.random() * H, p: Math.random() * 7, s: 0.6 + Math.random() * 0.8,
         }))
-        const BLOOMS: [number, number][] = [[502, 176], [652, 170], [148, 192], [860, 492]]
+        const BLOOMS: [number, number][] = [[502, 176], [745, 172], [148, 192], [860, 492]]
         w.wings = BLOOMS.slice(0, 4).map(([bx, by], i) => ({
           cx: bx, cy: by - 12, p: i * 1.7, c: ["#F472B6", "#FBBF24", "#93C5FD", "#F9A8D4"][i],
         }))
@@ -188,7 +188,7 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
       if (!w.reduced) {
         for (const c of w.clerks) {
           c.wt -= dt / 1000
-          if (c.wt <= 0) { c.wt = 2.5 + Math.random() * 4; c.tx = 540 + Math.random() * 340; c.ty = 104 + Math.random() * 66 }
+          if (c.wt <= 0) { c.wt = 2.5 + Math.random() * 4; c.tx = 742 + Math.random() * 160; c.ty = 106 + Math.random() * 62 }
           const a = c as unknown as Actor
           if (c.tx !== undefined && c.ty !== undefined) {
             const dx = c.tx - c.x, dy = c.ty - c.y, d = Math.hypot(dx, dy)
@@ -639,7 +639,8 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
     const w = world.current
     let found: StationTip | null = null
     let station: string | null = null
-    const near = (a: Actor) => !a.hidden && Math.abs(mx - a.x) < 14 && Math.abs(my - (a.y - 20)) < 26
+    // actors draw at 0.75 now — the hover box shrinks with them
+    const near = (a: Actor) => !a.hidden && Math.abs(mx - a.x) < 11 && Math.abs(my - (a.y - 15)) < 20
     const courier = w.couriers.find((cr) => near(cr.actor))
     if (courier) found = courier.tip
     else if (near(w.hero)) found = heroTip
@@ -710,7 +711,7 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
             })}
             <span
               className="absolute rounded-md border px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wider"
-              style={{ left: `${(712 / W) * 100}%`, top: `${(226 / H) * 100}%`, transform: "translateX(-50%)",
+              style={{ left: `${(724 / W) * 100}%`, top: `${(220 / H) * 100}%`, transform: "translateX(-50%)",
                 background: "rgba(255,247,228,0.9)", borderColor: "#8A5A28", color: "#6B4A18" }}
             >
               {laneLabel}
