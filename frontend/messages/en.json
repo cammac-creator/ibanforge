@@ -1477,6 +1477,17 @@
       "description": "Watch a real IBAN validation cross the IBANforge pipeline, slowed down: toll gate, mod-97 scribe, BIC library, national registers, verdict, forge."
     },
     "canvasAlt": "The village: every building is a real step of the IBAN validation pipeline; the quest is narrated in the bar below the picture.",
+    "attract": {
+      "hint": "▶ Demo — replay of a real answer from {date} · click to take over",
+      "note": "Replay of a real answer from {date} — the first click makes a real call."
+    },
+    "carousel": {
+      "l1": "Here, the x402 toll gate: without a key, each call costs 0.005 USDC, online, no account.",
+      "l2": "The Scribe recomputes the mod-97 check digits: the IBAN's form before anything else.",
+      "l3": "In the registers' lane, the BIC comes from the central bank's national register, not from a guess.",
+      "l4": "The Watchtower screens the sanctions lists and the country's FATF status.",
+      "l5": "At the Forge, the answer is struck and sealed — for real, about one millisecond."
+    },
     "rail": {
       "title": "The pipeline",
       "step": "Step {n} / {total}",

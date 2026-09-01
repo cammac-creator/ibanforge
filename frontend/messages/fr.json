@@ -1477,6 +1477,17 @@
       "description": "Regarde une vraie validation IBAN traverser le pipeline d'IBANforge, au ralenti : péage x402, scribe mod-97, bibliothèque BIC, registres nationaux, verdict, forge."
     },
     "canvasAlt": "Le village : chaque bâtiment est une étape réelle du pipeline de validation IBAN ; le récit de la quête se lit dans le bandeau sous l'image.",
+    "attract": {
+      "hint": "▶ Démo — rejeu d'une réponse réelle du {date} · clique pour prendre la main",
+      "note": "Rejeu d'une réponse réelle du {date} — le premier clic lance un vrai appel."
+    },
+    "carousel": {
+      "l1": "Ici, le Péage x402 : sans clé, chaque appel se paie 0,005 USDC, en ligne, sans compte.",
+      "l2": "Le Scribe recalcule la clé de contrôle mod-97 : la forme de l'IBAN avant toute chose.",
+      "l3": "Dans la ruelle des registres, le BIC vient du registre national de la banque centrale, pas d'une déduction.",
+      "l4": "La Tour de guet croise les listes de sanctions et le statut GAFI du pays.",
+      "l5": "À la Forge, la réponse est frappée et scellée — en vrai, environ une milliseconde."
+    },
     "rail": {
       "title": "Le pipeline",
       "step": "Étape {n} / {total}",

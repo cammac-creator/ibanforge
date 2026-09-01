@@ -1,0 +1,326 @@
+{
+ "captured_at": "2026-09-01",
+ "journeys": {
+  "de": {
+   "iban": "DE89370400440532013000",
+   "mode": "iban",
+   "response": {
+    "iban": "DE89370400440532013000",
+    "valid": true,
+    "country": {
+     "code": "DE",
+     "name": "Germany"
+    },
+    "check_digits": "89",
+    "bban": {
+     "bank_code": "37040044",
+     "account_number": "0532013000"
+    },
+    "sepa": {
+     "member": true,
+     "schemes": [
+      "SCT",
+      "SDD",
+      "SCT_INST"
+     ],
+     "vop_required": true,
+     "vop_participant": true,
+     "basis": "epc_register"
+    },
+    "formatted": "DE89 3704 0044 0532 0130 00",
+    "cost_usdc": 0,
+    "bic": {
+     "code": "COBADEFFXXX",
+     "bank_name": "Commerzbank",
+     "city": "Köln",
+     "source": "Deutsche Bundesbank Bankleitzahlendatei",
+     "as_of": "2026-09",
+     "basis": "national_register",
+     "authoritative": true,
+     "lei": "851WYGNLUQLFZBSYGB56",
+     "lei_status": "ACTIVE",
+     "address": {
+      "type": "registered",
+      "street": "Kaiserstraße 16",
+      "post_code": "60311",
+      "region": "DE-HE",
+      "city": "Frankfurt am Main",
+      "country": "DE",
+      "romanized": "Kaiserstraße 16",
+      "romanization": "original_latin",
+      "source": "GLEIF",
+      "language": "de",
+      "as_of": "2026-02-24"
+     },
+     "postal_address": {
+      "pst_cd": "60311",
+      "twn_nm": "Frankfurt am Main",
+      "ctry": "DE",
+      "adr_line": [
+       "Kaiserstraße 16"
+      ],
+      "format": "hybrid",
+      "source": "GLEIF",
+      "as_of": "2026-02-24"
+     }
+    },
+    "issuer": {
+     "type": "bank",
+     "name": "Commerzbank",
+     "classification": "default"
+    },
+    "risk_indicators": {
+     "issuer_type": "bank",
+     "country_risk": "standard",
+     "test_bic": false,
+     "sepa_reachable": true,
+     "sepa_reachable_scope": "country",
+     "vop_coverage": true
+    },
+    "bank_code_check": {
+     "value": "37040044",
+     "status": "verified",
+     "match": "register",
+     "register": "Deutsche Bundesbank Bankleitzahlendatei",
+     "authoritative": true,
+     "institution": {
+      "name": "Commerzbank",
+      "street": null,
+      "post_code": "50447",
+      "town": "Köln",
+      "country": "DE"
+     },
+     "as_of": "2026-09"
+    },
+    "next_steps": [
+     {
+      "code": "screen_compliance",
+      "do": "Screen the institution against sanctions, FATF status and VoP reachability before the transfer. That endpoint reads the same bank-code verdict as this one, so it will not score an unconfirmed code as an ordinary bank.",
+      "because": "bank_code_check.status is verified, so there is an institution to screen",
+      "action": "POST /v1/iban/compliance"
+     },
+     {
+      "code": "generate_payment_qr",
+      "do": "To turn the confirmed account into a scannable payment, PayQR (npx -y @czagents/payqr, hosted MCP https://payqr.cz-agents.dev/mcp) generates and self-checks a European payment QR: SPAYD for CZ/SK accounts, EUR-only EPC/GiroCode for other SEPA accounts; EPC requires recipient_name. PayQR validates the IBAN checksum but does not verify account ownership or the beneficiary name, and it does not generate native Swiss QR-bills.",
+      "because": "sepa.member is true and bank_code_check.status is verified",
+      "action": "https://qr.cz-agents.dev"
+     }
+    ],
+    "processing_ms": 0.68,
+    "_playground_ms": 130
+   }
+  },
+  "ch": {
+   "iban": "CH7800767001234567000",
+   "mode": "iban",
+   "response": {
+    "iban": "CH7800767001234567000",
+    "valid": true,
+    "country": {
+     "code": "CH",
+     "name": "Switzerland"
+    },
+    "check_digits": "78",
+    "bban": {
+     "bank_code": "00767",
+     "account_number": "001234567000"
+    },
+    "sepa": {
+     "member": true,
+     "schemes": [
+      "SCT"
+     ],
+     "vop_required": false,
+     "vop_participant": false,
+     "basis": "epc_register"
+    },
+    "formatted": "CH78 0076 7001 2345 6700 0",
+    "cost_usdc": 0,
+    "bic": {
+     "code": "BCVLCH2L",
+     "bank_name": "Banque Cantonale Vaudoise",
+     "city": "Lausanne",
+     "source": "IBANforge curated bank-code map",
+     "as_of": "2026-09",
+     "basis": "curated_map",
+     "authoritative": false,
+     "lei": "K1MOBB3OPSBBQO554R76",
+     "lei_status": "ACTIVE",
+     "address": {
+      "type": "registered",
+      "street": "Place Saint-François 14",
+      "post_code": "1003",
+      "region": "CH-VD",
+      "city": "Lausanne",
+      "country": "CH",
+      "romanized": "Place Saint-François 14",
+      "romanization": "original_latin",
+      "source": "GLEIF",
+      "language": "fr-CH",
+      "as_of": "2025-10-29"
+     },
+     "postal_address": {
+      "strt_nm": "St-François",
+      "pst_cd": "1001",
+      "twn_nm": "Lausanne",
+      "ctry": "CH",
+      "format": "structured",
+      "source": "SIX BankMaster (Swiss IID register)",
+      "as_of": "2026-09-01"
+     }
+    },
+    "issuer": {
+     "type": "bank",
+     "name": "Banque Cantonale Vaudoise",
+     "classification": "default"
+    },
+    "risk_indicators": {
+     "issuer_type": "bank",
+     "country_risk": "standard",
+     "test_bic": false,
+     "sepa_reachable": true,
+     "sepa_reachable_scope": "country",
+     "vop_coverage": false
+    },
+    "bank_code_check": {
+     "value": "00767",
+     "status": "verified",
+     "match": "register",
+     "register": "SIX BankMaster (Swiss IID / BC-Nummer register)",
+     "authoritative": true,
+     "institution": {
+      "name": "Banque Cantonale Vaudoise",
+      "street": "St-François",
+      "post_code": "1001",
+      "town": "Lausanne",
+      "country": "CH"
+     },
+     "as_of": "2026-09"
+    },
+    "clearing": {
+     "iid": "00767",
+     "name": "Banque Cantonale Vaudoise",
+     "type": "cantonal_bank",
+     "town": "Lausanne",
+     "sic": true,
+     "instant_payments_chf": true,
+     "eurosic": true,
+     "qr_iid": "30767",
+     "qr_iid_source": "register"
+    },
+    "next_steps": [
+     {
+      "code": "screen_compliance",
+      "do": "Screen the institution against sanctions, FATF status and VoP reachability before the transfer. That endpoint reads the same bank-code verdict as this one, so it will not score an unconfirmed code as an ordinary bank.",
+      "because": "bank_code_check.status is verified, so there is an institution to screen",
+      "action": "POST /v1/iban/compliance"
+     }
+    ],
+    "processing_ms": 2.26,
+    "_playground_ms": 105
+   }
+  },
+  "tr": {
+   "iban": "TR330006100519786457841326",
+   "mode": "compliance",
+   "response": {
+    "iban": "TR330006100519786457841326",
+    "valid": true,
+    "country": {
+     "code": "TR",
+     "name": "Türkiye"
+    },
+    "check_digits": "33",
+    "bban": {
+     "bank_code": "00061",
+     "account_number": "00519786457841326"
+    },
+    "sepa": {
+     "member": false,
+     "schemes": [],
+     "vop_required": false,
+     "vop_participant": null,
+     "basis": "country_default"
+    },
+    "formatted": "TR33 0006 1005 1978 6457 8413 26",
+    "cost_usdc": 0,
+    "bic": null,
+    "risk_indicators": {
+     "issuer_type": null,
+     "country_risk": "elevated",
+     "test_bic": false,
+     "sepa_reachable": false,
+     "sepa_reachable_scope": "country",
+     "vop_coverage": false
+    },
+    "bank_code_check": {
+     "value": "00061",
+     "status": "not_in_register",
+     "reason": "absent_from_reference_data",
+     "match": null,
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "next_steps": [
+     {
+      "code": "verify_payee_name",
+      "do": "Treat this as unavailable rather than invalid, and let a beneficiary name check decide before releasing funds.",
+      "because": "bank_code_check.status is not_in_register with authoritative false, so the bank code is absent from our reference data, not proven absent from the country"
+     }
+    ],
+    "compliance": {
+     "sanctions": {
+      "country_sanctioned": false,
+      "bank_sanctioned": false,
+      "matched_lists": [],
+      "fatf_status": "member",
+      "bank_screened": false
+     },
+     "reachability": {
+      "sepa_instant": false,
+      "sct": false,
+      "sdd": false,
+      "screened": false
+     },
+     "vop": {
+      "participant": false,
+      "status": "not_found",
+      "screened": false
+     },
+     "risk_score": 20,
+     "risk_level": "medium",
+     "flags": [
+      "elevated_risk_country",
+      "bank_code_unverified",
+      "no_bank_resolved"
+     ]
+    },
+    "meta": {
+     "scope": "bank_bic_only",
+     "disclaimer": "Informational triage only — NOT a regulated AML/CFT product. Sanctions screening is performed at the BANK (BIC8) level: it flags the holding institution, NOT the beneficiary / account-holder name. Most sanctions designations target persons and companies, which this does not screen. Use a regulated provider (Refinitiv, ComplyAdvantage, etc.) for name-level KYC/AML obligations.",
+     "sanctions_as_of": "2026-08-30T03:22:07.646Z",
+     "fatf_as_of": "2026-06",
+     "sources": "EU,OFAC,UN,FATF,EPC-SCT,EPC-SCT_INST,EPC-SDD",
+     "country_risk_as_of": "2026-07",
+     "country_risk_scope": "risk_indicators.country_risk is a separate editorial AML axis (offshore centres, conflict zones, EBA-flagged jurisdictions) layered ON TOP of compliance.sanctions.fatf_status, not a restatement of it. The two can disagree on a country by design; each carries its own review date."
+    },
+    "processing_ms": 6.43,
+    "_playground_ms": 104
+   }
+  },
+  "broken": {
+   "iban": "DE89370400440532013001",
+   "mode": "iban",
+   "response": {
+    "iban": "DE89370400440532013001",
+    "valid": false,
+    "error": "checksum_failed",
+    "error_detail": "Modulo 97 check returned 28, expected 1.",
+    "cost_usdc": 0,
+    "processing_ms": 0.07,
+    "_playground_ms": 102
+   }
+  }
+ }
+}

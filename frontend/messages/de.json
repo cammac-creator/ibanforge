@@ -1477,6 +1477,17 @@
       "description": "Sieh zu, wie eine echte IBAN-Validierung die IBANforge-Pipeline durchläuft, verlangsamt: Zollhaus, Mod-97-Schreiber, BIC-Bibliothek, nationale Register, Urteil, Schmiede."
     },
     "canvasAlt": "Das Dorf: Jedes Gebäude ist ein echter Schritt der IBAN-Validierungspipeline; die Quest wird in der Leiste unter dem Bild erzählt.",
+    "attract": {
+      "hint": "▶ Demo — Wiedergabe einer echten Antwort vom {date} · klicke, um zu übernehmen",
+      "note": "Wiedergabe einer echten Antwort vom {date} — der erste Klick löst einen echten Aufruf aus."
+    },
+    "carousel": {
+      "l1": "Hier das Zollhaus x402: ohne Schlüssel kostet jeder Aufruf 0,005 USDC, online, ohne Konto.",
+      "l2": "Der Schreiber rechnet die Mod-97-Prüfziffern nach: die Form der IBAN vor allem anderen.",
+      "l3": "In der Registergasse stammt der BIC aus dem nationalen Register der Zentralbank, nicht aus einer Ableitung.",
+      "l4": "Der Wachturm prüft die Sanktionslisten und den FATF-Status des Landes.",
+      "l5": "In der Schmiede wird die Antwort geschlagen und versiegelt — in echt etwa eine Millisekunde."
+    },
     "rail": {
       "title": "Die Pipeline",
       "step": "Schritt {n} / {total}",

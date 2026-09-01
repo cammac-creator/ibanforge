@@ -71,6 +71,8 @@ interface Props {
   highlight?: string | null
   /** a station whose card stays open (the rail's clicked row) */
   pinned?: string | null
+  /** bump to abort whatever plays (the attract replay stops at the first gesture) */
+  abortKey?: number
   onQuestEnd?: () => void
   /** index of the step whose line is now showing */
   onStep?: (index: number) => void
@@ -99,7 +101,7 @@ interface Puff { x: number; y: number; a: number; s: number; vy: number }
 interface Seal { x: number; y: number; sprite: "coin" | "seal-x"; l: number; tint?: string }
 interface Pulse { x: number; y: number; r: number; l: number }
 
-export function VillageCanvas({ labels, tips, heroTip, villagerTip, idle, canvasAlt, quest, traffic, vignette, fast, highlight, pinned, onQuestEnd, onStep, onExit, onHover }: Props) {
+export function VillageCanvas({ labels, tips, heroTip, villagerTip, idle, canvasAlt, quest, traffic, vignette, fast, highlight, pinned, abortKey, onQuestEnd, onStep, onExit, onHover }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const faceRef = useRef<HTMLCanvasElement>(null)
   const [narr, setNarr] = useState<{ who: string; text: string }>(idle)
@@ -119,11 +121,19 @@ export function VillageCanvas({ labels, tips, heroTip, villagerTip, idle, canvas
     hero: { x: -30, y: 192, dir: 1, kind: "hero", face: "side", hidden: true } as Actor,
     // the villagers mill about the well-side market corner, east of the
     // library: north of the top street, out of every pipeline lane
-    clerks: [0, 1, 2, 3, 4].map((i) => ({
+    // palier 0 of the casting (v9 tranche C): three clerks leave the market
+    // crowd for their posts — librarian, sorter, usher — and turn to the hero
+    // at their step. One villager keeps the market alive.
+    clerks: [2].map((i) => ({
       x: 756 + i * 34, y: 114 + (i % 3) * 20, dir: 1 as const,
       kind: `clerk${i}` as Actor["kind"],
       wt: i * 1.9, tx: undefined as number | undefined, ty: undefined as number | undefined,
     })),
+    agents: {
+      library: { x: 722, y: 186, dir: -1, kind: "clerk3", face: "down" } as Actor,
+      classifier: { x: 216, y: 346, dir: 1, kind: "clerk0", face: "down" } as Actor,
+      court: { x: 346, y: 348, dir: -1, kind: "clerk1", face: "down" } as Actor,
+    } as Record<string, Actor>,
     watcher: { x: 900, y: 494, dir: -1, kind: "clerk5", face: "down" } as Actor,
     archivist: { x: 126, y: 502, dir: 1, kind: "clerk4", face: "down" } as Actor,
     couriers: [] as { key: number; tip: StationTip; actor: Actor; pts: [number, number][]; i: number }[],
@@ -134,6 +144,26 @@ export function VillageCanvas({ labels, tips, heroTip, villagerTip, idle, canvas
     /** transient sprites drawn where they are put (the ingot on the anvil,
      * the spark burst): atlas frames the village paid for and never drew */
     props: [] as { sprite: string; x: number; y: number; l: number; max: number; scale?: number }[],
+    /* ---- juice grammar (v9 tranche C): every effect below is fired by a
+       real step of the response, never by a timer of its own ---- */
+    hitstopUntil: 0,
+    flash: 0,
+    shake: { amp: 0, t0: 0 },
+    waves: [] as { x: number; y: number; max: number; t0: number; dur: number; c: string; w: number }[],
+    /** the seal that stays on the forge façade until the next quest */
+    stamp: null as { x: number; y: number; sprite: string; tint?: string } | null,
+    drop: null as { sprite: string; x: number; y0: number; y1: number; t0: number; dur: number; tint?: string; landed: boolean } | null,
+    /** parchment slips travelling between hands, counters and doors */
+    cards: [] as { mode: "slip" | "split" | "pair"; ax: number; ay: number; bx: number; by: number; t0: number; dur: number; hold: number; dot?: boolean }[],
+    slot: null as { x: number; y: number; w: number; h: number; t0: number; dur: number } | null,
+    beam: null as { x1: number; y1: number; t0: number; dur: number; c: string } | null,
+    barrier: 0, barrierTarget: 0,
+    hearth: 1, hearthTarget: 1,
+    veilBoost: 0, veilBoostTarget: 0,
+    marks: [] as { x: number; y: number; t0: number }[],
+    shutter: null as { x: number; y: number; t0: number } | null,
+    towerColor: "rgba(255,196,100,",
+    gestures: [] as { a: Actor; until: number }[],
     embers: [] as { x: number; y: number; vx: number; p: number }[],
     flies: [] as { x: number; y: number; p: number }[],
     /** daylight ambience: drifting pollen motes and a few butterflies */
@@ -203,7 +233,35 @@ export function VillageCanvas({ labels, tips, heroTip, villagerTip, idle, canvas
       const dt = Math.min(50, t - last); last = t
 
       /* -- simulate -- */
-      if (!w.reduced) {
+      // a hitstop freezes the living (not the particles) for a few frames
+      const frozen = t < w.hitstopUntil
+      w.flash = w.flash > 0.01 ? w.flash * 0.55 : 0
+      w.hearth += (w.hearthTarget - w.hearth) * 0.08
+      w.veilBoost += (w.veilBoostTarget - w.veilBoost) * 0.1
+      w.barrier += (w.barrierTarget - w.barrier) * 0.12
+      w.waves = w.waves.filter((v) => t - v.t0 < v.dur)
+      w.cards = w.cards.filter((c) => t - c.t0 < c.dur + c.hold)
+      w.marks = w.marks.filter((m) => t - m.t0 < 1600)
+      if (w.slot && t - w.slot.t0 > w.slot.dur) w.slot = null
+      if (w.beam && t - w.beam.t0 > w.beam.dur) w.beam = null
+      if (w.shutter && t - w.shutter.t0 > 2000) w.shutter = null
+      w.gestures = w.gestures.filter((g) => { g.a.moving = t < g.until; return t < g.until })
+      if (w.drop && !w.drop.landed && t >= w.drop.t0 + w.drop.dur) {
+        // the seal lands: the one moment an effect leaves its building
+        const d = w.drop
+        d.landed = true
+        w.stamp = { x: d.x, y: d.y1, sprite: d.sprite, tint: d.tint }
+        if (!w.reduced) {
+          w.hitstopUntil = t + 120
+          w.flash = 0.22
+          w.waves.push({ x: d.x, y: d.y1 + 6, max: 150, t0: t, dur: 900, c: "#FDE68A", w: 2.5 })
+          w.waves.push({ x: d.x, y: d.y1 + 6, max: 420, t0: t, dur: 1100, c: "#FDE68A", w: 3 })
+        } else {
+          w.waves.push({ x: d.x, y: d.y1 + 6, max: 90, t0: t, dur: 600, c: "#FDE68A", w: 2 })
+        }
+        w.drop = null
+      }
+      if (!w.reduced && !frozen) {
         for (const c of w.clerks) {
           c.wt -= dt / 1000
           if (c.wt <= 0) { c.wt = 2.5 + Math.random() * 4; c.tx = 742 + Math.random() * 160; c.ty = 106 + Math.random() * 62 }
@@ -256,7 +314,13 @@ export function VillageCanvas({ labels, tips, heroTip, villagerTip, idle, canvas
       w.pulses = w.pulses.filter((p) => --p.l > 0); w.pulses.forEach((p) => { p.r += 0.7 })
 
       /* -- draw -- */
-      ctx.setTransform(SCALE, 0, 0, SCALE, 0, 0)
+      let sdx = 0, sdy = 0
+      if (w.shake.amp > 0) {
+        const age = t - w.shake.t0
+        if (age > 220 || w.reduced) w.shake.amp = 0
+        else { const k = w.shake.amp * Math.exp((-5 * age) / 220); sdx = Math.sin(t / 9) * k; sdy = Math.cos(t / 7) * k * 0.6 }
+      }
+      ctx.setTransform(SCALE, 0, 0, SCALE, sdx * SCALE, sdy * SCALE)
       ctx.drawImage(w.groundLayer!, 0, 0)
 
       // the walked path: hero FOOTPRINTS, quiet on grass and paving alike —
@@ -304,7 +368,7 @@ export function VillageCanvas({ labels, tips, heroTip, villagerTip, idle, canvas
       }))
       const actors: Actor[] = [
         ...(w.clerks as unknown as Actor[]), ...w.couriers.map((c) => c.actor),
-        w.watcher, w.archivist, w.hero,
+        ...Object.values(w.agents), w.watcher, w.archivist, w.hero,
       ]
       // the hero you can find (v9): a warm ring under his feet, drawn just
       // before him, and a sort tie-break so he never hides behind the house
@@ -332,6 +396,93 @@ export function VillageCanvas({ labels, tips, heroTip, villagerTip, idle, canvas
       for (const e of ents) e.draw()
       // transient props: the ingot cooling on the anvil, the spark burst
       for (const p of w.props) drawSprite(ctx, img, p.sprite, p.x, p.y, { alpha: Math.min(1, p.l / 30), scale: p.scale })
+      // the seal that stays on the forge façade
+      if (w.stamp) {
+        if (w.stamp.tint) drawTinted(ctx, img, w.stamp.sprite, w.stamp.x, w.stamp.y, w.stamp.tint, 0.55)
+        else drawSprite(ctx, img, w.stamp.sprite, w.stamp.x, w.stamp.y)
+      }
+      const outCubic = (u: number) => 1 - Math.pow(1 - Math.min(1, Math.max(0, u)), 3)
+      const inQuad = (u: number) => Math.min(1, Math.max(0, u)) ** 2
+      // the registry shutter: two panels open, the slip comes out, they close
+      if (w.shutter) {
+        const age = t - w.shutter.t0
+        const open = age < 400 ? age / 400 : age < 1600 ? 1 : Math.max(0, 1 - (age - 1600) / 400)
+        const { x, y } = w.shutter
+        ctx.fillStyle = "#3A2A12"; ctx.fillRect(x - 6, y - 8, 12, 9)
+        ctx.fillStyle = "#8B5E2B"
+        ctx.fillRect(x - 6, y - 8, 6 * (1 - open), 9)
+        ctx.fillRect(x + 6 - 6 * (1 - open), y - 8, 6 * (1 - open), 9)
+      }
+      // parchment slips between hands, counters and doors
+      for (const c of w.cards) {
+        const u = outCubic((t - c.t0) / c.dur)
+        const alpha = t - c.t0 > c.dur + c.hold - 300 ? Math.max(0, (c.dur + c.hold - (t - c.t0)) / 300) : 1
+        ctx.save(); ctx.globalAlpha = alpha
+        const slip = (x: number, y: number, wdt = 12) => {
+          ctx.fillStyle = "#F3E7C8"; ctx.fillRect(x - wdt / 2, y - 4, wdt, 8)
+          ctx.strokeStyle = "#7A5322"; ctx.lineWidth = 1; ctx.strokeRect(x - wdt / 2 + 0.5, y - 3.5, wdt - 1, 7)
+          ctx.fillStyle = "#9A8B74"; ctx.fillRect(x - wdt / 2 + 2, y - 1.5, wdt - 4, 1); ctx.fillRect(x - wdt / 2 + 2, y + 1, wdt - 5, 1)
+        }
+        if (c.mode === "slip") {
+          const x = c.ax + (c.bx - c.ax) * u, y = c.ay + (c.by - c.ay) * u - Math.sin(u * Math.PI) * 10
+          slip(x, y)
+          if (c.dot) { ctx.fillStyle = "#B91C1C"; ctx.fillRect(x + 2, y - 3, 2.5, 2.5) }
+        } else if (c.mode === "split") {
+          // the BBAN cut into its fields: the slip parts into three that spread
+          const gap = 9 * u
+          ctx.fillStyle = "#F3E7C8"; ctx.strokeStyle = "#7A5322"; ctx.lineWidth = 1
+          for (let k = -1; k <= 1; k++) {
+            const x = c.ax + k * (5 + gap)
+            ctx.fillRect(x - 2, c.ay - 4, 4, 8); ctx.strokeRect(x - 1.5, c.ay - 3.5, 3, 7)
+          }
+        } else {
+          // Verification of Payee: two names laid over each other to see if they match
+          const x1 = c.ax - 22 + 22 * u, x2 = c.ax + 22 - 22 * u
+          slip(x1, c.ay, 14); slip(x2, c.ay + 2, 14)
+          if (u > 0.98) { ctx.fillStyle = "#15803D"; ctx.fillRect(c.ax - 1, c.ay - 6, 2, 5); ctx.fillRect(c.ax + 1, c.ay - 4, 3, 2) }
+        }
+        ctx.restore()
+      }
+      // the pigeonhole that lit up (the issuer's class), the scribe's strokes
+      if (w.slot) {
+        const a = Math.max(0, 1 - (t - w.slot.t0) / w.slot.dur)
+        ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = 0.55 * a
+        ctx.fillStyle = "#FDE68A"; ctx.fillRect(w.slot.x, w.slot.y, w.slot.w, w.slot.h); ctx.restore()
+      }
+      for (const m of w.marks) {
+        const a = Math.max(0, 1 - (t - m.t0) / 1600)
+        ctx.save(); ctx.globalAlpha = a; ctx.fillStyle = "#FDE68A"; ctx.fillRect(m.x, m.y, 1.5, 6); ctx.restore()
+      }
+      // the border barrier lifts for a SEPA member
+      if (w.barrier > 0.01) {
+        ctx.save(); ctx.translate(252, 494); ctx.rotate((-70 * Math.PI) / 180 * w.barrier)
+        ctx.fillStyle = "#6B4423"; ctx.fillRect(0, -1.5, 46, 3)
+        ctx.fillStyle = "#F3E7C8"; ctx.fillRect(10, -1.5, 8, 3); ctx.fillRect(28, -1.5, 8, 3)
+        ctx.restore()
+      }
+      // the watchtower's beam finds the hero; its colour is the screen's outcome
+      if (w.beam) {
+        const u = (t - w.beam.t0) / w.beam.dur
+        const a = u < 0.2 ? u / 0.2 : Math.max(0, 1 - (u - 0.2) / 0.8)
+        ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = 0.35 * a
+        ctx.fillStyle = w.beam.c
+        ctx.beginPath(); ctx.moveTo(380, 372); ctx.lineTo(w.beam.x1 - 14, w.beam.y1); ctx.lineTo(w.beam.x1 + 14, w.beam.y1); ctx.closePath(); ctx.fill()
+        ctx.restore()
+      }
+      // the seal falling on the anvil
+      if (w.drop) {
+        const u = inQuad((t - w.drop.t0) / w.drop.dur)
+        const y = w.drop.y0 + (w.drop.y1 - w.drop.y0) * u
+        if (w.drop.tint) drawTinted(ctx, img, w.drop.sprite, w.drop.x, y, w.drop.tint, 0.55)
+        else drawSprite(ctx, img, w.drop.sprite, w.drop.x, y)
+      }
+      // ground waves: ellipses, never circles — the 3/4 view flattens them
+      for (const v of w.waves) {
+        const u = (t - v.t0) / v.dur
+        const r = v.max * outCubic(u)
+        ctx.save(); ctx.globalAlpha = 0.5 * (1 - u); ctx.strokeStyle = v.c; ctx.lineWidth = v.w * (1 - u) + 0.5
+        ctx.beginPath(); ctx.ellipse(v.x, v.y, r, r * 0.45, 0, 0, Math.PI * 2); ctx.stroke(); ctx.restore()
+      }
       // the player marker: a golden chevron bobbing over the hero's head
       // while a quest runs (Stardew's multiplayer marker)
       if (!w.hero.hidden && w.veil) {
@@ -363,12 +514,15 @@ export function VillageCanvas({ labels, tips, heroTip, villagerTip, idle, canvas
       // lantern / flame halos
       for (let i = 0; i < HALOS.length; i++) {
         const [hx, hy, hr, hs] = HALOS[i]
-        // the forge hearth (index 1) breathes slow and wide; the braziers flicker
+        // the forge hearth (index 1) breathes slow and wide (and swells at the
+        // strike); the braziers flicker; the tower's takes the screen's colour
         const pulse = w.reduced ? 1 : i === 1 ? 0.93 + 0.15 * Math.sin(t / 2400) : 0.86 + 0.14 * Math.sin(t / 520 + i * 1.7)
-        const rr = hr * 1.3
+        const boost = i === 1 ? w.hearth : 1
+        const rr = hr * 1.3 * boost
+        const col = i === 0 ? w.towerColor : "rgba(255,196,100,"
         const g = ctx.createRadialGradient(hx, hy, 2, hx, hy, rr * pulse)
-        g.addColorStop(0, `rgba(255,196,100,${0.44 * hs})`)
-        g.addColorStop(1, "rgba(255,196,100,0)")
+        g.addColorStop(0, `${col}${Math.min(0.9, 0.44 * hs * boost)})`)
+        g.addColorStop(1, `${col}0)`)
         ctx.globalAlpha = 1
         ctx.fillStyle = g
         ctx.fillRect(hx - rr, hy - rr, rr * 2, rr * 2)
@@ -406,7 +560,7 @@ export function VillageCanvas({ labels, tips, heroTip, villagerTip, idle, canvas
         const vc = w.veilLayer.getContext("2d")!
         vc.setTransform(1, 0, 0, 1, 0, 0)
         vc.clearRect(0, 0, W, H)
-        vc.fillStyle = "rgba(6,6,12,0.52)"; vc.fillRect(0, 0, W, H)
+        vc.fillStyle = `rgba(6,6,12,${(0.52 + w.veilBoost).toFixed(3)})`; vc.fillRect(0, 0, W, H)
         vc.globalCompositeOperation = "destination-out"
         const hole = (x: number, y: number, r: number) => {
           const g = vc.createRadialGradient(x, y, 8, x, y, r)
@@ -421,6 +575,8 @@ export function VillageCanvas({ labels, tips, heroTip, villagerTip, idle, canvas
       }
 
       ctx.drawImage(w.vignetteLayer!, 0, 0)
+      // the impact flash: white, two frames, never full strength
+      if (w.flash > 0.01) { ctx.save(); ctx.globalAlpha = w.flash; ctx.fillStyle = "#FFFFFF"; ctx.fillRect(0, 0, W, H); ctx.restore() }
       // Labels left the canvas on 01/09: painted plaques scale down with it,
       // and at laptop widths they blurred into illegibility — the operator's
       // report, twice. They are DOM now (see the overlay in the JSX below):
@@ -511,9 +667,22 @@ export function VillageCanvas({ labels, tips, heroTip, villagerTip, idle, canvas
     w.hero.hidden = false; w.hero.x = -30; w.hero.y = 192; w.hero.face = "side"; w.hero.dir = 1
     w.veil = true; w.focus = null
     w.trail = []; w.trailAcc = 0
+    // a new quest clears what the last one left behind
+    w.stamp = null; w.drop = null; w.cards = []; w.waves = []; w.slot = null; w.beam = null; w.marks = []; w.shutter = null
+    w.barrierTarget = 0; w.hearthTarget = 1; w.veilBoostTarget = 0; w.towerColor = "rgba(255,196,100,"
     let anchor: [number, number] = [-28, 192]
     const startedAt = performance.now()
     const elapsed = () => Math.round((performance.now() - startedAt) / 1000)
+    const now = () => performance.now()
+    const R = w.reduced
+    const wave = (x: number, y: number, max: number, dur: number, c = "#FDE68A", lw = 2) => w.waves.push({ x, y, max, t0: now(), dur, c, w: lw })
+    const thump = (ms: number, amp: number) => { if (R) return; w.hitstopUntil = now() + ms; w.shake = { amp, t0: now() } }
+    const gesture = (id: string) => {
+      const a = w.agents[id]
+      if (!a) return
+      a.face = "side"; a.dir = w.hero.x < a.x ? -1 : 1
+      w.gestures.push({ a, until: now() + 700 })
+    }
 
     for (const [i, step] of steps.entries()) {
       if (w.gen !== gen) return
@@ -564,22 +733,92 @@ export function VillageCanvas({ labels, tips, heroTip, villagerTip, idle, canvas
       setNarr({ who: step.who, text: step.text })
       onStep?.(i)
       if (target) setBanner({ id: target.id, no: i + 1, total: steps.length, outcome: step.outcome })
-      if (step.station === "gate") w.seals.push({ x: 46, y: 140, sprite: "coin", l: 90 })
-      if (step.station === "scribe" && step.outcome === "fail") w.seals.push({ x: 204, y: 116, sprite: "seal-x", l: 110, tint: "#B91C1C" })
-      if (step.station === "registry" && target) w.pulses.push({ x: target.cx, y: target.base - 60, r: 6, l: 40 })
-      if (step.station === "tower") w.pulses.push({ x: 380, y: 372, r: 6, l: 40 })
+      /* ---- the control points, each one a real step of the response ---- */
+      const hx = w.hero.x, hy = w.hero.y
+      const p = step.params ?? {}
+      if (step.station === "gate") {
+        w.seals.push({ x: 46, y: 140, sprite: "coin", l: 90 })
+        wave(46, 196, 40, 700)
+      }
+      if (step.station === "scribe") {
+        if (step.outcome === "fail") {
+          w.seals.push({ x: 204, y: 116, sprite: "seal-x", l: 110, tint: "#B91C1C" })
+          wave(210, 196, 70, 800, "#EF4444", 2.5); thump(90, 2.5)
+        } else {
+          // three strokes — length, characters, check digits — then the stamp
+          for (let k = 0; k < 3; k++) { w.marks.push({ x: 199 + k * 7, y: 166, t0: now() }); if (!(await sleep(R ? 0 : 220))) return }
+          thump(60, 1.5); wave(210, 196, 34, 600)
+        }
+      }
+      if (step.key === "cutter") w.cards.push({ mode: "split", ax: 330, ay: 168, bx: 330, by: 168, t0: now(), dur: 900, hold: 1400 })
+      if (step.station === "library" && p.found) {
+        gesture("library")
+        w.cards.push({ mode: "slip", ax: 712, ay: 168, bx: hx, by: hy - 34, t0: now(), dur: 700, hold: 1500, dot: true })
+      }
+      if (step.station === "registry" && target) {
+        w.shutter = { x: target.door[0], y: target.door[1] - 26, t0: now() }
+        if (!(await sleep(R ? 0 : 400))) return
+        w.cards.push({ mode: "slip", ax: target.door[0], ay: target.door[1] - 24, bx: hx, by: hy - 34, t0: now(), dur: 600, hold: 1200, dot: true })
+        w.pulses.push({ x: target.cx, y: target.base - 60, r: 6, l: 40 })
+      }
+      if (step.station === "six") {
+        w.cards.push({ mode: "slip", ax: 420, ay: 322, bx: hx, by: hy - 34, t0: now(), dur: 600, hold: 1400 })
+        if (p.sic) w.cards.push({ mode: "slip", ax: 420, ay: 322, bx: hx + 8, by: hy - 40, t0: now() + 300, dur: 600, hold: 1100 })
+      }
+      if (step.key === "court") { gesture("court"); if (step.outcome === "ok") { thump(60, 1.2); wave(326, 348, 40, 700) } else wave(326, 348, 30, 700, "#F97316", 1.5) }
+      if (step.station === "classifier") {
+        gesture("classifier")
+        w.cards.push({ mode: "slip", ax: hx, ay: hy - 30, bx: 236, by: 316, t0: now(), dur: 600, hold: 200 })
+        const type = String(p.type ?? "other")
+        const idx = type === "bank" ? 0 : type === "emi" ? 1 : type === "neobank" ? 2 : 3
+        w.slot = { x: 204 + idx * 20, y: 290, w: 16, h: 12, t0: now() + 600, dur: 1600 }
+      }
+      if (step.station === "border") {
+        if (p.sepa) w.barrierTarget = 1
+        if (!(await sleep(R ? 0 : 400))) return
+        if (p.vopParticipant) w.cards.push({ mode: "pair", ax: 280, ay: 474, bx: 280, by: 474, t0: now(), dur: 900, hold: 1400 })
+        else w.cards.push({ mode: "slip", ax: 258, ay: 474, bx: 300, by: 474, t0: now(), dur: 700, hold: 1200 })
+      }
+      if (step.station === "tower") {
+        const c = step.outcome === "ok" ? "#FBBF24" : step.outcome === "fail" ? "#EF4444" : "#F97316"
+        w.towerColor = step.outcome === "ok" ? "rgba(255,196,100," : step.outcome === "fail" ? "rgba(239,68,68," : "rgba(249,115,22,"
+        w.beam = { x1: hx, y1: hy - 10, t0: now(), dur: 900, c }
+        w.pulses.push({ x: 380, y: 372, r: 6, l: 40 })
+        if (step.outcome === "fail") thump(80, 2)
+      }
       if (step.station === "forge") {
-        for (let i = 0; i < 24; i++) w.sparks.push({ x: 522 + (Math.random() - 0.5) * 36, y: 468, vx: (Math.random() - 0.5) * 1.8, vy: -Math.random() * 2 - 0.5, l: 30 + Math.random() * 20, c: "#FDE68A" })
-        w.seals.push({ x: 540, y: 398, sprite: step.outcome === "fail" ? "seal-x" : "coin", l: 120, tint: step.outcome === "fail" ? "#B91C1C" : undefined })
-        // the frames the atlas carried unused: the spark burst on the anvil,
-        // then the ingot cooling there for the rest of the step
-        w.props.push({ sprite: "spark", x: 522, y: 476, l: 22, max: 22, scale: 0.9 })
-        if (step.outcome !== "fail") w.props.push({ sprite: "ingot", x: 522, y: 472, l: 140, max: 140 })
+        // THE CLIMAX (DA audit §3.12): the world tightens, the hearth swells,
+        // the ingot glows white, three strikes — the third the strongest —
+        // then the seal drops and its wave crosses the whole village
+        const fail = steps.some((s) => s.station === "tower" && s.outcome === "fail")
+        w.veilBoostTarget = 0.16; w.hearthTarget = 1.6
+        if (!(await sleep(R ? 0 : 250))) return
+        w.props.push({ sprite: "ingot", x: 522, y: 472, l: 220, max: 220 })
+        if (!(await sleep(R ? 0 : 450))) return
+        if (!R) {
+          for (const k of [0, 1, 2]) {
+            const strong = k === 2
+            w.hitstopUntil = now() + (strong ? 120 : 90)
+            w.flash = strong ? 0.16 : 0.1
+            w.shake = { amp: strong ? 4.5 : 3, t0: now() }
+            w.props.push({ sprite: "spark", x: 522, y: 476, l: 14, max: 14, scale: strong ? 1.35 : 1.0 })
+            for (let n = 0; n < (strong ? 22 : 14); n++) w.sparks.push({ x: 522 + (Math.random() - 0.5) * 20, y: 470, vx: (Math.random() - 0.5) * 2.4, vy: -Math.random() * 2.4 - 0.6, l: 26 + Math.random() * 18, c: n % 3 ? "#FDE68A" : "#F59E0B" })
+            wave(522, 480, strong ? 110 : 80, 700, "#FDE68A", 2)
+            if (!(await sleep(300))) return
+          }
+          if (!(await sleep(150))) return
+        }
+        // the seal lands on the façade, between the hearth and the door — not
+        // on the roof ridge where the old floating coin used to hover
+        w.drop = { sprite: fail ? "seal-x" : "coin", x: 562, y0: R ? 446 : 330, y1: 446, t0: now(), dur: R ? 0 : 320, tint: fail ? "#B91C1C" : undefined, landed: false }
+        if (!(await sleep(R ? 200 : 400))) return
+        w.hearthTarget = 1; w.veilBoostTarget = 0
       }
       if (!(await sleep(step.holdMs))) return
     }
     if (w.gen !== gen) return
     w.veil = false; w.focus = null; w.hero.hidden = true
+    w.barrierTarget = 0; w.hearthTarget = 1; w.veilBoostTarget = 0
     setBanner(null)
     onQuestEnd?.()
   }, [makeMove, makeSleep, onQuestEnd, onStep, onExit])
@@ -601,6 +840,20 @@ export function VillageCanvas({ labels, tips, heroTip, villagerTip, idle, canvas
   // form is refused by react-hooks/set-state-in-effect; this one is accepted.
   useEffect(() => { setNarr(idle) }, [idle])
   useEffect(() => { world.current.fast = !!fast }, [fast])
+  // the attract replay stops dead at the visitor's first gesture: a new
+  // generation invalidates the running quest, the hero leaves, the veil lifts
+  useEffect(() => {
+    if (!abortKey) return
+    const w = world.current
+    w.gen++
+    w.hero.hidden = true
+    w.veil = false
+    w.focus = null
+    w.trail = []
+    const raf = requestAnimationFrame(() => { setBanner(null); setNarr(idle) })
+    return () => cancelAnimationFrame(raf)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [abortKey])
   // the rail's hovered row lights its building like the mouse would
   useEffect(() => { world.current.hover = highlight ?? null }, [highlight])
 
@@ -749,6 +1002,9 @@ export function VillageCanvas({ labels, tips, heroTip, villagerTip, idle, canvas
     else if (near(w.watcher)) found = tips.vigil ?? null
     else if (near(w.archivist)) found = tips.archive ?? null
     else if ((w.clerks as unknown as Actor[]).some(near)) found = villagerTip
+    else if (near(w.agents.library)) { found = tips.library ?? null; station = "library" }
+    else if (near(w.agents.classifier)) { found = tips.classifier ?? null; station = "classifier" }
+    else if (near(w.agents.court)) { found = tips.court ?? null; station = "court" }
     else {
       for (const s of STATIONS) {
         if (mx >= s.bx && mx <= s.bx + s.bw && my >= s.by && my <= s.by + s.bh) {

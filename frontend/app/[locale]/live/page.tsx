@@ -12,6 +12,8 @@ import { opAgeMinutes } from "@/lib/village/ops-age"
 import { LIVE_EXAMPLES } from "@/lib/village/examples"
 import { parseLiveParams } from "@/lib/village/permalink"
 import { buildRail, type RailRow, type RailState } from "@/lib/village/rail"
+import { pickDemo, shouldAttract } from "@/lib/village/attract"
+import demoJourneys from "@/lib/village/demo-journeys.json"
 import { RailPanel, type RailStrings } from "./rail"
 import { VillageCanvas, type NarratedStep, type StationTip, type TrafficCourier, type Vignette } from "./village-canvas"
 
@@ -46,7 +48,17 @@ interface QuestResult {
   mode: Mode
   data: Rec
   steps: NarratedStep[]
+  /** a replayed recorded answer: its capture date, shown wherever it is used */
+  demo?: string
 }
+
+const DEMO_PLAYLIST = ["de", "ch", "tr", "broken"] as const
+/** the idle carousel: five lines, each pointing at a station and lighting it */
+const CAROUSEL: { key: string; station: string }[] = [
+  { key: "l1", station: "gate" }, { key: "l2", station: "scribe" }, { key: "l3", station: "reg-DE" },
+  { key: "l4", station: "tower" }, { key: "l5", station: "forge" },
+]
+const CAROUSEL_MS = 12_000
 
 /* ---------- atlas badge (the ingot, the broken seal) ---------- */
 let atlasCache: Promise<{ img: HTMLImageElement; meta: Record<string, { x: number; y: number; w: number; h: number }> }> | null = null
@@ -127,6 +139,14 @@ export default function LivePage() {
   const [copied, setCopied] = useState<"curl" | "link" | null>(null)
   const [showJson, setShowJson] = useState(false)
   const [tick, setTick] = useState(0)
+  // attract mode: the village plays a dated replay once for a passive visitor
+  const [demoOn, setDemoOn] = useState(false)
+  const demoRunning = useRef(false)
+  const interacted = useRef(false)
+  const [abortKey, setAbortKey] = useState(0)
+  const stageRef = useRef<HTMLDivElement>(null)
+  // the idle carousel: −1 = the welcome line, then 0..4
+  const [carousel, setCarousel] = useState(-1)
 
   // One stable object per locale. As an inline literal it changed identity on
   // every render — and the canvas resets its narration whenever `idle`
@@ -134,7 +154,12 @@ export default function LivePage() {
   // the end-of-quest re-render each wiped the line on screen: the mod-97
   // Scribe was never read, the delivered result lived 3.6 s. Measured on the
   // live site on 01/09/2026.
-  const idle = useMemo(() => ({ who: t("who.village"), text: t("idle") }), [t])
+  const idle = useMemo(
+    () => carousel >= 0 && carousel < CAROUSEL.length
+      ? { who: t("who.village"), text: t(`carousel.${CAROUSEL[carousel].key}`) }
+      : { who: t("who.village"), text: t("idle") },
+    [t, carousel],
+  )
 
   // Real freshness for the house plaques — served by the public /health.
   useEffect(() => {
@@ -231,6 +256,49 @@ export default function LivePage() {
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
   }, [])
+
+  // The idle carousel: while no quest has played, the welcome line gives way
+  // every 12 s to one of five lines, each naming a station the canvas lights.
+  useEffect(() => {
+    if (running || progress !== -1 || demoOn) return
+    const iv = setInterval(() => setCarousel((c) => (c + 1) % CAROUSEL.length), CAROUSEL_MS)
+    return () => clearInterval(iv)
+  }, [running, progress, demoOn])
+
+  // Attract mode (owner's decision n°2, 01/09/2026): after six quiet seconds,
+  // a passive visitor sees a RECORDED real answer replayed — never a call —
+  // labelled with its date; any gesture stops it; once per session.
+  useEffect(() => {
+    const mark = () => { interacted.current = true; if (demoRunning.current) abortDemo() }
+    const events: (keyof WindowEventMap)[] = ["pointerdown", "pointermove", "keydown", "wheel", "touchstart"]
+    for (const ev of events) window.addEventListener(ev, mark, { passive: true })
+    const t0 = Date.now()
+    let visible = false
+    const io = stageRef.current
+      ? new IntersectionObserver((entries) => { visible = entries.some((e) => e.intersectionRatio >= 0.5) }, { threshold: [0, 0.5, 1] })
+      : null
+    if (io && stageRef.current) io.observe(stageRef.current)
+    let played = false
+    try { played = sessionStorage.getItem("village-attract") === "1" } catch { /* private mode: play at most once per load */ }
+    const timer = setInterval(() => {
+      const ok = shouldAttract({
+        idleMs: Date.now() - t0, interacted: interacted.current, visible, hidden: document.hidden,
+        reduced: matchMedia("(prefers-reduced-motion: reduce)").matches, played, running: demoRunning.current || runningRef.current,
+      })
+      if (!ok) return
+      played = true
+      clearInterval(timer)
+      startDemo()
+    }, 500)
+    return () => {
+      for (const ev of events) window.removeEventListener(ev, mark)
+      io?.disconnect()
+      clearInterval(timer)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  const runningRef = useRef(false)
+  useEffect(() => { runningRef.current = running }, [running])
 
   const check = (v: unknown) => (v ? "✓" : "—")
 
@@ -340,8 +408,44 @@ export default function LivePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  const startDemo = () => {
+    let count = 0
+    try {
+      count = Number(localStorage.getItem("village-attract-count") ?? 0)
+      localStorage.setItem("village-attract-count", String(count + 1))
+      sessionStorage.setItem("village-attract", "1")
+    } catch { /* storage refused: still play once */ }
+    const key = pickDemo(DEMO_PLAYLIST, count)
+    const j = demoJourneys.journeys[key]
+    const data = j.response as Rec
+    const steps = buildJourney(data).map((s) => narrate(s, data))
+    questId.current += 1
+    pending.current = { iban: j.iban, mode: j.mode as Mode, data, steps, demo: demoJourneys.captured_at }
+    demoRunning.current = true
+    setDemoOn(true)
+    setIban(j.iban.replace(/(.{4})/g, "$1 ").trim())
+    setMode(j.mode as Mode)
+    setResult(null)
+    setElapsed(null)
+    setScreenSec(0)
+    setProgress(0)
+    setRunning(true)
+    setQuest({ id: questId.current, steps })
+  }
+  const abortDemo = () => {
+    if (!demoRunning.current) return
+    demoRunning.current = false
+    pending.current = null
+    setDemoOn(false)
+    setAbortKey((k) => k + 1)
+    setRunning(false)
+    setProgress(-1)
+    setQuest(null)
+  }
+
   const runValidation = async (value: string, questMode: Mode = mode) => {
-    if (!value || busy || running) return
+    if (demoRunning.current) abortDemo()
+    if (!value || busy || runningRef.current) return
     setBusy(true)
     setError(null)
     try {
@@ -546,9 +650,18 @@ export default function LivePage() {
           first screen on a 13" laptop (1440×790 measured). */}
       <div className="mt-5 grid grid-cols-1 gap-3 max-sm:order-1 max-sm:mt-3 xl:[@media(min-height:860px)]:grid-cols-[minmax(0,1fr)_232px] xl:[@media(min-height:860px)]:items-start">
         <div
+          ref={stageRef}
           className="relative mx-auto w-full overflow-hidden rounded-lg border shadow-sm"
           style={{ maxWidth: "max(560px, min(100%, calc((100dvh - 410px) * 16 / 9)))" }}
         >
+          {demoOn && (
+            <div
+              className="pointer-events-none absolute left-0 right-0 top-0 z-10 px-3 py-1 text-center text-[11px] font-semibold tracking-wide"
+              style={{ background: "rgba(243,231,200,0.92)", color: "#7A5322", borderBottom: "1.5px solid #7A5322" }}
+            >
+              {t("attract.hint", { date: demoJourneys.captured_at })}
+            </div>
+          )}
           <VillageCanvas
             labels={labels}
             tips={tips}
@@ -560,11 +673,14 @@ export default function LivePage() {
             traffic={traffic}
             vignette={vignette}
             fast={fast}
-            highlight={hoverId}
+            highlight={hoverId ?? (!running && progress === -1 && carousel >= 0 ? CAROUSEL[carousel].station : null)}
             pinned={pinnedId}
+            abortKey={abortKey}
             onQuestEnd={() => {
               setRunning(false)
               setFast(false)
+              demoRunning.current = false
+              setDemoOn(false)
               if (pending.current) { setResult(pending.current); setProgress(pending.current.steps.length) }
             }}
             onStep={setProgress}
@@ -602,6 +718,7 @@ export default function LivePage() {
             <div className="mt-1 text-[15px] font-semibold">{verdict.head}</div>
             {verdict.facts && <div className="text-[13px]" style={{ color: "#6B5327" }}>{verdict.facts}</div>}
             <div className="mt-1 font-mono text-[11.5px]" style={{ color: "#7C4A08" }}>{verdict.meta}</div>
+            {result.demo && <div className="mt-1 text-[11.5px] italic" style={{ color: "#9A8B74" }}>{t("attract.note", { date: result.demo })}</div>}
           </div>
           <div className="flex w-full flex-col gap-1.5 sm:w-auto">
             <Button variant="outline" size="sm" onClick={() => void copy("curl", verdict.curl)}>⧉ {copied === "curl" ? t("verdict.copied") : t("verdict.copyCurl")}</Button>
