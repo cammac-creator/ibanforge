@@ -13,8 +13,9 @@ RUN npm ci --ignore-scripts
 
 COPY src/ src/
 COPY scripts/ scripts/
-COPY tsconfig.json ./
-RUN npx tsc
+COPY tsconfig.json tsconfig.build.json ./
+# tsconfig.build.json: same compiler options, tests excluded from the emit.
+RUN npx tsc -p tsconfig.build.json
 
 # UK modulus weight table, fetched from Vocalink rather than committed: it is
 # published for implementers without a written redistribution right, so it must

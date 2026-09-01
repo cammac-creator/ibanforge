@@ -457,6 +457,9 @@ describe('normalizeRequestPath', () => {
   it('consumes a non-numeric clearing segment', () => {
     // Was stored raw and whole: the old pattern required leading digits.
     expect(normalizeRequestPath('/v1/ch/clearing/CH230')).toBe('/v1/ch/clearing/:iid');
+    // One-time credentials in the path never reach the table (SEC-02, 2026-09-01).
+    expect(normalizeRequestPath('/v1/stripe/key/cs_live_a1B2c3D4e5F6')).toBe('/v1/stripe/key/:session_id');
+    expect(normalizeRequestPath('/v1/credits/recover/0xdeadbeefcafe')).toBe('/v1/credits/recover/:ref');
     expect(normalizeRequestPath('/v1/ch/clearing/762a')).toBe('/v1/ch/clearing/:iid');
   });
 

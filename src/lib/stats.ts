@@ -298,7 +298,12 @@ export function normalizeRequestPath(path: string): string {
     .replace(/\/v1\/bic\/[^/?]+/, (match) => (SPEC_TEMPLATE_SEGMENT.test(match) ? match : '/v1/bic/:code'))
     .replace(/\/v1\/ch\/clearing\/[^/?]+/, (match) =>
       SPEC_TEMPLATE_SEGMENT.test(match) ? match : '/v1/ch/clearing/:iid',
-    );
+    )
+    // Both segments are one-time credentials that hand out an API key in clear
+    // (SEC-02, 2026-09-01). A stored session id or settlement reference would be
+    // replayable by anyone reading the table; the label is all a dashboard needs.
+    .replace(/\/v1\/stripe\/key\/[^/?]+/, '/v1/stripe/key/:session_id')
+    .replace(/\/v1\/credits\/recover\/[^/?]+/, '/v1/credits/recover/:ref');
 }
 
 /**

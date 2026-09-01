@@ -1,0 +1,10 @@
+{
+  // Build-only view of tsconfig.json: the tests stay type-checked by
+  // `npm run typecheck` (which reads tsconfig.json), but they must not be
+  // emitted. Before 2026-09-01 `tsc` wrote 178 compiled test files into dist/,
+  // and the Dockerfile shipped them into the production image, fixtures and
+  // billing assertions included (audit QUA-01 / OPS-11). mcp/tsconfig.json had
+  // fixed the same defect for the npm package; this applies it to the API.
+  "extends": "./tsconfig.json",
+  "exclude": ["node_modules", "dist", "src/**/*.test.ts"]
+}

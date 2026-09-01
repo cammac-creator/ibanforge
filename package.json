@@ -1,6 +1,7 @@
 {
   "name": "ibanforge",
   "version": "1.4.4",
+  "private": true,
   "mcpName": "io.github.cammac-creator/ibanforge",
   "description": "IBAN validation, BIC/SWIFT lookup, Swiss clearing, SEPA compliance, issuer classification and risk indicators for AI agents. 121k+ BIC entries (38k+ LEI-enriched via GLEIF; additional rows from SWIFT directory, Bundesbank, SIX, NBP, EBA Step2 SCT), 1,100+ Swiss BC-Nummer from SIX, refreshed monthly. Supports 89 countries.",
   "type": "module",
@@ -18,7 +19,7 @@
   },
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc && cp src/db/bic_data.json dist/db/bic_data.json && cp src/db/nl-psp.json dist/db/nl-psp.json",
+    "build": "tsc -p tsconfig.build.json && cp src/db/bic_data.json dist/db/bic_data.json && cp src/db/nl-psp.json dist/db/nl-psp.json",
     "start": "node dist/index.js",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -49,13 +50,13 @@
     "reco-baseline": "tsx scripts/reco-baseline.ts",
     "db:seed-uk": "tsx scripts/seed-uk-modulus.ts",
     "openapi:dump": "tsx scripts/dump-openapi.ts",
-    "openapi:lint": "npm run openapi:dump && npx --yes @stoplight/spectral-cli@6 lint openapi.generated.json --ruleset .spectral.yaml"
+    "openapi:lint": "npm run openapi:dump && npx --yes @stoplight/spectral-cli@6 lint openapi.generated.json --ruleset .spectral.yaml",
+    "prepublishOnly": "npm run build"
   },
   "dependencies": {
     "@coinbase/x402": "^2.1.0",
     "@hono/node-server": "^2.1.1",
     "@modelcontextprotocol/sdk": "^1.12.0",
-    "@types/nodemailer": "^8.0.1",
     "@x402/core": "^2.23.0",
     "@x402/evm": "^2.23.0",
     "@x402/extensions": "^2.23.0",
@@ -63,7 +64,6 @@
     "better-sqlite3": "^13.0.3",
     "hono": "^4.13.5",
     "iban-core": "npm:ibanforge@^2.1.0",
-    "nodemailer": "^9.0.5",
     "stripe": "^22.5.0",
     "zod": "^4.4.3"
   },
@@ -122,7 +122,6 @@
     "url": "https://github.com/cammac-creator/ibanforge"
   },
   "homepage": "https://ibanforge.com",
-  "prepublishOnly": "npm run build",
   "engines": {
     "node": ">=22"
   },

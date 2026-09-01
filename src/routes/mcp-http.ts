@@ -944,7 +944,7 @@ setInterval(() => {
   for (const [key, val] of mcpCallCounts) {
     if (val.date !== today) mcpCallCounts.delete(key);
   }
-}, 10 * 60 * 1000);
+}, 10 * 60 * 1000).unref();
 
 /**
  * `units` is the number of tool calls this HTTP request carries — a JSON-RPC

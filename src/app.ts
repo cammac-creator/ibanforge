@@ -92,6 +92,21 @@ const pkg = require('../package.json') as { version: string };
 const redactQueryValues = (line: string): string =>
   line.replace(/([?&][^=&\s]+)=[^&\s]*/g, '$1=***');
 
+// Same promise, other half of the URL. Two routes carry their only credential
+// in the PATH, not the query: `/v1/stripe/key/:session_id` and
+// `/v1/credits/recover/:ref` each hand out an API key in clear, once, to
+// whoever presents that segment. A log reader who replays the line before the
+// buyer does takes the key. And an IBAN typed into `/v1/bic/<iban>` is a
+// submitted identifier too. `request_log` already redacts these through
+// `normalizeRequestPath`; stdout, which Railway keeps, did not. Security audit
+// 2026-09-01, finding SEC-02.
+const IBAN_SHAPED_PATH_TOKEN = /\b[A-Z]{2}\d{2}[A-Z0-9]{11,30}\b/g;
+const redactPathSecrets = (line: string): string =>
+  line
+    .replace(/(\/v1\/stripe\/key\/)[^/?\s]+/g, '$1***')
+    .replace(/(\/v1\/credits\/recover\/)[^/?\s]+/g, '$1***')
+    .replace(IBAN_SHAPED_PATH_TOKEN, '***');
+
 // Track all HTTP requests for dashboard analytics
 // Exclude internal/monitoring endpoints to avoid feedback loop
 const SKIP_TRACKING = new Set([
@@ -358,8 +373,7 @@ Both \`/v1/bic/:code\` and \`/v1/ch/clearing/:iid\` use **URL path parameters** 
 - Validating IBANs at checkout, payout, or before a SEPA transfer
 - Resolving BIC/SWIFT from an IBAN automatically
 - Detecting Swiss BC-Nummer / IID for routing
-- Catching an impossible UK account before a payout: validating a GB IBAN also runs the Vocalink modulus checksum over the sort code and account number it carries, in the same call and at no extra cost (\`modulus_check\`). mod-97 alone passes on GB pairs no bank could have issued.${praLine}${identityLine}
-- Catching an impossible UK account before a payout: validating a GB IBAN also runs the Vocalink modulus checksum over the sort code and account number it carries, in the same call and at no extra cost (\`modulus_check\`). mod-97 alone passes on GB pairs no bank could have issued.${praLine}${psdLine}
+- Catching an impossible UK account before a payout: validating a GB IBAN also runs the Vocalink modulus checksum over the sort code and account number it carries, in the same call and at no extra cost (\`modulus_check\`). mod-97 alone passes on GB pairs no bank could have issued.${praLine}${identityLine}${psdLine}
 - Detecting EMIs / virtual IBANs (Wise, Revolut, Mercury, Modulr, etc.)
 - Pre-flight VoP participant check before October 2025 SEPA deadline
 - Pay-per-call agent workflows without human onboarding (x402 USDC)
@@ -455,7 +469,7 @@ export function buildApp(): Hono<HonoEnv> {
     ],
   }));
   app.use('*', logger((message: string, ...rest: string[]) => {
-    console.log(redactQueryValues(message), ...rest);
+    console.log(redactPathSecrets(redactQueryValues(message)), ...rest);
   }));
   app.use('*', async (c, next) => {
     await next();
