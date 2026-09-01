@@ -40,3 +40,10 @@ data/uk-modulus.json
 
 # Regenerated from source for the contract linter — never committed
 openapi.generated.json
+
+# Village atlas inputs: Midjourney boards and cut sprites stay OUT of the
+# public repo (the boards carry a generation identity; the fiche mandates it).
+scripts/village-atlas/boards/
+scripts/village-atlas/sprites/
+scripts/village-atlas/out/
+scripts/village-atlas/sheets/

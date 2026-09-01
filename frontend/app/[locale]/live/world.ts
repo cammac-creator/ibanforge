@@ -60,14 +60,28 @@ export function drawSprite(
   ctx.restore();
 }
 
-/* ---------- geometry ---------- */
+/* ---------- geometry ----------
+ *
+ * Rebalanced 01/09/2026 on the operator's report: the first row sat shoulder
+ * to shoulder while the last one gaped. The registry row now spaces by each
+ * house's REAL width (the day board's four houses differ), the library gives
+ * the row room, and the bottom street gains a lived-in cluster (well, casks,
+ * tree, hay) between the forge and the vigil. Coordinates were tuned on the
+ * pipeline's layout-preview.png, not in the browser. */
 
 export const REGISTRY_CCS = ['DE', 'AT', 'BE', 'BG', 'NL', 'FI'] as const;
-const REGISTRY_SPRITES = ['house0', 'house1', 'house2', 'house3', 'house4', 'house1'];
-const REGISTRY_X0 = 560;
-const REGISTRY_STEP = 68;
-export const LANE_X = 600;
-export const LANE_DOOR_Y = 136;
+/** Day-board houses by true width; NL and FI reuse a face mirrored, which the
+ * fantasy banner glyphs absorb (nothing readable to mirror). */
+const REGISTRY_LANE: { sprite: string; cx: number; w: number; flip?: boolean }[] = [
+  { sprite: 'house0', cx: 564, w: 95 },
+  { sprite: 'house1', cx: 643, w: 52 },
+  { sprite: 'house2', cx: 715, w: 80 },
+  { sprite: 'house3', cx: 790, w: 59 },
+  { sprite: 'house1', cx: 852, w: 52, flip: true },
+  { sprite: 'house3', cx: 914, w: 59, flip: true },
+];
+const REGISTRY_BASE = 120;
+const REGISTRY_DOOR_Y = 138;
 
 export interface StationGeo {
   id: string;
@@ -80,45 +94,48 @@ export interface StationGeo {
   door: [number, number];
   anchor: [number, number];
   cc?: string;
+  flip?: boolean;
+  scale?: number;
 }
 
 function geo(
   id: string, sprite: string | null, cx: number, base: number,
-  bw: number, bh: number, door: [number, number], anchor: [number, number], cc?: string,
+  bw: number, bh: number, door: [number, number], anchor: [number, number],
+  extra: { cc?: string; flip?: boolean; scale?: number } = {},
 ): StationGeo {
-  return { id, sprite, cx, base, bx: cx - bw / 2, by: base - bh, bw, bh, door, anchor, cc };
+  return { id, sprite, cx, base, bx: cx - bw / 2, by: base - bh, bw, bh, door, anchor, ...extra };
 }
 
 export const STATIONS: StationGeo[] = [
-  geo('gate', 'gate', 80, 180, 84, 116, [80, 200], [80, 192]),
-  geo('scribe', 'stall-red', 204, 178, 64, 74, [204, 200], [204, 192]),
-  geo('cutter', 'stall-teal', 318, 178, 62, 70, [318, 200], [318, 192]),
-  geo('library', 'library', 472, 172, 172, 136, [472, 200], [472, 192]),
-  ...REGISTRY_CCS.map((cc, i) =>
-    geo(`reg-${cc}`, REGISTRY_SPRITES[i], REGISTRY_X0 + i * REGISTRY_STEP, 118, 62, 116,
-      [REGISTRY_X0 + i * REGISTRY_STEP, LANE_DOOR_Y], [LANE_X, 192], cc),
+  geo('gate', 'gate', 80, 182, 84, 116, [80, 200], [80, 192]),
+  geo('scribe', 'stall-red', 196, 180, 64, 74, [196, 200], [196, 192]),
+  geo('cutter', 'stall-teal', 306, 180, 62, 70, [306, 200], [306, 192]),
+  geo('library', 'library', 414, 176, 176, 126, [414, 200], [414, 192], { scale: 0.92 }),
+  ...REGISTRY_LANE.map((h, i) =>
+    geo(`reg-${REGISTRY_CCS[i]}`, h.sprite, h.cx, REGISTRY_BASE, h.w, 100,
+      [h.cx, REGISTRY_DOOR_Y], [h.cx, 192], { cc: REGISTRY_CCS[i], flip: h.flip }),
   ),
-  geo('warehouse', 'warehouse', 70, 96, 132, 108, [112, 98], [112, 76]),
-  geo('six', 'house3', 852, 326, 76, 116, [852, 348], [852, 342]),
-  geo('court', 'house-big', 716, 322, 100, 146, [716, 348], [716, 342]),
-  geo('classifier', 'house2', 582, 326, 76, 116, [582, 348], [582, 342]),
-  geo('border', 'fence', 438, 348, 104, 46, [438, 352], [438, 342]),
-  geo('tower', 'tower', 176, 330, 102, 170, [202, 344], [202, 342]),
-  geo('forge', 'forge', 410, 486, 152, 126, [410, 506], [410, 498]),
-  geo('archive', 'desk-day', 246, 482, 70, 50, [246, 504], [246, 498]),
-  geo('vigil', 'vigil-booth', 900, 474, 56, 60, [900, 496], [900, 498]),
+  geo('warehouse', 'warehouse', 84, 106, 132, 104, [120, 98], [120, 76]),
+  geo('classifier', 'house1', 604, 334, 60, 112, [604, 352], [604, 342], { scale: 1.12 }),
+  geo('court', 'house-big', 744, 338, 120, 150, [744, 352], [744, 342]),
+  geo('six', 'house3', 884, 334, 68, 112, [884, 352], [884, 342], { flip: true, scale: 1.12 }),
+  geo('border', 'fence', 430, 350, 104, 46, [430, 352], [430, 342]),
+  geo('tower', 'tower', 170, 332, 74, 170, [188, 344], [188, 342]),
+  geo('forge', 'forge', 430, 488, 152, 126, [430, 506], [430, 498]),
+  geo('archive', 'desk-day', 250, 484, 70, 50, [250, 504], [250, 498]),
+  geo('vigil', 'vigil-booth', 906, 476, 56, 60, [906, 496], [906, 498]),
 ];
 export const stationById = Object.fromEntries(STATIONS.map((s) => [s.id, s]));
 
 /** Where smoke rises (forge chimney is painted into the day sprite). */
-export const CHIMNEYS: [number, number][] = [[462, 386]];
+export const CHIMNEYS: [number, number][] = [[482, 390]];
 /** Where ember particles rise (forge hearth, braziers). */
-export const EMBER_ZONES: [number, number][] = [[392, 470], [224, 488], [196, 176]];
+export const EMBER_ZONES: [number, number][] = [[412, 472], [228, 490], [170, 172]];
 /** Halo lights, daylight-discreet: x, y, radius, strength. */
 export const HALOS: [number, number, number, number][] = [
-  [196, 170, 32, 0.4],    // tower brazier
-  [392, 456, 44, 0.5],    // forge hearth
-  [224, 484, 20, 0.35],   // archive brazier
+  [170, 166, 30, 0.4],    // tower brazier
+  [412, 458, 44, 0.5],    // forge hearth
+  [228, 486, 20, 0.35],   // archive brazier
 ];
 
 const ROAD_BANDS: [number, number, number, number][] = [
@@ -127,8 +144,11 @@ const ROAD_BANDS: [number, number, number, number][] = [
   [190, 330, 754, 24],  // middle street
   [190, 330, 24, 192],  // west bend
   [190, 486, 774, 24],  // bottom street
-  [588, 122, 24, 82],   // registry lane
   [-4, 64, 908, 24],    // caravan road
+  // one little path per registry door: the shared vertical lane died with the
+  // fixed-step row — the gaps between real-width houses are too narrow to
+  // walk, so the hero now climbs to each door from the street below.
+  ...REGISTRY_LANE.map((h): [number, number, number, number] => [h.cx - 5, 134, 10, 50]),
 ];
 
 /* ---------- static background: ground + streets only ---------- */
@@ -137,20 +157,29 @@ const ROAD_BANDS: [number, number, number, number][] = [
  * in one painter's-order pass, so the scenery list below is drawn per frame. */
 
 export function paintGround(ctx: Ctx, img: WorldImages) {
-  // checkered 180°-rotated tiling breaks the visible repetition of the tile;
-  // the step follows the tile's real size (day tile: 160px)
-  // plain tiling: the day tile is organic enough that straight repetition
-  // reads softer than a checkered rotation (whose gradient made a patchwork)
+  // The tile is pre-flattened at build time (local stone-joint contrast
+  // halved, saturation down, wider 208px period): the operator's report was
+  // that the ground SHOUTED and confused the eye. The checkered 180° rotation
+  // is back on top of that — on the calmed tile it breaks the period without
+  // re-creating the old patchwork. Step follows the tile's real size.
   const g = img.ground;
   const T = g.width;
   for (let j = 0; j * T < H; j++) {
     for (let i = 0; i * T < W; i++) {
-      ctx.drawImage(g, i * T, j * T);
+      if ((i + j) % 2 === 1) {
+        ctx.save();
+        ctx.translate(i * T + T / 2, j * T + T / 2);
+        ctx.rotate(Math.PI);
+        ctx.drawImage(g, -T / 2, -T / 2);
+        ctx.restore();
+      } else {
+        ctx.drawImage(g, i * T, j * T);
+      }
     }
   }
   // worn-earth streets on the pale cobbles (daylight)
   for (const [x, y, w, h] of ROAD_BANDS) {
-    ctx.fillStyle = 'rgba(128,100,70,0.26)';
+    ctx.fillStyle = 'rgba(134,104,72,0.28)';
     ctx.fillRect(x, y, w, h);
     ctx.fillStyle = 'rgba(96,74,50,0.18)';
     ctx.fillRect(x, y, w, 2);
@@ -160,39 +189,46 @@ export function paintGround(ctx: Ctx, img: WorldImages) {
 }
 
 /** Fixed scenery, merged with actors each frame and sorted by base line. */
-export interface Placed { sprite: string; cx: number; base: number; scale?: number }
+export interface Placed { sprite: string; cx: number; base: number; scale?: number; flip?: boolean; id?: string }
 export const SCENERY: Placed[] = [
-  ...STATIONS.filter((s) => s.sprite).map((s) => ({ sprite: s.sprite!, cx: s.cx, base: s.base })),
-  { sprite: 'signpost', cx: 478, base: 336 },   // border post sign
-  { sprite: 'ember-line', cx: 224, base: 494 }, // archive brazier
-  { sprite: 'cart', cx: 148, base: 92 },        // parked caravan cart
+  ...STATIONS.filter((s) => s.sprite).map((s) => ({
+    sprite: s.sprite!, cx: s.cx, base: s.base, scale: s.scale, flip: s.flip, id: s.id,
+  })),
+  { sprite: 'signpost', cx: 470, base: 338 },   // border post sign
+  { sprite: 'ember-line', cx: 228, base: 496 }, // archive brazier
+  { sprite: 'cart', cx: 172, base: 96 },        // parked caravan cart
   // greenery
-  { sprite: 'tree1', cx: 32, base: 150 }, { sprite: 'tree2', cx: 930, base: 420 },
-  { sprite: 'tree1', cx: 62, base: 392 }, { sprite: 'grove', cx: 300, base: 292 },
-  { sprite: 'tree2', cx: 935, base: 244 }, { sprite: 'tree1', cx: 390, base: 86 },
-  { sprite: 'planter-red', cx: 508, base: 180 }, { sprite: 'topiary', cx: 268, base: 192 },
-  { sprite: 'pot-yellow', cx: 148, base: 198 }, { sprite: 'planter2', cx: 660, base: 350 },
-  { sprite: 'ivy', cx: 428, base: 176 },
-  { sprite: 'tuft1', cx: 240, base: 220 }, { sprite: 'tuft2', cx: 500, base: 260 },
-  { sprite: 'tufts2', cx: 640, base: 240 }, { sprite: 'tuft1', cx: 60, base: 300 },
-  { sprite: 'tuft2', cx: 890, base: 380 }, { sprite: 'tufts2', cx: 340, base: 440 },
-  // village life props
-  { sprite: 'well', cx: 120, base: 470 },
-  { sprite: 'barrel-group', cx: 150, base: 110 }, { sprite: 'sacks', cx: 186, base: 96 },
-  { sprite: 'barrel-cart', cx: 484, base: 496 }, { sprite: 'wheelbarrow', cx: 540, base: 500 },
-  { sprite: 'hay', cx: 58, base: 506 }, { sprite: 'fence', cx: 292, base: 340 },
-  { sprite: 'rocks', cx: 352, base: 244 }, { sprite: 'rock-big', cx: 925, base: 522 },
+  { sprite: 'tree1', cx: 34, base: 152 }, { sprite: 'tree2', cx: 790, base: 486 },
+  { sprite: 'tree1', cx: 62, base: 394 }, { sprite: 'grove', cx: 300, base: 296 },
+  { sprite: 'tree2', cx: 938, base: 246 }, { sprite: 'tree1', cx: 386, base: 88 },
+  { sprite: 'planter-red', cx: 502, base: 184 }, { sprite: 'topiary', cx: 262, base: 194 },
+  { sprite: 'pot-yellow', cx: 148, base: 200 }, { sprite: 'planter2', cx: 668, base: 352 },
+  { sprite: 'ivy', cx: 366, base: 178 },
+  { sprite: 'tuft1', cx: 240, base: 222 }, { sprite: 'tuft2', cx: 500, base: 262 },
+  { sprite: 'tufts2', cx: 640, base: 242 }, { sprite: 'tuft1', cx: 60, base: 302 },
+  { sprite: 'tuft2', cx: 866, base: 384 }, { sprite: 'tufts2', cx: 340, base: 442 },
+  // village life props — the bottom street's lived-in cluster fills what used
+  // to be the map's one empty quarter (operator's report, 01/09)
+  { sprite: 'well', cx: 640, base: 478 },
+  { sprite: 'barrel-group', cx: 712, base: 470 }, { sprite: 'sacks', cx: 214, base: 90 },
+  { sprite: 'barrel-cart', cx: 500, base: 498 }, { sprite: 'wheelbarrow', cx: 548, base: 502 },
+  { sprite: 'hay', cx: 860, base: 500 }, { sprite: 'fence', cx: 296, base: 328 },
+  { sprite: 'rocks', cx: 352, base: 246 }, { sprite: 'rock-big', cx: 925, base: 522 },
 ];
 
 /** Station signs drawn after the scenery/actor pass (nothing crosses them). */
 export function drawSigns(ctx: Ctx, img: WorldImages) {
   void img;
-  // Swiss cross badge on the SIX house banner
+  // Swiss cross badge on the SIX house banner (mirrored red day-house: the
+  // banner sits right of centre once flipped; position derived from the
+  // station rather than retyped so a layout move cannot strand it)
+  const six = stationById['six'];
+  const bx = Math.round(six.cx + 8), by = Math.round(six.base - 57);
   ctx.fillStyle = '#C0392B';
-  ctx.fillRect(845, 246, 13, 11);
+  ctx.fillRect(bx, by, 13, 11);
   ctx.fillStyle = '#FFFFFF';
-  ctx.fillRect(850, 248, 3, 7);
-  ctx.fillRect(848, 250, 7, 3);
+  ctx.fillRect(bx + 5, by + 2, 3, 7);
+  ctx.fillRect(bx + 3, by + 4, 7, 3);
 }
 
 /** Peripheral night vignette, prerendered once at world size. */

@@ -14,7 +14,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import {
-  W, H, SCALE, STATIONS, stationById, REGISTRY_CCS, LANE_X, LANE_DOOR_Y,
+  W, H, SCALE, STATIONS, stationById, REGISTRY_CCS,
   loadWorldImages, paintGround, paintVignette, drawSprite, drawActor, drawSigns,
   SCENERY, HALOS, EMBER_ZONES, CHIMNEYS,
   type Actor, type StationGeo, type WorldImages,
@@ -68,6 +68,17 @@ const COURIER_RUNS: Record<TrafficCourier["kind"], [number, number][]> = {
 const HERO_SPEED = 156
 const COURIER_SPEED = 220
 
+/** Bespoke label spots (logical coords). The registry row staggers two lines
+ * so six close-set plaques cannot collide; street-side stations sit on the
+ * street's lower half so the courier line at y=192 stays mostly clear. */
+const LABEL_AT: Record<string, [number, number]> = {
+  gate: [80, 203], scribe: [196, 203], cutter: [306, 203], library: [414, 203],
+  "reg-DE": [564, 146], "reg-AT": [643, 163], "reg-BE": [715, 146],
+  "reg-BG": [790, 163], "reg-NL": [852, 146], "reg-FI": [914, 163],
+  warehouse: [160, 56], tower: [143, 350], forge: [430, 518],
+  archive: [250, 516], border: [430, 364], vigil: [906, 510],
+}
+
 /** Rounds the 90° corners of an axis-aligned path into short Bézier arcs, so
  * walks read as natural strolls instead of drill-square turns. */
 function roundPath(pts: [number, number][], r = 14): [number, number][] {
@@ -105,6 +116,9 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
   const [narr, setNarr] = useState<{ who: string; text: string }>(idle)
   const [tip, setTip] = useState<{ x: number; y: number; tip: StationTip } | null>(null)
   const [loaded, setLoaded] = useState(false)
+  /** station under the mouse — drives the DOM label lift and the cursor;
+   * the canvas glow reads the ref (per-frame), this state feeds the DOM */
+  const [hoverId, setHoverId] = useState<string | null>(null)
 
   const world = useRef({
     img: null as WorldImages | null,
@@ -125,6 +139,13 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
     sparks: [] as Spark[], puffs: [] as Puff[], seals: [] as Seal[], pulses: [] as Pulse[],
     embers: [] as { x: number; y: number; vx: number; p: number }[],
     flies: [] as { x: number; y: number; p: number }[],
+    /** daylight ambience: drifting pollen motes and a few butterflies */
+    pollen: [] as { x: number; y: number; p: number; s: number }[],
+    wings: [] as { cx: number; cy: number; p: number; c: string }[],
+    /** the walked path, item 4: points the hero has actually covered */
+    trail: [] as [number, number][],
+    /** station under the mouse — read by the draw pass for the golden lift */
+    hover: null as string | null,
     veil: false, focus: null as StationGeo | null, gen: 0, reduced: false,
   })
 
@@ -149,8 +170,16 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
           const [zx, zy] = EMBER_ZONES[i % EMBER_ZONES.length]
           return { x: zx + (Math.random() - 0.5) * 30, y: zy - Math.random() * 24, vx: (Math.random() - 0.5) * 0.1, p: Math.random() * 6 }
         })
-        // no fireflies in daylight
+        // no fireflies in daylight — the day breathes with pollen motes and a
+        // few butterflies over the planters instead (item 3, 01/09)
         w.flies = []
+        w.pollen = Array.from({ length: 16 }, () => ({
+          x: Math.random() * W, y: Math.random() * H, p: Math.random() * 7, s: 0.6 + Math.random() * 0.8,
+        }))
+        const BLOOMS: [number, number][] = [[502, 176], [668, 344], [148, 192], [860, 492]]
+        w.wings = BLOOMS.slice(0, 4).map(([bx, by], i) => ({
+          cx: bx, cy: by - 12, p: i * 1.7, c: ["#F472B6", "#FBBF24", "#93C5FD", "#F9A8D4"][i],
+        }))
         setLoaded(true)
       })
       .catch(() => { /* stays on the loading veil; a reload retries */ })
@@ -209,6 +238,12 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
           }
         }
         for (const f of w.flies) { f.x += Math.sin(t / 900 + f.p) * 0.18; f.y += Math.cos(t / 1100 + f.p) * 0.12 }
+        for (const g of w.pollen) {
+          g.x += 0.05 + Math.sin(t / 1300 + g.p) * 0.12
+          g.y += Math.cos(t / 1700 + g.p) * 0.08 - 0.012
+          if (g.x > W + 4) g.x = -4
+          if (g.y < -4) g.y = H + 4
+        }
         // forge chimney smoke
         if (Math.floor(t / 460) !== Math.floor((t - dt) / 460) && w.puffs.length < 18) {
           for (const [cx, cy] of CHIMNEYS) w.puffs.push({ x: cx, y: cy - 44, a: 0.45, s: 0.55, vy: 0.17 })
@@ -225,10 +260,47 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
       ctx.setTransform(SCALE, 0, 0, SCALE, 0, 0)
       ctx.drawImage(w.groundLayer!, 0, 0)
 
+      // the walked path (item 4): a dotted golden ribbon over the ground and
+      // UNDER everything that stands — the proof of where the hero has been
+      if (w.trail.length > 1) {
+        // two passes: a soft dark underlay so the ribbon reads on the brown
+        // streets too, then golden stitches on top (amber alone vanished on
+        // earth — measured on the first headless capture)
+        ctx.save()
+        ctx.lineCap = "round"
+        ctx.lineJoin = "round"
+        ctx.beginPath()
+        ctx.moveTo(w.trail[0][0], w.trail[0][1])
+        for (const [px, py] of w.trail) ctx.lineTo(px, py)
+        ctx.strokeStyle = "rgba(70,40,8,0.38)"
+        ctx.lineWidth = 5
+        ctx.stroke()
+        ctx.strokeStyle = "rgba(255,205,70,0.95)"
+        ctx.lineWidth = 2.2
+        ctx.setLineDash([6, 7])
+        ctx.lineDashOffset = w.reduced ? 0 : -t / 60
+        ctx.stroke()
+        ctx.restore()
+      }
+
       type Entity = { base: number; draw: () => void }
       const ents: Entity[] = SCENERY.map((p) => ({
         base: p.base,
-        draw: () => drawSprite(ctx, img, p.sprite, p.cx, p.base, { scale: p.scale }),
+        draw: () => {
+          // the hovered station lifts a breath and glows warm — the "you are
+          // pointing at me" answer the operator asked for (item 3)
+          const hot = p.id !== undefined && p.id === w.hover
+          if (hot) {
+            ctx.save()
+            ctx.shadowColor = "rgba(255,190,70,0.95)"
+            ctx.shadowBlur = 16
+            drawSprite(ctx, img, p.sprite, p.cx, p.base, { scale: p.scale, flip: p.flip, dy: -2 })
+            ctx.restore()
+            drawSprite(ctx, img, p.sprite, p.cx, p.base, { scale: p.scale, flip: p.flip, dy: -2 })
+          } else {
+            drawSprite(ctx, img, p.sprite, p.cx, p.base, { scale: p.scale, flip: p.flip })
+          }
+        },
       }))
       const actors: Actor[] = [
         ...(w.clerks as unknown as Actor[]), ...w.couriers.map((c) => c.actor),
@@ -258,6 +330,10 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
         ctx.globalAlpha = 0.25 + 0.3 * (0.5 + 0.5 * Math.sin(t / 500 + f.p))
         ctx.fillStyle = "#FDE68A"; ctx.fillRect(f.x, f.y, 1.2, 1.2)
       }
+      for (const g of w.pollen) {
+        ctx.globalAlpha = 0.10 + 0.14 * (0.5 + 0.5 * Math.sin(t / 800 + g.p))
+        ctx.fillStyle = "#FFFBEB"; ctx.fillRect(g.x, g.y, g.s, g.s)
+      }
       // lantern / flame halos
       for (let i = 0; i < HALOS.length; i++) {
         const [hx, hy, hr, hs] = HALOS[i]
@@ -271,6 +347,19 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
         ctx.fillRect(hx - rr, hy - rr, rr * 2, rr * 2)
       }
       ctx.restore()
+
+      // butterflies over the planters: a figure-eight and a two-pixel flap
+      for (const b of w.wings) {
+        const u = w.reduced ? b.p : t / 760 + b.p
+        const bx = b.cx + Math.sin(u) * 20
+        const by = b.cy + Math.sin(u * 2) * 8
+        const flap = w.reduced ? 1 : 0.4 + 1.4 * Math.abs(Math.sin(t / 90 + b.p))
+        ctx.fillStyle = b.c
+        ctx.fillRect(bx - flap - 0.6, by - 0.8, flap, 1.6)
+        ctx.fillRect(bx + 0.6, by - 0.8, flap, 1.6)
+        ctx.fillStyle = "#3F3F46"
+        ctx.fillRect(bx - 0.5, by - 1, 1, 2.4)
+      }
 
       // floating seals (verdicts)
       for (const s of w.seals) {
@@ -303,36 +392,10 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
       }
 
       ctx.drawImage(w.vignetteLayer!, 0, 0)
-
-      // crisp labels (screen space) — opaque cream plaques, always readable
-      // the canvas is CSS-downscaled to roughly half its backing size, so the
-      // plaques are drawn double: they land at a readable ~13px on screen
-      ctx.setTransform(1, 0, 0, 1, 0, 0)
-      ctx.font = "700 26px var(--font-sans, system-ui), sans-serif"
-      ctx.textAlign = "center"
-      const label = (text: string, lx: number, ly: number) => {
-        const wpx = ctx.measureText(text).width + 26
-        ctx.fillStyle = "#FFF7E4"
-        ctx.fillRect(lx - wpx / 2, ly - 25, wpx, 36)
-        ctx.lineWidth = 3
-        ctx.strokeStyle = "#8A5A28"
-        ctx.strokeRect(lx - wpx / 2 + 1.5, ly - 23.5, wpx - 3, 33)
-        ctx.lineWidth = 1
-        ctx.fillStyle = "#4A2E10"
-        ctx.fillText(text, lx, ly + 2)
-      }
-      // plaques sit UNDER the doors; a few get bespoke spots to avoid overlaps
-      const LABEL_AT: Record<string, [number, number]> = {
-        warehouse: [152, 64], tower: [150, 344], forge: [410, 516],
-        archive: [246, 514], border: [438, 366], vigil: [900, 508],
-      }
-      for (const s of STATIONS) {
-        const txt = labels[s.id]
-        if (!txt) continue
-        const [lx, ly] = LABEL_AT[s.id] ?? [s.cx, s.base + 10]
-        label(txt, lx * SCALE, ly * SCALE)
-      }
-      label(laneLabel, 730 * SCALE, 16 * SCALE)
+      // Labels left the canvas on 01/09: painted plaques scale down with it,
+      // and at laptop widths they blurred into illegibility — the operator's
+      // report, twice. They are DOM now (see the overlay in the JSX below):
+      // browser text at screen pixels, crisp at every size.
     }
     raf = requestAnimationFrame(frame)
     return () => cancelAnimationFrame(raf)
@@ -363,6 +426,7 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
         if (w.gen !== genAtStart) return false
         if (w.reduced) {
           a.x = tx; a.y = ty
+          if (a === w.hero) w.trail.push([tx, ty])
           await new Promise((r) => setTimeout(r, 120))
           continue
         }
@@ -375,6 +439,15 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
         for (let i = 0; i < n; i++) {
           if (w.gen !== genAtStart) return false
           a.x += sx; a.y += sy
+          // the walked ribbon (item 4): hero only, sampled every few pixels,
+          // hard-capped so a long session can never grow it unbounded
+          if (a === w.hero) {
+            const lastP = w.trail[w.trail.length - 1]
+            if (!lastP || Math.hypot(a.x - lastP[0], a.y - lastP[1]) >= 4) {
+              w.trail.push([a.x, a.y])
+              if (w.trail.length > 800) w.trail.shift()
+            }
+          }
           await new Promise((r) => setTimeout(r, 16))
         }
         a.x = tx; a.y = ty; a.moving = false
@@ -394,8 +467,10 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
 
     w.hero.hidden = false; w.hero.x = -30; w.hero.y = 192; w.hero.face = "side"; w.hero.dir = 1
     w.veil = true; w.focus = null
+    w.trail = [[w.hero.x, w.hero.y]]
     let anchor: [number, number] = [-28, 192]
     let inLane = false
+    let laneCx = 0
 
     for (const step of steps) {
       if (w.gen !== gen) return
@@ -418,7 +493,7 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
       if (step.station === "exit") {
         w.focus = null
         setNarr({ who: step.who, text: step.text })
-        if (inLane) { await walk([[LANE_X, 192]]); inLane = false; anchor = [LANE_X, 192] }
+        if (inLane) { await walk([[laneCx, 192]]); inLane = false; anchor = [laneCx, 192] }
         if (!(await walk(roadRoute(anchor, [952, 498])))) return
         await walk([[998, 498]])
         break
@@ -426,14 +501,17 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
 
       if (target) {
         const wantLane = step.station === "registry"
-        if (inLane && !wantLane) { if (!(await walk([[LANE_X, 192]]))) return; inLane = false; anchor = [LANE_X, 192] }
+        if (inLane && !wantLane) { if (!(await walk([[laneCx, 192]]))) return; inLane = false; anchor = [laneCx, 192] }
         if (wantLane) {
-          if (!inLane) {
-            if (!(await walk(roadRoute(anchor, [LANE_X, 192])))) return
-            if (!(await walk([[LANE_X, LANE_DOOR_Y]]))) return
-            inLane = true
-          }
+          // The shared vertical lane died with the fixed-step row (the real
+          // day houses have real widths and no walkable gaps): each door now
+          // has its own little path up from the top street, so the hero walks
+          // the street to the house's foot and climbs.
+          if (inLane) { if (!(await walk([[laneCx, 192]]))) return; anchor = [laneCx, 192] }
+          if (!(await walk(roadRoute(anchor, [target.cx, 192])))) return
           if (!(await walk([target.door]))) return
+          inLane = true
+          laneCx = target.cx
         } else if (anchor[0] !== target.anchor[0] || anchor[1] !== target.anchor[1]) {
           if (!(await walk(roadRoute(anchor, target.anchor)))) return
           if (target.door[0] !== target.anchor[0] || target.door[1] !== target.anchor[1]) {
@@ -575,6 +653,7 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
     const my = ((e.clientY - r.top) / r.height) * H
     const w = world.current
     let found: StationTip | null = null
+    let station: string | null = null
     const near = (a: Actor) => !a.hidden && Math.abs(mx - a.x) < 14 && Math.abs(my - (a.y - 20)) < 26
     const courier = w.couriers.find((cr) => near(cr.actor))
     if (courier) found = courier.tip
@@ -586,11 +665,19 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
       for (const s of STATIONS) {
         if (mx >= s.bx && mx <= s.bx + s.bw && my >= s.by && my <= s.by + s.bh) {
           found = tips[s.id] ?? null
+          station = s.id
           break
         }
       }
     }
+    w.hover = station
+    setHoverId(station)
     setTip(found ? { x: e.clientX, y: e.clientY, tip: found } : null)
+  }
+  const onLeave = () => {
+    world.current.hover = null
+    setHoverId(null)
+    setTip(null)
   }
 
   return (
@@ -601,11 +688,50 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
           width={W * SCALE}
           height={H * SCALE}
           onMouseMove={onMove}
-          onMouseLeave={() => setTip(null)}
+          onMouseLeave={onLeave}
           onClick={onMove}
-          className="block w-full cursor-crosshair"
-          style={{ imageRendering: "auto", aspectRatio: "16/9", background: "#0B0E16" }}
+          className="block w-full"
+          style={{ imageRendering: "auto", aspectRatio: "16/9", background: "#0B0E16", cursor: hoverId ? "pointer" : "crosshair" }}
         />
+        {/* Labels are DOM, not paint (01/09): plaques painted into the canvas
+            scale down with it and blurred illegible at laptop widths — the
+            operator's report, twice. Browser text stays at screen pixels.
+            pointer-events-none: the canvas under them owns the mouse. */}
+        {loaded && (
+          <div aria-hidden className="pointer-events-none absolute inset-0 select-none">
+            {STATIONS.filter((s) => labels[s.id]).map((s) => {
+              const [lx, ly] = LABEL_AT[s.id] ?? [s.cx, s.base + 12]
+              const hot = hoverId === s.id
+              return (
+                <span
+                  key={s.id}
+                  className="absolute -translate-x-1/2 whitespace-nowrap rounded-md border font-bold transition-transform duration-150"
+                  style={{
+                    left: `${(lx / W) * 100}%`,
+                    top: `${(ly / H) * 100}%`,
+                    fontSize: s.cc ? 10 : 11.5,
+                    lineHeight: 1.1,
+                    padding: "2px 7px",
+                    background: hot ? "#FDE68A" : "rgba(255,247,228,0.94)",
+                    borderColor: hot ? "#B45309" : "#8A5A28",
+                    color: "#4A2E10",
+                    boxShadow: "0 1px 0 rgba(74,46,16,0.35)",
+                    transform: `translateX(-50%)${hot ? " scale(1.18)" : ""}`,
+                  }}
+                >
+                  {labels[s.id]}
+                </span>
+              )
+            })}
+            <span
+              className="absolute rounded-md border px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wider"
+              style={{ left: `${(739 / W) * 100}%`, top: "1.2%", transform: "translateX(-50%)",
+                background: "rgba(255,247,228,0.9)", borderColor: "#8A5A28", color: "#6B4A18" }}
+            >
+              {laneLabel}
+            </span>
+          </div>
+        )}
         {!loaded && (
           <div className="absolute inset-0 flex items-center justify-center text-sm tracking-widest uppercase"
             style={{ background: "#0B0E16", color: "#FDE68A" }}>
