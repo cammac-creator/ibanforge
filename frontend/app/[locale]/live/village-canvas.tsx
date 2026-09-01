@@ -30,6 +30,8 @@ export interface NarratedStep {
   outcome: StepOutcome
   holdMs: number
   regCc?: string | null
+  /** Exit line built at the moment it shows, from the real on-screen seconds. */
+  textAt?: (elapsedSec: number) => string
 }
 
 export interface StationTip { name: string; role: string; real: string }
@@ -54,6 +56,7 @@ interface Props {
   heroTip: StationTip
   villagerTip: StationTip
   idle: { who: string; text: string }
+  canvasAlt: string
   quest: { id: number; steps: NarratedStep[] } | null
   traffic?: TrafficCourier[]
   vignette?: Vignette | null
@@ -88,7 +91,7 @@ interface Puff { x: number; y: number; a: number; s: number; vy: number }
 interface Seal { x: number; y: number; sprite: "coin" | "seal-x"; l: number }
 interface Pulse { x: number; y: number; r: number; l: number }
 
-export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, idle, quest, traffic, vignette, onQuestEnd }: Props) {
+export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, idle, canvasAlt, quest, traffic, vignette, onQuestEnd }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const faceRef = useRef<HTMLCanvasElement>(null)
   const [narr, setNarr] = useState<{ who: string; text: string }>(idle)
@@ -381,7 +384,9 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
     // Tick-counted rather than wall-clock: virtual-time capture tools and
     // hidden tabs then advance the film consistently with the timers.
     return async (ms: number) => {
-      let left = w.reduced ? Math.min(ms, 400) : ms
+      // Reduced motion removes the walk (makeMove teleports), never the time
+      // to read a line: capped at 400 ms it played a 45 s film in 6 s.
+      let left = ms
       while (left > 0) {
         if (w.gen !== genAtStart) return false
         const tick = document.hidden ? 300 : 16
@@ -448,6 +453,11 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
     w.veil = true; w.focus = null
     w.trail = []; w.trailAcc = 0
     let anchor: [number, number] = [-28, 192]
+    const startedAt = performance.now()
+    const lineOf = (step: NarratedStep) => ({
+      who: step.who,
+      text: step.textAt ? step.textAt(Math.round((performance.now() - startedAt) / 1000)) : step.text,
+    })
 
     for (const step of steps) {
       if (w.gen !== gen) return
@@ -469,7 +479,7 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
       }
       if (step.station === "exit") {
         w.focus = null
-        setNarr({ who: step.who, text: step.text })
+        setNarr(lineOf(step))
         if (!(await walk([...roadRoute(anchor, [952, 498]), [998, 498]]))) return
         break
       }
@@ -515,6 +525,10 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
       void runQuest(quest.steps)
     }
   }, [quest, runQuest])
+  // Fires on every identity change of `idle`, so the parent MUST hand over a
+  // memoized object (page.tsx does): an inline literal re-fired this on each
+  // traffic poll and erased the line a quest was showing. The content-keyed
+  // form is refused by react-hooks/set-state-in-effect; this one is accepted.
   useEffect(() => { setNarr(idle) }, [idle])
 
   /* ---------- traffic couriers ---------- */
@@ -677,6 +691,8 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
           onMouseMove={onMove}
           onMouseLeave={onLeave}
           onClick={onMove}
+          role="img"
+          aria-label={canvasAlt}
           className="block w-full"
           style={{ imageRendering: "auto", aspectRatio: "16/9", background: "#0B0E16", cursor: hoverId ? "pointer" : "crosshair" }}
         />
@@ -739,6 +755,7 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
         className="flex items-start gap-3 border-t-2 px-4 py-3"
         style={{ borderColor: "var(--primary)", background: "var(--card)", minHeight: 66 }}
         aria-live="polite"
+        aria-atomic="true"
       >
         <canvas ref={faceRef} width={44} height={44} className="shrink-0 rounded border" style={{ imageRendering: "pixelated", borderColor: "var(--border)", background: "#141218" }} />
         <div className="text-[15px] leading-relaxed">

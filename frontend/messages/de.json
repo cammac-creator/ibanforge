@@ -1351,7 +1351,12 @@
   },
   "live": {
     "title": "Das Dorf — die Pipeline, live",
-    "lede": "Jede Figur ist ein echter Agent der Pipeline, jedes Gebäude ein echter Schritt im Code. Eine Validierung dauert wenige Dutzend Millisekunden — hier ist sie bewusst verlangsamt, damit man ihr zusehen kann. Gib eine IBAN ein und folge ihr. Fahre über Figuren und Gebäude, um zu sehen, wer was tut.",
+    "meta": {
+      "title": "Das Dorf — die IBAN-Pipeline live",
+      "description": "Sieh zu, wie eine echte IBAN-Validierung die IBANforge-Pipeline durchläuft, verlangsamt: Zollhaus, Mod-97-Schreiber, BIC-Bibliothek, nationale Register, Urteil, Schmiede."
+    },
+    "canvasAlt": "Das Dorf: Jedes Gebäude ist ein echter Schritt der IBAN-Validierungspipeline; die Quest wird in der Leiste unter dem Bild erzählt.",
+    "lede": "Jede Figur ist ein echter Agent der Pipeline, jedes Gebäude ein echter Schritt im Code. Eine Validierung dauert serverseitig etwa eine Millisekunde — hier ist sie bewusst verlangsamt, damit man ihr zusehen kann. Gib eine IBAN ein und folge ihr. Fahre über Figuren und Gebäude, um zu sehen, wer was tut.",
     "inputLabel": "Zu prüfende IBAN",
     "validate": "Diese IBAN prüfen",
     "running": "Quest läuft…",
@@ -1439,8 +1444,8 @@
         "okNoBic": "Die Antwort wird geschmiedet und versiegelt: IBAN gültig."
       },
       "exit": {
-        "ok": "Zugestellt. Auf dem Bildschirm: rund dreißig Sekunden. In echt: {ms} ms — die Verlangsamung ist Absicht.",
-        "okNoMs": "Zugestellt. Die Verlangsamung ist Absicht — in echt wenige Dutzend Millisekunden.",
+        "ok": "Zugestellt. Auf dem Bildschirm: {secs} s. In echt: {ms, number} ms Serverzeit — die Verlangsamung ist Absicht.",
+        "okNoMs": "Zugestellt. Die Verlangsamung ist Absicht — in echt serverseitig etwa eine Millisekunde.",
         "fail": "Die Quest endet hier — die Ablehnung wird gezeigt, wie sie ist."
       },
       "tower": {
@@ -1496,7 +1501,7 @@
         "real": "lib/countries.ts · sepa / vop"
       },
       "tower": {
-        "role": "Die Compliance-Quest steigt hier hinauf: Sanktionen, FATF, Risiko-Score. Bald auf dieser Seite spielbar.",
+        "role": "Die Compliance-Quest steigt hier hinauf: Sanktionen, FATF, Risiko-Score. Wechsle auf den Tab Compliance, um sie hinaufzuschicken.",
         "real": "POST /v1/iban/compliance"
       },
       "forge": {

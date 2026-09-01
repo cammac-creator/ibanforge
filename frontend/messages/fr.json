@@ -1351,7 +1351,12 @@
   },
   "live": {
     "title": "Le Village — le pipeline en direct",
-    "lede": "Chaque personnage est un agent réel du pipeline, chaque bâtiment une vraie étape du code. Une validation dure quelques dizaines de millisecondes — ici elle est ralentie volontairement pour qu'on la voie travailler. Tape un IBAN et suis-le. Survole n'importe qui pour savoir qui fait quoi.",
+    "meta": {
+      "title": "Le Village — le pipeline IBAN en direct",
+      "description": "Regarde une vraie validation IBAN traverser le pipeline d'IBANforge, au ralenti : péage x402, scribe mod-97, bibliothèque BIC, registres nationaux, verdict, forge."
+    },
+    "canvasAlt": "Le village : chaque bâtiment est une étape réelle du pipeline de validation IBAN ; le récit de la quête se lit dans le bandeau sous l'image.",
+    "lede": "Chaque personnage est un agent réel du pipeline, chaque bâtiment une vraie étape du code. Une validation prend environ une milliseconde côté serveur — ici elle est ralentie volontairement pour qu'on la voie travailler. Tape un IBAN et suis-le. Survole n'importe qui pour savoir qui fait quoi.",
     "inputLabel": "IBAN à valider",
     "validate": "Valider cet IBAN",
     "running": "Quête en cours…",
@@ -1439,8 +1444,8 @@
         "okNoBic": "La réponse est frappée et scellée : IBAN valide."
       },
       "exit": {
-        "ok": "Livrée. À l'écran : une trentaine de secondes. En vrai : {ms} ms — le ralenti est volontaire.",
-        "okNoMs": "Livrée. Le ralenti est volontaire — en vrai, quelques dizaines de millisecondes.",
+        "ok": "Livrée. À l'écran : {secs} s. En vrai : {ms, number} ms de traitement serveur — le ralenti est volontaire.",
+        "okNoMs": "Livrée. Le ralenti est volontaire — en vrai, environ une milliseconde côté serveur.",
         "fail": "La quête s'arrête ici — le refus est montré tel quel."
       },
       "tower": {
@@ -1496,7 +1501,7 @@
         "real": "lib/countries.ts · sepa / vop"
       },
       "tower": {
-        "role": "La quête compliance monte ici : sanctions, GAFI, score de risque. Bientôt jouable sur cette page.",
+        "role": "La quête compliance monte ici : sanctions, GAFI, score de risque. Bascule sur l'onglet Compliance pour l'y envoyer.",
         "real": "POST /v1/iban/compliance"
       },
       "forge": {

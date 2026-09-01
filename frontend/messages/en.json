@@ -1351,7 +1351,12 @@
   },
   "live": {
     "title": "The Village — the pipeline, live",
-    "lede": "Every character is a real agent of the pipeline, every building a real step in the code. A validation takes a few dozen milliseconds — here it is deliberately slowed down so you can watch it work. Type an IBAN and follow it. Hover anyone to see who does what.",
+    "meta": {
+      "title": "The Village — the IBAN pipeline, live",
+      "description": "Watch a real IBAN validation cross the IBANforge pipeline, slowed down: toll gate, mod-97 scribe, BIC library, national registers, verdict, forge."
+    },
+    "canvasAlt": "The village: every building is a real step of the IBAN validation pipeline; the quest is narrated in the bar below the picture.",
+    "lede": "Every character is a real agent of the pipeline, every building a real step in the code. A validation takes about a millisecond on the server — here it is deliberately slowed down so you can watch it work. Type an IBAN and follow it. Hover anyone to see who does what.",
     "inputLabel": "IBAN to validate",
     "validate": "Validate this IBAN",
     "running": "Quest under way…",
@@ -1439,8 +1444,8 @@
         "okNoBic": "The response is struck and sealed: valid IBAN."
       },
       "exit": {
-        "ok": "Delivered. On screen: about thirty seconds. For real: {ms} ms — the slow-down is deliberate.",
-        "okNoMs": "Delivered. The slow-down is deliberate — in reality, a few dozen milliseconds.",
+        "ok": "Delivered. On screen: {secs} s. For real: {ms, number} ms of server time — the slow-down is deliberate.",
+        "okNoMs": "Delivered. The slow-down is deliberate — in reality, about a millisecond on the server.",
         "fail": "The quest ends here — the refusal is shown as it is."
       },
       "tower": {
@@ -1496,7 +1501,7 @@
         "real": "lib/countries.ts · sepa / vop"
       },
       "tower": {
-        "role": "The compliance quest climbs here: sanctions, FATF, risk score. Playable on this page soon.",
+        "role": "The compliance quest climbs here: sanctions, FATF, risk score. Switch to the Compliance tab to send it up.",
         "real": "POST /v1/iban/compliance"
       },
       "forge": {

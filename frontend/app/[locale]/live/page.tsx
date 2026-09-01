@@ -40,6 +40,14 @@ export default function LivePage() {
   const vignetteId = useRef(0)
   const [freshness, setFreshness] = useState<{ sources: Record<string, string>; overall: string | null }>({ sources: {}, overall: null })
 
+  // One stable object per locale. As an inline literal it changed identity on
+  // every render — and the canvas resets its narration whenever `idle`
+  // changes — so the 5 s traffic poll (which the quest's own call feeds) and
+  // the end-of-quest re-render each wiped the line on screen: the mod-97
+  // Scribe was never read, the delivered result lived 3.6 s. Measured on the
+  // live site on 01/09/2026.
+  const idle = useMemo(() => ({ who: t("who.village"), text: t("idle") }), [t])
+
   // Real freshness for the house plaques — served by the public /health.
   useEffect(() => {
     let stop = false
@@ -102,6 +110,7 @@ export default function LivePage() {
     const whoKey = step.key === "modulus" ? "cutter" : step.key === "pra" ? "court" : step.key
     const who = t(`who.${whoKey}`)
     let text: string
+    let textAt: NarratedStep["textAt"]
     switch (step.key) {
       case "gate":
         text = p.paid ? t("steps.gate.paid", { cost: String(p.cost) }) : t("steps.gate.free")
@@ -159,9 +168,15 @@ export default function LivePage() {
         break
       case "exit": {
         const ms = typeof response.processing_ms === "number" ? response.processing_ms : null
-        text = step.outcome === "fail"
-          ? t("steps.exit.fail")
-          : ms !== null ? t("steps.exit.ok", { ms: String(ms) }) : t("steps.exit.okNoMs")
+        if (step.outcome === "fail") text = t("steps.exit.fail")
+        else if (ms === null) text = t("steps.exit.okNoMs")
+        else {
+          // The on-screen duration is measured when the line shows, never
+          // written into a translation (a hard-coded "thirty seconds" drifted
+          // to 46 s as stations were added).
+          textAt = (secs) => t("steps.exit.ok", { ms, secs })
+          text = textAt(45)
+        }
         break
       }
       default:
@@ -174,6 +189,7 @@ export default function LivePage() {
       outcome: step.outcome,
       holdMs: Math.min(3600, Math.max(1800, 1500 + text.length * 16)),
       regCc: step.station === "registry" ? String(p.cc ?? "") : null,
+      textAt,
     }
   }
 
@@ -304,7 +320,8 @@ export default function LivePage() {
           tips={tips}
           heroTip={{ name: t("tips.hero.name"), role: t("tips.hero.role"), real: t("tips.hero.real") }}
           villagerTip={{ name: t("tips.villager.name"), role: t("tips.villager.role"), real: t("tips.villager.real") }}
-          idle={{ who: t("who.village"), text: t("idle") }}
+          idle={idle}
+          canvasAlt={t("canvasAlt")}
           quest={quest}
           traffic={traffic}
           vignette={vignette}
