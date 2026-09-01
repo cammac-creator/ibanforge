@@ -444,6 +444,12 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
     const w = world.current
     return async (a: Actor, rawPts: [number, number][], speed: number) => {
       const pts = w.reduced ? rawPts : naturalPath([[a.x, a.y], ...rawPts]).slice(1)
+      // a third of the film was transport: a long stroll (the whole move,
+      // not the ~12 px spline samples it is cut into) goes ×1.5, approaches
+      // keep the walking pace; ⏩ doubles everything
+      let total = 0, px = a.x, py = a.y
+      for (const [tx, ty] of pts) { total += Math.hypot(tx - px, ty - py); px = tx; py = ty }
+      const boost = total > 300 ? 1.5 : 1
       for (const [tx, ty] of pts) {
         if (w.gen !== genAtStart) return false
         if (w.reduced) {
@@ -456,9 +462,7 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
           continue
         }
         const d = Math.hypot(tx - a.x, ty - a.y)
-        // a third of the film was transport: long empty stretches go ×1.5,
-        // approaches keep the walking pace; ⏩ doubles everything
-        const v = speed * (d > 300 ? 1.5 : 1) * (w.fast ? 2 : 1)
+        const v = speed * boost * (w.fast ? 2 : 1)
         const n = Math.max(1, (d / v) * 60)
         const sx = (tx - a.x) / n, sy = (ty - a.y) / n
         a.dir = sx < 0 ? -1 : 1
