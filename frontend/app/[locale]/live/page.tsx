@@ -466,9 +466,12 @@ export default function LivePage() {
           typeof compliance?.risk_score === "number" ? t("verdict.risk", { score: compliance.risk_score }) : null,
         ].filter(Boolean).join(" · ")
       : ""
-    const meta = valid
-      ? t("verdict.meta", { steps: result.steps.length, ms: ms ?? "—", secs: elapsed ?? screenSec })
-      : t("verdict.metaFail", { steps: result.steps.length })
+    const secs = elapsed ?? screenSec
+    const meta = !valid
+      ? t("verdict.metaFail", { steps: result.steps.length })
+      : ms === null
+        ? t("verdict.metaNoMs", { steps: result.steps.length, secs })
+        : t("verdict.meta", { steps: result.steps.length, ms, secs })
     const path = result.mode === "compliance" ? "/v1/iban/compliance" : "/v1/iban/validate"
     const curl = `curl -X POST https://api.ibanforge.com${path} \\\n  -H "Content-Type: application/json" \\\n  -H "Authorization: Bearer $IBANFORGE_KEY" \\\n  -d '{"iban":"${result.iban}"}'`
     const link = `${typeof window !== "undefined" ? window.location.origin : "https://ibanforge.com"}/${locale}/live?iban=${encodeURIComponent(result.iban)}&mode=${result.mode}&autoplay=1`
