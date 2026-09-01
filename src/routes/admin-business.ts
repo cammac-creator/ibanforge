@@ -18,7 +18,6 @@ import { Hono } from 'hono';
 import { timingSafeEqual } from 'node:crypto';
 import { getStatsDB } from '../lib/db.js';
 import { isInternal } from '../lib/lifecycle-radar.js';
-import { killLineState } from '../lib/killline.js';
 import {
   buildBusinessSummary,
   type BusinessKeyRow,
@@ -210,11 +209,6 @@ adminBusiness.get('/admin/business-summary', (c) => {
       // The radar runs daily; past 48 h something is wrong with the scheduler.
       stale: hoursSinceRadar == null || hoursSinceRadar > 48,
     },
-    // The 30/09 criterion, measured against its own wording.
-    // ⚠️ The wording is a PROPOSAL and is flagged as such in the payload: it
-    // must not be reported as a verdict until the owner adopts it. Key
-    // prefixes only, never an address — same rule as the rest of this route.
-    kill_line: killLineState(),
     ...buildBusinessSummary({
       keys,
       traffic: {
@@ -232,9 +226,6 @@ adminBusiness.get('/admin/business-summary', (c) => {
       'credit packs sold vs consumed, free-tier wall, steady unpaid users, client ' +
       'concentration, and traffic split (402 and catalog reads separated out). ' +
       'Accounts are identified by key prefix and email domain only — never an address. ' +
-      'Window via ?days=N (1-90, default 7). `kill_line` measures the 30/09 ' +
-      'criterion; its `criterion_is_a_proposal` flag is always true until the ' +
-      'wording is ratified, and `go: null` means a candidate is one unread ' +
-      'thread away, not that the answer is no.',
+      'Window via ?days=N (1-90, default 7).',
   });
 });

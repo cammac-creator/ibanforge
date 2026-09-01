@@ -5,6 +5,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+## [1.4.4] — 2026-09-01
+
 ### Fixed
 - **⚠️ The bank sanctions screen was discarding designated banks it could not name.** When the compliance database was rebuilt, a sanctioned BIC was kept only if that BIC already existed in our own bank directory. This is backwards: a bank a sanctions authority has designated and that no commercial directory lists is precisely the dangerous case, not a data error to drop. The EU consolidated list carries only two bank BICs, and one of them — a Libyan bank the EU designates — was discarded this way, so half the EU bank coverage was missing. **33 designated banks in total were unreachable; the database now holds them and the screen answers on them.** Corrected on 2026-08-21, database regenerated from the primary sources, and the refresh now fails loudly instead of dropping a row in a best-effort catch.
 - **We cannot tell you whether your own queries were affected, and that is the retention policy working.** Request paths are normalised before they are written down: a lookup of a specific BIC is stored as `/v1/bic/:code`, never the code you asked about. So no log anywhere records which institutions any customer queried, which also means no individual notice is possible. If you screened bank BICs against the EU or UN lists through this API before 2026-08-21, re-run the ones that matter to you.
