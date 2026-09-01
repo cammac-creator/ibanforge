@@ -6,6 +6,17 @@ on:
   pull_request:
     branches: [main]
 
+# The repository default for GITHUB_TOKEN is `write`, so a workflow with no
+# permissions block hands a write token to every step. This one only reads the
+# checkout: it never pushes, never tags, never comments. Narrowed 2026-09-01
+# after the infra audit (OPS-04) pointed out that the five `npm ci` / `pip
+# install -e` here run WITHOUT --ignore-scripts, so a compromised transitive
+# dependency would execute its install script next to a token able to write to
+# main. The two crons that genuinely push (refresh-bic, refresh-compliance)
+# declare `contents: write` themselves and are unaffected.
+permissions:
+  contents: read
+
 jobs:
   ci:
     runs-on: ubuntu-latest
@@ -64,6 +75,11 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 24
+          # cache-dependency-path is REQUIRED here: `cache: npm` alone looks for
+          # a lockfile at the repository root, which is the backend one, and
+          # would key the cache on the wrong dependency tree.
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
 
       - run: npm ci
         working-directory: frontend
@@ -94,6 +110,8 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 20
+          cache: npm
+          cache-dependency-path: mcp/package-lock.json
       - name: Install, build & test the published MCP server
         working-directory: mcp
         run: |
@@ -107,12 +125,69 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 20
+          cache: npm
+          cache-dependency-path: sdks/typescript/package-lock.json
       - name: Install, build & test the TypeScript SDK
         working-directory: sdks/typescript
         run: |
           npm ci
           npm run build
           npm test
+
+  # The image that actually goes to production was never built here (OPS-10,
+  # infra audit 2026-09-01). It differs from every job above in the one way that
+  # matters: `npm ci --ignore-scripts` (Dockerfile), which only works because
+  # better-sqlite3 13 ships a Node-API prebuild per platform. A dependency bump
+  # that sends the install back through node-gyp breaks the image on a slim
+  # base with no compiler — and the current discovery path for that is a failed
+  # deploy on a platform whose restart policy gives up after 3 tries.
+  #
+  # NON-BLOCKING for now (continue-on-error), on purpose: this job has never
+  # run, its cost on a runner is a full two-stage build plus a 36 MB database
+  # copy, and turning a brand-new job into a merge gate on its first day is how
+  # a green main becomes red for a reason nobody has yet read. Make it blocking
+  # (drop continue-on-error) once it has passed on ~10 consecutive pushes to
+  # main — that is the evidence that it fails on breakage and not on weather.
+  docker:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build the production image
+        run: docker build -t ibanforge-ci .
+
+      # IBANFORGE_FREE_MODE=true is the minimum a production boot needs:
+      # ensureWalletConfigured() (src/middleware/x402.ts) throws in production
+      # unless either X402_ENABLED=true + WALLET_ADDRESS, or this explicit
+      # free-mode flag. Using the flag keeps the job independent of any secret,
+      # so it cannot go red on a fork or on a PR from outside the repository.
+      - name: Boot the container
+        run: |
+          docker run -d --name ibanforge-ci \
+            -p 3300:3000 \
+            -e NODE_ENV=production \
+            -e IBANFORGE_FREE_MODE=true \
+            ibanforge-ci
+
+      # --retry-connrefused and --retry-all-errors together: the entrypoint
+      # copies two databases (36 MB) into the volume before node even starts, so
+      # the first attempts hit a closed port, and /health answers 503 until the
+      # databases open. Both are "not ready yet", not "broken".
+      - name: Wait for /health to answer ok
+        run: |
+          BODY=$(curl -fsS --retry 24 --retry-delay 5 --retry-connrefused --retry-all-errors \
+                   --max-time 20 http://localhost:3300/health)
+          echo "$BODY"
+          echo "$BODY" | grep -q '"status":"ok"'
+
+      # Always: a failed curl above must not leave a container running on the
+      # runner, and the logs are the only thing that explains a yellow job.
+      - name: Container logs and teardown
+        if: always()
+        run: |
+          docker logs ibanforge-ci 2>&1 | tail -40 || true
+          docker rm -f ibanforge-ci || true
 
   sdk-python:
     runs-on: ubuntu-latest

@@ -99,6 +99,9 @@ interface Counts {
   bgBae: number;
   psd: number;
   psdByCountry: Map<string, number>;
+  praBanks: number;
+  ecbMfi: number;
+  bdeMfi: number;
 }
 
 function read(path: string): Counts {
@@ -142,6 +145,23 @@ function read(path: string): Counts {
     // data is actually served for, and it is 112 of 4,416 rows — a drop there
     // would hide entirely inside a tolerance on the total.
     psdByCountry: group('SELECT country AS k, COUNT(*) AS n FROM psd_entities GROUP BY country'),
+    // The three registers whose seeders are declared NON-blocking in
+    // refresh-bic.yml (db:seed-pra, db:seed-mfi). Added 2026-09-01 after the
+    // infra audit (OPS-02) emptied all three on a copy and this guard still
+    // answered "Quality diff OK", exit 0: the seeders exit 0 by design when a
+    // source is unreachable, and the test suite SKIPS on an empty table
+    // (it.skipIf), so nothing else in the chain sees the loss. A table that
+    // silently empties then commits and deploys is exactly what this file
+    // exists to stop.
+    //
+    // No new bands: they go through the same `compare` as ch_clearing and
+    // de_blz. Both live just above SMALL (281 and 238), so a shrink is judged
+    // by the 10 % band today and would fall back to the absolute one if a
+    // register ever drops under 200 rows. That fallback is the intent, not an
+    // accident.
+    praBanks: scalar('SELECT COUNT(*) AS n FROM pra_banks'),
+    ecbMfi: scalar('SELECT COUNT(*) AS n FROM ecb_mfi'),
+    bdeMfi: scalar('SELECT COUNT(*) AS n FROM bde_mfi'),
   };
   db.close();
   return counts;
@@ -202,6 +222,9 @@ try {
   compare('bg_bae', before.bgBae, after.bgBae);
   compare('psd_entities', before.psd, after.psd);
   compareMaps('psd_entities country', before.psdByCountry, after.psdByCountry);
+  compare('pra_banks', before.praBanks, after.praBanks);
+  compare('ecb_mfi', before.ecbMfi, after.ecbMfi);
+  compare('bde_mfi', before.bdeMfi, after.bdeMfi);
 
   console.log(`bic_entries: ${before.total} -> ${after.total}`);
   console.log(`sources: ${[...after.bySource].map(([k, n]) => `${k}=${n}`).join(' ')}`);

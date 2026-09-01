@@ -148,12 +148,32 @@ jobs:
       - name: Publish to MCP Registry
         if: hashFiles('mcp/server.json') != ''
         working-directory: mcp
+        env:
+          # OPS-15, infra audit 2026-09-01. Every `uses:` in this repository is
+          # a first-party actions/* action, so the usual GitHub Actions supply
+          # chain is clean — but this binary was resolved from "releases/latest"
+          # at every run, which made it the one unpinned executable in the whole
+          # delivery chain, running with this repository's OIDC identity. Now
+          # pinned to a version, with the digest the project publishes next to
+          # the release.
+          #
+          # To bump both values together:
+          #   TAG=$(curl -fsSL https://api.github.com/repos/modelcontextprotocol/registry/releases/latest | jq -r .tag_name)
+          #   curl -fsSL "https://github.com/modelcontextprotocol/registry/releases/download/${TAG}/registry_${TAG#v}_checksums.txt" | grep mcp-publisher_linux_amd64
+          #
+          # What this check does and does not buy: the digest lives HERE, in a
+          # reviewed file, so a release whose assets are replaced after the fact
+          # stops the job. Reading the digest from the release's own
+          # checksums.txt at run time would not — a rewritten release rewrites
+          # its checksums too.
+          MCP_PUBLISHER_VERSION: v1.8.1
+          MCP_PUBLISHER_SHA256: a06c9096dcb9727c13555b6be26c7effa707b01f06a4c561ba7a3635443cf2cc
         run: |
-          # Install the mcp-publisher CLI from the latest GitHub release binary.
+          # Install the mcp-publisher CLI from a pinned GitHub release binary.
           # (The old install.sh script URL now 404s.)
-          TAG=$(curl -fsSL https://api.github.com/repos/modelcontextprotocol/registry/releases/latest | grep -oP '"tag_name":\s*"\K[^"]+')
-          echo "mcp-publisher $TAG"
-          curl -fsSL "https://github.com/modelcontextprotocol/registry/releases/download/${TAG}/mcp-publisher_linux_amd64.tar.gz" -o /tmp/mcp-publisher.tgz
+          echo "mcp-publisher ${MCP_PUBLISHER_VERSION} (pinned)"
+          curl -fsSL "https://github.com/modelcontextprotocol/registry/releases/download/${MCP_PUBLISHER_VERSION}/mcp-publisher_linux_amd64.tar.gz" -o /tmp/mcp-publisher.tgz
+          echo "${MCP_PUBLISHER_SHA256}  /tmp/mcp-publisher.tgz" | sha256sum -c -
           tar -xzf /tmp/mcp-publisher.tgz -C /tmp mcp-publisher
           chmod +x /tmp/mcp-publisher
           /tmp/mcp-publisher login github-oidc
@@ -203,6 +223,77 @@ jobs:
           - npm \`@ibanforge/sdk\`: https://www.npmjs.com/package/@ibanforge/sdk (manual)
           EOF
           echo "Checklist written to job summary."
+
+      # ─── GitHub tag + release ────────────────────────────────────────────
+      # OPS-09, infra audit 2026-09-01: this workflow published to three
+      # registries and created no GitHub release at all. The Releases page sat
+      # on v1.2.2 of 30/04 while the tags had already reached v1.4.3 — and the
+      # Releases page is where a human, a package manager badge or a crawler
+      # reads what changed between two versions.
+      #
+      # Placed AFTER the checklist step on purpose: a failure here must not cost
+      # the manual-refresh checklist, which is the only trace of what still has
+      # to be done by hand.
+      - name: Create the tag when this run was dispatched by hand
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          # Gated on the tag EXISTING, not on the event name. On the `push:
+          # tags` path the tag is what triggered this run, so there is nothing
+          # to create; on workflow_dispatch there is no tag at all, and
+          # `gh release create` would then invent one at the default branch head
+          # rather than at the commit this run actually checked out and
+          # published.
+          #
+          # 🚨 THIS TAGS THE COMMIT THIS RUN CHECKED OUT — i.e. the branch head
+          # at dispatch time. That is right for a release you are cutting now,
+          # and WRONG for back-filling a version whose bump commit is already
+          # behind other work: the tag would name a tree that is not what was
+          # published. Back-fill by hand at the right SHA instead, BEFORE
+          # dispatching anything:
+          #   git tag -a vX.Y.Z <sha-du-bump> -m "vX.Y.Z" && git push origin vX.Y.Z
+          # The tag push then triggers this workflow on the correct commit and
+          # this step finds the tag already there.
+          if git rev-parse -q --verify "refs/tags/v${VERSION}" >/dev/null; then
+            echo "Tag v${VERSION} already exists — nothing to create."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "v${VERSION}" -m "v${VERSION}"
+          # This cannot loop back into this workflow: GitHub does not start a
+          # workflow run from a push made with GITHUB_TOKEN. Do not "fix" this
+          # into a conditional guard on github.event_name.
+          git push origin "v${VERSION}"
+
+      - name: Publish the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          # Idempotent: the documented flow is "npm by hand, then re-run this
+          # workflow", so a second run on the same version is normal and must
+          # not fail.
+          if gh release view "v${VERSION}" >/dev/null 2>&1; then
+            echo "Release v${VERSION} already exists — nothing to do."
+            exit 0
+          fi
+          # --notes-start-tag is NOT optional. Without it --generate-notes
+          # starts from the last PUBLISHED release, which can be months and
+          # several versions behind; the notes would then cover everything since
+          # that release instead of the single version being published.
+          # The previous tag is the one immediately below this version in
+          # version order, not simply the highest tag — that distinction matters
+          # when an older version is re-published by hand.
+          PREV=$( { git tag --list 'v*.*.*' | grep -vx "v${VERSION}"; echo "v${VERSION}"; } \
+                  | sort -V | awk -v cur="v${VERSION}" '$0 == cur { print prev; exit } { prev = $0 }' )
+          if [ -n "$PREV" ]; then
+            echo "Generating notes from ${PREV} to v${VERSION}"
+            gh release create "v${VERSION}" --generate-notes --notes-start-tag "$PREV" --title "v${VERSION}"
+          else
+            echo "No earlier tag — generating notes from the first commit."
+            gh release create "v${VERSION}" --generate-notes --title "v${VERSION}"
+          fi
 
   # ─── Optional: trigger a Glama re-scan via the API once it stabilizes ──
   # Glama doesn't expose a documented refresh endpoint yet (2026-04-29 docs).

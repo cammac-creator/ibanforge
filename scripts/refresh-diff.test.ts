@@ -33,9 +33,16 @@ function build(path: string, opts: {
   ebaStep2?: number;
   chClearing?: number;
   tinyCountryRows?: number;
+  praBanks?: number;
+  ecbMfi?: number;
+  bdeMfi?: number;
 } = {}): void {
   const {
     gleif = 4000, swiftcodes = 8000, ebaStep2 = 180, chClearing = 1165, tinyCountryRows = 3,
+    // Orders of magnitude taken from the real database, so the fixture lands in
+    // the same band as production: pra_banks and bde_mfi sit just above SMALL
+    // (200) and are therefore judged by the percentage band, ecb_mfi far above.
+    praBanks = 281, ecbMfi = 5373, bdeMfi = 238,
   } = opts;
   rmSync(path, { force: true });
   const db = new Database(path);
@@ -44,6 +51,9 @@ function build(path: string, opts: {
     CREATE TABLE ch_clearing (iid TEXT);
     CREATE TABLE de_blz (blz TEXT);
     CREATE TABLE national_bank_codes (country TEXT, code TEXT);
+    CREATE TABLE pra_banks (frn TEXT);
+    CREATE TABLE ecb_mfi (mfi_id TEXT);
+    CREATE TABLE bde_mfi (mfi_id TEXT);
   `);
   const ins = db.prepare('INSERT INTO bic_entries VALUES (?, ?, ?, ?, ?)');
   const add = db.transaction((n: number, source: string, cc: string) => {
@@ -57,6 +67,17 @@ function build(path: string, opts: {
   add(tinyCountryRows, 'gleif', 'VA');
   const insCh = db.prepare('INSERT INTO ch_clearing VALUES (?)');
   db.transaction((n: number) => { for (let i = 0; i < n; i++) insCh.run(String(i).padStart(5, '0')); })(chClearing);
+  // The tables must EXIST in both snapshots even when empty: read() swallows a
+  // missing table as 0, and compare() reads 0 -> 0 as "nothing to say". A
+  // fixture that skipped the CREATE would make the OPS-02 case below pass
+  // whether or not the guard actually looks at these three registers.
+  const fill = (table: string, n: number): void => {
+    const ins = db.prepare(`INSERT INTO ${table} VALUES (?)`);
+    db.transaction((rows: number) => { for (let i = 0; i < rows; i++) ins.run(`ID${i}`); })(n);
+  };
+  fill('pra_banks', praBanks);
+  fill('ecb_mfi', ecbMfi);
+  fill('bde_mfi', bdeMfi);
   db.close();
 }
 
@@ -120,6 +141,41 @@ describe('refresh-diff refuses a damaged refresh and passes a normal one', () =>
     const { status, out } = run(p('a'), p('b'));
     expect(out).toContain('ch_clearing: 1165 -> 0');
     expect(status).toBe(1);
+  });
+
+  // OPS-02, infra audit of 2026-09-01. The auditor emptied pra_banks, ecb_mfi
+  // and bde_mfi on a copy of the real database and the guard answered
+  // "Quality diff OK", exit 0 — those three seeders are the ones refresh-bic.yml
+  // declares NON-blocking, and the test suite skips rather than fails on an
+  // empty table. Seeder green, guard blind, tests green, commit, deploy.
+  it('BLOCKS the three registers whose seeders are allowed to fail quietly', () => {
+    build(p('a'));
+    build(p('b'), { praBanks: 0, ecbMfi: 0, bdeMfi: 0 });
+    const { status, out } = run(p('a'), p('b'));
+    expect(out).toContain('Refusing to commit');
+    // Named one by one: an operator reading a red run has to learn WHICH
+    // register stopped answering, not merely that something did.
+    expect(out).toContain('pra_banks: 281 -> 0');
+    expect(out).toContain('ecb_mfi: 5373 -> 0');
+    expect(out).toContain('bde_mfi: 238 -> 0');
+    expect(status).toBe(1);
+  });
+
+  it('BLOCKS a register losing more than a tenth of its rows', () => {
+    // Not only the total wipe: a source answering with a truncated file is the
+    // likelier failure, and it never reaches zero.
+    build(p('a'), { ecbMfi: 5373 });
+    build(p('b'), { ecbMfi: 4600 });
+    const { status, out } = run(p('a'), p('b'));
+    expect(out).toContain('ecb_mfi: 5373 -> 4600');
+    expect(status).toBe(1);
+  });
+
+  it('does NOT block the ordinary monthly churn of those registers', () => {
+    build(p('a'), { praBanks: 281, ecbMfi: 5373, bdeMfi: 238 });
+    build(p('b'), { praBanks: 279, ecbMfi: 5390, bdeMfi: 240 });
+    const { status } = run(p('a'), p('b'));
+    expect(status).toBe(0);
   });
 
   it('does NOT block a long-tail country losing its handful of rows', () => {

@@ -1,5 +1,17 @@
 name: Publish n8n-nodes-ibanforge (with provenance)
 
+# ⚠️ DORMANT — this workflow has NEVER run. Established 2026-09-01 (infra audit,
+# OPS-19): `gh run list --workflow=n8n-publish.yml` is empty and no `n8n-v*` tag
+# exists in the repository, so nothing has ever matched its trigger. It is kept
+# rather than deleted because n8n-nodes-ibanforge is a real package that will
+# need a publish path; but until it runs once, treat it as UNPROVEN — the
+# trusted-publisher prerequisite below has never been exercised either.
+#
+# What triggers it: pushing a tag matching `n8n-v*` (e.g. `git tag n8n-v1.0.0 &&
+# git push origin n8n-v1.0.0`), or a manual `workflow_dispatch` from the Actions
+# tab. Note it does NOT follow the `v*.*.*` tags that drive release-publish.yml:
+# the n8n node carries its own version, in integrations/n8n/package.json.
+#
 # n8n's community-node rules (since 2026-05-01) require publication through a
 # GitHub Action with a provenance statement. Trigger by tagging n8n-vX.Y.Z.
 #

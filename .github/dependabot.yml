@@ -40,7 +40,11 @@ updates:
     schedule:
       interval: "weekly"
       day: "monday"
-    open-pull-requests-limit: 5
+    # Raised from 5 to 10 on 2026-09-01 (infra audit, OPS-06). The ceiling was
+    # ATTAINED: five frontend PRs were open, so Dependabot had stopped opening
+    # new ones entirely — including any security update. A ceiling that is
+    # reached silently stops being a rate limit and becomes an off switch.
+    open-pull-requests-limit: 10
     ignore:
       - dependency-name: "typescript"
         versions: [">=6.0.0"]
@@ -72,6 +76,72 @@ updates:
         versions: [">=6.0.0"]
     commit-message:
       prefix: "chore(deps,mcp)"
+      include: "scope"
+
+  # The three PUBLISHED artefacts that received no dependency update at all
+  # until 2026-09-01 (infra audit, OPS-06). Publishing a package to npm or PyPI
+  # and leaving its tree unwatched is worse than not watching an internal
+  # directory: the vulnerability ships to whoever installs it.
+
+  # npm @ibanforge/sdk
+  - package-ecosystem: "npm"
+    directory: "/sdks/typescript"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: "typescript"
+        versions: [">=6.0.0"]
+    groups:
+      dev-tooling:
+        patterns:
+          - "vitest"
+          - "typescript"
+          - "@types/*"
+          - "eslint"
+          - "@typescript-eslint/*"
+    commit-message:
+      prefix: "chore(deps,sdk-ts)"
+      include: "scope"
+
+  # npm n8n-nodes-ibanforge. No lockfile here (n8n-publish.yml runs `npm
+  # install`, not `npm ci`), which Dependabot handles: it updates package.json
+  # alone. Both dependencies are dev-only, hence the single group.
+  - package-ecosystem: "npm"
+    directory: "/integrations/n8n"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 3
+    ignore:
+      - dependency-name: "typescript"
+        versions: [">=6.0.0"]
+    groups:
+      dev-tooling:
+        patterns:
+          - "typescript"
+          - "@types/*"
+          - "n8n-workflow"
+    commit-message:
+      prefix: "chore(deps,n8n)"
+      include: "scope"
+
+  # PyPI ibanforge. Read from sdks/python/pyproject.toml; the runtime tree is a
+  # single dependency (httpx), the rest is test tooling.
+  - package-ecosystem: "pip"
+    directory: "/sdks/python"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 3
+    groups:
+      test-tooling:
+        patterns:
+          - "pytest*"
+          - "respx"
+    commit-message:
+      prefix: "chore(deps,sdk-py)"
       include: "scope"
 
   - package-ecosystem: "github-actions"
