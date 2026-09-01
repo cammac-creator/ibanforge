@@ -33,11 +33,14 @@ from .exceptions import (
     IBANforgeError,
     InvalidInputError,
     PaymentRequiredError,
+    PayloadTooLargeError,
     QuotaExhaustedError,
     RateLimitError,
 )
 from .client import DEFAULT_BASE_URL, DEFAULT_TIMEOUT, resolve_api_key, resolve_base_url
 from .types import (
+    AddressCheckResult,
+    AddressFinding,
     APIKey,
     APIKeyUsage,
     BICLookupResult,
@@ -51,6 +54,7 @@ from .types import (
     IBANStructure,
     IBANStructureList,
     IBANValidationResult,
+    ReferenceValidationResult,
     TestIbanResult,
 )
 
@@ -83,6 +87,11 @@ def _raise_for_status(res: httpx.Response) -> None:
         raise PaymentRequiredError(msg, status=402, body=body)
     if res.status_code == 403:
         raise AuthError(msg, status=403, body=body)
+    # 413 has its own remedy — split the payload — and used to fall into the
+    # `InvalidInputError` catch-all, which tells a caller to fix a body that is
+    # not malformed, only too big. Audit DX-09, 2026-09-01.
+    if res.status_code == 413:
+        raise PayloadTooLargeError(msg, status=413, body=body)
     if res.status_code == 429:
         if msg_obj.get("error") == "quota_exceeded":
             raise QuotaExhaustedError(msg, status=429, body=body)
@@ -184,6 +193,36 @@ class AsyncIBANforge:
         if count is not None:
             params["count"] = count
         res = await self._client.get("/v1/test-iban", params=params)
+        _raise_for_status(res)
+        return res.json()
+
+    async def validate_reference(
+        self, reference: str, reference_type: Optional[str] = None
+    ) -> ReferenceValidationResult:
+        """Check a QR-bill (QRR), ISO 11649 (RF/SCOR), Belgian OGM/VCS or Finnish
+        payment reference against the dated document that publishes its rule. FREE.
+
+        This checks the reference ALONE. The pairing verdict — whether that
+        reference may legally travel with a given account — is the paid half:
+        send a ``reference`` field to POST /v1/iban/validate.
+        """
+        params: Dict[str, Any] = {"reference": reference}
+        if reference_type is not None:
+            params["reference_type"] = reference_type
+        res = await self._client.get("/v1/reference/validate", params=params)
+        _raise_for_status(res)
+        return res.json()
+
+    async def check_address(
+        self, scheme: str, address: Dict[str, Any]
+    ) -> AddressCheckResult:
+        """Check a structured ISO 20022 postal address against a scheme's rules
+        (``sps``, ``hvps_plus``, ``fedwire``). FREE.
+
+        Every finding names the guideline it was read from: relay ``source`` with
+        the verdict rather than the boolean alone.
+        """
+        res = await self._client.post("/v1/address/check", json={"scheme": scheme, "address": address})
         _raise_for_status(res)
         return res.json()
 

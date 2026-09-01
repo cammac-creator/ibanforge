@@ -104,6 +104,17 @@ export class QuotaExhaustedError extends IBANforgeError {
 export class RateLimitError extends IBANforgeError {
   constructor(m: string, s?: number, b?: unknown) { super(m, s, b); this.name = 'RateLimitError'; }
 }
+/**
+ * 413 — the request body is over the API's limit (1 MB, and a batch is capped
+ * at 100 IBANs before that).
+ *
+ * Broken out of `InvalidInputError` on 2026-09-01 (audit DX-09): 413 is a
+ * distinct, reproducible answer with a distinct remedy — split the payload —
+ * and a caller that catches "malformed input" retries the same body forever.
+ */
+export class PayloadTooLargeError extends IBANforgeError {
+  constructor(m: string, s?: number, b?: unknown) { super(m, s, b); this.name = 'PayloadTooLargeError'; }
+}
 /** Other 4xx — malformed input. */
 export class InvalidInputError extends IBANforgeError {
   constructor(m: string, s?: number, b?: unknown) { super(m, s, b); this.name = 'InvalidInputError'; }
@@ -508,6 +519,65 @@ export interface CreditBundleList {
   documentation?: string;
 }
 
+/**
+ * GET|POST /v1/reference/validate — a QR-bill (QRR) or ISO 11649 (RF) payment
+ * reference, checked against its published check-digit rule. FREE.
+ */
+export interface ReferenceValidationResult {
+  /** Uppercased, separators removed: what was actually judged. */
+  reference: string;
+  /** Null when nothing recognised the string. */
+  scheme: string | null;
+  /**
+   * Null is a real answer, not a missing one: Norwegian KID and Swedish OCR are
+   * configured per creditor account by the beneficiary's bank, so `false` there
+   * would reject perfectly good references.
+   */
+  valid: boolean | null;
+  status: string;
+  /** A STRING, because an OGM remainder can legitimately start with a zero. */
+  check_digit_expected?: string;
+  /** The dated document the rule was read from. Keep it when relaying. */
+  source: string | null;
+  as_of?: string;
+  note: string;
+  /** Set when the same digits also satisfy another country's length rule. */
+  also_valid_as?: { scheme: string; valid: boolean; note?: string };
+  /** What the paid pairing check adds, and what it costs. */
+  pairing_verdict?: string;
+}
+
+/** One rule applied by POST /v1/address/check, with the guideline it comes from. */
+export interface AddressFinding {
+  rule: string;
+  verdict: 'pass' | 'fail' | 'not_applicable' | string;
+  detail: string;
+  source: string;
+}
+
+/**
+ * POST /v1/address/check — a structured ISO 20022 postal address measured
+ * against a payment scheme's rules. FREE.
+ */
+export interface AddressCheckResult {
+  scheme: string;
+  conforms: boolean;
+  findings: AddressFinding[];
+  note?: string;
+}
+
+/** The ISO 20022 address tags the checker reads. */
+export interface PostalAddress {
+  twn_nm?: string;
+  ctry?: string;
+  pst_cd?: string;
+  strt_nm?: string;
+  bldg_nb?: string;
+  adr_tp?: string;
+  adr_line?: string[];
+  [tag: string]: unknown;
+}
+
 /** GET /v1/demo — worked examples, no key, no payment. */
 export interface DemoResult {
   message: string;
@@ -528,6 +598,7 @@ async function raiseForStatus(res: Response): Promise<void> {
   const s = res.status;
   if (s === 401 || s === 403) throw new AuthError(msg, s, body);
   if (s === 402) throw new PaymentRequiredError(msg, s, body);
+  if (s === 413) throw new PayloadTooLargeError(msg, s, body);
   if (s === 429) {
     if (o.error === 'quota_exceeded') throw new QuotaExhaustedError(msg, s, body);
     throw new RateLimitError(msg, s, body);
@@ -657,6 +728,39 @@ export class IBANforge {
     if (options.count !== undefined) q.set('count', String(options.count));
     const suffix = q.toString();
     return this.get(`/v1/test-iban${suffix ? `?${suffix}` : ''}`);
+  }
+
+  /**
+   * Check a QR-bill (QRR), ISO 11649 (RF/SCOR), Belgian OGM/VCS or Finnish
+   * payment reference against the dated document that publishes its rule. FREE.
+   *
+   * This checks the reference ALONE. The pairing verdict — whether that
+   * reference may legally travel with a given account under the Swiss Payment
+   * Standards — is the paid half: send a `reference` field to
+   * POST /v1/iban/validate and read `reference_check.pairing`.
+   *
+   * The route also answers POST with the same body fields; GET is used here
+   * because a reference is short enough to travel in a query string and a GET
+   * is cacheable.
+   */
+  validateReference(
+    reference: string,
+    options: { referenceType?: string } = {},
+  ): Promise<ReferenceValidationResult> {
+    const q = new URLSearchParams({ reference });
+    if (options.referenceType) q.set('reference_type', options.referenceType);
+    return this.get(`/v1/reference/validate?${q.toString()}`);
+  }
+
+  /**
+   * Check a structured ISO 20022 postal address against a scheme's rules
+   * (`sps`, `hvps_plus`, `fedwire`). FREE.
+   *
+   * Every finding names the guideline it was read from: relay `source` with the
+   * verdict rather than the boolean alone.
+   */
+  checkAddress(scheme: string, address: PostalAddress): Promise<AddressCheckResult> {
+    return this.post('/v1/address/check', { scheme, address });
   }
 
   /** Prepaid credit packs and their per-call price. FREE to list. */

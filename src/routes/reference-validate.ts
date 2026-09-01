@@ -3,6 +3,7 @@ import type { Context } from 'hono';
 import { z } from 'zod';
 import type { HonoEnv } from '../types.js';
 import { recordOperation } from '../lib/stats.js';
+import { recordSafely } from '../lib/record-safely.js';
 import { validatePaymentReference } from '../lib/payment-reference.js';
 
 /**
@@ -90,18 +91,21 @@ function handle(
   //
   // The scheme rides in `error_detail` instead, which is safe because every
   // reader of that column filters on a specific `operation_type` first.
-  try {
-    recordOperation(
-      'reference_validate',
-      null,
-      result.valid === true,
-      0,
-      result.scheme ?? 'unrecognised',
-      c.get('apiKeyPrefix'),
-    );
-  } catch {
-    // stats failure must not break the response
-  }
+  // Wrapped since 2026-09-01 (QUA-12): the swallow is unchanged, but the
+  // failures are now counted and raise an ops alert past a streak, so a stats
+  // DB that stops accepting writes cannot look like a service nobody calls.
+  recordSafely(
+    () =>
+      recordOperation(
+        'reference_validate',
+        null,
+        result.valid === true,
+        0,
+        result.scheme ?? 'unrecognised',
+        c.get('apiKeyPrefix'),
+      ),
+    'reference_validate',
+  );
 
   return c.json({
     reference: result.reference,

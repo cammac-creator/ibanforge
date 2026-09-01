@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type { HonoEnv } from '../types.js';
 import { buildComplianceResponse, buildBicComplianceResponse } from '../lib/compliance-response.js';
 import { recordOperation } from '../lib/stats.js';
+import { recordSafely } from '../lib/record-safely.js';
 import { getIban, getBic, computeRevenue } from '../lib/request-helpers.js';
 
 const ibanCompliance = new Hono<HonoEnv>();
@@ -42,12 +43,15 @@ ibanCompliance.post('/v1/iban/compliance', async (c) => {
   if (hasBic) {
     const screened = buildBicComplianceResponse(bic.trim());
     if ('error' in screened) {
-      recordOperation('iban_compliance', null, false, 0, 'bic', c.get('apiKeyPrefix'));
+      recordSafely(() => recordOperation('iban_compliance', null, false, 0, 'bic', c.get('apiKeyPrefix')), 'iban_compliance');
       return c.json(screened, 400);
     }
     const processingMs = Math.round((performance.now() - start) * 100) / 100;
     const revenue = computeRevenue(c, 0.02);
-    recordOperation('iban_compliance', screened.country.code, true, revenue, undefined, c.get('apiKeyPrefix'));
+    recordSafely(
+      () => recordOperation('iban_compliance', screened.country.code, true, revenue, undefined, c.get('apiKeyPrefix')),
+      'iban_compliance',
+    );
     return c.json({
       ...screened,
       cost_usdc: c.get('apiKeyAuthenticated') ? 0 : 0.02,
@@ -67,7 +71,14 @@ ibanCompliance.post('/v1/iban/compliance', async (c) => {
   const processingMs = Math.round((performance.now() - start) * 100) / 100;
   const errorDetail = result.valid ? undefined : result.iban.slice(0, 4);
   const revenue = computeRevenue(c, 0.02);
-  recordOperation('iban_compliance', result.country?.code ?? null, result.valid, revenue, errorDetail, c.get('apiKeyPrefix'));
+  // Wrapped since 2026-09-01 (QUA-12): the swallow is unchanged, but the
+  // failures are now counted and raise an ops alert past a streak, so a stats
+  // DB that stops accepting writes cannot look like a service nobody calls.
+  recordSafely(
+    () =>
+      recordOperation('iban_compliance', result.country?.code ?? null, result.valid, revenue, errorDetail, c.get('apiKeyPrefix')),
+    'iban_compliance',
+  );
 
   const costUsdc = c.get('apiKeyAuthenticated') ? 0 : 0.02;
 

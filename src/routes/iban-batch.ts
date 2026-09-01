@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import type { HonoEnv } from '../types.js';
 import { validateIBAN } from '../lib/iban.js';
-import { enrichResult } from '../lib/enrich.js';
+import { createEnrichCache, enrichResult } from '../lib/enrich.js';
 import { recordBatch } from '../lib/stats.js';
 import { getIbansArray, computeRevenue } from '../lib/request-helpers.js';
 import type { IBANValidationResult } from '../types.js';
@@ -50,9 +50,18 @@ ibanBatch.post('/v1/iban/batch', async (c) => {
 
   const isApiKey = c.get('apiKeyAuthenticated');
 
+  // One memo for this batch, thrown away with the response (PERF-05, audit of
+  // 01/09/2026): a batch of 100 used to run 100 independent enrichments, and
+  // enrichResult is ~99% of this route's CPU. A list of 100 IBANs of one bank —
+  // a payroll file, a supplier ledger, the shape this endpoint is bought for —
+  // now resolves that bank once. Scoped to the request on purpose: a
+  // process-lifetime cache would keep serving a bank name the monthly refresh
+  // has already changed.
+  const cache = createEnrichCache();
+
   const results: IBANValidationResult[] = ibans.map((iban) => {
     const result = validateIBAN(iban);
-    enrichResult(result);
+    enrichResult(result, cache);
     result.cost_usdc = isApiKey ? 0 : 0.002; // Batch rate (vs $0.005 single), free for API key tier
     return result;
   });

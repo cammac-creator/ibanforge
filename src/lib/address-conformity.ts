@@ -113,6 +113,50 @@ export const CBPR_NOTE =
 const ADR_LINE_MAX_LENGTH = 70;
 const ADR_LINE_MAX_COUNT = 2;
 
+/**
+ * The widths of the STRUCTURED elements, which nothing checked until the data
+ * audit of 01/09/2026 (DATA-04): a `StrtNm` of 200 characters and a `TwnNm` of
+ * 100 passed every rail, and the two length rules that existed
+ * (`adr_line_max_length_70`, `adr_line_max_2`) only ever looked at `AdrLine`.
+ * An address that overruns these is rejected by the receiving scheme, which is
+ * precisely what a pre-flight is for.
+ *
+ * These are the ISO 20022 data types of the elements, as the SPS field table
+ * assigns them (ch. 3.11 table 9 — the same table this file already quotes for
+ * `AdrLine` being Max70Text and `Ctry` being ISO 3166 alpha-2). The T2 and
+ * Fedwire documents do not restate widths, so on those two rails the rule is
+ * sourced to the data type rather than to the rail, and says so.
+ *
+ * `Ctry` is absent on purpose: its width is two characters, and
+ * `ctry_iso3166` already fails anything that is not exactly two uppercase
+ * letters. A second rule would report the same defect twice.
+ */
+const STRUCTURED_MAX_LENGTHS = [
+  { field: 'strt_nm', tag: 'StrtNm', type: 'Max70Text', max: 70 },
+  { field: 'bldg_nb', tag: 'BldgNb', type: 'Max16Text', max: 16 },
+  { field: 'pst_cd', tag: 'PstCd', type: 'Max16Text', max: 16 },
+  { field: 'twn_nm', tag: 'TwnNm', type: 'Max35Text', max: 35 },
+] as const satisfies ReadonlyArray<{
+  field: keyof AddressToCheck;
+  tag: string;
+  type: string;
+  max: number;
+}>;
+
+/**
+ * What the two rails whose own document is silent on widths are told.
+ *
+ * Same honesty as ISO_CTRY_CLAUSE, and for the same reason: the width comes
+ * from the ISO 20022 data type the element carries, read off the one field
+ * table we could fetch (SIX SPS), not from the Federal Reserve page or the T2
+ * UDFS, neither of which restates it.
+ */
+const ISO_WIDTH_CLAUSE =
+  ' This rail\'s own fetched document does not restate element widths; the width applied is the ISO 20022 data ' +
+  'type of the element, taken from the one field table that could be fetched (SIX, Swiss Implementation ' +
+  'Guidelines SPS 2026 v2.3, published 20.02.2026, ch. 3.11 table 9). The ISO 20022 base schema itself was ' +
+  'unreachable (iso20022.org, 26.08.2026).';
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -244,6 +288,42 @@ function ruleCtryIso3166(address: AddressToCheck, source: string): AddressFindin
     rule: 'ctry_iso3166',
     verdict: 'pass',
     detail: `Ctry "${ctry}" is an assigned ISO 3166-1 alpha-2 code.`,
+    source,
+  };
+}
+
+/**
+ * One structured element against its ISO 20022 width.
+ *
+ * `not_applicable` when the element is absent, like every other conditional
+ * rule here: a caller counting passes must not be credited with a check that
+ * had nothing to look at. The length measured is the TRIMMED value, the same
+ * one every other rule in this file reasons about.
+ */
+function ruleStructuredMaxLength(
+  address: AddressToCheck,
+  spec: (typeof STRUCTURED_MAX_LENGTHS)[number],
+  source: string,
+): AddressFinding {
+  const rule = `${spec.field}_max_${spec.max}`;
+  const value = present(address[spec.field] as string | undefined);
+
+  if (!value) {
+    return {
+      rule,
+      verdict: 'not_applicable',
+      detail: `No ${spec.tag} supplied, so there is nothing to measure.`,
+      source,
+    };
+  }
+
+  return {
+    rule,
+    verdict: value.length <= spec.max ? 'pass' : 'fail',
+    detail:
+      value.length <= spec.max
+        ? `${spec.tag} is ${value.length} characters, within the ${spec.type} maximum of ${spec.max}.`
+        : `${spec.tag} is ${value.length} characters; ${spec.tag} is ${spec.type}, so ${spec.max} is the maximum.`,
     source,
   };
 }
@@ -421,12 +501,26 @@ export function checkPostalAddress(scheme: AddressScheme, address: AddressToChec
     findings.push(ruleAdrLineMaxCount(address, `${SRC_SPS_IG} "Maximum 2 lines allowed if offered as part of the hybrid address."`));
     findings.push(ruleAdrLineMaxLength(address, `${SRC_SPS_IG} AdrLine is Max70Text in the hybrid address.`));
     findings.push(ruleAdrLineNoRepeat(address));
+    // The widths of the structured elements, from the same field table as the
+    // rules above (DATA-04, 01/09/2026 — nothing measured them before).
+    for (const spec of STRUCTURED_MAX_LENGTHS) {
+      findings.push(
+        ruleStructuredMaxLength(
+          address,
+          spec,
+          `${SRC_SPS_IG} The table gives ${spec.tag} as ${spec.type}.`,
+        ),
+      );
+    }
   } else if (scheme === 'fedwire') {
     findings.push(ruleTwnNmRequired(address, SRC_FED));
     findings.push(ruleCtryRequired(address, SRC_FED));
     findings.push(ruleCtryIso3166(address, SRC_FED + ISO_CTRY_CLAUSE));
     findings.push(ruleAdrLineMaxCount(address, SRC_FED));
     findings.push(ruleAdrLineMaxLength(address, SRC_FED));
+    for (const spec of STRUCTURED_MAX_LENGTHS) {
+      findings.push(ruleStructuredMaxLength(address, spec, SRC_FED + ISO_WIDTH_CLAUSE));
+    }
     // No AdrTp rule and no non-repetition rule: the Federal Reserve page states
     // neither, and the upstream document it points to (PMPG, November 2026
     // postal address guidance) is on swift.com and could not be read. Silence
@@ -434,8 +528,13 @@ export function checkPostalAddress(scheme: AddressScheme, address: AddressToChec
   } else {
     findings.push(ruleTwnNmCtryConditional(address));
     findings.push(ruleCtryIso3166(address, SRC_T2 + ISO_CTRY_CLAUSE));
+    for (const spec of STRUCTURED_MAX_LENGTHS) {
+      findings.push(ruleStructuredMaxLength(address, spec, SRC_T2 + ISO_WIDTH_CLAUSE));
+    }
     // No AdrLine cap: the T2 validation appendix sets none, and importing the
-    // SPS cap of 2 would fail addresses this rail accepts.
+    // SPS cap of 2 would fail addresses this rail accepts. The widths above are
+    // a different matter: they are the element's own data type, which the rail
+    // inherits whether or not its document repeats it.
   }
 
   return {

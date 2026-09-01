@@ -54,7 +54,16 @@ describe('exportPaidState', () => {
     );
     // SELECT * on purpose: a hand-written column list would silently stop
     // exporting a new column, and it would only show up on restore day.
-    for (const c of columns) expect(Object.keys(row)).toContain(c);
+    //
+    // One column is dropped after the read, deliberately and by name:
+    // `raw_key_one_time_view` is a live API key in clear, and a backup is made
+    // to be copied off the server (SEC-03, audit 2026-09-01). The guard below
+    // still covers every OTHER column, which is what this test exists for; the
+    // exclusion has its own tests further down.
+    const excluded = ['raw_key_one_time_view'];
+    for (const c of columns.filter((name) => !excluded.includes(name))) {
+      expect(Object.keys(row)).toContain(c);
+    }
   });
 
   it('stamps the format so a future reader can refuse what it cannot read', () => {
@@ -140,5 +149,63 @@ describe('restorePaidState — the drill', () => {
   it('survives an empty dump without throwing', () => {
     const empty = { format: BACKUP_FORMAT, taken_at: 'x', counts: { api_keys: 0, api_usage: 0 }, api_keys: [], api_usage: [] };
     expect(() => restorePaidState(empty)).not.toThrow();
+  });
+});
+
+/**
+ * A backup is made to be copied off the server. What it carries matters.
+ *
+ * `SELECT *` swept up `raw_key_one_time_view` — the API key IN CLEAR, held for
+ * the few days between a purchase and the buyer collecting it. One admin call
+ * therefore returned every uncollected key, in plaintext, next to every
+ * customer address, in the one file whose whole purpose is to leave the
+ * machine (SEC-03, audit 2026-09-01). Nothing is lost by dropping it: a restore
+ * authenticates callers from `key_hash`, which is why the drill above still
+ * passes.
+ */
+describe('exportPaidState — what must never leave the server', () => {
+  function seedWithPlaintextKey(prefix: string) {
+    getStatsDB()
+      .prepare(
+        `INSERT INTO api_keys (key_hash, key_prefix, email, monthly_limit, raw_key_one_time_view)
+         VALUES (?, ?, ?, 200, ?)`,
+      )
+      .run(`hash-${prefix}`, prefix, MAIL, `${prefix}_not_a_real_key`);
+  }
+
+  it('leaves the plaintext one-time key out of the dump', () => {
+    seedWithPlaintextKey('ifk_bk0100');
+    const dump = exportPaidState('2026-09-01T21:00:00Z');
+    const row = dump.api_keys.find((k) => k.key_prefix === 'ifk_bk0100');
+    expect(row, 'the key row itself must still be exported').toBeDefined();
+    expect(row!.key_hash, 'the hash is what a restore needs').toBe('hash-ifk_bk0100');
+    expect(Object.keys(row!)).not.toContain('raw_key_one_time_view');
+    // Belt and braces: not under any other key either.
+    expect(JSON.stringify(dump)).not.toContain('_not_a_real_key');
+  });
+
+  it('still exports columns nobody remembered to name — the SELECT * doctrine holds', () => {
+    seedWithPlaintextKey('ifk_bk0101');
+    const dump = exportPaidState('2026-09-01T21:00:00Z');
+    const row = dump.api_keys.find((k) => k.key_prefix === 'ifk_bk0101');
+    for (const column of ['email', 'monthly_limit', 'credits_remaining', 'created_at']) {
+      expect(Object.keys(row!), `column ${column} dropped out of the backup`).toContain(column);
+    }
+  });
+
+  it('writes one events row per export, with the volume it carried', () => {
+    seedWithPlaintextKey('ifk_bk0102');
+    const before = (getStatsDB()
+      .prepare("SELECT COUNT(*) n FROM events WHERE label LIKE 'backup export:%'")
+      .get() as { n: number }).n;
+    const dump = exportPaidState('2026-09-01T21:00:00Z');
+    const after = getStatsDB()
+      .prepare("SELECT label FROM events WHERE label LIKE 'backup export:%' ORDER BY id DESC LIMIT 1")
+      .get() as { label: string } | undefined;
+    const count = (getStatsDB()
+      .prepare("SELECT COUNT(*) n FROM events WHERE label LIKE 'backup export:%'")
+      .get() as { n: number }).n;
+    expect(count, 'an export that leaves no trace is an export nobody can audit').toBe(before + 1);
+    expect(after!.label).toContain(`${dump.counts.api_keys} keys`);
   });
 });

@@ -55,13 +55,42 @@ function extractKey(c: Parameters<MiddlewareHandler<HonoEnv>>[0]): string | null
 }
 
 /**
+ * Routes documented as FREE that nevertheless live under `/v1/*`.
+ *
+ * They are mounted after this middleware, so presenting a key on one of them
+ * used to debit the monthly allowance: six calls to `/v1/iban/format`,
+ * `/v1/iban/structure`, `/v1/demo` and `/v1/ops/recent` with a fresh key took
+ * `X-Quota-Used` from 0 to 6, while `/llms.txt` and `/v1` advertise all of them
+ * as free (SEC-04, audit 2026-09-01). A developer who sets their key globally
+ * in an HTTP client — the normal thing to do — was paying for the free tour.
+ *
+ * The exemption lives here rather than in the mount order on purpose: mounting
+ * them before this middleware would also drop `apiKeyPrefix`, so the calls would
+ * stop being attributed to their customer in the telemetry. Billing zero keeps
+ * the attribution and removes the charge.
+ */
+const FREE_ROUTE_PREFIXES = [
+  '/v1/iban/format',
+  '/v1/iban/structure',
+  '/v1/demo',
+  '/v1/ops/recent',
+  '/v1/reference/validate',
+  '/v1/address/check',
+  '/v1/test-iban',
+];
+
+function isFreeRoute(path: string): boolean {
+  return FREE_ROUTE_PREFIXES.some((p) => path === p || path.startsWith(`${p}/`));
+}
+
+/**
  * How many quota slots / credits this request bills.
  *
  * Batch validation bills 1 unit per IBAN — pricing parity with the x402
  * per-IBAN price ($0.002 × N). Before 2026-07-11 a whole batch billed a
  * single unit, so a 100-IBAN batch cost the same as one validation: a ~100×
  * underbilling on prepaid packs and the free tier. Every other endpoint
- * bills 1 unit per request.
+ * bills 1 unit per request — except the free ones, which bill zero.
  *
  * Reading the body here is safe — Hono caches parsed bodies, the downstream
  * handler re-reads it freely. Capped at the batch size limit (100): larger
@@ -69,6 +98,10 @@ function extractKey(c: Parameters<MiddlewareHandler<HonoEnv>>[0]): string | null
  * a 402 from quoting a shortfall no valid request could ever bill.
  */
 async function billableUnits(c: Parameters<MiddlewareHandler<HonoEnv>>[0]): Promise<number> {
+  // Zero units survives both ceilings by construction: the monthly check is
+  // `measured + units > limit` and the credit debit is `credits_remaining >=
+  // units`, so an exhausted key still gets served on a free route.
+  if (isFreeRoute(c.req.path)) return 0;
   if (c.req.method !== 'POST' || c.req.path !== '/v1/iban/batch') return 1;
   const body = (await c.req.json().catch(() => null)) as Record<string, unknown> | null;
   const ibans = getIbansArray(body);

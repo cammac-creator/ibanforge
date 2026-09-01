@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import type { Context } from 'hono';
 import { timingSafeEqual, createHash } from 'node:crypto';
 import { generateApiKey, validateApiKey, getUsage, revokeApiKey, rotateApiKey } from '../lib/api-keys.js';
 import { getStatsDB } from '../lib/db.js';
@@ -48,7 +49,13 @@ import {
   runActivationPass,
 } from '../lib/activation-nudge-server.js';
 import { getCompanyProfiles, upsertCompanyProfile, type ProfileSource } from '../lib/company-profiles.js';
-import { sendApiKeyEmail, sendFreeKeyEmail, sendKeyVerificationEmail, isEmailConfigured } from '../lib/email.js';
+import {
+  sendApiKeyEmail,
+  sendFreeKeyEmail,
+  sendKeyVerificationEmail,
+  isEmailConfigured,
+  alertKeyDeliveryFailure,
+} from '../lib/email.js';
 
 // Bundle credits — prepaid pools sized for the 3 typical agent stacks.
 // Pricing keeps a fair per-call rate (cheaper than retail x402) so agents
@@ -239,11 +246,18 @@ apiKeys.post('/v1/keys/generate', async (c) => {
   // with every example address published in the repo; with a relay configured
   // in the shell, `npm run check` would mail real people documentation samples.
   if (!process.env.VITEST) {
+    // QUA-13 (2026-09-01): a free key that never reaches its mailbox is the
+    // cheapest possible explanation for "this key never made a call", and until
+    // now it produced nothing at all. The relay's own refusal alerts from inside
+    // src/lib/email.ts; a throw before it answers alerts from here. No address
+    // in the text: Telegram is not a declared processor.
     void sendFreeKeyEmail({
       to: email.trim().toLowerCase(),
       rawKey: result.api_key,
       monthlyLimit: 200,
-    }).catch(() => {});
+    }).catch(() => {
+      alertKeyDeliveryFailure('free key delivery threw before the relay answered');
+    });
   }
 
   return c.json({
@@ -346,13 +360,44 @@ function usageBlock(v: ReturnType<typeof validateApiKey>): Record<string, unknow
   };
 }
 
+/**
+ * The three places a caller may present its key, on the two self-service read
+ * endpoints.
+ *
+ * Deliberately identical to `extractKey` in src/middleware/api-key.ts, which is
+ * what every billed route already accepts and what the docs advertise. These two
+ * routes took `Authorization: Bearer` only, so a client following the documented
+ * `X-API-Key` dialect got a 401 that reads exactly like "your key is invalid"
+ * while trying to read its own usage report. That is a self-inflicted cause of
+ * silence after a purchase (security audit, improvement 1, 2026-09-01).
+ *
+ * NOT imported from the middleware: `extractKey` is not exported there, and that
+ * file belongs to another change in flight. Reproduced here rather than
+ * exported, so this stays a read-only fix; the two copies must stay identical,
+ * and a new dialect belongs in both or in neither.
+ */
+function presentedKey(c: Context): string | null {
+  const auth = c.req.header('Authorization');
+  if (auth?.startsWith('Bearer ')) {
+    const v = auth.slice(7);
+    if (v.startsWith('ifk_')) return v;
+  }
+  const xKey = c.req.header('X-API-Key') ?? c.req.header('x-api-key');
+  if (xKey?.startsWith('ifk_')) return xKey;
+  const queryKey = c.req.query('api_key');
+  if (queryKey?.startsWith('ifk_')) return queryKey;
+  return null;
+}
+
+const MISSING_KEY_MESSAGE =
+  'Provide your API key via Authorization: Bearer ifk_xxx, X-API-Key: ifk_xxx or ?api_key=ifk_xxx';
+
 apiKeys.get('/v1/keys/usage', (c) => {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader?.startsWith('Bearer ifk_')) {
-    return c.json({ error: 'missing_key', message: 'Provide your API key via Authorization: Bearer ifk_xxx' }, 401);
+  const key = presentedKey(c);
+  if (!key) {
+    return c.json({ error: 'missing_key', message: MISSING_KEY_MESSAGE }, 401);
   }
 
-  const key = authHeader.slice(7);
   const validation = validateApiKey(key);
 
   if (!validation.valid) {
@@ -402,12 +447,11 @@ apiKeys.get('/v1/admin/backup', (c) => {
 });
 
 apiKeys.get('/v1/keys/report', (c) => {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader?.startsWith('Bearer ifk_')) {
-    return c.json({ error: 'missing_key', message: 'Provide your API key via Authorization: Bearer ifk_xxx' }, 401);
+  const key = presentedKey(c);
+  if (!key) {
+    return c.json({ error: 'missing_key', message: MISSING_KEY_MESSAGE }, 401);
   }
 
-  const key = authHeader.slice(7);
   const validation = validateApiKey(key);
 
   if (!validation.valid) {

@@ -67,7 +67,23 @@ function ensureFeedbackTable() {
   }
 }
 
-ensureFeedbackTable();
+// 🚨 This DDL runs as an import side effect, which is what made a corrupt
+// `stats.sqlite` fatal: the throw happened while `src/app.ts` was still being
+// loaded, so `serve()` never ran, no listener existed and `/health` could not
+// even answer 503. Railway then stopped restarting after 3 attempts and nothing
+// outside the dead process noticed (audit 2026-09-01, finding PERF-03).
+//
+// Swallowing it here is not hiding the failure: `getStatsDB()` records the
+// cause in `getStatsDbState()`, `/health` turns it into a diagnosed 503 and
+// `index.ts` raises an OPS alert at boot. On a healthy database nothing changes.
+try {
+  ensureFeedbackTable();
+} catch (err) {
+  console.error(
+    '[feedback] table init failed — stats database unusable:',
+    err instanceof Error ? err.message : err,
+  );
+}
 
 /**
  * Shared insert behind POST /v1/feedback and the MCP send_feedback tool.

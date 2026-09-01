@@ -236,3 +236,43 @@ describe('verificationDelivery', () => {
     expect(marked[0].id).toBe(second);
   });
 });
+
+/**
+ * The /64 has to survive the way an address is WRITTEN (SEC-05, 2026-09-01).
+ *
+ * The compressed groups used to be dropped before the first four were taken,
+ * so `2001:db8::1` normalised to `2001:db8:1`: two addresses in the same /64
+ * landed in two buckets, and one machine changed bucket depending on whether it
+ * wrote itself compressed or in full. The cap counted nothing reliable.
+ */
+describe('normalizeIpForGuard — one bucket per /64, whatever the notation', () => {
+  it('puts two addresses of the same /64 in the same bucket', () => {
+    expect(normalizeIpForGuard('2001:db8::1')).toBe(normalizeIpForGuard('2001:db8::2'));
+    expect(normalizeIpForGuard('2001:db8::1')).toBe('2001:db8:0:0');
+  });
+
+  it('gives the compressed and the expanded form of one address the same bucket', () => {
+    expect(normalizeIpForGuard('2001:0db8:0000:0000:0000:0000:0000:0001')).toBe(normalizeIpForGuard('2001:db8::1'));
+  });
+
+  it('keeps different /64s apart', () => {
+    expect(normalizeIpForGuard('2001:db8:1::1')).not.toBe(normalizeIpForGuard('2001:db8:2::1'));
+    // The counter-example from the audit: a prefix with no compressible zero
+    // worked before and must keep working.
+    expect(normalizeIpForGuard('2a02:1210:4e2f:1400::5')).toBe(normalizeIpForGuard('2a02:1210:4e2f:1400::6'));
+    expect(normalizeIpForGuard('2a02:1210:4e2f:1400::5')).toBe('2a02:1210:4e2f:1400');
+  });
+
+  it('does NOT collapse IPv4-mapped addresses into one shared bucket', () => {
+    // ::ffff:192.0.2.1 is the form Node hands out on a dual-stack socket. Its
+    // first four hextets are zeros for EVERY such address, so expanding it
+    // would put every IPv4 caller in the world in one bucket and turn a
+    // per-source cap into a global one.
+    expect(normalizeIpForGuard('::ffff:192.0.2.1')).not.toBe(normalizeIpForGuard('::ffff:198.51.100.7'));
+    expect(normalizeIpForGuard('::ffff:192.0.2.1')).toBe('192.0.2.1');
+  });
+
+  it('ignores a zone index, which names a local interface and not the peer', () => {
+    expect(normalizeIpForGuard('fe80::1%eth0')).toBe(normalizeIpForGuard('fe80::1'));
+  });
+});

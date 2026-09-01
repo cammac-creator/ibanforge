@@ -8,7 +8,7 @@
  */
 import { serve, type ServerType } from '@hono/node-server';
 import { createRequire } from 'node:module';
-import { closeAll } from './lib/db.js';
+import { closeAll, initStatsDB, checkpointStatsWal } from './lib/db.js';
 import { buildApp } from './app.js';
 import { ensureWalletConfigured } from './middleware/x402.js';
 import { purgeOldRequestLog, purgeTerminatedKeyTelemetry } from './lib/stats.js';
@@ -27,6 +27,29 @@ ensureWalletConfigured();
 
 const require = createRequire(import.meta.url);
 const pkg = require('../package.json') as { version: string };
+
+// 🚨 Open the stats database BEFORE buildApp(), and survive it failing.
+//
+// Audit 2026-09-01, finding PERF-03: a corrupt `stats.sqlite` used to throw
+// while `src/app.ts` was still importing (`src/routes/feedback.ts` calls
+// getStatsDB() as a module side effect), so this process died before `serve()`.
+// No listener, no `/health`, and at `restartPolicyMaxRetries = 3` Railway stops
+// trying — while every watchdog we own (`ops-probes`) lives inside the process
+// that just died. Measured worst case: a month of downtime with all CI green.
+//
+// A service that answers a diagnosed 503 is infinitely more useful than a
+// container that does not exist. The alert below is the only thing that leaves
+// the box; `opsFail` swallows its own errors, so a stats database too broken to
+// hold the alert counter cannot re-kill the boot.
+const statsState = initStatsDB();
+if (!statsState.ok) {
+  console.error(`FATAL-BUT-SURVIVED: stats database unusable — ${statsState.error}`);
+  void opsFail(
+    'db:stats',
+    `Base stats illisible au démarrage : ${statsState.error ?? 'cause inconnue'}. ` +
+      "L'API écoute et répond 503 sur /health ; clés, quotas et crédits sont hors service.",
+  );
+}
 
 const app = buildApp();
 
@@ -57,11 +80,19 @@ try {
 } catch (err) {
   console.error('Retention purge failed at boot:', err);
 }
+// Right after the purges, and again on every daily tick: the deletions above
+// are exactly what fills the write-ahead log, and nothing else in this service
+// ever checkpoints it (audit 2026-09-01, finding PERF-09 — only SQLite's
+// passive auto-checkpoint at 1 000 pages ran, and a long-lived reader keeps it
+// from truncating). On a Railway volume an unbounded WAL is disk that never
+// comes back. Non-throwing by construction: housekeeping must not cost a boot.
+checkpointStatsWal();
 setInterval(() => {
   try {
     purgeOldRequestLog(12);
     purgeTerminatedKeyTelemetry(30);
     purgeExpiredVerifications();
+    checkpointStatsWal();
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error('Retention purge failed:', msg);

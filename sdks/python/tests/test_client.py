@@ -16,6 +16,7 @@ from ibanforge import (
     IBANforge,
     InvalidInputError,
     PaymentRequiredError,
+    PayloadTooLargeError,
     QuotaExhaustedError,
     RateLimitError,
 )
@@ -141,6 +142,132 @@ def test_400_raises_invalid_input(client: IBANforge):
     with pytest.raises(InvalidInputError) as exc:
         client.validate_iban("CH")
     assert "too short" in str(exc.value)
+
+
+@respx.mock
+def test_413_raises_payload_too_large(client: IBANforge):
+    """Audit DX-09, 2026-09-01. 413 fell into the `InvalidInputError` catch-all,
+    which tells a caller to fix a body that is not malformed, only too big — so
+    the retry loop repeats the same payload forever. Its own class carries its
+    own remedy: split the payload."""
+    respx.post(f"{BASE}/v1/iban/batch").mock(
+        return_value=httpx.Response(413, json={"error": "payload_too_large", "message": "body over 1 MB"})
+    )
+    with pytest.raises(PayloadTooLargeError) as exc:
+        client.validate_batch([SAMPLE_IBAN])
+    assert exc.value.status == 413
+    assert exc.value.code == "payload_too_large"
+    # Still an IBANforgeError, so a caller catching the base class is unaffected.
+    assert isinstance(exc.value, InvalidInputError) is False
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_async_413_raises_payload_too_large():
+    respx.post(f"{BASE}/v1/iban/batch").mock(
+        return_value=httpx.Response(413, json={"error": "payload_too_large"})
+    )
+    async with AsyncIBANforge() as cl:
+        with pytest.raises(PayloadTooLargeError):
+            await cl.validate_batch([SAMPLE_IBAN])
+
+
+# ---- Audit DX-10, 2026-09-01: the two free endpoints shipped on 27/08/2026 ----
+#
+# Both clients covered 12 endpoints and omitted these two. They are the only
+# calls that answer 200 with no key and no payment — the free shop window an
+# agent tries before deciding anything — and they were unreachable from the
+# client the docs point at.
+
+
+@respx.mock
+def test_validate_reference_is_free_and_passes_the_type_through():
+    cl = IBANforge()  # no api_key
+    route = respx.get(f"{BASE}/v1/reference/validate").mock(
+        return_value=httpx.Response(
+            200,
+            json={"reference": "RF18539007547034", "scheme": "rf", "valid": True, "status": "checked"},
+        )
+    )
+    out = cl.validate_reference("RF18539007547034", reference_type="scor")
+    assert out["valid"] is True
+    sent = route.calls.last.request
+    assert sent.url.params["reference"] == "RF18539007547034"
+    assert sent.url.params["reference_type"] == "scor"
+    assert sent.headers.get("authorization") is None
+    cl.close()
+
+
+@respx.mock
+def test_validate_reference_relays_valid_none():
+    """Norwegian KID and Swedish OCR are configured per creditor account by the
+    beneficiary's bank: `None` is the answer, and it must not read as False."""
+    cl = IBANforge()
+    respx.get(f"{BASE}/v1/reference/validate").mock(
+        return_value=httpx.Response(
+            200,
+            json={"reference": "12345678903", "scheme": "kid", "valid": None, "status": "not_checkable"},
+        )
+    )
+    out = cl.validate_reference("12345678903")
+    assert out["valid"] is None
+    cl.close()
+
+
+@respx.mock
+def test_check_address_posts_scheme_and_address():
+    cl = IBANforge()
+    route = respx.post(f"{BASE}/v1/address/check").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "scheme": "sps",
+                "conforms": True,
+                "findings": [
+                    {
+                        "rule": "twn_nm_required",
+                        "verdict": "pass",
+                        "detail": 'TwnNm is present ("Zurich").',
+                        "source": "SIX, Swiss Implementation Guidelines, SPS 2026 v2.3",
+                    }
+                ],
+            },
+        )
+    )
+    out = cl.check_address("sps", {"twn_nm": "Zurich", "ctry": "CH"})
+    assert out["conforms"] is True
+    # Each finding names the document it was read from; a bare boolean would
+    # strip the licence-bearing citation the API is careful to attach.
+    assert "SIX" in out["findings"][0]["source"]
+    import json as _json
+
+    assert _json.loads(route.calls.last.request.content) == {
+        "scheme": "sps",
+        "address": {"twn_nm": "Zurich", "ctry": "CH"},
+    }
+    cl.close()
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_async_check_address():
+    respx.post(f"{BASE}/v1/address/check").mock(
+        return_value=httpx.Response(200, json={"scheme": "sps", "conforms": False, "findings": []})
+    )
+    async with AsyncIBANforge() as cl:
+        out = await cl.check_address("sps", {"ctry": "CH"})
+    assert out["conforms"] is False
+
+
+@pytest.mark.asyncio
+@respx.mock
+async def test_async_validate_reference():
+    respx.get(f"{BASE}/v1/reference/validate").mock(
+        return_value=httpx.Response(200, json={"reference": "21000", "scheme": "qrr", "valid": True})
+    )
+    async with AsyncIBANforge() as cl:
+        out = await cl.validate_reference("21000")
+    assert out["scheme"] == "qrr"
 
 
 @respx.mock

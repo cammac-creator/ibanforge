@@ -33,6 +33,7 @@
  * working — it cannot mint a key nobody holds.
  */
 import { getStatsDB } from './db.js';
+import { recordEvent } from './events.js';
 
 /** Bumped when the shape changes, so a restore can refuse a dump it cannot read. */
 export const BACKUP_FORMAT = 1;
@@ -47,17 +48,54 @@ export interface BackupPayload {
 }
 
 /**
+ * Columns dropped from the export after they are read.
+ *
+ * `raw_key_one_time_view` is the API key IN CLEAR, kept for the few days
+ * between a purchase and the buyer collecting it. Its whole reason to exist is
+ * to bound how long a key lives in plaintext — and the export walked straight
+ * past that bound: one admin call returned every uncollected key, in clear,
+ * next to every customer address, in a file whose entire purpose is to be
+ * copied off the server (SEC-03, audit 2026-09-01).
+ *
+ * Nothing is lost. A restore rebuilds access from `key_hash`, which is what
+ * authenticates a caller; the buyer's existing key keeps working. Only the
+ * convenience of re-serving a key nobody collected goes, and that is a
+ * plaintext credential we should not be shipping in a backup anyway.
+ */
+const EXPORT_EXCLUDED_COLUMNS = ['raw_key_one_time_view'] as const;
+
+/**
  * Everything needed to give a paying customer their access back.
  *
  * Columns are read with `SELECT *` on purpose. A hand-written column list
  * silently stops exporting anything added later, and the failure only shows up
  * on the day someone tries to restore — which is the worst possible day to
- * discover that the backup was incomplete.
+ * discover that the backup was incomplete. The one column removed is removed
+ * AFTER the read, by name, so the doctrine survives: a new column is exported
+ * without anyone having to remember it, and only a deliberate line here can
+ * ever leave one out.
  */
 export function exportPaidState(takenAt: string): BackupPayload {
   const db = getStatsDB();
-  const keys = db.prepare('SELECT * FROM api_keys').all() as Array<Record<string, unknown>>;
+  const keys = (db.prepare('SELECT * FROM api_keys').all() as Array<Record<string, unknown>>).map((row) => {
+    const copy = { ...row };
+    for (const column of EXPORT_EXCLUDED_COLUMNS) delete copy[column];
+    return copy;
+  });
   const usage = db.prepare('SELECT * FROM api_usage').all() as Array<Record<string, unknown>>;
+  // An export is the one read that takes the whole customer base off the
+  // server, and it left no trace of its own: a single `request_log` line,
+  // indistinguishable from any other call. This annotation puts it on the
+  // dashboard timeline with its volume, so "when was the last dump taken, and
+  // how big was it" has an answer that does not require log archaeology.
+  try {
+    recordEvent('manual', `backup export: ${keys.length} keys, ${usage.length} usage rows`);
+  } catch (err) {
+    // A disaster-recovery export must not fail over its own annotation: the
+    // stats DB has writers outside this process and a BUSY here would turn the
+    // one call that saves the billing state into a 500.
+    console.error('[backup] export annotation failed:', err instanceof Error ? err.message : err);
+  }
   return {
     format: BACKUP_FORMAT,
     taken_at: takenAt,

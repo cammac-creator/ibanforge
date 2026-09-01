@@ -18,6 +18,7 @@ import { stripeRetrieve } from './stripe-retrieve.js';
 import { generateApiKey, generateCreditKey, validateApiKey, decrementCredits, refundCredit } from '../lib/api-keys.js';
 import { closeAll, getStatsDB } from '../lib/db.js';
 import { CREDITS_PURCHASE_TYPE, getStats } from '../lib/stats.js';
+import { buildFirstCallCurl } from '../lib/first-call.js';
 import { createHash } from 'node:crypto';
 import type { HonoEnv } from '../types.js';
 
@@ -477,6 +478,97 @@ describe('a pack sale is booked as revenue', () => {
       body: '{}',
     });
     expect(revenueToday()).toBeCloseTo(before, 6);
+  });
+
+  /**
+   * SEC-10 (2026-09-01). Booking zero revenue is not the same as booking
+   * nothing: the row still carried `total + 1` and `success_count + 1`, so
+   * under IBANFORGE_FREE_MODE or with the x402 gate off in dev, every free pack
+   * wrote a phantom sale next to the real ones. The revenue assertion above
+   * could never see it, which is why it survived.
+   */
+  it('books no sale at all when nothing was paid', async () => {
+    const app = new Hono<HonoEnv>();
+    app.route('/', creditsBuy);
+    const salesToday = (): number => {
+      const row = getStatsDB()
+        .prepare("SELECT COALESCE(SUM(total), 0) AS n FROM daily_stats WHERE date = date('now') AND operation_type = ?")
+        .get(CREDITS_PURCHASE_TYPE) as { n: number };
+      return row.n;
+    };
+    const before = salesToday();
+    await app.request('/v1/credits/buy/1k', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: '{}',
+    });
+    expect(salesToday()).toBe(before);
+
+    // ...and a settled one still counts, so the fix did not silence the rail.
+    await app.request('/v1/credits/buy/1k', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'payment-signature': Buffer.from(`sec10-${Date.now()}`).toString('base64'),
+      },
+      body: '{}',
+    });
+    expect(salesToday()).toBe(before + 1);
+  });
+});
+
+/**
+ * BIZ-04 (2026-09-01). The card rail hands over a page, a copy button, a curl
+ * carrying the real key and a mail. The USDC rail, the one the whole agent bet
+ * rides on, handed over a JSON whose only instruction printed the key PREFIX
+ * followed by an ellipsis: a string nobody can authenticate with.
+ */
+describe('the USDC rail hands over a command that works', () => {
+  async function buy(bundle: string, body = '{}'): Promise<Record<string, unknown>> {
+    const app = new Hono<HonoEnv>();
+    app.route('/', creditsBuy);
+    const res = await app.request(`/v1/credits/buy/${bundle}`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'payment-signature': Buffer.from(`first-call-${Math.random()}`).toString('base64'),
+      },
+      body,
+    });
+    expect(res.status).toBe(201);
+    return (await res.json()) as Record<string, unknown>;
+  }
+
+  it('returns the same first-call command the delivery emails carry', async () => {
+    const out = await buy('1k');
+    const key = out.api_key as string;
+    expect(out.first_call).toBe(buildFirstCallCurl(key));
+    expect(out.first_call as string).toContain(key);
+  });
+
+  it('never prints an ellipsis where a key belongs', async () => {
+    const out = await buy('5k');
+    const hint = out.usage_hint as string;
+    expect(hint).toContain(out.api_key as string);
+    // The old hint was `Bearer ifk_xxxxxxxx... on subsequent calls`. A caller
+    // that pasted it got a 401 that reads exactly like an invalid key.
+    expect(hint).not.toContain('...');
+    expect(hint).not.toContain(`Bearer ${out.key_prefix as string}.`);
+  });
+
+  /**
+   * The address was already captured and then dropped on the floor. Delivery
+   * itself cannot be exercised here: the send is guarded by `process.env.VITEST`
+   * for the same reason as the free rail (the suite drives these routes with the
+   * example addresses published in the repo, and a relay configured in the shell
+   * would mail real people). What is asserted is that accepting the address
+   * changes nothing else about the response.
+   */
+  it('still mints normally when an address is supplied', async () => {
+    const out = await buy('1k', JSON.stringify({ email: 'acme@example.com' }));
+    expect(out.api_key as string).toMatch(/^ifk_[a-f0-9]{64}$/);
+    expect(out.first_call as string).toContain(out.api_key as string);
+    expect(validateApiKey(out.api_key as string).email).toBe('acme@example.com');
   });
 
   /**

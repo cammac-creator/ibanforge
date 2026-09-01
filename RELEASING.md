@@ -16,16 +16,24 @@ because npm now enforces a live 2FA challenge that no CI token can pass.
 > `npm error code EOTP`, both in CI and locally. This is by design (anti
 > supply-chain), so there is no token that makes npm publish non-interactively.
 
-## Step 0 — bump the version (one number, six files)
+## Step 0 — bump the version (one number, seven files)
 
-All versions must match. The six locations:
+All versions must match. The seven locations:
 
 - `package.json`
-- `mcp/package.json`
+- `server.json` at the repo root (top-level `version` **and** `packages[].version`)
 - `mcp/server.json` (top-level `version` **and** `packages[].version`)
+- `mcp/package.json`
 - `sdks/typescript/package.json` **and** the `const VERSION` in `sdks/typescript/src/index.ts`
 - `sdks/python/ibanforge/_version.py`
 - `sdks/python/pyproject.toml`
+
+> The root `server.json` is the one this list forgot. It is documentation — only
+> `mcp/server.json` is published, because the release workflow runs
+> `mcp-publisher` with `working-directory: mcp` — but `src/routes/server-json.test.ts`
+> requires the two to agree, so leaving it behind turns the suite red at the worst
+> possible moment. Found by the audit of 2026-09-01 (DX-12), where this file said
+> six and the repo had seven.
 
 Then verify everything is green:
 
@@ -37,6 +45,18 @@ npm run check                      # backend: typecheck + lint + tests
 ```
 
 Commit and push the bump.
+
+## Step 0b — freeze the changelog
+
+Rename the `## [Unreleased]` heading of `CHANGELOG.md` to `## [X.Y.Z] — YYYY-MM-DD`
+and open a fresh empty `## [Unreleased]` above it.
+
+Not cosmetic, and not optional: `https://ibanforge.com/changelog` renders this file
+straight from the repository, and `frontend/lib/feed.ts` builds the release items of
+the RSS feed by matching `^## \[version\] — date`. A version that never gets its
+heading is a version that never appears on either surface. That is exactly what
+happened to 1.4.4: production served it while the public changelog stopped at 1.4.3
+(audit of 2026-09-01, DX-04).
 
 ## Step 1 — publish npm by hand (Touch ID)
 

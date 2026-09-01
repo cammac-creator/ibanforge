@@ -697,6 +697,31 @@ interface JsonRecord {
   [k: string]: unknown;
 }
 
+/**
+ * A `fetch` that never produced a response, turned into the same shape an
+ * upstream failure has, plus `_transport_error` so a tool can take its free
+ * fallback instead of dead-ending on `fetch failed`.
+ *
+ * `status: 0` on purpose: no HTTP status was ever read, and reporting 402 here
+ * would put words in the server's mouth.
+ */
+function transportError(err: unknown): JsonRecord {
+  const e = err as { message?: string; cause?: { code?: string } };
+  const code = e?.cause?.code;
+  return {
+    _error: true,
+    _transport_error: true,
+    status: 0,
+    error: 'transport_error',
+    message: e?.message ?? String(err),
+    ...(code ? { code } : {}),
+    _hint:
+      code === 'UND_ERR_HEADERS_OVERFLOW'
+        ? 'The response headers exceeded Node\'s http.maxHeaderSize (16 KB by default), so the response was dropped before it could be read. Retry with `node --max-http-header-size=65536`, or set IBANFORGE_API_KEY (free, 200 req/month via POST https://api.ibanforge.com/v1/keys/generate) so the call never hits the paywall.'
+        : 'Network error reaching the IBANforge API. Check connectivity, or set IBANFORGE_API_BASE for self-hosted instances.',
+  };
+}
+
 async function apiCall(method: 'GET' | 'POST', path: string, body?: JsonRecord): Promise<JsonRecord> {
   const headers: Record<string, string> = {
     'User-Agent': `ibanforge-mcp/${pkg.version}`,
@@ -709,11 +734,25 @@ async function apiCall(method: 'GET' | 'POST', path: string, body?: JsonRecord):
     headers['Content-Type'] = 'application/json';
   }
 
-  const res = await fetch(`${API_BASE}${path}`, {
-    method,
-    headers,
-    body: body ? JSON.stringify(body) : undefined,
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${path}`, {
+      method,
+      headers,
+      body: body ? JSON.stringify(body) : undefined,
+    });
+  } catch (err) {
+    // A throw here means no response object at all, and the caller could not
+    // tell that apart from a genuine outage. On 2026-09-01 the MCP audit found
+    // the commonest case was neither: the 402 arrived, but its headers were
+    // over Node's 16 KB `http.maxHeaderSize`, so undici aborted with
+    // UND_ERR_HEADERS_OVERFLOW and validate_iban answered `fetch failed` while
+    // the free fallback right below it sat unused. The server side is fixed
+    // (audit MCP-01), and this is the belt: a transport failure on a paid route
+    // is reported like the paywall it probably was, so the degraded free path
+    // runs instead of dead-ending.
+    return transportError(err);
+  }
 
   const text = await res.text();
   let parsed: unknown;
@@ -747,9 +786,34 @@ async function apiCall(method: 'GET' | 'POST', path: string, body?: JsonRecord):
   return parsed as JsonRecord;
 }
 
+/**
+ * The `instructions` block an MCP client injects into its model's context at
+ * connect time. Verbatim copy of `src/mcp/instructions.ts` in the API repo:
+ * this package is a separate npm project and cannot import from `src/`, so the
+ * copy is kept honest by a character-for-character parity test
+ * (`src/mcp/instructions.test.ts`).
+ *
+ * Until 2026-09-01 this surface — the main distribution channel — answered
+ * `initialize` with no instructions at all, while the HTTP transport had them
+ * (audit MCP-11).
+ */
+const INSTRUCTIONS =
+  'Start with validate_iban on any IBAN-looking string (e.g. DE89370400440532013000) — one call returns validity, the issuing bank + BIC, virtual-IBAN/EMI detection, SEPA reachability and VoP readiness. ' +
+  // 2026-08-17: this sentence used to read "For unlimited use … in one
+  // step" — an agent took it literally and scripted 42 keys in a
+  // morning. Sell the same path truthfully: one key per developer, and
+  // repeat creations from one network go through mailbox verification.
+  // The example address has to pass the signup guard: example.com is on
+  // the disposable-domain blocklist, so the literal copy of the previous
+  // wording ("you@example.com") answered 400 disposable_email.
+  'Free tier: 10 tool calls/IP/day, no signup. For sustained use, POST https://api.ibanforge.com/v1/keys/generate {"email":"you@company.com"} issues a free API key (200 REST calls/month, one per developer — repeat creations from the same network require e-mail verification); prepaid credit packs from $5 per 1,000 calls, no expiry. ' +
+  'Missing data, wrong result, or something blocking you from paying? Call send_feedback — a human reads every report. ' +
+  'Paying as an agent (wallet, USDC on Base, one $5 payment for 1,000 calls): https://ibanforge.com/docs/pay-as-an-agent — ' +
+  'Docs and code samples: https://ibanforge.com/docs/recipes';
+
 const server = new Server(
   { name: 'ibanforge', version: pkg.version },
-  { capabilities: { tools: {} } },
+  { capabilities: { tools: {} }, instructions: INSTRUCTIONS },
 );
 
 server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: TOOLS }));
@@ -783,6 +847,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   // a failure whatever the tool, and it never matches the success schema.
   const relay = async (data: JsonRecord) => (data._error ? fail(data) : out(data));
 
+  // The two cases where a degraded free answer beats no answer: the paywall
+  // said so (402), or the response never arrived at all. The second one is
+  // audit MCP-02 of 2026-09-01 — an oversized 402 header made undici throw, and
+  // the fallback below, which existed and was good, never ran.
+  const wantsFreeFallback = (result: JsonRecord): boolean =>
+    result._error === true && (result.status === 402 || result._transport_error === true);
+
   // Fallback message appended to anonymous-mode results so MCP inspectors
   // and discovery tools (Glama, Smithery, MCP.so) get a useful payload
   // without requiring an API key while still surfacing the upgrade path.
@@ -811,7 +882,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           return fail({ error: 'invalid_input', message: 'Argument `iban` must be a non-empty string.' });
         }
         const result = await apiCall('POST', '/v1/iban/validate', { iban: a.iban });
-        if (result._error && result.status === 402) {
+        if (wantsFreeFallback(result)) {
           const free = await apiCall('GET', `/v1/iban/format?iban=${encodeURIComponent(a.iban)}`);
           if (!free._error) {
             return out({ ...free, _note: degradedNote(result) });
@@ -834,7 +905,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           return fail({ error: 'too_many_ibans', message: 'Max 100 IBANs per batch. Split your input.' });
         }
         const result = await apiCall('POST', '/v1/iban/batch', { ibans: a.ibans as string[] });
-        if (result._error && result.status === 402) {
+        if (wantsFreeFallback(result)) {
           const ibans = a.ibans as string[];
           const results = await Promise.all(
             ibans.map((iban) => apiCall('GET', `/v1/iban/format?iban=${encodeURIComponent(iban)}`)),

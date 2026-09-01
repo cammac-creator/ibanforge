@@ -3,6 +3,7 @@ import { Hono } from 'hono';
 import type { Handler } from 'hono';
 import { datasetFacts } from '../lib/dataset-facts.js';
 import { PAYMENT_LINKS, PRICING_PAGE } from '../lib/payment-links.js';
+import { dataTools, FREE_ENDPOINTS } from '../mcp/inventory.js';
 
 /** Dataset sizes, read once and rounded down so a claim cannot outlive its data. */
 const F = datasetFacts();
@@ -161,8 +162,15 @@ const x402Document: Handler = (c) => {
       resource: `https://api.ibanforge.com${ep.examplePath ?? ep.path}`,
       accepts: buildAccepts(ep, walletAddress),
     })),
+    // The free API endpoints come FIRST and come from the inventory. Until the
+    // audit of 2026-09-01 (DX-13, MCP-18) this list held only /v1/demo and the
+    // metadata routes below it, so an agent asking "what can I try before
+    // paying?" answered itself with "a demo" and left — while four real
+    // endpoints, two of them shipped a week earlier precisely to be tried for
+    // free, sat unlisted. The metadata documents stay: an agent that wants to
+    // read the contract before spending should find it in the same place.
     free_endpoints: [
-      { path: '/v1/demo', description: 'Free demo with example IBAN/BIC validations' },
+      ...FREE_ENDPOINTS,
       { path: '/health', description: 'Health check' },
       { path: '/openapi.json', description: 'OpenAPI 3.1 specification' },
       { path: '/.well-known/x402', description: 'This document' },
@@ -171,7 +179,9 @@ const x402Document: Handler = (c) => {
     mcp: {
       http_url: 'https://api.ibanforge.com/mcp',
       stdio: { command: 'npx', args: ['ibanforge-mcp'] },
-      tools: ['validate_iban', 'batch_validate_iban', 'lookup_bic', 'check_compliance', 'lookup_ch_clearing'],
+      // Read from the inventory rather than typed out: this list had been
+      // stuck at five names since before the 2026-08-26 release.
+      tools: dataTools().map((t) => t.name),
     },
     auth: {
       api_key: {
@@ -261,12 +271,16 @@ const AGENT_MANIFEST = {
     'Pre-payout compliance screening for autonomous agents — check the bank behind a counterparty IBAN before you send funds: validation, sanctions, Swiss clearing, SEPA/VoP reachability and risk scoring.',
   url: 'https://ibanforge.com',
   contact: 'https://github.com/cammac-creator/ibanforge',
+  // One capability per data tool, read from the inventory, then the
+  // cross-cutting signals that no single tool owns. The tool-shaped half used
+  // to be typed out and had been missing the two 2026-08-26 tools ever since
+  // (audit 2026-09-01, MCP-18): a crawler reading this file learned nothing
+  // about the only two capabilities it could have exercised for free.
   capabilities: [
-    'iban_validation',
-    'bic_lookup',
+    ...dataTools()
+      .map((t) => t.capability)
+      .filter((slug): slug is string => slug !== null),
     'swift_lookup',
-    'swiss_clearing_lookup',
-    'sepa_compliance_check',
     'sanctions_screening',
     'vop_check',
     'emi_classification',
@@ -310,6 +324,60 @@ for (const path of [
 // text; preferredTransport is HTTP+JSON (not JSONRPC) and the description
 // routes real integrations to MCP/REST.
 // ──────────────────────────────────────────────────────────────────────────────
+
+interface A2ASkillDetail {
+  description: string;
+  tags: string[];
+  examples?: string[];
+}
+
+/**
+ * The search-facing half of each A2A skill, keyed by tool name.
+ *
+ * A directory indexes on tags and on the wording, so these stay written by
+ * hand; the LIST of skills comes from the inventory. A tool with no entry here
+ * still ships a skill, described by its inventory sentence and with no tags,
+ * which is a thin entry rather than a missing one.
+ */
+const A2A_SKILL_DETAIL: Record<string, A2ASkillDetail> = {
+  validate_iban: {
+    description:
+      'Structure (mod-97 + country BBAN), issuing bank with BIC, bank-code check against 6 national registers, EMI/vIBAN classification, SEPA + VoP reachability.',
+    tags: ['iban', 'validation', 'sepa', 'vop', 'bank'],
+    examples: ['Validate DE89370400440532013000 and tell me the issuing bank.'],
+  },
+  batch_validate_iban: {
+    description: 'Up to 100 IBANs per call, one credit per IBAN, same enrichment as single validation.',
+    tags: ['iban', 'batch', 'payout'],
+  },
+  lookup_bic: {
+    description:
+      'Resolve a BIC against 121k+ entries (39k+ LEI-enriched via GLEIF): bank name, city, country, LEI, address where published.',
+    tags: ['bic', 'swift', 'lei'],
+  },
+  lookup_ch_clearing: {
+    description:
+      'BC-Nummer / IID against the SIX BankMaster (1,100+ entries): institution, seat address, SIC/euroSIC/instant participation, QR-IID semantics.',
+    tags: ['swiss', 'clearing', 'qr-iid', 'six'],
+  },
+  check_compliance: {
+    description:
+      'Bank-level sanctions (OFAC + EU, BIC8 level — not name screening), FATF lists, SEPA/VoP reachability, 0-100 risk score.',
+    tags: ['sanctions', 'fatf', 'risk', 'compliance'],
+  },
+  validate_payment_reference: {
+    description:
+      'RF/ISO 11649, Swiss QRR, Belgian OGM/VCS and Finnish viitenumero checksums, each against the dated document that publishes the rule, plus the QRR/QR-IBAN pairing verdict when an IBAN is supplied. Free, no key.',
+    tags: ['payment-reference', 'iso-11649', 'qr-bill', 'ogm', 'free'],
+    examples: ['Is RF18539007547034 a valid creditor reference, and may it travel with this Swiss IBAN?'],
+  },
+  check_postal_address: {
+    description:
+      "Conformity of a structured ISO 20022 postal address against one rail's published rules (sps, hvps_plus, fedwire), one finding per rule with its source document and date. Free, no key.",
+    tags: ['iso-20022', 'postal-address', 'sps', 'hvps-plus', 'fedwire', 'free'],
+    examples: ['Does this ISO 20022 address pass the Swiss SPS rules before I build the pain.001?'],
+  },
+};
 
 const A2A_AGENT_CARD = {
   // A2A 1.0: the normative proto consolidates url/transport/version into
@@ -355,40 +423,23 @@ const A2A_AGENT_CARD = {
   },
   defaultInputModes: ['application/json'],
   defaultOutputModes: ['application/json'],
-  skills: [
-    {
-      id: 'validate_iban',
-      name: 'Validate IBAN',
-      description:
-        'Structure (mod-97 + country BBAN), issuing bank with BIC, bank-code check against 6 national registers, EMI/vIBAN classification, SEPA + VoP reachability.',
-      tags: ['iban', 'validation', 'sepa', 'vop', 'bank'],
-      examples: ['Validate DE89370400440532013000 and tell me the issuing bank.'],
-    },
-    {
-      id: 'batch_validate_iban',
-      name: 'Batch Validate IBANs',
-      description: 'Up to 100 IBANs per call, one credit per IBAN, same enrichment as single validation.',
-      tags: ['iban', 'batch', 'payout'],
-    },
-    {
-      id: 'lookup_bic',
-      name: 'Lookup BIC/SWIFT',
-      description: 'Resolve a BIC against 121k+ entries (39k+ LEI-enriched via GLEIF): bank name, city, country, LEI, address where published.',
-      tags: ['bic', 'swift', 'lei'],
-    },
-    {
-      id: 'lookup_ch_clearing',
-      name: 'Swiss Clearing Lookup',
-      description: 'BC-Nummer / IID against the SIX BankMaster (1,100+ entries): institution, seat address, SIC/euroSIC/instant participation, QR-IID semantics.',
-      tags: ['swiss', 'clearing', 'qr-iid', 'six'],
-    },
-    {
-      id: 'check_compliance',
-      name: 'Compliance Check',
-      description: 'Bank-level sanctions (OFAC + EU, BIC8 level — not name screening), FATF lists, SEPA/VoP reachability, 0-100 risk score.',
-      tags: ['sanctions', 'fatf', 'risk', 'compliance'],
-    },
-  ],
+  // Skills come from the inventory's data tools, so the card cannot advertise
+  // fewer capabilities than the server serves. It advertised five out of seven
+  // from 2026-08-26 to 2026-09-01 because the list was written out by hand
+  // here, and this card is one of the two documents agent directories read
+  // first (audit 2026-09-01, DX-01 and MCP-16). Tags, examples and the longer
+  // wording stay hand-written below: they are what makes a skill findable by
+  // search, and no inventory sentence can guess them.
+  skills: dataTools().map((tool) => {
+    const extra = A2A_SKILL_DETAIL[tool.name];
+    return {
+      id: tool.name,
+      name: tool.title,
+      description: extra?.description ?? tool.description,
+      tags: extra?.tags ?? [],
+      ...(extra?.examples ? { examples: extra.examples } : {}),
+    };
+  }),
 };
 
 discovery.get('/.well-known/agent-card.json', (c) => c.json(A2A_AGENT_CARD));

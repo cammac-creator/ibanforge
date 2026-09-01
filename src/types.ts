@@ -371,6 +371,8 @@ export interface IBANValidationResult {
      * check for you and says nothing about a specific account.
      */
     vop_participant?: boolean | null;
+    /** Where `schemes` comes from: the EPC registers (bank grain) or the country default. */
+    basis?: 'country_default' | 'epc_register';
   };
   issuer?: {
     /**

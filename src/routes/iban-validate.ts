@@ -3,6 +3,7 @@ import type { HonoEnv } from '../types.js';
 import { validateIBAN } from '../lib/iban.js';
 import { enrichResult } from '../lib/enrich.js';
 import { recordOperation } from '../lib/stats.js';
+import { recordSafely } from '../lib/record-safely.js';
 import { getIban, getReference, getReferenceType, computeRevenue } from '../lib/request-helpers.js';
 import { buildReferenceCheck } from '../lib/payment-reference.js';
 import type { IBANValidationResult } from '../types.js';
@@ -69,7 +70,14 @@ ibanValidate.post('/v1/iban/validate', async (c) => {
 
   const errorDetail = result.valid ? undefined : result.iban.slice(0, 4);
   const revenue = computeRevenue(c, postedPrice);
-  recordOperation('iban_validate', result.country?.code ?? null, result.valid, revenue, errorDetail, c.get('apiKeyPrefix'));
+  // Wrapped since 2026-09-01 (QUA-12): the swallow is unchanged, but the
+  // failures are now counted and raise an ops alert past a streak, so a stats
+  // DB that stops accepting writes cannot look like a service nobody calls.
+  recordSafely(
+    () =>
+      recordOperation('iban_validate', result.country?.code ?? null, result.valid, revenue, errorDetail, c.get('apiKeyPrefix')),
+    'iban_validate',
+  );
 
   return c.json(result);
 });

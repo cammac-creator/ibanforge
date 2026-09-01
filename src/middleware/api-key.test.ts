@@ -3,6 +3,7 @@ import { Hono } from 'hono';
 import { apiKeyMiddleware } from './api-key.js';
 import { ibanValidate } from '../routes/iban-validate.js';
 import { ibanBatch } from '../routes/iban-batch.js';
+import { ibanFormat } from '../routes/iban-format.js';
 import { generateApiKey, generateCreditKey, validateApiKey, getUsage, checkAndIncrementQuota } from '../lib/api-keys.js';
 import { getStatsDB } from '../lib/db.js';
 import type { HonoEnv } from '../types.js';
@@ -384,5 +385,89 @@ describe('apiKeyMiddleware — telling a successful caller where it stands', () 
     expect(res.status).toBe(200);
     expect(res.headers.get('X-Credits-Total')).toBe('1000');
     expect(res.headers.get('X-Credits-Remaining')).toBe('999');
+  });
+});
+
+/**
+ * The free tour must not be billed (SEC-04, audit 2026-09-01).
+ *
+ * `/v1/iban/format`, `/v1/iban/structure`, `/v1/demo`, `/v1/ops/recent` and
+ * their neighbours are advertised as free in `/llms.txt` and on `/v1` — and
+ * they are, until the caller presents a key. They are mounted after this
+ * middleware, so a developer who sets their key globally in an HTTP client (the
+ * normal thing to do) paid a quota slot for each of them: six such calls with a
+ * fresh key took `X-Quota-Used` from 0 to 6.
+ */
+describe('apiKeyMiddleware — routes documented free are billed nothing', () => {
+  function makeFreeApp() {
+    const app = new Hono<HonoEnv>();
+    app.use('/v1/*', apiKeyMiddleware());
+    app.route('/', ibanFormat);
+    return app;
+  }
+
+  it('leaves the quota untouched when a key calls a free route', async () => {
+    const key = generateApiKey(`free-route-${RUN_ID}-1@example.com`)!.api_key;
+    const { keyHash } = validateApiKey(key);
+    const before = getUsage(keyHash).used;
+
+    const app = makeFreeApp();
+    const res = await app.request('/v1/iban/format?iban=CH9300762011623852957', {
+      headers: { Authorization: `Bearer ${key}` },
+    });
+
+    expect(res.status).toBe(200);
+    expect(getUsage(keyHash).used, 'a free route debited the monthly allowance').toBe(before);
+    expect(res.headers.get('X-Quota-Used')).toBe(String(before));
+  });
+
+  it('still attributes the call to its key, which is why the fix is here and not in the mount order', async () => {
+    // Mounting these routes before the middleware would also have removed the
+    // charge — and with it `apiKeyPrefix`, so the calls would stop being
+    // attributed to their customer in the telemetry. Billing zero keeps both.
+    const key = generateApiKey(`free-route-${RUN_ID}-2@example.com`)!.api_key;
+    const app = new Hono<HonoEnv>();
+    app.use('/v1/*', apiKeyMiddleware());
+    let seenPrefix: string | null = null;
+    app.get('/v1/iban/format', (c) => {
+      seenPrefix = c.get('apiKeyPrefix');
+      return c.json({ ok: true });
+    });
+    await app.request('/v1/iban/format?iban=CH9300762011623852957', {
+      headers: { Authorization: `Bearer ${key}` },
+    });
+    expect(seenPrefix).toBe(key.slice(0, 12));
+  });
+
+  it('serves a free route to a key whose allowance is already spent', async () => {
+    // The assertion that actually protects the promise: an exhausted key is
+    // turned away from paid routes and must still get the free ones. Zero units
+    // pass the ceiling by construction (`measured + units > limit`).
+    const key = generateApiKey(`free-route-${RUN_ID}-3@example.com`)!.api_key;
+    const { keyHash, monthlyLimit } = validateApiKey(key);
+    getStatsDB()
+      .prepare('INSERT OR REPLACE INTO api_usage (key_hash, month, count) VALUES (?, ?, ?)')
+      .run(keyHash, new Date().toISOString().slice(0, 7), monthlyLimit ?? 200);
+
+    const app = makeFreeApp();
+    const res = await app.request('/v1/iban/format?iban=CH9300762011623852957', {
+      headers: { Authorization: `Bearer ${key}` },
+    });
+    expect(res.status).toBe(200);
+    expect(res.headers.get('X-Quota-Exhausted'), 'a free route must not answer with the paywall hint').toBeNull();
+  });
+
+  it('keeps billing the paid routes, one unit per call', async () => {
+    const key = generateApiKey(`free-route-${RUN_ID}-4@example.com`)!.api_key;
+    const { keyHash } = validateApiKey(key);
+    const before = getUsage(keyHash).used;
+    const app = makeApp();
+    const res = await app.request('/v1/iban/validate', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ iban: 'DE89370400440532013000' }),
+    });
+    expect(res.status).toBe(200);
+    expect(getUsage(keyHash).used).toBe(before + 1);
   });
 });

@@ -23,7 +23,7 @@ import Stripe from 'stripe';
 import { getStatsDB } from '../lib/db.js';
 import { generateStripeKey, generateOemKey, deactivateBySubscription, OEM_MONTHLY_LIMIT } from '../lib/api-keys.js';
 import { notifyPurchaseTelegram } from '../lib/notify.js';
-import { sendApiKeyEmail, sendOemKeyEmail } from '../lib/email.js';
+import { sendApiKeyEmail, sendOemKeyEmail, alertKeyDeliveryFailure } from '../lib/email.js';
 
 export const STRIPE_BUNDLES: Record<string, { credits: number; price_usd: number }> = {
   '1k': { credits: 1000, price_usd: 5 },
@@ -395,7 +395,15 @@ stripeWebhook.post('/v1/stripe/webhook', async (c) => {
               credits: result.notify.credits,
               bundle: result.notify.bundle,
             });
-      void deliver.catch(() => {});
+      // The empty catch was doubly defensive (the transport swallows and logs
+      // everything already), but it also meant a key that was PAID FOR and never
+      // arrived left no trace anywhere a human looks. QUA-13, 2026-09-01: the
+      // relay's own refusal now alerts from inside src/lib/email.ts, and a throw
+      // before it ever answers alerts from here. Nothing personal in the text:
+      // Telegram is not a declared processor (src/lib/ops-alert.ts, rule 3).
+      void deliver.catch(() => {
+        alertKeyDeliveryFailure('stripe key delivery threw before the relay answered');
+      });
     }
   }
 

@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import type { HonoEnv } from '../types.js';
 import { recordOperation } from '../lib/stats.js';
+import { recordSafely } from '../lib/record-safely.js';
 import {
   ADDRESS_SCHEMES,
   CBPR_NOTE,
@@ -157,11 +158,13 @@ addressCheck.post('/v1/address/check', async (c) => {
   //     price. A free door must not be a cheaper way in.
   //
   // The scheme is the dimension this endpoint is about anyway, and it is kept.
-  try {
-    recordOperation('address_check', null, result.conforms, 0, normalized, c.get('apiKeyPrefix'));
-  } catch {
-    // stats failure must not break the response
-  }
+  // Wrapped since 2026-09-01 (QUA-12): the swallow is unchanged, but the
+  // failures are now counted and raise an ops alert past a streak, so a stats
+  // DB that stops accepting writes cannot look like a service nobody calls.
+  recordSafely(
+    () => recordOperation('address_check', null, result.conforms, 0, normalized, c.get('apiKeyPrefix')),
+    'address_check',
+  );
 
   return c.json(result);
 });

@@ -55,7 +55,99 @@ const STATS_DB_PATH = process.env.STATS_DB_PATH ?? resolve(__dirname, '../../dat
 
 let statsDB: DatabaseType.Database | null = null;
 
+/**
+ * Whether the stats database could be opened and migrated, and why not.
+ *
+ * 🚨 Performance/resilience audit 2026-09-01, finding PERF-03. A corrupt
+ * `stats.sqlite` used to kill the process at IMPORT time — `getStatsDB()` is
+ * called as a module side effect by `src/routes/feedback.ts`, so the throw
+ * happened before `serve()` ever ran. No listener existed, `/health` returned
+ * nothing at all, Railway gave up after `restartPolicyMaxRetries = 3`, and the
+ * only in-process watchdogs (`ops-probes`) were inside the dead process. Worst
+ * case the service stayed down for a month with every automation green.
+ *
+ * The state below turns that total, silent failure into a diagnosed 503:
+ * `/health` reports `databases.stats: "error"` with the SQLite message, Railway
+ * keeps restarting a container that at least says what is wrong, and `index.ts`
+ * raises an OPS alert at boot. `entrypoint.sh` never overwrites `stats.sqlite`
+ * (by design — it holds the API keys), so a corrupt file survives every restart
+ * unchanged: being able to READ the diagnosis is the whole fix.
+ */
+export interface StatsDbState {
+  ok: boolean;
+  error?: string;
+}
+
+let statsDbState: StatsDbState = { ok: true };
+
+/** Last known state of the stats database. Read by `/health`. */
+export function getStatsDbState(): StatsDbState {
+  return statsDbState;
+}
+
+/**
+ * Open and migrate the stats database once, at boot, without letting a failure
+ * take the process down. Call it from `index.ts` BEFORE `buildApp()` so the
+ * outcome is known by the time `/health` can be asked.
+ */
+export function initStatsDB(): StatsDbState {
+  try {
+    getStatsDB();
+  } catch {
+    // getStatsDB already recorded the cause in statsDbState.
+  }
+  return statsDbState;
+}
+
+/**
+ * Bound the size of the write-ahead log (audit 2026-09-01, finding PERF-09).
+ *
+ * Nothing checkpointed the WAL explicitly: only SQLite's passive auto-checkpoint
+ * at 1 000 pages ran, and a long-lived reader is enough to keep it from ever
+ * truncating. On a Railway volume that is disk that never comes back. TRUNCATE
+ * is the only mode that returns the file to zero bytes.
+ *
+ * Guarded and non-throwing on purpose: this is housekeeping called from the
+ * retention tick, and a busy database must never turn it into a boot failure.
+ * Returns true when the checkpoint completed without being blocked.
+ */
+export function checkpointStatsWal(): boolean {
+  try {
+    const [row] = getStatsDB().pragma('wal_checkpoint(TRUNCATE)') as Array<{ busy: number }>;
+    return row?.busy === 0;
+  } catch (err) {
+    console.error('[db] WAL checkpoint failed:', err instanceof Error ? err.message : err);
+    return false;
+  }
+}
+
+/**
+ * Public accessor. The open + migrate sequence lives in `openStatsDB` below;
+ * this wrapper exists so that a failure is RECORDED and never leaves a
+ * half-initialised handle cached — `openStatsDB` assigns `statsDB` before the
+ * first PRAGMA runs, so without this every later caller would have been handed
+ * back a connection whose schema migration never completed (audit 2026-09-01).
+ */
 export function getStatsDB(): DatabaseType.Database {
+  try {
+    const db = openStatsDB();
+    statsDbState = { ok: true };
+    return db;
+  } catch (err) {
+    if (statsDB) {
+      try {
+        statsDB.close();
+      } catch {
+        // A handle on a corrupt file can refuse to close; dropping it is enough.
+      }
+      statsDB = null;
+    }
+    statsDbState = { ok: false, error: err instanceof Error ? err.message : String(err) };
+    throw err;
+  }
+}
+
+function openStatsDB(): DatabaseType.Database {
   if (!statsDB) {
     const Db = loadDatabaseSync();
     statsDB = new Db(STATS_DB_PATH);
@@ -104,6 +196,29 @@ export function getStatsDB(): DatabaseType.Database {
         hour INTEGER,
         day_of_week INTEGER
       );
+      -- SIZE BUDGET of request_log (audit 2026-09-01, finding PERF-04).
+      -- No backticks and no question mark below: this comment lives inside a
+      -- JS template literal, where a backtick ends the string.
+      -- Retention is 12 months (src/index.ts, privacy policy + DPA commitment)
+      -- and is NOT shortened here: the promise is the promise. What it costs,
+      -- measured with dbstat on a 1 095 000-row projection (3 000 req/day):
+      --   table                        125.5 Mo
+      --   idx_request_log_ip_hash       49.2 Mo   <- the heaviest
+      --   idx_request_log_date          33.2 Mo
+      --   idx_request_log_path          27.0 Mo
+      --   idx_request_log_client_kind   17.5 Mo
+      --   idx_request_log_key_prefix    11.2 Mo
+      --   stats.sqlite whole           306 Mo     (22 Mo today)
+      -- The heaviest index STAYS: EXPLAIN QUERY PLAN on that same projection
+      -- shows /admin/scanners uses it twice, once for the ip_hash equality of
+      -- the drill-down and once for the IS NOT NULL scan behind the list of top
+      -- sources. Dropping it would trade 49 Mo for a full scan of 1.1 M rows on
+      -- the only view that tells a scanner from a customer.
+      -- No composite index was added for /stats/status-by-path either: once the
+      -- query leads with the date (see getStatusByPath), the planner picks
+      -- idx_request_log_date, and neither (path, created_at) nor
+      -- (created_at, path) is ever chosen. Each would have cost about 40 Mo at
+      -- 12 months of retention for no change of plan.
       CREATE INDEX IF NOT EXISTS idx_request_log_date ON request_log(created_at);
       CREATE INDEX IF NOT EXISTS idx_request_log_path ON request_log(path);
       CREATE INDEX IF NOT EXISTS idx_operations_type ON operations(operation_type);
@@ -729,5 +844,9 @@ export function closeAll(): void {
     statsDB = null;
     resetStatsStatements();
   }
+  // A recorded open failure must not outlive the connection it described: after
+  // a close the next getStatsDB() decides afresh, otherwise a test (or a reseed)
+  // that repairs the file would keep /health red forever (PERF-03, 2026-09-01).
+  statsDbState = { ok: true };
   closeComplianceDB();
 }

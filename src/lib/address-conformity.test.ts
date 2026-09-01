@@ -61,6 +61,10 @@ describe('sps — the strictest corpus, and the only one that could be read in f
       'adr_line_max_2',
       'adr_line_max_length_70',
       'adr_line_no_repeat',
+      'strt_nm_max_70',
+      'bldg_nb_max_16',
+      'pst_cd_max_16',
+      'twn_nm_max_35',
     ]);
   });
 
@@ -186,6 +190,10 @@ describe('fedwire — town and country unconditionally, two lines of 70, and not
       'ctry_iso3166',
       'adr_line_max_2',
       'adr_line_max_length_70',
+      'strt_nm_max_70',
+      'bldg_nb_max_16',
+      'pst_cd_max_16',
+      'twn_nm_max_35',
     ]);
   });
 
@@ -253,5 +261,76 @@ describe('conforms is false on a failure and unaffected by a rule that did not r
 
   it('is false as soon as one rule fails', () => {
     expect(checkPostalAddress('sps', { ...clean, adr_tp: 'ADDR' }).conforms).toBe(false);
+  });
+});
+
+/**
+ * DATA-04, data audit of 01/09/2026: the checker had no length rule on any
+ * STRUCTURED element. A StrtNm of 200 characters, a TwnNm of 100 and a PstCd
+ * of 30 passed every rail, and the caller was told the address conformed.
+ */
+describe('the widths of the structured elements', () => {
+  const overlong: AddressToCheck = {
+    strt_nm: 'A'.repeat(200),
+    bldg_nb: '1'.repeat(20),
+    pst_cd: '9'.repeat(30),
+    twn_nm: 'B'.repeat(100),
+    ctry: 'CH',
+  };
+
+  it.each(ADDRESS_SCHEMES)('%s fails each element that overruns its ISO 20022 type', (scheme) => {
+    const result = checkPostalAddress(scheme, overlong);
+    expect(result.conforms).toBe(false);
+    const failed = result.findings.filter((f) => f.verdict === 'fail').map((f) => f.rule);
+    expect(failed).toEqual(
+      expect.arrayContaining(['strt_nm_max_70', 'bldg_nb_max_16', 'pst_cd_max_16', 'twn_nm_max_35']),
+    );
+  });
+
+  it.each(ADDRESS_SCHEMES)('%s passes an address that fits, and says what it measured', (scheme) => {
+    const result = checkPostalAddress(scheme, clean);
+    const finding = result.findings.find((f) => f.rule === 'twn_nm_max_35');
+    expect(finding?.verdict).toBe('pass');
+    expect(finding?.detail).toContain('Max35Text');
+  });
+
+  it('measures each element at its own boundary, not one size for all', () => {
+    // 16 and 35 are different numbers, and a checker that applied 70 to
+    // everything would pass all three of these.
+    expect(find('sps', { ...clean, pst_cd: '9'.repeat(16) }, 'pst_cd_max_16').verdict).toBe('pass');
+    expect(find('sps', { ...clean, pst_cd: '9'.repeat(17) }, 'pst_cd_max_16').verdict).toBe('fail');
+    expect(find('sps', { ...clean, twn_nm: 'B'.repeat(35) }, 'twn_nm_max_35').verdict).toBe('pass');
+    expect(find('sps', { ...clean, twn_nm: 'B'.repeat(36) }, 'twn_nm_max_35').verdict).toBe('fail');
+    expect(find('sps', { ...clean, strt_nm: 'A'.repeat(70) }, 'strt_nm_max_70').verdict).toBe('pass');
+    expect(find('sps', { ...clean, strt_nm: 'A'.repeat(71) }, 'strt_nm_max_70').verdict).toBe('fail');
+  });
+
+  it('is not_applicable on an absent element rather than a free pass', () => {
+    const f = find('sps', { twn_nm: 'Zurich', ctry: 'CH' }, 'strt_nm_max_70');
+    expect(f.verdict).toBe('not_applicable');
+  });
+
+  it('says on the two silent rails where the width comes from', () => {
+    // The Federal Reserve page and the T2 UDFS state that the elements exist,
+    // not how wide they are. The rule is sourced to the data type, and the
+    // finding says so rather than implying the rail spelled it out.
+    for (const scheme of ['fedwire', 'hvps_plus'] as const) {
+      const source = find(scheme, clean, 'twn_nm_max_35').source;
+      expect(source).toContain('does not restate element widths');
+      expect(source).toContain('ISO 20022 data type');
+    }
+    // SPS quotes its own field table, so no such clause there.
+    expect(find('sps', clean, 'twn_nm_max_35').source).not.toContain('does not restate');
+    expect(find('sps', clean, 'twn_nm_max_35').source).toContain('Max35Text');
+  });
+
+  it('does not repeat the Ctry width as a rule of its own', () => {
+    // Two characters is the width of a CountryCode, and ctry_iso3166 already
+    // fails anything that is not exactly two uppercase letters. A ctry_max_2
+    // would report the same defect twice.
+    for (const scheme of ADDRESS_SCHEMES) {
+      expect(checkPostalAddress(scheme, clean).findings.map((f) => f.rule)).not.toContain('ctry_max_2');
+    }
+    expect(find('sps', { ...clean, ctry: 'CHE' }, 'ctry_iso3166').verdict).toBe('fail');
   });
 });

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { auditCuratedMap } from './curated-map-consistency.js';
+import { findImpostors } from './curated-map-impostors.js';
 
 /**
  * Guards on src/db/bic_data.json, which is hand-assembled and had nothing
@@ -32,6 +33,29 @@ describe('curated bank-code map', () => {
       share,
       `${audit.undescribable}/${audit.total} map entries resolve to a BIC the directory cannot describe`,
     ).toBeLessThan(0.02);
+  });
+
+  it('never names a bank under a BIC that is not that bank', () => {
+    // The third assertion, and the only one that can catch a WRONG answer
+    // rather than a missing one. The two above cannot: a BIC can be perfectly
+    // formed, of the right country, and simply belong to another institution.
+    //
+    // Found by the data audit of 01/09/2026 (DATA-01 / DATA-01b): five entries,
+    // one of them serving the live Italian ABI 03268 as "Banca Monte dei Paschi
+    // di Siena" under SARDIT2S, a BIC absent from our own 121,773-row
+    // directory, while MPS was already correctly keyed at IT:01030. A payment
+    // pre-flight received a false bank name and an unroutable BIC with
+    // `authoritative: false` for its only warning.
+    //
+    // The conjunction behind the detector, and why it is not a name-equality
+    // check, is documented in curated-map-impostors.ts. No exception list: the
+    // five hits were all defects, all five are corrected, and an entry that
+    // trips this is telling you the same thing they did.
+    const impostors = findImpostors();
+    expect(
+      impostors.map((i) => `${i.key} serves ${i.bic} for "${i.bank_name}" (directory: ${i.resolvesAs.join(', ')})`),
+      'a curated entry names an institution the directory resolves under a different BIC8',
+    ).toEqual([]);
   });
 
   it('still covers the countries the map claims to cover', () => {

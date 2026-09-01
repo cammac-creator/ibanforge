@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { validateIBAN } from '../lib/iban.js';
 import type { HonoEnv } from '../types.js';
 import { recordOperation } from '../lib/stats.js';
+import { recordSafely } from '../lib/record-safely.js';
 
 /**
  * GET /v1/iban/format — FREE pure-format IBAN check.
@@ -60,18 +61,21 @@ ibanFormat.get('/v1/iban/format', async (c) => {
   const result = validateIBAN(parsed.data.iban);
 
   // Record stats — free endpoint, revenue is 0
-  try {
-    recordOperation(
-      'iban_format',
-      result.valid ? result.country?.code ?? null : null,
-      result.valid,
-      0,
-      result.error ?? undefined,
-      c.get('apiKeyPrefix'),
-    );
-  } catch {
-    // stats failure must not break the response
-  }
+  // Wrapped since 2026-09-01 (QUA-12): the swallow is unchanged, but the
+  // failures are now counted and raise an ops alert past a streak, so a stats
+  // DB that stops accepting writes cannot look like a service nobody calls.
+  recordSafely(
+    () =>
+      recordOperation(
+        'iban_format',
+        result.valid ? result.country?.code ?? null : null,
+        result.valid,
+        0,
+        result.error ?? undefined,
+        c.get('apiKeyPrefix'),
+      ),
+    'iban_format',
+  );
 
   if (!result.valid) {
     return c.json({

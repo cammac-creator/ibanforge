@@ -353,7 +353,7 @@ export function recordOperation(
   revenueUsdc: number,
   errorDetail?: string,
   keyPrefix?: string | null,
-) {
+): boolean {
   try {
     const hour = new Date().getUTCHours();
     const dow = (new Date().getUTCDay() + 6) % 7; // 0=Mon, 6=Sun
@@ -361,10 +361,15 @@ export function recordOperation(
     insertOp().run(type, countryCode, success ? 1 : 0, hour, dow, truncatedError, keyPrefix ?? null);
     upsertDaily().run(type, 1, success ? 1 : 0, revenueUsdc);
     upsertHourly().run(hour, dow, type, 1, success ? 1 : 0);
+    return true;
   } catch (err) {
     // Stats are non-critical — never crash the API, but log so a broken stats
-    // DB is visible instead of silently dropping every operation.
+    // DB is visible instead of silently dropping every operation. The boolean
+    // is what lets `recordSafely` (src/lib/record-safely.ts) count consecutive
+    // failures and raise an ops alert: a measurement that dies in silence is
+    // indistinguishable from a quiet week (audit QUA-12, 2026-09-01).
     console.error('[stats] recordOperation failed:', err);
+    return false;
   }
 }
 
@@ -1578,71 +1583,124 @@ export interface StatusByPathRow {
   s3xx: number;
   s4xx: number;
   s5xx: number;
-  avg_ms: number;
+  /** null when the window holds no timed row for this path, exactly as SQL AVG did. */
+  avg_ms: number | null;
   /** Exact HTTP status code → count. Keys are stringified ints ("400", "402", "404"...). */
   by_status: Record<string, number>;
   /** HTTP method → count. Reveals e.g. "agent sent GET on a POST-only route". */
   by_method: Record<string, number>;
 }
 
+/** How many paths the endpoint reports, longest-standing part of its contract. */
+const STATUS_BY_PATH_LIMIT = 30;
+
+/**
+ * 🚨 Rewritten 2026-09-01 (audit findings PERF-06 and PERF-01). Same payload,
+ * one query instead of three, and the date at the head of the WHERE.
+ *
+ * What was wrong: all three queries filtered on `created_at`, but SQLite chose
+ * `idx_request_log_path` to satisfy `GROUP BY path` and therefore read the
+ * WHOLE history, not the requested window. `EXPLAIN QUERY PLAN` said it out
+ * loud — `SCAN request_log USING INDEX idx_request_log_path` — and on a
+ * 1 000 000-row projection of 12 months of retention the three passes cost
+ * 800 + 800 + 800 ms. better-sqlite3 is synchronous and this process is
+ * single-instance, so that is 2.4 s during which EVERY client is frozen: a
+ * `/v1/iban/format` call measured at 0.91 ms answered in 2 091 ms while the
+ * dashboard loaded one tile. None of it appeared in our own p95, because
+ * /stats/* is in SKIP_TRACKING.
+ *
+ * What replaces it: a single `GROUP BY path, status, method` whose WHERE leads
+ * with the date, which the planner answers with `SEARCH request_log USING INDEX
+ * idx_request_log_date (created_at>?)` — the window, and only the window. The
+ * three breakdowns are then folded in JS from at most (paths × statuses ×
+ * methods) rows, a few hundred in practice (87 distinct triples over the whole
+ * developer history). Measured on the same 1 000 000-row database:
+ * 2 388 ms → 54 ms at 30 days, 180 ms at the 90-day ceiling the route enforces.
+ *
+ * No index was added: with the date leading, neither `(path, created_at)` nor
+ * `(created_at, path)` is ever chosen by the planner, and each would have cost
+ * roughly 40 Mo at 12 months of retention (see the size budget in db.ts).
+ */
 export function getStatusByPath(days: number = 30): StatusByPathRow[] {
   const db = getStatsDB();
-  const aggregates = db.prepare(`
+
+  const rows = db.prepare(`
     SELECT
       path,
-      COUNT(*) as total,
-      SUM(CASE WHEN status >= 200 AND status < 300 THEN 1 ELSE 0 END) as s2xx,
-      SUM(CASE WHEN status >= 300 AND status < 400 THEN 1 ELSE 0 END) as s3xx,
-      SUM(CASE WHEN status >= 400 AND status < 500 THEN 1 ELSE 0 END) as s4xx,
-      SUM(CASE WHEN status >= 500 THEN 1 ELSE 0 END) as s5xx,
-      ROUND(AVG(response_ms), 0) as avg_ms
+      status,
+      method,
+      COUNT(*) as n,
+      SUM(response_ms) as sum_ms,
+      SUM(CASE WHEN response_ms IS NULL THEN 0 ELSE 1 END) as n_ms
     FROM request_log
     WHERE created_at >= datetime('now', '-' || ? || ' days')
-    GROUP BY path
-    ORDER BY total DESC
-    LIMIT 30
-  `).all(days) as Array<Omit<StatusByPathRow, 'by_status'>>;
+    GROUP BY path, status, method
+  `).all(days) as Array<{
+    path: string;
+    status: number;
+    method: string;
+    n: number;
+    sum_ms: number | null;
+    n_ms: number;
+  }>;
 
-  if (aggregates.length === 0) return [];
+  // Accumulator per path. `sumMs`/`countMs` reproduce SQL AVG exactly: AVG
+  // skips NULLs, so a path whose response_ms are all NULL must report avg_ms
+  // null (what ROUND(AVG(NULL), 0) returned), not 0.
+  interface Acc {
+    path: string;
+    total: number;
+    s2xx: number;
+    s3xx: number;
+    s4xx: number;
+    s5xx: number;
+    sumMs: number;
+    countMs: number;
+    by_status: Record<string, number>;
+    by_method: Record<string, number>;
+  }
+  const byPath = new Map<string, Acc>();
 
-  // Second pass: exact status × path for the paths we kept. One row per (path,
-  // status) — cheaper than a GROUP_CONCAT and keeps the SQL portable.
-  const pathPlaceholders = aggregates.map(() => '?').join(',');
-  const detailRows = db.prepare(`
-    SELECT path, status, COUNT(*) as n
-    FROM request_log
-    WHERE created_at >= datetime('now', '-' || ? || ' days')
-      AND path IN (${pathPlaceholders})
-    GROUP BY path, status
-  `).all(days, ...aggregates.map(r => r.path)) as Array<{ path: string; status: number; n: number }>;
-
-  const detailMap = new Map<string, Record<string, number>>();
-  for (const r of detailRows) {
-    const existing = detailMap.get(r.path) ?? {};
-    existing[String(r.status)] = r.n;
-    detailMap.set(r.path, existing);
+  for (const r of rows) {
+    let acc = byPath.get(r.path);
+    if (!acc) {
+      acc = {
+        path: r.path, total: 0, s2xx: 0, s3xx: 0, s4xx: 0, s5xx: 0,
+        sumMs: 0, countMs: 0, by_status: {}, by_method: {},
+      };
+      byPath.set(r.path, acc);
+    }
+    acc.total += r.n;
+    if (r.status >= 200 && r.status < 300) acc.s2xx += r.n;
+    else if (r.status >= 300 && r.status < 400) acc.s3xx += r.n;
+    else if (r.status >= 400 && r.status < 500) acc.s4xx += r.n;
+    else if (r.status >= 500) acc.s5xx += r.n;
+    acc.sumMs += r.sum_ms ?? 0;
+    acc.countMs += r.n_ms;
+    acc.by_status[String(r.status)] = (acc.by_status[String(r.status)] ?? 0) + r.n;
+    acc.by_method[r.method] = (acc.by_method[r.method] ?? 0) + r.n;
   }
 
-  const methodRows = db.prepare(`
-    SELECT path, method, COUNT(*) as n
-    FROM request_log
-    WHERE created_at >= datetime('now', '-' || ? || ' days')
-      AND path IN (${pathPlaceholders})
-    GROUP BY path, method
-  `).all(days, ...aggregates.map(r => r.path)) as Array<{ path: string; method: string; n: number }>;
-
-  const methodMap = new Map<string, Record<string, number>>();
-  for (const r of methodRows) {
-    const existing = methodMap.get(r.path) ?? {};
-    existing[r.method] = r.n;
-    methodMap.set(r.path, existing);
-  }
-
-  return aggregates.map(r => ({
-    ...r,
-    by_status: detailMap.get(r.path) ?? {},
-    by_method: methodMap.get(r.path) ?? {},
-  }));
+  // `path` breaks ties on purpose. SQLite's `ORDER BY total DESC LIMIT 30` left
+  // equal totals in whatever order the scan produced, so which of two tied
+  // paths made the cut at rank 30 was not reproducible from one call to the
+  // next. Sorting in JS is where that can be pinned down, so it is.
+  return [...byPath.values()]
+    .sort((a, b) => b.total - a.total || (a.path < b.path ? -1 : a.path > b.path ? 1 : 0))
+    .slice(0, STATUS_BY_PATH_LIMIT)
+    .map((a) => ({
+      path: a.path,
+      total: a.total,
+      s2xx: a.s2xx,
+      s3xx: a.s3xx,
+      s4xx: a.s4xx,
+      s5xx: a.s5xx,
+      // ROUND(x, 0) in SQLite returns a REAL; Math.round matches it for the
+      // non-negative durations this column holds.
+      avg_ms: a.countMs > 0 ? Math.round(a.sumMs / a.countMs) : null,
+      by_status: a.by_status,
+      by_method: a.by_method,
+    }));
 }
 
 /**

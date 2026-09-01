@@ -104,6 +104,12 @@ describe('outgoing message bodies carry no em or en dash', () => {
       month: '2026-08',
       keyPrefix: FAKE_PREFIX,
     }),
+    // Added 2026-09-01 (BIZ-14). These two messages were live and unswept: both
+    // were assembled inside their async sender, so the lock test above could not
+    // see them and the OEM subject shipped an em dash. Making them pure is what
+    // makes the rule enforceable, not the dash removal itself.
+    buildOemKeyEmail: emailModule.buildOemKeyEmail({ rawKey: FAKE_KEY, monthlyLimit: 50_000 }),
+    buildKeyVerificationEmail: emailModule.buildKeyVerificationEmail({ code: '123456' }),
   };
 
   it('the sweep covers every builder the module exports', () => {
@@ -119,6 +125,29 @@ describe('outgoing message bodies carry no em or en dash', () => {
     expect(DASHES.test(mail.subject), `subject: ${mail.subject}`).toBe(false);
     expect(DASHES.test(mail.text), 'text part').toBe(false);
     expect(DASHES.test(mail.html), 'html part').toBe(false);
+  });
+});
+
+/**
+ * SEC-08 (2026-09-01): a failed send used to print the customer's address into
+ * stdout, which Railway keeps. The log still has to be actionable, so the
+ * domain stays and the local part goes.
+ */
+describe('recipientDomain', () => {
+  it('keeps the domain and drops the person', () => {
+    expect(emailModule.recipientDomain('acme@example.com')).toBe('example.com');
+    expect(emailModule.recipientDomain('Acme@Alpha.Example.NET')).toBe('alpha.example.net');
+  });
+
+  it('never returns something address-shaped, whatever it is handed', () => {
+    for (const weird of ['', 'no-at-sign', 'trailing@', '@leading', 'a@b@c']) {
+      const out = emailModule.recipientDomain(weird);
+      expect(out).not.toContain('@');
+    }
+    expect(emailModule.recipientDomain('trailing@')).toBe('unknown');
+    // Two @ signs: the LAST one delimits the domain, so nothing of the local
+    // part can ride along in the log.
+    expect(emailModule.recipientDomain('a@b@example.com')).toBe('example.com');
   });
 });
 

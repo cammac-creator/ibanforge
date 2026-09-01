@@ -487,18 +487,42 @@ export function checkAndIncrementQuota(
 } {
   const db = getStatsDB();
   const month = new Date().toISOString().slice(0, 7);
-  db.prepare(
-    'INSERT INTO api_usage (key_hash, month, count) VALUES (?, ?, 0) ON CONFLICT(key_hash, month) DO NOTHING',
-  ).run(keyHash, month);
-  const row = db.prepare('SELECT count FROM api_usage WHERE key_hash = ? AND month = ?').get(keyHash, month) as {
-    count: number;
-  };
-  // What the ceiling is measured against. Normally the current month; for a key
-  // opted out of the monthly reset, every month it has ever used.
-  const measured = noRecredit
-    ? (db.prepare('SELECT COALESCE(SUM(count), 0) AS n FROM api_usage WHERE key_hash = ?').get(keyHash) as { n: number }).n
-    : row.count;
-  if (measured + units > monthlyLimit) {
+  // Read the counter and write it back in ONE transaction.
+  //
+  // The read and the write were two separate statements. better-sqlite3 is
+  // synchronous and no `await` sits between them, so within this process the
+  // pair is already indivisible — but `stats.sqlite` has writers outside it
+  // (the admin scripts this codebase names in src/middleware/api-key.ts), and
+  // against a second writer the pair is a classic read-modify-write race: two
+  // callers read the same count, both find room, both write, and one call is
+  // served free. The credit path was already guarded (`decrementCredits` is a
+  // single conditional UPDATE); this aligns the quota path with it. SEC-09,
+  // audit 2026-09-01.
+  //
+  // A transaction rather than a guarded UPDATE because the ceiling is not
+  // always the row being written: on the `noRecredit` basis it is a SUM over
+  // every month while the write lands on the current one, which no single
+  // WHERE clause expresses.
+  const decide = db.transaction((): { measured: number; allowed: boolean } => {
+    db.prepare(
+      'INSERT INTO api_usage (key_hash, month, count) VALUES (?, ?, 0) ON CONFLICT(key_hash, month) DO NOTHING',
+    ).run(keyHash, month);
+    const row = db.prepare('SELECT count FROM api_usage WHERE key_hash = ? AND month = ?').get(keyHash, month) as {
+      count: number;
+    };
+    // What the ceiling is measured against. Normally the current month; for a key
+    // opted out of the monthly reset, every month it has ever used.
+    const measuredNow = noRecredit
+      ? (db.prepare('SELECT COALESCE(SUM(count), 0) AS n FROM api_usage WHERE key_hash = ?').get(keyHash) as { n: number }).n
+      : row.count;
+    if (measuredNow + units > monthlyLimit) return { measured: measuredNow, allowed: false };
+    db.prepare('UPDATE api_usage SET count = count + ? WHERE key_hash = ? AND month = ?').run(units, keyHash, month);
+    return { measured: measuredNow, allowed: true };
+  });
+  // IMMEDIATE takes the write lock at BEGIN instead of on the first write, so a
+  // concurrent writer collides at the start rather than half way through.
+  const { measured, allowed } = decide.immediate();
+  if (!allowed) {
     return {
       allowed: false,
       used: measured,
@@ -508,7 +532,6 @@ export function checkAndIncrementQuota(
       crossedNoticeThreshold: false,
     };
   }
-  db.prepare('UPDATE api_usage SET count = count + ? WHERE key_hash = ? AND month = ?').run(units, keyHash, month);
   // Reported on the same basis the ceiling was checked against, so `used` and
   // `remaining` stay coherent with the refusal above. Identical to the old
   // `row.count + units` for every key on the normal monthly basis.

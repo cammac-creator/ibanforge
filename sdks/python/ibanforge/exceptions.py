@@ -52,6 +52,17 @@ class RateLimitError(IBANforgeError):
     """Global rate limit exceeded (per-IP)."""
 
 
+class PayloadTooLargeError(IBANforgeError):
+    """413 — the request body is over the API's limit.
+
+    Broken out of ``InvalidInputError`` on 2026-09-01 (audit DX-09): 413 is a
+    distinct, reproducible answer with a distinct remedy — split the payload —
+    and a caller that catches "malformed input" retries the same body forever.
+    A batch is also capped at 100 IBANs, which is refused with 400 before the
+    body size is ever measured.
+    """
+
+
 class InvalidInputError(IBANforgeError):
     """4xx returned for an obviously malformed request — bad IBAN length, bad BIC
     format, missing query param, etc. Carries the server's `error_detail` if any.

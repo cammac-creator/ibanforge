@@ -725,6 +725,68 @@ describe('/v1/keys/report — the customer reads their own key', () => {
     const body = (await res.json()) as { report: { window_days: number } };
     expect(body.report.window_days).toBe(30);
   });
+
+  /**
+   * Security audit, improvement 1 (2026-09-01). These two routes accepted
+   * `Authorization: Bearer` and nothing else, while every billed route accepts
+   * three dialects through `extractKey` (src/middleware/api-key.ts) and the docs
+   * advertise `X-API-Key`. A client following the documented header could not
+   * read its own usage and got a 401 that reads exactly like "your key is
+   * invalid", which is a self-inflicted cause of the silence measured after
+   * the purchase.
+   */
+  describe('the documented key dialects all work', () => {
+    for (const [name, headersFor] of [
+      ['Authorization: Bearer', (k: string) => ({ Authorization: `Bearer ${k}` })],
+      ['X-API-Key', (k: string) => ({ 'X-API-Key': k })],
+      ['x-api-key (lowercase)', (k: string) => ({ 'x-api-key': k })],
+    ] as const) {
+      it(`serves /v1/keys/usage with ${name}`, async () => {
+        const key = mintKey('acme@example.com');
+        const res = await makeApp().request('/v1/keys/usage', { headers: headersFor(key) });
+        expect(res.status).toBe(200);
+        const body = (await res.json()) as { key_prefix: string };
+        // The prefix comes from the presented key, whichever door it came in.
+        expect(body.key_prefix).toBe(key.slice(0, 12));
+      });
+
+      it(`serves /v1/keys/report with ${name}`, async () => {
+        const key = mintKey('acme@example.com');
+        const res = await makeApp().request('/v1/keys/report', { headers: headersFor(key) });
+        expect(res.status).toBe(200);
+        const body = (await res.json()) as { key_prefix: string };
+        expect(body.key_prefix).toBe(key.slice(0, 12));
+      });
+    }
+
+    it('serves both routes with ?api_key=, like every billed route', async () => {
+      const key = mintKey('acme@example.com');
+      for (const path of ['/v1/keys/usage', '/v1/keys/report']) {
+        const res = await makeApp().request(`${path}?api_key=${key}`);
+        expect(res.status, path).toBe(200);
+      }
+    });
+
+    it('still refuses a value that is not one of our keys, whatever the header', async () => {
+      const refused: Record<string, string>[] = [
+        { 'X-API-Key': 'not-a-key' },
+        { Authorization: 'Bearer not-a-key' },
+        // Right shape, no such key: 401 for a different reason, still 401.
+        { 'X-API-Key': 'ifk_nope' },
+      ];
+      for (const headers of refused) {
+        expect((await makeApp().request('/v1/keys/usage', { headers })).status).toBe(401);
+      }
+    });
+
+    it('names every accepted door in the refusal, so nobody guesses', async () => {
+      const res = await makeApp().request('/v1/keys/usage');
+      expect(res.status).toBe(401);
+      const body = (await res.json()) as { message: string };
+      expect(body.message).toContain('X-API-Key');
+      expect(body.message).toContain('Bearer');
+    });
+  });
 });
 
 /**

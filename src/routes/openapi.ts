@@ -3,6 +3,10 @@ import { createRequire } from 'node:module';
 import { getEntryCount } from '../lib/bic-lookup.js';
 import { BANK_CODE_CHECK_SCHEMA , NEXT_STEPS_SCHEMA, OFFICIAL_IDENTITY_SCHEMA, POSTAL_ADDRESS_SCHEMA } from '../lib/bank-code-schema.js';
 import { ADDRESS_SCHEMES, CBPR_NOTE } from '../lib/address-conformity.js';
+// Read from the route rather than retyped: the enum of error types and the
+// flood cap are what the handler enforces, and a contract that quotes its own
+// copy of them is a contract that will be wrong one refactor from now.
+import { FEEDBACK_ERROR_TYPES, FEEDBACK_INSERTS_PER_SOURCE_HOUR } from './feedback.js';
 
 const openapi = new Hono();
 
@@ -13,7 +17,7 @@ const require = createRequire(import.meta.url);
 const { version: PKG_VERSION } = require('../../package.json') as { version: string };
 
 // Built lazily on first request (needs a DB read for live counts), then memoized.
-const buildSpec = () => ({
+const buildRawSpec = () => ({
   openapi: '3.1.0',
   info: {
     title: 'IBANforge API',
@@ -139,8 +143,15 @@ const buildSpec = () => ({
                     count: { type: 'integer', description: 'Total IBANs processed' },
                     valid_count: { type: 'integer', description: 'Number of valid IBANs' },
                     cost_usdc: { type: 'number', description: 'Total cost in USDC' },
+                    // Always served, and the `required` list above named four
+                    // fields while omitting the fifth (audit 2026-09-01, DX-06).
+                    processing_ms: {
+                      type: 'number',
+                      description: 'Server-side time spent on the whole batch, in milliseconds.',
+                      example: 4.2,
+                    },
                   },
-                  required: ['results', 'count', 'valid_count', 'cost_usdc'],
+                  required: ['results', 'count', 'valid_count', 'cost_usdc', 'processing_ms'],
                 },
               },
             },
@@ -222,8 +233,39 @@ const buildSpec = () => ({
                     { $ref: '#/components/schemas/IBANValidationResult' },
                     {
                       type: 'object',
+                      required: ['compliance', 'meta'],
                       properties: {
                         compliance: { $ref: '#/components/schemas/ComplianceResult' },
+                        // Served on every compliance answer and declared
+                        // nowhere until the audit of 2026-09-01 (DX-06). It is
+                        // the block that says what the verdict does NOT cover,
+                        // which is the half a caller most needs to read.
+                        meta: {
+                          type: 'object',
+                          description:
+                            'Provenance and scope of the verdict. Read it before acting on `compliance`: it names what was screened and, more importantly, what was not.',
+                          required: ['scope', 'disclaimer'],
+                          properties: {
+                            scope: {
+                              type: 'string',
+                              example: 'bank_bic_only',
+                              description: 'What the screen covered. "bank_bic_only" means the holding institution, never the beneficiary name.',
+                            },
+                            disclaimer: {
+                              type: 'string',
+                              description: 'The limits of the answer in plain words. Informational triage, not a regulated AML/CFT product.',
+                            },
+                            sanctions_as_of: { type: 'string', description: 'When the sanctions data was last refreshed.' },
+                            fatf_as_of: { type: 'string', example: '2026-06', description: 'The FATF plenary the jurisdiction flag comes from.' },
+                            sources: { type: 'string', example: 'EU,OFAC,UN,FATF,EPC-SCT,EPC-SCT_INST,EPC-SDD', description: 'The lists and registers consulted.' },
+                            country_risk_as_of: { type: 'string', example: '2026-07', description: 'Review date of the editorial country-risk axis.' },
+                            country_risk_scope: {
+                              type: 'string',
+                              description:
+                                'Why `risk_indicators.country_risk` and `compliance.sanctions.fatf_status` may disagree: they are two separate axes, each with its own review date, not two spellings of one.',
+                            },
+                          },
+                        },
                       },
                     },
                   ],
@@ -747,6 +789,144 @@ const buildSpec = () => ({
         },
       },
     },
+    // The self-service lifecycle of a key. All three authenticate with the KEY
+    // ITSELF as a bearer token, never with the admin secret — the handlers say
+    // so in as many words ("Self-service rotation. Auth is the (still valid)
+    // key itself.") — so they are public routes and their absence from this
+    // document was a hole, not a deliberate omission (audit 2026-09-01,
+    // DX-05). The cost of that hole is specific: a developer who leaks a key
+    // and reads only the contract cannot find out that they can kill it
+    // themselves, in one call, without contacting anyone.
+    '/v1/keys/revoke': {
+      post: {
+        operationId: 'revokeApiKey',
+        summary: 'Revoke the presented API key',
+        description:
+          'Permanently deactivates the key sent in the Authorization header. Authentication is the key itself: whoever holds it may kill it, which is what makes this usable the minute a key leaks. There is no body and no way to revoke a key other than the one presented. Irreversible — use POST /v1/keys/rotate instead if you want a working replacement.',
+        tags: ['API Keys'],
+        security: [{ apiKey: [] }],
+        responses: {
+          '200': {
+            description: 'Key deactivated. Returns revoked: true and key_prefix.',
+          },
+          '401': { description: 'No Authorization: Bearer ifk_… header ("missing_key")' },
+          '404': { description: 'Key not found or already revoked ("invalid_key")' },
+        },
+      },
+    },
+    '/v1/keys/rotate': {
+      post: {
+        operationId: 'rotateApiKey',
+        summary: 'Replace the presented API key with a fresh one',
+        description:
+          'Mints a new key inheriting the same plan and the same remaining credits, and revokes the presented one in the same operation. Authentication is the (still valid) key itself. The new key is returned once and never shown again: store it before doing anything else.',
+        tags: ['API Keys'],
+        security: [{ apiKey: [] }],
+        responses: {
+          '201': {
+            description:
+              'New key issued and the old one revoked. Returns api_key (once), key_prefix, monthly_limit and credits_remaining.',
+          },
+          '401': { description: 'No Authorization: Bearer ifk_… header ("missing_key")' },
+          '404': { description: 'Key not found or inactive ("invalid_key")' },
+        },
+      },
+    },
+    '/v1/credits/balance': {
+      get: {
+        operationId: 'getCreditBalance',
+        summary: 'Read the remaining credits of the presented key',
+        description:
+          'For a prepaid bundle key: credits_remaining, credits_total, credits_used and the top-up endpoints. For a monthly subscription key the answer is type: "subscription" with a pointer to GET /v1/keys/usage, because a subscription has no balance to report. Authentication is the key itself.',
+        tags: ['Credits'],
+        security: [{ apiKey: [] }],
+        responses: {
+          '200': {
+            description:
+              'type ("credit_bundle" or "subscription"), key_prefix, and — for a bundle — credits_remaining, credits_total, credits_used, topup_endpoints.',
+          },
+          '401': { description: 'Missing or invalid API key ("missing_key" / "invalid_key")' },
+        },
+      },
+    },
+    '/v1/feedback': {
+      post: {
+        operationId: 'submitFeedback',
+        summary: 'Report incorrect data or claim an x402 refund',
+        description:
+          'Free, no key and no payment. Report a wrong or stale answer, a missing entry, or a latency problem; passing the `tx_hash` of an x402 call is what turns a report into a refund claim. A human reads every report. Also exposed as the `send_feedback` MCP tool.',
+        tags: ['Free'],
+        security: [],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                properties: {
+                  error_type: {
+                    type: 'string',
+                    enum: [...FEEDBACK_ERROR_TYPES],
+                    default: 'other',
+                    description: 'What kind of problem is being reported.',
+                  },
+                  endpoint: { type: 'string', description: 'The endpoint that answered wrongly, e.g. /v1/bic/UBSWCHZH80A' },
+                  tx_hash: { type: 'string', description: 'The x402 transaction hash, when claiming a refund.' },
+                  expected: { type: 'string', description: 'What the answer should have been.' },
+                  got: { type: 'string', description: 'What the answer actually was.' },
+                  notes: { type: 'string', description: 'Anything else that helps reproduce it.' },
+                  contact: { type: 'string', description: 'Where to reply, if a reply is wanted.' },
+                  agent: { type: 'string', description: 'The agent or client that found it.' },
+                },
+                // At least one of endpoint / tx_hash / notes is required. That is a
+                // cross-field rule the handler enforces ("insufficient_detail") and
+                // that no JSON Schema `required` list can express, so it is stated
+                // here rather than mis-stated in the schema.
+                description:
+                  'Provide at least one of endpoint, tx_hash or notes — a report with none of the three is refused with "insufficient_detail".',
+              },
+            },
+          },
+        },
+        responses: {
+          '201': {
+            description:
+              'Report recorded. Returns ok, id, status ("open") and next_steps.check_status pointing at GET /v1/feedback/{id}.',
+          },
+          '400': {
+            description:
+              'Refused before recording. "invalid_json", "invalid_request", "invalid_error_type" (see the enum) or "insufficient_detail".',
+          },
+          '429': {
+            description: `At most ${FEEDBACK_INSERTS_PER_SOURCE_HOUR} reports per hour per source ("feedback_rate_limited").`,
+          },
+        },
+      },
+    },
+    '/v1/feedback/{id}': {
+      get: {
+        operationId: 'getFeedbackStatus',
+        summary: 'Check the status of a report',
+        description:
+          'Free, no key. Returns the minimal public view of one report: id, created_at, endpoint, error_type and status. The notes, expected and got fields stay private.',
+        tags: ['Free'],
+        security: [],
+        parameters: [
+          {
+            name: 'id',
+            in: 'path',
+            required: true,
+            description: 'The numeric id returned by POST /v1/feedback.',
+            schema: { type: 'integer', minimum: 1 },
+          },
+        ],
+        responses: {
+          '200': { description: 'id, created_at, endpoint, error_type, status' },
+          '400': { description: 'The id is not numeric ("invalid_id")' },
+          '404': { description: 'No report with that id ("not_found")' },
+        },
+      },
+    },
     '/v1/credits/bundles': {
       get: {
         operationId: 'listCreditBundles',
@@ -1014,6 +1194,7 @@ const buildSpec = () => ({
           },
         ],
         responses: {
+          '400': { $ref: '#/components/responses/UnknownParameterOrWindow' },
           '403': { description: 'Authentication required — send Authorization: Bearer ifk_...' },
           '200': {
             description: 'Historical stats array',
@@ -1097,6 +1278,12 @@ const buildSpec = () => ({
     },
   },
   components: {
+    responses: {
+      UnknownParameterOrWindow: {
+        description: 'Unknown query parameter, or a window past 90 days (audit 2026-09-01, PERF-13).',
+        content: { 'application/json': { schema: { $ref: '#/components/schemas/ApiError' } } },
+      },
+    },
     securitySchemes: {
       x402Payment: {
         type: 'apiKey',
@@ -1115,6 +1302,43 @@ const buildSpec = () => ({
       },
     },
     schemas: {
+      /**
+       * The shape EVERY failure already has, finally written down.
+       *
+       * The audit of 2026-09-01 (DX-02) sampled 17 probes on 14 routes and
+       * found the served errors perfectly regular — `{"error": "<snake_case
+       * token>", "message": "<sentence>"}` — while all 31 declared 4xx/5xx
+       * responses in this document carried a description and nothing else. So
+       * a generated client (openapi-generator, Kiota, and the Custom GPT that
+       * `integrations/openai/custom-gpt-setup.md` builds by pasting this very
+       * document) could type every success and no failure, for a server whose
+       * failures were the easy part.
+       *
+       * `error` is the field to branch on: it is a stable token, whereas
+       * `message` is prose that may be reworded. `additionalProperties` stays
+       * open because several routes add contextual help next to those two
+       * (`example`, `expected`, `schemes`, `endpoints`, `countries_endpoint`,
+       * `upgrade_to_full_validation`), and a closed schema would make a
+       * generated client drop exactly the field that says how to recover.
+       */
+      ApiError: {
+        type: 'object',
+        required: ['error', 'message'],
+        additionalProperties: true,
+        properties: {
+          error: {
+            type: 'string',
+            description:
+              'Stable machine-readable token in snake_case, e.g. "invalid_iban", "payment_required", "payload_too_large", "rate_limited". Branch on this, never on `message`.',
+            example: 'invalid_iban',
+          },
+          message: {
+            type: 'string',
+            description: 'Human-readable sentence explaining the failure. Wording may change; the token above will not.',
+            example: 'IBAN failed the mod-97 checksum.',
+          },
+        },
+      },
       IBANValidationResult: {
         type: 'object',
         required: ['iban', 'valid', 'cost_usdc'],
@@ -1227,11 +1451,20 @@ const buildSpec = () => ({
               },
             },
           },
+          // Seven fields of this schema are conditional, and until the audit of
+          // 2026-09-01 (DX-08) nothing said so: a generated client typed them
+          // as optionals with no rule for when to expect them, which is how a
+          // caller ends up branching on a field that is simply never there on
+          // the answers it gets. Each now states its own condition.
           error: {
             type: 'string',
             enum: ['invalid_format', 'unsupported_country', 'wrong_length', 'checksum_failed'],
+            description: 'Present ONLY when `valid` is false. Absent on every successful validation.',
           },
-          error_detail: { type: 'string' },
+          error_detail: {
+            type: 'string',
+            description: 'Present ONLY when `error` is, and explains it in one sentence (e.g. "Modulo 97 check returned 28, expected 1.").',
+          },
           reference_check: {
             allOf: [{ $ref: '#/components/schemas/ReferenceCheckBlock' }],
             description: 'Present ONLY when the request carried a `reference` field.',
@@ -1250,7 +1483,7 @@ const buildSpec = () => ({
               schemes: {
                 type: 'array',
                 description:
-                  'SEPA schemes the institution supports (SCT = Credit Transfer, SDD = Direct Debit, SCT_INST = Instant Credit Transfer)',
+                  'SEPA schemes available for this account. When the resolved institution has rows in the EPC scheme registers these are ITS schemes (basis = "epc_register"); otherwise the country-level schemes (basis = "country_default"). SCT = Credit Transfer, SDD = Direct Debit, SCT_INST = Instant Credit Transfer.',
                 items: {
                   type: 'string',
                   enum: ['SCT', 'SDD', 'SCT_INST'],
@@ -1265,6 +1498,12 @@ const buildSpec = () => ({
                 type: ['boolean', 'null'],
                 description:
                   'Bank-level VoP readiness: true when the resolved institution is listed as "ready" in the EPC Verification of Payee scheme register; false when it is not; null when no institution was resolved. Listing means the bank answers VoP requests — it does not run the name check for you.',
+              },
+              basis: {
+                type: 'string',
+                enum: ['country_default', 'epc_register'],
+                description:
+                  'Where `schemes` comes from: "epc_register" when the resolved BIC has rows in the embedded EPC scheme registers (bank grain), "country_default" otherwise. Absent when enrichment stopped early. Audit 2026-09-01 (DATA-02).',
               },
             },
             required: ['member', 'schemes', 'vop_required'],
@@ -1374,7 +1613,11 @@ const buildSpec = () => ({
             required: ['issuer_type', 'country_risk', 'test_bic', 'sepa_reachable', 'sepa_reachable_scope', 'vop_coverage'],
           },
           bank_code_check: BANK_CODE_CHECK_SCHEMA,
-          official_identity: OFFICIAL_IDENTITY_SCHEMA,
+          official_identity: {
+            ...OFFICIAL_IDENTITY_SCHEMA,
+            description:
+              'Present ONLY when a central bank publishes the holder of the code we resolved: reached by LEI on any BIC lookup, and by the national bank code for FR and ES. Absent rather than negative on a miss, and never able to change `valid` or `bank_code_check` — the publishers relay codes, they do not allocate them.',
+          },
           modulus_check: {
             type: 'object',
             description:
@@ -1579,8 +1822,39 @@ const buildSpec = () => ({
           lei_status: { type: ['string', 'null'] },
           is_test_bic: { type: 'boolean' },
           source: { type: ['string', 'null'] },
-          official_identity: OFFICIAL_IDENTITY_SCHEMA,
-          note: { type: 'string' },
+          official_identity: {
+            ...OFFICIAL_IDENTITY_SCHEMA,
+            description:
+              'Present ONLY when a central bank publishes the holder of the code we resolved: reached by LEI on any BIC lookup, and by the national bank code for FR and ES. Absent rather than negative on a miss, and never able to change `valid` or `bank_code_check` — the publishers relay codes, they do not allocate them.',
+          },
+          note: {
+            type: 'string',
+            description:
+              'Present only when the lookup has something to qualify, typically that coverage may be partial for an unresolved code. Absent on a plain hit.',
+          },
+          // Served on EVERY answer since 2026-08-21, found and not found alike,
+          // and declared nowhere until the audit of 2026-09-01 (DX-06). It is
+          // the one compliance signal on the cheap lookup: a reader of the
+          // contract alone could not know a sanctions screen had run at all.
+          sanctions: {
+            type: 'object',
+            description:
+              'Bank-level sanctions screen, run on every answer including a "found: false" one. `listed` is null, never false, when the database could not be read: a check that did not happen must not look like a check that passed. Screens the institution behind the BIC8, never a beneficiary name.',
+            required: ['screened', 'listed'],
+            properties: {
+              screened: { type: 'boolean', description: 'Whether the screen ran.' },
+              listed: {
+                type: ['boolean', 'null'],
+                description: 'true when the institution appears on a screened list, false when it does not, null when the screen could not run.',
+              },
+              // On one line, like its twin in ComplianceResult: the
+              // sanctions-claims guard exempts a `matched_lists` declaration
+              // from the "name every list you screen" rule, and it matches on
+              // the line, so splitting the field would make an example of one
+              // authority read as a coverage claim of one authority.
+              matched_lists: { type: 'array', items: { type: 'string' }, example: ['OFAC'], description: 'The lists that matched. Empty when none did.' },
+            },
+          },
           cost_usdc: { type: 'number', example: 0.003 },
           processing_ms: { type: 'number' },
         },
@@ -1668,6 +1942,24 @@ const buildSpec = () => ({
           },
           sic_iid: { type: ['string', 'null'] },
           qr_iid: { type: ['string', 'null'], description: 'QR-IID for QR-bill payments' },
+          // Both served, neither declared until the audit of 2026-09-01
+          // (DX-06). They are what makes qr_iid usable: without the source an
+          // integrator cannot tell a registered allocation from an inference,
+          // and without the list an institution holding several QR-IIDs looks
+          // like it holds one.
+          qr_iid_source: {
+            type: ['string', 'null'],
+            example: 'register',
+            description:
+              'Where `qr_iid` comes from: "register" when the SIX register allocates it to this institution, otherwise the basis used. Null when there is no QR-IID.',
+          },
+          qr_iids: {
+            type: 'array',
+            items: { type: 'string' },
+            example: ['30005', '30308'],
+            description:
+              'Every QR-IID allocated to this institution, in register order. `qr_iid` is the first of them; an institution may legitimately hold several.',
+          },
           valid_on: { type: 'string', format: 'date' },
           cost_usdc: { type: 'number', example: 0.003 },
           processing_ms: { type: 'number' },
@@ -1768,6 +2060,65 @@ const buildSpec = () => ({
     { name: 'Free', description: 'Free endpoints — no payment required' },
   ],
 });
+
+/** The minimum structure the error pass needs to see. Cast through `unknown`
+ * because `paths` is a literal whose entries carry `get` or `post` depending
+ * on the route, so it does not structurally match a uniform record. */
+interface OperationLike {
+  requestBody?: unknown;
+  responses?: Record<string, { description?: string; content?: unknown }>;
+}
+
+const ERROR_CONTENT = {
+  'application/json': { schema: { $ref: '#/components/schemas/ApiError' } },
+} as const;
+
+/** Two failures every route can answer and none of them declared. */
+const RATE_LIMIT_RESPONSE = {
+  description:
+    'Rate limit exceeded. Applied globally by the server, so any operation can answer it. Honour the Retry-After header; see https://api.ibanforge.com/rate-limits.yml',
+  content: ERROR_CONTENT,
+};
+const PAYLOAD_TOO_LARGE_RESPONSE = {
+  description:
+    'Request body exceeds 256 KB. Applied globally to every operation that takes a body, before routing and before payment, so nothing is charged. Split the input (batch validation accepts up to 100 IBANs per call).',
+  content: ERROR_CONTENT,
+};
+
+/**
+ * Give every failure a schema, and declare the two global ones.
+ *
+ * Done as a pass over the finished document rather than by editing 31
+ * `responses` blocks by hand, because the property being defended is
+ * completeness: a route added tomorrow gets the contract for free, and no one
+ * has to remember. Audit 2026-09-01, DX-02.
+ *
+ * `429` goes on every operation because `rateLimitMiddleware()` is mounted on
+ * `*` (`src/app.ts`). `413` goes only on operations that take a body: the
+ * `bodyLimit` middleware is mounted on `*` too, but declaring that `GET
+ * /health` can answer 413 would be noise dressed as rigour.
+ *
+ * Existing hand-written 4xx/5xx descriptions are kept: they name the `error`
+ * tokens a caller branches on, which no generic sentence could replace.
+ */
+function withErrorContract<T>(spec: T): T {
+  const paths = (spec as unknown as { paths: Record<string, Record<string, OperationLike>> }).paths;
+  for (const pathItem of Object.values(paths)) {
+    for (const operation of Object.values(pathItem)) {
+      const responses = operation.responses;
+      if (!responses) continue;
+      responses['429'] ??= { ...RATE_LIMIT_RESPONSE };
+      if (operation.requestBody) responses['413'] ??= { ...PAYLOAD_TOO_LARGE_RESPONSE };
+      for (const [status, response] of Object.entries(responses)) {
+        if (!/^[45]/.test(status)) continue;
+        if (!response.content) response.content = ERROR_CONTENT;
+      }
+    }
+  }
+  return spec;
+}
+
+const buildSpec = () => withErrorContract(buildRawSpec());
 
 let specCache: ReturnType<typeof buildSpec> | null = null;
 

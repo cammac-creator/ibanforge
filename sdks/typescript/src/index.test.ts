@@ -9,6 +9,7 @@ import {
   QuotaExhaustedError,
   RateLimitError,
   InvalidInputError,
+  PayloadTooLargeError,
   APIError,
 } from './index.js';
 
@@ -161,6 +162,60 @@ describe('IBANforge — request shapes', () => {
   });
 });
 
+describe('IBANforge — the two free endpoints shipped on 27/08/2026', () => {
+  // Audit DX-10, 2026-09-01: both SDKs covered 12 endpoints and omitted these
+  // two. They are the only calls that answer 200 with no key and no payment —
+  // the free shop window an agent tries before deciding anything — and they
+  // were unreachable from the client the docs point at.
+  it('validateReference issues a free GET with the reference url-encoded', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ reference: 'RF18539007547034', scheme: 'rf', valid: true }));
+    await new IBANforge().validateReference('RF18539007547034');
+    expect(calledInit().method).toBe('GET');
+    expect(calledUrl()).toBe('https://api.ibanforge.com/v1/reference/validate?reference=RF18539007547034');
+  });
+
+  it('validateReference passes reference_type through when the caller pins the scheme', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ reference: '21000', scheme: 'qrr', valid: true }));
+    await new IBANforge().validateReference('21000', { referenceType: 'qrr' });
+    expect(calledUrl()).toContain('reference_type=qrr');
+  });
+
+  it('validateReference relays `valid: null`, which is an answer and not a gap', async () => {
+    // Norwegian KID and Swedish OCR are configured per creditor account by the
+    // beneficiary's bank. Typing `valid` as a plain boolean would push callers
+    // into reading that as false.
+    fetchMock.mockResolvedValue(
+      jsonResponse({ reference: '12345678903', scheme: 'kid', valid: null, status: 'not_checkable', source: null, note: 'n/a' }),
+    );
+    const out = await new IBANforge().validateReference('12345678903');
+    expect(out.valid).toBeNull();
+  });
+
+  it('checkAddress POSTs { scheme, address } and reads the findings back', async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse({
+        scheme: 'sps',
+        conforms: true,
+        findings: [{ rule: 'twn_nm_required', verdict: 'pass', detail: 'TwnNm is present.', source: 'SIX SPS 2026 v2.3' }],
+      }),
+    );
+    const out = await new IBANforge().checkAddress('sps', { twn_nm: 'Zurich', ctry: 'CH' });
+    const init = calledInit();
+    expect(init.method).toBe('POST');
+    expect(calledUrl()).toBe('https://api.ibanforge.com/v1/address/check');
+    expect(JSON.parse(init.body as string)).toEqual({ scheme: 'sps', address: { twn_nm: 'Zurich', ctry: 'CH' } });
+    // Each finding names the guideline it was read from; a bare boolean would
+    // strip the licence-bearing citation the API is careful to attach.
+    expect(out.findings[0].source).toContain('SIX');
+  });
+
+  it('neither free endpoint sends an Authorization header when no key is set', async () => {
+    fetchMock.mockResolvedValue(jsonResponse({ scheme: 'sps', conforms: true, findings: [] }));
+    await new IBANforge().checkAddress('sps', { ctry: 'CH' });
+    expect((calledInit().headers as Record<string, string>).Authorization).toBeUndefined();
+  });
+});
+
 describe('IBANforge — validateBatch input guards', () => {
   it('rejects an empty array before hitting the network', () => {
     // The guard throws synchronously, before any async work begins.
@@ -191,6 +246,10 @@ describe('IBANforge — HTTP status → typed error mapping', () => {
     [429, { error: 'quota_exceeded', message: 'out of quota' }, QuotaExhaustedError],
     [429, { error: 'rate_limited', message: 'slow down' }, RateLimitError],
     [400, { message: 'bad iban' }, InvalidInputError],
+    // 413 is a distinct, reproducible answer with a distinct remedy — split the
+    // payload. Folded into InvalidInputError until 2026-09-01 (audit DX-09), it
+    // told a caller to fix a body that was not malformed, only too big.
+    [413, { error: 'payload_too_large', message: 'body over 1 MB' }, PayloadTooLargeError],
     [404, { message: 'not found' }, InvalidInputError],
     [500, { message: 'boom' }, APIError],
     [503, { message: 'down' }, APIError],

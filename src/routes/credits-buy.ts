@@ -14,6 +14,8 @@ import type { Context } from 'hono';
 import type { HonoEnv } from '../types.js';
 import { findCreditKeyByPaymentRef, generateCreditKey } from '../lib/api-keys.js';
 import { recordCreditsPurchase } from '../lib/stats.js';
+import { buildFirstCallCurl } from '../lib/first-call.js';
+import { sendApiKeyEmail, alertKeyDeliveryFailure } from '../lib/email.js';
 
 const BUNDLES: Record<string, { credits: number; price_usdc: number }> = {
   '1k': { credits: 1000, price_usdc: 5 },
@@ -90,7 +92,36 @@ creditsBuy.post('/v1/credits/buy/:bundle', async (c) => {
   // recorded what they collected; the routes that SELL recorded nothing, so
   // every prepaid pack bought with USDC was invisible in daily_stats and the
   // dashboard read a service that sold nothing while it was being paid.
-  recordCreditsPurchase(slug, bundle.price_usdc, ref !== null);
+  //
+  // 🚨 Only booked when a settlement actually happened (SEC-10, 2026-09-01).
+  // `recordCreditsPurchase` books zero revenue for an unpaid pack, but it still
+  // increments the count and success columns of the daily line: under
+  // IBANFORGE_FREE_MODE, or with the x402 gate off in dev, every free pack
+  // handed out was writing a phantom sale next to the real ones. A sale that
+  // nobody paid for is not a sale with a price of zero, it is not a sale.
+  if (ref !== null) recordCreditsPurchase(slug, bundle.price_usdc, true);
+
+  // Mail delivery on the USDC rail, matching the card rail (BIZ-04, 2026-09-01).
+  //
+  // This route already captured the address above and then never used it, so an
+  // agent operator who lost this response had no second copy of the key, no
+  // command and no account link, while a card buyer received all three. Same
+  // content, same fire-and-forget contract as the Stripe webhook: the transport
+  // caps itself at 6s and the caller waits zero.
+  //
+  // Skipped under vitest for the same reason as the free rail in
+  // src/routes/api-keys.ts: the suite drives this route with published example
+  // addresses, and a relay configured in the shell would mail real people.
+  if (email && !process.env.VITEST) {
+    void sendApiKeyEmail({
+      to: email,
+      rawKey: result.api_key,
+      credits: result.credits,
+      bundle: slug,
+    }).catch(() => {
+      alertKeyDeliveryFailure('credits/buy key delivery threw before the relay answered');
+    });
+  }
 
   return c.json({
     api_key: result.api_key,
@@ -99,7 +130,13 @@ creditsBuy.post('/v1/credits/buy/:bundle', async (c) => {
     bundle: slug,
     price_paid_usdc: bundle.price_usdc,
     price_per_call_usdc: Math.round((bundle.price_usdc / bundle.credits) * 1_000_000) / 1_000_000,
-    usage_hint: 'Send Authorization: Bearer ' + result.key_prefix + '... on subsequent /v1/iban/* and /v1/bic/* calls.',
+    // The command that works, not a description of one (BIZ-04, 2026-09-01).
+    // Same block the delivery emails and the Stripe success page carry, so the
+    // three rails cannot drift. `usage_hint` printed the PREFIX followed by an
+    // ellipsis, which is a string no caller can ever authenticate with.
+    first_call: buildFirstCallCurl(result.api_key),
+    usage_hint:
+      'Send Authorization: Bearer ' + result.api_key + ' on subsequent /v1/iban/* and /v1/bic/* calls.',
     balance_endpoint: 'GET /v1/credits/balance',
     // How to get this key back exactly once if you lose this response. The
     // reference is sha256(your payment header) truncated to 32 hex chars, so

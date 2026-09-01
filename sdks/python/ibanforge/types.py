@@ -406,3 +406,55 @@ class DemoResult(TypedDict, total=False):
     iban_examples: Any
     bic_examples: Any
     compliance_example: Any
+
+
+class ReferenceAlternative(TypedDict, total=False):
+    """Another scheme the same digits also satisfy."""
+
+    scheme: str
+    valid: bool
+    note: str
+
+
+class ReferenceValidationResult(TypedDict, total=False):
+    """GET /v1/reference/validate — a structured payment reference, checked
+    against the dated document that publishes its rule. FREE.
+
+    ``valid`` can be ``None``, and that is a real answer rather than a missing
+    one: Norwegian KID and Swedish OCR are configured per creditor account by
+    the beneficiary's bank, so ``False`` there would reject good references.
+    """
+
+    reference: str
+    scheme: Optional[str]
+    valid: Optional[bool]
+    status: str
+    check_digit_expected: str
+    source: Optional[str]
+    as_of: str
+    note: str
+    also_valid_as: ReferenceAlternative
+    pairing_verdict: str
+
+
+class AddressFinding(TypedDict, total=False):
+    """One rule applied by POST /v1/address/check, with the guideline it comes from."""
+
+    rule: str
+    verdict: str
+    detail: str
+    source: str
+
+
+class AddressCheckResult(TypedDict, total=False):
+    """POST /v1/address/check — a structured ISO 20022 postal address measured
+    against a payment scheme's rules (sps, hvps_plus, fedwire). FREE.
+
+    Each finding names the document it was read from: relay ``source`` with the
+    verdict rather than the boolean alone.
+    """
+
+    scheme: str
+    conforms: bool
+    findings: List[AddressFinding]
+    note: str

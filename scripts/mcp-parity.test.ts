@@ -199,18 +199,29 @@ describe('parité MCP — send_feedback écrit, donc il est plafonné partout', 
  * d'outils DOIT donc être celle de C, sinon le même serveur annonce une chose à
  * la découverte et en sert une autre à l'exécution.
  *
- * ⚠️ Écart ouvert au 21/08/2026 : la carte énumère 5 outils, C en sert 6.
- * `src/routes/mcp-card.ts` est hors du périmètre de la session qui a propagé
- * send_feedback — le correctif est d'UNE entrée à ajouter dans son tableau
- * `tools` (plus `toHaveLength(6)` dans src/routes/mcp-card.test.ts). Tant que ce
- * n'est pas fait, l'écart est déclaré ici plutôt que passé sous silence, et le
- * jour où il est refermé ce test le dit et demande de vider la liste.
+ * ✅ Écart du 21/08/2026 refermé le 01/09/2026, et la comparaison a changé de
+ * point d'appui. La carte n'écrit plus ses outils à la main : elle les dérive
+ * de `src/mcp/inventory.ts`, la table unique dont dérivent aussi la carte A2A,
+ * le document x402, agents.json, mcp.json et /llms.txt (audit 2026-09-01,
+ * DX-01). Lire la carte au texte ne mesurait donc plus rien.
+ *
+ * Les deux fichiers se lisent en paire, et ensemble ils ferment la boucle :
+ *  - `src/mcp/inventory.test.ts` joint l'inventaire aux six documents servis ;
+ *  - ce test-ci joint l'inventaire aux trois transports MCP réels. C'est la
+ *    seule jointure que rien d'autre ne couvre, et c'est celle qui compte : un
+ *    outil ajouté à un serveur sans passer par l'inventaire resterait invisible
+ *    de toute découverte, ce qui est exactement le défaut du 26/08.
+ *
+ * `CARD_MISSING_TOOLS` reste en place, vide : le jour où un écart doit être
+ * toléré, il se déclare ici plutôt que de se taire.
  */
-const CARD_MISSING_TOOLS = ['send_feedback'];
+const CARD_MISSING_TOOLS: string[] = [];
 
 describe('parité MCP — la carte de découverte ne peut pas mentir sur tools/list', () => {
   const CARD = read('src/routes/mcp-card.ts');
-  const cardTools = [...CARD.matchAll(/^\s*name:\s*'([a-z_]+)',/gm)].map((m) => m[1]).sort();
+  const cardTools = [...read('src/mcp/inventory.ts').matchAll(/^\s*name:\s*'([a-z_]+)',/gm)]
+    .map((m) => m[1])
+    .sort();
 
   it("la carte décrit bien la surface HTTP (sinon la comparaison n'a pas de sens)", () => {
     expect(CARD).toContain("url: 'https://api.ibanforge.com/mcp'");

@@ -9,6 +9,7 @@ import { classifyBicInput } from '../lib/input-normalize.js';
 import { lookupClearingSeatByBic } from '../lib/ch-clearing.js';
 import { toIso20022PostalAddress, type Iso20022PostalAddress } from '../lib/postal-address.js';
 import { recordOperation, recordRejection } from '../lib/stats.js';
+import { recordSafely } from '../lib/record-safely.js';
 import { recordDemandGap } from '../lib/demand-gaps.js';
 import { computeRevenue } from '../lib/request-helpers.js';
 import type { BICLookupResult } from '../types.js';
@@ -115,7 +116,13 @@ bicLookup.get('/v1/bic/:code', (c) => {
 
   const errorDetail = found ? undefined : validation.bic;
   const revenue = computeRevenue(c, COST_USDC);
-  recordOperation('bic_lookup', validation.country_code ?? null, found, revenue, errorDetail, c.get('apiKeyPrefix'));
+  // Wrapped since 2026-09-01 (QUA-12): the swallow is unchanged, but the
+  // failures are now counted and raise an ops alert past a streak, so a stats
+  // DB that stops accepting writes cannot look like a service nobody calls.
+  recordSafely(
+    () => recordOperation('bic_lookup', validation.country_code ?? null, found, revenue, errorDetail, c.get('apiKeyPrefix')),
+    'bic_lookup',
+  );
   // The demand ledger: an ISO-9362-shaped BIC we do not hold is a directory
   // gap, aggregated by code so the monthly data decision can follow demand.
   // Shape-gated twice (validateBIC above, the recorder's own gate), so a

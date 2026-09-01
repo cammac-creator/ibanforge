@@ -13,6 +13,7 @@ import {
 } from '../lib/ch-clearing.js';
 import { classifyIidInput } from '../lib/input-normalize.js';
 import { recordOperation, recordRejection } from '../lib/stats.js';
+import { recordSafely } from '../lib/record-safely.js';
 import { recordDemandGap } from '../lib/demand-gaps.js';
 import { computeRevenue } from '../lib/request-helpers.js';
 import type { ChClearingLookupResult } from '../types.js';
@@ -66,7 +67,10 @@ chClearing.get('/v1/ch/clearing/:iid', (c) => {
   const revenue = computeRevenue(c, COST_USDC);
 
   if (!entry) {
-    recordOperation('ch_clearing_lookup', 'CH', false, revenue, normalizedIid, c.get('apiKeyPrefix'));
+    recordSafely(
+      () => recordOperation('ch_clearing_lookup', 'CH', false, revenue, normalizedIid, c.get('apiKeyPrefix')),
+      'ch_clearing_lookup',
+    );
     // The demand ledger: an IID absent from the BankMaster extract we serve.
     // QR-IIDs and freshly allocated numbers show up here first.
     recordDemandGap('ch_clearing', 'CH', normalizedIid, 'not_found');
@@ -82,7 +86,13 @@ chClearing.get('/v1/ch/clearing/:iid', (c) => {
     return c.json(result);
   }
 
-  recordOperation('ch_clearing_lookup', entry.address.country, true, revenue, undefined, c.get('apiKeyPrefix'));
+  // Wrapped since 2026-09-01 (QUA-12): the swallow is unchanged, but the
+  // failures are now counted and raise an ops alert past a streak, so a stats
+  // DB that stops accepting writes cannot look like a service nobody calls.
+  recordSafely(
+    () => recordOperation('ch_clearing_lookup', entry.address.country, true, revenue, undefined, c.get('apiKeyPrefix')),
+    'ch_clearing_lookup',
+  );
 
   const result: ChClearingLookupResult = {
     iid: entry.iid,

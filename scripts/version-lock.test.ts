@@ -143,12 +143,12 @@ const SDKS: ReadonlyArray<{ name: string; decls: ReadonlyArray<{ where: string; 
  * conséquence naturelle d'un travail fini.
  */
 const TOLERATED: ReadonlyArray<{ sdk: string; expected: string; since: string; why: string }> = [
-  {
-    sdk: 'TypeScript (@ibanforge/sdk)',
-    expected: '1.4.3',
-    since: '2026-08-30 (noyau MCP republié en 1.4.4)',
-    why: "1.4.3 est ce que npm SERT pour ce SDK. Le bump du 30/08 n'a touché que le noyau MCP (septième outil, fail() sur les refus d'entrée, bank_code_check.reason et bic.basis) : le client HTTP n'a pas bougé d'une ligne. Écrire 1.4.4 dans son package.json ferait mentir le dépôt sur ce qui est publié — la dérive exacte que ce fichier existe pour enregistrer plutôt que pour maquiller. Se videra à la prochaine republication.",
-  },
+  // TypeScript (@ibanforge/sdk) : exception VIDÉE le 01/09/2026, même motif que
+  // la Python huit jours plus tôt. Le « le client HTTP n'a pas bougé d'une
+  // ligne » avait cessé d'être vrai : l'audit du 01/09 (DX-09, DX-10) a ajouté
+  // PayloadTooLargeError et les deux endpoints gratuits du 27/08
+  // (validateReference, checkAddress) au client lui-même. Bump 1.4.4 des deux
+  // déclarations ; la publication npm reste le geste de Claude-Alain (Touch ID).
   // Python (ibanforge) : exception VIDÉE le 01/09/2026, comme la doctrine le
   // demande — conséquence naturelle d'un travail fini. Le « rien à republier
   // tant que le client ne change pas » avait cessé d'être vrai : 9c1fa55 a

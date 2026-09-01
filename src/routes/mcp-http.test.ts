@@ -10,9 +10,12 @@
  *
  * Without these checks a regression on /mcp would silently break listings.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { Hono } from 'hono';
-import { mcpHttp } from './mcp-http.js';
+import { LATEST_PROTOCOL_VERSION } from '@modelcontextprotocol/sdk/types.js';
+import type { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
+import { mcpHttp, mcpSessions, createMcpSessionStore, MCP_SESSIONS_PER_IP_DAY } from './mcp-http.js';
+import { MCP_TOOLS } from '../mcp/inventory.js';
 import type { HonoEnv } from '../types.js';
 
 function makeApp() {
@@ -56,12 +59,31 @@ async function parseStreamableHttp(res: Response): Promise<JsonRpcResponse> {
   return JSON.parse(match[1]) as JsonRpcResponse;
 }
 
-async function initialize(app: ReturnType<typeof makeApp>): Promise<string> {
+/**
+ * A fresh source address per call.
+ *
+ * Everything free on this transport is metered per IP: tool calls against a
+ * daily allowance, and since 2026-09-01 session openings against their own.
+ * Left unset, every test in this file shared the 'unknown' bucket, so an
+ * eleventh tool call ANYWHERE made a different test fail with a rate-limit
+ * error — and the day `batch_validate_iban` started billing per IBAN (MCP-07)
+ * that shared bucket overflowed on the spot. Documentation addresses (RFC 5737
+ * TEST-NET-2) hand each call its own allowance without loosening a single
+ * limit. The tests that MEASURE a limit pin their own address on purpose.
+ */
+let ipCounter = 0;
+function freshIp(): string {
+  ipCounter += 1;
+  return `198.51.100.${(ipCounter % 200) + 1}`;
+}
+
+async function initialize(app: ReturnType<typeof makeApp>, clientIp: string = freshIp()): Promise<string> {
   const res = await app.request('/mcp', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'Accept': 'application/json, text/event-stream',
+      'x-real-ip': clientIp,
     },
     body: JSON.stringify({ ...RPC_BASE, method: 'initialize', params: INIT_PARAMS }),
   });
@@ -85,7 +107,7 @@ async function rpc(
   method: string,
   params: Record<string, unknown> = {},
   id = 2,
-  clientIp?: string,
+  clientIp: string = freshIp(),
 ): Promise<JsonRpcResponse> {
   const res = await app.request('/mcp', {
     method: 'POST',
@@ -93,7 +115,7 @@ async function rpc(
       'Content-Type': 'application/json',
       'Accept': 'application/json, text/event-stream',
       'mcp-session-id': sessionId,
-      ...(clientIp ? { 'x-real-ip': clientIp } : {}),
+      'x-real-ip': clientIp,
     },
     body: JSON.stringify({ jsonrpc: '2.0', id, method, params }),
   });
@@ -114,15 +136,54 @@ describe('GET /mcp (no session) — discovery hint', () => {
     const body = await res.json() as Record<string, unknown>;
     expect(body.protocol).toBe('mcp');
     expect(body.transport).toBe('streamable-http');
-    expect(body.tools).toEqual([
-      'validate_iban',
-      'batch_validate_iban',
-      'lookup_bic',
-      'lookup_ch_clearing',
-      'check_compliance',
-      'validate_payment_reference',
-      'check_postal_address',
-    ]);
+    expect(Array.isArray(body.tools)).toBe(true);
+  });
+
+  /**
+   * The hint and the server have to say the same thing (MCP-13, 2026-09-01).
+   *
+   * Both values used to be typed by hand into this document — the one a curious
+   * developer opens in a browser — and both had drifted: it announced protocol
+   * 2024-11-05 and 7 tools while the server negotiated 2025-06-18 and served 8.
+   * A hand-kept copy of a list is a copy that goes stale in silence, so the
+   * assertion compares the hint against the live tools/list rather than against
+   * a third hand-written list here.
+   */
+  it('lists exactly the tools tools/list serves, and the protocol the SDK speaks', async () => {
+    const app = makeApp();
+    const hint = await (await app.request('/mcp')).json() as { tools: string[]; version: string };
+
+    const sessionId = await initialize(app);
+    const listResp = await rpc(app, sessionId, 'tools/list');
+    const served = (listResp.result as { tools: Array<{ name: string }> }).tools.map((t) => t.name);
+
+    expect([...hint.tools].sort(), 'the discovery hint and tools/list disagree').toEqual([...served].sort());
+    expect(hint.tools.length).toBe(8);
+    expect(hint.version).toBe(LATEST_PROTOCOL_VERSION);
+  });
+
+  /**
+   * The bridge between what this server RUNS and what the discovery documents
+   * SAY (DX-01 / MCP-13, both 2026-09-01).
+   *
+   * `src/mcp/inventory.ts` is the single table the server card, the A2A card,
+   * the x402 document, agents.json and /llms.txt all derive from, and its own
+   * test welds those six documents to it. Nothing welded the table to the
+   * server that actually answers, so a ninth tool could be registered here and
+   * be missing from every document at once — the shape of the bug that gave
+   * five different tool counts for one product. This is the missing weld: the
+   * hint is derived from the live server, so comparing the two compares the
+   * table against reality.
+   */
+  it('agrees with the inventory every discovery document is built from', async () => {
+    const app = makeApp();
+    const sessionId = await initialize(app);
+    const listResp = await rpc(app, sessionId, 'tools/list');
+    const served = (listResp.result as { tools: Array<{ name: string }> }).tools.map((t) => t.name).sort();
+    expect(
+      MCP_TOOLS.map((t) => t.name).sort(),
+      'src/mcp/inventory.ts and the running MCP server disagree on the tool list',
+    ).toEqual(served);
   });
 });
 
@@ -490,5 +551,333 @@ describe('POST /mcp — JSON-RPC batch billing', () => {
     });
     const body = await parseStreamableHttp(res);
     expect(body.error, 'tools/list is free and must stay free in a batch').toBeUndefined();
+  });
+});
+
+/**
+ * Two exit doors for MCP sessions, tested on a store of three.
+ *
+ * Each live session holds a whole McpServer — 2.77 MB of heap, measured after
+ * two forced GCs during the 2026-09-01 security audit (SEC-01 / MCP-08) — and
+ * until that audit the Map holding them had no exit at all: the SDK's close
+ * hooks fire only for a client that sends DELETE or drops its stream, which
+ * directory crawlers never do. The rules are exercised here on a store built
+ * with a cap of 3 rather than on the live one: filling the real cap would
+ * allocate hundreds of megabytes of McpServer and leave them in the runner for
+ * every test file that comes after.
+ */
+describe('MCP session store — the two exit doors', () => {
+  const fakeTransport = (): WebStandardStreamableHTTPServerTransport =>
+    ({ close: () => Promise.resolve() }) as unknown as WebStandardStreamableHTTPServerTransport;
+
+  it('drops a session left idle past the TTL', () => {
+    const store = createMcpSessionStore(3, 30 * 60 * 1000);
+    const t0 = 1_000_000;
+    store.set('idle', fakeTransport(), t0);
+    store.set('busy', fakeTransport(), t0);
+
+    // 'busy' is read 29 minutes in, so it is not idle when the sweep runs.
+    store.get('busy', t0 + 29 * 60 * 1000);
+    expect(store.sweep(t0 + 31 * 60 * 1000)).toBe(1);
+
+    expect(store.get('idle')).toBeUndefined();
+    expect(store.get('busy')).toBeDefined();
+  });
+
+  it('evicts the least recently used session when the cap is reached', () => {
+    const store = createMcpSessionStore(3, 30 * 60 * 1000);
+    const t0 = 1_000_000;
+    store.set('a', fakeTransport(), t0);
+    store.set('b', fakeTransport(), t0 + 1);
+    store.set('c', fakeTransport(), t0 + 2);
+    // 'a' is used again, so 'b' becomes the oldest.
+    store.get('a', t0 + 3);
+
+    store.set('d', fakeTransport(), t0 + 4);
+
+    expect(store.size).toBe(3);
+    expect(store.get('b'), 'the least recently used session should have gone').toBeUndefined();
+    expect(store.get('a')).toBeDefined();
+    expect(store.get('c')).toBeDefined();
+    expect(store.get('d')).toBeDefined();
+  });
+
+  it('never grows past the cap, however many sessions arrive', () => {
+    const store = createMcpSessionStore(3, 30 * 60 * 1000);
+    for (let i = 0; i < 50; i++) store.set(`s${i}`, fakeTransport(), 1_000_000 + i);
+    expect(store.size).toBe(3);
+  });
+});
+
+/**
+ * What a client hears when its session is gone (MCP-09, audit 2026-09-01).
+ *
+ * The SDK answers `400 Bad Request: Server not initialized`, which describes
+ * the server rather than the session — an LLM reading it concludes the service
+ * is broken instead of re-opening a session. It happens after every redeploy
+ * (the store is in memory) and now after an idle sweep too.
+ */
+describe('POST /mcp — an expired session says what to do about it', () => {
+  async function callWithSession(app: ReturnType<typeof makeApp>, sessionId: string) {
+    return app.request('/mcp', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json, text/event-stream',
+        'mcp-session-id': sessionId,
+        'x-real-ip': freshIp(),
+      },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 9, method: 'tools/list', params: {} }),
+    });
+  }
+
+  it('answers 404 and names the remedy for an unknown session id', async () => {
+    const app = makeApp();
+    const res = await callWithSession(app, '00000000-0000-4000-8000-000000000000');
+    // 404 is what the streamable-HTTP spec reserves for an unknown session id:
+    // a compliant client re-sends `initialize` on it instead of retrying.
+    expect(res.status).toBe(404);
+    const body = await res.json() as { error: { code: number; message: string } };
+    expect(body.error.message).toContain('Session expired or server redeployed');
+    expect(body.error.message).toContain('initialize');
+  });
+
+  it('gives the same answer once the idle sweep has taken the session', async () => {
+    const app = makeApp();
+    const sessionId = await initialize(app);
+    // Only Date is faked: the awaits below still need real timers to resolve.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      vi.setSystemTime(Date.now() + 31 * 60 * 1000);
+      expect(mcpSessions.sweep()).toBeGreaterThanOrEqual(1);
+      const res = await callWithSession(app, sessionId);
+      expect(res.status).toBe(404);
+      const body = await res.json() as { error: { message: string } };
+      expect(body.error.message).toContain('Send initialize again');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+/**
+ * Opening a session is the expensive request, and nothing counted it (SEC-01).
+ *
+ * `initialize` is not a `tools/call`, so it escaped the daily allowance
+ * entirely: 300 anonymous POSTs from one address retained 812 MB, at roughly
+ * 277 MB a minute under the global rate limiter alone.
+ */
+describe('POST /mcp — opening a session is metered per address', () => {
+  it(`refuses the ${MCP_SESSIONS_PER_IP_DAY + 1}st new session from one address in a day`, async () => {
+    const app = makeApp();
+    const ip = '198.51.100.240';
+    // A POST with no session id builds a transport whatever it carries, and
+    // that is the memory being metered — so the budget is burnt here with
+    // requests that never become stored sessions, which keeps the test's own
+    // footprint flat.
+    const burn = async () =>
+      app.request('/mcp', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json, text/event-stream',
+          'x-real-ip': ip,
+        },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'ping', params: {} }),
+      });
+
+    for (let i = 0; i < MCP_SESSIONS_PER_IP_DAY; i++) await burn();
+
+    const refused = await burn();
+    const body = await refused.json() as { error?: { code: number; message: string; data: { used: number } } };
+    expect(body.error?.code).toBe(-32000);
+    expect(body.error?.message).toContain('Daily MCP session limit reached');
+
+    // And the same ledger stops a fresh handshake from that address.
+    const initRes = await app.request('/mcp', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json, text/event-stream',
+        'x-real-ip': ip,
+      },
+      body: JSON.stringify({ ...RPC_BASE, method: 'initialize', params: INIT_PARAMS }),
+    });
+    expect(initRes.headers.get('mcp-session-id'), 'no session should be opened past the cap').toBeNull();
+  });
+});
+
+/**
+ * The free tier, billed in units of data instead of calls (MCP-07).
+ *
+ * Ten calls of `batch_validate_iban` at 100 IBANs each was 1,000 enriched
+ * validations per address per day, against 200 REST calls a MONTH for a
+ * verified free key: the anonymous path was 150x more generous than the
+ * signed-up one. Every other surface already bills this tool per IBAN.
+ */
+describe('POST /mcp — batch_validate_iban bills per IBAN', () => {
+  it('spends a whole day of allowance on one 100-IBAN batch', async () => {
+    const app = makeApp();
+    const ip = '198.51.100.241';
+    const sessionId = await initialize(app, ip);
+    const res = await app.request('/mcp', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json, text/event-stream',
+        'mcp-session-id': sessionId,
+        'x-real-ip': ip,
+      },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 11,
+        method: 'tools/call',
+        params: {
+          name: 'batch_validate_iban',
+          arguments: { ibans: Array.from({ length: 100 }, () => 'DE89370400440532013000') },
+        },
+      }),
+    });
+    const body = await parseStreamableHttp(res);
+    expect(body.error, 'a 100-IBAN batch must not cost one unit').toBeDefined();
+    expect(body.error?.code).toBe(-32000);
+    expect((body.error as unknown as { data: { used: number } }).data.used).toBe(100);
+  });
+
+  it('leaves a small batch inside the allowance', async () => {
+    const app = makeApp();
+    const ip = '198.51.100.242';
+    const sessionId = await initialize(app, ip);
+    const callResp = await rpc(
+      app,
+      sessionId,
+      'tools/call',
+      { name: 'batch_validate_iban', arguments: { ibans: ['DE89370400440532013000', 'CH9300762011623852957'] } },
+      12,
+      ip,
+    );
+    expect(callResp.error).toBeUndefined();
+  });
+});
+
+/**
+ * What a call costs, and what it was billed (MCP-10 and MCP-17).
+ *
+ * Six of the seven data tools named no price at all, so an agent reading
+ * tools/list had no basis on which to decide to pay — and every result
+ * announced `cost_usdc: 0.005` on a tier that charges nothing, so an agent
+ * relaying that field told its operator about a charge nobody made.
+ */
+describe('tools/list and tools/call — the price is stated, the bill is honest', () => {
+  it('names a cost in every tool description', async () => {
+    const app = makeApp();
+    const sessionId = await initialize(app);
+    const listResp = await rpc(app, sessionId, 'tools/list');
+    const tools = (listResp.result as { tools: Array<{ name: string; description?: string }> }).tools;
+    for (const tool of tools) {
+      if (tool.name === 'send_feedback') continue; // free by design, and says so in its own words
+      expect(tool.description, `${tool.name} states no price`).toContain('COST:');
+      expect(tool.description, `${tool.name} states no free allowance`).toContain('/v1/keys/generate');
+    }
+  });
+
+  it('bills validate_iban zero on this transport and still publishes the list price', async () => {
+    const app = makeApp();
+    const sessionId = await initialize(app);
+    const callResp = await rpc(app, sessionId, 'tools/call', {
+      name: 'validate_iban',
+      arguments: { iban: 'DE89370400440532013000' },
+    });
+    expect(callResp.error).toBeUndefined();
+    const result = callResp.result as { structuredContent?: Record<string, unknown> };
+    // Asserted on structuredContent because that is what the schema strips:
+    // a field missing from the outputSchema is a field no agent ever sees.
+    expect(result.structuredContent!.cost_usdc, 'a free call must not report a charge').toBe(0);
+    expect(result.structuredContent!.list_price_usdc, 'stripped by the output schema').toBe(0.005);
+  });
+
+  it('does the same inside every row of a batch', async () => {
+    const app = makeApp();
+    const sessionId = await initialize(app);
+    const callResp = await rpc(app, sessionId, 'tools/call', {
+      name: 'batch_validate_iban',
+      arguments: { ibans: ['DE89370400440532013000'] },
+    });
+    const result = callResp.result as { structuredContent?: { results?: Array<Record<string, unknown>> } };
+    const first = result.structuredContent!.results![0];
+    expect(first.cost_usdc).toBe(0);
+    expect(first.list_price_usdc).toBe(0.002);
+  });
+
+  it('publishes the outcome and the tool on the response itself', async () => {
+    // The telemetry middleware in app.ts reads these headers to tell a served
+    // call from a refused one (MCP-04). They have to survive on the Response
+    // the SDK transport builds, not only on the JSON-RPC error path.
+    const app = makeApp();
+    const ip = freshIp();
+    const sessionId = await initialize(app, ip);
+    const res = await app.request('/mcp', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json, text/event-stream',
+        'mcp-session-id': sessionId,
+        'x-real-ip': ip,
+      },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 21, method: 'tools/call', params: { name: 'lookup_ch_clearing', arguments: { iid: '230' } } }),
+    });
+    expect(res.headers.get('X-MCP-Outcome')).toBe('ok');
+    expect(res.headers.get('X-MCP-Tool')).toBe('lookup_ch_clearing');
+  });
+
+  it('does the same on the Swiss clearing lookup', async () => {
+    const app = makeApp();
+    const sessionId = await initialize(app);
+    const callResp = await rpc(app, sessionId, 'tools/call', {
+      name: 'lookup_ch_clearing',
+      arguments: { iid: '230' },
+    });
+    const result = callResp.result as { structuredContent?: Record<string, unknown> };
+    expect(result.structuredContent!.cost_usdc).toBe(0);
+    expect(result.structuredContent!.list_price_usdc).toBe(0.003);
+  });
+});
+
+/**
+ * DNS rebinding, refused where it can happen and nowhere else (MCP-14/SEC-07).
+ *
+ * A page on an attacker's origin can point its own hostname at this container.
+ * The SDK's guard is the cheap answer, but it only runs when BOTH
+ * `allowedHosts` and `enableDnsRebindingProtection` are set — which is how this
+ * can look done and not be. It stays off in dev and in tests, where the Host is
+ * `localhost` and a strict list would refuse every local probe.
+ */
+describe('POST /mcp — Host allow-list', () => {
+  it('is off by default, so local and test callers are never refused', async () => {
+    expect(process.env.MCP_ALLOWED_HOSTS).toBeUndefined();
+    const app = makeApp();
+    const sessionId = await initialize(app);
+    expect(sessionId).toBeTruthy();
+  });
+
+  it('refuses a Host outside the list once one is configured', async () => {
+    process.env.MCP_ALLOWED_HOSTS = 'api.ibanforge.com';
+    try {
+      const app = makeApp();
+      const res = await app.request('/mcp', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json, text/event-stream',
+          'x-real-ip': freshIp(),
+          Host: 'attacker.example.net',
+        },
+        body: JSON.stringify({ ...RPC_BASE, method: 'initialize', params: INIT_PARAMS }),
+      });
+      expect(res.status).toBe(403);
+      expect(res.headers.get('mcp-session-id')).toBeNull();
+    } finally {
+      delete process.env.MCP_ALLOWED_HOSTS;
+    }
   });
 });

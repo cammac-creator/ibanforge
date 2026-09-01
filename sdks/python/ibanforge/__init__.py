@@ -32,6 +32,7 @@ from .exceptions import (
     IBANforgeError,
     InvalidInputError,
     PaymentRequiredError,
+    PayloadTooLargeError,
     QuotaExhaustedError,
     RateLimitError,
 )
@@ -45,6 +46,7 @@ __all__ = [
     "QuotaExhaustedError",
     "RateLimitError",
     "InvalidInputError",
+    "PayloadTooLargeError",
     "APIError",
     "__version__",
 ]

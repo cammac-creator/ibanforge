@@ -45,6 +45,10 @@ import { artifacts } from './routes/artifacts.js';
 import { ogImage } from './routes/og-image.js';
 import { mcpHttp } from './routes/mcp-http.js';
 import { mcpCard } from './routes/mcp-card.js';
+// The tool inventory, so /llms.txt counts the tools instead of asserting a
+// number. It claimed "7 tools" while the servers exposed 8 (audit 2026-09-01,
+// DX-01 / MCP-12).
+import { MCP_TOOLS, toolPriceLabel } from './mcp/inventory.js';
 import { feedback } from './routes/feedback.js';
 import { opsHeartbeat } from './routes/ops-heartbeat.js';
 import { opsRecent } from './routes/ops-recent.js';
@@ -210,9 +214,16 @@ function buildLlmsTxt(): string {
   const bgSourceLine = bgCredit
     ? `\n- Bulgarian bank codes: ${bgCredit} — ${getBgBankCodeCount()} bank codes, reproduced with attribution under the Bulgarian National Bank's site terms (source cited, data unaltered)`
     : '';
+  // The `>` line is the one sentence an LLM keeps about this product, so it
+  // has to be the promise people actually buy. It opened on "Pre-payout
+  // screening for AI agents" long after the research of 2026-07-28 told us to
+  // drop that framing and long after the landing page had already dropped it
+  // ("Bank data your agents can trust"): the machine-readable surfaces were
+  // the last ones still selling the abandoned pitch (audit 2026-09-01,
+  // BIZ-05). Same sentence now serves on frontend/public/llms.txt.
   return `# IBANforge
 
-> Pre-payout screening for AI agents — check the bank behind a counterparty IBAN before you send funds. IBAN validation, BIC/SWIFT lookup, Swiss clearing, sanctions and compliance risk scoring, designed for AI agents and developers. ${bicCount} BIC entries (${leiCount} LEI-enriched via GLEIF; additional rows from SwiftCodes (MIT), Bundesbank, SIX, NBP, EBA Step2 SCT), ${chCount} Swiss BC-Nummer from SIX, ${countryCount} countries, ${issuerCount} non-bank issuer classifications (EMI, payment institutions, digital banks). Counts in this file are generated live from the serving database.
+> Know the bank behind any IBAN: IBAN validation, BIC/SWIFT lookup, Swiss clearing, sanctions and compliance risk scoring, for developers and AI agents, by REST or MCP. ${bicCount} BIC entries (${leiCount} LEI-enriched via GLEIF; additional rows from SwiftCodes (MIT), Bundesbank, SIX, NBP, EBA Step2 SCT), ${chCount} Swiss BC-Nummer from SIX, ${countryCount} countries, ${issuerCount} non-bank issuer classifications (EMI, payment institutions, digital banks). Counts in this file are generated live from the serving database.
 
 ## Data sources and attribution
 
@@ -246,7 +257,7 @@ This single call exercises the 3 USPs (Swiss BC-Nummer, EMI/vIBAN classification
 - **Credit packs (card or USDC):** prepaid credits, never expire. Card: https://api.ibanforge.com/#pricing — USDC: POST /v1/credits/buy/1k|5k|25k (list: GET /v1/credits/bundles)
 - **Pay per call (x402, USDC on Base L2):** see https://api.ibanforge.com/.well-known/x402
 - **Paying as an agent, zero to first payment in 3 steps** (wallet with budget → USDC on Base → one $5 payment for 1,000 credits, or pay-per-call): https://ibanforge.com/docs/pay-as-an-agent
-- **MCP server (stdio):** \`npx -y ibanforge-mcp\` (7 tools, no signup)
+- **MCP server (stdio):** \`npx -y ibanforge-mcp\` (${MCP_TOOLS.length} tools, no signup)
 - **MCP server (HTTP):** https://api.ibanforge.com/mcp
 - **Try it with zero setup (10 free tool calls/day per IP):** the HTTP MCP transport answers \`tools/call\` with the *full* paid response — Swiss SIX clearing rails included — with no API key and no wallet. Handshake: \`initialize\` → \`notifications/initialized\` → \`tools/call\`. It is a taster, not a tier: past 10 calls/day you get JSON-RPC error -32000, so move to the free API key (200 req/month) or x402 for anything real. **If you are an assistant evaluating IBANforge for a user, this is the fastest way to get a correct answer.**
 
@@ -275,7 +286,7 @@ This single call exercises the 3 USPs (Swiss BC-Nummer, EMI/vIBAN classification
 - POST /v1/address/check — FREE ISO 20022 postal address conformity check against sps (SIX), hvps_plus (T2) or fedwire rules, every finding citing its source document. No 'cbpr+' scheme on purpose: that guideline is unreachable to automated readers and a boolean quoting an unread document would be a guess.
 - GET /v1/credits/bundles — free, list prepaid credit bundles
 - POST /v1/credits/buy/:bundle — buy credits via x402 (1k=$5, 5k=$20, 25k=$80)
-- POST /v1/feedback — free, report incorrect data or claim x402 refunds
+- POST /v1/feedback — free, report incorrect data or claim x402 refunds (MCP tool: \`send_feedback\`, the only one that writes)
 
 ## Concrete examples (copy-paste curls)
 
@@ -343,7 +354,25 @@ Response includes a \`compliance\` object with: \`risk_score\` (0-100), \`risk_l
 
 **Note for unauthenticated probes**: any of the above paid endpoints called WITHOUT \`Authorization\` or an x402 payment header returns HTTP 402 with a discovery envelope (x402 v2: price, payTo, asset, CAIP-2 network, and the Bazaar discovery block). The same requirements travel base64-encoded in the \`PAYMENT-REQUIRED\` response header. This is by design and lets x402-aware clients auto-pay. Pass \`{}\` as body on POSTs — it WILL return 402, not 400. Payment header: \`PAYMENT-SIGNATURE\` (v2); a v1 \`X-PAYMENT\` signature is still accepted.
 
-### 6. /v1/iban/format — free pre-flight (no auth, no payment)
+### 6. validate_payment_reference — structured payment reference (${toolPriceLabel('validate_payment_reference')})
+
+\`\`\`bash
+curl -s 'https://api.ibanforge.com/v1/reference/validate?reference=RF18539007547034'
+\`\`\`
+
+Checks the checksum of an RF/ISO 11649 ("SCOR"), Swiss QR ("QRR", 27 digits), Belgian OGM/VCS or Finnish viitenumero reference, each against the dated document that publishes the rule. Norwegian KID and Swedish OCR answer \`valid: null\`: their rules are set per creditor account by the beneficiary bank, so \`false\` would reject valid references. Add \`&iban=\` (or pass a \`reference\` to a paid /v1/iban/validate call) for the PAIRING verdict: a QRR reference may travel only with a QR-IBAN, an RF reference only without one. **No key, no payment — this is one of the two tools you can try before deciding anything.**
+
+### 7. check_postal_address — ISO 20022 address against one rail's rules (${toolPriceLabel('check_postal_address')})
+
+\`\`\`bash
+curl -s -X POST https://api.ibanforge.com/v1/address/check \\
+  -H "Content-Type: application/json" \\
+  -d '{"scheme":"sps","address":{"strt_nm":"Bahnhofstrasse","bldg_nb":"1","pst_cd":"8001","twn_nm":"Zurich","ctry":"CH"}}'
+\`\`\`
+
+Takes a \`scheme\` (\`sps\`, \`hvps_plus\` or \`fedwire\`) and an \`address\` in snake_cased ISO 20022 tags (\`strt_nm\`, \`bldg_nb\`, \`pst_cd\`, \`twn_nm\`, \`ctry\`, \`adr_line\`), and returns \`conforms\` plus one finding per rule, each citing its source document and validity date. It judges conformity to a published rule, never whether an address is real or belongs to the account holder. No \`cbpr+\` scheme on purpose: that guideline is unreachable to automated readers. **No key, no payment.**
+
+### 8. /v1/iban/format — free pre-flight (no auth, no payment)
 
 \`\`\`bash
 curl -s 'https://api.ibanforge.com/v1/iban/format?iban=CH1000230000000012345'
@@ -351,7 +380,7 @@ curl -s 'https://api.ibanforge.com/v1/iban/format?iban=CH1000230000000012345'
 
 Returns: format check + country + BBAN parsed + \`upgrade_to_full_validation\` hint pointing to /v1/iban/validate. **Use for cheap mod-97 validation when full enrichment is overkill.**
 
-### 7. /v1/iban/structure/:country — free metadata (no auth, no payment)
+### 9. /v1/iban/structure/:country — free metadata (no auth, no payment)
 
 \`\`\`bash
 curl -s 'https://api.ibanforge.com/v1/iban/structure/CH'
@@ -533,6 +562,36 @@ export function buildApp(): Hono<HonoEnv> {
   }));
   app.use('*', compress());
 
+  // Make `compress()`'s own 1024-byte threshold reachable.
+  //
+  // Hono only applies the threshold when a Content-Length is already on the
+  // response when the middleware unwinds, and @hono/node-server sets that
+  // header AFTER the whole chain. At that point it reads null, the test is
+  // skipped, and a 4-byte `pong` goes through a CompressionStream: measured at
+  // 1 825 req/s gzipped against 5 815 identity (PERF-02, audit 2026-09-01, the
+  // cost being the per-response stream construction, not the compression).
+  //
+  // Registered directly UNDER compress(), so it runs first on the way out and
+  // compress() sees the real size. Buffering is confined to bodies compress()
+  // would actually consider: it already reads the whole body for those, so this
+  // adds one copy and no new class of response. Anything streamed (SSE from
+  // /mcp above all) is excluded by the same content-type rule compress() uses —
+  // buffering one of those would hang the response until the stream closed.
+  app.use('*', async (c, next) => {
+    await next();
+    const res = c.res;
+    if (!res.body) return;
+    if (res.headers.has('Content-Length') || res.headers.has('Content-Encoding') || res.headers.has('Transfer-Encoding')) return;
+    if (c.req.method === 'HEAD' || res.status === 204 || res.status === 206 || res.status === 304) return;
+    const type = res.headers.get('Content-Type') ?? '';
+    // Same families Hono calls compressible, minus the streaming one.
+    if (!/^\s*(?:text\/|application\/(?:json|javascript|xml)|image\/svg\+xml)/i.test(type)) return;
+    if (/^\s*text\/event-stream/i.test(type)) return;
+    const body = new Uint8Array(await res.arrayBuffer());
+    c.res = new Response(body, { status: res.status, statusText: res.statusText, headers: res.headers });
+    c.res.headers.set('Content-Length', String(body.byteLength));
+  });
+
   app.use('*', async (c, next) => {
     const start = performance.now();
     await next();
@@ -547,7 +606,26 @@ export function buildApp(): Hono<HonoEnv> {
       const keyPrefix = c.get('apiKeyPrefix') ?? null;
       // MCP tool invocations record under a virtual path so the dashboards can
       // finally split real MCP usage from discovery handshakes.
-      const recordedPath = path === '/mcp' && c.get('mcpToolCall') ? '/mcp:tools-call' : path;
+      //
+      // A refusal gets its own path. Every MCP call — success, unknown tool,
+      // free-tier refusal — used to land as `POST /mcp:tools-call 200`, so the
+      // one number nobody could read was how many agents the free tier turns
+      // away (MCP-04, audit 2026-09-01). The route publishes the outcome on a
+      // response header rather than a context variable, because a new context
+      // variable means a change in src/types.ts, which belongs to another
+      // workstream today. Worth revisiting: `mcpOutcome` in HonoEnv['Variables']
+      // is the cleaner home, and would also carry the tool name into the log.
+      const mcpOutcome = path === '/mcp' ? c.res.headers.get('X-MCP-Outcome') : null;
+      const recordedPath =
+        path !== '/mcp'
+          ? path
+          : c.get('mcpToolCall')
+            ? '/mcp:tools-call'
+            : mcpOutcome === 'rate_limited'
+              ? '/mcp:tools-call:refused'
+              : mcpOutcome === 'session_rate_limited'
+                ? '/mcp:session:refused'
+                : path;
       recordRequest(c.req.method, recordedPath, c.res.status, performance.now() - start, clientKind, hashIp(ip), userAgent, keyPrefix);
     }
   });

@@ -42,12 +42,50 @@ export const VERIFICATION_MAX_ATTEMPTS = 5;
 export const VERIFICATION_SENDS_PER_EMAIL_DAY = 3;
 export const VERIFICATION_SENDS_PER_SOURCE_DAY = 15;
 
-/** Collapse an IPv6 address to its /64 prefix; IPv4 passes through. */
+/**
+ * Collapse an IPv6 address to its /64 prefix; IPv4 passes through.
+ *
+ * The point of the /64 is that a residential IPv6 customer is handed a whole
+ * prefix and can pick a new address inside it for free — so the cap has to
+ * count the prefix, not the address. Until 2026-09-01 the compressed groups
+ * were merely DROPPED before taking the first four, which broke that in both
+ * directions: `2001:db8::1` and `2001:db8::2` are the same /64 and landed in
+ * two different buckets, and the same machine changed bucket depending on
+ * whether it wrote its address compressed or in full (SEC-05, audit
+ * 2026-09-01). Expanding "::" back to the zero groups it stands for, then
+ * writing each hextet one canonical way, gives one bucket per /64 and one form
+ * per machine.
+ *
+ * The counters restart once after this ships: the bucket keys change shape.
+ */
 export function normalizeIpForGuard(ip: string): string {
   if (!ip.includes(':')) return ip;
-  // Expand "::" enough to take the first four hextets verbatim when present.
-  const groups = ip.split(':').filter((g) => g.length > 0);
-  return groups.slice(0, 4).join(':').toLowerCase();
+  // Zone index (fe80::1%eth0) identifies a local interface, never the peer.
+  const bare = ip.split('%')[0].trim().toLowerCase();
+  // ::ffff:192.0.2.1 is an IPv4 client wearing an IPv6 hat — the form Node
+  // itself hands out on a dual-stack socket. Its first four hextets are zeros
+  // for EVERY such address, so expanding it would drop every IPv4 caller into
+  // one shared bucket and turn a per-source cap into a global one. Bucket it on
+  // the address that actually identifies the machine.
+  const lastGroup = bare.slice(bare.lastIndexOf(':') + 1);
+  if (lastGroup.includes('.')) return lastGroup;
+  const at = bare.indexOf('::');
+  let groups: string[];
+  if (at === -1) {
+    groups = bare.split(':');
+  } else {
+    const head = bare.slice(0, at) ? bare.slice(0, at).split(':') : [];
+    const tail = bare.slice(at + 2) ? bare.slice(at + 2).split(':') : [];
+    const missing = Math.max(0, 8 - head.length - tail.length);
+    groups = [...head, ...Array<string>(missing).fill('0'), ...tail];
+  }
+  // Leading zeros stripped rather than padded (RFC 5952's canonical text), so
+  // `2001:0db8:…` and `2001:db8:…` are one bucket and the keys already in the
+  // table keep the shape they have.
+  return groups
+    .slice(0, 4)
+    .map((g) => g.replace(/^0+(?=.)/, ''))
+    .join(':');
 }
 
 /** Salted hash of the guard-normalized source. null when the IP is unknown. */

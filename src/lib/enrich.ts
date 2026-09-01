@@ -17,18 +17,19 @@ import { classifyIssuer } from './issuers.js';
 import { lookupFiInstitution } from './fi-register.js';
 import { lookupNationalCode, nationalRegisterAvailable } from './national-registers.js';
 import { lookupNlPsp } from './nl-psp.js';
-import { getCountryRisk } from './countries.js';
+import { getCountryRisk, getSepaInfo, SEPA_MEMBERS_EXTRA } from './countries.js';
 import { lookupClearingByBankCode, lookupClearingSeatByBic } from './ch-clearing.js';
 import { toIso20022PostalAddress, type Iso20022PostalAddress } from './postal-address.js';
 import { blzRegisterAvailable, lookupBlz } from './de-blz.js';
 import { bgBaeRegisterAvailable, getBgAsOf, lookupBgBankCode } from './bg-bae.js';
-import { checkVop } from './compliance.js';
+import { checkReachability, checkVop } from './compliance.js';
 import { recordDemandGap } from './demand-gaps.js';
 import { checkUkModulus } from './uk-modulus.js';
 import { praAuthorisationByLei } from './pra-banks.js';
 import { officialIdentityByNationalCode } from './official-identity.js';
 import { psdRegistrationByBankCode, type PsdEntityType } from './psd-register.js';
 import type { BankCodeCheck, BicBasis, IBANValidationResult, RegisterInstitution } from '../types.js';
+import type { SepaScheme } from './countries.js';
 import { nextSteps } from './next-steps.js';
 
 /**
@@ -39,6 +40,50 @@ import { nextSteps } from './next-steps.js';
 type BicBlockWithPostalAddress = NonNullable<IBANValidationResult['bic']> & {
   postal_address?: Iso20022PostalAddress;
 };
+
+/**
+ * Where `sepa.schemes` came from — the field DATA-02 (01/09/2026) says was
+ * missing.
+ *
+ * `epc_register`: the resolved institution's own rows in the EPC scheme
+ * registers we ship. `country_default`: the country-grain literal, served
+ * because no institution was resolved or because the one we resolved is not in
+ * the register (which is not evidence it is absent from the scheme — same
+ * doctrine as `bank_code_check.authoritative`).
+ *
+ * Declared here as a local intersection rather than on the shared
+ * IBANValidationResult, the same way `postal_address` above is: a shared type
+ * file is the worst place to take a lock for one optional field. The OpenAPI
+ * contract wording that needs to follow is in the report for 01/09/2026.
+ */
+export type SepaSchemesBasis = 'country_default' | 'epc_register';
+
+type SepaBlockWithBasis = NonNullable<IBANValidationResult['sepa']> & {
+  basis?: SepaSchemesBasis;
+};
+
+/**
+ * The schemes the EPC registers list for one institution, in the same order
+ * the country-grain literal uses.
+ *
+ * Empty when the BIC8 has no row at all: absence from the register is not
+ * evidence the bank is out of the scheme, so the caller keeps the country
+ * answer rather than being told "no schemes". Empty likewise when the database
+ * cannot be read — the same failure discipline as the register blocks above.
+ */
+function epcSchemesForBic8(bic8: string): SepaScheme[] {
+  try {
+    const reach = checkReachability(bic8);
+    if (!reach.screened) return [];
+    const schemes: SepaScheme[] = [];
+    if (reach.sct) schemes.push('SCT');
+    if (reach.sdd) schemes.push('SDD');
+    if (reach.sepa_instant) schemes.push('SCT_INST');
+    return schemes;
+  } catch {
+    return [];
+  }
+}
 
 /**
  * A BIC is a test/internal institution if the second character of the
@@ -553,17 +598,52 @@ function bicProvenance(
 }
 
 /**
- * Enrich a valid IBAN result with BIC lookup, issuer classification,
- * and risk indicators. Mutates the result object in place.
+ * What `resolveBank` settles, and what a batch can therefore reuse.
+ *
+ * `lookupFailed` is carried but never cached — see the call site.
  */
-export function enrichResult(result: IBANValidationResult): void {
-  // Make the invariant local and explicit instead of relying on a non-null
-  // assertion on result.country (a valid IBAN always carries country + bban,
-  // but the guard documents and enforces it here).
-  if (!result.valid || !result.country || !result.bban?.bank_code) return;
+interface BankResolution {
+  hit: BankLookupHit | null;
+  lookupFailed: boolean;
+  bic: BicBlockWithPostalAddress | null;
+}
 
-  const cc = result.country.code;
-  const bankCode = result.bban.bank_code;
+/**
+ * A memo of the bank resolutions already computed, for the length of ONE batch
+ * or ONE request and no longer.
+ *
+ * Deliberately handed in by the caller rather than kept in module scope: the
+ * reference data behind a resolution is reloaded monthly and a process-lifetime
+ * cache would serve a stale bank name until the next deploy. A caller that
+ * passes nothing gets exactly the behaviour this file had before (PERF-05,
+ * 01/09/2026).
+ */
+export interface EnrichCache {
+  bank: Map<string, BankResolution>;
+}
+
+export function createEnrichCache(): EnrichCache {
+  return { bank: new Map() };
+}
+
+/**
+ * Everything about the holding institution that (country, bank code) alone
+ * decides: the directory hit, the `bic` block that gets served, and whether a
+ * reference lookup failed on the way.
+ *
+ * Extracted from enrichResult so a batch can compute it ONCE per distinct bank
+ * (PERF-05, performance audit of 01/09/2026: a batch of 100 ran 100 independent
+ * passes, and enrichResult is ~99% of the CPU of the two paid routes). Nothing
+ * inside depends on the account number or on the rest of the IBAN, which is
+ * exactly what makes the memoisation safe; everything that does — the bank-code
+ * verdict on the whole BBAN, the UK modulus, the demand ledger — deliberately
+ * stayed behind in enrichResult.
+ */
+function resolveBank(cc: string, bankCode: string): BankResolution {
+  // Declared without an initialiser: the first statement that touches it is the
+  // unconditional assignment below, and eslint's no-useless-assignment is right
+  // that a `null` here would only be written to be overwritten.
+  let bic: BicBlockWithPostalAddress | null;
 
   // BIC lookup.
   //
@@ -582,7 +662,7 @@ export function enrichResult(result: IBANValidationResult): void {
   } catch {
     lookupFailed = true;
   }
-  result.bic = hit
+  bic = hit
     ? {
         code: hit.code,
         bank_name: hit.bank_name,
@@ -612,7 +692,7 @@ export function enrichResult(result: IBANValidationResult): void {
       if (reg?.bic) {
         // Provenance follows the answer: this BIC comes from the national
         // register, not from the directory the fallback would have read.
-        result.bic = {
+        bic = {
           code: reg.bic,
           bank_name: reg.name,
           city: reg.town,
@@ -646,7 +726,7 @@ export function enrichResult(result: IBANValidationResult): void {
     try {
       const reg = nationalRegisterAvailable(cc) ? lookupNationalCode(cc, bankCode) : null;
       if (reg?.bic) {
-        result.bic = {
+        bic = {
           code: reg.bic,
           bank_name: reg.name,
           // The OeNB publishes the seat, the NBB publishes names only — so
@@ -682,7 +762,7 @@ export function enrichResult(result: IBANValidationResult): void {
     try {
       const reg = lookupBgBankCode(bankCode);
       if (reg?.bic) {
-        result.bic = {
+        bic = {
           code: reg.bic,
           // Verbatim, in Cyrillic, as the register writes it. Transliterating
           // would be the alteration its terms forbid.
@@ -726,20 +806,20 @@ export function enrichResult(result: IBANValidationResult): void {
   // The lookup is by BIC11, so a branch code resolves the branch's own row.
   // No branch guard is needed at this layer — it runs at seed time — and adding
   // one here would risk disagreeing with it.
-  if (result.bic?.code) {
-    const code = result.bic.code;
+  if (bic?.code) {
+    const code = bic.code;
     // `lookup`, not `lookupByBic11`: for an 11-character argument the two are
     // the same query, but lookup() memoises it. Cheap either way (0.019 ms
     // measured), and there is no reason for the hot path to skip a cache that
     // already exists.
     const row = lookup(code.length === 8 ? `${code}XXX` : code);
     if (row) {
-      result.bic.lei = row.lei ?? null;
-      result.bic.lei_status = row.lei_status ?? null;
+      bic.lei = row.lei ?? null;
+      bic.lei_status = row.lei_status ?? null;
       // Dated and sourced by the shared builder. An address that arrives beside
       // a monthly-refreshed bank name reads as equally current; it usually is
       // not, and `as_of` is what stops that reading.
-      result.bic.address = registeredAddress(row);
+      bic.address = registeredAddress(row);
 
       // The same seat in ISO 20022 `PostalAddress` vocabulary, for the November
       // 2026 structured-address rules. Strictly additive — `address` above is
@@ -752,10 +832,56 @@ export function enrichResult(result: IBANValidationResult): void {
       // worst place to take a lock for one optional field.
       const postalAddress = toIso20022PostalAddress(row, lookupClearingSeatByBic(row.bic11));
       if (postalAddress) {
-        (result.bic as BicBlockWithPostalAddress).postal_address = postalAddress;
+        bic.postal_address = postalAddress;
       }
     }
   }
+
+  return { hit, lookupFailed, bic };
+}
+
+/**
+ * Enrich a valid IBAN result with BIC lookup, issuer classification,
+ * and risk indicators. Mutates the result object in place.
+ *
+ * `cache` is optional and scoped to one batch or one request: pass the Map from
+ * createEnrichCache() and the bank resolution is computed once per distinct
+ * (country, bank code) instead of once per IBAN. It changes no answer — the
+ * cached half depends on nothing else — it only stops a hundred IBANs of the
+ * same bank from asking the same question a hundred times.
+ */
+export function enrichResult(result: IBANValidationResult, cache?: EnrichCache): void {
+  // The five SEPA members the library's frozen set does not carry (DATA-03,
+  // 01/09/2026). `sepa` is filled by the library's own validate() before we get
+  // here, so the correction has to be applied to the built block, and it is
+  // applied BEFORE the guard below: membership is a country fact and does not
+  // depend on a bank code being present. See SEPA_MEMBERS_EXTRA in countries.ts
+  // for the register counts behind it.
+  if (result.valid && result.country && result.sepa && SEPA_MEMBERS_EXTRA[result.country.code]) {
+    result.sepa = { ...result.sepa, ...getSepaInfo(result.country.code) };
+  }
+
+  // Make the invariant local and explicit instead of relying on a non-null
+  // assertion on result.country (a valid IBAN always carries country + bban,
+  // but the guard documents and enforces it here).
+  if (!result.valid || !result.country || !result.bban?.bank_code) return;
+
+  const cc = result.country.code;
+  const bankCode = result.bban.bank_code;
+
+  // The bank behind the code, computed once per (country, bank code) when the
+  // caller supplies a cache. `bic` is handed out as a shallow copy so one
+  // result in a batch can never write into another's answer, and a resolution
+  // whose reference lookup FAILED is never cached: freezing a transient
+  // database error would turn one unreadable read into `unavailable` for every
+  // remaining IBAN of that bank in the batch.
+  const cacheKey = `${cc}\u0000${bankCode}`;
+  const cached = cache?.bank.get(cacheKey);
+  const resolved = cached ?? resolveBank(cc, bankCode);
+  if (cache && !cached && !resolved.lookupFailed) cache.bank.set(cacheKey, resolved);
+
+  const { hit, lookupFailed } = resolved;
+  result.bic = resolved.bic ? { ...resolved.bic } : null;
 
   // Issuer classification — BIC8 exact match, then institution-name fallback
   if (result.bic) {
@@ -853,6 +979,34 @@ export function enrichResult(result: IBANValidationResult): void {
     result.sepa.vop_participant = result.bic?.code
       ? checkVop(result.bic.code.slice(0, 8)).participant
       : null;
+
+    // `schemes` at the grain the published contract promises it at (DATA-02,
+    // 01/09/2026). The OpenAPI description says "SEPA schemes the INSTITUTION
+    // supports"; the library answers a literal per group of countries and never
+    // reads the EPC registers — so /v1/iban/validate announced "SDD available"
+    // on DE57100505000123456789 while /v1/iban/compliance, reading the register
+    // shipped in the same product, answered `sdd: false`. One IBAN, two
+    // endpoints, two answers.
+    //
+    // The register wins when it has something to say about the institution we
+    // resolved, and `basis` says which of the two answered, the way
+    // `risk_indicators.sepa_reachable_scope` already does for its neighbour.
+    //
+    // Two deliberate limits. A BIC8 with no row keeps the country answer: the
+    // register lists participants, so an absence is not a withdrawal from the
+    // scheme. And a non-member country is never given schemes off a resolved
+    // BIC — a foreign branch's BIC would otherwise make `member: false` sit
+    // beside a non-empty `schemes`.
+    const sepa = result.sepa as SepaBlockWithBasis;
+    const registered = sepa.member && result.bic?.code
+      ? epcSchemesForBic8(result.bic.code.slice(0, 8))
+      : [];
+    if (registered.length > 0) {
+      sepa.schemes = registered;
+      sepa.basis = 'epc_register';
+    } else {
+      sepa.basis = 'country_default';
+    }
   }
 
   result.risk_indicators = {

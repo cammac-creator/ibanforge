@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { createRequire } from 'node:module';
 import { getEntryCount, getLastUpdated, getSourceFreshness, type SourceFreshness } from '../lib/bic-lookup.js';
 import { getChClearingCount } from '../lib/ch-clearing.js';
-import { getStatsDB } from '../lib/db.js';
+import { getStatsDB, getStatsDbState } from '../lib/db.js';
 import { getComplianceDB } from '../lib/compliance-db.js';
 import { ukModulusStatus, type UkModulusStatus } from '../lib/uk-modulus.js';
 import { verificationDelivery } from '../lib/key-creation-guard.js';
@@ -115,8 +115,64 @@ function probeVerificationMail(): { window_hours: number; state: 'ok' | 'degrade
   }
 }
 
+/** Did this database answer at all? Used only to qualify a degraded response. */
+function probeState(probe: () => void): 'ok' | 'error' {
+  try {
+    probe();
+    return 'ok';
+  } catch {
+    return 'error';
+  }
+}
+
+/**
+ * 🚨 PERF-03 (audit 2026-09-01): the answer given when the stats database could
+ * not be opened at all.
+ *
+ * Until this change that failure was not a red healthcheck, it was NO
+ * healthcheck: `getStatsDB()` runs as an import side effect of
+ * `src/routes/feedback.ts`, so a corrupt `stats.sqlite` threw before `serve()`,
+ * no listener ever existed, Railway gave up after `restartPolicyMaxRetries = 3`
+ * and every in-process watchdog died with it. The container that never exists
+ * looks, from outside, exactly like a network problem.
+ *
+ * So the point of this payload is the `message`: `entrypoint.sh` deliberately
+ * never overwrites `stats.sqlite` (it holds the API keys), which means a
+ * corrupt file survives every restart untouched. Being able to READ the SQLite
+ * error is what turns a silent month of downtime into one line of diagnosis.
+ * The other two databases are probed so the reader sees which of the three is
+ * down instead of assuming all of them are.
+ */
+function statsDbUnavailable(error: string | undefined): {
+  status: string;
+  version: string;
+  uptime_seconds: number;
+  databases: { bic: string; stats: string; compliance: string };
+  message: string;
+} {
+  return {
+    status: 'error',
+    version: pkg.version,
+    uptime_seconds: Math.floor((Date.now() - startTime) / 1000),
+    databases: {
+      bic: probeState(() => void getEntryCount()),
+      stats: 'error',
+      compliance: probeState(
+        () => void getComplianceDB().prepare('SELECT 1 FROM sanctioned_countries LIMIT 1').get(),
+      ),
+    },
+    message: error ?? 'stats_database_unavailable',
+  };
+}
+
 health.get('/health', (c) => {
   try {
+    // Read BEFORE probing: on a boot where the DDL already failed at import,
+    // the cause is recorded and there is no reason to make the corrupt file
+    // throw a second time.
+    const bootState = getStatsDbState();
+    if (!bootState.ok) return c.json(statsDbUnavailable(bootState.error), 503);
+
     const db = probeDatabases();
 
     // ⚠️ The SHAPE of this response is a contract: Railway's healthcheck reads
@@ -152,6 +208,11 @@ health.get('/health', (c) => {
       bic_sources: probeSourceFreshness(),
     });
   } catch {
+    // The probe itself may be the first thing to touch a broken stats database
+    // (nothing had opened it yet). It records the cause on its way out, so ask
+    // again before falling back to the anonymous failure.
+    const state = getStatsDbState();
+    if (!state.ok) return c.json(statsDbUnavailable(state.error), 503);
     return c.json({ status: 'error', message: 'health_check_failed' }, 503);
   }
 });

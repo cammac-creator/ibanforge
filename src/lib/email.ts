@@ -1,5 +1,6 @@
 import { PAYMENT_LINKS, PRICING_PAGE } from './payment-links.js';
 import { sendViaRelay, isRelayConfigured } from './mail-transport.js';
+import { opsFail } from './ops-alert.js';
 import {
   ACCOUNT_PAGE,
   KEY_PLACEHOLDER,
@@ -28,6 +29,61 @@ import {
  */
 export function isEmailConfigured(): boolean {
   return isRelayConfigured();
+}
+
+/**
+ * The recipient's domain, and nothing else.
+ *
+ * SEC-08 (2026-09-01): every failed send used to print the full address into
+ * stdout, which Railway keeps. Same class as the query-value leak corrected on
+ * 2026-07-25. The domain is what makes the log actionable ("our relay is down"
+ * reads differently from "one mailbox refuses us") and it is not the customer.
+ *
+ * Exported so the rule is asserted rather than trusted.
+ */
+export function recipientDomain(address: string): string {
+  const at = address.lastIndexOf('@');
+  if (at === -1 || at === address.length - 1) return 'unknown';
+  return address.slice(at + 1).toLowerCase();
+}
+
+/**
+ * One failed delivery, said twice: once in the log for whoever is reading it,
+ * once on the owner's phone for the deliveries that carry a key.
+ *
+ * QUA-13 (2026-09-01): a key that was paid for and never arrived produced a
+ * `console.error` and nothing else, while disk volume, 5xx rate and sanctions
+ * age all raise ops alerts. That failure is indistinguishable, from every
+ * dashboard we own, from a customer who simply never called, which is the exact
+ * question the 30/08 funnel measurement left open. Threshold 1: there is no
+ * such thing as an acceptable number of undelivered keys.
+ *
+ * 🚨 Muted under vitest, and this is not cosmetic. The Stripe webhook delivers
+ * without a `VITEST` guard (unlike the free and USDC rails), the suite drives it
+ * with the example addresses published in this repo, and no relay is configured
+ * there, so EVERY `npm run check` would reach this line. On a shell that has
+ * TELEGRAM_BOT_TOKEN set that is a real alert, on the owner's phone, several
+ * times per run. An alert that cries wolf on every test run is an alert nobody
+ * reads at 3am, which is the one moment it exists for.
+ *
+ * 🚨 The message itself carries no address and no domain: `./ops-alert.ts` rule 3
+ * is stricter than a privacy default, because Telegram is not a declared
+ * processor and a corporate domain names a customer nearly as well as their
+ * address does. The domain goes to the log, where it makes the line actionable.
+ */
+export function alertKeyDeliveryFailure(what: string): void {
+  if (process.env.VITEST) return;
+  void opsFail('mail:key-delivery', `${what}: the relay refused the message or could not be reached.`, 1);
+}
+
+/**
+ * `alert` is false for the messages that carry no key (quota warning, activation
+ * nudge, verification code): losing one of those is a missed nudge, not a lost
+ * purchase, and alerting on all of them would drown the one that matters.
+ */
+function reportUndelivered(what: string, to: string, alert: boolean): void {
+  console.error(`[email] ${what} not delivered, recipient domain:`, recipientDomain(to));
+  if (alert) alertKeyDeliveryFailure(what);
 }
 
 export interface ApiKeyEmailInput {
@@ -73,7 +129,12 @@ export function buildApiKeyEmail(p: ApiKeyEmailInput): { subject: string; text: 
     ${buildFirstCallHtml({ bearer: p.rawKey })}
     <p style="font-size:14px;margin:0"><a href="https://ibanforge.com/docs" style="color:#fbbf24;text-decoration:none">Read the docs</a> &nbsp;&middot;&nbsp; <a href="https://ibanforge.com/legal/terms" style="color:#fbbf24;text-decoration:none">Terms</a></p>
     <hr style="border:none;border-top:1px solid rgba(255,255,255,.06);margin:24px 0 14px">
-    <p style="color:#52525b;font-size:12px;margin:0">IBANforge &middot; pre-payout screening for AI agents &middot; <a href="https://ibanforge.com" style="color:#71717a">ibanforge.com</a> &middot; governed by the <a href="https://ibanforge.com/legal/terms" style="color:#71717a">Terms of Service</a></p>
+    <!-- BIZ-05 (2026-09-01), third surface: the machine-facing copy still said
+         "pre-payout screening for AI agents" while the landing had already
+         moved. Who actually pays is someone holding a file of IBANs who needs
+         to know what is behind them, and zero autonomous agents. The two
+         llms.txt carry the same line. -->
+    <p style="color:#52525b;font-size:12px;margin:0">IBANforge &middot; know the bank behind any IBAN &middot; <a href="https://ibanforge.com" style="color:#71717a">ibanforge.com</a> &middot; governed by the <a href="https://ibanforge.com/legal/terms" style="color:#71717a">Terms of Service</a></p>
   </div></body></html>`;
 
   return { subject: `Your IBANforge API key, ${credits} credits`, text, html };
@@ -82,7 +143,7 @@ export function buildApiKeyEmail(p: ApiKeyEmailInput): { subject: string; text: 
 export async function sendApiKeyEmail(p: ApiKeyEmailInput & { to: string }): Promise<boolean> {
   const { subject, text, html } = buildApiKeyEmail(p);
   const ok = await sendViaRelay({ to: p.to, subject, text, html });
-  if (!ok) console.error('[email] API key not delivered to', p.to);
+  if (!ok) reportUndelivered('purchase key delivery', p.to, true);
   return ok;
 }
 
@@ -139,7 +200,7 @@ export function buildFreeKeyEmail(p: FreeKeyEmailInput): { subject: string; text
 export async function sendFreeKeyEmail(p: FreeKeyEmailInput & { to: string }): Promise<boolean> {
   const { subject, text, html } = buildFreeKeyEmail(p);
   const ok = await sendViaRelay({ to: p.to, subject, text, html });
-  if (!ok) console.error('[email] free key not delivered to', p.to);
+  if (!ok) reportUndelivered('free key delivery', p.to, true);
   return ok;
 }
 
@@ -188,7 +249,7 @@ export function buildActivationNudgeEmail(p: ActivationNudgeInput): { subject: s
 export async function sendActivationNudgeEmail(p: ActivationNudgeInput & { to: string }): Promise<boolean> {
   const { subject, text, html } = buildActivationNudgeEmail(p);
   const ok = await sendViaRelay({ to: p.to, subject, text, html });
-  if (!ok) console.error('[email] activation nudge not delivered to', p.to);
+  if (!ok) reportUndelivered('activation nudge', p.to, false);
   return ok;
 }
 
@@ -257,45 +318,59 @@ export function buildQuotaWarningEmail(p: QuotaWarningInput): { subject: string;
 export async function sendQuotaWarningEmail(p: QuotaWarningInput & { to: string }): Promise<boolean> {
   const { subject, text, html } = buildQuotaWarningEmail(p);
   const ok = await sendViaRelay({ to: p.to, subject: subject, text, html });
-  if (!ok) console.error('[email] quota warning not delivered to', p.to);
+  if (!ok) reportUndelivered('quota warning', p.to, false);
   return ok;
 }
 
 /**
  * 6-digit code for the second-key-per-network verification step. Plain and
- * short on purpose: the reader may be an agent parsing the mailbox — the code
- * appears alone on its own line so a regex finds it without heuristics.
+ * short on purpose: the reader may be an agent parsing the mailbox, so the code
+ * appears alone on its own line and a regex finds it without heuristics.
+ *
+ * Split out of its sender on 2026-09-01 (BIZ-14): the wording used to be built
+ * inside the async function, where nothing pure could be asserted, which is
+ * exactly how the em dash rule stayed green while two live messages broke it.
  */
-export async function sendKeyVerificationEmail(p: { to: string; code: string }): Promise<boolean> {
+export function buildKeyVerificationEmail(p: { code: string }): { subject: string; text: string; html: string } {
   const subject = `${p.code} is your IBANforge verification code`;
   const text =
     `Your IBANforge verification code:\n\n${p.code}\n\n` +
     `Valid for 15 minutes. Repeat your key request with {"email": "...", "code": "${p.code}"}.\n\n` +
     `You received this because a second API key was requested from your network today. ` +
-    `If that was not you, ignore this mail — no key was created.\n\nIBANforge`;
+    `If that was not you, ignore this mail: no key was created.\n\nIBANforge`;
   const html = `<!DOCTYPE html><html><body style="margin:0;background:#0f0f13;padding:28px;font-family:-apple-system,Segoe UI,Roboto,sans-serif;color:#d4d4d8">
   <div style="max-width:560px;margin:0 auto;background:#16161b;border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:30px 32px">
     <div style="font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:#71717a;font-family:monospace">IBANforge</div>
     <h1 style="color:#fafafa;font-size:22px;margin:10px 0 6px">Your verification code</h1>
     <p style="font-size:32px;letter-spacing:.3em;font-family:monospace;color:#fafafa;margin:18px 0">${p.code}</p>
     <p style="color:#a1a1aa;font-size:14px;margin:0 0 10px">Valid 15 minutes. Repeat your key request with <code style="color:#fafafa">{"email": "...", "code": "${p.code}"}</code>.</p>
-    <p style="color:#71717a;font-size:12px;margin:14px 0 0">You received this because a second API key was requested from your network today. If that was not you, ignore this mail — no key was created.</p>
+    <p style="color:#71717a;font-size:12px;margin:14px 0 0">You received this because a second API key was requested from your network today. If that was not you, ignore this mail: no key was created.</p>
   </div></body></html>`;
+  return { subject, text, html };
+}
+
+export async function sendKeyVerificationEmail(p: { to: string; code: string }): Promise<boolean> {
+  const { subject, text, html } = buildKeyVerificationEmail(p);
   const ok = await sendViaRelay({ to: p.to, subject, text, html });
-  if (!ok) console.error('[email] verification code not delivered to', p.to);
+  if (!ok) reportUndelivered('verification code', p.to, false);
   return ok;
 }
 
 /**
- * Editor/OEM subscription welcome — same delivery mechanics as
- * sendApiKeyEmail but worded for a monthly allowance that renews, not a
- * prepaid credit pool.
+ * Editor/OEM subscription welcome: same delivery mechanics as buildApiKeyEmail,
+ * worded for a monthly allowance that renews rather than a prepaid credit pool.
+ *
+ * BIZ-14 (2026-09-01): the subject carried an em dash, on a live transactional
+ * message, while the same rule was locked by test on the four builders that
+ * were pure. It was not pure because it was assembled inline in the sender
+ * below, so there was nothing for the sweep to look at. Making it pure is the
+ * fix; removing the dash is only the symptom.
  */
-export async function sendOemKeyEmail(p: {
-  to: string;
-  rawKey: string;
-  monthlyLimit: number;
-}): Promise<boolean> {
+export function buildOemKeyEmail(p: { rawKey: string; monthlyLimit: number }): {
+  subject: string;
+  text: string;
+  html: string;
+} {
   const limit = p.monthlyLimit.toLocaleString('en-US');
 
   const text =
@@ -313,18 +388,18 @@ export async function sendOemKeyEmail(p: {
     `Check your usage any time:\n` +
     `  curl -H "Authorization: Bearer ${p.rawKey}" https://api.ibanforge.com/v1/keys/usage\n\n` +
     `Your named support contact: support@ibanforge.com (mention Editor/OEM).\n` +
-    `Keep this key safe — it will not be shown again.\n\nIBANforge`;
+    `Keep this key safe. It will not be shown again.\n\nIBANforge`;
 
   const html = `<!DOCTYPE html><html><body style="margin:0;background:#0f0f13;padding:28px;font-family:-apple-system,Segoe UI,Roboto,sans-serif;color:#d4d4d8">
   <div style="max-width:560px;margin:0 auto;background:#16161b;border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:30px 32px">
     <div style="font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:#71717a;font-family:monospace">IBANforge</div>
     <h1 style="color:#fafafa;font-size:22px;margin:10px 0 6px">Welcome to Editor / OEM</h1>
-    <p style="color:#a1a1aa;font-size:15px;margin:0 0 22px">Your subscription is active — <b style="color:#fafafa">${limit} requests/month</b>, resets on the 1st.</p>
+    <p style="color:#a1a1aa;font-size:15px;margin:0 0 22px">Your subscription is active: <b style="color:#fafafa">${limit} requests/month</b>, resets on the 1st.</p>
     <div style="background:#09090b;border:1px solid #27272a;border-radius:10px;padding:14px 16px;margin:0 0 8px">
       <div style="font-size:11px;color:#71717a;font-family:monospace;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Your API key</div>
       <code style="font-family:'JetBrains Mono',monospace;font-size:14px;color:#f59e0b;word-break:break-all">${p.rawKey}</code>
     </div>
-    <p style="color:#71717a;font-size:12px;margin:0 0 22px">Keep it safe — it will not be shown again.</p>
+    <p style="color:#71717a;font-size:12px;margin:0 0 22px">Keep it safe. It will not be shown again.</p>
     <div style="font-size:13px;color:#a1a1aa;margin-bottom:6px">Use it as a Bearer token:</div>
     <pre style="background:#09090b;border:1px solid #1c1c22;border-radius:10px;padding:14px 16px;font-family:'JetBrains Mono',monospace;font-size:12px;color:#d6d3cc;white-space:pre-wrap;overflow-x:auto;margin:0 0 22px">curl -H "Authorization: Bearer ${p.rawKey}" \\
      -X POST https://api.ibanforge.com/v1/iban/validate \\
@@ -336,7 +411,12 @@ export async function sendOemKeyEmail(p: {
     <p style="color:#52525b;font-size:12px;margin:0">IBANforge · bank data API for software vendors · <a href="https://ibanforge.com" style="color:#71717a">ibanforge.com</a></p>
   </div></body></html>`;
 
-  const ok = await sendViaRelay({ to: p.to, subject: `Your IBANforge Editor / OEM key — ${limit} requests/month`, text, html });
-  if (!ok) console.error('[email] OEM key not delivered to', p.to);
+  return { subject: `Your IBANforge Editor / OEM key, ${limit} requests/month`, text, html };
+}
+
+export async function sendOemKeyEmail(p: { to: string; rawKey: string; monthlyLimit: number }): Promise<boolean> {
+  const { subject, text, html } = buildOemKeyEmail(p);
+  const ok = await sendViaRelay({ to: p.to, subject, text, html });
+  if (!ok) reportUndelivered('OEM key delivery', p.to, true);
   return ok;
 }

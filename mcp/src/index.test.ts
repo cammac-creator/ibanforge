@@ -35,6 +35,14 @@ const BIC_PAYLOAD = {
   city: 'Zurich',
 };
 
+/** The free `/v1/iban/format` answer, shaped to satisfy `required: [iban, valid]`. */
+const FORMAT_PAYLOAD = {
+  iban: 'CH9300762011623852957',
+  valid: true,
+  formatted: 'CH93 0076 2011 6238 5295 7',
+  country: { code: 'CH', name: 'Switzerland' },
+};
+
 let api: HttpServer;
 let apiBase: string;
 let client: Client;
@@ -46,6 +54,22 @@ beforeAll(async () => {
     res.setHeader('content-type', 'application/json');
     if (req.url?.startsWith('/v1/bic/')) {
       res.writeHead(200).end(JSON.stringify(BIC_PAYLOAD));
+      return;
+    }
+    // Audit MCP-02, 2026-09-01. The real 402 on POST /v1/iban/validate carried
+    // 18 600 bytes of `PAYMENT-REQUIRED`, over Node's 16 KB http.maxHeaderSize,
+    // so undici threw UND_ERR_HEADERS_OVERFLOW and the tool answered
+    // `fetch failed` — with the free fallback right beside it, unused. The stub
+    // reproduces the ONE thing that matters: a response the client's parser
+    // refuses before it can read the status.
+    if (req.url === '/v1/iban/validate' && req.method === 'POST') {
+      res.setHeader('payment-required', 'A'.repeat(20_000));
+      res.writeHead(402).end(JSON.stringify({ error: 'payment_required' }));
+      return;
+    }
+    // The free rail the fallback is supposed to take.
+    if (req.url?.startsWith('/v1/iban/format')) {
+      res.writeHead(200).end(JSON.stringify(FORMAT_PAYLOAD));
       return;
     }
     // send_feedback relays to the real route rather than writing anything of
@@ -166,6 +190,19 @@ describe('errors are flagged, not dressed up as results', () => {
     expect(res.structuredContent).toBeUndefined();
     const content = res.content as Array<{ type: string; text: string }>;
     expect(JSON.parse(content[0].text).error).toBe('invalid_bic');
+  });
+
+  it('falls back to the free rail when the response never arrives, instead of "fetch failed"', async () => {
+    // The stub answers /v1/iban/validate with 20 KB of headers, which is what
+    // production did until 2026-09-01. Before the fix this call came back
+    // `isError: true` with `message: "fetch failed"` — the degraded free result
+    // below it was never reached.
+    const res = await client.callTool({ name: 'validate_iban', arguments: { iban: 'CH9300762011623852957' } });
+
+    expect(res.isError, 'a transport failure on a paid route must not dead-end').toBeFalsy();
+    expect(res.structuredContent).toMatchObject({ iban: 'CH9300762011623852957', valid: true });
+    const note = (res.structuredContent as { _note?: string })._note ?? '';
+    expect(note, 'the degraded answer must say it is degraded').toContain('Anonymous mode');
   });
 
   it('marks an unknown tool as an error', async () => {

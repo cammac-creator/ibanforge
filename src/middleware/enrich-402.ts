@@ -381,6 +381,97 @@ function buildFallbackAnnouncement(
 }
 
 /**
+ * Byte budget for the `PAYMENT-REQUIRED` header.
+ *
+ * Node caps a whole response header block at `http.maxHeaderSize`, 16 384
+ * bytes by default, and undici (the engine behind `fetch`) aborts the response
+ * with UND_ERR_HEADERS_OVERFLOW rather than surfacing the 402 underneath. The
+ * MCP audit of 2026-09-01 measured 18 600 bytes on POST /v1/iban/validate and
+ * 19 509 on POST /v1/iban/batch: every Node caller — the published
+ * `ibanforge-mcp` package, our own TypeScript SDK, the `wrapFetchWithPayment`
+ * recipe in /docs/pay-as-an-agent — read `fetch failed` where a price should
+ * have been. Python, curl and HTTP/2 clients never saw it.
+ *
+ * 8 KB, not 16: the other response headers already cost ~1.3 KB, and a budget
+ * with no room left is a budget that breaks again the next time the discovery
+ * payload grows.
+ */
+export const MAX_PAYMENT_REQUIRED_BYTES = 8192;
+
+/**
+ * Fields dropped from the header copy of an extension, in order.
+ *
+ * `outputSchema` is a full JSON Schema of the response — 11 KB on
+ * /v1/iban/validate — and nothing on the payment path reads it: @x402/core
+ * compares only `extensions.<key>.info` when it checks a client echo
+ * (`getExtensionInfo` returns `value.info` when present), the Bazaar
+ * facilitator validates `info` against the sibling `schema`, and the x402 SDK's
+ * own v1 catalog path deletes this very field. The 402 BODY still carries it
+ * in full for indexers that read bodies.
+ */
+const HEADER_BULK_EXTENSION_KEYS = ['outputSchema'] as const;
+
+/** The header value the SDK encodes: base64 of the JSON announcement. */
+function encodeAnnouncement(announcement: Record<string, unknown>): string {
+  return Buffer.from(JSON.stringify(announcement), 'utf8').toString('base64');
+}
+
+function encodedBytes(announcement: Record<string, unknown>): number {
+  return encodeAnnouncement(announcement).length;
+}
+
+/** Every extension copied, minus the bulk fields that sit BESIDE `info`. */
+function withoutExtensionBulk(extensions: unknown): Record<string, unknown> | null {
+  if (!extensions || typeof extensions !== 'object' || Array.isArray(extensions)) return null;
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(extensions as Record<string, unknown>)) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      out[key] = value;
+      continue;
+    }
+    const copy = { ...(value as Record<string, unknown>) };
+    for (const bulk of HEADER_BULK_EXTENSION_KEYS) delete copy[bulk];
+    out[key] = copy;
+  }
+  return out;
+}
+
+/**
+ * The announcement as it goes into the `PAYMENT-REQUIRED` header: the same
+ * object, shrunk only as far as the budget requires, and never below it.
+ *
+ * Two rungs, in this order, and deliberately no third. Drop the bulk fields
+ * beside `info`; if that is still too large, drop `extensions` outright. A
+ * HALF-trimmed `info` is the one thing this must never emit: on the paid
+ * retry, @x402/core validates the client's echoed extension info as a subset
+ * of what the server advertises (`objectContainsSubset` in
+ * `x402ResourceServer.validateExtensions`, and the Bazaar extension declares no
+ * dynamic fields), so a client echoing a trimmed `info` would be refused with
+ * `extension_echo_mismatch`. A client that saw no extensions echoes none, and
+ * that same check passes untouched.
+ *
+ * `x402Version`, `error`, `resource` and `accepts` are never touched — they are
+ * the payment terms, and the whole point is that the caller finally gets to
+ * read them. Audit MCP-01, 2026-09-01.
+ */
+export function projectAnnouncementForHeader(
+  announcement: Record<string, unknown>,
+  maxBytes: number = MAX_PAYMENT_REQUIRED_BYTES,
+): Record<string, unknown> {
+  if (encodedBytes(announcement) <= maxBytes) return announcement;
+
+  const slimmed: Record<string, unknown> = { ...announcement };
+  const extensions = withoutExtensionBulk(announcement.extensions);
+  if (extensions) {
+    slimmed.extensions = extensions;
+    if (encodedBytes(slimmed) <= maxBytes) return slimmed;
+  }
+
+  delete slimmed.extensions;
+  return slimmed;
+}
+
+/**
  * Human- and agent-readable access ramp shared by both 402 enrichment paths.
  * Lists the three ways to call a paid endpoint: a free API key, prepaid
  * credit packs (card or USDC), and pay-per-call x402. The machine `accepts`
@@ -568,7 +659,8 @@ export function enrich402Middleware(): MiddlewareHandler<HonoEnv> {
     const method = c.req.method;
     const walletAddress = process.env.WALLET_ADDRESS ?? '0x0000000000000000000000000000000000000000';
 
-    let announcement = decodePaymentRequired(c.res.headers.get('payment-required'));
+    const headerAnnouncement = decodePaymentRequired(c.res.headers.get('payment-required'));
+    let announcement = headerAnnouncement;
 
     if (!announcement) {
       const existing = (await c.res.clone().text()).trim();
@@ -609,5 +701,18 @@ export function enrich402Middleware(): MiddlewareHandler<HonoEnv> {
       headers: c.res.headers,
     });
     c.res.headers.set('Content-Type', 'application/json');
+
+    // The header is the half a Node caller cannot survive, and this middleware
+    // is the one place that already holds both halves: the body above keeps the
+    // complete announcement, the header goes out trimmed to what fetch() can
+    // parse. Rewritten only when the SDK wrote one — a 402 we built ourselves
+    // has no gate behind it and must not start advertising payment terms in a
+    // header. Audit MCP-01, 2026-09-01.
+    if (headerAnnouncement) {
+      const projected = projectAnnouncementForHeader(headerAnnouncement);
+      if (projected !== headerAnnouncement) {
+        c.res.headers.set('PAYMENT-REQUIRED', encodeAnnouncement(projected));
+      }
+    }
   };
 }

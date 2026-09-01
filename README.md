@@ -64,6 +64,11 @@ Standard JSON-RPC `initialize` + `tools/list` + `tools/call` flow. Use this when
 | `lookup_bic`          | User already has a BIC/SWIFT — backed by 121k+ BIC entries (39k+ LEI-enriched via GLEIF) | $0.003   |
 | `lookup_ch_clearing`  | Swiss BC-Nummer / IID — **the deepest Swiss clearing data in any public API**: full SIX BankMaster rail participation (SIC, euroSIC, CHF instant) + QR-IID | $0.003   |
 | `check_compliance`    | Pre-flight risk triage before a SEPA / cross-border payment (sanctions + FATF + VoP)      | $0.02    |
+| `validate_payment_reference` | RF/ISO 11649, Swiss QRR, Belgian OGM/VCS or Finnish viitenumero checksum, plus the QRR ↔ QR-IBAN pairing verdict | **free** |
+| `check_postal_address` | An ISO 20022 address against one rail's published rules (`sps`, `hvps_plus`, `fedwire`), each finding citing its source | **free** |
+| `send_feedback`       | Report incorrect data or claim an x402 refund — the only tool that writes                 | free     |
+
+The two free tools need no key, no wallet and no signup: they are the ones to try first.
 
 Full descriptions with WHEN-to-use triggers are served live at [`/.well-known/mcp/server-card.json`](https://api.ibanforge.com/.well-known/mcp/server-card.json).
 
@@ -138,7 +143,11 @@ curl https://api.ibanforge.com/v1/demo
 | `GET`  | `/v1/ch/clearing/{iid}`    | $0.003        | Swiss BC-Nummer / IID — SIC, euroSIC, QR-IID                  |
 | `POST` | `/v1/iban/compliance`      | $0.02         | Sanctions + FATF + SEPA Instant + VoP + risk score 0-100      |
 | `GET`  | `/v1/iban/format`          | **free**      | Pure mod-97 + structure check, no DB hit                       |
+| `GET`  | `/v1/iban/structure[/{country}]` | **free** | IBAN templates per country, no auth                            |
+| `GET\|POST` | `/v1/reference/validate` | **free**   | RF/ISO 11649, Swiss QRR, Belgian OGM/VCS, Finnish viitenumero  |
+| `POST` | `/v1/address/check`        | **free**      | ISO 20022 address vs `sps` / `hvps_plus` / `fedwire` rules      |
 | `GET`  | `/v1/demo`                 | free          | Example validations, no auth                                   |
+| `GET`  | `/v1/credits/bundles`      | free          | Prepaid credit bundles and their prices                        |
 | `GET`  | `/health`                  | free          | Health + DB status                                             |
 | `POST` | `/v1/keys/generate`        | free          | Generate an `ifk_*` API key (200 req/month) — body: `{email}`  |
 

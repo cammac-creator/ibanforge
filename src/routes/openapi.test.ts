@@ -113,3 +113,146 @@ describe('/v1/keys/generate: the spec documents the whole signup, verification i
     expect(description).toMatch(/\bcode\b/);
   });
 });
+
+/**
+ * A contract that types every success and no failure is half a contract.
+ *
+ * Audit of 2026-09-01 (DX-02): all thirty-one declared 4xx/5xx responses in
+ * this document carried a `description` and nothing else, and no `Error`
+ * component existed at all — while the served errors are perfectly regular
+ * (`{"error": "<snake_case token>", "message": "<sentence>"}`, verified on 17
+ * probes over 14 routes). So a generated client, including the Custom GPT that
+ * `integrations/openai/custom-gpt-setup.md` builds by pasting this very
+ * document, could not branch on a single failure.
+ *
+ * `429` and `413` were the other half: `rateLimitMiddleware()` and `bodyLimit`
+ * are both mounted on `*` in `src/app.ts`, so any operation can answer 429 and
+ * any operation with a body can answer 413 — and they were declared on three
+ * paths and on none, respectively.
+ */
+describe('every failure the API can answer is typed', () => {
+  const spec = buildSpec() as unknown as {
+    components: { schemas: Record<string, { required?: string[]; additionalProperties?: boolean }> };
+    paths: Record<string, Record<string, { requestBody?: unknown; responses?: Record<string, { content?: Record<string, { schema?: { $ref?: string } }> }> }>>;
+  };
+
+  const operations = Object.entries(spec.paths).flatMap(([path, item]) =>
+    Object.entries(item)
+      .filter(([, op]) => op && typeof op === 'object' && 'responses' in op)
+      .map(([method, op]) => ({ path, method, op })),
+  );
+
+  it('declares the ApiError component the whole document leans on', () => {
+    const apiError = spec.components.schemas.ApiError;
+    expect(apiError, 'components.schemas.ApiError is gone').toBeDefined();
+    expect(apiError.required).toEqual(['error', 'message']);
+    // Several routes add contextual recovery hints next to those two
+    // (`example`, `expected`, `schemes`, `upgrade_to_full_validation`…). A
+    // closed schema would make a generated client drop exactly the field that
+    // says how to recover.
+    expect(apiError.additionalProperties).toBe(true);
+  });
+
+  it('points every 4xx and 5xx response at it', () => {
+    const naked: string[] = [];
+    for (const { path, method, op } of operations) {
+      for (const [status, response] of Object.entries(op.responses ?? {})) {
+        if (!/^[45]/.test(status)) continue;
+        const ref = response.content?.['application/json']?.schema?.$ref;
+        if (ref !== '#/components/schemas/ApiError') naked.push(`${method.toUpperCase()} ${path} ${status}`);
+      }
+    }
+    expect(naked, `responses with no error schema: ${naked.join(', ')}`).toEqual([]);
+  });
+
+  it('declares 429 on every operation, because the rate limit is mounted on *', () => {
+    const missing = operations
+      .filter(({ op }) => !op.responses?.['429'])
+      .map(({ path, method }) => `${method.toUpperCase()} ${path}`);
+    expect(missing, `operations that cannot answer 429 according to the contract: ${missing.join(', ')}`).toEqual([]);
+  });
+
+  it('declares 413 on every operation that takes a body, and only those', () => {
+    // Not on GET /health: bodyLimit is global, but a document that says a
+    // bodiless request can exceed 256 KB is noise dressed as rigour.
+    for (const { path, method, op } of operations) {
+      const declares413 = Boolean(op.responses?.['413']);
+      expect(declares413, `${method.toUpperCase()} ${path} declares 413: ${declares413}`).toBe(Boolean(op.requestBody));
+    }
+  });
+});
+
+/**
+ * Routes that a developer needs in an emergency, and fields that are served.
+ *
+ * DX-05: the whole self-service key lifecycle was missing from the document.
+ * All three routes authenticate with the caller's own key — the handlers say
+ * so ("Self-service rotation. Auth is the (still valid) key itself.") — so
+ * they are public and their absence was a hole. Someone who leaks a key and
+ * reads only the contract could not learn they can kill it themselves.
+ *
+ * DX-06: five fields were served on every answer and declared in no schema.
+ * `sanctions` on a BIC lookup is the one compliance signal on the cheap
+ * endpoint, and `meta` on a compliance answer is the block that says what the
+ * verdict does not cover: both were invisible to a reader of the contract.
+ */
+describe('the contract covers the routes and fields the server actually serves', () => {
+  const spec = buildSpec() as unknown as {
+    paths: Record<string, Record<string, unknown>>;
+    components: { schemas: Record<string, { properties?: Record<string, unknown>; required?: string[] }> };
+  };
+
+  it.each([
+    ['/v1/keys/revoke', 'post'],
+    ['/v1/keys/rotate', 'post'],
+    ['/v1/credits/balance', 'get'],
+    ['/v1/feedback', 'post'],
+    ['/v1/feedback/{id}', 'get'],
+  ])('documents %s %s', (path, method) => {
+    expect(spec.paths[path], `${path} is not in the document`).toBeDefined();
+    expect(spec.paths[path][method], `${path} has no ${method} operation`).toBeDefined();
+  });
+
+  it('declares the sanctions screen served on every BIC lookup', () => {
+    expect(Object.keys(spec.components.schemas.BICLookupResult.properties ?? {})).toContain('sanctions');
+  });
+
+  it('declares both QR-IID fields served on a Swiss clearing lookup', () => {
+    const properties = Object.keys(spec.components.schemas.ChClearingResult.properties ?? {});
+    expect(properties).toEqual(expect.arrayContaining(['qr_iid_source', 'qr_iids']));
+  });
+
+  it('counts processing_ms among the required fields of a batch answer', () => {
+    const batch = spec.paths['/v1/iban/batch'].post as {
+      responses: { '200': { content: { 'application/json': { schema: { required: string[] } } } } };
+    };
+    expect(batch.responses['200'].content['application/json'].schema.required).toContain('processing_ms');
+  });
+
+  it('declares the meta block of a compliance answer', () => {
+    const compliance = spec.paths['/v1/iban/compliance'].post as {
+      responses: { '200': { content: { 'application/json': { schema: { allOf: Array<{ properties?: Record<string, unknown> }> } } } } };
+    };
+    const extension = compliance.responses['200'].content['application/json'].schema.allOf.find((s) => s.properties);
+    expect(Object.keys(extension?.properties ?? {})).toContain('meta');
+  });
+
+  it('says when each conditional field of a validation result appears', () => {
+    // DX-08: seven declared fields are never served on a plain valid answer.
+    // They are conditional, and nothing said so, so a generated client typed
+    // them as optionals with no rule for when to expect them.
+    const properties = spec.components.schemas.IBANValidationResult.properties as Record<string, { description?: string }>;
+    for (const field of [
+      'error',
+      'error_detail',
+      'reference_check',
+      'issuer',
+      'psd_registration',
+      'official_identity',
+      'modulus_check',
+    ]) {
+      const description = properties[field]?.description ?? '';
+      expect(description, `${field} does not say when it appears`).toMatch(/present|absent|only|when/i);
+    }
+  });
+});

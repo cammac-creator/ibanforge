@@ -71,9 +71,17 @@ describe('GET /stats/rejections', () => {
     expect(row!.count).toBeGreaterThan(0);
   });
 
-  it('borne la fenêtre à 90 jours et retombe sur 30 si le paramètre est illisible', async () => {
-    const clamped = await app.request('/stats/rejections?days=999', auth);
-    expect(((await clamped.json()) as { period_days: number }).period_days).toBe(90);
+  it('refuse une fenêtre au-delà de 90 jours et retombe sur 30 si le paramètre est illisible', async () => {
+    // 01/09/2026, PERF-01 : la fenêtre n'est plus rabotée en silence, elle est
+    // REFUSÉE. Ces agrégats bloquent l'event loop de tout le service pendant
+    // qu'ils tournent (2 895 ms mesurées à 90 jours sur la projection à 1 M de
+    // lignes) ; servir 90 quand on demande 999 laissait croire à une réponse
+    // sur un an, et c'est exactement le piège que PERF-13 documente ailleurs.
+    const refused = await app.request('/stats/rejections?days=999', auth);
+    expect(refused.status).toBe(400);
+    const body = (await refused.json()) as { error: string; message: string };
+    expect(body.error).toBe('period_too_long');
+    expect(body.message).toContain('90');
 
     const floored = await app.request('/stats/rejections?days=0', auth);
     expect(((await floored.json()) as { period_days: number }).period_days).toBe(1);
@@ -335,9 +343,12 @@ describe('GET /stats/traffic-trend', () => {
     expect(day.distinct_ips).toBe(3);
   });
 
-  it('clamps the period to [1, 90] and falls back to 30 on an unreadable one', async () => {
-    const clamped = await app.request('/stats/traffic-trend?period=999', auth);
-    expect(((await clamped.json()) as { period_days: number }).period_days).toBe(90);
+  it('refuses a period past 90 days and falls back to 30 on an unreadable one', async () => {
+    // Was a silent clamp until 01/09/2026 (PERF-01): a caller asking for a year
+    // got 90 days back labelled as what they asked for.
+    const refused = await app.request('/stats/traffic-trend?period=999', auth);
+    expect(refused.status).toBe(400);
+    expect(((await refused.json()) as { error: string }).error).toBe('period_too_long');
 
     const floored = await app.request('/stats/traffic-trend?period=0', auth);
     expect(((await floored.json()) as { period_days: number }).period_days).toBe(1);
@@ -472,5 +483,77 @@ describe('getStatsHistory — served latency', () => {
     const day = row(day5);
     expect(day.p95_ms).not.toBeNull();
     expect(day.p99_ms).toBeNull();
+  });
+});
+
+/**
+ * 🚨 PERF-13 (audit 2026-09-01): the parameter that was read by nobody.
+ *
+ * Every route here read `period` and only `period`, so `/stats/history?days=90`
+ * answered 200 with a figure computed over the 7-day default. The auditor
+ * measured this endpoint family's own cost through that trap and published a
+ * number six times too low before catching it. A measuring instrument that
+ * silently answers a different question than the one asked is worse than one
+ * that refuses.
+ */
+describe('/stats/* — no window is ever measured in silence (PERF-13)', () => {
+  it('accepts `days` as an alias of `period` and returns the SAME window', async () => {
+    const withPeriod = await app.request('/stats/traffic-trend?period=14', auth);
+    const withDays = await app.request('/stats/traffic-trend?days=14', auth);
+    expect(withPeriod.status).toBe(200);
+    expect(withDays.status).toBe(200);
+    expect(((await withDays.json()) as { period_days: number }).period_days).toBe(14);
+    expect(((await withPeriod.json()) as { period_days: number }).period_days).toBe(14);
+  });
+
+  it('answers 400 unknown_parameter on a misspelled parameter, naming it', async () => {
+    const res = await app.request('/stats/traffic-trend?perido=30', auth);
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string; message: string };
+    expect(body.error).toBe('unknown_parameter');
+    expect(body.message).toContain('perido');
+  });
+
+  it.each([
+    '/stats/history',
+    '/stats/hourly',
+    '/stats/errors',
+    '/stats/rejections',
+    '/stats/business-funnel',
+    '/stats/status-by-path',
+    '/stats/patterns',
+    '/stats/events',
+    '/stats/sources',
+    '/stats/traffic-trend',
+  ])('%s refuses an unknown parameter and caps the window at 90 days', async (path) => {
+    const unknown = await app.request(`${path}?window=30`, auth);
+    expect(unknown.status, `${path} unknown param`).toBe(400);
+    expect(((await unknown.json()) as { error: string }).error).toBe('unknown_parameter');
+
+    const tooLong = await app.request(`${path}?period=365`, auth);
+    expect(tooLong.status, `${path} period=365`).toBe(400);
+    expect(((await tooLong.json()) as { error: string }).error).toBe('period_too_long');
+
+    // The ceiling itself still works: 90 is the dashboard's widest choice.
+    expect((await app.request(`${path}?period=90`, auth)).status, `${path} period=90`).toBe(200);
+  });
+
+  it('refuses a parameter on the two routes that have no window at all', async () => {
+    // `/stats` and `/stats/cohort-footprint` report all of history by design,
+    // so `?period=30` there is a caller believing they scoped an unscoped
+    // figure — the purest form of the same trap.
+    for (const path of ['/stats', '/stats/cohort-footprint']) {
+      const res = await app.request(`${path}?period=30`, auth);
+      expect(res.status, path).toBe(400);
+      expect(((await res.json()) as { error: string }).error).toBe('unknown_parameter');
+      expect((await app.request(path, auth)).status, `${path} bare`).toBe(200);
+    }
+  });
+
+  it('still refuses without the token before it looks at any parameter', async () => {
+    // The 403 must not become a 400: an unauthenticated caller learns nothing
+    // about which parameters exist.
+    const res = await app.request('/stats/history?perido=30');
+    expect(res.status).toBe(403);
   });
 });

@@ -121,6 +121,8 @@ asyncio.run(main())
 | `lookup_bic(code)` | $0.003 | BIC/SWIFT → bank name, country, city, LEI, registered address. 121k+ BIC entries (39k+ LEI-enriched via GLEIF). |
 | `lookup_ch_clearing(iid)` | $0.003 | Swiss BC-Nummer / IID → full SIX BankMaster rail participation + QR-IID, the deepest Swiss clearing data in any public API. |
 | `check_compliance(iban)` | $0.02 | Sanctions (bank BIC) + FATF + SEPA Instant + VoP + risk score 0–100 |
+| `validate_reference(reference)` | **free** | QR-bill (QRR), ISO 11649 (RF/SCOR), Belgian OGM/VCS or Finnish reference, checked against the dated document that publishes the rule |
+| `check_address(scheme, address)` | **free** | A structured ISO 20022 postal address measured against a scheme's rules (`sps`, `hvps_plus`, `fedwire`), each finding citing its guideline |
 | `iban_structures()` | **free** | Every supported country and its IBAN length |
 | `iban_structure(country)` | **free** | One country's BBAN template — offsets, lengths, charsets |
 | `test_iban(country=...)` | **free** | Test IBANs with a REAL bank code, plus the register row proving it |
@@ -233,6 +235,7 @@ with IBANforge() as client:
 | `PaymentRequiredError` | 402 | No key and no credit. `e.body["accepts"]` carries the x402 challenge — pay and retry, no dead end |
 | `QuotaExhaustedError` | 429 | Monthly free quota spent (the API usually answers 402 instead, so you can pay through) |
 | `RateLimitError` | 429 | Too fast — back off |
+| `PayloadTooLargeError` | 413 | The body is over the limit — split it, do not retry the same payload |
 | `InvalidInputError` | other 4xx | Malformed request (a malformed *IBAN* is a 200, see above) |
 | `APIError` | 5xx | Server-side failure — retry with backoff |
 

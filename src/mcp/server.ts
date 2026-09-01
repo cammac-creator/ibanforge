@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { validateIBAN } from '../lib/iban.js';
-import { enrichResult } from '../lib/enrich.js';
+import { enrichResult, createEnrichCache } from '../lib/enrich.js';
 import { lookup } from '../lib/bic-lookup.js';
 import { validateBIC } from '../lib/bic-validator.js';
 import { buildComplianceResponse } from '../lib/compliance-response.js';
@@ -15,6 +15,7 @@ import { buildCountriesPayload, buildPricingPayload, buildValidateAndExplainProm
 import { validatePaymentReference, buildReferenceCheck } from '../lib/payment-reference.js';
 import { checkPostalAddress, ADDRESS_SCHEMES, type AddressScheme } from '../lib/address-conformity.js';
 import { datasetFacts } from '../lib/dataset-facts.js';
+import { MCP_INSTRUCTIONS } from './instructions.js';
 // send_feedback : même insertion et mêmes clips de longueur que la route
 // publique POST /v1/feedback et que le transport HTTP — une seule écriture,
 // une seule liste de catégories.
@@ -46,6 +47,11 @@ const server = new McpServer({
       sizes: ['1200x630'],
     },
   ],
+}, {
+  // Same block as the HTTP transport and the npm package, from the shared
+  // constant. This surface answered `initialize` with no instructions at all
+  // until 2026-09-01 (audit MCP-11).
+  instructions: MCP_INSTRUCTIONS,
 });
 
 server.registerTool(
@@ -139,9 +145,12 @@ Cost: $0.002 USDC per IBAN via x402 (e.g., 10 IBANs = $0.020, 50 IBANs = $0.100,
     },
   },
   async ({ ibans }) => {
+    // One resolution cache per batch: a lot of IBANs from the same bank
+    // resolves the bank once (PERF-05, 2026-09-01), payloads unchanged.
+    const cache = createEnrichCache();
     const results = ibans.map((iban) => {
       const result = validateIBAN(iban);
-      enrichResult(result);
+      enrichResult(result, cache);
       return result;
     });
     return {
