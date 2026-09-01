@@ -82,11 +82,11 @@ export const REGISTRY_CCS = ['DE', 'AT', 'BE', 'BG', 'NL', 'FI'] as const;
  * with bases ordered so no banner ever hides behind a neighbour. */
 const REGISTRY_LANE: { sprite: string; cx: number; w: number; h: number; base: number }[] = [
   { sprite: 'reg-de', cx: 573, w: 74, h: 76, base: 334 },
-  { sprite: 'reg-at', cx: 624, w: 87, h: 66, base: 338 },
-  { sprite: 'reg-be', cx: 694, w: 70, h: 82, base: 336 },
-  { sprite: 'reg-bg', cx: 742, w: 86, h: 71, base: 339 },
-  { sprite: 'reg-nl', cx: 797, w: 84, h: 108, base: 341 },
-  { sprite: 'reg-fi', cx: 860, w: 103, h: 72, base: 343 },
+  { sprite: 'reg-at', cx: 633, w: 96, h: 73, base: 338 },
+  { sprite: 'reg-be', cx: 708, w: 70, h: 82, base: 336 },
+  { sprite: 'reg-bg', cx: 758, w: 86, h: 71, base: 339 },
+  { sprite: 'reg-nl', cx: 812, w: 77, h: 98, base: 341 },
+  { sprite: 'reg-fi', cx: 868, w: 97, h: 68, base: 343 },
 ];
 
 export interface StationGeo {
@@ -123,7 +123,10 @@ export const STATIONS: StationGeo[] = [
     geo(`reg-${REGISTRY_CCS[i]}`, h.sprite, h.cx, h.base, h.w, h.h,
       [h.cx, 350], [h.cx, 342], { cc: REGISTRY_CCS[i] }),
   ),
-  geo('warehouse', 'warehouse', 84, 106, 132, 104, [120, 98], [120, 76]),
+  // the warehouse left the jammed top-left corner for the EAST END of the
+  // caravan road — the logistics terminus, where the vignette cart now ends
+  // its run and "enters" the depot (operator, 01/09 evening)
+  geo('warehouse', 'warehouse', 850, 106, 132, 104, [850, 98], [850, 76]),
   // the three counters wear their bespoke boards too: sorting office with
   // pigeonholes, columned courthouse, Swiss chalet with its painted flag —
   // re-cut on the door scale (v7), the classifier pushed west to breathe
@@ -203,7 +206,8 @@ export const SCENERY: Placed[] = [
     sprite: s.sprite!, cx: s.cx, base: s.base, scale: s.scale, flip: s.flip, id: s.id,
   })),
   { sprite: 'signpost', cx: 322, base: 496 },   // border post sign, by the barrier
-  { sprite: 'cart', cx: 172, base: 96 },        // parked caravan cart
+  { sprite: 'cart', cx: 752, base: 100 },       // parked cart, by the depot
+  { sprite: 'tree2', cx: 140, base: 112 },      // fills the corner the depot left
   // greenery
   { sprite: 'tree1', cx: 34, base: 152 }, { sprite: 'tree2', cx: 790, base: 486 },
   { sprite: 'tree1', cx: 62, base: 394 }, { sprite: 'tree1', cx: 430, base: 158 },
@@ -219,7 +223,7 @@ export const SCENERY: Placed[] = [
   { sprite: 'planter2', cx: 745, base: 180 }, { sprite: 'wheelbarrow', cx: 862, base: 176 },
   { sprite: 'fence', cx: 905, base: 148 }, { sprite: 'rocks', cx: 120, base: 300 },
   // village life props on the bottom street
-  { sprite: 'barrel-group', cx: 712, base: 470 }, { sprite: 'sacks', cx: 214, base: 90 },
+  { sprite: 'barrel-group', cx: 712, base: 470 }, { sprite: 'sacks', cx: 800, base: 92 },
   { sprite: 'barrel-cart', cx: 438, base: 478 },
   { sprite: 'hay', cx: 860, base: 500 }, { sprite: 'rock-big', cx: 925, base: 522 },
 ];

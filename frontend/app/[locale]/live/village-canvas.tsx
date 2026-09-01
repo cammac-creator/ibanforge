@@ -75,11 +75,11 @@ const COURIER_SPEED = 220
  * stays mostly clear. */
 const LABEL_AT: Record<string, [number, number]> = {
   gate: [80, 203], scribe: [210, 203], cutter: [330, 203], library: [655, 203],
-  "reg-DE": [573, 346], "reg-AT": [624, 361], "reg-BE": [694, 346],
-  "reg-BG": [742, 361], "reg-NL": [797, 346], "reg-FI": [860, 361],
+  "reg-DE": [573, 346], "reg-AT": [633, 361], "reg-BE": [708, 346],
+  "reg-BG": [758, 361], "reg-NL": [812, 346], "reg-FI": [868, 361],
   // the three counters stagger like the lane: their long names collide flat
   classifier: [236, 346], court: [358, 362], six: [470, 346],
-  warehouse: [160, 56], tower: [380, 517], forge: [560, 518],
+  warehouse: [850, 112], tower: [380, 517], forge: [560, 518],
   archive: [140, 516], border: [280, 518], vigil: [906, 510],
 }
 
@@ -122,8 +122,9 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
     /** daylight ambience: drifting pollen motes and a few butterflies */
     pollen: [] as { x: number; y: number; p: number; s: number }[],
     wings: [] as { cx: number; cy: number; p: number; c: string }[],
-    /** the walked path, item 4: points the hero has actually covered */
-    trail: [] as [number, number][],
+    /** the walked path: footprints the hero has actually left */
+    trail: [] as { x: number; y: number; ang: number; side: 1 | -1 }[],
+    trailAcc: 0,
     /** station under the mouse — read by the draw pass for the golden lift */
     hover: null as string | null,
     veil: false, focus: null as StationGeo | null, gen: 0, reduced: false,
@@ -240,26 +241,20 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
       ctx.setTransform(SCALE, 0, 0, SCALE, 0, 0)
       ctx.drawImage(w.groundLayer!, 0, 0)
 
-      // the walked path (item 4): a dotted golden ribbon over the ground and
-      // UNDER everything that stands — the proof of where the hero has been
-      if (w.trail.length > 1) {
-        // two passes: a soft dark underlay so the ribbon reads on the brown
-        // streets too, then golden stitches on top (amber alone vanished on
-        // earth — measured on the first headless capture)
+      // the walked path: hero FOOTPRINTS, quiet on grass and paving alike —
+      // the animated dashed ribbon read as clutter (operator, 01/09 evening)
+      if (w.trail.length) {
         ctx.save()
-        ctx.lineCap = "round"
-        ctx.lineJoin = "round"
-        ctx.beginPath()
-        ctx.moveTo(w.trail[0][0], w.trail[0][1])
-        for (const [px, py] of w.trail) ctx.lineTo(px, py)
-        ctx.strokeStyle = "rgba(70,40,8,0.38)"
-        ctx.lineWidth = 5
-        ctx.stroke()
-        ctx.strokeStyle = "rgba(255,205,70,0.95)"
-        ctx.lineWidth = 2.2
-        ctx.setLineDash([6, 7])
-        ctx.lineDashOffset = w.reduced ? 0 : -t / 60
-        ctx.stroke()
+        ctx.fillStyle = "rgba(58,44,20,0.38)"
+        for (const s of w.trail) {
+          const px = s.x + Math.cos(s.ang + Math.PI / 2) * 2.2 * s.side
+          const py = s.y + Math.sin(s.ang + Math.PI / 2) * 2.2 * s.side
+          ctx.save()
+          ctx.translate(px, py)
+          ctx.rotate(s.ang)
+          ctx.fillRect(-1.7, -1, 3.4, 2)
+          ctx.restore()
+        }
         ctx.restore()
       }
 
@@ -404,8 +399,11 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
       for (const [tx, ty] of pts) {
         if (w.gen !== genAtStart) return false
         if (w.reduced) {
+          const ang = Math.atan2(ty - a.y, tx - a.x)
           a.x = tx; a.y = ty
-          if (a === w.hero) w.trail.push([tx, ty])
+          if (a === w.hero) {
+            w.trail.push({ x: tx, y: ty, ang, side: (w.trail.length % 2 ? 1 : -1) as 1 | -1 })
+          }
           await new Promise((r) => setTimeout(r, 120))
           continue
         }
@@ -418,13 +416,15 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
         for (let i = 0; i < n; i++) {
           if (w.gen !== genAtStart) return false
           a.x += sx; a.y += sy
-          // the walked ribbon (item 4): hero only, sampled every few pixels,
-          // hard-capped so a long session can never grow it unbounded
+          // footprints: hero only, one every ~9px of walk, alternating feet,
+          // hard-capped so a long session can never grow the list unbounded
           if (a === w.hero) {
-            const lastP = w.trail[w.trail.length - 1]
-            if (!lastP || Math.hypot(a.x - lastP[0], a.y - lastP[1]) >= 4) {
-              w.trail.push([a.x, a.y])
-              if (w.trail.length > 800) w.trail.shift()
+            w.trailAcc += Math.hypot(sx, sy)
+            if (w.trailAcc >= 9) {
+              w.trailAcc = 0
+              const side = (w.trail.length % 2 ? 1 : -1) as 1 | -1
+              w.trail.push({ x: a.x, y: a.y, ang: Math.atan2(sy, sx), side })
+              if (w.trail.length > 400) w.trail.shift()
             }
           }
           await new Promise((r) => setTimeout(r, 16))
@@ -446,7 +446,7 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
 
     w.hero.hidden = false; w.hero.x = -30; w.hero.y = 192; w.hero.face = "side"; w.hero.dir = 1
     w.veil = true; w.focus = null
-    w.trail = [[w.hero.x, w.hero.y]]
+    w.trail = []; w.trailAcc = 0
     let anchor: [number, number] = [-28, 192]
 
     for (const step of steps) {
@@ -564,8 +564,9 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
     w.hero.hidden = true
     if (v.kind === "caravan") {
       line(0)
-      // leg 1 — arrival on the caravan road, unloading at the warehouse
-      if (!(await rollCart(76, -40, 930, [120]))) return
+      // leg 1 — the caravan road, a stop at the depot's doorstep, then the
+      // cart rolls on and vanishes BEHIND the warehouse: delivered
+      if (!(await rollCart(76, -40, 930, [780]))) return
       // leg 2 — down the middle street, one delivery at every registry door
       // (right to left: the descending sort matches the cart's direction)
       const houseStops = STATIONS.filter((s) => s.cc).map((s) => s.cx).sort((a, b) => b - a)
@@ -682,6 +683,9 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
         {/* Labels are DOM, not paint (01/09): plaques painted into the canvas
             scale down with it and blurred illegible at laptop widths — the
             operator's report, twice. Browser text stays at screen pixels.
+            They wear the parchment family of the hover card (same paper, same
+            hard pixel shadow) and STEP ASIDE while a card is open, so the
+            screen never floods (operator, 01/09 evening).
             pointer-events-none: the canvas under them owns the mouse. */}
         {loaded && (
           <div aria-hidden className="pointer-events-none absolute inset-0 select-none">
@@ -691,18 +695,22 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
               return (
                 <span
                   key={s.id}
-                  className="absolute -translate-x-1/2 whitespace-nowrap rounded-md border font-bold transition-transform duration-150"
+                  className="absolute -translate-x-1/2 whitespace-nowrap border font-bold"
                   style={{
                     left: `${(lx / W) * 100}%`,
                     top: `${(ly / H) * 100}%`,
                     fontSize: s.cc ? 10 : 11.5,
                     lineHeight: 1.1,
                     padding: "2px 7px",
-                    background: hot ? "#FDE68A" : "rgba(255,247,228,0.94)",
-                    borderColor: hot ? "#B45309" : "#8A5A28",
-                    color: "#4A2E10",
-                    boxShadow: "0 1px 0 rgba(74,46,16,0.35)",
+                    background: hot ? "#FDE68A" : "#F3E7C8",
+                    borderColor: hot ? "#B45309" : "#7A5322",
+                    borderWidth: 1.5,
+                    borderRadius: 3,
+                    color: "#3A2A12",
+                    boxShadow: "2px 2px 0 rgba(10,8,4,0.38)",
+                    opacity: tip ? 0 : 1,
                     transform: `translateX(-50%)${hot ? " scale(1.18)" : ""}`,
+                    transition: "opacity 180ms, transform 150ms",
                   }}
                 >
                   {labels[s.id]}
@@ -710,9 +718,11 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
               )
             })}
             <span
-              className="absolute rounded-md border px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wider"
+              className="absolute border px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wider"
               style={{ left: `${(724 / W) * 100}%`, top: `${(220 / H) * 100}%`, transform: "translateX(-50%)",
-                background: "rgba(255,247,228,0.9)", borderColor: "#8A5A28", color: "#6B4A18" }}
+                background: "#F3E7C8", borderColor: "#7A5322", borderWidth: 1.5, borderRadius: 3,
+                color: "#5C4218", boxShadow: "2px 2px 0 rgba(10,8,4,0.38)",
+                opacity: tip ? 0 : 1, transition: "opacity 180ms" }}
             >
               {laneLabel}
             </span>
