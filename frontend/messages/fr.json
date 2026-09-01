@@ -7,7 +7,8 @@
       "playground": "Playground",
       "pricing": "Tarifs",
       "blog": "Blog",
-      "dashboard": "Tableau de bord"
+      "dashboard": "Tableau de bord",
+      "live": "Live"
     },
     "toggleMenu": "Ouvrir le menu"
   },
@@ -1346,6 +1347,178 @@
     "cta": {
       "docs": "Sources de données et provenance, la version longue",
       "changelog": "Ce qui a changé, daté : le changelog"
+    }
+  },
+  "live": {
+    "title": "Le Village — le pipeline en direct",
+    "lede": "Chaque personnage est un agent réel du pipeline, chaque bâtiment une vraie étape du code. Une validation dure quelques dizaines de millisecondes — ici elle est ralentie volontairement pour qu'on la voie travailler. Tape un IBAN et suis-le. Survole n'importe qui pour savoir qui fait quoi.",
+    "inputLabel": "IBAN à valider",
+    "validate": "Valider cet IBAN",
+    "running": "Quête en cours…",
+    "anyIban": "N'importe quel IBAN, réel ou d'exemple.",
+    "idle": "Bienvenue. Tape un IBAN ci-dessus pour suivre sa quête, ou survole les bâtiments et les personnages.",
+    "honesty": "Ce que tu vois : de vraies requêtes et le vrai chemin de chaque requête, ralentis pour l'œil. Les durées intermédiaires sont mises en scène ; le temps total affiché à la fin est le vrai. Les villageois gris sont un décor assumé — ils ne courent jamais le pipeline.",
+    "lane": "Ruelle des Registres nationaux",
+    "errors": {
+      "generic": "La requête n'a pas abouti — réessaie dans un instant.",
+      "network": "Réseau injoignable — réessaie dans un instant."
+    },
+    "labels": {
+      "gate": "Péage x402",
+      "scribe": "Scribe mod-97",
+      "cutter": "Découpeur BBAN",
+      "library": "Bibliothèque BIC",
+      "six": "Guichet SIX",
+      "court": "Tribunal du Verdict",
+      "classifier": "Classificateur",
+      "border": "Poste-frontière",
+      "tower": "Tour de guet",
+      "forge": "LA FORGE",
+      "archive": "L'Archiviste",
+      "warehouse": "Entrepôt",
+      "vigil": "Le Veilleur",
+      "regNL": "Registre NL",
+      "regFI": "Registre FI",
+      "regDE": "Bundesbank",
+      "regAT": "OeNB",
+      "regBE": "NBB",
+      "regBG": "BNB"
+    },
+    "who": {
+      "gate": "PORTIER X402",
+      "scribe": "SCRIBE",
+      "cutter": "DÉCOUPEUR",
+      "library": "BIBLIOTHÉCAIRE",
+      "registry": "REGISTRE NATIONAL",
+      "six": "GUICHET SIX",
+      "court": "TRIBUNAL",
+      "classifier": "CLASSIFICATEUR",
+      "border": "POSTE-FRONTIÈRE",
+      "forge": "FORGERON",
+      "exit": "LE VILLAGE",
+      "village": "LE VILLAGE"
+    },
+    "steps": {
+      "gate": {
+        "paid": "La requête paie {cost} USDC au péage x402 — micropaiement machine à machine.",
+        "free": "La requête montre sa clé API au portier et passe. (Sans clé : 0,005 USDC en x402.)"
+      },
+      "scribe": {
+        "ok": "Forme {cc} vérifiée : longueur du pays, caractères, clé de contrôle mod-97 — correcte.",
+        "fail": "{reason} Sceau brisé : la requête ressort, les étapes suivantes ne tournent même pas."
+      },
+      "cutter": "Le BBAN s'ouvre : code banque {bankCode} · compte {account}.",
+      "modulus": {
+        "ok": "Arithmétique modulus UK (tables Vocalink) : le numéro de compte passe.",
+        "warn": "Arithmétique modulus UK : le compte ne passe pas les tables publiées."
+      },
+      "library": {
+        "found": "Trouvé dans l'annuaire composite — source : {source}.",
+        "miss": "Aucun BIC dans l'annuaire pour ce code banque — l'API le dit plutôt que d'inventer."
+      },
+      "registry": "{register} : le registre national donne le BIC {bic} — vérité du registre, pas une déduction.",
+      "six": "Clearing suisse : {name}, IID {iid} — participation SIC lue au registre SIX.",
+      "court": {
+        "verified": "Verdict : code banque vérifié — {register}.",
+        "warn": "Verdict : {status} — l'API refuse de deviner."
+      },
+      "pra": {
+        "ok": "Autorisation prudentielle lue (Bank of England) : {firm}.",
+        "warn": "Pas d'autorisation prudentielle trouvée pour cet établissement."
+      },
+      "classifier": {
+        "bank": "Émetteur : banque traditionnelle — {name}.",
+        "emi": "Émetteur : établissement de monnaie électronique (EMI) — {name}.",
+        "neobank": "Émetteur : néobanque — {name}.",
+        "other": "Émetteur classé : {name}."
+      },
+      "border": "Zone SEPA {sepa} · bénéficiaire vérifiable (VoP) {vop}.",
+      "forge": {
+        "ok": "La réponse est frappée et scellée : IBAN valide, BIC {bic}.",
+        "okNoBic": "La réponse est frappée et scellée : IBAN valide."
+      },
+      "exit": {
+        "ok": "Livrée. À l'écran : une trentaine de secondes. En vrai : {ms} ms — le ralenti est volontaire.",
+        "okNoMs": "Livrée. Le ralenti est volontaire — en vrai, quelques dizaines de millisecondes.",
+        "fail": "La quête s'arrête ici — le refus est montré tel quel."
+      }
+    },
+    "reasons": {
+      "checksum_failed": "Clé mod-97 fausse.",
+      "invalid_format": "Format illisible.",
+      "unsupported_country": "Pays inconnu de l'IBAN.",
+      "wrong_length": "Longueur fausse pour ce pays.",
+      "invalid_check_digits": "Chiffres de contrôle invalides.",
+      "invalid_bban_structure": "Structure du BBAN invalide.",
+      "unknown": "Forme invalide."
+    },
+    "tips": {
+      "gate": {
+        "role": "Encaisse le micropaiement x402, ou laisse passer une clé API.",
+        "real": "middleware/x402.ts · cost_usdc"
+      },
+      "scribe": {
+        "role": "Vérifie la forme : longueur du pays, caractères, clé mod-97.",
+        "real": "lib/iban.ts · validateIBAN()"
+      },
+      "cutter": {
+        "role": "Ouvre le BBAN (banque, guichet, compte) — et fait l'arithmétique modulus UK.",
+        "real": "lib/iban.ts + lib/uk-modulus.ts"
+      },
+      "library": {
+        "role": "Cherche le code banque dans l'annuaire composite (GLEIF, SwiftCodes, SIX, EBA, NBP…).",
+        "real": "lib/bic-lookup.ts · basis: directory_prefix / curated_map"
+      },
+      "registry": {
+        "role": "Registre national officiel : la paire code banque → BIC est celle du registre.",
+        "real": "bic.basis = national_register (DE·AT·BE·BG)"
+      },
+      "six": {
+        "role": "Clearing suisse : BC-Nummer, participation SIC, QR-IID (CH/LI).",
+        "real": "lib/ch-clearing.ts"
+      },
+      "court": {
+        "role": "Rend le verdict : verified, not_in_register — ou unavailable si un registre n'a pas répondu (jamais un faux refus).",
+        "real": "checkBankCode() · lib/enrich.ts"
+      },
+      "classifier": {
+        "role": "Banque traditionnelle, EMI ou néobanque ? L’émetteur est étiqueté.",
+        "real": "lib/issuers.ts"
+      },
+      "border": {
+        "role": "Zone SEPA et atteignabilité VoP (vérification du nom du bénéficiaire).",
+        "real": "lib/countries.ts · sepa / vop"
+      },
+      "tower": {
+        "role": "La quête compliance monte ici : sanctions, GAFI, score de risque. Bientôt jouable sur cette page.",
+        "real": "POST /v1/iban/compliance"
+      },
+      "forge": {
+        "role": "Frappe la réponse — lingot scellé ✓ ou sceau brisé ✗ — puis livre le JSON.",
+        "real": "routes/iban-validate.ts · processing_ms"
+      },
+      "archive": {
+        "role": "Brûle chaque nuit les registres de requêtes de plus de 12 mois. La rétention est tenue par le code.",
+        "real": "purgeOldRequestLog(12) · src/index.ts"
+      },
+      "warehouse": {
+        "role": "Reçoit les caravanes de données : les registres sont rebâtis chaque 1ᵉʳ du mois, les sanctions chaque dimanche.",
+        "real": ".github/workflows/refresh-bic.yml · /health.bic_sources"
+      },
+      "vigil": {
+        "role": "Ronde horaire : crons vivants ? disque ? taux d’erreurs ? âge des sanctions ? Le village se surveille lui-même.",
+        "real": "startOpsProbes() · lib/ops-probes.ts"
+      },
+      "hero": {
+        "name": "Le Coursier (ton IBAN)",
+        "role": "Porte ta requête de station en station — son chemin est déduit de la vraie réponse.",
+        "real": "POST /v1/iban/validate — chemin reconstruit"
+      },
+      "villager": {
+        "name": "Villageois (décor)",
+        "role": "Vaque au village et ne court JAMAIS le pipeline — le décor est assumé, jamais déguisé en trafic.",
+        "real": "—"
+      }
     }
   }
 }

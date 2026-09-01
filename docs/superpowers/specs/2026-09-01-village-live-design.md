@@ -71,8 +71,16 @@ réel ; cette table est le contrat d'honnêteté du monde.
 | Poste-frontière | Zone SEPA, atteignabilité VoP | `lib/countries.ts` |
 | Tour de guet (quête compliance) | Sanctions (BIC banque), GAFI, score de risque | `lib/compliance*.ts` |
 | LA FORGE | Assemblage de la réponse, `reference_check` éventuel, `processing_ms` ; lingot scellé ✓ ou sceau brisé ✗, JSON réel affiché | `routes/iban-validate.ts` |
-| Entrepôt + caravanes (bord de carte) | Rafraîchissement mensuel des données ; plaques « stock du MM/AAAA » au survol des maisons, tirées des vraies dates | `.github/workflows/refresh-bic.yml`, `as_of` / `getReferenceAsOf` |
+| Entrepôt + caravane mensuelle (bord de carte) | Rebuild mensuel des ~9 registres (planchers de sécurité par source, alerte nommée) ; plaques « stock du MM/AAAA » au survol des maisons, lues sur la **vraie** fraîcheur publique | `.github/workflows/refresh-bic.yml`, `/health.bic_sources` (`getSourceFreshness`) |
+| Caravane des sanctions (hebdo, vers la Tour) | Refresh compliance chaque dimanche 03h UTC — découvert à l'inventaire du 01/09 : hebdo, pas mensuel | `.github/workflows/refresh-compliance.yml` |
+| L'Archiviste (annexe près de la forge) | Purge quotidienne de rétention : requêtes > 12 mois, clients partis sous 30 j — engagement DPA tenu par le code | `purgeOldRequestLog` / `purgeTerminatedKeyTelemetry` (`src/index.ts`) |
+| Le Veilleur (poste de vigie) | Sondes horaires « hommes morts » : crons vivants, radars, disque, taux 5xx, âge des sanctions | `startOpsProbes()` (`lib/ops-probes.ts`) |
 | Place du village (PNJ décoratifs) | Rien — décor assumé, ne court jamais le pipeline | — |
+
+Restent en coulisses (jamais sur la page publique) : les radars internes
+(lifecycle, forums, prospects, cohortes, nudge d'activation), veille marché et
+baseline reco du lundi, digests, sonde de visibilité, CI/release/n8n, registre
+de la demande (admin). Tri validé par Claude-Alain le 01/09/2026 sur maquette.
 
 Les échecs réels se voient : IBAN invalide → sceau brisé chez le Scribe et
 sortie par la porte des erreurs, sans visiter la suite (fidèle au code :
@@ -177,7 +185,7 @@ les prompts n'ont jamais nommé de jeu ou d'éditeur.
 | **M1** | Monde + quête validate + saisie + narration + projecteur | Taper un IBAN → quête complète lisible, échec mod-97 montré, JSON final affiché |
 | **M2** | `ops/recent` + coursiers-PNJ + escouades batch | Trafic réel visible en fond de démo |
 | **M3** | Quête compliance (tour de guet) + guichet SIX (CH/LI) | Démo compliance et démo IBAN suisse |
-| **M4** | Caravanes + plaques `as_of` + image OG + finitions i18n | Partage réseau avec belle carte OG, page EN/FR/DE |
+| **M4** | Caravanes (mensuelle + sanctions hebdo) + plaques de fraîcheur branchées sur `/health.bic_sources` + Archiviste + Veilleur + image OG + finitions i18n | Partage réseau avec belle carte OG, page EN/FR/DE |
 
 ## 10. Hors périmètre v1 (idées notées, non engagées)
 

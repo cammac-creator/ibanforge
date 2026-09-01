@@ -7,7 +7,8 @@
       "playground": "Playground",
       "pricing": "Pricing",
       "blog": "Blog",
-      "dashboard": "Dashboard"
+      "dashboard": "Dashboard",
+      "live": "Live"
     },
     "toggleMenu": "Toggle menu"
   },
@@ -1346,6 +1347,178 @@
     "cta": {
       "docs": "Data sources & provenance, the long version",
       "changelog": "What changed, dated: the changelog"
+    }
+  },
+  "live": {
+    "title": "The Village — the pipeline, live",
+    "lede": "Every character is a real agent of the pipeline, every building a real step in the code. A validation takes a few dozen milliseconds — here it is deliberately slowed down so you can watch it work. Type an IBAN and follow it. Hover anyone to see who does what.",
+    "inputLabel": "IBAN to validate",
+    "validate": "Validate this IBAN",
+    "running": "Quest under way…",
+    "anyIban": "Any IBAN, real or example.",
+    "idle": "Welcome. Type an IBAN above to follow its quest, or hover the buildings and characters.",
+    "honesty": "What you see: real requests and each request's real path, slowed down for the eye. Intermediate timings are staged; the total time shown at the end is real. Grey villagers are openly decorative — they never run the pipeline.",
+    "lane": "National Registers Row",
+    "errors": {
+      "generic": "The request didn't go through — try again in a moment.",
+      "network": "Network unreachable — try again in a moment."
+    },
+    "labels": {
+      "gate": "x402 Toll Gate",
+      "scribe": "Mod-97 Scribe",
+      "cutter": "BBAN Cutter",
+      "library": "BIC Library",
+      "six": "SIX Counter",
+      "court": "Court of Verdict",
+      "classifier": "Classifier",
+      "border": "Border Post",
+      "tower": "Watchtower",
+      "forge": "THE FORGE",
+      "archive": "The Archivist",
+      "warehouse": "Warehouse",
+      "vigil": "The Watchman",
+      "regNL": "NL Register",
+      "regFI": "FI Register",
+      "regDE": "Bundesbank",
+      "regAT": "OeNB",
+      "regBE": "NBB",
+      "regBG": "BNB"
+    },
+    "who": {
+      "gate": "X402 GATEKEEPER",
+      "scribe": "SCRIBE",
+      "cutter": "CUTTER",
+      "library": "LIBRARIAN",
+      "registry": "NATIONAL REGISTER",
+      "six": "SIX COUNTER",
+      "court": "COURT",
+      "classifier": "CLASSIFIER",
+      "border": "BORDER POST",
+      "forge": "BLACKSMITH",
+      "exit": "THE VILLAGE",
+      "village": "THE VILLAGE"
+    },
+    "steps": {
+      "gate": {
+        "paid": "The request pays {cost} USDC at the x402 toll — machine-to-machine micropayment.",
+        "free": "The request shows its API key and walks through. (Without a key: 0.005 USDC via x402.)"
+      },
+      "scribe": {
+        "ok": "{cc} form checked: country length, characters, mod-97 check digits — correct.",
+        "fail": "{reason} Seal broken: the request leaves — the next stages never even run."
+      },
+      "cutter": "The BBAN opens: bank code {bankCode} · account {account}.",
+      "modulus": {
+        "ok": "UK modulus arithmetic (Vocalink tables): the account number passes.",
+        "warn": "UK modulus arithmetic: the account fails the published tables."
+      },
+      "library": {
+        "found": "Found in the composite directory — source: {source}.",
+        "miss": "No BIC in the directory for this bank code — the API says so rather than invent one."
+      },
+      "registry": "{register}: the national register itself gives BIC {bic} — register truth, not a guess.",
+      "six": "Swiss clearing: {name}, IID {iid} — SIC participation read from the SIX register.",
+      "court": {
+        "verified": "Verdict: bank code verified — {register}.",
+        "warn": "Verdict: {status} — the API refuses to guess."
+      },
+      "pra": {
+        "ok": "Prudential authorisation read (Bank of England): {firm}.",
+        "warn": "No prudential authorisation found for this institution."
+      },
+      "classifier": {
+        "bank": "Issuer: traditional bank — {name}.",
+        "emi": "Issuer: e-money institution (EMI) — {name}.",
+        "neobank": "Issuer: neobank — {name}.",
+        "other": "Issuer classified: {name}."
+      },
+      "border": "SEPA zone {sepa} · beneficiary verifiable (VoP) {vop}.",
+      "forge": {
+        "ok": "The response is struck and sealed: valid IBAN, BIC {bic}.",
+        "okNoBic": "The response is struck and sealed: valid IBAN."
+      },
+      "exit": {
+        "ok": "Delivered. On screen: about thirty seconds. For real: {ms} ms — the slow-down is deliberate.",
+        "okNoMs": "Delivered. The slow-down is deliberate — in reality, a few dozen milliseconds.",
+        "fail": "The quest ends here — the refusal is shown as it is."
+      }
+    },
+    "reasons": {
+      "checksum_failed": "Mod-97 check failed.",
+      "invalid_format": "Unreadable format.",
+      "unsupported_country": "Unknown IBAN country.",
+      "wrong_length": "Wrong length for this country.",
+      "invalid_check_digits": "Invalid check digits.",
+      "invalid_bban_structure": "Invalid BBAN structure.",
+      "unknown": "Invalid form."
+    },
+    "tips": {
+      "gate": {
+        "role": "Collects the x402 micropayment, or waves an API key through.",
+        "real": "middleware/x402.ts · cost_usdc"
+      },
+      "scribe": {
+        "role": "Checks the form: country length, characters, mod-97 key.",
+        "real": "lib/iban.ts · validateIBAN()"
+      },
+      "cutter": {
+        "role": "Opens the BBAN (bank, branch, account) — and runs the UK modulus arithmetic.",
+        "real": "lib/iban.ts + lib/uk-modulus.ts"
+      },
+      "library": {
+        "role": "Looks the bank code up in the composite directory (GLEIF, SwiftCodes, SIX, EBA, NBP…).",
+        "real": "lib/bic-lookup.ts · basis: directory_prefix / curated_map"
+      },
+      "registry": {
+        "role": "Official national register: the bank-code → BIC pairing is the register’s own.",
+        "real": "bic.basis = national_register (DE·AT·BE·BG)"
+      },
+      "six": {
+        "role": "Swiss clearing: BC number, SIC participation, QR-IID (CH/LI).",
+        "real": "lib/ch-clearing.ts"
+      },
+      "court": {
+        "role": "Hands down the verdict: verified, not_in_register — or unavailable when a register could not answer (never a false refusal).",
+        "real": "checkBankCode() · lib/enrich.ts"
+      },
+      "classifier": {
+        "role": "Traditional bank, EMI or neobank? The issuer gets labelled.",
+        "real": "lib/issuers.ts"
+      },
+      "border": {
+        "role": "SEPA zone and VoP reachability (beneficiary name verification).",
+        "real": "lib/countries.ts · sepa / vop"
+      },
+      "tower": {
+        "role": "The compliance quest climbs here: sanctions, FATF, risk score. Playable on this page soon.",
+        "real": "POST /v1/iban/compliance"
+      },
+      "forge": {
+        "role": "Strikes the response — sealed ingot ✓ or broken seal ✗ — then delivers the JSON.",
+        "real": "routes/iban-validate.ts · processing_ms"
+      },
+      "archive": {
+        "role": "Burns request logs older than 12 months every night. Retention held by code.",
+        "real": "purgeOldRequestLog(12) · src/index.ts"
+      },
+      "warehouse": {
+        "role": "Receives the data caravans: registers rebuilt on the 1st of each month, sanctions every Sunday.",
+        "real": ".github/workflows/refresh-bic.yml · /health.bic_sources"
+      },
+      "vigil": {
+        "role": "Hourly round: crons alive? disk? error rate? sanctions age? The village watches itself.",
+        "real": "startOpsProbes() · lib/ops-probes.ts"
+      },
+      "hero": {
+        "name": "The Courier (your IBAN)",
+        "role": "Carries your request station to station — its path is derived from the real response.",
+        "real": "POST /v1/iban/validate — chemin reconstruit"
+      },
+      "villager": {
+        "name": "Villager (scenery)",
+        "role": "Wanders the village and NEVER runs the pipeline — scenery is owned as scenery, never dressed up as traffic.",
+        "real": "—"
+      }
     }
   }
 }

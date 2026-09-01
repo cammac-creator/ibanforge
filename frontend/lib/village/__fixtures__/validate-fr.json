@@ -1,0 +1,93 @@
+{
+ "iban": "FR7630006000011234567890189",
+ "valid": true,
+ "country": {
+  "code": "FR",
+  "name": "France"
+ },
+ "check_digits": "76",
+ "bban": {
+  "bank_code": "30006",
+  "account_number": "1234567890189",
+  "branch_code": "00001"
+ },
+ "sepa": {
+  "member": true,
+  "schemes": [
+   "SCT",
+   "SDD",
+   "SCT_INST"
+  ],
+  "vop_required": true,
+  "vop_participant": true
+ },
+ "formatted": "FR76 3000 6000 0112 3456 7890 189",
+ "cost_usdc": 0.005,
+ "bic": {
+  "code": "AGRIFRPP",
+  "bank_name": "CREDIT AGRICOLE SA",
+  "city": "MONTROUGE",
+  "source": "IBANforge curated bank-code map",
+  "as_of": "2026-09",
+  "basis": "curated_map",
+  "authoritative": false,
+  "lei": "969500TJ5KRTCJQWXH05",
+  "lei_status": "ACTIVE",
+  "address": {
+   "type": "registered",
+   "street": "12 PLACE DES ETATS UNIS",
+   "post_code": "92120",
+   "region": null,
+   "city": "MONTROUGE",
+   "country": "FR",
+   "romanized": "12 PLACE DES ETATS UNIS",
+   "romanization": "original_latin",
+   "source": "GLEIF",
+   "language": "fr",
+   "as_of": "2025-10-22"
+  },
+  "postal_address": {
+   "pst_cd": "92120",
+   "twn_nm": "MONTROUGE",
+   "ctry": "FR",
+   "adr_line": [
+    "12 PLACE DES ETATS UNIS"
+   ],
+   "format": "hybrid",
+   "source": "GLEIF",
+   "as_of": "2025-10-22"
+  }
+ },
+ "issuer": {
+  "type": "bank",
+  "name": "CREDIT AGRICOLE SA",
+  "classification": "default"
+ },
+ "risk_indicators": {
+  "issuer_type": "bank",
+  "country_risk": "standard",
+  "test_bic": false,
+  "sepa_reachable": true,
+  "sepa_reachable_scope": "country",
+  "vop_coverage": true
+ },
+ "bank_code_check": {
+  "value": "30006",
+  "status": "verified",
+  "match": "register",
+  "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+  "authoritative": false,
+  "as_of": "2026-09"
+ },
+ "official_identity": {
+  "name": "Crédit Agricole S.A.",
+  "lei": "969500TJ5KRTCJQWXH05",
+  "address": "12 PLACE DES ETATS UNIS, 92120 MONTROUGE",
+  "category": "Credit Institution",
+  "matched_by": "national_code",
+  "source": "European Central Bank, list of monetary financial institutions (free at ecb.europa.eu)",
+  "free_of_charge": "This information may be obtained free of charge from the ECB website at ecb.europa.eu.",
+  "as_of": "2026-08-31",
+  "authoritative": false
+ }
+}
