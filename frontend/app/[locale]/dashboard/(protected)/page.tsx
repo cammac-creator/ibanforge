@@ -10,6 +10,12 @@ import {
 } from '@/components/dashboard/acquisition-panel';
 import { Heatmap } from '@/components/dashboard/heatmap';
 import { WeeklyDigestCard, type DigestEntry } from '@/components/dashboard/weekly-digest-card';
+import {
+  LivingToolCard,
+  type DemandGapsPayload,
+  type FeedbackReport,
+  type SourceFreshnessEntry,
+} from '@/components/dashboard/living-tool-card';
 import { StatusByPathTable, type StatusByPathRow } from '@/components/dashboard/status-by-path-table';
 import { ChannelsPanel, type ChannelRow } from '@/components/dashboard/channels-panel';
 import { ErrorTable } from '@/components/dashboard/error-table';
@@ -222,7 +228,7 @@ export default async function DashboardPage({
     ? (periodParam as ValidPeriod)
     : 30;
 
-  const [statsRes, historyRes, funnelRes, activationRes, errorsRes, hourlyRes, eventsRes, digestRes, statusByPathRes, sourcesRes, patternsRes, cohortFootprintRes, orphanRes, crm] = await Promise.all([
+  const [statsRes, historyRes, funnelRes, activationRes, errorsRes, hourlyRes, eventsRes, digestRes, statusByPathRes, sourcesRes, patternsRes, cohortFootprintRes, orphanRes, crm, demandGapsRes, feedbackRes, healthRes] = await Promise.all([
     fetchJSON<StatsResponse>('/stats', statsHeaders),
     fetchJSON<HistoryEntry[]>(`/stats/history?period=${period}`, statsHeaders),
     fetchJSON<{ rows?: BusinessFunnelDay[] }>(`/stats/business-funnel?period=${period}`, statsHeaders),
@@ -252,6 +258,16 @@ export default async function DashboardPage({
       ? fetchJSON<{ orphans: OrphanMailRow[]; pending: number }>('/v1/admin/orphan-mail', { 'X-Admin-Secret': ADMIN_SECRET })
       : Promise.resolve({ ok: false, status: 0, data: null } satisfies Fetched<{ orphans: OrphanMailRow[]; pending: number }>),
     fetchCrmData(),
+    // The living-tool loops (01/09/2026): the demand ledger, the feedback
+    // reader, and /health's per-source freshness. Health is public; the two
+    // admin reads degrade to an empty card half, never a broken page.
+    ADMIN_SECRET
+      ? fetchJSON<DemandGapsPayload>('/v1/admin/demand-gaps?days=30', { 'X-Admin-Secret': ADMIN_SECRET })
+      : Promise.resolve({ ok: false, status: 0, data: null } satisfies Fetched<DemandGapsPayload>),
+    ADMIN_SECRET
+      ? fetchJSON<{ open: number; reports: FeedbackReport[] }>('/v1/admin/feedback?limit=10', { 'X-Admin-Secret': ADMIN_SECRET })
+      : Promise.resolve({ ok: false, status: 0, data: null } satisfies Fetched<{ open: number; reports: FeedbackReport[] }>),
+    fetchJSON<{ bic_sources?: SourceFreshnessEntry[] }>('/health', {}),
   ]);
 
   const stats = statsRes.data;
@@ -363,6 +379,16 @@ export default async function DashboardPage({
 
       {/* 0b. Monday auto-written digest (hidden until the first one lands) */}
       <WeeklyDigestCard digests={digestRes.data?.digests ?? []} />
+
+      {/* 0c. The living tool: demand ledger, agent feedback, source freshness.
+          Quiet and green on a calm day; names the register, the country or
+          the report that needs a decision on a bad one. */}
+      <LivingToolCard
+        gaps={demandGapsRes.data}
+        feedbackOpen={feedbackRes.data?.open ?? 0}
+        reports={feedbackRes.data?.reports ?? []}
+        sources={healthRes.data?.bic_sources ?? []}
+      />
 
       {/* 1. KPI row — the four numbers that matter */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">

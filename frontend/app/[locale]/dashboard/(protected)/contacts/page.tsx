@@ -1,4 +1,5 @@
 import { CrmApp } from '@/components/crm/crm-app';
+import { NoReplyRules } from '@/components/crm/no-reply-rules';
 import { FreshnessBadge } from '@/components/crm/freshness-badge';
 import { fetchCrmData } from '@/lib/crm/build-contacts';
 import { SOFT_CAP } from '@/lib/crm/sent-today';
@@ -84,6 +85,12 @@ export default async function ContactsPage() {
         woke={woke}
         sentToday={sentToday}
       />
+
+      {/* The standing sender rules, listable after the fact — the undo that
+          used to live only in the breath after setting one. Folded shut, at
+          the very bottom: consulted rarely, but findable the day an address
+          arrives pre-marked and the operator asks why. */}
+      <NoReplyRules />
     </div>
   );
 }

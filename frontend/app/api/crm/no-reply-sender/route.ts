@@ -16,6 +16,34 @@ const ADMIN_SECRET = process.env.ADMIN_SECRET || '';
  * flag on somebody else's request — one gesture, one endpoint, one refusal
  * possible at a time.
  */
+/**
+ * The list behind the gesture. Added 01/09/2026: a rule accepted in the breath
+ * after a click was REMOVABLE only in that same breath — come back two days
+ * later and nothing in the UI could even say the rule existed. The backend
+ * listing endpoint predates this proxy; the UI simply had no way to reach it,
+ * which is the api_keys.source failure shape again: an instrument that exists
+ * and cannot be read.
+ */
+export async function GET() {
+  if (!(await isAuthenticated())) {
+    return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+  }
+  if (!API_URL || !ADMIN_SECRET) {
+    return NextResponse.json({ error: 'not_configured' }, { status: 503 });
+  }
+  try {
+    const r = await fetch(`${API_URL}/v1/admin/no-reply-senders`, {
+      headers: { 'X-Admin-Secret': ADMIN_SECRET },
+      signal: AbortSignal.timeout(15_000),
+      cache: 'no-store',
+    });
+    const data = await r.json().catch(() => ({}));
+    return NextResponse.json(data, { status: r.status });
+  } catch {
+    return NextResponse.json({ error: 'upstream_failed' }, { status: 502 });
+  }
+}
+
 export async function POST(req: NextRequest) {
   if (!(await isAuthenticated())) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
