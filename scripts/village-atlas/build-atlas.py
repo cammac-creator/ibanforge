@@ -65,11 +65,33 @@ RECIPE = {
 }
 
 
+def brightness_for(name):
+    # Daylight pass: buildings and street furniture get a warm lift, fire and
+    # gilded props stay as painted, characters barely move (already bright).
+    if name.startswith(('hero', 'cour', 'clerk')):
+        return 1.06
+    if name in ('embers', 'ember-line', 'spark', 'smoke', 'flame-s', 'flame-ball',
+                'coin', 'coin-sign', 'ingot', 'seal-x'):
+        return 1.0
+    if name == 'anvil':
+        return 1.15
+    return 1.26
+
+
 def scaled(name):
     path, th = RECIPE[name]
     img = Image.open(f"{SP}/{path}").convert('RGBA')
     tw = max(1, round(img.width * th / img.height))
-    return img.resize((tw, th), L)
+    img = img.resize((tw, th), L)
+    b = brightness_for(name)
+    if b != 1.0:
+        a = img.getchannel('A')
+        rgb = ImageEnhance.Brightness(img.convert('RGB')).enhance(b)
+        # let the banners and painted wood sing a little
+        rgb = ImageEnhance.Color(rgb).enhance(1.12)
+        img = rgb.convert('RGBA')
+        img.putalpha(a)
+    return img
 
 
 def build_atlas():

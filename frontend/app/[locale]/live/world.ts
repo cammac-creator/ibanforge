@@ -158,9 +158,9 @@ export function paintGround(ctx: Ctx, img: WorldImages) {
   }
   // warm-lit streets
   for (const [x, y, w, h] of ROAD_BANDS) {
-    ctx.fillStyle = 'rgba(255,208,130,0.14)';
+    ctx.fillStyle = 'rgba(255,208,130,0.22)';
     ctx.fillRect(x, y, w, h);
-    ctx.fillStyle = 'rgba(255,208,130,0.10)';
+    ctx.fillStyle = 'rgba(255,208,130,0.15)';
     ctx.fillRect(x, y, w, 2);
     ctx.fillRect(x, y + h - 2, w, 2);
   }
@@ -192,9 +192,9 @@ export function drawSigns(ctx: Ctx, img: WorldImages) {
 
 /** Peripheral night vignette, prerendered once at world size. */
 export function paintVignette(ctx: Ctx) {
-  const g = ctx.createRadialGradient(W / 2, H / 2, H * 0.44, W / 2, H / 2, H * 0.95);
+  const g = ctx.createRadialGradient(W / 2, H / 2, H * 0.52, W / 2, H / 2, H * 1.0);
   g.addColorStop(0, 'rgba(8,8,14,0)');
-  g.addColorStop(1, 'rgba(8,8,14,0.42)');
+  g.addColorStop(1, 'rgba(8,8,14,0.24)');
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, W, H);
 }

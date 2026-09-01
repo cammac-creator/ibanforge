@@ -236,12 +236,13 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
       for (let i = 0; i < HALOS.length; i++) {
         const [hx, hy, hr, hs] = HALOS[i]
         const pulse = w.reduced ? 1 : 0.86 + 0.14 * Math.sin(t / 520 + i * 1.7)
-        const g = ctx.createRadialGradient(hx, hy, 2, hx, hy, hr * pulse)
-        g.addColorStop(0, `rgba(255,190,90,${0.34 * hs})`)
-        g.addColorStop(1, "rgba(255,190,90,0)")
+        const rr = hr * 1.3
+        const g = ctx.createRadialGradient(hx, hy, 2, hx, hy, rr * pulse)
+        g.addColorStop(0, `rgba(255,196,100,${0.44 * hs})`)
+        g.addColorStop(1, "rgba(255,196,100,0)")
         ctx.globalAlpha = 1
         ctx.fillStyle = g
-        ctx.fillRect(hx - hr, hy - hr, hr * 2, hr * 2)
+        ctx.fillRect(hx - rr, hy - rr, rr * 2, rr * 2)
       }
       ctx.restore()
 
@@ -262,7 +263,7 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
         const vc = w.veilLayer.getContext("2d")!
         vc.setTransform(1, 0, 0, 1, 0, 0)
         vc.clearRect(0, 0, W, H)
-        vc.fillStyle = "rgba(6,6,12,0.46)"; vc.fillRect(0, 0, W, H)
+        vc.fillStyle = "rgba(6,6,12,0.36)"; vc.fillRect(0, 0, W, H)
         vc.globalCompositeOperation = "destination-out"
         const hole = (x: number, y: number, r: number) => {
           const g = vc.createRadialGradient(x, y, 8, x, y, r)
