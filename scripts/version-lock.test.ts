@@ -149,12 +149,12 @@ const TOLERATED: ReadonlyArray<{ sdk: string; expected: string; since: string; w
     since: '2026-08-30 (noyau MCP republié en 1.4.4)',
     why: "1.4.3 est ce que npm SERT pour ce SDK. Le bump du 30/08 n'a touché que le noyau MCP (septième outil, fail() sur les refus d'entrée, bank_code_check.reason et bic.basis) : le client HTTP n'a pas bougé d'une ligne. Écrire 1.4.4 dans son package.json ferait mentir le dépôt sur ce qui est publié — la dérive exacte que ce fichier existe pour enregistrer plutôt que pour maquiller. Se videra à la prochaine republication.",
   },
-  {
-    sdk: 'Python (ibanforge)',
-    expected: '1.4.3',
-    since: '2026-08-30 (noyau MCP republié en 1.4.4)',
-    why: 'Idem côté PyPI, et pour la même raison : rien à republier tant que le client ne change pas.',
-  },
+  // Python (ibanforge) : exception VIDÉE le 01/09/2026, comme la doctrine le
+  // demande — conséquence naturelle d'un travail fini. Le « rien à republier
+  // tant que le client ne change pas » avait cessé d'être vrai : 9c1fa55 a
+  // typé le bloc adresse et porté lei/address sur validate DANS le dépôt sans
+  // republication, donc PyPI servait un client en retard sur son propre code.
+  // Bump 1.4.4 + republication CI le jour même.
 ];
 
 describe('version lock — le noyau MCP porte partout le même numéro', () => {
