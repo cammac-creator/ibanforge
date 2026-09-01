@@ -15,7 +15,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import {
   W, H, SCALE, STATIONS, stationById, REGISTRY_CCS,
-  loadWorldImages, paintGround, paintVignette, drawSprite, drawActor,
+  loadWorldImages, paintGround, paintVignette, drawSprite, drawActor, drawTinted,
   SCENERY, HALOS, EMBER_ZONES, CHIMNEYS,
   type Actor, type StationGeo, type WorldImages,
 } from "./world"
@@ -60,6 +60,8 @@ interface Props {
   quest: { id: number; steps: NarratedStep[] } | null
   traffic?: TrafficCourier[]
   vignette?: Vignette | null
+  /** ⏩ holds ÷3, walks ×2 — the visitor who wants the proof, not the show */
+  fast?: boolean
   onQuestEnd?: () => void
 }
 
@@ -88,10 +90,10 @@ const LABEL_AT: Record<string, [number, number]> = {
 
 interface Spark { x: number; y: number; vx: number; vy: number; l: number; c: string }
 interface Puff { x: number; y: number; a: number; s: number; vy: number }
-interface Seal { x: number; y: number; sprite: "coin" | "seal-x"; l: number }
+interface Seal { x: number; y: number; sprite: "coin" | "seal-x"; l: number; tint?: string }
 interface Pulse { x: number; y: number; r: number; l: number }
 
-export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, idle, canvasAlt, quest, traffic, vignette, onQuestEnd }: Props) {
+export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, idle, canvasAlt, quest, traffic, vignette, fast, onQuestEnd }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const faceRef = useRef<HTMLCanvasElement>(null)
   const [narr, setNarr] = useState<{ who: string; text: string }>(idle)
@@ -120,6 +122,9 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
     cart: null as { x: number; y: number; dir: 1 | -1 } | null,
     veilLayer: null as HTMLCanvasElement | null,
     sparks: [] as Spark[], puffs: [] as Puff[], seals: [] as Seal[], pulses: [] as Pulse[],
+    /** transient sprites drawn where they are put (the ingot on the anvil,
+     * the spark burst): atlas frames the village paid for and never drew */
+    props: [] as { sprite: string; x: number; y: number; l: number; max: number; scale?: number }[],
     embers: [] as { x: number; y: number; vx: number; p: number }[],
     flies: [] as { x: number; y: number; p: number }[],
     /** daylight ambience: drifting pollen motes and a few butterflies */
@@ -130,7 +135,7 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
     trailAcc: 0,
     /** station under the mouse — read by the draw pass for the golden lift */
     hover: null as string | null,
-    veil: false, focus: null as StationGeo | null, gen: 0, reduced: false,
+    veil: false, focus: null as StationGeo | null, gen: 0, reduced: false, fast: false,
   })
 
   /* ---------- asset loading ---------- */
@@ -238,6 +243,7 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
       w.sparks = w.sparks.filter((s) => --s.l > 0); w.sparks.forEach((s) => { s.x += s.vx; s.y += s.vy; s.vy += 0.04 })
       w.puffs = w.puffs.filter((p) => (p.a -= 0.004) > 0); w.puffs.forEach((p) => { p.y -= p.vy; p.s += 0.006 })
       w.seals = w.seals.filter((s) => --s.l > 0)
+      w.props = w.props.filter((p) => --p.l > 0)
       w.pulses = w.pulses.filter((p) => --p.l > 0); w.pulses.forEach((p) => { p.r += 0.7 })
 
       /* -- draw -- */
@@ -265,6 +271,13 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
       const ents: Entity[] = SCENERY.map((p) => ({
         base: p.base,
         draw: () => {
+          // life at rest (v9): trees and grove lean one pixel on a slow sine,
+          // tufts less — the gesture that turns an illustration into a world
+          const sway = w.reduced ? 0
+            : p.sprite.startsWith("tree") || p.sprite === "grove" ? Math.sin(t / 2800 + p.cx) * 1.0
+            : p.sprite.startsWith("tuft") ? Math.sin(t / 1900 + p.cx) * 0.6
+            : 0
+          const cx = p.cx + sway
           // the hovered station lifts a breath and glows warm — the "you are
           // pointing at me" answer the operator asked for (item 3)
           const hot = p.id !== undefined && p.id === w.hover
@@ -272,11 +285,11 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
             ctx.save()
             ctx.shadowColor = "rgba(255,190,70,0.95)"
             ctx.shadowBlur = 16
-            drawSprite(ctx, img, p.sprite, p.cx, p.base, { scale: p.scale, flip: p.flip, dy: -2 })
+            drawSprite(ctx, img, p.sprite, cx, p.base, { scale: p.scale, flip: p.flip, dy: -2 })
             ctx.restore()
-            drawSprite(ctx, img, p.sprite, p.cx, p.base, { scale: p.scale, flip: p.flip, dy: -2 })
+            drawSprite(ctx, img, p.sprite, cx, p.base, { scale: p.scale, flip: p.flip, dy: -2 })
           } else {
-            drawSprite(ctx, img, p.sprite, p.cx, p.base, { scale: p.scale, flip: p.flip })
+            drawSprite(ctx, img, p.sprite, cx, p.base, { scale: p.scale, flip: p.flip })
           }
         },
       }))
@@ -284,8 +297,23 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
         ...(w.clerks as unknown as Actor[]), ...w.couriers.map((c) => c.actor),
         w.watcher, w.archivist, w.hero,
       ]
+      // the hero you can find (v9): a warm ring under his feet, drawn just
+      // before him, and a sort tie-break so he never hides behind the house
+      // he is visiting
+      if (!w.hero.hidden) {
+        ents.push({
+          base: w.hero.y + 0.49,
+          draw: () => {
+            const pulse = w.reduced ? 1 : 0.86 + 0.14 * Math.sin(t / 700)
+            const g = ctx.createRadialGradient(w.hero.x, w.hero.y, 2, w.hero.x, w.hero.y, 13 * pulse)
+            g.addColorStop(0, "rgba(253,224,138,0.36)"); g.addColorStop(1, "rgba(253,224,138,0)")
+            ctx.save(); ctx.globalCompositeOperation = "lighter"; ctx.fillStyle = g
+            ctx.fillRect(w.hero.x - 16, w.hero.y - 16, 32, 32); ctx.restore()
+          },
+        })
+      }
       for (const a of actors) {
-        if (!a.hidden) ents.push({ base: a.y, draw: () => drawActor(ctx, img, a, t, w.reduced) })
+        if (!a.hidden) ents.push({ base: a === w.hero ? a.y + 0.5 : a.y, draw: () => drawActor(ctx, img, a, t, w.reduced) })
       }
       if (w.cart) {
         const c = w.cart
@@ -293,6 +321,18 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
       }
       ents.sort((a, b) => a.base - b.base)
       for (const e of ents) e.draw()
+      // transient props: the ingot cooling on the anvil, the spark burst
+      for (const p of w.props) drawSprite(ctx, img, p.sprite, p.x, p.y, { alpha: Math.min(1, p.l / 30), scale: p.scale })
+      // the player marker: a golden chevron bobbing over the hero's head
+      // while a quest runs (Stardew's multiplayer marker)
+      if (!w.hero.hidden && w.veil) {
+        const bob = w.reduced ? 0 : Math.sin(t / 900) * 2
+        const hx = w.hero.x, hy = w.hero.y - 44 + bob
+        ctx.fillStyle = "#B45309"
+        ctx.beginPath(); ctx.moveTo(hx - 5, hy - 7); ctx.lineTo(hx + 5, hy - 7); ctx.lineTo(hx, hy + 1); ctx.closePath(); ctx.fill()
+        ctx.fillStyle = "#FDE68A"
+        ctx.beginPath(); ctx.moveTo(hx - 4, hy - 6); ctx.lineTo(hx + 4, hy - 6); ctx.lineTo(hx, hy); ctx.closePath(); ctx.fill()
+      }
 
       // smoke, sparks, embers, fireflies
       for (const p of w.puffs) drawSprite(ctx, img, "smoke", p.x, p.y, { alpha: p.a, scale: p.s })
@@ -314,7 +354,8 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
       // lantern / flame halos
       for (let i = 0; i < HALOS.length; i++) {
         const [hx, hy, hr, hs] = HALOS[i]
-        const pulse = w.reduced ? 1 : 0.86 + 0.14 * Math.sin(t / 520 + i * 1.7)
+        // the forge hearth (index 1) breathes slow and wide; the braziers flicker
+        const pulse = w.reduced ? 1 : i === 1 ? 0.93 + 0.15 * Math.sin(t / 2400) : 0.86 + 0.14 * Math.sin(t / 520 + i * 1.7)
         const rr = hr * 1.3
         const g = ctx.createRadialGradient(hx, hy, 2, hx, hy, rr * pulse)
         g.addColorStop(0, `rgba(255,196,100,${0.44 * hs})`)
@@ -341,7 +382,8 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
       // floating seals (verdicts)
       for (const s of w.seals) {
         const yy = s.y - (110 - s.l) * 0.2
-        drawSprite(ctx, img, s.sprite, s.x, yy, { alpha: Math.min(1, s.l / 30) })
+        if (s.tint) drawTinted(ctx, img, s.sprite, s.x, yy, s.tint, 0.55, { alpha: Math.min(1, s.l / 30) })
+        else drawSprite(ctx, img, s.sprite, s.x, yy, { alpha: Math.min(1, s.l / 30) })
       }
       for (const p of w.pulses) {
         ctx.strokeStyle = "#FBBF24"; ctx.globalAlpha = p.l / 40
@@ -355,15 +397,16 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
         const vc = w.veilLayer.getContext("2d")!
         vc.setTransform(1, 0, 0, 1, 0, 0)
         vc.clearRect(0, 0, W, H)
-        vc.fillStyle = "rgba(6,6,12,0.36)"; vc.fillRect(0, 0, W, H)
+        vc.fillStyle = "rgba(6,6,12,0.52)"; vc.fillRect(0, 0, W, H)
         vc.globalCompositeOperation = "destination-out"
         const hole = (x: number, y: number, r: number) => {
           const g = vc.createRadialGradient(x, y, 8, x, y, r)
           g.addColorStop(0, "rgba(0,0,0,1)"); g.addColorStop(1, "rgba(0,0,0,0)")
           vc.fillStyle = g; vc.fillRect(x - r, y - r, r * 2, r * 2)
         }
-        hole(w.hero.x, w.hero.y - 16, 104)
-        if (w.focus) hole(w.focus.cx, w.focus.base - w.focus.bh / 2, 126)
+        hole(w.hero.x, w.hero.y - 16, 78)
+        // the focus hole aims at the DOOR, not the middle of the façade
+        if (w.focus) hole(w.focus.door[0], w.focus.door[1] - 22, 96)
         vc.globalCompositeOperation = "source-over"
         ctx.drawImage(w.veilLayer, 0, 0)
       }
@@ -391,7 +434,7 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
         if (w.gen !== genAtStart) return false
         const tick = document.hidden ? 300 : 16
         await new Promise((r) => setTimeout(r, tick))
-        left -= tick
+        left -= tick * (w.fast ? 3 : 1)
       }
       return w.gen === genAtStart
     }
@@ -413,7 +456,10 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
           continue
         }
         const d = Math.hypot(tx - a.x, ty - a.y)
-        const n = Math.max(1, (d / speed) * 60)
+        // a third of the film was transport: long empty stretches go ×1.5,
+        // approaches keep the walking pace; ⏩ doubles everything
+        const v = speed * (d > 300 ? 1.5 : 1) * (w.fast ? 2 : 1)
+        const n = Math.max(1, (d / v) * 60)
         const sx = (tx - a.x) / n, sy = (ty - a.y) / n
         a.dir = sx < 0 ? -1 : 1
         a.face = Math.abs(sx) >= Math.abs(sy) ? "side" : sy < 0 ? "up" : "down"
@@ -499,13 +545,17 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
       }
 
       setNarr({ who: step.who, text: step.text })
-      if (step.station === "gate") w.seals.push({ x: 80, y: 140, sprite: "coin", l: 90 })
-      if (step.station === "scribe" && step.outcome === "fail") w.seals.push({ x: 204, y: 116, sprite: "seal-x", l: 110 })
+      if (step.station === "gate") w.seals.push({ x: 46, y: 140, sprite: "coin", l: 90 })
+      if (step.station === "scribe" && step.outcome === "fail") w.seals.push({ x: 204, y: 116, sprite: "seal-x", l: 110, tint: "#B91C1C" })
       if (step.station === "registry" && target) w.pulses.push({ x: target.cx, y: target.base - 60, r: 6, l: 40 })
       if (step.station === "tower") w.pulses.push({ x: 380, y: 372, r: 6, l: 40 })
       if (step.station === "forge") {
         for (let i = 0; i < 24; i++) w.sparks.push({ x: 522 + (Math.random() - 0.5) * 36, y: 468, vx: (Math.random() - 0.5) * 1.8, vy: -Math.random() * 2 - 0.5, l: 30 + Math.random() * 20, c: "#FDE68A" })
-        w.seals.push({ x: 540, y: 398, sprite: step.outcome === "fail" ? "seal-x" : "coin", l: 120 })
+        w.seals.push({ x: 540, y: 398, sprite: step.outcome === "fail" ? "seal-x" : "coin", l: 120, tint: step.outcome === "fail" ? "#B91C1C" : undefined })
+        // the frames the atlas carried unused: the spark burst on the anvil,
+        // then the ingot cooling there for the rest of the step
+        w.props.push({ sprite: "spark", x: 522, y: 476, l: 22, max: 22, scale: 0.9 })
+        if (step.outcome !== "fail") w.props.push({ sprite: "ingot", x: 522, y: 472, l: 140, max: 140 })
       }
       if (!(await sleep(step.holdMs))) return
     }
@@ -530,6 +580,7 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
   // traffic poll and erased the line a quest was showing. The content-keyed
   // form is refused by react-hooks/set-state-in-effect; this one is accepted.
   useEffect(() => { setNarr(idle) }, [idle])
+  useEffect(() => { world.current.fast = !!fast }, [fast])
 
   /* ---------- traffic couriers ---------- */
   useEffect(() => {
@@ -543,7 +594,7 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
         key: op.key, tip: op.tip, pts, i: 1,
         actor: {
           x: pts[0][0] - (idx % 3) * 10, y: pts[0][1], dir: 1,
-          kind: COURIER_KINDS[op.tint % COURIER_KINDS.length], face: "side", moving: true,
+          kind: COURIER_KINDS[op.tint % COURIER_KINDS.length], face: "side", moving: true, alpha: 0.86,
         },
       })
     }
@@ -711,7 +762,7 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
               return (
                 <span
                   key={s.id}
-                  className="absolute -translate-x-1/2 whitespace-nowrap border font-bold"
+                  className={`absolute -translate-x-1/2 whitespace-nowrap border font-bold${s.cc ? " hidden sm:inline-block" : ""}`}
                   style={{
                     left: `${(lx / W) * 100}%`,
                     top: `${(ly / H) * 100}%`,
@@ -734,7 +785,7 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
               )
             })}
             <span
-              className="absolute border px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wider"
+              className="hidden sm:inline-block absolute border px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wider"
               style={{ left: `${(724 / W) * 100}%`, top: `${(220 / H) * 100}%`, transform: "translateX(-50%)",
                 background: "#F3E7C8", borderColor: "#7A5322", borderWidth: 1.5, borderRadius: 3,
                 color: "#5C4218", boxShadow: "2px 2px 0 rgba(10,8,4,0.38)",

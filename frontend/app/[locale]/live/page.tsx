@@ -7,6 +7,9 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { buildJourney, type JourneyStep } from "@/lib/village/journey"
+import { opAgeMinutes } from "@/lib/village/ops-age"
+import { LIVE_EXAMPLES } from "@/lib/village/examples"
+import { parseLiveParams } from "@/lib/village/permalink"
 import { VillageCanvas, type NarratedStep, type StationTip, type TrafficCourier, type Vignette } from "./village-canvas"
 
 const OP_TYPES = new Set([
@@ -31,6 +34,8 @@ export default function LivePage() {
   const [mode, setMode] = useState<"iban" | "compliance">("iban")
   const [busy, setBusy] = useState(false)
   const [running, setRunning] = useState(false)
+  // ⏩ the visitor who wants the proof, not the show: holds ÷3, walks ×2
+  const [fast, setFast] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [quest, setQuest] = useState<{ id: number; steps: NarratedStep[] } | null>(null)
   const questId = useRef(0)
@@ -65,19 +70,29 @@ export default function LivePage() {
   // poll only sets the cursor, so page load does not replay old operations.
   useEffect(() => {
     let stop = false
-    const toCourier = (op: FeedOp): TrafficCourier => {
+    // How old a replayed operation is, in the courier's own card — a replay
+    // is never dressed up as live.
+    const ageOf = (ts: string, now: number): string => {
+      const m = opAgeMinutes(ts, now)
+      if (m === null) return ""
+      if (m < 1) return t("traffic.justNow")
+      if (m < 60) return t("traffic.ago", { min: m })
+      return t("traffic.agoHours", { h: Math.floor(m / 60) })
+    }
+    const toCourier = (op: FeedOp, when: string): TrafficCourier => {
       const typeKey = OP_TYPES.has(op.type) ? op.type : "unknown"
+      const role = t("traffic.role", {
+        type: t(`traffic.types.${typeKey}`),
+        country: op.country ?? "—",
+        result: op.success ? "✓" : "✗",
+      })
       return {
         key: op.id,
         kind: !op.success ? "fail" : op.type === "bic_lookup" ? "library" : "full",
         tint: op.id,
         tip: {
           name: t("traffic.name"),
-          role: t("traffic.role", {
-            type: t(`traffic.types.${typeKey}`),
-            country: op.country ?? "—",
-            result: op.success ? "✓" : "✗",
-          }),
+          role: when ? `${role} · ${when}` : role,
           real: t("traffic.real"),
         },
       }
@@ -91,8 +106,17 @@ export default function LivePage() {
         const ops = Array.isArray(data.ops) ? data.ops : []
         if (ops.length === 0) return
         lastOpId.current = Math.max(lastOpId.current, ...ops.map((o) => o.id))
-        if (seedOnly) return
-        const fresh = ops.slice(0, 6).reverse().map(toCourier)
+        if (seedOnly) {
+          // Couriers from the first second (v9): the last three real
+          // operations walk the road at once, each dated in its card. Before,
+          // the first poll only set the cursor, and on a quiet site the road
+          // stayed empty for minutes — the liveliest proof of the page never
+          // showed to a one-minute visitor (conversion audit, 01/09/2026).
+          const now = Date.now()
+          setTraffic(ops.slice(0, 3).reverse().map((op) => toCourier(op, ageOf(op.t, now))))
+          return
+        }
+        const fresh = ops.slice(0, 6).reverse().map((op) => toCourier(op, t("traffic.live")))
         setTraffic((prev) => [...prev.slice(-12), ...fresh])
       } catch {
         // feed is ambience — silence is the correct failure mode
@@ -193,19 +217,23 @@ export default function LivePage() {
     }
   }
 
-  // ?autoplay=1 starts the demo quest by itself — for shares and filming.
+  // The permalink: ?iban=…&mode=compliance fills the field, ?autoplay=1
+  // starts the quest by itself — for shares, replays and filming.
   const autoplayed = useRef(false)
   useEffect(() => {
     if (autoplayed.current) return
-    if (new URLSearchParams(window.location.search).get("autoplay") === "1") {
-      autoplayed.current = true
-      const t = setTimeout(() => { void runValidation(DEMO_IBAN.replace(/\s+/g, "")) }, 1200)
-      return () => clearTimeout(t)
-    }
+    const p = parseLiveParams(window.location.search)
+    if (!p.iban && !p.autoplay) return
+    autoplayed.current = true
+    const timer = setTimeout(() => {
+      if (p.iban) { setIban(p.iban); setMode(p.mode) }
+      if (p.autoplay) void runValidation((p.iban ?? DEMO_IBAN).replace(/\s+/g, ""), p.mode)
+    }, p.autoplay ? 1200 : 0)
+    return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const runValidation = async (value: string) => {
+  const runValidation = async (value: string, questMode: "iban" | "compliance" = mode) => {
     if (!value || busy || running) return
     setBusy(true)
     setError(null)
@@ -213,7 +241,7 @@ export default function LivePage() {
       const res = await fetch("/api/playground", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: mode, value }),
+        body: JSON.stringify({ type: questMode, value }),
       })
       const data = (await res.json()) as Record<string, unknown>
       if (!res.ok && typeof data.valid !== "boolean") {
@@ -285,18 +313,19 @@ export default function LivePage() {
   }
 
   return (
-    <main className="mx-auto max-w-5xl px-4 py-8 sm:py-12">
+    <main className="mx-auto flex max-w-5xl flex-col px-4 py-6 sm:py-8">
       <h1 className="text-2xl font-bold sm:text-3xl">{t("title")}</h1>
       <p className="mt-2 max-w-[68ch] text-muted-foreground">{t("lede")}</p>
 
-      <Tabs value={mode} onValueChange={(v) => setMode(v as "iban" | "compliance")} className="mt-6">
-        <TabsList>
-          <TabsTrigger value="iban">{t("mode.iban")}</TabsTrigger>
-          <TabsTrigger value="compliance">{t("mode.compliance")}</TabsTrigger>
-        </TabsList>
-      </Tabs>
-
-      <form onSubmit={submit} className="mt-3 flex flex-wrap items-center gap-2">
+      {/* mode and field on one row: the header stack pushed the narration bar
+          under the fold on a 13" laptop (measured 1440×790) */}
+      <form onSubmit={submit} className="mt-4 flex flex-wrap items-center gap-2">
+        <Tabs value={mode} onValueChange={(v) => setMode(v as "iban" | "compliance")}>
+          <TabsList>
+            <TabsTrigger value="iban">{t("mode.iban")}</TabsTrigger>
+            <TabsTrigger value="compliance">{t("mode.compliance")}</TabsTrigger>
+          </TabsList>
+        </Tabs>
         <Input
           value={iban}
           onChange={(e) => setIban(e.target.value)}
@@ -311,9 +340,36 @@ export default function LivePage() {
         </Button>
         <span className="text-xs text-muted-foreground">{t("anyIban")}</span>
       </form>
+      {/* five example quests, one click each — stories a cold visitor could
+          not tell from memory (a Swiss counter, a sanctions screen, a broken
+          IBAN): the mod-97 seal breaking was coded and unreachable */}
+      <div className="mt-2 flex flex-wrap items-center gap-2 max-sm:order-2 max-sm:mt-3">
+        <span className="text-xs text-muted-foreground">{t("chips.label")}</span>
+        {LIVE_EXAMPLES.map((e) => (
+          <Button
+            key={e.key}
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={busy || running}
+            onClick={() => {
+              setMode(e.mode)
+              setIban(e.iban)
+              void runValidation(e.iban.replace(/\s+/g, ""), e.mode)
+            }}
+          >
+            {t(`chips.${e.key}`)}
+          </Button>
+        ))}
+      </div>
       {error && <p className="mt-2 text-sm" style={{ color: "var(--err, #F87171)" }}>{error}</p>}
 
-      <div className="mt-6 overflow-hidden rounded-lg border shadow-sm">
+      {/* Sized so the village AND its narration bar share the first screen on
+          a 13" laptop (1440×790 measured: the bar sat 137 px under the fold). */}
+      <div
+        className="mx-auto mt-5 w-full overflow-hidden rounded-lg border shadow-sm max-sm:order-1 max-sm:mt-3"
+        style={{ maxWidth: "max(560px, min(100%, calc((100dvh - 410px) * 16 / 9)))" }}
+      >
         <VillageCanvas
           labels={labels}
           laneLabel={t("lane")}
@@ -325,11 +381,12 @@ export default function LivePage() {
           quest={quest}
           traffic={traffic}
           vignette={vignette}
-          onQuestEnd={() => setRunning(false)}
+          fast={fast}
+          onQuestEnd={() => { setRunning(false); setFast(false) }}
         />
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center gap-2">
+      <div className="mt-3 flex flex-wrap items-center gap-2 max-sm:order-3">
         <span className="text-xs uppercase tracking-wide text-muted-foreground">{t("vignettes.label")}</span>
         <Button variant="outline" size="sm" disabled={busy || running} onClick={() => playVignette("caravan")}>
           {t("vignettes.caravan.btn")}
@@ -340,9 +397,15 @@ export default function LivePage() {
         <Button variant="outline" size="sm" disabled={busy || running} onClick={() => playVignette("archive")}>
           {t("vignettes.archive.btn")}
         </Button>
+        {running && (
+          <Button variant="outline" size="sm" disabled={fast} onClick={() => setFast(true)}>
+            ⏩ {t("faster")}
+          </Button>
+        )}
       </div>
 
-      <p className="mt-3 max-w-[75ch] text-sm text-muted-foreground">{t("honesty")}</p>
+      <p className="mt-3 max-w-[75ch] text-sm text-muted-foreground max-sm:order-4">{t("ledeMore")}</p>
+      <p className="mt-3 max-w-[75ch] text-sm text-muted-foreground max-sm:order-5">{t("honesty")}</p>
     </main>
   )
 }

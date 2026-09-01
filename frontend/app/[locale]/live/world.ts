@@ -114,12 +114,15 @@ function geo(
 }
 
 export const STATIONS: StationGeo[] = [
-  geo('gate', 'gate', 80, 182, 84, 116, [80, 200], [80, 192]),
+  // v9 (01/09 evening): doors sit where the BOARDS paint them, measured on
+  // the sprites — the engine used to send the hero to the sprite's centre,
+  // 23-60 px from six painted doorways (DA audit).
+  geo('gate', 'gate', 80, 182, 84, 116, [43, 196], [43, 192]),
   // the stalls breathe: unglued from the gate, wider apart (operator, 01/09)
   geo('scribe', 'stall-red', 210, 180, 64, 74, [210, 200], [210, 192]),
   geo('cutter', 'stall-teal', 330, 180, 62, 70, [330, 200], [330, 192]),
   // the library moved east onto the old market square, by the well
-  geo('library', 'library', 655, 176, 176, 126, [655, 200], [655, 192], { scale: 0.92 }),
+  geo('library', 'library', 655, 176, 176, 126, [705, 186], [705, 192], { scale: 0.92 }),
   ...REGISTRY_LANE.map((h, i) =>
     geo(`reg-${REGISTRY_CCS[i]}`, h.sprite, h.cx, h.base, h.w, h.h,
       [h.cx, 350], [h.cx, 342], { cc: REGISTRY_CCS[i] }),
@@ -127,17 +130,17 @@ export const STATIONS: StationGeo[] = [
   // the warehouse left the jammed top-left corner for the EAST END of the
   // caravan road — the logistics terminus, where the vignette cart now ends
   // its run and "enters" the depot (operator, 01/09 evening)
-  geo('warehouse', 'warehouse', 850, 106, 132, 104, [850, 98], [850, 76]),
+  geo('warehouse', 'warehouse', 850, 106, 132, 104, [790, 96], [790, 76]),
   // the three counters wear their bespoke boards too: sorting office with
   // pigeonholes, columned courthouse, Swiss chalet with its painted flag —
   // re-cut on the door scale (v7), the classifier pushed west to breathe
   geo('classifier', 'classifier-b', 236, 334, 110, 84, [236, 352], [236, 342]),
-  geo('court', 'court-b', 358, 337, 128, 99, [358, 352], [358, 342]),
-  geo('six', 'six-b', 470, 340, 128, 124, [470, 352], [470, 342]),
+  geo('court', 'court-b', 358, 337, 128, 99, [326, 348], [326, 342]),
+  geo('six', 'six-b', 470, 340, 128, 124, [420, 348], [420, 342]),
   // the barrier sits ACROSS the bottom street: the hero passes through it
   geo('border', 'fence', 280, 506, 104, 46, [280, 498], [280, 498]),
   geo('tower', 'tower', 380, 496, 64, 140, [380, 504], [380, 498], { scale: 0.82 }),
-  geo('forge', 'forge', 560, 488, 152, 126, [560, 506], [560, 498]),
+  geo('forge', 'forge', 560, 488, 152, 126, [537, 500], [537, 498]),
   geo('archive', 'archive-b', 140, 486, 91, 72, [140, 502], [140, 498]),
   geo('vigil', 'vigil-booth', 906, 476, 56, 60, [906, 496], [906, 498]),
 ];
@@ -270,6 +273,8 @@ export interface Actor {
   /** last movement axis, for sprite facing */
   face?: 'side' | 'up' | 'down';
   moving?: boolean; hidden?: boolean;
+  /** draw opacity — couriers step back so the hero stands out */
+  alpha?: number;
 }
 
 /** Characters draw at 0.75: measured against the boards' doors the old size
@@ -300,7 +305,49 @@ export function drawActor(ctx: Ctx, img: WorldImages, a: Actor, t: number, reduc
     flip: (a.face ?? 'down') === 'side' && a.dir < 0,
     dy: -bob,
     scale: ACTOR_SCALE,
+    alpha: a.alpha,
   });
+}
+
+/* ---------- tinted sprites ---------- */
+
+let tintLayer: HTMLCanvasElement | null = null;
+
+/** Draw a sprite recoloured. The tint is applied on an offscreen canvas under
+ * `source-atop`, so it fills the sprite's own pixels only and never spills on
+ * the ground behind it (a `source-atop` straight on the world canvas would
+ * paint the whole rectangle, the ground being opaque). */
+export function drawTinted(
+  ctx: Ctx, img: WorldImages, name: string, cx: number, baseY: number,
+  tint: string, strength: number,
+  opts: { alpha?: number; scale?: number; dy?: number } = {},
+) {
+  const f = img.meta[name];
+  if (!f) return;
+  const s = opts.scale ?? 1;
+  const w = Math.ceil(f.w * s), h = Math.ceil(f.h * s);
+  if (!tintLayer) tintLayer = document.createElement('canvas');
+  if (tintLayer.width < w || tintLayer.height < h) {
+    tintLayer.width = Math.max(tintLayer.width, w);
+    tintLayer.height = Math.max(tintLayer.height, h);
+  }
+  const tc = tintLayer.getContext('2d')!;
+  tc.setTransform(1, 0, 0, 1, 0, 0);
+  tc.globalCompositeOperation = 'source-over';
+  tc.globalAlpha = 1;
+  tc.clearRect(0, 0, tintLayer.width, tintLayer.height);
+  tc.imageSmoothingEnabled = false;
+  tc.drawImage(img.atlas, f.x, f.y, f.w, f.h, 0, 0, w, h);
+  tc.globalCompositeOperation = 'source-atop';
+  tc.globalAlpha = strength;
+  tc.fillStyle = tint;
+  tc.fillRect(0, 0, w, h);
+  tc.globalAlpha = 1;
+  tc.globalCompositeOperation = 'source-over';
+  ctx.save();
+  if (opts.alpha !== undefined) ctx.globalAlpha = opts.alpha;
+  ctx.drawImage(tintLayer, 0, 0, w, h, cx - w / 2, baseY + (opts.dy ?? 0) - h, w, h);
+  ctx.restore();
 }
 
 export { SPINE };

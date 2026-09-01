@@ -8,7 +8,7 @@
       "pricing": "Tarifs",
       "blog": "Blog",
       "dashboard": "Tableau de bord",
-      "live": "Live"
+      "live": "Le Village"
     },
     "toggleMenu": "Ouvrir le menu"
   },
@@ -225,6 +225,7 @@
         "title": "Livrée en 0,41 ms.",
         "head": "application/json · 0,41 ms serveur",
         "tryLive": "Essayez en direct dans le playground",
+        "seeVillage": "Ce trajet, en vrai, à l'échelle du village →",
         "copy": "Un POST, une réponse — forgée, trempée, estampillée. Voici la réponse exacte que vous recevez."
       }
     },
@@ -1371,7 +1372,17 @@
       "description": "Regarde une vraie validation IBAN traverser le pipeline d'IBANforge, au ralenti : péage x402, scribe mod-97, bibliothèque BIC, registres nationaux, verdict, forge."
     },
     "canvasAlt": "Le village : chaque bâtiment est une étape réelle du pipeline de validation IBAN ; le récit de la quête se lit dans le bandeau sous l'image.",
-    "lede": "Chaque personnage est un agent réel du pipeline, chaque bâtiment une vraie étape du code. Une validation prend environ une milliseconde côté serveur — ici elle est ralentie volontairement pour qu'on la voie travailler. Tape un IBAN et suis-le. Survole n'importe qui pour savoir qui fait quoi.",
+    "ledeMore": "Une validation prend environ une milliseconde côté serveur — ici elle est ralentie volontairement pour qu'on la voie travailler. Survole n'importe qui pour savoir qui fait quoi.",
+    "faster": "Accélérer",
+    "chips": {
+      "label": "Ou lance une quête d'exemple :",
+      "de": "IBAN allemand",
+      "ch": "Guichet suisse",
+      "tr": "Compliance (Turquie)",
+      "broken": "IBAN cassé",
+      "gb": "Royaume-Uni (PRA)"
+    },
+    "lede": "Chaque personnage est un agent réel du pipeline, chaque bâtiment une vraie étape du code. Tape un IBAN et suis-le.",
     "inputLabel": "IBAN à valider",
     "validate": "Valider cet IBAN",
     "running": "Quête en cours…",
@@ -1547,6 +1558,10 @@
       }
     },
     "traffic": {
+      "ago": "il y a {min} min",
+      "agoHours": "il y a {h} h",
+      "justNow": "à l'instant",
+      "live": "en direct",
       "name": "Coursier du trafic",
       "role": "Vraie requête en cours : {type} · {country} · {result}",
       "real": "GET /v1/ops/recent — type + pays + succès, jamais le contenu",

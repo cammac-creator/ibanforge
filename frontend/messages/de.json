@@ -8,7 +8,7 @@
       "pricing": "Preise",
       "blog": "Blog",
       "dashboard": "Dashboard",
-      "live": "Live"
+      "live": "Das Dorf"
     },
     "toggleMenu": "Menü öffnen"
   },
@@ -225,6 +225,7 @@
         "title": "Geliefert in 0,41 ms.",
         "head": "application/json · 0,41 ms Server",
         "tryLive": "Live im Playground testen",
+        "seeVillage": "Dieser Weg, in echt, im Maßstab des Dorfs →",
         "copy": "Ein POST, eine Antwort — geschmiedet, abgeschreckt, geprägt. Genau diese Antwort erhalten Sie zurück."
       }
     },
@@ -1371,7 +1372,17 @@
       "description": "Sieh zu, wie eine echte IBAN-Validierung die IBANforge-Pipeline durchläuft, verlangsamt: Zollhaus, Mod-97-Schreiber, BIC-Bibliothek, nationale Register, Urteil, Schmiede."
     },
     "canvasAlt": "Das Dorf: Jedes Gebäude ist ein echter Schritt der IBAN-Validierungspipeline; die Quest wird in der Leiste unter dem Bild erzählt.",
-    "lede": "Jede Figur ist ein echter Agent der Pipeline, jedes Gebäude ein echter Schritt im Code. Eine Validierung dauert serverseitig etwa eine Millisekunde — hier ist sie bewusst verlangsamt, damit man ihr zusehen kann. Gib eine IBAN ein und folge ihr. Fahre über Figuren und Gebäude, um zu sehen, wer was tut.",
+    "ledeMore": "Eine Validierung dauert serverseitig etwa eine Millisekunde — hier ist sie bewusst verlangsamt, damit man ihr zusehen kann. Fahre über Figuren und Gebäude, um zu sehen, wer was tut.",
+    "faster": "Schneller",
+    "chips": {
+      "label": "Oder starte eine Beispiel-Quest:",
+      "de": "Deutsche IBAN",
+      "ch": "Schweizer Schalter",
+      "tr": "Compliance (Türkei)",
+      "broken": "Kaputte IBAN",
+      "gb": "Vereinigtes Königreich (PRA)"
+    },
+    "lede": "Jede Figur ist ein echter Agent der Pipeline, jedes Gebäude ein echter Schritt im Code. Gib eine IBAN ein und folge ihr.",
     "inputLabel": "Zu prüfende IBAN",
     "validate": "Diese IBAN prüfen",
     "running": "Quest läuft…",
@@ -1547,6 +1558,10 @@
       }
     },
     "traffic": {
+      "ago": "vor {min} Min.",
+      "agoHours": "vor {h} Std.",
+      "justNow": "gerade eben",
+      "live": "live",
       "name": "Verkehrskurier",
       "role": "Echte Anfrage, jetzt gerade: {type} · {country} · {result}",
       "real": "GET /v1/ops/recent — Typ + Land + Ergebnis, nie der Inhalt",

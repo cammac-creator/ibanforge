@@ -96,7 +96,7 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
     },
     ship: {
       eyebrow: t('film.ship.eyebrow'), title: t('film.ship.title'), head: t('film.ship.head'),
-      tryLive: t('film.ship.tryLive'), copy: t('film.ship.copy'),
+      tryLive: t('film.ship.tryLive'), seeVillage: t('film.ship.seeVillage'), copy: t('film.ship.copy'),
     },
   }
 
@@ -133,7 +133,7 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
       </section>
 
       {/* ── The film: five forging stations, scrubbed by scroll ──────────── */}
-      <ForgeFilm t={film} playgroundHref={`/${locale}/playground`} />
+      <ForgeFilm t={film} playgroundHref={`/${locale}/playground`} villageHref={`/${locale}/live?autoplay=1`} />
 
       {/* ── Sourced stats, counting up on scroll ─────────────────────────── */}
       <section className="stats-band">

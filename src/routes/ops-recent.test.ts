@@ -11,7 +11,7 @@ const HERMETIC_DB = vi.hoisted(() => {
 
 import { opsRecent } from './ops-recent.js';
 import { recordOperation } from '../lib/stats.js';
-import { closeAll } from '../lib/db.js';
+import { closeAll, getStatsDB } from '../lib/db.js';
 import { rmSync } from 'node:fs';
 
 const app = new Hono();
@@ -75,5 +75,27 @@ describe('GET /v1/ops/recent', () => {
     // 5 s cache; the cap applies either way.
     const { ops } = await fetchOps('?after=0');
     expect(ops.length).toBeLessThanOrEqual(50);
+  });
+
+  it('leaves out the operations made by our own keys — the playground and the probes', async () => {
+    // Decision of the owner, 01/09/2026: a demonstration run from the site
+    // must not walk the village road as if it were a customer. The same
+    // is_internal_email() the funnel uses decides; keyless (x402) rows and
+    // customer keys stay.
+    const db = getStatsDB();
+    db.prepare(
+      "INSERT INTO api_keys (key_hash, key_prefix, email) VALUES ('h-int', 'ibf_int_01', 'playground@ibanforge.internal')",
+    ).run();
+    db.prepare(
+      "INSERT INTO api_keys (key_hash, key_prefix, email) VALUES ('h-cust', 'ibf_cust_01', 'ops@alpha.example.net')",
+    ).run();
+    // XK is used nowhere else in this file: its absence below is the proof.
+    recordOperation('iban_validate', 'XK', true, 0.005, undefined, 'ibf_int_01');
+    recordOperation('iban_validate', 'NL', true, 0.005, undefined, 'ibf_cust_01');
+    recordOperation('iban_validate', 'BE', true, 0.005);
+
+    const { ops } = await fetchOps();
+    expect(ops.slice(0, 2).map((o) => o.country)).toEqual(['BE', 'NL']);
+    expect(ops.map((o) => o.country)).not.toContain('XK');
   });
 });
