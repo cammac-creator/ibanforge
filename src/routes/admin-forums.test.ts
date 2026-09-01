@@ -131,3 +131,51 @@ describe('forum-marketplaces', () => {
     expect(bad.status).toBe(400);
   });
 });
+
+describe('forum-threads — les deux paramètres optionnels (TABS-16, TABS-18)', () => {
+  const url = `https://example.com/lean-${RUN_ID}`;
+
+  it('sert la table des limites par plateforme, plutôt que de la laisser recopier', async () => {
+    const app = makeApp();
+    const res = await app.request('/v1/admin/forum-threads', { headers: H });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { platform_limits?: Record<string, { max: number | null; comfy: number }> };
+    // Le composeur compte contre CETTE table, plus contre une copie locale.
+    expect(body.platform_limits?.stackoverflow).toEqual({ max: 30_000, comfy: 2_500 });
+    expect(body.platform_limits?.hn?.max).toBeNull();
+  });
+
+  it('fields=list retire les textes longs, et rien d’autre', async () => {
+    const app = makeApp();
+    await app.request('/v1/admin/forum-threads', {
+      method: 'POST',
+      headers: H,
+      body: JSON.stringify({
+        url,
+        title: 'Comment valider un IBAN belge',
+        source: 'manual',
+        draft: 'Un brouillon assez long pour peser dans le sondage.',
+        summary_fr: 'Résumé.',
+        excerpt: 'Extrait.',
+      }),
+    });
+    const full = (await (await app.request('/v1/admin/forum-threads', { headers: H })).json()) as {
+      threads: Array<Record<string, unknown>>;
+    };
+    const mineFull = full.threads.find((t) => t.url === url);
+    expect(mineFull?.draft).toBe('Un brouillon assez long pour peser dans le sondage.');
+
+    const lean = (await (await app.request('/v1/admin/forum-threads?fields=list', { headers: H })).json()) as {
+      threads: Array<Record<string, unknown>>;
+    };
+    const mineLean = lean.threads.find((t) => t.url === url);
+    expect(mineLean).toBeDefined();
+    for (const heavy of ['draft', 'draft_fr', 'summary_fr', 'notes', 'excerpt', 'score_detail']) {
+      expect(heavy in mineLean!).toBe(false);
+    }
+    // Tout ce que la liste dessine est toujours là.
+    expect(mineLean!.title).toBe('Comment valider un IBAN belge');
+    expect(mineLean!.status).toBeDefined();
+    expect(mineLean!.first_seen).toBeDefined();
+  });
+})

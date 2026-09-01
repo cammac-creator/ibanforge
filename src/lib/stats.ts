@@ -519,7 +519,16 @@ export function resetStatsStatements() {
 export interface SourceStatsRow {
   client_kind: ClientKind;
   total: number;
-  paid_calls: number;        // status 200 on paid /v1/* endpoints
+  /**
+   * 200 on a BILLABLE endpoint with the expected verb, internal keys and
+   * OpenAPI placeholder paths dropped — term for term the rule the business
+   * funnel counts a success by, and deliberately not "any 200 on /v1/". Our own
+   * admin surface lives under /v1/admin and is not a sale. Because the two
+   * definitions now match, `SUM(paid_calls) <= SUM(funnel.success)` holds by
+   * construction over the same window, and a test asserts it: those are the two
+   * cards the page puts side by side to answer the same question.
+   */
+  paid_calls: number;
   paywall_hits: number;      // status 402 (discovery probes + unauth attempts)
   errors: number;            // status >= 400, excluding 402
   avg_response_ms: number;
@@ -545,19 +554,41 @@ export interface SourceStatsResponse {
 export function getSourceStats(days: number): SourceStatsResponse {
   const db = getStatsDB();
 
+  // DASH-03 (audit 2026-09-01). `paid_calls` used to be "200 on /v1/%, minus
+  // two named free endpoints". Every /v1/admin/* call the dashboard makes to
+  // render ITSELF matches that, and it makes seventeen per page: over 30 days
+  // in production the column showed 48 248, of which 36 022 were /v1/admin/*,
+  // while the business funnel on the SAME page counted 1 370 successes. The
+  // card that exists to answer "does the agent channel produce customers?" was
+  // answering with the traffic of its own screen. It now uses the exact filter
+  // the business funnel uses — a (verb, billable path) pair — so the two views
+  // of "paid" on that page can be read against each other.
+  const billable = buildBillableFilter();
+  registerInternalEmailFn(db);
+  // DASH-09. `datetime('now','-30 days')` is a rolling instant, so the GROUP BY
+  // date below returned 31 calendar dates, one of them partial, while
+  // getStatsHistory returned 30 for the same period: the two totals of the same
+  // page differed by a whole day of traffic. Bound on the calendar boundary,
+  // N dates today included, exactly like getTrafficTrend.
+  const since = `-${Math.max(0, days - 1)} days`;
+
   const byKind = db.prepare(`
     SELECT
       COALESCE(client_kind, 'api') AS client_kind,
       COUNT(*) AS total,
-      SUM(CASE WHEN status = 200 AND path LIKE '/v1/%' AND path NOT IN ('/v1/iban/format', '/v1/address/check') THEN 1 ELSE 0 END) AS paid_calls,
+      SUM(CASE WHEN status = 200 AND (${billable.sql})
+                AND path NOT LIKE '%\\%7B%' ESCAPE '\\'
+                AND path NOT LIKE '%{%'
+                ${EXTERNAL_ONLY_SQL}
+           THEN 1 ELSE 0 END) AS paid_calls,
       SUM(CASE WHEN status = 402 THEN 1 ELSE 0 END) AS paywall_hits,
       SUM(CASE WHEN status >= 400 AND status != 402 THEN 1 ELSE 0 END) AS errors,
       ROUND(AVG(response_ms), 1) AS avg_response_ms
     FROM request_log
-    WHERE created_at >= datetime('now', ?)
+    WHERE created_at >= date('now', ?)
     GROUP BY COALESCE(client_kind, 'api')
     ORDER BY total DESC
-  `).all(`-${days} days`) as SourceStatsRow[];
+  `).all(...billable.params, since) as SourceStatsRow[];
 
   const breakdown = db.prepare(`
     SELECT
@@ -566,12 +597,12 @@ export function getSourceStats(days: number): SourceStatsResponse {
       COUNT(*) AS total,
       SUM(CASE WHEN status = 200 THEN 1 ELSE 0 END) AS success
     FROM request_log
-    WHERE created_at >= datetime('now', ?)
-      AND path LIKE '/v1/%' AND path NOT IN ('/v1/iban/format', '/v1/address/check')
+    WHERE created_at >= date('now', ?)
+      AND (${billable.sql})
     GROUP BY path, COALESCE(client_kind, 'api')
     ORDER BY total DESC
     LIMIT 50
-  `).all(`-${days} days`) as Array<{ path: string; client_kind: ClientKind; total: number; success: number }>;
+  `).all(since, ...billable.params) as Array<{ path: string; client_kind: ClientKind; total: number; success: number }>;
 
   const total = byKind.reduce((acc, r) => acc + r.total, 0);
 
@@ -743,6 +774,18 @@ function internalOpPrefixes(): string[] {
     .map((k) => k.key_prefix);
 }
 
+/**
+ * "Not one of our own keys", as a correlated subquery instead of a bound list.
+ *
+ * Same rule as internalOpPrefixes() above and as the business funnel, but it
+ * costs zero bound parameters, so a query already carrying its own can use it
+ * without counting. Requires registerInternalEmailFn(db) on the connection.
+ * Anonymous rows (key_prefix NULL) stay counted: they are the x402 demand
+ * signal, and they cannot be attributed to anyone, ours included.
+ */
+const EXTERNAL_ONLY_SQL =
+  "AND (key_prefix IS NULL OR key_prefix NOT IN (SELECT key_prefix FROM api_keys WHERE is_internal_email(email)))";
+
 function excludePrefixClause(excluded: string[]): string {
   if (excluded.length === 0) return '';
   return ` AND (key_prefix IS NULL OR key_prefix NOT IN (${excluded.map(() => '?').join(',')}))`;
@@ -754,6 +797,27 @@ function typeStats(type: OperationType, excluded: string[] = []): { total: numbe
       excludePrefixClause(excluded)
   ).get(type, ...excluded) as { total: number; success_count: number };
   return row;
+}
+
+/**
+ * Success rate for one operation type, over a window, internals excluded.
+ *
+ * DASH-08 (audit 2026-09-01): the dashboard shows "Taux de succès 92,7 %" (all
+ * time, internals excluded, window not stated anywhere) two cards away from
+ * "Taux erreur IBAN 12,26 %" (30 days, internals INCLUDED). 100 - 12,26 is
+ * 87,74, and the page never says why the two disagree. Exported so a caller can
+ * ask both questions on the SAME window and the same population; the coherence
+ * test asserts the pair sums to 100.
+ */
+export function getTypeSuccessRate(type: OperationType, days?: number): { total: number; success_rate: number } {
+  const db = getStatsDB();
+  registerInternalEmailFn(db);
+  const windowClause = days == null ? '' : " AND created_at >= date('now', '-' || ? || ' days')";
+  const row = db.prepare(
+    'SELECT COUNT(*) as total, COALESCE(SUM(success), 0) as success_count FROM operations' +
+      ' WHERE operation_type = ? AND reject_reason IS NULL ' + EXTERNAL_ONLY_SQL + windowClause
+  ).get(...(days == null ? [type] : [type, Math.max(0, days - 1)])) as { total: number; success_count: number };
+  return { total: row.total, success_rate: rate(row.total, row.success_count) };
 }
 
 function rate(total: number, success: number): number {
@@ -910,27 +974,72 @@ export function getStatsHistory(days: number = 7): Array<{
    * label is precisely the number this field exists to stop publishing.
    */
   p99_ms: number | null;
+  /**
+   * Which table the three operation series above were read from, so a reader
+   * never has to guess whether they are filterable. DASH-05, 2026-09-01.
+   */
+  ops_source: 'operations';
+  /**
+   * Units the three series above DROPPED that day: our own tests, probes and
+   * the regrouped abuse cohorts. Published rather than merely subtracted, on
+   * getTrafficTrend's rule — a volume that disappears without a line of its own
+   * is a volume nobody can check.
+   */
+  ops_internal: number;
 }> {
   const db = getStatsDB();
-  // Business operations from daily_stats
+  registerInternalEmailFn(db);
+
+  // DASH-05 (audit 2026-09-01). These three series used to come from
+  // `daily_stats`, which has no key_prefix column: filtering our own traffic
+  // out of them was impossible BY CONSTRUCTION, not merely forgotten. Over 30
+  // days in production they summed to 43 506, of which 39 064 (89.8 %) were two
+  // regrouped key farms, while the all-time total with internals excluded was
+  // 6 092 — seven times smaller than thirty days with them in. Reading the same
+  // three types off `operations` costs one GROUP BY and makes the population
+  // sayable; `ops_internal` below carries what was removed.
+  //
+  // 🚨 STILL TRUE after this fix: recordBatch writes one `operations` row per
+  // IBAN of a lot, so a batch of 100 counts as 100 here, exactly as it did in
+  // daily_stats. These are OPERATIONS SERVED, not HTTP calls. The card title
+  // that says "Appels API" is the remaining half of DASH-05 and it lives in
+  // the dashboard page, not here.
   const opsRows = db.prepare(`
     SELECT
-      date,
-      SUM(CASE WHEN operation_type = 'iban_validate' THEN total ELSE 0 END) as iban_validate,
-      SUM(CASE WHEN operation_type = 'iban_batch' THEN total ELSE 0 END) as iban_batch,
-      SUM(CASE WHEN operation_type = 'bic_lookup' THEN total ELSE 0 END) as bic_lookup,
-      SUM(revenue_usdc) as revenue_usdc
-    FROM daily_stats
-    WHERE date >= date('now', '-' || ? || ' days')
-    GROUP BY date
+      date(created_at) as date,
+      SUM(CASE WHEN operation_type = 'iban_validate' THEN 1 ELSE 0 END) as iban_validate,
+      SUM(CASE WHEN operation_type = 'iban_batch' THEN 1 ELSE 0 END) as iban_batch,
+      SUM(CASE WHEN operation_type = 'bic_lookup' THEN 1 ELSE 0 END) as bic_lookup
+    FROM operations
+    WHERE created_at >= date('now', '-' || ? || ' days')
+      AND reject_reason IS NULL
+      ${EXTERNAL_ONLY_SQL}
+    GROUP BY date(created_at)
     ORDER BY date ASC
   `).all(days - 1) as Array<{
     date: string;
     iban_validate: number;
     iban_batch: number;
     bic_lookup: number;
-    revenue_usdc: number;
   }>;
+
+  const internalRows = db.prepare(`
+    SELECT date(created_at) as date, COUNT(*) as internal
+    FROM operations
+    WHERE created_at >= date('now', '-' || ? || ' days')
+      AND reject_reason IS NULL
+      AND key_prefix IN (SELECT key_prefix FROM api_keys WHERE is_internal_email(email))
+    GROUP BY date(created_at)
+  `).all(days - 1) as Array<{ date: string; internal: number }>;
+
+  // Revenue stays on daily_stats: `operations` never carried it, and pack sales
+  // (credits_purchase) have no operation row at all.
+  const revRows = db.prepare(`
+    SELECT date, COALESCE(SUM(revenue_usdc), 0) as revenue_usdc
+    FROM daily_stats
+    WHERE date >= date('now', '-' || ? || ' days')
+    GROUP BY date
+  `).all(days - 1) as Array<{ date: string; revenue_usdc: number }>;
 
   // Total HTTP requests from request_log, broken down by status group.
   // The window is widened by 8 weeks beyond the requested period: the extra
@@ -1006,7 +1115,12 @@ export function getStatsHistory(days: number = 7): Array<{
   // Expected band per date: min/max of the totals of up to 8 PRIOR dates
   // sharing its weekday. Under 3 samples the band is null — a band drawn
   // from one or two points would read as confidence nobody has.
+  // DASH-13: the current UTC day is PARTIAL, and comparing a few hours of it
+  // against eight complete days puts the bar under the band every morning —
+  // an "expected" range that manufactures a collapse. No band on today.
+  const todayUtc = new Date().toISOString().slice(0, 10);
   const band = (date: string): { min: number | null; max: number | null } => {
+    if (date === todayUtc) return { min: null, max: null };
     const target = new Date(`${date}T00:00:00Z`);
     const samples: number[] = [];
     for (let w = 1; w <= 8; w++) {
@@ -1027,14 +1141,16 @@ export function getStatsHistory(days: number = 7): Array<{
   // dates, and the off-by-one stayed invisible until the database had rows
   // on every date of a window: a 7-day status page then grew an 8th column.
   const cutoff = new Date(Date.now() - (days - 1) * 86_400_000).toISOString().slice(0, 10);
-  const allDates = [...new Set([...opsRows.map(r => r.date), ...reqRows.map(r => r.date)])]
+  const allDates = [...new Set([...opsRows.map(r => r.date), ...reqRows.map(r => r.date), ...revRows.map(r => r.date)])]
     .filter(d => d >= cutoff)
     .sort();
   const opsMap = new Map(opsRows.map(r => [r.date, r]));
+  const revMap = new Map(revRows.map(r => [r.date, r.revenue_usdc]));
+  const internalMap = new Map(internalRows.map(r => [r.date, r.internal]));
 
   return allDates.map(date => {
     const req = reqMap.get(date);
-    const rev = opsMap.get(date)?.revenue_usdc ?? 0;
+    const rev = revMap.get(date) ?? 0;
     const b = band(date);
     return {
       date,
@@ -1053,6 +1169,8 @@ export function getStatsHistory(days: number = 7): Array<{
       p50_ms: latMap.get(date)?.p50 ?? null,
       p95_ms: latMap.get(date)?.p95 ?? null,
       p99_ms: latMap.get(date)?.p99 ?? null,
+      ops_source: 'operations' as const,
+      ops_internal: internalMap.get(date) ?? 0,
     };
   });
 }
@@ -1210,14 +1328,17 @@ export function getBusinessFunnel(days: number = 30): BusinessFunnelDay[] {
       SUM(CASE WHEN status = 400 THEN 1 ELSE 0 END) as bad_input,
       SUM(CASE WHEN status >= 500 THEN 1 ELSE 0 END) as server_error
     FROM request_log
-    WHERE created_at >= datetime('now', '-' || ? || ' days')
+    -- DASH-09 (2026-09-01): date(), not datetime(). A rolling instant kept a
+    -- 31st, partial column under a title that says 30 days, and made this
+    -- funnel un-comparable with the history curve drawn right above it.
+    WHERE created_at >= date('now', '-' || ? || ' days')
       AND (${filter.sql})
       AND path NOT LIKE '%\\%7B%' ESCAPE '\\'
       AND path NOT LIKE '%{%'
       ${internalFilter}
     GROUP BY date(created_at)
     ORDER BY date ASC
-  `).all(days, ...filter.params, ...internalPrefixes) as BusinessFunnelDay[];
+  `).all(Math.max(0, days - 1), ...filter.params, ...internalPrefixes) as BusinessFunnelDay[];
   return rows;
 }
 
@@ -1708,35 +1829,58 @@ export function getStatusByPath(days: number = 30): StatusByPathRow[] {
  */
 export function getErrorStats(days: number = 30): ErrorStatsResponse {
   const db = getStatsDB();
+  // DASH-18 / DASH-08 (audit 2026-09-01): this whole family read `operations`
+  // with NO internal exclusion, while getStats() excludes them and says in a
+  // comment why (7 449 farmed validations once made ES the #1 country). Two
+  // answers to "how often do we fail?" on the same page, on two populations,
+  // neither of them stated. Same rule as getStats now.
+  registerInternalEmailFn(db);
+  const since = Math.max(0, days - 1);
+
+  // DASH-11: a common calendar axis for every trend. The old query hard-coded
+  // '-7 days' whatever the selector said, and returned only the days that had
+  // traffic — so the two sparklines drawn side by side had 8 and 3 points, on
+  // different windows, under numbers computed over 30.
+  const axis: string[] = [];
+  for (let i = since; i >= 0; i--) {
+    axis.push(new Date(Date.now() - i * 86_400_000).toISOString().slice(0, 10));
+  }
 
   // Overall error rates
   function typeErrorRate(opType: string): { rate: number; trend: number[] } {
     const overall = db.prepare(`
       SELECT COUNT(*) as total, COALESCE(SUM(success), 0) as success_count
       FROM operations
-      WHERE operation_type = ? AND created_at >= datetime('now', '-' || ? || ' days')
+      WHERE operation_type = ? AND created_at >= date('now', '-' || ? || ' days')
         AND reject_reason IS NULL
-    `).get(opType, days) as { total: number; success_count: number };
+        ${EXTERNAL_ONLY_SQL}
+    `).get(opType, since) as { total: number; success_count: number };
     const errorRate = overall.total > 0 ? Math.round(((overall.total - overall.success_count) / overall.total) * 10000) / 100 : 0;
 
-    // Daily error rate trend for last 7 days
     const dailyRows = db.prepare(`
       SELECT date(created_at) as day, COUNT(*) as total, COALESCE(SUM(success), 0) as success_count
       FROM operations
-      WHERE operation_type = ? AND created_at >= datetime('now', '-7 days')
+      WHERE operation_type = ? AND created_at >= date('now', '-' || ? || ' days')
         AND reject_reason IS NULL
+        ${EXTERNAL_ONLY_SQL}
       GROUP BY day
       ORDER BY day ASC
-    `).all(opType) as Array<{ day: string; total: number; success_count: number }>;
+    `).all(opType, since) as Array<{ day: string; total: number; success_count: number }>;
 
-    const trend = dailyRows.map(r =>
-      r.total > 0 ? Math.round(((r.total - r.success_count) / r.total) * 10000) / 100 : 0
-    );
+    const byDay = new Map(dailyRows.map(r => [r.day, r]));
+    const trend = axis.map(d => {
+      const r = byDay.get(d);
+      return r && r.total > 0 ? Math.round(((r.total - r.success_count) / r.total) * 10000) / 100 : 0;
+    });
 
     return { rate: errorRate, trend };
   }
 
-  // Top 10 invalid IBAN prefixes from error_detail
+  // Top 10 invalid IBAN prefixes from error_detail.
+  // `country_code` is NULL on a failed validation (there is no country to
+  // record when the string is not an IBAN), so the displayed column was 'XX' on
+  // ten rows out of ten. The first two characters of the submitted prefix are
+  // the only country evidence that exists, and only when they are letters.
   const topInvalidIbans = db.prepare(`
     SELECT
       error_detail as prefix,
@@ -1746,11 +1890,12 @@ export function getErrorStats(days: number = 30): ErrorStatsResponse {
     WHERE operation_type = 'iban_validate'
       AND success = 0
       AND error_detail IS NOT NULL
-      AND created_at >= datetime('now', '-' || ? || ' days')
+      AND created_at >= date('now', '-' || ? || ' days')
+      ${EXTERNAL_ONLY_SQL}
     GROUP BY error_detail, country_code
     ORDER BY count DESC
     LIMIT 10
-  `).all(days) as Array<{ prefix: string; country: string; count: number }>;
+  `).all(since) as Array<{ prefix: string; country: string; count: number }>;
 
   // Top 10 missing BICs from error_detail
   const topMissingBics = db.prepare(`
@@ -1762,11 +1907,12 @@ export function getErrorStats(days: number = 30): ErrorStatsResponse {
     WHERE operation_type = 'bic_lookup'
       AND success = 0
       AND error_detail IS NOT NULL
-      AND created_at >= datetime('now', '-' || ? || ' days')
+      AND created_at >= date('now', '-' || ? || ' days')
+      ${EXTERNAL_ONLY_SQL}
     GROUP BY error_detail, country_code
     ORDER BY count DESC
     LIMIT 10
-  `).all(days) as Array<{ bic: string; country: string; count: number }>;
+  `).all(since) as Array<{ bic: string; country: string; count: number }>;
 
   // Errors by country
   const errorsByCountry = db.prepare(`
@@ -1774,21 +1920,36 @@ export function getErrorStats(days: number = 30): ErrorStatsResponse {
     FROM operations
     WHERE success = 0
       AND country_code IS NOT NULL
-      AND created_at >= datetime('now', '-' || ? || ' days')
+      AND created_at >= date('now', '-' || ? || ' days')
+      ${EXTERNAL_ONLY_SQL}
     GROUP BY country_code
     ORDER BY count DESC
     LIMIT 20
-  `).all(days) as Array<{ country: string; count: number }>;
+  `).all(since) as Array<{ country: string; count: number }>;
 
   return {
     error_rate: {
       iban_validate: typeErrorRate('iban_validate'),
       bic_lookup: typeErrorRate('bic_lookup'),
     },
-    top_invalid_ibans: topInvalidIbans.map(r => ({ ...r, error_type: 'invalid' })),
+    top_invalid_ibans: topInvalidIbans.map(r => ({
+      ...r,
+      country: r.country !== 'XX' ? r.country : countryFromPrefix(r.prefix),
+      error_type: 'invalid',
+    })),
     top_missing_bics: topMissingBics,
     errors_by_country: errorsByCountry,
   };
+}
+
+/**
+ * The only country evidence a failed IBAN validation leaves: the two leading
+ * letters of what was submitted. '??' when they are not letters at all, which
+ * is honest in a way that a blanket 'XX' on every row was not.
+ */
+function countryFromPrefix(prefix: string): string {
+  const head = (prefix ?? '').slice(0, 2).toUpperCase();
+  return /^[A-Z]{2}$/.test(head) ? head : '??';
 }
 
 /**
@@ -1810,25 +1971,40 @@ export function getPatternStats(days: number = 30): PatternStatsResponse {
     ORDER BY date ASC
   `).all(days - 1) as Array<{ date: string; iban_validate: number; iban_batch: number; bic_lookup: number }>;
 
-  // Top 5 countries by volume
+  // DASH-04 (audit 2026-09-01). These two queries were the ONLY readers of
+  // `operations` that did not drop internal keys, and the dashboard prefers
+  // them over the filtered all-time list from getStats. Result: the "Top pays"
+  // card showed BE 30 882 and ES 7 469 — the two regrouped key farms, in full —
+  // while the cohort panel further down the SAME page gave the decontaminated
+  // ranking (DE, NL, CH). A coverage decision taken on that card aimed at
+  // Belgium. Same rule as getStats now, expressed as the subquery form used by
+  // getTrafficTrend rather than a bound prefix list (one parameter per internal
+  // key blows past SQLite's ceiling exactly when a signup burst makes the view
+  // worth reading).
+  registerInternalEmailFn(db);
+
+  // DASH-15: the card slices 6, this returned 5, so its length silently meant
+  // "top 5" on the live path and "top 6" on the all-time fallback.
   const topCountriesRows = db.prepare(`
     SELECT country_code as country, COUNT(*) as count
     FROM operations
     WHERE country_code IS NOT NULL
       AND created_at >= datetime('now', '-' || ? || ' days')
+      ${EXTERNAL_ONLY_SQL}
     GROUP BY country_code
     ORDER BY count DESC
-    LIMIT 5
+    LIMIT 6
   `).all(days) as Array<{ country: string; count: number }>;
 
   const topCountriesList = topCountriesRows.map(r => r.country);
 
-  // Geo trend: daily counts for top 5 countries pivoted
-  const geoRows = db.prepare(`
+  // Geo trend: daily counts for the top countries above, pivoted
+  const geoRows = topCountriesList.length === 0 ? [] : db.prepare(`
     SELECT date(created_at) as date, country_code as country, COUNT(*) as count
     FROM operations
     WHERE country_code IN (${topCountriesList.map(() => '?').join(', ')})
       AND created_at >= datetime('now', '-' || ? || ' days')
+      ${EXTERNAL_ONLY_SQL}
     GROUP BY date(created_at), country_code
     ORDER BY date ASC
   `).all(...topCountriesList, days) as Array<{ date: string; country: string; count: number }>;

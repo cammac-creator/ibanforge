@@ -401,3 +401,107 @@ export function buildBusinessSummary(input: {
     },
   };
 }
+
+// ---------------------------------------------------------------------------
+// Packs sold, by rail — DASH-01 / DASH-02 (audit 2026-09-01)
+// ---------------------------------------------------------------------------
+
+/**
+ * 🚨 Why this exists.
+ *
+ * The dashboard's revenue card had two halves and both of them lied. The USDC
+ * half showed a wallet BALANCE (a figure that goes DOWN when we spend) beside a
+ * "total received" that mixes our own test payments in; the card half showed an
+ * em dash hard-coded in the JSX and a "Non configuré" badge, while five credit
+ * packs had been sold, one of them on 2026-08-27 with no matching USDC line in
+ * daily_stats — i.e. paid by card, by the rail the page said did not exist.
+ * Meanwhile the headline KPI read "$0.2590 Revenus totaux", which is ATTEMPTED
+ * x402 and not money at all.
+ *
+ * A revenue figure that cannot name its rail is not a revenue figure. This
+ * answers, per rail: how many packs, for how many dollars, and how many of
+ * those dollars are a DEDUCTION from the price table rather than an amount the
+ * processor reported.
+ */
+export type PaymentRail = 'card' | 'usdc' | 'unknown';
+
+export interface PackKeyRow {
+  email: string;
+  credits_total: number | null;
+  amount_paid_minor: number | null;
+  amount_paid_currency: string | null;
+  stripe_session_id: string | null;
+  x402_payment_ref: string | null;
+  issued_by_us: number | null;
+  created_at: string | null;
+}
+
+export interface RailTotal {
+  count: number;
+  usd: number;
+}
+
+export interface PacksSold {
+  count: number;
+  usd: number;
+  by_rail: Record<PaymentRail, RailTotal>;
+  /** Packs handed over without payment (pilots, comps). Never money. */
+  granted_count: number;
+  /** How many of `count` were priced from the table instead of a receipt. */
+  deduced_count: number;
+  /** True as soon as one dollar of `usd` is a deduction. The UI must say so. */
+  partly_deduced: boolean;
+  last_sale_at: string | null;
+}
+
+/**
+ * Which rail carried the money. Stripe writes its session id, the x402 credits
+ * flow writes its payment reference; a pack with neither predates both columns
+ * or was granted, and 'unknown' says that instead of guessing a rail.
+ */
+export function packRail(k: PackKeyRow): PaymentRail {
+  if (k.stripe_session_id) return 'card';
+  if (k.x402_payment_ref) return 'usdc';
+  return 'unknown';
+}
+
+export function packsSold(rows: PackKeyRow[]): PacksSold {
+  const empty = (): RailTotal => ({ count: 0, usd: 0 });
+  const out: PacksSold = {
+    count: 0,
+    usd: 0,
+    by_rail: { card: empty(), usdc: empty(), unknown: empty() },
+    granted_count: 0,
+    deduced_count: 0,
+    partly_deduced: false,
+    last_sale_at: null,
+  };
+
+  for (const k of rows) {
+    if ((k.credits_total ?? 0) <= 0) continue;
+    // Internal accounts are our own tests; the two placeholder buyers
+    // (credits-buyer, stripe-buyer) are NOT internal to this module and are
+    // counted, for the reason spelled out above ANONYMOUS_BUYERS: an anonymous
+    // paying agent is the customer this API is betting on.
+    if (isInternal(k.email)) continue;
+    // A pack we handed over is a cost, not a receipt.
+    if (k.issued_by_us) {
+      out.granted_count += 1;
+      continue;
+    }
+
+    const price = accountUsd(k);
+    const rail = packRail(k);
+    out.count += 1;
+    out.usd = Math.round((out.usd + price.usd) * 100) / 100;
+    out.by_rail[rail].count += 1;
+    out.by_rail[rail].usd = Math.round((out.by_rail[rail].usd + price.usd) * 100) / 100;
+    if (price.source === 'deduced') out.deduced_count += 1;
+    if (k.created_at && (out.last_sale_at === null || k.created_at > out.last_sale_at)) {
+      out.last_sale_at = k.created_at;
+    }
+  }
+
+  out.partly_deduced = out.deduced_count > 0;
+  return out;
+}

@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { timingSafeEqual } from 'node:crypto';
 import { getStatsDB } from '../lib/db.js';
+import { packsSold, type PackKeyRow, type PacksSold } from '../lib/business-summary.js';
 
 const adminRevenue = new Hono();
 
@@ -161,6 +162,29 @@ function readCachedTxs(): CachedTx[] {
     .all() as CachedTx[];
 }
 
+/**
+ * Packs sold, by rail — DASH-01 / DASH-02 (audit 2026-09-01).
+ *
+ * Served from BOTH branches below, including the fast balance-only one, because
+ * it is a single indexed SQLite read and the card that displays it must not
+ * have to wait ~25 s of Transfer-log scanning to stop saying that no card rail
+ * exists. On-chain settlement and pack sales are two different questions with
+ * two different answers, and the card has to show both: a pack bought by card
+ * NEVER touches the wallet, so any wallet-only reading of revenue is structurally
+ * blind to it.
+ */
+function packsSoldNow(): PacksSold {
+  const rows = getStatsDB()
+    .prepare(
+      `SELECT email, credits_total, amount_paid_minor, amount_paid_currency,
+              stripe_session_id, x402_payment_ref, issued_by_us, created_at
+         FROM api_keys
+        WHERE credits_total IS NOT NULL AND credits_total > 0`,
+    )
+    .all() as PackKeyRow[];
+  return packsSold(rows);
+}
+
 function addressToTopic(addr: string): string {
   return '0x' + addr.slice(2).padStart(64, '0').toLowerCase();
 }
@@ -185,6 +209,7 @@ adminRevenue.get('/admin/revenue', async (c) => {
       asset: 'USDC',
       contract: USDC_BASE_CONTRACT,
       balance_usdc: await fetchBalanceUsdc(wallet),
+      packs_sold: packsSoldNow(),
       balance_only: true,
     });
   }
@@ -305,6 +330,9 @@ adminRevenue.get('/admin/revenue', async (c) => {
     internal_payers_configured: internalPayers.size > 0,
     received_internal_usdc: internalPayers.size ? round6(internalUsdc) : null,
     received_external_usdc: internalPayers.size ? round6(totalUsdc - internalUsdc) : null,
+    packs_sold: packsSoldNow(),
+    packs_note:
+      'Prepaid credit packs actually SOLD, split by the rail that carried the money (stripe_session_id = card, x402_payment_ref = USDC). Card money never reaches the wallet above, so balance_usdc and total_received_usdc are structurally blind to it. `deduced_count` counts packs priced from the pack table because the processor amount was never stored: those dollars are a deduction, not a receipt, and any UI showing the total must say so.',
     transaction_count: cached.length,
     internal_transaction_count: internalPayers.size
       ? cached.filter((t) => isInternalPayer(t.from_addr)).length

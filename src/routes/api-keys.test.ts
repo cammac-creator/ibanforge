@@ -10,6 +10,9 @@ function makeApp() {
   return app;
 }
 
+/** Unique per run: the stats DB is a file, and these rows outlive the process. */
+const RUN_TAG = String(Date.now());
+
 const originalEnv = { ...process.env };
 beforeEach(() => {
   process.env.ADMIN_SECRET = 'correct-horse-battery-staple';
@@ -905,5 +908,84 @@ describe('/v1/admin/institutional-contacts', () => {
     expect(body.contacts.some((r) => r.email === ALPHA)).toBe(false);
     // A second delete must not pretend to have removed anything.
     expect((await post('/v1/admin/institutional-contacts/delete', { email: ALPHA })).status).toBe(404);
+  });
+});
+
+describe('GET /v1/admin/email-messages — the two optional cuts (TABS-12, TABS-03)', () => {
+  const app = () => makeApp();
+  const H = { 'X-Admin-Secret': 'correct-horse-battery-staple', 'Content-Type': 'application/json' };
+  const DAY = '2026-09-01';
+  const OLD = '2026-07-04';
+
+  async function seed() {
+    await app().request('/v1/admin/email-messages', {
+      method: 'POST',
+      headers: H,
+      body: JSON.stringify({
+        messages: [
+          {
+            id: `fields-today-${RUN_TAG}`,
+            customer_email: 'acme@example.com',
+            direction: 'out',
+            msg_date: `${DAY}T09:12:31`,
+            subject: 'Suivi',
+            snippet: 'Des nouvelles',
+            body: 'Un corps de message assez long pour que son absence se voie.',
+          },
+          {
+            id: `fields-old-${RUN_TAG}`,
+            customer_email: 'acme@example.com',
+            direction: 'out',
+            msg_date: `${OLD}T09:00:00`,
+            subject: 'Ancien',
+            snippet: 'Ancien',
+            body: 'Un autre corps.',
+          },
+        ],
+      }),
+    });
+  }
+
+  async function list(qs: string) {
+    const res = await app().request(`/v1/admin/email-messages${qs}`, { headers: H });
+    expect(res.status).toBe(200);
+    const j = (await res.json()) as { messages: Array<Record<string, unknown>> };
+    return j.messages.filter((m) => String(m.id).endsWith(RUN_TAG));
+  }
+
+  it('answers exactly as before when no parameter is given', async () => {
+    await seed();
+    const rows = await list('');
+    expect(rows).toHaveLength(2);
+    // Retro-compatibility is the whole promise: an older caller keeps its body.
+    expect(rows.every((m) => typeof m.body === 'string' && m.body.length > 0)).toBe(true);
+  });
+
+  it('drops the bodies on fields=summary, and nothing else', async () => {
+    await seed();
+    const rows = await list('?fields=summary');
+    expect(rows).toHaveLength(2);
+    expect(rows.every((m) => !('body' in m))).toBe(true);
+    // Everything a list view actually draws is still there.
+    expect(rows.every((m) => typeof m.snippet === 'string' && typeof m.subject === 'string')).toBe(true);
+  });
+
+  it('keeps only the rows dated on or after `since`', async () => {
+    await seed();
+    const rows = await list(`?since=${DAY}`);
+    expect(rows.map((m) => m.id)).toEqual([`fields-today-${RUN_TAG}`]);
+  });
+
+  it('ignores a malformed `since` rather than emptying the list', async () => {
+    await seed();
+    expect(await list('?since=hier')).toHaveLength(2);
+    expect(await list('?since=2026-9-1')).toHaveLength(2);
+  });
+
+  it('combines both cuts, which is what the send path asks for', async () => {
+    await seed();
+    const rows = await list(`?fields=summary&since=${DAY}`);
+    expect(rows).toHaveLength(1);
+    expect('body' in rows[0]).toBe(false);
   });
 });

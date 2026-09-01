@@ -21,6 +21,14 @@ export interface ActivationClient {
   free_used_month: number;
   free_quota: number;
   paywall_hits: number;
+  /**
+   * Refusals (402 / 429) inside the REQUESTED window, unlike paywall_hits which
+   * is always 90 days. DASH-07, 2026-09-01: the "hit the limit" step used to
+   * read `free_used_month` from api_usage's CURRENT CALENDAR MONTH, so on the
+   * 1st it was zero by construction under a card titled "30 days", and it grew
+   * back on its own as the month went on.
+   */
+  limit_hits_window: number;
   credits_total: number;
   credits_remaining: number;
   packs: number;
@@ -35,6 +43,17 @@ export interface ActivationFunnel {
   purchased: number;
   median_hours_signup_to_first_call: number | null;
   median_hours_first_call_to_purchase: number | null;
+  /**
+   * How many clients each median was actually computed over. DASH-20: both
+   * medians drop any delay below zero, so a buyer whose credit key predates
+   * their first call vanishes from the sample in silence, and median(0) renders
+   * "< 1 h" whether it rests on two clients or on none. A median without its n
+   * is a number pretending to be a measurement.
+   */
+  median_n_signup_to_first_call: number;
+  median_n_first_call_to_purchase: number;
+  /** What "hit the limit" counted: 402/429 refusals over `period_days`. */
+  hit_limit_basis: 'refusals_402_429_in_window';
 }
 
 export interface ActivationSourceRow {
@@ -49,6 +68,12 @@ export interface ActivationCohort {
   signups: number;
   called_pct: number;
   paid_pct: number;
+  /**
+   * The ISO week still running. DASH-19: it is drawn as the 8th bar of the
+   * acquisition chart, so every Monday the rightmost column shows a few hours
+   * of data next to seven complete weeks and reads as a collapse.
+   */
+  partial: boolean;
 }
 
 export interface ActivationResponse {
@@ -76,6 +101,7 @@ interface LogAgg {
   last_seen_at: string | null;
   calls_90d: number;
   paywall_hits: number;
+  limit_hits_window: number;
 }
 
 /**
@@ -138,12 +164,13 @@ export function getActivation(days = 30): ActivationResponse {
            MIN(created_at) AS first_call_at,
            MAX(created_at) AS last_seen_at,
            SUM(CASE WHEN created_at >= datetime('now','-90 days') THEN 1 ELSE 0 END) AS calls_90d,
-           SUM(CASE WHEN status IN (402, 429) AND created_at >= datetime('now','-90 days') THEN 1 ELSE 0 END) AS paywall_hits
+           SUM(CASE WHEN status IN (402, 429) AND created_at >= datetime('now','-90 days') THEN 1 ELSE 0 END) AS paywall_hits,
+           SUM(CASE WHEN status IN (402, 429) AND created_at >= date('now','-' || ? || ' days') THEN 1 ELSE 0 END) AS limit_hits_window
          FROM request_log
          WHERE key_prefix IN (${placeholders})
          GROUP BY key_prefix`,
       )
-      .all(...prefixes) as LogAgg[];
+      .all(Math.max(0, days - 1), ...prefixes) as LogAgg[];
     for (const r of rows) logByPrefix.set(r.key_prefix, r);
   }
 
@@ -173,6 +200,7 @@ export function getActivation(days = 30): ActivationResponse {
     let lastSeen: string | null = null;
     let calls90 = 0;
     let paywall = 0;
+    let limitHitsWindow = 0;
     for (const k of list) {
       const agg = logByPrefix.get(k.key_prefix);
       if (!agg) continue;
@@ -180,6 +208,7 @@ export function getActivation(days = 30): ActivationResponse {
       if (agg.last_seen_at && (!lastSeen || agg.last_seen_at > lastSeen)) lastSeen = agg.last_seen_at;
       calls90 += agg.calls_90d ?? 0;
       paywall += agg.paywall_hits ?? 0;
+      limitHitsWindow += agg.limit_hits_window ?? 0;
     }
 
     const signupAt = list.reduce((min, k) => (k.created_at < min ? k.created_at : min), list[0].created_at);
@@ -218,6 +247,7 @@ export function getActivation(days = 30): ActivationResponse {
       free_used_month: freeUsed,
       free_quota: freeQuota,
       paywall_hits: paywall,
+      limit_hits_window: limitHitsWindow,
       credits_total: creditsTotal,
       credits_remaining: creditsRemaining,
       packs: paidKeys.length,
@@ -234,9 +264,16 @@ export function getActivation(days = 30): ActivationResponse {
   const cutoffMs = nowMs - days * 86_400_000;
   const inPeriod = clients.filter((c) => parseSqlUtc(c.signup_at).getTime() >= cutoffMs);
   const called = inPeriod.filter((c) => c.first_call_at !== null);
-  const limited = inPeriod.filter(
-    (c) => c.paywall_hits > 0 || (c.free_quota > 0 && c.free_used_month >= c.free_quota),
-  );
+  // DASH-07 (audit 2026-09-01). This step used to be
+  // `paywall_hits > 0 (90 days) OR free_used_month >= quota`, where
+  // free_used_month is api_usage for the CURRENT CALENDAR MONTH. On 2026-09-01
+  // that second term was zero for all 68 external clients — not because nobody
+  // hit a wall, but because the month was one day old. The step was therefore
+  // driven by the day of the month, under a card that says "30 days". It is now
+  // the refusals actually served inside the requested window, one window for
+  // the whole funnel, which is the only reading that can be compared week over
+  // week.
+  const limited = inPeriod.filter((c) => c.limit_hits_window > 0);
   const buyers = inPeriod.filter((c) => c.packs > 0);
 
   const purchaseAt = (c: ActivationClient): string | null => {
@@ -248,21 +285,25 @@ export function getActivation(days = 30): ActivationResponse {
     return paid ?? null;
   };
 
+  const signupDelays = called
+    .map((c) => hoursBetween(c.signup_at, c.first_call_at!))
+    .filter((h) => h >= 0);
+  const purchaseDelays = buyers
+    .filter((c) => c.first_call_at !== null && purchaseAt(c) !== null)
+    .map((c) => hoursBetween(c.first_call_at!, purchaseAt(c)!))
+    .filter((h) => h >= 0);
+
   const funnel: ActivationFunnel = {
     period_days: days,
     signed_up: inPeriod.length,
     first_call: called.length,
     hit_limit: limited.length,
     purchased: buyers.length,
-    median_hours_signup_to_first_call: median(
-      called.map((c) => hoursBetween(c.signup_at, c.first_call_at!)).filter((h) => h >= 0),
-    ),
-    median_hours_first_call_to_purchase: median(
-      buyers
-        .filter((c) => c.first_call_at !== null && purchaseAt(c) !== null)
-        .map((c) => hoursBetween(c.first_call_at!, purchaseAt(c)!))
-        .filter((h) => h >= 0),
-    ),
+    median_hours_signup_to_first_call: median(signupDelays),
+    median_hours_first_call_to_purchase: median(purchaseDelays),
+    median_n_signup_to_first_call: signupDelays.length,
+    median_n_first_call_to_purchase: purchaseDelays.length,
+    hit_limit_basis: 'refusals_402_429_in_window',
   };
 
   // ---- sources: same population as the funnel, so the two read together
@@ -298,7 +339,13 @@ export function getActivation(days = 30): ActivationResponse {
   const pct = (part: number, whole: number) => (whole > 0 ? Math.round((part / whole) * 100) : 0);
   const cohorts: ActivationCohort[] = weekStarts.map((w) => {
     const b = cohortMap.get(w)!;
-    return { week_start: w, signups: b.signups, called_pct: pct(b.called, b.signups), paid_pct: pct(b.paid, b.signups) };
+    return {
+      week_start: w,
+      signups: b.signups,
+      called_pct: pct(b.called, b.signups),
+      paid_pct: pct(b.paid, b.signups),
+      partial: w === currentMonday,
+    };
   });
 
   return { clients, funnel, sources, cohorts };

@@ -711,7 +711,7 @@ apiKeys.get('/v1/admin/keys', (c) => {
   // reads exactly like one that was never built: silence.
   const rows = db.prepare(
     `SELECT k.key_hash, k.key_prefix, k.email, k.monthly_limit, k.active, k.created_at,
-            k.credits_total, k.credits_remaining, k.issued_by_us, k.source,
+            k.credits_total, k.credits_remaining, k.amount_paid_minor, k.amount_paid_currency, k.issued_by_us, k.source,
             CASE WHEN k.stripe_session_id IS NOT NULL THEN 1 ELSE 0 END AS paid,
             COALESCE(u.count, 0) AS used,
             COALESCE(p.count, 0) AS used_prev,
@@ -997,7 +997,10 @@ apiKeys.post('/v1/admin/email-messages', async (c) => {
         snippet: clip(r.snippet, 300),
         snippet_fr: clip(r.snippet_fr, 8000),
         lang: clip(r.lang, 8),
-        body: clip(r.body, 8000),
+        // 50 000, aligned with the send route and the draft store (dashboard
+        // audit 2026-09-01, TABS-10): the 8 000 clip here silently amputated the
+        // longest mails after the frontend limit had already been lifted.
+        body: clip(r.body, 50_000),
         counterparty: clip(r.counterparty, 255),
         no_reply_needed: noReply,
       });
@@ -1010,18 +1013,41 @@ apiKeys.post('/v1/admin/email-messages', async (c) => {
   return c.json({ upserted });
 });
 
+/**
+ * The whole mailbox, or a lighter cut of it.
+ *
+ * Two OPTIONAL query parameters, added 2026-09-01 for the dashboard audit
+ * findings TABS-12 and TABS-03. Both default to the answer this endpoint has
+ * always given, because the CRM pages and this API ship from two platforms:
+ * between the two pushes, an older caller must keep receiving exactly what it
+ * received before.
+ *
+ *  - `fields=summary` drops `body`. Bodies are the bulk of this payload by a
+ *    wide margin, and every list view re-downloads all of them to render the
+ *    snippets it already has. The open thread asks again without the parameter.
+ *  - `since=YYYY-MM-DD` keeps the rows dated on or after that day. Compared as
+ *    text on purpose: msg_date is free-form TEXT, so a row we cannot place in
+ *    time simply falls out, which is what every reader of this column already
+ *    does with it. Anything that is not a plain ISO day is ignored rather than
+ *    guessed at, so a malformed parameter widens to the full list instead of
+ *    silently emptying it.
+ */
 apiKeys.get('/v1/admin/email-messages', (c) => {
   if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
     return c.json({ error: 'unauthorized' }, 401);
   }
   const db = getStatsDB();
-  const rows = db
-    .prepare(
-      `SELECT id, customer_email, direction, msg_date, subject, snippet, snippet_fr, lang, body, counterparty,
-              no_reply_needed
-       FROM email_messages ORDER BY msg_date ASC`,
-    )
-    .all();
+  const summaryOnly = c.req.query('fields') === 'summary';
+  const sinceRaw = c.req.query('since') ?? '';
+  const since = /^\d{4}-\d{2}-\d{2}$/.test(sinceRaw) ? sinceRaw : null;
+  const columns = summaryOnly
+    ? `id, customer_email, direction, msg_date, subject, snippet, snippet_fr, lang, counterparty, no_reply_needed`
+    : `id, customer_email, direction, msg_date, subject, snippet, snippet_fr, lang, body, counterparty, no_reply_needed`;
+  const rows = since
+    ? db
+        .prepare(`SELECT ${columns} FROM email_messages WHERE msg_date >= ? ORDER BY msg_date ASC`)
+        .all(since)
+    : db.prepare(`SELECT ${columns} FROM email_messages ORDER BY msg_date ASC`).all();
   return c.json({ messages: rows });
 });
 

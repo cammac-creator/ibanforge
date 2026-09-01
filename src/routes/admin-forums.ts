@@ -12,6 +12,7 @@ import { Hono } from 'hono';
 import { timingSafeEqual } from 'node:crypto';
 import { getStatsDB } from '../lib/db.js';
 import { ensureMarketplaceRows, lastScanInfo, runScan } from '../lib/forum-radar-server.js';
+import { PLATFORM_LIMITS } from '../lib/forum-radar.js';
 
 const adminForums = new Hono();
 
@@ -40,9 +41,23 @@ adminForums.get('/v1/admin/forum-threads', (c) => {
 
   const where = status && THREAD_STATUSES.has(status) ? 'WHERE status = ?' : '';
   const params = where ? [status, limit] : [limit];
+  /**
+   * `fields=list` drops the long text: the two drafts, the French summary, the
+   * notes, the excerpt and the score detail (audit TABS-18, 2026-09-01).
+   *
+   * The scan poll asks every five seconds for the sole purpose of learning
+   * whether the scan is over, and was re-downloading every draft of every
+   * thread each time. Optional and additive: with no parameter the answer is
+   * the row it has always been.
+   */
+  const columns =
+    c.req.query('fields') === 'list'
+      ? `id, url, source, title, lang, score, activity, thread_created_at, status, planned_for,
+         posted_url, needs_attention, posted_at, first_seen, updated_at`
+      : '*';
   const rows = db
     .prepare(
-      `SELECT * FROM forum_threads ${where}
+      `SELECT ${columns} FROM forum_threads ${where}
        ORDER BY needs_attention DESC,
                 CASE status WHEN 'new' THEN 0 WHEN 'to_answer' THEN 1 WHEN 'drafted' THEN 2
                             WHEN 'planned' THEN 3 WHEN 'posted' THEN 4 ELSE 5 END,
@@ -59,6 +74,11 @@ adminForums.get('/v1/admin/forum-threads', (c) => {
     threads: rows,
     counts: Object.fromEntries(counts.map((r) => [r.status, r.n])),
     scan: lastScanInfo(),
+    // Served rather than recopied into the dashboard (audit TABS-16,
+    // 2026-09-01). The same eight platform ceilings lived on both sides,
+    // identical to the byte and linked by nothing: raising one would have left
+    // the composer counting against a limit the poster no longer enforced.
+    platform_limits: PLATFORM_LIMITS,
   });
 });
 
