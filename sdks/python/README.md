@@ -4,7 +4,7 @@
 [![Python](https://img.shields.io/pypi/pyversions/ibanforge.svg)](https://pypi.org/project/ibanforge/)
 [![License](https://img.shields.io/pypi/l/ibanforge.svg)](https://pypi.org/project/ibanforge/)
 
-Official Python SDK for the [IBANforge API](https://ibanforge.com) — IBAN validation, BIC/SWIFT lookup, Swiss BC-Nummer, and sanctions/SEPA/VoP compliance triage.
+Official Python SDK for the [IBANforge API](https://ibanforge.com?src=sdk-py) — IBAN validation, BIC/SWIFT lookup, Swiss BC-Nummer, and sanctions/SEPA/VoP compliance triage.
 
 Built for AI finance agents and fintech developers. Sync + async clients, full type hints, typed exceptions.
 
@@ -238,7 +238,7 @@ with IBANforge() as client:
 
 ## For LLM agents (LangChain, LlamaIndex, CrewAI, AutoGen)
 
-The IBANforge API is also available as a native MCP server (`npx -y ibanforge-mcp`) and via x402 micropayments — see the [agent guide](https://ibanforge.com/agents). For Python-first agents, the SDK above is usually enough.
+The IBANforge API is also available as a native MCP server (`npx -y ibanforge-mcp`) and via x402 micropayments — see the [agent guide](https://ibanforge.com/agents?src=sdk-py). For Python-first agents, the SDK above is usually enough.
 
 ## Configuration
 
@@ -257,9 +257,9 @@ client.close()
 
 ## Links
 
-- API documentation: <https://ibanforge.com/docs>
-- Interactive OpenAPI: <https://ibanforge.com/openapi>
-- Agent guide: <https://ibanforge.com/agents>
+- API documentation: <https://ibanforge.com/docs?src=sdk-py>
+- Interactive OpenAPI: <https://ibanforge.com/openapi?src=sdk-py>
+- Agent guide: <https://ibanforge.com/agents?src=sdk-py>
 - TypeScript SDK: [`@ibanforge/sdk`](https://www.npmjs.com/package/@ibanforge/sdk)
 - MCP server: [`ibanforge-mcp`](https://www.npmjs.com/package/ibanforge-mcp)
 - Source: <https://github.com/cammac-creator/ibanforge>

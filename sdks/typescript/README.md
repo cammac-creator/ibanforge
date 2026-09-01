@@ -1,6 +1,6 @@
 # @ibanforge/sdk
 
-Official TypeScript/JavaScript SDK for the [IBANforge API](https://ibanforge.com) — IBAN validation, BIC/SWIFT lookup, Swiss BC-Nummer clearing, SEPA + VoP reachability and compliance risk scoring. Zero runtime dependencies (uses native `fetch`).
+Official TypeScript/JavaScript SDK for the [IBANforge API](https://ibanforge.com?src=sdk-ts) — IBAN validation, BIC/SWIFT lookup, Swiss BC-Nummer clearing, SEPA + VoP reachability and compliance risk scoring. Zero runtime dependencies (uses native `fetch`).
 
 > Every code block on this page is executed by the test suite, against recorded responses from the real API, and each `// comment` on a `console.log` is checked against what actually printed. A block that stops being true fails CI.
 
@@ -236,7 +236,7 @@ console.log(h.status);                     // 'ok'
 
 ## Full documentation
 
-[ibanforge.com/docs](https://ibanforge.com/docs) · [agent guide](https://ibanforge.com/agents) · [OpenAPI](https://ibanforge.com/openapi)
+[ibanforge.com/docs](https://ibanforge.com/docs?src=sdk-ts) · [agent guide](https://ibanforge.com/agents?src=sdk-ts) · [OpenAPI](https://ibanforge.com/openapi?src=sdk-ts)
 
 ## License
 

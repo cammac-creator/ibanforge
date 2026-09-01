@@ -3,7 +3,7 @@
 [![npm](https://img.shields.io/npm/v/ibanforge-mcp)](https://www.npmjs.com/package/ibanforge-mcp)
 [![License](https://img.shields.io/npm/l/ibanforge-mcp)](https://github.com/cammac-creator/ibanforge/blob/main/LICENSE)
 
-Official **Model Context Protocol (MCP) server** for [IBANforge](https://ibanforge.com) — IBAN validation, BIC/SWIFT lookup, Swiss BC-Nummer (1,100+ SIX entries), EMI/vIBAN classification, SEPA + VoP reachability and compliance risk scoring.
+Official **Model Context Protocol (MCP) server** for [IBANforge](https://ibanforge.com?src=npm-mcp) — IBAN validation, BIC/SWIFT lookup, Swiss BC-Nummer (1,100+ SIX entries), EMI/vIBAN classification, SEPA + VoP reachability and compliance risk scoring.
 
 ## Tools
 
@@ -100,8 +100,8 @@ After adding the server, ask your AI agent:
 
 ## Links
 
-- [Website](https://ibanforge.com)
-- [API documentation](https://ibanforge.com/docs)
+- [Website](https://ibanforge.com?src=npm-mcp)
+- [API documentation](https://ibanforge.com/docs?src=npm-mcp)
 - [OpenAPI 3.1 spec](https://api.ibanforge.com/openapi.json)
 - [x402 discovery](https://api.ibanforge.com/.well-known/x402)
 - [Issue tracker](https://github.com/cammac-creator/ibanforge/issues)
