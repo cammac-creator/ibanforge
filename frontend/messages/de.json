@@ -1357,7 +1357,7 @@
     "running": "Quest läuft…",
     "anyIban": "Jede IBAN, echt oder Beispiel.",
     "idle": "Willkommen. Gib oben eine IBAN ein, um ihrer Quest zu folgen, oder fahre über Gebäude und Figuren.",
-    "honesty": "Was du siehst: echte Anfragen und den echten Weg jeder Anfrage, fürs Auge verlangsamt. Zwischenzeiten sind inszeniert; die am Ende gezeigte Gesamtzeit ist echt. Graue Dorfbewohner sind bewusst Kulisse — sie laufen nie die Pipeline.",
+    "honesty": "Was du siehst: echte Anfragen und den echten Weg jeder Anfrage, fürs Auge verlangsamt. Zwischenzeiten sind inszeniert; die am Ende gezeigte Gesamtzeit ist echt. Graue Dorfbewohner sind bewusst Kulisse — sie laufen nie die Pipeline. Die Kuriere mit Kapuze, die vorbeiziehen, sind echte Anfragen von jetzt gerade (Typ, Land, Ergebnis — nie ihr Inhalt).",
     "lane": "Gasse der nationalen Register",
     "errors": {
       "generic": "Die Anfrage kam nicht durch — versuche es gleich noch einmal.",
@@ -1518,6 +1518,22 @@
         "name": "Dorfbewohner (Kulisse)",
         "role": "Geht im Dorf umher und läuft NIE die Pipeline — Kulisse bleibt Kulisse, nie als Traffic verkleidet.",
         "real": "—"
+      }
+    },
+    "traffic": {
+      "name": "Verkehrskurier",
+      "role": "Echte Anfrage, jetzt gerade: {type} · {country} · {result}",
+      "real": "GET /v1/ops/recent — Typ + Land + Ergebnis, nie der Inhalt",
+      "types": {
+        "iban_validate": "IBAN-Prüfung",
+        "iban_batch": "Batch-Prüfung",
+        "bic_lookup": "BIC-Suche",
+        "iban_compliance": "Compliance-Screening",
+        "ch_clearing_lookup": "Schweizer Clearing",
+        "iban_format": "Formatprüfung",
+        "reference_validate": "Zahlungsreferenz",
+        "address_check": "Adressprüfung",
+        "unknown": "Anfrage"
       }
     }
   }

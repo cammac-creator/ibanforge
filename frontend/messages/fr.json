@@ -1357,7 +1357,7 @@
     "running": "Quête en cours…",
     "anyIban": "N'importe quel IBAN, réel ou d'exemple.",
     "idle": "Bienvenue. Tape un IBAN ci-dessus pour suivre sa quête, ou survole les bâtiments et les personnages.",
-    "honesty": "Ce que tu vois : de vraies requêtes et le vrai chemin de chaque requête, ralentis pour l'œil. Les durées intermédiaires sont mises en scène ; le temps total affiché à la fin est le vrai. Les villageois gris sont un décor assumé — ils ne courent jamais le pipeline.",
+    "honesty": "Ce que tu vois : de vraies requêtes et le vrai chemin de chaque requête, ralentis pour l'œil. Les durées intermédiaires sont mises en scène ; le temps total affiché à la fin est le vrai. Les villageois gris sont un décor assumé — ils ne courent jamais le pipeline. Les coursiers à capuche qui traversent sont de vraies requêtes du moment (type, pays, succès — jamais leur contenu).",
     "lane": "Ruelle des Registres nationaux",
     "errors": {
       "generic": "La requête n'a pas abouti — réessaie dans un instant.",
@@ -1518,6 +1518,22 @@
         "name": "Villageois (décor)",
         "role": "Vaque au village et ne court JAMAIS le pipeline — le décor est assumé, jamais déguisé en trafic.",
         "real": "—"
+      }
+    },
+    "traffic": {
+      "name": "Coursier du trafic",
+      "role": "Vraie requête en cours : {type} · {country} · {result}",
+      "real": "GET /v1/ops/recent — type + pays + succès, jamais le contenu",
+      "types": {
+        "iban_validate": "validation IBAN",
+        "iban_batch": "validation par lot",
+        "bic_lookup": "recherche BIC",
+        "iban_compliance": "screening compliance",
+        "ch_clearing_lookup": "clearing suisse",
+        "iban_format": "contrôle de format",
+        "reference_validate": "référence de paiement",
+        "address_check": "contrôle d'adresse",
+        "unknown": "requête"
       }
     }
   }

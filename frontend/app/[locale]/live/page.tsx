@@ -1,12 +1,18 @@
 "use client"
 
-import { useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useTranslations } from "next-intl"
 import { Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { buildJourney, type JourneyStep } from "@/lib/village/journey"
-import { VillageCanvas, type NarratedStep, type StationTip } from "./village-canvas"
+import { VillageCanvas, type NarratedStep, type StationTip, type TrafficCourier } from "./village-canvas"
+
+const OP_TYPES = new Set([
+  "iban_validate", "iban_batch", "bic_lookup", "iban_compliance",
+  "ch_clearing_lookup", "iban_format", "reference_validate", "address_check",
+])
+interface FeedOp { id: number; t: string; type: string; country: string | null; success: boolean }
 
 const DEMO_IBAN = "DE89 3704 0044 0532 0130 00"
 const KNOWN_REASONS = new Set([
@@ -26,6 +32,51 @@ export default function LivePage() {
   const [error, setError] = useState<string | null>(null)
   const [quest, setQuest] = useState<{ id: number; steps: NarratedStep[] } | null>(null)
   const questId = useRef(0)
+  const [traffic, setTraffic] = useState<TrafficCourier[]>([])
+  const lastOpId = useRef(0)
+
+  // Real-traffic feed: each courier is one genuine operation from
+  // /v1/ops/recent (type + country + outcome — never the content). The first
+  // poll only sets the cursor, so page load does not replay old operations.
+  useEffect(() => {
+    let stop = false
+    const toCourier = (op: FeedOp): TrafficCourier => {
+      const typeKey = OP_TYPES.has(op.type) ? op.type : "unknown"
+      return {
+        key: op.id,
+        kind: !op.success ? "fail" : op.type === "bic_lookup" ? "library" : "full",
+        tint: op.id,
+        tip: {
+          name: t("traffic.name"),
+          role: t("traffic.role", {
+            type: t(`traffic.types.${typeKey}`),
+            country: op.country ?? "—",
+            result: op.success ? "✓" : "✗",
+          }),
+          real: t("traffic.real"),
+        },
+      }
+    }
+    const poll = async (seedOnly: boolean) => {
+      if (stop || document.hidden) return
+      try {
+        const qs = lastOpId.current > 0 ? `?after=${lastOpId.current}` : ""
+        const res = await fetch(`/api/ops${qs}`)
+        const data = (await res.json()) as { ops?: FeedOp[] }
+        const ops = Array.isArray(data.ops) ? data.ops : []
+        if (ops.length === 0) return
+        lastOpId.current = Math.max(lastOpId.current, ...ops.map((o) => o.id))
+        if (seedOnly) return
+        const fresh = ops.slice(0, 6).reverse().map(toCourier)
+        setTraffic((prev) => [...prev.slice(-12), ...fresh])
+      } catch {
+        // feed is ambience — silence is the correct failure mode
+      }
+    }
+    void poll(true)
+    const iv = setInterval(() => void poll(false), 5000)
+    return () => { stop = true; clearInterval(iv) }
+  }, [t])
 
   const check = (v: unknown) => (v ? "✓" : "—")
 
@@ -173,6 +224,7 @@ export default function LivePage() {
           villagerTip={{ name: t("tips.villager.name"), role: t("tips.villager.role"), real: t("tips.villager.real") }}
           idle={{ who: t("who.village"), text: t("idle") }}
           quest={quest}
+          traffic={traffic}
           onQuestEnd={() => setRunning(false)}
         />
       </div>

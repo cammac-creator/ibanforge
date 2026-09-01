@@ -1357,7 +1357,7 @@
     "running": "Quest under way…",
     "anyIban": "Any IBAN, real or example.",
     "idle": "Welcome. Type an IBAN above to follow its quest, or hover the buildings and characters.",
-    "honesty": "What you see: real requests and each request's real path, slowed down for the eye. Intermediate timings are staged; the total time shown at the end is real. Grey villagers are openly decorative — they never run the pipeline.",
+    "honesty": "What you see: real requests and each request's real path, slowed down for the eye. Intermediate timings are staged; the total time shown at the end is real. Grey villagers are openly decorative — they never run the pipeline. The hooded couriers crossing by are real requests happening right now (type, country, outcome — never their content).",
     "lane": "National Registers Row",
     "errors": {
       "generic": "The request didn't go through — try again in a moment.",
@@ -1518,6 +1518,22 @@
         "name": "Villager (scenery)",
         "role": "Wanders the village and NEVER runs the pipeline — scenery is owned as scenery, never dressed up as traffic.",
         "real": "—"
+      }
+    },
+    "traffic": {
+      "name": "Traffic courier",
+      "role": "Real request happening now: {type} · {country} · {result}",
+      "real": "GET /v1/ops/recent — type + country + outcome, never the content",
+      "types": {
+        "iban_validate": "IBAN validation",
+        "iban_batch": "batch validation",
+        "bic_lookup": "BIC lookup",
+        "iban_compliance": "compliance screening",
+        "ch_clearing_lookup": "Swiss clearing",
+        "iban_format": "format check",
+        "reference_validate": "payment reference",
+        "address_check": "address check",
+        "unknown": "request"
       }
     }
   }

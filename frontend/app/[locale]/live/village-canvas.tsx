@@ -29,6 +29,14 @@ export interface NarratedStep {
 
 export interface StationTip { name: string; role: string; real: string }
 
+/** One REAL operation from /v1/ops/recent, dressed as a running courier. */
+export interface TrafficCourier {
+  key: number
+  kind: "full" | "library" | "fail"
+  tint: number
+  tip: StationTip
+}
+
 interface Props {
   labels: Record<string, string>
   laneLabel: string
@@ -37,14 +45,24 @@ interface Props {
   villagerTip: StationTip
   idle: { who: string; text: string }
   quest: { id: number; steps: NarratedStep[] } | null
+  traffic?: TrafficCourier[]
   onQuestEnd?: () => void
+}
+
+const COURIER_TINTS: [string, string][] = [
+  ["#E8A24A", "#B4702B"], ["#D9B23C", "#A5842A"], ["#F0CE6B", "#C29A3B"],
+]
+const COURIER_RUNS: Record<TrafficCourier["kind"], [number, number][]> = {
+  full: [[-14, 90], [470, 90], [470, 156], [96, 156], [96, 240], [470, 240], [494, 240]],
+  library: [[-14, 90], [217, 90], [-16, 90]],
+  fail: [[-14, 90], [98, 90], [-16, 90]],
 }
 
 interface Particle { x: number; y: number; vx: number; vy: number; l: number; c: string }
 interface Smoke { x: number; y: number; r: number; l: number }
 interface Seal { x: number; y: number; ok: boolean; l: number }
 
-export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, idle, quest, onQuestEnd }: Props) {
+export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, idle, quest, traffic, onQuestEnd }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const faceRef = useRef<HTMLCanvasElement>(null)
   const [narr, setNarr] = useState<{ who: string; text: string }>(idle)
@@ -61,9 +79,28 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
     watcher: { x: 455, y: 218, dir: -1, c1: "#8FA0B5", c2: "#5B6B80", lantern: true } as Actor,
     archivist: { x: 119, y: 234, dir: 1, c1: "#B08968", c2: "#7C5A36" } as Actor,
     sparks: [] as Particle[], smokes: [] as Smoke[], seals: [] as Seal[],
+    couriers: [] as { key: number; tip: StationTip; actor: Actor; pts: [number, number][]; i: number }[],
+    seenCouriers: new Set<number>(),
     veil: false, focus: null as StationGeo | null, gen: 0,
     reduced: false, bg: null as HTMLCanvasElement | null,
   })
+
+  // Spawn one courier per unseen real operation — capped so a burst stays
+  // readable; dropped overflow is dropped silently (the feed is ambience).
+  useEffect(() => {
+    if (!traffic) return
+    const w = world.current
+    for (const [idx, op] of traffic.entries()) {
+      if (w.seenCouriers.has(op.key) || w.couriers.length >= 8) continue
+      w.seenCouriers.add(op.key)
+      const [c1, c2] = COURIER_TINTS[op.tint % COURIER_TINTS.length]
+      const pts = COURIER_RUNS[op.kind]
+      w.couriers.push({
+        key: op.key, tip: op.tip, pts, i: 1,
+        actor: { x: pts[0][0] - (idx % 3) * 6, y: pts[0][1], dir: 1, c1, c2, satchel: true, moving: true },
+      })
+    }
+  }, [traffic])
 
   /* ---------- render loop ---------- */
   useEffect(() => {
@@ -98,6 +135,18 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
           }
         }
       }
+      // real-traffic couriers run their simplified route, then leave
+      if (!w.reduced) {
+        for (const cr of w.couriers) {
+          const [tx, ty] = cr.pts[cr.i]
+          const dx = tx - cr.actor.x, dy = ty - cr.actor.y
+          const d = Math.hypot(dx, dy)
+          const step = (110 * dt) / 1000
+          if (d <= step) { cr.actor.x = tx; cr.actor.y = ty; cr.i++ }
+          else { cr.actor.x += (dx / d) * step; cr.actor.y += (dy / d) * step; cr.actor.dir = dx < 0 ? -1 : 1 }
+        }
+        w.couriers = w.couriers.filter((cr) => cr.i < cr.pts.length)
+      }
       w.sparks = w.sparks.filter((s) => --s.l > 0); w.sparks.forEach((s) => { s.x += s.vx; s.y += s.vy; s.vy += 0.05 })
       w.smokes = w.smokes.filter((s) => --s.l > 0); w.smokes.forEach((s) => { s.y -= 0.25; s.r += 0.04 })
       w.seals = w.seals.filter((s) => --s.l > 0)
@@ -110,7 +159,8 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
       px(ctx, 139, 92, 8, 4, fl ? P.fire : P.fireHi); px(ctx, 141, 89, 4, 3, fl ? P.fireHi : P.fire)
 
       const actors: Actor[] = [
-        ...(w.villagers as unknown as Actor[]), w.watcher, w.archivist, w.hero,
+        ...(w.villagers as unknown as Actor[]), ...w.couriers.map((cr) => cr.actor),
+        w.watcher, w.archivist, w.hero,
       ].filter((a) => !a.hidden).sort((a, b) => a.y - b.y)
       actors.forEach((a) => drawActor(ctx, a, t, w.reduced))
 
@@ -284,7 +334,9 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
     const w = world.current
     let found: StationTip | null = null
     const near = (a: Actor) => !a.hidden && Math.abs(mx - a.x) < 7 && Math.abs(my - (a.y - 8)) < 11
-    if (near(w.hero)) found = heroTip
+    const courier = w.couriers.find((cr) => near(cr.actor))
+    if (courier) found = courier.tip
+    else if (near(w.hero)) found = heroTip
     else if (near(w.watcher)) found = tips.vigil ?? null
     else if (near(w.archivist)) found = tips.archive ?? null
     else if ((w.villagers as unknown as Actor[]).some(near)) found = villagerTip

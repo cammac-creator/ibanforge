@@ -47,6 +47,7 @@ import { mcpHttp } from './routes/mcp-http.js';
 import { mcpCard } from './routes/mcp-card.js';
 import { feedback } from './routes/feedback.js';
 import { opsHeartbeat } from './routes/ops-heartbeat.js';
+import { opsRecent } from './routes/ops-recent.js';
 import { createPlaygroundRelay } from './routes/playground.js';
 import { createX402Middleware } from './middleware/x402.js';
 import { apiKeyMiddleware } from './middleware/api-key.js';
@@ -702,6 +703,11 @@ export function buildApp(): Hono<HonoEnv> {
   // Homme mort des crons GitHub (audit B3). Hors /v1/*, donc ni clé API ni
   // x402 ; sa propre porte est HEARTBEAT_TOKEN (voir ops-heartbeat.ts).
   app.route('/', opsHeartbeat);
+
+  // Flux « vrai trafic » de la page /live. Sous /v1/* mais absent de la table
+  // des routes payantes, donc servi librement — même niveau d'exposition que
+  // /stats (agrégats de la même table, jamais error_detail ni key_prefix).
+  app.route('/', opsRecent);
 
   // Landing-page demo relay — keeps PLAYGROUND_API_KEY server-side. Mounted
   // outside /v1/* so it is never paywalled, and it re-dispatches into the app.
