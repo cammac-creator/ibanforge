@@ -177,9 +177,19 @@ export default function LivePage() {
     }
   }
 
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    const value = iban.replace(/\s+/g, "")
+  // ?autoplay=1 starts the demo quest by itself — for shares and filming.
+  const autoplayed = useRef(false)
+  useEffect(() => {
+    if (autoplayed.current) return
+    if (new URLSearchParams(window.location.search).get("autoplay") === "1") {
+      autoplayed.current = true
+      const t = setTimeout(() => { void runValidation(DEMO_IBAN.replace(/\s+/g, "")) }, 1200)
+      return () => clearTimeout(t)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const runValidation = async (value: string) => {
     if (!value || busy || running) return
     setBusy(true)
     setError(null)
@@ -203,6 +213,11 @@ export default function LivePage() {
     } finally {
       setBusy(false)
     }
+  }
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault()
+    void runValidation(iban.replace(/\s+/g, ""))
   }
 
   const { labels, tips } = useMemo(() => {

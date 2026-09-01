@@ -1,223 +1,241 @@
 /**
- * The village world: geometry, palette and procedural sprites.
+ * The village world, art scale: geometry and the atlas renderer.
  *
- * Pure module — no React, no DOM globals at import time. Everything here draws
- * into a 480×270 logical world rendered at 2× into a 960×540 canvas.
+ * Every visible thing is a cut-out of Claude-Alain's Midjourney boards packed
+ * into /village/atlas.png (LANCZOS-scaled at build time, see the scratchpad
+ * build-atlas.py recipe). This module knows geometry and drawing; it holds no
+ * React and no strings.
  *
- * Sprites are deliberate placeholders drawn in the validated palette; the
- * Midjourney boards keep the same silhouettes and will replace them sheet by
- * sheet without touching the engine.
+ * World: 960×540 logical, rendered at ×2 into a 1920×1080 canvas.
  */
 
 import { SPINE } from '@/lib/village/roads';
 
-export const W = 480;
-export const H = 270;
+export const W = 960;
+export const H = 540;
 export const SCALE = 2;
 
-export const P = {
-  ground: '#FDF6DC', ground2: '#F8EECB', grass: '#E8E0A8',
-  road: '#EFDFAE', roadEdge: '#D9C382',
-  wall: '#EAD9B0', wall2: '#DFC894', timber: '#8A6B44',
-  roof: '#3F3F46', roof2: '#27272A', roofHi: '#52525B',
-  stone: '#C8BFAA', stone2: '#AFA48C',
-  win: '#F59E0B', winHi: '#FBBF24', fire: '#F59E0B', fireHi: '#FDE68A',
-  ink: '#27272A',
-  heroCloak: '#FBBF24', heroCloak2: '#D97706', heroEye: '#FFF7CC',
-  ok: '#3F9D5A', bad: '#C24034',
-  smoke: 'rgba(120,113,104,.55)',
-} as const;
+export type Ctx = CanvasRenderingContext2D;
 
-export const BANNERS = ['#E0A93E', '#4C6FAE', '#3E7A5A', '#8C3B3B', '#31456E', '#B0653C'];
+export interface AtlasFrame { x: number; y: number; w: number; h: number }
+export type AtlasMeta = Record<string, AtlasFrame>;
 
-/** Registry-house order along the lane; index = banner color + x slot. */
+export interface WorldImages {
+  atlas: HTMLImageElement;
+  meta: AtlasMeta;
+  ground: HTMLImageElement;
+}
+
+export async function loadWorldImages(base = '/village'): Promise<WorldImages> {
+  const load = (src: string) =>
+    new Promise<HTMLImageElement>((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = reject;
+      img.src = src;
+    });
+  const [atlas, ground, metaRes] = await Promise.all([
+    load(`${base}/atlas.png`),
+    load(`${base}/ground.png`),
+    fetch(`${base}/atlas.json`),
+  ]);
+  const meta = (await metaRes.json()) as AtlasMeta;
+  return { atlas, meta, ground };
+}
+
+/** Draw a sprite by name, anchored bottom-center at (cx, baseY). */
+export function drawSprite(
+  ctx: Ctx, img: WorldImages, name: string, cx: number, baseY: number,
+  opts: { flip?: boolean; alpha?: number; scale?: number; dy?: number } = {},
+) {
+  const f = img.meta[name];
+  if (!f) return;
+  const s = opts.scale ?? 1;
+  const w = f.w * s, h = f.h * s;
+  ctx.save();
+  if (opts.alpha !== undefined) ctx.globalAlpha = opts.alpha;
+  ctx.translate(cx, baseY + (opts.dy ?? 0));
+  if (opts.flip) ctx.scale(-1, 1);
+  ctx.drawImage(img.atlas, f.x, f.y, f.w, f.h, -w / 2, -h, w, h);
+  ctx.restore();
+}
+
+/* ---------- geometry ---------- */
+
 export const REGISTRY_CCS = ['DE', 'AT', 'BE', 'BG', 'NL', 'FI'] as const;
+const REGISTRY_SPRITES = ['house0', 'house1', 'house2', 'house3', 'house4', 'house1'];
+const REGISTRY_X0 = 540;
+const REGISTRY_STEP = 64;
+export const LANE_X = 600;
+export const LANE_DOOR_Y = 134;
 
 export interface StationGeo {
   id: string;
-  x: number; y: number; w: number; h: number;
-  /** Where an actor stands when visiting. */
+  sprite: string | null;
+  /** bottom-center anchor of the main sprite */
+  cx: number;
+  base: number;
+  /** hover bbox */
+  bx: number; by: number; bw: number; bh: number;
   door: [number, number];
-  /** Curved-path anchor on the main road spine (see roadRoute). */
   anchor: [number, number];
   cc?: string;
-  flag?: number;
+}
+
+function geo(
+  id: string, sprite: string | null, cx: number, base: number,
+  bw: number, bh: number, door: [number, number], anchor: [number, number], cc?: string,
+): StationGeo {
+  return { id, sprite, cx, base, bx: cx - bw / 2, by: base - bh, bw, bh, door, anchor, cc };
 }
 
 export const STATIONS: StationGeo[] = [
-  { id: 'gate', x: 18, y: 52, w: 36, h: 34, door: [38, 90], anchor: [38, 90] },
-  { id: 'scribe', x: 84, y: 60, w: 28, h: 26, door: [98, 90], anchor: [98, 90] },
-  { id: 'cutter', x: 140, y: 66, w: 30, h: 20, door: [155, 90], anchor: [155, 90] },
-  { id: 'library', x: 194, y: 46, w: 46, h: 40, door: [217, 90], anchor: [217, 90] },
-  ...REGISTRY_CCS.map((cc, i) => ({
-    id: `reg-${cc}`, cc, flag: i,
-    x: 258 + i * 30, y: 30, w: 20, h: 28,
-    door: [268 + i * 30, 62] as [number, number],
-    anchor: [300, 90] as [number, number],
-  })),
-  { id: 'six', x: 404, y: 128, w: 30, h: 24, door: [419, 156], anchor: [419, 156] },
-  { id: 'court', x: 336, y: 122, w: 34, h: 30, door: [353, 156], anchor: [353, 156] },
-  { id: 'classifier', x: 272, y: 128, w: 32, h: 24, door: [288, 156], anchor: [288, 156] },
-  { id: 'border', x: 206, y: 130, w: 30, h: 22, door: [221, 156], anchor: [221, 156] },
-  { id: 'tower', x: 132, y: 96, w: 22, h: 58, door: [143, 158], anchor: [143, 156] },
-  { id: 'forge', x: 168, y: 192, w: 60, h: 44, door: [198, 240], anchor: [198, 240] },
-  { id: 'archive', x: 106, y: 204, w: 26, h: 26, door: [119, 234], anchor: [119, 240] },
-  { id: 'warehouse', x: 432, y: 10, w: 38, h: 28, door: [451, 42], anchor: [451, 42] },
-  { id: 'vigil', x: 446, y: 180, w: 18, h: 34, door: [455, 218], anchor: [455, 218] },
+  geo('gate', 'house0', 80, 176, 80, 116, [80, 198], [80, 192]),
+  geo('scribe', 'desk', 200, 172, 66, 54, [200, 198], [200, 192]),
+  geo('cutter', 'desk', 306, 172, 66, 54, [306, 198], [306, 192]),
+  geo('library', 'house-big', 430, 168, 100, 146, [430, 198], [430, 192]),
+  ...REGISTRY_CCS.map((cc, i) =>
+    geo(`reg-${cc}`, REGISTRY_SPRITES[i], REGISTRY_X0 + i * REGISTRY_STEP, 118, 62, 116,
+      [REGISTRY_X0 + i * REGISTRY_STEP, LANE_DOOR_Y], [LANE_X, 192], cc),
+  ),
+  geo('warehouse', 'cart', 62, 84, 76, 60, [104, 84], [104, 84]),
+  geo('six', 'house3', 852, 326, 76, 116, [852, 348], [852, 342]),
+  geo('court', 'house-big', 716, 322, 100, 146, [716, 348], [716, 342]),
+  geo('classifier', 'house2', 582, 326, 76, 116, [582, 348], [582, 342]),
+  geo('border', 'checkpoint', 438, 344, 100, 100, [438, 352], [438, 342]),
+  geo('tower', 'tower', 190, 326, 70, 176, [202, 344], [202, 342]),
+  geo('forge', 'furnace', 410, 482, 130, 130, [410, 504], [410, 498]),
+  geo('archive', 'desk', 246, 480, 80, 56, [246, 504], [246, 498]),
+  geo('vigil', 'vigil-post', 900, 468, 60, 64, [900, 494], [900, 498]),
 ];
 export const stationById = Object.fromEntries(STATIONS.map((s) => [s.id, s]));
 
-/* ---------- drawing primitives ---------- */
-export type Ctx = CanvasRenderingContext2D;
-export const px = (c: Ctx, x: number, y: number, w: number, h: number, col: string) => {
-  c.fillStyle = col; c.fillRect(x | 0, y | 0, w, h);
-};
+/** Ambience décor: lantern posts along the streets. */
+export const LANTERNS: [number, number][] = [[128, 452], [528, 208], [704, 368], [655, 150]];
+/** Chimneys glued onto roofs (x, base, smoke source). */
+export const CHIMNEYS: [number, number][] = [[455, 96], [733, 212]];
+/** Where ember particles rise. */
+export const EMBER_ZONES: [number, number][] = [[410, 480], [222, 488], [190, 176]];
+/** Halo lights: x, y, radius, strength, flicker phase. */
+export const HALOS: [number, number, number, number][] = [
+  [196, 172, 46, 0.55],   // tower flame
+  [410, 452, 64, 0.6],    // forge
+  [128, 424, 34, 0.45], [528, 180, 34, 0.45], [704, 340, 34, 0.45], [655, 122, 34, 0.45],
+  [900, 442, 26, 0.4],    // vigil
+  [222, 484, 26, 0.4],    // archive brazier
+];
 
-function house(c: Ctx, s: StationGeo) {
-  const { x, y, w, h, flag = 0 } = s;
-  px(c, x, y + 10, w, h - 10, P.wall); px(c, x, y + 10, w, 2, P.wall2);
-  px(c, x - 1, y + 4, w + 2, 7, P.roof); px(c, x + 1, y + 2, w - 2, 3, P.roof2); px(c, x + 1, y + 4, w - 2, 1, P.roofHi);
-  px(c, x + 3, y + 14, 4, 5, P.win); px(c, x + w - 7, y + 14, 4, 5, P.win);
-  px(c, x + (w >> 1) - 3, y + h - 9, 6, 9, P.timber);
-  px(c, x + (w >> 1) - 2, y - 4, 1, 8, P.timber);
-  px(c, x + (w >> 1) - 1, y - 4, 6, 9, BANNERS[flag % BANNERS.length]);
-  px(c, x + (w >> 1) - 1, y - 4, 6, 1, 'rgba(255,255,255,.35)');
-}
+const ROAD_BANDS: [number, number, number, number][] = [
+  [-4, 180, 968, 24],   // top street
+  [920, 180, 24, 174],  // east bend
+  [190, 330, 754, 24],  // middle street
+  [190, 330, 24, 192],  // west bend
+  [190, 486, 774, 24],  // bottom street
+  [588, 122, 24, 82],   // registry lane
+  [-4, 64, 908, 24],    // caravan road
+];
 
-function bigHall(c: Ctx, s: StationGeo, o: { win?: number; chimney?: boolean; anvil?: boolean; book?: boolean; scales?: boolean }) {
-  const { x, y, w, h } = s;
-  px(c, x, y + 8, w, h - 8, P.wall); px(c, x, y + 8, w, 2, P.wall2);
-  px(c, x - 2, y, w + 4, 10, P.roof); px(c, x, y - 2, w, 4, P.roof2);
-  const n = o.win ?? 2;
-  for (let i = 0; i < n; i++) px(c, x + 5 + i * (n > 1 ? ((w - 10) / (n - 1)) | 0 : 0), y + 14, 5, 7, P.win);
-  px(c, x + (w >> 1) - 4, y + h - 11, 8, 11, P.timber);
-  if (o.chimney) { px(c, x + w - 10, y - 10, 6, 12, P.stone2); px(c, x + w - 9, y - 11, 4, 2, P.ink); }
-  if (o.anvil) { px(c, x + 8, y + h - 6, 10, 3, P.ink); px(c, x + 11, y + h - 9, 4, 3, P.ink); }
-  if (o.book) { px(c, x + (w >> 1) - 5, y + 3, 10, 5, '#FFFBEB'); px(c, x + (w >> 1) - 1, y + 3, 1, 5, P.timber); }
-  if (o.scales) { px(c, x + (w >> 1) - 1, y + 1, 2, 6, P.ink); px(c, x + (w >> 1) - 6, y + 3, 4, 2, P.ink); px(c, x + (w >> 1) + 3, y + 3, 4, 2, P.ink); }
-}
+/* ---------- static background: ground + streets only ---------- */
+/* Buildings and décor are NOT baked here: anything that moves (couriers on
+ * the caravan road, the hero in the registry lane) must interleave with them
+ * in one painter's-order pass, so the scenery list below is drawn per frame. */
 
-function hut(c: Ctx, s: StationGeo, sign?: 'quill' | 'knife') {
-  const { x, y, w, h } = s;
-  px(c, x, y + 7, w, h - 7, P.wall2); px(c, x - 1, y + 1, w + 2, 8, P.roof);
-  px(c, x + 3, y + 11, 4, 5, P.win); px(c, x + w - 8, y + h - 9, 5, 9, P.timber);
-  if (sign === 'quill') { px(c, x + w - 3, y - 3, 6, 6, '#FFFBEB'); px(c, x + w - 1, y - 2, 1, 4, P.timber); }
-  if (sign === 'knife') { px(c, x + 2, y + 2, 8, 2, P.stone2); px(c, x + 2, y + 1, 3, 4, P.ink); }
-}
-
-function towerDraw(c: Ctx, s: StationGeo) {
-  const { x, y, w, h } = s;
-  px(c, x + 2, y + 10, w - 4, h - 10, P.stone); px(c, x + 2, y + 10, w - 4, 2, P.stone2);
-  px(c, x, y + 6, w, 6, P.stone2);
-  for (let i = 0; i < 3; i++) px(c, x + 1 + i * 7, y + 3, 4, 4, P.stone2);
-  px(c, x + 7, y + h - 12, 7, 12, P.ink); px(c, x + 7, y + 26, 7, 6, P.win);
-}
-
-function gateDraw(c: Ctx, s: StationGeo) {
-  const { x, y, w, h } = s;
-  px(c, x, y + 6, 10, h - 6, P.stone); px(c, x + w - 10, y + 6, 10, h - 6, P.stone);
-  px(c, x, y + 2, 10, 6, P.stone2); px(c, x + w - 10, y + 2, 10, 6, P.stone2);
-  px(c, x + 8, y + 12, w - 16, 7, P.stone2); px(c, x + 10, y + 19, w - 20, 15, '#F3E7BC');
-  px(c, x + 2, y + 16, 3, 4, P.win); px(c, x + w - 5, y + 16, 3, 4, P.win);
-  px(c, x + (w >> 1) - 3, y + 6, 7, 7, P.winHi); px(c, x + (w >> 1) - 1, y + 8, 3, 3, P.win);
-}
-
-function boothDraw(c: Ctx, s: StationGeo) {
-  const { x, y, w, h } = s;
-  px(c, x, y + 6, w, h - 6, P.wall); px(c, x - 1, y, w + 2, 8, '#8C3B3B'); px(c, x - 1, y, w + 2, 2, '#A34747');
-  px(c, x + 4, y + 11, w - 8, 6, P.win);
-  px(c, x + w - 9, y + 2, 7, 5, '#C24034'); px(c, x + w - 7, y + 3, 3, 1, '#FFF'); px(c, x + w - 6, y + 2, 1, 3, '#FFF');
-}
-
-function wareDraw(c: Ctx, s: StationGeo) {
-  const { x, y, w, h } = s;
-  px(c, x, y + 8, w, h - 8, '#D8C08A'); px(c, x - 2, y, w + 4, 10, P.roof);
-  px(c, x + 6, y + 12, 8, 10, P.timber); px(c, x + w - 14, y + 12, 8, 10, P.timber);
-}
-
-function vigilDraw(c: Ctx, s: StationGeo) {
-  const { x, y, w, h } = s;
-  px(c, x + 3, y + 8, w - 6, h - 8, P.stone2); px(c, x, y + 4, w, 6, P.roof);
-  px(c, x + 6, y + 14, 5, 5, P.winHi);
-}
-
-function well(c: Ctx, x: number, y: number) {
-  px(c, x, y, 14, 8, P.stone); px(c, x + 2, y + 2, 10, 4, '#6E9BB5');
-  px(c, x - 1, y - 6, 2, 8, P.timber); px(c, x + 13, y - 6, 2, 8, P.timber); px(c, x - 1, y - 7, 16, 2, P.roof);
-}
-function tree(c: Ctx, x: number, y: number) {
-  px(c, x + 3, y + 8, 3, 5, P.timber); px(c, x, y, 9, 9, '#B9C46F');
-  px(c, x + 2, y - 3, 5, 5, '#C9D385'); px(c, x + 2, y + 2, 2, 2, '#DDE4A4');
-}
-export function brazier(c: Ctx, x: number, y: number, lit: boolean) {
-  px(c, x, y, 8, 3, P.ink); px(c, x + 1, y - 2, 6, 2, P.ink);
-  if (lit) { px(c, x + 2, y - 5, 4, 3, P.fire); px(c, x + 3, y - 7, 2, 2, P.fireHi); }
-}
-export function cartDraw(c: Ctx, x: number, y: number) {
-  px(c, x, y - 6, 18, 7, '#8A6B44'); px(c, x + 1, y - 9, 16, 4, '#A9885B');
-  px(c, x + 2, y + 1, 4, 4, P.ink); px(c, x + 12, y + 1, 4, 4, P.ink);
-  px(c, x + 18, y - 4, 6, 3, '#C9A15E'); px(c, x + 23, y - 6, 2, 2, '#8A6B44');
-}
-
-function drawRoadSeg(c: Ctx, a: [number, number], b: [number, number], w: number) {
-  const x1 = Math.min(a[0], b[0]), y1 = Math.min(a[1], b[1]);
-  const ww = Math.abs(b[0] - a[0]), hh = Math.abs(b[1] - a[1]);
-  if (ww) {
-    px(c, x1 - w / 2, y1 - w / 2, ww + w, w, P.road);
-    px(c, x1 - w / 2, y1 - w / 2, ww + w, 1, P.roadEdge); px(c, x1 - w / 2, y1 + w / 2 - 1, ww + w, 1, P.roadEdge);
-  } else {
-    px(c, x1 - w / 2, y1 - w / 2, w, hh + w, P.road);
-    px(c, x1 - w / 2, y1 - w / 2, 1, hh + w, P.roadEdge); px(c, x1 + w / 2 - 1, y1 - w / 2, 1, hh + w, P.roadEdge);
+export function paintGround(ctx: Ctx, img: WorldImages) {
+  // checkered 180°-rotated tiling breaks the visible repetition of the tile
+  const g = img.ground;
+  for (let j = 0; j * 256 < H; j++) {
+    for (let i = 0; i * 256 < W; i++) {
+      if ((i + j) % 2 === 0) {
+        ctx.drawImage(g, i * 256, j * 256);
+      } else {
+        ctx.save();
+        ctx.translate(i * 256 + 128, j * 256 + 128);
+        ctx.rotate(Math.PI);
+        ctx.drawImage(g, -128, -128);
+        ctx.restore();
+      }
+    }
   }
+  // warm-lit streets
+  for (const [x, y, w, h] of ROAD_BANDS) {
+    ctx.fillStyle = 'rgba(255,208,130,0.14)';
+    ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = 'rgba(255,208,130,0.10)';
+    ctx.fillRect(x, y, w, 2);
+    ctx.fillRect(x, y + h - 2, w, 2);
+  }
+
 }
 
-/** Paints the full static background into an offscreen canvas. */
-export function paintBackground(bgc: Ctx) {
-  px(bgc, 0, 0, W, H, P.ground);
-  let seed = 7;
-  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
-  for (let i = 0; i < 260; i++) { const x = (rnd() * W) | 0, y = (rnd() * H) | 0; px(bgc, x, y, 2, 1, rnd() < 0.5 ? P.grass : P.ground2); }
-  for (let i = 0; i < 26; i++) { const x = (rnd() * W) | 0, y = (rnd() * H) | 0; px(bgc, x, y, 6, 4, P.ground2); }
-  for (let i = 0; i < SPINE.length - 1; i++) drawRoadSeg(bgc, SPINE[i], SPINE[i + 1], 12);
-  drawRoadSeg(bgc, [300, 90], [300, 62], 8);   // registry lane
-  drawRoadSeg(bgc, [-20, 44], [430, 44], 8);   // caravan road
-  // village square
-  px(bgc, 16, 196, 64, 52, P.road); px(bgc, 16, 196, 64, 1, P.roadEdge); px(bgc, 16, 247, 64, 1, P.roadEdge);
-  well(bgc, 38, 214);
-  tree(bgc, 6, 170); tree(bgc, 300, 196); tree(bgc, 360, 210); tree(bgc, 64, 116); tree(bgc, 238, 6); tree(bgc, 120, 20);
-  const S = stationById;
-  gateDraw(bgc, S.gate); hut(bgc, S.scribe, 'quill'); hut(bgc, S.cutter, 'knife');
-  bigHall(bgc, S.library, { win: 3, book: true });
-  STATIONS.filter((s) => s.flag !== undefined).forEach((s) => house(bgc, s));
-  boothDraw(bgc, S.six); bigHall(bgc, S.court, { win: 2, scales: true }); hut(bgc, S.classifier);
-  hut(bgc, S.border); px(bgc, 232, 146, 2, 10, P.timber); px(bgc, 226, 146, 14, 2, '#C24034');
-  towerDraw(bgc, S.tower); bigHall(bgc, S.forge, { win: 3, chimney: true, anvil: true });
-  hut(bgc, S.archive); wareDraw(bgc, S.warehouse); vigilDraw(bgc, S.vigil);
-  px(bgc, 470, 232, 10, 16, P.roadEdge);
+/** Fixed scenery, merged with actors each frame and sorted by base line. */
+export interface Placed { sprite: string; cx: number; base: number; scale?: number }
+export const SCENERY: Placed[] = [
+  ...STATIONS.filter((s) => s.sprite).map((s) => ({ sprite: s.sprite!, cx: s.cx, base: s.base })),
+  { sprite: 'anvil', cx: 458, base: 486 },
+  { sprite: 'embers', cx: 382, base: 496 },
+  { sprite: 'ember-line', cx: 222, base: 492 },
+  ...LANTERNS.map(([x, y]) => ({ sprite: 'lantern', cx: x, base: y })),
+  ...CHIMNEYS.map(([x, y]) => ({ sprite: 'chimney', cx: x, base: y })),
+];
+
+/** Station signs, high on the walls — nothing ever passes in front of them,
+ * so one draw after the scenery/actor pass is safe. */
+export function drawSigns(ctx: Ctx, img: WorldImages) {
+  drawSprite(ctx, img, 'coin-sign', 80, 100);             // toll gate
+  drawSprite(ctx, img, 'ingot', 430, 62, { scale: 0.9 }); // library lintel
+  ctx.fillStyle = '#C0392B';                               // Swiss badge (SIX)
+  ctx.fillRect(846, 232, 12, 10);
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(851, 234, 2, 6);
+  ctx.fillRect(848, 236, 8, 2);
+}
+
+/** Peripheral night vignette, prerendered once at world size. */
+export function paintVignette(ctx: Ctx) {
+  const g = ctx.createRadialGradient(W / 2, H / 2, H * 0.44, W / 2, H / 2, H * 0.95);
+  g.addColorStop(0, 'rgba(8,8,14,0)');
+  g.addColorStop(1, 'rgba(8,8,14,0.42)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
 }
 
 /* ---------- actors ---------- */
+
+export type ActorKind =
+  | 'hero' | 'cour-a' | 'cour-b' | 'cour-c'
+  | 'clerk0' | 'clerk1' | 'clerk2' | 'clerk3' | 'clerk4' | 'clerk5';
+
 export interface Actor {
   x: number; y: number; dir: 1 | -1;
-  c1: string; c2: string;
-  eyes?: boolean; satchel?: boolean; lantern?: boolean; scroll?: boolean;
+  kind: ActorKind;
+  /** last movement axis, for sprite facing */
+  face?: 'side' | 'up' | 'down';
   moving?: boolean; hidden?: boolean;
 }
 
-export function drawActor(c: Ctx, a: Actor, t: number, reduced: boolean) {
+export function drawActor(ctx: Ctx, img: WorldImages, a: Actor, t: number, reduced: boolean) {
   if (a.hidden) return;
-  const bob = reduced ? 0 : a.moving ? Math.floor(t / 140) % 2 : 0;
-  const { x } = a; const yy = a.y - 12 - bob;
-  px(c, x - 3, yy + 8, 2, 4, '#4A3B28'); px(c, x + 1, yy + 8, 2, 4, '#4A3B28');
-  px(c, x - 4, yy + 2, 8, 7, a.c1); px(c, x - 4, yy + 7, 8, 2, a.c2);
-  px(c, x - 3, yy - 2, 6, 5, a.c1); px(c, x - 2, yy - 3, 4, 2, a.c1);
-  if (a.eyes) {
-    const g = Math.floor(t / 900) % 2 ? P.heroEye : '#FDE68A';
-    px(c, x - 2, yy, 5, 2, '#3A2A10'); px(c, x - 2, yy - 1, 1, 1, g); px(c, x + 1, yy - 1, 1, 1, g);
+  const bob = reduced ? 0 : a.moving ? (Math.floor(t / 130) % 2) : (Math.floor(t / 900) % 2) * 0.5;
+  let name: string;
+  if (a.kind.startsWith('clerk')) {
+    name = a.kind;
   } else {
-    px(c, x - 2, yy - 1, 4, 2, '#57402A');
+    const face = a.face ?? 'down';
+    const suffix = face === 'side' ? 'side' : face === 'up' ? 'back' : 'front';
+    name = `${a.kind}-${suffix}`;
   }
-  if (a.satchel) px(c, x + (a.dir < 0 ? -6 : 4), yy + 4, 3, 3, '#7C5A36');
-  if (a.lantern) px(c, x + (a.dir < 0 ? -6 : 5), yy + 5, 2, 3, P.winHi);
-  if (a.scroll) px(c, x - 1, yy + 4, 4, 2, '#FFFBEB');
+  // soft contact shadow first, sprite on top
+  ctx.save();
+  ctx.globalAlpha = 0.25;
+  ctx.fillStyle = '#0A0A12';
+  ctx.beginPath();
+  ctx.ellipse(a.x, a.y + 1.5, 9, 3, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+  drawSprite(ctx, img, name, a.x, a.y, {
+    flip: (a.face ?? 'down') === 'side' && a.dir < 0,
+    dy: -bob,
+  });
 }
+
+export { SPINE };

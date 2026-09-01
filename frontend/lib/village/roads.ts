@@ -6,7 +6,7 @@
  */
 
 export const SPINE: [number, number][] = [
-  [-14, 90], [470, 90], [470, 156], [96, 156], [96, 240], [470, 240],
+  [-28, 192], [932, 192], [932, 342], [202, 342], [202, 498], [952, 498],
 ];
 
 /** Scalar position of a point along the spine. Anchors must sit on it. */
