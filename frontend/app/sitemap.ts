@@ -5,8 +5,17 @@ import { routing } from "@/i18n/routing";
 
 const BASE_URL = "https://ibanforge.com";
 
+/**
+ * ⚠️ No `lastModified` on anything whose modification date we do not know.
+ *
+ * Audit 2026-09-01 (WEB-21): every static entry carried `lastModified: new
+ * Date()`, so each build republished the whole catalogue as "modified today".
+ * A `lastmod` that moves on every deployment carries no information and is
+ * discarded, which costs us the signal on the pages where it IS true. Blog
+ * posts keep theirs: their date comes from the frontmatter and is a fact. Docs
+ * and static pages have no date to state, so they state none.
+ */
 export default function sitemap(): MetadataRoute.Sitemap {
-  const now = new Date();
   const entries: MetadataRoute.Sitemap = [];
 
   for (const locale of routing.locales) {
@@ -14,29 +23,40 @@ export default function sitemap(): MetadataRoute.Sitemap {
 
     // Static pages
     entries.push(
-      { url: prefix, lastModified: now, changeFrequency: "weekly", priority: 1 },
-      { url: `${prefix}/agents`, lastModified: now, changeFrequency: "monthly", priority: 0.95 },
-      { url: `${prefix}/vendors`, lastModified: now, changeFrequency: "monthly", priority: 0.85 },
-      { url: `${prefix}/sources`, lastModified: now, changeFrequency: "monthly", priority: 0.75 },
-      { url: `${prefix}/compare`, lastModified: now, changeFrequency: "monthly", priority: 0.8 },
-      { url: `${prefix}/tools/test-iban`, lastModified: now, changeFrequency: "monthly", priority: 0.8 },
-      { url: `${prefix}/playground`, lastModified: now, changeFrequency: "monthly", priority: 0.9 },
-      { url: `${prefix}/docs`, lastModified: now, changeFrequency: "weekly", priority: 0.8 },
-      { url: `${prefix}/pricing`, lastModified: now, changeFrequency: "monthly", priority: 0.7 },
-      { url: `${prefix}/openapi`, lastModified: now, changeFrequency: "monthly", priority: 0.7 },
-      { url: `${prefix}/blog`, lastModified: now, changeFrequency: "weekly", priority: 0.6 },
-      // The trust pages. Written, true, linked from the footer, carrying no
-      // noindex — and absent from this hand-kept list, so a crawler that starts
-      // from the sitemap rather than from the links never sees them. Low
-      // priority on purpose: they are the answer to "can I buy from these
-      // people", read once by someone already deciding, not pages we compete on.
-      { url: `${prefix}/changelog`, lastModified: now, changeFrequency: "weekly", priority: 0.5 },
-      { url: `${prefix}/status`, lastModified: now, changeFrequency: "daily", priority: 0.5 },
-      { url: `${prefix}/legal/terms`, lastModified: now, changeFrequency: "yearly", priority: 0.4 },
-      { url: `${prefix}/legal/privacy`, lastModified: now, changeFrequency: "yearly", priority: 0.4 },
-      { url: `${prefix}/legal/dpa`, lastModified: now, changeFrequency: "yearly", priority: 0.4 },
-      { url: `${prefix}/legal/imprint`, lastModified: now, changeFrequency: "yearly", priority: 0.4 },
-      { url: `${prefix}/legal/sla`, lastModified: now, changeFrequency: "yearly", priority: 0.4 },
+      { url: prefix, changeFrequency: "weekly", priority: 1 },
+      { url: `${prefix}/agents`, changeFrequency: "monthly", priority: 0.95 },
+      { url: `${prefix}/vendors`, changeFrequency: "monthly", priority: 0.85 },
+      { url: `${prefix}/sources`, changeFrequency: "monthly", priority: 0.75 },
+      { url: `${prefix}/compare`, changeFrequency: "monthly", priority: 0.8 },
+      { url: `${prefix}/tools/test-iban`, changeFrequency: "monthly", priority: 0.8 },
+      { url: `${prefix}/playground`, changeFrequency: "monthly", priority: 0.9 },
+      // Linked from the main menu on every page and, until 2026-09-01, absent
+      // from this list (WEB-11).
+      { url: `${prefix}/live`, changeFrequency: "monthly", priority: 0.6 },
+      { url: `${prefix}/docs`, changeFrequency: "weekly", priority: 0.8 },
+      { url: `${prefix}/pricing`, changeFrequency: "monthly", priority: 0.7 },
+      { url: `${prefix}/openapi`, changeFrequency: "monthly", priority: 0.7 },
+      { url: `${prefix}/blog`, changeFrequency: "weekly", priority: 0.6 },
+      // The trust pages, listed here from `/changelog` down. Written, true,
+      // linked from the footer and carrying no noindex — they were missing from
+      // this hand-kept list until 2026-08, so a crawler starting from the
+      // sitemap rather than from the links never saw them. Low priority on
+      // purpose: they answer "can I buy from these people", read once by
+      // someone already deciding, not pages we compete on.
+      { url: `${prefix}/changelog`, changeFrequency: "weekly", priority: 0.5 },
+      { url: `${prefix}/status`, changeFrequency: "daily", priority: 0.5 },
+      { url: `${prefix}/legal`, changeFrequency: "yearly", priority: 0.3 },
+      { url: `${prefix}/legal/terms`, changeFrequency: "yearly", priority: 0.4 },
+      { url: `${prefix}/legal/privacy`, changeFrequency: "yearly", priority: 0.4 },
+      { url: `${prefix}/legal/dpa`, changeFrequency: "yearly", priority: 0.4 },
+      { url: `${prefix}/legal/imprint`, changeFrequency: "yearly", priority: 0.4 },
+      { url: `${prefix}/legal/sla`, changeFrequency: "yearly", priority: 0.4 },
+      // 🚫 `/account` is deliberately NOT here. It answers 200 and is linked
+      // from the footer, but its own generateMetadata sets
+      // `robots: { index: false }` — a credential form has no business
+      // competing with the docs in a result page. Submitting a noindex URL in
+      // a sitemap is reported as an error by Search Console, so listing it
+      // would trade one defect for another (WEB-11, audit 2026-09-01).
     );
 
     // Doc pages
@@ -44,14 +64,13 @@ export default function sitemap(): MetadataRoute.Sitemap {
       if (doc.slug !== "index") {
         entries.push({
           url: `${prefix}/docs/${doc.slug}`,
-          lastModified: now,
           changeFrequency: "weekly",
           priority: 0.7,
         });
       }
     }
 
-    // Blog posts
+    // Blog posts — the only entries with a modification date we can state.
     for (const post of getAllPosts(locale)) {
       entries.push({
         url: `${prefix}/blog/${post.slug}`,

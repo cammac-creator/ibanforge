@@ -277,6 +277,115 @@ function Leave({ apiKey, locale }: { apiKey: string; locale: string }) {
   );
 }
 
+/**
+ * The state a buyer actually lands in, and the one this page did not have.
+ *
+ * Measured on 30/08/2026: five paying customers, zero calls in thirty days.
+ * This page is what the purchase e-mail points at, and until 2026-09-01 it
+ * answered someone who had never called with an empty usage report — a reading
+ * of a past that does not exist yet. It contained no `curl`, no `Bearer` and no
+ * snippet of any kind (BIZ-09 / WEB-04b, audit 2026-09-01).
+ *
+ * So: the first call, written out with the key the visitor just pasted, and a
+ * button that fires it from this page. The command is the same one the docs
+ * give, deliberately — what is copied here must be what works there.
+ *
+ * The call goes browser to API, like every other call on this page: the key
+ * never reaches our own server, which is the claim the file header makes and
+ * the reason this page needs no session.
+ */
+const FIRST_CALL_IBAN = "CH9300762011623852957";
+
+type CallPhase =
+  | { kind: "idle" }
+  | { kind: "running" }
+  | { kind: "done"; status: number; body: string }
+  | { kind: "failed" };
+
+function FirstCall({ apiKey }: { apiKey: string }) {
+  const t = useTranslations("account");
+  const [phase, setPhase] = useState<CallPhase>({ kind: "idle" });
+  const [copied, setCopied] = useState(false);
+
+  const command = [
+    `curl -X POST ${API_URL}/v1/iban/validate \\`,
+    `  -H "Authorization: Bearer ${apiKey}" \\`,
+    '  -H "Content-Type: application/json" \\',
+    `  -d '{"iban":"${FIRST_CALL_IBAN}"}'`,
+  ].join("\n");
+
+  async function run() {
+    setPhase({ kind: "running" });
+    try {
+      const res = await fetch(`${API_URL}/v1/iban/validate`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ iban: FIRST_CALL_IBAN }),
+      });
+      // The body is shown whatever the status: a 402 or a 429 is an answer the
+      // caller needs to read, not a failure of this page.
+      const raw = await res.text();
+      let body = raw;
+      try {
+        body = JSON.stringify(JSON.parse(raw), null, 2);
+      } catch {
+        // Not JSON. Show it as it came rather than swallowing it.
+      }
+      setPhase({ kind: "done", status: res.status, body });
+    } catch {
+      // Network failure, CORS, offline. The key was still sent nowhere else.
+      setPhase({ kind: "failed" });
+    }
+  }
+
+  return (
+    <section className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-4">
+      <h2 className="font-heading text-lg font-semibold">{t("firstCallTitle")}</h2>
+      <p className="mt-1 text-sm text-muted-foreground">{t("firstCallBody")}</p>
+
+      <pre className="mt-3 overflow-x-auto rounded bg-background px-3 py-3 font-mono text-xs leading-relaxed">
+        {command}
+      </pre>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={() => {
+            navigator.clipboard?.writeText(command).then(
+              () => setCopied(true),
+              () => setCopied(false),
+            );
+          }}
+          className="rounded-md border px-4 py-2 text-sm"
+        >
+          {copied ? t("firstCallCopied") : t("firstCallCopy")}
+        </button>
+        <button
+          type="button"
+          onClick={run}
+          disabled={phase.kind === "running"}
+          className="rounded-md bg-amber-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+        >
+          {phase.kind === "running" ? t("firstCallRunning") : t("firstCallRun")}
+        </button>
+      </div>
+
+      {phase.kind === "failed" && <p className="mt-3 text-sm">{t("firstCallFailed")}</p>}
+
+      {phase.kind === "done" && (
+        <div className="mt-4">
+          <div className="text-xs uppercase tracking-wider text-muted-foreground">
+            {t("firstCallResult")} · HTTP {phase.status}
+          </div>
+          <pre className="mt-2 max-h-80 overflow-auto rounded bg-background px-3 py-3 font-mono text-xs leading-relaxed">
+            {phase.body}
+          </pre>
+        </div>
+      )}
+    </section>
+  );
+}
+
 export function AccountApp({ locale }: { locale: string }) {
   const t = useTranslations("account");
   const [key, setKey] = useState("");
@@ -346,6 +455,12 @@ export function AccountApp({ locale }: { locale: string }) {
 
       {d && (
         <div className="space-y-8">
+          {/* Nothing was ever called with this key: the report below has no past
+              to show, so the first call comes first (BIZ-09). Both counters are
+              read, not just the monthly one — a key that called last month and
+              not this one has a history worth reading and is not a new buyer. */}
+          {d.usage.used === 0 && d.report.total === 0 && <FirstCall apiKey={key.trim()} />}
+
           <section>
             <h2 className="mb-3 font-heading text-lg font-semibold">{t("quotaTitle")}</h2>
             <div className="grid gap-3 sm:grid-cols-3">

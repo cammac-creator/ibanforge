@@ -10,10 +10,17 @@ import {
   P50_PROCESSING_MS,
   SUPPORTED_COUNTRIES,
 } from "@/lib/landing-stats"
+import { alternatesFor } from "@/lib/seo"
 
-// Metadata is generated per-locale by app/[locale]/layout.tsx — do NOT define
-// a static `metadata` here, it would override the locale-aware version with
-// the EN default.
+// Title and description are generated per-locale by app/[locale]/layout.tsx —
+// do NOT define a static `metadata` here, it would override the locale-aware
+// version with the EN default. `alternates` cannot live in the layout though
+// (WEB-01/WEB-02, audit 2026-09-01): only the page itself knows its own path,
+// so the home declares its canonical + hreflang set here.
+export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }) {
+  const { locale } = await params
+  return { alternates: alternatesFor(locale, "/") }
+}
 
 const FEATURE_COUNT = 6
 const ENDPOINT_COUNT = 7

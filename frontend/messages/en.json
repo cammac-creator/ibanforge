@@ -70,7 +70,7 @@
       },
       "1": {
         "badge": "MCP-native — agent ready",
-        "title": "7 tools, no signup",
+        "title": "8 tools, no signup",
         "description": "Native Model Context Protocol server (stdio + HTTP). Claude, Cursor and any MCP agent install in one line: npx -y ibanforge-mcp."
       },
       "2": {
@@ -233,7 +233,7 @@
       "sub": "This page speaks robot too — every claim above is machine-readable, and every endpoint is payable without a human in the loop.",
       "illoAlt": "A robotic arm dropping one glowing coin into a payment slot",
       "mcpTitle": "MCP-native",
-      "mcpBody": "7 tools, no signup. Claude, Cursor and any MCP agent install in one line:",
+      "mcpBody": "8 tools, no signup. Claude, Cursor and any MCP agent install in one line:",
       "x402Title": "x402 micropayments",
       "x402Body": "Autonomous agents pay per request in USDC — no account, no checkout, settlement on-chain.",
       "docsTitle": "Machine-readable docs",
@@ -363,7 +363,7 @@
       },
       "3": {
         "question": "What about high volume?",
-        "answer": "The per-call pricing scales linearly with no rate limits. For very high volumes (millions of calls/month), open an issue on our GitHub repository (github.com/cammac-creator/ibanforge) — we can discuss custom pricing or a bulk arrangement that makes more sense for your use case."
+        "answer": "The per-call pricing scales linearly with no rate limits. For very high volumes (millions of calls/month), or to embed the API in your own product, the Editor/OEM path is the one to take: volume pricing, a written SLA and support commitments. It is described on our vendor page (ibanforge.com/en/vendors), and support@ibanforge.com opens the conversation."
       },
       "heading": "Frequently asked questions"
     },
@@ -411,6 +411,8 @@
       "highlight": "ground"
     },
     "subtitle": "Test the API for free — no payment, no signup. Every answer below is a real, live response.",
+    "metaTitle": "Playground",
+    "sectionTitle": "Try a live call",
     "tabs": {
       "iban": "IBAN",
       "bic": "BIC",
@@ -490,7 +492,9 @@
     "error": {
       "unexpected": "Unexpected error from the API.",
       "network": "Could not reach the API. Please check your connection or try again later.",
-      "unavailable": "The playground is temporarily unavailable. This is on our side, not yours; the API itself is up. Please try again in a moment."
+      "unavailable": "The playground is temporarily unavailable. This is on our side, not yours; the API itself is up. Please try again in a moment.",
+      "forbiddenOrigin": "This playground only answers requests from ibanforge.com.",
+      "rateLimited": "Too many playground calls from your network, try again in a few minutes."
     },
     "result": {
       "label": "Response"
@@ -914,8 +918,8 @@
   },
   "agents": {
     "meta": {
-      "title": "MCP Server for IBAN Validation — 7 tools, no signup",
-      "description": "Integrate IBANforge in 60 seconds — Claude Desktop, Cursor, Cline. Native MCP server with 7 tools. Free API key (200 req/month, no credit card). Pay-per-call in USDC via x402 on Base L2 — agents pay autonomously."
+      "title": "MCP Server for IBAN Validation — 8 tools, no signup",
+      "description": "Integrate IBANforge in 60 seconds — Claude Desktop, Cursor, Cline. Native MCP server with 8 tools. Free API key (200 req/month, no credit card). Pay-per-call in USDC via x402 on Base L2 — agents pay autonomously."
     },
     "eyebrow": "For AI Agents",
     "hero": {
@@ -931,7 +935,7 @@
       "mcp": {
         "badge": "Path 1 · MCP",
         "title": "Native MCP server",
-        "description": "Drop into Claude Desktop, Cursor, or Cline. 7 tools auto-discovered. Best for desktop agents and IDE assistants.",
+        "description": "Drop into Claude Desktop, Cursor, or Cline. 8 tools auto-discovered. Best for desktop agents and IDE assistants.",
         "tradeoff": "Stdio or HTTP · npm or remote"
       },
       "apiKey": {
@@ -950,12 +954,12 @@
     "mcp": {
       "eyebrow": "Path 1 · MCP",
       "heading": "Install in Claude Desktop, Cursor or Cline",
-      "description": "The IBANforge MCP server exposes 7 tools to your AI client. Two transports: stdio via npm package or remote streamable-HTTP.",
+      "description": "The IBANforge MCP server exposes 8 tools to your AI client. Two transports: stdio via npm package or remote streamable-HTTP.",
       "claudeLabel": "Stdio · Claude Desktop",
       "claudePath": "Add to ~/Library/Application Support/Claude/claude_desktop_config.json (macOS) or %APPDATA%/Claude/claude_desktop_config.json (Windows).",
       "httpLabel": "HTTP · remote endpoint",
       "httpDescription": "Point any MCP-compatible client to:",
-      "toolsHeading": "7 tools available"
+      "toolsHeading": "8 tools available"
     },
     "apiKey": {
       "eyebrow": "Path 2 · Free key",
@@ -999,8 +1003,7 @@
     "disrupted": "Service disruption",
     "w7": "7-day success rate",
     "w30": "30-day success rate",
-    "w90": "90-day success rate",
-    "last90": "Last 90 days",
+    "last90": "Last 30 days",
     "barsHint": "One bar per day — green: no server errors, amber: isolated 5xx, red: >1% server errors.",
     "noData": "no data",
     "method": "Method: success rate = share of requests answered without a 5xx server error, computed from the production request log (client errors like 402/404 are expected API behavior and do not count against availability). Page refreshes every 5 minutes. Written SLAs are available in Editor/OEM agreements.",
@@ -1010,6 +1013,10 @@
     "latencyP99": "99th percentile",
     "latencyNote": "Measured on production traffic over the last 30 days, refused requests excluded: a call the paywall turned away in a millisecond is not evidence of speed. Days with too few served requests are left out rather than given a percentile drawn from a handful of samples. The 99th percentile keeps a higher bar of its own: below a hundred measurements in a day there is no ninety-ninth percentile to report, only the 95th under another name.",
     "latencyNoData": "not enough served traffic to measure"
+  },
+  "openapi": {
+    "title": "OpenAPI Reference",
+    "description": "Live OpenAPI 3.1 reference for the IBANforge API: five paid endpoints, a free demo, key generation and health, all with try-it-out in the browser."
   },
   "changelog": {
     "title": "Changelog",
@@ -1150,7 +1157,7 @@
         },
         "agents": {
           "label": "AI agents (MCP, autonomous payment)",
-          "ibanforge": "Native MCP server (7 tools) + x402 pay-per-call in USDC — an agent can pay without an account",
+          "ibanforge": "Native MCP server (8 tools) + x402 pay-per-call in USDC — an agent can pay without an account",
           "ibancom": "No",
           "ibanapi": "No",
           "libs": "No (a library, not a service)"
@@ -1232,6 +1239,14 @@
     "noKey": "Paste the key you were issued. Nothing else identifies you here — no account, no password.",
     "invalid": "That key was not recognised. It may have been revoked or rotated.",
     "unreachable": "The API could not be reached. Your key was not sent anywhere else.",
+    "firstCallTitle": "This key has not called yet",
+    "firstCallBody": "Nothing to report until a first call lands. Here is that call, ready to paste, with your key already in it.",
+    "firstCallCopy": "Copy the command",
+    "firstCallCopied": "Copied",
+    "firstCallRun": "Run this call now",
+    "firstCallRunning": "Calling…",
+    "firstCallResult": "What the API answered",
+    "firstCallFailed": "The call could not be made from this page. Your key was sent to the API and nowhere else; try the command above from a terminal.",
     "quotaTitle": "This month",
     "used": "Calls used",
     "remaining": "Remaining",
@@ -1523,7 +1538,7 @@
       "hero": {
         "name": "The Courier (your IBAN)",
         "role": "Carries your request station to station — its path is derived from the real response.",
-        "real": "POST /v1/iban/validate — chemin reconstruit"
+        "real": "POST /v1/iban/validate — path reconstructed"
       },
       "villager": {
         "name": "Villager (scenery)",

@@ -1,6 +1,8 @@
 import fs from 'fs';
 import path from 'path';
 import matter from 'gray-matter';
+import { notFound } from 'next/navigation';
+import { SLUG_PATTERN } from './content-slug';
 
 function blogDir(locale: string): string {
   return path.join(process.cwd(), 'content', locale, 'blog');
@@ -37,6 +39,9 @@ export function getAllPosts(locale: string = 'en'): BlogPost[] {
 }
 
 export function getPost(slug: string, locale: string = 'en'): { meta: BlogPost; content: string } {
+  // FRT-09 (2026-09-01): same filesystem-path concatenation as getDoc; see the
+  // note in lib/content-slug.ts for why the platform is not the guard.
+  if (!SLUG_PATTERN.test(slug)) notFound();
   const dir = blogDir(locale);
   const file = path.join(dir, `${slug}.mdx`);
 

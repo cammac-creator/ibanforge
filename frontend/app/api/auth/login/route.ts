@@ -11,8 +11,17 @@ const WINDOW_MS = 15 * 60 * 1000; // 15 minutes
 
 function checkBruteForce(ip: string): boolean {
   const now = Date.now();
+  /*
+   * FRT-05 (audit 2026-09-01): the map used to shed an entry only when that
+   * same IP came back, so a spray across many addresses left one entry per
+   * address for the life of the lambda instance. Sweeping the expired ones on
+   * each call keeps it bounded by the number of IPs seen in the last window.
+   */
+  for (const [key, record] of loginAttempts) {
+    if (now > record.resetAt) loginAttempts.delete(key);
+  }
   const record = loginAttempts.get(ip);
-  if (!record || now > record.resetAt) {
+  if (!record) {
     loginAttempts.set(ip, { count: 1, resetAt: now + WINDOW_MS });
     return true;
   }
@@ -30,6 +39,13 @@ export async function POST(req: NextRequest) {
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
 
   if (!checkBruteForce(ip)) {
+    /*
+     * FRT-05: the 429 used to return immediately while every other answer paid
+     * the 200 ms delay, so response time alone told an attacker "you are being
+     * throttled" versus "that password is wrong" — the exact signal the delay
+     * exists to hide. Pay the same toll before answering.
+     */
+    await constantTimeDelay();
     return NextResponse.json(
       { error: 'Too many login attempts. Try again later.' },
       { status: 429 },

@@ -3,12 +3,22 @@ import { getTranslations } from "next-intl/server";
 import { getAllPosts } from "@/lib/blog";
 
 import type { Metadata } from "next";
+import { alternatesFor } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "Blog",
-  description:
-    "Updates, guides, and changelog from the IBANforge team.",
-};
+// Title and description are still static (not per-locale) — out of scope for
+// this pass (audit 2026-09-01, WEB-01/WEB-02: `alternates` only). Converted
+// from `export const metadata` to `generateMetadata` because a segment's
+// `alternates` REPLACES its parent's rather than merging into it, so the
+// canonical + hreflang set can only be added here, alongside a `params` read.
+export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
+  const { locale } = await params;
+  return {
+    title: "Blog",
+    description:
+      "Updates, guides, and changelog from the IBANforge team.",
+    alternates: alternatesFor(locale, "/blog"),
+  };
+}
 
 export default async function BlogPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;

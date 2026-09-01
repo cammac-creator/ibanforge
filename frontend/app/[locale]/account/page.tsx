@@ -1,5 +1,6 @@
 import { getTranslations } from "next-intl/server";
 import { AccountApp } from "@/components/account/account-app";
+import { alternatesFor } from "@/lib/seo";
 
 /**
  * The customer-facing account page.
@@ -14,8 +15,11 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: "account" });
   return {
-    title: `${t("title")} | IBANforge`,
+    // No "| IBANforge" suffix: the locale layout's title template already
+    // appends it (WEB-20, audit 2026-09-01).
+    title: t("title"),
     description: t("subtitle"),
+    alternates: alternatesFor(locale, "/account"),
     // Nothing here is indexable — the page is empty without a key, and we do
     // not want a credential form competing with the docs in search results.
     robots: { index: false, follow: true },

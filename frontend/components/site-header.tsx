@@ -8,6 +8,9 @@ import { Menu, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { LocaleSwitcher } from "@/components/locale-switcher"
 
+/** Ties the hamburger's `aria-controls` to the menu it opens. */
+const MOBILE_MENU_ID = "site-mobile-menu"
+
 export function SiteHeader() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const t = useTranslations("header")
@@ -67,17 +70,34 @@ export function SiteHeader() {
 
           {/* Mobile hamburger */}
           <button
+            type="button"
             className="md:hidden flex items-center justify-center size-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
             onClick={() => setMobileOpen((v) => !v)}
             aria-label={t("toggleMenu")}
+            // Audit 2026-09-01 (WEB-09): the button said nothing about the
+            // state it controls, so a screen reader announced a plain button
+            // and the menu it opened appeared out of nowhere.
+            aria-expanded={mobileOpen}
+            aria-controls={MOBILE_MENU_ID}
           >
             {mobileOpen ? <X className="size-4" /> : <Menu className="size-4" />}
           </button>
         </div>
       </div>
 
-      {/* Mobile menu */}
+      {/* Mobile menu.
+
+          `inert` and not `hidden`: closed, this block was merely collapsed to
+          `max-h-0 opacity-0`, so its six links stayed in the tab order and
+          readable by a screen reader on every page of the site — a keyboard
+          user tabbing through the header fell into an invisible menu (WEB-09,
+          audit 2026-09-01). `inert` removes the whole subtree from focus and
+          from the accessibility tree while leaving the height transition
+          intact, which `display: none` would kill. */}
       <div
+        id={MOBILE_MENU_ID}
+        inert={!mobileOpen}
+        aria-hidden={!mobileOpen}
         className={cn(
           "md:hidden border-t border-border overflow-hidden transition-all duration-200",
           mobileOpen ? "max-h-64 opacity-100" : "max-h-0 opacity-0"

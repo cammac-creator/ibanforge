@@ -2,6 +2,7 @@ import { MDXRemote } from "next-mdx-remote/rsc";
 import { getTranslations } from "next-intl/server";
 import { getPost } from "@/lib/blog";
 import { mdxOptions, mdxComponents } from "@/lib/mdx";
+import { alternatesFor, ogImageFor } from "@/lib/seo";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 
@@ -25,15 +26,24 @@ export async function generateMetadata({
   if (!post) return { title: { absolute: "Not Found — IBANforge Blog" } };
   const url = `https://ibanforge.com/${locale}/blog/${slug}`;
   return {
+    // `absolute` opts out of the layout's "%s | IBANforge" template, so the
+    // brand appears exactly once here already (WEB-20 does not bite on this
+    // page).
     title: { absolute: `${post.meta.title} — IBANforge Blog` },
     description: post.meta.description,
-    alternates: { canonical: url },
+    // Canonical AND hreflang, inseparably: `{ canonical: url }` alone replaced
+    // the layout's `alternates` object and left every article without a
+    // `languages` block (WEB-02, audit 2026-09-01).
+    alternates: alternatesFor(locale, `/blog/${slug}`),
     openGraph: {
       type: "article",
       title: post.meta.title,
       description: post.meta.description,
       url,
       publishedTime: post.meta.date,
+      // Without this the object below replaced `opengraph-image.tsx` and the
+      // articles, the pages most often shared, had no share card (WEB-12).
+      images: [ogImageFor(locale)],
     },
   };
 }

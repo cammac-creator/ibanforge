@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useCallback, useContext, useEffect, useState, type FormEvent, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { routeKeyFailure } from '@/lib/api-key-failure';
@@ -35,6 +35,10 @@ interface KeyResponse {
  * a second key — could not obtain one from the web at all.
  */
 type Stage = 'form' | 'verify' | 'success' | 'error';
+
+/** What Tab may land on inside the dialog. */
+const FOCUSABLE =
+  'a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])';
 
 /**
  * Refusals we can phrase ourselves, in the visitor's language. Anything not
@@ -110,6 +114,10 @@ export function ApiKeyDialogProvider({ children }: { children: ReactNode }) {
   /** Inline warning shown above the field of the step the visitor is on. */
   const [notice, setNotice] = useState<string>('');
   const [copied, setCopied] = useState(false);
+  /** The panel, so Tab can be kept inside it. */
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  /** Whatever had the focus when the dialog opened, to give it back. */
+  const triggerRef = useRef<HTMLElement | null>(null);
 
   const reset = useCallback(() => {
     setStage('form');
@@ -124,10 +132,21 @@ export function ApiKeyDialogProvider({ children }: { children: ReactNode }) {
 
   const close = useCallback(() => {
     setIsOpen(false);
+    // Hand the focus back to the button that opened the dialog. Without this it
+    // fell to <body>, and a keyboard user who closed the dialog restarted their
+    // journey through the page from the very top (WEB-18, audit 2026-09-01).
+    // Done before the unmount so the browser has somewhere to put it.
+    const trigger = triggerRef.current;
+    triggerRef.current = null;
+    if (trigger && document.contains(trigger)) trigger.focus();
     setTimeout(reset, 200);
   }, [reset]);
 
   const open = useCallback(() => {
+    // Remembered here rather than in an effect: this is the only moment the
+    // element that asked for the dialog still holds the focus.
+    triggerRef.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
     reset();
     setIsOpen(true);
   }, [reset]);
@@ -142,7 +161,37 @@ export function ApiKeyDialogProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!isOpen) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') close();
+      if (e.key === 'Escape') {
+        close();
+        return;
+      }
+      if (e.key !== 'Tab') return;
+      // The dialog announced `aria-modal="true"` and trapped nothing: Tab
+      // walked straight out of it and into the page behind, which the modal
+      // claims is unreachable (WEB-18, audit 2026-09-01).
+      //
+      // The list is rebuilt on every press on purpose. This dialog swaps its
+      // whole body between four stages (form, verify, success, error), so a
+      // list captured once would name elements that no longer exist.
+      const panel = panelRef.current;
+      if (!panel) return;
+      const items = Array.from(
+        panel.querySelectorAll<HTMLElement>(FOCUSABLE),
+      ).filter((el) => !el.hasAttribute('disabled') && el.tabIndex !== -1);
+      if (items.length === 0) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      const active = document.activeElement;
+      const inside = active instanceof Node && panel.contains(active);
+      if (e.shiftKey) {
+        if (!inside || active === first) {
+          e.preventDefault();
+          last.focus();
+        }
+      } else if (!inside || active === last) {
+        e.preventDefault();
+        first.focus();
+      }
     };
     document.addEventListener('keydown', onKey);
     document.body.style.overflow = 'hidden';
@@ -263,6 +312,7 @@ export function ApiKeyDialogProvider({ children }: { children: ReactNode }) {
           style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }}
         >
           <div
+            ref={panelRef}
             onClick={(e) => e.stopPropagation()}
             className="w-full max-w-lg rounded-xl border p-7 relative"
             style={{

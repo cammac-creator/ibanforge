@@ -189,6 +189,10 @@ Each finding also carries a `source` field, elided above for width — it names 
 | `adr_tp_forbidden` — Address Type "Must not be sent" | yes | — | — |
 | `adr_line_max_2` | yes | — | yes |
 | `adr_line_max_length_70` | yes | — | yes |
+| `strt_nm_max_70` — ISO 20022 maximum length of the structured element (70) | yes | — | — |
+| `bldg_nb_max_16` — ISO 20022 maximum length of the structured element (16) | yes | — | — |
+| `pst_cd_max_16` — ISO 20022 maximum length of the structured element (16) | yes | — | — |
+| `twn_nm_max_35` — ISO 20022 maximum length of the structured element (35) | yes | — | — |
 | `adr_line_no_repeat` | yes | — | — |
 
 A dash means the fetched document for that rail states nothing on the subject. It does not mean the rule is inverted, and we do not import a neighbouring rail's rule to fill the gap — silence is reported as silence.

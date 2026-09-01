@@ -8,11 +8,21 @@ import { CodeBlock } from "@/components/code-block"
 import { CostCalculator } from "./calculator"
 import { Faq } from "./faq"
 import { GetKeyButton } from "@/components/api-key-dialog"
+import { alternatesFor } from "@/lib/seo"
 
-export const metadata: Metadata = {
-  title: "Pricing",
-  description:
-    "Start free with 200 requests/month, prepay credit packs by card or USDC, or pay per call with x402. Fractions of a cent per request.",
+// Title and description are still static (not per-locale) — out of scope for
+// this pass (audit 2026-09-01, WEB-01/WEB-02: `alternates` only). Converted
+// from `export const metadata` to `generateMetadata` because a segment's
+// `alternates` REPLACES its parent's rather than merging into it, so the
+// canonical + hreflang set can only be added here, alongside a `params` read.
+export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
+  const { locale } = await params
+  return {
+    title: "Pricing",
+    description:
+      "Start free with 200 requests/month, prepay credit packs by card or USDC, or pay per call with x402. Fractions of a cent per request.",
+    alternates: alternatesFor(locale, "/pricing"),
+  }
 }
 
 const ENDPOINT_COUNT = 5

@@ -6,6 +6,42 @@ const SESSION_TTL_SECONDS = 60 * 60 * 24 * 7; // 7 days
 
 interface SessionPayload {
   iat: number;
+  /** Session generation. See getSessionVersion(). */
+  v: number;
+}
+
+/**
+ * SESSION_VERSION is the revocation switch (audit FRT-03, 2026-09-01).
+ *
+ * The session is stateless: nothing server-side records which tokens are alive,
+ * so /api/auth/logout can only delete the browser's copy. A token captured
+ * beforehand stayed valid for its full seven days, and nothing short of
+ * rotating SESSION_SECRET could cut it short.
+ *
+ * The version number is stamped into the signed payload and compared on every
+ * verify. Bumping SESSION_VERSION in the environment invalidates every session
+ * ever issued, immediately and without touching SESSION_SECRET — which matters
+ * because rotating the secret is the heavier, more error-prone move.
+ *
+ * Default 1, so the variable can stay unset until it is needed. Deploying this
+ * change invalidates the sessions signed before it (their payload has no `v`),
+ * which means one extra login; that is the intended semantics, not a defect.
+ *
+ * The seven-day TTL is kept on purpose: this dashboard is used continuously,
+ * and a shorter TTL would trade a real daily cost against a threat this switch
+ * already answers.
+ */
+function getSessionVersion(): number {
+  const raw = process.env.SESSION_VERSION;
+  if (raw === undefined || raw.trim() === '') return 1;
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < 1) {
+    // Falling back silently would quietly re-validate the very sessions the
+    // operator meant to cut. Say it out loud instead.
+    console.warn('[auth] SESSION_VERSION must be a positive integer; falling back to 1');
+    return 1;
+  }
+  return n;
 }
 
 /**
@@ -57,6 +93,10 @@ function verify(token: string): SessionPayload | null {
   try {
     const payload = JSON.parse(Buffer.from(body, 'base64url').toString('utf8'));
     if (typeof payload.iat !== 'number') return null;
+    // A token signed under another generation is refused even though its MAC is
+    // valid. Tokens issued before FRT-03 carry no `v` at all, so `undefined`
+    // fails this comparison and they are refused too — that is the point.
+    if (payload.v !== getSessionVersion()) return null;
     const ageSeconds = Math.floor(Date.now() / 1000) - payload.iat;
     if (ageSeconds < 0) return null;
     if (ageSeconds > SESSION_TTL_SECONDS) return null;
@@ -76,7 +116,7 @@ export async function isAuthenticated(): Promise<boolean> {
 export function getSessionCookieConfig() {
   return {
     name: SESSION_COOKIE,
-    value: sign({ iat: Math.floor(Date.now() / 1000) }),
+    value: sign({ iat: Math.floor(Date.now() / 1000), v: getSessionVersion() }),
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax' as const,

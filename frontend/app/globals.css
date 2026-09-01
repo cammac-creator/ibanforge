@@ -111,7 +111,13 @@
   --fg-1: #F5F3EF; /* warm white — titles (was #FAFAFA, less clinical) */
   --fg-2: #D4D4D8;
   --fg-3: #A1A1AA;
-  --fg-4: #82828C; /* lightened from #71717A → ~4.7:1 WCAG AA on ink surfaces */
+  /* Audit 2026-09-01 (WEB-08): the previous comment claimed "~4.7:1 on ink
+     surfaces" for #82828C. True on --ink-2 (4.74) and false everywhere else,
+     down to 4.46 on --ink-3 and on the cards, i.e. below the 4.5 AA floor on
+     the surfaces this token is most used on. A comment that states a passing
+     ratio is worse than none: it retires the question. #8A8A94 measures
+     5.82 / 5.60 / 5.27 / 4.96 on ink-0 to ink-3, above the floor everywhere. */
+  --fg-4: #8A8A94;
   --fg-5: #52525B;
 
   --amber-50:  #FFFBEB;
@@ -527,7 +533,13 @@
   --fst-3: #44403C;
   --hot: #FFF7ED;
   --ffg-2: #A8A29E;
-  --ffg-3: #78716C;
+  /* Audit 2026-09-01 (WEB-07): #78716C measured 4.12:1 on --coal and 3.65:1 on
+     --fst-1, both under the 4.5 AA floor, and this token carries .cue,
+     .st-num, .mod-note, .ep-d, .trust-n, the whole .json-out response block
+     and the LINKS in .reviewed. #8B837C measures 5.30 on --coal and 4.69 on
+     --fst-1. It stays at 4.07 on --fst-2, which no text in this ramp sits on
+     at body size; closing that one needs a lighter ramp, not a token swap. */
+  --ffg-3: #8B837C;
   --fquench: #38BDF8;
   --fok: #4ADE80;
   --fember-grad: linear-gradient(100deg, #F59E0B 10%, #EF4444 90%);

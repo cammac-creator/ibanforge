@@ -4,6 +4,7 @@ import { getTranslations } from "next-intl/server";
 import { Check, Scale, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { GetKeyButton } from "@/components/api-key-dialog";
+import { alternatesFor } from "@/lib/seo";
 
 export async function generateMetadata({
   params,
@@ -15,6 +16,7 @@ export async function generateMetadata({
   return {
     title: t("meta.title"),
     description: t("meta.description"),
+    alternates: alternatesFor(locale, "/compare"),
   };
 }
 

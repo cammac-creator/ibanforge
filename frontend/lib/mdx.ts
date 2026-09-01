@@ -1,6 +1,8 @@
 import fs from 'fs';
 import path from 'path';
 import { createElement, type ComponentProps } from 'react';
+import { notFound } from 'next/navigation';
+import { SLUG_PATTERN } from './content-slug';
 import matter from 'gray-matter';
 import remarkGfm from 'remark-gfm';
 import rehypePrettyCode, { type Options as RehypePrettyCodeOptions } from 'rehype-pretty-code';
@@ -74,6 +76,8 @@ export function getAllDocs(locale: string = 'en'): DocMeta[] {
 }
 
 export function getDoc(slug: string, locale: string = 'en'): { meta: DocMeta; content: string } {
+  // FRT-09 (2026-09-01): shape allowlist before the slug reaches a path.
+  if (!SLUG_PATTERN.test(slug)) notFound();
   const dir = docsDir(locale);
   const file = path.join(dir, `${slug}.mdx`);
 

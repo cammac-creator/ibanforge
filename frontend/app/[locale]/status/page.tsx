@@ -1,8 +1,26 @@
 import { getTranslations } from "next-intl/server";
+import { alternatesFor } from "@/lib/seo";
 
 export const revalidate = 300;
 
 const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || "https://api.ibanforge.com";
+
+/**
+ * PERF-07 (audit 2026-09-01): this page asked for ninety days of history every
+ * five minutes and waited as long as the API took. At twelve months of
+ * retention that query held the API for more than half a second, on a public
+ * page nobody had asked to be expensive. Thirty days is what the page actually
+ * publishes — the latency tiles were already computed over thirty — so the
+ * other sixty days were fetched, parsed and thrown away.
+ */
+const HISTORY_DAYS = 30;
+
+/**
+ * The page is regenerated every five minutes, so a slow API must cost one stale
+ * render, never a hanging one. Five seconds is far above the measured cost of
+ * the trimmed query and far below any wait a visitor would sit through.
+ */
+const HISTORY_TIMEOUT_MS = 5_000;
 
 interface DayStat {
   date: string;
@@ -17,6 +35,16 @@ interface DayStat {
    * the p95 still reports — that gap is the honest answer, not a defect.
    */
   p99_ms: number | null;
+}
+
+/** One row of /stats/history, before the nulls are normalised into DayStat. */
+interface HistoryRow {
+  date: string;
+  total_requests: number;
+  s5xx: number;
+  p50_ms?: number | null;
+  p95_ms?: number | null;
+  p99_ms?: number | null;
 }
 
 interface StatusData {
@@ -48,19 +76,20 @@ async function getStatusData(): Promise<StatusData> {
   const token = process.env.STATS_TOKEN;
   if (token) {
     try {
-      const res = await fetch(`${API_URL}/stats/history?period=90`, {
+      const fetched = fetch(`${API_URL}/stats/history?period=${HISTORY_DAYS}`, {
         headers: { Authorization: `Bearer ${token}` },
         next: { revalidate: 300 },
-      });
-      if (res.ok) {
-        const rows = (await res.json()) as Array<{
-          date: string;
-          total_requests: number;
-          s5xx: number;
-          p50_ms?: number | null;
-          p95_ms?: number | null;
-          p99_ms?: number | null;
-        }>;
+      }).then(async (res) => (res.ok ? ((await res.json()) as HistoryRow[]) : null));
+
+      /*
+       * Race a plain timer rather than abort. An AbortSignal would opt this
+       * fetch out of Next's data cache, which is the same trade lib/landing-
+       * stats.ts documents; and the point here is to stop waiting on a slow
+       * API, not to save it a request already in flight.
+       */
+      const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), HISTORY_TIMEOUT_MS));
+      const rows = await Promise.race([fetched.catch(() => null), timeout]);
+      if (rows) {
         days = rows.map((r) => ({
           date: r.date,
           total_requests: r.total_requests ?? 0,
@@ -74,6 +103,10 @@ async function getStatusData(): Promise<StatusData> {
         }));
       }
     } catch {
+      // Timeout, refusal or unreachable API. An empty history makes every
+      // figure on this page render as an em dash, which is the honest answer:
+      // a page inviting a prospect to trust the service must not fill a gap
+      // with a number nobody measured.
       days = [];
     }
   }
@@ -94,7 +127,14 @@ const LOCALE_TAG: Record<string, string> = { en: "en-US", fr: "fr-CH", de: "de-C
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: "status" });
-  return { title: `${t("title")} | IBANforge`, description: t("subtitle") };
+  // No "| IBANforge" suffix: the locale layout's title template already
+  // appends it, so this used to render "... | IBANforge | IBANforge"
+  // (WEB-20, audit 2026-09-01).
+  return {
+    title: t("title"),
+    description: t("subtitle"),
+    alternates: alternatesFor(locale, "/status"),
+  };
 }
 
 export default async function StatusPage({ params }: { params: Promise<{ locale: string }> }) {
@@ -105,7 +145,7 @@ export default async function StatusPage({ params }: { params: Promise<{ locale:
 
   const dayMap = new Map(data.days.map((d) => [d.date, d]));
   const bars: { key: string; label: string; day: DayStat | null }[] = [];
-  for (let i = 89; i >= 0; i--) {
+  for (let i = HISTORY_DAYS - 1; i >= 0; i--) {
     const d = new Date();
     d.setDate(d.getDate() - i);
     const key = d.toISOString().slice(0, 10);
@@ -132,19 +172,24 @@ export default async function StatusPage({ params }: { params: Promise<{ locale:
       .sort((a, b) => a - b);
     return vals.length ? vals[Math.floor(vals.length / 2)] : null;
   }
-  const p50 = medianOf((d) => d.p50_ms, 30);
-  const p95 = medianOf((d) => d.p95_ms, 30);
+  const p50 = medianOf((d) => d.p50_ms, HISTORY_DAYS);
+  const p95 = medianOf((d) => d.p95_ms, HISTORY_DAYS);
   // Published beside the other two because the median is not what an
   // integrator meets: a payout batch makes thousands of calls, and the slowest
   // one in a hundred is the one that sets its timeout budget. Days without
   // enough traffic to have a ninety-ninth percentile contribute nothing here
   // rather than a number borrowed from the p95.
-  const p99 = medianOf((d) => d.p99_ms, 30);
+  const p99 = medianOf((d) => d.p99_ms, HISTORY_DAYS);
 
+  /*
+   * The ninety-day tile is gone with the ninety-day query (PERF-07). Keeping it
+   * would have printed a thirty-day rate under a "90 days" label, which is the
+   * one thing this page must never do; leaving it permanently blank would be
+   * honest but useless. The `status.w90` message key is now unused.
+   */
   const windows: { label: string; value: string | null }[] = [
     { label: t("w7"), value: successRate(data.days, 7) },
-    { label: t("w30"), value: successRate(data.days, 30) },
-    { label: t("w90"), value: successRate(data.days, 90) },
+    { label: t("w30"), value: successRate(data.days, HISTORY_DAYS) },
   ];
 
   return (
@@ -166,7 +211,7 @@ export default async function StatusPage({ params }: { params: Promise<{ locale:
         {data.version && <span className="font-mono text-sm"> · v{data.version}</span>}
       </p>
 
-      <div className="mt-10 grid grid-cols-3 gap-px rounded-lg border border-border bg-border overflow-hidden">
+      <div className="mt-10 grid grid-cols-2 gap-px rounded-lg border border-border bg-border overflow-hidden">
         {windows.map((w) => (
           <div key={w.label} className="bg-card p-4">
             <p className="font-heading text-2xl font-semibold tabular-nums">

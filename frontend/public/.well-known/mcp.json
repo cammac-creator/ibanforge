@@ -1,15 +1,20 @@
 {
   "name": "ibanforge",
-  "description": "Pre-payout screening for AI agents — check the bank behind a counterparty IBAN before you send funds: IBAN validation, BIC/SWIFT lookup, Swiss BC-Nummer clearing (full SIX BankMaster payment-rail participation + QR-IID — the deepest Swiss clearing data in any public API), EMI/vIBAN classification, SEPA + VoP reachability and sanctions + risk scoring.",
-  "version": "1.3.3",
+  "description": "Know the bank behind any IBAN: IBAN validation, BIC/SWIFT lookup, Swiss BC-Nummer clearing (full SIX BankMaster payment-rail participation + QR-IID — the deepest Swiss clearing data in any public API), EMI/vIBAN classification, SEPA + VoP reachability and sanctions + risk scoring, for developers and AI agents, by REST or MCP.",
+  "version": "1.4.4",
   "install": {
     "npm": "npx -y ibanforge-mcp",
     "config": {
       "mcpServers": {
         "ibanforge": {
           "command": "npx",
-          "args": ["-y", "ibanforge-mcp"],
-          "env": { "IBANFORGE_API_KEY": "ifk_optional_free_tier_key" }
+          "args": [
+            "-y",
+            "ibanforge-mcp"
+          ],
+          "env": {
+            "IBANFORGE_API_KEY": "ifk_optional_free_tier_key"
+          }
         }
       }
     },
@@ -18,57 +23,153 @@
   "tools": [
     {
       "name": "validate_iban",
-      "description": "Validate one IBAN and enrich it: BIC/SWIFT, country, EMI/vIBAN issuer class, SEPA + VoP reachability, risk indicators, and Swiss bc_nummer for CH/LI. Cost: $0.005 USDC.",
+      "description": "Validate one IBAN and enrich it with the issuing bank, BIC, EMI/vIBAN class, SEPA + VoP reachability, risk indicators and Swiss BC-Nummer. Cost: $0.005 USDC.",
       "inputSchema": {
         "type": "object",
         "properties": {
-          "iban": { "type": "string", "description": "The IBAN to validate (e.g., CH10 0023 0000 0000 1234 5)" }
+          "iban": {
+            "type": "string",
+            "description": "The IBAN to validate (e.g., CH10 0023 0000 0000 1234 5)"
+          }
         },
-        "required": ["iban"]
+        "required": [
+          "iban"
+        ]
       }
     },
     {
       "name": "batch_validate_iban",
-      "description": "Validate up to 100 IBANs in one call. Cost: $0.002 USDC per IBAN (e.g. 100 IBANs = $0.20).",
+      "description": "Validate up to 100 IBANs in one call, with the same enrichment as a single validation. Cost: $0.002 USDC per IBAN (e.g. 100 IBANs = $0.20).",
       "inputSchema": {
         "type": "object",
         "properties": {
-          "ibans": { "type": "array", "items": { "type": "string" }, "description": "Array of IBANs to validate (1-100)" }
+          "ibans": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Array of IBANs to validate (1-100)"
+          }
         },
-        "required": ["ibans"]
+        "required": [
+          "ibans"
+        ]
       }
     },
     {
       "name": "lookup_bic",
-      "description": "Resolve a BIC/SWIFT code into bank name, country, city and LEI. Backed by 121k+ BIC entries, refreshed monthly. Cost: $0.003 USDC.",
+      "description": "Resolve a BIC/SWIFT code into the institution behind it: legal name, country, city, LEI and registered address where published. Cost: $0.003 USDC.",
       "inputSchema": {
         "type": "object",
         "properties": {
-          "bic": { "type": "string", "description": "BIC code (8 or 11 characters, e.g., UBSWCHZH80A)" }
+          "bic": {
+            "type": "string",
+            "description": "BIC code (8 or 11 characters, e.g., UBSWCHZH80A)"
+          }
         },
-        "required": ["bic"]
-      }
-    },
-    {
-      "name": "lookup_ch_clearing",
-      "description": "Resolve a Swiss BC-Nummer / IID into institution name, type, address, full payment-rail participation (SIC, euroSIC, CHF instant, LSV+/BDD) and QR-IID — the deepest Swiss clearing data in any public API (1,100+ SIX BankMaster entries). Cost: $0.003 USDC.",
-      "inputSchema": {
-        "type": "object",
-        "properties": {
-          "iid": { "type": "string", "description": "Swiss IID / BC-Nummer (1-5 digits, e.g., 230 for UBS Switzerland)" }
-        },
-        "required": ["iid"]
+        "required": [
+          "bic"
+        ]
       }
     },
     {
       "name": "check_compliance",
-      "description": "Pre-flight compliance triage on an IBAN: bank-BIC-level sanctions screening (OFAC, EU, UN) + FATF jurisdiction flag + SEPA Instant reachability + VoP (EU 2024/886) participant + risk score 0-100. The UN axis is thin (a handful of bank BICs); no SECO (Swiss) list is screened. Informational, not a regulated AML/CFT product. Cost: $0.02 USDC.",
+      "description": "Pre-flight compliance triage on an IBAN or a BIC: bank-level sanctions screening, FATF jurisdiction flag, SEPA Instant reachability, VoP participation and a 0-100 risk score. Cost: $0.02 USDC.",
       "inputSchema": {
         "type": "object",
         "properties": {
-          "iban": { "type": "string", "description": "IBAN to check" }
+          "iban": {
+            "type": "string",
+            "description": "IBAN to check"
+          },
+          "bic": {
+            "type": "string",
+            "description": "BIC to check instead of an IBAN (never both)"
+          }
+        }
+      }
+    },
+    {
+      "name": "lookup_ch_clearing",
+      "description": "Resolve a Swiss BC-Nummer / IID into the institution, its seat address, its BIC and its full payment-rail participation including QR-IID. Cost: $0.003 USDC.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "iid": {
+            "type": "string",
+            "description": "Swiss IID / BC-Nummer (1-5 digits, e.g., 230 for UBS Switzerland)"
+          }
         },
-        "required": ["iban"]
+        "required": [
+          "iid"
+        ]
+      }
+    },
+    {
+      "name": "validate_payment_reference",
+      "description": "Check a structured payment reference (RF/ISO 11649, Swiss QRR, Belgian OGM/VCS, Finnish viitenumero) against the dated document that publishes its rule. Cost: free.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "reference": {
+            "type": "string",
+            "description": "The structured reference (RF/ISO 11649, Swiss QRR, Belgian OGM/VCS, Finnish viitenumero)"
+          },
+          "iban": {
+            "type": "string",
+            "description": "Optional IBAN, to also get the QRR/QR-IBAN pairing verdict"
+          }
+        },
+        "required": [
+          "reference"
+        ]
+      }
+    },
+    {
+      "name": "check_postal_address",
+      "description": "Check a structured ISO 20022 postal address against one payment rail's published rules (sps, hvps_plus or fedwire), each finding citing its source document. Cost: free.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "scheme": {
+            "type": "string",
+            "enum": [
+              "sps",
+              "hvps_plus",
+              "fedwire"
+            ],
+            "description": "The payment rail whose published address rules to apply"
+          },
+          "address": {
+            "type": "object",
+            "description": "ISO 20022 PostalAddress in snake_cased tags: strt_nm, bldg_nb, pst_cd, twn_nm, ctry, adr_line"
+          }
+        },
+        "required": [
+          "scheme",
+          "address"
+        ]
+      }
+    },
+    {
+      "name": "send_feedback",
+      "description": "Report incorrect data or claim an x402 refund, without opening an account. Cost: free.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "error_type": {
+            "type": "string",
+            "description": "What kind of problem is being reported"
+          },
+          "message": {
+            "type": "string",
+            "description": "What is wrong, in plain words"
+          }
+        },
+        "required": [
+          "error_type",
+          "message"
+        ]
       }
     }
   ],

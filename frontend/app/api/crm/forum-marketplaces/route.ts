@@ -25,6 +25,13 @@ export async function GET() {
 }
 
 export async function PATCH(req: NextRequest) {
+  /*
+   * Auth before input validation (FRT-11, 2026-09-01): this handler used to
+   * answer 400 to an unauthenticated caller with a malformed parameter, which
+   * hands a prober the parameter grammar for free. forward() checks again; the
+   * cost is one extra HMAC verify on a request that was going to be refused.
+   */
+  if (!(await isAuthenticated())) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   const slug = req.nextUrl.searchParams.get('slug') ?? '';
   if (!/^[a-z0-9-]+$/.test(slug)) return NextResponse.json({ error: 'invalid_slug' }, { status: 400 });
   const body = await req.text();

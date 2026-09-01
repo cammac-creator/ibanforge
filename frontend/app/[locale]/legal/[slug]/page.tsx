@@ -1,6 +1,7 @@
 import { MDXRemote } from "next-mdx-remote/rsc";
 import { getLegalDoc } from "@/lib/legal";
 import { mdxOptions, mdxComponents } from "@/lib/mdx";
+import { alternatesFor } from "@/lib/seo";
 import { getTranslations } from "next-intl/server";
 import { notFound } from "next/navigation";
 import Link from "next/link";
@@ -15,12 +16,15 @@ export async function generateMetadata({
 }: {
   params: Promise<{ locale: string; slug: string }>;
 }) {
-  const { slug } = await params;
+  const { locale, slug } = await params;
   const doc = getLegalDoc(slug);
-  if (!doc) return { title: "Not Found | IBANforge" };
+  // No "| IBANforge" suffix in either branch: the locale layout's title
+  // template already appends it (WEB-20, audit 2026-09-01).
+  if (!doc) return { title: "Not Found" };
   return {
-    title: `${doc.meta.title} | IBANforge`,
+    title: doc.meta.title,
     description: doc.meta.description,
+    alternates: alternatesFor(locale, `/legal/${slug}`),
   };
 }
 

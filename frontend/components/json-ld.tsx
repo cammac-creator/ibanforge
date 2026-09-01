@@ -1,15 +1,29 @@
 /**
  * JSON-LD structured data for IBANforge.
  *
- * Four schemas help AI agents and search engines understand the product:
+ * Three schemas help AI agents and search engines understand the product:
  * - SoftwareApplication: full product description with offers + featureList
  * - Organization: name, logo, social links
  * - HowTo: 3-step integration guide (key/x402 → validate → MCP)
- * - BreadcrumbList: site hierarchy hint for crawlers
  *
  * FAQPage and WebAPI were removed 2026-08: Google dropped the FAQ rich result
  * on 2026-05-07, and no consumer of the WebAPI type was ever identified — the
- * OpenAPI pointer lives in Breadcrumb and /.well-known/api-catalog instead.
+ * OpenAPI pointer lives in /.well-known/api-catalog instead.
+ *
+ * `priceCurrency` is 'USD' and not 'USDC' since the same audit: the field takes
+ * an ISO 4217 code, 'USDC' is not one, and Search Console reports it as an
+ * invalid value on every offer. Settlement really happens in USDC on Base, and
+ * the stablecoin is pegged to the dollar the prices are quoted in, so 'USD' is
+ * the truthful currency of the price. The payment asset is stated where it can
+ * be stated properly: the x402 402 responses and the pricing page.
+ *
+ * BreadcrumbList was removed 2026-09-01 (audit WEB-15). This component is
+ * embedded in the LOCALE LAYOUT, so its single hard-coded trail
+ * "Home > Docs > OpenAPI" was emitted on all 170 pages, describing a position
+ * in the hierarchy that is true of none of them and contradicting, on every
+ * doc page, the accurate BreadcrumbList that `docs/[slug]/page.tsx` builds from
+ * its own frontmatter. A breadcrumb is a per-page statement; the only place it
+ * can be true is the page.
  *
  * Embedded in app/[locale]/layout.tsx <head>. Inline JSON.stringify is safe
  * here because we control the source — none of these strings contain user
@@ -32,7 +46,7 @@ const SOFTWARE_APPLICATION = {
       name: 'Validate IBAN',
       description: 'Validate single IBAN with BIC lookup, issuer classification, SEPA + VoP flags',
       price: '0.005',
-      priceCurrency: 'USDC',
+      priceCurrency: 'USD',
       eligibleQuantity: { '@type': 'QuantitativeValue', value: 1, unitText: 'request' },
     },
     {
@@ -40,7 +54,7 @@ const SOFTWARE_APPLICATION = {
       name: 'Batch validate IBANs',
       description: 'Validate up to 100 IBANs in one call',
       price: '0.002',
-      priceCurrency: 'USDC',
+      priceCurrency: 'USD',
       eligibleQuantity: { '@type': 'QuantitativeValue', value: 1, unitText: 'IBAN' },
     },
     {
@@ -48,7 +62,7 @@ const SOFTWARE_APPLICATION = {
       name: 'Lookup BIC',
       description: 'Lookup BIC/SWIFT against 121k+ BIC entries from public sources (GLEIF, SWIFT directory, Bundesbank, SIX, NBP, EBA Step2 SCT), with LEI enrichment for 39k+ rows sourced from GLEIF',
       price: '0.003',
-      priceCurrency: 'USDC',
+      priceCurrency: 'USD',
       eligibleQuantity: { '@type': 'QuantitativeValue', value: 1, unitText: 'request' },
     },
     {
@@ -56,7 +70,7 @@ const SOFTWARE_APPLICATION = {
       name: 'Swiss clearing lookup',
       description: 'Swiss BC-Nummer / IID lookup (1,100+ SIX BankMaster entries)',
       price: '0.003',
-      priceCurrency: 'USDC',
+      priceCurrency: 'USD',
       eligibleQuantity: { '@type': 'QuantitativeValue', value: 1, unitText: 'request' },
     },
     {
@@ -65,7 +79,7 @@ const SOFTWARE_APPLICATION = {
       description:
         'Full compliance triage: sanctions (OFAC), FATF, SEPA Instant, VoP, risk score (0-100)',
       price: '0.02',
-      priceCurrency: 'USDC',
+      priceCurrency: 'USD',
       eligibleQuantity: { '@type': 'QuantitativeValue', value: 1, unitText: 'request' },
     },
     {
@@ -135,17 +149,7 @@ const HOW_TO = {
   ],
 };
 
-const BREADCRUMB = {
-  '@context': 'https://schema.org',
-  '@type': 'BreadcrumbList',
-  itemListElement: [
-    { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://ibanforge.com/' },
-    { '@type': 'ListItem', position: 2, name: 'Docs', item: 'https://ibanforge.com/docs' },
-    { '@type': 'ListItem', position: 3, name: 'OpenAPI', item: 'https://api.ibanforge.com/openapi.json' },
-  ],
-};
-
-const SCHEMAS = [SOFTWARE_APPLICATION, ORGANIZATION, HOW_TO, BREADCRUMB];
+const SCHEMAS = [SOFTWARE_APPLICATION, ORGANIZATION, HOW_TO];
 
 export function JsonLd() {
   return (

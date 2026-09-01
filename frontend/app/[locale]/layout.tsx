@@ -6,6 +6,7 @@ import { routing } from "@/i18n/routing";
 import { ConditionalShell } from "@/components/conditional-shell";
 import { JsonLd } from "@/components/json-ld";
 import { ApiKeyDialogProvider } from "@/components/api-key-dialog";
+import { urlFor } from "@/lib/seo";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -69,21 +70,23 @@ export async function generateMetadata({
   const meta =
     META_BY_LOCALE[locale as keyof typeof META_BY_LOCALE] ?? META_BY_LOCALE.en;
 
-  const baseUrl = "https://ibanforge.com";
-  const canonicalUrl = locale === "en" ? baseUrl : `${baseUrl}/${locale}`;
+  const canonicalUrl = urlFor(locale);
 
   return {
     title: { default: meta.title, template: "%s | IBANforge" },
     description: meta.description,
-    alternates: {
-      canonical: canonicalUrl,
-      languages: {
-        en: `${baseUrl}`,
-        "fr-CH": `${baseUrl}/fr`,
-        "de-CH": `${baseUrl}/de`,
-        "x-default": `${baseUrl}`,
-      },
-    },
+    // ⚠️ No `alternates` here, deliberately, since the audit of 2026-09-01.
+    //
+    // A layout's metadata is inherited by every page below it, and a canonical
+    // URL is the one field that must never be: this block used to hand the
+    // locale HOME's URL to all 170 pages, so 52 of them declared another page
+    // as their canonical version and 18 named `https://ibanforge.com`, which
+    // answers 307. The layout cannot know the path it is wrapping, so the only
+    // place the truth exists is the page itself.
+    //
+    // Every page therefore declares its own via `alternatesFor(locale, path)`
+    // from `lib/seo.ts`, which returns the canonical and the hreflang set
+    // together so one cannot be shipped without the other (WEB-01, WEB-02).
     openGraph: {
       type: "website",
       locale: meta.ogLocale,

@@ -189,6 +189,10 @@ Chaque finding porte aussi un champ `source`, élidé ci-dessus pour la largeur 
 | `adr_tp_forbidden` — Address Type « Must not be sent » | oui | — | — |
 | `adr_line_max_2` | oui | — | oui |
 | `adr_line_max_length_70` | oui | — | oui |
+| `strt_nm_max_70` — longueur maximale ISO 20022 de l’élément structuré (70) | oui | — | — |
+| `bldg_nb_max_16` — longueur maximale ISO 20022 de l’élément structuré (16) | oui | — | — |
+| `pst_cd_max_16` — longueur maximale ISO 20022 de l’élément structuré (16) | oui | — | — |
+| `twn_nm_max_35` — longueur maximale ISO 20022 de l’élément structuré (35) | oui | — | — |
 | `adr_line_no_repeat` | oui | — | — |
 
 Un tiret signifie que le document consulté pour ce rail n'énonce rien sur le sujet. Il ne signifie pas que la règle est inversée, et nous n'importons pas la règle d'un rail voisin pour combler le trou — le silence est rapporté comme un silence.

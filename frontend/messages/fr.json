@@ -70,7 +70,7 @@
       },
       "1": {
         "badge": "MCP-native — pour agents",
-        "title": "7 outils, sans inscription",
+        "title": "8 outils, sans inscription",
         "description": "Serveur Model Context Protocol natif (stdio + HTTP). Claude, Cursor et tout agent MCP s’installent en une ligne : npx -y ibanforge-mcp."
       },
       "2": {
@@ -233,7 +233,7 @@
       "sub": "Cette page parle aussi robot — chaque affirmation ci-dessus est lisible par machine, et chaque endpoint est payable sans humain dans la boucle.",
       "illoAlt": "Un bras robotique dépose une pièce incandescente dans une fente de paiement",
       "mcpTitle": "MCP natif",
-      "mcpBody": "7 outils, sans inscription. Claude, Cursor et tout agent MCP s'installent en une ligne :",
+      "mcpBody": "8 outils, sans inscription. Claude, Cursor et tout agent MCP s'installent en une ligne :",
       "x402Title": "Micropaiements x402",
       "x402Body": "Les agents autonomes paient à la requête en USDC — sans compte, sans checkout, règlement on-chain.",
       "docsTitle": "Docs lisibles par machine",
@@ -363,7 +363,7 @@
       },
       "3": {
         "question": "Et pour les gros volumes ?",
-        "answer": "La tarification à l'appel évolue linéairement sans limite de débit. Pour de très gros volumes (millions d'appels/mois), ouvrez un ticket sur notre dépôt GitHub (github.com/cammac-creator/ibanforge) — nous pourrons discuter d'une tarification personnalisée ou d'un arrangement en volume plus adapté à votre cas d'usage."
+        "answer": "La tarification à l'appel évolue linéairement sans limite de débit. Pour de très gros volumes (millions d'appels/mois), ou pour intégrer l'API dans votre propre produit, la voie est celle des éditeurs (Éditeur/OEM) : tarification au volume, SLA écrit et engagements de support. Elle est décrite sur notre page éditeurs (ibanforge.com/fr/vendors), et support@ibanforge.com ouvre la discussion."
       },
       "heading": "Questions fréquentes"
     },
@@ -411,6 +411,8 @@
       "highlight": "ground"
     },
     "subtitle": "Testez l'API gratuitement — sans paiement, sans inscription. Chaque réponse ci-dessous est réelle et en direct.",
+    "metaTitle": "Playground",
+    "sectionTitle": "Essayer un appel en direct",
     "tabs": {
       "iban": "IBAN",
       "bic": "BIC",
@@ -490,7 +492,9 @@
     "error": {
       "unexpected": "Erreur inattendue de l'API.",
       "network": "Impossible de contacter l'API. Vérifiez votre connexion ou réessayez ultérieurement.",
-      "unavailable": "Le playground est momentanément indisponible. C'est de notre côté, pas du vôtre ; l'API elle-même fonctionne. Réessayez dans un instant."
+      "unavailable": "Le playground est momentanément indisponible. C'est de notre côté, pas du vôtre ; l'API elle-même fonctionne. Réessayez dans un instant.",
+      "forbiddenOrigin": "Ce playground ne répond qu'aux requêtes venant de ibanforge.com.",
+      "rateLimited": "Trop d'appels au playground depuis votre réseau, réessayez dans quelques minutes."
     },
     "result": {
       "label": "Réponse"
@@ -914,8 +918,8 @@
   },
   "agents": {
     "meta": {
-      "title": "Serveur MCP de validation d’IBAN — 7 outils, sans inscription",
-      "description": "Intégrez IBANforge en 60 secondes — Claude Desktop, Cursor, Cline. Serveur MCP natif à 7 outils. Clé API gratuite (200 requêtes/mois, sans carte). Paiement à l’appel en USDC via x402 sur Base L2 : un agent paie sans compte."
+      "title": "Serveur MCP de validation d’IBAN — 8 outils, sans inscription",
+      "description": "Intégrez IBANforge en 60 secondes — Claude Desktop, Cursor, Cline. Serveur MCP natif à 8 outils. Clé API gratuite (200 requêtes/mois, sans carte). Paiement à l’appel en USDC via x402 sur Base L2 : un agent paie sans compte."
     },
     "eyebrow": "Pour les agents IA",
     "hero": {
@@ -931,7 +935,7 @@
       "mcp": {
         "badge": "Voie 1 · MCP",
         "title": "Serveur MCP natif",
-        "description": "Branchez-le sur Claude Desktop, Cursor ou Cline. 7 outils auto-découverts. Idéal pour les agents desktop et les assistants IDE.",
+        "description": "Branchez-le sur Claude Desktop, Cursor ou Cline. 8 outils auto-découverts. Idéal pour les agents desktop et les assistants IDE.",
         "tradeoff": "Stdio ou HTTP · npm ou distant"
       },
       "apiKey": {
@@ -950,12 +954,12 @@
     "mcp": {
       "eyebrow": "Voie 1 · MCP",
       "heading": "Installer dans Claude Desktop, Cursor ou Cline",
-      "description": "Le serveur MCP IBANforge expose 7 outils à votre client IA. Deux transports : stdio via package npm ou HTTP streamable distant.",
+      "description": "Le serveur MCP IBANforge expose 8 outils à votre client IA. Deux transports : stdio via package npm ou HTTP streamable distant.",
       "claudeLabel": "Stdio · Claude Desktop",
       "claudePath": "Ajouter à ~/Library/Application Support/Claude/claude_desktop_config.json (macOS) ou %APPDATA%/Claude/claude_desktop_config.json (Windows).",
       "httpLabel": "HTTP · endpoint distant",
       "httpDescription": "Pointez n'importe quel client MCP compatible vers :",
-      "toolsHeading": "7 outils disponibles"
+      "toolsHeading": "8 outils disponibles"
     },
     "apiKey": {
       "eyebrow": "Voie 2 · Clé gratuite",
@@ -999,8 +1003,7 @@
     "disrupted": "Perturbation en cours",
     "w7": "Taux de succès 7 jours",
     "w30": "Taux de succès 30 jours",
-    "w90": "Taux de succès 90 jours",
-    "last90": "90 derniers jours",
+    "last90": "30 derniers jours",
     "barsHint": "Une barre par jour — vert : aucune erreur serveur, ambre : 5xx isolées, rouge : >1 % d'erreurs serveur.",
     "noData": "pas de données",
     "method": "Méthode : taux de succès = part des requêtes servies sans erreur serveur 5xx, calculé depuis le journal de requêtes de production (les erreurs client comme 402/404 sont un comportement attendu de l'API et ne comptent pas contre la disponibilité). Page rafraîchie toutes les 5 minutes. Des SLA écrits sont disponibles dans les accords Editor/OEM.",
@@ -1010,6 +1013,10 @@
     "latencyP99": "99e centile",
     "latencyNote": "Mesuré sur le trafic de production des 30 derniers jours, appels refusés exclus : une requête écartée en une milliseconde par le mur payant ne prouve aucune rapidité. Les journées trop creuses sont laissées de côté plutôt que de recevoir un centile tiré d'une poignée de mesures. Le 99e centile garde sa propre barre, plus haute : en dessous de cent mesures dans la journée, il n'y a pas de 99e centile à publier, seulement le 95e sous un autre nom.",
     "latencyNoData": "trafic servi insuffisant pour mesurer"
+  },
+  "openapi": {
+    "title": "Référence OpenAPI",
+    "description": "Référence OpenAPI 3.1 en direct de l'API IBANforge : cinq endpoints payants, une démo gratuite, la création de clé et le health, tous essayables dans le navigateur."
   },
   "changelog": {
     "title": "Changelog",
@@ -1150,7 +1157,7 @@
         },
         "agents": {
           "label": "Agents IA (MCP, paiement autonome)",
-          "ibanforge": "Serveur MCP natif (7 outils) + paiement x402 en USDC : un agent paie sans compte",
+          "ibanforge": "Serveur MCP natif (8 outils) + paiement x402 en USDC : un agent paie sans compte",
           "ibancom": "Non",
           "ibanapi": "Non",
           "libs": "Non (une bibliothèque, pas un service)"
@@ -1232,6 +1239,14 @@
     "noKey": "Collez la clé qui vous a été remise. Rien d'autre ne vous identifie ici : pas de compte, pas de mot de passe.",
     "invalid": "Cette clé n'a pas été reconnue. Elle a peut-être été révoquée ou renouvelée.",
     "unreachable": "L'API est injoignable. Votre clé n'a été envoyée nulle part ailleurs.",
+    "firstCallTitle": "Cette clé n'a pas encore appelé",
+    "firstCallBody": "Rien à rapporter tant qu'un premier appel n'est pas arrivé. Voici cet appel, prêt à coller, avec votre clé dedans.",
+    "firstCallCopy": "Copier la commande",
+    "firstCallCopied": "Copié",
+    "firstCallRun": "Lancer cet appel maintenant",
+    "firstCallRunning": "Appel en cours…",
+    "firstCallResult": "Ce que l'API a répondu",
+    "firstCallFailed": "L'appel n'a pas pu partir de cette page. Votre clé a été envoyée à l'API et nulle part ailleurs ; essayez la commande ci-dessus depuis un terminal.",
     "quotaTitle": "Ce mois-ci",
     "used": "Appels consommés",
     "remaining": "Restant",

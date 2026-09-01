@@ -2,6 +2,7 @@ import { MDXRemote } from "next-mdx-remote/rsc";
 import { getTranslations } from "next-intl/server";
 import { getDoc, mdxOptions, mdxComponents } from "@/lib/mdx";
 import { GetKeyButton } from "@/components/api-key-dialog";
+import { alternatesFor, ogImageFor } from "@/lib/seo";
 import { notFound } from "next/navigation";
 
 export const dynamicParams = true;
@@ -30,17 +31,29 @@ export async function generateMetadata({
 }) {
   const { locale, slug } = await params;
   const doc = tryGetDoc(slug, locale);
-  if (!doc) return { title: "Not Found | IBANforge Docs" };
+  if (!doc) return { title: "Not Found" };
   const url = `https://ibanforge.com/${locale}/docs/${slug}`;
   return {
-    title: `${doc.meta.title} | IBANforge Docs`,
+    // No brand here: the locale layout's title template already appends
+    // "| IBANforge". Written out, this page used to render
+    // "… | IBANforge Docs | IBANforge" (WEB-20, audit 2026-09-01).
+    title: doc.meta.title,
     description: doc.meta.description,
-    alternates: { canonical: url },
+    // `alternatesFor` carries the canonical AND the hreflang set. Writing
+    // `{ canonical: url }` alone here is what erased the `languages` block from
+    // all 116 doc and blog pages: a segment's `alternates` replaces its
+    // parent's, it does not merge into it (WEB-02).
+    alternates: alternatesFor(locale, `/docs/${slug}`),
     openGraph: {
       type: "article",
       title: doc.meta.title,
       description: doc.meta.description,
       url,
+      // Same replacement rule, same consequence one field over: an `openGraph`
+      // object without `images` overrode `app/[locale]/opengraph-image.tsx` and
+      // left the docs, the pages people actually share, with no share card at
+      // all (WEB-12).
+      images: [ogImageFor(locale)],
     },
   };
 }

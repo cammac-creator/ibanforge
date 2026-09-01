@@ -1,6 +1,9 @@
 import { MDXRemote } from "next-mdx-remote/rsc";
 import { mdxOptions, mdxComponents } from "@/lib/mdx";
 import { getTranslations } from "next-intl/server";
+import { alternatesFor } from "@/lib/seo";
+// Drops CHANGELOG.md's own `# Changelog`, which was a second h1 on this page.
+import { stripLeadingH1 } from "@/lib/changelog-md";
 
 export const revalidate = 3600;
 
@@ -25,7 +28,7 @@ async function getChangelog(): Promise<string | null> {
   try {
     const res = await fetch(CHANGELOG_URL, { next: { revalidate: 3600 } });
     if (!res.ok) return null;
-    return await res.text();
+    return stripLeadingH1(await res.text());
   } catch {
     return null;
   }
@@ -34,7 +37,13 @@ async function getChangelog(): Promise<string | null> {
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: "changelog" });
-  return { title: `${t("title")} | IBANforge`, description: t("subtitle") };
+  // No brand: the locale layout's template appends "| IBANforge" already, and
+  // this title used to render "Changelog | IBANforge | IBANforge" (WEB-20).
+  return {
+    title: t("title"),
+    description: t("subtitle"),
+    alternates: alternatesFor(locale, "/changelog"),
+  };
 }
 
 export default async function ChangelogPage({ params }: { params: Promise<{ locale: string }> }) {

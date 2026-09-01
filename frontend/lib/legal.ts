@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import matter from 'gray-matter';
+import { SLUG_PATTERN } from './content-slug';
 
 /**
  * Legal documents (terms, privacy, dpa, imprint) live in content/legal/ as a
@@ -23,6 +24,13 @@ export const LEGAL_SLUGS = ['terms', 'privacy', 'dpa', 'sla', 'imprint'] as cons
 
 export function getLegalDoc(slug: string): { meta: LegalMeta; content: string } | null {
   if (!(LEGAL_SLUGS as readonly string[]).includes(slug)) return null;
+  /*
+   * FRT-09 (2026-09-01), second lock. LEGAL_SLUGS already closes the door on
+   * path traversal; the shape check is here so that adding a slug to that list
+   * later cannot reopen it by accident. `null` rather than notFound(): the
+   * caller contract is a nullable return, and getAllLegalDocs maps over it.
+   */
+  if (!SLUG_PATTERN.test(slug)) return null;
   const file = path.join(LEGAL_DIR, `${slug}.mdx`);
   if (!fs.existsSync(file)) return null;
   const raw = fs.readFileSync(file, 'utf-8');

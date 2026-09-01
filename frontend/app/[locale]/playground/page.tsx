@@ -76,6 +76,10 @@ export default function PlaygroundPage() {
         // French page).
         const msg =
           (data?.error === "playground_unavailable" && t("error.unavailable")) ||
+          // The route's two other named refusals. Without these branches they
+          // reached the visitor as the raw English `message` of an API error.
+          (data?.error === "forbidden_origin" && t("error.forbiddenOrigin")) ||
+          (data?.error === "rate_limited" && t("error.rateLimited")) ||
           (typeof data?.message === "string" && data.message) ||
           (typeof data?.error === "string" && data.error) ||
           t("error.unexpected")
@@ -120,7 +124,13 @@ export default function PlaygroundPage() {
       </div>
 
       {/* Tabs (segmented control) */}
-      <div className="flex flex-col gap-5">
+      <section className="flex flex-col gap-5">
+        {/* The page went straight from its `h1` to the footer's `h3`, a level
+            skipped in the outline (WEB-19, audit 2026-09-01). This heading
+            names the interactive block for a screen reader and closes the gap;
+            it is `sr-only` because the eyebrow and the title above already say
+            it to everyone else. */}
+        <h2 className="sr-only">{t("sectionTitle")}</h2>
         <Tabs value={activeTab} onValueChange={(v) => changeTab(v as PlaygroundMode)}>
           <TabsList className="w-full flex-wrap sm:w-fit">
             {MODES.map((m) => (
@@ -197,7 +207,7 @@ export default function PlaygroundPage() {
         ) : (
           result && <ResultCard mode={activeTab} data={result} animateKey={seq} />
         )}
-      </div>
+      </section>
 
       {/* Peak of intent. The visitor has just watched the API answer on their
           own input; until 2026-08-20 the only exit here was "See the docs",

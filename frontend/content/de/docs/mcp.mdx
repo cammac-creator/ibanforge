@@ -1,6 +1,6 @@
 ---
 title: "MCP-Integration"
-description: "IBANforge mit Claude, Cursor und jedem MCP-Agenten verbinden: das npm-Paket ibanforge-mcp, ein gehosteter Endpoint ohne Installation, sieben Tools und Ergebnisse, die sagen, was als Nächstes zu tun ist."
+description: "IBANforge mit Claude, Cursor und jedem MCP-Agenten verbinden: das npm-Paket ibanforge-mcp, ein gehosteter Endpoint ohne Installation, acht Tools und Ergebnisse, die sagen, was als Nächstes zu tun ist."
 order: 5
 ---
 
@@ -40,7 +40,7 @@ claude mcp add ibanforge -e IBANFORGE_API_KEY=ifk_ihr_schluessel -- npx -y ibanf
 
 Der Schlüssel ist optional und kostenlos: [hier erstellen](/) mit einer E-Mail-Adresse (200 Anfragen/Monat, ohne Karte). Ohne Schlüssel startet der Server trotzdem, und kostenpflichtige Tools antworten mit x402-Zahlungsanweisungen, die ein Agent mit USDC auf Base pro Aufruf begleichen kann.
 
-Nach dem Speichern den Client neu starten. Sechs IBANforge-Tools erscheinen im Tool-Menü.
+Nach dem Speichern den Client neu starten. Acht IBANforge-Tools erscheinen im Tool-Menü.
 
 ## Option 2 — der gehostete Endpoint (nichts zu installieren)
 
@@ -52,7 +52,7 @@ Streamable-HTTP-Transport, **10 kostenlose Tool-Aufrufe pro IP und Tag**, ganz o
 
 Im offiziellen MCP-Registry ist der Server als `io.github.cammac-creator/ibanforge` gelistet.
 
-## Die sieben Tools
+## Die acht Tools
 
 ### validate_iban
 
@@ -112,6 +112,14 @@ Prüft eine strukturierte ISO-20022-Postadresse gegen die veröffentlichten Rege
 { "scheme": "sps", "address": { "strt_nm": "Bahnhofstrasse", "bldg_nb": "45", "pst_cd": "8001", "twn_nm": "Zurich", "ctry": "CH" } }
 ```
 
+### send_feedback
+
+Ein falsches Ergebnis, veraltete oder fehlende Daten oder alles, was Sie an der Nutzung oder an der BEZAHLUNG des Dienstes hindert, direkt an die Betreiber melden. Kostenlos, und das Tool antwortet auch dann noch, wenn das kostenlose Tageskontingent aufgebraucht ist: den Beschwerdekasten mit genau der Grenze zu deckeln, die die Beschwerde auslöst, würde die Meldungen zum Schweigen bringen, für die er da ist. Ein Mensch liest jede Meldung; ein nachgewiesener Datenfehler bei einem bezahlten x402-Aufruf wird on-chain erstattet. `error_type` und `notes` sind Pflicht, der Rest ist optional.
+
+```json
+{ "error_type": "wrong_bic", "notes": "BIC verweist auf eine 2024 fusionierte Bank", "endpoint": "/v1/iban/validate", "contact": "acme@example.com" }
+```
+
 ## Ergebnisse, die sagen, was als Nächstes zu tun ist
 
 Jedes Validierungsergebnis trägt ein geordnetes Feld `next_steps`: Was eine Zahlung blockiert, kommt zuerst, was sie nur anreichert, danach. Jeder Eintrag hat einen stabilen `code` zum Verzweigen, einen `do`-Satz, den der Agent weitergeben kann, und ein `because`, das das Antwortfeld nennt, aus dem der Rat entstand — der Rat ist prüfbar statt geglaubt. `bank_code_not_allocated` heißt Stopp; `verify_payee_name` heißt weitermachen und eine Empfängernamen-Prüfung entscheiden lassen.
@@ -146,7 +154,7 @@ Jedes Validierungsergebnis trägt ein geordnetes Feld `next_steps`: Was eine Zah
 ## Hinweise
 
 - Das npm-Paket ist ein schlanker Client für `api.ibanforge.com`: Die Daten leben serverseitig, nichts herunterzuladen, und Ergebnisse spiegeln stets die letzte Registeraktualisierung.
-- Alle sieben Tools liefern dasselbe JSON wie die REST-API, als Text und als MCP-`structuredContent`.
+- Alle acht Tools liefern dasselbe JSON wie die REST-API, als Text und als MCP-`structuredContent`.
 - Releases erscheinen auf [npm](https://www.npmjs.com/package/ibanforge-mcp) und werden ins MCP-Registry gespiegelt.
 
 Siehe auch: [Rezepte](/docs/recipes) · [Was „verified" bedeutet](/docs/iban-validate) · [Datenquellen](/docs/data-sources)

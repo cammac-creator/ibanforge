@@ -37,6 +37,9 @@ const groups: DocGroup[] = [
   },
 ];
 
+/** Ties the floating toggle's `aria-controls` to the drawer it opens. */
+const DOCS_DRAWER_ID = "docs-mobile-nav"
+
 export function DocsSidebar({ docs }: { docs: DocMeta[] }) {
   const pathname = usePathname();
   const locale = useLocale();
@@ -110,9 +113,14 @@ export function DocsSidebar({ docs }: { docs: DocMeta[] }) {
   return (
     <>
       <button
+        type="button"
         className="lg:hidden fixed bottom-4 right-4 z-50 flex items-center justify-center size-12 rounded-full bg-primary text-primary-foreground shadow-lg"
         onClick={() => setMobileOpen((v) => !v)}
         aria-label={t("sidebar.toggleNav")}
+        // Audit 2026-09-01 (WEB-09): nothing linked this button to the drawer
+        // it opens, nor said whether the drawer was open.
+        aria-expanded={mobileOpen}
+        aria-controls={DOCS_DRAWER_ID}
       >
         {mobileOpen ? <X className="size-5" /> : <Menu className="size-5" />}
       </button>
@@ -124,7 +132,18 @@ export function DocsSidebar({ docs }: { docs: DocMeta[] }) {
         />
       )}
 
+      {/* The mobile drawer.
+
+          Closed, it was only pushed off-screen with `-translate-x-full`: its
+          twenty-odd doc links stayed focusable and readable by a screen reader
+          on every documentation page, so tabbing through an article walked into
+          a navigation nobody could see (WEB-09, audit 2026-09-01). `inert`
+          takes the subtree out of the tab order and out of the accessibility
+          tree without touching the slide transition. */}
       <aside
+        id={DOCS_DRAWER_ID}
+        inert={!mobileOpen}
+        aria-hidden={!mobileOpen}
         className={cn(
           "lg:hidden fixed inset-y-0 left-0 z-40 w-72 bg-background border-r border-border p-6 pt-20 transition-transform duration-200",
           mobileOpen ? "translate-x-0" : "-translate-x-full"

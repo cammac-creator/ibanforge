@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getAllLegalDocs } from "@/lib/legal";
 import { getTranslations } from "next-intl/server";
+import { alternatesFor } from "@/lib/seo";
 
 export async function generateMetadata({
   params,
@@ -9,9 +10,12 @@ export async function generateMetadata({
 }) {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: "legal" });
+  // No "| IBANforge" suffix here: the locale layout's title template already
+  // appends it (WEB-20, audit 2026-09-01).
   return {
-    title: `${t("index.title")} | IBANforge`,
+    title: t("index.title"),
     description: t("index.subtitle"),
+    alternates: alternatesFor(locale, "/legal"),
   };
 }
 

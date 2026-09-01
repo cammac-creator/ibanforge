@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { CodeBlock } from "@/components/code-block";
+import { alternatesFor } from "@/lib/seo";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { EndpointRow } from "@/components/ui/endpoint-row";
@@ -31,7 +32,11 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: "agents" });
-  return { title: t("meta.title"), description: t("meta.description") };
+  return {
+    title: t("meta.title"),
+    description: t("meta.description"),
+    alternates: alternatesFor(locale, "/agents"),
+  };
 }
 
 const MCP_CLAUDE_DESKTOP_JSON = `{
@@ -111,6 +116,10 @@ const r = await paid("https://api.ibanforge.com/v1/iban/validate", {
 });
 // pays $0.005 USDC autonomously, returns 200 with the response`;
 
+// DX-01 (audit 2026-09-01): the MCP server actually exposes 8 tools
+// (`tools/list` in prod returns count=8), but this array stopped at 7 and
+// left `send_feedback` out, while the page copy already said "8 tools" in
+// every locale. `mcp/src/index.ts` is the source of truth this list mirrors.
 const TOOLS = [
   {
     name: "validate_iban",
@@ -146,6 +155,11 @@ const TOOLS = [
     name: "check_postal_address",
     price: "Free",
     description: "ISO 20022 postal address rules for SPS, T2 and Fedwire ahead of the November 2026 changes — every finding cites its source document.",
+  },
+  {
+    name: "send_feedback",
+    price: "Free",
+    description: "Report a wrong result, missing data or anything blocking payment. A human reads every report.",
   },
 ];
 

@@ -70,7 +70,7 @@
       },
       "1": {
         "badge": "MCP-nativ — agentenbereit",
-        "title": "7 Tools, ohne Anmeldung",
+        "title": "8 Tools, ohne Anmeldung",
         "description": "Nativer Model-Context-Protocol-Server (stdio + HTTP). Claude, Cursor und jeder MCP-Agent installieren in einer Zeile: npx -y ibanforge-mcp."
       },
       "2": {
@@ -233,7 +233,7 @@
       "sub": "Diese Seite spricht auch Roboter — jede Aussage oben ist maschinenlesbar, und jeder Endpoint ist ohne Menschen in der Schleife bezahlbar.",
       "illoAlt": "Ein Roboterarm wirft eine glühende Münze in einen Zahlungsschlitz",
       "mcpTitle": "MCP-nativ",
-      "mcpBody": "7 Tools, keine Anmeldung. Claude, Cursor und jeder MCP-Agent installieren in einer Zeile:",
+      "mcpBody": "8 Tools, keine Anmeldung. Claude, Cursor und jeder MCP-Agent installieren in einer Zeile:",
       "x402Title": "x402-Mikrozahlungen",
       "x402Body": "Autonome Agenten zahlen pro Anfrage in USDC — kein Konto, kein Checkout, Settlement on-chain.",
       "docsTitle": "Maschinenlesbare Doku",
@@ -363,7 +363,7 @@
       },
       "3": {
         "question": "Was ist mit hohen Volumen?",
-        "answer": "Die Preise pro Aufruf skalieren linear ohne Ratenlimits. Für sehr hohe Volumen (Millionen von Aufrufen/Monat) eröffnen Sie ein Ticket auf unserem GitHub-Repository (github.com/cammac-creator/ibanforge) — wir besprechen gerne individuelle Preisgestaltung oder Volumenvereinbarungen für Ihren Anwendungsfall."
+        "answer": "Die Preise pro Aufruf skalieren linear ohne Ratenlimits. Für sehr hohe Volumen (Millionen von Aufrufen/Monat), oder um die API in Ihr eigenes Produkt einzubetten, führt der Weg über Editor/OEM: Volumenpreise, ein schriftliches SLA und Support-Zusagen. Beschrieben ist er auf unserer Seite für Softwareanbieter (ibanforge.com/de/vendors), und support@ibanforge.com eröffnet das Gespräch."
       },
       "heading": "Häufig gestellte Fragen"
     },
@@ -411,6 +411,8 @@
       "highlight": "ground"
     },
     "subtitle": "Testen Sie die API kostenlos — ohne Zahlung, ohne Registrierung. Jede Antwort unten ist eine echte Live-Antwort.",
+    "metaTitle": "Playground",
+    "sectionTitle": "Live-Aufruf ausprobieren",
     "tabs": {
       "iban": "IBAN",
       "bic": "BIC",
@@ -490,7 +492,9 @@
     "error": {
       "unexpected": "Unerwarteter Fehler von der API.",
       "network": "Die API ist nicht erreichbar. Bitte überprüfen Sie Ihre Verbindung oder versuchen Sie es später erneut.",
-      "unavailable": "Der Playground ist vorübergehend nicht verfügbar. Das liegt an uns, nicht an Ihnen; die API selbst läuft. Bitte versuchen Sie es gleich noch einmal."
+      "unavailable": "Der Playground ist vorübergehend nicht verfügbar. Das liegt an uns, nicht an Ihnen; die API selbst läuft. Bitte versuchen Sie es gleich noch einmal.",
+      "forbiddenOrigin": "Dieser Playground beantwortet nur Anfragen von ibanforge.com.",
+      "rateLimited": "Zu viele Playground-Aufrufe aus Ihrem Netzwerk, versuchen Sie es in einigen Minuten erneut."
     },
     "result": {
       "label": "Antwort"
@@ -914,8 +918,8 @@
   },
   "agents": {
     "meta": {
-      "title": "MCP-Server für IBAN-Prüfung — 7 Tools, ohne Anmeldung",
-      "description": "IBANforge in 60 Sekunden einbinden — Claude Desktop, Cursor, Cline. Nativer MCP-Server mit 7 Tools. Kostenloser API-Schlüssel (200 Anfragen/Monat, ohne Kreditkarte). Bezahlung pro Aufruf in USDC über x402 auf Base L2 — Agenten zahlen eigenständig."
+      "title": "MCP-Server für IBAN-Prüfung — 8 Tools, ohne Anmeldung",
+      "description": "IBANforge in 60 Sekunden einbinden — Claude Desktop, Cursor, Cline. Nativer MCP-Server mit 8 Tools. Kostenloser API-Schlüssel (200 Anfragen/Monat, ohne Kreditkarte). Bezahlung pro Aufruf in USDC über x402 auf Base L2 — Agenten zahlen eigenständig."
     },
     "eyebrow": "Für KI-Agenten",
     "hero": {
@@ -931,7 +935,7 @@
       "mcp": {
         "badge": "Weg 1 · MCP",
         "title": "Nativer MCP-Server",
-        "description": "In Claude Desktop, Cursor oder Cline einbinden. 7 Tools automatisch erkannt. Ideal für Desktop-Agenten und IDE-Assistenten.",
+        "description": "In Claude Desktop, Cursor oder Cline einbinden. 8 Tools automatisch erkannt. Ideal für Desktop-Agenten und IDE-Assistenten.",
         "tradeoff": "Stdio oder HTTP · npm oder Remote"
       },
       "apiKey": {
@@ -950,12 +954,12 @@
     "mcp": {
       "eyebrow": "Weg 1 · MCP",
       "heading": "In Claude Desktop, Cursor oder Cline installieren",
-      "description": "Der IBANforge MCP-Server stellt 7 Tools für Ihren KI-Client bereit. Zwei Transporte: stdio über npm-Paket oder remote streamable-HTTP.",
+      "description": "Der IBANforge MCP-Server stellt 8 Tools für Ihren KI-Client bereit. Zwei Transporte: stdio über npm-Paket oder remote streamable-HTTP.",
       "claudeLabel": "Stdio · Claude Desktop",
       "claudePath": "Hinzufügen zu ~/Library/Application Support/Claude/claude_desktop_config.json (macOS) oder %APPDATA%/Claude/claude_desktop_config.json (Windows).",
       "httpLabel": "HTTP · Remote-Endpunkt",
       "httpDescription": "Verbinden Sie jeden MCP-kompatiblen Client mit:",
-      "toolsHeading": "5 verfügbare Tools"
+      "toolsHeading": "8 verfügbare Tools"
     },
     "apiKey": {
       "eyebrow": "Weg 2 · Kostenloser Schlüssel",
@@ -999,8 +1003,7 @@
     "disrupted": "Störung",
     "w7": "Erfolgsrate 7 Tage",
     "w30": "Erfolgsrate 30 Tage",
-    "w90": "Erfolgsrate 90 Tage",
-    "last90": "Letzte 90 Tage",
+    "last90": "Letzte 30 Tage",
     "barsHint": "Ein Balken pro Tag — grün: keine Serverfehler, bernstein: vereinzelte 5xx, rot: >1 % Serverfehler.",
     "noData": "keine Daten",
     "method": "Methode: Erfolgsrate = Anteil der Anfragen ohne 5xx-Serverfehler, berechnet aus dem Produktions-Request-Log (Client-Fehler wie 402/404 sind erwartetes API-Verhalten und zählen nicht gegen die Verfügbarkeit). Seite aktualisiert sich alle 5 Minuten. Schriftliche SLAs sind in Editor/OEM-Vereinbarungen erhältlich.",
@@ -1010,6 +1013,10 @@
     "latencyP99": "99. Perzentil",
     "latencyNote": "Gemessen am Produktionsverkehr der letzten 30 Tage, abgelehnte Anfragen ausgenommen: Eine in einer Millisekunde abgewiesene Anfrage belegt keine Geschwindigkeit. Tage mit zu wenig bedientem Verkehr bleiben unberücksichtigt, statt ein Perzentil aus einer Handvoll Messungen zu erhalten. Das 99. Perzentil hat eine eigene, höhere Schwelle: Unter hundert Messungen an einem Tag gibt es kein 99. Perzentil zu berichten, sondern nur das 95. unter anderem Namen.",
     "latencyNoData": "zu wenig bedienter Verkehr zum Messen"
+  },
+  "openapi": {
+    "title": "OpenAPI-Referenz",
+    "description": "Live-OpenAPI-3.1-Referenz der IBANforge-API: fünf kostenpflichtige Endpunkte, eine kostenlose Demo, Schlüsselerstellung und Health, alle direkt im Browser testbar."
   },
   "changelog": {
     "title": "Changelog",
@@ -1150,7 +1157,7 @@
         },
         "agents": {
           "label": "KI-Agenten (MCP, autonome Zahlung)",
-          "ibanforge": "Nativer MCP-Server (7 Tools) + x402-Zahlung in USDC — ein Agent zahlt ohne Konto",
+          "ibanforge": "Nativer MCP-Server (8 Tools) + x402-Zahlung in USDC — ein Agent zahlt ohne Konto",
           "ibancom": "Nein",
           "ibanapi": "Nein",
           "libs": "Nein (eine Bibliothek, kein Dienst)"
@@ -1232,6 +1239,14 @@
     "noKey": "Fügen Sie den Schlüssel ein, den Sie erhalten haben. Nichts sonst identifiziert Sie hier: kein Konto, kein Passwort.",
     "invalid": "Dieser Schlüssel wurde nicht erkannt. Möglicherweise wurde er widerrufen oder erneuert.",
     "unreachable": "Die API ist nicht erreichbar. Ihr Schlüssel wurde nirgendwo sonst hingesendet.",
+    "firstCallTitle": "Dieser Schlüssel hat noch nicht aufgerufen",
+    "firstCallBody": "Es gibt nichts zu berichten, solange kein erster Aufruf angekommen ist. Hier ist dieser Aufruf, fertig zum Einfügen, mit Ihrem Schlüssel darin.",
+    "firstCallCopy": "Befehl kopieren",
+    "firstCallCopied": "Kopiert",
+    "firstCallRun": "Diesen Aufruf jetzt ausführen",
+    "firstCallRunning": "Aufruf läuft…",
+    "firstCallResult": "Was die API geantwortet hat",
+    "firstCallFailed": "Der Aufruf konnte von dieser Seite aus nicht abgesetzt werden. Ihr Schlüssel ging an die API und nirgendwo sonst; versuchen Sie den Befehl oben in einem Terminal.",
     "quotaTitle": "Diesen Monat",
     "used": "Verbrauchte Aufrufe",
     "remaining": "Verbleibend",
