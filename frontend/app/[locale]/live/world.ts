@@ -10,6 +10,7 @@
  */
 
 import { SPINE } from '@/lib/village/roads';
+import { naturalPath } from '@/lib/village/path';
 
 export const W = 960;
 export const H = 540;
@@ -154,14 +155,16 @@ export const HALOS: [number, number, number, number][] = [
   [133, 478, 20, 0.35],   // archive brazier
 ];
 
-const ROAD_BANDS: [number, number, number, number][] = [
-  [-4, 180, 968, 24],   // top street
-  [920, 180, 24, 174],  // east bend
-  [190, 330, 754, 24],  // middle street
-  [190, 330, 24, 192],  // west bend
-  [128, 486, 836, 24],  // bottom street (reaches west to the archivist's desk)
-  [-4, 64, 908, 24],    // caravan road
+/** Street centre-lines. Drawn as thick round-joined ribbons through
+ * naturalPath — the same gentle-sway generator the hero walks — so the
+ * streets curve and the stroll stays inside them by construction. */
+const ROAD_AXES: [number, number][][] = [
+  // the main spine, one continuous ribbon so every corner rounds
+  [[-8, 192], [930, 192], [930, 342], [204, 342], [204, 498], [960, 498]],
+  [[-8, 76], [908, 76]],     // caravan road, ending at the depot
+  [[126, 498], [210, 498]],  // the archivist's little spur
 ];
+const ROAD_W = 26;
 
 /* ---------- static background: ground + streets only ---------- */
 /* Buildings and décor are NOT baked here: anything that moves (couriers on
@@ -179,24 +182,39 @@ export function paintGround(ctx: Ctx, img: WorldImages) {
   for (let j = 0; j * T < H; j++) {
     for (let i = 0; i * T < W; i++) ctx.drawImage(g, i * T, j * T);
   }
+  // streets as gently curved ribbons: rounded joins and caps, a slightly
+  // wider dark seam underneath so the paving sits IN the grass
+  const ribbons = ROAD_AXES.map((axis) => {
+    const pts = naturalPath(axis);
+    const p = new Path2D();
+    p.moveTo(pts[0][0], pts[0][1]);
+    for (const [x, y] of pts) p.lineTo(x, y);
+    return p;
+  });
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = 'rgba(96,84,52,0.30)';
+  ctx.lineWidth = ROAD_W + 3;
+  for (const p of ribbons) ctx.stroke(p);
+  ctx.restore();
+  // cobblestone texture masked to the ribbon shape
+  const layer = document.createElement('canvas');
+  layer.width = W;
+  layer.height = H;
+  const lc = layer.getContext('2d')!;
   const s = img.ground;
   const S = s.width;
-  ctx.save();
-  ctx.beginPath();
-  for (const [x, y, w, h] of ROAD_BANDS) ctx.rect(x, y, w, h);
-  ctx.clip();
   for (let j = 0; j * S < H; j++) {
-    for (let i = 0; i * S < W; i++) ctx.drawImage(s, i * S, j * S);
+    for (let i = 0; i * S < W; i++) lc.drawImage(s, i * S, j * S);
   }
-  ctx.restore();
-  // a soft dark seam so the paving sits IN the grass instead of on it
-  ctx.fillStyle = 'rgba(96,84,52,0.20)';
-  for (const [x, y, w, h] of ROAD_BANDS) {
-    ctx.fillRect(x, y, w, 2);
-    ctx.fillRect(x, y + h - 2, w, 2);
-    ctx.fillRect(x, y, 2, h);
-    ctx.fillRect(x + w - 2, y, 2, h);
-  }
+  lc.globalCompositeOperation = 'destination-in';
+  lc.lineCap = 'round';
+  lc.lineJoin = 'round';
+  lc.strokeStyle = '#000';
+  lc.lineWidth = ROAD_W;
+  for (const p of ribbons) lc.stroke(p);
+  ctx.drawImage(layer, 0, 0);
 }
 
 /** Fixed scenery, merged with actors each frame and sorted by base line. */
