@@ -1396,7 +1396,8 @@
       "border": "GRENZPOSTEN",
       "forge": "SCHMIED",
       "exit": "DAS DORF",
-      "village": "DAS DORF"
+      "village": "DAS DORF",
+      "tower": "WÄCHTER"
     },
     "steps": {
       "gate": {
@@ -1441,6 +1442,11 @@
         "ok": "Zugestellt. Auf dem Bildschirm: rund dreißig Sekunden. In echt: {ms} ms — die Verlangsamung ist Absicht.",
         "okNoMs": "Zugestellt. Die Verlangsamung ist Absicht — in echt wenige Dutzend Millisekunden.",
         "fail": "Die Quest endet hier — die Ablehnung wird gezeigt, wie sie ist."
+      },
+      "tower": {
+        "ok": "Vom Turm: Sanktionen — keine · FATF: {fatf} · Risiko-Score {score}/100. Geringes Risiko.",
+        "warn": "Screening: Stufe {level}, Score {score}/100 — die Flags stehen im Detail in der Antwort.",
+        "fail": "Wächter-Alarm: Sanktionstreffer oder hohes Risiko — Score {score}/100."
       }
     },
     "reasons": {
@@ -1535,6 +1541,35 @@
         "address_check": "Adressprüfung",
         "unknown": "Anfrage"
       }
+    },
+    "mode": {
+      "iban": "Prüfung",
+      "compliance": "Compliance (Sanktionen + FATF)"
+    },
+    "vignettes": {
+      "label": "Vignetten — wiederholbare Inszenierungen echter Automatisierungen:",
+      "caravan": {
+        "btn": "🚚 Daten-Karawanen",
+        "who": "KARAWANE",
+        "l1": "Am 1. jedes Monats um 03:00 füllt die Karawane ~9 Register neu (GLEIF, Bundesbank, SIX, EBA, NBP…). Letzte echte Fahrt: {date}.",
+        "l2": "Fahre über ein Haus, um die echte Frische seines Bestands zu lesen — öffentlich serviert von /health.",
+        "l3": "Und jeden Sonntag bringt die Sanktions-Karawane frische Listen hinauf zum Wachturm."
+      },
+      "watch": {
+        "btn": "🕯 Runde der Nachtwache",
+        "who": "NACHTWACHE",
+        "l1": "Die stündliche Runde: Crons am Leben? Radare? Platte? Fehlerrate? Alter der Sanktionslisten?",
+        "l2": "Eine stille Automatisierung und eine tote machen dasselbe Schweigen — darum die Runde. Das Dorf überwacht sich selbst."
+      },
+      "archive": {
+        "btn": "📜 Der Archivar",
+        "who": "ARCHIVAR",
+        "l1": "Jede Nacht verbrennt der Archivar Anfrage-Protokolle, die älter als 12 Monate sind — und binnen 30 Tagen die abgereister Kunden.",
+        "l2": "Aufbewahrung ist keine Rechtsseite: sie ist eine Schleife im Code, die Alarm schlägt, wenn sie zwei Nächte scheitert."
+      }
+    },
+    "freshness": {
+      "plaque": "Bestand vom {date}"
     }
   }
 }

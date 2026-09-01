@@ -144,6 +144,24 @@ export function buildJourney(response: Rec): JourneyStep[] {
     });
   }
 
+  const compliance = rec(response.compliance);
+  if (compliance) {
+    const sanctions = rec(compliance.sanctions);
+    const level = str(compliance.risk_level) ?? 'unknown';
+    const sanctioned =
+      sanctions?.country_sanctioned === true || sanctions?.bank_sanctioned === true;
+    steps.push({
+      station: 'tower', key: 'tower',
+      outcome: sanctioned || level === 'high' ? 'fail' : level === 'low' ? 'ok' : 'warn',
+      params: {
+        sanctioned,
+        fatf: sanctions ? str(sanctions.fatf_status) : null,
+        score: typeof compliance.risk_score === 'number' ? compliance.risk_score : null,
+        level,
+      },
+    });
+  }
+
   const ms = typeof response.processing_ms === 'number' ? response.processing_ms : null;
   steps.push({
     station: 'forge', key: 'forge', outcome: 'ok',

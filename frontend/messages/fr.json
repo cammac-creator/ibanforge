@@ -1396,7 +1396,8 @@
       "border": "POSTE-FRONTIÈRE",
       "forge": "FORGERON",
       "exit": "LE VILLAGE",
-      "village": "LE VILLAGE"
+      "village": "LE VILLAGE",
+      "tower": "GUETTEUR"
     },
     "steps": {
       "gate": {
@@ -1441,6 +1442,11 @@
         "ok": "Livrée. À l'écran : une trentaine de secondes. En vrai : {ms} ms — le ralenti est volontaire.",
         "okNoMs": "Livrée. Le ralenti est volontaire — en vrai, quelques dizaines de millisecondes.",
         "fail": "La quête s'arrête ici — le refus est montré tel quel."
+      },
+      "tower": {
+        "ok": "Du haut de la tour : sanctions — rien · GAFI : {fatf} · score de risque {score}/100. Risque faible.",
+        "warn": "Screening : niveau {level}, score {score}/100 — le détail des drapeaux est dans la réponse.",
+        "fail": "Alerte du guetteur : sanction détectée ou risque élevé — score {score}/100."
       }
     },
     "reasons": {
@@ -1535,6 +1541,35 @@
         "address_check": "contrôle d'adresse",
         "unknown": "requête"
       }
+    },
+    "mode": {
+      "iban": "Validation",
+      "compliance": "Compliance (sanctions + GAFI)"
+    },
+    "vignettes": {
+      "label": "Vignettes — mises en scène rejouables d’automatisations réelles :",
+      "caravan": {
+        "btn": "🚚 Caravanes de données",
+        "who": "CARAVANE",
+        "l1": "Chaque 1ᵉʳ du mois à 03h, la caravane recharge ~9 registres (GLEIF, Bundesbank, SIX, EBA, NBP…). Dernier passage réel : {date}.",
+        "l2": "Chaque maison affiche au survol la fraîcheur réelle de son stock — servie par /health, publiquement.",
+        "l3": "Et chaque dimanche, la caravane des sanctions monte les listes fraîches à la Tour de guet."
+      },
+      "watch": {
+        "btn": "🕯 Ronde du Veilleur",
+        "who": "VEILLEUR",
+        "l1": "Ronde horaire du Veilleur : crons vivants ? radars ? disque ? taux d’erreurs ? âge des listes de sanctions ?",
+        "l2": "Une automatisation silencieuse et une automatisation morte font le même silence — d’où la ronde. Le village se surveille lui-même."
+      },
+      "archive": {
+        "btn": "📜 L’Archiviste",
+        "who": "ARCHIVISTE",
+        "l1": "Chaque nuit, l’Archiviste brûle les registres de requêtes de plus de 12 mois — et sous 30 jours ceux des clients partis.",
+        "l2": "La rétention n’est pas une page légale : c’est une boucle dans le code, qui alerte si elle échoue deux nuits."
+      }
+    },
+    "freshness": {
+      "plaque": "stock du {date}"
     }
   }
 }

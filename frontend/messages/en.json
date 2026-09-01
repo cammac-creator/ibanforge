@@ -1396,7 +1396,8 @@
       "border": "BORDER POST",
       "forge": "BLACKSMITH",
       "exit": "THE VILLAGE",
-      "village": "THE VILLAGE"
+      "village": "THE VILLAGE",
+      "tower": "WATCHMAN"
     },
     "steps": {
       "gate": {
@@ -1441,6 +1442,11 @@
         "ok": "Delivered. On screen: about thirty seconds. For real: {ms} ms — the slow-down is deliberate.",
         "okNoMs": "Delivered. The slow-down is deliberate — in reality, a few dozen milliseconds.",
         "fail": "The quest ends here — the refusal is shown as it is."
+      },
+      "tower": {
+        "ok": "From the tower: sanctions — none · FATF: {fatf} · risk score {score}/100. Low risk.",
+        "warn": "Screening: level {level}, score {score}/100 — the flags are detailed in the response.",
+        "fail": "Watchman alert: sanction hit or high risk — score {score}/100."
       }
     },
     "reasons": {
@@ -1535,6 +1541,35 @@
         "address_check": "address check",
         "unknown": "request"
       }
+    },
+    "mode": {
+      "iban": "Validation",
+      "compliance": "Compliance (sanctions + FATF)"
+    },
+    "vignettes": {
+      "label": "Vignettes — replayable stagings of real automations:",
+      "caravan": {
+        "btn": "🚚 Data caravans",
+        "who": "CARAVAN",
+        "l1": "On the 1st of each month at 03:00, the caravan restocks ~9 registers (GLEIF, Bundesbank, SIX, EBA, NBP…). Last real run: {date}.",
+        "l2": "Hover any house to read the real freshness of its stock — served publicly by /health.",
+        "l3": "And every Sunday, the sanctions caravan carries fresh lists up to the Watchtower."
+      },
+      "watch": {
+        "btn": "🕯 Night watch round",
+        "who": "NIGHT WATCH",
+        "l1": "The hourly round: crons alive? radars? disk? error rate? age of the sanctions lists?",
+        "l2": "A silent automation and a dead one make the same silence — hence the round. The village watches itself."
+      },
+      "archive": {
+        "btn": "📜 The Archivist",
+        "who": "ARCHIVIST",
+        "l1": "Every night the Archivist burns request logs older than 12 months — and within 30 days those of departed customers.",
+        "l2": "Retention is not a legal page: it is a loop in the code, and it alerts if it fails two nights in a row."
+      }
+    },
+    "freshness": {
+      "plaque": "stocked {date}"
     }
   }
 }

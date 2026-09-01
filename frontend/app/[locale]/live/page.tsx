@@ -5,8 +5,9 @@ import { useTranslations } from "next-intl"
 import { Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { buildJourney, type JourneyStep } from "@/lib/village/journey"
-import { VillageCanvas, type NarratedStep, type StationTip, type TrafficCourier } from "./village-canvas"
+import { VillageCanvas, type NarratedStep, type StationTip, type TrafficCourier, type Vignette } from "./village-canvas"
 
 const OP_TYPES = new Set([
   "iban_validate", "iban_batch", "bic_lookup", "iban_compliance",
@@ -27,6 +28,7 @@ const STATION_IDS = [
 export default function LivePage() {
   const t = useTranslations("live")
   const [iban, setIban] = useState(DEMO_IBAN)
+  const [mode, setMode] = useState<"iban" | "compliance">("iban")
   const [busy, setBusy] = useState(false)
   const [running, setRunning] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -34,6 +36,21 @@ export default function LivePage() {
   const questId = useRef(0)
   const [traffic, setTraffic] = useState<TrafficCourier[]>([])
   const lastOpId = useRef(0)
+  const [vignette, setVignette] = useState<Vignette | null>(null)
+  const vignetteId = useRef(0)
+  const [freshness, setFreshness] = useState<{ sources: Record<string, string>; overall: string | null }>({ sources: {}, overall: null })
+
+  // Real freshness for the house plaques — served by the public /health.
+  useEffect(() => {
+    let stop = false
+    fetch("/api/health-sources")
+      .then((r) => r.json())
+      .then((d: { sources?: Record<string, string>; overall?: string | null }) => {
+        if (!stop) setFreshness({ sources: d.sources ?? {}, overall: d.overall ?? null })
+      })
+      .catch(() => { /* plaques simply stay dateless */ })
+    return () => { stop = true }
+  }, [])
 
   // Real-traffic feed: each courier is one genuine operation from
   // /v1/ops/recent (type + country + outcome — never the content). The first
@@ -128,6 +145,15 @@ export default function LivePage() {
       case "border":
         text = t("steps.border", { sepa: check(p.sepa), vop: check(p.vopParticipant) })
         break
+      case "tower": {
+        const score = String(p.score ?? "—")
+        text = step.outcome === "ok"
+          ? t("steps.tower.ok", { fatf: String(p.fatf ?? "—"), score })
+          : step.outcome === "fail"
+            ? t("steps.tower.fail", { score })
+            : t("steps.tower.warn", { level: String(p.level), score })
+        break
+      }
       case "forge":
         text = p.bic ? t("steps.forge.ok", { bic: String(p.bic) }) : t("steps.forge.okNoBic")
         break
@@ -161,7 +187,7 @@ export default function LivePage() {
       const res = await fetch("/api/playground", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: "iban", value }),
+        body: JSON.stringify({ type: mode, value }),
       })
       const data = (await res.json()) as Record<string, unknown>
       if (!res.ok && typeof data.valid !== "boolean") {
@@ -182,23 +208,64 @@ export default function LivePage() {
   const { labels, tips } = useMemo(() => {
     const labels: Record<string, string> = {}
     const tips: Record<string, StationTip> = {}
+    const day = (s?: string | null) => (s ? s.slice(0, 10) : null)
+    const plaque = (d: string | null) => (d ? ` · ${t("freshness.plaque", { date: d })}` : "")
     for (const id of STATION_IDS) {
       labels[id] = t(`labels.${id}`)
       tips[id] = { name: t(`labels.${id}`), role: t(`tips.${id}.role`), real: t(`tips.${id}.real`) }
     }
+    // Real freshness plaques (spec §4): dates read from /health.bic_sources.
+    tips.six.real += plaque(day(freshness.sources.six_group))
+    tips.library.real += plaque(day(freshness.sources.gleif ?? freshness.sources.swiftcodes))
+    tips.warehouse.real += plaque(day(freshness.overall))
+    const regDates: Record<string, string | null> = {
+      DE: day(freshness.sources.bundesbank),
+      AT: day(freshness.sources.oenb),
+      BE: day(freshness.overall), BG: day(freshness.overall),
+      NL: day(freshness.sources.nbp ?? freshness.overall), FI: day(freshness.overall),
+    }
     for (const cc of ["DE", "AT", "BE", "BG", "NL", "FI"]) {
       labels[`reg-${cc}`] = t(`labels.reg${cc}`)
-      tips[`reg-${cc}`] = { name: t(`labels.reg${cc}`), role: t("tips.registry.role"), real: t("tips.registry.real") }
+      tips[`reg-${cc}`] = {
+        name: t(`labels.reg${cc}`),
+        role: t("tips.registry.role"),
+        real: t("tips.registry.real") + plaque(regDates[cc]),
+      }
     }
     return { labels, tips }
-  }, [t])
+  }, [t, freshness])
+
+  const playVignette = (kind: Vignette["kind"]) => {
+    if (busy || running) return
+    vignetteId.current += 1
+    setRunning(true)
+    const L = (k: string, params?: Record<string, string>) => ({ who: t(`vignettes.${kind}.who`), text: t(k, params) })
+    const lines =
+      kind === "caravan"
+        ? [
+            L("vignettes.caravan.l1", { date: freshness.overall?.slice(0, 10) ?? "—" }),
+            L("vignettes.caravan.l2"),
+            L("vignettes.caravan.l3"),
+          ]
+        : kind === "watch"
+          ? [L("vignettes.watch.l1"), L("vignettes.watch.l2")]
+          : [L("vignettes.archive.l1"), L("vignettes.archive.l2")]
+    setVignette({ id: vignetteId.current, kind, lines })
+  }
 
   return (
     <main className="mx-auto max-w-5xl px-4 py-8 sm:py-12">
       <h1 className="text-2xl font-bold sm:text-3xl">{t("title")}</h1>
       <p className="mt-2 max-w-[68ch] text-muted-foreground">{t("lede")}</p>
 
-      <form onSubmit={submit} className="mt-6 flex flex-wrap items-center gap-2">
+      <Tabs value={mode} onValueChange={(v) => setMode(v as "iban" | "compliance")} className="mt-6">
+        <TabsList>
+          <TabsTrigger value="iban">{t("mode.iban")}</TabsTrigger>
+          <TabsTrigger value="compliance">{t("mode.compliance")}</TabsTrigger>
+        </TabsList>
+      </Tabs>
+
+      <form onSubmit={submit} className="mt-3 flex flex-wrap items-center gap-2">
         <Input
           value={iban}
           onChange={(e) => setIban(e.target.value)}
@@ -225,8 +292,22 @@ export default function LivePage() {
           idle={{ who: t("who.village"), text: t("idle") }}
           quest={quest}
           traffic={traffic}
+          vignette={vignette}
           onQuestEnd={() => setRunning(false)}
         />
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <span className="text-xs uppercase tracking-wide text-muted-foreground">{t("vignettes.label")}</span>
+        <Button variant="outline" size="sm" disabled={busy || running} onClick={() => playVignette("caravan")}>
+          {t("vignettes.caravan.btn")}
+        </Button>
+        <Button variant="outline" size="sm" disabled={busy || running} onClick={() => playVignette("watch")}>
+          {t("vignettes.watch.btn")}
+        </Button>
+        <Button variant="outline" size="sm" disabled={busy || running} onClick={() => playVignette("archive")}>
+          {t("vignettes.archive.btn")}
+        </Button>
       </div>
 
       <p className="mt-3 max-w-[75ch] text-sm text-muted-foreground">{t("honesty")}</p>

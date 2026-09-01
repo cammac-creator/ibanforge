@@ -59,7 +59,7 @@ export const STATIONS: StationGeo[] = [
   { id: 'court', x: 336, y: 122, w: 34, h: 30, door: [353, 156], anchor: [353, 156] },
   { id: 'classifier', x: 272, y: 128, w: 32, h: 24, door: [288, 156], anchor: [288, 156] },
   { id: 'border', x: 206, y: 130, w: 30, h: 22, door: [221, 156], anchor: [221, 156] },
-  { id: 'tower', x: 132, y: 96, w: 22, h: 58, door: [143, 158], anchor: [143, 158] },
+  { id: 'tower', x: 132, y: 96, w: 22, h: 58, door: [143, 158], anchor: [143, 156] },
   { id: 'forge', x: 168, y: 192, w: 60, h: 44, door: [198, 240], anchor: [198, 240] },
   { id: 'archive', x: 106, y: 204, w: 26, h: 26, door: [119, 234], anchor: [119, 240] },
   { id: 'warehouse', x: 432, y: 10, w: 38, h: 28, door: [451, 42], anchor: [451, 42] },

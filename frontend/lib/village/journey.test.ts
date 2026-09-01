@@ -4,6 +4,7 @@ import de from './__fixtures__/validate-de.json';
 import gb from './__fixtures__/validate-gb.json';
 import ch from './__fixtures__/validate-ch.json';
 import fr from './__fixtures__/validate-fr.json';
+import complianceDe from './__fixtures__/compliance-de.json';
 
 // The fixtures are the live /v1/demo payloads, saved verbatim on 2026-09-01.
 // This suite is the honesty lock of the village: if the pipeline's response
@@ -117,6 +118,31 @@ describe('buildJourney — invalid IBAN', () => {
     expect(scribe.outcome).toBe('fail');
     expect(scribe.params).toMatchObject({ reason: 'checksum_failed' });
     expect(at(steps, 'exit')!.outcome).toBe('fail');
+  });
+});
+
+describe('buildJourney — compliance (the tower quest)', () => {
+  const steps = buildJourney(complianceDe as Record<string, unknown>);
+
+  it('climbs the watchtower between the border post and the forge', () => {
+    const ids = stations(steps);
+    const tower = ids.indexOf('tower');
+    expect(tower).toBeGreaterThan(ids.indexOf('border'));
+    expect(tower).toBeLessThan(ids.indexOf('forge'));
+  });
+
+  it('reports what the screening really said', () => {
+    expect(at(steps, 'tower')!.outcome).toBe('ok');
+    expect(at(steps, 'tower')!.params).toMatchObject({
+      sanctioned: false,
+      fatf: 'member',
+      score: 0,
+      level: 'low',
+    });
+  });
+
+  it('a plain validate response never visits the tower', () => {
+    expect(stations(buildJourney(de as Record<string, unknown>))).not.toContain('tower');
   });
 });
 

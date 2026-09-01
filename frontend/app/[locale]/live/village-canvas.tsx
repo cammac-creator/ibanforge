@@ -12,7 +12,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import {
   W, H, SCALE, P, STATIONS, stationById, REGISTRY_CCS,
-  paintBackground, drawActor, brazier, px, type Actor, type StationGeo,
+  paintBackground, drawActor, brazier, cartDraw, px, type Actor, type StationGeo,
 } from "./world"
 import { roadRoute } from "@/lib/village/roads"
 import type { StationId, StepOutcome } from "@/lib/village/journey"
@@ -37,6 +37,13 @@ export interface TrafficCourier {
   tip: StationTip
 }
 
+/** A replayable staging of a real automation (clearly labelled as such). */
+export interface Vignette {
+  id: number
+  kind: "caravan" | "watch" | "archive"
+  lines: { who: string; text: string }[]
+}
+
 interface Props {
   labels: Record<string, string>
   laneLabel: string
@@ -46,6 +53,7 @@ interface Props {
   idle: { who: string; text: string }
   quest: { id: number; steps: NarratedStep[] } | null
   traffic?: TrafficCourier[]
+  vignette?: Vignette | null
   onQuestEnd?: () => void
 }
 
@@ -62,7 +70,7 @@ interface Particle { x: number; y: number; vx: number; vy: number; l: number; c:
 interface Smoke { x: number; y: number; r: number; l: number }
 interface Seal { x: number; y: number; ok: boolean; l: number }
 
-export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, idle, quest, traffic, onQuestEnd }: Props) {
+export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, idle, quest, traffic, vignette, onQuestEnd }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const faceRef = useRef<HTMLCanvasElement>(null)
   const [narr, setNarr] = useState<{ who: string; text: string }>(idle)
@@ -81,6 +89,8 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
     sparks: [] as Particle[], smokes: [] as Smoke[], seals: [] as Seal[],
     couriers: [] as { key: number; tip: StationTip; actor: Actor; pts: [number, number][]; i: number }[],
     seenCouriers: new Set<number>(),
+    cart: null as { x: number; y: number } | null,
+    pulses: [] as { x: number; y: number; r: number; l: number }[],
     veil: false, focus: null as StationGeo | null, gen: 0,
     reduced: false, bg: null as HTMLCanvasElement | null,
   })
@@ -150,6 +160,7 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
       w.sparks = w.sparks.filter((s) => --s.l > 0); w.sparks.forEach((s) => { s.x += s.vx; s.y += s.vy; s.vy += 0.05 })
       w.smokes = w.smokes.filter((s) => --s.l > 0); w.smokes.forEach((s) => { s.y -= 0.25; s.r += 0.04 })
       w.seals = w.seals.filter((s) => --s.l > 0)
+      w.pulses = w.pulses.filter((p) => --p.l > 0); w.pulses.forEach((p) => { p.r += 0.5 })
 
       ctx.setTransform(SCALE, 0, 0, SCALE, 0, 0)
       ctx.drawImage(w.bg!, 0, 0)
@@ -157,6 +168,11 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
       brazier(ctx, 110, 226, Math.floor(t / 400) % 2 === 0)
       const fl = Math.floor(t / 240) % 2
       px(ctx, 139, 92, 8, 4, fl ? P.fire : P.fireHi); px(ctx, 141, 89, 4, 3, fl ? P.fireHi : P.fire)
+      if (w.cart) cartDraw(ctx, w.cart.x, w.cart.y)
+      for (const p of w.pulses) {
+        ctx.strokeStyle = P.winHi; ctx.globalAlpha = p.l / 40
+        ctx.strokeRect(p.x - p.r, p.y - p.r, p.r * 2, p.r * 2); ctx.globalAlpha = 1
+      }
 
       const actors: Actor[] = [
         ...(w.villagers as unknown as Actor[]), ...w.couriers.map((cr) => cr.actor),
@@ -311,6 +327,90 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
     if (quest && quest.steps.length > 0) void runQuest(quest.steps)
   }, [quest, runQuest])
   useEffect(() => { setNarr(idle) }, [idle])
+
+  /* ---------- vignettes: replayable stagings of real automations ---------- */
+  const runVignette = useCallback(async (v: Vignette) => {
+    const w = world.current
+    const gen = ++w.gen
+    const alive = () => w.gen === gen
+    const sleep = async (ms: number) => {
+      const end = Date.now() + (w.reduced ? Math.min(ms, 400) : ms)
+      while (Date.now() < end) {
+        if (!alive()) return false
+        await new Promise((r) => setTimeout(r, document.hidden ? 300 : 16))
+      }
+      return alive()
+    }
+    const move = async (a: Actor, pts: [number, number][], speed: number) => {
+      for (const [tx, ty] of pts) {
+        if (!alive()) return false
+        if (w.reduced) { a.x = tx; a.y = ty; if (!(await sleep(120))) return false; continue }
+        const d = Math.hypot(tx - a.x, ty - a.y)
+        const n = Math.max(1, (d / speed) * 60)
+        const sx = (tx - a.x) / n, sy = (ty - a.y) / n
+        a.dir = sx < 0 ? -1 : 1; a.moving = true
+        for (let i = 0; i < n; i++) {
+          if (!alive()) return false
+          a.x += sx; a.y += sy
+          await new Promise((r) => setTimeout(r, 16))
+        }
+        a.x = tx; a.y = ty; a.moving = false
+      }
+      return true
+    }
+    const line = (i: number) => { if (v.lines[i]) setNarr(v.lines[i]) }
+    const rollCart = async (y: number, toX: number, stops: number[]) => {
+      w.cart = { x: -26, y }
+      for (const sx of [...stops, toX]) {
+        while (w.cart && w.cart.x < sx) {
+          if (!alive()) return false
+          w.cart.x += w.reduced ? 12 : 1.3
+          await new Promise((r) => setTimeout(r, 16))
+        }
+        if (stops.includes(sx)) { w.pulses.push({ x: sx, y: y - 8, r: 3, l: 40 }); if (!(await sleep(380))) return false }
+      }
+      w.cart = null
+      return true
+    }
+
+    w.hero.hidden = true
+    if (v.kind === "caravan") {
+      line(0)
+      if (!(await rollCart(44, 451, [268, 298, 328, 358, 388, 418]))) return
+      line(1); if (!(await sleep(2600))) return
+      line(2)
+      if (!(await rollCart(156, 136, []))) return
+      w.pulses.push({ x: 143, y: 100, r: 3, l: 40 })
+      if (!(await sleep(2200))) return
+    } else if (v.kind === "watch") {
+      line(0)
+      const tour: [number, number][] = [[455, 240], [96, 240], [96, 156], [353, 156], [470, 156], [455, 218]]
+      if (!(await move(w.watcher, [[455, 240]], 70))) return
+      for (const p of tour.slice(1)) {
+        if (!(await move(w.watcher, [p], 70))) return
+        w.pulses.push({ x: w.watcher.x, y: w.watcher.y - 14, r: 3, l: 40 })
+      }
+      line(1); if (!(await sleep(2600))) return
+    } else {
+      line(0)
+      if (!(await move(w.archivist, [[112, 230]], 30))) return
+      for (let i = 0; i < 6; i++) {
+        if (!alive()) return
+        w.sparks.push(...Array.from({ length: 6 }, () => ({ x: 112, y: 224, vx: (Math.random() - 0.5) * 1.4, vy: -Math.random() * 1.6 - 0.3, l: 24 + Math.random() * 14, c: "#E8863C" })))
+        w.smokes.push({ x: 112, y: 218, r: 2, l: 70 })
+        if (!(await sleep(600))) return
+      }
+      line(1); if (!(await sleep(2600))) return
+      if (!(await move(w.archivist, [[119, 234]], 30))) return
+    }
+    if (!alive()) return
+    setNarr(idle)
+    onQuestEnd?.()
+  }, [idle, onQuestEnd])
+
+  useEffect(() => {
+    if (vignette) void runVignette(vignette)
+  }, [vignette, runVignette])
 
   /* ---------- portrait ---------- */
   useEffect(() => {
