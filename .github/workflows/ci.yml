@@ -157,6 +157,11 @@ jobs:
       - name: Build the production image
         run: docker build -t ibanforge-ci .
 
+      # A production boot refuses to start without three things, none of them
+      # a real secret here: IBANFORGE_FREE_MODE (below), IP_HASH_SECRET
+      # (src/lib/stats.ts refuses a well-known salt in production) and an
+      # explicit CORS_ORIGIN (src/app.ts refuses a wildcard in production).
+      # First run on main (2026-09-01) died on the second one.
       # IBANFORGE_FREE_MODE=true is the minimum a production boot needs:
       # ensureWalletConfigured() (src/middleware/x402.ts) throws in production
       # unless either X402_ENABLED=true + WALLET_ADDRESS, or this explicit
@@ -168,6 +173,8 @@ jobs:
             -p 3300:3000 \
             -e NODE_ENV=production \
             -e IBANFORGE_FREE_MODE=true \
+            -e IP_HASH_SECRET=ci-smoke-only-not-a-secret \
+            -e CORS_ORIGIN=https://ibanforge.com \
             ibanforge-ci
 
       # --retry-connrefused and --retry-all-errors together: the entrypoint
