@@ -1372,6 +1372,68 @@
       "description": "Watch a real IBAN validation cross the IBANforge pipeline, slowed down: toll gate, mod-97 scribe, BIC library, national registers, verdict, forge."
     },
     "canvasAlt": "The village: every building is a real step of the IBAN validation pipeline; the quest is narrated in the bar below the picture.",
+    "rail": {
+      "title": "The pipeline",
+      "step": "Step {n} / {total}",
+      "lastSeen": "Last real request: {when}",
+      "noneYet": "No real request seen since the page opened",
+      "groups": {
+        "formalities": "Formalities",
+        "registers": "Registers",
+        "frontier": "Border & forge"
+      },
+      "names": {
+        "gate": "x402 toll gate",
+        "scribe": "mod-97 scribe",
+        "cutter": "BBAN cutter",
+        "library": "BIC library",
+        "registry": "National register",
+        "six": "SIX counter",
+        "court": "Court of the Verdict",
+        "classifier": "Classifier",
+        "border": "Border post",
+        "tower": "Watchtower",
+        "forge": "The Forge",
+        "exit": "Delivery",
+        "modulus": "Modulus arithmetic (UK)",
+        "pra": "Prudential authorisation (BoE)"
+      },
+      "states": {
+        "idle": "ahead",
+        "skipped": "not walked by this request",
+        "current": "in progress",
+        "done": "passed",
+        "warn": "reserve",
+        "fail": "failed"
+      }
+    },
+    "clock": {
+      "screen": "On screen",
+      "real": "For real",
+      "serverTime": "server time"
+    },
+    "verdict": {
+      "title": "The ingot",
+      "valid": "Valid IBAN",
+      "invalid": "IBAN refused",
+      "noBic": "no BIC found",
+      "registerOk": "register ✓",
+      "sepaOk": "SEPA ✓",
+      "sepaNo": "outside SEPA",
+      "vopOk": "VoP ✓",
+      "vopNo": "VoP —",
+      "risk": "risk {score}/100",
+      "meta": "{steps} steps · {ms} ms of server time · {secs} s on screen",
+      "metaFail": "{steps} steps · the pipeline stopped at the Scribe, the rest never ran",
+      "copyCurl": "Copy this quest's curl",
+      "copied": "Copied",
+      "getKey": "Get your key (200 requests/month)",
+      "showJson": "The full JSON",
+      "hideJson": "Fold the JSON",
+      "replay": "Replay",
+      "copyLink": "Copy the link to this quest",
+      "linkCopied": "Link copied"
+    },
     "ledeMore": "A validation takes about a millisecond on the server — here it is deliberately slowed down so you can watch it work. Hover anyone to see who does what.",
     "faster": "Speed up",
     "chips": {

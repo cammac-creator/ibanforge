@@ -1,15 +1,18 @@
 "use client"
 
 import { useEffect, useMemo, useRef, useState } from "react"
-import { useTranslations } from "next-intl"
+import { useLocale, useTranslations } from "next-intl"
 import { Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { GetKeyButton } from "@/components/api-key-dialog"
 import { buildJourney, type JourneyStep } from "@/lib/village/journey"
 import { opAgeMinutes } from "@/lib/village/ops-age"
 import { LIVE_EXAMPLES } from "@/lib/village/examples"
 import { parseLiveParams } from "@/lib/village/permalink"
+import { buildRail, type RailRow, type RailState } from "@/lib/village/rail"
+import { RailPanel, type RailStrings } from "./rail"
 import { VillageCanvas, type NarratedStep, type StationTip, type TrafficCourier, type Vignette } from "./village-canvas"
 
 const OP_TYPES = new Set([
@@ -27,11 +30,80 @@ const STATION_IDS = [
   "gate", "scribe", "cutter", "library", "six", "court",
   "classifier", "border", "tower", "forge", "archive", "warehouse", "vigil",
 ] as const
+const RAIL_NAME_KEYS = [
+  "gate", "scribe", "cutter", "library", "registry", "six", "court",
+  "classifier", "border", "tower", "forge", "exit", "modulus", "pra",
+] as const
+const RAIL_STATES: RailState[] = ["idle", "skipped", "current", "done", "warn", "fail"]
+
+type Mode = "iban" | "compliance"
+type Rec = Record<string, unknown>
+const rec = (v: unknown): Rec | null => (v !== null && typeof v === "object" && !Array.isArray(v) ? (v as Rec) : null)
+
+/** What a finished quest leaves behind — the response, verbatim, and its route. */
+interface QuestResult {
+  iban: string
+  mode: Mode
+  data: Rec
+  steps: NarratedStep[]
+}
+
+/* ---------- atlas badge (the ingot, the broken seal) ---------- */
+let atlasCache: Promise<{ img: HTMLImageElement; meta: Record<string, { x: number; y: number; w: number; h: number }> }> | null = null
+function loadAtlas() {
+  if (!atlasCache) {
+    atlasCache = (async () => {
+      const [meta, img] = await Promise.all([
+        fetch("/village/atlas.json").then((r) => r.json()),
+        new Promise<HTMLImageElement>((resolve, reject) => {
+          const i = new Image()
+          i.onload = () => resolve(i)
+          i.onerror = reject
+          i.src = "/village/atlas.png"
+        }),
+      ])
+      return { img, meta }
+    })()
+  }
+  return atlasCache
+}
+
+function AtlasBadge({ frame, tint, size = 64 }: { frame: string; tint?: string; size?: number }) {
+  const ref = useRef<HTMLCanvasElement>(null)
+  useEffect(() => {
+    let stop = false
+    loadAtlas()
+      .then(({ img, meta }) => {
+        const f = meta[frame]
+        const c = ref.current
+        if (stop || !f || !c) return
+        const ctx = c.getContext("2d")
+        if (!ctx) return
+        ctx.imageSmoothingEnabled = false
+        ctx.clearRect(0, 0, size, size)
+        const s = Math.min((size - 8) / f.w, (size - 8) / f.h)
+        const w = f.w * s, h = f.h * s
+        ctx.drawImage(img, f.x, f.y, f.w, f.h, (size - w) / 2, (size - h) / 2, w, h)
+        if (tint) {
+          ctx.globalCompositeOperation = "source-atop"
+          ctx.globalAlpha = 0.55
+          ctx.fillStyle = tint
+          ctx.fillRect(0, 0, size, size)
+          ctx.globalAlpha = 1
+          ctx.globalCompositeOperation = "source-over"
+        }
+      })
+      .catch(() => { /* the badge simply stays blank */ })
+    return () => { stop = true }
+  }, [frame, tint, size])
+  return <canvas ref={ref} width={size} height={size} className="shrink-0" style={{ imageRendering: "pixelated" }} aria-hidden />
+}
 
 export default function LivePage() {
   const t = useTranslations("live")
+  const locale = useLocale()
   const [iban, setIban] = useState(DEMO_IBAN)
-  const [mode, setMode] = useState<"iban" | "compliance">("iban")
+  const [mode, setMode] = useState<Mode>("iban")
   const [busy, setBusy] = useState(false)
   const [running, setRunning] = useState(false)
   // ⏩ the visitor who wants the proof, not the show: holds ÷3, walks ×2
@@ -44,6 +116,17 @@ export default function LivePage() {
   const [vignette, setVignette] = useState<Vignette | null>(null)
   const vignetteId = useRef(0)
   const [freshness, setFreshness] = useState<{ sources: Record<string, string>; overall: string | null }>({ sources: {}, overall: null })
+  // the rail and the clock: where the film is, how long it has been on screen
+  const [progress, setProgress] = useState(-1)
+  const [screenSec, setScreenSec] = useState(0)
+  const [elapsed, setElapsed] = useState<number | null>(null)
+  const [result, setResult] = useState<QuestResult | null>(null)
+  const pending = useRef<QuestResult | null>(null)
+  const [hoverId, setHoverId] = useState<string | null>(null)
+  const [pinnedId, setPinnedId] = useState<string | null>(null)
+  const [copied, setCopied] = useState<"curl" | "link" | null>(null)
+  const [showJson, setShowJson] = useState(false)
+  const [tick, setTick] = useState(0)
 
   // One stable object per locale. As an inline literal it changed identity on
   // every render — and the canvas resets its narration whenever `idle`
@@ -66,8 +149,7 @@ export default function LivePage() {
   }, [])
 
   // Real-traffic feed: each courier is one genuine operation from
-  // /v1/ops/recent (type + country + outcome — never the content). The first
-  // poll only sets the cursor, so page load does not replay old operations.
+  // /v1/ops/recent (type + country + outcome — never the content).
   useEffect(() => {
     let stop = false
     // How old a replayed operation is, in the courier's own card — a replay
@@ -88,6 +170,7 @@ export default function LivePage() {
       })
       return {
         key: op.id,
+        t: op.t,
         kind: !op.success ? "fail" : op.type === "bic_lookup" ? "library" : "full",
         tint: op.id,
         tip: {
@@ -126,6 +209,28 @@ export default function LivePage() {
     const iv = setInterval(() => void poll(false), 5000)
     return () => { stop = true; clearInterval(iv) }
   }, [t])
+
+  // the on-screen clock while a quest runs; the exit line's own measure
+  // (`elapsed`) takes over once delivered
+  useEffect(() => {
+    if (!running) return
+    const start = Date.now()
+    const iv = setInterval(() => setScreenSec(Math.floor((Date.now() - start) / 1000)), 1000)
+    return () => clearInterval(iv)
+  }, [running])
+
+  // the rail's traffic line ages ("il y a 4 min") without a new operation
+  useEffect(() => {
+    const iv = setInterval(() => setTick((n) => n + 1), 30_000)
+    return () => clearInterval(iv)
+  }, [])
+
+  // Escape closes a pinned card
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setPinnedId(null) }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [])
 
   const check = (v: unknown) => (v ? "✓" : "—")
 
@@ -208,9 +313,11 @@ export default function LivePage() {
     }
     return {
       station: step.station,
+      key: step.key,
       who,
       text,
       outcome: step.outcome,
+      params: step.params,
       holdMs: Math.min(3600, Math.max(1800, 1500 + text.length * 16)),
       regCc: step.station === "registry" ? String(p.cc ?? "") : null,
       textAt,
@@ -233,7 +340,7 @@ export default function LivePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const runValidation = async (value: string, questMode: "iban" | "compliance" = mode) => {
+  const runValidation = async (value: string, questMode: Mode = mode) => {
     if (!value || busy || running) return
     setBusy(true)
     setError(null)
@@ -250,6 +357,13 @@ export default function LivePage() {
       }
       const steps = buildJourney(data).map((s) => narrate(s, data))
       questId.current += 1
+      pending.current = { iban: value, mode: questMode, data, steps }
+      setResult(null)
+      setShowJson(false)
+      setPinnedId(null)
+      setElapsed(null)
+      setScreenSec(0)
+      setProgress(0)
       setRunning(true)
       setQuest({ id: questId.current, steps })
     } catch {
@@ -312,15 +426,74 @@ export default function LivePage() {
     setVignette({ id: vignetteId.current, kind, lines })
   }
 
+  /* ---------- the rail ---------- */
+  const rail = useMemo(() => buildRail(quest?.steps ?? null, progress), [quest, progress])
+  const visitedCc = quest?.steps.find((s) => s.station === "registry")?.regCc || "DE"
+  const stationOf = (row: RailRow) => (row.station === "registry" ? `reg-${visitedCc}` : row.station)
+  const lastOp = traffic.length ? traffic[traffic.length - 1] : null
+  const lastSeen = (() => {
+    if (!lastOp?.t) return t("rail.noneYet")
+    // `tick` only exists to re-run this every 30 s
+    const m = opAgeMinutes(lastOp.t, Date.now() + tick * 0)
+    const when = m === null ? "" : m < 1 ? t("traffic.justNow") : m < 60 ? t("traffic.ago", { min: m }) : t("traffic.agoHours", { h: Math.floor(m / 60) })
+    return t("rail.lastSeen", { when })
+  })()
+  const railStrings: RailStrings = {
+    title: t("rail.title"),
+    step: (n, total) => t("rail.step", { n, total }),
+    names: Object.fromEntries(RAIL_NAME_KEYS.map((k) => [k, t(`rail.names.${k}`)])),
+    groups: { formalities: t("rail.groups.formalities"), registers: t("rail.groups.registers"), frontier: t("rail.groups.frontier") },
+    states: Object.fromEntries(RAIL_STATES.map((k) => [k, t(`rail.states.${k}`)])) as Record<RailState, string>,
+    traffic: lastSeen,
+  }
+
+  /* ---------- the verdict ---------- */
+  const verdict = useMemo(() => {
+    if (!result) return null
+    const d = result.data
+    const valid = d.valid === true
+    const country = rec(d.country), bic = rec(d.bic), issuer = rec(d.issuer), sepa = rec(d.sepa)
+    const checkBank = rec(d.bank_code_check), compliance = rec(d.compliance)
+    const ms = typeof d.processing_ms === "number" ? d.processing_ms : null
+    const head = valid
+      ? [t("verdict.valid"), typeof country?.code === "string" ? country.code : null, typeof issuer?.name === "string" ? issuer.name : null, typeof bic?.code === "string" ? `BIC ${bic.code}` : t("verdict.noBic")].filter(Boolean).join(" · ")
+      : [t("verdict.invalid"), typeof d.error === "string" ? t(`reasons.${KNOWN_REASONS.has(d.error) ? d.error : "unknown"}`) : null].filter(Boolean).join(" · ")
+    const facts = valid
+      ? [
+          checkBank?.status === "verified" ? t("verdict.registerOk") : null,
+          sepa ? (sepa.member === true ? t("verdict.sepaOk") : t("verdict.sepaNo")) : null,
+          sepa ? (sepa.vop_participant === true ? t("verdict.vopOk") : t("verdict.vopNo")) : null,
+          typeof compliance?.risk_score === "number" ? t("verdict.risk", { score: compliance.risk_score }) : null,
+        ].filter(Boolean).join(" · ")
+      : ""
+    const meta = valid
+      ? t("verdict.meta", { steps: result.steps.length, ms: ms ?? "—", secs: elapsed ?? screenSec })
+      : t("verdict.metaFail", { steps: result.steps.length })
+    const path = result.mode === "compliance" ? "/v1/iban/compliance" : "/v1/iban/validate"
+    const curl = `curl -X POST https://api.ibanforge.com${path} \\\n  -H "Content-Type: application/json" \\\n  -H "Authorization: Bearer $IBANFORGE_KEY" \\\n  -d '{"iban":"${result.iban}"}'`
+    const link = `${typeof window !== "undefined" ? window.location.origin : "https://ibanforge.com"}/${locale}/live?iban=${encodeURIComponent(result.iban)}&mode=${result.mode}&autoplay=1`
+    return { valid, head, facts, meta, curl, link }
+  }, [result, elapsed, screenSec, t, locale])
+
+  const copy = async (what: "curl" | "link", text: string) => {
+    try { await navigator.clipboard.writeText(text) } catch { return }
+    setCopied(what)
+    setTimeout(() => setCopied(null), 2000)
+  }
+
+  const serverMs = result && typeof result.data.processing_ms === "number" ? result.data.processing_ms : null
+  const clockSec = elapsed ?? (running ? screenSec : null)
+  const mmss = (s: number) => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`
+
   return (
-    <main className="mx-auto flex max-w-5xl flex-col px-4 py-6 sm:py-8">
+    <main className="mx-auto flex max-w-5xl flex-col px-4 py-6 sm:py-8 xl:[@media(min-height:860px)]:max-w-[1290px]">
       <h1 className="text-2xl font-bold sm:text-3xl">{t("title")}</h1>
       <p className="mt-2 max-w-[68ch] text-muted-foreground">{t("lede")}</p>
 
       {/* mode and field on one row: the header stack pushed the narration bar
           under the fold on a 13" laptop (measured 1440×790) */}
       <form onSubmit={submit} className="mt-4 flex flex-wrap items-center gap-2">
-        <Tabs value={mode} onValueChange={(v) => setMode(v as "iban" | "compliance")}>
+        <Tabs value={mode} onValueChange={(v) => setMode(v as Mode)}>
           <TabsList>
             <TabsTrigger value="iban">{t("mode.iban")}</TabsTrigger>
             <TabsTrigger value="compliance">{t("mode.compliance")}</TabsTrigger>
@@ -343,7 +516,7 @@ export default function LivePage() {
       {/* five example quests, one click each — stories a cold visitor could
           not tell from memory (a Swiss counter, a sanctions screen, a broken
           IBAN): the mod-97 seal breaking was coded and unreachable */}
-      <div className="mt-2 flex flex-wrap items-center gap-2 max-sm:order-2 max-sm:mt-3">
+      <div className="mt-2 flex flex-wrap items-center gap-2 max-sm:order-3 max-sm:mt-3">
         <span className="text-xs text-muted-foreground">{t("chips.label")}</span>
         {LIVE_EXAMPLES.map((e) => (
           <Button
@@ -364,29 +537,87 @@ export default function LivePage() {
       </div>
       {error && <p className="mt-2 text-sm" style={{ color: "var(--err, #F87171)" }}>{error}</p>}
 
-      {/* Sized so the village AND its narration bar share the first screen on
-          a 13" laptop (1440×790 measured: the bar sat 137 px under the fold). */}
-      <div
-        className="mx-auto mt-5 w-full overflow-hidden rounded-lg border shadow-sm max-sm:order-1 max-sm:mt-3"
-        style={{ maxWidth: "max(560px, min(100%, calc((100dvh - 410px) * 16 / 9)))" }}
-      >
-        <VillageCanvas
-          labels={labels}
-          laneLabel={t("lane")}
-          tips={tips}
-          heroTip={{ name: t("tips.hero.name"), role: t("tips.hero.role"), real: t("tips.hero.real") }}
-          villagerTip={{ name: t("tips.villager.name"), role: t("tips.villager.role"), real: t("tips.villager.real") }}
-          idle={idle}
-          canvasAlt={t("canvasAlt")}
-          quest={quest}
-          traffic={traffic}
-          vignette={vignette}
-          fast={fast}
-          onQuestEnd={() => { setRunning(false); setFast(false) }}
-        />
+      {/* The stage and the rail: a column beside the village on a large,
+          tall screen; a strip under the narration everywhere else. The
+          stage is sized so the village AND its narration bar share the
+          first screen on a 13" laptop (1440×790 measured). */}
+      <div className="mt-5 grid grid-cols-1 gap-3 max-sm:order-1 max-sm:mt-3 xl:[@media(min-height:860px)]:grid-cols-[minmax(0,1fr)_232px] xl:[@media(min-height:860px)]:items-start">
+        <div
+          className="relative mx-auto w-full overflow-hidden rounded-lg border shadow-sm"
+          style={{ maxWidth: "max(560px, min(100%, calc((100dvh - 410px) * 16 / 9)))" }}
+        >
+          <VillageCanvas
+            labels={labels}
+            tips={tips}
+            heroTip={{ name: t("tips.hero.name"), role: t("tips.hero.role"), real: t("tips.hero.real") }}
+            villagerTip={{ name: t("tips.villager.name"), role: t("tips.villager.role"), real: t("tips.villager.real") }}
+            idle={idle}
+            canvasAlt={t("canvasAlt")}
+            quest={quest}
+            traffic={traffic}
+            vignette={vignette}
+            fast={fast}
+            highlight={hoverId}
+            pinned={pinnedId}
+            onQuestEnd={() => {
+              setRunning(false)
+              setFast(false)
+              if (pending.current) { setResult(pending.current); setProgress(pending.current.steps.length) }
+            }}
+            onStep={setProgress}
+            onExit={setElapsed}
+            onHover={setHoverId}
+          />
+          {/* the double clock: the slow-down is declared beside the real time */}
+          {clockSec !== null && (
+            <div
+              className="pointer-events-none absolute right-2 top-2 z-10 rounded border px-2.5 py-1.5 font-mono text-[11px] leading-tight tabular-nums"
+              style={{ background: "#F3E7C8", borderColor: "#7A5322", color: "#3A2A12", boxShadow: "2px 2px 0 rgba(10,8,4,0.38)" }}
+              aria-hidden
+            >
+              <div className="flex justify-between gap-3"><span className="uppercase tracking-wider" style={{ color: "#7A5322" }}>{t("clock.screen")}</span><span>{mmss(clockSec)}</span></div>
+              <div className="flex justify-between gap-3"><span className="uppercase tracking-wider" style={{ color: "#7A5322" }}>{t("clock.real")}</span><span>{serverMs !== null && !running ? `${serverMs.toLocaleString(locale)} ms` : "…"}</span></div>
+              {serverMs !== null && !running && <div className="text-[9px]" style={{ color: "#9A8B74" }}>{t("clock.serverTime")}</div>}
+            </div>
+          )}
+        </div>
+        <RailPanel rail={rail} strings={railStrings} hoverId={hoverId} onHover={setHoverId} onPick={(id) => setPinnedId((p) => (p === id ? null : id))} stationOf={stationOf} />
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center gap-2 max-sm:order-3">
+      {/* the verdict: what the visitor earned stays on the table, with the
+          three exits a developer wants — the curl, the key, the JSON */}
+      {verdict && result && (
+        <section
+          className="mt-3 flex flex-wrap items-start gap-4 rounded-lg border px-4 py-3 max-sm:order-2"
+          style={{ background: "#F3E7C8", borderColor: "#7A5322", color: "#2A2115", boxShadow: "2px 2px 0 rgba(10,8,4,0.25)" }}
+          aria-label={t("verdict.title")}
+        >
+          <AtlasBadge frame={verdict.valid ? "ingot" : "seal-x"} tint={verdict.valid ? undefined : "#B91C1C"} />
+          <div className="min-w-[240px] flex-1">
+            <div className="text-[10.5px] font-bold uppercase tracking-[0.14em]" style={{ color: "#7A5322" }}>{t("verdict.title")}</div>
+            <div className="font-mono text-[13px]">{result.iban.replace(/(.{4})/g, "$1 ").trim()}</div>
+            <div className="mt-1 text-[15px] font-semibold">{verdict.head}</div>
+            {verdict.facts && <div className="text-[13px]" style={{ color: "#6B5327" }}>{verdict.facts}</div>}
+            <div className="mt-1 font-mono text-[11.5px]" style={{ color: "#7C4A08" }}>{verdict.meta}</div>
+          </div>
+          <div className="flex w-full flex-col gap-1.5 sm:w-auto">
+            <Button variant="outline" size="sm" onClick={() => void copy("curl", verdict.curl)}>⧉ {copied === "curl" ? t("verdict.copied") : t("verdict.copyCurl")}</Button>
+            <GetKeyButton variant="amber" size="sm">🔑 {t("verdict.getKey")}</GetKeyButton>
+            <Button variant="outline" size="sm" onClick={() => setShowJson((v) => !v)}>▸ {showJson ? t("verdict.hideJson") : t("verdict.showJson")}</Button>
+            <div className="flex gap-1.5">
+              <Button variant="outline" size="sm" className="flex-1" disabled={busy || running} onClick={() => void runValidation(result.iban, result.mode)}>↻ {t("verdict.replay")}</Button>
+              <Button variant="outline" size="sm" className="flex-1" onClick={() => void copy("link", verdict.link)}>🔗 {copied === "link" ? t("verdict.linkCopied") : t("verdict.copyLink")}</Button>
+            </div>
+          </div>
+          {showJson && (
+            <pre className="w-full overflow-x-auto rounded border p-3 font-mono text-[11px] leading-snug" style={{ background: "#FDF8EC", borderColor: "rgba(122,83,34,.35)", color: "#2A2115" }}>
+              {JSON.stringify(result.data, null, 2)}
+            </pre>
+          )}
+        </section>
+      )}
+
+      <div className="mt-3 flex flex-wrap items-center gap-2 max-sm:order-4">
         <span className="text-xs uppercase tracking-wide text-muted-foreground">{t("vignettes.label")}</span>
         <Button variant="outline" size="sm" disabled={busy || running} onClick={() => playVignette("caravan")}>
           {t("vignettes.caravan.btn")}
@@ -404,8 +635,8 @@ export default function LivePage() {
         )}
       </div>
 
-      <p className="mt-3 max-w-[75ch] text-sm text-muted-foreground max-sm:order-4">{t("ledeMore")}</p>
-      <p className="mt-3 max-w-[75ch] text-sm text-muted-foreground max-sm:order-5">{t("honesty")}</p>
+      <p className="mt-3 max-w-[75ch] text-sm text-muted-foreground max-sm:order-5">{t("ledeMore")}</p>
+      <p className="mt-3 max-w-[75ch] text-sm text-muted-foreground max-sm:order-6">{t("honesty")}</p>
     </main>
   )
 }

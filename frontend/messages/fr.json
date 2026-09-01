@@ -1372,6 +1372,68 @@
       "description": "Regarde une vraie validation IBAN traverser le pipeline d'IBANforge, au ralenti : péage x402, scribe mod-97, bibliothèque BIC, registres nationaux, verdict, forge."
     },
     "canvasAlt": "Le village : chaque bâtiment est une étape réelle du pipeline de validation IBAN ; le récit de la quête se lit dans le bandeau sous l'image.",
+    "rail": {
+      "title": "Le pipeline",
+      "step": "Étape {n} / {total}",
+      "lastSeen": "Dernière requête réelle : {when}",
+      "noneYet": "Aucune requête réelle vue depuis l'ouverture",
+      "groups": {
+        "formalities": "Formalités",
+        "registers": "Registres",
+        "frontier": "Frontière & forge"
+      },
+      "names": {
+        "gate": "Péage x402",
+        "scribe": "Scribe mod-97",
+        "cutter": "Découpeur BBAN",
+        "library": "Bibliothèque BIC",
+        "registry": "Registre national",
+        "six": "Guichet SIX",
+        "court": "Tribunal du Verdict",
+        "classifier": "Classificateur",
+        "border": "Poste-frontière",
+        "tower": "Tour de guet",
+        "forge": "La Forge",
+        "exit": "Livraison",
+        "modulus": "Arithmétique modulus (UK)",
+        "pra": "Autorisation prudentielle (BoE)"
+      },
+      "states": {
+        "idle": "à venir",
+        "skipped": "non emprunté par cette requête",
+        "current": "en cours",
+        "done": "réussi",
+        "warn": "réserve",
+        "fail": "échec"
+      }
+    },
+    "clock": {
+      "screen": "À l'écran",
+      "real": "En vrai",
+      "serverTime": "temps serveur"
+    },
+    "verdict": {
+      "title": "Le lingot",
+      "valid": "IBAN valide",
+      "invalid": "IBAN refusé",
+      "noBic": "BIC introuvable",
+      "registerOk": "registre ✓",
+      "sepaOk": "SEPA ✓",
+      "sepaNo": "hors SEPA",
+      "vopOk": "VoP ✓",
+      "vopNo": "VoP —",
+      "risk": "risque {score}/100",
+      "meta": "{steps} étapes · {ms} ms de traitement serveur · {secs} s à l'écran",
+      "metaFail": "{steps} étapes · le pipeline s'est arrêté au Scribe, les suivantes n'ont pas tourné",
+      "copyCurl": "Copier le curl de cette quête",
+      "copied": "Copié",
+      "getKey": "Prendre ta clé (200 requêtes/mois)",
+      "showJson": "Le JSON complet",
+      "hideJson": "Replier le JSON",
+      "replay": "Rejouer",
+      "copyLink": "Copier le lien de cette quête",
+      "linkCopied": "Lien copié"
+    },
     "ledeMore": "Une validation prend environ une milliseconde côté serveur — ici elle est ralentie volontairement pour qu'on la voie travailler. Survole n'importe qui pour savoir qui fait quoi.",
     "faster": "Accélérer",
     "chips": {

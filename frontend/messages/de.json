@@ -1372,6 +1372,68 @@
       "description": "Sieh zu, wie eine echte IBAN-Validierung die IBANforge-Pipeline durchläuft, verlangsamt: Zollhaus, Mod-97-Schreiber, BIC-Bibliothek, nationale Register, Urteil, Schmiede."
     },
     "canvasAlt": "Das Dorf: Jedes Gebäude ist ein echter Schritt der IBAN-Validierungspipeline; die Quest wird in der Leiste unter dem Bild erzählt.",
+    "rail": {
+      "title": "Die Pipeline",
+      "step": "Schritt {n} / {total}",
+      "lastSeen": "Letzte echte Anfrage: {when}",
+      "noneYet": "Seit dem Öffnen keine echte Anfrage gesehen",
+      "groups": {
+        "formalities": "Formalitäten",
+        "registers": "Register",
+        "frontier": "Grenze & Schmiede"
+      },
+      "names": {
+        "gate": "Zollhaus x402",
+        "scribe": "Mod-97-Schreiber",
+        "cutter": "BBAN-Schneider",
+        "library": "BIC-Bibliothek",
+        "registry": "Nationales Register",
+        "six": "SIX-Schalter",
+        "court": "Gericht des Urteils",
+        "classifier": "Sortierer",
+        "border": "Grenzposten",
+        "tower": "Wachturm",
+        "forge": "Die Schmiede",
+        "exit": "Zustellung",
+        "modulus": "Modulus-Prüfung (UK)",
+        "pra": "Aufsichtszulassung (BoE)"
+      },
+      "states": {
+        "idle": "steht bevor",
+        "skipped": "von dieser Anfrage nicht durchlaufen",
+        "current": "läuft",
+        "done": "bestanden",
+        "warn": "Vorbehalt",
+        "fail": "gescheitert"
+      }
+    },
+    "clock": {
+      "screen": "Auf dem Bildschirm",
+      "real": "In echt",
+      "serverTime": "Serverzeit"
+    },
+    "verdict": {
+      "title": "Der Barren",
+      "valid": "IBAN gültig",
+      "invalid": "IBAN abgelehnt",
+      "noBic": "kein BIC gefunden",
+      "registerOk": "Register ✓",
+      "sepaOk": "SEPA ✓",
+      "sepaNo": "außerhalb SEPA",
+      "vopOk": "VoP ✓",
+      "vopNo": "VoP —",
+      "risk": "Risiko {score}/100",
+      "meta": "{steps} Schritte · {ms} ms Serverzeit · {secs} s auf dem Bildschirm",
+      "metaFail": "{steps} Schritte · die Pipeline hielt beim Schreiber, der Rest lief nie",
+      "copyCurl": "curl dieser Quest kopieren",
+      "copied": "Kopiert",
+      "getKey": "Deinen Schlüssel holen (200 Anfragen/Monat)",
+      "showJson": "Das vollständige JSON",
+      "hideJson": "JSON einklappen",
+      "replay": "Wiederholen",
+      "copyLink": "Link zu dieser Quest kopieren",
+      "linkCopied": "Link kopiert"
+    },
     "ledeMore": "Eine Validierung dauert serverseitig etwa eine Millisekunde — hier ist sie bewusst verlangsamt, damit man ihr zusehen kann. Fahre über Figuren und Gebäude, um zu sehen, wer was tut.",
     "faster": "Schneller",
     "chips": {

@@ -25,9 +25,13 @@ import type { StationId, StepOutcome } from "@/lib/village/journey"
 
 export interface NarratedStep {
   station: StationId
+  /** the journey step key (== station, or 'modulus' / 'pra' for a sub-step) */
+  key: string
   who: string
   text: string
   outcome: StepOutcome
+  /** the real values the step produced, for the rail's suffixes */
+  params?: Record<string, string | number | boolean | null>
   holdMs: number
   regCc?: string | null
   /** Exit line built at the moment it shows, from the real on-screen seconds. */
@@ -38,6 +42,8 @@ export interface StationTip { name: string; role: string; real: string }
 
 export interface TrafficCourier {
   key: number
+  /** when the operation was logged (either stats.sqlite timestamp shape) */
+  t?: string
   kind: "full" | "library" | "fail"
   tint: number
   tip: StationTip
@@ -51,7 +57,6 @@ export interface Vignette {
 
 interface Props {
   labels: Record<string, string>
-  laneLabel: string
   tips: Record<string, StationTip>
   heroTip: StationTip
   villagerTip: StationTip
@@ -62,7 +67,17 @@ interface Props {
   vignette?: Vignette | null
   /** ⏩ holds ÷3, walks ×2 — the visitor who wants the proof, not the show */
   fast?: boolean
+  /** a station lit from outside (the rail's hovered row) */
+  highlight?: string | null
+  /** a station whose card stays open (the rail's clicked row) */
+  pinned?: string | null
   onQuestEnd?: () => void
+  /** index of the step whose line is now showing */
+  onStep?: (index: number) => void
+  /** the delivered (or refused) line is showing, after this many on-screen seconds */
+  onExit?: (elapsedSec: number) => void
+  /** the station under the mouse changed */
+  onHover?: (id: string | null) => void
 }
 
 const COURIER_KINDS = ["cour-a", "cour-b", "cour-c"] as const
@@ -78,30 +93,24 @@ const COURIER_SPEED = 220
  * on the middle street so six close-set plaques cannot collide; the top-row
  * stations sit on their street's lower half so the courier line at y=192
  * stays mostly clear. */
-const LABEL_AT: Record<string, [number, number]> = {
-  gate: [80, 203], scribe: [210, 203], cutter: [330, 203], library: [655, 203],
-  "reg-DE": [573, 346], "reg-AT": [633, 361], "reg-BE": [708, 346],
-  "reg-BG": [758, 361], "reg-NL": [812, 346], "reg-FI": [868, 361],
-  // the three counters stagger like the lane: their long names collide flat
-  classifier: [236, 346], court: [358, 362], six: [470, 346],
-  warehouse: [850, 112], tower: [380, 517], forge: [560, 518],
-  archive: [140, 516], border: [280, 518], vigil: [906, 510],
-}
 
 interface Spark { x: number; y: number; vx: number; vy: number; l: number; c: string }
 interface Puff { x: number; y: number; a: number; s: number; vy: number }
 interface Seal { x: number; y: number; sprite: "coin" | "seal-x"; l: number; tint?: string }
 interface Pulse { x: number; y: number; r: number; l: number }
 
-export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, idle, canvasAlt, quest, traffic, vignette, fast, onQuestEnd }: Props) {
+export function VillageCanvas({ labels, tips, heroTip, villagerTip, idle, canvasAlt, quest, traffic, vignette, fast, highlight, pinned, onQuestEnd, onStep, onExit, onHover }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const faceRef = useRef<HTMLCanvasElement>(null)
   const [narr, setNarr] = useState<{ who: string; text: string }>(idle)
-  const [tip, setTip] = useState<{ x: number; y: number; tip: StationTip } | null>(null)
+  const [tip, setTip] = useState<{ x: number; y: number; side?: "right" | "left"; tip: StationTip } | null>(null)
   const [loaded, setLoaded] = useState(false)
   /** station under the mouse — drives the DOM label lift and the cursor;
    * the canvas glow reads the ref (per-frame), this state feeds the DOM */
   const [hoverId, setHoverId] = useState<string | null>(null)
+  /** the one banner allowed in the world: the station being worked, numbered */
+  const [banner, setBanner] = useState<{ id: string; no: number; total: number; outcome: StepOutcome } | null>(null)
+  const lastHover = useRef<string | null>(null)
 
   const world = useRef({
     img: null as WorldImages | null,
@@ -419,7 +428,7 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
     }
     raf = requestAnimationFrame(frame)
     return () => cancelAnimationFrame(raf)
-  }, [labels, laneLabel, loaded])
+  }, [loaded])
 
   /* ---------- movement helpers ---------- */
   const makeSleep = useCallback((genAtStart: number) => {
@@ -504,12 +513,9 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
     w.trail = []; w.trailAcc = 0
     let anchor: [number, number] = [-28, 192]
     const startedAt = performance.now()
-    const lineOf = (step: NarratedStep) => ({
-      who: step.who,
-      text: step.textAt ? step.textAt(Math.round((performance.now() - startedAt) / 1000)) : step.text,
-    })
+    const elapsed = () => Math.round((performance.now() - startedAt) / 1000)
 
-    for (const step of steps) {
+    for (const [i, step] of steps.entries()) {
       if (w.gen !== gen) return
       const failExit = step.station === "exit" && step.outcome === "fail"
       let target: StationGeo | null = null
@@ -522,14 +528,21 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
 
       if (failExit) {
         w.focus = null
+        setBanner(null)
         setNarr({ who: step.who, text: step.text })
+        onStep?.(i)
+        onExit?.(elapsed())
         w.hero.dir = -1
         await walk([[80, 192], [-40, 192]])
         break
       }
       if (step.station === "exit") {
         w.focus = null
-        setNarr(lineOf(step))
+        setBanner(null)
+        const secs = elapsed()
+        setNarr({ who: step.who, text: step.textAt ? step.textAt(secs) : step.text })
+        onStep?.(i)
+        onExit?.(secs)
         if (!(await walk([...roadRoute(anchor, [952, 498]), [998, 498]]))) return
         break
       }
@@ -549,6 +562,8 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
       }
 
       setNarr({ who: step.who, text: step.text })
+      onStep?.(i)
+      if (target) setBanner({ id: target.id, no: i + 1, total: steps.length, outcome: step.outcome })
       if (step.station === "gate") w.seals.push({ x: 46, y: 140, sprite: "coin", l: 90 })
       if (step.station === "scribe" && step.outcome === "fail") w.seals.push({ x: 204, y: 116, sprite: "seal-x", l: 110, tint: "#B91C1C" })
       if (step.station === "registry" && target) w.pulses.push({ x: target.cx, y: target.base - 60, r: 6, l: 40 })
@@ -565,8 +580,9 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
     }
     if (w.gen !== gen) return
     w.veil = false; w.focus = null; w.hero.hidden = true
+    setBanner(null)
     onQuestEnd?.()
-  }, [makeMove, makeSleep, onQuestEnd])
+  }, [makeMove, makeSleep, onQuestEnd, onStep, onExit])
 
   // Play each quest id ONCE. The effect also fires when runQuest is recreated
   // (its onQuestEnd prop is an inline closure upstream, so any page re-render
@@ -585,6 +601,8 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
   // form is refused by react-hooks/set-state-in-effect; this one is accepted.
   useEffect(() => { setNarr(idle) }, [idle])
   useEffect(() => { world.current.fast = !!fast }, [fast])
+  // the rail's hovered row lights its building like the mouse would
+  useEffect(() => { world.current.hover = highlight ?? null }, [highlight])
 
   /* ---------- traffic couriers ---------- */
   useEffect(() => {
@@ -700,6 +718,20 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
   }, [loaded])
 
   /* ---------- hover cards ---------- */
+  // A station's card is ANCHORED beside its building (never over it, the
+  // golden lift stays visible), flipped to the left near the window's edge
+  // and lifted up in the lower third; an actor's card follows the mouse.
+  const anchorFor = (s: StationGeo): { x: number; y: number; side: "right" | "left" } | null => {
+    const cv = canvasRef.current
+    if (!cv) return null
+    const r = cv.getBoundingClientRect()
+    const sx = r.width / W, sy = r.height / H
+    const rightX = r.left + (s.bx + s.bw) * sx + 12
+    const side: "right" | "left" = rightX + 300 > window.innerWidth ? "left" : "right"
+    const x = side === "right" ? rightX : r.left + s.bx * sx - 12 - 300
+    const y = Math.min(r.top + s.by * sy, window.innerHeight - 170)
+    return { x, y, side }
+  }
   const onMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const cv = canvasRef.current
     if (!cv) return
@@ -726,15 +758,31 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
         }
       }
     }
-    w.hover = station
+    w.hover = station ?? highlight ?? null
     setHoverId(station)
-    setTip(found ? { x: e.clientX, y: e.clientY, tip: found } : null)
+    if (station !== lastHover.current) { lastHover.current = station; onHover?.(station) }
+    const geo = station ? stationById[station] : null
+    const a = geo ? anchorFor(geo) : null
+    setTip(found ? (a ? { x: a.x, y: a.y, side: a.side, tip: found } : { x: e.clientX + 14, y: e.clientY + 10, tip: found }) : null)
   }
   const onLeave = () => {
-    world.current.hover = null
+    world.current.hover = highlight ?? null
     setHoverId(null)
-    setTip(null)
+    if (lastHover.current !== null) { lastHover.current = null; onHover?.(null) }
+    setTip(pinned ? anchoredTip(pinned) : null)
   }
+  // the rail's clicked row: its card opens beside the building and stays
+  // (measured after commit — refs are not read during render)
+  const anchoredTip = (id: string) => {
+    const geo = stationById[id]
+    const a = geo ? anchorFor(geo) : null
+    return a && tips[id] ? { x: a.x, y: a.y, side: a.side, tip: tips[id] } : null
+  }
+  useEffect(() => {
+    const raf = requestAnimationFrame(() => setTip(pinned ? anchoredTip(pinned) : null))
+    return () => cancelAnimationFrame(raf)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pinned])
 
   return (
     <div className="relative">
@@ -751,54 +799,31 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
           className="block w-full"
           style={{ imageRendering: "auto", aspectRatio: "16/9", background: "#0B0E16", cursor: hoverId ? "pointer" : "crosshair" }}
         />
-        {/* Labels are DOM, not paint (01/09): plaques painted into the canvas
-            scale down with it and blurred illegible at laptop widths — the
-            operator's report, twice. Browser text stays at screen pixels.
-            They wear the parchment family of the hover card (same paper, same
-            hard pixel shadow) and STEP ASIDE while a card is open, so the
-            screen never floods (operator, 01/09 evening).
-            pointer-events-none: the canvas under them owns the mouse. */}
-        {loaded && (
-          <div aria-hidden className="pointer-events-none absolute inset-0 select-none">
-            {STATIONS.filter((s) => labels[s.id]).map((s) => {
-              const [lx, ly] = LABEL_AT[s.id] ?? [s.cx, s.base + 12]
-              const hot = hoverId === s.id
-              return (
-                <span
-                  key={s.id}
-                  className={`absolute -translate-x-1/2 whitespace-nowrap border font-bold${s.cc ? " hidden sm:inline-block" : ""}`}
-                  style={{
-                    left: `${(lx / W) * 100}%`,
-                    top: `${(ly / H) * 100}%`,
-                    fontSize: s.cc ? 10 : 11.5,
-                    lineHeight: 1.1,
-                    padding: "2px 7px",
-                    background: hot ? "#FDE68A" : "#F3E7C8",
-                    borderColor: hot ? "#B45309" : "#7A5322",
-                    borderWidth: 1.5,
-                    borderRadius: 3,
-                    color: "#3A2A12",
-                    boxShadow: "2px 2px 0 rgba(10,8,4,0.38)",
-                    opacity: tip ? 0 : 1,
-                    transform: `translateX(-50%)${hot ? " scale(1.18)" : ""}`,
-                    transition: "opacity 180ms, transform 150ms",
-                  }}
-                >
-                  {labels[s.id]}
-                </span>
-              )
-            })}
+        {/* The one text allowed over the picture (v9): the station being
+            worked, numbered — the twenty permanent labels left the world,
+            the rail beside the village names the rest. */}
+        {loaded && banner && stationById[banner.id] && (() => {
+          const s = stationById[banner.id]
+          const dot = banner.outcome === "fail" ? "#B91C1C" : banner.outcome === "warn" ? "#B45309" : "#15803D"
+          return (
             <span
-              className="hidden sm:inline-block absolute border px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wider"
-              style={{ left: `${(724 / W) * 100}%`, top: `${(220 / H) * 100}%`, transform: "translateX(-50%)",
+              aria-hidden
+              className="pointer-events-none absolute select-none whitespace-nowrap border font-bold"
+              style={{
+                left: `${(s.cx / W) * 100}%`,
+                top: `${((s.by - 8) / H) * 100}%`,
+                transform: "translate(-50%, -100%)",
+                fontSize: 11.5, lineHeight: 1.1, padding: "3px 8px",
                 background: "#F3E7C8", borderColor: "#7A5322", borderWidth: 1.5, borderRadius: 3,
-                color: "#5C4218", boxShadow: "2px 2px 0 rgba(10,8,4,0.38)",
-                opacity: tip ? 0 : 1, transition: "opacity 180ms" }}
+                color: "#3A2A12", boxShadow: "2px 2px 0 rgba(10,8,4,0.38)",
+              }}
             >
-              {laneLabel}
+              <span className="mr-1 font-mono" style={{ color: "#7A5322" }}>{banner.no}/{banner.total}</span>
+              {labels[banner.id] ?? banner.id}
+              <span className="ml-1.5 inline-block h-2 w-2 rounded-full align-middle" style={{ background: dot }} />
             </span>
-          </div>
-        )}
+          )
+        })()}
         {!loaded && (
           <div className="absolute inset-0 flex items-center justify-center text-sm tracking-widest uppercase"
             style={{ background: "#0B0E16", color: "#FDE68A" }}>
@@ -822,10 +847,10 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
       </div>
       {tip && (
         <div
-          className="pointer-events-none fixed z-30 max-w-[300px] px-4 py-3 text-[13px] leading-snug"
+          className="pointer-events-none fixed z-30 w-[300px] px-4 py-3 text-[13px] leading-snug"
           style={{
-            left: Math.min(tip.x + 14, typeof window !== "undefined" ? window.innerWidth - 310 : tip.x),
-            top: tip.y + 10,
+            left: tip.side ? tip.x : Math.min(tip.x, typeof window !== "undefined" ? window.innerWidth - 310 : tip.x),
+            top: tip.y,
             color: "#2A2115",
             borderStyle: "solid",
             borderWidth: 14,
@@ -833,6 +858,13 @@ export function VillageCanvas({ labels, laneLabel, tips, heroTip, villagerTip, i
             filter: "drop-shadow(4px 5px 0 rgba(5,5,10,.5))",
           }}
         >
+          {tip.side && (
+            <span
+              aria-hidden
+              className="absolute h-3.5 w-3.5 rotate-45"
+              style={{ top: 22, [tip.side === "right" ? "left" : "right"]: -7, background: "#F3E7C8", borderLeft: "1.5px solid #7A5322", borderBottom: "1.5px solid #7A5322" }}
+            />
+          )}
           <div className="font-semibold">{tip.tip.name}</div>
           <div style={{ color: "#6B5327" }}>{tip.tip.role}</div>
           <div className="mt-1 border-t border-dashed pt-1 font-mono text-[11.5px]" style={{ borderColor: "rgba(120,83,9,.4)", color: "#7C4A08" }}>
