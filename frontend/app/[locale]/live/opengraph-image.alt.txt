@@ -1,1 +1,0 @@
-The IBANforge village: a real IBAN validation crossing the pipeline, the golden courier at the Bundesbank registry house.

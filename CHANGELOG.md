@@ -5,6 +5,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Removed
+
+- **The `/live` village page is paused and no longer served.** Operator decision of 2026-09-02: the idea — watch the agents and every actor of the pipeline at work, to see what happens backstage — stays; the execution was judged too rough to be live, and the nine redesign mock-ups audited the same day had not found the form yet. Removed: the route and its canvas engine, the sprite atlas and its rebuild script, the two relays only that page used (`/api/ops`, `/api/health-sources`), the menu entry, the landing link and the sitemap entry. `/{locale}/live` redirects (temporarily) to the playground for the links already shared. The code is kept whole at git tag `village-pause-2026-09-02`. The backend feed `GET /v1/ops/recent` stays, now unused.
+
 ## [1.4.4] — 2026-09-01
 
 ### Fixed

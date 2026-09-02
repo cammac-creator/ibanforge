@@ -65,6 +65,16 @@ const nextConfig: NextConfig = {
        */
       { source: "/:locale(en|fr|de)/docs/quickstart", destination: "/:locale/docs", permanent: true },
       { source: "/docs/quickstart", destination: "/en/docs", permanent: true },
+      /*
+       * 2026-09-02: the /live village is paused (operator decision: the idea
+       * stays, the execution was judged too rough to be live). The code is
+       * kept whole at git tag `village-pause-2026-09-02`. Links already out
+       * there (menu, landing, sitemap, OG image shared since 01/09) land on the
+       * playground, which shows the same pipeline as a real response.
+       * Temporary on purpose: the page may come back in another form.
+       */
+      { source: "/:locale(en|fr|de)/live", destination: "/:locale/playground", permanent: false },
+      { source: "/live", destination: "/en/playground", permanent: false },
     ];
   },
 };

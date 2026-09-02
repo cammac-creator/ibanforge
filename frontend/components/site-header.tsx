@@ -21,7 +21,6 @@ export function SiteHeader() {
     { href: `/${locale}/agents`, label: t("nav.agents") },
     { href: `/${locale}/docs`, label: t("nav.docs") },
     { href: `/${locale}/playground`, label: t("nav.playground") },
-    { href: `/${locale}/live`, label: t("nav.live") },
     { href: `/${locale}/pricing`, label: t("nav.pricing") },
     { href: `/${locale}/blog`, label: t("nav.blog") },
   ]

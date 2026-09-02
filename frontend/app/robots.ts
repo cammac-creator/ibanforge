@@ -10,7 +10,7 @@ import { MetadataRoute } from "next";
  * The bare rule looked like a protection and was one only against a crawler
  * that guessed the URL rather than followed the link.
  *
- * `/api/` covers the Next route handlers (`/api/crm/*`, `/api/ops`,
+ * `/api/` covers the Next route handlers (`/api/crm/*`, `/api/playground`,
  * `/api/dashboard`), none of which is a page and none of which belongs in an
  * index.
  */

@@ -30,9 +30,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
       { url: `${prefix}/compare`, changeFrequency: "monthly", priority: 0.8 },
       { url: `${prefix}/tools/test-iban`, changeFrequency: "monthly", priority: 0.8 },
       { url: `${prefix}/playground`, changeFrequency: "monthly", priority: 0.9 },
-      // Linked from the main menu on every page and, until 2026-09-01, absent
-      // from this list (WEB-11).
-      { url: `${prefix}/live`, changeFrequency: "monthly", priority: 0.6 },
       { url: `${prefix}/docs`, changeFrequency: "weekly", priority: 0.8 },
       { url: `${prefix}/pricing`, changeFrequency: "monthly", priority: 0.7 },
       { url: `${prefix}/openapi`, changeFrequency: "monthly", priority: 0.7 },

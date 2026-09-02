@@ -28,7 +28,7 @@ export interface FilmStrings {
     eyebrow: string; title: string; copy: string
     iid: string; sic: string; eurosic: string; instant: string
   }
-  ship: { eyebrow: string; title: string; head: string; tryLive: string; seeVillage: string; copy: string }
+  ship: { eyebrow: string; title: string; head: string; tryLive: string; copy: string }
 }
 
 /* Static SVG scenery + data-heavy markup, kept as trusted constants so the
@@ -100,7 +100,7 @@ function Scene({ html, mid = false }: { html: string; mid?: boolean }) {
   )
 }
 
-export function ForgeFilm({ t, playgroundHref, villageHref }: { t: FilmStrings; playgroundHref: string; villageHref: string }) {
+export function ForgeFilm({ t, playgroundHref }: { t: FilmStrings; playgroundHref: string }) {
   const rootRef = useRef<HTMLElement>(null)
 
   useEffect(() => {
@@ -427,10 +427,7 @@ export function ForgeFilm({ t, playgroundHref, villageHref }: { t: FilmStrings; 
                 <figcaption className="ship-head"><span className="pill-ok">200 OK</span><span>{t.ship.head}</span></figcaption>
                 <pre className="json-out"><code dangerouslySetInnerHTML={{ __html: JSON_OUT }} /></pre>
               </figure>
-              {/* the film tells the pipeline in text; the village makes it walk —
-                  the two pages did not know each other (conversion audit, 01/09) */}
               <p><a className="btn-ghost-link" href={playgroundHref}>{t.ship.tryLive}</a></p>
-              <p><a className="btn-ghost-link" href={villageHref}>{t.ship.seeVillage}</a></p>
             </div>
             <p className="st-copy">{t.ship.copy}</p>
           </div>
