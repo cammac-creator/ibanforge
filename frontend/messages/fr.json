@@ -1211,7 +1211,7 @@
         },
         {
           "title": "Pré-contrôle de conformité intégré",
-          "body": "Filtrage des sanctions (OFAC, UE, ONU), listes GAFI, atteignabilité SEPA et données d'exigence VoP, score de risque 0 à 100 : un endpoint pour trier avant qu'un paiement quitte votre produit.",
+          "body": "Filtrage des sanctions (OFAC, EU, UN), listes GAFI, atteignabilité SEPA et données d'exigence VoP, score de risque 0 à 100 : un endpoint pour trier avant qu'un paiement quitte votre produit.",
           "link": "Documentation conformité"
         },
         {
