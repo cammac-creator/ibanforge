@@ -26,9 +26,13 @@ account as soon as an IBAN is entered, using the IBANforge API
         "views/res_config_settings_views.xml",
         "views/res_partner_bank_views.xml",
     ],
-    # NOTE: static/description/icon.{svg,png} both ship (140x140). Before the
-    # Odoo App Store upload, add real Odoo screenshots and an "images" key for
-    # the listing carousel.
+    # Listing carousel: two screenshots taken on a real Odoo 18 instance on
+    # 2 September 2026 (the bank account form after the IBAN was typed, and
+    # the module's own Settings tab). icon.{svg,png} both ship (140x140).
+    "images": [
+        "static/description/screenshot-bank-account.png",
+        "static/description/screenshot-settings.png",
+    ],
     "installable": True,
     "application": False,
     "auto_install": False,
