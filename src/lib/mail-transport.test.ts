@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { sendViaRelay, isRelayConfigured } from './mail-transport.js';
+import { sendViaRelay, deliverViaRelay, classifyRelayRefusal, isRelayConfigured } from './mail-transport.js';
 
 /**
  * Railway blocks outbound SMTP below its Pro plan — measured 2026-07-25 from
@@ -90,5 +90,60 @@ describe('sendViaRelay', () => {
     // Without a timeout, a hung relay would block the Stripe webhook (which
     // awaits delivery) well past Stripe's ~10s deadline.
     expect(signal).toBeInstanceOf(AbortSignal);
+  });
+});
+
+describe('deliverViaRelay tells an address the server refuses from a relay that is down', () => {
+  const REFUSED_RECIPIENT =
+    "send failed: {'acme@alpha.example.net': (550, b'5.1.1 <acme@alpha.example.net>: Recipient address rejected: Domain not found')}";
+
+  it('a 502 quoting a recipient refusal is undeliverable: the address is the problem', async () => {
+    configure();
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(REFUSED_RECIPIENT, { status: 502 })));
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const r = await deliverViaRelay(MAIL);
+    expect(r.outcome).toBe('undeliverable');
+    expect(r.status).toBe(502);
+    expect(await sendViaRelay(MAIL)).toBe(false);
+  });
+
+  it('a 502 without a recipient code is a refusal: the SMTP upstream is the problem', async () => {
+    configure();
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('send failed: timed out', { status: 502 })));
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    expect((await deliverViaRelay(MAIL)).outcome).toBe('refused');
+  });
+
+  it('a 401 is a refusal even when the body mentions a recipient: the shared secret is the problem', async () => {
+    configure();
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('unauthorized recipient', { status: 401 })));
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    expect((await deliverViaRelay(MAIL)).outcome).toBe('refused');
+  });
+
+  it('a network error is unreachable, and no configuration is unconfigured', async () => {
+    configure();
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('ECONNREFUSED'); }));
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    expect((await deliverViaRelay(MAIL)).outcome).toBe('unreachable');
+    delete process.env.MAIL_RELAY_URL;
+    expect((await deliverViaRelay(MAIL)).outcome).toBe('unconfigured');
+  });
+
+  it('never logs the relay text, which quotes the address', async () => {
+    configure();
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(REFUSED_RECIPIENT, { status: 502 })));
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    await deliverViaRelay(MAIL);
+    const logged = spy.mock.calls.map((c) => c.join(' ')).join('\n');
+    expect(logged).not.toContain('alpha.example.net');
+    expect(logged).toContain('undeliverable recipient');
+  });
+
+  it('classifies the SMTP prose the relay forwards', () => {
+    expect(classifyRelayRefusal(502, "(550, b'5.1.1 no such user')")).toBe('undeliverable');
+    expect(classifyRelayRefusal(502, 'Domain not found')).toBe('undeliverable');
+    expect(classifyRelayRefusal(502, 'Connection unexpectedly closed')).toBe('refused');
+    expect(classifyRelayRefusal(503, 'relay mailbox not configured')).toBe('refused');
   });
 });

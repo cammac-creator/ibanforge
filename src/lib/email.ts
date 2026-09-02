@@ -1,5 +1,5 @@
 import { PAYMENT_LINKS, PRICING_PAGE } from './payment-links.js';
-import { sendViaRelay, isRelayConfigured } from './mail-transport.js';
+import { sendViaRelay, deliverViaRelay, isRelayConfigured, type RelayOutcome } from './mail-transport.js';
 import { opsFail } from './ops-alert.js';
 import {
   ACCOUNT_PAGE,
@@ -349,11 +349,22 @@ export function buildKeyVerificationEmail(p: { code: string }): { subject: strin
   return { subject, text, html };
 }
 
-export async function sendKeyVerificationEmail(p: { to: string; code: string }): Promise<boolean> {
+/**
+ * Says WHY a code did not leave, because the two reasons want opposite
+ * answers: an address the mail server refuses is the caller's to fix (400,
+ * no alert), a relay that is down or misconfigured is ours (503, alert).
+ * Measured 02/09/2026: every 503 of the previous month was a script feeding
+ * addresses that cannot exist, and the relay was healthy throughout.
+ */
+export async function deliverKeyVerificationEmail(p: { to: string; code: string }): Promise<RelayOutcome> {
   const { subject, text, html } = buildKeyVerificationEmail(p);
-  const ok = await sendViaRelay({ to: p.to, subject, text, html });
-  if (!ok) reportUndelivered('verification code', p.to, false);
-  return ok;
+  const { outcome } = await deliverViaRelay({ to: p.to, subject, text, html });
+  if (outcome !== 'sent') reportUndelivered('verification code', p.to, false);
+  return outcome;
+}
+
+export async function sendKeyVerificationEmail(p: { to: string; code: string }): Promise<boolean> {
+  return (await deliverKeyVerificationEmail(p)) === 'sent';
 }
 
 /**

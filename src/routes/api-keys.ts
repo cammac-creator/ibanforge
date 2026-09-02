@@ -53,7 +53,7 @@ import { getCompanyProfiles, upsertCompanyProfile, type ProfileSource } from '..
 import {
   sendApiKeyEmail,
   sendFreeKeyEmail,
-  sendKeyVerificationEmail,
+  deliverKeyVerificationEmail,
   isEmailConfigured,
   alertKeyDeliveryFailure,
 } from '../lib/email.js';
@@ -182,15 +182,28 @@ apiKeys.post('/v1/keys/generate', async (c) => {
         }
         const sendId = recordVerificationSend(creationSource, email.trim().toLowerCase());
         const challenge = createVerificationChallenge(email.trim().toLowerCase(), creationSource);
-        const sent = await sendKeyVerificationEmail({ to: email.trim().toLowerCase(), code: challenge });
+        const outcome = await deliverKeyVerificationEmail({ to: email.trim().toLowerCase(), code: challenge });
+        const sent = outcome === 'sent';
         // The outcome is written whichever way it went: a refusal that leaves
         // no trace is exactly how this channel failed unnoticed for three days.
         markVerificationOutcome(sendId, sent);
+        if (outcome === 'undeliverable') {
+          // The mail server for that domain refused the address. No retry and
+          // no alert can fix it, and "try again in a few minutes" would have
+          // been a lie: it is the caller's address to fix.
+          return c.json({
+            error: 'undeliverable_email',
+            message:
+              'The mail server for this address refused it, so no verification code could be delivered. ' +
+              'Check the address, or use another mailbox you can read.',
+          }, 400);
+        }
         if (!sent) {
-          // Ten 503s in the last 30 days (dashboard audit, 2026-09-02) and no
-          // alert for any of them: a verification code that cannot leave is a
-          // signup that fails, not a missed nudge. Threshold 3: one relay
-          // hiccup does not wake anyone, a run of them does.
+          // A month of 503s here turned out to be one script feeding addresses
+          // that cannot exist, with the relay healthy throughout (02/09/2026):
+          // those now answer 400 above. What remains is ours: the relay down,
+          // its mailbox unconfigured, or a shared secret that no longer
+          // matches. Threshold 3: one hiccup does not wake anyone, a run does.
           void opsFail(
             'mail:verification',
             'Verification codes are not leaving: the free-key signup answers 503 while the relay refuses or cannot be reached.',

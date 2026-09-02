@@ -718,8 +718,9 @@ const buildRawSpec = () => ({
           '201': { description: 'API key generated (shown only once)' },
           '400': {
             description:
-              'Body rejected before any key was considered. "error" is "invalid_json", "invalid_email", or ' +
-              '"disposable_email" (the free tier needs a real, non-disposable mailbox).',
+              'Body rejected before any key was considered. "error" is "invalid_json", "invalid_email", ' +
+              '"disposable_email" (the free tier needs a real, non-disposable mailbox), or "undeliverable_email" ' +
+              '(the mail server for that domain refused the address, so no verification code could be delivered).',
           },
           '403': {
             description:
@@ -736,8 +737,9 @@ const buildRawSpec = () => ({
           },
           '503': {
             description:
-              '"verification_unavailable": the verification mail could not be sent right now, so no key was ' +
-              'issued and no code is pending. Retry in a few minutes.',
+              '"verification_unavailable": the mail relay is down or misconfigured on our side, so no key was ' +
+              'issued and no code is pending. Retry in a few minutes. An address the mail server refuses ' +
+              'answers 400 "undeliverable_email" instead.',
           },
         },
       },

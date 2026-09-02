@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { apiKeys } from './api-keys.js';
 import { getStatsDB } from '../lib/db.js';
 import { generateApiKey } from '../lib/api-keys.js';
@@ -604,6 +604,45 @@ describe('POST /v1/keys/generate — per-network creation guard', () => {
     const body = (await fourth.json()) as { error: string; message: string };
     expect(body.error).toBe('key_creation_limit');
     expect(body.message).toContain('credits');
+  });
+
+  it('an address the mail server refuses answers 400 undeliverable_email, not a 503 that blames the relay', async () => {
+    delete process.env.IBANFORGE_ADMIN_TEST_KEYS;
+    process.env.MAIL_RELAY_URL = 'https://relay.test/api/relay/send';
+    process.env.MAIL_RELAY_SECRET = 'shared-secret';
+    vi.stubGlobal('fetch', vi.fn(async () =>
+      new Response("send failed: {'x@alpha.example.net': (550, b'5.1.2 Recipient address rejected: Domain not found')}", { status: 502 })));
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const app = makeApp();
+      const ts = Date.now();
+      const ip = `198.54.${(ts % 240) + 1}.${(Math.floor(ts / 240) % 240) + 1}`;
+      expect((await gen(app, `owner-${ts}@alpha-corp.example.net`, ip)).status).toBe(201);
+      const second = await gen(app, `nobody-${ts}@alpha-corp.example.net`, ip);
+      expect(second.status).toBe(400);
+      expect(((await second.json()) as { error: string }).error).toBe('undeliverable_email');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('a relay that rejects our shared secret still answers 503 verification_unavailable', async () => {
+    delete process.env.IBANFORGE_ADMIN_TEST_KEYS;
+    process.env.MAIL_RELAY_URL = 'https://relay.test/api/relay/send';
+    process.env.MAIL_RELAY_SECRET = 'shared-secret';
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('unauthorized', { status: 401 })));
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const app = makeApp();
+      const ts = Date.now();
+      const ip = `198.55.${(ts % 240) + 1}.${(Math.floor(ts / 240) % 240) + 1}`;
+      expect((await gen(app, `owner-${ts}@alpha-corp.example.net`, ip)).status).toBe(201);
+      const second = await gen(app, `second-${ts}@alpha-corp.example.net`, ip);
+      expect(second.status).toBe(503);
+      expect(((await second.json()) as { error: string }).error).toBe('verification_unavailable');
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it('keeps disposable suffixes out at creation — the wave used tempmail.edu.ge', async () => {
