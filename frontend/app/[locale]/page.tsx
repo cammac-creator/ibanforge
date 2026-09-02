@@ -156,6 +156,19 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
         </div>
       </section>
 
+      {/* ── The non-developer door: the creditor file audit (02/09/2026) ── */}
+      <section className="sect" aria-labelledby="h-audit" style={{ paddingTop: 0 }}>
+        <div className="wrap">
+          <h2 className="sect-h" id="h-audit">{t('audit.heading')}</h2>
+          <p className="sect-sub">{t('audit.text')}</p>
+          <div className="hero-cta" style={{ marginTop: '1.4rem' }}>
+            <Link href={`/${locale}/audit`} className="btn-ghost-link">
+              {t('audit.cta')}
+            </Link>
+          </div>
+        </div>
+      </section>
+
       {/* ── Endpoints, price-stamped ──────────────────────────────────────── */}
       <section className="sect" aria-labelledby="h-endpoints" style={{ paddingTop: 0 }}>
         <div className="wrap">

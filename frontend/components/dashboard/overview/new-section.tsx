@@ -9,10 +9,11 @@ import {
 import type { ActivationClientRow } from '../clients-table';
 import type { BuildInput } from '@/lib/crm/build-contacts';
 import { topUsers } from '@/lib/crm/top-users';
-import { recentSignups, type SignupSources } from '@/lib/dashboard-overview';
+import { recentSignups, type SignupSources, type AuditStats } from '@/lib/dashboard-overview';
 import { StatCardV2 } from '../stat-card-v2';
 import { ClientLinks } from './client-links';
 import { SignupSourcesCard } from './signup-sources-card';
+import { AuditStatsCard } from './audit-stats-card';
 import { FetchFailed, type Fetched } from './fetching';
 import { snapshotOnce, writableIds } from './one-clock';
 import { OverviewSection, overviewCard } from './section';
@@ -38,6 +39,7 @@ export async function NewSection({
   demandGapsPromise,
   feedbackPromise,
   sourcesPromise,
+  auditStatsPromise,
 }: {
   locale: string;
   /** The page's single instant: see one-clock.ts. */
@@ -49,6 +51,7 @@ export async function NewSection({
   demandGapsPromise: Promise<Fetched<DemandGapsPayload>>;
   feedbackPromise: Promise<Fetched<{ open: number; reports: FeedbackReport[] }>>;
   sourcesPromise: Promise<Fetched<SignupSources>>;
+  auditStatsPromise: Promise<Fetched<AuditStats>>;
 }) {
   const t = await getTranslations('dashboard.overview');
   const [activationRes, clientsRes, crm, historyRes, gapsRes, feedbackRes] = await Promise.all([
@@ -139,6 +142,8 @@ export async function NewSection({
       </div>
 
       <SignupSourcesCard sourcesPromise={sourcesPromise} locale={locale} />
+
+      <AuditStatsCard statsPromise={auditStatsPromise} locale={locale} />
 
       {/* Loops 1 and 2 of the 🌱 card. Loop 3 (register freshness) is up in
           "what is broken", where an outdated register belongs. */}

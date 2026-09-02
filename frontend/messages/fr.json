@@ -239,6 +239,11 @@
       "x402Body": "Les agents autonomes paient à la requête en USDC — sans compte, sans checkout, règlement on-chain.",
       "docsTitle": "Docs lisibles par machine",
       "docsBody": "Spécification OpenAPI, données structurées et résumé en texte brut, pensés pour les crawlers et les agents."
+    },
+    "audit": {
+      "heading": "Pas développeur ? Auditez votre fichier de créanciers",
+      "text": "Déposez le CSV ou XLSX depuis lequel vous payez. Aperçu gratuit de ce que la banque rejetterait, puis 149 CHF pour le classeur annoté, tout de suite.",
+      "cta": "Auditer un fichier"
     }
   },
   "pricing": {
@@ -611,6 +616,15 @@
           "kindReferrer": "référent",
           "landings": "Pages d'arrivée",
           "since": "Mesuré depuis le {date} ; les clés antérieures n'ont pas de provenance."
+        },
+        "audit": {
+          "title": "Audit de fichier, {days} derniers jours",
+          "uploads": "fichiers déposés",
+          "sales": "payés",
+          "revenue": "CHF",
+          "conversion": "conversion",
+          "lastSale": "dernière vente",
+          "empty": "Aucun fichier déposé pour l'instant."
         }
       },
       "details": {
@@ -1577,7 +1591,7 @@
     "metaDescription": "Déposez un CSV ou un XLSX de créanciers. Aperçu gratuit, puis 149 CHF jusqu'à 5 000 lignes pour le classeur annoté : IBAN invalides, codes banque inconnus, BIC discordants, doublons, joignabilité SEPA et adresses structurées pour l'échéance SIX du 14 novembre 2026.",
     "eyebrow": "Audit de fichier de créanciers",
     "title": "Contrôlez votre fichier de créanciers avant le prochain lot de paiements",
-    "intro": "Déposez le CSV ou le XLSX depuis lequel vous payez. Chaque ligne passe par les mêmes registres que l'API IBANforge : structure et clé de l'IBAN, code banque contre le registre national, nom de banque et BIC, joignabilité SEPA, et règles d'adresse ISO 20022. Vous voyez gratuitement ce qui doit être corrigé ; le classeur annoté a un prix affiché, payé par carte, téléchargeable sur-le-champ.",
+    "intro": "Chaque ligne passe par les mêmes registres que l'API IBANforge : IBAN, code banque, nom de banque et BIC, joignabilité SEPA, règles d'adresse ISO 20022. Vous voyez gratuitement quoi corriger ; le classeur annoté a un prix affiché, payé par carte, téléchargeable sur-le-champ.",
     "promise": {
       "title": "Ce que chaque ligne reçoit",
       "item1": "Structure et clé de contrôle de l'IBAN, avec la raison exacte en cas d'échec",
@@ -1676,7 +1690,85 @@
       "missing": "Ce lien ne porte aucun audit, ou l'audit a expiré.",
       "back": "Retour à la page d'audit"
     },
-    "ogDescription": "Déposez le CSV ou XLSX depuis lequel vous payez. Aperçu gratuit de ce que la banque rejetterait, puis 149 CHF pour le classeur annoté : IBAN, code banque, BIC, joignabilité SEPA, adresse structurée avant le 14 novembre 2026."
+    "ogDescription": "Déposez le CSV ou XLSX depuis lequel vous payez. Aperçu gratuit de ce que la banque rejetterait, puis 149 CHF pour le classeur annoté : IBAN, code banque, BIC, joignabilité SEPA, adresse structurée avant le 14 novembre 2026.",
+    "steps": {
+      "title": "Trois étapes, un fichier",
+      "s1t": "Déposez votre fichier",
+      "s1": "CSV ou XLSX, une colonne nommée IBAN suffit.",
+      "s2t": "Voyez quoi corriger, gratuitement",
+      "s2": "Compteurs, constats par type, vingt lignes masquées.",
+      "s3t": "Payez, téléchargez",
+      "s3": "149 CHF par carte, le classeur annoté tout de suite, plus le lien par mail."
+    },
+    "workbook": {
+      "title": "Ce que vous téléchargez",
+      "text": "Vos colonnes, intactes, puis les nôtres : statut, constats, banque et BIC du registre, pays de l'IBAN, joignabilité SEPA, verdict d'adresse ISO 20022, détail. Une feuille de synthèse ferme le classeur.",
+      "sample": "Télécharger un rapport d'exemple (.xlsx)",
+      "cols": [
+        "Nom",
+        "IBAN",
+        "Statut",
+        "Constats",
+        "Banque (registre)",
+        "BIC (registre)",
+        "Adresse ISO 20022"
+      ],
+      "rows": [
+        [
+          "Alpha Menuiserie SA",
+          "CH10 0023 ... 2345",
+          "OK",
+          "",
+          "UBS Switzerland AG",
+          "UBSWCHZH80A",
+          "OK"
+        ],
+        [
+          "Gamma Transports",
+          "CH10 0023 ... 2346",
+          "Ne pas payer",
+          "IBAN invalide",
+          "",
+          "",
+          ""
+        ],
+        [
+          "Delta Consulting",
+          "CH93 0076 ... 2957",
+          "Ne pas payer",
+          "Code banque absent du registre national",
+          "",
+          "",
+          "OK"
+        ],
+        [
+          "Beta Elektro GmbH",
+          "DE89 3704 ... 3000",
+          "OK",
+          "",
+          "Commerzbank AG",
+          "COBADEFFXXX",
+          "OK"
+        ]
+      ],
+      "status": {
+        "ok": "OK",
+        "error": "Ne pas payer"
+      }
+    },
+    "faq": {
+      "title": "Questions avant de déposer",
+      "q1": "Quels fichiers passent ?",
+      "a1": "CSV (virgule, point-virgule ou tabulation) et Excel XLSX ou XLS, jusqu'à 5 Mo et 20 000 lignes. Une colonne nommée IBAN suffit ; nom, BIC, rue, NPA, localité et pays sont utilisés s'ils existent.",
+      "q2": "Que deviennent mes données ?",
+      "a2": "Le fichier est lu en mémoire sur nos serveurs aux Pays-Bas et n'est pas enregistré. Seul le rapport annoté est conservé : 2 heures si vous ne payez pas, 24 heures après paiement, puis effacé. Rien ne sert à autre chose.",
+      "q3": "Que contrôle l'audit, et que ne contrôle-t-il pas ?",
+      "a3": "Structure et clé, code banque contre le registre national, nom de banque et BIC, joignabilité SEPA, doublons, BIC de votre fichier contre le registre, pays de l'adresse contre pays de l'IBAN, et les règles d'adresse structurée quand des colonnes d'adresse existent. Il ne confirme pas que le compte appartient au créancier nommé : c'est la Verification of Payee, faite par les banques.",
+      "q4": "Plus de 20 000 lignes, ou plusieurs fichiers ?",
+      "a4": "Coupez le fichier : chaque partie est un audit au prix affiché. Pour un besoin récurrent, l'API et son endpoint de lot coûtent moins par ligne ; écrivez à support@ibanforge.com.",
+      "q5": "Puis-je repasser le fichier corrigé ?",
+      "a5": "Oui. Déposez-le à nouveau : l'aperçu gratuit vous dit si tout est réglé avant de payer une seconde fois, et souvent vous n'en aurez pas besoin."
+    }
   },
   "qrBill": {
     "metaTitle": "Contrôle de QR-facture suisse : adresse structurée ou combinée, QR-IBAN et référence, gratuit",

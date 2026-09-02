@@ -136,6 +136,7 @@ export function markAuditPaid(
   },
 ): AuditJob | null {
   const db = getStatsDB();
+  const before = getAuditJob(id);
   const now = new Date().toISOString().replace('T', ' ').slice(0, 19);
   db.prepare(
     `UPDATE audit_jobs
@@ -155,7 +156,23 @@ export function markAuditPaid(
     isoIn(PAID_TTL_HOURS),
     id,
   );
-  return getAuditJob(id);
+  const after = getAuditJob(id);
+  if (before && !before.paid_at && after?.paid_at) {
+    db.prepare(
+      `INSERT INTO audit_sales (job_id, rows, tier, price_chf, amount_paid_minor, amount_paid_currency, stripe_session_id, lang)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).run(
+      id,
+      after.rows,
+      after.tier,
+      after.price_chf,
+      payment.amount_minor,
+      payment.currency,
+      payment.session_id,
+      after.lang,
+    );
+  }
+  return after;
 }
 
 export function countAuditDownload(id: string): void {
@@ -201,4 +218,41 @@ export function listPaidAuditJobs(limit = 50): Array<
     amount_paid_minor: r.amount_paid_minor,
     amount_paid_currency: r.amount_paid_currency,
   }));
+}
+
+export interface AuditStats {
+  period_days: number;
+  since: string;
+  uploads: number;
+  sales: number;
+  revenue_chf: number;
+  last_sale_at: string | null;
+  conversion: number | null;
+}
+
+/** Uploads (durable, from the operations log) and sales (durable ledger) over the period. */
+export function auditStats(days: number): AuditStats {
+  const db = getStatsDB();
+  const since = new Date(Date.now() - days * 86_400_000).toISOString().slice(0, 10);
+  const uploads = (
+    db
+      .prepare(
+        `SELECT COUNT(*) n FROM operations WHERE operation_type = 'audit_upload' AND created_at >= datetime('now', ?)`,
+      )
+      .get(`-${days} days`) as { n: number }
+  ).n;
+  const sales = db
+    .prepare(
+      `SELECT COUNT(*) n, COALESCE(SUM(price_chf), 0) chf, MAX(paid_at) last FROM audit_sales WHERE paid_at >= datetime('now', ?)`,
+    )
+    .get(`-${days} days`) as { n: number; chf: number; last: string | null };
+  return {
+    period_days: days,
+    since,
+    uploads,
+    sales: sales.n,
+    revenue_chf: sales.chf,
+    last_sale_at: sales.last,
+    conversion: uploads > 0 ? Math.round((sales.n / uploads) * 1000) / 1000 : null,
+  };
 }

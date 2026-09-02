@@ -610,6 +610,21 @@ function openStatsDB(): DatabaseType.Database {
       );
       CREATE INDEX IF NOT EXISTS idx_audit_jobs_expires ON audit_jobs(expires_at);
       CREATE INDEX IF NOT EXISTS idx_audit_jobs_session ON audit_jobs(stripe_session_id);
+      -- Durable ledger of paid audits: audit_jobs rows purge 24 h after payment,
+      -- so the sales count and the revenue live here, without any report content.
+      CREATE TABLE IF NOT EXISTS audit_sales (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        job_id TEXT NOT NULL,
+        paid_at TEXT DEFAULT (datetime('now')),
+        rows INTEGER NOT NULL,
+        tier TEXT NOT NULL,
+        price_chf INTEGER NOT NULL,
+        amount_paid_minor INTEGER,
+        amount_paid_currency TEXT,
+        stripe_session_id TEXT,
+        lang TEXT
+      );
+      CREATE INDEX IF NOT EXISTS idx_audit_sales_paid ON audit_sales(paid_at);
       -- One row per activation nudge ("your key never made its first call"),
       -- and it is the anti-repetition ledger, not a log: the daily pass refuses
       -- any address that already appears here.

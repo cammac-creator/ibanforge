@@ -24,7 +24,7 @@ import type {
   StatsResponse,
 } from '@/components/dashboard/overview/types';
 import { fetchCrmData } from '@/lib/crm/build-contacts';
-import type { SignupSources } from '@/lib/dashboard-overview';
+import type { SignupSources, AuditStats } from '@/lib/dashboard-overview';
 
 /**
  * The founder's cockpit.
@@ -107,6 +107,7 @@ export default async function DashboardPage({
   const demandGapsP = admin<DemandGapsPayload>('/v1/admin/demand-gaps?days=30');
   const feedbackP = admin<{ open: number; reports: FeedbackReport[] }>('/v1/admin/feedback?limit=10');
   const signupSourcesP = admin<SignupSources>('/v1/admin/signup-sources?days=30');
+  const auditStatsP = admin<AuditStats>('/v1/admin/audit-stats?days=30');
   // Swallows its own failures already; the catch is belt and braces, because a
   // promise created here and awaited three sections down would otherwise be an
   // unhandled rejection before anyone looks at it.
@@ -209,6 +210,7 @@ export default async function DashboardPage({
           demandGapsPromise={demandGapsP}
           feedbackPromise={feedbackP}
           sourcesPromise={signupSourcesP}
+          auditStatsPromise={auditStatsP}
         />
       </Suspense>
 

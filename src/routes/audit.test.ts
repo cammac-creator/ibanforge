@@ -3,7 +3,12 @@ import { Hono } from 'hono';
 import * as XLSX from 'xlsx';
 import { audit } from './audit.js';
 import { closeAll, getStatsDB } from '../lib/db.js';
-import { markAuditPaid, getAuditJob, purgeExpiredAuditJobs } from '../lib/audit-jobs.js';
+import {
+  markAuditPaid,
+  getAuditJob,
+  purgeExpiredAuditJobs,
+  auditStats,
+} from '../lib/audit-jobs.js';
 import { AUDIT_MAX_BYTES } from '../lib/audit-file.js';
 
 const VALID_CH = 'CH1000230000000012345';
@@ -138,5 +143,39 @@ describe('checkout, status and report', () => {
     expect(purgeExpiredAuditJobs()).toBeGreaterThanOrEqual(1);
     const s = await app().request(`/v1/audit/status/${job}`);
     expect(s.status).toBe(404);
+  });
+});
+
+describe('sample report and statistics', () => {
+  it('serves the sample annotated workbook without a job, cacheable', async () => {
+    const r = await app().request('/v1/audit/sample-report.xlsx?lang=de');
+    expect(r.status).toBe(200);
+    expect(r.headers.get('content-type')).toContain('spreadsheetml');
+    expect(r.headers.get('cache-control')).toContain('public');
+    const wb = XLSX.read(Buffer.from(await r.arrayBuffer()), { type: 'buffer' });
+    expect(wb.SheetNames).toEqual(['Prüfung', 'Zusammenfassung']);
+  });
+
+  it('counts a sale once, on the transition to paid, and reports it in the statistics', async () => {
+    const before = auditStats(30);
+    const r = await upload(['IBAN', VALID_CH].join('\n'));
+    const { job } = (await r.json()) as { job: string };
+    markAuditPaid(job, {
+      session_id: 'cs_stats_1',
+      email: null,
+      amount_minor: 14900,
+      currency: 'chf',
+    });
+    markAuditPaid(job, {
+      session_id: 'cs_stats_1',
+      email: null,
+      amount_minor: 14900,
+      currency: 'chf',
+    });
+    const after = auditStats(30);
+    expect(after.sales).toBe(before.sales + 1);
+    expect(after.revenue_chf).toBe(before.revenue_chf + 149);
+    expect(after.uploads).toBeGreaterThan(before.uploads);
+    expect(after.last_sale_at).toBeTruthy();
   });
 });

@@ -42,6 +42,7 @@ import {
   UNPAID_TTL_HOURS,
 } from '../lib/audit-jobs.js';
 import { recordOperation } from '../lib/stats.js';
+import { SAMPLE_CREDITOR_CSV } from '../lib/audit-sample.js';
 import { recordSafely } from '../lib/record-safely.js';
 
 const SITE = process.env.PUBLIC_SITE_URL ?? 'https://ibanforge.com';
@@ -188,6 +189,22 @@ audit.post('/v1/audit/upload', async (c) => {
     ...publicJob(job, { sessionId: null }),
     processing_ms: Math.round((performance.now() - started) * 100) / 100,
     tiers: AUDIT_TIERS.map((t) => ({ up_to_rows: t.max_rows, price_chf: t.price_chf })),
+  });
+});
+
+/** The deliverable, shown before anyone uploads anything: the sample file's annotated workbook. */
+audit.get('/v1/audit/sample-report.xlsx', (c) => {
+  const lang = langOf(c.req.query('lang'));
+  const result = auditFile(Buffer.from(SAMPLE_CREDITOR_CSV, 'utf8'), 'exemple-creanciers.csv');
+  const report = buildWorkbook(result, lang, new Date('2026-09-02T12:00:00Z'));
+  const bytes = report.buffer.slice(
+    report.byteOffset,
+    report.byteOffset + report.byteLength,
+  ) as ArrayBuffer;
+  return c.body(bytes, 200, {
+    'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'Content-Disposition': `attachment; filename="ibanforge-exemple-audit-${lang}.xlsx"`,
+    'Cache-Control': 'public, max-age=3600',
   });
 });
 

@@ -239,6 +239,11 @@
       "x402Body": "Autonome Agenten zahlen pro Anfrage in USDC — kein Konto, kein Checkout, Settlement on-chain.",
       "docsTitle": "Maschinenlesbare Doku",
       "docsBody": "OpenAPI-Spezifikation, strukturierte Daten und eine Klartext-Zusammenfassung für Crawler und Agenten."
+    },
+    "audit": {
+      "heading": "Kein Entwickler? Prüfen Sie Ihre Kreditorendatei",
+      "text": "Laden Sie die CSV- oder XLSX-Datei hoch, aus der Sie zahlen. Kostenlose Vorschau dessen, was die Bank abweisen würde, dann 149 CHF für die kommentierte Arbeitsmappe, sofort.",
+      "cta": "Datei prüfen"
     }
   },
   "pricing": {
@@ -611,6 +616,15 @@
           "kindReferrer": "Referrer",
           "landings": "Einstiegsseiten",
           "since": "Gemessen seit {date}; früher erstellte Schlüssel tragen keine Herkunft."
+        },
+        "audit": {
+          "title": "Kreditorendatei-Prüfung, letzte {days} Tage",
+          "uploads": "hochgeladene Dateien",
+          "sales": "bezahlt",
+          "revenue": "CHF",
+          "conversion": "Konversion",
+          "lastSale": "letzter Verkauf",
+          "empty": "Noch keine Datei hochgeladen."
         }
       },
       "details": {
@@ -1577,7 +1591,7 @@
     "metaDescription": "Laden Sie eine CSV- oder XLSX-Datei mit Kreditoren hoch. Kostenlose Vorschau, dann 149 CHF bis 5'000 Zeilen für die kommentierte Arbeitsmappe: ungültige IBAN, unbekannte Bankleitzahlen, abweichende BIC, Duplikate, SEPA-Erreichbarkeit und strukturierte Adressen für die SIX-Frist vom 14. November 2026.",
     "eyebrow": "Prüfung der Kreditorendatei",
     "title": "Prüfen Sie Ihre Kreditorendatei vor dem nächsten Zahlungslauf",
-    "intro": "Laden Sie die CSV- oder XLSX-Datei hoch, aus der Sie zahlen. Jede Zeile durchläuft dieselben Register wie die IBANforge-API: IBAN-Struktur und Prüfziffer, Bankleitzahl gegen das nationale Register, Bankname und BIC, SEPA-Erreichbarkeit und die Adressregeln nach ISO 20022. Was zu korrigieren ist, sehen Sie kostenlos; die kommentierte Arbeitsmappe hat einen angezeigten Preis, per Karte bezahlt, sofort herunterladbar.",
+    "intro": "Jede Zeile durchläuft dieselben Register wie die IBANforge-API: IBAN, Bankleitzahl, Bankname und BIC, SEPA-Erreichbarkeit, Adressregeln nach ISO 20022. Was zu korrigieren ist, sehen Sie kostenlos; die kommentierte Arbeitsmappe hat einen angezeigten Preis, per Karte bezahlt, sofort herunterladbar.",
     "promise": {
       "title": "Was jede Zeile erhält",
       "item1": "IBAN-Struktur und Prüfziffer, mit dem genauen Grund bei Fehlern",
@@ -1676,7 +1690,85 @@
       "missing": "Dieser Link enthält keine Prüfung, oder sie ist abgelaufen.",
       "back": "Zurück zur Prüfungsseite"
     },
-    "ogDescription": "Laden Sie die CSV- oder XLSX-Datei hoch, aus der Sie zahlen. Kostenlose Vorschau dessen, was die Bank abweisen würde, dann 149 CHF für die kommentierte Arbeitsmappe: IBAN, Bankleitzahl, BIC, SEPA, strukturierte Adresse vor dem 14. November 2026."
+    "ogDescription": "Laden Sie die CSV- oder XLSX-Datei hoch, aus der Sie zahlen. Kostenlose Vorschau dessen, was die Bank abweisen würde, dann 149 CHF für die kommentierte Arbeitsmappe: IBAN, Bankleitzahl, BIC, SEPA, strukturierte Adresse vor dem 14. November 2026.",
+    "steps": {
+      "title": "Drei Schritte, eine Datei",
+      "s1t": "Datei ablegen",
+      "s1": "CSV oder XLSX, eine Spalte namens IBAN genügt.",
+      "s2t": "Kostenlos sehen, was zu korrigieren ist",
+      "s2": "Zähler, Befunde nach Typ, zwanzig maskierte Zeilen.",
+      "s3t": "Zahlen, herunterladen",
+      "s3": "149 CHF per Karte, die kommentierte Arbeitsmappe sofort, dazu der Link per E-Mail."
+    },
+    "workbook": {
+      "title": "Was Sie herunterladen",
+      "text": "Ihre Spalten, unverändert, dann unsere: Status, Befunde, Bank und BIC aus dem Register, IBAN-Land, SEPA-Erreichbarkeit, Adressurteil ISO 20022, Detail. Ein Zusammenfassungsblatt schliesst die Arbeitsmappe ab.",
+      "sample": "Beispielbericht herunterladen (.xlsx)",
+      "cols": [
+        "Name",
+        "IBAN",
+        "Status",
+        "Befunde",
+        "Bank (Register)",
+        "BIC (Register)",
+        "Adresse ISO 20022"
+      ],
+      "rows": [
+        [
+          "Alpha Menuiserie SA",
+          "CH10 0023 ... 2345",
+          "OK",
+          "",
+          "UBS Switzerland AG",
+          "UBSWCHZH80A",
+          "OK"
+        ],
+        [
+          "Gamma Transports",
+          "CH10 0023 ... 2346",
+          "Nicht zahlen",
+          "IBAN ungültig",
+          "",
+          "",
+          ""
+        ],
+        [
+          "Delta Consulting",
+          "CH93 0076 ... 2957",
+          "Nicht zahlen",
+          "Bankleitzahl nicht im nationalen Register",
+          "",
+          "",
+          "OK"
+        ],
+        [
+          "Beta Elektro GmbH",
+          "DE89 3704 ... 3000",
+          "OK",
+          "",
+          "Commerzbank AG",
+          "COBADEFFXXX",
+          "OK"
+        ]
+      ],
+      "status": {
+        "ok": "OK",
+        "error": "Nicht zahlen"
+      }
+    },
+    "faq": {
+      "title": "Fragen vor dem Hochladen",
+      "q1": "Welche Dateien funktionieren?",
+      "a1": "CSV (Komma, Semikolon oder Tabulator) und Excel XLSX oder XLS, bis 5 MB und 20'000 Zeilen. Eine Spalte namens IBAN genügt; Name, BIC, Strasse, PLZ, Ort und Land werden genutzt, wenn vorhanden.",
+      "q2": "Was geschieht mit meinen Daten?",
+      "a2": "Die Datei wird im Arbeitsspeicher unserer Server in den Niederlanden gelesen und nicht gespeichert. Nur der kommentierte Bericht wird aufbewahrt: 2 Stunden ohne Zahlung, 24 Stunden nach der Zahlung, dann gelöscht. Nichts wird für etwas anderes verwendet.",
+      "q3": "Was prüft die Prüfung, und was nicht?",
+      "a3": "Struktur und Prüfziffer, Bankleitzahl gegen das nationale Register, Bankname und BIC, SEPA-Erreichbarkeit, Duplikate, den BIC Ihrer Datei gegen das Register, Adressland gegen IBAN-Land und die Regeln für strukturierte Adressen, wenn Adressspalten vorhanden sind. Sie bestätigt nicht, dass das Konto dem genannten Kreditor gehört: das ist die Verification of Payee der Banken.",
+      "q4": "Mehr als 20'000 Zeilen oder mehrere Dateien?",
+      "a4": "Teilen Sie die Datei: jeder Teil ist eine eigene Prüfung zum angezeigten Preis. Für wiederkehrenden Bedarf kosten die API und ihr Batch-Endpoint pro Zeile weniger; schreiben Sie an support@ibanforge.com.",
+      "q5": "Kann ich die korrigierte Datei erneut prüfen lassen?",
+      "a5": "Ja. Laden Sie sie erneut hoch: die kostenlose Vorschau sagt Ihnen, ob alles behoben ist, bevor Sie ein zweites Mal zahlen, und oft brauchen Sie das nicht."
+    }
   },
   "qrBill": {
     "metaTitle": "Swiss-QR-Rechnung prüfen: strukturierte oder kombinierte Adresse, QR-IBAN und Referenz, kostenlos",

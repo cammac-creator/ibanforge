@@ -239,6 +239,11 @@
       "x402Body": "Autonomous agents pay per request in USDC — no account, no checkout, settlement on-chain.",
       "docsTitle": "Machine-readable docs",
       "docsBody": "OpenAPI spec, structured data and a plain-text summary built for crawlers and agents."
+    },
+    "audit": {
+      "heading": "Not a developer? Audit your creditor file",
+      "text": "Upload the CSV or XLSX you pay from. Free preview of what the bank would reject, then 149 CHF for the annotated workbook, at once.",
+      "cta": "Audit a file"
     }
   },
   "pricing": {
@@ -611,6 +616,15 @@
           "kindReferrer": "referrer",
           "landings": "Landing pages",
           "since": "Measured since {date}; keys created before that carry no origin."
+        },
+        "audit": {
+          "title": "Creditor file audit, last {days} days",
+          "uploads": "files uploaded",
+          "sales": "paid",
+          "revenue": "CHF",
+          "conversion": "conversion",
+          "lastSale": "last sale",
+          "empty": "No file uploaded yet."
         }
       },
       "details": {
@@ -1577,7 +1591,7 @@
     "metaDescription": "Upload a CSV or XLSX of creditors. Free preview, then 149 CHF up to 5,000 rows for the annotated workbook: invalid IBANs, unknown bank codes, BIC mismatches, duplicates, SEPA reach and structured addresses for the SIX deadline of 14 November 2026.",
     "eyebrow": "Creditor file audit",
     "title": "Audit your creditor file before the next payment run",
-    "intro": "Upload the CSV or XLSX you pay from. Every row goes through the same registers the IBANforge API serves: IBAN structure and check digits, bank code against the national register, bank name and BIC, SEPA reachability, and the ISO 20022 address rules. You see what needs fixing for free; the annotated workbook costs a displayed price, paid by card, downloadable at once.",
+    "intro": "Every row goes through the same registers the IBANforge API serves: IBAN, bank code, bank name and BIC, SEPA reach, ISO 20022 address rules. You see what to fix for free; the annotated workbook has a displayed price, paid by card, downloadable at once.",
     "promise": {
       "title": "What every row gets",
       "item1": "IBAN structure and check digits, with the exact reason when it fails",
@@ -1676,7 +1690,85 @@
       "missing": "This link has no audit attached, or it has expired.",
       "back": "Back to the audit page"
     },
-    "ogDescription": "Upload the CSV or XLSX you pay from. Free preview of what the bank would reject, then 149 CHF for the annotated workbook: IBAN, bank code, BIC, SEPA reach, structured address before 14 November 2026."
+    "ogDescription": "Upload the CSV or XLSX you pay from. Free preview of what the bank would reject, then 149 CHF for the annotated workbook: IBAN, bank code, BIC, SEPA reach, structured address before 14 November 2026.",
+    "steps": {
+      "title": "Three steps, one file",
+      "s1t": "Drop your file",
+      "s1": "CSV or XLSX, a column named IBAN is enough.",
+      "s2t": "See what to fix, free",
+      "s2": "Counts, findings by type, twenty masked rows.",
+      "s3t": "Pay, download",
+      "s3": "149 CHF by card, the annotated workbook right away, plus the link by e-mail."
+    },
+    "workbook": {
+      "title": "What you download",
+      "text": "Your columns, untouched, then ours: status, findings, bank and BIC from the register, IBAN country, SEPA reach, ISO 20022 address verdict, detail. A summary sheet closes the workbook.",
+      "sample": "Download a sample report (.xlsx)",
+      "cols": [
+        "Name",
+        "IBAN",
+        "Status",
+        "Findings",
+        "Bank (register)",
+        "BIC (register)",
+        "Address ISO 20022"
+      ],
+      "rows": [
+        [
+          "Alpha Menuiserie SA",
+          "CH10 0023 ... 2345",
+          "OK",
+          "",
+          "UBS Switzerland AG",
+          "UBSWCHZH80A",
+          "OK"
+        ],
+        [
+          "Gamma Transports",
+          "CH10 0023 ... 2346",
+          "Do not pay",
+          "IBAN invalid",
+          "",
+          "",
+          ""
+        ],
+        [
+          "Delta Consulting",
+          "CH93 0076 ... 2957",
+          "Do not pay",
+          "Bank code not in the national register",
+          "",
+          "",
+          "OK"
+        ],
+        [
+          "Beta Elektro GmbH",
+          "DE89 3704 ... 3000",
+          "OK",
+          "",
+          "Commerzbank AG",
+          "COBADEFFXXX",
+          "OK"
+        ]
+      ],
+      "status": {
+        "ok": "OK",
+        "error": "Do not pay"
+      }
+    },
+    "faq": {
+      "title": "Questions before you upload",
+      "q1": "Which files work?",
+      "a1": "CSV (comma, semicolon or tab) and Excel XLSX or XLS, up to 5 MB and 20,000 rows. One column named IBAN is enough; name, BIC, street, postal code, town and country are used when present.",
+      "q2": "What happens to my data?",
+      "a2": "The file is read in memory on our servers in the Netherlands and is not stored. Only the annotated report is kept: 2 hours if you do not pay, 24 hours after payment, then deleted. Nothing is used for anything else.",
+      "q3": "What does the audit check, and what does it not?",
+      "a3": "Structure and check digits, bank code against the national register, bank name and BIC, SEPA reach, duplicates, the BIC in your file against the register, address country against IBAN country, and the structured-address rules when address columns exist. It does not confirm that the account belongs to the named creditor: that is Verification of Payee, done by banks.",
+      "q4": "More than 20,000 rows, or several files?",
+      "a4": "Split the file: each part is its own audit at the displayed price. For a recurring need, the API and its batch endpoint cost less per row; write to support@ibanforge.com.",
+      "q5": "Can I re-run the corrected file?",
+      "a5": "Yes. Upload it again: the free preview tells you whether everything is fixed before you pay a second time, and often you will not need to."
+    }
   },
   "qrBill": {
     "metaTitle": "Swiss QR-bill check: structured or combined address, QR-IBAN and reference, free",
