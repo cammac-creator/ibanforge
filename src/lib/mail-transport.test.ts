@@ -1,10 +1,14 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import {
   sendViaRelay,
   deliverViaRelay,
   classifyRelayRefusal,
   isRelayConfigured,
+  _setDomainCheckForTests,
 } from './mail-transport.js';
+
+// The DNS pre-check has its own module and tests; here it says yes.
+beforeEach(() => _setDomainCheckForTests(async () => true));
 
 /**
  * Railway blocks outbound SMTP below its Pro plan — measured 2026-07-25 from
@@ -173,6 +177,16 @@ describe('deliverViaRelay tells an address the server refuses from a relay that 
     const logged = spy.mock.calls.map((c) => c.join(' ')).join('\n');
     expect(logged).not.toContain('alpha.example.net');
     expect(logged).toContain('undeliverable recipient');
+  });
+
+  it('never hands the relay a recipient whose domain takes no mail', async () => {
+    configure();
+    _setDomainCheckForTests(async () => false);
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    expect((await deliverViaRelay(MAIL)).outcome).toBe('undeliverable');
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('classifies the SMTP prose the relay forwards', () => {

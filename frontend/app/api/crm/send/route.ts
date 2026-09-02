@@ -264,6 +264,20 @@ export async function POST(req: NextRequest) {
     if (r.ok && data && (data as { sent?: boolean }).sent && subject) {
       await recordSent(to, subject, text, account);
     }
+    // The provider's outbound anti-spam answers "550 5.2.0 Spam message
+    // rejected" for EVERY message from a mailbox it has flagged, a minimal
+    // test mail included (measured 02/09/2026). Read raw, that looks like a
+    // problem with this mail; it is a problem with the mailbox, and the way
+    // out is the other sending account or an unblock at the provider.
+    if (!r.ok && data && typeof (data as { detail?: unknown }).detail === 'string') {
+      const detail = (data as { detail: string }).detail;
+      if (/5\.2\.0/.test(detail) && /spam/i.test(detail)) {
+        (data as { detail: string }).detail =
+          `La boîte d'envoi ${account || ''} est bloquée par son hébergeur (protection anti-spam sortante) : ` +
+          'ce refus vise la boîte, pas ce mail. Envoie depuis l\'autre compte, ou débloque la boîte dans le Manager Infomaniak. ' +
+          `Réponse du serveur : ${detail}`;
+      }
+    }
     return NextResponse.json(data, { status: r.status });
   } catch {
     return NextResponse.json({ error: 'upstream_failed', message: 'Endpoint VPS injoignable' }, { status: 502 });

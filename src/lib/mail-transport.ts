@@ -31,7 +31,24 @@ export function isRelayConfigured(): boolean {
   return Boolean(process.env.MAIL_RELAY_URL && process.env.MAIL_RELAY_SECRET);
 }
 
+import { domainAcceptsMail, domainOf } from './mail-domain.js';
+
 export type RelayOutcome = 'sent' | 'undeliverable' | 'refused' | 'unreachable' | 'unconfigured';
+
+/**
+ * Before the relay is asked, the recipient's domain must exist: each message the
+ * provider refuses for a domain without a mail server counts against the
+ * sending mailbox, and on 02/09/2026 enough of them got the mailbox blocked
+ * outright (550 5.2.0 on everything, key mails included). Tests swap the check.
+ */
+// Under vitest the check says yes unless a test sets it: the suite's fixture
+// domains are documentation names, and no test should depend on a resolver.
+let acceptsMail: (domain: string) => Promise<boolean> = process.env.VITEST
+  ? async () => true
+  : domainAcceptsMail;
+export function _setDomainCheckForTests(fn: (domain: string) => Promise<boolean>): void {
+  acceptsMail = fn;
+}
 
 export interface RelayResult {
   outcome: RelayOutcome;
@@ -63,6 +80,11 @@ export async function deliverViaRelay(mail: RelayMail): Promise<RelayResult> {
   if (!url || !secret) {
     console.error('[mail] MAIL_RELAY_URL / MAIL_RELAY_SECRET not set — send skipped');
     return { outcome: 'unconfigured' };
+  }
+
+  if (!(await acceptsMail(domainOf(mail.to)))) {
+    console.error('[mail] recipient domain takes no mail, message not handed to the relay');
+    return { outcome: 'undeliverable', detail: 'recipient domain has no mail server' };
   }
 
   try {
