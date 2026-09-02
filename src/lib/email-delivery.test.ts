@@ -86,6 +86,32 @@ describe('a key that does not reach its mailbox raises an ops alert', () => {
     expect((opsFail.mock.calls[0] as unknown as [string])[0]).toBe('mail:key-delivery');
   });
 
+  it('stays quiet when the free-key address is refused by its own mail server', async () => {
+    process.env.MAIL_RELAY_URL = 'https://relay.test/api/relay/send';
+    process.env.MAIL_RELAY_SECRET = 'shared-secret';
+    vi.stubGlobal('fetch', vi.fn(async () =>
+      new Response("send failed: {'acme@example.com': (550, b'5.1.2 Recipient address rejected: Domain not found')}", { status: 502 })));
+    try {
+      const ok = await asProduction(() => email.sendFreeKeyEmail({ to: 'acme@example.com', rawKey: FAKE_KEY, monthlyLimit: 200 }));
+      expect(ok).toBe(false);
+      expect(opsFail).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('still alerts when the relay itself refuses the free-key mail', async () => {
+    process.env.MAIL_RELAY_URL = 'https://relay.test/api/relay/send';
+    process.env.MAIL_RELAY_SECRET = 'shared-secret';
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('unauthorized', { status: 401 })));
+    try {
+      await asProduction(() => email.sendFreeKeyEmail({ to: 'acme@example.com', rawKey: FAKE_KEY, monthlyLimit: 200 }));
+      expect(opsFail).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('alerts when the OEM key delivery fails', async () => {
     await asProduction(() => email.sendOemKeyEmail({ to: 'acme@example.com', rawKey: FAKE_KEY, monthlyLimit: 50_000 }));
     expect(opsFail).toHaveBeenCalledTimes(1);

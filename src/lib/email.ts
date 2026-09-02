@@ -199,9 +199,13 @@ export function buildFreeKeyEmail(p: FreeKeyEmailInput): { subject: string; text
 
 export async function sendFreeKeyEmail(p: FreeKeyEmailInput & { to: string }): Promise<boolean> {
   const { subject, text, html } = buildFreeKeyEmail(p);
-  const ok = await sendViaRelay({ to: p.to, subject, text, html });
-  if (!ok) reportUndelivered('free key delivery', p.to, true);
-  return ok;
+  const { outcome } = await deliverViaRelay({ to: p.to, subject, text, html });
+  // An address its own mail server refuses is not a delivery failure on our
+  // side: the key was shown on screen, and no relay fix will make that
+  // mailbox exist. Waking someone up for it trains them to ignore the alert
+  // that matters, the one where the relay itself is down.
+  if (outcome !== 'sent') reportUndelivered('free key delivery', p.to, outcome !== 'undeliverable');
+  return outcome === 'sent';
 }
 
 export interface ActivationNudgeInput {
