@@ -32,6 +32,8 @@ const LONG_DESCRIPTIONS: Record<string, string> = {
     'Validate a structured payment reference — RF/ISO 11649 ("SCOR", mod 97-10), Swiss QR reference ("QRR", 27 digits, modulo 10 recursive), Belgian OGM/VCS, Finnish viitenumero — each against a dated primary source that publishes the rule. Pass an IBAN and you also get the PAIRING verdict: a QRR reference may only travel with a QR-IBAN (SIX range 30000-31999) and an ISO 11649 reference may not, per the Swiss Implementation Guidelines. Norwegian KID and Swedish OCR are recognised but answer valid: null — their rules are configured per creditor account by the beneficiary bank. Cost: free.',
   check_postal_address:
     "Check a structured ISO 20022 postal address against a payment rail's published address rules — 'sps' (Swiss Payment Standards, SIX), 'hvps_plus' (HVPS+/T2, ECB) or 'fedwire' (Federal Reserve) — rule by rule, each verdict citing the document and its validity date. The November 2026 changes remove the fully unstructured address option; this is the pre-flight that says whether an address survives them. Deliberately no 'cbpr+' scheme: that guideline is unreachable to automated readers, and a conformity boolean quoting an unread document would be a guess dressed as a verdict. Cost: free.",
+  check_swiss_qr_bill:
+    'Check a Swiss QR-bill payload (the SPC text inside the QR code): header, creditor IBAN and QR-IBAN range, QRR/SCOR/NON reference checksums and pairing, amount, currency, and whether the addresses are structured (type S) or still combined (type K), with a proposed structured form. Cost: free.',
 };
 
 // MCP server card. Served at the canonical /.well-known/mcp/server-card.json

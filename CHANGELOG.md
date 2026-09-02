@@ -9,6 +9,22 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 - **The `/live` village page is paused and no longer served.** Operator decision of 2026-09-02: the idea — watch the agents and every actor of the pipeline at work, to see what happens backstage — stays; the execution was judged too rough to be live, and the nine redesign mock-ups audited the same day had not found the form yet. Removed: the route and its canvas engine, the sprite atlas and its rebuild script, the two relays only that page used (`/api/ops`, `/api/health-sources`), the menu entry, the landing link and the sitemap entry. `/{locale}/live` redirects (temporarily) to the playground for the links already shared. The code is kept whole at git tag `village-pause-2026-09-02`. The backend feed `GET /v1/ops/recent` stays, now unused.
 
+## [1.5.0] — 2026-09-02
+
+### Added
+
+- **Creditor file audit, sold at a displayed price.** `POST /v1/audit/upload` takes a CSV or XLSX of creditors and audits every row in process with the registers the API already serves: IBAN structure and check digits, bank code against the national register, bank name and BIC, SEPA reach, issuer type, plus the checks only a whole file allows (duplicates, the file's BIC against the register, address country against IBAN country, Swiss structured-address rules ahead of 14 November 2026). Free preview with masked IBANs, then a one-off Stripe Checkout Session created from code (149 CHF up to 5,000 rows, 349 CHF up to 20,000); the webhook marks the job paid and the status route asks Stripe directly when the webhook is late. Reports live on the persistent volume for 2 h unpaid or 24 h after payment, then purge. Pages `/audit` and `/audit/done` in EN, FR and DE.
+- **Swiss QR-bill payload check, free.** `POST /v1/ch/qr-bill/check` reads the text inside a QR-bill code (SPC to EPD) and returns every rule verdict at once: header and version, creditor IBAN and QR-IBAN range, QRR/SCOR/NON reference checksum and its pairing with the IBAN, amount, currency, and whether the creditor and ultimate debtor addresses are structured (type S) or still combined (type K), which the standard removed on 21 November 2025 and banks stop processing on 14 November 2026. A combined address comes back with `proposed_structured`. Ninth MCP tool `check_swiss_qr_bill` on all three servers, page `/tools/qr-bill`, documented in the OpenAPI contract and the docs.
+- **Runtime-dependency guard.** `npm run deps:check` fails when code under `src/` imports a package that is not a production dependency; it runs in CI and inside `npm run check`.
+
+### Changed
+
+- **The production-image boot check in CI now blocks.** It was advisory while it proved itself; the same day an image that could not boot reached Railway with a green CI.
+
+### Fixed
+
+- **Thirteen minutes of API outage on 2026-09-02 (17:02 to 17:15 CEST).** The audit route imported `xlsx` from `devDependencies`; the production image runs `npm ci --omit=dev`, the container died at boot, and because the service mounts a volume the previous container had already been stopped. `xlsx` moved to `dependencies`; the two guards above exist so this class of mistake stops in CI.
+
 ## [1.4.4] — 2026-09-01
 
 ### Fixed

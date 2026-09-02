@@ -1179,7 +1179,8 @@
       "what": "Deux choses que cette API fait pour vous, déjà en production. Un contrôle de conformité gratuit vous dit, règle par règle et avec le document dont chaque règle provient, si une adresse que vous avez structurée passe sur un rail donné. Et résoudre un code de clearing ou un IBAN en BIC supprime souvent l'obligation d'adresse de l'agent : détenez le BIC, et cette branche de la règle ne s'applique plus à vous.",
       "refused": "Refusée : un pays en minuscules et pas d'élément localité",
       "accepted": "Acceptée : localité, pays et rue dans leurs propres éléments",
-      "note": "Ce qu'elle ne fait pas : elle ne migre pas le carnet d'adresses de vos clients et ne transforme pas un texte libre en adresse structurée. Elle contrôle ce que vous avez structuré, gratuitement, et nomme le document derrière chaque verdict."
+      "note": "Ce qu'elle ne fait pas : elle ne migre pas le carnet d'adresses de vos clients et ne transforme pas un texte libre en adresse structurée. Elle contrôle ce que vous avez structuré, gratuitement, et nomme le document derrière chaque verdict.",
+      "qrTool": "Vous tenez une QR-facture ? Vérifiez si son adresse est structurée ou combinée, gratuitement."
     },
     "vop": {
       "title": "Et la Verification of Payee",
@@ -1664,6 +1665,51 @@
       "missingTitle": "Aucun audit ici",
       "missing": "Ce lien ne porte aucun audit, ou l'audit a expiré.",
       "back": "Retour à la page d'audit"
+    }
+  },
+  "qrBill": {
+    "metaTitle": "Contrôle de QR-facture suisse : adresse structurée ou combinée, QR-IBAN et référence, gratuit",
+    "metaDescription": "Collez le texte d'un code QR-facture suisse et voyez chaque verdict : en-tête, appariement QR-IBAN et référence, sommes de contrôle, montant, et si les adresses sont structurées (type S) ou encore combinées (type K) avant l'échéance SIX du 14 novembre 2026.",
+    "eyebrow": "Outil gratuit",
+    "title": "Cette QR-facture est-elle prête pour le 14 novembre 2026 ?",
+    "intro": "Collez le texte contenu dans un code QR-facture suisse (il commence par SPC). Vous obtenez tous les verdicts d'un coup : en-tête, IBAN du créancier et plage QR-IBAN, référence QRR, SCOR ou NON et sa somme de contrôle, montant, monnaie, et si les adresses sont structurées (type S) ou encore combinées (type K). Une adresse combinée revient avec les champs structurés à utiliser à la place.",
+    "deadline": "Les adresses de type K ont été retirées de la norme le 21 novembre 2025 ; dès le 14 novembre 2026, les banques ne traitent plus les ordres permanents et modèles de paiement qui s'appuient dessus.",
+    "docsLink": "Lire la documentation",
+    "input": {
+      "label": "Texte de la QR-facture (Swiss Payments Code)",
+      "hint": "Une valeur par ligne, exactement comme le code QR la porte : SPC, 0200, 1, IBAN, créancier, créancier final (vide), montant, monnaie, débiteur final, type de référence, référence, message, EPD. Rien n'est conservé.",
+      "button": "Contrôler",
+      "sampleS": "Essayer un exemple structuré",
+      "sampleK": "Essayer un exemple combiné (K)"
+    },
+    "result": {
+      "valid": "Bien formée",
+      "ready": "Prête pour le 14.11.2026",
+      "yes": "Oui",
+      "no": "Non",
+      "iban": "IBAN du créancier",
+      "reference": "Référence",
+      "creditorAddress": "Adresse du créancier",
+      "debtorAddress": "Adresse du débiteur",
+      "structured": "Structurée (S)",
+      "combined": "Combinée (K)",
+      "invalidType": "Type invalide",
+      "findings": "Constats",
+      "error": "Erreur",
+      "warning": "Avertissement",
+      "clean": "Aucun constat : toutes les règles passent.",
+      "proposedCreditor": "Adresse structurée proposée pour le créancier",
+      "proposedDebtor": "Adresse structurée proposée pour le débiteur",
+      "nextSteps": "Et ensuite"
+    },
+    "api": {
+      "title": "Le même contrôle depuis le code",
+      "text": "Envoyez la charge utile en POST à l'endpoint gratuit ; ni clé ni quota. La banque derrière l'IBAN et sa participation aux rails de paiement relèvent de /v1/iban/validate, payant.",
+      "mcp": "Pour les agents IA, l'outil MCP s'appelle check_swiss_qr_bill."
+    },
+    "errors": {
+      "generic": "Le contrôle n'a pas pu s'exécuter. Réessayez.",
+      "network": "Le serveur n'a pas répondu. Réessayez dans une minute."
     }
   }
 }

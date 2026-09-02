@@ -78,6 +78,7 @@ const FREE_ROUTE_PREFIXES = [
   '/v1/address/check',
   '/v1/test-iban',
   '/v1/audit',
+  '/v1/ch/qr-bill',
 ];
 
 function isFreeRoute(path: string): boolean {

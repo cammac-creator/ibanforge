@@ -383,6 +383,14 @@ const A2A_SKILL_DETAIL: Record<string, A2ASkillDetail> = {
     tags: ['iso-20022', 'postal-address', 'sps', 'hvps-plus', 'fedwire', 'free'],
     examples: ['Does this ISO 20022 address pass the Swiss SPS rules before I build the pain.001?'],
   },
+  check_swiss_qr_bill: {
+    description:
+      'Rule-by-rule check of a Swiss QR-bill payload (SPC text): header, QR-IBAN and reference pairing, checksums, amount, currency, and structured (S) versus combined (K) addresses ahead of the SIX deadline of 14.11.2026, with a proposed structured form for combined addresses. Free.',
+    tags: ['swiss', 'qr-bill', 'qr-iban', 'iso-20022', 'postal-address', 'free'],
+    examples: [
+      'Is this QR-bill ready for 14 November 2026, or does its creditor address still use type K?',
+    ],
+  },
 };
 
 const A2A_AGENT_CARD = {

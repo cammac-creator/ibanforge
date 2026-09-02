@@ -42,6 +42,7 @@ A request without a valid key or payment gets a `402` response with machine-read
 | `/v1/iban/format` | GET or POST | Free | Structure, checksum, country and BBAN, no key needed. The registry (BIC, bank, SEPA, sanctions, Swiss clearing) is what the paid calls add |
 | `/v1/reference/validate` | GET/POST | Free | Payment reference checksum (RF/ISO 11649, Swiss QRR, Belgian OGM, Finnish viitenumero) |
 | `/v1/address/check` | POST | Free | ISO 20022 postal address conformity (SPS, HVPS+/T2, Fedwire), every finding sourced |
+| `/v1/ch/qr-bill/check` | POST | Free | Swiss QR-bill payload: header, QR-IBAN and reference pairing, checksums, structured (S) or combined (K) addresses before 14.11.2026, with a proposed structured form |
 | `/v1/demo` | GET | Free | Example validations (no payment needed) |
 | `/health` | GET | Free | Service health check |
 

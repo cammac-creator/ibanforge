@@ -25,6 +25,8 @@ Deux remarques sur ce tableau.
 
 **Méfiez-vous d'une date qui a l'air juste et ne l'est pas.** Le *22 novembre* est une vraie échéance — de **2025** : c'est l'entrée en vigueur de SPS 2025 et la fin de la coexistence MT/MX. Ce n'est pas une date de 2026, et un plan de migration qui la décale d'un an planifie contre rien.
 
+Vous tenez une QR-facture suisse plutôt qu'une adresse nue ? [`POST /v1/ch/qr-bill/check`](/docs/swiss-qr-iban) lit toute la charge utile et dit si ses adresses sont structurées (type S) ou encore combinées (type K), avec une forme structurée proposée.
+
 ## Ce que les règles demandent à une adresse d'agent : une ville et un pays
 
 Le fait le plus utile de ces règles, pour qui construit un logiciel de paiement, c'est le peu qu'elles exigent d'une adresse d'**établissement financier**.

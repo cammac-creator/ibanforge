@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "ibanforge"
-version = "1.4.4"
+version = "1.5.0"
 description = "Official Python SDK for the IBANforge API — IBAN validation, BIC/SWIFT lookup, Swiss BC-Nummer, sanctions/SEPA/VoP compliance triage."
 readme = "README.md"
 license = "MIT"

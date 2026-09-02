@@ -22,6 +22,7 @@ import {
   ADDRESS_SCHEMES,
   type AddressScheme,
 } from '../lib/address-conformity.js';
+import { checkSwissQrBill } from '../lib/swiss-qr-bill.js';
 import { datasetFacts } from '../lib/dataset-facts.js';
 import { MCP_INSTRUCTIONS } from './instructions.js';
 import { TOOL_OUTPUT_SCHEMAS } from './output-schemas.js';
@@ -412,6 +413,40 @@ Cost: free. The checksums are published commodities; the paid surface is POST /v
     return {
       content: [{ type: 'text' as const, text: JSON.stringify(payload, null, 2) }],
       structuredContent: payload as unknown as Record<string, unknown>,
+    };
+  },
+);
+
+server.registerTool(
+  'check_swiss_qr_bill',
+  {
+    title: 'Check Swiss QR-bill Payload',
+    description: `Check a Swiss QR-bill payload, the text a QR-bill's code carries (starts with SPC), rule by rule, each finding citing the SIX document it comes from. USE WHEN: an agent, an ERP or an accounting tool holds a scanned or generated QR-bill and must know before paying or issuing it whether it is well-formed, whether the reference type matches the IBAN (QRR needs a QR-IBAN, IID 30000-31999), and above all whether the creditor and debtor addresses are STRUCTURED (type S) or still COMBINED (type K): the standard removed type K on 21.11.2025 and banks stop processing payments built on it from 14.11.2026. DO NOT USE to learn which bank holds the account or its payment-rail participation: that is the paid validate_iban. RETURNS: { valid, ready_for_2026_11_14, creditor_iban { value, valid, country, qr_iban, iid }, creditor { present, address, structured, sps_check, proposed_structured }, ultimate_debtor, amount, currency, reference { type, value, valid, note }, findings [{ code, severity, field, detail, source }], next_steps, source }. A combined address comes back with proposed_structured, the S-type fields derived from the combined lines, to relay as a fix. IMPORTANT: relay each finding's source string. 
+
+Cost: free. Pure rule evaluation over the published SIX standard, no database. The paid surface is the bank behind the IBAN (validate_iban).`,
+    inputSchema: {
+      payload: z
+        .string()
+        .min(1)
+        .max(4000)
+        .describe(
+          'The Swiss QR Code text, line by line with real line breaks: SPC, 0200, 1, IBAN, creditor (7 lines), ultimate creditor (7 empty lines), amount, currency, ultimate debtor (7 lines), reference type, reference, message, EPD, then optional billing information and alternative schemes.',
+        ),
+    },
+    outputSchema: TOOL_OUTPUT_SCHEMAS.check_swiss_qr_bill,
+    annotations: {
+      title: 'Check Swiss QR-bill Payload',
+      readOnlyHint: true,
+      destructiveHint: false,
+      idempotentHint: true,
+      openWorldHint: false,
+    },
+  },
+  async ({ payload }) => {
+    const result = checkSwissQrBill(payload);
+    return {
+      content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
+      structuredContent: result as unknown as Record<string, unknown>,
     };
   },
 );

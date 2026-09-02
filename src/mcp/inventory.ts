@@ -139,6 +139,16 @@ export const MCP_TOOLS: readonly InventoryTool[] = [
     capability: 'postal_address_check',
   },
   {
+    name: 'check_swiss_qr_bill',
+    title: 'Check Swiss QR-bill Payload',
+    restRoute: 'POST /v1/ch/qr-bill/check',
+    price: 'free',
+    description:
+      'Check a Swiss QR-bill payload (the SPC text inside the QR code): header, creditor IBAN and QR-IBAN range, QRR/SCOR/NON reference checksums and their pairing with the IBAN, amount, currency, and whether the addresses are structured (type S) or still combined (type K), which banks stop processing on 14.11.2026; a combined address comes back with a proposed structured form.',
+    readOnly: true,
+    capability: 'swiss_qr_bill_check',
+  },
+  {
     // The only tool that writes, hence the only one outside `dataTools()`.
     // It stays out of the server card and the A2A skills on purpose: a
     // directory crawler indexes capabilities a caller can buy, and a feedback

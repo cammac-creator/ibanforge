@@ -171,7 +171,7 @@ describe('GET /mcp (no session) — discovery hint', () => {
     expect([...hint.tools].sort(), 'the discovery hint and tools/list disagree').toEqual(
       [...served].sort(),
     );
-    expect(hint.tools.length).toBe(8);
+    expect(hint.tools.length).toBe(9);
     expect(hint.version).toBe(LATEST_PROTOCOL_VERSION);
   });
 
@@ -215,7 +215,7 @@ describe('POST /mcp — full handshake', () => {
         tools: Array<{ name: string; outputSchema?: unknown; inputSchema?: unknown }>;
       }
     ).tools;
-    expect(tools).toHaveLength(8);
+    expect(tools).toHaveLength(9);
 
     const expectedNames = [
       'validate_iban',
@@ -226,6 +226,7 @@ describe('POST /mcp — full handshake', () => {
       'send_feedback',
       'validate_payment_reference',
       'check_postal_address',
+      'check_swiss_qr_bill',
     ];
     for (const expected of expectedNames) {
       const tool = tools.find((t) => t.name === expected);

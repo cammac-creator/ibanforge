@@ -88,6 +88,7 @@ const CONTRACT_TOOLS = [
   'batch_validate_iban',
   'check_compliance',
   'check_postal_address',
+  'check_swiss_qr_bill',
   'lookup_bic',
   'lookup_ch_clearing',
   'send_feedback',
@@ -106,11 +107,11 @@ const KNOWN_GAPS: ReadonlyArray<{ what: string; why: string }> = [
       'Le canal de distribution principal est le plus pauvre des trois. Écart antérieur à ' +
       "l'audit B3 (20/08/2026), non refermé : les resources de A devraient être servies par " +
       "l'API distante (elles le sont déjà : GET /v1/iban/structure, /v1/credits/bundles), ce qui " +
-      "demande un relais et pas une simple copie. À traiter dans une session dédiée.",
+      'demande un relais et pas une simple copie. À traiter dans une session dédiée.',
   },
 ];
 
-describe('parité MCP — les extracteurs voient exactement ce qu\'il faut', () => {
+describe("parité MCP — les extracteurs voient exactement ce qu'il faut", () => {
   // Garde-fou du garde-fou, dans les DEUX sens : une regex qui ne matche plus
   // rendrait tout le reste vert en ne comparant que des tableaux vides ; une
   // regex qui matche trop (un champ `name:` imbriqué pris pour un outil)
@@ -125,7 +126,7 @@ describe('parité MCP — les extracteurs voient exactement ce qu\'il faut', () 
   }
 });
 
-describe('parité MCP — aucun écart entre les trois listes d\'outils', () => {
+describe("parité MCP — aucun écart entre les trois listes d'outils", () => {
   it('A, B et C exposent la MÊME liste', () => {
     const [a, b, c] = IDS.map((id) => toolNames(id));
     expect(b, `${SURFACES.B.path} ne sert pas la même liste que ${SURFACES.A.path}`).toEqual(a);
@@ -168,7 +169,9 @@ describe('parité MCP — send_feedback écrit, donc il est plafonné partout', 
       SRC.B,
       'src/mcp/server.ts écrit en base sans HTTP au-dessus : sans plafond, send_feedback y est une boîte à spam.',
     ).toContain('FEEDBACK_INSERTS_PER_SOURCE_HOUR');
-    expect(SRC.B, 'le plafond de src/mcp/server.ts ne refuse plus rien').toContain('feedback_rate_limited');
+    expect(SRC.B, 'le plafond de src/mcp/server.ts ne refuse plus rien').toContain(
+      'feedback_rate_limited',
+    );
   });
 
   it('les catégories de A sont le miroir exact de FEEDBACK_ERROR_TYPES', () => {
@@ -176,16 +179,25 @@ describe('parité MCP — send_feedback écrit, donc il est plafonné partout', 
     // liste est recopiée. C'est le seul endroit du contrat qui se maintient à
     // la main — donc le seul qui puisse diverger en silence.
     const source = read('src/routes/feedback.ts');
-    const truth = [...(source.match(/FEEDBACK_ERROR_TYPES\s*=\s*\[([^\]]+)\]/)?.[1] ?? '').matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
-    expect(truth.length, 'FEEDBACK_ERROR_TYPES introuvable dans src/routes/feedback.ts').toBeGreaterThan(0);
-    const mirrored = [
-      ...(SRC.A.match(/enum:\s*\[((?:\s*'[a-z_]+',?)+)\],\s*\n\s*description:\s*'Category of the report/)?.[1] ?? '').matchAll(
+    const truth = [
+      ...(source.match(/FEEDBACK_ERROR_TYPES\s*=\s*\[([^\]]+)\]/)?.[1] ?? '').matchAll(
         /'([a-z_]+)'/g,
       ),
     ].map((m) => m[1]);
     expect(
+      truth.length,
+      'FEEDBACK_ERROR_TYPES introuvable dans src/routes/feedback.ts',
+    ).toBeGreaterThan(0);
+    const mirrored = [
+      ...(
+        SRC.A.match(
+          /enum:\s*\[((?:\s*'[a-z_]+',?)+)\],\s*\n\s*description:\s*'Category of the report/,
+        )?.[1] ?? ''
+      ).matchAll(/'([a-z_]+)'/g),
+    ].map((m) => m[1]);
+    expect(
       mirrored,
-      "la copie de FEEDBACK_ERROR_TYPES dans mcp/src/index.ts a divergé de src/routes/feedback.ts — un agent enverrait une catégorie que la route refuse.",
+      'la copie de FEEDBACK_ERROR_TYPES dans mcp/src/index.ts a divergé de src/routes/feedback.ts — un agent enverrait une catégorie que la route refuse.',
     ).toEqual(truth);
   });
 });
@@ -277,7 +289,11 @@ describe('parité MCP — les compteurs annoncés suivent la réalité', () => {
    */
   it("l'en-tête et la bannière de la surface A annoncent son vrai nombre d'outils", () => {
     const n = toolNames('A').length;
-    expect(SRC.A, `mcp/src/index.ts annonce un autre compte que ses ${n} outils`).toContain(`Exposes ${n} tools`);
-    expect(SRC.A, `la bannière stderr de mcp/src/index.ts n'annonce pas ${n} outils`).toContain(`${n} tools exposed.`);
+    expect(SRC.A, `mcp/src/index.ts annonce un autre compte que ses ${n} outils`).toContain(
+      `Exposes ${n} tools`,
+    );
+    expect(SRC.A, `la bannière stderr de mcp/src/index.ts n'annonce pas ${n} outils`).toContain(
+      `${n} tools exposed.`,
+    );
   });
 });

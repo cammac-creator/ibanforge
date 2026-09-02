@@ -312,6 +312,20 @@ Four schemes are checked arithmetically, each against a primary document that pu
 
 **One ambiguity is worth knowing about.** Only a leading `RF` and a 27-digit length pin a scheme down. A bare 12-digit string is simultaneously a Belgian OGM and a legal Finnish length, so the answer gives the more specific reading and reports the other in `also_valid_as`. Pass `reference_type` when you know the country.
 
+## Step 5 — check the whole QR-bill payload (`POST /v1/ch/qr-bill/check`, free)
+
+The text inside a Swiss QR code (the "Swiss Payments Code", 31 positional lines from `SPC` to `EPD`) can be checked in one call: header and version, creditor IBAN and whether it sits in the QR-IID range, the `QRR` / `SCOR` / `NON` reference and its checksum, the pairing rules (a QR-IBAN requires `QRR`; an ordinary IBAN forbids it), amount and currency, ultimate creditor left empty, and the one thing the SIX deadline of **14 November 2026** makes urgent: are the creditor and ultimate debtor addresses **structured (type S)** or still **combined (type K)**?
+
+```bash
+curl -s -X POST https://api.ibanforge.com/v1/ch/qr-bill/check \
+  -H "Content-Type: application/json" \
+  -d '{ "payload": "SPC\n0200\n1\nCH4431999123000889012\nS\nRobert Schneider AG\nRue du Lac\n1268\n2501\nBiel\nCH\n\n\n\n\n\n\n\n1949.75\nCHF\nS\nPia Rutschmann\nMarktgasse\n28\n9400\nRorschach\nCH\nQRR\n210000000003139471430009017\nOrder 15.06.2026\nEPD" }'
+```
+
+The answer carries `valid` (no error-level finding), `ready_for_2026_11_14` (valid and every present address is type S), one `findings` entry per broken rule with its `source`, and for a combined address a `proposed_structured` block: the type S fields derived from the two combined lines, to relay as the fix. Type K addresses were removed from the standard on 21 November 2025; from 14 November 2026 banks no longer process standing orders and payment templates built on them.
+
+It is free, pure rule evaluation, no database: the bank behind the IBAN and its payment-rail participation remain the job of `POST /v1/iban/validate`. The same check is the MCP tool `check_swiss_qr_bill` and the page [/tools/qr-bill](/tools/qr-bill).
+
 ## Virtual IBAN classification & end-user identification (AMLR Art. 22(3))
 
 The same `issuer` block that reads `bank` for Valiant is what flags a **virtual IBAN** issuer elsewhere. This matters beyond Switzerland, because of one specific European obligation.

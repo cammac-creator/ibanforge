@@ -1,7 +1,7 @@
 {
   "name": "ibanforge",
   "description": "Know the bank behind any IBAN: IBAN validation, BIC/SWIFT lookup, Swiss BC-Nummer clearing (full SIX BankMaster payment-rail participation + QR-IID — the deepest Swiss clearing data in any public API), EMI/vIBAN classification, SEPA + VoP reachability and sanctions + risk scoring, for developers and AI agents, by REST or MCP.",
-  "version": "1.4.4",
+  "version": "1.5.0",
   "install": {
     "npm": "npx -y ibanforge-mcp",
     "config": {
@@ -148,6 +148,22 @@
         "required": [
           "scheme",
           "address"
+        ]
+      }
+    },
+    {
+      "name": "check_swiss_qr_bill",
+      "description": "Check a Swiss QR-bill payload (the SPC text inside the QR code): header, creditor IBAN and QR-IBAN range, QRR/SCOR/NON reference checksums and pairing, amount, currency, and whether the addresses are structured (type S) or still combined (type K), with a proposed structured form. Cost: free.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "payload": {
+            "type": "string",
+            "description": "The Swiss QR Code text with real line breaks (SPC ... EPD)."
+          }
+        },
+        "required": [
+          "payload"
         ]
       }
     },

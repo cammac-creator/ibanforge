@@ -25,6 +25,8 @@ Two things about that table.
 
 **Beware of one date that looks right and is not.** *22 November* is a real deadline — of **2025**: it is when SPS 2025 came into force and when MT/MX coexistence ended. It is not a 2026 date, and a migration plan that carries it forward by a year is planning against nothing.
 
+Holding a Swiss QR-bill rather than a bare address? [`POST /v1/ch/qr-bill/check`](/docs/swiss-qr-iban) reads the whole payload and says whether its addresses are structured (type S) or still combined (type K), with a proposed structured form.
+
 ## What the rules ask of an agent address: a town and a country
 
 The single most useful fact about these rules, for anyone building payment software, is how little they demand of a **financial institution** address.

@@ -62,7 +62,8 @@ export type OperationType =
   | 'reference_validate'
   | 'address_check'
   | 'audit_upload'
-  | 'audit_sale';
+  | 'audit_sale'
+  | 'qr_bill_check';
 
 // --- IBAN Validation ---
 

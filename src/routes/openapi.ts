@@ -352,6 +352,75 @@ const buildRawSpec = () => ({
         },
       },
     },
+    '/v1/ch/qr-bill/check': {
+      post: {
+        operationId: 'checkSwissQrBill',
+        summary: 'Free Swiss QR-bill payload check (structured vs combined address)',
+        description:
+          'FREE rule check of the text inside a Swiss QR-bill code (the Swiss Payments Code, 31 positional lines from SPC to EPD): header and version, creditor IBAN and QR-IBAN range (IID 30000-31999), QRR/SCOR/NON reference checksum and its pairing with the IBAN, amount, currency, ultimate creditor left empty, and whether the creditor and ultimate debtor addresses are structured (type S) or still combined (type K). Type K was removed from the standard on 21.11.2025; from 14.11.2026 banks no longer process standing orders and payment templates built on it. A combined address comes back with proposed_structured, the S-type fields derived from the combined lines. Pure rule evaluation, no database: the bank behind the IBAN is the job of POST /v1/iban/validate.',
+        tags: ['Free'],
+        security: [],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                type: 'object',
+                required: ['payload'],
+                properties: {
+                  payload: {
+                    type: 'string',
+                    maxLength: 4000,
+                    description: 'The Swiss QR Code text with real line breaks (SPC ... EPD, then optional billing information and up to two alternative schemes).',
+                  },
+                },
+              },
+              example: {
+                payload:
+                  'SPC\n0200\n1\nCH4431999123000889012\nS\nRobert Schneider AG\nRue du Lac\n1268\n2501\nBiel\nCH\n\n\n\n\n\n\n\n1949.75\nCHF\nS\nPia Rutschmann\nMarktgasse\n28\n9400\nRorschach\nCH\nQRR\n210000000003139471430009017\nOrder 15.06.2026\nEPD',
+              },
+            },
+          },
+        },
+        responses: {
+          '200': {
+            description: 'The verdict: valid, ready_for_2026_11_14, creditor_iban, creditor, ultimate_debtor, reference, findings (code, severity, field, detail, source), next_steps, source.',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    valid: { type: 'boolean' },
+                    ready_for_2026_11_14: { type: 'boolean', description: 'valid and every present address is structured (type S).' },
+                    creditor_iban: { type: 'object', additionalProperties: true },
+                    creditor: { type: 'object', additionalProperties: true },
+                    ultimate_debtor: { type: 'object', additionalProperties: true },
+                    reference: { type: 'object', additionalProperties: true },
+                    findings: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          code: { type: 'string' },
+                          severity: { type: 'string', enum: ['error', 'warning'] },
+                          field: { type: 'string' },
+                          detail: { type: 'string' },
+                          source: { type: 'string' },
+                        },
+                      },
+                    },
+                    next_steps: { type: 'array', items: { type: 'string' } },
+                    source: { type: 'string' },
+                  },
+                  additionalProperties: true,
+                },
+              },
+            },
+          },
+          '400': { description: 'invalid_json or invalid_payload, with an example payload in the body.' },
+        },
+      },
+    },
     '/v1/address/check': {
       post: {
         operationId: 'checkPostalAddress',

@@ -1179,7 +1179,8 @@
       "what": "Two things this API does about it, both already live. A free conformity check tells you, rule by rule and with the document each rule comes from, whether an address you have structured passes a given rail. And resolving a clearing code or an IBAN into a BIC often removes the agent-address obligation altogether: hold the BIC, and that branch of the rule does not apply to you.",
       "refused": "Refused: a country in lowercase and no town element",
       "accepted": "Accepted: town, country and the street in their own elements",
-      "note": "What it does not do: it does not migrate your customers' address book, and it does not parse free text into a structured address. It checks what you have structured, for free, and it names the document behind every verdict."
+      "note": "What it does not do: it does not migrate your customers' address book, and it does not parse free text into a structured address. It checks what you have structured, for free, and it names the document behind every verdict.",
+      "qrTool": "Holding a QR-bill? Check whether its address is structured or combined, free."
     },
     "vop": {
       "title": "And Verification of Payee",
@@ -1664,6 +1665,51 @@
       "missingTitle": "No audit here",
       "missing": "This link has no audit attached, or it has expired.",
       "back": "Back to the audit page"
+    }
+  },
+  "qrBill": {
+    "metaTitle": "Swiss QR-bill check: structured or combined address, QR-IBAN and reference, free",
+    "metaDescription": "Paste the text of a Swiss QR-bill code and see every rule verdict: header, QR-IBAN and reference pairing, checksums, amount, and whether the addresses are structured (type S) or still combined (type K) before the SIX deadline of 14 November 2026.",
+    "eyebrow": "Free tool",
+    "title": "Is this QR-bill ready for 14 November 2026?",
+    "intro": "Paste the text inside a Swiss QR-bill code (it starts with SPC). You get every rule verdict at once: header, creditor IBAN and QR-IBAN range, QRR, SCOR or NON reference and its checksum, amount, currency, and whether the addresses are structured (type S) or still combined (type K). A combined address comes back with the structured fields to use instead.",
+    "deadline": "Type K addresses were removed from the standard on 21 November 2025; from 14 November 2026 banks no longer process standing orders and payment templates built on them.",
+    "docsLink": "Read the documentation",
+    "input": {
+      "label": "QR-bill text (Swiss Payments Code)",
+      "hint": "One value per line, exactly as the QR code carries it: SPC, 0200, 1, IBAN, creditor, ultimate creditor (empty), amount, currency, ultimate debtor, reference type, reference, message, EPD. Nothing is stored.",
+      "button": "Check",
+      "sampleS": "Try a structured sample",
+      "sampleK": "Try a combined (K) sample"
+    },
+    "result": {
+      "valid": "Well-formed",
+      "ready": "Ready for 14.11.2026",
+      "yes": "Yes",
+      "no": "No",
+      "iban": "Creditor IBAN",
+      "reference": "Reference",
+      "creditorAddress": "Creditor address",
+      "debtorAddress": "Debtor address",
+      "structured": "Structured (S)",
+      "combined": "Combined (K)",
+      "invalidType": "Invalid type",
+      "findings": "Findings",
+      "error": "Error",
+      "warning": "Warning",
+      "clean": "No finding: every rule passes.",
+      "proposedCreditor": "Proposed structured creditor address",
+      "proposedDebtor": "Proposed structured debtor address",
+      "nextSteps": "What to do next"
+    },
+    "api": {
+      "title": "The same check from code",
+      "text": "POST the payload to the free endpoint; no key, no quota. The bank behind the IBAN and its payment-rail participation are the paid /v1/iban/validate.",
+      "mcp": "For AI agents, the MCP tool is check_swiss_qr_bill."
+    },
+    "errors": {
+      "generic": "The check could not run. Try again.",
+      "network": "The server did not answer. Try again in a minute."
     }
   }
 }

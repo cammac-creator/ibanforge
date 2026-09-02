@@ -65,6 +65,7 @@ import { stripeSuccess } from './routes/stripe-success.js';
 import { ibanStructure } from './routes/iban-structure.js';
 import { addressCheck } from './routes/address-check.js';
 import { audit } from './routes/audit.js';
+import { chQrBill } from './routes/ch-qr-bill.js';
 import { rateLimitMiddleware } from './middleware/rate-limit.js';
 import { recordRequest, classifyClient, hashIp, extractClientIp } from './lib/stats.js';
 import { bicGuardMiddleware, iidGuardMiddleware } from './middleware/identifier-guard.js';
@@ -379,7 +380,17 @@ curl -s -X POST https://api.ibanforge.com/v1/address/check \\
 
 Takes a \`scheme\` (\`sps\`, \`hvps_plus\` or \`fedwire\`) and an \`address\` in snake_cased ISO 20022 tags (\`strt_nm\`, \`bldg_nb\`, \`pst_cd\`, \`twn_nm\`, \`ctry\`, \`adr_line\`), and returns \`conforms\` plus one finding per rule, each citing its source document and validity date. It judges conformity to a published rule, never whether an address is real or belongs to the account holder. No \`cbpr+\` scheme on purpose: that guideline is unreachable to automated readers. **No key, no payment.**
 
-### 8. /v1/iban/format — free pre-flight (no auth, no payment)
+### 8. check_swiss_qr_bill — Swiss QR-bill payload, structured or combined address (${toolPriceLabel('check_swiss_qr_bill')})
+
+\`\`\`bash
+curl -s -X POST https://api.ibanforge.com/v1/ch/qr-bill/check \\
+  -H "Content-Type: application/json" \\
+  -d '{"payload":"SPC\\n0200\\n1\\nCH4431999123000889012\\nS\\nRobert Schneider AG\\nRue du Lac\\n1268\\n2501\\nBiel\\nCH\\n\\n\\n\\n\\n\\n\\n\\n1949.75\\nCHF\\nS\\nPia Rutschmann\\nMarktgasse\\n28\\n9400\\nRorschach\\nCH\\nQRR\\n210000000003139471430009017\\nOrder 15.06.2026\\nEPD"}'
+\`\`\`
+
+Takes the text inside a Swiss QR-bill code (\`payload\`, real line breaks) and returns every rule verdict at once: header, creditor IBAN and QR-IBAN range, QRR/SCOR/NON checksum and pairing with the IBAN, amount, currency, and \`ready_for_2026_11_14\`: whether the addresses are structured (type S) or still combined (type K), which banks stop processing on 14 November 2026. A combined address comes back with \`proposed_structured\`.
+
+### 9. /v1/iban/format — free pre-flight (no auth, no payment)
 
 \`\`\`bash
 curl -s 'https://api.ibanforge.com/v1/iban/format?iban=CH1000230000000012345'
@@ -853,6 +864,7 @@ export function buildApp(): Hono<HonoEnv> {
   // database of ours, which is exactly why it is free.
   app.route('/', addressCheck);
   app.route('/', audit);
+  app.route('/', chQrBill);
   app.route('/', health);
   app.route('/', stats);
   app.route('/', adminRevenue);

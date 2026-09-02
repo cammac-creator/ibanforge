@@ -98,6 +98,11 @@ export default async function VendorsPage({
           <p className="text-sm text-foreground/90" style={{ lineHeight: 1.7 }}>
             {t("deadline.what")}
           </p>
+          <p className="text-sm">
+            <Link href={`/${locale}/tools/qr-bill`} className="underline underline-offset-4">
+              {t("deadline.qrTool")}
+            </Link>
+          </p>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
             <figure className="m-0 min-w-0">
               <figcaption className="font-mono text-[11px] uppercase tracking-caps text-muted-foreground mb-1.5">

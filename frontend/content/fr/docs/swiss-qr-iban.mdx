@@ -365,6 +365,20 @@ Cette même classification alimente le score de risque de [`POST /v1/iban/compli
 
 Ce `meta.disclaimer` n'est pas un ornement et il n'est pas adouci ici : il s'agit d'un **tri informatif, pas d'un produit AML/CFT réglementé**. Le filtrage des sanctions s'opère au niveau de la banque (BIC8) sur les données OFAC, EU et UN — il signale l'établissement teneur, jamais le nom du bénéficiaire ou du titulaire. C'est un signal amont qui dit quel type d'établissement se tient derrière un identifiant ; l'identification des utilisateurs finaux au titre de l'art. 22(3) se joue chez l'établissement émetteur, avec des moyens que nous ne détenons ni ne remplaçons.
 
+## Étape 5 — contrôler toute la charge utile de la QR-facture (`POST /v1/ch/qr-bill/check`, gratuit)
+
+Le texte contenu dans un code QR suisse (le « Swiss Payments Code », 31 lignes positionnelles de `SPC` à `EPD`) se contrôle en un appel : en-tête et version, IBAN du créancier et son appartenance à la plage QR-IID, la référence `QRR` / `SCOR` / `NON` et sa somme de contrôle, les règles d'appariement (un QR-IBAN exige `QRR` ; un IBAN ordinaire l'interdit), montant et monnaie, créancier final laissé vide, et ce que l'échéance SIX du **14 novembre 2026** rend urgent : les adresses du créancier et du débiteur final sont-elles **structurées (type S)** ou encore **combinées (type K)** ?
+
+```bash
+curl -s -X POST https://api.ibanforge.com/v1/ch/qr-bill/check \
+  -H "Content-Type: application/json" \
+  -d '{ "payload": "SPC\n0200\n1\nCH4431999123000889012\nS\nRobert Schneider AG\nRue du Lac\n1268\n2501\nBiel\nCH\n\n\n\n\n\n\n\n1949.75\nCHF\nS\nPia Rutschmann\nMarktgasse\n28\n9400\nRorschach\nCH\nQRR\n210000000003139471430009017\nOrder 15.06.2026\nEPD" }'
+```
+
+La réponse porte `valid` (aucun constat de niveau erreur), `ready_for_2026_11_14` (valide et chaque adresse présente est de type S), une entrée `findings` par règle enfreinte avec sa `source`, et pour une adresse combinée un bloc `proposed_structured` : les champs de type S dérivés des deux lignes combinées, à relayer comme correctif. Les adresses de type K ont été retirées de la norme le 21 novembre 2025 ; dès le 14 novembre 2026 les banques ne traitent plus les ordres permanents et modèles de paiement qui s'appuient dessus.
+
+C'est gratuit, pure évaluation de règles, sans base de données : la banque derrière l'IBAN et sa participation aux rails de paiement restent le travail de `POST /v1/iban/validate`. Le même contrôle est l'outil MCP `check_swiss_qr_bill` et la page [/tools/qr-bill](/tools/qr-bill).
+
 ## Les limites, dites franchement
 
 - **L'établissement, jamais le compte ni son titulaire.** Un QR-IID résolu nomme l'établissement émetteur. Il ne dit rien des douze chiffres qui le suivent dans l'IBAN, ni de la personne qui détient ce compte.

@@ -112,6 +112,14 @@ Contrôle une adresse postale ISO 20022 structurée contre les règles publiées
 { "scheme": "sps", "address": { "strt_nm": "Bahnhofstrasse", "bldg_nb": "45", "pst_cd": "8001", "twn_nm": "Zurich", "ctry": "CH" } }
 ```
 
+### check_swiss_qr_bill
+
+Contrôle une charge utile de QR-facture suisse, le texte contenu dans le code QR (il commence par `SPC`), règle par règle : en-tête, IBAN du créancier et plage QR-IBAN, sommes de contrôle des références `QRR` / `SCOR` / `NON` et leur appariement avec l'IBAN, montant, monnaie, et si les adresses du créancier et du débiteur sont **structurées (type S)** ou encore **combinées (type K)**. La norme a retiré le type K le 21 novembre 2025 et les banques cessent de traiter les paiements qui s'appuient dessus dès le 14 novembre 2026 ; une adresse combinée revient avec `proposed_structured`, les champs de type S dérivés des lignes combinées. Gratuit, routé vers `POST /v1/ch/qr-bill/check`.
+
+```json
+{ "payload": "SPC\n0200\n1\nCH4431999123000889012\nS\nRobert Schneider AG\nRue du Lac\n1268\n2501\nBiel\nCH\n\n\n\n\n\n\n\n1949.75\nCHF\nS\nPia Rutschmann\nMarktgasse\n28\n9400\nRorschach\nCH\nQRR\n210000000003139471430009017\nOrder 15.06.2026\nEPD" }
+```
+
 ### send_feedback
 
 Signaler un résultat faux, une donnée périmée ou absente, ou tout ce qui vous empêche d'utiliser ou de PAYER le service, directement aux opérateurs. Gratuit, et l'outil continue de répondre une fois l'allocation gratuite quotidienne épuisée : plafonner la boîte à réclamations avec la limite qui produit la réclamation ferait taire précisément les rapports qu'elle sert à recevoir. Un humain lit chaque rapport ; une erreur de donnée avérée sur un appel x402 payé est remboursée on-chain. `error_type` et `notes` sont requis, le reste est optionnel.

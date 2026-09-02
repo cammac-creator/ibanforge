@@ -1179,7 +1179,8 @@
       "what": "Zwei Dinge, die diese API dafür tut, beide bereits produktiv. Eine kostenlose Konformitätsprüfung sagt Ihnen Regel für Regel, mit dem Dokument, aus dem jede Regel stammt, ob eine von Ihnen strukturierte Adresse auf einer bestimmten Schiene besteht. Und das Auflösen eines Clearing-Codes oder einer IBAN in einen BIC hebt die Adresspflicht des Agenten oft ganz auf: Wer den BIC hat, für den gilt dieser Zweig der Regel nicht.",
       "refused": "Abgelehnt: Land in Kleinbuchstaben und kein Ortselement",
       "accepted": "Akzeptiert: Ort, Land und Strasse in eigenen Elementen",
-      "note": "Was sie nicht tut: Sie migriert nicht das Adressbuch Ihrer Kunden und macht aus Freitext keine strukturierte Adresse. Sie prüft, was Sie strukturiert haben, kostenlos, und nennt zu jedem Urteil das Dokument dahinter."
+      "note": "Was sie nicht tut: Sie migriert nicht das Adressbuch Ihrer Kunden und macht aus Freitext keine strukturierte Adresse. Sie prüft, was Sie strukturiert haben, kostenlos, und nennt zu jedem Urteil das Dokument dahinter.",
+      "qrTool": "Sie halten eine QR-Rechnung? Prüfen Sie kostenlos, ob ihre Adresse strukturiert oder kombiniert ist."
     },
     "vop": {
       "title": "Und Verification of Payee",
@@ -1664,6 +1665,51 @@
       "missingTitle": "Keine Prüfung hier",
       "missing": "Dieser Link enthält keine Prüfung, oder sie ist abgelaufen.",
       "back": "Zurück zur Prüfungsseite"
+    }
+  },
+  "qrBill": {
+    "metaTitle": "Swiss-QR-Rechnung prüfen: strukturierte oder kombinierte Adresse, QR-IBAN und Referenz, kostenlos",
+    "metaDescription": "Fügen Sie den Text eines Swiss-QR-Rechnungscodes ein und sehen Sie jedes Regelurteil: Kopfzeilen, QR-IBAN und Referenz, Prüfziffern, Betrag, und ob die Adressen strukturiert (Typ S) oder noch kombiniert (Typ K) sind, vor der SIX-Frist vom 14. November 2026.",
+    "eyebrow": "Kostenloses Tool",
+    "title": "Ist diese QR-Rechnung bereit für den 14. November 2026?",
+    "intro": "Fügen Sie den Text im Swiss-QR-Code ein (er beginnt mit SPC). Sie erhalten alle Urteile auf einmal: Kopfzeilen, Kreditoren-IBAN und QR-IBAN-Bereich, Referenz QRR, SCOR oder NON mit Prüfziffer, Betrag, Währung, und ob die Adressen strukturiert (Typ S) oder noch kombiniert (Typ K) sind. Eine kombinierte Adresse kommt mit den stattdessen zu verwendenden strukturierten Feldern zurück.",
+    "deadline": "Adressen vom Typ K wurden am 21. November 2025 aus dem Standard entfernt; ab dem 14. November 2026 verarbeiten die Banken darauf beruhende Daueraufträge und Zahlungsvorlagen nicht mehr.",
+    "docsLink": "Dokumentation lesen",
+    "input": {
+      "label": "Text der QR-Rechnung (Swiss Payments Code)",
+      "hint": "Ein Wert pro Zeile, genau wie im QR-Code: SPC, 0200, 1, IBAN, Kreditor, endgültiger Kreditor (leer), Betrag, Währung, endgültiger Debitor, Referenztyp, Referenz, Mitteilung, EPD. Nichts wird gespeichert.",
+      "button": "Prüfen",
+      "sampleS": "Strukturiertes Beispiel testen",
+      "sampleK": "Kombiniertes Beispiel (K) testen"
+    },
+    "result": {
+      "valid": "Wohlgeformt",
+      "ready": "Bereit für den 14.11.2026",
+      "yes": "Ja",
+      "no": "Nein",
+      "iban": "Kreditoren-IBAN",
+      "reference": "Referenz",
+      "creditorAddress": "Adresse des Kreditors",
+      "debtorAddress": "Adresse des Debitors",
+      "structured": "Strukturiert (S)",
+      "combined": "Kombiniert (K)",
+      "invalidType": "Ungültiger Typ",
+      "findings": "Befunde",
+      "error": "Fehler",
+      "warning": "Warnung",
+      "clean": "Kein Befund: alle Regeln bestanden.",
+      "proposedCreditor": "Vorgeschlagene strukturierte Kreditorenadresse",
+      "proposedDebtor": "Vorgeschlagene strukturierte Debitorenadresse",
+      "nextSteps": "Nächste Schritte"
+    },
+    "api": {
+      "title": "Dieselbe Prüfung aus dem Code",
+      "text": "Senden Sie die Nutzdaten per POST an den kostenlosen Endpoint; ohne Schlüssel, ohne Kontingent. Die Bank hinter der IBAN und ihre Teilnahme an den Zahlungsschienen liefert das kostenpflichtige /v1/iban/validate.",
+      "mcp": "Für KI-Agenten heisst das MCP-Tool check_swiss_qr_bill."
+    },
+    "errors": {
+      "generic": "Die Prüfung konnte nicht laufen. Versuchen Sie es erneut.",
+      "network": "Der Server hat nicht geantwortet. Versuchen Sie es in einer Minute erneut."
     }
   }
 }

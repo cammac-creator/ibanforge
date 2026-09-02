@@ -112,6 +112,14 @@ Check a structured ISO 20022 postal address against a payment rail's published r
 { "scheme": "sps", "address": { "strt_nm": "Bahnhofstrasse", "bldg_nb": "45", "pst_cd": "8001", "twn_nm": "Zurich", "ctry": "CH" } }
 ```
 
+### check_swiss_qr_bill
+
+Check a Swiss QR-bill payload, the text inside the QR code (it starts with `SPC`), rule by rule: header, creditor IBAN and QR-IBAN range, `QRR` / `SCOR` / `NON` reference checksums and their pairing with the IBAN, amount, currency, and whether the creditor and debtor addresses are **structured (type S)** or still **combined (type K)**. The standard removed type K on 21 November 2025 and banks stop processing payments built on it from 14 November 2026; a combined address comes back with `proposed_structured`, the S-type fields derived from the combined lines. Free, routed to `POST /v1/ch/qr-bill/check`.
+
+```json
+{ "payload": "SPC\n0200\n1\nCH4431999123000889012\nS\nRobert Schneider AG\nRue du Lac\n1268\n2501\nBiel\nCH\n\n\n\n\n\n\n\n1949.75\nCHF\nS\nPia Rutschmann\nMarktgasse\n28\n9400\nRorschach\nCH\nQRR\n210000000003139471430009017\nOrder 15.06.2026\nEPD" }
+```
+
 ### send_feedback
 
 Report a wrong result, stale or missing data, or anything blocking you from using or PAYING for the service, straight to the operators. Free, and it keeps working after the daily free-tier allowance is spent: capping the complaint box with the limit that produced the complaint would silence the reports it exists for. A human reads every one; a verified data error on a paid x402 call is refunded on-chain. `error_type` and `notes` are required, the rest is optional.

@@ -630,6 +630,93 @@ const SEND_FEEDBACK_OUTPUT_SCHEMA = {
  * return type (what a handler is allowed to put in `structuredContent`) is
  * inferred FROM that precision.
  */
+const QR_ADDRESS_SCHEMA = z.object({
+  type: z.string().describe('AdrTp as carried: S (structured), K (combined) or empty.'),
+  name: z.string(),
+  line1: z.string().describe('StrtNm for type S, AdrLine1 for type K.'),
+  line2: z.string().describe('BldgNb for type S, AdrLine2 (postal code and town) for type K.'),
+  postal_code: z.string(),
+  town: z.string(),
+  country: z.string(),
+});
+
+const QR_PARTY_SCHEMA = z.object({
+  present: z.boolean(),
+  address: QR_ADDRESS_SCHEMA,
+  structured: z
+    .boolean()
+    .nullable()
+    .describe('true = type S, false = type K (combined), null = absent or invalid type.'),
+  sps_check: z
+    .object({
+      scheme: z.string(),
+      conforms: z.boolean(),
+      findings: z.array(
+        z.object({ rule: z.string(), verdict: z.string(), detail: z.string(), source: z.string() }),
+      ),
+      note: z.string(),
+    })
+    .nullable()
+    .describe('The SPS structured-address verdicts for a type S address; null otherwise.'),
+  proposed_structured: z
+    .object({
+      strt_nm: z.string().optional(),
+      bldg_nb: z.string().optional(),
+      pst_cd: z.string().optional(),
+      twn_nm: z.string().optional(),
+      ctry: z.string().optional(),
+      confidence: z.string().describe('high | low'),
+      note: z.string(),
+    })
+    .nullable()
+    .describe('For a combined (K) address: the type S fields derived from the combined lines.'),
+});
+
+const CHECK_SWISS_QR_BILL_OUTPUT_SCHEMA = {
+  valid: z.boolean().describe('True when no finding has severity error.'),
+  ready_for_2026_11_14: z
+    .boolean()
+    .describe(
+      'valid AND every present address is structured (type S): what banks require from 14.11.2026.',
+    ),
+  qr_type: z.string(),
+  version: z.string(),
+  coding: z.string(),
+  creditor_iban: z.object({
+    value: z.string(),
+    valid: z.boolean(),
+    country: z.string().nullable(),
+    qr_iban: z.boolean().describe('IID in 30000-31999, which requires reference type QRR.'),
+    iid: z.string().nullable(),
+  }),
+  creditor: QR_PARTY_SCHEMA,
+  ultimate_creditor_empty: z.boolean(),
+  amount: z.string().nullable(),
+  currency: z.string().nullable(),
+  ultimate_debtor: QR_PARTY_SCHEMA,
+  reference: z.object({
+    type: z.string().describe('QRR | SCOR | NON as carried.'),
+    value: z.string(),
+    valid: z.boolean().nullable(),
+    note: z.string(),
+  }),
+  unstructured_message: z.string().nullable(),
+  trailer: z.string(),
+  billing_information: z.string().nullable(),
+  alternative_schemes: z.array(z.string()),
+  findings: z.array(
+    z.object({
+      code: z.string().describe('Stable identifier, safe to branch on.'),
+      severity: z.string().describe('error | warning'),
+      field: z.string(),
+      detail: z.string(),
+      source: z.string().describe('The SIX document the rule comes from. Relay it.'),
+    }),
+  ),
+  next_steps: z.array(z.string()),
+  source: z.string(),
+};
+
 export const TOOL_OUTPUT_SCHEMAS = {
   validate_iban: VALIDATE_IBAN_OUTPUT_SCHEMA,
   batch_validate_iban: BATCH_VALIDATE_IBAN_OUTPUT_SCHEMA,
@@ -637,6 +724,7 @@ export const TOOL_OUTPUT_SCHEMAS = {
   check_compliance: CHECK_COMPLIANCE_OUTPUT_SCHEMA,
   validate_payment_reference: VALIDATE_PAYMENT_REFERENCE_OUTPUT_SCHEMA,
   check_postal_address: CHECK_POSTAL_ADDRESS_OUTPUT_SCHEMA,
+  check_swiss_qr_bill: CHECK_SWISS_QR_BILL_OUTPUT_SCHEMA,
   lookup_ch_clearing: LOOKUP_CH_CLEARING_OUTPUT_SCHEMA,
   send_feedback: SEND_FEEDBACK_OUTPUT_SCHEMA,
 } satisfies Record<string, z.ZodRawShape>;

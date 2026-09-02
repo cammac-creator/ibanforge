@@ -2,7 +2,7 @@
 /**
  * IBANforge MCP Server
  *
- * Exposes 8 tools backed by the IBANforge HTTP API (api.ibanforge.com):
+ * Exposes 9 tools backed by the IBANforge HTTP API (api.ibanforge.com):
  *   - validate_iban
  *   - batch_validate_iban
  *   - lookup_bic
@@ -10,6 +10,7 @@
  *   - check_compliance
  *   - validate_payment_reference
  *   - check_postal_address
+ *   - check_swiss_qr_bill
  *   - send_feedback
  *
  * `send_feedback` was HTTP-only until 21/08/2026 (audit B3): npm is the main
@@ -488,6 +489,25 @@ const TOOLS: Tool[] = [
         pairing_as_of: { type: 'string' },
       },
       required: ['reference', 'scheme', 'valid', 'status', 'source', 'note'],
+    },
+  },
+  {
+    name: 'check_swiss_qr_bill',
+    title: 'Check Swiss QR-bill Payload',
+    annotations: { title: 'Check Swiss QR-bill Payload', ...READ_ONLY },
+    description:
+      "Check a Swiss QR-bill payload, the text a QR-bill's code carries (starts with SPC), rule by rule, each finding citing the SIX document it comes from. USE WHEN: an agent, an ERP or an accounting tool holds a scanned or generated QR-bill and must know before paying or issuing it whether it is well-formed, whether the reference type matches the IBAN (QRR needs a QR-IBAN, IID 30000-31999), and above all whether the creditor and debtor addresses are STRUCTURED (type S) or still COMBINED (type K): the standard removed type K on 21.11.2025 and banks stop processing payments built on it from 14.11.2026. DO NOT USE to learn which bank holds the account or its payment-rail participation: that is the paid validate_iban. RETURNS: { valid, ready_for_2026_11_14, creditor_iban { value, valid, country, qr_iban, iid }, creditor { present, address, structured, sps_check, proposed_structured }, ultimate_debtor, amount, currency, reference { type, value, valid, note }, findings [{ code, severity, field, detail, source }], next_steps, source }. A combined address comes back with proposed_structured, the S-type fields derived from the combined lines, to relay as a fix. IMPORTANT: relay each finding's source string. " +
+      'COST: free (routed to POST /v1/ch/qr-bill/check).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        payload: {
+          type: 'string',
+          description:
+            'The Swiss QR Code text with real line breaks: SPC, 0200, 1, IBAN, creditor (7 lines), ultimate creditor (7 empty lines), amount, currency, ultimate debtor (7 lines), reference type, reference, message, EPD, optional billing information and alternative schemes.',
+        },
+      },
+      required: ['payload'],
     },
   },
   {
@@ -979,6 +999,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         return relay(result);
       }
 
+      case 'check_swiss_qr_bill': {
+        if (typeof a.payload !== 'string' || !a.payload.trim()) {
+          return fail({ error: 'invalid_input', message: 'Argument `payload` must be the Swiss QR Code text (starts with SPC).' });
+        }
+        const result = await apiCall('POST', '/v1/ch/qr-bill/check', { payload: a.payload });
+        return relay(result);
+      }
+
       case 'check_postal_address': {
         if (typeof a.scheme !== 'string' || !a.scheme.trim()) {
           return fail({ error: 'invalid_input', message: 'Argument `scheme` must be one of sps, hvps_plus, fedwire.' });
@@ -1035,4 +1063,4 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 const transport = new StdioServerTransport();
 await server.connect(transport);
 
-process.stderr.write('IBANforge MCP server ready (stdio). 8 tools exposed.\n');
+process.stderr.write('IBANforge MCP server ready (stdio). 9 tools exposed.\n');

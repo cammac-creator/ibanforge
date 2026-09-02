@@ -24,14 +24,14 @@ Optional: set IBANFORGE_API_KEY=ifk_... in env for the free tier (200 req/month)
 POST https://api.ibanforge.com/mcp  (JSON-RPC: initialize → tools/list → tools/call)
 
 ### OpenAI agents (no Custom GPT or ChatGPT Plus needed)
-Agents SDK: point MCPServerStreamableHttp at the MCP URL above — the 8 tools auto-load.
+Agents SDK: point MCPServerStreamableHttp at the MCP URL above — the 9 tools auto-load.
 Function-calling (Chat Completions / Responses): wire tools to the OpenAPI at /openapi.json.
 
 ### Pay-per-call without an API key (x402, USDC on Base L2)
 GET https://api.ibanforge.com/.well-known/x402 returns the full catalog. Any agent with a Base wallet can discover, pay, and call.
 Zero to first payment in 3 steps (wallet with budget → USDC on Base → one $5 payment for 1,000 credits): https://ibanforge.com/docs/pay-as-an-agent
 
-## 8 MCP tools
+## 9 MCP tools
 - validate_iban — validate one IBAN + enrich (BIC, issuer EMI/vIBAN, SEPA, VoP, risk, Swiss bc_nummer). Cost: $0.005
 - batch_validate_iban — up to 100 IBANs in one call. Cost: $0.002 per IBAN (e.g. 100 = $0.20)
 - lookup_bic — resolve a BIC/SWIFT into bank, country, city, LEI. Cost: $0.003
@@ -39,6 +39,7 @@ Zero to first payment in 3 steps (wallet with budget → USDC on Base → one $5
 - check_compliance — sanctions (OFAC, bank-BIC level) + FATF + SEPA Instant + VoP + risk score 0-100. Informational, not regulated AML/CFT. Cost: $0.02
 - validate_payment_reference — RF/ISO 11649, Swiss QRR, Belgian OGM/VCS, Finnish viitenumero checksums against the dated document that publishes each rule, plus the QRR/QR-IBAN pairing verdict. Cost: free
 - check_postal_address — ISO 20022 postal address against one rail's published rules (sps, hvps_plus, fedwire), one finding per rule with its source and date. Cost: free
+- check_swiss_qr_bill — Swiss QR-bill payload check: header, QR-IBAN and reference pairing, checksums, structured (S) versus combined (K) addresses ahead of 14.11.2026, with a proposed structured form. Free.
 - send_feedback — report incorrect data or claim an x402 refund, no account. Cost: free
 
 ## REST endpoints
