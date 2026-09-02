@@ -46,10 +46,7 @@ import { getBicDB } from './db.js';
  * Seeded by scripts/seed-pra-banks.ts.
  */
 export type PraSection =
-  | 'uk_incorporated'
-  | 'non_uk_branch'
-  | 'gibraltar_branch'
-  | 'eea_sro_branch';
+  'uk_incorporated' | 'non_uk_branch' | 'gibraltar_branch' | 'eea_sro_branch';
 
 /**
  * Whose LEI the list published for this firm. `head_office_lei` is the branch
@@ -168,8 +165,7 @@ export function getPraListMonth(): string | null {
   if (!ready()) return null;
   try {
     const row = getBicDB().prepare('SELECT MAX(list_month) AS m FROM pra_banks').get() as
-      | { m: string | null }
-      | undefined;
+      { m: string | null } | undefined;
     return row?.m ?? null;
   } catch {
     return null;

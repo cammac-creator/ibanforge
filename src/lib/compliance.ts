@@ -26,8 +26,7 @@ export function checkSanctions(countryCode: string, bic8: string | null): Sancti
     _checkFatf = db.prepare('SELECT status FROM fatf_countries WHERE country_code = ?');
 
   const countrySanction = _checkSanctionedCountry.get(countryCode) as
-    | { sanction_type: string }
-    | undefined;
+    { sanction_type: string } | undefined;
   const bankSanctions = bic8 ? (_checkSanctionedBank.all(bic8) as { source_list: string }[]) : [];
   const fatfRow = _checkFatf.get(countryCode) as { status: string } | undefined;
 

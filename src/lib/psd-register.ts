@@ -79,11 +79,7 @@ import { getBicDB } from './db.js';
  * Seeded by scripts/seed-eba-psd.ts.
  */
 export type PsdEntityType =
-  | 'payment_institution'
-  | 'emi'
-  | 'aisp'
-  | 'exempted_emi'
-  | 'exempted_payment_institution';
+  'payment_institution' | 'emi' | 'aisp' | 'exempted_emi' | 'exempted_payment_institution';
 
 export interface PsdRegistration {
   /** Always true. There is no negative form of this block — see the file note. */
@@ -226,8 +222,7 @@ export function getPsdAsOf(): string | null {
   if (!ready()) return null;
   try {
     const row = getBicDB().prepare('SELECT MAX(as_of) AS d FROM psd_entities').get() as
-      | { d: string | null }
-      | undefined;
+      { d: string | null } | undefined;
     return row?.d ?? null;
   } catch {
     return null;

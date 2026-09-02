@@ -45,8 +45,7 @@ function sampleFrenchCode(): { national_bank_code: string; name: string } | unde
 function sampleSpanishCode(): { code: string; name: string } | undefined {
   if (!bdeLoaded) return undefined;
   return getBicDB().prepare('SELECT code, name FROM bde_mfi LIMIT 1').get() as
-    | { code: string; name: string }
-    | undefined;
+    { code: string; name: string } | undefined;
 }
 
 // ---------------------------------------------------------------------------

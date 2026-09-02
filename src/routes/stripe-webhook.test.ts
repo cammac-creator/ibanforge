@@ -53,8 +53,7 @@ function storedAmount(sessionId: string):
       'SELECT amount_paid_minor, amount_paid_currency FROM api_keys WHERE stripe_session_id = ?',
     )
     .get(sessionId) as
-    | { amount_paid_minor: number | null; amount_paid_currency: string | null }
-    | undefined;
+    { amount_paid_minor: number | null; amount_paid_currency: string | null } | undefined;
 }
 
 describe('processStripeEvent — checkout.session.completed', () => {

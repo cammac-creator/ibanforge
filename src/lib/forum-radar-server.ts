@@ -91,8 +91,7 @@ function ensureKvTable(): void {
 export function kvGet(key: string): string | undefined {
   ensureKvTable();
   const row = getStatsDB().prepare('SELECT value FROM kv_state WHERE key = ?').get(key) as
-    | { value: string }
-    | undefined;
+    { value: string } | undefined;
   return row?.value;
 }
 

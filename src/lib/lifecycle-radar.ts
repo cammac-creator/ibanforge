@@ -54,11 +54,7 @@ export interface ClientActivityResponse {
 // ---------------------------------------------------------------------------
 
 export type RadarEventKind =
-  | 'QUOTA_FULL'
-  | 'QUOTA_80'
-  | 'PAID_IDLE'
-  | 'NEW_CORPORATE'
-  | 'GONE_QUIET';
+  'QUOTA_FULL' | 'QUOTA_80' | 'PAID_IDLE' | 'NEW_CORPORATE' | 'GONE_QUIET';
 
 export interface RadarEvent {
   kind: RadarEventKind;

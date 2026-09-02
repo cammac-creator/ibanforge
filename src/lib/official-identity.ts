@@ -233,8 +233,7 @@ export function getEcbListDate(): string | null {
   if (!ready().ecb) return null;
   try {
     const row = getBicDB().prepare('SELECT MAX(list_date) AS d FROM ecb_mfi').get() as
-      | { d: string | null }
-      | undefined;
+      { d: string | null } | undefined;
     return row?.d ?? null;
   } catch {
     return null;
@@ -246,8 +245,7 @@ export function getBdeListDate(): string | null {
   if (!ready().bde) return null;
   try {
     const row = getBicDB().prepare('SELECT MAX(list_date) AS d FROM bde_mfi').get() as
-      | { d: string | null }
-      | undefined;
+      { d: string | null } | undefined;
     return row?.d ?? null;
   } catch {
     return null;

@@ -96,10 +96,7 @@ export const PAIRING_SOURCE: ReferenceProvenance = {
 
 /** The pairing verdict between a reference and the account it would travel with. */
 export type ReferencePairing =
-  | 'ok'
-  | 'qrr_requires_qr_iban'
-  | 'scor_forbidden_with_qr_iban'
-  | 'not_applicable';
+  'ok' | 'qrr_requires_qr_iban' | 'scor_forbidden_with_qr_iban' | 'not_applicable';
 
 /** A second reading of the same string, when more than one scheme fits it. */
 export interface ReferenceAlternative {

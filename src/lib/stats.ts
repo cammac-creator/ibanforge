@@ -1616,8 +1616,7 @@ export function getClientProfiles(days = 90): Record<string, ClientProfile> {
     const n = Number((nth.get(p.key_prefix) as { n: number }).n);
     if (n === 0) continue;
     const row = p95.get(p.key_prefix, Math.min(n - 1, Math.floor(n * 0.95))) as
-      | { response_ms: number }
-      | undefined;
+      { response_ms: number } | undefined;
     p.p95_ms = row ? Math.round(row.response_ms) : 0;
   }
 

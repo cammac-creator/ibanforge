@@ -221,8 +221,7 @@ describe('mismatched-method probe still gets quoted (piste A)', () => {
     const table = buildRouteTable(wallet, 'GET', '/v1/iban/validate');
     expect(table['POST /v1/iban/validate'], 'canonical POST entry stays').toBeDefined();
     const synth = table['GET /v1/iban/validate'] as
-      | { accepts?: unknown; resource?: string }
-      | undefined;
+      { accepts?: unknown; resource?: string } | undefined;
     expect(synth, 'synthetic GET entry makes requiresPayment() true').toBeDefined();
     expect(synth!.accepts, 'probe entry is payable').toBeDefined();
     expect(synth!.resource).toBe('https://api.ibanforge.com/v1/iban/validate');

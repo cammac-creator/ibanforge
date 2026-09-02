@@ -792,12 +792,7 @@ export interface ComplianceResult {
 // --- Swiss Clearing (BC-Nummer) ---
 
 export type ChInstitutionType =
-  | 'bank'
-  | 'cantonal_bank'
-  | 'postfinance'
-  | 'raiffeisen'
-  | 'central_bank'
-  | 'foreign_participant';
+  'bank' | 'cantonal_bank' | 'postfinance' | 'raiffeisen' | 'central_bank' | 'foreign_participant';
 
 export type ChIidType = 'headquarters' | 'branch' | 'other';
 

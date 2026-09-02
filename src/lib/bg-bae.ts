@@ -110,8 +110,7 @@ export function bgBaeRegisterAvailable(): boolean {
   if (!ready()) return false;
   try {
     const row = getBicDB().prepare('SELECT 1 AS ok FROM bg_bae LIMIT 1').get() as
-      | { ok: number }
-      | undefined;
+      { ok: number } | undefined;
     return !!row;
   } catch {
     return false;
@@ -202,8 +201,7 @@ export function getBgAsOf(): string | null {
   if (!ready()) return null;
   try {
     const row = getBicDB().prepare('SELECT MAX(as_of) AS d FROM bg_bae').get() as
-      | { d: string | null }
-      | undefined;
+      { d: string | null } | undefined;
     return row?.d ?? null;
   } catch {
     return null;
