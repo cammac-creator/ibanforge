@@ -402,6 +402,11 @@
       "label": "Éditeur / OEM",
       "text": "Vous intégrez IBANforge dans votre propre produit ? Licence éditeur / OEM à partir de 149 $ par mois (50 000 requêtes, SLA écrit, facturation UE) : parlons-en.",
       "cta": "Voir la page éditeurs →"
+    },
+    "audit": {
+      "label": "Audit de fichier de créanciers",
+      "text": "Pas développeur ? Déposez le CSV ou XLSX depuis lequel vous payez et chaque ligne est contrôlée contre les mêmes registres : 149 CHF jusqu'à 5 000 lignes, 349 CHF jusqu'à 20 000, aperçu gratuit d'abord, classeur annoté dès le paiement.",
+      "cta": "Auditer un fichier"
     }
   },
   "playground": {
@@ -1619,7 +1624,8 @@
         "findings": "Constats",
         "bank": "Banque"
       },
-      "more": "Aperçu gratuit : {shown} lignes sur {rows}, IBAN masqués. Le classeur payant montre chaque ligne en entier."
+      "more": "Aperçu gratuit : {shown} lignes sur {rows}, IBAN masqués. Le classeur payant montre chaque ligne en entier.",
+      "meaning": "{errors, plural, =0 {Aucun paiement de ce fichier ne serait rejeté par la banque} one {# paiement de ce fichier serait rejeté par la banque} other {# paiements de ce fichier seraient rejetés par la banque}} ; {warnings, plural, =0 {rien d'autre à vérifier} one {# ligne mérite une vérification} other {# lignes méritent une vérification}} avant le prochain lot de virements."
     },
     "status": {
       "ok": "OK",

@@ -402,6 +402,11 @@
       "label": "Editor / OEM",
       "text": "Sie betten IBANforge in Ihr eigenes Produkt ein? Editor-/OEM-Lizenz ab 149 $ pro Monat (50'000 Anfragen, schriftliches SLA, EU-Rechnungsstellung): Sprechen Sie mit uns.",
       "cta": "Zur Hersteller-Seite →"
+    },
+    "audit": {
+      "label": "Prüfung der Kreditorendatei",
+      "text": "Kein Entwickler? Laden Sie die CSV- oder XLSX-Datei hoch, aus der Sie zahlen, und jede Zeile wird gegen dieselben Register geprüft: 149 CHF bis 5'000 Zeilen, 349 CHF bis 20'000, zuerst kostenlose Vorschau, kommentierte Arbeitsmappe direkt nach der Zahlung.",
+      "cta": "Datei prüfen"
     }
   },
   "playground": {
@@ -1619,7 +1624,8 @@
         "findings": "Befunde",
         "bank": "Bank"
       },
-      "more": "Kostenlose Vorschau: {shown} von {rows} Zeilen, IBAN maskiert. Die bezahlte Arbeitsmappe zeigt jede Zeile vollständig."
+      "more": "Kostenlose Vorschau: {shown} von {rows} Zeilen, IBAN maskiert. Die bezahlte Arbeitsmappe zeigt jede Zeile vollständig.",
+      "meaning": "{errors, plural, =0 {Keine Zahlung dieser Datei würde von der Bank abgewiesen} one {# Zahlung dieser Datei würde von der Bank abgewiesen} other {# Zahlungen dieser Datei würden von der Bank abgewiesen}}; {warnings, plural, =0 {sonst ist nichts zu prüfen} one {# Zeile verdient einen Blick} other {# Zeilen verdienen einen Blick}} vor dem nächsten Zahlungslauf."
     },
     "status": {
       "ok": "OK",

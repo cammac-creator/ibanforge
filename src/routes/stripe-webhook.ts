@@ -30,7 +30,12 @@ import {
 import { notifyPurchaseTelegram } from '../lib/notify.js';
 import { markAuditPaid } from '../lib/audit-jobs.js';
 import { notifyOps } from '../lib/ops-alert.js';
-import { sendApiKeyEmail, sendOemKeyEmail, alertKeyDeliveryFailure } from '../lib/email.js';
+import {
+  sendApiKeyEmail,
+  sendOemKeyEmail,
+  alertKeyDeliveryFailure,
+  sendAuditReadyEmail,
+} from '../lib/email.js';
 
 export const STRIPE_BUNDLES: Record<string, { credits: number; price_usd: number }> = {
   '1k': { credits: 1000, price_usd: 5 },
@@ -247,6 +252,15 @@ export function processStripeEvent(event: Stripe.Event): {
       event.id,
       event.type,
     );
+    if (paidJob?.payer_email) {
+      sendAuditReadyEmail({
+        to: paidJob.payer_email,
+        lang: paidJob.lang,
+        link: `https://ibanforge.com/${paidJob.lang}/audit/done?job=${paidJob.id}&session_id=${encodeURIComponent(session.id)}`,
+        rows: paidJob.rows,
+        price_chf: paidJob.price_chf,
+      });
+    }
     if (paidJob && !process.env.VITEST) {
       const who = paidJob.payer_email
         ? `<mail>@${paidJob.payer_email.split('@')[1]}`

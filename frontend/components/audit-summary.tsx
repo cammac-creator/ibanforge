@@ -44,6 +44,9 @@ export function AuditSummaryView({ status, masked }: { status: AuditStatus; mask
   const codes = Object.entries(s.by_code).sort((a, b) => b[1] - a[1]);
   return (
     <div className="flex flex-col gap-6 print:gap-4">
+      <p className="rounded-lg border border-amber-300/60 bg-amber-50/60 dark:bg-amber-950/20 p-4 text-sm leading-relaxed">
+        {t("preview.meaning", { errors: s.error, warnings: s.warning })}
+      </p>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <Stat label={t("preview.rows")} value={s.rows} />
         <Stat label={t("status.ok")} value={s.ok} tone="ok" />

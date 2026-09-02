@@ -227,6 +227,8 @@ audit.post('/v1/audit/checkout/:job', async (c) => {
   const session = await stripe.checkout.sessions.create({
     mode: 'payment',
     locale,
+    // A 100 % promotion code is how the operator proves the paid path without a card.
+    allow_promotion_codes: true,
     customer_email: email,
     line_items: [
       {

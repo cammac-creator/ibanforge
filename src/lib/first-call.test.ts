@@ -110,6 +110,13 @@ describe('outgoing message bodies carry no em or en dash', () => {
     // makes the rule enforceable, not the dash removal itself.
     buildOemKeyEmail: emailModule.buildOemKeyEmail({ rawKey: FAKE_KEY, monthlyLimit: 50_000 }),
     buildKeyVerificationEmail: emailModule.buildKeyVerificationEmail({ code: '123456' }),
+    buildAuditReadyEmail: emailModule.buildAuditReadyEmail({
+      to: 'buyer@example.com',
+      lang: 'fr',
+      link: 'https://ibanforge.com/fr/audit/done?job=abc&session_id=cs_1',
+      rows: 1240,
+      price_chf: 149,
+    }),
   };
 
   it('the sweep covers every builder the module exports', () => {

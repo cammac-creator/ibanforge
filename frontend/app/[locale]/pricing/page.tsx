@@ -335,6 +335,25 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
         <Faq />
       </section>
 
+      {/* ── Creditor file audit: the one-off, priced, non-developer door (02/09/2026) ── */}
+      <section
+        className="border-t px-4 py-14 w-full"
+        style={{ borderColor: 'var(--hairline)' }}
+      >
+        <div className="max-w-3xl mx-auto flex flex-col items-center text-center gap-3">
+          <span className="eyebrow">{t('audit.label')}</span>
+          <p className="text-sm text-[var(--fg-2)] leading-relaxed max-w-xl text-balance">
+            {t('audit.text')}
+          </p>
+          <Link
+            href={`/${locale}/audit`}
+            className="font-mono text-sm text-amber-500 hover:text-amber-400 underline underline-offset-4 transition-colors"
+          >
+            {t('audit.cta')}
+          </Link>
+        </div>
+      </section>
+
       {/* ── Editor / OEM — contact only, no priced offer (t21 not live yet) ── */}
       <section
         className="border-t px-4 py-14 w-full"

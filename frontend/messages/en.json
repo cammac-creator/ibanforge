@@ -402,6 +402,11 @@
       "label": "Editor / OEM",
       "text": "Embedding IBANforge in your own product? Editor / OEM licensing from $149/month (50,000 requests, written SLA, EU invoicing): talk to us.",
       "cta": "See the vendors page →"
+    },
+    "audit": {
+      "label": "Creditor file audit",
+      "text": "Not a developer? Upload the CSV or XLSX you pay from and get every row checked against the same registers: 149 CHF up to 5,000 rows, 349 CHF up to 20,000, free preview first, annotated workbook right after payment.",
+      "cta": "Audit a file"
     }
   },
   "playground": {
@@ -1619,7 +1624,8 @@
         "findings": "Findings",
         "bank": "Bank"
       },
-      "more": "Free preview: {shown} of {rows} rows, IBANs masked. The paid workbook shows every row in full."
+      "more": "Free preview: {shown} of {rows} rows, IBANs masked. The paid workbook shows every row in full.",
+      "meaning": "{errors, plural, =0 {No payment in this file would be rejected by the bank} one {# payment in this file would be rejected by the bank} other {# payments in this file would be rejected by the bank}}; {warnings, plural, =0 {nothing else needs a look} one {# row deserves a look} other {# rows deserve a look}} before the next payment run."
     },
     "status": {
       "ok": "OK",

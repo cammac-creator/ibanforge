@@ -475,3 +475,81 @@ export async function sendOemKeyEmail(p: {
   if (!ok) reportUndelivered('OEM key delivery', p.to, true);
   return ok;
 }
+
+// ---------------------------------------------------------------------------
+// Creditor-file audit: "your report is ready" (02/09/2026)
+// ---------------------------------------------------------------------------
+
+export interface AuditReadyEmailInput {
+  to: string;
+  lang: 'en' | 'fr' | 'de';
+  link: string;
+  rows: number;
+  price_chf: number;
+}
+
+const AUDIT_READY_COPY = {
+  en: {
+    subject: (rows: number) => `Your creditor file audit is ready (${rows} rows)`,
+    title: 'Your audit is ready',
+    body: (rows: number, price: number) =>
+      `Thanks for your purchase (${price} CHF). The annotated workbook for your ${rows}-row file is ready to download.`,
+    button: 'Open the report',
+    retention:
+      'The report stays available for 24 hours after payment, then it is deleted. The link works from any browser.',
+    support: 'A question, a row you disagree with, an invoice: support@ibanforge.com.',
+  },
+  fr: {
+    subject: (rows: number) => `Votre audit de fichier de créanciers est prêt (${rows} lignes)`,
+    title: 'Votre audit est prêt',
+    body: (rows: number, price: number) =>
+      `Merci pour votre achat (${price} CHF). Le classeur annoté de votre fichier de ${rows} lignes est prêt à télécharger.`,
+    button: 'Ouvrir le rapport',
+    retention:
+      "Le rapport reste disponible 24 heures après le paiement, puis il est effacé. Le lien fonctionne depuis n'importe quel navigateur.",
+    support: 'Une question, une ligne que vous contestez, une facture : support@ibanforge.com.',
+  },
+  de: {
+    subject: (rows: number) => `Ihre Prüfung der Kreditorendatei ist bereit (${rows} Zeilen)`,
+    title: 'Ihre Prüfung ist bereit',
+    body: (rows: number, price: number) =>
+      `Danke für Ihren Kauf (${price} CHF). Die kommentierte Arbeitsmappe Ihrer Datei mit ${rows} Zeilen steht zum Download bereit.`,
+    button: 'Bericht öffnen',
+    retention:
+      'Der Bericht bleibt 24 Stunden nach der Zahlung verfügbar und wird dann gelöscht. Der Link funktioniert in jedem Browser.',
+    support: 'Eine Frage, eine strittige Zeile, eine Rechnung: support@ibanforge.com.',
+  },
+} as const;
+
+export function buildAuditReadyEmail(p: AuditReadyEmailInput): {
+  subject: string;
+  text: string;
+  html: string;
+} {
+  const c = AUDIT_READY_COPY[p.lang] ?? AUDIT_READY_COPY.en;
+  const text = `${c.title}\n\n${c.body(p.rows, p.price_chf)}\n\n${c.button}: ${p.link}\n\n${c.retention}\n${c.support}\n\nIBANforge`;
+  const html = `<!DOCTYPE html><html><body style="margin:0;background:#0f0f13;padding:28px;font-family:-apple-system,Segoe UI,Roboto,sans-serif">
+  <div style="max-width:560px;margin:0 auto;background:#16161b;border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:30px 32px">
+    <div style="font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:#71717a;font-family:monospace">IBANforge</div>
+    <h1 style="color:#fafafa;font-size:22px;margin:10px 0 6px">${c.title}</h1>
+    <p style="color:#a1a1aa;font-size:15px;margin:0 0 22px">${c.body(p.rows, p.price_chf)}</p>
+    <p style="margin:0 0 22px"><a href="${p.link}" style="display:inline-block;background:#f59e0b;color:#111;font-weight:600;padding:12px 18px;border-radius:10px;text-decoration:none">${c.button}</a></p>
+    <p style="color:#71717a;font-size:12px;margin:0 0 6px">${c.retention}</p>
+    <p style="color:#71717a;font-size:12px;margin:0">${c.support}</p>
+    <hr style="border:none;border-top:1px solid rgba(255,255,255,.06);margin:24px 0 14px">
+    <p style="color:#52525b;font-size:12px;margin:0">IBANforge &middot; <a href="https://ibanforge.com" style="color:#71717a">ibanforge.com</a></p>
+  </div></body></html>`;
+  return { subject: c.subject(p.rows), text, html };
+}
+
+/** Fire-and-forget: a lost mail must never fail the webhook; the done page still works. */
+export function sendAuditReadyEmail(p: AuditReadyEmailInput): void {
+  if (process.env.VITEST) return;
+  const { subject, text, html } = buildAuditReadyEmail(p);
+  void deliverViaRelay({ to: p.to, subject, text, html })
+    .then((r) => {
+      if (r.outcome !== 'sent')
+        reportUndelivered('audit-ready mail', p.to, r.outcome !== 'undeliverable');
+    })
+    .catch(() => reportUndelivered('audit-ready mail', p.to, true));
+}
