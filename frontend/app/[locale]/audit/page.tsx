@@ -15,6 +15,13 @@ export async function generateMetadata({
     title: t("metaTitle"),
     description: t("metaDescription"),
     alternates: alternatesFor(locale, "/audit"),
+    openGraph: {
+      title: t("metaTitle"),
+      description: t("ogDescription"),
+      url: `https://ibanforge.com/${locale}/audit`,
+      type: "website",
+    },
+    twitter: { card: "summary_large_image", title: t("metaTitle"), description: t("ogDescription") },
   };
 }
 
@@ -26,8 +33,22 @@ export default async function AuditPage({
   const { locale } = await params;
   const t = await getTranslations("audit");
 
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: t("metaTitle"),
+    description: t("ogDescription"),
+    brand: { "@type": "Brand", name: "IBANforge" },
+    url: `https://ibanforge.com/${locale}/audit`,
+    offers: [
+      { "@type": "Offer", price: "149", priceCurrency: "CHF", description: t("prices.standard"), availability: "https://schema.org/InStock", url: `https://ibanforge.com/${locale}/audit` },
+      { "@type": "Offer", price: "349", priceCurrency: "CHF", description: t("prices.large"), availability: "https://schema.org/InStock", url: `https://ibanforge.com/${locale}/audit` },
+    ],
+  };
+
   return (
     <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8 py-16 flex flex-col gap-10">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <header className="flex flex-col gap-4">
         <Badge variant="outline" className="w-fit">
           {t("eyebrow")}

@@ -742,3 +742,14 @@
 .brand-word em { display: inline-block; font-style: normal; font-family: var(--font-oswald); font-weight: 500; font-size: 0.985em; padding: 0.06em 0.05em 0.28em; margin: -0.06em -0.05em -0.28em; background: linear-gradient(100deg, var(--amber-500) 15%, #EF4444 95%); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .forge .btn-ghost-link { display: inline-block; border: 1px solid var(--fst-3); color: var(--hot); border-radius: 8px; padding: 0.7rem 1.4rem; font-weight: 600; font-size: 0.9rem; text-decoration: none; transition: border-color var(--dur-2) var(--ease-std); }
 .forge .btn-ghost-link:hover { border-color: rgba(245, 158, 11, 0.5); }
+
+
+/* Results of the creditor-file audit slide into view once; nothing moves for people who asked for less motion. */
+@keyframes ibf-rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.ibf-rise { animation: ibf-rise 420ms cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+@media (prefers-reduced-motion: reduce) {
+  .ibf-rise { animation: none; }
+}

@@ -7,7 +7,8 @@
       "playground": "Playground",
       "pricing": "Tarifs",
       "blog": "Blog",
-      "dashboard": "Tableau de bord"
+      "dashboard": "Tableau de bord",
+      "audit": "Audit de fichier"
     },
     "toggleMenu": "Ouvrir le menu"
   },
@@ -1572,7 +1573,7 @@
     }
   },
   "audit": {
-    "metaTitle": "Audit de fichier de créanciers : IBAN, banque, BIC, SEPA et adresse ISO 20022, à prix affiché",
+    "metaTitle": "Audit de fichier de créanciers : 149 CHF, résultat immédiat",
     "metaDescription": "Déposez un CSV ou un XLSX de créanciers. Aperçu gratuit, puis 149 CHF jusqu'à 5 000 lignes pour le classeur annoté : IBAN invalides, codes banque inconnus, BIC discordants, doublons, joignabilité SEPA et adresses structurées pour l'échéance SIX du 14 novembre 2026.",
     "eyebrow": "Audit de fichier de créanciers",
     "title": "Contrôlez votre fichier de créanciers avant le prochain lot de paiements",
@@ -1610,7 +1611,9 @@
         "expired": "Cet audit a expiré. Déposez le fichier à nouveau.",
         "payments": "Le paiement par carte n'est pas disponible pour le moment. Écrivez à support@ibanforge.com.",
         "generic": "Quelque chose n'a pas marché. Réessayez ou écrivez à support@ibanforge.com."
-      }
+      },
+      "sample": "Essayer avec un fichier d’exemple",
+      "dropHere": "Lâchez le fichier ici"
     },
     "preview": {
       "rows": "Lignes",
@@ -1672,7 +1675,8 @@
       "missingTitle": "Aucun audit ici",
       "missing": "Ce lien ne porte aucun audit, ou l'audit a expiré.",
       "back": "Retour à la page d'audit"
-    }
+    },
+    "ogDescription": "Déposez le CSV ou XLSX depuis lequel vous payez. Aperçu gratuit de ce que la banque rejetterait, puis 149 CHF pour le classeur annoté : IBAN, code banque, BIC, joignabilité SEPA, adresse structurée avant le 14 novembre 2026."
   },
   "qrBill": {
     "metaTitle": "Contrôle de QR-facture suisse : adresse structurée ou combinée, QR-IBAN et référence, gratuit",

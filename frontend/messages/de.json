@@ -7,7 +7,8 @@
       "playground": "Playground",
       "pricing": "Preise",
       "blog": "Blog",
-      "dashboard": "Dashboard"
+      "dashboard": "Dashboard",
+      "audit": "Dateiprüfung"
     },
     "toggleMenu": "Menü öffnen"
   },
@@ -1572,7 +1573,7 @@
     }
   },
   "audit": {
-    "metaTitle": "Prüfung der Kreditorendatei: IBAN, Bank, BIC, SEPA und ISO-20022-Adresse, zum angezeigten Preis",
+    "metaTitle": "Prüfung der Kreditorendatei: 149 CHF, Ergebnis sofort",
     "metaDescription": "Laden Sie eine CSV- oder XLSX-Datei mit Kreditoren hoch. Kostenlose Vorschau, dann 149 CHF bis 5'000 Zeilen für die kommentierte Arbeitsmappe: ungültige IBAN, unbekannte Bankleitzahlen, abweichende BIC, Duplikate, SEPA-Erreichbarkeit und strukturierte Adressen für die SIX-Frist vom 14. November 2026.",
     "eyebrow": "Prüfung der Kreditorendatei",
     "title": "Prüfen Sie Ihre Kreditorendatei vor dem nächsten Zahlungslauf",
@@ -1610,7 +1611,9 @@
         "expired": "Diese Prüfung ist abgelaufen. Laden Sie die Datei erneut hoch.",
         "payments": "Kartenzahlung ist derzeit nicht verfügbar. Schreiben Sie an support@ibanforge.com.",
         "generic": "Etwas ist schiefgelaufen. Versuchen Sie es erneut oder schreiben Sie an support@ibanforge.com."
-      }
+      },
+      "sample": "Mit einer Beispieldatei testen",
+      "dropHere": "Hier ablegen"
     },
     "preview": {
       "rows": "Zeilen",
@@ -1672,7 +1675,8 @@
       "missingTitle": "Keine Prüfung hier",
       "missing": "Dieser Link enthält keine Prüfung, oder sie ist abgelaufen.",
       "back": "Zurück zur Prüfungsseite"
-    }
+    },
+    "ogDescription": "Laden Sie die CSV- oder XLSX-Datei hoch, aus der Sie zahlen. Kostenlose Vorschau dessen, was die Bank abweisen würde, dann 149 CHF für die kommentierte Arbeitsmappe: IBAN, Bankleitzahl, BIC, SEPA, strukturierte Adresse vor dem 14. November 2026."
   },
   "qrBill": {
     "metaTitle": "Swiss-QR-Rechnung prüfen: strukturierte oder kombinierte Adresse, QR-IBAN und Referenz, kostenlos",

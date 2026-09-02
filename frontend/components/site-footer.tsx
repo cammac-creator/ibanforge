@@ -51,7 +51,7 @@ export function SiteFooter() {
   return (
     <footer className="border-t border-border bg-background">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="py-10 grid grid-cols-2 gap-8 sm:grid-cols-3">
+        <div className="py-8 sm:py-10 grid grid-cols-2 gap-x-6 gap-y-7 sm:grid-cols-4 sm:gap-8">
           <div className="col-span-2 sm:col-span-1">
             <Link href={`/${locale}`} className="font-bold font-mono text-primary">
               IBANforge
@@ -61,19 +61,25 @@ export function SiteFooter() {
             </p>
           </div>
 
-          {columns.map((col) => (
-            <div key={col.title}>
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+          {columns.map((col, i) => (
+            <div key={col.title} className={i === columns.length - 1 ? "col-span-2 sm:col-span-1" : ""}>
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 sm:mb-3">
                 {col.title}
               </h3>
-              <ul className="space-y-2">
+              <ul
+                className={
+                  i === columns.length - 1
+                    ? "flex flex-wrap gap-x-4 gap-y-1.5 sm:block sm:space-y-2"
+                    : "space-y-1.5 sm:space-y-2"
+                }
+              >
                 {col.links.map((link) => (
                   <li key={link.label}>
                     <Link
                       href={link.href}
                       target={"external" in link ? "_blank" : undefined}
                       rel={"external" in link ? "noopener noreferrer" : undefined}
-                      className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                      className="text-[13px] sm:text-sm text-muted-foreground hover:text-foreground transition-colors"
                     >
                       {link.label}
                     </Link>
@@ -86,11 +92,11 @@ export function SiteFooter() {
 
         <Separator />
 
-        <div className="py-5 flex items-center justify-between gap-4 flex-wrap">
+        <div className="py-4 sm:py-5 flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
           <p className="text-xs text-muted-foreground">
             {t("copyright", { year: new Date().getFullYear() })}
           </p>
-          <p className="text-xs font-mono text-muted-foreground">
+          <p className="text-[11px] leading-snug sm:text-xs font-mono text-muted-foreground sm:text-right">
             {t("dataLine")}
           </p>
         </div>

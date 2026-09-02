@@ -7,7 +7,8 @@
       "playground": "Playground",
       "pricing": "Pricing",
       "blog": "Blog",
-      "dashboard": "Dashboard"
+      "dashboard": "Dashboard",
+      "audit": "File audit"
     },
     "toggleMenu": "Toggle menu"
   },
@@ -1572,7 +1573,7 @@
     }
   },
   "audit": {
-    "metaTitle": "Creditor file audit: IBAN, bank, BIC, SEPA and ISO 20022 address, at a displayed price",
+    "metaTitle": "Creditor file audit: 149 CHF, result at once",
     "metaDescription": "Upload a CSV or XLSX of creditors. Free preview, then 149 CHF up to 5,000 rows for the annotated workbook: invalid IBANs, unknown bank codes, BIC mismatches, duplicates, SEPA reach and structured addresses for the SIX deadline of 14 November 2026.",
     "eyebrow": "Creditor file audit",
     "title": "Audit your creditor file before the next payment run",
@@ -1610,7 +1611,9 @@
         "expired": "This audit has expired. Upload the file again.",
         "payments": "Card payments are not available right now. Write to support@ibanforge.com.",
         "generic": "Something went wrong. Try again or write to support@ibanforge.com."
-      }
+      },
+      "sample": "Try with a sample file",
+      "dropHere": "Drop it here"
     },
     "preview": {
       "rows": "Rows",
@@ -1672,7 +1675,8 @@
       "missingTitle": "No audit here",
       "missing": "This link has no audit attached, or it has expired.",
       "back": "Back to the audit page"
-    }
+    },
+    "ogDescription": "Upload the CSV or XLSX you pay from. Free preview of what the bank would reject, then 149 CHF for the annotated workbook: IBAN, bank code, BIC, SEPA reach, structured address before 14 November 2026."
   },
   "qrBill": {
     "metaTitle": "Swiss QR-bill check: structured or combined address, QR-IBAN and reference, free",
