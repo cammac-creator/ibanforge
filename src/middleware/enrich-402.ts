@@ -8,7 +8,12 @@ import {
   routeTemplateOf,
 } from '../lib/x402-discovery.js';
 import { canonicalPaidPath } from './x402.js';
-import { ENTRY_PAYMENT_LINK, PRICING_PAGE } from '../lib/payment-links.js';
+import {
+  ENTRY_PAYMENT_LINK,
+  PRICING_PAGE,
+  PRO_PAYMENT_LINK,
+  PRO_PRICE_USD,
+} from '../lib/payment-links.js';
 
 /** Dataset sizes, read once and rounded down so a claim cannot outlive its data. */
 const F = datasetFacts();
@@ -554,6 +559,17 @@ function buildAccessRamp(): Record<string, unknown> {
       // here — phrased as what the fee actually buys.
       data_note:
         'The public registers behind this API are available free of charge from their official publishers (see https://ibanforge.com/docs/data-sources). The fee pays for validation logic, aggregation, freshness and API delivery.',
+    },
+    // Pro subscription (2026-09-02): the flat monthly alternative, for a caller
+    // that budgets one number a month rather than topping up packs. Same source
+    // of truth as every other card surface (src/lib/payment-links.ts); card
+    // only, a subscription has no x402 rail. A sibling of credit_packs, not a
+    // child: a plan is not a pack, and ingesters that read credit_packs keep
+    // reading exactly what they read before.
+    monthly_plan: {
+      description: `Pro: $${PRO_PRICE_USD}/month for 10,000 requests, resets on the 1st, cancel anytime`,
+      subscribe_by_card: PRO_PAYMENT_LINK,
+      details: PRICING_PAGE,
     },
     x402: {
       description: 'Pay per call with USDC on Base L2 (machine-to-machine)',
