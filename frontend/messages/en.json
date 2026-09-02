@@ -38,7 +38,8 @@
       "imprint": "Legal notice",
       "compare": "Compare",
       "account": "Your key",
-      "sources": "Sources & permissions"
+      "sources": "Sources & permissions",
+      "audit": "Creditor file audit"
     },
     "copyright": "© {year} IBANforge.",
     "dataLine": "Data: GLEIF · Quelle: Deutsche Bundesbank · SIX · EBA · NBP · SwiftCodes/MIT · Bank of England (List of Banks, 2026-08) — monthly · OFAC · UN · EU · EPC — weekly"
@@ -1561,6 +1562,108 @@
     "cta": {
       "docs": "Data sources & provenance, the long version",
       "changelog": "What changed, dated: the changelog"
+    }
+  },
+  "audit": {
+    "metaTitle": "Creditor file audit: IBAN, bank, BIC, SEPA and ISO 20022 address, at a displayed price",
+    "metaDescription": "Upload a CSV or XLSX of creditors. Free preview, then 149 CHF up to 5,000 rows for the annotated workbook: invalid IBANs, unknown bank codes, BIC mismatches, duplicates, SEPA reach and structured addresses for the SIX deadline of 14 November 2026.",
+    "eyebrow": "Creditor file audit",
+    "title": "Audit your creditor file before the next payment run",
+    "intro": "Upload the CSV or XLSX you pay from. Every row goes through the same registers the IBANforge API serves: IBAN structure and check digits, bank code against the national register, bank name and BIC, SEPA reachability, and the ISO 20022 address rules. You see what needs fixing for free; the annotated workbook costs a displayed price, paid by card, downloadable at once.",
+    "promise": {
+      "title": "What every row gets",
+      "item1": "IBAN structure and check digits, with the exact reason when it fails",
+      "item2": "Bank code checked against the national register; name and BIC of the institution",
+      "item3": "BIC in your file compared with the register, duplicates, address country against IBAN country",
+      "item4": "SEPA reachability and the institution type (bank or payment institution)",
+      "item5": "Postal address checked against the Swiss structured-address rules (or ISO 20022 elsewhere) when your file has address columns"
+    },
+    "prices": {
+      "title": "Displayed price, no quote",
+      "standard": "up to 5,000 rows",
+      "large": "5,001 to 20,000 rows",
+      "note": "One file, one payment by card on Stripe. The annotated workbook (.xlsx) and the summary are ready right after payment and stay downloadable for 24 hours."
+    },
+    "deadline": {
+      "title": "14 November 2026: SIX stops processing QR-bill payments with unstructured addresses",
+      "text": "From that date, standing orders and payment templates built on QR-bills with a non-structured address are no longer processed. If your creditor file has street, postal code and town columns, the audit tells you which rows are not ready."
+    },
+    "upload": {
+      "label": "Drop your creditor file here",
+      "hint": "CSV or XLSX, up to 5 MB and 20,000 rows. A column named IBAN is enough; name, BIC and address columns are used when present.",
+      "button": "Analyse for free",
+      "analyzing": "Analysing",
+      "error": {
+        "network": "The server did not answer. Try again in a minute.",
+        "noIban": "No column holds IBANs. Name one IBAN, or make sure the account column contains IBANs.",
+        "empty": "The file has no data rows.",
+        "tooManyRows": "The file has more than 20,000 rows. Split it and upload the parts.",
+        "tooLarge": "The file is larger than 5 MB.",
+        "unreadable": "The file could not be read as CSV or XLSX.",
+        "expired": "This audit has expired. Upload the file again.",
+        "payments": "Card payments are not available right now. Write to support@ibanforge.com.",
+        "generic": "Something went wrong. Try again or write to support@ibanforge.com."
+      }
+    },
+    "preview": {
+      "rows": "Rows",
+      "byType": "Findings by type",
+      "noAddress": "No address columns found: the ISO 20022 address check was skipped.",
+      "clean": "No finding on any row.",
+      "table": {
+        "line": "Line",
+        "iban": "IBAN",
+        "status": "Status",
+        "findings": "Findings",
+        "bank": "Bank"
+      },
+      "more": "Free preview: {shown} of {rows} rows, IBANs masked. The paid workbook shows every row in full."
+    },
+    "status": {
+      "ok": "OK",
+      "warning": "Check",
+      "error": "Do not pay"
+    },
+    "findings": {
+      "iban_missing": "IBAN missing",
+      "iban_invalid": "IBAN invalid",
+      "bank_code_not_allocated": "Bank code not in the national register",
+      "modulus_check_failed": "UK account checksum fails",
+      "sepa_not_reachable": "Not reachable by SEPA transfer",
+      "test_bic": "Test BIC",
+      "bic_mismatch": "BIC in file differs from the register",
+      "country_mismatch": "Address country differs from IBAN country",
+      "duplicate": "Duplicate IBAN",
+      "issuer_not_bank": "Held at a payment institution, not a bank",
+      "country_risk": "Elevated country risk",
+      "address_not_structured": "Address not structured (ISO 20022)"
+    },
+    "pay": {
+      "title": "Get the annotated workbook: {price} CHF for {rows} rows",
+      "text": "Payment by card on Stripe. The download opens right after, with every row, the bank and BIC from the register, the detail of each finding, and a summary sheet.",
+      "email": "E-mail for the receipt (optional)",
+      "button": "Pay {price} CHF and download",
+      "redirecting": "Opening the payment page",
+      "retention": "The report is kept 24 hours after payment, then deleted. An unpaid upload is deleted after 2 hours."
+    },
+    "privacy": {
+      "title": "What happens to your file",
+      "text": "The file is read in memory on our servers in the Netherlands (Railway, europe-west4) and is not stored. Only the annotated report is kept: 2 hours if you do not pay, 24 hours after payment, then deleted automatically. Nothing is used for anything else.",
+      "support": "Questions, a file that will not read, an invoice: support@ibanforge.com."
+    },
+    "done": {
+      "metaTitle": "Your creditor file audit",
+      "title": "Your audit is ready",
+      "waitingTitle": "Confirming your payment",
+      "waiting": "Stripe is confirming the payment; this takes a few seconds.",
+      "paid": "Download the annotated workbook below. It stays available for 24 hours.",
+      "notPaid": "The payment is not confirmed yet. Keep this page open and reload it in a minute; if it stays unconfirmed, write to support@ibanforge.com with the time of your payment.",
+      "download": "Download the workbook (.xlsx)",
+      "print": "Print the summary",
+      "retention": "The report is deleted 24 hours after payment.",
+      "missingTitle": "No audit here",
+      "missing": "This link has no audit attached, or it has expired.",
+      "back": "Back to the audit page"
     }
   }
 }

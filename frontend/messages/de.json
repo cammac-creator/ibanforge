@@ -38,7 +38,8 @@
       "imprint": "Impressum",
       "compare": "Vergleich",
       "account": "Ihr Schlüssel",
-      "sources": "Quellen & Genehmigungen"
+      "sources": "Quellen & Genehmigungen",
+      "audit": "Kreditorendatei prüfen"
     },
     "copyright": "© {year} IBANforge.",
     "dataLine": "Daten: GLEIF · Quelle: Deutsche Bundesbank · SIX · EBA · NBP · SwiftCodes/MIT · Bank of England (List of Banks, 2026-08) — monatlich · OFAC · UN · EU · EPC — wöchentlich"
@@ -1561,6 +1562,108 @@
     "cta": {
       "docs": "Datenquellen und Provenienz, die lange Fassung",
       "changelog": "Was sich geändert hat, datiert: das Changelog"
+    }
+  },
+  "audit": {
+    "metaTitle": "Prüfung der Kreditorendatei: IBAN, Bank, BIC, SEPA und ISO-20022-Adresse, zum angezeigten Preis",
+    "metaDescription": "Laden Sie eine CSV- oder XLSX-Datei mit Kreditoren hoch. Kostenlose Vorschau, dann 149 CHF bis 5'000 Zeilen für die kommentierte Arbeitsmappe: ungültige IBAN, unbekannte Bankleitzahlen, abweichende BIC, Duplikate, SEPA-Erreichbarkeit und strukturierte Adressen für die SIX-Frist vom 14. November 2026.",
+    "eyebrow": "Prüfung der Kreditorendatei",
+    "title": "Prüfen Sie Ihre Kreditorendatei vor dem nächsten Zahlungslauf",
+    "intro": "Laden Sie die CSV- oder XLSX-Datei hoch, aus der Sie zahlen. Jede Zeile durchläuft dieselben Register wie die IBANforge-API: IBAN-Struktur und Prüfziffer, Bankleitzahl gegen das nationale Register, Bankname und BIC, SEPA-Erreichbarkeit und die Adressregeln nach ISO 20022. Was zu korrigieren ist, sehen Sie kostenlos; die kommentierte Arbeitsmappe hat einen angezeigten Preis, per Karte bezahlt, sofort herunterladbar.",
+    "promise": {
+      "title": "Was jede Zeile erhält",
+      "item1": "IBAN-Struktur und Prüfziffer, mit dem genauen Grund bei Fehlern",
+      "item2": "Bankleitzahl gegen das nationale Register geprüft; Name und BIC des Instituts",
+      "item3": "BIC Ihrer Datei mit dem Register verglichen, Duplikate, Adressland gegen IBAN-Land",
+      "item4": "SEPA-Erreichbarkeit und Institutstyp (Bank oder Zahlungsinstitut)",
+      "item5": "Postadresse gegen die Schweizer Regeln für strukturierte Adressen (bzw. ISO 20022 anderswo) geprüft, wenn Ihre Datei Adressspalten hat"
+    },
+    "prices": {
+      "title": "Angezeigter Preis, keine Offerte",
+      "standard": "bis 5'000 Zeilen",
+      "large": "5'001 bis 20'000 Zeilen",
+      "note": "Eine Datei, eine Kartenzahlung über Stripe. Die kommentierte Arbeitsmappe (.xlsx) und die Zusammenfassung sind sofort nach der Zahlung bereit und bleiben 24 Stunden herunterladbar."
+    },
+    "deadline": {
+      "title": "14. November 2026: SIX verarbeitet keine QR-Rechnungs-Zahlungen mit unstrukturierter Adresse mehr",
+      "text": "Ab diesem Datum werden Daueraufträge und Zahlungsvorlagen auf Basis von QR-Rechnungen mit unstrukturierter Adresse nicht mehr verarbeitet. Hat Ihre Kreditorendatei Spalten für Strasse, PLZ und Ort, sagt Ihnen die Prüfung, welche Zeilen nicht bereit sind."
+    },
+    "upload": {
+      "label": "Legen Sie Ihre Kreditorendatei hier ab",
+      "hint": "CSV oder XLSX, bis 5 MB und 20'000 Zeilen. Eine Spalte namens IBAN genügt; Spalten für Name, BIC und Adresse werden genutzt, wenn vorhanden.",
+      "button": "Kostenlos analysieren",
+      "analyzing": "Analyse läuft",
+      "error": {
+        "network": "Der Server hat nicht geantwortet. Versuchen Sie es in einer Minute erneut.",
+        "noIban": "Keine Spalte enthält IBAN. Nennen Sie eine Spalte IBAN oder prüfen Sie, ob die Kontospalte IBAN enthält.",
+        "empty": "Die Datei enthält keine Datenzeilen.",
+        "tooManyRows": "Die Datei hat mehr als 20'000 Zeilen. Teilen Sie sie und laden Sie die Teile hoch.",
+        "tooLarge": "Die Datei ist grösser als 5 MB.",
+        "unreadable": "Die Datei konnte nicht als CSV oder XLSX gelesen werden.",
+        "expired": "Diese Prüfung ist abgelaufen. Laden Sie die Datei erneut hoch.",
+        "payments": "Kartenzahlung ist derzeit nicht verfügbar. Schreiben Sie an support@ibanforge.com.",
+        "generic": "Etwas ist schiefgelaufen. Versuchen Sie es erneut oder schreiben Sie an support@ibanforge.com."
+      }
+    },
+    "preview": {
+      "rows": "Zeilen",
+      "byType": "Befunde nach Typ",
+      "noAddress": "Keine Adressspalten gefunden: die ISO-20022-Adressprüfung wurde übersprungen.",
+      "clean": "Kein Befund in keiner Zeile.",
+      "table": {
+        "line": "Zeile",
+        "iban": "IBAN",
+        "status": "Status",
+        "findings": "Befunde",
+        "bank": "Bank"
+      },
+      "more": "Kostenlose Vorschau: {shown} von {rows} Zeilen, IBAN maskiert. Die bezahlte Arbeitsmappe zeigt jede Zeile vollständig."
+    },
+    "status": {
+      "ok": "OK",
+      "warning": "Prüfen",
+      "error": "Nicht zahlen"
+    },
+    "findings": {
+      "iban_missing": "IBAN fehlt",
+      "iban_invalid": "IBAN ungültig",
+      "bank_code_not_allocated": "Bankleitzahl nicht im nationalen Register",
+      "modulus_check_failed": "Britische Kontoprüfziffer fehlgeschlagen",
+      "sepa_not_reachable": "Per SEPA-Überweisung nicht erreichbar",
+      "test_bic": "Test-BIC",
+      "bic_mismatch": "BIC in der Datei weicht vom Register ab",
+      "country_mismatch": "Adressland weicht vom IBAN-Land ab",
+      "duplicate": "Doppelte IBAN",
+      "issuer_not_bank": "Konto bei einem Zahlungsinstitut, nicht bei einer Bank",
+      "country_risk": "Erhöhtes Länderrisiko",
+      "address_not_structured": "Adresse nicht strukturiert (ISO 20022)"
+    },
+    "pay": {
+      "title": "Kommentierte Arbeitsmappe erhalten: {price} CHF für {rows} Zeilen",
+      "text": "Kartenzahlung über Stripe. Der Download öffnet sich direkt danach, mit jeder Zeile, Bank und BIC aus dem Register, dem Detail jedes Befunds und einem Zusammenfassungsblatt.",
+      "email": "E-Mail für die Quittung (optional)",
+      "button": "{price} CHF zahlen und herunterladen",
+      "redirecting": "Zahlungsseite wird geöffnet",
+      "retention": "Der Bericht wird 24 Stunden nach der Zahlung aufbewahrt und dann gelöscht. Ein unbezahlter Upload wird nach 2 Stunden gelöscht."
+    },
+    "privacy": {
+      "title": "Was mit Ihrer Datei geschieht",
+      "text": "Die Datei wird im Arbeitsspeicher unserer Server in den Niederlanden (Railway, europe-west4) gelesen und nicht gespeichert. Nur der kommentierte Bericht wird aufbewahrt: 2 Stunden ohne Zahlung, 24 Stunden nach der Zahlung, dann automatisch gelöscht. Nichts wird für etwas anderes verwendet.",
+      "support": "Fragen, eine Datei, die sich nicht lesen lässt, eine Rechnung: support@ibanforge.com."
+    },
+    "done": {
+      "metaTitle": "Ihre Prüfung der Kreditorendatei",
+      "title": "Ihre Prüfung ist bereit",
+      "waitingTitle": "Zahlung wird bestätigt",
+      "waiting": "Stripe bestätigt die Zahlung; das dauert einige Sekunden.",
+      "paid": "Laden Sie die kommentierte Arbeitsmappe unten herunter. Sie bleibt 24 Stunden verfügbar.",
+      "notPaid": "Die Zahlung ist noch nicht bestätigt. Lassen Sie diese Seite offen und laden Sie sie in einer Minute neu; bleibt es dabei, schreiben Sie an support@ibanforge.com mit der Uhrzeit Ihrer Zahlung.",
+      "download": "Arbeitsmappe herunterladen (.xlsx)",
+      "print": "Zusammenfassung drucken",
+      "retention": "Der Bericht wird 24 Stunden nach der Zahlung gelöscht.",
+      "missingTitle": "Keine Prüfung hier",
+      "missing": "Dieser Link enthält keine Prüfung, oder sie ist abgelaufen.",
+      "back": "Zurück zur Prüfungsseite"
     }
   }
 }

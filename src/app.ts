@@ -64,6 +64,7 @@ import { stripeRetrieve } from './routes/stripe-retrieve.js';
 import { stripeSuccess } from './routes/stripe-success.js';
 import { ibanStructure } from './routes/iban-structure.js';
 import { addressCheck } from './routes/address-check.js';
+import { audit } from './routes/audit.js';
 import { rateLimitMiddleware } from './middleware/rate-limit.js';
 import { recordRequest, classifyClient, hashIp, extractClientIp } from './lib/stats.js';
 import { bicGuardMiddleware, iidGuardMiddleware } from './middleware/identifier-guard.js';
@@ -585,13 +586,16 @@ export function buildApp(): Hono<HonoEnv> {
   // (a 100-IBAN batch is ~5 KB, a Stripe webhook ~15 KB) while turning a memory
   // DoS into a clean 413. Placed after the rate limiter so a flood is throttled
   // before we even read the body.
-  app.use(
-    '*',
-    bodyLimit({
-      maxSize: 256 * 1024,
-      onError: (c) =>
-        c.json({ error: 'payload_too_large', message: 'Request body exceeds 256 KB.' }, 413),
-    }),
+  const generalBodyLimit = bodyLimit({
+    maxSize: 256 * 1024,
+    onError: (c) =>
+      c.json({ error: 'payload_too_large', message: 'Request body exceeds 256 KB.' }, 413),
+  });
+  // The creditor-file audit is the one route that legitimately receives a
+  // file: its handler enforces its own 5 MB cap on Content-Length and on the
+  // multipart part. Everything else keeps the 256 KB ceiling.
+  app.use('*', (c, next) =>
+    c.req.path === '/v1/audit/upload' ? next() : generalBodyLimit(c, next),
   );
   app.use('*', compress());
 
@@ -848,6 +852,7 @@ export function buildApp(): Hono<HonoEnv> {
   // Pure rule evaluation over an address the caller supplies — it reads no
   // database of ours, which is exactly why it is free.
   app.route('/', addressCheck);
+  app.route('/', audit);
   app.route('/', health);
   app.route('/', stats);
   app.route('/', adminRevenue);

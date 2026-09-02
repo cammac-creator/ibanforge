@@ -38,7 +38,8 @@
       "imprint": "Mentions légales",
       "compare": "Comparatif",
       "account": "Votre clé",
-      "sources": "Sources et permissions"
+      "sources": "Sources et permissions",
+      "audit": "Audit de fichier"
     },
     "copyright": "© {year} IBANforge.",
     "dataLine": "Données : GLEIF · Quelle: Deutsche Bundesbank · SIX · EBA · NBP · SwiftCodes/MIT · Bank of England (List of Banks, 2026-08) — mensuel · OFAC · UN · UE · EPC — hebdomadaire"
@@ -1561,6 +1562,108 @@
     "cta": {
       "docs": "Sources de données et provenance, la version longue",
       "changelog": "Ce qui a changé, daté : le changelog"
+    }
+  },
+  "audit": {
+    "metaTitle": "Audit de fichier de créanciers : IBAN, banque, BIC, SEPA et adresse ISO 20022, à prix affiché",
+    "metaDescription": "Déposez un CSV ou un XLSX de créanciers. Aperçu gratuit, puis 149 CHF jusqu'à 5 000 lignes pour le classeur annoté : IBAN invalides, codes banque inconnus, BIC discordants, doublons, joignabilité SEPA et adresses structurées pour l'échéance SIX du 14 novembre 2026.",
+    "eyebrow": "Audit de fichier de créanciers",
+    "title": "Contrôlez votre fichier de créanciers avant le prochain lot de paiements",
+    "intro": "Déposez le CSV ou le XLSX depuis lequel vous payez. Chaque ligne passe par les mêmes registres que l'API IBANforge : structure et clé de l'IBAN, code banque contre le registre national, nom de banque et BIC, joignabilité SEPA, et règles d'adresse ISO 20022. Vous voyez gratuitement ce qui doit être corrigé ; le classeur annoté a un prix affiché, payé par carte, téléchargeable sur-le-champ.",
+    "promise": {
+      "title": "Ce que chaque ligne reçoit",
+      "item1": "Structure et clé de contrôle de l'IBAN, avec la raison exacte en cas d'échec",
+      "item2": "Code banque vérifié contre le registre national ; nom et BIC de l'établissement",
+      "item3": "BIC de votre fichier comparé au registre, doublons, pays de l'adresse contre pays de l'IBAN",
+      "item4": "Joignabilité SEPA et type d'établissement (banque ou établissement de paiement)",
+      "item5": "Adresse postale contrôlée contre les règles suisses d'adresse structurée (ou ISO 20022 ailleurs) quand votre fichier a des colonnes d'adresse"
+    },
+    "prices": {
+      "title": "Prix affiché, sans devis",
+      "standard": "jusqu'à 5 000 lignes",
+      "large": "de 5 001 à 20 000 lignes",
+      "note": "Un fichier, un paiement par carte sur Stripe. Le classeur annoté (.xlsx) et la synthèse sont prêts dès le paiement et restent téléchargeables 24 heures."
+    },
+    "deadline": {
+      "title": "14 novembre 2026 : SIX cesse de traiter les paiements QR-facture à adresse non structurée",
+      "text": "Dès cette date, les ordres permanents et modèles de paiement fondés sur des QR-factures à adresse non structurée ne sont plus traités. Si votre fichier de créanciers a des colonnes rue, NPA et localité, l'audit vous dit quelles lignes ne sont pas prêtes."
+    },
+    "upload": {
+      "label": "Déposez votre fichier de créanciers ici",
+      "hint": "CSV ou XLSX, jusqu'à 5 Mo et 20 000 lignes. Une colonne nommée IBAN suffit ; les colonnes nom, BIC et adresse sont utilisées si elles existent.",
+      "button": "Analyser gratuitement",
+      "analyzing": "Analyse en cours",
+      "error": {
+        "network": "Le serveur n'a pas répondu. Réessayez dans une minute.",
+        "noIban": "Aucune colonne ne contient d'IBAN. Nommez-en une IBAN, ou vérifiez que la colonne des comptes contient des IBAN.",
+        "empty": "Le fichier n'a aucune ligne de données.",
+        "tooManyRows": "Le fichier dépasse 20 000 lignes. Coupez-le et déposez les parties.",
+        "tooLarge": "Le fichier dépasse 5 Mo.",
+        "unreadable": "Le fichier n'a pas pu être lu comme CSV ou XLSX.",
+        "expired": "Cet audit a expiré. Déposez le fichier à nouveau.",
+        "payments": "Le paiement par carte n'est pas disponible pour le moment. Écrivez à support@ibanforge.com.",
+        "generic": "Quelque chose n'a pas marché. Réessayez ou écrivez à support@ibanforge.com."
+      }
+    },
+    "preview": {
+      "rows": "Lignes",
+      "byType": "Constats par type",
+      "noAddress": "Aucune colonne d'adresse trouvée : le contrôle d'adresse ISO 20022 n'a pas été fait.",
+      "clean": "Aucun constat sur aucune ligne.",
+      "table": {
+        "line": "Ligne",
+        "iban": "IBAN",
+        "status": "Statut",
+        "findings": "Constats",
+        "bank": "Banque"
+      },
+      "more": "Aperçu gratuit : {shown} lignes sur {rows}, IBAN masqués. Le classeur payant montre chaque ligne en entier."
+    },
+    "status": {
+      "ok": "OK",
+      "warning": "À vérifier",
+      "error": "Ne pas payer"
+    },
+    "findings": {
+      "iban_missing": "IBAN manquant",
+      "iban_invalid": "IBAN invalide",
+      "bank_code_not_allocated": "Code banque absent du registre national",
+      "modulus_check_failed": "Contrôle de compte britannique en échec",
+      "sepa_not_reachable": "Hors de portée d'un virement SEPA",
+      "test_bic": "BIC de test",
+      "bic_mismatch": "BIC du fichier différent du registre",
+      "country_mismatch": "Pays de l'adresse différent du pays de l'IBAN",
+      "duplicate": "IBAN en doublon",
+      "issuer_not_bank": "Compte chez un établissement de paiement, pas une banque",
+      "country_risk": "Risque pays élevé",
+      "address_not_structured": "Adresse non structurée (ISO 20022)"
+    },
+    "pay": {
+      "title": "Obtenir le classeur annoté : {price} CHF pour {rows} lignes",
+      "text": "Paiement par carte sur Stripe. Le téléchargement s'ouvre juste après, avec chaque ligne, la banque et le BIC du registre, le détail de chaque constat et une feuille de synthèse.",
+      "email": "E-mail pour le reçu (facultatif)",
+      "button": "Payer {price} CHF et télécharger",
+      "redirecting": "Ouverture de la page de paiement",
+      "retention": "Le rapport est conservé 24 heures après le paiement, puis effacé. Un dépôt non payé est effacé après 2 heures."
+    },
+    "privacy": {
+      "title": "Ce qui arrive à votre fichier",
+      "text": "Le fichier est lu en mémoire sur nos serveurs aux Pays-Bas (Railway, europe-west4) et n'est pas enregistré. Seul le rapport annoté est conservé : 2 heures si vous ne payez pas, 24 heures après paiement, puis effacé automatiquement. Rien ne sert à autre chose.",
+      "support": "Une question, un fichier qui ne se lit pas, une facture : support@ibanforge.com."
+    },
+    "done": {
+      "metaTitle": "Votre audit de fichier de créanciers",
+      "title": "Votre audit est prêt",
+      "waitingTitle": "Confirmation du paiement",
+      "waiting": "Stripe confirme le paiement ; cela prend quelques secondes.",
+      "paid": "Téléchargez le classeur annoté ci-dessous. Il reste disponible 24 heures.",
+      "notPaid": "Le paiement n'est pas encore confirmé. Gardez cette page ouverte et rechargez-la dans une minute ; si rien ne change, écrivez à support@ibanforge.com avec l'heure de votre paiement.",
+      "download": "Télécharger le classeur (.xlsx)",
+      "print": "Imprimer la synthèse",
+      "retention": "Le rapport est effacé 24 heures après le paiement.",
+      "missingTitle": "Aucun audit ici",
+      "missing": "Ce lien ne porte aucun audit, ou l'audit a expiré.",
+      "back": "Retour à la page d'audit"
     }
   }
 }

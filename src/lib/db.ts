@@ -583,6 +583,33 @@ function openStatsDB(): DatabaseType.Database {
         utm_campaign TEXT
       );
       CREATE INDEX IF NOT EXISTS idx_signup_attribution_created ON signup_attribution(created_at);
+      -- One row per creditor-file audit ("audit de fichier", 02/09/2026): the
+      -- annotated workbook waits here between the upload and the Stripe
+      -- payment, then for the re-download window. Bank details of third
+      -- parties live in the report blob, so rows are short-lived by design:
+      -- purgeExpiredAuditJobs() removes unpaid jobs after expires_at (2 h) and
+      -- paid ones 24 h after payment. Nothing else reads the blob.
+      CREATE TABLE IF NOT EXISTS audit_jobs (
+        id TEXT PRIMARY KEY,
+        created_at TEXT DEFAULT (datetime('now')),
+        expires_at TEXT NOT NULL,
+        filename TEXT,
+        rows INTEGER NOT NULL,
+        tier TEXT NOT NULL,
+        price_chf INTEGER NOT NULL,
+        lang TEXT NOT NULL DEFAULT 'en',
+        summary_json TEXT NOT NULL,
+        preview_json TEXT NOT NULL,
+        report BLOB NOT NULL,
+        stripe_session_id TEXT,
+        paid_at TEXT,
+        payer_email TEXT,
+        amount_paid_minor INTEGER,
+        amount_paid_currency TEXT,
+        downloads INTEGER NOT NULL DEFAULT 0
+      );
+      CREATE INDEX IF NOT EXISTS idx_audit_jobs_expires ON audit_jobs(expires_at);
+      CREATE INDEX IF NOT EXISTS idx_audit_jobs_session ON audit_jobs(stripe_session_id);
       -- One row per activation nudge ("your key never made its first call"),
       -- and it is the anti-repetition ledger, not a log: the daily pass refuses
       -- any address that already appears here.

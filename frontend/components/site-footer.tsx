@@ -14,6 +14,7 @@ export function SiteFooter() {
         { href: `/${locale}/docs`, label: t("link.docs") },
         { href: `/${locale}/playground`, label: t("link.playground") },
         { href: `/${locale}/pricing`, label: t("link.pricing") },
+        { href: `/${locale}/audit`, label: t("link.audit") },
         { href: `/${locale}/vendors`, label: t("link.vendors") },
         { href: `/${locale}/compare`, label: t("link.compare") },
         { href: `/${locale}/openapi`, label: t("link.openapi") },

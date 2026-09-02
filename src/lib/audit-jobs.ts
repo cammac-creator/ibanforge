@@ -1,0 +1,204 @@
+/**
+ * Storage for creditor-file audits between the upload and the download.
+ *
+ * Why a table at all: the customer uploads, looks at the free preview, then
+ * leaves for Stripe's hosted page and comes back. The annotated workbook has
+ * to survive that round trip, and a redeploy in between, so it lives on the
+ * persistent volume with the stats database, never on the container disk.
+ *
+ * Why short-lived: the report holds bank details of the customer's
+ * creditors. An unpaid job is gone after two hours, a paid one twenty-four
+ * hours after payment, and the page says exactly that.
+ */
+import { randomBytes } from 'node:crypto';
+import { getStatsDB } from './db.js';
+import type { AuditSummary, PreviewRow, AuditLang, AuditTierCode } from './audit-file.js';
+
+export const UNPAID_TTL_HOURS = 2;
+export const PAID_TTL_HOURS = 24;
+
+export interface AuditJob {
+  id: string;
+  created_at: string;
+  expires_at: string;
+  filename: string | null;
+  rows: number;
+  tier: AuditTierCode;
+  price_chf: number;
+  lang: AuditLang;
+  summary: AuditSummary;
+  preview: PreviewRow[];
+  stripe_session_id: string | null;
+  paid_at: string | null;
+  payer_email: string | null;
+  downloads: number;
+}
+
+interface Row {
+  id: string;
+  created_at: string;
+  expires_at: string;
+  filename: string | null;
+  rows: number;
+  tier: string;
+  price_chf: number;
+  lang: string;
+  summary_json: string;
+  preview_json: string;
+  stripe_session_id: string | null;
+  paid_at: string | null;
+  payer_email: string | null;
+  downloads: number;
+}
+
+function isoIn(hours: number, from = Date.now()): string {
+  return new Date(from + hours * 3_600_000).toISOString().replace('T', ' ').slice(0, 19);
+}
+
+function toJob(r: Row): AuditJob {
+  return {
+    id: r.id,
+    created_at: r.created_at,
+    expires_at: r.expires_at,
+    filename: r.filename,
+    rows: r.rows,
+    tier: r.tier as AuditTierCode,
+    price_chf: r.price_chf,
+    lang: r.lang as AuditLang,
+    summary: JSON.parse(r.summary_json) as AuditSummary,
+    preview: JSON.parse(r.preview_json) as PreviewRow[],
+    stripe_session_id: r.stripe_session_id,
+    paid_at: r.paid_at,
+    payer_email: r.payer_email,
+    downloads: r.downloads,
+  };
+}
+
+export function createAuditJob(input: {
+  filename: string | null;
+  rows: number;
+  tier: AuditTierCode;
+  price_chf: number;
+  lang: AuditLang;
+  summary: AuditSummary;
+  preview: PreviewRow[];
+  report: Buffer;
+}): AuditJob {
+  const id = randomBytes(18).toString('hex');
+  const db = getStatsDB();
+  db.prepare(
+    `INSERT INTO audit_jobs (id, expires_at, filename, rows, tier, price_chf, lang, summary_json, preview_json, report)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(
+    id,
+    isoIn(UNPAID_TTL_HOURS),
+    input.filename,
+    input.rows,
+    input.tier,
+    input.price_chf,
+    input.lang,
+    JSON.stringify(input.summary),
+    JSON.stringify(input.preview),
+    input.report,
+  );
+  return getAuditJob(id)!;
+}
+
+const COLUMNS =
+  'id, created_at, expires_at, filename, rows, tier, price_chf, lang, summary_json, preview_json, stripe_session_id, paid_at, payer_email, downloads';
+
+export function getAuditJob(id: string): AuditJob | null {
+  const r = getStatsDB().prepare(`SELECT ${COLUMNS} FROM audit_jobs WHERE id = ?`).get(id) as
+    Row | undefined;
+  return r ? toJob(r) : null;
+}
+
+export function getAuditReport(id: string): Buffer | null {
+  const r = getStatsDB().prepare('SELECT report FROM audit_jobs WHERE id = ?').get(id) as
+    { report: Buffer } | undefined;
+  return r ? r.report : null;
+}
+
+export function attachAuditSession(id: string, sessionId: string): void {
+  getStatsDB()
+    .prepare('UPDATE audit_jobs SET stripe_session_id = ? WHERE id = ?')
+    .run(sessionId, id);
+}
+
+/** Mark paid. Idempotent: a second call keeps the first payment's data. */
+export function markAuditPaid(
+  id: string,
+  payment: {
+    session_id: string;
+    email: string | null;
+    amount_minor: number | null;
+    currency: string | null;
+  },
+): AuditJob | null {
+  const db = getStatsDB();
+  const now = new Date().toISOString().replace('T', ' ').slice(0, 19);
+  db.prepare(
+    `UPDATE audit_jobs
+        SET paid_at = COALESCE(paid_at, ?),
+            stripe_session_id = COALESCE(stripe_session_id, ?),
+            payer_email = COALESCE(payer_email, ?),
+            amount_paid_minor = COALESCE(amount_paid_minor, ?),
+            amount_paid_currency = COALESCE(amount_paid_currency, ?),
+            expires_at = CASE WHEN paid_at IS NULL THEN ? ELSE expires_at END
+      WHERE id = ?`,
+  ).run(
+    now,
+    payment.session_id,
+    payment.email,
+    payment.amount_minor,
+    payment.currency,
+    isoIn(PAID_TTL_HOURS),
+    id,
+  );
+  return getAuditJob(id);
+}
+
+export function countAuditDownload(id: string): void {
+  getStatsDB().prepare('UPDATE audit_jobs SET downloads = downloads + 1 WHERE id = ?').run(id);
+}
+
+/** Remove what nobody may read any more. Cheap; called on every upload and status read. */
+export function purgeExpiredAuditJobs(now = new Date()): number {
+  const cutoff = now.toISOString().replace('T', ' ').slice(0, 19);
+  const info = getStatsDB().prepare('DELETE FROM audit_jobs WHERE expires_at < ?').run(cutoff);
+  return info.changes;
+}
+
+/** For the admin dashboard: sales, without any report content. */
+export function listPaidAuditJobs(limit = 50): Array<
+  Omit<AuditJob, 'preview' | 'summary'> & {
+    amount_paid_minor: number | null;
+    amount_paid_currency: string | null;
+  }
+> {
+  const rows = getStatsDB()
+    .prepare(
+      `SELECT id, created_at, expires_at, filename, rows, tier, price_chf, lang, stripe_session_id, paid_at, payer_email, downloads,
+              amount_paid_minor, amount_paid_currency
+         FROM audit_jobs WHERE paid_at IS NOT NULL ORDER BY paid_at DESC LIMIT ?`,
+    )
+    .all(limit) as Array<
+    Row & { amount_paid_minor: number | null; amount_paid_currency: string | null }
+  >;
+  return rows.map((r) => ({
+    id: r.id,
+    created_at: r.created_at,
+    expires_at: r.expires_at,
+    filename: r.filename,
+    rows: r.rows,
+    tier: r.tier as AuditTierCode,
+    price_chf: r.price_chf,
+    lang: r.lang as AuditLang,
+    stripe_session_id: r.stripe_session_id,
+    paid_at: r.paid_at,
+    payer_email: r.payer_email,
+    downloads: r.downloads,
+    amount_paid_minor: r.amount_paid_minor,
+    amount_paid_currency: r.amount_paid_currency,
+  }));
+}

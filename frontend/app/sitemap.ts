@@ -26,6 +26,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
       { url: prefix, changeFrequency: "weekly", priority: 1 },
       { url: `${prefix}/agents`, changeFrequency: "monthly", priority: 0.95 },
       { url: `${prefix}/vendors`, changeFrequency: "monthly", priority: 0.85 },
+      { url: `${prefix}/audit`, changeFrequency: "monthly", priority: 0.85 },
       { url: `${prefix}/sources`, changeFrequency: "monthly", priority: 0.75 },
       { url: `${prefix}/compare`, changeFrequency: "monthly", priority: 0.8 },
       { url: `${prefix}/tools/test-iban`, changeFrequency: "monthly", priority: 0.8 },

@@ -28,6 +28,8 @@ import {
   OEM_MONTHLY_LIMIT,
 } from '../lib/api-keys.js';
 import { notifyPurchaseTelegram } from '../lib/notify.js';
+import { markAuditPaid } from '../lib/audit-jobs.js';
+import { notifyOps } from '../lib/ops-alert.js';
 import { sendApiKeyEmail, sendOemKeyEmail, alertKeyDeliveryFailure } from '../lib/email.js';
 
 export const STRIPE_BUNDLES: Record<string, { credits: number; price_usd: number }> = {
@@ -228,6 +230,37 @@ export function processStripeEvent(event: Stripe.Event): {
 
   // Editor/OEM subscription checkout (private Payment Link, metadata.plan='oem').
   // Mints a monthly-limit key tied to the subscription id — NOT a credit pack.
+  // Creditor-file audit (audit.ts): a one-off Checkout Session created from
+  // code with metadata.audit_job. No key to mint: the job flips to paid and
+  // the customer's status poll returns the download link. Idempotent through
+  // processed_webhooks like every other event; markAuditPaid itself keeps the
+  // first payment's data if Stripe retries.
+  const auditJobId = session.metadata?.audit_job;
+  if (typeof auditJobId === 'string' && auditJobId !== '') {
+    const paidJob = markAuditPaid(auditJobId, {
+      session_id: session.id,
+      email: session.customer_email ?? session.customer_details?.email ?? null,
+      amount_minor: session.amount_total ?? null,
+      currency: session.currency ?? null,
+    });
+    db.prepare('INSERT INTO processed_webhooks (stripe_event_id, event_type) VALUES (?, ?)').run(
+      event.id,
+      event.type,
+    );
+    if (paidJob && !process.env.VITEST) {
+      const who = paidJob.payer_email
+        ? `<mail>@${paidJob.payer_email.split('@')[1]}`
+        : 'e-mail inconnu';
+      void notifyOps(
+        `Audit de fichier vendu : ${paidJob.price_chf} CHF, ${paidJob.rows} lignes, ${who}. Rapport telechargeable 24 h.`,
+      ).catch(() => undefined);
+    }
+    return {
+      status: 200,
+      body: { received: true, event_id: event.id, audit_job: auditJobId, paid: paidJob !== null },
+    };
+  }
+
   if ((session.metadata?.plan ?? '') === 'oem') {
     const email = session.customer_email ?? session.customer_details?.email ?? null;
     const subscriptionId =

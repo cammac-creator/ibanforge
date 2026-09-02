@@ -60,7 +60,9 @@ export type OperationType =
   | 'ch_clearing_lookup'
   | 'iban_format'
   | 'reference_validate'
-  | 'address_check';
+  | 'address_check'
+  | 'audit_upload'
+  | 'audit_sale';
 
 // --- IBAN Validation ---
 
