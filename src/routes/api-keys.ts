@@ -76,6 +76,7 @@ import {
   type ProfileSource,
 } from '../lib/company-profiles.js';
 import { parseAttribution, recordSignupAttribution } from '../lib/signup-attribution.js';
+import { domainAcceptsMail, domainOf } from '../lib/mail-domain.js';
 import {
   sendApiKeyEmail,
   sendFreeKeyEmail,
@@ -168,6 +169,23 @@ apiKeys.post('/v1/keys/generate', async (c) => {
         error: 'disposable_email',
         message:
           'Free tier requires a real email address. example.com, mailinator and other disposable domains are blocked.',
+      },
+      400,
+    );
+  }
+
+  // A domain with no mail server cannot receive the key, the code or anything
+  // else, and every send to one costs the mailbox's reputation at the provider
+  // (02/09/2026: blocked for "spam" after days of exactly that). Refused here,
+  // before a key exists. Skipped under vitest: the suite's fixture domains are
+  // documentation names, and a test must not depend on a resolver.
+  if (!process.env.VITEST && !(await domainAcceptsMail(domainOf(email)))) {
+    return c.json(
+      {
+        error: 'undeliverable_email',
+        message:
+          'The domain of this address has no mail server, so no key or verification code could reach it. ' +
+          'Check the address, or use another mailbox you can read.',
       },
       400,
     );
