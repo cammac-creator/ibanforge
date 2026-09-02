@@ -1003,7 +1003,7 @@ const buildRawSpec = () => ({
         operationId: 'listCreditBundles',
         summary: 'List prepaid credit bundles (free)',
         description:
-          'Lists the available prepaid credit bundles with prices. Buy a bundle once via x402 (POST /v1/credits/buy/{bundle}) and receive an API key preloaded with N credits (1 credit = 1 validation/lookup; batch validation debits 1 credit per IBAN) — credits never expire. Card checkout is also available at https://ibanforge.com/pricing.',
+          'Lists the available prepaid credit bundles with prices. Buy a bundle once via x402 (POST /v1/credits/buy/{bundle}) and receive an API key preloaded with N credits (1 credit = 1 validation/lookup; batch validation debits 1 credit per IBAN) — credits never expire. Card checkout is also available at https://ibanforge.com/pricing. The `subscription` object lists the flat monthly alternative (Pro: 10,000 requests/month by card).',
         tags: ['Credits'],
         // Explicitly no authentication, which is a different statement from
         // omitting the field: an agent reading the contract can tell 'free' from
@@ -1033,6 +1033,18 @@ const buildRawSpec = () => ({
                     },
                     payment_method: { type: 'string', example: 'x402 USDC on Base mainnet' },
                     documentation: { type: 'string' },
+                    subscription: {
+                      type: 'object',
+                      description:
+                        'The recurring alternative to packs: a flat monthly plan paid by card, key delivered by e-mail after checkout.',
+                      properties: {
+                        plan: { type: 'string', example: 'pro' },
+                        monthly_requests: { type: 'integer', example: 10000 },
+                        price_usd_per_month: { type: 'number', example: 29 },
+                        checkout: { type: 'string', format: 'uri' },
+                        payment_method: { type: 'string', example: 'card (Stripe)' },
+                      },
+                    },
                   },
                 },
               },

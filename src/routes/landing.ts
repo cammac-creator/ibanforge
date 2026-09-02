@@ -2,7 +2,7 @@
 import { Hono } from 'hono';
 import { html, raw } from 'hono/html';
 import { createRequire } from 'node:module';
-import { PAYMENT_LINKS } from '../lib/payment-links.js';
+import { PAYMENT_LINKS, PRO_PAYMENT_LINK } from '../lib/payment-links.js';
 import { datasetFacts } from '../lib/dataset-facts.js';
 
 const require = createRequire(import.meta.url);
@@ -1258,6 +1258,10 @@ landing.get('/', (c) => {
                   <li><span class="check">&check;</span> Larger packs = lower per-call cost</li>
                   <li><span class="check">&check;</span> Card, Apple Pay, Google Pay</li>
                   <li><span class="check">&check;</span> Receipt + key by email</li>
+                  <li>
+                    <span class="check">&check;</span> Or flat:
+                    <a href="${PRO_PAYMENT_LINK}">Pro, $29/month for 10,000 requests</a>
+                  </li>
                 </ul>
                 <div class="stripe-buttons" data-stripe-guard="true">
                   <a href="${PAYMENT_LINKS['1k']}" class="stripe-pack-btn" data-stripe-bundle="1k">

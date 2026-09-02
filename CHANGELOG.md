@@ -5,6 +5,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Added
+
+- **Pro subscription, the flat monthly tier.** $29 a month for 10,000 requests: the allowance resets on the 1st, the key dies with its subscription, cancel anytime. Sold through a public Stripe Payment Link on the pricing page and minted by the webhook through the same path as Editor / OEM (`metadata.plan = 'pro'`), with its own welcome e-mail. Listed for machines in `GET /v1/credits/bundles` under `subscription`, in the card hint of every 402 body, on the API landing and in llms.txt.
+- **Postman collection.** `integrations/postman/ibanforge.postman_collection.json`, generated from the live OpenAPI contract: 28 requests in 8 folders, bearer auth from a single `apiKey` variable, the free endpoints marked as such.
+
 ### Removed
 
 - **The `/live` village page is paused and no longer served.** Operator decision of 2026-09-02: the idea — watch the agents and every actor of the pipeline at work, to see what happens backstage — stays; the execution was judged too rough to be live, and the nine redesign mock-ups audited the same day had not found the form yet. Removed: the route and its canvas engine, the sprite atlas and its rebuild script, the two relays only that page used (`/api/ops`, `/api/health-sources`), the menu entry, the landing link and the sitemap entry. `/{locale}/live` redirects (temporarily) to the playground for the links already shared. The code is kept whole at git tag `village-pause-2026-09-02`. The backend feed `GET /v1/ops/recent` stays, now unused.

@@ -131,11 +131,12 @@ stripeSuccess.get('/stripe/success', (c) => {
   function render(data) {
     const key = escapeHtml(data.api_key);
     const curl = curlFor(data.api_key);
-    const isOem = data.plan === 'oem';
+    const isOem = data.plan === 'oem' || data.plan === 'pro';
+    const planName = data.plan === 'pro' ? 'Pro' : 'Editor / OEM';
     const total = data.credits_total;
     const email = data.email ? escapeHtml(data.email) : null;
     const subLine = isOem
-      ? 'Editor / OEM subscription active — ' + Number(data.monthly_limit).toLocaleString() + ' requests/month. Save your API key — it will not be shown again.'
+      ? planName + ' subscription active — ' + Number(data.monthly_limit).toLocaleString() + ' requests/month. Save your API key — it will not be shown again.'
       : total + ' credits added. Save your API key — it will not be shown again.';
     const statBlock = isOem
       ? '<div class="stat"><div class="stat-label">Requests / month</div><div class="stat-value">' + Number(data.monthly_limit).toLocaleString() + '</div></div>'

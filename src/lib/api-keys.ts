@@ -142,6 +142,16 @@ export function generateStripeKey(
 export const OEM_MONTHLY_LIMIT = 50_000;
 
 /**
+ * Pro subscription: the PUBLIC monthly tier (2026-09-02, market study of 02/09:
+ * the category enters at $20 to $99 a month). Same mechanics as OEM, a monthly
+ * allowance that resets on the 1st and a key that dies with its subscription,
+ * for a fifth of the allowance, no SLA and no embedding rights. The price
+ * lives in Stripe and in src/lib/payment-links.ts; only the allowance is
+ * decided here.
+ */
+export const PRO_MONTHLY_LIMIT = 10_000;
+
+/**
  * Stripe-paid Editor/OEM subscription key — monthly_limit-based (NOT credits):
  * the subscription buys embedding rights + a high monthly allowance that
  * resets on the 1st, not a prepaid pool. Same one-time-view delivery as

@@ -1,7 +1,7 @@
 {
   "name": "n8n-nodes-ibanforge",
-  "version": "0.1.0",
-  "description": "IBAN validation, BIC/SWIFT lookup, Swiss clearing and compliance pre-checks for n8n workflows \u2014 backed by 6 national bank registers (121k+ BIC entries, 89 countries)",
+  "version": "0.1.1",
+  "description": "IBAN validation, BIC/SWIFT lookup, Swiss clearing and compliance pre-checks for n8n workflows — backed by 6 national bank registers (121k+ BIC entries, 89 countries)",
   "keywords": [
     "n8n-community-node-package",
     "iban",
@@ -28,7 +28,7 @@
     "node": ">=20"
   },
   "scripts": {
-    "build": "tsc && mkdir -p dist/nodes/IbanForge && cp nodes/IbanForge/ibanforge.svg dist/nodes/IbanForge/",
+    "build": "tsc && mkdir -p dist/nodes/IbanForge && cp nodes/IbanForge/ibanforge.svg nodes/IbanForge/IbanForge.node.json dist/nodes/IbanForge/",
     "lint": "tsc --noEmit"
   },
   "files": [

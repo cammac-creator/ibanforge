@@ -59,6 +59,7 @@ Zero to first payment in 3 steps (wallet with budget → USDC on Base → one $5
 ## How to pay (3 rails, no dead-ends)
 - Free tier: POST /v1/keys/generate → Authorization: Bearer ifk_... (200 req/month)
 - Credit packs (card or USDC, never expire): 1k = $5, 5k = $20, 25k = $80 → POST /v1/credits/buy/1k|5k|25k
+- Pro subscription (card): $29/month for 10,000 requests, resets on the 1st, cancel anytime → https://ibanforge.com/pricing
 - x402 micropayments: pay per call in USDC on Base L2, no signup
 
 ## SDKs

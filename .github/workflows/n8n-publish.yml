@@ -1,23 +1,25 @@
 name: Publish n8n-nodes-ibanforge (with provenance)
 
-# ⚠️ DORMANT — this workflow has NEVER run. Established 2026-09-01 (infra audit,
-# OPS-19): `gh run list --workflow=n8n-publish.yml` is empty and no `n8n-v*` tag
-# exists in the repository, so nothing has ever matched its trigger. It is kept
-# rather than deleted because n8n-nodes-ibanforge is a real package that will
-# need a publish path; but until it runs once, treat it as UNPROVEN — the
-# trusted-publisher prerequisite below has never been exercised either.
-#
-# What triggers it: pushing a tag matching `n8n-v*` (e.g. `git tag n8n-v1.0.0 &&
-# git push origin n8n-v1.0.0`), or a manual `workflow_dispatch` from the Actions
-# tab. Note it does NOT follow the `v*.*.*` tags that drive release-publish.yml:
-# the n8n node carries its own version, in integrations/n8n/package.json.
-#
 # n8n's community-node rules (since 2026-05-01) require publication through a
-# GitHub Action with a provenance statement. Trigger by tagging n8n-vX.Y.Z.
+# GitHub Action with a provenance statement; a package published from a laptop
+# fails `npx @n8n/scan-community-package n8n-nodes-ibanforge` on that single
+# point (verified 2026-09-02 against 0.1.0). This workflow is that publication.
 #
-# Prerequisite (one-time, manual): declare this repo + workflow as a trusted
-# publisher for the npm package `n8n-nodes-ibanforge` (npmjs.com → package →
-# Settings → Trusted publishers), or set an NPM_TOKEN secret as fallback.
+# Trigger: push a tag matching `n8n-v*` (e.g. `git tag n8n-v0.1.1 && git push
+# origin n8n-v0.1.1`), or a manual `workflow_dispatch` from the Actions tab.
+# It does NOT follow the `v*.*.*` tags that drive release-publish.yml: the n8n
+# node carries its own version, in integrations/n8n/package.json.
+#
+# Auth: npm TRUSTED PUBLISHING (OIDC), no token anywhere. One-time setup on
+# npmjs.com → package n8n-nodes-ibanforge → Settings → Publish access →
+# Trusted publishers → Add: GitHub Actions, owner `cammac-creator`, repository
+# `ibanforge`, workflow filename `n8n-publish.yml` (no environment). Until that
+# is done, the publish step fails with ENEEDAUTH and nothing else happens.
+# Trusted publishing needs npm >= 11.5.1, hence the explicit upgrade below;
+# `NODE_AUTH_TOKEN` is deliberately NOT set, an empty token would shadow OIDC.
+#
+# History: dormant from 2026-09-01 (never run, infra audit OPS-19) to the day
+# the scanner named the missing provenance.
 
 on:
   push:
@@ -26,7 +28,7 @@ on:
   workflow_dispatch: {}
 
 permissions:
-  id-token: write # OIDC for npm provenance
+  id-token: write # OIDC for npm provenance + trusted publishing
   contents: read
 
 jobs:
@@ -41,13 +43,23 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 22
-          registry-url: 'https://registry.npmjs.org'
+
+      - name: npm with trusted publishing support
+        run: npm install -g npm@latest && npm --version
 
       - run: npm install
 
       - run: npm run build
 
-      - name: Publish with provenance
+      - name: The tag and package.json must agree
+        if: startsWith(github.ref, 'refs/tags/n8n-v')
+        run: |
+          TAG="${GITHUB_REF_NAME#n8n-v}"
+          PKG="$(node -p "require('./package.json').version")"
+          if [ "$TAG" != "$PKG" ]; then
+            echo "tag n8n-v$TAG but package.json says $PKG" >&2
+            exit 1
+          fi
+
+      - name: Publish with provenance (trusted publishing)
         run: npm publish --access public --provenance
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

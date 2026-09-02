@@ -109,6 +109,13 @@ describe('outgoing message bodies carry no em or en dash', () => {
     // see them and the OEM subject shipped an em dash. Making them pure is what
     // makes the rule enforceable, not the dash removal itself.
     buildOemKeyEmail: emailModule.buildOemKeyEmail({ rawKey: FAKE_KEY, monthlyLimit: 50_000 }),
+    // Pro (2026-09-02): the public monthly tier shares the builder with OEM.
+    buildSubscriptionKeyEmail: emailModule.buildSubscriptionKeyEmail({
+      rawKey: FAKE_KEY,
+      monthlyLimit: 10_000,
+      plan: 'pro',
+    }),
+    buildProKeyEmail: emailModule.buildProKeyEmail({ rawKey: FAKE_KEY, monthlyLimit: 10_000 }),
     buildKeyVerificationEmail: emailModule.buildKeyVerificationEmail({ code: '123456' }),
     buildAuditReadyEmail: emailModule.buildAuditReadyEmail({
       to: 'buyer@example.com',

@@ -15,6 +15,15 @@ export const PAYMENT_LINKS = {
   '25k': 'https://buy.stripe.com/14A7sE9ERbyld0QcuS8so02',
 } as const;
 
+/**
+ * Pro subscription (2026-09-02): the public monthly tier. A public Payment
+ * Link whose metadata.plan = 'pro' is what the webhook keys on. The allowance
+ * is PRO_MONTHLY_LIMIT in src/lib/api-keys.ts; the price is restated here
+ * because this file is where every card-rail fact is read from.
+ */
+export const PRO_PAYMENT_LINK = 'https://buy.stripe.com/aFacMYaIVeKx1i87ay8so04';
+export const PRO_PRICE_USD = 29;
+
 /** Entry-level pack: the cheapest way to turn a blocked call into a paid one. */
 export const ENTRY_PAYMENT_LINK = PAYMENT_LINKS['1k'];
 
@@ -28,4 +37,5 @@ export const PRICING_PAGE = 'https://ibanforge.com/pricing';
  */
 export const CARD_CHECKOUT_HINT =
   `Pay by card in one click: ${ENTRY_PAYMENT_LINK} (1,000 credits, $5) ` +
-  `— all packs: ${PRICING_PAGE}`;
+  `— all packs: ${PRICING_PAGE} ` +
+  `— or a flat $${PRO_PRICE_USD}/month for 10,000 requests: ${PRO_PAYMENT_LINK}`;

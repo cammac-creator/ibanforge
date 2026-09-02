@@ -22,8 +22,8 @@ export async function notifyPurchaseTelegram(p: {
   bundle: string;
   credits: number;
   keyPrefix: string;
-  /** Editor/OEM subscription — recurring revenue, worded differently. */
-  plan?: 'oem';
+  /** Subscription (Editor/OEM or Pro) — recurring revenue, worded differently. */
+  plan?: 'oem' | 'pro';
   monthlyLimit?: number;
 }): Promise<boolean> {
   const token = process.env.TELEGRAM_BOT_TOKEN;
@@ -36,16 +36,15 @@ export async function notifyPurchaseTelegram(p: {
   // No customer email in the message, on purpose: Telegram is not one of the
   // processors declared in the privacy policy / DPA, so no personal data may
   // transit it. The key prefix + dashboard answer "who" in two taps.
-  const text =
-    p.plan === 'oem'
-      ? `\u{1F389} IBANforge — ABONNEMENT Editor/OEM (MRR !)\n` +
-        `Montant : $${p.amountUsd}/mois (${(p.monthlyLimit ?? 0).toLocaleString('en-US')} req/mois)\n` +
-        `Clé : ${p.keyPrefix}…\n` +
-        `Client : https://ibanforge.com/dashboard/clients`
-      : `\u{1F4B0} IBANforge — nouvel achat Stripe\n` +
-        `Montant : $${p.amountUsd} (pack ${p.bundle}, ${p.credits.toLocaleString('en-US')} crédits)\n` +
-        `Clé : ${p.keyPrefix}…\n` +
-        `Client : https://ibanforge.com/dashboard/clients`;
+  const text = p.plan
+    ? `\u{1F389} IBANforge — ABONNEMENT ${p.plan === 'oem' ? 'Editor/OEM' : 'Pro'} (MRR !)\n` +
+      `Montant : $${p.amountUsd}/mois (${(p.monthlyLimit ?? 0).toLocaleString('en-US')} req/mois)\n` +
+      `Clé : ${p.keyPrefix}…\n` +
+      `Client : https://ibanforge.com/dashboard/clients`
+    : `\u{1F4B0} IBANforge — nouvel achat Stripe\n` +
+      `Montant : $${p.amountUsd} (pack ${p.bundle}, ${p.credits.toLocaleString('en-US')} crédits)\n` +
+      `Clé : ${p.keyPrefix}…\n` +
+      `Client : https://ibanforge.com/dashboard/clients`;
 
   try {
     const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {

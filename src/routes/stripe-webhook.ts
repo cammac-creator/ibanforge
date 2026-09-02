@@ -26,13 +26,15 @@ import {
   generateOemKey,
   deactivateBySubscription,
   OEM_MONTHLY_LIMIT,
+  PRO_MONTHLY_LIMIT,
 } from '../lib/api-keys.js';
+import { PRO_PRICE_USD } from '../lib/payment-links.js';
 import { notifyPurchaseTelegram } from '../lib/notify.js';
 import { markAuditPaid } from '../lib/audit-jobs.js';
 import { notifyOps } from '../lib/ops-alert.js';
 import {
   sendApiKeyEmail,
-  sendOemKeyEmail,
+  sendSubscriptionKeyEmail,
   alertKeyDeliveryFailure,
   sendAuditReadyEmail,
 } from '../lib/email.js';
@@ -48,6 +50,22 @@ export const STRIPE_BUNDLES: Record<string, { credits: number; price_usd: number
 // page. The subscription buys embedding rights + SLA + a monthly allowance,
 // not prepaid credits.
 export const STRIPE_OEM_PLAN = { monthly_limit: OEM_MONTHLY_LIMIT, price_usd: 149 };
+
+// Pro subscription (2026-09-02): the PUBLIC monthly tier, sold through a public
+// Payment Link on the pricing page (metadata.plan = 'pro'). Minted through the
+// same path as OEM: a monthly allowance that resets on the 1st, a key that
+// dies with its subscription. No SLA, no embedding rights.
+export const STRIPE_PRO_PLAN = { monthly_limit: PRO_MONTHLY_LIMIT, price_usd: PRO_PRICE_USD };
+
+export type SubscriptionPlan = 'oem' | 'pro';
+
+export const SUBSCRIPTION_PLANS: Record<
+  SubscriptionPlan,
+  { monthly_limit: number; price_usd: number }
+> = {
+  oem: STRIPE_OEM_PLAN,
+  pro: STRIPE_PRO_PLAN,
+};
 
 /**
  * The events that mint a key.
@@ -105,8 +123,8 @@ export interface StripePurchaseNotify {
   priceUsd: number;
   keyPrefix: string;
   rawKey: string;
-  /** Set on Editor/OEM subscriptions — switches the customer email template. */
-  plan?: 'oem';
+  /** Set on subscriptions (Editor/OEM, Pro) — switches the customer email template. */
+  plan?: SubscriptionPlan;
   monthlyLimit?: number;
 }
 
@@ -233,8 +251,9 @@ export function processStripeEvent(event: Stripe.Event): {
     };
   }
 
-  // Editor/OEM subscription checkout (private Payment Link, metadata.plan='oem').
-  // Mints a monthly-limit key tied to the subscription id — NOT a credit pack.
+  // Subscription checkout: Editor/OEM (private Payment Link, metadata.plan='oem')
+  // or Pro (public Payment Link, metadata.plan='pro'). Mints a monthly-limit key
+  // tied to the subscription id — NOT a credit pack.
   // Creditor-file audit (audit.ts): a one-off Checkout Session created from
   // code with metadata.audit_job. No key to mint: the job flips to paid and
   // the customer's status poll returns the download link. Idempotent through
@@ -275,7 +294,10 @@ export function processStripeEvent(event: Stripe.Event): {
     };
   }
 
-  if ((session.metadata?.plan ?? '') === 'oem') {
+  const requestedPlan = session.metadata?.plan ?? '';
+  if (requestedPlan === 'oem' || requestedPlan === 'pro') {
+    const plan: SubscriptionPlan = requestedPlan;
+    const planConfig = SUBSCRIPTION_PLANS[plan];
     const email = session.customer_email ?? session.customer_details?.email ?? null;
     const subscriptionId =
       typeof session.subscription === 'string'
@@ -297,13 +319,13 @@ export function processStripeEvent(event: Stripe.Event): {
         body: {
           received: true,
           event_id: event.id,
-          plan: 'oem',
+          plan,
           skipped: 'subscription_already_canceled',
           subscription: subscriptionId,
         },
       };
     }
-    const mint = generateOemKey(email, STRIPE_OEM_PLAN.monthly_limit, session.id, subscriptionId);
+    const mint = generateOemKey(email, planConfig.monthly_limit, session.id, subscriptionId);
     // After the mint: the row must exist for the amount to land on it.
     const paid = recordAmountPaid(session);
 
@@ -315,12 +337,12 @@ export function processStripeEvent(event: Stripe.Event): {
     const notify: StripePurchaseNotify | undefined = mint.api_key
       ? {
           email,
-          bundle: 'oem',
+          bundle: plan,
           credits: 0,
-          priceUsd: STRIPE_OEM_PLAN.price_usd,
+          priceUsd: planConfig.price_usd,
           keyPrefix: mint.key_prefix,
           rawKey: mint.api_key,
-          plan: 'oem',
+          plan,
           monthlyLimit: mint.monthly_limit,
         }
       : undefined;
@@ -330,7 +352,7 @@ export function processStripeEvent(event: Stripe.Event): {
       body: {
         received: true,
         event_id: event.id,
-        plan: 'oem',
+        plan,
         monthly_limit: mint.monthly_limit,
         key_prefix: mint.key_prefix,
         ...(paid ?? {}),
@@ -455,19 +477,19 @@ stripeWebhook.post('/v1/stripe/webhook', async (c) => {
     // acknowledgement is not. Fire and forget, and never let the two couple
     // again.
     if (result.notify.email && result.notify.email.includes('@')) {
-      const deliver =
-        result.notify.plan === 'oem'
-          ? sendOemKeyEmail({
-              to: result.notify.email,
-              rawKey: result.notify.rawKey,
-              monthlyLimit: result.notify.monthlyLimit ?? 0,
-            })
-          : sendApiKeyEmail({
-              to: result.notify.email,
-              rawKey: result.notify.rawKey,
-              credits: result.notify.credits,
-              bundle: result.notify.bundle,
-            });
+      const deliver = result.notify.plan
+        ? sendSubscriptionKeyEmail({
+            to: result.notify.email,
+            rawKey: result.notify.rawKey,
+            monthlyLimit: result.notify.monthlyLimit ?? 0,
+            plan: result.notify.plan,
+          })
+        : sendApiKeyEmail({
+            to: result.notify.email,
+            rawKey: result.notify.rawKey,
+            credits: result.notify.credits,
+            bundle: result.notify.bundle,
+          });
       // The empty catch was doubly defensive (the transport swallows and logs
       // everything already), but it also meant a key that was PAID FOR and never
       // arrived left no trace anywhere a human looks. QUA-13, 2026-09-01: the

@@ -12,7 +12,11 @@
  * webhook), this returns 404 and the frontend should retry after a short delay.
  */
 import { Hono } from 'hono';
-import { consumeOneTimeKey, consumeOneTimeKeyByPaymentRef } from '../lib/api-keys.js';
+import {
+  consumeOneTimeKey,
+  consumeOneTimeKeyByPaymentRef,
+  OEM_MONTHLY_LIMIT,
+} from '../lib/api-keys.js';
 
 export const stripeRetrieve = new Hono();
 
@@ -47,9 +51,16 @@ stripeRetrieve.get('/v1/stripe/key/:session_id', (c) => {
     key_prefix: result.api_key.slice(0, 12),
     credits_total: result.credits_total,
     credits_remaining: result.credits_remaining,
-    // Editor/OEM subscription keys carry a monthly allowance instead of credits.
+    // Subscription keys carry a monthly allowance instead of credits. The plan
+    // is read off the allowance: OEM is the only one at 50,000, everything
+    // below is Pro (2026-09-02).
     monthly_limit: result.monthly_limit,
-    plan: result.monthly_limit !== null && result.credits_total === null ? 'oem' : 'credits',
+    plan:
+      result.monthly_limit !== null && result.credits_total === null
+        ? result.monthly_limit >= OEM_MONTHLY_LIMIT
+          ? 'oem'
+          : 'pro'
+        : 'credits',
     email: result.email,
     note: 'This key will only be shown ONCE. Store it securely.',
     usage_hint:

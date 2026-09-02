@@ -1,0 +1,91 @@
+---
+title: "Verification of Payee and Switzerland: who checks the payee name, who does not, and what it means for your euro payments"
+description: "Since 9 October 2025, banks in the euro area must check that a payee's name and IBAN belong together before every credit transfer. Swiss banks do not have to, Liechtenstein banks not yet. What that means for a Swiss company that pays or receives euros, with the document and the sentence behind every statement, as of 2 September 2026."
+date: "2026-09-02"
+---
+
+A customer in Munich transfers you 12,400 euros. Before releasing the money, their bank asks the payee's bank: does this IBAN really belong to "Muster Präzision AG"? Since 9 October 2025 that question is mandatory in the euro area. It is called Verification of Payee, VoP for short. And if your account sits at a Swiss bank, the answer is, in many cases: "verification not possible".
+
+This text explains who has to check, who does not, what your customer sees at that moment, and what you can do about it. We read the primary sources on 2 September 2026: the EU regulation, the two rulebooks of the European Payments Council, the pages of SIX, of the Swiss Bankers Association and of the Swiss Euro Clearing Bank, and the EEA register of EFTA. Every statement carries its document. Where a page refused direct access, we read the PDF itself or the archived copy, and we say so.
+
+## What VoP is, in five sentences
+
+Before a SEPA credit transfer is executed, the payer's bank sends the payee name the payer typed, together with the IBAN, to the payee's bank. That bank answers with one of four results: "Match", "Close Match" (together with the actual name), "No Match" or "Verification check not possible". The payer sees the result before releasing the payment and decides. The check blocks nothing; it warns. It applies to SEPA credit transfers and to SEPA instant credit transfers.
+
+The rules are the Verification Of Payee Scheme Rulebook of the European Payments Council, document EPC218-23. Version 1.0/2024, issued on 10 October 2024, has applied since 5 October 2025. Version 1.1/2026, issued on 16 March 2026, applies from 20 September 2026; it carries corrections from the launch phase, not a new obligation. One detail the press regularly blurs: the regulation itself never uses the words "Close Match". It says "almost match". "Close Match" is the language of the EPC rulebook.
+
+## Who has to check: the dates in the regulation
+
+| Jurisdiction | Obligation | Basis |
+|---|---|---|
+| EU member states whose currency is the euro | since 9 October 2025, in force | Regulation (EU) 2024/886, Article 5c(9) |
+| EU member states whose currency is not the euro | from 9 July 2027 | the same provision |
+| EEA: Liechtenstein, Iceland, Norway | no date | incorporation into the EEA Agreement "under scrutiny", no decision of the EEA Joint Committee visible (last reachable copy of the EFTA register: 4 January 2026) |
+| Switzerland | no date, no obligation | neither EU nor EEA; voluntary participation in the EPC scheme possible, no Swiss scheme visible |
+
+The sentence both EU dates come from, Article 5c(9): "PSPs located in a Member State whose currency is the euro shall comply with this Article by 9 October 2025. PSPs located in a Member State whose currency is not the euro shall comply [...] by 9 July 2027."
+
+## Switzerland: no obligation, no scheme of its own, an open door
+
+Three findings, each with its source.
+
+**First, no obligation.** Article 5c binds only payment service providers "located in a Member State". A Swiss bank is not one. It has to neither trigger a check as the payer's bank nor answer one as the payee's bank.
+
+**Second, no Swiss scheme visible.** A Swiss "Namensabgleich" or "IBAN name check" with a date of its own does not appear in the primary sources. The SIX instant payments page quotes the EU dates for information only. The Swiss Payments roadmap covers ISO 20022 and the structured addresses of November 2026, not VoP. The SIX newsroom, the pages of the Swiss Bankers Association and the 2025 annual report of the Swiss Euro Clearing Bank, which connects Swiss institutions to SEPA, do not contain the term. We deliberately write "not visible" rather than "not yet announced": the second we could not prove.
+
+**Third, the door is open.** The EPC rulebook admits institutions from non-EEA countries within the geographical scope of SEPA as participants (section 4.4). And the EPC country list EPC409-09 names the Swiss bank explicitly: "A bank which is authorised in accordance with Article 3 of the Federal Law on Banks and Savings Banks of 8 November 1934 by the Swiss Financial Market Supervisory Authority (FINMA)." A FINMA-licensed bank can therefore join the VoP scheme voluntarily, as a responding bank, so that its customers can be verified, or as a requesting bank, so that it checks its own payments. That is a contract, not a Swiss legal duty. Whether and which Swiss banks have joined, we did not check; the reliable answer comes from your bank.
+
+## What your customer in Germany sees when they transfer you euros
+
+Your customer's bank is obliged to attempt the check, including towards a Swiss account. The regulation puts it this way: "Upon the request of the payer's PSP, the payee's PSP shall verify whether the payment account identifier [...] and the name of the payee provided by the payer match."
+
+If your bank has not joined the scheme, nobody can answer. Your customer's bank then shows them "Verification check not possible" and must tell them that the check did not take place. The payment still goes through. But your customer sees that warning at the exact moment they release money to a foreign IBAN. Some pay on, some pause, call, or ask for confirmation. That is friction, not a block, and it lands on you, not on the bank.
+
+Three things you can do about it:
+
+1. **The name on your invoice is the name on your account, letter for letter, legal form included.** Where the check happens, that name decides between "Match" and "Close Match". Where it does not, your customer compares by eye, and a clean name reassures.
+2. **IBAN, BIC and the exact account holder appear together on the invoice**, not the brand name alone, not the department.
+3. **Ask your bank whether it has joined the EPC VoP scheme as a responding bank.** If yes, your customers see "Match" instead of a warning. If no, you know where the callbacks come from.
+
+## What happens when you transfer euros to a supplier in the EU
+
+The direction reverses. Your Swiss bank is not obliged to check. Unless it has joined the scheme as a requesting bank, nobody compares name and IBAN before your money leaves. The check that has protected companies in the euro area since October 2025 against the classic invoice fraud, where someone swaps the IBAN on a genuine invoice, does not run for you.
+
+So the pre-check is yours: is the IBAN structurally valid? Does the national register know the bank code inside it? Does the bank behind the IBAN match the BIC on the invoice? Does the IBAN's country match the supplier's country? Does the same IBAN suddenly sit under two different suppliers in your creditor file? That is the work of a pre-check at input time, or of an [audit of the whole file before the payment run](/en/audit).
+
+For the record, so that nobody reads more into this than there is: IBANforge is not a VoP service. The EPC scheme is reserved to regulated payment service providers, and no pre-check in the world tells you that an account belongs to a given person. It tells you what the registers know about the bank behind the IBAN, and the field `sepa.vop_participant` tells you whether the resolved institution is listed as VoP-ready. That is less than VoP, and exactly what VoP does not deliver at a Swiss bank.
+
+## Close Match on company names: AG, SA, Sàrl and umlauts
+
+How close "matching" has to be is not in the regulation but in the EPC recommendations on matching, document EPC288-23 of 10 October 2024. They are recommendations; every responding bank implements its own matching. But they tell you what to expect.
+
+**Umlauts and accents are not a Close Match case.** They are removed before the comparison, in a separate "Data clean-up" step: "Change diacritics/accents unless the Responding PSP is able to compare the received Name of the Payment Counterparty with Latin characters", with the examples ü equals u and é equals e. "Muster Präzision AG" and "Muster Praezision AG" normally become a Match after that clean-up, not a Close Match.
+
+**What leads to a Close Match**, according to the same recommendation: two transposed letters, a different word order, a small edit distance, a phonetic substitution, and, directly relevant to Swiss companies: "Some commonly accepted abbreviations, alternate or abbreviated names are used in the (legal or commercial) name of the Payment Counterparty." An invoice from "Muster Präzision" without the "AG" should therefore produce a Close Match, and your customer then sees your full account name and has to confirm it. "Muster Precision Ltd" produces a No Match.
+
+**There is no Close Match on identification codes.** Whoever checks the payee through an identifier such as the VAT number or the LEI gets only Match or No Match: "There is no Close Match possible on such codes."
+
+## Liechtenstein: in the EEA, but without a date yet
+
+Liechtenstein is an EEA state, not an EU member. Article 5c(9) binds, by its wording, only "Member States". For the regulation to apply in Liechtenstein, the EEA Joint Committee has to incorporate it into the EEA Agreement. The EFTA register EEA-Lex lists it as an "EU legal act marked as EEA relevant by the EU and under scrutiny for incorporation into the EEA Agreement by Iceland, Liechtenstein and Norway". In the last copy we could reach, dated 4 January 2026, no decision and no EEA date is recorded. Quoting 9 July 2027 for Liechtenstein, as happens now and then, is therefore premature. The EPC country list notes: "It is assumed that legislation adopted for the EEA [...] only fully and directly applies to payment transactions between institutions located within the EU and the EEA."
+
+## The three confusions you read everywhere
+
+1. **"Close Match" and accents.** The regulation says "almost match", the EPC says "Close Match", and accents are neutralised before the comparison. An umlaut alone is not a Close Match.
+2. **"Switzerland is in the SEPA area, so VoP applies there too."** The EPC's geographical SEPA list is not an EU legal competence. A Swiss bank's participation is voluntary and contractual, and a Swiss scheme is not visible in the sources.
+3. **EEA equals EU.** The mention "Text with EEA relevance" does not make a regulation applicable in Liechtenstein. That takes a decision of the EEA Joint Committee, and it is missing.
+
+## What we watch
+
+20 September 2026, when version 1.1 of the EPC rulebook takes effect; the decision of the EEA Joint Committee for Liechtenstein; any publication by SIX, the Swiss Bankers Association or a single bank about a Swiss name check or about joining the EPC scheme. If one of them changes, this page changes, with a date.
+
+## Sources
+
+- Regulation (EU) 2024/886 of 13 March 2024, Article 5c: [eur-lex.europa.eu, CELEX 32024R0886](https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:32024R0886). The deadlines in paragraph 9, the payee bank's duty in paragraph 1.
+- EPC218-23, Verification Of Payee Scheme Rulebook, version 1.0/2024 (issued 10 October 2024, effective 5 October 2025) and version 1.1/2026 (issued 16 March 2026, effective 20 September 2026): [PDF of version 1.0](https://www.europeanpaymentscouncil.eu/sites/default/files/kb/file/2024-10/EPC218-23%20v1.0%202024%20Verification%20Of%20Payee%20Scheme%20Rulebook_0.pdf). The EPC document page refused direct access (403); we read the PDF.
+- EPC288-23, EPC Recommendations for the Matching Processes under the VOP Scheme Rulebook, version 1.0, 10 October 2024: [PDF](https://www.europeanpaymentscouncil.eu/sites/default/files/kb/file/2024-10/EPC288-23%20v1.0%20EPC%20Recommendations%20for%20the%20Matching%20Processes%20under%20the%20VOP%20Scheme%20Rulebook_0.pdf).
+- EPC409-09, EPC List of Countries in the SEPA Schemes' Geographical Scope, version 7.0, 22 May 2025: [PDF](https://www.europeanpaymentscouncil.eu/sites/default/files/kb/file/2025-05/EPC409-09%20EPC%20List%20of%20SEPA%20Scheme%20Countries%20v7.0.pdf).
+- SIX, Instant Payment in Switzerland: [six-group.com](https://www.six-group.com/en/products-services/banking-services/billing-and-payments/instant-payments.html); Swiss Payments roadmap and newsroom, searched on 2 September 2026. Swiss Bankers Association, swissbanking.ch, and Swiss Euro Clearing Bank, annual report 2025: no occurrence.
+- EFTA, EEA-Lex, factsheet 32024R0886: [efta.int](https://www.efta.int/eea-lex/32024R0886). Direct access refused (403); we read the archived copy of 4 January 2026.
+
+*As of 2 September 2026. This text is a reading of public rulebooks, not legal advice. What your bank actually does, your bank knows.*

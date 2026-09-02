@@ -127,8 +127,6 @@
         "cost": "$0.003",
         "description": "Recherche BC-Numéro suisse (SIX BankMaster)"
       },
-      "heading": "Endpoints et tarifs",
-      "subtitle": "Commencez avec 200 requêtes gratuites par mois. Payez à mesure que vous grandissez — par carte ou en USDC.",
       "5": {
         "method": "GET",
         "path": "/v1/reference/validate",
@@ -140,7 +138,9 @@
         "path": "/v1/address/check",
         "cost": "Gratuit",
         "description": "Règles d'adresses ISO 20022 (SPS, T2, Fedwire) avant les échéances de novembre 2026"
-      }
+      },
+      "heading": "Endpoints et tarifs",
+      "subtitle": "Commencez avec 200 requêtes gratuites par mois. Payez à mesure que vous grandissez — par carte ou en USDC."
     },
     "quickStart": {
       "heading": "Démarrage rapide",
@@ -413,6 +413,15 @@
       "label": "Audit de fichier de créanciers",
       "text": "Pas développeur ? Déposez le CSV ou XLSX depuis lequel vous payez et chaque ligne est contrôlée contre les mêmes registres : 149 CHF jusqu'à 5 000 lignes, 349 CHF jusqu'à 20 000, aperçu gratuit d'abord, classeur annoté dès le paiement.",
       "cta": "Auditer un fichier"
+    },
+    "pro": {
+      "label": "Abonnement Pro",
+      "title": "Vous préférez une facture mensuelle fixe ?",
+      "text": "Pro : 10 000 requêtes par mois, tous les endpoints, remise à zéro le 1er, résiliable à tout moment. Paiement par carte via Stripe, votre clé arrive par e-mail dès le paiement et fonctionne en quelques secondes.",
+      "note": "Besoin de 50 000 requêtes par mois, d'un SLA écrit ou d'un droit d'intégration ? C'est la licence éditeur / OEM, plus bas.",
+      "price": "29 $",
+      "per": "/ mois",
+      "cta": "Souscrire à Pro"
     }
   },
   "playground": {

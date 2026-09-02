@@ -408,8 +408,9 @@ export async function sendKeyVerificationEmail(p: { to: string; code: string }):
 }
 
 /**
- * Editor/OEM subscription welcome: same delivery mechanics as buildApiKeyEmail,
- * worded for a monthly allowance that renews rather than a prepaid credit pool.
+ * Subscription welcome (Editor/OEM, and Pro since 2026-09-02): same delivery
+ * mechanics as buildApiKeyEmail, worded for a monthly allowance that renews
+ * rather than a prepaid credit pool.
  *
  * BIZ-14 (2026-09-01): the subject carried an em dash, on a live transactional
  * message, while the same rule was locked by test on the four builders that
@@ -417,20 +418,54 @@ export async function sendKeyVerificationEmail(p: { to: string; code: string }):
  * below, so there was nothing for the sweep to look at. Making it pure is the
  * fix; removing the dash is only the symptom.
  */
-export function buildOemKeyEmail(p: { rawKey: string; monthlyLimit: number }): {
+export type SubscriptionEmailPlan = 'oem' | 'pro';
+
+const SUBSCRIPTION_EMAIL_COPY: Record<
+  SubscriptionEmailPlan,
+  { name: string; support: string; footer: string; legalLinks: boolean }
+> = {
+  oem: {
+    name: 'Editor / OEM',
+    support: 'Your named support contact: support@ibanforge.com (mention Editor/OEM).',
+    footer: 'bank data API for software vendors',
+    legalLinks: true,
+  },
+  // Pro (2026-09-02): the public monthly tier. No SLA and no DPA link, because
+  // neither is part of the plan; the cancellation rule is stated because it is
+  // the first question a subscriber asks.
+  pro: {
+    name: 'Pro',
+    support:
+      'Questions, invoices, a plan change or a cancellation: support@ibanforge.com (mention Pro). Cancelling stops the next renewal; the key keeps working until the end of the paid month.',
+    footer: 'IBAN and bank data API',
+    legalLinks: false,
+  },
+};
+
+export function buildSubscriptionKeyEmail(p: {
+  rawKey: string;
+  monthlyLimit: number;
+  plan: SubscriptionEmailPlan;
+}): {
   subject: string;
   text: string;
   html: string;
 } {
   const limit = p.monthlyLimit.toLocaleString('en-US');
+  const copy = SUBSCRIPTION_EMAIL_COPY[p.plan];
+  const legalText = copy.legalLinks
+    ? `SLA: https://ibanforge.com/en/legal/sla\n` + `DPA: https://ibanforge.com/en/legal/dpa\n`
+    : '';
+  const legalHtml = copy.legalLinks
+    ? `<a href="https://ibanforge.com/en/legal/sla" style="color:#fbbf24;text-decoration:none">Your SLA →</a> &nbsp;·&nbsp; <a href="https://ibanforge.com/en/legal/dpa" style="color:#fbbf24;text-decoration:none">DPA →</a> &nbsp;·&nbsp; `
+    : `<a href="https://ibanforge.com/en/account" style="color:#fbbf24;text-decoration:none">Your key at a glance →</a> &nbsp;·&nbsp; `;
 
   const text =
-    `Welcome to IBANforge Editor / OEM.\n\n` +
+    `Welcome to IBANforge ${copy.name}.\n\n` +
     `API key: ${p.rawKey}\n` +
-    `Plan: Editor / OEM subscription (${limit} requests/month, resets on the 1st)\n` +
+    `Plan: ${copy.name} subscription (${limit} requests/month, resets on the 1st)\n` +
     `Your key at a glance: https://ibanforge.com/en/account\n` +
-    `SLA: https://ibanforge.com/en/legal/sla\n` +
-    `DPA: https://ibanforge.com/en/legal/dpa\n` +
+    legalText +
     `Terms: https://ibanforge.com/en/legal/terms\n\n` +
     `Use it as a Bearer token:\n` +
     `  curl -H "Authorization: Bearer ${p.rawKey}" \\\n` +
@@ -438,13 +473,13 @@ export function buildOemKeyEmail(p: { rawKey: string; monthlyLimit: number }): {
     `       -H "content-type: application/json" -d '{"iban":"CH1000230000000012345"}'\n\n` +
     `Check your usage any time:\n` +
     `  curl -H "Authorization: Bearer ${p.rawKey}" https://api.ibanforge.com/v1/keys/usage\n\n` +
-    `Your named support contact: support@ibanforge.com (mention Editor/OEM).\n` +
+    `${copy.support}\n` +
     `Keep this key safe. It will not be shown again.\n\nIBANforge`;
 
   const html = `<!DOCTYPE html><html><body style="margin:0;background:#0f0f13;padding:28px;font-family:-apple-system,Segoe UI,Roboto,sans-serif;color:#d4d4d8">
   <div style="max-width:560px;margin:0 auto;background:#16161b;border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:30px 32px">
     <div style="font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:#71717a;font-family:monospace">IBANforge</div>
-    <h1 style="color:#fafafa;font-size:22px;margin:10px 0 6px">Welcome to Editor / OEM</h1>
+    <h1 style="color:#fafafa;font-size:22px;margin:10px 0 6px">Welcome to ${copy.name}</h1>
     <p style="color:#a1a1aa;font-size:15px;margin:0 0 22px">Your subscription is active: <b style="color:#fafafa">${limit} requests/month</b>, resets on the 1st.</p>
     <div style="background:#09090b;border:1px solid #27272a;border-radius:10px;padding:14px 16px;margin:0 0 8px">
       <div style="font-size:11px;color:#71717a;font-family:monospace;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Your API key</div>
@@ -456,13 +491,41 @@ export function buildOemKeyEmail(p: { rawKey: string; monthlyLimit: number }): {
      -X POST https://api.ibanforge.com/v1/iban/validate \\
      -H "content-type: application/json" \\
      -d '{"iban":"CH1000230000000012345"}'</pre>
-    <p style="font-size:14px;margin:0 0 6px"><a href="https://ibanforge.com/en/legal/sla" style="color:#fbbf24;text-decoration:none">Your SLA →</a> &nbsp;·&nbsp; <a href="https://ibanforge.com/en/legal/dpa" style="color:#fbbf24;text-decoration:none">DPA →</a> &nbsp;·&nbsp; <a href="https://ibanforge.com/en/legal/terms" style="color:#fbbf24;text-decoration:none">Terms →</a> &nbsp;·&nbsp; <a href="https://ibanforge.com/docs" style="color:#fbbf24;text-decoration:none">Docs →</a></p>
-    <p style="color:#a1a1aa;font-size:13px;margin:14px 0 0">Named support: <a href="mailto:support@ibanforge.com" style="color:#fbbf24;text-decoration:none">support@ibanforge.com</a> (mention Editor/OEM).</p>
+    <p style="font-size:14px;margin:0 0 6px">${legalHtml}<a href="https://ibanforge.com/en/legal/terms" style="color:#fbbf24;text-decoration:none">Terms →</a> &nbsp;·&nbsp; <a href="https://ibanforge.com/docs" style="color:#fbbf24;text-decoration:none">Docs →</a></p>
+    <p style="color:#a1a1aa;font-size:13px;margin:14px 0 0">${copy.support.replace('support@ibanforge.com', '<a href="mailto:support@ibanforge.com" style="color:#fbbf24;text-decoration:none">support@ibanforge.com</a>')}</p>
     <hr style="border:none;border-top:1px solid rgba(255,255,255,.06);margin:24px 0 14px">
-    <p style="color:#52525b;font-size:12px;margin:0">IBANforge · bank data API for software vendors · <a href="https://ibanforge.com" style="color:#71717a">ibanforge.com</a></p>
+    <p style="color:#52525b;font-size:12px;margin:0">IBANforge · ${copy.footer} · <a href="https://ibanforge.com" style="color:#71717a">ibanforge.com</a></p>
   </div></body></html>`;
 
-  return { subject: `Your IBANforge Editor / OEM key, ${limit} requests/month`, text, html };
+  return { subject: `Your IBANforge ${copy.name} key, ${limit} requests/month`, text, html };
+}
+
+export function buildOemKeyEmail(p: { rawKey: string; monthlyLimit: number }): {
+  subject: string;
+  text: string;
+  html: string;
+} {
+  return buildSubscriptionKeyEmail({ ...p, plan: 'oem' });
+}
+
+export function buildProKeyEmail(p: { rawKey: string; monthlyLimit: number }): {
+  subject: string;
+  text: string;
+  html: string;
+} {
+  return buildSubscriptionKeyEmail({ ...p, plan: 'pro' });
+}
+
+export async function sendSubscriptionKeyEmail(p: {
+  to: string;
+  rawKey: string;
+  monthlyLimit: number;
+  plan: SubscriptionEmailPlan;
+}): Promise<boolean> {
+  const { subject, text, html } = buildSubscriptionKeyEmail(p);
+  const ok = await sendViaRelay({ to: p.to, subject, text, html });
+  if (!ok) reportUndelivered(`${SUBSCRIPTION_EMAIL_COPY[p.plan].name} key delivery`, p.to, true);
+  return ok;
 }
 
 export async function sendOemKeyEmail(p: {
@@ -470,10 +533,7 @@ export async function sendOemKeyEmail(p: {
   rawKey: string;
   monthlyLimit: number;
 }): Promise<boolean> {
-  const { subject, text, html } = buildOemKeyEmail(p);
-  const ok = await sendViaRelay({ to: p.to, subject, text, html });
-  if (!ok) reportUndelivered('OEM key delivery', p.to, true);
-  return ok;
+  return sendSubscriptionKeyEmail({ ...p, plan: 'oem' });
 }
 
 // ---------------------------------------------------------------------------

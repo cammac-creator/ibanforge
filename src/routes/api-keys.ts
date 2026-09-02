@@ -8,7 +8,9 @@ import {
   getUsage,
   revokeApiKey,
   rotateApiKey,
+  PRO_MONTHLY_LIMIT,
 } from '../lib/api-keys.js';
+import { PRO_PAYMENT_LINK, PRO_PRICE_USD } from '../lib/payment-links.js';
 import { getStatsDB } from '../lib/db.js';
 import { getKeyReport } from '../lib/key-report.js';
 import { exportPaidState } from '../lib/backup.js';
@@ -406,6 +408,16 @@ apiKeys.get('/v1/credits/bundles', (c) => {
     })),
     payment_method: 'x402 USDC on Base mainnet',
     documentation: 'https://ibanforge.com/agents#credits',
+    // The recurring alternative, for a client that would rather budget a flat
+    // monthly amount than top up packs (2026-09-02). Card only: a subscription
+    // has no x402 rail.
+    subscription: {
+      plan: 'pro',
+      monthly_requests: PRO_MONTHLY_LIMIT,
+      price_usd_per_month: PRO_PRICE_USD,
+      checkout: PRO_PAYMENT_LINK,
+      payment_method: 'card (Stripe)',
+    },
   });
 });
 

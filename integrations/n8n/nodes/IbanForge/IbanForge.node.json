@@ -1,0 +1,18 @@
+{
+  "node": "n8n-nodes-ibanforge",
+  "nodeVersion": "1.0",
+  "codexVersion": "1.0",
+  "categories": ["Finance & Accounting"],
+  "resources": {
+    "credentialDocumentation": [
+      {
+        "url": "https://ibanforge.com/docs/api-keys?src=n8n"
+      }
+    ],
+    "primaryDocumentation": [
+      {
+        "url": "https://ibanforge.com/docs?src=n8n"
+      }
+    ]
+  }
+}

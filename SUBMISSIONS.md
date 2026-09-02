@@ -250,3 +250,15 @@ y reste ouverte.
 
 Re-vérifier 1 semaine après chaque soumission. Si une soumission est rejetée,
 demander pourquoi (souvent un champ ou une catégorie manquante) et resoumettre.
+
+---
+
+## 7) Annuaires d'API généralistes : état au 02.09.2026
+
+| Annuaire | État | Ce qu'il reste |
+|---|---|---|
+| **apis.guru** | ⏳ ticket ouvert le 27.08.2026 : [openapi-directory#3162](https://github.com/APIs-guru/openapi-directory/issues/3162) (format = celui de leur formulaire : Format/Official/Url/Name/Category/Logo). Ils traitent par vagues ; ne pas rouvrir. | Attendre. Si rien fin septembre, commenter le ticket. |
+| **Postman API Network** | ✅ collection versionnée dans `integrations/postman/` (28 requêtes, auth bearer héritée) | Compte Postman à la main de Claude-Alain : importer le JSON, *Publish → Public API Network*, catégorie *Financial services*. |
+| **RapidAPI Hub** | ⏳ rien de publié | Compte RapidAPI (Provider) : *Add API → Import OpenAPI* avec `https://api.ibanforge.com/openapi.json`, base URL `https://api.ibanforge.com`, en-tête `Authorization: Bearer`, plan *Basic* gratuit uniquement (on liste, on ne vend pas : 25 % de commission). Lien de la doc : ibanforge.com/docs. |
+| **n8n (nœud vérifié)** | ⏳ `n8n-nodes-ibanforge` 0.1.0 est sur npm mais **sans provenance** : `npx @n8n/scan-community-package n8n-nodes-ibanforge` échoue sur ce seul point (02.09.2026). Le lint `@n8n/node-cli` passe. | 1) Claude-Alain, sur npmjs.com → package → *Settings → Trusted publishers → Add* : owner `cammac-creator`, repo `ibanforge`, workflow `n8n-publish.yml`. 2) Moi : tag `n8n-v0.1.1`, la CI publie avec provenance, le scanner repasse. 3) Claude-Alain : soumettre sur le Creator Portal n8n (login). |
+| **Odoo Apps** | ✅ module testé sur Odoo 18 réel (10 tests verts le 02.09.2026, Docker) | Compte odoo.com + clé SSH à la main de Claude-Alain ; dépôt dédié branche `18.0`, voir `integrations/odoo/README.md`. |

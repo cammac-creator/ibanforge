@@ -34,6 +34,11 @@ const CREDIT_PACKS = [
   { bundle: "25k", price: "$80", credits: "25 000", url: "https://buy.stripe.com/14A7sE9ERbyld0QcuS8so02" },
 ] as const
 
+// Pro subscription (02/09/2026): the flat monthly tier, a public Payment Link
+// whose metadata.plan = 'pro' is what the API webhook keys on. Price and
+// allowance are restated in src/lib/payment-links.ts and src/lib/api-keys.ts.
+const PRO_PAYMENT_LINK = "https://buy.stripe.com/aFacMYaIVeKx1i87ay8so04"
+
 export default async function PricingPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
   const t = await getTranslations('pricing');
@@ -194,6 +199,36 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
             ),
           })}
         </p>
+      </section>
+
+      {/* ── Pro: the flat monthly plan (02/09/2026). Sits right under the three
+          rails because it answers the question the packs raise: what if I would
+          rather budget one number a month? ── */}
+      <section className="px-4 pb-16 max-w-5xl mx-auto w-full">
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-6 md:p-8 flex flex-col md:flex-row md:items-center gap-6">
+          <div className="flex-1 flex flex-col gap-2">
+            <span className="font-mono text-xs uppercase tracking-widest text-amber-500">
+              {t('pro.label')}
+            </span>
+            <h2 className="text-xl font-semibold tracking-tight text-balance">{t('pro.title')}</h2>
+            <p className="text-sm text-muted-foreground leading-relaxed max-w-2xl">{t('pro.text')}</p>
+            <p className="text-xs text-muted-foreground/70 leading-relaxed">{t('pro.note')}</p>
+          </div>
+          <div className="flex flex-col items-start md:items-end gap-3 shrink-0">
+            <p className="font-mono text-3xl font-bold text-amber-500 tabular-nums">
+              {t('pro.price')}
+              <span className="text-sm font-normal text-muted-foreground"> {t('pro.per')}</span>
+            </p>
+            <Button
+              size="sm"
+              variant="amber"
+              className="px-5"
+              render={<a href={PRO_PAYMENT_LINK} rel="noopener" />}
+            >
+              {t('pro.cta')}
+            </Button>
+          </div>
+        </div>
       </section>
 
       {/* ── Pricing table ─────────────────────────────────────────────────── */}

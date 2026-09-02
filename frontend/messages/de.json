@@ -127,8 +127,6 @@
         "cost": "$0.003",
         "description": "Schweizer BC-Nummer-Suche (SIX BankMaster)"
       },
-      "heading": "Endpoints und Preise",
-      "subtitle": "Starten Sie mit 200 Gratis-Anfragen pro Monat. Zahlen Sie erst, wenn Sie wachsen — per Karte oder in USDC.",
       "5": {
         "method": "GET",
         "path": "/v1/reference/validate",
@@ -140,7 +138,9 @@
         "path": "/v1/address/check",
         "cost": "Kostenlos",
         "description": "ISO-20022-Adressregeln (SPS, T2, Fedwire) vor den Umstellungen im November 2026"
-      }
+      },
+      "heading": "Endpoints und Preise",
+      "subtitle": "Starten Sie mit 200 Gratis-Anfragen pro Monat. Zahlen Sie erst, wenn Sie wachsen — per Karte oder in USDC."
     },
     "quickStart": {
       "heading": "Schnellstart",
@@ -413,6 +413,15 @@
       "label": "Prüfung der Kreditorendatei",
       "text": "Kein Entwickler? Laden Sie die CSV- oder XLSX-Datei hoch, aus der Sie zahlen, und jede Zeile wird gegen dieselben Register geprüft: 149 CHF bis 5'000 Zeilen, 349 CHF bis 20'000, zuerst kostenlose Vorschau, kommentierte Arbeitsmappe direkt nach der Zahlung.",
       "cta": "Datei prüfen"
+    },
+    "pro": {
+      "label": "Pro-Abonnement",
+      "title": "Lieber eine feste Monatsrechnung?",
+      "text": "Pro: 10'000 Anfragen pro Monat, alle Endpunkte, Zurücksetzung am 1., jederzeit kündbar. Kartenzahlung über Stripe, Ihr Schlüssel kommt direkt nach der Zahlung per E-Mail und funktioniert in Sekunden.",
+      "note": "Sie brauchen 50'000 Anfragen pro Monat, ein schriftliches SLA oder Einbettungsrechte? Das ist Editor / OEM, weiter unten.",
+      "price": "29 $",
+      "per": "/ Monat",
+      "cta": "Pro abonnieren"
     }
   },
   "playground": {

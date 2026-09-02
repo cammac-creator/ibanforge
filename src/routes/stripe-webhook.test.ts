@@ -1,7 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import type Stripe from 'stripe';
 import { processStripeEvent } from './stripe-webhook.js';
-import { consumeOneTimeKey, validateApiKey, OEM_MONTHLY_LIMIT } from '../lib/api-keys.js';
+import {
+  consumeOneTimeKey,
+  validateApiKey,
+  OEM_MONTHLY_LIMIT,
+  PRO_MONTHLY_LIMIT,
+} from '../lib/api-keys.js';
 import { getStatsDB } from '../lib/db.js';
 
 function keyCount(): number {
@@ -125,6 +130,33 @@ function mockOemEvent(opts: {
   } as unknown as Stripe.Event;
 }
 
+// Pro subscription checkout (2026-09-02): the PUBLIC Payment Link carries
+// plan='pro'; everything else is the OEM shape at the Pro price.
+function mockProEvent(opts: {
+  id: string;
+  email?: string | null;
+  sessionId?: string;
+  subscriptionId?: string | null;
+}): Stripe.Event {
+  return {
+    id: opts.id,
+    type: 'checkout.session.completed',
+    data: {
+      object: {
+        id: opts.sessionId ?? `cs_test_${opts.id}`,
+        metadata: { plan: 'pro' },
+        customer_email: opts.email ?? null,
+        customer_details: opts.email ? { email: opts.email } : null,
+        payment_status: 'paid',
+        mode: 'subscription',
+        subscription: opts.subscriptionId ?? `sub_test_${opts.id}`,
+        amount_total: 2900,
+        currency: 'usd',
+      },
+    },
+  } as unknown as Stripe.Event;
+}
+
 function mockSubscriptionDeleted(opts: { id: string; subscriptionId: string }): Stripe.Event {
   return {
     id: opts.id,
@@ -194,6 +226,54 @@ describe('processStripeEvent — Editor/OEM subscription', () => {
     );
     expect(result.status).toBe(200);
     expect(result.body.key_deactivated).toBe(false);
+  });
+});
+
+describe('processStripeEvent — Pro subscription (public monthly tier)', () => {
+  it('mints a 10,000/month key on a pro checkout and says so', () => {
+    const run = Date.now();
+    const sessionId = `cs_test_pro_${run}`;
+    const result = processStripeEvent(
+      mockProEvent({ id: `evt_pro_${run}`, email: `pro-${run}@example.com`, sessionId }),
+    );
+    expect(result.status).toBe(200);
+    expect(result.body.plan).toBe('pro');
+    expect(result.body.monthly_limit).toBe(PRO_MONTHLY_LIMIT);
+    expect(result.body.amount_paid_minor).toBe(2900);
+    expect(result.notify?.plan).toBe('pro');
+    expect(result.notify?.priceUsd).toBe(29);
+    expect(result.notify?.monthlyLimit).toBe(PRO_MONTHLY_LIMIT);
+
+    const delivered = consumeOneTimeKey(sessionId);
+    expect(delivered).not.toBeNull();
+    expect(delivered!.monthly_limit).toBe(PRO_MONTHLY_LIMIT);
+    expect(delivered!.credits_total).toBeNull();
+    const v = validateApiKey(delivered!.api_key);
+    expect(v.valid).toBe(true);
+    expect(v.monthlyLimit).toBe(PRO_MONTHLY_LIMIT);
+  });
+
+  it('the Pro key dies with its subscription, like the OEM one', () => {
+    const run = Date.now();
+    const sessionId = `cs_test_pro_churn_${run}`;
+    const subscriptionId = `sub_test_pro_churn_${run}`;
+    processStripeEvent(mockProEvent({ id: `evt_pro_c_${run}`, sessionId, subscriptionId }));
+    const delivered = consumeOneTimeKey(sessionId);
+    expect(validateApiKey(delivered!.api_key).valid).toBe(true);
+    const churn = processStripeEvent(
+      mockSubscriptionDeleted({ id: `evt_pro_churn_${run}`, subscriptionId }),
+    );
+    expect(churn.body.key_deactivated).toMatch(/^ifk_/);
+    expect(validateApiKey(delivered!.api_key).valid).toBe(false);
+  });
+
+  it('does not mint twice for the same pro session', () => {
+    const run = Date.now();
+    const sessionId = `cs_test_pro_retry_${run}`;
+    const first = processStripeEvent(mockProEvent({ id: `evt_pro_a_${run}`, sessionId }));
+    const second = processStripeEvent(mockProEvent({ id: `evt_pro_b_${run}`, sessionId }));
+    expect(second.body.key_prefix).toBe(first.body.key_prefix);
+    expect(second.notify).toBeUndefined();
   });
 });
 
