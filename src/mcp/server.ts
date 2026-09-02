@@ -168,6 +168,14 @@ Cost: $0.002 USDC per IBAN via x402 (e.g., 10 IBANs = $0.020, 50 IBANs = $0.100,
     const results = ibans.map((iban) => {
       const result = validateIBAN(iban);
       enrichResult(result, cache);
+      // validateIBAN stamps every row with the SINGLE-call price (0.005); a
+      // row of a batch is catalogued at 0.002, the 60% discount this tool's
+      // own description sells (see the HTTP transport's identical correction,
+      // src/routes/mcp-http.ts, `billedFree(result, 0.002)`). Left alone, this
+      // field would publish the wrong catalogue number under the right name —
+      // and unlike the JSON text below, TOOL_OUTPUT_SCHEMAS.batch_validate_iban
+      // now hands that number to a client as a validated, structured field.
+      result.cost_usdc = 0.002;
       return result;
     });
     return {
