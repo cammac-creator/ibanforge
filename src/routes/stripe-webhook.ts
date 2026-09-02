@@ -21,7 +21,12 @@
 import { Hono } from 'hono';
 import Stripe from 'stripe';
 import { getStatsDB } from '../lib/db.js';
-import { generateStripeKey, generateOemKey, deactivateBySubscription, OEM_MONTHLY_LIMIT } from '../lib/api-keys.js';
+import {
+  generateStripeKey,
+  generateOemKey,
+  deactivateBySubscription,
+  OEM_MONTHLY_LIMIT,
+} from '../lib/api-keys.js';
 import { notifyPurchaseTelegram } from '../lib/notify.js';
 import { sendApiKeyEmail, sendOemKeyEmail, alertKeyDeliveryFailure } from '../lib/email.js';
 
@@ -141,9 +146,11 @@ function recordAmountPaid(session: Stripe.Checkout.Session): {
   return { amount_paid_minor: minor, amount_paid_currency: currency };
 }
 
-export function processStripeEvent(
-  event: Stripe.Event,
-): { status: number; body: Record<string, unknown>; notify?: StripePurchaseNotify } {
+export function processStripeEvent(event: Stripe.Event): {
+  status: number;
+  body: Record<string, unknown>;
+  notify?: StripePurchaseNotify;
+} {
   const db = getStatsDB();
 
   const already = db
@@ -164,10 +171,14 @@ export function processStripeEvent(
       // that mints the key — and the idempotency barrier would eat Stripe's
       // replay of this event, leaving that key immortal. The tombstone makes
       // the order irrelevant: a later mint against this subscription refuses.
-      db.prepare('INSERT OR IGNORE INTO dead_subscriptions (subscription_id) VALUES (?)').run(sub.id);
+      db.prepare('INSERT OR IGNORE INTO dead_subscriptions (subscription_id) VALUES (?)').run(
+        sub.id,
+      );
     }
-    db.prepare('INSERT INTO processed_webhooks (stripe_event_id, event_type) VALUES (?, ?)')
-      .run(event.id, event.type);
+    db.prepare('INSERT INTO processed_webhooks (stripe_event_id, event_type) VALUES (?, ?)').run(
+      event.id,
+      event.type,
+    );
     return {
       status: 200,
       body: {
@@ -179,8 +190,10 @@ export function processStripeEvent(
   }
 
   if (!MINTING_EVENTS.has(event.type)) {
-    db.prepare('INSERT INTO processed_webhooks (stripe_event_id, event_type) VALUES (?, ?)')
-      .run(event.id, event.type);
+    db.prepare('INSERT INTO processed_webhooks (stripe_event_id, event_type) VALUES (?, ?)').run(
+      event.id,
+      event.type,
+    );
     return { status: 200, body: { received: true, ignored_event_type: event.type } };
   }
 
@@ -203,8 +216,10 @@ export function processStripeEvent(
     session.payment_status !== 'paid' &&
     session.payment_status !== 'no_payment_required'
   ) {
-    db.prepare('INSERT INTO processed_webhooks (stripe_event_id, event_type) VALUES (?, ?)')
-      .run(event.id, event.type);
+    db.prepare('INSERT INTO processed_webhooks (stripe_event_id, event_type) VALUES (?, ?)').run(
+      event.id,
+      event.type,
+    );
     return {
       status: 200,
       body: { received: true, pending: true, payment_status: session.payment_status },
@@ -226,8 +241,10 @@ export function processStripeEvent(
       subscriptionId &&
       db.prepare('SELECT 1 FROM dead_subscriptions WHERE subscription_id = ?').get(subscriptionId)
     ) {
-      db.prepare('INSERT INTO processed_webhooks (stripe_event_id, event_type) VALUES (?, ?)')
-        .run(event.id, event.type);
+      db.prepare('INSERT INTO processed_webhooks (stripe_event_id, event_type) VALUES (?, ?)').run(
+        event.id,
+        event.type,
+      );
       return {
         status: 200,
         body: {
@@ -243,8 +260,10 @@ export function processStripeEvent(
     // After the mint: the row must exist for the amount to land on it.
     const paid = recordAmountPaid(session);
 
-    db.prepare('INSERT INTO processed_webhooks (stripe_event_id, event_type) VALUES (?, ?)')
-      .run(event.id, event.type);
+    db.prepare('INSERT INTO processed_webhooks (stripe_event_id, event_type) VALUES (?, ?)').run(
+      event.id,
+      event.type,
+    );
 
     const notify: StripePurchaseNotify | undefined = mint.api_key
       ? {
@@ -277,8 +296,10 @@ export function processStripeEvent(
   const bundleConfig = STRIPE_BUNDLES[bundle];
 
   if (!bundleConfig) {
-    db.prepare('INSERT INTO processed_webhooks (stripe_event_id, event_type) VALUES (?, ?)')
-      .run(event.id, event.type);
+    db.prepare('INSERT INTO processed_webhooks (stripe_event_id, event_type) VALUES (?, ?)').run(
+      event.id,
+      event.type,
+    );
     return { status: 200, body: { received: true, error: 'unknown_bundle', bundle } };
   }
 
@@ -287,8 +308,10 @@ export function processStripeEvent(
   // After the mint: the row must exist for the amount to land on it.
   const paid = recordAmountPaid(session);
 
-  db.prepare('INSERT INTO processed_webhooks (stripe_event_id, event_type) VALUES (?, ?)')
-    .run(event.id, event.type);
+  db.prepare('INSERT INTO processed_webhooks (stripe_event_id, event_type) VALUES (?, ?)').run(
+    event.id,
+    event.type,
+  );
 
   // Owner alert fires only on a FRESH mint (api_key non-null). On Stripe retries
   // the mint is idempotent → api_key is null → no notify → no duplicate alert.
@@ -344,7 +367,10 @@ stripeWebhook.post('/v1/stripe/webhook', async (c) => {
     stripe = getStripe();
   } catch {
     return c.json(
-      { error: 'webhook_not_configured', message: 'Webhook processing is temporarily unavailable.' },
+      {
+        error: 'webhook_not_configured',
+        message: 'Webhook processing is temporarily unavailable.',
+      },
       503,
     );
   }

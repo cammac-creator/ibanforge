@@ -56,7 +56,12 @@ describe('the registry of institutions we write to', () => {
       website: 'https://alpha.example.net',
       dossier: 'Réutilisation des données publiées',
     });
-    upsertInstitutionalContact({ email: ALPHA, org: 'Autorité Alpha', category: 'autorite', role: 'Service juridique' });
+    upsertInstitutionalContact({
+      email: ALPHA,
+      org: 'Autorité Alpha',
+      category: 'autorite',
+      role: 'Service juridique',
+    });
     const row = mine()[0];
     expect(row.role).toBe('Service juridique');
     expect(row.country).toBe('CH');
@@ -67,7 +72,12 @@ describe('the registry of institutions we write to', () => {
 
   it('stores nothing rather than blanks for the fields left out', () => {
     clean();
-    upsertInstitutionalContact({ email: BETA, org: 'Réseau Beta', category: 'reseau_paiement', country: '   ' });
+    upsertInstitutionalContact({
+      email: BETA,
+      org: 'Réseau Beta',
+      category: 'reseau_paiement',
+      country: '   ',
+    });
     const row = mine()[0];
     expect(row.country).toBeNull();
     expect(row.role).toBeNull();
@@ -78,14 +88,23 @@ describe('the registry of institutions we write to', () => {
 
   it('lowercases the address, since the thread is attached by lowercase address', () => {
     clean();
-    upsertInstitutionalContact({ email: '  Registry@Alpha.Example.NET ', org: 'Autorité Alpha', category: 'autorite' });
+    upsertInstitutionalContact({
+      email: '  Registry@Alpha.Example.NET ',
+      org: 'Autorité Alpha',
+      category: 'autorite',
+    });
     expect(mine()[0].email).toBe(ALPHA);
     clean();
   });
 
   it('uppercases the country, so CH and ch are not two countries', () => {
     clean();
-    upsertInstitutionalContact({ email: BETA, org: 'Réseau Beta', category: 'reseau_paiement', country: ' ch ' });
+    upsertInstitutionalContact({
+      email: BETA,
+      org: 'Réseau Beta',
+      category: 'reseau_paiement',
+      country: ' ch ',
+    });
     expect(mine()[0].country).toBe('CH');
     clean();
   });
@@ -108,7 +127,11 @@ describe('the registry of institutions we write to', () => {
   });
 
   it('refuses an address that is not one', () => {
-    const res = upsertInstitutionalContact({ email: 'pas-une-adresse', org: 'Autorité Alpha', category: 'autorite' });
+    const res = upsertInstitutionalContact({
+      email: 'pas-une-adresse',
+      org: 'Autorité Alpha',
+      category: 'autorite',
+    });
     expect(res.ok).toBe(false);
   });
 
@@ -116,21 +139,33 @@ describe('the registry of institutions we write to', () => {
     clean();
     // A row with no org is unfindable in a list grouped by org, which is the
     // only thing this registry is read for.
-    expect(upsertInstitutionalContact({ email: ALPHA, org: '', category: 'autorite' }).ok).toBe(false);
-    expect(upsertInstitutionalContact({ email: ALPHA, org: '   ', category: 'autorite' }).ok).toBe(false);
+    expect(upsertInstitutionalContact({ email: ALPHA, org: '', category: 'autorite' }).ok).toBe(
+      false,
+    );
+    expect(upsertInstitutionalContact({ email: ALPHA, org: '   ', category: 'autorite' }).ok).toBe(
+      false,
+    );
     expect(mine()).toHaveLength(0);
   });
 
   it('refuses an empty category, whitespace included', () => {
     clean();
-    expect(upsertInstitutionalContact({ email: ALPHA, org: 'Autorité Alpha', category: '' }).ok).toBe(false);
-    expect(upsertInstitutionalContact({ email: ALPHA, org: 'Autorité Alpha', category: '  ' }).ok).toBe(false);
+    expect(
+      upsertInstitutionalContact({ email: ALPHA, org: 'Autorité Alpha', category: '' }).ok,
+    ).toBe(false);
+    expect(
+      upsertInstitutionalContact({ email: ALPHA, org: 'Autorité Alpha', category: '  ' }).ok,
+    ).toBe(false);
     expect(mine()).toHaveLength(0);
   });
 
   it('takes any category it is handed, because the list of institutions is not closed', () => {
     clean();
-    upsertInstitutionalContact({ email: BETA, org: 'Réseau Beta', category: 'chambre_de_compensation' });
+    upsertInstitutionalContact({
+      email: BETA,
+      org: 'Réseau Beta',
+      category: 'chambre_de_compensation',
+    });
     expect(mine()[0].category).toBe('chambre_de_compensation');
     clean();
   });

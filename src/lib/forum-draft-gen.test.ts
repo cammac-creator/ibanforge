@@ -101,7 +101,14 @@ describe('buildUserPrompt — le brief transmis au générateur', () => {
     expect(p).toContain('no product mention');
   });
   it('reste utilisable sans extrait ni notes', () => {
-    const p = buildUserPrompt({ title: 'T', excerpt: '', url: '', lang: 'en', source: 'hn', notes: '' });
+    const p = buildUserPrompt({
+      title: 'T',
+      excerpt: '',
+      url: '',
+      lang: 'en',
+      source: 'hn',
+      notes: '',
+    });
     expect(p).toContain('judge from the title');
     expect(p).not.toContain('Operator notes');
   });
@@ -116,7 +123,14 @@ describe('generateDraft — comportement sans clé', () => {
     process.env = { ...original };
   });
   it('rend null (génération sautée) quand ANTHROPIC_API_KEY est absente', async () => {
-    const out = await generateDraft({ title: 'T', excerpt: '', url: '', lang: 'en', source: 'github', notes: '' });
+    const out = await generateDraft({
+      title: 'T',
+      excerpt: '',
+      url: '',
+      lang: 'en',
+      source: 'github',
+      notes: '',
+    });
     expect(out).toBeNull();
   });
 });

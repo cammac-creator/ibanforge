@@ -77,7 +77,10 @@ export interface BackfillReport {
 async function fetchPage(url: string): Promise<string | null> {
   try {
     const res = await fetch(url, {
-      headers: { 'User-Agent': 'ibanforge-radar/1.0 (+https://ibanforge.com)', Accept: 'text/html' },
+      headers: {
+        'User-Agent': 'ibanforge-radar/1.0 (+https://ibanforge.com)',
+        Accept: 'text/html',
+      },
       signal: AbortSignal.timeout(PAGE_TIMEOUT_MS),
       redirect: 'follow',
     });
@@ -98,7 +101,9 @@ function siteBase(website: string): string {
  * site, own domain only, with the page URL as proof. Null when no probed page
  * publishes one.
  */
-export async function enrichOne(website: string): Promise<{ email: string; sourceUrl: string } | null> {
+export async function enrichOne(
+  website: string,
+): Promise<{ email: string; sourceUrl: string } | null> {
   const base = siteBase(website);
   for (const path of CONTACT_PATHS) {
     let url: string;
@@ -124,7 +129,11 @@ async function callAnthropic(
   if (!apiKey) return null;
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
-    headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+    headers: {
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'content-type': 'application/json',
+    },
     body: JSON.stringify({
       // The model's thinking block spends the SAME max_tokens budget as the
       // answer, and the customer-context block lengthens that thinking: at
@@ -142,7 +151,10 @@ async function callAnthropic(
     const detail = await res.text().catch(() => '');
     throw new Error(`Anthropic HTTP ${res.status}: ${detail.slice(0, 120)}`);
   }
-  const data = (await res.json()) as { content?: Array<{ type: string; text?: string }>; stop_reason?: string };
+  const data = (await res.json()) as {
+    content?: Array<{ type: string; text?: string }>;
+    stop_reason?: string;
+  };
   const text = (data.content ?? []).map((c) => c.text ?? '').join('');
   const stopReason = data.stop_reason ?? '?';
   if (!text.trim()) throw new Error(`generation empty (stop_reason=${stopReason})`);
@@ -241,7 +253,9 @@ export async function enrichClientCompanies(limit = CLIENT_ENRICH_PER_RUN): Prom
     ).map((r) => r.e),
   );
   const keyRows = db
-    .prepare('SELECT lower(email) AS email, key_prefix FROM api_keys ORDER BY datetime(created_at) DESC')
+    .prepare(
+      'SELECT lower(email) AS email, key_prefix FROM api_keys ORDER BY datetime(created_at) DESC',
+    )
     .all() as Array<{ email: string; key_prefix: string }>;
 
   const prefixesByEmail = new Map<string, string[]>();
@@ -314,7 +328,9 @@ export async function enrichClientCompanies(limit = CLIENT_ENRICH_PER_RUN): Prom
       }
     } catch (err) {
       // Transient (network, API) — no row written, retried next run.
-      out.errors.push(`client ${email.split('@')[1] ?? email}: ${err instanceof Error ? err.message : String(err)}`);
+      out.errors.push(
+        `client ${email.split('@')[1] ?? email}: ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
   }
   return out;
@@ -430,7 +446,14 @@ export async function runProspectBackfill(
                recommended_lang = ?, status = 'a_mailer', updated_at = datetime('now')
              WHERE id = ? AND status = 'a_enrichir'`,
           )
-          .run(mail.subjectEn, mail.bodyEn, mail.subjectFr, mail.bodyFr, recommendedLang(p.country), p.id);
+          .run(
+            mail.subjectEn,
+            mail.bodyEn,
+            mail.subjectFr,
+            mail.bodyFr,
+            recommendedLang(p.country),
+            p.id,
+          );
         if (r.changes > 0) report.drafted.written++;
       } catch (err) {
         report.errors.push(`draft ${p.id}: ${err instanceof Error ? err.message : String(err)}`);
@@ -439,7 +462,11 @@ export async function runProspectBackfill(
 
     // -- 3. customer identities (Clients tab gap of 19/08) ------------------
     const clients = await enrichClientCompanies(opts.clientLimit ?? CLIENT_ENRICH_PER_RUN);
-    report.clients = { tried: clients.tried, identified: clients.identified, unresolved: clients.unresolved };
+    report.clients = {
+      tried: clients.tried,
+      identified: clients.identified,
+      unresolved: clients.unresolved,
+    };
     report.errors.push(...clients.errors);
 
     if (report.enriched.found + report.drafted.written + clients.identified > 0) {
@@ -468,7 +495,10 @@ export async function runProspectBackfill(
   }
 }
 
-export function lastProspectBackfillReport(): { last_run_at: string | null; report: BackfillReport | null } {
+export function lastProspectBackfillReport(): {
+  last_run_at: string | null;
+  report: BackfillReport | null;
+} {
   let parsed: BackfillReport | null;
   try {
     parsed = JSON.parse(kvGet(KV_LAST_REPORT) ?? 'null') as BackfillReport | null;

@@ -48,7 +48,9 @@ function pickBankCode(country: Country): string | null {
   const db = getBicDB();
   if (country === 'DE') {
     const row = db
-      .prepare('SELECT blz FROM de_blz WHERE retired = 0 OR retired IS NULL ORDER BY RANDOM() LIMIT 1')
+      .prepare(
+        'SELECT blz FROM de_blz WHERE retired = 0 OR retired IS NULL ORDER BY RANDOM() LIMIT 1',
+      )
       .get() as { blz: string } | undefined;
     return row?.blz ?? null;
   }
@@ -56,7 +58,9 @@ function pickBankCode(country: Country): string | null {
     // Ordinary IIDs only: QR-IIDs (30000-31999) are a separate number range
     // with their own semantics, wrong for a generic test IBAN.
     const row = db
-      .prepare("SELECT iid FROM ch_clearing WHERE CAST(iid AS INTEGER) < 30000 ORDER BY RANDOM() LIMIT 1")
+      .prepare(
+        'SELECT iid FROM ch_clearing WHERE CAST(iid AS INTEGER) < 30000 ORDER BY RANDOM() LIMIT 1',
+      )
       .get() as { iid: string } | undefined;
     return row ? row.iid.padStart(5, '0') : null;
   }
@@ -129,16 +133,24 @@ testIban.get('/v1/test-iban', (c) => {
       400,
     );
   }
-  const count = Number.isInteger(countParam) && countParam >= 1 && countParam <= 10 ? countParam : 1;
+  const count =
+    Number.isInteger(countParam) && countParam >= 1 && countParam <= 10 ? countParam : 1;
 
   const items = [];
   for (let i = 0; i < count; i++) {
-    const country = (countryParam as Country) || COUNTRIES[Math.floor(Math.random() * COUNTRIES.length)];
+    const country =
+      (countryParam as Country) || COUNTRIES[Math.floor(Math.random() * COUNTRIES.length)];
     const item = generateOne(country);
     if (item) items.push(item);
   }
   if (items.length === 0) {
-    return c.json({ error: 'generation_failed', message: 'Could not generate against the current register data. Try again.' }, 503);
+    return c.json(
+      {
+        error: 'generation_failed',
+        message: 'Could not generate against the current register data. Try again.',
+      },
+      503,
+    );
   }
   return c.json({
     test_ibans: items,

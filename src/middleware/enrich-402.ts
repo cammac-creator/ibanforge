@@ -1,7 +1,12 @@
 import type { MiddlewareHandler } from 'hono';
 import type { HonoEnv, PaywallCause } from '../types.js';
 import { datasetFacts } from '../lib/dataset-facts.js';
-import { buildBazaarInfo, findDiscovery, markExample, routeTemplateOf } from '../lib/x402-discovery.js';
+import {
+  buildBazaarInfo,
+  findDiscovery,
+  markExample,
+  routeTemplateOf,
+} from '../lib/x402-discovery.js';
 import { canonicalPaidPath } from './x402.js';
 import { ENTRY_PAYMENT_LINK, PRICING_PAGE } from '../lib/payment-links.js';
 
@@ -106,7 +111,11 @@ const PRICING: EndpointPricing[] = [
     // Real response shape: count/valid_count totals, per-result validate enrichment (trimmed).
     outputExample: {
       results: [
-        { iban: 'CH1000230000000012345', valid: true, country: { code: 'CH', name: 'Switzerland' } },
+        {
+          iban: 'CH1000230000000012345',
+          valid: true,
+          country: { code: 'CH', name: 'Switzerland' },
+        },
         { iban: 'DE89370400440532013000', valid: true, country: { code: 'DE', name: 'Germany' } },
       ],
       count: 2,
@@ -117,8 +126,7 @@ const PRICING: EndpointPricing[] = [
   {
     match: (m, p) => m === 'GET' && p.startsWith('/v1/bic/'),
     price_usdc: 0.003,
-    description:
-      `Lookup a BIC/SWIFT code against ${F.claim.bic} BIC entries (${F.claim.lei} LEI-enriched via GLEIF, refreshed monthly). Returns bank name, country, city, LEI, and registered head-office address (where available).`,
+    description: `Lookup a BIC/SWIFT code against ${F.claim.bic} BIC entries (${F.claim.lei} LEI-enriched via GLEIF, refreshed monthly). Returns bank name, country, city, LEI, and registered head-office address (where available).`,
     inputSchema: {
       type: 'object',
       required: ['code'],
@@ -189,8 +197,7 @@ const PRICING: EndpointPricing[] = [
   {
     match: (m, p) => m === 'GET' && p.startsWith('/v1/ch/clearing/'),
     price_usdc: 0.003,
-    description:
-      `Swiss BC-Nummer / IID clearing lookup against ${F.claim.chClearing} SIX BankMaster entries (refreshed monthly). Returns institution name, type, address, BIC, the full payment-rail participation (SIC, RTGS CHF, Instant Payments CHF, euroSIC, LSV+/BDD) and the QR-IID allocation.`,
+    description: `Swiss BC-Nummer / IID clearing lookup against ${F.claim.chClearing} SIX BankMaster entries (refreshed monthly). Returns institution name, type, address, BIC, the full payment-rail participation (SIC, RTGS CHF, Instant Payments CHF, euroSIC, LSV+/BDD) and the QR-IID allocation.`,
     inputSchema: {
       type: 'object',
       required: ['iid'],
@@ -206,7 +213,12 @@ const PRICING: EndpointPricing[] = [
     outputExample: {
       iid: '00230',
       found: true,
-      institution: { name: 'UBS Switzerland AG', type: 'bank', iid_type: 'headquarters', headquarters_iid: '00230' },
+      institution: {
+        name: 'UBS Switzerland AG',
+        type: 'bank',
+        iid_type: 'headquarters',
+        headquarters_iid: '00230',
+      },
       bic: 'UBSWCHZH80A',
       payment_services: {
         sic: true,
@@ -230,7 +242,12 @@ const PRICING: EndpointPricing[] = [
  * Prices must stay in sync with src/routes/credits-buy.ts and the x402 route
  * table in src/middleware/x402.ts. Audit 2026-07-25.
  */
-const CREDIT_BUNDLES: Array<{ slug: string; credits: number; price_usdc: number; discount?: string }> = [
+const CREDIT_BUNDLES: Array<{
+  slug: string;
+  credits: number;
+  price_usdc: number;
+  discount?: string;
+}> = [
   { slug: '1k', credits: 1000, price_usdc: 5 },
   { slug: '5k', credits: 5000, price_usdc: 20, discount: '-20% vs retail' },
   { slug: '25k', credits: 25000, price_usdc: 80, discount: '-36% vs retail' },
@@ -252,7 +269,8 @@ for (const b of CREDIT_BUNDLES) {
       properties: {
         email: {
           type: 'string',
-          description: 'Optional — anonymous keys are fully functional. Used only to let you recover the key.',
+          description:
+            'Optional — anonymous keys are fully functional. Used only to let you recover the key.',
         },
       },
     },
@@ -535,7 +553,8 @@ function buildAccessRamp(): Record<string, unknown> {
       // path. /docs/pay-as-an-agent (live, linked from llms.txt and the MCP
       // instructions) walks that path in 3 steps — the 402 itself was the one
       // surface that never mentioned it.
-      wallet_setup: 'https://ibanforge.com/docs/pay-as-an-agent — create and fund an agent wallet, then make your first paid call (3 steps)',
+      wallet_setup:
+        'https://ibanforge.com/docs/pay-as-an-agent — create and fund an agent wallet, then make your first paid call (3 steps)',
       protocol_docs: 'https://x402.org',
       discovery: 'https://api.ibanforge.com/.well-known/x402',
       bazaar: 'https://api.cdp.coinbase.com/platform/v2/x402/discovery/resources',
@@ -657,7 +676,8 @@ export function enrich402Middleware(): MiddlewareHandler<HonoEnv> {
 
     const url = new URL(c.req.url);
     const method = c.req.method;
-    const walletAddress = process.env.WALLET_ADDRESS ?? '0x0000000000000000000000000000000000000000';
+    const walletAddress =
+      process.env.WALLET_ADDRESS ?? '0x0000000000000000000000000000000000000000';
 
     const headerAnnouncement = decodePaymentRequired(c.res.headers.get('payment-required'));
     let announcement = headerAnnouncement;

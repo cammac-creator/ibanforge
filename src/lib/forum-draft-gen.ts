@@ -77,7 +77,9 @@ export interface GeneratedDraft {
  * string, which JSON.parse rejects (5 of 6 drafts failed exactly there).
  * Delimiters have no escaping problem at all.
  */
-export function parseMarkedOutput(text: string): { draft: string; draftFr: string; summaryFr: string } | null {
+export function parseMarkedOutput(
+  text: string,
+): { draft: string; draftFr: string; summaryFr: string } | null {
   const m =
     /===DRAFT===\s*([\s\S]*?)\s*===DRAFT_FR===\s*([\s\S]*?)\s*===SUMMARY_FR===\s*([\s\S]*?)\s*(?:===END===|$)/.exec(
       text,
@@ -89,7 +91,9 @@ export function parseMarkedOutput(text: string): { draft: string; draftFr: strin
   }
   // Older two-section shape (no DRAFT_FR): keep parsing it, the translation
   // backfill fills draft_fr afterwards.
-  const two = /===DRAFT===\s*([\s\S]*?)\s*===SUMMARY_FR===\s*([\s\S]*?)\s*(?:===END===|$)/.exec(text);
+  const two = /===DRAFT===\s*([\s\S]*?)\s*===SUMMARY_FR===\s*([\s\S]*?)\s*(?:===END===|$)/.exec(
+    text,
+  );
   if (!two) return null;
   const draft = two[1].trim();
   const summaryFr = two[2].trim();
@@ -151,9 +155,14 @@ export function buildVerifiedFacts(text: string): string {
         enrichResult(result);
         const bits: string[] = [`IBAN ${result.iban}: valid`];
         if (result.bban?.bank_code) bits.push(`bank code ${result.bban.bank_code}`);
-        if (result.bic?.code) bits.push(`resolves to BIC ${result.bic.code}${result.bic.bank_name ? ` (${result.bic.bank_name})` : ''}`);
-        if (result.sepa?.schemes?.length) bits.push(`SEPA schemes: ${result.sepa.schemes.join('/')}`);
-        if (typeof result.sepa?.vop_participant === 'boolean') bits.push(`vop_participant: ${result.sepa.vop_participant}`);
+        if (result.bic?.code)
+          bits.push(
+            `resolves to BIC ${result.bic.code}${result.bic.bank_name ? ` (${result.bic.bank_name})` : ''}`,
+          );
+        if (result.sepa?.schemes?.length)
+          bits.push(`SEPA schemes: ${result.sepa.schemes.join('/')}`);
+        if (typeof result.sepa?.vop_participant === 'boolean')
+          bits.push(`vop_participant: ${result.sepa.vop_participant}`);
         lines.push(bits.join(' · '));
       } else {
         lines.push(`IBAN ${ibanMatch[1]}: INVALID per mod-97/structure check`);
@@ -236,14 +245,24 @@ export async function generateDraft(t: DraftInput): Promise<GeneratedDraft | nul
   const marked = parseMarkedOutput(text);
   if (marked) {
     const draftFr = marked.draftFr || (t.lang === 'fr' ? marked.draft : '');
-    return { draft: stripDashes(marked.draft), draftFr: stripDashes(draftFr), summaryFr: stripDashes(marked.summaryFr) };
+    return {
+      draft: stripDashes(marked.draft),
+      draftFr: stripDashes(draftFr),
+      summaryFr: stripDashes(marked.summaryFr),
+    };
   }
   const parsed = extractJson(text);
   if (parsed && typeof parsed.draft === 'string' && typeof parsed.summary_fr === 'string') {
     const draft = stripDashes(parsed.draft.trim());
-    return { draft, draftFr: t.lang === 'fr' ? draft : '', summaryFr: stripDashes(parsed.summary_fr.trim()) };
+    return {
+      draft,
+      draftFr: t.lang === 'fr' ? draft : '',
+      summaryFr: stripDashes(parsed.summary_fr.trim()),
+    };
   }
-  throw new Error(`generation output unparseable (stop_reason=${data.stop_reason ?? '?'}, ${text.slice(0, 60)})`);
+  throw new Error(
+    `generation output unparseable (stop_reason=${data.stop_reason ?? '?'}, ${text.slice(0, 60)})`,
+  );
 }
 
 /**
@@ -256,7 +275,11 @@ export async function translateToFr(draft: string): Promise<string | null> {
   if (!apiKey) return null;
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
-    headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+    headers: {
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'content-type': 'application/json',
+    },
     body: JSON.stringify({
       model: 'claude-sonnet-5',
       max_tokens: 2500,

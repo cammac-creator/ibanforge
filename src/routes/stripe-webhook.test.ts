@@ -42,15 +42,19 @@ function mockEvent(opts: {
 }
 
 /** What the database actually holds for a checkout session. */
-function storedAmount(sessionId: string): {
-  amount_paid_minor: number | null;
-  amount_paid_currency: string | null;
-} | undefined {
+function storedAmount(sessionId: string):
+  | {
+      amount_paid_minor: number | null;
+      amount_paid_currency: string | null;
+    }
+  | undefined {
   return getStatsDB()
     .prepare(
       'SELECT amount_paid_minor, amount_paid_currency FROM api_keys WHERE stripe_session_id = ?',
     )
-    .get(sessionId) as { amount_paid_minor: number | null; amount_paid_currency: string | null } | undefined;
+    .get(sessionId) as
+    | { amount_paid_minor: number | null; amount_paid_currency: string | null }
+    | undefined;
 }
 
 describe('processStripeEvent — checkout.session.completed', () => {
@@ -83,16 +87,12 @@ describe('processStripeEvent — checkout.session.completed', () => {
 
   it('rejects an unknown bundle but still marks the event processed', () => {
     const eventId = `evt_test_${Date.now()}_bad_bundle`;
-    const result = processStripeEvent(
-      mockEvent({ id: eventId, bundle: '999k' }),
-    );
+    const result = processStripeEvent(mockEvent({ id: eventId, bundle: '999k' }));
     expect(result.status).toBe(200);
     expect(result.body.error).toBe('unknown_bundle');
 
     // Replay: should be idempotent (event already marked processed)
-    const replay = processStripeEvent(
-      mockEvent({ id: eventId, bundle: '999k' }),
-    );
+    const replay = processStripeEvent(mockEvent({ id: eventId, bundle: '999k' }));
     expect(replay.body.idempotent).toBe(true);
   });
 });
@@ -161,13 +161,9 @@ describe('processStripeEvent — Editor/OEM subscription', () => {
   it('does not mint twice for the same checkout session (webhook retry)', () => {
     const run = Date.now();
     const sessionId = `cs_test_oem_retry_${run}`;
-    const first = processStripeEvent(
-      mockOemEvent({ id: `evt_oem_a_${run}`, sessionId }),
-    );
+    const first = processStripeEvent(mockOemEvent({ id: `evt_oem_a_${run}`, sessionId }));
     // Stripe retries deliver a DIFFERENT event id for the same session.
-    const second = processStripeEvent(
-      mockOemEvent({ id: `evt_oem_b_${run}`, sessionId }),
-    );
+    const second = processStripeEvent(mockOemEvent({ id: `evt_oem_b_${run}`, sessionId }));
     expect(second.status).toBe(200);
     expect(second.body.key_prefix).toBe(first.body.key_prefix);
     expect(second.notify).toBeUndefined(); // no duplicate owner alert / email
@@ -192,7 +188,10 @@ describe('processStripeEvent — Editor/OEM subscription', () => {
   it('answers 200 gracefully for an unknown canceled subscription', () => {
     const run = Date.now();
     const result = processStripeEvent(
-      mockSubscriptionDeleted({ id: `evt_churn_unknown_${run}`, subscriptionId: `sub_never_minted_${run}` }),
+      mockSubscriptionDeleted({
+        id: `evt_churn_unknown_${run}`,
+        subscriptionId: `sub_never_minted_${run}`,
+      }),
     );
     expect(result.status).toBe(200);
     expect(result.body.key_deactivated).toBe(false);
@@ -205,13 +204,23 @@ describe('processStripeEvent — idempotency', () => {
     const sessionId = `cs_test_${Date.now()}_idempotent`;
 
     const first = processStripeEvent(
-      mockEvent({ id: eventId, bundle: '1k', sessionId, email: `idempo-${Date.now()}@example.com` }),
+      mockEvent({
+        id: eventId,
+        bundle: '1k',
+        sessionId,
+        email: `idempo-${Date.now()}@example.com`,
+      }),
     );
     expect(first.body.credits_minted).toBe(1000);
     const firstPrefix = first.body.key_prefix;
 
     const second = processStripeEvent(
-      mockEvent({ id: eventId, bundle: '1k', sessionId, email: `idempo-${Date.now()}@example.com` }),
+      mockEvent({
+        id: eventId,
+        bundle: '1k',
+        sessionId,
+        email: `idempo-${Date.now()}@example.com`,
+      }),
     );
     expect(second.body.idempotent).toBe(true);
     expect(second.body.key_prefix).toBeUndefined();
@@ -242,18 +251,30 @@ describe('the amount collected is measured, never re-derived', () => {
     );
 
     expect(result.body.amount_paid_minor).toBe(2000);
-    expect(storedAmount(sessionId)).toEqual({ amount_paid_minor: 2000, amount_paid_currency: 'usd' });
+    expect(storedAmount(sessionId)).toEqual({
+      amount_paid_minor: 2000,
+      amount_paid_currency: 'usd',
+    });
   });
 
   it('records the currency beside the amount rather than assuming USD', () => {
     const run = Date.now();
     const sessionId = `cs_test_currency_${run}`;
     processStripeEvent(
-      mockEvent({ id: `evt_currency_${run}`, bundle: '1k', sessionId, amountTotal: 4500, currency: 'eur' }),
+      mockEvent({
+        id: `evt_currency_${run}`,
+        bundle: '1k',
+        sessionId,
+        amountTotal: 4500,
+        currency: 'eur',
+      }),
     );
     // A minor-unit integer without its currency is not an amount. The pack
     // table's implicit USD is exactly the assumption this column removes.
-    expect(storedAmount(sessionId)).toEqual({ amount_paid_minor: 4500, amount_paid_currency: 'eur' });
+    expect(storedAmount(sessionId)).toEqual({
+      amount_paid_minor: 4500,
+      amount_paid_currency: 'eur',
+    });
   });
 
   it('keeps a discounted price instead of the list price of the pack', () => {
@@ -274,7 +295,13 @@ describe('the amount collected is measured, never re-derived', () => {
     const run = Date.now();
     const sessionId = `cs_test_noamount_${run}`;
     const result = processStripeEvent(
-      mockEvent({ id: `evt_noamount_${run}`, bundle: '1k', sessionId, amountTotal: null, currency: null }),
+      mockEvent({
+        id: `evt_noamount_${run}`,
+        bundle: '1k',
+        sessionId,
+        amountTotal: null,
+        currency: null,
+      }),
     );
 
     expect(result.body.amount_paid_minor).toBeUndefined();
@@ -313,7 +340,10 @@ describe('the amount collected is measured, never re-derived', () => {
     );
     expect(second.status).toBe(200);
     // The mint was idempotent and so was the amount.
-    expect(storedAmount(sessionId)).toEqual({ amount_paid_minor: 2000, amount_paid_currency: 'usd' });
+    expect(storedAmount(sessionId)).toEqual({
+      amount_paid_minor: 2000,
+      amount_paid_currency: 'usd',
+    });
   });
 
   it('measures the subscription checkout too, not just credit packs', () => {
@@ -323,7 +353,10 @@ describe('the amount collected is measured, never re-derived', () => {
       mockOemEvent({ id: `evt_oem_amount_${run}`, sessionId, amountTotal: 14900 }),
     );
     expect(result.body.amount_paid_minor).toBe(14900);
-    expect(storedAmount(sessionId)).toEqual({ amount_paid_minor: 14900, amount_paid_currency: 'usd' });
+    expect(storedAmount(sessionId)).toEqual({
+      amount_paid_minor: 14900,
+      amount_paid_currency: 'usd',
+    });
   });
 
   /**
@@ -378,9 +411,7 @@ describe('processStripeEvent — async payment guard', () => {
 describe('processStripeEvent — non-checkout events', () => {
   it('records but ignores customer.created (or any non-checkout event)', () => {
     const eventId = `evt_test_${Date.now()}_other`;
-    const result = processStripeEvent(
-      mockEvent({ id: eventId, type: 'customer.created' }),
-    );
+    const result = processStripeEvent(mockEvent({ id: eventId, type: 'customer.created' }));
     expect(result.status).toBe(200);
     expect(result.body.ignored_event_type).toBe('customer.created');
     expect(result.body.credits_minted).toBeUndefined();
@@ -392,7 +423,12 @@ describe('consumeOneTimeKey', () => {
     const sessionId = `cs_test_${Date.now()}_consume`;
     const eventId = `evt_test_${Date.now()}_consume`;
     const result = processStripeEvent(
-      mockEvent({ id: eventId, bundle: '5k', sessionId, email: `consume-${Date.now()}@example.com` }),
+      mockEvent({
+        id: eventId,
+        bundle: '5k',
+        sessionId,
+        email: `consume-${Date.now()}@example.com`,
+      }),
     );
     expect(result.body.credits_minted).toBe(5000);
 
@@ -414,9 +450,7 @@ describe('consumeOneTimeKey', () => {
   it('strips placeholder email "stripe-buyer" when no email was provided', () => {
     const sessionId = `cs_test_${Date.now()}_no_email`;
     const eventId = `evt_test_${Date.now()}_no_email`;
-    processStripeEvent(
-      mockEvent({ id: eventId, bundle: '1k', sessionId, email: null }),
-    );
+    processStripeEvent(mockEvent({ id: eventId, bundle: '1k', sessionId, email: null }));
     const result = consumeOneTimeKey(sessionId);
     expect(result?.email).toBeNull();
   });
@@ -436,7 +470,12 @@ describe('async payment methods — the day SEPA/TWINT is enabled', () => {
   it('waits rather than minting when the completed session is not paid yet', () => {
     const sessionId = `cs_test_async_${Date.now()}`;
     const result = processStripeEvent(
-      mockEvent({ id: `evt_async_pending_${Date.now()}`, bundle: '5k', sessionId, paymentStatus: 'unpaid' }),
+      mockEvent({
+        id: `evt_async_pending_${Date.now()}`,
+        bundle: '5k',
+        sessionId,
+        paymentStatus: 'unpaid',
+      }),
     );
     expect(result.status).toBe(200);
     expect(result.body.pending).toBe(true);
@@ -482,11 +521,21 @@ describe('async payment methods — the day SEPA/TWINT is enabled', () => {
     const before = keyCount();
 
     const first = processStripeEvent(
-      mockEvent({ id: `evt_r1_${stamp}`, type: 'checkout.session.async_payment_succeeded', bundle: '1k', sessionId }),
+      mockEvent({
+        id: `evt_r1_${stamp}`,
+        type: 'checkout.session.async_payment_succeeded',
+        bundle: '1k',
+        sessionId,
+      }),
     );
     // Same event id again — the processed_webhooks barrier.
     const sameEvent = processStripeEvent(
-      mockEvent({ id: `evt_r1_${stamp}`, type: 'checkout.session.async_payment_succeeded', bundle: '1k', sessionId }),
+      mockEvent({
+        id: `evt_r1_${stamp}`,
+        type: 'checkout.session.async_payment_succeeded',
+        bundle: '1k',
+        sessionId,
+      }),
     );
     // A DIFFERENT event id on the same session — the stripe_session_id barrier,
     // which is the one that matters when `completed` and
@@ -537,7 +586,11 @@ describe('out-of-order delivery — the tombstone', () => {
     expect(deleted.body.key_deactivated).toBe(false);
 
     const completed = processStripeEvent(
-      mockOemEvent({ id: `evt_oem_late_${run}`, sessionId: `cs_test_late_${run}`, subscriptionId: subId }),
+      mockOemEvent({
+        id: `evt_oem_late_${run}`,
+        sessionId: `cs_test_late_${run}`,
+        subscriptionId: subId,
+      }),
     );
     expect(completed.status).toBe(200);
     expect(completed.body.skipped).toBe('subscription_already_canceled');
@@ -548,7 +601,11 @@ describe('out-of-order delivery — the tombstone', () => {
     const run = Date.now();
     const subId = `sub_test_ordered_${run}`;
     const minted = processStripeEvent(
-      mockOemEvent({ id: `evt_oem_ord_${run}`, sessionId: `cs_test_ord_${run}`, subscriptionId: subId }),
+      mockOemEvent({
+        id: `evt_oem_ord_${run}`,
+        sessionId: `cs_test_ord_${run}`,
+        subscriptionId: subId,
+      }),
     );
     expect(minted.body.key_prefix).toMatch(/^ifk_/);
 

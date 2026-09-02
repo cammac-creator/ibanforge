@@ -141,7 +141,9 @@ export function recordDemandGap(
     // honest without re-counting the table, and costs a primary-key probe on
     // a path that already runs several per request.
     const exists = getStatsDB()
-      .prepare('SELECT 1 FROM lookup_gaps WHERE kind = ? AND country = ? AND code = ? AND outcome = ? LIMIT 1')
+      .prepare(
+        'SELECT 1 FROM lookup_gaps WHERE kind = ? AND country = ? AND code = ? AND outcome = ? LIMIT 1',
+      )
       .get(kind, cc, key, oc);
     if (!exists && rowCountCache >= MAX_ROWS) return;
     upsert().run({ kind, country: cc, code: key, outcome: oc });

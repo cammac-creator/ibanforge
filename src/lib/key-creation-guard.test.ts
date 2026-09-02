@@ -25,8 +25,12 @@ describe('normalizeIpForGuard', () => {
   });
 
   it('collapses IPv6 to its /64 — one subscriber must not get millions of identities', () => {
-    expect(normalizeIpForGuard('2001:db8:aaaa:bbbb:1111:2222:3333:4444')).toBe('2001:db8:aaaa:bbbb');
-    expect(normalizeIpForGuard('2001:DB8:AAAA:BBBB:9999:8888:7777:6666')).toBe('2001:db8:aaaa:bbbb');
+    expect(normalizeIpForGuard('2001:db8:aaaa:bbbb:1111:2222:3333:4444')).toBe(
+      '2001:db8:aaaa:bbbb',
+    );
+    expect(normalizeIpForGuard('2001:DB8:AAAA:BBBB:9999:8888:7777:6666')).toBe(
+      '2001:db8:aaaa:bbbb',
+    );
   });
 
   it('returns null source when the IP is unknown — the guard fails open, never bricks signups', () => {
@@ -44,7 +48,9 @@ describe('creation counting', () => {
     expect(countKeyCreations(src, 24)).toBe(2);
     // Backdate one row past the window: it must stop counting.
     getStatsDB()
-      .prepare("UPDATE key_creations SET created_at = datetime('now', '-2 days') WHERE ip_hash = ? AND id = (SELECT MIN(id) FROM key_creations WHERE ip_hash = ?)")
+      .prepare(
+        "UPDATE key_creations SET created_at = datetime('now', '-2 days') WHERE ip_hash = ? AND id = (SELECT MIN(id) FROM key_creations WHERE ip_hash = ?)",
+      )
       .run(src, src);
     expect(countKeyCreations(src, 24)).toBe(1);
     expect(countKeyCreations(src, 24 * 7)).toBe(2);
@@ -54,7 +60,9 @@ describe('creation counting', () => {
     const src = `guard-ua-${RUN}`;
     recordKeyCreation(src, 'demo-http-client/9.9.9', 'ifk_testpref1');
     const row = getStatsDB()
-      .prepare('SELECT user_agent, key_prefix FROM key_creations WHERE ip_hash = ? ORDER BY id DESC LIMIT 1')
+      .prepare(
+        'SELECT user_agent, key_prefix FROM key_creations WHERE ip_hash = ? ORDER BY id DESC LIMIT 1',
+      )
       .get(src) as { user_agent: string | null; key_prefix: string | null };
     expect(row.user_agent).toBe('demo-http-client/9.9.9');
     expect(row.key_prefix).toBe('ifk_testpref1');
@@ -64,7 +72,9 @@ describe('creation counting', () => {
     const src = `guard-legacy-${RUN}`;
     recordKeyCreation(src);
     const row = getStatsDB()
-      .prepare('SELECT user_agent, key_prefix FROM key_creations WHERE ip_hash = ? ORDER BY id DESC LIMIT 1')
+      .prepare(
+        'SELECT user_agent, key_prefix FROM key_creations WHERE ip_hash = ? ORDER BY id DESC LIMIT 1',
+      )
       .get(src) as { user_agent: string | null; key_prefix: string | null };
     expect(row.user_agent).toBeNull();
     expect(row.key_prefix).toBeNull();
@@ -95,7 +105,9 @@ describe('verification challenge', () => {
     const email = `verif-exp-${RUN}@alpha-corp.example.net`;
     const code = createVerificationChallenge(email, 'src');
     getStatsDB()
-      .prepare("UPDATE pending_verifications SET expires_at = datetime('now', '-1 minute') WHERE email = ?")
+      .prepare(
+        "UPDATE pending_verifications SET expires_at = datetime('now', '-1 minute') WHERE email = ?",
+      )
       .run(email);
     expect(checkVerificationCode(email, code)).toEqual({ ok: false, reason: 'expired' });
     expect(checkVerificationCode(email, code)).toEqual({ ok: false, reason: 'no_challenge' });
@@ -132,7 +144,10 @@ describe('verification send limits (mail-bombing guard)', () => {
       expect(challengeSendAllowed(src, email)).toEqual({ ok: true });
       recordVerificationSend(src, email);
     }
-    expect(challengeSendAllowed(src, `spray-${RUN}-final@example.net`)).toEqual({ ok: false, reason: 'source' });
+    expect(challengeSendAllowed(src, `spray-${RUN}-final@example.net`)).toEqual({
+      ok: false,
+      reason: 'source',
+    });
   });
 
   it('a null source is still bounded by the recipient cap (fail-open on source only)', () => {
@@ -157,8 +172,12 @@ describe('verification send limits (mail-bombing guard)', () => {
     ).run();
     const removed = purgeExpiredVerifications();
     expect(removed).toBeGreaterThanOrEqual(2);
-    expect(db.prepare('SELECT COUNT(*) AS n FROM pending_verifications WHERE email = ?').get(email)).toEqual({ n: 0 });
-    expect(db.prepare("SELECT COUNT(*) AS n FROM verification_sends WHERE ip_hash = 'purge-src'").get()).toEqual({ n: 0 });
+    expect(
+      db.prepare('SELECT COUNT(*) AS n FROM pending_verifications WHERE email = ?').get(email),
+    ).toEqual({ n: 0 });
+    expect(
+      db.prepare("SELECT COUNT(*) AS n FROM verification_sends WHERE ip_hash = 'purge-src'").get(),
+    ).toEqual({ n: 0 });
   });
 });
 
@@ -252,14 +271,18 @@ describe('normalizeIpForGuard — one bucket per /64, whatever the notation', ()
   });
 
   it('gives the compressed and the expanded form of one address the same bucket', () => {
-    expect(normalizeIpForGuard('2001:0db8:0000:0000:0000:0000:0000:0001')).toBe(normalizeIpForGuard('2001:db8::1'));
+    expect(normalizeIpForGuard('2001:0db8:0000:0000:0000:0000:0000:0001')).toBe(
+      normalizeIpForGuard('2001:db8::1'),
+    );
   });
 
   it('keeps different /64s apart', () => {
     expect(normalizeIpForGuard('2001:db8:1::1')).not.toBe(normalizeIpForGuard('2001:db8:2::1'));
     // The counter-example from the audit: a prefix with no compressible zero
     // worked before and must keep working.
-    expect(normalizeIpForGuard('2a02:1210:4e2f:1400::5')).toBe(normalizeIpForGuard('2a02:1210:4e2f:1400::6'));
+    expect(normalizeIpForGuard('2a02:1210:4e2f:1400::5')).toBe(
+      normalizeIpForGuard('2a02:1210:4e2f:1400::6'),
+    );
     expect(normalizeIpForGuard('2a02:1210:4e2f:1400::5')).toBe('2a02:1210:4e2f:1400');
   });
 
@@ -268,7 +291,9 @@ describe('normalizeIpForGuard — one bucket per /64, whatever the notation', ()
     // first four hextets are zeros for EVERY such address, so expanding it
     // would put every IPv4 caller in the world in one bucket and turn a
     // per-source cap into a global one.
-    expect(normalizeIpForGuard('::ffff:192.0.2.1')).not.toBe(normalizeIpForGuard('::ffff:198.51.100.7'));
+    expect(normalizeIpForGuard('::ffff:192.0.2.1')).not.toBe(
+      normalizeIpForGuard('::ffff:198.51.100.7'),
+    );
     expect(normalizeIpForGuard('::ffff:192.0.2.1')).toBe('192.0.2.1');
   });
 

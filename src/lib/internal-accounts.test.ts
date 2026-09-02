@@ -16,7 +16,10 @@ describe('internal accounts', () => {
     // exactly ONE deliberate alternative: @cohorte.invalid (regrouped abuse
     // cohorts stay VISIBLE in the CRM but out of funnel/stats).
     const here = fileURLToPath(new URL('.', import.meta.url));
-    const front = readFileSync(new URL('../../frontend/lib/crm/build-contacts.ts', `file://${here}`), 'utf8');
+    const front = readFileSync(
+      new URL('../../frontend/lib/crm/build-contacts.ts', `file://${here}`),
+      'utf8',
+    );
     const frontSource = /INTERNAL_RE =\s*\/\((.*)\)\/i;/s.exec(front)?.[1];
     expect(frontSource).toBeTruthy();
     const parts = (s: string) => new Set(s.replace(/^\(|\)$/g, '').split('|'));

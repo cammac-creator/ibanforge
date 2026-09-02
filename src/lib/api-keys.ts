@@ -73,7 +73,15 @@ export function generateCreditKey(
   const storedEmail = email && email.includes('@') ? email : 'credits-buyer';
   db.prepare(
     'INSERT INTO api_keys (key_hash, key_prefix, email, monthly_limit, credits_remaining, credits_total, x402_payment_ref, raw_key_one_time_view) VALUES (?, ?, ?, NULL, ?, ?, ?, ?)',
-  ).run(keyHash, keyPrefix, storedEmail, credits, credits, paymentRef ?? null, paymentRef ? rawKey : null);
+  ).run(
+    keyHash,
+    keyPrefix,
+    storedEmail,
+    credits,
+    credits,
+    paymentRef ?? null,
+    paymentRef ? rawKey : null,
+  );
   return { api_key: rawKey, key_prefix: keyPrefix, credits };
 }
 
@@ -154,7 +162,12 @@ export function generateOemKey(
     .prepare('SELECT key_prefix FROM api_keys WHERE stripe_session_id = ?')
     .get(stripeSessionId) as { key_prefix: string } | undefined;
   if (existing) {
-    return { api_key: null, key_prefix: existing.key_prefix, monthly_limit: monthlyLimit, idempotent: true };
+    return {
+      api_key: null,
+      key_prefix: existing.key_prefix,
+      monthly_limit: monthlyLimit,
+      idempotent: true,
+    };
   }
 
   const rawKey = KEY_PREFIX + randomBytes(32).toString('hex');
@@ -164,7 +177,15 @@ export function generateOemKey(
 
   db.prepare(
     'INSERT INTO api_keys (key_hash, key_prefix, email, monthly_limit, stripe_session_id, stripe_subscription_id, raw_key_one_time_view) VALUES (?, ?, ?, ?, ?, ?, ?)',
-  ).run(keyHash, keyPrefix, storedEmail, monthlyLimit, stripeSessionId, stripeSubscriptionId, rawKey);
+  ).run(
+    keyHash,
+    keyPrefix,
+    storedEmail,
+    monthlyLimit,
+    stripeSessionId,
+    stripeSubscriptionId,
+    rawKey,
+  );
 
   return { api_key: rawKey, key_prefix: keyPrefix, monthly_limit: monthlyLimit, idempotent: false };
 }
@@ -180,7 +201,9 @@ export function deactivateBySubscription(stripeSubscriptionId: string): string |
     .prepare('SELECT key_prefix FROM api_keys WHERE stripe_subscription_id = ? AND active = 1')
     .get(stripeSubscriptionId) as { key_prefix: string } | undefined;
   if (!row) return null;
-  db.prepare("UPDATE api_keys SET active = 0, deactivated_at = datetime('now') WHERE stripe_subscription_id = ?").run(stripeSubscriptionId);
+  db.prepare(
+    "UPDATE api_keys SET active = 0, deactivated_at = datetime('now') WHERE stripe_subscription_id = ?",
+  ).run(stripeSubscriptionId);
   return row.key_prefix;
 }
 
@@ -193,19 +216,33 @@ export function deactivateBySubscription(stripeSubscriptionId: string): string |
  * GET on /v1/stripe/key/:session_id, but the session_id leaks into browser
  * history and could be sniffed. One-shot retrieval limits the attack window.
  */
-export function consumeOneTimeKey(
-  stripeSessionId: string,
-): { api_key: string; credits_total: number | null; credits_remaining: number | null; monthly_limit: number | null; email: string | null } | null {
+export function consumeOneTimeKey(stripeSessionId: string): {
+  api_key: string;
+  credits_total: number | null;
+  credits_remaining: number | null;
+  monthly_limit: number | null;
+  email: string | null;
+} | null {
   const db = getStatsDB();
-  const row = db.prepare(
-    'SELECT raw_key_one_time_view, credits_total, credits_remaining, monthly_limit, email FROM api_keys WHERE stripe_session_id = ? AND raw_key_one_time_view IS NOT NULL AND active = 1',
-  ).get(stripeSessionId) as
-    | { raw_key_one_time_view: string; credits_total: number | null; credits_remaining: number | null; monthly_limit: number | null; email: string }
+  const row = db
+    .prepare(
+      'SELECT raw_key_one_time_view, credits_total, credits_remaining, monthly_limit, email FROM api_keys WHERE stripe_session_id = ? AND raw_key_one_time_view IS NOT NULL AND active = 1',
+    )
+    .get(stripeSessionId) as
+    | {
+        raw_key_one_time_view: string;
+        credits_total: number | null;
+        credits_remaining: number | null;
+        monthly_limit: number | null;
+        email: string;
+      }
     | undefined;
 
   if (!row) return null;
 
-  db.prepare('UPDATE api_keys SET raw_key_one_time_view = NULL WHERE stripe_session_id = ?').run(stripeSessionId);
+  db.prepare('UPDATE api_keys SET raw_key_one_time_view = NULL WHERE stripe_session_id = ?').run(
+    stripeSessionId,
+  );
 
   return {
     api_key: row.raw_key_one_time_view,
@@ -231,10 +268,16 @@ export function consumeOneTimeKeyByPaymentRef(
       'SELECT raw_key_one_time_view, credits_total, credits_remaining FROM api_keys WHERE x402_payment_ref = ? AND raw_key_one_time_view IS NOT NULL AND active = 1',
     )
     .get(paymentRef) as
-    | { raw_key_one_time_view: string; credits_total: number | null; credits_remaining: number | null }
+    | {
+        raw_key_one_time_view: string;
+        credits_total: number | null;
+        credits_remaining: number | null;
+      }
     | undefined;
   if (!row) return null;
-  db.prepare('UPDATE api_keys SET raw_key_one_time_view = NULL WHERE x402_payment_ref = ?').run(paymentRef);
+  db.prepare('UPDATE api_keys SET raw_key_one_time_view = NULL WHERE x402_payment_ref = ?').run(
+    paymentRef,
+  );
   return {
     api_key: row.raw_key_one_time_view,
     credits_total: row.credits_total,
@@ -268,7 +311,9 @@ export function revokeApiKey(key: string): boolean {
   if (!key.startsWith(KEY_PREFIX)) return false;
   const keyHash = hashKey(key);
   const result = getStatsDB()
-    .prepare("UPDATE api_keys SET active = 0, deactivated_at = datetime('now') WHERE key_hash = ? AND active = 1")
+    .prepare(
+      "UPDATE api_keys SET active = 0, deactivated_at = datetime('now') WHERE key_hash = ? AND active = 1",
+    )
     .run(keyHash);
   return result.changes > 0;
 }
@@ -280,9 +325,12 @@ export function revokeApiKey(key: string): boolean {
  * the prepaid balance. Returns the new raw key, or null if the input key is
  * invalid/inactive.
  */
-export function rotateApiKey(
-  oldKey: string,
-): { api_key: string; key_prefix: string; monthly_limit: number | null; credits_remaining: number | null } | null {
+export function rotateApiKey(oldKey: string): {
+  api_key: string;
+  key_prefix: string;
+  monthly_limit: number | null;
+  credits_remaining: number | null;
+} | null {
   if (!oldKey.startsWith(KEY_PREFIX)) return null;
   const db = getStatsDB();
   const oldHash = hashKey(oldKey);
@@ -310,12 +358,22 @@ export function rotateApiKey(
     // off the monthly reset would clear itself in one self-service /rotate call.
     db.prepare(
       'INSERT INTO api_keys (key_hash, key_prefix, email, monthly_limit, credits_remaining, credits_total, no_recredit) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    ).run(newHash, keyPrefix, row.email, row.monthly_limit, row.credits_remaining, row.credits_total, row.no_recredit ?? 0);
+    ).run(
+      newHash,
+      keyPrefix,
+      row.email,
+      row.monthly_limit,
+      row.credits_remaining,
+      row.credits_total,
+      row.no_recredit ?? 0,
+    );
     // Move the usage ledger to the new key hash too. Otherwise the lifetime sum
     // (and the plain monthly count) restart at zero on rotation — which would
     // make rotation a one-call quota reset for anyone, flagged or not.
     db.prepare('UPDATE api_usage SET key_hash = ? WHERE key_hash = ?').run(newHash, oldHash);
-    db.prepare("UPDATE api_keys SET active = 0, deactivated_at = datetime('now') WHERE key_hash = ?").run(oldHash);
+    db.prepare(
+      "UPDATE api_keys SET active = 0, deactivated_at = datetime('now') WHERE key_hash = ?",
+    ).run(oldHash);
   });
   tx();
 
@@ -328,7 +386,8 @@ export function rotateApiKey(
 }
 
 export function validateApiKey(key: string): ApiKeyValidation {
-  if (!key.startsWith(KEY_PREFIX)) return { valid: false, keyHash: '', monthlyLimit: DEFAULT_MONTHLY_LIMIT };
+  if (!key.startsWith(KEY_PREFIX))
+    return { valid: false, keyHash: '', monthlyLimit: DEFAULT_MONTHLY_LIMIT };
   const keyHash = hashKey(key);
   const row = getStatsDB()
     .prepare(
@@ -366,10 +425,14 @@ export function validateApiKey(key: string): ApiKeyValidation {
  */
 export function decrementCredits(keyHash: string, units = 1): { ok: boolean; remaining: number } {
   const db = getStatsDB();
-  const result = db.prepare(
-    'UPDATE api_keys SET credits_remaining = credits_remaining - ? WHERE key_hash = ? AND active = 1 AND credits_remaining >= ?',
-  ).run(units, keyHash, units);
-  const row = db.prepare('SELECT credits_remaining FROM api_keys WHERE key_hash = ?').get(keyHash) as { credits_remaining: number | null } | undefined;
+  const result = db
+    .prepare(
+      'UPDATE api_keys SET credits_remaining = credits_remaining - ? WHERE key_hash = ? AND active = 1 AND credits_remaining >= ?',
+    )
+    .run(units, keyHash, units);
+  const row = db
+    .prepare('SELECT credits_remaining FROM api_keys WHERE key_hash = ?')
+    .get(keyHash) as { credits_remaining: number | null } | undefined;
   return { ok: result.changes > 0, remaining: Math.max(0, row?.credits_remaining ?? 0) };
 }
 
@@ -381,9 +444,11 @@ export function refundCredit(keyHash: string, units = 1): void {
   // Cap the refund at credits_total so a stray double-refund can never inflate
   // the balance above what was purchased (mirrors the MAX(count-N,0) clamp in
   // decrementQuota).
-  getStatsDB().prepare(
-    'UPDATE api_keys SET credits_remaining = MIN(credits_remaining + ?, credits_total) WHERE key_hash = ? AND credits_remaining IS NOT NULL',
-  ).run(units, keyHash);
+  getStatsDB()
+    .prepare(
+      'UPDATE api_keys SET credits_remaining = MIN(credits_remaining + ?, credits_total) WHERE key_hash = ? AND credits_remaining IS NOT NULL',
+    )
+    .run(units, keyHash);
 }
 
 /**
@@ -456,7 +521,9 @@ export function recordQuotaNotice(keyHash: string, month: string): boolean {
  * warning that key gets this month.
  */
 export function clearQuotaNotice(keyHash: string, month: string): void {
-  getStatsDB().prepare('DELETE FROM quota_notices WHERE key_hash = ? AND month = ?').run(keyHash, month);
+  getStatsDB()
+    .prepare('DELETE FROM quota_notices WHERE key_hash = ? AND month = ?')
+    .run(keyHash, month);
 }
 
 export function checkAndIncrementQuota(
@@ -507,16 +574,26 @@ export function checkAndIncrementQuota(
     db.prepare(
       'INSERT INTO api_usage (key_hash, month, count) VALUES (?, ?, 0) ON CONFLICT(key_hash, month) DO NOTHING',
     ).run(keyHash, month);
-    const row = db.prepare('SELECT count FROM api_usage WHERE key_hash = ? AND month = ?').get(keyHash, month) as {
+    const row = db
+      .prepare('SELECT count FROM api_usage WHERE key_hash = ? AND month = ?')
+      .get(keyHash, month) as {
       count: number;
     };
     // What the ceiling is measured against. Normally the current month; for a key
     // opted out of the monthly reset, every month it has ever used.
     const measuredNow = noRecredit
-      ? (db.prepare('SELECT COALESCE(SUM(count), 0) AS n FROM api_usage WHERE key_hash = ?').get(keyHash) as { n: number }).n
+      ? (
+          db
+            .prepare('SELECT COALESCE(SUM(count), 0) AS n FROM api_usage WHERE key_hash = ?')
+            .get(keyHash) as { n: number }
+        ).n
       : row.count;
     if (measuredNow + units > monthlyLimit) return { measured: measuredNow, allowed: false };
-    db.prepare('UPDATE api_usage SET count = count + ? WHERE key_hash = ? AND month = ?').run(units, keyHash, month);
+    db.prepare('UPDATE api_usage SET count = count + ? WHERE key_hash = ? AND month = ?').run(
+      units,
+      keyHash,
+      month,
+    );
     return { measured: measuredNow, allowed: true };
   });
   // IMMEDIATE takes the write lock at BEGIN instead of on the first write, so a
@@ -575,7 +652,11 @@ export function recordMonthlyObservation(keyHash: string, units = 1): string {
   db.prepare(
     'INSERT INTO api_usage (key_hash, month, count) VALUES (?, ?, 0) ON CONFLICT(key_hash, month) DO NOTHING',
   ).run(keyHash, month);
-  db.prepare('UPDATE api_usage SET count = count + ? WHERE key_hash = ? AND month = ?').run(units, keyHash, month);
+  db.prepare('UPDATE api_usage SET count = count + ? WHERE key_hash = ? AND month = ?').run(
+    units,
+    keyHash,
+    month,
+  );
   return month;
 }
 
@@ -585,9 +666,9 @@ export function getUsage(
 ): { used: number; limit: number; remaining: number; month: string } {
   const db = getStatsDB();
   const month = new Date().toISOString().slice(0, 7);
-  const row = db.prepare('SELECT count FROM api_usage WHERE key_hash = ? AND month = ?').get(keyHash, month) as
-    | { count: number }
-    | undefined;
+  const row = db
+    .prepare('SELECT count FROM api_usage WHERE key_hash = ? AND month = ?')
+    .get(keyHash, month) as { count: number } | undefined;
   const used = row?.count ?? 0;
   return { used, limit: monthlyLimit, remaining: monthlyLimit - used, month };
 }
@@ -605,7 +686,9 @@ export function getUsage(
 export function decrementQuota(keyHash: string, units = 1, month?: string): void {
   const db = getStatsDB();
   const m = month ?? new Date().toISOString().slice(0, 7);
-  db.prepare(
-    'UPDATE api_usage SET count = MAX(count - ?, 0) WHERE key_hash = ? AND month = ?',
-  ).run(units, keyHash, m);
+  db.prepare('UPDATE api_usage SET count = MAX(count - ?, 0) WHERE key_hash = ? AND month = ?').run(
+    units,
+    keyHash,
+    m,
+  );
 }

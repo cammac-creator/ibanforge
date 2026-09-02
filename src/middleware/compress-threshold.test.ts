@@ -30,7 +30,10 @@ describe('compression threshold', () => {
     const app = buildApp();
     const res = await app.request('/ping', { headers: GZIP });
     expect(res.status).toBe(200);
-    expect(res.headers.get('content-encoding'), '4 bytes went through a CompressionStream').toBeNull();
+    expect(
+      res.headers.get('content-encoding'),
+      '4 bytes went through a CompressionStream',
+    ).toBeNull();
     // The real size is now published, which is what made the threshold readable.
     expect(res.headers.get('content-length')).toBe('4');
     expect(await res.text()).toBe('pong');
@@ -40,7 +43,9 @@ describe('compression threshold', () => {
     const app = buildApp();
     const res = await app.request('/openapi.json', { headers: GZIP });
     expect(res.status).toBe(200);
-    expect(res.headers.get('content-encoding'), 'the big documents must stay compressed').toBe('gzip');
+    expect(res.headers.get('content-encoding'), 'the big documents must stay compressed').toBe(
+      'gzip',
+    );
   });
 
   it('leaves the body and its content-type intact', async () => {
@@ -50,8 +55,11 @@ describe('compression threshold', () => {
     const app = buildApp();
     const res = await app.request('/health', { headers: GZIP });
     expect(res.headers.get('content-type')).toContain('application/json');
-    expect(res.headers.get('x-content-type-options'), 'a security header was dropped in the rebuild').toBe('nosniff');
-    const body = await res.json() as Record<string, unknown>;
+    expect(
+      res.headers.get('x-content-type-options'),
+      'a security header was dropped in the rebuild',
+    ).toBe('nosniff');
+    const body = (await res.json()) as Record<string, unknown>;
     expect(body.status).toBeTruthy();
   });
 

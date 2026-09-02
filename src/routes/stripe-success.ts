@@ -24,7 +24,8 @@ import {
 export const stripeSuccess = new Hono();
 
 stripeSuccess.get('/stripe/success', (c) => {
-  return c.html(`<!DOCTYPE html>
+  return c.html(
+    `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -239,5 +240,7 @@ stripeSuccess.get('/stripe/success', (c) => {
 })();
 </script>
 </body>
-</html>`, 200);
+</html>`,
+    200,
+  );
 });

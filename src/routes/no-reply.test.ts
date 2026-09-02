@@ -80,9 +80,9 @@ async function sender(address: string, value: boolean): Promise<number> {
 }
 
 function stored(id: string): number | undefined {
-  const row = getStatsDB().prepare('SELECT no_reply_needed FROM email_messages WHERE id = ?').get(id) as
-    | { no_reply_needed: number }
-    | undefined;
+  const row = getStatsDB()
+    .prepare('SELECT no_reply_needed FROM email_messages WHERE id = ?')
+    .get(id) as { no_reply_needed: number } | undefined;
   return row?.no_reply_needed;
 }
 
@@ -99,7 +99,10 @@ describe('POST /v1/admin/email-messages/no-reply — admin auth', () => {
   it('rejects a wrong secret of the same length', async () => {
     const res = await makeApp().request('/v1/admin/email-messages/no-reply', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Admin-Secret': 'wrong-horse-battery-staple-BAD' },
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Admin-Secret': 'wrong-horse-battery-staple-BAD',
+      },
       body: JSON.stringify({ id: 'whatever', value: true }),
     });
     expect(res.status).toBe(401);
@@ -112,9 +115,24 @@ describe('POST /v1/admin/email-messages/no-reply — the direction gate', () => 
     const outbound = `nr-${RUN}-out`;
     const draft = `nr-${RUN}-draft`;
     await ingest([
-      { id: inbound, customer_email: 'acme@example.com', direction: 'in', msg_date: '2026-08-01T10:00:00Z' },
-      { id: outbound, customer_email: 'acme@example.com', direction: 'out', msg_date: '2026-08-01T11:00:00Z' },
-      { id: draft, customer_email: 'acme@example.com', direction: 'draft', msg_date: '2026-08-01T12:00:00Z' },
+      {
+        id: inbound,
+        customer_email: 'acme@example.com',
+        direction: 'in',
+        msg_date: '2026-08-01T10:00:00Z',
+      },
+      {
+        id: outbound,
+        customer_email: 'acme@example.com',
+        direction: 'out',
+        msg_date: '2026-08-01T11:00:00Z',
+      },
+      {
+        id: draft,
+        customer_email: 'acme@example.com',
+        direction: 'draft',
+        msg_date: '2026-08-01T12:00:00Z',
+      },
     ]);
 
     expect(await noReply(inbound, true)).toEqual({ status: 200, updated: 1 });
@@ -134,7 +152,9 @@ describe('POST /v1/admin/email-messages/no-reply — the direction gate', () => 
 
   it('is reversible, and replaying either way lands on the same state', async () => {
     const id = `nr-${RUN}-toggle`;
-    await ingest([{ id, customer_email: 'acme@example.com', direction: 'in', msg_date: '2026-08-02T09:00:00Z' }]);
+    await ingest([
+      { id, customer_email: 'acme@example.com', direction: 'in', msg_date: '2026-08-02T09:00:00Z' },
+    ]);
 
     await noReply(id, true);
     await noReply(id, true);
@@ -150,7 +170,9 @@ describe('POST /v1/admin/email-messages/no-reply — the direction gate', () => 
 
   it('refuses a non-boolean value instead of quietly unmarking', async () => {
     const id = `nr-${RUN}-strict`;
-    await ingest([{ id, customer_email: 'acme@example.com', direction: 'in', msg_date: '2026-08-02T10:00:00Z' }]);
+    await ingest([
+      { id, customer_email: 'acme@example.com', direction: 'in', msg_date: '2026-08-02T10:00:00Z' },
+    ]);
     await noReply(id, true);
 
     const res = await makeApp().request('/v1/admin/email-messages/no-reply', {
@@ -166,12 +188,16 @@ describe('POST /v1/admin/email-messages/no-reply — the direction gate', () => 
 describe('GET /v1/admin/email-messages — the marker travels to the CRM', () => {
   it('serves no_reply_needed with the message', async () => {
     const id = `nr-${RUN}-served`;
-    await ingest([{ id, customer_email: 'acme@example.com', direction: 'in', msg_date: '2026-08-03T08:00:00Z' }]);
+    await ingest([
+      { id, customer_email: 'acme@example.com', direction: 'in', msg_date: '2026-08-03T08:00:00Z' },
+    ]);
     await noReply(id, true);
 
     const res = await makeApp().request('/v1/admin/email-messages', { headers: admin });
     expect(res.status).toBe(200);
-    const { messages } = (await res.json()) as { messages: Array<{ id: string; no_reply_needed: number }> };
+    const { messages } = (await res.json()) as {
+      messages: Array<{ id: string; no_reply_needed: number }>;
+    };
     expect(messages.find((m) => m.id === id)?.no_reply_needed).toBe(1);
   });
 });
@@ -225,10 +251,20 @@ describe('no-reply senders — the standing rule', () => {
     const other = `nr-${RUN}-rule-other`;
     await ingest([
       // Same mailbox, shouted: the comparison is on the whole address, folded.
-      { id: marked, customer_email: 'Notifications@Alpha.Example.net', direction: 'in', msg_date: '2026-08-04T08:00:00Z' },
+      {
+        id: marked,
+        customer_email: 'Notifications@Alpha.Example.net',
+        direction: 'in',
+        msg_date: '2026-08-04T08:00:00Z',
+      },
       // A neighbour in the same domain must stay untouched — the exact case a
       // fragment rule would get wrong.
-      { id: other, customer_email: 'ops@alpha.example.net', direction: 'in', msg_date: '2026-08-04T09:00:00Z' },
+      {
+        id: other,
+        customer_email: 'ops@alpha.example.net',
+        direction: 'in',
+        msg_date: '2026-08-04T09:00:00Z',
+      },
     ]);
     expect(stored(marked)).toBe(1);
     expect(stored(other)).toBe(0);
@@ -239,8 +275,18 @@ describe('no-reply senders — the standing rule', () => {
     const out = `nr-${RUN}-rule-out`;
     const draft = `nr-${RUN}-rule-draft`;
     await ingest([
-      { id: out, customer_email: 'notifications@alpha.example.net', direction: 'out', msg_date: '2026-08-04T10:00:00Z' },
-      { id: draft, customer_email: 'notifications@alpha.example.net', direction: 'draft', msg_date: '2026-08-04T11:00:00Z' },
+      {
+        id: out,
+        customer_email: 'notifications@alpha.example.net',
+        direction: 'out',
+        msg_date: '2026-08-04T10:00:00Z',
+      },
+      {
+        id: draft,
+        customer_email: 'notifications@alpha.example.net',
+        direction: 'draft',
+        msg_date: '2026-08-04T11:00:00Z',
+      },
     ]);
     expect(stored(out)).toBe(0);
     expect(stored(draft)).toBe(0);
@@ -250,14 +296,24 @@ describe('no-reply senders — the standing rule', () => {
     await sender(`notifications@alpha.example.net`, true);
     const before = `nr-${RUN}-rule-before`;
     await ingest([
-      { id: before, customer_email: 'notifications@alpha.example.net', direction: 'in', msg_date: '2026-08-05T08:00:00Z' },
+      {
+        id: before,
+        customer_email: 'notifications@alpha.example.net',
+        direction: 'in',
+        msg_date: '2026-08-05T08:00:00Z',
+      },
     ]);
     expect(stored(before)).toBe(1);
 
     expect(await sender(`notifications@alpha.example.net`, false)).toBe(200);
     const after = `nr-${RUN}-rule-after`;
     await ingest([
-      { id: after, customer_email: 'notifications@alpha.example.net', direction: 'in', msg_date: '2026-08-05T09:00:00Z' },
+      {
+        id: after,
+        customer_email: 'notifications@alpha.example.net',
+        direction: 'in',
+        msg_date: '2026-08-05T09:00:00Z',
+      },
     ]);
     expect(stored(after)).toBe(0);
     // The old judgement was true about the message it was made on; withdrawing

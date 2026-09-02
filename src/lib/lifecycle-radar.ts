@@ -95,7 +95,12 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 export function emailDomain(email: string): string {
   const at = email.lastIndexOf('@');
-  return at === -1 ? '' : email.slice(at + 1).trim().toLowerCase();
+  return at === -1
+    ? ''
+    : email
+        .slice(at + 1)
+        .trim()
+        .toLowerCase();
 }
 
 // 'cohorte.invalid' is the synthetic contact domain for abuse cohorts
@@ -189,7 +194,10 @@ const TWO_PART_SUFFIX = new Set([
 
 /** Best-effort company label from a domain (display hint only): acme.com → "Acme". */
 export function guessCompany(domain: string): string {
-  const d = domain.trim().toLowerCase().replace(/^www\./, '');
+  const d = domain
+    .trim()
+    .toLowerCase()
+    .replace(/^www\./, '');
   if (!d) return '';
   const parts = d.split('.');
   let idx = parts.length - 2; // registrable label for a single-part TLD
@@ -336,11 +344,7 @@ export interface DiffResult {
   nextState: RadarState;
 }
 
-export function diffAgainstState(
-  events: RadarEvent[],
-  prev: RadarState,
-  now: Date,
-): DiffResult {
+export function diffAgainstState(events: RadarEvent[], prev: RadarState, now: Date): DiffResult {
   const nowIso = now.toISOString();
   const fresh: RadarEvent[] = [];
   const nextKeys: Record<string, RadarKeyState> = {};
@@ -430,7 +434,9 @@ export function formatReport(
       // transits Telegram, which is not a declared processor — no personal
       // data may ride along. The dashboard resolves the identity.
       const who = `${e.keyPrefix}… (${e.company || e.domain})`;
-      lines.push(`• ${who} — ${e.detail}${activityHint(e, opts.activity)}. Action : ${meta.action}`);
+      lines.push(
+        `• ${who} — ${e.detail}${activityHint(e, opts.activity)}. Action : ${meta.action}`,
+      );
     }
     lines.push('');
   }

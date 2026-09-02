@@ -147,14 +147,17 @@ describe('only demonstrated countries are served', () => {
     }
   });
 
-  it.skipIf(!loaded)('declines a Spanish code in the credit-institution range even if one appeared', () => {
-    // Belt and braces with the measurement above: the guard is at read time, so
-    // a bad refresh cannot serve a bank as a payment institution in the window
-    // between landing and someone noticing the red build.
-    for (const code of ['2100', '0049', '0075', '3187']) {
-      expect(psdRegistrationByBankCode('ES', code), code).toBeNull();
-    }
-  });
+  it.skipIf(!loaded)(
+    'declines a Spanish code in the credit-institution range even if one appeared',
+    () => {
+      // Belt and braces with the measurement above: the guard is at read time, so
+      // a bad refresh cannot serve a bank as a payment institution in the window
+      // between landing and someone noticing the red build.
+      for (const code of ['2100', '0049', '0075', '3187']) {
+        expect(psdRegistrationByBankCode('ES', code), code).toBeNull();
+      }
+    },
+  );
 
   it.skipIf(!loaded)('declines anything that is not four digits', () => {
     for (const code of ['671', '67177', 'ABCD', '', '  ']) {
@@ -323,21 +326,27 @@ describe('the priced compliance call moves, deliberately and only where it shoul
 describe('next_steps never contradicts the block beside it', () => {
   const emi = rowsFor('ES', 'emi')[0];
 
-  it.skipIf(!loaded || !emi)('stops calling the code absent once the register names its holder', () => {
-    // The bank code resolves no BIC, so bank_code_check still says
-    // not_in_register — correct, that table is the BIC directory. But saying
-    // "absent from our reference data" beside a psd_registration naming the
-    // institution, its authority and the copy date is a plain contradiction.
-    const result = validateIBAN(esIban(emi.national_reference_code));
-    enrichResult(result);
-    expect(result.psd_registration).toBeDefined();
+  it.skipIf(!loaded || !emi)(
+    'stops calling the code absent once the register names its holder',
+    () => {
+      // The bank code resolves no BIC, so bank_code_check still says
+      // not_in_register — correct, that table is the BIC directory. But saying
+      // "absent from our reference data" beside a psd_registration naming the
+      // institution, its authority and the copy date is a plain contradiction.
+      const result = validateIBAN(esIban(emi.national_reference_code));
+      enrichResult(result);
+      expect(result.psd_registration).toBeDefined();
 
-    const step = result.next_steps!.find((s) => s.code === 'verify_payee_name');
-    expect(step, 'the name check should still fire — an EMI is where it matters most').toBeDefined();
-    expect(step!.because).not.toContain('absent from our reference data');
-    expect(step!.because).toContain('psd_registration names the holder');
-    expect(step!.because).toContain(getPsdAsOf()!);
-  });
+      const step = result.next_steps!.find((s) => s.code === 'verify_payee_name');
+      expect(
+        step,
+        'the name check should still fire — an EMI is where it matters most',
+      ).toBeDefined();
+      expect(step!.because).not.toContain('absent from our reference data');
+      expect(step!.because).toContain('psd_registration names the holder');
+      expect(step!.because).toContain(getPsdAsOf()!);
+    },
+  );
 
   it.skipIf(!loaded)('keeps the original wording where no register spoke', () => {
     // The reworded branch must not leak onto every other unresolved bank code.

@@ -46,15 +46,13 @@ const USAGE = {
 } as const;
 
 /** Shared by the GET and the POST: one code path, one contract. */
-function handle(
-  c: Context<HonoEnv>,
-  raw: { reference?: unknown; reference_type?: unknown },
-) {
+function handle(c: Context<HonoEnv>, raw: { reference?: unknown; reference_type?: unknown }) {
   if (raw.reference === undefined || raw.reference === null || raw.reference === '') {
     return c.json(
       {
         error: 'missing_reference',
-        message: 'Pass ?reference=... as a query parameter, or {"reference": "..."} as a JSON body.',
+        message:
+          'Pass ?reference=... as a query parameter, or {"reference": "..."} as a JSON body.',
         ...USAGE,
       },
       400,

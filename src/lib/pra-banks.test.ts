@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { getBicDB } from './db.js';
-import { getPraBanksCount, getPraListMonth, praAttribution, praAuthorisationByLei } from './pra-banks.js';
+import {
+  getPraBanksCount,
+  getPraListMonth,
+  praAttribution,
+  praAuthorisationByLei,
+} from './pra-banks.js';
 import { enrichResult } from './enrich.js';
 import { validateIBAN } from './iban.js';
 
@@ -90,7 +95,11 @@ describe('praAuthorisationByLei', () => {
     const row = sample('non_uk_branch');
     expect(row).toBeDefined();
     const hit = praAuthorisationByLei(row!.lei, 'GB');
-    expect(hit).toMatchObject({ authorised: true, section: 'non_uk_branch', basis: 'head_office_lei' });
+    expect(hit).toMatchObject({
+      authorised: true,
+      section: 'non_uk_branch',
+      basis: 'head_office_lei',
+    });
   });
 
   it.skipIf(!loaded)('refuses to carry a UK authorisation onto the parent’s foreign BICs', () => {
@@ -164,10 +173,9 @@ describe('curated map vs PRA register', () => {
    */
   it('GB:BUKB names the same institution as the PRA register', async () => {
     const { readFileSync } = await import('node:fs');
-    const curated = JSON.parse(readFileSync(new URL('../db/bic_data.json', import.meta.url), 'utf8')) as Record<
-      string,
-      { bic: string; bank_name: string }
-    >;
+    const curated = JSON.parse(
+      readFileSync(new URL('../db/bic_data.json', import.meta.url), 'utf8'),
+    ) as Record<string, { bic: string; bank_name: string }>;
     const entry = curated['GB:BUKB'];
     expect(entry.bic).toBe('BUKBGB22');
     expect(entry.bank_name).toContain('Barclays');

@@ -50,8 +50,26 @@ export interface ExtractedAddress {
 // ISO 639-1 codes whose addresses are written in a non-Latin script and thus
 // benefit from a romanized (English) alternative when GLEIF provides one.
 const NON_LATIN_LANGS = new Set([
-  'zh', 'ja', 'ko', 'ru', 'ar', 'he', 'el', 'th', 'hi', 'bg',
-  'uk', 'sr', 'mk', 'ka', 'hy', 'fa', 'ur', 'be', 'kk', 'mn',
+  'zh',
+  'ja',
+  'ko',
+  'ru',
+  'ar',
+  'he',
+  'el',
+  'th',
+  'hi',
+  'bg',
+  'uk',
+  'sr',
+  'mk',
+  'ka',
+  'hy',
+  'fa',
+  'ur',
+  'be',
+  'kk',
+  'mn',
 ]);
 
 function lang2(lang: string | null | undefined): string {
@@ -59,7 +77,10 @@ function lang2(lang: string | null | undefined): string {
 }
 
 function joinLines(lines: string[] | undefined): string | null {
-  const joined = (lines ?? []).map((l) => (l ?? '').trim()).filter(Boolean).join(', ');
+  const joined = (lines ?? [])
+    .map((l) => (l ?? '').trim())
+    .filter(Boolean)
+    .join(', ');
   return joined || null;
 }
 
@@ -101,10 +122,7 @@ export function extractGleifAddress(entity: GleifEntityAddresses): ExtractedAddr
  * otherwise the BIC is a foreign branch that would inherit the wrong (parent
  * head-office) address and city.
  */
-export function addressMatchesBic(
-  bic: string,
-  entityCountry: string | null | undefined,
-): boolean {
+export function addressMatchesBic(bic: string, entityCountry: string | null | undefined): boolean {
   if (!entityCountry || bic.length < 6) return false;
   return bic.slice(4, 6).toUpperCase() === entityCountry.trim().toUpperCase();
 }

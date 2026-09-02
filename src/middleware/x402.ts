@@ -3,8 +3,16 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { createRequire } from 'node:module';
 import type { HonoEnv } from '../types.js';
 import { datasetFacts } from '../lib/dataset-facts.js';
-import { BANK_CODE_CHECK_SCHEMA as BANK_CODE_CHECK_OPENAPI , NEXT_STEPS_SCHEMA as NEXT_STEPS_OPENAPI } from '../lib/bank-code-schema.js';
-import { buildBazaarInfo, discoveryForRoute, findDiscovery, routeTemplateOf } from '../lib/x402-discovery.js';
+import {
+  BANK_CODE_CHECK_SCHEMA as BANK_CODE_CHECK_OPENAPI,
+  NEXT_STEPS_SCHEMA as NEXT_STEPS_OPENAPI,
+} from '../lib/bank-code-schema.js';
+import {
+  buildBazaarInfo,
+  discoveryForRoute,
+  findDiscovery,
+  routeTemplateOf,
+} from '../lib/x402-discovery.js';
 import { getIbansArray } from '../lib/request-helpers.js';
 // Read-only reuse: the SAME digest the purchase route derives a recovery ref
 // from, so an unconfirmed settlement can hand back the recovery URL its own
@@ -225,7 +233,8 @@ export function buildRouteTable(
   //     (validate + enrich + compliance) at p99 0.184 ms.
   const V = `v${pkg.version}`;
   const F = datasetFacts();
-  const PERF = 'server processing <5ms (network excluded — measure your own round trip on GET /ping)';
+  const PERF =
+    'server processing <5ms (network excluded — measure your own round trip on GET /ping)';
   const TRUST_TAG_VALIDATE = `Production · ${PERF} · ${F.claim.bic} BICs (${F.claim.lei} LEI via GLEIF) + ${F.claim.chClearing} SIX · ${V}`;
   const TRUST_TAG_BIC = `Production · ${PERF} · ${F.claim.bic} BICs (${F.claim.lei} LEI-enriched via GLEIF, refreshed monthly) · ${V}`;
   const TRUST_TAG_CH = `Production · ${PERF} · ${F.claim.chClearing} SIX BankMaster entries, refreshed monthly · ${V}`;
@@ -237,7 +246,8 @@ export function buildRouteTable(
     properties: {
       iban: {
         type: 'string',
-        description: 'IBAN to validate. Spaces and lowercase accepted. Example: CH1000230000000012345',
+        description:
+          'IBAN to validate. Spaces and lowercase accepted. Example: CH1000230000000012345',
         minLength: 15,
         maxLength: 34,
       },
@@ -251,7 +261,10 @@ export function buildRouteTable(
     type: 'object',
     properties: {
       iban: { type: 'string', description: 'Normalized IBAN (uppercase, no spaces).' },
-      formatted: { type: 'string', description: 'IBAN with 4-char groups, e.g. CH10 0023 0000 0000 1234 5.' },
+      formatted: {
+        type: 'string',
+        description: 'IBAN with 4-char groups, e.g. CH10 0023 0000 0000 1234 5.',
+      },
       valid: { type: 'boolean' },
       country: {
         type: 'object',
@@ -309,7 +322,8 @@ export function buildRouteTable(
           issuer_type: {
             type: ['string', 'null'],
             enum: ['bank', 'digital_bank', 'emi', 'payment_institution', null],
-            description: 'Null when no institution resolved. It no longer defaults to "bank" for an institution we did not find.',
+            description:
+              'Null when no institution resolved. It no longer defaults to "bank" for an institution we did not find.',
           },
           country_risk: { type: 'string', enum: ['standard', 'elevated', 'high'] },
           test_bic: { type: 'boolean' },
@@ -317,7 +331,8 @@ export function buildRouteTable(
           sepa_reachable_scope: {
             type: 'string',
             enum: ['country'],
-            description: 'Scope sepa_reachable holds at. Derived from the country, never from the account.',
+            description:
+              'Scope sepa_reachable holds at. Derived from the country, never from the account.',
           },
           vop_coverage: { type: 'boolean' },
         },
@@ -326,13 +341,21 @@ export function buildRouteTable(
       next_steps: NEXT_STEPS_OPENAPI,
       clearing: {
         type: 'object',
-        description: 'Swiss clearing data when country is CH or LI and the IID is in the SIX BankMaster. Null otherwise.',
+        description:
+          'Swiss clearing data when country is CH or LI and the IID is in the SIX BankMaster. Null otherwise.',
         properties: {
           iid: { type: 'string', description: '5-digit zero-padded BC-Nummer.' },
           name: { type: 'string' },
           type: {
             type: 'string',
-            enum: ['bank', 'cantonal_bank', 'postfinance', 'raiffeisen', 'central_bank', 'foreign_participant'],
+            enum: [
+              'bank',
+              'cantonal_bank',
+              'postfinance',
+              'raiffeisen',
+              'central_bank',
+              'foreign_participant',
+            ],
           },
           town: { type: 'string' },
           sic: { type: 'boolean' },
@@ -355,8 +378,7 @@ export function buildRouteTable(
         payTo: walletAddress,
         maxTimeoutSeconds: 60,
       },
-      description:
-        `Validate a European IBAN and enrich it with bank, compliance and routing data. Use whenever the user mentions an IBAN, a bank account, a SEPA payment or asks who the bank is. Returns: valid, country, BIC/SWIFT, bank name, EMI/vIBAN flag, SEPA + VoP reachability, risk score, Swiss bc_nummer for CH/LI. ${TRUST_TAG_VALIDATE}.`,
+      description: `Validate a European IBAN and enrich it with bank, compliance and routing data. Use whenever the user mentions an IBAN, a bank account, a SEPA payment or asks who the bank is. Returns: valid, country, BIC/SWIFT, bank name, EMI/vIBAN flag, SEPA + VoP reachability, risk score, Swiss bc_nummer for CH/LI. ${TRUST_TAG_VALIDATE}.`,
       mimeType: 'application/json',
       extensions: {
         bazaar: {
@@ -390,8 +412,7 @@ export function buildRouteTable(
         payTo: walletAddress,
         maxTimeoutSeconds: 60,
       },
-      description:
-        `Validate up to 100 IBANs in one call at $0.002 per IBAN (2.5x cheaper per IBAN than single calls at $0.005, and one settlement instead of N). A quote asked for without a body is the 1-IBAN minimum, $0.002 — the same figure the catalog lists. Use for CSV cleanup, customer DB dedup, or pre-flight payout list triage. ${TRUST_TAG_BATCH}.`,
+      description: `Validate up to 100 IBANs in one call at $0.002 per IBAN (2.5x cheaper per IBAN than single calls at $0.005, and one settlement instead of N). A quote asked for without a body is the 1-IBAN minimum, $0.002 — the same figure the catalog lists. Use for CSV cleanup, customer DB dedup, or pre-flight payout list triage. ${TRUST_TAG_BATCH}.`,
       mimeType: 'application/json',
       extensions: {
         bazaar: {
@@ -430,8 +451,7 @@ export function buildRouteTable(
         payTo: walletAddress,
         maxTimeoutSeconds: 60,
       },
-      description:
-        `Resolve a BIC/SWIFT code (8 or 11 chars) into the underlying bank: name, country, city, LEI, and registered head-office address (where available). Use only when you already have the BIC — for IBAN inputs, prefer /v1/iban/validate which resolves the BIC for you. ${TRUST_TAG_BIC}.`,
+      description: `Resolve a BIC/SWIFT code (8 or 11 chars) into the underlying bank: name, country, city, LEI, and registered head-office address (where available). Use only when you already have the BIC — for IBAN inputs, prefer /v1/iban/validate which resolves the BIC for you. ${TRUST_TAG_BIC}.`,
       mimeType: 'application/json',
       extensions: {
         bazaar: {
@@ -492,8 +512,7 @@ export function buildRouteTable(
         payTo: walletAddress,
         maxTimeoutSeconds: 60,
       },
-      description:
-        `Pre-flight compliance triage on an IBAN before a SEPA / cross-border payment: sanctions screening (OFAC), FATF jurisdiction flag, SEPA Instant reachability, VoP (EU 2024/886) participant. Returns risk_score 0-100. Informational, not a regulated AML/CFT product. ${TRUST_TAG_COMPLIANCE}.`,
+      description: `Pre-flight compliance triage on an IBAN before a SEPA / cross-border payment: sanctions screening (OFAC), FATF jurisdiction flag, SEPA Instant reachability, VoP (EU 2024/886) participant. Returns risk_score 0-100. Informational, not a regulated AML/CFT product. ${TRUST_TAG_COMPLIANCE}.`,
       mimeType: 'application/json',
       extensions: {
         bazaar: {
@@ -513,7 +532,11 @@ export function buildRouteTable(
               },
               bic: {
                 type: 'object',
-                properties: { code: { type: 'string' }, bank_name: { type: 'string' }, city: { type: 'string' } },
+                properties: {
+                  code: { type: 'string' },
+                  bank_name: { type: 'string' },
+                  city: { type: 'string' },
+                },
               },
               compliance: {
                 type: 'object',
@@ -524,7 +547,10 @@ export function buildRouteTable(
                       country_sanctioned: { type: 'boolean' },
                       bank_sanctioned: { type: 'boolean' },
                       matched_lists: { type: 'array', items: { type: 'string' } },
-                      fatf_status: { type: 'string', enum: ['member', 'grey_list', 'black_list', 'non_member'] },
+                      fatf_status: {
+                        type: 'string',
+                        enum: ['member', 'grey_list', 'black_list', 'non_member'],
+                      },
                     },
                   },
                   reachability: {
@@ -539,7 +565,10 @@ export function buildRouteTable(
                     type: 'object',
                     properties: {
                       participant: { type: 'boolean' },
-                      status: { type: 'string', enum: ['active', 'pending', 'inactive', 'not_found'] },
+                      status: {
+                        type: 'string',
+                        enum: ['active', 'pending', 'inactive', 'not_found'],
+                      },
                     },
                   },
                   risk_score: {
@@ -663,8 +692,7 @@ export function buildRouteTable(
         payTo: walletAddress,
         maxTimeoutSeconds: 60,
       },
-      description:
-        `Resolve a Swiss BC-Nummer / IID (1-5 digits) into institution name, type, address, BIC, the full payment-rail participation (SIC, RTGS CHF, Instant Payments CHF, euroSIC, LSV+/BDD) and the QR-IID allocation. Backed by ${F.claim.chClearing} SIX BankMaster entries (refreshed monthly) — the canonical Swiss banking source. ${TRUST_TAG_CH}.`,
+      description: `Resolve a Swiss BC-Nummer / IID (1-5 digits) into institution name, type, address, BIC, the full payment-rail participation (SIC, RTGS CHF, Instant Payments CHF, euroSIC, LSV+/BDD) and the QR-IID allocation. Backed by ${F.claim.chClearing} SIX BankMaster entries (refreshed monthly) — the canonical Swiss banking source. ${TRUST_TAG_CH}.`,
       mimeType: 'application/json',
       extensions: {
         bazaar: {
@@ -682,7 +710,17 @@ export function buildRouteTable(
                 type: 'object',
                 properties: {
                   name: { type: 'string' },
-                  type: { type: 'string', enum: ['bank', 'cantonal_bank', 'postfinance', 'raiffeisen', 'central_bank', 'foreign_participant'] },
+                  type: {
+                    type: 'string',
+                    enum: [
+                      'bank',
+                      'cantonal_bank',
+                      'postfinance',
+                      'raiffeisen',
+                      'central_bank',
+                      'foreign_participant',
+                    ],
+                  },
                   iid_type: { type: 'string', enum: ['headquarters', 'branch', 'other'] },
                   headquarters_iid: { type: 'string' },
                 },
@@ -747,9 +785,13 @@ export function buildRouteTable(
     const [routeMethod, routeTemplate] = key.split(' ');
     // Only the matching route's config is ever consulted, but resolving it
     // per route keeps every entry describing itself truthfully.
-    const isCurrent = routeMethod === requestMethod && routeTemplateOf(requestPath) === routeTemplate;
+    const isCurrent =
+      routeMethod === requestMethod && routeTemplateOf(requestPath) === routeTemplate;
     const path = isCurrent ? requestPath : routeTemplate;
-    const entry = config as { extensions?: { bazaar?: Record<string, unknown> } } & Record<string, unknown>;
+    const entry = config as { extensions?: { bazaar?: Record<string, unknown> } } & Record<
+      string,
+      unknown
+    >;
     Object.assign(entry, {
       resource: `https://api.ibanforge.com${path}`,
       serviceName: SERVICE_NAME,
@@ -782,7 +824,9 @@ export function buildRouteTable(
     const sp = k.indexOf(' ');
     const km = k.slice(0, sp);
     const kp = k.slice(sp + 1);
-    return kp === requestPath && km !== requestMethod && !kp.includes(':') && !isSellingRoute(km, kp);
+    return (
+      kp === requestPath && km !== requestMethod && !kp.includes(':') && !isSellingRoute(km, kp)
+    );
   });
   if (canonicalKey) {
     const synthKey = `${requestMethod} ${requestPath}`;
@@ -1017,7 +1061,12 @@ export function unconfirmedSettlementBody(
 ): {
   error: string;
   message: string;
-  settlement: { confirmation_received: false; paid: null; authoritative: false; timeout_ms: number };
+  settlement: {
+    confirmation_received: false;
+    paid: null;
+    authoritative: false;
+    timeout_ms: number;
+  };
   recovery_url?: string;
   recovery_note?: string;
 } {
@@ -1055,9 +1104,9 @@ export function unconfirmedSettlementBody(
 }
 
 /** The same client, with each of its three calls bounded in time. */
-export function boundFacilitator<T extends { verify: unknown; settle: unknown; getSupported: unknown }>(
-  client: T,
-): T {
+export function boundFacilitator<
+  T extends { verify: unknown; settle: unknown; getSupported: unknown },
+>(client: T): T {
   const verify = client.verify as (...args: unknown[]) => Promise<unknown>;
   const settle = client.settle as (...args: unknown[]) => Promise<unknown>;
   const getSupported = client.getSupported as (...args: unknown[]) => Promise<unknown>;
@@ -1094,7 +1143,9 @@ async function buildPaywall(): Promise<X402Paywall> {
   let facilitatorClient: InstanceType<CoreServerModule['HTTPFacilitatorClient']>;
   if (cdpKeyId && cdpKeySecret) {
     const { createFacilitatorConfig } = await import('@coinbase/x402');
-    facilitatorClient = new core.HTTPFacilitatorClient(createFacilitatorConfig(cdpKeyId, cdpKeySecret));
+    facilitatorClient = new core.HTTPFacilitatorClient(
+      createFacilitatorConfig(cdpKeyId, cdpKeySecret),
+    );
   } else {
     facilitatorClient = new core.HTTPFacilitatorClient({
       url: process.env.FACILITATOR_URL || 'https://x402.org/facilitator',
@@ -1134,7 +1185,10 @@ function getPaywall(walletAddress: string): Promise<X402Paywall> {
  * `paymentMiddleware()` construction. On failure the latch is cleared so the
  * next paid request retries, which is the SDK's own behaviour.
  */
-async function syncFacilitator(paywall: X402Paywall, httpServer: HTTPResourceServer): Promise<void> {
+async function syncFacilitator(
+  paywall: X402Paywall,
+  httpServer: HTTPResourceServer,
+): Promise<void> {
   if (paywall.facilitatorSynced) return;
   if (!paywall.facilitatorSync) {
     paywall.facilitatorSync = httpServer.initialize().then(
@@ -1161,10 +1215,7 @@ export function resetX402Paywall(): void {
 export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
   return async (c, next) => {
     // Dev bypass
-    if (
-      process.env.NODE_ENV === 'development' &&
-      c.req.header('X-Dev-Skip') === 'true'
-    ) {
+    if (process.env.NODE_ENV === 'development' && c.req.header('X-Dev-Skip') === 'true') {
       await next();
       return;
     }
@@ -1179,7 +1230,10 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
     // (200 req/month) buys 200 bundles, i.e. up to $16,000 of credits for one
     // unit of quota, and each minted key can start over.
     // Security audit 2026-07-25, finding 1.
-    if (c.get('apiKeyAuthenticated') && !isSellingRoute(c.req.method, new URL(c.req.url).pathname)) {
+    if (
+      c.get('apiKeyAuthenticated') &&
+      !isSellingRoute(c.req.method, new URL(c.req.url).pathname)
+    ) {
       await next();
       return;
     }
@@ -1189,10 +1243,7 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
       if (isProd && !explicitFreeMode) {
         // Defense in depth: if boot-time validation was bypassed somehow,
         // refuse to serve paid endpoints rather than fail-open.
-        return c.json(
-          { error: 'Payment system misconfigured. Please contact support.' },
-          503,
-        );
+        return c.json({ error: 'Payment system misconfigured. Please contact support.' }, 503);
       }
       await next();
       return;
@@ -1201,10 +1252,7 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
     const walletAddress = process.env.WALLET_ADDRESS;
     if (!walletAddress) {
       if (isProd) {
-        return c.json(
-          { error: 'Payment system misconfigured. Please contact support.' },
-          503,
-        );
+        return c.json({ error: 'Payment system misconfigured. Please contact support.' }, 503);
       }
       await next();
       return;
@@ -1221,10 +1269,14 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
       // up reading its own correction.
       for (const config of Object.values(routes)) {
         const entry = config as { description?: string };
-        if (typeof entry.description === 'string') entry.description = capDescription(entry.description);
+        if (typeof entry.description === 'string')
+          entry.description = capDescription(entry.description);
       }
 
-      const httpServer = new paywall.core.x402HTTPResourceServer(paywall.server, routes as RoutesArg);
+      const httpServer = new paywall.core.x402HTTPResourceServer(
+        paywall.server,
+        routes as RoutesArg,
+      );
       const context = {
         adapter: new paywall.hono.HonoAdapter(c),
         path: c.req.path,
@@ -1255,7 +1307,12 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
       // `false` = do not let the SDK run its own facilitator sync: we just did
       // it, once, above. This is the parameter whose default fired the
       // detached `GET /supported` from every construction.
-      const middleware = paywall.hono.paymentMiddlewareFromHTTPServer(httpServer, undefined, undefined, false);
+      const middleware = paywall.hono.paymentMiddlewareFromHTTPServer(
+        httpServer,
+        undefined,
+        undefined,
+        false,
+      );
 
       // Run the paywall inside a request-scoped slot so a settle that timed out
       // can be told apart from a settle that was refused. Both leave the SDK
@@ -1288,10 +1345,7 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
     } catch (err) {
       console.error('[x402] Middleware error:', err);
       if (process.env.NODE_ENV === 'production') {
-        return c.json(
-          { error: 'Payment system unavailable. Please try again later.' },
-          503,
-        );
+        return c.json({ error: 'Payment system unavailable. Please try again later.' }, 503);
       }
       await next();
     }

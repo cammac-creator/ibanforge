@@ -6,7 +6,8 @@ import { COUNTRY_RISK_AS_OF } from './countries.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
-const COMPLIANCE_DB_PATH = process.env.COMPLIANCE_DB_PATH ?? resolve(__dirname, '../../data/compliance.sqlite');
+const COMPLIANCE_DB_PATH =
+  process.env.COMPLIANCE_DB_PATH ?? resolve(__dirname, '../../data/compliance.sqlite');
 
 let complianceDB: DatabaseType.Database | null = null;
 

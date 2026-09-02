@@ -58,7 +58,7 @@ describe('did_you_mean — les trois confusions observées', () => {
     ['POST', '/v1/iban/validate'],
     ['DELETE', '/v1/iban/validate'],
     ['GET', '/totalement/inconnu'],
-  ])("ne devine rien pour %s %s (pas de piste inventée)", (method, path) => {
+  ])('ne devine rien pour %s %s (pas de piste inventée)', (method, path) => {
     expect(notFoundBody(method, path).did_you_mean).toBeUndefined();
   });
 
@@ -72,7 +72,7 @@ describe('did_you_mean — les trois confusions observées', () => {
 });
 
 describe('DPA — le corps nomme le chemin, jamais la charge utile', () => {
-  it("ne contient aucun champ dérivé du corps de requête", async () => {
+  it('ne contient aucun champ dérivé du corps de requête', async () => {
     const iban = 'CH9300762011623852957';
     const res = await makeApp().request('/', {
       method: 'POST',

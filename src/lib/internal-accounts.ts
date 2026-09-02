@@ -57,7 +57,11 @@ export function isInternalEmail(email: string | null | undefined): boolean {
  * Registered per connection, idempotent, so callers can just ask before use.
  */
 export function registerInternalEmailFn(db: {
-  function: (name: string, opts: { deterministic: boolean }, fn: (email: unknown) => number) => unknown;
+  function: (
+    name: string,
+    opts: { deterministic: boolean },
+    fn: (email: unknown) => number,
+  ) => unknown;
 }): void {
   const registered = REGISTERED as WeakSet<object>;
   if (registered.has(db as object)) return;

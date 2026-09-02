@@ -1,6 +1,18 @@
 import { Hono } from 'hono';
 import { timingSafeEqual } from 'node:crypto';
-import { getStats, getStatsHistory, getHourlyStats, getErrorStats, getPatternStats, getStatusByPath, getBusinessFunnel, getSourceStats, getRejectionStats, getCohortFootprint, getTrafficTrend } from '../lib/stats.js';
+import {
+  getStats,
+  getStatsHistory,
+  getHourlyStats,
+  getErrorStats,
+  getPatternStats,
+  getStatusByPath,
+  getBusinessFunnel,
+  getSourceStats,
+  getRejectionStats,
+  getCohortFootprint,
+  getTrafficTrend,
+} from '../lib/stats.js';
 import { getEvents } from '../lib/events.js';
 import { getEntryCount } from '../lib/bic-lookup.js';
 
@@ -60,9 +72,7 @@ const MAX_PERIOD_DAYS = 90;
  */
 const WINDOW_PARAMS = new Set(['period', 'days']);
 
-type WindowRead =
-  | { ok: true; days: number }
-  | { ok: false; error: string; message: string };
+type WindowRead = { ok: true; days: number } | { ok: false; error: string; message: string };
 
 function readWindow(
   query: Record<string, string>,

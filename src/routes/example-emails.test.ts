@@ -34,13 +34,24 @@ const ROOT = join(import.meta.dirname, '..', '..');
 
 /** Never reaches a reader, or is not ours to police. */
 const SKIP_DIRS = new Set([
-  'node_modules', '.git', '.next', 'dist', 'build', 'coverage', '.venv',
-  '.superpowers', '.claude', 'data', 'tmp', 'internal',
+  'node_modules',
+  '.git',
+  '.next',
+  'dist',
+  'build',
+  'coverage',
+  '.venv',
+  '.superpowers',
+  '.claude',
+  'data',
+  'tmp',
+  'internal',
   // Implementation plans and specs are dated design history, like CHANGELOG.
   'superpowers',
   // A mocked response body is not an instruction to a reader: the Python SDK
   // suite asserts on `{"email": "a@b.c"}`, which is a fixture, not an example.
-  'tests', '__tests__',
+  'tests',
+  '__tests__',
 ]);
 
 const EXTS = /\.(ts|tsx|js|mjs|py|json|md|mdx|txt|html)$/;

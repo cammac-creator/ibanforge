@@ -37,7 +37,9 @@ describe('every finding carries the document it comes from', () => {
     expect(find('sps', clean, 'twn_nm_required').source).toContain('14 November 2026');
     expect(find('fedwire', clean, 'twn_nm_required').source).toContain('Federal Reserve');
     expect(find('fedwire', clean, 'twn_nm_required').source).toContain('16 November 2026');
-    expect(find('hvps_plus', clean, 'twn_nm_ctry_required_if_no_adr_line').source).toContain('R2026.NOV');
+    expect(find('hvps_plus', clean, 'twn_nm_ctry_required_if_no_adr_line').source).toContain(
+      'R2026.NOV',
+    );
   });
 
   it('says on every answer why there is no cbpr+ scheme', () => {
@@ -107,7 +109,11 @@ describe('sps — the strictest corpus, and the only one that could be read in f
   });
 
   it('flags a segment inside a line, not only a whole line', () => {
-    const f = find('sps', { ...clean, adr_line: ['c/o Societe Alpha, Zurich'] }, 'adr_line_no_repeat');
+    const f = find(
+      'sps',
+      { ...clean, adr_line: ['c/o Societe Alpha, Zurich'] },
+      'adr_line_no_repeat',
+    );
     expect(f.verdict).toBe('fail');
     expect(f.detail).toContain('TwnNm');
   });
@@ -207,20 +213,29 @@ describe('fedwire — town and country unconditionally, two lines of 70, and not
     // The Federal Reserve page states neither, and the upstream PMPG document it
     // points to is on swift.com and could not be read. Silence is reported as
     // silence: we run no rule rather than import the Swiss one.
-    const rules = checkPostalAddress('fedwire', { ...clean, adr_tp: 'ADDR', adr_line: ['8001 Zurich'] })
-      .findings.map((f) => f.rule);
+    const rules = checkPostalAddress('fedwire', {
+      ...clean,
+      adr_tp: 'ADDR',
+      adr_line: ['8001 Zurich'],
+    }).findings.map((f) => f.rule);
     expect(rules).not.toContain('adr_tp_forbidden');
     expect(rules).not.toContain('adr_line_no_repeat');
   });
 
   it('fails past two lines', () => {
-    expect(find('fedwire', { ...clean, adr_line: ['a', 'b', 'c'] }, 'adr_line_max_2').verdict).toBe('fail');
+    expect(find('fedwire', { ...clean, adr_line: ['a', 'b', 'c'] }, 'adr_line_max_2').verdict).toBe(
+      'fail',
+    );
   });
 });
 
 describe('hvps_plus — the same requirement, but conditional, which is why there is a scheme parameter', () => {
   it('requires TownName and Country only when AddressLine is absent', () => {
-    const f = find('hvps_plus', { adr_line: ['Bundesplatz 1', '3003 Bern'] }, 'twn_nm_ctry_required_if_no_adr_line');
+    const f = find(
+      'hvps_plus',
+      { adr_line: ['Bundesplatz 1', '3003 Bern'] },
+      'twn_nm_ctry_required_if_no_adr_line',
+    );
     expect(f.verdict).toBe('not_applicable');
     expect(checkPostalAddress('hvps_plus', { adr_line: ['Bundesplatz 1'] }).conforms).toBe(true);
   });
@@ -231,22 +246,32 @@ describe('hvps_plus — the same requirement, but conditional, which is why ther
     expect(missingBoth.detail).toContain('TownName');
     expect(missingBoth.detail).toContain('Country');
 
-    const missingCtry = find('hvps_plus', { twn_nm: 'Bern' }, 'twn_nm_ctry_required_if_no_adr_line');
+    const missingCtry = find(
+      'hvps_plus',
+      { twn_nm: 'Bern' },
+      'twn_nm_ctry_required_if_no_adr_line',
+    );
     expect(missingCtry.verdict).toBe('fail');
     expect(missingCtry.detail).toContain('Country');
     expect(missingCtry.detail).not.toContain('TownName,');
   });
 
   it('does not cap AddressLine, because the fetched T2 appendix caps nothing', () => {
-    const rules = checkPostalAddress('hvps_plus', { adr_line: ['a', 'b', 'c', 'd', 'e'] }).findings.map(
-      (f) => f.rule,
-    );
+    const rules = checkPostalAddress('hvps_plus', {
+      adr_line: ['a', 'b', 'c', 'd', 'e'],
+    }).findings.map((f) => f.rule);
     expect(rules).not.toContain('adr_line_max_2');
-    expect(checkPostalAddress('hvps_plus', { adr_line: ['a', 'b', 'c', 'd', 'e'] }).conforms).toBe(true);
+    expect(checkPostalAddress('hvps_plus', { adr_line: ['a', 'b', 'c', 'd', 'e'] }).conforms).toBe(
+      true,
+    );
   });
 
   it('says that the fetched document does not forbid an AddressLine-only address', () => {
-    const f = find('hvps_plus', { adr_line: ['Bundesplatz 1'] }, 'twn_nm_ctry_required_if_no_adr_line');
+    const f = find(
+      'hvps_plus',
+      { adr_line: ['Bundesplatz 1'] },
+      'twn_nm_ctry_required_if_no_adr_line',
+    );
     expect(f.detail).toContain('does not forbid');
     expect(f.detail).toContain('MyStandards');
   });
@@ -283,16 +308,24 @@ describe('the widths of the structured elements', () => {
     expect(result.conforms).toBe(false);
     const failed = result.findings.filter((f) => f.verdict === 'fail').map((f) => f.rule);
     expect(failed).toEqual(
-      expect.arrayContaining(['strt_nm_max_70', 'bldg_nb_max_16', 'pst_cd_max_16', 'twn_nm_max_35']),
+      expect.arrayContaining([
+        'strt_nm_max_70',
+        'bldg_nb_max_16',
+        'pst_cd_max_16',
+        'twn_nm_max_35',
+      ]),
     );
   });
 
-  it.each(ADDRESS_SCHEMES)('%s passes an address that fits, and says what it measured', (scheme) => {
-    const result = checkPostalAddress(scheme, clean);
-    const finding = result.findings.find((f) => f.rule === 'twn_nm_max_35');
-    expect(finding?.verdict).toBe('pass');
-    expect(finding?.detail).toContain('Max35Text');
-  });
+  it.each(ADDRESS_SCHEMES)(
+    '%s passes an address that fits, and says what it measured',
+    (scheme) => {
+      const result = checkPostalAddress(scheme, clean);
+      const finding = result.findings.find((f) => f.rule === 'twn_nm_max_35');
+      expect(finding?.verdict).toBe('pass');
+      expect(finding?.detail).toContain('Max35Text');
+    },
+  );
 
   it('measures each element at its own boundary, not one size for all', () => {
     // 16 and 35 are different numbers, and a checker that applied 70 to
@@ -301,8 +334,12 @@ describe('the widths of the structured elements', () => {
     expect(find('sps', { ...clean, pst_cd: '9'.repeat(17) }, 'pst_cd_max_16').verdict).toBe('fail');
     expect(find('sps', { ...clean, twn_nm: 'B'.repeat(35) }, 'twn_nm_max_35').verdict).toBe('pass');
     expect(find('sps', { ...clean, twn_nm: 'B'.repeat(36) }, 'twn_nm_max_35').verdict).toBe('fail');
-    expect(find('sps', { ...clean, strt_nm: 'A'.repeat(70) }, 'strt_nm_max_70').verdict).toBe('pass');
-    expect(find('sps', { ...clean, strt_nm: 'A'.repeat(71) }, 'strt_nm_max_70').verdict).toBe('fail');
+    expect(find('sps', { ...clean, strt_nm: 'A'.repeat(70) }, 'strt_nm_max_70').verdict).toBe(
+      'pass',
+    );
+    expect(find('sps', { ...clean, strt_nm: 'A'.repeat(71) }, 'strt_nm_max_70').verdict).toBe(
+      'fail',
+    );
   });
 
   it('is not_applicable on an absent element rather than a free pass', () => {
@@ -329,7 +366,9 @@ describe('the widths of the structured elements', () => {
     // fails anything that is not exactly two uppercase letters. A ctry_max_2
     // would report the same defect twice.
     for (const scheme of ADDRESS_SCHEMES) {
-      expect(checkPostalAddress(scheme, clean).findings.map((f) => f.rule)).not.toContain('ctry_max_2');
+      expect(checkPostalAddress(scheme, clean).findings.map((f) => f.rule)).not.toContain(
+        'ctry_max_2',
+      );
     }
     expect(find('sps', { ...clean, ctry: 'CHE' }, 'ctry_iso3166').verdict).toBe('fail');
   });

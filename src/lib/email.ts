@@ -1,5 +1,10 @@
 import { PAYMENT_LINKS, PRICING_PAGE } from './payment-links.js';
-import { sendViaRelay, deliverViaRelay, isRelayConfigured, type RelayOutcome } from './mail-transport.js';
+import {
+  sendViaRelay,
+  deliverViaRelay,
+  isRelayConfigured,
+  type RelayOutcome,
+} from './mail-transport.js';
 import { opsFail } from './ops-alert.js';
 import {
   ACCOUNT_PAGE,
@@ -73,7 +78,11 @@ export function recipientDomain(address: string): string {
  */
 export function alertKeyDeliveryFailure(what: string): void {
   if (process.env.VITEST) return;
-  void opsFail('mail:key-delivery', `${what}: the relay refused the message or could not be reached.`, 1);
+  void opsFail(
+    'mail:key-delivery',
+    `${what}: the relay refused the message or could not be reached.`,
+    1,
+  );
 }
 
 /**
@@ -102,7 +111,11 @@ export interface ApiKeyEmailInput {
  * Swiss IBAN with no expected answer, which told a reader nothing about whether
  * their call had succeeded.
  */
-export function buildApiKeyEmail(p: ApiKeyEmailInput): { subject: string; text: string; html: string } {
+export function buildApiKeyEmail(p: ApiKeyEmailInput): {
+  subject: string;
+  text: string;
+  html: string;
+} {
   const credits = p.credits.toLocaleString('en-US');
 
   const text =
@@ -164,7 +177,11 @@ export interface FreeKeyEmailInput {
  * to buy yet, and a purchase prompt here is what makes the whole message read
  * as a sequence rather than a delivery.
  */
-export function buildFreeKeyEmail(p: FreeKeyEmailInput): { subject: string; text: string; html: string } {
+export function buildFreeKeyEmail(p: FreeKeyEmailInput): {
+  subject: string;
+  text: string;
+  html: string;
+} {
   const limit = p.monthlyLimit.toLocaleString('en-US');
 
   const text =
@@ -225,7 +242,11 @@ export interface ActivationNudgeInput {
  * message is for: the founder's own mail is what gets answers, and this is its
  * automated, lighter cousin.
  */
-export function buildActivationNudgeEmail(p: ActivationNudgeInput): { subject: string; text: string; html: string } {
+export function buildActivationNudgeEmail(p: ActivationNudgeInput): {
+  subject: string;
+  text: string;
+  html: string;
+} {
   const text =
     `Your IBANforge key has not made its first call yet.\n\n` +
     `No reproach in that, it usually means the first call is still one copy-paste away.\n` +
@@ -250,7 +271,9 @@ export function buildActivationNudgeEmail(p: ActivationNudgeInput): { subject: s
   return { subject: 'Your IBANforge key has not made its first call yet', text, html };
 }
 
-export async function sendActivationNudgeEmail(p: ActivationNudgeInput & { to: string }): Promise<boolean> {
+export async function sendActivationNudgeEmail(
+  p: ActivationNudgeInput & { to: string },
+): Promise<boolean> {
   const { subject, text, html } = buildActivationNudgeEmail(p);
   const ok = await sendViaRelay({ to: p.to, subject, text, html });
   if (!ok) reportUndelivered('activation nudge', p.to, false);
@@ -275,7 +298,11 @@ export interface QuotaWarningInput {
  * was back in service within the hour, without paying). Card first, USDC
  * second, nothing else.
  */
-export function buildQuotaWarningEmail(p: QuotaWarningInput): { subject: string; text: string; html: string } {
+export function buildQuotaWarningEmail(p: QuotaWarningInput): {
+  subject: string;
+  text: string;
+  html: string;
+} {
   const pct = Math.round((p.used / p.limit) * 100);
   const left = Math.max(0, p.limit - p.used);
   const subject = `You are at ${pct}% of your IBANforge free tier (80% alert)`;
@@ -319,7 +346,9 @@ export function buildQuotaWarningEmail(p: QuotaWarningInput): { subject: string;
  * config means no send and no throw, so a missing mailbox can never break a
  * customer's API call (this runs off the hot path, fire-and-forget).
  */
-export async function sendQuotaWarningEmail(p: QuotaWarningInput & { to: string }): Promise<boolean> {
+export async function sendQuotaWarningEmail(
+  p: QuotaWarningInput & { to: string },
+): Promise<boolean> {
   const { subject, text, html } = buildQuotaWarningEmail(p);
   const ok = await sendViaRelay({ to: p.to, subject: subject, text, html });
   if (!ok) reportUndelivered('quota warning', p.to, false);
@@ -335,7 +364,11 @@ export async function sendQuotaWarningEmail(p: QuotaWarningInput & { to: string 
  * inside the async function, where nothing pure could be asserted, which is
  * exactly how the em dash rule stayed green while two live messages broke it.
  */
-export function buildKeyVerificationEmail(p: { code: string }): { subject: string; text: string; html: string } {
+export function buildKeyVerificationEmail(p: { code: string }): {
+  subject: string;
+  text: string;
+  html: string;
+} {
   const subject = `${p.code} is your IBANforge verification code`;
   const text =
     `Your IBANforge verification code:\n\n${p.code}\n\n` +
@@ -360,7 +393,10 @@ export function buildKeyVerificationEmail(p: { code: string }): { subject: strin
  * Measured 02/09/2026: every 503 of the previous month was a script feeding
  * addresses that cannot exist, and the relay was healthy throughout.
  */
-export async function deliverKeyVerificationEmail(p: { to: string; code: string }): Promise<RelayOutcome> {
+export async function deliverKeyVerificationEmail(p: {
+  to: string;
+  code: string;
+}): Promise<RelayOutcome> {
   const { subject, text, html } = buildKeyVerificationEmail(p);
   const { outcome } = await deliverViaRelay({ to: p.to, subject, text, html });
   if (outcome !== 'sent') reportUndelivered('verification code', p.to, false);
@@ -429,7 +465,11 @@ export function buildOemKeyEmail(p: { rawKey: string; monthlyLimit: number }): {
   return { subject: `Your IBANforge Editor / OEM key, ${limit} requests/month`, text, html };
 }
 
-export async function sendOemKeyEmail(p: { to: string; rawKey: string; monthlyLimit: number }): Promise<boolean> {
+export async function sendOemKeyEmail(p: {
+  to: string;
+  rawKey: string;
+  monthlyLimit: number;
+}): Promise<boolean> {
   const { subject, text, html } = buildOemKeyEmail(p);
   const ok = await sendViaRelay({ to: p.to, subject, text, html });
   if (!ok) reportUndelivered('OEM key delivery', p.to, true);

@@ -70,7 +70,9 @@ describe('checkpointStatsWal', () => {
 
   it('leaves the data intact — this is housekeeping, not a purge', () => {
     const db = getStatsDB();
-    const { n } = db.prepare("SELECT COUNT(*) AS n FROM request_log WHERE path LIKE '/v1/bench/%'").get() as {
+    const { n } = db
+      .prepare("SELECT COUNT(*) AS n FROM request_log WHERE path LIKE '/v1/bench/%'")
+      .get() as {
       n: number;
     };
     expect(n).toBe(20_000);
@@ -81,7 +83,11 @@ describe('checkpointStatsWal', () => {
     // false and a log line, never an exception that takes the boot down.
     vi.resetModules();
     const previous = process.env.STATS_DB_PATH;
-    process.env.STATS_DB_PATH = join(mkdtempSync(join(tmpdir(), 'ibanforge-wal-ro-')), 'nope', 'x.sqlite');
+    process.env.STATS_DB_PATH = join(
+      mkdtempSync(join(tmpdir(), 'ibanforge-wal-ro-')),
+      'nope',
+      'x.sqlite',
+    );
     const fresh = await import('./db.js');
     try {
       expect(fresh.checkpointStatsWal()).toBe(false);

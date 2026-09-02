@@ -152,7 +152,7 @@ const STRUCTURED_MAX_LENGTHS = [
  * UDFS, neither of which restates it.
  */
 const ISO_WIDTH_CLAUSE =
-  ' This rail\'s own fetched document does not restate element widths; the width applied is the ISO 20022 data ' +
+  " This rail's own fetched document does not restate element widths; the width applied is the ISO 20022 data " +
   'type of the element, taken from the one field table that could be fetched (SIX, Swiss Implementation ' +
   'Guidelines SPS 2026 v2.3, published 20.02.2026, ch. 3.11 table 9). The ISO 20022 base schema itself was ' +
   'unreachable (iso20022.org, 26.08.2026).';
@@ -400,7 +400,12 @@ function ruleAdrLineNoRepeat(address: AddressToCheck): AddressFinding {
   const source = SRC_SPS_IG;
 
   if (ls.length === 0) {
-    return { rule: 'adr_line_no_repeat', verdict: 'not_applicable', detail: 'No AdrLine supplied.', source };
+    return {
+      rule: 'adr_line_no_repeat',
+      verdict: 'not_applicable',
+      detail: 'No AdrLine supplied.',
+      source,
+    };
   }
 
   const values = structuredValues(address);
@@ -415,7 +420,10 @@ function ruleAdrLineNoRepeat(address: AddressToCheck): AddressFinding {
 
   const repeats: string[] = [];
   for (const line of ls) {
-    const segments = line.split(',').map((s) => s.trim()).filter(Boolean);
+    const segments = line
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
     for (const segment of segments) {
       const label = values.get(norm(segment));
       if (label) repeats.push(`"${segment}" repeats ${label}`);
@@ -486,7 +494,10 @@ function ruleTwnNmCtryConditional(address: AddressToCheck): AddressFinding {
  * can see what was checked and not only what broke. `conforms` is false as soon
  * as one finding fails.
  */
-export function checkPostalAddress(scheme: AddressScheme, address: AddressToCheck): AddressCheckResult {
+export function checkPostalAddress(
+  scheme: AddressScheme,
+  address: AddressToCheck,
+): AddressCheckResult {
   const findings: AddressFinding[] = [];
 
   if (scheme === 'sps') {
@@ -496,10 +507,19 @@ export function checkPostalAddress(scheme: AddressScheme, address: AddressToChec
     // the message."
     findings.push(ruleTwnNmRequired(address, `${SRC_SPS_IG} Restated in ${SRC_SPS_BR}`));
     findings.push(ruleCtryRequired(address, `${SRC_SPS_IG} Restated in ${SRC_SPS_BR}`));
-    findings.push(ruleCtryIso3166(address, `${SRC_SPS_IG} The table states Ctry as ISO 3166 alpha-2.`));
+    findings.push(
+      ruleCtryIso3166(address, `${SRC_SPS_IG} The table states Ctry as ISO 3166 alpha-2.`),
+    );
     findings.push(ruleAdrTpForbidden(address));
-    findings.push(ruleAdrLineMaxCount(address, `${SRC_SPS_IG} "Maximum 2 lines allowed if offered as part of the hybrid address."`));
-    findings.push(ruleAdrLineMaxLength(address, `${SRC_SPS_IG} AdrLine is Max70Text in the hybrid address.`));
+    findings.push(
+      ruleAdrLineMaxCount(
+        address,
+        `${SRC_SPS_IG} "Maximum 2 lines allowed if offered as part of the hybrid address."`,
+      ),
+    );
+    findings.push(
+      ruleAdrLineMaxLength(address, `${SRC_SPS_IG} AdrLine is Max70Text in the hybrid address.`),
+    );
     findings.push(ruleAdrLineNoRepeat(address));
     // The widths of the structured elements, from the same field table as the
     // rules above (DATA-04, 01/09/2026 — nothing measured them before).

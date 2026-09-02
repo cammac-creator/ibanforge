@@ -17,10 +17,7 @@ ibanValidate.post('/v1/iban/validate', async (c) => {
   try {
     body = await c.req.json<Record<string, unknown>>();
   } catch {
-    return c.json(
-      { error: 'invalid_json', message: 'Request body must be valid JSON' },
-      400,
-    );
+    return c.json({ error: 'invalid_json', message: 'Request body must be valid JSON' }, 400);
   }
 
   const iban = getIban(body);
@@ -28,7 +25,8 @@ ibanValidate.post('/v1/iban/validate', async (c) => {
     return c.json(
       {
         error: 'invalid_request',
-        message: "Request body must include an 'iban' field (case-insensitive: 'iban', 'IBAN', 'Iban' all work).",
+        message:
+          "Request body must include an 'iban' field (case-insensitive: 'iban', 'IBAN', 'Iban' all work).",
       },
       400,
     );
@@ -75,7 +73,14 @@ ibanValidate.post('/v1/iban/validate', async (c) => {
   // DB that stops accepting writes cannot look like a service nobody calls.
   recordSafely(
     () =>
-      recordOperation('iban_validate', result.country?.code ?? null, result.valid, revenue, errorDetail, c.get('apiKeyPrefix')),
+      recordOperation(
+        'iban_validate',
+        result.country?.code ?? null,
+        result.valid,
+        revenue,
+        errorDetail,
+        c.get('apiKeyPrefix'),
+      ),
     'iban_validate',
   );
 

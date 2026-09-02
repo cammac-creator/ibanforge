@@ -67,7 +67,9 @@ describe('the purchase alert cannot hold the Stripe webhook open', () => {
     configured();
     // What undici raises when the signal fires mid-flight.
     globalThis.fetch = vi.fn(async () => {
-      throw Object.assign(new Error('The operation was aborted due to timeout'), { name: 'TimeoutError' });
+      throw Object.assign(new Error('The operation was aborted due to timeout'), {
+        name: 'TimeoutError',
+      });
     }) as unknown as typeof fetch;
 
     // Best-effort by contract: it reports failure, it never throws, and above
@@ -78,7 +80,9 @@ describe('the purchase alert cannot hold the Stripe webhook open', () => {
 
   it('still never throws when Telegram refuses outright', async () => {
     configured();
-    globalThis.fetch = vi.fn(async () => new Response('nope', { status: 403 })) as unknown as typeof fetch;
+    globalThis.fetch = vi.fn(
+      async () => new Response('nope', { status: 403 }),
+    ) as unknown as typeof fetch;
     expect(await notifyPurchaseTelegram(PURCHASE)).toBe(false);
   });
 

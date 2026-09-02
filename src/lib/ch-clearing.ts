@@ -53,7 +53,9 @@ function qrByMaster(): Map<string, string[]> {
   const index = new Map<string, string[]>();
   try {
     const rows = getBicDB()
-      .prepare("SELECT iid, qr_iid FROM ch_clearing WHERE qr_iid IS NOT NULL AND TRIM(qr_iid) <> ''")
+      .prepare(
+        "SELECT iid, qr_iid FROM ch_clearing WHERE qr_iid IS NOT NULL AND TRIM(qr_iid) <> ''",
+      )
       .all() as Array<{ iid: string; qr_iid: string }>;
     for (const row of rows) {
       // Only rows in the QR range describe a QR-IID. Anything else is a
@@ -234,7 +236,8 @@ function rowToEntry(row: ChClearingRow): ChClearingEntry {
   const hq = row.headquarters_iid ? normalizeIid(row.headquarters_iid) : null;
   if (hq && hq !== row.iid) {
     const inherited = index.get(hq);
-    if (inherited?.length) return withQrIids(buildEntry(row, row.iid, inherited[0], 'headquarters'), inherited);
+    if (inherited?.length)
+      return withQrIids(buildEntry(row, row.iid, inherited[0], 'headquarters'), inherited);
   }
 
   return buildEntry(row, row.iid, null, null);
@@ -356,7 +359,9 @@ function stmtByBic() {
 }
 
 function addressKey(r: ChClearingRow): string {
-  return [r.street, r.building_number, r.post_code, r.town, r.country].map((v) => v ?? '').join('|');
+  return [r.street, r.building_number, r.post_code, r.town, r.country]
+    .map((v) => v ?? '')
+    .join('|');
 }
 
 /**

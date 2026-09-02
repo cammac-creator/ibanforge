@@ -87,7 +87,9 @@ describe('/v1/admin/prospects — upsert + read back', () => {
     });
     expect(up2.status).toBe(200);
 
-    const list = await app.request('/v1/admin/prospects', { headers: { 'X-Admin-Secret': SECRET } });
+    const list = await app.request('/v1/admin/prospects', {
+      headers: { 'X-Admin-Secret': SECRET },
+    });
     const json = (await list.json()) as { prospects: Array<{ id: string }> };
     const matches = json.prospects.filter((p) => p.id === id);
     expect(matches.length).toBe(1);
@@ -130,7 +132,9 @@ describe('/v1/admin/prospects/update — the outcome axis', () => {
     });
 
   const read = async () => {
-    const res = await makeApp().request('/v1/admin/prospects', { headers: { 'X-Admin-Secret': SECRET } });
+    const res = await makeApp().request('/v1/admin/prospects', {
+      headers: { 'X-Admin-Secret': SECRET },
+    });
     const json = (await res.json()) as { prospects: Array<Record<string, string | null>> };
     return json.prospects.find((p) => p.id === pid)!;
   };
@@ -140,13 +144,23 @@ describe('/v1/admin/prospects/update — the outcome axis', () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Admin-Secret': SECRET },
       body: JSON.stringify({
-        prospects: [{ id: pid, company: 'Fictive Sàrl', status: 'contacte', contact_email: `outcome-${RUN_ID}@prospect-test.example` }],
+        prospects: [
+          {
+            id: pid,
+            company: 'Fictive Sàrl',
+            status: 'contacte',
+            contact_email: `outcome-${RUN_ID}@prospect-test.example`,
+          },
+        ],
       }),
     });
   });
 
   it('records an outcome and reads it back', async () => {
-    expect((await update({ outcome: 'pas_interesse', outcomeNote: 'Ils ont déjà un fournisseur.' })).status).toBe(200);
+    expect(
+      (await update({ outcome: 'pas_interesse', outcomeNote: 'Ils ont déjà un fournisseur.' }))
+        .status,
+    ).toBe(200);
     const row = await read();
     expect(row.outcome).toBe('pas_interesse');
     expect(row.outcome_note).toBe('Ils ont déjà un fournisseur.');
@@ -182,7 +196,11 @@ describe('/v1/admin/prospects/update — the outcome axis', () => {
   });
 
   it('clears the date and the note when the outcome is taken back', async () => {
-    await update({ outcome: 'pas_maintenant', wakeUpAt: '2026-09-15', outcomeNote: 'rappeler après l été' });
+    await update({
+      outcome: 'pas_maintenant',
+      wakeUpAt: '2026-09-15',
+      outcomeNote: 'rappeler après l été',
+    });
     await update({ outcome: null });
     const row = await read();
     expect(row.outcome).toBeNull();
@@ -216,7 +234,9 @@ describe('email-messages upsert → prospect status auto-flip', () => {
   }
 
   async function readStatus(app: Hono): Promise<string> {
-    const list = await app.request('/v1/admin/prospects', { headers: { 'X-Admin-Secret': SECRET } });
+    const list = await app.request('/v1/admin/prospects', {
+      headers: { 'X-Admin-Secret': SECRET },
+    });
     const json = (await list.json()) as { prospects: Array<{ id: string; status: string }> };
     return json.prospects.find((p) => p.id === pid)!.status;
   }
@@ -228,7 +248,15 @@ describe('email-messages upsert → prospect status auto-flip', () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Admin-Secret': SECRET },
       body: JSON.stringify({
-        messages: [{ id: `m-out-${RUN_ID}`, customer_email: email.toUpperCase(), direction: 'out', subject: 'Hello', msg_date: '2026-07-02T08:00' }],
+        messages: [
+          {
+            id: `m-out-${RUN_ID}`,
+            customer_email: email.toUpperCase(),
+            direction: 'out',
+            subject: 'Hello',
+            msg_date: '2026-07-02T08:00',
+          },
+        ],
       }),
     });
     expect(res.status).toBe(200);
@@ -242,7 +270,15 @@ describe('email-messages upsert → prospect status auto-flip', () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Admin-Secret': SECRET },
       body: JSON.stringify({
-        messages: [{ id: `m-in-${RUN_ID}`, customer_email: email, direction: 'in', subject: 'Re: Hello', msg_date: '2026-07-02T09:00' }],
+        messages: [
+          {
+            id: `m-in-${RUN_ID}`,
+            customer_email: email,
+            direction: 'in',
+            subject: 'Re: Hello',
+            msg_date: '2026-07-02T09:00',
+          },
+        ],
       }),
     });
     expect(await readStatus(app)).toBe('a_mailer');
@@ -255,7 +291,15 @@ describe('email-messages upsert → prospect status auto-flip', () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Admin-Secret': SECRET },
       body: JSON.stringify({
-        messages: [{ id: `m-out2-${RUN_ID}`, customer_email: email, direction: 'out', subject: 'Hello again', msg_date: '2026-07-02T10:00' }],
+        messages: [
+          {
+            id: `m-out2-${RUN_ID}`,
+            customer_email: email,
+            direction: 'out',
+            subject: 'Hello again',
+            msg_date: '2026-07-02T10:00',
+          },
+        ],
       }),
     });
     expect(await readStatus(app)).toBe('rejete');
@@ -268,7 +312,16 @@ describe('email-messages upsert → prospect status auto-flip', () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Admin-Secret': SECRET },
       body: JSON.stringify({
-        messages: [{ id: `m-draft-${RUN_ID}`, customer_email: email, direction: 'draft', subject: 'Brouillon', msg_date: '2026-07-02T11:00', body: 'draft body' }],
+        messages: [
+          {
+            id: `m-draft-${RUN_ID}`,
+            customer_email: email,
+            direction: 'draft',
+            subject: 'Brouillon',
+            msg_date: '2026-07-02T11:00',
+            body: 'draft body',
+          },
+        ],
       }),
     });
     expect(res.status).toBe(200);
@@ -285,8 +338,20 @@ describe('email-messages delete — drafts only', () => {
       headers: { 'Content-Type': 'application/json', 'X-Admin-Secret': SECRET },
       body: JSON.stringify({
         messages: [
-          { id: `del-draft-${RUN_ID}`, customer_email: mail, direction: 'draft', subject: 'Brouillon', msg_date: '2026-07-02T12:00' },
-          { id: `del-out-${RUN_ID}`, customer_email: mail, direction: 'out', subject: 'Envoyé', msg_date: '2026-07-02T12:01' },
+          {
+            id: `del-draft-${RUN_ID}`,
+            customer_email: mail,
+            direction: 'draft',
+            subject: 'Brouillon',
+            msg_date: '2026-07-02T12:00',
+          },
+          {
+            id: `del-out-${RUN_ID}`,
+            customer_email: mail,
+            direction: 'out',
+            subject: 'Envoyé',
+            msg_date: '2026-07-02T12:01',
+          },
         ],
       }),
     });
@@ -343,7 +408,9 @@ describe('/v1/admin/prospects — em dashes scrubbed from mail prose on seed', (
     });
     expect(up.status).toBe(200);
 
-    const list = await app.request('/v1/admin/prospects', { headers: { 'X-Admin-Secret': SECRET } });
+    const list = await app.request('/v1/admin/prospects', {
+      headers: { 'X-Admin-Secret': SECRET },
+    });
     const { prospects } = (await list.json()) as { prospects: Array<Record<string, string>> };
     const p = prospects.find((x) => x.id === id)!;
 

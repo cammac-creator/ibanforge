@@ -93,7 +93,9 @@ export const CREDIT_PACK_USD: Record<number, number> = {
 export function creditPackUsd(credits: number): { usd: number; exact: boolean } {
   const known = CREDIT_PACK_USD[credits];
   if (known != null) return { usd: known, exact: true };
-  const tiers = Object.keys(CREDIT_PACK_USD).map(Number).sort((a, b) => a - b);
+  const tiers = Object.keys(CREDIT_PACK_USD)
+    .map(Number)
+    .sort((a, b) => a - b);
   const nearest = tiers.reduce((best, t) =>
     Math.abs(t - credits) < Math.abs(best - credits) ? t : best,
   );
@@ -352,9 +354,7 @@ export function buildBusinessSummary(input: {
   // product working, not a fault. Folding it into "errors" both frightens and
   // hides — it buried a 5xx rate worth being proud of.
   const errors = Math.max(traffic.s4xx - traffic.s402, 0) + traffic.s5xx;
-  const discovery = paths
-    .filter((p) => isDiscoveryPath(p.path))
-    .reduce((t, p) => t + p.count, 0);
+  const discovery = paths.filter((p) => isDiscoveryPath(p.path)).reduce((t, p) => t + p.count, 0);
 
   const windowedCalls = clients.reduce((t, c) => t + c.calls, 0);
   const busiest = clients.reduce((m, c) => Math.max(m, c.calls), 0);

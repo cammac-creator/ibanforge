@@ -85,7 +85,11 @@ function noteFailure(label: string): void {
   if (lastAlertAt !== null && now - lastAlertAt < RECORD_ALERT_COOLDOWN_MS) return;
   lastAlertAt = now;
   alertOpen = true;
-  void opsFail(OPS_KEY, `stats write "${label}" has failed ${fails} times in a row. Measurement is down, the API is not.`, 1);
+  void opsFail(
+    OPS_KEY,
+    `stats write "${label}" has failed ${fails} times in a row. Measurement is down, the API is not.`,
+    1,
+  );
 }
 
 function noteSuccess(label: string): void {

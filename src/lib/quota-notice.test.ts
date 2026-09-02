@@ -30,38 +30,56 @@ describe('maybeSendQuotaWarning', () => {
     const keyHash = makeAgedKey(`qn-ph-${RUN_ID}@example.com`);
 
     for (const placeholder of ['credits-buyer', 'stripe-buyer', 'oem-subscriber']) {
-      expect(await maybeSendQuotaWarning(input(keyHash, placeholder, '2030-01'))).toBe('no_contact');
+      expect(await maybeSendQuotaWarning(input(keyHash, placeholder, '2030-01'))).toBe(
+        'no_contact',
+      );
     }
   });
 
   it('never mails a disposable or unroutable address', async () => {
     const keyHash = makeAgedKey(`qn-disp-${RUN_ID}@example.com`);
 
-    expect(await maybeSendQuotaWarning(input(keyHash, 'x@yopmail.com', '2030-05'))).toBe('unroutable_contact');
-    expect(await maybeSendQuotaWarning(input(keyHash, 'x@tempmail.edu.ge', '2030-05'))).toBe('unroutable_contact');
-    expect(await maybeSendQuotaWarning(input(keyHash, 'cohorte@cohorte.invalid', '2030-05'))).toBe('unroutable_contact');
+    expect(await maybeSendQuotaWarning(input(keyHash, 'x@yopmail.com', '2030-05'))).toBe(
+      'unroutable_contact',
+    );
+    expect(await maybeSendQuotaWarning(input(keyHash, 'x@tempmail.edu.ge', '2030-05'))).toBe(
+      'unroutable_contact',
+    );
+    expect(await maybeSendQuotaWarning(input(keyHash, 'cohorte@cohorte.invalid', '2030-05'))).toBe(
+      'unroutable_contact',
+    );
   });
 
   it(`never mails a key younger than ${MIN_KEY_AGE_HOURS}h — the invented-address wave crosses 80% within minutes of signup`, async () => {
     const { keyHash } = validateApiKey(generateApiKey(`qn-young-${RUN_ID}@example.com`)!.api_key);
 
-    expect(await maybeSendQuotaWarning(input(keyHash, 'holder@alpha-corp.example.net', '2030-06'))).toBe('too_new');
+    expect(
+      await maybeSendQuotaWarning(input(keyHash, 'holder@alpha-corp.example.net', '2030-06')),
+    ).toBe('too_new');
   });
 
   it('a refused address must not burn the once-per-month lock', async () => {
     const keyHash = makeAgedKey(`qn-lock-${RUN_ID}@example.com`);
 
-    expect(await maybeSendQuotaWarning(input(keyHash, 'x@mailinator.com', '2030-07'))).toBe('unroutable_contact');
+    expect(await maybeSendQuotaWarning(input(keyHash, 'x@mailinator.com', '2030-07'))).toBe(
+      'unroutable_contact',
+    );
     // Same key, now with a routable address: the lock must still be free
     // (outcome is send_failed because SMTP is unset, NOT already_notified).
-    expect(await maybeSendQuotaWarning(input(keyHash, 'holder@alpha-corp.example.net', '2030-07'))).toBe('send_failed');
+    expect(
+      await maybeSendQuotaWarning(input(keyHash, 'holder@alpha-corp.example.net', '2030-07')),
+    ).toBe('send_failed');
   });
 
   it('releases the once-per-month lock when the send fails, so it can be retried', async () => {
     const keyHash = makeAgedKey(`qn-retry-${RUN_ID}@example.com`);
 
-    const first = await maybeSendQuotaWarning(input(keyHash, 'holder@alpha-corp.example.net', '2030-02'));
-    const second = await maybeSendQuotaWarning(input(keyHash, 'holder@alpha-corp.example.net', '2030-02'));
+    const first = await maybeSendQuotaWarning(
+      input(keyHash, 'holder@alpha-corp.example.net', '2030-02'),
+    );
+    const second = await maybeSendQuotaWarning(
+      input(keyHash, 'holder@alpha-corp.example.net', '2030-02'),
+    );
 
     expect(first).toBe('send_failed');
     expect(second).not.toBe('already_notified');
@@ -72,7 +90,9 @@ describe('maybeSendQuotaWarning', () => {
     const { recordQuotaNotice } = await import('./api-keys.js');
     recordQuotaNotice(keyHash, '2030-03'); // a warning already went out this month
 
-    expect(await maybeSendQuotaWarning(input(keyHash, 'holder@alpha-corp.example.net', '2030-03'))).toBe('already_notified');
+    expect(
+      await maybeSendQuotaWarning(input(keyHash, 'holder@alpha-corp.example.net', '2030-03')),
+    ).toBe('already_notified');
   });
 });
 
@@ -89,7 +109,9 @@ describe('maybeSendQuotaWarning — flagged cohorts', () => {
   it('does not mail a key the cohort radar has flagged', async () => {
     const keyHash = makeAgedKey(`qn-farm-${RUN_ID}@example.com`);
     flag(keyHash);
-    const outcome = await maybeSendQuotaWarning(input(keyHash, `qn-farm-${RUN_ID}@example.com`, '2026-08'));
+    const outcome = await maybeSendQuotaWarning(
+      input(keyHash, `qn-farm-${RUN_ID}@example.com`, '2026-08'),
+    );
     expect(outcome).toBe('flagged_cohort');
   });
 

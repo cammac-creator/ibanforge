@@ -24,7 +24,9 @@ function sameBankBatch(): string[] {
   return Array.from({ length: 10 }, (_, i) => {
     const bban = `37040044${String(1000000000 + i)}`;
     const rearranged = `${bban}DE00`;
-    const numeric = [...rearranged].map((ch) => (/[0-9]/.test(ch) ? ch : String(ch.charCodeAt(0) - 55))).join('');
+    const numeric = [...rearranged]
+      .map((ch) => (/[0-9]/.test(ch) ? ch : String(ch.charCodeAt(0) - 55)))
+      .join('');
     let rem = 0;
     for (const d of numeric) rem = (rem * 10 + Number(d)) % 97;
     return `DE${String(98 - rem).padStart(2, '0')}${bban}`;

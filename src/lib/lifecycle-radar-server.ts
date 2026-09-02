@@ -46,9 +46,9 @@ function ensureKvTable(): void {
 function loadState(): RadarState {
   try {
     ensureKvTable();
-    const row = getStatsDB()
-      .prepare('SELECT value FROM kv_state WHERE key = ?')
-      .get(STATE_KEY) as { value: string } | undefined;
+    const row = getStatsDB().prepare('SELECT value FROM kv_state WHERE key = ?').get(STATE_KEY) as
+      | { value: string }
+      | undefined;
     if (!row) return { keys: {} };
     const parsed = JSON.parse(row.value) as Partial<RadarState>;
     return { last_run_at: parsed.last_run_at, keys: parsed.keys ?? {} };

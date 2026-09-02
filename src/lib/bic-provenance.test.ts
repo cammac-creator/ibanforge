@@ -31,7 +31,12 @@ describe('the BIC block says where it comes from', () => {
     // really is the source. Several candidates rather than one: the directory
     // is reseeded monthly, and a test pinned to a single institution would go
     // red on ordinary churn instead of on a regression.
-    const candidates = [['IE', 'MONZ'], ['GB', 'AUGT'], ['NL', 'MOXR'], ['IE', 'KLRN']] as const;
+    const candidates = [
+      ['IE', 'MONZ'],
+      ['GB', 'AUGT'],
+      ['NL', 'MOXR'],
+      ['IE', 'KLRN'],
+    ] as const;
     const hits = candidates
       .map(([cc, code]) => lookupByCountryBank(cc, code))
       .filter((h) => h?.match === 'prefix');

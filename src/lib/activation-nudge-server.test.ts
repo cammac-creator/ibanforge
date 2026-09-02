@@ -22,7 +22,11 @@ import { getStatsDB } from './db.js';
 import { ensureAliasTable } from './email-aliases.js';
 import { generateApiKey } from './api-keys.js';
 import { draftId } from './activation-nudge.js';
-import { getNudgeLedger, lastActivationReport, runActivationPass } from './activation-nudge-server.js';
+import {
+  getNudgeLedger,
+  lastActivationReport,
+  runActivationPass,
+} from './activation-nudge-server.js';
 import { apiKeys } from '../routes/api-keys.js';
 import { rmSync } from 'node:fs';
 
@@ -67,7 +71,20 @@ const ISSUED = `handed-${RUN}@${DOMAIN}`;
 const ALIAS_CANON = `canon-${RUN}@${DOMAIN}`;
 const ALIAS_OTHER = `other-${RUN}@${DOMAIN}`;
 
-const emails = [SILENT, CALLED, FRESH, INTERNAL, PILOT, WITH_THREAD, MIXED_LOWER, MIXED_UPPER, TALKED, ISSUED, ALIAS_CANON, ALIAS_OTHER];
+const emails = [
+  SILENT,
+  CALLED,
+  FRESH,
+  INTERNAL,
+  PILOT,
+  WITH_THREAD,
+  MIXED_LOWER,
+  MIXED_UPPER,
+  TALKED,
+  ISSUED,
+  ALIAS_CANON,
+  ALIAS_OTHER,
+];
 const prefixes = new Map<string, string>();
 
 function mint(email: string, ageHours: number): string {
@@ -126,7 +143,10 @@ beforeAll(() => {
   ensureAliasTable();
   mint(ALIAS_CANON, 72);
   mint(ALIAS_OTHER, 71);
-  db.prepare('INSERT INTO email_aliases (alias, canonical) VALUES (?, ?)').run(ALIAS_OTHER, ALIAS_CANON);
+  db.prepare('INSERT INTO email_aliases (alias, canonical) VALUES (?, ?)').run(
+    ALIAS_OTHER,
+    ALIAS_CANON,
+  );
 });
 
 afterAll(() => {
@@ -311,7 +331,9 @@ describe('the nudge is claimed once and only once', () => {
     // The operator declared them equivalent; the draft half already honoured
     // it, and one aliased human once got two nudges in a single pass.
     await runActivationPass();
-    const written = getNudgeLedger(1000).filter((r) => r.email === ALIAS_CANON || r.email === ALIAS_OTHER);
+    const written = getNudgeLedger(1000).filter(
+      (r) => r.email === ALIAS_CANON || r.email === ALIAS_OTHER,
+    );
     expect(written, 'one declared person must hold exactly one nudge').toHaveLength(1);
   });
 

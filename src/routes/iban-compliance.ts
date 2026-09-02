@@ -30,7 +30,8 @@ ibanCompliance.post('/v1/iban/compliance', async (c) => {
     return c.json(
       {
         error: 'invalid_request',
-        message: "Send either 'iban' or 'bic', not both: they can designate different institutions.",
+        message:
+          "Send either 'iban' or 'bic', not both: they can designate different institutions.",
       },
       400,
     );
@@ -43,13 +44,24 @@ ibanCompliance.post('/v1/iban/compliance', async (c) => {
   if (hasBic) {
     const screened = buildBicComplianceResponse(bic.trim());
     if ('error' in screened) {
-      recordSafely(() => recordOperation('iban_compliance', null, false, 0, 'bic', c.get('apiKeyPrefix')), 'iban_compliance');
+      recordSafely(
+        () => recordOperation('iban_compliance', null, false, 0, 'bic', c.get('apiKeyPrefix')),
+        'iban_compliance',
+      );
       return c.json(screened, 400);
     }
     const processingMs = Math.round((performance.now() - start) * 100) / 100;
     const revenue = computeRevenue(c, 0.02);
     recordSafely(
-      () => recordOperation('iban_compliance', screened.country.code, true, revenue, undefined, c.get('apiKeyPrefix')),
+      () =>
+        recordOperation(
+          'iban_compliance',
+          screened.country.code,
+          true,
+          revenue,
+          undefined,
+          c.get('apiKeyPrefix'),
+        ),
       'iban_compliance',
     );
     return c.json({
@@ -60,7 +72,13 @@ ibanCompliance.post('/v1/iban/compliance', async (c) => {
   }
 
   if (!hasIban) {
-    return c.json({ error: 'invalid_request', message: "Request body must include an 'iban' or a 'bic' field (case-insensitive)." }, 400);
+    return c.json(
+      {
+        error: 'invalid_request',
+        message: "Request body must include an 'iban' or a 'bic' field (case-insensitive).",
+      },
+      400,
+    );
   }
 
   // One shared assembly for REST and both MCP transports. See
@@ -76,7 +94,14 @@ ibanCompliance.post('/v1/iban/compliance', async (c) => {
   // DB that stops accepting writes cannot look like a service nobody calls.
   recordSafely(
     () =>
-      recordOperation('iban_compliance', result.country?.code ?? null, result.valid, revenue, errorDetail, c.get('apiKeyPrefix')),
+      recordOperation(
+        'iban_compliance',
+        result.country?.code ?? null,
+        result.valid,
+        revenue,
+        errorDetail,
+        c.get('apiKeyPrefix'),
+      ),
     'iban_compliance',
   );
 

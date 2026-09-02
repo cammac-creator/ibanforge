@@ -64,13 +64,22 @@ export function upsertCompanyProfile(p: {
          company = excluded.company, website = excluded.website, country = excluded.country,
          what_they_do = excluded.what_they_do, source = excluded.source, updated_at = excluded.updated_at`,
     )
-    .run(p.email.toLowerCase(), nn(p.company), nn(p.website), nn(p.country), nn(p.whatTheyDo), p.source);
+    .run(
+      p.email.toLowerCase(),
+      nn(p.company),
+      nn(p.website),
+      nn(p.country),
+      nn(p.whatTheyDo),
+      p.source,
+    );
 }
 
 export function getCompanyProfiles(): Record<string, CompanyProfile> {
   ensureTable();
   const rows = getStatsDB()
-    .prepare('SELECT email, company, website, country, what_they_do, source, enriched_at FROM company_profiles')
+    .prepare(
+      'SELECT email, company, website, country, what_they_do, source, enriched_at FROM company_profiles',
+    )
     .all() as CompanyProfile[];
   return Object.fromEntries(rows.map((r) => [r.email, r]));
 }
@@ -80,12 +89,47 @@ export function getCompanyProfiles(): Record<string, CompanyProfile> {
  * organisation — nothing there to probe.
  */
 export const GENERIC_EMAIL_DOMAINS = new Set([
-  'gmail.com', 'googlemail.com', 'proton.me', 'protonmail.com', 'protonmail.ch', 'pm.me', 'passinbox.com',
-  'outlook.com', 'hotmail.com', 'live.com', 'msn.com', 'yahoo.com', 'yahoo.fr', 'yahoo.de', 'yahoo.co.uk',
-  'qq.com', '163.com', '126.com', 'foxmail.com', 'icloud.com', 'me.com', 'mac.com',
-  'gmx.de', 'gmx.ch', 'gmx.net', 'gmx.at', 'web.de', 'mail.ru', 'yandex.ru', 'yandex.com',
-  'bluewin.ch', 'tutanota.com', 'tuta.io', 'aol.com', 'hey.com', 'duck.com', 'fastmail.com',
-  'zoho.com', 'mailbox.org', 'posteo.de', 'mailfence.com',
+  'gmail.com',
+  'googlemail.com',
+  'proton.me',
+  'protonmail.com',
+  'protonmail.ch',
+  'pm.me',
+  'passinbox.com',
+  'outlook.com',
+  'hotmail.com',
+  'live.com',
+  'msn.com',
+  'yahoo.com',
+  'yahoo.fr',
+  'yahoo.de',
+  'yahoo.co.uk',
+  'qq.com',
+  '163.com',
+  '126.com',
+  'foxmail.com',
+  'icloud.com',
+  'me.com',
+  'mac.com',
+  'gmx.de',
+  'gmx.ch',
+  'gmx.net',
+  'gmx.at',
+  'web.de',
+  'mail.ru',
+  'yandex.ru',
+  'yandex.com',
+  'bluewin.ch',
+  'tutanota.com',
+  'tuta.io',
+  'aol.com',
+  'hey.com',
+  'duck.com',
+  'fastmail.com',
+  'zoho.com',
+  'mailbox.org',
+  'posteo.de',
+  'mailfence.com',
 ]);
 
 /**

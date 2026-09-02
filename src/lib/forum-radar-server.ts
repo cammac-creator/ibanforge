@@ -64,9 +64,16 @@ export async function sendTelegramShort(text: string): Promise<boolean> {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'User-Agent': 'ibanforge-backend' },
     signal: AbortSignal.timeout(20_000),
-    body: JSON.stringify({ chat_id: chat, text: text.slice(0, 3900), disable_web_page_preview: true }),
+    body: JSON.stringify({
+      chat_id: chat,
+      text: text.slice(0, 3900),
+      disable_web_page_preview: true,
+    }),
   });
-  const body = (await res.json().catch(() => ({ ok: false }))) as { ok: boolean; description?: string };
+  const body = (await res.json().catch(() => ({ ok: false }))) as {
+    ok: boolean;
+    description?: string;
+  };
   if (!body.ok) throw new Error(`Telegram: ${body.description ?? res.status}`);
   return true;
 }
@@ -188,7 +195,9 @@ const THREAD_SOURCES: ThreadSource[] = [
           githubHeaders(),
         );
         if (status !== 200) {
-          throw new Error(`GitHub HTTP ${status}${process.env.GITHUB_TOKEN ? '' : ' (GITHUB_TOKEN absent — source désactivée)'}`);
+          throw new Error(
+            `GitHub HTTP ${status}${process.env.GITHUB_TOKEN ? '' : ' (GITHUB_TOKEN absent — source désactivée)'}`,
+          );
         }
         out.push(...parseGitHubIssues(JSON.parse(body)));
       }
@@ -271,7 +280,17 @@ function upsertThread(t: ScoredThread): 'inserted' | 'refreshed' | 'known' {
          (url, source, title, excerpt, lang, score, score_detail, activity, thread_created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
-    .run(t.url, t.source, t.title, t.excerpt, t.lang, t.score, t.scoreDetail, t.activity, t.threadCreatedAt);
+    .run(
+      t.url,
+      t.source,
+      t.title,
+      t.excerpt,
+      t.lang,
+      t.score,
+      t.scoreDetail,
+      t.activity,
+      t.threadCreatedAt,
+    );
   if (ins.changes === 1) return 'inserted';
   // Refresh live metrics on rows the operator has not touched yet; a thread
   // already worked (any status beyond 'new') is theirs, never overwritten.
@@ -367,10 +386,16 @@ async function detectPostedReplies(report: ScanReport): Promise<void> {
           html_url?: string;
           created_at?: string;
         }>;
-        const mine = comments.find((c) => (c.user?.login ?? '').toLowerCase() === GITHUB_LOGIN.toLowerCase());
+        const mine = comments.find(
+          (c) => (c.user?.login ?? '').toLowerCase() === GITHUB_LOGIN.toLowerCase(),
+        );
         report.autodetect.checked++;
         if (mine) {
-          markPosted.run(mine.html_url ?? row.url, mine.created_at ?? new Date().toISOString(), row.id);
+          markPosted.run(
+            mine.html_url ?? row.url,
+            mine.created_at ?? new Date().toISOString(),
+            row.id,
+          );
           report.autodetect.found++;
         }
         continue;
@@ -380,18 +405,30 @@ async function detectPostedReplies(report: ScanReport): Promise<void> {
       const qm = /questions\/(\d+)/.exec(row.url);
       if (!qm) continue;
       const site = row.source === 'money_se' ? 'money' : 'stackoverflow';
-      const { status, body } = await fetchText(`${SE_BASE}/questions/${qm[1]}/answers?site=${site}&pagesize=50`);
+      const { status, body } = await fetchText(
+        `${SE_BASE}/questions/${qm[1]}/answers?site=${site}&pagesize=50`,
+      );
       if (status !== 200) throw new Error(`SE HTTP ${status}`);
-      const answers = (JSON.parse(body) as { items?: Array<{ owner?: { user_id?: number }; answer_id?: number }> })
-        .items ?? [];
+      const answers =
+        (
+          JSON.parse(body) as {
+            items?: Array<{ owner?: { user_id?: number }; answer_id?: number }>;
+          }
+        ).items ?? [];
       const mine = answers.find((a) => String(a.owner?.user_id ?? '') === soUserId);
       report.autodetect.checked++;
       if (mine?.answer_id) {
-        markPosted.run(`https://${site === 'money' ? 'money.stackexchange' : 'stackoverflow'}.com/a/${mine.answer_id}`, new Date().toISOString(), row.id);
+        markPosted.run(
+          `https://${site === 'money' ? 'money.stackexchange' : 'stackoverflow'}.com/a/${mine.answer_id}`,
+          new Date().toISOString(),
+          row.id,
+        );
         report.autodetect.found++;
       }
     } catch (err) {
-      report.errors.push(`autodetect #${row.id}: ${err instanceof Error ? err.message : String(err)}`);
+      report.errors.push(
+        `autodetect #${row.id}: ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
   }
 }
@@ -414,7 +451,14 @@ async function watchPostedThreads(report: ScanReport): Promise<void> {
       `SELECT id, url, source, title, posted_url, watch_state FROM forum_threads
        WHERE status = 'posted' AND posted_url IS NOT NULL AND posted_url != ''`,
     )
-    .all() as Array<{ id: number; url: string; source: string; title: string; posted_url: string; watch_state: string | null }>;
+    .all() as Array<{
+    id: number;
+    url: string;
+    source: string;
+    title: string;
+    posted_url: string;
+    watch_state: string | null;
+  }>;
 
   for (const row of rows) {
     try {
@@ -451,7 +495,8 @@ async function watchPostedThreads(report: ScanReport): Promise<void> {
           `${SE_BASE}/questions/${qm[1]}?site=${site}&filter=default`,
         );
         if (status !== 200) throw new Error(`SE HTTP ${status}`);
-        const q = (JSON.parse(body) as { items?: Array<{ last_activity_date?: number }> }).items?.[0];
+        const q = (JSON.parse(body) as { items?: Array<{ last_activity_date?: number }> })
+          .items?.[0];
         const activity = q?.last_activity_date ?? 0;
         fresh = { ...state, so_activity: activity, checked_at: new Date().toISOString() };
         const am = /\/a\/(\d+)/.exec(row.posted_url);
@@ -472,13 +517,18 @@ async function watchPostedThreads(report: ScanReport): Promise<void> {
       report.watch.checked++;
       if (news) {
         // Send BEFORE saving the new baseline: a failed ping retries next tick.
-        await sendTelegramShort(`💬 Forums IBANforge : ${news} après ta réponse\n${row.title.slice(0, 90)}\n${row.url}`);
+        await sendTelegramShort(
+          `💬 Forums IBANforge : ${news} après ta réponse\n${row.title.slice(0, 90)}\n${row.url}`,
+        );
         db.prepare(
           `UPDATE forum_threads SET watch_state = ?, needs_attention = 1, updated_at = datetime('now') WHERE id = ?`,
         ).run(JSON.stringify(fresh), row.id);
         report.watch.flagged++;
       } else if (fresh) {
-        db.prepare(`UPDATE forum_threads SET watch_state = ? WHERE id = ?`).run(JSON.stringify(fresh), row.id);
+        db.prepare(`UPDATE forum_threads SET watch_state = ? WHERE id = ?`).run(
+          JSON.stringify(fresh),
+          row.id,
+        );
       }
     } catch (err) {
       report.errors.push(`watch #${row.id}: ${err instanceof Error ? err.message : String(err)}`);
@@ -527,7 +577,9 @@ async function backfillDrafts(report: ScanReport): Promise<void> {
           report.errors.push('drafts: ANTHROPIC_API_KEY absente — traduction sautée');
           return;
         }
-        db.prepare(`UPDATE forum_threads SET draft_fr = ?, updated_at = datetime('now') WHERE id = ?`).run(fr, row.id);
+        db.prepare(
+          `UPDATE forum_threads SET draft_fr = ?, updated_at = datetime('now') WHERE id = ?`,
+        ).run(fr, row.id);
         report.drafts.generated++;
         continue;
       }
@@ -578,7 +630,14 @@ export function ensureMarketplaceRows(): void {
   );
   for (const m of MARKETPLACES) {
     const auto = m.kind === 'manual' ? 0 : 1;
-    ins.run(m.slug, m.name, m.url, m.actionUrl ?? null, auto, m.kind === 'manual' ? 'manual' : 'unknown');
+    ins.run(
+      m.slug,
+      m.name,
+      m.url,
+      m.actionUrl ?? null,
+      auto,
+      m.kind === 'manual' ? 'manual' : 'unknown',
+    );
     upd.run(m.name, m.url, m.actionUrl ?? null, auto, m.slug);
   }
 }
@@ -618,11 +677,19 @@ const BAZAAR_MAX_PAGES = 60;
 async function countBazaar(target: string): Promise<number> {
   const found = new Set<string>();
   for (let page = 0; page < BAZAAR_MAX_PAGES; page++) {
-    const { status, body } = await fetchText(`${target}?limit=${BAZAAR_PAGE_LIMIT}&offset=${page * BAZAAR_PAGE_LIMIT}`);
+    const { status, body } = await fetchText(
+      `${target}?limit=${BAZAAR_PAGE_LIMIT}&offset=${page * BAZAAR_PAGE_LIMIT}`,
+    );
     if (status !== 200) throw new Error(`Bazaar HTTP ${status}`);
-    const data = JSON.parse(body) as { items?: Array<{ resource?: unknown }>; pagination?: { total?: unknown } };
+    const data = JSON.parse(body) as {
+      items?: Array<{ resource?: unknown }>;
+      pagination?: { total?: unknown };
+    };
     for (const item of data.items ?? []) {
-      if (typeof item.resource === 'string' && item.resource.startsWith('https://api.ibanforge.com')) {
+      if (
+        typeof item.resource === 'string' &&
+        item.resource.startsWith('https://api.ibanforge.com')
+      ) {
         found.add(item.resource);
       }
     }
@@ -644,14 +711,19 @@ async function runOneCheck(def: MarketplaceDef): Promise<{ status: string; detai
     const n = await countBazaar(def.checkTarget ?? '');
     return interpretCheck(def, 200, String(n));
   }
-  const { status, body } = await fetchText(def.checkTarget ?? '', 'application/json, text/html;q=0.8');
+  const { status, body } = await fetchText(
+    def.checkTarget ?? '',
+    'application/json, text/html;q=0.8',
+  );
   return interpretCheck(def, status, body);
 }
 
 async function scanMarketplaces(report: ScanReport, force = false): Promise<void> {
   ensureMarketplaceRows();
   const db = getStatsDB();
-  const rows = db.prepare('SELECT slug, status, checked_at FROM marketplace_checks').all() as Array<{
+  const rows = db
+    .prepare('SELECT slug, status, checked_at FROM marketplace_checks')
+    .all() as Array<{
     slug: string;
     status: string;
     checked_at: string | null;
@@ -678,7 +750,9 @@ async function scanMarketplaces(report: ScanReport, force = false): Promise<void
             `📊 Marketplace IBANforge : ${def.name}\n${prev.status} → ${out.status}\n${out.detail}\n${def.url}`,
           );
         } catch (err) {
-          report.errors.push(`event telegram ${def.slug}: ${err instanceof Error ? err.message : String(err)}`);
+          report.errors.push(
+            `event telegram ${def.slug}: ${err instanceof Error ? err.message : String(err)}`,
+          );
         }
       }
       db.prepare(
@@ -689,7 +763,12 @@ async function scanMarketplaces(report: ScanReport, force = false): Promise<void
       const surface = VISIBILITY_SURFACE[def.slug];
       if (surface) {
         try {
-          recordVisibility({ surface, state: visibilityStateOf(out.status), detail: out.detail, url: def.url });
+          recordVisibility({
+            surface,
+            state: visibilityStateOf(out.status),
+            detail: out.detail,
+            url: def.url,
+          });
         } catch {
           /* the overview panel is a mirror; a failed write must not fail the check */
         }
@@ -713,7 +792,10 @@ async function scanMarketplaces(report: ScanReport, force = false): Promise<void
 
 let scanning = false;
 
-export async function runScan(what: 'threads' | 'marketplaces' | 'all' = 'all', force = false): Promise<ScanReport> {
+export async function runScan(
+  what: 'threads' | 'marketplaces' | 'all' = 'all',
+  force = false,
+): Promise<ScanReport> {
   const report: ScanReport = {
     started_at: new Date().toISOString(),
     finished_at: '',
@@ -752,7 +834,11 @@ export async function runScan(what: 'threads' | 'marketplaces' | 'all' = 'all', 
   return report;
 }
 
-export function lastScanInfo(): { last_scan_at: string | null; last_report: ScanReport | null; scanning: boolean } {
+export function lastScanInfo(): {
+  last_scan_at: string | null;
+  last_report: ScanReport | null;
+  scanning: boolean;
+} {
   let parsed: ScanReport | null = null;
   try {
     const raw = kvGet(KV_LAST_REPORT);

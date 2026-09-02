@@ -24,7 +24,11 @@ vi.mock('./ops-alert.js', () => ({
 const email = await import('./email.js');
 
 const FAKE_KEY = 'ifk_' + 'a1b2c3d4'.repeat(8);
-const ENV = { vitest: process.env.VITEST, url: process.env.MAIL_RELAY_URL, secret: process.env.MAIL_RELAY_SECRET };
+const ENV = {
+  vitest: process.env.VITEST,
+  url: process.env.MAIL_RELAY_URL,
+  secret: process.env.MAIL_RELAY_SECRET,
+};
 
 beforeEach(() => {
   opsFail.mockClear();
@@ -69,7 +73,12 @@ async function asProduction<T>(fn: () => Promise<T>): Promise<T> {
 describe('a key that does not reach its mailbox raises an ops alert', () => {
   it('alerts when the paid-key delivery fails', async () => {
     const ok = await asProduction(() =>
-      email.sendApiKeyEmail({ to: 'acme@example.com', rawKey: FAKE_KEY, credits: 1000, bundle: '1k' }),
+      email.sendApiKeyEmail({
+        to: 'acme@example.com',
+        rawKey: FAKE_KEY,
+        credits: 1000,
+        bundle: '1k',
+      }),
     );
     expect(ok).toBe(false);
     expect(opsFail).toHaveBeenCalledTimes(1);
@@ -81,7 +90,9 @@ describe('a key that does not reach its mailbox raises an ops alert', () => {
   });
 
   it('alerts when the free-key delivery fails', async () => {
-    await asProduction(() => email.sendFreeKeyEmail({ to: 'acme@example.com', rawKey: FAKE_KEY, monthlyLimit: 200 }));
+    await asProduction(() =>
+      email.sendFreeKeyEmail({ to: 'acme@example.com', rawKey: FAKE_KEY, monthlyLimit: 200 }),
+    );
     expect(opsFail).toHaveBeenCalledTimes(1);
     expect((opsFail.mock.calls[0] as unknown as [string])[0]).toBe('mail:key-delivery');
   });
@@ -89,10 +100,20 @@ describe('a key that does not reach its mailbox raises an ops alert', () => {
   it('stays quiet when the free-key address is refused by its own mail server', async () => {
     process.env.MAIL_RELAY_URL = 'https://relay.test/api/relay/send';
     process.env.MAIL_RELAY_SECRET = 'shared-secret';
-    vi.stubGlobal('fetch', vi.fn(async () =>
-      new Response("send failed: {'acme@example.com': (550, b'5.1.2 Recipient address rejected: Domain not found')}", { status: 502 })));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response(
+            "send failed: {'acme@example.com': (550, b'5.1.2 Recipient address rejected: Domain not found')}",
+            { status: 502 },
+          ),
+      ),
+    );
     try {
-      const ok = await asProduction(() => email.sendFreeKeyEmail({ to: 'acme@example.com', rawKey: FAKE_KEY, monthlyLimit: 200 }));
+      const ok = await asProduction(() =>
+        email.sendFreeKeyEmail({ to: 'acme@example.com', rawKey: FAKE_KEY, monthlyLimit: 200 }),
+      );
       expect(ok).toBe(false);
       expect(opsFail).not.toHaveBeenCalled();
     } finally {
@@ -103,9 +124,14 @@ describe('a key that does not reach its mailbox raises an ops alert', () => {
   it('still alerts when the relay itself refuses the free-key mail', async () => {
     process.env.MAIL_RELAY_URL = 'https://relay.test/api/relay/send';
     process.env.MAIL_RELAY_SECRET = 'shared-secret';
-    vi.stubGlobal('fetch', vi.fn(async () => new Response('unauthorized', { status: 401 })));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('unauthorized', { status: 401 })),
+    );
     try {
-      await asProduction(() => email.sendFreeKeyEmail({ to: 'acme@example.com', rawKey: FAKE_KEY, monthlyLimit: 200 }));
+      await asProduction(() =>
+        email.sendFreeKeyEmail({ to: 'acme@example.com', rawKey: FAKE_KEY, monthlyLimit: 200 }),
+      );
       expect(opsFail).toHaveBeenCalledTimes(1);
     } finally {
       vi.unstubAllGlobals();
@@ -113,7 +139,9 @@ describe('a key that does not reach its mailbox raises an ops alert', () => {
   });
 
   it('alerts when the OEM key delivery fails', async () => {
-    await asProduction(() => email.sendOemKeyEmail({ to: 'acme@example.com', rawKey: FAKE_KEY, monthlyLimit: 50_000 }));
+    await asProduction(() =>
+      email.sendOemKeyEmail({ to: 'acme@example.com', rawKey: FAKE_KEY, monthlyLimit: 50_000 }),
+    );
     expect(opsFail).toHaveBeenCalledTimes(1);
   });
 
@@ -123,7 +151,10 @@ describe('a key that does not reach its mailbox raises an ops alert', () => {
    */
   it('stays quiet for the messages that carry no key', async () => {
     await asProduction(async () => {
-      await email.sendActivationNudgeEmail({ to: 'acme@example.com', keyPrefix: FAKE_KEY.slice(0, 12) });
+      await email.sendActivationNudgeEmail({
+        to: 'acme@example.com',
+        keyPrefix: FAKE_KEY.slice(0, 12),
+      });
       await email.sendQuotaWarningEmail({
         to: 'acme@example.com',
         used: 160,
@@ -143,7 +174,12 @@ describe('a key that does not reach its mailbox raises an ops alert', () => {
    */
   it('puts no address and no domain in the alert text', async () => {
     await asProduction(() =>
-      email.sendApiKeyEmail({ to: 'ops@alpha.example.net', rawKey: FAKE_KEY, credits: 1000, bundle: '1k' }),
+      email.sendApiKeyEmail({
+        to: 'ops@alpha.example.net',
+        rawKey: FAKE_KEY,
+        credits: 1000,
+        bundle: '1k',
+      }),
     );
     const detail = (opsFail.mock.calls[0] as unknown as [string, string])[1];
     expect(detail).not.toContain('@');
@@ -153,7 +189,12 @@ describe('a key that does not reach its mailbox raises an ops alert', () => {
 
   it('logs the domain and never the person (SEC-08)', async () => {
     const spy = console.error as unknown as ReturnType<typeof vi.fn>;
-    await email.sendApiKeyEmail({ to: 'ops@alpha.example.net', rawKey: FAKE_KEY, credits: 1000, bundle: '1k' });
+    await email.sendApiKeyEmail({
+      to: 'ops@alpha.example.net',
+      rawKey: FAKE_KEY,
+      credits: 1000,
+      bundle: '1k',
+    });
     const logged = spy.mock.calls.map((c: unknown[]) => c.join(' ')).join('\n');
     expect(logged).toContain('alpha.example.net');
     expect(logged).not.toContain('ops@alpha.example.net');
@@ -164,7 +205,12 @@ describe('a key that does not reach its mailbox raises an ops alert', () => {
    * green-to-red, `npm run check` has started paging whoever runs it.
    */
   it('never alerts from inside the test suite', async () => {
-    await email.sendApiKeyEmail({ to: 'acme@example.com', rawKey: FAKE_KEY, credits: 1000, bundle: '1k' });
+    await email.sendApiKeyEmail({
+      to: 'acme@example.com',
+      rawKey: FAKE_KEY,
+      credits: 1000,
+      bundle: '1k',
+    });
     expect(process.env.VITEST).toBeTruthy();
     expect(opsFail).not.toHaveBeenCalled();
   });

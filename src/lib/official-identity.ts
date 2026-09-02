@@ -97,14 +97,17 @@ export interface OfficialIdentity {
   authoritative: false;
 }
 
-const ECB_SOURCE = 'European Central Bank, list of monetary financial institutions (free at ecb.europa.eu)';
-const ECB_FREE = 'This information may be obtained free of charge from the ECB website at ecb.europa.eu.';
+const ECB_SOURCE =
+  'European Central Bank, list of monetary financial institutions (free at ecb.europa.eu)';
+const ECB_FREE =
+  'This information may be obtained free of charge from the ECB website at ecb.europa.eu.';
 
 const BDE_SOURCE = 'Banco de España, list of MFIs';
 const BDE_FREE =
   'This information may be obtained free of charge from the Banco de España website at www.bde.es.';
 /** The formula the Banco de España's terms require, word for word. */
-const BDE_ATTRIBUTION = 'Own elaboration based on data from the Banco de España website (www.bde.es)';
+const BDE_ATTRIBUTION =
+  'Own elaboration based on data from the Banco de España website (www.bde.es)';
 
 interface EcbRow {
   name: string;
@@ -185,7 +188,9 @@ function ready(): { ecb: boolean; bde: boolean } {
     checked = true;
     try {
       const rows = getBicDB()
-        .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('ecb_mfi','bde_mfi')")
+        .prepare(
+          "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('ecb_mfi','bde_mfi')",
+        )
         .all() as Array<{ name: string }>;
       const names = new Set(rows.map((r) => r.name));
       ecbPresent = names.has('ecb_mfi');
@@ -227,7 +232,9 @@ export function getBdeMfiCount(): number {
 export function getEcbListDate(): string | null {
   if (!ready().ecb) return null;
   try {
-    const row = getBicDB().prepare('SELECT MAX(list_date) AS d FROM ecb_mfi').get() as { d: string | null } | undefined;
+    const row = getBicDB().prepare('SELECT MAX(list_date) AS d FROM ecb_mfi').get() as
+      | { d: string | null }
+      | undefined;
     return row?.d ?? null;
   } catch {
     return null;
@@ -238,7 +245,9 @@ export function getEcbListDate(): string | null {
 export function getBdeListDate(): string | null {
   if (!ready().bde) return null;
   try {
-    const row = getBicDB().prepare('SELECT MAX(list_date) AS d FROM bde_mfi').get() as { d: string | null } | undefined;
+    const row = getBicDB().prepare('SELECT MAX(list_date) AS d FROM bde_mfi').get() as
+      | { d: string | null }
+      | undefined;
     return row?.d ?? null;
   } catch {
     return null;
@@ -327,7 +336,7 @@ export function officialIdentityByNationalCode(
     try {
       if (!ecbByNationalStmt) {
         ecbByNationalStmt = getBicDB().prepare(
-          "SELECT name, lei, address, category, list_date FROM ecb_mfi " +
+          'SELECT name, lei, address, category, list_date FROM ecb_mfi ' +
             "WHERE country = 'FR' AND national_bank_code = ? LIMIT 1",
         );
       }

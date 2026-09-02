@@ -399,7 +399,11 @@ export function validatePaymentReference(
     // VIITENUMERO, not the KID you asked for". That is an artefact of the
     // candidate list, not a fact about the string, and it sat right beside the
     // one sentence this feature exists to state honestly.
-    if (DETECTABLE_SCHEMES.includes(requested) && detected.length > 0 && !detected.includes(requested)) {
+    if (
+      DETECTABLE_SCHEMES.includes(requested) &&
+      detected.length > 0 &&
+      !detected.includes(requested)
+    ) {
       return {
         ...result,
         note: `${result.note} Note: the string looks like ${detected[0].toUpperCase()}, not the ${requested.toUpperCase()} you asked for — the verdict above judges it as ${requested.toUpperCase()}, as requested.`,
@@ -430,7 +434,9 @@ export function validatePaymentReference(
         also_valid_as: {
           scheme: alternative.scheme as ReferenceScheme,
           valid: alternative.valid,
-          ...(alternative.check_digit_expected ? { check_digit_expected: alternative.check_digit_expected } : {}),
+          ...(alternative.check_digit_expected
+            ? { check_digit_expected: alternative.check_digit_expected }
+            : {}),
         },
         note: `${primary.note} This string is also a legal length for a ${detected[1]} reference, where it checks out as ${alternative.valid ? 'valid' : 'invalid'} — see also_valid_as. Pass reference_type when you know the country.`,
       };

@@ -105,7 +105,9 @@ describe('the free endpoint contract', () => {
   });
 
   it('serves the Swiss QR reference of the guidelines worked example', async () => {
-    const body = await json(await req('/v1/reference/validate?reference=210000000003139471430009017'));
+    const body = await json(
+      await req('/v1/reference/validate?reference=210000000003139471430009017'),
+    );
     expect(body.scheme).toBe('qrr');
     expect(body.valid).toBe(true);
     expect(String(body.source)).toContain('Annex B');
@@ -119,14 +121,18 @@ describe('the free endpoint contract', () => {
   });
 
   it('accepts the Belgian printed form, url-encoded', async () => {
-    const body = await json(await req('/v1/reference/validate?reference=%2B%2B%2B010%2F8068%2F17183%2B%2B%2B'));
+    const body = await json(
+      await req('/v1/reference/validate?reference=%2B%2B%2B010%2F8068%2F17183%2B%2B%2B'),
+    );
     expect(body.reference).toBe('010806817183');
     expect(body.valid).toBe(true);
   });
 
   it('answers valid: null — never false — for KID and OCR', async () => {
     for (const type of ['kid', 'ocr']) {
-      const body = await json(await req(`/v1/reference/validate?reference=12345678&reference_type=${type}`));
+      const body = await json(
+        await req(`/v1/reference/validate?reference=12345678&reference_type=${type}`),
+      );
       expect(body.valid, type).toBeNull();
       expect(body.valid, type).not.toBe(false);
       expect(body.status, type).toBe('unverifiable_without_creditor_config');
@@ -185,8 +191,14 @@ describe('the free endpoint contract', () => {
   it('books an operation for a free answer, with its scheme and no country', async () => {
     const rows = () =>
       getStatsDB()
-        .prepare('SELECT country_code, success, error_detail FROM operations WHERE operation_type = ?')
-        .all('reference_validate') as Array<{ country_code: string | null; success: number; error_detail: string | null }>;
+        .prepare(
+          'SELECT country_code, success, error_detail FROM operations WHERE operation_type = ?',
+        )
+        .all('reference_validate') as Array<{
+        country_code: string | null;
+        success: number;
+        error_detail: string | null;
+      }>;
 
     const before = rows().length;
     await req('/v1/reference/validate?reference=RF18539007547034');

@@ -204,14 +204,19 @@ export function getActivation(days = 30): ActivationResponse {
     for (const k of list) {
       const agg = logByPrefix.get(k.key_prefix);
       if (!agg) continue;
-      if (agg.first_call_at && (!firstCall || agg.first_call_at < firstCall)) firstCall = agg.first_call_at;
-      if (agg.last_seen_at && (!lastSeen || agg.last_seen_at > lastSeen)) lastSeen = agg.last_seen_at;
+      if (agg.first_call_at && (!firstCall || agg.first_call_at < firstCall))
+        firstCall = agg.first_call_at;
+      if (agg.last_seen_at && (!lastSeen || agg.last_seen_at > lastSeen))
+        lastSeen = agg.last_seen_at;
       calls90 += agg.calls_90d ?? 0;
       paywall += agg.paywall_hits ?? 0;
       limitHitsWindow += agg.limit_hits_window ?? 0;
     }
 
-    const signupAt = list.reduce((min, k) => (k.created_at < min ? k.created_at : min), list[0].created_at);
+    const signupAt = list.reduce(
+      (min, k) => (k.created_at < min ? k.created_at : min),
+      list[0].created_at,
+    );
     const freeUsed = freeKeys.reduce((a, k) => a + (usageByHash.get(k.key_hash) ?? 0), 0);
     const freeQuota = freeKeys.reduce((a, k) => a + (k.monthly_limit ?? 200), 0);
     const creditsTotal = paidKeys.reduce((a, k) => a + (k.credits_total ?? 0), 0);
@@ -256,7 +261,7 @@ export function getActivation(days = 30): ActivationResponse {
   }
 
   clients.sort((a, z) => {
-    if ((a.packs > 0) !== (z.packs > 0)) return a.packs > 0 ? -1 : 1;
+    if (a.packs > 0 !== z.packs > 0) return a.packs > 0 ? -1 : 1;
     return (z.last_seen_at ?? '').localeCompare(a.last_seen_at ?? '');
   });
 

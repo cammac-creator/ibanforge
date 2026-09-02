@@ -71,7 +71,12 @@ import { notFoundHandler } from './lib/not-found.js';
 import { getEntryCount, getChClearingCount, getLeiEnrichedCount } from './lib/bic-lookup.js';
 import { getPraBanksCount, praAttribution } from './lib/pra-banks.js';
 import { bgAttribution, getBgBankCodeCount } from './lib/bg-bae.js';
-import { getBdeListDate, getBdeMfiCount, getEcbListDate, getEcbMfiCount } from './lib/official-identity.js';
+import {
+  getBdeListDate,
+  getBdeMfiCount,
+  getEcbListDate,
+  getEcbMfiCount,
+} from './lib/official-identity.js';
 import {
   PSD_SERVED_COUNTRIES,
   getPsdCountryCount,
@@ -465,42 +470,68 @@ export function buildApp(): Hono<HonoEnv> {
         'Example: CORS_ORIGIN=https://ibanforge.com,https://www.ibanforge.com',
     );
   }
-  const configuredOrigins = (corsRaw || '*').split(',').map(s => s.trim());
+  const configuredOrigins = (corsRaw || '*').split(',').map((s) => s.trim());
   const localhostPattern = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
 
-  app.use('*', cors({
-    origin: (origin) => {
-      if (!isProd && configuredOrigins.includes('*')) return '*';
-      if (localhostPattern.test(origin)) return origin;
-      return configuredOrigins.includes(origin) ? origin : configuredOrigins[0];
-    },
-    allowMethods: ['GET', 'POST', 'OPTIONS'],
-    // X-API-Key is a documented auth header (api-key middleware accepts it), so it
-    // must be allowed through CORS preflight or browser callers can't use it.
-    // PAYMENT-SIGNATURE is the x402 v2 payment header and X-Payment the v1 one.
-    // Both must be listed: a browser client sending a header absent from this
-    // list is stopped at the preflight, so the paid call never leaves the page.
-    allowHeaders: ['Content-Type', 'Authorization', 'PAYMENT-SIGNATURE', 'X-Payment', 'X-API-Key'],
-    // Without exposeHeaders a browser caller can read only the six CORS-safelisted
-    // response headers, so every signal we take care to send back — how much quota
-    // is left, why a key was refused, what a batch was charged — was invisible to
-    // JavaScript. The server looked like it answered; the page saw nothing. Only
-    // client-facing signalling is listed: X-Frame-Options and friends are for the
-    // browser itself, not for the caller's code.
-    exposeHeaders: [
-      'X-Quota-Used', 'X-Quota-Limit', 'X-Quota-Remaining', 'X-Quota-Month',
-      'X-Quota-Charged', 'X-Quota-Required', 'X-Quota-Exhausted',
-      'X-Quota-Insufficient', 'X-Quota-Reset-Hint', 'X-Quota-Notice',
-      'X-Credits-Remaining', 'X-Credits-Total', 'X-Credits-Charged',
-      'X-Credits-Required', 'X-Credits-Exhausted', 'X-Credits-Insufficient',
-      'X-Credits-Topup-Hint',
-      'X-API-Key-Invalid', 'X-API-Version',
-      'X-RateLimit-Limit', 'X-RateLimit-Remaining', 'X-RateLimit-Reset',
-    ],
-  }));
-  app.use('*', logger((message: string, ...rest: string[]) => {
-    console.log(redactPathSecrets(redactQueryValues(message)), ...rest);
-  }));
+  app.use(
+    '*',
+    cors({
+      origin: (origin) => {
+        if (!isProd && configuredOrigins.includes('*')) return '*';
+        if (localhostPattern.test(origin)) return origin;
+        return configuredOrigins.includes(origin) ? origin : configuredOrigins[0];
+      },
+      allowMethods: ['GET', 'POST', 'OPTIONS'],
+      // X-API-Key is a documented auth header (api-key middleware accepts it), so it
+      // must be allowed through CORS preflight or browser callers can't use it.
+      // PAYMENT-SIGNATURE is the x402 v2 payment header and X-Payment the v1 one.
+      // Both must be listed: a browser client sending a header absent from this
+      // list is stopped at the preflight, so the paid call never leaves the page.
+      allowHeaders: [
+        'Content-Type',
+        'Authorization',
+        'PAYMENT-SIGNATURE',
+        'X-Payment',
+        'X-API-Key',
+      ],
+      // Without exposeHeaders a browser caller can read only the six CORS-safelisted
+      // response headers, so every signal we take care to send back — how much quota
+      // is left, why a key was refused, what a batch was charged — was invisible to
+      // JavaScript. The server looked like it answered; the page saw nothing. Only
+      // client-facing signalling is listed: X-Frame-Options and friends are for the
+      // browser itself, not for the caller's code.
+      exposeHeaders: [
+        'X-Quota-Used',
+        'X-Quota-Limit',
+        'X-Quota-Remaining',
+        'X-Quota-Month',
+        'X-Quota-Charged',
+        'X-Quota-Required',
+        'X-Quota-Exhausted',
+        'X-Quota-Insufficient',
+        'X-Quota-Reset-Hint',
+        'X-Quota-Notice',
+        'X-Credits-Remaining',
+        'X-Credits-Total',
+        'X-Credits-Charged',
+        'X-Credits-Required',
+        'X-Credits-Exhausted',
+        'X-Credits-Insufficient',
+        'X-Credits-Topup-Hint',
+        'X-API-Key-Invalid',
+        'X-API-Version',
+        'X-RateLimit-Limit',
+        'X-RateLimit-Remaining',
+        'X-RateLimit-Reset',
+      ],
+    }),
+  );
+  app.use(
+    '*',
+    logger((message: string, ...rest: string[]) => {
+      console.log(redactPathSecrets(redactQueryValues(message)), ...rest);
+    }),
+  );
   app.use('*', async (c, next) => {
     await next();
     c.header('X-Powered-By', 'IBANforge');
@@ -526,10 +557,7 @@ export function buildApp(): Hono<HonoEnv> {
     c.header('Referrer-Policy', 'strict-origin-when-cross-origin');
     c.header('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
     // Permissions-Policy: deny dangerous browser features the API never uses
-    c.header(
-      'Permissions-Policy',
-      'geolocation=(), microphone=(), camera=(), payment=(), usb=()',
-    );
+    c.header('Permissions-Policy', 'geolocation=(), microphone=(), camera=(), payment=(), usb=()');
     // CSP for HTML responses only (don't apply to JSON API responses)
     const ct = c.res.headers.get('content-type') || '';
     if (ct.includes('text/html')) {
@@ -557,10 +585,14 @@ export function buildApp(): Hono<HonoEnv> {
   // (a 100-IBAN batch is ~5 KB, a Stripe webhook ~15 KB) while turning a memory
   // DoS into a clean 413. Placed after the rate limiter so a flood is throttled
   // before we even read the body.
-  app.use('*', bodyLimit({
-    maxSize: 256 * 1024,
-    onError: (c) => c.json({ error: 'payload_too_large', message: 'Request body exceeds 256 KB.' }, 413),
-  }));
+  app.use(
+    '*',
+    bodyLimit({
+      maxSize: 256 * 1024,
+      onError: (c) =>
+        c.json({ error: 'payload_too_large', message: 'Request body exceeds 256 KB.' }, 413),
+    }),
+  );
   app.use('*', compress());
 
   // Make `compress()`'s own 1024-byte threshold reachable.
@@ -582,14 +614,24 @@ export function buildApp(): Hono<HonoEnv> {
     await next();
     const res = c.res;
     if (!res.body) return;
-    if (res.headers.has('Content-Length') || res.headers.has('Content-Encoding') || res.headers.has('Transfer-Encoding')) return;
-    if (c.req.method === 'HEAD' || res.status === 204 || res.status === 206 || res.status === 304) return;
+    if (
+      res.headers.has('Content-Length') ||
+      res.headers.has('Content-Encoding') ||
+      res.headers.has('Transfer-Encoding')
+    )
+      return;
+    if (c.req.method === 'HEAD' || res.status === 204 || res.status === 206 || res.status === 304)
+      return;
     const type = res.headers.get('Content-Type') ?? '';
     // Same families Hono calls compressible, minus the streaming one.
     if (!/^\s*(?:text\/|application\/(?:json|javascript|xml)|image\/svg\+xml)/i.test(type)) return;
     if (/^\s*text\/event-stream/i.test(type)) return;
     const body = new Uint8Array(await res.arrayBuffer());
-    c.res = new Response(body, { status: res.status, statusText: res.statusText, headers: res.headers });
+    c.res = new Response(body, {
+      status: res.status,
+      statusText: res.statusText,
+      headers: res.headers,
+    });
     c.res.headers.set('Content-Length', String(body.byteLength));
   });
 
@@ -627,7 +669,16 @@ export function buildApp(): Hono<HonoEnv> {
               : mcpOutcome === 'session_rate_limited'
                 ? '/mcp:session:refused'
                 : path;
-      recordRequest(c.req.method, recordedPath, c.res.status, performance.now() - start, clientKind, hashIp(ip), userAgent, keyPrefix);
+      recordRequest(
+        c.req.method,
+        recordedPath,
+        c.res.status,
+        performance.now() - start,
+        clientKind,
+        hashIp(ip),
+        userAgent,
+        keyPrefix,
+      );
     }
   });
 
@@ -706,7 +757,14 @@ export function buildApp(): Hono<HonoEnv> {
     const body = (await c.req.json().catch(() => null)) as Record<string, unknown> | null;
     const iban = getIban(body);
     if (!iban || typeof iban !== 'string' || iban.trim() === '') {
-      return c.json({ error: 'invalid_request', message: "Request body must include an 'iban' field (case-insensitive: 'iban', 'IBAN', 'Iban' all work)." }, 400);
+      return c.json(
+        {
+          error: 'invalid_request',
+          message:
+            "Request body must include an 'iban' field (case-insensitive: 'iban', 'IBAN', 'Iban' all work).",
+        },
+        400,
+      );
     }
     await next();
   });
@@ -715,7 +773,13 @@ export function buildApp(): Hono<HonoEnv> {
     const body = (await c.req.json().catch(() => null)) as Record<string, unknown> | null;
     const iban = getIban(body);
     if (!iban || typeof iban !== 'string' || iban.trim() === '') {
-      return c.json({ error: 'invalid_request', message: "Request body must include an 'iban' field (case-insensitive)." }, 400);
+      return c.json(
+        {
+          error: 'invalid_request',
+          message: "Request body must include an 'iban' field (case-insensitive).",
+        },
+        400,
+      );
     }
     await next();
   });
@@ -724,7 +788,14 @@ export function buildApp(): Hono<HonoEnv> {
     const body = (await c.req.json().catch(() => null)) as Record<string, unknown> | null;
     const ibans = getIbansArray(body);
     if (!Array.isArray(ibans) || ibans.length === 0) {
-      return c.json({ error: 'invalid_request', message: "Request body must include a non-empty array of IBANs. Field accepted: 'ibans', 'iban_list' or 'list'." }, 400);
+      return c.json(
+        {
+          error: 'invalid_request',
+          message:
+            "Request body must include a non-empty array of IBANs. Field accepted: 'ibans', 'iban_list' or 'list'.",
+        },
+        400,
+      );
     }
     await next();
   });

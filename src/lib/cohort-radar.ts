@@ -132,7 +132,11 @@ function burstWindow(sortedMs: number[], windows: CohortWindow[]): CohortWindow 
   return null;
 }
 
-export function findCohorts(rows: CreationRow[], now: Date, windows: CohortWindow[] = COHORT_WINDOWS): Cohort[] {
+export function findCohorts(
+  rows: CreationRow[],
+  now: Date,
+  windows: CohortWindow[] = COHORT_WINDOWS,
+): Cohort[] {
   const maxHours = Math.max(...windows.map((w) => w.hours));
   const since = now.getTime() - maxHours * 60 * 60 * 1000;
 

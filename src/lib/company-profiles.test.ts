@@ -36,7 +36,12 @@ describe('company-profiles — identity table', () => {
   });
 
   it('replaces on re-upsert instead of duplicating', () => {
-    upsertCompanyProfile({ email: A, company: 'Alpha v2', whatTheyDo: `Nouvelle activité ${RUN}.`, source: 'manual' });
+    upsertCompanyProfile({
+      email: A,
+      company: 'Alpha v2',
+      whatTheyDo: `Nouvelle activité ${RUN}.`,
+      source: 'manual',
+    });
     const row = getCompanyProfiles()[A];
     expect(row.company).toBe('Alpha v2');
     expect(row.source).toBe('manual');
@@ -45,7 +50,9 @@ describe('company-profiles — identity table', () => {
 
 describe('uaWebsite — the identity a polite User-Agent advertises', () => {
   it('extracts the +URL convention and ignores UAs without one', () => {
-    expect(uaWebsite('AlphaCare/7.0.3.49 (+https://care.alpha.example.net)')).toBe('https://care.alpha.example.net');
+    expect(uaWebsite('AlphaCare/7.0.3.49 (+https://care.alpha.example.net)')).toBe(
+      'https://care.alpha.example.net',
+    );
     expect(uaWebsite('ibanforge-radar/1.0 (+https://ibanforge.com)')).toBe('https://ibanforge.com');
     expect(uaWebsite('python-requests/2.32.5')).toBe(null);
     expect(uaWebsite('Mozilla/5.0 (Macintosh)')).toBe(null);

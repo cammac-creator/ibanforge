@@ -22,10 +22,7 @@ import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { buildApp } from '../app.js';
 import { resetX402Paywall } from './x402.js';
-import {
-  MAX_PAYMENT_REQUIRED_BYTES,
-  projectAnnouncementForHeader,
-} from './enrich-402.js';
+import { MAX_PAYMENT_REQUIRED_BYTES, projectAnnouncementForHeader } from './enrich-402.js';
 import { closeAll } from '../lib/db.js';
 
 // Our own bucket in the process-wide in-memory rate limiter. TEST-NET-2.
@@ -175,7 +172,9 @@ describe('projectAnnouncementForHeader', () => {
     const info = { input: { type: 'http', method: 'POST' }, output: { type: 'json' } };
     const fat = {
       ...terms,
-      extensions: { bazaar: { discoverable: true, info, outputSchema: { pad: 'x'.repeat(20_000) } } },
+      extensions: {
+        bazaar: { discoverable: true, info, outputSchema: { pad: 'x'.repeat(20_000) } },
+      },
     };
     const projected = projectAnnouncementForHeader(fat) as {
       extensions: { bazaar: Record<string, unknown> };

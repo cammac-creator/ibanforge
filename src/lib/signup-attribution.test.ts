@@ -12,11 +12,23 @@ describe('parseAttribution', () => {
         utm_campaign: 'Sept-2026',
         email: 'acme@example.com',
       }),
-    ).toEqual({ landing: '/de/pricing', referrer: 'news.ycombinator.com', utm_source: 'newsletter', utm_medium: 'email', utm_campaign: 'sept-2026' });
+    ).toEqual({
+      landing: '/de/pricing',
+      referrer: 'news.ycombinator.com',
+      utm_source: 'newsletter',
+      utm_medium: 'email',
+      utm_campaign: 'sept-2026',
+    });
   });
 
   it('refuses shapes that could carry anything but labels', () => {
-    expect(parseAttribution({ landing: 'javascript:alert(1)', referrer: 'a b.com', utm_source: '<script>' })).toEqual({});
+    expect(
+      parseAttribution({
+        landing: 'javascript:alert(1)',
+        referrer: 'a b.com',
+        utm_source: '<script>',
+      }),
+    ).toEqual({});
     expect(parseAttribution({ landing: '/' + 'x'.repeat(200) })).toEqual({});
   });
 
@@ -29,9 +41,19 @@ describe('parseAttribution', () => {
 });
 
 describe('channelOf', () => {
-  const base = { src: null, client: 'web', landing: '/en', referrer: null, utm_source: null, utm_medium: null, utm_campaign: null };
+  const base = {
+    src: null,
+    client: 'web',
+    landing: '/en',
+    referrer: null,
+    utm_source: null,
+    utm_medium: null,
+    utm_campaign: null,
+  };
   it('names the most specific origin known', () => {
-    expect(channelOf({ ...base, utm_source: 'newsletter', src: 'npm', referrer: 'google.com' })).toBe('utm:newsletter');
+    expect(
+      channelOf({ ...base, utm_source: 'newsletter', src: 'npm', referrer: 'google.com' }),
+    ).toBe('utm:newsletter');
     expect(channelOf({ ...base, src: 'npm', referrer: 'google.com' })).toBe('src:npm');
     expect(channelOf({ ...base, referrer: 'google.com' })).toBe('ref:google.com');
     expect(channelOf(base)).toBe('direct');

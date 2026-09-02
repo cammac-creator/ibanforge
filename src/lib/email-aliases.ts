@@ -42,15 +42,20 @@ export function toCanonical(email: string, map: Map<string, string>): string {
  * form (a → b while b → c would make lookups order-dependent); aliasing an
  * address to itself, or an address that other aliases point AT, is refused.
  */
-export function addAlias(aliasRaw: string, canonicalRaw: string): { ok: true } | { ok: false; reason: string } {
+export function addAlias(
+  aliasRaw: string,
+  canonicalRaw: string,
+): { ok: true } | { ok: false; reason: string } {
   ensureAliasTable();
   const alias = aliasRaw.trim().toLowerCase();
   const map = loadAliasMap();
   const canonical = toCanonical(canonicalRaw, map);
-  if (!alias.includes('@') || !canonical.includes('@')) return { ok: false, reason: 'adresses invalides' };
+  if (!alias.includes('@') || !canonical.includes('@'))
+    return { ok: false, reason: 'adresses invalides' };
   if (alias === canonical) return { ok: false, reason: 'alias identique au canonique' };
   const usedAsCanonical = listAliases().some((r) => r.canonical === alias);
-  if (usedAsCanonical) return { ok: false, reason: `${alias} est déjà l'adresse canonique d'un autre alias` };
+  if (usedAsCanonical)
+    return { ok: false, reason: `${alias} est déjà l'adresse canonique d'un autre alias` };
   getStatsDB()
     .prepare(
       `INSERT INTO email_aliases (alias, canonical) VALUES (?, ?)

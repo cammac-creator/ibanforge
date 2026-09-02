@@ -142,5 +142,8 @@ export function upsertInstitutionalContact(
 export function deleteInstitutionalContact(emailRaw: string): boolean {
   ensureInstitutionalTable();
   const email = emailRaw.trim().toLowerCase();
-  return getStatsDB().prepare('DELETE FROM institutional_contacts WHERE email = ?').run(email).changes > 0;
+  return (
+    getStatsDB().prepare('DELETE FROM institutional_contacts WHERE email = ?').run(email).changes >
+    0
+  );
 }

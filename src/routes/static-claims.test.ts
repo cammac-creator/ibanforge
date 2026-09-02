@@ -25,8 +25,17 @@ const ROOT = join(import.meta.dirname, '..', '..');
 
 /** Never reaches a customer, or is not ours to police. */
 const SKIP_DIRS = new Set([
-  'node_modules', '.git', '.next', 'dist', 'build', 'coverage',
-  '.superpowers', '.claude', 'data', 'tmp', 'internal',
+  'node_modules',
+  '.git',
+  '.next',
+  'dist',
+  'build',
+  'coverage',
+  '.superpowers',
+  '.claude',
+  'data',
+  'tmp',
+  'internal',
   // Implementation plans and specs are dated design history, like CHANGELOG.
   'superpowers',
 ]);
@@ -52,7 +61,10 @@ const CODE_COMMENT = /^\s*(\/\/|\*|\/\*)/;
 const CODE_EXT = /\.(ts|tsx|js|mjs)$/;
 
 const BANNED: Array<{ pattern: RegExp; wanted: string }> = [
-  { pattern: /\b84\s+(countries|pays|Länder)/, wanted: '89 countries (real count, live at /llms.txt)' },
+  {
+    pattern: /\b84\s+(countries|pays|Länder)/,
+    wanted: '89 countries (real count, live at /llms.txt)',
+  },
   { pattern: /\b7[05]\+?\s+(countries|pays|Länder)/, wanted: '89 countries' },
   { pattern: /~\s?1[,.'\u00a0\u202f ]?200\b/, wanted: '1,100+ Swiss entries' },
   { pattern: /\b1[,.']190\b/, wanted: '1,100+ Swiss entries' },

@@ -398,15 +398,21 @@ function openStatsDB(): DatabaseType.Database {
       );
     `);
     // Migrate existing databases that may be missing the new columns
-    const existingCols = (statsDB.prepare("PRAGMA table_info(operations)").all() as Array<{ name: string }>).map(r => r.name);
-    if (!existingCols.includes('hour')) statsDB.exec('ALTER TABLE operations ADD COLUMN hour INTEGER');
-    if (!existingCols.includes('day_of_week')) statsDB.exec('ALTER TABLE operations ADD COLUMN day_of_week INTEGER');
-    if (!existingCols.includes('error_detail')) statsDB.exec('ALTER TABLE operations ADD COLUMN error_detail TEXT');
+    const existingCols = (
+      statsDB.prepare('PRAGMA table_info(operations)').all() as Array<{ name: string }>
+    ).map((r) => r.name);
+    if (!existingCols.includes('hour'))
+      statsDB.exec('ALTER TABLE operations ADD COLUMN hour INTEGER');
+    if (!existingCols.includes('day_of_week'))
+      statsDB.exec('ALTER TABLE operations ADD COLUMN day_of_week INTEGER');
+    if (!existingCols.includes('error_detail'))
+      statsDB.exec('ALTER TABLE operations ADD COLUMN error_detail TEXT');
     // Why a column of its own, next to error_detail: error_detail holds a
     // truncated slice of the SUBMITTED value, reject_reason holds only a
     // category from the RejectReason union. Keeping them apart is what lets us
     // count "what agents get rejected for" without retaining what they sent (DPA).
-    if (!existingCols.includes('reject_reason')) statsDB.exec('ALTER TABLE operations ADD COLUMN reject_reason TEXT');
+    if (!existingCols.includes('reject_reason'))
+      statsDB.exec('ALTER TABLE operations ADD COLUMN reject_reason TEXT');
     statsDB.exec('CREATE INDEX IF NOT EXISTS idx_operations_reject ON operations(reject_reason)');
     // Which customer asked. request_log already carried key_prefix but holds no
     // country, and operations held the country but not who asked, so "which
@@ -414,10 +420,14 @@ function openStatsDB(): DatabaseType.Database {
     // Clients tab exists for. Forward-only: rows written before 2026-07-30 are
     // attributed by scripts/backfill-operation-keys.ts where a single request
     // can be matched, and stay NULL where it cannot.
-    if (!existingCols.includes('key_prefix')) statsDB.exec('ALTER TABLE operations ADD COLUMN key_prefix TEXT');
+    if (!existingCols.includes('key_prefix'))
+      statsDB.exec('ALTER TABLE operations ADD COLUMN key_prefix TEXT');
     statsDB.exec('CREATE INDEX IF NOT EXISTS idx_operations_key ON operations(key_prefix)');
-    const keyCols = (statsDB.prepare("PRAGMA table_info(api_keys)").all() as Array<{ name: string }>).map(r => r.name);
-    if (!keyCols.includes('monthly_limit')) statsDB.exec('ALTER TABLE api_keys ADD COLUMN monthly_limit INTEGER');
+    const keyCols = (
+      statsDB.prepare('PRAGMA table_info(api_keys)').all() as Array<{ name: string }>
+    ).map((r) => r.name);
+    if (!keyCols.includes('monthly_limit'))
+      statsDB.exec('ALTER TABLE api_keys ADD COLUMN monthly_limit INTEGER');
     // Acquisition channel ("src" query param carried by our outbound links:
     // npm README, n8n node, directory listings…). Forward-only and best-effort:
     // NULL means "unattributed", never a guess. Added 2026-08-06 so that new
@@ -427,14 +437,18 @@ function openStatsDB(): DatabaseType.Database {
     // NULL the key follows the existing monthly subscription model. When it
     // is an integer >= 0 the key consumes from the prepaid bundle (and the
     // monthly_limit is ignored). Decremented atomically per call.
-    if (!keyCols.includes('credits_remaining')) statsDB.exec('ALTER TABLE api_keys ADD COLUMN credits_remaining INTEGER');
-    if (!keyCols.includes('credits_total')) statsDB.exec('ALTER TABLE api_keys ADD COLUMN credits_total INTEGER');
+    if (!keyCols.includes('credits_remaining'))
+      statsDB.exec('ALTER TABLE api_keys ADD COLUMN credits_remaining INTEGER');
+    if (!keyCols.includes('credits_total'))
+      statsDB.exec('ALTER TABLE api_keys ADD COLUMN credits_total INTEGER');
     // Stripe Checkout session id — links an api_key to the Stripe payment that
     // minted it. Used for idempotency (we never mint twice for the same session)
     // and to retrieve the raw key once via /v1/stripe/key/:session_id.
     if (!keyCols.includes('stripe_session_id')) {
       statsDB.exec('ALTER TABLE api_keys ADD COLUMN stripe_session_id TEXT');
-      statsDB.exec('CREATE INDEX IF NOT EXISTS idx_api_keys_stripe_session ON api_keys(stripe_session_id)');
+      statsDB.exec(
+        'CREATE INDEX IF NOT EXISTS idx_api_keys_stripe_session ON api_keys(stripe_session_id)',
+      );
     }
     // Raw API key stored in plaintext for ONE-TIME retrieval after Stripe payment.
     // Nulled out by consumeOneTimeKey() as soon as the buyer fetches it from the
@@ -447,7 +461,9 @@ function openStatsDB(): DatabaseType.Database {
     // subscription ends (churn must not leave a live key behind).
     if (!keyCols.includes('stripe_subscription_id')) {
       statsDB.exec('ALTER TABLE api_keys ADD COLUMN stripe_subscription_id TEXT');
-      statsDB.exec('CREATE INDEX IF NOT EXISTS idx_api_keys_stripe_subscription ON api_keys(stripe_subscription_id)');
+      statsDB.exec(
+        'CREATE INDEX IF NOT EXISTS idx_api_keys_stripe_subscription ON api_keys(stripe_subscription_id)',
+      );
     }
     // When a key was deactivated — drives the DPA clause 4.7 commitment:
     // telemetry attributable to a terminated customer is deleted by default
@@ -456,7 +472,9 @@ function openStatsDB(): DatabaseType.Database {
     // 30-day deletion countdown from this deploy (conservative default).
     if (!keyCols.includes('deactivated_at')) {
       statsDB.exec('ALTER TABLE api_keys ADD COLUMN deactivated_at TEXT');
-      statsDB.exec("UPDATE api_keys SET deactivated_at = datetime('now') WHERE active = 0 AND deactivated_at IS NULL");
+      statsDB.exec(
+        "UPDATE api_keys SET deactivated_at = datetime('now') WHERE active = 0 AND deactivated_at IS NULL",
+      );
     }
     // What the buyer was ACTUALLY charged, as the payment provider reported it,
     // in the provider's own minor units (Stripe amount_total: 2000 = $20.00).
@@ -648,24 +666,38 @@ function openStatsDB(): DatabaseType.Database {
     // incoming message in the business mailbox and nothing counted them.
     // NULL means "outcome unknown" (rows written before this column existed),
     // and must never be read as success.
-    const vsCols = (statsDB.prepare('PRAGMA table_info(verification_sends)').all() as Array<{ name: string }>).map((r) => r.name);
+    const vsCols = (
+      statsDB.prepare('PRAGMA table_info(verification_sends)').all() as Array<{ name: string }>
+    ).map((r) => r.name);
     if (vsCols.length && !vsCols.includes('relay_accepted')) {
       statsDB.exec('ALTER TABLE verification_sends ADD COLUMN relay_accepted INTEGER');
     }
 
-    const ftCols = (statsDB.prepare('PRAGMA table_info(forum_threads)').all() as Array<{ name: string }>).map((r) => r.name);
-    if (ftCols.length && !ftCols.includes('draft_fr')) statsDB.exec('ALTER TABLE forum_threads ADD COLUMN draft_fr TEXT');
+    const ftCols = (
+      statsDB.prepare('PRAGMA table_info(forum_threads)').all() as Array<{ name: string }>
+    ).map((r) => r.name);
+    if (ftCols.length && !ftCols.includes('draft_fr'))
+      statsDB.exec('ALTER TABLE forum_threads ADD COLUMN draft_fr TEXT');
     // Reply watch: the radar re-reads posted threads; a reply after ours flips
     // needs_attention and pings Telegram. posted_at feeds the one-post-per-
     // platform-per-day guardrail in the UI.
-    if (ftCols.length && !ftCols.includes('watch_state')) statsDB.exec('ALTER TABLE forum_threads ADD COLUMN watch_state TEXT');
-    if (ftCols.length && !ftCols.includes('needs_attention')) statsDB.exec('ALTER TABLE forum_threads ADD COLUMN needs_attention INTEGER NOT NULL DEFAULT 0');
-    if (ftCols.length && !ftCols.includes('posted_at')) statsDB.exec('ALTER TABLE forum_threads ADD COLUMN posted_at TEXT');
+    if (ftCols.length && !ftCols.includes('watch_state'))
+      statsDB.exec('ALTER TABLE forum_threads ADD COLUMN watch_state TEXT');
+    if (ftCols.length && !ftCols.includes('needs_attention'))
+      statsDB.exec(
+        'ALTER TABLE forum_threads ADD COLUMN needs_attention INTEGER NOT NULL DEFAULT 0',
+      );
+    if (ftCols.length && !ftCols.includes('posted_at'))
+      statsDB.exec('ALTER TABLE forum_threads ADD COLUMN posted_at TEXT');
     // Track request provenance: distinguish MCP HTTP / MCP stdio / REST direct / bot / web
-    const reqCols = (statsDB.prepare("PRAGMA table_info(request_log)").all() as Array<{ name: string }>).map(r => r.name);
+    const reqCols = (
+      statsDB.prepare('PRAGMA table_info(request_log)').all() as Array<{ name: string }>
+    ).map((r) => r.name);
     if (!reqCols.includes('client_kind')) {
       statsDB.exec('ALTER TABLE request_log ADD COLUMN client_kind TEXT');
-      statsDB.exec('CREATE INDEX IF NOT EXISTS idx_request_log_client_kind ON request_log(client_kind)');
+      statsDB.exec(
+        'CREATE INDEX IF NOT EXISTS idx_request_log_client_kind ON request_log(client_kind)',
+      );
     }
     // Scanner identification: HMAC-truncated IP hash (clustering, not reversible)
     // and full User-Agent. Used by /admin/scanners to expose top sources of
@@ -683,12 +715,16 @@ function openStatsDB(): DatabaseType.Database {
     // from apiKeyMiddleware (historical rows stay NULL).
     if (!reqCols.includes('key_prefix')) {
       statsDB.exec('ALTER TABLE request_log ADD COLUMN key_prefix TEXT');
-      statsDB.exec('CREATE INDEX IF NOT EXISTS idx_request_log_key_prefix ON request_log(key_prefix)');
+      statsDB.exec(
+        'CREATE INDEX IF NOT EXISTS idx_request_log_key_prefix ON request_log(key_prefix)',
+      );
     }
     // key_creations gained the client library string and minted prefix after the
     // table already existed in production; add them forward-only. Rows written
     // before this migration keep NULL for both.
-    const kcCols = (statsDB.prepare('PRAGMA table_info(key_creations)').all() as Array<{ name: string }>).map((r) => r.name);
+    const kcCols = (
+      statsDB.prepare('PRAGMA table_info(key_creations)').all() as Array<{ name: string }>
+    ).map((r) => r.name);
     if (kcCols.length && !kcCols.includes('user_agent')) {
       statsDB.exec('ALTER TABLE key_creations ADD COLUMN user_agent TEXT');
     }
@@ -697,7 +733,9 @@ function openStatsDB(): DatabaseType.Database {
     }
     // Unconditional and last: the column exists by now on both paths (fresh
     // CREATE TABLE above, or the ALTER just run).
-    statsDB.exec('CREATE INDEX IF NOT EXISTS idx_key_creations_ua ON key_creations(user_agent, created_at)');
+    statsDB.exec(
+      'CREATE INDEX IF NOT EXISTS idx_key_creations_ua ON key_creations(user_agent, created_at)',
+    );
     // Undo trail for the cohort radar: what each key's address was before the
     // radar rewrote it. The manual relabel endpoint returns this mapping in its
     // response, but the automatic radar has no caller to hand it to — so a wrong
@@ -755,13 +793,20 @@ function openStatsDB(): DatabaseType.Database {
     // have booked USDC revenue as Stripe revenue in the CRM.
     if (!keyCols.includes('x402_payment_ref')) {
       statsDB.exec('ALTER TABLE api_keys ADD COLUMN x402_payment_ref TEXT');
-      statsDB.exec('CREATE INDEX IF NOT EXISTS idx_api_keys_x402_ref ON api_keys(x402_payment_ref)');
+      statsDB.exec(
+        'CREATE INDEX IF NOT EXISTS idx_api_keys_x402_ref ON api_keys(x402_payment_ref)',
+      );
     }
     // CRM timeline: French translation + detected language of foreign messages.
-    const msgCols = (statsDB.prepare('PRAGMA table_info(email_messages)').all() as Array<{ name: string }>).map((r) => r.name);
-    if (msgCols.length && !msgCols.includes('snippet_fr')) statsDB.exec('ALTER TABLE email_messages ADD COLUMN snippet_fr TEXT');
-    if (msgCols.length && !msgCols.includes('lang')) statsDB.exec('ALTER TABLE email_messages ADD COLUMN lang TEXT');
-    if (msgCols.length && !msgCols.includes('body')) statsDB.exec('ALTER TABLE email_messages ADD COLUMN body TEXT');
+    const msgCols = (
+      statsDB.prepare('PRAGMA table_info(email_messages)').all() as Array<{ name: string }>
+    ).map((r) => r.name);
+    if (msgCols.length && !msgCols.includes('snippet_fr'))
+      statsDB.exec('ALTER TABLE email_messages ADD COLUMN snippet_fr TEXT');
+    if (msgCols.length && !msgCols.includes('lang'))
+      statsDB.exec('ALTER TABLE email_messages ADD COLUMN lang TEXT');
+    if (msgCols.length && !msgCols.includes('body'))
+      statsDB.exec('ALTER TABLE email_messages ADD COLUMN body TEXT');
     // "This one needs no answer" — a thank-you, a read receipt, a ticket bot.
     //
     // 🚨 The marker belongs to the MESSAGE, not to the contact, and that is the
@@ -777,7 +822,9 @@ function openStatsDB(): DatabaseType.Database {
     // relationship, and filing a warm thank-you under "pas_interesse" would be
     // a lie that then poisons the outcome counters.
     if (msgCols.length && !msgCols.includes('no_reply_needed')) {
-      statsDB.exec('ALTER TABLE email_messages ADD COLUMN no_reply_needed INTEGER NOT NULL DEFAULT 0');
+      statsDB.exec(
+        'ALTER TABLE email_messages ADD COLUMN no_reply_needed INTEGER NOT NULL DEFAULT 0',
+      );
     }
     // Addresses whose future inbound mail is marked on arrival — the "always do
     // this for this correspondent" rule, applied by POST /v1/admin/email-messages.
@@ -811,7 +858,9 @@ function openStatsDB(): DatabaseType.Database {
     // Adding outcomes to that field means auditing every one of those sites
     // and leaves an outcome one re-sync away from being overwritten. These
     // columns are orthogonal to all of it.
-    const prospectCols = (statsDB.prepare('PRAGMA table_info(prospects)').all() as Array<{ name: string }>).map((r) => r.name);
+    const prospectCols = (
+      statsDB.prepare('PRAGMA table_info(prospects)').all() as Array<{ name: string }>
+    ).map((r) => r.name);
     if (prospectCols.length && !prospectCols.includes('outcome')) {
       // 'en_discussion' | 'pas_maintenant' | 'pas_interesse' | 'mauvaise_personne',
       // or NULL for "no outcome recorded", which is not the same as a negative one.
@@ -821,7 +870,8 @@ function openStatsDB(): DatabaseType.Database {
     // Why, in the operator's own words. Short and free text on purpose: the
     // reason a deal dies is never one of five buttons, and a wrong button
     // teaches the next campaign the wrong lesson.
-    if (prospectCols.length && !prospectCols.includes('outcome_note')) statsDB.exec('ALTER TABLE prospects ADD COLUMN outcome_note TEXT');
+    if (prospectCols.length && !prospectCols.includes('outcome_note'))
+      statsDB.exec('ALTER TABLE prospects ADD COLUMN outcome_note TEXT');
     // YYYY-MM-DD. Set with 'pas_maintenant': until that day the contact leaves
     // the day's queue entirely, instead of coming back every ten days like
     // everyone else and being dismissed by hand each time.
@@ -831,7 +881,8 @@ function openStatsDB(): DatabaseType.Database {
     }
     // When the outcome was recorded, so a stale judgement can be told from a
     // fresh one without reading the thread.
-    if (prospectCols.length && !prospectCols.includes('outcome_at')) statsDB.exec('ALTER TABLE prospects ADD COLUMN outcome_at TEXT');
+    if (prospectCols.length && !prospectCols.includes('outcome_at'))
+      statsDB.exec('ALTER TABLE prospects ADD COLUMN outcome_at TEXT');
   }
   return statsDB;
 }

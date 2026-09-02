@@ -42,7 +42,16 @@ beforeAll(() => {
   // written by application code carry this format while SQLite defaults write
   // 'YYYY-MM-DD HH:MM:SS' — the aggregation must survive both (it crashed on
   // the double-Z parse the first night it ran).
-  insKey.run(`${PFX}_f_free`, `${PFX}_f_free`, FRESH, new Date(now - 86_400_000).toISOString(), 200, null, null, null);
+  insKey.run(
+    `${PFX}_f_free`,
+    `${PFX}_f_free`,
+    FRESH,
+    new Date(now - 86_400_000).toISOString(),
+    200,
+    null,
+    null,
+    null,
+  );
   // INTERNAL: must never appear.
   insKey.run(`${PFX}_i_free`, `${PFX}_i_free`, INTERNAL, daysAgo(5), 200, null, null, null);
 

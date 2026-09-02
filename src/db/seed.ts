@@ -9,7 +9,11 @@ import { Readable } from 'node:stream';
 import { createUnzip } from 'node:zlib';
 import { execSync } from 'node:child_process';
 import { getCountryName } from '../lib/countries.js';
-import { extractGleifAddress, addressMatchesBic, type GleifEntityAddresses } from '../lib/gleif-address.js';
+import {
+  extractGleifAddress,
+  addressMatchesBic,
+  type GleifEntityAddresses,
+} from '../lib/gleif-address.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DB_PATH = process.env.DB_PATH ?? resolve(__dirname, '../../data/bic.sqlite');
@@ -31,11 +35,13 @@ async function downloadBicLeiMapping(): Promise<string> {
       console.log('Using cached BIC-LEI mapping:', existing);
       return existing;
     }
-  } catch { /* not found */ }
+  } catch {
+    /* not found */
+  }
 
   console.log('Downloading BIC-LEI mapping from GLEIF...');
   const metaRes = await fetch('https://mapping.gleif.org/api/v2/bic-lei/latest');
-  const meta = await metaRes.json() as { data: { attributes: { downloadLink: string } } };
+  const meta = (await metaRes.json()) as { data: { attributes: { downloadLink: string } } };
   const downloadUrl = meta.data.attributes.downloadLink;
 
   const zipPath = resolve(TMP_DIR, 'lei-bic.zip');
@@ -95,7 +101,7 @@ async function fetchEntities(leis: string[]): Promise<Map<string, EntityInfo>> {
     try {
       const res = await fetch(
         `${GLEIF_API}/lei-records?filter[lei]=${encodeURIComponent(filter)}&page[size]=${batchSize}`,
-        { headers: { 'Accept': 'application/vnd.api+json' } }
+        { headers: { Accept: 'application/vnd.api+json' } },
       );
 
       if (!res.ok) {
@@ -103,7 +109,7 @@ async function fetchEntities(leis: string[]): Promise<Map<string, EntityInfo>> {
         continue;
       }
 
-      const json = await res.json() as {
+      const json = (await res.json()) as {
         data: Array<{
           attributes: {
             lei: string;
@@ -139,7 +145,7 @@ async function fetchEntities(leis: string[]): Promise<Map<string, EntityInfo>> {
 
     // Rate limit
     if (i + batchSize < leis.length) {
-      await new Promise(r => setTimeout(r, 300));
+      await new Promise((r) => setTimeout(r, 300));
     }
 
     if ((i / batchSize) % 20 === 0) {
@@ -246,11 +252,14 @@ async function seed() {
   // "no such column: operation_type" — which failed the cron's test step and
   // silently skipped the "Commit updated database" step (stale bic.sqlite).
 
-  const count = (db.prepare('SELECT COUNT(*) as cnt FROM bic_entries').get() as { cnt: number }).cnt;
+  const count = (db.prepare('SELECT COUNT(*) as cnt FROM bic_entries').get() as { cnt: number })
+    .cnt;
   console.log(`\n=== Done! ${count} BIC entries in database ===`);
 
   // Show sample
-  const sample = db.prepare('SELECT bic11, institution, country_code, city, lei FROM bic_entries LIMIT 5').all();
+  const sample = db
+    .prepare('SELECT bic11, institution, country_code, city, lei FROM bic_entries LIMIT 5')
+    .all();
   console.log('\nSample entries:');
   console.table(sample);
 

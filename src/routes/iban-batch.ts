@@ -15,18 +15,20 @@ ibanBatch.post('/v1/iban/batch', async (c) => {
   try {
     body = await c.req.json<Record<string, unknown>>();
   } catch {
-    return c.json(
-      { error: 'invalid_json', message: 'Request body must be valid JSON' },
-      400,
-    );
+    return c.json({ error: 'invalid_json', message: 'Request body must be valid JSON' }, 400);
   }
 
   const rawIbans = getIbansArray(body);
-  if (!rawIbans || !Array.isArray(rawIbans) || !rawIbans.every((item) => typeof item === 'string')) {
+  if (
+    !rawIbans ||
+    !Array.isArray(rawIbans) ||
+    !rawIbans.every((item) => typeof item === 'string')
+  ) {
     return c.json(
       {
         error: 'invalid_request',
-        message: "Request body must include an array of IBAN strings (1-100 items). Field accepted: 'ibans', 'iban_list' or 'list'.",
+        message:
+          "Request body must include an array of IBAN strings (1-100 items). Field accepted: 'ibans', 'iban_list' or 'list'.",
       },
       400,
     );
@@ -35,10 +37,7 @@ ibanBatch.post('/v1/iban/batch', async (c) => {
   const ibans = rawIbans as string[];
 
   if (ibans.length === 0) {
-    return c.json(
-      { error: 'empty_batch', message: 'At least 1 IBAN is required' },
-      400,
-    );
+    return c.json({ error: 'empty_batch', message: 'At least 1 IBAN is required' }, 400);
   }
 
   if (ibans.length > 100) {

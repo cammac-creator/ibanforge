@@ -4,7 +4,13 @@ import { apiKeyMiddleware } from './api-key.js';
 import { ibanValidate } from '../routes/iban-validate.js';
 import { ibanBatch } from '../routes/iban-batch.js';
 import { ibanFormat } from '../routes/iban-format.js';
-import { generateApiKey, generateCreditKey, validateApiKey, getUsage, checkAndIncrementQuota } from '../lib/api-keys.js';
+import {
+  generateApiKey,
+  generateCreditKey,
+  validateApiKey,
+  getUsage,
+  checkAndIncrementQuota,
+} from '../lib/api-keys.js';
 import { getStatsDB } from '../lib/db.js';
 import type { HonoEnv } from '../types.js';
 
@@ -454,7 +460,10 @@ describe('apiKeyMiddleware — routes documented free are billed nothing', () =>
       headers: { Authorization: `Bearer ${key}` },
     });
     expect(res.status).toBe(200);
-    expect(res.headers.get('X-Quota-Exhausted'), 'a free route must not answer with the paywall hint').toBeNull();
+    expect(
+      res.headers.get('X-Quota-Exhausted'),
+      'a free route must not answer with the paywall hint',
+    ).toBeNull();
   });
 
   it('keeps billing the paid routes, one unit per call', async () => {

@@ -143,7 +143,9 @@ describe('the promise that a v1 payment still settles', () => {
     const source = readFileSync(entry, 'utf8');
 
     expect(source, 'v2 payment header').toContain('payment-signature');
-    expect(source, 'v1 payment header — dropping this locks out older clients').toContain('x-payment');
+    expect(source, 'v1 payment header — dropping this locks out older clients').toContain(
+      'x-payment',
+    );
   });
 });
 
@@ -159,14 +161,17 @@ describe('the promise that a v1 payment still settles', () => {
  * the route table lived inside a closure no test could reach.
  */
 describe('every priced route stays payable', () => {
-  const TABLE = () => buildRouteTable('0x0000000000000000000000000000000000000001', 'GET', '/v1/bic/COBADEFFXXX');
+  const TABLE = () =>
+    buildRouteTable('0x0000000000000000000000000000000000000001', 'GET', '/v1/bic/COBADEFFXXX');
 
   it('describes itself within the facilitator payload limit', () => {
     for (const [route, config] of Object.entries(TABLE())) {
       const { description } = config as { description?: string };
       expect(typeof description, route).toBe('string');
-      expect(description!.length, `${route} description is ${description!.length} chars`)
-        .toBeLessThanOrEqual(MAX_RESOURCE_DESCRIPTION);
+      expect(
+        description!.length,
+        `${route} description is ${description!.length} chars`,
+      ).toBeLessThanOrEqual(MAX_RESOURCE_DESCRIPTION);
     }
   });
 
@@ -215,7 +220,9 @@ describe('mismatched-method probe still gets quoted (piste A)', () => {
   it('exposes a payable synthetic entry for a GET probe on a POST route', () => {
     const table = buildRouteTable(wallet, 'GET', '/v1/iban/validate');
     expect(table['POST /v1/iban/validate'], 'canonical POST entry stays').toBeDefined();
-    const synth = table['GET /v1/iban/validate'] as { accepts?: unknown; resource?: string } | undefined;
+    const synth = table['GET /v1/iban/validate'] as
+      | { accepts?: unknown; resource?: string }
+      | undefined;
     expect(synth, 'synthetic GET entry makes requiresPayment() true').toBeDefined();
     expect(synth!.accepts, 'probe entry is payable').toBeDefined();
     expect(synth!.resource).toBe('https://api.ibanforge.com/v1/iban/validate');
@@ -228,7 +235,9 @@ describe('mismatched-method probe still gets quoted (piste A)', () => {
   });
 
   it('never quotes the credit-sale route to a probe (selling routes excluded)', () => {
-    expect(buildRouteTable(wallet, 'GET', '/v1/credits/buy/1k')['GET /v1/credits/buy/1k']).toBeUndefined();
+    expect(
+      buildRouteTable(wallet, 'GET', '/v1/credits/buy/1k')['GET /v1/credits/buy/1k'],
+    ).toBeUndefined();
   });
 
   it('adds nothing when the method already matches', () => {
@@ -315,7 +324,13 @@ describe('paid routes reached with a trailing slash have a canonical form', () =
   });
 
   it('ignores paths that sell nothing — this is not a global routing change', () => {
-    for (const path of ['/v1/iban/format/', '/v1/iban/structure/CH/', '/v1/credits/bundles/', '/health/', '/']) {
+    for (const path of [
+      '/v1/iban/format/',
+      '/v1/iban/structure/CH/',
+      '/v1/credits/bundles/',
+      '/health/',
+      '/',
+    ]) {
       expect(canonicalPaidPath('GET', path), path).toBeNull();
     }
   });
@@ -352,7 +367,9 @@ describe('a silent facilitator cannot hold a paid request for minutes', () => {
       // buyer and delivers nothing.
       await vi.advanceTimersByTimeAsync(budget - 1);
       let settled = false;
-      void outcome.then(() => { settled = true; });
+      void outcome.then(() => {
+        settled = true;
+      });
       await Promise.resolve();
       expect(settled).toBe(false);
 
@@ -364,8 +381,12 @@ describe('a silent facilitator cannot hold a paid request for minutes', () => {
   });
 
   it('is transparent when the facilitator answers in time', async () => {
-    await expect(withFacilitatorTimeout(Promise.resolve('supported'), 'supported')).resolves.toBe('supported');
-    await expect(withFacilitatorTimeout(Promise.reject(new Error('402 boom')), 'verify')).rejects.toThrow('402 boom');
+    await expect(withFacilitatorTimeout(Promise.resolve('supported'), 'supported')).resolves.toBe(
+      'supported',
+    );
+    await expect(
+      withFacilitatorTimeout(Promise.reject(new Error('402 boom')), 'verify'),
+    ).rejects.toThrow('402 boom');
   });
 
   /**
@@ -380,7 +401,9 @@ describe('a silent facilitator cannot hold a paid request for minutes', () => {
     process.on('unhandledRejection', onUnhandled);
     try {
       let rejectLate: (e: Error) => void = () => {};
-      const late = new Promise<never>((_, rej) => { rejectLate = rej; });
+      const late = new Promise<never>((_, rej) => {
+        rejectLate = rej;
+      });
       const bounded = withFacilitatorTimeout(late, 'verify');
       // Stop waiting on it, then let the underlying call fail afterwards.
       const raced = bounded.catch(() => 'timed out');
@@ -499,15 +522,20 @@ describe('an unconfirmed settlement never reads as a refusal', () => {
    * the exact case where the buyer may already have paid for the key.
    */
   it('hands back the recovery URL its own 502 replaced', () => {
-    const sold = unconfirmedSettlementBody(new FacilitatorTimeoutError('settle', 6_000), 6_000, 'deadbeef');
+    const sold = unconfirmedSettlementBody(
+      new FacilitatorTimeoutError('settle', 6_000),
+      6_000,
+      'deadbeef',
+    );
     expect(sold.recovery_url).toBe('https://api.ibanforge.com/v1/credits/recover/deadbeef');
     expect(sold.recovery_note).toMatch(/once/i);
   });
 
   it('offers no recovery URL when nothing was minted to recover', () => {
     // A per-call paid route creates nothing; a recovery link would be a dead end.
-    expect(unconfirmedSettlementBody(new FacilitatorTimeoutError('settle', 6_000), 6_000, null))
-      .not.toHaveProperty('recovery_url');
+    expect(
+      unconfirmedSettlementBody(new FacilitatorTimeoutError('settle', 6_000), 6_000, null),
+    ).not.toHaveProperty('recovery_url');
     expect(body).not.toHaveProperty('recovery_url');
   });
 });

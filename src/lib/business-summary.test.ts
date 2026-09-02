@@ -26,7 +26,10 @@ function key(over: Partial<BusinessKeyRow> = {}): BusinessKeyRow {
   };
 }
 
-function summary(keys: BusinessKeyRow[], over: Partial<Parameters<typeof buildBusinessSummary>[0]> = {}) {
+function summary(
+  keys: BusinessKeyRow[],
+  over: Partial<Parameters<typeof buildBusinessSummary>[0]> = {},
+) {
   return buildBusinessSummary({
     keys,
     traffic: { total: 0, s402: 0, s4xx: 0, s5xx: 0 },
@@ -62,8 +65,18 @@ describe('credit pack pricing', () => {
 describe('credits', () => {
   it('reports what was sold, what was consumed, and how many packs sit idle', () => {
     const s = summary([
-      key({ key_prefix: 'ifk_a', email: 'alpha@alpha.example.net', credits_total: 4000, credits_remaining: 1200 }),
-      key({ key_prefix: 'ifk_b', email: 'beta@beta.example.net', credits_total: 1000, credits_remaining: 993 }),
+      key({
+        key_prefix: 'ifk_a',
+        email: 'alpha@alpha.example.net',
+        credits_total: 4000,
+        credits_remaining: 1200,
+      }),
+      key({
+        key_prefix: 'ifk_b',
+        email: 'beta@beta.example.net',
+        credits_total: 1000,
+        credits_remaining: 993,
+      }),
     ]);
     expect(s.credits.sold_credits).toBe(5000);
     expect(s.credits.sold_usd).toBe(21);
@@ -88,7 +101,12 @@ describe('credits', () => {
     // report must not, or the agent-native bet becomes invisible the day it
     // starts working.
     const s = summary([
-      key({ key_prefix: 'ifk_anon', email: 'credits-buyer', credits_total: 1000, credits_remaining: 200 }),
+      key({
+        key_prefix: 'ifk_anon',
+        email: 'credits-buyer',
+        credits_total: 1000,
+        credits_remaining: 200,
+      }),
     ]);
     expect(s.credits.paying_accounts).toBe(1);
     expect(s.credits.sold_usd).toBe(5);
@@ -120,7 +138,12 @@ describe('credits', () => {
 
   it('leaves operator and test accounts out of the business figures', () => {
     const s = summary([
-      key({ email: 'playground@ibanforge.com', credits_total: 25000, credits_remaining: 0, used_all_time: 25000 }),
+      key({
+        email: 'playground@ibanforge.com',
+        credits_total: 25000,
+        credits_remaining: 0,
+        used_all_time: 25000,
+      }),
       key({ email: 'alpha@alpha.example.net', credits_total: 1000, credits_remaining: 500 }),
     ]);
     expect(s.credits.paying_accounts).toBe(1);
@@ -150,7 +173,12 @@ describe('steady unpaid users', () => {
 
   it('ignores an account that has gone quiet', () => {
     const s = summary([
-      key({ email: 'old@alpha.example.net', used: 0, used_all_time: 210, series: [70, 80, 60, 0, 0, 0] }),
+      key({
+        email: 'old@alpha.example.net',
+        used: 0,
+        used_all_time: 210,
+        series: [70, 80, 60, 0, 0, 0],
+      }),
     ]);
     expect(s.steady_unpaid).toHaveLength(0);
   });
@@ -159,14 +187,24 @@ describe('steady unpaid users', () => {
     // A key with a couple of lifetime calls is not a habit, and listing it
     // beside one with hundreds is how the useful name gets buried.
     const s = summary([
-      key({ email: 'trickle@alpha.example.net', used: 1, used_all_time: 2, series: [0, 0, 0, 1, 0, 1] }),
+      key({
+        email: 'trickle@alpha.example.net',
+        used: 1,
+        used_all_time: 2,
+        series: [0, 0, 0, 1, 0, 1],
+      }),
     ]);
     expect(s.steady_unpaid).toHaveLength(0);
   });
 
   it('ignores a single-month burst', () => {
     const s = summary([
-      key({ email: 'once@alpha.example.net', used: 40, used_all_time: 40, series: [0, 0, 0, 0, 0, 40] }),
+      key({
+        email: 'once@alpha.example.net',
+        used: 40,
+        used_all_time: 40,
+        series: [0, 0, 0, 0, 0, 40],
+      }),
     ]);
     expect(s.steady_unpaid).toHaveLength(0);
   });
@@ -198,7 +236,13 @@ describe('the free-tier wall', () => {
 
   it('does not call a credit key capped', () => {
     const s = summary([
-      key({ email: 'a@alpha.example.net', monthly_limit: 200, used: 200, credits_total: 5000, credits_remaining: 10 }),
+      key({
+        email: 'a@alpha.example.net',
+        monthly_limit: 200,
+        used: 200,
+        credits_total: 5000,
+        credits_remaining: 10,
+      }),
     ]);
     expect(s.keys.at_cap_this_month).toBe(0);
   });

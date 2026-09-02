@@ -77,11 +77,13 @@ const EXPORT_EXCLUDED_COLUMNS = ['raw_key_one_time_view'] as const;
  */
 export function exportPaidState(takenAt: string): BackupPayload {
   const db = getStatsDB();
-  const keys = (db.prepare('SELECT * FROM api_keys').all() as Array<Record<string, unknown>>).map((row) => {
-    const copy = { ...row };
-    for (const column of EXPORT_EXCLUDED_COLUMNS) delete copy[column];
-    return copy;
-  });
+  const keys = (db.prepare('SELECT * FROM api_keys').all() as Array<Record<string, unknown>>).map(
+    (row) => {
+      const copy = { ...row };
+      for (const column of EXPORT_EXCLUDED_COLUMNS) delete copy[column];
+      return copy;
+    },
+  );
   const usage = db.prepare('SELECT * FROM api_usage').all() as Array<Record<string, unknown>>;
   // An export is the one read that takes the whole customer base off the
   // server, and it left no trace of its own: a single `request_log` line,
@@ -127,10 +129,17 @@ export interface RestoreReport {
  */
 export function restorePaidState(payload: BackupPayload): RestoreReport {
   if (payload?.format !== BACKUP_FORMAT) {
-    throw new Error(`unsupported backup format: ${payload?.format ?? 'missing'} (expected ${BACKUP_FORMAT})`);
+    throw new Error(
+      `unsupported backup format: ${payload?.format ?? 'missing'} (expected ${BACKUP_FORMAT})`,
+    );
   }
   const db = getStatsDB();
-  const report: RestoreReport = { keys_inserted: 0, keys_skipped: 0, usage_inserted: 0, usage_skipped: 0 };
+  const report: RestoreReport = {
+    keys_inserted: 0,
+    keys_skipped: 0,
+    usage_inserted: 0,
+    usage_skipped: 0,
+  };
 
   const insertRow = (table: string, row: Record<string, unknown>): boolean => {
     const cols = Object.keys(row);

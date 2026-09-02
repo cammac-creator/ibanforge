@@ -26,8 +26,14 @@ import type { HonoEnv } from '../types.js';
  * que pas de piste du tout, puisque l'agent la suivra.
  */
 const ENDPOINT_HINTS: Array<{ when: (method: string, path: string) => boolean; hint: string }> = [
-  { when: (m, p) => m === 'POST' && p === '/', hint: 'POST /v1/iban/validate with body {"iban":"CH93..."}' },
-  { when: (m, p) => m === 'POST' && /^\/v1\/bic/.test(p), hint: 'GET /v1/bic/UBSWCHZH (BIC lookup is a GET)' },
+  {
+    when: (m, p) => m === 'POST' && p === '/',
+    hint: 'POST /v1/iban/validate with body {"iban":"CH93..."}',
+  },
+  {
+    when: (m, p) => m === 'POST' && /^\/v1\/bic/.test(p),
+    hint: 'GET /v1/bic/UBSWCHZH (BIC lookup is a GET)',
+  },
   {
     when: (m, p) => m === 'GET' && /^\/v1\/iban\/(validate|compliance|batch)/.test(p),
     hint: 'POST the same path with body {"iban":"CH93..."} (these are POST endpoints)',

@@ -1,0 +1,3 @@
+# openapi.ts is read as SOURCE TEXT by tests (docs-enums, sanctions-claims, api-keys spec):
+# their regexes span its long string literals, which prettier would wrap.
+src/routes/openapi.ts

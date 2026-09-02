@@ -4,18 +4,14 @@ import type { Context } from 'hono';
 import type { HonoEnv } from '../types.js';
 
 // Minimal mock Context — enough for computeRevenue's needs.
-function mockContext(opts: {
-  apiKey?: boolean;
-  devSkip?: boolean;
-}): Context<HonoEnv> {
+function mockContext(opts: { apiKey?: boolean; devSkip?: boolean }): Context<HonoEnv> {
   const vars: Record<string, unknown> = {
     apiKeyAuthenticated: opts.apiKey ?? false,
   };
   return {
     get: (k: string) => vars[k],
     req: {
-      header: (name: string) =>
-        name === 'X-Dev-Skip' && opts.devSkip ? 'true' : undefined,
+      header: (name: string) => (name === 'X-Dev-Skip' && opts.devSkip ? 'true' : undefined),
     },
   } as unknown as Context<HonoEnv>;
 }

@@ -75,7 +75,10 @@ try {
   const purged = purgeOldRequestLog(12);
   if (purged > 0) console.log(`Retention: purged ${purged} request_log rows older than 12 months`);
   const purgedTerminated = purgeTerminatedKeyTelemetry(30);
-  if (purgedTerminated > 0) console.log(`Retention: purged ${purgedTerminated} request_log rows of terminated keys (DPA 4.7)`);
+  if (purgedTerminated > 0)
+    console.log(
+      `Retention: purged ${purgedTerminated} request_log rows of terminated keys (DPA 4.7)`,
+    );
   purgeExpiredVerifications();
 } catch (err) {
   console.error('Retention purge failed at boot:', err);
@@ -87,22 +90,25 @@ try {
 // from truncating). On a Railway volume an unbounded WAL is disk that never
 // comes back. Non-throwing by construction: housekeeping must not cost a boot.
 checkpointStatsWal();
-setInterval(() => {
-  try {
-    purgeOldRequestLog(12);
-    purgeTerminatedKeyTelemetry(30);
-    purgeExpiredVerifications();
-    checkpointStatsWal();
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.error('Retention purge failed:', msg);
-    // Seuil 2 : la purge tourne toutes les 24 h et porte un engagement DPA
-    // (clause 4.7). Deux échecs = 48 h de données qui auraient dû disparaître,
-    // et c'est le seul angle mort de l'audit B3 dont la conséquence est
-    // juridique. Un `console.error` seul ne prévient personne.
-    void opsFail('retention:purge', `Purge de rétention en échec : ${msg}`, 2);
-  }
-}, 24 * 60 * 60 * 1000).unref();
+setInterval(
+  () => {
+    try {
+      purgeOldRequestLog(12);
+      purgeTerminatedKeyTelemetry(30);
+      purgeExpiredVerifications();
+      checkpointStatsWal();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error('Retention purge failed:', msg);
+      // Seuil 2 : la purge tourne toutes les 24 h et porte un engagement DPA
+      // (clause 4.7). Deux échecs = 48 h de données qui auraient dû disparaître,
+      // et c'est le seul angle mort de l'audit B3 dont la conséquence est
+      // juridique. Un `console.error` seul ne prévient personne.
+      void opsFail('retention:purge', `Purge de rétention en échec : ${msg}`, 2);
+    }
+  },
+  24 * 60 * 60 * 1000,
+).unref();
 
 // Daily commercial lifecycle radar, in-process — the customer ledger must not
 // transit an external CI runner (see lifecycle-radar-server.ts).
@@ -158,7 +164,9 @@ function gracefulShutdown(signal: string): void {
     process.exit(0);
   }
   shuttingDown = true;
-  console.log(`\n${signal} received. Draining in-flight requests (max ${DRAIN_TIMEOUT_MS / 1000}s)...`);
+  console.log(
+    `\n${signal} received. Draining in-flight requests (max ${DRAIN_TIMEOUT_MS / 1000}s)...`,
+  );
 
   let finished = false;
   const finish = (reason: string): void => {
@@ -175,7 +183,9 @@ function gracefulShutdown(signal: string): void {
   // ever calling back, so past the deadline we cut the sockets ourselves
   // instead of hanging until the platform kills the container.
   const deadline = setTimeout(() => {
-    console.warn(`Shutdown: drain timed out after ${DRAIN_TIMEOUT_MS / 1000}s — closing remaining connections.`);
+    console.warn(
+      `Shutdown: drain timed out after ${DRAIN_TIMEOUT_MS / 1000}s — closing remaining connections.`,
+    );
     (server as { closeAllConnections?: () => void }).closeAllConnections?.();
     finish('drain deadline reached');
   }, DRAIN_TIMEOUT_MS);

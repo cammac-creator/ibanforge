@@ -123,7 +123,12 @@ export function getWeeklyFacts(now: Date = new Date()): WeeklyFacts {
   // Signups / first calls / purchases per window, internal accounts excluded.
   const keys = db
     .prepare(`SELECT email, key_prefix, created_at, credits_total FROM api_keys`)
-    .all() as Array<{ email: string; key_prefix: string; created_at: string; credits_total: number | null }>;
+    .all() as Array<{
+    email: string;
+    key_prefix: string;
+    created_at: string;
+    credits_total: number | null;
+  }>;
   const external = keys.filter((k) => !isInternalEmail(k.email));
 
   const inWindow = (sql: string, start: string, end: string) => {
@@ -171,7 +176,9 @@ export function getWeeklyFacts(now: Date = new Date()): WeeklyFacts {
   const revenueIn = (start: string, end: string) =>
     (
       db
-        .prepare(`SELECT COALESCE(SUM(revenue_usdc), 0) AS total FROM daily_stats WHERE date >= ? AND date < ?`)
+        .prepare(
+          `SELECT COALESCE(SUM(revenue_usdc), 0) AS total FROM daily_stats WHERE date >= ? AND date < ?`,
+        )
         .get(start, end) as { total: number }
     ).total;
 
@@ -204,7 +211,10 @@ export function getWeeklyFacts(now: Date = new Date()): WeeklyFacts {
     signups: metric(signupsIn(curStart, curEnd), signupsIn(prevStart, curStart)),
     first_calls: metric(firstCallsIn(curStart, curEnd), firstCallsIn(prevStart, curStart)),
     purchases: metric(purchasesIn(curStart, curEnd), purchasesIn(prevStart, curStart)),
-    revenue_usdc_attempted: { current: revenueIn(curStart, curEnd), previous: revenueIn(prevStart, curStart) },
+    revenue_usdc_attempted: {
+      current: revenueIn(curStart, curEnd),
+      previous: revenueIn(prevStart, curStart),
+    },
     top_sources: topSources,
     top_countries: topCountries,
   };

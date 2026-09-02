@@ -16,9 +16,8 @@ vi.mock('./ops-alert.js', () => ({
   opsOk: (...args: unknown[]) => opsOk(...(args as [])),
 }));
 
-const { recordSafely, resetRecordSafely, recordSafelyFailures, RECORD_FAIL_THRESHOLD } = await import(
-  './record-safely.js'
-);
+const { recordSafely, resetRecordSafely, recordSafelyFailures, RECORD_FAIL_THRESHOLD } =
+  await import('./record-safely.js');
 
 beforeEach(() => {
   resetRecordSafely();

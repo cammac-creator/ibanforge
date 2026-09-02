@@ -42,7 +42,13 @@ describe('GET /stripe/success', () => {
 
   it('keeps the interpolated constants free of apostrophes', async () => {
     // Not a style rule: an apostrophe here is a JS syntax error on the page.
-    for (const line of [FIRST_CALL_EXPECTED_LINE_1, FIRST_CALL_EXPECTED_LINE_2, ACCOUNT_PAGE, FIRST_CALL_ENDPOINT, FIRST_CALL_IBAN]) {
+    for (const line of [
+      FIRST_CALL_EXPECTED_LINE_1,
+      FIRST_CALL_EXPECTED_LINE_2,
+      ACCOUNT_PAGE,
+      FIRST_CALL_ENDPOINT,
+      FIRST_CALL_IBAN,
+    ]) {
       expect(line, `"${line}" is inlined into a single-quoted JS string`).not.toContain("'");
       expect(line).not.toContain('\\');
     }
@@ -124,7 +130,9 @@ describe('the first call is one click away', () => {
     const start = src.indexOf('function curlFor');
     const end = src.indexOf('\n  }', start) + 4;
     expect(start).toBeGreaterThan(-1);
-    const curlFor = new Function(`${src.slice(start, end)}\nreturn curlFor;`)() as (k: string) => string;
+    const curlFor = new Function(`${src.slice(start, end)}\nreturn curlFor;`)() as (
+      k: string,
+    ) => string;
     const FAKE_KEY = 'ifk_' + 'a1b2c3d4'.repeat(8);
     expect(curlFor(FAKE_KEY)).toBe(buildFirstCallCurl(FAKE_KEY));
   });

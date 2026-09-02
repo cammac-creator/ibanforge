@@ -26,7 +26,13 @@ describe('POST /v1/address/check (free, no payment)', () => {
   it('answers 200 with a verdict and no cost field', async () => {
     const { status, json } = await post({
       scheme: 'sps',
-      address: { strt_nm: 'Bahnhofstrasse', bldg_nb: '45', pst_cd: '8001', twn_nm: 'Zurich', ctry: 'CH' },
+      address: {
+        strt_nm: 'Bahnhofstrasse',
+        bldg_nb: '45',
+        pst_cd: '8001',
+        twn_nm: 'Zurich',
+        ctry: 'CH',
+      },
     });
 
     expect(status).toBe(200);
@@ -107,16 +113,32 @@ describe('POST /v1/address/check (free, no payment)', () => {
  * this?". Free it stays; measured it now is.
  */
 describe('POST /v1/address/check — the demand for a free endpoint is measurable', () => {
-  const rows = (): Array<{ country_code: string | null; success: number; error_detail: string | null }> =>
+  const rows = (): Array<{
+    country_code: string | null;
+    success: number;
+    error_detail: string | null;
+  }> =>
     getStatsDB()
-      .prepare('SELECT country_code, success, error_detail FROM operations WHERE operation_type = ?')
-      .all('address_check') as Array<{ country_code: string | null; success: number; error_detail: string | null }>;
+      .prepare(
+        'SELECT country_code, success, error_detail FROM operations WHERE operation_type = ?',
+      )
+      .all('address_check') as Array<{
+      country_code: string | null;
+      success: number;
+      error_detail: string | null;
+    }>;
 
   it('books one operation per served answer, carrying the scheme and the verdict', async () => {
     const before = rows().length;
     await post({
       scheme: 'sps',
-      address: { strt_nm: 'Bahnhofstrasse', bldg_nb: '45', pst_cd: '8001', twn_nm: 'Zurich', ctry: 'CH' },
+      address: {
+        strt_nm: 'Bahnhofstrasse',
+        bldg_nb: '45',
+        pst_cd: '8001',
+        twn_nm: 'Zurich',
+        ctry: 'CH',
+      },
     });
     // 'CHE' is not ISO 3166 alpha-2: the answer is served, and it does not
     // conform. Also the shape of country the caller most often sends.

@@ -82,8 +82,32 @@ beforeAll(() => {
   key.run('h-cust', CUSTOMER_PREFIX, CUSTOMER_EMAIL, 200, null, null, null, null, null, null, 0);
   // Two buyers, two rails, one of each kind of dollar: a receipt the processor
   // reported, and a price the table had to deduce.
-  key.run('h-card', 'ibf_card', BUYER_CARD_EMAIL, null, 5000, 5000, 'cs_test_alpha', null, 2000, 'usd', 0);
-  key.run('h-chain', 'ibf_chain', BUYER_CHAIN_EMAIL, null, 1000, 1000, null, '0xref-alpha', null, null, 0);
+  key.run(
+    'h-card',
+    'ibf_card',
+    BUYER_CARD_EMAIL,
+    null,
+    5000,
+    5000,
+    'cs_test_alpha',
+    null,
+    2000,
+    'usd',
+    0,
+  );
+  key.run(
+    'h-chain',
+    'ibf_chain',
+    BUYER_CHAIN_EMAIL,
+    null,
+    1000,
+    1000,
+    null,
+    '0xref-alpha',
+    null,
+    null,
+    0,
+  );
 
   const op = db.prepare(
     `INSERT INTO operations (operation_type, country_code, success, created_at, hour, day_of_week, error_detail, reject_reason, key_prefix)
@@ -108,8 +132,10 @@ beforeAll(() => {
      VALUES (?, ?, ?, 12, datetime('now', '-1 days'), 12, 1, ?, ?)`,
   );
   for (let i = 0; i < DASHBOARD_CALLS; i++) req.run('GET', '/v1/admin/keys', 200, 'browser', null);
-  for (let i = 0; i < CUSTOMER_BILLABLE_CALLS; i++) req.run('POST', '/v1/iban/validate', 200, 'api', CUSTOMER_PREFIX);
-  for (let i = 0; i < CUSTOMER_REFUSALS; i++) req.run('POST', '/v1/iban/validate', 402, 'api', CUSTOMER_PREFIX);
+  for (let i = 0; i < CUSTOMER_BILLABLE_CALLS; i++)
+    req.run('POST', '/v1/iban/validate', 200, 'api', CUSTOMER_PREFIX);
+  for (let i = 0; i < CUSTOMER_REFUSALS; i++)
+    req.run('POST', '/v1/iban/validate', 402, 'api', CUSTOMER_PREFIX);
   // The farm's own billable success: real HTTP, not market signal. The funnel
   // drops it; "Payées" must drop it too or the two can never be compared.
   req.run('POST', '/v1/iban/validate', 200, 'api', FARM_PREFIX);
@@ -195,7 +221,7 @@ describe('DASH-04 — the Top pays is not the key farm', () => {
 });
 
 describe('DASH-03 — "Payées" cannot exceed the business funnel beside it', () => {
-  it('drops the dashboard\'s own admin traffic and our own keys', () => {
+  it("drops the dashboard's own admin traffic and our own keys", () => {
     const paid = getSourceStats(30).by_client_kind.reduce((t, r) => t + r.paid_calls, 0);
     expect(paid).toBe(CUSTOMER_BILLABLE_CALLS);
     // 40 admin calls + 1 internal billable success are in the log and must not
@@ -240,7 +266,7 @@ describe('DASH-11 / DASH-18 — the error card and its sparkline', () => {
     expect(errors.error_rate.bic_lookup.trend).toHaveLength(30);
   });
 
-  it('keeps the probe\'s failures out of the invalid-IBAN table', () => {
+  it("keeps the probe's failures out of the invalid-IBAN table", () => {
     const prefixes = getErrorStats(30).top_invalid_ibans.map((r) => r.prefix);
     expect(prefixes).toContain('DE00');
     expect(prefixes).not.toContain('ES00');

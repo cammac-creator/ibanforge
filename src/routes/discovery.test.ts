@@ -66,7 +66,7 @@ describe('discovery — 404s measured on real crawler traffic (2026-07-28)', () 
     // the exact defect measured in the 2026-08-06 inventory.
     const res = await makeApp().request('/.well-known/agent-card.json');
     expect(res.status).toBe(200);
-    const card = await res.json() as Record<string, unknown>;
+    const card = (await res.json()) as Record<string, unknown>;
     expect(card.protocolVersion).toBeTruthy();
     expect(card.version).toBeTruthy();
     expect(Array.isArray(card.skills)).toBe(true);
@@ -101,14 +101,19 @@ describe('discovery — 404s measured on real crawler traffic (2026-07-28)', () 
     const res = await makeApp().request('/.well-known/api-catalog');
     expect(res.status).toBe(200);
     expect(res.headers.get('content-type')).toContain('application/linkset+json');
-    const body = await res.json() as { linkset: Array<{ anchor: string; 'service-desc': unknown[] }> };
+    const body = (await res.json()) as {
+      linkset: Array<{ anchor: string; 'service-desc': unknown[] }>;
+    };
     expect(body.linkset[0].anchor).toBe('https://api.ibanforge.com');
     expect(body.linkset[0]['service-desc']).toBeTruthy();
   });
 
   it('serves apis.json at both the root and well-known paths, with live figures', async () => {
     const app = makeApp();
-    const root = await (await app.request('/apis.json')).json() as { apis: Array<{ properties: Array<{ type: string }> }>; description: string };
+    const root = (await (await app.request('/apis.json')).json()) as {
+      apis: Array<{ properties: Array<{ type: string }> }>;
+      description: string;
+    };
     const wk = await (await app.request('/.well-known/apis.json')).json();
     expect(wk).toEqual(root);
     const types = root.apis[0].properties.map((p) => p.type);
@@ -141,7 +146,11 @@ describe('discovery — 404s measured on real crawler traffic (2026-07-28)', () 
   it('serves /.well-known/glama.json with LIVE counts, never hardcoded (45 distinct IPs)', async () => {
     const res = await makeApp().request('/.well-known/glama.json');
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { name: string; tools: { name: string }[]; description: string };
+    const body = (await res.json()) as {
+      name: string;
+      tools: { name: string }[];
+      description: string;
+    };
     expect(body.name).toBe('IBANforge');
     expect(body.tools.map((t) => t.name)).toEqual([
       'validate_iban',
@@ -313,7 +322,12 @@ describe('x402 catalogue — every advertised resource must be callable', () => 
   const accepts = async () => {
     const res = await makeApp().request('/.well-known/x402');
     const body = (await res.json()) as {
-      endpoints: Array<{ method: string; path: string; resource: string; accepts: Array<Record<string, unknown>> }>;
+      endpoints: Array<{
+        method: string;
+        path: string;
+        resource: string;
+        accepts: Array<Record<string, unknown>>;
+      }>;
     };
     return body.endpoints;
   };
@@ -357,7 +371,9 @@ describe('x402 catalogue — every advertised resource must be callable', () => 
       for (const a of e.accepts) {
         expect(a.network, `${e.method} ${e.path}`).toBe('eip155:8453');
         expect(a.amount, `${e.method} ${e.path}`).toMatch(/^\d+$/);
-        expect(a, `${e.method} ${e.path} still carries the v1 field`).not.toHaveProperty('maxAmountRequired');
+        expect(a, `${e.method} ${e.path} still carries the v1 field`).not.toHaveProperty(
+          'maxAmountRequired',
+        );
       }
     }
   });

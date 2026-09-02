@@ -32,8 +32,17 @@ import { datasetFacts } from '../lib/dataset-facts.js';
 const ROOT = join(import.meta.dirname, '..', '..');
 
 const SKIP_DIRS = new Set([
-  'node_modules', '.git', '.next', 'dist', 'build', 'coverage',
-  '.superpowers', '.claude', 'data', 'tmp', 'docs',
+  'node_modules',
+  '.git',
+  '.next',
+  'dist',
+  'build',
+  'coverage',
+  '.superpowers',
+  '.claude',
+  'data',
+  'tmp',
+  'docs',
 ]);
 
 /** Data files and history, which describe the past or hold raw rows. */
@@ -77,7 +86,10 @@ const CLAIM = new RegExp(
 );
 
 function toNumber(raw: string): number | null {
-  const t = raw.trim().toLowerCase().replace(/[ ,.](?=\d{3}\b)/g, '');
+  const t = raw
+    .trim()
+    .toLowerCase()
+    .replace(/[ ,.](?=\d{3}\b)/g, '');
   if (t.endsWith('k')) {
     const n = Number.parseFloat(t.slice(0, -1).replace(',', '.'));
     return Number.isNaN(n) ? null : Math.round(n * 1000);

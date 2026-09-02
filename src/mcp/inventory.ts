@@ -83,7 +83,8 @@ export const MCP_TOOLS: readonly InventoryTool[] = [
     title: 'Batch Validate IBANs',
     restRoute: 'POST /v1/iban/batch',
     price: 0.002,
-    description: 'Validate up to 100 IBANs in one call, with the same enrichment as a single validation.',
+    description:
+      'Validate up to 100 IBANs in one call, with the same enrichment as a single validation.',
     readOnly: true,
     capability: 'batch_iban_validation',
   },
@@ -167,15 +168,23 @@ export interface FreeEndpoint {
 }
 
 export const FREE_ENDPOINTS: readonly FreeEndpoint[] = [
-  { path: '/v1/iban/format', description: 'Free IBAN format check (mod-97 + country structure), no auth' },
-  { path: '/v1/iban/structure', description: 'Free IBAN structural templates per country, no auth' },
+  {
+    path: '/v1/iban/format',
+    description: 'Free IBAN format check (mod-97 + country structure), no auth',
+  },
+  {
+    path: '/v1/iban/structure',
+    description: 'Free IBAN structural templates per country, no auth',
+  },
   {
     path: '/v1/reference/validate',
-    description: 'Free structured payment reference validation (RF/ISO 11649, Swiss QRR, OGM/VCS, viitenumero), no auth',
+    description:
+      'Free structured payment reference validation (RF/ISO 11649, Swiss QRR, OGM/VCS, viitenumero), no auth',
   },
   {
     path: '/v1/address/check',
-    description: 'Free ISO 20022 postal address conformity check (sps, hvps_plus, fedwire), no auth',
+    description:
+      'Free ISO 20022 postal address conformity check (sps, hvps_plus, fedwire), no auth',
   },
   { path: '/v1/demo', description: 'Free demo with example IBAN/BIC validations' },
   { path: '/v1/credits/bundles', description: 'Free list of prepaid credit bundles' },

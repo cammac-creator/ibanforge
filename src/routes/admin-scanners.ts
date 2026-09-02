@@ -35,7 +35,10 @@ interface DrillRow {
 
 adminScanners.get('/admin/scanners', (c) => {
   if (!checkAuth(c.req.header('Authorization'))) {
-    return c.json({ error: 'unauthorized', message: 'Admin endpoints require Bearer STATS_TOKEN.' }, 403);
+    return c.json(
+      { error: 'unauthorized', message: 'Admin endpoints require Bearer STATS_TOKEN.' },
+      403,
+    );
   }
 
   const days = Math.max(1, Math.min(30, parseInt(c.req.query('days') ?? '7', 10)));
@@ -100,13 +103,21 @@ adminScanners.get('/admin/scanners', (c) => {
     )
     .all(`-${days} days`, limit) as ScannerRow[];
 
-  const totalLogged = (db.prepare(
-    `SELECT COUNT(*) as c FROM request_log WHERE created_at >= datetime('now', ?) AND ip_hash IS NOT NULL`,
-  ).get(`-${days} days`) as { c: number }).c;
+  const totalLogged = (
+    db
+      .prepare(
+        `SELECT COUNT(*) as c FROM request_log WHERE created_at >= datetime('now', ?) AND ip_hash IS NOT NULL`,
+      )
+      .get(`-${days} days`) as { c: number }
+  ).c;
 
-  const totalAnonymous = (db.prepare(
-    `SELECT COUNT(*) as c FROM request_log WHERE created_at >= datetime('now', ?) AND ip_hash IS NULL`,
-  ).get(`-${days} days`) as { c: number }).c;
+  const totalAnonymous = (
+    db
+      .prepare(
+        `SELECT COUNT(*) as c FROM request_log WHERE created_at >= datetime('now', ?) AND ip_hash IS NULL`,
+      )
+      .get(`-${days} days`) as { c: number }
+  ).c;
 
   return c.json({
     period_days: days,
@@ -130,8 +141,7 @@ adminScanners.get('/admin/scanners', (c) => {
       last_seen: r.last_seen,
       drill_down: `?ip_hash=${r.ip_hash}&days=${days}`,
     })),
-    docs:
-      'Pass Bearer STATS_TOKEN. Aggregates request_log by (ip_hash, user_agent) over the last N days (1-30, default 7). Add ?ip_hash=... to drill into paths/methods for one source. IPs are salted-SHA256 truncated; never reversible.',
+    docs: 'Pass Bearer STATS_TOKEN. Aggregates request_log by (ip_hash, user_agent) over the last N days (1-30, default 7). Add ?ip_hash=... to drill into paths/methods for one source. IPs are salted-SHA256 truncated; never reversible.',
   });
 });
 

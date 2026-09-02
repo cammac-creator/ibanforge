@@ -52,7 +52,11 @@ const KEYWORDS: Array<{ re: RegExp; weight: number; label: string }> = [
   { re: /qr-?iban|qr-?iid|qr[- ]bill|qr-?rechnung/, weight: 30, label: 'qr-suisse' },
   { re: /verification of payee|\bvop\b|namensabgleich/, weight: 30, label: 'vop' },
   { re: /direct debit|\bsdd\b|lastschrift|prélèvement/, weight: 20, label: 'sdd' },
-  { re: /bank name|which bank|bank lookup|bank code|bankleitzahl|\bblz\b/, weight: 15, label: 'bank-lookup' },
+  {
+    re: /bank name|which bank|bank lookup|bank code|bankleitzahl|\bblz\b/,
+    weight: 15,
+    label: 'bank-lookup',
+  },
   { re: /clearing|bc-?nummer/, weight: 20, label: 'clearing' },
   { re: /swiss|suisse|schweiz|\bch\b/, weight: 10, label: 'suisse' },
   { re: /virtual iban|\bviban\b/, weight: 25, label: 'viban' },
@@ -118,7 +122,8 @@ export function detectLang(text: string): 'en' | 'de' | 'fr' {
   const hay = ` ${text.toLowerCase()} `;
   const de = [' der ', ' die ', ' das ', ' und ', ' für ', ' nicht ', ' eine ', 'ß', ' werden '];
   const fr = [' le ', ' la ', ' les ', ' est ', ' une ', ' avec ', ' pour ', ' que '];
-  const count = (words: string[]): number => words.reduce((a, w) => a + (hay.includes(w) ? 1 : 0), 0);
+  const count = (words: string[]): number =>
+    words.reduce((a, w) => a + (hay.includes(w) ? 1 : 0), 0);
   if (count(de) >= 2) return 'de';
   if (count(fr) >= 2) return 'fr';
   return 'en';
@@ -158,7 +163,10 @@ export function recencyBonus(threadCreatedAt: string, now: number): number {
   return 0;
 }
 
-export function finalizeCandidate(c: ThreadCandidate, now: number = Date.now()): ScoredThread | null {
+export function finalizeCandidate(
+  c: ThreadCandidate,
+  now: number = Date.now(),
+): ScoredThread | null {
   const { score, detail } = scoreThread(c.title, c.excerpt);
   if (score < MIN_SCORE) return null;
   const fresh = recencyBonus(c.threadCreatedAt, now);
@@ -182,7 +190,10 @@ interface SEItem {
   creation_date?: number;
 }
 
-export function parseStackExchange(payload: unknown, source: 'stackoverflow' | 'money_se'): ThreadCandidate[] {
+export function parseStackExchange(
+  payload: unknown,
+  source: 'stackoverflow' | 'money_se',
+): ThreadCandidate[] {
   const items = ((payload as { items?: SEItem[] })?.items ?? []).filter((i) => i.link && i.title);
   return items.map((i) => ({
     url: String(i.link),
@@ -206,7 +217,9 @@ interface GHItem {
 }
 
 export function parseGitHubIssues(payload: unknown): ThreadCandidate[] {
-  const items = ((payload as { items?: GHItem[] })?.items ?? []).filter((i) => i.html_url && i.title);
+  const items = ((payload as { items?: GHItem[] })?.items ?? []).filter(
+    (i) => i.html_url && i.title,
+  );
   return items.map((i) => ({
     url: String(i.html_url),
     source: 'github' as const,
@@ -230,7 +243,9 @@ interface HNHit {
 }
 
 export function parseHN(payload: unknown): ThreadCandidate[] {
-  const hits = ((payload as { hits?: HNHit[] })?.hits ?? []).filter((h) => h.objectID && (h.title || h.story_title));
+  const hits = ((payload as { hits?: HNHit[] })?.hits ?? []).filter(
+    (h) => h.objectID && (h.title || h.story_title),
+  );
   return hits.map((h) => ({
     url: `https://news.ycombinator.com/item?id=${h.objectID}`,
     source: 'hn' as const,
@@ -254,7 +269,9 @@ interface PPItem {
 }
 
 export function parsePullpush(payload: unknown): ThreadCandidate[] {
-  const items = ((payload as { data?: PPItem[] })?.data ?? []).filter((i) => i.permalink && i.title);
+  const items = ((payload as { data?: PPItem[] })?.data ?? []).filter(
+    (i) => i.permalink && i.title,
+  );
   return items.map((i) => ({
     url: `https://reddit.com${i.permalink}`,
     source: 'reddit' as const,
@@ -276,7 +293,9 @@ interface DiscourseTopic {
 }
 
 export function parseDiscourse(payload: unknown, host: string): ThreadCandidate[] {
-  const topics = ((payload as { topics?: DiscourseTopic[] })?.topics ?? []).filter((t) => t.id && t.title && t.slug);
+  const topics = ((payload as { topics?: DiscourseTopic[] })?.topics ?? []).filter(
+    (t) => t.id && t.title && t.slug,
+  );
   return topics.map((t) => ({
     url: `https://${host}/t/${t.slug}/${t.id}`,
     source: 'discourse' as const,
@@ -420,7 +439,8 @@ export const MARKETPLACES: MarketplaceDef[] = [
     name: 'API Evangelist (fiche + agent readiness)',
     url: 'https://github.com/api-evangelist/providers/blob/main/_providers/ibanforge.md',
     kind: 'raw_contains',
-    checkTarget: 'https://raw.githubusercontent.com/api-evangelist/providers/main/_providers/ibanforge.md',
+    checkTarget:
+      'https://raw.githubusercontent.com/api-evangelist/providers/main/_providers/ibanforge.md',
     marker: 'ibanforge',
     cadenceHours: 168,
   },
@@ -489,19 +509,30 @@ export interface CheckOutcome {
  * was, detail records the failure) — a flaky probe must never flip a listing
  * to 'absent'.
  */
-export function interpretCheck(def: MarketplaceDef, httpStatus: number, body: string): CheckOutcome {
+export function interpretCheck(
+  def: MarketplaceDef,
+  httpStatus: number,
+  body: string,
+): CheckOutcome {
   switch (def.kind) {
     case 'bazaar': {
       // Caller aggregates the paginated scan and passes "N" as body.
       const n = parseInt(body, 10) || 0;
       return n > 0
         ? { status: 'listed', detail: `${n} ressource${n > 1 ? 's' : ''} au catalogue` }
-        : { status: 'absent', detail: '0 ressource — refaire un micro-règlement (rien n’indexe rétroactivement)' };
+        : {
+            status: 'absent',
+            detail: '0 ressource — refaire un micro-règlement (rien n’indexe rétroactivement)',
+          };
     }
     case 'github_issue': {
       if (httpStatus !== 200) return { status: 'unknown', detail: `GitHub HTTP ${httpStatus}` };
       try {
-        const issue = JSON.parse(body) as { state?: string; comments?: number; updated_at?: string };
+        const issue = JSON.parse(body) as {
+          state?: string;
+          comments?: number;
+          updated_at?: string;
+        };
         if (issue.state === 'open') {
           return {
             status: 'pending',
@@ -529,7 +560,10 @@ export function interpretCheck(def: MarketplaceDef, httpStatus: number, body: st
       if (httpStatus === 404) return { status: 'absent', detail: 'paquet introuvable' };
       if (httpStatus !== 200) return { status: 'unknown', detail: `HTTP ${httpStatus}` };
       try {
-        const pkg = JSON.parse(body) as { 'dist-tags'?: { latest?: string }; time?: Record<string, string> };
+        const pkg = JSON.parse(body) as {
+          'dist-tags'?: { latest?: string };
+          time?: Record<string, string>;
+        };
         const v = pkg['dist-tags']?.latest ?? '?';
         const when = pkg.time?.[v]?.slice(0, 10) ?? '';
         return { status: 'listed', detail: `v${v} publiée${when ? ` le ${when}` : ''}` };

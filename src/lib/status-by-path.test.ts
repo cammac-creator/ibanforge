@@ -65,7 +65,11 @@ function legacyStatusByPath(days: number): StatusByPathRow[] {
     GROUP BY path, status
   `,
     )
-    .all(days, ...aggregates.map((r) => r.path)) as Array<{ path: string; status: number; n: number }>;
+    .all(days, ...aggregates.map((r) => r.path)) as Array<{
+    path: string;
+    status: number;
+    n: number;
+  }>;
 
   const detailMap = new Map<string, Record<string, number>>();
   for (const r of detailRows) {
@@ -84,7 +88,11 @@ function legacyStatusByPath(days: number): StatusByPathRow[] {
     GROUP BY path, method
   `,
     )
-    .all(days, ...aggregates.map((r) => r.path)) as Array<{ path: string; method: string; n: number }>;
+    .all(days, ...aggregates.map((r) => r.path)) as Array<{
+    path: string;
+    method: string;
+    n: number;
+  }>;
 
   const methodMap = new Map<string, Record<string, number>>();
   for (const r of methodRows) {

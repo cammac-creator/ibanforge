@@ -1,5 +1,22 @@
 import { describe, it, expect, afterAll, beforeEach } from 'vitest';
-import { CREDITS_PURCHASE_TYPE, recordOperation, recordBatch, recordRequest, recordRejection, getRejectionStats, getStats, getQuickStats, getStatsHistory, getStatusByPath, getBusinessFunnel, getClientProfiles, getBotProfiles, classifyClient, extractClientIp, normalizeRequestPath } from './stats.js';
+import {
+  CREDITS_PURCHASE_TYPE,
+  recordOperation,
+  recordBatch,
+  recordRequest,
+  recordRejection,
+  getRejectionStats,
+  getStats,
+  getQuickStats,
+  getStatsHistory,
+  getStatusByPath,
+  getBusinessFunnel,
+  getClientProfiles,
+  getBotProfiles,
+  classifyClient,
+  extractClientIp,
+  normalizeRequestPath,
+} from './stats.js';
 import { generateApiKey } from './api-keys.js';
 import { closeAll, getStatsDB } from './db.js';
 import type { RejectReason } from './input-normalize.js';
@@ -10,7 +27,9 @@ afterAll(() => {
 
 describe('extractClientIp (spoof-resistant, trusted-proxy last hop)', () => {
   it('prefers x-real-ip (set by the proxy, not the client)', () => {
-    expect(extractClientIp({ 'x-real-ip': '9.9.9.9', 'x-forwarded-for': '1.1.1.1, 2.2.2.2' })).toBe('9.9.9.9');
+    expect(extractClientIp({ 'x-real-ip': '9.9.9.9', 'x-forwarded-for': '1.1.1.1, 2.2.2.2' })).toBe(
+      '9.9.9.9',
+    );
   });
   it('uses the LAST X-Forwarded-For hop (the trusted proxy appends it)', () => {
     // A client-forged first entry must NOT win — the real peer is the last hop.
@@ -34,13 +53,13 @@ describe('recordOperation', () => {
   });
 
   it('does not throw when country_code is null', () => {
-    expect(() => recordOperation('iban_batch', null, true, 0.020)).not.toThrow();
+    expect(() => recordOperation('iban_batch', null, true, 0.02)).not.toThrow();
   });
 });
 
 describe('recordBatch', () => {
   it('does not throw when recording a batch', () => {
-    expect(() => recordBatch(5, 4, 0.020)).not.toThrow();
+    expect(() => recordBatch(5, 4, 0.02)).not.toThrow();
   });
 });
 
@@ -229,7 +248,13 @@ describe('getBusinessFunnel', () => {
     const rows = getBusinessFunnel(30);
     for (const r of rows) {
       expect(typeof r.date).toBe('string');
-      for (const k of ['success', 'paywall', 'auth_or_quota', 'bad_input', 'server_error'] as const) {
+      for (const k of [
+        'success',
+        'paywall',
+        'auth_or_quota',
+        'bad_input',
+        'server_error',
+      ] as const) {
         expect(typeof r[k]).toBe('number');
         expect(r[k]).toBeGreaterThanOrEqual(0);
       }
@@ -277,7 +302,9 @@ describe('recordRejection', () => {
     const rows = getRejectionStats(30);
     const bic = rows.filter((r) => r.operation_type === 'bic_lookup');
     expect(bic.find((r) => r.reject_reason === 'normalizable')?.count).toBeGreaterThanOrEqual(2);
-    expect(bic.find((r) => r.reject_reason === 'placeholder_literal')?.count).toBeGreaterThanOrEqual(1);
+    expect(
+      bic.find((r) => r.reject_reason === 'placeholder_literal')?.count,
+    ).toBeGreaterThanOrEqual(1);
   });
 
   // DPA: the column must only ever hold a category from the RejectReason union.
@@ -301,8 +328,15 @@ describe('recordRejection', () => {
     } satisfies Record<RejectReason, true>);
     recordRejection('ch_clearing_lookup', 'not_numeric');
     const rows = getStatsDB()
-      .prepare('SELECT country_code, success, error_detail, reject_reason FROM operations WHERE reject_reason IS NOT NULL')
-      .all() as Array<{ country_code: string | null; success: number; error_detail: string | null; reject_reason: string }>;
+      .prepare(
+        'SELECT country_code, success, error_detail, reject_reason FROM operations WHERE reject_reason IS NOT NULL',
+      )
+      .all() as Array<{
+      country_code: string | null;
+      success: number;
+      error_detail: string | null;
+      reject_reason: string;
+    }>;
     expect(rows.length).toBeGreaterThanOrEqual(1);
     for (const r of rows) {
       expect(categories).toContain(r.reject_reason);
@@ -319,7 +353,9 @@ describe('recordRejection', () => {
   // as a measurement change. Asserting the column exists would not catch that.
   it('keeps rejections out of the operation aggregations (separate lane)', () => {
     const rejectionCount = () =>
-      getRejectionStats(30).find((r) => r.operation_type === 'bic_lookup' && r.reject_reason === 'too_short')?.count ?? 0;
+      getRejectionStats(30).find(
+        (r) => r.operation_type === 'bic_lookup' && r.reject_reason === 'too_short',
+      )?.count ?? 0;
 
     const beforeType = getStats().by_type.bic_lookup;
     const beforeQuick = getQuickStats().bic_lookups;
@@ -363,11 +399,15 @@ describe('recordRejection', () => {
 
   it('leaves the key NULL when nobody was authenticated', () => {
     const before = getStatsDB()
-      .prepare('SELECT COUNT(*) n FROM operations WHERE reject_reason IS NOT NULL AND key_prefix IS NULL')
+      .prepare(
+        'SELECT COUNT(*) n FROM operations WHERE reject_reason IS NOT NULL AND key_prefix IS NULL',
+      )
       .get() as { n: number };
     recordRejection('bic_lookup', 'too_long');
     const after = getStatsDB()
-      .prepare('SELECT COUNT(*) n FROM operations WHERE reject_reason IS NOT NULL AND key_prefix IS NULL')
+      .prepare(
+        'SELECT COUNT(*) n FROM operations WHERE reject_reason IS NOT NULL AND key_prefix IS NULL',
+      )
       .get() as { n: number };
     expect(after.n - before.n).toBe(1);
   });
@@ -403,26 +443,56 @@ describe('classifyClient', () => {
 
   it('classifies known AI agent UAs as mcp_stdio (agent traffic bucket)', () => {
     expect(classifyClient('/v1/iban/validate', 'ChatGPT-User/1.0')).toBe('mcp_stdio');
-    expect(classifyClient('/v1/iban/validate', 'GPTBot/1.2 (+https://openai.com/gptbot)')).toBe('mcp_stdio');
+    expect(classifyClient('/v1/iban/validate', 'GPTBot/1.2 (+https://openai.com/gptbot)')).toBe(
+      'mcp_stdio',
+    );
     expect(classifyClient('/v1/iban/validate', 'Claude-User/1.0 (Anthropic)')).toBe('mcp_stdio');
-    expect(classifyClient('/v1/iban/validate', 'ClaudeBot/1.0 (+https://www.anthropic.com)')).toBe('mcp_stdio');
+    expect(classifyClient('/v1/iban/validate', 'ClaudeBot/1.0 (+https://www.anthropic.com)')).toBe(
+      'mcp_stdio',
+    );
     expect(classifyClient('/v1/iban/validate', 'Cursor/0.42.0')).toBe('mcp_stdio');
     expect(classifyClient('/v1/iban/validate', 'Cline/3.1.0')).toBe('mcp_stdio');
-    expect(classifyClient('/v1/iban/validate', 'PerplexityBot/1.0 (+https://www.perplexity.ai)')).toBe('mcp_stdio');
+    expect(
+      classifyClient('/v1/iban/validate', 'PerplexityBot/1.0 (+https://www.perplexity.ai)'),
+    ).toBe('mcp_stdio');
   });
 
   it('classifies indexer / catalog crawlers as bot', () => {
     expect(classifyClient('/v1/iban/validate', 'decixa-probe/1.0')).toBe('bot');
     expect(classifyClient('/.well-known/x402', 'x402scan/2.0')).toBe('bot');
-    expect(classifyClient('/openapi.json', 'Googlebot/2.1 (+http://www.google.com/bot.html)')).toBe('bot');
-    expect(classifyClient('/', 'Mozilla/5.0 (compatible; Bingbot/2.0; +http://www.bing.com/bingbot.htm)')).toBe('bot');
-    expect(classifyClient('/v1/iban/validate', 'Mozilla/5.0 (compatible; bazaar-indexer)')).toBe('bot');
+    expect(classifyClient('/openapi.json', 'Googlebot/2.1 (+http://www.google.com/bot.html)')).toBe(
+      'bot',
+    );
+    expect(
+      classifyClient(
+        '/',
+        'Mozilla/5.0 (compatible; Bingbot/2.0; +http://www.bing.com/bingbot.htm)',
+      ),
+    ).toBe('bot');
+    expect(classifyClient('/v1/iban/validate', 'Mozilla/5.0 (compatible; bazaar-indexer)')).toBe(
+      'bot',
+    );
   });
 
   it('classifies real browsers as web', () => {
-    expect(classifyClient('/', 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')).toBe('web');
-    expect(classifyClient('/', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:124.0) Gecko/20100101 Firefox/124.0')).toBe('web');
-    expect(classifyClient('/', 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1')).toBe('web');
+    expect(
+      classifyClient(
+        '/',
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      ),
+    ).toBe('web');
+    expect(
+      classifyClient(
+        '/',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:124.0) Gecko/20100101 Firefox/124.0',
+      ),
+    ).toBe('web');
+    expect(
+      classifyClient(
+        '/',
+        'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+      ),
+    ).toBe('web');
   });
 
   it('falls back to api for unknown UAs', () => {
@@ -438,7 +508,9 @@ describe('classifyClient', () => {
   });
 
   it('is case-insensitive on the UA', () => {
-    expect(classifyClient('/v1/iban/validate', 'IBANFORGE-MCP/1.2.2'.toLowerCase())).toBe('mcp_stdio');
+    expect(classifyClient('/v1/iban/validate', 'IBANFORGE-MCP/1.2.2'.toLowerCase())).toBe(
+      'mcp_stdio',
+    );
     expect(classifyClient('/v1/iban/validate', 'CHATGPT-USER/1.0')).toBe('mcp_stdio');
     expect(classifyClient('/v1/iban/validate', 'GOOGLEBOT/2.1')).toBe('bot');
   });
@@ -458,15 +530,21 @@ describe('normalizeRequestPath', () => {
     // Was stored raw and whole: the old pattern required leading digits.
     expect(normalizeRequestPath('/v1/ch/clearing/CH230')).toBe('/v1/ch/clearing/:iid');
     // One-time credentials in the path never reach the table (SEC-02, 2026-09-01).
-    expect(normalizeRequestPath('/v1/stripe/key/cs_live_a1B2c3D4e5F6')).toBe('/v1/stripe/key/:session_id');
-    expect(normalizeRequestPath('/v1/credits/recover/0xdeadbeefcafe')).toBe('/v1/credits/recover/:ref');
+    expect(normalizeRequestPath('/v1/stripe/key/cs_live_a1B2c3D4e5F6')).toBe(
+      '/v1/stripe/key/:session_id',
+    );
+    expect(normalizeRequestPath('/v1/credits/recover/0xdeadbeefcafe')).toBe(
+      '/v1/credits/recover/:ref',
+    );
     expect(normalizeRequestPath('/v1/ch/clearing/762a')).toBe('/v1/ch/clearing/:iid');
   });
 
   it('redacts an IBAN-shaped segment on a path no route matches (the 404 case)', () => {
     // Was stored complete: no rule covered unmatched paths.
     expect(normalizeRequestPath('/CH9300762011623852957')).toBe('/:redacted');
-    expect(normalizeRequestPath('/lookup/DE89370400440532013000/details')).toBe('/lookup/:redacted/details');
+    expect(normalizeRequestPath('/lookup/DE89370400440532013000/details')).toBe(
+      '/lookup/:redacted/details',
+    );
   });
 
   it('keeps the existing buckets for well-formed identifiers (no dashboard fragmentation)', () => {
@@ -496,8 +574,12 @@ describe('normalizeRequestPath', () => {
   // Both properties must hold at once: the wrapper survives so the funnel
   // exclusion keeps firing, the identifier does not.
   it('redacts an identifier wrapped in braces, keeping the wrapper', () => {
-    expect(normalizeRequestPath('/v1/bic/%7BCH9300762011623852957%7D')).toBe('/v1/bic/%7B:redacted%7D');
-    expect(normalizeRequestPath('/v1/ch/clearing/%7BCH9300762011623852957%7D')).toBe('/v1/ch/clearing/%7B:redacted%7D');
+    expect(normalizeRequestPath('/v1/bic/%7BCH9300762011623852957%7D')).toBe(
+      '/v1/bic/%7B:redacted%7D',
+    );
+    expect(normalizeRequestPath('/v1/ch/clearing/%7BCH9300762011623852957%7D')).toBe(
+      '/v1/ch/clearing/%7B:redacted%7D',
+    );
     expect(normalizeRequestPath('/%7BCH9300762011623852957%7D')).toBe('/%7B:redacted%7D');
     // Raw braces (a client that does not encode) and lowercase hex.
     expect(normalizeRequestPath('/v1/bic/{CH9300762011623852957}')).toBe('/v1/bic/{:redacted}');
@@ -508,7 +590,15 @@ describe('normalizeRequestPath', () => {
   });
 
   it('leaves ordinary endpoints untouched', () => {
-    for (const p of ['/', '/v1/iban/validate', '/health', '/openapi.json', '/mcp', '/v1/credits/buy/25k', '/v1/iban/structure/CH']) {
+    for (const p of [
+      '/',
+      '/v1/iban/validate',
+      '/health',
+      '/openapi.json',
+      '/mcp',
+      '/v1/credits/buy/25k',
+      '/v1/iban/structure/CH',
+    ]) {
       expect(normalizeRequestPath(p)).toBe(p);
     }
   });
@@ -541,7 +631,9 @@ describe('request_log persists no submitted identifier (DPA)', () => {
     // `B` of `%7B` glues onto the `CH` and the whole segment stops matching.
     const BOUNDARY = /\/|%[0-9A-Fa-f]{2}|[{}]/;
 
-    const rows = getStatsDB().prepare('SELECT path FROM request_log').all() as Array<{ path: string }>;
+    const rows = getStatsDB().prepare('SELECT path FROM request_log').all() as Array<{
+      path: string;
+    }>;
     expect(rows.length).toBeGreaterThanOrEqual(5);
 
     for (const { path } of rows) {
@@ -603,7 +695,9 @@ describe('per-client attribution (operations carry the key that asked)', () => {
       { valid: false, country: 'MT' },
     ]);
     const rows = getStatsDB()
-      .prepare(`SELECT country_code, success FROM operations WHERE key_prefix = 'ifk_batch01' ORDER BY id`)
+      .prepare(
+        `SELECT country_code, success FROM operations WHERE key_prefix = 'ifk_batch01' ORDER BY id`,
+      )
       .all() as Array<{ country_code: string | null; success: number }>;
     expect(rows).toHaveLength(3);
     expect(rows.map((r) => r.country_code).sort()).toEqual(['CY', 'MT', 'MT']);
@@ -620,8 +714,26 @@ describe('getClientProfiles', () => {
   afterAll(clearSynthetic);
 
   it('reports what one customer did: volume, endpoints, countries and freshness', () => {
-    recordRequest('POST', '/v1/iban/validate', 200, 12, 'api', 'iphash1', 'guzzle/7', 'ifk_profile1');
-    recordRequest('POST', '/v1/iban/validate', 402, 8, 'api', 'iphash1', 'guzzle/7', 'ifk_profile1');
+    recordRequest(
+      'POST',
+      '/v1/iban/validate',
+      200,
+      12,
+      'api',
+      'iphash1',
+      'guzzle/7',
+      'ifk_profile1',
+    );
+    recordRequest(
+      'POST',
+      '/v1/iban/validate',
+      402,
+      8,
+      'api',
+      'iphash1',
+      'guzzle/7',
+      'ifk_profile1',
+    );
     recordOperation('iban_validate', 'ES', true, 0, undefined, 'ifk_profile1');
     recordOperation('iban_validate', 'ES', true, 0, undefined, 'ifk_profile1');
     recordOperation('iban_validate', 'IT', false, 0, undefined, 'ifk_profile1');
@@ -689,7 +801,16 @@ describe('getBotProfiles', () => {
   });
 
   it('never mixes in a caller that authenticated: those belong to the Clients tab', () => {
-    recordRequest('GET', '/.well-known/x402', 200, 4, 'api', 'ipC', 'synthbot-keyed/1.0', 'ifk_somekey01');
+    recordRequest(
+      'GET',
+      '/.well-known/x402',
+      200,
+      4,
+      'api',
+      'ipC',
+      'synthbot-keyed/1.0',
+      'ifk_somekey01',
+    );
     expect(getBotProfiles(90, 1)['synthbot-keyed/1.0']).toBeUndefined();
   });
 
@@ -745,7 +866,8 @@ describe('getCohortFootprint', () => {
     // A regrouped cohort key plus its validations, all on one country.
     const key = generateApiKey(addr);
     db.prepare('UPDATE api_keys SET email = ? WHERE key_prefix = ?').run(addr, key!.key_prefix);
-    for (let i = 0; i < 5; i++) recordOperation('iban_validate', 'BE', true, 0, undefined, key!.key_prefix);
+    for (let i = 0; i < 5; i++)
+      recordOperation('iban_validate', 'BE', true, 0, undefined, key!.key_prefix);
 
     const fp = getCohortFootprint();
     const mine = fp.cohorts.find((c) => c.address === addr);
@@ -758,10 +880,16 @@ describe('getCohortFootprint', () => {
     // The distortion, checked directly rather than via the top-8 list (whose
     // membership depends on whatever else the shared test DB has accumulated):
     // BE counts more when the cohort is folded in than when it is excluded.
-    const beWith = (db.prepare("SELECT COUNT(*) n FROM operations WHERE country_code = 'BE'").get() as { n: number }).n;
+    const beWith = (
+      db.prepare("SELECT COUNT(*) n FROM operations WHERE country_code = 'BE'").get() as {
+        n: number;
+      }
+    ).n;
     const beWithout = (
       db
-        .prepare("SELECT COUNT(*) n FROM operations WHERE country_code = 'BE' AND key_prefix IS NOT ?")
+        .prepare(
+          "SELECT COUNT(*) n FROM operations WHERE country_code = 'BE' AND key_prefix IS NOT ?",
+        )
         .get(key!.key_prefix) as { n: number }
     ).n;
     expect(beWith).toBeGreaterThan(beWithout);

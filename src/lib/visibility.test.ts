@@ -39,7 +39,12 @@ describe('the listing watch', () => {
     // An unreachable directory is our probe's problem. Alarming on it would
     // teach the operator to ignore the whole panel.
     recordVisibility({ surface: `${P}flaky`, state: 'present', day: '2026-08-10' });
-    recordVisibility({ surface: `${P}flaky`, state: 'error', detail: 'timeout', day: '2026-08-14' });
+    recordVisibility({
+      surface: `${P}flaky`,
+      state: 'error',
+      detail: 'timeout',
+      day: '2026-08-14',
+    });
     const rows = getVisibility();
     expect(rows.find((s) => s.surface === `${P}never`)?.lost).toBe(false);
     expect(rows.find((s) => s.surface === `${P}flaky`)?.lost).toBe(false);

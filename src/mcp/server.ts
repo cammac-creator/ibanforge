@@ -11,49 +11,62 @@ import { lookup } from '../lib/bic-lookup.js';
 import { validateBIC } from '../lib/bic-validator.js';
 import { buildComplianceResponse } from '../lib/compliance-response.js';
 import { lookupClearingByBankCode, normalizeIid, getChClearingCount } from '../lib/ch-clearing.js';
-import { buildCountriesPayload, buildPricingPayload, buildValidateAndExplainPrompt } from '../lib/mcp-resources.js';
+import {
+  buildCountriesPayload,
+  buildPricingPayload,
+  buildValidateAndExplainPrompt,
+} from '../lib/mcp-resources.js';
 import { validatePaymentReference, buildReferenceCheck } from '../lib/payment-reference.js';
-import { checkPostalAddress, ADDRESS_SCHEMES, type AddressScheme } from '../lib/address-conformity.js';
+import {
+  checkPostalAddress,
+  ADDRESS_SCHEMES,
+  type AddressScheme,
+} from '../lib/address-conformity.js';
 import { datasetFacts } from '../lib/dataset-facts.js';
 import { MCP_INSTRUCTIONS } from './instructions.js';
 import { TOOL_OUTPUT_SCHEMAS } from './output-schemas.js';
 // send_feedback : même insertion et mêmes clips de longueur que la route
 // publique POST /v1/feedback et que le transport HTTP — une seule écriture,
 // une seule liste de catégories.
-import { recordFeedbackRow, FEEDBACK_ERROR_TYPES, FEEDBACK_INSERTS_PER_SOURCE_HOUR } from '../routes/feedback.js';
+import {
+  recordFeedbackRow,
+  FEEDBACK_ERROR_TYPES,
+  FEEDBACK_INSERTS_PER_SOURCE_HOUR,
+} from '../routes/feedback.js';
 
 /** Dataset sizes, read once and rounded down so a claim cannot outlive its data. */
 const F = datasetFacts();
 
-
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const pkg = JSON.parse(readFileSync(resolve(__dirname, '../../package.json'), 'utf-8'));
 
-const server = new McpServer({
-  name: 'ibanforge',
-  title: 'IBANforge',
-  version: pkg.version,
-  description:
-    `IBAN validation, BIC/SWIFT lookup, Swiss clearing, SEPA compliance and risk indicators. ${F.claim.bic} BIC entries (${F.claim.lei} LEI-enriched via GLEIF), ${F.claim.chClearing} Swiss BC-Nummer from SIX, ${F.claim.countries} countries, refreshed monthly.`,
-  websiteUrl: 'https://ibanforge.com',
-  icons: [
-    {
-      src: 'https://www.ibanforge.com/favicon.ico',
-      mimeType: 'image/vnd.microsoft.icon',
-      sizes: ['64x64'],
-    },
-    {
-      src: 'https://api.ibanforge.com/og-image.png',
-      mimeType: 'image/svg+xml',
-      sizes: ['1200x630'],
-    },
-  ],
-}, {
-  // Same block as the HTTP transport and the npm package, from the shared
-  // constant. This surface answered `initialize` with no instructions at all
-  // until 2026-09-01 (audit MCP-11).
-  instructions: MCP_INSTRUCTIONS,
-});
+const server = new McpServer(
+  {
+    name: 'ibanforge',
+    title: 'IBANforge',
+    version: pkg.version,
+    description: `IBAN validation, BIC/SWIFT lookup, Swiss clearing, SEPA compliance and risk indicators. ${F.claim.bic} BIC entries (${F.claim.lei} LEI-enriched via GLEIF), ${F.claim.chClearing} Swiss BC-Nummer from SIX, ${F.claim.countries} countries, refreshed monthly.`,
+    websiteUrl: 'https://ibanforge.com',
+    icons: [
+      {
+        src: 'https://www.ibanforge.com/favicon.ico',
+        mimeType: 'image/vnd.microsoft.icon',
+        sizes: ['64x64'],
+      },
+      {
+        src: 'https://api.ibanforge.com/og-image.png',
+        mimeType: 'image/svg+xml',
+        sizes: ['1200x630'],
+      },
+    ],
+  },
+  {
+    // Same block as the HTTP transport and the npm package, from the shared
+    // constant. This surface answered `initialize` with no instructions at all
+    // until 2026-09-01 (audit MCP-11).
+    instructions: MCP_INSTRUCTIONS,
+  },
+);
 
 server.registerTool(
   'validate_iban',
@@ -162,7 +175,10 @@ Cost: $0.002 USDC per IBAN via x402 (e.g., 10 IBANs = $0.020, 50 IBANs = $0.100,
       // Wrapped in { results, count }, not the bare array `content` carries:
       // matches TOOL_OUTPUT_SCHEMAS.batch_validate_iban, and mirrors the same
       // asymmetry the HTTP transport already has (src/routes/mcp-http.ts).
-      structuredContent: { results: results as unknown as Record<string, unknown>[], count: results.length },
+      structuredContent: {
+        results: results as unknown as Record<string, unknown>[],
+        count: results.length,
+      },
     };
   },
 );
@@ -244,7 +260,10 @@ Cost: $0.003 USDC per call via x402 micropayment on Base L2.`,
       // answered null. Mirroring REST into `country.name` while leaving
       // `country_name: null` is the honest reading of both histories: the nested
       // object is the aligned one, the flat pair is preserved exactly as it was.
-      country: { code: validation.country_code, name: row?.country_name ?? validation.country_code },
+      country: {
+        code: validation.country_code,
+        name: row?.country_name ?? validation.country_code,
+      },
       city: row?.city ?? null,
       branch_code: validation.branch_code,
       branch_info: row?.branch_info ?? null,
@@ -412,7 +431,9 @@ Cost: free. The rules are published commodities; the paid surface is the postal_
     inputSchema: {
       scheme: z
         .enum(ADDRESS_SCHEMES as [AddressScheme, ...AddressScheme[]])
-        .describe("Which rail's rules to check against: 'sps' (Swiss, SIX), 'hvps_plus' (T2, ECB) or 'fedwire' (Federal Reserve)."),
+        .describe(
+          "Which rail's rules to check against: 'sps' (Swiss, SIX), 'hvps_plus' (T2, ECB) or 'fedwire' (Federal Reserve).",
+        ),
       address: z
         .object({
           twn_nm: z.string().optional().describe('TwnNm — town name.'),
@@ -420,8 +441,18 @@ Cost: free. The rules are published commodities; the paid surface is the postal_
           pst_cd: z.string().optional().describe('PstCd — postal code.'),
           strt_nm: z.string().optional().describe('StrtNm — street name.'),
           bldg_nb: z.string().optional().describe('BldgNb — building number.'),
-          adr_tp: z.string().optional().describe('AdrTp — address type. SPS forbids sending it; supply it to see that rule fire.'),
-          adr_line: z.array(z.string()).optional().describe('AdrLine — free-text lines, the hybrid-address remainder. Rails cap their number and length.'),
+          adr_tp: z
+            .string()
+            .optional()
+            .describe(
+              'AdrTp — address type. SPS forbids sending it; supply it to see that rule fire.',
+            ),
+          adr_line: z
+            .array(z.string())
+            .optional()
+            .describe(
+              'AdrLine — free-text lines, the hybrid-address remainder. Rails cap their number and length.',
+            ),
         })
         .strict()
         .describe('The ISO 20022 PostalAddress under test, in ISO tag vocabulary (snake_cased).'),
@@ -482,7 +513,10 @@ Cost: $0.003 USDC per call via x402 micropayment on Base L2.`,
   async ({ iid }) => {
     // Validate format
     if (!/^\d{1,5}$/.test(iid)) {
-      const errorPayload = { error: 'invalid_iid_format', message: 'IID must be a 1-5 digit number.' };
+      const errorPayload = {
+        error: 'invalid_iid_format',
+        message: 'IID must be a 1-5 digit number.',
+      };
       return {
         content: [
           {
@@ -586,13 +620,31 @@ server.registerTool(
     inputSchema: {
       error_type: z
         .enum(FEEDBACK_ERROR_TYPES)
-        .describe('Category of the report. Use "other" for product feedback, pricing/payment blockers or feature needs.'),
-      notes: z.string().min(3).max(4000).describe('What happened, what you needed, or what blocked you — free text.'),
-      endpoint: z.string().max(200).optional().describe('Endpoint or tool concerned, e.g. /v1/iban/batch.'),
+        .describe(
+          'Category of the report. Use "other" for product feedback, pricing/payment blockers or feature needs.',
+        ),
+      notes: z
+        .string()
+        .min(3)
+        .max(4000)
+        .describe('What happened, what you needed, or what blocked you — free text.'),
+      endpoint: z
+        .string()
+        .max(200)
+        .optional()
+        .describe('Endpoint or tool concerned, e.g. /v1/iban/batch.'),
       expected: z.string().max(1000).optional().describe('What you expected (for data errors).'),
       got: z.string().max(1000).optional().describe('What you received instead (for data errors).'),
-      contact: z.string().max(255).optional().describe('Where we may answer you (e-mail) — optional, reports can be anonymous.'),
-      agent: z.string().max(120).optional().describe('Which agent/model is reporting, e.g. "claude-sonnet-5 via MCP".'),
+      contact: z
+        .string()
+        .max(255)
+        .optional()
+        .describe('Where we may answer you (e-mail) — optional, reports can be anonymous.'),
+      agent: z
+        .string()
+        .max(120)
+        .optional()
+        .describe('Which agent/model is reporting, e.g. "claude-sonnet-5 via MCP".'),
     },
     outputSchema: TOOL_OUTPUT_SCHEMAS.send_feedback,
     annotations: { title: 'Send Feedback to IBANforge' },
@@ -639,11 +691,13 @@ server.registerResource(
     mimeType: 'application/json',
   },
   async () => ({
-    contents: [{
-      uri: 'ibanforge://countries',
-      mimeType: 'application/json',
-      text: JSON.stringify(buildCountriesPayload(), null, 2),
-    }],
+    contents: [
+      {
+        uri: 'ibanforge://countries',
+        mimeType: 'application/json',
+        text: JSON.stringify(buildCountriesPayload(), null, 2),
+      },
+    ],
   }),
 );
 
@@ -652,15 +706,18 @@ server.registerResource(
   'ibanforge://pricing',
   {
     title: 'Pricing',
-    description: 'Per-call pricing for IBANforge API endpoints (USDC on Base L2 via x402 protocol).',
+    description:
+      'Per-call pricing for IBANforge API endpoints (USDC on Base L2 via x402 protocol).',
     mimeType: 'application/json',
   },
   async () => ({
-    contents: [{
-      uri: 'ibanforge://pricing',
-      mimeType: 'application/json',
-      text: JSON.stringify(buildPricingPayload(), null, 2),
-    }],
+    contents: [
+      {
+        uri: 'ibanforge://pricing',
+        mimeType: 'application/json',
+        text: JSON.stringify(buildPricingPayload(), null, 2),
+      },
+    ],
   }),
 );
 
@@ -670,19 +727,22 @@ server.registerPrompt(
   'validate_and_explain',
   {
     title: 'Validate and Explain IBAN',
-    description: 'Validate an IBAN and generate a human-readable explanation suitable for non-technical users.',
+    description:
+      'Validate an IBAN and generate a human-readable explanation suitable for non-technical users.',
     argsSchema: {
       iban: z.string().describe('The IBAN to validate and explain'),
     },
   },
   async ({ iban }) => ({
-    messages: [{
-      role: 'user',
-      content: {
-        type: 'text',
-        text: buildValidateAndExplainPrompt(iban),
+    messages: [
+      {
+        role: 'user',
+        content: {
+          type: 'text',
+          text: buildValidateAndExplainPrompt(iban),
+        },
       },
-    }],
+    ],
   }),
 );
 

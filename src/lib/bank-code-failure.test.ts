@@ -80,7 +80,8 @@ vi.mock('./national-registers.js', async (importOriginal) => {
   return {
     ...actual,
     lookupNationalCode: (cc: string, code: string) => {
-      if (failing.nationalRegister) throw new Error('SqliteError: database disk image is malformed');
+      if (failing.nationalRegister)
+        throw new Error('SqliteError: database disk image is malformed');
       return actual.lookupNationalCode(cc, code);
     },
   };

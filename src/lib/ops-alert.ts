@@ -115,7 +115,10 @@ export async function notifyOps(text: string): Promise<boolean> {
   const token = process.env.TELEGRAM_BOT_TOKEN ?? '';
   const chat = process.env.TELEGRAM_CHAT_ID ?? '';
   if (!token || !chat) {
-    console.error('[ops-alert] TELEGRAM_BOT_TOKEN/CHAT_ID absents — alerte non envoyée:', text.slice(0, 200));
+    console.error(
+      '[ops-alert] TELEGRAM_BOT_TOKEN/CHAT_ID absents — alerte non envoyée:',
+      text.slice(0, 200),
+    );
     return false;
   }
   if (process.env.OPS_ALERTS_DISABLED === '1') {
@@ -127,7 +130,11 @@ export async function notifyOps(text: string): Promise<boolean> {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'User-Agent': 'ibanforge-backend' },
       signal: AbortSignal.timeout(15_000),
-      body: JSON.stringify({ chat_id: chat, text: text.slice(0, 3900), disable_web_page_preview: true }),
+      body: JSON.stringify({
+        chat_id: chat,
+        text: text.slice(0, 3900),
+        disable_web_page_preview: true,
+      }),
     });
     if (!res.ok) {
       console.error('[ops-alert] telegram HTTP', res.status);
@@ -160,7 +167,9 @@ export async function opsFail(key: string, detail: string, threshold = 1): Promi
       writeState(key, s);
       return;
     }
-    const ok = await notifyOps(`🔴 IBANforge — ${key}\n${detail}\n(${s.fails} échec(s) consécutif(s))`);
+    const ok = await notifyOps(
+      `🔴 IBANforge — ${key}\n${detail}\n(${s.fails} échec(s) consécutif(s))`,
+    );
     if (ok) {
       markSent(key);
       writeState(key, { fails: s.fails, firing: true });
@@ -210,7 +219,11 @@ export function heartbeat(name: string): void {
   try {
     kvSet(K_BEAT(name), String(Date.now()));
   } catch (err) {
-    console.error('[ops-alert] heartbeat write failed:', name, err instanceof Error ? err.message : err);
+    console.error(
+      '[ops-alert] heartbeat write failed:',
+      name,
+      err instanceof Error ? err.message : err,
+    );
   }
 }
 
@@ -219,7 +232,11 @@ export const HEARTBEATS: ReadonlyArray<{ name: string; maxAgeMs: number; label: 
   // Chaque seuil = cadence nominale + marge franche, pour qu'un simple retard
   // (runner GitHub lent) n'alerte pas. Le but est de détecter une automatisation
   // QUI NE TOURNE PLUS — pas une qui traîne.
-  { name: 'weekly-veille', maxAgeMs: 9 * 24 * 3600_000, label: 'veille hebdo (+ canari découvrabilité)' },
+  {
+    name: 'weekly-veille',
+    maxAgeMs: 9 * 24 * 3600_000,
+    label: 'veille hebdo (+ canari découvrabilité)',
+  },
   { name: 'weekly-reco-baseline', maxAgeMs: 9 * 24 * 3600_000, label: 'baseline reco-IA' },
   { name: 'refresh-compliance', maxAgeMs: 9 * 24 * 3600_000, label: 'refresh compliance' },
   // Mensuel : 35 j couvre un mois long + un runner en retard.
@@ -266,13 +283,33 @@ export const RADAR_BEATS: ReadonlyArray<{
       return at ? new Date(at).getTime() : null;
     },
   },
-  { key: 'forum_radar_last_scan_at', label: 'radar forums', maxAgeMs: 30 * 3600_000, parse: (raw) => new Date(raw).getTime() },
-  { key: 'prospect_radar_last_run', label: 'radar prospects', maxAgeMs: 12 * 3600_000, parse: (raw) => new Date(raw).getTime() },
-  { key: 'cohort_radar_last_run', label: 'radar cohortes', maxAgeMs: 3 * 3600_000, parse: (raw) => new Date(raw).getTime() },
+  {
+    key: 'forum_radar_last_scan_at',
+    label: 'radar forums',
+    maxAgeMs: 30 * 3600_000,
+    parse: (raw) => new Date(raw).getTime(),
+  },
+  {
+    key: 'prospect_radar_last_run',
+    label: 'radar prospects',
+    maxAgeMs: 12 * 3600_000,
+    parse: (raw) => new Date(raw).getTime(),
+  },
+  {
+    key: 'cohort_radar_last_run',
+    label: 'radar cohortes',
+    maxAgeMs: 3 * 3600_000,
+    parse: (raw) => new Date(raw).getTime(),
+  },
 ];
 
 /** Juge un âge et alerte/résout. Facteur commun aux crons et aux radars. */
-async function judge(alertKey: string, label: string, lastMs: number, maxAgeMs: number): Promise<void> {
+async function judge(
+  alertKey: string,
+  label: string,
+  lastMs: number,
+  maxAgeMs: number,
+): Promise<void> {
   const ageMs = Date.now() - lastMs;
   if (!Number.isFinite(ageMs)) return;
   if (ageMs > maxAgeMs) {
@@ -302,7 +339,11 @@ export async function checkHeartbeats(): Promise<void> {
       }
       await judge(`heartbeat:${h.name}`, h.label, Number(raw), h.maxAgeMs);
     } catch (err) {
-      console.error('[ops-alert] heartbeat check failed:', h.name, err instanceof Error ? err.message : err);
+      console.error(
+        '[ops-alert] heartbeat check failed:',
+        h.name,
+        err instanceof Error ? err.message : err,
+      );
     }
   }
 
@@ -314,7 +355,11 @@ export async function checkHeartbeats(): Promise<void> {
       if (last === null || !Number.isFinite(last)) continue;
       await judge(`heartbeat:${r.key}`, r.label, last, r.maxAgeMs);
     } catch (err) {
-      console.error('[ops-alert] radar beat check failed:', r.key, err instanceof Error ? err.message : err);
+      console.error(
+        '[ops-alert] radar beat check failed:',
+        r.key,
+        err instanceof Error ? err.message : err,
+      );
     }
   }
 }

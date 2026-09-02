@@ -36,15 +36,18 @@ describe('iban-core contract — IBAN validation', () => {
     ['DE89370400440532013000', 'DE', 'Germany', '89', '37040044', '0532013000'],
     ['GB29NWBK60161331926819', 'GB', 'United Kingdom', '29', 'NWBK', '31926819'],
     ['LT121000011101001000', 'LT', 'Lithuania', '12', '10000', '11101001000'],
-  ])('validates %s and decomposes its BBAN', (iban, code, name, checkDigits, bankCode, accountNumber) => {
-    const r = validateIBAN(iban);
-    expect(r.valid).toBe(true);
-    expect(r.country).toEqual({ code, name });
-    expect(r.check_digits).toBe(checkDigits);
-    expect(r.bban?.bank_code).toBe(bankCode);
-    expect(r.bban?.account_number).toBe(accountNumber);
-    expect(r.error).toBeUndefined();
-  });
+  ])(
+    'validates %s and decomposes its BBAN',
+    (iban, code, name, checkDigits, bankCode, accountNumber) => {
+      const r = validateIBAN(iban);
+      expect(r.valid).toBe(true);
+      expect(r.country).toEqual({ code, name });
+      expect(r.check_digits).toBe(checkDigits);
+      expect(r.bban?.bank_code).toBe(bankCode);
+      expect(r.bban?.account_number).toBe(accountNumber);
+      expect(r.error).toBeUndefined();
+    },
+  );
 
   it('reads the GB branch code, which is the only re-exported structure with three fields', () => {
     expect(validateIBAN('GB29NWBK60161331926819').bban?.branch_code).toBe('601613');
@@ -53,7 +56,11 @@ describe('iban-core contract — IBAN validation', () => {
   it('formats and normalises: lowercase, spaces and dashes all reach the same result', () => {
     const canonical = validateIBAN('CH9300762011623852957');
     expect(canonical.formatted).toBe('CH93 0076 2011 6238 5295 7');
-    for (const variant of ['ch9300762011623852957', 'CH93 0076 2011 6238 5295 7', 'CH93-0076-2011-6238-5295-7']) {
+    for (const variant of [
+      'ch9300762011623852957',
+      'CH93 0076 2011 6238 5295 7',
+      'CH93-0076-2011-6238-5295-7',
+    ]) {
       expect(validateIBAN(variant)).toEqual(canonical);
     }
   });
@@ -65,12 +72,15 @@ describe('iban-core contract — IBAN validation', () => {
     ['CH0000000000000000066', '00'],
     ['CH0100000000000000048', '01'],
     ['CH9900000000000000030', '99'],
-  ])('rejects %s: check digits %s are outside the ISO 13616 range despite passing mod-97', (iban, digits) => {
-    const r = validateIBAN(iban);
-    expect(r.valid).toBe(false);
-    expect(r.error).toBe('invalid_check_digits');
-    expect(r.error_detail).toContain(`'${digits}'`);
-  });
+  ])(
+    'rejects %s: check digits %s are outside the ISO 13616 range despite passing mod-97',
+    (iban, digits) => {
+      const r = validateIBAN(iban);
+      expect(r.valid).toBe(false);
+      expect(r.error).toBe('invalid_check_digits');
+      expect(r.error_detail).toContain(`'${digits}'`);
+    },
+  );
 
   it('rejects non-numeric check digits', () => {
     const r = validateIBAN('CHXX00762011623852957');
@@ -114,15 +124,18 @@ describe('iban-core contract — IBAN validation', () => {
     expect(elapsed).toBeLessThan(250);
   });
 
-  it.each([[null], [undefined], [{}], [42], [[]]])('does not throw on the non-string input %s', (input) => {
-    let r: ReturnType<typeof validateIBAN> | undefined;
-    expect(() => {
-      r = validateIBAN(input as unknown as string);
-    }).not.toThrow();
-    expect(r?.valid).toBe(false);
-    expect(r?.iban).toBe('');
-    expect(r?.error).toBe('invalid_format');
-  });
+  it.each([[null], [undefined], [{}], [42], [[]]])(
+    'does not throw on the non-string input %s',
+    (input) => {
+      let r: ReturnType<typeof validateIBAN> | undefined;
+      expect(() => {
+        r = validateIBAN(input as unknown as string);
+      }).not.toThrow();
+      expect(r?.valid).toBe(false);
+      expect(r?.iban).toBe('');
+      expect(r?.error).toBe('invalid_format');
+    },
+  );
 });
 
 describe('iban-core contract — the adapter itself (t23)', () => {
@@ -215,8 +228,16 @@ describe('iban-core contract — country tables', () => {
   });
 
   it('keeps SEPA membership and VoP obligation per country', () => {
-    expect(getSepaInfo('CH')).toEqual({ member: true, schemes: ['SCT', 'SDD'], vop_required: false });
-    expect(getSepaInfo('DE')).toEqual({ member: true, schemes: ['SCT', 'SDD', 'SCT_INST'], vop_required: true });
+    expect(getSepaInfo('CH')).toEqual({
+      member: true,
+      schemes: ['SCT', 'SDD'],
+      vop_required: false,
+    });
+    expect(getSepaInfo('DE')).toEqual({
+      member: true,
+      schemes: ['SCT', 'SDD', 'SCT_INST'],
+      vop_required: true,
+    });
     expect(getSepaInfo('BR')).toEqual({ member: false, schemes: [], vop_required: false });
   });
 

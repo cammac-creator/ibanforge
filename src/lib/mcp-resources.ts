@@ -15,7 +15,11 @@ export interface CountryInfo {
   risk: 'standard' | 'elevated' | 'high';
 }
 
-export function buildCountriesPayload(): { countries: CountryInfo[]; total: number; last_updated: string } {
+export function buildCountriesPayload(): {
+  countries: CountryInfo[];
+  total: number;
+  last_updated: string;
+} {
   const countries: CountryInfo[] = Object.entries(IBAN_LENGTHS).map(([code, length]) => ({
     code,
     name: getCountryName(code),
@@ -37,14 +41,45 @@ export interface PricingEntry {
   description: string;
 }
 
-export function buildPricingPayload(): { pricing: PricingEntry[]; currency: string; network: string; free_tier: string; note: string } {
+export function buildPricingPayload(): {
+  pricing: PricingEntry[];
+  currency: string;
+  network: string;
+  free_tier: string;
+  note: string;
+} {
   return {
     pricing: [
-      { endpoint: '/v1/iban/validate', method: 'POST', price_usdc: 0.005, description: 'IBAN validation + BIC lookup + SEPA info + risk indicators' },
-      { endpoint: '/v1/iban/batch', method: 'POST', price_usdc: 0.002, description: 'Batch IBAN validation (per IBAN, up to 100)' },
-      { endpoint: '/v1/bic/:code', method: 'GET', price_usdc: 0.003, description: 'BIC/SWIFT lookup with LEI enrichment' },
-      { endpoint: '/v1/iban/compliance', method: 'POST', price_usdc: 0.02, description: 'Full compliance check: sanctions + SEPA + VoP + risk score' },
-      { endpoint: '/v1/ch/clearing/:iid', method: 'GET', price_usdc: 0.003, description: 'Swiss BC-Nummer clearing lookup' },
+      {
+        endpoint: '/v1/iban/validate',
+        method: 'POST',
+        price_usdc: 0.005,
+        description: 'IBAN validation + BIC lookup + SEPA info + risk indicators',
+      },
+      {
+        endpoint: '/v1/iban/batch',
+        method: 'POST',
+        price_usdc: 0.002,
+        description: 'Batch IBAN validation (per IBAN, up to 100)',
+      },
+      {
+        endpoint: '/v1/bic/:code',
+        method: 'GET',
+        price_usdc: 0.003,
+        description: 'BIC/SWIFT lookup with LEI enrichment',
+      },
+      {
+        endpoint: '/v1/iban/compliance',
+        method: 'POST',
+        price_usdc: 0.02,
+        description: 'Full compliance check: sanctions + SEPA + VoP + risk score',
+      },
+      {
+        endpoint: '/v1/ch/clearing/:iid',
+        method: 'GET',
+        price_usdc: 0.003,
+        description: 'Swiss BC-Nummer clearing lookup',
+      },
     ],
     currency: 'USDC',
     network: 'Base L2 (eip155:8453)',

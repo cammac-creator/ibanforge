@@ -90,7 +90,13 @@ addressCheck.post('/v1/address/check', async (c) => {
         },
         example: {
           scheme: 'sps',
-          address: { strt_nm: 'Bahnhofstrasse', bldg_nb: '45', pst_cd: '8001', twn_nm: 'Zurich', ctry: 'CH' },
+          address: {
+            strt_nm: 'Bahnhofstrasse',
+            bldg_nb: '45',
+            pst_cd: '8001',
+            twn_nm: 'Zurich',
+            ctry: 'CH',
+          },
         },
       },
       400,
@@ -162,7 +168,8 @@ addressCheck.post('/v1/address/check', async (c) => {
   // failures are now counted and raise an ops alert past a streak, so a stats
   // DB that stops accepting writes cannot look like a service nobody calls.
   recordSafely(
-    () => recordOperation('address_check', null, result.conforms, 0, normalized, c.get('apiKeyPrefix')),
+    () =>
+      recordOperation('address_check', null, result.conforms, 0, normalized, c.get('apiKeyPrefix')),
     'address_check',
   );
 

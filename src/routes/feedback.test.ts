@@ -1,6 +1,11 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { Hono } from 'hono';
-import { feedback, recordFeedbackRow, countRecentFeedback, FEEDBACK_INSERTS_PER_SOURCE_HOUR } from './feedback.js';
+import {
+  feedback,
+  recordFeedbackRow,
+  countRecentFeedback,
+  FEEDBACK_INSERTS_PER_SOURCE_HOUR,
+} from './feedback.js';
 import { getStatsDB } from '../lib/db.js';
 import { hashIp } from '../lib/stats.js';
 
@@ -25,7 +30,13 @@ describe('recordFeedbackRow — field caps (defence in depth on both write paths
     });
     const row = getStatsDB()
       .prepare('SELECT notes, endpoint, expected, contact, agent FROM feedback WHERE id = ?')
-      .get(id) as { notes: string; endpoint: string; expected: string; contact: string; agent: string };
+      .get(id) as {
+      notes: string;
+      endpoint: string;
+      expected: string;
+      contact: string;
+      agent: string;
+    };
     expect(row.notes.length).toBe(4000);
     expect(row.endpoint.length).toBe(200);
     expect(row.expected.length).toBeLessThanOrEqual(2000);
@@ -109,7 +120,10 @@ describe('GET /v1/admin/feedback — the reader', () => {
       headers: { 'X-Admin-Secret': SECRET },
     });
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { open: number; reports: Array<{ id: number; notes: string; status: string }> };
+    const body = (await res.json()) as {
+      open: number;
+      reports: Array<{ id: number; notes: string; status: string }>;
+    };
     const mine = body.reports.find((r) => r.id === id);
     expect(mine?.notes).toBe(marker);
     expect(mine?.status).toBe('open');
@@ -122,7 +136,9 @@ describe('GET /v1/admin/feedback — the reader', () => {
     });
     expect(((await done.json()) as { updated: number }).updated).toBe(1);
     const after = (await (
-      await app.request(`/v1/admin/feedback?status=done&limit=200`, { headers: { 'X-Admin-Secret': SECRET } })
+      await app.request(`/v1/admin/feedback?status=done&limit=200`, {
+        headers: { 'X-Admin-Secret': SECRET },
+      })
     ).json()) as { reports: Array<{ id: number }> };
     expect(after.reports.some((r) => r.id === id)).toBe(true);
   });

@@ -39,8 +39,17 @@ const ROOT = join(import.meta.dirname, '..', '..');
 
 /** Directories that never reach a customer. */
 const SKIP_DIRS = new Set([
-  'node_modules', '.git', '.next', 'dist', 'build', 'coverage',
-  '.superpowers', '.claude', 'docs', 'data', 'tmp',
+  'node_modules',
+  '.git',
+  '.next',
+  'dist',
+  'build',
+  'coverage',
+  '.superpowers',
+  '.claude',
+  'docs',
+  'data',
+  'tmp',
 ]);
 
 /** Extensions worth scanning: served code, copy, descriptors and manifests. */
@@ -49,7 +58,7 @@ const EXTS = /\.(ts|tsx|js|mjs|json|md|mdx|txt|html)$/;
 /** Files whose mention of a list is a description of the pipeline, not a promise to a customer. */
 const ALLOWED = new Set([
   'scripts/refresh-compliance.ts', // the fetcher: it may name a feed it attempts
-  'CHANGELOG.md',                  // history, and it documents this very removal
+  'CHANGELOG.md', // history, and it documents this very removal
   'src/routes/sanctions-claims.test.ts',
 ]);
 
@@ -71,8 +80,11 @@ function walk(dir: string, out: string[] = []): string[] {
 
 /** The authorities the shipped database actually carries. Ground truth for both directions. */
 const shipped = new Set(
-  (getComplianceDB().prepare('SELECT DISTINCT source_list FROM sanctioned_entities').all() as Array<{ source_list: string }>)
-    .map((r) => r.source_list.toUpperCase()),
+  (
+    getComplianceDB()
+      .prepare('SELECT DISTINCT source_list FROM sanctioned_entities')
+      .all() as Array<{ source_list: string }>
+  ).map((r) => r.source_list.toUpperCase()),
 );
 
 describe('sanctions coverage claims match the shipped database', () => {
@@ -120,7 +132,10 @@ describe('sanctions coverage claims match the shipped database', () => {
       }
     }
 
-    expect(offenders, `Surfaces claiming a sanctions list that is not in the database:\n${offenders.join('\n')}`).toEqual([]);
+    expect(
+      offenders,
+      `Surfaces claiming a sanctions list that is not in the database:\n${offenders.join('\n')}`,
+    ).toEqual([]);
   });
 });
 
@@ -162,7 +177,10 @@ describe('served copy claims only what the product can prove', () => {
       }
     }
 
-    expect(offenders, `Surfaces promising a check we do not perform:\n${offenders.join('\n')}`).toEqual([]);
+    expect(
+      offenders,
+      `Surfaces promising a check we do not perform:\n${offenders.join('\n')}`,
+    ).toEqual([]);
   });
 });
 

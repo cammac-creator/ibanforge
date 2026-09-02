@@ -17,9 +17,8 @@ function makeApp() {
  */
 function rejections(operation: string, reason: string): number {
   return (
-    getRejectionStats(1).find(
-      (r) => r.operation_type === operation && r.reject_reason === reason,
-    )?.count ?? 0
+    getRejectionStats(1).find((r) => r.operation_type === operation && r.reject_reason === reason)
+      ?.count ?? 0
   );
 }
 

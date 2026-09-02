@@ -11,7 +11,6 @@ const F = datasetFacts();
 const require = createRequire(import.meta.url);
 const SERVER_VERSION = (require('../../package.json') as { version: string }).version;
 
-
 const discovery = new Hono();
 
 // USDC contract on Base L2
@@ -70,7 +69,8 @@ const PAID_ENDPOINTS: PricedEndpoint[] = [
     method: 'POST',
     path: '/v1/iban/compliance',
     price_usdc: 0.02,
-    description: 'Pre-payout screening — check the bank behind a counterparty IBAN before you send funds: validation + sanctions screening (OFAC) + SEPA Instant reachability + VoP participant + risk score (0-100)',
+    description:
+      'Pre-payout screening — check the bank behind a counterparty IBAN before you send funds: validation + sanctions screening (OFAC) + SEPA Instant reachability + VoP participant + risk score (0-100)',
   },
   {
     method: 'GET',
@@ -124,8 +124,7 @@ const x402Document: Handler = (c) => {
   return c.json({
     x402Version: 2,
     name: 'IBANforge',
-    description:
-      `IBAN validation, BIC/SWIFT lookup, Swiss clearing & compliance API. ${F.claim.bic} BIC entries (${F.claim.lei} LEI-enriched via GLEIF), ${F.claim.chClearing} Swiss BC-Nummer from SIX, ${F.claim.countries} countries, ${F.claim.issuers} non-bank issuer classifications (EMI, payment institutions, digital banks), refreshed monthly.`,
+    description: `IBAN validation, BIC/SWIFT lookup, Swiss clearing & compliance API. ${F.claim.bic} BIC entries (${F.claim.lei} LEI-enriched via GLEIF), ${F.claim.chClearing} Swiss BC-Nummer from SIX, ${F.claim.countries} countries, ${F.claim.issuers} non-bank issuer classifications (EMI, payment institutions, digital banks), refreshed monthly.`,
     homepage: 'https://ibanforge.com',
     documentation: 'https://ibanforge.com/docs',
     pricing: 'https://ibanforge.com/pricing',
@@ -294,7 +293,11 @@ const AGENT_MANIFEST = {
     discovery: 'https://api.ibanforge.com/.well-known/x402',
   },
   interfaces: [
-    { type: 'rest', url: 'https://api.ibanforge.com', spec: 'https://api.ibanforge.com/openapi.json' },
+    {
+      type: 'rest',
+      url: 'https://api.ibanforge.com',
+      spec: 'https://api.ibanforge.com/openapi.json',
+    },
     { type: 'mcp', transport: 'http', url: 'https://api.ibanforge.com/mcp' },
     { type: 'mcp', transport: 'stdio', package: 'ibanforge-mcp' },
   ],
@@ -347,7 +350,8 @@ const A2A_SKILL_DETAIL: Record<string, A2ASkillDetail> = {
     examples: ['Validate DE89370400440532013000 and tell me the issuing bank.'],
   },
   batch_validate_iban: {
-    description: 'Up to 100 IBANs per call, one credit per IBAN, same enrichment as single validation.',
+    description:
+      'Up to 100 IBANs per call, one credit per IBAN, same enrichment as single validation.',
     tags: ['iban', 'batch', 'payout'],
   },
   lookup_bic: {
@@ -369,7 +373,9 @@ const A2A_SKILL_DETAIL: Record<string, A2ASkillDetail> = {
     description:
       'RF/ISO 11649, Swiss QRR, Belgian OGM/VCS and Finnish viitenumero checksums, each against the dated document that publishes the rule, plus the QRR/QR-IBAN pairing verdict when an IBAN is supplied. Free, no key.',
     tags: ['payment-reference', 'iso-11649', 'qr-bill', 'ogm', 'free'],
-    examples: ['Is RF18539007547034 a valid creditor reference, and may it travel with this Swiss IBAN?'],
+    examples: [
+      'Is RF18539007547034 a valid creditor reference, and may it travel with this Swiss IBAN?',
+    ],
   },
   check_postal_address: {
     description:
@@ -418,7 +424,8 @@ const A2A_AGENT_CARD = {
       type: 'apiKey',
       in: 'header',
       name: 'Authorization',
-      description: 'Bearer ifk_… — free key via POST /v1/keys/generate (200 req/month). x402/USDC accepted on paid routes without any key.',
+      description:
+        'Bearer ifk_… — free key via POST /v1/keys/generate (200 req/month). x402/USDC accepted on paid routes without any key.',
     },
   },
   defaultInputModes: ['application/json'],
@@ -462,13 +469,14 @@ const API_CATALOG = {
       'service-desc': [
         { href: 'https://api.ibanforge.com/openapi.json', type: 'application/json' },
       ],
-      'service-doc': [
-        { href: 'https://ibanforge.com/docs', type: 'text/html' },
-      ],
+      'service-doc': [{ href: 'https://ibanforge.com/docs', type: 'text/html' }],
       'service-meta': [
         { href: 'https://api.ibanforge.com/llms.txt', type: 'text/plain' },
         { href: 'https://api.ibanforge.com/.well-known/x402', type: 'application/json' },
-        { href: 'https://api.ibanforge.com/.well-known/mcp/server-card.json', type: 'application/json' },
+        {
+          href: 'https://api.ibanforge.com/.well-known/mcp/server-card.json',
+          type: 'application/json',
+        },
       ],
       status: [{ href: 'https://ibanforge.com/status', type: 'text/html' }],
     },
@@ -499,7 +507,13 @@ const APIS_JSON = {
         'REST + MCP + x402. Free tier: 200 requests/month with an emailed key; the HTTP MCP transport answers 10 free tool calls per IP per day with no key at all.',
       humanURL: 'https://ibanforge.com',
       baseURL: 'https://api.ibanforge.com',
-      tags: ['iban-validation', 'bic-lookup', 'swiss-clearing', 'verification-of-payee', 'uk-modulus'],
+      tags: [
+        'iban-validation',
+        'bic-lookup',
+        'swiss-clearing',
+        'verification-of-payee',
+        'uk-modulus',
+      ],
       properties: [
         { type: 'OpenAPI', url: 'https://api.ibanforge.com/openapi.json' },
         { type: 'MCP-Server', url: 'https://api.ibanforge.com/mcp' },
@@ -608,15 +622,43 @@ const GLAMA_MANIFEST = {
   documentation: 'https://ibanforge.com/docs/mcp',
   categories: ['finance', 'compliance', 'data-validation', 'banking'],
   keywords: [
-    'iban', 'bic', 'swift', 'sepa', 'vop', 'swiss-clearing', 'bc-nummer',
-    'qr-iid', 'fintech', 'compliance', 'risk-scoring', 'x402', 'micropayments', 'mcp',
+    'iban',
+    'bic',
+    'swift',
+    'sepa',
+    'vop',
+    'swiss-clearing',
+    'bc-nummer',
+    'qr-iid',
+    'fintech',
+    'compliance',
+    'risk-scoring',
+    'x402',
+    'micropayments',
+    'mcp',
   ],
   tools: [
-    { name: 'validate_iban', description: 'Validate a single IBAN with BIC, SEPA, issuer and risk data ($0.005)' },
-    { name: 'batch_validate_iban', description: 'Validate up to 100 IBANs in one call ($0.002 each)' },
-    { name: 'lookup_bic', description: `Look up a BIC/SWIFT code against ${F.claim.bic} entries ($0.003)` },
-    { name: 'check_compliance', description: 'Sanctions (OFAC) at bank level + FATF + SEPA reachability + VoP + risk score ($0.02)' },
-    { name: 'lookup_ch_clearing', description: `Look up a Swiss BC-Nummer / IID with SIC, euroSIC, CHF instant, QR-IID and institution type — ${F.claim.chClearing} entries from the SIX BankMaster ($0.003)` },
+    {
+      name: 'validate_iban',
+      description: 'Validate a single IBAN with BIC, SEPA, issuer and risk data ($0.005)',
+    },
+    {
+      name: 'batch_validate_iban',
+      description: 'Validate up to 100 IBANs in one call ($0.002 each)',
+    },
+    {
+      name: 'lookup_bic',
+      description: `Look up a BIC/SWIFT code against ${F.claim.bic} entries ($0.003)`,
+    },
+    {
+      name: 'check_compliance',
+      description:
+        'Sanctions (OFAC) at bank level + FATF + SEPA reachability + VoP + risk score ($0.02)',
+    },
+    {
+      name: 'lookup_ch_clearing',
+      description: `Look up a Swiss BC-Nummer / IID with SIC, euroSIC, CHF instant, QR-IID and institution type — ${F.claim.chClearing} entries from the SIX BankMaster ($0.003)`,
+    },
   ],
 } as const;
 
@@ -643,7 +685,11 @@ discovery.get('/.well-known/security.txt', (c) =>
 // tells the indexes holding the bad URL where the real one is.
 // ──────────────────────────────────────────────────────────────────────────────
 
-for (const [suffix, bundle] of [['1K', '1k'], ['5K', '5k'], ['25K', '25k']] as const) {
+for (const [suffix, bundle] of [
+  ['1K', '1k'],
+  ['5K', '5k'],
+  ['25K', '25k'],
+] as const) {
   discovery.get(`/STRIPE_PAYMENT_LINK_${suffix}`, (c) => c.redirect(PAYMENT_LINKS[bundle], 301));
 }
 
@@ -699,7 +745,10 @@ discovery.get('/sitemap.xml', (c) => c.redirect('https://ibanforge.com/sitemap.x
 // through to the landing page, which is mounted after this router.
 discovery.on(['POST', 'PUT', 'PATCH', 'DELETE'], '/', (c) =>
   c.json(
-    { error: 'method_not_allowed', message: 'The API root answers GET and HEAD. See /openapi.json for the endpoints.' },
+    {
+      error: 'method_not_allowed',
+      message: 'The API root answers GET and HEAD. See /openapi.json for the endpoints.',
+    },
     405,
     { Allow: 'GET, HEAD' },
   ),

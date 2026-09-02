@@ -61,34 +61,39 @@ describe('the canonical lists are pinned to the source, not to this test', () =>
   });
 });
 
-describe.each(['en', 'de', 'fr'])('docs/compliance.mdx (%s) documents only served values', (lang) => {
-  const mdx = read(`frontend/content/${lang}/docs/compliance.mdx`);
-  const lines = mdx.split('\n');
-  const row = (needle: string): string => {
-    const l = lines.find((x) => x.startsWith('|') && x.includes(needle));
-    expect(l, `table row for ${needle}`).toBeTruthy();
-    return l!;
-  };
+describe.each(['en', 'de', 'fr'])(
+  'docs/compliance.mdx (%s) documents only served values',
+  (lang) => {
+    const mdx = read(`frontend/content/${lang}/docs/compliance.mdx`);
+    const lines = mdx.split('\n');
+    const row = (needle: string): string => {
+      const l = lines.find((x) => x.startsWith('|') && x.includes(needle));
+      expect(l, `table row for ${needle}`).toBeTruthy();
+      return l!;
+    };
 
-  it('fatf_status row', () => {
-    const tokens = backtickTokens(row('fatf_status')).filter((t) => !t.includes('.') && t !== 'sanctions');
-    expect(tokens.length).toBeGreaterThanOrEqual(4);
-    for (const t of tokens) expect(SERVED_FATF, t).toContain(t);
-  });
+    it('fatf_status row', () => {
+      const tokens = backtickTokens(row('fatf_status')).filter(
+        (t) => !t.includes('.') && t !== 'sanctions',
+      );
+      expect(tokens.length).toBeGreaterThanOrEqual(4);
+      for (const t of tokens) expect(SERVED_FATF, t).toContain(t);
+    });
 
-  it('risk_level row', () => {
-    const tokens = backtickTokens(row('risk_level')).filter((t) => t !== 'risk_level');
-    expect(tokens.length).toBeGreaterThanOrEqual(5);
-    for (const t of tokens) expect(SERVED_RISK_LEVELS, t).toContain(t);
-  });
+    it('risk_level row', () => {
+      const tokens = backtickTokens(row('risk_level')).filter((t) => t !== 'risk_level');
+      expect(tokens.length).toBeGreaterThanOrEqual(5);
+      for (const t of tokens) expect(SERVED_RISK_LEVELS, t).toContain(t);
+    });
 
-  it('flags row cites only real flag names', () => {
-    const tokens = backtickTokens(row('| `flags`')).filter((t) => t !== 'flags');
-    // Tokens inside the JSON example arrive quoted, not backticked — catch those too.
-    const jsonTokens = [...row('| `flags`').matchAll(/"([a-z0-9_]+)"/g)].map((m) => m[1]);
-    for (const t of [...tokens, ...jsonTokens]) expect(SERVED_FLAGS, t).toContain(t);
-  });
-});
+    it('flags row cites only real flag names', () => {
+      const tokens = backtickTokens(row('| `flags`')).filter((t) => t !== 'flags');
+      // Tokens inside the JSON example arrive quoted, not backticked — catch those too.
+      const jsonTokens = [...row('| `flags`').matchAll(/"([a-z0-9_]+)"/g)].map((m) => m[1]);
+      for (const t of [...tokens, ...jsonTokens]) expect(SERVED_FLAGS, t).toContain(t);
+    });
+  },
+);
 
 describe('openapi.ts serves the same vocabulary', () => {
   const openapiSrc = read('src/routes/openapi.ts');
@@ -137,26 +142,29 @@ function unionValues(typeName: string): string[] {
 const SERVED_REASONS = unionValues('BankCodeReason');
 const SERVED_BASES = unionValues('BicBasis');
 
-describe.each(['en', 'de', 'fr'])('docs/iban-validate.mdx (%s) names every served enum value', (lang) => {
-  const mdx = read(`frontend/content/${lang}/docs/iban-validate.mdx`);
-  const lines = mdx.split('\n');
-  const row = (needle: string): string => {
-    const l = lines.find((x) => x.startsWith('|') && x.includes(needle));
-    expect(l, `table row for ${needle}`).toBeTruthy();
-    return l!;
-  };
+describe.each(['en', 'de', 'fr'])(
+  'docs/iban-validate.mdx (%s) names every served enum value',
+  (lang) => {
+    const mdx = read(`frontend/content/${lang}/docs/iban-validate.mdx`);
+    const lines = mdx.split('\n');
+    const row = (needle: string): string => {
+      const l = lines.find((x) => x.startsWith('|') && x.includes(needle));
+      expect(l, `table row for ${needle}`).toBeTruthy();
+      return l!;
+    };
 
-  it('the reason row names all six reasons', () => {
-    expect(SERVED_REASONS.length).toBe(6);
-    // Anchored on the field CELL: the status row cites `reason` in prose and
-    // would be found first on a bare substring.
-    const r = row('| `reason` |');
-    for (const v of SERVED_REASONS) expect(r, v).toContain(`\`${v}\``);
-  });
+    it('the reason row names all six reasons', () => {
+      expect(SERVED_REASONS.length).toBe(6);
+      // Anchored on the field CELL: the status row cites `reason` in prose and
+      // would be found first on a bare substring.
+      const r = row('| `reason` |');
+      for (const v of SERVED_REASONS) expect(r, v).toContain(`\`${v}\``);
+    });
 
-  it('the basis row names all three bases', () => {
-    expect(SERVED_BASES.length).toBe(3);
-    const r = row('| `basis` |');
-    for (const v of SERVED_BASES) expect(r, v).toContain(`\`${v}\``);
-  });
-});
+    it('the basis row names all three bases', () => {
+      expect(SERVED_BASES.length).toBe(3);
+      const r = row('| `basis` |');
+      for (const v of SERVED_BASES) expect(r, v).toContain(`\`${v}\``);
+    });
+  },
+);

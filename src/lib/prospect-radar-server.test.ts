@@ -35,7 +35,10 @@ const TRUNCATED_OUTPUT = FULL_OUTPUT.slice(0, FULL_OUTPUT.indexOf('===END==='));
 function anthropicResponse(text: string, stopReason: string): Response {
   return new Response(
     JSON.stringify({
-      content: [{ type: 'thinking', thinking: 'reasoning tokens' }, { type: 'text', text }],
+      content: [
+        { type: 'thinking', thinking: 'reasoning tokens' },
+        { type: 'text', text },
+      ],
       stop_reason: stopReason,
     }),
     { status: 200, headers: { 'content-type': 'application/json' } },
@@ -68,9 +71,9 @@ describe('draftOne retry on unparseable generation', () => {
 
   it('throws with the stop_reason after two unparseable generations', async () => {
     // A fresh Response per call: a body only reads once.
-    const fetchMock = vi.fn().mockImplementation(() =>
-      Promise.resolve(anthropicResponse(TRUNCATED_OUTPUT, 'max_tokens')),
-    );
+    const fetchMock = vi
+      .fn()
+      .mockImplementation(() => Promise.resolve(anthropicResponse(TRUNCATED_OUTPUT, 'max_tokens')));
     vi.stubGlobal('fetch', fetchMock);
 
     await expect(draftOne(PROSPECT)).rejects.toThrow(/unparseable \(stop_reason=max_tokens\)/);

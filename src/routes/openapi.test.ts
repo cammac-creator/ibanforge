@@ -43,7 +43,10 @@ const ROOT = join(import.meta.dirname, '..', '..');
 function generateHandlerSource(): string {
   const src = readFileSync(join(ROOT, 'src/routes/api-keys.ts'), 'utf8');
   const start = src.indexOf("apiKeys.post('/v1/keys/generate'");
-  expect(start, 'the /v1/keys/generate handler moved out of src/routes/api-keys.ts').toBeGreaterThan(-1);
+  expect(
+    start,
+    'the /v1/keys/generate handler moved out of src/routes/api-keys.ts',
+  ).toBeGreaterThan(-1);
   const end = src.indexOf('\napiKeys.', start + 10);
   return src.slice(start, end === -1 ? undefined : end);
 }
@@ -51,10 +54,14 @@ function generateHandlerSource(): string {
 const HANDLER = generateHandlerSource();
 
 /** Every HTTP status the handler can answer with. */
-const HANDLER_STATUSES = [...new Set([...HANDLER.matchAll(/\},\s*(\d{3})\)/g)].map((m) => m[1]))].sort();
+const HANDLER_STATUSES = [
+  ...new Set([...HANDLER.matchAll(/\},\s*(\d{3})\)/g)].map((m) => m[1])),
+].sort();
 
 /** Every machine-readable `error` value the handler can emit. */
-const HANDLER_ERRORS = [...new Set([...HANDLER.matchAll(/error:\s*'([a-z_]+)'/g)].map((m) => m[1]))].sort();
+const HANDLER_ERRORS = [
+  ...new Set([...HANDLER.matchAll(/error:\s*'([a-z_]+)'/g)].map((m) => m[1])),
+].sort();
 
 // Cast through unknown: `paths` is a literal object whose entries carry `get`
 // or `post` depending on the route, so it does not structurally match a
@@ -63,7 +70,11 @@ const PATHS = buildSpec().paths as unknown as Record<string, { post: Record<stri
 const OPERATION = PATHS['/v1/keys/generate'].post;
 const OPERATION_TEXT = JSON.stringify(OPERATION);
 const SCHEMA = (
-  OPERATION.requestBody as { content: { 'application/json': { schema: { required: string[]; properties: Record<string, unknown> } } } }
+  OPERATION.requestBody as {
+    content: {
+      'application/json': { schema: { required: string[]; properties: Record<string, unknown> } };
+    };
+  }
 ).content['application/json'].schema;
 
 describe('/v1/keys/generate: the spec documents the whole signup, verification included', () => {
@@ -71,7 +82,10 @@ describe('/v1/keys/generate: the spec documents the whole signup, verification i
     // 403 (verification_required / verification_failed) and 503
     // (verification_unavailable) are the two that were missing, and they are
     // precisely the ones a caller cannot guess.
-    expect(HANDLER_STATUSES.length, 'handler scan found no statuses, the extraction broke').toBeGreaterThan(3);
+    expect(
+      HANDLER_STATUSES.length,
+      'handler scan found no statuses, the extraction broke',
+    ).toBeGreaterThan(3);
     const documented = Object.keys(OPERATION.responses as Record<string, unknown>).sort();
     expect(documented).toEqual(expect.arrayContaining(HANDLER_STATUSES));
   });
@@ -79,7 +93,10 @@ describe('/v1/keys/generate: the spec documents the whole signup, verification i
   it('names every error string the handler can emit', () => {
     // An agent branches on `error`, not on prose. A status alone does not tell
     // it whether to retry with a code, wait a day, or stop asking.
-    expect(HANDLER_ERRORS.length, 'handler scan found no error codes, the extraction broke').toBeGreaterThan(5);
+    expect(
+      HANDLER_ERRORS.length,
+      'handler scan found no error codes, the extraction broke',
+    ).toBeGreaterThan(5);
     const missing = HANDLER_ERRORS.filter((e) => !OPERATION_TEXT.includes(e));
     expect(missing, `the contract never names: ${missing.join(', ')}`).toEqual([]);
   });
@@ -132,8 +149,19 @@ describe('/v1/keys/generate: the spec documents the whole signup, verification i
  */
 describe('every failure the API can answer is typed', () => {
   const spec = buildSpec() as unknown as {
-    components: { schemas: Record<string, { required?: string[]; additionalProperties?: boolean }> };
-    paths: Record<string, Record<string, { requestBody?: unknown; responses?: Record<string, { content?: Record<string, { schema?: { $ref?: string } }> }> }>>;
+    components: {
+      schemas: Record<string, { required?: string[]; additionalProperties?: boolean }>;
+    };
+    paths: Record<
+      string,
+      Record<
+        string,
+        {
+          requestBody?: unknown;
+          responses?: Record<string, { content?: Record<string, { schema?: { $ref?: string } }> }>;
+        }
+      >
+    >;
   };
 
   const operations = Object.entries(spec.paths).flatMap(([path, item]) =>
@@ -159,7 +187,8 @@ describe('every failure the API can answer is typed', () => {
       for (const [status, response] of Object.entries(op.responses ?? {})) {
         if (!/^[45]/.test(status)) continue;
         const ref = response.content?.['application/json']?.schema?.$ref;
-        if (ref !== '#/components/schemas/ApiError') naked.push(`${method.toUpperCase()} ${path} ${status}`);
+        if (ref !== '#/components/schemas/ApiError')
+          naked.push(`${method.toUpperCase()} ${path} ${status}`);
       }
     }
     expect(naked, `responses with no error schema: ${naked.join(', ')}`).toEqual([]);
@@ -169,7 +198,10 @@ describe('every failure the API can answer is typed', () => {
     const missing = operations
       .filter(({ op }) => !op.responses?.['429'])
       .map(({ path, method }) => `${method.toUpperCase()} ${path}`);
-    expect(missing, `operations that cannot answer 429 according to the contract: ${missing.join(', ')}`).toEqual([]);
+    expect(
+      missing,
+      `operations that cannot answer 429 according to the contract: ${missing.join(', ')}`,
+    ).toEqual([]);
   });
 
   it('declares 413 on every operation that takes a body, and only those', () => {
@@ -177,7 +209,9 @@ describe('every failure the API can answer is typed', () => {
     // bodiless request can exceed 256 KB is noise dressed as rigour.
     for (const { path, method, op } of operations) {
       const declares413 = Boolean(op.responses?.['413']);
-      expect(declares413, `${method.toUpperCase()} ${path} declares 413: ${declares413}`).toBe(Boolean(op.requestBody));
+      expect(declares413, `${method.toUpperCase()} ${path} declares 413: ${declares413}`).toBe(
+        Boolean(op.requestBody),
+      );
     }
   });
 });
@@ -199,7 +233,9 @@ describe('every failure the API can answer is typed', () => {
 describe('the contract covers the routes and fields the server actually serves', () => {
   const spec = buildSpec() as unknown as {
     paths: Record<string, Record<string, unknown>>;
-    components: { schemas: Record<string, { properties?: Record<string, unknown>; required?: string[] }> };
+    components: {
+      schemas: Record<string, { properties?: Record<string, unknown>; required?: string[] }>;
+    };
   };
 
   it.each([
@@ -214,7 +250,9 @@ describe('the contract covers the routes and fields the server actually serves',
   });
 
   it('declares the sanctions screen served on every BIC lookup', () => {
-    expect(Object.keys(spec.components.schemas.BICLookupResult.properties ?? {})).toContain('sanctions');
+    expect(Object.keys(spec.components.schemas.BICLookupResult.properties ?? {})).toContain(
+      'sanctions',
+    );
   });
 
   it('declares both QR-IID fields served on a Swiss clearing lookup', () => {
@@ -226,14 +264,26 @@ describe('the contract covers the routes and fields the server actually serves',
     const batch = spec.paths['/v1/iban/batch'].post as {
       responses: { '200': { content: { 'application/json': { schema: { required: string[] } } } } };
     };
-    expect(batch.responses['200'].content['application/json'].schema.required).toContain('processing_ms');
+    expect(batch.responses['200'].content['application/json'].schema.required).toContain(
+      'processing_ms',
+    );
   });
 
   it('declares the meta block of a compliance answer', () => {
     const compliance = spec.paths['/v1/iban/compliance'].post as {
-      responses: { '200': { content: { 'application/json': { schema: { allOf: Array<{ properties?: Record<string, unknown> }> } } } } };
+      responses: {
+        '200': {
+          content: {
+            'application/json': {
+              schema: { allOf: Array<{ properties?: Record<string, unknown> }> };
+            };
+          };
+        };
+      };
     };
-    const extension = compliance.responses['200'].content['application/json'].schema.allOf.find((s) => s.properties);
+    const extension = compliance.responses['200'].content['application/json'].schema.allOf.find(
+      (s) => s.properties,
+    );
     expect(Object.keys(extension?.properties ?? {})).toContain('meta');
   });
 
@@ -241,7 +291,10 @@ describe('the contract covers the routes and fields the server actually serves',
     // DX-08: seven declared fields are never served on a plain valid answer.
     // They are conditional, and nothing said so, so a generated client typed
     // them as optionals with no rule for when to expect them.
-    const properties = spec.components.schemas.IBANValidationResult.properties as Record<string, { description?: string }>;
+    const properties = spec.components.schemas.IBANValidationResult.properties as Record<
+      string,
+      { description?: string }
+    >;
     for (const field of [
       'error',
       'error_detail',
@@ -252,7 +305,9 @@ describe('the contract covers the routes and fields the server actually serves',
       'modulus_check',
     ]) {
       const description = properties[field]?.description ?? '';
-      expect(description, `${field} does not say when it appears`).toMatch(/present|absent|only|when/i);
+      expect(description, `${field} does not say when it appears`).toMatch(
+        /present|absent|only|when/i,
+      );
     }
   });
 });

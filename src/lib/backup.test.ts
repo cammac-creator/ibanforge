@@ -49,9 +49,9 @@ describe('exportPaidState', () => {
     seed('ifk_bk0002', 1_000, 1_000);
     const dump = exportPaidState('2026-08-21T22:00:00Z');
     const row = dump.api_keys.find((k) => k.key_prefix === 'ifk_bk0002')!;
-    const columns = (getStatsDB().prepare('PRAGMA table_info(api_keys)').all() as Array<{ name: string }>).map(
-      (c) => c.name,
-    );
+    const columns = (
+      getStatsDB().prepare('PRAGMA table_info(api_keys)').all() as Array<{ name: string }>
+    ).map((c) => c.name);
     // SELECT * on purpose: a hand-written column list would silently stop
     // exporting a new column, and it would only show up on restore day.
     //
@@ -86,7 +86,9 @@ describe('restorePaidState — the drill', () => {
     expect(report.keys_inserted).toBeGreaterThan(0);
 
     const back = getStatsDB()
-      .prepare("SELECT credits_total, credits_remaining, email FROM api_keys WHERE key_prefix = 'ifk_bk0003'")
+      .prepare(
+        "SELECT credits_total, credits_remaining, email FROM api_keys WHERE key_prefix = 'ifk_bk0003'",
+      )
       .get() as { credits_total: number; credits_remaining: number; email: string };
     expect(back.credits_total).toBe(25_000);
     expect(back.credits_remaining).toBe(24_940);
@@ -99,7 +101,9 @@ describe('restorePaidState — the drill', () => {
     wipe();
     restorePaidState(dump);
     const u = getStatsDB()
-      .prepare("SELECT count FROM api_usage WHERE key_hash = 'hash-ifk_bk0004' AND month = '2026-08'")
+      .prepare(
+        "SELECT count FROM api_usage WHERE key_hash = 'hash-ifk_bk0004' AND month = '2026-08'",
+      )
       .get() as { count: number };
     expect(u.count).toBe(42);
   });
@@ -147,7 +151,13 @@ describe('restorePaidState — the drill', () => {
   });
 
   it('survives an empty dump without throwing', () => {
-    const empty = { format: BACKUP_FORMAT, taken_at: 'x', counts: { api_keys: 0, api_usage: 0 }, api_keys: [], api_usage: [] };
+    const empty = {
+      format: BACKUP_FORMAT,
+      taken_at: 'x',
+      counts: { api_keys: 0, api_usage: 0 },
+      api_keys: [],
+      api_usage: [],
+    };
     expect(() => restorePaidState(empty)).not.toThrow();
   });
 });
@@ -195,16 +205,22 @@ describe('exportPaidState — what must never leave the server', () => {
 
   it('writes one events row per export, with the volume it carried', () => {
     seedWithPlaintextKey('ifk_bk0102');
-    const before = (getStatsDB()
-      .prepare("SELECT COUNT(*) n FROM events WHERE label LIKE 'backup export:%'")
-      .get() as { n: number }).n;
+    const before = (
+      getStatsDB()
+        .prepare("SELECT COUNT(*) n FROM events WHERE label LIKE 'backup export:%'")
+        .get() as { n: number }
+    ).n;
     const dump = exportPaidState('2026-09-01T21:00:00Z');
     const after = getStatsDB()
-      .prepare("SELECT label FROM events WHERE label LIKE 'backup export:%' ORDER BY id DESC LIMIT 1")
+      .prepare(
+        "SELECT label FROM events WHERE label LIKE 'backup export:%' ORDER BY id DESC LIMIT 1",
+      )
       .get() as { label: string } | undefined;
-    const count = (getStatsDB()
-      .prepare("SELECT COUNT(*) n FROM events WHERE label LIKE 'backup export:%'")
-      .get() as { n: number }).n;
+    const count = (
+      getStatsDB()
+        .prepare("SELECT COUNT(*) n FROM events WHERE label LIKE 'backup export:%'")
+        .get() as { n: number }
+    ).n;
     expect(count, 'an export that leaves no trace is an export nobody can audit').toBe(before + 1);
     expect(after!.label).toContain(`${dump.counts.api_keys} keys`);
   });

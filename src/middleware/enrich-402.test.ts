@@ -150,8 +150,9 @@ describe('enrich402Middleware — the exhausted client must not be handed a way 
       await next();
     });
     app.use('*', enrich402Middleware());
-    app.post('/v1/iban/validate', () =>
-      new Response('{}', { status: 402, headers: { 'Content-Type': 'application/json' } }),
+    app.post(
+      '/v1/iban/validate',
+      () => new Response('{}', { status: 402, headers: { 'Content-Type': 'application/json' } }),
     );
     return app;
   }
@@ -203,10 +204,14 @@ describe('the Bazaar discovery block the catalog ingester reads', () => {
     // as the plain-http URL Railway hands us behind its TLS terminator.
     const app = new Hono();
     app.use('*', enrich402Middleware());
-    app.post('/v1/iban/validate', () => new Response('{}', {
-      status: 402,
-      headers: { 'Content-Type': 'application/json' },
-    }));
+    app.post(
+      '/v1/iban/validate',
+      () =>
+        new Response('{}', {
+          status: 402,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+    );
 
     const res = await app.request('/v1/iban/validate', { method: 'POST' });
     const body = await res.json();
@@ -224,10 +229,14 @@ describe('the Bazaar discovery block the catalog ingester reads', () => {
     // Without this, every BIC ever probed would be catalogued as its own resource.
     const app = new Hono();
     app.use('*', enrich402Middleware());
-    app.get('/v1/bic/:code', () => new Response('{}', {
-      status: 402,
-      headers: { 'Content-Type': 'application/json' },
-    }));
+    app.get(
+      '/v1/bic/:code',
+      () =>
+        new Response('{}', {
+          status: 402,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+    );
 
     const res = await app.request('/v1/bic/COBADEFFXXX');
     const body = await res.json();
@@ -243,10 +252,14 @@ describe('the Bazaar discovery block the catalog ingester reads', () => {
     // reporting them to a user as the real answer. Audit 2026-07-25.
     const app = new Hono();
     app.use('*', enrich402Middleware());
-    app.get('/v1/ch/clearing/:iid', () => new Response('{}', {
-      status: 402,
-      headers: { 'Content-Type': 'application/json' },
-    }));
+    app.get(
+      '/v1/ch/clearing/:iid',
+      () =>
+        new Response('{}', {
+          status: 402,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+    );
 
     const res = await app.request('/v1/ch/clearing/779');
     const example = (await res.json()).extensions.bazaar.info.output.example;
@@ -287,10 +300,14 @@ describe('the body is the header, not a second opinion', () => {
   function appServing(header: string) {
     const app = new Hono();
     app.use('*', enrich402Middleware());
-    app.post('/v1/iban/validate', () => new Response('{}', {
-      status: 402,
-      headers: { 'Content-Type': 'application/json', 'payment-required': header },
-    }));
+    app.post(
+      '/v1/iban/validate',
+      () =>
+        new Response('{}', {
+          status: 402,
+          headers: { 'Content-Type': 'application/json', 'payment-required': header },
+        }),
+    );
     return app;
   }
 
@@ -315,7 +332,9 @@ describe('the body is the header, not a second opinion', () => {
   });
 
   it('falls back to its own table when the header is unreadable', async () => {
-    const res = await appServing('not-base64-at-all!!').request('/v1/iban/validate', { method: 'POST' });
+    const res = await appServing('not-base64-at-all!!').request('/v1/iban/validate', {
+      method: 'POST',
+    });
     const body = (await res.json()) as { x402Version: number; accepts: Array<{ amount: string }> };
     expect(body.x402Version).toBe(2);
     expect(body.accepts[0].amount).toBe('5000');
@@ -349,10 +368,14 @@ describe('a refused payment says why', () => {
     const header = Buffer.from(JSON.stringify(announcement)).toString('base64');
     const app = new Hono();
     app.use('*', enrich402Middleware());
-    app.post('/v1/iban/validate', () => new Response('{}', {
-      status: 402,
-      headers: { 'Content-Type': 'application/json', 'payment-required': header },
-    }));
+    app.post(
+      '/v1/iban/validate',
+      () =>
+        new Response('{}', {
+          status: 402,
+          headers: { 'Content-Type': 'application/json', 'payment-required': header },
+        }),
+    );
     return app;
   }
 
@@ -395,7 +418,10 @@ describe('every 402 carries a card link a machine can follow', () => {
   function anonymous402(path = '/v1/iban/validate') {
     const app = new Hono<HonoEnv>();
     app.use('*', enrich402Middleware());
-    app.post(path, () => new Response('{}', { status: 402, headers: { 'Content-Type': 'application/json' } }));
+    app.post(
+      path,
+      () => new Response('{}', { status: 402, headers: { 'Content-Type': 'application/json' } }),
+    );
     return app.request(path, { method: 'POST', body: '{}' });
   }
 
@@ -419,7 +445,12 @@ describe('every 402 carries a card link a machine can follow', () => {
   });
 
   it('says the same thing on every paid route, not just the one', async () => {
-    for (const path of ['/v1/iban/validate', '/v1/iban/batch', '/v1/iban/compliance', '/v1/credits/buy/5k']) {
+    for (const path of [
+      '/v1/iban/validate',
+      '/v1/iban/batch',
+      '/v1/iban/compliance',
+      '/v1/credits/buy/5k',
+    ]) {
       const body = (await (await anonymous402(path)).json()) as {
         credit_packs: { pay_by_card: string };
       };
@@ -504,18 +535,27 @@ describe('a paid route reached with a trailing slash is not a dead end', () => {
     ['GET', '/v1/ch/clearing/230/', '/v1/ch/clearing/230'],
     ['POST', '/v1/credits/buy/1k/', '/v1/credits/buy/1k'],
   ])('%s %s is sent to %s with a method-preserving redirect', async (method, from, to) => {
-    const res = await appWithPaidRoutes().request(from, { method, body: method === 'POST' ? '{}' : undefined });
+    const res = await appWithPaidRoutes().request(from, {
+      method,
+      body: method === 'POST' ? '{}' : undefined,
+    });
     expect(res.status).toBe(308);
     expect(res.headers.get('location')).toBe(to);
   });
 
   it('keeps the query string, so a keyed or referred call is not silently stripped', async () => {
-    const res = await appWithPaidRoutes().request('/v1/iban/validate/?api_key=ifk_x', { method: 'POST', body: '{}' });
+    const res = await appWithPaidRoutes().request('/v1/iban/validate/?api_key=ifk_x', {
+      method: 'POST',
+      body: '{}',
+    });
     expect(res.headers.get('location')).toBe('/v1/iban/validate?api_key=ifk_x');
   });
 
   it('leaves the canonical paths exactly as they were', async () => {
-    const res = await appWithPaidRoutes().request('/v1/iban/validate', { method: 'POST', body: '{}' });
+    const res = await appWithPaidRoutes().request('/v1/iban/validate', {
+      method: 'POST',
+      body: '{}',
+    });
     expect(res.status).toBe(402);
   });
 

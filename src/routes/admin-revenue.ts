@@ -158,7 +158,9 @@ function cacheTxs(
 
 function readCachedTxs(): CachedTx[] {
   return getStatsDB()
-    .prepare('SELECT hash, from_addr, value_usdc, block, ts FROM wallet_transactions ORDER BY block DESC')
+    .prepare(
+      'SELECT hash, from_addr, value_usdc, block, ts FROM wallet_transactions ORDER BY block DESC',
+    )
     .all() as CachedTx[];
 }
 
@@ -191,7 +193,10 @@ function addressToTopic(addr: string): string {
 
 adminRevenue.get('/admin/revenue', async (c) => {
   if (!checkAuth(c.req.header('Authorization'))) {
-    return c.json({ error: 'unauthorized', message: 'Admin endpoints require Bearer STATS_TOKEN.' }, 403);
+    return c.json(
+      { error: 'unauthorized', message: 'Admin endpoints require Bearer STATS_TOKEN.' },
+      403,
+    );
   }
 
   const wallet = process.env.WALLET_ADDRESS;
@@ -245,7 +250,9 @@ adminRevenue.get('/admin/revenue', async (c) => {
 
   for (let i = 0; i < chunks.length; i += PARALLEL_BATCH) {
     const batch = chunks.slice(i, i + PARALLEL_BATCH);
-    const results = await Promise.all(batch.map((ch) => fetchLogsChunk(ch.from, ch.to, recipientTopic)));
+    const results = await Promise.all(
+      batch.map((ch) => fetchLogsChunk(ch.from, ch.to, recipientTopic)),
+    );
     for (const r of results) {
       if (r.failed) failedChunks += 1;
       allLogs.push(...r.logs);
@@ -318,7 +325,9 @@ adminRevenue.get('/admin/revenue', async (c) => {
     explorer: `https://basescan.org/tx/${t.hash}`,
   }));
 
-  const sortedByDay = Object.fromEntries(Object.entries(byDay).sort((a, b) => b[0].localeCompare(a[0])));
+  const sortedByDay = Object.fromEntries(
+    Object.entries(byDay).sort((a, b) => b[0].localeCompare(a[0])),
+  );
 
   return c.json({
     wallet,

@@ -45,9 +45,8 @@ function totalRejections(): number {
 
 function count(operation: string, reason: string): number {
   return (
-    getRejectionStats(1).find(
-      (r) => r.operation_type === operation && r.reject_reason === reason,
-    )?.count ?? 0
+    getRejectionStats(1).find((r) => r.operation_type === operation && r.reject_reason === reason)
+      ?.count ?? 0
   );
 }
 
@@ -113,8 +112,7 @@ describe('la garde ne change aucun comportement observable', () => {
     const bicPlaceholder = await app.request('/v1/bic/%7Bcode%7D');
     expect(await bicPlaceholder.json()).toEqual({
       error: 'placeholder_literal',
-      message:
-        "You sent the literal OpenAPI placeholder '{code}'. Substitute it with a real BIC.",
+      message: "You sent the literal OpenAPI placeholder '{code}'. Substitute it with a real BIC.",
       example: 'GET /v1/bic/UBSWCHZH',
       schema: 'https://api.ibanforge.com/openapi.json',
     });

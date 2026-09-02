@@ -11,7 +11,12 @@ import {
 const NOW = new Date('2026-08-19T17:10:00Z');
 
 /** Build a creation row at N minutes before NOW. */
-function row(minutesAgo: number, ua: string | null, email: string | null, prefix = `ifk_${minutesAgo}${email ?? ''}`): CreationRow {
+function row(
+  minutesAgo: number,
+  ua: string | null,
+  email: string | null,
+  prefix = `ifk_${minutesAgo}${email ?? ''}`,
+): CreationRow {
   const at = new Date(NOW.getTime() - minutesAgo * 60 * 1000);
   return {
     key_prefix: prefix,
@@ -101,7 +106,12 @@ describe('findCohorts', () => {
     const legit = row(3, 'axios/1.6.0', 'nicolas.perret@alpha.example.net', 'ifk_legit');
     const rows = [
       ...Array.from({ length: 8 }, (_, i) =>
-        row(i + 1, 'axios/1.6.0', `pwwhqjpghlv${String.fromCharCode(97 + i)}@gmail.com`, `ifk_p${i}`),
+        row(
+          i + 1,
+          'axios/1.6.0',
+          `pwwhqjpghlv${String.fromCharCode(97 + i)}@gmail.com`,
+          `ifk_p${i}`,
+        ),
       ),
       legit,
     ];
@@ -126,7 +136,12 @@ describe('findCohorts', () => {
     // One signup every 90 minutes never trips the 15-minute rule, but eight of
     // them inside a day do.
     const rows = Array.from({ length: 8 }, (_, i) =>
-      row(90 * (i + 1), 'slow-client/1.0', `pwwhqjpghlv${String.fromCharCode(97 + i)}@gmail.com`, `ifk_slow${i}`),
+      row(
+        90 * (i + 1),
+        'slow-client/1.0',
+        `pwwhqjpghlv${String.fromCharCode(97 + i)}@gmail.com`,
+        `ifk_slow${i}`,
+      ),
     );
     const cohorts = findCohorts(rows, NOW);
     expect(cohorts).toHaveLength(1);
@@ -138,7 +153,12 @@ describe('findCohorts', () => {
     // Five signups in ten minutes, but they ended three hours before this pass.
     // Anchored to now it would be invisible; a slide over the history sees it.
     const rows = Array.from({ length: 5 }, (_, i) =>
-      row(180 + i * 2, 'late-client/1.0', `pwwhqjpghlv${String.fromCharCode(97 + i)}@gmail.com`, `ifk_late${i}`),
+      row(
+        180 + i * 2,
+        'late-client/1.0',
+        `pwwhqjpghlv${String.fromCharCode(97 + i)}@gmail.com`,
+        `ifk_late${i}`,
+      ),
     );
     const cohorts = findCohorts(rows, NOW);
     expect(cohorts).toHaveLength(1);
@@ -181,7 +201,9 @@ describe('findCohorts', () => {
 
 describe('cohortAddress', () => {
   it('builds an address on a top-level domain that can never receive mail', () => {
-    expect(cohortAddress('demo-http-client/9.9', '2026-08-19')).toBe('demo-http-client-9-9-2026-08-19@cohorte.invalid');
+    expect(cohortAddress('demo-http-client/9.9', '2026-08-19')).toBe(
+      'demo-http-client-9-9-2026-08-19@cohorte.invalid',
+    );
   });
 
   it('survives a client string made only of punctuation', () => {

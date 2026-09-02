@@ -19,12 +19,23 @@
  * mentir l'homme mort de la prochaine session.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { opsFail, opsOk, notifyOps, checkHeartbeats, HEARTBEATS, RADAR_BEATS } from './ops-alert.js';
+import {
+  opsFail,
+  opsOk,
+  notifyOps,
+  checkHeartbeats,
+  HEARTBEATS,
+  RADAR_BEATS,
+} from './ops-alert.js';
 import { kvGet, kvSet } from './forum-radar-server.js';
 import { getStatsDB } from './db.js';
 
 let sent: string[] = [];
-const ENV = { tok: process.env.TELEGRAM_BOT_TOKEN, chat: process.env.TELEGRAM_CHAT_ID, off: process.env.OPS_ALERTS_DISABLED };
+const ENV = {
+  tok: process.env.TELEGRAM_BOT_TOKEN,
+  chat: process.env.TELEGRAM_CHAT_ID,
+  off: process.env.OPS_ALERTS_DISABLED,
+};
 
 /** Une clé neuve par test : aucune interférence, aucun état hérité. */
 let KEY = '';
@@ -54,7 +65,11 @@ afterEach(() => {
   } catch {
     /* la table n'existe pas encore : rien à nettoyer */
   }
-  for (const [k, v] of [['TELEGRAM_BOT_TOKEN', ENV.tok], ['TELEGRAM_CHAT_ID', ENV.chat], ['OPS_ALERTS_DISABLED', ENV.off]] as const) {
+  for (const [k, v] of [
+    ['TELEGRAM_BOT_TOKEN', ENV.tok],
+    ['TELEGRAM_CHAT_ID', ENV.chat],
+    ['OPS_ALERTS_DISABLED', ENV.off],
+  ] as const) {
     if (v === undefined) delete process.env[k];
     else process.env[k] = v;
   }
@@ -72,7 +87,10 @@ describe('opsFail — le message part au seuil, et une seule fois', () => {
     // Le point entier : la panne dure, la sonde ne répète pas.
     await opsFail(KEY, 'détail', 3);
     await opsFail(KEY, 'détail', 3);
-    expect(sent, 'la sonde répète son alerte à chaque tick — exactement le bruit à éviter').toHaveLength(1);
+    expect(
+      sent,
+      'la sonde répète son alerte à chaque tick — exactement le bruit à éviter',
+    ).toHaveLength(1);
   });
 
   it('avec un seuil de 1, parle au premier échec', async () => {
@@ -86,7 +104,10 @@ describe('opsOk — la guérison se dit, mais seulement si quelqu’un a vu la p
     await opsFail(KEY, 'détail');
     expect(sent).toHaveLength(1);
     await opsOk(KEY, 'a repointé');
-    expect(sent, 'aucune ligne de résolution — un problème réglé et une sonde morte se ressemblent alors').toHaveLength(2);
+    expect(
+      sent,
+      'aucune ligne de résolution — un problème réglé et une sonde morte se ressemblent alors',
+    ).toHaveLength(2);
   });
 
   it('ne dit rien quand rien ne s’était déclenché', async () => {
@@ -125,7 +146,10 @@ describe('une alerte qui n’est pas partie reste à envoyer', () => {
     expect(sent).toHaveLength(1); // tentée
     telegramUp(true);
     await opsFail(KEY, 'détail');
-    expect(sent, "l'alerte a été considérée comme émise alors que Telegram l'avait refusée").toHaveLength(2);
+    expect(
+      sent,
+      "l'alerte a été considérée comme émise alors que Telegram l'avait refusée",
+    ).toHaveLength(2);
   });
 
   it('secrets absents : ne jette pas, ne prétend pas avoir envoyé', async () => {
@@ -209,7 +233,9 @@ describe('homme mort — un cron muet finit par crier, un cron vivant se tait', 
     // un objet JSON, les trois autres des chaînes ISO nues. Uniformiser côté
     // sonde reviendrait à réécrire l'état des radars.
     const lifecycle = RADAR_BEATS.find((r) => r.key === 'lifecycle_radar_state');
-    expect(lifecycle?.parse('{"last_run_at":"2026-08-20T10:00:00.000Z"}')).toBe(Date.parse('2026-08-20T10:00:00.000Z'));
+    expect(lifecycle?.parse('{"last_run_at":"2026-08-20T10:00:00.000Z"}')).toBe(
+      Date.parse('2026-08-20T10:00:00.000Z'),
+    );
     const cohort = RADAR_BEATS.find((r) => r.key === 'cohort_radar_last_run');
     expect(cohort?.parse('2026-08-20T10:00:00.000Z')).toBe(Date.parse('2026-08-20T10:00:00.000Z'));
   });
@@ -231,7 +257,8 @@ describe('homme mort — un cron muet finit par crier, un cron vivant se tait', 
       await expect(checkHeartbeats()).resolves.toBeUndefined();
       expect(sent, 'une clé illisible a produit une alerte').toHaveLength(0);
     } finally {
-      if (saved === undefined) kvSet(radar.key, JSON.stringify({ last_run_at: new Date().toISOString() }));
+      if (saved === undefined)
+        kvSet(radar.key, JSON.stringify({ last_run_at: new Date().toISOString() }));
       else kvSet(radar.key, saved);
     }
   });

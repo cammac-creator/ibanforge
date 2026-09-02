@@ -97,7 +97,10 @@ describe('/v1/admin/keys — admin auth (timing-safe)', () => {
  * mail that carried it.
  */
 describe('/v1/admin/keys — issued_by_us', () => {
-  const admin = { 'Content-Type': 'application/json', 'X-Admin-Secret': 'correct-horse-battery-staple' };
+  const admin = {
+    'Content-Type': 'application/json',
+    'X-Admin-Secret': 'correct-horse-battery-staple',
+  };
 
   async function mint(email: string, body: Record<string, unknown>): Promise<string> {
     const res = await makeApp().request('/v1/admin/keys', {
@@ -111,7 +114,9 @@ describe('/v1/admin/keys — issued_by_us', () => {
 
   async function listed(prefix: string): Promise<number> {
     const res = await makeApp().request('/v1/admin/keys', { headers: admin });
-    const body = (await res.json()) as { keys: Array<{ key_prefix: string; issued_by_us: number }> };
+    const body = (await res.json()) as {
+      keys: Array<{ key_prefix: string; issued_by_us: number }>;
+    };
     return body.keys.find((k) => k.key_prefix === prefix)!.issued_by_us;
   }
 
@@ -125,7 +130,10 @@ describe('/v1/admin/keys — issued_by_us', () => {
   it('backfills by pattern, and the column defaults to "not ours"', () => {
     const db = getStatsDB();
     const col = (
-      db.prepare('PRAGMA table_info(api_keys)').all() as Array<{ name: string; dflt_value: string | null }>
+      db.prepare('PRAGMA table_info(api_keys)').all() as Array<{
+        name: string;
+        dflt_value: string | null;
+      }>
     ).find((c) => c.name === 'issued_by_us');
     expect(col).toBeDefined();
     expect(col!.dflt_value).toBe('0');
@@ -140,7 +148,9 @@ describe('/v1/admin/keys — issued_by_us', () => {
     expect(organic).not.toBeNull();
     expect(flag(seeded!.key_prefix)).toBe(0);
 
-    db.exec("UPDATE api_keys SET issued_by_us = 1 WHERE email LIKE '%-pilot@%' OR email LIKE '%@cohorte.invalid'");
+    db.exec(
+      "UPDATE api_keys SET issued_by_us = 1 WHERE email LIKE '%-pilot@%' OR email LIKE '%@cohorte.invalid'",
+    );
 
     expect(flag(seeded!.key_prefix)).toBe(1);
     expect(flag(organic!.key_prefix)).toBe(0);
@@ -148,7 +158,9 @@ describe('/v1/admin/keys — issued_by_us', () => {
 
   function flag(prefix: string): number {
     return (
-      getStatsDB().prepare('SELECT issued_by_us FROM api_keys WHERE key_prefix = ?').get(prefix) as {
+      getStatsDB()
+        .prepare('SELECT issued_by_us FROM api_keys WHERE key_prefix = ?')
+        .get(prefix) as {
         issued_by_us: number;
       }
     ).issued_by_us;
@@ -247,8 +259,15 @@ describe('POST /v1/admin/events — manual annotations', () => {
 
   it('rejects an empty label, records a real one', async () => {
     const app = makeApp();
-    const headers = { 'Content-Type': 'application/json', 'X-Admin-Secret': 'correct-horse-battery-staple' };
-    const bad = await app.request('/v1/admin/events', { method: 'POST', headers, body: JSON.stringify({ label: '  ' }) });
+    const headers = {
+      'Content-Type': 'application/json',
+      'X-Admin-Secret': 'correct-horse-battery-staple',
+    };
+    const bad = await app.request('/v1/admin/events', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ label: '  ' }),
+    });
     expect(bad.status).toBe(400);
     const ok = await app.request('/v1/admin/events', {
       method: 'POST',
@@ -257,21 +276,29 @@ describe('POST /v1/admin/events — manual annotations', () => {
     });
     expect(ok.status).toBe(201);
     const { getEvents } = await import('../lib/events.js');
-    expect(getEvents(1).some((e) => e.label === 'admin-events-route-fixture' && e.kind === 'manual')).toBe(true);
+    expect(
+      getEvents(1).some((e) => e.label === 'admin-events-route-fixture' && e.kind === 'manual'),
+    ).toBe(true);
     const { getStatsDB } = await import('../lib/db.js');
     getStatsDB().prepare(`DELETE FROM events WHERE label = 'admin-events-route-fixture'`).run();
   });
 });
 
 describe('/v1/admin/weekly-facts + /v1/admin/digest — Monday digest plumbing', () => {
-  const headers = { 'Content-Type': 'application/json', 'X-Admin-Secret': 'correct-horse-battery-staple' };
+  const headers = {
+    'Content-Type': 'application/json',
+    'X-Admin-Secret': 'correct-horse-battery-staple',
+  };
 
   it('facts endpoint requires the secret and serves the WoW block', async () => {
     const app = makeApp();
     expect((await app.request('/v1/admin/weekly-facts')).status).toBe(401);
     const res = await app.request('/v1/admin/weekly-facts', { headers });
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { week: string; requests: { current: number; previous: number } };
+    const body = (await res.json()) as {
+      week: string;
+      requests: { current: number; previous: number };
+    };
     expect(body.week).toMatch(/^\d{4}-W\d{2}$/);
     expect(typeof body.requests.current).toBe('number');
   });
@@ -280,11 +307,17 @@ describe('/v1/admin/weekly-facts + /v1/admin/digest — Monday digest plumbing',
     const app = makeApp();
     const week = '1999-W01'; // far outside any real listing window
     const post = (body_fr: string) =>
-      app.request('/v1/admin/digest', { method: 'POST', headers, body: JSON.stringify({ week, body_fr }) });
+      app.request('/v1/admin/digest', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ week, body_fr }),
+      });
     expect((await post('premier jet')).status).toBe(201);
     expect((await post('version corrigée')).status).toBe(201);
     const { getStatsDB } = await import('../lib/db.js');
-    const rows = getStatsDB().prepare('SELECT body_fr FROM weekly_digest WHERE week = ?').all(week) as Array<{ body_fr: string }>;
+    const rows = getStatsDB()
+      .prepare('SELECT body_fr FROM weekly_digest WHERE week = ?')
+      .all(week) as Array<{ body_fr: string }>;
     expect(rows).toHaveLength(1);
     expect(rows[0].body_fr).toBe('version corrigée');
     getStatsDB().prepare('DELETE FROM weekly_digest WHERE week = ?').run(week);
@@ -316,28 +349,44 @@ describe('/v1/admin/weekly-facts + /v1/admin/digest — Monday digest plumbing',
 });
 
 describe('/v1/admin/thread-summary — cached French thread summaries', () => {
-  const headers = { 'Content-Type': 'application/json', 'X-Admin-Secret': 'correct-horse-battery-staple' };
+  const headers = {
+    'Content-Type': 'application/json',
+    'X-Admin-Secret': 'correct-horse-battery-staple',
+  };
 
   it('misses on unknown email, upserts, hits on matching key, misses on a changed key', async () => {
     const app = makeApp();
     const email = 'summary-probe@alpha.example.net';
-    const miss = await app.request(`/v1/admin/thread-summary?email=${encodeURIComponent(email)}&key=k1`, { headers });
+    const miss = await app.request(
+      `/v1/admin/thread-summary?email=${encodeURIComponent(email)}&key=k1`,
+      { headers },
+    );
     expect(miss.status).toBe(200);
     expect(((await miss.json()) as { summary: unknown }).summary).toBeNull();
 
     const post = await app.request('/v1/admin/thread-summary', {
       method: 'POST',
       headers,
-      body: JSON.stringify({ email, thread_key: 'k1', summary_fr: 'Il attend le pricing entreprise.' }),
+      body: JSON.stringify({
+        email,
+        thread_key: 'k1',
+        summary_fr: 'Il attend le pricing entreprise.',
+      }),
     });
     expect(post.status).toBe(201);
 
-    const hit = await app.request(`/v1/admin/thread-summary?email=${encodeURIComponent(email)}&key=k1`, { headers });
+    const hit = await app.request(
+      `/v1/admin/thread-summary?email=${encodeURIComponent(email)}&key=k1`,
+      { headers },
+    );
     const hitBody = (await hit.json()) as { summary: { summary_fr: string } | null };
     expect(hitBody.summary?.summary_fr).toContain('pricing');
 
     // A new message moves the key: the stale summary must not be served.
-    const stale = await app.request(`/v1/admin/thread-summary?email=${encodeURIComponent(email)}&key=k2`, { headers });
+    const stale = await app.request(
+      `/v1/admin/thread-summary?email=${encodeURIComponent(email)}&key=k2`,
+      { headers },
+    );
     expect(((await stale.json()) as { summary: unknown }).summary).toBeNull();
 
     const { getStatsDB } = await import('../lib/db.js');
@@ -356,7 +405,10 @@ describe('/v1/admin/thread-summary — cached French thread summaries', () => {
 });
 
 describe('/v1/admin/contact-notes — the operator working memory', () => {
-  const headers = { 'Content-Type': 'application/json', 'X-Admin-Secret': 'correct-horse-battery-staple' };
+  const headers = {
+    'Content-Type': 'application/json',
+    'X-Admin-Secret': 'correct-horse-battery-staple',
+  };
   const EMAIL = 'notes-probe@alpha.example.net';
 
   it('adds, lists (newest first) and deletes a note', async () => {
@@ -374,14 +426,21 @@ describe('/v1/admin/contact-notes — the operator working memory', () => {
     });
     expect(b.status).toBe(201);
 
-    const list = await app.request(`/v1/admin/contact-notes?email=${encodeURIComponent(EMAIL)}`, { headers });
+    const list = await app.request(`/v1/admin/contact-notes?email=${encodeURIComponent(EMAIL)}`, {
+      headers,
+    });
     const notes = ((await list.json()) as { notes: Array<{ id: number; note: string }> }).notes;
     expect(notes.length).toBe(2);
     expect(notes[0].note).toContain('VoP');
 
-    const del = await app.request(`/v1/admin/contact-notes?id=${notes[0].id}`, { method: 'DELETE', headers });
+    const del = await app.request(`/v1/admin/contact-notes?id=${notes[0].id}`, {
+      method: 'DELETE',
+      headers,
+    });
     expect(del.status).toBe(200);
-    const after = await app.request(`/v1/admin/contact-notes?email=${encodeURIComponent(EMAIL)}`, { headers });
+    const after = await app.request(`/v1/admin/contact-notes?email=${encodeURIComponent(EMAIL)}`, {
+      headers,
+    });
     expect(((await after.json()) as { notes: unknown[] }).notes.length).toBe(1);
 
     const { getStatsDB } = await import('../lib/db.js');
@@ -482,7 +541,10 @@ describe('POST /v1/admin/keys/relabel — regroup abuse cohorts', () => {
     ]) {
       const res = await app.request('/v1/admin/keys/relabel', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Admin-Secret': 'correct-horse-battery-staple' },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Admin-Secret': 'correct-horse-battery-staple',
+        },
         body: JSON.stringify(body),
       });
       expect(res.status).toBe(400);
@@ -510,7 +572,10 @@ describe('POST /v1/admin/keys/relabel — regroup abuse cohorts', () => {
 
     const res = await app.request('/v1/admin/keys/relabel', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Admin-Secret': 'correct-horse-battery-staple' },
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Admin-Secret': 'correct-horse-battery-staple',
+      },
       body: JSON.stringify({
         key_prefixes: [farm1, farm2, 'ifk_absent000'],
         email: 'cohorte-test@cohorte.invalid',
@@ -534,7 +599,9 @@ describe('POST /v1/admin/keys/relabel — regroup abuse cohorts', () => {
       .all(farm1, farm2) as Array<{ email: string }>;
     expect(relabeled.every((r) => r.email === 'cohorte-test@cohorte.invalid')).toBe(true);
 
-    const untouched = db.prepare('SELECT email FROM api_keys WHERE key_prefix = ?').get(bystander) as {
+    const untouched = db
+      .prepare('SELECT email FROM api_keys WHERE key_prefix = ?')
+      .get(bystander) as {
       email: string;
     };
     expect(untouched.email).toBe(`real-${suffix}@example.com`);
@@ -610,8 +677,16 @@ describe('POST /v1/keys/generate — per-network creation guard', () => {
     delete process.env.IBANFORGE_ADMIN_TEST_KEYS;
     process.env.MAIL_RELAY_URL = 'https://relay.test/api/relay/send';
     process.env.MAIL_RELAY_SECRET = 'shared-secret';
-    vi.stubGlobal('fetch', vi.fn(async () =>
-      new Response("send failed: {'x@alpha.example.net': (550, b'5.1.2 Recipient address rejected: Domain not found')}", { status: 502 })));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response(
+            "send failed: {'x@alpha.example.net': (550, b'5.1.2 Recipient address rejected: Domain not found')}",
+            { status: 502 },
+          ),
+      ),
+    );
     vi.spyOn(console, 'error').mockImplementation(() => {});
     try {
       const app = makeApp();
@@ -630,7 +705,10 @@ describe('POST /v1/keys/generate — per-network creation guard', () => {
     delete process.env.IBANFORGE_ADMIN_TEST_KEYS;
     process.env.MAIL_RELAY_URL = 'https://relay.test/api/relay/send';
     process.env.MAIL_RELAY_SECRET = 'shared-secret';
-    vi.stubGlobal('fetch', vi.fn(async () => new Response('unauthorized', { status: 401 })));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('unauthorized', { status: 401 })),
+    );
     vi.spyOn(console, 'error').mockImplementation(() => {});
     try {
       const app = makeApp();
@@ -658,7 +736,13 @@ describe('POST /v1/keys/generate — per-network creation guard', () => {
       body: JSON.stringify({
         email: `origin-${ts}@alpha-corp.example.net`,
         source: 'npm',
-        attribution: { landing: '/en/docs/quickstart', referrer: 'Google.com', utm_source: tag, utm_medium: 'Email', junk: 'x' },
+        attribution: {
+          landing: '/en/docs/quickstart',
+          referrer: 'Google.com',
+          utm_source: tag,
+          utm_medium: 'Email',
+          junk: 'x',
+        },
       }),
     });
     expect(first.status).toBe(201);
@@ -667,7 +751,12 @@ describe('POST /v1/keys/generate — per-network creation guard', () => {
     const { signupSources } = await import('../lib/signup-attribution.js');
     const s = signupSources(1);
     expect(s.channels.find((c) => c.channel === `utm:${tag}`)?.n).toBe(1);
-    expect(s.campaigns.find((c) => c.utm_source === tag)).toEqual({ utm_source: tag, utm_medium: 'email', utm_campaign: null, n: 1 });
+    expect(s.campaigns.find((c) => c.utm_source === tag)).toEqual({
+      utm_source: tag,
+      utm_medium: 'email',
+      utm_campaign: null,
+      n: 1,
+    });
     expect(s.landings.find((l) => l.path === '/en/docs/quickstart')?.n).toBeGreaterThanOrEqual(1);
     expect(s.referrers.find((r) => r.host === 'google.com')?.n).toBeGreaterThanOrEqual(1);
     expect(s.channels.find((c) => c.channel === 'api')?.n).toBeGreaterThanOrEqual(1);
@@ -678,7 +767,9 @@ describe('POST /v1/keys/generate — per-network creation guard', () => {
     const app = new Hono();
     app.route('/', adminSignupSources);
     expect((await app.request('/v1/admin/signup-sources')).status).toBe(401);
-    const ok = await app.request('/v1/admin/signup-sources?days=7', { headers: { 'X-Admin-Secret': 'correct-horse-battery-staple' } });
+    const ok = await app.request('/v1/admin/signup-sources?days=7', {
+      headers: { 'X-Admin-Secret': 'correct-horse-battery-staple' },
+    });
     expect(ok.status).toBe(200);
     const body = (await ok.json()) as { period_days: number; channels: unknown[]; total: number };
     expect(body.period_days).toBe(7);
@@ -761,7 +852,9 @@ describe('/v1/keys/report — the customer reads their own key', () => {
 
   it('answers a valid key with its own usage and report', async () => {
     const key = mintKey('acme@example.com');
-    const res = await makeApp().request('/v1/keys/report', { headers: { Authorization: `Bearer ${key}` } });
+    const res = await makeApp().request('/v1/keys/report', {
+      headers: { Authorization: `Bearer ${key}` },
+    });
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
       key_prefix: string;
@@ -784,7 +877,9 @@ describe('/v1/keys/report — the customer reads their own key', () => {
        VALUES ('POST', '/v1/iban/validate', 200, 12, 10, 2, ?)`,
     ).run(theirs.slice(0, 12));
 
-    const res = await makeApp().request('/v1/keys/report', { headers: { Authorization: `Bearer ${mine}` } });
+    const res = await makeApp().request('/v1/keys/report', {
+      headers: { Authorization: `Bearer ${mine}` },
+    });
     const body = (await res.json()) as { report: { total: number } };
     // The neighbour's call must not appear in my report.
     expect(body.report.total).toBe(0);
@@ -918,7 +1013,10 @@ describe('/v1/admin/backup', () => {
  * they refuse (no secret, no organisation) as for what they store.
  */
 describe('/v1/admin/institutional-contacts', () => {
-  const ADMIN = { 'Content-Type': 'application/json', 'X-Admin-Secret': 'correct-horse-battery-staple' };
+  const ADMIN = {
+    'Content-Type': 'application/json',
+    'X-Admin-Secret': 'correct-horse-battery-staple',
+  };
   const ALPHA = 'registry@alpha.example.net';
 
   const post = (path: string, body: unknown, headers: Record<string, string> = ADMIN) =>
@@ -927,15 +1025,21 @@ describe('/v1/admin/institutional-contacts', () => {
   async function purge() {
     const { ensureInstitutionalTable } = await import('../lib/institutional-contacts.js');
     ensureInstitutionalTable();
-    getStatsDB().prepare(`DELETE FROM institutional_contacts WHERE email LIKE '%@alpha.example.net'`).run();
+    getStatsDB()
+      .prepare(`DELETE FROM institutional_contacts WHERE email LIKE '%@alpha.example.net'`)
+      .run();
   }
 
   it('refuses all three endpoints without the admin secret', async () => {
     // The registry names who we are asking things of. It answers nobody else.
     expect((await makeApp().request('/v1/admin/institutional-contacts')).status).toBe(401);
     const json = { 'Content-Type': 'application/json' };
-    expect((await post('/v1/admin/institutional-contacts', { email: ALPHA }, json)).status).toBe(401);
-    expect((await post('/v1/admin/institutional-contacts/delete', { email: ALPHA }, json)).status).toBe(401);
+    expect((await post('/v1/admin/institutional-contacts', { email: ALPHA }, json)).status).toBe(
+      401,
+    );
+    expect(
+      (await post('/v1/admin/institutional-contacts/delete', { email: ALPHA }, json)).status,
+    ).toBe(401);
   });
 
   it('lists the registry for an authorised caller', async () => {
@@ -965,7 +1069,11 @@ describe('/v1/admin/institutional-contacts', () => {
   });
 
   it('answers 400 in French rather than storing a nameless row', async () => {
-    const res = await post('/v1/admin/institutional-contacts', { email: ALPHA, org: '', category: 'autorite' });
+    const res = await post('/v1/admin/institutional-contacts', {
+      email: ALPHA,
+      org: '',
+      category: 'autorite',
+    });
     expect(res.status).toBe(400);
     const body = (await res.json()) as { error: string; message: string };
     expect(body.error).toBe('invalid_input');
@@ -979,20 +1087,31 @@ describe('/v1/admin/institutional-contacts', () => {
 
   it('deletes a known address and reports a miss on an unknown one', async () => {
     await purge();
-    await post('/v1/admin/institutional-contacts', { email: ALPHA, org: 'Autorité Alpha', category: 'autorite' });
-    const del = await post('/v1/admin/institutional-contacts/delete', { email: ALPHA.toUpperCase() });
+    await post('/v1/admin/institutional-contacts', {
+      email: ALPHA,
+      org: 'Autorité Alpha',
+      category: 'autorite',
+    });
+    const del = await post('/v1/admin/institutional-contacts/delete', {
+      email: ALPHA.toUpperCase(),
+    });
     expect(del.status).toBe(200);
     const body = (await del.json()) as { deleted: number; contacts: Array<{ email: string }> };
     expect(body.deleted).toBe(1);
     expect(body.contacts.some((r) => r.email === ALPHA)).toBe(false);
     // A second delete must not pretend to have removed anything.
-    expect((await post('/v1/admin/institutional-contacts/delete', { email: ALPHA })).status).toBe(404);
+    expect((await post('/v1/admin/institutional-contacts/delete', { email: ALPHA })).status).toBe(
+      404,
+    );
   });
 });
 
 describe('GET /v1/admin/email-messages — the two optional cuts (TABS-12, TABS-03)', () => {
   const app = () => makeApp();
-  const H = { 'X-Admin-Secret': 'correct-horse-battery-staple', 'Content-Type': 'application/json' };
+  const H = {
+    'X-Admin-Secret': 'correct-horse-battery-staple',
+    'Content-Type': 'application/json',
+  };
   const DAY = '2026-09-01';
   const OLD = '2026-07-04';
 
@@ -1046,7 +1165,9 @@ describe('GET /v1/admin/email-messages — the two optional cuts (TABS-12, TABS-
     expect(rows).toHaveLength(2);
     expect(rows.every((m) => !('body' in m))).toBe(true);
     // Everything a list view actually draws is still there.
-    expect(rows.every((m) => typeof m.snippet === 'string' && typeof m.subject === 'string')).toBe(true);
+    expect(rows.every((m) => typeof m.snippet === 'string' && typeof m.subject === 'string')).toBe(
+      true,
+    );
   });
 
   it('keeps only the rows dated on or after `since`', async () => {

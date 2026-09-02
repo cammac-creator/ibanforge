@@ -26,8 +26,28 @@ export const FATF_BLACK_LIST: string[] = ['KP', 'IR', 'MM'];
  * − DZ (Algeria), − NA (Namibia) — both delisted after completed action plans.
  */
 export const FATF_GREY_LIST: string[] = [
-  'AO', 'BA', 'BO', 'BG', 'CM', 'CI', 'CD', 'HT', 'IQ', 'KE', 'KW',
-  'LA', 'LB', 'MC', 'NP', 'PG', 'SS', 'SY', 'VE', 'VN', 'VG', 'YE',
+  'AO',
+  'BA',
+  'BO',
+  'BG',
+  'CM',
+  'CI',
+  'CD',
+  'HT',
+  'IQ',
+  'KE',
+  'KW',
+  'LA',
+  'LB',
+  'MC',
+  'NP',
+  'PG',
+  'SS',
+  'SY',
+  'VE',
+  'VN',
+  'VG',
+  'YE',
 ];
 
 /**
@@ -41,10 +61,42 @@ export const FATF_SUSPENDED: string[] = ['RU'];
 
 /** FATF member jurisdictions — stable; membership changes are rare. */
 export const FATF_MEMBERS: string[] = [
-  'AR', 'AU', 'AT', 'BE', 'BR', 'CA', 'CN', 'DK', 'FI', 'FR',
-  'DE', 'GR', 'HK', 'IS', 'IN', 'IE', 'IL', 'IT', 'JP', 'KR',
-  'LU', 'MY', 'MX', 'NL', 'NZ', 'NO', 'PT', 'SA', 'SG',
-  'ZA', 'ES', 'SE', 'CH', 'TR', 'GB', 'US',
+  'AR',
+  'AU',
+  'AT',
+  'BE',
+  'BR',
+  'CA',
+  'CN',
+  'DK',
+  'FI',
+  'FR',
+  'DE',
+  'GR',
+  'HK',
+  'IS',
+  'IN',
+  'IE',
+  'IL',
+  'IT',
+  'JP',
+  'KR',
+  'LU',
+  'MY',
+  'MX',
+  'NL',
+  'NZ',
+  'NO',
+  'PT',
+  'SA',
+  'SG',
+  'ZA',
+  'ES',
+  'SE',
+  'CH',
+  'TR',
+  'GB',
+  'US',
 ];
 
 /** Countries under comprehensive sanctions regimes. */
@@ -52,5 +104,13 @@ export const SANCTIONED_COUNTRIES_COMPREHENSIVE: string[] = ['CU', 'IR', 'KP', '
 
 /** Countries under sectoral / partial sanctions regimes. */
 export const SANCTIONED_COUNTRIES_SECTORAL: string[] = [
-  'BY', 'VE', 'ZW', 'MM', 'SD', 'CF', 'SO', 'LY', 'YE',
+  'BY',
+  'VE',
+  'ZW',
+  'MM',
+  'SD',
+  'CF',
+  'SO',
+  'LY',
+  'YE',
 ];

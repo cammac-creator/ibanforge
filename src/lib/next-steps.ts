@@ -128,7 +128,10 @@ export function nextSteps(result: IBANValidationResult): NextStep[] {
   //    same kind of finding as a hand-verified BIC8 pairing and carries a date
   //    and an authority on top. Leaving it out would have ingested the EBA
   //    register and then withheld the one signal it exists to produce.
-  if ((issuer?.classification === 'curated' || issuer?.classification === 'register') && issuer.type !== 'bank') {
+  if (
+    (issuer?.classification === 'curated' || issuer?.classification === 'register') &&
+    issuer.type !== 'bank'
+  ) {
     steps.push({
       code: 'expect_virtual_iban',
       do: 'Expect a virtual IBAN. Account holder and IBAN holder often differ here, so weight the name check accordingly.',
@@ -145,8 +148,7 @@ export function nextSteps(result: IBANValidationResult): NextStep[] {
   if (issuer?.iban_issuer === 'not_listed') {
     steps.push({
       code: 'issuer_not_a_known_iban_issuer',
-      do:
-        'Do not treat this as a confirmed bank. The code resolves to a BIC, but its holder is not among the providers known to issue IBANs in this country, so the account may not exist. Verify the payee by name before sending.',
+      do: 'Do not treat this as a confirmed bank. The code resolves to a BIC, but its holder is not among the providers known to issue IBANs in this country, so the account may not exist. Verify the payee by name before sending.',
       because: 'issuer.iban_issuer is not_listed, so the BIC holder is not a known IBAN issuer',
     });
   }

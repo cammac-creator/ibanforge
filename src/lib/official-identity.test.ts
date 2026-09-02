@@ -36,7 +36,9 @@ function sampleEcbByLei(): { lei: string; name: string } | undefined {
 function sampleFrenchCode(): { national_bank_code: string; name: string } | undefined {
   if (!ecbLoaded) return undefined;
   return getBicDB()
-    .prepare("SELECT national_bank_code, name FROM ecb_mfi WHERE country = 'FR' AND national_bank_code IS NOT NULL LIMIT 1")
+    .prepare(
+      "SELECT national_bank_code, name FROM ecb_mfi WHERE country = 'FR' AND national_bank_code IS NOT NULL LIMIT 1",
+    )
     .get() as { national_bank_code: string; name: string } | undefined;
 }
 
@@ -71,7 +73,9 @@ function sampleSpanishCode(): { code: string; name: string } | undefined {
 function expectProvenanceContract(block: OfficialIdentity): void {
   const serialised = JSON.stringify(block);
   expect(block.source, 'every block names its publisher').toBeTruthy();
-  expect(block.as_of, 'every block is dated by the list it came from').toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  expect(block.as_of, 'every block is dated by the list it came from').toMatch(
+    /^\d{4}-\d{2}-\d{2}$/,
+  );
   expect(serialised, 'every block tells buyers the data is free at the source').toMatch(
     /free of charge|free at/i,
   );
@@ -96,28 +100,36 @@ describe('the provenance contract', () => {
     expectProvenanceContract(block);
   });
 
-  it.skipIf(!bdeLoaded)('holds on a Banco de España block, and carries their formula verbatim', () => {
-    const row = sampleSpanishCode()!;
-    const block = officialIdentityByNationalCode('ES', row.code)!;
-    expect(block).not.toBeNull();
-    expectProvenanceContract(block);
-    expect(block.source).toBe('Banco de España, list of MFIs');
-    // Word for word. Their terms require reproduction "faithfully, without any
-    // manipulation or alteration"; a paraphrased credit line is not the credit
-    // line we were given.
-    expect(block.attribution).toBe('Own elaboration based on data from the Banco de España website (www.bde.es)');
-  });
+  it.skipIf(!bdeLoaded)(
+    'holds on a Banco de España block, and carries their formula verbatim',
+    () => {
+      const row = sampleSpanishCode()!;
+      const block = officialIdentityByNationalCode('ES', row.code)!;
+      expect(block).not.toBeNull();
+      expectProvenanceContract(block);
+      expect(block.source).toBe('Banco de España, list of MFIs');
+      // Word for word. Their terms require reproduction "faithfully, without any
+      // manipulation or alteration"; a paraphrased credit line is not the credit
+      // line we were given.
+      expect(block.attribution).toBe(
+        'Own elaboration based on data from the Banco de España website (www.bde.es)',
+      );
+    },
+  );
 
-  it.skipIf(!bdeLoaded)('states the free-of-charge notice for the right publisher on a Spanish block', () => {
-    // The brief scoped this notice to the ECB. The Banco de España's own legal
-    // notice imposes the identical duty for information sold or transferred for
-    // consideration, so the Spanish block carries it too — pointing at bde.es,
-    // not at the ECB.
-    const row = sampleSpanishCode()!;
-    const block = officialIdentityByNationalCode('ES', row.code)!;
-    expect(block.free_of_charge).toContain('bde.es');
-    expect(block.free_of_charge).not.toContain('ecb.europa.eu');
-  });
+  it.skipIf(!bdeLoaded)(
+    'states the free-of-charge notice for the right publisher on a Spanish block',
+    () => {
+      // The brief scoped this notice to the ECB. The Banco de España's own legal
+      // notice imposes the identical duty for information sold or transferred for
+      // consideration, so the Spanish block carries it too — pointing at bde.es,
+      // not at the ECB.
+      const row = sampleSpanishCode()!;
+      const block = officialIdentityByNationalCode('ES', row.code)!;
+      expect(block.free_of_charge).toContain('bde.es');
+      expect(block.free_of_charge).not.toContain('ecb.europa.eu');
+    },
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -155,37 +167,40 @@ describe('officialIdentityByLei', () => {
     expect(officialIdentityByLei(row.lei.toLowerCase())?.name).toBe(row.name);
   });
 
-  it.skipIf(!ecbLoaded)('serves one identity to every BIC an institution owns (the LEI fan-out)', () => {
-    // A single LEI carries many BICs — measured 2026-08-26, 232 of the LEIs on
-    // this list map to more than one BIC8, and one of them covers 42 across as
-    // many countries. So one row legitimately answers many different BIC
-    // lookups, and it must answer the SAME thing each time: the identity is a
-    // fact about the legal entity, not about which of its BICs was asked.
-    const fanned = getBicDB()
-      .prepare(
-        `SELECT m.lei AS lei, COUNT(DISTINCT b.bic8) AS n
+  it.skipIf(!ecbLoaded)(
+    'serves one identity to every BIC an institution owns (the LEI fan-out)',
+    () => {
+      // A single LEI carries many BICs — measured 2026-08-26, 232 of the LEIs on
+      // this list map to more than one BIC8, and one of them covers 42 across as
+      // many countries. So one row legitimately answers many different BIC
+      // lookups, and it must answer the SAME thing each time: the identity is a
+      // fact about the legal entity, not about which of its BICs was asked.
+      const fanned = getBicDB()
+        .prepare(
+          `SELECT m.lei AS lei, COUNT(DISTINCT b.bic8) AS n
            FROM ecb_mfi m JOIN bic_entries b ON b.lei = m.lei
           GROUP BY m.lei HAVING n > 1 LIMIT 1`,
-      )
-      .get() as { lei: string; n: number } | undefined;
-    if (!fanned) return;
+        )
+        .get() as { lei: string; n: number } | undefined;
+      if (!fanned) return;
 
-    const bics = getBicDB()
-      .prepare('SELECT DISTINCT bic8, country_code FROM bic_entries WHERE lei = ? ORDER BY bic8')
-      .all(fanned.lei) as Array<{ bic8: string; country_code: string }>;
-    expect(bics.length).toBeGreaterThan(1);
+      const bics = getBicDB()
+        .prepare('SELECT DISTINCT bic8, country_code FROM bic_entries WHERE lei = ? ORDER BY bic8')
+        .all(fanned.lei) as Array<{ bic8: string; country_code: string }>;
+      expect(bics.length).toBeGreaterThan(1);
 
-    const blocks = bics.map(() => officialIdentityByLei(fanned.lei));
-    for (const block of blocks) {
-      expect(block).not.toBeNull();
-      expectProvenanceContract(block!);
-    }
-    // Identical, whichever BIC was the way in — and in particular not
-    // suppressed for the entity's foreign BICs, which is where a country scope
-    // borrowed from pra-banks.ts would have silently dropped the identity.
-    const distinct = new Set(blocks.map((b) => JSON.stringify(b)));
-    expect(distinct.size).toBe(1);
-  });
+      const blocks = bics.map(() => officialIdentityByLei(fanned.lei));
+      for (const block of blocks) {
+        expect(block).not.toBeNull();
+        expectProvenanceContract(block!);
+      }
+      // Identical, whichever BIC was the way in — and in particular not
+      // suppressed for the entity's foreign BICs, which is where a country scope
+      // borrowed from pra-banks.ts would have silently dropped the identity.
+      const distinct = new Set(blocks.map((b) => JSON.stringify(b)));
+      expect(distinct.size).toBe(1);
+    },
+  );
 });
 
 describe('officialIdentityByNationalCode', () => {
@@ -224,7 +239,9 @@ describe('officialIdentityByNationalCode', () => {
 
   it.skipIf(!bdeLoaded)('says nothing about a four-digit code Spain does not allocate', () => {
     const taken = new Set(
-      (getBicDB().prepare('SELECT code FROM bde_mfi').all() as Array<{ code: string }>).map((r) => r.code),
+      (getBicDB().prepare('SELECT code FROM bde_mfi').all() as Array<{ code: string }>).map(
+        (r) => r.code,
+      ),
     );
     const free = ['9999', '9998', '9997'].find((c) => !taken.has(c));
     expect(free).toBeDefined();
@@ -249,7 +266,9 @@ describe('enrichResult wiring', () => {
   it.skipIf(!ecbLoaded)('attaches the block to a French IBAN carrying a listed code banque', () => {
     const row = sampleFrenchCode()!;
     // Account digits are arbitrary; only the bank code is being exercised.
-    const result = validateIBAN(buildIban('FR', row.national_bank_code + '01005' + '0500013M02606'));
+    const result = validateIBAN(
+      buildIban('FR', row.national_bank_code + '01005' + '0500013M02606'),
+    );
     if (!result.valid) return;
     enrichResult(result);
     expect(result.official_identity).toBeDefined();
@@ -257,15 +276,18 @@ describe('enrichResult wiring', () => {
     expect(result.official_identity!.name).toBe(row.name);
   });
 
-  it.skipIf(!bdeLoaded)('attaches the block to a Spanish IBAN carrying a listed supervisory code', () => {
-    const row = sampleSpanishCode()!;
-    const result = validateIBAN(buildIban('ES', row.code + '0418450200051332'));
-    if (!result.valid) return;
-    enrichResult(result);
-    expect(result.official_identity).toBeDefined();
-    expectProvenanceContract(result.official_identity!);
-    expect(result.official_identity!.name).toBe(row.name);
-  });
+  it.skipIf(!bdeLoaded)(
+    'attaches the block to a Spanish IBAN carrying a listed supervisory code',
+    () => {
+      const row = sampleSpanishCode()!;
+      const result = validateIBAN(buildIban('ES', row.code + '0418450200051332'));
+      if (!result.valid) return;
+      enrichResult(result);
+      expect(result.official_identity).toBeDefined();
+      expectProvenanceContract(result.official_identity!);
+      expect(result.official_identity!.name).toBe(row.name);
+    },
+  );
 
   it.skipIf(!ecbLoaded || !bdeLoaded)('changes neither `valid` nor `bank_code_check`', () => {
     // The whole safety argument of this feature. Both publishers relay rather

@@ -68,7 +68,9 @@ describe('POST /v1/iban/compliance', () => {
     const { body } = await check('RU0204452560040702810412345678901');
     expect(body.valid).toBe(true);
     const c = body.compliance as {
-      risk_score: number; risk_level: string; flags: string[];
+      risk_score: number;
+      risk_level: string;
+      flags: string[];
       sanctions: { country_sanctioned: boolean; fatf_status: string };
     };
     expect(c.risk_score).toBeGreaterThanOrEqual(80);
@@ -147,7 +149,10 @@ describe('POST /v1/iban/compliance with a bic instead of an iban', () => {
   it('accepts the swift alias, because half the industry calls it that', async () => {
     const { status, body } = await screen({ swift: 'AGRULYLT' });
     expect(status).toBe(200);
-    expect(((body.compliance as Record<string, unknown>).sanctions as Record<string, unknown>).bank_sanctioned).toBe(true);
+    expect(
+      ((body.compliance as Record<string, unknown>).sanctions as Record<string, unknown>)
+        .bank_sanctioned,
+    ).toBe(true);
   });
 
   it('refuses both fields at once rather than silently picking one', async () => {

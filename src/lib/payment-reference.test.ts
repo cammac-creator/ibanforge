@@ -333,7 +333,10 @@ describe('QRR / SCOR pairing against a Swiss account', () => {
 
 describe('pairing outside Switzerland', () => {
   it('is not_applicable for a QRR on a German IBAN', () => {
-    const block = buildReferenceCheck(validateIBAN('DE89370400440532013000'), '210000000003139471430009017');
+    const block = buildReferenceCheck(
+      validateIBAN('DE89370400440532013000'),
+      '210000000003139471430009017',
+    );
     expect(block.pairing).toBe('not_applicable');
     expect(block.note).toMatch(/Swiss Payment Standards rule/);
   });
@@ -359,7 +362,10 @@ describe('pairing outside Switzerland', () => {
     // The codes appear in a column of the guidelines; their wording lives in a
     // status-report document that was not consulted. The block refers to the
     // guidelines without quoting a label.
-    const block = buildReferenceCheck(validateIBAN('CH5204835012345671000'), '210000000003139471430009017');
+    const block = buildReferenceCheck(
+      validateIBAN('CH5204835012345671000'),
+      '210000000003139471430009017',
+    );
     expect(block.note).not.toMatch(/CH1[67]/);
     expect(JSON.stringify(block)).not.toMatch(/CH1[67]/);
   });

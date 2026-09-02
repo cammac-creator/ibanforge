@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { lookupNationalCode, nationalRegisterAvailable, normaliseCode } from './national-registers.js';
+import {
+  lookupNationalCode,
+  nationalRegisterAvailable,
+  normaliseCode,
+} from './national-registers.js';
 
 /**
  * Austria and Belgium share one table because they are structurally the same

@@ -3,7 +3,13 @@ import type Database from 'better-sqlite3';
 import { getStatsDB } from './db.js';
 import { isInternalEmail, registerInternalEmailFn } from './internal-accounts.js';
 import type { RejectReason } from './input-normalize.js';
-import type { OperationType, StatsOverview, HourlyStatsResponse, ErrorStatsResponse, PatternStatsResponse } from '../types.js';
+import type {
+  OperationType,
+  StatsOverview,
+  HourlyStatsResponse,
+  ErrorStatsResponse,
+  PatternStatsResponse,
+} from '../types.js';
 
 // ---------------------------------------------------------------------------
 // Cached prepared statements
@@ -93,12 +99,18 @@ export function hashIp(ip: string | null | undefined): string | null {
  * the LAST segment, so we read that. `x-real-ip` (set by the proxy itself) is
  * preferred when present.
  */
-export function extractClientIp(headers: { 'x-forwarded-for'?: string | null; 'x-real-ip'?: string | null }): string | null {
+export function extractClientIp(headers: {
+  'x-forwarded-for'?: string | null;
+  'x-real-ip'?: string | null;
+}): string | null {
   const realIp = headers['x-real-ip']?.trim();
   if (realIp) return realIp;
   const xff = headers['x-forwarded-for'];
   if (xff) {
-    const parts = xff.split(',').map((p) => p.trim()).filter(Boolean);
+    const parts = xff
+      .split(',')
+      .map((p) => p.trim())
+      .filter(Boolean);
     const last = parts[parts.length - 1];
     if (last) return last;
   }
@@ -189,7 +201,15 @@ export function classifyClient(path: string, userAgent: string | undefined): Cli
   // agent-originated calls, not just those via npm i ibanforge-mcp.
   if (AGENT_PATTERNS.some((p) => ua.includes(p))) return 'mcp_stdio';
   if (BOT_PATTERNS.some((p) => ua.includes(p))) return 'bot';
-  if (ua.includes('mozilla') && (ua.includes('webkit') || ua.includes('gecko') || ua.includes('chrome') || ua.includes('safari') || ua.includes('firefox') || ua.includes('edge'))) {
+  if (
+    ua.includes('mozilla') &&
+    (ua.includes('webkit') ||
+      ua.includes('gecko') ||
+      ua.includes('chrome') ||
+      ua.includes('safari') ||
+      ua.includes('firefox') ||
+      ua.includes('edge'))
+  ) {
     return 'web';
   }
   return 'api';
@@ -294,16 +314,20 @@ function redactSegment(segment: string): string {
  */
 export function normalizeRequestPath(path: string): string {
   const redacted = path.split('/').map(redactSegment).join('/');
-  return redacted
-    .replace(/\/v1\/bic\/[^/?]+/, (match) => (SPEC_TEMPLATE_SEGMENT.test(match) ? match : '/v1/bic/:code'))
-    .replace(/\/v1\/ch\/clearing\/[^/?]+/, (match) =>
-      SPEC_TEMPLATE_SEGMENT.test(match) ? match : '/v1/ch/clearing/:iid',
-    )
-    // Both segments are one-time credentials that hand out an API key in clear
-    // (SEC-02, 2026-09-01). A stored session id or settlement reference would be
-    // replayable by anyone reading the table; the label is all a dashboard needs.
-    .replace(/\/v1\/stripe\/key\/[^/?]+/, '/v1/stripe/key/:session_id')
-    .replace(/\/v1\/credits\/recover\/[^/?]+/, '/v1/credits/recover/:ref');
+  return (
+    redacted
+      .replace(/\/v1\/bic\/[^/?]+/, (match) =>
+        SPEC_TEMPLATE_SEGMENT.test(match) ? match : '/v1/bic/:code',
+      )
+      .replace(/\/v1\/ch\/clearing\/[^/?]+/, (match) =>
+        SPEC_TEMPLATE_SEGMENT.test(match) ? match : '/v1/ch/clearing/:iid',
+      )
+      // Both segments are one-time credentials that hand out an API key in clear
+      // (SEC-02, 2026-09-01). A stored session id or settlement reference would be
+      // replayable by anyone reading the table; the label is all a dashboard needs.
+      .replace(/\/v1\/stripe\/key\/[^/?]+/, '/v1/stripe/key/:session_id')
+      .replace(/\/v1\/credits\/recover\/[^/?]+/, '/v1/credits/recover/:ref')
+  );
 }
 
 /**
@@ -330,7 +354,18 @@ export function recordRequest(
     // identifier-shaped segment before it reaches storage (see above).
     const normalizedPath = normalizeRequestPath(path);
     const truncatedUa = userAgent ? userAgent.slice(0, 256) : null;
-    insertRequest().run(method, normalizedPath, status, Math.round(responseMs), hour, dow, clientKind, ipHash, truncatedUa, keyPrefix);
+    insertRequest().run(
+      method,
+      normalizedPath,
+      status,
+      Math.round(responseMs),
+      hour,
+      dow,
+      clientKind,
+      ipHash,
+      truncatedUa,
+      keyPrefix,
+    );
   } catch (err) {
     // Request tracking is non-critical and must never break the API, but a
     // silent swallow would hide a broken stats DB. Log without rethrowing.
@@ -358,7 +393,15 @@ export function recordOperation(
     const hour = new Date().getUTCHours();
     const dow = (new Date().getUTCDay() + 6) % 7; // 0=Mon, 6=Sun
     const truncatedError = errorDetail ? errorDetail.slice(0, 12) : null;
-    insertOp().run(type, countryCode, success ? 1 : 0, hour, dow, truncatedError, keyPrefix ?? null);
+    insertOp().run(
+      type,
+      countryCode,
+      success ? 1 : 0,
+      hour,
+      dow,
+      truncatedError,
+      keyPrefix ?? null,
+    );
     upsertDaily().run(type, 1, success ? 1 : 0, revenueUsdc);
     upsertHourly().run(hour, dow, type, 1, success ? 1 : 0);
     return true;
@@ -487,10 +530,12 @@ export function recordBatch(
     const tx = db.transaction(() => {
       const stmt = insertOp();
       if (outcomes) {
-        for (const o of outcomes) stmt.run('iban_batch', o.country, o.valid ? 1 : 0, hour, dow, null, key);
+        for (const o of outcomes)
+          stmt.run('iban_batch', o.country, o.valid ? 1 : 0, hour, dow, null, key);
       } else {
         for (let i = 0; i < validCount; i++) stmt.run('iban_batch', null, 1, hour, dow, null, key);
-        for (let i = 0; i < count - validCount; i++) stmt.run('iban_batch', null, 0, hour, dow, null, key);
+        for (let i = 0; i < count - validCount; i++)
+          stmt.run('iban_batch', null, 0, hour, dow, null, key);
       }
       upsertDaily().run('iban_batch', count, validCount, revenueUsdc);
       upsertHourly().run(hour, dow, 'iban_batch', count, validCount);
@@ -529,8 +574,8 @@ export interface SourceStatsRow {
    * cards the page puts side by side to answer the same question.
    */
   paid_calls: number;
-  paywall_hits: number;      // status 402 (discovery probes + unauth attempts)
-  errors: number;            // status >= 400, excluding 402
+  paywall_hits: number; // status 402 (discovery probes + unauth attempts)
+  errors: number; // status >= 400, excluding 402
   avg_response_ms: number;
 }
 
@@ -572,7 +617,9 @@ export function getSourceStats(days: number): SourceStatsResponse {
   // N dates today included, exactly like getTrafficTrend.
   const since = `-${Math.max(0, days - 1)} days`;
 
-  const byKind = db.prepare(`
+  const byKind = db
+    .prepare(
+      `
     SELECT
       COALESCE(client_kind, 'api') AS client_kind,
       COUNT(*) AS total,
@@ -588,9 +635,13 @@ export function getSourceStats(days: number): SourceStatsResponse {
     WHERE created_at >= date('now', ?)
     GROUP BY COALESCE(client_kind, 'api')
     ORDER BY total DESC
-  `).all(...billable.params, since) as SourceStatsRow[];
+  `,
+    )
+    .all(...billable.params, since) as SourceStatsRow[];
 
-  const breakdown = db.prepare(`
+  const breakdown = db
+    .prepare(
+      `
     SELECT
       path,
       COALESCE(client_kind, 'api') AS client_kind,
@@ -602,7 +653,14 @@ export function getSourceStats(days: number): SourceStatsResponse {
     GROUP BY path, COALESCE(client_kind, 'api')
     ORDER BY total DESC
     LIMIT 50
-  `).all(since, ...billable.params) as Array<{ path: string; client_kind: ClientKind; total: number; success: number }>;
+  `,
+    )
+    .all(since, ...billable.params) as Array<{
+    path: string;
+    client_kind: ClientKind;
+    total: number;
+    success: number;
+  }>;
 
   const total = byKind.reduce((acc, r) => acc + r.total, 0);
 
@@ -784,18 +842,23 @@ function internalOpPrefixes(): string[] {
  * signal, and they cannot be attributed to anyone, ours included.
  */
 const EXTERNAL_ONLY_SQL =
-  "AND (key_prefix IS NULL OR key_prefix NOT IN (SELECT key_prefix FROM api_keys WHERE is_internal_email(email)))";
+  'AND (key_prefix IS NULL OR key_prefix NOT IN (SELECT key_prefix FROM api_keys WHERE is_internal_email(email)))';
 
 function excludePrefixClause(excluded: string[]): string {
   if (excluded.length === 0) return '';
   return ` AND (key_prefix IS NULL OR key_prefix NOT IN (${excluded.map(() => '?').join(',')}))`;
 }
 
-function typeStats(type: OperationType, excluded: string[] = []): { total: number; success_count: number } {
-  const row = getStatsDB().prepare(
-    'SELECT COUNT(*) as total, COALESCE(SUM(success), 0) as success_count FROM operations WHERE operation_type = ? AND reject_reason IS NULL' +
-      excludePrefixClause(excluded)
-  ).get(type, ...excluded) as { total: number; success_count: number };
+function typeStats(
+  type: OperationType,
+  excluded: string[] = [],
+): { total: number; success_count: number } {
+  const row = getStatsDB()
+    .prepare(
+      'SELECT COUNT(*) as total, COALESCE(SUM(success), 0) as success_count FROM operations WHERE operation_type = ? AND reject_reason IS NULL' +
+        excludePrefixClause(excluded),
+    )
+    .get(type, ...excluded) as { total: number; success_count: number };
   return row;
 }
 
@@ -809,14 +872,24 @@ function typeStats(type: OperationType, excluded: string[] = []): { total: numbe
  * ask both questions on the SAME window and the same population; the coherence
  * test asserts the pair sums to 100.
  */
-export function getTypeSuccessRate(type: OperationType, days?: number): { total: number; success_rate: number } {
+export function getTypeSuccessRate(
+  type: OperationType,
+  days?: number,
+): { total: number; success_rate: number } {
   const db = getStatsDB();
   registerInternalEmailFn(db);
   const windowClause = days == null ? '' : " AND created_at >= date('now', '-' || ? || ' days')";
-  const row = db.prepare(
-    'SELECT COUNT(*) as total, COALESCE(SUM(success), 0) as success_count FROM operations' +
-      ' WHERE operation_type = ? AND reject_reason IS NULL ' + EXTERNAL_ONLY_SQL + windowClause
-  ).get(...(days == null ? [type] : [type, Math.max(0, days - 1)])) as { total: number; success_count: number };
+  const row = db
+    .prepare(
+      'SELECT COUNT(*) as total, COALESCE(SUM(success), 0) as success_count FROM operations' +
+        ' WHERE operation_type = ? AND reject_reason IS NULL ' +
+        EXTERNAL_ONLY_SQL +
+        windowClause,
+    )
+    .get(...(days == null ? [type] : [type, Math.max(0, days - 1)])) as {
+    total: number;
+    success_count: number;
+  };
   return { total: row.total, success_rate: rate(row.total, row.success_count) };
 }
 
@@ -837,17 +910,19 @@ export function getStats(): StatsOverview {
 
   const totalOps = ibanVal.total + ibanBatch.total + bicLookup.total;
 
-  const revenue = db.prepare(
-    'SELECT COALESCE(SUM(revenue_usdc), 0) as total FROM daily_stats'
-  ).get() as { total: number };
+  const revenue = db
+    .prepare('SELECT COALESCE(SUM(revenue_usdc), 0) as total FROM daily_stats')
+    .get() as { total: number };
 
   // The early x402 rollout (before 2026-04-18) recorded attempted payments
   // whose on-chain settlement never happened — see revenue_note below. The
   // clean figure starts after that drift so the dashboard can show a sum
   // that is not knowingly overstated.
-  const revenueClean = db.prepare(
-    "SELECT COALESCE(SUM(revenue_usdc), 0) as total FROM daily_stats WHERE date >= '2026-04-18'"
-  ).get() as { total: number };
+  const revenueClean = db
+    .prepare(
+      "SELECT COALESCE(SUM(revenue_usdc), 0) as total FROM daily_stats WHERE date >= '2026-04-18'",
+    )
+    .get() as { total: number };
 
   // `days` is the field that makes this table usable for a decision, and its
   // absence made the raw counts actively misleading. A country seen 426 times
@@ -855,14 +930,16 @@ export function getStats(): StatsOverview {
   // fifty days is a customer with the product wired in. Ranking coverage work
   // on `count` alone puts the burst first. `first_seen`/`last_seen` separate a
   // country that is still active from one that stopped months ago.
-  const topCountries = db.prepare(
-    'SELECT country_code as country, COUNT(*) as count,' +
-      " COUNT(DISTINCT date(created_at)) as days," +
-      ' MIN(date(created_at)) as first_seen, MAX(date(created_at)) as last_seen' +
-      ' FROM operations WHERE country_code IS NOT NULL' +
-      excludePrefixClause(excluded) +
-      ' GROUP BY country_code ORDER BY count DESC LIMIT 30'
-  ).all(...excluded) as Array<{
+  const topCountries = db
+    .prepare(
+      'SELECT country_code as country, COUNT(*) as count,' +
+        ' COUNT(DISTINCT date(created_at)) as days,' +
+        ' MIN(date(created_at)) as first_seen, MAX(date(created_at)) as last_seen' +
+        ' FROM operations WHERE country_code IS NOT NULL' +
+        excludePrefixClause(excluded) +
+        ' GROUP BY country_code ORDER BY count DESC LIMIT 30',
+    )
+    .all(...excluded) as Array<{
     country: string;
     count: number;
     days: number;
@@ -870,34 +947,42 @@ export function getStats(): StatsOverview {
     last_seen: string;
   }>;
 
-  const last7 = db.prepare(
-    "SELECT date, SUM(total) as total, SUM(revenue_usdc) as revenue FROM daily_stats WHERE date >= date('now', '-6 days') GROUP BY date ORDER BY date DESC"
-  ).all() as Array<{ date: string; total: number; revenue: number }>;
+  const last7 = db
+    .prepare(
+      "SELECT date, SUM(total) as total, SUM(revenue_usdc) as revenue FROM daily_stats WHERE date >= date('now', '-6 days') GROUP BY date ORDER BY date DESC",
+    )
+    .all() as Array<{ date: string; total: number; revenue: number }>;
 
   // Total HTTP requests (all traffic)
-  const totalRequests = db.prepare(
-    'SELECT COUNT(*) as total FROM request_log'
-  ).get() as { total: number };
+  const totalRequests = db.prepare('SELECT COUNT(*) as total FROM request_log').get() as {
+    total: number;
+  };
 
-  const requestsByPath = db.prepare(
-    'SELECT path, COUNT(*) as count, ROUND(AVG(response_ms), 0) as avg_ms FROM request_log GROUP BY path ORDER BY count DESC LIMIT 15'
-  ).all() as Array<{ path: string; count: number; avg_ms: number }>;
+  const requestsByPath = db
+    .prepare(
+      'SELECT path, COUNT(*) as count, ROUND(AVG(response_ms), 0) as avg_ms FROM request_log GROUP BY path ORDER BY count DESC LIMIT 15',
+    )
+    .all() as Array<{ path: string; count: number; avg_ms: number }>;
 
-  const requestsByStatus = db.prepare(
-    "SELECT CASE WHEN status >= 200 AND status < 300 THEN '2xx' WHEN status >= 300 AND status < 400 THEN '3xx' WHEN status >= 400 AND status < 500 THEN '4xx' ELSE '5xx' END as status_group, COUNT(*) as count FROM request_log GROUP BY status_group ORDER BY status_group"
-  ).all() as Array<{ status_group: string; count: number }>;
+  const requestsByStatus = db
+    .prepare(
+      "SELECT CASE WHEN status >= 200 AND status < 300 THEN '2xx' WHEN status >= 300 AND status < 400 THEN '3xx' WHEN status >= 400 AND status < 500 THEN '4xx' ELSE '5xx' END as status_group, COUNT(*) as count FROM request_log GROUP BY status_group ORDER BY status_group",
+    )
+    .all() as Array<{ status_group: string; count: number }>;
 
-  const requestsToday = db.prepare(
-    "SELECT COUNT(*) as total FROM request_log WHERE created_at >= datetime('now', 'start of day')"
-  ).get() as { total: number };
+  const requestsToday = db
+    .prepare(
+      "SELECT COUNT(*) as total FROM request_log WHERE created_at >= datetime('now', 'start of day')",
+    )
+    .get() as { total: number };
 
   // Freshness witness: when the collector dies (auth broken, disk full,
   // middleware unplugged), every counter above reads zero — exactly like a
   // quiet day. The dashboard compares this timestamp to the clock instead of
   // trusting the zeros.
-  const lastWrite = db.prepare(
-    'SELECT MAX(created_at) as last FROM request_log'
-  ).get() as { last: string | null };
+  const lastWrite = db.prepare('SELECT MAX(created_at) as last FROM request_log').get() as {
+    last: string | null;
+  };
 
   return {
     total_requests: totalRequests.total,
@@ -1004,7 +1089,9 @@ export function getStatsHistory(days: number = 7): Array<{
   // daily_stats. These are OPERATIONS SERVED, not HTTP calls. The card title
   // that says "Appels API" is the remaining half of DASH-05 and it lives in
   // the dashboard page, not here.
-  const opsRows = db.prepare(`
+  const opsRows = db
+    .prepare(
+      `
     SELECT
       date(created_at) as date,
       SUM(CASE WHEN operation_type = 'iban_validate' THEN 1 ELSE 0 END) as iban_validate,
@@ -1016,36 +1103,48 @@ export function getStatsHistory(days: number = 7): Array<{
       ${EXTERNAL_ONLY_SQL}
     GROUP BY date(created_at)
     ORDER BY date ASC
-  `).all(days - 1) as Array<{
+  `,
+    )
+    .all(days - 1) as Array<{
     date: string;
     iban_validate: number;
     iban_batch: number;
     bic_lookup: number;
   }>;
 
-  const internalRows = db.prepare(`
+  const internalRows = db
+    .prepare(
+      `
     SELECT date(created_at) as date, COUNT(*) as internal
     FROM operations
     WHERE created_at >= date('now', '-' || ? || ' days')
       AND reject_reason IS NULL
       AND key_prefix IN (SELECT key_prefix FROM api_keys WHERE is_internal_email(email))
     GROUP BY date(created_at)
-  `).all(days - 1) as Array<{ date: string; internal: number }>;
+  `,
+    )
+    .all(days - 1) as Array<{ date: string; internal: number }>;
 
   // Revenue stays on daily_stats: `operations` never carried it, and pack sales
   // (credits_purchase) have no operation row at all.
-  const revRows = db.prepare(`
+  const revRows = db
+    .prepare(
+      `
     SELECT date, COALESCE(SUM(revenue_usdc), 0) as revenue_usdc
     FROM daily_stats
     WHERE date >= date('now', '-' || ? || ' days')
     GROUP BY date
-  `).all(days - 1) as Array<{ date: string; revenue_usdc: number }>;
+  `,
+    )
+    .all(days - 1) as Array<{ date: string; revenue_usdc: number }>;
 
   // Total HTTP requests from request_log, broken down by status group.
   // The window is widened by 8 weeks beyond the requested period: the extra
   // days never leave this function, they only feed the expected band (a
   // 7-day view has no same-weekday history of its own to compare against).
-  const reqRows = db.prepare(`
+  const reqRows = db
+    .prepare(
+      `
     SELECT date(created_at) as date, COUNT(*) as total_requests,
       SUM(CASE WHEN status >= 200 AND status < 300 THEN 1 ELSE 0 END) as s2xx,
       SUM(CASE WHEN status >= 300 AND status < 400 THEN 1 ELSE 0 END) as s3xx,
@@ -1054,7 +1153,16 @@ export function getStatsHistory(days: number = 7): Array<{
     FROM request_log
     WHERE created_at >= datetime('now', '-' || ? || ' days')
     GROUP BY date(created_at)
-  `).all(days + 56) as Array<{ date: string; total_requests: number; s2xx: number; s3xx: number; s4xx: number; s5xx: number }>;
+  `,
+    )
+    .all(days + 56) as Array<{
+    date: string;
+    total_requests: number;
+    s2xx: number;
+    s3xx: number;
+    s4xx: number;
+    s5xx: number;
+  }>;
 
   /**
    * Daily median and 95th percentile of served latency.
@@ -1080,7 +1188,9 @@ export function getStatsHistory(days: number = 7): Array<{
    * answer is the gap the page already knows how to render.
    */
   const MIN_SAMPLES_FOR_P99 = 100;
-  const latRows = db.prepare(`
+  const latRows = db
+    .prepare(
+      `
     WITH ranked AS (
       SELECT date(created_at) AS d, response_ms,
              ROW_NUMBER() OVER (PARTITION BY date(created_at) ORDER BY response_ms) AS rn,
@@ -1096,10 +1206,18 @@ export function getStatsHistory(days: number = 7): Array<{
            MAX(CASE WHEN rn = MAX(1, CAST(n * 0.99 AS INTEGER)) THEN response_ms END) AS p99
       FROM ranked
      GROUP BY d
-  `).all(days) as Array<{ date: string; n: number; p50: number | null; p95: number | null; p99: number | null }>;
+  `,
+    )
+    .all(days) as Array<{
+    date: string;
+    n: number;
+    p50: number | null;
+    p95: number | null;
+    p99: number | null;
+  }>;
 
   const latMap = new Map(
-    latRows.map(r => [
+    latRows.map((r) => [
       r.date,
       {
         ...(r.n >= MIN_SAMPLES_FOR_PERCENTILE
@@ -1110,7 +1228,7 @@ export function getStatsHistory(days: number = 7): Array<{
     ]),
   );
 
-  const reqMap = new Map(reqRows.map(r => [r.date, r]));
+  const reqMap = new Map(reqRows.map((r) => [r.date, r]));
 
   // Expected band per date: min/max of the totals of up to 8 PRIOR dates
   // sharing its weekday. Under 3 samples the band is null — a band drawn
@@ -1141,14 +1259,20 @@ export function getStatsHistory(days: number = 7): Array<{
   // dates, and the off-by-one stayed invisible until the database had rows
   // on every date of a window: a 7-day status page then grew an 8th column.
   const cutoff = new Date(Date.now() - (days - 1) * 86_400_000).toISOString().slice(0, 10);
-  const allDates = [...new Set([...opsRows.map(r => r.date), ...reqRows.map(r => r.date), ...revRows.map(r => r.date)])]
-    .filter(d => d >= cutoff)
+  const allDates = [
+    ...new Set([
+      ...opsRows.map((r) => r.date),
+      ...reqRows.map((r) => r.date),
+      ...revRows.map((r) => r.date),
+    ]),
+  ]
+    .filter((d) => d >= cutoff)
     .sort();
-  const opsMap = new Map(opsRows.map(r => [r.date, r]));
-  const revMap = new Map(revRows.map(r => [r.date, r.revenue_usdc]));
-  const internalMap = new Map(internalRows.map(r => [r.date, r.internal]));
+  const opsMap = new Map(opsRows.map((r) => [r.date, r]));
+  const revMap = new Map(revRows.map((r) => [r.date, r.revenue_usdc]));
+  const internalMap = new Map(internalRows.map((r) => [r.date, r.internal]));
 
-  return allDates.map(date => {
+  return allDates.map((date) => {
     const req = reqMap.get(date);
     const rev = revMap.get(date) ?? 0;
     const b = band(date);
@@ -1178,19 +1302,30 @@ export function getStatsHistory(days: number = 7): Array<{
 /**
  * Quick counts for health endpoint
  */
-export function getQuickStats(): { total_operations: number; iban_validations: number; bic_lookups: number; success_rate: number } {
+export function getQuickStats(): {
+  total_operations: number;
+  iban_validations: number;
+  bic_lookups: number;
+  success_rate: number;
+} {
   const db = getStatsDB();
-  const row = db.prepare(
-    'SELECT COUNT(*) as total, COALESCE(SUM(success), 0) as success_count FROM operations WHERE reject_reason IS NULL'
-  ).get() as { total: number; success_count: number };
+  const row = db
+    .prepare(
+      'SELECT COUNT(*) as total, COALESCE(SUM(success), 0) as success_count FROM operations WHERE reject_reason IS NULL',
+    )
+    .get() as { total: number; success_count: number };
 
-  const ibanCount = db.prepare(
-    "SELECT COUNT(*) as cnt FROM operations WHERE operation_type IN ('iban_validate', 'iban_batch') AND reject_reason IS NULL"
-  ).get() as { cnt: number };
+  const ibanCount = db
+    .prepare(
+      "SELECT COUNT(*) as cnt FROM operations WHERE operation_type IN ('iban_validate', 'iban_batch') AND reject_reason IS NULL",
+    )
+    .get() as { cnt: number };
 
-  const bicCount = db.prepare(
-    "SELECT COUNT(*) as cnt FROM operations WHERE operation_type = 'bic_lookup' AND reject_reason IS NULL"
-  ).get() as { cnt: number };
+  const bicCount = db
+    .prepare(
+      "SELECT COUNT(*) as cnt FROM operations WHERE operation_type = 'bic_lookup' AND reject_reason IS NULL",
+    )
+    .get() as { cnt: number };
 
   return {
     total_operations: row.total,
@@ -1207,13 +1342,17 @@ export function getHourlyStats(days: number = 7): HourlyStatsResponse {
   const db = getStatsDB();
 
   // Aggregate by day_of_week + hour across the requested period
-  const heatmapRows = db.prepare(`
+  const heatmapRows = db
+    .prepare(
+      `
     SELECT day_of_week as day, hour, SUM(total) as total
     FROM hourly_stats
     WHERE date >= date('now', '-' || ? || ' days')
     GROUP BY day_of_week, hour
     ORDER BY day_of_week, hour
-  `).all(days) as Array<{ day: number; hour: number; total: number }>;
+  `,
+    )
+    .all(days) as Array<{ day: number; hour: number; total: number }>;
 
   // Find peak 6-hour window by summing across all days
   const hourTotals: number[] = Array(24).fill(0);
@@ -1240,12 +1379,16 @@ export function getHourlyStats(days: number = 7): HourlyStatsResponse {
     dayTotals[row.day] = (dayTotals[row.day] ?? 0) + row.total;
   }
   const avgDayTotal = dayTotals.reduce((a, b) => a + b, 0) / 7;
-  const peakDays = dayTotals.map((t, i) => ({ i, t })).filter(({ t }) => t > avgDayTotal).map(({ i }) => i);
+  const peakDays = dayTotals
+    .map((t, i) => ({ i, t }))
+    .filter(({ t }) => t > avgDayTotal)
+    .map(({ i }) => i);
 
   // Weekend drop %: compare Sat(5)+Sun(6) vs Mon(0)+Tue(1)+Wed(2)+Thu(3)+Fri(4)
   const weekdayTotal = [0, 1, 2, 3, 4].reduce((sum, d) => sum + (dayTotals[d] ?? 0), 0) / 5;
   const weekendTotal = [5, 6].reduce((sum, d) => sum + (dayTotals[d] ?? 0), 0) / 2;
-  const weekendDropPct = weekdayTotal > 0 ? Math.round(((weekdayTotal - weekendTotal) / weekdayTotal) * 10000) / 100 : 0;
+  const weekendDropPct =
+    weekdayTotal > 0 ? Math.round(((weekdayTotal - weekendTotal) / weekdayTotal) * 10000) / 100 : 0;
 
   return {
     heatmap: heatmapRows,
@@ -1308,7 +1451,10 @@ export function getBusinessFunnel(days: number = 30): BusinessFunnelDay[] {
   // Anonymous traffic (key_prefix NULL) stays counted: it can't be attributed,
   // and x402 demand is precisely what the funnel exists to measure.
   const internalPrefixes = (
-    db.prepare('SELECT key_prefix, email FROM api_keys').all() as Array<{ key_prefix: string; email: string }>
+    db.prepare('SELECT key_prefix, email FROM api_keys').all() as Array<{
+      key_prefix: string;
+      email: string;
+    }>
   )
     .filter((k) => isInternalEmail(k.email))
     .map((k) => k.key_prefix);
@@ -1319,7 +1465,9 @@ export function getBusinessFunnel(days: number = 30): BusinessFunnelDay[] {
   // the billable path-prefix but are never real business traffic, just scanners
   // or agents mis-substituting the OpenAPI spec template variables. Counting
   // them as "bad_input" made the funnel look 100% broken.
-  const rows = db.prepare(`
+  const rows = db
+    .prepare(
+      `
     SELECT
       date(created_at) as date,
       SUM(CASE WHEN status >= 200 AND status < 300 THEN 1 ELSE 0 END) as success,
@@ -1338,7 +1486,9 @@ export function getBusinessFunnel(days: number = 30): BusinessFunnelDay[] {
       ${internalFilter}
     GROUP BY date(created_at)
     ORDER BY date ASC
-  `).all(Math.max(0, days - 1), ...filter.params, ...internalPrefixes) as BusinessFunnelDay[];
+  `,
+    )
+    .all(Math.max(0, days - 1), ...filter.params, ...internalPrefixes) as BusinessFunnelDay[];
   return rows;
 }
 
@@ -1465,7 +1615,9 @@ export function getClientProfiles(days = 90): Record<string, ClientProfile> {
   for (const p of Object.values(out)) {
     const n = Number((nth.get(p.key_prefix) as { n: number }).n);
     if (n === 0) continue;
-    const row = p95.get(p.key_prefix, Math.min(n - 1, Math.floor(n * 0.95))) as { response_ms: number } | undefined;
+    const row = p95.get(p.key_prefix, Math.min(n - 1, Math.floor(n * 0.95))) as
+      | { response_ms: number }
+      | undefined;
     p.p95_ms = row ? Math.round(row.response_ms) : 0;
   }
 
@@ -1745,7 +1897,9 @@ const STATUS_BY_PATH_LIMIT = 30;
 export function getStatusByPath(days: number = 30): StatusByPathRow[] {
   const db = getStatsDB();
 
-  const rows = db.prepare(`
+  const rows = db
+    .prepare(
+      `
     SELECT
       path,
       status,
@@ -1756,7 +1910,9 @@ export function getStatusByPath(days: number = 30): StatusByPathRow[] {
     FROM request_log
     WHERE created_at >= datetime('now', '-' || ? || ' days')
     GROUP BY path, status, method
-  `).all(days) as Array<{
+  `,
+    )
+    .all(days) as Array<{
     path: string;
     status: number;
     method: string;
@@ -1786,8 +1942,16 @@ export function getStatusByPath(days: number = 30): StatusByPathRow[] {
     let acc = byPath.get(r.path);
     if (!acc) {
       acc = {
-        path: r.path, total: 0, s2xx: 0, s3xx: 0, s4xx: 0, s5xx: 0,
-        sumMs: 0, countMs: 0, by_status: {}, by_method: {},
+        path: r.path,
+        total: 0,
+        s2xx: 0,
+        s3xx: 0,
+        s4xx: 0,
+        s5xx: 0,
+        sumMs: 0,
+        countMs: 0,
+        by_status: {},
+        by_method: {},
       };
       byPath.set(r.path, acc);
     }
@@ -1848,16 +2012,25 @@ export function getErrorStats(days: number = 30): ErrorStatsResponse {
 
   // Overall error rates
   function typeErrorRate(opType: string): { rate: number; trend: number[] } {
-    const overall = db.prepare(`
+    const overall = db
+      .prepare(
+        `
       SELECT COUNT(*) as total, COALESCE(SUM(success), 0) as success_count
       FROM operations
       WHERE operation_type = ? AND created_at >= date('now', '-' || ? || ' days')
         AND reject_reason IS NULL
         ${EXTERNAL_ONLY_SQL}
-    `).get(opType, since) as { total: number; success_count: number };
-    const errorRate = overall.total > 0 ? Math.round(((overall.total - overall.success_count) / overall.total) * 10000) / 100 : 0;
+    `,
+      )
+      .get(opType, since) as { total: number; success_count: number };
+    const errorRate =
+      overall.total > 0
+        ? Math.round(((overall.total - overall.success_count) / overall.total) * 10000) / 100
+        : 0;
 
-    const dailyRows = db.prepare(`
+    const dailyRows = db
+      .prepare(
+        `
       SELECT date(created_at) as day, COUNT(*) as total, COALESCE(SUM(success), 0) as success_count
       FROM operations
       WHERE operation_type = ? AND created_at >= date('now', '-' || ? || ' days')
@@ -1865,12 +2038,16 @@ export function getErrorStats(days: number = 30): ErrorStatsResponse {
         ${EXTERNAL_ONLY_SQL}
       GROUP BY day
       ORDER BY day ASC
-    `).all(opType, since) as Array<{ day: string; total: number; success_count: number }>;
+    `,
+      )
+      .all(opType, since) as Array<{ day: string; total: number; success_count: number }>;
 
-    const byDay = new Map(dailyRows.map(r => [r.day, r]));
-    const trend = axis.map(d => {
+    const byDay = new Map(dailyRows.map((r) => [r.day, r]));
+    const trend = axis.map((d) => {
       const r = byDay.get(d);
-      return r && r.total > 0 ? Math.round(((r.total - r.success_count) / r.total) * 10000) / 100 : 0;
+      return r && r.total > 0
+        ? Math.round(((r.total - r.success_count) / r.total) * 10000) / 100
+        : 0;
     });
 
     return { rate: errorRate, trend };
@@ -1881,7 +2058,9 @@ export function getErrorStats(days: number = 30): ErrorStatsResponse {
   // record when the string is not an IBAN), so the displayed column was 'XX' on
   // ten rows out of ten. The first two characters of the submitted prefix are
   // the only country evidence that exists, and only when they are letters.
-  const topInvalidIbans = db.prepare(`
+  const topInvalidIbans = db
+    .prepare(
+      `
     SELECT
       error_detail as prefix,
       COALESCE(country_code, 'XX') as country,
@@ -1895,10 +2074,14 @@ export function getErrorStats(days: number = 30): ErrorStatsResponse {
     GROUP BY error_detail, country_code
     ORDER BY count DESC
     LIMIT 10
-  `).all(since) as Array<{ prefix: string; country: string; count: number }>;
+  `,
+    )
+    .all(since) as Array<{ prefix: string; country: string; count: number }>;
 
   // Top 10 missing BICs from error_detail
-  const topMissingBics = db.prepare(`
+  const topMissingBics = db
+    .prepare(
+      `
     SELECT
       error_detail as bic,
       COALESCE(country_code, 'XX') as country,
@@ -1912,10 +2095,14 @@ export function getErrorStats(days: number = 30): ErrorStatsResponse {
     GROUP BY error_detail, country_code
     ORDER BY count DESC
     LIMIT 10
-  `).all(since) as Array<{ bic: string; country: string; count: number }>;
+  `,
+    )
+    .all(since) as Array<{ bic: string; country: string; count: number }>;
 
   // Errors by country
-  const errorsByCountry = db.prepare(`
+  const errorsByCountry = db
+    .prepare(
+      `
     SELECT COALESCE(country_code, 'XX') as country, COUNT(*) as count
     FROM operations
     WHERE success = 0
@@ -1925,14 +2112,16 @@ export function getErrorStats(days: number = 30): ErrorStatsResponse {
     GROUP BY country_code
     ORDER BY count DESC
     LIMIT 20
-  `).all(since) as Array<{ country: string; count: number }>;
+  `,
+    )
+    .all(since) as Array<{ country: string; count: number }>;
 
   return {
     error_rate: {
       iban_validate: typeErrorRate('iban_validate'),
       bic_lookup: typeErrorRate('bic_lookup'),
     },
-    top_invalid_ibans: topInvalidIbans.map(r => ({
+    top_invalid_ibans: topInvalidIbans.map((r) => ({
       ...r,
       country: r.country !== 'XX' ? r.country : countryFromPrefix(r.prefix),
       error_type: 'invalid',
@@ -1959,7 +2148,9 @@ export function getPatternStats(days: number = 30): PatternStatsResponse {
   const db = getStatsDB();
 
   // Endpoint share trend (daily breakdown by type)
-  const endpointTrend = db.prepare(`
+  const endpointTrend = db
+    .prepare(
+      `
     SELECT
       date,
       SUM(CASE WHEN operation_type = 'iban_validate' THEN total ELSE 0 END) as iban_validate,
@@ -1969,7 +2160,14 @@ export function getPatternStats(days: number = 30): PatternStatsResponse {
     WHERE date >= date('now', '-' || ? || ' days')
     GROUP BY date
     ORDER BY date ASC
-  `).all(days - 1) as Array<{ date: string; iban_validate: number; iban_batch: number; bic_lookup: number }>;
+  `,
+    )
+    .all(days - 1) as Array<{
+    date: string;
+    iban_validate: number;
+    iban_batch: number;
+    bic_lookup: number;
+  }>;
 
   // DASH-04 (audit 2026-09-01). These two queries were the ONLY readers of
   // `operations` that did not drop internal keys, and the dashboard prefers
@@ -1985,7 +2183,9 @@ export function getPatternStats(days: number = 30): PatternStatsResponse {
 
   // DASH-15: the card slices 6, this returned 5, so its length silently meant
   // "top 5" on the live path and "top 6" on the all-time fallback.
-  const topCountriesRows = db.prepare(`
+  const topCountriesRows = db
+    .prepare(
+      `
     SELECT country_code as country, COUNT(*) as count
     FROM operations
     WHERE country_code IS NOT NULL
@@ -1994,12 +2194,19 @@ export function getPatternStats(days: number = 30): PatternStatsResponse {
     GROUP BY country_code
     ORDER BY count DESC
     LIMIT 6
-  `).all(days) as Array<{ country: string; count: number }>;
+  `,
+    )
+    .all(days) as Array<{ country: string; count: number }>;
 
-  const topCountriesList = topCountriesRows.map(r => r.country);
+  const topCountriesList = topCountriesRows.map((r) => r.country);
 
   // Geo trend: daily counts for the top countries above, pivoted
-  const geoRows = topCountriesList.length === 0 ? [] : db.prepare(`
+  const geoRows =
+    topCountriesList.length === 0
+      ? []
+      : (db
+          .prepare(
+            `
     SELECT date(created_at) as date, country_code as country, COUNT(*) as count
     FROM operations
     WHERE country_code IN (${topCountriesList.map(() => '?').join(', ')})
@@ -2007,7 +2214,13 @@ export function getPatternStats(days: number = 30): PatternStatsResponse {
       ${EXTERNAL_ONLY_SQL}
     GROUP BY date(created_at), country_code
     ORDER BY date ASC
-  `).all(...topCountriesList, days) as Array<{ date: string; country: string; count: number }>;
+  `,
+          )
+          .all(...topCountriesList, days) as Array<{
+          date: string;
+          country: string;
+          count: number;
+        }>);
 
   // Pivot geo rows: { date, CH: 34, DE: 28, ... }
   const geoByDate: Map<string, Record<string, number | string>> = new Map();
@@ -2223,7 +2436,7 @@ export function getCohortFootprint(): CohortFootprint {
     .all(...allPrefixes) as Array<{ country: string; count: number }>;
   const countries_with = db
     .prepare(
-      "SELECT country_code country, COUNT(*) count FROM operations WHERE country_code IS NOT NULL GROUP BY country_code ORDER BY count DESC LIMIT 8",
+      'SELECT country_code country, COUNT(*) count FROM operations WHERE country_code IS NOT NULL GROUP BY country_code ORDER BY count DESC LIMIT 8',
     )
     .all() as Array<{ country: string; count: number }>;
 

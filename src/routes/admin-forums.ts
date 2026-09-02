@@ -29,7 +29,16 @@ function isAdminAuthorized(provided: string | undefined): boolean {
 }
 
 const THREAD_STATUSES = new Set(['new', 'to_answer', 'drafted', 'planned', 'posted', 'dismissed']);
-const THREAD_SOURCES = new Set(['stackoverflow', 'money_se', 'github', 'hn', 'reddit', 'discourse', 'odoo', 'manual']);
+const THREAD_SOURCES = new Set([
+  'stackoverflow',
+  'money_se',
+  'github',
+  'hn',
+  'reddit',
+  'discourse',
+  'odoo',
+  'manual',
+]);
 
 adminForums.get('/v1/admin/forum-threads', (c) => {
   if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
@@ -97,8 +106,10 @@ adminForums.post('/v1/admin/forum-threads', async (c) => {
   if (!/^https:\/\//.test(url) || !title) {
     return c.json({ error: 'invalid_input', message: 'url (https) et title requis' }, 400);
   }
-  const source = typeof body.source === 'string' && THREAD_SOURCES.has(body.source) ? body.source : 'manual';
-  const status = typeof body.status === 'string' && THREAD_STATUSES.has(body.status) ? body.status : 'to_answer';
+  const source =
+    typeof body.source === 'string' && THREAD_SOURCES.has(body.source) ? body.source : 'manual';
+  const status =
+    typeof body.status === 'string' && THREAD_STATUSES.has(body.status) ? body.status : 'to_answer';
   const s = (k: string, max = 10_000): string | null => {
     const v = body[k];
     return typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : null;
@@ -232,7 +243,10 @@ adminForums.patch('/v1/admin/forum-marketplaces/:slug', async (c) => {
   // Manual rows carry an operator-set status; automated rows are the radar's.
   // A hand-set status IS a verification, so it stamps checked_at — otherwise
   // the row keeps reading "vérifié jamais" forever in the Vitrines pane.
-  if (typeof body.status === 'string' && ['listed', 'absent', 'pending', 'dead', 'manual'].includes(body.status)) {
+  if (
+    typeof body.status === 'string' &&
+    ['listed', 'absent', 'pending', 'dead', 'manual'].includes(body.status)
+  ) {
     sets.push('status = ?', `checked_at = datetime('now')`);
     vals.push(body.status);
   }

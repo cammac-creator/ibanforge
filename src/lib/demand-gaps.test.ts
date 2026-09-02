@@ -39,7 +39,9 @@ describe('recordDemandGap', () => {
     recordDemandGap('bank_code', 'LT', '10000', 'not_in_register:not_allocated');
     recordDemandGap('bank_code', 'LT', '10000', 'not_in_register:not_allocated');
     recordDemandGap('bank_code', 'LT', '10000', 'not_in_register:not_allocated');
-    const rows = getStatsDB().prepare('SELECT hits FROM lookup_gaps').all() as Array<{ hits: number }>;
+    const rows = getStatsDB().prepare('SELECT hits FROM lookup_gaps').all() as Array<{
+      hits: number;
+    }>;
     expect(rows).toHaveLength(1);
     expect(rows[0].hits).toBe(3);
   });
@@ -49,14 +51,16 @@ describe('recordDemandGap', () => {
     recordDemandGap('bic', 'DE', 'acme@example.com', 'not_found');
     recordDemandGap('bank_code', 'DE', '../../etc/passwd', 'not_in_register');
     recordDemandGap('ch_clearing', 'CH', '123456789', 'not_found');
-    const n = (getStatsDB().prepare('SELECT COUNT(*) AS n FROM lookup_gaps').get() as { n: number }).n;
+    const n = (getStatsDB().prepare('SELECT COUNT(*) AS n FROM lookup_gaps').get() as { n: number })
+      .n;
     expect(n).toBe(0);
   });
 
   it('drops rows without a country: NULL in this PRIMARY KEY would defeat the upsert', () => {
     recordDemandGap('bank_code', null, '12345', 'not_in_register');
     recordDemandGap('bank_code', 'not-a-cc', '12345', 'not_in_register');
-    const n = (getStatsDB().prepare('SELECT COUNT(*) AS n FROM lookup_gaps').get() as { n: number }).n;
+    const n = (getStatsDB().prepare('SELECT COUNT(*) AS n FROM lookup_gaps').get() as { n: number })
+      .n;
     expect(n).toBe(0);
   });
 

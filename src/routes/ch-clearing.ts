@@ -7,10 +7,7 @@
 
 import { Hono } from 'hono';
 import type { HonoEnv } from '../types.js';
-import {
-  lookupClearingByBankCode,
-  normalizeIid,
-} from '../lib/ch-clearing.js';
+import { lookupClearingByBankCode, normalizeIid } from '../lib/ch-clearing.js';
 import { classifyIidInput } from '../lib/input-normalize.js';
 import { recordOperation, recordRejection } from '../lib/stats.js';
 import { recordSafely } from '../lib/record-safely.js';
@@ -38,7 +35,10 @@ chClearing.get('/v1/ch/clearing/:iid', (c) => {
     return c.json(
       {
         error: 'placeholder_literal',
-        message: "You sent the literal OpenAPI placeholder '" + rawIid + "'. Substitute it with a real Swiss IID.",
+        message:
+          "You sent the literal OpenAPI placeholder '" +
+          rawIid +
+          "'. Substitute it with a real Swiss IID.",
         example: 'GET /v1/ch/clearing/230',
         schema: 'https://api.ibanforge.com/openapi.json',
       },
@@ -68,7 +68,15 @@ chClearing.get('/v1/ch/clearing/:iid', (c) => {
 
   if (!entry) {
     recordSafely(
-      () => recordOperation('ch_clearing_lookup', 'CH', false, revenue, normalizedIid, c.get('apiKeyPrefix')),
+      () =>
+        recordOperation(
+          'ch_clearing_lookup',
+          'CH',
+          false,
+          revenue,
+          normalizedIid,
+          c.get('apiKeyPrefix'),
+        ),
       'ch_clearing_lookup',
     );
     // The demand ledger: an IID absent from the BankMaster extract we serve.
@@ -90,7 +98,15 @@ chClearing.get('/v1/ch/clearing/:iid', (c) => {
   // failures are now counted and raise an ops alert past a streak, so a stats
   // DB that stops accepting writes cannot look like a service nobody calls.
   recordSafely(
-    () => recordOperation('ch_clearing_lookup', entry.address.country, true, revenue, undefined, c.get('apiKeyPrefix')),
+    () =>
+      recordOperation(
+        'ch_clearing_lookup',
+        entry.address.country,
+        true,
+        revenue,
+        undefined,
+        c.get('apiKeyPrefix'),
+      ),
     'ch_clearing_lookup',
   );
 

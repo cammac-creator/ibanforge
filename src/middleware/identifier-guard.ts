@@ -87,7 +87,10 @@ export function bicGuardMiddleware(): MiddlewareHandler<HonoEnv, BIC_PATH> {
       return c.json(
         {
           error: 'placeholder_literal',
-          message: "You sent the literal OpenAPI placeholder '" + code + "'. Substitute it with a real BIC.",
+          message:
+            "You sent the literal OpenAPI placeholder '" +
+            code +
+            "'. Substitute it with a real BIC.",
           example: 'GET /v1/bic/UBSWCHZH',
           schema: 'https://api.ibanforge.com/openapi.json',
         },
@@ -98,7 +101,10 @@ export function bicGuardMiddleware(): MiddlewareHandler<HonoEnv, BIC_PATH> {
     if (rejection !== null) {
       recordRejection('bic_lookup', rejection, c.get('apiKeyPrefix'));
       return c.json(
-        { error: 'invalid_bic_format', message: 'BIC code must be 8 or 11 alphanumeric characters' },
+        {
+          error: 'invalid_bic_format',
+          message: 'BIC code must be 8 or 11 alphanumeric characters',
+        },
         400,
       );
     }
@@ -118,7 +124,10 @@ export function iidGuardMiddleware(): MiddlewareHandler<HonoEnv, IID_PATH> {
       return c.json(
         {
           error: 'placeholder_literal',
-          message: "You sent the literal OpenAPI placeholder '" + iid + "'. Substitute it with a real Swiss IID.",
+          message:
+            "You sent the literal OpenAPI placeholder '" +
+            iid +
+            "'. Substitute it with a real Swiss IID.",
           example: 'GET /v1/ch/clearing/230',
           schema: 'https://api.ibanforge.com/openapi.json',
         },
@@ -128,7 +137,10 @@ export function iidGuardMiddleware(): MiddlewareHandler<HonoEnv, IID_PATH> {
 
     if (rejection !== null) {
       recordRejection('ch_clearing_lookup', rejection, c.get('apiKeyPrefix'));
-      return c.json({ error: 'invalid_iid_format', message: 'IID must be a 1-5 digit number.' }, 400);
+      return c.json(
+        { error: 'invalid_iid_format', message: 'IID must be a 1-5 digit number.' },
+        400,
+      );
     }
 
     await next();

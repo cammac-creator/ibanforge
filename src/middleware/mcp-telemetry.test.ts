@@ -38,13 +38,22 @@ async function openSession(app: ReturnType<typeof buildApp>, ip: string): Promis
       jsonrpc: '2.0',
       id: 1,
       method: 'initialize',
-      params: { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'vitest', version: '1' } },
+      params: {
+        protocolVersion: '2024-11-05',
+        capabilities: {},
+        clientInfo: { name: 'vitest', version: '1' },
+      },
     }),
   });
   return res.headers.get('mcp-session-id') ?? '';
 }
 
-async function callTool(app: ReturnType<typeof buildApp>, sessionId: string, ip: string, iid = '230') {
+async function callTool(
+  app: ReturnType<typeof buildApp>,
+  sessionId: string,
+  ip: string,
+  iid = '230',
+) {
   return app.request('/mcp', {
     method: 'POST',
     headers: { ...MCP_HEADERS, 'x-real-ip': ip, 'mcp-session-id': sessionId },
@@ -74,7 +83,7 @@ describe('MCP telemetry — a refusal has its own path', () => {
     // The refusal is a JSON-RPC error carried in a 200, which is exactly why
     // the status could not tell the two apart.
     expect(refused.status).toBe(200);
-    const body = await refused.json() as { error?: { code: number } };
+    const body = (await refused.json()) as { error?: { code: number } };
     expect(body.error?.code).toBe(-32000);
 
     const paths = recentMcpPaths(3);
@@ -95,7 +104,7 @@ describe('MCP telemetry — a refusal has its own path', () => {
       });
     for (let i = 0; i < 30; i++) await burn();
     const refused = await burn();
-    const body = await refused.json() as { error?: { message: string } };
+    const body = (await refused.json()) as { error?: { message: string } };
     expect(body.error?.message).toContain('Daily MCP session limit reached');
     expect(recentMcpPaths(1)).toEqual(['/mcp:session:refused']);
   });

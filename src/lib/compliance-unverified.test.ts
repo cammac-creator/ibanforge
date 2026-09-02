@@ -42,7 +42,9 @@ describe('compliance stops scoring an unresolved bank code as an ordinary bank',
   it('weighs an authoritative denial heavier than an unconfirmed code', () => {
     const denied = compliance('DE44999999990532013000');
     const merelyUnknown = compliance('FR1499999000010123456789A42');
-    expect(denied.compliance!.risk_score ?? 0).toBeGreaterThan(merelyUnknown.compliance!.risk_score ?? 0);
+    expect(denied.compliance!.risk_score ?? 0).toBeGreaterThan(
+      merelyUnknown.compliance!.risk_score ?? 0,
+    );
   });
 
   it('leaves a clean, confirmed IBAN scoring exactly as before', () => {

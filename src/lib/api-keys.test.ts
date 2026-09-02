@@ -1,5 +1,14 @@
 import { describe, it, expect } from 'vitest';
-import { generateApiKey, validateApiKey, checkAndIncrementQuota, getUsage, decrementQuota, revokeApiKey, rotateApiKey, recordQuotaNotice } from './api-keys.js';
+import {
+  generateApiKey,
+  validateApiKey,
+  checkAndIncrementQuota,
+  getUsage,
+  decrementQuota,
+  revokeApiKey,
+  rotateApiKey,
+  recordQuotaNotice,
+} from './api-keys.js';
 import { buildQuotaWarningEmail } from './email.js';
 import { getStatsDB } from './db.js';
 
@@ -32,9 +41,9 @@ describe('API Keys', () => {
   it('revokeApiKey deactivates a key (and is idempotent)', () => {
     const r = generateApiKey(`revoke-${RUN_ID}@example.com`)!;
     expect(validateApiKey(r.api_key).valid).toBe(true);
-    expect(revokeApiKey(r.api_key)).toBe(true);     // first revoke succeeds
+    expect(revokeApiKey(r.api_key)).toBe(true); // first revoke succeeds
     expect(validateApiKey(r.api_key).valid).toBe(false); // key is dead
-    expect(revokeApiKey(r.api_key)).toBe(false);    // second is a no-op
+    expect(revokeApiKey(r.api_key)).toBe(false); // second is a no-op
   });
 
   it('rotateApiKey issues a fresh key and kills the old one', () => {
@@ -68,7 +77,11 @@ describe('API Keys', () => {
     const v = validateApiKey(result!.api_key);
     const db = getStatsDB();
     // Stand in for an allowance already spent in an earlier month.
-    db.prepare('INSERT INTO api_usage (key_hash, month, count) VALUES (?, ?, ?)').run(v.keyHash, '2000-01', 200);
+    db.prepare('INSERT INTO api_usage (key_hash, month, count) VALUES (?, ?, ?)').run(
+      v.keyHash,
+      '2000-01',
+      200,
+    );
 
     // On the normal monthly basis the new month starts clean.
     expect(checkAndIncrementQuota(v.keyHash, 200, 1, false).allowed).toBe(true);
@@ -83,7 +96,9 @@ describe('API Keys', () => {
   it('reads the opt-out flag back through validateApiKey', () => {
     const result = generateApiKey(`norecredit-flag-${RUN_ID}@example.com`);
     expect(validateApiKey(result!.api_key).noRecredit).toBe(false);
-    getStatsDB().prepare('UPDATE api_keys SET no_recredit = 1 WHERE key_prefix = ?').run(result!.key_prefix);
+    getStatsDB()
+      .prepare('UPDATE api_keys SET no_recredit = 1 WHERE key_prefix = ?')
+      .run(result!.key_prefix);
     expect(validateApiKey(result!.api_key).noRecredit).toBe(true);
   });
 
@@ -143,8 +158,9 @@ describe('quota upsell threshold', () => {
     const key = generateApiKey(`q80-${RUN_ID}@example.com`, 10)!;
     const { keyHash } = validateApiKey(key.api_key);
 
-    const crossings = Array.from({ length: 10 }, () =>
-      checkAndIncrementQuota(keyHash, 10).crossedNoticeThreshold,
+    const crossings = Array.from(
+      { length: 10 },
+      () => checkAndIncrementQuota(keyHash, 10).crossedNoticeThreshold,
     );
 
     expect(crossings.filter(Boolean)).toHaveLength(1);
@@ -187,7 +203,12 @@ describe('quota warning email', () => {
   });
 
   it('never suggests minting a second free key', () => {
-    const mail = buildQuotaWarningEmail({ used: 160, limit: 200, month: '2026-07', keyPrefix: 'ifk_x' });
+    const mail = buildQuotaWarningEmail({
+      used: 160,
+      limit: 200,
+      month: '2026-07',
+      keyPrefix: 'ifk_x',
+    });
 
     expect(mail.text).not.toContain('/v1/keys/generate');
     expect(mail.html).not.toContain('/v1/keys/generate');

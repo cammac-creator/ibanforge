@@ -109,7 +109,10 @@ describe('/health', () => {
  */
 describe('/health — freshness of the UK modulus table', () => {
   /** A run whose table path points at a file that does not exist. */
-  async function healthWithoutUkTable(): Promise<{ status: number; body: Record<string, unknown> }> {
+  async function healthWithoutUkTable(): Promise<{
+    status: number;
+    body: Record<string, unknown>;
+  }> {
     vi.resetModules();
     process.env.UK_MODULUS_PATH = join(mkdtempSync(join(tmpdir(), 'ibanforge-uk-')), 'absent.json');
     const [{ health: freshHealth }, db, compliance] = await Promise.all([
@@ -168,7 +171,12 @@ describe('/health — freshness of the UK modulus table', () => {
 describe('/health — per-source freshness (the living-tool block)', () => {
   it('names every register with its own age and stale flag', async () => {
     const body = (await (await app.request('/health')).json()) as {
-      bic_sources: Array<{ source: string; entries: number; last_updated: string | null; stale: boolean }>;
+      bic_sources: Array<{
+        source: string;
+        entries: number;
+        last_updated: string | null;
+        stale: boolean;
+      }>;
     };
     expect(Array.isArray(body.bic_sources)).toBe(true);
     expect(body.bic_sources.length).toBeGreaterThan(1);

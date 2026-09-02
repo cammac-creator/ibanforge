@@ -27,7 +27,6 @@ const FREE_MONTHLY = 200;
 const RATE_PER_MIN = RATE_LIMIT;
 const MCP_FREE_DAILY = 10;
 
-
 // ──────────────────────────────────────────────────────────────────────────────
 // Agentic access contract — the one artifact with real operational meaning.
 //

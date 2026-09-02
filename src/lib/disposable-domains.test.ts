@@ -34,7 +34,7 @@ describe('isUnroutableEmail', () => {
     expect(isUnroutableEmail('no-at-sign')).toBe(true);
   });
 
-  it('blocks only the last label, so the repo\'s invented fixture domains keep working', () => {
+  it("blocks only the last label, so the repo's invented fixture domains keep working", () => {
     // *.example.net is an RFC 2606 name we use for test fixtures across the
     // suite; only a literal reserved TLD (.test, .invalid…) is refused.
     expect(isUnroutableEmail('holder@societe-alpha.example.net')).toBe(false);

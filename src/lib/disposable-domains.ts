@@ -67,7 +67,19 @@ const DISPOSABLE_DOMAINS = [
  * (the 2026-08-17 signup wave used tempmail.edu.ge — an .edu.ge suffix no
  * exact list would have carried).
  */
-const DISPOSABLE_SUBSTRINGS = ['tempmail', 'temp-mail', 'tmpmail', 'trashmail', '10minutemail', 'guerrillamail', 'mailinator', 'yopmail', 'throwawaymail', 'fakeinbox', 'burnermail'];
+const DISPOSABLE_SUBSTRINGS = [
+  'tempmail',
+  'temp-mail',
+  'tmpmail',
+  'trashmail',
+  '10minutemail',
+  'guerrillamail',
+  'mailinator',
+  'yopmail',
+  'throwawaymail',
+  'fakeinbox',
+  'burnermail',
+];
 
 /**
  * TLDs that can never resolve on the public internet (RFC 2606 / RFC 6761
@@ -78,7 +90,12 @@ const UNROUTABLE_TLDS = new Set(['invalid', 'test', 'example', 'localhost', 'loc
 
 export function emailDomain(email: string): string {
   const at = email.lastIndexOf('@');
-  return at === -1 ? '' : email.slice(at + 1).trim().toLowerCase();
+  return at === -1
+    ? ''
+    : email
+        .slice(at + 1)
+        .trim()
+        .toLowerCase();
 }
 
 /** True when the address points at a known disposable-inbox service. */

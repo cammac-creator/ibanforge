@@ -45,7 +45,11 @@ import { getBicDB } from './db.js';
  *
  * Seeded by scripts/seed-pra-banks.ts.
  */
-export type PraSection = 'uk_incorporated' | 'non_uk_branch' | 'gibraltar_branch' | 'eea_sro_branch';
+export type PraSection =
+  | 'uk_incorporated'
+  | 'non_uk_branch'
+  | 'gibraltar_branch'
+  | 'eea_sro_branch';
 
 /**
  * Whose LEI the list published for this firm. `head_office_lei` is the branch
@@ -147,7 +151,8 @@ function ready(): boolean {
 export function getPraBanksCount(): number {
   if (!ready()) return 0;
   try {
-    return (getBicDB().prepare('SELECT COUNT(*) AS cnt FROM pra_banks').get() as { cnt: number }).cnt;
+    return (getBicDB().prepare('SELECT COUNT(*) AS cnt FROM pra_banks').get() as { cnt: number })
+      .cnt;
   } catch {
     return 0;
   }

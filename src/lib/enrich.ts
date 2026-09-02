@@ -28,7 +28,12 @@ import { checkUkModulus } from './uk-modulus.js';
 import { praAuthorisationByLei } from './pra-banks.js';
 import { officialIdentityByNationalCode } from './official-identity.js';
 import { psdRegistrationByBankCode, type PsdEntityType } from './psd-register.js';
-import type { BankCodeCheck, BicBasis, IBANValidationResult, RegisterInstitution } from '../types.js';
+import type {
+  BankCodeCheck,
+  BicBasis,
+  IBANValidationResult,
+  RegisterInstitution,
+} from '../types.js';
 import type { SepaScheme } from './countries.js';
 import { nextSteps } from './next-steps.js';
 
@@ -302,7 +307,8 @@ function askNationalRegister(
  * issue. The provenance belongs in the documentation, where it cannot be mistaken
  * for a claim of exhaustiveness. `source='bundesbank'` is 144 rows.
  */
-const COMPOSITE_REGISTER = 'IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)';
+const COMPOSITE_REGISTER =
+  'IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)';
 
 /**
  * Countries whose own authority PUBLISHES that the IBAN's bank-code positions
@@ -998,9 +1004,8 @@ export function enrichResult(result: IBANValidationResult, cache?: EnrichCache):
     // BIC — a foreign branch's BIC would otherwise make `member: false` sit
     // beside a non-empty `schemes`.
     const sepa = result.sepa as SepaBlockWithBasis;
-    const registered = sepa.member && result.bic?.code
-      ? epcSchemesForBic8(result.bic.code.slice(0, 8))
-      : [];
+    const registered =
+      sepa.member && result.bic?.code ? epcSchemesForBic8(result.bic.code.slice(0, 8)) : [];
     if (registered.length > 0) {
       sepa.schemes = registered;
       sepa.basis = 'epc_register';

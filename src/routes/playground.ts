@@ -28,7 +28,11 @@ interface Target {
 /** Whitelist — also what stops the relay from being pointed back at itself. */
 const TARGETS: Record<string, (value: string) => Target> = {
   iban: (v) => ({ path: '/v1/iban/validate', method: 'POST', body: JSON.stringify({ iban: v }) }),
-  compliance: (v) => ({ path: '/v1/iban/compliance', method: 'POST', body: JSON.stringify({ iban: v }) }),
+  compliance: (v) => ({
+    path: '/v1/iban/compliance',
+    method: 'POST',
+    body: JSON.stringify({ iban: v }),
+  }),
   bic: (v) => ({ path: `/v1/bic/${encodeURIComponent(v)}`, method: 'GET' }),
 };
 
@@ -39,12 +43,15 @@ const HOURLY_LIMIT = 30;
 const WINDOW_MS = 60 * 60 * 1000;
 const hits = new Map<string, { count: number; resetAt: number }>();
 
-setInterval(() => {
-  const now = Date.now();
-  for (const [k, v] of hits) {
-    if (now >= v.resetAt) hits.delete(k);
-  }
-}, 10 * 60 * 1000).unref();
+setInterval(
+  () => {
+    const now = Date.now();
+    for (const [k, v] of hits) {
+      if (now >= v.resetAt) hits.delete(k);
+    }
+  },
+  10 * 60 * 1000,
+).unref();
 
 /**
  * Takes the app itself so the relay can re-dispatch through the full middleware
@@ -52,9 +59,9 @@ setInterval(() => {
  * for /v1/iban/compliance would mean copying the whole risk-scoring path.
  * Passed as a parameter rather than imported to keep index.ts → routes acyclic.
  */
-export function createPlaygroundRelay(
-  app: { fetch: (req: Request) => Response | Promise<Response> },
-): Hono<HonoEnv> {
+export function createPlaygroundRelay(app: {
+  fetch: (req: Request) => Response | Promise<Response>;
+}): Hono<HonoEnv> {
   const playground = new Hono<HonoEnv>();
 
   playground.post('/internal/playground', async (c) => {
@@ -72,7 +79,8 @@ export function createPlaygroundRelay(
       return c.json(
         {
           error: 'invalid_request',
-          message: 'Expected {"type":"iban"|"compliance"|"bic","value":"..."} with value of 64 chars or fewer.',
+          message:
+            'Expected {"type":"iban"|"compliance"|"bic","value":"..."} with value of 64 chars or fewer.',
         },
         400,
       );

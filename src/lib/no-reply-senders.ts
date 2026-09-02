@@ -80,7 +80,9 @@ export function setNoReplySender(rawAddress: string, value: boolean): void {
   const address = normalizeSenderAddress(rawAddress);
   const db = getStatsDB();
   if (value) {
-    db.prepare('INSERT INTO no_reply_senders (address) VALUES (?) ON CONFLICT(address) DO NOTHING').run(address);
+    db.prepare(
+      'INSERT INTO no_reply_senders (address) VALUES (?) ON CONFLICT(address) DO NOTHING',
+    ).run(address);
   } else {
     db.prepare('DELETE FROM no_reply_senders WHERE address = ?').run(address);
   }

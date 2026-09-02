@@ -2,7 +2,13 @@ import { opsFail } from '../lib/ops-alert.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import { timingSafeEqual, createHash } from 'node:crypto';
-import { generateApiKey, validateApiKey, getUsage, revokeApiKey, rotateApiKey } from '../lib/api-keys.js';
+import {
+  generateApiKey,
+  validateApiKey,
+  getUsage,
+  revokeApiKey,
+  rotateApiKey,
+} from '../lib/api-keys.js';
 import { getStatsDB } from '../lib/db.js';
 import { getKeyReport } from '../lib/key-report.js';
 import { exportPaidState } from '../lib/backup.js';
@@ -23,7 +29,13 @@ import {
 import { getActivation } from '../lib/activation.js';
 import { recordEvent } from '../lib/events.js';
 import { getVisibility, recordVisibility, isVisibilityState } from '../lib/visibility.js';
-import { getOrphans, recordOrphan, resolveOrphan, countPendingOrphans, isOrphanKind } from '../lib/orphan-mail.js';
+import {
+  getOrphans,
+  recordOrphan,
+  resolveOrphan,
+  countPendingOrphans,
+  isOrphanKind,
+} from '../lib/orphan-mail.js';
 import { addAlias, listAliases, loadAliasMap, toCanonical } from '../lib/email-aliases.js';
 import {
   listNoReplySenders,
@@ -40,8 +52,17 @@ import {
 } from '../lib/institutional-contacts.js';
 import { getWeeklyFacts, saveWeeklyDigest, getWeeklyDigests } from '../lib/weekly-facts.js';
 import { notifyPurchaseTelegram } from '../lib/notify.js';
-import { isProspectBackfillRunning, lastProspectBackfillReport, runProspectBackfill } from '../lib/prospect-radar-server.js';
-import { isCohortScanRunning, lastCohortReport, runCohortScan, getCohortRelabels } from '../lib/cohort-radar-server.js';
+import {
+  isProspectBackfillRunning,
+  lastProspectBackfillReport,
+  runProspectBackfill,
+} from '../lib/prospect-radar-server.js';
+import {
+  isCohortScanRunning,
+  lastCohortReport,
+  runCohortScan,
+  getCohortRelabels,
+} from '../lib/cohort-radar-server.js';
 import {
   getNudgeLedger,
   isActivationPassRunning,
@@ -49,7 +70,11 @@ import {
   lastActivationReport,
   runActivationPass,
 } from '../lib/activation-nudge-server.js';
-import { getCompanyProfiles, upsertCompanyProfile, type ProfileSource } from '../lib/company-profiles.js';
+import {
+  getCompanyProfiles,
+  upsertCompanyProfile,
+  type ProfileSource,
+} from '../lib/company-profiles.js';
 import { parseAttribution, recordSignupAttribution } from '../lib/signup-attribution.js';
 import {
   sendApiKeyEmail,
@@ -106,7 +131,8 @@ export function isAdminAuthorized(provided: string | undefined): boolean {
 
 // Domains we refuse for free-tier signups to keep the stats funnel honest.
 // They get re-allowed when IBANFORGE_ADMIN_TEST_KEYS=true (CI/automation only).
-const BLOCKED_EMAIL_DOMAINS = /@(example|test|invalid|localhost|mailinator|tempmail|guerrillamail|10minutemail|throwaway|dispostable|trashmail|fakeinbox|getnada|maildrop|sharklasers|yopmail)\.(com|org|net|io|me|fr|ch|de)$/i;
+const BLOCKED_EMAIL_DOMAINS =
+  /@(example|test|invalid|localhost|mailinator|tempmail|guerrillamail|10minutemail|throwaway|dispostable|trashmail|fakeinbox|getnada|maildrop|sharklasers|yopmail)\.(com|org|net|io|me|fr|ch|de)$/i;
 
 apiKeys.post('/v1/keys/generate', async (c) => {
   let body: { email?: unknown; source?: unknown; attribution?: unknown };
@@ -123,7 +149,10 @@ apiKeys.post('/v1/keys/generate', async (c) => {
 
   // Stricter shape check: local-part@domain.tld (avoids "test@" or "foo@bar")
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
-    return c.json({ error: 'invalid_email', message: 'Email must be a valid address (e.g. you@company.com)' }, 400);
+    return c.json(
+      { error: 'invalid_email', message: 'Email must be a valid address (e.g. you@company.com)' },
+      400,
+    );
   }
 
   // Block disposable / fictional domains unless explicitly allowed (CI tests).
@@ -134,10 +163,14 @@ apiKeys.post('/v1/keys/generate', async (c) => {
     process.env.IBANFORGE_ADMIN_TEST_KEYS !== 'true' &&
     (BLOCKED_EMAIL_DOMAINS.test(email) || isDisposableDomain(email))
   ) {
-    return c.json({
-      error: 'disposable_email',
-      message: 'Free tier requires a real email address. example.com, mailinator and other disposable domains are blocked.',
-    }, 400);
+    return c.json(
+      {
+        error: 'disposable_email',
+        message:
+          'Free tier requires a real email address. example.com, mailinator and other disposable domains are blocked.',
+      },
+      400,
+    );
   }
 
   // Per-NETWORK creation guard. The per-email one-per-day rule below is
@@ -155,16 +188,22 @@ apiKeys.post('/v1/keys/generate', async (c) => {
   const creationSource = keyCreationSource(clientIp);
   if (creationSource && process.env.IBANFORGE_ADMIN_TEST_KEYS !== 'true') {
     if (countKeyCreations(creationSource, 24) >= DAILY_KEY_CREATION_LIMIT) {
-      return c.json({
-        error: 'key_creation_limit',
-        message:
-          `At most ${DAILY_KEY_CREATION_LIMIT} free keys per network per day — existing keys keep working. ` +
-          'Need more capacity today? Prepaid credits are instant ($5 per 1,000, POST /v1/credits/buy/1k) ' +
-          'and x402 pay-per-call needs no key at all.',
-      }, 429);
+      return c.json(
+        {
+          error: 'key_creation_limit',
+          message:
+            `At most ${DAILY_KEY_CREATION_LIMIT} free keys per network per day — existing keys keep working. ` +
+            'Need more capacity today? Prepaid credits are instant ($5 per 1,000, POST /v1/credits/buy/1k) ' +
+            'and x402 pay-per-call needs no key at all.',
+        },
+        429,
+      );
     }
     if (countKeyCreations(creationSource, 24 * VERIFY_WINDOW_DAYS) >= 1) {
-      const code = typeof (body as { code?: unknown }).code === 'string' ? String((body as { code?: unknown }).code).trim() : '';
+      const code =
+        typeof (body as { code?: unknown }).code === 'string'
+          ? String((body as { code?: unknown }).code).trim()
+          : '';
       if (!code) {
         // Bound the code SEND before issuing/mailing it. The daily creation cap
         // above counts successes only, so without this a caller with one key on
@@ -173,17 +212,23 @@ apiKeys.post('/v1/keys/generate', async (c) => {
         // 100/min). Cap per recipient (anti-bombing) and per source.
         const sendCheck = challengeSendAllowed(creationSource, email.trim().toLowerCase());
         if (!sendCheck.ok) {
-          return c.json({
-            error: 'verification_rate_limited',
-            message:
-              sendCheck.reason === 'recipient'
-                ? 'Too many verification codes were requested for this address today. Try again tomorrow, or use the most recent code you already received.'
-                : 'Too many verification codes were requested from this network today. Existing keys keep working; prepaid credits are instant (POST /v1/credits/buy/1k) and x402 needs no key.',
-          }, 429);
+          return c.json(
+            {
+              error: 'verification_rate_limited',
+              message:
+                sendCheck.reason === 'recipient'
+                  ? 'Too many verification codes were requested for this address today. Try again tomorrow, or use the most recent code you already received.'
+                  : 'Too many verification codes were requested from this network today. Existing keys keep working; prepaid credits are instant (POST /v1/credits/buy/1k) and x402 needs no key.',
+            },
+            429,
+          );
         }
         const sendId = recordVerificationSend(creationSource, email.trim().toLowerCase());
         const challenge = createVerificationChallenge(email.trim().toLowerCase(), creationSource);
-        const outcome = await deliverKeyVerificationEmail({ to: email.trim().toLowerCase(), code: challenge });
+        const outcome = await deliverKeyVerificationEmail({
+          to: email.trim().toLowerCase(),
+          code: challenge,
+        });
         const sent = outcome === 'sent';
         // The outcome is written whichever way it went: a refusal that leaves
         // no trace is exactly how this channel failed unnoticed for three days.
@@ -192,12 +237,15 @@ apiKeys.post('/v1/keys/generate', async (c) => {
           // The mail server for that domain refused the address. No retry and
           // no alert can fix it, and "try again in a few minutes" would have
           // been a lie: it is the caller's address to fix.
-          return c.json({
-            error: 'undeliverable_email',
-            message:
-              'The mail server for this address refused it, so no verification code could be delivered. ' +
-              'Check the address, or use another mailbox you can read.',
-          }, 400);
+          return c.json(
+            {
+              error: 'undeliverable_email',
+              message:
+                'The mail server for this address refused it, so no verification code could be delivered. ' +
+                'Check the address, or use another mailbox you can read.',
+            },
+            400,
+          );
         }
         if (!sent) {
           // A month of 503s here turned out to be one script feeding addresses
@@ -210,29 +258,39 @@ apiKeys.post('/v1/keys/generate', async (c) => {
             'Verification codes are not leaving: the free-key signup answers 503 while the relay refuses or cannot be reached.',
             3,
           );
-          return c.json({
-            error: 'verification_unavailable',
-            message: 'A verification mail could not be sent right now. Try again in a few minutes.',
-          }, 503);
+          return c.json(
+            {
+              error: 'verification_unavailable',
+              message:
+                'A verification mail could not be sent right now. Try again in a few minutes.',
+            },
+            503,
+          );
         }
-        return c.json({
-          error: 'verification_required',
-          message:
-            'A key was already issued from this network recently, so this one needs a verified mailbox: ' +
-            `we sent a 6-digit code to ${email.trim().toLowerCase()}. ` +
-            'Repeat this request within 15 minutes as {"email": "...", "code": "123456"}.',
-        }, 403);
+        return c.json(
+          {
+            error: 'verification_required',
+            message:
+              'A key was already issued from this network recently, so this one needs a verified mailbox: ' +
+              `we sent a 6-digit code to ${email.trim().toLowerCase()}. ` +
+              'Repeat this request within 15 minutes as {"email": "...", "code": "123456"}.',
+          },
+          403,
+        );
       }
       const check = checkVerificationCode(email.trim().toLowerCase(), code);
       if (!check.ok) {
-        return c.json({
-          error: 'verification_failed',
-          reason: check.reason,
-          message:
-            check.reason === 'expired' || check.reason === 'no_challenge'
-              ? 'This code is no longer valid — request a key again without a code to receive a fresh one.'
-              : 'Wrong code. Check the most recent mail; the challenge locks after 5 attempts.',
-        }, 403);
+        return c.json(
+          {
+            error: 'verification_failed',
+            reason: check.reason,
+            message:
+              check.reason === 'expired' || check.reason === 'no_challenge'
+                ? 'This code is no longer valid — request a key again without a code to receive a fresh one.'
+                : 'Wrong code. Check the most recent mail; the challenge locks after 5 attempts.',
+          },
+          403,
+        );
       }
     }
   }
@@ -248,13 +306,17 @@ apiKeys.post('/v1/keys/generate', async (c) => {
   const result = generateApiKey(email.trim().toLowerCase(), undefined, source);
 
   if (!result) {
-    return c.json({
-      error: 'rate_limited',
-      message: 'Only one API key can be generated per email per day. Try again tomorrow.',
-    }, 429);
+    return c.json(
+      {
+        error: 'rate_limited',
+        message: 'Only one API key can be generated per email per day. Try again tomorrow.',
+      },
+      429,
+    );
   }
 
-  if (creationSource) recordKeyCreation(creationSource, c.req.header('user-agent') ?? null, result.key_prefix);
+  if (creationSource)
+    recordKeyCreation(creationSource, c.req.header('user-agent') ?? null, result.key_prefix);
 
   // Where this signup came from: the landing page, the referring site and the
   // campaign labels the dialog captured on arrival. Telemetry, never a gate.
@@ -292,14 +354,17 @@ apiKeys.post('/v1/keys/generate', async (c) => {
     });
   }
 
-  return c.json({
-    api_key: result.api_key,
-    key_prefix: result.key_prefix,
-    email: email.trim().toLowerCase(),
-    monthly_limit: 200,
-    message: 'Save this key — it will not be shown again.',
-    terms_url: 'https://ibanforge.com/legal/terms',
-  }, 201);
+  return c.json(
+    {
+      api_key: result.api_key,
+      key_prefix: result.key_prefix,
+      email: email.trim().toLowerCase(),
+      monthly_limit: 200,
+      message: 'Save this key — it will not be shown again.',
+      terms_url: 'https://ibanforge.com/legal/terms',
+    },
+    201,
+  );
 });
 
 /**
@@ -333,7 +398,10 @@ apiKeys.get('/v1/credits/bundles', (c) => {
 apiKeys.get('/v1/credits/balance', (c) => {
   const authHeader = c.req.header('Authorization');
   if (!authHeader?.startsWith('Bearer ifk_')) {
-    return c.json({ error: 'missing_key', message: 'Provide your API key via Authorization: Bearer ifk_xxx' }, 401);
+    return c.json(
+      { error: 'missing_key', message: 'Provide your API key via Authorization: Bearer ifk_xxx' },
+      401,
+    );
   }
   const key = authHeader.slice(7);
   const v = validateApiKey(key);
@@ -344,7 +412,8 @@ apiKeys.get('/v1/credits/balance', (c) => {
     return c.json({
       type: 'subscription',
       key_prefix: key.slice(0, 12),
-      message: 'This is a monthly subscription key, not a credit bundle. Use GET /v1/keys/usage for monthly stats.',
+      message:
+        'This is a monthly subscription key, not a credit bundle. Use GET /v1/keys/usage for monthly stats.',
     });
   }
   return c.json({
@@ -493,7 +562,9 @@ apiKeys.get('/v1/keys/report', (c) => {
   // Clamped, not trusted: an unbounded window is a full-table scan any holder
   // could ask for repeatedly.
   const requested = Number(c.req.query('days') ?? 30);
-  const windowDays = Number.isFinite(requested) ? Math.min(Math.max(Math.trunc(requested), 1), 365) : 30;
+  const windowDays = Number.isFinite(requested)
+    ? Math.min(Math.max(Math.trunc(requested), 1), 365)
+    : 30;
 
   return c.json({
     key_prefix: key.slice(0, 12),
@@ -513,14 +584,24 @@ apiKeys.get('/v1/keys/report', (c) => {
 apiKeys.post('/v1/keys/revoke', (c) => {
   const authHeader = c.req.header('Authorization');
   if (!authHeader?.startsWith('Bearer ifk_')) {
-    return c.json({ error: 'missing_key', message: 'Provide the key to revoke via Authorization: Bearer ifk_xxx' }, 401);
+    return c.json(
+      {
+        error: 'missing_key',
+        message: 'Provide the key to revoke via Authorization: Bearer ifk_xxx',
+      },
+      401,
+    );
   }
   const key = authHeader.slice(7);
   const revoked = revokeApiKey(key);
   if (!revoked) {
     return c.json({ error: 'invalid_key', message: 'Key not found or already revoked.' }, 404);
   }
-  return c.json({ revoked: true, key_prefix: key.slice(0, 12), message: 'Key permanently deactivated. Rotate to get a fresh one.' });
+  return c.json({
+    revoked: true,
+    key_prefix: key.slice(0, 12),
+    message: 'Key permanently deactivated. Rotate to get a fresh one.',
+  });
 });
 
 /**
@@ -530,20 +611,29 @@ apiKeys.post('/v1/keys/revoke', (c) => {
 apiKeys.post('/v1/keys/rotate', (c) => {
   const authHeader = c.req.header('Authorization');
   if (!authHeader?.startsWith('Bearer ifk_')) {
-    return c.json({ error: 'missing_key', message: 'Provide the key to rotate via Authorization: Bearer ifk_xxx' }, 401);
+    return c.json(
+      {
+        error: 'missing_key',
+        message: 'Provide the key to rotate via Authorization: Bearer ifk_xxx',
+      },
+      401,
+    );
   }
   const key = authHeader.slice(7);
   const rotated = rotateApiKey(key);
   if (!rotated) {
     return c.json({ error: 'invalid_key', message: 'Key not found or inactive.' }, 404);
   }
-  return c.json({
-    api_key: rotated.api_key,
-    key_prefix: rotated.key_prefix,
-    monthly_limit: rotated.monthly_limit ?? 200,
-    credits_remaining: rotated.credits_remaining,
-    message: 'New key issued and the old one revoked. Save this — it will not be shown again.',
-  }, 201);
+  return c.json(
+    {
+      api_key: rotated.api_key,
+      key_prefix: rotated.key_prefix,
+      monthly_limit: rotated.monthly_limit ?? 200,
+      credits_remaining: rotated.credits_remaining,
+      message: 'New key issued and the old one revoked. Save this — it will not be shown again.',
+    },
+    201,
+  );
 });
 
 apiKeys.post('/v1/admin/keys', async (c) => {
@@ -575,13 +665,16 @@ apiKeys.post('/v1/admin/keys', async (c) => {
     return c.json({ error: 'rate_limited' }, 429);
   }
 
-  return c.json({
-    api_key: result.api_key,
-    key_prefix: result.key_prefix,
-    email: email.trim().toLowerCase(),
-    monthly_limit: monthlyLimit ?? 200,
-    issued_by_us: issuedByUs,
-  }, 201);
+  return c.json(
+    {
+      api_key: result.api_key,
+      key_prefix: result.key_prefix,
+      email: email.trim().toLowerCase(),
+      monthly_limit: monthlyLimit ?? 200,
+      issued_by_us: issuedByUs,
+    },
+    201,
+  );
 });
 
 apiKeys.post('/v1/admin/keys/import', async (c) => {
@@ -620,7 +713,15 @@ apiKeys.post('/v1/admin/keys/import', async (c) => {
     'INSERT INTO api_keys (key_hash, key_prefix, email, monthly_limit) VALUES (?, ?, ?, ?)',
   ).run(keyHash, keyPrefix, email.trim().toLowerCase(), monthlyLimit);
 
-  return c.json({ imported: true, key_prefix: keyPrefix, email: email.trim().toLowerCase(), monthly_limit: monthlyLimit ?? 200 }, 201);
+  return c.json(
+    {
+      imported: true,
+      key_prefix: keyPrefix,
+      email: email.trim().toLowerCase(),
+      monthly_limit: monthlyLimit ?? 200,
+    },
+    201,
+  );
 });
 
 /**
@@ -669,14 +770,20 @@ apiKeys.post('/v1/admin/keys/relabel', async (c) => {
   const db = getStatsDB();
   // no_recredit travels in `previous` too: restoring the mapping restores the
   // quota behaviour along with the address, so the whole call stays undoable.
-  const read = db.prepare('SELECT key_prefix, email, no_recredit FROM api_keys WHERE key_prefix = ?');
+  const read = db.prepare(
+    'SELECT key_prefix, email, no_recredit FROM api_keys WHERE key_prefix = ?',
+  );
   const write = db.prepare('UPDATE api_keys SET email = ? WHERE key_prefix = ?');
   const writeFlag = db.prepare('UPDATE api_keys SET no_recredit = ? WHERE key_prefix = ?');
 
   const previous: Array<{ key_prefix: string; email: string; no_recredit: number }> = [];
   const notFound: string[] = [];
   for (const prefix of prefixes) {
-    const rows = read.all(prefix) as Array<{ key_prefix: string; email: string; no_recredit: number | null }>;
+    const rows = read.all(prefix) as Array<{
+      key_prefix: string;
+      email: string;
+      no_recredit: number | null;
+    }>;
     if (rows.length === 0) {
       notFound.push(prefix);
       continue;
@@ -741,8 +848,9 @@ apiKeys.get('/v1/admin/keys', (c) => {
   // the arrivals — had no instrument, for twenty-four days, while the data
   // accumulated in the table. An instrument that is built and never wired up
   // reads exactly like one that was never built: silence.
-  const rows = db.prepare(
-    `SELECT k.key_hash, k.key_prefix, k.email, k.monthly_limit, k.active, k.created_at,
+  const rows = db
+    .prepare(
+      `SELECT k.key_hash, k.key_prefix, k.email, k.monthly_limit, k.active, k.created_at,
             k.credits_total, k.credits_remaining, k.amount_paid_minor, k.amount_paid_currency, k.issued_by_us, k.source,
             CASE WHEN k.stripe_session_id IS NOT NULL THEN 1 ELSE 0 END AS paid,
             COALESCE(u.count, 0) AS used,
@@ -765,8 +873,9 @@ apiKeys.get('/v1/admin/keys', (c) => {
      LEFT JOIN (SELECT key_hash, MAX(month) AS last_active_month FROM api_usage GROUP BY key_hash) lam
             ON lam.key_hash = k.key_hash
      LEFT JOIN email_summaries es ON es.email = k.email
-     ORDER BY k.created_at DESC`
-  ).all(month, prevMonth) as Array<Record<string, unknown> & { key_hash: string }>;
+     ORDER BY k.created_at DESC`,
+    )
+    .all(month, prevMonth) as Array<Record<string, unknown> & { key_hash: string }>;
 
   // Per-customer monthly usage series (last 6 months) → CRM sparkline.
   const months: string[] = [];
@@ -826,7 +935,9 @@ apiKeys.get('/v1/admin/keys', (c) => {
     // customer who had stopped.
     const series = months.map((mo) => quota?.get(mo) ?? calls?.get(mo) ?? 0);
     const fromQuota = months.some((mo) => quota?.get(mo) !== undefined);
-    const fromCalls = months.some((mo) => quota?.get(mo) === undefined && calls?.get(mo) !== undefined);
+    const fromCalls = months.some(
+      (mo) => quota?.get(mo) === undefined && calls?.get(mo) !== undefined,
+    );
     const out: Record<string, unknown> = {
       ...r,
       series,
@@ -887,7 +998,8 @@ apiKeys.post('/v1/admin/email-summary', async (c) => {
        last_date = excluded.last_date, last_subject = excluded.last_subject,
        last_snippet = excluded.last_snippet, updated_at = datetime('now')`,
   );
-  const str = (v: unknown): string | null => (typeof v === 'string' && v.length ? v.slice(0, 500) : null);
+  const str = (v: unknown): string | null =>
+    typeof v === 'string' && v.length ? v.slice(0, 500) : null;
   const num = (v: unknown): number => (Number.isFinite(Number(v)) ? Number(v) : 0);
 
   // Safety net: a caller that forgot the alias table still lands the row on
@@ -948,7 +1060,8 @@ apiKeys.post('/v1/admin/email-messages', async (c) => {
   }
 
   const db = getStatsDB();
-  const clip = (v: unknown, n: number): string | null => (typeof v === 'string' && v.length ? v.slice(0, n) : null);
+  const clip = (v: unknown, n: number): string | null =>
+    typeof v === 'string' && v.length ? v.slice(0, n) : null;
   const upsert = db.prepare(
     `INSERT INTO email_messages (id, customer_email, direction, msg_date, subject, snippet, snippet_fr, lang, body, counterparty, no_reply_needed)
      VALUES (@id, @customer_email, @direction, @msg_date, @subject, @snippet, @snippet_fr, @lang, @body, @counterparty, @no_reply_needed)
@@ -986,7 +1099,13 @@ apiKeys.post('/v1/admin/email-messages', async (c) => {
   const tx = db.transaction((rows: EmailMessageInput[]) => {
     let n = 0;
     for (const r of rows) {
-      if (!r || typeof r.id !== 'string' || typeof r.customer_email !== 'string' || !r.customer_email.includes('@')) continue;
+      if (
+        !r ||
+        typeof r.id !== 'string' ||
+        typeof r.customer_email !== 'string' ||
+        !r.customer_email.includes('@')
+      )
+        continue;
       // Alias-resolved so a second address can never split a thread in two.
       const email = toCanonical(r.customer_email, aliasMap);
       // 'draft' = a CRM-native draft awaiting review in the dashboard. It lives
@@ -1017,7 +1136,9 @@ apiKeys.post('/v1/admin/email-messages', async (c) => {
       const from = normalizeSenderAddress(String(r.counterparty ?? ''));
       const noReply =
         direction === 'in' &&
-        (noReplySenders.has(email) || noReplySenders.has(raw) || (from !== '' && noReplySenders.has(from)))
+        (noReplySenders.has(email) ||
+          noReplySenders.has(raw) ||
+          (from !== '' && noReplySenders.has(from)))
           ? 1
           : 0;
       upsert.run({
@@ -1103,7 +1224,9 @@ apiKeys.post('/v1/admin/email-messages/delete', async (c) => {
     return c.json({ error: 'invalid_body', message: 'Expected { id: "…" }' }, 400);
   }
   const db = getStatsDB();
-  const res = db.prepare(`DELETE FROM email_messages WHERE id = ? AND direction = 'draft'`).run(body.id);
+  const res = db
+    .prepare(`DELETE FROM email_messages WHERE id = ? AND direction = 'draft'`)
+    .run(body.id);
   return c.json({ deleted: res.changes });
 });
 
@@ -1137,7 +1260,10 @@ apiKeys.post('/v1/admin/email-messages/no-reply', async (c) => {
     return c.json({ error: 'invalid_json', message: 'Request body must be valid JSON' }, 400);
   }
   if (typeof body.id !== 'string' || !body.id) {
-    return c.json({ error: 'invalid_body', message: 'Expected { id: "…", value: true|false }' }, 400);
+    return c.json(
+      { error: 'invalid_body', message: 'Expected { id: "…", value: true|false }' },
+      400,
+    );
   }
   // Strictly boolean, never coerced: a body whose `value` arrived as the string
   // "false" or as undefined would otherwise quietly UNMARK a message the
@@ -1188,7 +1314,10 @@ apiKeys.post('/v1/admin/no-reply-senders', async (c) => {
   // and a fragment is precisely what must never enter this table.
   const address = typeof body.address === 'string' ? normalizeSenderAddress(body.address) : '';
   if (!address.includes('@')) {
-    return c.json({ error: 'invalid_body', message: 'Expected { address: "…@…", value: true|false }' }, 400);
+    return c.json(
+      { error: 'invalid_body', message: 'Expected { address: "…@…", value: true|false }' },
+      400,
+    );
   }
   if (typeof body.value !== 'boolean') {
     return c.json({ error: 'invalid_body', message: 'value must be a boolean' }, 400);
@@ -1240,7 +1369,10 @@ apiKeys.get('/v1/admin/client-activity', (c) => {
     )
     .all() as Array<{ key_prefix: string; day: string; count: number }>;
 
-  type Activity = { endpoints: Array<{ path: string; count: number }>; days: Array<{ day: string; count: number }> };
+  type Activity = {
+    endpoints: Array<{ path: string; count: number }>;
+    days: Array<{ day: string; count: number }>;
+  };
   const byKey: Record<string, Activity> = {};
   const ensure = (k: string): Activity => (byKey[k] ??= { endpoints: [], days: [] });
   for (const e of endpoints) ensure(e.key_prefix).endpoints.push({ path: e.path, count: e.count });
@@ -1273,16 +1405,20 @@ apiKeys.post('/v1/admin/keys/raise-limit', async (c) => {
     return c.json({ error: 'invalid_input', message: 'monthly_limit borné à [100, 20000]' }, 400);
   }
   const db = getStatsDB();
-  const before = db.prepare('SELECT monthly_limit, email FROM api_keys WHERE key_prefix = ?').get(keyPrefix) as
-    | { monthly_limit: number | null; email: string }
-    | undefined;
+  const before = db
+    .prepare('SELECT monthly_limit, email FROM api_keys WHERE key_prefix = ?')
+    .get(keyPrefix) as { monthly_limit: number | null; email: string } | undefined;
   if (!before) return c.json({ error: 'not_found' }, 404);
   db.prepare('UPDATE api_keys SET monthly_limit = ? WHERE key_prefix = ?').run(limit, keyPrefix);
   db.prepare(`INSERT INTO events (kind, label) VALUES ('manual', ?)`).run(
     `quota relevé via CRM : ${keyPrefix} ${before.monthly_limit ?? 200} → ${limit}/mois`,
   );
   console.log(`[admin] raise-limit ${keyPrefix}: ${before.monthly_limit ?? 200} -> ${limit}`);
-  return c.json({ key_prefix: keyPrefix, previous_limit: before.monthly_limit ?? 200, monthly_limit: limit });
+  return c.json({
+    key_prefix: keyPrefix,
+    previous_limit: before.monthly_limit ?? 200,
+    monthly_limit: limit,
+  });
 });
 
 /**
@@ -1337,7 +1473,8 @@ apiKeys.get('/v1/admin/client-profiles', (c) => {
     )
     .all() as Array<{ key_prefix: string; month: string; count: number }>;
   const monthsByKey: Record<string, Array<{ month: string; count: number }>> = {};
-  for (const r of usage) (monthsByKey[r.key_prefix] ??= []).push({ month: r.month, count: r.count });
+  for (const r of usage)
+    (monthsByKey[r.key_prefix] ??= []).push({ month: r.month, count: r.count });
   // Which keys we have already warned about their quota, so the panel does not
   // suggest sending a notice twice.
   const warned = db
@@ -1417,7 +1554,10 @@ apiKeys.post('/v1/admin/visibility', async (c) => {
     return c.json({ error: 'invalid_json' }, 400);
   }
   if (!Array.isArray(body.checks) || body.checks.length === 0) {
-    return c.json({ error: 'invalid_body', message: 'Expected { checks: [{surface, state}] }' }, 400);
+    return c.json(
+      { error: 'invalid_body', message: 'Expected { checks: [{surface, state}] }' },
+      400,
+    );
   }
   let saved = 0;
   for (const raw of body.checks) {
@@ -1550,7 +1690,13 @@ apiKeys.post('/v1/admin/institutional-contacts', async (c) => {
   // `null` and `[]` are valid JSON: reading a field off them throws, and the
   // caller would get a 500 where the contract promises a 400.
   if (!body || typeof body !== 'object' || Array.isArray(body)) {
-    return c.json({ error: 'invalid_input', message: 'Corps attendu : un contact { email, org, category, ... }' }, 400);
+    return c.json(
+      {
+        error: 'invalid_input',
+        message: 'Corps attendu : un contact { email, org, category, ... }',
+      },
+      400,
+    );
   }
   const res = upsertInstitutionalContact(body as InstitutionalContactInput);
   if (!res.ok) return c.json({ error: 'invalid_input', message: res.reason }, 400);
@@ -1627,7 +1773,8 @@ apiKeys.post('/v1/admin/digest', async (c) => {
   if (!bodyFr) {
     return c.json({ error: 'body_required', message: 'body_fr must be non-empty' }, 400);
   }
-  const factsJson = typeof body.facts_json === 'string' ? body.facts_json : JSON.stringify(body.facts_json ?? null);
+  const factsJson =
+    typeof body.facts_json === 'string' ? body.facts_json : JSON.stringify(body.facts_json ?? null);
   saveWeeklyDigest(week, bodyFr, factsJson);
   return c.json({ saved: true, week }, 201);
 });
@@ -1667,7 +1814,10 @@ apiKeys.post('/v1/admin/thread-summary', async (c) => {
   const key = typeof body.thread_key === 'string' ? body.thread_key.trim() : '';
   const summary = typeof body.summary_fr === 'string' ? body.summary_fr.trim() : '';
   if (!email || !key || !summary) {
-    return c.json({ error: 'invalid_body', message: 'email, thread_key and summary_fr are required' }, 400);
+    return c.json(
+      { error: 'invalid_body', message: 'email, thread_key and summary_fr are required' },
+      400,
+    );
   }
   getStatsDB()
     .prepare(
@@ -1689,7 +1839,9 @@ apiKeys.get('/v1/admin/contact-notes', (c) => {
   const email = (c.req.query('email') ?? '').trim().toLowerCase();
   if (!email) return c.json({ error: 'invalid_query', message: 'email is required' }, 400);
   const notes = getStatsDB()
-    .prepare('SELECT id, note, created_at FROM contact_notes WHERE email = ? ORDER BY id DESC LIMIT 50')
+    .prepare(
+      'SELECT id, note, created_at FROM contact_notes WHERE email = ? ORDER BY id DESC LIMIT 50',
+    )
     .all(email);
   return c.json({ notes });
 });
@@ -1707,7 +1859,10 @@ apiKeys.post('/v1/admin/contact-notes', async (c) => {
   const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
   const note = typeof body.note === 'string' ? body.note.trim() : '';
   if (!email || !note) {
-    return c.json({ error: 'invalid_body', message: 'email and a non-empty note are required' }, 400);
+    return c.json(
+      { error: 'invalid_body', message: 'email and a non-empty note are required' },
+      400,
+    );
   }
   const r = getStatsDB()
     .prepare('INSERT INTO contact_notes (email, note) VALUES (?, ?)')
@@ -1822,7 +1977,12 @@ apiKeys.post('/v1/admin/test-email', async (c) => {
   if (!to || !to.includes('@')) {
     return c.json({ error: 'missing_to', message: 'pass ?to=email@example.com' }, 400);
   }
-  const sent = await sendApiKeyEmail({ to, rawKey: 'ifk_test_0000000000000000', credits: 0, bundle: 'TEST' });
+  const sent = await sendApiKeyEmail({
+    to,
+    rawKey: 'ifk_test_0000000000000000',
+    credits: 0,
+    bundle: 'TEST',
+  });
   return c.json({ sent, configured: isEmailConfigured() });
 });
 
@@ -1937,7 +2097,8 @@ apiKeys.post('/v1/admin/prospects', async (c) => {
   }
 
   const db = getStatsDB();
-  const clip = (v: unknown, n: number): string | null => (typeof v === 'string' && v.length ? v.slice(0, n) : null);
+  const clip = (v: unknown, n: number): string | null =>
+    typeof v === 'string' && v.length ? v.slice(0, n) : null;
   const upsert = db.prepare(
     `INSERT INTO prospects (id, company, segment, website, country, what_they_do, fit_reason,
         buying_signal, signal_source_url, contact_name, contact_role, contact_email,
@@ -2010,7 +2171,13 @@ apiKeys.post('/v1/admin/prospects/update', async (c) => {
   if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
     return c.json({ error: 'unauthorized' }, 401);
   }
-  let body: { id?: unknown; status?: unknown; outcome?: unknown; outcomeNote?: unknown; wakeUpAt?: unknown };
+  let body: {
+    id?: unknown;
+    status?: unknown;
+    outcome?: unknown;
+    outcomeNote?: unknown;
+    wakeUpAt?: unknown;
+  };
   try {
     body = await c.req.json();
   } catch {
@@ -2028,7 +2195,10 @@ apiKeys.post('/v1/admin/prospects/update', async (c) => {
   // teach the outcome data a lesson nobody meant.
   const hasBareWake = !hasOutcome && body.wakeUpAt !== undefined;
   if (!hasStatus && !hasOutcome && !hasBareWake) {
-    return c.json({ error: 'invalid_body', message: 'Expected at least one of status, outcome, wakeUpAt' }, 400);
+    return c.json(
+      { error: 'invalid_body', message: 'Expected at least one of status, outcome, wakeUpAt' },
+      400,
+    );
   }
 
   const sets: string[] = [];
@@ -2045,7 +2215,10 @@ apiKeys.post('/v1/admin/prospects/update', async (c) => {
   if (hasStatus) {
     const allowed = ['a_mailer', 'a_enrichir', 'archive', 'rejete'];
     if (typeof body.status !== 'string' || !allowed.includes(body.status)) {
-      return c.json({ error: 'invalid_status', message: `status must be one of ${allowed.join(', ')}` }, 400);
+      return c.json(
+        { error: 'invalid_status', message: `status must be one of ${allowed.join(', ')}` },
+        400,
+      );
     }
     sets.push('status = ?');
     args.push(body.status);
@@ -2053,8 +2226,17 @@ apiKeys.post('/v1/admin/prospects/update', async (c) => {
 
   if (hasOutcome) {
     const allowed = ['en_discussion', 'pas_maintenant', 'pas_interesse', 'mauvaise_personne'];
-    if (body.outcome !== null && (typeof body.outcome !== 'string' || !allowed.includes(body.outcome))) {
-      return c.json({ error: 'invalid_outcome', message: `outcome must be null or one of ${allowed.join(', ')}` }, 400);
+    if (
+      body.outcome !== null &&
+      (typeof body.outcome !== 'string' || !allowed.includes(body.outcome))
+    ) {
+      return c.json(
+        {
+          error: 'invalid_outcome',
+          message: `outcome must be null or one of ${allowed.join(', ')}`,
+        },
+        400,
+      );
     }
     const outcome = body.outcome as string | null;
 
@@ -2063,19 +2245,31 @@ apiKeys.post('/v1/admin/prospects/update', async (c) => {
     let wakeUpAt: string | null = null;
     if (outcome === 'pas_maintenant') {
       if (typeof body.wakeUpAt !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(body.wakeUpAt)) {
-        return c.json({ error: 'invalid_wake_up_at', message: 'pas_maintenant requires wakeUpAt as YYYY-MM-DD' }, 400);
+        return c.json(
+          {
+            error: 'invalid_wake_up_at',
+            message: 'pas_maintenant requires wakeUpAt as YYYY-MM-DD',
+          },
+          400,
+        );
       }
       wakeUpAt = body.wakeUpAt;
     }
 
-    const note = typeof body.outcomeNote === 'string' && body.outcomeNote.trim()
-      ? body.outcomeNote.trim().slice(0, 500)
-      : null;
+    const note =
+      typeof body.outcomeNote === 'string' && body.outcomeNote.trim()
+        ? body.outcomeNote.trim().slice(0, 500)
+        : null;
 
     sets.push('outcome = ?', 'outcome_note = ?', 'wake_up_at = ?', 'outcome_at = ?');
     // Clearing the outcome clears everything that hangs off it, so no orphan
     // wake-up date survives to wake a contact nobody is waiting on any more.
-    args.push(outcome, outcome === null ? null : note, wakeUpAt, outcome === null ? null : new Date().toISOString());
+    args.push(
+      outcome,
+      outcome === null ? null : note,
+      wakeUpAt,
+      outcome === null ? null : new Date().toISOString(),
+    );
   }
 
   const db = getStatsDB();
@@ -2191,7 +2385,10 @@ apiKeys.post('/v1/admin/activation-nudges/run', (c) => {
     return c.json({ started: false, reason: 'already_running' });
   }
   void runActivationPass().catch((err) =>
-    console.error('[activation-nudge] manual run failed:', err instanceof Error ? err.message : err),
+    console.error(
+      '[activation-nudge] manual run failed:',
+      err instanceof Error ? err.message : err,
+    ),
   );
   return c.json({ started: true });
 });
@@ -2225,7 +2422,9 @@ apiKeys.post('/v1/admin/company-profiles', async (c) => {
   let upserted = 0;
   for (const raw of body.profiles as Array<Record<string, unknown>>) {
     const email = typeof raw.email === 'string' ? raw.email.trim().toLowerCase() : '';
-    const source = allowedSources.includes(raw.source as ProfileSource) ? (raw.source as ProfileSource) : 'manual';
+    const source = allowedSources.includes(raw.source as ProfileSource)
+      ? (raw.source as ProfileSource)
+      : 'manual';
     if (!email || !email.includes('@')) continue;
     upsertCompanyProfile({
       email,

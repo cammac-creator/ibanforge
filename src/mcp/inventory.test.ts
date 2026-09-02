@@ -70,7 +70,10 @@ describe('the inventory is internally coherent', () => {
       expect(tool.capability, `${tool.name} has no capability slug`).not.toBeNull();
     }
     for (const tool of MCP_TOOLS.filter((t) => !t.readOnly)) {
-      expect(tool.capability, `${tool.name} writes and must not be advertised as a capability`).toBeNull();
+      expect(
+        tool.capability,
+        `${tool.name} writes and must not be advertised as a capability`,
+      ).toBeNull();
     }
   });
 
@@ -84,26 +87,40 @@ describe('the served discovery documents carry every data tool', () => {
   it('the MCP server card lists them all', async () => {
     const card = await fetchJson('/.well-known/mcp/server-card.json');
     const names = (card.tools as Array<{ name: string }>).map((t) => t.name);
-    expect(names.sort()).toEqual(dataTools().map((t) => t.name).sort());
+    expect(names.sort()).toEqual(
+      dataTools()
+        .map((t) => t.name)
+        .sort(),
+    );
   });
 
   it('the A2A agent card exposes one skill per data tool', async () => {
     const card = await fetchJson('/.well-known/agent-card.json');
     const ids = (card.skills as Array<{ id: string }>).map((s) => s.id);
-    expect(ids.sort()).toEqual(dataTools().map((t) => t.name).sort());
+    expect(ids.sort()).toEqual(
+      dataTools()
+        .map((t) => t.name)
+        .sort(),
+    );
   });
 
   it('the x402 document names them under mcp.tools', async () => {
     const doc = await fetchJson('/.well-known/x402');
     const names = (doc.mcp as { tools: string[] }).tools;
-    expect([...names].sort()).toEqual(dataTools().map((t) => t.name).sort());
+    expect([...names].sort()).toEqual(
+      dataTools()
+        .map((t) => t.name)
+        .sort(),
+    );
   });
 
   it('agents.json declares the capability slug of each data tool', async () => {
     const manifest = await fetchJson('/.well-known/agents.json');
     const capabilities = manifest.capabilities as string[];
     for (const tool of dataTools()) {
-      expect(capabilities, `agents.json is missing the capability of ${tool.name}`).toContain(tool.capability);
+      expect(capabilities, `agents.json is missing the capability of ${tool.name}`).toContain(
+        tool.capability,
+      );
     }
   });
 });
@@ -125,11 +142,15 @@ describe('the surfaces that describe the server itself carry all tools', () => {
   });
 
   it('the static frontend mcp.json lists every tool and the released version', () => {
-    const doc = JSON.parse(readFileSync(resolve(ROOT, 'frontend/public/.well-known/mcp.json'), 'utf8')) as {
+    const doc = JSON.parse(
+      readFileSync(resolve(ROOT, 'frontend/public/.well-known/mcp.json'), 'utf8'),
+    ) as {
       version: string;
       tools: Array<{ name: string }>;
     };
-    const pkg = JSON.parse(readFileSync(resolve(ROOT, 'package.json'), 'utf8')) as { version: string };
+    const pkg = JSON.parse(readFileSync(resolve(ROOT, 'package.json'), 'utf8')) as {
+      version: string;
+    };
     // The version guard is the point of this case: the file sat at 1.3.3 for
     // two months while production served 1.4.x, and nothing was watching.
     expect(doc.version).toBe(pkg.version);
@@ -173,9 +194,10 @@ describe('the free endpoints are advertised where an agent looks before paying',
       // /v1/address/check and /v1/reference/validate are POST-first; a GET
       // that answers anything other than 401/402 proves the point either way.
       const res = await app.request(`https://api.ibanforge.com${endpoint.path}`);
-      expect([401, 402], `${endpoint.path} is advertised as free but answered ${res.status}`).not.toContain(
-        res.status,
-      );
+      expect(
+        [401, 402],
+        `${endpoint.path} is advertised as free but answered ${res.status}`,
+      ).not.toContain(res.status);
     }
   });
 });

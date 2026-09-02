@@ -34,8 +34,7 @@ function key(over: Partial<AdminKey> = {}): AdminKey {
   };
 }
 
-const detect = (keys: AdminKey[], lastRunAt?: Date) =>
-  detectEvents(keys, { now: NOW, lastRunAt });
+const detect = (keys: AdminKey[], lastRunAt?: Date) => detectEvents(keys, { now: NOW, lastRunAt });
 
 describe('classifiers', () => {
   it('flags internal / test accounts', () => {
@@ -130,7 +129,13 @@ describe('detectEvents — quota (free keys only)', () => {
 
   it('does not apply quota rules to paid keys', () => {
     const e = detect([
-      key({ email: 'p@acme.com', used: 5000, monthly_limit: 200, credits_total: 10000, credits_remaining: 5000 }),
+      key({
+        email: 'p@acme.com',
+        used: 5000,
+        monthly_limit: 200,
+        credits_total: 10000,
+        credits_remaining: 5000,
+      }),
     ]);
     expect(e.some((x) => x.kind.startsWith('QUOTA'))).toBe(false);
   });
@@ -139,21 +144,36 @@ describe('detectEvents — quota (free keys only)', () => {
 describe('detectEvents — paid idle', () => {
   it('fires when <5% consumed and 7+ days old', () => {
     const e = detect([
-      key({ email: 'paid@acme.com', created_at: '2026-06-20T00:00:00Z', credits_total: 1000, credits_remaining: 990 }),
+      key({
+        email: 'paid@acme.com',
+        created_at: '2026-06-20T00:00:00Z',
+        credits_total: 1000,
+        credits_remaining: 990,
+      }),
     ]);
     expect(e.map((x) => x.kind)).toEqual(['PAID_IDLE']);
   });
 
   it('does not fire when 5%+ consumed', () => {
     const e = detect([
-      key({ email: 'paid@acme.com', created_at: '2026-06-20T00:00:00Z', credits_total: 1000, credits_remaining: 900 }),
+      key({
+        email: 'paid@acme.com',
+        created_at: '2026-06-20T00:00:00Z',
+        credits_total: 1000,
+        credits_remaining: 900,
+      }),
     ]);
     expect(e).toHaveLength(0);
   });
 
   it('does not fire before 7 days', () => {
     const e = detect([
-      key({ email: 'paid@acme.com', created_at: '2026-06-30T00:00:00Z', credits_total: 1000, credits_remaining: 999 }),
+      key({
+        email: 'paid@acme.com',
+        created_at: '2026-06-30T00:00:00Z',
+        credits_total: 1000,
+        credits_remaining: 999,
+      }),
     ]);
     expect(e).toHaveLength(0);
   });
@@ -172,12 +192,18 @@ describe('detectEvents — new corporate', () => {
   });
 
   it('ignores freemail signups', () => {
-    const e = detect([key({ email: 'someone@gmail.com', created_at: '2026-07-01T12:00:00Z' })], lastRun);
+    const e = detect(
+      [key({ email: 'someone@gmail.com', created_at: '2026-07-01T12:00:00Z' })],
+      lastRun,
+    );
     expect(e).toHaveLength(0);
   });
 
   it('ignores corporate keys created before the last run', () => {
-    const e = detect([key({ email: 'cfo@oldco.com', created_at: '2026-06-15T12:00:00Z' })], lastRun);
+    const e = detect(
+      [key({ email: 'cfo@oldco.com', created_at: '2026-06-15T12:00:00Z' })],
+      lastRun,
+    );
     expect(e).toHaveLength(0);
   });
 });
@@ -253,7 +279,11 @@ describe('diffAgainstState — anti-repetition', () => {
     expect(first.nextState.keys['ifk_y']).toBeDefined();
 
     // condition gone (new month reset) → not in next state
-    const cleared = diffAgainstState(detect([key({ key_prefix: 'ifk_y', email: 'a@acme.com', used: 0 })]), first.nextState, NOW);
+    const cleared = diffAgainstState(
+      detect([key({ key_prefix: 'ifk_y', email: 'a@acme.com', used: 0 })]),
+      first.nextState,
+      NOW,
+    );
     expect(cleared.fresh).toHaveLength(0);
     expect(cleared.nextState.keys['ifk_y']).toBeUndefined();
   });
@@ -261,10 +291,13 @@ describe('diffAgainstState — anti-repetition', () => {
 
 describe('formatReport', () => {
   it('renders a grouped French report with an action line', () => {
-    const events = detect([
-      key({ email: 'a@acme.com', used: 200 }),
-      key({ email: 'cfo@newco.com', created_at: '2026-07-01T12:00:00Z' }),
-    ], new Date('2026-07-01T00:00:00Z'));
+    const events = detect(
+      [
+        key({ email: 'a@acme.com', used: 200 }),
+        key({ email: 'cfo@newco.com', created_at: '2026-07-01T12:00:00Z' }),
+      ],
+      new Date('2026-07-01T00:00:00Z'),
+    );
     const msg = formatReport(events, { now: NOW });
     expect(msg).toContain('RADAR CLIENTS IBANFORGE');
     expect(msg).toContain('QUOTA GRATUIT ÉPUISÉ');
@@ -276,10 +309,15 @@ describe('formatReport', () => {
 
 describe('fetchAdmin', () => {
   it('sends X-Admin-Secret and parses JSON', async () => {
-    const mock = vi.fn(async () =>
-      new Response(JSON.stringify({ ok: 1 }), { status: 200 }),
+    const mock = vi.fn(
+      async () => new Response(JSON.stringify({ ok: 1 }), { status: 200 }),
     ) as unknown as typeof fetch;
-    const out = await fetchAdmin<{ ok: number }>('https://api.test', 'sekret', '/v1/admin/keys', mock);
+    const out = await fetchAdmin<{ ok: number }>(
+      'https://api.test',
+      'sekret',
+      '/v1/admin/keys',
+      mock,
+    );
     expect(out).toEqual({ ok: 1 });
     const call = (mock as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
     expect(call[0]).toBe('https://api.test/v1/admin/keys');
@@ -287,7 +325,11 @@ describe('fetchAdmin', () => {
   });
 
   it('throws on a non-2xx response', async () => {
-    const mock = vi.fn(async () => new Response('nope', { status: 401 })) as unknown as typeof fetch;
-    await expect(fetchAdmin('https://api.test', 'x', '/v1/admin/keys', mock)).rejects.toThrow('HTTP 401');
+    const mock = vi.fn(
+      async () => new Response('nope', { status: 401 }),
+    ) as unknown as typeof fetch;
+    await expect(fetchAdmin('https://api.test', 'x', '/v1/admin/keys', mock)).rejects.toThrow(
+      'HTTP 401',
+    );
   });
 });

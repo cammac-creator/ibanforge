@@ -8,7 +8,13 @@ const feedback = new Hono();
 interface FeedbackBody {
   tx_hash?: string;
   endpoint?: string;
-  error_type?: 'wrong_validation' | 'stale_bic' | 'missing_data' | 'incorrect_classification' | 'latency' | 'other';
+  error_type?:
+    | 'wrong_validation'
+    | 'stale_bic'
+    | 'missing_data'
+    | 'incorrect_classification'
+    | 'latency'
+    | 'other';
   expected?: unknown;
   got?: unknown;
   notes?: string;
@@ -141,7 +147,9 @@ export function recordFeedbackRow(p: {
 export function countRecentFeedback(ipHash: string, hours: number): number {
   return (
     getStatsDB()
-      .prepare("SELECT COUNT(*) AS n FROM feedback WHERE ip_hash = ? AND created_at >= datetime('now', ?)")
+      .prepare(
+        "SELECT COUNT(*) AS n FROM feedback WHERE ip_hash = ? AND created_at >= datetime('now', ?)",
+      )
       .get(ipHash, `-${hours} hours`) as { n: number }
   ).n;
 }
@@ -223,10 +231,13 @@ feedback.post('/v1/feedback', async (c) => {
 
   // Per-source insert quota: bound how fast one source can grow the table.
   if (ipHash && countRecentFeedback(ipHash, 1) >= FEEDBACK_INSERTS_PER_SOURCE_HOUR) {
-    return c.json({
-      error: 'feedback_rate_limited',
-      message: `At most ${FEEDBACK_INSERTS_PER_SOURCE_HOUR} feedback reports per hour. Try again later.`,
-    }, 429);
+    return c.json(
+      {
+        error: 'feedback_rate_limited',
+        message: `At most ${FEEDBACK_INSERTS_PER_SOURCE_HOUR} feedback reports per hour. Try again later.`,
+      },
+      429,
+    );
   }
 
   const rowId = recordFeedbackRow({
@@ -271,7 +282,13 @@ feedback.get('/v1/feedback/:id', (c) => {
   const row = db
     .prepare('SELECT id, created_at, endpoint, error_type, status FROM feedback WHERE id = ?')
     .get(Number(id)) as
-    | { id: number; created_at: string; endpoint: string | null; error_type: string; status: string }
+    | {
+        id: number;
+        created_at: string;
+        endpoint: string | null;
+        error_type: string;
+        status: string;
+      }
     | undefined;
 
   if (!row) {
@@ -316,7 +333,9 @@ feedback.get('/v1/admin/feedback', (c) => {
            FROM feedback ORDER BY created_at DESC, id DESC LIMIT ?`,
         )
         .all(limit);
-  const open = (db.prepare(`SELECT COUNT(*) AS n FROM feedback WHERE status = 'open'`).get() as { n: number }).n;
+  const open = (
+    db.prepare(`SELECT COUNT(*) AS n FROM feedback WHERE status = 'open'`).get() as { n: number }
+  ).n;
   return c.json({ open, reports: rows });
 });
 
@@ -341,7 +360,10 @@ feedback.post('/v1/admin/feedback/status', async (c) => {
   const id = typeof body.id === 'number' && Number.isInteger(body.id) ? body.id : null;
   const status = body.status === 'open' || body.status === 'done' ? body.status : null;
   if (id === null || status === null) {
-    return c.json({ error: 'invalid_body', message: "id must be an integer and status 'open' or 'done'" }, 400);
+    return c.json(
+      { error: 'invalid_body', message: "id must be an integer and status 'open' or 'done'" },
+      400,
+    );
   }
   const info = getStatsDB().prepare('UPDATE feedback SET status = ? WHERE id = ?').run(status, id);
   return c.json({ updated: info.changes });

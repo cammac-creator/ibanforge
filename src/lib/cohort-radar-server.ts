@@ -135,7 +135,9 @@ export async function runCohortScan(now: Date = new Date()): Promise<CohortRadar
         });
       } catch (err) {
         // One bad cohort must not cost the others: record and carry on.
-        report.errors.push(`${cohort.userAgent}: ${err instanceof Error ? err.message : String(err)}`);
+        report.errors.push(
+          `${cohort.userAgent}: ${err instanceof Error ? err.message : String(err)}`,
+        );
       }
     }
 
@@ -166,7 +168,10 @@ export async function runCohortScan(now: Date = new Date()): Promise<CohortRadar
   }
 }
 
-export function lastCohortReport(): { last_run_at: string | null; report: CohortRadarReport | null } {
+export function lastCohortReport(): {
+  last_run_at: string | null;
+  report: CohortRadarReport | null;
+} {
   let parsed: CohortRadarReport | null;
   try {
     parsed = JSON.parse(kvGet(KV_LAST_REPORT) ?? 'null') as CohortRadarReport | null;
@@ -191,11 +196,20 @@ export function getCohortRelabels(
   const db = getStatsDB();
   if (address) {
     return db
-      .prepare('SELECT key_prefix, old_email, address, created_at FROM cohort_relabels WHERE address = ? ORDER BY created_at DESC')
-      .all(address) as Array<{ key_prefix: string; old_email: string; address: string; created_at: string }>;
+      .prepare(
+        'SELECT key_prefix, old_email, address, created_at FROM cohort_relabels WHERE address = ? ORDER BY created_at DESC',
+      )
+      .all(address) as Array<{
+      key_prefix: string;
+      old_email: string;
+      address: string;
+      created_at: string;
+    }>;
   }
   return db
-    .prepare('SELECT key_prefix, old_email, address, created_at FROM cohort_relabels ORDER BY created_at DESC LIMIT 500')
+    .prepare(
+      'SELECT key_prefix, old_email, address, created_at FROM cohort_relabels ORDER BY created_at DESC LIMIT 500',
+    )
     .all() as Array<{ key_prefix: string; old_email: string; address: string; created_at: string }>;
 }
 

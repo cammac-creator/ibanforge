@@ -36,7 +36,10 @@ describe('DATA-02 — sepa.schemes at the grain the contract promises', () => {
       .prepare('SELECT scheme FROM sepa_participants WHERE bic8 = ?')
       .all(bic8) as Array<{ scheme: string }>;
     const registered = new Set(rows.map((r) => r.scheme));
-    expect(registered.size, `${bic8} must be in the EPC register for this test to mean anything`).toBeGreaterThan(0);
+    expect(
+      registered.size,
+      `${bic8} must be in the EPC register for this test to mean anything`,
+    ).toBeGreaterThan(0);
 
     expect(result.sepa!.basis).toBe('epc_register');
     expect(new Set(result.sepa!.schemes)).toEqual(registered);
@@ -92,15 +95,26 @@ describe('DATA-03 — the five SEPA members the frozen library set misses', () =
     expect(result.risk_indicators!.sepa_reachable).toBe(true);
   });
 
-  it.each(Object.keys(SEPA_MEMBERS_EXTRA))('answers %s as a member through the facade too', (cc) => {
-    // /v1/iban/structure and the MCP country resource read getSepaInfo
-    // directly, not an enriched result.
-    expect(getSepaInfo(cc).member).toBe(true);
-  });
+  it.each(Object.keys(SEPA_MEMBERS_EXTRA))(
+    'answers %s as a member through the facade too',
+    (cc) => {
+      // /v1/iban/structure and the MCP country resource read getSepaInfo
+      // directly, not an enriched result.
+      expect(getSepaInfo(cc).member).toBe(true);
+    },
+  );
 
   it('leaves the library its own countries', () => {
-    expect(getSepaInfo('DE')).toEqual({ member: true, schemes: ['SCT', 'SDD', 'SCT_INST'], vop_required: true });
-    expect(getSepaInfo('CH')).toEqual({ member: true, schemes: ['SCT', 'SDD'], vop_required: false });
+    expect(getSepaInfo('DE')).toEqual({
+      member: true,
+      schemes: ['SCT', 'SDD', 'SCT_INST'],
+      vop_required: true,
+    });
+    expect(getSepaInfo('CH')).toEqual({
+      member: true,
+      schemes: ['SCT', 'SDD'],
+      vop_required: false,
+    });
     expect(getSepaInfo('BR')).toEqual({ member: false, schemes: [], vop_required: false });
   });
 
@@ -123,9 +137,10 @@ describe('DATA-03 — the five SEPA members the frozen library set misses', () =
     }
 
     for (const [cc, schemes] of Object.entries(SEPA_MEMBERS_EXTRA)) {
-      expect(new Set(schemes), `${cc} in SEPA_MEMBERS_EXTRA (as of ${SEPA_MEMBERS_EXTRA_AS_OF})`).toEqual(
-        fromRegister.get(cc),
-      );
+      expect(
+        new Set(schemes),
+        `${cc} in SEPA_MEMBERS_EXTRA (as of ${SEPA_MEMBERS_EXTRA_AS_OF})`,
+      ).toEqual(fromRegister.get(cc));
     }
     expect([...fromRegister.keys()].sort()).toEqual(Object.keys(SEPA_MEMBERS_EXTRA).sort());
   });

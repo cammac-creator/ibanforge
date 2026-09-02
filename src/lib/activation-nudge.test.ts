@@ -68,16 +68,31 @@ describe('selectNudgeCandidates', () => {
       row({ email: 'old@alpha.example.net', created_at: '2026-08-01 08:00:00' }),
       row({ email: 'recent@alpha.example.net', created_at: '2026-08-25 08:00:00' }),
     ]);
-    expect(picked.map((r) => r.email)).toEqual(['recent@alpha.example.net', 'old@alpha.example.net']);
+    expect(picked.map((r) => r.email)).toEqual([
+      'recent@alpha.example.net',
+      'old@alpha.example.net',
+    ]);
   });
 
   it('sends one message per PERSON, not per key', () => {
     // Three unused keys behind one mailbox is one person, and three copies of
     // the same mail in one morning is how a nudge becomes spam.
     const picked = selectNudgeCandidates([
-      row({ email: 'dup@alpha.example.net', key_prefix: 'ifk_dup_1', created_at: '2026-08-25 08:00:00' }),
-      row({ email: 'DUP@alpha.example.net', key_prefix: 'ifk_dup_2', created_at: '2026-08-24 08:00:00' }),
-      row({ email: 'dup@alpha.example.net', key_prefix: 'ifk_dup_3', created_at: '2026-08-23 08:00:00' }),
+      row({
+        email: 'dup@alpha.example.net',
+        key_prefix: 'ifk_dup_1',
+        created_at: '2026-08-25 08:00:00',
+      }),
+      row({
+        email: 'DUP@alpha.example.net',
+        key_prefix: 'ifk_dup_2',
+        created_at: '2026-08-24 08:00:00',
+      }),
+      row({
+        email: 'dup@alpha.example.net',
+        key_prefix: 'ifk_dup_3',
+        created_at: '2026-08-23 08:00:00',
+      }),
     ]);
     expect(picked).toHaveLength(1);
     expect(picked[0].key_prefix).toBe('ifk_dup_1');
@@ -97,11 +112,20 @@ describe('selectNudgeCandidates', () => {
   it('collapses two aliased addresses into one person', () => {
     // The operator declared "this address IS that customer". The draft half of
     // the pass already honours it; this pins that the nudge half does too.
-    const canonicalOf = (e: string) => (e === 'second@alpha.example.net' ? 'first@alpha.example.net' : e);
+    const canonicalOf = (e: string) =>
+      e === 'second@alpha.example.net' ? 'first@alpha.example.net' : e;
     const picked = selectNudgeCandidates(
       [
-        row({ email: 'first@alpha.example.net', key_prefix: 'ifk_alias_1', created_at: '2026-08-25 08:00:00' }),
-        row({ email: 'second@alpha.example.net', key_prefix: 'ifk_alias_2', created_at: '2026-08-24 08:00:00' }),
+        row({
+          email: 'first@alpha.example.net',
+          key_prefix: 'ifk_alias_1',
+          created_at: '2026-08-25 08:00:00',
+        }),
+        row({
+          email: 'second@alpha.example.net',
+          key_prefix: 'ifk_alias_2',
+          created_at: '2026-08-24 08:00:00',
+        }),
       ],
       25,
       { canonicalOf },
@@ -114,7 +138,8 @@ describe('selectNudgeCandidates', () => {
     // The founder already wrote to them, or another of their addresses already
     // holds the one nudge: an automated "you never tried" after his own mail
     // unmasks every message as a sequence.
-    const canonicalOf = (e: string) => (e === 'alias@alpha.example.net' ? 'talked@alpha.example.net' : e);
+    const canonicalOf = (e: string) =>
+      e === 'alias@alpha.example.net' ? 'talked@alpha.example.net' : e;
     const picked = selectNudgeCandidates(
       [row({ email: 'alias@alpha.example.net' }), row({ email: 'fresh@alpha.example.net' })],
       25,

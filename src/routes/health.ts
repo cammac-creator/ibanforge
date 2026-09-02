@@ -1,6 +1,11 @@
 import { Hono } from 'hono';
 import { createRequire } from 'node:module';
-import { getEntryCount, getLastUpdated, getSourceFreshness, type SourceFreshness } from '../lib/bic-lookup.js';
+import {
+  getEntryCount,
+  getLastUpdated,
+  getSourceFreshness,
+  type SourceFreshness,
+} from '../lib/bic-lookup.js';
 import { getChClearingCount } from '../lib/ch-clearing.js';
 import { getStatsDB, getStatsDbState } from '../lib/db.js';
 import { getComplianceDB } from '../lib/compliance-db.js';

@@ -27,7 +27,14 @@ export interface PaywallCause {
   detail: string;
   // required/remaining: batch billing (1 unit per IBAN) can refuse a request
   // all-or-nothing while some allowance is left — these say how much.
-  quota?: { used: number; limit: number; month: string; resets: string; required?: number; remaining?: number };
+  quota?: {
+    used: number;
+    limit: number;
+    month: string;
+    resets: string;
+    required?: number;
+    remaining?: number;
+  };
   credits?: { required?: number; remaining?: number; total: number; topup: string };
 }
 
@@ -45,7 +52,15 @@ export type { HonoEnv };
 
 // --- Operation tracking ---
 
-export type OperationType = 'iban_validate' | 'iban_batch' | 'bic_lookup' | 'iban_compliance' | 'ch_clearing_lookup' | 'iban_format' | 'reference_validate' | 'address_check';
+export type OperationType =
+  | 'iban_validate'
+  | 'iban_batch'
+  | 'bic_lookup'
+  | 'iban_compliance'
+  | 'ch_clearing_lookup'
+  | 'iban_format'
+  | 'reference_validate'
+  | 'address_check';
 
 // --- IBAN Validation ---
 
@@ -484,7 +499,13 @@ export interface IBANValidationResult {
    */
   reference_check?: ReferenceCheckBlock;
   formatted?: string;
-  error?: 'invalid_format' | 'unsupported_country' | 'wrong_length' | 'checksum_failed' | 'invalid_check_digits' | 'invalid_bban_structure';
+  error?:
+    | 'invalid_format'
+    | 'unsupported_country'
+    | 'wrong_length'
+    | 'checksum_failed'
+    | 'invalid_check_digits'
+    | 'invalid_bban_structure';
   error_detail?: string;
   cost_usdc: number;
   processing_ms?: number;
@@ -660,7 +681,11 @@ export interface StatsOverview {
 
 // --- Dashboard v2: Hourly / Error / Pattern stats ---
 
-export interface HourlyHeatmapEntry { day: number; hour: number; total: number; }
+export interface HourlyHeatmapEntry {
+  day: number;
+  hour: number;
+  total: number;
+}
 export interface HourlyStatsResponse {
   heatmap: HourlyHeatmapEntry[];
   peak_hours: { start: number; end: number; days: number[] };
@@ -678,7 +703,12 @@ export interface ErrorStatsResponse {
 }
 
 export interface PatternStatsResponse {
-  endpoint_share_trend: Array<{ date: string; iban_validate: number; iban_batch: number; bic_lookup: number }>;
+  endpoint_share_trend: Array<{
+    date: string;
+    iban_validate: number;
+    iban_batch: number;
+    bic_lookup: number;
+  }>;
   geo_trend: Array<Record<string, number | string>>;
   top_countries_list: string[];
 }

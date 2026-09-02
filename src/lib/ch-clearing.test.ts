@@ -153,9 +153,7 @@ describe('Swiss BC-Nummer Clearing Lookup', () => {
     });
 
     it('detectInstitutionType for LI entry → "foreign_participant"', () => {
-      expect(detectInstitutionType('Neue Bank AG', '30173', 'LI')).toBe(
-        'foreign_participant',
-      );
+      expect(detectInstitutionType('Neue Bank AG', '30173', 'LI')).toBe('foreign_participant');
     });
 
     it('full entry detection via lookupClearing', () => {

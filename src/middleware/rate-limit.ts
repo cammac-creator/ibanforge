@@ -65,7 +65,13 @@ export function rateLimitMiddleware(): MiddlewareHandler {
     const path = new URL(c.req.url).pathname;
 
     // Exempt free/monitoring routes from rate limiting
-    if (path === '/health' || path === '/openapi.json' || path === '/ping' || path === '/stats' || path === '/v1/demo') {
+    if (
+      path === '/health' ||
+      path === '/openapi.json' ||
+      path === '/ping' ||
+      path === '/stats' ||
+      path === '/v1/demo'
+    ) {
       await next();
       return;
     }

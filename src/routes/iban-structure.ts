@@ -37,29 +37,39 @@ ibanStructure.get('/v1/iban/structure/:country', (c) => {
 
   // Catch the OpenAPI placeholder mistake — same pattern as /v1/bic/:code.
   if (raw === '{COUNTRY}' || /^\{.*\}$/.test(raw)) {
-    return c.json({
-      error: 'placeholder_literal',
-      message: "You sent the literal OpenAPI placeholder. Substitute with a real ISO 3166-1 alpha-2 country code.",
-      example: 'GET /v1/iban/structure/CH',
-      schema: 'https://api.ibanforge.com/openapi.json',
-    }, 400);
+    return c.json(
+      {
+        error: 'placeholder_literal',
+        message:
+          'You sent the literal OpenAPI placeholder. Substitute with a real ISO 3166-1 alpha-2 country code.',
+        example: 'GET /v1/iban/structure/CH',
+        schema: 'https://api.ibanforge.com/openapi.json',
+      },
+      400,
+    );
   }
 
   if (!/^[A-Z]{2}$/.test(raw)) {
-    return c.json({
-      error: 'invalid_country_code',
-      message: 'Country code must be 2 uppercase ISO 3166-1 alpha-2 letters.',
-      example: 'GET /v1/iban/structure/CH',
-    }, 400);
+    return c.json(
+      {
+        error: 'invalid_country_code',
+        message: 'Country code must be 2 uppercase ISO 3166-1 alpha-2 letters.',
+        example: 'GET /v1/iban/structure/CH',
+      },
+      400,
+    );
   }
 
   const length = IBAN_LENGTHS[raw];
   if (!length) {
-    return c.json({
-      error: 'unsupported_country',
-      message: `'${raw}' is not a recognised IBAN country. We cover 89 countries — see /v1/iban/structure for the full list.`,
-      countries_endpoint: 'GET /v1/iban/structure (list)',
-    }, 404);
+    return c.json(
+      {
+        error: 'unsupported_country',
+        message: `'${raw}' is not a recognised IBAN country. We cover 89 countries — see /v1/iban/structure for the full list.`,
+        countries_endpoint: 'GET /v1/iban/structure (list)',
+      },
+      404,
+    );
   }
 
   const bban = BBAN_STRUCTURE[raw];

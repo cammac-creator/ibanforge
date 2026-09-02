@@ -39,16 +39,28 @@ describe('forum-threads — cycle de vie', () => {
     const created = await app.request('/v1/admin/forum-threads', {
       method: 'POST',
       headers: H,
-      body: JSON.stringify({ url, title: 'Test thread', source: 'github', status: 'planned', planned_for: '2026-08-25' }),
+      body: JSON.stringify({
+        url,
+        title: 'Test thread',
+        source: 'github',
+        status: 'planned',
+        planned_for: '2026-08-25',
+      }),
     });
     expect(created.status).toBe(200);
-    const { thread } = (await created.json()) as { thread: { id: number; status: string; planned_for: string } };
+    const { thread } = (await created.json()) as {
+      thread: { id: number; status: string; planned_for: string };
+    };
     expect(thread.status).toBe('planned');
     expect(thread.planned_for).toBe('2026-08-25');
 
     const list = await app.request('/v1/admin/forum-threads?status=planned', { headers: H });
     expect(list.status).toBe(200);
-    const data = (await list.json()) as { threads: Array<{ url: string }>; counts: Record<string, number>; scan: unknown };
+    const data = (await list.json()) as {
+      threads: Array<{ url: string }>;
+      counts: Record<string, number>;
+      scan: unknown;
+    };
     expect(data.threads.some((t) => t.url === url)).toBe(true);
     expect(data.counts.planned).toBeGreaterThanOrEqual(1);
     expect(data.scan).toBeDefined();
@@ -56,10 +68,16 @@ describe('forum-threads — cycle de vie', () => {
     const patched = await app.request(`/v1/admin/forum-threads/${thread.id}`, {
       method: 'PATCH',
       headers: H,
-      body: JSON.stringify({ status: 'posted', posted_url: 'https://example.com/answer', draft: 'final text' }),
+      body: JSON.stringify({
+        status: 'posted',
+        posted_url: 'https://example.com/answer',
+        draft: 'final text',
+      }),
     });
     expect(patched.status).toBe(200);
-    const after = (await patched.json()) as { thread: { status: string; posted_url: string; draft: string } };
+    const after = (await patched.json()) as {
+      thread: { status: string; posted_url: string; draft: string };
+    };
     expect(after.thread.status).toBe('posted');
     expect(after.thread.posted_url).toBe('https://example.com/answer');
   });
@@ -69,10 +87,17 @@ describe('forum-threads — cycle de vie', () => {
     const again = await app.request('/v1/admin/forum-threads', {
       method: 'POST',
       headers: H,
-      body: JSON.stringify({ url, title: 'Test thread (rescan)', source: 'github', status: 'posted' }),
+      body: JSON.stringify({
+        url,
+        title: 'Test thread (rescan)',
+        source: 'github',
+        status: 'posted',
+      }),
     });
     expect(again.status).toBe(200);
-    const { thread } = (await again.json()) as { thread: { posted_url: string | null; draft: string | null } };
+    const { thread } = (await again.json()) as {
+      thread: { posted_url: string | null; draft: string | null };
+    };
     expect(thread.posted_url).toBe('https://example.com/answer');
     expect(thread.draft).toBe('final text');
   });
@@ -139,7 +164,9 @@ describe('forum-threads — les deux paramètres optionnels (TABS-16, TABS-18)',
     const app = makeApp();
     const res = await app.request('/v1/admin/forum-threads', { headers: H });
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { platform_limits?: Record<string, { max: number | null; comfy: number }> };
+    const body = (await res.json()) as {
+      platform_limits?: Record<string, { max: number | null; comfy: number }>;
+    };
     // Le composeur compte contre CETTE table, plus contre une copie locale.
     expect(body.platform_limits?.stackoverflow).toEqual({ max: 30_000, comfy: 2_500 });
     expect(body.platform_limits?.hn?.max).toBeNull();
@@ -165,7 +192,9 @@ describe('forum-threads — les deux paramètres optionnels (TABS-16, TABS-18)',
     const mineFull = full.threads.find((t) => t.url === url);
     expect(mineFull?.draft).toBe('Un brouillon assez long pour peser dans le sondage.');
 
-    const lean = (await (await app.request('/v1/admin/forum-threads?fields=list', { headers: H })).json()) as {
+    const lean = (await (
+      await app.request('/v1/admin/forum-threads?fields=list', { headers: H })
+    ).json()) as {
       threads: Array<Record<string, unknown>>;
     };
     const mineLean = lean.threads.find((t) => t.url === url);
@@ -178,4 +207,4 @@ describe('forum-threads — les deux paramètres optionnels (TABS-16, TABS-18)',
     expect(mineLean!.status).toBeDefined();
     expect(mineLean!.first_seen).toBeDefined();
   });
-})
+});

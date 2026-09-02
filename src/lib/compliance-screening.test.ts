@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { checkSanctions, checkReachability, checkVop, buildComplianceResult, calculateRiskScore } from './compliance.js';
+import {
+  checkSanctions,
+  checkReachability,
+  checkVop,
+  buildComplianceResult,
+  calculateRiskScore,
+} from './compliance.js';
 import type { SanctionsCheck, ReachabilityCheck, VopCheck } from '../types.js';
 
 /**
@@ -65,8 +71,11 @@ describe('"nothing to screen" is reported as such, never as "screened and clean"
 
   it('stops charging risk points for absences nobody verified', () => {
     const s: SanctionsCheck = {
-      country_sanctioned: false, bank_sanctioned: false, matched_lists: [],
-      fatf_status: 'member', bank_screened: false,
+      country_sanctioned: false,
+      bank_sanctioned: false,
+      matched_lists: [],
+      fatf_status: 'member',
+      bank_screened: false,
     };
     const r: ReachabilityCheck = { sepa_instant: false, sct: false, sdd: false, screened: false };
     const v: VopCheck = { participant: false, status: 'not_found', screened: false };
@@ -80,8 +89,12 @@ describe('"nothing to screen" is reported as such, never as "screened and clean"
     // Same inputs, but a bank WAS screened and came back unreachable. That is a
     // finding, and it still scores.
     const screened = calculateRiskScore(
-      { ...s, bank_screened: true }, { ...r, screened: true }, { ...v, screened: true },
-      'bank', 'standard', false,
+      { ...s, bank_screened: true },
+      { ...r, screened: true },
+      { ...v, screened: true },
+      'bank',
+      'standard',
+      false,
     );
     expect(screened.flags).toEqual(['no_sepa_instant', 'no_vop']);
     expect(screened.risk_score).toBe(10);

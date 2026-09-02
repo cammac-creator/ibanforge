@@ -52,13 +52,25 @@ function literalAfter(source: string, name: string): string {
 }
 
 const SURFACES: Array<{ label: string; path: string; anchor: string }> = [
-  { label: 'stdio publié (npm ibanforge-mcp)', path: 'mcp/src/index.ts', anchor: 'const INSTRUCTIONS =' },
+  {
+    label: 'stdio publié (npm ibanforge-mcp)',
+    path: 'mcp/src/index.ts',
+    anchor: 'const INSTRUCTIONS =',
+  },
 ];
 
 /** Les surfaces qui IMPORTENT la constante, donc à vérifier autrement. */
 const IMPORTERS: Array<{ label: string; path: string; importLine: string }> = [
-  { label: 'stdio embarqué (npm run mcp / smithery)', path: 'src/mcp/server.ts', importLine: "import { MCP_INSTRUCTIONS } from './instructions.js'" },
-  { label: 'HTTP distant (api.ibanforge.com/mcp)', path: 'src/routes/mcp-http.ts', importLine: "import { MCP_INSTRUCTIONS } from '../mcp/instructions.js'" },
+  {
+    label: 'stdio embarqué (npm run mcp / smithery)',
+    path: 'src/mcp/server.ts',
+    importLine: "import { MCP_INSTRUCTIONS } from './instructions.js'",
+  },
+  {
+    label: 'HTTP distant (api.ibanforge.com/mcp)',
+    path: 'src/routes/mcp-http.ts',
+    importLine: "import { MCP_INSTRUCTIONS } from '../mcp/instructions.js'",
+  },
 ];
 
 describe('les trois surfaces MCP servent les mêmes instructions', () => {

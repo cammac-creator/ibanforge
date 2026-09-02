@@ -9,7 +9,7 @@ describe('purgeOldRequestLog', () => {
       `INSERT INTO request_log (method, path, status, response_ms, created_at, hour, day_of_week)
        VALUES ('GET', '/retention-test', 200, 1, ?, 0, 0)`,
     );
-    insert.run("2020-01-01 00:00:00");
+    insert.run('2020-01-01 00:00:00');
     insert.run(new Date().toISOString().replace('T', ' ').slice(0, 19));
 
     const before = db
@@ -69,9 +69,7 @@ describe('purgeOldRequestLog', () => {
 
     purgeOldRequestLog(12);
 
-    const rows = db
-      .prepare(`SELECT id FROM feedback WHERE endpoint = '/retention-test'`)
-      .all();
+    const rows = db.prepare(`SELECT id FROM feedback WHERE endpoint = '/retention-test'`).all();
     expect(rows).toHaveLength(1);
     db.prepare(`DELETE FROM feedback WHERE endpoint = '/retention-test'`).run();
   });
@@ -97,7 +95,12 @@ describe('purgeOldRequestLog', () => {
 describe('purgeTerminatedKeyTelemetry (DPA clause 4.7)', () => {
   const RUN = Date.now();
 
-  function seedKey(opts: { prefix: string; email: string; active: number; deactivatedAt: string | null }) {
+  function seedKey(opts: {
+    prefix: string;
+    email: string;
+    active: number;
+    deactivatedAt: string | null;
+  }) {
     const db = getStatsDB();
     db.prepare(
       `INSERT INTO api_keys (key_hash, key_prefix, email, active, deactivated_at)
@@ -116,7 +119,9 @@ describe('purgeTerminatedKeyTelemetry (DPA clause 4.7)', () => {
   function countLogs(prefix: string): number {
     const db = getStatsDB();
     return (
-      db.prepare(`SELECT COUNT(*) AS n FROM request_log WHERE key_prefix = ?`).get(prefix) as { n: number }
+      db.prepare(`SELECT COUNT(*) AS n FROM request_log WHERE key_prefix = ?`).get(prefix) as {
+        n: number;
+      }
     ).n;
   }
 
@@ -130,7 +135,12 @@ describe('purgeTerminatedKeyTelemetry (DPA clause 4.7)', () => {
 
   it('deletes telemetry of a key terminated >30 days ago (no active key left)', () => {
     const prefix = `ifk_dpa_old${RUN}`.slice(0, 12);
-    seedKey({ prefix, email: `dpa47-old-${RUN}@example.com`, active: 0, deactivatedAt: '2026-01-01 00:00:00' });
+    seedKey({
+      prefix,
+      email: `dpa47-old-${RUN}@example.com`,
+      active: 0,
+      deactivatedAt: '2026-01-01 00:00:00',
+    });
     seedLog(prefix);
 
     purgeTerminatedKeyTelemetry(30);
@@ -141,7 +151,12 @@ describe('purgeTerminatedKeyTelemetry (DPA clause 4.7)', () => {
   it('deletes operations rows of a terminated key too (same clause, same window)', () => {
     const db = getStatsDB();
     const prefix = `ifk_dpa_ops${RUN}`.slice(0, 12);
-    seedKey({ prefix, email: `dpa47-ops-${RUN}@example.com`, active: 0, deactivatedAt: '2026-01-01 00:00:00' });
+    seedKey({
+      prefix,
+      email: `dpa47-ops-${RUN}@example.com`,
+      active: 0,
+      deactivatedAt: '2026-01-01 00:00:00',
+    });
     db.prepare(
       `INSERT INTO operations (operation_type, country_code, success, hour, day_of_week, key_prefix)
        VALUES ('validate', 'CH', 1, 0, 0, ?)`,
@@ -149,7 +164,9 @@ describe('purgeTerminatedKeyTelemetry (DPA clause 4.7)', () => {
 
     purgeTerminatedKeyTelemetry(30);
     const n = (
-      db.prepare(`SELECT COUNT(*) AS n FROM operations WHERE key_prefix = ?`).get(prefix) as { n: number }
+      db.prepare(`SELECT COUNT(*) AS n FROM operations WHERE key_prefix = ?`).get(prefix) as {
+        n: number;
+      }
     ).n;
     expect(n).toBe(0);
     cleanup([prefix]);
@@ -159,8 +176,18 @@ describe('purgeTerminatedKeyTelemetry (DPA clause 4.7)', () => {
     const recent = `ifk_dpa_rec${RUN}`.slice(0, 12);
     const live = `ifk_dpa_liv${RUN}`.slice(0, 12);
     const now = new Date().toISOString().replace('T', ' ').slice(0, 19);
-    seedKey({ prefix: recent, email: `dpa47-recent-${RUN}@example.com`, active: 0, deactivatedAt: now });
-    seedKey({ prefix: live, email: `dpa47-live-${RUN}@example.com`, active: 1, deactivatedAt: null });
+    seedKey({
+      prefix: recent,
+      email: `dpa47-recent-${RUN}@example.com`,
+      active: 0,
+      deactivatedAt: now,
+    });
+    seedKey({
+      prefix: live,
+      email: `dpa47-live-${RUN}@example.com`,
+      active: 1,
+      deactivatedAt: null,
+    });
     seedLog(recent);
     seedLog(live);
 
@@ -191,7 +218,12 @@ describe('purgeTerminatedKeyTelemetry (DPA clause 4.7)', () => {
     // must still be deleted.
     const gone = `ifk_dpa_gon${RUN}`.slice(0, 12);
     const alive = `ifk_dpa_ali${RUN}`.slice(0, 12);
-    seedKey({ prefix: gone, email: 'credits-buyer', active: 0, deactivatedAt: '2026-01-01 00:00:00' });
+    seedKey({
+      prefix: gone,
+      email: 'credits-buyer',
+      active: 0,
+      deactivatedAt: '2026-01-01 00:00:00',
+    });
     seedKey({ prefix: alive, email: 'credits-buyer', active: 1, deactivatedAt: null });
     seedLog(gone);
     seedLog(alive);

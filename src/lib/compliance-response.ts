@@ -1,5 +1,9 @@
 import { getCountryRisk } from './countries.js';
-import { buildComplianceResult, type BankCodeConfidence, unassessableCompliance } from './compliance.js';
+import {
+  buildComplianceResult,
+  type BankCodeConfidence,
+  unassessableCompliance,
+} from './compliance.js';
 import { getComplianceMeta, type ComplianceMeta } from './compliance-db.js';
 import { enrichResult, isTestBic } from './enrich.js';
 import { validateIBAN } from './iban.js';
@@ -82,13 +86,27 @@ export function buildComplianceResponse(iban: string): ComplianceResponse {
 
   let compliance: ComplianceResult;
   try {
-    compliance = buildComplianceResult(true, countryCode, bic8, issuerType, countryRisk, isTestBic, bankCode);
+    compliance = buildComplianceResult(
+      true,
+      countryCode,
+      bic8,
+      issuerType,
+      countryRisk,
+      isTestBic,
+      bankCode,
+    );
   } catch {
     // The database is unreachable, which is a different thing from an IBAN we
     // could not read: here we HAVE a valid IBAN and cannot check it, so the
     // honest answer is elevated-and-say-so, not unassessable.
     compliance = {
-      sanctions: { country_sanctioned: false, bank_sanctioned: false, matched_lists: [], fatf_status: 'non_member', bank_screened: false },
+      sanctions: {
+        country_sanctioned: false,
+        bank_sanctioned: false,
+        matched_lists: [],
+        fatf_status: 'non_member',
+        bank_screened: false,
+      },
       reachability: { sepa_instant: false, sct: false, sdd: false, screened: false },
       vop: { participant: false, status: 'not_found', screened: false },
       risk_score: 50,
@@ -139,10 +157,23 @@ export function buildBicComplianceResponse(
     // `bankCode` stays at its default: there is no bank code in play, so there
     // is nothing to confirm or deny about one. Scoring it as 'unverified' would
     // penalise the caller for a check this input does not involve.
-    compliance = buildComplianceResult(true, countryCode, bic8, issuerType, countryRisk, isTestBic(bic8));
+    compliance = buildComplianceResult(
+      true,
+      countryCode,
+      bic8,
+      issuerType,
+      countryRisk,
+      isTestBic(bic8),
+    );
   } catch {
     compliance = {
-      sanctions: { country_sanctioned: false, bank_sanctioned: false, matched_lists: [], fatf_status: 'non_member', bank_screened: false },
+      sanctions: {
+        country_sanctioned: false,
+        bank_sanctioned: false,
+        matched_lists: [],
+        fatf_status: 'non_member',
+        bank_screened: false,
+      },
       reachability: { sepa_instant: false, sct: false, sdd: false, screened: false },
       vop: { participant: false, status: 'not_found', screened: false },
       risk_score: 50,

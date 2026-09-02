@@ -45,7 +45,14 @@ describe('recencyBonus — les fils récents passent devant', () => {
   });
   it('finalizeCandidate additionne et trace le bonus, plafonné à 100', () => {
     const t = finalizeCandidate(
-      { url: 'https://x', source: 'github', title: 'IBAN validation with BIC lookup', excerpt: 'validate please', activity: '', threadCreatedAt: '2026-08-16' },
+      {
+        url: 'https://x',
+        source: 'github',
+        title: 'IBAN validation with BIC lookup',
+        excerpt: 'validate please',
+        activity: '',
+        threadCreatedAt: '2026-08-16',
+      },
       now,
     );
     expect(t?.scoreDetail).toContain('récent(+25)');
@@ -56,7 +63,17 @@ describe('recencyBonus — les fils récents passent devant', () => {
 describe('parseDiscourse / parseOdooSearch — les nouveaux forums', () => {
   it('Discourse : reconstruit les URLs de topics', () => {
     const [c] = parseDiscourse(
-      { topics: [{ id: 56496, title: 'IBAN number isn&#39;t valid', slug: 'iban-number-isnt-valid', created_at: '2019-12-01T00:00:00Z', posts_count: 5 }] },
+      {
+        topics: [
+          {
+            id: 56496,
+            title: 'IBAN number isn&#39;t valid',
+            slug: 'iban-number-isnt-valid',
+            created_at: '2019-12-01T00:00:00Z',
+            posts_count: 5,
+          },
+        ],
+      },
       'discuss.frappe.io',
     );
     expect(c.url).toBe('https://discuss.frappe.io/t/iban-number-isnt-valid/56496');
@@ -64,10 +81,13 @@ describe('parseDiscourse / parseOdooSearch — les nouveaux forums', () => {
     expect(c.activity).toContain('discuss.frappe.io');
   });
   it('Odoo : extrait les fils du HTML, dédupliqués, slug humanisé', () => {
-    const html = 'x href="/forum/help-1/how-to-use-sepa-direct-debit-sdd-205846" y /forum/help-1/how-to-use-sepa-direct-debit-sdd-205846 z /forum/help-1/tag/foo';
+    const html =
+      'x href="/forum/help-1/how-to-use-sepa-direct-debit-sdd-205846" y /forum/help-1/how-to-use-sepa-direct-debit-sdd-205846 z /forum/help-1/tag/foo';
     const out = parseOdooSearch(html);
     expect(out).toHaveLength(1);
-    expect(out[0].url).toBe('https://www.odoo.com/forum/help-1/how-to-use-sepa-direct-debit-sdd-205846');
+    expect(out[0].url).toBe(
+      'https://www.odoo.com/forum/help-1/how-to-use-sepa-direct-debit-sdd-205846',
+    );
     expect(out[0].title).toBe('how to use sepa direct debit sdd');
   });
   it('payloads vides tolérés', () => {
@@ -78,7 +98,9 @@ describe('parseDiscourse / parseOdooSearch — les nouveaux forums', () => {
 
 describe('repoOfUrl — la clé du malus anti-backlog', () => {
   it('extrait owner/repo en minuscules des URLs GitHub', () => {
-    expect(repoOfUrl('https://github.com/Metasfresh/metasfresh/issues/13338')).toBe('metasfresh/metasfresh');
+    expect(repoOfUrl('https://github.com/Metasfresh/metasfresh/issues/13338')).toBe(
+      'metasfresh/metasfresh',
+    );
   });
   it('null hors GitHub', () => {
     expect(repoOfUrl('https://stackoverflow.com/questions/1')).toBeNull();
@@ -97,7 +119,10 @@ describe('scoreThread — un score lisible, jamais opaque', () => {
   });
 
   it('les niches suisses et VoP pèsent plus lourd que le générique', () => {
-    const qr = scoreThread('QR-IBAN detection for Liechtenstein', 'How do I detect a QR-IID?').score;
+    const qr = scoreThread(
+      'QR-IBAN detection for Liechtenstein',
+      'How do I detect a QR-IID?',
+    ).score;
     const vop = scoreThread('Verification of Payee', 'Is the beneficiary bank VoP ready?').score;
     const generic = scoreThread('IBAN regex', 'validate an IBAN with a regex').score;
     expect(qr).toBeGreaterThan(generic);
@@ -123,10 +148,16 @@ describe('scoreThread — un score lisible, jamais opaque', () => {
 
 describe('detectLang — route la langue du BROUILLON', () => {
   it('allemand sur un fil FinTS typique', () => {
-    expect(detectLang('Wird es für die neue Spezifikation eine Änderung geben, und werden die Banken das nicht unterstützen?')).toBe('de');
+    expect(
+      detectLang(
+        'Wird es für die neue Spezifikation eine Änderung geben, und werden die Banken das nicht unterstützen?',
+      ),
+    ).toBe('de');
   });
   it('français détecté', () => {
-    expect(detectLang('Comment valider un IBAN avec les données de la banque pour une application ?')).toBe('fr');
+    expect(
+      detectLang('Comment valider un IBAN avec les données de la banque pour une application ?'),
+    ).toBe('fr');
   });
   it('anglais par défaut', () => {
     expect(detectLang('How to get the BIC from an IBAN?')).toBe('en');
@@ -134,9 +165,16 @@ describe('detectLang — route la langue du BROUILLON', () => {
 });
 
 describe('finalizeCandidate — filtre le bruit sous MIN_SCORE', () => {
-  const base = { url: 'https://x', source: 'github' as const, activity: '', threadCreatedAt: '2026-01-01' };
+  const base = {
+    url: 'https://x',
+    source: 'github' as const,
+    activity: '',
+    threadCreatedAt: '2026-01-01',
+  };
   it('rejette un candidat hors sujet', () => {
-    expect(finalizeCandidate({ ...base, title: 'Fix typo in README', excerpt: 'small doc change' })).toBeNull();
+    expect(
+      finalizeCandidate({ ...base, title: 'Fix typo in README', excerpt: 'small doc change' }),
+    ).toBeNull();
   });
   it('garde un candidat pertinent avec langue et détail', () => {
     const t = finalizeCandidate({
@@ -176,7 +214,16 @@ describe('parsers — payloads réels → candidats propres', () => {
 
   it('GitHub : body null toléré, état et commentaires exposés', () => {
     const [c] = parseGitHubIssues({
-      items: [{ html_url: 'https://github.com/a/b/issues/1', title: 'Find BIC from IBAN', body: null, state: 'open', comments: 3, created_at: '2013-07-01T00:00:00Z' }],
+      items: [
+        {
+          html_url: 'https://github.com/a/b/issues/1',
+          title: 'Find BIC from IBAN',
+          body: null,
+          state: 'open',
+          comments: 3,
+          created_at: '2013-07-01T00:00:00Z',
+        },
+      ],
     });
     expect(c.excerpt).toBe('');
     expect(c.activity).toBe('open · 3 comm.');
@@ -184,9 +231,30 @@ describe('parsers — payloads réels → candidats propres', () => {
   });
 
   it('HN et pullpush : URLs reconstruites', () => {
-    const [h] = parseHN({ hits: [{ objectID: '123', title: 'Show HN: IBAN tool', points: 3, num_comments: 0, created_at: '2026-04-01T00:00:00Z' }] });
+    const [h] = parseHN({
+      hits: [
+        {
+          objectID: '123',
+          title: 'Show HN: IBAN tool',
+          points: 3,
+          num_comments: 0,
+          created_at: '2026-04-01T00:00:00Z',
+        },
+      ],
+    });
     expect(h.url).toBe('https://news.ycombinator.com/item?id=123');
-    const [p] = parsePullpush({ data: [{ permalink: '/r/fintech/comments/x/y/', title: 'IBAN API?', subreddit: 'fintech', score: 5, num_comments: 2, created_utc: 1750000000 }] });
+    const [p] = parsePullpush({
+      data: [
+        {
+          permalink: '/r/fintech/comments/x/y/',
+          title: 'IBAN API?',
+          subreddit: 'fintech',
+          score: 5,
+          num_comments: 2,
+          created_utc: 1750000000,
+        },
+      ],
+    });
     expect(p.url).toBe('https://reddit.com/r/fintech/comments/x/y/');
     expect(p.activity).toContain('r/fintech');
   });
@@ -211,30 +279,52 @@ describe('interpretCheck — verdicts de présence marketplace', () => {
   });
 
   it('bazaar : compte agrégé → listé ou absent avec consigne', () => {
-    expect(interpretCheck(def('bazaar'), 200, '5')).toEqual({ status: 'listed', detail: '5 ressources au catalogue' });
+    expect(interpretCheck(def('bazaar'), 200, '5')).toEqual({
+      status: 'listed',
+      detail: '5 ressources au catalogue',
+    });
     const absent = interpretCheck(def('bazaar'), 200, '0');
     expect(absent.status).toBe('absent');
     expect(absent.detail).toContain('micro-règlement');
   });
 
   it('github_issue : open = en file, closed = à vérifier à la main', () => {
-    const open = interpretCheck(def('github_issue'), 200, JSON.stringify({ state: 'open', comments: 0, updated_at: '2026-04-28T10:00:00Z' }));
+    const open = interpretCheck(
+      def('github_issue'),
+      200,
+      JSON.stringify({ state: 'open', comments: 0, updated_at: '2026-04-28T10:00:00Z' }),
+    );
     expect(open.status).toBe('pending');
     expect(open.detail).toContain('2026-04-28');
-    expect(interpretCheck(def('github_issue'), 200, JSON.stringify({ state: 'closed' })).status).toBe('manual');
+    expect(
+      interpretCheck(def('github_issue'), 200, JSON.stringify({ state: 'closed' })).status,
+    ).toBe('manual');
   });
 
   it('http_contains : 404 = absent, marqueur trouvé = listé (tier/score extraits)', () => {
     expect(interpretCheck(def('http_contains', 'ibanforge'), 404, '').status).toBe('absent');
-    expect(interpretCheck(def('http_contains', 'ibanforge'), 200, 'nothing here').status).toBe('absent');
-    const listed = interpretCheck(def('http_contains', 'ibanforge'), 200, '{"name":"IBANforge","tier":"verified","score":84.4}');
+    expect(interpretCheck(def('http_contains', 'ibanforge'), 200, 'nothing here').status).toBe(
+      'absent',
+    );
+    const listed = interpretCheck(
+      def('http_contains', 'ibanforge'),
+      200,
+      '{"name":"IBANforge","tier":"verified","score":84.4}',
+    );
     expect(listed.status).toBe('listed');
     expect(listed.detail).toContain('verified');
     expect(listed.detail).toContain('84.4');
   });
 
   it('npm : version et date de publication', () => {
-    const out = interpretCheck(def('npm'), 200, JSON.stringify({ 'dist-tags': { latest: '1.4.3' }, time: { '1.4.3': '2026-08-05T21:00:00Z' } }));
+    const out = interpretCheck(
+      def('npm'),
+      200,
+      JSON.stringify({
+        'dist-tags': { latest: '1.4.3' },
+        time: { '1.4.3': '2026-08-05T21:00:00Z' },
+      }),
+    );
     expect(out.status).toBe('listed');
     expect(out.detail).toBe('v1.4.3 publiée le 2026-08-05');
   });

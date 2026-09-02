@@ -6,7 +6,6 @@ import { dataTools, priceLabel } from '../mcp/inventory.js';
 /** Dataset sizes, read once and rounded down so a claim cannot outlive its data. */
 const F = datasetFacts();
 
-
 const require = createRequire(import.meta.url);
 const pkg = require('../../package.json') as { version: string };
 
@@ -45,14 +44,14 @@ const LONG_DESCRIPTIONS: Record<string, string> = {
 // the card and the tool servers drift apart in the first place.
 const MCP_SERVER_CARD = {
   name: 'IBANforge',
-  description:
-    `IBAN validation, BIC/SWIFT lookup, Swiss clearing, SEPA compliance and risk scoring API for AI agents. ${F.claim.bic} BIC entries (${F.claim.lei} LEI-enriched via GLEIF), ${F.claim.chClearing} Swiss BC-Nummer from SIX, 89 countries, refreshed monthly.`,
+  description: `IBAN validation, BIC/SWIFT lookup, Swiss clearing, SEPA compliance and risk scoring API for AI agents. ${F.claim.bic} BIC entries (${F.claim.lei} LEI-enriched via GLEIF), ${F.claim.chClearing} Swiss BC-Nummer from SIX, 89 countries, refreshed monthly.`,
   url: 'https://api.ibanforge.com/mcp',
   transport: 'streamable-http',
   version: pkg.version,
   tools: dataTools().map((tool) => ({
     name: tool.name,
-    description: LONG_DESCRIPTIONS[tool.name] ?? `${tool.description} Cost: ${priceLabel(tool.price)}.`,
+    description:
+      LONG_DESCRIPTIONS[tool.name] ?? `${tool.description} Cost: ${priceLabel(tool.price)}.`,
   })),
   homepage: 'https://ibanforge.com',
   repository: 'https://github.com/cammac-creator/ibanforge',
@@ -61,7 +60,12 @@ const MCP_SERVER_CARD = {
 
 const mcpCard = new Hono();
 
-for (const path of ['/.well-known/mcp/server-card.json', '/.well-known/mcp.json', '/mcp.json', '/.well-known/mcp']) {
+for (const path of [
+  '/.well-known/mcp/server-card.json',
+  '/.well-known/mcp.json',
+  '/mcp.json',
+  '/.well-known/mcp',
+]) {
   mcpCard.get(path, (c) => c.json(MCP_SERVER_CARD));
 }
 

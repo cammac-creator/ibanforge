@@ -242,9 +242,9 @@ describe('stripRedundantSegments — segment level, never token level', () => {
   });
 
   it('is case- and whitespace-insensitive', () => {
-    expect(stripRedundantSegments('Bahnhofstrasse 45,  8001   ZURICH', new Set(['8001 zurich']))).toBe(
-      'Bahnhofstrasse 45',
-    );
+    expect(
+      stripRedundantSegments('Bahnhofstrasse 45,  8001   ZURICH', new Set(['8001 zurich'])),
+    ).toBe('Bahnhofstrasse 45');
   });
 });
 

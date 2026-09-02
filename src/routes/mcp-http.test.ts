@@ -14,7 +14,12 @@ import { describe, it, expect, vi } from 'vitest';
 import { Hono } from 'hono';
 import { LATEST_PROTOCOL_VERSION } from '@modelcontextprotocol/sdk/types.js';
 import type { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
-import { mcpHttp, mcpSessions, createMcpSessionStore, MCP_SESSIONS_PER_IP_DAY } from './mcp-http.js';
+import {
+  mcpHttp,
+  mcpSessions,
+  createMcpSessionStore,
+  MCP_SESSIONS_PER_IP_DAY,
+} from './mcp-http.js';
 import { MCP_TOOLS } from '../mcp/inventory.js';
 import type { HonoEnv } from '../types.js';
 
@@ -55,7 +60,10 @@ async function parseStreamableHttp(res: Response): Promise<JsonRpcResponse> {
   }
   // text/event-stream — extract first `data: {...}` frame
   const match = text.match(/^data:\s*(\{.*\})$/m);
-  if (!match) throw new Error(`No JSON-RPC frame in SSE body. Content-Type was "${ct}". First 200 chars: ${text.slice(0, 200)}`);
+  if (!match)
+    throw new Error(
+      `No JSON-RPC frame in SSE body. Content-Type was "${ct}". First 200 chars: ${text.slice(0, 200)}`,
+    );
   return JSON.parse(match[1]) as JsonRpcResponse;
 }
 
@@ -77,12 +85,15 @@ function freshIp(): string {
   return `198.51.100.${(ipCounter % 200) + 1}`;
 }
 
-async function initialize(app: ReturnType<typeof makeApp>, clientIp: string = freshIp()): Promise<string> {
+async function initialize(
+  app: ReturnType<typeof makeApp>,
+  clientIp: string = freshIp(),
+): Promise<string> {
   const res = await app.request('/mcp', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Accept': 'application/json, text/event-stream',
+      Accept: 'application/json, text/event-stream',
       'x-real-ip': clientIp,
     },
     body: JSON.stringify({ ...RPC_BASE, method: 'initialize', params: INIT_PARAMS }),
@@ -113,7 +124,7 @@ async function rpc(
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Accept': 'application/json, text/event-stream',
+      Accept: 'application/json, text/event-stream',
       'mcp-session-id': sessionId,
       'x-real-ip': clientIp,
     },
@@ -133,7 +144,7 @@ describe('GET /mcp (no session) — discovery hint', () => {
     const res = await app.request('/mcp');
     expect(res.status).toBe(405);
     expect(res.headers.get('allow')).toContain('POST');
-    const body = await res.json() as Record<string, unknown>;
+    const body = (await res.json()) as Record<string, unknown>;
     expect(body.protocol).toBe('mcp');
     expect(body.transport).toBe('streamable-http');
     expect(Array.isArray(body.tools)).toBe(true);
@@ -151,13 +162,15 @@ describe('GET /mcp (no session) — discovery hint', () => {
    */
   it('lists exactly the tools tools/list serves, and the protocol the SDK speaks', async () => {
     const app = makeApp();
-    const hint = await (await app.request('/mcp')).json() as { tools: string[]; version: string };
+    const hint = (await (await app.request('/mcp')).json()) as { tools: string[]; version: string };
 
     const sessionId = await initialize(app);
     const listResp = await rpc(app, sessionId, 'tools/list');
     const served = (listResp.result as { tools: Array<{ name: string }> }).tools.map((t) => t.name);
 
-    expect([...hint.tools].sort(), 'the discovery hint and tools/list disagree').toEqual([...served].sort());
+    expect([...hint.tools].sort(), 'the discovery hint and tools/list disagree').toEqual(
+      [...served].sort(),
+    );
     expect(hint.tools.length).toBe(8);
     expect(hint.version).toBe(LATEST_PROTOCOL_VERSION);
   });
@@ -179,7 +192,9 @@ describe('GET /mcp (no session) — discovery hint', () => {
     const app = makeApp();
     const sessionId = await initialize(app);
     const listResp = await rpc(app, sessionId, 'tools/list');
-    const served = (listResp.result as { tools: Array<{ name: string }> }).tools.map((t) => t.name).sort();
+    const served = (listResp.result as { tools: Array<{ name: string }> }).tools
+      .map((t) => t.name)
+      .sort();
     expect(
       MCP_TOOLS.map((t) => t.name).sort(),
       'src/mcp/inventory.ts and the running MCP server disagree on the tool list',
@@ -195,15 +210,31 @@ describe('POST /mcp — full handshake', () => {
     // tools/list
     const listResp = await rpc(app, sessionId, 'tools/list');
     expect(listResp.error).toBeUndefined();
-    const tools = (listResp.result as { tools: Array<{ name: string; outputSchema?: unknown; inputSchema?: unknown }> }).tools;
+    const tools = (
+      listResp.result as {
+        tools: Array<{ name: string; outputSchema?: unknown; inputSchema?: unknown }>;
+      }
+    ).tools;
     expect(tools).toHaveLength(8);
 
-    const expectedNames = ['validate_iban', 'batch_validate_iban', 'lookup_bic', 'check_compliance', 'lookup_ch_clearing', 'send_feedback', 'validate_payment_reference', 'check_postal_address'];
+    const expectedNames = [
+      'validate_iban',
+      'batch_validate_iban',
+      'lookup_bic',
+      'check_compliance',
+      'lookup_ch_clearing',
+      'send_feedback',
+      'validate_payment_reference',
+      'check_postal_address',
+    ];
     for (const expected of expectedNames) {
       const tool = tools.find((t) => t.name === expected);
       expect(tool, `tool ${expected} should be registered`).toBeDefined();
       expect(tool!.inputSchema, `tool ${expected} should declare inputSchema`).toBeDefined();
-      expect(tool!.outputSchema, `tool ${expected} should declare outputSchema (Smithery quality score)`).toBeDefined();
+      expect(
+        tool!.outputSchema,
+        `tool ${expected} should declare outputSchema (Smithery quality score)`,
+      ).toBeDefined();
     }
 
     // tools/call validate_iban
@@ -212,10 +243,16 @@ describe('POST /mcp — full handshake', () => {
       arguments: { iban: 'DE89370400440532013000' },
     });
     expect(callResp.error).toBeUndefined();
-    const callResult = callResp.result as { content: Array<{ type: string; text: string }>; structuredContent?: Record<string, unknown> };
+    const callResult = callResp.result as {
+      content: Array<{ type: string; text: string }>;
+      structuredContent?: Record<string, unknown>;
+    };
     expect(callResult.content).toBeDefined();
     expect(callResult.content[0].type).toBe('text');
-    expect(callResult.structuredContent, 'paid tools must return structuredContent for SDK runtime validation').toBeDefined();
+    expect(
+      callResult.structuredContent,
+      'paid tools must return structuredContent for SDK runtime validation',
+    ).toBeDefined();
     expect(callResult.structuredContent!.iban).toBe('DE89370400440532013000');
     expect(callResult.structuredContent!.valid).toBe(true);
   });
@@ -339,7 +376,9 @@ describe('POST /mcp — full handshake', () => {
       '203.0.113.12',
     );
     expect(callResp.error).toBeUndefined();
-    const result = callResp.result as { structuredContent?: { results?: Array<Record<string, unknown>> } };
+    const result = callResp.result as {
+      structuredContent?: { results?: Array<Record<string, unknown>> };
+    };
     const first = result.structuredContent!.results![0];
     const bic = first.bic as Record<string, unknown>;
     expect(bic.basis, 'stripped by the batch output schema').toBe('national_register');
@@ -354,7 +393,13 @@ describe('POST /mcp — full handshake', () => {
       name: 'check_postal_address',
       arguments: {
         scheme: 'sps',
-        address: { strt_nm: 'Bahnhofstrasse', bldg_nb: '45', pst_cd: '8001', twn_nm: 'Zurich', ctry: 'CH' },
+        address: {
+          strt_nm: 'Bahnhofstrasse',
+          bldg_nb: '45',
+          pst_cd: '8001',
+          twn_nm: 'Zurich',
+          ctry: 'CH',
+        },
       },
     });
     expect(callResp.error).toBeUndefined();
@@ -434,7 +479,10 @@ describe('POST /mcp — full handshake', () => {
     expect(callResp.error).toBeUndefined();
     const result = callResp.result as { structuredContent?: Record<string, unknown> };
     expect(result.structuredContent).toBeDefined();
-    expect(result.structuredContent!.compliance, 'check_compliance must include a compliance bundle').toBeDefined();
+    expect(
+      result.structuredContent!.compliance,
+      'check_compliance must include a compliance bundle',
+    ).toBeDefined();
   });
 
   it('tools/call batch_validate_iban returns wrapped { results, count } structuredContent', async () => {
@@ -445,7 +493,9 @@ describe('POST /mcp — full handshake', () => {
       arguments: { ibans: ['DE89370400440532013000', 'CH9300762011623852957'] },
     });
     expect(callResp.error).toBeUndefined();
-    const result = callResp.result as { structuredContent?: { results?: unknown[]; count?: number } };
+    const result = callResp.result as {
+      structuredContent?: { results?: unknown[]; count?: number };
+    };
     expect(result.structuredContent).toBeDefined();
     expect(Array.isArray(result.structuredContent!.results)).toBe(true);
     expect(result.structuredContent!.results).toHaveLength(2);
@@ -488,12 +538,17 @@ describe('POST /mcp — JSON-RPC batch billing', () => {
     }));
   }
 
-  async function postBatch(app: ReturnType<typeof makeApp>, sessionId: string, ip: string, n: number) {
+  async function postBatch(
+    app: ReturnType<typeof makeApp>,
+    sessionId: string,
+    ip: string,
+    n: number,
+  ) {
     return app.request('/mcp', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Accept': 'application/json, text/event-stream',
+        Accept: 'application/json, text/event-stream',
         'mcp-session-id': sessionId,
         // Last segment is the trusted-proxy hop, which is what the limiter reads.
         'X-Forwarded-For': `198.51.100.1, ${ip}`,
@@ -523,11 +578,16 @@ describe('POST /mcp — JSON-RPC batch billing', () => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Accept': 'application/json, text/event-stream',
+        Accept: 'application/json, text/event-stream',
         'mcp-session-id': sessionId,
         'X-Forwarded-For': `198.51.100.1, 203.0.113.202`,
       },
-      body: JSON.stringify({ jsonrpc: '2.0', id: 7, method: 'tools/call', params: { name: 'lookup_ch_clearing', arguments: { iid: '230' } } }),
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 7,
+        method: 'tools/call',
+        params: { name: 'lookup_ch_clearing', arguments: { iid: '230' } },
+      }),
     });
     const body = await parseStreamableHttp(res);
     expect(body.error).toBeUndefined();
@@ -541,12 +601,17 @@ describe('POST /mcp — JSON-RPC batch billing', () => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Accept': 'application/json, text/event-stream',
+        Accept: 'application/json, text/event-stream',
         'mcp-session-id': sessionId,
         'X-Forwarded-For': `198.51.100.1, 203.0.113.203`,
       },
       body: JSON.stringify(
-        Array.from({ length: 40 }, (_, i) => ({ jsonrpc: '2.0', id: 300 + i, method: 'tools/list', params: {} })),
+        Array.from({ length: 40 }, (_, i) => ({
+          jsonrpc: '2.0',
+          id: 300 + i,
+          method: 'tools/list',
+          params: {},
+        })),
       ),
     });
     const body = await parseStreamableHttp(res);
@@ -623,7 +688,7 @@ describe('POST /mcp — an expired session says what to do about it', () => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Accept': 'application/json, text/event-stream',
+        Accept: 'application/json, text/event-stream',
         'mcp-session-id': sessionId,
         'x-real-ip': freshIp(),
       },
@@ -637,7 +702,7 @@ describe('POST /mcp — an expired session says what to do about it', () => {
     // 404 is what the streamable-HTTP spec reserves for an unknown session id:
     // a compliant client re-sends `initialize` on it instead of retrying.
     expect(res.status).toBe(404);
-    const body = await res.json() as { error: { code: number; message: string } };
+    const body = (await res.json()) as { error: { code: number; message: string } };
     expect(body.error.message).toContain('Session expired or server redeployed');
     expect(body.error.message).toContain('initialize');
   });
@@ -652,7 +717,7 @@ describe('POST /mcp — an expired session says what to do about it', () => {
       expect(mcpSessions.sweep()).toBeGreaterThanOrEqual(1);
       const res = await callWithSession(app, sessionId);
       expect(res.status).toBe(404);
-      const body = await res.json() as { error: { message: string } };
+      const body = (await res.json()) as { error: { message: string } };
       expect(body.error.message).toContain('Send initialize again');
     } finally {
       vi.useRealTimers();
@@ -680,7 +745,7 @@ describe('POST /mcp — opening a session is metered per address', () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Accept': 'application/json, text/event-stream',
+          Accept: 'application/json, text/event-stream',
           'x-real-ip': ip,
         },
         body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'ping', params: {} }),
@@ -689,7 +754,9 @@ describe('POST /mcp — opening a session is metered per address', () => {
     for (let i = 0; i < MCP_SESSIONS_PER_IP_DAY; i++) await burn();
 
     const refused = await burn();
-    const body = await refused.json() as { error?: { code: number; message: string; data: { used: number } } };
+    const body = (await refused.json()) as {
+      error?: { code: number; message: string; data: { used: number } };
+    };
     expect(body.error?.code).toBe(-32000);
     expect(body.error?.message).toContain('Daily MCP session limit reached');
 
@@ -698,12 +765,15 @@ describe('POST /mcp — opening a session is metered per address', () => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Accept': 'application/json, text/event-stream',
+        Accept: 'application/json, text/event-stream',
         'x-real-ip': ip,
       },
       body: JSON.stringify({ ...RPC_BASE, method: 'initialize', params: INIT_PARAMS }),
     });
-    expect(initRes.headers.get('mcp-session-id'), 'no session should be opened past the cap').toBeNull();
+    expect(
+      initRes.headers.get('mcp-session-id'),
+      'no session should be opened past the cap',
+    ).toBeNull();
   });
 });
 
@@ -724,7 +794,7 @@ describe('POST /mcp — batch_validate_iban bills per IBAN', () => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Accept': 'application/json, text/event-stream',
+        Accept: 'application/json, text/event-stream',
         'mcp-session-id': sessionId,
         'x-real-ip': ip,
       },
@@ -752,7 +822,10 @@ describe('POST /mcp — batch_validate_iban bills per IBAN', () => {
       app,
       sessionId,
       'tools/call',
-      { name: 'batch_validate_iban', arguments: { ibans: ['DE89370400440532013000', 'CH9300762011623852957'] } },
+      {
+        name: 'batch_validate_iban',
+        arguments: { ibans: ['DE89370400440532013000', 'CH9300762011623852957'] },
+      },
       12,
       ip,
     );
@@ -773,11 +846,14 @@ describe('tools/list and tools/call — the price is stated, the bill is honest'
     const app = makeApp();
     const sessionId = await initialize(app);
     const listResp = await rpc(app, sessionId, 'tools/list');
-    const tools = (listResp.result as { tools: Array<{ name: string; description?: string }> }).tools;
+    const tools = (listResp.result as { tools: Array<{ name: string; description?: string }> })
+      .tools;
     for (const tool of tools) {
       if (tool.name === 'send_feedback') continue; // free by design, and says so in its own words
       expect(tool.description, `${tool.name} states no price`).toContain('COST:');
-      expect(tool.description, `${tool.name} states no free allowance`).toContain('/v1/keys/generate');
+      expect(tool.description, `${tool.name} states no free allowance`).toContain(
+        '/v1/keys/generate',
+      );
     }
   });
 
@@ -803,7 +879,9 @@ describe('tools/list and tools/call — the price is stated, the bill is honest'
       name: 'batch_validate_iban',
       arguments: { ibans: ['DE89370400440532013000'] },
     });
-    const result = callResp.result as { structuredContent?: { results?: Array<Record<string, unknown>> } };
+    const result = callResp.result as {
+      structuredContent?: { results?: Array<Record<string, unknown>> };
+    };
     const first = result.structuredContent!.results![0];
     expect(first.cost_usdc).toBe(0);
     expect(first.list_price_usdc).toBe(0.002);
@@ -820,11 +898,16 @@ describe('tools/list and tools/call — the price is stated, the bill is honest'
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Accept': 'application/json, text/event-stream',
+        Accept: 'application/json, text/event-stream',
         'mcp-session-id': sessionId,
         'x-real-ip': ip,
       },
-      body: JSON.stringify({ jsonrpc: '2.0', id: 21, method: 'tools/call', params: { name: 'lookup_ch_clearing', arguments: { iid: '230' } } }),
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 21,
+        method: 'tools/call',
+        params: { name: 'lookup_ch_clearing', arguments: { iid: '230' } },
+      }),
     });
     expect(res.headers.get('X-MCP-Outcome')).toBe('ok');
     expect(res.headers.get('X-MCP-Tool')).toBe('lookup_ch_clearing');
@@ -868,7 +951,7 @@ describe('POST /mcp — Host allow-list', () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Accept': 'application/json, text/event-stream',
+          Accept: 'application/json, text/event-stream',
           'x-real-ip': freshIp(),
           Host: 'attacker.example.net',
         },

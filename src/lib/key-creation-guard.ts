@@ -97,7 +97,9 @@ export function keyCreationSource(ip: string | null | undefined): string | null 
 /** How many keys this source created in the last `hours` hours. */
 export function countKeyCreations(source: string, hours: number): number {
   const row = getStatsDB()
-    .prepare("SELECT COUNT(*) AS n FROM key_creations WHERE ip_hash = ? AND created_at >= datetime('now', ?)")
+    .prepare(
+      "SELECT COUNT(*) AS n FROM key_creations WHERE ip_hash = ? AND created_at >= datetime('now', ?)",
+    )
     .get(source, `-${hours} hours`) as { n: number };
   return row.n;
 }
@@ -136,7 +138,9 @@ export function challengeSendAllowed(source: string | null, email: string): Chal
   const db = getStatsDB();
   const toEmail = (
     db
-      .prepare("SELECT COUNT(*) AS n FROM verification_sends WHERE email_hash = ? AND created_at >= datetime('now', '-24 hours')")
+      .prepare(
+        "SELECT COUNT(*) AS n FROM verification_sends WHERE email_hash = ? AND created_at >= datetime('now', '-24 hours')",
+      )
       .get(sha256(email.trim().toLowerCase())) as { n: number }
   ).n;
   if (toEmail >= VERIFICATION_SENDS_PER_EMAIL_DAY) return { ok: false, reason: 'recipient' };
@@ -146,7 +150,9 @@ export function challengeSendAllowed(source: string | null, email: string): Chal
   if (source) {
     const fromSource = (
       db
-        .prepare("SELECT COUNT(*) AS n FROM verification_sends WHERE ip_hash = ? AND created_at >= datetime('now', '-24 hours')")
+        .prepare(
+          "SELECT COUNT(*) AS n FROM verification_sends WHERE ip_hash = ? AND created_at >= datetime('now', '-24 hours')",
+        )
         .get(source) as { n: number }
     ).n;
     if (fromSource >= VERIFICATION_SENDS_PER_SOURCE_DAY) return { ok: false, reason: 'source' };
@@ -161,10 +167,9 @@ export function challengeSendAllowed(source: string | null, email: string): Chal
  */
 export function recordVerificationSend(source: string | null, email: string): number {
   const db = getStatsDB();
-  const info = db.prepare('INSERT INTO verification_sends (ip_hash, email_hash) VALUES (?, ?)').run(
-    source,
-    sha256(email.trim().toLowerCase()),
-  );
+  const info = db
+    .prepare('INSERT INTO verification_sends (ip_hash, email_hash) VALUES (?, ?)')
+    .run(source, sha256(email.trim().toLowerCase()));
   db.prepare("DELETE FROM verification_sends WHERE created_at < datetime('now', '-2 days')").run();
   db.prepare("DELETE FROM pending_verifications WHERE expires_at < datetime('now')").run();
   return Number(info.lastInsertRowid);
@@ -180,7 +185,9 @@ export function recordVerificationSend(source: string | null, email: string): nu
  */
 export function markVerificationOutcome(id: number, accepted: boolean): void {
   if (!Number.isFinite(id) || id <= 0) return;
-  getStatsDB().prepare('UPDATE verification_sends SET relay_accepted = ? WHERE id = ?').run(accepted ? 1 : 0, id);
+  getStatsDB()
+    .prepare('UPDATE verification_sends SET relay_accepted = ? WHERE id = ?')
+    .run(accepted ? 1 : 0, id);
 }
 
 export interface VerificationDelivery {
@@ -224,8 +231,12 @@ export function verificationDelivery(hours = 24): VerificationDelivery {
  */
 export function purgeExpiredVerifications(): number {
   const db = getStatsDB();
-  const a = db.prepare("DELETE FROM verification_sends WHERE created_at < datetime('now', '-2 days')").run().changes;
-  const b = db.prepare("DELETE FROM pending_verifications WHERE expires_at < datetime('now')").run().changes;
+  const a = db
+    .prepare("DELETE FROM verification_sends WHERE created_at < datetime('now', '-2 days')")
+    .run().changes;
+  const b = db
+    .prepare("DELETE FROM pending_verifications WHERE expires_at < datetime('now')")
+    .run().changes;
   return a + b;
 }
 
@@ -262,9 +273,9 @@ export function checkVerificationCode(email: string, code: string): Verification
     .get(email) as { code_hash: string; attempts: number; expires_at: string } | undefined;
   if (!row) return { ok: false, reason: 'no_challenge' };
 
-  const expired = db
-    .prepare("SELECT datetime('now') > ? AS gone")
-    .get(row.expires_at) as { gone: number };
+  const expired = db.prepare("SELECT datetime('now') > ? AS gone").get(row.expires_at) as {
+    gone: number;
+  };
   if (expired.gone) {
     db.prepare('DELETE FROM pending_verifications WHERE email = ?').run(email);
     return { ok: false, reason: 'expired' };
@@ -275,7 +286,9 @@ export function checkVerificationCode(email: string, code: string): Verification
   const want = Buffer.from(row.code_hash);
   const match = got.length === want.length && timingSafeEqual(got, want);
   if (!match) {
-    db.prepare('UPDATE pending_verifications SET attempts = attempts + 1 WHERE email = ?').run(email);
+    db.prepare('UPDATE pending_verifications SET attempts = attempts + 1 WHERE email = ?').run(
+      email,
+    );
     return { ok: false, reason: 'wrong_code' };
   }
   db.prepare('DELETE FROM pending_verifications WHERE email = ?').run(email);

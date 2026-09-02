@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { sendViaRelay, deliverViaRelay, classifyRelayRefusal, isRelayConfigured } from './mail-transport.js';
+import {
+  sendViaRelay,
+  deliverViaRelay,
+  classifyRelayRefusal,
+  isRelayConfigured,
+} from './mail-transport.js';
 
 /**
  * Railway blocks outbound SMTP below its Pro plan — measured 2026-07-25 from
@@ -37,7 +42,9 @@ describe('isRelayConfigured', () => {
 describe('sendViaRelay', () => {
   it('posts the message to the relay with the shared secret header', async () => {
     configure();
-    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ sent: true }), { status: 200 }));
+    const fetchMock = vi.fn(
+      async () => new Response(JSON.stringify({ sent: true }), { status: 200 }),
+    );
     vi.stubGlobal('fetch', fetchMock);
 
     const ok = await sendViaRelay(MAIL);
@@ -63,7 +70,10 @@ describe('sendViaRelay', () => {
 
   it('reports failure without throwing when the relay answers an error', async () => {
     configure();
-    vi.stubGlobal('fetch', vi.fn(async () => new Response('nope', { status: 502 })));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('nope', { status: 502 })),
+    );
     vi.spyOn(console, 'error').mockImplementation(() => {});
 
     expect(await sendViaRelay(MAIL)).toBe(false);
@@ -71,7 +81,12 @@ describe('sendViaRelay', () => {
 
   it('reports failure without throwing when the relay is unreachable', async () => {
     configure();
-    vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('ECONNREFUSED'); }));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new Error('ECONNREFUSED');
+      }),
+    );
     vi.spyOn(console, 'error').mockImplementation(() => {});
 
     expect(await sendViaRelay(MAIL)).toBe(false);
@@ -80,10 +95,13 @@ describe('sendViaRelay', () => {
   it('bounds the wait so a hanging relay can never stall a caller', async () => {
     configure();
     let signal: AbortSignal | undefined;
-    vi.stubGlobal('fetch', vi.fn(async (_u: string, init: RequestInit) => {
-      signal = init.signal as AbortSignal;
-      return new Response(JSON.stringify({ sent: true }), { status: 200 });
-    }));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_u: string, init: RequestInit) => {
+        signal = init.signal as AbortSignal;
+        return new Response(JSON.stringify({ sent: true }), { status: 200 });
+      }),
+    );
 
     await sendViaRelay(MAIL);
 
@@ -99,7 +117,10 @@ describe('deliverViaRelay tells an address the server refuses from a relay that 
 
   it('a 502 quoting a recipient refusal is undeliverable: the address is the problem', async () => {
     configure();
-    vi.stubGlobal('fetch', vi.fn(async () => new Response(REFUSED_RECIPIENT, { status: 502 })));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(REFUSED_RECIPIENT, { status: 502 })),
+    );
     vi.spyOn(console, 'error').mockImplementation(() => {});
     const r = await deliverViaRelay(MAIL);
     expect(r.outcome).toBe('undeliverable');
@@ -109,21 +130,32 @@ describe('deliverViaRelay tells an address the server refuses from a relay that 
 
   it('a 502 without a recipient code is a refusal: the SMTP upstream is the problem', async () => {
     configure();
-    vi.stubGlobal('fetch', vi.fn(async () => new Response('send failed: timed out', { status: 502 })));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('send failed: timed out', { status: 502 })),
+    );
     vi.spyOn(console, 'error').mockImplementation(() => {});
     expect((await deliverViaRelay(MAIL)).outcome).toBe('refused');
   });
 
   it('a 401 is a refusal even when the body mentions a recipient: the shared secret is the problem', async () => {
     configure();
-    vi.stubGlobal('fetch', vi.fn(async () => new Response('unauthorized recipient', { status: 401 })));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('unauthorized recipient', { status: 401 })),
+    );
     vi.spyOn(console, 'error').mockImplementation(() => {});
     expect((await deliverViaRelay(MAIL)).outcome).toBe('refused');
   });
 
   it('a network error is unreachable, and no configuration is unconfigured', async () => {
     configure();
-    vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('ECONNREFUSED'); }));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new Error('ECONNREFUSED');
+      }),
+    );
     vi.spyOn(console, 'error').mockImplementation(() => {});
     expect((await deliverViaRelay(MAIL)).outcome).toBe('unreachable');
     delete process.env.MAIL_RELAY_URL;
@@ -132,7 +164,10 @@ describe('deliverViaRelay tells an address the server refuses from a relay that 
 
   it('never logs the relay text, which quotes the address', async () => {
     configure();
-    vi.stubGlobal('fetch', vi.fn(async () => new Response(REFUSED_RECIPIENT, { status: 502 })));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(REFUSED_RECIPIENT, { status: 502 })),
+    );
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
     await deliverViaRelay(MAIL);
     const logged = spy.mock.calls.map((c) => c.join(' ')).join('\n');

@@ -189,7 +189,8 @@ function ready(): boolean {
 export function getPsdEntityCount(): number {
   if (!ready()) return 0;
   try {
-    return (getBicDB().prepare('SELECT COUNT(*) AS cnt FROM psd_entities').get() as { cnt: number }).cnt;
+    return (getBicDB().prepare('SELECT COUNT(*) AS cnt FROM psd_entities').get() as { cnt: number })
+      .cnt;
   } catch {
     return 0;
   }

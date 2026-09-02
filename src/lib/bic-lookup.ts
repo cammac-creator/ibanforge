@@ -408,7 +408,8 @@ export function lookup(bic: string): BICRow | null {
 }
 
 export function getEntryCount(): number {
-  return (getBicDB().prepare('SELECT COUNT(*) as cnt FROM bic_entries').get() as { cnt: number }).cnt;
+  return (getBicDB().prepare('SELECT COUNT(*) as cnt FROM bic_entries').get() as { cnt: number })
+    .cnt;
 }
 
 /**
@@ -418,7 +419,8 @@ export function getEntryCount(): number {
  * surfaces (llms.txt, discovery) — not for lookups.
  */
 export function getChClearingCount(): number {
-  return (getBicDB().prepare('SELECT COUNT(*) as cnt FROM ch_clearing').get() as { cnt: number }).cnt;
+  return (getBicDB().prepare('SELECT COUNT(*) as cnt FROM ch_clearing').get() as { cnt: number })
+    .cnt;
 }
 
 /**
@@ -429,15 +431,18 @@ export function getChClearingCount(): number {
  * once at module load by datasetFacts().
  */
 export function allBic8(): Array<{ bic8: string; institution: string | null }> {
-  return getBicDB()
-    .prepare('SELECT DISTINCT bic8, institution FROM bic_entries')
-    .all() as Array<{ bic8: string; institution: string | null }>;
+  return getBicDB().prepare('SELECT DISTINCT bic8, institution FROM bic_entries').all() as Array<{
+    bic8: string;
+    institution: string | null;
+  }>;
 }
 
 /** Number of BIC entries carrying an LEI (GLEIF-enriched). Same self-description purpose. */
 export function getLeiEnrichedCount(): number {
   return (
-    getBicDB().prepare("SELECT COUNT(*) as cnt FROM bic_entries WHERE lei IS NOT NULL AND lei != ''").get() as {
+    getBicDB()
+      .prepare("SELECT COUNT(*) as cnt FROM bic_entries WHERE lei IS NOT NULL AND lei != ''")
+      .get() as {
       cnt: number;
     }
   ).cnt;
@@ -522,7 +527,12 @@ export function getSourceFreshness(): SourceFreshness[] {
       .all()
       .map((r) => {
         const row = r as { source: string; entries: number; last_updated: string | null };
-        return { source: row.source, entries: row.entries, last_updated: row.last_updated, stale: false };
+        return {
+          source: row.source,
+          entries: row.entries,
+          last_updated: row.last_updated,
+          stale: false,
+        };
       });
   }
   const cutoff = Date.now() - SOURCE_STALE_DAYS * 86_400_000;
@@ -543,10 +553,7 @@ export function getSourceFreshness(): SourceFreshness[] {
  *
  * Returns a simplified object suitable for IBAN validation enrichment, or null.
  */
-export function lookupByCountryBank(
-  countryCode: string,
-  bankCode: string,
-): BankLookupHit | null {
+export function lookupByCountryBank(countryCode: string, bankCode: string): BankLookupHit | null {
   // Bulgaria: a bank code the BAE register allocates to nobody resolves to
   // nothing, whichever strategy would have answered.
   //
@@ -627,7 +634,13 @@ export function lookupByCountryBank(
       "SELECT bic8, institution, city, source, updated_at FROM bic_entries WHERE country_code = ? AND bic8 LIKE ? ORDER BY (source = 'gleif') DESC, bic8 LIMIT 1",
     )
     .get(countryCode, bankCode + '%') as
-    | { bic8: string; institution: string | null; city: string | null; source: string | null; updated_at: string | null }
+    | {
+        bic8: string;
+        institution: string | null;
+        city: string | null;
+        source: string | null;
+        updated_at: string | null;
+      }
     | undefined;
 
   if (!row) return null;
@@ -639,7 +652,9 @@ export function lookupByCountryBank(
   // the count lets a caller running a payment pre-flight downgrade the answer
   // instead of trusting a coin flip.
   const { n } = db
-    .prepare('SELECT COUNT(DISTINCT bic8) AS n FROM bic_entries WHERE country_code = ? AND bic8 LIKE ?')
+    .prepare(
+      'SELECT COUNT(DISTINCT bic8) AS n FROM bic_entries WHERE country_code = ? AND bic8 LIKE ?',
+    )
     .get(countryCode, bankCode + '%') as { n: number };
 
   return {

@@ -51,20 +51,28 @@ describe('POST /internal/heartbeat/:name — la porte', () => {
   });
 
   it('refuse un mauvais jeton', async () => {
-    expect((await post('/internal/heartbeat/weekly-veille', { 'x-heartbeat-token': 'wrong' })).status).toBe(401);
+    expect(
+      (await post('/internal/heartbeat/weekly-veille', { 'x-heartbeat-token': 'wrong' })).status,
+    ).toBe(401);
   });
 
   it('refuse un jeton de la bonne longueur mais faux (comparaison à temps constant)', async () => {
     const sameLength = 'x'.repeat(TOKEN.length);
-    expect((await post('/internal/heartbeat/weekly-veille', { 'x-heartbeat-token': sameLength })).status).toBe(401);
+    expect(
+      (await post('/internal/heartbeat/weekly-veille', { 'x-heartbeat-token': sameLength })).status,
+    ).toBe(401);
   });
 
   it("refuse tout quand HEARTBEAT_TOKEN n'est pas posé — jamais ouverte par défaut", async () => {
     delete process.env.HEARTBEAT_TOKEN;
-    expect((await post('/internal/heartbeat/weekly-veille', { 'x-heartbeat-token': TOKEN })).status).toBe(401);
+    expect(
+      (await post('/internal/heartbeat/weekly-veille', { 'x-heartbeat-token': TOKEN })).status,
+    ).toBe(401);
     // Et surtout : une valeur vide ne doit pas non plus ouvrir la porte.
     process.env.HEARTBEAT_TOKEN = '';
-    expect((await post('/internal/heartbeat/weekly-veille', { 'x-heartbeat-token': '' })).status).toBe(401);
+    expect(
+      (await post('/internal/heartbeat/weekly-veille', { 'x-heartbeat-token': '' })).status,
+    ).toBe(401);
   });
 
   it("n'accepte PAS ADMIN_SECRET — mauvais rayon d'explosion sur un dépôt public", async () => {
@@ -72,7 +80,9 @@ describe('POST /internal/heartbeat/:name — la porte', () => {
     const previous = process.env.ADMIN_SECRET;
     process.env.ADMIN_SECRET = admin;
     try {
-      expect((await post('/internal/heartbeat/weekly-veille', { 'x-heartbeat-token': admin })).status).toBe(401);
+      expect(
+        (await post('/internal/heartbeat/weekly-veille', { 'x-heartbeat-token': admin })).status,
+      ).toBe(401);
     } finally {
       if (previous === undefined) delete process.env.ADMIN_SECRET;
       else process.env.ADMIN_SECRET = previous;

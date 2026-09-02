@@ -74,7 +74,9 @@ describe('cohort radar, end to end', () => {
     const report = await runCohortScan();
     expect(report.cohorts.find((c) => c.user_agent === HUMAN_UA)).toBeUndefined();
     const rows = getStatsDB()
-      .prepare(`SELECT email, no_recredit FROM api_keys WHERE key_prefix IN (${HUMAN.map(() => '?').join(',')})`)
+      .prepare(
+        `SELECT email, no_recredit FROM api_keys WHERE key_prefix IN (${HUMAN.map(() => '?').join(',')})`,
+      )
       .all(...created.slice(MACHINE.length)) as Array<{ email: string; no_recredit: number }>;
     for (const r of rows) {
       expect(r.email).not.toContain('@cohorte.invalid');
@@ -90,7 +92,9 @@ describe('cohort radar, end to end', () => {
   it('a grouped key measures its ceiling across every month', () => {
     const db = getStatsDB();
     const prefix = created[0];
-    const row = db.prepare('SELECT key_hash FROM api_keys WHERE key_prefix = ?').get(prefix) as { key_hash: string };
+    const row = db.prepare('SELECT key_hash FROM api_keys WHERE key_prefix = ?').get(prefix) as {
+      key_hash: string;
+    };
     db.prepare('INSERT OR REPLACE INTO api_usage (key_hash, month, count) VALUES (?, ?, ?)').run(
       row.key_hash,
       '2000-01',
@@ -100,14 +104,19 @@ describe('cohort radar, end to end', () => {
     const q = checkAndIncrementQuota(row.key_hash, 200, 1, true);
     expect(q.allowed).toBe(false);
     expect(q.remaining).toBe(0);
-    db.prepare('DELETE FROM api_usage WHERE key_hash = ? AND month = ?').run(row.key_hash, '2000-01');
+    db.prepare('DELETE FROM api_usage WHERE key_hash = ? AND month = ?').run(
+      row.key_hash,
+      '2000-01',
+    );
   });
 
   it('never touches a key that carries prepaid credits', async () => {
     const paid = generateApiKey(`paying-${RUN}@alpha.example.net`);
     created.push(paid!.key_prefix);
     getStatsDB()
-      .prepare('UPDATE api_keys SET credits_remaining = 1000, credits_total = 1000 WHERE key_prefix = ?')
+      .prepare(
+        'UPDATE api_keys SET credits_remaining = 1000, credits_total = 1000 WHERE key_prefix = ?',
+      )
       .run(paid!.key_prefix);
     const paidUA = `test-paid-client/${RUN}`;
     for (let i = 0; i < 6; i++) recordKeyCreation(`cohort-test-${RUN}`, paidUA, paid!.key_prefix);

@@ -36,7 +36,7 @@
     "mcp": "tsx src/mcp/server.ts",
     "docker:build": "docker build -t ibanforge .",
     "docker:run": "docker run -p 3000:3000 --env-file .env ibanforge",
-    "check": "npm run typecheck && npm run lint && npm run test",
+    "check": "npm run typecheck && npm run format:check && npm run lint && npm run test",
     "bic:enrich": "npx tsx scripts/enrich-bic-database.ts",
     "issuers:build": "node scripts/build-issuer-index.mjs",
     "iban-registry:check": "npx tsx scripts/check-iban-registry.ts",

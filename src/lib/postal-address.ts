@@ -223,7 +223,10 @@ export function packAdrLines(line: string): string[] {
   // Segment boundaries first: they are where the source itself broke the
   // address, so a split there reproduces the original lines rather than
   // inventing a new one.
-  const segments = text.split(',').map((s) => s.trim()).filter(Boolean);
+  const segments = text
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
   const bySegments = greedyFill(segments, ', ');
   if (bySegments) return bySegments;
 
@@ -317,7 +320,8 @@ function fromDirectoryRow(row: DirectoryAddressRow): Iso20022PostalAddress | nul
   // ships no English alternative we serve no AdrLine at all — a transliteration
   // is never invented, here no more than anywhere else.
   const stored = clean(row.street);
-  const latin = stored && hasNonLatinScript(stored) ? clean(row.address_en) : (stored ?? clean(row.address_en));
+  const latin =
+    stored && hasNonLatinScript(stored) ? clean(row.address_en) : (stored ?? clean(row.address_en));
 
   const adr_line = latin
     ? packAdrLines(stripRedundantSegments(latin, redundantValues({ pst_cd, twn_nm, ctry })))

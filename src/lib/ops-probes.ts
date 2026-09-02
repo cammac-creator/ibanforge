@@ -44,7 +44,10 @@ async function probeVolume(): Promise<void> {
     // 92 % : à ce niveau SQLite peut déjà échouer sur un checkpoint WAL, qui a
     // besoin de place pour réécrire — attendre 100 % serait attendre la panne.
     if (usedPct >= 92) {
-      await opsFail('volume:critical', `Volume ${DATA_DIR} à ${usedPct} % — purger request_log ou agrandir le volume.`);
+      await opsFail(
+        'volume:critical',
+        `Volume ${DATA_DIR} à ${usedPct} % — purger request_log ou agrandir le volume.`,
+      );
     } else if (usedPct >= 80) {
       await opsFail('volume:warn', `Volume ${DATA_DIR} à ${usedPct} %.`);
     } else {
@@ -88,7 +91,10 @@ async function probeServerErrors(): Promise<void> {
     if (total === 0) return;
     const pct = (s5xx / total) * 100;
     if (s5xx >= 5 && pct > 2) {
-      await opsFail('http:5xx', `${s5xx} réponses 5xx sur ${total} requêtes (${pct.toFixed(1)} %) en 1 h.`);
+      await opsFail(
+        'http:5xx',
+        `${s5xx} réponses 5xx sur ${total} requêtes (${pct.toFixed(1)} %) en 1 h.`,
+      );
     } else {
       await opsOk('http:5xx');
     }
@@ -125,7 +131,10 @@ async function probeComplianceAge(): Promise<void> {
     const ageDays = (Date.now() - new Date(asOf).getTime()) / 86_400_000;
     if (!Number.isFinite(ageDays)) return;
     if (ageDays > 9) {
-      await opsFail('compliance:age', `Listes de sanctions vieilles de ${ageDays.toFixed(1)} j (refresh hebdo attendu).`);
+      await opsFail(
+        'compliance:age',
+        `Listes de sanctions vieilles de ${ageDays.toFixed(1)} j (refresh hebdo attendu).`,
+      );
     } else {
       await opsOk('compliance:age', `Listes rafraîchies (${ageDays.toFixed(1)} j).`);
     }
@@ -161,7 +170,10 @@ async function probeFatfAge(): Promise<void> {
           `Recalibrer compliance-static.ts et bump FATF_AS_OF.`,
       );
     } else {
-      await opsOk('compliance:fatf-age', `Listes FATF de ${FATF_AS_OF} (${Math.round(ageDays)} j).`);
+      await opsOk(
+        'compliance:fatf-age',
+        `Listes FATF de ${FATF_AS_OF} (${Math.round(ageDays)} j).`,
+      );
     }
   } catch (err) {
     console.error('[ops-probe] fatf age:', err instanceof Error ? err.message : err);
@@ -186,7 +198,9 @@ export function startOpsProbes(): void {
     return;
   }
   const safeTick = (): void => {
-    void tick().catch((err) => console.error('[ops-probe] tick failed:', err instanceof Error ? err.message : err));
+    void tick().catch((err) =>
+      console.error('[ops-probe] tick failed:', err instanceof Error ? err.message : err),
+    );
   };
   setTimeout(safeTick, BOOT_DELAY_MS).unref();
   setInterval(safeTick, TICK_MS).unref();

@@ -68,7 +68,7 @@ ibanFormat.get('/v1/iban/format', async (c) => {
     () =>
       recordOperation(
         'iban_format',
-        result.valid ? result.country?.code ?? null : null,
+        result.valid ? (result.country?.code ?? null) : null,
         result.valid,
         0,
         result.error ?? undefined,

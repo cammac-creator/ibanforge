@@ -121,7 +121,9 @@ describe('the facilitator handshake happens once, not on every request', () => {
   it('serves two paid requests with a single GET /supported', async () => {
     const app = buildApp();
     const first = await app.request(`https://api.ibanforge.com/v1/bic/COBADEFFXXX`, { headers: H });
-    const second = await app.request(`https://api.ibanforge.com/v1/bic/COBADEFFXXX`, { headers: H });
+    const second = await app.request(`https://api.ibanforge.com/v1/bic/COBADEFFXXX`, {
+      headers: H,
+    });
 
     expect(first.status).toBe(402);
     expect(second.status).toBe(402);
@@ -138,10 +140,9 @@ describe('the facilitator handshake happens once, not on every request', () => {
     expect(supportedCalls).toBe(1);
 
     supportedCalls = 0;
-    const free = await app.request(
-      `https://api.ibanforge.com/v1/iban/format?iban=${VALID_IBAN}`,
-      { headers: H },
-    );
+    const free = await app.request(`https://api.ibanforge.com/v1/iban/format?iban=${VALID_IBAN}`, {
+      headers: H,
+    });
 
     expect(free.status).toBe(200);
     expect(supportedCalls, 'a free route must never reach the payment rail').toBe(0);
@@ -254,7 +255,13 @@ describe('the 402 an indexer reads', () => {
     const body = (await res.json()) as {
       x402Version: number;
       error: string;
-      resource: { url: string; mimeType: string; serviceName: string; tags: string[]; iconUrl: string };
+      resource: {
+        url: string;
+        mimeType: string;
+        serviceName: string;
+        tags: string[];
+        iconUrl: string;
+      };
       accepts: Array<Record<string, unknown>>;
       extensions?: { bazaar?: Record<string, unknown> };
     };
@@ -291,7 +298,10 @@ describe('the 402 an indexer reads', () => {
   it('announces the URL actually requested on a parameterised route, never the template', async () => {
     const res = await req('/v1/bic/COBADEFFXXX');
     expect(res.status).toBe(402);
-    const body = (await res.json()) as { resource: { url: string }; accepts: Array<{ amount: string }> };
+    const body = (await res.json()) as {
+      resource: { url: string };
+      accepts: Array<{ amount: string }>;
+    };
     expect(body.resource.url).toBe('https://api.ibanforge.com/v1/bic/COBADEFFXXX');
     expect(body.resource.url).not.toContain(':code');
     expect(body.accepts[0].amount).toBe('3000');

@@ -117,8 +117,8 @@ export function apiKeyMiddleware(): MiddlewareHandler<HonoEnv> {
       return;
     }
 
-
-    const { valid, keyHash, email, monthlyLimit, creditsRemaining, creditsTotal, noRecredit } = validateApiKey(key);
+    const { valid, keyHash, email, monthlyLimit, creditsRemaining, creditsTotal, noRecredit } =
+      validateApiKey(key);
 
     if (!valid) {
       // A key WAS supplied but doesn't validate (typo, truncation, revoked).
@@ -163,7 +163,12 @@ export function apiKeyMiddleware(): MiddlewareHandler<HonoEnv> {
               'Prefer USDC? POST /v1/credits/buy/1k|5k|25k, or pay per call via x402.'
             : `Your prepaid credit bundle (${creditsTotal ?? 0} credits) is used up. ${CARD_CHECKOUT_HINT}. ` +
               'Prefer USDC? POST /v1/credits/buy/1k|5k|25k, or pay per call via x402.',
-          credits: { required: units, remaining, total: creditsTotal ?? 0, topup: 'POST /v1/credits/buy/1k|5k|25k' },
+          credits: {
+            required: units,
+            remaining,
+            total: creditsTotal ?? 0,
+            topup: 'POST /v1/credits/buy/1k|5k|25k',
+          },
         });
         c.header(shortfall ? 'X-Credits-Insufficient' : 'X-Credits-Exhausted', 'true');
         c.header('X-Credits-Required', String(units));
@@ -194,7 +199,10 @@ export function apiKeyMiddleware(): MiddlewareHandler<HonoEnv> {
       try {
         observedMonth = recordMonthlyObservation(keyHash, units);
       } catch (err) {
-        console.error('[stats] monthly observation failed:', err instanceof Error ? err.message : err);
+        console.error(
+          '[stats] monthly observation failed:',
+          err instanceof Error ? err.message : err,
+        );
       }
       await next();
       // Refund credits on 4xx client errors (mirror monthly quota behavior).
@@ -213,7 +221,10 @@ export function apiKeyMiddleware(): MiddlewareHandler<HonoEnv> {
           try {
             decrementQuota(keyHash, units, observedMonth);
           } catch (err) {
-            console.error('[stats] observation refund failed:', err instanceof Error ? err.message : err);
+            console.error(
+              '[stats] observation refund failed:',
+              err instanceof Error ? err.message : err,
+            );
           }
         }
         left = remaining + units;
@@ -244,7 +255,14 @@ export function apiKeyMiddleware(): MiddlewareHandler<HonoEnv> {
           : `Your free tier is exhausted for ${quota.month} (${quota.used}/${quota.limit} requests used) — ` +
             `it resets on the 1st of next month. To keep going now: ${CARD_CHECKOUT_HINT}. ` +
             'Prefer USDC? POST /v1/credits/buy/1k|5k|25k, or pay per call via x402.',
-        quota: { used: quota.used, limit: quota.limit, month: quota.month, resets: '1st of month', required: units, remaining: quota.remaining },
+        quota: {
+          used: quota.used,
+          limit: quota.limit,
+          month: quota.month,
+          resets: '1st of month',
+          required: units,
+          remaining: quota.remaining,
+        },
       });
       c.header(shortfall ? 'X-Quota-Insufficient' : 'X-Quota-Exhausted', 'true');
       c.header('X-Quota-Required', String(units));

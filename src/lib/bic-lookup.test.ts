@@ -92,7 +92,9 @@ describe('getLastUpdated — cached, and still the right answer', () => {
     // rows: 12.6 ms measured 23/08/2026, called twice per enrichment. Speed is
     // worthless if the value drifts, so pin it against the live query.
     const direct = (
-      getBicDB().prepare('SELECT MAX(updated_at) AS v FROM bic_entries').get() as { v: string | null }
+      getBicDB().prepare('SELECT MAX(updated_at) AS v FROM bic_entries').get() as {
+        v: string | null;
+      }
     ).v;
     expect(getLastUpdated()).toBe(direct);
     expect(getLastUpdated()).toBe(direct); // second call comes from the cache

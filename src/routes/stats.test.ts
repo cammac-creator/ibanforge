@@ -247,7 +247,9 @@ describe('GET /stats/traffic-trend', () => {
   beforeAll(() => {
     process.env.CRM_INTERNAL_EMAILS = '';
     const db = getStatsDB();
-    db.prepare("DELETE FROM request_log WHERE date(created_at) = date('now', ?)").run(`-${DAY_AGO} days`);
+    db.prepare("DELETE FROM request_log WHERE date(created_at) = date('now', ?)").run(
+      `-${DAY_AGO} days`,
+    );
     // Two keys with contrasting addresses: one customer, one of ours. The
     // cohort suffix is what makes the second internal — see INTERNAL_EMAIL_RE.
     db.prepare('INSERT INTO api_keys (key_hash, key_prefix, email) VALUES (?, ?, ?)').run(

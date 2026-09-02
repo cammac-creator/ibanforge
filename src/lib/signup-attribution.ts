@@ -72,7 +72,12 @@ export interface SignupSources {
   channels: Array<{ channel: string; n: number }>;
   landings: Array<{ path: string; n: number }>;
   referrers: Array<{ host: string; n: number }>;
-  campaigns: Array<{ utm_source: string; utm_medium: string | null; utm_campaign: string | null; n: number }>;
+  campaigns: Array<{
+    utm_source: string;
+    utm_medium: string | null;
+    utm_campaign: string | null;
+    n: number;
+  }>;
 }
 
 interface Row {
@@ -102,12 +107,16 @@ export function channelOf(r: Row): string {
 function count<T extends string>(values: T[]): Array<{ value: T; n: number }> {
   const m = new Map<T, number>();
   for (const v of values) m.set(v, (m.get(v) ?? 0) + 1);
-  return [...m.entries()].map(([value, n]) => ({ value, n })).sort((a, b) => b.n - a.n || String(a.value).localeCompare(String(b.value)));
+  return [...m.entries()]
+    .map(([value, n]) => ({ value, n }))
+    .sort((a, b) => b.n - a.n || String(a.value).localeCompare(String(b.value)));
 }
 
 export function signupSources(days: number): SignupSources {
   const db = getStatsDB();
-  const since = (db.prepare('SELECT min(created_at) AS t FROM signup_attribution').get() as { t: string | null }).t;
+  const since = (
+    db.prepare('SELECT min(created_at) AS t FROM signup_attribution').get() as { t: string | null }
+  ).t;
   // Farm keys relabelled into .invalid, our own addresses and the signup probes
   // are not signups, so they do not count here either.
   const rows = db
@@ -121,11 +130,19 @@ export function signupSources(days: number): SignupSources {
             AND k.email NOT LIKE '%@ibanforge.internal'))`,
     )
     .all(`-${Math.max(1, Math.min(365, Math.floor(days)))} days`) as Row[];
-  const camp = new Map<string, { utm_source: string; utm_medium: string | null; utm_campaign: string | null; n: number }>();
+  const camp = new Map<
+    string,
+    { utm_source: string; utm_medium: string | null; utm_campaign: string | null; n: number }
+  >();
   for (const r of rows) {
     if (!r.utm_source) continue;
     const k = `${r.utm_source}|${r.utm_medium ?? ''}|${r.utm_campaign ?? ''}`;
-    const cur = camp.get(k) ?? { utm_source: r.utm_source, utm_medium: r.utm_medium, utm_campaign: r.utm_campaign, n: 0 };
+    const cur = camp.get(k) ?? {
+      utm_source: r.utm_source,
+      utm_medium: r.utm_medium,
+      utm_campaign: r.utm_campaign,
+      n: 0,
+    };
     cur.n += 1;
     camp.set(k, cur);
   }
@@ -134,8 +151,12 @@ export function signupSources(days: number): SignupSources {
     since: since ? since.slice(0, 10) : null,
     total: rows.length,
     channels: count(rows.map(channelOf)).map(({ value, n }) => ({ channel: value, n })),
-    landings: count(rows.map((r) => r.landing).filter((v): v is string => Boolean(v))).map(({ value, n }) => ({ path: value, n })),
-    referrers: count(rows.map((r) => r.referrer).filter((v): v is string => Boolean(v))).map(({ value, n }) => ({ host: value, n })),
+    landings: count(rows.map((r) => r.landing).filter((v): v is string => Boolean(v))).map(
+      ({ value, n }) => ({ path: value, n }),
+    ),
+    referrers: count(rows.map((r) => r.referrer).filter((v): v is string => Boolean(v))).map(
+      ({ value, n }) => ({ host: value, n }),
+    ),
     campaigns: [...camp.values()].sort((a, b) => b.n - a.n),
   };
 }

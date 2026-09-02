@@ -212,7 +212,14 @@ describe('enrichResult', () => {
     enrichResult(result);
 
     if (result.clearing) {
-      expect(['bank', 'cantonal_bank', 'postfinance', 'raiffeisen', 'central_bank', 'foreign_participant']).toContain(result.clearing.type);
+      expect([
+        'bank',
+        'cantonal_bank',
+        'postfinance',
+        'raiffeisen',
+        'central_bank',
+        'foreign_participant',
+      ]).toContain(result.clearing.type);
     }
   });
 

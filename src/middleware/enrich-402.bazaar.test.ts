@@ -33,13 +33,20 @@ function makeApp(handler: (c: import('hono').Context) => Promise<Response> | Res
 }
 
 /** The 402 the x402 SDK actually produces: empty body, terms in the header. */
-const emptyBody = () => new Response('', { status: 402, headers: { 'Content-Type': 'application/json' } });
+const emptyBody = () =>
+  new Response('', { status: 402, headers: { 'Content-Type': 'application/json' } });
 
 interface BazaarBody {
   extensions?: {
     bazaar?: {
       info?: {
-        input?: { type?: string; method?: string; bodyType?: string; body?: Record<string, unknown>; pathParams?: Record<string, string> };
+        input?: {
+          type?: string;
+          method?: string;
+          bodyType?: string;
+          body?: Record<string, unknown>;
+          pathParams?: Record<string, string>;
+        };
         output?: { type?: string; example?: Record<string, unknown> };
       };
     };
@@ -63,11 +70,12 @@ describe('402 discovery examples are stamped as examples', () => {
   const NOTICE = /ILLUSTRATIVE SAMPLE/;
 
   it('stamps the example when terms come from upstream', async () => {
-    const app = makeApp(() =>
-      new Response(JSON.stringify({ accepts: [{ scheme: 'exact', network: 'eip155:8453' }] }), {
-        status: 402,
-        headers: { 'Content-Type': 'application/json' },
-      }),
+    const app = makeApp(
+      () =>
+        new Response(JSON.stringify({ accepts: [{ scheme: 'exact', network: 'eip155:8453' }] }), {
+          status: 402,
+          headers: { 'Content-Type': 'application/json' },
+        }),
     );
 
     const info = await bazaarOf(await app.request('/v1/ch/clearing/762'));
@@ -99,14 +107,18 @@ describe('402 discovery examples are stamped as examples', () => {
 describe('the Bazaar info block', () => {
   it('describes the call as an HTTP request', async () => {
     const app = makeApp(emptyBody);
-    const info = await bazaarOf(await app.request('/v1/iban/validate', { method: 'POST', body: '{}' }));
+    const info = await bazaarOf(
+      await app.request('/v1/iban/validate', { method: 'POST', body: '{}' }),
+    );
     expect(info.input?.type).toBe('http');
     expect(info.input?.method).toBe('POST');
   });
 
   it('input.body holds example VALUES, not a JSON Schema', async () => {
     const app = makeApp(emptyBody);
-    const info = await bazaarOf(await app.request('/v1/iban/validate', { method: 'POST', body: '{}' }));
+    const info = await bazaarOf(
+      await app.request('/v1/iban/validate', { method: 'POST', body: '{}' }),
+    );
     expect(info.input?.body?.iban).toBe('CH1000230000000012345');
   });
 
@@ -128,7 +140,9 @@ describe('the Bazaar info block', () => {
 
   it('output is wrapped as {type, example}, which is what the validator reads', async () => {
     const app = makeApp(emptyBody);
-    const info = await bazaarOf(await app.request('/v1/iban/validate', { method: 'POST', body: '{}' }));
+    const info = await bazaarOf(
+      await app.request('/v1/iban/validate', { method: 'POST', body: '{}' }),
+    );
     expect(info.output?.type).toBe('json');
     expect(info.output?.example).toHaveProperty('iban');
     expect(info.output?.example).toHaveProperty('valid');
@@ -136,7 +150,9 @@ describe('the Bazaar info block', () => {
 
   it('compliance sample contains sanctions / fatf / sepa / vop', async () => {
     const app = makeApp(emptyBody);
-    const info = await bazaarOf(await app.request('/v1/iban/compliance', { method: 'POST', body: '{}' }));
+    const info = await bazaarOf(
+      await app.request('/v1/iban/compliance', { method: 'POST', body: '{}' }),
+    );
     const out = info.output?.example ?? {};
     // Real response shape: compliance layer nested under `compliance`,
     // with risk_score / risk_level / sanctions / reachability / vop inside.
@@ -174,11 +190,12 @@ describe('what enrich402 does and does not rewrite', () => {
   });
 
   it('does not touch non-402 responses', async () => {
-    const app = makeApp(() =>
-      new Response(JSON.stringify({ ok: true }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      }),
+    const app = makeApp(
+      () =>
+        new Response(JSON.stringify({ ok: true }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
     );
 
     const r = await app.request('/v1/iban/validate', { method: 'POST', body: '{}' });
@@ -188,14 +205,20 @@ describe('what enrich402 does and does not rewrite', () => {
   });
 
   it('leaves a 402 that is not a payment offer entirely alone', async () => {
-    const app = makeApp(() =>
-      new Response(JSON.stringify({ error: 'custom_402', detail: 'Another middleware owns this' }), {
-        status: 402,
-        headers: { 'Content-Type': 'application/json' },
-      }),
+    const app = makeApp(
+      () =>
+        new Response(
+          JSON.stringify({ error: 'custom_402', detail: 'Another middleware owns this' }),
+          {
+            status: 402,
+            headers: { 'Content-Type': 'application/json' },
+          },
+        ),
     );
 
-    const body = (await (await app.request('/v1/iban/validate', { method: 'POST', body: '{}' })).json()) as {
+    const body = (await (
+      await app.request('/v1/iban/validate', { method: 'POST', body: '{}' })
+    ).json()) as {
       error: string;
       free_tier?: unknown;
     };
@@ -210,11 +233,12 @@ describe('what enrich402 does and does not rewrite', () => {
       amount: '5000',
       payTo: '0x0000000000000000000000000000000000000001',
     };
-    const app = makeApp(() =>
-      new Response(JSON.stringify({ accepts: [terms] }), {
-        status: 402,
-        headers: { 'Content-Type': 'application/json' },
-      }),
+    const app = makeApp(
+      () =>
+        new Response(JSON.stringify({ accepts: [terms] }), {
+          status: 402,
+          headers: { 'Content-Type': 'application/json' },
+        }),
     );
 
     const r = await app.request('/v1/iban/validate', { method: 'POST', body: '{}' });

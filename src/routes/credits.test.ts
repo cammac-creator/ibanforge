@@ -15,7 +15,13 @@ import { apiKeys } from './api-keys.js';
 import { ibanValidate } from './iban-validate.js';
 import { apiKeyMiddleware } from '../middleware/api-key.js';
 import { stripeRetrieve } from './stripe-retrieve.js';
-import { generateApiKey, generateCreditKey, validateApiKey, decrementCredits, refundCredit } from '../lib/api-keys.js';
+import {
+  generateApiKey,
+  generateCreditKey,
+  validateApiKey,
+  decrementCredits,
+  refundCredit,
+} from '../lib/api-keys.js';
 import { closeAll, getStatsDB } from '../lib/db.js';
 import { CREDITS_PURCHASE_TYPE, getStats } from '../lib/stats.js';
 import { buildFirstCallCurl } from '../lib/first-call.js';
@@ -127,7 +133,14 @@ describe('GET /v1/credits/bundles', () => {
     app.route('/', apiKeys);
     const res = await app.request('/v1/credits/bundles');
     expect(res.status).toBe(200);
-    const body = await res.json() as { bundles: Array<{ slug: string; credits: number; price_usdc: number; price_per_call_usdc: number }> };
+    const body = (await res.json()) as {
+      bundles: Array<{
+        slug: string;
+        credits: number;
+        price_usdc: number;
+        price_per_call_usdc: number;
+      }>;
+    };
     expect(body.bundles).toHaveLength(3);
     const slugs = body.bundles.map((b) => b.slug);
     expect(slugs).toContain('1k');
@@ -156,7 +169,12 @@ describe('GET /v1/credits/balance', () => {
       headers: { Authorization: `Bearer ${k.api_key}` },
     });
     expect(res.status).toBe(200);
-    const body = await res.json() as { type: string; credits_remaining: number; credits_total: number; credits_used: number };
+    const body = (await res.json()) as {
+      type: string;
+      credits_remaining: number;
+      credits_total: number;
+      credits_used: number;
+    };
     expect(body.type).toBe('credit_bundle');
     expect(body.credits_remaining).toBe(1000);
     expect(body.credits_total).toBe(1000);
@@ -172,7 +190,7 @@ describe('GET /v1/credits/balance', () => {
       headers: { Authorization: `Bearer ${k!.api_key}` },
     });
     expect(res.status).toBe(200);
-    const body = await res.json() as { type: string };
+    const body = (await res.json()) as { type: string };
     expect(body.type).toBe('subscription');
   });
 });
@@ -408,13 +426,21 @@ describe('a credit pack bought with USDC survives a lost response', () => {
       key_prefix: string;
     };
     const replay = await app.request('/v1/credits/buy/25k', opts);
-    const second = (await replay.json()) as { api_key?: string; key_prefix: string; idempotent: boolean };
+    const second = (await replay.json()) as {
+      api_key?: string;
+      key_prefix: string;
+      idempotent: boolean;
+    };
 
     expect(second.idempotent).toBe(true);
     expect(second.api_key).toBeUndefined();
     expect(second.key_prefix).toBe(first.key_prefix);
     expect(
-      (getStatsDB().prepare('SELECT COUNT(*) AS n FROM api_keys WHERE x402_payment_ref = ?').get(ref) as { n: number }).n,
+      (
+        getStatsDB()
+          .prepare('SELECT COUNT(*) AS n FROM api_keys WHERE x402_payment_ref = ?')
+          .get(ref) as { n: number }
+      ).n,
     ).toBe(1);
   });
 
@@ -433,7 +459,10 @@ describe('a credit pack bought with USDC survives a lost response', () => {
     const k = generateCreditKey(null, 1000);
     const row = getStatsDB()
       .prepare('SELECT raw_key_one_time_view, x402_payment_ref FROM api_keys WHERE key_prefix = ?')
-      .get(k.key_prefix) as { raw_key_one_time_view: string | null; x402_payment_ref: string | null };
+      .get(k.key_prefix) as {
+      raw_key_one_time_view: string | null;
+      x402_payment_ref: string | null;
+    };
     expect(row.raw_key_one_time_view).toBeNull();
     expect(row.x402_payment_ref).toBeNull();
   });
@@ -448,7 +477,9 @@ describe('a credit pack bought with USDC survives a lost response', () => {
 describe('a pack sale is booked as revenue', () => {
   function revenueToday(): number {
     const row = getStatsDB()
-      .prepare("SELECT COALESCE(SUM(revenue_usdc), 0) AS r FROM daily_stats WHERE date = date('now') AND operation_type = ?")
+      .prepare(
+        "SELECT COALESCE(SUM(revenue_usdc), 0) AS r FROM daily_stats WHERE date = date('now') AND operation_type = ?",
+      )
       .get(CREDITS_PURCHASE_TYPE) as { r: number };
     return row.r;
   }
@@ -492,7 +523,9 @@ describe('a pack sale is booked as revenue', () => {
     app.route('/', creditsBuy);
     const salesToday = (): number => {
       const row = getStatsDB()
-        .prepare("SELECT COALESCE(SUM(total), 0) AS n FROM daily_stats WHERE date = date('now') AND operation_type = ?")
+        .prepare(
+          "SELECT COALESCE(SUM(total), 0) AS n FROM daily_stats WHERE date = date('now') AND operation_type = ?",
+        )
         .get(CREDITS_PURCHASE_TYPE) as { n: number };
       return row.n;
     };
@@ -583,7 +616,10 @@ describe('the USDC rail hands over a command that works', () => {
     const revenueBefore = getStats().total_revenue_usdc;
     await app.request('/v1/credits/buy/5k', {
       method: 'POST',
-      headers: { 'content-type': 'application/json', 'payment-signature': Buffer.from(`ops-${Date.now()}`).toString('base64') },
+      headers: {
+        'content-type': 'application/json',
+        'payment-signature': Buffer.from(`ops-${Date.now()}`).toString('base64'),
+      },
       body: '{}',
     });
     expect(getStats().total_operations).toBe(opsBefore);

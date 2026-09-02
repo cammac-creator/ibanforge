@@ -24,10 +24,7 @@ import type { HonoEnv } from '../types.js';
 export function computeRevenue(c: Context<HonoEnv>, priceUsdc: number): number {
   if (c.get('apiKeyAuthenticated')) return 0;
   if (process.env.X402_ENABLED !== 'true') return 0;
-  if (
-    process.env.NODE_ENV === 'development' &&
-    c.req.header('X-Dev-Skip') === 'true'
-  ) {
+  if (process.env.NODE_ENV === 'development' && c.req.header('X-Dev-Skip') === 'true') {
     return 0;
   }
   return priceUsdc;

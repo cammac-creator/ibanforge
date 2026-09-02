@@ -5,9 +5,7 @@ import { recordEvent, getEvents } from './events.js';
 const MARKER = 'events-test-fixture';
 
 afterAll(() => {
-  getStatsDB()
-    .prepare(`DELETE FROM events WHERE label LIKE '%${MARKER}%'`)
-    .run();
+  getStatsDB().prepare(`DELETE FROM events WHERE label LIKE '%${MARKER}%'`).run();
 });
 
 describe('events — chart annotations', () => {

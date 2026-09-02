@@ -223,10 +223,14 @@ function createFounderDraftIfAbsent(canonicalEmail: string, now: Date): boolean 
 function loadNudgeBlockedSet(canonicalOf: (email: string) => string): Set<string> {
   const db = getStatsDB();
   const blocked = new Set<string>();
-  const claimed = db.prepare('SELECT email FROM activation_nudges').all() as Array<{ email: string }>;
+  const claimed = db.prepare('SELECT email FROM activation_nudges').all() as Array<{
+    email: string;
+  }>;
   for (const r of claimed) blocked.add(canonicalOf(r.email));
   const talked = db
-    .prepare(`SELECT DISTINCT customer_email AS email FROM email_messages WHERE direction IN ('in', 'out')`)
+    .prepare(
+      `SELECT DISTINCT customer_email AS email FROM email_messages WHERE direction IN ('in', 'out')`,
+    )
     .all() as Array<{ email: string }>;
   for (const r of talked) blocked.add(canonicalOf(r.email));
   return blocked;
@@ -244,7 +248,9 @@ function claimNudge(email: string, keyPrefix: string): boolean {
 }
 
 function markDelivered(keyPrefix: string): void {
-  getStatsDB().prepare('UPDATE activation_nudges SET delivered = 1 WHERE key_prefix = ?').run(keyPrefix);
+  getStatsDB()
+    .prepare('UPDATE activation_nudges SET delivered = 1 WHERE key_prefix = ?')
+    .run(keyPrefix);
 }
 
 // ---------------------------------------------------------------------------
@@ -306,7 +312,9 @@ export async function runActivationPass(now: Date = new Date()): Promise<Activat
           }
           report.nudged.push({ email, key_prefix: cand.key_prefix, delivered: ok });
         } catch (err) {
-          report.errors.push(`nudge ${cand.key_prefix}: ${err instanceof Error ? err.message : String(err)}`);
+          report.errors.push(
+            `nudge ${cand.key_prefix}: ${err instanceof Error ? err.message : String(err)}`,
+          );
         }
       }
     }
@@ -333,7 +341,9 @@ export async function runActivationPass(now: Date = new Date()): Promise<Activat
           report.drafted.push(canonical);
         }
       } catch (err) {
-        report.errors.push(`draft ${canonical}: ${err instanceof Error ? err.message : String(err)}`);
+        report.errors.push(
+          `draft ${canonical}: ${err instanceof Error ? err.message : String(err)}`,
+        );
       }
     }
 
@@ -349,7 +359,10 @@ export function isActivationPassRunning(): boolean {
   return running;
 }
 
-export function lastActivationReport(): { last_run_at: string | null; report: ActivationPassReport | null } {
+export function lastActivationReport(): {
+  last_run_at: string | null;
+  report: ActivationPassReport | null;
+} {
   let parsed: ActivationPassReport | null;
   try {
     parsed = JSON.parse(kvGet(KV_LAST_REPORT) ?? 'null') as ActivationPassReport | null;

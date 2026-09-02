@@ -69,7 +69,8 @@ bicLookup.get('/v1/bic/:code', (c) => {
     return c.json(
       {
         error: 'placeholder_literal',
-        message: "You sent the literal OpenAPI placeholder '" + code + "'. Substitute it with a real BIC.",
+        message:
+          "You sent the literal OpenAPI placeholder '" + code + "'. Substitute it with a real BIC.",
         example: 'GET /v1/bic/UBSWCHZH',
         schema: 'https://api.ibanforge.com/openapi.json',
       },
@@ -120,7 +121,15 @@ bicLookup.get('/v1/bic/:code', (c) => {
   // failures are now counted and raise an ops alert past a streak, so a stats
   // DB that stops accepting writes cannot look like a service nobody calls.
   recordSafely(
-    () => recordOperation('bic_lookup', validation.country_code ?? null, found, revenue, errorDetail, c.get('apiKeyPrefix')),
+    () =>
+      recordOperation(
+        'bic_lookup',
+        validation.country_code ?? null,
+        found,
+        revenue,
+        errorDetail,
+        c.get('apiKeyPrefix'),
+      ),
     'bic_lookup',
   );
   // The demand ledger: an ISO-9362-shaped BIC we do not hold is a directory
@@ -128,7 +137,12 @@ bicLookup.get('/v1/bic/:code', (c) => {
   // Shape-gated twice (validateBIC above, the recorder's own gate), so a
   // pasted email or path garbage can never reach the table.
   if (!found) {
-    recordDemandGap('bic', validation.country_code ?? validation.bic11!.slice(4, 6), validation.bic11!, 'not_found');
+    recordDemandGap(
+      'bic',
+      validation.country_code ?? validation.bic11!.slice(4, 6),
+      validation.bic11!,
+      'not_found',
+    );
   }
 
   // Built by the shared helper so /v1/iban/validate cannot serve a different
@@ -225,7 +239,9 @@ bicLookup.get('/v1/bic/:code', (c) => {
     } else if (sanctions.listed) {
       parts.push('We hold no record under this BIC8, so we cannot name the institution behind it.');
     } else {
-      parts.push('BIC format valid but not found in database. Data sourced from GLEIF — coverage may be partial.');
+      parts.push(
+        'BIC format valid but not found in database. Data sourced from GLEIF — coverage may be partial.',
+      );
     }
 
     result.note = parts.join(' ');

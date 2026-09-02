@@ -196,8 +196,19 @@ const ENTRIES: DiscoveryEntry[] = [
       outputExample: {
         iid: '00230',
         found: true,
-        institution: { name: 'UBS Switzerland AG', type: 'bank', iid_type: 'headquarters', headquarters_iid: '00230' },
-        address: { street: 'Bahnhofstrasse', building_number: '45', post_code: '8098', town: 'Zürich', country: 'CH' },
+        institution: {
+          name: 'UBS Switzerland AG',
+          type: 'bank',
+          iid_type: 'headquarters',
+          headquarters_iid: '00230',
+        },
+        address: {
+          street: 'Bahnhofstrasse',
+          building_number: '45',
+          post_code: '8098',
+          town: 'Zürich',
+          country: 'CH',
+        },
         bic: 'UBSWCHZH80A',
         payment_services: {
           sic: true,
@@ -255,7 +266,9 @@ const ENTRIES: DiscoveryEntry[] = [
 function pathRegex(template: string): RegExp {
   const source = template
     .split('/')
-    .map((segment) => (segment.startsWith(':') ? '[^/]+' : segment.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
+    .map((segment) =>
+      segment.startsWith(':') ? '[^/]+' : segment.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
+    )
     .join('/');
   return new RegExp(`^${source}$`);
 }

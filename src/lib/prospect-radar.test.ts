@@ -16,12 +16,19 @@ describe('extractEmails', () => {
     const html = `
       <a href="mailto:contact@alpha.example.net">write us</a>
       <p>or contact@alpha.example.net directly, or team@alpha.example.net</p>`;
-    expect(extractEmails(html).sort()).toEqual(['contact@alpha.example.net', 'team@alpha.example.net']);
+    expect(extractEmails(html).sort()).toEqual([
+      'contact@alpha.example.net',
+      'team@alpha.example.net',
+    ]);
   });
 
   it('decodes the cheap entity obfuscations', () => {
-    const html = 'reach us: hello&#64;alpha.example.net or <a href="mailto:info%40alpha.example.net">x</a>';
-    expect(extractEmails(html).sort()).toEqual(['hello@alpha.example.net', 'info@alpha.example.net']);
+    const html =
+      'reach us: hello&#64;alpha.example.net or <a href="mailto:info%40alpha.example.net">x</a>';
+    expect(extractEmails(html).sort()).toEqual([
+      'hello@alpha.example.net',
+      'info@alpha.example.net',
+    ]);
   });
 
   it('does not mistake asset filenames for addresses', () => {
@@ -49,21 +56,31 @@ describe('pickEmail', () => {
   });
 
   it('never picks a machine or wrong-desk inbox', () => {
-    expect(pickEmail(['noreply@alpha.example.net', 'press@alpha.example.net', 'jobs@alpha.example.net'], site)).toBe(
-      null,
-    );
+    expect(
+      pickEmail(
+        ['noreply@alpha.example.net', 'press@alpha.example.net', 'jobs@alpha.example.net'],
+        site,
+      ),
+    ).toBe(null);
   });
 
   it('prefers a generic human inbox, then a person, then the service desks', () => {
-    expect(pickEmail(['support@alpha.example.net', 'maria@alpha.example.net', 'hello@alpha.example.net'], site)).toBe(
-      'hello@alpha.example.net',
+    expect(
+      pickEmail(
+        ['support@alpha.example.net', 'maria@alpha.example.net', 'hello@alpha.example.net'],
+        site,
+      ),
+    ).toBe('hello@alpha.example.net');
+    expect(pickEmail(['support@alpha.example.net', 'maria@alpha.example.net'], site)).toBe(
+      'maria@alpha.example.net',
     );
-    expect(pickEmail(['support@alpha.example.net', 'maria@alpha.example.net'], site)).toBe('maria@alpha.example.net');
     expect(pickEmail(['support@alpha.example.net'], site)).toBe('support@alpha.example.net');
   });
 
   it('accepts an address on a subdomain of the site', () => {
-    expect(pickEmail(['contact@mail.alpha.example.net'], site)).toBe('contact@mail.alpha.example.net');
+    expect(pickEmail(['contact@mail.alpha.example.net'], site)).toBe(
+      'contact@mail.alpha.example.net',
+    );
   });
 });
 
@@ -123,13 +140,21 @@ describe('parseDescribeOutput', () => {
     const out = parseDescribeOutput(
       '===COMPANY===\nSociété Alpha\n===COUNTRY===\nch\n===DESC===\nValide des virements pour PME.\n===END===',
     );
-    expect(out).toEqual({ company: 'Société Alpha', country: 'CH', desc: 'Valide des virements pour PME.' });
-    const unknown = parseDescribeOutput('===COMPANY===\nUNKNOWN\n===COUNTRY===\nUNKNOWN\n===DESC===\nUNKNOWN\n===END===');
+    expect(out).toEqual({
+      company: 'Société Alpha',
+      country: 'CH',
+      desc: 'Valide des virements pour PME.',
+    });
+    const unknown = parseDescribeOutput(
+      '===COMPANY===\nUNKNOWN\n===COUNTRY===\nUNKNOWN\n===DESC===\nUNKNOWN\n===END===',
+    );
     expect(unknown).toEqual({ company: null, country: null, desc: null });
   });
 
   it('rejects a malformed country instead of storing garbage', () => {
-    const out = parseDescribeOutput('===COMPANY===\nX\n===COUNTRY===\nSuisse\n===DESC===\nY\n===END===');
+    const out = parseDescribeOutput(
+      '===COMPANY===\nX\n===COUNTRY===\nSuisse\n===DESC===\nY\n===END===',
+    );
     expect(out?.country).toBe(null);
   });
 
@@ -162,7 +187,11 @@ describe('buildProspectMailPrompt', () => {
   });
 
   it('names the contact when one exists', () => {
-    const prompt = buildProspectMailPrompt({ ...base, contact_name: 'Maria Muster', contact_role: 'CTO' });
+    const prompt = buildProspectMailPrompt({
+      ...base,
+      contact_name: 'Maria Muster',
+      contact_role: 'CTO',
+    });
     expect(prompt).toContain('Maria Muster (CTO)');
   });
 });

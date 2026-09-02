@@ -19,21 +19,78 @@ import { PRODUCT_FACTS } from './forum-draft-gen.js';
 // ---------------------------------------------------------------- addresses
 
 /** Pages worth probing for a published address, in probe order. */
-export const CONTACT_PATHS = ['', '/contact', '/contact-us', '/about', '/imprint', '/impressum', '/legal'];
+export const CONTACT_PATHS = [
+  '',
+  '/contact',
+  '/contact-us',
+  '/about',
+  '/imprint',
+  '/impressum',
+  '/legal',
+];
 
 /** Local parts that reach a machine or the wrong desk, never a founder. */
 const BANNED_LOCALPARTS = new Set([
-  'noreply', 'no-reply', 'donotreply', 'do-not-reply', 'notifications', 'notification',
-  'abuse', 'spam', 'postmaster', 'webmaster', 'hostmaster', 'mailer-daemon',
-  'jobs', 'careers', 'hr', 'recruiting', 'press', 'media', 'pr',
-  'privacy', 'dpo', 'gdpr', 'legal', 'compliance', 'billing', 'invoice', 'invoices',
-  'unsubscribe', 'security', 'cert',
+  'noreply',
+  'no-reply',
+  'donotreply',
+  'do-not-reply',
+  'notifications',
+  'notification',
+  'abuse',
+  'spam',
+  'postmaster',
+  'webmaster',
+  'hostmaster',
+  'mailer-daemon',
+  'jobs',
+  'careers',
+  'hr',
+  'recruiting',
+  'press',
+  'media',
+  'pr',
+  'privacy',
+  'dpo',
+  'gdpr',
+  'legal',
+  'compliance',
+  'billing',
+  'invoice',
+  'invoices',
+  'unsubscribe',
+  'security',
+  'cert',
   // form placeholders and demo strings seen in the wild
-  'example', 'test', 'demo', 'user', 'name', 'firstname', 'lastname', 'email', 'your', 'you', 'someone', 'john.doe', 'jane.doe',
+  'example',
+  'test',
+  'demo',
+  'user',
+  'name',
+  'firstname',
+  'lastname',
+  'email',
+  'your',
+  'you',
+  'someone',
+  'john.doe',
+  'jane.doe',
 ]);
 
 /** File suffixes the naive regex mistakes for mail domains (logo@2x.png). */
-const ASSET_TLDS = new Set(['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'ico', 'css', 'js', 'woff', 'woff2']);
+const ASSET_TLDS = new Set([
+  'png',
+  'jpg',
+  'jpeg',
+  'gif',
+  'svg',
+  'webp',
+  'ico',
+  'css',
+  'js',
+  'woff',
+  'woff2',
+]);
 
 /** Generic inboxes ranked by how likely a human founder reads them. */
 const PREFERRED_LOCALPARTS = ['contact', 'hello', 'hi', 'hey', 'info', 'team', 'founders', 'mail'];
@@ -160,7 +217,9 @@ export function buildProspectMailPrompt(p: ProspectForMail): string {
     p.buying_signal ? `Buying signal: ${p.buying_signal}` : '',
     p.signal_source_url ? `Where we saw the signal: ${p.signal_source_url}` : '',
     p.personalization_hook ? `Personalisation hook: ${p.personalization_hook}` : '',
-    p.contact_name ? `Contact: ${p.contact_name}${p.contact_role ? ` (${p.contact_role})` : ''}` : 'Contact: unknown (use the neutral greeting)',
+    p.contact_name
+      ? `Contact: ${p.contact_name}${p.contact_role ? ` (${p.contact_role})` : ''}`
+      : 'Contact: unknown (use the neutral greeting)',
   ].filter(Boolean);
   return `Write the outreach email for this prospect.\n\n${lines.join('\n')}`;
 }
@@ -187,12 +246,19 @@ export function pageGist(html: string, cap = 1600): string {
     /<meta[^>]+property=["']og:description["'][^>]*content=["']([^"']{1,400})/i.exec(html)?.[1] ??
     '';
   const body = html
-    .replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>|<noscript[\s\S]*?<\/noscript>/gi, ' ')
+    .replace(
+      /<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>|<noscript[\s\S]*?<\/noscript>/gi,
+      ' ',
+    )
     .replace(/<[^>]+>/g, ' ')
     .replace(/&[a-z#0-9]+;/gi, ' ')
     .replace(/\s+/g, ' ')
     .trim();
-  return [title && `TITLE: ${title.trim()}`, meta && `META: ${meta.trim()}`, body && `BODY: ${body}`]
+  return [
+    title && `TITLE: ${title.trim()}`,
+    meta && `META: ${meta.trim()}`,
+    body && `BODY: ${body}`,
+  ]
     .filter(Boolean)
     .join('\n')
     .slice(0, cap);
@@ -240,7 +306,11 @@ export function parseDescribeOutput(text: string): SiteDescription | null {
   const country = grab('COUNTRY', 'DESC');
   const desc = grab('DESC', 'END');
   if (!text.includes('===DESC===')) return null;
-  return { company, country: country && /^[A-Za-z]{2}$/.test(country) ? country.toUpperCase() : null, desc };
+  return {
+    company,
+    country: country && /^[A-Za-z]{2}$/.test(country) ? country.toUpperCase() : null,
+    desc,
+  };
 }
 
 /**
