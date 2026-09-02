@@ -1,0 +1,20 @@
+{
+  // Type-checks scripts/ the same way `npm run typecheck` already checks
+  // src/ (tsconfig.json) and the npm package checks itself (mcp/tsconfig.json).
+  // Before 2026-09-02 this tree was invisible to tsc: `npm run typecheck` only
+  // reads tsconfig.json, whose include is `src/**/*`, so none of the 39
+  // operational scripts were type-checked even though vitest runs their
+  // tests and the Dockerfile copies scripts/ into the build stage (audit QUA-07).
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    // "." rather than "scripts": every script that touches the database or
+    // enrichment logic imports straight from src/ (e.g. ../src/lib/countries),
+    // so scripts/ and src/ are not disjoint trees. rootDir only has to be an
+    // ancestor of every file in the program; noEmit means it never drives an
+    // output path.
+    "rootDir": ".",
+    "noEmit": true
+  },
+  "include": ["scripts/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
+}

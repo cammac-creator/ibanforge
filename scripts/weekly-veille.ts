@@ -78,7 +78,7 @@ type Stats = {
 };
 
 /** Shape of GET /admin/business-summary (src/routes/admin-business.ts). */
-type BusinessSummary = {
+export type BusinessSummary = {
   window_days: number;
   radar?: { last_run_at: string | null; hours_since: number | null; stale: boolean };
   credits: {

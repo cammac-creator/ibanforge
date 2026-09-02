@@ -27,7 +27,7 @@
     "lint:fix": "eslint src/ scripts/ mcp/ sdks/typescript/src integrations/n8n --fix",
     "format": "prettier --write 'src/**/*.ts'",
     "format:check": "prettier --check 'src/**/*.ts'",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.scripts.json",
     "db:seed": "tsx src/db/seed.ts",
     "db:enrich": "tsx scripts/enrich-countries.ts",
     "db:seed-ch": "tsx scripts/seed-bc-nummer.ts",

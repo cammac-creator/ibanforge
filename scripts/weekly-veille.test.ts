@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { conversionSection, statsSection, weekly } from './weekly-veille.js';
+import type { BusinessSummary } from './weekly-veille.js';
 
 type Row = Parameters<typeof weekly>[0][number];
 
@@ -89,13 +90,30 @@ const summary = {
     sold_credits: 6000,
     sold_usd: 25,
     sold_usd_is_estimate: false,
+    sold_usd_deduced_accounts: 0,
     consumed_credits: 300,
     consumption_pct: 5,
     paying_accounts: 2,
     idle_accounts: 1,
     accounts: [
-      { key_prefix: 'ifk_a', domain: 'alpha.example.net', sold: 5000, consumed: 298, pct: 6 },
-      { key_prefix: 'ifk_b', domain: 'beta.example.net', sold: 1000, consumed: 2, pct: 0.2 },
+      {
+        key_prefix: 'ifk_a',
+        domain: 'alpha.example.net',
+        sold: 5000,
+        consumed: 298,
+        pct: 6,
+        usd: 21,
+        amount_source: 'measured',
+      },
+      {
+        key_prefix: 'ifk_b',
+        domain: 'beta.example.net',
+        sold: 1000,
+        consumed: 2,
+        pct: 0.2,
+        usd: 4,
+        amount_source: 'measured',
+      },
     ],
     accounts_omitted: 0,
   },
@@ -119,7 +137,7 @@ const summary = {
     discovery: 310,
     discovery_pct: 31,
   },
-};
+} satisfies BusinessSummary;
 
 describe('the conversion block', () => {
   it('leads with what was sold against what was consumed', () => {
