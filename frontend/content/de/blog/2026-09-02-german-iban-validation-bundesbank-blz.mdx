@@ -1,0 +1,89 @@
+---
+title: "Deutsche IBAN-Validierung gegen das Bundesbank-Register: was die BLZ verrät"
+description: "Jede deutsche IBAN trägt eine achtstellige Bankleitzahl. Die Deutsche Bundesbank veröffentlicht monatlich das Register, das sie zuteilt, mit dem Institut und dessen BIC, und es ist das einzige nationale Register, das auch das Ende eines Codes veröffentlicht. Was jede Antwort bei der Auszahlung bedeutet, und was sie nicht sagen kann."
+date: "2026-09-02"
+---
+
+Eine deutsche IBAN hat zweiundzwanzig Zeichen, acht davon sind die Bankleitzahl, der Bankcode, der sagt, welches Institut das Konto führt. Anders als die meisten Länder veröffentlicht Deutschland das Register, das diese Codes zuteilt: die Bankleitzahlendatei der Deutschen Bundesbank, monatlich aktualisiert, mit dem Institut hinter jedem Code und dem dazugehörigen BIC.
+
+Dieses Register ist es, das eine deutsche IBAN-Prüfung von einer blossen Prüfziffer unterscheidet. Dieser Beitrag geht Feld für Feld durch, was es beantwortet, in der Form, in der unsere API sie ausliefert.
+
+## Bei der Prüfziffer sind sich alle Produkte einig
+
+`DE89 3704 0044 0532 0130 00` besteht die Mod-97-Prüfung. Das tut auch jede Zeichenfolge, die ein Betrugsskript mit derselben Arithmetik erzeugt. Die Prüfziffer beweist, dass die Ziffern in sich stimmig sind; sie sagt nichts darüber, ob `37040044` je einer Bank zugeteilt wurde.
+
+## Das Register beantwortet die zweite Frage
+
+IBAN an `POST /v1/iban/validate` senden und `bank_code_check` lesen:
+
+```json
+"bank_code_check": {
+  "value": "37040044",
+  "status": "verified",
+  "match": "register",
+  "register": "Deutsche Bundesbank Bankleitzahlendatei",
+  "authoritative": true,
+  "institution": { "name": "Commerzbank", "post_code": "50447", "town": "Köln", "country": "DE" },
+  "as_of": "2026-08"
+}
+```
+
+Vier Dinge, die in diesem Block stehen.
+
+- `status: "verified"` mit `match: "register"`: Die acht Ziffern wurden in der Bundesbank-Datei selbst gefunden.
+- `authoritative: true`: Die Antwort stammt von der Zuteilungsstelle selbst, nicht von einem BIC-Verzeichnis, das zufällig deutsche Banken erwähnt. Hat ein Land kein solches Register, steht dasselbe Feld auf `false`, und ein Fehltreffer beweist dort nichts.
+- `institution`: Name, Postleitzahl und Ort genau so, wie die Bundesbank sie führt. Keine Strasse, weil das Register keine Strassenspalte hat; wir liefern `null`, statt sie aus einer anderen Quelle zu füllen.
+- `as_of`: welche monatliche Ausgabe geantwortet hat. Ein Code, der mitten im Monat zugeteilt wird, erscheint erst in der nächsten.
+
+## Der BIC stammt aus derselben Datei
+
+Die Bankleitzahlendatei führt den vollen elfstelligen BIC pro BLZ. Deshalb löst eine Sparkasse zu ihrem eigenen BIC auf und nicht zum gemeinsamen BIC8 ihrer Landesbank: Die Zuordnung ist veröffentlicht, wir geben sie nur weiter. In der Antwort trägt `bic` den Code und den Banknamen, und `sepa.basis: "national_register"` sagt, dass der BIC aus dem Register gelesen und nicht abgeleitet wurde. Für ein Auszahlungssystem, das den BIC neben der IBAN speichert, ist das der Wert, den man speichert.
+
+## Stillgelegte Bankleitzahlen: der Teil, den nur Deutschland verrät
+
+Bankleitzahlen enden. Nach einer Fusion wird die BLZ des übernommenen Instituts zur Löschung markiert, und eine Weile lang validiert sie noch, nennt noch eine echte Bank und besteht noch jede Formatprüfung am Markt. Das Bundesbank-Register veröffentlicht dieses Ende so klar wie den Anfang, und die Antwort trägt es mit:
+
+```json
+"bank_code_check": {
+  "value": "...",
+  "status": "verified",
+  "authoritative": false,
+  "retired": true,
+  "superseded_by": "...",
+  "as_of": "2026-08"
+}
+```
+
+`retired: true` ist eine Warnung, keine Ablehnung: Die Bankleitzahl war zugeteilt, also bleibt der status auf `verified`, aber `authoritative` fällt auf `false`, weil das Register selbst nicht mehr dafür einsteht. `superseded_by` nennt den Nachfolgecode, wenn das Register einen angibt. Zahlungsempfängerdaten, die auf einer stillgelegten Bankleitzahl aufbauen, haben ein Haltbarkeitsdatum, und dieses Feld sagt, wie lange.
+
+## Was `not_in_register` für Deutschland bedeutet
+
+Weil die Bundesbank die Stelle ist, die deutsche Bankleitzahlen zuteilt, ist ein Fehltreffer hier eine Tatsache über Deutschland und nicht über unsere Abdeckung: Die acht Ziffern gehören niemandem. `status: "not_in_register"` neben `authoritative: true` ist deshalb ein starker Grund, eine Zahlung zu stoppen, bevor sie hinausgeht. Die IBAN wird daneben trotzdem `valid: true` melden. Struktur und Zuteilung sind zwei verschiedene Fragen, und nur die zweite braucht ein Register.
+
+Die Antwort zieht den Schluss für Sie gleich selbst, in `next_steps`, mit denselben einfachen Worten, die auch ein menschlicher Prüfer verwenden würde:
+
+```json
+"next_steps": [{
+  "code": "bank_code_not_allocated",
+  "do": "Do not send. The bank code is absent from the national register, so no institution holds this account.",
+  "because": "bank_code_check.status is not_in_register and authoritative is true (Deutsche Bundesbank Bankleitzahlendatei)"
+}]
+```
+
+## Die ehrlichen Grenzen
+
+- Wir prüfen die Bankleitzahl, nie das Konto oder dessen Inhaber. Eine verifizierte BLZ sagt, dass das Institut existiert, und nennt es; sie sagt nichts über die zehn Ziffern, die folgen.
+- Institut, nicht Filiale. Eine deutsche IBAN identifiziert das Institut. Details auf Filialebene lassen sich daraus nicht ableiten, weder von uns noch von sonst jemandem.
+- Monatliche Aktualität, und die Ausgabe ist auf jeder Antwort vermerkt.
+- Der Namensabgleich ist ein eigener Mechanismus. Im Euroraum ist das die Verification of Payee (VoP), von den Banken zum Zahlungszeitpunkt durchgeführt; `sepa.vop_required` sagt Ihnen, wann er vorgeschrieben ist.
+
+## Ein Aufruf zum Ausprobieren
+
+```bash
+curl -X POST https://api.ibanforge.com/v1/iban/validate \
+  -H "Authorization: Bearer ifk_..." \
+  -H "Content-Type: application/json" \
+  -d '{"iban":"DE89370400440532013000"}'
+```
+
+Ein kostenloser Schlüssel deckt 200 Aufrufe im Monat ab, genug, um an einer Stichprobe jedes Feld zu lesen, bevor irgendetwas entschieden wird. Die vollständige Feldreferenz steht unter [was „verified" bedeutet](/de/docs/iban-validate), die deutschen Besonderheiten im [BLZ-Check](/de/docs/blz-check); das österreichische Register, das durchaus eine LEI führt, hat [eine eigene Seite](/de/docs/at-bank-codes).

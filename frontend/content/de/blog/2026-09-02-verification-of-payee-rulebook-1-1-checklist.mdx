@@ -1,0 +1,54 @@
+---
+title: "Verification of Payee, Regelwerk Version 1.1: die Checkliste zum 20. September 2026"
+description: "Verification of Payee ist für Zahlungsdienstleister im Euroraum seit dem 9. Oktober 2025 verpflichtend, und Version 1.1 des EPC-Regelwerks tritt am 20. September 2026 in Kraft. Was eine IBAN-Prüfung vor dem Namensabgleich leistet, was sie nicht leisten kann, und welche Datenarbeit sich lohnt, vor diesem Datum abzuschliessen."
+date: "2026-09-02"
+---
+
+Zwei Daten rahmen diesen Beitrag. Seit dem **9. Oktober 2025** ist die Verification of Payee (VoP) für Zahlungsdienstleister in den Mitgliedstaaten des Euroraums nach der Verordnung (EU) 2024/886 verpflichtend. Am **20. September 2026** treten die Änderungen aus Version 1.1 des VoP-Regelwerks des European Payments Council in Kraft. Zahlungsdienstleister in EWR-Mitgliedstaaten ausserhalb des Euroraums haben bis zum 9. Juli 2027 Zeit.
+
+Im Mai haben wir einen [allgemeinen Leitfaden zu VoP](/de/blog/2026-05-22-verification-of-payee-guide) veröffentlicht. Dieser hier ist enger gefasst: die Checkliste dessen, was eine IBAN-Prüfung vor dem Namensabgleich klären kann, damit der Abgleich selbst mit sauberen Daten startet.
+
+## Was VoP ist, in einem Absatz
+
+Bevor eine SEPA-Überweisung gesendet wird, fragt die Bank des Zahlers bei der Bank des Zahlungsempfängers an, ob der vom Zahler eingegebene Name mit dem Inhaber der IBAN übereinstimmt. Die Antwort lautet Treffer, naher Treffer, kein Treffer oder „Prüfung nicht möglich", und der Zahler entscheidet mit diesem Ergebnis in der Hand. Das Verfahren existiert, um Fehlüberweisungen und autorisierten Push-Payment-Betrug zu senken. Es läuft zwischen Banken, zum Zahlungszeitpunkt, anhand des Namens des Kontoinhabers.
+
+## Was eine IBAN-Prüfung nicht ist
+
+Eine IBAN-Prüfung identifiziert das Institut hinter einer Kontonummer. Sie sieht weder das Konto noch dessen Inhaber noch dessen Status, kann den Namensabgleich also weder durchführen noch ersetzen noch annähern. Jedes Produkt, das etwas anderes suggeriert, beschreibt etwas anderes. Unsere Antwort sagt das von sich aus: Wann immer ein Ergebnis die Kontofrage offenlässt, benennt `next_steps` die Lücke in klaren Worten.
+
+Was die Prüfung leisten kann, ist sicherzustellen, dass die Überweisung, die bei VoP ankommt, überhaupt eine Verifizierung wert ist: eine echte IBAN, eine zugeteilte Bankleitzahl, ein erreichbares Institut und ein klares Bild davon, ob VoP überhaupt greift.
+
+## Die Checkliste
+
+**1. Struktur, einmalig.** Jede IBAN in der Zahlungsempfängerdatei besteht die Prüfziffer und das Länderformat. Trivial, und die Stelle, an der Tippfehler und abgeschnittene Importe sterben, bevor sie eine unnötige VoP-Anfrage kosten.
+
+**2. Zuteilung, wo ein Register existiert.** In Deutschland, Österreich, Belgien, Bulgarien, der Schweiz und Liechtenstein wird die Bankleitzahl in der IBAN gegen das eigene Register des Landes geprüft, und `bank_code_check.authoritative: true` zeigt das an. Ein Code, den das Register nicht kennt, gehört niemandem, und kein Namensabgleich wird je darauf laufen. Anderswo steht dasselbe Feld auf `false`, und ein Fehltreffer beweist dort nichts, was die Antwort offenlegt statt verbirgt.
+
+**3. Erreichbarkeit, pro Bank des Zahlungsempfängers.** Zwei Felder in `sepa` tragen, was hier zählt:
+
+```json
+"sepa": {
+  "member": true,
+  "schemes": ["SCT", "SDD", "SCT_INST"],
+  "vop_required": true,
+  "vop_participant": true
+}
+```
+
+`vop_required` sagt, ob die Verordnung VoP für das Land dieser IBAN vorschreibt. `vop_participant` sagt, ob das ermittelte Institut im VoP-Register des EPC als bereit gelistet ist, und das Feld steht auf `null`, wenn sich kein Institut ermitteln liess, weil eine Vermutung hier schlimmer wäre als eine Lücke. Eine Bank des Zahlungsempfängers, die verpflichtet, aber nicht gelistet ist, ist die Zeile, die man sich vor dem Stichtag ansieht, nicht danach.
+
+**4. Stillgelegte Bankleitzahlen, ersetzt.** Ein Code, den das Register zur Löschung markiert, validiert weiterhin. Deutschland veröffentlicht den Nachfolger in `superseded_by`; Details im [BLZ-Check](/de/docs/blz-check). Zahlungsempfängerdaten, die auf einer stillgelegten Bankleitzahl aufbauen, produzieren am ehesten ein „Prüfung nicht möglich" aus Gründen, die nichts mit dem Namen zu tun haben.
+
+**5. Emittententyp, bekannt.** Eine IBAN, die von einem E-Geld-Institut oder einer Neobank ausgegeben wird, ist kein Bankkonto im klassischen Sinn, und Auszahlungs- und Compliance-Teams behandeln sie unterschiedlich. `issuer.type` sagt, um welchen Typ es sich handelt, und die Einordnung ist für die uns bekannten Institute kuratiert und nicht abgeleitet.
+
+**6. Das Ergebnis, protokolliert.** Was auch immer die VoP-Antwort ist, die IBAN-Prüfung sollte daneben aufbewahrt werden. Ein „kein Treffer" bei einer IBAN, deren Bankleitzahl zugeteilt und deren Institut VoP-bereit war, ist ein anderes Signal als ein „kein Treffer" bei einer IBAN, die niemand hätte verifizieren können.
+
+## Bei grossem Volumen, ein Endpunkt
+
+Für eine Zahlungsempfängerdatei statt einer einzelnen Überweisung nimmt der [Batch-Endpunkt](/de/docs/iban-batch) bis zu 100 IBANs pro Aufruf entgegen und beantwortet jede unabhängig, und der [Compliance-Endpunkt](/de/docs/compliance) fasst SEPA- und VoP-Erreichbarkeit in einem einzigen Risikoscore von 0 bis 100 zusammen, mit Sanktionsprüfung auf Bankebene über den BIC. Beide sind Vorabtriage, keine Entscheidung, und keiner der beiden rührt an den Kontoinhaber.
+
+## Wo wir aufhören
+
+Unsere Sanktionsprüfung erfolgt auf Bankebene, über den BIC8, nie auf Namensebene. Unsere Registerprüfungen sind in einer Handvoll Länder massgeblich und anderswo eine zusammengesetzte Karte. Und VoP selbst ist der Mechanismus der Banken, ausgeführt zum Zahlungszeitpunkt: Was wir liefern, ist die Datenarbeit, die diesen Lauf erst lohnenswert macht.
+
+*Dieser Beitrag ist eine allgemeine Information über die EU-Verordnung über Echtzeitzahlungen und das Verification-of-Payee-Verfahren des European Payments Council, keine Rechtsberatung. Pflichten und Daten bitte anhand der [Verordnung (EU) 2024/886](https://eur-lex.europa.eu/eli/reg/2024/886/oj/eng) und der Veröffentlichungen des [European Payments Council](https://www.europeanpaymentscouncil.eu/what-we-do/other-schemes/verification-payee) prüfen. Geprüft am 2. September 2026.*

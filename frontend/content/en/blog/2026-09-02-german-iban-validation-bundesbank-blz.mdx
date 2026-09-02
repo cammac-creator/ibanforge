@@ -1,0 +1,89 @@
+---
+title: "German IBAN validation against the Bundesbank register: what the BLZ tells you"
+description: "Every German IBAN carries an eight-digit Bankleitzahl. The Deutsche Bundesbank publishes the register that allocates them, monthly, with the institution and its BIC, and it is the only national register that also publishes the end of a code. What each answer means at payout time, and what it cannot tell you."
+date: "2026-09-02"
+---
+
+A German IBAN is twenty-two characters, and eight of them are a Bankleitzahl, the bank code that says which institution holds the account. Unlike most countries, Germany publishes the register that allocates those codes: the Deutsche Bundesbank's Bankleitzahlendatei, refreshed monthly, with the institution behind each code and the BIC that goes with it.
+
+That register is what separates a German IBAN check from a checksum. This post walks through what it answers, field by field, using the shape our API serves.
+
+## The checksum is where every product agrees
+
+`DE89 3704 0044 0532 0130 00` passes mod-97. So does any string a fraud script generates with the same arithmetic. The checksum proves the digits are consistent with each other; it says nothing about whether `37040044` was ever handed to a bank.
+
+## The register answers the second question
+
+Send the IBAN to `POST /v1/iban/validate` and read `bank_code_check`:
+
+```json
+"bank_code_check": {
+  "value": "37040044",
+  "status": "verified",
+  "match": "register",
+  "register": "Deutsche Bundesbank Bankleitzahlendatei",
+  "authoritative": true,
+  "institution": { "name": "Commerzbank", "post_code": "50447", "town": "Köln", "country": "DE" },
+  "as_of": "2026-08"
+}
+```
+
+Four things to read in that block.
+
+- `status: "verified"` with `match: "register"`: the eight digits were found in the Bundesbank file itself.
+- `authoritative: true`: the answer comes from the allocation authority, not from a BIC directory that happens to mention German banks. Where a country has no such register, the same field is `false`, and an absence there proves nothing.
+- `institution`: the name, postcode and town exactly as the Bundesbank prints them. No street, because the register has no street column; we serve `null` rather than fill it from another source.
+- `as_of`: which monthly edition answered. A code allocated mid-month appears in the next one.
+
+## The BIC comes from the same file
+
+The Bankleitzahlendatei carries the full eleven-character BIC per BLZ. That is why a Sparkasse resolves to its own BIC rather than to the shared BIC8 of its Landesbank: the pairing is published, we only relay it. In the response, `bic` carries the code and the bank name, and `sepa.basis: "national_register"` tells you the BIC was read from the register and not inferred. For a payout system that stores the BIC next to the IBAN, this is the value to store.
+
+## Retirements: the part only Germany tells you
+
+Bank codes end. After a merger the absorbed institution's BLZ is marked for deletion, and for a while it still validates, still names a real bank, and still passes every format check on the market. The Bundesbank register publishes that end as clearly as the beginning, and the response carries it:
+
+```json
+"bank_code_check": {
+  "value": "...",
+  "status": "verified",
+  "authoritative": false,
+  "retired": true,
+  "superseded_by": "...",
+  "as_of": "2026-08"
+}
+```
+
+`retired: true` is a warning, not a denial: the code was allocated, so the status stays `verified`, but `authoritative` drops to `false` because the register itself no longer stands behind it. `superseded_by` names the successor code when the register gives one. Beneficiary details built on a retired code have a shelf life, and this is the field that says how long.
+
+## What `not_in_register` means for Germany
+
+Because the Bundesbank is the authority that allocates German bank codes, an absence is a fact about Germany and not about our coverage: the eight digits belong to nobody. `status: "not_in_register"` next to `authoritative: true` is therefore a strong reason to stop a payment before it leaves. The IBAN will still answer `valid: true` beside it. Structure and allocation are two different questions, and only the second one needs a register.
+
+The response draws the conclusion for you in `next_steps`, in the same plain words a reviewer would use:
+
+```json
+"next_steps": [{
+  "code": "bank_code_not_allocated",
+  "do": "Do not send. The bank code is absent from the national register, so no institution holds this account.",
+  "because": "bank_code_check.status is not_in_register and authoritative is true (Deutsche Bundesbank Bankleitzahlendatei)"
+}]
+```
+
+## The honest limits
+
+- We check the bank code, never the account or its holder. A verified BLZ says the institution exists and names it; it says nothing about the ten digits that follow.
+- Institution, not branch. A German IBAN identifies the institution. Branch-level detail is not derivable from it, by us or by anyone.
+- Monthly freshness, and the edition is stamped on every answer.
+- Name matching is a different mechanism. In the euro area that is Verification of Payee, run by the banks at payment time; `sepa.vop_required` tells you when it is mandated.
+
+## One call to try it
+
+```bash
+curl -X POST https://api.ibanforge.com/v1/iban/validate \
+  -H "Authorization: Bearer ifk_..." \
+  -H "Content-Type: application/json" \
+  -d '{"iban":"DE89370400440532013000"}'
+```
+
+A free key covers 200 calls a month, enough to read every field on a sample before deciding anything. The full field reference is on [what "verified" means](/en/docs/iban-validate) and the German specifics on the [BLZ check](/en/docs/blz-check); Austria's register, which does carry an LEI, has [its own page](/en/docs/at-bank-codes).

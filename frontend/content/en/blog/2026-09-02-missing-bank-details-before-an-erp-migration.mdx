@@ -1,0 +1,110 @@
+---
+title: "Filling in missing bank details before an ERP migration: a batch recipe"
+description: "A vendor master with thousands of IBANs, some without a BIC, some pointing at bank codes that no longer exist, and a new system that refuses incomplete records. How to triage it in batches of 100, what each field decides, what it costs, and where an IBAN check has to hand over to the supplier."
+date: "2026-09-02"
+---
+
+The most common IBAN job we see is not a payment. It is a migration. A company moves its vendor master from one ERP to another, the new system validates bank data on import, and a few thousand supplier records suddenly need a BIC they never had, or fail because the bank code inside the IBAN was retired years ago. The old system accepted anything; the new one does not.
+
+This post is the recipe we would follow. It uses the [batch endpoint](/en/docs/iban-batch) because the unit of work is a list, not a payment, and it stops where an API has to stop: at the account itself.
+
+## What "complete" means for a bank master record
+
+A record is worth importing when four questions have an answer:
+
+1. **Is the IBAN structurally valid?** Checksum and country format. Cheap, and every product on the market agrees on it.
+2. **Is the bank code inside it allocated to an institution?** A checksum cannot tell you that. Only a register can, and only some countries publish one.
+3. **Which institution, and which BIC?** The new ERP usually wants the BIC on the record, and it wants the one the register publishes, not a guess.
+4. **Can a payment run reach it?** SEPA membership and schemes, so that a supplier paid by direct debit or instant transfer does not fail weeks later.
+
+The batch response answers all four per IBAN, in fields you can map straight to columns. Here is the part of one result that matters for a German supplier, trimmed:
+
+```json
+{
+  "iban": "DE89370400440532013000",
+  "valid": true,
+  "bic": { "code": "COBADEFFXXX", "bank_name": "Commerzbank", "city": "Köln" },
+  "sepa": { "member": true, "schemes": ["SCT", "SDD", "SCT_INST"], "vop_required": true },
+  "bank_code_check": {
+    "value": "37040044",
+    "status": "verified",
+    "authoritative": true,
+    "register": "Deutsche Bundesbank Bankleitzahlendatei",
+    "as_of": "2026-08"
+  }
+}
+```
+
+`valid` answers the first question. `bank_code_check` answers the second, and `authoritative` says whether the answer came from the country's own register (Germany, Austria, Belgium, Bulgaria, Switzerland and Liechtenstein today) or from a composite map assembled from BIC directories, where an absence proves nothing. `bic` answers the third. `sepa` answers the fourth.
+
+## The triage, in three buckets
+
+Run the list through in batches of 100, then sort every row into one of three piles.
+
+**Write back.** `valid: true`, `bank_code_check.status: "verified"`, a `bic.code` present. Copy the BIC and the bank name into the record and move on. This is most of the file.
+
+**Replace.** `valid: true` but `bank_code_check.retired: true`. The code was allocated, the institution existed, and the register now marks it for deletion, usually after a merger. A format check will never flag this. The German register names the successor in `superseded_by` when it has one, so the replacement is often a lookup rather than a phone call. Details on the [BLZ check](/en/docs/blz-check).
+
+**Ask the supplier.** `valid: false`, or `status: "not_in_register"` with `authoritative: true`. The first is a typo or a truncated import. The second means the eight digits inside the IBAN are allocated to nobody, which is a strong reason not to pay and a clear question to send back. When `authoritative` is `false` the absence is a fact about our coverage rather than about the bank, so that row goes into the first pile with a note, not into this one.
+
+## The code
+
+Sixty lines of Python cover it. The batch endpoint takes up to 100 IBANs per call and answers each independently, so one bad row never fails the others.
+
+```python
+import csv
+import requests
+
+API = "https://api.ibanforge.com/v1/iban/batch"
+KEY = "ifk_..."  # your key
+
+def chunks(rows, size=100):
+    for i in range(0, len(rows), size):
+        yield rows[i:i + size]
+
+with open("vendors.csv", newline="") as f:
+    vendors = [r for r in csv.DictReader(f) if r.get("iban")]
+
+triage = {"write_back": [], "replace": [], "ask": []}
+
+for batch in chunks(vendors):
+    r = requests.post(
+        API,
+        headers={"Authorization": f"Bearer {KEY}"},
+        json={"ibans": [v["iban"] for v in batch]},
+        timeout=30,
+    )
+    r.raise_for_status()
+    for vendor, result in zip(batch, r.json()["results"]):
+        check = result.get("bank_code_check") or {}
+        bic = result.get("bic") or {}
+        if not result["valid"]:
+            triage["ask"].append((vendor, "invalid IBAN"))
+        elif check.get("status") == "not_in_register" and check.get("authoritative"):
+            triage["ask"].append((vendor, "bank code not allocated"))
+        elif check.get("retired"):
+            triage["replace"].append((vendor, check.get("superseded_by")))
+        else:
+            vendor["bic"] = bic.get("code")
+            vendor["bank_name"] = bic.get("bank_name")
+            triage["write_back"].append(vendor)
+
+for pile, rows in triage.items():
+    print(pile, len(rows))
+```
+
+Note the `zip`: results come back in the order the IBANs were sent, which is what makes the join trivial.
+
+## What it costs
+
+A batch debits one credit per IBAN on an API key, the same rule as the free tier's 200 requests a month. A first sample of 200 suppliers therefore costs nothing. For the full file, a pack of 5,000 credits is $20 and covers a vendor master of five thousand lines; the packs do not expire, so what is left after the migration stays on the key for the next entity or the next system. Paying per call in USDC works too, at $0.002 per IBAN in a batch.
+
+## Where the recipe has to stop
+
+An IBAN check identifies the institution behind an account number. It does not confirm that the account exists, is open, or belongs to the supplier whose name is on the record. Two things follow.
+
+First, the "ask the supplier" pile is not a failure of the tool, it is the point where a human confirmation is the only honest next step. Second, the name-to-account question has its own mechanism in the euro area, Verification of Payee, and it belongs to the payment, not to the import. The response says so itself: whenever a result leaves that gap open, `next_steps` names it.
+
+And one German detail worth knowing before the first run: the Bundesbank register carries no street column, so `institution.street` is `null` for every German bank. That is a fact about the register, not a hole in the lookup, and we would rather serve an honest `null` than an address the register never published.
+
+If you want to see the fields on one supplier before writing any code, the [playground](/en/playground) runs the same call on a single IBAN.

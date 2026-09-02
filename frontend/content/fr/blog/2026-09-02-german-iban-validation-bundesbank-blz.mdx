@@ -1,0 +1,89 @@
+---
+title: "Validation d'IBAN allemand face au registre de la Bundesbank : ce que dit la BLZ"
+description: "Chaque IBAN allemand porte une Bankleitzahl à huit chiffres. La Deutsche Bundesbank publie chaque mois le registre qui les attribue, avec l'établissement et son BIC, et c'est le seul registre national qui publie aussi la fin d'un code. Ce que signifie chaque réponse au moment du versement, et ce qu'elle ne peut pas vous dire."
+date: "2026-09-02"
+---
+
+Un IBAN allemand compte vingt-deux caractères, dont huit forment une Bankleitzahl, le code banque qui indique quel établissement détient le compte. Contrairement à la plupart des pays, l'Allemagne publie le registre qui attribue ces codes : la Bankleitzahlendatei de la Deutsche Bundesbank, republiée chaque mois, avec l'établissement derrière chaque code et le BIC qui l'accompagne.
+
+C'est ce registre qui distingue un contrôle d'IBAN allemand d'une simple clé de contrôle. Ce billet passe en revue ce qu'il répond, champ par champ, dans la forme où notre API le sert.
+
+## La clé de contrôle : ce sur quoi tous les produits s'accordent
+
+`DE89 3704 0044 0532 0130 00` passe le mod-97. Toute chaîne générée par un script frauduleux avec la même arithmétique le passe aussi. La clé de contrôle prouve que les chiffres sont cohérents entre eux ; elle ne dit rien sur le fait que `37040044` ait un jour été attribué à une banque.
+
+## Le registre répond à la deuxième question
+
+Envoyez l'IBAN à `POST /v1/iban/validate` et lisez `bank_code_check` :
+
+```json
+"bank_code_check": {
+  "value": "37040044",
+  "status": "verified",
+  "match": "register",
+  "register": "Deutsche Bundesbank Bankleitzahlendatei",
+  "authoritative": true,
+  "institution": { "name": "Commerzbank", "post_code": "50447", "town": "Köln", "country": "DE" },
+  "as_of": "2026-08"
+}
+```
+
+Quatre éléments à lire dans ce bloc.
+
+- `status: "verified"` avec `match: "register"` : les huit chiffres ont été trouvés dans le fichier de la Bundesbank lui-même.
+- `authoritative: true` : la réponse vient de l'autorité d'attribution, pas d'un annuaire BIC qui mentionne au passage des banques allemandes. Là où un pays ne publie pas un tel registre, ce même champ vaut `false`, et une absence n'y prouve rien.
+- `institution` : le nom, le code postal et la ville, exactement comme les imprime la Bundesbank. Pas de rue, car le registre n'a aucune colonne rue ; nous servons `null` plutôt que de la remplir depuis une autre source.
+- `as_of` : quelle édition mensuelle a répondu. Un code attribué en cours de mois apparaît dans l'édition suivante.
+
+## Le BIC vient du même fichier
+
+La Bankleitzahlendatei porte le BIC complet à onze caractères pour chaque BLZ. C'est pour cela qu'une Sparkasse se résout vers son propre BIC plutôt que vers le BIC8 partagé de sa Landesbank : l'appariement est publié, nous ne faisons que le relayer. Dans la réponse, `bic` porte le code et le nom de la banque, et `sepa.basis: "national_register"` indique que le BIC a été lu dans le registre et non déduit. Pour un système de versement qui stocke le BIC à côté de l'IBAN, c'est la valeur à conserver.
+
+## Les retraits : ce que seule l'Allemagne dit
+
+Les codes banque ont une fin. Après une fusion, la BLZ de l'établissement absorbé est marquée pour suppression, et pendant un moment elle continue de valider, continue de nommer une vraie banque, et continue de passer tous les contrôles de format du marché. Le registre de la Bundesbank publie cette fin aussi clairement que le début, et la réponse la porte :
+
+```json
+"bank_code_check": {
+  "value": "...",
+  "status": "verified",
+  "authoritative": false,
+  "retired": true,
+  "superseded_by": "...",
+  "as_of": "2026-08"
+}
+```
+
+`retired: true` est un avertissement, pas un refus : le code a été attribué, donc le statut reste `verified`, mais `authoritative` retombe à `false` parce que le registre lui-même ne le garantit plus. `superseded_by` nomme le code successeur quand le registre en donne un. Les coordonnées de bénéficiaire construites sur un code retiré ont une date de péremption, et c'est ce champ qui dit laquelle.
+
+## Ce que `not_in_register` signifie pour l'Allemagne
+
+Puisque la Bundesbank est l'autorité qui attribue les codes banque allemands, une absence est un fait sur l'Allemagne et non sur notre couverture : les huit chiffres n'appartiennent à personne. `status: "not_in_register"` à côté de `authoritative: true` est donc une bonne raison d'arrêter un paiement avant son départ. L'IBAN, lui, continuera de répondre `valid: true` juste à côté. Structure et attribution sont deux questions distinctes, et seule la seconde a besoin d'un registre.
+
+La réponse tire la conclusion à votre place dans `next_steps`, avec les mêmes mots simples qu'utiliserait un relecteur humain :
+
+```json
+"next_steps": [{
+  "code": "bank_code_not_allocated",
+  "do": "Do not send. The bank code is absent from the national register, so no institution holds this account.",
+  "because": "bank_code_check.status is not_in_register and authoritative is true (Deutsche Bundesbank Bankleitzahlendatei)"
+}]
+```
+
+## Les limites honnêtes
+
+- Nous contrôlons le code banque, jamais le compte ni son titulaire. Une BLZ `verified` dit que l'établissement existe et le nomme ; elle ne dit rien des dix chiffres qui suivent.
+- L'établissement, pas l'agence. Un IBAN allemand identifie l'établissement. Le détail au niveau de l'agence ne peut en être déduit, ni par nous ni par personne.
+- Fraîcheur mensuelle, et l'édition est estampillée sur chaque réponse.
+- La correspondance de noms est un mécanisme différent. Dans la zone euro, c'est la Verification of Payee (VoP), exécutée par les banques au moment du paiement ; `sepa.vop_required` indique quand elle est exigée.
+
+## Un appel pour l'essayer
+
+```bash
+curl -X POST https://api.ibanforge.com/v1/iban/validate \
+  -H "Authorization: Bearer ifk_..." \
+  -H "Content-Type: application/json" \
+  -d '{"iban":"DE89370400440532013000"}'
+```
+
+Une clé gratuite couvre 200 appels par mois, de quoi lire tous les champs sur un échantillon avant de trancher quoi que ce soit. La référence complète des champs est sur [ce que « verified » veut dire](/fr/docs/iban-validate) et les spécificités allemandes sur le [contrôle de BLZ](/fr/docs/blz-check) ; le registre autrichien, qui porte bien un LEI, a [sa propre page](/fr/docs/at-bank-codes).

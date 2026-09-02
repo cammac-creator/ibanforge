@@ -1,0 +1,110 @@
+---
+title: "Compléter les coordonnées bancaires manquantes avant une migration ERP : une recette par lots"
+description: "Un fichier fournisseurs avec des milliers d'IBAN, certains sans BIC, certains pointant vers des codes banque qui n'existent plus, et un nouveau système qui refuse les fiches incomplètes. Comment le trier par lots de 100, ce que décide chaque champ, ce que ça coûte, et où un contrôle d'IBAN doit céder la main au fournisseur."
+date: "2026-09-02"
+---
+
+Le travail le plus courant que nous voyons autour de l'IBAN n'est pas un paiement. C'est une migration. Une entreprise fait passer son fichier fournisseurs d'un ERP à un autre, le nouveau système valide les coordonnées bancaires à l'import, et quelques milliers de fiches fournisseurs ont soudain besoin d'un BIC qu'elles n'ont jamais eu, ou échouent parce que le code banque contenu dans l'IBAN a été retiré des années plus tôt. L'ancien système acceptait tout ; le nouveau non.
+
+Ce billet est la recette que nous suivrions. Il s'appuie sur l'[endpoint batch](/fr/docs/iban-batch) parce que l'unité de travail est une liste, pas un paiement, et il s'arrête là où une API doit s'arrêter : au compte lui-même.
+
+## Ce que « complet » veut dire pour une fiche bancaire
+
+Une fiche mérite d'être importée quand quatre questions ont une réponse :
+
+1. **L'IBAN est-il structurellement valide ?** Clé de contrôle et format national. Peu coûteux, et tous les produits du marché sont d'accord là-dessus.
+2. **Le code banque qu'il contient est-il attribué à un établissement ?** Une clé de contrôle ne peut pas vous le dire. Seul un registre le peut, et seuls certains pays en publient un.
+3. **Quel établissement, et quel BIC ?** Le nouvel ERP veut généralement le BIC sur la fiche, et il veut celui que publie le registre, pas une supposition.
+4. **Un cycle de paiement peut-il l'atteindre ?** Appartenance SEPA et schémas de paiement, pour qu'un fournisseur payé par prélèvement ou par virement instantané n'échoue pas des semaines plus tard.
+
+La réponse batch répond aux quatre questions par IBAN, dans des champs que vous pouvez transposer directement en colonnes. Voici la partie d'un résultat qui compte pour un fournisseur allemand, réduite à l'essentiel :
+
+```json
+{
+  "iban": "DE89370400440532013000",
+  "valid": true,
+  "bic": { "code": "COBADEFFXXX", "bank_name": "Commerzbank", "city": "Köln" },
+  "sepa": { "member": true, "schemes": ["SCT", "SDD", "SCT_INST"], "vop_required": true },
+  "bank_code_check": {
+    "value": "37040044",
+    "status": "verified",
+    "authoritative": true,
+    "register": "Deutsche Bundesbank Bankleitzahlendatei",
+    "as_of": "2026-08"
+  }
+}
+```
+
+`valid` répond à la première question. `bank_code_check` répond à la deuxième, et `authoritative` indique si la réponse vient du registre propre au pays (Allemagne, Autriche, Belgique, Bulgarie, Suisse et Liechtenstein aujourd'hui) ou d'une carte composite assemblée à partir d'annuaires BIC, où une absence ne prouve rien. `bic` répond à la troisième. `sepa` répond à la quatrième.
+
+## Le tri, en trois piles
+
+Passez la liste par lots de 100, puis classez chaque ligne dans l'une de ces trois piles.
+
+**À réintégrer.** `valid: true`, `bank_code_check.status: "verified"`, un `bic.code` présent. Copiez le BIC et le nom de la banque dans la fiche et passez à la suivante. C'est la majorité du fichier.
+
+**À remplacer.** `valid: true` mais `bank_code_check.retired: true`. Le code a été attribué, l'établissement a existé, et le registre le marque désormais pour suppression, en général après une fusion. Un contrôle de format ne le signalera jamais. Le registre allemand nomme le successeur dans `superseded_by` quand il en a un, si bien que le remplacement relève souvent d'une simple recherche plutôt que d'un appel téléphonique. Détails sur le [contrôle de BLZ](/fr/docs/blz-check).
+
+**À demander au fournisseur.** `valid: false`, ou `status: "not_in_register"` avec `authoritative: true`. Le premier cas est une faute de frappe ou un import tronqué. Le second signifie que les huit chiffres contenus dans l'IBAN ne sont attribués à personne, ce qui est une bonne raison de ne pas payer et une question claire à renvoyer. Quand `authoritative` vaut `false`, l'absence est un fait sur notre couverture plutôt que sur la banque, donc cette ligne part dans la première pile avec une note, pas dans celle-ci.
+
+## Le code
+
+Soixante lignes de Python suffisent. L'endpoint batch accepte jusqu'à 100 IBAN par appel et répond à chacun indépendamment, si bien qu'une ligne défectueuse ne fait jamais échouer les autres.
+
+```python
+import csv
+import requests
+
+API = "https://api.ibanforge.com/v1/iban/batch"
+KEY = "ifk_..."  # your key
+
+def chunks(rows, size=100):
+    for i in range(0, len(rows), size):
+        yield rows[i:i + size]
+
+with open("vendors.csv", newline="") as f:
+    vendors = [r for r in csv.DictReader(f) if r.get("iban")]
+
+triage = {"write_back": [], "replace": [], "ask": []}
+
+for batch in chunks(vendors):
+    r = requests.post(
+        API,
+        headers={"Authorization": f"Bearer {KEY}"},
+        json={"ibans": [v["iban"] for v in batch]},
+        timeout=30,
+    )
+    r.raise_for_status()
+    for vendor, result in zip(batch, r.json()["results"]):
+        check = result.get("bank_code_check") or {}
+        bic = result.get("bic") or {}
+        if not result["valid"]:
+            triage["ask"].append((vendor, "invalid IBAN"))
+        elif check.get("status") == "not_in_register" and check.get("authoritative"):
+            triage["ask"].append((vendor, "bank code not allocated"))
+        elif check.get("retired"):
+            triage["replace"].append((vendor, check.get("superseded_by")))
+        else:
+            vendor["bic"] = bic.get("code")
+            vendor["bank_name"] = bic.get("bank_name")
+            triage["write_back"].append(vendor)
+
+for pile, rows in triage.items():
+    print(pile, len(rows))
+```
+
+Remarque sur le `zip` : les résultats reviennent dans l'ordre où les IBAN ont été envoyés, ce qui rend la jointure triviale.
+
+## Ce que ça coûte
+
+Un lot débite un crédit par IBAN sur une clé API, la même règle que les 200 requêtes mensuelles du palier gratuit. Un premier échantillon de 200 fournisseurs ne coûte donc rien. Pour le fichier complet, un pack de 5 000 crédits coûte 20 $ et couvre un fichier fournisseurs de cinq mille lignes ; les packs n'expirent pas, donc ce qu'il en reste après la migration demeure sur la clé pour la prochaine entité ou le prochain système. Payer à l'appel en USDC fonctionne aussi, à 0,002 $ par IBAN dans un lot.
+
+## Où la recette doit s'arrêter
+
+Un contrôle d'IBAN identifie l'établissement derrière un numéro de compte. Il ne confirme pas que le compte existe, qu'il est ouvert, ou qu'il appartient au fournisseur dont le nom figure sur la fiche. Deux conséquences en découlent.
+
+D'abord, la pile « à demander au fournisseur » n'est pas un échec de l'outil, c'est le point où une confirmation humaine est la seule suite honnête. Ensuite, la question du rapprochement nom-compte a son propre mécanisme dans la zone euro, la Verification of Payee (VoP), et elle relève du paiement, pas de l'import. La réponse le dit elle-même : chaque fois qu'un résultat laisse ce vide ouvert, `next_steps` le nomme.
+
+Et un détail allemand à connaître avant le premier essai : le registre de la Bundesbank ne comporte aucune colonne rue, donc `institution.street` vaut `null` pour toutes les banques allemandes. C'est un fait sur le registre, pas un trou dans la recherche, et nous préférons servir un `null` honnête plutôt qu'une adresse que le registre n'a jamais publiée.
+
+Si vous voulez voir les champs sur un seul fournisseur avant d'écrire la moindre ligne de code, le [playground](/fr/playground) exécute le même appel sur un IBAN unique.

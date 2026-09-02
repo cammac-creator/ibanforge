@@ -1,0 +1,110 @@
+---
+title: "Fehlende Bankdaten vor einer ERP-Migration ergänzen: ein Stapelrezept"
+description: "Ein Lieferantenstamm mit Tausenden von IBANs, manche ohne BIC, manche mit Bankleitzahlen, die es nicht mehr gibt, und ein neues System, das unvollständige Datensätze ablehnt. Wie man ihn in Stapeln von 100 sortiert, was jedes Feld entscheidet, was es kostet, und wo eine IBAN-Prüfung den Fall an den Lieferanten übergeben muss."
+date: "2026-09-02"
+---
+
+Die häufigste IBAN-Aufgabe, die wir sehen, ist keine Zahlung. Es ist eine Migration. Ein Unternehmen verschiebt seinen Lieferantenstamm von einem ERP-System in ein anderes, das neue System validiert die Bankdaten beim Import, und einige tausend Lieferantendatensätze brauchen plötzlich einen BIC, den sie nie hatten, oder scheitern, weil die Bankleitzahl in der IBAN vor Jahren aus dem Verkehr gezogen wurde. Das alte System akzeptierte alles; das neue nicht.
+
+Dieser Beitrag ist das Rezept, dem wir folgen würden. Er nutzt den [Batch-Endpunkt](/de/docs/iban-batch), weil die Arbeitseinheit eine Liste ist und keine Zahlung, und er hört dort auf, wo eine API aufhören muss: beim Konto selbst.
+
+## Was „vollständig" für einen Datensatz im Lieferantenstamm bedeutet
+
+Ein Datensatz lohnt den Import, wenn vier Fragen eine Antwort haben:
+
+1. **Ist die IBAN strukturell gültig?** Prüfziffer und Länderformat. Günstig, und darüber ist sich jedes Produkt am Markt einig.
+2. **Ist die enthaltene Bankleitzahl einem Institut zugeteilt?** Das kann eine Prüfziffer nicht sagen. Das kann nur ein Register, und nur manche Länder veröffentlichen eines.
+3. **Welches Institut, und welcher BIC?** Das neue ERP-System will in der Regel den BIC im Datensatz, und zwar den, den das Register veröffentlicht, nicht eine Vermutung.
+4. **Erreicht ein Zahlungslauf es?** SEPA-Mitgliedschaft und Verfahren, damit ein per Lastschrift oder Echtzeitüberweisung bezahlter Lieferant nicht Wochen später scheitert.
+
+Die Antwort des Batch-Endpunkts beantwortet alle vier Fragen pro IBAN, in Feldern, die sich direkt auf Spalten abbilden lassen. Hier der Teil eines Ergebnisses, der für einen deutschen Lieferanten zählt, gekürzt:
+
+```json
+{
+  "iban": "DE89370400440532013000",
+  "valid": true,
+  "bic": { "code": "COBADEFFXXX", "bank_name": "Commerzbank", "city": "Köln" },
+  "sepa": { "member": true, "schemes": ["SCT", "SDD", "SCT_INST"], "vop_required": true },
+  "bank_code_check": {
+    "value": "37040044",
+    "status": "verified",
+    "authoritative": true,
+    "register": "Deutsche Bundesbank Bankleitzahlendatei",
+    "as_of": "2026-08"
+  }
+}
+```
+
+`valid` beantwortet die erste Frage. `bank_code_check` beantwortet die zweite, und `authoritative` sagt, ob die Antwort aus dem eigenen Register des Landes stammt (heute Deutschland, Österreich, Belgien, Bulgarien, die Schweiz und Liechtenstein) oder aus einer zusammengesetzten Karte, die aus BIC-Verzeichnissen zusammengestellt ist, wo ein Fehltreffer nichts beweist. `bic` beantwortet die dritte. `sepa` beantwortet die vierte.
+
+## Die Triage, in drei Kategorien
+
+Die Liste in Stapeln von 100 durchlaufen lassen und danach jede Zeile in eine von drei Kategorien einordnen.
+
+**Zurückschreiben.** `valid: true`, `bank_code_check.status: "verified"`, ein vorhandener `bic.code`. BIC und Bankname in den Datensatz kopieren und weiter. Das ist der Grossteil der Datei.
+
+**Ersetzen.** `valid: true`, aber `bank_code_check.retired: true`. Die Bankleitzahl war zugeteilt, das Institut hat existiert, und das Register markiert sie jetzt zur Löschung, meist nach einer Fusion. Eine reine Formatprüfung wird das nie erkennen. Das deutsche Register nennt den Nachfolger in `superseded_by`, wenn es einen gibt, sodass der Ersatz oft eine Abfrage ist und kein Telefonanruf. Details im [BLZ-Check](/de/docs/blz-check).
+
+**Lieferant fragen.** `valid: false`, oder `status: "not_in_register"` zusammen mit `authoritative: true`. Ersteres ist ein Tippfehler oder ein abgeschnittener Import. Zweiteres bedeutet, dass die acht Ziffern in der IBAN niemandem zugeteilt sind, ein starker Grund, nicht zu zahlen, und eine klare Rückfrage an den Lieferanten. Steht `authoritative` auf `false`, ist der Fehltreffer eine Tatsache über unsere Abdeckung und nicht über die Bank, also geht diese Zeile mit einem Vermerk in die erste Kategorie und nicht in diese.
+
+## Der Code
+
+Sechzig Zeilen Python reichen dafür. Der Batch-Endpunkt nimmt bis zu 100 IBANs pro Aufruf entgegen und beantwortet jede unabhängig, sodass eine fehlerhafte Zeile nie die anderen zum Scheitern bringt.
+
+```python
+import csv
+import requests
+
+API = "https://api.ibanforge.com/v1/iban/batch"
+KEY = "ifk_..."  # your key
+
+def chunks(rows, size=100):
+    for i in range(0, len(rows), size):
+        yield rows[i:i + size]
+
+with open("vendors.csv", newline="") as f:
+    vendors = [r for r in csv.DictReader(f) if r.get("iban")]
+
+triage = {"write_back": [], "replace": [], "ask": []}
+
+for batch in chunks(vendors):
+    r = requests.post(
+        API,
+        headers={"Authorization": f"Bearer {KEY}"},
+        json={"ibans": [v["iban"] for v in batch]},
+        timeout=30,
+    )
+    r.raise_for_status()
+    for vendor, result in zip(batch, r.json()["results"]):
+        check = result.get("bank_code_check") or {}
+        bic = result.get("bic") or {}
+        if not result["valid"]:
+            triage["ask"].append((vendor, "invalid IBAN"))
+        elif check.get("status") == "not_in_register" and check.get("authoritative"):
+            triage["ask"].append((vendor, "bank code not allocated"))
+        elif check.get("retired"):
+            triage["replace"].append((vendor, check.get("superseded_by")))
+        else:
+            vendor["bic"] = bic.get("code")
+            vendor["bank_name"] = bic.get("bank_name")
+            triage["write_back"].append(vendor)
+
+for pile, rows in triage.items():
+    print(pile, len(rows))
+```
+
+Zum `zip`: Die Ergebnisse kommen in der Reihenfolge zurück, in der die IBANs gesendet wurden, was den Join trivial macht.
+
+## Was es kostet
+
+Ein Stapel belastet einen Credit pro IBAN auf einem API-Schlüssel, dieselbe Regel wie die 200 Anfragen im Monat der kostenlosen Stufe. Eine erste Stichprobe von 200 Lieferanten kostet deshalb nichts. Für die ganze Datei kostet ein Paket von 5 000 Credits 20 $ und deckt einen Lieferantenstamm von fünftausend Zeilen ab; die Pakete verfallen nicht, sodass das, was nach der Migration übrig bleibt, auf dem Schlüssel bleibt, für die nächste Gesellschaft oder das nächste System. Bezahlung pro Aufruf in USDC funktioniert ebenfalls, zu 0,002 $ pro IBAN im Stapel.
+
+## Wo das Rezept aufhören muss
+
+Eine IBAN-Prüfung identifiziert das Institut hinter einer Kontonummer. Sie bestätigt nicht, dass das Konto existiert, offen ist oder dem Lieferanten gehört, dessen Name im Datensatz steht. Daraus folgen zwei Dinge.
+
+Erstens ist die Kategorie „Lieferant fragen" kein Versagen des Werkzeugs, sondern der Punkt, an dem eine menschliche Bestätigung der einzig ehrliche nächste Schritt ist. Zweitens hat die Frage, ob der Name zum Konto passt, im Euroraum einen eigenen Mechanismus, die Verification of Payee (VoP), und der gehört zur Zahlung, nicht zum Import. Die Antwort sagt das selbst: Wann immer ein Ergebnis diese Lücke offenlässt, benennt `next_steps` sie.
+
+Und ein deutsches Detail, das man vor dem ersten Durchlauf kennen sollte: Das Bundesbank-Register führt keine Strassenspalte, daher ist `institution.street` bei jeder deutschen Bank `null`. Das ist eine Tatsache über das Register, keine Lücke im Lookup, und wir liefern lieber ein ehrliches `null` als eine Adresse, die das Register nie veröffentlicht hat.
+
+Wer die Felder an einem einzelnen Lieferanten sehen will, bevor er Code schreibt, findet im [Playground](/de/playground) denselben Aufruf für eine einzelne IBAN.

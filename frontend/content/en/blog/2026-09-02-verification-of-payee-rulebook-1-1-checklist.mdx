@@ -1,0 +1,54 @@
+---
+title: "Verification of Payee, rulebook version 1.1: the 20 September 2026 checklist"
+description: "Verification of Payee has been mandatory for euro-area payment service providers since 9 October 2025, and version 1.1 of the EPC scheme rulebook takes effect on 20 September 2026. What an IBAN check does before the name match, what it cannot do, and the data work worth finishing before the date."
+date: "2026-09-02"
+---
+
+Two dates frame this post. Since **9 October 2025**, Verification of Payee (VoP) has been mandatory for payment service providers in euro-area Member States under Regulation (EU) 2024/886. On **20 September 2026**, the changes in version 1.1 of the European Payments Council's VoP scheme rulebook take effect. PSPs in EEA Member States outside the euro area have until 9 July 2027.
+
+We published a [general guide to VoP](/en/blog/2026-05-22-verification-of-payee-guide) in May. This one is narrower: it is the checklist of what an IBAN check can settle before the name match runs, so that the match itself has clean input.
+
+## What VoP is, in one paragraph
+
+Before a SEPA credit transfer is sent, the payer's bank asks the payee's bank whether the name the payer typed matches the holder of the IBAN. The answer is a match, a close match, no match, or "check not possible", and the payer decides with that in hand. The scheme exists to cut misdirected payments and authorised push payment fraud. It runs between banks, at payment time, on the account holder's name.
+
+## What an IBAN check is not
+
+An IBAN check identifies the institution behind an account number. It does not see the account, its holder or its status, so it cannot perform, replace or approximate the name match. Any product that suggests otherwise is describing something else. Our response says this about itself: whenever a result leaves the account question open, `next_steps` names the gap in plain words.
+
+What the check can do is make sure the transfer that reaches VoP is one worth verifying: a real IBAN, an allocated bank code, a reachable institution, and a clear view of whether VoP applies at all.
+
+## The checklist
+
+**1. Structure, once.** Every IBAN in the beneficiary file passes the checksum and the country format. Trivial, and the place where typos and truncated imports die before they cost a VoP round trip.
+
+**2. Allocation, where a register exists.** In Germany, Austria, Belgium, Bulgaria, Switzerland and Liechtenstein the bank code inside the IBAN is checked against the country's own register, and `bank_code_check.authoritative: true` says so. A code the register does not know belongs to nobody, and no name match will ever run on it. Elsewhere the same field is `false` and an absence proves nothing, which the response states rather than hides.
+
+**3. Reachability, per beneficiary bank.** Two fields in `sepa` carry what matters here:
+
+```json
+"sepa": {
+  "member": true,
+  "schemes": ["SCT", "SDD", "SCT_INST"],
+  "vop_required": true,
+  "vop_participant": true
+}
+```
+
+`vop_required` says whether the regulation mandates VoP for this IBAN's country. `vop_participant` says whether the resolved institution is listed as ready in the EPC's VoP scheme register, and it is `null` when no institution could be resolved, because a guess here would be worse than a gap. A beneficiary bank that is required but not listed is the row to look at before the date, not after.
+
+**4. Retired bank codes, replaced.** A code the register marks for deletion still validates. Germany publishes the successor in `superseded_by`; details on the [BLZ check](/en/docs/blz-check). Beneficiary details built on a retired code are the ones most likely to produce a "check not possible" for reasons that have nothing to do with the name.
+
+**5. Issuer type, known.** An IBAN issued by an electronic money institution or a neobank is not a bank account in the traditional sense, and payout and compliance teams treat it differently. `issuer.type` says which it is, and the classification is curated for the institutions we know rather than inferred.
+
+**6. The outcome, logged.** Whatever the VoP answer, keep the IBAN check next to it. A "no match" on an IBAN whose bank code was allocated and whose institution is VoP-ready is a different signal from a "no match" on an IBAN nobody could have verified.
+
+## At scale, one endpoint
+
+For a beneficiary file rather than a single transfer, the [batch endpoint](/en/docs/iban-batch) takes up to 100 IBANs per call and answers each independently, and the [compliance endpoint](/en/docs/compliance) folds SEPA and VoP reachability into a single 0 to 100 risk score with bank-level sanctions screening on the BIC. Both are pre-flight triage, not a decision, and neither touches the account holder.
+
+## Where we stop
+
+Our sanctions screening is bank-level, on the BIC8, never name-level. Our register checks are authoritative in a handful of countries and a composite map elsewhere. And VoP itself is the banks' mechanism, run at payment time: what we offer is the data work that makes it worth running.
+
+*This post is general information about the EU Instant Payments Regulation and the European Payments Council's Verification of Payee scheme, not legal advice. Confirm obligations and dates against [Regulation (EU) 2024/886](https://eur-lex.europa.eu/eli/reg/2024/886/oj/eng) and the [European Payments Council](https://www.europeanpaymentscouncil.eu/what-we-do/other-schemes/verification-payee) publications. Reviewed 2 September 2026.*
