@@ -6,7 +6,7 @@ date: "2026-09-02"
 
 Eine deutsche IBAN hat zweiundzwanzig Zeichen, acht davon sind die Bankleitzahl, der Bankcode, der sagt, welches Institut das Konto führt. Anders als die meisten Länder veröffentlicht Deutschland das Register, das diese Codes zuteilt: die Bankleitzahlendatei der Deutschen Bundesbank, monatlich aktualisiert, mit dem Institut hinter jedem Code und dem dazugehörigen BIC.
 
-Dieses Register ist es, das eine deutsche IBAN-Prüfung von einer blossen Prüfziffer unterscheidet. Dieser Beitrag geht Feld für Feld durch, was es beantwortet, in der Form, in der unsere API sie ausliefert.
+Dieses Register ist es, das eine deutsche IBAN-Prüfung von einer blossen Prüfziffer unterscheidet. Dieser Beitrag geht Feld für Feld durch, was es beantwortet, in der Form, in der unsere API die Antworten ausliefert.
 
 ## Bei der Prüfziffer sind sich alle Produkte einig
 
@@ -54,13 +54,13 @@ Bankleitzahlen enden. Nach einer Fusion wird die BLZ des übernommenen Instituts
 }
 ```
 
-`retired: true` ist eine Warnung, keine Ablehnung: Die Bankleitzahl war zugeteilt, also bleibt der status auf `verified`, aber `authoritative` fällt auf `false`, weil das Register selbst nicht mehr dafür einsteht. `superseded_by` nennt den Nachfolgecode, wenn das Register einen angibt. Zahlungsempfängerdaten, die auf einer stillgelegten Bankleitzahl aufbauen, haben ein Haltbarkeitsdatum, und dieses Feld sagt, wie lange.
+`retired: true` ist eine Warnung, keine Ablehnung: Die Bankleitzahl war zugeteilt, also bleibt der Status auf `verified`, aber `authoritative` fällt auf `false`, weil das Register selbst nicht mehr dafür einsteht. `superseded_by` nennt den Nachfolgecode, wenn das Register einen angibt. Zahlungsempfängerdaten, die auf einer stillgelegten Bankleitzahl aufbauen, haben ein Haltbarkeitsdatum, und dieses Feld sagt, wie lange.
 
 ## Was `not_in_register` für Deutschland bedeutet
 
-Weil die Bundesbank die Stelle ist, die deutsche Bankleitzahlen zuteilt, ist ein Fehltreffer hier eine Tatsache über Deutschland und nicht über unsere Abdeckung: Die acht Ziffern gehören niemandem. `status: "not_in_register"` neben `authoritative: true` ist deshalb ein starker Grund, eine Zahlung zu stoppen, bevor sie hinausgeht. Die IBAN wird daneben trotzdem `valid: true` melden. Struktur und Zuteilung sind zwei verschiedene Fragen, und nur die zweite braucht ein Register.
+Weil die Bundesbank die Stelle ist, die deutsche Bankleitzahlen zuteilt, ist ein Fehltreffer eine Tatsache über Deutschland und nicht über unsere Abdeckung: Die acht Ziffern gehören niemandem. `status: "not_in_register"` neben `authoritative: true` ist deshalb ein starker Grund, eine Zahlung zu stoppen, bevor sie hinausgeht. Die IBAN wird daneben trotzdem `valid: true` melden. Struktur und Zuteilung sind zwei verschiedene Fragen, und nur die zweite braucht ein Register.
 
-Die Antwort zieht den Schluss für Sie gleich selbst, in `next_steps`, mit denselben einfachen Worten, die auch ein menschlicher Prüfer verwenden würde:
+Die Antwort zieht für Sie den Schluss in `next_steps`, mit denselben einfachen Worten, die auch ein Prüfer verwenden würde:
 
 ```json
 "next_steps": [{
@@ -86,4 +86,4 @@ curl -X POST https://api.ibanforge.com/v1/iban/validate \
   -d '{"iban":"DE89370400440532013000"}'
 ```
 
-Ein kostenloser Schlüssel deckt 200 Aufrufe im Monat ab, genug, um an einer Stichprobe jedes Feld zu lesen, bevor irgendetwas entschieden wird. Die vollständige Feldreferenz steht unter [was „verified" bedeutet](/de/docs/iban-validate), die deutschen Besonderheiten im [BLZ-Check](/de/docs/blz-check); das österreichische Register, das durchaus eine LEI führt, hat [eine eigene Seite](/de/docs/at-bank-codes).
+Ein kostenloser Schlüssel deckt 200 Aufrufe im Monat ab, genug, um an einer Stichprobe jedes Feld zu lesen, bevor irgendetwas entschieden wird. Die vollständige Feldreferenz steht unter [was „verified“ bedeutet](/de/docs/iban-validate), die deutschen Besonderheiten im [BLZ-Check](/de/docs/blz-check); das österreichische Register, das durchaus eine LEI führt, hat [eine eigene Seite](/de/docs/at-bank-codes).

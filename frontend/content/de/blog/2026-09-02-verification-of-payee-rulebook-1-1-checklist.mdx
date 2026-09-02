@@ -10,7 +10,7 @@ Im Mai haben wir einen [allgemeinen Leitfaden zu VoP](/de/blog/2026-05-22-verifi
 
 ## Was VoP ist, in einem Absatz
 
-Bevor eine SEPA-Überweisung gesendet wird, fragt die Bank des Zahlers bei der Bank des Zahlungsempfängers an, ob der vom Zahler eingegebene Name mit dem Inhaber der IBAN übereinstimmt. Die Antwort lautet Treffer, naher Treffer, kein Treffer oder „Prüfung nicht möglich", und der Zahler entscheidet mit diesem Ergebnis in der Hand. Das Verfahren existiert, um Fehlüberweisungen und autorisierten Push-Payment-Betrug zu senken. Es läuft zwischen Banken, zum Zahlungszeitpunkt, anhand des Namens des Kontoinhabers.
+Bevor eine SEPA-Überweisung gesendet wird, fragt die Bank des Zahlers bei der Bank des Zahlungsempfängers an, ob der vom Zahler eingegebene Name mit dem Inhaber der IBAN übereinstimmt. Die Antwort lautet Übereinstimmung, teilweise Übereinstimmung, keine Übereinstimmung oder „Prüfung nicht möglich“, und der Zahler entscheidet mit diesem Ergebnis in der Hand. Das Verfahren existiert, um Fehlüberweisungen und autorisierten Push-Payment-Betrug zu senken. Es läuft zwischen Banken, zum Zahlungszeitpunkt, anhand des Namens des Kontoinhabers.
 
 ## Was eine IBAN-Prüfung nicht ist
 
@@ -37,11 +37,11 @@ Was die Prüfung leisten kann, ist sicherzustellen, dass die Überweisung, die b
 
 `vop_required` sagt, ob die Verordnung VoP für das Land dieser IBAN vorschreibt. `vop_participant` sagt, ob das ermittelte Institut im VoP-Register des EPC als bereit gelistet ist, und das Feld steht auf `null`, wenn sich kein Institut ermitteln liess, weil eine Vermutung hier schlimmer wäre als eine Lücke. Eine Bank des Zahlungsempfängers, die verpflichtet, aber nicht gelistet ist, ist die Zeile, die man sich vor dem Stichtag ansieht, nicht danach.
 
-**4. Stillgelegte Bankleitzahlen, ersetzt.** Ein Code, den das Register zur Löschung markiert, validiert weiterhin. Deutschland veröffentlicht den Nachfolger in `superseded_by`; Details im [BLZ-Check](/de/docs/blz-check). Zahlungsempfängerdaten, die auf einer stillgelegten Bankleitzahl aufbauen, produzieren am ehesten ein „Prüfung nicht möglich" aus Gründen, die nichts mit dem Namen zu tun haben.
+**4. Stillgelegte Bankleitzahlen, ersetzt.** Ein Code, den das Register zur Löschung markiert, validiert weiterhin. Deutschland veröffentlicht den Nachfolger in `superseded_by`; Details im [BLZ-Check](/de/docs/blz-check). Zahlungsempfängerdaten, die auf einer stillgelegten Bankleitzahl aufbauen, produzieren am ehesten ein „Prüfung nicht möglich“ aus Gründen, die nichts mit dem Namen zu tun haben.
 
 **5. Emittententyp, bekannt.** Eine IBAN, die von einem E-Geld-Institut oder einer Neobank ausgegeben wird, ist kein Bankkonto im klassischen Sinn, und Auszahlungs- und Compliance-Teams behandeln sie unterschiedlich. `issuer.type` sagt, um welchen Typ es sich handelt, und die Einordnung ist für die uns bekannten Institute kuratiert und nicht abgeleitet.
 
-**6. Das Ergebnis, protokolliert.** Was auch immer die VoP-Antwort ist, die IBAN-Prüfung sollte daneben aufbewahrt werden. Ein „kein Treffer" bei einer IBAN, deren Bankleitzahl zugeteilt und deren Institut VoP-bereit war, ist ein anderes Signal als ein „kein Treffer" bei einer IBAN, die niemand hätte verifizieren können.
+**6. Das Ergebnis, protokolliert.** Was auch immer die VoP-Antwort ist, die IBAN-Prüfung sollte daneben aufbewahrt werden. Eine Antwort „keine Übereinstimmung“ bei einer IBAN, deren Bankleitzahl zugeteilt und deren Institut VoP-bereit war, ist ein anderes Signal als eine Antwort „keine Übereinstimmung“ bei einer IBAN, die niemand hätte verifizieren können.
 
 ## Bei grossem Volumen, ein Endpunkt
 
@@ -51,4 +51,4 @@ Für eine Zahlungsempfängerdatei statt einer einzelnen Überweisung nimmt der [
 
 Unsere Sanktionsprüfung erfolgt auf Bankebene, über den BIC8, nie auf Namensebene. Unsere Registerprüfungen sind in einer Handvoll Länder massgeblich und anderswo eine zusammengesetzte Karte. Und VoP selbst ist der Mechanismus der Banken, ausgeführt zum Zahlungszeitpunkt: Was wir liefern, ist die Datenarbeit, die diesen Lauf erst lohnenswert macht.
 
-*Dieser Beitrag ist eine allgemeine Information über die EU-Verordnung über Echtzeitzahlungen und das Verification-of-Payee-Verfahren des European Payments Council, keine Rechtsberatung. Pflichten und Daten bitte anhand der [Verordnung (EU) 2024/886](https://eur-lex.europa.eu/eli/reg/2024/886/oj/eng) und der Veröffentlichungen des [European Payments Council](https://www.europeanpaymentscouncil.eu/what-we-do/other-schemes/verification-payee) prüfen. Geprüft am 2. September 2026.*
+*Dieser Beitrag ist eine allgemeine Information über die EU-Verordnung über Echtzeitüberweisungen und das Verification-of-Payee-Verfahren des European Payments Council, keine Rechtsberatung. Pflichten und Daten bitte anhand der [Verordnung (EU) 2024/886](https://eur-lex.europa.eu/eli/reg/2024/886/oj/eng) und der Veröffentlichungen des [European Payments Council](https://www.europeanpaymentscouncil.eu/what-we-do/other-schemes/verification-payee) prüfen. Geprüft am 2. September 2026.*

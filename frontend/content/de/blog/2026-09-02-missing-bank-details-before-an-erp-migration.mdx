@@ -8,14 +8,14 @@ Die häufigste IBAN-Aufgabe, die wir sehen, ist keine Zahlung. Es ist eine Migra
 
 Dieser Beitrag ist das Rezept, dem wir folgen würden. Er nutzt den [Batch-Endpunkt](/de/docs/iban-batch), weil die Arbeitseinheit eine Liste ist und keine Zahlung, und er hört dort auf, wo eine API aufhören muss: beim Konto selbst.
 
-## Was „vollständig" für einen Datensatz im Lieferantenstamm bedeutet
+## Was „vollständig“ für einen Datensatz im Lieferantenstamm bedeutet
 
 Ein Datensatz lohnt den Import, wenn vier Fragen eine Antwort haben:
 
 1. **Ist die IBAN strukturell gültig?** Prüfziffer und Länderformat. Günstig, und darüber ist sich jedes Produkt am Markt einig.
 2. **Ist die enthaltene Bankleitzahl einem Institut zugeteilt?** Das kann eine Prüfziffer nicht sagen. Das kann nur ein Register, und nur manche Länder veröffentlichen eines.
 3. **Welches Institut, und welcher BIC?** Das neue ERP-System will in der Regel den BIC im Datensatz, und zwar den, den das Register veröffentlicht, nicht eine Vermutung.
-4. **Erreicht ein Zahlungslauf es?** SEPA-Mitgliedschaft und Verfahren, damit ein per Lastschrift oder Echtzeitüberweisung bezahlter Lieferant nicht Wochen später scheitert.
+4. **Ist das Konto für einen Zahlungslauf erreichbar?** SEPA-Mitgliedschaft und Verfahren, damit ein per Lastschrift oder Echtzeitüberweisung bezahlter Lieferant nicht Wochen später scheitert.
 
 Die Antwort des Batch-Endpunkts beantwortet alle vier Fragen pro IBAN, in Feldern, die sich direkt auf Spalten abbilden lassen. Hier der Teil eines Ergebnisses, der für einen deutschen Lieferanten zählt, gekürzt:
 
@@ -45,7 +45,7 @@ Die Liste in Stapeln von 100 durchlaufen lassen und danach jede Zeile in eine vo
 
 **Ersetzen.** `valid: true`, aber `bank_code_check.retired: true`. Die Bankleitzahl war zugeteilt, das Institut hat existiert, und das Register markiert sie jetzt zur Löschung, meist nach einer Fusion. Eine reine Formatprüfung wird das nie erkennen. Das deutsche Register nennt den Nachfolger in `superseded_by`, wenn es einen gibt, sodass der Ersatz oft eine Abfrage ist und kein Telefonanruf. Details im [BLZ-Check](/de/docs/blz-check).
 
-**Lieferant fragen.** `valid: false`, oder `status: "not_in_register"` zusammen mit `authoritative: true`. Ersteres ist ein Tippfehler oder ein abgeschnittener Import. Zweiteres bedeutet, dass die acht Ziffern in der IBAN niemandem zugeteilt sind, ein starker Grund, nicht zu zahlen, und eine klare Rückfrage an den Lieferanten. Steht `authoritative` auf `false`, ist der Fehltreffer eine Tatsache über unsere Abdeckung und nicht über die Bank, also geht diese Zeile mit einem Vermerk in die erste Kategorie und nicht in diese.
+**Lieferant fragen.** `valid: false`, oder `status: "not_in_register"` zusammen mit `authoritative: true`. Ersteres ist ein Tippfehler oder ein abgeschnittener Import. Letzteres bedeutet, dass die acht Ziffern in der IBAN niemandem zugeteilt sind, ein starker Grund, nicht zu zahlen, und eine klare Rückfrage an den Lieferanten. Steht `authoritative` auf `false`, ist der Fehltreffer eine Tatsache über unsere Abdeckung und nicht über die Bank, also geht diese Zeile mit einem Vermerk in die erste Kategorie und nicht in diese.
 
 ## Der Code
 
@@ -103,7 +103,7 @@ Ein Stapel belastet einen Credit pro IBAN auf einem API-Schlüssel, dieselbe Reg
 
 Eine IBAN-Prüfung identifiziert das Institut hinter einer Kontonummer. Sie bestätigt nicht, dass das Konto existiert, offen ist oder dem Lieferanten gehört, dessen Name im Datensatz steht. Daraus folgen zwei Dinge.
 
-Erstens ist die Kategorie „Lieferant fragen" kein Versagen des Werkzeugs, sondern der Punkt, an dem eine menschliche Bestätigung der einzig ehrliche nächste Schritt ist. Zweitens hat die Frage, ob der Name zum Konto passt, im Euroraum einen eigenen Mechanismus, die Verification of Payee (VoP), und der gehört zur Zahlung, nicht zum Import. Die Antwort sagt das selbst: Wann immer ein Ergebnis diese Lücke offenlässt, benennt `next_steps` sie.
+Erstens ist die Kategorie „Lieferant fragen“ kein Versagen des Werkzeugs, sondern der Punkt, an dem eine menschliche Bestätigung der einzig ehrliche nächste Schritt ist. Zweitens hat die Frage, ob der Name zum Konto passt, im Euroraum einen eigenen Mechanismus, die Verification of Payee (VoP), und der gehört zur Zahlung, nicht zum Import. Die Antwort sagt das selbst: Wann immer ein Ergebnis diese Lücke offenlässt, benennt `next_steps` sie.
 
 Und ein deutsches Detail, das man vor dem ersten Durchlauf kennen sollte: Das Bundesbank-Register führt keine Strassenspalte, daher ist `institution.street` bei jeder deutschen Bank `null`. Das ist eine Tatsache über das Register, keine Lücke im Lookup, und wir liefern lieber ein ehrliches `null` als eine Adresse, die das Register nie veröffentlicht hat.
 
