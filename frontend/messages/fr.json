@@ -1716,7 +1716,7 @@
       "rows": [
         [
           "Alpha Menuiserie SA",
-          "CH10 0023 ... 2345",
+          "CH10 0023 … 2345",
           "OK",
           "",
           "UBS Switzerland AG",
@@ -1725,7 +1725,7 @@
         ],
         [
           "Gamma Transports",
-          "CH10 0023 ... 2346",
+          "CH10 0023 … 2346",
           "Ne pas payer",
           "IBAN invalide",
           "",
@@ -1734,7 +1734,7 @@
         ],
         [
           "Delta Consulting",
-          "CH93 0076 ... 2957",
+          "CH93 0076 … 2957",
           "Ne pas payer",
           "Code banque absent du registre national",
           "",
@@ -1743,7 +1743,7 @@
         ],
         [
           "Beta Elektro GmbH",
-          "DE89 3704 ... 3000",
+          "DE89 3704 … 3000",
           "OK",
           "",
           "Commerzbank AG",

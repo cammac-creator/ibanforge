@@ -13,13 +13,13 @@ export async function AuditWorkbookPreview({ locale }: { locale: string }) {
       <h2 className="font-semibold">{t("workbook.title")}</h2>
       <p className="text-sm text-muted-foreground leading-relaxed max-w-prose">{t("workbook.text")}</p>
       <div className="rounded-lg border overflow-x-auto bg-background">
-        <table className="w-full text-xs sm:text-sm border-collapse">
+        <table className="w-full text-[11px] sm:text-xs border-collapse">
           <thead>
             <tr className="bg-muted/50">
               {cols.map((c, i) => (
                 <th
                   key={c}
-                  className={`px-3 py-2 text-left font-medium whitespace-nowrap ${i >= 2 ? "border-l border-amber-500/40 bg-amber-500/5" : ""}`}
+                  className={`px-2 py-1.5 text-left font-medium align-top ${i >= 2 ? "border-l border-amber-500/40 bg-amber-500/5" : ""}`}
                 >
                   {c}
                 </th>
@@ -32,7 +32,7 @@ export async function AuditWorkbookPreview({ locale }: { locale: string }) {
                 {r.map((cell, ci) => (
                   <td
                     key={ci}
-                    className={`px-3 py-2 whitespace-nowrap ${ci >= 2 ? "border-l border-amber-500/40 bg-amber-500/5" : ""} ${ci === 1 ? "font-mono" : ""} ${
+                    className={`px-2 py-1.5 align-top ${ci === 1 ? "font-mono whitespace-nowrap" : ""} ${ci >= 2 ? "border-l border-amber-500/40 bg-amber-500/5" : ""} ${
                       ci === 2 ? (cell === errorWord ? "font-medium text-red-700 dark:text-red-400" : "font-medium text-emerald-700 dark:text-emerald-400") : ""
                     }`}
                   >
