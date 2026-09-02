@@ -33,6 +33,7 @@ import { health } from './routes/health.js';
 import { stats } from './routes/stats.js';
 import { adminBusiness } from './routes/admin-business.js';
 import { adminRevenue } from './routes/admin-revenue.js';
+import { adminSignupSources } from './routes/admin-signup-sources.js';
 import { adminScanners } from './routes/admin-scanners.js';
 import demandGaps from './routes/demand-gaps.js';
 import { adminForums } from './routes/admin-forums.js';
@@ -779,6 +780,7 @@ export function buildApp(): Hono<HonoEnv> {
   app.route('/', health);
   app.route('/', stats);
   app.route('/', adminRevenue);
+  app.route('/', adminSignupSources);
   app.route('/', adminBusiness);
   app.route('/', adminScanners);
   app.route('/', adminForums);

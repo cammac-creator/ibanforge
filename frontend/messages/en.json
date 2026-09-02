@@ -595,7 +595,18 @@
         "signupsEmpty": "No signup in the last week.",
         "called": "has called",
         "notCalled": "has not called yet",
-        "signedUp": "signed up {days} d ago"
+        "signedUp": "signed up {days} d ago",
+        "sources": {
+          "title": "Where the last {days} days' signups came from",
+          "empty": "No signup with a known origin yet.",
+          "direct": "Direct (no referrer)",
+          "api": "No browser (curl, SDK, agent)",
+          "kindCampaign": "campaign",
+          "kindTag": "our link",
+          "kindReferrer": "referrer",
+          "landings": "Landing pages",
+          "since": "Measured since {date}; keys created before that carry no origin."
+        }
       },
       "details": {
         "title": "The {days}-day detail",
@@ -1020,6 +1031,22 @@
       "verificationUnavailable": "We could not send the verification mail right now. Try again in a few minutes, or write to support@ibanforge.com.",
       "keyCreationLimit": "This network has reached its daily limit of free keys. Keys you already hold keep working. Prepaid credits are instant, and x402 pay-per-call needs no key at all.",
       "rateLimited": "A key was already issued to this address today. Try again tomorrow, or use prepaid credits, which are instant."
+    },
+    "firstCall": {
+      "title": "Run your first call now",
+      "hint": "One real call with your new key, on a sample Swiss IBAN. It uses 1 of your {limit} monthly calls.",
+      "run": "Run this call",
+      "running": "Calling the API…",
+      "done": "Answered in {ms} ms",
+      "valid": "Valid IBAN",
+      "invalid": "Invalid IBAN",
+      "quota": "{used} of {limit} calls used this month",
+      "showJson": "Show the full response",
+      "snippets": "Now in your code",
+      "copy": "Copy",
+      "copied": "Copied",
+      "error": "The call failed: {message}",
+      "again": "Run it again"
     }
   },
   "agents": {

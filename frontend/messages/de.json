@@ -595,7 +595,18 @@
         "signupsEmpty": "Keine Anmeldung seit einer Woche.",
         "called": "hat aufgerufen",
         "notCalled": "noch nicht aufgerufen",
-        "signedUp": "angemeldet vor {days} T"
+        "signedUp": "angemeldet vor {days} T",
+        "sources": {
+          "title": "Woher die Anmeldungen der letzten {days} Tage kamen",
+          "empty": "Noch keine Anmeldung mit bekannter Herkunft.",
+          "direct": "Direkt (ohne Referrer)",
+          "api": "Ohne Browser (curl, SDK, Agent)",
+          "kindCampaign": "Kampagne",
+          "kindTag": "unser Link",
+          "kindReferrer": "Referrer",
+          "landings": "Einstiegsseiten",
+          "since": "Gemessen seit {date}; früher erstellte Schlüssel tragen keine Herkunft."
+        }
       },
       "details": {
         "title": "Das Detail über {days} Tage",
@@ -1020,6 +1031,22 @@
       "verificationUnavailable": "Die Bestätigungsmail konnte gerade nicht versandt werden. Versuchen Sie es in einigen Minuten erneut, oder schreiben Sie an support@ibanforge.com.",
       "keyCreationLimit": "Dieses Netzwerk hat sein Tageslimit an kostenlosen Schlüsseln erreicht. Bereits ausgestellte Schlüssel funktionieren weiter. Prepaid-Guthaben ist sofort verfügbar, und x402 Pay-per-Call braucht überhaupt keinen Schlüssel.",
       "rateLimited": "Für diese Adresse wurde heute bereits ein Schlüssel ausgestellt. Versuchen Sie es morgen erneut, oder nutzen Sie Prepaid-Guthaben, das sofort verfügbar ist."
+    },
+    "firstCall": {
+      "title": "Jetzt den ersten Aufruf starten",
+      "hint": "Ein echter Aufruf mit Ihrem neuen Schlüssel, an einer Schweizer Beispiel-IBAN. Er verbraucht 1 Ihrer {limit} monatlichen Aufrufe.",
+      "run": "Diesen Aufruf starten",
+      "running": "API wird aufgerufen…",
+      "done": "Antwort in {ms} ms",
+      "valid": "Gültige IBAN",
+      "invalid": "Ungültige IBAN",
+      "quota": "{used} von {limit} Aufrufen in diesem Monat",
+      "showJson": "Vollständige Antwort anzeigen",
+      "snippets": "Derselbe Aufruf in Ihrem Code",
+      "copy": "Kopieren",
+      "copied": "Kopiert",
+      "error": "Der Aufruf ist fehlgeschlagen: {message}",
+      "again": "Erneut starten"
     }
   },
   "agents": {

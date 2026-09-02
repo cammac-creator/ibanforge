@@ -595,7 +595,18 @@
         "signupsEmpty": "Aucune inscription depuis une semaine.",
         "called": "a appelé",
         "notCalled": "pas encore appelé",
-        "signedUp": "inscrit il y a {days} j"
+        "signedUp": "inscrit il y a {days} j",
+        "sources": {
+          "title": "D'où viennent les inscrits des {days} derniers jours",
+          "empty": "Aucune inscription avec une provenance connue pour l'instant.",
+          "direct": "Direct (sans référent)",
+          "api": "Sans navigateur (curl, SDK, agent)",
+          "kindCampaign": "campagne",
+          "kindTag": "notre lien",
+          "kindReferrer": "référent",
+          "landings": "Pages d'arrivée",
+          "since": "Mesuré depuis le {date} ; les clés antérieures n'ont pas de provenance."
+        }
       },
       "details": {
         "title": "Le détail {days} jours",
@@ -1020,6 +1031,22 @@
       "verificationUnavailable": "Le mail de vérification n'a pas pu partir. Réessayez dans quelques minutes, ou écrivez à support@ibanforge.com.",
       "keyCreationLimit": "Ce réseau a atteint sa limite quotidienne de clés gratuites. Les clés que vous détenez déjà continuent de fonctionner. Les crédits prépayés sont instantanés, et le paiement à l'appel x402 ne demande aucune clé.",
       "rateLimited": "Une clé a déjà été émise pour cette adresse aujourd'hui. Réessayez demain, ou passez par les crédits prépayés, qui sont instantanés."
+    },
+    "firstCall": {
+      "title": "Lancez votre premier appel",
+      "hint": "Un vrai appel avec votre nouvelle clé, sur un IBAN suisse d'exemple. Il consomme 1 de vos {limit} appels mensuels.",
+      "run": "Lancer cet appel",
+      "running": "Appel en cours…",
+      "done": "Réponse en {ms} ms",
+      "valid": "IBAN valide",
+      "invalid": "IBAN invalide",
+      "quota": "{used} appel(s) sur {limit} ce mois",
+      "showJson": "Voir la réponse complète",
+      "snippets": "Le même appel dans votre code",
+      "copy": "Copier",
+      "copied": "Copié",
+      "error": "L'appel a échoué : {message}",
+      "again": "Relancer"
     }
   },
   "agents": {

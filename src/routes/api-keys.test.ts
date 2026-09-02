@@ -645,6 +645,46 @@ describe('POST /v1/keys/generate — per-network creation guard', () => {
     }
   });
 
+  it('records where a browser signup came from, and counts a curl signup as api', async () => {
+    delete process.env.IBANFORGE_ADMIN_TEST_KEYS;
+    const app = makeApp();
+    const ts = Date.now();
+    const tag = `t${ts}`;
+    const browserIp = `198.56.${(ts % 240) + 1}.${(Math.floor(ts / 240) % 240) + 1}`;
+    const curlIp = `198.57.${(ts % 240) + 1}.${(Math.floor(ts / 240) % 240) + 1}`;
+    const first = await app.request('/v1/keys/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': browserIp },
+      body: JSON.stringify({
+        email: `origin-${ts}@alpha-corp.example.net`,
+        source: 'npm',
+        attribution: { landing: '/en/docs/quickstart', referrer: 'Google.com', utm_source: tag, utm_medium: 'Email', junk: 'x' },
+      }),
+    });
+    expect(first.status).toBe(201);
+    expect((await gen(app, `origin-curl-${ts}@alpha-corp.example.net`, curlIp)).status).toBe(201);
+
+    const { signupSources } = await import('../lib/signup-attribution.js');
+    const s = signupSources(1);
+    expect(s.channels.find((c) => c.channel === `utm:${tag}`)?.n).toBe(1);
+    expect(s.campaigns.find((c) => c.utm_source === tag)).toEqual({ utm_source: tag, utm_medium: 'email', utm_campaign: null, n: 1 });
+    expect(s.landings.find((l) => l.path === '/en/docs/quickstart')?.n).toBeGreaterThanOrEqual(1);
+    expect(s.referrers.find((r) => r.host === 'google.com')?.n).toBeGreaterThanOrEqual(1);
+    expect(s.channels.find((c) => c.channel === 'api')?.n).toBeGreaterThanOrEqual(1);
+  });
+
+  it('serves the origins to the admin only', async () => {
+    const { adminSignupSources } = await import('./admin-signup-sources.js');
+    const app = new Hono();
+    app.route('/', adminSignupSources);
+    expect((await app.request('/v1/admin/signup-sources')).status).toBe(401);
+    const ok = await app.request('/v1/admin/signup-sources?days=7', { headers: { 'X-Admin-Secret': 'correct-horse-battery-staple' } });
+    expect(ok.status).toBe(200);
+    const body = (await ok.json()) as { period_days: number; channels: unknown[]; total: number };
+    expect(body.period_days).toBe(7);
+    expect(Array.isArray(body.channels)).toBe(true);
+  });
+
   it('keeps disposable suffixes out at creation — the wave used tempmail.edu.ge', async () => {
     delete process.env.IBANFORGE_ADMIN_TEST_KEYS;
     const app = makeApp();

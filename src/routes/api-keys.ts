@@ -50,6 +50,7 @@ import {
   runActivationPass,
 } from '../lib/activation-nudge-server.js';
 import { getCompanyProfiles, upsertCompanyProfile, type ProfileSource } from '../lib/company-profiles.js';
+import { parseAttribution, recordSignupAttribution } from '../lib/signup-attribution.js';
 import {
   sendApiKeyEmail,
   sendFreeKeyEmail,
@@ -108,9 +109,9 @@ export function isAdminAuthorized(provided: string | undefined): boolean {
 const BLOCKED_EMAIL_DOMAINS = /@(example|test|invalid|localhost|mailinator|tempmail|guerrillamail|10minutemail|throwaway|dispostable|trashmail|fakeinbox|getnada|maildrop|sharklasers|yopmail)\.(com|org|net|io|me|fr|ch|de)$/i;
 
 apiKeys.post('/v1/keys/generate', async (c) => {
-  let body: { email?: unknown; source?: unknown };
+  let body: { email?: unknown; source?: unknown; attribution?: unknown };
   try {
-    body = await c.req.json<{ email?: unknown; source?: unknown }>();
+    body = await c.req.json<{ email?: unknown; source?: unknown; attribution?: unknown }>();
   } catch {
     return c.json({ error: 'invalid_json', message: 'Request body must be valid JSON' }, 400);
   }
@@ -254,6 +255,14 @@ apiKeys.post('/v1/keys/generate', async (c) => {
   }
 
   if (creationSource) recordKeyCreation(creationSource, c.req.header('user-agent') ?? null, result.key_prefix);
+
+  // Where this signup came from: the landing page, the referring site and the
+  // campaign labels the dialog captured on arrival. Telemetry, never a gate.
+  try {
+    recordSignupAttribution(result.key_prefix, source, parseAttribution(body.attribution));
+  } catch {
+    // The stats database refusing a write must not cost anyone their key.
+  }
 
   // Deliver the key to the mailbox too, with the command that proves it works.
   //

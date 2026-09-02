@@ -548,6 +548,23 @@ function openStatsDB(): DatabaseType.Database {
       );
       CREATE INDEX IF NOT EXISTS idx_verification_sends_ip ON verification_sends(ip_hash, created_at);
       CREATE INDEX IF NOT EXISTS idx_verification_sends_email ON verification_sends(email_hash, created_at);
+      -- Where each signup came from (src/lib/signup-attribution.ts): the campaign
+      -- tag our links carry, whether a browser was involved, and what that
+      -- browser knew on arrival. No retention: a path, a host and labels are
+      -- not personal data, and the question "which surface produces signups"
+      -- is asked over months, not days.
+      CREATE TABLE IF NOT EXISTS signup_attribution (
+        key_prefix TEXT PRIMARY KEY,
+        created_at TEXT DEFAULT (datetime('now')),
+        src TEXT,
+        client TEXT NOT NULL DEFAULT 'api',
+        landing TEXT,
+        referrer TEXT,
+        utm_source TEXT,
+        utm_medium TEXT,
+        utm_campaign TEXT
+      );
+      CREATE INDEX IF NOT EXISTS idx_signup_attribution_created ON signup_attribution(created_at);
       -- One row per activation nudge ("your key never made its first call"),
       -- and it is the anti-repetition ledger, not a log: the daily pass refuses
       -- any address that already appears here.

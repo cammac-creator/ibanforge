@@ -4,6 +4,8 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import { useLocale, useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { routeKeyFailure } from '@/lib/api-key-failure';
+import { attributionOf, readArrival, rememberArrival } from '@/lib/arrival';
+import { FirstCallPanel } from '@/components/first-call-panel';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://api.ibanforge.com';
 
@@ -48,57 +50,13 @@ const FOCUSABLE =
 type Failure = { error?: unknown; reason?: unknown; message?: unknown };
 
 /**
- * Acquisition attribution: remember `?src=` when it ARRIVES, not when the
- * visitor finally asks for a key.
- *
- * ## Why this exists at all
- *
- * The attribution shipped on 06/08/2026 read `window.location.search` inside
- * the POST handler. That only captures someone who lands on a `?src=` URL and
- * signs up without ever navigating: one client-side route change and the query
- * string is gone. Measured on 30/08, once `source` was finally exposed by
- * /v1/admin/keys — 107 external keys, source empty on every single one. The
- * column was written by the API, forwarded by this file, and had never held a
- * value: the only instrument that could say which surface produces arrivals
- * recorded nothing for twenty-four days, silently, because a missing value and
- * a value that was never captured look exactly alike.
- *
- * ## sessionStorage, and not localStorage
- *
- * The right lifetime is the visit. localStorage would attribute a signup made
- * three weeks later to a link clicked once, which is worse than no attribution:
- * a wrong number is acted on, an absent one is questioned. A private-mode
- * browser that throws on storage simply falls back to the live query string,
- * which is the behaviour we had.
+ * Acquisition attribution lives in lib/arrival.ts: captured when the visitor
+ * ARRIVES (the only moment the referrer and the campaign query string are
+ * still there), kept for the visit in sessionStorage, and sent with the key
+ * request as `source` (our own ?src= tag) plus `attribution` (landing page,
+ * referring host, utm labels). See that file for what reading it at POST time
+ * cost: twenty-four days of empty attribution.
  */
-const SRC_STORAGE_KEY = 'ibf_src';
-/** The exact shape the API accepts (api-keys.ts), so nothing is stored that would be refused. */
-const SRC_SHAPE = /^[a-z0-9_-]{1,40}$/;
-
-function rememberSource(): void {
-  if (typeof window === 'undefined') return;
-  const raw = new URLSearchParams(window.location.search).get('src');
-  if (!raw) return;
-  const src = raw.trim().toLowerCase();
-  if (!SRC_SHAPE.test(src)) return;
-  try {
-    window.sessionStorage.setItem(SRC_STORAGE_KEY, src);
-  } catch {
-    // Private mode, storage disabled, quota. Attribution is best-effort and
-    // must never be the reason a key request fails.
-  }
-}
-
-function readSource(): string | null {
-  if (typeof window === 'undefined') return null;
-  const live = new URLSearchParams(window.location.search).get('src');
-  if (live && SRC_SHAPE.test(live.trim().toLowerCase())) return live.trim().toLowerCase();
-  try {
-    return window.sessionStorage.getItem(SRC_STORAGE_KEY);
-  } catch {
-    return null;
-  }
-}
 
 export function ApiKeyDialogProvider({ children }: { children: ReactNode }) {
   const t = useTranslations('apiKeyDialog');
@@ -155,7 +113,7 @@ export function ApiKeyDialogProvider({ children }: { children: ReactNode }) {
   // the first paint of the landing page — which is the only moment the
   // referring `?src=` is still in the URL.
   useEffect(() => {
-    rememberSource();
+    rememberArrival();
   }, []);
 
   useEffect(() => {
@@ -242,11 +200,11 @@ export function ApiKeyDialogProvider({ children }: { children: ReactNode }) {
       setNotice('');
       setError('');
       try {
-        // Best-effort acquisition attribution: the ?src= our outbound links
-        // carry (npm README, n8n node, directories), as seen on ARRIVAL rather
-        // than here — see rememberSource above for what reading it here cost.
-        // Absent → omitted.
-        const src = readSource();
+        // Best-effort acquisition attribution, as captured on ARRIVAL by
+        // lib/arrival.ts rather than read here: the ?src= our outbound links
+        // carry, plus the landing page, the referrer and the utm labels.
+        const arrival = readArrival();
+        const src = arrival?.src ?? null;
         const r = await fetch(`${API_BASE}/v1/keys/generate`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -254,6 +212,9 @@ export function ApiKeyDialogProvider({ children }: { children: ReactNode }) {
             email: email.trim().toLowerCase(),
             ...(verificationCode ? { code: verificationCode } : {}),
             ...(src ? { source: src } : {}),
+            // Always an object from a browser, even an empty one: that is how
+            // the API tells a browser signup from a curl or an agent.
+            attribution: arrival ? attributionOf(arrival) : {},
           }),
         });
         const body = await r.json().catch(() => ({}));
@@ -314,7 +275,7 @@ export function ApiKeyDialogProvider({ children }: { children: ReactNode }) {
           <div
             ref={panelRef}
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-lg rounded-xl border p-7 relative"
+            className="w-full max-w-lg rounded-xl border p-7 relative max-h-[92vh] overflow-y-auto"
             style={{
               borderColor: 'var(--ink-4)',
               background: 'var(--ink-1)',
@@ -531,6 +492,7 @@ export function ApiKeyDialogProvider({ children }: { children: ReactNode }) {
                     {t('monthly')}: {result.monthly_limit}/mo
                   </span>
                 </div>
+                <FirstCallPanel apiBase={API_BASE} apiKey={result.api_key} monthlyLimit={result.monthly_limit} />
                 <div className="border-t pt-4" style={{ borderColor: 'var(--ink-4)' }}>
                   <div
                     className="font-mono text-xs uppercase tracking-caps mb-2"
