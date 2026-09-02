@@ -39,6 +39,7 @@ Eine Anfrage ohne gültigen Schlüssel oder Zahlung erhält eine `402`-Antwort m
 | `/v1/bic/:code` | GET | $0.003 | BIC/SWIFT-Code abfragen |
 | `/v1/iban/compliance` | POST | $0.02 | Sanktionen, FATF, SEPA/VoP-Erreichbarkeit + Risiko-Score 0–100 |
 | `/v1/ch/clearing/:iid` | GET | $0.003 | Schweizer BC-Nummer / IID abfragen (SIX BankMaster) |
+| `/v1/iban/format` | GET oder POST | Kostenlos | Struktur, Prüfziffer, Land und BBAN, ohne Schlüssel. Das Register (BIC, Bank, SEPA, Sanktionen, Schweizer Clearing) liefern die bezahlten Aufrufe |
 | `/v1/reference/validate` | GET/POST | Kostenlos | Prufziffer von Zahlungsreferenzen (RF/ISO 11649, Schweizer QRR, belgische OGM, finnische viitenumero) |
 | `/v1/address/check` | POST | Kostenlos | ISO-20022-Adresskonformität (SPS, HVPS+/T2, Fedwire), jeder Befund mit Quelle |
 | `/v1/demo` | GET | Kostenlos | Beispielvalidierungen (keine Zahlung erforderlich) |

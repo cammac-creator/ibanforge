@@ -82,6 +82,9 @@ describe('enrich402Middleware', () => {
     expect(body.message).toContain('API key');
     expect(body.free_tier).toBeDefined();
     expect(body.free_tier.signup).toContain('/v1/keys/generate');
+    // The wall names the free structural route, so a keyless caller learns what
+    // costs nothing before deciding whether the registry is worth paying for.
+    expect(body.free_structural_check.endpoint).toContain('/v1/iban/format');
     expect(body.x402).toBeDefined();
     expect(res.headers.get('payment-required')).toBe('base64-x402-data-here');
   });

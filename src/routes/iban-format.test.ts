@@ -21,6 +21,26 @@ describe('GET /v1/iban/format (free, no payment)', () => {
     expect(body.upgrade_to_full_validation).toContain('/v1/iban/validate');
   });
 
+  it('answers the same verdict to a POST with a JSON body, so the paid call shape works without a key', async () => {
+    const app = buildApp();
+    const res = await app.request('/v1/iban/format', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ iban: 'CH93 0076 2011 6238 5295 7' }),
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      valid: boolean;
+      country: { code: string };
+      bban: { bank_code: string };
+      cost_usdc?: unknown;
+    };
+    expect(body.valid).toBe(true);
+    expect(body.country.code).toBe('CH');
+    expect(body.bban.bank_code).toBe('00762');
+    expect(body.cost_usdc).toBeUndefined();
+  });
+
   it('rejects a wrong-checksum IBAN with valid: false and a clear error code', async () => {
     const app = buildApp();
     const r = await app.request('/v1/iban/format?iban=CH9300762011623852958');

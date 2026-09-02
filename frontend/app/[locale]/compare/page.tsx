@@ -33,7 +33,8 @@ const ROWS = [
   "trust",
 ] as const;
 
-const COLS = ["ibanforge", "ibancom", "ibanapi", "libs"] as const;
+const COLS = ["ibanforge", "abstract", "ibancom", "ibanapi", "libs"] as const;
+const OTHERS = [0, 1, 2, 3, 4] as const;
 
 export default async function ComparePage({
   params,
@@ -85,7 +86,7 @@ export default async function ComparePage({
           className="rounded-xl border overflow-x-auto"
           style={{ borderColor: "var(--ink-4)", background: "var(--ink-1)" }}
         >
-          <table className="w-full text-sm" style={{ minWidth: "980px" }}>
+          <table className="w-full text-sm" style={{ minWidth: "1120px" }}>
             <thead>
               <tr className="border-b" style={{ borderColor: "var(--ink-4)", background: "var(--ink-2)" }}>
                 <th className="px-4 py-3 text-left font-medium text-muted-foreground text-xs w-[16%]">
@@ -94,8 +95,8 @@ export default async function ComparePage({
                 <th className="px-4 py-3 text-left text-xs font-mono font-semibold text-amber-500 w-[23%]">
                   {t("table.cols.ibanforge")}
                 </th>
-                {(["ibancom", "ibanapi", "libs"] as const).map((c) => (
-                  <th key={c} className="px-4 py-3 text-left text-xs font-mono font-semibold text-foreground w-[20%]">
+                {(["abstract", "ibancom", "ibanapi", "libs"] as const).map((c) => (
+                  <th key={c} className="px-4 py-3 text-left text-xs font-mono font-semibold text-foreground w-[15%]">
                     {t(`table.cols.${c}`)}
                   </th>
                 ))}
@@ -147,7 +148,83 @@ export default async function ComparePage({
             className="underline underline-offset-2 hover:text-muted-foreground"
           >
             ibanapi.com/prices
+          </a>{" "}
+          ·{" "}
+          <a
+            href="https://www.abstractapi.com/api/iban-validation"
+            rel="nofollow noopener"
+            className="underline underline-offset-2 hover:text-muted-foreground"
+          >
+            abstractapi.com
           </a>
+        </p>
+      </section>
+
+      {/* ── Where we lose ─────────────────────────────────────────────────── */}
+      <section className="px-4 pb-20 max-w-4xl mx-auto w-full">
+        <h2
+          className="text-2xl sm:text-3xl font-semibold tracking-tight mb-10 text-center"
+          style={{ letterSpacing: "-0.02em" }}
+        >
+          {t("honest.heading")}
+        </h2>
+        <ul className="flex flex-col gap-4">
+          {[0, 1].map((i) => (
+            <li
+              key={i}
+              className="rounded-xl border p-5 flex gap-3 items-start"
+              style={{ borderColor: "var(--ink-4)", background: "var(--ink-1)" }}
+            >
+              <Scale className="size-4 shrink-0 mt-0.5 text-muted-foreground" aria-hidden />
+              <p className="text-sm text-muted-foreground" style={{ lineHeight: 1.65 }}>
+                {t(`honest.items.${i}`)}
+              </p>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      {/* ── Also on the market ────────────────────────────────────────────── */}
+      <section className="px-4 pb-20 max-w-5xl mx-auto w-full">
+        <h2
+          className="text-2xl sm:text-3xl font-semibold tracking-tight mb-10 text-center"
+          style={{ letterSpacing: "-0.02em" }}
+        >
+          {t("others.heading")}
+        </h2>
+        <div
+          className="rounded-xl border overflow-x-auto"
+          style={{ borderColor: "var(--ink-4)", background: "var(--ink-1)" }}
+        >
+          <table className="w-full text-sm" style={{ minWidth: "760px" }}>
+            <thead>
+              <tr className="border-b" style={{ borderColor: "var(--ink-4)", background: "var(--ink-2)" }}>
+                {(["vendor", "sells", "price", "free"] as const).map((c) => (
+                  <th key={c} className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">
+                    {t(`others.cols.${c}`)}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {OTHERS.map((i) => (
+                <tr key={i} className={i < OTHERS.length - 1 ? "border-b" : ""} style={{ borderColor: "var(--hairline)" }}>
+                  <td className="px-4 py-4 align-top text-xs font-mono font-semibold text-foreground">{t(`others.rows.${i}.vendor`)}</td>
+                  <td className="px-4 py-4 align-top text-xs text-muted-foreground" style={{ lineHeight: 1.6 }}>{t(`others.rows.${i}.sells`)}</td>
+                  <td className="px-4 py-4 align-top text-xs text-muted-foreground" style={{ lineHeight: 1.6 }}>{t(`others.rows.${i}.price`)}</td>
+                  <td className="px-4 py-4 align-top text-xs text-muted-foreground" style={{ lineHeight: 1.6 }}>{t(`others.rows.${i}.free`)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="text-xs text-muted-foreground/70 mt-4" style={{ lineHeight: 1.6 }}>
+          {t("footnoteExtra")}{" "}
+          <a href="https://www.iban.de/preise.html" rel="nofollow noopener" className="underline underline-offset-2 hover:text-muted-foreground">iban.de</a>{" "}·{" "}
+          <a href="https://www.iban-test.eu/" rel="nofollow noopener" className="underline underline-offset-2 hover:text-muted-foreground">iban-test.eu</a>{" "}·{" "}
+          <a href="https://www.bankdataapi.com/" rel="nofollow noopener" className="underline underline-offset-2 hover:text-muted-foreground">bankdataapi.com</a>{" "}·{" "}
+          <a href="https://api-ninjas.com/pricing" rel="nofollow noopener" className="underline underline-offset-2 hover:text-muted-foreground">api-ninjas.com</a>{" "}·{" "}
+          <a href="https://openiban.com/" rel="nofollow noopener" className="underline underline-offset-2 hover:text-muted-foreground">openiban.com</a>
         </p>
       </section>
 

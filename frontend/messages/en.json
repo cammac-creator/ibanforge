@@ -399,7 +399,7 @@
     },
     "oem": {
       "label": "Editor / OEM",
-      "text": "Embedding IBANforge in your own product? Editor / OEM licensing with SLA and EU invoicing — talk to us.",
+      "text": "Embedding IBANforge in your own product? Editor / OEM licensing from $149/month (50,000 requests, written SLA, EU invoicing): talk to us.",
       "cta": "See the vendors page →"
     }
   },
@@ -1159,8 +1159,8 @@
   },
   "vendors": {
     "meta": {
-      "title": "For Software Vendors — embed IBAN validation in your product",
-      "description": "OEM licensing for ERP, accounting and payroll vendors: registry-grade IBAN validation, the deepest Swiss clearing data in any public API, compliance pre-checks and a signable DPA. Cut VoP failures before the rulebook v1.1 deadline (20 Sept 2026)."
+      "title": "For Software Vendors: embed IBAN validation in your product",
+      "description": "OEM licensing for ERP, accounting and payroll vendors from $149/month: registry-grade IBAN validation, the deepest Swiss clearing data in a public API, a free ISO 20022 address check for the 14 and 15 November 2026 deadlines, compliance pre-checks and a signable DPA."
     },
     "eyebrow": "For software vendors",
     "hero": {
@@ -1171,26 +1171,33 @@
         "docs": "Read the docs"
       }
     },
-    "vop": {
+    "deadline": {
       "badge": "Dated deadline",
-      "title": "VoP rulebook v1.1 — 20 September 2026",
-      "body": "Since October 2025, euro-area banks must verify payee details before a credit transfer (Verification of Payee). Payments carrying mistyped or non-existent IBANs now fail loudly — at the worst possible moment. IBANforge is not a VoP service (the EPC scheme is reserved to regulated PSPs), but a pre-check at input time removes what VoP would reject later: broken structure, unknown bank, unreachable rails.",
-      "note": "The honest pitch: pre-check now, so VoP has nothing to reject."
+      "title": "Structured addresses: 14 and 15 November 2026",
+      "body": "On 14 November 2026 the Swiss Payment Standards 2026 come into force, and SIX states that payments which do not meet the structured-address rules can no longer be processed. On 15 November 2026 the EPC schemes (SCT, SCT Inst, SDD) accept structured and hybrid addresses only, and the country element becomes mandatory as soon as one agent sits in a SEPA country outside the EEA, which is Switzerland. Every invoicing, accounting or ERP product that emits a payment file is concerned.",
+      "what": "Two things this API does about it, both already live. A free conformity check tells you, rule by rule and with the document each rule comes from, whether an address you have structured passes a given rail. And resolving a clearing code or an IBAN into a BIC often removes the agent-address obligation altogether: hold the BIC, and that branch of the rule does not apply to you.",
+      "refused": "Refused: a country in lowercase and no town element",
+      "accepted": "Accepted: town, country and the street in their own elements",
+      "note": "What it does not do: it does not migrate your customers' address book, and it does not parse free text into a structured address. It checks what you have structured, for free, and it names the document behind every verdict."
+    },
+    "vop": {
+      "title": "And Verification of Payee",
+      "body": "Since 9 October 2025, euro-area payment service providers must verify payee details before a credit transfer. Version 1.1 of the EPC rulebook takes effect on 20 September 2026; it is a technical milestone, not a new obligation. IBANforge is not a VoP service (the EPC scheme is reserved to regulated PSPs): a pre-check at input time removes what VoP would reject later, and sepa.vop_participant tells you whether the resolved institution is listed as ready."
     },
     "flow": {
       "heading": "Where it sits in your product",
       "steps": [
         {
           "title": "Your software",
-          "body": "A user types an IBAN — supplier onboarding, payroll master data, payment entry."
+          "body": "A user types an IBAN or an address: supplier onboarding, payroll master data, payment entry, invoice emission."
         },
         {
           "title": "IBANforge pre-check",
-          "body": "Structure (89-country registry), issuing bank identified (121k+ BICs), rails (SEPA / SIC / instant), risk flags — one call, p99 under 50 ms."
+          "body": "Structure (89-country registry), issuing bank identified (121k+ BICs), rails (SEPA / SIC / instant), risk flags, address conformity: one call, p99 under 50 ms."
         },
         {
           "title": "At payment time",
-          "body": "Fewer VoP rejections, fewer manual repairs, fewer support tickets with your name on them."
+          "body": "Fewer rejected files in November, fewer VoP rejections, fewer manual repairs, fewer support tickets with your name on them."
         }
       ]
     },
@@ -1198,18 +1205,18 @@
       "heading": "Three reasons vendors pick IBANforge",
       "items": [
         {
-          "title": "Swiss data nobody else exposes",
-          "body": "1,100+ SIX BankMaster entries with SIC / euroSIC / instant participation and QR-IID handling, refreshed monthly — plus 121k+ BICs (39k+ LEI-enriched via GLEIF). If your users pay Swiss suppliers, this is the difference.",
+          "title": "The deepest Swiss clearing data in a public API",
+          "body": "1,100+ SIX BankMaster entries with SIC / euroSIC / instant participation and QR-IID handling, refreshed monthly, plus an ISO 20022 postal_address on every institution we can serve one for, and 121k+ BICs (39k+ LEI-enriched via GLEIF). If your users pay Swiss suppliers, this is the difference.",
           "link": "Swiss clearing docs"
         },
         {
           "title": "Compliance pre-check built in",
-          "body": "Sanctions screening (OFAC, EU, UN), FATF lists, SEPA reachability and VoP-requirement data, risk score 0–100 — one endpoint to triage before a payment leaves your product.",
+          "body": "Sanctions screening (OFAC, EU, UN), FATF lists, SEPA reachability and VoP-requirement data, risk score 0 to 100: one endpoint to triage before a payment leaves your product.",
           "link": "Compliance docs"
         },
         {
           "title": "A trust pack you can send to procurement",
-          "body": "Signable DPA, published terms and privacy policy, live status page, versioned changelog. IBANs are never stored — validation runs in memory and only country + bank-prefix metadata is logged. And when a customer leaves, their telemetry deletes itself: erased by default 30 days after termination, contractually (DPA clause 4.7).",
+          "body": "Signable DPA, published terms and privacy policy, live status page, versioned changelog. IBANs are never stored: validation runs in memory and only country + bank-prefix metadata is logged. And when a customer leaves, their telemetry deletes itself: erased by default 30 days after termination, contractually (DPA clause 4.7).",
           "link": "Legal & DPA"
         }
       ]
@@ -1217,21 +1224,23 @@
     "oem": {
       "eyebrow": "Editor / OEM",
       "title": "Licensing that matches how you ship",
-      "body": "Embedding IBANforge inside your own product, for your own customers, takes more than a metered key: redistribution rights, a written SLA, EU invoicing, a named support contact. That is the OEM agreement — no public price list, one conversation.",
+      "price": "From $149 per month",
+      "priceDetail": "One key at 50,000 requests per month, redistribution rights, a written SLA (99.5%), EU invoicing, a named support contact. Above 50,000 requests a month, one conversation sets the volume price.",
+      "body": "Embedding IBANforge inside your own product, for your own customers, takes more than a metered key. That is the OEM agreement, and its starting price is public because every other vendor in this market hides theirs.",
       "cta": "support@ibanforge.com",
-      "hint": "One email — tell us what you ship and to whom.",
+      "hint": "One email: tell us what you ship and to whom.",
       "slaLink": "Read the SLA"
     }
   },
   "compare": {
     "meta": {
-      "title": "IBANforge vs iban.com vs IBANAPI vs open-source libraries — an honest comparison",
-      "description": "Prices and capabilities of IBAN validation APIs, checked July 2026 from public pricing pages: iban.com from €530/year, IBANAPI from $15/month, IBANforge $5 one-time packs, and when a free open-source library is all you need."
+      "title": "IBANforge vs AbstractAPI vs iban.com vs IBANAPI vs open-source libraries: an honest comparison",
+      "description": "Prices and capabilities of IBAN validation APIs, read from public pricing pages on September 2, 2026: AbstractAPI $99/month for a boolean, iban.com from €530/year, IBANAPI from $15, IBANforge $5 one-time packs, and when a free open-source library is all you need."
     },
     "eyebrow": "Comparison",
     "hero": {
       "title": "Choosing an IBAN validation API",
-      "description": "Four realistic options: two established commercial APIs, the open-source libraries, and us. Same job, very different pricing models. Prices below were read from the public pricing pages on July 11, 2026."
+      "description": "Five realistic options: the cheapest boolean on the market, two established commercial APIs, the open-source libraries, and us. Same word on the tin, very different objects inside. Every price below was read from a public pricing page on September 2, 2026."
     },
     "disclosure": "We sell one of the products in this table — read it with that in mind. Every number is dated and comes from a public page; if we got something wrong or a price changed, tell us at support@ibanforge.com and we will fix it.",
     "table": {
@@ -1241,71 +1250,81 @@
         "ibanforge": "IBANforge",
         "ibancom": "iban.com (IBAN Suite)",
         "ibanapi": "IBANAPI",
-        "libs": "Open-source libs"
+        "libs": "Open-source libs",
+        "abstract": "AbstractAPI"
       },
       "rows": {
         "pricing": {
           "label": "Pricing model",
           "ibanforge": "Prepaid packs: $5 / 1,000 credits, never expire. Or $0.002–0.02 per call (x402). Free: 200/month.",
           "ibancom": "Annual subscription: €530/year (2,000 lookups) to €4,150/year (unlimited), 1-year minimum, VAT excl.",
-          "ibanapi": "Monthly subscription: $15/month (2,000 basic + 400 bank credits) to $115/month.",
-          "libs": "Free (MIT/LGPL). Your time is the cost."
+          "ibanapi": "Prepaid credits that expire with the plan: $15 for 60 days (2,000 basic + 400 bank lookups) to $115 for a year (30,000 + 5,000).",
+          "libs": "Free (MIT/LGPL). Your time is the cost.",
+          "abstract": "Monthly subscription: $99/month for 60,000 requests per month (about $0.00165 per call), volume slider to $199 and $499. Free: 100 requests, 1 request per second."
         },
         "example": {
           "label": "2,000 validations with bank data",
           "ibanforge": "$10 one-time (2 × 1k packs) — no expiry, no subscription",
           "ibancom": "€530/year (Professional plan)",
           "ibanapi": "≥ $40/month tier (bank credits are the binding limit: 400/month at $15)",
-          "libs": "$0 — but no bank data at all (structure + checksum only)"
+          "libs": "$0 — but no bank data at all (structure + checksum only)",
+          "abstract": "No bank data at any price: the response is {\"iban\": \"...\", \"is_valid\": true}. For 2,000 boolean checks, $99/month."
         },
         "freeTier": {
           "label": "Free tier",
           "ibanforge": "200 requests/month, no card, key by email in one call",
           "ibancom": "100-query trial, expires after one month",
           "ibanapi": "100 basic + 20 bank credits, 30 days",
-          "libs": "Everything is free"
+          "libs": "Everything is free",
+          "abstract": "100 requests, 1 request per second"
         },
         "bankData": {
           "label": "Bank identification (BIC, name)",
           "ibanforge": "121k+ BICs, 39k+ LEI-enriched via GLEIF, refreshed monthly",
           "ibancom": "Yes — their core product",
           "ibanapi": "“If available” per their docs",
-          "libs": "No — structural validation only"
+          "libs": "No — structural validation only",
+          "abstract": "No. A boolean only"
         },
         "swiss": {
           "label": "Swiss clearing depth (SIC / euroSIC / QR-IID)",
           "ibanforge": "1,100+ SIX BankMaster entries, instant-rail participation, QR-IID semantics",
           "ibancom": "Not exposed as a product",
           "ibanapi": "No",
-          "libs": "No"
+          "libs": "No",
+          "abstract": "No"
         },
         "compliance": {
           "label": "Compliance pre-check (sanctions, FATF, VoP requirement)",
           "ibanforge": "One endpoint, $0.02: bank screening (OFAC, EU, UN), FATF lists, SEPA/VoP data, 0–100 risk score",
           "ibancom": "Separate products (BAV/VoP from €2,000 per 2,500 verifications)",
           "ibanapi": "No",
-          "libs": "No"
+          "libs": "No",
+          "abstract": "No"
         },
         "agents": {
           "label": "AI agents (MCP, autonomous payment)",
           "ibanforge": "Native MCP server (8 tools) + x402 pay-per-call in USDC — an agent can pay without an account",
           "ibancom": "No",
           "ibanapi": "No",
-          "libs": "No (a library, not a service)"
+          "libs": "No (a library, not a service)",
+          "abstract": "No"
         },
         "signup": {
           "label": "Time to first call",
           "ibanforge": "One curl for a free key — or zero signup via x402",
           "ibancom": "Order form, annual contract",
           "ibanapi": "Account signup",
-          "libs": "npm/pip install"
+          "libs": "npm/pip install",
+          "abstract": "Account signup"
         },
         "trust": {
           "label": "Published legal/ops surface",
           "ibanforge": "ToS, privacy, pre-signed DPA, OEM SLA, live status page — all public. Telemetry self-deletes 30 days after termination (DPA 4.7)",
           "ibancom": "Enterprise terms on request (not published as of July 2026)",
           "ibanapi": "ToS/privacy published; no public status page found (July 2026)",
-          "libs": "License file"
+          "libs": "License file",
+          "abstract": "ToS and privacy published"
         }
       }
     },
@@ -1333,7 +1352,56 @@
       "getKey": "Get a free key",
       "playground": "Open the playground"
     },
-    "footnote": "Prices checked on July 11, 2026 on iban.com/pricing and ibanapi.com/prices. VAT and plan details are theirs to change; the linked pages are authoritative."
+    "footnote": "Prices checked on July 11, 2026 on iban.com/pricing and ibanapi.com/prices. VAT and plan details are theirs to change; the linked pages are authoritative.",
+    "honest": {
+      "heading": "Where we lose, said plainly",
+      "items": [
+        "Per call, AbstractAPI is three times cheaper than us: about $0.00165 against $0.005. If a boolean is all you need, 60,000 checks a month cost $99 there and about $200 in our 25,000-credit packs. You are not buying the same object, but you should know the number.",
+        "Java and .NET have no IBANforge SDK yet. IbanNet and iban4j are the de facto standards of those ecosystems for structure and checksum; we serve the data they refuse to serve, through REST, Python and TypeScript."
+      ]
+    },
+    "others": {
+      "heading": "Also on the market, checked the same day",
+      "cols": {
+        "vendor": "Vendor",
+        "sells": "What it sells",
+        "price": "Price read on September 2, 2026",
+        "free": "Free tier"
+      },
+      "rows": [
+        {
+          "vendor": "iban.de",
+          "sells": "IBAN calculation and validation, same tiers as iban.com, about 20% cheaper",
+          "price": "€420 to €3,800 per year, one-year term",
+          "free": "None found"
+        },
+        {
+          "vendor": "iban-test.eu",
+          "sells": "40 countries against real directories, 111 in syntax only, a hosted MCP server",
+          "price": "10 free checks, then a paid grid not extracted",
+          "free": "10 checks"
+        },
+        {
+          "vendor": "apilayer bankdataapi",
+          "sells": "IBAN, SWIFT, German BLZ, US routing numbers",
+          "price": "$39.99/month for 2,500 to $239.99/month for 60,000",
+          "free": "100 per month"
+        },
+        {
+          "vendor": "API Ninjas",
+          "sells": "IBAN decomposition; bank name, address and BIC reserved to paid plans",
+          "price": "$39/month for 100,000 calls shared across all their APIs",
+          "free": "3,000 per month, non-commercial use"
+        },
+        {
+          "vendor": "openiban",
+          "sells": "Checksum plus bank enrichment for BE, DE, NL, LU, CH, AT, LI",
+          "price": "Free forever, open source",
+          "free": "Everything"
+        }
+      ]
+    },
+    "footnoteExtra": "Verified September 2, 2026:"
   },
   "testIban": {
     "metaTitle": "Test IBAN Generator — real bank codes, verified against national registers",

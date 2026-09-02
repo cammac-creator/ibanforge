@@ -399,7 +399,7 @@
     },
     "oem": {
       "label": "Editor / OEM",
-      "text": "Sie betten IBANforge in Ihr eigenes Produkt ein? Editor-/OEM-Lizenz mit SLA und EU-Rechnungsstellung — sprechen Sie mit uns.",
+      "text": "Sie betten IBANforge in Ihr eigenes Produkt ein? Editor-/OEM-Lizenz ab 149 $ pro Monat (50'000 Anfragen, schriftliches SLA, EU-Rechnungsstellung): Sprechen Sie mit uns.",
       "cta": "Zur Hersteller-Seite →"
     }
   },
@@ -1159,79 +1159,88 @@
   },
   "vendors": {
     "meta": {
-      "title": "Für Softwarehersteller — IBAN-Validierung in Ihr Produkt einbetten",
-      "description": "OEM-Lizenzierung für ERP-, Buchhaltungs- und Lohnsoftware: Registry-grade IBAN-Validierung, die tiefsten Schweizer Clearing-Daten einer öffentlichen API, Compliance-Vorprüfungen und ein unterschriftsreifer DPA. Reduzieren Sie VoP-Fehlschläge vor der Rulebook-v1.1-Frist (20. Sept. 2026)."
+      "title": "Für Softwareanbieter: IBAN-Validierung in Ihr Produkt einbetten",
+      "description": "OEM-Lizenz für ERP-, Buchhaltungs- und Lohnsoftware ab 149 $ pro Monat: IBAN-Validierung gegen Register, die tiefsten Schweizer Clearing-Daten einer öffentlichen API, eine kostenlose ISO-20022-Adressprüfung für die Stichtage 14. und 15. November 2026, Compliance-Vorprüfungen und ein unterzeichenbarer DPA."
     },
-    "eyebrow": "Für Softwarehersteller",
+    "eyebrow": "Für Softwareanbieter",
     "hero": {
-      "title": "Ihr Produkt verarbeitet IBANs. Wir halten sie sauber.",
-      "description": "ERP, Buchhaltung, Lohn oder Banking-Software: Betten Sie Registry-grade IBAN-Validierung bei der Eingabe ein, damit die Zahlungen Ihrer Kunden nicht mehr im Zahlungsmoment scheitern. Eine REST-API, maschinenlesbare Fehler, keine Kontodaten gespeichert.",
+      "title": "Ihr Produkt berührt IBANs. Wir halten sie sauber.",
+      "description": "ERP, Buchhaltung, Lohn oder Banking-Software: Betten Sie eine registerbasierte IBAN-Validierung bei der Eingabe ein, damit die Zahlungen Ihrer Kunden nicht mehr im Zahlungsmoment scheitern. Eine REST-API, maschinenlesbare Fehler, keine gespeicherten Kontodaten.",
       "cta": {
         "contact": "OEM-Lizenz besprechen",
-        "docs": "Zur Dokumentation"
+        "docs": "Dokumentation lesen"
       }
     },
+    "deadline": {
+      "badge": "Datierter Stichtag",
+      "title": "Strukturierte Adressen: 14. und 15. November 2026",
+      "body": "Am 14. November 2026 treten die Swiss Payment Standards 2026 in Kraft, und SIX schreibt, dass Zahlungen, welche die Regeln zur strukturierten Adresse nicht erfüllen, nicht mehr verarbeitet werden können. Am 15. November 2026 akzeptieren die EPC-Schemen (SCT, SCT Inst, SDD) nur noch strukturierte und hybride Adressen, und das Element Land wird Pflicht, sobald ein Agent in einem SEPA-Land ausserhalb des EWR sitzt, also in der Schweiz. Jedes Fakturierungs-, Buchhaltungs- oder ERP-Produkt, das eine Zahlungsdatei erzeugt, ist betroffen.",
+      "what": "Zwei Dinge, die diese API dafür tut, beide bereits produktiv. Eine kostenlose Konformitätsprüfung sagt Ihnen Regel für Regel, mit dem Dokument, aus dem jede Regel stammt, ob eine von Ihnen strukturierte Adresse auf einer bestimmten Schiene besteht. Und das Auflösen eines Clearing-Codes oder einer IBAN in einen BIC hebt die Adresspflicht des Agenten oft ganz auf: Wer den BIC hat, für den gilt dieser Zweig der Regel nicht.",
+      "refused": "Abgelehnt: Land in Kleinbuchstaben und kein Ortselement",
+      "accepted": "Akzeptiert: Ort, Land und Strasse in eigenen Elementen",
+      "note": "Was sie nicht tut: Sie migriert nicht das Adressbuch Ihrer Kunden und macht aus Freitext keine strukturierte Adresse. Sie prüft, was Sie strukturiert haben, kostenlos, und nennt zu jedem Urteil das Dokument dahinter."
+    },
     "vop": {
-      "badge": "Datierte Frist",
-      "title": "VoP-Rulebook v1.1 — 20. September 2026",
-      "body": "Seit Oktober 2025 müssen Banken im Euroraum den Zahlungsempfänger vor einer Überweisung prüfen (Verification of Payee). Zahlungen mit falsch erfassten oder nicht existierenden IBANs scheitern jetzt laut — im schlechtesten Moment. IBANforge ist kein VoP-Dienst (das EPC-Scheme ist regulierten PSPs vorbehalten), aber eine Vorprüfung bei der Eingabe beseitigt an der Quelle, was VoP später ablehnen würde: kaputte Struktur, unbekannte Bank, unerreichbare Rails.",
-      "note": "Der ehrliche Pitch: jetzt vorprüfen, damit VoP nichts abzulehnen hat."
+      "title": "Und Verification of Payee",
+      "body": "Seit dem 9. Oktober 2025 müssen Zahlungsdienstleister im Euroraum die Empfängerdaten vor einer Überweisung prüfen. Version 1.1 des EPC-Regelwerks tritt am 20. September 2026 in Kraft; das ist ein technischer Meilenstein, keine neue Pflicht. IBANforge ist kein VoP-Dienst (das EPC-Schema ist regulierten Zahlungsdienstleistern vorbehalten): Eine Vorprüfung bei der Eingabe entfernt, was die VoP später ablehnen würde, und sepa.vop_participant sagt Ihnen, ob das aufgelöste Institut als bereit gelistet ist."
     },
     "flow": {
       "heading": "Wo es in Ihrem Produkt sitzt",
       "steps": [
         {
           "title": "Ihre Software",
-          "body": "Ein Benutzer erfasst eine IBAN — Lieferanten-Onboarding, Lohnstammdaten, Zahlungserfassung."
+          "body": "Ein Nutzer gibt eine IBAN oder eine Adresse ein: Lieferanten-Onboarding, Lohnstammdaten, Zahlungserfassung, Rechnungsausgabe."
         },
         {
           "title": "IBANforge-Vorprüfung",
-          "body": "Struktur (Registry mit 89 Ländern), ausgebende Bank identifiziert (121k+ BICs), Rails (SEPA / SIC / Instant), Risiko-Flags — ein Aufruf, p99 unter 50 ms."
+          "body": "Struktur (Register für 89 Länder), ausgebende Bank identifiziert (121k+ BICs), Schienen (SEPA / SIC / Instant), Risikohinweise, Adresskonformität: ein Aufruf, p99 unter 50 ms."
         },
         {
           "title": "Im Zahlungsmoment",
-          "body": "Weniger VoP-Ablehnungen, weniger manuelle Korrekturen, weniger Support-Tickets mit Ihrem Namen darauf."
+          "body": "Weniger abgelehnte Dateien im November, weniger VoP-Ablehnungen, weniger manuelle Korrekturen, weniger Support-Tickets mit Ihrem Namen darauf."
         }
       ]
     },
     "args": {
-      "heading": "Drei Gründe für IBANforge",
+      "heading": "Drei Gründe, warum Anbieter IBANforge wählen",
       "items": [
         {
-          "title": "Schweizer Daten, die sonst niemand anbietet",
-          "body": "1,100+ SIX-BankMaster-Einträge mit SIC / euroSIC / Instant-Teilnahme und QR-IID-Handling, monatlich aktualisiert — plus 121k+ BICs (39k+ LEI-angereichert via GLEIF). Wenn Ihre Benutzer Schweizer Lieferanten bezahlen, ist das der Unterschied.",
-          "link": "Schweizer Clearing-Doku"
+          "title": "Die tiefsten Schweizer Clearing-Daten einer öffentlichen API",
+          "body": "1'100+ SIX-BankMaster-Einträge mit SIC-/euroSIC-/Instant-Teilnahme und QR-IID-Behandlung, monatlich aktualisiert, dazu eine ISO-20022-postal_address für jedes Institut, für das wir eine liefern können, und 121k+ BICs (39k+ LEI-angereichert via GLEIF). Wenn Ihre Nutzer Schweizer Lieferanten bezahlen, ist das der Unterschied.",
+          "link": "Dokumentation Schweizer Clearing"
         },
         {
           "title": "Compliance-Vorprüfung eingebaut",
-          "body": "Sanktionsprüfung (OFAC, EU, UN), FATF-Listen, SEPA-Erreichbarkeit und VoP-Pflichtdaten, Risikoscore 0–100 — ein Endpunkt zur Triage, bevor eine Zahlung Ihr Produkt verlässt.",
-          "link": "Compliance-Doku"
+          "body": "Sanktionsprüfung (OFAC, EU, UNO), FATF-Listen, SEPA-Erreichbarkeit und VoP-Pflichtdaten, Risikoscore 0 bis 100: ein Endpunkt zur Triage, bevor eine Zahlung Ihr Produkt verlässt.",
+          "link": "Dokumentation Compliance"
         },
         {
-          "title": "Ein Trust-Pack für Ihren Einkauf",
-          "body": "Unterschriftsreifer DPA, veröffentlichte AGB und Datenschutzerklärung, Live-Statusseite, versioniertes Changelog. IBANs werden nie gespeichert — die Validierung läuft im Speicher, protokolliert werden nur Land + Bank-Präfix. Und wenn ein Kunde geht, löscht sich seine Telemetrie selbst: standardmässig 30 Tage nach Kündigung, vertraglich zugesichert (DPA Klausel 4.7).",
-          "link": "Rechtliches & DPA"
+          "title": "Ein Vertrauenspaket für Ihren Einkauf",
+          "body": "Unterzeichenbarer DPA, veröffentlichte AGB und Datenschutzerklärung, Live-Statusseite, versioniertes Changelog. IBANs werden nie gespeichert: Die Validierung läuft im Speicher, protokolliert werden nur Land und Bankpräfix. Und wenn ein Kunde geht, löscht sich seine Telemetrie selbst: standardmässig 30 Tage nach Kündigung, vertraglich (DPA Klausel 4.7).",
+          "link": "Rechtliches und DPA"
         }
       ]
     },
     "oem": {
       "eyebrow": "Editor / OEM",
       "title": "Eine Lizenz, die zu Ihrer Auslieferung passt",
-      "body": "IBANforge in Ihr eigenes Produkt einzubetten, für Ihre eigenen Kunden, braucht mehr als einen Schlüssel mit Zähler: Weitergaberechte, ein schriftliches SLA, EU-Rechnung, ein benannter Support-Kontakt. Das ist der OEM-Vertrag — keine öffentliche Preisliste, ein Gespräch.",
+      "price": "Ab 149 $ pro Monat",
+      "priceDetail": "Ein Schlüssel mit 50'000 Anfragen pro Monat, Weitervertriebsrechte, schriftliches SLA (99,5 %), EU-Rechnungsstellung, ein benannter Support-Kontakt. Oberhalb von 50'000 Anfragen pro Monat legt ein Gespräch den Volumenpreis fest.",
+      "body": "IBANforge in Ihr eigenes Produkt einzubetten, für Ihre eigenen Kunden, braucht mehr als einen gezählten Schlüssel. Das ist die OEM-Vereinbarung, und ihr Einstiegspreis ist öffentlich, weil jeder andere Anbieter in diesem Markt seinen versteckt.",
       "cta": "support@ibanforge.com",
-      "hint": "Eine E-Mail — sagen Sie uns, was Sie ausliefern und an wen.",
+      "hint": "Eine E-Mail: Sagen Sie uns, was Sie ausliefern und an wen.",
       "slaLink": "SLA lesen"
     }
   },
   "compare": {
     "meta": {
-      "title": "IBANforge vs iban.com vs IBANAPI vs Open-Source-Bibliotheken — ein ehrlicher Vergleich",
-      "description": "Preise und Fähigkeiten von IBAN-Validierungs-APIs, im Juli 2026 von den öffentlichen Preisseiten erhoben: iban.com ab 530 €/Jahr, IBANAPI ab 15 $/Monat, IBANforge-Packs ab 5 $ ohne Verfall, und wann eine kostenlose Bibliothek genügt."
+      "title": "IBANforge gegen AbstractAPI, iban.com, IBANAPI und Open-Source-Bibliotheken: ein ehrlicher Vergleich",
+      "description": "Preise und Fähigkeiten von IBAN-Validierungs-APIs, am 2. September 2026 von öffentlichen Preisseiten gelesen: AbstractAPI 99 $ pro Monat für einen Booleschen Wert, iban.com ab 530 € pro Jahr, IBANAPI ab 15 $, IBANforge mit 5-$-Paketen ohne Abo, und wann eine kostenlose Open-Source-Bibliothek genügt."
     },
     "eyebrow": "Vergleich",
     "hero": {
       "title": "Eine IBAN-Validierungs-API auswählen",
-      "description": "Vier realistische Optionen: zwei etablierte kommerzielle APIs, die Open-Source-Bibliotheken und wir. Dieselbe Aufgabe, sehr unterschiedliche Preismodelle. Die Preise unten wurden am 11. Juli 2026 von den öffentlichen Preisseiten abgelesen."
+      "description": "Fünf realistische Optionen: der günstigste Boolesche Wert am Markt, zwei etablierte kommerzielle APIs, die Open-Source-Bibliotheken und wir. Dasselbe Wort auf der Verpackung, sehr verschiedene Dinge darin. Jeder Preis unten wurde am 2. September 2026 von einer öffentlichen Preisseite gelesen."
     },
     "disclosure": "Wir verkaufen eines der Produkte in dieser Tabelle — lesen Sie sie mit diesem Wissen. Jede Zahl ist datiert und stammt von einer öffentlichen Seite; wenn sich ein Preis geändert hat oder uns ein Fehler unterlaufen ist, schreiben Sie an support@ibanforge.com und wir korrigieren.",
     "table": {
@@ -1241,71 +1250,81 @@
         "ibanforge": "IBANforge",
         "ibancom": "iban.com (IBAN Suite)",
         "ibanapi": "IBANAPI",
-        "libs": "Open-Source-Bibliotheken"
+        "libs": "Open-Source-Bibliotheken",
+        "abstract": "AbstractAPI"
       },
       "rows": {
         "pricing": {
           "label": "Preismodell",
           "ibanforge": "Prepaid-Packs: 5 $ / 1.000 Credits, verfallen nie. Oder 0,002–0,02 $ pro Aufruf (x402). Kostenlos: 200/Monat.",
           "ibancom": "Jahresabo: 530 €/Jahr (2.000 Lookups) bis 4.150 €/Jahr (unbegrenzt), Mindestlaufzeit 1 Jahr, zzgl. MwSt.",
-          "ibanapi": "Monatsabo: 15 $/Monat (2.000 Basic + 400 Bank-Credits) bis 115 $/Monat.",
-          "libs": "Kostenlos (MIT/LGPL). Die Kosten sind Ihre Zeit."
+          "ibanapi": "Vorausbezahlte Credits, die mit dem Plan verfallen: 15 $ für 60 Tage (2'000 Basis + 400 Bankabfragen) bis 115 $ für ein Jahr (30'000 + 5'000).",
+          "libs": "Kostenlos (MIT/LGPL). Die Kosten sind Ihre Zeit.",
+          "abstract": "Monatsabo: 99 $ pro Monat für 60'000 Anfragen pro Monat (etwa 0,00165 $ pro Aufruf), Volumenregler bis 199 $ und 499 $. Kostenlos: 100 Anfragen, 1 Anfrage pro Sekunde."
         },
         "example": {
           "label": "2.000 Validierungen mit Bankdaten",
           "ibanforge": "10 $ einmalig (2 × 1k-Packs) — kein Verfall, kein Abo",
           "ibancom": "530 €/Jahr (Professional-Plan)",
           "ibanapi": "Stufe ≥ 40 $/Monat (Bank-Credits sind die harte Grenze: 400/Monat bei 15 $)",
-          "libs": "0 $ — aber gar keine Bankdaten (nur Struktur + Prüfsumme)"
+          "libs": "0 $ — aber gar keine Bankdaten (nur Struktur + Prüfsumme)",
+          "abstract": "Keine Bankdaten zu keinem Preis: Die Antwort ist {\"iban\": \"...\", \"is_valid\": true}. Für 2'000 Boolesche Prüfungen 99 $ pro Monat."
         },
         "freeTier": {
           "label": "Kostenloses Kontingent",
           "ibanforge": "200 Anfragen/Monat, keine Karte, Schlüssel per E-Mail in einem Aufruf",
           "ibancom": "Test mit 100 Anfragen, läuft nach einem Monat ab",
           "ibanapi": "100 Basic + 20 Bank-Credits, 30 Tage",
-          "libs": "Alles kostenlos"
+          "libs": "Alles kostenlos",
+          "abstract": "100 Anfragen, 1 Anfrage pro Sekunde"
         },
         "bankData": {
           "label": "Bankidentifikation (BIC, Name)",
           "ibanforge": "121k+ BICs, 39k+ LEI-angereichert via GLEIF, monatlich aktualisiert",
           "ibancom": "Ja — ihr Kernprodukt",
           "ibanapi": "„Falls verfügbar“ laut Doku",
-          "libs": "Nein — nur strukturelle Validierung"
+          "libs": "Nein — nur strukturelle Validierung",
+          "abstract": "Nein. Nur ein Boolescher Wert"
         },
         "swiss": {
           "label": "Schweizer Clearing-Tiefe (SIC / euroSIC / QR-IID)",
           "ibanforge": "1,100+ SIX-BankMaster-Einträge, Instant-Rail-Teilnahme, QR-IID-Semantik",
           "ibancom": "Nicht als Produkt angeboten",
           "ibanapi": "Nein",
-          "libs": "Nein"
+          "libs": "Nein",
+          "abstract": "Nein"
         },
         "compliance": {
           "label": "Compliance-Vorprüfung (Sanktionen, FATF, VoP-Pflicht)",
           "ibanforge": "Ein Endpunkt, 0,02 $: Bankprüfung (OFAC, EU, UN), FATF-Listen, SEPA/VoP-Daten, Score 0–100",
           "ibancom": "Separate Produkte (BAV/VoP ab 2.000 € je 2.500 Prüfungen)",
           "ibanapi": "Nein",
-          "libs": "Nein"
+          "libs": "Nein",
+          "abstract": "Nein"
         },
         "agents": {
           "label": "KI-Agenten (MCP, autonome Zahlung)",
           "ibanforge": "Nativer MCP-Server (8 Tools) + x402-Zahlung in USDC — ein Agent zahlt ohne Konto",
           "ibancom": "Nein",
           "ibanapi": "Nein",
-          "libs": "Nein (eine Bibliothek, kein Dienst)"
+          "libs": "Nein (eine Bibliothek, kein Dienst)",
+          "abstract": "Nein"
         },
         "signup": {
           "label": "Zeit bis zum ersten Aufruf",
           "ibanforge": "Ein curl für einen kostenlosen Schlüssel — oder null Anmeldung via x402",
           "ibancom": "Bestellformular, Jahresvertrag",
           "ibanapi": "Konto anlegen",
-          "libs": "npm/pip install"
+          "libs": "npm/pip install",
+          "abstract": "Kontoerstellung"
         },
         "trust": {
           "label": "Veröffentlichte Rechts-/Ops-Unterlagen",
           "ibanforge": "AGB, Datenschutz, vorunterzeichneter DPA, OEM-SLA, Live-Statusseite — alles öffentlich. Telemetrie löscht sich 30 Tage nach Kündigung selbst (DPA 4.7)",
           "ibancom": "Enterprise-Bedingungen auf Anfrage (Stand Juli 2026 nicht veröffentlicht)",
           "ibanapi": "AGB/Datenschutz veröffentlicht; keine öffentliche Statusseite gefunden (Juli 2026)",
-          "libs": "Lizenzdatei"
+          "libs": "Lizenzdatei",
+          "abstract": "AGB und Datenschutz veröffentlicht"
         }
       }
     },
@@ -1333,7 +1352,56 @@
       "getKey": "Kostenlosen Schlüssel holen",
       "playground": "Playground öffnen"
     },
-    "footnote": "Preise am 11. Juli 2026 auf iban.com/pricing und ibanapi.com/prices erhoben. MwSt. und Plandetails liegen bei den Anbietern; deren Seiten sind massgeblich."
+    "footnote": "Preise am 11. Juli 2026 auf iban.com/pricing und ibanapi.com/prices erhoben. MwSt. und Plandetails liegen bei den Anbietern; deren Seiten sind massgeblich.",
+    "honest": {
+      "heading": "Wo wir verlieren, klar gesagt",
+      "items": [
+        "Pro Aufruf ist AbstractAPI dreimal günstiger als wir: etwa 0,00165 $ gegen 0,005 $. Wenn Ihnen ein Boolescher Wert genügt, kosten 60'000 Prüfungen pro Monat dort 99 $ und bei uns etwa 200 $ in Paketen zu 25'000 Credits. Sie kaufen nicht dasselbe, aber Sie sollten die Zahl kennen.",
+        "Java und .NET haben noch kein IBANforge-SDK. IbanNet und iban4j sind die De-facto-Standards dieser Ökosysteme für Struktur und Prüfziffer; wir liefern die Daten, die sie bewusst nicht liefern, über REST, Python und TypeScript."
+      ]
+    },
+    "others": {
+      "heading": "Ebenfalls am Markt, am selben Tag geprüft",
+      "cols": {
+        "vendor": "Anbieter",
+        "sells": "Was er verkauft",
+        "price": "Preis, gelesen am 2. September 2026",
+        "free": "Kostenlose Stufe"
+      },
+      "rows": [
+        {
+          "vendor": "iban.de",
+          "sells": "IBAN-Berechnung und -Validierung, dieselben Stufen wie iban.com, etwa 20 % günstiger",
+          "price": "420 € bis 3'800 € pro Jahr, Laufzeit ein Jahr",
+          "free": "Keine gefunden"
+        },
+        {
+          "vendor": "iban-test.eu",
+          "sells": "40 Länder gegen echte Verzeichnisse, 111 nur syntaktisch, ein gehosteter MCP-Server",
+          "price": "10 kostenlose Prüfungen, danach ein nicht ausgelesenes Preisraster",
+          "free": "10 Prüfungen"
+        },
+        {
+          "vendor": "apilayer bankdataapi",
+          "sells": "IBAN, SWIFT, deutsche BLZ, US-Routing-Nummern",
+          "price": "39,99 $ pro Monat für 2'500 bis 239,99 $ pro Monat für 60'000",
+          "free": "100 pro Monat"
+        },
+        {
+          "vendor": "API Ninjas",
+          "sells": "IBAN-Zerlegung; Bankname, Adresse und BIC den bezahlten Plänen vorbehalten",
+          "price": "39 $ pro Monat für 100'000 Aufrufe, geteilt über alle ihre APIs",
+          "free": "3'000 pro Monat, nicht kommerziell"
+        },
+        {
+          "vendor": "openiban",
+          "sells": "Prüfziffer plus Bankanreicherung für BE, DE, NL, LU, CH, AT, LI",
+          "price": "Für immer kostenlos, Open Source",
+          "free": "Alles"
+        }
+      ]
+    },
+    "footnoteExtra": "Geprüft am 2. September 2026:"
   },
   "testIban": {
     "metaTitle": "Test-IBAN-Generator — echte Bankcodes, gegen Nationalregister verifiziert",

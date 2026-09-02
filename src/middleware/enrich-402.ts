@@ -505,6 +505,16 @@ function buildAccessRamp(): Record<string, unknown> {
       signup: 'POST /v1/keys/generate with body {"email":"you@company.com"}',
       usage: 'Add header: Authorization: Bearer ifk_your_key_here',
     },
+    // The structural verdict is free and needs no key: format, checksum,
+    // country, BBAN. Until 02/09/2026 a caller who hit this wall had to guess
+    // that; the paid call is what adds the registry (BIC, bank, SEPA, sanctions,
+    // Swiss clearing), and the wall now says so.
+    free_structural_check: {
+      description:
+        'Structure, checksum, country and BBAN, free and without a key. Registry data (BIC, bank, SEPA, sanctions, Swiss clearing) is what the paid call adds.',
+      endpoint:
+        'GET /v1/iban/format?iban=CH9300762011623852957 or POST /v1/iban/format with body {"iban":"..."}',
+    },
     credit_packs: {
       description: 'Prepaid credits — never expire, lower per-call cost than retail',
       // 🚨 This field used to be an HTML anchor — `https://api.ibanforge.com/#pricing`

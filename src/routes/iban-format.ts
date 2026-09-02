@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import { z } from 'zod';
 import { validateIBAN } from '../lib/iban.js';
 import type { HonoEnv } from '../types.js';
@@ -29,15 +29,31 @@ const querySchema = z.object({
     .max(34, 'IBAN must be at most 34 characters'),
 });
 
-ibanFormat.get('/v1/iban/format', async (c) => {
-  const ibanQuery = c.req.query('iban');
+/**
+ * The free structural check, in both shapes a developer reaches for: the GET
+ * with a query string the docs have always shown, and a POST with the same
+ * JSON body as the paid validate call. A keyless POST to /v1/iban/validate
+ * answers 402 by design (that is the x402 paywall); this is the free door
+ * next to it, and the 402 body points here (enrich-402.ts).
+ */
+async function readIban(c: Context<HonoEnv>): Promise<string | undefined> {
+  if (c.req.method === 'POST') {
+    const body = await c.req.json<{ iban?: unknown }>().catch(() => ({}) as { iban?: unknown });
+    return typeof body.iban === 'string' ? body.iban : undefined;
+  }
+  return c.req.query('iban');
+}
+
+const formatHandler = async (c: Context<HonoEnv>) => {
+  const ibanQuery = await readIban(c);
 
   if (!ibanQuery) {
     return c.json(
       {
         error: 'missing_iban',
-        message: 'Pass ?iban=... as a query parameter.',
-        example: 'GET /v1/iban/format?iban=CH9300762011623852957',
+        message: 'Pass ?iban=... as a query parameter, or POST a JSON body {"iban":"..."}.',
+        example:
+          'GET /v1/iban/format?iban=CH9300762011623852957 or POST /v1/iban/format {"iban":"CH93..."}',
         upgrade_to_full_validation:
           'POST /v1/iban/validate ($0.005) — adds BIC, SEPA, VoP, sanctions, Swiss BC-Nummer.',
       },
@@ -99,6 +115,9 @@ ibanFormat.get('/v1/iban/format', async (c) => {
     upgrade_to_full_validation:
       'POST /v1/iban/validate ($0.005) — adds BIC, SEPA, VoP, sanctions, Swiss BC-Nummer.',
   });
-});
+};
+
+ibanFormat.get('/v1/iban/format', formatHandler);
+ibanFormat.post('/v1/iban/format', formatHandler);
 
 export { ibanFormat };

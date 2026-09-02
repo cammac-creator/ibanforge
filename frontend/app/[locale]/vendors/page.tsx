@@ -77,7 +77,7 @@ export default async function VendorsPage({
         </div>
       </section>
 
-      {/* ── VoP deadline band ─────────────────────────────────────────────── */}
+      {/* ── Structured-address deadline band ────────────────────────────── */}
       <section className="px-4 pb-8 max-w-4xl mx-auto w-full">
         <div className="rounded-xl border border-amber-500/25 bg-amber-500/5 p-7 sm:p-8 flex flex-col gap-4">
           <div className="flex flex-wrap items-center gap-3">
@@ -86,17 +86,55 @@ export default async function VendorsPage({
               className="text-amber-500 border-amber-500/40 bg-amber-500/10 font-mono text-xs inline-flex items-center gap-1.5"
             >
               <CalendarClock className="size-3.5" aria-hidden />
-              {t("vop.badge")}
+              {t("deadline.badge")}
             </Badge>
             <h2 className="text-lg sm:text-xl font-semibold tracking-tight font-mono text-amber-500">
-              {t("vop.title")}
+              {t("deadline.title")}
             </h2>
           </div>
           <p className="text-sm text-muted-foreground" style={{ lineHeight: 1.7 }}>
-            {t("vop.body")}
+            {t("deadline.body")}
           </p>
+          <p className="text-sm text-foreground/90" style={{ lineHeight: 1.7 }}>
+            {t("deadline.what")}
+          </p>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            <figure className="m-0 min-w-0">
+              <figcaption className="font-mono text-[11px] uppercase tracking-caps text-muted-foreground mb-1.5">
+                {t("deadline.refused")}
+              </figcaption>
+              <pre
+                className="text-[11.5px] leading-relaxed rounded-lg border p-3 overflow-x-auto whitespace-pre"
+                style={{ borderColor: "var(--ink-4)", background: "var(--ink-1)" }}
+              >{`curl -X POST https://api.ibanforge.com/v1/address/check \\
+  -H "Content-Type: application/json" \\
+  -d '{"scheme":"sps","address":{"ctry":"ch",
+       "adr_line":["Bahnhofstrasse 45","8001 Zurich"]}}'
+
+{ "conforms": false,
+  "findings": [ { "rule": "twn_nm_required", "verdict": "fail" },
+                { "rule": "ctry_iso3166",    "verdict": "fail" } ] }`}</pre>
+            </figure>
+            <figure className="m-0 min-w-0">
+              <figcaption className="font-mono text-[11px] uppercase tracking-caps text-muted-foreground mb-1.5">
+                {t("deadline.accepted")}
+              </figcaption>
+              <pre
+                className="text-[11.5px] leading-relaxed rounded-lg border p-3 overflow-x-auto whitespace-pre"
+                style={{ borderColor: "var(--ink-4)", background: "var(--ink-1)" }}
+              >{`curl -X POST https://api.ibanforge.com/v1/address/check \\
+  -H "Content-Type: application/json" \\
+  -d '{"scheme":"sps","address":{"strt_nm":"Bahnhofstrasse",
+       "bldg_nb":"45","pst_cd":"8001","twn_nm":"Zurich","ctry":"CH"}}'
+
+{ "conforms": true, "findings": [ ... all "pass" ... ] }`}</pre>
+            </figure>
+          </div>
           <p className="text-sm font-medium text-foreground border-t pt-4" style={{ borderColor: "rgba(245, 158, 11, 0.15)" }}>
-            {t("vop.note")}
+            {t("deadline.note")}
+          </p>
+          <p className="text-xs text-muted-foreground" style={{ lineHeight: 1.7 }}>
+            <span className="font-semibold text-foreground/80">{t("vop.title")}.</span> {t("vop.body")}
           </p>
         </div>
       </section>
@@ -175,6 +213,12 @@ export default async function VendorsPage({
           <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight" style={{ letterSpacing: "-0.02em" }}>
             {t("oem.title")}
           </h2>
+          <p className="text-3xl sm:text-4xl font-semibold tracking-tight font-mono text-amber-500">
+            {t("oem.price")}
+          </p>
+          <p className="text-sm text-foreground/90 max-w-xl text-balance" style={{ lineHeight: 1.7 }}>
+            {t("oem.priceDetail")}
+          </p>
           <p className="text-sm text-muted-foreground max-w-xl text-balance" style={{ lineHeight: 1.7 }}>
             {t("oem.body")}
           </p>
