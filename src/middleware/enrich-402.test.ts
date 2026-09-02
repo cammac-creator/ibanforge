@@ -2,7 +2,12 @@
 import { describe, it, expect } from 'vitest';
 import { Hono } from 'hono';
 import { enrich402Middleware } from './enrich-402.js';
-import { ENTRY_PAYMENT_LINK, PAYMENT_LINKS, PRICING_PAGE } from '../lib/payment-links.js';
+import {
+  ENTRY_PAYMENT_LINK,
+  PAYMENT_LINKS,
+  PRICING_PAGE,
+  PRO_PAYMENT_LINK,
+} from '../lib/payment-links.js';
 import type { HonoEnv, PaywallCause } from '../types.js';
 
 /**
@@ -496,15 +501,19 @@ describe('every 402 carries a card link a machine can follow', () => {
    * The private Editor/OEM Payment Link is sold in conversation and must never
    * appear on a public surface. It is not in payment-links.ts at all, which is
    * what makes importing from that module safe — this test says so out loud so
-   * nobody adds it there later.
+   * nobody adds it there later. The public links are the three packs and, since
+   * 2026-09-02, the Pro monthly plan (`monthly_plan.subscribe_by_card`), which
+   * is public by design and lives in the same module.
    */
-  it('publishes only the three public pack links', async () => {
+  it('publishes only the public links: three packs and the Pro plan', async () => {
     const raw = await (await anonymous402()).text();
     const links = raw.match(/https:\/\/buy\.stripe\.com\/[A-Za-z0-9]+/g) ?? [];
     expect(links.length).toBeGreaterThan(0);
+    const allowed = [...Object.values(PAYMENT_LINKS as Record<string, string>), PRO_PAYMENT_LINK];
     for (const link of links) {
-      expect(Object.values(PAYMENT_LINKS as Record<string, string>)).toContain(link);
+      expect(allowed).toContain(link);
     }
+    expect(links).toContain(PRO_PAYMENT_LINK);
   });
 });
 
