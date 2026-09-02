@@ -16,7 +16,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import {
   W, H, SCALE, STATIONS, stationById, REGISTRY_CCS,
   loadWorldImages, paintGround, paintVignette, drawSprite, drawActor, drawTinted,
-  SCENERY, HALOS, EMBER_ZONES, CHIMNEYS,
+  SCENERY, HALOS, EMBER_ZONES, CHIMNEYS, ACTOR_SCALE,
   type Actor, type StationGeo, type WorldImages,
 } from "./world"
 import { roadRoute } from "@/lib/village/roads"
@@ -130,10 +130,21 @@ export function VillageCanvas({ labels, tips, heroTip, villagerTip, idle, canvas
       wt: i * 1.9, tx: undefined as number | undefined, ty: undefined as number | undefined,
     })),
     agents: {
+      // tranche D: the owner's boards — gate guard, scribe, cutter, border
+      // officer, national registrar (armband tinted per country, moves to
+      // the visited house); the librarian, sorter and usher keep their clerks
+      gate: { x: 32, y: 198, dir: 1, kind: "agent-gate", face: "down" } as Actor,
+      scribe: { x: 186, y: 196, dir: 1, kind: "agent-scribe", face: "down" } as Actor,
+      cutter: { x: 352, y: 196, dir: -1, kind: "agent-cutter", face: "down" } as Actor,
       library: { x: 722, y: 186, dir: -1, kind: "clerk3", face: "down" } as Actor,
+      registrar: { x: 589, y: 348, dir: -1, kind: "agent-registrar-DE", face: "down" } as Actor,
       classifier: { x: 216, y: 346, dir: 1, kind: "clerk0", face: "down" } as Actor,
       court: { x: 346, y: 348, dir: -1, kind: "clerk1", face: "down" } as Actor,
+      border: { x: 254, y: 500, dir: 1, kind: "agent-border", face: "down" } as Actor,
     } as Record<string, Actor>,
+    /** the smith at his anvil: two boards, hammer up and hammer down */
+    smith: { x: 526, y: 502 },
+    smithDownUntil: 0,
     watcher: { x: 900, y: 494, dir: -1, kind: "clerk5", face: "down" } as Actor,
     archivist: { x: 126, y: 502, dir: 1, kind: "clerk4", face: "down" } as Actor,
     couriers: [] as { key: number; tip: StationTip; actor: Actor; pts: [number, number][]; i: number }[],
@@ -245,7 +256,7 @@ export function VillageCanvas({ labels, tips, heroTip, villagerTip, idle, canvas
       if (w.slot && t - w.slot.t0 > w.slot.dur) w.slot = null
       if (w.beam && t - w.beam.t0 > w.beam.dur) w.beam = null
       if (w.shutter && t - w.shutter.t0 > 2000) w.shutter = null
-      w.gestures = w.gestures.filter((g) => { g.a.moving = t < g.until; return t < g.until })
+      w.gestures = w.gestures.filter((g) => { const on = t < g.until; g.a.moving = on; if (!on) g.a.face = "down"; return on })
       if (w.drop && !w.drop.landed && t >= w.drop.t0 + w.drop.dur) {
         // the seal lands: the one moment an effect leaves its building
         const d = w.drop
@@ -364,6 +375,10 @@ export function VillageCanvas({ labels, tips, heroTip, villagerTip, idle, canvas
           } else {
             drawSprite(ctx, img, p.sprite, cx, p.base, { scale: p.scale, flip: p.flip })
           }
+          // the pictorial sign (tranche D): one symbol, no letters, lifts with its building
+          if (p.sign && p.signDx !== undefined && p.signDy !== undefined) {
+            drawSprite(ctx, img, p.sign, cx + p.signDx, p.base + p.signDy, { dy: hot ? -2 : 0 })
+          }
         },
       }))
       const actors: Actor[] = [
@@ -392,6 +407,15 @@ export function VillageCanvas({ labels, tips, heroTip, villagerTip, idle, canvas
         const c = w.cart
         ents.push({ base: c.y + 10, draw: () => drawSprite(ctx, img, "cart", c.x, c.y + 10, { flip: c.dir < 0 }) })
       }
+      // the smith and his anvil, hammer up between strikes
+      ents.push({
+        base: w.smith.y,
+        draw: () => {
+          ctx.save(); ctx.globalAlpha = 0.25; ctx.fillStyle = "#0A0A12"
+          ctx.beginPath(); ctx.ellipse(w.smith.x, w.smith.y + 1.5, 9, 3, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore()
+          drawSprite(ctx, img, t < w.smithDownUntil ? "agent-smith-down" : "agent-smith-up", w.smith.x, w.smith.y, { scale: ACTOR_SCALE })
+        },
+      })
       ents.sort((a, b) => a.base - b.base)
       for (const e of ents) e.draw()
       // transient props: the ingot cooling on the anvil, the spark burst
@@ -737,10 +761,12 @@ export function VillageCanvas({ labels, tips, heroTip, villagerTip, idle, canvas
       const hx = w.hero.x, hy = w.hero.y
       const p = step.params ?? {}
       if (step.station === "gate") {
+        gesture("gate")
         w.seals.push({ x: 46, y: 140, sprite: "coin", l: 90 })
         wave(46, 196, 40, 700)
       }
       if (step.station === "scribe") {
+        gesture("scribe")
         if (step.outcome === "fail") {
           w.seals.push({ x: 204, y: 116, sprite: "seal-x", l: 110, tint: "#B91C1C" })
           wave(210, 196, 70, 800, "#EF4444", 2.5); thump(90, 2.5)
@@ -750,12 +776,16 @@ export function VillageCanvas({ labels, tips, heroTip, villagerTip, idle, canvas
           thump(60, 1.5); wave(210, 196, 34, 600)
         }
       }
-      if (step.key === "cutter") w.cards.push({ mode: "split", ax: 330, ay: 168, bx: 330, by: 168, t0: now(), dur: 900, hold: 1400 })
+      if (step.key === "cutter") { gesture("cutter"); w.cards.push({ mode: "split", ax: 330, ay: 168, bx: 330, by: 168, t0: now(), dur: 900, hold: 1400 }) }
       if (step.station === "library" && p.found) {
         gesture("library")
         w.cards.push({ mode: "slip", ax: 712, ay: 168, bx: hx, by: hy - 34, t0: now(), dur: 700, hold: 1500, dot: true })
       }
       if (step.station === "registry" && target) {
+        // the registrar of THIS country steps out beside the visited door
+        const reg = w.agents.registrar
+        reg.kind = `agent-registrar-${target.cc ?? "DE"}`; reg.x = target.door[0] + 16; reg.y = target.door[1] - 2; reg.dir = -1
+        gesture("registrar")
         w.shutter = { x: target.door[0], y: target.door[1] - 26, t0: now() }
         if (!(await sleep(R ? 0 : 400))) return
         w.cards.push({ mode: "slip", ax: target.door[0], ay: target.door[1] - 24, bx: hx, by: hy - 34, t0: now(), dur: 600, hold: 1200, dot: true })
@@ -774,6 +804,7 @@ export function VillageCanvas({ labels, tips, heroTip, villagerTip, idle, canvas
         w.slot = { x: 204 + idx * 20, y: 290, w: 16, h: 12, t0: now() + 600, dur: 1600 }
       }
       if (step.station === "border") {
+        gesture("border")
         if (p.sepa) w.barrierTarget = 1
         if (!(await sleep(R ? 0 : 400))) return
         if (p.vopParticipant) w.cards.push({ mode: "pair", ax: 280, ay: 474, bx: 280, by: 474, t0: now(), dur: 900, hold: 1400 })
@@ -798,6 +829,7 @@ export function VillageCanvas({ labels, tips, heroTip, villagerTip, idle, canvas
         if (!R) {
           for (const k of [0, 1, 2]) {
             const strong = k === 2
+            w.smithDownUntil = now() + 150
             w.hitstopUntil = now() + (strong ? 120 : 90)
             w.flash = strong ? 0.16 : 0.1
             w.shake = { amp: strong ? 4.5 : 3, t0: now() }
@@ -1003,6 +1035,12 @@ export function VillageCanvas({ labels, tips, heroTip, villagerTip, idle, canvas
     else if (near(w.archivist)) found = tips.archive ?? null
     else if ((w.clerks as unknown as Actor[]).some(near)) found = villagerTip
     else if (near(w.agents.library)) { found = tips.library ?? null; station = "library" }
+    else if (near(w.agents.gate)) { found = tips.gate ?? null; station = "gate" }
+    else if (near(w.agents.scribe)) { found = tips.scribe ?? null; station = "scribe" }
+    else if (near(w.agents.cutter)) { found = tips.cutter ?? null; station = "cutter" }
+    else if (near(w.agents.border)) { found = tips.border ?? null; station = "border" }
+    else if (near(w.agents.registrar)) { const cc = w.agents.registrar.kind.slice(-2); found = tips[`reg-${cc}`] ?? null; station = `reg-${cc}` }
+    else if (Math.abs(mx - w.smith.x) < 12 && Math.abs(my - (w.smith.y - 18)) < 22) { found = tips.forge ?? null; station = "forge" }
     else if (near(w.agents.classifier)) { found = tips.classifier ?? null; station = "classifier" }
     else if (near(w.agents.court)) { found = tips.court ?? null; station = "court" }
     else {

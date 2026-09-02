@@ -140,7 +140,8 @@ export const STATIONS: StationGeo[] = [
   // the barrier sits ACROSS the bottom street: the hero passes through it
   geo('border', 'fence', 280, 506, 104, 46, [280, 498], [280, 498]),
   geo('tower', 'tower', 380, 496, 64, 140, [380, 504], [380, 498], { scale: 0.82 }),
-  geo('forge', 'forge', 560, 488, 152, 126, [537, 500], [537, 498]),
+  // the smith stands at the hearth (tranche D); the hero stops beside him
+  geo('forge', 'forge', 560, 488, 152, 126, [562, 500], [562, 498]),
   geo('archive', 'archive-b', 140, 486, 91, 72, [140, 502], [140, 498]),
   geo('vigil', 'vigil-booth', 906, 476, 56, 60, [906, 496], [906, 498]),
 ];
@@ -221,11 +222,43 @@ export function paintGround(ctx: Ctx, img: WorldImages) {
 }
 
 /** Fixed scenery, merged with actors each frame and sorted by base line. */
-export interface Placed { sprite: string; cx: number; base: number; scale?: number; flip?: boolean; id?: string }
+export interface Placed {
+  sprite: string; cx: number; base: number; scale?: number; flip?: boolean; id?: string;
+  /** the pictorial sign hung on the building (tranche D): frame + offset from (cx, base) */
+  sign?: string; signDx?: number; signDy?: number;
+}
+/** One symbol per craft, a national shield per registry house: the world
+ * names its buildings without a single character (the twenty labels left
+ * in tranche B; the rail carries the words). */
+const SIGN_FOR: Record<string, string> = {
+  gate: 'sign-gate', scribe: 'sign-scribe', cutter: 'sign-cutter', library: 'sign-library',
+  court: 'sign-court', classifier: 'sign-classifier', border: 'sign-border', tower: 'sign-tower',
+  forge: 'sign-forge', archive: 'sign-archive', warehouse: 'sign-warehouse',
+  'reg-DE': 'shield-DE', 'reg-AT': 'shield-AT', 'reg-BE': 'shield-BE',
+  'reg-BG': 'shield-BG', 'reg-NL': 'shield-NL', 'reg-FI': 'shield-FI',
+};
+/** where each sign hangs, relative to the building's (cx, base) */
+function signAt(s: StationGeo): [number, number] {
+  if (s.cc) return [0, -s.bh + 20];                 // shield above the door
+  switch (s.id) {
+    case 'gate': return [-s.bw / 2 + 4, -s.bh + 40];
+    case 'library': return [-s.bw / 2 + 22, -s.bh + 46];
+    case 'tower': return [-26, -30];
+    case 'border': return [54, -32];                 // by the signpost, not on the fence
+    case 'forge': return [-s.bw / 2 + 30, -s.bh + 44];
+    case 'warehouse': return [-s.bw / 2 + 26, -s.bh + 40];
+    case 'six': return [-s.bw / 2 + 14, -s.bh + 40];
+    default: return [-s.bw / 2 + 12, -s.bh + 26];
+  }
+}
 export const SCENERY: Placed[] = [
-  ...STATIONS.filter((s) => s.sprite).map((s) => ({
-    sprite: s.sprite!, cx: s.cx, base: s.base, scale: s.scale, flip: s.flip, id: s.id,
-  })),
+  ...STATIONS.filter((s) => s.sprite).map((s) => {
+    const [signDx, signDy] = signAt(s);
+    return {
+      sprite: s.sprite!, cx: s.cx, base: s.base, scale: s.scale, flip: s.flip, id: s.id,
+      sign: SIGN_FOR[s.id], signDx, signDy,
+    };
+  }),
   { sprite: 'signpost', cx: 322, base: 496 },   // border post sign, by the barrier
   { sprite: 'cart', cx: 752, base: 100 },       // parked cart, by the depot
   { sprite: 'tree2', cx: 140, base: 112 },      // fills the corner the depot left
@@ -263,9 +296,11 @@ export function paintVignette(ctx: Ctx) {
 
 /* ---------- actors ---------- */
 
-export type ActorKind =
-  | 'hero' | 'cour-a' | 'cour-b' | 'cour-c'
-  | 'clerk0' | 'clerk1' | 'clerk2' | 'clerk3' | 'clerk4' | 'clerk5';
+/** 'hero', 'cour-a/b/c', 'clerk0..5', and since tranche D the agents cut
+ * from the owner's boards ('agent-gate', 'agent-scribe', 'agent-cutter',
+ * 'agent-border', 'agent-registrar-DE'…). Frames are `${kind}-${face}`,
+ * falling back to `${kind}-front`, then to the bare kind. */
+export type ActorKind = string;
 
 export interface Actor {
   x: number; y: number; dir: 1 | -1;
@@ -292,6 +327,8 @@ export function drawActor(ctx: Ctx, img: WorldImages, a: Actor, t: number, reduc
     const face = a.face ?? 'down';
     const suffix = face === 'side' ? 'side' : face === 'up' ? 'back' : 'front';
     name = `${a.kind}-${suffix}`;
+    // a board may carry fewer poses than three: fall back rather than vanish
+    if (!img.meta[name]) name = img.meta[`${a.kind}-front`] ? `${a.kind}-front` : a.kind;
   }
   // soft contact shadow first, sprite on top
   ctx.save();
