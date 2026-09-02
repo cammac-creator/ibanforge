@@ -1175,12 +1175,13 @@
     "deadline": {
       "badge": "Dated deadline",
       "title": "Structured addresses: 14 and 15 November 2026",
-      "body": "On 14 November 2026 the Swiss Payment Standards 2026 come into force, and SIX states that payments which do not meet the structured-address rules can no longer be processed. On 15 November 2026 the EPC schemes (SCT, SCT Inst, SDD) accept structured and hybrid addresses only, and the country element becomes mandatory as soon as one agent sits in a SEPA country outside the EEA, which is Switzerland. Every invoicing, accounting or ERP product that emits a payment file is concerned.",
+      "body": "On 14 November 2026 the Swiss Payment Standards 2026 come into force, and SIX states that payments which do not meet the structured-address rules can no longer be processed. On 15 November 2026 the EPC schemes (SCT, SCT Inst, SDD) accept structured and hybrid addresses only, and the country element becomes mandatory as soon as one agent sits in a SEPA country outside the EEA, which is Switzerland. Every invoicing, accounting or ERP product that emits a payment file is concerned. Since 27 August 2026 Swift has deferred its own November 2026 date for cross-border messages without setting a new one; SIX and the EPC had not changed anything on 2 September 2026.",
       "what": "Two things this API does about it, both already live. A free conformity check tells you, rule by rule and with the document each rule comes from, whether an address you have structured passes a given rail. And resolving a clearing code or an IBAN into a BIC often removes the agent-address obligation altogether: hold the BIC, and that branch of the rule does not apply to you.",
       "refused": "Refused: a country in lowercase and no town element",
       "accepted": "Accepted: town, country and the street in their own elements",
       "note": "What it does not do: it does not migrate your customers' address book, and it does not parse free text into a structured address. It checks what you have structured, for free, and it names the document behind every verdict.",
-      "qrTool": "Holding a QR-bill? Check whether its address is structured or combined, free."
+      "qrTool": "Holding a QR-bill? Check whether its address is structured or combined, free.",
+      "datesLink": "Which date is THE date? The state of every rail, with sources."
     },
     "vop": {
       "title": "And Verification of Payee",

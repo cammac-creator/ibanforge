@@ -1175,12 +1175,13 @@
     "deadline": {
       "badge": "Échéance datée",
       "title": "Adresses structurées : 14 et 15 novembre 2026",
-      "body": "Le 14 novembre 2026, les Swiss Payment Standards 2026 entrent en vigueur, et SIX écrit que les paiements qui ne respectent pas les règles d'adresse structurée ne peuvent plus être traités. Le 15 novembre 2026, les schémas EPC (SCT, SCT Inst, SDD) n'acceptent plus que les adresses structurées et hybrides, et l'élément pays devient obligatoire dès qu'un agent se trouve dans un pays SEPA hors EEE, c'est-à-dire la Suisse. Tout produit de facturation, de comptabilité ou d'ERP qui émet un fichier de paiement est concerné.",
+      "body": "Le 14 novembre 2026, les Swiss Payment Standards 2026 entrent en vigueur, et SIX écrit que les paiements qui ne respectent pas les règles d'adresse structurée ne peuvent plus être traités. Le 15 novembre 2026, les schémas EPC (SCT, SCT Inst, SDD) n'acceptent plus que les adresses structurées et hybrides, et l'élément pays devient obligatoire dès qu'un agent se trouve dans un pays SEPA hors EEE, c'est-à-dire la Suisse. Tout produit de facturation, de comptabilité ou d'ERP qui émet un fichier de paiement est concerné. Depuis le 27 août 2026, Swift a reporté sa propre date de novembre 2026 pour les messages transfrontaliers sans en fixer une nouvelle ; SIX et l'EPC n'avaient rien changé au 2 septembre 2026.",
       "what": "Deux choses que cette API fait pour vous, déjà en production. Un contrôle de conformité gratuit vous dit, règle par règle et avec le document dont chaque règle provient, si une adresse que vous avez structurée passe sur un rail donné. Et résoudre un code de clearing ou un IBAN en BIC supprime souvent l'obligation d'adresse de l'agent : détenez le BIC, et cette branche de la règle ne s'applique plus à vous.",
       "refused": "Refusée : un pays en minuscules et pas d'élément localité",
       "accepted": "Acceptée : localité, pays et rue dans leurs propres éléments",
       "note": "Ce qu'elle ne fait pas : elle ne migre pas le carnet d'adresses de vos clients et ne transforme pas un texte libre en adresse structurée. Elle contrôle ce que vous avez structuré, gratuitement, et nomme le document derrière chaque verdict.",
-      "qrTool": "Vous tenez une QR-facture ? Vérifiez si son adresse est structurée ou combinée, gratuitement."
+      "qrTool": "Vous tenez une QR-facture ? Vérifiez si son adresse est structurée ou combinée, gratuitement.",
+      "datesLink": "Quelle est LA date ? L'état de chaque rail, avec les sources."
     },
     "vop": {
       "title": "Et la Verification of Payee",

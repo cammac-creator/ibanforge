@@ -1175,12 +1175,13 @@
     "deadline": {
       "badge": "Datierter Stichtag",
       "title": "Strukturierte Adressen: 14. und 15. November 2026",
-      "body": "Am 14. November 2026 treten die Swiss Payment Standards 2026 in Kraft, und SIX schreibt, dass Zahlungen, welche die Regeln zur strukturierten Adresse nicht erfüllen, nicht mehr verarbeitet werden können. Am 15. November 2026 akzeptieren die EPC-Schemen (SCT, SCT Inst, SDD) nur noch strukturierte und hybride Adressen, und das Element Land wird Pflicht, sobald ein Agent in einem SEPA-Land ausserhalb des EWR sitzt, also in der Schweiz. Jedes Fakturierungs-, Buchhaltungs- oder ERP-Produkt, das eine Zahlungsdatei erzeugt, ist betroffen.",
+      "body": "Am 14. November 2026 treten die Swiss Payment Standards 2026 in Kraft, und SIX schreibt, dass Zahlungen, welche die Regeln zur strukturierten Adresse nicht erfüllen, nicht mehr verarbeitet werden können. Am 15. November 2026 akzeptieren die EPC-Schemen (SCT, SCT Inst, SDD) nur noch strukturierte und hybride Adressen, und das Element Land wird Pflicht, sobald ein Agent in einem SEPA-Land ausserhalb des EWR sitzt, also in der Schweiz. Jedes Fakturierungs-, Buchhaltungs- oder ERP-Produkt, das eine Zahlungsdatei erzeugt, ist betroffen. Seit dem 27. August 2026 hat Swift sein eigenes Datum vom November 2026 für grenzüberschreitende Nachrichten ohne neues Datum verschoben; SIX und der EPC hatten am 2. September 2026 nichts geändert.",
       "what": "Zwei Dinge, die diese API dafür tut, beide bereits produktiv. Eine kostenlose Konformitätsprüfung sagt Ihnen Regel für Regel, mit dem Dokument, aus dem jede Regel stammt, ob eine von Ihnen strukturierte Adresse auf einer bestimmten Schiene besteht. Und das Auflösen eines Clearing-Codes oder einer IBAN in einen BIC hebt die Adresspflicht des Agenten oft ganz auf: Wer den BIC hat, für den gilt dieser Zweig der Regel nicht.",
       "refused": "Abgelehnt: Land in Kleinbuchstaben und kein Ortselement",
       "accepted": "Akzeptiert: Ort, Land und Strasse in eigenen Elementen",
       "note": "Was sie nicht tut: Sie migriert nicht das Adressbuch Ihrer Kunden und macht aus Freitext keine strukturierte Adresse. Sie prüft, was Sie strukturiert haben, kostenlos, und nennt zu jedem Urteil das Dokument dahinter.",
-      "qrTool": "Sie halten eine QR-Rechnung? Prüfen Sie kostenlos, ob ihre Adresse strukturiert oder kombiniert ist."
+      "qrTool": "Sie halten eine QR-Rechnung? Prüfen Sie kostenlos, ob ihre Adresse strukturiert oder kombiniert ist.",
+      "datesLink": "Welches Datum ist DAS Datum? Der Stand jeder Schiene, mit Quellen."
     },
     "vop": {
       "title": "Und Verification of Payee",

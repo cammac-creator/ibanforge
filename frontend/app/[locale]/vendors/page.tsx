@@ -103,6 +103,11 @@ export default async function VendorsPage({
               {t("deadline.qrTool")}
             </Link>
           </p>
+          <p className="text-sm">
+            <Link href={`/${locale}/blog/2026-09-02-which-date-structured-addresses`} className="underline underline-offset-4">
+              {t("deadline.datesLink")}
+            </Link>
+          </p>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
             <figure className="m-0 min-w-0">
               <figcaption className="font-mono text-[11px] uppercase tracking-caps text-muted-foreground mb-1.5">

@@ -1,0 +1,59 @@
+---
+title: "Quelle est LA date ? Les adresses structurées dans les paiements, rail par rail, au 2 septembre 2026"
+description: "Quatre dates circulent pour la fin des adresses postales non structurées dans les paiements. Le 27 août 2026, Swift a suspendu la sienne. SIX, l'Eurosystème et l'EPC n'ont pas bougé. Fedwire et la Banque d'Angleterre visent 2027. Voici l'état de chaque rail, avec le document et la phrase derrière chaque date."
+date: "2026-09-02"
+---
+
+Demandez à cinq personnes des paiements quand les adresses non structurées cessent d'être acceptées et vous obtenez quatre dates : 14 novembre 2026, 15 novembre 2026, 16 novembre 2026, 22 novembre 2026. Redemandez après le 27 août 2026 et la réponse honnête est : cela dépend du rail, et l'un des plus grands rails n'a plus de date du tout.
+
+Nous avons lu les six sources primaires le 2 septembre 2026 : SIX, Swift, la Banque centrale européenne, la Réserve fédérale, l'European Payments Council et la Banque d'Angleterre. Voici l'état de chacune, avec le document et la phrase d'où elle sort. Quand une source était inaccessible en direct, nous avons lu la copie archivée et nous le disons.
+
+## Ce qui a changé le 27 août 2026
+
+Swift a annoncé accepter une demande de la communauté de prolonger la migration vers l'adresse structurée dans les messages de paiement ISO 20022. Dans ses mots : « Swift has agreed to extend the timeline. Swift will defer all payments changes. It will provide an update by December, at the latest, as part of its governance cycle. » Le retrait des adresses postales non structurées dans les messages CBPR+, prévu pour la Standards Release mise en production le 14 novembre 2026, est donc suspendu sans date de remplacement.
+
+Six jours plus tard, les normes suisses, les spécifications de l'Eurosystème et les rulebooks de l'EPC affichent encore novembre 2026. Personne n'a republié. C'est avec cette situation qu'un plan de migration doit vivre.
+
+## L'état de chaque rail
+
+| Date | Rail | Ce qui s'arrête | État au 2 septembre 2026 |
+|---|---|---|---|
+| 21/22 novembre 2025 | SIX, Implementation Guidelines QR-facture 2.2 vers 2.3 | Adresse combinée (type K) retirée de la QR-facture ; seule l'adresse structurée (type S) admise | En vigueur |
+| 22 novembre 2025 | SIX, Swiss Payment Standards 2025 | Adresse hybride introduite, facultative | En vigueur |
+| 22 novembre 2025 | Swift | Fin de la coexistence MT et ISO 20022. Un autre sujet, pas une date d'adresse | En vigueur |
+| 13 novembre 2026 | SIX | Les banques doivent avoir assaini ordres permanents et modèles de paiement | Toujours publié, non revu depuis le 27 août |
+| 14 novembre 2026 | SIX, Swiss Payment Standards 2026 (Business Rules 3.3, guidelines virement 2.3) | Les paiements qui ne respectent pas les règles d'adresse structurée ou hybride ne sont plus traités | Toujours publié, non revu depuis le 27 août |
+| 14 novembre 2026 | Swift Standards Release 2026, CBPR+ | Adresses non structurées rejetées dans les messages transfrontaliers | Suspendu le 27 août 2026 ; mise à jour promise pour décembre 2026 au plus tard |
+| 14 novembre 2026 | Eurosystème T2, release R2026.NOV | Règle « Town Name And Country », dérivée de HVPS+ | Spécifications du 3 août 2026 inchangées ; aucun report visible |
+| 15 novembre 2026 | EPC, rulebooks SCT et SCT Inst 2025 v1.1 | Adresses non structurées refusées dans les virements SEPA | Rulebooks du 5 octobre 2025 inchangés ; alignés par construction sur le week-end Swift |
+| 16 novembre 2026 | Fedwire Funds Service | Fin du format uniquement non structuré | Reporté à novembre 2027 ; la FAQ « format » dit encore « As of Nov 16 » |
+| Novembre 2027, non confirmé | Banque d'Angleterre, CHAPS | Retrait des champs d'adresse non structurée | La Banque attend un report de douze mois, « sous réserve de confirmation » |
+
+## Trois confusions à dissiper
+
+**14, 15 et 22 novembre 2026 ne sont pas trois dates rivales.** Le 22 novembre était le plan initial de l'EPC et de Swift, en 2023. Les rulebooks 2025 l'ont changé : « the initially determined date of 22 November 2026 has been changed into 15 November 2026. This amended date is aligned with the November 2026 Swift Standards MX Release date scheduled in the second full weekend of November 2026. » Swift et SIX nomment le samedi de mise en production, le 14 novembre ; l'EPC nomme le dimanche d'entrée en vigueur des schémas SEPA, le 15 novembre. Même week-end.
+
+**Le 5 octobre 2025 n'est pas une date d'adresse.** C'est la date d'émission des rulebooks EPC version 1.1. Elle apparaît dans des plans de migration comme si quelque chose avait basculé ce jour-là. Rien n'a basculé.
+
+**Fedwire se contredit sur son propre site.** La FAQ « format » dit encore « As of Nov 16, the Fedwire Funds Service will require the hybrid/end-state postal address requirements for all parties and agents. » La page sœur, dont le fil d'Ariane dit encore novembre 2026 mais dont le titre dit désormais novembre 2027, dit « FRFS has rescheduled its Fedwire Funds release to November 2027. The exact implementation date will be announced in the fall. »
+
+## Ce que cela veut dire si vous émettez des fichiers de paiement suisses
+
+La date suisse tient telle qu'elle est publiée. SIX n'a pas revu ses factsheets : dès le 14 novembre 2026, les paiements qui ne respectent pas les règles d'adresse structurée ne peuvent plus être traités, et les banques doivent avoir assaini ordres permanents et modèles pour le 13 novembre. Que SIX suive Swift ou non est inconnu aujourd'hui ; préparer le 14 novembre 2026 ne coûte rien qui serait perdu, parce que les adresses structurées et hybrides sont déjà acceptées partout. La Banque d'Angleterre dit la même chose de son propre rail : « there is no need to wait for the removal of unstructured fields before adopting them. »
+
+Pour les QR-factures, la question est déjà tranchée : l'adresse combinée (type K) a quitté la norme en novembre 2025, et seul le type S structuré subsiste.
+
+Trois choses sur ce site aident, gratuitement : [`POST /v1/address/check`](/fr/docs/structured-addresses) vous dit si une adresse que vous avez structurée passe les règles suisses, HVPS+ ou Fedwire, chaque constat nommant son document ; [`POST /v1/ch/qr-bill/check`](/fr/tools/qr-bill) lit une QR-facture entière et dit si ses adresses sont de type S ou encore de type K, avec la forme structurée proposée ; et l'[audit de fichier de créanciers](/fr/audit) passe les deux sur un fichier entier.
+
+## Sources, lues le 2 septembre 2026
+
+- SIX, factsheet « New Requirements QR-bill: Need for Action for SMEs », 19 août 2025 : « The new requirements for the QR-bill come into force on 22 November 2025. The most important adjustment is the sole support of the structured address (address type S). » La couverture des Implementation Guidelines QR-facture 2.3 porte « valid from 21 November 2025 » ; l'écart d'un jour n'est jamais expliqué.
+- SIX, factsheet « Adjustment of Addresses in Payment Orders and Migration to ISO 20022 Message Versions: Need for Action for SMEs », 19 août 2025 : « Payments that do not meet the new requirements can no longer be processed from 14 November 2026. » et « Financial institutions must ensure that existing standing orders and templates are adjusted by 13 November 2026 at the latest. »
+- SIX, Swiss Business Rules SPS 2026 version 3.3 et Swiss Implementation Guidelines Credit Transfer SPS 2026 version 2.3, datées du 20 février 2026, « valid from 14 November 2026 ».
+- Swift, communiqué du 27 août 2026, « Swift accepts community request to extend structured address migration for ISO 20022 payment messages ». L'article de mars 2026 « ISO 20022 milestone for November 2026 » porte désormais un bandeau qui y renvoie, son corps inchangé.
+- Banque centrale européenne, T2 RTGS User Detailed Functional Specifications R2026.NOV, note de couverture du 3 août 2026, règle Y058 « Town Name And Country Rule » ; calendrier « Start release deployment of T2 R2026.NOV to Production », 14 novembre 2026.
+- Federal Reserve Financial Services, FAQ format ISO 20022 du Fedwire Funds Service (« As of Nov 16 ») et « November 2027 Release Frequently Asked Questions » (« rescheduled its Fedwire Funds release to November 2027 »).
+- European Payments Council, rulebook SCT EPC125-05 et rulebook SCT Inst EPC004-16, version 2025 1.1, 5 octobre 2025 (copies archivées du 20 août 2026 ; le site répond 403 en direct).
+- Banque d'Angleterre, page « ISO 20022 » du programme de renouvellement RTGS, mise à jour après le 27 août 2026 : « Our current expectation is that implementation will be deferred by 12 months ... This approach remains subject to confirmation and validation. »
+
+Nous mettrons cette page à jour quand Swift publiera sa nouvelle date. Si vous tenez un document qui contredit une ligne ci-dessus, écrivez à support@ibanforge.com avec le document : cette page est faite pour être juste, pas pour être première.

@@ -85,7 +85,10 @@ const SRC_FED =
   'Federal Reserve Financial Services, ISO 20022 implementation center — Fedwire Funds Service changes ' +
   'effective 16 November 2026: "remove the fully unstructured postal address option in favor of a single ' +
   'hybrid postal address format for all parties and agents across all message types ... require town name ' +
-  'and country, and allow ... two free-text lines of up to 70 characters each" (frbservices.org, read 26.08.2026).';
+  'and country, and allow ... two free-text lines of up to 70 characters each" (frbservices.org, read 26.08.2026). ' +
+  'Rescheduled: the "November 2027 Release Frequently Asked Questions" page reads "FRFS has rescheduled its Fedwire ' +
+  'Funds release to November 2027 ... The exact implementation date will be announced in the fall" while the format ' +
+  'FAQ still says "As of Nov 16" (both read 02.09.2026). The rule content is unchanged; only its date moved.';
 
 const SRC_T2 =
   'European Central Bank, T2 RTGS User Detailed Functional Specifications R2026.NOV, 31 July 2026 — ' +
@@ -107,7 +110,11 @@ export const CBPR_NOTE =
   ' are published on swift.com, which was unreachable on 26.08.2026 (iso20022.org likewise; ' +
   'europeanpaymentscouncil.eu returns 403 on its document library). Every rule applied here is quoted from a ' +
   'document that was actually read, and each finding names it. A boolean claiming CBPR+ conformity would be a ' +
-  'guess dressed as a verdict.';
+  'guess dressed as a verdict. Dates, as of 02.09.2026: on 27 August 2026 Swift deferred all payments changes of ' +
+  'its November 2026 Standards Release, the retirement of unstructured addresses included, with an update promised ' +
+  'by December 2026 at the latest; SIX (14.11.2026), the Eurosystem T2 R2026.NOV and the EPC rulebooks (15.11.2026) ' +
+  'were unchanged on that day; Fedwire moved to November 2027; the Bank of England expects a twelve-month deferral, ' +
+  'subject to confirmation. See ibanforge.com/blog/2026-09-02-which-date-structured-addresses.';
 
 /** ISO 20022 `Max70Text` — the width of one `AdrLine`. */
 const ADR_LINE_MAX_LENGTH = 70;
