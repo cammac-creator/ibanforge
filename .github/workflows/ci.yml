@@ -154,7 +154,9 @@ jobs:
   # main — that is the evidence that it fails on breakage and not on weather.
   docker:
     runs-on: ubuntu-latest
-    continue-on-error: true
+    # Blocking since 02/09/2026: an image that does not boot is an outage for
+    # a service with a volume (the previous container is stopped first), so a
+    # failed boot here must stop the merge, not just decorate it.
     steps:
       - uses: actions/checkout@v7
 
