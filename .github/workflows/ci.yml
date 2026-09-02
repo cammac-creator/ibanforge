@@ -146,12 +146,10 @@ jobs:
   # base with no compiler — and the current discovery path for that is a failed
   # deploy on a platform whose restart policy gives up after 3 tries.
   #
-  # NON-BLOCKING for now (continue-on-error), on purpose: this job has never
-  # run, its cost on a runner is a full two-stage build plus a 36 MB database
-  # copy, and turning a brand-new job into a merge gate on its first day is how
-  # a green main becomes red for a reason nobody has yet read. Make it blocking
-  # (drop continue-on-error) once it has passed on ~10 consecutive pushes to
-  # main — that is the evidence that it fails on breakage and not on weather.
+  # BLOCKING since 02/09/2026. It was advisory while it proved itself; that
+  # same day an image that could not boot (a runtime import of a devDependency)
+  # reached Railway with a green CI and took the API down for thirteen
+  # minutes. The boot check is the one gate that reads the production image.
   docker:
     runs-on: ubuntu-latest
     # Blocking since 02/09/2026: an image that does not boot is an outage for
