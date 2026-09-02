@@ -55,7 +55,7 @@ const HANDLER = generateHandlerSource();
 
 /** Every HTTP status the handler can answer with. */
 const HANDLER_STATUSES = [
-  ...new Set([...HANDLER.matchAll(/\},\s*(\d{3})\)/g)].map((m) => m[1])),
+  ...new Set([...HANDLER.matchAll(/\},\s*(\d{3}),?\s*\)/g)].map((m) => m[1])),
 ].sort();
 
 /** Every machine-readable `error` value the handler can emit. */
