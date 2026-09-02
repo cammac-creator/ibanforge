@@ -36,7 +36,7 @@
     "mcp": "tsx src/mcp/server.ts",
     "docker:build": "docker build -t ibanforge .",
     "docker:run": "docker run -p 3000:3000 --env-file .env ibanforge",
-    "check": "npm run typecheck && npm run format:check && npm run lint && npm run test",
+    "check": "npm run typecheck && npm run format:check && npm run lint && npm run test && npm run deps:check",
     "bic:enrich": "npx tsx scripts/enrich-bic-database.ts",
     "issuers:build": "node scripts/build-issuer-index.mjs",
     "iban-registry:check": "npx tsx scripts/check-iban-registry.ts",
@@ -51,7 +51,8 @@
     "db:seed-uk": "tsx scripts/seed-uk-modulus.ts",
     "openapi:dump": "tsx scripts/dump-openapi.ts",
     "openapi:lint": "npm run openapi:dump && npx --yes @stoplight/spectral-cli@6 lint openapi.generated.json --ruleset .spectral.yaml",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "deps:check": "tsx scripts/check-runtime-deps.ts"
   },
   "dependencies": {
     "@coinbase/x402": "^2.1.0",
