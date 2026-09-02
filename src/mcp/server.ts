@@ -16,6 +16,7 @@ import { validatePaymentReference, buildReferenceCheck } from '../lib/payment-re
 import { checkPostalAddress, ADDRESS_SCHEMES, type AddressScheme } from '../lib/address-conformity.js';
 import { datasetFacts } from '../lib/dataset-facts.js';
 import { MCP_INSTRUCTIONS } from './instructions.js';
+import { TOOL_OUTPUT_SCHEMAS } from './output-schemas.js';
 // send_feedback : même insertion et mêmes clips de longueur que la route
 // publique POST /v1/feedback et que le transport HTTP — une seule écriture,
 // une seule liste de catégories.
@@ -92,6 +93,7 @@ Cost: $0.005 USDC per call via x402 micropayment on Base L2.`,
           "The IBAN to validate. Must be a string of 15-34 alphanumeric characters. Spaces and hyphens are accepted and stripped automatically before validation. Examples: 'CH56 0483 5012 3456 7800 9', 'DE89370400440532013000', 'FR76-3000-6000-0112-3456-7890-189'.",
         ),
     },
+    outputSchema: TOOL_OUTPUT_SCHEMAS.validate_iban,
     annotations: {
       title: 'Validate IBAN',
       readOnlyHint: true,
@@ -105,6 +107,7 @@ Cost: $0.005 USDC per call via x402 micropayment on Base L2.`,
     enrichResult(result);
     return {
       content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
+      structuredContent: result as unknown as Record<string, unknown>,
     };
   },
 );
@@ -136,6 +139,7 @@ Cost: $0.002 USDC per IBAN via x402 (e.g., 10 IBANs = $0.020, 50 IBANs = $0.100,
           "Array of IBANs to validate, between 1 and 100 items. Each IBAN is a string of 15-34 alphanumeric characters. Spaces and hyphens in individual IBANs are stripped automatically. Example: ['CH5604835012345678009', 'DE89370400440532013000', 'FR7630006000011234567890189'].",
         ),
     },
+    outputSchema: TOOL_OUTPUT_SCHEMAS.batch_validate_iban,
     annotations: {
       title: 'Batch Validate IBANs',
       readOnlyHint: true,
@@ -155,6 +159,10 @@ Cost: $0.002 USDC per IBAN via x402 (e.g., 10 IBANs = $0.020, 50 IBANs = $0.100,
     });
     return {
       content: [{ type: 'text' as const, text: JSON.stringify(results, null, 2) }],
+      // Wrapped in { results, count }, not the bare array `content` carries:
+      // matches TOOL_OUTPUT_SCHEMAS.batch_validate_iban, and mirrors the same
+      // asymmetry the HTTP transport already has (src/routes/mcp-http.ts).
+      structuredContent: { results: results as unknown as Record<string, unknown>[], count: results.length },
     };
   },
 );
@@ -190,6 +198,7 @@ Cost: $0.003 USDC per call via x402 micropayment on Base L2.`,
           "The BIC/SWIFT code to look up. Must be 8 characters (BIC8, e.g., 'UBSWCHZH') or 11 characters (BIC11, e.g., 'UBSWCHZH80A'). Case-insensitive. The first 4 characters are the institution code, characters 5-6 are the country code (ISO 3166-1), characters 7-8 are the location code, and optional characters 9-11 are the branch code.",
         ),
     },
+    outputSchema: TOOL_OUTPUT_SCHEMAS.lookup_bic,
     annotations: {
       title: 'Lookup BIC/SWIFT Code',
       readOnlyHint: true,
@@ -202,17 +211,15 @@ Cost: $0.003 USDC per call via x402 micropayment on Base L2.`,
     const validation = validateBIC(bic);
 
     if (!validation.valid) {
+      const errorPayload = { bic: validation.bic, valid: false, error: validation.error };
       return {
         content: [
           {
             type: 'text' as const,
-            text: JSON.stringify(
-              { bic: validation.bic, valid: false, error: validation.error },
-              null,
-              2,
-            ),
+            text: JSON.stringify(errorPayload, null, 2),
           },
         ],
+        structuredContent: errorPayload as unknown as Record<string, unknown>,
       };
     }
 
@@ -248,6 +255,7 @@ Cost: $0.003 USDC per call via x402 micropayment on Base L2.`,
 
     return {
       content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
+      structuredContent: result as unknown as Record<string, unknown>,
     };
   },
 );
@@ -282,6 +290,7 @@ Cost: $0.02 USDC per call via x402 micropayment on Base L2.`,
           "The IBAN to check. Must be a string of 15-34 alphanumeric characters. Spaces and hyphens are accepted and stripped automatically before validation. Examples: 'CH56 0483 5012 3456 7800 9', 'DE89370400440532013000'.",
         ),
     },
+    outputSchema: TOOL_OUTPUT_SCHEMAS.check_compliance,
     annotations: {
       title: 'Compliance Risk Check',
       readOnlyHint: true,
@@ -298,6 +307,7 @@ Cost: $0.02 USDC per call via x402 micropayment on Base L2.`,
     const combined = { ...buildComplianceResponse(iban), cost_usdc: 0.02 };
     return {
       content: [{ type: 'text' as const, text: JSON.stringify(combined, null, 2) }],
+      structuredContent: combined as unknown as Record<string, unknown>,
     };
   },
 );
@@ -356,6 +366,7 @@ Cost: free. The checksums are published commodities; the paid surface is POST /v
           "Optional. The creditor IBAN this reference would travel with. Supply it to get the pairing verdict — that is the reason to use this tool over a local checksum library. Example: 'CH4431999123000889012'.",
         ),
     },
+    outputSchema: TOOL_OUTPUT_SCHEMAS.validate_payment_reference,
     annotations: {
       title: 'Validate Payment Reference',
       readOnlyHint: true,
@@ -373,6 +384,7 @@ Cost: free. The checksums are published commodities; the paid surface is POST /v
       : validatePaymentReference(reference, reference_type ?? null);
     return {
       content: [{ type: 'text' as const, text: JSON.stringify(payload, null, 2) }],
+      structuredContent: payload as unknown as Record<string, unknown>,
     };
   },
 );
@@ -414,6 +426,7 @@ Cost: free. The rules are published commodities; the paid surface is the postal_
         .strict()
         .describe('The ISO 20022 PostalAddress under test, in ISO tag vocabulary (snake_cased).'),
     },
+    outputSchema: TOOL_OUTPUT_SCHEMAS.check_postal_address,
     annotations: {
       title: 'Check ISO 20022 Postal Address',
       readOnlyHint: true,
@@ -426,6 +439,7 @@ Cost: free. The rules are published commodities; the paid surface is the postal_
     const payload = checkPostalAddress(scheme, address);
     return {
       content: [{ type: 'text' as const, text: JSON.stringify(payload, null, 2) }],
+      structuredContent: payload as unknown as Record<string, unknown>,
     };
   },
 );
@@ -456,6 +470,7 @@ Cost: $0.003 USDC per call via x402 micropayment on Base L2.`,
           "Swiss BC-Nummer / IID. 1-5 digits, e.g. '230' or '00230'. Zero-padded internally to 5 digits. Examples: '230' (UBS), '30000' (PostFinance), '700' (Zürcher Kantonalbank), '80000' (Raiffeisen).",
         ),
     },
+    outputSchema: TOOL_OUTPUT_SCHEMAS.lookup_ch_clearing,
     annotations: {
       title: 'Lookup Swiss Bank Clearing Number',
       readOnlyHint: true,
@@ -467,17 +482,15 @@ Cost: $0.003 USDC per call via x402 micropayment on Base L2.`,
   async ({ iid }) => {
     // Validate format
     if (!/^\d{1,5}$/.test(iid)) {
+      const errorPayload = { error: 'invalid_iid_format', message: 'IID must be a 1-5 digit number.' };
       return {
         content: [
           {
             type: 'text' as const,
-            text: JSON.stringify(
-              { error: 'invalid_iid_format', message: 'IID must be a 1-5 digit number.' },
-              null,
-              2,
-            ),
+            text: JSON.stringify(errorPayload, null, 2),
           },
         ],
+        structuredContent: errorPayload as unknown as Record<string, unknown>,
       };
     }
 
@@ -485,23 +498,21 @@ Cost: $0.003 USDC per call via x402 micropayment on Base L2.`,
     const entry = lookupClearingByBankCode(normalizedIid);
 
     if (!entry) {
+      const notFoundPayload = {
+        iid: normalizedIid,
+        found: false,
+        error: 'clearing_not_found',
+        message: `IID ${normalizedIid} not found in Swiss BankMaster database.`,
+        cost_usdc: 0.003,
+      };
       return {
         content: [
           {
             type: 'text' as const,
-            text: JSON.stringify(
-              {
-                iid: normalizedIid,
-                found: false,
-                error: 'clearing_not_found',
-                message: `IID ${normalizedIid} not found in Swiss BankMaster database.`,
-                cost_usdc: 0.003,
-              },
-              null,
-              2,
-            ),
+            text: JSON.stringify(notFoundPayload, null, 2),
           },
         ],
+        structuredContent: notFoundPayload as unknown as Record<string, unknown>,
       };
     }
 
@@ -530,6 +541,7 @@ Cost: $0.003 USDC per call via x402 micropayment on Base L2.`,
 
     return {
       content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }],
+      structuredContent: result,
     };
   },
 );
@@ -582,10 +594,7 @@ server.registerTool(
       contact: z.string().max(255).optional().describe('Where we may answer you (e-mail) — optional, reports can be anonymous.'),
       agent: z.string().max(120).optional().describe('Which agent/model is reporting, e.g. "claude-sonnet-5 via MCP".'),
     },
-    outputSchema: {
-      ok: z.boolean(),
-      id: z.number().describe('Report id — check status at GET /v1/feedback/{id}.'),
-    },
+    outputSchema: TOOL_OUTPUT_SCHEMAS.send_feedback,
     annotations: { title: 'Send Feedback to IBANforge' },
   },
   async ({ error_type, notes, endpoint, expected, got, contact, agent }) => {

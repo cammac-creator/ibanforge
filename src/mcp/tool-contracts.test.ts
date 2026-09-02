@@ -36,6 +36,11 @@ import { validateIBAN } from '../lib/iban.js';
 const ROOT = join(import.meta.dirname, '..', '..');
 const STDIO = readFileSync(join(ROOT, 'src/mcp/server.ts'), 'utf8');
 const HTTP = readFileSync(join(ROOT, 'src/routes/mcp-http.ts'), 'utf8');
+// outputSchema itself (field descriptions included) moved out of both
+// transports and into this shared module under MCP-15 (2026-09-02): the
+// deprecation notice this file checks for below now lives here on the HTTP
+// side, not in mcp-http.ts's own text.
+const SCHEMAS = readFileSync(join(ROOT, 'src/mcp/output-schemas.ts'), 'utf8');
 
 /** The "Returns: { ... }" block of a named tool in the stdio server. */
 function returnsBlockFor(source: string, marker: string): string {
@@ -108,10 +113,15 @@ describe('lookup_bic: MCP and REST agree on the country shape', () => {
     // Removing it now would break an agent mid-conversation for no benefit.
     expect(STDIO).toContain('country_code: validation.country_code');
     expect(HTTP).toContain('country_code: validation.country_code');
-    for (const src of [STDIO, HTTP]) {
-      expect(src).toMatch(/DEPRECATED since 1\.4\.0/);
-      expect(src).toMatch(/2027-01-01/);
-    }
+    // STDIO still spells the deprecation out in its own tool description, for
+    // a human reading the tool list. On the HTTP side the SAME notice lives in
+    // the outputSchema `.describe()` for country_code/country_name, which
+    // moved to src/mcp/output-schemas.ts under MCP-15 so both transports read
+    // one copy — so it is SCHEMAS, not HTTP, that carries it now.
+    expect(STDIO).toMatch(/DEPRECATED since 1\.4\.0/);
+    expect(STDIO).toMatch(/2027-01-01/);
+    expect(SCHEMAS).toMatch(/DEPRECATED since 1\.4\.0/);
+    expect(SCHEMAS).toMatch(/2027-01-01/);
   });
 
   it('states that the two differ on the missing-name fallback', () => {

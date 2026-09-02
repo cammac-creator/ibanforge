@@ -27,135 +27,16 @@ import { extractClientIp } from '../lib/stats.js';
 import { buildCountriesPayload, buildPricingPayload, buildValidateAndExplainPrompt } from '../lib/mcp-resources.js';
 import { datasetFacts } from '../lib/dataset-facts.js';
 import { MCP_INSTRUCTIONS } from '../mcp/instructions.js';
+import { TOOL_OUTPUT_SCHEMAS } from '../mcp/output-schemas.js';
 
 /** Dataset sizes, read once and rounded down so a claim cannot outlive its data. */
 const F = datasetFacts();
 
-/**
- * The bank-code verdict, declared once and reused by all three tool schemas.
- *
- * An agent reading this needs the branch spelled out, because the difference
- * between the three statuses is the difference between stopping a payment and
- * letting it through: only `authoritative: true` turns `not_in_register` into
- * evidence that the bank code does not exist.
- */
-/**
- * What an agent should do next. Declared once, attached to all three tools, for
- * the same reason as BANK_CODE_CHECK_SCHEMA: the MCP SDK validates a tool's
- * output against its declared schema and silently drops `structuredContent` on
- * a mismatch, so a field added to the response and not to every schema stops
- * the structured path without any error.
- */
-const NEXT_STEPS_SCHEMA = z
-  .array(
-    z.object({
-      code: z.string().describe('Stable identifier. Branch on this.'),
-      do: z.string(),
-      because: z.string().describe('The response field that produced this step.'),
-      action: z.string().optional().describe('An IBANforge call that performs the step, when one exists.'),
-    }),
-  )
-  .optional()
-  .describe('Ordered advice derived from THIS result: what blocks a payment first, what merely enriches it after. Branch on `code`, never on the prose. `because` names the field that produced the step so the advice is auditable. Empty for an IBAN that failed validation.');
-
-/**
- * The official identity a central bank publishes for the resolved code.
- *
- * Declared here and attached to every tool whose result can carry it, for the
- * reason spelled out above NEXT_STEPS_SCHEMA: the SDK validates output against
- * the declared schema and Zod SILENTLY STRIPS what the schema does not name. A
- * block left out here would vanish from `structuredContent` without an error —
- * and this one carries licence conditions (`source`, `free_of_charge`) that
- * both publishers require to accompany the data on every access.
- */
-const OFFICIAL_IDENTITY_SCHEMA = z
-  .object({
-    name: z.string().describe("The institution's name as the publisher writes it."),
-    lei: z.string().nullable(),
-    address: z.string().nullable().describe('One-line registered address as published.'),
-    category: z.string(),
-    matched_by: z.string().describe('lei | national_code'),
-    source: z.string().describe('The publisher, cited as their licence requires. Relay it.'),
-    free_of_charge: z
-      .string()
-      .describe(
-        'Both publishers require buyers to be told, on every access, that the data is available free of charge from their own website. Relay it with the answer; do not strip it.',
-      ),
-    attribution: z.string().optional().describe('The Banco de Espana citation formula, verbatim. Spanish blocks only.'),
-    as_of: z.string().describe('Date of the list this row came from. Both lists are republished every business day.'),
-    authoritative: z.boolean().describe('Always false. Neither publisher allocates bank codes.'),
-  })
-  .optional()
-  .describe(
-    'Who a central bank says holds the resolved code (ECB by LEI and for FR bank codes, Banco de Espana for ES). Present only on a match — absence is not a negative. INFORMATIONAL ONLY: it never changes valid or bank_code_check, because both publishers relay rather than allocate.',
-  );
-
-/**
- * Where a derived BIC came from, declared once for the three tools that serve
- * one.
- *
- * Same trap as NEXT_STEPS_SCHEMA above, and this field is the worst one to lose
- * to it: an agent that cannot see the basis has no way to tell a register
- * pairing from a prefix guess, and the guess is the one it must not settle
- * against. Zod strips what the schema does not name, silently.
- */
-const BIC_BASIS_SCHEMA = z
-  .string()
-  .optional()
-  .describe(
-    'Where the bank code to BIC pairing came from, and therefore what may be done with the BIC. ' +
-      'national_register (the country register publishes this BIC for this bank code — today DE, AT, BE and BG; settlement-grade) | ' +
-      'curated_map (our maintained bank-code map, exact key, usually right and not an allocation record) | ' +
-      'directory_prefix (the bic8 LIKE fallback, which can match several institutions — read bank_code_check.candidates). ' +
-      'Outside a national_register basis the BIC is ADVISORY: confirm it with the beneficiary or the bank before storing it as a routing instruction.',
-  );
-
-const BIC_AUTHORITATIVE_SCHEMA = z
-  .boolean()
-  .optional()
-  .describe(
-    'Whether this BIC may be stored and settled against. Derived from basis, so the two cannot disagree. ' +
-      'NOT bank_code_check.authoritative, which answers a different question — whether a national register was consulted about the BANK CODE. In Switzerland the register confirms the code while the BIC still comes from our curated map.',
-  );
-
-const BANK_CODE_CHECK_SCHEMA = z
-  .object({
-    value: z.string(),
-    status: z
-      .string()
-      .describe(
-        'verified | not_in_register | unavailable. A separate verdict on the bank code, so bic:null stops meaning three different things.',
-      ),
-    reason: z
-      .string()
-      .optional()
-      .describe(
-        'WHY the verdict is not verified, as one token to branch on. Absent when status is verified. ' +
-          'not_allocated (a national register denies the code — the only value that licenses "do not send") | ' +
-          'absent_from_reference_data (our composite map does not carry it; the country register was not consulted) | ' +
-          'no_reference_data_for_country | ' +
-          'register_names_no_holder (the register defines the code space and publishes no holder — silence, not a denial) | ' +
-          'national_register_unavailable (the register this country is normally decided against could not be consulted) | ' +
-          'lookup_failed (the lookup could not run: timeout, unreadable database). ' +
-          'The last two describe IBANforge, never the beneficiary. Never escalate either into a refusal.',
-      ),
-    match: z.string().nullable().describe('register (exact key) | prefix (bic8 LIKE heuristic) | null'),
-    register: z.string().nullable(),
-    authoritative: z
-      .boolean()
-      .describe(
-        'True only where the reference set is the national register (CH, LI, DE). Only then does not_in_register mean the code is not allocated.',
-      ),
-    candidates: z.number().optional().describe('BIC8 the prefix matched; >1 means the BIC may belong to another institution.'),
-    retired: z
-      .boolean()
-      .optional()
-      .describe('True when an authoritative register is withdrawing the code. Still a verified result: it WAS allocated.'),
-    superseded_by: z.string().optional().describe('The bank code that takes over. Re-paper the beneficiary against it.'),
-    as_of: z.string(),
-  })
-  .optional();
-
+// The bank-code verdict, "what an agent should do next", the official-identity
+// block and the BIC basis/authoritative pair used to be declared here, local
+// to this transport. They now live in `../mcp/output-schemas.js` (imported
+// above as part of TOOL_OUTPUT_SCHEMAS), shared with `src/mcp/server.ts`
+// (MCP-15) — see that module's header for why.
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const pkg = JSON.parse(readFileSync(resolve(__dirname, '../../package.json'), 'utf-8'));
@@ -348,74 +229,7 @@ function createMcpServer(): McpServer {
       inputSchema: {
         iban: z.string().describe('IBAN to validate (spaces/hyphens stripped automatically)'),
       },
-      outputSchema: {
-        iban: z.string().describe('Normalized IBAN (uppercase, no spaces).'),
-        valid: z.boolean(),
-        formatted: z.string().optional().describe('IBAN with 4-char groups for display.'),
-        country: z.object({
-          code: z.string().describe('ISO 3166-1 alpha-2 country code.'),
-          name: z.string(),
-        }).optional(),
-        check_digits: z.string().optional(),
-        bban: z.object({
-          bank_code: z.string(),
-          branch_code: z.string().optional(),
-          account_number: z.string(),
-        }).optional(),
-        bic: z.object({
-          code: z.string(),
-          bank_name: z.string().nullable(),
-          city: z.string().nullable(),
-          basis: BIC_BASIS_SCHEMA,
-          authoritative: BIC_AUTHORITATIVE_SCHEMA,
-        }).nullable().optional().describe('Resolved BIC/SWIFT when BBAN→BIC mapping exists. Read basis before storing it as a routing instruction: only a national_register pairing is settlement-grade.'),
-        sepa: z.object({
-          member: z.boolean(),
-          schemes: z.array(z.string()),
-          vop_required: z.boolean(),
-          vop_participant: z.boolean().nullable().optional().describe('true = resolved bank is listed as ready in the EPC VoP scheme register; null = no institution resolved.'),
-          // Declared because `enrichResult` now serves it: the SDK validates
-          // this payload against the schema and drops `structuredContent`
-          // silently on a field it does not know, so an undeclared field is a
-          // field no agent ever sees.
-          basis: z.enum(['country_default', 'epc_register']).optional().describe('Where `schemes` came from: read at the EPC register for this bank, or defaulted from the country.'),
-        }).optional(),
-        issuer: z.object({
-          type: z.string().describe('bank | digital_bank | emi | payment_institution'),
-          name: z.string(),
-          classification: z
-            .string()
-            .describe(
-              'curated | register | default. Whether the type was established or assumed. curated = the BIC8 is in the issuer set, so this is an identification. register = an official register names the holder of this bank code and says what it is; it carries a date and an authority in psd_registration, and it only ever replaces a default. default = nothing is on file and "bank" is the fallback, which covers 97.9% of BIC8 (measured 29/07/2026). Count curated and register when sizing virtual-IBAN exposure, never default.',
-            ),
-        }).optional(),
-        risk_indicators: z.object({
-          issuer_type: z.string().nullable().describe('Null when no institution resolved — it no longer defaults to "bank".'),
-          country_risk: z.string(),
-          test_bic: z.boolean(),
-          sepa_reachable: z.boolean(),
-          sepa_reachable_scope: z.string().describe('Scope the reachability holds at. Country-derived, not account-derived.'),
-          vop_coverage: z.boolean(),
-        }).optional(),
-        bank_code_check: BANK_CODE_CHECK_SCHEMA,
-        official_identity: OFFICIAL_IDENTITY_SCHEMA,
-        next_steps: NEXT_STEPS_SCHEMA,
-        clearing: z.object({
-          iid: z.string(),
-          name: z.string(),
-          type: z.string(),
-          town: z.string().nullable(),
-          sic: z.boolean(),
-          instant_payments_chf: z.boolean(),
-          eurosic: z.boolean(),
-          qr_iid: z.string().nullable(),
-        }).nullable().optional().describe('Swiss clearing data when country is CH or LI.'),
-        error: z.string().optional(),
-        error_detail: z.string().optional(),
-        cost_usdc: z.number().describe('What THIS call was billed. Zero on the free MCP tier.'),
-        list_price_usdc: z.number().optional().describe('Catalogue price of the same call on the paid REST/x402 route.'),
-        processing_ms: z.number().optional(),
-      },
+      outputSchema: TOOL_OUTPUT_SCHEMAS.validate_iban,
       annotations: { title: 'Validate IBAN', ...READ_ONLY_ANNOTATIONS },
     },
     async ({ iban }) => {
@@ -443,59 +257,7 @@ function createMcpServer(): McpServer {
       inputSchema: {
         ibans: z.array(z.string()).min(1).max(100).describe('Array of IBANs (1-100)'),
       },
-      outputSchema: {
-        results: z.array(z.object({
-          iban: z.string(),
-          valid: z.boolean(),
-          country: z.object({ code: z.string(), name: z.string() }).optional(),
-          bban: z.object({
-            bank_code: z.string(),
-            branch_code: z.string().optional(),
-            account_number: z.string(),
-          }).optional(),
-          bic: z.object({
-            code: z.string(),
-            bank_name: z.string().nullable(),
-            city: z.string().nullable(),
-            basis: BIC_BASIS_SCHEMA,
-            authoritative: BIC_AUTHORITATIVE_SCHEMA,
-          }).nullable().optional(),
-          issuer: z.object({ type: z.string(), name: z.string(), classification: z.string() }).optional(),
-          sepa: z.object({
-            member: z.boolean(),
-            schemes: z.array(z.string()),
-            vop_required: z.boolean(),
-            vop_participant: z.boolean().nullable().optional(),
-            basis: z.enum(['country_default', 'epc_register']).optional(),
-          }).optional(),
-          risk_indicators: z.object({
-            issuer_type: z.string().nullable(),
-            country_risk: z.string(),
-            test_bic: z.boolean(),
-            sepa_reachable: z.boolean(),
-            sepa_reachable_scope: z.string(),
-            vop_coverage: z.boolean(),
-          }).optional(),
-          bank_code_check: BANK_CODE_CHECK_SCHEMA,
-          official_identity: OFFICIAL_IDENTITY_SCHEMA,
-          next_steps: NEXT_STEPS_SCHEMA,
-          clearing: z.object({
-            iid: z.string(),
-            name: z.string(),
-            type: z.string(),
-            town: z.string().nullable(),
-            sic: z.boolean(),
-            instant_payments_chf: z.boolean(),
-            eurosic: z.boolean(),
-            qr_iid: z.string().nullable(),
-          }).nullable().optional(),
-          error: z.string().optional(),
-          error_detail: z.string().optional(),
-          cost_usdc: z.number().describe('What THIS IBAN was billed. Zero on the free MCP tier.'),
-          list_price_usdc: z.number().optional().describe('Catalogue price per IBAN on the paid REST/x402 route.'),
-        })).describe('One result per input IBAN, in the same order. Same shape as validate_iban.'),
-        count: z.number().describe('Number of IBANs processed.'),
-      },
+      outputSchema: TOOL_OUTPUT_SCHEMAS.batch_validate_iban,
       annotations: { title: 'Batch Validate IBANs', ...READ_ONLY_ANNOTATIONS },
     },
     async ({ ibans }) => {
@@ -534,28 +296,7 @@ function createMcpServer(): McpServer {
       inputSchema: {
         bic: z.string().describe('BIC/SWIFT code (8 or 11 chars)'),
       },
-      outputSchema: {
-        bic: z.string().describe('Echo of the input, normalized to uppercase.'),
-        bic8: z.string().optional().describe('8-char form (institution-level).'),
-        bic11: z.string().optional().describe('11-char form including branch.'),
-        valid_format: z.boolean().optional(),
-        found: z.boolean().optional(),
-        institution: z.string().nullable().optional().describe('Bank legal name.'),
-        country_code: z.string().optional().describe('DEPRECATED since 1.4.0, removed no earlier than 2027-01-01. Use country.code.'),
-        country_name: z.string().nullable().optional().describe('DEPRECATED since 1.4.0, removed no earlier than 2027-01-01. Use country.name, which falls back to the code rather than to null.'),
-        country: z
-          .object({ code: z.string(), name: z.string() })
-          .optional()
-          .describe('Same shape as REST GET /v1/bic/:code. name falls back to the country code when the row carries no name.'),
-        city: z.string().nullable().optional(),
-        branch_code: z.string().optional(),
-        branch_info: z.string().nullable().optional(),
-        lei: z.string().nullable().optional().describe('Legal Entity Identifier (ISO 17442) if available.'),
-        lei_status: z.string().nullable().optional(),
-        is_test_bic: z.boolean().optional(),
-        valid: z.boolean().optional().describe('Set when the BIC failed format validation.'),
-        error: z.string().optional(),
-      },
+      outputSchema: TOOL_OUTPUT_SCHEMAS.lookup_bic,
       annotations: { title: 'Lookup BIC/SWIFT', ...READ_ONLY_ANNOTATIONS },
     },
     async ({ bic }) => {
@@ -623,83 +364,7 @@ function createMcpServer(): McpServer {
       inputSchema: {
         iban: z.string().describe('IBAN to check'),
       },
-      outputSchema: {
-        iban: z.string(),
-        valid: z.boolean(),
-        country: z.object({ code: z.string(), name: z.string() }).optional(),
-        bic: z.object({
-          code: z.string(),
-          bank_name: z.string().nullable(),
-          city: z.string().nullable(),
-          basis: BIC_BASIS_SCHEMA,
-          authoritative: BIC_AUTHORITATIVE_SCHEMA,
-        }).nullable().optional(),
-        issuer: z.object({ type: z.string(), name: z.string(), classification: z.string() }).optional(),
-        sepa: z.object({
-          member: z.boolean(),
-          schemes: z.array(z.string()),
-          vop_required: z.boolean(),
-        }).optional(),
-        risk_indicators: z.object({
-          issuer_type: z.string().nullable().describe('Null when no institution resolved — it no longer defaults to "bank".'),
-          country_risk: z.string(),
-          test_bic: z.boolean(),
-          sepa_reachable: z.boolean(),
-          sepa_reachable_scope: z.string().describe('Scope the reachability holds at. Country-derived, not account-derived.'),
-          vop_coverage: z.boolean(),
-        }).optional(),
-        bank_code_check: BANK_CODE_CHECK_SCHEMA,
-        official_identity: OFFICIAL_IDENTITY_SCHEMA,
-        next_steps: NEXT_STEPS_SCHEMA,
-        compliance: z.object({
-          sanctions: z.object({
-            country_sanctioned: z.boolean(),
-            bank_sanctioned: z.boolean(),
-            matched_lists: z.array(z.string()),
-            fatf_status: z.string(),
-          }),
-          reachability: z.object({
-            sepa_instant: z.boolean(),
-            sct: z.boolean(),
-            sdd: z.boolean(),
-          }),
-          vop: z.object({
-            participant: z.boolean(),
-            status: z.string(),
-          }),
-          // .nullable() is load-bearing, not defensive. This tool returns
-          // structuredContent, so the MCP SDK validates the payload against
-          // this schema and throws McpError on a mismatch. Without it, every
-          // invalid-IBAN call on the production /mcp transport would become a
-          // JSON-RPC protocol error instead of the fixed verdict.
-          risk_score: z
-            .number()
-            .min(0)
-            .max(100)
-            .nullable()
-            .describe('0 = safest, 100 = block. null when the IBAN could not be validated: there was nothing to score.'),
-          risk_level: z
-            .string()
-            .describe('low | medium | elevated | high | critical | unassessable. unassessable means the IBAN itself did not validate, so no screening was possible: it is the absence of a verdict, never a favourable one.'),
-          flags: z.array(z.string()),
-        }),
-        // Declared because the shared assembly now attaches it here too. This
-        // transport was the only one omitting the bank_bic_only disclaimer, and
-        // an undeclared key would be stripped by the schema on the way out.
-        meta: z
-          .object({
-            scope: z.string(),
-            disclaimer: z.string(),
-            sanctions_as_of: z.string().nullable().optional(),
-            fatf_as_of: z.string().nullable().optional(),
-            sources: z.string().optional(),
-          })
-          .passthrough(),
-        cost_usdc: z.number().describe('What THIS call was billed. Zero on the free MCP tier.'),
-        list_price_usdc: z.number().optional().describe('Catalogue price of the same call on the paid REST/x402 route.'),
-        error: z.string().optional(),
-        error_detail: z.string().optional(),
-      },
+      outputSchema: TOOL_OUTPUT_SCHEMAS.check_compliance,
       annotations: { title: 'Compliance Check', ...READ_ONLY_ANNOTATIONS },
     },
     async ({ iban }) => {
@@ -743,37 +408,9 @@ function createMcpServer(): McpServer {
       // validates output against this schema and Zod SILENTLY STRIPS what it
       // does not name, so an omitted field vanishes from structuredContent with
       // no error at all — including `source`, which carries the provenance this
-      // whole feature is built on. See the note above NEXT_STEPS_SCHEMA.
-      outputSchema: {
-        reference: z.string().describe('Normalized: uppercase, separators removed.'),
-        scheme: z.string().nullable().describe('rf | qrr | ogm | viitenumero | kid | ocr, or null when nothing matched.'),
-        valid: z
-          .boolean()
-          .nullable()
-          .describe('null means the scheme was recognised and cannot be checked without the creditor bank configuration. Never report null as false.'),
-        status: z.string().describe('checked | unverifiable_without_creditor_config | unrecognised'),
-        check_digit_expected: z
-          .string()
-          .optional()
-          .describe('A STRING, so a two-digit value beginning with zero survives (OGM remainder 3 is "03", remainder 0 is "97").'),
-        also_valid_as: z
-          .object({
-            scheme: z.string(),
-            valid: z.boolean(),
-            check_digit_expected: z.string().optional(),
-          })
-          .optional()
-          .describe('The second reading of an ambiguous string, with its own verdict.'),
-        source: z.string().nullable().describe('The document publishing the rule. Null only when no scheme matched. Relay it.'),
-        as_of: z.string().optional().describe('YYYY-MM of that document.'),
-        note: z.string().describe('What was checked, and what was not.'),
-        pairing: z
-          .string()
-          .optional()
-          .describe('Present only when an iban was supplied: ok | qrr_requires_qr_iban | scor_forbidden_with_qr_iban | not_applicable'),
-        pairing_source: z.string().optional().describe('The document publishing the pairing rule — a DIFFERENT one from source.'),
-        pairing_as_of: z.string().optional(),
-      },
+      // whole feature is built on. See the note above NEXT_STEPS_SCHEMA in
+      // ../mcp/output-schemas.js.
+      outputSchema: TOOL_OUTPUT_SCHEMAS.validate_payment_reference,
       annotations: { title: 'Validate Payment Reference', ...READ_ONLY_ANNOTATIONS },
     },
     async ({ reference, reference_type, iban }) => {
@@ -820,21 +457,7 @@ function createMcpServer(): McpServer {
       // 🚨 Every field the handler can emit MUST be named here — the SDK
       // silently strips what the output schema does not name, `source` and
       // `detail` included, which are the whole point of the findings.
-      outputSchema: {
-        scheme: z.string().describe('sps | hvps_plus | fedwire — the rule set that was applied.'),
-        conforms: z.boolean().describe('True when no finding failed. not_applicable findings never count against it.'),
-        findings: z
-          .array(
-            z.object({
-              rule: z.string().describe('Stable identifier, safe to branch on.'),
-              verdict: z.string().describe('pass | fail | not_applicable'),
-              detail: z.string().describe('What was looked at and what was concluded.'),
-              source: z.string().describe('The document the rule comes from, with its date. Relay it.'),
-            }),
-          )
-          .describe('One entry per rule of the scheme, in a stable order.'),
-        note: z.string().describe("Why 'cbpr+' is not on the menu. Served on every answer."),
-      },
+      outputSchema: TOOL_OUTPUT_SCHEMAS.check_postal_address,
       annotations: { title: 'Check ISO 20022 Postal Address', ...READ_ONLY_ANNOTATIONS },
     },
     async ({ scheme, address }) => {
@@ -863,41 +486,7 @@ function createMcpServer(): McpServer {
       inputSchema: {
         iid: z.string().describe('Swiss IID (1-5 digit number)'),
       },
-      outputSchema: {
-        iid: z.string().optional().describe('Normalized 5-digit BC-Nummer.'),
-        found: z.boolean().optional(),
-        institution: z.object({
-          name: z.string(),
-          type: z.string().describe('bank | cantonal_bank | postfinance | raiffeisen | central_bank | foreign_participant'),
-          iid_type: z.string().describe('headquarters | branch | other'),
-          headquarters_iid: z.string(),
-        }).optional(),
-        address: z.object({
-          street: z.string().nullable(),
-          building_number: z.string().nullable(),
-          post_code: z.string().nullable(),
-          town: z.string().nullable(),
-          country: z.string(),
-        }).optional(),
-        bic: z.string().nullable().optional().describe('BIC if mapped.'),
-        payment_services: z.object({
-          sic: z.boolean().describe('Swiss Interbank Clearing.'),
-          rtgs_chf: z.boolean(),
-          instant_payments_chf: z.boolean(),
-          eurosic: z.boolean(),
-          lsv_bdd_chf: z.boolean(),
-          lsv_bdd_eur: z.boolean(),
-        }).optional(),
-        sic_iid: z.string().nullable().optional(),
-        qr_iid: z.string().nullable().optional().describe('QR-bill enabled IID.'),
-        valid_on: z.string().optional(),
-        redirected_from: z.string().optional(),
-        note: z.string().optional(),
-        cost_usdc: z.number().optional().describe('What THIS call was billed. Zero on the free MCP tier.'),
-        list_price_usdc: z.number().optional().describe('Catalogue price of the same call on the paid REST/x402 route.'),
-        error: z.string().optional(),
-        message: z.string().optional(),
-      },
+      outputSchema: TOOL_OUTPUT_SCHEMAS.lookup_ch_clearing,
       annotations: { title: 'Swiss Clearing Lookup', ...READ_ONLY_ANNOTATIONS },
     },
     async ({ iid }) => {
@@ -1019,10 +608,7 @@ function createMcpServer(): McpServer {
         contact: z.string().max(255).optional().describe('Where we may answer you (e-mail) — optional, reports can be anonymous.'),
         agent: z.string().max(120).optional().describe('Which agent/model is reporting, e.g. "claude-sonnet-5 via MCP".'),
       },
-      outputSchema: {
-        ok: z.boolean(),
-        id: z.number().describe('Report id — check status at GET /v1/feedback/{id}.'),
-      },
+      outputSchema: TOOL_OUTPUT_SCHEMAS.send_feedback,
       annotations: { title: 'Send Feedback to IBANforge' },
     },
     async ({ error_type, notes, endpoint, expected, got, contact, agent }) => {
