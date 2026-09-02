@@ -92,7 +92,8 @@ export function ActivationFunnel({ funnel }: { funnel: ActivationFunnelData }) {
                   </span>
                 </div>
               </div>
-              <span className="w-44 shrink-0 text-xs text-[var(--fg-5)]">
+              {/* 176 px fixed pushed the page 7 px past a 390 px viewport (mobile audit, 2026-09-02): narrower on phones, the caption wraps. */}
+              <span className="w-32 shrink-0 text-xs text-[var(--fg-5)] sm:w-44">
                 {pct !== null ? `${pct} % des inscrits` : ' '}
                 {med ? ` · ${med}` : ''}
               </span>

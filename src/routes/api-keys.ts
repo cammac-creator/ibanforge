@@ -1,3 +1,4 @@
+import { opsFail } from '../lib/ops-alert.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import { timingSafeEqual, createHash } from 'node:crypto';
@@ -186,6 +187,15 @@ apiKeys.post('/v1/keys/generate', async (c) => {
         // no trace is exactly how this channel failed unnoticed for three days.
         markVerificationOutcome(sendId, sent);
         if (!sent) {
+          // Ten 503s in the last 30 days (dashboard audit, 2026-09-02) and no
+          // alert for any of them: a verification code that cannot leave is a
+          // signup that fails, not a missed nudge. Threshold 3: one relay
+          // hiccup does not wake anyone, a run of them does.
+          void opsFail(
+            'mail:verification',
+            'Verification codes are not leaving: the free-key signup answers 503 while the relay refuses or cannot be reached.',
+            3,
+          );
           return c.json({
             error: 'verification_unavailable',
             message: 'A verification mail could not be sent right now. Try again in a few minutes.',
