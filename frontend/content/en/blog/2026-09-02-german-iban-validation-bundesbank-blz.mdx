@@ -37,7 +37,7 @@ Four things to read in that block.
 
 ## The BIC comes from the same file
 
-The Bankleitzahlendatei carries the full eleven-character BIC per BLZ. That is why a Sparkasse resolves to its own BIC rather than to the shared BIC8 of its Landesbank: the pairing is published, we only relay it. In the response, `bic` carries the code and the bank name, and `sepa.basis: "national_register"` tells you the BIC was read from the register and not inferred. For a payout system that stores the BIC next to the IBAN, this is the value to store.
+The Bankleitzahlendatei carries the full eleven-character BIC per BLZ. That is why a Sparkasse resolves to its own BIC rather than to the shared BIC8 of its Landesbank: the pairing is published, we only relay it. In the response, `bic` carries the code and the bank name, and `bic.basis: "national_register"` tells you the BIC was read from the register and not inferred. For a payout system that stores the BIC next to the IBAN, this is the value to store.
 
 ## Retirements: the part only Germany tells you
 

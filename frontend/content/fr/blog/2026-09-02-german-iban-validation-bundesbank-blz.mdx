@@ -37,7 +37,7 @@ Quatre éléments à lire dans ce bloc.
 
 ## Le BIC vient du même fichier
 
-La Bankleitzahlendatei porte le BIC complet à onze caractères pour chaque BLZ. C'est pour cela qu'une Sparkasse se résout vers son propre BIC plutôt que vers le BIC8 partagé de sa Landesbank : l'appariement est publié, nous ne faisons que le relayer. Dans la réponse, `bic` porte le code et le nom de la banque, et `sepa.basis: "national_register"` indique que le BIC a été lu dans le registre et non déduit. Pour un système de versement qui stocke le BIC à côté de l'IBAN, c'est la valeur à conserver.
+La Bankleitzahlendatei porte le BIC complet à onze caractères pour chaque BLZ. C'est pour cela qu'une Sparkasse se résout vers son propre BIC plutôt que vers le BIC8 partagé de sa Landesbank : l'appariement est publié, nous ne faisons que le relayer. Dans la réponse, `bic` porte le code et le nom de la banque, et `bic.basis: "national_register"` indique que le BIC a été lu dans le registre et non déduit. Pour un système de versement qui stocke le BIC à côté de l'IBAN, c'est la valeur à conserver.
 
 ## Les retraits : ce que seule l'Allemagne dit
 
