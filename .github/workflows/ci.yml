@@ -40,6 +40,8 @@ jobs:
         run: npm run typecheck
       - name: Formatting (prettier)
         run: npm run format:check
+      - name: Runtime dependencies (production image)
+        run: npm run deps:check
 
       - name: Lint
         run: npm run lint
