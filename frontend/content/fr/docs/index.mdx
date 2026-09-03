@@ -43,6 +43,7 @@ Une requête sans clé valide ni paiement reçoit une réponse `402` avec des in
 | `/v1/reference/validate` | GET/POST | Gratuit | Checksum de reference de paiement (RF/ISO 11649, QRR suisse, OGM belge, viitenumero finlandais) |
 | `/v1/address/check` | POST | Gratuit | Conformité d'adresse postale ISO 20022 (SPS, HVPS+/T2, Fedwire), chaque constat sourcé |
 | `/v1/ch/qr-bill/check` | POST | Gratuit | Charge utile de QR-facture suisse : en-tête, appariement QR-IBAN et référence, sommes de contrôle, adresse structurée (S) ou combinée (K) avant le 14.11.2026, avec une forme structurée proposée |
+| `/v1/audit/upload` | POST | Aperçu gratuit, puis 149 CHF | Un fichier de créanciers entier (CSV ou XLSX) : chaque ligne contre les mêmes registres, doublons, contrôles BIC et adresse ; aperçu masqué gratuit, classeur annoté après paiement. La page pour non-développeurs est [/audit](/audit) |
 | `/v1/demo` | GET | Gratuit | Exemples de validation (sans paiement) |
 | `/health` | GET | Gratuit | Verification de l'etat du service |
 

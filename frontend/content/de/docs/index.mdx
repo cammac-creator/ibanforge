@@ -43,6 +43,7 @@ Eine Anfrage ohne gültigen Schlüssel oder Zahlung erhält eine `402`-Antwort m
 | `/v1/reference/validate` | GET/POST | Kostenlos | Prufziffer von Zahlungsreferenzen (RF/ISO 11649, Schweizer QRR, belgische OGM, finnische viitenumero) |
 | `/v1/address/check` | POST | Kostenlos | ISO-20022-Adresskonformität (SPS, HVPS+/T2, Fedwire), jeder Befund mit Quelle |
 | `/v1/ch/qr-bill/check` | POST | Kostenlos | Swiss-QR-Rechnung: Kopfzeilen, QR-IBAN und Referenz, Prüfziffern, strukturierte (S) oder kombinierte (K) Adresse vor dem 14.11.2026, mit vorgeschlagener strukturierter Form |
+| `/v1/audit/upload` | POST | Vorschau kostenlos, dann 149 CHF | Eine ganze Kreditorendatei (CSV oder XLSX): jede Zeile gegen dieselben Register, Duplikate, BIC- und Adressprüfung; maskierte Vorschau kostenlos, kommentierte Arbeitsmappe nach Zahlung. Die Seite für Nicht-Entwickler ist [/audit](/audit) |
 | `/v1/demo` | GET | Kostenlos | Beispielvalidierungen (keine Zahlung erforderlich) |
 | `/health` | GET | Kostenlos | Service-Gesundheitsprüfung |
 
