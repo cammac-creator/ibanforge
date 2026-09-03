@@ -1,0 +1,64 @@
+name: Publish ibanforge-sdk (Java) to Maven Central
+
+# Publishes sdks/java to Maven Central through the Sonatype Central Portal.
+# Trigger: push a tag matching `java-v*` (e.g. `git tag java-v1.5.0 && git
+# push origin java-v1.5.0`), or a manual `workflow_dispatch`. Independent of
+# the `v*.*.*` tags of release-publish.yml: the Java SDK carries its own
+# version in sdks/java/pom.xml, which must match the tag.
+#
+# Secrets (repository settings): CENTRAL_USERNAME and CENTRAL_PASSWORD (a
+# Portal user token, https://central.sonatype.com/usertoken), GPG_PRIVATE_KEY
+# (ASCII-armored private key of "IBANforge Maven signing") and GPG_PASSPHRASE.
+# setup-java writes the `central` server into settings.xml from the two
+# CENTRAL_* variables and imports the key; the pom's `release` profile does
+# sources, javadoc, signature and the Portal upload.
+
+on:
+  push:
+    tags:
+      - 'java-v*'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sdks/java
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: sdks/java/pom.xml
+          server-id: central
+          server-username: CENTRAL_USERNAME
+          server-password: CENTRAL_PASSWORD
+          gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
+          gpg-passphrase: MAVEN_GPG_PASSPHRASE
+
+      - name: The tag and pom.xml must agree
+        if: startsWith(github.ref, 'refs/tags/java-v')
+        run: |
+          TAG="${GITHUB_REF_NAME#java-v}"
+          POM="$(mvn -q help:evaluate -Dexpression=project.version -DforceStdout)"
+          if [ "$TAG" != "$POM" ]; then
+            echo "tag java-v$TAG but pom.xml says $POM" >&2
+            exit 1
+          fi
+
+      - name: Test
+        run: mvn -B --no-transfer-progress test
+
+      - name: Deploy to Maven Central (signed, sources, javadoc)
+        env:
+          CENTRAL_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
+          CENTRAL_PASSWORD: ${{ secrets.CENTRAL_PASSWORD }}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: mvn -B --no-transfer-progress -P release -DskipTests deploy
