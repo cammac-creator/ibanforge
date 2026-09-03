@@ -60,7 +60,7 @@ System.out.println(bad.error());  // "checksum_failed"
 ## Get a free key in one line
 
 ```java
-APIKey key = IBANforge.generateApiKey("you@example.com");
+APIKey key = IBANforge.generateApiKey("you@company.com");
 System.out.println(key.monthlyLimit()); // 200
 // key.apiKey() is shown ONCE -- store it now.
 ```
@@ -68,7 +68,7 @@ System.out.println(key.monthlyLimit()); // 200
 Or grab one interactively at [ibanforge.com](https://ibanforge.com?src=sdk-java). Use a mailbox you can read: fictional and disposable domains (`example.com`, `mailinator`, ...) are refused with `disposable_email`. A **second** key from the same network within seven days answers `403 verification_required` and mails a six-digit code -- replay the call with it:
 
 ```java
-APIKey key = IBANforge.generateApiKey("you@example.com", "123456");
+APIKey key = IBANforge.generateApiKey("you@company.com", "123456");
 ```
 
 ## All methods
