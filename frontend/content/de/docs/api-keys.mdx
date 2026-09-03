@@ -140,6 +140,8 @@ Der Schlüssel funktioniert auf allen kostenpflichtigen Endpunkten:
 | Prepaid-Guthabenpakete — Karte oder USDC | 1k / 5k / 25k Credits | $5 / $20 / $80 — verfallen nie |
 | x402 Pay-per-Call | Unbegrenzt | $0,002–$0,02/Aufruf |
 
+**Namensnennung im kostenlosen Tarif.** Jede Antwort eines kostenpflichtigen Endpunkts, die über einen kostenlosen Schlüssel läuft, trägt ein Objekt `attribution` (`text`, `url`, `note`). Wenn Sie diese Ergebnisse Menschen zeigen (eine Seite, ein Bildschirm, ein Dokument), blenden Sie „Powered by IBANforge" mit dem Link ein; ein Ergebnis, das in Ihrem Backend bleibt, schuldet nichts. Bezahlte Tarife tragen keine Namensnennung.
+
 Die 200 kostenlosen Anfragen werden ueber alle Endpunkte geteilt und setzen sich am 1. jedes Monats zurueck. **Batch-Validierung zaehlt 1 Anfrage pro IBAN** — ein Batch mit 50 IBANs verbraucht 50 Anfragen (oder 50 Prepaid-Credits), dieselbe Regel wie der x402-Preis pro IBAN.
 
 ## Ihre Nutzung prüfen

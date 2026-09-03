@@ -1,3 +1,4 @@
+import { attachAttribution } from '../lib/attribution.js';
 import { Hono } from 'hono';
 import type { HonoEnv } from '../types.js';
 import { buildComplianceResponse, buildBicComplianceResponse } from '../lib/compliance-response.js';
@@ -109,7 +110,9 @@ ibanCompliance.post('/v1/iban/compliance', async (c) => {
 
   // Always surface the scope + disclaimer + data freshness so an agent never
   // mistakes a bank-BIC sanctions check for full beneficiary screening.
-  return c.json({ ...response, cost_usdc: costUsdc, processing_ms: processingMs });
+  return c.json(
+    attachAttribution(c, { ...response, cost_usdc: costUsdc, processing_ms: processingMs }),
+  );
 });
 
 export { ibanCompliance };

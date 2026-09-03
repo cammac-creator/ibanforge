@@ -11,7 +11,7 @@ OpenAPI document the API serves at /openapi.json.)
 
 from __future__ import annotations
 
-from typing import Any, List, Optional, TypedDict
+from typing import Any, Dict, List, Optional, TypedDict
 
 
 class Country(TypedDict, total=False):
@@ -157,6 +157,7 @@ class IBANValidationResult(TypedDict, total=False):
     next_steps: List[NextStep]
     cost_usdc: float
     processing_ms: float
+    attribution: Dict[str, Any]  # free tier only: the credit to display when results are shown to people
     error: str
     error_detail: str
 

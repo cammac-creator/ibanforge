@@ -1,3 +1,4 @@
+import { attachAttribution } from '../lib/attribution.js';
 import { Hono } from 'hono';
 import type { HonoEnv } from '../types.js';
 import { validateIBAN } from '../lib/iban.js';
@@ -83,13 +84,15 @@ ibanBatch.post('/v1/iban/batch', async (c) => {
     results.map((r) => ({ valid: r.valid, country: r.country?.code ?? null })),
   );
 
-  return c.json({
-    results,
-    count: results.length,
-    valid_count: validCount,
-    cost_usdc: totalCost,
-    processing_ms: processingMs,
-  });
+  return c.json(
+    attachAttribution(c, {
+      results,
+      count: results.length,
+      valid_count: validCount,
+      cost_usdc: totalCost,
+      processing_ms: processingMs,
+    }),
+  );
 });
 
 export { ibanBatch };

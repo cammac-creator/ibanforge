@@ -45,8 +45,22 @@ type HonoEnv = {
     paywallCause?: PaywallCause;
     /** Set by the MCP route when the request carries tools/call invocations, so the stats middleware can split real usage from discovery handshakes. */
     mcpToolCall?: boolean;
+    /** Set by the API-key middleware when the request is served on the free tier: the response then carries the attribution block. */
+    freeTier?: boolean;
   };
 };
+
+/**
+ * The credit a free-tier integration owes when it shows our results to
+ * people. Served on every paid-endpoint response of a free key, never on a
+ * paid plan; see src/lib/attribution.ts for the wording and the doctrine.
+ */
+export interface Attribution {
+  required: true;
+  text: string;
+  url: string;
+  note: string;
+}
 
 export type { HonoEnv };
 
@@ -512,6 +526,8 @@ export interface IBANValidationResult {
   error_detail?: string;
   cost_usdc: number;
   processing_ms?: number;
+  /** Present on free-tier responses only. */
+  attribution?: Attribution;
 }
 
 export interface BatchValidationRequest {

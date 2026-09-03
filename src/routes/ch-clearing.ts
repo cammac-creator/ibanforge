@@ -5,6 +5,7 @@
  * Cost: 0.003 USDC (same as BIC lookup)
  */
 
+import { attachAttribution } from '../lib/attribution.js';
 import { Hono } from 'hono';
 import type { HonoEnv } from '../types.js';
 import { lookupClearingByBankCode, normalizeIid } from '../lib/ch-clearing.js';
@@ -150,7 +151,7 @@ chClearing.get('/v1/ch/clearing/:iid', (c) => {
     result.note = `IID ${entry.redirected_from} has been merged into IID ${entry.iid}.`;
   }
 
-  return c.json(result);
+  return c.json(attachAttribution(c, result));
 });
 
 export { chClearing };

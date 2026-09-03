@@ -7,6 +7,7 @@ import {
   decrementCredits,
   refundCredit,
   recordMonthlyObservation,
+  FREE_TIER_MONTHLY_LIMIT,
 } from '../lib/api-keys.js';
 import { getIbansArray } from '../lib/request-helpers.js';
 import { CARD_CHECKOUT_HINT } from '../lib/payment-links.js';
@@ -300,6 +301,10 @@ export function apiKeyMiddleware(): MiddlewareHandler<HonoEnv> {
       );
     }
 
+    // The free tier carries its credit: a key at or under the free allowance
+    // gets the attribution block on every paid-endpoint response. Prepaid,
+    // Pro and OEM keys take the other branch or a higher limit, and never do.
+    c.set('freeTier', monthlyLimit <= FREE_TIER_MONTHLY_LIMIT);
     c.set('apiKeyAuthenticated', true);
     await next();
 

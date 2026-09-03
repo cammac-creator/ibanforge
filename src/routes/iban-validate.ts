@@ -1,3 +1,4 @@
+import { attachAttribution } from '../lib/attribution.js';
 import { Hono } from 'hono';
 import type { HonoEnv } from '../types.js';
 import { validateIBAN } from '../lib/iban.js';
@@ -84,7 +85,7 @@ ibanValidate.post('/v1/iban/validate', async (c) => {
     'iban_validate',
   );
 
-  return c.json(result);
+  return c.json(attachAttribution(c, result));
 });
 
 export { ibanValidate };

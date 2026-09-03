@@ -57,7 +57,7 @@ import java.util.Map;
  * IBANValidationResult r = client.validateIban("CH1000230000000012345");
  *
  * // Generate a free key in 1 line
- * APIKey key = IBANforge.generateApiKey("you@example.com");
+ * APIKey key = IBANforge.generateApiKey("you@company.com");
  * }</pre>
  *
  * <p><b>Warning:</b> the IBAN above is not decoration. {@code CH9300762011623852957} -- the

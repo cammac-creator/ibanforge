@@ -134,6 +134,8 @@ The key works on all paid endpoints:
 | Prepaid credit packs — card or USDC | 1k / 5k / 25k credits | $5 / $20 / $80 — never expire |
 | x402 pay-per-call | Unlimited | $0.002–$0.02/call |
 
+**Attribution on the free tier.** Every paid-endpoint response served on a free key carries an `attribution` object (`text`, `url`, `note`). When you show these results to people (a page, a screen, a document), display "Powered by IBANforge" with the link; a result that stays inside your backend owes nothing. Paid plans carry no attribution.
+
 The 200 free requests are shared across all endpoints and reset on the 1st of each month. **Batch validation counts 1 request per IBAN** — a batch of 50 IBANs uses 50 requests (or 50 prepaid credits), the same rule as the x402 per-IBAN price.
 
 ## Check your usage

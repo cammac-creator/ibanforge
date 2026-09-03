@@ -138,6 +138,8 @@ La clé fonctionne sur tous les endpoints payants :
 | Packs de crédits prépayés — carte ou USDC | 1k / 5k / 25k crédits | 5 $ / 20 $ / 80 $ — n'expirent jamais |
 | x402 paiement à l'appel | Illimité | 0,002 $–0,02 $/appel |
 
+**Attribution sur le palier gratuit.** Chaque réponse d'un endpoint payant servie sur une clé gratuite porte un objet `attribution` (`text`, `url`, `note`). Quand vous montrez ces résultats à des personnes (une page, un écran, un document), affichez « Powered by IBANforge » avec le lien ; un résultat qui reste dans votre backend ne doit rien. Les plans payants ne portent aucune attribution.
+
 Les 200 requetes gratuites sont partagees entre tous les endpoints et se reinitalisent le 1er de chaque mois. **La validation par lot compte 1 requete par IBAN** — un lot de 50 IBANs consomme 50 requetes (ou 50 credits prepayes), la meme regle que le prix x402 par IBAN.
 
 ## Vérifier votre consommation

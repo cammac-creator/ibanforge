@@ -52,6 +52,11 @@ const SKIP_DIRS = new Set([
   // suite asserts on `{"email": "a@b.c"}`, which is a fixture, not an example.
   'tests',
   '__tests__',
+  // Build output of the Java and .NET SDKs (gitignored, present on a
+  // developer machine): a generated javadoc page is not something we serve.
+  'target',
+  'bin',
+  'obj',
 ]);
 
 const EXTS = /\.(ts|tsx|js|mjs|py|json|md|mdx|txt|html)$/;

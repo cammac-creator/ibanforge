@@ -1,3 +1,4 @@
+import { attachAttribution } from '../lib/attribution.js';
 import { Hono } from 'hono';
 import type { HonoEnv } from '../types.js';
 import { validateBIC } from '../lib/bic-validator.js';
@@ -247,7 +248,7 @@ bicLookup.get('/v1/bic/:code', (c) => {
     result.note = parts.join(' ');
   }
 
-  return c.json(result);
+  return c.json(attachAttribution(c, result));
 });
 
 export { bicLookup };

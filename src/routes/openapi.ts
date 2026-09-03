@@ -140,6 +140,18 @@ const buildRawSpec = () => ({
                       type: 'array',
                       items: { $ref: '#/components/schemas/IBANValidationResult' },
                     },
+                    attribution: {
+                      type: 'object',
+                      description:
+                        'Free tier only. When these results are shown to people, display `text` with a link to `url`; backend-only use owes nothing. Absent on paid plans and on x402 calls.',
+                      required: ['required', 'text', 'url', 'note'],
+                      properties: {
+                        required: { type: 'boolean', enum: [true] },
+                        text: { type: 'string', example: 'Powered by IBANforge' },
+                        url: { type: 'string', format: 'uri' },
+                        note: { type: 'string' },
+                      },
+                    },
                     count: { type: 'integer', description: 'Total IBANs processed' },
                     valid_count: { type: 'integer', description: 'Number of valid IBANs' },
                     cost_usdc: { type: 'number', description: 'Total cost in USDC' },
@@ -1426,6 +1438,18 @@ const buildRawSpec = () => ({
         type: 'object',
         required: ['iban', 'valid', 'cost_usdc'],
         properties: {
+          attribution: {
+            type: 'object',
+            description:
+              'Free tier only. When these results are shown to people, display `text` with a link to `url`; backend-only use owes nothing. Absent on paid plans and on x402 calls.',
+            required: ['required', 'text', 'url', 'note'],
+            properties: {
+              required: { type: 'boolean', enum: [true] },
+              text: { type: 'string', example: 'Powered by IBANforge' },
+              url: { type: 'string', format: 'uri' },
+              note: { type: 'string' },
+            },
+          },
           iban: { type: 'string', description: 'The IBAN as provided (normalized)' },
           valid: { type: 'boolean' },
           country: {
@@ -1865,6 +1889,18 @@ const buildRawSpec = () => ({
         type: 'object',
         required: ['bic', 'bic8', 'bic11', 'found', 'valid_format', 'institution', 'country', 'city', 'branch_code', 'branch_info', 'lei', 'lei_status', 'is_test_bic', 'source', 'cost_usdc'],
         properties: {
+          attribution: {
+            type: 'object',
+            description:
+              'Free tier only. When these results are shown to people, display `text` with a link to `url`; backend-only use owes nothing. Absent on paid plans and on x402 calls.',
+            required: ['required', 'text', 'url', 'note'],
+            properties: {
+              required: { type: 'boolean', enum: [true] },
+              text: { type: 'string', example: 'Powered by IBANforge' },
+              url: { type: 'string', format: 'uri' },
+              note: { type: 'string' },
+            },
+          },
           bic: { type: 'string', example: 'UBSWCHZH' },
           bic8: { type: 'string', example: 'UBSWCHZH' },
           bic11: { type: 'string', example: 'UBSWCHZHXXX' },
@@ -1990,6 +2026,18 @@ const buildRawSpec = () => ({
         type: 'object',
         required: ['iid', 'found'],
         properties: {
+          attribution: {
+            type: 'object',
+            description:
+              'Free tier only. When these results are shown to people, display `text` with a link to `url`; backend-only use owes nothing. Absent on paid plans and on x402 calls.',
+            required: ['required', 'text', 'url', 'note'],
+            properties: {
+              required: { type: 'boolean', enum: [true] },
+              text: { type: 'string', example: 'Powered by IBANforge' },
+              url: { type: 'string', format: 'uri' },
+              note: { type: 'string' },
+            },
+          },
           iid: { type: 'string', example: '00230', description: 'Zero-padded 5-digit IID' },
           found: { type: 'boolean' },
           institution: {

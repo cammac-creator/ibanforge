@@ -300,6 +300,8 @@ export interface IBANValidationResult {
   error_detail?: string;
   cost_usdc: number;
   processing_ms?: number;
+  /** Free tier only: the credit to display when results are shown to people. */
+  attribution?: { required: true; text: string; url: string; note: string };
 }
 
 export interface IBANFormatResult {
