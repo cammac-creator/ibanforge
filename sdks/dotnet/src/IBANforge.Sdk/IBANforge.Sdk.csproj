@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <PackageId>IBANforge.Sdk</PackageId>
+    <Version>1.5.0</Version>
+    <Authors>IBANforge</Authors>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://ibanforge.com</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/cammac-creator/ibanforge</RepositoryUrl>
+    <Description>Official .NET SDK for the IBANforge API: IBAN validation, BIC/SWIFT lookup, Swiss BC-Nummer clearing, SEPA/VoP, payment reference and ISO 20022 address checks, and compliance triage.</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="../../README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>

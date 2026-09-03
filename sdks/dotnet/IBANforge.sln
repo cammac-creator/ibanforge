@@ -1,0 +1,36 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{3DCF94D6-439C-41C8-823C-C6FEF344FC66}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IBANforge.Sdk", "src\IBANforge.Sdk\IBANforge.Sdk.csproj", "{ED1904BA-F7C8-4749-AB8C-7612EE180998}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{AD627917-6EEA-4D8B-A532-A80F0D455A44}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IBANforge.Sdk.Tests", "tests\IBANforge.Sdk.Tests\IBANforge.Sdk.Tests.csproj", "{A68272E1-2812-4BEF-888F-B9ACF3B561BC}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{ED1904BA-F7C8-4749-AB8C-7612EE180998}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{ED1904BA-F7C8-4749-AB8C-7612EE180998}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{ED1904BA-F7C8-4749-AB8C-7612EE180998}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{ED1904BA-F7C8-4749-AB8C-7612EE180998}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A68272E1-2812-4BEF-888F-B9ACF3B561BC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A68272E1-2812-4BEF-888F-B9ACF3B561BC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A68272E1-2812-4BEF-888F-B9ACF3B561BC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A68272E1-2812-4BEF-888F-B9ACF3B561BC}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{ED1904BA-F7C8-4749-AB8C-7612EE180998} = {3DCF94D6-439C-41C8-823C-C6FEF344FC66}
+		{A68272E1-2812-4BEF-888F-B9ACF3B561BC} = {AD627917-6EEA-4D8B-A532-A80F0D455A44}
+	EndGlobalSection
+EndGlobal
