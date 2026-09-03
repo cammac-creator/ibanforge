@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top" />
+    <meta charset="utf-8" />
+    <style>
+      body { font: 13px/1.5 -apple-system, "Segoe UI", Roboto, Arial, sans-serif; color: #1f2937; margin: 0; padding: 16px; }
+      h1 { font-size: 15px; margin: 0 0 4px; }
+      p { margin: 0 0 10px; }
+      .muted { color: #6b7280; font-size: 12px; }
+      label { display: block; font-weight: 600; margin: 14px 0 4px; }
+      input { width: 100%; box-sizing: border-box; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
+      button { margin-top: 10px; padding: 8px 12px; border: 0; border-radius: 6px; background: #14263f; color: #fff; font-weight: 600; cursor: pointer; }
+      button.secondary { background: #e5e7eb; color: #1f2937; }
+      button[disabled] { opacity: .6; cursor: progress; }
+      .status { margin-top: 12px; padding: 10px; border-radius: 6px; background: #f3f4f6; font-size: 12px; }
+      .status.ok { background: #ecfdf5; color: #065f46; }
+      .status.err { background: #fef2f2; color: #991b1b; }
+      code { font-family: ui-monospace, Menlo, monospace; font-size: 12px; background: #f3f4f6; padding: 1px 4px; border-radius: 4px; }
+      ul { padding-left: 18px; margin: 6px 0 0; }
+      li { margin-bottom: 4px; }
+      a { color: #c8742f; }
+    </style>
+  </head>
+  <body>
+    <h1>IBANforge</h1>
+    <p class="muted">Check a column of IBANs against the bank registers. Your own key, 200 checks a month free, no card.</p>
+
+    <label for="key">API key</label>
+    <input id="key" type="password" placeholder="ifk_…" autocomplete="off" />
+    <button id="save" onclick="save()">Test and save</button>
+    <button class="secondary" onclick="clearKey()">Remove</button>
+    <div id="status" class="status">Checking the saved key…</div>
+    <p class="muted" style="margin-top:10px">No key yet? <a href="https://ibanforge.com/?src=sheets" target="_blank" rel="noopener">Get a free one</a> (e-mail, one minute).</p>
+
+    <label>Then, in any cell</label>
+    <ul>
+      <li><code>=IBAN_VALID(A2:A200)</code> TRUE / FALSE</li>
+      <li><code>=IBAN_BANK(A2:A200)</code> bank named by the register</li>
+      <li><code>=IBAN_BIC(A2:A200)</code> BIC</li>
+      <li><code>=IBAN_CHECK(A2:A200)</code> valid, bank, BIC, verdict, SEPA</li>
+    </ul>
+    <p class="muted" style="margin-top:10px">One request per IBAN, sent in batches of 100. Results are cached six hours, so recalculating does not pay twice. French: <code>IBAN_VALIDE</code>, <code>IBAN_BANQUE</code>, <code>IBAN_CONTROLE</code>. German: <code>IBAN_GUELTIG</code>, <code>IBAN_BANKNAME</code>, <code>IBAN_PRUEFUNG</code>.</p>
+
+    <script>
+      function show(cls, text) { var s = document.getElementById('status'); s.className = 'status ' + cls; s.textContent = text; }
+      function describe(st) {
+        if (!st.configured) return show('', 'No key saved yet.');
+        if (st.error) return show('err', 'Saved key ' + st.key_prefix + '… but: ' + st.error);
+        var line = 'Key ' + st.key_prefix + '… works.';
+        if (st.month && st.limit) line += ' ' + st.used + ' of ' + st.limit + ' used in ' + st.month + '.';
+        else if (st.credits_remaining !== undefined && st.credits_remaining !== null) line += ' ' + st.credits_remaining + ' credits left.';
+        show('ok', line);
+      }
+      function save() {
+        var btn = document.getElementById('save'); btn.disabled = true; show('', 'Testing the key…');
+        google.script.run
+          .withSuccessHandler(function (st) { btn.disabled = false; st.configured = true; st.key_prefix = document.getElementById('key').value.trim().slice(0, 12); describe(st); document.getElementById('key').value = ''; })
+          .withFailureHandler(function (e) { btn.disabled = false; show('err', e.message || String(e)); })
+          .ibfSaveKey(document.getElementById('key').value);
+      }
+      function clearKey() {
+        google.script.run.withSuccessHandler(describe).withFailureHandler(function (e) { show('err', e.message || String(e)); }).ibfClearKey();
+      }
+      google.script.run.withSuccessHandler(describe).withFailureHandler(function (e) { show('err', e.message || String(e)); }).ibfGetKeyStatus();
+    </script>
+  </body>
+</html>

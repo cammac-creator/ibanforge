@@ -31,6 +31,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
       { url: `${prefix}/compare`, changeFrequency: "monthly", priority: 0.8 },
       { url: `${prefix}/tools/test-iban`, changeFrequency: "monthly", priority: 0.8 },
       { url: `${prefix}/tools/qr-bill`, changeFrequency: "monthly", priority: 0.8 },
+      { url: `${prefix}/sheets`, changeFrequency: "monthly", priority: 0.8 },
       { url: `${prefix}/playground`, changeFrequency: "monthly", priority: 0.9 },
       { url: `${prefix}/docs`, changeFrequency: "weekly", priority: 0.8 },
       { url: `${prefix}/pricing`, changeFrequency: "monthly", priority: 0.7 },

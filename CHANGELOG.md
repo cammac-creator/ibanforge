@@ -7,6 +7,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ### Added
 
+- **Google Sheets add-on, source published.** `integrations/sheets/`: four custom functions (`IBAN_VALID`, `IBAN_BANK`, `IBAN_BIC`, `IBAN_CHECK`, with French and German aliases) that check a column of IBANs through `POST /v1/iban/batch` in batches of 100 on the user's own key, a six-hour per-user cache so a recalculation does not pay twice, a sidebar that tests and stores the key in the user's script properties. Page `/sheets` in EN, FR and DE with the by-hand install path until the Marketplace listing exists; icons under `/sheets/`; README with the publishing procedure and `LISTING.md` with the store texts. Tested under Node with the Apps Script services stubbed, plus the invalid-key path against the live API.
 - **Pro subscription, the flat monthly tier.** $29 a month for 10,000 requests: the allowance resets on the 1st, the key dies with its subscription, cancel anytime. Sold through a public Stripe Payment Link on the pricing page and minted by the webhook through the same path as Editor / OEM (`metadata.plan = 'pro'`), with its own welcome e-mail. Listed for machines in `GET /v1/credits/bundles` under `subscription`, in the card hint of every 402 body, on the API landing and in llms.txt.
 - **Postman collection.** `integrations/postman/ibanforge.postman_collection.json`, generated from the live OpenAPI contract: 28 requests in 8 folders, bearer auth from a single `apiKey` variable, the free endpoints marked as such.
 

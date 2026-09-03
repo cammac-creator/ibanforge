@@ -40,7 +40,8 @@
       "compare": "Compare",
       "account": "Your key",
       "sources": "Sources & permissions",
-      "audit": "Creditor file audit"
+      "audit": "Creditor file audit",
+      "sheets": "Google Sheets"
     },
     "copyright": "© {year} IBANforge.",
     "dataLine": "Data: GLEIF · Quelle: Deutsche Bundesbank · SIX · EBA · NBP · SwiftCodes/MIT · Bank of England (List of Banks, 2026-08) — monthly · OFAC · UN · EU · EPC — weekly"
@@ -1822,6 +1823,54 @@
     "errors": {
       "generic": "The check could not run. Try again.",
       "network": "The server did not answer. Try again in a minute."
+    }
+  },
+  "sheets": {
+    "metaTitle": "IBANforge for Google Sheets",
+    "metaDescription": "Four formulas that check a column of IBANs against the bank registers: valid, bank, BIC, bank-code verdict, SEPA. Your own key, 200 checks a month free.",
+    "eyebrow": "Google Sheets add-on",
+    "title": "Check a column of IBANs from a formula",
+    "intro": "=IBAN_CHECK(A2:A200) fills five columns next to your IBANs: valid, the bank the register names, the BIC, the bank-code verdict and SEPA reach. Batches of 100, cached six hours, on your own IBANforge key.",
+    "cta": {
+      "key": "Get a free key",
+      "source": "Read the source on GitHub"
+    },
+    "functions": {
+      "0": {
+        "formula": "=IBAN_VALID(A2:A200)",
+        "returns": "TRUE or FALSE, one row per cell"
+      },
+      "1": {
+        "formula": "=IBAN_BANK(A2:A200)",
+        "returns": "the institution the national register names for the bank code"
+      },
+      "2": {
+        "formula": "=IBAN_BIC(A2:A200)",
+        "returns": "the BIC the register pairs with the bank code, empty when none"
+      },
+      "3": {
+        "formula": "=IBAN_CHECK(A2:A200)",
+        "returns": "five columns: valid, bank, BIC, bank-code verdict, SEPA"
+      },
+      "title": "The four functions",
+      "aliases": "French aliases IBAN_VALIDE, IBAN_BANQUE, IBAN_CONTROLE and German aliases IBAN_GUELTIG, IBAN_BANKNAME, IBAN_PRUEFUNG call the same code."
+    },
+    "install": {
+      "title": "Install",
+      "status": "The add-on is being submitted to the Google Workspace Marketplace; until Google's review completes there is no store button. The script is open source and installs by hand in five minutes:",
+      "steps": {
+        "0": "In your spreadsheet: Extensions, then Apps Script.",
+        "1": "Paste Code.gs and Sidebar.html from the GitHub folder, and the manifest appsscript.json (Project settings, show the manifest).",
+        "2": "Reload the spreadsheet: a menu Extensions, IBANforge, Set up API key appears. Paste your key there.",
+        "3": "Type =IBAN_CHECK(A2:A200) next to a column of IBANs."
+      }
+    },
+    "billing": {
+      "title": "What it costs, what it sends",
+      "text": "One request per IBAN, on your own key: 200 a month free, no card, then prepaid packs or the Pro plan at 29 dollars a month for 10,000. Results are cached six hours per user, so recalculating a sheet does not pay twice.",
+      "privacy": "Nothing leaves the sheet except the IBAN strings the functions receive; the key stays in your own script properties, never in the spreadsheet.",
+      "privacyLink": "Privacy policy",
+      "limits": "IBANforge is not a Verification of Payee service and never says that an account belongs to a person: it tells you what the registers know about the bank behind the IBAN."
     }
   }
 }
