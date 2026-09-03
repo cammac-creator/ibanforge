@@ -1,20 +1,35 @@
 # Releasing IBANforge
 
-This repo publishes to **four** places. Two are fully automated; **npm is manual**
-because npm now enforces a live 2FA challenge that no CI token can pass.
+This repo publishes to **four** places. All four run from CI once npm's
+**trusted publishing** is registered for the two npm packages (a one-time,
+two-minute step on npmjs.com, below). Until then, **npm is manual**.
 
 | Target | How | Auth |
 |---|---|---|
 | PyPI `ibanforge` | **automatic** (CI) | `PYPI_TOKEN` repo secret |
 | MCP Registry | **automatic** (CI) | GitHub Actions OIDC (no secret) |
-| npm `ibanforge-mcp` | **manual** (Touch ID) | interactive `npm login` |
-| npm `@ibanforge/sdk` | **manual** (Touch ID) | interactive `npm login` |
+| npm `ibanforge-mcp` | **automatic** once registered, else manual (Touch ID) | npm trusted publishing (OIDC) |
+| npm `@ibanforge/sdk` | **automatic** once registered, else manual (Touch ID) | npm trusted publishing (OIDC) |
 
-> **Why npm is manual.** Since 2026 npm enforces a "2FA approval gate" (staged
+> **Why npm was manual.** Since 2026 npm enforces a "2FA approval gate" (staged
 > publishing): finalizing a publish requires a live, interactive 2FA challenge.
 > Automation/granular tokens — even with "bypass 2FA" enabled — fail with
-> `npm error code EOTP`, both in CI and locally. This is by design (anti
-> supply-chain), so there is no token that makes npm publish non-interactively.
+> `npm error code EOTP`, both in CI and locally. The one path npm exempts is
+> **trusted publishing**: a GitHub Actions workflow registered on the package as
+> its publisher, authenticated by OIDC, no token anywhere. That is what
+> `release-publish.yml` does since 03/09/2026 (and `n8n-publish.yml` for the n8n
+> node).
+
+## Step 0a — register the trusted publisher (once per package, 2 minutes each)
+
+On npmjs.com, logged in as the package owner, for **`ibanforge-mcp`** and for
+**`@ibanforge/sdk`**: package page → *Settings* → *Publish access* → *Trusted
+publishers* → *Add*: GitHub Actions · owner `cammac-creator` · repository
+`ibanforge` · workflow filename `release-publish.yml` · environment: leave empty.
+(For `n8n-nodes-ibanforge` the workflow filename is `n8n-publish.yml`.)
+
+From then on Step 1 below is unnecessary: a tag push publishes everything, in the
+right order, in one run.
 
 ## Step 0 — bump the version (one number, seven files)
 
@@ -58,7 +73,7 @@ heading is a version that never appears on either surface. That is exactly what
 happened to 1.4.4: production served it while the public changelog stopped at 1.4.3
 (audit of 2026-09-01, DX-04).
 
-## Step 1 — publish npm by hand (Touch ID)
+## Step 1 — publish npm by hand (Touch ID) — only while Step 0a is not done
 
 The MCP Registry validates that the npm package version exists, so **npm must go
 first**. In your Terminal (not CI):

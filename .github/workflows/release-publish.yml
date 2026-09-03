@@ -4,12 +4,17 @@ name: Release & republish
 # with a `version` input). Auto-publishes the registries that allow token/OIDC
 # automation: PyPI (PYPI_TOKEN) and the MCP Registry (GitHub Actions OIDC).
 #
-# npm is HYBRID: npm's 2026 "2FA approval gate" (staged publishing) requires a
-# live interactive 2FA challenge that no automation token can satisfy, so the two
-# npm steps are best-effort and the maintainer publishes them by hand with
-# Touch ID (see RELEASING.md). The MCP Registry validates that the npm package
-# version exists, so the correct order is: npm (manual) FIRST, then re-run this
-# workflow so the MCP Registry step succeeds.
+# npm publishes through TRUSTED PUBLISHING (OIDC, no token anywhere), the same
+# path n8n-publish.yml uses: npm's 2026 "2FA approval gate" blocks every token,
+# but a GitHub Actions identity registered on npmjs.com as the package's trusted
+# publisher is exempt. One-time registration per package, by the maintainer:
+# npmjs.com → package → Settings → Publish access → Trusted publishers → Add:
+# GitHub Actions, owner `cammac-creator`, repository `ibanforge`, workflow
+# filename `release-publish.yml`, no environment. Until that is done the two
+# npm steps fail with ENEEDAUTH, stay best-effort, and the maintainer publishes
+# by hand with Touch ID (RELEASING.md). The MCP Registry validates that the npm
+# package version exists, so when npm was manual the order is: npm FIRST, then
+# re-run this workflow so the MCP Registry step succeeds.
 #
 # Platforms without a publish API (Smithery, MCP.so, RapidAPI, DevHunt, Glama)
 # need a manual refresh — the job ends with a checklist in the run summary.
@@ -53,31 +58,25 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Publishing version: $VERSION"
 
-      # ─── npm — ibanforge-mcp + @ibanforge/sdk ────────────────────────────
+      # ─── npm — ibanforge-mcp + @ibanforge/sdk (trusted publishing) ───────
+      # No registry-url and no NODE_AUTH_TOKEN on purpose: an empty token would
+      # shadow the OIDC exchange. Trusted publishing needs npm >= 11.5.1, hence
+      # the explicit upgrade (Node 22 ships npm 10). Both steps stay best-effort:
+      # while the trusted publisher is not registered on npmjs.com they fail
+      # with ENEEDAUTH and must never block PyPI, the MCP Registry or the
+      # GitHub release.
       - uses: actions/setup-node@v7
         with:
-          node-version: '20'
-          registry-url: 'https://registry.npmjs.org'
+          node-version: '22'
 
-      # npm publish is best-effort in CI: npm's 2FA approval gate (staged
-      # publishing) requires a live interactive 2FA challenge that no token can
-      # satisfy, so a CI publish fails with EOTP by design. We attempt it (in
-      # case the gate is ever lifted), but never fail the whole release on it —
-      # PyPI + the MCP Registry publish fine automatically. When npm is skipped
-      # this way, publish the two packages manually with Touch ID:
-      #   cd mcp && npm publish --access public
-      #   cd sdks/typescript && npm run build && npm publish --access public
-      - name: Publish ibanforge-mcp (best-effort — manual fallback on 2FA gate)
+      - name: npm with trusted publishing support
+        run: npm install -g npm@latest && npm --version
+
+      - name: Publish ibanforge-mcp (trusted publishing; Touch ID by hand until registered)
         if: hashFiles('mcp/package.json') != ''
         continue-on-error: true # never let an npm hiccup (incl. npm ci) block the PyPI/MCP steps
         working-directory: mcp
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          if [ -z "$NODE_AUTH_TOKEN" ]; then
-            echo "::warning::NPM_TOKEN not set — skipping ibanforge-mcp publish"
-            exit 0
-          fi
           PUBLISHED=$(npm view ibanforge-mcp@${{ steps.ver.outputs.version }} version 2>/dev/null || echo "")
           if [ "$PUBLISHED" = "${{ steps.ver.outputs.version }}" ]; then
             echo "ibanforge-mcp@${{ steps.ver.outputs.version }} already on npm — skipping"
@@ -85,34 +84,28 @@ jobs:
           fi
           npm ci
           npm run build
-          if npm publish --access public; then
-            echo "ibanforge-mcp@${{ steps.ver.outputs.version }} published to npm"
+          if npm publish --access public --provenance; then
+            echo "ibanforge-mcp@${{ steps.ver.outputs.version }} published to npm with provenance"
           else
-            echo "::warning::npm publish of ibanforge-mcp failed (likely the 2FA approval gate). Publish manually: cd mcp && npm publish --access public"
+            echo "::warning::npm publish of ibanforge-mcp failed: the trusted publisher is not registered on npmjs.com yet (see the header of this file), or npm's 2FA gate. Publish manually: cd mcp && npm publish --access public"
           fi
 
-      - name: Publish @ibanforge/sdk (best-effort — manual fallback on 2FA gate)
+      - name: Publish @ibanforge/sdk (trusted publishing; Touch ID by hand until registered)
         if: hashFiles('sdks/typescript/package.json') != ''
         continue-on-error: true # never let an npm hiccup (incl. npm ci) block the PyPI/MCP steps
         working-directory: sdks/typescript
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          if [ -z "$NODE_AUTH_TOKEN" ]; then
-            echo "::warning::NPM_TOKEN not set — skipping @ibanforge/sdk publish"
-            exit 0
-          fi
           PUBLISHED=$(npm view @ibanforge/sdk@${{ steps.ver.outputs.version }} version 2>/dev/null || echo "")
           if [ "$PUBLISHED" = "${{ steps.ver.outputs.version }}" ]; then
             echo "@ibanforge/sdk@${{ steps.ver.outputs.version }} already on npm — skipping"
             exit 0
           fi
           npm ci
-          npm run build || true
-          if npm publish --access public; then
-            echo "@ibanforge/sdk@${{ steps.ver.outputs.version }} published to npm"
+          npm run build
+          if npm publish --access public --provenance; then
+            echo "@ibanforge/sdk@${{ steps.ver.outputs.version }} published to npm with provenance"
           else
-            echo "::warning::npm publish of @ibanforge/sdk failed (likely the 2FA approval gate). Publish manually: cd sdks/typescript && npm run build && npm publish --access public"
+            echo "::warning::npm publish of @ibanforge/sdk failed: the trusted publisher is not registered on npmjs.com yet (see the header of this file), or npm's 2FA gate. Publish manually: cd sdks/typescript && npm run build && npm publish --access public"
           fi
 
       # ─── PyPI — ibanforge ────────────────────────────────────────────────
@@ -208,10 +201,11 @@ jobs:
           - [ ] **Coinbase Bazaar** — auto-indexed after the next paid x402 settlement; if absent 48h after release, run scripts/bazaar-warmup.mjs to trigger a fresh settlement
           - [ ] **agentic.market** — depends on Bazaar; if Bazaar shows IBANforge but agentic.market UI lags, post in #x402 on discord.gg/cdp
 
-          ## npm — MANUAL (npm 2FA approval gate; see RELEASING.md)
+          ## npm — automatic once each package has its trusted publisher (RELEASING.md)
 
-          Publish these two with Touch ID, THEN re-run this workflow so the
-          MCP Registry step (which validates the npm version exists) passes:
+          If the two npm steps above warned with ENEEDAUTH, the trusted publisher
+          is not registered yet: publish these two with Touch ID, THEN re-run this
+          workflow so the MCP Registry step (which validates the npm version exists) passes:
           - [ ] \`cd mcp && npm publish --access public\` → ibanforge-mcp@${{ steps.ver.outputs.version }}
           - [ ] \`cd sdks/typescript && npm run build && npm publish --access public\` → @ibanforge/sdk@${{ steps.ver.outputs.version }}
 
@@ -219,8 +213,8 @@ jobs:
 
           - PyPI \`ibanforge\`: https://pypi.org/project/ibanforge/
           - MCP Registry: https://registry.modelcontextprotocol.io/v0/servers?search=ibanforge
-          - npm \`ibanforge-mcp\`: https://www.npmjs.com/package/ibanforge-mcp (manual)
-          - npm \`@ibanforge/sdk\`: https://www.npmjs.com/package/@ibanforge/sdk (manual)
+          - npm \`ibanforge-mcp\`: https://www.npmjs.com/package/ibanforge-mcp
+          - npm \`@ibanforge/sdk\`: https://www.npmjs.com/package/@ibanforge/sdk
           EOF
           echo "Checklist written to job summary."
 
