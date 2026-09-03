@@ -22,10 +22,11 @@
  * state for a neighbouring file would turn every later `/health` red.
  */
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { writeFileSync, mkdtempSync, copyFileSync } from 'node:fs';
+import { writeFileSync, mkdtempSync } from 'node:fs';
+import Database from 'better-sqlite3';
 import { randomBytes } from 'node:crypto';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { join } from 'node:path';
 
 const originalEnv = { ...process.env };
 
@@ -42,11 +43,15 @@ function corruptStatsDb(): string {
   return path;
 }
 
-/** A copy of the developer database, so the control case is a REAL schema. */
+/** A fresh, valid database the app will initialise at boot: the control case. */
 function healthyStatsDb(): string {
   const dir = mkdtempSync(join(tmpdir(), 'ibanforge-boot-ok-'));
   const path = join(dir, 'stats.sqlite');
-  copyFileSync(resolve(process.cwd(), 'data/stats.sqlite'), path);
+  // A fresh, valid, empty database: the app creates its schema at boot, as it
+  // does on a new volume. It used to copy data/stats.sqlite from the checkout,
+  // a file that only existed because the test suite itself had written to it;
+  // since every test file opens its own database, nothing creates it any more.
+  new Database(path).close();
   return path;
 }
 
