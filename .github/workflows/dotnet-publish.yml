@@ -1,0 +1,60 @@
+name: Publish IBANforge.Sdk (.NET) to NuGet
+
+# Publishes sdks/dotnet to nuget.org. Trigger: push a tag matching
+# `dotnet-v*` (e.g. `git tag dotnet-v1.5.0 && git push origin dotnet-v1.5.0`),
+# or a manual `workflow_dispatch`. Independent of the `v*.*.*` tags of
+# release-publish.yml: the .NET SDK carries its own version in its csproj,
+# which must match the tag.
+#
+# Secret: NUGET_API_KEY, an API key created on nuget.org (Account → API Keys,
+# scope "Push new packages and package versions", glob `IBANforge.Sdk`). The
+# nuget.org account itself is a Microsoft account, opened by the maintainer.
+# Until the secret exists the push step fails with 401 and nothing else happens.
+
+on:
+  push:
+    tags:
+      - 'dotnet-v*'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sdks/dotnet
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: The tag and the csproj must agree
+        if: startsWith(github.ref, 'refs/tags/dotnet-v')
+        run: |
+          TAG="${GITHUB_REF_NAME#dotnet-v}"
+          CSPROJ="$(grep -oE '<Version>[^<]+</Version>' src/IBANforge.Sdk/IBANforge.Sdk.csproj | sed -E 's/<\/?Version>//g')"
+          if [ "$TAG" != "$CSPROJ" ]; then
+            echo "tag dotnet-v$TAG but the csproj says $CSPROJ" >&2
+            exit 1
+          fi
+
+      - name: Test
+        run: dotnet test --nologo
+
+      - name: Pack
+        run: dotnet pack src/IBANforge.Sdk/IBANforge.Sdk.csproj -c Release -o /tmp/pkg --nologo
+
+      - name: Push to nuget.org
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+        run: |
+          if [ -z "$NUGET_API_KEY" ]; then
+            echo "::error::NUGET_API_KEY is not set: create the key on nuget.org and run \`gh secret set NUGET_API_KEY\`" >&2
+            exit 1
+          fi
+          dotnet nuget push /tmp/pkg/*.nupkg --api-key "$NUGET_API_KEY" --source https://api.nuget.org/v3/index.json --skip-duplicate
