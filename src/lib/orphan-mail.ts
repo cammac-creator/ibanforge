@@ -45,6 +45,10 @@ export interface OrphanMail {
    * for it. The original text stays the reference; this is the reading aid.
    */
   gist_fr: string | null;
+  /** The original text, as the sync sends it (6,000 characters at most). */
+  body: string | null;
+  /** Its French translation, written once on demand. */
+  body_fr: string | null;
 }
 
 export function isOrphanKind(v: unknown): v is OrphanKind {
@@ -58,6 +62,9 @@ export interface OrphanInput {
   snippet?: string | null;
   msg_date: string;
   kind: OrphanKind;
+  body?: string | null;
+  /** The French translation, when the sync already made it (new rows only). */
+  body_fr?: string | null;
 }
 
 /**
@@ -71,14 +78,17 @@ export interface OrphanInput {
 export function recordOrphan(input: OrphanInput): void {
   getStatsDB()
     .prepare(
-      `INSERT INTO orphan_mail (id, sender, subject, snippet, msg_date, kind)
-       VALUES (@id, @sender, @subject, @snippet, @msg_date, @kind)
+      `INSERT INTO orphan_mail (id, sender, subject, snippet, msg_date, kind, body, body_fr)
+       VALUES (@id, @sender, @subject, @snippet, @msg_date, @kind, @body, @body_fr)
        ON CONFLICT(id) DO UPDATE SET
          sender = excluded.sender,
          subject = excluded.subject,
          snippet = excluded.snippet,
          msg_date = excluded.msg_date,
-         kind = excluded.kind`,
+         kind = excluded.kind,
+         -- A run that sends no body or no translation keeps the ones already held.
+         body = COALESCE(excluded.body, orphan_mail.body),
+         body_fr = COALESCE(orphan_mail.body_fr, excluded.body_fr)`,
     )
     .run({
       id: input.id,
@@ -87,6 +97,8 @@ export function recordOrphan(input: OrphanInput): void {
       snippet: input.snippet ?? null,
       msg_date: input.msg_date,
       kind: input.kind,
+      body: input.body ? input.body.slice(0, 6000) : null,
+      body_fr: input.body_fr ? input.body_fr.slice(0, 12000) : null,
     });
 }
 
@@ -105,7 +117,7 @@ export function getOrphans(includeResolved = false, limit = 40): OrphanMail[] {
   const where = includeResolved ? '' : 'WHERE resolved = 0';
   return getStatsDB()
     .prepare(
-      `SELECT id, sender, subject, snippet, msg_date, kind, resolved, resolved_as, gist_fr
+      `SELECT id, sender, subject, snippet, msg_date, kind, resolved, resolved_as, gist_fr, body, body_fr
          FROM orphan_mail ${where}
         ORDER BY resolved ASC,
                  CASE kind WHEN 'reply' THEN 0 ELSE 1 END ASC,
@@ -142,5 +154,13 @@ export function setOrphanGist(id: string, gist: string): boolean {
   const res = getStatsDB()
     .prepare('UPDATE orphan_mail SET gist_fr = ? WHERE id = ? AND gist_fr IS NULL')
     .run(gist, id);
+  return res.changes > 0;
+}
+
+/** Store the French translation of the full text, once; same rule as the gist. */
+export function setOrphanTranslation(id: string, bodyFr: string): boolean {
+  const res = getStatsDB()
+    .prepare('UPDATE orphan_mail SET body_fr = ? WHERE id = ? AND body_fr IS NULL')
+    .run(bodyFr, id);
   return res.changes > 0;
 }

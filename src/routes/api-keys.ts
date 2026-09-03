@@ -38,6 +38,7 @@ import {
   countPendingOrphans,
   isOrphanKind,
   setOrphanGist,
+  setOrphanTranslation,
 } from '../lib/orphan-mail.js';
 import { addAlias, listAliases, loadAliasMap, toCanonical } from '../lib/email-aliases.js';
 import {
@@ -1618,7 +1619,12 @@ apiKeys.get('/v1/admin/orphan-mail', (c) => {
     return c.json({ error: 'unauthorized' }, 401);
   }
   const includeResolved = c.req.query('all') === '1';
-  return c.json({ orphans: getOrphans(includeResolved), pending: countPendingOrphans() });
+  // `limit` (03/09/2026): the sync asks for every row it already sent, so it
+  // translates only the new ones; the dashboard keeps the default.
+  const rawLimit = Number(c.req.query('limit') ?? '');
+  const limit =
+    Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(Math.floor(rawLimit), 5000) : 40;
+  return c.json({ orphans: getOrphans(includeResolved, limit), pending: countPendingOrphans() });
 });
 
 apiKeys.post('/v1/admin/orphan-mail', async (c) => {
@@ -1651,6 +1657,8 @@ apiKeys.post('/v1/admin/orphan-mail', async (c) => {
       snippet: typeof m.snippet === 'string' ? m.snippet : null,
       msg_date: m.msg_date,
       kind: m.kind,
+      body: typeof m.body === 'string' && m.body.trim() ? m.body : null,
+      body_fr: typeof m.body_fr === 'string' && m.body_fr.trim() ? m.body_fr : null,
     });
     saved += 1;
   }
@@ -1795,6 +1803,34 @@ apiKeys.post('/v1/admin/orphan-mail/gist', async (c) => {
   const exists = getOrphans(true, 100000).some((o) => o.id === body.id);
   if (!exists) return c.json({ error: 'not_found' }, 404);
   const written = setOrphanGist(body.id, gist);
+  return c.json({ id: body.id, written });
+});
+
+/**
+ * The French translation of the full text, same contract and same
+ * idempotency as the gist: first write wins, a retry answers 200 unchanged.
+ * Longer ceiling: a translation is the size of the mail, not of a summary.
+ */
+apiKeys.post('/v1/admin/orphan-mail/translation', async (c) => {
+  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
+  let body: { id?: unknown; body_fr?: unknown };
+  try {
+    body = await c.req.json<{ id?: unknown; body_fr?: unknown }>();
+  } catch {
+    return c.json({ error: 'invalid_json' }, 400);
+  }
+  const text = (typeof body.body_fr === 'string' ? stripEmDashes(body.body_fr.trim()) : null) ?? '';
+  if (typeof body.id !== 'string' || !text || text.length > 12000) {
+    return c.json(
+      { error: 'invalid_body', message: 'Expected { id, body_fr } (1 to 12000 chars)' },
+      400,
+    );
+  }
+  const exists = getOrphans(true, 100000).some((o) => o.id === body.id);
+  if (!exists) return c.json({ error: 'not_found' }, 404);
+  const written = setOrphanTranslation(body.id, text);
   return c.json({ id: body.id, written });
 });
 

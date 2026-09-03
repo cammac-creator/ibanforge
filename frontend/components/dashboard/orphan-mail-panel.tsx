@@ -1,6 +1,7 @@
 import { InfoDot } from './info-dot';
 import { AttachOrphanControl } from './attach-orphan';
 import { OrphanGist } from './orphan-gist';
+import { OrphanFullText } from './orphan-full-text';
 import { isAutomatedNotice } from '@/lib/crm/orphan-suggest';
 
 /**
@@ -29,6 +30,8 @@ export interface OrphanMailRow {
   resolved: 0 | 1;
   resolved_as: string | null;
   gist_fr?: string | null;
+  body?: string | null;
+  body_fr?: string | null;
 }
 
 function frDay(iso: string): string {
@@ -94,8 +97,9 @@ function OrphanRow({ o }: { o: OrphanMailRow }) {
         snippet={o.snippet}
         msgDate={o.msg_date}
         initial={o.gist_fr ?? null}
-        eager={o.kind === 'reply'}
+        eager
       />
+      <OrphanFullText id={o.id} body={o.body ?? null} initialFr={o.body_fr ?? null} />
       <AttachOrphanControl orphanId={o.id} sender={o.sender} automated={automated} />
     </li>
   );
@@ -172,13 +176,14 @@ export function OrphanMailPanel({
           qui arrive quand un client répond depuis une autre adresse que celle de sa clé : sans ce
           panneau, le message n&apos;apparaît nulle part. « Réponse » veut dire qu&apos;il répond à
           quelque chose qu&apos;on a envoyé, donc que quelqu&apos;un attend. Sous chaque objet, un
-          résumé en français écrit par le rédacteur du CRM ; le texte original reste dépliable.
-          Quand une adresse du CRM ressemble à l&apos;expéditeur, elle est proposée d&apos;office
-          avec la raison ; la décision reste la tienne, en deux clics. Trois issues par mail : le
-          rattacher à un client (son fil complet remonte à la synchro suivante), l&apos;enregistrer
-          comme correspondant institutionnel, ou le classer sans rattachement quand ce n&apos;est
-          personne (un avis automatique, une newsletter). Les premiers contacts sont pliés sous leur
-          compteur, les avis automatiques en dernier.
+          résumé en français écrit par le rédacteur du CRM ; « mail complet » déplie le texte
+          entier, traduit en français automatiquement, l'original à côté. Quand une adresse du CRM
+          ressemble à l&apos;expéditeur, elle est proposée d&apos;office avec la raison ; la
+          décision reste la tienne, en deux clics. Trois issues par mail : le rattacher à un client
+          (son fil complet remonte à la synchro suivante), l&apos;enregistrer comme correspondant
+          institutionnel, ou le classer sans rattachement quand ce n&apos;est personne (un avis
+          automatique, une newsletter). Les premiers contacts sont pliés sous leur compteur, les
+          avis automatiques en dernier.
         </InfoDot>
       </div>
 

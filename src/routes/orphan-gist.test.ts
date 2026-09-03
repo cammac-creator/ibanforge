@@ -1,7 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { Hono } from 'hono';
 import { apiKeys } from './api-keys.js';
-import { recordOrphan, getOrphans, setOrphanGist } from '../lib/orphan-mail.js';
+import {
+  recordOrphan,
+  getOrphans,
+  setOrphanGist,
+  setOrphanTranslation,
+} from '../lib/orphan-mail.js';
 
 /**
  * The French gist of an orphan mail (03/09/2026): stored once through the
@@ -90,5 +95,121 @@ describe('POST /v1/admin/orphan-mail/gist', () => {
     });
     expect(empty.status).toBe(400);
     expect(setOrphanGist('never-recorded', 'y')).toBe(false);
+  });
+});
+
+describe('the full text and its translation', () => {
+  it('ingests the body, keeps it across a run without one, and stores the translation once', async () => {
+    const id = `orphan-body-${Date.now()}`;
+    const app = makeApp();
+    const headers = {
+      'Content-Type': 'application/json',
+      'X-Admin-Secret': 'correct-horse-battery-staple',
+    };
+    const ingest = await app.request('/v1/admin/orphan-mail', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        messages: [
+          {
+            id,
+            sender: 'writer@alpha.example.net',
+            subject: 'Hello',
+            snippet: 'Hi there, a longer message follows.',
+            msg_date: '2026-09-02 09:00',
+            kind: 'first_contact',
+            body: 'Hi there, a longer message follows.\n\nSecond paragraph with the actual ask.',
+          },
+        ],
+      }),
+    });
+    expect(ingest.status).toBe(201);
+    let row = getOrphans(true, 100000).find((o) => o.id === id);
+    expect(row?.body).toContain('Second paragraph');
+    expect(row?.body_fr).toBeNull();
+
+    // The next sync run sends the same row without a body: the held one stays.
+    recordOrphan({
+      id,
+      sender: 'writer@alpha.example.net',
+      msg_date: '2026-09-02 09:00',
+      kind: 'first_contact',
+    });
+    row = getOrphans(true, 100000).find((o) => o.id === id);
+    expect(row?.body).toContain('Second paragraph');
+
+    const tr = await app.request('/v1/admin/orphan-mail/translation', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        id,
+        body_fr:
+          'Bonjour, un message plus long suit.\n\nDeuxième paragraphe avec la vraie demande.',
+      }),
+    });
+    expect(await tr.json()).toEqual({ id, written: true });
+    expect(getOrphans(true, 100000).find((o) => o.id === id)?.body_fr).toContain(
+      'Deuxième paragraphe',
+    );
+    expect(setOrphanTranslation(id, 'autre')).toBe(false);
+    const unknown = await app.request('/v1/admin/orphan-mail/translation', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ id: 'never', body_fr: 'x' }),
+    });
+    expect(unknown.status).toBe(404);
+  });
+});
+
+describe('a translation made by the sync itself', () => {
+  it('lands on a new row, never overwrites a held one, and the list can be asked in full', async () => {
+    const stamp = Date.now();
+    const headers = {
+      'Content-Type': 'application/json',
+      'X-Admin-Secret': 'correct-horse-battery-staple',
+    };
+    const app = makeApp();
+    const held = `orphan-held-${stamp}`;
+    recordOrphan({
+      id: held,
+      sender: 'a@alpha.example.net',
+      msg_date: '2026-09-02 09:00',
+      kind: 'first_contact',
+      body: 'Hello',
+    });
+    expect(setOrphanTranslation(held, 'Première traduction.')).toBe(true);
+    recordOrphan({
+      id: held,
+      sender: 'a@alpha.example.net',
+      msg_date: '2026-09-02 09:00',
+      kind: 'first_contact',
+      body_fr: 'Une autre.',
+    });
+    expect(getOrphans(true, 100000).find((o) => o.id === held)?.body_fr).toBe(
+      'Première traduction.',
+    );
+
+    const fresh = `orphan-fresh-${stamp}`;
+    const ingest = await app.request('/v1/admin/orphan-mail', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        messages: [
+          {
+            id: fresh,
+            sender: 'b@alpha.example.net',
+            msg_date: '2026-09-02 09:01',
+            kind: 'first_contact',
+            body: 'Hello',
+            body_fr: 'Bonjour',
+          },
+        ],
+      }),
+    });
+    expect(ingest.status).toBe(201);
+    const list = await app.request('/v1/admin/orphan-mail?all=1&limit=5000', { headers });
+    const rows = ((await list.json()) as { orphans: Array<{ id: string; body_fr: string | null }> })
+      .orphans;
+    expect(rows.find((o) => o.id === fresh)?.body_fr).toBe('Bonjour');
   });
 });

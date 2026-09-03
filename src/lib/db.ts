@@ -431,6 +431,15 @@ function openStatsDB(): DatabaseType.Database {
     ).map((r) => r.name);
     if (orphanCols.length > 0 && !orphanCols.includes('gist_fr'))
       statsDB.exec('ALTER TABLE orphan_mail ADD COLUMN gist_fr TEXT');
+    // The full text (03/09/2026): the sync used to send a 300-character
+    // snippet and nothing else, so the queue could show a mail but never let
+    // the operator READ it. `body` is the original (6,000 chars at most, as
+    // the sync sends it), `body_fr` its French translation, written once on
+    // demand through the VPS writer.
+    if (orphanCols.length > 0 && !orphanCols.includes('body'))
+      statsDB.exec('ALTER TABLE orphan_mail ADD COLUMN body TEXT');
+    if (orphanCols.length > 0 && !orphanCols.includes('body_fr'))
+      statsDB.exec('ALTER TABLE orphan_mail ADD COLUMN body_fr TEXT');
     const keyCols = (
       statsDB.prepare('PRAGMA table_info(api_keys)').all() as Array<{ name: string }>
     ).map((r) => r.name);
