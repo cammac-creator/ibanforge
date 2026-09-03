@@ -107,14 +107,23 @@ function pick(obj: Json | undefined, keys: string[]): Json | null {
 }
 
 const app = buildApp();
-const key = generateOemKey('export-register-pages@ibanforge.local', 10_000_000, `cs_export_${Date.now()}`, null);
+const key = generateOemKey(
+  'export-register-pages@ibanforge.local',
+  10_000_000,
+  `cs_export_${Date.now()}`,
+  null,
+);
 if (!key.api_key) throw new Error('could not mint the export key');
 const headers = { Authorization: `Bearer ${key.api_key}`, 'content-type': 'application/json' };
 
 async function call(path: string, init?: RequestInit): Promise<Json> {
-  const res = await app.request(path, { ...init, headers: { ...headers, ...(init?.headers as Json | undefined) } });
+  const res = await app.request(path, {
+    ...init,
+    headers: { ...headers, ...(init?.headers as Json | undefined) },
+  });
   const body = (await res.json()) as Json;
-  if (res.status !== 200) throw new Error(`${path} -> ${res.status} ${JSON.stringify(body).slice(0, 200)}`);
+  if (res.status !== 200)
+    throw new Error(`${path} -> ${res.status} ${JSON.stringify(body).slice(0, 200)}`);
   return body;
 }
 
@@ -123,7 +132,9 @@ async function call(path: string, init?: RequestInit): Promise<Json> {
 // ---------------------------------------------------------------------------
 const bic = getBicDB();
 const blzRows = bic
-  .prepare('SELECT blz, name, short_name, bic, post_code, town, retired, successor_blz, updated_at FROM de_blz ORDER BY blz')
+  .prepare(
+    'SELECT blz, name, short_name, bic, post_code, town, retired, successor_blz, updated_at FROM de_blz ORDER BY blz',
+  )
   .all() as BlzRow[];
 const byBic8 = new Map<string, string[]>();
 for (const r of blzRows) {
@@ -132,12 +143,17 @@ for (const r of blzRows) {
   byBic8.set(k, [...(byBic8.get(k) ?? []), r.blz]);
 }
 const de: Json = {};
-let deBatch1: string[] = [];
+const deBatch1: string[] = [];
 for (const r of blzRows) {
   const bban = `${r.blz}1000000000`;
   const iban = `DE${checkDigits('DE', bban)}${bban}`;
-  const answer = await call('/v1/iban/validate', { method: 'POST', body: JSON.stringify({ iban }) });
-  const related = (r.bic ? byBic8.get(r.bic.slice(0, 8)) ?? [] : []).filter((b) => b !== r.blz).slice(0, 12);
+  const answer = await call('/v1/iban/validate', {
+    method: 'POST',
+    body: JSON.stringify({ iban }),
+  });
+  const related = (r.bic ? (byBic8.get(r.bic.slice(0, 8)) ?? []) : [])
+    .filter((b) => b !== r.blz)
+    .slice(0, 12);
   de[r.blz] = {
     register: {
       blz: r.blz,
@@ -153,11 +169,31 @@ for (const r of blzRows) {
     example_iban: iban,
     api: {
       valid: answer.valid,
-      bic: pick(answer.bic as Json, ['code', 'bank_name', 'city', 'source', 'as_of', 'basis', 'authoritative', 'lei']),
+      bic: pick(answer.bic as Json, [
+        'code',
+        'bank_name',
+        'city',
+        'source',
+        'as_of',
+        'basis',
+        'authoritative',
+        'lei',
+      ]),
       bank_code_check: answer.bank_code_check ?? null,
-      sepa: pick(answer.sepa as Json, ['member', 'schemes', 'vop_required', 'vop_participant', 'basis']),
+      sepa: pick(answer.sepa as Json, [
+        'member',
+        'schemes',
+        'vop_required',
+        'vop_participant',
+        'basis',
+      ]),
       issuer: pick(answer.issuer as Json, ['type', 'name', 'classification']),
-      risk_indicators: pick(answer.risk_indicators as Json, ['country_risk', 'sepa_reachable', 'vop_coverage', 'test_bic']),
+      risk_indicators: pick(answer.risk_indicators as Json, [
+        'country_risk',
+        'sepa_reachable',
+        'vop_coverage',
+        'test_bic',
+      ]),
     },
     related,
   };
@@ -186,10 +222,14 @@ for (const r of iidRows) {
     chSkipped++;
     continue; // redirected or empty rows answer through their target; no page of their own
   }
-  const { cost_usdc: _c, processing_ms: _p, ...api } = answer;
+  const api: Json = { ...answer };
+  delete api.cost_usdc;
+  delete api.processing_ms;
   const bban = `${r.iid}${'1'.padStart(12, '0')}`;
   const iban = `CH${checkDigits('CH', bban)}${bban}`;
-  const related = (r.headquarters_iid ? byHq.get(r.headquarters_iid) ?? [] : []).filter((i) => i !== r.iid).slice(0, 12);
+  const related = (r.headquarters_iid ? (byHq.get(r.headquarters_iid) ?? []) : [])
+    .filter((i) => i !== r.iid)
+    .slice(0, 12);
   ch[r.iid] = {
     register: {
       iid: r.iid,
@@ -214,11 +254,25 @@ mkdirSync(OUT_DIR, { recursive: true });
 const generated_at = new Date().toISOString().slice(0, 10);
 writeFileSync(
   resolve(OUT_DIR, 'de-blz.json'),
-  JSON.stringify({ generated_at, source: 'Deutsche Bundesbank Bankleitzahlendatei', count: Object.keys(de).length, batch1: deBatch1, entries: de }),
+  JSON.stringify({
+    generated_at,
+    source: 'Deutsche Bundesbank Bankleitzahlendatei',
+    count: Object.keys(de).length,
+    batch1: deBatch1,
+    entries: de,
+  }),
 );
 writeFileSync(
   resolve(OUT_DIR, 'ch-iid.json'),
-  JSON.stringify({ generated_at, source: 'SIX BankMaster', count: Object.keys(ch).length, batch1: chBatch1, entries: ch }),
+  JSON.stringify({
+    generated_at,
+    source: 'SIX BankMaster',
+    count: Object.keys(ch).length,
+    batch1: chBatch1,
+    entries: ch,
+  }),
 );
 console.log(`de-blz.json: ${Object.keys(de).length} BLZ, batch1 ${deBatch1.length}`);
-console.log(`ch-iid.json: ${Object.keys(ch).length} IID (${chSkipped} rows without a page of their own), batch1 ${chBatch1.length}`);
+console.log(
+  `ch-iid.json: ${Object.keys(ch).length} IID (${chSkipped} rows without a page of their own), batch1 ${chBatch1.length}`,
+);
