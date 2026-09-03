@@ -6,7 +6,7 @@ const HERMETIC_DB = vi.hoisted(() => {
   return path;
 });
 
-const notify = vi.hoisted(() => vi.fn(async () => true));
+const notify = vi.hoisted(() => vi.fn(async (_text: string) => true));
 vi.mock('./ops-alert.js', () => ({ notifyOps: notify }));
 
 import { recordDemandGap, resetDemandGaps } from './demand-gaps.js';
