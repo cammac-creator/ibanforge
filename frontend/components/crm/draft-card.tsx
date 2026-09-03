@@ -54,7 +54,11 @@ export function DraftCard({
   const [showOriginal, setShowOriginal] = useState(false);
   const [subject, setSubject] = useState(draft.subject ?? '');
   const [body, setBody] = useState(draft.body ?? draft.snippet ?? '');
-  const reading = draftReading(draft, showOriginal);
+  // Always the French when there is one: the original is shown BESIDE it
+  // below, never instead of it (owner, 03/09/2026). `draftReading` keeps its
+  // contract; what changed is that this card no longer asks it to swap.
+  const reading = draftReading(draft, false);
+  const original = draft.body ?? draft.snippet ?? '';
   const [busy, setBusy] = useState<false | 'send' | 'save' | 'del'>(false);
   // Latched on a confirmed send. router.refresh() is not awaitable and the
   // card stays mounted until the new payload arrives, so without this the send
@@ -122,7 +126,14 @@ export function DraftCard({
         // blocking rules server-side (audit TABS-03, 2026-09-01). Declared
         // rather than guessed there: the route holds neither the thread nor
         // the grant the operator gave.
-        body: JSON.stringify({ account, to: contact.email, subject, body, intent: g.intent, override: g.forcedCodes }),
+        body: JSON.stringify({
+          account,
+          to: contact.email,
+          subject,
+          body,
+          intent: g.intent,
+          override: g.forcedCodes,
+        }),
       });
       const a = await readAnswer(r);
       if (!confirmedSent(a)) {
@@ -180,7 +191,10 @@ export function DraftCard({
       // itself worked, and the store skips a row it cannot key. Only the count
       // says the text is safe, and saying it is when it is not loses the text.
       if (!changedRows(a, 'upserted')) {
-        setMsg({ text: withReason('Échec de l’enregistrement, le brouillon n’a pas changé', reasonOf(a)), bad: true });
+        setMsg({
+          text: withReason('Échec de l’enregistrement, le brouillon n’a pas changé', reasonOf(a)),
+          bad: true,
+        });
         return;
       }
       setMsg({ text: '💾 Brouillon enregistré.', bad: false });
@@ -213,7 +227,10 @@ export function DraftCard({
       });
       const a = await readAnswer(r);
       if (!changedRows(a, 'deleted')) {
-        setMsg({ text: withReason('Échec de la suppression, le brouillon est toujours là', reasonOf(a)), bad: true });
+        setMsg({
+          text: withReason('Échec de la suppression, le brouillon est toujours là', reasonOf(a)),
+          bad: true,
+        });
         return;
       }
       router.refresh();
@@ -237,7 +254,9 @@ export function DraftCard({
     // that widens the whole page.
     <div className="min-w-0 rounded-lg border border-dashed border-amber-500/40 bg-amber-500/5 p-3 wrap-anywhere">
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px]">
-        <span className="font-semibold text-amber-400">📝 brouillon, en attente de ta relecture</span>
+        <span className="font-semibold text-amber-400">
+          📝 brouillon, en attente de ta relecture
+        </span>
         {stamp && (
           <span className="text-[var(--fg-3)]" title={draft.msg_date ?? undefined}>
             {stamp}
@@ -264,7 +283,9 @@ export function DraftCard({
         </div>
       ) : (
         <>
-          <p className="mt-1.5 text-[13px] font-medium text-[var(--fg-1)]">{subject || '(sans objet)'}</p>
+          <p className="mt-1.5 text-[13px] font-medium text-[var(--fg-1)]">
+            {subject || '(sans objet)'}
+          </p>
           {/* Reading view only. `reading.text` may be the French translation,
               which is never what leaves: the send path reads `body`, the state
               the textarea edits. draftReading() owns that distinction and
@@ -283,11 +304,17 @@ export function DraftCard({
               <button
                 type="button"
                 onClick={() => setShowOriginal(!showOriginal)}
+                aria-expanded={showOriginal}
                 className="text-[12px] text-[var(--fg-3)] underline decoration-dotted underline-offset-2 hover:text-[var(--fg-1)]"
               >
-                {showOriginal ? 'voir la traduction' : 'voir l’original'}
+                {showOriginal ? '▾ masquer l’original' : '▸ afficher l’original'}
               </button>
             </div>
+          )}
+          {reading.canTranslate && showOriginal && (
+            <p className="mt-1 whitespace-pre-wrap border-l-2 border-[var(--ink-5)] pl-2 text-[12px] leading-relaxed text-[var(--fg-3)]">
+              {original}
+            </p>
           )}
         </>
       )}

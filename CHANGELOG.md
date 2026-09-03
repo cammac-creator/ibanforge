@@ -5,6 +5,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Changed
+
+- **CRM: the French translation no longer replaces the original, and the answer has room to be read.** In a thread bubble and on a draft card, "afficher l'original" now reveals the source text under the French instead of swapping one for the other, so comparing two languages costs one click and no going back. In both composers the translation is a plain panel rather than a fold, the body field grows with its content (one scrollbar where there were two nested ones), the sheet stands up by itself as soon as a proposal lands, and the height the operator chooses is remembered.
+
 ### Added
 
 - **Dashboard, "Courrier à rattacher": read in French, pre-selected match, calmer rows.** Each orphan mail gets a French gist (who writes, what they want) from the VPS writer, generated once and kept on the row (`gist_fr`, `POST /v1/admin/orphan-mail/gist`); replies ask for theirs on sight, first contacts on a click, the original text folds underneath. The attach control now names the most likely client before anything is typed (shared company domain first, then the domain in a file's label, then a name fragment), with the reason, one click away from the two-click confirmation. Automated notices (DMARC reports, no-reply senders) are labelled as such with the dismissal first. Rows read sender, subject, gist, then actions. "Mail complet" unfolds the whole text: the original as the sync now sends it (`body`, up to 6,000 characters) and its French translation, made by the sync as the mail arrives (`body_fr`) or by the dashboard on first sight for older rows (`POST /v1/admin/orphan-mail/translation`, written once). Nothing to click: the operator asked for automatic French, and the gist is requested for every row on sight.

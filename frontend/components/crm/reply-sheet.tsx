@@ -1,8 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { confirmedSent, generatedDraft, readAnswer, reasonOf, withReason } from '@/lib/crm/api-result';
+import {
+  confirmedSent,
+  generatedDraft,
+  readAnswer,
+  reasonOf,
+  withReason,
+} from '@/lib/crm/api-result';
 import { isAutomated } from '@/lib/crm/automated';
 import { institutionalBrief } from '@/lib/crm/institutional-brief';
 import { threadTail } from '@/lib/crm/thread-tail';
@@ -25,6 +31,15 @@ import { PANEL_PADDING_PX } from './panel-padding';
  * subject went to text-sm, 30px against 26. 216 + 8 + 4 = 228.
  */
 export const REPLY_SHEET_PX = 228;
+
+/**
+ * Where the sheet remembers the height the operator last chose.
+ *
+ * Their choice and not a guess: the short sheet is right while the thread is
+ * being read, the tall one while an answer is being written, and only the
+ * person doing it knows which they are doing.
+ */
+const EXPAND_KEY = 'ibf.crm.replySheetExpanded';
 
 /**
  * How much of the panel's scrolling region the sheet hides: its own height,
@@ -168,6 +183,46 @@ export function ReplySheet({
    */
   const [expanded, setExpanded] = useState(false);
 
+  /**
+   * The remembered choice (03/09/2026, owner: "l'espace de lecture de la
+   * réponse est trop petit"). Read in an effect rather than in the initial
+   * state: this subtree is server-rendered, and a first state that differs
+   * between the server and the browser is a hydration mismatch.
+   */
+  useEffect(() => {
+    try {
+      if (localStorage.getItem(EXPAND_KEY) === '1') setExpanded(true);
+    } catch {
+      // Private window, or storage refused: the default height stands.
+    }
+  }, []);
+
+  function toggleExpanded() {
+    setExpanded((e) => {
+      const next = !e;
+      try {
+        localStorage.setItem(EXPAND_KEY, next ? '1' : '0');
+      } catch {
+        // Nothing to remember; the toggle still works for this sheet.
+      }
+      return next;
+    });
+  }
+
+  /**
+   * The answer grows with what is in it, so this sheet has ONE scrollbar
+   * instead of two. A textarea with a fixed row count scrolls inside a region
+   * that scrolls as well, and reading a fifteen-line mail through a four-line
+   * window is what the owner called too small.
+   */
+  const bodyRef = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    const el = bodyRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  }, [body, expanded, open]);
+
   const filled = !!subject.trim() && !!body.trim();
 
   /**
@@ -309,8 +364,14 @@ export function ReplySheet({
       // that thread in the recipient's mailbox.
       setBody(gen.emailEn);
       setFr(gen.translationFr);
+      // A proposal is a text to READ, in two languages. At four rows the sheet
+      // would hand back a fifteen-line mail through a four-line window.
+      setExpanded(true);
       g.clear();
-      setMsg({ text: '✍️ Proposition écrite, rien n’est parti. Relis avant d’envoyer.', bad: false });
+      setMsg({
+        text: '✍️ Proposition écrite, rien n’est parti. Relis avant d’envoyer.',
+        bad: false,
+      });
     } catch {
       setMsg({ text: 'Erreur réseau, rien n’a été proposé.', bad: true });
     } finally {
@@ -342,7 +403,14 @@ export function ReplySheet({
         // blocking rules server-side (audit TABS-03, 2026-09-01). Declared
         // rather than guessed there: the route holds neither the thread nor
         // the grant the operator gave.
-        body: JSON.stringify({ account: c.account, to: c.email, subject, body, intent: g.intent, override: g.forcedCodes }),
+        body: JSON.stringify({
+          account: c.account,
+          to: c.email,
+          subject,
+          body,
+          intent: g.intent,
+          override: g.forcedCodes,
+        }),
       });
       const a = await readAnswer(r);
       if (!confirmedSent(a)) {
@@ -400,7 +468,9 @@ export function ReplySheet({
    * so a note inside it could be out of view while the armed button is not.
    */
   const forcedNote = g.forcedNote && (
-    <p className="mt-2 shrink-0 text-[12px] font-medium leading-snug text-red-300">⚠️ {g.forcedNote}</p>
+    <p className="mt-2 shrink-0 text-[12px] font-medium leading-snug text-red-300">
+      ⚠️ {g.forcedNote}
+    </p>
   );
   const note = msg && (
     <p
@@ -498,7 +568,7 @@ export function ReplySheet({
         <div className="flex shrink-0 items-center gap-3">
           <button
             type="button"
-            onClick={() => setExpanded((e) => !e)}
+            onClick={toggleExpanded}
             aria-pressed={expanded}
             className="cursor-pointer text-[12px] text-[var(--fg-3)] underline underline-offset-2 hover:text-[var(--fg-1)]"
           >
@@ -529,35 +599,46 @@ export function ReplySheet({
             minimum width that w-full does not remove, and that minimum would
             set a floor the panel cannot absorb on a narrow window. */}
         <textarea
+          ref={bodyRef}
           autoFocus
           value={body}
           onChange={(e) => setBody(e.target.value)}
-          rows={expanded ? 14 : 4}
+          // A floor, not a height: the effect above sizes the field to its
+          // content, so `resize-none overflow-hidden` below is what removes the
+          // inner scrollbar rather than what hides text.
+          rows={4}
           placeholder={firstLetter ? 'Écris ta demande.' : 'Écris ta réponse.'}
           aria-label={firstLetter ? 'Corps de la demande' : 'Corps de la réponse'}
-          className="w-full min-w-0 rounded-lg border border-[var(--ink-4)] bg-[var(--ink-0)] p-3 text-base leading-[22px] sm:text-sm text-[var(--fg-1)] focus:border-amber-500/40 focus:outline-none"
+          className="w-full min-w-0 resize-none overflow-hidden rounded-lg border border-[var(--ink-4)] bg-[var(--ink-0)] p-3 text-base leading-[22px] sm:text-sm text-[var(--fg-1)] focus:border-amber-500/40 focus:outline-none"
         />
         {fr && (
           /*
-           * Open on arrival: the translation is what the owner reads to judge a
-           * draft, so hiding it behind a click makes the reading step optional
-           * on the one surface whose whole purpose is to be read before
-           * sending.
-           *
-           * `key={fr}` because `open` is initial state only. Without it a
-           * translation folded once stays folded through every later proposal,
-           * since the node is never unmounted between two non-null values.
+           * Shown, never folded (03/09/2026). It was a `details` open by
+           * default, which still reads as something to unfold, and sitting
+           * under a four-row textarea inside a scrolling region it was one more
+           * thing to hunt for. The mail above is what leaves; this is the same
+           * mail in French, and both are read without touching anything.
            */
-          <details key={fr} open className="mt-1">
-            <summary className="cursor-pointer text-[12px] text-blue-400">
-              Traduction FR (pour toi seul, jamais envoyée)
-            </summary>
-            <p className="mt-1 whitespace-pre-wrap text-[12px] text-[var(--fg-3)] wrap-anywhere">{fr}</p>
-          </details>
+          <section
+            aria-label="Traduction française du message"
+            className="mt-2 rounded-lg border border-blue-500/25 bg-blue-500/5 p-2.5"
+          >
+            <p className="mb-1 text-[12px] font-medium text-blue-300">
+              🌐 En français, pour toi seul. C’est le texte au-dessus qui part.
+            </p>
+            <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-[var(--fg-2)] wrap-anywhere">
+              {fr}
+            </p>
+          </section>
         )}
         {/* The report is handed over whole apart from its issue list: what is
             filtered is what is shown, never what blocks. */}
-        <GuardrailChecks id={checksId} report={{ ...g.report, issues: shown }} subject={subject} body={body} />
+        <GuardrailChecks
+          id={checksId}
+          report={{ ...g.report, issues: shown }}
+          subject={subject}
+          body={body}
+        />
       </div>
       <div className="mt-2 flex shrink-0 flex-wrap items-center gap-3">
         {/* Said in words rather than dressed as a button: generating is a tool
@@ -575,7 +656,9 @@ export function ReplySheet({
           {/* Only ever offered against the em dash on this path: `empty_body` is
               the one other blocking rule a reply can raise, and it cannot stand
               at the same time as `sendable`, which the offer requires. */}
-          {g.offer && <OverrideButton offer={g.offer} pressed={g.forced} onClick={g.toggle} dense />}
+          {g.offer && (
+            <OverrideButton offer={g.offer} pressed={g.forced} onClick={g.toggle} dense />
+          )}
           <button
             type="button"
             onClick={send}

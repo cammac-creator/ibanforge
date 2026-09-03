@@ -52,6 +52,9 @@ import { PANEL_PADDING_PX } from './panel-padding';
  */
 export const OUTBOUND_SHEET_PX = 276;
 
+/** Where this sheet remembers the height the operator last chose, as the reply sheet does. */
+const EXPAND_KEY = 'ibf.crm.outboundSheetExpanded';
+
 /**
  * How tall the sheet stands while the operator is choosing an angle.
  *
@@ -134,9 +137,7 @@ export const OUTBOUND_SHEET_COVER_PX = OUTBOUND_SHEET_PX - PANEL_PADDING_PX;
  * `choose` never holds an empty list: nothing to choose between is a failure
  * with a different sentence, not a panel of no buttons.
  */
-type AngleStep =
-  | { kind: 'choose'; angles: ProposedAngle[] }
-  | { kind: 'failed'; reason: string };
+type AngleStep = { kind: 'choose'; angles: ProposedAngle[] } | { kind: 'failed'; reason: string };
 
 /**
  * Writing to somebody who has not asked to hear from us, and every rule that
@@ -217,6 +218,44 @@ export function OutboundSheet({
    * are writing, and the sheet is back at rest the moment it folds.
    */
   const [expanded, setExpanded] = useState(false);
+  /**
+   * The remembered choice, same contract and same reason as the reply sheet's
+   * (03/09/2026): read in an effect, because this subtree is server-rendered
+   * and a first state that differs between server and browser is a mismatch.
+   */
+  useEffect(() => {
+    try {
+      if (localStorage.getItem(EXPAND_KEY) === '1') setExpanded(true);
+    } catch {
+      // Private window, or storage refused: the default height stands.
+    }
+  }, []);
+
+  function toggleExpanded() {
+    setExpanded((e) => {
+      const next = !e;
+      try {
+        localStorage.setItem(EXPAND_KEY, next ? '1' : '0');
+      } catch {
+        // Nothing to remember; the toggle still works for this sheet.
+      }
+      return next;
+    });
+  }
+
+  /**
+   * The body grows with its content, so this sheet has one scrollbar and not
+   * two: a fixed row count scrolls inside a region that scrolls as well, and
+   * reading a long mail through a six-line window is the complaint this
+   * answers (owner, 03/09/2026).
+   */
+  const bodyRef = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    const el = bodyRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  }, [body, expanded, open]);
   const [busy, setBusy] = useState<false | 'gen' | 'send' | 'draft' | 'angles'>(false);
   const [msg, setMsg] = useState<{ text: string; bad: boolean } | null>(null);
   /**
@@ -534,6 +573,8 @@ export function OutboundSheet({
       setSubject(gen.subject || subject);
       setBody(gen.emailEn);
       setFr(gen.translationFr);
+      // Something to read, in two languages: the sheet stands up for it.
+      setExpanded(true);
       g.clear();
       // The panel goes when the draft it produced is in the composer, and not
       // a moment earlier. Closing it on the click would make a failed
@@ -559,7 +600,12 @@ export function OutboundSheet({
     setMsg(null);
     // One draft per contact, and the store upserts on the address, so saving
     // destroys the previous one. Never silently.
-    if (c.draft && !window.confirm('Un brouillon existe déjà pour ce contact. L’enregistrement va le remplacer. Continuer ?')) {
+    if (
+      c.draft &&
+      !window.confirm(
+        'Un brouillon existe déjà pour ce contact. L’enregistrement va le remplacer. Continuer ?',
+      )
+    ) {
       return;
     }
     setBusy('draft');
@@ -572,7 +618,10 @@ export function OutboundSheet({
       const a = await readAnswer(r);
       // 200 is not proof of a stored row, see lib/crm/api-result.ts.
       if (!changedRows(a, 'upserted')) {
-        setMsg({ text: withReason('Échec de l’enregistrement, rien n’a été gardé', reasonOf(a)), bad: true });
+        setMsg({
+          text: withReason('Échec de l’enregistrement, rien n’a été gardé', reasonOf(a)),
+          bad: true,
+        });
         return;
       }
       // Cleared on success: the text now lives in the draft card in the thread,
@@ -619,7 +668,14 @@ export function OutboundSheet({
         // blocking rules server-side (audit TABS-03, 2026-09-01). Declared
         // rather than guessed there: the route holds neither the thread nor
         // the grant the operator gave.
-        body: JSON.stringify({ account: c.account, to: c.email, subject, body, intent: g.intent, override: g.forcedCodes }),
+        body: JSON.stringify({
+          account: c.account,
+          to: c.email,
+          subject,
+          body,
+          intent: g.intent,
+          override: g.forcedCodes,
+        }),
       });
       const a = await readAnswer(r);
       if (!confirmedSent(a)) {
@@ -695,7 +751,9 @@ export function OutboundSheet({
    * that is about to ignore a rule.
    */
   const forcedNote = g.forcedNote && (
-    <p className="mt-2 shrink-0 text-[12px] font-medium leading-snug text-red-300">⚠️ {g.forcedNote}</p>
+    <p className="mt-2 shrink-0 text-[12px] font-medium leading-snug text-red-300">
+      ⚠️ {g.forcedNote}
+    </p>
   );
   const note = msg && (
     <p
@@ -733,7 +791,9 @@ export function OutboundSheet({
             className="min-w-0 flex-1 truncate rounded-lg border border-[var(--ink-4)] bg-[var(--ink-0)] px-3 py-1.5 text-left text-[13px] text-[var(--fg-3)] hover:border-amber-500/40 hover:text-[var(--fg-2)]"
           >
             {/* Folded text is not lost text: say it is there and unsaved. */}
-            {hasText ? '✏️ Message en cours, ni enregistré ni envoyé' : `Écrire à ${c.company || c.email}`}
+            {hasText
+              ? '✏️ Message en cours, ni enregistré ni envoyé'
+              : `Écrire à ${c.company || c.email}`}
           </button>
           <button
             type="button"
@@ -808,7 +868,7 @@ export function OutboundSheet({
         <div className="flex shrink-0 items-center gap-3">
           <button
             type="button"
-            onClick={() => setExpanded((e) => !e)}
+            onClick={toggleExpanded}
             aria-pressed={expanded}
             className="cursor-pointer text-[12px] text-[var(--fg-3)] underline underline-offset-2 hover:text-[var(--fg-1)]"
           >
@@ -916,12 +976,15 @@ export function OutboundSheet({
             minimum width that w-full does not remove, and that minimum would
             set a min-content floor the panel cannot absorb at 375px. */}
         <textarea
+          ref={bodyRef}
           value={body}
           onChange={(e) => setBody(e.target.value)}
-          rows={expanded ? 16 : 6}
+          // A floor, not a height: the effect below sizes the field to what is
+          // in it, so the inner scrollbar goes and the region scrolls alone.
+          rows={6}
           placeholder="Écris, ou fais générer une relance."
           aria-label="Corps du message"
-          className="w-full min-w-0 rounded-lg border border-[var(--ink-4)] bg-[var(--ink-0)] p-3 text-base leading-[22px] sm:text-sm text-[var(--fg-1)] focus:border-amber-500/40 focus:outline-none"
+          className="w-full min-w-0 resize-none overflow-hidden rounded-lg border border-[var(--ink-4)] bg-[var(--ink-0)] p-3 text-base leading-[22px] sm:text-sm text-[var(--fg-1)] focus:border-amber-500/40 focus:outline-none"
         />
         {fr && (
           /*
@@ -936,12 +999,17 @@ export function OutboundSheet({
            * generation, since the node is never unmounted between two
            * non-null values and React would not re-apply the attribute.
            */
-          <details key={fr} open className="mt-1">
-            <summary className="cursor-pointer text-[12px] text-blue-400">
-              Traduction FR (pour toi seul, jamais envoyée)
-            </summary>
-            <p className="mt-1 whitespace-pre-wrap text-[12px] text-[var(--fg-3)] wrap-anywhere">{fr}</p>
-          </details>
+          <section
+            aria-label="Traduction française du message"
+            className="mt-2 rounded-lg border border-blue-500/25 bg-blue-500/5 p-2.5"
+          >
+            <p className="mb-1 text-[12px] font-medium text-blue-300">
+              🌐 En français, pour toi seul. C’est le texte au-dessus qui part.
+            </p>
+            <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-[var(--fg-2)] wrap-anywhere">
+              {fr}
+            </p>
+          </section>
         )}
         <GuardrailChecks id={checksId} report={g.report} subject={subject} body={body} />
       </div>

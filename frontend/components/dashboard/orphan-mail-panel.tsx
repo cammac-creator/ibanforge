@@ -177,7 +177,7 @@ export function OrphanMailPanel({
           panneau, le message n&apos;apparaît nulle part. « Réponse » veut dire qu&apos;il répond à
           quelque chose qu&apos;on a envoyé, donc que quelqu&apos;un attend. Sous chaque objet, un
           résumé en français écrit par le rédacteur du CRM ; « mail complet » déplie le texte
-          entier, traduit en français automatiquement, l'original à côté. Quand une adresse du CRM
+          entier, traduit en français automatiquement, l&apos;original à côté. Quand une adresse du CRM
           ressemble à l&apos;expéditeur, elle est proposée d&apos;office avec la raison ; la
           décision reste la tienne, en deux clics. Trois issues par mail : le rattacher à un client
           (son fil complet remonte à la synchro suivante), l&apos;enregistrer comme correspondant

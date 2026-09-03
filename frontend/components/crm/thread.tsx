@@ -54,8 +54,13 @@ function Bubble({ m, counterpartLabel }: { m: Message; counterpartLabel?: string
   // placeholder, or 'und').
   const validLang = !!(m.lang && /^[a-z]{2,3}$/.test(m.lang) && m.lang !== 'und');
   const hasFr = !!(validLang && m.lang !== 'fr' && m.snippet_fr);
-  const source = hasFr && !showOriginal ? (m.snippet_fr ?? '') : m.body || m.snippet || '';
-  const { fresh, quoted } = splitQuoted(source);
+  // The French IS the body when we hold one, and the original is shown
+  // BESIDE it on demand, never instead of it (owner, 03/09/2026: swapping one
+  // for the other turned a comparison into a game of clicking back and forth,
+  // in two places at once, since the composer below had its own fold).
+  const original = m.body || m.snippet || '';
+  const { fresh, quoted } = splitQuoted(hasFr ? (m.snippet_fr ?? '') : original);
+  const { fresh: originalFresh } = splitQuoted(original);
 
   // splitQuoted cuts at the first quote marker, so a '>' inside genuinely new
   // text folds real content away. The toggle therefore states how many lines
@@ -93,7 +98,9 @@ function Bubble({ m, counterpartLabel }: { m: Message; counterpartLabel?: string
             and 3.94:1 on the amber, both under AA. This row carries the date
             and the 'date inconnue' fallback. */}
         <div className="mb-1 flex flex-wrap items-center gap-2 text-[12px] text-[var(--fg-3)]">
-          <span className={robot ? 'text-[var(--fg-3)]' : mine ? 'text-amber-400' : 'text-blue-400'}>
+          <span
+            className={robot ? 'text-[var(--fg-3)]' : mine ? 'text-amber-400' : 'text-blue-400'}
+          >
             {mine ? 'toi' : (counterpartLabel ?? 'lui')}
           </span>
           {robot && (
@@ -115,7 +122,7 @@ function Bubble({ m, counterpartLabel }: { m: Message; counterpartLabel?: string
               title={hasFr ? 'Traduit automatiquement en français' : 'Langue détectée du message'}
             >
               🌐 {(m.lang && LANG_LABEL[m.lang]) || m.lang}
-              {hasFr && !showOriginal ? ' · traduit' : ''}
+              {hasFr ? ' · traduit' : ''}
             </span>
           )}
         </div>
@@ -152,16 +159,26 @@ function Bubble({ m, counterpartLabel }: { m: Message; counterpartLabel?: string
           </>
         )}
         {hasFr && (
-          <button
-            type="button"
-            onClick={() => setShowOriginal(!showOriginal)}
-            // No aria-expanded here: this swaps one rendering of the message for
-            // another, it does not reveal a region. The label already says which
-            // way it will go.
-            className="mt-1 block cursor-pointer text-[12px] text-violet-400 underline underline-offset-2 hover:text-violet-300"
-          >
-            {showOriginal ? 'voir la traduction' : 'voir l’original'}
-          </button>
+          <>
+            <button
+              type="button"
+              onClick={() => setShowOriginal(!showOriginal)}
+              // aria-expanded now says what it does: this reveals a region under
+              // the message rather than replacing the message.
+              aria-expanded={showOriginal}
+              className="mt-1 block cursor-pointer text-[12px] text-violet-400 underline underline-offset-2 hover:text-violet-300"
+            >
+              {showOriginal ? '▾ masquer l’original' : '▸ afficher l’original'}
+            </button>
+            {showOriginal && (
+              // Same contrast rule as the quote above (--fg-3 measured on the
+              // composited tint, not picked by name), and the violet rule ties
+              // it to the badge that says the message was translated.
+              <p className="mt-1 whitespace-pre-wrap border-l-2 border-violet-400/40 pl-2 text-[12px] text-[var(--fg-3)]">
+                {originalFresh}
+              </p>
+            )}
+          </>
         )}
       </div>
     </div>
@@ -218,7 +235,9 @@ export function Thread({
       </p>
     );
   }
-  return <ThreadBody messages={messages} counterpartLabel={counterpartLabel} draftSlot={draftSlot} />;
+  return (
+    <ThreadBody messages={messages} counterpartLabel={counterpartLabel} draftSlot={draftSlot} />
+  );
 }
 
 function ThreadBody({
@@ -254,7 +273,9 @@ function ThreadBody({
         </div>,
       );
     }
-    withSeparators.push(<Bubble key={m.id ?? `m-${i}`} m={m} counterpartLabel={counterpartLabel} />);
+    withSeparators.push(
+      <Bubble key={m.id ?? `m-${i}`} m={m} counterpartLabel={counterpartLabel} />,
+    );
   }
 
   return (
@@ -265,7 +286,8 @@ function ThreadBody({
           onClick={() => setUnfolded(true)}
           className="mx-auto rounded-full border border-[var(--ink-4)] px-3 py-1 text-[12px] text-[var(--fg-3)] hover:border-[var(--fg-3)] hover:text-[var(--fg-1)]"
         >
-          ▸ {hidden.length} message{hidden.length > 1 ? 's' : ''} précédent{hidden.length > 1 ? 's' : ''}
+          ▸ {hidden.length} message{hidden.length > 1 ? 's' : ''} précédent
+          {hidden.length > 1 ? 's' : ''}
           {(() => {
             const from = dayLabel(hidden[0]?.msg_date);
             const to = dayLabel(hidden.at(-1)?.msg_date);
