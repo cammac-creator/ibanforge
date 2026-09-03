@@ -43,7 +43,9 @@
       "audit": "Kreditorendatei prüfen",
       "sheets": "Google Sheets",
       "blz": "Bankleitzahlen",
-      "iid": "Schweizer IID"
+      "iid": "Schweizer IID",
+      "at": "Österreichische BLZ",
+      "be": "Belgische Bankcodes"
     },
     "copyright": "© {year} IBANforge.",
     "dataLine": "Daten: GLEIF · Quelle: Deutsche Bundesbank · SIX · EBA · NBP · SwiftCodes/MIT · Bank of England (List of Banks, 2026-08) — monatlich · OFAC · UN · EU · EPC — wöchentlich"

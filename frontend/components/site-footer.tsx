@@ -18,6 +18,8 @@ export function SiteFooter() {
         { href: `/${locale}/sheets`, label: t("link.sheets") },
         { href: `/${locale}/blz`, label: t("link.blz") },
         { href: `/${locale}/iid`, label: t("link.iid") },
+        { href: `/${locale}/at`, label: t("link.at") },
+        { href: `/${locale}/be`, label: t("link.be") },
         { href: `/${locale}/vendors`, label: t("link.vendors") },
         { href: `/${locale}/compare`, label: t("link.compare") },
         { href: `/${locale}/openapi`, label: t("link.openapi") },

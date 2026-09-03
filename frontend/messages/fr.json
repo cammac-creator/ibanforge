@@ -43,7 +43,9 @@
       "audit": "Audit de fichier",
       "sheets": "Google Sheets",
       "blz": "BLZ allemandes",
-      "iid": "IID suisses"
+      "iid": "IID suisses",
+      "at": "Codes banque autrichiens",
+      "be": "Codes banque belges"
     },
     "copyright": "© {year} IBANforge.",
     "dataLine": "Données : GLEIF · Quelle: Deutsche Bundesbank · SIX · EBA · NBP · SwiftCodes/MIT · Bank of England (List of Banks, 2026-08) — mensuel · OFAC · UN · UE · EPC — hebdomadaire"
