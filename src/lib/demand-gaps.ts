@@ -1,5 +1,7 @@
 import type { Statement } from 'better-sqlite3';
+import { validate } from 'iban-core';
 import { getStatsDB } from './db.js';
+import { TEXTBOOK_IBANS } from './textbook-ibans.js';
 
 /**
  * The demand ledger: what callers asked for that we could not answer.
@@ -87,7 +89,34 @@ function ensureTable(): void {
     );
     CREATE INDEX IF NOT EXISTS idx_lookup_gaps_last_seen ON lookup_gaps(last_seen);
   `);
+  purgeTextbookRows();
   ensured = true;
+}
+
+/**
+ * Rows the textbook IBANs left behind before the recording site learned to
+ * skip them (03/09/2026: CH 00762 thirteen times in two days, LT 10000, the
+ * Turkish example's 00061). Deleting by (country, bank_code) of each textbook
+ * IBAN, at every boot, is idempotent and costs one statement per entry on a
+ * table of at most 50k rows; it also covers a textbook IBAN added later, whose
+ * old rows would otherwise sit at the top of the ledger for a month.
+ *
+ * Same failure doctrine as the recorder: a failed purge is logged, never fatal.
+ */
+function purgeTextbookRows(): void {
+  try {
+    const del = getStatsDB().prepare(
+      `DELETE FROM lookup_gaps WHERE kind = 'bank_code' AND country = ? AND code = ?`,
+    );
+    for (const iban of TEXTBOOK_IBANS) {
+      const parsed = validate(iban);
+      const code = parsed.bban?.bank_code;
+      if (!parsed.valid || !code) continue;
+      del.run(iban.slice(0, 2), code.toUpperCase());
+    }
+  } catch (err) {
+    console.error('[demand-gaps] textbook purge failed:', err);
+  }
 }
 
 function upsert(): Statement {

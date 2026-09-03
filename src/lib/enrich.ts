@@ -24,6 +24,7 @@ import { blzRegisterAvailable, lookupBlz } from './de-blz.js';
 import { bgBaeRegisterAvailable, getBgAsOf, lookupBgBankCode } from './bg-bae.js';
 import { checkReachability, checkVop } from './compliance.js';
 import { recordDemandGap } from './demand-gaps.js';
+import { isTextbookIban } from './textbook-ibans.js';
 import { checkUkModulus } from './uk-modulus.js';
 import { praAuthorisationByLei } from './pra-banks.js';
 import { officialIdentityByNationalCode } from './official-identity.js';
@@ -1036,8 +1037,15 @@ export function enrichResult(result: IBANValidationResult, cache?: EnrichCache):
   // The demand ledger: a checksum-valid IBAN whose bank code we could not
   // verify is the traffic telling us which data to plug in next. Recorded on
   // the CHECKED value (the code the verdict is about — Iceland's bank grain,
-  // Finland's whole string), never on invalid IBANs, whose slices are noise.
-  if (result.valid && result.bank_code_check.status !== 'verified') {
+  // Finland's whole string), never on invalid IBANs, whose slices are noise,
+  // and never on the textbook IBANs everybody pastes first (the registry's
+  // own examples, our docs and sample file): they measure curiosity, not
+  // demand, and CH93 0076… alone topped the ledger for two days.
+  if (
+    result.valid &&
+    result.bank_code_check.status !== 'verified' &&
+    !isTextbookIban(result.iban)
+  ) {
     const check = result.bank_code_check;
     recordDemandGap(
       'bank_code',
