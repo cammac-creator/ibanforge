@@ -1263,7 +1263,7 @@
       "priceDetail": "One key at 50,000 requests per month, redistribution rights, a written SLA (99.5%), EU invoicing, a named support contact. Above 50,000 requests a month, one conversation sets the volume price.",
       "body": "Embedding IBANforge inside your own product, for your own customers, takes more than a metered key. That is the OEM agreement, and its starting price is public because every other vendor in this market hides theirs.",
       "cta": "support@ibanforge.com",
-      "hint": "One email: tell us what you ship and to whom.",
+      "hint": "One email: tell us what you ship and to whom. Under 10,000 requests a month and no SLA needed? The Pro plan at $29 a month is self-service, on the pricing page.",
       "slaLink": "Read the SLA"
     }
   },

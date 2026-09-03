@@ -1263,7 +1263,7 @@
       "priceDetail": "Une clé à 50 000 requêtes par mois, droits de redistribution, SLA écrit (99,5 %), facturation UE, un contact de support nommé. Au-delà de 50 000 requêtes par mois, une conversation fixe le prix de volume.",
       "body": "Intégrer IBANforge dans votre propre produit, pour vos propres clients, demande plus qu'une clé comptée. C'est l'accord OEM, et son prix de départ est public parce que tous les autres acteurs de ce marché cachent le leur.",
       "cta": "support@ibanforge.com",
-      "hint": "Un seul mail : dites-nous ce que vous livrez et à qui.",
+      "hint": "Un seul mail : dites-nous ce que vous livrez et à qui. Moins de 10 000 requêtes par mois et pas besoin de SLA ? Le palier Pro à 29 $ par mois se prend seul, sur la page des tarifs.",
       "slaLink": "Lire le SLA"
     }
   },

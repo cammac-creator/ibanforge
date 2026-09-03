@@ -187,7 +187,8 @@ export function buildFreeKeyEmail(p: FreeKeyEmailInput): {
   const text =
     `Your IBANforge API key is ready.\n\n` +
     `API key: ${p.rawKey}\n` +
-    `Free tier: ${limit} requests per month, reset on the 1st.\n\n` +
+    `Free tier: ${limit} requests per month, reset on the 1st.\n` +
+    `Need more later? Pro is $29 a month for 10,000 requests, and prepaid credit packs never expire: ${PRICING_PAGE}\n\n` +
     buildFirstCallText({ bearer: p.rawKey }) +
     `\nDocs: https://ibanforge.com/docs\n` +
     `Terms: https://ibanforge.com/legal/terms\n` +
@@ -198,7 +199,8 @@ export function buildFreeKeyEmail(p: FreeKeyEmailInput): {
   <div style="max-width:560px;margin:0 auto;background:#16161b;border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:30px 32px">
     <div style="font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:#71717a;font-family:monospace">IBANforge</div>
     <h1 style="color:#fafafa;font-size:22px;margin:10px 0 6px">Your API key is ready</h1>
-    <p style="color:#a1a1aa;font-size:15px;margin:0 0 22px">Free tier: <b style="color:#fafafa">${limit} requests per month</b>, reset on the 1st.</p>
+    <p style="color:#a1a1aa;font-size:15px;margin:0 0 6px">Free tier: <b style="color:#fafafa">${limit} requests per month</b>, reset on the 1st.</p>
+    <p style="color:#71717a;font-size:13px;margin:0 0 22px">Need more later? Pro is $29 a month for 10,000 requests, and <a href="${PRICING_PAGE}" style="color:#a1a1aa">prepaid credit packs</a> never expire.</p>
     <div style="background:#09090b;border:1px solid #27272a;border-radius:10px;padding:14px 16px;margin:0 0 8px">
       <div style="font-size:11px;color:#71717a;font-family:monospace;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Your API key</div>
       <code style="font-family:'JetBrains Mono',monospace;font-size:14px;color:#f59e0b;word-break:break-all">${p.rawKey}</code>
