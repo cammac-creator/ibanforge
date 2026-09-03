@@ -1957,6 +1957,47 @@
       "qrNote": "QR-IID {qr} : un QR-IBAN avec ce numéro attend une référence QRR sur la QR-facture.",
       "indexTitle": "Numéros de clearing suisses (IID / BC-Nummer)",
       "indexIntro": "Chaque IID du SIX BankMaster avec sa page : établissement, siège, BIC, participation aux rails de paiement, QR-IID et la réponse exacte de l'API IBANforge. Rafraîchi avec le registre."
+    },
+    "at": {
+      "metaTitle": "Code banque autrichien {code} : {name}, {town}",
+      "metaDescription": "Code banque {code} dans le répertoire de l'Oesterreichische Nationalbank : {name} à {town}, BIC {bic}. Adresse du siège, LEI, structure de l'IBAN, portée SEPA et la réponse exacte de l'API IBANforge.",
+      "eyebrow": "Répertoire de l'Oesterreichische Nationalbank",
+      "title": "Code banque autrichien {code}",
+      "subtitle": "{name}, {town}",
+      "facts": {
+        "code": "Code banque (Bankleitzahl)",
+        "bank": "Établissement",
+        "bic": "BIC",
+        "street": "Rue",
+        "postCode": "Code postal",
+        "town": "Localité",
+        "lei": "LEI",
+        "none": "aucun"
+      },
+      "structure": "Un IBAN autrichien, c'est AT, deux chiffres de contrôle, le code banque à cinq chiffres, puis le numéro de compte à onze chiffres. Le code banque est ce que le répertoire de l'OeNB peut garantir ; le numéro de compte n'est connu que de la banque.",
+      "docLink": "Comment répond le registre autrichien",
+      "indexTitle": "Codes banque autrichiens (répertoire OeNB)",
+      "indexIntro": "Chaque code banque du répertoire de l'Oesterreichische Nationalbank, avec l'établissement, l'adresse de son siège et son LEI quand le registre les publie, le BIC qu'il lui associe, et la réponse exacte de l'API IBANforge. Rafraîchi chaque mois avec le registre."
+    },
+    "be": {
+      "metaTitle": "Code banque belge {code} : {name}",
+      "metaDescription": "Identifiant bancaire {code} dans la liste de la Banque nationale de Belgique : {name}, BIC {bic}. Les codes de la même banque, la structure de l'IBAN, la portée SEPA et la réponse exacte de l'API IBANforge.",
+      "eyebrow": "Liste de la Banque nationale de Belgique",
+      "title": "Code banque belge {code}",
+      "subtitle": "{name}",
+      "facts": {
+        "code": "Identifiant bancaire",
+        "bank": "Établissement",
+        "bic": "BIC",
+        "groupCodes": "Codes de cette banque",
+        "none": "aucun"
+      },
+      "groupNote": "La Banque nationale de Belgique attribue des blocs d'identifiants à un même établissement. La liste ci-dessous montre une page par banque ; chaque code d'un bloc a sa propre adresse et renvoie vers elle.",
+      "canonicalNote": "Ce code appartient à un bloc attribué à une seule banque. La page de la banque est",
+      "structure": "Un IBAN belge, c'est BE, deux chiffres de contrôle, l'identifiant bancaire à trois chiffres, le numéro de compte à sept chiffres, puis deux chiffres de contrôle nationaux (les dix premiers chiffres modulo 97). L'identifiant est ce que la liste de la BNB peut garantir ; le numéro de compte n'est connu que de la banque.",
+      "docLink": "Comment répond le registre belge",
+      "indexTitle": "Codes banque belges (liste BNB)",
+      "indexIntro": "Chaque identifiant bancaire attribué dans la liste de la Banque nationale de Belgique, une page par établissement, avec le BIC qui lui est associé et la réponse exacte de l'API IBANforge. Le registre ne publie que des noms : aucune adresse n'apparaît ici que le registre n'ait publiée."
     }
   }
 }

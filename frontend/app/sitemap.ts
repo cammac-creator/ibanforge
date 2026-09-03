@@ -1,5 +1,5 @@
 import { MetadataRoute } from "next";
-import { chIidFile, deBlzFile } from "@/lib/registers";
+import { atBlzFile, beBankFile, chIidFile, deBlzFile } from "@/lib/registers";
 import { getAllDocs } from "@/lib/mdx";
 import { getAllPosts } from "@/lib/blog";
 import { routing } from "@/i18n/routing";
@@ -31,6 +31,15 @@ export default function sitemap(): MetadataRoute.Sitemap {
       entries.push({ url: `${BASE_URL}/${locale}/iid/${iid}`, changeFrequency: "monthly", priority: 0.5 });
     }
   }
+  // Austria reads German; Belgium reads French and, for its payments teams, English.
+  for (const code of atBlzFile().batch1) {
+    entries.push({ url: `${BASE_URL}/de/at/${code}`, changeFrequency: "monthly", priority: 0.5 });
+  }
+  for (const code of beBankFile().batch1) {
+    for (const locale of ["fr", "en"]) {
+      entries.push({ url: `${BASE_URL}/${locale}/be/${code}`, changeFrequency: "monthly", priority: 0.5 });
+    }
+  }
 
   for (const locale of routing.locales) {
     const prefix = `${BASE_URL}/${locale}`;
@@ -48,6 +57,8 @@ export default function sitemap(): MetadataRoute.Sitemap {
       { url: `${prefix}/sheets`, changeFrequency: "monthly", priority: 0.8 },
       { url: `${prefix}/blz`, changeFrequency: "monthly", priority: 0.7 },
       { url: `${prefix}/iid`, changeFrequency: "monthly", priority: 0.7 },
+      { url: `${prefix}/at`, changeFrequency: "monthly", priority: 0.7 },
+      { url: `${prefix}/be`, changeFrequency: "monthly", priority: 0.7 },
       { url: `${prefix}/playground`, changeFrequency: "monthly", priority: 0.9 },
       { url: `${prefix}/docs`, changeFrequency: "weekly", priority: 0.8 },
       { url: `${prefix}/pricing`, changeFrequency: "monthly", priority: 0.7 },

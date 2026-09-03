@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 
 /**
- * The public register pages (/blz/{blz}, /iid/{iid}) read a JSON exported by
+ * The public register pages (/blz/{blz}, /iid/{iid}, /at/{code}, /be/{code}) read a JSON exported by
  * `npm run pages:export` in the API repository, which calls the API in-process
  * for every code: the "what the API answers" block on each page is the route's
  * own answer, not a re-implementation. See scripts/export-register-pages.ts.
@@ -47,6 +47,41 @@ export interface IidEntry {
   related: string[];
 }
 
+export interface AtRegister {
+  code: string;
+  name: string;
+  bic: string | null;
+  street: string | null;
+  post_code: string | null;
+  town: string | null;
+  lei: string | null;
+  as_of: string;
+}
+
+export interface AtEntry {
+  register: AtRegister;
+  example_iban: string;
+  api: Record<string, unknown>;
+  related: string[];
+}
+
+export interface BeRegister {
+  code: string;
+  name: string;
+  bic: string | null;
+  /** First code of the block the NBB allocated to this institution: the bank's page. */
+  canonical: string;
+  group_codes: string[];
+  as_of: string;
+}
+
+export interface BeEntry {
+  register: BeRegister;
+  example_iban: string;
+  api: Record<string, unknown>;
+  related: string[];
+}
+
 interface RegisterFile<T> {
   generated_at: string;
   source: string;
@@ -57,6 +92,8 @@ interface RegisterFile<T> {
 
 let deCache: RegisterFile<BlzEntry> | null = null;
 let chCache: RegisterFile<IidEntry> | null = null;
+let atCache: RegisterFile<AtEntry> | null = null;
+let beCache: RegisterFile<BeEntry> | null = null;
 
 function read<T>(file: string): RegisterFile<T> {
   const raw = fs.readFileSync(path.join(process.cwd(), 'data', 'registers', file), 'utf-8');
@@ -71,6 +108,28 @@ export function deBlzFile(): RegisterFile<BlzEntry> {
 export function chIidFile(): RegisterFile<IidEntry> {
   if (!chCache) chCache = read<IidEntry>('ch-iid.json');
   return chCache;
+}
+
+export function atBlzFile(): RegisterFile<AtEntry> {
+  if (!atCache) atCache = read<AtEntry>('at-blz.json');
+  return atCache;
+}
+
+export function beBankFile(): RegisterFile<BeEntry> {
+  if (!beCache) beCache = read<BeEntry>('be-bank.json');
+  return beCache;
+}
+
+/** Austrian bank codes are five digits, no padding accepted: 19043 is not 019043. */
+export function getAtCode(code: string): AtEntry | null {
+  if (!/^\d{5}$/.test(code)) return null;
+  return atBlzFile().entries[code] ?? null;
+}
+
+/** Belgian bank identifiers are three digits, leading zeros included: 001, not 1. */
+export function getBeCode(code: string): BeEntry | null {
+  if (!/^\d{3}$/.test(code)) return null;
+  return beBankFile().entries[code] ?? null;
 }
 
 export function getBlz(blz: string): BlzEntry | null {

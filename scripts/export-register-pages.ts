@@ -1,6 +1,7 @@
 /**
  * Export the data behind the public register pages (/blz/{blz} for Germany,
- * /iid/{iid} for Switzerland) into frontend/data/registers/*.json.
+ * /iid/{iid} for Switzerland, /at/{code} for Austria, /be/{code} for Belgium)
+ * into frontend/data/registers/*.json.
  *
  * ## Why the pages read a JSON and not the API at request time
  *
@@ -106,6 +107,38 @@ function pick(obj: Json | undefined, keys: string[]): Json | null {
   return out;
 }
 
+/** The api block every register page prints: the route's own answer, trimmed to the fields a reader can act on. */
+function apiBlock(answer: Json): Json {
+  return {
+    valid: answer.valid,
+    bic: pick(answer.bic as Json, [
+      'code',
+      'bank_name',
+      'city',
+      'source',
+      'as_of',
+      'basis',
+      'authoritative',
+      'lei',
+    ]),
+    bank_code_check: answer.bank_code_check ?? null,
+    sepa: pick(answer.sepa as Json, [
+      'member',
+      'schemes',
+      'vop_required',
+      'vop_participant',
+      'basis',
+    ]),
+    issuer: pick(answer.issuer as Json, ['type', 'name', 'classification']),
+    risk_indicators: pick(answer.risk_indicators as Json, [
+      'country_risk',
+      'sepa_reachable',
+      'vop_coverage',
+      'test_bic',
+    ]),
+  };
+}
+
 const app = buildApp();
 const key = generateOemKey(
   'export-register-pages@ibanforge.local',
@@ -167,34 +200,7 @@ for (const r of blzRows) {
       as_of: r.updated_at.slice(0, 7),
     },
     example_iban: iban,
-    api: {
-      valid: answer.valid,
-      bic: pick(answer.bic as Json, [
-        'code',
-        'bank_name',
-        'city',
-        'source',
-        'as_of',
-        'basis',
-        'authoritative',
-        'lei',
-      ]),
-      bank_code_check: answer.bank_code_check ?? null,
-      sepa: pick(answer.sepa as Json, [
-        'member',
-        'schemes',
-        'vop_required',
-        'vop_participant',
-        'basis',
-      ]),
-      issuer: pick(answer.issuer as Json, ['type', 'name', 'classification']),
-      risk_indicators: pick(answer.risk_indicators as Json, [
-        'country_risk',
-        'sepa_reachable',
-        'vop_coverage',
-        'test_bic',
-      ]),
-    },
+    api: apiBlock(answer),
     related,
   };
   if (!r.retired && r.bic && r.bic.endsWith('XXX')) deBatch1.push(r.blz);
@@ -250,6 +256,128 @@ for (const r of iidRows) {
   if (r.iid_type === 1) chBatch1.push(r.iid);
 }
 
+// ---------------------------------------------------------------------------
+// Austria and Belgium: one synthetic IBAN per national bank code, the
+// validate route's own answer. Both registers live in national_bank_codes
+// (OeNB directory, NBB list); the edition date is the one the route stamps.
+// ---------------------------------------------------------------------------
+interface NationalRow {
+  country: string;
+  code: string;
+  name: string;
+  bic: string | null;
+  street: string | null;
+  post_code: string | null;
+  town: string | null;
+  lei: string | null;
+}
+const nationalRows = bic
+  .prepare(
+    "SELECT country, code, name, bic, street, post_code, town, lei FROM national_bank_codes WHERE country IN ('AT', 'BE') ORDER BY country, code",
+  )
+  .all() as NationalRow[];
+const stamp = new Date().toISOString().slice(0, 7);
+const asOf = (answer: Json): string =>
+  ((answer.bank_code_check as Json | undefined)?.as_of as string | undefined) ?? stamp;
+const registerName = (answer: Json, fallback: string): string =>
+  ((answer.bank_code_check as Json | undefined)?.register as string | undefined) ?? fallback;
+
+// Austria: five-digit Bankleitzahl, positions 5 to 9 of the IBAN, then an
+// eleven-digit account. Related codes are the other codes of the same BIC8.
+const atRows = nationalRows.filter((r) => r.country === 'AT');
+const atByBic8 = new Map<string, string[]>();
+for (const r of atRows) {
+  if (!r.bic) continue;
+  const k = r.bic.slice(0, 8);
+  atByBic8.set(k, [...(atByBic8.get(k) ?? []), r.code]);
+}
+const at: Json = {};
+let atSource = 'Oesterreichische Nationalbank SEPA-Zahlungsverkehrs-Verzeichnis';
+for (const r of atRows) {
+  const bban = `${r.code}00000000001`;
+  const iban = `AT${checkDigits('AT', bban)}${bban}`;
+  const answer = await call('/v1/iban/validate', {
+    method: 'POST',
+    body: JSON.stringify({ iban }),
+  });
+  if (answer.valid !== true) throw new Error(`AT ${r.code}: synthetic IBAN ${iban} is not valid`);
+  atSource = registerName(answer, atSource);
+  const related = (r.bic ? (atByBic8.get(r.bic.slice(0, 8)) ?? []) : [])
+    .filter((c) => c !== r.code)
+    .slice(0, 12);
+  at[r.code] = {
+    register: {
+      code: r.code,
+      name: r.name,
+      bic: r.bic,
+      street: r.street,
+      post_code: r.post_code,
+      town: r.town,
+      lei: r.lei,
+      as_of: asOf(answer),
+    },
+    example_iban: iban,
+    api: apiBlock(answer),
+    related,
+  };
+}
+// First batch: every institution once (first code per BIC8) before any
+// institution twice, capped so the batch stays a list a reader would look up.
+const AT_BATCH_CAP = 400;
+const seenBic8 = new Set<string>();
+const atFirst: string[] = [];
+const atRest: string[] = [];
+for (const r of atRows) {
+  if (!r.bic) continue;
+  const k = r.bic.slice(0, 8);
+  if (seenBic8.has(k)) atRest.push(r.code);
+  else {
+    seenBic8.add(k);
+    atFirst.push(r.code);
+  }
+}
+const atBatch1 = [...atFirst, ...atRest].slice(0, AT_BATCH_CAP);
+
+// Belgium: three-digit bank identifier, seven-digit account, two national
+// check digits (the first ten digits modulo 97, 97 when the remainder is 0).
+// The NBB allocates blocks of identifiers to one institution, so one page per
+// code would be the same page a hundred times over: every code keeps its
+// address, but the first code of a block is the bank's canonical page and the
+// others point to it.
+const beRows = nationalRows.filter((r) => r.country === 'BE');
+const groupKey = (r: NationalRow): string => `${r.name}|${r.bic ?? ''}`;
+const beGroups = new Map<string, string[]>();
+for (const r of beRows) beGroups.set(groupKey(r), [...(beGroups.get(groupKey(r)) ?? []), r.code]);
+const be: Json = {};
+let beSource = 'Banque nationale de Belgique, identification des banques';
+for (const r of beRows) {
+  const account = '0000001';
+  const nationalCheck = String(Number(`${r.code}${account}`) % 97 || 97).padStart(2, '0');
+  const bban = `${r.code}${account}${nationalCheck}`;
+  const iban = `BE${checkDigits('BE', bban)}${bban}`;
+  const answer = await call('/v1/iban/validate', {
+    method: 'POST',
+    body: JSON.stringify({ iban }),
+  });
+  if (answer.valid !== true) throw new Error(`BE ${r.code}: synthetic IBAN ${iban} is not valid`);
+  beSource = registerName(answer, beSource);
+  const group = beGroups.get(groupKey(r)) ?? [r.code];
+  be[r.code] = {
+    register: {
+      code: r.code,
+      name: r.name,
+      bic: r.bic,
+      canonical: group[0],
+      group_codes: group,
+      as_of: asOf(answer),
+    },
+    example_iban: iban,
+    api: apiBlock(answer),
+    related: group.filter((c) => c !== r.code).slice(0, 12),
+  };
+}
+const beBatch1 = [...beGroups.values()].map((codes) => codes[0]);
+
 mkdirSync(OUT_DIR, { recursive: true });
 const generated_at = new Date().toISOString().slice(0, 10);
 writeFileSync(
@@ -272,7 +400,31 @@ writeFileSync(
     entries: ch,
   }),
 );
+writeFileSync(
+  resolve(OUT_DIR, 'at-blz.json'),
+  JSON.stringify({
+    generated_at,
+    source: atSource,
+    count: Object.keys(at).length,
+    batch1: atBatch1,
+    entries: at,
+  }),
+);
+writeFileSync(
+  resolve(OUT_DIR, 'be-bank.json'),
+  JSON.stringify({
+    generated_at,
+    source: beSource,
+    count: Object.keys(be).length,
+    batch1: beBatch1,
+    entries: be,
+  }),
+);
 console.log(`de-blz.json: ${Object.keys(de).length} BLZ, batch1 ${deBatch1.length}`);
+console.log(`at-blz.json: ${Object.keys(at).length} codes, batch1 ${atBatch1.length}`);
+console.log(
+  `be-bank.json: ${Object.keys(be).length} codes in ${beGroups.size} institutions, batch1 ${beBatch1.length}`,
+);
 console.log(
   `ch-iid.json: ${Object.keys(ch).length} IID (${chSkipped} rows without a page of their own), batch1 ${chBatch1.length}`,
 );

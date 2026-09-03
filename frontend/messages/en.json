@@ -1957,6 +1957,47 @@
       "qrNote": "QR-IID {qr}: a QR-IBAN with this number expects a QRR reference on the QR-bill.",
       "indexTitle": "Swiss clearing numbers (IID / BC-Nummer)",
       "indexIntro": "Every IID of the SIX BankMaster with a page of its own: institution, seat, BIC, payment-rail participation, QR-IID and the exact answer of the IBANforge API. Refreshed with the register."
+    },
+    "at": {
+      "metaTitle": "Austrian bank code {code}: {name}, {town}",
+      "metaDescription": "Bank code {code} in the Oesterreichische Nationalbank directory: {name} in {town}, BIC {bic}. Seat address, LEI, IBAN structure, SEPA reach and the exact answer of the IBANforge API.",
+      "eyebrow": "Oesterreichische Nationalbank directory",
+      "title": "Austrian bank code {code}",
+      "subtitle": "{name}, {town}",
+      "facts": {
+        "code": "Bank code (Bankleitzahl)",
+        "bank": "Institution",
+        "bic": "BIC",
+        "street": "Street",
+        "postCode": "Postcode",
+        "town": "Town",
+        "lei": "LEI",
+        "none": "none"
+      },
+      "structure": "An Austrian IBAN is AT, two check digits, the five-digit bank code, then the eleven-digit account number. The bank code is what the OeNB directory can vouch for; the account number is known only to the bank.",
+      "docLink": "How the Austrian register answers",
+      "indexTitle": "Austrian bank codes (OeNB directory)",
+      "indexIntro": "Every bank code of the Oesterreichische Nationalbank directory, with the institution, its seat address and its LEI where the register publishes one, the BIC it pairs with it, and the exact answer of the IBANforge API. Refreshed monthly with the register."
+    },
+    "be": {
+      "metaTitle": "Belgian bank code {code}: {name}",
+      "metaDescription": "Bank identifier {code} in the National Bank of Belgium list: {name}, BIC {bic}. The codes of the same bank, IBAN structure, SEPA reach and the exact answer of the IBANforge API.",
+      "eyebrow": "National Bank of Belgium list",
+      "title": "Belgian bank code {code}",
+      "subtitle": "{name}",
+      "facts": {
+        "code": "Bank identifier",
+        "bank": "Institution",
+        "bic": "BIC",
+        "groupCodes": "Codes of this bank",
+        "none": "none"
+      },
+      "groupNote": "The National Bank of Belgium allocates blocks of identifiers to one institution. The list below shows one page per bank; every code of a block has its own address and points to it.",
+      "canonicalNote": "This code belongs to a block allocated to one bank. The bank's page is",
+      "structure": "A Belgian IBAN is BE, two check digits, the three-digit bank identifier, the seven-digit account number, then two national check digits (the first ten digits modulo 97). The identifier is what the NBB list can vouch for; the account number is known only to the bank.",
+      "docLink": "How the Belgian register answers",
+      "indexTitle": "Belgian bank codes (NBB list)",
+      "indexIntro": "Every bank identifier allocated in the National Bank of Belgium list, one page per institution, with the BIC it pairs with it and the exact answer of the IBANforge API. The register publishes names only: no address appears here that the register did not publish."
     }
   }
 }

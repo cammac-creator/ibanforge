@@ -1957,6 +1957,47 @@
       "qrNote": "QR-IID {qr}: eine QR-IBAN mit dieser Nummer erwartet eine QRR-Referenz auf der QR-Rechnung.",
       "indexTitle": "Schweizer Clearing-Nummern (IID / BC-Nummer)",
       "indexIntro": "Jede IID des SIX BankMaster mit eigener Seite: Institut, Sitz, BIC, Teilnahme an den Zahlungsschienen, QR-IID und die exakte Antwort der IBANforge-API. Mit dem Register aktualisiert."
+    },
+    "at": {
+      "metaTitle": "Österreichische Bankleitzahl {code}: {name}, {town}",
+      "metaDescription": "Bankleitzahl {code} im Verzeichnis der Oesterreichischen Nationalbank: {name} in {town}, BIC {bic}. Sitzadresse, LEI, IBAN-Aufbau, SEPA-Erreichbarkeit und die exakte Antwort der IBANforge-API.",
+      "eyebrow": "Verzeichnis der Oesterreichischen Nationalbank",
+      "title": "Bankleitzahl {code} (Österreich)",
+      "subtitle": "{name}, {town}",
+      "facts": {
+        "code": "Bankleitzahl",
+        "bank": "Institut",
+        "bic": "BIC",
+        "street": "Strasse",
+        "postCode": "Postleitzahl",
+        "town": "Ort",
+        "lei": "LEI",
+        "none": "keine"
+      },
+      "structure": "Eine österreichische IBAN besteht aus AT, zwei Prüfziffern, der fünfstelligen Bankleitzahl und der elfstelligen Kontonummer. Für die Bankleitzahl kann das OeNB-Verzeichnis bürgen; die Kontonummer kennt nur die Bank.",
+      "docLink": "Wie das österreichische Register antwortet",
+      "indexTitle": "Österreichische Bankleitzahlen (OeNB-Verzeichnis)",
+      "indexIntro": "Jede Bankleitzahl des Verzeichnisses der Oesterreichischen Nationalbank, mit dem Institut, seiner Sitzadresse und seinem LEI, soweit das Register sie veröffentlicht, dem zugehörigen BIC und der exakten Antwort der IBANforge-API. Monatlich mit dem Register aktualisiert."
+    },
+    "be": {
+      "metaTitle": "Belgischer Bankcode {code}: {name}",
+      "metaDescription": "Bankkennung {code} in der Liste der Belgischen Nationalbank: {name}, BIC {bic}. Die Codes derselben Bank, IBAN-Aufbau, SEPA-Erreichbarkeit und die exakte Antwort der IBANforge-API.",
+      "eyebrow": "Liste der Belgischen Nationalbank",
+      "title": "Belgischer Bankcode {code}",
+      "subtitle": "{name}",
+      "facts": {
+        "code": "Bankkennung",
+        "bank": "Institut",
+        "bic": "BIC",
+        "groupCodes": "Codes dieser Bank",
+        "none": "keine"
+      },
+      "groupNote": "Die Belgische Nationalbank weist einem Institut ganze Blöcke von Kennungen zu. Die Liste unten zeigt eine Seite pro Bank; jeder Code eines Blocks hat seine eigene Adresse und verweist auf sie.",
+      "canonicalNote": "Dieser Code gehört zu einem Block, der einer einzigen Bank zugewiesen ist. Die Seite der Bank ist",
+      "structure": "Eine belgische IBAN besteht aus BE, zwei Prüfziffern, der dreistelligen Bankkennung, der siebenstelligen Kontonummer und zwei nationalen Prüfziffern (die ersten zehn Ziffern modulo 97). Für die Kennung kann die Liste der BNB bürgen; die Kontonummer kennt nur die Bank.",
+      "docLink": "Wie das belgische Register antwortet",
+      "indexTitle": "Belgische Bankcodes (BNB-Liste)",
+      "indexIntro": "Jede in der Liste der Belgischen Nationalbank zugewiesene Bankkennung, eine Seite pro Institut, mit dem zugehörigen BIC und der exakten Antwort der IBANforge-API. Das Register veröffentlicht nur Namen: keine Adresse erscheint hier, die das Register nicht veröffentlicht hat."
     }
   }
 }
