@@ -13,12 +13,14 @@ export default defineConfig({
     // because many files assert "this counter moved by exactly 1" against the
     // SAME `data/stats.sqlite`. Vitest 4 removed that option and ignored it
     // silently: the files ran in parallel on one database, and a different
-    // delta failed on every run. See src/test/hermetic-stats.ts.
+    // delta failed on every run. See test/hermetic-stats.ts (outside src/ on
+    // purpose: the runtime-dependency guard reads src/ as production code, and
+    // this file imports vitest).
     //
     // ⚠️ Never "repair" a delta that breaks by loosening it to
     // `toBeGreaterThanOrEqual`: the assertion would then guard nothing (it
     // would pass at 0 counted rejections as well as at 2, the two failures it
     // exists to catch). Look here first.
-    setupFiles: ['src/test/hermetic-stats.ts'],
+    setupFiles: ['test/hermetic-stats.ts'],
   },
 });
