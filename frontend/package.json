@@ -28,7 +28,7 @@
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "recharts": "^3.10.1",
-    "rehype-pretty-code": "^0.14.3",
+    "rehype-pretty-code": "^0.14.5",
     "remark-gfm": "^4.0.1",
     "shadcn": "^4.1.2",
     "shiki": "^4.4.3",
