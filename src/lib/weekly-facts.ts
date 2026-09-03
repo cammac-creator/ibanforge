@@ -1,4 +1,6 @@
 import { getStatsDB } from './db.js';
+import { getDemandGaps } from './demand-gaps.js';
+import { monthEndedBefore, proposeFromDemand, type DemandProposal } from './demand-proposal.js';
 import { buildBillableFilter } from './stats.js';
 import { isInternalEmail, registerInternalEmailFn } from './internal-accounts.js';
 
@@ -30,6 +32,20 @@ export interface WeeklyFacts {
   revenue_usdc_attempted: { current: number; previous: number };
   top_sources: Array<{ source: string; signups: number }>;
   top_countries: Array<{ country: string; count: number }>;
+  /**
+   * The demand ledger over the last 30 days and the proposal it makes, so the
+   * digest can say what the traffic asked for that we could not answer.
+   */
+  demand: {
+    top: Array<{
+      kind: string;
+      country: string | null;
+      code: string;
+      outcome: string;
+      hits: number;
+    }>;
+    proposal: DemandProposal | null;
+  };
 }
 
 function isoDate(d: Date): string {
@@ -217,6 +233,21 @@ export function getWeeklyFacts(now: Date = new Date()): WeeklyFacts {
     },
     top_sources: topSources,
     top_countries: topCountries,
+    demand: demandBlock(now),
+  };
+}
+
+function demandBlock(now: Date): WeeklyFacts['demand'] {
+  const summary = getDemandGaps(30);
+  return {
+    top: summary.top.slice(0, 3).map((r) => ({
+      kind: r.kind,
+      country: r.country,
+      code: r.code,
+      outcome: r.outcome,
+      hits: r.hits,
+    })),
+    proposal: proposeFromDemand(summary, monthEndedBefore(now)),
   };
 }
 

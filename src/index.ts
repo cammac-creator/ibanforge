@@ -17,6 +17,7 @@ import { startLifecycleRadar } from './lib/lifecycle-radar-server.js';
 import { startForumRadar } from './lib/forum-radar-server.js';
 import { startProspectRadar } from './lib/prospect-radar-server.js';
 import { startCohortRadar } from './lib/cohort-radar-server.js';
+import { startMonthlyDemandLoop } from './lib/demand-proposal-server.js';
 import { startActivationNudge } from './lib/activation-nudge-server.js';
 import { startOpsProbes } from './lib/ops-probes.js';
 import { opsFail } from './lib/ops-alert.js';
@@ -125,6 +126,10 @@ startProspectRadar();
 // Signup cohort radar: collapses a burst of automated signups into one CRM
 // dossier and off the monthly reset (see cohort-radar-server.ts).
 startCohortRadar();
+
+// Monthly turn of the living tool: the demand ledger proposes the next
+// register or BIC to plug, once per month (see demand-proposal-server.ts).
+startMonthlyDemandLoop();
 
 // Daily first-call pass: one nudge, ever, to a key that never called, and a
 // founder draft in the CRM for each new signup (see activation-nudge-server.ts).

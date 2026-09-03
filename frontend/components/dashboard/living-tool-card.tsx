@@ -40,10 +40,28 @@ export interface DemandGapEntry {
   last_seen: string;
 }
 
+/** The monthly proposal the ledger makes (src/lib/demand-proposal.ts). */
+export interface DemandProposal {
+  month: string;
+  kind: 'register' | 'composite' | 'none' | 'too_early';
+  country: string | null;
+  code: string;
+  codes: number;
+  hits: number;
+  share_pct: number;
+  action_fr: string;
+  why_fr: string;
+  source_hint: string | null;
+}
+
 export interface DemandGapsPayload {
   by_country: Array<{ country: string | null; distinct_codes: number; hits: number }>;
   top: DemandGapEntry[];
   outages: DemandGapEntry[];
+  /** Live proposal for the window shown; absent on an older API. */
+  proposal?: DemandProposal | null;
+  /** The last monthly turn: what was proposed on the 1st, and whether it was sent. */
+  monthly?: { month: string; proposed_at: string; sent: boolean; proposal: DemandProposal | null } | null;
 }
 
 export interface FeedbackReport {
@@ -169,6 +187,19 @@ export function LivingToolCard({
             <p className="mt-1.5 text-[11px] text-amber-400">
               + {gaps.outages.length} clé{gaps.outages.length > 1 ? 's' : ''} en panne de lecture
               (unavailable), comptée{gaps.outages.length > 1 ? 's' : ''} à part
+            </p>
+          )}
+          {gaps?.proposal && (
+            <p
+              className={`mt-2 text-[11px] leading-snug ${
+                gaps.proposal.kind === 'register' || gaps.proposal.kind === 'composite'
+                  ? 'text-[var(--fg-2)]'
+                  : 'text-[var(--fg-4)]'
+              }`}
+              title={gaps.proposal.why_fr}
+            >
+              <b>Proposition du mois</b> ({gaps.proposal.month}) : {gaps.proposal.action_fr}
+              {gaps.monthly?.sent ? ' Envoyée sur Telegram.' : ''}
             </p>
           )}
         </div>

@@ -202,6 +202,14 @@ export interface DemandGapSummary {
   outages: DemandGapRow[];
 }
 
+/** When the ledger started counting (oldest first_seen), or null when empty. */
+export function ledgerSince(): string | null {
+  ensureTable();
+  const row = getStatsDB().prepare('SELECT MIN(first_seen) AS since FROM lookup_gaps').get() as
+    { since: string | null } | undefined;
+  return row?.since ?? null;
+}
+
 /**
  * The reader behind /v1/admin/demand-gaps. `days` windows on last_seen, so a
  * gap nobody has hit for months ages out of the ranking without being erased.
