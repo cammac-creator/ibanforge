@@ -16,6 +16,9 @@ import {
   repoOfUrl,
   scoreThread,
   type MarketplaceDef,
+  threadAgeDays,
+  POSTABLE_SOURCE_NAMES,
+  MAX_THREAD_AGE_DAYS,
 } from './forum-radar.js';
 
 describe('PLATFORM_LIMITS — chaque source a sa limite', () => {
@@ -181,6 +184,8 @@ describe('finalizeCandidate — filtre le bruit sous MIN_SCORE', () => {
       ...base,
       title: 'IBAN validation with bank code check',
       excerpt: 'the BIC lookup fails for Swiss clearing numbers',
+      // Opened five days ago: the 03/09 rule drops anything older than a month.
+      threadCreatedAt: new Date(Date.now() - 5 * 86_400_000).toISOString().slice(0, 10),
     });
     expect(t).not.toBeNull();
     expect(t?.lang).toBe('en');
@@ -345,5 +350,48 @@ describe('MARKETPLACES — cohérence des définitions', () => {
         expect(m.cadenceHours, m.slug).toBeGreaterThan(0);
       }
     }
+  });
+});
+
+describe('la règle du 03/09 — un mois, et seulement les forums où on peut répondre', () => {
+  const base = {
+    url: 'https://github.com/a/b/issues/9',
+    source: 'github' as const,
+    title: 'Find the BIC from an IBAN for SEPA payouts',
+    excerpt: 'We need the bank BIC and name from the IBAN before sending SEPA credit transfers',
+    activity: 'open · 0 comm.',
+  };
+  const now = Date.parse('2026-09-03T12:00:00Z');
+
+  it('garde un fil ouvert de dix jours', () => {
+    expect(finalizeCandidate({ ...base, threadCreatedAt: '2026-08-24' }, now)).not.toBeNull();
+  });
+
+  it('écarte un fil de plus de trente jours, même pertinent', () => {
+    expect(finalizeCandidate({ ...base, threadCreatedAt: '2026-07-20' }, now)).toBeNull();
+  });
+
+  it("écarte un fil sans date : un âge inconnu n'est pas un fil récent", () => {
+    expect(finalizeCandidate({ ...base, threadCreatedAt: '' }, now)).toBeNull();
+  });
+
+  it('écarte une issue déjà fermée', () => {
+    expect(
+      finalizeCandidate(
+        { ...base, threadCreatedAt: '2026-08-30', activity: 'closed · 2 comm.' },
+        now,
+      ),
+    ).toBeNull();
+  });
+
+  it('threadAgeDays : null sans date, sinon des jours', () => {
+    expect(threadAgeDays('', now)).toBeNull();
+    expect(threadAgeDays('not a date', now)).toBeNull();
+    expect(Math.floor(threadAgeDays('2026-08-24', now) as number)).toBe(10);
+  });
+
+  it('seules les sources GitHub et Stack Exchange restent ingérées', () => {
+    expect([...POSTABLE_SOURCE_NAMES].sort()).toEqual(['github', 'stackexchange']);
+    expect(MAX_THREAD_AGE_DAYS).toBe(30);
   });
 });

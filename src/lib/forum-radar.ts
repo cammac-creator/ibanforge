@@ -72,6 +72,27 @@ const KEYWORDS: Array<{ re: RegExp; weight: number; label: string }> = [
 export const MIN_SCORE = 30;
 
 /**
+ * The rule of 03/09/2026, from Claude-Alain: a reply is worth writing only on
+ * a thread younger than a month, on a forum where he (or the GitHub account)
+ * can actually post. Everything older is archaeology: the asker has moved on,
+ * and the answer reads as promotion. Everything on a forum that needs a
+ * registration we do not have (Odoo forum, Discourse instances, Reddit, HN)
+ * would sit as a draft forever, which is what 25 of them did.
+ */
+export const MAX_THREAD_AGE_DAYS = 30;
+
+/** Server-side source names the scan may ingest threads from. */
+export const POSTABLE_SOURCE_NAMES: ReadonlySet<string> = new Set(['stackexchange', 'github']);
+
+/** Days since the thread was opened; null when the date is missing or unreadable. */
+export function threadAgeDays(threadCreatedAt: string, now: number = Date.now()): number | null {
+  if (!threadCreatedAt) return null;
+  const t = Date.parse(threadCreatedAt);
+  if (!Number.isFinite(t)) return null;
+  return (now - t) / 86_400_000;
+}
+
+/**
  * Per-platform reply length limits, in characters. `max` is the hard platform
  * ceiling (posting above it fails or truncates); `comfy` is the etiquette
  * ceiling above which a forum reply starts reading like a blog post. Sources:
@@ -169,6 +190,11 @@ export function finalizeCandidate(
 ): ScoredThread | null {
   const { score, detail } = scoreThread(c.title, c.excerpt);
   if (score < MIN_SCORE) return null;
+  // The 03/09 rule (see MAX_THREAD_AGE_DAYS): no date, or older than a month,
+  // or an issue already closed, is not a conversation anyone is waiting on.
+  const age = threadAgeDays(c.threadCreatedAt, now);
+  if (age === null || age > MAX_THREAD_AGE_DAYS) return null;
+  if (c.activity.startsWith('closed')) return null;
   const fresh = recencyBonus(c.threadCreatedAt, now);
   return {
     ...c,

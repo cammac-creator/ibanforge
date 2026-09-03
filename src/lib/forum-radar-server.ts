@@ -30,6 +30,8 @@ import {
   type MarketplaceDef,
   type ScoredThread,
   type ThreadCandidate,
+  MAX_THREAD_AGE_DAYS,
+  POSTABLE_SOURCE_NAMES,
 } from './forum-radar.js';
 
 const TICK_MS = 60 * 60 * 1000;
@@ -37,7 +39,9 @@ const DUE_AFTER_MS = 20 * 60 * 60 * 1000;
 const BOOT_DELAY_MS = 3 * 60 * 1000; // offset from the lifecycle radar's 5 min
 const FETCH_TIMEOUT_MS = 15_000;
 const GITHUB_SPACING_MS = 7_000;
-const LOOKBACK_DAYS = 90;
+// The 03/09/2026 rule: a month, not a quarter. The window drives the provider
+// queries; finalizeCandidate applies the same bound to what comes back.
+const LOOKBACK_DAYS = MAX_THREAD_AGE_DAYS;
 
 const KV_LAST_SCAN = 'forum_radar_last_scan_at';
 const KV_LAST_REPORT = 'forum_radar_last_report';
@@ -321,6 +325,11 @@ async function scanThreads(report: ScanReport): Promise<void> {
   const sinceISO = new Date(Date.now() - LOOKBACK_DAYS * 86400 * 1000).toISOString().slice(0, 10);
   const mutedRepos = dismissedRepoSet();
   for (const source of THREAD_SOURCES) {
+    // Forums we cannot post on (Odoo, Discourse, Reddit, HN) are not scanned
+    // any more: a thread that can only become a draft nobody can send is
+    // noise in the tab, not a lead. The fetchers stay, gated, so re-enabling
+    // one is a one-line change once an account exists.
+    if (!POSTABLE_SOURCE_NAMES.has(source.name)) continue;
     try {
       const candidates = await source.fetchAll(sinceEpoch, sinceISO);
       report.threads.seen += candidates.length;
