@@ -200,6 +200,33 @@ jobs:
           docker logs ibanforge-ci 2>&1 | tail -40 || true
           docker rm -f ibanforge-ci || true
 
+  sdk-java:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: sdks/java/pom.xml
+      - name: Build & test the Java SDK
+        working-directory: sdks/java
+        run: mvn -B --no-transfer-progress test
+
+  sdk-dotnet:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '8.0.x'
+      - name: Build, test & pack the .NET SDK
+        working-directory: sdks/dotnet
+        run: |
+          dotnet test --nologo
+          dotnet pack src/IBANforge.Sdk/IBANforge.Sdk.csproj -c Release -o /tmp/pkg --nologo
+
   sdk-python:
     runs-on: ubuntu-latest
     steps:

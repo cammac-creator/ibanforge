@@ -1,5 +1,5 @@
 ---
-title: "Recettes : valider un IBAN en Python, Node, PHP, Sheets, n8n, Odoo"
+title: "Recettes : valider un IBAN en Python, Node, PHP, Java, .NET, Sheets, n8n, Odoo"
 description: "Recettes prêtes à copier pour valider un IBAN et identifier la banque émettrice en Python, Node.js/TypeScript, PHP, Google Sheets, n8n et agents IA (MCP) — avec la note honnête sur ce qu'une somme de contrôle seule ne peut pas dire."
 order: 12
 ---
@@ -83,6 +83,30 @@ echo $data["valid"] ? "valide" : "invalide", " — ",
      $data["bank_code_check"]["status"] ?? "n/a", PHP_EOL;
 // valide — verified
 ```
+
+## Java
+
+Le SDK Java officiel (Java 17 ou plus, Jackson seul) reflète le client TypeScript méthode pour méthode. La publication sur Maven Central est en attente ; d'ici là, construisez-le depuis le dépôt avec `mvn install` dans `sdks/java` et dépendez de `com.ibanforge:ibanforge-sdk:1.5.0`.
+
+```java
+IBANforge client = IBANforge.builder().apiKey(System.getenv("IBANFORGE_API_KEY")).build();
+IBANValidationResult r = client.validateIban("DE89 3704 0044 0532 0130 00");
+System.out.println(r.valid() + " " + r.bic().code() + " " + r.bankCodeCheck().status());
+```
+
+Les erreurs sont typées sous `IBANforgeException` : `PaymentRequiredException` (402, le défi x402 dans `accepts`), `RateLimitException`, `InvalidInputException`, `ApiException`. `client.formatIban(...)` et les autres routes gratuites n'ont pas besoin de clé. [README et tableau complet des méthodes](https://github.com/cammac-creator/ibanforge/tree/main/sdks/java).
+
+## C# / .NET
+
+Le SDK .NET officiel (net8.0, aucune dépendance hors du framework) expose les mêmes méthodes en appels asynchrones. La publication sur NuGet est en attente ; d'ici là, référencez le projet ou faites `dotnet pack` depuis `sdks/dotnet` (identifiant `IBANforge.Sdk`, version 1.5.0).
+
+```csharp
+using var client = new IBANforgeClient(new IBANforgeOptions { ApiKey = Environment.GetEnvironmentVariable("IBANFORGE_API_KEY") });
+var r = await client.ValidateIbanAsync("DE89 3704 0044 0532 0130 00");
+Console.WriteLine($"{r.Valid} {r.Bic?.Code} {r.BankCodeCheck?.Status}");
+```
+
+Passez votre propre `HttpClient` (IHttpClientFactory) au constructeur si vous en avez un ; les exceptions reflètent la hiérarchie Java et TypeScript. [README](https://github.com/cammac-creator/ibanforge/tree/main/sdks/dotnet).
 
 ## Google Sheets
 

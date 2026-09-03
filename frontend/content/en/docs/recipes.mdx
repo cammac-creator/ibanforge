@@ -1,5 +1,5 @@
 ---
-title: "Recipes: validate an IBAN in Python, Node, PHP, Sheets, n8n, Odoo"
+title: "Recipes: validate an IBAN in Python, Node, PHP, Java, .NET, Sheets, n8n, Odoo"
 description: "Copy-paste recipes to validate an IBAN and identify the issuing bank in Python, Node.js/TypeScript, PHP, Google Sheets, n8n and AI agents (MCP) — with the honest note on what a checksum alone cannot tell you."
 order: 12
 ---
@@ -83,6 +83,30 @@ echo $data["valid"] ? "valid" : "invalid", " — ",
      $data["bank_code_check"]["status"] ?? "n/a", PHP_EOL;
 // valid — verified
 ```
+
+## Java
+
+The official Java SDK (Java 17+, Jackson only) mirrors the TypeScript client method for method. Maven Central publication is pending; until then build it from the repository with `mvn install` in `sdks/java` and depend on `com.ibanforge:ibanforge-sdk:1.5.0`.
+
+```java
+IBANforge client = IBANforge.builder().apiKey(System.getenv("IBANFORGE_API_KEY")).build();
+IBANValidationResult r = client.validateIban("DE89 3704 0044 0532 0130 00");
+System.out.println(r.valid() + " " + r.bic().code() + " " + r.bankCodeCheck().status());
+```
+
+Errors are typed under `IBANforgeException`: `PaymentRequiredException` (402, the x402 challenge in `accepts`), `RateLimitException`, `InvalidInputException`, `ApiException`. `client.formatIban(...)` and the other free routes need no key. [README and the full method table](https://github.com/cammac-creator/ibanforge/tree/main/sdks/java).
+
+## C# / .NET
+
+The official .NET SDK (net8.0, no dependency beyond the framework) exposes the same methods as async calls. NuGet publication is pending; until then reference the project or `dotnet pack` it from `sdks/dotnet` (package id `IBANforge.Sdk`, version 1.5.0).
+
+```csharp
+using var client = new IBANforgeClient(new IBANforgeOptions { ApiKey = Environment.GetEnvironmentVariable("IBANFORGE_API_KEY") });
+var r = await client.ValidateIbanAsync("DE89 3704 0044 0532 0130 00");
+Console.WriteLine($"{r.Valid} {r.Bic?.Code} {r.BankCodeCheck?.Status}");
+```
+
+Pass your own `HttpClient` (IHttpClientFactory) to the constructor when you have one; exceptions mirror the Java and TypeScript hierarchy. [README](https://github.com/cammac-creator/ibanforge/tree/main/sdks/dotnet).
 
 ## Google Sheets
 
