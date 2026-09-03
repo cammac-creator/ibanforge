@@ -10,9 +10,10 @@ import { routing } from "@/i18n/routing";
 export const dynamicParams = true;
 
 /**
- * The first batch is pre-rendered and listed in the sitemap; every other BLZ of
- * the register renders on demand from the same JSON (see lib/registers.ts and
- * scripts/export-register-pages.ts in the API repository).
+ * The first batch is the one the sitemap lists; every code of the register
+ * renders on demand from the same JSON (see lib/registers.ts and
+ * scripts/export-register-pages.ts in the API repository). The site renders
+ * server-side, so these params only tell the build what the first batch is.
  */
 export function generateStaticParams() {
   const { batch1 } = deBlzFile();
