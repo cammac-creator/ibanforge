@@ -86,7 +86,7 @@ echo $data["valid"] ? "gültig" : "ungültig", " — ",
 
 ## Java
 
-Das offizielle Java-SDK (Java 17 oder neuer, nur Jackson) spiegelt den TypeScript-Client Methode für Methode. Die Veröffentlichung auf Maven Central steht noch aus; bis dahin aus dem Repository bauen (`mvn install` in `sdks/java`) und `com.ibanforge:ibanforge-sdk:1.5.0` einbinden.
+Das offizielle Java-SDK (Java 17 oder neuer, nur Jackson) spiegelt den TypeScript-Client Methode für Methode. Es liegt auf Maven Central: `com.ibanforge:ibanforge-sdk:1.5.0` einbinden.
 
 ```java
 IBANforge client = IBANforge.builder().apiKey(System.getenv("IBANFORGE_API_KEY")).build();

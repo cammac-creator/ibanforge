@@ -4,15 +4,7 @@ Official Java SDK for the [IBANforge API](https://ibanforge.com?src=sdk-java) --
 
 ## Install
 
-Maven Central publication is pending (it is at the project owner's hand). Until then, build and install from the repository:
-
-```bash
-git clone https://github.com/cammac-creator/ibanforge.git
-cd ibanforge/sdks/java
-mvn install
-```
-
-Then depend on it like any local artifact:
+Published on [Maven Central](https://central.sonatype.com/artifact/com.ibanforge/ibanforge-sdk):
 
 ```xml
 <dependency>

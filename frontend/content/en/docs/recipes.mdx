@@ -86,7 +86,7 @@ echo $data["valid"] ? "valid" : "invalid", " — ",
 
 ## Java
 
-The official Java SDK (Java 17+, Jackson only) mirrors the TypeScript client method for method. Maven Central publication is pending; until then build it from the repository with `mvn install` in `sdks/java` and depend on `com.ibanforge:ibanforge-sdk:1.5.0`.
+The official Java SDK (Java 17+, Jackson only) mirrors the TypeScript client method for method. It is on Maven Central: depend on `com.ibanforge:ibanforge-sdk:1.5.0`.
 
 ```java
 IBANforge client = IBANforge.builder().apiKey(System.getenv("IBANFORGE_API_KEY")).build();
