@@ -37,6 +37,7 @@ import {
   resolveOrphan,
   countPendingOrphans,
   isOrphanKind,
+  setOrphanGist,
 } from '../lib/orphan-mail.js';
 import { addAlias, listAliases, loadAliasMap, toCanonical } from '../lib/email-aliases.js';
 import {
@@ -1767,6 +1768,34 @@ apiKeys.post('/v1/admin/orphan-mail/resolve', async (c) => {
   const ok = resolveOrphan(body.id, typeof body.attached_to === 'string' ? body.attached_to : null);
   if (!ok) return c.json({ error: 'not_found' }, 404);
   return c.json({ resolved: body.id, pending: countPendingOrphans() });
+});
+
+/**
+ * The French gist of one orphan, written by the dashboard after the VPS writer
+ * answered. Idempotent: a second write for the same id is a no-op that still
+ * answers 200, so a retried request never overwrites a gist already read.
+ */
+apiKeys.post('/v1/admin/orphan-mail/gist', async (c) => {
+  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
+  let body: { id?: unknown; gist_fr?: unknown };
+  try {
+    body = await c.req.json<{ id?: unknown; gist_fr?: unknown }>();
+  } catch {
+    return c.json({ error: 'invalid_json' }, 400);
+  }
+  const gist = (typeof body.gist_fr === 'string' ? stripEmDashes(body.gist_fr.trim()) : null) ?? '';
+  if (typeof body.id !== 'string' || !gist || gist.length > 1200) {
+    return c.json(
+      { error: 'invalid_body', message: 'Expected { id, gist_fr } (1 to 1200 chars)' },
+      400,
+    );
+  }
+  const exists = getOrphans(true, 100000).some((o) => o.id === body.id);
+  if (!exists) return c.json({ error: 'not_found' }, 404);
+  const written = setOrphanGist(body.id, gist);
+  return c.json({ id: body.id, written });
 });
 
 /**

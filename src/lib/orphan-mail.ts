@@ -39,6 +39,12 @@ export interface OrphanMail {
   resolved: 0 | 1;
   /** Which customer it was attached to, when it was. */
   resolved_as: string | null;
+  /**
+   * Two or three French sentences saying who writes and what they want,
+   * generated once from subject and snippet. NULL until the dashboard asked
+   * for it. The original text stays the reference; this is the reading aid.
+   */
+  gist_fr: string | null;
 }
 
 export function isOrphanKind(v: unknown): v is OrphanKind {
@@ -99,7 +105,7 @@ export function getOrphans(includeResolved = false, limit = 40): OrphanMail[] {
   const where = includeResolved ? '' : 'WHERE resolved = 0';
   return getStatsDB()
     .prepare(
-      `SELECT id, sender, subject, snippet, msg_date, kind, resolved, resolved_as
+      `SELECT id, sender, subject, snippet, msg_date, kind, resolved, resolved_as, gist_fr
          FROM orphan_mail ${where}
         ORDER BY resolved ASC,
                  CASE kind WHEN 'reply' THEN 0 ELSE 1 END ASC,
@@ -126,4 +132,15 @@ export function countPendingOrphans(): number {
     .prepare('SELECT COUNT(*) AS n FROM orphan_mail WHERE resolved = 0')
     .get() as { n: number };
   return row.n;
+}
+
+/**
+ * Store the French gist, once. A gist already present is kept: the writer is
+ * not asked twice for the same message, and a later reader trusts the first.
+ */
+export function setOrphanGist(id: string, gist: string): boolean {
+  const res = getStatsDB()
+    .prepare('UPDATE orphan_mail SET gist_fr = ? WHERE id = ? AND gist_fr IS NULL')
+    .run(gist, id);
+  return res.changes > 0;
 }

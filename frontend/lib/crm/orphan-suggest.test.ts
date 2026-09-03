@@ -70,3 +70,42 @@ describe('suggestFor without a query (sender heuristic)', () => {
     expect(suggestFor('zqx@gmail.com', '', ROWS)).toEqual([]);
   });
 });
+
+import { bestMatch, isAutomatedNotice } from './orphan-suggest';
+
+describe('bestMatch (the pre-selected client)', () => {
+  const rows: PersonRow[] = [
+    { email: 'ops@alpha.example.net', label: 'Societe Alpha', kind: 'client' },
+    { email: 'sales@alpha.example.net', label: 'Societe Alpha', kind: 'prospect' },
+    { email: 'j.dupont@beta.example.org', label: 'Beta SA', kind: 'client' },
+    { email: 'zed@gmail.com', label: 'Zed', kind: 'prospect' },
+  ];
+  it('prefers a shared company domain, clients first', () => {
+    expect(bestMatch('cfo@alpha.example.net', rows)).toEqual({ row: rows[0], reason: 'same_domain' });
+  });
+  it('never treats a mailbox provider as a shared domain', () => {
+    expect(bestMatch('someone@gmail.com', rows)).toBeNull();
+  });
+  it('finds the sender domain in a file label', () => {
+    expect(bestMatch('info@beta.example.org', rows)?.reason).toBe('same_domain');
+    expect(bestMatch('hello@betasa.io', rows)).toBeNull();
+    expect(bestMatch('hello@beta.io', rows)?.row.email).toBe('j.dupont@beta.example.org');
+  });
+  it('falls back to a name fragment of the address, and says so', () => {
+    expect(bestMatch('jean.dupont@gmail.com', rows)).toEqual({ row: rows[2], reason: 'name_in_address' });
+  });
+  it('never proposes the sender itself', () => {
+    expect(bestMatch('ops@alpha.example.net', rows)?.row.email).toBe('sales@alpha.example.net');
+  });
+});
+
+describe('isAutomatedNotice', () => {
+  it('recognises DMARC reports and no-reply senders', () => {
+    expect(isAutomatedNotice('dmarcreport@microsoft.com', '[Preview] Report Domain: ibanforge.com Submitter: x')).toBe(true);
+    expect(isAutomatedNotice('no-reply@example.com', 'Your listing is live')).toBe(true);
+    expect(isAutomatedNotice('noreply@example.com', null)).toBe(true);
+  });
+  it('leaves a person alone', () => {
+    expect(isAutomatedNotice('jean@alpha.example.net', 'Re: our call')).toBe(false);
+  });
+});

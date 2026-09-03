@@ -423,6 +423,14 @@ function openStatsDB(): DatabaseType.Database {
     if (!existingCols.includes('key_prefix'))
       statsDB.exec('ALTER TABLE operations ADD COLUMN key_prefix TEXT');
     statsDB.exec('CREATE INDEX IF NOT EXISTS idx_operations_key ON operations(key_prefix)');
+    // French gist of an orphan mail (2026-09-03): the queue is read by a French
+    // speaker and nearly every message in it is English. Written once by the
+    // dashboard through the VPS writer; NULL until then, never regenerated.
+    const orphanCols = (
+      statsDB.prepare('PRAGMA table_info(orphan_mail)').all() as Array<{ name: string }>
+    ).map((r) => r.name);
+    if (orphanCols.length > 0 && !orphanCols.includes('gist_fr'))
+      statsDB.exec('ALTER TABLE orphan_mail ADD COLUMN gist_fr TEXT');
     const keyCols = (
       statsDB.prepare('PRAGMA table_info(api_keys)').all() as Array<{ name: string }>
     ).map((r) => r.name);

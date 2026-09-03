@@ -2,7 +2,13 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { INSTITUTION_CATEGORIES } from '@/lib/crm/business';
-import { suggestFor, type PersonRow } from '@/lib/crm/orphan-suggest';
+import {
+  bestMatch,
+  MATCH_REASON_FR,
+  suggestFor,
+  type BestMatch,
+  type PersonRow,
+} from '@/lib/crm/orphan-suggest';
 import { loadAliases, loadIndex } from '@/lib/crm/people-index';
 
 /**
@@ -42,7 +48,19 @@ type Busy = 'idle' | 'busy' | 'error';
 /** Free-category sentinel: the select offers it, the input under it carries it. */
 const FREE_CATEGORY = '__libre__';
 
-export function AttachOrphanControl({ orphanId, sender }: { orphanId: string; sender: string }) {
+/**
+ * `automated`: the panel recognised a DMARC report or a no-reply sender. The
+ * dismissal then comes first, and no client is proposed: nobody is behind it.
+ */
+export function AttachOrphanControl({
+  orphanId,
+  sender,
+  automated = false,
+}: {
+  orphanId: string;
+  sender: string;
+  automated?: boolean;
+}) {
   const [mode, setMode] = useState<Mode>('closed');
   const [canonical, setCanonical] = useState('');
   const [armed, setArmed] = useState(false);
@@ -61,7 +79,10 @@ export function AttachOrphanControl({ orphanId, sender }: { orphanId: string; se
   const [customCategory, setCustomCategory] = useState('');
   const [country, setCountry] = useState('');
   const [done, setDone] = useState<
-    { kind: 'attached'; to: string } | { kind: 'registered'; org: string } | { kind: 'dismissed' } | null
+    | { kind: 'attached'; to: string }
+    | { kind: 'registered'; org: string }
+    | { kind: 'dismissed' }
+    | null
   >(null);
 
   // Both roads need the index, and for opposite reasons. "Attach" reads it to
@@ -70,8 +91,11 @@ export function AttachOrphanControl({ orphanId, sender }: { orphanId: string; se
   // is one the correspondent register cannot really claim, and filing it twice
   // is how the same desk ends up with two identities. Loading it for the first
   // mode only meant the more expensive of the two mistakes was the unguarded one.
+  // Loaded on mount as well (03/09/2026): the closed state names the most
+  // likely client BEFORE the operator opens anything, and that needs the index.
+  // One fetch per browser session either way (lib/crm/people-index.ts caches).
   useEffect(() => {
-    if ((mode !== 'attach' && mode !== 'institution') || rows !== null) return;
+    if (automated || rows !== null) return;
     let alive = true;
     loadIndex().then(
       (r) => alive && setRows(r),
@@ -84,12 +108,16 @@ export function AttachOrphanControl({ orphanId, sender }: { orphanId: string; se
     return () => {
       alive = false;
     };
-  }, [mode, rows, sender]);
+  }, [automated, rows, sender]);
+
+  const proposal: BestMatch | null =
+    !automated && Array.isArray(rows) ? bestMatch(sender, rows) : null;
 
   if (done?.kind === 'attached') {
     return (
       <p aria-live="polite" className="mt-1 text-[12px] text-emerald-400">
-        ✓ {sender} rattaché à {done.to} — son fil complet remonte au prochain passage de la synchro (au plus 15 min).
+        ✓ {sender} rattaché à {done.to} — son fil complet remonte au prochain passage de la synchro
+        (au plus 15 min).
       </p>
     );
   }
@@ -105,8 +133,8 @@ export function AttachOrphanControl({ orphanId, sender }: { orphanId: string; se
     // not work is exactly the road back to the orphan queue.
     return (
       <p aria-live="polite" className="mt-1 text-[12px] text-sky-300">
-        ✓ {sender} enregistré comme correspondant ({done.org}) — son fil, cette réponse comprise, remonte au
-        prochain passage de la synchro (au plus 15 min), sous « Correspondances ».
+        ✓ {sender} enregistré comme correspondant ({done.org}) — son fil, cette réponse comprise,
+        remonte au prochain passage de la synchro (au plus 15 min), sous « Correspondances ».
       </p>
     );
   }
@@ -119,43 +147,78 @@ export function AttachOrphanControl({ orphanId, sender }: { orphanId: string; se
   }
 
   if (mode === 'closed') {
+    const openAttach = (prefill?: string) => {
+      if (prefill) setCanonical(prefill);
+      setMode('attach');
+      // A previous index failure must not freeze this control in the
+      // degraded state forever: reopening retries the fetch.
+      if (rows === 'failed') setRows(null);
+    };
+    const dismissButton = (
+      <button
+        type="button"
+        onClick={() => setMode('dismiss')}
+        className={
+          automated
+            ? 'rounded border border-sky-500/50 px-2 py-1 text-[12px] font-medium text-sky-300 hover:bg-sky-500/10'
+            : 'rounded border border-[var(--ink-4)] px-2 py-1 text-[12px] text-[var(--fg-3)] hover:text-[var(--fg-1)]'
+        }
+      >
+        Classer sans rattacher
+      </button>
+    );
     return (
-      <div className="mt-1 flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={() => {
-            setMode('attach');
-            // A previous index failure must not freeze this control in the
-            // degraded state forever: reopening retries the fetch.
-            if (rows === 'failed') setRows(null);
-          }}
-          className="rounded border border-amber-500/40 px-2 py-1 text-[12px] font-medium text-amber-400 hover:bg-amber-500/10"
-        >
-          Rattacher à un client…
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            setMode('institution');
-            // Same retry as the alias road, and now that this mode reads the
-            // index it needs it for the same reason: a failure left in place
-            // would freeze the double-identity warnings off for good.
-            if (rows === 'failed') setRows(null);
-          }}
-          className="rounded border border-sky-500/40 px-2 py-1 text-[12px] font-medium text-sky-300 hover:bg-sky-500/10"
-        >
-          {/* Not "rattacher": nothing is attached to anything here. The sender
+      <div className="mt-1.5">
+        {/* The pre-selection, before any typing: the row the index ranks
+            first for this sender, with the reason in plain words. It is a
+            proposal, never a decision: the button only opens the attach form
+            with the address filled in, and the two-click confirmation stays. */}
+        {proposal && (
+          <p className="mb-1.5 text-[12px] text-[var(--fg-2)]">
+            <span className="text-[var(--fg-3)]">Probablement</span>{' '}
+            <strong>{proposal.row.label || proposal.row.email}</strong>{' '}
+            <span className="text-[var(--fg-4)]">
+              ({proposal.row.email}, {proposal.row.kind === 'client' ? 'client' : 'prospect'} ·{' '}
+              {MATCH_REASON_FR[proposal.reason]})
+            </span>
+          </p>
+        )}
+        <div className="flex flex-wrap gap-2">
+          {automated && dismissButton}
+          {proposal ? (
+            <button
+              type="button"
+              onClick={() => openAttach(proposal.row.email)}
+              className="rounded border border-emerald-500/50 px-2 py-1 text-[12px] font-medium text-emerald-400 hover:bg-emerald-500/10"
+            >
+              Rattacher à {proposal.row.label || proposal.row.email}…
+            </button>
+          ) : null}
+          <button
+            type="button"
+            onClick={() => openAttach()}
+            className="rounded border border-amber-500/40 px-2 py-1 text-[12px] font-medium text-amber-400 hover:bg-amber-500/10"
+          >
+            {proposal ? 'Un autre client…' : 'Rattacher à un client…'}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setMode('institution');
+              // Same retry as the alias road, and now that this mode reads the
+              // index it needs it for the same reason: a failure left in place
+              // would freeze the double-identity warnings off for good.
+              if (rows === 'failed') setRows(null);
+            }}
+            className="rounded border border-sky-500/40 px-2 py-1 text-[12px] font-medium text-sky-300 hover:bg-sky-500/10"
+          >
+            {/* Not "rattacher": nothing is attached to anything here. The sender
               IS the file being opened, and a verb that says otherwise is what
               sent this gesture looking for a customer to merge into. */}
-          Enregistrer comme correspondant…
-        </button>
-        <button
-          type="button"
-          onClick={() => setMode('dismiss')}
-          className="rounded border border-[var(--ink-4)] px-2 py-1 text-[12px] text-[var(--fg-3)] hover:text-[var(--fg-1)]"
-        >
-          Classer sans rattacher
-        </button>
+            Enregistrer comme correspondant…
+          </button>
+          {!automated && dismissButton}
+        </div>
       </div>
     );
   }
@@ -211,8 +274,8 @@ export function AttachOrphanControl({ orphanId, sender }: { orphanId: string; se
     return (
       <div className="mt-1.5">
         <p className="mb-1.5 text-[12px] text-[var(--fg-3)]">
-          Enregistrer <strong>{sender}</strong> comme correspondant institutionnel — autorité, banque centrale,
-          réseau, registre, fournisseur. Son fil aura son propre dossier.
+          Enregistrer <strong>{sender}</strong> comme correspondant institutionnel — autorité,
+          banque centrale, réseau, registre, fournisseur. Son fil aura son propre dossier.
         </p>
         <div className="flex flex-wrap items-center gap-2">
           <input
@@ -320,7 +383,9 @@ export function AttachOrphanControl({ orphanId, sender }: { orphanId: string; se
               }
             }}
             className={`rounded border px-2.5 py-1.5 text-[12px] font-medium disabled:opacity-40 ${
-              armed ? 'border-sky-400 bg-sky-500/15 text-sky-200' : 'border-sky-500/50 text-sky-300 hover:bg-sky-500/10'
+              armed
+                ? 'border-sky-400 bg-sky-500/15 text-sky-200'
+                : 'border-sky-500/50 text-sky-300 hover:bg-sky-500/10'
             }`}
           >
             {busy === 'busy' ? 'Enregistrement…' : armed ? 'Oui, enregistrer' : 'Enregistrer'}
@@ -341,20 +406,21 @@ export function AttachOrphanControl({ orphanId, sender }: { orphanId: string; se
               after, because after it there is nothing left to decide. */}
           {knownAlias ? (
             <p className="mt-1 text-[11.5px] text-amber-300">
-              ⚠ {sender} est déjà rattaché au client {knownAlias} — l&apos;enregistrer comme correspondant
-              créerait une double identité.
+              ⚠ {sender} est déjà rattaché au client {knownAlias} — l&apos;enregistrer comme
+              correspondant créerait une double identité.
             </p>
           ) : (
             known && (
               <p className="mt-1 text-[11.5px] text-amber-300">
-                ⚠ {sender} est déjà connu du CRM comme {known.kind === 'client' ? 'client' : 'prospect'}.
+                ⚠ {sender} est déjà connu du CRM comme{' '}
+                {known.kind === 'client' ? 'client' : 'prospect'}.
               </p>
             )
           )}
           {armed && (
             <p className="mt-1.5 text-[12px] text-sky-200">
-              Enregistrer <strong>{sender}</strong> sous <strong>{cleanedOrg}</strong> ({categoryLabel}). Reclique
-              pour confirmer.
+              Enregistrer <strong>{sender}</strong> sous <strong>{cleanedOrg}</strong> (
+              {categoryLabel}). Reclique pour confirmer.
             </p>
           )}
           {busy === 'error' && <p className="mt-1 text-[12px] text-red-300">échec : {message}</p>}
@@ -389,7 +455,11 @@ export function AttachOrphanControl({ orphanId, sender }: { orphanId: string; se
         >
           {busy === 'busy' ? 'Classement…' : 'Oui, classer'}
         </button>
-        <button type="button" onClick={reset} className="rounded px-1.5 py-1 text-[12px] text-[var(--fg-4)] hover:text-[var(--fg-2)]">
+        <button
+          type="button"
+          onClick={reset}
+          className="rounded px-1.5 py-1 text-[12px] text-[var(--fg-4)] hover:text-[var(--fg-2)]"
+        >
           annuler
         </button>
         {busy === 'error' && (
@@ -404,8 +474,11 @@ export function AttachOrphanControl({ orphanId, sender }: { orphanId: string; se
   // mode === 'attach'
   const cleaned = canonical.trim().toLowerCase();
   const valid = cleaned.includes('@') && cleaned !== sender;
-  const suggestions = Array.isArray(rows) ? suggestFor(sender, canonical, rows).filter((r) => r.email !== sender) : [];
-  const addressKnown = !Array.isArray(rows) || rows.length === 0 || rows.some((r) => r.email === cleaned);
+  const suggestions = Array.isArray(rows)
+    ? suggestFor(sender, canonical, rows).filter((r) => r.email !== sender)
+    : [];
+  const addressKnown =
+    !Array.isArray(rows) || rows.length === 0 || rows.some((r) => r.email === cleaned);
 
   return (
     <div className="mt-1.5">
@@ -435,13 +508,17 @@ export function AttachOrphanControl({ orphanId, sender }: { orphanId: string; se
             if (Date.now() - armedAtRef.current < 400) return;
             setBusy('busy');
             try {
-              const aliasReply = (await post('/api/crm/email-aliases', { alias: sender, canonical: cleaned })) as {
+              const aliasReply = (await post('/api/crm/email-aliases', {
+                alias: sender,
+                canonical: cleaned,
+              })) as {
                 aliases?: Array<{ alias: string; canonical: string }>;
               };
               // The server resolves alias chains; its answer, not the typed
               // address, is what resolved_as must record — a later reader of
               // resolved_as trusts it over re-deciding.
-              const resolved = aliasReply.aliases?.find((a) => a.alias === sender)?.canonical ?? cleaned;
+              const resolved =
+                aliasReply.aliases?.find((a) => a.alias === sender)?.canonical ?? cleaned;
               await post('/api/crm/orphan-resolve', { id: orphanId, attached_to: resolved });
               setDone({ kind: 'attached', to: resolved });
             } catch (e) {
@@ -458,7 +535,11 @@ export function AttachOrphanControl({ orphanId, sender }: { orphanId: string; se
         >
           {busy === 'busy' ? 'Rattachement…' : armed ? 'Oui, ils ne font qu’un' : 'Rattacher'}
         </button>
-        <button type="button" onClick={reset} className="rounded px-1.5 py-1 text-[12px] text-[var(--fg-4)] hover:text-[var(--fg-2)]">
+        <button
+          type="button"
+          onClick={reset}
+          className="rounded px-1.5 py-1 text-[12px] text-[var(--fg-4)] hover:text-[var(--fg-2)]"
+        >
           annuler
         </button>
       </div>
@@ -495,25 +576,29 @@ export function AttachOrphanControl({ orphanId, sender }: { orphanId: string; se
       )}
       {rows === 'failed' && (
         <p className="mt-1 text-[11.5px] text-amber-300">
-          L&apos;index CRM n&apos;a pas répondu : pas de suggestions ni de garde-fou d&apos;adresse inconnue.
-          Saisie libre possible ; rouvre le formulaire pour réessayer.
+          L&apos;index CRM n&apos;a pas répondu : pas de suggestions ni de garde-fou d&apos;adresse
+          inconnue. Saisie libre possible ; rouvre le formulaire pour réessayer.
         </p>
       )}
 
       <div aria-live="polite">
         {armed && (
           <p className="mt-1.5 text-[12px] text-emerald-300">
-            Déclarer que <strong>{sender}</strong> est la même personne que <strong>{cleaned}</strong> — son fil
-            fusionnera dans ce dossier.
+            Déclarer que <strong>{sender}</strong> est la même personne que{' '}
+            <strong>{cleaned}</strong> — son fil fusionnera dans ce dossier.
             {knownAlias && knownAlias !== cleaned && (
-              <strong className="text-amber-300"> ⚠ {sender} est déjà rattaché à {knownAlias} ; confirmer le re-rattache.</strong>
+              <strong className="text-amber-300">
+                {' '}
+                ⚠ {sender} est déjà rattaché à {knownAlias} ; confirmer le re-rattache.
+              </strong>
             )}{' '}
             Reclique pour confirmer.
           </p>
         )}
         {valid && Array.isArray(rows) && rows.length > 0 && !addressKnown && (
           <p className="mt-1 text-[11.5px] text-amber-300">
-            ⚠ {cleaned} n&apos;est ni un détenteur de clé ni un prospect connu du CRM — vérifie avant de confirmer.
+            ⚠ {cleaned} n&apos;est ni un détenteur de clé ni un prospect connu du CRM — vérifie
+            avant de confirmer.
           </p>
         )}
         {busy === 'error' && <p className="mt-1 text-[12px] text-red-300">échec : {message}</p>}

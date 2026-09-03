@@ -1,5 +1,7 @@
 import { InfoDot } from './info-dot';
 import { AttachOrphanControl } from './attach-orphan';
+import { OrphanGist } from './orphan-gist';
+import { isAutomatedNotice } from '@/lib/crm/orphan-suggest';
 
 /**
  * Mail about IBANforge from an address the CRM cannot attach to anyone.
@@ -12,7 +14,10 @@ import { AttachOrphanControl } from './attach-orphan';
  *
  * This panel exists so that never happens quietly again. It does not guess who
  * the sender is; attaching a message to a customer is a human decision, and all
- * this does is make the decision possible.
+ * this does is make the decision possible. Since 03/09/2026 it also makes the
+ * decision READABLE: a French gist under each subject (the queue is read in
+ * French and written to in English), the most likely client named before
+ * anything is typed, and automated notices labelled as such.
  */
 export interface OrphanMailRow {
   id: string;
@@ -23,6 +28,7 @@ export interface OrphanMailRow {
   kind: 'reply' | 'first_contact';
   resolved: 0 | 1;
   resolved_as: string | null;
+  gist_fr?: string | null;
 }
 
 function frDay(iso: string): string {
@@ -39,39 +45,69 @@ function daysWaiting(iso: string): number {
 
 function OrphanRow({ o }: { o: OrphanMailRow }) {
   const age = daysWaiting(o.msg_date);
+  const [local, domain] = o.sender.split('@');
+  const automated = o.kind !== 'reply' && isAutomatedNotice(o.sender, o.subject);
   return (
-    <li className="py-2.5">
+    <li className="py-3">
       <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
         <span
           className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
-            o.kind === 'reply' ? 'bg-amber-500/20 text-amber-300' : 'bg-[var(--ink-4)] text-[var(--fg-3)]'
+            o.kind === 'reply'
+              ? 'bg-amber-500/20 text-amber-300'
+              : 'bg-[var(--ink-4)] text-[var(--fg-3)]'
           }`}
         >
           {o.kind === 'reply' ? 'Réponse' : 'Premier contact'}
         </span>
+        {automated && (
+          <span className="shrink-0 rounded bg-sky-500/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-sky-300">
+            Avis automatique
+          </span>
+        )}
         <a
           href={`mailto:${o.sender}`}
-          className="text-[13.5px] font-medium text-[var(--fg-1)] hover:text-amber-400"
+          className="text-[13.5px] text-[var(--fg-1)] hover:text-amber-400"
         >
-          {o.sender}
+          <span className="font-semibold">{local}</span>
+          {domain && <span className="text-[var(--fg-3)]">@{domain}</span>}
         </a>
         <span className="ml-auto text-[12px] text-[var(--fg-4)]">
           {frDay(o.msg_date)}
           {/* Four days is past "I'll get to it": from there the wait itself
               becomes the information. */}
-          {age >= 4 && <span className="ml-1.5 font-semibold text-amber-400">· attend depuis {age} j</span>}
+          {age >= 4 && (
+            <span className="ml-1.5 font-semibold text-amber-400">· attend depuis {age} j</span>
+          )}
         </span>
       </div>
-      {o.subject && <p className="mt-0.5 text-[12.5px] text-[var(--fg-3)]">{o.subject}</p>}
-      {/* The snippet is all we hold of the message (the sync stores no body);
-          clamping it hid the very words the decision needs. */}
-      {o.snippet && <p className="mt-0.5 text-[12px] leading-relaxed text-[var(--fg-4)]">{o.snippet}</p>}
-      <AttachOrphanControl orphanId={o.id} sender={o.sender} />
+      {/* The subject is the title of the row: it is the one line the sender
+          wrote to be read first, and the gist below answers it in French. */}
+      {o.subject && (
+        <p className="mt-1 text-[13.5px] font-medium leading-snug text-[var(--fg-1)]">
+          {o.subject}
+        </p>
+      )}
+      <OrphanGist
+        id={o.id}
+        sender={o.sender}
+        subject={o.subject}
+        snippet={o.snippet}
+        msgDate={o.msg_date}
+        initial={o.gist_fr ?? null}
+        eager={o.kind === 'reply'}
+      />
+      <AttachOrphanControl orphanId={o.id} sender={o.sender} automated={automated} />
     </li>
   );
 }
 
-export function OrphanMailPanel({ orphans, totalPending }: { orphans: OrphanMailRow[]; totalPending?: number }) {
+export function OrphanMailPanel({
+  orphans,
+  totalPending,
+}: {
+  orphans: OrphanMailRow[];
+  totalPending?: number;
+}) {
   const pending = orphans.filter((o) => !o.resolved);
   // The API caps the list (oldest first server-side, so the cut falls on the
   // newest); `totalPending` is the uncapped count. When they differ, saying so
@@ -91,10 +127,16 @@ export function OrphanMailPanel({ orphans, totalPending }: { orphans: OrphanMail
   const firstContacts = pending.filter((o) => o.kind !== 'reply');
 
   // A queue empties from its oldest end: the reply that has waited longest is
-  // the one to deal with first, not the one that just arrived.
+  // the one to deal with first, not the one that just arrived. Among first
+  // contacts, the ones a person wrote come before the automated notices.
   const byOldest = (a: OrphanMailRow, b: OrphanMailRow) => a.msg_date.localeCompare(b.msg_date);
   replies.sort(byOldest);
-  firstContacts.sort(byOldest);
+  firstContacts.sort((a, b) => {
+    const aa = isAutomatedNotice(a.sender, a.subject) ? 1 : 0;
+    const ba = isAutomatedNotice(b.sender, b.subject) ? 1 : 0;
+    return aa - ba || byOldest(a, b);
+  });
+  const automatedCount = firstContacts.filter((o) => isAutomatedNotice(o.sender, o.subject)).length;
 
   // Nothing waiting is the normal state, and a panel that renders an empty box
   // every day trains the eye to skip the whole column.
@@ -115,21 +157,28 @@ export function OrphanMailPanel({ orphans, totalPending }: { orphans: OrphanMail
             <span>
               {firstContacts.length} premier{firstContacts.length > 1 ? 's' : ''} contact
               {firstContacts.length > 1 ? 's' : ''} en attente
+              {automatedCount > 0 && (
+                <span>
+                  , dont {automatedCount} avis automatique{automatedCount > 1 ? 's' : ''}
+                </span>
+              )}
             </span>
           )}
           {hidden > 0 && <span> · {hidden} de plus au-delà de la limite d&apos;affichage</span>}
         </p>
         <InfoDot>
           Des mails qui parlent d&apos;IBANforge et que le CRM ne peut relier à personne, parce que
-          l&apos;expéditeur n&apos;est ni un détenteur de clé ni un prospect connu. C&apos;est ce qui
-          arrive quand un client répond depuis une autre adresse que celle de sa clé : sans ce
+          l&apos;expéditeur n&apos;est ni un détenteur de clé ni un prospect connu. C&apos;est ce
+          qui arrive quand un client répond depuis une autre adresse que celle de sa clé : sans ce
           panneau, le message n&apos;apparaît nulle part. « Réponse » veut dire qu&apos;il répond à
-          quelque chose qu&apos;on a envoyé, donc que quelqu&apos;un attend. Deux issues par mail :
-          le rattacher à un client (son fil complet remonte à la synchro suivante), ou le classer
-          sans rattachement quand ce n&apos;est pas un client — une autorité qui répond à une de nos
-          lettres, un avis automatique. Les premiers contacts sont pliés sous leur compteur : au
-          premier relevé, presque tous étaient des avis automatiques (publications npm, reçus
-          Stripe), et les afficher aurait enterré le seul qui comptait.
+          quelque chose qu&apos;on a envoyé, donc que quelqu&apos;un attend. Sous chaque objet, un
+          résumé en français écrit par le rédacteur du CRM ; le texte original reste dépliable.
+          Quand une adresse du CRM ressemble à l&apos;expéditeur, elle est proposée d&apos;office
+          avec la raison ; la décision reste la tienne, en deux clics. Trois issues par mail : le
+          rattacher à un client (son fil complet remonte à la synchro suivante), l&apos;enregistrer
+          comme correspondant institutionnel, ou le classer sans rattachement quand ce n&apos;est
+          personne (un avis automatique, une newsletter). Les premiers contacts sont pliés sous leur
+          compteur, les avis automatiques en dernier.
         </InfoDot>
       </div>
 
@@ -142,10 +191,15 @@ export function OrphanMailPanel({ orphans, totalPending }: { orphans: OrphanMail
       )}
 
       {firstContacts.length > 0 && (
-        <details className={replies.length > 0 ? 'mt-3 border-t border-[var(--ink-4)]/50 pt-2' : ''}>
+        <details
+          className={replies.length > 0 ? 'mt-3 border-t border-[var(--ink-4)]/50 pt-2' : ''}
+        >
           <summary className="cursor-pointer select-none text-[12.5px] text-[var(--fg-3)] hover:text-[var(--fg-1)]">
             Déplier les {firstContacts.length} premier{firstContacts.length > 1 ? 's' : ''} contact
-            {firstContacts.length > 1 ? 's' : ''} (surtout des avis automatiques)
+            {firstContacts.length > 1 ? 's' : ''}
+            {automatedCount > 0
+              ? ` (${automatedCount} avis automatique${automatedCount > 1 ? 's' : ''} en fin de liste)`
+              : ''}
           </summary>
           <ul className="divide-y divide-[var(--ink-4)]/50">
             {firstContacts.map((o) => (

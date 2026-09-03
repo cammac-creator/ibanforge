@@ -108,3 +108,88 @@ export function suggestFor(sender: string, query: string, rows: PersonRow[], max
     .slice(0, max)
     .map((x) => x.r);
 }
+
+/**
+ * Why a row is proposed, in the operator's words. Ordered from the reason that
+ * settles it to the one that only hints.
+ */
+export type MatchReason = 'same_domain' | 'domain_in_label' | 'name_in_address';
+
+export interface BestMatch {
+  row: PersonRow;
+  reason: MatchReason;
+}
+
+export const MATCH_REASON_FR: Record<MatchReason, string> = {
+  same_domain: 'même domaine de messagerie',
+  domain_in_label: 'le domaine de l’expéditeur est dans le nom du dossier',
+  name_in_address: 'un nom de l’adresse se retrouve dans le dossier',
+};
+
+function domainOf(email: string): string {
+  return email.trim().toLowerCase().split('@')[1] ?? '';
+}
+
+function isGenericDomain(domain: string): boolean {
+  const label = domain.split('.')[0] ?? '';
+  return GENERIC_MAIL_DOMAINS.has(label);
+}
+
+/**
+ * The one row worth pre-selecting for a sender, with the reason, or null.
+ *
+ * The strongest signal is a shared company domain: two addresses at
+ * alpha.example.net are the same firm nine times out of ten, and never when the
+ * domain is a mailbox provider. Next, the sender's domain name appearing in a
+ * file's label ("acme" in "ACME Sàrl"). Last, a name fragment of the local part
+ * found in a label or an address, which is the weakest and only ever a hint.
+ *
+ * Ties inside a tier go to clients before prospects, then to the shorter
+ * address, so the answer is stable between renders. Null beats a guess: the
+ * control still offers the typed search when nothing here holds.
+ */
+export function bestMatch(sender: string, rows: PersonRow[]): BestMatch | null {
+  const s = sender.trim().toLowerCase();
+  const domain = domainOf(s);
+  const byTier = (candidates: PersonRow[]): PersonRow | undefined =>
+    [...candidates].sort((a, b) => {
+      if (a.kind !== b.kind) return a.kind === 'client' ? -1 : 1;
+      return a.email.length - b.email.length || a.email.localeCompare(b.email);
+    })[0];
+  const others = rows.filter((r) => r.email !== s);
+  if (domain && !isGenericDomain(domain)) {
+    const same = byTier(others.filter((r) => domainOf(r.email) === domain));
+    if (same) return { row: same, reason: 'same_domain' };
+    const label = domain.split('.')[0] ?? '';
+    if (label.length >= 4) {
+      const inLabel = byTier(others.filter((r) => r.label.toLowerCase().includes(label)));
+      if (inLabel) return { row: inLabel, reason: 'domain_in_label' };
+    }
+  }
+  const names = senderTokens(s).filter((t) => t.length >= 4 && t !== domain.split('.')[0]);
+  if (names.length) {
+    const named = byTier(others.filter((r) => names.some((t) => matches(r, t))));
+    if (named) return { row: named, reason: 'name_in_address' };
+  }
+  return null;
+}
+
+/**
+ * Mail no person wrote: DMARC aggregate reports, no-reply senders, delivery
+ * notices. Named so the queue can say "avis automatique" and offer the
+ * dismissal first, instead of asking the operator to read a report to find out.
+ */
+export function isAutomatedNotice(sender: string, subject: string | null): boolean {
+  const s = sender.toLowerCase();
+  const local = s.split('@')[0] ?? '';
+  const subj = (subject ?? '').toLowerCase();
+  if (
+    /^(no-?reply|noreply|do-?not-?reply|donotreply|mailer-daemon|postmaster|dmarc|bounce|notifications?)/.test(
+      local,
+    )
+  )
+    return true;
+  if (/dmarc|report domain:|aggregate report|delivery status notification|undeliverable/.test(subj))
+    return true;
+  return false;
+}
