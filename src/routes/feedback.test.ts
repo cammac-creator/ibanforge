@@ -153,3 +153,54 @@ describe('GET /v1/admin/feedback — the reader', () => {
     expect(res.status).toBe(400);
   });
 });
+
+describe('scanner probes are noise, not open reports', () => {
+  it('a probe marker with nothing else lands as noise; a real complaint stays open', async () => {
+    const { isScannerProbe, recordFeedbackRow } = await import('./feedback.js');
+    expect(
+      isScannerProbe({
+        error_type: 'wrong_validation',
+        notes: 'probe-jhpyoj',
+        agent: 'mcp-npm',
+        ipHash: null,
+      }),
+    ).toBe(true);
+    expect(isScannerProbe({ error_type: 'other', notes: 'test', ipHash: null })).toBe(true);
+    expect(
+      isScannerProbe({
+        error_type: 'stale_bic',
+        endpoint: '/v1/bic/ABCDCHZZ',
+        notes: 'merged',
+        ipHash: null,
+      }),
+    ).toBe(false);
+    expect(
+      isScannerProbe({
+        error_type: 'wrong_validation',
+        notes: 'CH IBAN of Bank Alpha comes back not_in_register',
+        ipHash: null,
+      }),
+    ).toBe(false);
+    const { getStatsDB } = await import('../lib/db.js');
+    const noise = recordFeedbackRow({
+      error_type: 'wrong_validation',
+      notes: 'probe-qyvhxf',
+      agent: 'mcp-npm',
+      ipHash: null,
+    });
+    const real = recordFeedbackRow({
+      error_type: 'stale_bic',
+      endpoint: '/v1/bic/ABCDCHZZ',
+      notes: 'merged',
+      ipHash: null,
+    });
+    const status = (id: number) =>
+      (
+        getStatsDB().prepare('SELECT status FROM feedback WHERE id = ?').get(id) as {
+          status: string;
+        }
+      ).status;
+    expect(status(noise)).toBe('noise');
+    expect(status(real)).toBe('open');
+  });
+});

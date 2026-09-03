@@ -108,7 +108,7 @@ function clip(s: string | null | undefined, max: number): string | null {
   return s.length > max ? s.slice(0, max) : s;
 }
 
-export function recordFeedbackRow(p: {
+export interface FeedbackRowInput {
   tx_hash?: string | null;
   endpoint?: string | null;
   error_type: string;
@@ -118,11 +118,30 @@ export function recordFeedbackRow(p: {
   contact?: string | null;
   agent?: string | null;
   ipHash: string | null;
-}): number {
+}
+
+/**
+ * The directory scanners (Glama, Smithery and their kind) exercise every tool
+ * of a published MCP server with synthetic input, send_feedback included:
+ * on 03/09/2026 four "reports" arrived in pairs, notes `probe-xxxxxx`, nothing
+ * else filled in, and sat as open on the living-tool card as if a human had
+ * written them. A report with no endpoint, no transaction, no expected/got
+ * pair, no contact and a note that is a probe marker or too short to act on
+ * is stored (the ledger stays complete) under status `noise`, which the open
+ * count ignores. A real one-line complaint with an endpoint stays open.
+ */
+export function isScannerProbe(p: FeedbackRowInput): boolean {
+  if (p.endpoint || p.tx_hash || p.contact) return false;
+  if (p.expected !== undefined || p.got !== undefined) return false;
+  const notes = (p.notes ?? '').trim();
+  return /^probe[-_ ]?[a-z0-9]{0,12}$/i.test(notes) || notes.length < 12;
+}
+
+export function recordFeedbackRow(p: FeedbackRowInput): number {
   const info = getStatsDB()
     .prepare(
-      `INSERT INTO feedback (tx_hash, endpoint, error_type, expected, got, notes, contact, agent, ip_hash)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO feedback (tx_hash, endpoint, error_type, expected, got, notes, contact, agent, ip_hash, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
       clip(p.tx_hash, 120),
@@ -134,6 +153,7 @@ export function recordFeedbackRow(p: {
       clip(p.contact, 255),
       clip(p.agent, 120),
       p.ipHash,
+      isScannerProbe(p) ? 'noise' : 'open',
     );
   return Number(info.lastInsertRowid);
 }
