@@ -384,6 +384,23 @@ describe('la règle du 03/09 — un mois, et seulement les forums où on peut r�
     ).toBeNull();
   });
 
+  it("écarte les soumissions, annonces et versions : personne n'y attend une réponse", () => {
+    for (const title of [
+      '[SUBMISSION] iban4j',
+      'MCP Server Submission: looktwice-mcp',
+      '🎉 v0.1.0 released — check-digit math agents can finally trust | v0.1.0',
+      'Release notes 2.4: IBAN validation improvements',
+    ]) {
+      expect(finalizeCandidate({ ...base, title, threadCreatedAt: '2026-08-30' }, now)).toBeNull();
+    }
+    expect(
+      finalizeCandidate(
+        { ...base, title: 'How do I get the BIC from an IBAN?', threadCreatedAt: '2026-08-30' },
+        now,
+      ),
+    ).not.toBeNull();
+  });
+
   it('threadAgeDays : null sans date, sinon des jours', () => {
     expect(threadAgeDays('', now)).toBeNull();
     expect(threadAgeDays('not a date', now)).toBeNull();

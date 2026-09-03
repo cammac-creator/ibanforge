@@ -84,6 +84,16 @@ export const MAX_THREAD_AGE_DAYS = 30;
 /** Server-side source names the scan may ingest threads from. */
 export const POSTABLE_SOURCE_NAMES: ReadonlySet<string> = new Set(['stackexchange', 'github']);
 
+/**
+ * A thread that submits, announces or releases something is not a question:
+ * nobody there is waiting for help, and a reply reads as promotion. The first
+ * scan under the one-month rule surfaced four of these and no question at all
+ * ("[SUBMISSION] iban4j" to an awesome-list, "MCP Server Submission:
+ * looktwice-mcp" to the Cline marketplace, "v0.1.0 released").
+ */
+export const NOT_A_QUESTION_RE =
+  /\[(submission|release|announcement)\]|\bserver submission\b|\bsubmission:|\breleased\b|\brelease notes\b|\bchangelog\b/i;
+
 /** Days since the thread was opened; null when the date is missing or unreadable. */
 export function threadAgeDays(threadCreatedAt: string, now: number = Date.now()): number | null {
   if (!threadCreatedAt) return null;
@@ -195,6 +205,7 @@ export function finalizeCandidate(
   const age = threadAgeDays(c.threadCreatedAt, now);
   if (age === null || age > MAX_THREAD_AGE_DAYS) return null;
   if (c.activity.startsWith('closed')) return null;
+  if (NOT_A_QUESTION_RE.test(c.title)) return null;
   const fresh = recencyBonus(c.threadCreatedAt, now);
   return {
     ...c,
