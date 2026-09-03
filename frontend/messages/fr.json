@@ -636,7 +636,13 @@
           "revenue": "CHF",
           "conversion": "conversion",
           "lastSale": "dernière vente",
-          "empty": "Aucun fichier déposé pour l'instant."
+          "empty": "Aucun fichier déposé pour l'instant.",
+          "recent": "les dépôts, du plus récent au plus ancien",
+          "rows": "{rows} lignes",
+          "rowsUnknown": "taille inconnue",
+          "internal": "clé interne (test)",
+          "withKey": "clé {key}",
+          "noKey": "sans clé (page publique)"
         }
       },
       "details": {

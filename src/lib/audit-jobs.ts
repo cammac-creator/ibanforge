@@ -12,6 +12,7 @@
  */
 import { randomBytes } from 'node:crypto';
 import { getStatsDB } from './db.js';
+import { isInternalEmail } from './internal-accounts.js';
 import type { AuditSummary, PreviewRow, AuditLang, AuditTierCode } from './audit-file.js';
 
 export const UNPAID_TTL_HOURS = 2;
@@ -228,6 +229,21 @@ export interface AuditStats {
   revenue_chf: number;
   last_sale_at: string | null;
   conversion: number | null;
+  /**
+   * The uploads themselves, newest first, so "2 files" on the card can be read
+   * as two dated events: the size class the API recorded, whether a key was
+   * sent (the page never sends one, a script might), and whether that key is
+   * one of ours. Nothing else is kept about an upload once its job is purged.
+   */
+  recent_uploads: Array<{
+    at: string;
+    rows: number | null;
+    tier: string | null;
+    key_prefix: string | null;
+    internal: boolean;
+  }>;
+  /** The sales of the window, from the durable ledger. */
+  recent_sales: Array<{ paid_at: string; rows: number; tier: string; price_chf: number }>;
 }
 
 /** Uploads (durable, from the operations log) and sales (durable ledger) over the period. */
@@ -246,6 +262,51 @@ export function auditStats(days: number): AuditStats {
       `SELECT COUNT(*) n, COALESCE(SUM(price_chf), 0) chf, MAX(paid_at) last FROM audit_sales WHERE paid_at >= datetime('now', ?)`,
     )
     .get(`-${days} days`) as { n: number; chf: number; last: string | null };
+  const uploadRows = db
+    .prepare(
+      `SELECT created_at AS at, error_detail AS detail, key_prefix
+       FROM operations
+       WHERE operation_type = 'audit_upload' AND created_at >= datetime('now', ?)
+       ORDER BY created_at DESC, id DESC LIMIT 20`,
+    )
+    .all(`-${days} days`) as Array<{
+    at: string;
+    detail: string | null;
+    key_prefix: string | null;
+  }>;
+  // Which of the keys that uploaded are ours: resolved in code with the one
+  // rule every other reader uses (isInternalEmail), not with the SQL function
+  // some connections register and others do not.
+  const prefixes = [
+    ...new Set(uploadRows.map((r) => r.key_prefix).filter((p): p is string => !!p)),
+  ];
+  const emailOf = new Map<string, string>();
+  if (prefixes.length) {
+    const rows = db
+      .prepare(
+        `SELECT key_prefix, email FROM api_keys WHERE key_prefix IN (${prefixes.map(() => '?').join(',')})`,
+      )
+      .all(...prefixes) as Array<{ key_prefix: string; email: string }>;
+    for (const r of rows) emailOf.set(r.key_prefix, r.email);
+  }
+  const recentUploads = uploadRows.map((r) => {
+    // recordOperation keeps the first twelve characters of "<rows> rows, tier
+    // <tier>", so the row count survives and the tier usually does not.
+    const m = /^(\d+) rows(?:, tier (\S+))?/.exec(r.detail ?? '');
+    return {
+      at: r.at,
+      rows: m ? Number(m[1]) : null,
+      tier: m?.[2] ?? null,
+      key_prefix: r.key_prefix,
+      internal: r.key_prefix ? isInternalEmail(emailOf.get(r.key_prefix)) : false,
+    };
+  });
+  const recentSales = db
+    .prepare(
+      `SELECT paid_at, rows, tier, price_chf FROM audit_sales WHERE paid_at >= datetime('now', ?)
+       ORDER BY paid_at DESC LIMIT 20`,
+    )
+    .all(`-${days} days`) as AuditStats['recent_sales'];
   return {
     period_days: days,
     since,
@@ -254,5 +315,7 @@ export function auditStats(days: number): AuditStats {
     revenue_chf: sales.chf,
     last_sale_at: sales.last,
     conversion: uploads > 0 ? Math.round((sales.n / uploads) * 1000) / 1000 : null,
+    recent_uploads: recentUploads,
+    recent_sales: recentSales,
   };
 }

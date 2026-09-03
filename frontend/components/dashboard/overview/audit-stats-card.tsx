@@ -23,6 +23,22 @@ export async function AuditStatsCard({ statsPromise, locale }: { statsPromise: P
           <div><dt className="text-[var(--fg-5)]">{t('fresh.audit.revenue')}</dt><dd className="font-mono text-lg">{data.revenue_chf}</dd></div>
           <div><dt className="text-[var(--fg-5)]">{t('fresh.audit.conversion')}</dt><dd className="font-mono text-lg">{data.conversion === null ? '–' : `${Math.round(data.conversion * 100)} %`}</dd></div>
           {last ? <div className="col-span-2 text-[12px] text-[var(--fg-5)]">{t('fresh.audit.lastSale')} : {last}</div> : null}
+          {data.recent_uploads && data.recent_uploads.length > 0 ? (
+            <div className="col-span-2 mt-1">
+              <p className="text-[11px] text-[var(--fg-5)]">{t('fresh.audit.recent')}</p>
+              <ul className="mt-0.5 flex flex-col gap-0.5 text-[11px] text-[var(--fg-4)]">
+                {data.recent_uploads.slice(0, 6).map((u) => (
+                  <li key={`${u.at}-${u.key_prefix ?? ''}`} className="font-mono">
+                    {new Date(`${u.at.replace(' ', 'T')}Z`).toLocaleString(locale, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Zurich' })}
+                    {' · '}
+                    {u.rows === null ? t('fresh.audit.rowsUnknown') : t('fresh.audit.rows', { rows: u.rows })}
+                    {' · '}
+                    {u.internal ? t('fresh.audit.internal') : u.key_prefix ? t('fresh.audit.withKey', { key: u.key_prefix }) : t('fresh.audit.noKey')}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
         </dl>
       )}
     </div>

@@ -636,7 +636,13 @@
           "revenue": "CHF",
           "conversion": "conversion",
           "lastSale": "last sale",
-          "empty": "No file uploaded yet."
+          "empty": "No file uploaded yet.",
+          "recent": "the uploads, newest first",
+          "rows": "{rows} rows",
+          "rowsUnknown": "size unknown",
+          "internal": "internal key (test)",
+          "withKey": "key {key}",
+          "noKey": "no key (public page)"
         }
       },
       "details": {
