@@ -41,7 +41,9 @@
       "account": "Votre clé",
       "sources": "Sources et permissions",
       "audit": "Audit de fichier",
-      "sheets": "Google Sheets"
+      "sheets": "Google Sheets",
+      "blz": "BLZ allemandes",
+      "iid": "IID suisses"
     },
     "copyright": "© {year} IBANforge.",
     "dataLine": "Données : GLEIF · Quelle: Deutsche Bundesbank · SIX · EBA · NBP · SwiftCodes/MIT · Bank of England (List of Banks, 2026-08) — mensuel · OFAC · UN · UE · EPC — hebdomadaire"
@@ -1871,6 +1873,90 @@
       "privacy": "Rien ne sort de la feuille sauf les chaînes IBAN que les fonctions reçoivent ; la clé reste dans vos propres propriétés de script, jamais dans la feuille.",
       "privacyLink": "Politique de confidentialité",
       "limits": "IBANforge n'est pas un service de Verification of Payee et n'affirme jamais qu'un compte appartient à une personne : il dit ce que les registres savent de la banque derrière l'IBAN."
+    }
+  },
+  "registers": {
+    "common": {
+      "apiTitle": "Ce que l'API répond pour ce code",
+      "apiText": "Le bloc ci-dessous est la réponse de la route elle-même, produite par le code qui sert api.ibanforge.com, sur le registre à la date indiquée. Rien n'est retouché.",
+      "exampleTitle": "Structure de l'IBAN avec ce code",
+      "exampleNote": "Exemple synthétique : la partie compte est un espace réservé, cet IBAN n'appartient à personne. Il montre où le code se place dans l'IBAN.",
+      "relatedTitle": "Autres codes du même établissement",
+      "ctaCheck": "Contrôler un IBAN dans le playground",
+      "ctaAudit": "Auditer un fichier de créanciers entier",
+      "sourceLabel": "Source",
+      "asOfLabel": "registre au",
+      "notFound": "Ce code n'est pas dans le registre que nous tenons.",
+      "searchLabel": "Chercher un code",
+      "searchButton": "Ouvrir",
+      "batchNote": "La liste ci-dessous est le premier lot, les codes qu'on cherche le plus. Chaque autre code du registre a aussi sa page : tapez-le ci-dessus."
+    },
+    "blz": {
+      "metaTitle": "Bankleitzahl {blz} : {name}, {town}",
+      "metaDescription": "BLZ {blz} au registre de la Deutsche Bundesbank : {name} à {town}, BIC {bic}. Statut, code successeur, structure de l'IBAN, portée SEPA et la réponse exacte de l'API IBANforge.",
+      "eyebrow": "Registre de la Deutsche Bundesbank",
+      "title": "Bankleitzahl {blz}",
+      "subtitle": "{name}, {town}",
+      "facts": {
+        "blz": "Bankleitzahl",
+        "bank": "Établissement",
+        "shortName": "Nom court",
+        "bic": "BIC",
+        "postCode": "Code postal",
+        "town": "Localité",
+        "status": "Statut",
+        "active": "actif",
+        "retired": "marqué pour suppression",
+        "successor": "BLZ successeur",
+        "none": "aucun"
+      },
+      "structure": "Un IBAN allemand, c'est DE, deux chiffres de contrôle, la Bankleitzahl à huit chiffres, puis le numéro de compte à dix chiffres. La BLZ est ce que le registre peut garantir ; le numéro de compte, seule la banque le connaît.",
+      "indexTitle": "Codes bancaires allemands (Bankleitzahlen)",
+      "indexIntro": "Chaque BLZ du registre de la Deutsche Bundesbank, avec l'établissement qu'elle nomme, le BIC apparié, son statut et la réponse exacte de l'API IBANforge. Rafraîchi chaque mois avec le registre."
+    },
+    "iid": {
+      "metaTitle": "IID {iid} (numéro de clearing) : {name}, {town}",
+      "metaDescription": "Numéro de clearing suisse {iid} au SIX BankMaster : {name} à {town}, BIC {bic}. Services de paiement, QR-IID, structure de l'IBAN et la réponse exacte de l'API IBANforge.",
+      "eyebrow": "SIX BankMaster",
+      "title": "IID {iid}",
+      "subtitle": "{name}, {town}",
+      "facts": {
+        "iid": "IID / numéro de clearing",
+        "institution": "Établissement",
+        "type": "Type d'établissement",
+        "iidType": "Type d'IID",
+        "headquarters": "IID du siège",
+        "address": "Siège",
+        "bic": "BIC",
+        "services": "Services de paiement",
+        "sicIid": "IID SIC",
+        "qrIid": "QR-IID",
+        "validOn": "Valable au",
+        "none": "aucun"
+      },
+      "types": {
+        "bank": "banque",
+        "cantonal_bank": "banque cantonale",
+        "postfinance": "PostFinance",
+        "raiffeisen": "Raiffeisen",
+        "central_bank": "banque centrale",
+        "foreign_participant": "participant étranger",
+        "headquarters": "siège",
+        "branch": "succursale",
+        "other": "autre"
+      },
+      "services": {
+        "sic": "SIC",
+        "rtgs_chf": "RTGS CHF",
+        "instant_payments_chf": "Instant Payments CHF",
+        "eurosic": "euroSIC",
+        "lsv_bdd_chf": "LSV+/BDD CHF",
+        "lsv_bdd_eur": "LSV+/BDD EUR"
+      },
+      "structure": "Un IBAN suisse, c'est CH, deux chiffres de contrôle, l'IID à cinq chiffres, puis une partie compte à douze chiffres. Quand l'établissement détient un QR-IID, le QR-IBAN d'une QR-facture porte ce numéro à la même place.",
+      "qrNote": "QR-IID {qr} : un QR-IBAN avec ce numéro attend une référence QRR sur la QR-facture.",
+      "indexTitle": "Numéros de clearing suisses (IID / BC-Nummer)",
+      "indexIntro": "Chaque IID du SIX BankMaster avec sa page : établissement, siège, BIC, participation aux rails de paiement, QR-IID et la réponse exacte de l'API IBANforge. Rafraîchi avec le registre."
     }
   }
 }

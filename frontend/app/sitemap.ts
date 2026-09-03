@@ -1,4 +1,5 @@
 import { MetadataRoute } from "next";
+import { chIidFile, deBlzFile } from "@/lib/registers";
 import { getAllDocs } from "@/lib/mdx";
 import { getAllPosts } from "@/lib/blog";
 import { routing } from "@/i18n/routing";
@@ -18,6 +19,19 @@ const BASE_URL = "https://ibanforge.com";
 export default function sitemap(): MetadataRoute.Sitemap {
   const entries: MetadataRoute.Sitemap = [];
 
+  // Register pages, first batch only (see scripts/export-register-pages.ts in
+  // the API repository): every German head-office BLZ in German, every Swiss
+  // headquarters IID in German and French. The other codes have pages too,
+  // rendered on demand, and join the list once this batch has shown its worth.
+  for (const blz of deBlzFile().batch1) {
+    entries.push({ url: `${BASE_URL}/de/blz/${blz}`, changeFrequency: "monthly", priority: 0.5 });
+  }
+  for (const iid of chIidFile().batch1) {
+    for (const locale of ["de", "fr"]) {
+      entries.push({ url: `${BASE_URL}/${locale}/iid/${iid}`, changeFrequency: "monthly", priority: 0.5 });
+    }
+  }
+
   for (const locale of routing.locales) {
     const prefix = `${BASE_URL}/${locale}`;
 
@@ -32,6 +46,8 @@ export default function sitemap(): MetadataRoute.Sitemap {
       { url: `${prefix}/tools/test-iban`, changeFrequency: "monthly", priority: 0.8 },
       { url: `${prefix}/tools/qr-bill`, changeFrequency: "monthly", priority: 0.8 },
       { url: `${prefix}/sheets`, changeFrequency: "monthly", priority: 0.8 },
+      { url: `${prefix}/blz`, changeFrequency: "monthly", priority: 0.7 },
+      { url: `${prefix}/iid`, changeFrequency: "monthly", priority: 0.7 },
       { url: `${prefix}/playground`, changeFrequency: "monthly", priority: 0.9 },
       { url: `${prefix}/docs`, changeFrequency: "weekly", priority: 0.8 },
       { url: `${prefix}/pricing`, changeFrequency: "monthly", priority: 0.7 },
