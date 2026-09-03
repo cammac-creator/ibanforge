@@ -1,5 +1,5 @@
 ---
-title: "Recettes : valider un IBAN en Python, Node, PHP, Sheets, n8n"
+title: "Recettes : valider un IBAN en Python, Node, PHP, Sheets, n8n, Odoo"
 description: "Recettes prêtes à copier pour valider un IBAN et identifier la banque émettrice en Python, Node.js/TypeScript, PHP, Google Sheets, n8n et agents IA (MCP) — avec la note honnête sur ce qu'une somme de contrôle seule ne peut pas dire."
 order: 12
 ---
@@ -113,6 +113,16 @@ Settings → Community nodes → Install → n8n-nodes-ibanforge
 ```
 
 Auto-hébergé : `npm install n8n-nodes-ibanforge`. (Les nodes communautaires non vérifiés tournent en auto-hébergé ; le listing vérifié pour n8n Cloud est en cours.)
+
+## Odoo
+
+Un module Odoo 18 (AGPL-3) remplit le BIC et le nom de la banque sur un compte bancaire de partenaire dès qu'un IBAN est saisi, et crée ou réutilise la fiche banque correspondante. Il n'est pas encore sur l'Odoo Apps store ; installez-le depuis le dépôt, à la racine de la branche qui porte le nom de la version d'Odoo :
+
+```
+git clone -b 18.0 https://github.com/cammac-creator/ibanforge-odoo.git addons/ibanforge_bank_autofill
+```
+
+Mettez à jour la liste des applications, installez **IBANforge bank autofill**, puis ouvrez Configuration → IBANforge et collez votre clé API. Sans clé, le module reste hors ligne et Odoo se comporte exactement comme d'origine. Le [README](https://github.com/cammac-creator/ibanforge-odoo#readme) décrit le badge SEPA et risque, et ce que le module ajoute par rapport à Odoo natif et au module OCA.
 
 ## Agents IA (MCP)
 
