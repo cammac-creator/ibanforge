@@ -128,6 +128,7 @@ export function ReplySheet({
   open,
   onOpenChange,
   onDirtyChange,
+  onNext,
 }: {
   contact: Contact;
   /**
@@ -159,6 +160,8 @@ export function ReplySheet({
    * nothing more: the text stays here, and no draft is persisted per contact.
    */
   onDirtyChange?: (dirty: boolean) => void;
+  /** Opens the next file of the list; offered on the line that says « envoyé ». */
+  onNext?: () => void;
 }) {
   const router = useRouter();
   /**
@@ -475,9 +478,21 @@ export function ReplySheet({
   const note = msg && (
     <p
       role={msg.bad ? 'alert' : 'status'}
-      className={`mt-2 shrink-0 text-[12px] ${msg.bad ? 'text-red-400' : 'text-[var(--fg-2)]'}`}
+      className={`mt-2 shrink-0 text-[12.5px] ${msg.bad ? 'text-red-400' : 'text-[var(--fg-2)]'}`}
     >
       {msg.text}
+      {!msg.bad && msg.text.startsWith('✅') && onNext && (
+        <>
+          {' '}
+          <button
+            type="button"
+            onClick={onNext}
+            className="ml-1 rounded border border-emerald-500/50 px-2 py-0.5 text-[12px] font-medium text-emerald-300 hover:bg-emerald-500/10"
+          >
+            Suivant ▶
+          </button>
+        </>
+      )}
     </p>
   );
 
@@ -603,6 +618,14 @@ export function ReplySheet({
           autoFocus
           value={body}
           onChange={(e) => setBody(e.target.value)}
+          // ⌘⏎ / Ctrl+⏎ sends under the same guard as the button: a mail leaves
+          // without the hand leaving the keyboard, never past a block.
+          onKeyDown={(e) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && canSend) {
+              e.preventDefault();
+              void send();
+            }
+          }}
           // A floor, not a height: the effect above sizes the field to its
           // content, so `resize-none overflow-hidden` below is what removes the
           // inner scrollbar rather than what hides text.

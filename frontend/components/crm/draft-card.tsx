@@ -285,6 +285,14 @@ export function DraftCard({
             ref={bodyRef}
             value={body}
             onChange={(e) => setBody(e.target.value)}
+            // ⌘⏎ / Ctrl+⏎ sends under the same guard as the button: a mail leaves
+            // without the hand leaving the keyboard, never past a block.
+            onKeyDown={(e) => {
+              if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && sendable && busy === false) {
+                e.preventDefault();
+                void send();
+              }
+            }}
             rows={6}
             aria-label="Corps du brouillon"
             // Sized to its content, as the reply sheet is: a fixed ten rows

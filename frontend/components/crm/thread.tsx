@@ -32,7 +32,16 @@ const LANG_LABEL: Record<string, string> = {
   hu: 'hongrois',
 };
 
-function Bubble({ m, counterpartLabel }: { m: Message; counterpartLabel?: string }) {
+function Bubble({
+  m,
+  counterpartLabel,
+  lastInbound = false,
+}: {
+  m: Message;
+  counterpartLabel?: string;
+  /** The newest message the contact wrote: where the panel lands on opening. */
+  lastInbound?: boolean;
+}) {
   const [showQuoted, setShowQuoted] = useState(false);
   const [showOriginal, setShowOriginal] = useState(false);
 
@@ -71,7 +80,10 @@ function Bubble({ m, counterpartLabel }: { m: Message; counterpartLabel?: string
   const stamp = formatStamp(m.msg_date);
 
   return (
-    <div className={mine ? 'flex justify-end' : 'flex justify-start'}>
+    <div
+      className={mine ? 'flex justify-end' : 'flex justify-start'}
+      data-last-inbound={lastInbound ? '' : undefined}
+    >
       <div
         className={[
           // wrap-anywhere is load-bearing, not cosmetic. Mail bodies carry long
@@ -271,6 +283,13 @@ function ThreadBody({
 
   let lastDay: string | null = null;
   const withSeparators: ReactNode[] = [];
+  let lastInboundIndex = -1;
+  for (let i = shown.length - 1; i >= 0; i -= 1) {
+    if (shown[i].direction === 'in') {
+      lastInboundIndex = i;
+      break;
+    }
+  }
   for (let i = 0; i < shown.length; i += 1) {
     const m = shown[i];
     const day = dayLabel(m.msg_date);
@@ -285,7 +304,12 @@ function ThreadBody({
       );
     }
     withSeparators.push(
-      <Bubble key={m.id ?? `m-${i}`} m={m} counterpartLabel={counterpartLabel} />,
+      <Bubble
+        key={m.id ?? `m-${i}`}
+        m={m}
+        counterpartLabel={counterpartLabel}
+        lastInbound={i === lastInboundIndex}
+      />,
     );
   }
 

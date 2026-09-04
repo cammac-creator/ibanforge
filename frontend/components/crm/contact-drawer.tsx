@@ -49,12 +49,15 @@ export function ContactDrawer({
   open,
   label,
   onClose,
+  nav,
   children,
 }: {
   open: boolean;
   /** What the dialog is called, for a screen reader. */
   label: string;
   onClose: (reason: CloseReason) => void;
+  /** Position in the list the drawer was opened from, with the two moves. */
+  nav?: { index: number; total: number; onPrev?: () => void; onNext?: () => void };
   children: React.ReactNode;
 }) {
   const panel = useRef<HTMLElement>(null);
@@ -143,15 +146,47 @@ export function ContactDrawer({
         change with it.
       */}
       <div className="relative flex h-full min-w-0 flex-col p-4">
-        <button
-          ref={closeButton}
-          type="button"
-          onClick={() => onClose('button')}
-          aria-label="Fermer la fiche"
-          className="absolute right-3 top-3 z-20 rounded-md border border-[var(--ink-5)] bg-[var(--ink-2)] px-2 py-0.5 text-[13px] text-[var(--fg-3)] transition-colors hover:border-[var(--fg-4)] hover:text-[var(--fg-1)]"
-        >
-          ✕
-        </button>
+        <div className="absolute right-3 top-3 z-20 flex items-center gap-1.5">
+          {/* Walking the list from inside the drawer: five answers become one
+              sequence instead of five returns to the table. j / k do the same
+              from the keyboard when no field has the focus. */}
+          {nav && nav.total > 0 && (
+            <span className="flex items-center gap-1 rounded-md border border-[var(--ink-5)] bg-[var(--ink-2)] text-[12px] text-[var(--fg-3)]">
+              <button
+                type="button"
+                onClick={nav.onPrev}
+                disabled={!nav.onPrev}
+                aria-label="Fiche précédente (k)"
+                title="Fiche précédente (k)"
+                className="px-1.5 py-0.5 hover:text-[var(--fg-1)] disabled:opacity-30"
+              >
+                ◀
+              </button>
+              <span className="tabular-nums" aria-live="polite">
+                {nav.index + 1}/{nav.total}
+              </span>
+              <button
+                type="button"
+                onClick={nav.onNext}
+                disabled={!nav.onNext}
+                aria-label="Fiche suivante (j)"
+                title="Fiche suivante (j)"
+                className="px-1.5 py-0.5 hover:text-[var(--fg-1)] disabled:opacity-30"
+              >
+                ▶
+              </button>
+            </span>
+          )}
+          <button
+            ref={closeButton}
+            type="button"
+            onClick={() => onClose('button')}
+            aria-label="Fermer la fiche"
+            className="rounded-md border border-[var(--ink-5)] bg-[var(--ink-2)] px-2 py-0.5 text-[13px] text-[var(--fg-3)] transition-colors hover:border-[var(--fg-4)] hover:text-[var(--fg-1)]"
+          >
+            ✕
+          </button>
+        </div>
         {children}
       </div>
     </aside>

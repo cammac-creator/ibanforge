@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   type MailFilterKey,
@@ -204,11 +204,14 @@ export function ContactTable({
   input,
   selectedId,
   onSelect,
+  onRowsChange,
   initialSelection,
 }: {
   input: RowsInput;
   selectedId: string | null;
   onSelect: (id: string, trigger?: HTMLElement | null) => void;
+  /** The rows as ordered and filtered here, so the drawer can offer « suivant ». */
+  onRowsChange?: (ids: string[]) => void;
   /** Deep-linked landing selection (e.g. the Prospects nav entry). */
   initialSelection?: RowSelection;
 }) {
@@ -231,6 +234,9 @@ export function ContactTable({
   // keystroke and every hover-driven busy flip; without the memo the whole
   // table would be rebuilt to redraw one highlighted row.
   const rows = useMemo(() => searchRows(selectedRows(input, selection), q), [input, selection, q]);
+  useEffect(() => {
+    onRowsChange?.(rows.map((r) => r.id));
+  }, [rows, onRowsChange]);
 
   // Touch swipe: left = snooze (needs a prospect row), right = mark read
   // (needs an unread thread). 64px of travel commits; less snaps back. Held
