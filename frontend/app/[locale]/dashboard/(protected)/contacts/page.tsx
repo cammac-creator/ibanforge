@@ -101,6 +101,9 @@ export default async function ContactsPage() {
         snoozed={snoozed}
         woke={woke}
         sentToday={sentToday}
+        todayIso={new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Zurich' }).format(
+          new Date(),
+        )}
       />
 
       {/* The standing sender rules, listable after the fact — the undo that

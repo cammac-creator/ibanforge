@@ -133,7 +133,9 @@ export function ContactDrawer({
         // written, and at 460 the composer was "trop petite pour travailler
         // agréablement" (owner, 28/08). Still a drawer, the table stays visible
         // beside it on a desktop; 94% keeps a sliver of context on tablets.
-        'shadow-[-18px_0_44px_rgba(0,0,0,0.5)] sm:w-[min(640px,94%)]',
+        // Past 1280px the reading surface widens: a long letter from an authority
+        // fits without scrolling, and the table still shows its useful columns.
+        'shadow-[-18px_0_44px_rgba(0,0,0,0.5)] sm:w-[min(640px,94%)] xl:w-[min(820px,60%)]',
         'transition-transform duration-[220ms] ease-out motion-reduce:transition-none',
         open ? 'translate-x-0' : 'pointer-events-none translate-x-full',
       ].join(' ')}

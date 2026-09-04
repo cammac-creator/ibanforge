@@ -233,7 +233,41 @@ export function ContactTable({
   // a search haystack per contact, and this component re-renders on every
   // keystroke and every hover-driven busy flip; without the memo the whole
   // table would be rebuilt to redraw one highlighted row.
-  const rows = useMemo(() => searchRows(selectedRows(input, selection), q), [input, selection, q]);
+  const liveRows = useMemo(
+    () => searchRows(selectedRows(input, selection), q),
+    [input, selection, q],
+  );
+
+  // While a file is open, the order and the shelves are frozen as they were
+  // when it was opened. Reading a row clears its unread mark, which used to
+  // re-sort it and move it from « urgent » to the freshest shelf under the
+  // cursor, so the row one came from was never where one left it. Membership
+  // is NOT frozen: a row that leaves the filter (an answer sent) still
+  // disappears, and that disappearance stays the confirmation the gesture
+  // gives. Released when the file closes or the selection or the query moves.
+  const frozen = useRef<{
+    key: string;
+    order: Map<string, number>;
+    group: Map<string, MailRow['group']>;
+  } | null>(null);
+  const freezeKey = `${JSON.stringify(selection)}|${q}`;
+  if (selectedId === null) frozen.current = null;
+  else if (!frozen.current || frozen.current.key !== freezeKey) {
+    frozen.current = {
+      key: freezeKey,
+      order: new Map(liveRows.map((r, i) => [r.id, i])),
+      group: new Map(liveRows.map((r) => [r.id, r.group])),
+    };
+  }
+  const rows = useMemo(() => {
+    const f = frozen.current;
+    if (!f) return liveRows;
+    return [...liveRows]
+      .sort((a, b) => (f.order.get(a.id) ?? Infinity) - (f.order.get(b.id) ?? Infinity))
+      .map((r) => (f.group.has(r.id) ? { ...r, group: f.group.get(r.id) ?? null } : r));
+    // frozen is a ref updated above, on purpose outside React's dependency tracking
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [liveRows, selectedId, freezeKey]);
   useEffect(() => {
     onRowsChange?.(rows.map((r) => r.id));
   }, [rows, onRowsChange]);

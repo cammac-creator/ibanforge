@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatDay, formatStamp } from './format';
+import { dayLabel, formatDay, formatStamp } from './format';
 
 describe('formatStamp', () => {
   it('renders day, month and time from the stored shape', () => {
@@ -45,5 +45,20 @@ describe('formatDay', () => {
   it('behaves like formatStamp on missing and unrecognised values', () => {
     expect(formatDay(null)).toBeNull();
     expect(formatDay('Jan 5, 2026')).toBe('Jan 5, 2026');
+  });
+});
+
+describe('dayLabel — the shelf between two days, decided against one clock', () => {
+  it('names today, yesterday, and a weekday with its month', () => {
+    expect(dayLabel('2026-09-04 10:15', '2026-09-04')).toBe('aujourd’hui');
+    expect(dayLabel('2026-09-03T22:15:00Z', '2026-09-04')).toBe('hier');
+    expect(dayLabel('2026-08-17 09:26', '2026-09-04')).toBe('lundi 17 août');
+  });
+  it('adds the year when it is not this one', () => {
+    expect(dayLabel('2025-08-17 09:26', '2026-09-04')).toBe('dimanche 17 août 2025');
+  });
+  it('answers nothing on an undatable stamp', () => {
+    expect(dayLabel('date inconnue', '2026-09-04')).toBeNull();
+    expect(dayLabel(null, '2026-09-04')).toBeNull();
   });
 });

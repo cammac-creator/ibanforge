@@ -91,8 +91,11 @@ export function CrmApp({
   snoozed,
   woke = {},
   sentToday,
+  todayIso,
 }: {
   contacts: Contact[];
+  /** The page's day in Zurich, YYYY-MM-DD: the one clock every date label reads. */
+  todayIso: string;
   /** Keyed by Contact.id, one entry per contact, built by the page. */
   situations: Record<string, Situation>;
   /**
@@ -508,6 +511,7 @@ export function CrmApp({
               <ContactDetail contact={shown} situation={situation} woke={woke[shown.id]} />
               <Thread
                 messages={shown.messages}
+                todayIso={todayIso}
                 // Without this the contact's bubbles are labelled 'lui'. An
                 // address-less prospect has neither, so the fallback stands.
                 counterpartLabel={shown.company || shown.email || undefined}

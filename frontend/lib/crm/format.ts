@@ -59,3 +59,45 @@ export function formatDay(raw: string | null | undefined): string | null {
   if (!p) return raw;
   return `${p.day}/${p.month}`;
 }
+
+const DAY_NAMES = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
+const MONTH_NAMES = [
+  'janvier',
+  'février',
+  'mars',
+  'avril',
+  'mai',
+  'juin',
+  'juillet',
+  'août',
+  'septembre',
+  'octobre',
+  'novembre',
+  'décembre',
+];
+
+/**
+ * « aujourd’hui », « hier », or « lundi 17 août » — the shelf between two days
+ * of a thread, with the year when it is not this one.
+ *
+ * String work against a day the PAGE decided, never `new Date()` or
+ * `toLocaleDateString`: the thread is rendered on the server and hydrated in
+ * a browser two time zones away, and the old version read the same stamp in
+ * UTC on one branch and local time on the other, so an intercalary could sit
+ * on a different day on each side. The weekday comes from UTC arithmetic on
+ * the parsed digits, which is the same on both.
+ */
+export function dayLabel(raw: string | null | undefined, todayIso: string): string | null {
+  if (!raw) return null;
+  const m = STAMP.exec(raw);
+  const t = STAMP.exec(todayIso);
+  if (!m || !t) return null;
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  const [ty, tmo, td] = [Number(t[1]), Number(t[2]), Number(t[3])];
+  const gap = Math.round((Date.UTC(ty, tmo - 1, td) - Date.UTC(y, mo - 1, d)) / 86_400_000);
+  if (gap === 0) return 'aujourd’hui';
+  if (gap === 1) return 'hier';
+  const weekday = DAY_NAMES[new Date(Date.UTC(y, mo - 1, d)).getUTCDay()];
+  const month = MONTH_NAMES[mo - 1] ?? m[2];
+  return `${weekday} ${d} ${month}${y !== ty ? ` ${y}` : ''}`;
+}

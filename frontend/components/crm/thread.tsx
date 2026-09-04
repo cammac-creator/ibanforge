@@ -2,7 +2,7 @@
 
 import { useState, type ReactNode } from 'react';
 import { isAutomated } from '@/lib/crm/automated';
-import { formatStamp } from '@/lib/crm/format';
+import { dayLabel, formatStamp } from '@/lib/crm/format';
 import { splitQuoted } from '@/lib/crm/quoted';
 import type { Message } from '@/lib/crm/types';
 
@@ -215,18 +215,6 @@ function Bubble({
  * plain node, so a Server Component can be passed straight through this client
  * boundary.
  */
-/** "aujourd'hui", "hier", or "lundi 11 août" — the shelf between two days. */
-function dayLabel(sqlDate: string | null | undefined): string | null {
-  if (!sqlDate) return null;
-  const d = new Date(sqlDate.includes('T') ? sqlDate : `${sqlDate.replace(' ', 'T')}Z`);
-  if (Number.isNaN(d.getTime())) return null;
-  const today = new Date();
-  const startOf = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
-  const gap = Math.round((startOf(today) - startOf(d)) / 86_400_000);
-  if (gap === 0) return 'aujourd’hui';
-  if (gap === 1) return 'hier';
-  return d.toLocaleDateString('fr-CH', { weekday: 'long', day: 'numeric', month: 'long' });
-}
 
 /** Everything older than the last KEEP_RECENT messages folds behind one line. */
 const KEEP_RECENT = 6;
@@ -235,8 +223,11 @@ export function Thread({
   messages,
   counterpartLabel,
   draftSlot,
+  todayIso,
 }: {
   messages: Message[];
+  /** The page's day (Zurich), so « aujourd’hui » is the same word on both sides of hydration. */
+  todayIso: string;
   /**
    * Shown on inbound bubbles in place of 'lui'. The caller holds the Contact;
    * this component does not, and Message carries no display name of its own
@@ -259,7 +250,12 @@ export function Thread({
     );
   }
   return (
-    <ThreadBody messages={messages} counterpartLabel={counterpartLabel} draftSlot={draftSlot} />
+    <ThreadBody
+      messages={messages}
+      counterpartLabel={counterpartLabel}
+      draftSlot={draftSlot}
+      todayIso={todayIso}
+    />
   );
 }
 
@@ -267,10 +263,12 @@ function ThreadBody({
   messages,
   counterpartLabel,
   draftSlot,
+  todayIso,
 }: {
   messages: Message[];
   counterpartLabel?: string;
   draftSlot?: ReactNode;
+  todayIso: string;
 }) {
   // Folded by default past KEEP_RECENT: reopening a long thread should cost a
   // glance. State lives here so switching contacts re-folds naturally (the
@@ -292,7 +290,7 @@ function ThreadBody({
   }
   for (let i = 0; i < shown.length; i += 1) {
     const m = shown[i];
-    const day = dayLabel(m.msg_date);
+    const day = dayLabel(m.msg_date, todayIso);
     if (day && day !== lastDay) {
       lastDay = day;
       withSeparators.push(
@@ -324,8 +322,8 @@ function ThreadBody({
           ▸ {hidden.length} message{hidden.length > 1 ? 's' : ''} précédent
           {hidden.length > 1 ? 's' : ''}
           {(() => {
-            const from = dayLabel(hidden[0]?.msg_date);
-            const to = dayLabel(hidden.at(-1)?.msg_date);
+            const from = dayLabel(hidden[0]?.msg_date, todayIso);
+            const to = dayLabel(hidden.at(-1)?.msg_date, todayIso);
             return from && to ? ` (${from} → ${to})` : '';
           })()}
         </button>
