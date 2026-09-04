@@ -827,25 +827,29 @@
   }
 }
 
-/* ── Film / stations (static default: stacked readable blocks) ── */
+/* ── Film / stations (static default: stacked readable blocks) ──
+   One `.pin` holds the four `.st`; without JS or with reduced motion they
+   are plain stacked blocks. The motion layer below turns the section into a
+   scroll track and the pin into a single sticky screen. */
 .forge .film {
   position: relative;
   border-top: 1px solid var(--fst-2);
 }
-.forge .rail {
+.forge .rail,
+.forge .film-dots {
   display: none;
 }
-.forge .st {
-  position: relative;
-  border-bottom: 1px solid var(--fst-2);
-}
 .forge .pin {
+  position: relative;
+}
+.forge .st {
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: clamp(3rem, 9vh, 6rem) 0;
   overflow: hidden;
+  border-bottom: 1px solid var(--fst-2);
 }
 .forge .scene {
   position: absolute;
@@ -1157,6 +1161,10 @@
 }
 .forge .json-out .n {
   color: var(--fquench);
+}
+.forge .json-out .jl {
+  display: block;
+  white-space: pre;
 }
 
 /* ── Bands after the film ── */
@@ -1557,28 +1565,89 @@
 
 /* ── Motion layer: ONLY with JS + motion allowed ── */
 @media (prefers-reduced-motion: no-preference) {
+  /* The timeline: four stations of --film-s each on ONE sticky screen. The
+     section is the scroll track (plus the pin's own height, so the last
+     station holds until the pin unpins); every pixel of it drives a beat.
+     Rebuilt 2026-09-04 evening: one pin per station left each one sliding
+     away finished over a dead viewport, which read as "played backwards". */
   html.js .forge .film {
+    --film-s: 115vh;
+    height: calc(4 * var(--film-s) + 100svh);
     border-top-color: transparent;
   }
-  html.js .forge .st {
-    border-bottom-color: transparent;
-  }
-  /* Audit 2026-09-04 (L2): 190vh × 5 was 60 % of the page. 140vh keeps a
-     40vh scrub per station, enough for every beat to land and be read. */
-  html.js .forge .st {
-    height: 140vh;
+  @media (max-width: 720px) {
+    html.js .forge .film {
+      --film-s: 105vh;
+    }
   }
   html.js .forge .pin {
     position: sticky;
     top: 0;
     height: 100vh;
     height: 100svh;
+    overflow: hidden;
+  }
+  html.js .forge .st {
+    position: absolute;
+    inset: 0;
+    padding: 0;
+    border-bottom: 0;
+    opacity: 0;
+    visibility: hidden;
+    will-change: opacity, transform;
+  }
+  html.js .forge .st.live {
+    visibility: visible;
+  }
+  html.js .forge .st:first-of-type {
+    opacity: 1;
+    visibility: visible;
+  }
+  html.js .forge .film-dots {
+    display: flex;
+    position: absolute;
+    z-index: 4;
+    left: 50%;
+    bottom: clamp(0.9rem, 2.5vh, 1.6rem);
+    transform: translateX(-50%);
+    gap: 0.55rem;
+    list-style: none;
+    margin: 0;
     padding: 0;
   }
-  @media (max-width: 720px) {
-    html.js .forge .st {
-      height: 130vh;
-    }
+  html.js .forge .film-dots li {
+    width: 26px;
+    height: 3px;
+    border-radius: 2px;
+    background: var(--fst-3);
+    transition:
+      background 0.3s ease,
+      width 0.3s ease,
+      box-shadow 0.3s ease;
+  }
+  html.js .forge .film-dots li.on {
+    width: 46px;
+    background: var(--amber-500);
+    box-shadow: 0 0 10px var(--amber-500);
+  }
+  html.js .forge .json-out .jl {
+    opacity: 0;
+    transform: translateX(-8px);
+    transition:
+      opacity 0.28s ease,
+      transform 0.28s ease;
+  }
+  html.js .forge .json-out .jl.on {
+    opacity: 1;
+    transform: none;
+  }
+  html.js .forge .pill-ok {
+    transition: box-shadow 0.4s ease;
+  }
+  html.js .forge .pill-ok.on {
+    box-shadow:
+      0 0 0 4px rgba(74, 222, 128, 0.18),
+      0 0 24px rgba(74, 222, 128, 0.35);
   }
   html.js .forge .rail {
     display: block;
@@ -1641,7 +1710,7 @@
   html.js .forge .stamp-ok.on {
     transform: scale(1);
   }
-  html.js .forge .pin.shake .st-inner {
+  html.js .forge .st-inner.shake {
     animation: fgShake 0.32s linear;
   }
   html.js .forge .q-row {

@@ -166,7 +166,8 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
               size="lg"
               variant="amber"
               className="px-6"
-              render={<Link href={`/${locale}/playground`} />}
+              nativeButton={false}
+            render={<Link href={`/${locale}/playground`} />}
             >
               {t('hero.cta.tryFree')}
             </Button>
@@ -321,7 +322,7 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
               offer of the page were announced by a negation and a ghost
               button. A full button, centred like the section. */}
           <div className="hero-cta hero-cta-center" style={{ marginTop: '1.4rem' }}>
-            <Button size="lg" variant="amber" className="px-8" render={<Link href={`/${locale}/audit`} />}>
+            <Button size="lg" variant="amber" className="px-8" nativeButton={false} render={<Link href={`/${locale}/audit`} />}>
               {t('audit.cta')}
             </Button>
           </div>
@@ -392,6 +393,7 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
               size="lg"
               variant="outline"
               className="px-8"
+              nativeButton={false}
               render={<Link href={`/${locale}/docs`} />}
             >
               {t('cta.button')}
