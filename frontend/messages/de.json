@@ -547,6 +547,10 @@
         "reader": "Leser fehlgeschlagen (HTTP {status}): das ist kein „nichts“, das ist eine Lesung, die nicht stattgefunden hat.",
         "readerUnreachable": "Leser fehlgeschlagen (API nicht erreichbar): das ist kein „nichts“, das ist eine Lesung, die nicht stattgefunden hat."
       },
+      "traffic": {
+        "title": "Der Verkehr, Tag für Tag",
+        "lead": "wer uns aufruft, und ob es mehr ist als im Zeitraum davor"
+      },
       "money": {
         "title": "Das Geld",
         "lead": "was eingegangen ist, und was verkauft, aber nicht verbraucht wurde",

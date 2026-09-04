@@ -2,11 +2,18 @@ import { describe, expect, it } from 'vitest';
 import {
   KEYLESS_KEYS,
   NATURE_KEYS,
+  type TrafficTrendDay,
+  comparePeriods,
+  deltaPct,
+  fmtInt,
+  isWeekend,
+  movingAverage,
   naturesTotal,
   parseTrafficTrend,
+  shortDay,
   sliceToPeriod,
   summariseTrend,
-  type TrafficTrendDay,
+  trendEvents,
 } from './traffic-trend';
 
 /**
@@ -81,14 +88,20 @@ describe('sliceToPeriod', () => {
   const now = new Date('2026-08-30T11:00:00Z');
 
   it('keeps today and the N-1 days before it, dropping what falls outside', () => {
-    const days = ['2026-08-23', '2026-08-24', '2026-08-29', '2026-08-30'].map((d) => day(d, { browser: 1 }));
+    const days = ['2026-08-23', '2026-08-24', '2026-08-29', '2026-08-30'].map((d) =>
+      day(d, { browser: 1 }),
+    );
     const out = sliceToPeriod(days, 7, now);
     expect(out).toHaveLength(7);
     expect(out[0].date).toBe('2026-08-24');
     expect(out[out.length - 1].date).toBe('2026-08-30');
     // 08-23 is the eighth day back: outside the window, and gone.
     expect(out.some((d) => d.date === '2026-08-23')).toBe(false);
-    expect(out.filter((d) => d.browser === 1).map((d) => d.date)).toEqual(['2026-08-24', '2026-08-29', '2026-08-30']);
+    expect(out.filter((d) => d.browser === 1).map((d) => d.date)).toEqual([
+      '2026-08-24',
+      '2026-08-29',
+      '2026-08-30',
+    ]);
   });
 
   it('draws one bar per calendar day, quiet days at zero', () => {
@@ -96,7 +109,10 @@ describe('sliceToPeriod', () => {
     // equal slot per row it receives, so a sparse series pushes two days ten
     // apart against each other and lets the 404 line slope across a stretch
     // nothing measured. Seven days asked for, seven rows out.
-    const days = [day('2026-08-24', { browser: 5, not_found: 5 }), day('2026-08-30', { browser: 5 })];
+    const days = [
+      day('2026-08-24', { browser: 5, not_found: 5 }),
+      day('2026-08-30', { browser: 5 }),
+    ];
     const out = sliceToPeriod(days, 7, now);
     expect(out.map((d) => d.date)).toEqual([
       '2026-08-24',
@@ -121,7 +137,9 @@ describe('sliceToPeriod', () => {
     // The route omits days with no traffic. Taking the last 7 rows here would
     // reach back to July and label it "7 jours".
     const days = [
-      ...['2026-07-01', '2026-07-02', '2026-07-03', '2026-07-04', '2026-07-05'].map((d) => day(d, { browser: 5 })),
+      ...['2026-07-01', '2026-07-02', '2026-07-03', '2026-07-04', '2026-07-05'].map((d) =>
+        day(d, { browser: 5 }),
+      ),
       day('2026-08-30', { browser: 5 }),
     ];
     const out = sliceToPeriod(days, 7, now);
@@ -158,7 +176,14 @@ describe('sliceToPeriod', () => {
 describe('summariseTrend', () => {
   const days = [
     day('2026-08-28', { with_key: 100, agent: 50, browser: 200, anonymous_api: 10, not_found: 5 }),
-    day('2026-08-29', { with_key: 20, browser: 900, declared_bot: 30, internal: 40, not_found: 800, paywall: 12 }),
+    day('2026-08-29', {
+      with_key: 20,
+      browser: 900,
+      declared_bot: 30,
+      internal: 40,
+      not_found: 800,
+      paywall: 12,
+    }),
     day('2026-08-30', { with_key: 60, agent: 70, browser: 100, server_error: 3 }),
   ];
 
@@ -243,12 +268,16 @@ describe('parseTrafficTrend', () => {
   });
 
   it('drops a row without a date rather than putting it on a nameless tick', () => {
-    const rows = parseTrafficTrend({ days: [{ total: 5 }, null, { date: '', total: 5 }, { date: '2026-08-30' }] });
+    const rows = parseTrafficTrend({
+      days: [{ total: 5 }, null, { date: '', total: 5 }, { date: '2026-08-30' }],
+    });
     expect(rows?.map((r) => r.date)).toEqual(['2026-08-30']);
   });
 
   it('zeroes a field the route renamed instead of drawing NaN', () => {
-    const rows = parseTrafficTrend({ days: [{ date: '2026-08-30', browser: '12', not_found: null }] });
+    const rows = parseTrafficTrend({
+      days: [{ date: '2026-08-30', browser: '12', not_found: null }],
+    });
     expect(rows?.[0]?.browser).toBe(0);
     expect(rows?.[0]?.not_found).toBe(0);
   });
@@ -256,5 +285,63 @@ describe('parseTrafficTrend', () => {
   it('keeps only the calendar day when the route sends a timestamp', () => {
     const rows = parseTrafficTrend({ days: [{ date: '2026-08-30T00:00:00Z', total: 1 }] });
     expect(rows?.[0]?.date).toBe('2026-08-30');
+  });
+});
+
+describe('the readings the premium card adds', () => {
+  const day = (date: string, total: number, not_found = 0): TrafficTrendDay => ({
+    date,
+    total,
+    with_key: total,
+    agent: 0,
+    declared_bot: 0,
+    browser: 0,
+    anonymous_api: 0,
+    internal: 0,
+    not_found,
+    paywall: 0,
+    server_error: 0,
+    distinct_ips: 1,
+  });
+
+  it('formats integers the same way on both sides of hydration', () => {
+    expect(fmtInt(254089)).toBe('254 089');
+    expect(fmtInt(999)).toBe('999');
+    expect(fmtInt(-1200)).toBe('-1 200');
+    expect(shortDay('2026-09-04')).toBe('04.09');
+    expect(isWeekend('2026-09-05')).toBe(true);
+    expect(isWeekend('2026-09-04')).toBe(false);
+  });
+
+  it('averages over a trailing window, aligned on the input', () => {
+    const days = [10, 20, 30, 40].map((t, i) => day(`2026-09-0${i + 1}`, t));
+    expect(movingAverage(days, 2)).toEqual([10, 15, 25, 35]);
+  });
+
+  it('compares a window with the one before it only when the history reaches back', () => {
+    const now = new Date('2026-09-10T12:00:00Z');
+    const days: TrafficTrendDay[] = [];
+    for (let i = 0; i < 20; i++) {
+      const d = new Date(now.getTime() - i * 86_400_000).toISOString().slice(0, 10);
+      days.push(day(d, i < 10 ? 100 : 50));
+    }
+    const c = comparePeriods(days, 7, now);
+    expect(c.previous).not.toBeNull();
+    expect(deltaPct(700, 350)).toBe(100);
+    expect(deltaPct(10, 0)).toBeNull();
+    expect(comparePeriods(days, 30, now).previous).toBeNull();
+  });
+
+  it('names a peak and a sweep, and never today', () => {
+    const days = [
+      day('2026-09-01', 100),
+      day('2026-09-02', 110),
+      day('2026-09-03', 90),
+      day('2026-09-04', 400), // peak
+      day('2026-09-05', 120, 80), // sweep: 80 of 120 are 404
+      day('2026-09-06', 900), // today, partial
+    ];
+    const ev = trendEvents(days, '2026-09-06');
+    expect(ev.map((e) => `${e.date}:${e.kind}`)).toEqual(['2026-09-05:sweep', '2026-09-04:peak']);
   });
 });

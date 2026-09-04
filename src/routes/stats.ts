@@ -334,7 +334,11 @@ stats.get('/stats/traffic-trend', (c) => {
   }
 
   try {
-    const window = readWindow(c.req.query(), 30);
+    // 180 here, twice the ceiling of the other windows: the overview compares
+    // each window with the one before it (30 days against the 30 before), and
+    // a 90-day window needs 180 days of history to say « contre la période
+    // précédente ». Still bounded; the per-day query is the same cost per day.
+    const window = readWindow(c.req.query(), 30, 180);
     if (!window.ok) return c.json({ error: window.error, message: window.message }, 400);
     const days = window.days;
     return c.json({ period_days: days, days: getTrafficTrend(days) });

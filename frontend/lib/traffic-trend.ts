@@ -46,7 +46,12 @@ export const NATURE_KEYS = [
 export type NatureKey = (typeof NATURE_KEYS)[number];
 
 /** The keyless natures: the bot population this tab is actually about. */
-export const KEYLESS_KEYS: readonly NatureKey[] = ['agent', 'declared_bot', 'browser', 'anonymous_api'];
+export const KEYLESS_KEYS: readonly NatureKey[] = [
+  'agent',
+  'declared_bot',
+  'browser',
+  'anonymous_api',
+];
 
 export const TREND_PERIODS = [7, 30, 90] as const;
 export type TrendPeriod = (typeof TREND_PERIODS)[number];
@@ -227,8 +232,7 @@ export function parseTrafficTrend(raw: unknown): TrafficTrendDay[] | null {
 export type TrendFailure = 'no-token' | 'unreachable' | 'http' | 'malformed';
 
 export type TrafficTrendResult =
-  | { ok: true; days: TrafficTrendDay[] }
-  | { ok: false; reason: TrendFailure; status: number };
+  { ok: true; days: TrafficTrendDay[] } | { ok: false; reason: TrendFailure; status: number };
 
 const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 const STATS_TOKEN = process.env.STATS_TOKEN || '';
@@ -253,4 +257,126 @@ export async function fetchTrafficTrend(period = 90): Promise<TrafficTrendResult
   const days = parseTrafficTrend(await r.json().catch(() => null));
   if (days === null) return { ok: false, reason: 'malformed', status: r.status };
   return { ok: true, days };
+}
+
+/* ------------------------------------------------------------------------- */
+/* Reading the trend: what the premium card draws besides the bars.          */
+/* ------------------------------------------------------------------------- */
+
+/** Digits grouped with a narrow no-break space: the same string on the
+ *  server and in the browser, which toLocaleString is not (ICU differs). */
+export function fmtInt(n: number): string {
+  const s = String(Math.round(Math.abs(n)));
+  const grouped = s.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+  return n < 0 ? `-${grouped}` : grouped;
+}
+
+/** DD.MM from a YYYY-MM-DD key, string work only. */
+export function shortDay(date: string): string {
+  return `${date.slice(8, 10)}.${date.slice(5, 7)}`;
+}
+
+/** Saturday or Sunday, decided in UTC from the digits, so both sides agree. */
+export function isWeekend(date: string): boolean {
+  const d = new Date(
+    Date.UTC(Number(date.slice(0, 4)), Number(date.slice(5, 7)) - 1, Number(date.slice(8, 10))),
+  );
+  const w = d.getUTCDay();
+  return w === 0 || w === 6;
+}
+
+/** Trailing moving average of the daily totals over `window` days, aligned on the input. */
+export function movingAverage(days: TrafficTrendDay[], window = 7): number[] {
+  const out: number[] = [];
+  let sum = 0;
+  for (let i = 0; i < days.length; i++) {
+    sum += days[i].total;
+    if (i >= window) sum -= days[i - window].total;
+    out.push(Math.round(sum / Math.min(i + 1, window)));
+  }
+  return out;
+}
+
+/** Percentage change from `previous` to `current`; null when there is nothing to compare to. */
+export function deltaPct(current: number, previous: number | null | undefined): number | null {
+  if (previous === null || previous === undefined || previous <= 0) return null;
+  return Math.round(((current - previous) / previous) * 100);
+}
+
+/**
+ * The window asked for and the one just before it, same length, so every
+ * figure of the card can say « contre la période précédente ». The previous
+ * window is null when the fetched history does not reach back far enough —
+ * a comparison against an empty window would read as +∞ growth.
+ */
+export function comparePeriods(
+  all: TrafficTrendDay[],
+  period: number,
+  now: Date,
+): { current: TrafficTrendDay[]; previous: TrafficTrendDay[] | null } {
+  const current = sliceToPeriod(all, period, now);
+  const earliest = all.reduce<string | null>(
+    (m, d) => (m === null || d.date < m ? d.date : m),
+    null,
+  );
+  const prevEnd = new Date(now.getTime() - period * DAY_MS);
+  const prevFloor = dayKeyUTC(prevEnd.getTime() - (period - 1) * DAY_MS);
+  if (earliest === null || earliest > prevFloor) return { current, previous: null };
+  return { current, previous: sliceToPeriod(all, period, prevEnd) };
+}
+
+function median(values: number[]): number {
+  // Zeros included: most days have no 404 at all, and a median that ignored
+  // them would make every sweep look ordinary.
+  const v = [...values].sort((a, b) => a - b);
+  if (v.length === 0) return 0;
+  const mid = Math.floor(v.length / 2);
+  return v.length % 2 === 1 ? v[mid] : Math.round((v[mid - 1] + v[mid]) / 2);
+}
+
+export interface TrendEvent {
+  date: string;
+  /** A day far above the window's usual volume, or a 404 sweep. */
+  kind: 'peak' | 'sweep';
+  total: number;
+  notFound: number;
+  /** How many times the median the figure reached. */
+  factor: number;
+}
+
+/**
+ * The days worth a sentence: a total past twice the window's median, and a
+ * 404 count past three times the median 404s that also makes up a third of
+ * the day — the signature of a scanner, which is what the red line is for.
+ * Today is left out: a partial day is neither a peak nor a collapse.
+ */
+export function trendEvents(days: TrafficTrendDay[], todayKey: string): TrendEvent[] {
+  const done = days.filter((d) => d.date !== todayKey);
+  const medTotal = median(done.map((d) => d.total));
+  const medNotFound = median(done.map((d) => d.not_found));
+  const out: TrendEvent[] = [];
+  for (const d of done) {
+    const sweep =
+      d.not_found >= Math.max(50, medNotFound * 3) && d.total > 0 && d.not_found / d.total >= 0.3;
+    if (sweep) {
+      out.push({
+        date: d.date,
+        kind: 'sweep',
+        total: d.total,
+        notFound: d.not_found,
+        factor: medNotFound > 0 ? Math.round((d.not_found / medNotFound) * 10) / 10 : 0,
+      });
+      continue;
+    }
+    if (medTotal > 0 && d.total >= medTotal * 2) {
+      out.push({
+        date: d.date,
+        kind: 'peak',
+        total: d.total,
+        notFound: d.not_found,
+        factor: Math.round((d.total / medTotal) * 10) / 10,
+      });
+    }
+  }
+  return out.sort((a, b) => b.date.localeCompare(a.date));
 }

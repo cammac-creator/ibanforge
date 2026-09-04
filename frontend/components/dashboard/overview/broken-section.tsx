@@ -65,7 +65,8 @@ export async function BrokenSection({
 
   const ibanTotal = statsRes.data?.by_type?.iban_validate?.total ?? 0;
   const ibanValid = statsRes.data?.by_type?.iban_validate?.valid_count ?? 0;
-  const successRate = statsRes.ok && ibanTotal > 0 ? ((ibanValid / ibanTotal) * 100).toFixed(1) : null;
+  const successRate =
+    statsRes.ok && ibanTotal > 0 ? ((ibanValid / ibanTotal) * 100).toFixed(1) : null;
 
   const errors = errorsRes.data;
   // The refusal list is information under the verdict, never a reason to raise
@@ -73,7 +74,7 @@ export async function BrokenSection({
   const hasDetail = level !== 'ok' || unreadable > 0 || refusals.length > 0;
 
   return (
-    <OverviewSection step={3} title={t('broken.title')} lead={t('broken.lead')}>
+    <OverviewSection step={4} title={t('broken.title')} lead={t('broken.lead')}>
       <div className={`rounded-xl border p-4 ${LEVEL_STYLE[level]}`}>
         <p className="text-sm font-medium">{t(`broken.verdict.${level}` as 'broken.verdict.ok')}</p>
 
@@ -149,7 +150,9 @@ export async function BrokenSection({
         />
         <StatCardV2
           title={t('broken.ibanErrorRate', { days: period })}
-          value={errorsRes.ok && errors ? `${errors.error_rate.iban_validate.rate.toFixed(2)}%` : '—'}
+          value={
+            errorsRes.ok && errors ? `${errors.error_rate.iban_validate.rate.toFixed(2)}%` : '—'
+          }
           sparkline={errors?.error_rate?.iban_validate?.trend ?? []}
           accentColor="#ef4444"
           hint={t('broken.ibanErrorRateHint', { days: period })}
@@ -164,7 +167,9 @@ export async function BrokenSection({
       </div>
 
       {refusals.length > 0 && (
-        <p className={`${overviewCard} text-[12px] text-[var(--fg-4)]`}>{t('broken.refusalsHint')}</p>
+        <p className={`${overviewCard} text-[12px] text-[var(--fg-4)]`}>
+          {t('broken.refusalsHint')}
+        </p>
       )}
     </OverviewSection>
   );

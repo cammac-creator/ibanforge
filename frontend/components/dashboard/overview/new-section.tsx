@@ -1,11 +1,7 @@
 import { getTranslations } from 'next-intl/server';
 import { ActivationFunnel } from '../activation-funnel';
 import { TopUsersToday } from '../top-users-today';
-import {
-  LivingToolCard,
-  type DemandGapsPayload,
-  type FeedbackReport,
-} from '../living-tool-card';
+import { LivingToolCard, type DemandGapsPayload, type FeedbackReport } from '../living-tool-card';
 import type { ActivationClientRow } from '../clients-table';
 import type { BuildInput } from '@/lib/crm/build-contacts';
 import { topUsers } from '@/lib/crm/top-users';
@@ -83,23 +79,37 @@ export async function NewSection({
   const todayOps = ops(hist[hist.length - 1]);
   const yesterdayOps = ops(hist[hist.length - 2]);
   const opsTrendPct =
-    yesterdayOps > 0 ? `${Math.abs(Math.round(((todayOps - yesterdayOps) / yesterdayOps) * 100))}%` : undefined;
+    yesterdayOps > 0
+      ? `${Math.abs(Math.round(((todayOps - yesterdayOps) / yesterdayOps) * 100))}%`
+      : undefined;
   const opsTrend: 'up' | 'down' | 'neutral' =
-    yesterdayOps === 0 ? 'neutral' : todayOps > yesterdayOps ? 'up' : todayOps < yesterdayOps ? 'down' : 'neutral';
+    yesterdayOps === 0
+      ? 'neutral'
+      : todayOps > yesterdayOps
+        ? 'up'
+        : todayOps < yesterdayOps
+          ? 'down'
+          : 'neutral';
 
   return (
-    <OverviewSection step={4} title={t('fresh.title')} lead={t('fresh.lead')}>
+    <OverviewSection step={5} title={t('fresh.title')} lead={t('fresh.lead')}>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatCardV2
           title={t('fresh.opsToday')}
           value={historyRes.ok ? todayOps.toLocaleString(locale) : '—'}
-          trend={opsTrendPct ? { direction: opsTrend, label: t('money.vsYesterday', { percent: opsTrendPct }) } : undefined}
+          trend={
+            opsTrendPct
+              ? { direction: opsTrend, label: t('money.vsYesterday', { percent: opsTrendPct }) }
+              : undefined
+          }
           sparkline={hist.slice(-7).map(ops)}
           accentColor="#f59e0b"
           hint={t('fresh.opsTodayHint')}
         />
         <div className="sm:col-span-2">
-          {podium && snap && <TopUsersToday top={podium} todayUtc={snap.todayUtc} locale={locale} />}
+          {podium && snap && (
+            <TopUsersToday top={podium} todayUtc={snap.todayUtc} locale={locale} />
+          )}
         </div>
       </div>
 
@@ -124,7 +134,9 @@ export async function NewSection({
                 <span className="min-w-0 flex-1 truncate text-[var(--fg-1)]" title={s.email}>
                   {s.email}
                 </span>
-                <span className={`shrink-0 text-[11px] ${s.called ? 'text-emerald-400' : 'text-[var(--fg-4)]'}`}>
+                <span
+                  className={`shrink-0 text-[11px] ${s.called ? 'text-emerald-400' : 'text-[var(--fg-4)]'}`}
+                >
                   {s.called ? t('fresh.called') : t('fresh.notCalled')}
                 </span>
                 <span className="hidden shrink-0 text-[11px] text-[var(--fg-5)] sm:inline">

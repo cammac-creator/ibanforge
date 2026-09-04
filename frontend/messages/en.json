@@ -547,6 +547,10 @@
         "reader": "reader failed (HTTP {status}): this is not \"nothing\", this is a read that did not happen.",
         "readerUnreachable": "reader failed (API unreachable): this is not \"nothing\", this is a read that did not happen."
       },
+      "traffic": {
+        "title": "Traffic, day by day",
+        "lead": "who calls us, and whether it is more than the period before"
+      },
       "money": {
         "title": "The money",
         "lead": "what came in, and what was sold without being used",

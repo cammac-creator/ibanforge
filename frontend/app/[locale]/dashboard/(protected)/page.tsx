@@ -5,7 +5,11 @@ import type { ChannelRow } from '@/components/dashboard/channels-panel';
 import type { CohortFootprint } from '@/components/dashboard/cohort-study-panel';
 import type { ActivationClientRow } from '@/components/dashboard/clients-table';
 import type { DigestEntry } from '@/components/dashboard/weekly-digest-card';
-import type { DemandGapsPayload, FeedbackReport, SourceFreshnessEntry } from '@/components/dashboard/living-tool-card';
+import type {
+  DemandGapsPayload,
+  FeedbackReport,
+  SourceFreshnessEntry,
+} from '@/components/dashboard/living-tool-card';
 import type { OrphanMailRow } from '@/components/dashboard/orphan-mail-panel';
 import type { StatusByPathRow } from '@/components/dashboard/status-by-path-table';
 import { BrokenSection } from '@/components/dashboard/overview/broken-section';
@@ -14,6 +18,7 @@ import { DetailsSection } from '@/components/dashboard/overview/details-section'
 import { ApiDownBanner, HealthStrip, OverviewHeader } from '@/components/dashboard/overview/header';
 import { MoneySection } from '@/components/dashboard/overview/money-section';
 import { NewSection } from '@/components/dashboard/overview/new-section';
+import { TrafficSection } from '@/components/dashboard/overview/traffic-section';
 import { SectionSkeleton } from '@/components/dashboard/overview/section';
 import { fetchJSON, notFetched, type Fetched } from '@/components/dashboard/overview/fetching';
 import type {
@@ -24,6 +29,7 @@ import type {
   StatsResponse,
 } from '@/components/dashboard/overview/types';
 import { fetchCrmData } from '@/lib/crm/build-contacts';
+import { fetchTrafficTrend } from '@/lib/traffic-trend';
 import type { SignupSources, AuditStats } from '@/lib/dashboard-overview';
 
 /**
@@ -93,9 +99,13 @@ export default async function DashboardPage({
   const eventsP = stats<{ events: Array<{ created_at: string; kind: string; label: string }> }>(
     `/stats/events?period=${period}`,
   );
-  const statusByPathP = stats<{ rows: StatusByPathRow[] }>(`/stats/status-by-path?period=${period}`);
+  const statusByPathP = stats<{ rows: StatusByPathRow[] }>(
+    `/stats/status-by-path?period=${period}`,
+  );
   const sourcesP = stats<{ by_client_kind: ChannelRow[] }>(`/stats/sources?period=${period}`);
-  const patternsP = stats<{ geo_trend: Array<Record<string, number | string>> }>(`/stats/patterns?period=${period}`);
+  const patternsP = stats<{ geo_trend: Array<Record<string, number | string>> }>(
+    `/stats/patterns?period=${period}`,
+  );
   const cohortFootprintP = stats<CohortFootprint>('/stats/cohort-footprint');
   const healthP = fetchJSON<{ bic_sources?: SourceFreshnessEntry[] }>(`${API_URL}/health`, {});
 
@@ -105,7 +115,9 @@ export default async function DashboardPage({
   const digestP = admin<{ digests: DigestEntry[] }>('/v1/admin/digest?limit=8');
   const orphanP = admin<{ orphans: OrphanMailRow[]; pending: number }>('/v1/admin/orphan-mail');
   const demandGapsP = admin<DemandGapsPayload>('/v1/admin/demand-gaps?days=30');
-  const feedbackP = admin<{ open: number; reports: FeedbackReport[] }>('/v1/admin/feedback?limit=10');
+  const feedbackP = admin<{ open: number; reports: FeedbackReport[] }>(
+    '/v1/admin/feedback?limit=10',
+  );
   const signupSourcesP = admin<SignupSources>('/v1/admin/signup-sources?days=30');
   const auditStatsP = admin<AuditStats>('/v1/admin/audit-stats?days=30');
   // Swallows its own failures already; the catch is belt and braces, because a
@@ -154,12 +166,17 @@ export default async function DashboardPage({
    * pass `new Date().toISOString()` to the same badge in production.
    */
   const readAtIso = new Date().toISOString();
+  // 180 days: the card compares each window with the one before it, and the
+  // 90-day window needs the 90 before it to say so.
+  const trendP = fetchTrafficTrend(180);
 
   return (
     <div className="flex min-w-0 flex-col gap-7">
       <OverviewHeader period={period} readAtIso={readAtIso} />
 
-      <Suspense fallback={<div className="h-[70px] animate-pulse rounded-xl bg-[var(--ink-2)]/60" />}>
+      <Suspense
+        fallback={<div className="h-[70px] animate-pulse rounded-xl bg-[var(--ink-2)]/60" />}
+      >
         <HealthStrip statsPromise={statsP} />
       </Suspense>
       <Suspense fallback={null}>
@@ -177,6 +194,10 @@ export default async function DashboardPage({
           crmPromise={crmP}
           digestPromise={digestP}
         />
+      </Suspense>
+
+      <Suspense fallback={<SectionSkeleton tall />}>
+        <TrafficSection nowIso={readAtIso} trendPromise={trendP} />
       </Suspense>
 
       <Suspense fallback={<SectionSkeleton tall />}>

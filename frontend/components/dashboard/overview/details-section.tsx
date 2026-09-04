@@ -15,7 +15,13 @@ import { dedupeMarkers } from '@/lib/dashboard-overview';
 import { FetchFailed, type Fetched } from './fetching';
 import { snapshotOnce } from './one-clock';
 import { OverviewSection, overviewCard } from './section';
-import type { ActivationData, ErrorsResponse, HistoryEntry, HourlyResponse, StatsResponse } from './types';
+import type {
+  ActivationData,
+  ErrorsResponse,
+  HistoryEntry,
+  HourlyResponse,
+  StatsResponse,
+} from './types';
 
 /**
  * Section 5 — the 30-day detail, folded shut.
@@ -53,7 +59,9 @@ export async function DetailsSection({
   nowIso: string;
   historyPromise: Promise<Fetched<HistoryEntry[]>>;
   funnelPromise: Promise<Fetched<{ rows?: BusinessFunnelDay[] }>>;
-  eventsPromise: Promise<Fetched<{ events: Array<{ created_at: string; kind: string; label: string }> }>>;
+  eventsPromise: Promise<
+    Fetched<{ events: Array<{ created_at: string; kind: string; label: string }> }>
+  >;
   errorsPromise: Promise<Fetched<ErrorsResponse>>;
   hourlyPromise: Promise<Fetched<HourlyResponse>>;
   statusByPathPromise: Promise<Fetched<{ rows: StatusByPathRow[] }>>;
@@ -133,7 +141,7 @@ export async function DetailsSection({
   const sectionTitle = 'flex items-center gap-2 text-sm font-medium text-[var(--fg-2)]';
 
   return (
-    <OverviewSection step={5} title={o('details.title', { days: period })} lead={o('details.lead')}>
+    <OverviewSection step={6} title={o('details.title', { days: period })} lead={o('details.lead')}>
       <details className={overviewCard}>
         <summary className="cursor-pointer text-sm font-medium text-[var(--fg-2)]">
           {o('details.open')}
@@ -144,21 +152,24 @@ export async function DetailsSection({
             <div className="mb-4 flex items-center gap-2">
               <p className={sectionTitle}>{o('details.businessFunnel', { days: period })}</p>
               <InfoDot>
-                Seules les requêtes sur les endpoints facturables (IBAN / BIC / CH clearing) avec la bonne méthode
-                HTTP. Le bruit (scanner, robots, discovery) est exclu, ainsi que les clés internes — le funnel ne
-                mesure que la demande réelle du marché.
+                Seules les requêtes sur les endpoints facturables (IBAN / BIC / CH clearing) avec la
+                bonne méthode HTTP. Le bruit (scanner, robots, discovery) est exclu, ainsi que les
+                clés internes — le funnel ne mesure que la demande réelle du marché.
                 <br />
                 <br />
-                <strong>Différence avec « Requêtes HTTP »</strong> : ce graphe-ci = la DEMANDE (qui utilise le
-                produit) ; l&apos;autre = l&apos;ATTENTION (tout ce qui touche le serveur, bruit compris).
+                <strong>Différence avec « Requêtes HTTP »</strong> : ce graphe-ci = la DEMANDE (qui
+                utilise le produit) ; l&apos;autre = l&apos;ATTENTION (tout ce qui touche le
+                serveur, bruit compris).
                 <br />
                 <br />
-                <strong className="text-[var(--ok)]">Paid success</strong> = l’agent a payé (x402) ou utilisé sa clé
-                et reçu 2xx.
+                <strong className="text-[var(--ok)]">Paid success</strong> = l’agent a payé (x402)
+                ou utilisé sa clé et reçu 2xx.
                 <br />
-                <strong className="text-amber-400">Paywall hit</strong> = agent intéressé mais sans auth → 402.
+                <strong className="text-amber-400">Paywall hit</strong> = agent intéressé mais sans
+                auth → 402.
                 <br />
-                <strong className="text-violet-400">Auth / quota</strong> = 401 (mauvaise clé) ou 429 (quota atteint).
+                <strong className="text-violet-400">Auth / quota</strong> = 401 (mauvaise clé) ou
+                429 (quota atteint).
                 <br />
                 <strong className="text-yellow-400">Bad input</strong> = 400 (body mal formé).
                 <br />
@@ -166,7 +177,10 @@ export async function DetailsSection({
               </InfoDot>
             </div>
             {!funnelRes.ok ? (
-              <FetchFailed name={o('details.businessFunnel', { days: period })} status={funnelRes.status} />
+              <FetchFailed
+                name={o('details.businessFunnel', { days: period })}
+                status={funnelRes.status}
+              />
             ) : (
               <BusinessFunnelChart
                 data={funnelRes.data?.rows ?? []}
@@ -181,21 +195,25 @@ export async function DetailsSection({
               <div className="mb-4 flex items-center gap-2">
                 <p className={sectionTitle}>{o('details.httpRequests', { days: period })}</p>
                 <InfoDot>
-                  <strong>Tout ce qui frappe à la porte du serveur</strong> : vraies validations, mais aussi robots,
-                  scanners, handshakes MCP, pages de découverte, 404. C&apos;est un thermomètre d&apos;ATTENTION, pas
-                  de business — un pic ici sans pic dans le funnel de conversion = du bruit machine.
+                  <strong>Tout ce qui frappe à la porte du serveur</strong> : vraies validations,
+                  mais aussi robots, scanners, handshakes MCP, pages de découverte, 404. C&apos;est
+                  un thermomètre d&apos;ATTENTION, pas de business — un pic ici sans pic dans le
+                  funnel de conversion = du bruit machine.
                   <br />
                   <br />
-                  <strong className="text-[var(--fg-2)]">Zone grise « Attendu »</strong> = la plage min-max des 8
-                  dernières mêmes journées de semaine.
+                  <strong className="text-[var(--fg-2)]">Zone grise « Attendu »</strong> = la plage
+                  min-max des 8 dernières mêmes journées de semaine.
                   <br />
-                  <strong className="text-violet-300">Traits pointillés violets</strong> = les événements listés sous
-                  le graphe, dédupliqués depuis le 01/09/2026 : une version ne marque plus que le premier jour où
-                  elle apparaît.
+                  <strong className="text-violet-300">Traits pointillés violets</strong> = les
+                  événements listés sous le graphe, dédupliqués depuis le 01/09/2026 : une version
+                  ne marque plus que le premier jour où elle apparaît.
                 </InfoDot>
               </div>
               {!historyRes.ok ? (
-                <FetchFailed name={o('details.httpRequests', { days: period })} status={historyRes.status} />
+                <FetchFailed
+                  name={o('details.httpRequests', { days: period })}
+                  status={historyRes.status}
+                />
               ) : hist.length > 0 ? (
                 <StackedBarChart
                   data={hist}
@@ -218,7 +236,9 @@ export async function DetailsSection({
             <div className={overviewCard}>
               <div className="mb-4 flex items-center gap-2">
                 <p className={sectionTitle}>
-                  {countriesArePeriodScoped ? o('details.topCountries', { days: period }) : o('details.topCountriesAllTime')}
+                  {countriesArePeriodScoped
+                    ? o('details.topCountries', { days: period })
+                    : o('details.topCountriesAllTime')}
                 </p>
                 <InfoDot>
                   Déduit du code pays ISO de l’IBAN/BIC validé. « XX » = BIC test/internal.
@@ -236,7 +256,9 @@ export async function DetailsSection({
                       : row.country;
                     return (
                       <div key={row.country} className="flex items-center gap-3">
-                        <span className="w-5 text-right font-mono text-xs text-[var(--fg-5)]">{i + 1}</span>
+                        <span className="w-5 text-right font-mono text-xs text-[var(--fg-5)]">
+                          {i + 1}
+                        </span>
                         <div className="min-w-0 flex-1">
                           <div className="mb-0.5 flex items-center justify-between">
                             <span className="truncate text-sm text-[var(--fg-1)]">{label}</span>
@@ -245,7 +267,10 @@ export async function DetailsSection({
                             </span>
                           </div>
                           <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--ink-4)]">
-                            <div className="h-full rounded-full bg-amber-500/40" style={{ width: `${pct}%` }} />
+                            <div
+                              className="h-full rounded-full bg-amber-500/40"
+                              style={{ width: `${pct}%` }}
+                            />
                           </div>
                         </div>
                       </div>
@@ -296,12 +321,16 @@ export async function DetailsSection({
               <div className="mb-4 flex items-center gap-2">
                 <p className={sectionTitle}>{o('details.statusByPath', { days: period })}</p>
                 <InfoDot>
-                  Chaque path avec sa répartition 2xx/3xx/4xx/5xx et sa latence. Survole une barre pour le détail par
-                  code HTTP. Les endpoints massivement refusés sont aussi nommés en section 3.
+                  Chaque path avec sa répartition 2xx/3xx/4xx/5xx et sa latence. Survole une barre
+                  pour le détail par code HTTP. Les endpoints massivement refusés sont aussi nommés
+                  en section 3.
                 </InfoDot>
               </div>
               {!statusRes.ok ? (
-                <FetchFailed name={o('details.statusByPath', { days: period })} status={statusRes.status} />
+                <FetchFailed
+                  name={o('details.statusByPath', { days: period })}
+                  status={statusRes.status}
+                />
               ) : (
                 <StatusByPathTable rows={(statusRes.data?.rows ?? []).slice(0, 12)} />
               )}

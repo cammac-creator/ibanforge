@@ -93,7 +93,7 @@ export async function ChaseSection({
 
   return (
     <OverviewSection
-      step={2}
+      step={3}
       title={t('chase.title')}
       lead={t('chase.lead')}
       aside={

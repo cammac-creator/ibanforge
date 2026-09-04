@@ -547,6 +547,10 @@
         "reader": "lecteur en échec (HTTP {status}) : ce n'est pas « rien », c'est une lecture impossible.",
         "readerUnreachable": "lecteur en échec (API injoignable) : ce n'est pas « rien », c'est une lecture impossible."
       },
+      "traffic": {
+        "title": "Le trafic, jour par jour",
+        "lead": "qui nous appelle, et si c’est plus que la période d’avant"
+      },
       "money": {
         "title": "L'argent",
         "lead": "ce qui est encaissé, et ce qui est vendu sans être consommé",

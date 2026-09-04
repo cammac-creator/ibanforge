@@ -1,10 +1,12 @@
 import { getLocale } from 'next-intl/server';
 import { BotsApp, type BridgeClient } from '@/components/crm/bots-app';
-import { TrafficTrendCard } from '@/components/dashboard/traffic-trend-card';
 import { buildBots, fetchBotProfiles, groupBots } from '@/lib/crm/bot-dossiers';
 import { fetchCrmData } from '@/lib/crm/build-contacts';
-import { buildDossiers, fetchClientProfiles, fetchCompanyProfiles } from '@/lib/crm/client-dossiers';
-import { fetchTrafficTrend } from '@/lib/traffic-trend';
+import {
+  buildDossiers,
+  fetchClientProfiles,
+  fetchCompanyProfiles,
+} from '@/lib/crm/client-dossiers';
 
 export const dynamic = 'force-dynamic';
 
@@ -54,11 +56,10 @@ export default async function ClientsBotPage() {
   // `perdu` and `sonde` verdicts need before a ratio means anything.
   // The widest window the selector offers, fetched once: the card narrows to
   // 7 or 30 days in the browser, so the switch costs nothing here.
-  const [locale, profiles, clients, trend] = await Promise.all([
+  const [locale, profiles, clients] = await Promise.all([
     getLocale(),
     fetchBotProfiles(90, 20),
     loadBridgeClients(),
-    fetchTrafficTrend(90),
   ]);
   // Grouped before the browser ever sees them (audit TABS-05 and TABS-14): one
   // line per product with the versions kept as detail, and a single line for
@@ -71,23 +72,29 @@ export default async function ClientsBotPage() {
       <header>
         <h1 className="text-xl font-semibold text-[var(--fg-1)]">Clients Bot</h1>
         <p className="mt-0.5 text-sm text-[var(--fg-4)]">
-          Tout ce qui nous appelle sans clé : annuaires d&apos;agents, registres MCP, sondes x402, contrôles de
-          disponibilité. La courbe d&apos;ensemble d&apos;abord, les dossiers ensuite — cliquez une ligne pour
-          ouvrir le sien.
+          Tout ce qui nous appelle sans clé : annuaires d&apos;agents, registres MCP, sondes x402,
+          contrôles de disponibilité. Un dossier par robot — cliquez une ligne pour ouvrir le sien.
         </p>
       </header>
-
-      {/* Above the dossiers, and no longer behind the emptiness test below:
-          the trend runs on STATS_TOKEN while the dossiers run on ADMIN_SECRET,
-          so a missing secret used to blank a chart that had everything it
-          needed to draw itself. */}
-      <TrafficTrendCard result={trend} />
+      {/* The day-by-day curve moved to the overview (owner's call, 04/09/2026):
+          it is the whole API's question, not the robots' alone. */}
+      <p className="text-[12.5px] text-[var(--fg-4)]">
+        La courbe du trafic jour par jour est sur la{' '}
+        <a
+          href={`/${locale}/dashboard`}
+          className="underline decoration-dotted underline-offset-2 hover:text-[var(--fg-1)]"
+        >
+          Vue d&apos;ensemble
+        </a>
+        , section 2.
+      </p>
 
       {bots.length === 0 ? (
         <div className="rounded-xl border border-[var(--ink-4)]/60 bg-[var(--ink-2)]/60 p-8 text-center">
           <p className="font-medium text-[var(--fg-2)]">Aucun agent au-dessus du seuil</p>
           <p className="mt-1 text-sm text-[var(--fg-3)]">
-            ADMIN_SECRET non configuré, API injoignable, ou vraiment personne sur les 90 derniers jours.
+            ADMIN_SECRET non configuré, API injoignable, ou vraiment personne sur les 90 derniers
+            jours.
           </p>
         </div>
       ) : (
