@@ -537,6 +537,13 @@
   * {
     @apply border-border outline-ring/50;
   }
+  /* Audit 2026-09-04 (S2): `outline-ring/50` composites to 3.0:1 on the coal,
+     the floor of WCAG 1.4.11, and below it on a card. Full amber is 9.2:1.
+     Base layer on purpose: a component that draws its own ring still wins. */
+  :focus-visible {
+    outline: 2px solid var(--amber-500);
+    outline-offset: 2px;
+  }
   body {
     @apply bg-background text-foreground;
     /* Prevent horizontal page scroll from wide mono headings on small screens.
@@ -573,6 +580,12 @@
   --fquench: #38bdf8;
   --fok: #4ade80;
   --fember-grad: linear-gradient(100deg, #f59e0b 10%, #ef4444 90%);
+  /* Audit 2026-09-04 (S1): --fst-2 on --coal measures 1.30:1, so every card
+     read as a rectangle of text with no edge. A forged piece has an edge that
+     catches the light: --fedge is 3.24:1 on coal and 3.01:1 on a card. */
+  --fedge: #6b6058;
+  --fedge-lit: rgba(255, 247, 237, 0.07);
+  --fshadow: 0 16px 36px -14px rgba(0, 0, 0, 0.7);
   background: var(--coal);
   color: var(--hot);
   font-family: var(--font-sans);
@@ -603,26 +616,6 @@
   text-align: center;
   padding: 5rem 1rem 4rem;
   overflow: hidden;
-}
-.forge .glow {
-  position: absolute;
-  pointer-events: none;
-  border-radius: 50%;
-}
-.forge .glow-a {
-  inset: auto -10% -38% -10%;
-  height: 70vh;
-  background: radial-gradient(
-    closest-side,
-    rgba(245, 158, 11, 0.26),
-    rgba(245, 158, 11, 0.07) 55%,
-    transparent 75%
-  );
-}
-.forge .glow-b {
-  inset: auto 10% -30% 35%;
-  height: 55vh;
-  background: radial-gradient(closest-side, rgba(239, 68, 68, 0.17), transparent 70%);
 }
 .forge .hero-badge {
   position: relative;
@@ -1117,10 +1110,10 @@
   }
 }
 .forge .plaque {
-  border: 1px solid var(--fst-2);
-  border-top-color: var(--fst-3);
+  border: 1px solid var(--fedge);
   border-radius: 10px;
   background: linear-gradient(170deg, var(--fst-1), #121010 65%);
+  box-shadow: inset 0 1px 0 var(--fedge-lit), var(--fshadow);
   padding: 1.5rem;
   display: flex;
   flex-direction: column;
@@ -1159,9 +1152,10 @@
   align-items: center;
   gap: 0.9rem;
   flex-wrap: wrap;
-  border: 1px solid var(--fst-2);
+  border: 1px solid var(--fedge);
   border-radius: 10px;
   background: var(--fst-1);
+  box-shadow: inset 0 1px 0 var(--fedge-lit);
   padding: 0.85rem 1.1rem;
 }
 .forge .ep-m {
@@ -1235,8 +1229,9 @@
   }
 }
 .forge .agent-card {
-  border: 1px solid var(--fst-2);
+  border: 1px solid var(--fedge);
   border-radius: 10px;
+  box-shadow: inset 0 1px 0 var(--fedge-lit), var(--fshadow);
   padding: 1.4rem;
   display: flex;
   flex-direction: column;
@@ -1340,7 +1335,8 @@
 .forge .reviewed .links a {
   color: var(--ffg-3);
 }
-.forge .reviewed .links a:hover {
+.forge .reviewed .links a:hover,
+.forge .reviewed .links a:focus-visible {
   color: var(--hot);
 }
 
@@ -1487,18 +1483,6 @@
     opacity: 0;
     animation: fgMark 0.55s cubic-bezier(0.2, 1.3, 0.4, 1) forwards;
   }
-  html.js .forge .glow-a {
-    animation: fgDrift 11s ease-in-out infinite alternate;
-  }
-  html.js .forge .glow-b {
-    animation: fgDrift 14s ease-in-out infinite alternate-reverse;
-  }
-  html.js .forge .cue::after {
-    animation: fgNudge 1.8s ease-in-out infinite;
-  }
-  html.js .forge .agents-illo .coin {
-    animation: fgCoin 3.5s ease-in-out infinite;
-  }
   html.js .forge .embers rect {
     animation: fgEmber 7s ease-in-out infinite;
   }
@@ -1538,23 +1522,6 @@
       transform: none;
     }
   }
-  @keyframes fgDrift {
-    from {
-      transform: translate(-2%, 0) scale(1);
-    }
-    to {
-      transform: translate(3%, -4%) scale(1.08);
-    }
-  }
-  @keyframes fgNudge {
-    0%,
-    100% {
-      transform: translateY(0);
-    }
-    50% {
-      transform: translateY(5px);
-    }
-  }
   @keyframes fgShake {
     0%,
     100% {
@@ -1580,15 +1547,6 @@
     }
     50% {
       transform: translateY(-16px);
-    }
-  }
-  @keyframes fgCoin {
-    0%,
-    100% {
-      transform: translateY(0);
-    }
-    50% {
-      transform: translateY(5px);
     }
   }
   @media (max-height: 560px) {
@@ -1648,8 +1606,20 @@
   text-decoration: none;
   transition: border-color var(--dur-2) var(--ease-std);
 }
-.forge .btn-ghost-link:hover {
+.forge .btn-ghost-link:hover,
+.forge .btn-ghost-link:focus-visible {
   border-color: rgba(245, 158, 11, 0.5);
+}
+/* The llms.txt line is a link dressed as code: say so on hover and focus. */
+.forge .agent-link {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: rgba(245, 158, 11, 0.35);
+  text-underline-offset: 3px;
+}
+.forge .agent-link:hover,
+.forge .agent-link:focus-visible {
+  text-decoration-color: var(--amber-500);
 }
 
 /* Results of the creditor-file audit slide into view once; nothing moves for people who asked for less motion. */

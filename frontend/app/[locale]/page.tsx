@@ -10,7 +10,7 @@ import {
   P50_PROCESSING_MS,
   SUPPORTED_COUNTRIES,
 } from "@/lib/landing-stats"
-import { alternatesFor } from "@/lib/seo"
+import { alternatesFor, urlFor } from "@/lib/seo"
 
 // Title and description are generated per-locale by app/[locale]/layout.tsx —
 // do NOT define a static `metadata` here, it would override the locale-aware
@@ -26,12 +26,14 @@ const FEATURE_COUNT = 6
 const ENDPOINT_COUNT = 7
 
 /* Ambient ember particles — the logo's rising bars, scattered. Static SVG
-   markup as trusted constants; the drift animation is CSS, js+motion gated. */
-const EMBERS_HERO = `<rect x="40" y="150" width="3" height="7" fill="#F59E0B" opacity="0.55"/><rect x="85" y="90" width="2" height="5" fill="#FCD34D" opacity="0.35"/><rect x="130" y="180" width="4" height="9" fill="#F59E0B" opacity="0.7"/><rect x="170" y="60" width="2" height="4" fill="#EF4444" opacity="0.3"/><rect x="215" y="130" width="3" height="6" fill="#F59E0B" opacity="0.5"/><rect x="255" y="200" width="5" height="10" fill="#F59E0B" opacity="0.8"/><rect x="300" y="40" width="2" height="4" fill="#FCD34D" opacity="0.25"/><rect x="330" y="160" width="3" height="7" fill="#EF4444" opacity="0.45"/><rect x="370" y="100" width="2" height="5" fill="#F59E0B" opacity="0.4"/><rect x="415" y="185" width="4" height="8" fill="#FCD34D" opacity="0.65"/><rect x="455" y="70" width="2" height="4" fill="#F59E0B" opacity="0.3"/><rect x="495" y="140" width="3" height="6" fill="#EF4444" opacity="0.5"/><rect x="540" y="190" width="4" height="9" fill="#F59E0B" opacity="0.75"/><rect x="575" y="110" width="2" height="5" fill="#FCD34D" opacity="0.35"/><rect x="20" y="60" width="2" height="4" fill="#F59E0B" opacity="0.25"/><rect x="110" y="30" width="2" height="3" fill="#EF4444" opacity="0.2"/>`
+   markup as trusted constants; the drift animation is CSS, js+motion gated.
+   Audit 2026-09-04 (S10): 34 isolated 3×7 px rects read as compression
+   artefacts on the captures, not as embers — down to a dozen in all. */
+const EMBERS_HERO = `<rect x="40" y="150" width="3" height="7" fill="#F59E0B" opacity="0.55"/><rect x="85" y="90" width="2" height="5" fill="#FCD34D" opacity="0.35"/><rect x="130" y="180" width="4" height="9" fill="#F59E0B" opacity="0.7"/><rect x="170" y="60" width="2" height="4" fill="#EF4444" opacity="0.3"/><rect x="215" y="130" width="3" height="6" fill="#F59E0B" opacity="0.5"/><rect x="255" y="200" width="5" height="10" fill="#F59E0B" opacity="0.8"/>`
 
-const EMBERS_SECTION = `<rect x="55" y="170" width="3" height="6" fill="#F59E0B" opacity="0.45"/><rect x="120" y="110" width="2" height="4" fill="#FCD34D" opacity="0.3"/><rect x="190" y="195" width="4" height="8" fill="#F59E0B" opacity="0.6"/><rect x="250" y="80" width="2" height="4" fill="#EF4444" opacity="0.25"/><rect x="310" y="150" width="3" height="6" fill="#F59E0B" opacity="0.4"/><rect x="380" y="200" width="4" height="9" fill="#F59E0B" opacity="0.65"/><rect x="440" y="120" width="2" height="5" fill="#FCD34D" opacity="0.3"/><rect x="505" y="175" width="3" height="7" fill="#EF4444" opacity="0.4"/><rect x="560" y="95" width="2" height="4" fill="#F59E0B" opacity="0.28"/>`
+const EMBERS_SECTION = `<rect x="55" y="170" width="3" height="6" fill="#F59E0B" opacity="0.45"/><rect x="120" y="110" width="2" height="4" fill="#FCD34D" opacity="0.3"/><rect x="190" y="195" width="4" height="8" fill="#F59E0B" opacity="0.6"/>`
 
-const EMBERS_CTA = `<rect x="70" y="140" width="3" height="7" fill="#F59E0B" opacity="0.5"/><rect x="140" y="70" width="2" height="4" fill="#FCD34D" opacity="0.3"/><rect x="205" y="185" width="4" height="9" fill="#F59E0B" opacity="0.7"/><rect x="270" y="110" width="2" height="5" fill="#EF4444" opacity="0.35"/><rect x="335" y="55" width="2" height="4" fill="#FCD34D" opacity="0.25"/><rect x="395" y="165" width="3" height="7" fill="#F59E0B" opacity="0.55"/><rect x="460" y="90" width="2" height="4" fill="#F59E0B" opacity="0.3"/><rect x="525" y="150" width="3" height="6" fill="#EF4444" opacity="0.45"/><rect x="580" y="200" width="4" height="8" fill="#F59E0B" opacity="0.7"/>`
+const EMBERS_CTA = `<rect x="70" y="140" width="3" height="7" fill="#F59E0B" opacity="0.5"/><rect x="140" y="70" width="2" height="4" fill="#FCD34D" opacity="0.3"/><rect x="205" y="185" width="4" height="9" fill="#F59E0B" opacity="0.7"/>`
 
 /* The x402 spot illustration: a robotic arm paying its coin into the slot. */
 const AGENTS_ILLO = `<defs><radialGradient id="acoin" cx="38%" cy="35%" r="75%"><stop offset="0%" stop-color="#FCD34D"/><stop offset="55%" stop-color="#F59E0B"/><stop offset="100%" stop-color="#D97706"/></radialGradient></defs><rect x="18" y="122" width="128" height="12" rx="3" fill="#292524"/><circle cx="34" cy="128" r="2.5" fill="#57534E"/><circle cx="130" cy="128" r="2.5" fill="#57534E"/><rect x="70" y="66" width="16" height="58" rx="4" fill="#3F3A34"/><path d="M78,70 q-26,18 -8,52" stroke="#292524" stroke-width="3" fill="none"/><g stroke-linecap="round"><line x1="78" y1="70" x2="152" y2="34" stroke="#57534E" stroke-width="13"/><line x1="152" y1="34" x2="230" y2="55" stroke="#44403C" stroke-width="10"/></g><circle cx="78" cy="70" r="8" fill="#292524" stroke="#57534E" stroke-width="2"/><circle cx="152" cy="34" r="8.5" fill="#292524" stroke="#57534E" stroke-width="2"/><circle cx="152" cy="34" r="3" fill="#78716C"/><g stroke="#57534E" stroke-width="5.5" fill="none" stroke-linecap="round"><path d="M230,49 q16,-2 24,8"/><path d="M230,61 q16,4 22,14"/></g><g class="coin"><ellipse cx="258" cy="66" rx="27" ry="21" fill="#F59E0B" opacity="0.13"/><circle cx="258" cy="66" r="13.5" fill="url(#acoin)"/><circle cx="258" cy="66" r="13.5" fill="none" stroke="#FCD34D" stroke-width="1.6" opacity="0.8"/><rect x="254" y="60" width="8" height="12" rx="2" fill="#1C0A00" opacity="0.35"/></g><rect x="288" y="84" width="56" height="50" rx="7" fill="#1C1917" stroke="#292524"/><rect x="288" y="84" width="56" height="8" rx="4" fill="#26211C"/><rect x="299" y="100" width="34" height="6" rx="3" fill="#F59E0B" opacity="0.9"/><rect x="299" y="115" width="12" height="5" rx="1.5" fill="#EF4444" opacity="0.65"/><rect x="315" y="115" width="12" height="5" rx="1.5" fill="#4ADE80" opacity="0.65"/>`
@@ -53,11 +55,25 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
   const t = await getTranslations('home');
   const liveStats = await getLandingStats();
 
+  // One figure for the BIC base, the live one: the plaque used to say
+  // "121 000+" 350 px away from the band's live "121 773" (audit 2026-09-04, S5).
+  const nf = new Intl.NumberFormat(locale)
+  const figures = {
+    bic: nf.format(liveStats.bicEntries),
+    bicK: `${Math.floor(liveStats.bicEntries / 1000)}K`,
+    countries: String(SUPPORTED_COUNTRIES),
+  }
   const FEATURES = Array.from({ length: FEATURE_COUNT }, (_, i) => ({
-    badge: t(`features.${i}.badge`),
+    badge: t(`features.${i}.badge`, figures),
     title: t(`features.${i}.title`),
-    description: t(`features.${i}.description`),
+    description: t(`features.${i}.description`, figures),
   }))
+  // The refresh date /health already reports and the page used to throw away:
+  // "refreshed monthly" becomes a dated fact, never typed by hand (S4).
+  const refreshedOn = liveStats.bicDataLastUpdated
+    ? new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })
+        .format(new Date(`${liveStats.bicDataLastUpdated}T00:00:00Z`))
+    : null
 
   const ENDPOINTS = Array.from({ length: ENDPOINT_COUNT }, (_, i) => ({
     method: t(`endpoints.${i}.method`),
@@ -104,8 +120,6 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
     <div className="forge">
       {/* ── Hero: the lockup lands, the film waits below ─────────────────── */}
       <section className="hero" aria-label="IBANforge">
-        <div className="glow glow-a" aria-hidden="true"></div>
-        <div className="glow glow-b" aria-hidden="true"></div>
         <Embers html={EMBERS_HERO} />
         <p className="hero-badge"><span className="dot" aria-hidden="true"></span>{t('badge')}</p>
         <p className="wordmark" aria-hidden="true"><span className="mark"></span><span className="wtext"><span className="lt">I</span><span className="lt" style={{ animationDelay: '0.07s' }}>B</span><span className="lt" style={{ animationDelay: '0.14s' }}>A</span><span className="lt" style={{ animationDelay: '0.21s' }}>N</span><span className="fw" style={{ animationDelay: '0.34s' }}>forge</span></span></p>
@@ -116,18 +130,21 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
           })}
         </h1>
         <p className="hero-desc">{t('hero.description')}</p>
+        {/* Audit 2026-09-04 (S7): the primary action asked for an e-mail
+            against a promise; seeing a response is the smaller step and the
+            natural first one on an API. The key comes second. */}
         <div className="hero-cta">
-          <GetKeyButton variant="amber" className="px-6">
-            {t('hero.cta.getKey')}
-          </GetKeyButton>
           <Button
             size="lg"
-            variant="outline"
+            variant="amber"
             className="px-6"
             render={<Link href={`/${locale}/playground`} />}
           >
             {t('hero.cta.tryFree')}
           </Button>
+          <GetKeyButton variant="outline" className="px-6">
+            {t('hero.cta.getKey')}
+          </GetKeyButton>
         </div>
         <p className="cue" id="forge-cue">{film.cue}</p>
       </section>
@@ -214,7 +231,7 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
             <Reveal delay={120} className="agent-card">
               <h3>{t('agentsRail.docsTitle')}</h3>
               <p>{t('agentsRail.docsBody')}</p>
-              <p className="agent-code"><a href="https://ibanforge.com/llms.txt" style={{ color: 'inherit', textDecoration: 'none' }}>GET /llms.txt</a></p>
+              <p className="agent-code"><a className="agent-link" href="https://ibanforge.com/llms.txt">GET /llms.txt</a></p>
             </Reveal>
           </div>
         </div>
@@ -232,7 +249,9 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
                 .map((source) => source.replace(/ /g, ' '))
                 .join(' · ')}
             </p>
-            <span className="trust-n">{t('trust.dataNote')}</span>
+            <span className="trust-n">
+              {refreshedOn ? t('trust.dataNoteDated', { date: refreshedOn }) : t('trust.dataNote')}
+            </span>
           </div>
           <div className="trust-cell">
             <span className="eyebrow">{t('trust.sanctionsLabel')}</span>
@@ -296,16 +315,22 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
+          // Audit 2026-09-04 (S11): this block used to describe a second,
+          // unrelated "IBANforge" next to the layout's SoftwareApplication,
+          // in hard English on /fr and /de, with a root URL that answers 307.
+          // One graph now: ids relate the entities, URLs carry the locale.
           __html: JSON.stringify({
             "@context": "https://schema.org",
             "@type": "WebAPI",
+            "@id": `${urlFor(locale)}#api`,
             name: "IBANforge",
-            url: "https://ibanforge.com",
-            description:
-              "IBAN validation, BIC/SWIFT lookup, Swiss clearing data and compliance risk for developers and AI agents.",
-            documentation: "https://ibanforge.com/en/docs",
-            termsOfService: "https://ibanforge.com/en/legal",
-            provider: { "@type": "Organization", name: "IBANforge", url: "https://ibanforge.com" },
+            url: urlFor(locale),
+            inLanguage: locale,
+            description: t('metadata.description'),
+            documentation: urlFor(locale, '/docs'),
+            termsOfService: urlFor(locale, '/legal'),
+            provider: { "@id": "https://ibanforge.com/#organization" },
+            isPartOf: { "@id": "https://ibanforge.com/#software" },
             offers: {
               "@type": "Offer",
               price: "0",

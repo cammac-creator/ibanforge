@@ -8,6 +8,7 @@
       "pricing": "Preise",
       "blog": "Blog",
       "dashboard": "Dashboard",
+      "account": "Ihr Key",
       "audit": "Dateiprüfung"
     },
     "toggleMenu": "Menü öffnen"
@@ -64,7 +65,7 @@
       "title": "Bankdaten, denen Ihre Agenten <accent>vertrauen</accent>.",
       "description": "IBANs validieren, BIC/SWIFT auflösen, Sanktionsrisiko bewerten — mit exklusiven Schweizer SIX-Clearingdaten. REST für Ihren Stack, natives MCP für Ihre Agenten.",
       "cta": {
-        "tryFree": "Kostenlos testen",
+        "tryFree": "Eine Anfrage testen",
         "getKey": "Kostenlosen Key holen"
       }
     },
@@ -80,9 +81,9 @@
         "description": "Nativer Model-Context-Protocol-Server (stdio + HTTP). Claude, Cursor und jeder MCP-Agent installieren in einer Zeile: npx -y ibanforge-mcp."
       },
       "2": {
-        "badge": "89 Länder · 121K BICs",
+        "badge": "{countries} Länder · {bicK} BICs",
         "title": "IBAN-Validierung & BIC-Lookup",
-        "description": "ISO-13616-Mod-97-Validierung mit vollständiger BBAN-Analyse in 89 Ländern — gestützt auf über 121.000 BIC-Einträge aus GLEIF, SwiftCodes (MIT), Bundesbank, SIX, NBP und EBA Step2."
+        "description": "ISO-13616-Mod-97-Validierung mit vollständiger BBAN-Analyse in 89 Ländern — gestützt auf {bic} BIC-Einträge aus GLEIF, SwiftCodes (MIT), Bundesbank, SIX, NBP und EBA Step2."
       },
       "3": {
         "badge": "EMI / vIBAN",
@@ -173,6 +174,7 @@
       "dataLabel": "Datenquellen",
       "dataValue": "GLEIF · SIX BankMaster · SwiftCodes (MIT) · Bundesbank · EBA STEP2 · NBP · Bank of England (List of Banks, 2026-08)",
       "dataNote": "Monatlich aktualisiert",
+      "dataNoteDated": "Monatlich aktualisiert · zuletzt am {date}",
       "sanctionsLabel": "Sanktionsprüfung",
       "sanctionsValue": "OFAC · EU · UN + FATF",
       "sanctionsNote": "Auf Bankebene (BIC8)",

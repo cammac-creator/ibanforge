@@ -258,6 +258,7 @@ export function ForgeFilm({ t, playgroundHref }: { t: FilmStrings; playgroundHre
     const updaters = [heat, strike, quench, stamp, shipFn]
 
     let raf = 0
+    let running = false
     const frame = () => {
       const y = window.scrollY
       if (cue) cue.style.opacity = (1 - clamp01(y / (vh * 0.35))).toFixed(3)
@@ -296,17 +297,42 @@ export function ForgeFilm({ t, playgroundHref }: { t: FilmStrings; playgroundHre
       })
 
       drawSparks()
+      if (running) raf = requestAnimationFrame(frame)
+    }
+    const start = () => {
+      if (running) return
+      running = true
       raf = requestAnimationFrame(frame)
     }
+    const stop = () => {
+      running = false
+      cancelAnimationFrame(raf)
+    }
+    // Audit 2026-09-04 (S6): this loop measured five rectangles and wrote ~25
+    // styles per frame for the life of the page, footer included. It now runs
+    // only while the film is within one viewport of the screen; the hero sits
+    // inside that margin, so the scroll cue still fades from the very top.
+    const gate =
+      "IntersectionObserver" in window
+        ? new IntersectionObserver(
+            (entries) => {
+              if (entries.some((e) => e.isIntersecting)) start()
+              else stop()
+            },
+            { rootMargin: "100% 0px 100% 0px" },
+          )
+        : null
 
     measure()
     window.addEventListener("resize", measure, { passive: true })
     window.addEventListener("load", measure)
     const settle = setTimeout(measure, 700) // fonts settling shifts offsets
-    raf = requestAnimationFrame(frame)
+    if (gate) gate.observe(root)
+    else start()
 
     return () => {
-      cancelAnimationFrame(raf)
+      stop()
+      gate?.disconnect()
       clearTimeout(settle)
       window.removeEventListener("resize", measure)
       window.removeEventListener("load", measure)

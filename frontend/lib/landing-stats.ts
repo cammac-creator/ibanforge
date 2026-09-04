@@ -15,11 +15,14 @@
 export interface LandingStats {
   bicEntries: number
   chClearingEntries: number
+  /** ISO day (YYYY-MM-DD) of the last BIC refresh, as /health reports it; null when unknown. */
+  bicDataLastUpdated: string | null
 }
 
 const FALLBACK: LandingStats = {
   bicEntries: 121_610,
   chClearingEntries: 1_165,
+  bicDataLastUpdated: null,
 }
 
 /** Countries with IBAN validation — backend src/lib/countries.ts IBAN_LENGTHS (89 entries). */
@@ -36,6 +39,14 @@ export const P50_PROCESSING_MS = 0.4
 interface HealthPayload {
   bic_database_entries?: unknown
   ch_clearing_entries?: unknown
+  bic_data_last_updated?: unknown
+}
+
+/** "2026-09-01 03:22:35" → "2026-09-01"; anything else → null. Never a guess. */
+export function refreshDay(raw: unknown): string | null {
+  if (typeof raw !== "string") return null
+  const m = /^(\d{4}-\d{2}-\d{2})/.exec(raw)
+  return m ? m[1] : null
 }
 
 export async function getLandingStats(): Promise<LandingStats> {
@@ -58,6 +69,7 @@ export async function getLandingStats(): Promise<LandingStats> {
     return {
       bicEntries: typeof bic === "number" && bic > 0 ? bic : FALLBACK.bicEntries,
       chClearingEntries: typeof ch === "number" && ch > 0 ? ch : FALLBACK.chClearingEntries,
+      bicDataLastUpdated: refreshDay(payload.bic_data_last_updated),
     }
   } catch {
     return FALLBACK

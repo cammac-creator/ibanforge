@@ -33,7 +33,9 @@
 const SOFTWARE_APPLICATION = {
   '@context': 'https://schema.org',
   '@type': 'SoftwareApplication',
+  '@id': 'https://ibanforge.com/#software',
   name: 'IBANforge',
+  provider: { '@id': 'https://ibanforge.com/#organization' },
   applicationCategory: 'DeveloperApplication',
   applicationSubCategory: 'API',
   operatingSystem: 'Web, REST API, MCP',
@@ -109,6 +111,7 @@ const SOFTWARE_APPLICATION = {
 const ORGANIZATION = {
   '@context': 'https://schema.org',
   '@type': 'Organization',
+  '@id': 'https://ibanforge.com/#organization',
   name: 'IBANforge',
   url: 'https://ibanforge.com',
   logo: 'https://ibanforge.com/icon-512.png',

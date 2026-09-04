@@ -27,7 +27,9 @@ const bebas = Bebas_Neue({
 });
 
 const oswald = Oswald({
-  weight: ["500", "600"],
+  // Only 500 is ever set (globals.css .wordmark .fw / .brand-word em);
+  // 600 shipped a dead font file in the critical path (audit 2026-09-04, S3).
+  weight: "500",
   variable: "--font-oswald",
   subsets: ["latin"],
 });

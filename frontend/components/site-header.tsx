@@ -61,11 +61,15 @@ export function SiteHeader() {
         <div className="flex items-center gap-2">
           <LocaleSwitcher />
 
+          {/* Audit 2026-09-04 (S8): this was the only filled button of the bar
+              and it opened the owner's password-protected console. A visitor
+              clicked the most visible control of the site and hit a locked
+              door. The account page is the visitor's own key. */}
           <Link
-            href={`/${locale}/dashboard`}
+            href={`/${locale}/account`}
             className="hidden md:inline-flex items-center h-8 px-3 rounded-lg border border-primary/40 bg-primary/10 text-primary text-sm font-medium hover:bg-primary/20 transition-colors"
           >
-            {t("nav.dashboard")}
+            {t("nav.account")}
           </Link>
 
           {/* Mobile hamburger */}
@@ -115,11 +119,11 @@ export function SiteHeader() {
             </Link>
           ))}
           <Link
-            href={`/${locale}/dashboard`}
+            href={`/${locale}/account`}
             onClick={() => setMobileOpen(false)}
             className="mt-1 px-3 py-2 rounded-md text-sm font-medium text-primary hover:bg-primary/10 transition-colors"
           >
-            {t("nav.dashboard")}
+            {t("nav.account")}
           </Link>
         </nav>
       </div>
