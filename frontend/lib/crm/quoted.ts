@@ -16,7 +16,7 @@ const MAX_MARKER_LINE = 400;
  *  A real attribution always carries a date or an address, so require a digit or an "@":
  *  without that guard, ordinary prose ending in "wrote:" is mistaken for a quote header. */
 const ATTRIBUTION =
-  /^(?=.*[\d@])\s*(On\b.*\bwrote\s*:|Le\b.*\ba écrit\s*:|Am\b.*\bschrieb\b.*:|.*\bkirjoitti\s*:)\s*$/i;
+  /^(?=.*[\d@])\s*(On\b.*\bwrote\s*:|Le\b.*\ba écrit\s*:|Am\b.*\bschrieb\b.*:|.*\bkirjoitti\s*:|Op\b.*\bschreef\b.*:|Il\b.*\bha scritto\s*:|El\b.*\bescribió\s*:|Em\b.*\bescreveu\s*:)\s*$/i;
 
 /** A separator run that introduces a forwarded header block, including labeled
  *  delimiters ("-----Original Message-----", "---------- Forwarded message ---------").
@@ -31,10 +31,25 @@ function isSeparator(line: string): boolean {
   return /^[-_]{5}/.test(trimmed) && /[-_]{5}$/.test(trimmed);
 }
 
-/** Header line that opens a quoted block. English and French forms only: those are the
- *  header blocks we have actually seen, while ATTRIBUTION deliberately reaches wider
- *  because this CRM receives mail in locales the interface is not translated into. */
-const HEADER = /^\s*(From|De|Sent|Envoyé|To|À|Subject|Objet)\s*:/i;
+/** Header lines of a quoted block, in the locales this mailbox actually receives
+ *  (English, French, German, Dutch, Italian, Spanish, Portuguese). The French forms
+ *  matter twice: a French correspondent writes them, and so does the translator that
+ *  turns "Von: / Gesendet:" into "De : / Envoyé :" before the bubble is drawn. */
+const HEADER =
+  /^\s*(From|De|Von|Van|Da|Sent|Envoyé|Gesendet|Verzonden|Inviato|Enviado|Enviada|To|À|An|Aan|A|Para|Cc|Subject|Objet|Betreff|Onderwerp|Oggetto|Asunto|Assunto|Date|Datum|Data|Fecha)\s*:/i;
+
+/** The line a header block opens on: the sender. */
+const HEADER_OPEN = /^\s*(From|De|Von|Van|Da)\s*:/i;
+
+/** An Outlook-style header block with no separator above it: a sender line followed,
+ *  within the next four lines, by at least two more header lines. Outlook, Apple Mail
+ *  and the translator all emit the block bare, and one "De :" alone in French prose
+ *  must not fold a mail, hence the two further lines. */
+function isHeaderBlock(lines: string[], i: number): boolean {
+  if (!HEADER_OPEN.test(lines[i])) return false;
+  const following = lines.slice(i + 1, i + 5).filter((l) => l.length <= MAX_MARKER_LINE);
+  return following.filter((l) => HEADER.test(l)).length >= 2;
+}
 
 /** Index of the first line that opens the quoted history, or -1. */
 function quoteCut(lines: string[]): number {
@@ -49,6 +64,7 @@ function quoteCut(lines: string[]): number {
     if (scannable && isSeparator(line) && lines.slice(i + 1, i + 4).some((l) => HEADER.test(l))) {
       return i;
     }
+    if (scannable && isHeaderBlock(lines, i)) return i;
   }
   return -1;
 }

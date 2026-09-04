@@ -119,3 +119,39 @@ describe('freshOnly', () => {
     expect(freshOnly('   ')).toBe('');
   });
 });
+
+describe('header blocks without a separator (Outlook, Apple Mail, and the translator)', () => {
+  it('cuts at a French header block, the form the translator emits', () => {
+    const body = [
+      'Merci pour votre message, voici mes réponses.',
+      '',
+      'De : Claude-Alain Martin <ops@alpha.example.net>',
+      'Envoyé : mercredi 2 septembre 2026 16:09',
+      'À : info@beta.example.org',
+      'Objet : Deux questions',
+      '',
+      'Bonjour,',
+    ].join('\n');
+    const r = splitQuoted(body);
+    expect(r.fresh).toBe('Merci pour votre message, voici mes réponses.');
+    expect(r.quoted.startsWith('De : Claude-Alain Martin')).toBe(true);
+    expect(freshOnly(body)).toBe('Merci pour votre message, voici mes réponses.');
+  });
+
+  it('cuts at a German Outlook header block', () => {
+    const body =
+      'Danke, passt.\n\nVon: Ops <ops@alpha.example.net>\nGesendet: Mittwoch, 2. September 2026 16:09\nAn: info@beta.example.org\nBetreff: Zwei Fragen\n\nHallo,';
+    expect(splitQuoted(body).fresh).toBe('Danke, passt.');
+  });
+
+  it('does not cut on a lone "De :" line inside prose', () => {
+    const body = 'De : rien à signaler de notre côté.\nNous reprenons contact lundi.';
+    expect(splitQuoted(body)).toEqual({ fresh: body, quoted: '' });
+  });
+
+  it('cuts at a Dutch attribution line', () => {
+    const body =
+      'Prima, dank.\nOp 2 sep. 2026 om 16:09 schreef Ops <ops@alpha.example.net>:\n> hallo';
+    expect(splitQuoted(body).fresh).toBe('Prima, dank.');
+  });
+});
