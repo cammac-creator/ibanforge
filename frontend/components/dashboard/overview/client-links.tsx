@@ -35,7 +35,9 @@ export async function ClientLinks({
 }) {
   const t = await getTranslations('dashboard.overview');
   const style =
-    'rounded border border-[var(--ink-5)] px-1.5 py-0.5 text-[11px] text-[var(--fg-4)] transition-colors hover:border-[var(--fg-4)] hover:text-[var(--fg-1)]';
+    // Finger-sized below sm: on a phone these two are the only actions on the
+    // whole overview, and at 22px tall they were half a touch target.
+    'rounded border border-[var(--ink-5)] px-2 py-1.5 text-[12px] text-[var(--fg-4)] transition-colors hover:border-[var(--fg-4)] hover:text-[var(--fg-1)] sm:px-1.5 sm:py-0.5 sm:text-[11px]';
   return (
     <span className="flex shrink-0 items-center gap-1">
       <Link href={clientsHref(locale, email)} className={style} prefetch={false}>

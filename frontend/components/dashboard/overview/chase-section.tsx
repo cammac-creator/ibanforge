@@ -5,6 +5,7 @@ import { OrphanMailPanel, type OrphanMailRow } from '../orphan-mail-panel';
 import { ReservoirCard } from '../reservoir-card';
 import type { BuildInput } from '@/lib/crm/build-contacts';
 import { reservoir } from '@/lib/crm/priority';
+import { HARD_CAP, SOFT_CAP } from '@/lib/crm/sent-today';
 import { chaseQueue, type ChaseReason } from '@/lib/dashboard-overview';
 import { ClientLinks } from './client-links';
 import { FetchFailed, type Fetched } from './fetching';
@@ -50,7 +51,9 @@ function CounterLink({
       prefetch={false}
       className="group flex items-baseline gap-1.5 rounded px-1.5 py-0.5 transition-colors hover:bg-[var(--ink-4)]/50"
     >
-      <span className={`font-mono text-base font-bold ${accent ?? 'text-[var(--fg-1)]'}`}>{value}</span>
+      <span className={`font-mono text-base font-bold ${accent ?? 'text-[var(--fg-1)]'}`}>
+        {value}
+      </span>
       <span className="text-[12px] text-[var(--fg-4)] group-hover:text-[var(--fg-2)]">{label}</span>
       <span aria-hidden className="text-[11px] text-[var(--fg-5)] group-hover:text-[var(--fg-3)]">
         →
@@ -74,7 +77,11 @@ export async function ChaseSection({
   orphanPromise: Promise<Fetched<{ orphans: OrphanMailRow[]; pending: number }>>;
 }) {
   const t = await getTranslations('dashboard.overview');
-  const [clientsRes, crm, orphanRes] = await Promise.all([clientsPromise, crmPromise, orphanPromise]);
+  const [clientsRes, crm, orphanRes] = await Promise.all([
+    clientsPromise,
+    crmPromise,
+    orphanPromise,
+  ]);
 
   const queue = chaseQueue(clientsRes.data ?? [], new Date(nowIso));
   const snap = crm ? snapshotOnce(crm, nowIso) : null;
@@ -105,19 +112,30 @@ export async function ChaseSection({
         ) : (
           <ul className="flex flex-col divide-y divide-[var(--ink-4)]/50">
             {queue.rows.map((r) => (
-              <li key={r.email} className="flex flex-wrap items-center gap-x-2 gap-y-1 py-2 first:pt-0 last:pb-0">
+              <li
+                key={r.email}
+                className="flex flex-wrap items-center gap-x-2 gap-y-1 py-2 first:pt-0 last:pb-0"
+              >
+                {/* 11px and no capitals: « a appelé puis s'est tu » is twenty-two
+                    characters, and capitals with tracking at 10px turned the one
+                    word that says why a row is here into a texture. */}
                 <span
-                  className={`shrink-0 rounded border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${REASON_COLOR[r.reason]}`}
+                  className={`shrink-0 rounded border px-1.5 py-0.5 text-[11px] font-semibold ${REASON_COLOR[r.reason]}`}
                 >
                   {t(`chase.reason.${r.reason}`)}
                 </span>
-                <span className="min-w-0 flex-1 basis-40 truncate text-[13px] text-[var(--fg-1)]" title={r.email}>
+                <span
+                  className="min-w-0 flex-1 basis-40 truncate text-[13px] text-[var(--fg-1)]"
+                  title={r.email}
+                >
                   {r.email}
                 </span>
                 <span className="shrink-0 text-[11px] text-[var(--fg-4)]">
                   {[
                     r.packs > 0 && r.creditsRemaining > 0
-                      ? t('chase.creditsLeft', { credits: r.creditsRemaining.toLocaleString(locale) })
+                      ? t('chase.creditsLeft', {
+                          credits: r.creditsRemaining.toLocaleString(locale),
+                        })
                       : null,
                     r.days !== null ? t('chase.days', { days: r.days }) : null,
                   ]
@@ -140,8 +158,21 @@ export async function ChaseSection({
         <div className="mt-3 flex flex-wrap items-baseline gap-x-1 gap-y-1 border-t border-[var(--ink-4)]/60 pt-2.5">
           {snap ? (
             <>
-              <CounterLink href={contacts} value={snap.ballWithUs} label={t('chase.ball')} accent="text-blue-400" />
-              <CounterLink href={contacts} value={snap.followupDue} label={t('chase.due')} accent="text-amber-400" />
+              {/* Each counter lands on the rows it counts: the URL carries the
+                  work tile, so « 68 relances dues » opens the 68 and not the
+                  whole base with a tile still to find and press. */}
+              <CounterLink
+                href={`${contacts}?vue=reponses`}
+                value={snap.ballWithUs}
+                label={t('chase.ball')}
+                accent="text-blue-400"
+              />
+              <CounterLink
+                href={`${contacts}?vue=relances`}
+                value={snap.followupDue}
+                label={t('chase.due')}
+                accent="text-amber-400"
+              />
               <CounterLink
                 href={`${contacts}?vue=prospection`}
                 value={tank?.ready ?? 0}
@@ -153,6 +184,22 @@ export async function ChaseSection({
                 value={snap.freeActive}
                 label={t('chase.freeActive')}
                 accent="text-yellow-400"
+              />
+              {/* The day's cadence, in the block that proposes the day's work.
+                  It used to be said only in the Contacts header, so the cap was
+                  discovered with a mail already written and a button gone grey.
+                  Amber from the soft cap, red at the hard one. */}
+              <CounterLink
+                href={contacts}
+                value={snap.sentToday}
+                label={t(snap.sentToday >= HARD_CAP ? 'chase.sentCapped' : 'chase.sentToday')}
+                accent={
+                  snap.sentToday >= HARD_CAP
+                    ? 'text-red-400'
+                    : snap.sentToday >= SOFT_CAP
+                      ? 'text-amber-400'
+                      : 'text-[var(--fg-2)]'
+                }
               />
             </>
           ) : (

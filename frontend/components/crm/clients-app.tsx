@@ -66,7 +66,15 @@ const HEADERS: Array<{ key: SortKey; label: string; width: string; right?: boole
   { key: 'mails', label: 'Mails', width: 'md:w-14', right: true },
 ];
 
-export function ClientsApp({ dossiers, locale, windowDays = 90 }: { dossiers: ClientDossier[]; locale: string; windowDays?: number }) {
+export function ClientsApp({
+  dossiers,
+  locale,
+  windowDays = 90,
+}: {
+  dossiers: ClientDossier[];
+  locale: string;
+  windowDays?: number;
+}) {
   // Freshness first: the operator's default question is "who moved lately?",
   // not "who is biggest?" (explicit ask, 18/08/2026).
   const [sort, setSort] = useState<SortKey>('freshness');
@@ -182,18 +190,27 @@ export function ClientsApp({ dossiers, locale, windowDays = 90 }: { dossiers: Cl
       active ? 'text-[var(--fg-2)]' : ''
     }`;
 
-  const opened = openId ? (view.find((d) => d.id === openId) ?? dossiers.find((d) => d.id === openId) ?? null) : null;
+  const opened = openId
+    ? (view.find((d) => d.id === openId) ?? dossiers.find((d) => d.id === openId) ?? null)
+    : null;
 
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[
           { l: 'Clients', v: String(shown.length), h: `${usedCount} ont appelé` },
-          { l: 'Requêtes cumulées', v: totalRequests.toLocaleString('fr-CH'), h: `${windowDays} derniers jours` },
+          {
+            l: 'Requêtes cumulées',
+            v: totalRequests.toLocaleString('fr-CH'),
+            h: `${windowDays} derniers jours`,
+          },
           { l: 'Pays contrôlés', v: String(distinctCountries), h: 'tous clients confondus' },
           { l: 'À débloquer', v: String(counts.blocked), h: 'arrêtés sur un refus' },
         ].map((s) => (
-          <div key={s.l} className="rounded-xl border border-[var(--ink-4)]/60 bg-[var(--ink-2)]/60 px-4 py-3">
+          <div
+            key={s.l}
+            className="rounded-xl border border-[var(--ink-4)]/60 bg-[var(--ink-2)]/60 px-4 py-3"
+          >
             <div className="text-[12px] uppercase tracking-wider text-[var(--fg-5)]">{s.l}</div>
             <div className="font-mono text-2xl tabular-nums text-[var(--fg-1)]">{s.v}</div>
             <div className="text-[12px] text-[var(--fg-4)]">{s.h}</div>
@@ -208,8 +225,8 @@ export function ClientsApp({ dossiers, locale, windowDays = 90 }: { dossiers: Cl
         <p className="text-[12px] text-[var(--fg-5)]">
           Hors clients : {offBooks.requests.toLocaleString('fr-CH')} requête
           {offBooks.requests > 1 ? 's' : ''} de trafic de fermes et de clés d&apos;amorçage sur{' '}
-          {offBooks.count} dossier{offBooks.count > 1 ? 's' : ''}, exclues des cartes ci-dessus comme
-          elles le sont de la vue d&apos;ensemble.
+          {offBooks.count} dossier{offBooks.count > 1 ? 's' : ''}, exclues des cartes ci-dessus
+          comme elles le sont de la vue d&apos;ensemble.
         </p>
       )}
 
@@ -219,7 +236,12 @@ export function ClientsApp({ dossiers, locale, windowDays = 90 }: { dossiers: Cl
             search. On phones the row thumb-scrolls; the old pill bar is gone. */}
         <div className="flex items-center gap-3 overflow-x-auto whitespace-nowrap border-b border-[var(--ink-4)] px-4 py-2 text-[11.5px] uppercase tracking-wider text-[var(--fg-5)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <span className="flex w-auto shrink-0 items-center gap-1 md:w-[27%] md:shrink">
-            <button type="button" onClick={() => onHeader('name')} className={headerBtn(sort === 'name')} title="Trier par nom">
+            <button
+              type="button"
+              onClick={() => onHeader('name')}
+              className={headerBtn(sort === 'name')}
+              title="Trier par nom"
+            >
               Client{arrowOf('name')}
             </button>
             {searchOpen || query ? (
@@ -277,10 +299,17 @@ export function ClientsApp({ dossiers, locale, windowDays = 90 }: { dossiers: Cl
                 }`}
               >
                 {filterMeta && (
-                  <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: filterMeta.colour }} />
+                  <span
+                    className="h-1.5 w-1.5 shrink-0 rounded-full"
+                    style={{ backgroundColor: filterMeta.colour }}
+                  />
                 )}
                 <span className="truncate">
-                  {filterMeta ? `État · ${filterMeta.label}` : filter === 'all' ? 'État · tous' : 'État'}
+                  {filterMeta
+                    ? `État · ${filterMeta.label}`
+                    : filter === 'all'
+                      ? 'État · tous'
+                      : 'État'}
                   {arrowOf('state')}
                 </span>
                 <span aria-hidden className="text-[9px]">
@@ -304,7 +333,11 @@ export function ClientsApp({ dossiers, locale, windowDays = 90 }: { dossiers: Cl
 
         {stateMenuOpen && (
           <>
-            <div className="fixed inset-0 z-20" onClick={() => setStateMenuOpen(false)} aria-hidden />
+            <div
+              className="fixed inset-0 z-20"
+              onClick={() => setStateMenuOpen(false)}
+              aria-hidden
+            />
             <div className="absolute left-3 top-11 z-30 w-72 overflow-hidden rounded-lg border border-[var(--ink-4)] bg-[var(--ink-1)] shadow-2xl md:left-[27%]">
               <button
                 type="button"
@@ -318,8 +351,20 @@ export function ClientsApp({ dossiers, locale, windowDays = 90 }: { dossiers: Cl
               </button>
               {(
                 [
-                  { key: 'used' as Filter, label: 'Ont appelé', n: usedCount, why: 'les adresses qui ont appelé au moins une fois', colour: null },
-                  { key: 'all' as Filter, label: 'Tous', n: shown.length, why: 'toutes les adresses, clés muettes comprises', colour: null },
+                  {
+                    key: 'used' as Filter,
+                    label: 'Ont appelé',
+                    n: usedCount,
+                    why: 'les adresses qui ont appelé au moins une fois',
+                    colour: null,
+                  },
+                  {
+                    key: 'all' as Filter,
+                    label: 'Tous',
+                    n: shown.length,
+                    why: 'toutes les adresses, clés muettes comprises',
+                    colour: null,
+                  },
                   ...[...STATES, ...NUANCES]
                     .filter((v) => counts[v.key] > 0)
                     .map((v) => ({
@@ -329,7 +374,13 @@ export function ClientsApp({ dossiers, locale, windowDays = 90 }: { dossiers: Cl
                       why: v.why,
                       colour: v.colour as string | null,
                     })),
-                ] as Array<{ key: Filter; label: string; n: number; why: string; colour: string | null }>
+                ] as Array<{
+                  key: Filter;
+                  label: string;
+                  n: number;
+                  why: string;
+                  colour: string | null;
+                }>
               ).map((item) => (
                 <button
                   key={item.key}
@@ -344,12 +395,17 @@ export function ClientsApp({ dossiers, locale, windowDays = 90 }: { dossiers: Cl
                   }`}
                 >
                   {item.colour ? (
-                    <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: item.colour }} />
+                    <span
+                      className="h-1.5 w-1.5 shrink-0 rounded-full"
+                      style={{ backgroundColor: item.colour }}
+                    />
                   ) : (
                     <span className="h-1.5 w-1.5 shrink-0" />
                   )}
                   <span className="min-w-0 flex-1 truncate">{item.label}</span>
-                  <span className="font-mono text-[12px] tabular-nums text-[var(--fg-4)]">{item.n}</span>
+                  <span className="font-mono text-[12px] tabular-nums text-[var(--fg-4)]">
+                    {item.n}
+                  </span>
                 </button>
               ))}
             </div>
@@ -387,19 +443,37 @@ export function ClientsApp({ dossiers, locale, windowDays = 90 }: { dossiers: Cl
                       we know one, moves underneath as the gloss it always was. */}
                   <span className="w-full min-w-0 md:w-[27%]">
                     <span className="flex items-center gap-1.5">
-                    {(() => { const chip = chipOfDossier(d); return chip ? (
-                      <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide" style={{ color: chip.color, backgroundColor: chip.bg }}>{chip.label}</span>
-                    ) : null; })()}
-                    {d.wonByOutreach && <ConquestChip compact />}
-                    <span className="block min-w-0 truncate text-sm font-medium text-[var(--fg-1)]" title={d.email}>
-                      {d.email}
-                    </span>
-                    {(() => { const f = flameOf(heatOfDossier(d, new Date()).score); return f ? (
-                      <span className={`shrink-0 text-[11px] ${f.dim ? 'opacity-45' : ''}`}>{f.glyph}</span>
-                    ) : null; })()}
+                      {(() => {
+                        const chip = chipOfDossier(d);
+                        return chip ? (
+                          <span
+                            className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide"
+                            style={{ color: chip.color, backgroundColor: chip.bg }}
+                          >
+                            {chip.label}
+                          </span>
+                        ) : null;
+                      })()}
+                      {d.wonByOutreach && <ConquestChip compact />}
+                      <span
+                        className="block min-w-0 truncate text-sm font-medium text-[var(--fg-1)]"
+                        title={d.email}
+                      >
+                        {d.email}
+                      </span>
+                      {(() => {
+                        const f = flameOf(heatOfDossier(d, new Date()).score);
+                        return f ? (
+                          <span className={`shrink-0 text-[11px] ${f.dim ? 'opacity-45' : ''}`}>
+                            {f.glyph}
+                          </span>
+                        ) : null;
+                      })()}
                     </span>
                     {d.company && (
-                      <span className="block truncate text-[12px] text-[var(--fg-4)]">{d.company}</span>
+                      <span className="block truncate text-[12px] text-[var(--fg-4)]">
+                        {d.company}
+                      </span>
                     )}
                   </span>
                   {/* One state word, then the precision behind it. Never two
@@ -410,7 +484,11 @@ export function ClientsApp({ dossiers, locale, windowDays = 90 }: { dossiers: Cl
                     <span
                       className="truncate text-[13px]"
                       style={{ color: word.colour }}
-                      title={st.derived ? `${word.why} (déduit de la fenêtre : aucune ligne d’activation)` : word.why}
+                      title={
+                        st.derived
+                          ? `${word.why} (déduit de la fenêtre : aucune ligne d’activation)`
+                          : word.why
+                      }
                     >
                       {word.one}
                       {st.derived ? '°' : ''}
@@ -426,12 +504,16 @@ export function ClientsApp({ dossiers, locale, windowDays = 90 }: { dossiers: Cl
                       questions the single number could not answer at once. */}
                   <span className="w-auto text-right font-mono text-sm tabular-nums md:w-[13%]">
                     {todayCalls > 0 ? (
-                      <span className="text-[var(--fg-1)]">{todayCalls.toLocaleString('fr-CH')}</span>
+                      <span className="text-[var(--fg-1)]">
+                        {todayCalls.toLocaleString('fr-CH')}
+                      </span>
                     ) : (
                       <span className="text-[var(--fg-4)]">0</span>
                     )}
                     <span className="text-[var(--fg-4)]"> / </span>
-                    <span className="text-[12px] text-[var(--fg-3)]">{d.requests.toLocaleString('fr-CH')}</span>
+                    <span className="text-[12px] text-[var(--fg-3)]">
+                      {d.requests.toLocaleString('fr-CH')}
+                    </span>
                   </span>
                   <span className="w-auto shrink-0 md:w-24">
                     <MiniSpark days={d.days} />
@@ -447,7 +529,9 @@ export function ClientsApp({ dossiers, locale, windowDays = 90 }: { dossiers: Cl
                       away in the dossier. */}
                   <span
                     className="min-w-0 flex-1 truncate font-mono text-[12px] text-[var(--fg-3)]"
-                    title={d.countries.length > 3 ? d.countries.map((c) => c.code).join(' ') : undefined}
+                    title={
+                      d.countries.length > 3 ? d.countries.map((c) => c.code).join(' ') : undefined
+                    }
                   >
                     {d.countries.length === 0
                       ? '—'
@@ -476,7 +560,14 @@ export function ClientsApp({ dossiers, locale, windowDays = 90 }: { dossiers: Cl
                         écrire
                       </a>
                     )}
-                    {d.mails.hasDraft && <span className="ml-1 text-[var(--warn)]">•</span>}
+                    {d.mails.hasDraft && (
+                      <span
+                        className="ml-1 text-[var(--warn)]"
+                        title="Un brouillon attend dans son fil, pas encore envoyé"
+                      >
+                        •<span className="sr-only">brouillon en attente</span>
+                      </span>
+                    )}
                   </span>
                 </button>
               </div>
@@ -486,7 +577,12 @@ export function ClientsApp({ dossiers, locale, windowDays = 90 }: { dossiers: Cl
       </div>
 
       {opened && (
-        <ClientDossierModal d={opened} locale={locale} windowDays={windowDays} onClose={() => setOpenId(null)} />
+        <ClientDossierModal
+          d={opened}
+          locale={locale}
+          windowDays={windowDays}
+          onClose={() => setOpenId(null)}
+        />
       )}
     </div>
   );

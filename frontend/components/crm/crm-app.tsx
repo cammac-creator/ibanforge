@@ -127,12 +127,19 @@ export function CrmApp({
   // the whole base, not the Prospects segment — the segment is the population,
   // and landing there would show every prospect already written to as well.
   const vue = searchParams.get('vue');
+  // ?vue=reponses and ?vue=relances land on the two work tiles: they are what
+  // the overview's counters point at, and a counter that arrives on the whole
+  // base with its tile still to find is a number, not a link.
   const initialSelection: RowSelection | undefined =
     vue === 'prospection'
       ? { population: 'all', refine: 'prospect' }
       : vue === 'correspondances'
         ? { population: 'institution' }
-        : undefined;
+        : vue === 'reponses'
+          ? { population: 'all', work: 'reply' }
+          : vue === 'relances'
+            ? { population: 'all', work: 'followup' }
+            : undefined;
   const [selectedId, setSelectedId] = useState<string | null>(linked);
   /**
    * The contact the drawer HOLDS, which outlives the one it shows.

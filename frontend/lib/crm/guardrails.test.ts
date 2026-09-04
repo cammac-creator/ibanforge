@@ -38,7 +38,12 @@ const wordsBody = (n: number) => Array.from({ length: n }, () => 'mot').join(' '
 
 describe('checkDraft', () => {
   it('accepts a clean followup', () => {
-    const r = checkDraft({ body: cleanFollowup, sentToday: 2, intent: 'outbound', isFirstTouch: false });
+    const r = checkDraft({
+      body: cleanFollowup,
+      sentToday: 2,
+      intent: 'outbound',
+      isFirstTouch: false,
+    });
     // toEqual([]) rather than a list of not.toContain: an implementation that
     // returns nothing at all has to fail somewhere, and this is where.
     expect(r.issues).toEqual([]);
@@ -50,7 +55,12 @@ describe('checkDraft', () => {
     // the rule it exercises would be the same pasted character, so a rule that
     // blocked on the en dash U+2013 by accident would still pass here. U+2014
     // is the character the owner's rule is about, and nothing else is.
-    const r = checkDraft({ body: `Bonjour ${EM_DASH} voici la suite.`, sentToday: 0, intent: 'outbound', isFirstTouch: false });
+    const r = checkDraft({
+      body: `Bonjour ${EM_DASH} voici la suite.`,
+      sentToday: 0,
+      intent: 'outbound',
+      isFirstTouch: false,
+    });
     expect(r.blocking).toBe(true);
     expect(codes(r)).toContain('em_dash');
   });
@@ -58,7 +68,12 @@ describe('checkDraft', () => {
   it('does not mistake a hyphen for an em dash', () => {
     // The rule is about U+2014, the character that reads as a machine wrote the
     // sentence. A hyphen is ordinary French and appears in most mails.
-    const r = checkDraft({ body: 'Dites-moi si ce rendez-vous vous convient.', sentToday: 0, intent: 'outbound', isFirstTouch: false });
+    const r = checkDraft({
+      body: 'Dites-moi si ce rendez-vous vous convient.',
+      sentToday: 0,
+      intent: 'outbound',
+      isFirstTouch: false,
+    });
     expect(codes(r)).not.toContain('em_dash');
     expect(r.blocking).toBe(false);
   });
@@ -87,7 +102,12 @@ describe('checkDraft', () => {
   });
 
   it('warns when a followup runs long', () => {
-    const r = checkDraft({ body: 'mot '.repeat(120), sentToday: 0, intent: 'outbound', isFirstTouch: false });
+    const r = checkDraft({
+      body: 'mot '.repeat(120),
+      sentToday: 0,
+      intent: 'outbound',
+      isFirstTouch: false,
+    });
     expect(codes(r)).toContain('length');
     expect(r.blocking).toBe(false);
   });
@@ -116,8 +136,23 @@ describe('checkDraft', () => {
   });
 
   it('warns when a cold mail has no opt-out', () => {
-    const r = checkDraft({ body: wordsBody(100), sentToday: 0, intent: 'outbound', isFirstTouch: true });
+    const r = checkDraft({
+      body: wordsBody(100),
+      sentToday: 0,
+      intent: 'outbound',
+      isFirstTouch: true,
+    });
     expect(codes(r)).toContain('no_optout');
+  });
+
+  it('takes STOP as an opt-out only as a whole word', () => {
+    const base = { sentToday: 0, intent: 'outbound' as const, isFirstTouch: true };
+    expect(
+      codes(checkDraft({ ...base, body: `${wordsBody(95)} Reply STOP to hear no more.` })),
+    ).not.toContain('no_optout');
+    expect(
+      codes(checkDraft({ ...base, body: `${wordsBody(95)} We stopped guessing BICs.` })),
+    ).toContain('no_optout');
   });
 
   it('does not require an opt-out on a followup', () => {
@@ -144,7 +179,12 @@ describe('checkDraft', () => {
   });
 
   it('accepts the clean cold template', () => {
-    const r = checkDraft({ body: cleanColdMail, sentToday: 0, intent: 'outbound', isFirstTouch: true });
+    const r = checkDraft({
+      body: cleanColdMail,
+      sentToday: 0,
+      intent: 'outbound',
+      isFirstTouch: true,
+    });
     expect(r.issues).toEqual([]);
     expect(r.blocking).toBe(false);
   });
@@ -173,7 +213,12 @@ describe('the daily cap boundary', () => {
   });
 
   it('says nothing one send below the soft cap', () => {
-    const r = checkDraft({ body, sentToday: SOFT_CAP - 1, intent: 'outbound', isFirstTouch: false });
+    const r = checkDraft({
+      body,
+      sentToday: SOFT_CAP - 1,
+      intent: 'outbound',
+      isFirstTouch: false,
+    });
     expect(codes(r)).not.toContain('daily_high');
     expect(codes(r)).not.toContain('daily_cap');
   });
@@ -181,7 +226,12 @@ describe('the daily cap boundary', () => {
   it('still only warns one send below the hard cap', () => {
     // The gap between the two thresholds has to stay a warning tier. Slide the
     // blocking test down by one and the operator loses the last two sends.
-    const r = checkDraft({ body, sentToday: HARD_CAP - 1, intent: 'outbound', isFirstTouch: false });
+    const r = checkDraft({
+      body,
+      sentToday: HARD_CAP - 1,
+      intent: 'outbound',
+      isFirstTouch: false,
+    });
     expect(codes(r)).toContain('daily_high');
     expect(codes(r)).not.toContain('daily_cap');
     expect(r.blocking).toBe(false);
@@ -189,7 +239,12 @@ describe('the daily cap boundary', () => {
 
   it('keeps blocking past the hard cap', () => {
     // Guards against an equality test where a threshold is meant.
-    const r = checkDraft({ body, sentToday: HARD_CAP + 5, intent: 'outbound', isFirstTouch: false });
+    const r = checkDraft({
+      body,
+      sentToday: HARD_CAP + 5,
+      intent: 'outbound',
+      isFirstTouch: false,
+    });
     expect(codes(r)).toContain('daily_cap');
     expect(r.blocking).toBe(true);
   });
@@ -203,42 +258,87 @@ describe('the daily cap boundary', () => {
 
 describe('the length windows', () => {
   it('warns just under the followup minimum and stops at it', () => {
-    expect(codes(checkDraft({ body: wordsBody(39), sentToday: 0, intent: 'outbound', isFirstTouch: false }))).toContain('length');
-    expect(codes(checkDraft({ body: wordsBody(40), sentToday: 0, intent: 'outbound', isFirstTouch: false }))).not.toContain('length');
+    expect(
+      codes(
+        checkDraft({ body: wordsBody(39), sentToday: 0, intent: 'outbound', isFirstTouch: false }),
+      ),
+    ).toContain('length');
+    expect(
+      codes(
+        checkDraft({ body: wordsBody(40), sentToday: 0, intent: 'outbound', isFirstTouch: false }),
+      ),
+    ).not.toContain('length');
   });
 
   it('is silent at the followup maximum and warns one word past it', () => {
-    expect(codes(checkDraft({ body: wordsBody(90), sentToday: 0, intent: 'outbound', isFirstTouch: false }))).not.toContain('length');
-    expect(codes(checkDraft({ body: wordsBody(91), sentToday: 0, intent: 'outbound', isFirstTouch: false }))).toContain('length');
+    expect(
+      codes(
+        checkDraft({ body: wordsBody(90), sentToday: 0, intent: 'outbound', isFirstTouch: false }),
+      ),
+    ).not.toContain('length');
+    expect(
+      codes(
+        checkDraft({ body: wordsBody(91), sentToday: 0, intent: 'outbound', isFirstTouch: false }),
+      ),
+    ).toContain('length');
   });
 
   it('warns just under the first-touch minimum and stops at it', () => {
-    expect(codes(checkDraft({ body: wordsBody(89), sentToday: 0, intent: 'outbound', isFirstTouch: true }))).toContain('length');
-    expect(codes(checkDraft({ body: wordsBody(90), sentToday: 0, intent: 'outbound', isFirstTouch: true }))).not.toContain('length');
+    expect(
+      codes(
+        checkDraft({ body: wordsBody(89), sentToday: 0, intent: 'outbound', isFirstTouch: true }),
+      ),
+    ).toContain('length');
+    expect(
+      codes(
+        checkDraft({ body: wordsBody(90), sentToday: 0, intent: 'outbound', isFirstTouch: true }),
+      ),
+    ).not.toContain('length');
   });
 
   it('is silent at the first-touch maximum and warns one word past it', () => {
-    expect(codes(checkDraft({ body: wordsBody(140), sentToday: 0, intent: 'outbound', isFirstTouch: true }))).not.toContain('length');
-    expect(codes(checkDraft({ body: wordsBody(141), sentToday: 0, intent: 'outbound', isFirstTouch: true }))).toContain('length');
+    expect(
+      codes(
+        checkDraft({ body: wordsBody(140), sentToday: 0, intent: 'outbound', isFirstTouch: true }),
+      ),
+    ).not.toContain('length');
+    expect(
+      codes(
+        checkDraft({ body: wordsBody(141), sentToday: 0, intent: 'outbound', isFirstTouch: true }),
+      ),
+    ).toContain('length');
   });
 
   it('reads a long body as fine cold and too long as a followup', () => {
     // Same 99 words either way. Only the flag moves, so an implementation that
     // ignores isFirstTouch, or that swaps the two windows, dies here.
     const long = { body: cleanColdMail, sentToday: 0 };
-    expect(codes(checkDraft({ ...long, intent: 'outbound', isFirstTouch: true }))).not.toContain('length');
-    expect(codes(checkDraft({ ...long, intent: 'outbound', isFirstTouch: false }))).toContain('length');
+    expect(codes(checkDraft({ ...long, intent: 'outbound', isFirstTouch: true }))).not.toContain(
+      'length',
+    );
+    expect(codes(checkDraft({ ...long, intent: 'outbound', isFirstTouch: false }))).toContain(
+      'length',
+    );
   });
 
   it('reads a short body as fine as a followup and too short cold', () => {
     // The mirror image, 60 words. Together the two pin the window both ways up.
     const short = { body: cleanFollowup, sentToday: 0 };
-    expect(codes(checkDraft({ ...short, intent: 'outbound', isFirstTouch: false }))).not.toContain('length');
-    expect(codes(checkDraft({ ...short, intent: 'outbound', isFirstTouch: true }))).toContain('length');
+    expect(codes(checkDraft({ ...short, intent: 'outbound', isFirstTouch: false }))).not.toContain(
+      'length',
+    );
+    expect(codes(checkDraft({ ...short, intent: 'outbound', isFirstTouch: true }))).toContain(
+      'length',
+    );
   });
 
   it('counts words, not characters', () => {
-    const r = checkDraft({ body: wordsBody(50), sentToday: 0, intent: 'outbound', isFirstTouch: false });
+    const r = checkDraft({
+      body: wordsBody(50),
+      sentToday: 0,
+      intent: 'outbound',
+      isFirstTouch: false,
+    });
     // 50 words is 199 characters. A character-based window would misfire.
     expect(codes(r)).not.toContain('length');
   });
@@ -255,12 +355,22 @@ describe('the length windows', () => {
     // makes a stray Enter send nothing at all. So what is pinned here is the
     // division of labour: the word window stays silent, and the block that
     // takes the send away comes from the rule written for it.
-    const emptyFollowup = checkDraft({ body: '', sentToday: 0, intent: 'outbound', isFirstTouch: false });
+    const emptyFollowup = checkDraft({
+      body: '',
+      sentToday: 0,
+      intent: 'outbound',
+      isFirstTouch: false,
+    });
     expect(codes(emptyFollowup)).not.toContain('length');
     expect(codes(emptyFollowup)).toEqual(['empty_body']);
     expect(emptyFollowup.blocking).toBe(true);
 
-    const blankColdMail = checkDraft({ body: '   \n  ', sentToday: 0, intent: 'outbound', isFirstTouch: true });
+    const blankColdMail = checkDraft({
+      body: '   \n  ',
+      sentToday: 0,
+      intent: 'outbound',
+      isFirstTouch: true,
+    });
     expect(codes(blankColdMail)).not.toContain('length');
     expect(codes(blankColdMail)).toEqual(['empty_body', 'no_optout']);
   });
@@ -269,11 +379,18 @@ describe('the length windows', () => {
 describe('link counting', () => {
   it('accepts one link and warns on the second', () => {
     const one = 'Le détail est ici https://a.example.com si vous voulez le lire.';
-    expect(codes(checkDraft({ body: one, sentToday: 0, intent: 'outbound', isFirstTouch: false }))).not.toContain(
-      'too_many_links',
-    );
     expect(
-      codes(checkDraft({ body: `${one} Et là https://b.example.com.`, sentToday: 0, intent: 'outbound', isFirstTouch: false })),
+      codes(checkDraft({ body: one, sentToday: 0, intent: 'outbound', isFirstTouch: false })),
+    ).not.toContain('too_many_links');
+    expect(
+      codes(
+        checkDraft({
+          body: `${one} Et là https://b.example.com.`,
+          sentToday: 0,
+          intent: 'outbound',
+          isFirstTouch: false,
+        }),
+      ),
     ).toContain('too_many_links');
   });
 
@@ -384,7 +501,12 @@ describe('the report', () => {
   });
 
   it('is blocking only when an issue is', () => {
-    const warned = checkDraft({ body: wordsBody(200), sentToday: SOFT_CAP, intent: 'outbound', isFirstTouch: false });
+    const warned = checkDraft({
+      body: wordsBody(200),
+      sentToday: SOFT_CAP,
+      intent: 'outbound',
+      isFirstTouch: false,
+    });
     expect(warned.issues.length).toBeGreaterThan(0);
     expect(warned.issues.every((i) => i.level === 'warning')).toBe(true);
     expect(warned.blocking).toBe(false);
@@ -398,9 +520,19 @@ describe('the report', () => {
     // ship its message unswept, which is why the set is asserted before the
     // loop rather than trusted.
     const body = `Offre gratuite ${EM_DASH} voir https://a.example.com et https://b.example.com.`;
-    const capped = checkDraft({ body, sentToday: HARD_CAP, intent: 'outbound', isFirstTouch: true });
+    const capped = checkDraft({
+      body,
+      sentToday: HARD_CAP,
+      intent: 'outbound',
+      isFirstTouch: true,
+    });
     const high = checkDraft({ body, sentToday: SOFT_CAP, intent: 'outbound', isFirstTouch: true });
-    const blank = checkDraft({ body: '   ', sentToday: 0, intent: 'outbound', isFirstTouch: false });
+    const blank = checkDraft({
+      body: '   ',
+      sentToday: 0,
+      intent: 'outbound',
+      isFirstTouch: false,
+    });
     const all = [...capped.issues, ...high.issues, ...blank.issues];
 
     expect(new Set(all.map((i) => i.code))).toEqual(
@@ -432,17 +564,51 @@ describe('the report', () => {
    * send button, which is what makes this the load-bearing column.
    */
   const SEVERITIES: Array<[GuardrailIssue['code'], GuardrailIssue['level'], CheckInput]> = [
-    ['em_dash', 'blocking', { body: `Bonjour ${EM_DASH} la suite.`, sentToday: 0, intent: 'outbound', isFirstTouch: false }],
-    ['daily_cap', 'blocking', { body: cleanFollowup, sentToday: HARD_CAP, intent: 'outbound', isFirstTouch: false }],
-    ['daily_high', 'warning', { body: cleanFollowup, sentToday: SOFT_CAP, intent: 'outbound', isFirstTouch: false }],
-    ['length', 'warning', { body: wordsBody(5), sentToday: 0, intent: 'outbound', isFirstTouch: false }],
+    [
+      'em_dash',
+      'blocking',
+      {
+        body: `Bonjour ${EM_DASH} la suite.`,
+        sentToday: 0,
+        intent: 'outbound',
+        isFirstTouch: false,
+      },
+    ],
+    [
+      'daily_cap',
+      'blocking',
+      { body: cleanFollowup, sentToday: HARD_CAP, intent: 'outbound', isFirstTouch: false },
+    ],
+    [
+      'daily_high',
+      'warning',
+      { body: cleanFollowup, sentToday: SOFT_CAP, intent: 'outbound', isFirstTouch: false },
+    ],
+    [
+      'length',
+      'warning',
+      { body: wordsBody(5), sentToday: 0, intent: 'outbound', isFirstTouch: false },
+    ],
     [
       'too_many_links',
       'warning',
-      { body: `${cleanFollowup} https://a.example.com https://b.example.com`, sentToday: 0, intent: 'outbound', isFirstTouch: false },
+      {
+        body: `${cleanFollowup} https://a.example.com https://b.example.com`,
+        sentToday: 0,
+        intent: 'outbound',
+        isFirstTouch: false,
+      },
     ],
-    ['no_optout', 'warning', { body: wordsBody(100), sentToday: 0, intent: 'outbound', isFirstTouch: true }],
-    ['spam_word', 'warning', { body: `${cleanFollowup} gratuit`, sentToday: 0, intent: 'outbound', isFirstTouch: false }],
+    [
+      'no_optout',
+      'warning',
+      { body: wordsBody(100), sentToday: 0, intent: 'outbound', isFirstTouch: true },
+    ],
+    [
+      'spam_word',
+      'warning',
+      { body: `${cleanFollowup} gratuit`, sentToday: 0, intent: 'outbound', isFirstTouch: false },
+    ],
   ];
 
   for (const [code, level, input] of SEVERITIES) {
@@ -505,7 +671,12 @@ describe('the subject line', () => {
   it('behaves exactly as before when the subject is omitted', () => {
     // Task 11 has to be able to adopt this without a flag day, so the two calls
     // must be indistinguishable.
-    const withoutSubject = checkDraft({ body: cleanColdMail, sentToday: SOFT_CAP, intent: 'outbound', isFirstTouch: true });
+    const withoutSubject = checkDraft({
+      body: cleanColdMail,
+      sentToday: SOFT_CAP,
+      intent: 'outbound',
+      isFirstTouch: true,
+    });
     const withClean = checkDraft({
       subject: 'Une question',
       body: cleanColdMail,
@@ -578,7 +749,13 @@ describe('the subject line', () => {
   });
 
   it('leaves the cold opt-out rule reading the body', () => {
-    const r = checkDraft({ subject: 'Une question', body: coldBody, sentToday: 0, intent: 'outbound', isFirstTouch: true });
+    const r = checkDraft({
+      subject: 'Une question',
+      body: coldBody,
+      sentToday: 0,
+      intent: 'outbound',
+      isFirstTouch: true,
+    });
     expect(codes(r)).not.toContain('no_optout');
   });
 });
@@ -587,13 +764,23 @@ describe('the length message', () => {
   it('says one mot, not one mots', () => {
     // Task 11 checks as the operator types, so the first word typed shows this
     // message on every new draft.
-    const r = checkDraft({ body: 'Bonjour', sentToday: 0, intent: 'outbound', isFirstTouch: false });
+    const r = checkDraft({
+      body: 'Bonjour',
+      sentToday: 0,
+      intent: 'outbound',
+      isFirstTouch: false,
+    });
     const message = r.issues.find((i) => i.code === 'length')?.message ?? '';
     expect(message).toContain('1 mot.');
   });
 
   it('says two mots', () => {
-    const r = checkDraft({ body: 'Bonjour vous', sentToday: 0, intent: 'outbound', isFirstTouch: false });
+    const r = checkDraft({
+      body: 'Bonjour vous',
+      sentToday: 0,
+      intent: 'outbound',
+      isFirstTouch: false,
+    });
     expect(r.issues.find((i) => i.code === 'length')?.message ?? '').toContain('2 mots.');
   });
 });
@@ -619,7 +806,13 @@ Claude-Alain`;
   const previous = { subject: 'Vérification des coordonnées bancaires', text: sent };
 
   it('warns when the draft is the mail already sent', () => {
-    const r = checkDraft({ body: sent, sentToday: 0, intent: 'outbound', isFirstTouch: false, previous });
+    const r = checkDraft({
+      body: sent,
+      sentToday: 0,
+      intent: 'outbound',
+      isFirstTouch: false,
+      previous,
+    });
     expect(codes(r)).toContain('repeat_previous');
   });
 
@@ -627,13 +820,25 @@ Claude-Alain`;
     // The hard requirement of this rule. Resending a close text is an editorial
     // call the owner is entitled to make, unlike an em dash or the daily cap,
     // which are promises to the domain's reputation.
-    const r = checkDraft({ body: sent, sentToday: 0, intent: 'outbound', isFirstTouch: false, previous });
+    const r = checkDraft({
+      body: sent,
+      sentToday: 0,
+      intent: 'outbound',
+      isFirstTouch: false,
+      previous,
+    });
     expect(r.issues.find((i) => i.code === 'repeat_previous')?.level).toBe('warning');
     expect(r.blocking).toBe(false);
   });
 
   it('says how much of the text is old, and what to do about it', () => {
-    const r = checkDraft({ body: sent, sentToday: 0, intent: 'outbound', isFirstTouch: false, previous });
+    const r = checkDraft({
+      body: sent,
+      sentToday: 0,
+      intent: 'outbound',
+      isFirstTouch: false,
+      previous,
+    });
     const message = r.issues.find((i) => i.code === 'repeat_previous')?.message ?? '';
     expect(message).toContain('100 %');
     // An instruction, not only a diagnosis.
@@ -648,8 +853,14 @@ Claude-Alain`;
     // comma. It also has to be a value other than 100, or a hard-coded
     // "Environ 100 %" would pass every test above.
     const half = `${sent.slice(0, 480)}\n\nUne idée toute neuve, écrite pour ce mail seulement, qui ne doit rien à ce qui précède et qui rallonge le texte sans le répéter du tout aujourd'hui.`;
-    const message = checkDraft({ body: half, sentToday: 0, intent: 'outbound', isFirstTouch: false, previous })
-      .issues.find((i) => i.code === 'repeat_previous')?.message ?? '';
+    const message =
+      checkDraft({
+        body: half,
+        sentToday: 0,
+        intent: 'outbound',
+        isFirstTouch: false,
+        previous,
+      }).issues.find((i) => i.code === 'repeat_previous')?.message ?? '';
     expect(message).toMatch(/Environ \d0 %/);
   });
 
@@ -684,7 +895,13 @@ Si le sujet ne vous parle pas, dites-le moi franchement et je ne reviendrai pas 
 
 Bien à vous,
 Claude-Alain`;
-    const r = checkDraft({ body: genuine, sentToday: 0, intent: 'outbound', isFirstTouch: false, previous });
+    const r = checkDraft({
+      body: genuine,
+      sentToday: 0,
+      intent: 'outbound',
+      isFirstTouch: false,
+      previous,
+    });
     expect(codes(r)).not.toContain('repeat_previous');
   });
 
@@ -741,7 +958,14 @@ Claude-Alain`;
   it('says nothing about an empty subject', () => {
     // A draft being written has no subject yet, and neither does one saved from
     // a generation that returned none. Neither is a duplicate.
-    const r = checkDraft({ subject: '  ', body: cleanFollowup, sentToday: 0, intent: 'outbound', isFirstTouch: false, previous });
+    const r = checkDraft({
+      subject: '  ',
+      body: cleanFollowup,
+      sentToday: 0,
+      intent: 'outbound',
+      isFirstTouch: false,
+      previous,
+    });
     expect(codes(r)).not.toContain('same_subject');
   });
 
@@ -793,10 +1017,27 @@ describe('the names the override button reads', () => {
     { body: cleanFollowup, sentToday: HARD_CAP, intent: 'outbound', isFirstTouch: false },
     { body: cleanFollowup, sentToday: SOFT_CAP, intent: 'outbound', isFirstTouch: false },
     { body: wordsBody(3), sentToday: 0, intent: 'outbound', isFirstTouch: false },
-    { body: 'https://a.example.net https://b.example.net', sentToday: 0, intent: 'outbound', isFirstTouch: false },
+    {
+      body: 'https://a.example.net https://b.example.net',
+      sentToday: 0,
+      intent: 'outbound',
+      isFirstTouch: false,
+    },
     { body: cleanFollowup, sentToday: 0, intent: 'outbound', isFirstTouch: true },
-    { body: `${cleanFollowup} C’est gratuit.`, sentToday: 0, intent: 'outbound', isFirstTouch: false },
-    { subject: 'Un objet déjà utilisé', body: cleanColdMail, sentToday: 0, intent: 'outbound', isFirstTouch: false, previous },
+    {
+      body: `${cleanFollowup} C’est gratuit.`,
+      sentToday: 0,
+      intent: 'outbound',
+      isFirstTouch: false,
+    },
+    {
+      subject: 'Un objet déjà utilisé',
+      body: cleanColdMail,
+      sentToday: 0,
+      intent: 'outbound',
+      isFirstTouch: false,
+      previous,
+    },
   ];
 
   const raised = battery.flatMap((input) => checkDraft(input).issues);

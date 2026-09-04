@@ -87,8 +87,14 @@ const OPTOUT_HINTS = [
   'opt out',
   'opt-out',
   'unsubscribe',
-  'stop',
 ];
+
+/**
+ * The one-word opt-out, matched as a WORD. As a substring, "stop" was
+ * satisfied by "stopped", "stops" and "non-stop" — the rule that protects the
+ * sending domain on a cold first mail was the easiest one to pass by accident.
+ */
+const OPTOUT_WORD = /\bstop\b/;
 
 const LINK_SCHEMES = ['https://', 'http://'];
 
@@ -259,11 +265,16 @@ export function checkDraft({
     }
 
     // Body only: an opt-out in the header is not an opt-out.
-    if (isFirstTouch && !OPTOUT_HINTS.some((h) => lowerBody.includes(h))) {
+    if (
+      isFirstTouch &&
+      !OPTOUT_HINTS.some((h) => lowerBody.includes(h)) &&
+      !OPTOUT_WORD.test(lowerBody)
+    ) {
       issues.push({
         code: 'no_optout',
         level: 'warning',
-        message: 'Pas de sortie proposée. Un premier mail à froid doit offrir de ne plus être contacté.',
+        message:
+          'Pas de sortie proposée. Un premier mail à froid doit offrir de ne plus être contacté.',
       });
     }
 

@@ -3,7 +3,7 @@ import { AliasRules } from '@/components/crm/alias-rules';
 import { NoReplyRules } from '@/components/crm/no-reply-rules';
 import { FreshnessBadge } from '@/components/crm/freshness-badge';
 import { fetchCrmData } from '@/lib/crm/build-contacts';
-import { SOFT_CAP } from '@/lib/crm/sent-today';
+import { HARD_CAP, SOFT_CAP } from '@/lib/crm/sent-today';
 import { crmSnapshot } from '@/lib/crm/snapshot';
 
 /**
@@ -59,8 +59,24 @@ export default async function ContactsPage() {
               the moment a send is refused, which is after the mail is written.
               Amber from SOFT_CAP, imported and never retyped, so the operator
               sees the pace before deciding to write rather than after. */}
-          <span className={sentToday >= SOFT_CAP ? 'text-amber-400' : undefined}>
+          <span
+            className={
+              sentToday >= HARD_CAP
+                ? 'font-medium text-red-400'
+                : sentToday >= SOFT_CAP
+                  ? 'text-amber-400'
+                  : undefined
+            }
+          >
             {sentToday} envoyé{sentToday > 1 ? 's' : ''} aujourd’hui
+            {/* Two colours for two different facts. Amber says slow down; red
+                says the prospecting door is shut for the day, which the
+                guardrail would otherwise only say once a mail was written. */}
+            {sentToday >= HARD_CAP
+              ? ' — plafond atteint, tout envoi de prospection est bloqué jusqu’à demain'
+              : sentToday >= SOFT_CAP
+                ? ` — encore ${HARD_CAP - sentToday} avant le plafond`
+                : ''}
           </span>
           {(() => {
             const drafts = contacts.filter((c) => c.draft !== null).length;

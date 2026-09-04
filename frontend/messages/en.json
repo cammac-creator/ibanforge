@@ -578,6 +578,8 @@
         "due": "follow-ups due",
         "ready": "mails ready to send",
         "freeActive": "active free users to convert",
+        "sentToday": "sent today",
+        "sentCapped": "sent today — cap reached, prospecting closed until tomorrow",
         "crmDown": "Contact base unreadable: counters unavailable, and that is not a zero.",
         "reason": {
           "paid-dormant": "paid, went quiet",
@@ -1743,15 +1745,7 @@
           "UBSWCHZH80A",
           "OK"
         ],
-        [
-          "Gamma Transports",
-          "CH10 0023 … 2346",
-          "Do not pay",
-          "IBAN invalid",
-          "",
-          "",
-          ""
-        ],
+        ["Gamma Transports", "CH10 0023 … 2346", "Do not pay", "IBAN invalid", "", "", ""],
         [
           "Delta Consulting",
           "CH93 0076 … 2957",
@@ -1761,15 +1755,7 @@
           "",
           "OK"
         ],
-        [
-          "Beta Elektro GmbH",
-          "DE89 3704 … 3000",
-          "OK",
-          "",
-          "Commerzbank AG",
-          "COBADEFFXXX",
-          "OK"
-        ]
+        ["Beta Elektro GmbH", "DE89 3704 … 3000", "OK", "", "Commerzbank AG", "COBADEFFXXX", "OK"]
       ],
       "status": {
         "ok": "OK",
