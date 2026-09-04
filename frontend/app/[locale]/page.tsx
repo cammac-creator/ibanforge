@@ -92,6 +92,7 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
 
   const film: FilmStrings = {
     cue: t('film.cue'),
+    heading: t('film.heading'),
     heat: {
       eyebrow: t('film.heat.eyebrow'), title: t('film.heat.title'), copy: t('film.heat.copy'),
       country: t('film.heat.country'), check: t('film.heat.check'),
@@ -164,7 +165,7 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
         <FoldDemo iban="CH1000230000000012345" fallback={DEFAULT_RESULT.iban} />
       </section>
 
-      {/* ── The film: five forging stations, scrubbed by scroll ──────────── */}
+      {/* ── The film: four forging stations, scrubbed by scroll ──────────── */}
       <ForgeFilm t={film} playgroundHref={`/${locale}/playground`} />
 
       {/* ── Sourced stats, counting up on scroll ─────────────────────────── */}
@@ -193,10 +194,13 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
         <div className="wrap">
           <h2 className="sect-h" id="h-audit">{t('audit.heading')}</h2>
           <p className="sect-sub">{t('audit.text')}</p>
-          <div className="hero-cta" style={{ marginTop: '1.4rem' }}>
-            <Link href={`/${locale}/audit`} className="btn-ghost-link">
+          {/* Audit 2026-09-04 (M4): the only CHF price and the only no-code
+              offer of the page were announced by a negation and a ghost
+              button. A full button, centred like the section. */}
+          <div className="hero-cta hero-cta-center" style={{ marginTop: '1.4rem' }}>
+            <Button size="lg" variant="amber" className="px-8" render={<Link href={`/${locale}/audit`} />}>
               {t('audit.cta')}
-            </Link>
+            </Button>
           </div>
         </div>
       </section>

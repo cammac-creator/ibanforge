@@ -1,7 +1,13 @@
 "use client"
 
 /**
- * The forge film — five pinned stations scrubbed by scroll.
+ * The forge film — four pinned stations scrubbed by scroll.
+ *
+ * Audit 2026-09-04 (L2): five stations of 190vh made the film 60 % of the
+ * page and pushed every buying fact past the two-thirds mark. The strike
+ * (mod-97, free everywhere) is no longer a station of its own: it closes the
+ * heat station instead, and each station scrubs over 140vh (130vh on a
+ * phone). The proof the film used to carry now plays at the fold.
  *
  * PE-safe by construction: this component server-renders complete static
  * content; every hidden start state in globals.css is gated behind
@@ -14,6 +20,7 @@ import { useEffect, useRef } from "react"
 
 export interface FilmStrings {
   cue: string
+  heading: string
   heat: {
     eyebrow: string; title: string; copy: string
     country: string; check: string; bank: string; account: string
@@ -207,31 +214,33 @@ export function ForgeFilm({ t, playgroundHref }: { t: FilmStrings; playgroundHre
       resizeCanvas()
     }
 
+    // One station, two beats: the address heats and splits into its parts
+    // over the first half of the scrub, then the mod-97 digits fly into
+    // place and the checksum stamp lands.
     const heat = (p: number) => {
-      if (!ibanBar) return
-      const e = ease(p)
-      ibanBar.style.color = mix(DULL, HOT, e)
-      ibanBar.style.textShadow =
-        `0 0 ${(18 * e).toFixed(1)}px rgba(245,158,11,${(0.55 * e).toFixed(3)}),` +
-        `0 2px ${(46 * e).toFixed(1)}px rgba(239,68,68,${(0.3 * e).toFixed(3)})`
-      segs.forEach((sg) => {
-        sg.classList.toggle("lit", p >= parseFloat(sg.getAttribute("data-lt") || "1"))
-      })
-    }
-    const strike = (p: number) => {
+      if (ibanBar) {
+        const e = ease(sub(p, 0, 0.5))
+        ibanBar.style.color = mix(DULL, HOT, e)
+        ibanBar.style.textShadow =
+          `0 0 ${(18 * e).toFixed(1)}px rgba(245,158,11,${(0.55 * e).toFixed(3)}),` +
+          `0 2px ${(46 * e).toFixed(1)}px rgba(239,68,68,${(0.3 * e).toFixed(3)})`
+        segs.forEach((sg) => {
+          sg.classList.toggle("lit", p >= parseFloat(sg.getAttribute("data-lt") || "1"))
+        })
+      }
       if (!modLine) return
-      const k = 1 - ease(sub(p, 0.08, 0.5))
+      const k = 1 - ease(sub(p, 0.5, 0.82))
       modLine.style.setProperty("--k", k.toFixed(4))
-      if (p >= 0.55 && !strikeFlag) {
+      if (p >= 0.86 && !strikeFlag) {
         strikeFlag = true
         burst()
-        const pin = stations[1]?.pin
+        const pin = stations[0]?.pin
         if (pin) {
           pin.classList.add("shake")
           setTimeout(() => pin.classList.remove("shake"), 400)
         }
       }
-      if (p < 0.4) strikeFlag = false
+      if (p < 0.7) strikeFlag = false
     }
     const quench = (p: number) => {
       qRows.forEach((row, i) => {
@@ -255,7 +264,7 @@ export function ForgeFilm({ t, playgroundHref }: { t: FilmStrings; playgroundHre
       ship.style.opacity = s.toFixed(3)
       ship.style.transform = `translateY(${(44 - 44 * s).toFixed(1)}px)`
     }
-    const updaters = [heat, strike, quench, stamp, shipFn]
+    const updaters = [heat, quench, stamp, shipFn]
 
     let raf = 0
     let running = false
@@ -341,61 +350,52 @@ export function ForgeFilm({ t, playgroundHref }: { t: FilmStrings; playgroundHre
   }, [])
 
   return (
-    <section className="film" ref={rootRef} aria-label="How IBANforge forges bank data">
+    <section className="film" ref={rootRef} aria-labelledby="h-film">
+      {/* Audit 2026-09-04 (M7): the station titles were five h2 — the document
+          outline opened with a poem before any product heading. One real h2
+          names the film; the stations are h3 beneath it. */}
+      <h2 className="sr-only" id="h-film">{t.heading}</h2>
       <div className="rail" aria-hidden="true"><span className="rail-head" /></div>
 
-      {/* 01 · HEAT */}
+      {/* 01 · HEAT + STRIKE */}
       <article className="st">
         <div className="pin">
           <Scene html={SCENE_HEAT} />
+          <Scene html={SCENE_STRIKE} />
+          <canvas className="sparks-canvas" aria-hidden="true" />
           <div className="st-inner">
-            <p className="st-eyebrow"><span className="st-num">01</span> <span className="eyebrow">{t.heat.eyebrow}</span></p>
-            <h2 className="st-title">{t.heat.title}</h2>
+            <p className="st-eyebrow"><span className="st-num">01</span> <span className="eyebrow">{t.heat.eyebrow} · {t.strike.eyebrow}</span></p>
+            <h3 className="st-title">{t.heat.title}</h3>
             <div className="st-stage">
-              <p className="iban-bar"><span className="seg seg-cc" data-lt="0.45">CH</span><span className="seg seg-ck" data-lt="0.6">10</span><span className="seg seg-bank" data-lt="0.75">00230</span><span className="seg seg-acct" data-lt="0.9">000000012345</span></p>
+              <p className="iban-bar"><span className="seg seg-cc" data-lt="0.14">CH</span><span className="seg seg-ck" data-lt="0.24">10</span><span className="seg seg-bank" data-lt="0.34">00230</span><span className="seg seg-acct" data-lt="0.44">000000012345</span></p>
               <ul className="parse">
-                <li data-t="0.45"><span className="pdot pdot-cc" aria-hidden="true" />{t.heat.country}</li>
-                <li data-t="0.6"><span className="pdot pdot-ck" aria-hidden="true" />{t.heat.check}</li>
-                <li data-t="0.75"><span className="pdot pdot-bank" aria-hidden="true" />{t.heat.bank}</li>
-                <li data-t="0.9"><span className="pdot pdot-acct" aria-hidden="true" />{t.heat.account}</li>
+                <li data-t="0.14"><span className="pdot pdot-cc" aria-hidden="true" />{t.heat.country}</li>
+                <li data-t="0.24"><span className="pdot pdot-ck" aria-hidden="true" />{t.heat.check}</li>
+                <li data-t="0.34"><span className="pdot pdot-bank" aria-hidden="true" />{t.heat.bank}</li>
+                <li data-t="0.44"><span className="pdot pdot-acct" aria-hidden="true" />{t.heat.account}</li>
               </ul>
+              <p className="mod-note" data-t="0.5">{t.strike.note}</p>
+              <p
+                className="mod-line"
+                aria-label="00230000000012345121710"
+                dangerouslySetInnerHTML={{ __html: MOD_LINE }}
+              />
+              <p className="mod-eq" data-t="0.82">mod 97 = <b>1</b></p>
+              <p className="stamp-ok" data-t="0.86">{t.strike.valid}</p>
             </div>
             <p className="st-copy">{t.heat.copy}</p>
           </div>
         </div>
       </article>
 
-      {/* 02 · STRIKE */}
-      <article className="st">
-        <div className="pin">
-          <Scene html={SCENE_STRIKE} />
-          <canvas className="sparks-canvas" aria-hidden="true" />
-          <div className="st-inner">
-            <p className="st-eyebrow"><span className="st-num">02</span> <span className="eyebrow">{t.strike.eyebrow}</span></p>
-            <h2 className="st-title">{t.strike.title}</h2>
-            <div className="st-stage">
-              <p className="mod-note">{t.strike.note}</p>
-              <p
-                className="mod-line"
-                aria-label="00230000000012345121710"
-                dangerouslySetInnerHTML={{ __html: MOD_LINE }}
-              />
-              <p className="mod-eq" data-t="0.5">mod 97 = <b>1</b></p>
-              <p className="stamp-ok" data-t="0.55">{t.strike.valid}</p>
-            </div>
-            <p className="st-copy">{t.strike.copy}</p>
-          </div>
-        </div>
-      </article>
-
-      {/* 03 · QUENCH */}
+      {/* 02 · QUENCH */}
       <article className="st">
         <div className="pin">
           <div className="q-layer q-hot" aria-hidden="true" />
           <div className="q-layer q-cold" aria-hidden="true" />
           <div className="st-inner">
-            <p className="st-eyebrow"><span className="st-num">03</span> <span className="eyebrow">{t.quench.eyebrow}</span></p>
-            <h2 className="st-title">{t.quench.title}</h2>
+            <p className="st-eyebrow"><span className="st-num">02</span> <span className="eyebrow">{t.quench.eyebrow}</span></p>
+            <h3 className="st-title">{t.quench.title}</h3>
             <div className="st-stage">
               <ul className="quench">
                 {/* One message key carries the whole screened set ("OFAC · EU · UN"):
@@ -416,13 +416,13 @@ export function ForgeFilm({ t, playgroundHref }: { t: FilmStrings; playgroundHre
         </div>
       </article>
 
-      {/* 04 · STAMP */}
+      {/* 03 · STAMP */}
       <article className="st">
         <div className="pin">
           <Scene html={SCENE_STAMP} mid />
           <div className="st-inner">
-            <p className="st-eyebrow"><span className="st-num">04</span> <span className="eyebrow">{t.stamp.eyebrow}</span></p>
-            <h2 className="st-title">{t.stamp.title}</h2>
+            <p className="st-eyebrow"><span className="st-num">03</span> <span className="eyebrow">{t.stamp.eyebrow}</span></p>
+            <h3 className="st-title">{t.stamp.title}</h3>
             <div className="st-stage">
               <div className="seal">
                 <p className="seal-bic">UBSWCHZH</p>
@@ -441,13 +441,13 @@ export function ForgeFilm({ t, playgroundHref }: { t: FilmStrings; playgroundHre
         </div>
       </article>
 
-      {/* 05 · SHIP */}
+      {/* 04 · SHIP */}
       <article className="st">
         <div className="pin">
           <Scene html={SCENE_SHIP} />
           <div className="st-inner">
-            <p className="st-eyebrow"><span className="st-num">05</span> <span className="eyebrow">{t.ship.eyebrow}</span></p>
-            <h2 className="st-title">{t.ship.title}</h2>
+            <p className="st-eyebrow"><span className="st-num">04</span> <span className="eyebrow">{t.ship.eyebrow}</span></p>
+            <h3 className="st-title">{t.ship.title}</h3>
             <div className="st-stage">
               <figure className="ship">
                 <figcaption className="ship-head"><span className="pill-ok">200 OK</span><span>{t.ship.head}</span></figcaption>

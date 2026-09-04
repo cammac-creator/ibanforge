@@ -110,7 +110,7 @@
         "title": "Les agents paient à l’appel",
         "description": "Les agents autonomes paient à la requête en USDC via x402 — sans compte, sans checkout. Les humains gardent la clé gratuite ou les crédits carte ; les agents ont leur propre rail."
       },
-      "heading": "Tout ce qu'il vous faut"
+      "heading": "Ce qu’un mod-97 ne vous dira jamais"
     },
     "endpoints": {
       "0": {
@@ -203,6 +203,7 @@
     },
     "film": {
       "cue": "Défilez pour forger",
+      "heading": "Ce que l’API fait d’un IBAN, en quatre temps",
       "heat": {
         "eyebrow": "Chauffe",
         "title": "La donnée brute entre dans la forge.",
@@ -258,7 +259,7 @@
       "docsBody": "Spécification OpenAPI, données structurées et résumé en texte brut, pensés pour les crawlers et les agents."
     },
     "audit": {
-      "heading": "Pas développeur ? Auditez votre fichier de créanciers",
+      "heading": "Vous payez des fournisseurs ? Auditez votre fichier de créanciers",
       "text": "Déposez le CSV ou XLSX depuis lequel vous payez. Aperçu gratuit de ce que la banque rejetterait, puis 149 CHF pour le classeur annoté, tout de suite.",
       "cta": "Auditer un fichier"
     }

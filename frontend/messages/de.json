@@ -110,7 +110,7 @@
         "title": "Agenten zahlen pro Aufruf",
         "description": "Autonome Agenten zahlen pro Anfrage in USDC über x402 — ohne Konto, ohne Checkout. Menschen nutzen den Gratis-Key oder Kartenguthaben; Agenten haben ihre eigene Schiene."
       },
-      "heading": "Alles, was Sie brauchen"
+      "heading": "Was eine Mod-97-Prüfung Ihnen nie verrät"
     },
     "endpoints": {
       "0": {
@@ -203,6 +203,7 @@
     },
     "film": {
       "cue": "Scrollen und schmieden",
+      "heading": "Was die API aus einer IBAN macht, in vier Schritten",
       "heat": {
         "eyebrow": "Glut",
         "title": "Rohdaten betreten die Schmiede.",
@@ -258,7 +259,7 @@
       "docsBody": "OpenAPI-Spezifikation, strukturierte Daten und eine Klartext-Zusammenfassung für Crawler und Agenten."
     },
     "audit": {
-      "heading": "Kein Entwickler? Prüfen Sie Ihre Kreditorendatei",
+      "heading": "Sie zahlen Lieferanten? Prüfen Sie Ihre Kreditorendatei",
       "text": "Laden Sie die CSV- oder XLSX-Datei hoch, aus der Sie zahlen. Kostenlose Vorschau dessen, was die Bank abweisen würde, dann 149 CHF für die kommentierte Arbeitsmappe, sofort.",
       "cta": "Datei prüfen"
     }

@@ -110,7 +110,7 @@
         "title": "Agents pay per call",
         "description": "Autonomous agents can pay per request in USDC via x402 — no account, no checkout. Humans keep the free key or card credits; agents get their own rail."
       },
-      "heading": "Everything you need"
+      "heading": "What a mod-97 check will never tell you"
     },
     "endpoints": {
       "0": {
@@ -203,6 +203,7 @@
     },
     "film": {
       "cue": "Scroll to forge",
+      "heading": "What the API makes of an IBAN, in four beats",
       "heat": {
         "eyebrow": "Heat",
         "title": "Raw data enters the forge.",
@@ -258,7 +259,7 @@
       "docsBody": "OpenAPI spec, structured data and a plain-text summary built for crawlers and agents."
     },
     "audit": {
-      "heading": "Not a developer? Audit your creditor file",
+      "heading": "Paying suppliers? Audit your creditor file",
       "text": "Upload the CSV or XLSX you pay from. Free preview of what the bank would reject, then 149 CHF for the annotated workbook, at once.",
       "cta": "Audit a file"
     }

@@ -686,6 +686,9 @@
   gap: 0.8rem;
   margin-top: clamp(1.4rem, 3vh, 2rem);
 }
+.forge .hero-cta-center {
+  justify-content: center;
+}
 .forge .hero-prov {
   margin-top: clamp(1.4rem, 3vh, 2rem);
   font-family: var(--font-mono);
@@ -953,11 +956,12 @@
   font-family: var(--font-mono);
   font-size: 0.75rem;
   color: var(--ffg-3);
+  margin-top: clamp(0.4rem, 1.5vh, 1rem);
 }
 .forge .mod-line {
   font-family: var(--font-mono);
   font-weight: 700;
-  font-size: clamp(0.95rem, 3.6vw, 2.1rem);
+  font-size: clamp(0.9rem, 3vw, 1.7rem);
   letter-spacing: 0.08em;
   color: var(--hot);
   text-shadow: 0 0 22px rgba(245, 158, 11, 0.35);
@@ -1455,8 +1459,10 @@
   html.js .forge .st {
     border-bottom-color: transparent;
   }
+  /* Audit 2026-09-04 (L2): 190vh × 5 was 60 % of the page. 140vh keeps a
+     40vh scrub per station, enough for every beat to land and be read. */
   html.js .forge .st {
-    height: 190vh;
+    height: 140vh;
   }
   html.js .forge .pin {
     position: sticky;
@@ -1467,7 +1473,7 @@
   }
   @media (max-width: 720px) {
     html.js .forge .st {
-      height: 170vh;
+      height: 130vh;
     }
   }
   html.js .forge .rail {
