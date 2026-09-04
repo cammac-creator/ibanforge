@@ -218,7 +218,11 @@ export async function ChaseSection({
 
       {/* Mail nobody owns, with its three real buttons — the only block on the
           old overview that already let the operator act. */}
-      {orphanRes.data?.orphans && orphanRes.data.orphans.length > 0 && (
+      {/* Rendered whenever the queue could be read, empty included: the panel
+          itself decides what an empty queue shows (one quiet line that keeps
+          the rows already dealt with reachable), and gating it here on
+          length > 0 kept that line from ever appearing. */}
+      {orphanRes.data?.orphans && (
         <OrphanMailPanel orphans={orphanRes.data.orphans} totalPending={orphanRes.data.pending} />
       )}
     </OverviewSection>

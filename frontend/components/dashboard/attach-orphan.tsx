@@ -506,13 +506,13 @@ export function AttachOrphanControl({
               the client or prospect file. Said before the confirmation, not
               after, because after it there is nothing left to decide. */}
           {knownAlias ? (
-            <p className="mt-1 text-[11.5px] text-amber-300">
+            <p className="mt-1 text-[12px] text-amber-300">
               ⚠ {sender} est déjà rattaché au client {knownAlias} — l&apos;enregistrer comme
               correspondant créerait une double identité.
             </p>
           ) : (
             known && (
-              <p className="mt-1 text-[11.5px] text-amber-300">
+              <p className="mt-1 text-[12px] text-amber-300">
                 ⚠ {sender} est déjà connu du CRM comme{' '}
                 {known.kind === 'client' ? 'client' : 'prospect'}.
               </p>
@@ -669,7 +669,7 @@ export function AttachOrphanControl({
                 setArmed(false);
                 clearFailure();
               }}
-              className={`rounded border px-2 py-1 text-[11.5px] ${
+              className={`rounded border px-2 py-1 text-[12px] ${
                 cleaned === s.email
                   ? 'border-amber-400 bg-amber-500/15 text-amber-300'
                   : 'border-[var(--ink-4)] text-[var(--fg-2)] hover:border-amber-500/40 hover:text-amber-300'
@@ -684,12 +684,12 @@ export function AttachOrphanControl({
         </div>
       )}
       {Array.isArray(rows) && rows.length > 0 && suggestions.length === 0 && (
-        <p className="mt-1 text-[11.5px] text-[var(--fg-4)]">
+        <p className="mt-1 text-[12px] text-[var(--fg-4)]">
           Aucune correspondance dans le CRM — tape un nom, une société ou une adresse.
         </p>
       )}
       {rows === 'failed' && (
-        <p className="mt-1 text-[11.5px] text-amber-300">
+        <p className="mt-1 text-[12px] text-amber-300">
           L&apos;index CRM n&apos;a pas répondu : pas de suggestions ni de garde-fou d&apos;adresse
           inconnue. Saisie libre possible ; rouvre le formulaire pour réessayer.
         </p>
@@ -717,7 +717,7 @@ export function AttachOrphanControl({
           </p>
         )}
         {valid && Array.isArray(rows) && rows.length > 0 && !addressKnown && (
-          <p className="mt-1 text-[11.5px] text-amber-300">
+          <p className="mt-1 text-[12px] text-amber-300">
             ⚠ {cleaned} n&apos;est ni un détenteur de clé ni un prospect connu du CRM — vérifie
             avant de confirmer.
           </p>
