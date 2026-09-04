@@ -46,10 +46,7 @@ export default async function VendorsPage({
       <section className="flex flex-col items-center text-center px-4 py-28 sm:py-32 gap-7 max-w-3xl mx-auto">
         <span className="eyebrow">{t("eyebrow")}</span>
 
-        <h1
-          className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight font-mono"
-          style={{ lineHeight: 1.08, letterSpacing: "-0.035em" }}
-        >
+        <h1 className="text-5xl sm:text-6xl md:text-7xl display-forge">
           {t("hero.title")}
         </h1>
 

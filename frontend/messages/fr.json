@@ -53,12 +53,7 @@
   },
   "home": {
     "metadata": {
-      "title": "IBANforge — API de validation IBAN et recherche BIC/SWIFT",
-      "description": "Validation IBAN, recherche BIC/SWIFT, données de clearing suisses et risque de conformité pour développeurs et agents IA. Offre gratuite — 200 requêtes/mois ; ensuite carte ou USDC.",
-      "og": {
-        "title": "IBANforge",
-        "description": "L’API de données bancaires pour développeurs et agents IA — validation IBAN, BIC/SWIFT, clearing suisse, risque compliance"
-      }
+      "description": "Validation IBAN, recherche BIC/SWIFT, données de clearing suisses et risque de conformité pour développeurs et agents IA. Offre gratuite — 200 requêtes/mois ; ensuite carte ou USDC."
     },
     "badge": "Live · Europe",
     "hero": {
@@ -158,21 +153,11 @@
       "heading": "Endpoints et tarifs",
       "subtitle": "Commencez avec 200 requêtes gratuites par mois. Payez à mesure que vous grandissez — par carte ou en USDC."
     },
-    "quickStart": {
-      "heading": "Démarrage rapide",
-      "subtitle": "Un POST, une réponse — voici exactement ce que l’API vous renvoie."
-    },
     "cta": {
       "heading": "Prêt à développer ?",
       "description": "Commencez avec une clé gratuite — 200 requêtes par mois, sans carte. Passez à l’échelle en crédits prépayés par carte, ou payez à l’appel en USDC.",
       "button": "Commencer à développer",
       "getKeyButton": "Obtenir une clé gratuite"
-    },
-    "demo": {
-      "valid": "Valide",
-      "server": "serveur",
-      "clearingTitle": "Clearing suisse · SIX",
-      "tryLive": "Essayer en direct"
     },
     "stats": {
       "bic": "entrées BIC",
@@ -202,7 +187,6 @@
       "linkStory": "L'histoire complète"
     },
     "film": {
-      "cue": "Défilez pour forger",
       "heading": "Ce que l’API fait d’un IBAN, en quatre temps",
       "heat": {
         "eyebrow": "Chauffe",
@@ -265,19 +249,19 @@
       "cta": "Lire les règles, rail par rail"
     },
     "integrations": {
-        "heading": "Dans votre langage, votre ERP, votre tableur",
-        "sub": "Chaque paquet ci-dessous existe et s’installe aujourd’hui. Ce qui n’est pas encore publié le dit.",
-        "items": {
-              "ts": "SDK TypeScript / JavaScript",
-              "py": "SDK Python",
-              "java": "SDK Java 17+ · Maven Central",
-              "dotnet": "SDK .NET 8 · depuis les sources, NuGet en attente",
-              "mcp": "Serveur MCP · Claude, Cursor, Cline",
-              "n8n": "Nœud n8n",
-              "odoo": "Module Odoo 18 · BIC et banque remplis à la saisie",
-              "sheets": "Complément Google Sheets",
-              "postman": "Collection Postman"
-        }
+      "heading": "Dans votre langage, votre ERP, votre tableur",
+      "sub": "Chaque paquet ci-dessous existe et s’installe aujourd’hui. Ce qui n’est pas encore publié le dit.",
+      "items": {
+        "ts": "SDK TypeScript / JavaScript",
+        "py": "SDK Python",
+        "java": "SDK Java 17+ · Maven Central",
+        "dotnet": "SDK .NET 8 · depuis les sources, NuGet en attente",
+        "mcp": "Serveur MCP · Claude, Cursor, Cline",
+        "n8n": "Nœud n8n",
+        "odoo": "Module Odoo 18 · BIC et banque remplis à la saisie",
+        "sheets": "Complément Google Sheets",
+        "postman": "Collection Postman"
+      }
     },
     "audit": {
       "heading": "Vous payez des fournisseurs ? Auditez votre fichier de créanciers",
@@ -1784,7 +1768,15 @@
           "UBSWCHZH80A",
           "OK"
         ],
-        ["Gamma Transports", "CH10 0023 … 2346", "Ne pas payer", "IBAN invalide", "", "", ""],
+        [
+          "Gamma Transports",
+          "CH10 0023 … 2346",
+          "Ne pas payer",
+          "IBAN invalide",
+          "",
+          "",
+          ""
+        ],
         [
           "Delta Consulting",
           "CH93 0076 … 2957",
@@ -1794,7 +1786,15 @@
           "",
           "OK"
         ],
-        ["Beta Elektro GmbH", "DE89 3704 … 3000", "OK", "", "Commerzbank AG", "COBADEFFXXX", "OK"]
+        [
+          "Beta Elektro GmbH",
+          "DE89 3704 … 3000",
+          "OK",
+          "",
+          "Commerzbank AG",
+          "COBADEFFXXX",
+          "OK"
+        ]
       ],
       "status": {
         "ok": "OK",

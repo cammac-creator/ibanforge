@@ -1476,13 +1476,17 @@
 .forge .trust-n a {
   color: inherit;
 }
+/* A Swiss cross, not a red bullet: the square carries its white cross. */
 .forge .swiss-sq {
   display: inline-block;
-  width: 9px;
-  height: 9px;
-  background: var(--swiss-500);
+  width: 11px;
+  height: 11px;
+  background:
+    linear-gradient(#fff, #fff) center / 2px 7px no-repeat,
+    linear-gradient(#fff, #fff) center / 7px 2px no-repeat,
+    var(--swiss-500);
   margin-right: 0.5rem;
-  vertical-align: baseline;
+  vertical-align: -1px;
 }
 .forge .reviewed {
   text-align: center;
@@ -1725,6 +1729,18 @@
       max-height: 34vh;
     }
   }
+}
+
+/* Audit 2026-09-04 (L5): one display voice. Bebas carries the brand on the
+   home and on the segment landings (vendors, agents, compare); Inter titles
+   the content pages; the mono face stays for code, labels and instruments. */
+.display-forge {
+  font-family: var(--font-bebas);
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.012em;
+  line-height: 0.98;
+  text-wrap: balance;
 }
 
 /* Site-wide brand lockup (header) — the anvil + IBAN/forge two-tone. */

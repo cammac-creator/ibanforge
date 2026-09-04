@@ -53,12 +53,7 @@
   },
   "home": {
     "metadata": {
-      "title": "IBANforge — IBAN Validation & BIC/SWIFT Lookup API",
-      "description": "IBAN validation, BIC/SWIFT lookup, Swiss clearing data and compliance risk for developers and AI agents. Free tier — 200 requests/month; pay by card or in USDC as you grow.",
-      "og": {
-        "title": "IBANforge",
-        "description": "Bank data API for developers and AI agents — IBAN validation, BIC/SWIFT, Swiss clearing, compliance risk"
-      }
+      "description": "IBAN validation, BIC/SWIFT lookup, Swiss clearing data and compliance risk for developers and AI agents. Free tier — 200 requests/month; pay by card or in USDC as you grow."
     },
     "badge": "Live · Europe",
     "hero": {
@@ -158,21 +153,11 @@
       "heading": "Endpoints & pricing",
       "subtitle": "Start free with 200 requests a month. Pay as you grow — by card or in USDC."
     },
-    "quickStart": {
-      "heading": "Quick start",
-      "subtitle": "One POST, one answer — this is the exact response you get back."
-    },
     "cta": {
       "heading": "Ready to build?",
       "description": "Start with a free key — 200 requests a month, no card required. Scale with prepaid credits by card, or pay per call in USDC.",
       "button": "Start building",
       "getKeyButton": "Get a free key"
-    },
-    "demo": {
-      "valid": "Valid",
-      "server": "server",
-      "clearingTitle": "Swiss clearing · SIX",
-      "tryLive": "Try it live"
     },
     "stats": {
       "bic": "BIC records",
@@ -202,7 +187,6 @@
       "linkStory": "The full story"
     },
     "film": {
-      "cue": "Scroll to forge",
       "heading": "What the API makes of an IBAN, in four beats",
       "heat": {
         "eyebrow": "Heat",
@@ -265,19 +249,19 @@
       "cta": "Read the rules, rail by rail"
     },
     "integrations": {
-        "heading": "In your language, your ERP, your spreadsheet",
-        "sub": "Every package below exists and installs today. What is not published yet says so.",
-        "items": {
-              "ts": "TypeScript / JavaScript SDK",
-              "py": "Python SDK",
-              "java": "Java 17+ SDK · Maven Central",
-              "dotnet": ".NET 8 SDK · from source, NuGet pending",
-              "mcp": "MCP server · Claude, Cursor, Cline",
-              "n8n": "n8n node",
-              "odoo": "Odoo 18 module · BIC and bank filled as you type",
-              "sheets": "Google Sheets add-on",
-              "postman": "Postman collection"
-        }
+      "heading": "In your language, your ERP, your spreadsheet",
+      "sub": "Every package below exists and installs today. What is not published yet says so.",
+      "items": {
+        "ts": "TypeScript / JavaScript SDK",
+        "py": "Python SDK",
+        "java": "Java 17+ SDK · Maven Central",
+        "dotnet": ".NET 8 SDK · from source, NuGet pending",
+        "mcp": "MCP server · Claude, Cursor, Cline",
+        "n8n": "n8n node",
+        "odoo": "Odoo 18 module · BIC and bank filled as you type",
+        "sheets": "Google Sheets add-on",
+        "postman": "Postman collection"
+      }
     },
     "audit": {
       "heading": "Paying suppliers? Audit your creditor file",
@@ -1784,7 +1768,15 @@
           "UBSWCHZH80A",
           "OK"
         ],
-        ["Gamma Transports", "CH10 0023 … 2346", "Do not pay", "IBAN invalid", "", "", ""],
+        [
+          "Gamma Transports",
+          "CH10 0023 … 2346",
+          "Do not pay",
+          "IBAN invalid",
+          "",
+          "",
+          ""
+        ],
         [
           "Delta Consulting",
           "CH93 0076 … 2957",
@@ -1794,7 +1786,15 @@
           "",
           "OK"
         ],
-        ["Beta Elektro GmbH", "DE89 3704 … 3000", "OK", "", "Commerzbank AG", "COBADEFFXXX", "OK"]
+        [
+          "Beta Elektro GmbH",
+          "DE89 3704 … 3000",
+          "OK",
+          "",
+          "Commerzbank AG",
+          "COBADEFFXXX",
+          "OK"
+        ]
       ],
       "status": {
         "ok": "OK",

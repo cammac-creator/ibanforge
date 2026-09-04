@@ -72,11 +72,14 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
 
   // One figure for the BIC base, the live one: the plaque used to say
   // "121 000+" 350 px away from the band's live "121 773" (audit 2026-09-04, S5).
+  // The narrow no-break space Intl emits for fr/de is ~3 px at 17 px in Inter:
+  // "121773" to the eye. A regular no-break space keeps the group readable.
   const nf = new Intl.NumberFormat(locale)
+  const grouped = (n: number) => nf.format(n).replace(/\u202f/g, '\u00a0')
   const figures = {
-    bic: nf.format(liveStats.bicEntries),
+    bic: grouped(liveStats.bicEntries),
     bicK: `${Math.floor(liveStats.bicEntries / 1000)}K`,
-    ch: nf.format(liveStats.chClearingEntries),
+    ch: grouped(liveStats.chClearingEntries),
     countries: String(SUPPORTED_COUNTRIES),
   }
   const FEATURES = Array.from({ length: FEATURE_COUNT }, (_, i) => ({
@@ -106,7 +109,6 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
   ]
 
   const film: FilmStrings = {
-    cue: t('film.cue'),
     heading: t('film.heading'),
     heat: {
       eyebrow: t('film.heat.eyebrow'), title: t('film.heat.title'), copy: t('film.heat.copy'),

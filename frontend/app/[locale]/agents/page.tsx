@@ -180,10 +180,7 @@ export default async function AgentsPage({
           {t("eyebrow")}
         </span>
 
-        <h1
-          className="text-5xl sm:text-6xl md:text-7xl font-bold tracking-tight font-mono"
-          style={{ lineHeight: 1.05, letterSpacing: "-0.035em" }}
-        >
+        <h1 className="text-6xl sm:text-7xl md:text-8xl display-forge">
           {t("hero.title")}
         </h1>
 

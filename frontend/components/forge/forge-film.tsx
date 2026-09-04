@@ -19,7 +19,6 @@
 import { useEffect, useRef } from "react"
 
 export interface FilmStrings {
-  cue: string
   heading: string
   heat: {
     eyebrow: string; title: string; copy: string
@@ -127,7 +126,6 @@ export function ForgeFilm({ t, playgroundHref }: { t: FilmStrings; playgroundHre
     const q = <T extends Element>(sel: string) => root.querySelector<T>(sel)
     const rail = q<HTMLElement>(".rail")
     const railHead = q<HTMLElement>(".rail-head")
-    const cue = document.getElementById("forge-cue")
     const ibanBar = q<HTMLElement>(".iban-bar")
     const segs = Array.from(root.querySelectorAll<HTMLElement>(".seg"))
     const modLine = q<HTMLElement>(".mod-line")
@@ -270,7 +268,6 @@ export function ForgeFilm({ t, playgroundHref }: { t: FilmStrings; playgroundHre
     let running = false
     const frame = () => {
       const y = window.scrollY
-      if (cue) cue.style.opacity = (1 - clamp01(y / (vh * 0.35))).toFixed(3)
 
       if (railHead && railH) {
         const fp = clamp01((y - filmTop) / (filmH - vh))
@@ -319,8 +316,7 @@ export function ForgeFilm({ t, playgroundHref }: { t: FilmStrings; playgroundHre
     }
     // Audit 2026-09-04 (S6): this loop measured five rectangles and wrote ~25
     // styles per frame for the life of the page, footer included. It now runs
-    // only while the film is within one viewport of the screen; the hero sits
-    // inside that margin, so the scroll cue still fades from the very top.
+    // only while the film is within one viewport of the screen.
     const gate =
       "IntersectionObserver" in window
         ? new IntersectionObserver(

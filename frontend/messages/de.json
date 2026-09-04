@@ -53,12 +53,7 @@
   },
   "home": {
     "metadata": {
-      "title": "IBANforge — API zur IBAN-Validierung und BIC/SWIFT-Suche",
-      "description": "IBAN-Validierung, BIC/SWIFT-Suche, Schweizer Clearingdaten und Compliance-Risiko für Entwickler und KI-Agenten. Gratis-Stufe — 200 Anfragen/Monat; danach Karte oder USDC.",
-      "og": {
-        "title": "IBANforge",
-        "description": "Die Bankdaten-API für Entwickler und KI-Agenten — IBAN-Validierung, BIC/SWIFT, Schweizer Clearing, Compliance-Risiko"
-      }
+      "description": "IBAN-Validierung, BIC/SWIFT-Suche, Schweizer Clearingdaten und Compliance-Risiko für Entwickler und KI-Agenten. Gratis-Stufe — 200 Anfragen/Monat; danach Karte oder USDC."
     },
     "badge": "Live · Europa",
     "hero": {
@@ -158,21 +153,11 @@
       "heading": "Endpoints und Preise",
       "subtitle": "Starten Sie mit 200 Gratis-Anfragen pro Monat. Zahlen Sie erst, wenn Sie wachsen — per Karte oder in USDC."
     },
-    "quickStart": {
-      "heading": "Schnellstart",
-      "subtitle": "Ein POST, eine Antwort — genau das liefert die API zurück."
-    },
     "cta": {
       "heading": "Bereit loszulegen?",
       "description": "Starten Sie mit einem kostenlosen Key — 200 Anfragen pro Monat, ohne Karte. Skalieren Sie mit Prepaid-Guthaben per Karte oder zahlen Sie pro Aufruf in USDC.",
       "button": "Jetzt starten",
       "getKeyButton": "Kostenlosen Key holen"
-    },
-    "demo": {
-      "valid": "Gültig",
-      "server": "Server",
-      "clearingTitle": "Schweizer Clearing · SIX",
-      "tryLive": "Live ausprobieren"
     },
     "stats": {
       "bic": "BIC-Einträge",
@@ -202,7 +187,6 @@
       "linkStory": "Die ganze Geschichte"
     },
     "film": {
-      "cue": "Scrollen und schmieden",
       "heading": "Was die API aus einer IBAN macht, in vier Schritten",
       "heat": {
         "eyebrow": "Glut",
@@ -265,19 +249,19 @@
       "cta": "Die Regeln lesen, Schiene für Schiene"
     },
     "integrations": {
-        "heading": "In Ihrer Sprache, Ihrem ERP, Ihrer Tabelle",
-        "sub": "Jedes Paket unten existiert und lässt sich heute installieren. Was noch nicht veröffentlicht ist, sagt es.",
-        "items": {
-              "ts": "TypeScript-/JavaScript-SDK",
-              "py": "Python-SDK",
-              "java": "Java-17+-SDK · Maven Central",
-              "dotnet": ".NET-8-SDK · aus dem Quellcode, NuGet ausstehend",
-              "mcp": "MCP-Server · Claude, Cursor, Cline",
-              "n8n": "n8n-Node",
-              "odoo": "Odoo-18-Modul · BIC und Bank beim Tippen ausgefüllt",
-              "sheets": "Google-Sheets-Add-on",
-              "postman": "Postman-Sammlung"
-        }
+      "heading": "In Ihrer Sprache, Ihrem ERP, Ihrer Tabelle",
+      "sub": "Jedes Paket unten existiert und lässt sich heute installieren. Was noch nicht veröffentlicht ist, sagt es.",
+      "items": {
+        "ts": "TypeScript-/JavaScript-SDK",
+        "py": "Python-SDK",
+        "java": "Java-17+-SDK · Maven Central",
+        "dotnet": ".NET-8-SDK · aus dem Quellcode, NuGet ausstehend",
+        "mcp": "MCP-Server · Claude, Cursor, Cline",
+        "n8n": "n8n-Node",
+        "odoo": "Odoo-18-Modul · BIC und Bank beim Tippen ausgefüllt",
+        "sheets": "Google-Sheets-Add-on",
+        "postman": "Postman-Sammlung"
+      }
     },
     "audit": {
       "heading": "Sie zahlen Lieferanten? Prüfen Sie Ihre Kreditorendatei",
@@ -1784,7 +1768,15 @@
           "UBSWCHZH80A",
           "OK"
         ],
-        ["Gamma Transports", "CH10 0023 … 2346", "Nicht zahlen", "IBAN ungültig", "", "", ""],
+        [
+          "Gamma Transports",
+          "CH10 0023 … 2346",
+          "Nicht zahlen",
+          "IBAN ungültig",
+          "",
+          "",
+          ""
+        ],
         [
           "Delta Consulting",
           "CH93 0076 … 2957",
@@ -1794,7 +1786,15 @@
           "",
           "OK"
         ],
-        ["Beta Elektro GmbH", "DE89 3704 … 3000", "OK", "", "Commerzbank AG", "COBADEFFXXX", "OK"]
+        [
+          "Beta Elektro GmbH",
+          "DE89 3704 … 3000",
+          "OK",
+          "",
+          "Commerzbank AG",
+          "COBADEFFXXX",
+          "OK"
+        ]
       ],
       "status": {
         "ok": "OK",
