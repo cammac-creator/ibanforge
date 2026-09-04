@@ -52,3 +52,15 @@ export function loadAliases(): Promise<Map<string, string>> {
     });
   return aliasesPromise;
 }
+
+/**
+ * Forget the alias map, so the next reader fetches it again.
+ *
+ * Called after an alias is written or removed: the map is cached for the
+ * session, and without this a second orphan from the address just attached
+ * would still read "no alias" and the double-identity warning would stay
+ * silent — the one time it has something to say.
+ */
+export function invalidateAliases(): void {
+  aliasesPromise = null;
+}

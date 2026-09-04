@@ -138,6 +138,25 @@ export function resolveOrphan(id: string, attachedTo: string | null): boolean {
   return res.changes > 0;
 }
 
+/**
+ * Put one back in the queue.
+ *
+ * The undo of resolveOrphan, and the half that was missing: dismissing was a
+ * one-click gesture with no way back, so a mail filed by mistake was gone with
+ * no trace. `resolved_as` is cleared too — the attachment it recorded is being
+ * withdrawn, and a later reader must not find a customer named on a row that
+ * is waiting again. Only a resolved row can be reopened; a pending one answers
+ * false, so the caller can tell "already waiting" from "unknown id".
+ */
+export function reopenOrphan(id: string): boolean {
+  const res = getStatsDB()
+    .prepare(
+      'UPDATE orphan_mail SET resolved = 0, resolved_as = NULL WHERE id = ? AND resolved = 1',
+    )
+    .run(id);
+  return res.changes > 0;
+}
+
 /** How many are waiting, for a badge that does not need the whole list. */
 export function countPendingOrphans(): number {
   const row = getStatsDB()

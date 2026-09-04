@@ -37,6 +37,7 @@ import {
   resolveOrphan,
   countPendingOrphans,
   isOrphanKind,
+  reopenOrphan,
   setOrphanGist,
   setOrphanTranslation,
 } from '../lib/orphan-mail.js';
@@ -1812,6 +1813,31 @@ apiKeys.post('/v1/admin/orphan-mail/resolve', async (c) => {
   const ok = resolveOrphan(body.id, typeof body.attached_to === 'string' ? body.attached_to : null);
   if (!ok) return c.json({ error: 'not_found' }, 404);
   return c.json({ resolved: body.id, pending: countPendingOrphans() });
+});
+
+/**
+ * Undo a resolution: the orphan waits again, its recorded attachment cleared.
+ *
+ * Dismissing and attaching were one-way. The dashboard now offers the way
+ * back in the breath after the gesture and from the list of rows already
+ * dealt with, and both land here. An id that is not resolved answers 404 —
+ * whether unknown or still waiting, there is nothing to withdraw.
+ */
+apiKeys.post('/v1/admin/orphan-mail/reopen', async (c) => {
+  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
+  let body: { id?: unknown };
+  try {
+    body = await c.req.json<{ id?: unknown }>();
+  } catch {
+    return c.json({ error: 'invalid_json' }, 400);
+  }
+  if (typeof body?.id !== 'string' || !body.id) {
+    return c.json({ error: 'invalid_body', message: 'Expected { id }' }, 400);
+  }
+  if (!reopenOrphan(body.id)) return c.json({ error: 'not_found' }, 404);
+  return c.json({ reopened: body.id, pending: countPendingOrphans() });
 });
 
 /**

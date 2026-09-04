@@ -5,6 +5,7 @@ import {
   getOrphans,
   isOrphanKind,
   recordOrphan,
+  reopenOrphan,
   resolveOrphan,
 } from './orphan-mail.js';
 
@@ -91,6 +92,24 @@ describe('the queue of mail nobody can be attached to', () => {
     const kept = mine(getOrphans(true))[0];
     expect(kept.resolved).toBe(1);
     expect(kept.resolved_as).toBe('acme@example.com');
+    clean();
+  });
+
+  it('comes back to the queue when the decision is withdrawn, with no customer named', () => {
+    clean();
+    recordOrphan({
+      id: `${P}9`,
+      sender: 'sender@example.net',
+      msg_date: '2026-01-05 10:00',
+      kind: 'reply',
+    });
+    expect(reopenOrphan(`${P}9`)).toBe(false); // still waiting: nothing to withdraw
+    expect(resolveOrphan(`${P}9`, 'acme@example.com')).toBe(true);
+    expect(reopenOrphan(`${P}9`)).toBe(true);
+    const back = mine(getOrphans())[0];
+    expect(back.resolved).toBe(0);
+    expect(back.resolved_as).toBeNull();
+    expect(reopenOrphan(`${P}nobody`)).toBe(false);
     clean();
   });
 

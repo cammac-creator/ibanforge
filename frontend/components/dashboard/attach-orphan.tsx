@@ -9,7 +9,7 @@ import {
   type BestMatch,
   type PersonRow,
 } from '@/lib/crm/orphan-suggest';
-import { loadAliases, loadIndex } from '@/lib/crm/people-index';
+import { invalidateAliases, loadAliases, loadIndex } from '@/lib/crm/people-index';
 
 /**
  * The three gestures that let the orphan queue empty:
@@ -55,13 +55,20 @@ const FREE_CATEGORY = '__libre__';
 export function AttachOrphanControl({
   orphanId,
   sender,
+  subject = null,
   automated = false,
 }: {
   orphanId: string;
   sender: string;
+  /** Named in the dismissal question, so the row being filed is the row being read. */
+  subject?: string | null;
   automated?: boolean;
 }) {
   const [mode, setMode] = useState<Mode>('closed');
+  // What the last undo did, said once in the closed state. Distinct from
+  // `message`, which only ever carries a failure.
+  const [notice, setNotice] = useState('');
+  const [dossier, setDossier] = useState('');
   const [canonical, setCanonical] = useState('');
   const [armed, setArmed] = useState(false);
   // A plain double-click must not count as arm + confirm: the two clicks land
@@ -94,8 +101,15 @@ export function AttachOrphanControl({
   // Loaded on mount as well (03/09/2026): the closed state names the most
   // likely client BEFORE the operator opens anything, and that needs the index.
   // One fetch per browser session either way (lib/crm/people-index.ts caches).
+  // On an automated notice the closed state proposes nobody, so it needs no
+  // index; but the moment a form OPENS on such a row, every guard below reads
+  // `rows` and `knownAlias` — the suggestions, the unknown-address warning,
+  // the double-identity warning. Gating on `automated` alone left all six
+  // silent on exactly the class of mail (build and release notices) that had
+  // just been recognised as automated, the morning after they caused a wrong
+  // alias. Hence `mode` in the condition and in the dependencies.
   useEffect(() => {
-    if (automated || rows !== null) return;
+    if ((automated && mode === 'closed') || rows !== null) return;
     let alive = true;
     loadIndex().then(
       (r) => alive && setRows(r),
@@ -108,16 +122,64 @@ export function AttachOrphanControl({
     return () => {
       alive = false;
     };
-  }, [automated, rows, sender]);
+  }, [automated, mode, rows, sender]);
 
   const proposal: BestMatch | null =
     !automated && Array.isArray(rows) ? bestMatch(sender, rows) : null;
 
+  /**
+   * The way back, offered in the breath after each gesture.
+   *
+   * Right after « Rattacher » the undo is free: the alias was just written and
+   * the sync has not run, so removing it moves nothing. Fifteen minutes later
+   * the same removal hands months of mail back to the sender's own thread —
+   * still correct, but no longer free — which is why the link sits here, on
+   * the confirmation, and not only in the alias drawer of the Contacts page.
+   * Either way the orphan itself returns to the queue, so nothing is decided
+   * by the undo except that nothing is decided.
+   */
+  async function undo(kind: 'attached' | 'dismissed'): Promise<void> {
+    setBusy('busy');
+    try {
+      if (kind === 'attached') {
+        await del('/api/crm/email-aliases', { alias: sender });
+        invalidateAliases();
+      }
+      await del('/api/crm/orphan-resolve', { id: orphanId });
+      setDone(null);
+      setMode('closed');
+      setArmed(false);
+      setBusy('idle');
+      setMessage('');
+      setNotice(
+        kind === 'attached'
+          ? 'Rattachement annulé : l’alias est retiré, le mail attend de nouveau ici.'
+          : 'Remis en file : le mail attend de nouveau ici.',
+      );
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : 'échec');
+      setBusy('error');
+    }
+  }
+
+  const undoFailure = busy === 'error' && (
+    <span className="ml-2 text-red-300">échec de l’annulation : {message}</span>
+  );
+
   if (done?.kind === 'attached') {
     return (
       <p aria-live="polite" className="mt-1 text-[12px] text-emerald-400">
-        ✓ {sender} rattaché à {done.to} — son fil complet remonte au prochain passage de la synchro
-        (au plus 15 min).
+        ✓ {sender} rattaché à {done.to} — alias permanent enregistré ; son fil complet remonte au
+        prochain passage de la synchro (au plus 15 min).{' '}
+        <button
+          type="button"
+          disabled={busy === 'busy'}
+          onClick={() => void undo('attached')}
+          className="cursor-pointer underline underline-offset-2 hover:text-emerald-200 disabled:opacity-50"
+        >
+          {busy === 'busy' ? 'annulation…' : 'annuler ce rattachement'}
+        </button>
+        {undoFailure}
       </p>
     );
   }
@@ -141,7 +203,16 @@ export function AttachOrphanControl({
   if (done?.kind === 'dismissed') {
     return (
       <p aria-live="polite" className="mt-1 text-[12px] text-[var(--fg-3)]">
-        ✓ Classé sans rattachement — il ne reviendra pas.
+        ✓ Classé sans rattachement.{' '}
+        <button
+          type="button"
+          disabled={busy === 'busy'}
+          onClick={() => void undo('dismissed')}
+          className="cursor-pointer underline underline-offset-2 hover:text-[var(--fg-1)] disabled:opacity-50"
+        >
+          {busy === 'busy' ? 'un instant…' : 'remettre en file'}
+        </button>
+        {undoFailure}
       </p>
     );
   }
@@ -169,6 +240,11 @@ export function AttachOrphanControl({
     );
     return (
       <div className="mt-1.5">
+        {notice && (
+          <p role="status" className="mb-1.5 text-[12px] text-[var(--fg-2)]">
+            {notice}
+          </p>
+        )}
         {/* The pre-selection, before any typing: the row the index ranks
             first for this sender, with the reason in plain words. It is a
             proposal, never a decision: the button only opens the attach form
@@ -238,8 +314,16 @@ export function AttachOrphanControl({
   };
 
   async function post(path: string, body: unknown): Promise<unknown> {
+    return call('POST', path, body);
+  }
+
+  async function del(path: string, body: unknown): Promise<unknown> {
+    return call('DELETE', path, body);
+  }
+
+  async function call(method: 'POST' | 'DELETE', path: string, body: unknown): Promise<unknown> {
     const r = await fetch(path, {
-      method: 'POST',
+      method,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
@@ -344,6 +428,22 @@ export function AttachOrphanControl({
             placeholder="pays ISO-2 (CH, DE…) — facultatif"
             className={field}
           />
+          {/* The one field the letter generator cannot do without, and the
+              full form under « Correspondances » has it: a correspondent born
+              here — the usual road, since an authority makes itself known by
+              answering — used to be filed without it, and nothing said so. */}
+          <textarea
+            aria-label="Dossier : ce qu’on leur demande (facultatif)"
+            value={dossier}
+            onChange={(e) => {
+              setDossier(e.target.value);
+              setArmed(false);
+              clearFailure();
+            }}
+            rows={2}
+            placeholder="dossier : ce qu’on leur demande, où on en est… (facultatif, le générateur de lettres s’appuie dessus)"
+            className="w-full min-w-0 resize-y rounded border border-[var(--ink-4)] bg-[var(--ink-0)] px-2 py-1.5 text-base text-[var(--fg-1)] placeholder:text-[var(--fg-5)] focus:border-sky-500/50 focus:outline-none sm:text-[12.5px]"
+          />
           <button
             type="button"
             disabled={busy === 'busy' || !ready}
@@ -370,6 +470,7 @@ export function AttachOrphanControl({
                   org: cleanedOrg,
                   category: chosenCategory,
                   country: country.trim() || null,
+                  dossier: dossier.trim() || null,
                 });
                 // attached_to is the sender itself: it IS the canonical
                 // address of this file, so `resolved_as` records the truth
@@ -436,7 +537,16 @@ export function AttachOrphanControl({
           {/* "autorité" used to be the example given here, which sent the one
               answer worth keeping down the dismissal road. It now has its own
               button, so the examples name what is genuinely nobody's mail. */}
-          Classer ce mail sans le relier à personne (newsletter, avis automatique…) ?
+          Classer{' '}
+          {subject ? (
+            <>
+              « <strong>{subject}</strong> »
+            </>
+          ) : (
+            'ce mail'
+          )}{' '}
+          de <strong>{sender}</strong> sans le relier à personne (newsletter, avis automatique…) ?
+          Réversible depuis « classés récemment ».
         </span>
         <button
           type="button"
@@ -519,6 +629,10 @@ export function AttachOrphanControl({
               // resolved_as trusts it over re-deciding.
               const resolved =
                 aliasReply.aliases?.find((a) => a.alias === sender)?.canonical ?? cleaned;
+              // The session cache of the alias map must forget what it knew:
+              // a second orphan from this sender has to see the alias just
+              // written, or the double-identity warning stays silent.
+              invalidateAliases();
               await post('/api/crm/orphan-resolve', { id: orphanId, attached_to: resolved });
               setDone({ kind: 'attached', to: resolved });
             } catch (e) {
@@ -583,9 +697,16 @@ export function AttachOrphanControl({
 
       <div aria-live="polite">
         {armed && (
-          <p className="mt-1.5 text-[12px] text-emerald-300">
-            Déclarer que <strong>{sender}</strong> est la même personne que{' '}
-            <strong>{cleaned}</strong> — son fil fusionnera dans ce dossier.
+          // Said in full because the gesture is not the one it looks like. It
+          // reads as filing one mail; it writes a rule that outlives the mail,
+          // and the next sync applies it to the address's whole past. The two
+          // wrong aliases of 2026-09-03 were accepted under a sentence that
+          // said "fusionnera" — future tense, one thread — and nothing more.
+          <p className="mt-1.5 text-[12.5px] leading-snug text-emerald-300">
+            Créer un alias <strong>permanent</strong> : <strong>{sender}</strong> →{' '}
+            <strong>{cleaned}</strong>. Tout le courrier de cette adresse, passé compris, sera
+            reversé dans ce dossier à chaque synchro. Réversible depuis « Alias enregistrés », en
+            bas de la page Contacts.
             {knownAlias && knownAlias !== cleaned && (
               <strong className="text-amber-300">
                 {' '}

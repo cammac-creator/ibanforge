@@ -1,4 +1,5 @@
 import { CrmApp } from '@/components/crm/crm-app';
+import { AliasRules } from '@/components/crm/alias-rules';
 import { NoReplyRules } from '@/components/crm/no-reply-rules';
 import { FreshnessBadge } from '@/components/crm/freshness-badge';
 import { fetchCrmData } from '@/lib/crm/build-contacts';
@@ -91,6 +92,7 @@ export default async function ContactsPage() {
           the very bottom: consulted rarely, but findable the day an address
           arrives pre-marked and the operator asks why. */}
       <NoReplyRules />
+      <AliasRules />
     </div>
   );
 }

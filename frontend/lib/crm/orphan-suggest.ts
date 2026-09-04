@@ -91,7 +91,7 @@ export function senderTokens(sender: string): string[] {
   const [localRaw, domainRaw] = sender.trim().toLowerCase().split('@');
   const tokens = new Set<string>();
   for (const t of (localRaw ?? '').split(/[^a-zà-öø-ÿ]+/i)) {
-    if (t.length >= 3 && !ROLE_LOCAL_PARTS.has(t)) tokens.add(t);
+    if (t.length >= 3 && !ROLE_LOCAL_PARTS.has(t) && !GENERIC_DOMAIN_LABELS.has(t)) tokens.add(t);
   }
   // "alpha.example.net" → "alpha": the leftmost domain label a company chooses
   // is the name-bearing one. Generic labels (mail providers, "mail.", "web.")
@@ -106,6 +106,21 @@ export function senderTokens(sender: string): string[] {
 
 function matches(row: PersonRow, needle: string): boolean {
   return row.email.includes(needle) || row.label.toLowerCase().includes(needle);
+}
+
+/**
+ * The same question, anchored on word boundaries. For the operator's own
+ * query a substring is right (they are typing, and "mark" should find
+ * "Markus"); for a proposal nobody typed it is not: a four-letter fragment
+ * of a stranger's address matching the middle of "marketing@" is how a
+ * pre-selection turns into a wrong alias.
+ */
+function matchesWord(row: PersonRow, needle: string): boolean {
+  const b = new RegExp(
+    `(^|[^a-z0-9])${needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([^a-z0-9]|$)`,
+    'i',
+  );
+  return b.test(row.email) || b.test(row.label);
 }
 
 /**
@@ -200,7 +215,7 @@ export function bestMatch(sender: string, rows: PersonRow[]): BestMatch | null {
   }
   const names = senderTokens(s).filter((t) => t.length >= 4 && t !== domain.split('.')[0]);
   if (names.length) {
-    const named = byTier(others.filter((r) => names.some((t) => matches(r, t))));
+    const named = byTier(others.filter((r) => names.some((t) => matchesWord(r, t))));
     if (named) return { row: named, reason: 'name_in_address' };
   }
   return null;

@@ -156,3 +156,26 @@ describe('role desks and generic labels are not evidence (the 2026-09-03 aliases
     expect(isAutomatedNotice('support@directory.example', 'Re: your question')).toBe(false);
   });
 });
+
+describe('a proposal needs a whole word, and sector words are not names', () => {
+  const rows: PersonRow[] = [
+    { email: 'marketing@epsilon.example.net', label: 'Epsilon Marketing SA', kind: 'prospect' },
+    { email: 'j.dupont@beta.example.org', label: 'Beta SA', kind: 'client' },
+    { email: 'ops@cryptopay.example', label: 'CryptoPay Ltd', kind: 'prospect' },
+  ];
+  it('does not pre-select on a fragment inside another word', () => {
+    expect(bestMatch('mark.lehmann@gmail.com', rows)).toBeNull();
+  });
+  it('still pre-selects on a whole name', () => {
+    expect(bestMatch('jean.dupont@gmail.com', rows)?.row.email).toBe('j.dupont@beta.example.org');
+  });
+  it('drops sector words from the local part as it does from the domain', () => {
+    expect(senderTokens('crypto.desk@gmail.com')).toEqual(['desk']);
+    expect(bestMatch('crypto.desk@gmail.com', rows)).toBeNull();
+  });
+  it('keeps the typed search a plain substring', () => {
+    expect(suggestFor('someone@gmail.com', 'mark', rows).map((r) => r.email)).toEqual([
+      'marketing@epsilon.example.net',
+    ]);
+  });
+});

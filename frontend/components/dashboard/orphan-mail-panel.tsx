@@ -2,6 +2,7 @@ import { InfoDot } from './info-dot';
 import { AttachOrphanControl } from './attach-orphan';
 import { OrphanGist } from './orphan-gist';
 import { OrphanFullText } from './orphan-full-text';
+import { ResolvedOrphans } from './resolved-orphans';
 import { isAutomatedNotice } from '@/lib/crm/orphan-suggest';
 
 /**
@@ -53,8 +54,10 @@ function OrphanRow({ o }: { o: OrphanMailRow }) {
   return (
     <li className="py-3">
       <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
+        {/* 11px, the floor for a badge read in French: at 10px in capitals
+            with tracking, « PREMIER CONTACT » lost its shape on the dark tint. */}
         <span
-          className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
+          className={`shrink-0 rounded px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wide ${
             o.kind === 'reply'
               ? 'bg-amber-500/20 text-amber-300'
               : 'bg-[var(--ink-4)] text-[var(--fg-3)]'
@@ -63,7 +66,7 @@ function OrphanRow({ o }: { o: OrphanMailRow }) {
           {o.kind === 'reply' ? 'Réponse' : 'Premier contact'}
         </span>
         {automated && (
-          <span className="shrink-0 rounded bg-sky-500/15 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-sky-300">
+          <span className="shrink-0 rounded bg-sky-500/15 px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-sky-300">
             Avis automatique
           </span>
         )}
@@ -100,7 +103,12 @@ function OrphanRow({ o }: { o: OrphanMailRow }) {
         eager
       />
       <OrphanFullText id={o.id} body={o.body ?? null} initialFr={o.body_fr ?? null} />
-      <AttachOrphanControl orphanId={o.id} sender={o.sender} automated={automated} />
+      <AttachOrphanControl
+        orphanId={o.id}
+        sender={o.sender}
+        subject={o.subject}
+        automated={automated}
+      />
     </li>
   );
 }
@@ -143,8 +151,10 @@ export function OrphanMailPanel({
   const automatedCount = firstContacts.filter((o) => isAutomatedNotice(o.sender, o.subject)).length;
 
   // Nothing waiting is the normal state, and a panel that renders an empty box
-  // every day trains the eye to skip the whole column.
-  if (pending.length === 0) return null;
+  // every day trains the eye to skip the whole column. One quiet line stays,
+  // because the rows already dealt with must remain reachable on the days the
+  // queue is empty — those are precisely the days after a decision was made.
+  if (pending.length === 0) return <ResolvedOrphans compact />;
 
   return (
     <div className="rounded-xl border border-amber-500/40 bg-gradient-to-br from-amber-500/[0.07] to-[var(--ink-2)]/60 p-5">
@@ -177,8 +187,8 @@ export function OrphanMailPanel({
           panneau, le message n&apos;apparaît nulle part. « Réponse » veut dire qu&apos;il répond à
           quelque chose qu&apos;on a envoyé, donc que quelqu&apos;un attend. Sous chaque objet, un
           résumé en français écrit par le rédacteur du CRM ; « mail complet » déplie le texte
-          entier, traduit en français automatiquement, l&apos;original à côté. Quand une adresse du CRM
-          ressemble à l&apos;expéditeur, elle est proposée d&apos;office avec la raison ; la
+          entier, traduit en français automatiquement, l&apos;original à côté. Quand une adresse du
+          CRM ressemble à l&apos;expéditeur, elle est proposée d&apos;office avec la raison ; la
           décision reste la tienne, en deux clics. Trois issues par mail : le rattacher à un client
           (son fil complet remonte à la synchro suivante), l&apos;enregistrer comme correspondant
           institutionnel, ou le classer sans rattachement quand ce n&apos;est personne (un avis
@@ -213,6 +223,7 @@ export function OrphanMailPanel({
           </ul>
         </details>
       )}
+      <ResolvedOrphans />
     </div>
   );
 }
