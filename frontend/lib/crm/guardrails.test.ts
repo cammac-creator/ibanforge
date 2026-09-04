@@ -155,6 +155,24 @@ describe('checkDraft', () => {
     ).toContain('no_optout');
   });
 
+  it('warns when the mail proposes a call, in any of the desk languages, and never blocks', () => {
+    const base = { sentToday: 0, intent: 'outbound' as const, isFirstTouch: false };
+    const r = checkDraft({ ...base, body: 'Happy to jump on a call next week if that helps.' });
+    expect(codes(r)).toContain('phone_call');
+    expect(r.blocking).toBe(false);
+    expect(
+      codes(checkDraft({ ...base, body: 'Je vous propose un appel de quinze minutes.' })),
+    ).toContain('phone_call');
+    expect(
+      codes(
+        checkDraft({
+          ...base,
+          body: 'The BIC comes from the register; the calling code is unrelated.',
+        }),
+      ),
+    ).not.toContain('phone_call');
+  });
+
   it('does not require an opt-out on a followup', () => {
     const r = checkDraft({
       body: 'Une relance courte et polie qui pose une question.',

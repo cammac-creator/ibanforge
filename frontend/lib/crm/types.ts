@@ -251,7 +251,8 @@ export interface GuardrailIssue {
     | 'no_optout'
     | 'spam_word'
     | 'repeat_previous'
-    | 'same_subject';
+    | 'same_subject'
+    | 'phone_call';
   level: 'blocking' | 'warning';
   message: string;
 }

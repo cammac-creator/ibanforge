@@ -158,6 +158,13 @@ function Bubble({ m, counterpartLabel }: { m: Message; counterpartLabel?: string
             )}
           </>
         )}
+        {/* snippet_fr is stored at 8 000 characters where the body keeps 50 000:
+            a long translated mail ends without saying so. The mark says it. */}
+        {hasFr && (m.snippet_fr?.length ?? 0) >= 7_900 && (
+          <p className="mt-1 text-[12.5px] text-amber-300">
+            ⚠ traduction tronquée : la fin du mail n’est lisible que dans l’original.
+          </p>
+        )}
         {hasFr && (
           <>
             <button

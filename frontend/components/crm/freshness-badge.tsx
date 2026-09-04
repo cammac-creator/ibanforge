@@ -22,13 +22,23 @@ export function FreshnessBadge({ fetchedAtIso }: { fetchedAtIso: string }) {
     return () => clearInterval(id);
   }, [fetchedAtIso]);
 
-  const t = new Date(fetchedAtIso);
-  const hhmm = `${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}`;
+  // Formatted in a FIXED zone, so the server (UTC on Vercel) and the browser
+  // (Zurich) print the same text for the same instant. getHours() printed the
+  // runtime's local hour on each side: « 08:35 » in the HTML, « 10:35 » after
+  // hydration, and React 19 reported the mismatch (#418) on every page that
+  // carries this badge — which is every dashboard page.
+  const hhmm = new Intl.DateTimeFormat('fr-CH', {
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'Europe/Zurich',
+  }).format(new Date(fetchedAtIso));
   const stale = ageMin >= 15;
 
   return (
     <span className="inline-flex items-center gap-1.5 text-[12px]">
-      <span className={stale ? 'text-amber-400' : 'text-[var(--fg-5)]'}>
+      {/* --fg-3, not --fg-5: this is the one line that says the data is
+          forty minutes old, and at --fg-5 it measured 2.6:1 on the ground. */}
+      <span className={stale ? 'text-amber-400' : 'text-[var(--fg-3)]'}>
         données de {hhmm}
         {stale ? ` (il y a ${ageMin} min)` : ''}
       </span>

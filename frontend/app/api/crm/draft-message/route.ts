@@ -34,7 +34,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'invalid_json' }, { status: 400 });
   }
   if (!body.email || !body.subject) {
-    return NextResponse.json({ error: 'invalid_body', message: 'email et subject requis' }, { status: 400 });
+    return NextResponse.json(
+      { error: 'invalid_body', message: 'email et subject requis' },
+      { status: 400 },
+    );
   }
   const text = body.body ?? '';
   const msg = {
@@ -53,9 +56,9 @@ export async function POST(req: NextRequest) {
      * the send route's own comment records having fixed on its side; the draft
      * side was left behind. A draft past 50k is a different problem.
      *
-     * ⚠️ This stops the FRONTEND being the one that cuts. The store clips the
-     * column at 8000 of its own accord (src/routes/api-keys.ts, the POST
-     * handler), so that is the real ceiling until it is raised there too.
+     * The store clips the same column at 50 000 as well (src/routes/api-keys.ts,
+     * the POST handler, raised from 8 000 on 2026-09-01), so the two ceilings
+     * agree: what fits here fits there.
      */
     body: text.slice(0, 50_000),
     counterparty: body.account ?? '',
@@ -68,7 +71,9 @@ export async function POST(req: NextRequest) {
       signal: AbortSignal.timeout(15_000),
     });
     const data = await r.json().catch(() => ({ error: 'bad_upstream_response' }));
-    return NextResponse.json(r.ok ? { saved: true, id: msg.id, ...data } : data, { status: r.status });
+    return NextResponse.json(r.ok ? { saved: true, id: msg.id, ...data } : data, {
+      status: r.status,
+    });
   } catch {
     return NextResponse.json({ error: 'upstream_failed' }, { status: 502 });
   }

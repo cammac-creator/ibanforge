@@ -459,7 +459,13 @@ export function ContactTable({
                       <span className={r.unread ? 'text-[var(--fg-1)]' : 'text-[var(--fg-2)]'}>
                         {r.subject}
                       </span>
-                      {r.preview && <span className="text-[var(--fg-4)]"> — {r.preview}</span>}
+                      {r.preview && (
+                        <span className="text-[var(--fg-4)]">
+                          {' — '}
+                          {r.lastFromUs && <span className="text-amber-400/80">toi : </span>}
+                          {r.preview}
+                        </span>
+                      )}
                     </span>
 
                     {/* What the thread is waiting for, in the words its kind

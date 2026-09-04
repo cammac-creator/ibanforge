@@ -98,6 +98,10 @@ const OPTOUT_WORD = /\bstop\b/;
 
 const LINK_SCHEMES = ['https://', 'http://'];
 
+/** Words that offer a call, a meeting or a demo, in the languages this desk writes. */
+const CALL_WORDS =
+  /\b(quick call|short call|a call|phone call|call me|jump on a call|hop on a call|meeting|demo|screen ?share|calendly|zoom|google meet|teams call|un appel|par téléphone|par telephone|au téléphone|au telephone|une réunion|une visio|ein anruf|telefonat|ein meeting|videocall|15 ?min)\b/i;
+
 /**
  * Exported so the composer can say which field carries it without writing the
  * character a second time. A second literal elsewhere would drift the day this
@@ -284,6 +288,19 @@ export function checkDraft({
     const hit = SPAM_WORDS.find((w) => lowerWritten.includes(w));
     if (hit) {
       issues.push({ code: 'spam_word', level: 'warning', message: `Mot à risque : « ${hit} ».` });
+    }
+
+    // The owner's standing rule: a mail never proposes a call. The brief says
+    // so to the writer; this is the check that says so to the sender, because
+    // an instruction in a prompt is not a guarantee. A warning, not a block:
+    // the fault is not writing the word, it is letting it leave unseen.
+    const call = lowerWritten.match(CALL_WORDS);
+    if (call) {
+      issues.push({
+        code: 'phone_call',
+        level: 'warning',
+        message: `Propose un appel ou une réunion (« ${call[0]} ») : la règle est une réponse écrite, jamais un appel.`,
+      });
     }
 
     /**

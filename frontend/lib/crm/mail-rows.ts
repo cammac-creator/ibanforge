@@ -47,6 +47,8 @@ export interface MailRow {
   who: string;
   subject: string;
   preview: string;
+  /** The preview is our own last mail, not the contact's — shown as « toi : ». */
+  lastFromUs: boolean;
   age: string;
   urgent: boolean;
   unread: boolean;
@@ -197,7 +199,10 @@ const FILTERS: Array<{
   // address get their own chip, since what they need is a different gesture.
   {
     key: 'prospect',
-    label: 'À prospecter',
+    // « Jamais écrit », not « À prospecter »: the segment beside it is called
+    // Prospects, and two controls one letter apart with two different counts
+    // read as a contradiction. This is what neverContacted tests.
+    label: 'Jamais écrit',
     urgent: false,
     test: (c, s, z) => neverContacted(c, s, z) && !!c.email,
   },
@@ -291,6 +296,21 @@ function lastWith(messages: Message[], field: 'subject' | 'snippet' | 'msg_date'
 }
 
 /**
+ * Whether the preview on the row is our own prose. Under « Relances » the
+ * last message is ours by definition, and the widest column of the table then
+ * showed the operator his own words with nothing saying so — the exact
+ * opposite of reading what the contact wrote. Decided on the message the
+ * preview is taken from, so the mark and the text never disagree.
+ */
+function lastFromUs(messages: Message[]): boolean {
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    const m = messages[i];
+    if (m?.snippet || m?.subject) return m.direction !== 'in';
+  }
+  return false;
+}
+
+/**
  * Days come from the situation, never computed here. `msg_date` carries no
  * timezone and this module runs on the server before the subtree is hydrated, so
  * a UTC server and a browser in Zurich would print two different labels for the
@@ -336,6 +356,7 @@ function toRow(
     who: c.company || c.email,
     subject: lastWith(c.messages, 'subject') ?? 'Aucun échange',
     preview: lastWith(c.messages, 'snippet') ?? '',
+    lastFromUs: lastFromUs(c.messages),
     age: ageLabel(s),
     urgent,
     chip: chipOf(c),

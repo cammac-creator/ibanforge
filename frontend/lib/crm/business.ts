@@ -73,7 +73,11 @@ export function institutionChip(category: string): BusinessChip {
   // Underscores are a storage convention, not a word: `reseau_paiement` typed
   // by hand under another name still reads as prose here.
   const shown = raw.replace(/_/g, ' ');
-  const label = !shown ? 'institution' : shown.length > CHIP_MAX ? `${shown.slice(0, CHIP_MAX - 1)}…` : shown;
+  const label = !shown
+    ? 'institution'
+    : shown.length > CHIP_MAX
+      ? `${shown.slice(0, CHIP_MAX - 1)}…`
+      : shown;
   return { label, ...INSTITUTION_COLOR };
 }
 
@@ -115,7 +119,10 @@ export type ReplyGroup = 'urgent' | 'week' | 'later';
 export const REPLY_GROUP_LABEL: Record<ReplyGroup, string> = {
   urgent: 'Urgent — non lu ou plus de 7 j',
   week: 'Cette semaine',
-  later: 'Peut attendre',
+  // Under « À répondre » nothing can wait by definition; the shelves are
+  // age bands, and this one is the freshest. « Peut attendre » filed the
+  // morning's mail, once read, as postponable.
+  later: 'Arrivé ces deux derniers jours',
 };
 
 export function replyGroupOf(unread: boolean, silenceDays: number | null): ReplyGroup {

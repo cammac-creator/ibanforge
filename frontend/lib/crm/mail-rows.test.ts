@@ -1212,3 +1212,20 @@ describe('« À prospecter » and « À enrichir » split on the address', () =>
     ]);
   });
 });
+
+describe('the preview says whose words it shows', () => {
+  it('marks our own last mail as ours, and a reply as theirs', () => {
+    const ours = client('ours@example.com', 'Ours', [
+      message('in', 'Question', 'Bonjour, une question', '2026-07-01'),
+      message('out', 'Re: Question', 'Voici la réponse', '2026-07-02'),
+    ]);
+    const theirs = client('theirs@example.com', 'Theirs', [
+      message('out', 'Prise de contact', 'Bonjour', '2026-07-01'),
+      message('in', 'Re: Prise de contact', 'Merci, intéressés', '2026-07-03'),
+    ]);
+    const rows = mailRows({ ...input, contacts: [ours, theirs], situations: {} }, 'all');
+    const byId = Object.fromEntries(rows.map((r) => [r.id, r.lastFromUs]));
+    expect(byId['ours@example.com']).toBe(true);
+    expect(byId['theirs@example.com']).toBe(false);
+  });
+});

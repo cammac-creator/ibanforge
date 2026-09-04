@@ -34,8 +34,20 @@ const PRODUCT_FACTS =
 const ADDRESS_RULE =
   'Address rule: unless a personal name appears in the brief above, do not guess one (never from the email domain); open with a plain Hi.';
 
+/**
+ * The owner's standing rule, written where every brief passes rather than
+ * trusted to a prompt that lives on another machine. Same wording as the
+ * prospect radar's, so the interdiction exists in one formulation only.
+ */
+const NO_CALL_RULE =
+  'NEVER propose a call, a meeting, a demo or a screen share, in any language. The ask is always reply-level: a written answer in this thread.';
+
 /** The operator's private notes on one address, newest first, best-effort. */
-async function operatorNotesFor(to: string, apiUrl: string, adminSecret: string): Promise<string[]> {
+async function operatorNotesFor(
+  to: string,
+  apiUrl: string,
+  adminSecret: string,
+): Promise<string[]> {
   if (!apiUrl || !adminSecret) return [];
   try {
     const res = await fetch(`${apiUrl}/v1/admin/contact-notes?email=${encodeURIComponent(to)}`, {
@@ -43,7 +55,8 @@ async function operatorNotesFor(to: string, apiUrl: string, adminSecret: string)
       signal: AbortSignal.timeout(6000),
     });
     if (!res.ok) return [];
-    const notes = ((await res.json()) as { notes?: Array<{ note: string; created_at: string }> }).notes ?? [];
+    const notes =
+      ((await res.json()) as { notes?: Array<{ note: string; created_at: string }> }).notes ?? [];
     return notes.slice(0, 6).map((n) => `${n.created_at.slice(0, 10)}: ${n.note}`);
   } catch {
     return [];
@@ -76,10 +89,9 @@ async function enrichInstitutional(
   apiUrl: string,
   adminSecret: string,
 ): Promise<unknown> {
-  const inst = (typeof b.institution === 'object' && b.institution !== null ? b.institution : {}) as Record<
-    string,
-    unknown
-  >;
+  const inst = (
+    typeof b.institution === 'object' && b.institution !== null ? b.institution : {}
+  ) as Record<string, unknown>;
   const str = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
   const org = str(inst.org);
   const category = str(inst.category);
@@ -95,13 +107,16 @@ async function enrichInstitutional(
     'You are writing WRITTEN CORRESPONDENCE on behalf of IBANforge to an institution. Ground the letter in the facts below, use ONLY these facts, and never invent a legal basis, a reference number or a deadline:',
     '- Who is writing: IBANforge, a Swiss commercial API that validates IBANs and looks up BIC/SWIFT codes for software companies and payment providers.',
     '- How IBANforge treats public data: registers are cited with attribution and with the date of the extract, and permission is asked IN WRITING before any datum from a source is served to customers. That is why this letter exists; say so plainly rather than apologising for it.',
-    org ? `- Institution addressed: ${org}${category ? ` (${category})` : ''}${country ? `, ${country}` : ''}` : '',
+    org
+      ? `- Institution addressed: ${org}${category ? ` (${category})` : ''}${country ? `, ${country}` : ''}`
+      : '',
     dossier ? `- Our file with them, in the operator's own words: ${dossier}` : '',
     notes.length
       ? `- Operator notes on this correspondent (private ground truth, use them to be precise, never quote them verbatim): ${notes.join(' | ')}`
       : '',
     PRODUCT_FACTS,
     ADDRESS_RULE,
+    NO_CALL_RULE,
   ].filter(Boolean);
 
   return {
@@ -128,7 +143,10 @@ async function enrichWithUsageFacts(body: unknown): Promise<unknown> {
     const headers = { 'X-Admin-Secret': adminSecret };
     const [keysRes, profRes, notesRes] = await Promise.all([
       fetch(`${apiUrl}/v1/admin/keys`, { headers, signal: AbortSignal.timeout(6000) }),
-      fetch(`${apiUrl}/v1/admin/client-profiles?days=90`, { headers, signal: AbortSignal.timeout(6000) }),
+      fetch(`${apiUrl}/v1/admin/client-profiles?days=90`, {
+        headers,
+        signal: AbortSignal.timeout(6000),
+      }),
       fetch(`${apiUrl}/v1/admin/contact-notes?email=${encodeURIComponent(to)}`, {
         headers,
         signal: AbortSignal.timeout(6000),
@@ -137,11 +155,16 @@ async function enrichWithUsageFacts(body: unknown): Promise<unknown> {
     if (!keysRes.ok || !profRes.ok) return body;
     const operatorNotes =
       notesRes?.ok === true
-        ? ((((await notesRes.json()) as { notes?: Array<{ note: string; created_at: string }> }).notes ?? [])
+        ? (
+            ((await notesRes.json()) as { notes?: Array<{ note: string; created_at: string }> })
+              .notes ?? []
+          )
             .slice(0, 6)
-            .map((n) => `${n.created_at.slice(0, 10)}: ${n.note}`))
+            .map((n) => `${n.created_at.slice(0, 10)}: ${n.note}`)
         : [];
-    const keys = (((await keysRes.json()) as { keys?: unknown }).keys ?? []) as Array<Record<string, unknown>>;
+    const keys = (((await keysRes.json()) as { keys?: unknown }).keys ?? []) as Array<
+      Record<string, unknown>
+    >;
     const profiles = (((await profRes.json()) as { profiles?: unknown }).profiles ?? {}) as Record<
       string,
       Record<string, unknown>
@@ -190,7 +213,7 @@ async function enrichWithUsageFacts(body: unknown): Promise<unknown> {
       [...m.entries()].sort((a, z) => z[1] - a[1]).slice(0, n);
 
     const lines = [
-      "API usage facts for this contact, from live IBANforge data. Ground the mail in them, use ONLY these facts, copy numbers exactly, never infer beyond them:",
+      'API usage facts for this contact, from live IBANforge data. Ground the mail in them, use ONLY these facts, copy numbers exactly, never infer beyond them:',
       `- keys: ${mine.length}${created ? ` (first created ${created})` : ''}${sources.length ? `, signup source: ${sources.join(', ')}` : ''}`,
       paidKeys.length
         ? `- PAYING CUSTOMER: bought a prepaid credit pack of ${creditsTotal} calls; ${creditsLeft} credits remaining (${creditsTotal - creditsLeft} already consumed). Do not sell them what they already own; thank them and help them get value from it.`
@@ -198,14 +221,27 @@ async function enrichWithUsageFacts(body: unknown): Promise<unknown> {
       freeKeys.length
         ? `- free tier this month: ${usedMonth} of ${quota} calls used${usedMonth >= quota ? ' (quota reached)' : ''}${paywall ? `, ${paywall} refused at the paywall` : ''}${paidKeys.length ? ' (before they bought the pack)' : ''}`
         : '',
-      total90 ? `- last 90 days: ${total90} successful calls; endpoints: ${top(byEndpoint, 4).map(([p, n]) => `${p} (${n})`).join(', ')}` : '- no successful call yet',
-      byCountry.size ? `- countries checked: ${top(byCountry, 6).map(([c, n]) => `${c} (${n})`).join(', ')}` : '',
-      agents.size ? `- stack: ${top(agents, 2).map(([u]) => u).join(', ')}` : '',
+      total90
+        ? `- last 90 days: ${total90} successful calls; endpoints: ${top(byEndpoint, 4)
+            .map(([p, n]) => `${p} (${n})`)
+            .join(', ')}`
+        : '- no successful call yet',
+      byCountry.size
+        ? `- countries checked: ${top(byCountry, 6)
+            .map(([c, n]) => `${c} (${n})`)
+            .join(', ')}`
+        : '',
+      agents.size
+        ? `- stack: ${top(agents, 2)
+            .map(([u]) => u)
+            .join(', ')}`
+        : '',
       operatorNotes.length
         ? `- Operator notes on this contact (private ground truth, use them to personalize, never quote them verbatim): ${operatorNotes.join(' | ')}`
         : '',
       PRODUCT_FACTS,
       ADDRESS_RULE,
+      NO_CALL_RULE,
     ].filter(Boolean);
 
     return { ...b, context: `${b.context}\n\n${lines.join('\n')}` };
@@ -251,7 +287,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
   if (!secret) {
-    return NextResponse.json({ error: 'not_configured', message: 'CRM_DRAFT_SECRET manquant côté serveur' }, { status: 503 });
+    return NextResponse.json(
+      { error: 'not_configured', message: 'CRM_DRAFT_SECRET manquant côté serveur' },
+      { status: 503 },
+    );
   }
   let body: unknown;
   try {
@@ -268,7 +307,9 @@ export async function POST(req: NextRequest) {
    * failure runs toward disclosure. The value itself is never logged.
    */
   if (rawRules && rawRules.trim() && parseRedactionRules(rawRules).length === 0) {
-    console.warn('[crm] CRM_DRAFT_REDACTION_RULES is set but parses to no rule; expected domain=Name entries');
+    console.warn(
+      '[crm] CRM_DRAFT_REDACTION_RULES is set but parses to no rule; expected domain=Name entries',
+    );
   }
   const redacted = applyRedactionRules(body, rawRules);
   if (!redacted.ok) {
@@ -291,6 +332,9 @@ export async function POST(req: NextRequest) {
     const data = await r.json().catch(() => ({ error: 'bad_upstream_response' }));
     return NextResponse.json(data, { status: r.status });
   } catch {
-    return NextResponse.json({ error: 'upstream_failed', message: 'Endpoint VPS injoignable (déployé ?)' }, { status: 502 });
+    return NextResponse.json(
+      { error: 'upstream_failed', message: 'Endpoint VPS injoignable (déployé ?)' },
+      { status: 502 },
+    );
   }
 }
