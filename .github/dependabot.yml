@@ -48,6 +48,12 @@ updates:
     ignore:
       - dependency-name: "typescript"
         versions: [">=6.0.0"]
+      # ESLint 10 removed context.getFilename(); eslint-plugin-react 7.37.5
+      # (pulled by eslint-config-next, peer eslint <= 9) still calls it, so
+      # `npm run lint` crashes while loading "react/display-name" (PR 132,
+      # 2026-09-03). Lift when eslint-plugin-react publishes an ESLint 10 release.
+      - dependency-name: "eslint"
+        versions: [">=10.0.0"]
     groups:
       next:
         patterns:
