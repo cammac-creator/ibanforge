@@ -327,10 +327,10 @@ describe('the readings the premium card adds', () => {
     }
     const c = comparePeriods(days, 7, now);
     expect(c.previous).not.toBeNull();
-    // The window before holds its own seven days and nothing of the current
-    // one: 7 × 50, not 7 × 50 plus the 7 × 100 that follow it.
+    // The window before holds its own seven days (three at 100, four at 50)
+    // and nothing of the current one — not those plus the 7 × 100 that follow.
     expect(c.previous?.length).toBe(7);
-    expect(c.previous?.reduce((sum, d) => sum + d.total, 0)).toBe(7 * 50);
+    expect(c.previous?.reduce((sum, d) => sum + d.total, 0)).toBe(3 * 100 + 4 * 50);
     expect(c.current.reduce((sum, d) => sum + d.total, 0)).toBe(7 * 100);
     expect(deltaPct(700, 350)).toBe(100);
     expect(deltaPct(10, 0)).toBeNull();
