@@ -27,6 +27,7 @@ import { gsap } from "gsap"
 import { ScrollTrigger } from "gsap/ScrollTrigger"
 import { SplitText } from "gsap/SplitText"
 import { DrawSVGPlugin } from "gsap/DrawSVGPlugin"
+import type { ForgeFx, ForgeScene } from "./forge-scene"
 
 export interface FilmStrings {
   heading: string
@@ -154,6 +155,17 @@ function build(root: HTMLElement) {
   const safari = /^((?!chrome|android|crios|fxios).)*safari/i.test(navigator.userAgent)
   const richMotion = !mobile() && !safari && (navigator.hardwareConcurrency ?? 4) >= 6
 
+  // The numbers the 3D forge reads. Tweened by the station timelines below
+  // whether or not the scene loads: they are cheap, and the scene arrives
+  // on its own schedule on wide screens with WebGL.
+  const fx: ForgeFx = { heat: 0, hammer: -0.35, glow: 0, quench: 0, steam: 0, ripple: 0, steel: 0, stamp: 0, flash: 0, decal: 0, ship: 0, cam: 0 }
+  let scene3d: ForgeScene | null = null
+  const glCanvas = q<HTMLCanvasElement>(".forge-gl")
+  const webgl = (() => {
+    try { const c = document.createElement("canvas"); return !!(c.getContext("webgl2") || c.getContext("webgl")) } catch { return false }
+  })()
+  const want3d = !!glCanvas && !mobile() && webgl && window.innerWidth >= 900
+
   ScrollTrigger.config({ ignoreMobileResize: true })
 
   // ── the sparks: a small particle system on a canvas, fired at the strike ──
@@ -253,6 +265,12 @@ function build(root: HTMLElement) {
   s0.fromTo(digits,
     { x: (i) => Number(digits[i].dataset.dx) * 1.9, y: (i) => Number(digits[i].dataset.dy) * 1.9, rotation: () => gsap.utils.random(-40, 40), autoAlpha: 0.4 },
     { x: 0, y: 0, rotation: 0, autoAlpha: 1, duration: 0.14, stagger: { each: 0.004, from: "random" }, ease: "power3.inOut" }, 0.44)
+  s0.fromTo(fx, { heat: 0 }, { heat: 1, duration: 0.3, ease: "power1.inOut" }, 0.08)
+  s0.to(fx, { hammer: -0.95, duration: 0.16, ease: "power2.out" }, 0.40)
+  s0.to(fx, { hammer: 0.32, duration: 0.04, ease: "power4.in" }, 0.56)
+  s0.to(fx, { hammer: -0.35, duration: 0.18, ease: "elastic.out(1, 0.45)" }, 0.60)
+  s0.fromTo(fx, { glow: 0 }, { glow: 1, duration: 0.01 }, 0.60)
+  s0.to(fx, { glow: 0, duration: 0.16, ease: "power2.out" }, 0.61)
   const hammer = q(".hammer")
   s0.to(hammer, { attr: { transform: "rotate(-76 300 -60)" }, duration: 0.16, ease: "power2.out" }, 0.40)
   s0.to(hammer, { attr: { transform: "rotate(8 300 -60)" }, duration: 0.04, ease: "power4.in" }, 0.56)
@@ -267,6 +285,12 @@ function build(root: HTMLElement) {
   // ── station 1 · quench ──
   const s1 = gsap.timeline()
   enter(s1, 1)
+  s1.fromTo(fx, { cam: 0 }, { cam: 1, duration: 0.14, ease: "power2.inOut" }, 0)
+  s1.fromTo(fx, { quench: 0 }, { quench: 1, duration: 0.22, ease: "power2.in" }, 0.06)
+  s1.fromTo(fx, { steam: 0 }, { steam: 1, duration: 0.08 }, 0.26)
+  s1.to(fx, { steam: 0, duration: 0.12 }, 0.84)
+  s1.fromTo(fx, { ripple: 0 }, { ripple: 1, duration: 0.62, ease: "none" }, 0.26)
+  s1.fromTo(fx, { steel: 0 }, { steel: 1, duration: 0.5, ease: "power1.inOut" }, 0.24)
   qa<HTMLElement>(".q-row").forEach((row, i) => {
     s1.fromTo(row, { clipPath: "inset(0% 100% 0% 0%)" }, { clipPath: "inset(0% 0% 0% 0%)", duration: 0.20, ease: "power2.inOut" }, 0.10 + i * 0.14)
     s1.to(row.querySelector(".q-res"), { textShadow: "0 0 14px rgba(203,213,225,0.55)", duration: 0.04 }, 0.30 + i * 0.14)
@@ -286,6 +310,12 @@ function build(root: HTMLElement) {
   // ── station 2 · stamp ──
   const s2 = gsap.timeline()
   enter(s2, 2)
+  s2.fromTo(fx, { cam: 1 }, { cam: 2, duration: 0.14, ease: "power2.inOut" }, 0)
+  s2.to(fx, { quench: 0, duration: 0.14, ease: "power2.out" }, 0)
+  s2.fromTo(fx, { stamp: 0 }, { stamp: 1, duration: 0.32, ease: "power4.in" }, 0.10)
+  s2.fromTo(fx, { flash: 0 }, { flash: 1, duration: 0.02, yoyo: true, repeat: 1 }, 0.42)
+  s2.fromTo(fx, { decal: 0 }, { decal: 1, duration: 0.1 }, 0.44)
+  s2.to(fx, { stamp: 0.35, duration: 0.24, ease: "power2.out" }, 0.56)
   s2.fromTo(q(".ring-c"), { drawSVG: "0%" }, { drawSVG: "100%", duration: 0.3, ease: "power2.inOut" }, 0.02)
   s2.fromTo(q(".ring"), { rotation: 0, transformOrigin: "50% 50%" }, { rotation: 70, duration: 0.88, ease: "none" }, 0.05)
   const seal = q<HTMLElement>(".seal")
@@ -299,6 +329,9 @@ function build(root: HTMLElement) {
   // ── station 3 · ship (holds at the end: no exit) ──
   const s3 = gsap.timeline()
   enter(s3, 3)
+  s3.fromTo(fx, { cam: 2 }, { cam: 3, duration: 0.16, ease: "power2.inOut" }, 0)
+  s3.to(fx, { stamp: 0, duration: 0.1 }, 0)
+  s3.fromTo(fx, { ship: 0 }, { ship: 1, duration: 0.8, ease: "power1.inOut" }, 0.05)
   s3.fromTo(qa(".rail-l"), { drawSVG: "0%" }, { drawSVG: "100%", duration: 0.25, stagger: 0.03, ease: "power2.inOut" }, 0.02)
   s3.fromTo(q(".ship"), { y: 44, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: 0.28, ease: "power3.out" }, 0.06)
   s3.fromTo(qa(".json-out .jl"), { autoAlpha: 0, x: -8 }, { autoAlpha: 1, x: 0, duration: 0.04, stagger: 0.018, ease: "power1.out" }, 0.18)
@@ -324,12 +357,20 @@ function build(root: HTMLElement) {
         const active = Math.min(STATIONS - 1, Math.floor(self.progress * STATIONS))
         dots.forEach((d, i) => d.classList.toggle("on", i === active))
       },
-      onToggle: (self) => haze.paused(!self.isActive),
+      onToggle: (self) => {
+        haze.paused(!self.isActive)
+        if (self.isActive) scene3d?.start()
+        else scene3d?.stop()
+      },
     },
   })
   master.add(s0, 0).add(s1, 1).add(s2, 2).add(s3, 3)
   // the strike fires once per pass, forward only
-  master.call(() => { if ((master.scrollTrigger?.direction ?? 1) > 0) burst() }, [], 0.60)
+  master.call(() => {
+    if ((master.scrollTrigger?.direction ?? 1) <= 0) return
+    if (scene3d) scene3d.burst()
+    else burst()
+  }, [], 0.60)
 
   const rail = q<HTMLElement>(".rail")
   const railHead = q<HTMLElement>(".rail-head")
@@ -353,12 +394,38 @@ function build(root: HTMLElement) {
   gsap.set(stations.slice(1).map((s) => s.el), { autoAlpha: 0 })
   gsap.set(stations[0].el, { autoAlpha: 1 })
   dots[0]?.classList.add("on")
+
+  // ── the forge in 3D, on wide screens with WebGL: it replaces the SVG
+  //    scenery once it is ready; the film runs the same either way ──
+  let cancelled3d = false
+  const onPointer = (e: PointerEvent) => scene3d?.setPointer((e.clientX / window.innerWidth) * 2 - 1, -((e.clientY / window.innerHeight) * 2 - 1))
+  const onResize3d = () => scene3d?.resize()
+  if (want3d && glCanvas) {
+    import("./forge-scene")
+      .then(({ createForgeScene }) => {
+        if (cancelled3d) return
+        const sc = createForgeScene(glCanvas, { bloom: !new URLSearchParams(location.search).has("nobloom"), shadows: true, fx })
+        scene3d = sc
+        ;(window as unknown as { __forge?: unknown }).__forge = { fx, get scene() { return scene3d } }
+        glCanvas.hidden = false
+        root.classList.add("has-3d")
+        window.addEventListener("pointermove", onPointer, { passive: true })
+        window.addEventListener("resize", onResize3d, { passive: true })
+        sc.resize()
+        if (master.scrollTrigger?.isActive) sc.start()
+      })
+      .catch(() => { /* the SVG scenery stays */ })
+  }
   // measure again once fonts and the first layout have settled
   const onFonts = () => ScrollTrigger.refresh()
   document.fonts?.ready.then(onFonts).catch(() => {})
   const settle = window.setTimeout(() => ScrollTrigger.refresh(), 600)
 
   return () => {
+    cancelled3d = true
+    window.removeEventListener("pointermove", onPointer)
+    window.removeEventListener("resize", onResize3d)
+    scene3d?.dispose()
     window.clearTimeout(settle)
     master.scrollTrigger?.kill()
     master.kill()
@@ -388,6 +455,7 @@ export function ForgeFilm({ t, playgroundHref }: { t: FilmStrings; playgroundHre
       {/* One real h2 names the film; the stations are h3 beneath it. */}
       <h2 className="sr-only" id="h-film">{t.heading}</h2>
       <div className="pin">
+        <canvas className="forge-gl" aria-hidden="true" hidden />
         <div className="rail" aria-hidden="true"><span className="rail-head" /></div>
         <ol className="film-dots" aria-hidden="true">
           {Array.from({ length: STATIONS }, (_, i) => <li key={i} />)}

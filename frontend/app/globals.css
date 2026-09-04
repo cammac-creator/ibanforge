@@ -865,6 +865,21 @@
 html[data-js] .forge .scene {
   will-change: transform, opacity;
 }
+/* The 3D forge, behind the words; once it shows, the SVG scenery and the
+   hot/cold washes step aside. */
+.forge .forge-gl {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.forge .film.has-3d .scene,
+.forge .film.has-3d .q-layer,
+.forge .film.has-3d .sparks-canvas {
+  display: none;
+}
 .forge .st-inner {
   position: relative;
   z-index: 2;
