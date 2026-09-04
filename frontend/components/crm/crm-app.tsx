@@ -343,10 +343,58 @@ export function CrmApp({
   const tailCount = (shown?.messages.length ?? 0) + (shown?.draft ? 1 : 0);
   // `selectedId` as well as `shownId`: re-opening the SAME contact leaves the
   // held file untouched, and the newest message still has to be back in view.
+  //
+  // Two landings for two moments. Opening a file lands on the TOP of the
+  // newest message the contact wrote — the question, not the signature the
+  // bottom of the region used to show. A send, or the composer opening, keeps
+  // landing on the end, where the mail that just left is. Told apart by which
+  // dependency moved: the file, or its tail.
+  const landed = useRef<string | null>(null);
   useEffect(() => {
     const el = scroller.current;
-    if (el && tailCount > 0) el.scrollTop = el.scrollHeight;
+    if (!el || tailCount === 0) return;
+    const fileChanged = landed.current !== shownId;
+    landed.current = shownId;
+    const anchor = fileChanged ? el.querySelector<HTMLElement>('[data-last-inbound]') : null;
+    el.scrollTop = anchor ? Math.max(0, anchor.offsetTop - el.offsetTop - 8) : el.scrollHeight;
   }, [selectedId, shownId, tailCount, composerOpen]);
+
+  // The list as the table orders and filters it, so the drawer can walk it.
+  const [orderedIds, setOrderedIds] = useState<string[]>([]);
+  const onRowsChange = useCallback((ids: string[]) => setOrderedIds(ids), []);
+  const position = shownId ? orderedIds.indexOf(shownId) : -1;
+  const prevId = position > 0 ? orderedIds[position - 1] : null;
+  const nextId =
+    position >= 0 && position < orderedIds.length - 1 ? orderedIds[position + 1] : null;
+  const goPrev = useCallback(() => {
+    if (prevId) open(prevId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prevId]);
+  const goNext = useCallback(() => {
+    if (nextId) open(nextId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nextId]);
+
+  // j / k walk the list from the keyboard when no field has the focus; with
+  // the drawer closed, j opens the first row. The dirty guard in open() still
+  // asks before a text in progress is lost.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const t = e.target as HTMLElement | null;
+      const tag = t?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || t?.isContentEditable) return;
+      if (e.key === 'j') {
+        if (drawerOpen) goNext();
+        else if (orderedIds[0]) open(orderedIds[0]);
+      } else if (e.key === 'k' && drawerOpen) {
+        goPrev();
+      }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [drawerOpen, goNext, goPrev, orderedIds]);
 
   return (
     <div className="min-w-0">
@@ -357,6 +405,7 @@ export function CrmApp({
         input={input}
         selectedId={selectedId}
         onSelect={open}
+        onRowsChange={onRowsChange}
         initialSelection={initialSelection}
       />
 
@@ -367,6 +416,16 @@ export function CrmApp({
         open={drawerOpen}
         label={shown ? `Fiche de ${shown.company || shown.email}` : 'Fiche contact'}
         onClose={close}
+        nav={
+          position >= 0
+            ? {
+                index: position,
+                total: orderedIds.length,
+                onPrev: prevId ? goPrev : undefined,
+                onNext: nextId ? goNext : undefined,
+              }
+            : undefined
+        }
       >
         {shown && (
           <>
@@ -498,6 +557,7 @@ export function CrmApp({
                 sentToday={sentToday}
                 open={composerOpen}
                 onOpenChange={setComposerOpen}
+                onNext={nextId ? goNext : undefined}
                 onDirtyChange={onDirtyChange}
               />
             ) : (
