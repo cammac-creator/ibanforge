@@ -3,20 +3,23 @@
 /**
  * The forge film — four stations on ONE pinned screen, scrubbed by scroll.
  *
- * Rebuilt 2026-09-04 (evening) after Claude-Alain saw the film "run backwards":
- * with one sticky pin per station, a station animated over its short scrub
- * (40vh) and then slid away, finished, over a full viewport of dead scroll —
- * every beat seemed to happen at the end. Now a single 100svh pin holds the
- * four stations stacked; the section's height is the whole timeline
- * (4 × --film-s), and a global progress g ∈ [0,1] is split into a station
- * index and a local p ∈ [0,1] that drives every beat. Consecutive stations
- * crossfade over 14 % of a station; nothing on screen is ever idle.
+ * Engine: GSAP 3.15 (standard "no charge" licence) with ScrollTrigger,
+ * SplitText and DrawSVG — loaded on demand, only with JS and motion allowed.
+ * One master timeline, four station timelines added back to back: a station
+ * enters (0→0.10), plays its beats (0.10→0.86) and leaves (0.90→1.0) BEFORE
+ * the next one enters, so two stations never share the screen. ScrollTrigger
+ * pins the screen for four station-lengths of scroll and scrubs the timeline
+ * with a short lag, which is what makes the motion feel weighted.
  *
- * PE-safe by construction: this component server-renders complete static
- * content; every hidden start state in globals.css is gated behind
- * `html.js` + `prefers-reduced-motion: no-preference`, and the engine below
- * bails out entirely under reduced motion. Without JS the film reads as four
- * stacked, fully readable blocks.
+ * Rebuilt twice on 2026-09-04: a pin per station animated over 40vh and slid
+ * away finished over a dead viewport ("it runs backwards"); then a manual
+ * crossfade let two stations overlap ("they walk over each other"). Both
+ * are gone by construction here.
+ *
+ * PE-safe: this component server-renders complete static content; every
+ * hidden start state in globals.css is gated behind `html.js` +
+ * `prefers-reduced-motion: no-preference`, and the engine bails out entirely
+ * under reduced motion. Without JS the film reads as four stacked blocks.
  */
 
 import { useEffect, useRef } from "react"
@@ -40,23 +43,28 @@ export interface FilmStrings {
   ship: { eyebrow: string; title: string; head: string; tryLive: string; copy: string }
 }
 
-/* Static SVG scenery + data-heavy markup, kept as trusted constants so the
-   JSX stays legible. Nothing user-controlled flows in here. Elements the
-   engine drives carry a class (heat-glow, hammer, arcs, rp, sm, ring, flash,
-   mark, cart). */
+type GSAP = typeof import("gsap")["gsap"]
+type ScrollTriggerT = typeof import("gsap/ScrollTrigger")["ScrollTrigger"]
+type SplitTextT = typeof import("gsap/SplitText")["SplitText"]
 
-const SCENE_HEAT = `<defs><radialGradient id="hglow" cx="50%" cy="100%" r="65%"><stop offset="0%" stop-color="#F59E0B" stop-opacity="0.16"/><stop offset="55%" stop-color="#EF4444" stop-opacity="0.06"/><stop offset="100%" stop-color="#EF4444" stop-opacity="0"/></radialGradient><radialGradient id="hember" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#FCD34D" stop-opacity="0.9"/><stop offset="45%" stop-color="#F59E0B" stop-opacity="0.55"/><stop offset="100%" stop-color="#F59E0B" stop-opacity="0"/></radialGradient></defs><rect class="heat-glow" x="0" y="335" width="1200" height="340" fill="url(#hglow)" opacity="0.5"/><polygon fill="#1A1310" points="0,675 0,616 130,596 260,622 390,600 540,630 700,604 860,628 1010,602 1200,624 1200,675"/><polygon fill="#120E09" points="0,675 0,642 110,624 250,650 400,628 560,654 720,632 880,652 1040,630 1200,648 1200,675"/><g><circle cx="180" cy="640" r="16" fill="url(#hember)"/><circle cx="415" cy="647" r="11" fill="url(#hember)" opacity="0.8"/><circle cx="655" cy="642" r="18" fill="url(#hember)"/><circle cx="905" cy="646" r="12" fill="url(#hember)" opacity="0.7"/><circle cx="1105" cy="638" r="14" fill="url(#hember)" opacity="0.85"/></g><g fill="#FCD34D"><rect x="174" y="636" width="13" height="4" rx="1" opacity="0.85"/><rect x="410" y="644" width="9" height="3" rx="1" opacity="0.6"/><rect x="648" y="638" width="15" height="4" rx="1" opacity="0.9"/><rect x="900" y="643" width="9" height="3" rx="1" opacity="0.55"/><rect x="1099" y="634" width="11" height="4" rx="1" opacity="0.7"/></g><g fill="#EF4444"><rect x="300" y="649" width="7" height="3" rx="1" opacity="0.5"/><rect x="770" y="648" width="8" height="3" rx="1" opacity="0.5"/><rect x="1010" y="650" width="6" height="3" rx="1" opacity="0.45"/></g>`
+/* Static SVG scenery, kept as trusted constants so the JSX stays legible.
+   Nothing user-controlled flows in here. Elements the engine drives carry a
+   class: turb, heat-glow, hammer, arcs, rp, sm, ring-c, flash, mark, cart,
+   rail-l. The forge palette only: amber, red, steel, green — no cyan. */
 
-const SCENE_STRIKE = `<defs><linearGradient id="srim" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#F59E0B" stop-opacity="0.5"/><stop offset="100%" stop-color="#F59E0B" stop-opacity="0"/></linearGradient></defs><g transform="translate(800,415) scale(0.72)"><g class="hammer" transform="rotate(-24 300 -60)" opacity="0.7"><rect x="255" y="-95" width="96" height="44" rx="6" fill="#221B13"/><rect x="292" y="-51" width="16" height="120" rx="5" fill="#1A140D"/></g><g class="arcs" stroke="#F59E0B" fill="none" stroke-linecap="round" opacity="0"><path d="M212,-18 q28,-34 74,-44" stroke-width="3"/><path d="M196,-40 q40,-52 108,-64" stroke-width="2" opacity="0.6"/></g><g opacity="0.62"><path fill="#191309" d="M18,0 L332,0 L332,40 Q332,52 318,54 L250,60 L236,132 L112,132 L98,60 Q40,58 12,34 Q-6,18 2,4 Z"/><polygon fill="#191309" points="92,132 256,132 300,186 48,186"/><rect x="18" y="0" width="314" height="6" fill="url(#srim)"/></g></g>`
+const SCENE_HEAT = `<defs><radialGradient id="hglow" cx="50%" cy="100%" r="65%"><stop offset="0%" stop-color="#F59E0B" stop-opacity="0.16"/><stop offset="55%" stop-color="#EF4444" stop-opacity="0.06"/><stop offset="100%" stop-color="#EF4444" stop-opacity="0"/></radialGradient><radialGradient id="hember" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#FCD34D" stop-opacity="0.9"/><stop offset="45%" stop-color="#F59E0B" stop-opacity="0.55"/><stop offset="100%" stop-color="#F59E0B" stop-opacity="0"/></radialGradient><filter id="haze" x="-5%" y="-10%" width="110%" height="120%"><feTurbulence class="turb" type="fractalNoise" baseFrequency="0.010 0.026" numOctaves="2" seed="7" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="14" xChannelSelector="R" yChannelSelector="G"/></filter></defs><rect class="heat-glow" x="0" y="335" width="1200" height="340" fill="url(#hglow)" opacity="0.5"/><g filter="url(#haze)"><polygon fill="#1A1310" points="0,675 0,616 130,596 260,622 390,600 540,630 700,604 860,628 1010,602 1200,624 1200,675"/><polygon fill="#120E09" points="0,675 0,642 110,624 250,650 400,628 560,654 720,632 880,652 1040,630 1200,648 1200,675"/><g><circle cx="180" cy="640" r="16" fill="url(#hember)"/><circle cx="415" cy="647" r="11" fill="url(#hember)" opacity="0.8"/><circle cx="655" cy="642" r="18" fill="url(#hember)"/><circle cx="905" cy="646" r="12" fill="url(#hember)" opacity="0.7"/><circle cx="1105" cy="638" r="14" fill="url(#hember)" opacity="0.85"/></g><g fill="#FCD34D"><rect x="174" y="636" width="13" height="4" rx="1" opacity="0.85"/><rect x="410" y="644" width="9" height="3" rx="1" opacity="0.6"/><rect x="648" y="638" width="15" height="4" rx="1" opacity="0.9"/><rect x="900" y="643" width="9" height="3" rx="1" opacity="0.55"/><rect x="1099" y="634" width="11" height="4" rx="1" opacity="0.7"/></g><g fill="#EF4444"><rect x="300" y="649" width="7" height="3" rx="1" opacity="0.5"/><rect x="770" y="648" width="8" height="3" rx="1" opacity="0.5"/><rect x="1010" y="650" width="6" height="3" rx="1" opacity="0.45"/></g></g>`
 
-const SCENE_QUENCH = `<defs><linearGradient id="qwater" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#38BDF8" stop-opacity="0.22"/><stop offset="100%" stop-color="#38BDF8" stop-opacity="0"/></linearGradient><filter id="qblur" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="14"/></filter></defs><rect x="0" y="560" width="1200" height="115" fill="url(#qwater)"/><line x1="0" y1="560" x2="1200" y2="560" stroke="#38BDF8" stroke-opacity="0.35" stroke-width="1.5"/><g transform="translate(600 586)"><ellipse class="rp" rx="52" ry="12" fill="none" stroke="#38BDF8" stroke-width="2" opacity="0"/><ellipse class="rp" rx="52" ry="12" fill="none" stroke="#38BDF8" stroke-width="1.6" opacity="0"/><ellipse class="rp" rx="52" ry="12" fill="none" stroke="#7DD3FC" stroke-width="1.2" opacity="0"/></g><g filter="url(#qblur)" fill="#BAE6FD"><circle class="sm" cx="520" cy="575" r="26" opacity="0"/><circle class="sm" cx="600" cy="580" r="34" opacity="0"/><circle class="sm" cx="690" cy="572" r="22" opacity="0"/><circle class="sm" cx="560" cy="590" r="18" opacity="0"/><circle class="sm" cx="650" cy="588" r="28" opacity="0"/><circle class="sm" cx="730" cy="584" r="16" opacity="0"/></g>`
+const SCENE_STRIKE = `<defs><linearGradient id="srim" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#F59E0B" stop-opacity="0.5"/><stop offset="100%" stop-color="#F59E0B" stop-opacity="0"/></linearGradient></defs><g transform="translate(800,415) scale(0.72)"><g class="hammer" transform="rotate(-24 300 -60)" opacity="0.72"><rect x="255" y="-95" width="96" height="44" rx="6" fill="#221B13"/><rect x="292" y="-51" width="16" height="120" rx="5" fill="#1A140D"/></g><g class="arcs" stroke="#F59E0B" fill="none" stroke-linecap="round" opacity="0"><path d="M212,-18 q28,-34 74,-44" stroke-width="3"/><path d="M196,-40 q40,-52 108,-64" stroke-width="2" opacity="0.6"/></g><g opacity="0.62"><path fill="#191309" d="M18,0 L332,0 L332,40 Q332,52 318,54 L250,60 L236,132 L112,132 L98,60 Q40,58 12,34 Q-6,18 2,4 Z"/><polygon fill="#191309" points="92,132 256,132 300,186 48,186"/><rect x="18" y="0" width="314" height="6" fill="url(#srim)"/></g></g>`
 
-const SCENE_STAMP = `<g transform="translate(930,300)"><circle class="flash" r="172" fill="#FFF7ED" opacity="0"/><circle r="158" fill="none" stroke="#3B352E" stroke-width="3" opacity="0.55"/><g class="ring"><circle r="126" fill="none" stroke="#3B352E" stroke-width="1.5" stroke-dasharray="10 16" opacity="0.5"/></g><g stroke="#3B352E" stroke-width="2.5" opacity="0.55"><line x1="0" y1="-158" x2="0" y2="-140"/><line x1="0" y1="158" x2="0" y2="140"/><line x1="-158" y1="0" x2="-140" y2="0"/><line x1="158" y1="0" x2="140" y2="0"/></g><g class="mark" transform="translate(-46,-46)" fill="#F59E0B" opacity="0.16"><rect x="10" y="38" width="80" height="16"/><polygon points="24,54 76,54 62,78 38,78"/><polygon points="34,78 66,78 76,92 24,92"/><rect x="22" y="26" width="8" height="9"/><rect x="34" y="16" width="8" height="19"/><rect x="46" y="8" width="8" height="27"/><rect x="58" y="16" width="8" height="19"/><rect x="70" y="26" width="8" height="9"/></g></g>`
+const SCENE_QUENCH = `<defs><linearGradient id="qwater" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#94A3B8" stop-opacity="0.2"/><stop offset="100%" stop-color="#94A3B8" stop-opacity="0"/></linearGradient><filter id="qblur" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="14"/></filter></defs><rect x="0" y="560" width="1200" height="115" fill="url(#qwater)"/><line x1="0" y1="560" x2="1200" y2="560" stroke="#CBD5E1" stroke-opacity="0.4" stroke-width="1.5"/><g transform="translate(600 586)"><ellipse class="rp" rx="52" ry="12" fill="none" stroke="#CBD5E1" stroke-width="2" opacity="0"/><ellipse class="rp" rx="52" ry="12" fill="none" stroke="#CBD5E1" stroke-width="1.6" opacity="0"/><ellipse class="rp" rx="52" ry="12" fill="none" stroke="#E2E8F0" stroke-width="1.2" opacity="0"/></g><g filter="url(#qblur)" fill="#E2E8F0"><circle class="sm" cx="520" cy="575" r="26" opacity="0"/><circle class="sm" cx="600" cy="580" r="34" opacity="0"/><circle class="sm" cx="690" cy="572" r="22" opacity="0"/><circle class="sm" cx="560" cy="590" r="18" opacity="0"/><circle class="sm" cx="650" cy="588" r="28" opacity="0"/><circle class="sm" cx="730" cy="584" r="16" opacity="0"/></g>`
 
-const SCENE_SHIP = `<defs><linearGradient id="ptrail" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#F59E0B" stop-opacity="0"/><stop offset="100%" stop-color="#F59E0B" stop-opacity="0.4"/></linearGradient><radialGradient id="piglow" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#F59E0B" stop-opacity="0.3"/><stop offset="100%" stop-color="#F59E0B" stop-opacity="0"/></radialGradient></defs><g opacity="0.6"><g stroke="#3B352E"><line x1="0" y1="646" x2="1200" y2="596" stroke-width="3"/><line x1="0" y1="668" x2="1200" y2="630" stroke-width="2.5"/><g stroke-width="2"><line x1="90" y1="648" x2="82" y2="668"/><line x1="270" y1="641" x2="264" y2="663"/><line x1="450" y1="633" x2="446" y2="657"/><line x1="630" y1="626" x2="628" y2="652"/><line x1="810" y1="618" x2="810" y2="646"/><line x1="990" y1="611" x2="992" y2="640"/><line x1="1170" y1="603" x2="1174" y2="635"/></g></g><g class="cart"><ellipse cx="700" cy="612" rx="120" ry="26" fill="url(#piglow)"/><rect x="560" y="601" width="130" height="6" rx="3" fill="url(#ptrail)"/><g transform="rotate(-2.4 700 606)"><rect x="652" y="592" width="96" height="20" rx="3" fill="#26201A"/><rect x="652" y="592" width="96" height="4" rx="2" fill="#F59E0B" opacity="0.55"/><circle cx="700" cy="602" r="6" fill="#F59E0B" opacity="0.5"/></g></g></g>`
+const SCENE_STAMP = `<defs><radialGradient id="sflash" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#FFF7ED" stop-opacity="0.95"/><stop offset="45%" stop-color="#F59E0B" stop-opacity="0.45"/><stop offset="100%" stop-color="#F59E0B" stop-opacity="0"/></radialGradient></defs><g transform="translate(930,300)"><circle class="flash" r="190" fill="url(#sflash)" opacity="0"/><circle class="ring-c" r="158" fill="none" stroke="#3B352E" stroke-width="3" opacity="0.55"/><g class="ring"><circle r="126" fill="none" stroke="#3B352E" stroke-width="1.5" stroke-dasharray="10 16" opacity="0.5"/></g><g stroke="#3B352E" stroke-width="2.5" opacity="0.55"><line x1="0" y1="-158" x2="0" y2="-140"/><line x1="0" y1="158" x2="0" y2="140"/><line x1="-158" y1="0" x2="-140" y2="0"/><line x1="158" y1="0" x2="140" y2="0"/></g><g class="mark" transform="translate(-46,-46)" fill="#F59E0B" opacity="0.16"><rect x="10" y="38" width="80" height="16"/><polygon points="24,54 76,54 62,78 38,78"/><polygon points="34,78 66,78 76,92 24,92"/><rect x="22" y="26" width="8" height="9"/><rect x="34" y="16" width="8" height="19"/><rect x="46" y="8" width="8" height="27"/><rect x="58" y="16" width="8" height="19"/><rect x="70" y="26" width="8" height="9"/></g></g>`
+
+const SCENE_SHIP = `<defs><linearGradient id="ptrail" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#F59E0B" stop-opacity="0"/><stop offset="100%" stop-color="#F59E0B" stop-opacity="0.4"/></linearGradient><radialGradient id="piglow" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#F59E0B" stop-opacity="0.3"/><stop offset="100%" stop-color="#F59E0B" stop-opacity="0"/></radialGradient></defs><g opacity="0.6"><g stroke="#3B352E"><line class="rail-l" x1="0" y1="646" x2="1200" y2="596" stroke-width="3"/><line class="rail-l" x1="0" y1="668" x2="1200" y2="630" stroke-width="2.5"/><g stroke-width="2"><line x1="90" y1="648" x2="82" y2="668"/><line x1="270" y1="641" x2="264" y2="663"/><line x1="450" y1="633" x2="446" y2="657"/><line x1="630" y1="626" x2="628" y2="652"/><line x1="810" y1="618" x2="810" y2="646"/><line x1="990" y1="611" x2="992" y2="640"/><line x1="1170" y1="603" x2="1174" y2="635"/></g></g><g class="cart"><ellipse cx="700" cy="612" rx="120" ry="26" fill="url(#piglow)"/><rect x="560" y="601" width="130" height="6" rx="3" fill="url(#ptrail)"/><g transform="rotate(-2.4 700 606)"><rect x="652" y="592" width="96" height="20" rx="3" fill="#26201A"/><rect x="652" y="592" width="96" height="4" rx="2" fill="#F59E0B" opacity="0.55"/><circle cx="700" cy="602" r="6" fill="#F59E0B" opacity="0.5"/></g></g></g>`
 
 // The mod-97 rearrangement, one span per digit with its authored scatter
-// vector; the parent carries the readable aria-label.
+// vector (CSS vars for the static resting state, data attributes for the
+// engine); the parent carries the readable aria-label.
 const MOD_DIGITS: Array<[string, number, number]> = [
   ["0", -26, -18], ["0", 18, 22], ["2", -9, 14], ["3", 31, -11], ["0", -22, 8],
   ["0", 12, -24], ["0", -33, -6], ["0", 7, 19], ["0", 24, 12], ["0", -14, -21],
@@ -66,7 +74,8 @@ const MOD_DIGITS: Array<[string, number, number]> = [
 ]
 
 const MOD_LINE = MOD_DIGITS.map(
-  ([d, dx, dy]) => `<span style="--dx:${dx}px;--dy:${dy}px" aria-hidden="true">${d}</span>`,
+  ([d, dx, dy]) =>
+    `<span style="--dx:${dx}px;--dy:${dy}px" data-dx="${dx}" data-dy="${dy}" aria-hidden="true">${d}</span>`,
 ).join("")
 
 // The REAL captured /v1/iban/validate payload for the UBS example — the same
@@ -105,6 +114,10 @@ const JSON_LINES = JSON_OUT.split("\n").map((l) => `<span class="jl">${l}</span>
 
 const STATIONS = 4
 
+const HOT = "#fff7ed", DULL = "#78716c", AMBER = "#f59e0b", RED = "#ef4444",
+  STEEL = "#94a3b8", SILVER = "#cbd5e1", GREEN = "#4ade80"
+const glow = (c: string) => `0 0 14px ${c}, 0 0 34px ${c}`
+
 function Scene({ html, mid = false }: { html: string; mid?: boolean }) {
   return (
     <svg
@@ -117,6 +130,227 @@ function Scene({ html, mid = false }: { html: string; mid?: boolean }) {
   )
 }
 
+/** Builds the whole film on the mounted DOM; returns its teardown. */
+function build(gsap: GSAP, ScrollTrigger: ScrollTriggerT, SplitText: SplitTextT, root: HTMLElement) {
+  const q = <T extends Element>(sel: string) => root.querySelector<T>(sel)
+  const qa = <T extends Element>(sel: string) => Array.from(root.querySelectorAll<T>(sel))
+  const pin = q<HTMLElement>(".pin")
+  if (!pin) return () => {}
+
+  const stations = qa<HTMLElement>(".st").map((el) => ({
+    el,
+    inner: el.querySelector<HTMLElement>(".st-inner"),
+    scenes: Array.from(el.querySelectorAll<SVGElement>(".scene")),
+    title: el.querySelector<HTMLElement>(".st-title"),
+    eyebrow: el.querySelector<HTMLElement>(".st-eyebrow"),
+    copy: el.querySelector<HTMLElement>(".st-copy"),
+  }))
+  const splits: Array<{ revert: () => void }> = []
+  const mobile = () => window.innerWidth < 720
+  const stationPx = () => window.innerHeight * (mobile() ? 1.1 : 1.2)
+
+  ScrollTrigger.config({ ignoreMobileResize: true })
+
+  // ── the sparks: a small particle system on a canvas, fired at the strike ──
+  const canvas = q<HTMLCanvasElement>(".sparks-canvas")
+  const ctx = canvas ? canvas.getContext("2d") : null
+  const dpr = Math.min(window.devicePixelRatio || 1, 2)
+  interface Spark { x: number; y: number; vx: number; vy: number; l: number; d: number; s: number; w: number }
+  let parts: Spark[] = []
+  let ticking = false
+  const draw = () => {
+    if (!ctx || !canvas) return
+    ctx.clearRect(0, 0, canvas.width, canvas.height)
+    if (parts.length === 0) {
+      gsap.ticker.remove(draw)
+      ticking = false
+      return
+    }
+    ctx.globalCompositeOperation = "lighter"
+    for (let i = parts.length - 1; i >= 0; i--) {
+      const p = parts[i]
+      p.x += p.vx; p.y += p.vy; p.vy += 0.14 * dpr; p.vx *= 0.985; p.l -= p.d
+      if (p.l <= 0) { parts.splice(i, 1); continue }
+      ctx.fillStyle = `rgba(${p.w < 0.5 ? "245,158,11" : "239,68,68"},${(p.l * 0.9).toFixed(3)})`
+      ctx.beginPath()
+      ctx.arc(p.x, p.y, p.s * p.l + 0.4, 0, 6.2832)
+      ctx.fill()
+    }
+    ctx.globalCompositeOperation = "source-over"
+  }
+  const modLine = q<HTMLElement>(".mod-line")
+  const burst = () => {
+    if (mobile() || !ctx || !canvas || !modLine || !canvas.parentElement) return
+    const r = canvas.parentElement.getBoundingClientRect()
+    canvas.width = Math.floor(r.width * dpr)
+    canvas.height = Math.floor(r.height * dpr)
+    const ml = modLine.getBoundingClientRect()
+    const cx = (ml.left + ml.width / 2 - r.left) * dpr
+    const cy = (ml.top + ml.height / 2 - r.top) * dpr
+    for (let i = 0; i < 120 && parts.length < 200; i++) {
+      const a = Math.random() * Math.PI * 2
+      const sp = (2 + Math.random() * 8) * dpr
+      parts.push({ x: cx, y: cy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 3.5 * dpr,
+        l: 1, d: 0.011 + Math.random() * 0.02, s: (0.8 + Math.random() * 2.2) * dpr, w: Math.random() })
+    }
+    if (!ticking) { ticking = true; gsap.ticker.add(draw) }
+  }
+
+  // ── shared enter / exit of a station ──
+  // The first station is already on screen while the film scrolls into
+  // view, so it does not fade in: an empty pinned screen is what a visitor
+  // would see otherwise. Its words are there from the start; the beats
+  // begin once the screen is pinned.
+  const enter = (tl: gsap.core.Timeline, i: number) => {
+    const s = stations[i]
+    // the scenery drifts a little slower than the words: depth, cheaply
+    tl.fromTo(s.scenes, { y: 22, scale: 1.05 }, { y: -22, scale: 1.05, duration: 1, ease: "none" }, 0)
+    if (i === 0) {
+      gsap.set(s.el, { autoAlpha: 1 })
+      return
+    }
+    tl.fromTo(s.el, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.05 }, 0)
+    tl.fromTo(s.scenes, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.14, ease: "power2.out" }, 0)
+    if (s.title) {
+      const split = new SplitText(s.title, { type: "words" })
+      splits.push(split)
+      tl.fromTo(split.words, { y: 28, autoAlpha: 0, rotationX: -35 }, { y: 0, autoAlpha: 1, rotationX: 0, duration: 0.08, stagger: 0.012, ease: "power3.out" }, 0.01)
+    }
+    tl.fromTo([s.eyebrow, s.copy].filter(Boolean), { y: 10, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: 0.08, ease: "power2.out" }, 0.03)
+  }
+  const exit = (tl: gsap.core.Timeline, i: number) => {
+    const s = stations[i]
+    tl.to(s.inner, { y: -30, autoAlpha: 0, duration: 0.08, ease: "power2.in" }, 0.90)
+    tl.to(s.el, { autoAlpha: 0, duration: 0.05 }, 0.95)
+  }
+  const show = (tl: gsap.core.Timeline, target: gsap.TweenTarget, at: number, dur = 0.05) =>
+    tl.fromTo(target, { y: 10, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: dur, ease: "power2.out" }, at)
+
+  // ── station 0 · heat, then the strike ──
+  const s0 = gsap.timeline()
+  enter(s0, 0)
+  const ibanSplit = new SplitText(qa(".iban-bar .seg"), { type: "chars" })
+  splits.push(ibanSplit)
+  s0.fromTo(ibanSplit.chars,
+    { color: DULL, textShadow: "0 0 0px rgba(245,158,11,0), 0 2px 0px rgba(239,68,68,0)" },
+    { color: HOT, textShadow: "0 0 18px rgba(245,158,11,0.6), 0 2px 44px rgba(239,68,68,0.3)", duration: 0.16, stagger: 0.006, ease: "power2.inOut" }, 0.08)
+  s0.fromTo(q(".heat-glow"), { opacity: 0.35 }, { opacity: 1, duration: 0.3, ease: "power1.inOut" }, 0.08)
+  const segColors = [AMBER, RED, STEEL, GREEN]
+  qa<HTMLElement>(".seg").forEach((seg, i) => {
+    s0.fromTo(seg, { borderColor: "rgba(0,0,0,0)" }, { borderColor: segColors[i], duration: 0.04 }, 0.12 + i * 0.08)
+  })
+  qa<HTMLElement>(".parse li").forEach((li, i) => show(s0, li, 0.12 + i * 0.08))
+  show(s0, q(".mod-note"), 0.40)
+  const digits = qa<HTMLElement>(".mod-line span")
+  s0.fromTo(digits,
+    { x: (i) => Number(digits[i].dataset.dx) * 1.9, y: (i) => Number(digits[i].dataset.dy) * 1.9, rotation: () => gsap.utils.random(-40, 40), autoAlpha: 0.4 },
+    { x: 0, y: 0, rotation: 0, autoAlpha: 1, duration: 0.14, stagger: { each: 0.004, from: "random" }, ease: "power3.inOut" }, 0.44)
+  const hammer = q(".hammer")
+  s0.to(hammer, { attr: { transform: "rotate(-76 300 -60)" }, duration: 0.16, ease: "power2.out" }, 0.40)
+  s0.to(hammer, { attr: { transform: "rotate(8 300 -60)" }, duration: 0.04, ease: "power4.in" }, 0.56)
+  s0.to(hammer, { attr: { transform: "rotate(-24 300 -60)" }, duration: 0.18, ease: "elastic.out(1, 0.45)" }, 0.60)
+  s0.fromTo(q(".arcs"), { opacity: 0 }, { opacity: 0.9, duration: 0.01 }, 0.595)
+  s0.to(q(".arcs"), { opacity: 0, duration: 0.12 }, 0.61)
+  s0.to(stations[0].inner, { keyframes: [{ x: -4, y: 2 }, { x: 4, y: -2 }, { x: -3, y: -1 }, { x: 2, y: 1 }, { x: 0, y: 0 }], duration: 0.03 }, 0.60)
+  show(s0, q(".mod-eq"), 0.66)
+  s0.fromTo(q(".stamp-ok"), { scale: 1.9, autoAlpha: 0 }, { scale: 1, autoAlpha: 1, duration: 0.06, ease: "back.out(2.5)" }, 0.72)
+  exit(s0, 0)
+
+  // ── station 1 · quench ──
+  const s1 = gsap.timeline()
+  enter(s1, 1)
+  qa<HTMLElement>(".q-row").forEach((row, i) => {
+    s1.fromTo(row, { clipPath: "inset(0% 100% 0% 0%)" }, { clipPath: "inset(0% 0% 0% 0%)", duration: 0.20, ease: "power2.inOut" }, 0.10 + i * 0.14)
+    s1.to(row.querySelector(".q-res"), { textShadow: "0 0 14px rgba(203,213,225,0.55)", duration: 0.04 }, 0.30 + i * 0.14)
+  })
+  s1.fromTo(q(".q-hot"), { autoAlpha: 1 }, { autoAlpha: 0, duration: 0.5, ease: "power1.inOut" }, 0.14)
+  s1.fromTo(q(".q-cold"), { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.5, ease: "power1.inOut" }, 0.14)
+  qa(".rp").forEach((rp, k) => {
+    s1.fromTo(rp, { scale: 1, opacity: 0.85, transformOrigin: "50% 50%" }, { scale: 7.5, opacity: 0, duration: 0.5, ease: "power1.out" }, 0.28 + k * 0.09)
+  })
+  qa(".sm").forEach((sm, k) => {
+    const sx = (k % 2 ? 1 : -1) * 26
+    s1.fromTo(sm, { y: 0, x: 0, opacity: 0 }, { keyframes: { y: [0, -120, -250], x: [0, sx * 0.5, sx], opacity: [0, 0.42, 0], easeEach: "none" }, duration: 0.56 }, 0.30 + k * 0.05)
+  })
+  qa<HTMLElement>(".q-badge").forEach((b, i) => show(s1, b, 0.64 + i * 0.08))
+  exit(s1, 1)
+
+  // ── station 2 · stamp ──
+  const s2 = gsap.timeline()
+  enter(s2, 2)
+  s2.fromTo(q(".ring-c"), { drawSVG: "0%" }, { drawSVG: "100%", duration: 0.3, ease: "power2.inOut" }, 0.02)
+  s2.fromTo(q(".ring"), { rotation: 0, transformOrigin: "50% 50%" }, { rotation: 70, duration: 0.88, ease: "none" }, 0.05)
+  const seal = q<HTMLElement>(".seal")
+  s2.fromTo(seal, { scale: 1.5, autoAlpha: 0 }, { scale: 1, autoAlpha: 1, duration: 0.30, ease: "power4.in" }, 0.12)
+  s2.to(seal, { boxShadow: "0 18px 60px rgba(0,0,0,0.55), 0 0 0 1px rgba(245,158,11,0.15), 0 0 44px rgba(245,158,11,0.08)", borderColor: "rgba(245,158,11,0.4)", duration: 0.04 }, 0.42)
+  s2.fromTo(q(".flash"), { opacity: 0, scale: 0.6, transformOrigin: "50% 50%" }, { opacity: 0.8, scale: 1.15, duration: 0.03, yoyo: true, repeat: 1, ease: "power2.out" }, 0.415)
+  s2.fromTo(q(".mark"), { scale: 1, opacity: 0.16, transformOrigin: "50% 50%" }, { scale: 1.35, opacity: 0.75, duration: 0.04, yoyo: true, repeat: 1, ease: "power2.out" }, 0.42)
+  qa<HTMLElement>(".clr-chips li").forEach((li, i) => show(s2, li, 0.52 + i * 0.08))
+  exit(s2, 2)
+
+  // ── station 3 · ship (holds at the end: no exit) ──
+  const s3 = gsap.timeline()
+  enter(s3, 3)
+  s3.fromTo(qa(".rail-l"), { drawSVG: "0%" }, { drawSVG: "100%", duration: 0.25, stagger: 0.03, ease: "power2.inOut" }, 0.02)
+  s3.fromTo(q(".ship"), { y: 44, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: 0.28, ease: "power3.out" }, 0.06)
+  s3.fromTo(qa(".json-out .jl"), { autoAlpha: 0, x: -8 }, { autoAlpha: 1, x: 0, duration: 0.04, stagger: 0.018, ease: "power1.out" }, 0.18)
+  s3.fromTo(q(".cart"), { attr: { transform: "translate(-520 21.7)" } }, { attr: { transform: "translate(420 -17.5)" }, duration: 0.80, ease: "power1.inOut" }, 0.05)
+  s3.to(q(".pill-ok"), { boxShadow: "0 0 0 4px rgba(74,222,128,0.18), 0 0 24px rgba(74,222,128,0.35)", duration: 0.05 }, 0.36)
+  show(s3, q(".try-live"), 0.78)
+
+  // ── the master: four stations back to back, scrubbed by the scroll ──
+  const dots = qa<HTMLElement>(".film-dots li")
+  const master = gsap.timeline({
+    defaults: { ease: "none" },
+    scrollTrigger: {
+      trigger: root,
+      pin,
+      start: "top top",
+      end: () => `+=${Math.round(STATIONS * stationPx())}`,
+      scrub: 0.75,
+      anticipatePin: 1,
+      invalidateOnRefresh: true,
+      onUpdate: (self) => {
+        const active = Math.min(STATIONS - 1, Math.floor(self.progress * STATIONS))
+        dots.forEach((d, i) => d.classList.toggle("on", i === active))
+      },
+      onToggle: (self) => haze.paused(!self.isActive),
+    },
+  })
+  master.add(s0, 0).add(s1, 1).add(s2, 2).add(s3, 3)
+  // the strike fires once per pass, forward only
+  master.call(() => { if ((master.scrollTrigger?.direction ?? 1) > 0) burst() }, [], 0.60)
+
+  const rail = q<HTMLElement>(".rail")
+  const railHead = q<HTMLElement>(".rail-head")
+  if (rail && railHead) {
+    master.fromTo(railHead, { y: 0 }, { y: () => rail.offsetHeight - 46, duration: STATIONS, ease: "none" }, 0)
+    master.to(railHead, { keyframes: [
+      { backgroundColor: RED, boxShadow: glow(RED), duration: 1.2 },
+      { backgroundColor: STEEL, boxShadow: glow(STEEL), duration: 1.3 },
+      { backgroundColor: SILVER, boxShadow: glow(SILVER), duration: 1.5 },
+    ], ease: "none" }, 0)
+  }
+
+  // the ember floor shimmers with heat, on its own clock, only while pinned
+  const haze = gsap.to(q(".turb"), { attr: { baseFrequency: "0.014 0.020" }, duration: 4, yoyo: true, repeat: -1, ease: "sine.inOut", paused: true })
+
+  gsap.set(stations.slice(1).map((s) => s.el), { autoAlpha: 0 })
+  gsap.set(stations[0].el, { autoAlpha: 1 })
+  dots[0]?.classList.add("on")
+  const onFonts = () => ScrollTrigger.refresh()
+  document.fonts?.ready.then(onFonts).catch(() => {})
+
+  return () => {
+    master.scrollTrigger?.kill()
+    master.kill()
+    haze.kill()
+    gsap.ticker.remove(draw)
+    parts = []
+    splits.forEach((s) => s.revert())
+  }
+}
+
 export function ForgeFilm({ t, playgroundHref }: { t: FilmStrings; playgroundHref: string }) {
   const rootRef = useRef<HTMLElement>(null)
 
@@ -124,292 +358,18 @@ export function ForgeFilm({ t, playgroundHref }: { t: FilmStrings; playgroundHre
     const root = rootRef.current
     if (!root) return
     if (!window.matchMedia("(prefers-reduced-motion: no-preference)").matches) return
-
-    const clamp01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v)
-    const lerp = (a: number, b: number, k: number) => a + (b - a) * k
-    const ease = (k: number) => (k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2)
-    const sub = (p: number, a: number, b: number) => clamp01((p - a) / (b - a))
-    const bump = (p: number, at: number, w: number) => Math.max(0, 1 - Math.abs(p - at) / w)
-    const mix = (a: number[], b: number[], k: number) =>
-      `rgb(${Math.round(lerp(a[0], b[0], k))},${Math.round(lerp(a[1], b[1], k))},${Math.round(lerp(a[2], b[2], k))})`
-    const DULL = [120, 113, 108], HOT = [255, 247, 237], AMBER = [245, 158, 11],
-      RED = [239, 68, 68], BLUE = [56, 189, 248], STEEL = [148, 163, 184]
-
-    const q = <T extends Element>(sel: string) => root.querySelector<T>(sel)
-    const qa = <T extends Element>(sel: string) => Array.from(root.querySelectorAll<T>(sel))
-    const rail = q<HTMLElement>(".rail")
-    const railHead = q<HTMLElement>(".rail-head")
-    const dots = qa<HTMLElement>(".film-dots li")
-    const ibanBar = q<HTMLElement>(".iban-bar")
-    const segs = qa<HTMLElement>(".seg")
-    const heatGlow = q<SVGElement>(".heat-glow")
-    const hammer = q<SVGElement>(".hammer")
-    const arcs = q<SVGElement>(".arcs")
-    const modLine = q<HTMLElement>(".mod-line")
-    const qRows = qa<HTMLElement>(".q-row")
-    const qHot = q<HTMLElement>(".q-hot")
-    const qCold = q<HTMLElement>(".q-cold")
-    const ripples = qa<SVGElement>(".rp")
-    const steam = qa<SVGElement>(".sm")
-    const seal = q<HTMLElement>(".seal")
-    const ring = q<SVGElement>(".ring")
-    const flash = q<SVGElement>(".flash")
-    const mark = q<SVGElement>(".mark")
-    const ship = q<HTMLElement>(".ship")
-    const jls = qa<HTMLElement>(".json-out .jl")
-    const cart = q<SVGElement>(".cart")
-    const pill = q<HTMLElement>(".pill-ok")
-    const stations = qa<HTMLElement>(".st").map((el) => ({
-      el,
-      inner: el.querySelector<HTMLElement>(".st-inner"),
-      scenes: Array.from(el.querySelectorAll<SVGElement>(".scene")),
-      tags: Array.from(el.querySelectorAll<HTMLElement>("[data-t]")),
-    }))
-    const N = stations.length
-    const OV = 0.14 // the crossfade, as a share of one station's scroll
-
-    let vh = window.innerHeight
-    let mobile = window.innerWidth < 720
-    let sparksOn = !mobile
-    let filmTop = 0, filmH = 0, railH = 0, strikeFlag = false
-    const headH = 46
-
-    const canvas = q<HTMLCanvasElement>(".sparks-canvas")
-    const ctx = canvas ? canvas.getContext("2d") : null
-    const dpr = Math.min(window.devicePixelRatio || 1, 2)
-    interface Spark { x: number; y: number; vx: number; vy: number; l: number; d: number; s: number; w: number }
-    let parts: Spark[] = []
-    let needClear = false
-
-    const resizeCanvas = () => {
-      if (!canvas || !canvas.parentElement) return
-      const r = canvas.parentElement.getBoundingClientRect()
-      canvas.width = Math.floor(r.width * dpr)
-      canvas.height = Math.floor(r.height * dpr)
-    }
-    const burst = () => {
-      if (!sparksOn || !ctx || !canvas || !modLine) return
-      const host = canvas.getBoundingClientRect()
-      const ml = modLine.getBoundingClientRect()
-      const cx = (ml.left + ml.width / 2 - host.left) * dpr
-      const cy = (ml.top + ml.height / 2 - host.top) * dpr
-      for (let i = 0; i < 110 && parts.length < 180; i++) {
-        const a = Math.random() * Math.PI * 2
-        const sp = (2 + Math.random() * 8) * dpr
-        parts.push({ x: cx, y: cy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 3.5 * dpr,
-          l: 1, d: 0.011 + Math.random() * 0.02, s: (0.8 + Math.random() * 2.2) * dpr, w: Math.random() })
-      }
-    }
-    const drawSparks = () => {
-      if (!ctx || !canvas) return
-      if (parts.length === 0) {
-        if (needClear) { ctx.clearRect(0, 0, canvas.width, canvas.height); needClear = false }
-        return
-      }
-      needClear = true
-      ctx.clearRect(0, 0, canvas.width, canvas.height)
-      ctx.globalCompositeOperation = "lighter"
-      for (let i = parts.length - 1; i >= 0; i--) {
-        const p = parts[i]
-        p.x += p.vx; p.y += p.vy; p.vy += 0.14 * dpr; p.vx *= 0.985; p.l -= p.d
-        if (p.l <= 0) { parts.splice(i, 1); continue }
-        ctx.fillStyle = `rgba(${p.w < 0.5 ? "245,158,11" : "239,68,68"},${(p.l * 0.9).toFixed(3)})`
-        ctx.beginPath()
-        ctx.arc(p.x, p.y, p.s * p.l + 0.4, 0, 6.2832)
-        ctx.fill()
-      }
-      ctx.globalCompositeOperation = "source-over"
-    }
-
-    const measure = () => {
-      vh = window.innerHeight
-      mobile = window.innerWidth < 720
-      sparksOn = !mobile
-      const r = root.getBoundingClientRect()
-      filmTop = r.top + window.scrollY
-      filmH = root.offsetHeight
-      railH = rail ? rail.offsetHeight : 0
-      resizeCanvas()
-    }
-
-    // ── Station 0 · heat, then the strike ──
-    // The address heats and splits (0.04→0.36), the hammer winds up
-    // (0.40→0.56) while the rearranged digits fly into place, and comes
-    // down at 0.60: sparks, a shake, the checksum stamp.
-    const heat = (p: number) => {
-      const e = ease(sub(p, 0.04, 0.36))
-      if (ibanBar) {
-        ibanBar.style.color = mix(DULL, HOT, e)
-        ibanBar.style.textShadow =
-          `0 0 ${(18 * e).toFixed(1)}px rgba(245,158,11,${(0.6 * e).toFixed(3)}),` +
-          `0 2px ${(48 * e).toFixed(1)}px rgba(239,68,68,${(0.32 * e).toFixed(3)})`
-      }
-      if (heatGlow) heatGlow.setAttribute("opacity", (0.35 + 0.65 * e).toFixed(3))
-      segs.forEach((sg) => {
-        sg.classList.toggle("lit", p >= parseFloat(sg.getAttribute("data-lt") || "1"))
+    let cancelled = false
+    let teardown: (() => void) | undefined
+    Promise.all([import("gsap"), import("gsap/ScrollTrigger"), import("gsap/SplitText"), import("gsap/DrawSVGPlugin")])
+      .then(([{ gsap }, { ScrollTrigger }, { SplitText }, { DrawSVGPlugin }]) => {
+        if (cancelled || !rootRef.current) return
+        gsap.registerPlugin(ScrollTrigger, SplitText, DrawSVGPlugin)
+        teardown = build(gsap, ScrollTrigger, SplitText, rootRef.current)
       })
-      if (modLine) {
-        const k = 1 - ease(sub(p, 0.44, 0.60))
-        modLine.style.setProperty("--k", k.toFixed(4))
-      }
-      if (hammer) {
-        let deg: number
-        if (p < 0.40) deg = -24
-        else if (p < 0.56) deg = -24 - 52 * ease(sub(p, 0.40, 0.56))
-        else if (p < 0.60) deg = -76 + 84 * Math.pow(sub(p, 0.56, 0.60), 2)
-        else deg = 8 - 32 * ease(sub(p, 0.60, 0.78))
-        hammer.setAttribute("transform", `rotate(${deg.toFixed(1)} 300 -60)`)
-      }
-      if (arcs) arcs.setAttribute("opacity", (p >= 0.59 ? 0.9 * (1 - sub(p, 0.60, 0.74)) : 0).toFixed(3))
-      if (p >= 0.60 && !strikeFlag) {
-        strikeFlag = true
-        burst()
-        const inner = stations[0]?.inner
-        if (inner) {
-          inner.classList.add("shake")
-          setTimeout(() => inner.classList.remove("shake"), 400)
-        }
-      }
-      if (p < 0.5) strikeFlag = false
-    }
-    // ── Station 1 · quench ──
-    // Three lists screened one after the other (0.08→0.58), the heat gives
-    // way to cold, ripples spread and steam rises off the water.
-    const quench = (p: number) => {
-      qRows.forEach((row, i) => {
-        const rp = ease(sub(p, 0.08 + i * 0.14, 0.30 + i * 0.14))
-        row.style.clipPath = `inset(0 ${(100 - rp * 100).toFixed(2)}% 0 0)`
-        row.classList.toggle("done", rp >= 1)
-      })
-      const cold = ease(sub(p, 0.12, 0.70))
-      if (qHot) qHot.style.opacity = (1 - cold).toFixed(3)
-      if (qCold) qCold.style.opacity = cold.toFixed(3)
-      ripples.forEach((rp, k) => {
-        const s = sub(p, 0.26 + k * 0.09, 0.80 + k * 0.09)
-        rp.setAttribute("transform", `scale(${(1 + s * 6.5).toFixed(3)})`)
-        rp.setAttribute("opacity", (s > 0 && s < 1 ? (1 - s) * 0.75 : 0).toFixed(3))
-      })
-      steam.forEach((sm, k) => {
-        const s = sub(p, 0.28 + k * 0.05, 0.86 + k * 0.05)
-        sm.setAttribute("transform", `translate(${((k % 2 ? 1 : -1) * s * 24).toFixed(1)} ${(-s * 250).toFixed(1)})`)
-        sm.setAttribute("opacity", (4 * s * (1 - s) * 0.38).toFixed(3))
-      })
-    }
-    // ── Station 2 · stamp ──
-    // The seal drops and sets at 0.44 (a flash, the mark kicks), the ring
-    // turns with the scroll, the clearing chips follow.
-    const stamp = (p: number) => {
-      const s = ease(sub(p, 0.10, 0.44))
-      if (seal) {
-        seal.style.opacity = s.toFixed(3)
-        seal.style.transform = `scale(${(1.45 - 0.45 * s).toFixed(4)})`
-        seal.classList.toggle("set", s >= 1)
-      }
-      if (ring) ring.setAttribute("transform", `rotate(${(p * 70).toFixed(1)})`)
-      if (flash) flash.setAttribute("opacity", (bump(p, 0.45, 0.06) * 0.32).toFixed(3))
-      if (mark) {
-        const sc = 1 + 0.38 * bump(p, 0.45, 0.09)
-        mark.setAttribute("transform", `translate(-46 -46) translate(50 50) scale(${sc.toFixed(3)}) translate(-50 -50)`)
-        mark.setAttribute("opacity", (0.16 + 0.5 * bump(p, 0.45, 0.12)).toFixed(3))
-      }
-    }
-    // ── Station 3 · ship ──
-    // The answer card rises (0.06→0.34) and prints itself line by line
-    // (0.18→0.72) while the cart rolls along the rail; 200 OK lights up.
-    const shipFn = (p: number) => {
-      const s = ease(sub(p, 0.06, 0.34))
-      if (ship) {
-        ship.style.opacity = s.toFixed(3)
-        ship.style.transform = `translateY(${(44 - 44 * s).toFixed(1)}px)`
-      }
-      const count = Math.round(ease(sub(p, 0.18, 0.72)) * jls.length)
-      jls.forEach((l, i) => l.classList.toggle("on", i < count))
-      if (cart) {
-        const dx = -520 + 940 * ease(sub(p, 0.05, 0.85))
-        cart.setAttribute("transform", `translate(${dx.toFixed(1)} ${(-dx * 0.0417).toFixed(1)})`)
-      }
-      if (pill) pill.classList.toggle("on", p >= 0.36)
-    }
-    const updaters = [heat, quench, stamp, shipFn]
-
-    let raf = 0
-    let running = false
-    const frame = () => {
-      const y = window.scrollY
-      const g = clamp01((y - filmTop) / Math.max(1, filmH - vh))
-      const x = g * N
-
-      stations.forEach((s, i) => {
-        const local = x - i
-        let f: number
-        if (local < 0) f = i === 0 ? 1 : local < -OV ? 0 : ease(1 + local / OV)
-        else if (local <= 1) f = 1
-        else f = i === N - 1 ? 1 : local > 1 + OV ? 0 : ease(1 - (local - 1) / OV)
-        const p = clamp01(local)
-        const dy = local < 0 ? (1 - f) * 36 : local > 1 ? -(1 - f) * 26 : 0
-        s.el.style.opacity = f.toFixed(3)
-        s.el.style.transform = `translateY(${dy.toFixed(1)}px)`
-        s.el.classList.toggle("live", f > 0.001)
-        s.tags.forEach((el) => {
-          el.classList.toggle("on", p >= parseFloat(el.getAttribute("data-t") || "1"))
-        })
-        // The scenery drifts a little slower than the words: depth, cheaply.
-        s.scenes.forEach((sc) => {
-          sc.style.transform = `translateY(${((0.5 - p) * 28).toFixed(1)}px) scale(1.05)`
-        })
-        updaters[i]?.(p)
-      })
-
-      if (railHead && railH) {
-        railHead.style.transform = `translateY(${(g * (railH - headH)).toFixed(1)}px)`
-        let col: string
-        if (g < 0.3) col = mix(AMBER, RED, (g / 0.3) * 0.6)
-        else if (g < 0.55) col = mix(RED, BLUE, sub(g, 0.3, 0.55))
-        else col = mix(BLUE, STEEL, sub(g, 0.55, 1) * 0.5)
-        railHead.style.background = col
-        railHead.style.boxShadow = `0 0 14px ${col}, 0 0 34px ${col}`
-      }
-      const active = Math.min(N - 1, Math.floor(x))
-      dots.forEach((d, i) => d.classList.toggle("on", i === active))
-
-      drawSparks()
-      if (running) raf = requestAnimationFrame(frame)
-    }
-    const start = () => {
-      if (running) return
-      running = true
-      raf = requestAnimationFrame(frame)
-    }
-    const stop = () => {
-      running = false
-      cancelAnimationFrame(raf)
-    }
-    // The loop runs only while the film is within one viewport of the screen.
-    const gate =
-      "IntersectionObserver" in window
-        ? new IntersectionObserver(
-            (entries) => {
-              if (entries.some((e) => e.isIntersecting)) start()
-              else stop()
-            },
-            { rootMargin: "100% 0px 100% 0px" },
-          )
-        : null
-
-    measure()
-    window.addEventListener("resize", measure, { passive: true })
-    window.addEventListener("load", measure)
-    const settle = setTimeout(measure, 700) // fonts settling shifts offsets
-    if (gate) gate.observe(root)
-    else start()
-
+      .catch(() => { /* the film stays a set of readable blocks */ })
     return () => {
-      stop()
-      gate?.disconnect()
-      clearTimeout(settle)
-      window.removeEventListener("resize", measure)
-      window.removeEventListener("load", measure)
-      parts = []
+      cancelled = true
+      teardown?.()
     }
   }, [])
 
@@ -432,21 +392,21 @@ export function ForgeFilm({ t, playgroundHref }: { t: FilmStrings; playgroundHre
             <p className="st-eyebrow"><span className="st-num">01</span> <span className="eyebrow">{t.heat.eyebrow} · {t.strike.eyebrow}</span></p>
             <h3 className="st-title">{t.heat.title}</h3>
             <div className="st-stage">
-              <p className="iban-bar"><span className="seg seg-cc" data-lt="0.10">CH</span><span className="seg seg-ck" data-lt="0.18">10</span><span className="seg seg-bank" data-lt="0.26">00230</span><span className="seg seg-acct" data-lt="0.34">000000012345</span></p>
+              <p className="iban-bar"><span className="seg seg-cc">CH</span><span className="seg seg-ck">10</span><span className="seg seg-bank">00230</span><span className="seg seg-acct">000000012345</span></p>
               <ul className="parse">
-                <li data-t="0.10"><span className="pdot pdot-cc" aria-hidden="true" />{t.heat.country}</li>
-                <li data-t="0.18"><span className="pdot pdot-ck" aria-hidden="true" />{t.heat.check}</li>
-                <li data-t="0.26"><span className="pdot pdot-bank" aria-hidden="true" />{t.heat.bank}</li>
-                <li data-t="0.34"><span className="pdot pdot-acct" aria-hidden="true" />{t.heat.account}</li>
+                <li data-t=""><span className="pdot pdot-cc" aria-hidden="true" />{t.heat.country}</li>
+                <li data-t=""><span className="pdot pdot-ck" aria-hidden="true" />{t.heat.check}</li>
+                <li data-t=""><span className="pdot pdot-bank" aria-hidden="true" />{t.heat.bank}</li>
+                <li data-t=""><span className="pdot pdot-acct" aria-hidden="true" />{t.heat.account}</li>
               </ul>
-              <p className="mod-note" data-t="0.40">{t.strike.note}</p>
+              <p className="mod-note" data-t="">{t.strike.note}</p>
               <p
                 className="mod-line"
                 aria-label="00230000000012345121710"
                 dangerouslySetInnerHTML={{ __html: MOD_LINE }}
               />
-              <p className="mod-eq" data-t="0.66">mod 97 = <b>1</b></p>
-              <p className="stamp-ok" data-t="0.72">{t.strike.valid}</p>
+              <p className="mod-eq" data-t="">mod 97 = <b>1</b></p>
+              <p className="stamp-ok" data-t="">{t.strike.valid}</p>
             </div>
             <p className="st-copy">{t.heat.copy}</p>
           </div>
@@ -470,9 +430,9 @@ export function ForgeFilm({ t, playgroundHref }: { t: FilmStrings; playgroundHre
                 ))}
               </ul>
               <p className="q-badges">
-                <span className="q-badge" data-t="0.64">{t.quench.fatf}</span>
-                <span className="q-badge" data-t="0.72">{t.quench.sepa}</span>
-                <span className="q-badge risk" data-t="0.80">{t.quench.risk}</span>
+                <span className="q-badge" data-t="">{t.quench.fatf}</span>
+                <span className="q-badge" data-t="">{t.quench.sepa}</span>
+                <span className="q-badge risk" data-t="">{t.quench.risk}</span>
               </p>
             </div>
             <p className="st-copy">{t.quench.copy}</p>
@@ -492,10 +452,10 @@ export function ForgeFilm({ t, playgroundHref }: { t: FilmStrings; playgroundHre
                 <p className="seal-city">Zürich · Switzerland</p>
               </div>
               <ul className="clr-chips">
-                <li data-t="0.52">{t.stamp.iid} <b>00230</b></li>
-                <li data-t="0.60">{t.stamp.sic} <b>✓</b></li>
-                <li data-t="0.68">{t.stamp.eurosic} <b>✓</b></li>
-                <li data-t="0.76">{t.stamp.instant} <b>✓</b></li>
+                <li data-t="">{t.stamp.iid} <b>00230</b></li>
+                <li data-t="">{t.stamp.sic} <b>✓</b></li>
+                <li data-t="">{t.stamp.eurosic} <b>✓</b></li>
+                <li data-t="">{t.stamp.instant} <b>✓</b></li>
               </ul>
             </div>
             <p className="st-copy">{t.stamp.copy}</p>
@@ -513,7 +473,7 @@ export function ForgeFilm({ t, playgroundHref }: { t: FilmStrings; playgroundHre
                 <figcaption className="ship-head"><span className="pill-ok">200 OK</span><span>{t.ship.head}</span></figcaption>
                 <pre className="json-out"><code dangerouslySetInnerHTML={{ __html: JSON_LINES }} /></pre>
               </figure>
-              <p data-t="0.78"><a className="btn-ghost-link" href={playgroundHref}>{t.ship.tryLive}</a></p>
+              <p className="try-live" data-t=""><a className="btn-ghost-link" href={playgroundHref}>{t.ship.tryLive}</a></p>
             </div>
             <p className="st-copy">{t.ship.copy}</p>
           </div>

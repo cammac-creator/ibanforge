@@ -578,6 +578,9 @@
      at body size; closing that one needs a lighter ramp, not a token swap. */
   --ffg-3: #8b837c;
   --fquench: #38bdf8;
+  /* The quench and the bank segment are steel, not cyan: the film keeps to
+     the forge's own materials (2026-09-04, on Claude-Alain's eye). */
+  --fsteel: #b6c2cf;
   --fok: #4ade80;
   --fember-grad: linear-gradient(100deg, #f59e0b 10%, #ef4444 90%);
   /* Audit 2026-09-04 (S1): --fst-2 on --coal measures 1.30:1, so every card
@@ -924,7 +927,7 @@
   --segc: var(--err);
 }
 .forge .seg-bank {
-  --segc: var(--fquench);
+  --segc: var(--fsteel);
 }
 .forge .seg-acct {
   --segc: var(--fok);
@@ -957,7 +960,7 @@
   background: var(--err);
 }
 .forge .pdot-bank {
-  background: var(--fquench);
+  background: var(--fsteel);
 }
 .forge .pdot-acct {
   background: var(--fok);
@@ -985,6 +988,7 @@
 }
 .forge .mod-line span {
   display: inline-block;
+  will-change: transform;
   transform: translate(
     calc(var(--dx, 0px) * var(--k, 0) * 1.9),
     calc(var(--dy, 0px) * var(--k, 0) * 1.9)
@@ -1021,7 +1025,7 @@
   background: radial-gradient(58% 46% at 50% 88%, rgba(245, 158, 11, 0.16), transparent 72%);
 }
 .forge .q-cold {
-  background: radial-gradient(58% 46% at 50% 88%, rgba(56, 189, 248, 0.15), transparent 72%);
+  background: radial-gradient(58% 46% at 50% 88%, rgba(182, 194, 207, 0.16), transparent 72%);
   opacity: 0;
 }
 .forge .quench {
@@ -1043,7 +1047,7 @@
   padding-bottom: 0.55rem;
 }
 .forge .q-row .q-res {
-  color: var(--fquench);
+  color: var(--fsteel);
 }
 .forge .q-badges {
   display: flex;
@@ -1055,8 +1059,8 @@
   font-size: 0.78rem;
   padding: 0.35rem 0.8rem;
   border-radius: 999px;
-  border: 1px solid rgba(56, 189, 248, 0.45);
-  color: var(--fquench);
+  border: 1px solid rgba(182, 194, 207, 0.45);
+  color: var(--fsteel);
 }
 .forge .q-badge.risk {
   border-color: rgba(74, 222, 128, 0.5);
@@ -1565,24 +1569,15 @@
 
 /* ── Motion layer: ONLY with JS + motion allowed ── */
 @media (prefers-reduced-motion: no-preference) {
-  /* The timeline: four stations of --film-s each on ONE sticky screen. The
-     section is the scroll track (plus the pin's own height, so the last
-     station holds until the pin unpins); every pixel of it drives a beat.
-     Rebuilt 2026-09-04 evening: one pin per station left each one sliding
-     away finished over a dead viewport, which read as "played backwards". */
+  /* The film, with JS and motion: ScrollTrigger pins `.pin` (one screen)
+     for four station-lengths of scroll and scrubs one GSAP timeline. Below
+     are only the RESTING states the engine takes over — never transitions,
+     which would fight the scrub. */
   html.js .forge .film {
-    --film-s: 115vh;
-    height: calc(4 * var(--film-s) + 100svh);
     border-top-color: transparent;
   }
-  @media (max-width: 720px) {
-    html.js .forge .film {
-      --film-s: 105vh;
-    }
-  }
   html.js .forge .pin {
-    position: sticky;
-    top: 0;
+    position: relative;
     height: 100vh;
     height: 100svh;
     overflow: hidden;
@@ -1592,16 +1587,45 @@
     inset: 0;
     padding: 0;
     border-bottom: 0;
-    opacity: 0;
-    visibility: hidden;
     will-change: opacity, transform;
   }
-  html.js .forge .st.live {
-    visibility: visible;
+  html.js .forge .st + .st {
+    opacity: 0;
+    visibility: hidden;
   }
-  html.js .forge .st:first-of-type {
-    opacity: 1;
-    visibility: visible;
+  html.js .forge .rail {
+    display: block;
+    position: absolute;
+    z-index: 3;
+    top: 8vh;
+    bottom: 8vh;
+    left: clamp(24px, 4vw, 72px);
+    width: 2px;
+    background: linear-gradient(
+      180deg,
+      var(--amber-500) 0%,
+      var(--err) 40%,
+      var(--fsteel) 62%,
+      var(--fst-3) 100%
+    );
+    opacity: 0.5;
+  }
+  html.js .forge .rail-head {
+    position: absolute;
+    left: -4px;
+    top: 0;
+    width: 10px;
+    height: 46px;
+    border-radius: 6px;
+    background: var(--amber-500);
+    box-shadow:
+      0 0 14px var(--amber-500),
+      0 0 34px var(--amber-500);
+  }
+  @media (max-width: 1099px) {
+    html.js .forge .rail {
+      display: none;
+    }
   }
   html.js .forge .film-dots {
     display: flex;
@@ -1630,101 +1654,48 @@
     background: var(--amber-500);
     box-shadow: 0 0 10px var(--amber-500);
   }
+  /* resting states, before the engine's first frame */
+  html.js .forge [data-t],
+  html.js .forge .stamp-ok,
+  html.js .forge .seal,
+  html.js .forge .ship,
   html.js .forge .json-out .jl {
     opacity: 0;
-    transform: translateX(-8px);
-    transition:
-      opacity 0.28s ease,
-      transform 0.28s ease;
-  }
-  html.js .forge .json-out .jl.on {
-    opacity: 1;
-    transform: none;
-  }
-  html.js .forge .pill-ok {
-    transition: box-shadow 0.4s ease;
-  }
-  html.js .forge .pill-ok.on {
-    box-shadow:
-      0 0 0 4px rgba(74, 222, 128, 0.18),
-      0 0 24px rgba(74, 222, 128, 0.35);
-  }
-  html.js .forge .rail {
-    display: block;
-    position: absolute;
-    z-index: 3;
-    top: 0;
-    bottom: 0;
-    left: clamp(24px, 4vw, 72px);
-    width: 2px;
-    background: linear-gradient(
-      180deg,
-      var(--amber-500) 0%,
-      var(--err) 40%,
-      var(--fquench) 62%,
-      var(--fst-3) 100%
-    );
-    opacity: 0.5;
-  }
-  html.js .forge .rail-head {
-    position: absolute;
-    left: -4px;
-    top: 0;
-    width: 10px;
-    height: 46px;
-    border-radius: 6px;
-    background: var(--amber-500);
-    box-shadow:
-      0 0 14px var(--amber-500),
-      0 0 34px var(--amber-500);
-  }
-  @media (max-width: 1099px) {
-    html.js .forge .rail {
-      display: none;
-    }
-  }
-  html.js .forge [data-t] {
-    opacity: 0;
-    transform: translateY(14px);
-    transition:
-      opacity 0.45s ease,
-      transform 0.45s ease;
-  }
-  html.js .forge [data-t].on {
-    opacity: 1;
-    transform: none;
+    visibility: hidden;
   }
   html.js .forge .seg {
     border-color: transparent;
-    transition: border-color 0.4s ease;
   }
-  html.js .forge .seg.lit {
-    border-color: var(--segc);
-  }
-  html.js .forge .stamp-ok {
-    transform: scale(1.9);
-    transition:
-      transform 0.26s cubic-bezier(0.2, 1.6, 0.3, 1),
-      opacity 0.18s ease;
-  }
-  html.js .forge .stamp-ok.on {
-    transform: scale(1);
-  }
-  html.js .forge .st-inner.shake {
-    animation: fgShake 0.32s linear;
+  html.js .forge .mod-line span {
+    --k: 1;
   }
   html.js .forge .q-row {
-    clip-path: inset(0 100% 0 0);
+    clip-path: inset(0% 100% 0% 0%);
   }
-  html.js .forge .q-row.done .q-res {
-    text-shadow: 0 0 14px rgba(56, 189, 248, 0.5);
-  }
+  /* the seal has no glow until it sets; the engine tweens the shadow */
   html.js .forge .seal {
-    opacity: 0;
+    box-shadow: none;
   }
-  html.js .forge .ship {
-    opacity: 0;
-    transform: translateY(44px);
+  /* short screens: everything of a station must fit the pinned screen */
+  @media (max-height: 760px) {
+    html.js .forge .st-title {
+      font-size: clamp(1.6rem, 5vh, 2.6rem);
+    }
+    html.js .forge .st-inner {
+      gap: 0.55rem;
+    }
+    html.js .forge .iban-bar {
+      font-size: clamp(1rem, 3.6vh, 1.9rem);
+    }
+    html.js .forge .mod-line {
+      font-size: clamp(0.9rem, 2.6vh, 1.3rem);
+    }
+    html.js .forge .json-out {
+      max-height: 30vh;
+    }
+    html.js .forge .st-copy {
+      font-size: 0.85rem;
+    }
   }
   /* The fold demo: the caret blinks while the address types itself, and the
      answer's lines cascade in once a run has settled (data-run is set only
