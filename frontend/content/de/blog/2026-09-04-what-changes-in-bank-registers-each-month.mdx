@@ -1,0 +1,34 @@
+---
+title: "Was sich in den Bankregistern in einem Monat ändert: gemessen an drei Ausgaben unserer eigenen Datenbank"
+description: "Eine einmal geprüfte Lieferantendatei driftet. Zwischen den Ausgaben vom 1. Juli, 1. August und 1. September 2026 der Register hinter IBANforge kamen BICs hinzu und verschwanden, Institute wurden umbenannt, Schweizer Clearingnummern bewegten sich. Die Zahlen, Register für Register, und was sie für eine Kreditorendatei bedeuten."
+date: "2026-09-04"
+---
+
+Jeden Monat, am 1., baut IBANforge seine Datenbank aus den Registern neu auf, die es bereitstellt: der BankMaster von SIX für die Schweiz, die Datei der Bundesbank für Deutschland, das Verzeichnis der OeNB für Österreich, die Liste der BNB für Belgien, die STEP2-Teilnehmerliste der EBA, GLEIF und die öffentlichen Swift-Verzeichnisse für die BIC-Karte. Drei Ausgaben liegen inzwischen in unserer Historie: 1. Juli, 1. August und 1. September 2026. Ihr Vergleich beantwortet eine Frage, die Kunden vor dem Kauf einer Dateiprüfung stellen: **Wie schnell veraltet eine geprüfte Datei?**
+
+## Die Zahlen, Register für Register
+
+| Register | Bestand am 2026-09-01 | 1. Juli → 1. August 2026 | 1. August → 1. September 2026 |
+|---|---|---|---|
+| BIC-Karte (GLEIF + Swift-Verzeichnisse + EBA + nationale Register) | 121k+ BIC11 | +135 neu, 29 verschwunden, 514 Institute umbenannt, 323 Orte geändert, 283 LEI-Status geändert | +78 neu, 21 verschwunden, 171 umbenannt, 109 Orte geändert, 47 LEI-Status geändert |
+| Schweizer Clearingnummern, SIX BankMaster | 1'100+ IID | 8 Einträge geändert | +1 neu, 2 zurückgezogen, 3 geändert (ein BIC geändert, zwei Institute umbenannt) |
+| Österreichische und belgische Bankcodes, OeNB und BNB | 1'653 Codes | erste gehaltene Ausgabe | +4 zugeteilt, 10 zurückgezogen |
+| Deutsche Bankleitzahlen, Bundesbank | 3'506 Codes | erste gehaltene Ausgabe | keine Änderung: die Bundesbank veröffentlicht quartalsweise, und die von uns gehaltene September-Ausgabe ist die vom August |
+
+Jede Zahl oben ist die Differenz zwischen zwei datierten Dateien, die wir unter Versionskontrolle halten; die Methode ist ein Join über den Registerschlüssel (BIC11, IID, nationaler Code) und ein Vergleich Feld für Feld.
+
+## Was die Zahlen bedeuten
+
+**Die zusammengesetzte BIC-Karte bewegt sich am meisten, und ein Teil dieser Bewegung ist Listenpflege.** GLEIF gibt Datensätze neu heraus, wenn ein rechtlicher Name oder eine Adresse korrigiert wird; ein Swift-Verzeichnis nimmt Codes auf und streicht sie im Takt seiner Beitragenden. Ein BIC, der aus diesen Listen verschwindet, hat nicht zwingend aufgehört, Zahlungen zu routen. Deshalb sagt jede Antwort von IBANforge, welches Register gesprochen hat: `bic.authoritative` ist nur wahr, wenn ein nationales Register den Code zugeteilt hat, und `bank_code_check.as_of` nennt die Ausgabe. Ein Treffer aus der Karte ist ein Hinweis mit Quelle; ein nationaler Treffer ist ein Urteil.
+
+**Die nationalen Register bewegen sich wenig, und jede Bewegung zählt.** Zwei Schweizer Clearingnummern in einem Monat zurückgezogen, ein BIC geändert, zwei Institute umbenannt: bei einer Kreditorendatei mit einigen tausend Zeilen sind das eine Handvoll Zahlungen, die beim nächsten Lauf abgewiesen oder umgeleitet werden, mit einem generischen R-Code und ohne Erklärung. Zehn im selben Monat zurückgezogene belgische und österreichische Codes erzählen dieselbe Geschichte. Deutschland ändert sich in Stufen, einmal pro Quartal, und eine Stufe kann Dutzende Codes auf einmal stilllegen, mit einer Nachfolge-Bankleitzahl, die die Datei übernehmen muss.
+
+**Eine Datei ist eine Momentaufnahme.** Eine im Januar geprüfte Lieferanten-Stammdatei trägt im Sommer mehrere hundert Einträge, deren Institutsname oder Ort nicht mehr dem entspricht, was die Register sagen, und einige Dutzend, deren Code verschwunden ist. Nichts davon ist in der Datei selbst sichtbar: die IBANs bestehen weiterhin die Prüfziffer, die BICs haben weiterhin elf Zeichen.
+
+## Was daraus folgt
+
+- **In einem Rhythmus nachprüfen, nicht einmal.** Die [Prüfung der Kreditorendatei](/audit) liest dieselben Register wie die API und liefert die kommentierte Arbeitsmappe sofort; vor jedem Zahlungslauf nach einer Registeraktualisierung, oder monatlich.
+- **Die Ausgabe lesen.** Jede Antwort trägt `as_of`; liegt Ihre letzte Prüfung davor, stammen die Urteile, die Sie halten, aus einem älteren Register.
+- **Zuerst die nationalen Register beobachten.** Eine Rücknahme im BankMaster von SIX oder in der Bundesbank-Datei ist eine Zahlung, die zurückkommt; eine Umbenennung bei GLEIF ist ein Etikett, das aktualisiert werden muss.
+
+Die Registerseiten zeigen den aktuellen Stand jedes Codes mit der Antwort der API selbst: [Deutsche Bankleitzahlen](/blz), [Schweizer Clearingnummern](/iid), [Österreichische Bankleitzahlen](/at), [Belgische Bankcodes](/be). Die Quellen und ihre Lizenzen stehen unter [Datenquellen und Herkunft](/docs/data-sources).

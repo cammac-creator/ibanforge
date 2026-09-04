@@ -1,0 +1,34 @@
+---
+title: "Ce qui change dans les registres bancaires en un mois : mesuré sur trois éditions de notre propre base"
+description: "Un fichier fournisseurs contrôlé une fois dérive. Entre les éditions du 1er juillet, du 1er août et du 1er septembre 2026 des registres derrière IBANforge, des BIC sont apparus et ont disparu, des établissements ont été renommés, des numéros de clearing suisses ont bougé. Les comptes, registre par registre, et ce qu'ils signifient pour un fichier de créanciers."
+date: "2026-09-04"
+---
+
+Chaque mois, le 1er, IBANforge reconstruit sa base depuis les registres qu'il sert : le BankMaster de SIX pour la Suisse, le fichier de la Bundesbank pour l'Allemagne, le répertoire de l'OeNB pour l'Autriche, la liste de la BNB pour la Belgique, la liste des participants STEP2 de l'EBA, GLEIF et les annuaires Swift publics pour la carte des BIC. Trois éditions sont maintenant dans notre historique, 1er juillet, 1er août et 1er septembre 2026. Les comparer répond à une question que les clients posent avant d'acheter un audit de fichier : **à quelle vitesse un fichier contrôlé devient-il périmé ?**
+
+## Les comptes, registre par registre
+
+| Registre | Détenu au 2026-09-01 | 1er juillet → 1er août 2026 | 1er août → 1er septembre 2026 |
+|---|---|---|---|
+| Carte des BIC (GLEIF + annuaires Swift + EBA + registres nationaux) | 121k+ BIC11 | +135 nouveaux, 29 disparus, 514 établissements renommés, 323 villes changées, 283 statuts LEI changés | +78 nouveaux, 21 disparus, 171 renommés, 109 villes changées, 47 statuts LEI changés |
+| Numéros de clearing suisses, SIX BankMaster | 1 100+ IID | 8 entrées modifiées | +1 nouveau, 2 retirés, 3 modifiés (un BIC changé, deux établissements renommés) |
+| Codes banque autrichiens et belges, OeNB et BNB | 1 653 codes | première édition détenue | +4 attribués, 10 retirés |
+| Bankleitzahlen allemandes, Bundesbank | 3 506 codes | première édition détenue | aucun changement : la Bundesbank publie par trimestre, et l'édition de septembre que nous tenons est celle d'août |
+
+Chaque chiffre ci-dessus est la différence entre deux fichiers datés que nous gardons sous contrôle de version ; la méthode est une jointure sur la clé du registre (BIC11, IID, code national) et une comparaison champ par champ.
+
+## Ce que les chiffres veulent dire
+
+**La carte composite des BIC bouge le plus, et une partie de ce mouvement est de l'entretien de liste.** GLEIF réémet des fiches quand un nom légal ou une adresse est corrigé ; un annuaire Swift ajoute et retire des codes au rythme de ses contributeurs. Un BIC qui disparaît de ces listes n'a pas forcément cessé de router des paiements. C'est pourquoi chaque réponse d'IBANforge dit quel registre a parlé : `bic.authoritative` n'est vrai que si un registre national a attribué le code, et `bank_code_check.as_of` nomme l'édition. Une correspondance composite est un indice avec sa source ; une correspondance nationale est un verdict.
+
+**Les registres nationaux bougent peu, et chaque mouvement compte.** Deux numéros de clearing suisses retirés en un mois, un BIC changé, deux établissements renommés : sur un fichier de créanciers de quelques milliers de lignes, c'est une poignée de paiements qui seront rejetés ou réacheminés au prochain lot, avec un code R générique et sans explication. Dix codes belges et autrichiens retirés le même mois racontent la même histoire. L'Allemagne change par paliers, une fois par trimestre, et un palier peut retirer des dizaines de codes d'un coup, avec un code successeur que le fichier doit adopter.
+
+**Un fichier est un instantané.** Un fichier fournisseurs contrôlé en janvier porte, à l'été, plusieurs centaines d'entrées dont le nom d'établissement ou la ville ne correspond plus à ce que disent les registres, et quelques dizaines dont le code a disparu. Rien de cela n'est visible dans le fichier lui-même : les IBAN passent toujours la clé de contrôle, les BIC ont toujours onze caractères.
+
+## Qu'en faire
+
+- **Recontrôler à une cadence, pas une fois.** L'[audit de fichier de créanciers](/audit) lit les mêmes registres que l'API et rend le classeur annoté sur-le-champ ; passez-le avant chaque lot de paiements qui suit un rafraîchissement des registres, ou chaque mois.
+- **Lire l'édition.** Chaque réponse porte `as_of` ; si votre dernier contrôle lui est antérieur, les verdicts que vous détenez viennent d'un registre plus ancien.
+- **Surveiller d'abord les registres nationaux.** Un retrait dans le BankMaster de SIX ou dans le fichier de la Bundesbank est un paiement qui reviendra ; un renommage chez GLEIF est une étiquette à mettre à jour.
+
+Les pages registre montrent l'état courant de chaque code avec la réponse de l'API elle-même : [Bankleitzahlen allemandes](/blz), [numéros de clearing suisses](/iid), [codes banque autrichiens](/at), [identifiants bancaires belges](/be). Les sources et leurs licences sont listées sur [Sources et provenance](/docs/data-sources).

@@ -1,0 +1,34 @@
+---
+title: "What changes in the bank registers in a month: measured on three editions of our own base"
+description: "A supplier file checked once drifts. Between the 1 July, 1 August and 1 September 2026 editions of the registers behind IBANforge, BICs appeared and disappeared, institutions were renamed, Swiss clearing numbers moved. The counts, register by register, and what they mean for a creditor file."
+date: "2026-09-04"
+---
+
+Every month, on the 1st, IBANforge rebuilds its base from the registers it serves: the SIX BankMaster for Switzerland, the Bundesbank file for Germany, the OeNB directory for Austria, the NBB list for Belgium, the EBA STEP2 participant list, GLEIF and the public Swift directories for the BIC map. Three editions sit in our history now, 1 July, 1 August and 1 September 2026. Comparing them answers a question customers ask before buying a file audit: **how fast does a checked file go stale?**
+
+## The counts, register by register
+
+| Register | Held on 2026-09-01 | 1 July → 1 August 2026 | 1 August → 1 September 2026 |
+|---|---|---|---|
+| BIC map (GLEIF + Swift directories + EBA + national) | 121k+ BIC11 | +135 new, 29 gone, 514 institutions renamed, 323 cities changed, 283 LEI statuses changed | +78 new, 21 gone, 171 renamed, 109 cities changed, 47 LEI statuses changed |
+| Swiss clearing numbers, SIX BankMaster | 1,100+ IIDs | 8 entries modified | +1 new, 2 withdrawn, 3 modified (one BIC changed, two institutions renamed) |
+| Austrian and Belgian bank codes, OeNB and NBB | 1,653 codes | first edition held | +4 allocated, 10 withdrawn |
+| German Bankleitzahlen, Bundesbank | 3,506 codes | first edition held | no change: the Bundesbank publishes on a quarterly cycle, and the September edition we hold is the August one |
+
+Every figure above is a diff between two dated files we keep in version control; the method is a join on the register key (BIC11, IID, national code) and a field-by-field comparison.
+
+## What the numbers mean
+
+**The composite BIC map moves the most, and part of that movement is list maintenance.** GLEIF re-issues records when a legal name or an address is corrected; a Swift directory list adds and prunes codes as its contributors do. A BIC that disappears from those lists has not necessarily stopped routing payments. That is why every IBANforge answer says which register spoke: `bic.authoritative` is true only when a national register allocated the code, and `bank_code_check.as_of` names the edition. A composite hit is a hint with a source; a national hit is a verdict.
+
+**The national registers move little, and each move matters.** Two Swiss clearing numbers withdrawn in a month, one BIC changed, two institutions renamed: on a creditor file of a few thousand lines, that is a handful of payments that will be rejected or rerouted at the next run, with a generic R-code and no explanation. Ten Belgian and Austrian codes withdrawn in the same month tell the same story. Germany changes in steps, once a quarter, and a step can retire dozens of codes at once with a successor code that the file must adopt.
+
+**A file is a snapshot.** A supplier master file checked in January carries, by summer, several hundred entries whose institution name or city no longer matches what the registers say, and a few dozen whose code is gone. None of this is visible in the file itself: the IBANs still pass the checksum, the BICs still have eleven characters.
+
+## What to do with it
+
+- **Re-check on a cadence, not once.** The [creditor file audit](/audit) reads the same registers as the API and returns the annotated workbook at once; run it before each payment run that follows a register refresh, or monthly.
+- **Read the edition.** Every answer carries `as_of`; if your last check predates it, the verdicts you hold are from an older register.
+- **Watch the national registers first.** A withdrawal in the SIX BankMaster or the Bundesbank file is a payment that will bounce; a renaming in GLEIF is a label to update.
+
+The register pages show the current state of each code with the API's own answer: [German Bankleitzahlen](/blz), [Swiss clearing numbers](/iid), [Austrian bank codes](/at), [Belgian bank identifiers](/be). The sources and their licences are listed on [Data sources & provenance](/docs/data-sources).
