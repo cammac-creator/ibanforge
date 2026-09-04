@@ -1,5 +1,7 @@
 'use client';
 
+import { useState } from 'react';
+
 import type { MailFilter, MailFilterKey, RowSelection } from '@/lib/crm/mail-rows';
 import { POPULATION_KEYS, REFINE_KEYS, WORK_KEYS, segmentLabel } from '@/lib/crm/table-view';
 
@@ -104,8 +106,16 @@ export function CrmToolbar({
   const toggle = (axis: 'work' | 'refine', key: MailFilterKey) =>
     onSelection({ ...selection, [axis]: selection[axis] === key ? null : key });
 
+  // Under sm the six chips cost two rows above a list that starts past half
+  // the screen; they fold behind one word, and unfold by themselves when one
+  // is pressed so a filter never hides the control that armed it.
+  const [refineOpen, setRefineOpen] = useState(false);
+  const refineShown = refineOpen || !!selection.refine;
+
   return (
-    <div className="flex flex-wrap items-center gap-x-2.5 gap-y-2 border-b border-[var(--ink-4)]/60 px-3 py-2.5">
+    // Sticky on a phone: scrolling the list used to scroll the search and the
+    // filters away, and coming back to them meant coming back to the top.
+    <div className="sticky top-0 z-20 flex flex-wrap items-center gap-x-2.5 gap-y-2 border-b border-[var(--ink-4)]/60 bg-[var(--ink-2)] px-3 py-2.5 sm:static sm:bg-transparent">
       <input
         value={query}
         onChange={(e) => onQuery(e.target.value)}
@@ -188,7 +198,19 @@ export function CrmToolbar({
       </div>
 
       {/* The refinements. Quiet on purpose: they narrow, they do not announce. */}
-      <div role="group" aria-label="Affiner" className="flex flex-wrap items-center gap-1.5">
+      <button
+        type="button"
+        onClick={() => setRefineOpen((o) => !o)}
+        aria-expanded={refineShown}
+        className="text-[12px] text-[var(--fg-3)] underline decoration-dotted underline-offset-2 sm:hidden"
+      >
+        {refineShown ? 'Affiner ▴' : 'Affiner ▾'}
+      </button>
+      <div
+        role="group"
+        aria-label="Affiner"
+        className={`${refineShown ? 'flex' : 'hidden'} flex-wrap items-center gap-1.5 sm:flex`}
+      >
         {REFINE_KEYS.map((key) => {
           const filter = filterOf(key);
           const on = selection.refine === key;

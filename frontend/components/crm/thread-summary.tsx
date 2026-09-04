@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { freshOnly } from '@/lib/crm/quoted';
 import type { Message } from '@/lib/crm/types';
 
 /**
@@ -13,7 +14,10 @@ import type { Message } from '@/lib/crm/types';
  * nothing — the thread itself is always the fallback.
  */
 export function threadKeyOf(messages: Message[]): string {
-  return `${messages.length}|${messages.at(-1)?.msg_date ?? ''}`;
+  // v2: the input changed shape (bodies instead of 300-character snippets),
+  // and the key is what tells the cache a stored summary is stale. Without
+  // the version every thread already summarised would keep the old one.
+  return `v2|${messages.length}|${messages.at(-1)?.msg_date ?? ''}`;
 }
 
 export function ThreadSummary({
@@ -52,7 +56,8 @@ export function ThreadSummary({
           `/api/crm/thread-summary?email=${encodeURIComponent(email)}&key=${encodeURIComponent(key)}`,
         ).then((r) => (r.ok ? r.json() : null));
         if (cancelled) return;
-        const cached = (hit as { summary?: { summary_fr?: string } | null } | null)?.summary?.summary_fr;
+        const cached = (hit as { summary?: { summary_fr?: string } | null } | null)?.summary
+          ?.summary_fr;
         if (cached) {
           setText(cached);
           setState('idle');
@@ -69,7 +74,13 @@ export function ThreadSummary({
               direction: m.direction,
               date: m.msg_date,
               subject: m.subject,
-              snippet: m.snippet_fr ?? m.snippet,
+              // The body, stripped of the quoted history, rather than the
+              // 300-character snippet the store keeps for the list: the page
+              // holds the full messages, and a summary written on cuts was
+              // an approximate summary exactly where the thread was longest.
+              // freshOnly and not splitQuoted, so a purely quoted reply
+              // contributes nothing instead of our own previous mail.
+              snippet: (freshOnly(m.body ?? '') || m.snippet_fr || m.snippet || '').slice(0, 2000),
             })),
           }),
         }).then((r) => (r.ok ? r.json() : null));

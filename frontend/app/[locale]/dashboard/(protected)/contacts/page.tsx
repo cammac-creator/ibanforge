@@ -72,11 +72,14 @@ export default async function ContactsPage() {
             {/* Two colours for two different facts. Amber says slow down; red
                 says the prospecting door is shut for the day, which the
                 guardrail would otherwise only say once a mail was written. */}
-            {sentToday >= HARD_CAP
-              ? ' — plafond atteint, tout envoi de prospection est bloqué jusqu’à demain'
-              : sentToday >= SOFT_CAP
-                ? ` — encore ${HARD_CAP - sentToday} avant le plafond`
-                : ''}
+            <span className="hidden sm:inline">
+              {sentToday >= HARD_CAP
+                ? ' — plafond atteint, tout envoi de prospection est bloqué jusqu’à demain'
+                : sentToday >= SOFT_CAP
+                  ? ` — encore ${HARD_CAP - sentToday} avant le plafond`
+                  : ''}
+            </span>
+            {sentToday >= HARD_CAP && <span className="sm:hidden"> — plafond atteint</span>}
           </span>
           {(() => {
             const drafts = contacts.filter((c) => c.draft !== null).length;
