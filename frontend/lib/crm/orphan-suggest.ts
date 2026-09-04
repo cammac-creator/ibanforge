@@ -52,6 +52,36 @@ const GENERIC_MAIL_DOMAINS = new Set([
 ]);
 
 /**
+ * Local parts that name a desk, not a person: "support@" says nothing about
+ * WHO wrote, so it must never count as a name fragment. On 2026-09-03 the
+ * "support" of an MCP directory's notification address matched the "support@"
+ * of a prospect, the pre-selected proposal was accepted, and the alias then
+ * pulled five months of build notices into that prospect's thread.
+ */
+const ROLE_LOCAL_PARTS = new Set(
+  `support info hello contact sales admin team office mail email billing help service services
+   jobs careers accounts accounting finance invoice invoices order orders legal privacy security
+   abuse postmaster webmaster hostmaster partner partners partnership partnerships community press
+   marketing newsletter news notification notifications noreply reply bounce bounces mailer daemon
+   alert alerts update updates dev api ops web www root system robot bot welcome onboarding
+   feedback compliance kyc`.split(/\s+/),
+);
+
+/**
+ * Domain labels that describe a kind of business, not one business: "agents",
+ * "labs", "cloud" each match a dozen files. A label has to be a NAME to be
+ * evidence, on both the token side and the label side of bestMatch.
+ */
+const GENERIC_DOMAIN_LABELS = new Set(
+  `agent agents app apps cloud online digital tech lab labs group team global world net dev corp
+   inc ltd gmbh sarl company solutions service services systems software studio studios media
+   network networks partners consulting holding international europe swiss suisse schweiz finance
+   financial pay payment payments bank banking crypto data api info contact support hello`.split(
+    /\s+/,
+  ),
+);
+
+/**
  * Name-ish fragments of an address: letter runs of length >= 3 from the local
  * part, plus the domain's name-bearing label when it is not a generic mailbox
  * provider. "a904312zed@gmail.com" yields ["zed"]; "j.dupont@alpha.example.net"
@@ -61,13 +91,15 @@ export function senderTokens(sender: string): string[] {
   const [localRaw, domainRaw] = sender.trim().toLowerCase().split('@');
   const tokens = new Set<string>();
   for (const t of (localRaw ?? '').split(/[^a-zà-öø-ÿ]+/i)) {
-    if (t.length >= 3) tokens.add(t);
+    if (t.length >= 3 && !ROLE_LOCAL_PARTS.has(t)) tokens.add(t);
   }
   // "alpha.example.net" → "alpha": the leftmost domain label a company chooses
   // is the name-bearing one. Generic labels (mail providers, "mail.", "web.")
   // are skipped, the TLD is never a candidate, and one label is enough.
   const labels = (domainRaw ?? '').split('.').slice(0, -1);
-  const named = labels.find((l) => l.length >= 3 && !GENERIC_MAIL_DOMAINS.has(l));
+  const named = labels.find(
+    (l) => l.length >= 3 && !GENERIC_MAIL_DOMAINS.has(l) && !GENERIC_DOMAIN_LABELS.has(l),
+  );
   if (named) tokens.add(named);
   return [...tokens];
 }
@@ -161,7 +193,7 @@ export function bestMatch(sender: string, rows: PersonRow[]): BestMatch | null {
     const same = byTier(others.filter((r) => domainOf(r.email) === domain));
     if (same) return { row: same, reason: 'same_domain' };
     const label = domain.split('.')[0] ?? '';
-    if (label.length >= 4) {
+    if (label.length >= 4 && !GENERIC_DOMAIN_LABELS.has(label)) {
       const inLabel = byTier(others.filter((r) => r.label.toLowerCase().includes(label)));
       if (inLabel) return { row: inLabel, reason: 'domain_in_label' };
     }
@@ -190,6 +222,14 @@ export function isAutomatedNotice(sender: string, subject: string | null): boole
   )
     return true;
   if (/dmarc|report domain:|aggregate report|delivery status notification|undeliverable/.test(subj))
+    return true;
+  // A directory's build and release notices come from its ordinary support
+  // desk, so the sender says nothing; the subject does.
+  if (
+    /^(build (succeeded|failed) for |release \S+ (of \S+ )?(has been |was )?published|your mcp server .* (was not |has been )approved)/.test(
+      subj,
+    )
+  )
     return true;
   return false;
 }

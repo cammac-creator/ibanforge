@@ -81,7 +81,10 @@ describe('bestMatch (the pre-selected client)', () => {
     { email: 'zed@gmail.com', label: 'Zed', kind: 'prospect' },
   ];
   it('prefers a shared company domain, clients first', () => {
-    expect(bestMatch('cfo@alpha.example.net', rows)).toEqual({ row: rows[0], reason: 'same_domain' });
+    expect(bestMatch('cfo@alpha.example.net', rows)).toEqual({
+      row: rows[0],
+      reason: 'same_domain',
+    });
   });
   it('never treats a mailbox provider as a shared domain', () => {
     expect(bestMatch('someone@gmail.com', rows)).toBeNull();
@@ -92,7 +95,10 @@ describe('bestMatch (the pre-selected client)', () => {
     expect(bestMatch('hello@beta.io', rows)?.row.email).toBe('j.dupont@beta.example.org');
   });
   it('falls back to a name fragment of the address, and says so', () => {
-    expect(bestMatch('jean.dupont@gmail.com', rows)).toEqual({ row: rows[2], reason: 'name_in_address' });
+    expect(bestMatch('jean.dupont@gmail.com', rows)).toEqual({
+      row: rows[2],
+      reason: 'name_in_address',
+    });
   });
   it('never proposes the sender itself', () => {
     expect(bestMatch('ops@alpha.example.net', rows)?.row.email).toBe('sales@alpha.example.net');
@@ -101,11 +107,52 @@ describe('bestMatch (the pre-selected client)', () => {
 
 describe('isAutomatedNotice', () => {
   it('recognises DMARC reports and no-reply senders', () => {
-    expect(isAutomatedNotice('dmarcreport@microsoft.com', '[Preview] Report Domain: ibanforge.com Submitter: x')).toBe(true);
+    expect(
+      isAutomatedNotice(
+        'dmarcreport@microsoft.com',
+        '[Preview] Report Domain: ibanforge.com Submitter: x',
+      ),
+    ).toBe(true);
     expect(isAutomatedNotice('no-reply@example.com', 'Your listing is live')).toBe(true);
     expect(isAutomatedNotice('noreply@example.com', null)).toBe(true);
   });
   it('leaves a person alone', () => {
     expect(isAutomatedNotice('jean@alpha.example.net', 'Re: our call')).toBe(false);
+  });
+});
+
+describe('role desks and generic labels are not evidence (the 2026-09-03 aliases)', () => {
+  const rows: PersonRow[] = [
+    { email: 'support@gamma.example.net', label: 'Gamma SA', kind: 'prospect' },
+    { email: 'someone@example.org', label: 'Delta agents toolkit', kind: 'client' },
+  ];
+  it('drops "support@" from the name fragments', () => {
+    expect(senderTokens('support@directory.example')).toEqual(['directory']);
+  });
+  it('does not pre-select a prospect because both desks are called support', () => {
+    expect(bestMatch('support@directory.example', rows)).toBeNull();
+    expect(suggestFor('support@directory.example', '', rows)).toEqual([]);
+  });
+  it('does not read a generic domain label ("agents") into a file label', () => {
+    expect(bestMatch('hello@agents.example', rows)).toBeNull();
+    expect(senderTokens('hello@agents.example')).toEqual([]);
+  });
+  it('flags directory build and release notices as automated', () => {
+    expect(isAutomatedNotice('support@directory.example', 'Build succeeded for ibanforge')).toBe(
+      true,
+    );
+    expect(
+      isAutomatedNotice(
+        'support@directory.example',
+        'Release 1.4.4 of ibanforge was published on September 2, 2026',
+      ),
+    ).toBe(true);
+    expect(
+      isAutomatedNotice(
+        'support@directory.example',
+        'Your MCP server "ibanforge" was not approved on X',
+      ),
+    ).toBe(true);
+    expect(isAutomatedNotice('support@directory.example', 'Re: your question')).toBe(false);
   });
 });

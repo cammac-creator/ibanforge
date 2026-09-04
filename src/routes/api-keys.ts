@@ -40,7 +40,13 @@ import {
   setOrphanGist,
   setOrphanTranslation,
 } from '../lib/orphan-mail.js';
-import { addAlias, listAliases, loadAliasMap, toCanonical } from '../lib/email-aliases.js';
+import {
+  addAlias,
+  listAliases,
+  loadAliasMap,
+  removeAlias,
+  toCanonical,
+} from '../lib/email-aliases.js';
 import {
   listNoReplySenders,
   loadNoReplySenders,
@@ -1693,6 +1699,36 @@ apiKeys.post('/v1/admin/email-aliases', async (c) => {
   const res = addAlias(body.alias, body.canonical);
   if (!res.ok) return c.json({ error: 'invalid_alias', message: res.reason }, 400);
   return c.json({ aliases: listAliases() });
+});
+
+/**
+ * Undo an alias. Body: { alias }.
+ *
+ * The alias list had no way back, and the cost of a wrong entry was hidden:
+ * the nightly re-ingest re-files the WHOLE mailbox through the alias map, so a
+ * wrong « ils ne font qu'un » silently pulled months of a directory's build
+ * notices into a prospect's thread — nobody reports that, its symptom is a
+ * thread that looks talkative. Removing the alias gives the alias address its
+ * inbound rows back (see removeAlias); an unknown alias answers 404, like
+ * institutional-contacts/delete below.
+ */
+apiKeys.post('/v1/admin/email-aliases/delete', async (c) => {
+  if (!isAdminAuthorized(c.req.header('X-Admin-Secret'))) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
+  let body: { alias?: unknown };
+  try {
+    body = await c.req.json<{ alias?: unknown }>();
+  } catch {
+    return c.json({ error: 'invalid_json' }, 400);
+  }
+  const alias = typeof body?.alias === 'string' ? body.alias.trim().toLowerCase() : '';
+  if (!alias.includes('@')) {
+    return c.json({ error: 'invalid_body', message: 'Expected { alias: "…@…" }' }, 400);
+  }
+  const res = removeAlias(alias);
+  if (!res.ok) return c.json({ error: 'not_found', message: res.reason }, 404);
+  return c.json({ deleted: 1, refiled: res.refiled, aliases: listAliases() });
 });
 
 /**

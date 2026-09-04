@@ -64,3 +64,40 @@ export function addAlias(
     .run(alias, canonical);
   return { ok: true };
 }
+
+/**
+ * Undo « cette adresse EST ce client ».
+ *
+ * An alias had no way back since it was born, and the cost of a wrong one is
+ * not one misfiled mail: the whole mailbox is re-ingested every night through
+ * the alias map, so a wrong « ils ne font qu'un » pulls months of the alias
+ * address's history into the canonical thread at the next sync (two of them
+ * did exactly that on 2026-09-03, both accepted from the pre-selected
+ * suggestion). Removing the alias gives those rows back: the inbound rows
+ * filed under the canonical address that actually CAME FROM the alias address
+ * — that is what `counterparty` records — return to the alias address's own
+ * thread. Outbound rows stay where they were written: a mail we sent to the
+ * canonical address is a fact about the canonical address, whatever the alias
+ * list said at the time.
+ */
+export function removeAlias(
+  aliasRaw: string,
+): { ok: true; canonical: string; refiled: number } | { ok: false; reason: string } {
+  ensureAliasTable();
+  const alias = aliasRaw.trim().toLowerCase();
+  const db = getStatsDB();
+  const row = db.prepare('SELECT canonical FROM email_aliases WHERE alias = ?').get(alias) as
+    { canonical: string } | undefined;
+  if (!row) return { ok: false, reason: 'alias inconnu' };
+  const refiled = db.transaction(() => {
+    const { changes } = db
+      .prepare(
+        `UPDATE email_messages SET customer_email = ?
+         WHERE customer_email = ? AND direction = 'in' AND lower(counterparty) = ?`,
+      )
+      .run(alias, row.canonical, alias);
+    db.prepare('DELETE FROM email_aliases WHERE alias = ?').run(alias);
+    return changes;
+  })();
+  return { ok: true, canonical: row.canonical, refiled };
+}
