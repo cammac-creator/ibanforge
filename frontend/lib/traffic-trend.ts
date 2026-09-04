@@ -320,9 +320,15 @@ export function comparePeriods(
     null,
   );
   const prevEnd = new Date(now.getTime() - period * DAY_MS);
+  const prevEndKey = dayKeyUTC(prevEnd.getTime());
   const prevFloor = dayKeyUTC(prevEnd.getTime() - (period - 1) * DAY_MS);
   if (earliest === null || earliest > prevFloor) return { current, previous: null };
-  return { current, previous: sliceToPeriod(all, period, prevEnd) };
+  // Only what lies before the window's end: sliceToPeriod keeps any day
+  // AFTER its `now` (a real feature for today's edge), and for a window in
+  // the past that would mean every day of the current window too — the
+  // previous period then weighed both periods and every delta read as a fall.
+  const past = all.filter((d) => d.date <= prevEndKey);
+  return { current, previous: sliceToPeriod(past, period, prevEnd) };
 }
 
 function median(values: number[]): number {
