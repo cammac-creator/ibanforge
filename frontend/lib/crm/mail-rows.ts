@@ -3,7 +3,7 @@ import { ballWithUs, followupDue, neverContacted } from './buckets';
 import { isClosed } from './closed';
 import { chipOf, replyGroupOf, type BusinessChip, type ReplyGroup } from './business';
 import { heatOf } from './heat';
-import { noReplyHolds } from './no-reply';
+import { lastInboundMessage, noReplyHolds } from './no-reply';
 import { nextActionLabel } from './situation';
 import type { Contact, Message, NextAction, Situation } from './types';
 
@@ -49,6 +49,10 @@ export interface MailRow {
   preview: string;
   /** The preview is our own last mail, not the contact's — shown as « toi : ». */
   lastFromUs: boolean;
+  /** Id of the newest message the contact wrote: the one « rien à répondre » marks from the row. */
+  lastInboundId: string | null;
+  /** Under « Relances », the criterion that ranks this row where it is. */
+  rankReason: string | null;
   age: string;
   urgent: boolean;
   unread: boolean;
@@ -341,12 +345,26 @@ function institutionSearch(c: Contact): string {
   return [i.category, i.role ?? '', i.dossier ?? ''].join(' ');
 }
 
+/**
+ * Why a follow-up sits where it sits, in the words of the criterion that
+ * decided it. order() ranks the « Relances » queue by pack, then live calls,
+ * then heat; none of that was visible on the row, and seventy-two rows in an
+ * order nobody can read is an order nobody trusts.
+ */
+function followupReason(c: Contact, s: Situation | undefined): string {
+  if (c.kind === 'client' && (c.business?.packs ?? 0) > 0) return 'a acheté un pack';
+  const calls = c.kind === 'client' ? (c.business?.calls90d ?? 0) : 0;
+  if (calls > 0) return `clé active, ${calls} appel${calls > 1 ? 's' : ''} sur 90 j`;
+  return `chaleur ${heatOf(c, s).score}`;
+}
+
 function toRow(
   c: Contact,
   s: Situation | undefined,
   urgent: boolean,
   grouped: boolean,
   woke: boolean,
+  active: MailFilterKey,
 ): MailRow {
   return {
     id: c.id,
@@ -357,6 +375,8 @@ function toRow(
     subject: lastWith(c.messages, 'subject') ?? 'Aucun échange',
     preview: lastWith(c.messages, 'snippet') ?? '',
     lastFromUs: lastFromUs(c.messages),
+    lastInboundId: lastInboundMessage(c)?.id ?? null,
+    rankReason: active === 'followup' ? followupReason(c, s) : null,
     age: ageLabel(s),
     urgent,
     chip: chipOf(c),
@@ -656,6 +676,7 @@ function project(input: RowsInput, contacts: Contact[], active: MailFilterKey): 
       filter.urgent,
       active === 'reply',
       input.woke?.[c.id] ?? false,
+      active,
     ),
   );
 }

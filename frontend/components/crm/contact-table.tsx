@@ -53,7 +53,7 @@ function snoozeTarget(): string {
  */
 export async function rowAction(
   row: MailRow,
-  kind: 'snooze' | 'archive' | 'read',
+  kind: 'snooze' | 'archive' | 'read' | 'noreply',
 ): Promise<boolean> {
   async function post(url: string, body: unknown): Promise<boolean> {
     try {
@@ -73,6 +73,11 @@ export async function rowAction(
   if (kind === 'archive' && row.prospectId) {
     return post('/api/crm/prospect-status', { id: row.prospectId, status: 'archive' });
   }
+  // The same message the drawer's control marks: lastInboundMessage picks it
+  // on both roads, so the badge, the band and this gesture cannot disagree.
+  if (kind === 'noreply' && row.lastInboundId) {
+    return post('/api/crm/no-reply', { id: row.lastInboundId, value: true });
+  }
   if (kind === 'read' && row.email) {
     return post('/api/crm/thread-read', { email: row.email });
   }
@@ -88,7 +93,7 @@ function RowActions({
   onDone: () => void;
   onBusy: (b: boolean) => void;
 }) {
-  async function act(kind: 'snooze' | 'archive' | 'read', e: React.MouseEvent) {
+  async function act(kind: 'snooze' | 'archive' | 'read' | 'noreply', e: React.MouseEvent) {
     e.stopPropagation();
     e.preventDefault();
     if (
@@ -105,7 +110,11 @@ function RowActions({
   const btn =
     'rounded border border-[var(--ink-5)] bg-[var(--ink-1)] px-1.5 py-0.5 text-[11px] text-[var(--fg-2)] hover:border-[var(--amber-500)]/60 hover:text-[var(--fg-1)]';
 
-  if (!row.prospectId && !row.unread) return null;
+  // « Rien à répondre » from the row, for the population that sends the most
+  // mail with no question in it — self-service clients and institutional
+  // desks — which has neither a prospect id nor an unread mark once opened.
+  const canNoReply = row.nextAction === 'reply' && !!row.lastInboundId;
+  if (!row.prospectId && !row.unread && !canNoReply) return null;
 
   return (
     // Over the last two columns, which hide themselves on hover (the age and
@@ -147,6 +156,16 @@ function RowActions({
             onClick={(e) => act('read', e)}
           >
             ✓ lu
+          </button>
+        )}
+        {canNoReply && (
+          <button
+            type="button"
+            className={btn}
+            title="Rien à répondre : classe son dernier message sans ouvrir la fiche"
+            onClick={(e) => act('noreply', e)}
+          >
+            🔕
           </button>
         )}
       </span>
@@ -572,6 +591,14 @@ export function ContactTable({
                       >
                         {status.label}
                       </span>
+                      {selection.work === 'followup' && r.rankReason && (
+                        <span
+                          className="block truncate text-[11px] text-[var(--fg-4)]"
+                          title="Ce qui place cette relance ici"
+                        >
+                          {r.rankReason}
+                        </span>
+                      )}
                     </span>
 
                     {/* The column the eye scans. Under the prospecting chip a
