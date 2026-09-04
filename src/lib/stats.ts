@@ -738,8 +738,11 @@ export function getTrafficTrend(days: number = 30): TrafficTrendDay[] {
   // Clamped here too, not only in the route: this is also called directly.
   // Math.trunc(NaN) stays NaN, which would sail through Math.max/min into the
   // SQL window '-NaN days' and silently return nothing.
+  // 180 and not 90: the overview compares each window with the one before
+  // it, and its 90-day window needs the 90 days before. The request log
+  // keeps twelve months, so the rows exist; the scan is bounded either way.
   const requested = Math.trunc(days);
-  const span = Number.isFinite(requested) ? Math.max(1, Math.min(90, requested)) : 30;
+  const span = Number.isFinite(requested) ? Math.max(1, Math.min(180, requested)) : 30;
 
   // `created_at >= date('now', ...)` and not datetime(): the bound must land on
   // a calendar boundary, because the rows are grouped by calendar date. With a
