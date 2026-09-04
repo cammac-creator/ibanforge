@@ -35,6 +35,21 @@ const EMBERS_SECTION = `<rect x="55" y="170" width="3" height="6" fill="#F59E0B"
 
 const EMBERS_CTA = `<rect x="70" y="140" width="3" height="7" fill="#F59E0B" opacity="0.5"/><rect x="140" y="70" width="2" height="4" fill="#FCD34D" opacity="0.3"/><rect x="205" y="185" width="4" height="9" fill="#F59E0B" opacity="0.7"/>`
 
+/* The distribution: every package and module that exists today, with the
+   command or pointer that installs it. Nothing here is announced ahead of
+   itself — .NET says "from source" until NuGet carries it. */
+const INTEGRATIONS = [
+  { key: 'ts', cmd: 'npm install @ibanforge/sdk', href: 'https://www.npmjs.com/package/@ibanforge/sdk' },
+  { key: 'py', cmd: 'pip install ibanforge', href: 'https://pypi.org/project/ibanforge/' },
+  { key: 'java', cmd: 'com.ibanforge:ibanforge-sdk', href: 'https://central.sonatype.com/artifact/com.ibanforge/ibanforge-sdk' },
+  { key: 'dotnet', cmd: 'IBANforge.Sdk · dotnet pack', href: 'https://github.com/cammac-creator/ibanforge/tree/main/sdks/dotnet' },
+  { key: 'mcp', cmd: 'npx -y ibanforge-mcp', href: 'https://www.npmjs.com/package/ibanforge-mcp' },
+  { key: 'n8n', cmd: 'npm install n8n-nodes-ibanforge', href: 'https://www.npmjs.com/package/n8n-nodes-ibanforge' },
+  { key: 'odoo', cmd: 'ibanforge_bank_autofill', href: 'https://github.com/cammac-creator/ibanforge/tree/main/integrations/odoo' },
+  { key: 'sheets', cmd: '=IBANFORGE_VALIDATE(A2)', href: '/sheets' },
+  { key: 'postman', cmd: 'ibanforge.postman_collection.json', href: 'https://github.com/cammac-creator/ibanforge/tree/main/integrations/postman' },
+] as const
+
 /* The x402 spot illustration: a robotic arm paying its coin into the slot. */
 const AGENTS_ILLO = `<defs><radialGradient id="acoin" cx="38%" cy="35%" r="75%"><stop offset="0%" stop-color="#FCD34D"/><stop offset="55%" stop-color="#F59E0B"/><stop offset="100%" stop-color="#D97706"/></radialGradient></defs><rect x="18" y="122" width="128" height="12" rx="3" fill="#292524"/><circle cx="34" cy="128" r="2.5" fill="#57534E"/><circle cx="130" cy="128" r="2.5" fill="#57534E"/><rect x="70" y="66" width="16" height="58" rx="4" fill="#3F3A34"/><path d="M78,70 q-26,18 -8,52" stroke="#292524" stroke-width="3" fill="none"/><g stroke-linecap="round"><line x1="78" y1="70" x2="152" y2="34" stroke="#57534E" stroke-width="13"/><line x1="152" y1="34" x2="230" y2="55" stroke="#44403C" stroke-width="10"/></g><circle cx="78" cy="70" r="8" fill="#292524" stroke="#57534E" stroke-width="2"/><circle cx="152" cy="34" r="8.5" fill="#292524" stroke="#57534E" stroke-width="2"/><circle cx="152" cy="34" r="3" fill="#78716C"/><g stroke="#57534E" stroke-width="5.5" fill="none" stroke-linecap="round"><path d="M230,49 q16,-2 24,8"/><path d="M230,61 q16,4 22,14"/></g><g class="coin"><ellipse cx="258" cy="66" rx="27" ry="21" fill="#F59E0B" opacity="0.13"/><circle cx="258" cy="66" r="13.5" fill="url(#acoin)"/><circle cx="258" cy="66" r="13.5" fill="none" stroke="#FCD34D" stroke-width="1.6" opacity="0.8"/><rect x="254" y="60" width="8" height="12" rx="2" fill="#1C0A00" opacity="0.35"/></g><rect x="288" y="84" width="56" height="50" rx="7" fill="#1C1917" stroke="#292524"/><rect x="288" y="84" width="56" height="8" rx="4" fill="#26211C"/><rect x="299" y="100" width="34" height="6" rx="3" fill="#F59E0B" opacity="0.9"/><rect x="299" y="115" width="12" height="5" rx="1.5" fill="#EF4444" opacity="0.65"/><rect x="315" y="115" width="12" height="5" rx="1.5" fill="#4ADE80" opacity="0.65"/>`
 
@@ -165,15 +180,50 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
         <FoldDemo iban="CH1000230000000012345" fallback={DEFAULT_RESULT.iban} />
       </section>
 
-      {/* ── The film: four forging stations, scrubbed by scroll ──────────── */}
-      <ForgeFilm t={film} playgroundHref={`/${locale}/playground`} />
+      {/* ── Trust band: sources, sanctions lists, Swiss provenance ────────── */}
+      {/* Audit 2026-09-04 (M6): the only honest "logo band" this product has
+          is its registers; it used to arrive at 88 % of the page. */}
+      <section className="trust-band" aria-label="Data sources and provenance">
+        <div className="wrap trust-grid">
+          <div className="trust-cell">
+            <span className="eyebrow">{t('trust.dataLabel')}</span>
+            <p className="trust-v">
+              {/* nbsp inside names and before each dot: lines only break after a separator */}
+              {t('trust.dataValue')
+                .split(' · ')
+                .map((source) => source.replace(/ /g, ' '))
+                .join(' · ')}
+            </p>
+            <span className="trust-n">
+              {refreshedOn ? t('trust.dataNoteDated', { date: refreshedOn }) : t('trust.dataNote')}
+            </span>
+          </div>
+          <div className="trust-cell">
+            <span className="eyebrow">{t('trust.sanctionsLabel')}</span>
+            <p className="trust-v">{t('trust.sanctionsValue')}</p>
+            <span className="trust-n">{t('trust.sanctionsNote')}</span>
+          </div>
+          <div className="trust-cell">
+            <span className="eyebrow">{t('trust.madeLabel')}</span>
+            <p className="trust-v"><span className="swiss-sq" aria-hidden="true"></span>Made in Switzerland</p>
+            <span className="trust-n">{t('trust.madeNote')}</span>
+          </div>
+          <div className="trust-cell">
+            <span className="eyebrow">{t('trust.privacyLabel')}</span>
+            <p className="trust-v">{t('trust.privacyValue')}</p>
+            <Link href={`/${locale}/legal/dpa`} className="trust-n" style={{ textDecoration: 'underline', textUnderlineOffset: 4 }}>
+              {t('trust.privacyNote')}
+            </Link>
+          </div>
+        </div>
+      </section>
 
       {/* ── Sourced stats, counting up on scroll ─────────────────────────── */}
       <section className="stats-band">
         <StatsBar stats={STATS} locale={locale} />
       </section>
 
-      {/* ── Features as forged plaques ────────────────────────────────────── */}
+      {/* ── What a mod-97 check will never tell you: the plaques ───────────── */}
       <section className="sect" aria-labelledby="h-features">
         <div className="wrap">
           <h2 className="sect-h" id="h-features">{t('features.heading')}</h2>
@@ -189,21 +239,32 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
         </div>
       </section>
 
-      {/* ── The non-developer door: the creditor file audit (02/09/2026) ── */}
-      <section className="sect" aria-labelledby="h-audit" style={{ paddingTop: 0 }}>
-        <div className="wrap">
-          <h2 className="sect-h" id="h-audit">{t('audit.heading')}</h2>
-          <p className="sect-sub">{t('audit.text')}</p>
-          {/* Audit 2026-09-04 (M4): the only CHF price and the only no-code
-              offer of the page were announced by a negation and a ghost
-              button. A full button, centred like the section. */}
-          <div className="hero-cta hero-cta-center" style={{ marginTop: '1.4rem' }}>
-            <Button size="lg" variant="amber" className="px-8" render={<Link href={`/${locale}/audit`} />}>
-              {t('audit.cta')}
-            </Button>
+      {/* ── The dated trigger: 14 November 2026 (audit 2026-09-04, M3) ────────
+          It was the seventh line of the endpoint list, at 80 % of the page.
+          The dates are the ones our own doc and the 2026-09-02 post cite,
+          source by source; Swift's suspension of 27 August 2026 is named. */}
+      <section className="deadline" aria-labelledby="h-deadline">
+        <div className="wrap deadline-grid">
+          <div>
+            <span className="eyebrow">{t('deadline.eyebrow')}</span>
+            <h2 className="sect-h sect-h-left" id="h-deadline">{t('deadline.heading')}</h2>
+          </div>
+          <div>
+            <p className="deadline-text">{t('deadline.text')}</p>
+            <div className="hero-cta">
+              <Link href={`/${locale}/docs/structured-addresses`} className="btn-ghost-link">
+                {t('deadline.cta')}
+              </Link>
+              <Link href={`/${locale}/audit`} className="btn-ghost-link">
+                {t('audit.cta')}
+              </Link>
+            </div>
           </div>
         </div>
       </section>
+
+      {/* ── The film: four forging stations, scrubbed by scroll ──────────── */}
+      <ForgeFilm t={film} playgroundHref={`/${locale}/playground`} />
 
       {/* ── Endpoints, price-stamped ──────────────────────────────────────── */}
       <section className="sect" aria-labelledby="h-endpoints" style={{ paddingTop: 0 }}>
@@ -219,6 +280,48 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
                 <span className="ep-cost">{endpoint.cost}</span>
               </Reveal>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Integrations: the distribution, visible (audit 2026-09-04, M5) ── */}
+      <section className="sect integrations" aria-labelledby="h-integrations">
+        <div className="wrap">
+          <h2 className="sect-h" id="h-integrations">{t('integrations.heading')}</h2>
+          <p className="sect-sub">{t('integrations.sub')}</p>
+          <ul className="integ-grid">
+            {INTEGRATIONS.map((item) => {
+              const external = item.href.startsWith('http')
+              const href = external ? item.href : `/${locale}${item.href}`
+              return (
+                <li key={item.key} className="integ">
+                  <a
+                    href={href}
+                    className="integ-link"
+                    {...(external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+                  >
+                    <span className="integ-name">{t(`integrations.items.${item.key}`)}</span>
+                    <code className="integ-cmd">{item.cmd}</code>
+                  </a>
+                </li>
+              )
+            })}
+          </ul>
+        </div>
+      </section>
+
+      {/* ── The non-developer door: the creditor file audit (02/09/2026) ── */}
+      <section className="sect" aria-labelledby="h-audit" style={{ paddingTop: 0 }}>
+        <div className="wrap">
+          <h2 className="sect-h" id="h-audit">{t('audit.heading')}</h2>
+          <p className="sect-sub">{t('audit.text')}</p>
+          {/* Audit 2026-09-04 (M4): the only CHF price and the only no-code
+              offer of the page were announced by a negation and a ghost
+              button. A full button, centred like the section. */}
+          <div className="hero-cta hero-cta-center" style={{ marginTop: '1.4rem' }}>
+            <Button size="lg" variant="amber" className="px-8" render={<Link href={`/${locale}/audit`} />}>
+              {t('audit.cta')}
+            </Button>
           </div>
         </div>
       </section>
@@ -252,42 +355,6 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
               <p>{t('agentsRail.docsBody')}</p>
               <p className="agent-code"><a className="agent-link" href="https://ibanforge.com/llms.txt">GET /llms.txt</a></p>
             </Reveal>
-          </div>
-        </div>
-      </section>
-
-      {/* ── Trust band: sources, sanctions lists, Swiss provenance ────────── */}
-      <section className="trust-band" aria-label="Data sources and provenance">
-        <div className="wrap trust-grid">
-          <div className="trust-cell">
-            <span className="eyebrow">{t('trust.dataLabel')}</span>
-            <p className="trust-v">
-              {/* nbsp inside names and before each dot: lines only break after a separator */}
-              {t('trust.dataValue')
-                .split(' · ')
-                .map((source) => source.replace(/ /g, ' '))
-                .join(' · ')}
-            </p>
-            <span className="trust-n">
-              {refreshedOn ? t('trust.dataNoteDated', { date: refreshedOn }) : t('trust.dataNote')}
-            </span>
-          </div>
-          <div className="trust-cell">
-            <span className="eyebrow">{t('trust.sanctionsLabel')}</span>
-            <p className="trust-v">{t('trust.sanctionsValue')}</p>
-            <span className="trust-n">{t('trust.sanctionsNote')}</span>
-          </div>
-          <div className="trust-cell">
-            <span className="eyebrow">{t('trust.madeLabel')}</span>
-            <p className="trust-v"><span className="swiss-sq" aria-hidden="true"></span>Made in Switzerland</p>
-            <span className="trust-n">{t('trust.madeNote')}</span>
-          </div>
-          <div className="trust-cell">
-            <span className="eyebrow">{t('trust.privacyLabel')}</span>
-            <p className="trust-v">{t('trust.privacyValue')}</p>
-            <Link href={`/${locale}/legal/dpa`} className="trust-n" style={{ textDecoration: 'underline', textUnderlineOffset: 4 }}>
-              {t('trust.privacyNote')}
-            </Link>
           </div>
         </div>
       </section>

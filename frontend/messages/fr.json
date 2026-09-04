@@ -258,6 +258,27 @@
       "docsTitle": "Docs lisibles par machine",
       "docsBody": "Spécification OpenAPI, données structurées et résumé en texte brut, pensés pour les crawlers et les agents."
     },
+    "deadline": {
+      "eyebrow": "Échéance",
+      "heading": "14 novembre 2026 : la Suisse cesse de traiter les adresses non structurées",
+      "text": "Dès le 14 novembre 2026, SIX ne traite plus les paiements dont l’adresse ne respecte pas les règles structurées ou hybrides ; l’Eurosystème et l’EPC tiennent le même week-end, Swift a suspendu sa date le 27 août 2026. POST /v1/address/check dit gratuitement si une adresse passe les règles suisses, HVPS+ ou Fedwire, en nommant le document ; l’audit de fichier passe un classeur entier.",
+      "cta": "Lire les règles, rail par rail"
+    },
+    "integrations": {
+        "heading": "Dans votre langage, votre ERP, votre tableur",
+        "sub": "Chaque paquet ci-dessous existe et s’installe aujourd’hui. Ce qui n’est pas encore publié le dit.",
+        "items": {
+              "ts": "SDK TypeScript / JavaScript",
+              "py": "SDK Python",
+              "java": "SDK Java 17+ · Maven Central",
+              "dotnet": "SDK .NET 8 · depuis les sources, NuGet en attente",
+              "mcp": "Serveur MCP · Claude, Cursor, Cline",
+              "n8n": "Nœud n8n",
+              "odoo": "Module Odoo 18 · BIC et banque remplis à la saisie",
+              "sheets": "Complément Google Sheets",
+              "postman": "Collection Postman"
+        }
+    },
     "audit": {
       "heading": "Vous payez des fournisseurs ? Auditez votre fichier de créanciers",
       "text": "Déposez le CSV ou XLSX depuis lequel vous payez. Aperçu gratuit de ce que la banque rejetterait, puis 149 CHF pour le classeur annoté, tout de suite.",

@@ -6,15 +6,25 @@ const text = (lines: ReturnType<typeof responseLines>) =>
   lines.map((l) => l.map((t) => t.text).join("")).join("\n")
 
 describe("responseLines", () => {
-  it("projects the captured UBS payload onto the reading order, one key per line", () => {
+  it("projects the captured UBS payload onto the reading order; long groups become blocks", () => {
     const out = text(responseLines(DEFAULT_RESULT.iban))
     expect(out).toBe(
       [
         "{",
         '  "valid": true,',
         '  "country": { "code": "CH", "name": "Switzerland" },',
-        '  "bic": { "code": "UBSWCHZH", "bank_name": "UBS Switzerland AG", "city": "Zürich" },',
-        '  "clearing": { "iid": "00230", "sic": true, "eurosic": true, "instant_payments_chf": true, "qr_iid": null },',
+        '  "bic": {',
+        '    "code": "UBSWCHZH",',
+        '    "bank_name": "UBS Switzerland AG",',
+        '    "city": "Zürich"',
+        "  },",
+        '  "clearing": {',
+        '    "iid": "00230",',
+        '    "sic": true,',
+        '    "eurosic": true,',
+        '    "instant_payments_chf": true,',
+        '    "qr_iid": null',
+        "  },",
         '  "sepa": { "member": true, "schemes": ["SCT", "SDD"] },',
         '  "issuer": { "type": "bank" },',
         '  "risk_indicators": { "country_risk": "standard", "sepa_reachable": true },',

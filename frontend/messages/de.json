@@ -258,6 +258,27 @@
       "docsTitle": "Maschinenlesbare Doku",
       "docsBody": "OpenAPI-Spezifikation, strukturierte Daten und eine Klartext-Zusammenfassung für Crawler und Agenten."
     },
+    "deadline": {
+      "eyebrow": "Stichtag",
+      "heading": "14. November 2026: Die Schweiz verarbeitet keine unstrukturierten Adressen mehr",
+      "text": "Ab dem 14. November 2026 verarbeitet SIX keine Zahlungen mehr, deren Adresse die strukturierten oder hybriden Regeln verletzt; Eurosystem und EPC halten dasselbe Wochenende, Swift hat sein Datum am 27. August 2026 ausgesetzt. POST /v1/address/check sagt kostenlos, ob eine Adresse die Schweizer, HVPS+- oder Fedwire-Regeln besteht, und nennt das Dokument; die Dateiprüfung nimmt eine ganze Arbeitsmappe.",
+      "cta": "Die Regeln lesen, Schiene für Schiene"
+    },
+    "integrations": {
+        "heading": "In Ihrer Sprache, Ihrem ERP, Ihrer Tabelle",
+        "sub": "Jedes Paket unten existiert und lässt sich heute installieren. Was noch nicht veröffentlicht ist, sagt es.",
+        "items": {
+              "ts": "TypeScript-/JavaScript-SDK",
+              "py": "Python-SDK",
+              "java": "Java-17+-SDK · Maven Central",
+              "dotnet": ".NET-8-SDK · aus dem Quellcode, NuGet ausstehend",
+              "mcp": "MCP-Server · Claude, Cursor, Cline",
+              "n8n": "n8n-Node",
+              "odoo": "Odoo-18-Modul · BIC und Bank beim Tippen ausgefüllt",
+              "sheets": "Google-Sheets-Add-on",
+              "postman": "Postman-Sammlung"
+        }
+    },
     "audit": {
       "heading": "Sie zahlen Lieferanten? Prüfen Sie Ihre Kreditorendatei",
       "text": "Laden Sie die CSV- oder XLSX-Datei hoch, aus der Sie zahlen. Kostenlose Vorschau dessen, was die Bank abweisen würde, dann 149 CHF für die kommentierte Arbeitsmappe, sofort.",

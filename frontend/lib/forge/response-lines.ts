@@ -23,6 +23,10 @@ export type Line = Token[]
 
 type Obj = Record<string, unknown>
 
+/** An inline group longer than this wraps into a block: the fold's terminal
+ *  is ~60 columns wide and a horizontal scrollbar is not a proof of anything. */
+const INLINE_MAX = 58
+
 /** Top-level keys in reading order, with the sub-keys kept for objects. */
 const SHAPE: Array<[key: string, sub?: string[]]> = [
   ["valid"],
@@ -67,7 +71,8 @@ function pair(key: string, value: unknown): Token[] {
  */
 export function responseLines(payload: unknown): Line[] {
   const src: Obj = isObj(payload) ? payload : {}
-  const body: Line[] = []
+  // one entry per top-level key: a single line, or the lines of a block
+  const body: Line[][] = []
   for (const [key, sub] of SHAPE) {
     if (!(key in src)) continue
     const value = src[key]
@@ -80,16 +85,32 @@ export function responseLines(payload: unknown): Line[] {
         line.push(...pair(k, value[k]))
       })
       line.push({ text: " }" })
-      body.push(line)
+      const width = line.reduce((n, t) => n + t.text.length, 2)
+      if (width <= INLINE_MAX) {
+        body.push([line])
+      } else {
+        const block: Line[] = [[{ text: JSON.stringify(key), cls: "k" }, { text: ": {" }]]
+        kept.forEach((k, i) => {
+          block.push([{ text: "    " }, ...pair(k, value[k]), ...(i < kept.length - 1 ? [{ text: "," }] : [])])
+        })
+        block.push([{ text: "  }" }])
+        body.push(block)
+      }
     } else if (!sub) {
-      body.push(pair(key, value))
+      body.push([pair(key, value)])
     }
   }
-  return [
-    [{ text: "{" }],
-    ...body.map((line, i) => (i < body.length - 1 ? [{ text: "  " }, ...line, { text: "," }] : [{ text: "  " }, ...line])),
-    [{ text: "}" }],
-  ]
+  const out: Line[] = [[{ text: "{" }]]
+  body.forEach((group, gi) => {
+    const last = gi === body.length - 1
+    group.forEach((line, li) => {
+      const closing = li === group.length - 1
+      const indented = group.length === 1 || li === 0 ? [{ text: "  " }, ...line] : line
+      out.push(closing && !last ? [...indented, { text: "," }] : indented)
+    })
+  })
+  out.push([{ text: "}" }])
+  return out
 }
 
 /** The server-side processing time the API reports, or null when absent. */

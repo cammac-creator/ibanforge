@@ -258,6 +258,27 @@
       "docsTitle": "Machine-readable docs",
       "docsBody": "OpenAPI spec, structured data and a plain-text summary built for crawlers and agents."
     },
+    "deadline": {
+      "eyebrow": "Deadline",
+      "heading": "14 November 2026: Switzerland stops processing unstructured addresses",
+      "text": "From 14 November 2026, SIX no longer processes payments whose address fails the structured or hybrid rules; the Eurosystem and the EPC hold the same weekend, Swift suspended its date on 27 August 2026. POST /v1/address/check tells you for free whether an address passes the Swiss, HVPS+ or Fedwire rules, naming the document; the file audit runs a whole workbook.",
+      "cta": "Read the rules, rail by rail"
+    },
+    "integrations": {
+        "heading": "In your language, your ERP, your spreadsheet",
+        "sub": "Every package below exists and installs today. What is not published yet says so.",
+        "items": {
+              "ts": "TypeScript / JavaScript SDK",
+              "py": "Python SDK",
+              "java": "Java 17+ SDK · Maven Central",
+              "dotnet": ".NET 8 SDK · from source, NuGet pending",
+              "mcp": "MCP server · Claude, Cursor, Cline",
+              "n8n": "n8n node",
+              "odoo": "Odoo 18 module · BIC and bank filled as you type",
+              "sheets": "Google Sheets add-on",
+              "postman": "Postman collection"
+        }
+    },
     "audit": {
       "heading": "Paying suppliers? Audit your creditor file",
       "text": "Upload the CSV or XLSX you pay from. Free preview of what the bank would reject, then 149 CHF for the annotated workbook, at once.",

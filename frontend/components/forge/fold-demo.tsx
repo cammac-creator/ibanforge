@@ -29,7 +29,8 @@ import { groupIban, isShowable, responseLines, serverMs } from "@/lib/forge/resp
 type Phase = "static" | "typing" | "calling" | "live" | "captured"
 
 const CACHE_KEY = "ibf-fold-demo"
-const CALL_TIMEOUT_MS = 2_500
+// Measured live on 2026-09-04: a cold relay + API round trip took ~2 s.
+const CALL_TIMEOUT_MS = 4_000
 const TYPE_EVERY_MS = 34
 
 interface Cached {

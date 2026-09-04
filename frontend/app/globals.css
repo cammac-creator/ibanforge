@@ -586,6 +586,19 @@
   --fedge: #6b6058;
   --fedge-lit: rgba(255, 247, 237, 0.07);
   --fshadow: 0 16px 36px -14px rgba(0, 0, 0, 0.7);
+  /* Surfaces (audit 2026-09-04, L4): the page was one flat black. Three
+     planes now — coal (page), forge (card), anvil (band) — each a step the
+     eye can tell apart under a raking light. */
+  --fforge: #17140f;
+  --fanvil: #221d18;
+  /* Type scale, ratio 1.25 on a 17 px body (M2). Seven sizes between 10.6
+     and 14 px were noise; this is a scale. */
+  --t-h2: clamp(1.9rem, 3.4vw, 2.75rem);
+  --t-h3: 1.2rem;
+  --t-body: 1.0625rem;
+  --t-small: 0.9375rem;
+  --t-mono: 0.875rem;
+  --t-label: 0.75rem;
   background: var(--coal);
   color: var(--hot);
   font-family: var(--font-sans);
@@ -593,7 +606,7 @@
 }
 .forge .eyebrow {
   font-family: var(--font-mono);
-  font-size: 0.72rem;
+  font-size: var(--t-label);
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--amber-500);
@@ -1150,6 +1163,7 @@
 .forge .stats-band {
   border-bottom: 1px solid var(--fst-2);
   padding: clamp(2.5rem, 6vh, 4rem) 0;
+  background: var(--fanvil);
 }
 .forge .sect {
   padding: clamp(3.5rem, 10vh, 6.5rem) 0;
@@ -1158,28 +1172,31 @@
   font-family: var(--font-bebas);
   font-weight: 400;
   text-transform: uppercase;
-  font-size: clamp(1.7rem, 4.4vw, 2.7rem);
+  font-size: var(--t-h2);
   letter-spacing: 0.01em;
   text-align: center;
+  text-wrap: balance;
+}
+.forge .sect-h-left {
+  text-align: left;
+  margin-top: 0.6rem;
 }
 .forge .sect-sub {
   text-align: center;
   color: var(--ffg-2);
-  font-size: 0.95rem;
+  font-size: var(--t-body);
   margin-top: 0.7rem;
-  max-width: 38rem;
+  max-width: 40rem;
   margin-inline: auto;
+  text-wrap: pretty;
 }
+/* Two columns, not three (M2): 296 px of 14 px text gave 42–48 characters a
+   line and a ragged edge; ~62 characters at 17 px reads like prose. */
 .forge .plaques {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 1.2rem;
   margin-top: 2.6rem;
-}
-@media (max-width: 980px) {
-  .forge .plaques {
-    grid-template-columns: repeat(2, 1fr);
-  }
 }
 @media (max-width: 620px) {
   .forge .plaques {
@@ -1199,7 +1216,7 @@
 .forge .plaque-badge {
   align-self: flex-start;
   font-family: var(--font-mono);
-  font-size: 0.66rem;
+  font-size: var(--t-label);
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--amber-500);
@@ -1208,13 +1225,15 @@
   padding: 0.22rem 0.55rem;
 }
 .forge .plaque h3 {
-  font-size: 1.05rem;
+  font-size: var(--t-h3);
   letter-spacing: -0.01em;
   font-weight: 600;
 }
 .forge .plaque p {
   color: var(--ffg-2);
-  font-size: 0.875rem;
+  font-size: var(--t-body);
+  max-width: 62ch;
+  text-wrap: pretty;
 }
 .forge .ep-list {
   display: flex;
@@ -1256,8 +1275,8 @@
   font-size: clamp(0.78rem, 1.8vw, 0.9rem);
 }
 .forge .ep-d {
-  color: var(--ffg-3);
-  font-size: 0.78rem;
+  color: var(--ffg-2);
+  font-size: var(--t-small);
   flex-basis: 100%;
 }
 @media (min-width: 720px) {
@@ -1275,6 +1294,86 @@
   border: 1px dashed var(--fst-3);
   border-radius: 6px;
   padding: 0.25rem 0.6rem;
+  white-space: nowrap;
+}
+
+/* The dated trigger, as a band of its own. */
+.forge .deadline {
+  border-block: 1px solid var(--fst-2);
+  background: linear-gradient(180deg, var(--fanvil), var(--fforge));
+  padding: clamp(3rem, 8vh, 5rem) 0;
+}
+.forge .deadline-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+  gap: clamp(1.5rem, 4vw, 4rem);
+  align-items: start;
+}
+@media (max-width: 860px) {
+  .forge .deadline-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.forge .deadline-text {
+  color: var(--ffg-2);
+  font-size: var(--t-body);
+  max-width: 60ch;
+  text-wrap: pretty;
+}
+.forge .deadline .hero-cta {
+  margin-top: 1.4rem;
+}
+
+/* Integrations: one row per package, the command as the object. */
+.forge .integ-grid {
+  list-style: none;
+  margin: 2.4rem 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.9rem;
+}
+@media (max-width: 980px) {
+  .forge .integ-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (max-width: 560px) {
+  .forge .integ-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.forge .integ-link {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-height: 100%;
+  border: 1px solid var(--fedge);
+  border-radius: 10px;
+  background: var(--fforge);
+  box-shadow: inset 0 1px 0 var(--fedge-lit);
+  padding: 1rem 1.1rem;
+  color: var(--hot);
+  text-decoration: none;
+  transition: border-color var(--dur-2) var(--ease-std);
+}
+.forge .integ-link:hover,
+.forge .integ-link:focus-visible {
+  border-color: rgba(245, 158, 11, 0.55);
+}
+.forge .integ-name {
+  font-size: var(--t-small);
+  font-weight: 600;
+}
+.forge .integ-cmd {
+  font-family: var(--font-mono);
+  font-size: var(--t-mono);
+  color: var(--amber-500);
+  background: #0a0908;
+  border: 1px solid var(--fst-2);
+  border-radius: 6px;
+  padding: 0.4rem 0.6rem;
+  overflow-x: auto;
   white-space: nowrap;
 }
 
@@ -1316,12 +1415,12 @@
   background: rgba(14, 12, 11, 0.85);
 }
 .forge .agent-card h3 {
-  font-size: 1rem;
+  font-size: var(--t-h3);
   font-weight: 600;
 }
 .forge .agent-card p {
   color: var(--ffg-2);
-  font-size: 0.85rem;
+  font-size: var(--t-body);
 }
 .forge .agent-code {
   font-family: var(--font-mono);
@@ -1347,8 +1446,9 @@
 }
 
 .forge .trust-band {
-  padding: clamp(3rem, 8vh, 5rem) 0;
-  border-bottom: 1px solid var(--fst-2);
+  padding: clamp(2.4rem, 6vh, 3.6rem) 0;
+  border-block: 1px solid var(--fst-2);
+  background: var(--fforge);
 }
 .forge .trust-grid {
   display: grid;
@@ -1364,13 +1464,13 @@
 }
 .forge .trust-v {
   font-family: var(--font-mono);
-  font-size: 0.78rem;
+  font-size: var(--t-mono);
   line-height: 1.9;
   color: var(--ffg-2);
   text-wrap: balance;
 }
 .forge .trust-n {
-  font-size: 0.72rem;
+  font-size: var(--t-small);
   color: var(--ffg-3);
 }
 .forge .trust-n a {
@@ -1398,7 +1498,7 @@
 }
 .forge .reviewed .ctx {
   color: var(--ffg-2);
-  font-size: 0.875rem;
+  font-size: var(--t-body);
   max-width: 38rem;
   margin: 0.9rem auto 0;
 }
@@ -1407,7 +1507,7 @@
   gap: 1.6rem;
   justify-content: center;
   margin-top: 1.1rem;
-  font-size: 0.78rem;
+  font-size: var(--t-small);
 }
 .forge .reviewed .links a {
   color: var(--ffg-3);

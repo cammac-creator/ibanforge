@@ -4,6 +4,43 @@ import { useEffect, useRef, type ReactNode } from "react"
 import { cn } from "@/lib/utils"
 
 /**
+ * One IntersectionObserver for every Reveal on the page (audit 2026-09-04,
+ * M8): the home mounted sixteen of them. Elements register with a callback;
+ * the observer is created on first use and dropped when the last one leaves.
+ */
+let shared: IntersectionObserver | null = null
+const pending = new Map<Element, () => void>()
+
+function observe(el: Element, onEnter: () => void): () => void {
+  if (!shared) {
+    shared = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue
+          const cb = pending.get(entry.target)
+          if (cb) {
+            pending.delete(entry.target)
+            shared?.unobserve(entry.target)
+            cb()
+          }
+        }
+      },
+      { threshold: 0.12, rootMargin: "0px 0px -8% 0px" },
+    )
+  }
+  pending.set(el, onEnter)
+  shared.observe(el)
+  return () => {
+    pending.delete(el)
+    shared?.unobserve(el)
+    if (pending.size === 0) {
+      shared?.disconnect()
+      shared = null
+    }
+  }
+}
+
+/**
  * Sober scroll-reveal. Fades + lifts its children into place once they enter
  * the viewport (fade + translateY 12→0, --dur-4 / --ease-out).
  *
@@ -36,19 +73,7 @@ export function Reveal({
       return
     }
 
-    const io = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          if (entry.isIntersecting) {
-            entry.target.classList.add("is-in")
-            io.unobserve(entry.target)
-          }
-        }
-      },
-      { threshold: 0.12, rootMargin: "0px 0px -8% 0px" }
-    )
-    io.observe(el)
-    return () => io.disconnect()
+    return observe(el, () => el.classList.add("is-in"))
   }, [])
 
   return (
