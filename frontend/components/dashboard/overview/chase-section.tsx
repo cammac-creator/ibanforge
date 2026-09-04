@@ -156,6 +156,15 @@ export async function ChaseSection({
             one is a link now, which is the whole difference between a table
             and a workstation. */}
         <div className="mt-3 flex flex-wrap items-baseline gap-x-1 gap-y-1 border-t border-[var(--ink-4)]/60 pt-2.5">
+          {/* Named as what they are: states of the mail threads over the whole
+              base. The list above is the activation queue of the client rows,
+              another population — dealing with its six lines does not lower
+              these numbers, and a reader deserved to be told. */}
+          {snap && (
+            <span className="mr-1 text-[11px] uppercase tracking-wide text-[var(--fg-4)]">
+              {t('chase.countersLead')}
+            </span>
+          )}
           {snap ? (
             <>
               {/* Each counter lands on the rows it counts: the URL carries the

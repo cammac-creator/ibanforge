@@ -579,6 +579,7 @@
         "ready": "mails ready to send",
         "freeActive": "active free users to convert",
         "sentToday": "sent today",
+        "countersLead": "Mail threads, whole base:",
         "sentCapped": "sent today — cap reached, prospecting closed until tomorrow",
         "crmDown": "Contact base unreadable: counters unavailable, and that is not a zero.",
         "reason": {
