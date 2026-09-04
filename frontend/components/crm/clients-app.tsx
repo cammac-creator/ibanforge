@@ -540,26 +540,34 @@ export function ClientsApp({
                           .map((c) => `${flag(c.code)} ${c.code}`)
                           .join('  ') + (d.countries.length > 3 ? ' …' : '')}
                   </span>
-                  <span className="w-14 text-right text-[12px]">
-                    {d.mails.sent + d.mails.received > 0 ? (
-                      <a
-                        href={contactsHref(locale, d.id)}
-                        onClick={(e) => e.stopPropagation()}
-                        title="Ouvrir son fil dans Contacts"
-                        className="text-amber-400 hover:underline"
-                      >
-                        {d.mails.sent + d.mails.received}
-                      </a>
-                    ) : (
-                      <a
-                        href={contactsHref(locale, d.id)}
-                        onClick={(e) => e.stopPropagation()}
-                        title="Écrire dans Contacts"
-                        className="text-[var(--fg-4)] hover:text-amber-400"
-                      >
-                        écrire
-                      </a>
-                    )}
+                  {/* The count is a statistic and the word is the action, on
+                      every row alike. A number that was secretly a button, and
+                      a word that appeared only on rows with nothing to show,
+                      had the affordance inverted: the client with nineteen
+                      mails, the one worth a follow-up, showed no verb at all. */}
+                  <span className="flex w-[4.5rem] items-baseline justify-end gap-1.5 text-[12px]">
+                    <span
+                      className={
+                        d.mails.sent + d.mails.received > 0
+                          ? 'tabular-nums text-[var(--fg-2)]'
+                          : 'text-[var(--fg-5)]'
+                      }
+                      title={
+                        d.mails.sent + d.mails.received > 0
+                          ? `${d.mails.sent} envoyé${d.mails.sent > 1 ? 's' : ''}, ${d.mails.received} reçu${d.mails.received > 1 ? 's' : ''}`
+                          : 'aucun échange'
+                      }
+                    >
+                      {d.mails.sent + d.mails.received > 0 ? d.mails.sent + d.mails.received : '—'}
+                    </span>
+                    <a
+                      href={contactsHref(locale, d.id)}
+                      onClick={(e) => e.stopPropagation()}
+                      title="Écrire dans Contacts : ouvre son fil, le composeur en bas"
+                      className="text-amber-400 hover:underline"
+                    >
+                      écrire
+                    </a>
                     {d.mails.hasDraft && (
                       <span
                         className="ml-1 text-[var(--warn)]"

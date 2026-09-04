@@ -43,7 +43,12 @@ function initialsOf(d: ClientDossier): string {
 function shortDate(raw: string | null): string | null {
   const t = parseUtc(raw);
   if (!t) return null;
-  return t.toLocaleDateString('fr-CH', { day: '2-digit', month: '2-digit', year: '2-digit', timeZone: 'Europe/Zurich' });
+  return t.toLocaleDateString('fr-CH', {
+    day: '2-digit',
+    month: '2-digit',
+    year: '2-digit',
+    timeZone: 'Europe/Zurich',
+  });
 }
 
 /** The relationship's milestones on one line: signup → first call → today. */
@@ -66,7 +71,12 @@ function Journey({ d, now }: { d: ClientDossier; now: Date }) {
         {steps.map((s, i) => (
           <div key={`${s.label}-${i}`} className="relative min-w-[104px] flex-1 px-1 pt-4">
             {/* the thread of the story, drawn from dot to dot */}
-            {i > 0 && <span className="absolute right-1/2 top-[7px] h-px w-full bg-[var(--ink-4)]" aria-hidden />}
+            {i > 0 && (
+              <span
+                className="absolute right-1/2 top-[7px] h-px w-full bg-[var(--ink-4)]"
+                aria-hidden
+              />
+            )}
             <span
               className="absolute left-1/2 top-1 h-[9px] w-[9px] -translate-x-1/2 rounded-full ring-4 ring-[var(--ink-1)]"
               style={{ backgroundColor: s.colour }}
@@ -74,10 +84,15 @@ function Journey({ d, now }: { d: ClientDossier; now: Date }) {
             />
             <div className="text-center">
               <div className="text-[11px] font-medium text-[var(--fg-3)]">{s.label}</div>
-              <div className="font-mono text-[11px] tabular-nums text-[var(--fg-5)]" title={s.at ?? undefined}>
+              <div
+                className="font-mono text-[11px] tabular-nums text-[var(--fg-5)]"
+                title={s.at ?? undefined}
+              >
                 {shortDate(s.at)}
               </div>
-              <div className="text-[10.5px] text-[var(--fg-5)]">{relativeDays(calendarDaysSince(s.t, now))}</div>
+              <div className="text-[10.5px] text-[var(--fg-5)]">
+                {relativeDays(calendarDaysSince(s.t, now))}
+              </div>
             </div>
           </div>
         ))}
@@ -98,7 +113,8 @@ export function ClientDossierModal({
   onClose: () => void;
 }) {
   const now = new Date();
-  const errRate = d.requests > 0 ? Math.round(((d.badInput + d.serverError) / d.requests) * 100) : 0;
+  const errRate =
+    d.requests > 0 ? Math.round(((d.badInput + d.serverError) / d.requests) * 100) : 0;
   const topCountry = d.countries[0];
   const attributed = d.countries.reduce((s, c) => s + c.count, 0);
   const quality = qualityTrend(d, now);
@@ -159,7 +175,9 @@ export function ClientDossierModal({
             <span
               aria-hidden
               className="flex h-14 w-14 shrink-0 select-none items-center justify-center rounded-xl text-lg font-black tracking-tight text-white/90 shadow-inner"
-              style={{ background: `linear-gradient(135deg, hsl(${hue} 65% 42%), hsl(${(hue + 42) % 360} 60% 28%))` }}
+              style={{
+                background: `linear-gradient(135deg, hsl(${hue} 65% 42%), hsl(${(hue + 42) % 360} 60% 28%))`,
+              }}
             >
               {initialsOf(d)}
             </span>
@@ -180,14 +198,18 @@ export function ClientDossierModal({
                 {heat.score >= 40 && (
                   <span
                     className="shrink-0 text-[12px]"
-                    title={heat.parts.map((p) => `${p.label} ${p.points > 0 ? '+' : ''}${p.points}`).join(' · ')}
+                    title={heat.parts
+                      .map((p) => `${p.label} ${p.points > 0 ? '+' : ''}${p.points}`)
+                      .join(' · ')}
                   >
                     🔥 {heat.score}
                   </span>
                 )}
               </div>
               <div className="mt-0.5 flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-0.5">
-                <span className="min-w-0 truncate font-mono text-[12.5px] text-[var(--fg-3)]">{d.email}</span>
+                <span className="min-w-0 truncate font-mono text-[12.5px] text-[var(--fg-3)]">
+                  {d.email}
+                </span>
                 {d.website && (
                   <a
                     href={d.website}
@@ -204,7 +226,11 @@ export function ClientDossierModal({
                   </span>
                 )}
               </div>
-              {d.whatTheyDo && <p className="mt-1 text-[12.5px] italic leading-snug text-[var(--fg-4)]">{d.whatTheyDo}</p>}
+              {d.whatTheyDo && (
+                <p className="mt-1 text-[12.5px] italic leading-snug text-[var(--fg-4)]">
+                  {d.whatTheyDo}
+                </p>
+              )}
             </div>
           </div>
 
@@ -212,10 +238,16 @@ export function ClientDossierModal({
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <span
               className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[12.5px] font-medium"
-              style={{ color: verdict.colour, borderColor: 'color-mix(in srgb, currentColor 35%, transparent)' }}
+              style={{
+                color: verdict.colour,
+                borderColor: 'color-mix(in srgb, currentColor 35%, transparent)',
+              }}
               title={verdict.why}
             >
-              <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: verdict.colour }} />
+              <span
+                className="h-1.5 w-1.5 rounded-full"
+                style={{ backgroundColor: verdict.colour }}
+              />
               {verdict.one}
               {state.derived ? '°' : ''}
             </span>
@@ -234,7 +266,7 @@ export function ClientDossierModal({
               href={contactsHref(locale, d.id)}
               className="shrink-0 rounded-md border border-[var(--amber-500)]/40 px-2.5 py-1 text-[12.5px] font-medium text-[var(--amber-400)] hover:bg-[var(--amber-500)]/10"
             >
-              ✉ Ouvrir son fil
+              ✉ Écrire
             </Link>
           </div>
         </div>
@@ -251,28 +283,38 @@ export function ClientDossierModal({
                 {d.authOrQuota > 0 ? `${d.authOrQuota} quota/auth (401/429)` : ''}
                 {d.authOrQuota > 0 && d.paywall > 0 ? ' · ' : ''}
                 {d.paywall > 0 ? `${d.paywall} paywall (402)` : ''}
-                {d.rejectReasons[0] ? ` · motif : ${d.rejectReasons[0].reason}` : ''}.
-                Dernier appel servi le {d.lastSuccessAt?.slice(0, 10) ?? '—'}. Tant qu&apos;ils n&apos;ont pas réussi un
-                appel, ils croient leur compte fermé.
+                {d.rejectReasons[0] ? ` · motif : ${d.rejectReasons[0].reason}` : ''}. Dernier appel
+                servi le {d.lastSuccessAt?.slice(0, 10) ?? '—'}. Tant qu&apos;ils n&apos;ont pas
+                réussi un appel, ils croient leur compte fermé.
               </p>
               {d.keys
                 .filter((k) => k.plan === 'free' && k.active)
                 .map((k) => (
-                  <RaiseLimitControl key={k.prefix} prefix={k.prefix} currentLimit={k.monthlyLimit ?? 200} />
+                  <RaiseLimitControl
+                    key={k.prefix}
+                    prefix={k.prefix}
+                    currentLimit={k.monthlyLimit ?? 200}
+                  />
                 ))}
             </div>
           )}
           {d.verdict === 'struggling' && (
             <div className="rounded-lg border border-[var(--warn)]/40 bg-[var(--warn)]/10 px-3 py-2 text-[13px] leading-snug text-[var(--fg-2)]">
-              <span className="font-semibold text-[var(--warn)]">Leur intégration bute</span> — plus de 30 %
-              d&apos;appels rejetés. Voir « Ce qui leur est refusé » : souvent un format d&apos;entrée, pas une panne.
+              <span className="font-semibold text-[var(--warn)]">Leur intégration bute</span> — plus
+              de 30 % d&apos;appels rejetés. Voir « Ce qui leur est refusé » : souvent un format
+              d&apos;entrée, pas une panne.
             </div>
           )}
           {quality && (quality.thisWeekPct >= 10 || quality.prevWeekPct >= 10) && (
             <p className="rounded-lg border border-amber-500/25 bg-amber-500/[0.06] px-3 py-2 text-[12.5px] leading-snug text-amber-200">
               ⚠ Qualité : <b>{quality.thisWeekPct} %</b> de bad input cette semaine, contre{' '}
               <b>{quality.prevWeekPct} %</b> avant
-              {quality.topReason ? <> · motif : <span className="font-mono">{quality.topReason}</span></> : null}
+              {quality.topReason ? (
+                <>
+                  {' '}
+                  · motif : <span className="font-mono">{quality.topReason}</span>
+                </>
+              ) : null}
               {quality.thisWeekPct > quality.prevWeekPct + 5
                 ? ' — intégration qui régresse, un mail d’aide vaut le coup.'
                 : quality.thisWeekPct < quality.prevWeekPct - 5
@@ -282,8 +324,16 @@ export function ClientDossierModal({
           )}
 
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-            <Stat label="Requêtes" value={String(d.requests)} hint={`${d.ok} servies · ${windowDays} j`} />
-            <Stat label="Mur payant" value={String(d.paywall + d.authOrQuota)} hint="402 · 401 · 429" />
+            <Stat
+              label="Requêtes"
+              value={String(d.requests)}
+              hint={`${d.ok} servies · ${windowDays} j`}
+            />
+            <Stat
+              label="Mur payant"
+              value={String(d.paywall + d.authOrQuota)}
+              hint="402 · 401 · 429"
+            />
             <Stat label="Rejets" value={`${errRate} %`} hint={`${d.badInput} en 400`} />
             <Stat label="Latence p95" value={`${d.p95Ms} ms`} hint={`${d.avgMs} ms en moy.`} />
             <Stat label="Machines" value={String(d.distinctIps)} hint="empreintes IP" />
@@ -320,11 +370,14 @@ export function ClientDossierModal({
           </Section>
 
           <div className="grid gap-6 sm:grid-cols-2">
-            <Section title="Pays contrôlés" note={attributed > 0 ? `${attributed} rattachés` : undefined}>
+            <Section
+              title="Pays contrôlés"
+              note={attributed > 0 ? `${attributed} rattachés` : undefined}
+            >
               {d.countries.length === 0 ? (
                 <Empty>
-                  Aucun contrôle rattaché. Le rattachement pays↔client existe depuis le 30/07/2026 ; avant cette date
-                  seules les requêtes isolables ont pu être reconstituées.
+                  Aucun contrôle rattaché. Le rattachement pays↔client existe depuis le 30/07/2026 ;
+                  avant cette date seules les requêtes isolables ont pu être reconstituées.
                 </Empty>
               ) : (
                 <>
@@ -354,14 +407,24 @@ export function ClientDossierModal({
               {d.endpoints.length === 0 ? (
                 <Empty>Aucun appel enregistré.</Empty>
               ) : (
-                d.endpoints.slice(0, 8).map((e) => <Bar key={e.path} label={e.path} value={e.count} max={d.endpoints[0].count} />)
+                d.endpoints
+                  .slice(0, 8)
+                  .map((e) => (
+                    <Bar key={e.path} label={e.path} value={e.count} max={d.endpoints[0].count} />
+                  ))
               )}
             </Section>
 
             {d.rejectReasons.length > 0 && (
               <Section title="Ce qui leur est refusé">
                 {d.rejectReasons.slice(0, 6).map((r) => (
-                  <Bar key={r.reason} label={r.reason} value={r.count} max={d.rejectReasons[0].count} tone="sky" />
+                  <Bar
+                    key={r.reason}
+                    label={r.reason}
+                    value={r.count}
+                    max={d.rejectReasons[0].count}
+                    tone="sky"
+                  />
                 ))}
               </Section>
             )}
@@ -396,17 +459,31 @@ export function ClientDossierModal({
             <div className="grid gap-2 sm:grid-cols-2">
               {d.keys.map((k) => {
                 const limit = k.creditsTotal ?? k.monthlyLimit ?? 200;
-                const used = k.creditsTotal != null ? k.creditsTotal - (k.creditsRemaining ?? 0) : k.usedThisMonth;
+                const used =
+                  k.creditsTotal != null
+                    ? k.creditsTotal - (k.creditsRemaining ?? 0)
+                    : k.usedThisMonth;
                 const pct = limit > 0 ? Math.min(100, Math.round((used / limit) * 100)) : 0;
                 return (
-                  <div key={k.prefix} className="rounded-lg border border-[var(--ink-4)]/60 bg-[var(--ink-2)]/50 px-3 py-2">
+                  <div
+                    key={k.prefix}
+                    className="rounded-lg border border-[var(--ink-4)]/60 bg-[var(--ink-2)]/50 px-3 py-2"
+                  >
                     <div className="flex items-center justify-between gap-2">
-                      <span className="min-w-0 truncate font-mono text-[12px] text-[var(--fg-2)]">{k.prefix}</span>
+                      <span className="min-w-0 truncate font-mono text-[12px] text-[var(--fg-2)]">
+                        {k.prefix}
+                      </span>
                       <span className="flex shrink-0 items-center gap-1.5">
                         <span className="rounded border border-[var(--ink-5)] px-1 py-px text-[11px] uppercase text-[var(--fg-4)]">
-                          {k.plan === 'credits' ? 'crédits' : k.plan === 'paid' ? 'payant' : 'gratuit'}
+                          {k.plan === 'credits'
+                            ? 'crédits'
+                            : k.plan === 'paid'
+                              ? 'payant'
+                              : 'gratuit'}
                         </span>
-                        {!k.active && <span className="text-[12px] text-[var(--err)]">révoquée</span>}
+                        {!k.active && (
+                          <span className="text-[12px] text-[var(--err)]">révoquée</span>
+                        )}
                       </span>
                     </div>
                     <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-[var(--ink-4)]">
@@ -414,7 +491,8 @@ export function ClientDossierModal({
                         className="block h-full rounded-full"
                         style={{
                           width: `${pct}%`,
-                          backgroundColor: pct >= 100 ? 'var(--err)' : pct >= 80 ? 'var(--warn)' : 'var(--ok)',
+                          backgroundColor:
+                            pct >= 100 ? 'var(--err)' : pct >= 80 ? 'var(--warn)' : 'var(--ok)',
                         }}
                       />
                     </div>
@@ -449,7 +527,8 @@ export function ClientDossierModal({
                   </div>
                   {d.mails.lastAt && (
                     <div className="min-w-0 truncate">
-                      Dernier le <span className="text-[var(--fg-2)]">{d.mails.lastAt.slice(0, 10)}</span>
+                      Dernier le{' '}
+                      <span className="text-[var(--fg-2)]">{d.mails.lastAt.slice(0, 10)}</span>
                       {d.mails.lastSubject && <> · « {d.mails.lastSubject} »</>}
                     </div>
                   )}

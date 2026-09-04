@@ -87,8 +87,12 @@ export function OrphanFullText({
     );
   }
 
+  // No inner scroll: the page already scrolls, and two columns each scrolling
+  // on their own desynchronised the side-by-side reading at the first screen
+  // (three scrollbars for one mail). The French is what is read; it gets the
+  // reading size, the original the reference size.
   const block =
-    'max-h-80 overflow-y-auto whitespace-pre-wrap rounded border border-[var(--ink-4)]/60 bg-[var(--ink-0)] p-2.5 text-[12.5px] leading-relaxed';
+    'whitespace-pre-wrap rounded border border-[var(--ink-4)]/60 bg-[var(--ink-0)] p-2.5 leading-relaxed wrap-anywhere';
 
   return (
     <details className="mt-1.5">
@@ -115,7 +119,7 @@ export function OrphanFullText({
             )}
           </div>
           {fr ? (
-            <div className={`${block} text-[var(--fg-1)]`}>{fr}</div>
+            <div className={`${block} text-[14px] text-[var(--fg-1)]`}>{fr}</div>
           ) : (
             <p className="text-[11.5px] text-[var(--fg-4)]">traduction à venir</p>
           )}
@@ -124,7 +128,7 @@ export function OrphanFullText({
           <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--fg-3)]">
             Original{lang ? ` (${lang})` : ''}
           </div>
-          <div className={`${block} text-[var(--fg-2)]`}>{body}</div>
+          <div className={`${block} text-[12.5px] text-[var(--fg-2)]`}>{body}</div>
         </div>
       </div>
     </details>
