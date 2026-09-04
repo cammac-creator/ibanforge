@@ -135,11 +135,13 @@ export function CrmApp({
       ? { population: 'all', refine: 'prospect' }
       : vue === 'correspondances'
         ? { population: 'institution' }
-        : vue === 'reponses'
-          ? { population: 'all', work: 'reply' }
-          : vue === 'relances'
-            ? { population: 'all', work: 'followup' }
-            : undefined;
+        : vue === 'enrichir'
+          ? { population: 'all', refine: 'enrich' }
+          : vue === 'reponses'
+            ? { population: 'all', work: 'reply' }
+            : vue === 'relances'
+              ? { population: 'all', work: 'followup' }
+              : undefined;
   const [selectedId, setSelectedId] = useState<string | null>(linked);
   /**
    * The contact the drawer HOLDS, which outlives the one it shows.

@@ -21,7 +21,16 @@ function harvestAgeDays(lastHarvestDay: string | null, todayUtc: string): number
   return Math.max(0, Math.round(ms / 86_400_000));
 }
 
-export function ReservoirCard({ reservoir, todayUtc }: { reservoir: Reservoir; todayUtc: string }) {
+export function ReservoirCard({
+  reservoir,
+  todayUtc,
+  enrichHref,
+}: {
+  reservoir: Reservoir;
+  todayUtc: string;
+  /** Where the files without an address are listed; the count links there when given. */
+  enrichHref?: string;
+}) {
   const { ready, addressable, toEnrich, lastHarvestDay } = reservoir;
   const low = ready < RESERVOIR_LOW;
   const color = low ? '#ef4444' : ready < GAUGE_FULL ? '#f59e0b' : '#14b8a6';
@@ -53,14 +62,24 @@ export function ReservoirCard({ reservoir, todayUtc }: { reservoir: Reservoir; t
           so "healthy" reads as a bar past its own tick, not a number to recall. */}
       <div className="relative mb-2 h-2 overflow-hidden rounded-full bg-[var(--ink-4)]/60">
         <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: color }} />
-        <div className="absolute inset-y-0 left-1/2 w-px bg-white/30" title={`seuil : ${RESERVOIR_LOW}`} />
+        <div
+          className="absolute inset-y-0 left-1/2 w-px bg-white/30"
+          title={`seuil : ${RESERVOIR_LOW}`}
+        />
       </div>
       <p className="text-[11px] leading-snug text-[var(--fg-4)]">
         {toWrite > 0 ? `${toWrite} à rédiger · ` : ''}
-        {toEnrich} à enrichir
-        {age !== null
-          ? ` · moisson ${age === 0 ? "aujourd'hui" : `il y a ${age} j`}`
-          : ''}
+        {enrichHref && toEnrich > 0 ? (
+          <a
+            href={enrichHref}
+            className="underline decoration-dotted underline-offset-2 hover:text-[var(--fg-1)]"
+          >
+            {toEnrich} à enrichir
+          </a>
+        ) : (
+          `${toEnrich} à enrichir`
+        )}
+        {age !== null ? ` · moisson ${age === 0 ? "aujourd'hui" : `il y a ${age} j`}` : ''}
       </p>
     </div>
   );

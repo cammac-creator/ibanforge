@@ -10,7 +10,12 @@ import {
 import { POPULATION_KEYS } from './table-view';
 import type { Contact, InstitutionInfo, Message, ProspectSourcing, Situation } from './types';
 
-function message(direction: Message['direction'], subject: string, snippet: string, msg_date: string): Message {
+function message(
+  direction: Message['direction'],
+  subject: string,
+  snippet: string,
+  msg_date: string,
+): Message {
   return { direction, msg_date, subject, snippet, counterparty: 'acme@example.com' };
 }
 
@@ -153,11 +158,17 @@ describe('mailRows', () => {
   it('sorts the reply filter by longest silence first', () => {
     // The only real contribution of the removed day rail, kept as a behaviour
     // of this filter rather than as a column of its own.
-    const two = { ...input, situations: {
-      'alpha@example.com': situation({ ballInCourt: 'us', silenceDays: 2 }),
-      'beta@example.com': situation({ ballInCourt: 'us', silenceDays: 40 }),
-    } };
-    expect(mailRows(two, 'reply').map((r) => r.id)).toEqual(['beta@example.com', 'alpha@example.com']);
+    const two = {
+      ...input,
+      situations: {
+        'alpha@example.com': situation({ ballInCourt: 'us', silenceDays: 2 }),
+        'beta@example.com': situation({ ballInCourt: 'us', silenceDays: 40 }),
+      },
+    };
+    expect(mailRows(two, 'reply').map((r) => r.id)).toEqual([
+      'beta@example.com',
+      'alpha@example.com',
+    ]);
   });
 
   it('puts an unread thread above a longer silence', () => {
@@ -174,7 +185,10 @@ describe('mailRows', () => {
         'beta@example.com': situation({ ballInCourt: 'us', silenceDays: 40 }),
       },
     };
-    expect(mailRows(two, 'reply').map((r) => r.id)).toEqual(['alpha@example.com', 'beta@example.com']);
+    expect(mailRows(two, 'reply').map((r) => r.id)).toEqual([
+      'alpha@example.com',
+      'beta@example.com',
+    ]);
   });
 
   it('carries unread onto the row under every filter', () => {
@@ -198,7 +212,10 @@ describe('mailRows', () => {
         'beta@example.com': situation({ ballInCourt: 'us', silenceDays: 5 }),
       },
     };
-    expect(mailRows(tied, 'reply').map((r) => r.id)).toEqual(['alpha@example.com', 'beta@example.com']);
+    expect(mailRows(tied, 'reply').map((r) => r.id)).toEqual([
+      'alpha@example.com',
+      'beta@example.com',
+    ]);
   });
 
   it('sorts every other filter by most recent first', () => {
@@ -207,7 +224,10 @@ describe('mailRows', () => {
     // fail here rather than hide behind sort stability. This is the order of
     // "Tous", so nothing else pins it.
     const both = { ...input, contacts: [beta, alpha] };
-    expect(mailRows(both, 'all').map((r) => r.id)).toEqual(['alpha@example.com', 'beta@example.com']);
+    expect(mailRows(both, 'all').map((r) => r.id)).toEqual([
+      'alpha@example.com',
+      'beta@example.com',
+    ]);
   });
 
   it('marks urgent by filter, not by contact', () => {
@@ -236,10 +256,16 @@ describe('mailRows', () => {
  * ANY predicate, so each filter below is pinned by the ids it returns, which a
  * predicate swapped for () => true or () => false cannot reproduce.
  */
-const newClient = client('gamma@example.com', 'Société Gamma', [
-  message('out', 'Bienvenue', 'Ta clé est prête', '2026-07-20'),
-], true);
+const newClient = client(
+  'gamma@example.com',
+  'Société Gamma',
+  [message('out', 'Bienvenue', 'Ta clé est prête', '2026-07-20')],
+  true,
+);
 const cold = prospect('delta@example.com', 'Société Delta', []);
+// The same file with no address yet: the « À enrichir » chip, and the one
+// row the parity guard needs for that key.
+const coldNoAddress: Contact = { ...prospect('noaddr-rich', 'Sans Adresse SA', []), email: '' };
 const wide: RowsInput = {
   contacts: [alpha, beta, newClient, cold],
   situations: {
@@ -353,10 +379,11 @@ describe('the Prospects population', () => {
   };
 
   it('holds every prospect, written to or not, and no client', () => {
-    expect(mailRows(population, 'prospects').map((r) => r.id).sort()).toEqual([
-      'never@alpha.example.net',
-      'written@alpha.example.net',
-    ]);
+    expect(
+      mailRows(population, 'prospects')
+        .map((r) => r.id)
+        .sort(),
+    ).toEqual(['never@alpha.example.net', 'written@alpha.example.net']);
   });
 
   it('is strictly wider than the À prospecter queue, which is the whole point', () => {
@@ -463,12 +490,25 @@ const judged: Contact = (() => {
 })();
 
 const rich: RowsInput = {
-  contacts: [alpha, beta, newClient, cold, buyer, sleeping, capped, drafted, desk, judged],
+  contacts: [
+    alpha,
+    beta,
+    newClient,
+    cold,
+    coldNoAddress,
+    buyer,
+    sleeping,
+    capped,
+    drafted,
+    desk,
+    judged,
+  ],
   situations: {
     'alpha@example.com': situation({ ballInCourt: 'us', silenceDays: 2 }),
     'beta@example.com': situation({ followupDue: true, silenceDays: 40 }),
     'gamma@example.com': situation({}),
     'delta@example.com': situation({ nextAction: 'first_mail' }),
+    'noaddr-rich': situation({ nextAction: 'first_mail' }),
     'buyer@alpha.example.net': situation({ ballInCourt: 'them', silenceDays: 1, messageCount: 1 }),
     'quiet@alpha.example.net': situation({ silenceDays: 90, messageCount: 1 }),
     'capped@alpha.example.net': situation({ silenceDays: 10, messageCount: 1 }),
@@ -541,9 +581,12 @@ describe('selectedRows', () => {
   it('intersects the population with the work queue', () => {
     // beta is the only follow-up due and it is a client; the segment must keep
     // it and the correspondents' segment must not.
-    expect(selectedRows(withInstitutions, { population: 'clients', work: 'followup' }).map((r) => r.id))
-      .toEqual(['beta@example.com']);
-    expect(selectedRows(withInstitutions, { population: 'institution', work: 'followup' })).toEqual([]);
+    expect(
+      selectedRows(withInstitutions, { population: 'clients', work: 'followup' }).map((r) => r.id),
+    ).toEqual(['beta@example.com']);
+    expect(selectedRows(withInstitutions, { population: 'institution', work: 'followup' })).toEqual(
+      [],
+    );
   });
 
   it('intersects all three axes at once', () => {
@@ -575,7 +618,9 @@ describe('selectedRows', () => {
       'buyer@alpha.example.net',
     ]);
     expect(
-      selectedRows(three, { population: 'clients', work: 'reply', refine: 'paying' }).map((r) => r.id),
+      selectedRows(three, { population: 'clients', work: 'reply', refine: 'paying' }).map(
+        (r) => r.id,
+      ),
     ).toEqual(['buyer@alpha.example.net']);
   });
 
@@ -606,7 +651,9 @@ describe('selectedRows', () => {
       'quiet@alpha.example.net',
     ]);
     // …and the accent follows the queue too, not the segment.
-    expect(selectedRows(two, { population: 'clients', work: 'reply' }).every((r) => r.urgent)).toBe(true);
+    expect(selectedRows(two, { population: 'clients', work: 'reply' }).every((r) => r.urgent)).toBe(
+      true,
+    );
     expect(selectedRows(two, { population: 'clients' }).some((r) => r.urgent)).toBe(false);
   });
 
@@ -629,8 +676,9 @@ describe('selectedRows', () => {
     expect(selectedRows(withArchived, { population: 'prospects' }).map((r) => r.id)).not.toContain(
       'omega@example.com',
     );
-    expect(selectedRows(withArchived, { population: 'all', refine: 'prospect' }).map((r) => r.id))
-      .not.toContain('omega@example.com');
+    expect(
+      selectedRows(withArchived, { population: 'all', refine: 'prospect' }).map((r) => r.id),
+    ).not.toContain('omega@example.com');
   });
 });
 
@@ -729,13 +777,42 @@ describe('business filters and shelves', () => {
   });
 
   it('reply rows carry shelves in the sort order; other filters carry none', () => {
-    const unreadNow = { ...client('u@alpha.example.net', 'U', [message('in', 'Hi', 'x', '2026-08-12 08:00')]), unread: true };
+    const unreadNow = {
+      ...client('u@alpha.example.net', 'U', [message('in', 'Hi', 'x', '2026-08-12 08:00')]),
+      unread: true,
+    };
     const old = client('o@alpha.example.net', 'O', [message('in', 'Old', 'y', '2026-08-01 08:00')]);
-    const fresh = client('f@alpha.example.net', 'F', [message('in', 'New', 'z', '2026-08-11 08:00')]);
+    const fresh = client('f@alpha.example.net', 'F', [
+      message('in', 'New', 'z', '2026-08-11 08:00'),
+    ]);
     const situations: Record<string, Situation> = {
-      'u@alpha.example.net': { ballInCourt: 'us', silenceDays: 0, firstContactAt: null, messageCount: 1, nextAction: 'reply', hasEverReplied: false, lastOutboundAt: null } as unknown as Situation,
-      'o@alpha.example.net': { ballInCourt: 'us', silenceDays: 11, firstContactAt: null, messageCount: 1, nextAction: 'reply', hasEverReplied: false, lastOutboundAt: null } as unknown as Situation,
-      'f@alpha.example.net': { ballInCourt: 'us', silenceDays: 1, firstContactAt: null, messageCount: 1, nextAction: 'reply', hasEverReplied: false, lastOutboundAt: null } as unknown as Situation,
+      'u@alpha.example.net': {
+        ballInCourt: 'us',
+        silenceDays: 0,
+        firstContactAt: null,
+        messageCount: 1,
+        nextAction: 'reply',
+        hasEverReplied: false,
+        lastOutboundAt: null,
+      } as unknown as Situation,
+      'o@alpha.example.net': {
+        ballInCourt: 'us',
+        silenceDays: 11,
+        firstContactAt: null,
+        messageCount: 1,
+        nextAction: 'reply',
+        hasEverReplied: false,
+        lastOutboundAt: null,
+      } as unknown as Situation,
+      'f@alpha.example.net': {
+        ballInCourt: 'us',
+        silenceDays: 1,
+        firstContactAt: null,
+        messageCount: 1,
+        nextAction: 'reply',
+        hasEverReplied: false,
+        lastOutboundAt: null,
+      } as unknown as Situation,
     };
     const input: RowsInput = { contacts: [unreadNow, old, fresh], situations, snoozed: {} };
     const rows = mailRows(input, 'reply');
@@ -851,7 +928,10 @@ const withInstitutions: RowsInput = {
 describe('the Correspondances filter', () => {
   it('holds every institution and nothing else', () => {
     const rows = mailRows(withInstitutions, 'institution');
-    expect(rows.map((r) => r.id).sort()).toEqual(['registry@alpha.example.net', 'scheme@beta.example.net']);
+    expect(rows.map((r) => r.id).sort()).toEqual([
+      'registry@alpha.example.net',
+      'scheme@beta.example.net',
+    ]);
   });
 
   it('counts exactly what it shows, like every other filter', () => {
@@ -864,25 +944,35 @@ describe('the Correspondances filter', () => {
   // head count the owner reads; one in "À prospecter" would invite a cold pitch
   // to a supervisor, which is the more expensive of the two mistakes.
   it('keeps institutions out of the client and prospecting queues', () => {
-    expect(mailRows(withInstitutions, 'clients').map((r) => r.id)).not.toContain('registry@alpha.example.net');
-    expect(mailRows(withInstitutions, 'prospect').map((r) => r.id)).not.toContain('registry@alpha.example.net');
+    expect(mailRows(withInstitutions, 'clients').map((r) => r.id)).not.toContain(
+      'registry@alpha.example.net',
+    );
+    expect(mailRows(withInstitutions, 'prospect').map((r) => r.id)).not.toContain(
+      'registry@alpha.example.net',
+    );
   });
 
   it('keeps them in Tous, where everything is', () => {
-    expect(mailRows(withInstitutions, 'all').map((r) => r.id)).toContain('registry@alpha.example.net');
+    expect(mailRows(withInstitutions, 'all').map((r) => r.id)).toContain(
+      'registry@alpha.example.net',
+    );
   });
 
   it('keeps a waiting institution in À répondre, which is the point of the whole feature', () => {
     // An authority that answered and is waiting on us is the most expensive
     // thing on this page to forget, and that filter asks about the thread
     // rather than about who is on the other end of it.
-    expect(mailRows(withInstitutions, 'reply').map((r) => r.id)).toContain('registry@alpha.example.net');
+    expect(mailRows(withInstitutions, 'reply').map((r) => r.id)).toContain(
+      'registry@alpha.example.net',
+    );
   });
 
   it('carries a draft into the drafts queue like anybody else', () => {
     const drafting = {
       ...withInstitutions,
-      contacts: [{ ...registry, draft: message('draft', 'Réponse', 'En cours', '2026-07-26') } as Contact],
+      contacts: [
+        { ...registry, draft: message('draft', 'Réponse', 'En cours', '2026-07-26') } as Contact,
+      ],
     };
     expect(mailRows(drafting, 'drafts').map((r) => r.id)).toEqual(['registry@alpha.example.net']);
   });
@@ -896,7 +986,9 @@ describe('the Correspondances filter', () => {
 
   it('shows a category nobody foresaw as itself rather than swallowing it', () => {
     // Underscores are a storage convention, not a word: the chip reads as prose.
-    const odd = institution('desk@gamma.example.net', 'Institut Gamma', [], { category: 'banque_regionale' });
+    const odd = institution('desk@gamma.example.net', 'Institut Gamma', [], {
+      category: 'banque_regionale',
+    });
     const rows = mailRows({ contacts: [odd], situations: {}, snoozed: {} }, 'institution');
     expect(rows[0].chip?.label).toBe('banque regionale');
   });
@@ -917,7 +1009,10 @@ describe('the Correspondances filter', () => {
   // answer first.
   it('puts an unread answer first, whatever the dates say', () => {
     const rows = mailRows(withInstitutions, 'institution');
-    expect(rows.map((r) => r.id)).toEqual(['scheme@beta.example.net', 'registry@alpha.example.net']);
+    expect(rows.map((r) => r.id)).toEqual([
+      'scheme@beta.example.net',
+      'registry@alpha.example.net',
+    ]);
   });
 
   it('finds a correspondent by its file line, which is what the operator remembers', () => {
@@ -935,7 +1030,11 @@ describe('the Correspondances filter', () => {
   const waitingOnThem: RowsInput = {
     contacts: [pending],
     situations: {
-      'pending@delta.example.net': situation({ ballInCourt: 'them', silenceDays: 24, followupDue: true }),
+      'pending@delta.example.net': situation({
+        ballInCourt: 'them',
+        silenceDays: 24,
+        followupDue: true,
+      }),
     },
     snoozed: {},
   };
@@ -946,7 +1045,9 @@ describe('the Correspondances filter', () => {
   // asks about the thread and not about the kind, which is what makes this
   // work; a kind test added there one day would break exactly here.
   it('puts an institution whose follow-up is due in Relances', () => {
-    expect(mailRows(waitingOnThem, 'followup').map((r) => r.id)).toEqual(['pending@delta.example.net']);
+    expect(mailRows(waitingOnThem, 'followup').map((r) => r.id)).toEqual([
+      'pending@delta.example.net',
+    ]);
   });
 
   // The money views. A correspondent has no key, so it carries no activation
@@ -973,7 +1074,13 @@ describe('a marked last inbound', () => {
   ]);
   const marked: RowsInput = {
     contacts: [thanked],
-    situations: { 'thanks@epsilon.example.net': situation({ ballInCourt: 'us', silenceDays: 3, messageCount: 2 }) },
+    situations: {
+      'thanks@epsilon.example.net': situation({
+        ballInCourt: 'us',
+        silenceDays: 3,
+        messageCount: 2,
+      }),
+    },
     snoozed: {},
   };
 
@@ -995,11 +1102,18 @@ describe('a marked last inbound', () => {
       contacts: [
         {
           ...thanked,
-          messages: [...thanked.messages, message('out', 'Avec plaisir', 'Bonne continuation', '2026-07-03')],
+          messages: [
+            ...thanked.messages,
+            message('out', 'Avec plaisir', 'Bonne continuation', '2026-07-03'),
+          ],
         },
       ],
       situations: {
-        'thanks@epsilon.example.net': situation({ ballInCourt: 'them', silenceDays: 2, messageCount: 3 }),
+        'thanks@epsilon.example.net': situation({
+          ballInCourt: 'them',
+          silenceDays: 2,
+          messageCount: 3,
+        }),
       },
       snoozed: {},
     };
@@ -1034,7 +1148,11 @@ describe('the follow-up queue is ranked by what a follow-up is worth (TABS-11)',
       'buyer@alpha.example.net': situation({ followupDue: true, silenceDays: 20, messageCount: 1 }),
       'heavy@alpha.example.net': situation({ followupDue: true, silenceDays: 20, messageCount: 1 }),
       'light@alpha.example.net': situation({ followupDue: true, silenceDays: 20, messageCount: 1 }),
-      'nobody@alpha.example.net': situation({ followupDue: true, silenceDays: 20, messageCount: 1 }),
+      'nobody@alpha.example.net': situation({
+        followupDue: true,
+        silenceDays: 20,
+        messageCount: 1,
+      }),
     },
     snoozed: {},
   };
@@ -1052,7 +1170,12 @@ describe('the follow-up queue is ranked by what a follow-up is worth (TABS-11)',
 
   it('counts a buyer as a buyer, not as a stack of packs', () => {
     // Two packs is not twice the reason to write: the rank is on HAVING bought.
-    const two = { ...buyer, email: 'two@alpha.example.net', id: 'two@alpha.example.net', business: money(2, 0) };
+    const two = {
+      ...buyer,
+      email: 'two@alpha.example.net',
+      id: 'two@alpha.example.net',
+      business: money(2, 0),
+    };
     const wider: RowsInput = {
       ...input,
       contacts: [two as Contact, buyer],
@@ -1063,5 +1186,29 @@ describe('the follow-up queue is ranked by what a follow-up is worth (TABS-11)',
     };
     // The pack term ties, so the call counter decides: buyer called, two did not.
     expect(mailRows(wider, 'followup').map((r) => r.id)[0]).toBe('buyer@alpha.example.net');
+  });
+});
+
+describe('« À prospecter » and « À enrichir » split on the address', () => {
+  it('counts a never-contacted prospect under exactly one of the two chips', () => {
+    const withAddress = prospect('cold@gamma.example.net', 'Gamma', []);
+    const noAddress: Contact = { ...prospect('noaddr-1', 'Delta', []), email: '' };
+    const rows: RowsInput = {
+      ...input,
+      contacts: [withAddress, noAddress],
+      situations: {
+        'cold@gamma.example.net': situation({ nextAction: 'first_mail' }),
+        'noaddr-1': situation({ nextAction: 'first_mail' }),
+      },
+    };
+    const count = Object.fromEntries(mailFilters(rows).map((f) => [f.key, f.count]));
+    expect(count.prospect).toBe(1);
+    expect(count.enrich).toBe(1);
+    expect(selectedRows(rows, { population: 'all', refine: 'prospect' }).map((r) => r.id)).toEqual([
+      'cold@gamma.example.net',
+    ]);
+    expect(selectedRows(rows, { population: 'all', refine: 'enrich' }).map((r) => r.id)).toEqual([
+      'noaddr-1',
+    ]);
   });
 });

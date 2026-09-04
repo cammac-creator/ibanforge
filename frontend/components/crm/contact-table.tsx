@@ -316,10 +316,15 @@ export function ContactTable({
               r.group && r.group !== rows[i - 1]?.group ? REPLY_GROUP_LABEL[r.group] : null;
             const flame = flameOf(r.heat);
             const status = rowStatus(r);
+            // On the prospecting chips the right column ranks the row rather
+            // than dating it; a file with no address says so, in the place the
+            // eye already reads, instead of opening on « envoi impossible ».
             const confidence =
-              selection.refine === 'prospect' && r.confidence
-                ? CONFIDENCE_BADGE[r.confidence]
-                : null;
+              (selection.refine === 'prospect' || selection.refine === 'enrich') && !r.email
+                ? { label: 'sans adresse', cls: 'text-[var(--amber-500)]' }
+                : (selection.refine === 'prospect' || selection.refine === 'enrich') && r.confidence
+                  ? CONFIDENCE_BADGE[r.confidence]
+                  : null;
             return (
               // The shelf is a SIBLING of the row's positioned wrapper, not a
               // child of it. Inside, it would stretch the box the hover actions

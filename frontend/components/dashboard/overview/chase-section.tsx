@@ -221,7 +221,11 @@ export async function ChaseSection({
           the old page grew its columns of black (ENS-19). */}
       {tank && snap && (
         <div className="sm:max-w-sm">
-          <ReservoirCard reservoir={tank} todayUtc={snap.todayUtc} />
+          <ReservoirCard
+            reservoir={tank}
+            todayUtc={snap.todayUtc}
+            enrichHref={`${contacts}?vue=enrichir`}
+          />
         </div>
       )}
 

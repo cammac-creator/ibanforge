@@ -17,6 +17,7 @@ export type MailFilterKey =
   | 'drafts'
   | 'clients'
   | 'prospect'
+  | 'enrich'
   | 'prospects'
   | 'institution'
   | 'closed'
@@ -152,7 +153,12 @@ const FILTERS: Array<{
   // `business` block because build-contacts happens not to join activation for
   // them today. The day that changes, a supervisor must still never land in a
   // money queue.
-  { key: 'paying', label: 'Payants', urgent: false, test: (c) => c.kind === 'client' && (c.business?.packs ?? 0) > 0 },
+  {
+    key: 'paying',
+    label: 'Payants',
+    urgent: false,
+    test: (c) => c.kind === 'client' && (c.business?.packs ?? 0) > 0,
+  },
   /**
    * The most urgent commercial state on the page, and until 2026-09-01 the only
    * one with no queue (audit TABS-13). The chip has existed since business.ts
@@ -168,7 +174,12 @@ const FILTERS: Array<{
     urgent: false,
     test: (c) => c.kind === 'client' && c.business?.status === 'at-limit',
   },
-  { key: 'dormant', label: 'Endormis', urgent: false, test: (c) => c.kind === 'client' && c.business?.status === 'dormant' },
+  {
+    key: 'dormant',
+    label: 'Endormis',
+    urgent: false,
+    test: (c) => c.kind === 'client' && c.business?.status === 'dormant',
+  },
   // A draft written and never sent is a follow-up that silently never left:
   // this queue makes every waiting draft countable and findable.
   { key: 'drafts', label: 'Brouillons', urgent: false, test: (c) => c.draft !== null },
@@ -179,7 +190,23 @@ const FILTERS: Array<{
   // everyone whose kind is prospect, written or not. Two different questions
   // one letter apart; the toolbar puts them in two different groups on
   // purpose, this one as a refining chip and the plural as a segment.
-  { key: 'prospect', label: 'À prospecter', urgent: false, test: neverContacted },
+  // Two chips where there was one. « À prospecter » used to count every
+  // never-contacted prospect, address or not, so the overview's « 0 mails
+  // prêts » led to thirteen files that each opened on « envoi impossible ».
+  // The chip now means "a first mail can leave"; the files still missing an
+  // address get their own chip, since what they need is a different gesture.
+  {
+    key: 'prospect',
+    label: 'À prospecter',
+    urgent: false,
+    test: (c, s, z) => neverContacted(c, s, z) && !!c.email,
+  },
+  {
+    key: 'enrich',
+    label: 'À enrichir',
+    urgent: false,
+    test: (c, s, z) => neverContacted(c, s, z) && !c.email,
+  },
   { key: 'clients', label: 'Clients', urgent: false, test: (c) => c.kind === 'client' },
   /**
    * The prospect POPULATION, the counterpart of `clients` and `institution`:
@@ -208,7 +235,12 @@ const FILTERS: Array<{
    * most expensive thing on this page to forget, and those two predicates ask
    * about the thread, not about who is on the other end.
    */
-  { key: 'institution', label: 'Correspondances', urgent: false, test: (c) => c.kind === 'institution' },
+  {
+    key: 'institution',
+    label: 'Correspondances',
+    urgent: false,
+    test: (c) => c.kind === 'institution',
+  },
   // The retrieval half of the closing gesture: a dossier the verdicts above
   // removed from the day's queues must stay one click away, or closing a row
   // starts to feel like deleting it and the gesture stops being used.
@@ -323,7 +355,9 @@ function toRow(
     closed: isClosed(c),
     noReply: noReplyHolds(c, s),
     confidence:
-      c.sourcing?.confidence === 'high' || c.sourcing?.confidence === 'medium' || c.sourcing?.confidence === 'low'
+      c.sourcing?.confidence === 'high' ||
+      c.sourcing?.confidence === 'medium' ||
+      c.sourcing?.confidence === 'low'
         ? c.sourcing.confidence
         : null,
     email: c.email,
@@ -462,7 +496,7 @@ function order(input: RowsInput, contacts: Contact[], active: MailFilterKey): Co
     // the prospecting queue ("call me back in September" has arrived) and the
     // follow-up queue. It was put to sleep WITH a date; the date outranks the
     // standing order, or the wake gesture would bury its own result.
-    if (active === 'prospect' || active === 'followup') {
+    if (active === 'prospect' || active === 'enrich' || active === 'followup') {
       const wokeA = input.woke?.[a.id] ?? false;
       const wokeB = input.woke?.[b.id] ?? false;
       if (wokeA !== wokeB) return wokeA ? -1 : 1;
@@ -482,12 +516,19 @@ function order(input: RowsInput, contacts: Contact[], active: MailFilterKey): Co
       if (gap !== 0) return gap;
       return byId(a, b);
     }
-    if (active === 'prospect') {
+    if (active === 'prospect' || active === 'enrich') {
       const rank = (c: Contact) =>
-        c.sourcing?.confidence === 'high' ? 3 : c.sourcing?.confidence === 'medium' ? 2 : c.sourcing?.confidence === 'low' ? 1 : 0;
+        c.sourcing?.confidence === 'high'
+          ? 3
+          : c.sourcing?.confidence === 'medium'
+            ? 2
+            : c.sourcing?.confidence === 'low'
+              ? 1
+              : 0;
       const confGap = rank(b) - rank(a);
       if (confGap !== 0) return confGap;
-      const heatGap = heatOf(b, input.situations[b.id]).score - heatOf(a, input.situations[a.id]).score;
+      const heatGap =
+        heatOf(b, input.situations[b.id]).score - heatOf(a, input.situations[a.id]).score;
       if (heatGap !== 0) return heatGap;
       return byId(a, b);
     }
@@ -525,13 +566,20 @@ function order(input: RowsInput, contacts: Contact[], active: MailFilterKey): Co
       const calls = (c: Contact) => (c.kind === 'client' ? (c.business?.calls90d ?? 0) : 0);
       const callGap = calls(b) - calls(a);
       if (callGap !== 0) return callGap;
-      const heatGap = heatOf(b, input.situations[b.id]).score - heatOf(a, input.situations[a.id]).score;
+      const heatGap =
+        heatOf(b, input.situations[b.id]).score - heatOf(a, input.situations[a.id]).score;
       if (heatGap !== 0) return heatGap;
     }
-    if (active === 'clients' || active === 'paying' || active === 'dormant' || active === 'at-limit') {
+    if (
+      active === 'clients' ||
+      active === 'paying' ||
+      active === 'dormant' ||
+      active === 'at-limit'
+    ) {
       // Money views rank by heat: the client burning credits outranks the one
       // whose last mail happens to be newer. Date breaks ties.
-      const heatGap = heatOf(b, input.situations[b.id]).score - heatOf(a, input.situations[a.id]).score;
+      const heatGap =
+        heatOf(b, input.situations[b.id]).score - heatOf(a, input.situations[a.id]).score;
       if (heatGap !== 0) return heatGap;
     }
     // 'prospects' rides with 'all' rather than falling through to recency, and
@@ -555,7 +603,8 @@ function order(input: RowsInput, contacts: Contact[], active: MailFilterKey): Co
       if (coldA !== coldB) return coldA ? -1 : 1;
       // Inside each half, heat first: the warm half ranks like the money
       // views, and the never-contacted half puts the hottest lead on top.
-      const heatGap = heatOf(b, input.situations[b.id]).score - heatOf(a, input.situations[a.id]).score;
+      const heatGap =
+        heatOf(b, input.situations[b.id]).score - heatOf(a, input.situations[a.id]).score;
       if (heatGap !== 0) return heatGap;
     }
     const dateA = lastWith(a.messages, 'msg_date') ?? '';
@@ -580,6 +629,12 @@ function project(input: RowsInput, contacts: Contact[], active: MailFilterKey): 
   const filter = FILTERS.find((f) => f.key === active);
   if (!filter) return [];
   return contacts.map((c) =>
-    toRow(c, input.situations[c.id], filter.urgent, active === 'reply', input.woke?.[c.id] ?? false),
+    toRow(
+      c,
+      input.situations[c.id],
+      filter.urgent,
+      active === 'reply',
+      input.woke?.[c.id] ?? false,
+    ),
   );
 }
