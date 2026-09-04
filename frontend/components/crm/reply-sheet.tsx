@@ -626,7 +626,7 @@ export function ReplySheet({
             <p className="mb-1 text-[12px] font-medium text-blue-300">
               🌐 En français, pour toi seul. C’est le texte au-dessus qui part.
             </p>
-            <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-[var(--fg-2)] wrap-anywhere">
+            <p className="whitespace-pre-wrap text-[14px] leading-[22px] text-[var(--fg-1)] wrap-anywhere">
               {fr}
             </p>
           </section>

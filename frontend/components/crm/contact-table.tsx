@@ -3,6 +3,7 @@
 import { Fragment, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
+  type MailFilterKey,
   mailFilters,
   searchRows,
   selectedRows,
@@ -299,13 +300,63 @@ export function ContactTable({
           // empty, the correspondents' segment is empty until an address is
           // registered, and a composed view can simply hold nobody. Blaming the
           // wrong control would send the operator to the wrong place.
-          <p className="px-4 py-10 text-center text-[13.5px] text-[var(--fg-3)]">
-            {q.trim()
-              ? 'Aucun contact ne correspond.'
-              : selection.population === 'institution' && !selection.work && !selection.refine
-                ? 'Aucun correspondant enregistré. Ajoute une adresse pour que son fil remonte ici.'
-                : 'Personne dans cette sélection.'}
-          </p>
+          <div className="px-4 py-10 text-center text-[13.5px] text-[var(--fg-3)]">
+            {q.trim() ? (
+              'Aucun contact ne correspond.'
+            ) : selection.population === 'institution' && !selection.work && !selection.refine ? (
+              'Aucun correspondant enregistré. Ajoute une adresse pour que son fil remonte ici.'
+            ) : selection.work || selection.refine ? (
+              // The controls that emptied the view, named, each with its own
+              // way out. « Correspondants 16 » above zero rows with a work tile
+              // still armed from the previous session read as a broken tool:
+              // the counts are absolute, the view is an intersection, and only
+              // this sentence says so.
+              <>
+                <p>
+                  Aucun contact ne réunit{' '}
+                  {[selection.population, selection.work, selection.refine]
+                    .filter((k): k is MailFilterKey => !!k && k !== 'all')
+                    .map((k) => filters.find((f) => f.key === k)?.label ?? k)
+                    .map((label, i) => (
+                      <span key={label}>
+                        {i > 0 ? ' + ' : ''}
+                        <strong className="text-[var(--fg-1)]">{label}</strong>
+                      </span>
+                    ))}
+                  .
+                </p>
+                <p className="mt-2 flex flex-wrap justify-center gap-2 text-[12.5px]">
+                  {selection.work && (
+                    <button
+                      type="button"
+                      onClick={() => setSelection({ ...selection, work: null })}
+                      className="rounded border border-[var(--ink-4)] px-2 py-0.5 hover:text-[var(--fg-1)]"
+                    >
+                      retirer {filters.find((f) => f.key === selection.work)?.label}
+                    </button>
+                  )}
+                  {selection.refine && (
+                    <button
+                      type="button"
+                      onClick={() => setSelection({ ...selection, refine: null })}
+                      className="rounded border border-[var(--ink-4)] px-2 py-0.5 hover:text-[var(--fg-1)]"
+                    >
+                      retirer {filters.find((f) => f.key === selection.refine)?.label}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setSelection({ population: 'all' })}
+                    className="rounded border border-[var(--ink-4)] px-2 py-0.5 hover:text-[var(--fg-1)]"
+                  >
+                    tout remettre à zéro
+                  </button>
+                </p>
+              </>
+            ) : (
+              'Personne dans cette sélection.'
+            )}
+          </div>
         ) : (
           rows.map((r, i) => {
             const on = r.id === selectedId;
@@ -393,7 +444,7 @@ export function ContactTable({
                       {r.woke && (
                         <span
                           title="Sa date de réveil est arrivée"
-                          className="shrink-0 self-center rounded bg-violet-500/15 px-1 py-0.5 text-[9.5px] font-bold uppercase tracking-wide text-violet-300"
+                          className="shrink-0 self-center rounded bg-violet-500/15 px-1 py-0.5 text-[11px] font-bold uppercase tracking-wide text-violet-300"
                         >
                           {/* The word the deleted list printed in full, kept
                               for the readers a `title` never reaches: it does
@@ -411,7 +462,7 @@ export function ContactTable({
                       {r.closed && (
                         <span
                           title="Dossier classé (pas intéressé / mauvaise personne) — un nouveau message de sa part le rouvrira"
-                          className="shrink-0 self-center rounded bg-zinc-500/15 px-1 py-0.5 text-[9.5px] font-bold uppercase tracking-wide text-zinc-400"
+                          className="shrink-0 self-center rounded bg-zinc-500/15 px-1 py-0.5 text-[11px] font-bold uppercase tracking-wide text-zinc-400"
                         >
                           classé
                         </span>
@@ -423,7 +474,7 @@ export function ContactTable({
                       {r.noReply && (
                         <span
                           title="Rien à répondre — leur dernier message ne demande pas de réponse. Un nouveau message de leur part remettra le fil dans la file."
-                          className="shrink-0 self-center rounded bg-sky-500/15 px-1 py-0.5 text-[9.5px] font-bold uppercase tracking-wide text-sky-300"
+                          className="shrink-0 self-center rounded bg-sky-500/15 px-1 py-0.5 text-[11px] font-bold uppercase tracking-wide text-sky-300"
                         >
                           {/* The button's own words, not an abbreviation of
                               them. The badge is rare enough to afford the three
@@ -435,7 +486,7 @@ export function ContactTable({
                       )}
                       {r.chip && (
                         <span
-                          className="shrink-0 self-center rounded px-1.5 py-0.5 text-[9.5px] font-bold uppercase tracking-wide"
+                          className="shrink-0 self-center rounded px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wide"
                           style={{ color: r.chip.color, backgroundColor: r.chip.bg }}
                         >
                           {r.chip.label}

@@ -69,7 +69,10 @@ export function ContactNotes({ email }: { email: string }) {
   return (
     <div className="min-w-0">
       <p className="mb-1.5 text-[12px] font-semibold uppercase tracking-wider text-[var(--fg-4)]">
-        📝 Notes <span className="font-normal normal-case tracking-normal text-[var(--fg-5)]">privées, lues par les brouillons IA</span>
+        📝 Notes{' '}
+        <span className="font-normal normal-case tracking-normal text-[var(--fg-5)]">
+          privées, lues par les brouillons IA
+        </span>
       </p>
       <div className="flex items-start gap-1.5">
         <textarea
@@ -96,11 +99,16 @@ export function ContactNotes({ email }: { email: string }) {
       ) : notes.length === 0 ? null : (
         <ul className="mt-2 space-y-1.5">
           {notes.map((n) => (
-            <li key={n.id} className="group flex items-start gap-2 rounded-md bg-[var(--ink-2)]/60 px-2.5 py-1.5">
+            <li
+              key={n.id}
+              className="group flex items-start gap-2 rounded-md bg-[var(--ink-2)]/60 px-2.5 py-1.5"
+            >
               <span className="min-w-0 flex-1 whitespace-pre-wrap text-[13px] leading-snug text-[var(--fg-2)]">
                 {n.note}
               </span>
-              <span className="shrink-0 text-[11px] tabular-nums text-[var(--fg-5)]">{n.created_at.slice(0, 10)}</span>
+              <span className="shrink-0 text-[11px] tabular-nums text-[var(--fg-3)]">
+                {n.created_at.slice(0, 10)}
+              </span>
               <button
                 type="button"
                 onClick={() => remove(n.id)}

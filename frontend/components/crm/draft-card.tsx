@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { changedRows, confirmedSent, readAnswer, reasonOf, withReason } from '@/lib/crm/api-result';
 import { draftReading } from '@/lib/crm/draft-reading';
@@ -54,6 +54,14 @@ export function DraftCard({
   const [showOriginal, setShowOriginal] = useState(false);
   const [subject, setSubject] = useState(draft.subject ?? '');
   const [body, setBody] = useState(draft.body ?? draft.snippet ?? '');
+  const [armedDelete, setArmedDelete] = useState(false);
+  const bodyRef = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    const el = bodyRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  });
   // Always the French when there is one: the original is shown BESIDE it
   // below, never instead of it (owner, 03/09/2026). `draftReading` keeps its
   // contract; what changed is that this card no longer asks it to swap.
@@ -274,11 +282,14 @@ export function DraftCard({
             placeholder="Objet"
           />
           <textarea
+            ref={bodyRef}
             value={body}
             onChange={(e) => setBody(e.target.value)}
-            rows={10}
+            rows={6}
             aria-label="Corps du brouillon"
-            className="w-full min-w-0 rounded-lg border border-[var(--ink-4)] bg-[var(--ink-0)] p-3 text-sm leading-[22px] text-[var(--fg-1)] focus:border-amber-500/40 focus:outline-none"
+            // Sized to its content, as the reply sheet is: a fixed ten rows
+            // inside a region that scrolls was the second scrollbar again.
+            className="w-full min-w-0 resize-none overflow-hidden rounded-lg border border-[var(--ink-4)] bg-[var(--ink-0)] p-3 text-base leading-[22px] sm:text-sm text-[var(--fg-1)] focus:border-amber-500/40 focus:outline-none"
           />
         </div>
       ) : (
@@ -290,7 +301,9 @@ export function DraftCard({
               which is never what leaves: the send path reads `body`, the state
               the textarea edits. draftReading() owns that distinction and
               flags it, so the badge below can say so plainly. */}
-          <p className="mt-0.5 whitespace-pre-wrap text-[12px] leading-relaxed text-[var(--fg-3)]">
+          {/* Reading size, not footnote size: this is the text one click from
+              leaving, and it was the smallest and greyest on the page. */}
+          <p className="mt-0.5 whitespace-pre-wrap text-[14px] leading-[22px] text-[var(--fg-2)]">
             {reading.text}
           </p>
           {reading.canTranslate && (
@@ -379,11 +392,27 @@ export function DraftCard({
             duplicate-send guard. */}
         <button
           type="button"
-          onClick={discard}
+          // Two clicks, like the archive gesture on a row and unlike the one
+          // click this used to be: a draft destroyed here exists nowhere else.
+          // The arming lapses after four seconds so a stray first click does
+          // not leave a loaded button behind.
+          onClick={() => {
+            if (!armedDelete) {
+              setArmedDelete(true);
+              window.setTimeout(() => setArmedDelete(false), 4000);
+              return;
+            }
+            setArmedDelete(false);
+            void discard();
+          }}
           disabled={busy !== false}
-          className="rounded-lg px-3 py-1 text-[13px] text-[var(--fg-3)] hover:text-red-400 disabled:opacity-50"
+          className={`rounded-lg px-3 py-1 text-[13px] disabled:opacity-50 ${
+            armedDelete
+              ? 'border border-red-500/60 text-red-300 hover:bg-red-500/10'
+              : 'text-[var(--fg-3)] hover:text-red-400'
+          }`}
         >
-          {busy === 'del' ? '…' : '🗑 Supprimer'}
+          {busy === 'del' ? '…' : armedDelete ? 'Confirmer la suppression ?' : '🗑 Supprimer'}
         </button>
       </div>
       {msg && (

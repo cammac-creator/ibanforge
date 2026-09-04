@@ -48,22 +48,36 @@ function WorkTile({
       type="button"
       onClick={onToggle}
       aria-pressed={on}
+      // Two signals that used to share one colour: « there is work » (an
+      // amber count) and « I am filtering on this » (an amber outline two
+      // pixels wide). Pressed is now a solid tile with its own cross; unpressed
+      // is a border, whatever the count.
       className={[
         'flex shrink-0 items-baseline gap-1.5 rounded-lg border px-2.5 py-1 transition-colors',
-        empty
-          ? 'border-[var(--ink-4)] bg-transparent hover:border-[var(--ink-5)]'
-          : 'border-[var(--amber-500)]/40 bg-[var(--amber-500)]/[0.12] hover:border-[var(--amber-500)]/70',
-        on ? 'outline outline-2 outline-offset-1 outline-[var(--amber-500)]' : '',
+        on
+          ? 'border-[var(--amber-500)] bg-[var(--amber-500)] text-[var(--ink-0)]'
+          : empty
+            ? 'border-[var(--ink-4)] bg-transparent hover:border-[var(--ink-5)]'
+            : 'border-[var(--amber-500)]/50 bg-transparent hover:bg-[var(--amber-500)]/[0.08]',
       ].join(' ')}
     >
       <span
-        className={`text-[11.5px] font-semibold ${empty ? 'text-[var(--fg-4)]' : 'text-[var(--amber-500)]'}`}
+        className={`text-[11.5px] font-semibold ${
+          on ? 'text-[var(--ink-0)]' : empty ? 'text-[var(--fg-4)]' : 'text-[var(--amber-500)]'
+        }`}
       >
         {filter.label}
       </span>
-      <span className="font-mono text-[15px] font-semibold tabular-nums text-[var(--fg-1)]">
+      <span
+        className={`font-mono text-[15px] font-semibold tabular-nums ${on ? 'text-[var(--ink-0)]' : 'text-[var(--fg-1)]'}`}
+      >
         {filter.count}
       </span>
+      {on && (
+        <span aria-hidden className="text-[11px] font-bold text-[var(--ink-0)]/80">
+          ✕
+        </span>
+      )}
     </button>
   );
 }
@@ -189,11 +203,15 @@ export function CrmToolbar({
                 on
                   ? 'border-[var(--amber-500)]/60 bg-[var(--amber-500)]/10 text-[var(--amber-500)]'
                   : 'border-[var(--ink-4)] text-[var(--fg-3)] hover:border-[var(--ink-5)] hover:text-[var(--fg-2)]',
-                filter.count === 0 && !on ? 'opacity-50' : '',
+                // A colour that is measured, not an opacity that is not: at
+                // opacity-50 × opacity-70 a zero count sat at 1.9:1.
+                filter.count === 0 && !on ? 'text-[var(--fg-4)]' : '',
               ].join(' ')}
             >
               {filter.label}
-              <span className="ml-1 font-mono tabular-nums opacity-70">{filter.count}</span>
+              <span className={`ml-1 font-mono tabular-nums ${on ? '' : 'text-[var(--fg-4)]'}`}>
+                {filter.count}
+              </span>
             </button>
           );
         })}

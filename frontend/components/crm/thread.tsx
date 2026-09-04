@@ -85,7 +85,11 @@ function Bubble({ m, counterpartLabel }: { m: Message; counterpartLabel?: string
           // is what actually keeps the page from widening. min-w-0 lets the
           // bubble shrink; overflow-wrap inherits, so subject, body and quote
           // are all covered here.
-          'min-w-0 max-w-[78%] rounded-xl px-3 py-2 text-sm leading-relaxed wrap-anywhere',
+          // The inbound bubble takes the width: the mail to read is theirs, and
+          // its side, its tint and its name already say whose it is. Ours keeps
+          // the asymmetry that makes the two readable at a glance.
+          'min-w-0 rounded-xl px-3 py-2 text-sm leading-relaxed wrap-anywhere',
+          mine ? 'max-w-[78%]' : 'max-w-[92%]',
           robot
             ? 'rounded-bl-sm bg-[var(--ink-3)] text-[var(--fg-2)]'
             : mine
@@ -152,7 +156,7 @@ function Bubble({ m, counterpartLabel }: { m: Message; counterpartLabel?: string
               // toggle can be genuinely new content. The quote stays visually
               // secondary through the left rule, the italics and the 10px size
               // rather than through contrast.
-              <p className="mt-1 whitespace-pre-wrap border-l-2 border-[var(--ink-5)] pl-2 text-[12px] italic text-[var(--fg-3)]">
+              <p className="mt-1 whitespace-pre-wrap border-l-2 border-[var(--ink-5)] pl-2 text-[13px] italic text-[var(--fg-3)]">
                 {quoted}
               </p>
             )}
@@ -181,7 +185,7 @@ function Bubble({ m, counterpartLabel }: { m: Message; counterpartLabel?: string
               // Same contrast rule as the quote above (--fg-3 measured on the
               // composited tint, not picked by name), and the violet rule ties
               // it to the badge that says the message was translated.
-              <p className="mt-1 whitespace-pre-wrap border-l-2 border-violet-400/40 pl-2 text-[12px] text-[var(--fg-3)]">
+              <p className="mt-1 whitespace-pre-wrap border-l-2 border-violet-400/40 pl-2 text-[14px] text-[var(--fg-2)]">
                 {originalFresh}
               </p>
             )}
