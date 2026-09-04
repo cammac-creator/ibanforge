@@ -23,7 +23,8 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react"
-import { useTranslations } from "next-intl"
+import { useLocale, useTranslations } from "next-intl"
+import { formatGrouped } from "@/lib/format-grouped"
 import { groupIban, isShowable, responseLines, serverMs } from "@/lib/forge/response-lines"
 
 type Phase = "static" | "typing" | "calling" | "live" | "captured"
@@ -59,6 +60,7 @@ function writeCache(value: Cached) {
 
 export function FoldDemo({ iban, fallback }: { iban: string; fallback: Record<string, unknown> }) {
   const t = useTranslations("home.hero.demo")
+  const locale = useLocale()
   const rootRef = useRef<HTMLDivElement>(null)
   const [phase, setPhase] = useState<Phase>("static")
   const [typed, setTyped] = useState<string>(groupIban(iban))
@@ -154,11 +156,11 @@ export function FoldDemo({ iban, fallback }: { iban: string; fallback: Record<st
 
   let timing: string
   if (phase === "live" && server !== null && rtt !== null) {
-    timing = t("live", { server: server.toLocaleString("fr-CH"), rtt: String(rtt) })
+    timing = t("live", { server: formatGrouped(server, locale, 2), rtt: formatGrouped(rtt, locale) })
   } else if (phase === "typing" || phase === "calling") {
     timing = t("calling")
   } else {
-    timing = t("captured", { server: server === null ? "0,41" : server.toLocaleString("fr-CH") })
+    timing = t("captured", { server: formatGrouped(server ?? 0.41, locale, 2) })
   }
 
   return (

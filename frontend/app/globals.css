@@ -254,7 +254,7 @@
     opacity var(--dur-4) var(--ease-out),
     transform var(--dur-4) var(--ease-out);
 }
-.js .reveal {
+[data-js] .reveal {
   opacity: 0;
   transform: translateY(12px);
 }
@@ -277,7 +277,7 @@
     scroll-behavior: auto !important;
   }
   .reveal,
-  .js .reveal {
+  [data-js] .reveal {
     opacity: 1 !important;
     transform: none !important;
   }
@@ -559,7 +559,7 @@
 /* ══════════════════════════════════════════════════════════════════════════
    THE FORGE — landing redesign (08/2026). Scoped under `.forge`; the film's
    scrub engine lives in components/forge/forge-film.tsx. PE-safe: every
-   hidden start state is gated behind `html.js` (set in [locale]/layout.tsx)
+   hidden start state is gated behind `html[data-js]` (set in [locale]/layout.tsx)
    AND prefers-reduced-motion: no-preference. Without JS or with reduced
    motion, the page reads as complete static blocks.
    ══════════════════════════════════════════════════════════════════════════ */
@@ -1573,27 +1573,39 @@
      for four station-lengths of scroll and scrubs one GSAP timeline. Below
      are only the RESTING states the engine takes over — never transitions,
      which would fight the scrub. */
-  html.js .forge .film {
+  /* The section IS the scroll track (four stations of --film-s plus the
+     screen), reserved here so the page never jumps when the engine starts;
+     the sticky pin is the fallback until ScrollTrigger takes it over. */
+  html[data-js] .forge .film {
+    --film-s: 120vh;
+    height: calc(100svh + 4 * var(--film-s));
     border-top-color: transparent;
   }
-  html.js .forge .pin {
-    position: relative;
+  @media (max-width: 720px) {
+    html[data-js] .forge .film {
+      --film-s: 110vh;
+    }
+  }
+  html[data-js] .forge .pin {
+    position: sticky;
+    top: 0;
     height: 100vh;
     height: 100svh;
     overflow: hidden;
   }
-  html.js .forge .st {
+  html[data-js] .forge .st {
     position: absolute;
     inset: 0;
-    padding: 0;
+    /* the site header is sticky over the pinned screen: leave it its row */
+    padding: 3.6rem 0 0;
     border-bottom: 0;
     will-change: opacity, transform;
   }
-  html.js .forge .st + .st {
+  html[data-js] .forge .st + .st {
     opacity: 0;
     visibility: hidden;
   }
-  html.js .forge .rail {
+  html[data-js] .forge .rail {
     display: block;
     position: absolute;
     z-index: 3;
@@ -1610,7 +1622,7 @@
     );
     opacity: 0.5;
   }
-  html.js .forge .rail-head {
+  html[data-js] .forge .rail-head {
     position: absolute;
     left: -4px;
     top: 0;
@@ -1623,11 +1635,11 @@
       0 0 34px var(--amber-500);
   }
   @media (max-width: 1099px) {
-    html.js .forge .rail {
+    html[data-js] .forge .rail {
       display: none;
     }
   }
-  html.js .forge .film-dots {
+  html[data-js] .forge .film-dots {
     display: flex;
     position: absolute;
     z-index: 4;
@@ -1639,7 +1651,7 @@
     margin: 0;
     padding: 0;
   }
-  html.js .forge .film-dots li {
+  html[data-js] .forge .film-dots li {
     width: 26px;
     height: 3px;
     border-radius: 2px;
@@ -1649,61 +1661,61 @@
       width 0.3s ease,
       box-shadow 0.3s ease;
   }
-  html.js .forge .film-dots li.on {
+  html[data-js] .forge .film-dots li.on {
     width: 46px;
     background: var(--amber-500);
     box-shadow: 0 0 10px var(--amber-500);
   }
   /* resting states, before the engine's first frame */
-  html.js .forge [data-t],
-  html.js .forge .stamp-ok,
-  html.js .forge .seal,
-  html.js .forge .ship,
-  html.js .forge .json-out .jl {
+  html[data-js] .forge [data-t],
+  html[data-js] .forge .stamp-ok,
+  html[data-js] .forge .seal,
+  html[data-js] .forge .ship,
+  html[data-js] .forge .json-out .jl {
     opacity: 0;
     visibility: hidden;
   }
-  html.js .forge .seg {
+  html[data-js] .forge .seg {
     border-color: transparent;
   }
-  html.js .forge .mod-line span {
+  html[data-js] .forge .mod-line span {
     --k: 1;
   }
-  html.js .forge .q-row {
+  html[data-js] .forge .q-row {
     clip-path: inset(0% 100% 0% 0%);
   }
   /* the seal has no glow until it sets; the engine tweens the shadow */
-  html.js .forge .seal {
+  html[data-js] .forge .seal {
     box-shadow: none;
   }
   /* short screens: everything of a station must fit the pinned screen */
   @media (max-height: 760px) {
-    html.js .forge .st-title {
+    html[data-js] .forge .st-title {
       font-size: clamp(1.6rem, 5vh, 2.6rem);
     }
-    html.js .forge .st-inner {
+    html[data-js] .forge .st-inner {
       gap: 0.55rem;
     }
-    html.js .forge .iban-bar {
+    html[data-js] .forge .iban-bar {
       font-size: clamp(1rem, 3.6vh, 1.9rem);
     }
-    html.js .forge .mod-line {
+    html[data-js] .forge .mod-line {
       font-size: clamp(0.9rem, 2.6vh, 1.3rem);
     }
-    html.js .forge .json-out {
+    html[data-js] .forge .json-out {
       max-height: 30vh;
     }
-    html.js .forge .st-copy {
+    html[data-js] .forge .st-copy {
       font-size: 0.85rem;
     }
   }
   /* The fold demo: the caret blinks while the address types itself, and the
      answer's lines cascade in once a run has settled (data-run is set only
      after a run, so the first paint shows the captured answer at rest). */
-  html.js .forge .hero-proof[data-phase='typing'] .hp-caret {
+  html[data-js] .forge .hero-proof[data-phase='typing'] .hp-caret {
     animation: hpCaret 0.9s steps(2, start) infinite;
   }
-  html.js .forge .hp-body[data-run] .hp-ln {
+  html[data-js] .forge .hp-body[data-run] .hp-ln {
     opacity: 0;
     transform: translateX(-6px);
     animation: hpIn 0.38s ease-out forwards;
@@ -1720,14 +1732,14 @@
       transform: none;
     }
   }
-  html.js .forge .embers rect {
+  html[data-js] .forge .embers rect {
     animation: fgEmber 7s ease-in-out infinite;
   }
-  html.js .forge .embers rect:nth-child(2n) {
+  html[data-js] .forge .embers rect:nth-child(2n) {
     animation-duration: 9.5s;
     animation-delay: -3s;
   }
-  html.js .forge .embers rect:nth-child(3n) {
+  html[data-js] .forge .embers rect:nth-child(3n) {
     animation-duration: 12s;
     animation-delay: -6s;
   }
@@ -1759,13 +1771,13 @@
     }
   }
   @media (max-height: 560px) {
-    html.js .forge .st-title {
+    html[data-js] .forge .st-title {
       font-size: clamp(1.5rem, 5vh, 2.4rem);
     }
-    html.js .forge .st-inner {
+    html[data-js] .forge .st-inner {
       gap: 0.6rem;
     }
-    html.js .forge .json-out {
+    html[data-js] .forge .json-out {
       max-height: 34vh;
     }
   }

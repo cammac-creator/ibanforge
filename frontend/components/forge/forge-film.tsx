@@ -4,7 +4,7 @@
  * The forge film — four stations on ONE pinned screen, scrubbed by scroll.
  *
  * Engine: GSAP 3.15 (standard "no charge" licence) with ScrollTrigger,
- * SplitText and DrawSVG — loaded on demand, only with JS and motion allowed.
+ * SplitText and DrawSVG — bundled, started only with JS and motion allowed.
  * One master timeline, four station timelines added back to back: a station
  * enters (0→0.10), plays its beats (0.10→0.86) and leaves (0.90→1.0) BEFORE
  * the next one enters, so two stations never share the screen. ScrollTrigger
@@ -23,6 +23,10 @@
  */
 
 import { useEffect, useRef } from "react"
+import { gsap } from "gsap"
+import { ScrollTrigger } from "gsap/ScrollTrigger"
+import { SplitText } from "gsap/SplitText"
+import { DrawSVGPlugin } from "gsap/DrawSVGPlugin"
 
 export interface FilmStrings {
   heading: string
@@ -43,20 +47,16 @@ export interface FilmStrings {
   ship: { eyebrow: string; title: string; head: string; tryLive: string; copy: string }
 }
 
-type GSAP = typeof import("gsap")["gsap"]
-type ScrollTriggerT = typeof import("gsap/ScrollTrigger")["ScrollTrigger"]
-type SplitTextT = typeof import("gsap/SplitText")["SplitText"]
-
 /* Static SVG scenery, kept as trusted constants so the JSX stays legible.
    Nothing user-controlled flows in here. Elements the engine drives carry a
    class: turb, heat-glow, hammer, arcs, rp, sm, ring-c, flash, mark, cart,
    rail-l. The forge palette only: amber, red, steel, green — no cyan. */
 
-const SCENE_HEAT = `<defs><radialGradient id="hglow" cx="50%" cy="100%" r="65%"><stop offset="0%" stop-color="#F59E0B" stop-opacity="0.16"/><stop offset="55%" stop-color="#EF4444" stop-opacity="0.06"/><stop offset="100%" stop-color="#EF4444" stop-opacity="0"/></radialGradient><radialGradient id="hember" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#FCD34D" stop-opacity="0.9"/><stop offset="45%" stop-color="#F59E0B" stop-opacity="0.55"/><stop offset="100%" stop-color="#F59E0B" stop-opacity="0"/></radialGradient><filter id="haze" x="-5%" y="-10%" width="110%" height="120%"><feTurbulence class="turb" type="fractalNoise" baseFrequency="0.010 0.026" numOctaves="2" seed="7" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="14" xChannelSelector="R" yChannelSelector="G"/></filter></defs><rect class="heat-glow" x="0" y="335" width="1200" height="340" fill="url(#hglow)" opacity="0.5"/><g filter="url(#haze)"><polygon fill="#1A1310" points="0,675 0,616 130,596 260,622 390,600 540,630 700,604 860,628 1010,602 1200,624 1200,675"/><polygon fill="#120E09" points="0,675 0,642 110,624 250,650 400,628 560,654 720,632 880,652 1040,630 1200,648 1200,675"/><g><circle cx="180" cy="640" r="16" fill="url(#hember)"/><circle cx="415" cy="647" r="11" fill="url(#hember)" opacity="0.8"/><circle cx="655" cy="642" r="18" fill="url(#hember)"/><circle cx="905" cy="646" r="12" fill="url(#hember)" opacity="0.7"/><circle cx="1105" cy="638" r="14" fill="url(#hember)" opacity="0.85"/></g><g fill="#FCD34D"><rect x="174" y="636" width="13" height="4" rx="1" opacity="0.85"/><rect x="410" y="644" width="9" height="3" rx="1" opacity="0.6"/><rect x="648" y="638" width="15" height="4" rx="1" opacity="0.9"/><rect x="900" y="643" width="9" height="3" rx="1" opacity="0.55"/><rect x="1099" y="634" width="11" height="4" rx="1" opacity="0.7"/></g><g fill="#EF4444"><rect x="300" y="649" width="7" height="3" rx="1" opacity="0.5"/><rect x="770" y="648" width="8" height="3" rx="1" opacity="0.5"/><rect x="1010" y="650" width="6" height="3" rx="1" opacity="0.45"/></g></g>`
+const SCENE_HEAT = `<defs><radialGradient id="hglow" cx="50%" cy="100%" r="65%"><stop offset="0%" stop-color="#F59E0B" stop-opacity="0.16"/><stop offset="55%" stop-color="#EF4444" stop-opacity="0.06"/><stop offset="100%" stop-color="#EF4444" stop-opacity="0"/></radialGradient><radialGradient id="hember" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#FCD34D" stop-opacity="0.9"/><stop offset="45%" stop-color="#F59E0B" stop-opacity="0.55"/><stop offset="100%" stop-color="#F59E0B" stop-opacity="0"/></radialGradient><filter id="haze" x="-5%" y="-10%" width="110%" height="120%"><feTurbulence class="turb" type="fractalNoise" baseFrequency="0.010 0.026" numOctaves="2" seed="7" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="14" xChannelSelector="R" yChannelSelector="G"/></filter></defs><rect class="heat-glow" x="0" y="335" width="1200" height="340" fill="url(#hglow)" opacity="0.5"/><g class="floor" filter="url(#haze)"><polygon fill="#1A1310" points="0,675 0,616 130,596 260,622 390,600 540,630 700,604 860,628 1010,602 1200,624 1200,675"/><polygon fill="#120E09" points="0,675 0,642 110,624 250,650 400,628 560,654 720,632 880,652 1040,630 1200,648 1200,675"/><g><circle cx="180" cy="640" r="16" fill="url(#hember)"/><circle cx="415" cy="647" r="11" fill="url(#hember)" opacity="0.8"/><circle cx="655" cy="642" r="18" fill="url(#hember)"/><circle cx="905" cy="646" r="12" fill="url(#hember)" opacity="0.7"/><circle cx="1105" cy="638" r="14" fill="url(#hember)" opacity="0.85"/></g><g fill="#FCD34D"><rect x="174" y="636" width="13" height="4" rx="1" opacity="0.85"/><rect x="410" y="644" width="9" height="3" rx="1" opacity="0.6"/><rect x="648" y="638" width="15" height="4" rx="1" opacity="0.9"/><rect x="900" y="643" width="9" height="3" rx="1" opacity="0.55"/><rect x="1099" y="634" width="11" height="4" rx="1" opacity="0.7"/></g><g fill="#EF4444"><rect x="300" y="649" width="7" height="3" rx="1" opacity="0.5"/><rect x="770" y="648" width="8" height="3" rx="1" opacity="0.5"/><rect x="1010" y="650" width="6" height="3" rx="1" opacity="0.45"/></g></g>`
 
 const SCENE_STRIKE = `<defs><linearGradient id="srim" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#F59E0B" stop-opacity="0.5"/><stop offset="100%" stop-color="#F59E0B" stop-opacity="0"/></linearGradient></defs><g transform="translate(800,415) scale(0.72)"><g class="hammer" transform="rotate(-24 300 -60)" opacity="0.72"><rect x="255" y="-95" width="96" height="44" rx="6" fill="#221B13"/><rect x="292" y="-51" width="16" height="120" rx="5" fill="#1A140D"/></g><g class="arcs" stroke="#F59E0B" fill="none" stroke-linecap="round" opacity="0"><path d="M212,-18 q28,-34 74,-44" stroke-width="3"/><path d="M196,-40 q40,-52 108,-64" stroke-width="2" opacity="0.6"/></g><g opacity="0.62"><path fill="#191309" d="M18,0 L332,0 L332,40 Q332,52 318,54 L250,60 L236,132 L112,132 L98,60 Q40,58 12,34 Q-6,18 2,4 Z"/><polygon fill="#191309" points="92,132 256,132 300,186 48,186"/><rect x="18" y="0" width="314" height="6" fill="url(#srim)"/></g></g>`
 
-const SCENE_QUENCH = `<defs><linearGradient id="qwater" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#94A3B8" stop-opacity="0.2"/><stop offset="100%" stop-color="#94A3B8" stop-opacity="0"/></linearGradient><filter id="qblur" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="14"/></filter></defs><rect x="0" y="560" width="1200" height="115" fill="url(#qwater)"/><line x1="0" y1="560" x2="1200" y2="560" stroke="#CBD5E1" stroke-opacity="0.4" stroke-width="1.5"/><g transform="translate(600 586)"><ellipse class="rp" rx="52" ry="12" fill="none" stroke="#CBD5E1" stroke-width="2" opacity="0"/><ellipse class="rp" rx="52" ry="12" fill="none" stroke="#CBD5E1" stroke-width="1.6" opacity="0"/><ellipse class="rp" rx="52" ry="12" fill="none" stroke="#E2E8F0" stroke-width="1.2" opacity="0"/></g><g filter="url(#qblur)" fill="#E2E8F0"><circle class="sm" cx="520" cy="575" r="26" opacity="0"/><circle class="sm" cx="600" cy="580" r="34" opacity="0"/><circle class="sm" cx="690" cy="572" r="22" opacity="0"/><circle class="sm" cx="560" cy="590" r="18" opacity="0"/><circle class="sm" cx="650" cy="588" r="28" opacity="0"/><circle class="sm" cx="730" cy="584" r="16" opacity="0"/></g>`
+const SCENE_QUENCH = `<defs><linearGradient id="qwater" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#94A3B8" stop-opacity="0.2"/><stop offset="100%" stop-color="#94A3B8" stop-opacity="0"/></linearGradient><radialGradient id="qsteam" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#E2E8F0" stop-opacity="0.9"/><stop offset="55%" stop-color="#E2E8F0" stop-opacity="0.35"/><stop offset="100%" stop-color="#E2E8F0" stop-opacity="0"/></radialGradient></defs><rect x="0" y="560" width="1200" height="115" fill="url(#qwater)"/><line x1="0" y1="560" x2="1200" y2="560" stroke="#CBD5E1" stroke-opacity="0.4" stroke-width="1.5"/><g transform="translate(600 586)"><ellipse class="rp" rx="52" ry="12" fill="none" stroke="#CBD5E1" stroke-width="2" opacity="0"/><ellipse class="rp" rx="52" ry="12" fill="none" stroke="#CBD5E1" stroke-width="1.6" opacity="0"/><ellipse class="rp" rx="52" ry="12" fill="none" stroke="#E2E8F0" stroke-width="1.2" opacity="0"/></g><g fill="url(#qsteam)"><circle class="sm" cx="520" cy="575" r="42" opacity="0"/><circle class="sm" cx="600" cy="580" r="54" opacity="0"/><circle class="sm" cx="690" cy="572" r="36" opacity="0"/><circle class="sm" cx="560" cy="590" r="30" opacity="0"/><circle class="sm" cx="650" cy="588" r="46" opacity="0"/><circle class="sm" cx="730" cy="584" r="26" opacity="0"/></g>`
 
 const SCENE_STAMP = `<defs><radialGradient id="sflash" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="#FFF7ED" stop-opacity="0.95"/><stop offset="45%" stop-color="#F59E0B" stop-opacity="0.45"/><stop offset="100%" stop-color="#F59E0B" stop-opacity="0"/></radialGradient></defs><g transform="translate(930,300)"><circle class="flash" r="190" fill="url(#sflash)" opacity="0"/><circle class="ring-c" r="158" fill="none" stroke="#3B352E" stroke-width="3" opacity="0.55"/><g class="ring"><circle r="126" fill="none" stroke="#3B352E" stroke-width="1.5" stroke-dasharray="10 16" opacity="0.5"/></g><g stroke="#3B352E" stroke-width="2.5" opacity="0.55"><line x1="0" y1="-158" x2="0" y2="-140"/><line x1="0" y1="158" x2="0" y2="140"/><line x1="-158" y1="0" x2="-140" y2="0"/><line x1="158" y1="0" x2="140" y2="0"/></g><g class="mark" transform="translate(-46,-46)" fill="#F59E0B" opacity="0.16"><rect x="10" y="38" width="80" height="16"/><polygon points="24,54 76,54 62,78 38,78"/><polygon points="34,78 66,78 76,92 24,92"/><rect x="22" y="26" width="8" height="9"/><rect x="34" y="16" width="8" height="19"/><rect x="46" y="8" width="8" height="27"/><rect x="58" y="16" width="8" height="19"/><rect x="70" y="26" width="8" height="9"/></g></g>`
 
@@ -131,7 +131,7 @@ function Scene({ html, mid = false }: { html: string; mid?: boolean }) {
 }
 
 /** Builds the whole film on the mounted DOM; returns its teardown. */
-function build(gsap: GSAP, ScrollTrigger: ScrollTriggerT, SplitText: SplitTextT, root: HTMLElement) {
+function build(root: HTMLElement) {
   const q = <T extends Element>(sel: string) => root.querySelector<T>(sel)
   const qa = <T extends Element>(sel: string) => Array.from(root.querySelectorAll<T>(sel))
   const pin = q<HTMLElement>(".pin")
@@ -147,7 +147,12 @@ function build(gsap: GSAP, ScrollTrigger: ScrollTriggerT, SplitText: SplitTextT,
   }))
   const splits: Array<{ revert: () => void }> = []
   const mobile = () => window.innerWidth < 720
+  // the CSS reserves 4 × --film-s (120vh, 110vh on a phone) as the track
   const stationPx = () => window.innerHeight * (mobile() ? 1.1 : 1.2)
+  // The heat haze (an animated displacement filter over the ember floor)
+  // is the one effect that costs frames on WebKit and small machines.
+  const safari = /^((?!chrome|android|crios|fxios).)*safari/i.test(navigator.userAgent)
+  const richMotion = !mobile() && !safari && (navigator.hardwareConcurrency ?? 4) >= 6
 
   ScrollTrigger.config({ ignoreMobileResize: true })
 
@@ -307,6 +312,8 @@ function build(gsap: GSAP, ScrollTrigger: ScrollTriggerT, SplitText: SplitTextT,
       pin,
       start: "top top",
       end: () => `+=${Math.round(STATIONS * stationPx())}`,
+      // the section already has the track's height (CSS): no spacer to add
+      pinSpacing: false,
       scrub: 0.75,
       anticipatePin: 1,
       invalidateOnRefresh: true,
@@ -332,16 +339,24 @@ function build(gsap: GSAP, ScrollTrigger: ScrollTriggerT, SplitText: SplitTextT,
     ], ease: "none" }, 0)
   }
 
-  // the ember floor shimmers with heat, on its own clock, only while pinned
-  const haze = gsap.to(q(".turb"), { attr: { baseFrequency: "0.014 0.020" }, duration: 4, yoyo: true, repeat: -1, ease: "sine.inOut", paused: true })
+  // the ember floor shimmers with heat, on its own clock, only while pinned —
+  // and only where the displacement filter is cheap enough
+  const floor = q(".floor")
+  if (!richMotion && floor) floor.removeAttribute("filter")
+  const haze = richMotion
+    ? gsap.to(q(".turb"), { attr: { baseFrequency: "0.014 0.020" }, duration: 4, yoyo: true, repeat: -1, ease: "sine.inOut", paused: true })
+    : gsap.to({}, { duration: 1, paused: true })
 
   gsap.set(stations.slice(1).map((s) => s.el), { autoAlpha: 0 })
   gsap.set(stations[0].el, { autoAlpha: 1 })
   dots[0]?.classList.add("on")
+  // measure again once fonts and the first layout have settled
   const onFonts = () => ScrollTrigger.refresh()
   document.fonts?.ready.then(onFonts).catch(() => {})
+  const settle = window.setTimeout(() => ScrollTrigger.refresh(), 600)
 
   return () => {
+    window.clearTimeout(settle)
     master.scrollTrigger?.kill()
     master.kill()
     haze.kill()
@@ -358,19 +373,11 @@ export function ForgeFilm({ t, playgroundHref }: { t: FilmStrings; playgroundHre
     const root = rootRef.current
     if (!root) return
     if (!window.matchMedia("(prefers-reduced-motion: no-preference)").matches) return
-    let cancelled = false
-    let teardown: (() => void) | undefined
-    Promise.all([import("gsap"), import("gsap/ScrollTrigger"), import("gsap/SplitText"), import("gsap/DrawSVGPlugin")])
-      .then(([{ gsap }, { ScrollTrigger }, { SplitText }, { DrawSVGPlugin }]) => {
-        if (cancelled || !rootRef.current) return
-        gsap.registerPlugin(ScrollTrigger, SplitText, DrawSVGPlugin)
-        teardown = build(gsap, ScrollTrigger, SplitText, rootRef.current)
-      })
-      .catch(() => { /* the film stays a set of readable blocks */ })
-    return () => {
-      cancelled = true
-      teardown?.()
-    }
+    // Bundled, not fetched on demand: the on-demand chunk arrived 4 to 6 s
+    // after the page (measured 2026-09-04), long enough for a visitor to
+    // scroll past a film that had not started.
+    gsap.registerPlugin(ScrollTrigger, SplitText, DrawSVGPlugin)
+    return build(root)
   }, [])
 
   return (

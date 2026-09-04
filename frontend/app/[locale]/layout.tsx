@@ -128,7 +128,11 @@ export default async function LocaleLayout({ children, params }: Props) {
             Reveal hidden state only applies with JS on (see globals.css .js). */}
         <script
           dangerouslySetInnerHTML={{
-            __html: "document.documentElement.classList.add('js')",
+            // A class on <html> is React's to manage: after a hydration error
+            // React re-renders the root and resets className, and every rule
+            // keyed on `html.js` silently dies (seen in Safari, 2026-09-04).
+            // The attribute is outside React's props and survives.
+            __html: "document.documentElement.setAttribute('data-js','');document.documentElement.classList.add('js')",
           }}
         />
       </head>

@@ -1,7 +1,8 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useCountUp } from "@/components/use-count-up"
+import { formatGrouped } from "@/lib/format-grouped"
 
 export interface StatItem {
   value: number
@@ -67,19 +68,11 @@ function Stat({
   const animated = useCountUp(started ? stat.value : 0, 900)
   const shown = started ? animated : stat.value
 
-  const formatter = useMemo(
-    () =>
-      new Intl.NumberFormat(locale, {
-        minimumFractionDigits: decimals,
-        maximumFractionDigits: decimals,
-      }),
-    [locale, decimals]
-  )
 
   return (
     <div className="flex flex-col items-center gap-2 text-center">
       <span className="font-mono tnum text-3xl sm:text-4xl font-semibold tracking-tight text-[var(--fg-1)]">
-        {formatter.format(shown)}
+        {formatGrouped(shown, locale, decimals)}
         {stat.suffix && (
           <span className="ml-1.5 text-base font-normal text-[var(--fg-3)]">{stat.suffix}</span>
         )}
