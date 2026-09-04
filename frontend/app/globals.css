@@ -862,6 +862,9 @@
   pointer-events: none;
   z-index: 0;
 }
+html[data-js] .forge .scene {
+  will-change: transform, opacity;
+}
 .forge .st-inner {
   position: relative;
   z-index: 2;

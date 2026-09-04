@@ -236,9 +236,12 @@ function build(root: HTMLElement) {
   enter(s0, 0)
   const ibanSplit = new SplitText(qa(".iban-bar .seg"), { type: "chars" })
   splits.push(ibanSplit)
-  s0.fromTo(ibanSplit.chars,
-    { color: DULL, textShadow: "0 0 0px rgba(245,158,11,0), 0 2px 0px rgba(239,68,68,0)" },
-    { color: HOT, textShadow: "0 0 18px rgba(245,158,11,0.6), 0 2px 44px rgba(239,68,68,0.3)", duration: 0.16, stagger: 0.006, ease: "power2.inOut" }, 0.08)
+  // colour per character, the glow once on the bar: WebKit repaints
+  // per-character text shadows dearly (long frames measured 2026-09-04)
+  s0.fromTo(ibanSplit.chars, { color: DULL }, { color: HOT, duration: 0.16, stagger: 0.006, ease: "power2.inOut" }, 0.08)
+  s0.fromTo(q(".iban-bar"),
+    { textShadow: "0 0 0px rgba(245,158,11,0), 0 2px 0px rgba(239,68,68,0)" },
+    { textShadow: "0 0 18px rgba(245,158,11,0.6), 0 2px 44px rgba(239,68,68,0.3)", duration: 0.22, ease: "power2.inOut" }, 0.14)
   s0.fromTo(q(".heat-glow"), { opacity: 0.35 }, { opacity: 1, duration: 0.3, ease: "power1.inOut" }, 0.08)
   const segColors = [AMBER, RED, STEEL, GREEN]
   qa<HTMLElement>(".seg").forEach((seg, i) => {
