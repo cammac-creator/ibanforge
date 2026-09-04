@@ -604,22 +604,30 @@
   padding-inline: clamp(1rem, 4vw, 2.5rem);
 }
 
-/* ── Hero ── */
+/* ── The fold ──
+   Audit 2026-09-04: two columns, the promise and the proof; no decorative
+   void, no repeated logo. The h1 is the largest object of the page (72 px on
+   a wide screen, Bebas like every display title of the forge). */
 .forge .hero {
   position: relative;
-  min-height: 92vh;
-  min-height: 92svh;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: minmax(0, 1.12fr) minmax(0, 1fr);
+  gap: clamp(2rem, 5vw, 4.5rem);
   align-items: center;
-  justify-content: center;
-  text-align: center;
-  padding: 5rem 1rem 4rem;
-  overflow: hidden;
+  max-width: 76rem;
+  margin-inline: auto;
+  padding: clamp(3rem, 8vh, 5.5rem) clamp(1rem, 4vw, 2.5rem) clamp(3.5rem, 9vh, 6rem);
+}
+@media (max-width: 960px) {
+  .forge .hero {
+    grid-template-columns: 1fr;
+    gap: 2.2rem;
+  }
+}
+.forge .hero-copy {
+  min-width: 0;
 }
 .forge .hero-badge {
-  position: relative;
-  z-index: 1;
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
@@ -628,10 +636,10 @@
   letter-spacing: 0.2em;
   text-transform: uppercase;
   color: var(--ffg-2);
-  border: 1px solid var(--fst-3);
+  border: 1px solid var(--fedge);
   border-radius: 999px;
   padding: 0.35rem 0.9rem;
-  margin-bottom: clamp(1.2rem, 3vh, 2rem);
+  margin-bottom: clamp(1.2rem, 3vh, 1.8rem);
 }
 .forge .hero-badge .dot {
   width: 7px;
@@ -640,60 +648,14 @@
   background: var(--live);
   box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.2);
 }
-.forge .wordmark {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  gap: 0.3em;
+.forge .hero h1 {
   font-family: var(--font-bebas);
   font-weight: 400;
-  font-size: clamp(2.7rem, 11.5vw, 9rem);
+  font-size: clamp(2.6rem, 5.4vw, 4.5rem);
   line-height: 0.98;
-  letter-spacing: 0.015em;
-}
-.forge .wordmark .mark {
-  height: 1.04em;
-}
-.forge .wordmark .wtext {
-  white-space: nowrap;
-}
-.forge .wordmark .lt {
-  display: inline-block;
-  color: var(--hot);
-}
-/* « forge » is ONE span: gradient runs across the word, and a clip on the
-   animated element itself survives its compositing layer — a parent's does not. */
-/* The padding/negative-margin pair keeps the descender of « g » INSIDE the
-   painted box: with background-clip:text WebKit only paints the gradient
-   within the border box, and the tight line-height leaves the descender
-   outside it — transparent, so the glyph reads amputated (seen on Safari). */
-.forge .wordmark .fw {
-  display: inline-block;
-  letter-spacing: 0;
-  font-family: var(--font-oswald);
-  font-weight: 500;
-  font-size: 0.985em;
-  padding: 0.06em 0.05em 0.28em;
-  margin: -0.06em -0.05em -0.28em;
-  background: linear-gradient(100deg, var(--amber-500) 15%, var(--err) 95%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-.forge .mark {
-  display: inline-block;
-  flex: none;
-  aspect-ratio: 284 / 320;
-  background: url('/brand/anvil-mark.png') center / contain no-repeat;
-}
-.forge .hero h1 {
-  position: relative;
-  z-index: 1;
-  font-size: clamp(1.25rem, 3.1vw, 2.1rem);
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  margin-top: clamp(1.2rem, 3vh, 2rem);
+  letter-spacing: 0.012em;
+  text-wrap: balance;
+  max-width: 12em;
 }
 .forge .hero h1 em {
   font-style: normal;
@@ -701,41 +663,152 @@
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+  /* the descender room background-clip:text needs, see .brand-word em */
+  padding-bottom: 0.12em;
+  margin-bottom: -0.12em;
 }
 .forge .hero-desc {
-  position: relative;
-  z-index: 1;
-  max-width: 40rem;
+  max-width: 34rem;
   color: var(--ffg-2);
-  margin-top: 1rem;
-  font-size: clamp(0.95rem, 1.4vw, 1.08rem);
+  margin-top: clamp(1rem, 2.4vh, 1.5rem);
+  font-size: clamp(1.02rem, 1.45vw, 1.3rem);
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+.forge .hero-desc b {
+  color: var(--hot);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 .forge .hero-cta {
-  position: relative;
-  z-index: 1;
   display: flex;
   flex-wrap: wrap;
   gap: 0.8rem;
-  justify-content: center;
-  margin-top: 2rem;
+  margin-top: clamp(1.4rem, 3vh, 2rem);
 }
-.forge .cue {
-  position: absolute;
-  bottom: 1.6rem;
-  left: 50%;
-  transform: translateX(-50%);
+.forge .hero-prov {
+  margin-top: clamp(1.4rem, 3vh, 2rem);
   font-family: var(--font-mono);
-  font-size: 0.68rem;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
+  font-size: 0.74rem;
+  line-height: 1.8;
+  color: var(--ffg-3);
+  max-width: 34rem;
+}
+.forge .hero-prov b {
+  color: var(--ffg-2);
+  font-weight: 500;
+}
+
+/* The proof: a terminal that shows a real answer. */
+.forge .hero-proof {
+  min-width: 0;
+  border: 1px solid var(--fedge);
+  border-radius: 12px;
+  background: #0a0908;
+  box-shadow: inset 0 1px 0 var(--fedge-lit), 0 30px 60px -24px rgba(0, 0, 0, 0.85);
+  font-family: var(--font-mono);
+  font-size: clamp(0.7rem, 0.95vw, 0.8rem);
+  line-height: 1.6;
   color: var(--ffg-3);
 }
-.forge .cue::after {
-  content: '▾';
+.forge .hp-head,
+.forge .hp-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.6rem 0.95rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  color: var(--ffg-2);
+}
+.forge .hp-head {
+  border-bottom: 1px solid var(--fst-2);
+  background: var(--fst-1);
+  border-radius: 12px 12px 0 0;
+}
+.forge .hp-foot {
+  border-top: 1px solid var(--fst-2);
+  flex-wrap: wrap;
+}
+.forge .hp-method b {
+  color: var(--amber-500);
+  font-weight: 700;
+}
+.forge .hp-input {
+  color: var(--hot);
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: clip;
+  max-width: 60%;
+}
+.forge .hp-caret {
+  display: inline-block;
+  width: 2px;
+  height: 0.95em;
+  margin-left: 2px;
+  vertical-align: -0.15em;
+  background: var(--amber-500);
+  opacity: 0;
+}
+.forge .hp-body {
+  margin: 0;
+  padding: 0.85rem 0.95rem;
+  overflow-x: auto;
+  max-height: clamp(220px, 38vh, 360px);
+  transition: opacity 0.3s ease;
+}
+.forge .hero-proof[data-phase='typing'] .hp-body,
+.forge .hero-proof[data-phase='calling'] .hp-body {
+  opacity: 0.28;
+}
+.forge .hp-ln {
   display: block;
-  text-align: center;
-  font-size: 0.9rem;
-  margin-top: 0.15rem;
+  white-space: pre;
+}
+.forge .hp-body .k {
+  color: #e7d3b0;
+}
+.forge .hp-body .s {
+  color: var(--amber-500);
+}
+.forge .hp-body .n {
+  color: var(--fquench);
+}
+.forge .hp-timing {
+  flex: 1;
+  min-width: 12rem;
+  color: var(--ffg-3);
+  letter-spacing: 0.02em;
+}
+.forge .hero-proof[data-phase='live'] .hp-timing {
+  color: var(--ffg-2);
+}
+.forge .hp-replay {
+  font: inherit;
+  color: var(--amber-500);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 0.15rem 0.45rem;
+  cursor: pointer;
+}
+.forge .hp-replay:hover,
+.forge .hp-replay:focus-visible {
+  border-color: rgba(245, 158, 11, 0.45);
+}
+.forge .hp-replay:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+@media (max-width: 960px) {
+  .forge .hero-proof {
+    font-size: 0.72rem;
+  }
+  .forge .hp-input {
+    max-width: 52%;
+  }
 }
 
 /* ── Film / stations (static default: stacked readable blocks) ── */
@@ -1474,14 +1547,28 @@
     opacity: 0;
     transform: translateY(44px);
   }
-  html.js .forge .wordmark .lt,
-  html.js .forge .wordmark .fw {
-    opacity: 0;
-    animation: fgStamp 0.5s cubic-bezier(0.2, 1.5, 0.35, 1) forwards;
+  /* The fold demo: the caret blinks while the address types itself, and the
+     answer's lines cascade in once a run has settled (data-run is set only
+     after a run, so the first paint shows the captured answer at rest). */
+  html.js .forge .hero-proof[data-phase='typing'] .hp-caret {
+    animation: hpCaret 0.9s steps(2, start) infinite;
   }
-  html.js .forge .wordmark .mark {
+  html.js .forge .hp-body[data-run] .hp-ln {
     opacity: 0;
-    animation: fgMark 0.55s cubic-bezier(0.2, 1.3, 0.4, 1) forwards;
+    transform: translateX(-6px);
+    animation: hpIn 0.38s ease-out forwards;
+    animation-delay: calc(var(--i, 0) * 55ms);
+  }
+  @keyframes hpCaret {
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes hpIn {
+    to {
+      opacity: 1;
+      transform: none;
+    }
   }
   html.js .forge .embers rect {
     animation: fgEmber 7s ease-in-out infinite;
@@ -1493,34 +1580,6 @@
   html.js .forge .embers rect:nth-child(3n) {
     animation-duration: 12s;
     animation-delay: -6s;
-  }
-  @keyframes fgStamp {
-    0% {
-      opacity: 0;
-      transform: scale(1.7);
-    }
-    62% {
-      opacity: 1;
-      transform: scale(0.96);
-    }
-    100% {
-      opacity: 1;
-      transform: scale(1);
-    }
-  }
-  @keyframes fgMark {
-    0% {
-      opacity: 0;
-      transform: translateY(-0.14em) scale(1.15);
-    }
-    70% {
-      opacity: 1;
-      transform: translateY(0.015em) scale(0.99);
-    }
-    100% {
-      opacity: 1;
-      transform: none;
-    }
   }
   @keyframes fgShake {
     0%,
@@ -1559,11 +1618,6 @@
     html.js .forge .json-out {
       max-height: 34vh;
     }
-  }
-}
-@media (max-width: 560px) {
-  .forge .wordmark {
-    white-space: normal;
   }
 }
 

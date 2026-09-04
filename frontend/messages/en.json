@@ -62,8 +62,18 @@
     },
     "badge": "Live · Europe",
     "hero": {
-      "title": "Bank data your agents can <accent>trust</accent>.",
-      "description": "Validate IBANs, resolve BIC/SWIFT and score sanctions risk — with exclusive Swiss SIX clearing data. REST for your stack, native MCP for your agents.",
+      "title": "The IBAN goes in. The BIC, the bank and the SEPA verdict <accent>come out</accent>.",
+      "description": "<b>{bic}</b> BIC entries, <b>{ch}</b> SIX clearing entries, OFAC/EU/UN screening: the data Swiss and DACH invoicing software has to serve before the November 2026 deadlines. REST, SDKs, MCP.",
+      "provenance": "Registers: GLEIF · SIX BankMaster · Bundesbank · EBA STEP2 · NBP · Bank of England",
+      "demo": {
+        "calling": "calling…",
+        "live": "{server} ms server · {rtt} ms round trip, measured on this call",
+        "captured": "{server} ms server · response captured on 7 July 2026",
+        "replay": "replay",
+        "replayAria": "Replay the request",
+        "inputAria": "IBAN sent",
+        "bodyAria": "API response"
+      },
       "cta": {
         "tryFree": "Try a request",
         "getKey": "Get a free key"

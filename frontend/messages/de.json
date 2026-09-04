@@ -62,8 +62,18 @@
     },
     "badge": "Live · Europa",
     "hero": {
-      "title": "Bankdaten, denen Ihre Agenten <accent>vertrauen</accent>.",
-      "description": "IBANs validieren, BIC/SWIFT auflösen, Sanktionsrisiko bewerten — mit exklusiven Schweizer SIX-Clearingdaten. REST für Ihren Stack, natives MCP für Ihre Agenten.",
+      "title": "Die IBAN kommt rein. BIC, Bank und SEPA-Status <accent>kommen raus</accent>.",
+      "description": "<b>{bic}</b> BIC-Einträge, <b>{ch}</b> SIX-Clearing-Einträge, OFAC/EU/UN-Screening: die Daten, die Schweizer und DACH-Rechnungssoftware vor den Umstellungen im November 2026 liefern muss. REST, SDKs, MCP.",
+      "provenance": "Register: GLEIF · SIX BankMaster · Bundesbank · EBA STEP2 · NBP · Bank of England",
+      "demo": {
+        "calling": "Aufruf läuft…",
+        "live": "{server} ms Server · {rtt} ms Umlauf, auf diesem Aufruf gemessen",
+        "captured": "{server} ms Server · Antwort aufgezeichnet am 7. Juli 2026",
+        "replay": "erneut",
+        "replayAria": "Anfrage erneut abspielen",
+        "inputAria": "Gesendete IBAN",
+        "bodyAria": "API-Antwort"
+      },
       "cta": {
         "tryFree": "Eine Anfrage testen",
         "getKey": "Kostenlosen Key holen"

@@ -5,6 +5,8 @@ import { GetKeyButton } from "@/components/api-key-dialog"
 import { Reveal } from "@/components/reveal"
 import { StatsBar } from "@/components/stats-bar"
 import { ForgeFilm, type FilmStrings } from "@/components/forge/forge-film"
+import { FoldDemo } from "@/components/forge/fold-demo"
+import { DEFAULT_RESULT } from "./playground/examples"
 import {
   getLandingStats,
   P50_PROCESSING_MS,
@@ -29,8 +31,6 @@ const ENDPOINT_COUNT = 7
    markup as trusted constants; the drift animation is CSS, js+motion gated.
    Audit 2026-09-04 (S10): 34 isolated 3×7 px rects read as compression
    artefacts on the captures, not as embers — down to a dozen in all. */
-const EMBERS_HERO = `<rect x="40" y="150" width="3" height="7" fill="#F59E0B" opacity="0.55"/><rect x="85" y="90" width="2" height="5" fill="#FCD34D" opacity="0.35"/><rect x="130" y="180" width="4" height="9" fill="#F59E0B" opacity="0.7"/><rect x="170" y="60" width="2" height="4" fill="#EF4444" opacity="0.3"/><rect x="215" y="130" width="3" height="6" fill="#F59E0B" opacity="0.5"/><rect x="255" y="200" width="5" height="10" fill="#F59E0B" opacity="0.8"/>`
-
 const EMBERS_SECTION = `<rect x="55" y="170" width="3" height="6" fill="#F59E0B" opacity="0.45"/><rect x="120" y="110" width="2" height="4" fill="#FCD34D" opacity="0.3"/><rect x="190" y="195" width="4" height="8" fill="#F59E0B" opacity="0.6"/>`
 
 const EMBERS_CTA = `<rect x="70" y="140" width="3" height="7" fill="#F59E0B" opacity="0.5"/><rect x="140" y="70" width="2" height="4" fill="#FCD34D" opacity="0.3"/><rect x="205" y="185" width="4" height="9" fill="#F59E0B" opacity="0.7"/>`
@@ -61,6 +61,7 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
   const figures = {
     bic: nf.format(liveStats.bicEntries),
     bicK: `${Math.floor(liveStats.bicEntries / 1000)}K`,
+    ch: nf.format(liveStats.chClearingEntries),
     countries: String(SUPPORTED_COUNTRIES),
   }
   const FEATURES = Array.from({ length: FEATURE_COUNT }, (_, i) => ({
@@ -118,35 +119,49 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
 
   return (
     <div className="forge">
-      {/* ── Hero: the lockup lands, the film waits below ─────────────────── */}
-      <section className="hero" aria-label="IBANforge">
-        <Embers html={EMBERS_HERO} />
-        <p className="hero-badge"><span className="dot" aria-hidden="true"></span>{t('badge')}</p>
-        <p className="wordmark" aria-hidden="true"><span className="mark"></span><span className="wtext"><span className="lt">I</span><span className="lt" style={{ animationDelay: '0.07s' }}>B</span><span className="lt" style={{ animationDelay: '0.14s' }}>A</span><span className="lt" style={{ animationDelay: '0.21s' }}>N</span><span className="fw" style={{ animationDelay: '0.34s' }}>forge</span></span></p>
-        <span className="sr-only">IBANforge</span>
-        <h1>
-          {t.rich('hero.title', {
-            accent: (chunks) => <em>{chunks}</em>,
-          })}
-        </h1>
-        <p className="hero-desc">{t('hero.description')}</p>
-        {/* Audit 2026-09-04 (S7): the primary action asked for an e-mail
-            against a promise; seeing a response is the smaller step and the
-            natural first one on an API. The key comes second. */}
-        <div className="hero-cta">
-          <Button
-            size="lg"
-            variant="amber"
-            className="px-6"
-            render={<Link href={`/${locale}/playground`} />}
-          >
-            {t('hero.cta.tryFree')}
-          </Button>
-          <GetKeyButton variant="outline" className="px-6">
-            {t('hero.cta.getKey')}
-          </GetKeyButton>
+      {/* ── The fold: the promise on the left, the proof on the right ──────
+          Audit 2026-09-04 (L3 + M1 + L1). The 149 px lockup repeated the
+          header's logo and dwarfed a 33 px h1; 56 % of the fold was empty;
+          nothing on it showed the product. The h1 is now the largest object
+          of the page, the sub-title carries the live figures and the buying
+          segment, and a real request plays beside it. */}
+      <section className="hero" aria-labelledby="h-hero">
+        <div className="hero-copy">
+          <p className="hero-badge"><span className="dot" aria-hidden="true"></span>{t('badge')} · {figures.bic} BIC</p>
+          <h1 id="h-hero">
+            {t.rich('hero.title', {
+              accent: (chunks) => <em>{chunks}</em>,
+            })}
+          </h1>
+          <p className="hero-desc">
+            {t.rich('hero.description', {
+              bic: figures.bic,
+              ch: figures.ch,
+              b: (chunks) => <b>{chunks}</b>,
+            })}
+          </p>
+          {/* Audit 2026-09-04 (S7): the primary action asked for an e-mail
+              against a promise; seeing a response is the smaller step and the
+              natural first one on an API. The key comes second. */}
+          <div className="hero-cta">
+            <Button
+              size="lg"
+              variant="amber"
+              className="px-6"
+              render={<Link href={`/${locale}/playground`} />}
+            >
+              {t('hero.cta.tryFree')}
+            </Button>
+            <GetKeyButton variant="outline" className="px-6">
+              {t('hero.cta.getKey')}
+            </GetKeyButton>
+          </div>
+          <p className="hero-prov">
+            {t('hero.provenance')}
+            {refreshedOn && <span> · {t('trust.dataNoteDated', { date: refreshedOn })}</span>}
+          </p>
         </div>
-        <p className="cue" id="forge-cue">{film.cue}</p>
+        <FoldDemo iban="CH1000230000000012345" fallback={DEFAULT_RESULT.iban} />
       </section>
 
       {/* ── The film: five forging stations, scrubbed by scroll ──────────── */}
