@@ -63,7 +63,15 @@ const nextConfig: NextConfig = {
      * `/:path*` matches `/en` and `/robots.txt` but NOT the bare `/`. That is
      * the one path a header set called "for every route" must not miss.
      */
-    return [{ source: "/(.*)", headers: SECURITY_HEADERS }];
+    return [
+      { source: "/(.*)", headers: SECURITY_HEADERS },
+      /*
+       * 2026-09-05 (evening check, decision 3A): the brand images carry a
+       * content hash in their name, so they can be cached like the scripts.
+       * A file that changes changes its name; nothing stale can survive.
+       */
+      { source: "/brand/:path*", headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }] },
+    ];
   },
   async redirects() {
     return [

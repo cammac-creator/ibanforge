@@ -13,10 +13,11 @@ import { localePath } from "@/lib/locale-path";
 // canonical + hreflang set can only be added here, alongside a `params` read.
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { locale } = await params;
+  // from the catalogue since 2026-09-05: the snippet was English in every language
+  const t = await getTranslations({ locale, namespace: "blog" });
   return {
-    title: "Blog",
-    description:
-      "Updates, guides, and changelog from the IBANforge team.",
+    title: t("metadata.title"),
+    description: t("metadata.description"),
     alternates: alternatesFor(locale, "/blog"),
   };
 }

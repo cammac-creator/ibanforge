@@ -63,7 +63,7 @@
       "demo": {
         "calling": "Aufruf läuft…",
         "live": "{server} ms Server · {rtt} ms Umlauf, auf diesem Aufruf gemessen",
-        "captured": "{server} ms Server · Antwort aufgezeichnet am {date}",
+        "captured": "unter einer Millisekunde serverseitig · Antwort aufgezeichnet am {date}",
         "replay": "erneut",
         "replayAria": "Anfrage erneut abspielen",
         "inputAria": "Gesendete IBAN",
@@ -285,8 +285,8 @@
   },
   "pricing": {
     "metadata": {
-      "title": "Preise",
-      "description": "Starten Sie kostenlos mit 200 Anfragen/Monat, kaufen Sie Credit-Packs per Karte oder USDC, oder zahlen Sie per x402 pro Aufruf. Bruchteile eines Cents pro Anfrage."
+      "title": "Preise der IBAN-API: gratis, Pro 29 $, OEM",
+      "description": "200 Anfragen pro Monat gratis, Pro für 29 $ pro Monat mit 10 000 Anfragen, Guthabenpakete ab 5 $ ohne Ablauf, Herstellerlizenz ab 149 $ pro Monat, Dateiprüfung 149 CHF."
     },
     "badge": "Transparente Preise",
     "hero": {
@@ -1015,12 +1015,16 @@
     "keyCta": {
       "prompt": "Lieber ein Formular als ein curl-Kommando? Derselbe Schlüssel, zwei Klicks, ohne Karte.",
       "button": "Kostenlosen Key holen"
+    },
+    "metadata": {
+      "title": "API-Dokumentation: IBAN, BIC, Schweizer Clearing",
+      "description": "Endpoint-Referenz, SDKs für TypeScript, Python, Java und .NET, MCP-Server, x402, Bankregister und Regeln für strukturierte Adressen."
     }
   },
   "blog": {
     "metadata": {
-      "title": "Blog",
-      "description": "Neuigkeiten, Anleitungen und Änderungsprotokoll vom IBANforge-Team."
+      "title": "Blog: Bankregister, VoP, strukturierte Adressen",
+      "description": "Leitfäden und Neuigkeiten: was sich jeden Monat in den Registern ändert, Verification of Payee, die Termine im November 2026 und die Releases."
     },
     "title": "Blog",
     "subtitle": "Neuigkeiten, Anleitungen und Änderungsprotokoll",
@@ -1205,7 +1209,29 @@
       "subtitle": "Die Dokumente, die den Dienst regeln: Bedingungen, Datenschutz, Auftragsverarbeitung, Betreiberidentität."
     },
     "englishOnly": "Vertragsdokumente werden auf Englisch bereitgestellt — die englische Fassung ist massgebend.",
-    "updated": "Aktualisiert am"
+    "updated": "Aktualisiert am",
+    "docs": {
+      "terms": {
+        "title": "Nutzungsbedingungen (Dokument auf Englisch)",
+        "description": "Nutzungsbedingungen der IBANforge-API und der Website. Massgebend ist die englische Fassung."
+      },
+      "privacy": {
+        "title": "Datenschutzerklärung (auf Englisch)",
+        "description": "Was IBANforge verarbeitet und speichert, wie lange, und Ihre Rechte nach DSG und DSGVO. Massgebend ist die englische Fassung."
+      },
+      "dpa": {
+        "title": "Auftragsverarbeitungsvertrag, DPA (auf Englisch)",
+        "description": "Vorunterzeichneter Auftragsverarbeitungsvertrag (Art. 28 DSGVO / DSG) für Kunden, die die IBANforge-API einbinden. Massgebend ist die englische Fassung."
+      },
+      "imprint": {
+        "title": "Impressum (auf Englisch)",
+        "description": "Betreiber und Kontakt für ibanforge.com und api.ibanforge.com. Massgebend ist die englische Fassung."
+      },
+      "sla": {
+        "title": "Service-Level-Vereinbarung, SLA (auf Englisch)",
+        "description": "SLA der Editor- und OEM-Lizenzen: 99,5 % monatliche Verfügbarkeit, Servicegutschriften, Messung über die öffentliche Statusseite. Massgebend ist die englische Fassung."
+      }
+    }
   },
   "status": {
     "title": "API-Status",

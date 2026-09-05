@@ -1722,7 +1722,7 @@ html[data-js] .forge .scene {
       rgba(12, 10, 9, 0) 80%,
       var(--coal) 100%
     ),
-    url('/brand/ember-ridge.webp') center bottom / cover no-repeat,
+    url('/brand/ember-ridge.2db30701.webp') center bottom / cover no-repeat,
     #000;
 }
 .forge .cta-final .wrap {
@@ -1958,7 +1958,7 @@ html[data-js] .forge .scene {
   aspect-ratio: 284 / 320;
   height: 1.7em;
   /* 6,5 Ko at 128 px instead of an 80 Ko PNG (audit 2026-09-05, n° 4). */
-  background: url('/brand/anvil-mark.webp') center / contain no-repeat;
+  background: url('/brand/anvil-mark.901fc07d.webp') center / contain no-repeat;
 }
 .brand-word {
   display: inline-flex;

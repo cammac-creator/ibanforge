@@ -63,7 +63,7 @@
       "demo": {
         "calling": "appel en cours…",
         "live": "{server} ms serveur · {rtt} ms aller-retour, mesurés sur cet appel",
-        "captured": "{server} ms serveur · réponse capturée le {date}",
+        "captured": "moins d'une milliseconde côté serveur · réponse capturée le {date}",
         "replay": "rejouer",
         "replayAria": "Rejouer la requête",
         "inputAria": "IBAN envoyé",
@@ -285,8 +285,8 @@
   },
   "pricing": {
     "metadata": {
-      "title": "Tarifs",
-      "description": "Commencez gratuitement avec 200 requêtes/mois, prépayez des packs de crédits par carte ou USDC, ou payez à l’appel via x402. Quelques fractions de centime par requête."
+      "title": "Tarifs de l'API IBAN : gratuit, Pro 29 $, OEM",
+      "description": "200 requêtes par mois gratuites, Pro à 29 $ par mois pour 10 000 requêtes, packs de crédits dès 5 $ sans expiration, licence éditeur dès 149 $ par mois, audit de fichier 149 CHF."
     },
     "badge": "Tarification transparente",
     "hero": {
@@ -1015,12 +1015,16 @@
     "keyCta": {
       "prompt": "Vous préférez un formulaire à une commande curl ? Même clé, deux clics, sans carte bancaire.",
       "button": "Obtenir une clé gratuite"
+    },
+    "metadata": {
+      "title": "Documentation de l'API : IBAN, BIC, clearing suisse",
+      "description": "Référence des endpoints, SDK TypeScript, Python, Java et .NET, serveur MCP, x402, registres bancaires et règles d'adresses structurées."
     }
   },
   "blog": {
     "metadata": {
-      "title": "Blog",
-      "description": "Actualités, guides et journal des modifications de l'équipe IBANforge."
+      "title": "Blog : registres bancaires, VoP, adresses structurées",
+      "description": "Guides et actualités : ce qui change chaque mois dans les registres, la vérification du bénéficiaire, les échéances de novembre 2026 et les versions."
     },
     "title": "Blog",
     "subtitle": "Actualités, guides et journal des modifications",
@@ -1205,7 +1209,29 @@
       "subtitle": "Les documents qui régissent le service : conditions, confidentialité, sous-traitance des données, identité de l'opérateur."
     },
     "englishOnly": "Les documents contractuels sont fournis en anglais — la version anglaise fait foi.",
-    "updated": "Mis à jour le"
+    "updated": "Mis à jour le",
+    "docs": {
+      "terms": {
+        "title": "Conditions d'utilisation (document en anglais)",
+        "description": "Conditions d'utilisation de l'API et du site IBANforge. Le document fait foi en anglais."
+      },
+      "privacy": {
+        "title": "Politique de confidentialité (en anglais)",
+        "description": "Ce qu'IBANforge traite et conserve, pendant combien de temps, et vos droits selon la LPD et le RGPD. Le document fait foi en anglais."
+      },
+      "dpa": {
+        "title": "Accord de traitement des données, DPA (en anglais)",
+        "description": "Accord de traitement des données pré-signé (art. 28 RGPD / LPD) pour les clients qui intègrent l'API IBANforge. Le document fait foi en anglais."
+      },
+      "imprint": {
+        "title": "Mentions légales (en anglais)",
+        "description": "Identité de l'exploitant et contact pour ibanforge.com et api.ibanforge.com. Le document fait foi en anglais."
+      },
+      "sla": {
+        "title": "Accord de niveau de service, SLA (en anglais)",
+        "description": "SLA des licences éditeur et OEM : disponibilité mensuelle de 99,5 %, crédits de service, mesure par la page d'état publique. Le document fait foi en anglais."
+      }
+    }
   },
   "status": {
     "title": "Statut de l'API",

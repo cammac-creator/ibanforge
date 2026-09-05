@@ -12,17 +12,17 @@ import { GetKeyButton } from "@/components/api-key-dialog"
 import { alternatesFor } from "@/lib/seo"
 import { localePath } from "@/lib/locale-path"
 
-// Title and description are still static (not per-locale) — out of scope for
-// this pass (audit 2026-09-01, WEB-01/WEB-02: `alternates` only). Converted
-// from `export const metadata` to `generateMetadata` because a segment's
-// `alternates` REPLACES its parent's rather than merging into it, so the
+// Title and description come from the catalogue since 2026-09-05 (evening
+// check): French and German searchers used to read an English snippet for a
+// page we declare French or German. `generateMetadata` and not a static
+// `metadata`: a segment's `alternates` REPLACES its parent's, so the
 // canonical + hreflang set can only be added here, alongside a `params` read.
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { locale } = await params
+  const t = await getTranslations({ locale, namespace: "pricing" })
   return {
-    title: "Pricing",
-    description:
-      "Start free with 200 requests/month, prepay credit packs by card or USDC, or pay per call with x402. Fractions of a cent per request.",
+    title: t("metadata.title"),
+    description: t("metadata.description"),
     alternates: alternatesFor(locale, "/pricing"),
   }
 }

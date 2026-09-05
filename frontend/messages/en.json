@@ -63,7 +63,7 @@
       "demo": {
         "calling": "calling…",
         "live": "{server} ms server · {rtt} ms round trip, measured on this call",
-        "captured": "{server} ms server · response captured on {date}",
+        "captured": "under a millisecond server-side · response captured on {date}",
         "replay": "replay",
         "replayAria": "Replay the request",
         "inputAria": "IBAN sent",
@@ -285,8 +285,8 @@
   },
   "pricing": {
     "metadata": {
-      "title": "Pricing",
-      "description": "Start free with 200 requests/month, prepay credit packs by card or USDC, subscribe to Pro for $29 a month, or pay per call with x402. Fractions of a cent per request."
+      "title": "IBAN API pricing: free, Pro $29, packs, OEM",
+      "description": "200 free requests a month, Pro at $29 a month for 10,000 requests, credit packs from $5 that never expire, vendor licence from $149 a month, file audit CHF 149."
     },
     "badge": "Transparent pricing",
     "hero": {
@@ -1015,12 +1015,16 @@
     "keyCta": {
       "prompt": "Prefer a form to a curl command? Same key, two clicks, no card.",
       "button": "Get a free key"
+    },
+    "metadata": {
+      "title": "API documentation: IBAN, BIC, Swiss clearing",
+      "description": "Endpoint reference, TypeScript, Python, Java and .NET SDKs, MCP server, x402, bank registers and structured-address rules."
     }
   },
   "blog": {
     "metadata": {
-      "title": "Blog",
-      "description": "Updates, guides, and changelog from the IBANforge team."
+      "title": "Blog: bank registers, VoP, structured addresses",
+      "description": "Guides and news: what changes in the registers each month, Verification of Payee, the November 2026 deadlines and the releases."
     },
     "title": "Blog",
     "subtitle": "Updates, guides, and changelog",
@@ -1205,7 +1209,29 @@
       "subtitle": "The documents that govern the service: terms, privacy, data processing, operator identity."
     },
     "englishOnly": "Contractual documents are provided in English — the English version is authoritative.",
-    "updated": "Updated"
+    "updated": "Updated",
+    "docs": {
+      "terms": {
+        "title": "Terms of Service",
+        "description": "The terms that govern use of the IBANforge API and website."
+      },
+      "privacy": {
+        "title": "Privacy Policy",
+        "description": "What data IBANforge processes, what it stores, for how long, and your rights under the Swiss FADP and the GDPR."
+      },
+      "dpa": {
+        "title": "Data Processing Agreement",
+        "description": "Pre-signed DPA (art. 28 GDPR / FADP) for customers who embed the IBANforge API — roles, processing scope, sub-processors, TOMs."
+      },
+      "imprint": {
+        "title": "Legal Notice",
+        "description": "Operator identity and contact for ibanforge.com and api.ibanforge.com."
+      },
+      "sla": {
+        "title": "Service Level Agreement",
+        "description": "SLA for Editor/OEM subscriptions — 99.5% monthly availability, service credits, measurement by the public status page."
+      }
+    }
   },
   "status": {
     "title": "API Status",

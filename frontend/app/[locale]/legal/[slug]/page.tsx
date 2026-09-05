@@ -22,9 +22,14 @@ export async function generateMetadata({
   // No "| IBANforge" suffix in either branch: the locale layout's title
   // template already appends it (WEB-20, audit 2026-09-01).
   if (!doc) return { title: "Not Found" };
+  // The documents are English by design (the English text prevails); the
+  // snippet a French or German searcher reads is not, since 2026-09-05. The
+  // catalogue carries a title and a description per document, and says so.
+  const t = await getTranslations({ locale, namespace: "legal" });
+  const key = `docs.${slug}`;
   return {
-    title: doc.meta.title,
-    description: doc.meta.description,
+    title: t.has(`${key}.title`) ? t(`${key}.title`) : doc.meta.title,
+    description: t.has(`${key}.description`) ? t(`${key}.description`) : doc.meta.description,
     alternates: alternatesFor(locale, `/legal/${slug}`),
   };
 }

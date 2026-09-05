@@ -160,7 +160,9 @@ export function FoldDemo({ iban, fallback, capturedOn }: { iban: string; fallbac
   } else if (phase === "typing" || phase === "calling") {
     timing = t("calling")
   } else {
-    timing = t("captured", { server: formatGrouped(server ?? 0.41, locale, 2), date: capturedOn })
+    // no figure on the fallback line since 2026-09-05: the in-memory capture
+    // measured 0.07 ms next to a page that publishes a 0.4 ms median
+    timing = t("captured", { date: capturedOn })
   }
 
   return (
