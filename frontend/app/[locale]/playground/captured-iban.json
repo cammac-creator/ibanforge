@@ -1,5 +1,5 @@
 {
-  "captured_at": "2026-07-07",
+  "captured_at": "2026-09-05",
   "response": {
     "iban": "CH1000230000000012345",
     "valid": true,
@@ -16,27 +16,61 @@
       "member": true,
       "schemes": [
         "SCT",
-        "SDD"
+        "SDD",
+        "SCT_INST"
       ],
-      "vop_required": false
+      "vop_required": false,
+      "vop_participant": false,
+      "basis": "epc_register"
     },
     "formatted": "CH10 0023 0000 0000 1234 5",
     "cost_usdc": 0,
     "bic": {
       "code": "UBSWCHZH",
       "bank_name": "UBS Switzerland AG",
-      "city": "Zürich"
+      "city": "Zürich",
+      "source": "IBANforge curated bank-code map",
+      "as_of": "2026-09",
+      "basis": "curated_map",
+      "authoritative": false,
+      "lei": null,
+      "lei_status": null,
+      "address": null,
+      "postal_address": {
+        "twn_nm": "ZURICH",
+        "ctry": "CH",
+        "format": "structured",
+        "source": "Redistributed SWIFT BIC directory (PeterNotenboom/SwiftCodes, MIT)",
+        "as_of": null
+      }
     },
     "issuer": {
       "type": "bank",
-      "name": "UBS Switzerland AG"
+      "name": "UBS Switzerland AG",
+      "classification": "default"
     },
     "risk_indicators": {
       "issuer_type": "bank",
       "country_risk": "standard",
       "test_bic": false,
       "sepa_reachable": true,
+      "sepa_reachable_scope": "country",
       "vop_coverage": false
+    },
+    "bank_code_check": {
+      "value": "00230",
+      "status": "verified",
+      "match": "register",
+      "register": "SIX BankMaster (Swiss IID / BC-Nummer register)",
+      "authoritative": true,
+      "institution": {
+        "name": "UBS Switzerland AG",
+        "street": "Bahnhofstrasse 45",
+        "post_code": "8098",
+        "town": "Zürich",
+        "country": "CH"
+      },
+      "as_of": "2026-09"
     },
     "clearing": {
       "iid": "00230",
@@ -46,8 +80,21 @@
       "sic": true,
       "instant_payments_chf": true,
       "eurosic": true,
-      "qr_iid": null
+      "qr_iid": "30005",
+      "qr_iid_source": "register",
+      "qr_iids": [
+        "30005",
+        "30308"
+      ]
     },
-    "processing_ms": 0.41
+    "next_steps": [
+      {
+        "code": "screen_compliance",
+        "do": "Screen the institution against sanctions, FATF status and VoP reachability before the transfer. That endpoint reads the same bank-code verdict as this one, so it will not score an unconfirmed code as an ordinary bank.",
+        "because": "bank_code_check.status is verified, so there is an institution to screen",
+        "action": "POST /v1/iban/compliance"
+      }
+    ],
+    "processing_ms": 0.07
   }
 }

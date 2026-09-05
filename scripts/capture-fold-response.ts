@@ -18,10 +18,21 @@ import { enrichResult } from '../src/lib/enrich.js';
 const IBAN = 'CH1000230000000012345';
 const OUT = resolve(process.cwd(), 'frontend/app/[locale]/playground/captured-iban.json');
 
-const start = performance.now();
-const result = validateIBAN(IBAN);
-enrichResult(result);
-result.processing_ms = Math.round((performance.now() - start) * 100) / 100;
+// The first call opens the database and fills the caches (66 ms measured on
+// 2026-09-05); the API answers warm. Five warm-up runs, then the median of
+// nine timed ones: what a warm server measures for this IBAN, neither the
+// cold outlier nor the luckiest run.
+for (let i = 0; i < 5; i++) enrichResult(validateIBAN(IBAN));
+const timings: number[] = [];
+let result = validateIBAN(IBAN);
+for (let i = 0; i < 9; i++) {
+  const start = performance.now();
+  result = validateIBAN(IBAN);
+  enrichResult(result);
+  timings.push(performance.now() - start);
+}
+timings.sort((a, b) => a - b);
+result.processing_ms = Math.round(timings[4] * 100) / 100;
 result.cost_usdc = 0;
 
 if (!result.valid || !result.bic || typeof result.bic !== 'object') {

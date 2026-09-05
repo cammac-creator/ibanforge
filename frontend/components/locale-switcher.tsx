@@ -33,6 +33,10 @@ export function LocaleSwitcher() {
     const segments = pathname.split('/');
     const hasPrefix = (routing.locales as readonly string[]).includes(segments[1] ?? '');
     const rest = `/${segments.slice(hasPrefix ? 2 : 1).join('/')}`;
+    // The middleware reads this cookie to pick the locale of an unprefixed
+    // path: without it, a reader who once opened /fr could never reach the
+    // English pages again (they bounced back to /fr/…, 2026-09-05).
+    document.cookie = `NEXT_LOCALE=${newLocale}; path=/; max-age=31536000; samesite=lax; secure`;
     router.push(localePath(newLocale, rest));
     setOpen(false);
   }

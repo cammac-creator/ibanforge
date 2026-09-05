@@ -7,7 +7,7 @@ import { routing } from "@/i18n/routing";
 import { ConditionalShell } from "@/components/conditional-shell";
 import { JsonLd } from "@/components/json-ld";
 import { ApiKeyDialogProvider } from "@/components/api-key-dialog";
-import { urlFor } from "@/lib/seo";
+import { ogImageFor, urlFor } from "@/lib/seo";
 import { LAYOUT_CLIENT_MESSAGES, pickMessages } from "@/lib/messages-pick";
 
 const inter = Inter({
@@ -107,11 +107,15 @@ export async function generateMetadata({
       siteName: "IBANforge",
       title: meta.title,
       description: meta.description,
+      // Named here since 2026-09-05: the image Next attaches on its own keeps
+      // the /en/ segment path, which now only answers a redirect.
+      images: [ogImageFor(locale)],
     },
     twitter: {
       card: "summary_large_image",
       title: meta.title,
       description: meta.description,
+      images: [ogImageFor(locale).url],
     },
   };
 }

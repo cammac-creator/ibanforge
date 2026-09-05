@@ -81,5 +81,7 @@ export function alternatesFor(locale: string, path: string = '/'): Alternates {
  */
 export function ogImageFor(locale: string): { url: string; width: number; height: number } {
   const known = (SEO_LOCALES as readonly string[]).includes(locale) ? locale : 'en';
-  return { url: urlFor(known, '/opengraph-image'), width: 1200, height: 630 };
+  // the query changes when the card is redrawn, so a crawler that cached
+  // the old one fetches the new (2026-09-05: the card was redrawn that day)
+  return { url: `${urlFor(known, '/opengraph-image')}?v=20260905`, width: 1200, height: 630 };
 }
