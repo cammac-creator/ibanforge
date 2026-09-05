@@ -795,6 +795,11 @@
 .forge .hp-timing {
   flex: 1;
   min-width: 12rem;
+  /* two lines reserved: "calling…" is one line, the measured answer two,
+     and the card below the fold moved with it (CLS 0.043, 2026-09-05) */
+  min-height: 2.8em;
+  display: flex;
+  align-items: center;
   color: var(--ffg-3);
   letter-spacing: 0.02em;
 }
@@ -1476,7 +1481,9 @@ html[data-js] .forge .scene {
 }
 @media (max-width: 980px) {
   .forge .integ-grid {
-    grid-template-columns: repeat(2, 1fr);
+    /* minmax(0, 1fr): a 1fr track keeps its min-content width and the long
+       commands pushed the second column off a phone screen (2026-09-05) */
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 @media (max-width: 560px) {
@@ -1506,6 +1513,7 @@ html[data-js] .forge .scene {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+  min-width: 0;
   min-height: 100%;
   border: 1px solid var(--fedge);
   border-radius: 10px;

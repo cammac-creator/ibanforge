@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { usePathname, useRouter } from 'next/navigation';
 import { routing } from '@/i18n/routing';
+import { localePath } from '@/lib/locale-path';
 
 const LABELS: Record<string, string> = { en: 'EN', fr: 'FR', de: 'DE' };
 
@@ -27,9 +28,12 @@ export function LocaleSwitcher() {
   }, [open]);
 
   function switchLocale(newLocale: string) {
+    // the current path with its locale prefix stripped, if it has one
+    // (English has none since 2026-09-05), then the target's prefix added
     const segments = pathname.split('/');
-    segments[1] = newLocale;
-    router.push(segments.join('/'));
+    const hasPrefix = (routing.locales as readonly string[]).includes(segments[1] ?? '');
+    const rest = `/${segments.slice(hasPrefix ? 2 : 1).join('/')}`;
+    router.push(localePath(newLocale, rest));
     setOpen(false);
   }
 

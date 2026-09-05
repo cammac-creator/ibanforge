@@ -489,14 +489,16 @@ export function createForgeScene(canvas: HTMLCanvasElement, opts: { bloom: boole
     raf = requestAnimationFrame(frame)
   }
   const start = () => { if (running) return; running = true; last = performance.now(); raf = requestAnimationFrame(frame) }
-  // One frame now, while the scene is still hidden: the shaders compile here,
-  // at idle, and not on the first scrolled frame of the film (a 1.3 s freeze
-  // measured on 2026-09-05 once the engine started loading at idle).
-  try {
-    update(0.016)
-    if (composer) composer.render()
-    else renderer.render(scene, camera)
-  } catch { /* a lost context is handled by the listeners above */ }
+  // The shaders compile now, while the scene is still hidden, and off the
+  // main thread where the driver allows it (KHR_parallel_shader_compile):
+  // the first scrolled frame of the film froze 1.3 s otherwise, and a
+  // synchronous warm-up cost 500 ms of blocking at idle on a machine without
+  // a GPU (both measured on 2026-09-05). One frame follows so the
+  // post-processing passes compile too.
+  update(0.016)
+  renderer.compileAsync(scene, camera)
+    .then(() => { if (!running) { if (composer) composer.render(); else renderer.render(scene, camera) } })
+    .catch(() => { /* a lost context is handled by the listeners above */ })
   const stop = () => { running = false; cancelAnimationFrame(raf) }
   const onVis = () => { if (document.hidden) stop() }
   document.addEventListener("visibilitychange", onVis)

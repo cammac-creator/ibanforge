@@ -79,6 +79,13 @@ const nextConfig: NextConfig = {
         permanent: true,
       },
       /*
+       * 2026-09-05 (audit n° 28): English moved from /en/* to the root. Every
+       * old URL answers a permanent redirect to its new address, in that
+       * order: the bare /en first, then everything beneath it.
+       */
+      { source: "/en", destination: "/", permanent: true },
+      { source: "/en/:path*", destination: "/:path*", permanent: true },
+      /*
        * BIZ-15 (2026-09-01): /docs/quickstart answers 404 since the 25/08
        * landing rewrite dropped the quickstart section. Inbound links and the
        * name itself meant "the docs index", so send them there rather than
@@ -86,7 +93,7 @@ const nextConfig: NextConfig = {
        * locales, otherwise `/anything/docs/quickstart` would match too.
        */
       { source: "/:locale(en|fr|de)/docs/quickstart", destination: "/:locale/docs", permanent: true },
-      { source: "/docs/quickstart", destination: "/en/docs", permanent: true },
+      { source: "/docs/quickstart", destination: "/docs", permanent: true },
       /*
        * 2026-09-02: the /live village is paused (operator decision: the idea
        * stays, the execution was judged too rough to be live). The code is
@@ -96,7 +103,7 @@ const nextConfig: NextConfig = {
        * Temporary on purpose: the page may come back in another form.
        */
       { source: "/:locale(en|fr|de)/live", destination: "/:locale/playground", permanent: false },
-      { source: "/live", destination: "/en/playground", permanent: false },
+      { source: "/live", destination: "/playground", permanent: false },
     ];
   },
 };

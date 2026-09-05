@@ -238,13 +238,14 @@ function build(root: HTMLElement) {
     defaults: { ease: "none" },
     scrollTrigger: {
       trigger: root,
-      pin,
+      // No ScrollTrigger pin since 2026-09-05: the screen is held by the CSS
+      // (`.pin` is position: sticky inside a section that reserves the
+      // track), which needs no spacer and cannot be left behind. The pinned
+      // element stayed position: fixed over the next sections on a phone
+      // after an instant jump past the film (an anchor, a scroll-to-top).
       start: "top top",
       end: () => `+=${Math.round(STATIONS * stationPx())}`,
-      // the section already has the track's height (CSS): no spacer to add
-      pinSpacing: false,
       scrub: 0.75,
-      anticipatePin: 1,
       invalidateOnRefresh: true,
       onUpdate: (self) => {
         const active = Math.min(STATIONS - 1, Math.floor(self.progress * STATIONS))
