@@ -664,6 +664,22 @@
   border-color: var(--fedge-lit);
   color: var(--hot);
 }
+/* On a phone the badge wraps: a rounded box then, not a pill cut in two. */
+@media (max-width: 480px) {
+  .forge .hero-badge {
+    white-space: normal;
+    align-items: flex-start;
+    border-radius: 14px;
+    line-height: 1.55;
+    letter-spacing: 0.14em;
+    font-size: 0.68rem;
+    padding: 0.45rem 0.85rem;
+  }
+  .forge .hero-badge .dot {
+    flex: none;
+    margin-top: 0.42em;
+  }
+}
 .forge .hero-badge .dot {
   width: 7px;
   height: 7px;
@@ -1486,29 +1502,7 @@ html[data-js] .forge .scene {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
-@media (max-width: 560px) {
-  .forge .integ-grid {
-    gap: 0.6rem;
-  }
-  .forge .integ-link {
-    padding: 0.8rem 0.85rem;
-    gap: 0.4rem;
-  }
-  .forge .integ-name {
-    font-size: 0.86rem;
-  }
-  .forge .integ-cmd {
-    font-size: 0.68rem;
-    white-space: normal;
-    overflow-wrap: anywhere;
-    padding: 0.35rem 0.5rem;
-  }
-}
-@media (max-width: 360px) {
-  .forge .integ-grid {
-    grid-template-columns: 1fr;
-  }
-}
+
 .forge .integ-link {
   display: flex;
   flex-direction: column;
@@ -1542,6 +1536,33 @@ html[data-js] .forge .scene {
   padding: 0.4rem 0.6rem;
   overflow-x: auto;
   white-space: nowrap;
+}
+/* Phones (audit 2026-09-05, n° 22, corrected the same evening): two columns
+   left the commands clipped at 390 px, and the wrap rule sat before the base
+   rule in the cascade. One column under 480 px, commands wrapped whole. */
+@media (max-width: 560px) {
+  .forge .integ-grid {
+    gap: 0.6rem;
+  }
+  .forge .integ-link {
+    padding: 0.8rem 0.85rem;
+    gap: 0.4rem;
+  }
+  .forge .integ-name {
+    font-size: 0.86rem;
+  }
+  .forge .integ-cmd {
+    font-size: 0.7rem;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    overflow-x: visible;
+    padding: 0.35rem 0.5rem;
+  }
+}
+@media (max-width: 480px) {
+  .forge .integ-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .forge .agents-rail {

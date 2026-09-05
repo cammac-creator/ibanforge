@@ -39,6 +39,15 @@ export function generateStaticParams() {
   return routing.locales.map((locale) => ({ locale }));
 }
 
+/**
+ * Only those three values exist for [locale]. Any other first segment
+ * (`/icon-512.png`, `/foo.txt`, paths the middleware leaves alone because of
+ * their dot) answers 404 before a page runs: the home used to render with
+ * locale "icon-512.png", hand it to Intl.NumberFormat and answer 500
+ * (measured on 2026-09-05).
+ */
+export const dynamicParams = false;
+
 type Props = {
   children: React.ReactNode;
   params: Promise<{ locale: string }>;

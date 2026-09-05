@@ -113,7 +113,8 @@ const ORGANIZATION = {
   '@id': 'https://ibanforge.com/#organization',
   name: 'IBANforge',
   url: 'https://ibanforge.com',
-  logo: 'https://ibanforge.com/icon-512.png',
+  // /icon.png is the one served (app/icon.png); /icon-512.png answered 500 (2026-09-05)
+  logo: 'https://ibanforge.com/icon.png',
   email: 'support@ibanforge.com',
   sameAs: [
     'https://github.com/cammac-creator/ibanforge',
