@@ -4,6 +4,7 @@ import { getTranslations } from "next-intl/server";
 import { Badge } from "@/components/ui/badge";
 import { GetKeyButton } from "@/components/api-key-dialog";
 import { alternatesFor } from "@/lib/seo";
+import { localePath } from "@/lib/locale-path";
 
 const SOURCE_URL = "https://github.com/cammac-creator/ibanforge/tree/main/integrations/sheets";
 
@@ -92,7 +93,7 @@ export default async function SheetsPage({
         <p className="text-sm text-muted-foreground leading-relaxed">{t("billing.text")}</p>
         <p className="text-sm text-muted-foreground leading-relaxed">
           {t("billing.privacy")}{" "}
-          <Link href={`/${locale}/legal/privacy`} className="underline underline-offset-2 hover:text-foreground">
+          <Link href={localePath(locale, '/legal/privacy')} className="underline underline-offset-2 hover:text-foreground">
             {t("billing.privacyLink")}
           </Link>
         </p>

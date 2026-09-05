@@ -51,7 +51,7 @@ Three things you can do about it:
 
 The direction reverses. Your Swiss bank is not obliged to check. Unless it has joined the scheme as a requesting bank, nobody compares name and IBAN before your money leaves. The check that has protected companies in the euro area since October 2025 against the classic invoice fraud, where someone swaps the IBAN on a genuine invoice, does not run for you.
 
-So the pre-check is yours: is the IBAN structurally valid? Does the national register know the bank code inside it? Does the bank behind the IBAN match the BIC on the invoice? Does the IBAN's country match the supplier's country? Does the same IBAN suddenly sit under two different suppliers in your creditor file? That is the work of a pre-check at input time, or of an [audit of the whole file before the payment run](/en/audit).
+So the pre-check is yours: is the IBAN structurally valid? Does the national register know the bank code inside it? Does the bank behind the IBAN match the BIC on the invoice? Does the IBAN's country match the supplier's country? Does the same IBAN suddenly sit under two different suppliers in your creditor file? That is the work of a pre-check at input time, or of an [audit of the whole file before the payment run](/audit).
 
 For the record, so that nobody reads more into this than there is: IBANforge is not a VoP service. The EPC scheme is reserved to regulated payment service providers, and no pre-check in the world tells you that an account belongs to a given person. It tells you what the registers know about the bank behind the IBAN, and the field `sepa.vop_participant` tells you whether the resolved institution is listed as VoP-ready. That is less than VoP, and exactly what VoP does not deliver at a Swiss bank.
 

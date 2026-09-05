@@ -15,6 +15,7 @@ import {
   SUPPORTED_COUNTRIES,
 } from "@/lib/landing-stats"
 import { alternatesFor, urlFor } from "@/lib/seo"
+import { localePath } from "@/lib/locale-path"
 
 // Title and description are generated per-locale by app/[locale]/layout.tsx —
 // do NOT define a static `metadata` here, it would override the locale-aware
@@ -155,7 +156,7 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
               sub-title states one line below and the stats band 300 px further.
               It now carries the one figure nothing else on the page shows, the
               30-day error-free rate, and opens the status page. */}
-          <Link href={`/${locale}/status`} className="hero-badge" data-evt="nav:status">
+          <Link href={localePath(locale, '/status')} className="hero-badge" data-evt="nav:status">
             <span className="dot" aria-hidden="true"></span>
             {rate30 ? t('badge', { rate: rate30 }) : t('badgeFallback')}
           </Link>
@@ -180,7 +181,7 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
               variant="amber"
               className="px-6"
               nativeButton={false}
-            render={<Link href={`/${locale}/playground`} data-evt="cta:try" />}
+            render={<Link href={localePath(locale, '/playground')} data-evt="cta:try" />}
             >
               {t('hero.cta.tryFree')}
             </Button>
@@ -190,7 +191,7 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
           </div>
           {/* The second audience, named on the fold (audit 2026-09-05, n° 20). */}
           <p className="hero-alt">
-            <Link href={`/${locale}/audit`} data-evt="cta:audit-fold">{t('hero.altDoor')}</Link>
+            <Link href={localePath(locale, '/audit')} data-evt="cta:audit-fold">{t('hero.altDoor')}</Link>
           </p>
         </div>
         <FoldDemo iban="CH1000230000000012345" fallback={DEFAULT_RESULT.iban} capturedOn={capturedOn} />
@@ -227,7 +228,7 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
           <div className="trust-cell">
             <span className="eyebrow">{t('trust.privacyLabel')}</span>
             <p className="trust-v">{t('trust.privacyValue')}</p>
-            <Link href={`/${locale}/legal/dpa`} className="trust-n" style={{ textDecoration: 'underline', textUnderlineOffset: 4 }}>
+            <Link href={localePath(locale, '/legal/dpa')} className="trust-n" style={{ textDecoration: 'underline', textUnderlineOffset: 4 }}>
               {t('trust.privacyNote')}
             </Link>
           </div>
@@ -282,10 +283,10 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
             </ul>
             <p className="deadline-text">{t('deadline.text')}</p>
             <div className="hero-cta">
-              <Button size="lg" variant="amber" className="px-6" nativeButton={false} render={<Link href={`/${locale}/docs/structured-addresses`} data-evt="cta:rules" />}>
+              <Button size="lg" variant="amber" className="px-6" nativeButton={false} render={<Link href={localePath(locale, '/docs/structured-addresses')} data-evt="cta:rules" />}>
                 {t('deadline.cta')}
               </Button>
-              <Link href={`/${locale}/audit`} className="btn-ghost-link" data-evt="cta:audit-deadline">
+              <Link href={localePath(locale, '/audit')} className="btn-ghost-link" data-evt="cta:audit-deadline">
                 {t('audit.cta')}
               </Link>
             </div>
@@ -303,7 +304,7 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
               offer of the page were announced by a negation and a ghost
               button. A full button, centred like the section. */}
           <div className="hero-cta hero-cta-center" style={{ marginTop: '1.4rem' }}>
-            <Button size="lg" variant="amber" className="px-8" nativeButton={false} render={<Link href={`/${locale}/audit`} data-evt="cta:audit" />}>
+            <Button size="lg" variant="amber" className="px-8" nativeButton={false} render={<Link href={localePath(locale, '/audit')} data-evt="cta:audit" />}>
               {t('audit.cta')}
             </Button>
           </div>
@@ -311,7 +312,7 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
       </section>
 
       {/* ── The film: four forging stations, scrubbed by scroll ──────────── */}
-      <ForgeFilm t={film} playgroundHref={`/${locale}/playground`} />
+      <ForgeFilm t={film} playgroundHref={localePath(locale, '/playground')} />
 
       {/* ── Endpoints, price-stamped ──────────────────────────────────────── */}
       <section className="sect" aria-labelledby="h-endpoints" style={{ paddingTop: 0 }}>
@@ -332,7 +333,7 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
               home (audit 2026-09-05, n° 15): one line, every plan, one link. */}
           <p className="ep-plans">
             {t('endpoints.plans')}{' '}
-            <Link href={`/${locale}/pricing`} data-evt="cta:pricing">{t('endpoints.plansLink')}</Link>
+            <Link href={localePath(locale, '/pricing')} data-evt="cta:pricing">{t('endpoints.plansLink')}</Link>
           </p>
         </div>
       </section>
@@ -345,7 +346,7 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
           <ul className="integ-grid">
             {INTEGRATIONS.map((item) => {
               const external = item.href.startsWith('http')
-              const href = external ? item.href : `/${locale}${item.href}`
+              const href = external ? item.href : localePath(locale, `${item.href}`)
               return (
                 <li key={item.key} className="integ">
                   <a
@@ -399,7 +400,7 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
             <a href="https://github.com/api-search/inbox/issues/3" target="_blank" rel="noopener noreferrer">
               {t('reviewed.linkReview')}
             </a>
-            <Link href={`/${locale}/blog/2026-08-11-graded-by-a-catalog-that-never-read-us`}>
+            <Link href={localePath(locale, '/blog/2026-08-11-graded-by-a-catalog-that-never-read-us')}>
               {t('reviewed.linkStory')}
             </Link>
           </p>
@@ -421,7 +422,7 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
               variant="outline"
               className="px-8"
               nativeButton={false}
-              render={<Link href={`/${locale}/docs`} data-evt="cta:docs" />}
+              render={<Link href={localePath(locale, '/docs')} data-evt="cta:docs" />}
             >
               {t('cta.button')}
             </Button>

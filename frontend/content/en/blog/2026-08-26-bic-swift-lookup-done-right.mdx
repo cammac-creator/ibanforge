@@ -110,12 +110,12 @@ Identity and permission are different questions. Knowing *who* an institution is
 }
 ```
 
-`basis: "lei"` says the join was made on the identifier, never on name similarity. `list_month` is a condition of the permission we were granted to use the list, so it ships with every block. And the field never answers `authorised: false`: the list covers deposit-taking alone and states in its own preamble that it does not supersede the Financial Services Register, so an absence is the absence of a claim rather than a finding. The [full story of asking for that permission](/en/blog/2026-08-25-uk-authorisation-with-permission) is its own post.
+`basis: "lei"` says the join was made on the identifier, never on name similarity. `list_month` is a condition of the permission we were granted to use the list, so it ships with every block. And the field never answers `authorised: false`: the list covers deposit-taking alone and states in its own preamble that it does not supersede the Financial Services Register, so an absence is the absence of a claim rather than a finding. The [full story of asking for that permission](/blog/2026-08-25-uk-authorisation-with-permission) is its own post.
 
 ## What the whole thing rests on
 
 121k+ BIC entries, assembled from GLEIF, the public SWIFT directory, SIX, EBA STEP2 SCT, Quelle: Deutsche Bundesbank, and NBP data, refreshed monthly — and, layered on top, the daily central-bank identity lists and the weekly sanctions and SEPA feeds. Every BIC lookup is screened against OFAC, EU and UN whether or not the directory holds a record, because a plain "not found" about a designated institution would be the most reassuring thing this endpoint could say about the least reassuring code it knows.
 
-Which register answered, what an absence means there, and how often each source moves: [data sources & provenance](/en/docs/data-sources). The country where our directory goes deepest is Switzerland, down to clearing participation and the QR-IID allocation — see [Swiss QR-IBAN & QR-IID](/en/docs/swiss-qr-iban).
+Which register answered, what an absence means there, and how often each source moves: [data sources & provenance](/docs/data-sources). The country where our directory goes deepest is Switzerland, down to clearing participation and the QR-IID allocation — see [Swiss QR-IBAN & QR-IID](/docs/swiss-qr-iban).
 
-Try any BIC above, or your own, in the [playground](/en/playground) and read the fields rather than the headline. That is the whole argument.
+Try any BIC above, or your own, in the [playground](/playground) and read the fields rather than the headline. That is the whole argument.

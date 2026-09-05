@@ -11,6 +11,7 @@ import { ClientLinks } from './client-links';
 import { FetchFailed, type Fetched } from './fetching';
 import { snapshotOnce, writableIds } from './one-clock';
 import { OverviewSection, overviewCard } from './section';
+import { localePath } from '@/lib/locale-path';
 
 /**
  * Section 2 — who to chase today.
@@ -88,8 +89,8 @@ export async function ChaseSection({
   const writable = snap ? writableIds(snap) : null;
   const tank = snap ? reservoir(snap.active) : null;
 
-  const contacts = `/${locale}/dashboard/contacts`;
-  const clientsTab = `/${locale}/dashboard/clients`;
+  const contacts = localePath(locale, '/dashboard/contacts');
+  const clientsTab = localePath(locale, '/dashboard/clients');
 
   return (
     <OverviewSection

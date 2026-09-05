@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { alternatesFor } from "@/lib/seo";
 import { apiJson, chIidFile, formatIban, getIid } from "@/lib/registers";
 import { routing } from "@/i18n/routing";
+import { localePath } from "@/lib/locale-path";
 
 export const dynamicParams = true;
 
@@ -56,7 +57,7 @@ export default async function IidPage({ params }: { params: Promise<{ locale: st
     [t("iid.facts.institution"), r.name],
     [t("iid.facts.type"), t(`iid.types.${typeKey}`)],
     [t("iid.facts.iidType"), t(`iid.types.${iidTypeKey}`)],
-    [t("iid.facts.headquarters"), api.institution?.headquarters_iid && api.institution.headquarters_iid !== r.iid ? <Link href={`/${locale}/iid/${api.institution.headquarters_iid}`} className="text-amber-500 underline underline-offset-2">{api.institution.headquarters_iid}</Link> : (api.institution?.headquarters_iid ?? t("iid.facts.none"))],
+    [t("iid.facts.headquarters"), api.institution?.headquarters_iid && api.institution.headquarters_iid !== r.iid ? <Link href={localePath(locale, `/iid/${api.institution.headquarters_iid}`)} className="text-amber-500 underline underline-offset-2">{api.institution.headquarters_iid}</Link> : (api.institution?.headquarters_iid ?? t("iid.facts.none"))],
     [t("iid.facts.address"), address || t("iid.facts.none")],
     [t("iid.facts.bic"), r.bic ?? t("iid.facts.none")],
     [t("iid.facts.services"), services.length ? services.join(" · ") : t("iid.facts.none")],
@@ -106,7 +107,7 @@ export default async function IidPage({ params }: { params: Promise<{ locale: st
           <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-sm">
             {related.map((e) => (
               <li key={e.register.iid} className="flex gap-3 truncate">
-                <Link href={`/${locale}/iid/${e.register.iid}`} className="font-mono text-amber-500 hover:text-amber-400 shrink-0">{e.register.iid}</Link>
+                <Link href={localePath(locale, `/iid/${e.register.iid}`)} className="font-mono text-amber-500 hover:text-amber-400 shrink-0">{e.register.iid}</Link>
                 <span className="text-muted-foreground truncate">{e.register.town ?? e.register.name}</span>
               </li>
             ))}
@@ -115,9 +116,9 @@ export default async function IidPage({ params }: { params: Promise<{ locale: st
       )}
 
       <section className="flex flex-wrap gap-4 text-sm">
-        <Link href={`/${locale}/playground`} className="text-amber-500 hover:text-amber-400 underline underline-offset-4">{t("common.ctaCheck")}</Link>
-        <Link href={`/${locale}/audit`} className="text-amber-500 hover:text-amber-400 underline underline-offset-4">{t("common.ctaAudit")}</Link>
-        <Link href={`/${locale}/iid`} className="text-muted-foreground hover:text-foreground underline underline-offset-4">{t("iid.indexTitle")}</Link>
+        <Link href={localePath(locale, '/playground')} className="text-amber-500 hover:text-amber-400 underline underline-offset-4">{t("common.ctaCheck")}</Link>
+        <Link href={localePath(locale, '/audit')} className="text-amber-500 hover:text-amber-400 underline underline-offset-4">{t("common.ctaAudit")}</Link>
+        <Link href={localePath(locale, '/iid')} className="text-muted-foreground hover:text-foreground underline underline-offset-4">{t("iid.indexTitle")}</Link>
       </section>
 
       <p className="text-xs text-muted-foreground">{t("common.sourceLabel")}: {file.source}, {t("common.asOfLabel")} {api.valid_on ?? r.valid_on}.</p>

@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { routeKeyFailure } from '@/lib/api-key-failure';
 import { attributionOf, readArrival, rememberArrival } from '@/lib/arrival';
 import { FirstCallPanel } from '@/components/first-call-panel';
+import { localePath } from '@/lib/locale-path';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://api.ibanforge.com';
 
@@ -355,12 +356,12 @@ export function ApiKeyDialogProvider({ children }: { children: ReactNode }) {
                 <p className="mt-3 text-[11px] leading-relaxed" style={{ color: 'var(--fg-3, #71717a)' }}>
                   {t.rich('termsNotice', {
                     terms: (chunks) => (
-                      <a href={`/${locale}/legal/terms`} target="_blank" rel="noreferrer" className="underline underline-offset-2">
+                      <a href={localePath(locale, '/legal/terms')} target="_blank" rel="noreferrer" className="underline underline-offset-2">
                         {chunks}
                       </a>
                     ),
                     privacy: (chunks) => (
-                      <a href={`/${locale}/legal/privacy`} target="_blank" rel="noreferrer" className="underline underline-offset-2">
+                      <a href={localePath(locale, '/legal/privacy')} target="_blank" rel="noreferrer" className="underline underline-offset-2">
                         {chunks}
                       </a>
                     ),

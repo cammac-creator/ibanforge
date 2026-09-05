@@ -5,6 +5,7 @@ import { Check, Scale, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { GetKeyButton } from "@/components/api-key-dialog";
 import { alternatesFor } from "@/lib/seo";
+import { localePath } from "@/lib/locale-path";
 
 export async function generateMetadata({
   params,
@@ -287,7 +288,7 @@ export default async function ComparePage({
           <GetKeyButton variant="amber" className="px-6">
             {t("cta.getKey")}
           </GetKeyButton>
-          <Button size="lg" variant="outline" className="px-6" render={<Link href={`/${locale}/playground`} />}>
+          <Button size="lg" variant="outline" className="px-6" render={<Link href={localePath(locale, '/playground')} />}>
             {t("cta.playground")}
           </Button>
         </div>

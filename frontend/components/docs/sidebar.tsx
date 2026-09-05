@@ -7,6 +7,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { ChevronRight, Menu, X, BookOpen, Zap, Server, Landmark, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { DocMeta } from "@/lib/mdx";
+import { localePath } from "@/lib/locale-path";
 
 interface DocGroup {
   labelKey: string;
@@ -47,14 +48,14 @@ export function DocsSidebar({ docs }: { docs: DocMeta[] }) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   function getHref(slug: string) {
-    return slug === "index" ? `/${locale}/docs` : `/${locale}/docs/${slug}`;
+    return slug === "index" ? localePath(locale, '/docs') : localePath(locale, `/docs/${slug}`);
   }
 
   function isActive(slug: string) {
     if (slug === "index") {
-      return pathname === `/${locale}/docs` || pathname === `/${locale}/docs/`;
+      return pathname === localePath(locale, '/docs') || pathname === localePath(locale, '/docs/');
     }
-    return pathname === `/${locale}/docs/${slug}`;
+    return pathname === localePath(locale, `/docs/${slug}`);
   }
 
   const docsBySlug = new Map(docs.map((d) => [d.slug, d]));

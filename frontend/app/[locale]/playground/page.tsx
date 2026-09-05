@@ -18,6 +18,7 @@ import {
   type PlaygroundMode,
   type Chip,
 } from "./examples"
+import { localePath } from "@/lib/locale-path"
 
 type Rec = Record<string, unknown>
 
@@ -219,7 +220,7 @@ export default function PlaygroundPage() {
           <GetKeyButton variant="amber" className="px-6">
             {t("getKey")}
           </GetKeyButton>
-          <Button variant="outline" className="px-6" render={<Link href={`/${locale}/docs`} />}>
+          <Button variant="outline" className="px-6" render={<Link href={localePath(locale, '/docs')} />}>
             {t("docsLink")}
           </Button>
         </div>

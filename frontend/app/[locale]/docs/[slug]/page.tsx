@@ -2,7 +2,7 @@ import { MDXRemote } from "next-mdx-remote/rsc";
 import { getTranslations } from "next-intl/server";
 import { getDoc, mdxOptions, mdxComponents } from "@/lib/mdx";
 import { GetKeyButton } from "@/components/api-key-dialog";
-import { alternatesFor, ogImageFor } from "@/lib/seo";
+import { alternatesFor, ogImageFor, urlFor } from "@/lib/seo";
 import { notFound } from "next/navigation";
 
 export const dynamicParams = true;
@@ -32,7 +32,7 @@ export async function generateMetadata({
   const { locale, slug } = await params;
   const doc = tryGetDoc(slug, locale);
   if (!doc) return { title: "Not Found" };
-  const url = `https://ibanforge.com/${locale}/docs/${slug}`;
+  const url = urlFor(locale, `/docs/${slug}`);
   return {
     // No brand here: the locale layout's title template already appends
     // "| IBANforge". Written out, this page used to render
@@ -67,7 +67,7 @@ export default async function DocPage({
   const doc = tryGetDoc(slug, locale);
   if (!doc) notFound();
   const t = await getTranslations({ locale, namespace: "docs" });
-  const url = `https://ibanforge.com/${locale}/docs/${slug}`;
+  const url = urlFor(locale, `/docs/${slug}`);
 
   // TechArticle + BreadcrumbList, built from the frontmatter every doc already
   // has — never a per-slug special case. The sibling sidebar carries a "never
@@ -90,8 +90,8 @@ export default async function DocPage({
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
     itemListElement: [
-      { "@type": "ListItem", position: 1, name: "Home", item: `https://ibanforge.com/${locale}` },
-      { "@type": "ListItem", position: 2, name: "Docs", item: `https://ibanforge.com/${locale}/docs` },
+      { "@type": "ListItem", position: 1, name: "Home", item: urlFor(locale) },
+      { "@type": "ListItem", position: 2, name: "Docs", item: urlFor(locale, '/docs') },
       { "@type": "ListItem", position: 3, name: doc.meta.title, item: url },
     ],
   };

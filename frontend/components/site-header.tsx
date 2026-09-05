@@ -8,6 +8,7 @@ import { Menu, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { LocaleSwitcher } from "@/components/locale-switcher"
 import { BrandWordmark } from "@/components/brand-wordmark"
+import { localePath } from "@/lib/locale-path"
 
 /** Ties the hamburger's `aria-controls` to the menu it opens. */
 const MOBILE_MENU_ID = "site-mobile-menu"
@@ -19,12 +20,12 @@ export function SiteHeader() {
   const pathname = usePathname()
 
   const navLinks = [
-    { href: `/${locale}/agents`, label: t("nav.agents") },
-    { href: `/${locale}/docs`, label: t("nav.docs") },
-    { href: `/${locale}/playground`, label: t("nav.playground") },
-    { href: `/${locale}/pricing`, label: t("nav.pricing") },
-    { href: `/${locale}/audit`, label: t("nav.audit") },
-    { href: `/${locale}/blog`, label: t("nav.blog") },
+    { href: localePath(locale, '/agents'), label: t("nav.agents") },
+    { href: localePath(locale, '/docs'), label: t("nav.docs") },
+    { href: localePath(locale, '/playground'), label: t("nav.playground") },
+    { href: localePath(locale, '/pricing'), label: t("nav.pricing") },
+    { href: localePath(locale, '/audit'), label: t("nav.audit") },
+    { href: localePath(locale, '/blog'), label: t("nav.blog") },
   ]
 
   return (
@@ -32,7 +33,7 @@ export function SiteHeader() {
       <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         {/* Logo */}
         <Link
-          href={`/${locale}`}
+          href={localePath(locale)}
           className="flex items-center gap-2.5"
         >
           <span className="brand-mark" aria-hidden="true" />
@@ -69,7 +70,7 @@ export function SiteHeader() {
               clicked the most visible control of the site and hit a locked
               door. The account page is the visitor's own key. */}
           <Link
-            href={`/${locale}/account`}
+            href={localePath(locale, '/account')}
             data-evt="nav:key"
             className="hidden lg:inline-flex items-center h-8 px-3 rounded-lg border border-primary/40 bg-primary/10 text-primary text-sm font-medium hover:bg-primary/20 transition-colors"
           >
@@ -123,7 +124,7 @@ export function SiteHeader() {
             </Link>
           ))}
           <Link
-            href={`/${locale}/account`}
+            href={localePath(locale, '/account')}
             onClick={() => setMobileOpen(false)}
             className="mt-1 px-3 py-2 rounded-md text-sm font-medium text-primary hover:bg-primary/10 transition-colors"
           >

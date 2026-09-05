@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl";
 import { Download, Loader2, Printer } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { AuditSummaryView, type AuditStatus } from "@/components/audit-summary";
+import { localePath } from "@/lib/locale-path";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "https://api.ibanforge.com";
 
@@ -57,7 +58,7 @@ export function AuditDoneClient({ locale }: { locale: string }) {
       <div className="flex flex-col gap-4">
         <h1 className="text-2xl font-semibold tracking-tight">{t("done.missingTitle")}</h1>
         <p className="text-muted-foreground">{t("done.missing")}</p>
-        <Link href={`/${locale}/audit`} className="underline">
+        <Link href={localePath(locale, '/audit')} className="underline">
           {t("done.back")}
         </Link>
       </div>
@@ -99,7 +100,7 @@ export function AuditDoneClient({ locale }: { locale: string }) {
         <p className="text-xs text-muted-foreground">{t("done.retention")}</p>
       ) : null}
       <p className="text-sm text-muted-foreground print:hidden">
-        <Link href={`/${locale}/audit`} className="underline">
+        <Link href={localePath(locale, '/audit')} className="underline">
           {t("done.back")}
         </Link>
       </p>

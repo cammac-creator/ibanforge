@@ -1,3 +1,4 @@
+import { localePath } from '@/lib/locale-path'
 /**
  * Deep links from the Clients tab into a Contacts thread.
  *
@@ -13,7 +14,7 @@ export const CLIENT_PARAM = 'client';
 
 export function contactsHref(locale: string, contactId: string): string {
   const params = new URLSearchParams({ [CLIENT_PARAM]: contactId.toLowerCase() });
-  return `/${locale}/dashboard/contacts?${params}`;
+  return localePath(locale, `/dashboard/contacts?${params}`);
 }
 
 /**
@@ -25,7 +26,7 @@ export const OPEN_PARAM = 'open';
 
 export function clientsHref(locale: string, clientId: string): string {
   const params = new URLSearchParams({ [OPEN_PARAM]: clientId.toLowerCase() });
-  return `/${locale}/dashboard/clients?${params}`;
+  return localePath(locale, `/dashboard/clients?${params}`);
 }
 
 /**
@@ -40,7 +41,7 @@ export const AGENT_PARAM = 'ua';
 
 export function botsHref(locale: string, userAgent: string): string {
   const params = new URLSearchParams({ [AGENT_PARAM]: userAgent });
-  return `/${locale}/dashboard/clients-bot?${params}`;
+  return localePath(locale, `/dashboard/clients-bot?${params}`);
 }
 
 /**

@@ -2,9 +2,10 @@ import { MDXRemote } from "next-mdx-remote/rsc";
 import { getTranslations } from "next-intl/server";
 import { getPost } from "@/lib/blog";
 import { mdxOptions, mdxComponents } from "@/lib/mdx";
-import { alternatesFor, ogImageFor } from "@/lib/seo";
+import { alternatesFor, ogImageFor, urlFor } from "@/lib/seo";
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { localePath } from "@/lib/locale-path";
 
 export const dynamicParams = true;
 
@@ -24,7 +25,7 @@ export async function generateMetadata({
   const { locale, slug } = await params;
   const post = tryGetPost(slug, locale);
   if (!post) return { title: { absolute: "Not Found — IBANforge Blog" } };
-  const url = `https://ibanforge.com/${locale}/blog/${slug}`;
+  const url = urlFor(locale, `/blog/${slug}`);
   return {
     // `absolute` opts out of the layout's "%s | IBANforge" template, so the
     // brand appears exactly once here already (WEB-20 does not bite on this
@@ -60,7 +61,7 @@ export default async function BlogPostPage({
   if (!post) notFound();
 
   const { meta, content } = post;
-  const url = `https://ibanforge.com/${locale}/blog/${slug}`;
+  const url = urlFor(locale, `/blog/${slug}`);
 
   const articleLd = {
     "@context": "https://schema.org",
@@ -87,7 +88,7 @@ export default async function BlogPostPage({
       />
       <div className="mb-10">
         <Link
-          href={`/${locale}/blog`}
+          href={localePath(locale, '/blog')}
           className="text-sm text-muted-foreground hover:text-foreground transition-colors mb-8 inline-block"
         >
           {t('backToBlog')}

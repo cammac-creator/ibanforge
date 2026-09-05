@@ -10,7 +10,7 @@ describe('contactsHref', () => {
 
   it('escapes an address with a plus, which a bare query string would eat', () => {
     // "a+b@x.net" unescaped comes back as "a b@x.net" and matches nobody.
-    expect(contactsHref('en', 'a+b@x.net')).toBe('/en/dashboard/contacts?client=a%2Bb%40x.net');
+    expect(contactsHref('en', 'a+b@x.net')).toBe('/dashboard/contacts?client=a%2Bb%40x.net');
   });
 });
 

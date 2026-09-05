@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { useLocale, useTranslations } from "next-intl"
 import { Separator } from "@/components/ui/separator"
+import { localePath } from "@/lib/locale-path"
 
 export function SiteFooter() {
   const t = useTranslations("footer")
@@ -10,44 +11,44 @@ export function SiteFooter() {
     {
       title: t("column.product"),
       links: [
-        { href: `/${locale}/agents`, label: t("link.agents") },
-        { href: `/${locale}/docs`, label: t("link.docs") },
-        { href: `/${locale}/playground`, label: t("link.playground") },
-        { href: `/${locale}/pricing`, label: t("link.pricing") },
-        { href: `/${locale}/audit`, label: t("link.audit") },
-        { href: `/${locale}/sheets`, label: t("link.sheets") },
-        { href: `/${locale}/blz`, label: t("link.blz") },
-        { href: `/${locale}/iid`, label: t("link.iid") },
-        { href: `/${locale}/at`, label: t("link.at") },
-        { href: `/${locale}/be`, label: t("link.be") },
-        { href: `/${locale}/vendors`, label: t("link.vendors") },
-        { href: `/${locale}/compare`, label: t("link.compare") },
-        { href: `/${locale}/openapi`, label: t("link.openapi") },
+        { href: localePath(locale, '/agents'), label: t("link.agents") },
+        { href: localePath(locale, '/docs'), label: t("link.docs") },
+        { href: localePath(locale, '/playground'), label: t("link.playground") },
+        { href: localePath(locale, '/pricing'), label: t("link.pricing") },
+        { href: localePath(locale, '/audit'), label: t("link.audit") },
+        { href: localePath(locale, '/sheets'), label: t("link.sheets") },
+        { href: localePath(locale, '/blz'), label: t("link.blz") },
+        { href: localePath(locale, '/iid'), label: t("link.iid") },
+        { href: localePath(locale, '/at'), label: t("link.at") },
+        { href: localePath(locale, '/be'), label: t("link.be") },
+        { href: localePath(locale, '/vendors'), label: t("link.vendors") },
+        { href: localePath(locale, '/compare'), label: t("link.compare") },
+        { href: localePath(locale, '/openapi'), label: t("link.openapi") },
       ],
     },
     {
       title: t("column.developers"),
       links: [
         { href: "https://github.com/cammac-creator/ibanforge", label: t("link.github"), external: true },
-        { href: `/${locale}/docs/mcp`, label: t("link.mcp") },
-        { href: `/${locale}/status`, label: t("link.apiStatus") },
+        { href: localePath(locale, '/docs/mcp'), label: t("link.mcp") },
+        { href: localePath(locale, '/status'), label: t("link.apiStatus") },
         // Next to API Status on purpose: both answer "is it working" — one for
         // the service, one for the caller's own key. Without a link here the
         // page was reachable only from an email, so a customer who deleted it
         // had no way back and search engines had none either.
-        { href: `/${locale}/account`, label: t("link.account") },
-        { href: `/${locale}/changelog`, label: t("link.changelog") },
+        { href: localePath(locale, '/account'), label: t("link.account") },
+        { href: localePath(locale, '/changelog'), label: t("link.changelog") },
         { href: "mailto:support@ibanforge.com", label: t("link.support"), external: true },
       ],
     },
     {
       title: t("column.legal"),
       links: [
-        { href: `/${locale}/sources`, label: t("link.sources") },
-        { href: `/${locale}/legal/terms`, label: t("link.terms") },
-        { href: `/${locale}/legal/privacy`, label: t("link.privacy") },
-        { href: `/${locale}/legal/dpa`, label: t("link.dpa") },
-        { href: `/${locale}/legal/imprint`, label: t("link.imprint") },
+        { href: localePath(locale, '/sources'), label: t("link.sources") },
+        { href: localePath(locale, '/legal/terms'), label: t("link.terms") },
+        { href: localePath(locale, '/legal/privacy'), label: t("link.privacy") },
+        { href: localePath(locale, '/legal/dpa'), label: t("link.dpa") },
+        { href: localePath(locale, '/legal/imprint'), label: t("link.imprint") },
         { href: "https://github.com/cammac-creator/ibanforge", label: t("link.openSource"), external: true },
       ],
     },
@@ -58,7 +59,7 @@ export function SiteFooter() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="py-8 sm:py-10 grid grid-cols-2 gap-x-6 gap-y-7 sm:grid-cols-4 sm:gap-8">
           <div className="col-span-2 sm:col-span-1">
-            <Link href={`/${locale}`} className="font-bold font-mono text-primary">
+            <Link href={localePath(locale)} className="font-bold font-mono text-primary">
               IBANforge
             </Link>
             <p className="mt-2 text-xs text-muted-foreground leading-relaxed max-w-52">

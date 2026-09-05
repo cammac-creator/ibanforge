@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { alternatesFor } from "@/lib/seo";
 import { apiJson, deBlzFile, formatIban, getBlz } from "@/lib/registers";
 import { routing } from "@/i18n/routing";
+import { localePath } from "@/lib/locale-path";
 
 export const dynamicParams = true;
 
@@ -64,7 +65,7 @@ export default async function BlzPage({ params }: { params: Promise<{ locale: st
                 <th scope="row" className="px-3 py-2 text-left font-medium text-muted-foreground whitespace-nowrap w-44">{k}</th>
                 <td className="px-3 py-2 font-mono text-xs sm:text-sm">
                   {k === t("blz.facts.successor") && r.successor_blz ? (
-                    <Link href={`/${locale}/blz/${r.successor_blz}`} className="text-amber-500 underline underline-offset-2">{v}</Link>
+                    <Link href={localePath(locale, `/blz/${r.successor_blz}`)} className="text-amber-500 underline underline-offset-2">{v}</Link>
                   ) : v}
                 </td>
               </tr>
@@ -92,7 +93,7 @@ export default async function BlzPage({ params }: { params: Promise<{ locale: st
           <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-sm">
             {related.map((e) => (
               <li key={e.register.blz} className="flex gap-3 truncate">
-                <Link href={`/${locale}/blz/${e.register.blz}`} className="font-mono text-amber-500 hover:text-amber-400 shrink-0">{e.register.blz}</Link>
+                <Link href={localePath(locale, `/blz/${e.register.blz}`)} className="font-mono text-amber-500 hover:text-amber-400 shrink-0">{e.register.blz}</Link>
                 <span className="text-muted-foreground truncate">{e.register.town ?? e.register.name}</span>
               </li>
             ))}
@@ -101,9 +102,9 @@ export default async function BlzPage({ params }: { params: Promise<{ locale: st
       )}
 
       <section className="flex flex-wrap gap-4 text-sm">
-        <Link href={`/${locale}/playground`} className="text-amber-500 hover:text-amber-400 underline underline-offset-4">{t("common.ctaCheck")}</Link>
-        <Link href={`/${locale}/audit`} className="text-amber-500 hover:text-amber-400 underline underline-offset-4">{t("common.ctaAudit")}</Link>
-        <Link href={`/${locale}/blz`} className="text-muted-foreground hover:text-foreground underline underline-offset-4">{t("blz.indexTitle")}</Link>
+        <Link href={localePath(locale, '/playground')} className="text-amber-500 hover:text-amber-400 underline underline-offset-4">{t("common.ctaCheck")}</Link>
+        <Link href={localePath(locale, '/audit')} className="text-amber-500 hover:text-amber-400 underline underline-offset-4">{t("common.ctaAudit")}</Link>
+        <Link href={localePath(locale, '/blz')} className="text-muted-foreground hover:text-foreground underline underline-offset-4">{t("blz.indexTitle")}</Link>
       </section>
 
       <p className="text-xs text-muted-foreground">{t("common.sourceLabel")}: {file.source}, {t("common.asOfLabel")} {r.as_of}.</p>

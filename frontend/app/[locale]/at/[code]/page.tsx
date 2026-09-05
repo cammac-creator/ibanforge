@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { alternatesFor } from "@/lib/seo";
 import { apiJson, atBlzFile, formatIban, getAtCode } from "@/lib/registers";
 import { routing } from "@/i18n/routing";
+import { localePath } from "@/lib/locale-path";
 
 export const dynamicParams = true;
 
@@ -82,7 +83,7 @@ export default async function AtCodePage({ params }: { params: Promise<{ locale:
           <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-sm">
             {related.map((e) => (
               <li key={e.register.code} className="flex gap-3 truncate">
-                <Link href={`/${locale}/at/${e.register.code}`} className="font-mono text-amber-500 hover:text-amber-400 shrink-0">{e.register.code}</Link>
+                <Link href={localePath(locale, `/at/${e.register.code}`)} className="font-mono text-amber-500 hover:text-amber-400 shrink-0">{e.register.code}</Link>
                 <span className="text-muted-foreground truncate">{e.register.town ?? e.register.name}</span>
               </li>
             ))}
@@ -91,10 +92,10 @@ export default async function AtCodePage({ params }: { params: Promise<{ locale:
       )}
 
       <section className="flex flex-wrap gap-4 text-sm">
-        <Link href={`/${locale}/playground`} className="text-amber-500 hover:text-amber-400 underline underline-offset-4">{t("common.ctaCheck")}</Link>
-        <Link href={`/${locale}/audit`} className="text-amber-500 hover:text-amber-400 underline underline-offset-4">{t("common.ctaAudit")}</Link>
-        <Link href={`/${locale}/docs/at-bank-codes`} className="text-muted-foreground hover:text-foreground underline underline-offset-4">{t("at.docLink")}</Link>
-        <Link href={`/${locale}/at`} className="text-muted-foreground hover:text-foreground underline underline-offset-4">{t("at.indexTitle")}</Link>
+        <Link href={localePath(locale, '/playground')} className="text-amber-500 hover:text-amber-400 underline underline-offset-4">{t("common.ctaCheck")}</Link>
+        <Link href={localePath(locale, '/audit')} className="text-amber-500 hover:text-amber-400 underline underline-offset-4">{t("common.ctaAudit")}</Link>
+        <Link href={localePath(locale, '/docs/at-bank-codes')} className="text-muted-foreground hover:text-foreground underline underline-offset-4">{t("at.docLink")}</Link>
+        <Link href={localePath(locale, '/at')} className="text-muted-foreground hover:text-foreground underline underline-offset-4">{t("at.indexTitle")}</Link>
       </section>
 
       <p className="text-xs text-muted-foreground">{t("common.sourceLabel")}: {file.source}, {t("common.asOfLabel")} {r.as_of}.</p>

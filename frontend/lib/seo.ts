@@ -21,6 +21,8 @@
  * same layout already said `fr_FR` and `de_DE`.
  */
 
+import { localePath } from './locale-path';
+
 export const SITE_URL = 'https://ibanforge.com';
 
 /** Mirrors `i18n/routing.ts`. Kept as a literal so the return type stays exact. */
@@ -44,9 +46,13 @@ function normalizePath(path: string): string {
   return trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
 }
 
-/** The absolute URL of `path` in `locale`. The locale prefix is always present. */
+/**
+ * The absolute URL of `path` in `locale`. English lives at the root since
+ * 2026-09-05 (audit n° 28): `https://ibanforge.com/docs`, and the home is
+ * `https://ibanforge.com/`, the URL every inbound link already carries.
+ */
 export function urlFor(locale: string, path: string = '/'): string {
-  return `${SITE_URL}/${locale}${normalizePath(path)}`;
+  return `${SITE_URL}${localePath(locale, normalizePath(path) || '/')}`;
 }
 
 /**
@@ -75,5 +81,5 @@ export function alternatesFor(locale: string, path: string = '/'): Alternates {
  */
 export function ogImageFor(locale: string): { url: string; width: number; height: number } {
   const known = (SEO_LOCALES as readonly string[]).includes(locale) ? locale : 'en';
-  return { url: `${SITE_URL}/${known}/opengraph-image`, width: 1200, height: 630 };
+  return { url: urlFor(known, '/opengraph-image'), width: 1200, height: 630 };
 }

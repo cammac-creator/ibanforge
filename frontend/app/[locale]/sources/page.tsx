@@ -3,6 +3,7 @@ import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { ArrowRight, FileCheck2, Landmark, Ruler, ScrollText } from "lucide-react";
 import { alternatesFor } from "@/lib/seo";
+import { localePath } from "@/lib/locale-path";
 
 export async function generateMetadata({
   params,
@@ -104,7 +105,7 @@ export default async function SourcesPage({
         </div>
         <p className="text-sm text-muted-foreground leading-relaxed max-w-3xl">{t("registers.body")}</p>
         <Link
-          href={`/${locale}/docs/data-sources`}
+          href={localePath(locale, '/docs/data-sources')}
           className="mt-3 inline-flex items-center gap-1.5 text-sm text-amber-500 hover:text-amber-400 underline underline-offset-4 transition-colors"
         >
           {t("registers.link")}
@@ -129,13 +130,13 @@ export default async function SourcesPage({
         </div>
         <div className="mt-6 flex flex-col sm:flex-row gap-x-8 gap-y-2">
           <Link
-            href={`/${locale}/docs/data-sources`}
+            href={localePath(locale, '/docs/data-sources')}
             className="text-sm text-amber-500 hover:text-amber-400 underline underline-offset-4 transition-colors"
           >
             {t("cta.docs")}
           </Link>
           <Link
-            href={`/${locale}/changelog`}
+            href={localePath(locale, '/changelog')}
             className="text-sm text-amber-500 hover:text-amber-400 underline underline-offset-4 transition-colors"
           >
             {t("cta.changelog")}

@@ -7,6 +7,7 @@ import {
   fetchClientProfiles,
   fetchCompanyProfiles,
 } from '@/lib/crm/client-dossiers';
+import { localePath } from '@/lib/locale-path';
 
 export const dynamic = 'force-dynamic';
 
@@ -81,7 +82,7 @@ export default async function ClientsBotPage() {
       <p className="text-[12.5px] text-[var(--fg-4)]">
         La courbe du trafic jour par jour est sur la{' '}
         <a
-          href={`/${locale}/dashboard`}
+          href={localePath(locale, '/dashboard')}
           className="underline decoration-dotted underline-offset-2 hover:text-[var(--fg-1)]"
         >
           Vue d&apos;ensemble

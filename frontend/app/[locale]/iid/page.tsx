@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { RegisterSearch } from "@/components/register-search";
 import { alternatesFor } from "@/lib/seo";
 import { chIidFile } from "@/lib/registers";
+import { localePath } from "@/lib/locale-path";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
   const { locale } = await params;
@@ -29,7 +30,7 @@ export default async function IidIndexPage({ params }: { params: Promise<{ local
       <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-sm">
         {rows.map((e) => (
           <li key={e.register.iid} className="flex gap-3 truncate">
-            <Link href={`/${locale}/iid/${e.register.iid}`} className="font-mono text-amber-500 hover:text-amber-400 shrink-0">{e.register.iid}</Link>
+            <Link href={localePath(locale, `/iid/${e.register.iid}`)} className="font-mono text-amber-500 hover:text-amber-400 shrink-0">{e.register.iid}</Link>
             <span className="text-muted-foreground truncate">{e.register.name}{e.register.town ? `, ${e.register.town}` : ""}</span>
           </li>
         ))}

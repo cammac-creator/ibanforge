@@ -4,6 +4,7 @@ import { getAllPosts } from "@/lib/blog";
 
 import type { Metadata } from "next";
 import { alternatesFor } from "@/lib/seo";
+import { localePath } from "@/lib/locale-path";
 
 // Title and description are still static (not per-locale) — out of scope for
 // this pass (audit 2026-09-01, WEB-01/WEB-02: `alternates` only). Converted
@@ -58,7 +59,7 @@ export default async function BlogPage({ params }: { params: Promise<{ locale: s
               </div>
               <h2 className="text-2xl font-heading font-semibold tracking-tight text-foreground mb-2">
                 <Link
-                  href={`/${locale}/blog/${post.slug}`}
+                  href={localePath(locale, `/blog/${post.slug}`)}
                   className="hover:text-primary transition-colors"
                 >
                   {post.title}
@@ -70,7 +71,7 @@ export default async function BlogPage({ params }: { params: Promise<{ locale: s
                 </p>
               )}
               <Link
-                href={`/${locale}/blog/${post.slug}`}
+                href={localePath(locale, `/blog/${post.slug}`)}
                 className="text-sm font-medium text-primary hover:underline"
               >
                 {t('readMore')}

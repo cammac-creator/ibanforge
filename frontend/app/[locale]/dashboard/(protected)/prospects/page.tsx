@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation';
+import { localePath } from '@/lib/locale-path';
 
 /**
  * Clients and prospects were two near-twin pages. They are one page now, at
@@ -10,5 +11,5 @@ import { redirect } from 'next/navigation';
  */
 export default async function ProspectsPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
-  redirect(`/${locale}/dashboard/contacts?vue=prospection`);
+  redirect(localePath(locale, '/dashboard/contacts?vue=prospection'));
 }

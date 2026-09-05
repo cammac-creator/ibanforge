@@ -5,6 +5,7 @@ import { alternatesFor } from "@/lib/seo";
 import { getTranslations } from "next-intl/server";
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { localePath } from "@/lib/locale-path";
 
 // Fully dynamic, exactly like docs/[slug]: under this project's next-intl
 // setup the locale comes from the request, so any static/ISR rendering of a
@@ -42,7 +43,7 @@ export default async function LegalPage({
     <article className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8 py-10">
       <div className="mb-6 flex items-center justify-between gap-4 flex-wrap">
         <Link
-          href={`/${locale}/legal`}
+          href={localePath(locale, '/legal')}
           className="text-xs font-mono uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
         >
           ← {t("index.title")}

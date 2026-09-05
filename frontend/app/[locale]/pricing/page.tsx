@@ -10,6 +10,7 @@ import { Faq } from "./faq"
 import { ClientMessages } from "@/components/client-messages"
 import { GetKeyButton } from "@/components/api-key-dialog"
 import { alternatesFor } from "@/lib/seo"
+import { localePath } from "@/lib/locale-path"
 
 // Title and description are still static (not per-locale) — out of scope for
 // this pass (audit 2026-09-01, WEB-01/WEB-02: `alternates` only). Converted
@@ -105,7 +106,7 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
             size="lg"
             variant="outline"
             className="px-6"
-            render={<Link href={`/${locale}/playground`} />}
+            render={<Link href={localePath(locale, '/playground')} />}
           >
             {t('hero.cta.tryFree')}
           </Button>
@@ -172,7 +173,7 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
             <h3 className="text-lg font-semibold">{t('rails.x402.title')}</h3>
             <p className="text-sm text-muted-foreground leading-relaxed flex-1">{t('rails.x402.body')}</p>
             <Link
-              href={`/${locale}/docs/x402`}
+              href={localePath(locale, '/docs/x402')}
               className="text-sm text-amber-500 hover:text-amber-400 underline underline-offset-4 transition-colors w-fit"
             >
               {t('rails.x402.cta')}
@@ -182,7 +183,7 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
         <p className="mt-6 text-center text-xs text-muted-foreground">
           {t.rich('rails.termsNotice', {
             terms: (chunks) => (
-              <Link href={`/${locale}/legal/terms`} className="underline underline-offset-2 hover:text-foreground">
+              <Link href={localePath(locale, '/legal/terms')} className="underline underline-offset-2 hover:text-foreground">
                 {chunks}
               </Link>
             ),
@@ -194,7 +195,7 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
         <p className="mt-2 text-center text-xs text-muted-foreground">
           {t.rich('rails.dataNotice', {
             sources: (chunks) => (
-              <Link href={`/${locale}/docs/data-sources`} className="underline underline-offset-2 hover:text-foreground">
+              <Link href={localePath(locale, '/docs/data-sources')} className="underline underline-offset-2 hover:text-foreground">
                 {chunks}
               </Link>
             ),
@@ -303,7 +304,7 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
             </p>
           </div>
           <Link
-            href={`/${locale}/playground`}
+            href={localePath(locale, '/playground')}
             className="shrink-0 text-sm text-amber-500 hover:text-amber-400 underline underline-offset-4 transition-colors"
           >
             {t('free.playgroundLink')}
@@ -345,7 +346,7 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
               ))}
             </ul>
             <Link
-              href={`/${locale}/docs/x402`}
+              href={localePath(locale, '/docs/x402')}
               className="text-sm text-amber-500 hover:text-amber-400 underline underline-offset-4 transition-colors w-fit mt-1"
             >
               {t('x402.docsLink')}
@@ -382,7 +383,7 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
             {t('audit.text')}
           </p>
           <Link
-            href={`/${locale}/audit`}
+            href={localePath(locale, '/audit')}
             className="font-mono text-sm text-amber-500 hover:text-amber-400 underline underline-offset-4 transition-colors"
           >
             {t('audit.cta')}
@@ -401,7 +402,7 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
             {t('oem.text')}
           </p>
           <Link
-            href={`/${locale}/vendors`}
+            href={localePath(locale, '/vendors')}
             className="font-mono text-sm text-amber-500 hover:text-amber-400 underline underline-offset-4 transition-colors"
           >
             {t('oem.cta')}
@@ -422,7 +423,7 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
             variant="amber"
             size="lg"
             className="px-8"
-            render={<Link href={`/${locale}/playground`} />}
+            render={<Link href={localePath(locale, '/playground')} />}
           >
             {t('cta.openPlayground')}
           </Button>
@@ -430,7 +431,7 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
             size="lg"
             variant="outline"
             className="px-8"
-            render={<Link href={`/${locale}/docs`} />}
+            render={<Link href={localePath(locale, '/docs')} />}
           >
             {t('cta.readDocs')}
           </Button>

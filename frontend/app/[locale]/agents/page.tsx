@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { EndpointRow } from "@/components/ui/endpoint-row";
 import { StatusDot } from "@/components/ui/status-dot";
+import { localePath } from "@/lib/locale-path";
 
 /**
  * Translated, and correct about what we ship.
@@ -465,7 +466,7 @@ export default async function AgentsPage({
           size="lg"
           variant="amber"
           className="px-8 mt-2"
-          render={<Link href={`/${locale}/playground`} />}
+          render={<Link href={localePath(locale, '/playground')} />}
         >
           {t("cta.button")}
         </Button>

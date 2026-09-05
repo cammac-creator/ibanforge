@@ -4,7 +4,7 @@ description: "UK PRA authorisation status is now part of every GB lookup — joi
 date: "2026-08-25"
 ---
 
-The United Kingdom has been the odd one out in our [data sources inventory](/en/docs/data-sources): the country with the heaviest real usage of this API, and the only major one where we served no authoritative institution data at all. The obvious source existed the whole time — the Bank of England publishes a monthly **List of PRA-regulated Banks**, a clean CSV with firm names, FRNs and LEIs. What did not exist was the right to use it: the Bank's website terms default to personal or internal, non-commercial use, and the list itself carries no licence.
+The United Kingdom has been the odd one out in our [data sources inventory](/docs/data-sources): the country with the heaviest real usage of this API, and the only major one where we served no authoritative institution data at all. The obvious source existed the whole time — the Bank of England publishes a monthly **List of PRA-regulated Banks**, a clean CSV with firm names, FRNs and LEIs. What did not exist was the right to use it: the Bank's website terms default to personal or internal, non-commercial use, and the list itself carries no licence.
 
 Our rule for cases like this is written in the inventory: **a supposed licence is worse than an unknown one**. So we wrote to the Bank and described exactly what we wanted to do — use the monthly list as a reference source inside a commercial API, with attribution. The Engagement and Enquiries team answered within a day: no objection to the use we described, provided attribution to the Bank of England is maintained, together with the month of the list.
 
@@ -37,8 +37,8 @@ The list refreshes monthly through the same workflow as our other registers.
 
 ## Also shipped this week
 
-- **[Swiss QR-IBAN and QR-IID, the reference page](/en/docs/swiss-qr-iban)** (EN/FR/DE). Switzerland runs a dedicated QR-IID range for QR-bill IBANs, and confusing it with the ordinary clearing number makes payments fail. The page covers both directions — including the question nobody else answers by API: *which QR-IID does the bank behind this ordinary IBAN hold?*
-- **The 402 now shows the way in.** Every payment-required response carries `wallet_setup`, a link to [paying as an agent](/en/docs/pay-as-an-agent) — the three-step path from no wallet to a first paid call. The response that says "payment required" should not leave to a search engine the question of how.
+- **[Swiss QR-IBAN and QR-IID, the reference page](/docs/swiss-qr-iban)** (EN/FR/DE). Switzerland runs a dedicated QR-IID range for QR-bill IBANs, and confusing it with the ordinary clearing number makes payments fail. The page covers both directions — including the question nobody else answers by API: *which QR-IID does the bank behind this ordinary IBAN hold?*
+- **The 402 now shows the way in.** Every payment-required response carries `wallet_setup`, a link to [paying as an agent](/docs/pay-as-an-agent) — the three-step path from no wallet to a first paid call. The response that says "payment required" should not leave to a search engine the question of how.
 - **A new landing page.** The pipeline told as a forge — heat, strike, quench, stamp, ship — in a scroll-driven film. Fully readable without JavaScript, because a good share of our readers are not humans.
 
-One date to keep in view: the EPC Verification of Payee scheme rulebook v1.1 and its API specifications take effect on **20 September 2026** — the regulatory background is on [/docs/vop](/en/docs/vop).
+One date to keep in view: the EPC Verification of Payee scheme rulebook v1.1 and its API specifications take effect on **20 September 2026** — the regulatory background is on [/docs/vop](/docs/vop).

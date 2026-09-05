@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { TestIbanClient } from "@/components/test-iban-client";
 import { ClientMessages } from "@/components/client-messages"
 import { alternatesFor } from "@/lib/seo";
+import { localePath } from "@/lib/locale-path";
 
 export async function generateMetadata({
   params,
@@ -39,7 +40,7 @@ export default async function TestIbanPage({
         <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight">{t("title")}</h1>
         <p className="text-muted-foreground leading-relaxed max-w-prose">{t("intro")}</p>
         <Link
-          href={`/${locale}/blog/2026-08-06-example-ibans-unallocated-bank-codes`}
+          href={localePath(locale, '/blog/2026-08-06-example-ibans-unallocated-bank-codes')}
           className="text-sm font-medium text-primary hover:underline w-fit"
         >
           {t("articleLink")} →

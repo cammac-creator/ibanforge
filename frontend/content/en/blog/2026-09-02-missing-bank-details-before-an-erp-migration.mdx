@@ -6,7 +6,7 @@ date: "2026-09-02"
 
 The most common IBAN job we see is not a payment. It is a migration. A company moves its vendor master from one ERP to another, the new system validates bank data on import, and a few thousand supplier records suddenly need a BIC they never had, or fail because the bank code inside the IBAN was retired years ago. The old system accepted anything; the new one does not.
 
-This post is the recipe we would follow. It uses the [batch endpoint](/en/docs/iban-batch) because the unit of work is a list, not a payment, and it stops where an API has to stop: at the account itself.
+This post is the recipe we would follow. It uses the [batch endpoint](/docs/iban-batch) because the unit of work is a list, not a payment, and it stops where an API has to stop: at the account itself.
 
 ## What "complete" means for a bank master record
 
@@ -43,7 +43,7 @@ Run the list through in batches of 100, then sort every row into one of three pi
 
 **Write back.** `valid: true`, `bank_code_check.status: "verified"`, a `bic.code` present. Copy the BIC and the bank name into the record and move on. This is most of the file.
 
-**Replace.** `valid: true` but `bank_code_check.retired: true`. The code was allocated, the institution existed, and the register now marks it for deletion, usually after a merger. A format check will never flag this. The German register names the successor in `superseded_by` when it has one, so the replacement is often a lookup rather than a phone call. Details on the [BLZ check](/en/docs/blz-check).
+**Replace.** `valid: true` but `bank_code_check.retired: true`. The code was allocated, the institution existed, and the register now marks it for deletion, usually after a merger. A format check will never flag this. The German register names the successor in `superseded_by` when it has one, so the replacement is often a lookup rather than a phone call. Details on the [BLZ check](/docs/blz-check).
 
 **Ask the supplier.** `valid: false`, or `status: "not_in_register"` with `authoritative: true`. The first is a typo or a truncated import. The second means the eight digits inside the IBAN are allocated to nobody, which is a strong reason not to pay and a clear question to send back. When `authoritative` is `false` the absence is a fact about our coverage rather than about the bank, so that row goes into the first pile with a note, not into this one.
 
@@ -107,4 +107,4 @@ First, the "ask the supplier" pile is not a failure of the tool, it is the point
 
 And one German detail worth knowing before the first run: the Bundesbank register carries no street column, so `institution.street` is `null` for every German bank. That is a fact about the register, not a hole in the lookup, and we would rather serve an honest `null` than an address the register never published.
 
-If you want to see the fields on one supplier before writing any code, the [playground](/en/playground) runs the same call on a single IBAN.
+If you want to see the fields on one supplier before writing any code, the [playground](/playground) runs the same call on a single IBAN.

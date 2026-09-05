@@ -27,7 +27,7 @@ describe('alternatesFor', () => {
 
   it('names the page, never the locale home', () => {
     const a = alternatesFor('en', '/pricing');
-    expect(a.canonical).toBe('https://ibanforge.com/en/pricing');
+    expect(a.canonical).toBe('https://ibanforge.com/pricing');
     expect(a.languages.fr).toBe('https://ibanforge.com/fr/pricing');
     expect(a.languages.de).toBe('https://ibanforge.com/de/pricing');
   });
@@ -53,8 +53,8 @@ describe('alternatesFor', () => {
     // `https://ibanforge.com/` answers 307 towards `/en`, and the sitemap lists
     // `/en`. A canonical pointing at a redirect names a URL that does not serve
     // the page.
-    expect(alternatesFor('en', '/').canonical).toBe('https://ibanforge.com/en');
-    expect(alternatesFor('en').canonical).toBe('https://ibanforge.com/en');
+    expect(alternatesFor('en', '/').canonical).toBe('https://ibanforge.com/');
+    expect(alternatesFor('en').canonical).toBe('https://ibanforge.com/');
   });
 
   it('reads one page out of the three ways a caller may spell its path', () => {

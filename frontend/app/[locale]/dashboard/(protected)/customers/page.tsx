@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation';
+import { localePath } from '@/lib/locale-path';
 
 /**
  * The old Clients page lived here. It lives at /dashboard/clients now, and this
@@ -15,5 +16,5 @@ import { redirect } from 'next/navigation';
  */
 export default async function CustomersPage({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
-  redirect(`/${locale}/dashboard/clients`);
+  redirect(localePath(locale, '/dashboard/clients'));
 }

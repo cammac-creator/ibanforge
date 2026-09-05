@@ -39,7 +39,7 @@ And now the honest half. Only some countries publish an authoritative allocation
 }
 ```
 
-Same `status`, different worth — which is exactly why `authoritative` is its own field rather than a footnote in the docs. Where it is `true`, `not_in_register` means the code is not allocated and is a strong reason to stop a payment. Where it is `false`, an absence proves nothing and should not be read as a rejection. The full country-by-country table, and what an absence means in each, is on [data sources & provenance](/en/docs/data-sources).
+Same `status`, different worth — which is exactly why `authoritative` is its own field rather than a footnote in the docs. Where it is `true`, `not_in_register` means the code is not allocated and is a strong reason to stop a payment. Where it is `false`, an absence proves nothing and should not be read as a rejection. The full country-by-country table, and what an absence means in each, is on [data sources & provenance](/docs/data-sources).
 
 ## 2. What comes back — and who published each part
 
@@ -63,7 +63,7 @@ Our rule is one source and one date per block, not one per response. The same Fr
 
 Three things worth noticing. `matched_by` says *how* the row was reached, because a join on a national bank code and a join on an LEI are not equally strong. `authoritative` is `false` even though the publisher is a central bank, because the [ECB list of monetary financial institutions](https://www.ecb.europa.eu/stats/financial_corporations/list_of_financial_institutions/html/index.en.html) relays what national authorities report rather than allocating codes itself. And `free_of_charge` is a licence condition, not decoration: the underlying registers are free at their official source, buyers must be told so on each access, so the notice travels inside the block. Relay the answer, relay those fields.
 
-The United Kingdom adds a fourth block: deposit-taking authorisation, used with the Bank of England's written permission and carrying the month of the list. That story is [its own post](/en/blog/2026-08-25-uk-authorisation-with-permission).
+The United Kingdom adds a fourth block: deposit-taking authorisation, used with the Bank of England's written permission and carrying the month of the list. That story is [its own post](/blog/2026-08-25-uk-authorisation-with-permission).
 
 ## 3. Compliance signals, and where they stop
 
@@ -91,6 +91,6 @@ Ours: a free key with 200 requests a month, prepaid packs that do not expire (1,
 
 ## Where we stop
 
-We cover 89 countries structurally, but `authoritative: true` is five countries and change, not the world; sanctions screening is bank-level; and our unusual Swiss depth — down to the QR-IID question nobody else answers by API, on [Swiss QR-IBAN & QR-IID](/en/docs/swiss-qr-iban) — does not exist everywhere.
+We cover 89 countries structurally, but `authoritative: true` is five countries and change, not the world; sanctions screening is bank-level; and our unusual Swiss depth — down to the QR-IID question nobody else answers by API, on [Swiss QR-IBAN & QR-IID](/docs/swiss-qr-iban) — does not exist everywhere.
 
-The fastest test of any of this, ours included, is to send a real IBAN and read the fields one by one. The [playground](/en/playground) does that, and the grid above is the one we would hand you to grade us with.
+The fastest test of any of this, ours included, is to send a real IBAN and read the fields one by one. The [playground](/playground) does that, and the grid above is the one we would hand you to grade us with.

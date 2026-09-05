@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getAllLegalDocs } from "@/lib/legal";
 import { getTranslations } from "next-intl/server";
 import { alternatesFor } from "@/lib/seo";
+import { localePath } from "@/lib/locale-path";
 
 export async function generateMetadata({
   params,
@@ -41,7 +42,7 @@ export default async function LegalIndexPage({
         {docs.map((doc) => (
           <Link
             key={doc.slug}
-            href={`/${locale}/legal/${doc.slug}`}
+            href={localePath(locale, `/legal/${doc.slug}`)}
             className="group rounded-lg border border-border bg-card p-5 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-lg"
           >
             <h2 className="font-heading font-semibold text-foreground group-hover:text-primary transition-colors">

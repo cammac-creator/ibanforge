@@ -3,6 +3,7 @@ import { atBlzFile, beBankFile, chIidFile, deBlzFile } from "@/lib/registers";
 import { getAllDocs } from "@/lib/mdx";
 import { getAllPosts } from "@/lib/blog";
 import { routing } from "@/i18n/routing";
+import { localePath } from "@/lib/locale-path";
 
 const BASE_URL = "https://ibanforge.com";
 
@@ -28,7 +29,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
   }
   for (const iid of chIidFile().batch1) {
     for (const locale of ["de", "fr"]) {
-      entries.push({ url: `${BASE_URL}/${locale}/iid/${iid}`, changeFrequency: "monthly", priority: 0.5 });
+      entries.push({ url: `${BASE_URL}${localePath(locale, `/iid/${iid}`)}`, changeFrequency: "monthly", priority: 0.5 });
     }
   }
   // Austria reads German; Belgium reads French and, for its payments teams, English.
@@ -37,16 +38,17 @@ export default function sitemap(): MetadataRoute.Sitemap {
   }
   for (const code of beBankFile().batch1) {
     for (const locale of ["fr", "en"]) {
-      entries.push({ url: `${BASE_URL}/${locale}/be/${code}`, changeFrequency: "monthly", priority: 0.5 });
+      entries.push({ url: `${BASE_URL}${localePath(locale, `/be/${code}`)}`, changeFrequency: "monthly", priority: 0.5 });
     }
   }
 
   for (const locale of routing.locales) {
-    const prefix = `${BASE_URL}/${locale}`;
+    // English at the root since 2026-09-05 (audit n° 28): `${BASE_URL}/` and `${BASE_URL}/docs`.
+    const prefix = `${BASE_URL}${locale === routing.defaultLocale ? "" : `/${locale}`}`;
 
     // Static pages
     entries.push(
-      { url: prefix, changeFrequency: "weekly", priority: 1 },
+      { url: `${prefix}/`, changeFrequency: "weekly", priority: 1 },
       { url: `${prefix}/agents`, changeFrequency: "monthly", priority: 0.95 },
       { url: `${prefix}/vendors`, changeFrequency: "monthly", priority: 0.85 },
       { url: `${prefix}/audit`, changeFrequency: "monthly", priority: 0.85 },

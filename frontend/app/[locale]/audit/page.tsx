@@ -5,7 +5,7 @@ import { AuditClient } from "@/components/audit-client";
 import { ClientMessages } from "@/components/client-messages"
 import { AuditWorkbookPreview } from "@/components/audit-workbook-preview";
 import { Upload, Eye, Download } from "lucide-react";
-import { alternatesFor } from "@/lib/seo";
+import { alternatesFor, urlFor } from "@/lib/seo";
 
 export async function generateMetadata({
   params,
@@ -21,7 +21,7 @@ export async function generateMetadata({
     openGraph: {
       title: t("metaTitle"),
       description: t("ogDescription"),
-      url: `https://ibanforge.com/${locale}/audit`,
+      url: urlFor(locale, '/audit'),
       type: "website",
     },
     twitter: { card: "summary_large_image", title: t("metaTitle"), description: t("ogDescription") },
@@ -42,10 +42,10 @@ export default async function AuditPage({
     name: t("metaTitle"),
     description: t("ogDescription"),
     brand: { "@type": "Brand", name: "IBANforge" },
-    url: `https://ibanforge.com/${locale}/audit`,
+    url: urlFor(locale, '/audit'),
     offers: [
-      { "@type": "Offer", price: "149", priceCurrency: "CHF", description: t("prices.standard"), availability: "https://schema.org/InStock", url: `https://ibanforge.com/${locale}/audit` },
-      { "@type": "Offer", price: "349", priceCurrency: "CHF", description: t("prices.large"), availability: "https://schema.org/InStock", url: `https://ibanforge.com/${locale}/audit` },
+      { "@type": "Offer", price: "149", priceCurrency: "CHF", description: t("prices.standard"), availability: "https://schema.org/InStock", url: urlFor(locale, '/audit') },
+      { "@type": "Offer", price: "349", priceCurrency: "CHF", description: t("prices.large"), availability: "https://schema.org/InStock", url: urlFor(locale, '/audit') },
     ],
   };
 

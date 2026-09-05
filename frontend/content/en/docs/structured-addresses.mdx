@@ -12,7 +12,7 @@ It also states, plainly, what this API does **not** do about it. That part matte
 
 ## The deadline, rail by rail
 
-> **State on 2 September 2026.** On 27 August 2026 Swift deferred all payments changes of its November 2026 Standards Release, the retirement of unstructured addresses included, with an update promised by December 2026 at the latest. SIX, the Eurosystem (T2 R2026.NOV) and the EPC rulebooks were unchanged on that day; Fedwire moved its release to November 2027; the Bank of England expects a twelve-month deferral, subject to confirmation. The rail-by-rail state, with every document and sentence, is on [Which date is THE date?](/en/blog/2026-09-02-which-date-structured-addresses).
+> **State on 2 September 2026.** On 27 August 2026 Swift deferred all payments changes of its November 2026 Standards Release, the retirement of unstructured addresses included, with an update promised by December 2026 at the latest. SIX, the Eurosystem (T2 R2026.NOV) and the EPC rulebooks were unchanged on that day; Fedwire moved its release to November 2027; the Bank of England expects a twelve-month deferral, subject to confirmation. The rail-by-rail state, with every document and sentence, is on [Which date is THE date?](/blog/2026-09-02-which-date-structured-addresses).
 
 | Date | What happens | Source |
 |---|---|---|
@@ -55,10 +55,10 @@ That sentence turns the whole problem around. If you hold a clearing code and no
 
 Which means the useful question in November 2026 is often not *"how do I structure this agent's address?"* but **"how do I get this agent's BIC so I never have to?"** — and resolving a national clearing code into a BIC is what this API has always done:
 
-- **Swiss IID / BC-Nummer** → [`GET /v1/ch/clearing/:iid`](/en/docs/ch-clearing)
-- **German Bankleitzahl** → [`bank_code_check` on a validated IBAN](/en/docs/blz-check)
-- **Austrian bank code** → [same block](/en/docs/at-bank-codes)
-- **Any IBAN** → [`POST /v1/iban/validate` resolves the BIC](/en/docs/iban-to-bic)
+- **Swiss IID / BC-Nummer** → [`GET /v1/ch/clearing/:iid`](/docs/ch-clearing)
+- **German Bankleitzahl** → [`bank_code_check` on a validated IBAN](/docs/blz-check)
+- **Austrian bank code** → [same block](/docs/at-bank-codes)
+- **Any IBAN** → [`POST /v1/iban/validate` resolves the BIC](/docs/iban-to-bic)
 
 No new code, no new endpoint, no new subscription. If the BIC resolves, the address requirement on that agent goes away.
 
@@ -141,7 +141,7 @@ Measured over the shipped database on 26 August 2026: **99.3% of directory rows 
 
 `as_of` is the date **the source** last stated the address. It is `null` when the dataset publishes none. It is never the date our database was refreshed, and it is never a clock read: an address stamped today from a file filed last year would be a false statement about the register.
 
-The same block appears on the `bic` object of [`POST /v1/iban/validate`](/en/docs/iban-validate), built by the same code, so the two endpoints cannot disagree about the same row.
+The same block appears on the `bic` object of [`POST /v1/iban/validate`](/docs/iban-validate), built by the same code, so the two endpoints cannot disagree about the same row.
 
 ## `POST /v1/address/check` — free conformity check
 

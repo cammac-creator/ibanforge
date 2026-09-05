@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useTranslations, useLocale } from 'next-intl';
 import { CommandPalette } from './cmdk';
+import { localePath } from '@/lib/locale-path';
 
 const PERIODS = [7, 30, 90];
 
@@ -27,11 +28,11 @@ export function TopNav() {
   const period = PERIODS.includes(current) ? current : 30;
 
   const TABS = [
-    { key: 'overview', href: `/${locale}/dashboard`, label: t('topNav.overview'), active: onOverview },
-    { key: 'contacts', href: `/${locale}/dashboard/contacts`, label: t('topNav.contacts'), active: onContacts },
-    { key: 'clients', href: `/${locale}/dashboard/clients`, label: 'Clients', active: onClients },
-    { key: 'bots', href: `/${locale}/dashboard/clients-bot`, label: 'Clients Bot', active: onBots },
-    { key: 'forums', href: `/${locale}/dashboard/forums`, label: 'Forums', active: onForums },
+    { key: 'overview', href: localePath(locale, '/dashboard'), label: t('topNav.overview'), active: onOverview },
+    { key: 'contacts', href: localePath(locale, '/dashboard/contacts'), label: t('topNav.contacts'), active: onContacts },
+    { key: 'clients', href: localePath(locale, '/dashboard/clients'), label: 'Clients', active: onClients },
+    { key: 'bots', href: localePath(locale, '/dashboard/clients-bot'), label: 'Clients Bot', active: onBots },
+    { key: 'forums', href: localePath(locale, '/dashboard/forums'), label: 'Forums', active: onForums },
   ];
 
   return (
@@ -95,7 +96,7 @@ export function TopNav() {
           </div>
         )}
         <div className="h-4 w-px bg-[var(--ink-4)]" />
-        <Link href={`/${locale}`} className="text-xs text-[var(--fg-4)] transition-colors hover:text-[var(--fg-2)]">
+        <Link href={localePath(locale)} className="text-xs text-[var(--fg-4)] transition-colors hover:text-[var(--fg-2)]">
           {t('topNav.backToSite')}
         </Link>
       </div>

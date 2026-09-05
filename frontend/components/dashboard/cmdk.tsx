@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocale } from 'next-intl';
+import { localePath } from '@/lib/locale-path';
 
 /**
  * ⌘K: from "I'm thinking of Société Alpha" to their file in two keystrokes,
@@ -87,8 +88,8 @@ export function CommandPalette() {
       // `open` is the Clients-side equivalent added with this palette.
       window.location.href =
         home === 'contacts'
-          ? `/${locale}/dashboard/contacts?client=${encodeURIComponent(row.email)}`
-          : `/${locale}/dashboard/clients?open=${encodeURIComponent(row.email)}`;
+          ? localePath(locale, `/dashboard/contacts?client=${encodeURIComponent(row.email)}`)
+          : localePath(locale, `/dashboard/clients?open=${encodeURIComponent(row.email)}`);
     },
     [locale],
   );

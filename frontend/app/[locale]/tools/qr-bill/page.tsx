@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { QrBillClient } from "@/components/qr-bill-client";
 import { ClientMessages } from "@/components/client-messages"
 import { alternatesFor } from "@/lib/seo";
+import { localePath } from "@/lib/locale-path";
 
 export async function generateMetadata({
   params,
@@ -38,7 +39,7 @@ export default async function QrBillPage({
         <p className="text-muted-foreground leading-relaxed max-w-prose">{t("intro")}</p>
         <p className="text-sm text-muted-foreground max-w-prose">
           {t("deadline")}{" "}
-          <Link href={`/${locale}/docs/swiss-qr-iban`} className="underline">
+          <Link href={localePath(locale, '/docs/swiss-qr-iban')} className="underline">
             {t("docsLink")}
           </Link>
         </p>

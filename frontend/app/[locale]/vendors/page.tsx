@@ -5,6 +5,7 @@ import { ArrowRight, CalendarClock, FileCheck2, Landmark, ShieldCheck } from "lu
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { alternatesFor } from "@/lib/seo";
+import { localePath } from "@/lib/locale-path";
 
 export async function generateMetadata({
   params,
@@ -33,9 +34,9 @@ export default async function VendorsPage({
   // Card links mirror the three arguments: Swiss clearing docs, compliance
   // docs, legal/DPA. Kept in code (not i18n) — they're routes, not copy.
   const ARG_LINKS = [
-    `/${locale}/docs/ch-clearing`,
-    `/${locale}/docs/compliance`,
-    `/${locale}/legal/dpa`,
+    localePath(locale, '/docs/ch-clearing'),
+    localePath(locale, '/docs/compliance'),
+    localePath(locale, '/legal/dpa'),
   ] as const;
 
   const STEPS = [0, 1, 2] as const;
@@ -67,7 +68,7 @@ export default async function VendorsPage({
             size="lg"
             variant="outline"
             className="px-6"
-            render={<Link href={`/${locale}/docs`} />}
+            render={<Link href={localePath(locale, '/docs')} />}
           >
             {t("hero.cta.docs")}
           </Button>
@@ -96,12 +97,12 @@ export default async function VendorsPage({
             {t("deadline.what")}
           </p>
           <p className="text-sm">
-            <Link href={`/${locale}/tools/qr-bill`} className="underline underline-offset-4">
+            <Link href={localePath(locale, '/tools/qr-bill')} className="underline underline-offset-4">
               {t("deadline.qrTool")}
             </Link>
           </p>
           <p className="text-sm">
-            <Link href={`/${locale}/blog/2026-09-02-which-date-structured-addresses`} className="underline underline-offset-4">
+            <Link href={localePath(locale, '/blog/2026-09-02-which-date-structured-addresses')} className="underline underline-offset-4">
               {t("deadline.datesLink")}
             </Link>
           </p>
@@ -239,7 +240,7 @@ export default async function VendorsPage({
           </Button>
           <p className="text-xs text-muted-foreground/70">{t("oem.hint")}</p>
           <Link
-            href={`/${locale}/legal/sla`}
+            href={localePath(locale, '/legal/sla')}
             className="text-sm text-amber-500 hover:text-amber-400 underline underline-offset-4 transition-colors"
           >
             {t("oem.slaLink")} →

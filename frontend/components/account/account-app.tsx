@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
+import { localePath } from "@/lib/locale-path";
 
 /**
  * The customer's own view of their key.
@@ -269,7 +270,7 @@ function Leave({ apiKey, locale }: { apiKey: string; locale: string }) {
             {phase === "working" ? t("leaveWorking") : t("leaveButton")}
           </button>
         )}
-        <a href={`/${locale}/legal/dpa`} className="text-sm text-muted-foreground underline underline-offset-2">
+        <a href={localePath(locale, '/legal/dpa')} className="text-sm text-muted-foreground underline underline-offset-2">
           {t("leaveDpa")}
         </a>
       </div>

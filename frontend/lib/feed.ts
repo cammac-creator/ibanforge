@@ -11,7 +11,7 @@ import { getAllPosts, type BlogPost } from './blog';
  * deploy (force-static route handlers), which matches how content ships here:
  * articles and releases only ever arrive through a deployment.
  *
- * The English post is the canonical entry; every item links its /en/ URL.
+ * The English post is the canonical entry; every item links its root URL (English has no prefix).
  */
 
 const SITE = 'https://ibanforge.com';
@@ -39,7 +39,7 @@ function esc(s: string): string {
 function blogItems(): FeedItem[] {
   return getAllPosts('en').map((p: BlogPost) => ({
     title: p.title,
-    url: `${SITE}/en/blog/${p.slug}`,
+    url: `${SITE}/blog/${p.slug}`,
     date: new Date(p.date),
     description: p.description,
   }));
@@ -59,7 +59,7 @@ function changelogItems(): FeedItem[] {
     for (const m of raw.matchAll(re)) {
       items.push({
         title: `Release ${m[1]}`,
-        url: `${SITE}/en/changelog`,
+        url: `${SITE}/changelog`,
         date: new Date(m[2]),
         description: `IBANforge ${m[1]} — full notes on the changelog page.`,
       });

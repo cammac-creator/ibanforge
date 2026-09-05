@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { localePath } from "@/lib/locale-path";
 
 /** One input, one button: /{locale}/{kind}/{code}. Digits only, trimmed. */
 export function RegisterSearch({
@@ -22,7 +23,7 @@ export function RegisterSearch({
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     const code = value.replace(/\D/g, "");
-    if (code) router.push(`/${locale}/${kind}/${code}`);
+    if (code) router.push(localePath(locale, `/${kind}/${code}`));
   };
   return (
     <form onSubmit={submit} className="flex flex-wrap items-end gap-2">
