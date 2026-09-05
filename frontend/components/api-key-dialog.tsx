@@ -570,15 +570,18 @@ export function GetKeyButton({
   className,
   variant,
   size = 'lg',
+  evt,
 }: {
   children: ReactNode;
   className?: string;
   variant?: 'default' | 'outline' | 'secondary' | 'ghost' | 'link' | 'destructive' | 'amber';
   size?: 'default' | 'xs' | 'sm' | 'lg' | 'icon';
+  /** Name reported by components/forge/cta-beacon.tsx on click. */
+  evt?: string;
 }) {
   const { open } = useApiKeyDialog();
   return (
-    <Button type="button" onClick={open} className={className} variant={variant} size={size}>
+    <Button type="button" onClick={open} className={className} variant={variant} size={size} data-evt={evt}>
       {children}
     </Button>
   );

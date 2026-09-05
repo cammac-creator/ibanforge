@@ -11,6 +11,8 @@
  *  - GET /v1/ch/clearing/230 (UBS) → richest, exclusive Swiss dataset.
  */
 
+import capturedIban from './captured-iban.json';
+
 export type PlaygroundMode = 'iban' | 'bic' | 'compliance' | 'clearing';
 
 export const MODES: PlaygroundMode[] = ['iban', 'bic', 'compliance', 'clearing'];
@@ -61,36 +63,9 @@ export const CHIPS: Record<PlaygroundMode, Chip[]> = {
 
 /** Default payloads — REAL captured responses (see file header). */
 export const DEFAULT_RESULT: Record<PlaygroundMode, Record<string, unknown>> = {
-  iban: {
-    iban: 'CH1000230000000012345',
-    valid: true,
-    country: { code: 'CH', name: 'Switzerland' },
-    check_digits: '10',
-    bban: { bank_code: '00230', account_number: '000000012345' },
-    sepa: { member: true, schemes: ['SCT', 'SDD'], vop_required: false },
-    formatted: 'CH10 0023 0000 0000 1234 5',
-    cost_usdc: 0,
-    bic: { code: 'UBSWCHZH', bank_name: 'UBS Switzerland AG', city: 'Zürich' },
-    issuer: { type: 'bank', name: 'UBS Switzerland AG' },
-    risk_indicators: {
-      issuer_type: 'bank',
-      country_risk: 'standard',
-      test_bic: false,
-      sepa_reachable: true,
-      vop_coverage: false,
-    },
-    clearing: {
-      iid: '00230',
-      name: 'UBS Switzerland AG',
-      type: 'bank',
-      town: 'Zürich',
-      sic: true,
-      instant_payments_chf: true,
-      eurosic: true,
-      qr_iid: null,
-    },
-    processing_ms: 0.41,
-  },
+  // The fold's answer lives in captured-iban.json, rewritten every month by
+  // scripts/capture-fold-response.ts in the BIC refresh workflow (n° 21).
+  iban: capturedIban.response as Record<string, unknown>,
   bic: {
     bic: 'NTSBDEB1',
     bic8: 'NTSBDEB1',

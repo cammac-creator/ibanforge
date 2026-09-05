@@ -6,6 +6,8 @@ import { Reveal } from "@/components/reveal"
 import { StatsBar } from "@/components/stats-bar"
 import { ForgeFilm, type FilmStrings } from "@/components/forge/forge-film"
 import { FoldDemo } from "@/components/forge/fold-demo"
+import { CtaBeacon } from "@/components/forge/cta-beacon"
+import capturedIban from "./playground/captured-iban.json"
 import { DEFAULT_RESULT } from "./playground/examples"
 import {
   getLandingStats,
@@ -49,9 +51,6 @@ const INTEGRATIONS = [
   { key: 'postman', cmd: 'ibanforge.postman_collection.json', href: 'https://github.com/cammac-creator/ibanforge/tree/main/integrations/postman' },
 ] as const
 
-/* The x402 spot illustration: a robotic arm paying its coin into the slot. */
-const AGENTS_ILLO = `<defs><radialGradient id="acoin" cx="38%" cy="35%" r="75%"><stop offset="0%" stop-color="#FCD34D"/><stop offset="55%" stop-color="#F59E0B"/><stop offset="100%" stop-color="#D97706"/></radialGradient></defs><rect x="18" y="122" width="128" height="12" rx="3" fill="#292524"/><circle cx="34" cy="128" r="2.5" fill="#57534E"/><circle cx="130" cy="128" r="2.5" fill="#57534E"/><rect x="70" y="66" width="16" height="58" rx="4" fill="#3F3A34"/><path d="M78,70 q-26,18 -8,52" stroke="#292524" stroke-width="3" fill="none"/><g stroke-linecap="round"><line x1="78" y1="70" x2="152" y2="34" stroke="#57534E" stroke-width="13"/><line x1="152" y1="34" x2="230" y2="55" stroke="#44403C" stroke-width="10"/></g><circle cx="78" cy="70" r="8" fill="#292524" stroke="#57534E" stroke-width="2"/><circle cx="152" cy="34" r="8.5" fill="#292524" stroke="#57534E" stroke-width="2"/><circle cx="152" cy="34" r="3" fill="#78716C"/><g stroke="#57534E" stroke-width="5.5" fill="none" stroke-linecap="round"><path d="M230,49 q16,-2 24,8"/><path d="M230,61 q16,4 22,14"/></g><g class="coin"><ellipse cx="258" cy="66" rx="27" ry="21" fill="#F59E0B" opacity="0.13"/><circle cx="258" cy="66" r="13.5" fill="url(#acoin)"/><circle cx="258" cy="66" r="13.5" fill="none" stroke="#FCD34D" stroke-width="1.6" opacity="0.8"/><rect x="254" y="60" width="8" height="12" rx="2" fill="#1C0A00" opacity="0.35"/></g><rect x="288" y="84" width="56" height="50" rx="7" fill="#1C1917" stroke="#292524"/><rect x="288" y="84" width="56" height="8" rx="4" fill="#26211C"/><rect x="299" y="100" width="34" height="6" rx="3" fill="#F59E0B" opacity="0.9"/><rect x="299" y="115" width="12" height="5" rx="1.5" fill="#EF4444" opacity="0.65"/><rect x="315" y="115" width="12" height="5" rx="1.5" fill="#4ADE80" opacity="0.65"/>`
-
 export default async function Home({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
   setRequestLocale(locale)
@@ -86,6 +85,13 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
   // used to carry "0,41" typed by hand in three languages while the stats
   // band showed the constant. Both now read the same source.
   const msLabel = new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(P50_PROCESSING_MS)
+  const dateFmt = new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })
+  // The fold's fallback answer says when it was captured: read from the file
+  // the monthly refresh rewrites, never typed by hand again (n° 21).
+  const capturedOn = dateFmt.format(new Date(`${capturedIban.captured_at}T00:00:00Z`))
+  // Days left before SIX stops processing unstructured addresses, computed at
+  // render (the page is revalidated every hour) and never by the browser.
+  const daysLeft = Math.ceil((Date.UTC(2026, 10, 14) - Date.now()) / 86_400_000)
   const refreshedOn = liveStats.bicDataLastUpdated
     ? new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })
         .format(new Date(`${liveStats.bicDataLastUpdated}T00:00:00Z`))
@@ -136,6 +142,7 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
 
   return (
     <div className="forge">
+      <CtaBeacon locale={locale} />
       {/* ── The fold: the promise on the left, the proof on the right ──────
           Audit 2026-09-04 (L3 + M1 + L1). The 149 px lockup repeated the
           header's logo and dwarfed a 33 px h1; 56 % of the fold was empty;
@@ -148,7 +155,7 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
               sub-title states one line below and the stats band 300 px further.
               It now carries the one figure nothing else on the page shows, the
               30-day error-free rate, and opens the status page. */}
-          <Link href={`/${locale}/status`} className="hero-badge">
+          <Link href={`/${locale}/status`} className="hero-badge" data-evt="nav:status">
             <span className="dot" aria-hidden="true"></span>
             {rate30 ? t('badge', { rate: rate30 }) : t('badgeFallback')}
           </Link>
@@ -173,16 +180,20 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
               variant="amber"
               className="px-6"
               nativeButton={false}
-            render={<Link href={`/${locale}/playground`} />}
+            render={<Link href={`/${locale}/playground`} data-evt="cta:try" />}
             >
               {t('hero.cta.tryFree')}
             </Button>
-            <GetKeyButton variant="outline" className="px-6">
+            <GetKeyButton variant="outline" className="px-6" evt="cta:key">
               {t('hero.cta.getKey')}
             </GetKeyButton>
           </div>
+          {/* The second audience, named on the fold (audit 2026-09-05, n° 20). */}
+          <p className="hero-alt">
+            <Link href={`/${locale}/audit`} data-evt="cta:audit-fold">{t('hero.altDoor')}</Link>
+          </p>
         </div>
-        <FoldDemo iban="CH1000230000000012345" fallback={DEFAULT_RESULT.iban} />
+        <FoldDemo iban="CH1000230000000012345" fallback={DEFAULT_RESULT.iban} capturedOn={capturedOn} />
       </section>
 
       {/* ── Trust band: sources, sanctions lists, Swiss provenance ────────── */}
@@ -252,18 +263,49 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
         <div className="wrap deadline-grid">
           <div>
             <span className="eyebrow">{t('deadline.eyebrow')}</span>
+            {/* Audit 2026-09-05 (n° 17): the "why now" had no anchor for the
+                eye. The count is computed on the server at each revalidation. */}
+            <p className="deadline-days" aria-label={daysLeft > 0 ? t('deadline.daysAria', { days: daysLeft }) : t('deadline.since')}>
+              {daysLeft > 0 ? (
+                <><b>{t('deadline.dayPrefix')}{daysLeft}</b><span>{t('deadline.daysLabel')}</span></>
+              ) : (
+                <><b>14.11.2026</b><span>{t('deadline.since')}</span></>
+              )}
+            </p>
             <h2 className="sect-h sect-h-left" id="h-deadline">{t('deadline.heading')}</h2>
           </div>
           <div>
+            <ul className="deadline-lines">
+              <li>{t('deadline.line1')}</li>
+              <li>{t('deadline.line2')}</li>
+              <li>{t('deadline.line3')}</li>
+            </ul>
             <p className="deadline-text">{t('deadline.text')}</p>
             <div className="hero-cta">
-              <Link href={`/${locale}/docs/structured-addresses`} className="btn-ghost-link">
+              <Button size="lg" variant="amber" className="px-6" nativeButton={false} render={<Link href={`/${locale}/docs/structured-addresses`} data-evt="cta:rules" />}>
                 {t('deadline.cta')}
-              </Link>
-              <Link href={`/${locale}/audit`} className="btn-ghost-link">
+              </Button>
+              <Link href={`/${locale}/audit`} className="btn-ghost-link" data-evt="cta:audit-deadline">
                 {t('audit.cta')}
               </Link>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── The non-developer door, right after the deadline it answers
+          (02/09/2026; moved up on 2026-09-05, audit n° 20) ── */}
+      <section className="sect audit-door" aria-labelledby="h-audit">
+        <div className="wrap">
+          <h2 className="sect-h" id="h-audit">{t('audit.heading')}</h2>
+          <p className="sect-sub">{t('audit.text')}</p>
+          {/* Audit 2026-09-04 (M4): the only CHF price and the only no-code
+              offer of the page were announced by a negation and a ghost
+              button. A full button, centred like the section. */}
+          <div className="hero-cta hero-cta-center" style={{ marginTop: '1.4rem' }}>
+            <Button size="lg" variant="amber" className="px-8" nativeButton={false} render={<Link href={`/${locale}/audit`} data-evt="cta:audit" />}>
+              {t('audit.cta')}
+            </Button>
           </div>
         </div>
       </section>
@@ -290,7 +332,7 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
               home (audit 2026-09-05, n° 15): one line, every plan, one link. */}
           <p className="ep-plans">
             {t('endpoints.plans')}{' '}
-            <Link href={`/${locale}/pricing`}>{t('endpoints.plansLink')}</Link>
+            <Link href={`/${locale}/pricing`} data-evt="cta:pricing">{t('endpoints.plansLink')}</Link>
           </p>
         </div>
       </section>
@@ -321,34 +363,11 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
         </div>
       </section>
 
-      {/* ── The non-developer door: the creditor file audit (02/09/2026) ── */}
-      <section className="sect" aria-labelledby="h-audit" style={{ paddingTop: 0 }}>
-        <div className="wrap">
-          <h2 className="sect-h" id="h-audit">{t('audit.heading')}</h2>
-          <p className="sect-sub">{t('audit.text')}</p>
-          {/* Audit 2026-09-04 (M4): the only CHF price and the only no-code
-              offer of the page were announced by a negation and a ghost
-              button. A full button, centred like the section. */}
-          <div className="hero-cta hero-cta-center" style={{ marginTop: '1.4rem' }}>
-            <Button size="lg" variant="amber" className="px-8" nativeButton={false} render={<Link href={`/${locale}/audit`} />}>
-              {t('audit.cta')}
-            </Button>
-          </div>
-        </div>
-      </section>
-
       {/* ── Agents get their own rail ─────────────────────────────────────── */}
       <section className="agents-rail sect" aria-labelledby="h-agents">
         <div className="wrap">
           <h2 className="sect-h" id="h-agents">{t('agentsRail.heading')}</h2>
           <p className="sect-sub">{t('agentsRail.sub')}</p>
-          <svg
-            className="agents-illo"
-            viewBox="0 0 360 150"
-            role="img"
-            aria-label={t('agentsRail.illoAlt')}
-            dangerouslySetInnerHTML={{ __html: AGENTS_ILLO }}
-          />
           <div className="agent-grid">
             <Reveal className="agent-card">
               <h3>{t('agentsRail.mcpTitle')}</h3>
@@ -394,7 +413,7 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
           <p>{t('cta.description')}</p>
           {/* Audit 2026-09-05 (n° 7): centred like the heading above it. */}
           <div className="hero-cta hero-cta-center">
-            <GetKeyButton variant="amber" className="px-8">
+            <GetKeyButton variant="amber" className="px-8" evt="cta:key-final">
               {t('cta.getKeyButton')}
             </GetKeyButton>
             <Button
@@ -402,7 +421,7 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
               variant="outline"
               className="px-8"
               nativeButton={false}
-              render={<Link href={`/${locale}/docs`} />}
+              render={<Link href={`/${locale}/docs`} data-evt="cta:docs" />}
             >
               {t('cta.button')}
             </Button>

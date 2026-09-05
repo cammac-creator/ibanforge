@@ -58,7 +58,7 @@ function writeCache(value: Cached) {
   }
 }
 
-export function FoldDemo({ iban, fallback }: { iban: string; fallback: Record<string, unknown> }) {
+export function FoldDemo({ iban, fallback, capturedOn }: { iban: string; fallback: Record<string, unknown>; capturedOn: string }) {
   const t = useTranslations("home.hero.demo")
   const locale = useLocale()
   const rootRef = useRef<HTMLDivElement>(null)
@@ -160,7 +160,7 @@ export function FoldDemo({ iban, fallback }: { iban: string; fallback: Record<st
   } else if (phase === "typing" || phase === "calling") {
     timing = t("calling")
   } else {
-    timing = t("captured", { server: formatGrouped(server ?? 0.41, locale, 2) })
+    timing = t("captured", { server: formatGrouped(server ?? 0.41, locale, 2), date: capturedOn })
   }
 
   return (

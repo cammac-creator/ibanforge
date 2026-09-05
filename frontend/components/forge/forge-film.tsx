@@ -262,7 +262,7 @@ export function ForgeFilm({ t, playgroundHref }: { t: FilmStrings; playgroundHre
                 <figcaption className="ship-head"><span className="pill-ok">200 OK</span><span>{t.ship.head}</span></figcaption>
                 <pre className="json-out"><code dangerouslySetInnerHTML={{ __html: jsonLines(t.ship.processingMs) }} /></pre>
               </figure>
-              <p className="try-live" data-t=""><a className="btn-ghost-link" href={playgroundHref}>{t.ship.tryLive}</a></p>
+              <p className="try-live" data-t=""><a className="btn-ghost-link" href={playgroundHref} data-evt="cta:playground-film">{t.ship.tryLive}</a></p>
             </div>
             <p className="st-copy">{t.ship.copy}</p>
           </div>

@@ -342,7 +342,9 @@ export function createForgeScene(canvas: HTMLCanvasElement, opts: { bloom: boole
     { p: new THREE.Vector3(-1.3, 1.75, 4.9), t: new THREE.Vector3(-1.35, 0.7, 0.0) },
     { p: new THREE.Vector3(-1.5, 1.6, 5.2), t: new THREE.Vector3(-1.4, 0.45, 0.8) },
     { p: new THREE.Vector3(-1.1, 1.9, 4.4), t: new THREE.Vector3(-1.3, 0.85, 0.0) },
-    { p: new THREE.Vector3(-0.3, 1.5, 5.4), t: new THREE.Vector3(0.2, 0.3, 1.7) },
+    // audit 2026-09-05 (n° 13): further back, so the anvil is not cut by the
+    // JSON card and the cart still has its rails
+    { p: new THREE.Vector3(-0.2, 1.65, 6.1), t: new THREE.Vector3(0.35, 0.3, 1.5) },
   ]
   const camPos = new THREE.Vector3(), camTarget = new THREE.Vector3(), tmpA = new THREE.Vector3(), tmpB = new THREE.Vector3()
   const pointer = { x: 0, y: 0, tx: 0, ty: 0 }
@@ -430,8 +432,11 @@ export function createForgeScene(canvas: HTMLCanvasElement, opts: { bloom: boole
     heatLight.intensity = heat * 7 + clamp01(fx.glow) * 6
     ;(decal.material as THREE.MeshBasicMaterial).opacity = clamp01(fx.decal)
 
-    // the hammer
+    // the hammer; lifted out of frame while the piece ships (n° 13): its
+    // handle used to cross the top-left corner of the last station
     hammer.rotation.z = fx.hammer
+    hammer.position.y = 0.98 + sh * 2.8
+    hammer.visible = sh < 0.995
 
     // the die and its flash
     die.position.y = lerp(DIE_UP, DIE_DOWN, smooth(clamp01(fx.stamp)))
@@ -484,6 +489,14 @@ export function createForgeScene(canvas: HTMLCanvasElement, opts: { bloom: boole
     raf = requestAnimationFrame(frame)
   }
   const start = () => { if (running) return; running = true; last = performance.now(); raf = requestAnimationFrame(frame) }
+  // One frame now, while the scene is still hidden: the shaders compile here,
+  // at idle, and not on the first scrolled frame of the film (a 1.3 s freeze
+  // measured on 2026-09-05 once the engine started loading at idle).
+  try {
+    update(0.016)
+    if (composer) composer.render()
+    else renderer.render(scene, camera)
+  } catch { /* a lost context is handled by the listeners above */ }
   const stop = () => { running = false; cancelAnimationFrame(raf) }
   const onVis = () => { if (document.hidden) stop() }
   document.addEventListener("visibilitychange", onVis)

@@ -63,7 +63,7 @@
       "demo": {
         "calling": "calling…",
         "live": "{server} ms server · {rtt} ms round trip, measured on this call",
-        "captured": "{server} ms server · response captured on 7 July 2026",
+        "captured": "{server} ms server · response captured on {date}",
         "replay": "replay",
         "replayAria": "Replay the request",
         "inputAria": "IBAN sent",
@@ -72,13 +72,14 @@
       "cta": {
         "tryFree": "Try a request",
         "getKey": "Get a free key"
-      }
+      },
+      "altDoor": "Not a developer? Audit your creditor file →"
     },
     "features": {
       "0": {
         "badge": "Swiss clearing — exclusive",
         "title": "BC-Nummer / QR-IID",
-        "description": "Every Swiss BC-Nummer from the SIX BankMaster with full payment-rail participation — SIC, euroSIC, CHF instant payments — plus QR-IID and institution type. The deepest Swiss clearing data in any public API."
+        "description": "Every BC-Nummer from the SIX BankMaster with its SIC, euroSIC and CHF instant rail participation, the QR-IID and the institution type. The deepest Swiss clearing data of any public API."
       },
       "1": {
         "badge": "MCP-native — agent ready",
@@ -88,7 +89,7 @@
       "2": {
         "badge": "{countries} countries · {bicK} BICs",
         "title": "IBAN validation & BIC lookup",
-        "description": "ISO 13616 mod-97 validation with full BBAN parsing across 89 countries — backed by {bic} BIC entries from GLEIF, SwiftCodes (MIT), Bundesbank, SIX, NBP and EBA Step2."
+        "description": "ISO 13616 mod-97 and BBAN parsing across {countries} countries, backed by {bic} BIC entries from GLEIF, SwiftCodes, the Bundesbank, SIX, the NBP and EBA STEP2."
       },
       "3": {
         "badge": "EMI / vIBAN",
@@ -103,7 +104,7 @@
       "5": {
         "badge": "x402 — agent payments",
         "title": "Agents pay per call",
-        "description": "Autonomous agents can pay per request in USDC via x402 — no account, no checkout. Humans keep the free key or card credits; agents get their own rail."
+        "description": "Autonomous agents pay per request in USDC via x402, no account, no checkout. Humans keep the free key or card credits."
       },
       "heading": "What a mod-97 check will never tell you"
     },
@@ -237,7 +238,6 @@
     "agentsRail": {
       "heading": "Agents get their own rail",
       "sub": "This page speaks robot too — every claim above is machine-readable, and every endpoint is payable without a human in the loop.",
-      "illoAlt": "A robotic arm dropping one glowing coin into a payment slot",
       "mcpTitle": "MCP-native",
       "mcpBody": "8 tools, no signup. Claude, Cursor and any MCP agent install in one line:",
       "x402Title": "x402 micropayments",
@@ -248,8 +248,15 @@
     "deadline": {
       "eyebrow": "Deadline",
       "heading": "14 November 2026: Switzerland stops processing unstructured addresses",
-      "text": "From 14 November 2026, SIX no longer processes payments whose address fails the structured or hybrid rules; the Eurosystem and the EPC hold the same weekend, Swift suspended its date on 27 August 2026. POST /v1/address/check tells you for free whether an address passes the Swiss, HVPS+ or Fedwire rules, naming the document; the file audit runs a whole workbook.",
-      "cta": "Read the rules, rail by rail"
+      "text": "POST /v1/address/check says for free whether an address passes the Swiss, HVPS+ or Fedwire rules, naming the document; the file audit takes a whole workbook.",
+      "cta": "Read the rules, rail by rail",
+      "dayPrefix": "D-",
+      "daysLabel": "days before 14 November 2026",
+      "daysAria": "{days} days before 14 November 2026",
+      "since": "in force since 14 November 2026",
+      "line1": "SIX no longer processes payments whose address fails the structured or hybrid rules.",
+      "line2": "The Eurosystem and the EPC switch the same weekend.",
+      "line3": "Swift suspended its own date on 27 August 2026."
     },
     "integrations": {
       "heading": "In your language, your ERP, your spreadsheet",

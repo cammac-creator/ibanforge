@@ -233,6 +233,7 @@ function build(root: HTMLElement) {
 
   // ── the master: four stations back to back, scrubbed by the scroll ──
   const dots = qa<HTMLElement>(".film-dots li")
+  let lastStation = -1
   const master = gsap.timeline({
     defaults: { ease: "none" },
     scrollTrigger: {
@@ -248,6 +249,11 @@ function build(root: HTMLElement) {
       onUpdate: (self) => {
         const active = Math.min(STATIONS - 1, Math.floor(self.progress * STATIONS))
         dots.forEach((d, i) => d.classList.toggle("on", i === active))
+        if (active !== lastStation) {
+          lastStation = active
+          // heard by components/forge/cta-beacon.tsx: first pin, last station
+          root.dispatchEvent(new CustomEvent("forge:station", { detail: active, bubbles: true }))
+        }
       },
       onToggle: (self) => {
         haze.paused(!self.isActive)

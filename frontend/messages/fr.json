@@ -63,7 +63,7 @@
       "demo": {
         "calling": "appel en cours…",
         "live": "{server} ms serveur · {rtt} ms aller-retour, mesurés sur cet appel",
-        "captured": "{server} ms serveur · réponse capturée le 7 juillet 2026",
+        "captured": "{server} ms serveur · réponse capturée le {date}",
         "replay": "rejouer",
         "replayAria": "Rejouer la requête",
         "inputAria": "IBAN envoyé",
@@ -72,13 +72,14 @@
       "cta": {
         "tryFree": "Essayer une requête",
         "getKey": "Obtenir une clé gratuite"
-      }
+      },
+      "altDoor": "Pas développeur ? Auditez votre fichier de créanciers →"
     },
     "features": {
       "0": {
         "badge": "Clearing suisse — exclusif",
         "title": "BC-Nummer / QR-IID",
-        "description": "Chaque BC-Nummer suisse du SIX BankMaster avec participation complète aux rails de paiement — SIC, euroSIC, paiements instantanés CHF — plus QR-IID et type d’institution. La donnée de clearing suisse la plus profonde de toutes les API publiques."
+        "description": "Chaque BC-Nummer du SIX BankMaster avec sa participation aux rails SIC, euroSIC et instantané CHF, le QR-IID et le type d’institution. La donnée de clearing suisse la plus profonde des API publiques."
       },
       "1": {
         "badge": "MCP-native — pour agents",
@@ -88,7 +89,7 @@
       "2": {
         "badge": "{countries} pays · {bicK} BIC",
         "title": "Validation IBAN & lookup BIC",
-        "description": "Validation mod-97 ISO 13616 avec décomposition BBAN complète sur 89 pays — adossée à {bic} entrées BIC issues de GLEIF, de SwiftCodes (MIT), de la Bundesbank, de SIX, de la NBP et d’EBA Step2."
+        "description": "Mod-97 ISO 13616 et décomposition BBAN sur {countries} pays, adossés à {bic} entrées BIC issues de GLEIF, SwiftCodes, Bundesbank, SIX, NBP et EBA STEP2."
       },
       "3": {
         "badge": "EMI / vIBAN",
@@ -103,7 +104,7 @@
       "5": {
         "badge": "x402 — paiement agents",
         "title": "Les agents paient à l’appel",
-        "description": "Les agents autonomes paient à la requête en USDC via x402 — sans compte, sans checkout. Les humains gardent la clé gratuite ou les crédits carte ; les agents ont leur propre rail."
+        "description": "Les agents autonomes paient à la requête en USDC via x402, sans compte ni checkout. Les humains gardent la clé gratuite ou les crédits par carte."
       },
       "heading": "Ce qu’un mod-97 ne vous dira jamais"
     },
@@ -237,7 +238,6 @@
     "agentsRail": {
       "heading": "Les agents ont leur propre rail",
       "sub": "Cette page parle aussi robot — chaque affirmation ci-dessus est lisible par machine, et chaque endpoint est payable sans humain dans la boucle.",
-      "illoAlt": "Un bras robotique dépose une pièce incandescente dans une fente de paiement",
       "mcpTitle": "MCP natif",
       "mcpBody": "8 outils, sans inscription. Claude, Cursor et tout agent MCP s'installent en une ligne :",
       "x402Title": "Micropaiements x402",
@@ -248,8 +248,15 @@
     "deadline": {
       "eyebrow": "Échéance",
       "heading": "14 novembre 2026 : la Suisse cesse de traiter les adresses non structurées",
-      "text": "Dès le 14 novembre 2026, SIX ne traite plus les paiements dont l’adresse ne respecte pas les règles structurées ou hybrides ; l’Eurosystème et l’EPC tiennent le même week-end, Swift a suspendu sa date le 27 août 2026. POST /v1/address/check dit gratuitement si une adresse passe les règles suisses, HVPS+ ou Fedwire, en nommant le document ; l’audit de fichier passe un classeur entier.",
-      "cta": "Lire les règles, rail par rail"
+      "text": "POST /v1/address/check dit gratuitement si une adresse passe les règles suisses, HVPS+ ou Fedwire, en nommant le document ; l’audit de fichier passe un classeur entier.",
+      "cta": "Lire les règles, rail par rail",
+      "dayPrefix": "J-",
+      "daysLabel": "jours avant le 14 novembre 2026",
+      "daysAria": "{days} jours avant le 14 novembre 2026",
+      "since": "en vigueur depuis le 14 novembre 2026",
+      "line1": "SIX ne traite plus les paiements dont l’adresse ne respecte pas les règles structurées ou hybrides.",
+      "line2": "L’Eurosystème et l’EPC basculent le même week-end.",
+      "line3": "Swift a suspendu sa propre date le 27 août 2026."
     },
     "integrations": {
       "heading": "Dans votre langage, votre ERP, votre tableur",

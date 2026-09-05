@@ -70,6 +70,7 @@ export function SiteHeader() {
               door. The account page is the visitor's own key. */}
           <Link
             href={`/${locale}/account`}
+            data-evt="nav:key"
             className="hidden lg:inline-flex items-center h-8 px-3 rounded-lg border border-primary/40 bg-primary/10 text-primary text-sm font-medium hover:bg-primary/20 transition-colors"
           >
             {t("nav.account")}
