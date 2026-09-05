@@ -1,5 +1,6 @@
 import { getTranslations } from "next-intl/server";
 import { AccountApp } from "@/components/account/account-app";
+import { ClientMessages } from "@/components/client-messages"
 import { alternatesFor } from "@/lib/seo";
 
 /**
@@ -34,7 +35,7 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
       <h1 className="font-heading text-3xl font-semibold tracking-tight">{t("title")}</h1>
       <p className="mt-2 text-muted-foreground">{t("subtitle")}</p>
       <div className="mt-10">
-        <AccountApp locale={locale} />
+        <ClientMessages ns={["account"]}><AccountApp locale={locale} /></ClientMessages>
       </div>
     </div>
   );

@@ -54,6 +54,8 @@ const nextConfig: NextConfig = {
   // Lighthouse flagged the three.js chunk without a map (2026-09-05, n° 33);
   // the code is public anyway, a production error should be readable.
   productionBrowserSourceMaps: true,
+  // The share card reads its font and mark from assets/ at render time.
+  outputFileTracingIncludes: { "/[locale]/opengraph-image": ["./assets/**/*"] },
   async headers() {
     /*
      * `/(.*)` and not the more common `/:path*`: checked against Next's own

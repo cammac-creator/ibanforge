@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { AuditDoneClient } from "@/components/audit-done-client";
+import { ClientMessages } from "@/components/client-messages"
 
 export async function generateMetadata({
   params,
@@ -20,7 +21,7 @@ export default async function AuditDonePage({
   const { locale } = await params;
   return (
     <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8 py-16 flex flex-col gap-8">
-      <AuditDoneClient locale={locale} />
+      <ClientMessages ns={["audit"]}><AuditDoneClient locale={locale} /></ClientMessages>
     </div>
   );
 }

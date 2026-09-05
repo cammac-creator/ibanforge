@@ -1,12 +1,14 @@
 import { NextIntlClientProvider, hasLocale } from "next-intl";
+import { getMessages, setRequestLocale } from "next-intl/server";
 import { notFound } from "next/navigation";
-import { Inter, JetBrains_Mono, Bebas_Neue, Oswald } from "next/font/google";
+import { Inter, JetBrains_Mono, Bebas_Neue } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import { routing } from "@/i18n/routing";
 import { ConditionalShell } from "@/components/conditional-shell";
 import { JsonLd } from "@/components/json-ld";
 import { ApiKeyDialogProvider } from "@/components/api-key-dialog";
 import { urlFor } from "@/lib/seo";
+import { LAYOUT_CLIENT_MESSAGES, pickMessages } from "@/lib/messages-pick";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -18,21 +20,24 @@ const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
 });
 
-// The forge identity: Bebas for the caps (IBAN, display titles), Oswald for
-// the lowercase "forge" — Bebas ships no lowercase at all.
+// The forge identity: Bebas for the caps (display titles). The lockup's
+// lowercase "forge" was Oswald 500 until 2026-09-05; it is traced into
+// components/brand-wordmark.tsx now, and Oswald is not loaded any more.
 const bebas = Bebas_Neue({
   weight: "400",
   variable: "--font-bebas",
   subsets: ["latin"],
 });
 
-const oswald = Oswald({
-  // Only 500 is ever set (globals.css .wordmark .fw / .brand-word em);
-  // 600 shipped a dead font file in the critical path (audit 2026-09-04, S3).
-  weight: "500",
-  variable: "--font-oswald",
-  subsets: ["latin"],
-});
+/**
+ * The three locales are known at build time: with `setRequestLocale` below,
+ * every page that reads no request data is rendered once and served by the
+ * CDN. Until 2026-09-05 (audit n° 1) the whole site was rendered on each
+ * visit (`cache-control: no-store`), the home included.
+ */
+export function generateStaticParams() {
+  return routing.locales.map((locale) => ({ locale }));
+}
 
 type Props = {
   children: React.ReactNode;
@@ -116,13 +121,15 @@ export default async function LocaleLayout({ children, params }: Props) {
   if (!hasLocale(routing.locales, locale)) {
     notFound();
   }
+  setRequestLocale(locale);
+  const messages = await getMessages();
 
   return (
     <html
       lang={locale}
       // `dark` rendered here, not only by next-themes' script: without JS the
       // header and the buttons used to come out light on a coal page (n° 27).
-      className={`${inter.variable} ${jetbrainsMono.variable} ${bebas.variable} ${oswald.variable} h-full dark`}
+      className={`${inter.variable} ${jetbrainsMono.variable} ${bebas.variable} h-full dark`}
       suppressHydrationWarning
     >
       <head>
@@ -147,7 +154,9 @@ export default async function LocaleLayout({ children, params }: Props) {
           defaultTheme="dark"
           enableSystem={false}
         >
-          <NextIntlClientProvider>
+          {/* Only what the client components of the shell read (n° 3):
+              the whole catalogue used to be serialised into every page. */}
+          <NextIntlClientProvider locale={locale} messages={pickMessages(messages, LAYOUT_CLIENT_MESSAGES)}>
             <ApiKeyDialogProvider>
               <ConditionalShell>{children}</ConditionalShell>
             </ApiKeyDialogProvider>

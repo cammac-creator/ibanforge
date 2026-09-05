@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { getTranslations } from "next-intl/server";
 import { alternatesFor } from "@/lib/seo";
+import { ClientMessages } from "@/components/client-messages"
 
 /**
  * Metadata only. `page.tsx` here is a client component, and a `"use client"`
@@ -31,5 +32,6 @@ export async function generateMetadata({
 }
 
 export default function PlaygroundLayout({ children }: { children: ReactNode }) {
-  return children;
+  // The page is a client component: its namespace travels through here.
+  return <ClientMessages ns={["playground"]}>{children}</ClientMessages>;
 }

@@ -1291,6 +1291,20 @@ html[data-js] .forge .scene {
   max-width: 62ch;
   text-wrap: pretty;
 }
+.forge .ep-plans {
+  margin-top: 1.4rem;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  letter-spacing: 0.02em;
+  color: var(--ffg-2);
+  line-height: 1.9;
+}
+.forge .ep-plans a {
+  color: var(--amber-500);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
 .forge .ep-list {
   display: flex;
   flex-direction: column;
@@ -1584,7 +1598,7 @@ html[data-js] .forge .scene {
       rgba(12, 10, 9, 0) 80%,
       var(--coal) 100%
     ),
-    url('/brand/ember-ridge.jpg') center bottom / cover no-repeat,
+    url('/brand/ember-ridge.webp') center bottom / cover no-repeat,
     #000;
 }
 .forge .cta-final .wrap {
@@ -1819,28 +1833,20 @@ html[data-js] .forge .scene {
   flex: none;
   aspect-ratio: 284 / 320;
   height: 1.7em;
-  background: url('/brand/anvil-mark.png') center / contain no-repeat;
+  /* 6,5 Ko at 128 px instead of an 80 Ko PNG (audit 2026-09-05, n° 4). */
+  background: url('/brand/anvil-mark.webp') center / contain no-repeat;
 }
 .brand-word {
-  font-family: var(--font-bebas);
-  font-weight: 400;
-  letter-spacing: 0.03em;
+  display: inline-flex;
+  align-items: center;
   white-space: nowrap;
   color: var(--fg-1);
   line-height: 1;
 }
-.brand-word em {
-  display: inline-block;
-  font-style: normal;
-  font-family: var(--font-oswald);
-  font-weight: 500;
-  font-size: 0.985em;
-  padding: 0.06em 0.05em 0.28em;
-  margin: -0.06em -0.05em -0.28em;
-  background: linear-gradient(100deg, var(--amber-500) 15%, #ef4444 95%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+.brand-word .brand-svg {
+  display: block;
+  width: auto;
+  overflow: visible;
 }
 .forge .btn-ghost-link {
   display: inline-block;

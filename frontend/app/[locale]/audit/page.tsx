@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { Badge } from "@/components/ui/badge";
 import { AuditClient } from "@/components/audit-client";
+import { ClientMessages } from "@/components/client-messages"
 import { AuditWorkbookPreview } from "@/components/audit-workbook-preview";
 import { Upload, Eye, Download } from "lucide-react";
 import { alternatesFor } from "@/lib/seo";
@@ -117,7 +118,7 @@ export default async function AuditPage({
         <p className="text-sm leading-relaxed text-muted-foreground">{t("deadline.text")}</p>
       </section>
 
-      <AuditClient locale={locale} />
+      <ClientMessages ns={["audit"]}><AuditClient locale={locale} /></ClientMessages>
 
       <AuditWorkbookPreview locale={locale} />
 

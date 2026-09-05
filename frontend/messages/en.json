@@ -151,7 +151,9 @@
         "description": "ISO 20022 address rules (SPS, T2, Fedwire) ahead of the November 2026 changes"
       },
       "heading": "Endpoints & pricing",
-      "subtitle": "Start free with 200 requests a month. Pay as you grow — by card or in USDC."
+      "subtitle": "Start free with 200 requests a month. Pay as you grow — by card or in USDC.",
+      "plans": "Free: 200 requests a month · Pro: $29 a month for 10,000 requests · credit packs from $5 · vendor licence from $149 a month · file audit CHF 149.",
+      "plansLink": "See pricing"
     },
     "cta": {
       "heading": "Ready to build?",
@@ -269,7 +271,10 @@
       "text": "Upload the CSV or XLSX you pay from. Free preview of what the bank would reject, then 149 CHF for the annotated workbook, at once.",
       "cta": "Audit a file"
     },
-    "badgeFallback": "API online · live status"
+    "badgeFallback": "API online · live status",
+    "share": {
+      "tagline": "ibanforge.com · REST · SDK · MCP · 200 free requests a month"
+    }
   },
   "pricing": {
     "metadata": {

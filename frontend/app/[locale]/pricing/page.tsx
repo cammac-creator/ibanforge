@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { CodeBlock } from "@/components/code-block"
 import { CostCalculator } from "./calculator"
 import { Faq } from "./faq"
+import { ClientMessages } from "@/components/client-messages"
 import { GetKeyButton } from "@/components/api-key-dialog"
 import { alternatesFor } from "@/lib/seo"
 
@@ -319,7 +320,7 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
           {t('calculator.subtitle')}
         </p>
 
-        <CostCalculator />
+        <ClientMessages ns={["pricing"]}><CostCalculator /></ClientMessages>
       </section>
 
       {/* ── x402 explainer ────────────────────────────────────────────────── */}
@@ -367,7 +368,7 @@ export default async function PricingPage({ params }: { params: Promise<{ locale
           {t('faq.heading')}
         </h2>
 
-        <Faq />
+        <ClientMessages ns={["pricing"]}><Faq /></ClientMessages>
       </section>
 
       {/* ── Creditor file audit: the one-off, priced, non-developer door (02/09/2026) ── */}

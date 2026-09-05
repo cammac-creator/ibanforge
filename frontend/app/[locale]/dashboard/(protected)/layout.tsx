@@ -2,6 +2,7 @@ import { isAuthenticated } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { TopNav } from '@/components/dashboard/top-nav';
 import { DashboardTooltipProvider } from '@/components/dashboard/tooltip-provider';
+import { ClientMessages } from "@/components/client-messages"
 
 export default async function DashboardLayout({
   children,
@@ -12,6 +13,7 @@ export default async function DashboardLayout({
   if (!authed) redirect('/dashboard/login');
 
   return (
+    <ClientMessages ns={["dashboard"]}>
     <DashboardTooltipProvider>
       <div className="min-h-screen bg-[var(--ink-0)] text-white">
         <TopNav />
@@ -20,5 +22,6 @@ export default async function DashboardLayout({
         </main>
       </div>
     </DashboardTooltipProvider>
+    </ClientMessages>
   );
 }

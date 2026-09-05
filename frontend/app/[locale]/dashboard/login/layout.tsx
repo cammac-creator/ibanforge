@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ClientMessages } from "@/components/client-messages"
 
 export const metadata: Metadata = {
   title: "Dashboard Login",
@@ -10,5 +11,5 @@ export default function DashboardLoginLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return <>{children}</>;
+  return <ClientMessages ns={["dashboard"]}>{children}</ClientMessages>;
 }

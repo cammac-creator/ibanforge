@@ -3,6 +3,7 @@ import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { Badge } from "@/components/ui/badge";
 import { TestIbanClient } from "@/components/test-iban-client";
+import { ClientMessages } from "@/components/client-messages"
 import { alternatesFor } from "@/lib/seo";
 
 export async function generateMetadata({
@@ -45,7 +46,7 @@ export default async function TestIbanPage({
         </Link>
       </header>
 
-      <TestIbanClient />
+      <ClientMessages ns={["testIban"]}><TestIbanClient /></ClientMessages>
 
       <section className="flex flex-col gap-3">
         <h2 className="text-xl font-semibold tracking-tight">{t("devTitle")}</h2>

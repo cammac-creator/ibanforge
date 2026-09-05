@@ -7,6 +7,7 @@ import { useLocale, useTranslations } from "next-intl"
 import { Menu, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { LocaleSwitcher } from "@/components/locale-switcher"
+import { BrandWordmark } from "@/components/brand-wordmark"
 
 /** Ties the hamburger's `aria-controls` to the menu it opens. */
 const MOBILE_MENU_ID = "site-mobile-menu"
@@ -35,7 +36,7 @@ export function SiteHeader() {
           className="flex items-center gap-2.5"
         >
           <span className="brand-mark" aria-hidden="true" />
-          <span className="brand-word text-xl">IBAN<em>forge</em></span>
+          <BrandWordmark className="text-xl" />
         </Link>
 
         {/* Desktop nav. `lg:` and not `md:` since 2026-09-05: between 768 and

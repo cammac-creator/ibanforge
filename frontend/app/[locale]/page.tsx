@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { getTranslations } from "next-intl/server"
+import { getTranslations, setRequestLocale } from "next-intl/server"
 import { Button } from "@/components/ui/button"
 import { GetKeyButton } from "@/components/api-key-dialog"
 import { Reveal } from "@/components/reveal"
@@ -24,6 +24,13 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
   return { alternates: alternatesFor(locale, "/") }
 }
 
+/**
+ * Rendered once per locale and refreshed every hour by the CDN (audit
+ * 2026-09-05, n° 1): the figures of /health and /stats/history change by
+ * the day at most, and the fold's real call happens in the browser anyway.
+ */
+export const revalidate = 3600
+
 const FEATURE_COUNT = 6
 const ENDPOINT_COUNT = 7
 
@@ -47,6 +54,7 @@ const AGENTS_ILLO = `<defs><radialGradient id="acoin" cx="38%" cy="35%" r="75%">
 
 export default async function Home({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
+  setRequestLocale(locale)
   const t = await getTranslations('home');
   const liveStats = await getLandingStats();
 
@@ -278,6 +286,12 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
               </Reveal>
             ))}
           </div>
+          {/* The subscription, the only recurring line, was absent from the
+              home (audit 2026-09-05, n° 15): one line, every plan, one link. */}
+          <p className="ep-plans">
+            {t('endpoints.plans')}{' '}
+            <Link href={`/${locale}/pricing`}>{t('endpoints.plansLink')}</Link>
+          </p>
         </div>
       </section>
 

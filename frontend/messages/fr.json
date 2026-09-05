@@ -151,7 +151,9 @@
         "description": "Règles d'adresses ISO 20022 (SPS, T2, Fedwire) avant les échéances de novembre 2026"
       },
       "heading": "Endpoints et tarifs",
-      "subtitle": "Commencez avec 200 requêtes gratuites par mois. Payez à mesure que vous grandissez — par carte ou en USDC."
+      "subtitle": "Commencez avec 200 requêtes gratuites par mois. Payez à mesure que vous grandissez — par carte ou en USDC.",
+      "plans": "Gratuit : 200 requêtes par mois · Pro : 29 $ par mois pour 10 000 requêtes · packs de crédits dès 5 $ · licence éditeur dès 149 $ par mois · audit de fichier 149 CHF.",
+      "plansLink": "Voir les tarifs"
     },
     "cta": {
       "heading": "Prêt à développer ?",
@@ -269,7 +271,10 @@
       "text": "Déposez le CSV ou XLSX depuis lequel vous payez. Aperçu gratuit de ce que la banque rejetterait, puis 149 CHF pour le classeur annoté, tout de suite.",
       "cta": "Auditer un fichier"
     },
-    "badgeFallback": "API en ligne · état en direct"
+    "badgeFallback": "API en ligne · état en direct",
+    "share": {
+      "tagline": "ibanforge.com · REST · SDK · MCP · 200 requêtes par mois gratuites"
+    }
   },
   "pricing": {
     "metadata": {

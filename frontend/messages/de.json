@@ -151,7 +151,9 @@
         "description": "ISO-20022-Adressregeln (SPS, T2, Fedwire) vor den Umstellungen im November 2026"
       },
       "heading": "Endpoints und Preise",
-      "subtitle": "Starten Sie mit 200 Gratis-Anfragen pro Monat. Zahlen Sie erst, wenn Sie wachsen — per Karte oder in USDC."
+      "subtitle": "Starten Sie mit 200 Gratis-Anfragen pro Monat. Zahlen Sie erst, wenn Sie wachsen — per Karte oder in USDC.",
+      "plans": "Gratis: 200 Anfragen pro Monat · Pro: 29 $ pro Monat für 10 000 Anfragen · Guthabenpakete ab 5 $ · Herstellerlizenz ab 149 $ pro Monat · Dateiprüfung 149 CHF.",
+      "plansLink": "Preise ansehen"
     },
     "cta": {
       "heading": "Bereit loszulegen?",
@@ -269,7 +271,10 @@
       "text": "Laden Sie die CSV- oder XLSX-Datei hoch, aus der Sie zahlen. Kostenlose Vorschau dessen, was die Bank abweisen würde, dann 149 CHF für die kommentierte Arbeitsmappe, sofort.",
       "cta": "Datei prüfen"
     },
-    "badgeFallback": "API online · Live-Status"
+    "badgeFallback": "API online · Live-Status",
+    "share": {
+      "tagline": "ibanforge.com · REST · SDK · MCP · 200 Anfragen pro Monat gratis"
+    }
   },
   "pricing": {
     "metadata": {

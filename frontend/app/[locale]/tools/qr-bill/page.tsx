@@ -3,6 +3,7 @@ import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { Badge } from "@/components/ui/badge";
 import { QrBillClient } from "@/components/qr-bill-client";
+import { ClientMessages } from "@/components/client-messages"
 import { alternatesFor } from "@/lib/seo";
 
 export async function generateMetadata({
@@ -43,7 +44,7 @@ export default async function QrBillPage({
         </p>
       </header>
 
-      <QrBillClient />
+      <ClientMessages ns={["qrBill"]}><QrBillClient /></ClientMessages>
 
       <section className="text-sm text-muted-foreground leading-relaxed flex flex-col gap-2">
         <h2 className="font-semibold text-foreground">{t("api.title")}</h2>
