@@ -55,7 +55,7 @@ const nextConfig: NextConfig = {
   // the code is public anyway, a production error should be readable.
   productionBrowserSourceMaps: true,
   // The share card reads its font and mark from assets/ at render time.
-  outputFileTracingIncludes: { "/[locale]/opengraph-image": ["./assets/**/*"] },
+  outputFileTracingIncludes: { "/[locale]/og": ["./assets/**/*"] },
   async headers() {
     /*
      * `/(.*)` and not the more common `/:path*`: checked against Next's own
@@ -83,6 +83,9 @@ const nextConfig: NextConfig = {
        * old URL answers a permanent redirect to its new address, in that
        * order: the bare /en first, then everything beneath it.
        */
+      // the share card moved from the file convention to /og (2026-09-05)
+      { source: "/opengraph-image", destination: "/og", permanent: true },
+      { source: "/:locale(fr|de)/opengraph-image", destination: "/:locale/og", permanent: true },
       { source: "/en", destination: "/", permanent: true },
       { source: "/en/:path*", destination: "/:path*", permanent: true },
       /*

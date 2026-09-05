@@ -14,6 +14,13 @@
  *
  * Bebas ships no lowercase, so everything here is capitals by design. The
  * mark is inlined as a data URI: satori fetches nothing at build time.
+ *
+ * A route handler (/og, /fr/og, /de/og) and not the `opengraph-image` file
+ * convention since the root move of 2026-09-05: Next derives the file
+ * convention's URL from the segment path, `/en/opengraph-image`, which now
+ * only answers a redirect, and a file-based image overrides any
+ * `openGraph.images` the layout declares. The layout names this route
+ * through lib/seo ogImageFor.
  */
 import { ImageResponse } from 'next/og';
 import { getTranslations } from 'next-intl/server';
@@ -26,9 +33,8 @@ export function generateStaticParams() {
   return routing.locales.map((locale) => ({ locale }));
 }
 
-export const alt = 'IBANforge — IBAN, BIC & Swiss clearing API';
-export const size = { width: 1200, height: 630 };
-export const contentType = 'image/png';
+export const dynamic = 'force-static';
+const size = { width: 1200, height: 630 };
 
 const COAL = '#0c0a09';
 const AMBER = '#f59e0b';
@@ -40,7 +46,7 @@ function splitAccent(raw: string): [string, string, string] {
   return m ? [m[1], m[2], m[3]] : [raw.replace(/<\/?accent>/g, ''), '', ''];
 }
 
-export default async function Image({ params }: { params: Promise<{ locale: string }> }) {
+export async function GET(_req: Request, { params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: 'home' });
   const [before, accent, after] = splitAccent(t.raw('hero.title') as string);
@@ -102,6 +108,7 @@ export default async function Image({ params }: { params: Promise<{ locale: stri
     {
       ...size,
       fonts: [{ name: 'Bebas Neue', data: bebas, weight: 400, style: 'normal' }],
+      headers: { 'Cache-Control': 'public, max-age=86400, s-maxage=604800' },
     },
   );
 }

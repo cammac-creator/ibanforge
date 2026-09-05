@@ -1,0 +1,50 @@
+{
+  "iban": "CH1000230000000012345",
+  "valid": true,
+  "country": {
+    "code": "CH",
+    "name": "Switzerland"
+  },
+  "check_digits": "10",
+  "bban": {
+    "bank_code": "00230",
+    "account_number": "000000012345"
+  },
+  "sepa": {
+    "member": true,
+    "schemes": [
+      "SCT",
+      "SDD"
+    ],
+    "vop_required": false
+  },
+  "formatted": "CH10 0023 0000 0000 1234 5",
+  "cost_usdc": 0,
+  "bic": {
+    "code": "UBSWCHZH",
+    "bank_name": "UBS Switzerland AG",
+    "city": "Zürich"
+  },
+  "issuer": {
+    "type": "bank",
+    "name": "UBS Switzerland AG"
+  },
+  "risk_indicators": {
+    "issuer_type": "bank",
+    "country_risk": "standard",
+    "test_bic": false,
+    "sepa_reachable": true,
+    "vop_coverage": false
+  },
+  "clearing": {
+    "iid": "00230",
+    "name": "UBS Switzerland AG",
+    "type": "bank",
+    "town": "Zürich",
+    "sic": true,
+    "instant_payments_chf": true,
+    "eurosic": true,
+    "qr_iid": null
+  },
+  "processing_ms": 0.41
+}

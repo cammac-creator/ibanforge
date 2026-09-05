@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest"
 import { DEFAULT_RESULT } from "@/app/[locale]/playground/examples"
+// The answer captured on 2026-07-07, frozen: the live capture in
+// playground/captured-iban.json is rewritten every month by the BIC refresh
+// (scripts/capture-fold-response.ts) and must not move these expectations.
+import UBS from "./fixtures/ubs-2026-07-07.json"
 import { groupIban, isShowable, responseLines, serverMs } from "./response-lines"
 
 const text = (lines: ReturnType<typeof responseLines>) =>
@@ -7,7 +11,7 @@ const text = (lines: ReturnType<typeof responseLines>) =>
 
 describe("responseLines", () => {
   it("projects the captured UBS payload onto the reading order; long groups become blocks", () => {
-    const out = text(responseLines(DEFAULT_RESULT.iban))
+    const out = text(responseLines(UBS))
     expect(out).toBe(
       [
         "{",
@@ -57,7 +61,11 @@ describe("responseLines", () => {
 
 describe("serverMs / groupIban / isShowable", () => {
   it("reads the processing time only when it is a sane number", () => {
-    expect(serverMs(DEFAULT_RESULT.iban)).toBe(0.41)
+    expect(serverMs(UBS)).toBe(0.41)
+    // the live capture: a sane number, whatever this month measured
+    const live = serverMs(DEFAULT_RESULT.iban)
+    expect(live).not.toBeNull()
+    expect(live as number).toBeGreaterThan(0)
     expect(serverMs({ processing_ms: "0.41" })).toBeNull()
     expect(serverMs({ processing_ms: -1 })).toBeNull()
     expect(serverMs(undefined)).toBeNull()
