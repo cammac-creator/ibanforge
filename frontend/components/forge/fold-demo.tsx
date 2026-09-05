@@ -169,12 +169,15 @@ export function FoldDemo({ iban, fallback }: { iban: string; fallback: Record<st
         <span className="hp-method">
           <b>POST</b> /v1/iban/validate
         </span>
-        <span className="hp-input" aria-label={t("inputAria")}>
+        <span className="hp-input">
+          <span className="sr-only">{t("inputAria")} : </span>
           {typed}
           <span className="hp-caret" aria-hidden="true" />
         </span>
       </div>
-      <pre className="hp-body" aria-label={t("bodyAria")} data-run={run || undefined}>
+      {/* A region that scrolls must be reachable from the keyboard (axe
+          scrollable-region-focusable, 2026-09-05). */}
+      <pre className="hp-body" role="region" aria-label={t("bodyAria")} tabIndex={0} data-run={run || undefined}>
         <code>
           {lines.map((line, i) => (
             <span className="hp-ln" style={{ "--i": i } as React.CSSProperties} key={`${run}-${i}`}>

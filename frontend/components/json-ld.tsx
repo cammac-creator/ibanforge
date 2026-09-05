@@ -4,7 +4,6 @@
  * Three schemas help AI agents and search engines understand the product:
  * - SoftwareApplication: full product description with offers + featureList
  * - Organization: name, logo, social links
- * - HowTo: 3-step integration guide (key/x402 → validate → MCP)
  *
  * FAQPage and WebAPI were removed 2026-08: Google dropped the FAQ rich result
  * on 2026-05-07, and no consumer of the WebAPI type was ever identified — the
@@ -124,35 +123,9 @@ const ORGANIZATION = {
   ],
 };
 
-const HOW_TO = {
-  '@context': 'https://schema.org',
-  '@type': 'HowTo',
-  name: 'Integrate IBANforge in 3 steps',
-  description: 'How to validate an IBAN with the IBANforge API in three steps.',
-  totalTime: 'PT5M',
-  step: [
-    {
-      '@type': 'HowToStep',
-      name: 'Get an API key (free) or use x402',
-      text: 'POST /v1/keys/generate with your email to get a free API key (200 requests/month). Or skip signup entirely and let your agent pay 0.005 USDC per call via x402.',
-      url: 'https://ibanforge.com/docs/api-keys',
-    },
-    {
-      '@type': 'HowToStep',
-      name: 'Call the validate endpoint',
-      text: 'curl -X POST https://api.ibanforge.com/v1/iban/validate -H "Authorization: Bearer ifk_***" -H "Content-Type: application/json" -d \'{"iban": "CH1000230000000012345"}\'',
-      url: 'https://ibanforge.com/docs/iban-validate',
-    },
-    {
-      '@type': 'HowToStep',
-      name: 'Or install the MCP server',
-      text: 'In Claude Desktop / Cursor / Cline: npx -y ibanforge-mcp (stdio) or point to https://api.ibanforge.com/mcp (streamable-HTTP).',
-      url: 'https://ibanforge.com/docs/mcp',
-    },
-  ],
-};
-
-const SCHEMAS = [SOFTWARE_APPLICATION, ORGANIZATION, HOW_TO];
+// No HowTo since 2026-09-05: Google dropped that rich result in 2023, the
+// block was 1 KB of dead weight on every page.
+const SCHEMAS = [SOFTWARE_APPLICATION, ORGANIZATION];
 
 export function JsonLd() {
   return (

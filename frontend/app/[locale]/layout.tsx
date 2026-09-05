@@ -40,24 +40,27 @@ type Props = {
 };
 
 const META_BY_LOCALE = {
+  // Audit 2026-09-05 (n° 14): the search snippet promised an "API for AI
+  // agents" while the fold speaks to invoicing software before the November
+  // 2026 deadlines. One promise now, the fold's; no figure typed by hand.
   en: {
-    title: "IBANforge — IBAN Validation & BIC/SWIFT Lookup API for AI Agents",
+    title: "IBANforge — IBAN, BIC & Swiss clearing API for invoicing tools",
     description:
-      "Validate IBANs, lookup BICs/SWIFT, score compliance risk. 121K BICs across 89 countries, sanctions screening, SEPA + VoP, native MCP for AI agents, x402 micropayments. Free tier: 200 requests/month.",
+      "IBAN, BIC, SIX Swiss clearing and sanctions in one request: the data invoicing software must serve before 14 November 2026. REST, SDKs, MCP. Free: 200 requests a month.",
     ogLocale: "en_US",
     alternates: { fr: "fr", de: "de" },
   },
   fr: {
-    title: "IBANforge — API de validation IBAN & BIC/SWIFT pour agents IA",
+    title: "IBANforge — API IBAN, BIC et clearing suisse pour éditeurs",
     description:
-      "Validez vos IBAN, recherchez des BIC/SWIFT, évaluez le risque de conformité. 121K codes BIC sur 89 pays, screening sanctions, SEPA + VoP, MCP natif pour agents IA, micropaiements x402. Gratuit : 200 requêtes/mois.",
+      "IBAN, BIC, clearing suisse SIX et sanctions en une requête : les données que les logiciels de facturation doivent servir avant le 14 novembre 2026. REST, SDK, MCP. Gratuit : 200 requêtes par mois.",
     ogLocale: "fr_FR",
     alternates: { en: "en", de: "de" },
   },
   de: {
-    title: "IBANforge — IBAN-Validierung & BIC/SWIFT-Lookup-API für KI-Agenten",
+    title: "IBANforge — API für IBAN, BIC und Schweizer Clearing",
     description:
-      "IBANs validieren, BIC/SWIFT abfragen, Compliance-Risiken bewerten. 121K BIC-Einträge in 89 Ländern, Sanktionsprüfung, SEPA + VoP, natives MCP für KI-Agenten, x402-Mikrozahlungen. Kostenlos: 200 Anfragen/Monat.",
+      "IBAN, BIC, SIX-Clearing und Sanktionen in einer Anfrage: die Daten, die Rechnungssoftware vor dem 14. November 2026 liefern muss. REST, SDKs, MCP. Gratis: 200 Anfragen pro Monat.",
     ogLocale: "de_DE",
     alternates: { en: "en", fr: "fr" },
   },
@@ -117,7 +120,9 @@ export default async function LocaleLayout({ children, params }: Props) {
   return (
     <html
       lang={locale}
-      className={`${inter.variable} ${jetbrainsMono.variable} ${bebas.variable} ${oswald.variable} h-full`}
+      // `dark` rendered here, not only by next-themes' script: without JS the
+      // header and the buttons used to come out light on a coal page (n° 27).
+      className={`${inter.variable} ${jetbrainsMono.variable} ${bebas.variable} ${oswald.variable} h-full dark`}
       suppressHydrationWarning
     >
       <head>

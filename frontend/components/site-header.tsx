@@ -38,8 +38,10 @@ export function SiteHeader() {
           <span className="brand-word text-xl">IBAN<em>forge</em></span>
         </Link>
 
-        {/* Desktop nav */}
-        <nav className="hidden md:flex items-center gap-1">
+        {/* Desktop nav. `lg:` and not `md:` since 2026-09-05: between 768 and
+            834 px (an iPad held upright) six links, the language switch and
+            the key button no longer fit, and the lockup broke onto two lines. */}
+        <nav className="hidden lg:flex items-center gap-1">
           {navLinks.map((link) => (
             <Link
               key={link.href}
@@ -48,7 +50,7 @@ export function SiteHeader() {
               // to tell which entry is the page already open. The visual
               // treatment says it to everyone else; this says it to them.
               aria-current={pathname === link.href ? 'page' : undefined}
-              className={`px-3 py-1.5 rounded-md text-sm transition-colors hover:bg-muted/50 hover:text-foreground ${
+              className={`px-3 py-2 rounded-md text-sm transition-colors hover:bg-muted/50 hover:text-foreground ${
                 pathname === link.href ? 'text-foreground' : 'text-muted-foreground'
               }`}
             >
@@ -67,7 +69,7 @@ export function SiteHeader() {
               door. The account page is the visitor's own key. */}
           <Link
             href={`/${locale}/account`}
-            className="hidden md:inline-flex items-center h-8 px-3 rounded-lg border border-primary/40 bg-primary/10 text-primary text-sm font-medium hover:bg-primary/20 transition-colors"
+            className="hidden lg:inline-flex items-center h-8 px-3 rounded-lg border border-primary/40 bg-primary/10 text-primary text-sm font-medium hover:bg-primary/20 transition-colors"
           >
             {t("nav.account")}
           </Link>
@@ -75,7 +77,7 @@ export function SiteHeader() {
           {/* Mobile hamburger */}
           <button
             type="button"
-            className="md:hidden flex items-center justify-center size-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+            className="lg:hidden flex items-center justify-center size-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
             onClick={() => setMobileOpen((v) => !v)}
             aria-label={t("toggleMenu")}
             // Audit 2026-09-01 (WEB-09): the button said nothing about the
@@ -103,7 +105,7 @@ export function SiteHeader() {
         inert={!mobileOpen}
         aria-hidden={!mobileOpen}
         className={cn(
-          "md:hidden border-t border-border overflow-hidden transition-all duration-200",
+          "lg:hidden border-t border-border overflow-hidden transition-all duration-200",
           mobileOpen ? "max-h-64 opacity-100" : "max-h-0 opacity-0"
         )}
       >

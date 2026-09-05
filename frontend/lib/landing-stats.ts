@@ -17,12 +17,19 @@ export interface LandingStats {
   chClearingEntries: number
   /** ISO day (YYYY-MM-DD) of the last BIC refresh, as /health reports it; null when unknown. */
   bicDataLastUpdated: string | null
+  /**
+   * Share of answers without a 5xx over the last 30 days, in percent, as the
+   * status page computes it from /stats/history. null when STATS_TOKEN is
+   * absent or the history is unreachable: the badge then claims no number.
+   */
+  successRate30: number | null
 }
 
 const FALLBACK: LandingStats = {
   bicEntries: 121_610,
   chClearingEntries: 1_165,
   bicDataLastUpdated: null,
+  successRate30: null,
 }
 
 /** Countries with IBAN validation — backend src/lib/countries.ts IBAN_LENGTHS (89 entries). */
@@ -49,7 +56,34 @@ export function refreshDay(raw: unknown): string | null {
   return m ? m[1] : null
 }
 
+interface HistoryRow {
+  total_requests?: number
+  s5xx?: number
+}
+
+/** The 30-day error-free rate, or null. Never throws, never waits past 4 s. */
+async function getSuccessRate30(): Promise<number | null> {
+  const token = process.env.STATS_TOKEN
+  if (!token) return null
+  try {
+    const fetched = fetch("https://api.ibanforge.com/stats/history?period=30", {
+      headers: { Authorization: `Bearer ${token}` },
+      next: { revalidate: 3_600 },
+    }).then(async (res) => (res.ok ? ((await res.json()) as HistoryRow[]) : null))
+    const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 4_000))
+    const rows = await Promise.race([fetched.catch(() => null), timeout])
+    if (!Array.isArray(rows) || rows.length === 0) return null
+    const total = rows.reduce((a, r) => a + (r.total_requests ?? 0), 0)
+    if (total === 0) return null
+    const errors = rows.reduce((a, r) => a + (r.s5xx ?? 0), 0)
+    return Math.round(((total - errors) / total) * 10_000) / 100
+  } catch {
+    return null
+  }
+}
+
 export async function getLandingStats(): Promise<LandingStats> {
+  const successRate30 = await getSuccessRate30()
   try {
     const fetched = fetch("https://api.ibanforge.com/health", {
       next: { revalidate: 86_400 }, // daily
@@ -62,7 +96,7 @@ export async function getLandingStats(): Promise<LandingStats> {
     // fetch out of the data cache, and a hung build is worse than a fallback.
     const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 4_000))
     const payload = await Promise.race([fetched.catch(() => null), timeout])
-    if (!payload) return FALLBACK
+    if (!payload) return { ...FALLBACK, successRate30 }
 
     const bic = payload.bic_database_entries
     const ch = payload.ch_clearing_entries
@@ -70,8 +104,9 @@ export async function getLandingStats(): Promise<LandingStats> {
       bicEntries: typeof bic === "number" && bic > 0 ? bic : FALLBACK.bicEntries,
       chClearingEntries: typeof ch === "number" && ch > 0 ? ch : FALLBACK.chClearingEntries,
       bicDataLastUpdated: refreshDay(payload.bic_data_last_updated),
+      successRate30,
     }
   } catch {
-    return FALLBACK
+    return { ...FALLBACK, successRate30 }
   }
 }

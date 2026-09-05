@@ -28,6 +28,11 @@ const CSP_REPORT_ONLY = [
   "img-src 'self' data: https:",
   "connect-src 'self' https://api.ibanforge.com",
   "frame-ancestors 'none'",
+  // Without a destination the reports went nowhere and the "read them, then
+  // block" step could never happen (audit 2026-09-05, n° 31). Both spellings:
+  // report-uri for every browser today, report-to for the Reporting API.
+  "report-uri /api/csp-report",
+  "report-to csp-endpoint",
 ].join("; ");
 
 const SECURITY_HEADERS = [
@@ -37,6 +42,7 @@ const SECURITY_HEADERS = [
   { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
   { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains" },
   { key: "Content-Security-Policy-Report-Only", value: CSP_REPORT_ONLY },
+  { key: "Reporting-Endpoints", value: 'csp-endpoint="/api/csp-report"' },
 ];
 
 const nextConfig: NextConfig = {
@@ -45,6 +51,9 @@ const nextConfig: NextConfig = {
   },
   // `x-powered-by: Next.js` announced the stack to every visitor for free.
   poweredByHeader: false,
+  // Lighthouse flagged the three.js chunk without a map (2026-09-05, n° 33);
+  // the code is public anyway, a production error should be readable.
+  productionBrowserSourceMaps: true,
   async headers() {
     /*
      * `/(.*)` and not the more common `/:path*`: checked against Next's own
@@ -56,6 +65,17 @@ const nextConfig: NextConfig = {
   },
   async redirects() {
     return [
+      /*
+       * 2026-09-05 (audit n° 29): www.ibanforge.com served the whole site a
+       * second time (200, canonical pointing at the apex) instead of sending
+       * the visitor to the one host. A permanent redirect, every path.
+       */
+      {
+        source: "/:path*",
+        has: [{ type: "host", value: "www.ibanforge.com" }],
+        destination: "https://ibanforge.com/:path*",
+        permanent: true,
+      },
       /*
        * BIZ-15 (2026-09-01): /docs/quickstart answers 404 since the 25/08
        * landing rewrite dropped the quickstart section. Inbound links and the

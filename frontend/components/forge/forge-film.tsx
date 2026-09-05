@@ -34,6 +34,8 @@ export interface FilmStrings {
   heat: {
     eyebrow: string; title: string; copy: string
     country: string; check: string; bank: string; account: string
+    /** The IBAN and its parts, read aloud instead of the split characters. */
+    ibanAria: string
   }
   strike: { eyebrow: string; title: string; valid: string }
   quench: {
@@ -45,7 +47,7 @@ export interface FilmStrings {
     eyebrow: string; title: string; copy: string
     iid: string; sic: string; eurosic: string; instant: string
   }
-  ship: { eyebrow: string; title: string; head: string; tryLive: string; copy: string }
+  ship: { eyebrow: string; title: string; head: string; tryLive: string; copy: string; processingMs: string }
 }
 
 /* Static SVG scenery, kept as trusted constants so the JSX stays legible.
@@ -96,9 +98,12 @@ const JSON_OUT = `{
   },
   <span class="k">"sepa"</span>: { <span class="k">"member"</span>: <span class="n">true</span>, <span class="k">"schemes"</span>: [<span class="s">"SCT"</span>, <span class="s">"SDD"</span>] },
   <span class="k">"risk_indicators"</span>: { <span class="k">"country_risk"</span>: <span class="s">"standard"</span> },
-  <span class="k">"processing_ms"</span>: <span class="n">0.41</span>
+  <span class="k">"processing_ms"</span>: <span class="n">__MS__</span>
 }`
-const JSON_LINES = JSON_OUT.split("\n").map((l) => `<span class="jl">${l}</span>`).join("")
+// The one latency figure of the page (lib/landing-stats P50_PROCESSING_MS),
+// handed down by the page; the literal is ours, never user input.
+const jsonLines = (ms: string) =>
+  JSON_OUT.replace("__MS__", ms).split("\n").map((l) => `<span class="jl">${l}</span>`).join("")
 
 const STATIONS = 4
 
@@ -233,7 +238,10 @@ function build(root: HTMLElement) {
   // ── station 0 · heat, then the strike ──
   const s0 = gsap.timeline()
   enter(s0, 0)
-  const ibanSplit = new SplitText(qa(".iban-bar .seg b"), { type: "chars" })
+  // aria "none": the default writes aria-label on each <b>, an attribute the
+  // element may not carry (axe, 2026-09-05); the bar is aria-hidden and a
+  // sr-only sentence before it reads the IBAN whole.
+  const ibanSplit = new SplitText(qa(".iban-bar .seg b"), { type: "chars", aria: "none" })
   splits.push(ibanSplit)
   // colour per character, the glow once on the bar: WebKit repaints
   // per-character text shadows dearly (long frames measured 2026-09-04)
@@ -457,7 +465,8 @@ export function ForgeFilm({ t, playgroundHref }: { t: FilmStrings; playgroundHre
             <p className="st-eyebrow"><span className="st-num">01</span> <span className="eyebrow">{t.heat.eyebrow} · {t.strike.eyebrow}</span></p>
             <h3 className="st-title">{t.heat.title}</h3>
             <div className="st-stage">
-              <p className="iban-bar">
+              <p className="sr-only">{t.heat.ibanAria}</p>
+              <p className="iban-bar" aria-hidden="true">
                 <span className="seg seg-cc"><b>CH</b><i>{t.heat.country}</i></span>
                 <span className="seg seg-ck"><b>10</b><i>{t.heat.check}</i></span>
                 <span className="seg seg-bank"><b>00230</b><i>{t.heat.bank}</i></span>
@@ -465,6 +474,7 @@ export function ForgeFilm({ t, playgroundHref }: { t: FilmStrings; playgroundHre
               </p>
               <p
                 className="mod-line"
+                role="img"
                 aria-label="00230000000012345121710"
                 dangerouslySetInnerHTML={{ __html: MOD_LINE }}
               />
@@ -533,7 +543,7 @@ export function ForgeFilm({ t, playgroundHref }: { t: FilmStrings; playgroundHre
             <div className="st-stage">
               <figure className="ship">
                 <figcaption className="ship-head"><span className="pill-ok">200 OK</span><span>{t.ship.head}</span></figcaption>
-                <pre className="json-out"><code dangerouslySetInnerHTML={{ __html: JSON_LINES }} /></pre>
+                <pre className="json-out"><code dangerouslySetInnerHTML={{ __html: jsonLines(t.ship.processingMs) }} /></pre>
               </figure>
               <p className="try-live" data-t=""><a className="btn-ghost-link" href={playgroundHref}>{t.ship.tryLive}</a></p>
             </div>

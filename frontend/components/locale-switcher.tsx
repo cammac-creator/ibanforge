@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { useLocale } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { usePathname, useRouter } from 'next/navigation';
 import { routing } from '@/i18n/routing';
 
@@ -9,6 +9,7 @@ const LABELS: Record<string, string> = { en: 'EN', fr: 'FR', de: 'DE' };
 
 export function LocaleSwitcher() {
   const locale = useLocale();
+  const t = useTranslations('header');
   const pathname = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -37,7 +38,9 @@ export function LocaleSwitcher() {
       <button
         onClick={() => setOpen((v) => !v)}
         className="text-xs font-mono font-semibold text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded border border-border"
-        aria-label="Change language"
+        // The accessible name carries the visible text, in the page's language
+        // (Lighthouse label-content-name-mismatch, 2026-09-05).
+        aria-label={t('changeLanguage', { locale: LABELS[locale] ?? 'EN' })}
       >
         {LABELS[locale] ?? 'EN'}
       </button>

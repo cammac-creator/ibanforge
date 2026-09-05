@@ -11,7 +11,8 @@
       "account": "Ihr Key",
       "audit": "Dateiprüfung"
     },
-    "toggleMenu": "Menü öffnen"
+    "toggleMenu": "Menü öffnen",
+    "changeLanguage": "Sprache: {locale}. Sprache wechseln"
   },
   "footer": {
     "logo": "IBANforge",
@@ -55,11 +56,10 @@
     "metadata": {
       "description": "IBAN-Validierung, BIC/SWIFT-Suche, Schweizer Clearingdaten und Compliance-Risiko für Entwickler und KI-Agenten. Gratis-Stufe — 200 Anfragen/Monat; danach Karte oder USDC."
     },
-    "badge": "Live · Europa",
+    "badge": "Online · {rate} % fehlerfrei über 30 Tage",
     "hero": {
       "title": "Die IBAN kommt rein. BIC, Bank und SEPA-Status <accent>kommen raus</accent>.",
       "description": "<b>{bic}</b> BIC-Einträge, <b>{ch}</b> SIX-Clearing-Einträge, OFAC/EU/UN-Screening: die Daten, die Schweizer und DACH-Rechnungssoftware vor den Umstellungen im November 2026 liefern muss. REST, SDKs, MCP.",
-      "provenance": "Register: GLEIF · SIX BankMaster · Bundesbank · EBA STEP2 · NBP · Bank of England",
       "demo": {
         "calling": "Aufruf läuft…",
         "live": "{server} ms Server · {rtt} ms Umlauf, auf diesem Aufruf gemessen",
@@ -177,14 +177,17 @@
       "madeNote": "Schweizer Clearingdaten direkt von SIX",
       "privacyLabel": "Privacy als Standard",
       "privacyValue": "IBANs nie gespeichert · selbstlöschende Telemetrie",
-      "privacyNote": "Gelöscht 30 Tage nach Kündigung — DPA Klausel 4.7"
+      "privacyNote": "Gelöscht 30 Tage nach Kündigung — DPA Klausel 4.7",
+      "ariaLabel": "Datenquellen und Herkunft",
+      "madeValue": "Aus der Schweiz"
     },
     "reviewed": {
       "label": "Unabhängig geprüft",
       "quote": "The most artifact-complete submission the inbox has had.",
       "context": "Kin Lane hat IBANforges API-Evangelist-Profil im August 2026 aus abgerufenen Artefakten neu aufgebaut — unser x402 erwies sich dabei als das erste unter den 3.767 MCP-Servern seines Katalogs.",
       "linkReview": "Das öffentliche Review lesen",
-      "linkStory": "Die ganze Geschichte"
+      "linkStory": "Die ganze Geschichte",
+      "quoteTranslation": "„Die artefaktvollständigste Einreichung, die der Posteingang je hatte.“"
     },
     "film": {
       "heading": "Was die API aus einer IBAN macht, in vier Schritten",
@@ -223,8 +226,8 @@
       },
       "ship": {
         "eyebrow": "Versand",
-        "title": "Geliefert in 0,41 ms.",
-        "head": "application/json · 0,41 ms Server",
+        "title": "Geliefert in {ms} ms.",
+        "head": "application/json · {ms} ms Server",
         "tryLive": "Live im Playground testen",
         "copy": "Eine Anfrage, eine Antwort: geschmiedet, abgeschreckt, geprägt."
       }
@@ -265,7 +268,8 @@
       "heading": "Sie zahlen Lieferanten? Prüfen Sie Ihre Kreditorendatei",
       "text": "Laden Sie die CSV- oder XLSX-Datei hoch, aus der Sie zahlen. Kostenlose Vorschau dessen, was die Bank abweisen würde, dann 149 CHF für die kommentierte Arbeitsmappe, sofort.",
       "cta": "Datei prüfen"
-    }
+    },
+    "badgeFallback": "API online · Live-Status"
   },
   "pricing": {
     "metadata": {

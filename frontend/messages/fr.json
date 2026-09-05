@@ -11,11 +11,12 @@
       "account": "Votre clé",
       "audit": "Audit de fichier"
     },
-    "toggleMenu": "Ouvrir le menu"
+    "toggleMenu": "Ouvrir le menu",
+    "changeLanguage": "Langue : {locale}. Changer de langue"
   },
   "footer": {
     "logo": "IBANforge",
-    "tagline": "L’API de données bancaires pour développeurs et agents IA — IBAN, BIC, clearing suisse, compliance.",
+    "tagline": "L’API de données bancaires pour développeurs et agents IA — IBAN, BIC, clearing suisse, conformité.",
     "column": {
       "product": "Produit",
       "developers": "Développeurs",
@@ -55,11 +56,10 @@
     "metadata": {
       "description": "Validation IBAN, recherche BIC/SWIFT, données de clearing suisses et risque de conformité pour développeurs et agents IA. Offre gratuite — 200 requêtes/mois ; ensuite carte ou USDC."
     },
-    "badge": "Live · Europe",
+    "badge": "En ligne · {rate} % sans erreur sur 30 jours",
     "hero": {
       "title": "L’IBAN entre. Le BIC, la banque et le verdict SEPA <accent>sortent</accent>.",
       "description": "<b>{bic}</b> entrées BIC, <b>{ch}</b> entrées de clearing SIX, screening OFAC/EU/UN : les données que les éditeurs de facturation suisses et DACH doivent servir avant les échéances de novembre 2026. REST, SDK, MCP.",
-      "provenance": "Registres : GLEIF · SIX BankMaster · Bundesbank · EBA STEP2 · NBP · Bank of England",
       "demo": {
         "calling": "appel en cours…",
         "live": "{server} ms serveur · {rtt} ms aller-retour, mesurés sur cet appel",
@@ -93,12 +93,12 @@
       "3": {
         "badge": "EMI / vIBAN",
         "title": "Classification émetteur",
-        "description": "Détecte les IBAN virtuels et les EMI (Wise, Revolut, N26, Mercury…) — un vrai signal compliance qu’un simple mod-97 ne donnera jamais."
+        "description": "Détecte les IBAN virtuels et les EMI (Wise, Revolut, N26, Mercury…) — un vrai signal de conformité qu’un simple mod-97 ne donnera jamais."
       },
       "4": {
-        "badge": "Sanctions + FATF",
-        "title": "Score de risque compliance",
-        "description": "Screening sanctions au niveau banque-BIC (OFAC, EU, UN) + FATF + SEPA + VoP, distillés en un score de risque 0-100."
+        "badge": "Sanctions + GAFI",
+        "title": "Score de risque de conformité",
+        "description": "Screening sanctions au niveau banque-BIC (OFAC, EU, UN) + GAFI + SEPA + VoP, distillés en un score de risque 0-100."
       },
       "5": {
         "badge": "x402 — paiement agents",
@@ -130,7 +130,7 @@
         "method": "POST",
         "path": "/v1/iban/compliance",
         "cost": "$0.02",
-        "description": "Check compliance complet : sanctions, SEPA Instant, VoP, score de risque"
+        "description": "Contrôle de conformité complet : sanctions, SEPA Instant, VoP, score de risque"
       },
       "4": {
         "method": "GET",
@@ -171,20 +171,23 @@
       "dataNote": "Actualisées chaque mois",
       "dataNoteDated": "Actualisées chaque mois · dernier rafraîchissement le {date}",
       "sanctionsLabel": "Screening sanctions",
-      "sanctionsValue": "OFAC · EU · UN + FATF",
+      "sanctionsValue": "OFAC · EU · UN + GAFI",
       "sanctionsNote": "Au niveau banque (BIC8)",
       "madeLabel": "Provenance",
       "madeNote": "Données de clearing suisses directement de SIX",
       "privacyLabel": "Privacy par défaut",
       "privacyValue": "IBAN jamais stockés · télémétrie auto-supprimée",
-      "privacyNote": "Effacée 30 jours après votre départ — DPA clause 4.7"
+      "privacyNote": "Effacée 30 jours après votre départ — DPA clause 4.7",
+      "ariaLabel": "Sources de données et provenance",
+      "madeValue": "Conçu en Suisse"
     },
     "reviewed": {
       "label": "Relu indépendamment",
       "quote": "The most artifact-complete submission the inbox has had.",
       "context": "Kin Lane a reconstruit la fiche API Evangelist d'IBANforge à partir des artefacts consultés, en août 2026 — et notre x402 s'est révélé le premier parmi les 3 767 serveurs MCP de son catalogue.",
       "linkReview": "Lire la revue publique",
-      "linkStory": "L'histoire complète"
+      "linkStory": "L'histoire complète",
+      "quoteTranslation": "« La candidature la plus complète en artefacts que la boîte de réception ait reçue. »"
     },
     "film": {
       "heading": "Ce que l’API fait d’un IBAN, en quatre temps",
@@ -223,8 +226,8 @@
       },
       "ship": {
         "eyebrow": "Livraison",
-        "title": "Livrée en 0,41 ms.",
-        "head": "application/json · 0,41 ms serveur",
+        "title": "Livrée en {ms} ms.",
+        "head": "application/json · {ms} ms serveur",
         "tryLive": "Essayez en direct dans le playground",
         "copy": "Une requête, une réponse : forgée, trempée, estampillée."
       }
@@ -265,7 +268,8 @@
       "heading": "Vous payez des fournisseurs ? Auditez votre fichier de créanciers",
       "text": "Déposez le CSV ou XLSX depuis lequel vous payez. Aperçu gratuit de ce que la banque rejetterait, puis 149 CHF pour le classeur annoté, tout de suite.",
       "cta": "Auditer un fichier"
-    }
+    },
+    "badgeFallback": "API en ligne · état en direct"
   },
   "pricing": {
     "metadata": {
@@ -1052,7 +1056,7 @@
     }
   },
   "apiKeyDialog": {
-    "eyebrow": "Tier gratuit",
+    "eyebrow": "Offre gratuite",
     "title": "Obtenir une clé API gratuite",
     "subtitle": "200 appels gratuits par mois. Pas de carte bancaire. La clé est affichée une seule fois.",
     "emailLabel": "Email",

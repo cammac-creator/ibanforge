@@ -84,7 +84,7 @@ export function SiteFooter() {
                       href={link.href}
                       target={"external" in link ? "_blank" : undefined}
                       rel={"external" in link ? "noopener noreferrer" : undefined}
-                      className="text-[13px] sm:text-sm text-muted-foreground hover:text-foreground transition-colors"
+                      className="inline-block py-1 text-[13px] sm:text-sm text-muted-foreground hover:text-foreground transition-colors"
                     >
                       {link.label}
                     </Link>

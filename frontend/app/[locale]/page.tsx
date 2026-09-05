@@ -27,14 +27,6 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
 const FEATURE_COUNT = 6
 const ENDPOINT_COUNT = 7
 
-/* Ambient ember particles — the logo's rising bars, scattered. Static SVG
-   markup as trusted constants; the drift animation is CSS, js+motion gated.
-   Audit 2026-09-04 (S10): 34 isolated 3×7 px rects read as compression
-   artefacts on the captures, not as embers — down to a dozen in all. */
-const EMBERS_SECTION = `<rect x="55" y="170" width="3" height="6" fill="#F59E0B" opacity="0.45"/><rect x="120" y="110" width="2" height="4" fill="#FCD34D" opacity="0.3"/><rect x="190" y="195" width="4" height="8" fill="#F59E0B" opacity="0.6"/>`
-
-const EMBERS_CTA = `<rect x="70" y="140" width="3" height="7" fill="#F59E0B" opacity="0.5"/><rect x="140" y="70" width="2" height="4" fill="#FCD34D" opacity="0.3"/><rect x="205" y="185" width="4" height="9" fill="#F59E0B" opacity="0.7"/>`
-
 /* The distribution: every package and module that exists today, with the
    command or pointer that installs it. Nothing here is announced ahead of
    itself — .NET says "from source" until NuGet carries it. */
@@ -52,18 +44,6 @@ const INTEGRATIONS = [
 
 /* The x402 spot illustration: a robotic arm paying its coin into the slot. */
 const AGENTS_ILLO = `<defs><radialGradient id="acoin" cx="38%" cy="35%" r="75%"><stop offset="0%" stop-color="#FCD34D"/><stop offset="55%" stop-color="#F59E0B"/><stop offset="100%" stop-color="#D97706"/></radialGradient></defs><rect x="18" y="122" width="128" height="12" rx="3" fill="#292524"/><circle cx="34" cy="128" r="2.5" fill="#57534E"/><circle cx="130" cy="128" r="2.5" fill="#57534E"/><rect x="70" y="66" width="16" height="58" rx="4" fill="#3F3A34"/><path d="M78,70 q-26,18 -8,52" stroke="#292524" stroke-width="3" fill="none"/><g stroke-linecap="round"><line x1="78" y1="70" x2="152" y2="34" stroke="#57534E" stroke-width="13"/><line x1="152" y1="34" x2="230" y2="55" stroke="#44403C" stroke-width="10"/></g><circle cx="78" cy="70" r="8" fill="#292524" stroke="#57534E" stroke-width="2"/><circle cx="152" cy="34" r="8.5" fill="#292524" stroke="#57534E" stroke-width="2"/><circle cx="152" cy="34" r="3" fill="#78716C"/><g stroke="#57534E" stroke-width="5.5" fill="none" stroke-linecap="round"><path d="M230,49 q16,-2 24,8"/><path d="M230,61 q16,4 22,14"/></g><g class="coin"><ellipse cx="258" cy="66" rx="27" ry="21" fill="#F59E0B" opacity="0.13"/><circle cx="258" cy="66" r="13.5" fill="url(#acoin)"/><circle cx="258" cy="66" r="13.5" fill="none" stroke="#FCD34D" stroke-width="1.6" opacity="0.8"/><rect x="254" y="60" width="8" height="12" rx="2" fill="#1C0A00" opacity="0.35"/></g><rect x="288" y="84" width="56" height="50" rx="7" fill="#1C1917" stroke="#292524"/><rect x="288" y="84" width="56" height="8" rx="4" fill="#26211C"/><rect x="299" y="100" width="34" height="6" rx="3" fill="#F59E0B" opacity="0.9"/><rect x="299" y="115" width="12" height="5" rx="1.5" fill="#EF4444" opacity="0.65"/><rect x="315" y="115" width="12" height="5" rx="1.5" fill="#4ADE80" opacity="0.65"/>`
-
-function Embers({ html }: { html: string }) {
-  return (
-    <svg
-      className="embers"
-      viewBox="0 0 600 240"
-      preserveAspectRatio="xMidYMax slice"
-      aria-hidden="true"
-      dangerouslySetInnerHTML={{ __html: html }}
-    />
-  )
-}
 
 export default async function Home({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
@@ -89,6 +69,15 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
   }))
   // The refresh date /health already reports and the page used to throw away:
   // "refreshed monthly" becomes a dated fact, never typed by hand (S4).
+  // 30-day share of answers without a 5xx, as /status computes it; null when
+  // the history is unreachable, and the badge then makes no numeric claim.
+  const rate30 = liveStats.successRate30 === null
+    ? null
+    : new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(liveStats.successRate30)
+  // One latency figure for the whole page (audit 2026-09-05, n° 18): the film
+  // used to carry "0,41" typed by hand in three languages while the stats
+  // band showed the constant. Both now read the same source.
+  const msLabel = new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(P50_PROCESSING_MS)
   const refreshedOn = liveStats.bicDataLastUpdated
     ? new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' })
         .format(new Date(`${liveStats.bicDataLastUpdated}T00:00:00Z`))
@@ -108,12 +97,15 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
     { value: P50_PROCESSING_MS, label: t('stats.latency'), decimals: 1, suffix: 'ms' },
   ]
 
+  const quoteTr = t('reviewed.quoteTranslation')
   const film: FilmStrings = {
     heading: t('film.heading'),
     heat: {
       eyebrow: t('film.heat.eyebrow'), title: t('film.heat.title'), copy: t('film.heat.copy'),
       country: t('film.heat.country'), check: t('film.heat.check'),
       bank: t('film.heat.bank'), account: t('film.heat.account'),
+      // What a screen reader gets instead of the split characters (n° 23).
+      ibanAria: `IBAN CH10 0023 0000 0000 1234 5 · ${t('film.heat.country')} CH · ${t('film.heat.check')} 10 · ${t('film.heat.bank')} 00230 · ${t('film.heat.account')} 000000012345`,
     },
     strike: { eyebrow: t('film.strike.eyebrow'), title: t('film.strike.title'), valid: t('film.strike.valid') },
     quench: {
@@ -127,8 +119,10 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
       eurosic: t('film.stamp.eurosic'), instant: t('film.stamp.instant'),
     },
     ship: {
-      eyebrow: t('film.ship.eyebrow'), title: t('film.ship.title'), head: t('film.ship.head'),
+      eyebrow: t('film.ship.eyebrow'),
+      title: t('film.ship.title', { ms: msLabel }), head: t('film.ship.head', { ms: msLabel }),
       tryLive: t('film.ship.tryLive'), copy: t('film.ship.copy'),
+      processingMs: String(P50_PROCESSING_MS),
     },
   }
 
@@ -142,7 +136,14 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
           segment, and a real request plays beside it. */}
       <section className="hero" aria-labelledby="h-hero">
         <div className="hero-copy">
-          <p className="hero-badge"><span className="dot" aria-hidden="true"></span>{t('badge')} · {figures.bic} BIC</p>
+          {/* Audit 2026-09-05 (n° 16): the badge repeated the BIC count that the
+              sub-title states one line below and the stats band 300 px further.
+              It now carries the one figure nothing else on the page shows, the
+              30-day error-free rate, and opens the status page. */}
+          <Link href={`/${locale}/status`} className="hero-badge">
+            <span className="dot" aria-hidden="true"></span>
+            {rate30 ? t('badge', { rate: rate30 }) : t('badgeFallback')}
+          </Link>
           <h1 id="h-hero">
             {t.rich('hero.title', {
               accent: (chunks) => <em>{chunks}</em>,
@@ -172,10 +173,6 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
               {t('hero.cta.getKey')}
             </GetKeyButton>
           </div>
-          <p className="hero-prov">
-            {t('hero.provenance')}
-            {refreshedOn && <span> · {t('trust.dataNoteDated', { date: refreshedOn })}</span>}
-          </p>
         </div>
         <FoldDemo iban="CH1000230000000012345" fallback={DEFAULT_RESULT.iban} />
       </section>
@@ -183,7 +180,7 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
       {/* ── Trust band: sources, sanctions lists, Swiss provenance ────────── */}
       {/* Audit 2026-09-04 (M6): the only honest "logo band" this product has
           is its registers; it used to arrive at 88 % of the page. */}
-      <section className="trust-band" aria-label="Data sources and provenance">
+      <section className="trust-band" aria-label={t('trust.ariaLabel')}>
         <div className="wrap trust-grid">
           <div className="trust-cell">
             <span className="eyebrow">{t('trust.dataLabel')}</span>
@@ -205,7 +202,7 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
           </div>
           <div className="trust-cell">
             <span className="eyebrow">{t('trust.madeLabel')}</span>
-            <p className="trust-v"><span className="swiss-sq" aria-hidden="true"></span>Made in Switzerland</p>
+            <p className="trust-v"><span className="swiss-sq" aria-hidden="true"></span>{t('trust.madeValue')}</p>
             <span className="trust-n">{t('trust.madeNote')}</span>
           </div>
           <div className="trust-cell">
@@ -328,7 +325,6 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
 
       {/* ── Agents get their own rail ─────────────────────────────────────── */}
       <section className="agents-rail sect" aria-labelledby="h-agents">
-        <Embers html={EMBERS_SECTION} />
         <div className="wrap">
           <h2 className="sect-h" id="h-agents">{t('agentsRail.heading')}</h2>
           <p className="sect-sub">{t('agentsRail.sub')}</p>
@@ -364,6 +360,7 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
         <div className="wrap">
           <span className="eyebrow" id="h-reviewed">{t('reviewed.label')}</span>
           <blockquote>“{t('reviewed.quote')}”</blockquote>
+          {quoteTr && <p className="ctx quote-tr">{quoteTr}</p>}
           <p className="ctx">{t('reviewed.context')}</p>
           <p className="links">
             <a href="https://github.com/api-search/inbox/issues/3" target="_blank" rel="noopener noreferrer">
@@ -378,11 +375,11 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
 
       {/* ── Finale: the ember ridge behind the last call ──────────────────── */}
       <section className="cta-final" aria-labelledby="h-cta">
-        <Embers html={EMBERS_CTA} />
         <div className="wrap">
           <h2 id="h-cta">{t('cta.heading')}</h2>
           <p>{t('cta.description')}</p>
-          <div className="hero-cta">
+          {/* Audit 2026-09-05 (n° 7): centred like the heading above it. */}
+          <div className="hero-cta hero-cta-center">
             <GetKeyButton variant="amber" className="px-8">
               {t('cta.getKeyButton')}
             </GetKeyButton>

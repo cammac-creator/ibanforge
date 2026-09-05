@@ -656,6 +656,13 @@
   border-radius: 999px;
   padding: 0.35rem 0.9rem;
   margin-bottom: clamp(1.2rem, 3vh, 1.8rem);
+  text-decoration: none;
+  transition: border-color 0.2s, color 0.2s;
+}
+.forge .hero-badge:hover,
+.forge .hero-badge:focus-visible {
+  border-color: var(--fedge-lit);
+  color: var(--hot);
 }
 .forge .hero-badge .dot {
   width: 7px;
@@ -704,18 +711,6 @@
 }
 .forge .hero-cta-center {
   justify-content: center;
-}
-.forge .hero-prov {
-  margin-top: clamp(1.4rem, 3vh, 2rem);
-  font-family: var(--font-mono);
-  font-size: 0.74rem;
-  line-height: 1.8;
-  color: var(--ffg-3);
-  max-width: 34rem;
-}
-.forge .hero-prov b {
-  color: var(--ffg-2);
-  font-weight: 500;
 }
 
 /* The proof: a terminal that shows a real answer. */
@@ -1231,6 +1226,9 @@ html[data-js] .forge .scene {
   font-weight: 400;
   text-transform: uppercase;
   font-size: var(--t-h2);
+  /* Bebas at 44 px inherited the body's 1.6: three-line headings sat on
+     70 px lines (audit 2026-09-05, n° 9). */
+  line-height: 1.05;
   letter-spacing: 0.01em;
   text-align: center;
   text-wrap: balance;
@@ -1491,18 +1489,6 @@ html[data-js] .forge .scene {
   overflow-x: auto;
   white-space: nowrap;
 }
-.forge .embers {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 58%;
-  width: 100%;
-  pointer-events: none;
-  opacity: 0.75;
-  z-index: 0;
-}
-
 .forge .trust-band {
   padding: clamp(2.4rem, 6vh, 3.6rem) 0;
   border-block: 1px solid var(--fst-2);
@@ -1557,6 +1543,10 @@ html[data-js] .forge .scene {
   letter-spacing: -0.01em;
   max-width: 42rem;
   margin: 1rem auto 0;
+}
+.forge .reviewed .quote-tr {
+  font-style: italic;
+  margin-top: -0.3rem;
 }
 .forge .reviewed .ctx {
   color: var(--ffg-2);
@@ -1780,17 +1770,6 @@ html[data-js] .forge .scene {
       transform: none;
     }
   }
-  html[data-js] .forge .embers rect {
-    animation: fgEmber 7s ease-in-out infinite;
-  }
-  html[data-js] .forge .embers rect:nth-child(2n) {
-    animation-duration: 9.5s;
-    animation-delay: -3s;
-  }
-  html[data-js] .forge .embers rect:nth-child(3n) {
-    animation-duration: 12s;
-    animation-delay: -6s;
-  }
   @keyframes fgShake {
     0%,
     100% {
@@ -1807,15 +1786,6 @@ html[data-js] .forge .scene {
     }
     80% {
       transform: translate(2px, 1px);
-    }
-  }
-  @keyframes fgEmber {
-    0%,
-    100% {
-      transform: translateY(0);
-    }
-    50% {
-      transform: translateY(-16px);
     }
   }
   @media (max-height: 560px) {
@@ -1855,6 +1825,7 @@ html[data-js] .forge .scene {
   font-family: var(--font-bebas);
   font-weight: 400;
   letter-spacing: 0.03em;
+  white-space: nowrap;
   color: var(--fg-1);
   line-height: 1;
 }
