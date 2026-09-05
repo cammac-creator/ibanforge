@@ -880,16 +880,26 @@ html[data-js] .forge .scene {
 .forge .film.has-3d .sparks-canvas {
   display: none;
 }
+/* The words keep to the left column; the right half of the screen is the
+   forge's (2026-09-05, on Claude-Alain's eye: one object to look at per
+   station, the scene never hidden by a card). */
 .forge .st-inner {
   position: relative;
   z-index: 2;
   width: 100%;
-  max-width: 58rem;
-  margin-inline: auto;
-  padding-inline: clamp(1rem, 5vw, 2.5rem);
+  max-width: 42rem;
+  margin-inline: clamp(1rem, 10vw, 11rem) auto;
+  padding-inline: 0 clamp(1rem, 3vw, 2rem);
   display: flex;
   flex-direction: column;
-  gap: clamp(0.9rem, 2.2vh, 1.4rem);
+  gap: clamp(0.8rem, 2vh, 1.3rem);
+}
+@media (max-width: 899px) {
+  .forge .st-inner {
+    max-width: 58rem;
+    margin-inline: auto;
+    padding-inline: clamp(1rem, 5vw, 2.5rem);
+  }
 }
 .forge .st-eyebrow {
   display: flex;
@@ -908,9 +918,10 @@ html[data-js] .forge .scene {
   font-family: var(--font-bebas);
   font-weight: 400;
   text-transform: uppercase;
-  font-size: clamp(2rem, 6.4vw, 4.2rem);
+  font-size: clamp(1.6rem, 3.3vw, 2.6rem);
   line-height: 1.02;
   letter-spacing: 0.01em;
+  text-wrap: balance;
 }
 .forge .st-copy {
   color: var(--ffg-2);
@@ -924,19 +935,36 @@ html[data-js] .forge .scene {
   margin-block: clamp(0.4rem, 1.5vh, 1rem);
 }
 
+/* The address is the object of the first station: the largest thing on it,
+   each part labelled under its own underline. */
 .forge .iban-bar {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.35em 0.55em;
+  gap: 0.4em 0.7em;
   font-family: var(--font-mono);
   font-weight: 700;
-  font-size: clamp(1.15rem, 4.4vw, 2.7rem);
+  font-size: clamp(1.4rem, 3.6vw, 2.5rem);
   letter-spacing: 0.06em;
   color: var(--hot);
 }
 .forge .seg {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
   border-bottom: 3px solid var(--segc, var(--fst-3));
   padding-bottom: 0.12em;
+}
+.forge .seg b {
+  font-weight: 700;
+}
+.forge .seg i {
+  font-style: normal;
+  font-weight: 500;
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ffg-3);
+  margin-top: 0.4em;
 }
 .forge .seg-cc {
   --segc: var(--amber-500);
@@ -998,11 +1026,10 @@ html[data-js] .forge .scene {
 }
 .forge .mod-line {
   font-family: var(--font-mono);
-  font-weight: 700;
-  font-size: clamp(0.9rem, 3vw, 1.7rem);
-  letter-spacing: 0.08em;
-  color: var(--hot);
-  text-shadow: 0 0 22px rgba(245, 158, 11, 0.35);
+  font-weight: 500;
+  font-size: clamp(0.9rem, 2.2vw, 1.35rem);
+  letter-spacing: 0.1em;
+  color: var(--ffg-2);
 }
 .forge .mod-line span {
   display: inline-block;
@@ -1053,7 +1080,7 @@ html[data-js] .forge .scene {
   display: flex;
   flex-direction: column;
   gap: 0.7rem;
-  max-width: 34rem;
+  max-width: 30rem;
 }
 .forge .q-row {
   display: flex;
@@ -1138,6 +1165,7 @@ html[data-js] .forge .scene {
 
 .forge .ship {
   margin: 0;
+  max-width: 30rem;
 }
 .forge .ship-head {
   display: flex;
@@ -1686,6 +1714,8 @@ html[data-js] .forge .scene {
   }
   /* resting states, before the engine's first frame */
   html[data-js] .forge [data-t],
+  html[data-js] .forge .seg i,
+  html[data-js] .forge .mod-line,
   html[data-js] .forge .stamp-ok,
   html[data-js] .forge .seal,
   html[data-js] .forge .ship,
@@ -1721,7 +1751,7 @@ html[data-js] .forge .scene {
       font-size: clamp(0.9rem, 2.6vh, 1.3rem);
     }
     html[data-js] .forge .json-out {
-      max-height: 30vh;
+      max-height: 34vh;
     }
     html[data-js] .forge .st-copy {
       font-size: 0.85rem;

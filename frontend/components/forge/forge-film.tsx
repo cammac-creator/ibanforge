@@ -35,7 +35,7 @@ export interface FilmStrings {
     eyebrow: string; title: string; copy: string
     country: string; check: string; bank: string; account: string
   }
-  strike: { eyebrow: string; title: string; note: string; valid: string; copy: string }
+  strike: { eyebrow: string; title: string; valid: string }
   quench: {
     eyebrow: string; title: string; copy: string
     noMatch: string; lists: string
@@ -83,32 +83,19 @@ const MOD_LINE = MOD_DIGITS.map(
 // single source of truth the playground ships (playground/examples.ts).
 // One <span class="jl"> per line, so the answer can print itself in.
 const JSON_OUT = `{
-  <span class="k">"iban"</span>: <span class="s">"CH1000230000000012345"</span>,
   <span class="k">"valid"</span>: <span class="n">true</span>,
-  <span class="k">"country"</span>: { <span class="k">"code"</span>: <span class="s">"CH"</span>, <span class="k">"name"</span>: <span class="s">"Switzerland"</span> },
-  <span class="k">"check_digits"</span>: <span class="s">"10"</span>,
-  <span class="k">"bban"</span>: { <span class="k">"bank_code"</span>: <span class="s">"00230"</span>, <span class="k">"account_number"</span>: <span class="s">"000000012345"</span> },
-  <span class="k">"sepa"</span>: { <span class="k">"member"</span>: <span class="n">true</span>, <span class="k">"schemes"</span>: [<span class="s">"SCT"</span>, <span class="s">"SDD"</span>], <span class="k">"vop_required"</span>: <span class="n">false</span> },
-  <span class="k">"formatted"</span>: <span class="s">"CH10 0023 0000 0000 1234 5"</span>,
-  <span class="k">"bic"</span>: { <span class="k">"code"</span>: <span class="s">"UBSWCHZH"</span>, <span class="k">"bank_name"</span>: <span class="s">"UBS Switzerland AG"</span>, <span class="k">"city"</span>: <span class="s">"Zürich"</span> },
-  <span class="k">"issuer"</span>: { <span class="k">"type"</span>: <span class="s">"bank"</span>, <span class="k">"name"</span>: <span class="s">"UBS Switzerland AG"</span> },
-  <span class="k">"risk_indicators"</span>: {
-    <span class="k">"issuer_type"</span>: <span class="s">"bank"</span>,
-    <span class="k">"country_risk"</span>: <span class="s">"standard"</span>,
-    <span class="k">"test_bic"</span>: <span class="n">false</span>,
-    <span class="k">"sepa_reachable"</span>: <span class="n">true</span>,
-    <span class="k">"vop_coverage"</span>: <span class="n">false</span>
+  <span class="k">"bic"</span>: {
+    <span class="k">"code"</span>: <span class="s">"UBSWCHZH"</span>,
+    <span class="k">"bank_name"</span>: <span class="s">"UBS Switzerland AG"</span>
   },
   <span class="k">"clearing"</span>: {
     <span class="k">"iid"</span>: <span class="s">"00230"</span>,
-    <span class="k">"name"</span>: <span class="s">"UBS Switzerland AG"</span>,
-    <span class="k">"type"</span>: <span class="s">"bank"</span>,
-    <span class="k">"town"</span>: <span class="s">"Zürich"</span>,
     <span class="k">"sic"</span>: <span class="n">true</span>,
-    <span class="k">"instant_payments_chf"</span>: <span class="n">true</span>,
     <span class="k">"eurosic"</span>: <span class="n">true</span>,
-    <span class="k">"qr_iid"</span>: <span class="n">null</span>
+    <span class="k">"instant_payments_chf"</span>: <span class="n">true</span>
   },
+  <span class="k">"sepa"</span>: { <span class="k">"member"</span>: <span class="n">true</span>, <span class="k">"schemes"</span>: [<span class="s">"SCT"</span>, <span class="s">"SDD"</span>] },
+  <span class="k">"risk_indicators"</span>: { <span class="k">"country_risk"</span>: <span class="s">"standard"</span> },
   <span class="k">"processing_ms"</span>: <span class="n">0.41</span>
 }`
 const JSON_LINES = JSON_OUT.split("\n").map((l) => `<span class="jl">${l}</span>`).join("")
@@ -246,7 +233,7 @@ function build(root: HTMLElement) {
   // ── station 0 · heat, then the strike ──
   const s0 = gsap.timeline()
   enter(s0, 0)
-  const ibanSplit = new SplitText(qa(".iban-bar .seg"), { type: "chars" })
+  const ibanSplit = new SplitText(qa(".iban-bar .seg b"), { type: "chars" })
   splits.push(ibanSplit)
   // colour per character, the glow once on the bar: WebKit repaints
   // per-character text shadows dearly (long frames measured 2026-09-04)
@@ -258,9 +245,10 @@ function build(root: HTMLElement) {
   const segColors = [AMBER, RED, STEEL, GREEN]
   qa<HTMLElement>(".seg").forEach((seg, i) => {
     s0.fromTo(seg, { borderColor: "rgba(0,0,0,0)" }, { borderColor: segColors[i], duration: 0.04 }, 0.12 + i * 0.08)
+    show(s0, seg.querySelector("i"), 0.13 + i * 0.08, 0.04)
   })
-  qa<HTMLElement>(".parse li").forEach((li, i) => show(s0, li, 0.12 + i * 0.08))
-  show(s0, q(".mod-note"), 0.40)
+  // the struck digits exist only from the strike's wind-up: nothing to read before
+  s0.fromTo(q(".mod-line"), { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.04 }, 0.42)
   const digits = qa<HTMLElement>(".mod-line span")
   s0.fromTo(digits,
     { x: (i) => Number(digits[i].dataset.dx) * 1.9, y: (i) => Number(digits[i].dataset.dy) * 1.9, rotation: () => gsap.utils.random(-40, 40), autoAlpha: 0.4 },
@@ -278,7 +266,6 @@ function build(root: HTMLElement) {
   s0.fromTo(q(".arcs"), { opacity: 0 }, { opacity: 0.9, duration: 0.01 }, 0.595)
   s0.to(q(".arcs"), { opacity: 0, duration: 0.12 }, 0.61)
   s0.to(stations[0].inner, { keyframes: [{ x: -4, y: 2 }, { x: 4, y: -2 }, { x: -3, y: -1 }, { x: 2, y: 1 }, { x: 0, y: 0 }], duration: 0.03 }, 0.60)
-  show(s0, q(".mod-eq"), 0.66)
   s0.fromTo(q(".stamp-ok"), { scale: 1.9, autoAlpha: 0 }, { scale: 1, autoAlpha: 1, duration: 0.06, ease: "back.out(2.5)" }, 0.72)
   exit(s0, 0)
 
@@ -334,7 +321,7 @@ function build(root: HTMLElement) {
   s3.fromTo(fx, { ship: 0 }, { ship: 1, duration: 0.8, ease: "power1.inOut" }, 0.05)
   s3.fromTo(qa(".rail-l"), { drawSVG: "0%" }, { drawSVG: "100%", duration: 0.25, stagger: 0.03, ease: "power2.inOut" }, 0.02)
   s3.fromTo(q(".ship"), { y: 44, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: 0.28, ease: "power3.out" }, 0.06)
-  s3.fromTo(qa(".json-out .jl"), { autoAlpha: 0, x: -8 }, { autoAlpha: 1, x: 0, duration: 0.04, stagger: 0.018, ease: "power1.out" }, 0.18)
+  s3.fromTo(qa(".json-out .jl"), { autoAlpha: 0, x: -8 }, { autoAlpha: 1, x: 0, duration: 0.05, stagger: 0.03, ease: "power1.out" }, 0.18)
   s3.fromTo(q(".cart"), { attr: { transform: "translate(-520 21.7)" } }, { attr: { transform: "translate(420 -17.5)" }, duration: 0.80, ease: "power1.inOut" }, 0.05)
   s3.to(q(".pill-ok"), { boxShadow: "0 0 0 4px rgba(74,222,128,0.18), 0 0 24px rgba(74,222,128,0.35)", duration: 0.05 }, 0.36)
   show(s3, q(".try-live"), 0.78)
@@ -470,20 +457,17 @@ export function ForgeFilm({ t, playgroundHref }: { t: FilmStrings; playgroundHre
             <p className="st-eyebrow"><span className="st-num">01</span> <span className="eyebrow">{t.heat.eyebrow} · {t.strike.eyebrow}</span></p>
             <h3 className="st-title">{t.heat.title}</h3>
             <div className="st-stage">
-              <p className="iban-bar"><span className="seg seg-cc">CH</span><span className="seg seg-ck">10</span><span className="seg seg-bank">00230</span><span className="seg seg-acct">000000012345</span></p>
-              <ul className="parse">
-                <li data-t=""><span className="pdot pdot-cc" aria-hidden="true" />{t.heat.country}</li>
-                <li data-t=""><span className="pdot pdot-ck" aria-hidden="true" />{t.heat.check}</li>
-                <li data-t=""><span className="pdot pdot-bank" aria-hidden="true" />{t.heat.bank}</li>
-                <li data-t=""><span className="pdot pdot-acct" aria-hidden="true" />{t.heat.account}</li>
-              </ul>
-              <p className="mod-note" data-t="">{t.strike.note}</p>
+              <p className="iban-bar">
+                <span className="seg seg-cc"><b>CH</b><i>{t.heat.country}</i></span>
+                <span className="seg seg-ck"><b>10</b><i>{t.heat.check}</i></span>
+                <span className="seg seg-bank"><b>00230</b><i>{t.heat.bank}</i></span>
+                <span className="seg seg-acct"><b>000000012345</b><i>{t.heat.account}</i></span>
+              </p>
               <p
                 className="mod-line"
                 aria-label="00230000000012345121710"
                 dangerouslySetInnerHTML={{ __html: MOD_LINE }}
               />
-              <p className="mod-eq" data-t="">mod 97 = <b>1</b></p>
               <p className="stamp-ok" data-t="">{t.strike.valid}</p>
             </div>
             <p className="st-copy">{t.heat.copy}</p>

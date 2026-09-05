@@ -191,18 +191,16 @@
       "heat": {
         "eyebrow": "Heat",
         "title": "Raw data enters the forge.",
-        "copy": "One POST to /v1/iban/validate. The string is parsed against its ISO 13616 country structure — country, check digits, bank code, account — across 89 countries.",
-        "country": "country · Switzerland",
-        "check": "check digits · 10",
-        "bank": "bank code · 00230",
-        "account": "account · 000000012345"
+        "copy": "One POST to /v1/iban/validate: the string is read against its country’s structure, then struck with mod-97.",
+        "country": "country",
+        "check": "check",
+        "bank": "bank",
+        "account": "account"
       },
       "strike": {
         "eyebrow": "Strike",
         "title": "The mod-97 strike.",
-        "note": "move CH10 to the end · convert letters (C→12, H→17)",
-        "valid": "✓ CHECKSUM VALID",
-        "copy": "Rearranged, letters converted, divided by 97. Remainder 1 — or the metal is scrap. The ISO 13616 checksum, exact and instant."
+        "valid": "✓ mod 97 = 1 · valid"
       },
       "quench": {
         "eyebrow": "Quench",
@@ -212,7 +210,7 @@
         "fatf": "FATF · member",
         "sepa": "SEPA reachable ✓",
         "risk": "risk_level: low",
-        "copy": "/v1/iban/compliance screens the bank BIC against the sanctions lists (OFAC, EU, UN), checks the FATF standing, SEPA and VoP reachability — distilled into a 0–100 risk score."
+        "copy": "The bank’s BIC goes through the sanctions lists, the FATF standing and SEPA reachability: one risk score from 0 to 100."
       },
       "stamp": {
         "eyebrow": "Stamp",
@@ -221,14 +219,14 @@
         "sic": "SIC",
         "eurosic": "euroSIC",
         "instant": "CHF instant",
-        "copy": "The institution behind the number: BIC, bank name, city — plus the Swiss exclusive, every BC-Nummer from the SIX BankMaster with SIC, euroSIC and CHF instant-payment participation."
+        "copy": "The institution behind the number — and for Switzerland, every BC-Nummer from the SIX BankMaster with its rail participation."
       },
       "ship": {
         "eyebrow": "Ship",
         "title": "Shipped in 0.41 ms.",
         "head": "application/json · 0.41 ms server",
         "tryLive": "Try it live in the playground",
-        "copy": "One POST, one answer — forged, quenched, stamped. This is the exact response you get back."
+        "copy": "One request, one answer: forged, quenched, stamped."
       }
     },
     "agentsRail": {

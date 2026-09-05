@@ -191,18 +191,16 @@
       "heat": {
         "eyebrow": "Glut",
         "title": "Rohdaten betreten die Schmiede.",
-        "copy": "Ein POST an /v1/iban/validate. Die Zeichenkette wird gegen ihre ISO-13616-Länderstruktur geprüft — Land, Prüfziffern, Bankcode, Konto — in 89 Ländern.",
-        "country": "Land · Schweiz",
-        "check": "Prüfziffern · 10",
-        "bank": "Bankcode · 00230",
-        "account": "Konto · 000000012345"
+        "copy": "Ein POST an /v1/iban/validate: die Zeichenkette wird nach der Struktur ihres Landes gelesen, dann mit Mod-97 geschlagen.",
+        "country": "Land",
+        "check": "Prüfziffern",
+        "bank": "Bank",
+        "account": "Konto"
       },
       "strike": {
         "eyebrow": "Schlag",
         "title": "Der Mod-97-Schlag.",
-        "note": "CH10 ans Ende · Buchstaben umgewandelt (C→12, H→17)",
-        "valid": "✓ PRÜFSUMME GÜLTIG",
-        "copy": "Umgestellt, Buchstaben umgewandelt, durch 97 geteilt. Rest 1 — oder das Metall ist Ausschuss. Die ISO-13616-Prüfsumme, exakt und sofort."
+        "valid": "✓ mod 97 = 1 · gültig"
       },
       "quench": {
         "eyebrow": "Abschrecken",
@@ -212,7 +210,7 @@
         "fatf": "FATF · Mitglied",
         "sepa": "SEPA erreichbar ✓",
         "risk": "risk_level: low",
-        "copy": "/v1/iban/compliance prüft den Bank-BIC gegen die Sanktionslisten (OFAC, EU, UN), dazu FATF-Status sowie SEPA- und VoP-Erreichbarkeit — destilliert in einen Risikoscore von 0–100."
+        "copy": "Der BIC der Bank durchläuft die Sanktionslisten, den FATF-Status und die SEPA-Erreichbarkeit: ein Risikoscore von 0 bis 100."
       },
       "stamp": {
         "eyebrow": "Prägung",
@@ -221,14 +219,14 @@
         "sic": "SIC",
         "eurosic": "euroSIC",
         "instant": "CHF Instant",
-        "copy": "Die Institution hinter der Nummer: BIC, Bankname, Ort — plus die Schweizer Exklusivität: jede BC-Nummer aus dem SIX BankMaster mit SIC-, euroSIC- und CHF-Instant-Teilnahme."
+        "copy": "Die Institution hinter der Nummer – und für die Schweiz jede BC-Nummer aus dem SIX BankMaster mit ihrer Teilnahme an den Schienen."
       },
       "ship": {
         "eyebrow": "Versand",
         "title": "Geliefert in 0,41 ms.",
         "head": "application/json · 0,41 ms Server",
         "tryLive": "Live im Playground testen",
-        "copy": "Ein POST, eine Antwort — geschmiedet, abgeschreckt, geprägt. Genau diese Antwort erhalten Sie zurück."
+        "copy": "Eine Anfrage, eine Antwort: geschmiedet, abgeschreckt, geprägt."
       }
     },
     "agentsRail": {

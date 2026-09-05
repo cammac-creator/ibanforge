@@ -115,10 +115,7 @@ export default async function Home({ params }: { params: Promise<{ locale: strin
       country: t('film.heat.country'), check: t('film.heat.check'),
       bank: t('film.heat.bank'), account: t('film.heat.account'),
     },
-    strike: {
-      eyebrow: t('film.strike.eyebrow'), title: t('film.strike.title'),
-      note: t('film.strike.note'), valid: t('film.strike.valid'), copy: t('film.strike.copy'),
-    },
+    strike: { eyebrow: t('film.strike.eyebrow'), title: t('film.strike.title'), valid: t('film.strike.valid') },
     quench: {
       eyebrow: t('film.quench.eyebrow'), title: t('film.quench.title'), copy: t('film.quench.copy'),
       noMatch: t('film.quench.noMatch'), lists: t('film.quench.lists'),
