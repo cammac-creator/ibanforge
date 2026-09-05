@@ -28,6 +28,8 @@ export interface ForgeFx {
   heat: number
   /** the hammer's angle around its pivot, radians (rest −0.35, wound −0.9, strike +0.32) */
   hammer: number
+  /** the hammer leaves the anvil: swung back and lifted out of frame (0 at the strike, 1 from the quench on) */
+  park: number
   /** the strike's after-glow on the anvil */
   glow: number
   /** the ingot goes down into the trough */
@@ -238,18 +240,36 @@ export function createForgeScene(canvas: HTMLCanvasElement, opts: { bloom: boole
   const INGOT_BATH = new THREE.Vector3(0.0, 0.15, 1.0)
   const INGOT_CART = new THREE.Vector3(0, 0.235, 0)
 
-  // ── the hammer ──
+  // ── the hammer: a smith's sledge ──
+  // The group pivots at the hand (rotation.z); the handle runs along −x and
+  // the head crosses it at the far end, long axis perpendicular to the
+  // handle so its flat face meets the ingot at the strike. Redrawn on
+  // 2026-09-05: the head was a near-cube in anvil-dark iron, which read as a
+  // lump; it is a polished steel block now, with a wood handle and a ferrule.
   const hammer = new THREE.Group()
   hammer.position.set(0.62, 0.98, 0.02)
-  const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.024, 0.03, 0.82, 12), new THREE.MeshStandardMaterial({ color: 0x3a2a1c, roughness: 0.8 }))
+  const wood = new THREE.MeshStandardMaterial({ color: 0x6b4a2b, roughness: 0.82, metalness: 0.02 })
+  const steel = new THREE.MeshStandardMaterial({ color: 0x9aa1a8, metalness: 0.96, roughness: 0.26 })
+  const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.034, 0.82, 14), wood)
   handle.rotation.z = Math.PI / 2
   handle.position.x = -0.41
   handle.castShadow = true
   hammer.add(handle)
-  const head = new THREE.Mesh(new RoundedBoxGeometry(0.2, 0.15, 0.17, 2, 0.02), new THREE.MeshStandardMaterial({ color: 0x35302c, metalness: 0.9, roughness: 0.45 }))
+  const head = new THREE.Mesh(new RoundedBoxGeometry(0.15, 0.4, 0.16, 3, 0.014), steel)
   head.position.x = -0.86
-  head.castShadow = true
+  head.castShadow = true; head.receiveShadow = true
   hammer.add(head)
+  // the two striking faces, a touch wider than the body, like a forged sledge
+  for (const sy of [-1, 1]) {
+    const face = new THREE.Mesh(new RoundedBoxGeometry(0.17, 0.05, 0.18, 2, 0.01), steel)
+    face.position.set(-0.86, sy * 0.205, 0)
+    face.castShadow = true
+    hammer.add(face)
+  }
+  const ferrule = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.05, 16), new THREE.MeshStandardMaterial({ color: 0x5b6067, metalness: 0.9, roughness: 0.35 }))
+  ferrule.rotation.z = Math.PI / 2
+  ferrule.position.x = -0.755
+  hammer.add(ferrule)
   scene.add(hammer)
 
   // ── the quenching trough ──
@@ -286,7 +306,9 @@ export function createForgeScene(canvas: HTMLCanvasElement, opts: { bloom: boole
   const dieFace = new THREE.Mesh(new THREE.BoxGeometry(0.66, 0.05, 0.2), new THREE.MeshStandardMaterial({ color: 0x1f1b18, metalness: 0.9, roughness: 0.3 }))
   dieFace.position.y = -0.025; dieFace.castShadow = true
   die.add(dieFace)
-  const DIE_UP = 1.75, DIE_DOWN = INGOT_ANVIL.y + 0.065 + 0.05
+  // raised well above the frame: at 1.75 the die's foot sat just over the
+  // resting hammer during the heat and the strike (Safari, 2026-09-05)
+  const DIE_UP = 2.45, DIE_DOWN = INGOT_ANVIL.y + 0.065 + 0.05
   die.position.set(INGOT_ANVIL.x, DIE_UP, INGOT_ANVIL.z)
   scene.add(die)
 
@@ -432,11 +454,14 @@ export function createForgeScene(canvas: HTMLCanvasElement, opts: { bloom: boole
     heatLight.intensity = heat * 7 + clamp01(fx.glow) * 6
     ;(decal.material as THREE.MeshBasicMaterial).opacity = clamp01(fx.decal)
 
-    // the hammer; lifted out of frame while the piece ships (n° 13): its
-    // handle used to cross the top-left corner of the last station
-    hammer.rotation.z = fx.hammer
-    hammer.position.y = 0.98 + sh * 2.8
-    hammer.visible = sh < 0.995
+    // the hammer; from the quench on it swings back and rises out of frame
+    // (fx.park), so the die never comes down through it and its handle no
+    // longer crosses the last station (seen in Safari, 2026-09-05)
+    const park = smooth(clamp01(fx.park))
+    hammer.rotation.z = fx.hammer - park * 1.5
+    hammer.position.y = 0.98 + park * 2.4
+    hammer.position.x = 0.62 + park * 0.5
+    hammer.visible = park < 0.995
 
     // the die and its flash
     die.position.y = lerp(DIE_UP, DIE_DOWN, smooth(clamp01(fx.stamp)))

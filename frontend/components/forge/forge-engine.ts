@@ -47,7 +47,7 @@ function build(root: HTMLElement) {
   // The numbers the 3D forge reads. Tweened by the station timelines below
   // whether or not the scene loads: they are cheap, and the scene arrives
   // on its own schedule on wide screens with WebGL.
-  const fx: ForgeFx = { heat: 0, hammer: -0.35, glow: 0, quench: 0, steam: 0, ripple: 0, steel: 0, stamp: 0, flash: 0, decal: 0, ship: 0, cam: 0 }
+  const fx: ForgeFx = { heat: 0, hammer: -0.35, park: 0, glow: 0, quench: 0, steam: 0, ripple: 0, steel: 0, stamp: 0, flash: 0, decal: 0, ship: 0, cam: 0 }
   let scene3d: ForgeScene | null = null
   const glCanvas = q<HTMLCanvasElement>(".forge-gl")
   const webgl = (() => {
@@ -178,6 +178,8 @@ function build(root: HTMLElement) {
   const s1 = gsap.timeline()
   enter(s1, 1)
   s1.fromTo(fx, { cam: 0 }, { cam: 1, duration: 0.14, ease: "power2.inOut" }, 0)
+  // the hammer leaves as the quench begins: swung back, then out of frame
+  s1.fromTo(fx, { park: 0 }, { park: 1, duration: 0.22, ease: "power2.inOut" }, 0.02)
   s1.fromTo(fx, { quench: 0 }, { quench: 1, duration: 0.22, ease: "power2.in" }, 0.06)
   s1.fromTo(fx, { steam: 0 }, { steam: 1, duration: 0.08 }, 0.26)
   s1.to(fx, { steam: 0, duration: 0.12 }, 0.84)
