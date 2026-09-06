@@ -183,7 +183,7 @@
     ],
     "vop_required": false
    },
-   "register": null,
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
    "api": {
     "valid": true,
     "country": {
@@ -248,7 +248,7 @@
     ],
     "vop_required": true
    },
-   "register": null,
+   "register": "Oesterreichische Nationalbank SEPA-Zahlungsverkehrs-Verzeichnis",
    "api": {
     "valid": true,
     "country": {
@@ -384,7 +384,7 @@
     "schemes": [],
     "vop_required": false
    },
-   "register": null,
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
    "api": {
     "valid": true,
     "country": {
@@ -445,7 +445,7 @@
     ],
     "vop_required": true
    },
-   "register": null,
+   "register": "Banque nationale de Belgique, bank identification codes (Protocol Secretariat)",
    "api": {
     "valid": true,
     "country": {
@@ -669,7 +669,7 @@
     "schemes": [],
     "vop_required": false
    },
-   "register": null,
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
    "api": {
     "valid": true,
     "country": {
@@ -732,7 +732,7 @@
     "schemes": [],
     "vop_required": false
    },
-   "register": null,
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
    "api": {
     "valid": true,
     "country": {
@@ -867,7 +867,7 @@
     ],
     "vop_required": false
    },
-   "register": null,
+   "register": "SIX BankMaster (Swiss IID / BC-Nummer register)",
    "api": {
     "valid": true,
     "country": {
@@ -1243,7 +1243,7 @@
     "schemes": [],
     "vop_required": false
    },
-   "register": null,
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
    "api": {
     "valid": true,
     "country": {
@@ -1825,7 +1825,7 @@
     "schemes": [],
     "vop_required": false
    },
-   "register": null,
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
    "api": {
     "valid": true,
     "country": {
@@ -2118,7 +2118,7 @@
     ],
     "vop_required": false
    },
-   "register": null,
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
    "api": {
     "valid": true,
     "country": {
@@ -2178,7 +2178,7 @@
     "schemes": [],
     "vop_required": false
    },
-   "register": null,
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
    "api": {
     "valid": true,
     "country": {
@@ -2703,7 +2703,7 @@
     "schemes": [],
     "vop_required": false
    },
-   "register": null,
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
    "api": {
     "valid": true,
     "country": {
@@ -3435,7 +3435,7 @@
     ],
     "vop_required": true
    },
-   "register": null,
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
    "api": {
     "valid": true,
     "country": {
@@ -3577,7 +3577,7 @@
     ],
     "vop_required": true
    },
-   "register": null,
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
    "api": {
     "valid": true,
     "country": {
@@ -3644,7 +3644,7 @@
     "schemes": [],
     "vop_required": false
    },
-   "register": null,
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
    "api": {
     "valid": true,
     "country": {
@@ -3711,7 +3711,7 @@
     ],
     "vop_required": false
    },
-   "register": null,
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
    "api": {
     "valid": true,
     "country": {
@@ -3848,7 +3848,7 @@
     ],
     "vop_required": false
    },
-   "register": null,
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
    "api": {
     "valid": true,
     "country": {
@@ -3981,7 +3981,7 @@
     "schemes": [],
     "vop_required": false
    },
-   "register": null,
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
    "api": {
     "valid": true,
     "country": {
@@ -4044,7 +4044,7 @@
     "schemes": [],
     "vop_required": false
    },
-   "register": null,
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
    "api": {
     "valid": true,
     "country": {
@@ -4190,7 +4190,7 @@
     "schemes": [],
     "vop_required": false
    },
-   "register": null,
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
    "api": {
     "valid": true,
     "country": {
@@ -4469,7 +4469,7 @@
     "schemes": [],
     "vop_required": false
    },
-   "register": null,
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
    "api": {
     "valid": true,
     "country": {
@@ -4749,7 +4749,7 @@
     ],
     "vop_required": true
    },
-   "register": null,
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
    "api": {
     "valid": true,
     "country": {
@@ -4882,7 +4882,7 @@
     ],
     "vop_required": false
    },
-   "register": null,
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
    "api": {
     "valid": true,
     "country": {
@@ -4944,7 +4944,7 @@
     ],
     "vop_required": false
    },
-   "register": null,
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
    "api": {
     "valid": true,
     "country": {
@@ -5009,7 +5009,7 @@
     "schemes": [],
     "vop_required": false
    },
-   "register": null,
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
    "api": {
     "valid": true,
     "country": {
@@ -5141,7 +5141,7 @@
     "schemes": [],
     "vop_required": false
    },
-   "register": null,
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
    "api": {
     "valid": true,
     "country": {
@@ -5198,7 +5198,7 @@
     "schemes": [],
     "vop_required": false
    },
-   "register": null,
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
    "api": {
     "valid": true,
     "country": {
@@ -5418,7 +5418,7 @@
     ],
     "vop_required": true
    },
-   "register": null,
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
    "api": {
     "valid": true,
     "country": {
@@ -5489,7 +5489,7 @@
     ],
     "vop_required": false
    },
-   "register": null,
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
    "api": {
     "valid": true,
     "country": {
@@ -5556,7 +5556,7 @@
     "schemes": [],
     "vop_required": false
    },
-   "register": null,
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
    "api": {
     "valid": true,
     "country": {
@@ -5757,7 +5757,7 @@
     "schemes": [],
     "vop_required": false
    },
-   "register": null,
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
    "api": {
     "valid": true,
     "country": {
@@ -5889,7 +5889,7 @@
     "schemes": [],
     "vop_required": false
    },
-   "register": null,
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
    "api": {
     "valid": true,
     "country": {
@@ -5946,7 +5946,7 @@
     "schemes": [],
     "vop_required": false
    },
-   "register": null,
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
    "api": {
     "valid": true,
     "country": {
@@ -6078,7 +6078,7 @@
     "schemes": [],
     "vop_required": false
    },
-   "register": null,
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
    "api": {
     "valid": true,
     "country": {
@@ -6141,7 +6141,7 @@
     "schemes": [],
     "vop_required": false
    },
-   "register": null,
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
    "api": {
     "valid": true,
     "country": {

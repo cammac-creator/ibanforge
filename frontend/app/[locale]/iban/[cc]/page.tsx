@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound, permanentRedirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { Badge } from "@/components/ui/badge";
 import { alternatesFor } from "@/lib/seo";
@@ -19,13 +19,16 @@ import { routing } from "@/i18n/routing";
 import { localePath } from "@/lib/locale-path";
 
 /**
- * One page per IBAN country: /iban/ch, /iban/de, … (lower case, the way a
- * URL is typed; the upper-case form redirects here). Everything on it comes
- * from data/countries.json, exported by the API repository from its own
- * validate route, so the "what the API answers" block is the route's answer
- * and the layout is the ISO 13616 registry's, not a re-typed table.
+ * One page per IBAN country: /iban/ch, /iban/de, … in lower case, the way a
+ * URL is typed. Every page is pre-rendered from data/countries.json, exported
+ * by the API repository from its own validate route, so the "what the API
+ * answers" block is the route's answer and the layout is the ISO 13616
+ * registry's, not a re-typed table. Anything else under /iban/ is a 404, the
+ * upper-case form included: measured on 2026-09-06, the locale layout's
+ * `dynamicParams = false` sends every unlisted path to the catch-all before
+ * this file runs, so a redirect written here would never execute.
  */
-export const dynamicParams = true;
+export const dynamicParams = false;
 
 export function generateStaticParams() {
   return routing.locales.flatMap((locale) => allCountryCodes().map((cc) => ({ locale, cc: cc.toLowerCase() })));
@@ -37,7 +40,7 @@ const schemes = (entry: CountryEntry) => entry.sepa.schemes.map((s) => SCHEME_LA
 export async function generateMetadata({ params }: { params: Promise<{ locale: string; cc: string }> }): Promise<Metadata> {
   const { locale, cc } = await params;
   const entry = getCountry(cc.toUpperCase());
-  if (!entry || cc !== cc.toLowerCase()) return { title: "Not Found" };
+  if (!entry) return { title: "Not Found" };
   const t = await getTranslations({ locale, namespace: "countries" });
   const country = countryName(entry.code, locale, entry.name_en);
   return {
@@ -60,7 +63,6 @@ export default async function CountryPage({ params }: { params: Promise<{ locale
   const { locale, cc } = await params;
   const entry = getCountry(cc.toUpperCase());
   if (!entry) notFound();
-  if (cc !== cc.toLowerCase()) permanentRedirect(localePath(locale, `/iban/${cc.toLowerCase()}`));
   const t = await getTranslations("countries");
   const tr = await getTranslations("registers");
   const country = countryName(entry.code, locale, entry.name_en);
@@ -133,6 +135,9 @@ export default async function CountryPage({ params }: { params: Promise<{ locale
           ))}
         </ul>
         <p className="text-xs text-muted-foreground">{t("anatomyNote")}</p>
+        {national && (entry.api.bank_code_check as { status?: string } | null)?.status === "not_in_register" && (
+          <p className="text-xs text-muted-foreground">{t("exampleNotAllocated", { register: entry.register ?? "" })}</p>
+        )}
       </section>
 
       <section className="overflow-x-auto rounded-md border" style={{ borderColor: "var(--hairline)" }}>

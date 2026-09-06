@@ -2170,6 +2170,7 @@
       "registerIndex": "The country's bank codes, one per page",
       "index": "All countries"
     },
-    "sourceNote": "Source: ISO 13616 registry for the length, layout and example; API answer captured on {date}."
+    "sourceNote": "Source: ISO 13616 registry for the length, layout and example; API answer captured on {date}.",
+    "exampleNotAllocated": "The bank code of this official example is not allocated in {register}: the API says so as it is, which is the expected behaviour on a demonstration IBAN."
   }
 }

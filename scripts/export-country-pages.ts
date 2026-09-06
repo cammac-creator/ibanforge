@@ -148,9 +148,13 @@ for (const cc of codes) {
     fields,
     example,
     sepa: getSepaInfo(cc),
-    /** The national register the API verified the example's bank code against, when it holds one. */
-    register:
-      check?.status === 'verified' && typeof check.register === 'string' ? check.register : null,
+    /**
+     * The register the API checked the example's bank code against, whether or
+     * not the code was found there: the ISO registry's Swiss example carries a
+     * code SIX never allocated, and the page must still say "SIX BankMaster",
+     * not "no register". Null only when the route consulted nothing.
+     */
+    register: typeof check?.register === 'string' ? check.register : null,
     api: apiBlock(answer),
   };
 }
@@ -170,7 +174,11 @@ writeFileSync(
     1,
   ),
 );
-const withRegister = codes.filter((cc) => (countries[cc] as Json).register).length;
+const withRegister = codes.filter(
+  (cc) =>
+    ((countries[cc] as Json).api as Json).bank_code_check &&
+    (((countries[cc] as Json).api as Json).bank_code_check as Json).authoritative === true,
+).length;
 console.log(
-  `${codes.length} countries written to ${file}; ${withRegister} verified against a national register`,
+  `${codes.length} countries written to ${file}; ${withRegister} checked against a national register`,
 );

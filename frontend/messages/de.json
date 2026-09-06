@@ -2170,6 +2170,7 @@
       "registerIndex": "Die Bankleitzahlen des Landes, eine pro Seite",
       "index": "Alle Länder"
     },
-    "sourceNote": "Quelle: ISO-13616-Register für Länge, Aufbau und Beispiel; API-Antwort erfasst am {date}."
+    "sourceNote": "Quelle: ISO-13616-Register für Länge, Aufbau und Beispiel; API-Antwort erfasst am {date}.",
+    "exampleNotAllocated": "Die Bankleitzahl dieses offiziellen Beispiels ist in {register} nicht vergeben: Die API sagt es so, wie es ist, das erwartete Verhalten bei einer Demo-IBAN."
   }
 }
