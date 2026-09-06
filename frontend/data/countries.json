@@ -5418,7 +5418,7 @@
     ],
     "vop_required": true
    },
-   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+   "register": "Národná banka Slovenska, prevodník of identification codes for the domestic payment system",
    "api": {
     "valid": true,
     "country": {
@@ -5429,11 +5429,11 @@
     "bank_code_check": {
      "value": "1200",
      "status": "not_in_register",
-     "reason": "absent_from_reference_data",
+     "reason": "not_allocated",
      "match": null,
-     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
-     "authoritative": false,
-     "as_of": "2026-09"
+     "register": "Národná banka Slovenska, prevodník of identification codes for the domestic payment system",
+     "authoritative": true,
+     "as_of": "2026-05"
     },
     "sepa": {
      "member": true,
