@@ -48,7 +48,7 @@
   "bugs": {
     "url": "https://github.com/cammac-creator/ibanforge/issues"
   },
-  "homepage": "https://ibanforge.com",
+  "homepage": "https://ibanforge.com?src=sdk-ts",
   "devDependencies": {
     "typescript": "^5.7.0",
     "vitest": "^4.1.10"

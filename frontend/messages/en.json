@@ -711,7 +711,8 @@
             "cta_pricing": "Page end → Pricing",
             "cta_key_final": "Page end → Get a key",
             "cta_docs": "Page end → Documentation",
-            "cta_key_account": "Your key page → Get a key"
+            "cta_key_account": "Your key page → Get a key",
+            "cta_key_tool": "Free tools → Get a key"
           }
         }
       },
@@ -2177,5 +2178,11 @@
     },
     "sourceNote": "Source: ISO 13616 registry for the length, layout and example; API answer captured on {date}.",
     "exampleNotAllocated": "The bank code of this official example is not allocated in {register}: the API says so as it is, which is the expected behaviour on a demonstration IBAN."
+  },
+  "tools": {
+    "keyBlock": {
+      "text": "This tool is free and needs no key. With a free key the API does the same from your code: 200 calls a month, no card.",
+      "cta": "Get a free key"
+    }
   }
 }

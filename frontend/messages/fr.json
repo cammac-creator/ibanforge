@@ -711,7 +711,8 @@
             "cta_pricing": "Fin de page → Tarifs",
             "cta_key_final": "Fin de page → Obtenir une clé",
             "cta_docs": "Fin de page → Documentation",
-            "cta_key_account": "Page Votre clé → Obtenir une clé"
+            "cta_key_account": "Page Votre clé → Obtenir une clé",
+            "cta_key_tool": "Outils gratuits → Obtenir une clé"
           }
         }
       },
@@ -2177,5 +2178,11 @@
     },
     "sourceNote": "Source : registre ISO 13616 pour la longueur, le découpage et l'exemple ; réponse de l'API relevée le {date}.",
     "exampleNotAllocated": "Le code banque de cet exemple officiel n'est pas attribué dans {register} : l'API le dit tel quel, c'est le comportement attendu sur un IBAN de démonstration."
+  },
+  "tools": {
+    "keyBlock": {
+      "text": "Cet outil est gratuit et sans clé. Avec une clé gratuite, l'API fait la même chose depuis votre code : 200 appels par mois, sans carte.",
+      "cta": "Obtenir une clé gratuite"
+    }
   }
 }

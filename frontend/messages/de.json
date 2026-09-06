@@ -711,7 +711,8 @@
             "cta_pricing": "Seitenende → Preise",
             "cta_key_final": "Seitenende → Schlüssel holen",
             "cta_docs": "Seitenende → Dokumentation",
-            "cta_key_account": "Seite Ihr Schlüssel → Schlüssel holen"
+            "cta_key_account": "Seite Ihr Schlüssel → Schlüssel holen",
+            "cta_key_tool": "Gratis-Werkzeuge → Schlüssel holen"
           }
         }
       },
@@ -2177,5 +2178,11 @@
     },
     "sourceNote": "Quelle: ISO-13616-Register für Länge, Aufbau und Beispiel; API-Antwort erfasst am {date}.",
     "exampleNotAllocated": "Die Bankleitzahl dieses offiziellen Beispiels ist in {register} nicht vergeben: Die API sagt es so, wie es ist, das erwartete Verhalten bei einer Demo-IBAN."
+  },
+  "tools": {
+    "keyBlock": {
+      "text": "Dieses Werkzeug ist gratis und braucht keinen Schlüssel. Mit einem Gratis-Schlüssel tut die API dasselbe aus Ihrem Code: 200 Aufrufe im Monat, ohne Karte.",
+      "cta": "Gratis-Schlüssel holen"
+    }
   }
 }

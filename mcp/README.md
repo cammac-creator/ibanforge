@@ -109,8 +109,8 @@ After adding the server, ask your AI agent:
 ## Legal
 
 Calls made through this server hit the hosted API and are governed by the
-[Terms of Service](https://ibanforge.com/legal/terms) ([privacy](https://ibanforge.com/legal/privacy),
-[DPA](https://ibanforge.com/legal/dpa)). Validation confirms IBAN structure
+[Terms of Service](https://ibanforge.com/legal/terms?src=npm-mcp) ([privacy](https://ibanforge.com/legal/privacy?src=npm-mcp),
+[DPA](https://ibanforge.com/legal/dpa?src=npm-mcp)). Validation confirms IBAN structure
 and registry data — it does not confirm that an account exists or belongs to
 anyone; verify the payee by name before sending funds.
 

@@ -11,7 +11,7 @@
 
   <name>IBANforge SDK</name>
   <description>Official Java SDK for the IBANforge API -- IBAN validation, BIC/SWIFT lookup, Swiss BC-Nummer clearing, SEPA/VoP and compliance risk scoring.</description>
-  <url>https://ibanforge.com</url>
+  <url>https://ibanforge.com?src=sdk-java</url>
 
   <licenses>
     <license>
@@ -25,7 +25,7 @@
     <developer>
       <name>IBANforge</name>
       <email>support@ibanforge.com</email>
-      <url>https://ibanforge.com</url>
+      <url>https://ibanforge.com?src=sdk-java</url>
     </developer>
   </developers>
 

@@ -9,7 +9,7 @@
     "subfolder": "mcp"
   },
   "version": "1.5.0",
-  "websiteUrl": "https://ibanforge.com",
+  "websiteUrl": "https://ibanforge.com?src=mcp-registry",
   "packages": [
     {
       "registryType": "npm",

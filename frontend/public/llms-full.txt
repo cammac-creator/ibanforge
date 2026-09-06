@@ -107,9 +107,9 @@ Read the score at `compliance.risk_score` / `compliance.risk_level`. Sanctions a
 
 ## Links
 
-- Website: https://ibanforge.com
+- Website: https://ibanforge.com?src=llms
 - API: https://api.ibanforge.com
-- Docs: https://ibanforge.com/docs
+- Docs: https://ibanforge.com/docs?src=llms
 - OpenAPI 3.1: https://api.ibanforge.com/openapi.json
 - npm: https://www.npmjs.com/package/ibanforge-mcp · PyPI: https://pypi.org/project/ibanforge/
 - GitHub: https://github.com/cammac-creator/ibanforge

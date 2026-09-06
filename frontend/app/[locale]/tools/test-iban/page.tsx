@@ -4,6 +4,7 @@ import { getTranslations } from "next-intl/server";
 import { Badge } from "@/components/ui/badge";
 import { TestIbanClient } from "@/components/test-iban-client";
 import { ClientMessages } from "@/components/client-messages"
+import { GetKeyButton } from "@/components/api-key-dialog";
 import { alternatesFor } from "@/lib/seo";
 import { localePath } from "@/lib/locale-path";
 
@@ -28,6 +29,7 @@ export default async function TestIbanPage({
 }) {
   const { locale } = await params;
   const t = await getTranslations("testIban");
+  const tk = await getTranslations("tools.keyBlock");
 
   const curl = `curl "https://api.ibanforge.com/v1/test-iban?country=DE&count=5"`;
 
@@ -57,6 +59,13 @@ export default async function TestIbanPage({
         </pre>
       </section>
 
+
+      {/* 2026-09-06: the free tool is where a developer decides; the door to
+          the free key was two clicks away in the header. */}
+      <section className="flex flex-wrap items-center gap-4 rounded-md border p-4" style={{ borderColor: "var(--hairline)" }}>
+        <p className="text-sm text-muted-foreground max-w-prose">{tk("text")}</p>
+        <GetKeyButton size="sm" evt="cta:key-tool">{tk("cta")}</GetKeyButton>
+      </section>
       <p className="text-xs text-muted-foreground border-t border-border pt-4">{t("disclaimer")}</p>
     </div>
   );

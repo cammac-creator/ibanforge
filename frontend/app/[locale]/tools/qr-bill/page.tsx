@@ -4,6 +4,7 @@ import { getTranslations } from "next-intl/server";
 import { Badge } from "@/components/ui/badge";
 import { QrBillClient } from "@/components/qr-bill-client";
 import { ClientMessages } from "@/components/client-messages"
+import { GetKeyButton } from "@/components/api-key-dialog";
 import { alternatesFor } from "@/lib/seo";
 import { localePath } from "@/lib/locale-path";
 
@@ -28,6 +29,7 @@ export default async function QrBillPage({
 }) {
   const { locale } = await params;
   const t = await getTranslations("qrBill");
+  const tk = await getTranslations("tools.keyBlock");
 
   return (
     <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8 py-16 flex flex-col gap-10">
@@ -46,6 +48,13 @@ export default async function QrBillPage({
       </header>
 
       <ClientMessages ns={["qrBill"]}><QrBillClient /></ClientMessages>
+
+      {/* 2026-09-06: the free tool is where a developer decides; the door to
+          the free key was two clicks away in the header. */}
+      <section className="flex flex-wrap items-center gap-4 rounded-md border p-4" style={{ borderColor: "var(--hairline)" }}>
+        <p className="text-sm text-muted-foreground max-w-prose">{tk("text")}</p>
+        <GetKeyButton size="sm" evt="cta:key-tool">{tk("cta")}</GetKeyButton>
+      </section>
 
       <section className="text-sm text-muted-foreground leading-relaxed flex flex-col gap-2">
         <h2 className="font-semibold text-foreground">{t("api.title")}</h2>

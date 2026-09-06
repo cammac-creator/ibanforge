@@ -29,7 +29,7 @@ Function-calling (Chat Completions / Responses): wire tools to the OpenAPI at /o
 
 ### Pay-per-call without an API key (x402, USDC on Base L2)
 GET https://api.ibanforge.com/.well-known/x402 returns the full catalog. Any agent with a Base wallet can discover, pay, and call.
-Zero to first payment in 3 steps (wallet with budget → USDC on Base → one $5 payment for 1,000 credits): https://ibanforge.com/docs/pay-as-an-agent
+Zero to first payment in 3 steps (wallet with budget → USDC on Base → one $5 payment for 1,000 credits): https://ibanforge.com/docs/pay-as-an-agent?src=llms
 
 ## 9 MCP tools
 - validate_iban — validate one IBAN + enrich (BIC, issuer EMI/vIBAN, SEPA, VoP, risk, Swiss bc_nummer). Cost: $0.005
@@ -59,7 +59,7 @@ Zero to first payment in 3 steps (wallet with budget → USDC on Base → one $5
 ## How to pay (3 rails, no dead-ends)
 - Free tier: POST /v1/keys/generate → Authorization: Bearer ifk_... (200 req/month)
 - Credit packs (card or USDC, never expire): 1k = $5, 5k = $20, 25k = $80 → POST /v1/credits/buy/1k|5k|25k
-- Pro subscription (card): $29/month for 10,000 requests, resets on the 1st, cancel anytime → https://ibanforge.com/pricing
+- Pro subscription (card): $29/month for 10,000 requests, resets on the 1st, cancel anytime → https://ibanforge.com/pricing?src=llms
 - x402 micropayments: pay per call in USDC on Base L2, no signup
 
 ## SDKs
@@ -76,4 +76,4 @@ Zero to first payment in 3 steps (wallet with budget → USDC on Base → one $5
 - Full agent guide: https://api.ibanforge.com/llms.txt
 
 ## Links
-Docs: https://ibanforge.com/docs · Playground: https://ibanforge.com/playground · Pricing: https://ibanforge.com/pricing · GitHub: https://github.com/cammac-creator/ibanforge
+Docs: https://ibanforge.com/docs?src=llms · Playground: https://ibanforge.com/playground?src=llms · Pricing: https://ibanforge.com/pricing?src=llms · GitHub: https://github.com/cammac-creator/ibanforge

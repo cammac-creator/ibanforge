@@ -35,7 +35,7 @@ Add to your MCP config (`~/Library/Application Support/Claude/claude_desktop_con
 }
 ```
 
-**Privacy by default:** submitted IBANs are never stored — validation runs in memory, IPs are kept only as salted hashes, and telemetry deletes itself (12-month cap; erased 30 days after a customer terminates, contractually — [DPA clause 4.7](https://ibanforge.com/en/legal/dpa)).
+**Privacy by default:** submitted IBANs are never stored — validation runs in memory, IPs are kept only as salted hashes, and telemetry deletes itself (12-month cap; erased 30 days after a customer terminates, contractually — [DPA clause 4.7](https://ibanforge.com/en/legal/dpa?src=github-readme)).
 
 Optional: set `IBANFORGE_API_KEY=ifk_...` in `env` for the free tier (200 req/month). Without it the server uses the public/demo surface; combine with **x402 micropayments** for unlimited pay-per-call access without signup.
 
@@ -217,9 +217,9 @@ Push to `main` — Railway auto-deploys via Dockerfile.
 ## Legal
 
 Use of the hosted API (`api.ibanforge.com`) is governed by the
-[Terms of Service](https://ibanforge.com/legal/terms). See also the
-[Privacy Policy](https://ibanforge.com/legal/privacy) and the pre-signed
-[Data Processing Agreement](https://ibanforge.com/legal/dpa) (art. 28 GDPR)
+[Terms of Service](https://ibanforge.com/legal/terms?src=github-readme). See also the
+[Privacy Policy](https://ibanforge.com/legal/privacy?src=github-readme) and the pre-signed
+[Data Processing Agreement](https://ibanforge.com/legal/dpa?src=github-readme) (art. 28 GDPR)
 for customers whose calls involve personal data. Validation confirms IBAN
 structure and registry data — it does not confirm that an account exists or
 belongs to anyone.

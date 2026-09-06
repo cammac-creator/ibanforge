@@ -4,7 +4,7 @@
   "title": "IBANforge",
   "description": "Pre-payout IBAN screening for AI agents: validation, sanctions, Swiss clearing, risk scoring",
   "version": "1.5.0",
-  "websiteUrl": "https://ibanforge.com",
+  "websiteUrl": "https://ibanforge.com?src=mcp-registry",
   "repository": {
     "url": "https://github.com/cammac-creator/ibanforge",
     "source": "github"

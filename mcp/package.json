@@ -46,7 +46,7 @@
   ],
   "author": "IBANforge",
   "license": "MIT",
-  "homepage": "https://ibanforge.com",
+  "homepage": "https://ibanforge.com?src=npm-mcp",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/cammac-creator/ibanforge.git",

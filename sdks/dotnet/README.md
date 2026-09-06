@@ -1,6 +1,6 @@
 # IBANforge.Sdk
 
-Official .NET SDK for the [IBANforge](https://ibanforge.com) API: IBAN
+Official .NET SDK for the [IBANforge](https://ibanforge.com?src=sdk-dotnet) API: IBAN
 validation, BIC/SWIFT lookup, Swiss BC-Nummer clearing, SEPA/VoP, payment
 reference and ISO 20022 address checks, and compliance triage. Targets
 `net8.0`, no dependency beyond the base class library (`System.Text.Json` and
