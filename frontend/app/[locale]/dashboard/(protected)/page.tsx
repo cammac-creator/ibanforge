@@ -30,7 +30,7 @@ import type {
 } from '@/components/dashboard/overview/types';
 import { fetchCrmData } from '@/lib/crm/build-contacts';
 import { fetchTrafficTrend } from '@/lib/traffic-trend';
-import type { SignupSources, AuditStats } from '@/lib/dashboard-overview';
+import type { SignupSources, AuditStats, WebEventsSummary } from '@/lib/dashboard-overview';
 
 /**
  * The founder's cockpit.
@@ -120,6 +120,10 @@ export default async function DashboardPage({
   );
   const signupSourcesP = admin<SignupSources>('/v1/admin/signup-sources?days=30');
   const auditStatsP = admin<AuditStats>('/v1/admin/audit-stats?days=30');
+  // What the landing page's visitors click (audit n° 32, 2026-09-05): the
+  // week for the pulse, the month for the shape.
+  const doorsWeekP = admin<WebEventsSummary>('/v1/admin/web-events?days=7');
+  const doorsMonthP = admin<WebEventsSummary>('/v1/admin/web-events?days=30');
   // Swallows its own failures already; the catch is belt and braces, because a
   // promise created here and awaited three sections down would otherwise be an
   // unhandled rejection before anyone looks at it.
@@ -232,6 +236,8 @@ export default async function DashboardPage({
           feedbackPromise={feedbackP}
           sourcesPromise={signupSourcesP}
           auditStatsPromise={auditStatsP}
+          doorsWeekPromise={doorsWeekP}
+          doorsMonthPromise={doorsMonthP}
         />
       </Suspense>
 

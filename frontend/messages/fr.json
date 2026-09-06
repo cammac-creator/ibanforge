@@ -684,6 +684,33 @@
           "internal": "clé interne (test)",
           "withKey": "clé {key}",
           "noKey": "sans clé (page publique)"
+        },
+        "doors": {
+          "title": "Les portes de l'accueil",
+          "lead": "Ce que les visiteurs cliquent sur la page d'accueil : la semaine pour le pouls, le mois pour la forme.",
+          "empty": "Aucun clic mesuré pour l'instant.",
+          "door": "Porte",
+          "col7": "7 j",
+          "col30": "30 j",
+          "film": "Film : {start} l'ont lancé, {end} sont allés au bout",
+          "clicks": "Clics : {week} sur 7 jours, {month} sur 30",
+          "pages": "Par page",
+          "referrers": "Référents",
+          "since": "Mesuré depuis le {date}. Navigateurs pilotés et Lighthouse exclus, aucun cookie, 90 jours de rétention.",
+          "names": {
+            "nav_key": "En-tête → Votre clé",
+            "nav_status": "Badge → Statut",
+            "cta_try": "Pli → Essayer une requête",
+            "cta_key": "Pli → Obtenir une clé",
+            "cta_audit_fold": "Pli → Auditer un fichier",
+            "cta_rules": "Échéance → Lire les règles",
+            "cta_audit_deadline": "Échéance → Auditer un fichier",
+            "cta_audit": "Section audit → Auditer",
+            "cta_playground_film": "Film → Essayer en direct",
+            "cta_pricing": "Fin de page → Tarifs",
+            "cta_key_final": "Fin de page → Obtenir une clé",
+            "cta_docs": "Fin de page → Documentation"
+          }
         }
       },
       "details": {

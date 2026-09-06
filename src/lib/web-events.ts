@@ -20,7 +20,13 @@ export interface WebEvent {
   viewport: string | null;
 }
 
-const NAME = /^[a-z][a-z0-9:_-]{1,39}$/;
+/**
+ * A name is a door family and a slug: `cta:try`, `nav:key`, `film:end`.
+ * Restricted on 2026-09-06: the first day of measurement was mostly our own
+ * deployment checks posting `probe:*` lines. The page owns the vocabulary
+ * (`data-evt` attributes and the two film marks); the API refuses the rest.
+ */
+const NAME = /^(nav|cta|film):[a-z0-9][a-z0-9-]{0,31}$/;
 const PAGE = /^\/[A-Za-z0-9._~\-/%]{0,119}$/;
 const HOST = /^[a-z0-9][a-z0-9.-]{0,79}$/;
 const LOCALES = new Set(['en', 'fr', 'de']);
@@ -76,7 +82,9 @@ export function recordWebEvent(event: WebEvent): void {
   // every few hundred rows, let the old ones go
   if (++sinceLastPrune >= 200) {
     sinceLastPrune = 0;
-    db.prepare(`DELETE FROM web_events WHERE created_at < datetime('now', ?)`).run(`-${RETENTION_DAYS} days`);
+    db.prepare(`DELETE FROM web_events WHERE created_at < datetime('now', ?)`).run(
+      `-${RETENTION_DAYS} days`,
+    );
   }
 }
 
@@ -96,23 +104,37 @@ export function webEventsSummary(days: number): WebEventsSummary {
   const db = getStatsDB();
   const w = `created_at >= datetime('now', ?)`;
   const arg = `-${days} days`;
-  const total = (db.prepare(`SELECT count(*) AS n FROM web_events WHERE ${w}`).get(arg) as { n: number }).n;
-  const since = (db.prepare(`SELECT min(created_at) AS t FROM web_events WHERE ${w}`).get(arg) as { t: string | null }).t;
+  const total = (
+    db.prepare(`SELECT count(*) AS n FROM web_events WHERE ${w}`).get(arg) as { n: number }
+  ).n;
+  const since = (
+    db.prepare(`SELECT min(created_at) AS t FROM web_events WHERE ${w}`).get(arg) as {
+      t: string | null;
+    }
+  ).t;
   return {
     days,
     since,
     total,
     by_name: db
-      .prepare(`SELECT name, count(*) AS count FROM web_events WHERE ${w} GROUP BY name ORDER BY count DESC`)
+      .prepare(
+        `SELECT name, count(*) AS count FROM web_events WHERE ${w} GROUP BY name ORDER BY count DESC`,
+      )
       .all(arg) as WebEventsSummary['by_name'],
     by_page: db
-      .prepare(`SELECT page, locale, count(*) AS count FROM web_events WHERE ${w} GROUP BY page, locale ORDER BY count DESC LIMIT 40`)
+      .prepare(
+        `SELECT page, locale, count(*) AS count FROM web_events WHERE ${w} GROUP BY page, locale ORDER BY count DESC LIMIT 40`,
+      )
       .all(arg) as WebEventsSummary['by_page'],
     by_referrer: db
-      .prepare(`SELECT referrer, count(*) AS count FROM web_events WHERE ${w} AND referrer IS NOT NULL GROUP BY referrer ORDER BY count DESC LIMIT 40`)
+      .prepare(
+        `SELECT referrer, count(*) AS count FROM web_events WHERE ${w} AND referrer IS NOT NULL GROUP BY referrer ORDER BY count DESC LIMIT 40`,
+      )
       .all(arg) as WebEventsSummary['by_referrer'],
     by_day: db
-      .prepare(`SELECT substr(created_at, 1, 10) AS day, count(*) AS count FROM web_events WHERE ${w} GROUP BY day ORDER BY day`)
+      .prepare(
+        `SELECT substr(created_at, 1, 10) AS day, count(*) AS count FROM web_events WHERE ${w} GROUP BY day ORDER BY day`,
+      )
       .all(arg) as WebEventsSummary['by_day'],
   };
 }

@@ -11,13 +11,18 @@ import { useEffect } from "react"
  * sends its name on click; the film reports its first pin and its last
  * station. What travels: the event name, the page path, the locale, the
  * referring host and a width class. Nothing that identifies a person, and
- * nothing at all when the browser asks not to be tracked.
+ * nothing at all when the browser asks not to be tracked — or when it is not
+ * a person at all (2026-09-06: driven browsers and Lighthouse stay silent).
  */
 const API = process.env.NEXT_PUBLIC_API_URL || "https://api.ibanforge.com"
 
 function send(name: string, locale: string) {
   try {
     if (navigator.doNotTrack === "1") return
+    // Not a person: a driven browser (our own deployment checks, Playwright,
+    // Selenium) or a Lighthouse run. Nearly every line of the first day of
+    // measurement was ours. The fold demo bails on the same flag.
+    if (navigator.webdriver || /HeadlessChrome|Lighthouse/i.test(navigator.userAgent)) return
     let referrer = ""
     try { referrer = document.referrer ? new URL(document.referrer).host : "" } catch { referrer = "" }
     const w = window.innerWidth

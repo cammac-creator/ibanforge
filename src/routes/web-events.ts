@@ -55,8 +55,10 @@ webEvents.post('/v1/web/events', async (c) => {
   const event = parseWebEvent(raw);
   if (!event) return c.json({ error: 'invalid_event' }, 400);
   const ip =
-    extractClientIp({ 'x-forwarded-for': c.req.header('x-forwarded-for'), 'x-real-ip': c.req.header('x-real-ip') }) ??
-    'unknown';
+    extractClientIp({
+      'x-forwarded-for': c.req.header('x-forwarded-for'),
+      'x-real-ip': c.req.header('x-real-ip'),
+    }) ?? 'unknown';
   if (!allowed(ip)) return c.body(null, 429);
   recordWebEvent(event);
   return c.body(null, 204);

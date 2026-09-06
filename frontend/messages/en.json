@@ -684,6 +684,33 @@
           "internal": "internal key (test)",
           "withKey": "key {key}",
           "noKey": "no key (public page)"
+        },
+        "doors": {
+          "title": "The landing page's doors",
+          "lead": "What visitors click on the home page: the week for the pulse, the month for the shape.",
+          "empty": "No click measured yet.",
+          "door": "Door",
+          "col7": "7 d",
+          "col30": "30 d",
+          "film": "Film: {start} started it, {end} reached the end",
+          "clicks": "Clicks: {week} over 7 days, {month} over 30",
+          "pages": "By page",
+          "referrers": "Referrers",
+          "since": "Measured since {date}. Driven browsers and Lighthouse excluded, no cookie, 90 days of retention.",
+          "names": {
+            "nav_key": "Header → Your key",
+            "nav_status": "Badge → Status",
+            "cta_try": "Fold → Try a request",
+            "cta_key": "Fold → Get a key",
+            "cta_audit_fold": "Fold → Audit a file",
+            "cta_rules": "Deadline → Read the rules",
+            "cta_audit_deadline": "Deadline → Audit a file",
+            "cta_audit": "Audit section → Audit",
+            "cta_playground_film": "Film → Try it live",
+            "cta_pricing": "Page end → Pricing",
+            "cta_key_final": "Page end → Get a key",
+            "cta_docs": "Page end → Documentation"
+          }
         }
       },
       "details": {

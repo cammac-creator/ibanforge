@@ -5,11 +5,12 @@ import { LivingToolCard, type DemandGapsPayload, type FeedbackReport } from '../
 import type { ActivationClientRow } from '../clients-table';
 import type { BuildInput } from '@/lib/crm/build-contacts';
 import { topUsers } from '@/lib/crm/top-users';
-import { recentSignups, type SignupSources, type AuditStats } from '@/lib/dashboard-overview';
+import { recentSignups, type SignupSources, type AuditStats, type WebEventsSummary } from '@/lib/dashboard-overview';
 import { StatCardV2 } from '../stat-card-v2';
 import { ClientLinks } from './client-links';
 import { SignupSourcesCard } from './signup-sources-card';
 import { AuditStatsCard } from './audit-stats-card';
+import { LandingDoorsCard } from './landing-doors-card';
 import { FetchFailed, type Fetched } from './fetching';
 import { snapshotOnce, writableIds } from './one-clock';
 import { OverviewSection, overviewCard } from './section';
@@ -36,6 +37,8 @@ export async function NewSection({
   feedbackPromise,
   sourcesPromise,
   auditStatsPromise,
+  doorsWeekPromise,
+  doorsMonthPromise,
 }: {
   locale: string;
   /** The page's single instant: see one-clock.ts. */
@@ -48,6 +51,8 @@ export async function NewSection({
   feedbackPromise: Promise<Fetched<{ open: number; reports: FeedbackReport[] }>>;
   sourcesPromise: Promise<Fetched<SignupSources>>;
   auditStatsPromise: Promise<Fetched<AuditStats>>;
+  doorsWeekPromise: Promise<Fetched<WebEventsSummary>>;
+  doorsMonthPromise: Promise<Fetched<WebEventsSummary>>;
 }) {
   const t = await getTranslations('dashboard.overview');
   const [activationRes, clientsRes, crm, historyRes, gapsRes, feedbackRes] = await Promise.all([
@@ -154,6 +159,8 @@ export async function NewSection({
       </div>
 
       <SignupSourcesCard sourcesPromise={sourcesPromise} locale={locale} />
+
+      <LandingDoorsCard weekPromise={doorsWeekPromise} monthPromise={doorsMonthPromise} locale={locale} />
 
       <AuditStatsCard statsPromise={auditStatsPromise} locale={locale} />
 

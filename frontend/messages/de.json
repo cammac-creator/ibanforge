@@ -684,6 +684,33 @@
           "internal": "interner Schlüssel (Test)",
           "withKey": "Schlüssel {key}",
           "noKey": "ohne Schlüssel (öffentliche Seite)"
+        },
+        "doors": {
+          "title": "Die Türen der Startseite",
+          "lead": "Was Besucher auf der Startseite anklicken: die Woche für den Puls, der Monat für die Form.",
+          "empty": "Noch kein Klick gemessen.",
+          "door": "Tür",
+          "col7": "7 T",
+          "col30": "30 T",
+          "film": "Film: {start} haben ihn gestartet, {end} bis zum Ende gesehen",
+          "clicks": "Klicks: {week} in 7 Tagen, {month} in 30",
+          "pages": "Nach Seite",
+          "referrers": "Referrer",
+          "since": "Gemessen seit {date}. Gesteuerte Browser und Lighthouse ausgeschlossen, kein Cookie, 90 Tage Aufbewahrung.",
+          "names": {
+            "nav_key": "Kopfzeile → Ihr Schlüssel",
+            "nav_status": "Badge → Status",
+            "cta_try": "Falz → Anfrage ausprobieren",
+            "cta_key": "Falz → Schlüssel holen",
+            "cta_audit_fold": "Falz → Datei prüfen",
+            "cta_rules": "Stichtag → Regeln lesen",
+            "cta_audit_deadline": "Stichtag → Datei prüfen",
+            "cta_audit": "Audit-Abschnitt → Prüfen",
+            "cta_playground_film": "Film → Live ausprobieren",
+            "cta_pricing": "Seitenende → Preise",
+            "cta_key_final": "Seitenende → Schlüssel holen",
+            "cta_docs": "Seitenende → Dokumentation"
+          }
         }
       },
       "details": {
