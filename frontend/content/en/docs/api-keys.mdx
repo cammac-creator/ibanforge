@@ -8,6 +8,18 @@ order: 1
 
 IBANforge offers a **free tier** via API keys — 200 requests/month across all endpoints. No credit card, no crypto wallet required. For higher volumes, you can use [x402 micropayments](/docs/x402).
 
+## Before the key: 10 calls a day, keyless
+
+`POST /v1/iban/validate` with a real `iban` and no credential is served in full — enrichment included — **10 times a day per IP address**, resetting at midnight UTC:
+
+```bash
+curl -X POST https://api.ibanforge.com/v1/iban/validate \
+  -H "Content-Type: application/json" \
+  -d '{"iban": "CH10 0023 0000 0000 1234 5"}'
+```
+
+The response carries a `trial` block with the count left today and the request that mints the key. It is a taster, not a tier: past 10 calls a day the endpoint answers `402` again with `cause.reason: "trial_exhausted"`, and the key below is what lifts it. The allowance is counted in memory per server instance, so treat it as approximate — never as a quota to build on.
+
 ## Generate a free API key
 
 Send a POST request to `/v1/keys/generate` with your email address:

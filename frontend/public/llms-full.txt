@@ -24,7 +24,15 @@ UK deposit-taking authorisation: Bank of England (List of Banks, 2026-08), used 
 
 ## Authentication & Pricing
 
-Three rails, pick what fits — agents never hit a dead-end:
+Three rails, pick what fits — agents never hit a dead-end. And before any of
+them, a taster that needs nothing at all:
+
+**Keyless trial (no key, no wallet, no email):**
+- `POST /v1/iban/validate` with a real `iban` is served 10 times a day per IP, full enrichment included
+- The response carries a `trial` block: calls left today, the reset (midnight UTC), and the one request that mints a free key
+- Past 10/day the route answers 402 again, `cause.reason = "trial_exhausted"`
+- The HTTP MCP transport has the same allowance: 10 tool calls/day per IP
+- An empty `{}` body always gets the 402 discovery envelope, never a trial — that probe belongs to the x402 indexers
 
 **Free tier (API key):**
 - POST /v1/keys/generate {"email":"you@company.com"} → use `Authorization: Bearer ifk_...`
@@ -57,6 +65,9 @@ Authorization: Bearer ifk_...
 
 {"iban": "CH10 0023 0000 0000 1234 5"}
 ```
+
+Drop the `Authorization` line and the same call still works, 10 times a day per
+IP — the response then carries a `trial` block instead of being billed.
 
 Response (real API output, trimmed to the fields agents use most):
 ```json

@@ -52,7 +52,7 @@ const buildRawSpec = () => ({
         operationId: 'validateIBAN',
         summary: 'Validate a single IBAN',
         description:
-          'Validates an IBAN and returns parsed components including country, check digits, BBAN, and optional BIC lookup. Costs 0.005 USDC via x402. Pass an optional `reference` to add `reference_check`: the reference checksum verdict AND whether the reference may legally travel with this account under the Swiss Payment Standards (QRR requires a QR-IBAN, ISO 11649/SCOR forbids one).',
+          'Validates an IBAN and returns parsed components including country, check digits, BBAN, and optional BIC lookup. Costs 0.005 USDC via x402. **Keyless trial: the first 10 calls a day from one IP are served with no key and no payment** — send a real `iban` and the response carries a `trial` block with the count left and how to take a free key (200 requests/month). Past 10, the route answers 402 again with `cause.reason = "trial_exhausted"`. Pass an optional `reference` to add `reference_check`: the reference checksum verdict AND whether the reference may legally travel with this account under the Swiss Payment Standards (QRR requires a QR-IBAN, ISO 11649/SCOR forbids one).',
         tags: ['IBAN'],
         security: [{ x402Payment: [] }, { apiKey: [] }],
         requestBody: {
@@ -87,14 +87,18 @@ const buildRawSpec = () => ({
         },
         responses: {
           '200': {
-            description: 'Validation result',
+            description:
+              'Validation result. Carries an optional `trial` block when the call was served by the keyless daily allowance (no key, no payment), and `cost_usdc: 0` with it — nobody was charged.',
             content: {
               'application/json': {
                 schema: { $ref: '#/components/schemas/IBANValidationResult' },
               },
             },
           },
-          '402': { description: 'Payment required (x402)' },
+          '402': {
+            description:
+              'Payment required (x402). Also returned when the keyless daily trial is used up for this IP — `cause.reason = "trial_exhausted"`, with the count served today, the reset (midnight UTC) and the free-key route. An empty `{}` body always gets this 402, never a 400: that is the discovery probe x402 indexers send.',
+          },
           '400': { description: 'Missing or malformed request body' },
         },
       },
@@ -1438,6 +1442,30 @@ const buildRawSpec = () => ({
         type: 'object',
         required: ['iban', 'valid', 'cost_usdc'],
         properties: {
+          trial: {
+            type: 'object',
+            description:
+              'Present ONLY on a call served by the keyless daily trial: POST /v1/iban/validate with a real `iban` and no API key is served 10 times a day per IP, with no payment. Says how many calls are left today and how to take a free key. Absent with a key, with an x402 payment, and on every other endpoint.',
+            required: [
+              'calls_used_today',
+              'calls_left_today',
+              'daily_limit',
+              'resets',
+              'free_key',
+              'docs',
+            ],
+            properties: {
+              calls_used_today: { type: 'integer', example: 1 },
+              calls_left_today: { type: 'integer', example: 9 },
+              daily_limit: { type: 'integer', example: 10 },
+              resets: { type: 'string', example: 'midnight UTC' },
+              free_key: {
+                type: 'string',
+                description: 'The request that ends the trial in your favour: a free key, 200 requests a month.',
+              },
+              docs: { type: 'string', format: 'uri' },
+            },
+          },
           attribution: {
             type: 'object',
             description:

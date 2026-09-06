@@ -121,7 +121,13 @@ out = IBANforge().format_iban("DE89370400440532013000")
 ## For developers — REST API
 
 ```bash
-# Validate IBAN
+# Validate IBAN — no key needed for the first 10 calls a day per IP.
+# The answer carries a `trial` block with the count left and how to get a key.
+curl -X POST https://api.ibanforge.com/v1/iban/validate \
+  -H "Content-Type: application/json" \
+  -d '{"iban":"CH10 0023 0000 0000 1234 5"}'
+
+# Past 10/day, add the free key (200 req/month, one POST, no card)
 curl -X POST https://api.ibanforge.com/v1/iban/validate \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer ifk_..." \
@@ -139,7 +145,7 @@ curl https://api.ibanforge.com/v1/demo
 
 | Method | Path                       | Cost          | Description                                                    |
 | ------ | -------------------------- | ------------- | -------------------------------------------------------------- |
-| `POST` | `/v1/iban/validate`        | $0.005        | Single IBAN — BIC + SEPA + issuer + risk + Swiss bc_nummer    |
+| `POST` | `/v1/iban/validate`        | $0.005        | Single IBAN — BIC + SEPA + issuer + risk + Swiss bc_nummer. First 10/day per IP free, no key |
 | `POST` | `/v1/iban/batch`           | $0.002/IBAN   | Up to 100 IBANs in one call                                    |
 | `GET`  | `/v1/bic/{code}`           | $0.003        | BIC/SWIFT lookup with LEI                                      |
 | `GET`  | `/v1/ch/clearing/{iid}`    | $0.003        | Swiss BC-Nummer / IID — SIC, euroSIC, QR-IID                  |

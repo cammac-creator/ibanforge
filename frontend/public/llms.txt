@@ -14,6 +14,10 @@ https://api.ibanforge.com
 
 ## How AI agents connect (pick one)
 
+### Try it right now, no key, no wallet (REST)
+curl -s -X POST https://api.ibanforge.com/v1/iban/validate -H 'Content-Type: application/json' -d '{"iban":"CH9300762011623852957"}'
+The first 10 calls a day from one IP are served in full, free. The answer carries a `trial` block saying how many are left today and how to take the free key (200 req/month). Past 10 the route answers 402 again, `cause.reason = "trial_exhausted"`. Send a REAL iban: an empty `{}` body is the x402 discovery probe and always gets the 402.
+
 ### MCP server (stdio — easiest, no signup)
 npx -y ibanforge-mcp
 Claude Desktop / Cursor / Cline config:
@@ -43,7 +47,7 @@ Zero to first payment in 3 steps (wallet with budget → USDC on Base → one $5
 - send_feedback — report incorrect data or claim an x402 refund, no account. Cost: free
 
 ## REST endpoints
-- POST /v1/iban/validate — single IBAN, full enrichment ($0.005)
+- POST /v1/iban/validate — single IBAN, full enrichment ($0.005; first 10/day per IP free, no key — see the keyless trial above)
 - POST /v1/iban/batch — up to 100 IBANs ($0.002 each)
 - GET  /v1/bic/{code} — BIC/SWIFT lookup with LEI ($0.003)
 - GET  /v1/ch/clearing/{iid} — Swiss clearing lookup ($0.003)
@@ -57,6 +61,7 @@ Zero to first payment in 3 steps (wallet with budget → USDC on Base → one $5
 - POST /v1/keys/generate {"email":"you@company.com"} — free API key (200 req/month)
 
 ## How to pay (3 rails, no dead-ends)
+- Try before anything: 10 keyless validations/day per IP on POST /v1/iban/validate, and 10 MCP tool calls/day per IP. Tasters, not tiers.
 - Free tier: POST /v1/keys/generate → Authorization: Bearer ifk_... (200 req/month)
 - Credit packs (card or USDC, never expire): 1k = $5, 5k = $20, 25k = $80 → POST /v1/credits/buy/1k|5k|25k
 - Pro subscription (card): $29/month for 10,000 requests, resets on the 1st, cancel anytime → https://ibanforge.com/pricing?src=llms

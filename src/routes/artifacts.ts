@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { RATE_LIMIT } from '../middleware/rate-limit.js';
+import { REST_TRIAL_DAILY_LIMIT } from '../lib/trial.js';
 
 /**
  * Machine-readable operating artifacts: what an agent is allowed to do without
@@ -160,6 +161,16 @@ quotas:
     window: 1 day
     scope: per client IP
     note: Full paid responses over the HTTP MCP transport with no key and no wallet.
+  rest_anonymous_trial:
+    requests: ${REST_TRIAL_DAILY_LIMIT}
+    window: 1 day
+    scope: per client IP
+    applies_to: POST /v1/iban/validate
+    resets: midnight UTC
+    note: The same taster over plain REST, for a caller with no key and no wallet.
+      Granted only when the body carries a real iban; an empty body still gets the
+      402 discovery envelope. Past the ceiling the route answers 402 with
+      cause.reason = trial_exhausted. Counted in memory, per instance.
   prepaid_credits:
     note: One credit per validation or lookup; batch validation debits one credit
       per IBAN. No expiry.
@@ -461,6 +472,14 @@ query string, so it cannot end up in a proxy log or a browser history.
 The HTTP MCP transport at \`https://api.ibanforge.com/mcp\` answers
 ${MCP_FREE_DAILY} full tool calls per IP per day with no key and no wallet, so
 an agent can evaluate the API before anyone signs anything.
+
+## 4. REST, anonymous
+
+\`POST /v1/iban/validate\` with a real \`iban\` and no credential at all is served
+${REST_TRIAL_DAILY_LIMIT} times per IP per day, full enrichment included. The
+answer carries a \`trial\` block with the count left and the one request that
+mints a free key. Same taster as the MCP one, for a human at a terminal. Past
+the ceiling the route answers 402 again, \`cause.reason = trial_exhausted\`.
 
 ## Failure modes
 

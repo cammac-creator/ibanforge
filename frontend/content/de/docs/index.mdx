@@ -22,7 +22,9 @@ Alle Endpunkte werden über HTTPS bereitgestellt. HTTP-Anfragen werden automatis
 
 ## Authentifizierung
 
-Drei Wege hinein — wählen Sie, was passt; Ihre App oder Ihr Agent landet nie in einer Sackgasse:
+**Vor allen dreien: Die ersten 10 Aufrufe pro Tag brauchen gar nichts.** `POST /v1/iban/validate` mit einer echten `iban` und ohne Schlüssel wird vollständig beantwortet, 10-mal pro Tag und IP-Adresse. Die Antwort enthält einen `trial`-Block mit der Zahl der heute verbleibenden Aufrufe und der einen Anfrage, die einen kostenlosen Schlüssel liefert. Eine Kostprobe, keine Stufe: über 10/Tag antwortet der Endpunkt wieder mit `402` und `cause.reason: "trial_exhausted"`.
+
+Danach drei Wege hinein — wählen Sie, was passt; Ihre App oder Ihr Agent landet nie in einer Sackgasse:
 
 1. **Kostenloser API-Schlüssel** — 200 Anfragen/Monat, keine Kreditkarte. [Generieren Sie einen](/docs/api-keys) mit einem einzigen POST und senden Sie dann `Authorization: Bearer ifk_...` mit jeder Anfrage.
 2. **Prepaid-Guthabenpakete** — 1k = 5 $, 5k = 20 $, 25k = 80 $. Sie verfallen nie und sind **per Karte** oder in USDC kaufbar (`POST /v1/credits/buy/1k|5k|25k`). Siehe [Preise](/pricing).
@@ -49,11 +51,28 @@ Eine Anfrage ohne gültigen Schlüssel oder Zahlung erhält eine `402`-Antwort m
 
 ## Schnellbeispiel
 
+Ohne Schlüssel, ohne Anmeldung — dieser Aufruf funktioniert so, wie er ist, 10-mal pro Tag und IP:
+
 ```bash
 curl -X POST https://api.ibanforge.com/v1/iban/validate \
   -H "Content-Type: application/json" \
   -d '{"iban": "CH10 0023 0000 0000 1234 5"}'
 ```
+
+Die Antwort enthält dann einen zusätzlichen `trial`-Block:
+
+```json
+"trial": {
+  "calls_used_today": 1,
+  "calls_left_today": 9,
+  "daily_limit": 10,
+  "resets": "midnight UTC",
+  "free_key": "POST https://api.ibanforge.com/v1/keys/generate with {\"email\":\"you@company.com\",\"source\":\"api-trial\"} — 200 requests a month, no card",
+  "docs": "https://ibanforge.com/docs/api-keys?src=api-trial"
+}
+```
+
+Ab dem 11. Aufruf am Tag holen Sie sich den [kostenlosen Schlüssel](/docs/api-keys) — ein einziger POST, keine Karte — und ergänzen dieselbe Anfrage um `Authorization: Bearer ifk_...`.
 
 Antwort:
 

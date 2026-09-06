@@ -22,7 +22,9 @@ Tous les endpoints sont servis en HTTPS. Les requetes HTTP sont automatiquement 
 
 ## Authentification
 
-Trois portes d'entrée — choisissez ce qui vous convient, votre app ou votre agent ne tombe jamais sur un cul-de-sac :
+**Avant toutes les trois : les 10 premiers appels du jour ne demandent rien.** `POST /v1/iban/validate` avec un vrai `iban` et sans clé est servi en entier, 10 fois par jour et par adresse IP. La réponse porte un bloc `trial` qui dit combien il en reste aujourd'hui et la requête unique qui donne une clé gratuite. C'est une dégustation, pas un palier : au-delà de 10/jour, l'endpoint répond de nouveau `402`, avec `cause.reason: "trial_exhausted"`.
+
+Ensuite, trois portes d'entrée — choisissez ce qui vous convient, votre app ou votre agent ne tombe jamais sur un cul-de-sac :
 
 1. **Clé API gratuite** — 200 requêtes/mois, sans carte bancaire. [Générez-la](/docs/api-keys) avec un simple POST, puis envoyez `Authorization: Bearer ifk_...` avec chaque requête.
 2. **Packs de crédits prépayés** — 1k = 5 $, 5k = 20 $, 25k = 80 $. Ils n'expirent jamais, achetables **par carte** ou en USDC (`POST /v1/credits/buy/1k|5k|25k`). Voir les [tarifs](/pricing).
@@ -49,11 +51,28 @@ Une requête sans clé valide ni paiement reçoit une réponse `402` avec des in
 
 ## Exemple rapide
 
+Sans clé, sans inscription — cet appel fonctionne tel quel, 10 fois par jour et par IP :
+
 ```bash
 curl -X POST https://api.ibanforge.com/v1/iban/validate \
   -H "Content-Type: application/json" \
   -d '{"iban": "CH10 0023 0000 0000 1234 5"}'
 ```
+
+La réponse porte alors un bloc `trial` supplémentaire :
+
+```json
+"trial": {
+  "calls_used_today": 1,
+  "calls_left_today": 9,
+  "daily_limit": 10,
+  "resets": "midnight UTC",
+  "free_key": "POST https://api.ibanforge.com/v1/keys/generate with {\"email\":\"you@company.com\",\"source\":\"api-trial\"} — 200 requests a month, no card",
+  "docs": "https://ibanforge.com/docs/api-keys?src=api-trial"
+}
+```
+
+Au-delà de 10 appels par jour, prenez la [clé gratuite](/docs/api-keys) — un seul POST, sans carte — et ajoutez `Authorization: Bearer ifk_...` à la même requête.
 
 Reponse :
 

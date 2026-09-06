@@ -8,6 +8,18 @@ order: 1
 
 IBANforge propose une **offre gratuite** via des cles API — 200 requetes/mois sur tous les endpoints. Aucune carte bancaire, aucun portefeuille crypto requis. Pour des volumes plus eleves, vous pouvez utiliser les [micropaiements x402](/docs/x402).
 
+## Avant la clé : 10 appels par jour, sans clé
+
+`POST /v1/iban/validate` avec un vrai `iban` et aucun identifiant est servi en entier — enrichissement compris — **10 fois par jour et par adresse IP**, remis à zéro à minuit UTC :
+
+```bash
+curl -X POST https://api.ibanforge.com/v1/iban/validate \
+  -H "Content-Type: application/json" \
+  -d '{"iban": "CH10 0023 0000 0000 1234 5"}'
+```
+
+La réponse porte un bloc `trial` avec le nombre d'appels restants aujourd'hui et la requête qui crée la clé. C'est une dégustation, pas un palier : au-delà de 10 appels par jour, l'endpoint répond de nouveau `402` avec `cause.reason: "trial_exhausted"`, et c'est la clé ci-dessous qui lève la limite. Le décompte vit en mémoire, par instance de serveur : à traiter comme un ordre de grandeur, jamais comme un quota sur lequel bâtir.
+
 ## Générer une clé API gratuite
 
 Envoyez une requête POST à `/v1/keys/generate` avec votre adresse email :

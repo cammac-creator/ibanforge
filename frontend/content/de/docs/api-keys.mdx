@@ -8,6 +8,18 @@ order: 1
 
 IBANforge bietet ein **kostenloses Kontingent** ueber API-Schluessel — 200 Anfragen/Monat auf allen Endpunkten. Keine Kreditkarte, keine Krypto-Wallet erforderlich. Fuer hoehere Volumen koennen Sie [x402-Mikrozahlungen](/docs/x402) verwenden.
 
+## Vor dem Schlüssel: 10 Aufrufe pro Tag, ohne Schlüssel
+
+`POST /v1/iban/validate` mit einer echten `iban` und ganz ohne Zugangsdaten wird vollständig beantwortet — samt Anreicherung — **10-mal pro Tag und IP-Adresse**, Rücksetzung um Mitternacht UTC:
+
+```bash
+curl -X POST https://api.ibanforge.com/v1/iban/validate \
+  -H "Content-Type: application/json" \
+  -d '{"iban": "CH10 0023 0000 0000 1234 5"}'
+```
+
+Die Antwort enthält einen `trial`-Block mit der Zahl der heute verbleibenden Aufrufe und der Anfrage, die den Schlüssel erzeugt. Eine Kostprobe, keine Stufe: über 10 Aufrufe pro Tag antwortet der Endpunkt wieder mit `402` und `cause.reason: "trial_exhausted"` — der Schlüssel unten hebt die Grenze auf. Gezählt wird im Arbeitsspeicher je Serverinstanz: als Größenordnung zu verstehen, nie als Kontingent, auf dem man baut.
+
 ## Kostenlosen API-Schlüssel generieren
 
 Senden Sie eine POST-Anfrage an `/v1/keys/generate` mit Ihrer E-Mail-Adresse:
