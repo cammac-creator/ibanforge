@@ -10,9 +10,10 @@ IBANforge is a compliance-grade API built for AI agents and developers. It valid
 
 ## Data sources and attribution
 
-GLEIF · SIX BankMaster · SwiftCodes (MIT) · Deutsche Bundesbank · Oesterreichische Nationalbank · Banque nationale de Belgique · Národná banka Slovenska · Finance Finland · NBP · EBA STEP2 · OFAC · EU · UN · FATF · EPC.
+GLEIF · SIX BankMaster · SwiftCodes (MIT) · Deutsche Bundesbank · Oesterreichische Nationalbank · Banque nationale de Belgique · Národná banka Slovenska · Central Bank of the Republic of San Marino · Finance Finland · NBP · EBA STEP2 · OFAC · EU · UN · FATF · EPC.
 UK deposit-taking authorisation: Bank of England (List of Banks, 2026-08), used with the Bank of England's written permission. The month of the list in force is served live at https://api.ibanforge.com/llms.txt
 Slovak bank codes: Národná banka Slovenska, Directory of identification codes for the domestic payment system (version 225, effective 2026-05-18), reproduced under the NBS site terms — the source is named and the file is not altered. The edition in force is served live at https://api.ibanforge.com/llms.txt
+San Marino bank codes: Central Bank of the Republic of San Marino, operating banks — four banks, read from the BCSM site. No terms of use are published there, so the licence is recorded as UNKNOWN and the source is credited by choice; the page states no edition, so the credit carries the date we read it. The list names the holder of a code it carries and does NOT publish the allocation of the ABI code space: an absence from it is not a non-allocation. Read date in force served live at https://api.ibanforge.com/llms.txt
 
 ## Core Capabilities
 

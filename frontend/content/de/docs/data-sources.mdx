@@ -32,6 +32,21 @@ Die slowakischen Daten werden nach den Nutzungsbedingungen der NBS-Website wiede
 
 Wir haben die NBS am 26.08.2026 gefragt, ob das Herauslösen einzelner Felder als Veränderung der Datei gilt; bis zum 06.09.2026 ohne Antwort. Die Tschechische Nationalbank, deren Bedingungen eine nahezu identische Klausel tragen, antwortete am 27.08.2026, dass dem nicht so ist. Antwortet die NBS anders, kommt dieses Register wieder heraus. Wie das bulgarische veröffentlicht es weder Löschkennzeichen noch Nachfolgecode — ein slowakisches `not_in_register` kommt daher nie mit einem Hinweis zur Neuvertragung.
 
+## Ein Register, das Inhaber nennt, ohne den Raum abzudecken — San Marino
+
+| Land | Register | Aktualisierung | Was es über den Code hinaus veröffentlicht |
+|---|---|---|---|
+| **SM** | Zentralbank der Republik San Marino, Liste der operativen Banken | monatlich neu gelesen (die Seite nennt **weder Ausgabe noch Revisionsdatum**, `as_of` ist daher unser Lesetag, und die Quellenangabe sagt „read on") | Name, BIC und der vollständige Sitz — tiefer als BE, BG oder SK veröffentlichen |
+
+San Marino steht für sich, weil es die Regel bricht, auf der die Tabelle oben beruht. Die Zentralbank veröffentlicht die vier Banken, die sie **beaufsichtigt**; sie veröffentlicht nicht die Vergabe des ABI-Coderaums. San Marino lizenziert außerdem Zahlungs- und E-Geld-Institute, die keine Banken sind (eines hält einen san-marinesischen BIC und wickelt über EBA STEP2 ab), und die offizielle san-marinesische Beispiel-IBAN trägt einen ABI-Code, der nicht auf der Seite steht. Also:
+
+- ein gelisteter Code antwortet `verified` mit dem Institut, das die Zentralbank nennt — und `authoritative: false`;
+- ein Code, der nicht auf der Liste steht, antwortet genau das, was San Marino vor diesem Register antwortete: `not_in_register` mit dem Grund **`absent_from_reference_data`**. Nie `not_allocated`, und nie ein Grund, eine Zahlung zu stoppen.
+
+Ein Flag geht in die andere Richtung: `bic.basis` ist `national_register` und `bic.authoritative` ist `true`, denn der BIC neben einem gelisteten Code ist die Zuordnung der Zentralbank selbst. San Marino ist die Stelle, an der die beiden Autoritäts-Flags auseinandergehen — umgekehrt zur Schweiz.
+
+**Die Lizenz ist unbekannt und wird als unbekannt geführt.** bcsm.sm veröffentlicht keine Nutzungsbedingungen — nur eine Datenschutzerklärung und einen Copyright-Hinweis im Fuß (geprüft am 06.09.2026). Unsere Position: vier Zeilen Routing-Daten, von der Aufsicht zur Nutzung veröffentlicht, pro Anfrage als ein Datensatz ausgeliefert, mit *Source: Central Bank of the Republic of San Marino, operating banks (read on …)* aus eigenem Entschluss und nicht aus Pflicht angegeben. Ein Brief an die Zentralbank liegt bereit; bei Widerspruch wird das Register zurückgezogen. Bis dahin wird keine Klausel erfunden.
+
 ## Die zusammengesetzte BIC-Karte — wo `authoritative: false`
 
 Überall sonst lösen Bankcodes gegen unsere zusammengesetzte Karte auf: **121k+ BIC-Einträge** aus GLEIF (LEI-angereichert), dem öffentlichen SWIFT-Verzeichnis, SIX, EBA STEP2 SCT, Bundesbank und NBP. Ein Treffer benennt den Inhaber des passenden BIC — er beweist **nicht**, dass das Institut IBANs ausgibt, und ein Fehlen beweist gar nichts. In den rund 30 Ländern mit Buchstaben-Bankcodes kann ein Präfix-Rückfall `candidates > 1` liefern; die Antwort kennzeichnet das als Hinweis.

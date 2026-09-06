@@ -2136,6 +2136,28 @@
       "indexIntro": "Every payment code of the Národná banka Slovenska directory — the prevodník — with the payment service provider, the BIC the register pairs with it, and the exact answer of the IBANforge API. Refreshed monthly with the register.",
       "wholeRegister": "All {count} codes of the register are listed: the Slovak payment system is small enough that there is no tail to hold back.",
       "countryLink": "The Slovak IBAN format, with the official example"
+    },
+    "sm": {
+      "metaTitle": "San Marino bank code {code}: {name}, {town}",
+      "metaDescription": "ABI code {code} in the Central Bank of the Republic of San Marino list of operating banks: {name} in {town}, BIC {bic}. Registered office, IBAN structure, SEPA reach and the exact answer of the IBANforge API.",
+      "eyebrow": "BCSM list of operating banks",
+      "title": "San Marino bank code {code}",
+      "facts": {
+        "code": "ABI code",
+        "bank": "Bank",
+        "bic": "BIC",
+        "street": "Registered office",
+        "postCode": "Postcode",
+        "town": "Town",
+        "none": "none"
+      },
+      "structure": "A San Marino IBAN is SM, two check digits, one CIN letter, the five-digit ABI code, a five-digit CAB, then the twelve-character account number. The ABI code is what the BCSM list can name a holder for; the account part is known only to the bank.",
+      "notExhaustiveTitle": "What a missing code does NOT mean",
+      "notExhaustive": "The Central Bank publishes the banks it supervises, not the allocation of the ABI code space. So a code on this list names its holder, and a code absent from it proves nothing: San Marino also licenses payment and e-money institutions that are not banks, and the official San Marino example IBAN itself carries an ABI that is not on this page. That is why the API answers authoritative: false here — unlike Austria or Slovakia, an absence is never a reason to stop a payment.",
+      "docLink": "How the San Marino list answers",
+      "indexTitle": "San Marino bank codes (BCSM operating banks)",
+      "indexIntro": "The four operating banks of the Central Bank of the Republic of San Marino, with the ABI code, the BIC the Central Bank pairs with it, the registered office, and the exact answer of the IBANforge API. Refreshed monthly with the other registers.",
+      "countryLink": "The San Marino IBAN format, with the official example"
     }
   },
   "countries": {

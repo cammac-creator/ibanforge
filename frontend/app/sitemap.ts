@@ -1,5 +1,5 @@
 import { MetadataRoute } from "next";
-import { atBlzFile, beBankFile, chIidFile, deBlzFile, skBankFile } from "@/lib/registers";
+import { atBlzFile, beBankFile, chIidFile, deBlzFile, skBankFile, smBankFile } from "@/lib/registers";
 import { allCountryCodes } from "@/lib/countries";
 import { getAllDocs } from "@/lib/mdx";
 import { getAllPosts } from "@/lib/blog";
@@ -61,6 +61,11 @@ export default function sitemap(): MetadataRoute.Sitemap {
   // first batch: the register is small enough to have no tail.
   const sk = skBankFile();
   listRegister(Object.keys(sk.entries), sk.batch1, (c) => `/sk/${c}`, ["en"]);
+  // San Marino in English and Italian? No — Italian is not a site locale, and
+  // the BCSM page we read and cite is the English edition. Four pages, one
+  // language, like Slovakia.
+  const sm = smBankFile();
+  listRegister(Object.keys(sm.entries), sm.batch1, (c) => `/sm/${c}`, ["en"]);
 
   // One page per IBAN country, in the three languages (2026-09-06).
   for (const cc of allCountryCodes()) {
@@ -90,6 +95,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
       { url: `${prefix}/at`, changeFrequency: "monthly", priority: 0.7 },
       { url: `${prefix}/be`, changeFrequency: "monthly", priority: 0.7 },
       { url: `${prefix}/sk`, changeFrequency: "monthly", priority: 0.7 },
+      { url: `${prefix}/sm`, changeFrequency: "monthly", priority: 0.7 },
       { url: `${prefix}/playground`, changeFrequency: "monthly", priority: 0.9 },
       { url: `${prefix}/docs`, changeFrequency: "weekly", priority: 0.8 },
       { url: `${prefix}/pricing`, changeFrequency: "monthly", priority: 0.7 },

@@ -1,0 +1,87 @@
+---
+title: "Codes banque saint-marinais (BCSM)"
+description: "Vérifier un code ABI saint-marinais (5 chiffres) contre la liste des banques opérationnelles de la Banque centrale : quatre banques avec leur siège social — et le seul registre que nous servons où un code absent ne prouve rien."
+order: 11
+---
+
+# Codes banque saint-marinais — la liste des banques opérationnelles de la BCSM
+
+Saint-Marin utilise le **code ABI** italien : cinq chiffres en positions 6 à 10 d'un IBAN `SM`, après la lettre CIN et avant le CAB à cinq chiffres. La source est la **Banca Centrale della Repubblica di San Marino**, qui publie sur une page les banques qu'elle supervise : nom, siège social, code ABI et BIC.
+
+Il y en a **quatre**, et c'est tout le secteur bancaire du pays. C'est aussi la raison d'être de cette page plutôt que d'une ligne dans un tableau : Saint-Marin est le seul registre que nous servons où **une absence ne signifie rien du tout**.
+
+## Un seul appel
+
+```bash
+curl -X POST https://api.ibanforge.com/v1/iban/validate \
+  -H "Content-Type: application/json" \
+  -d '{"iban": "SM15U0303409800000000270100"}'
+```
+
+```json
+{
+  "valid": true,
+  "bic": { "code": "BASMSMSM", "basis": "national_register", "authoritative": true },
+  "bank_code_check": {
+    "value": "03034",
+    "status": "verified",
+    "match": "register",
+    "register": "Central Bank of the Republic of San Marino, operating banks (banks only; …)",
+    "authoritative": false,
+    "institution": {
+      "name": "Banca Agricola Commerciale Istituto Bancario Sammarinese s.p.a.",
+      "street": "Via 3 settembre, 316",
+      "post_code": "47891",
+      "town": "Dogana",
+      "country": "SM"
+    }
+  }
+}
+```
+
+## Lisez bien `authoritative: false` — c'est tout l'enjeu
+
+Partout ailleurs où nous servons un registre national, `not_in_register` signifie que le code **n'est pas attribué**, une raison forte d'arrêter un paiement. Pas ici.
+
+La Banque centrale publie les banques qu'elle **supervise**. Elle ne publie pas l'attribution de l'espace des codes ABI, et rien sur bcsm.sm ne prétend le contraire. Trois faits le rendent concret :
+
+- Saint-Marin agrée aussi des **prestataires de services de paiement et de monnaie électronique qui ne sont pas des banques**. L'un d'eux au moins détient un BIC saint-marinais et règle via EBA STEP2 ; il n'est pas sur cette page.
+- L'**IBAN d'exemple officiel de Saint-Marin**, `SM86 U032 2509 8000 0000 0270 100`, porte le code ABI `03225` — absent de cette page lui aussi.
+- La page s'intitule *operating banks*, et c'est exactement ce qu'elle est.
+
+Un code trouvé nomme donc son titulaire, et un code non trouvé reçoit la réponse que Saint-Marin a toujours donnée : `not_in_register` avec la raison **`absent_from_reference_data`**, `authoritative: false`. Jamais `not_allocated`.
+
+> C'est l'inverse de l'histoire autrichienne et slovaque, où l'IBAN d'exemple officiel pointant vers un code non listé **est** une trouvaille, parce que ces registres attribuent. Ici ce n'en est pas une : c'est le registre qui reste dans son périmètre.
+
+## Deux drapeaux qui divergent, exprès
+
+Notez le bloc ci-dessus : `bank_code_check.authoritative` vaut `false` alors que `bic.authoritative` vaut `true`. Ils répondent à deux questions différentes, et Saint-Marin est l'endroit où ils se séparent.
+
+- L'**espace des codes** n'appartient pas ici à la Banque centrale : le verdict n'est donc pas autoritaire.
+- Le **BIC à côté d'un code qu'elle liste** est son appariement à elle — la Banque centrale a imprimé ces deux valeurs sur la même ligne —, donc `bic.basis` vaut `national_register` et ce BIC est stockable et utilisable pour régler.
+
+La Suisse est l'image miroir : le registre SIX règle le code banque tandis que le BIC à côté vient de notre carte curée.
+
+## Ce que publie la liste
+
+| Champ | Dans la liste BCSM | Note |
+|---|---|---|
+| `name` | oui | la banque, verbatim |
+| `bic` | oui, pour les quatre | imprimé à côté du code ABI |
+| `street` / `post_code` / `town` | oui | le siège social — plus profond que ce que publient la Belgique, la Bulgarie ou la Slovaquie |
+| `lei` | non | absent de cette liste ; nous n'en rapportons pas un de GLEIF pour le faire passer pour celui de la Banque centrale |
+
+## Fraîcheur et citation
+
+La BCSM ne publie **ni numéro d'édition ni date de révision** : `as_of` est donc le jour où nous avons lu la page, et le crédit le dit en toutes lettres — *Source: Central Bank of the Republic of San Marino, operating banks (read on …)*. Une date nue s'y lirait comme celle de la Banque centrale et la surestimerait.
+
+**La licence est inconnue, et nous le disons plutôt que de la deviner.** bcsm.sm ne publie aucune condition d'utilisation — seulement une politique de confidentialité et un copyright en pied de page (vérifié le 6 septembre 2026). Notre position : quatre lignes de données de routage publiées par le superviseur pour être utilisées, servies un enregistrement par requête, la source créditée par choix et non par obligation. Une lettre à la Banque centrale est en attente d'envoi ; en cas d'objection, le registre est retiré. Voir [sources des données](/docs/data-sources).
+
+## Les limites honnêtes
+
+- **Nous vérifions le code ABI, jamais le compte ni son titulaire.** Et ici, seulement dans le sens positif.
+- **Une absence n'est pas un refus.** Répété parce que c'est la seule chose à retenir.
+- **Établissement, pas agence.** Le CAB identifie une agence ; la liste BCSM n'énumère pas les agences, et nous ne refusons jamais dessus.
+- **Quatre banques, ce n'est pas les quatre prestataires de paiement de Saint-Marin.** Les établissements non bancaires sont agréés séparément et ne figurent pas sur cette page.
+
+À lire aussi : [Ce que « verified » signifie](/docs/iban-validate) · [Sources des données](/docs/data-sources) · [IBAN vers BIC](/docs/iban-to-bic) · [Codes banque slovaques](/docs/sk-bank-codes) · [Les quatre banques saint-marinaises](/sm)
