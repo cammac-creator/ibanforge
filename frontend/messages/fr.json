@@ -2231,7 +2231,8 @@
       "index": "Tous les pays"
     },
     "sourceNote": "Source : registre ISO 13616 pour la longueur, le découpage et l'exemple ; réponse de l'API relevée le {date}.",
-    "exampleNotAllocated": "Le code banque de cet exemple officiel n'est pas attribué dans {register} : l'API le dit tel quel, c'est le comportement attendu sur un IBAN de démonstration."
+    "exampleNotAllocated": "Le code banque de cet exemple officiel n'est pas attribué dans {register} : l'API le dit tel quel, c'est le comportement attendu sur un IBAN de démonstration.",
+    "examplePartialRegister": "Une partie des codes banque de ce pays est en outre nommée par une liste du superviseur, dont nous servons une page par code — mais cette liste ne publie pas l'attribution de l'espace des codes : un code qui n'y figure pas n'est donc pas un code jamais attribué."
   },
   "tools": {
     "keyBlock": {

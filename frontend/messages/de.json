@@ -2231,7 +2231,8 @@
       "index": "Alle Länder"
     },
     "sourceNote": "Quelle: ISO-13616-Register für Länge, Aufbau und Beispiel; API-Antwort erfasst am {date}.",
-    "exampleNotAllocated": "Die Bankleitzahl dieses offiziellen Beispiels ist in {register} nicht vergeben: Die API sagt es so, wie es ist, das erwartete Verhalten bei einer Demo-IBAN."
+    "exampleNotAllocated": "Die Bankleitzahl dieses offiziellen Beispiels ist in {register} nicht vergeben: Die API sagt es so, wie es ist, das erwartete Verhalten bei einer Demo-IBAN.",
+    "examplePartialRegister": "Ein Teil der Bankleitzahlen dieses Landes wird zusätzlich von einer Aufsichtsliste benannt, zu der wir je eine Seite ausliefern — doch diese Liste veröffentlicht nicht die Vergabe des Coderaums: Ein dort fehlender Code ist deshalb kein nie vergebener Code."
   },
   "tools": {
     "keyBlock": {

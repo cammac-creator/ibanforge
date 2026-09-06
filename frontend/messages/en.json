@@ -2231,7 +2231,8 @@
       "index": "All countries"
     },
     "sourceNote": "Source: ISO 13616 registry for the length, layout and example; API answer captured on {date}.",
-    "exampleNotAllocated": "The bank code of this official example is not allocated in {register}: the API says so as it is, which is the expected behaviour on a demonstration IBAN."
+    "exampleNotAllocated": "The bank code of this official example is not allocated in {register}: the API says so as it is, which is the expected behaviour on a demonstration IBAN.",
+    "examplePartialRegister": "Some of this country's bank codes are additionally named by a supervisor's list, which we serve one page each — but that list does not publish the allocation of the code space, so a code missing from it is not a code that was never issued."
   },
   "tools": {
     "keyBlock": {
