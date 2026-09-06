@@ -1,0 +1,66 @@
+---
+title: "Kreditorenstamm: die sieben Prüfungen vor dem 14. November 2026"
+description: "Am 14. November 2026 verarbeitet SIX keine Zahlungen mehr, deren Adresse weder strukturiert noch hybrid ist. Was ein Kreditorenstamm enthalten muss, Prüfung für Prüfung, wie man ihn in zehn Minuten kostenlos kontrolliert, und was von Hand zu tun bleibt."
+date: "2026-09-06"
+faq:
+  - q: "Was passiert genau am 14. November 2026?"
+    a: "Die Swiss Payment Standards 2026 von SIX (Business Rules 3.3, pain.001-Guidelines 2.3) treten in Kraft: Eine Zahlung, deren Adresse weder der strukturierten noch der hybriden Form folgt, wird nicht mehr verarbeitet. Am Vortag, dem 13. November, müssen die Banken Daueraufträge und Zahlungsvorlagen bereinigt haben, die auf alten QR-Rechnungen beruhen."
+  - q: "Reicht eine hybride Adresse?"
+    a: "Ja, gemäss den SPS-2026-Guidelines: Ort und Land in eigenen Feldern, die Postleitzahl ebenfalls, wenn Sie sie haben, und höchstens zwei freie Zeilen zu 70 Zeichen für den Rest. Was nicht mehr durchgeht, ist die ganze Adresse auf einer einzigen Zeile."
+  - q: "Swift hat seinen Termin am 27. August 2026 verschoben: Kann ich warten?"
+    a: "Nein. Die Verschiebung von Swift betrifft grenzüberschreitende CBPR+-Nachrichten, mit einem Update spätestens im Dezember 2026. SIX, das Eurosystem und die Rulebooks des EPC haben sich nicht bewegt: Der Schweizer 14. November und der SEPA-Termin vom 15. November bleiben."
+  - q: "Was kostet die Dateiprüfung?"
+    a: "Die Vorschau ist kostenlos: die Zähler und zwanzig Zeilen, IBAN maskiert. Die kommentierte Arbeitsmappe kostet 149 CHF bis 5 000 Zeilen und 349 CHF bis 20 000, per Karte bezahlt, 24 Stunden lang herunterladbar."
+---
+
+Am 14. November 2026 treten die [Swiss Payment Standards 2026](/de/docs/structured-addresses) in Kraft. Ab diesem Tag wird ein Zahlungsauftrag, dessen Kreditorenadresse weder der strukturierten noch der hybriden Form folgt, nicht mehr verarbeitet. Am 15. tun die SEPA-Rulebooks des EPC dasselbe für Euro-Überweisungen, und das Eurosystem stellt T2 am selben Wochenende um. Swift dagegen hat seinen eigenen Termin am 27. August 2026 ausgesetzt; wir haben [den Stand jedes Zahlungsverkehrsnetzes, Dokument für Dokument](/de/blog/2026-09-02-which-date-structured-addresses) beschrieben, und nichts Schweizerisches hat sich bewegt.
+
+Was im November auf dem Spiel steht, ist nicht Ihre Zahlungssoftware. Es ist Ihr Kreditorenstamm: die Tabelle oder der Export, in dem vor zehn Jahren erfasste Lieferanten schlummern, mit einer Adresse auf einer Zeile, einem von einer Rechnung abgeschriebenen BIC und manchmal einer nie geprüften IBAN. Jede Zahlung geht mit diesen Daten hinaus. Hier sind die sieben Prüfungen, die er bestehen muss, und wie man sie in zehn Minuten durchführt.
+
+## 1. Die Adresse ist strukturiert, oder zumindest hybrid
+
+Das ist die Regel, die sich im November ändert, und die einzige, die Erfassungsarbeit verlangt. Eine strukturierte Adresse setzt jedes Element in sein Feld: Strasse, Nummer, PLZ, Ort, Land. Die hybride Form, von den SPS-2026-Guidelines zugelassen, verlangt weniger: Ort und Land in eigenen Feldern, die PLZ, wenn Sie sie haben, und den Rest auf höchstens zwei freien Zeilen zu 70 Zeichen. Was nicht mehr durchgeht, ist die ganze Adresse auf einer Zeile, «Seestrasse 4, 8002 Zürich» in einer einzigen Spalte.
+
+Hat Ihre Datei nur eine Adressspalte, ist der erste Schritt, sie in drei zu teilen: PLZ, Ort, Land. Die Strasse darf auf einer Zeile bleiben. Diese Teilung allein macht die meisten Zeilen hybrid.
+
+## 2. Das Land der Adresse ist das Land der IBAN
+
+Ein Kreditor mit Sitz in Genf und deutscher IBAN ist an sich kein Fehler. In einer alten Datei zeigt die Abweichung aber fast immer einen nicht nachgetragenen Umzug oder ein gewechseltes Konto, dem die Adresse nicht gefolgt ist. Die Prüfung ist mechanisch: die ersten zwei Buchstaben der IBAN gegen das Landfeld der Adresse.
+
+## 3. Die IBAN ist gültig, und sie ist vom richtigen Typ
+
+Die Prüfziffern nach mod 97 fangen den Tippfehler. Den Rest fangen sie nicht: Eine Schweizer IBAN beginnt mit einer fünfstelligen Bankclearing-Nummer, eine deutsche mit einer achtstelligen Bankleitzahl, und jedes Land hat [seine Länge und seinen Aufbau](/de/iban). In der Schweiz kommt der Typ hinzu: Eine QR-IBAN, deren Bankcode im Bereich 30000 bis 31999 liegt, verlangt eine QR-Referenz, eine gewöhnliche IBAN verbietet sie. Eine QR-Referenz neben einer gewöhnlichen IBAN ist eine abgewiesene Zahlung.
+
+## 4. Der Bankcode existiert im Register
+
+Das ist die Prüfung, die die meisten Werkzeuge auslassen. Die Beispiel-IBAN, mit der alle testen, CH93 0076 2011 6238 5295 7, besteht die Prüfziffern und trägt einen Bankcode, den SIX nie vergeben hat. Das Schweizer IID-Register, die Bankleitzahlendatei der Bundesbank, die österreichische und die belgische Liste sagen, ob der Code existiert, welchem Institut er gehört und ob er zurückgezogen wurde. Ein zurückgezogener Code ist eine Zahlung, die zurückkommt.
+
+## 5. Der BIC der Datei ist der des Registers, oder es gibt keinen
+
+Ein von einer Rechnung abgeschriebener BIC altert schlecht: Fusionen, Umbenennungen, geschlossene Filialen. Trägt Ihre Datei einen, muss es der sein, den das Register dem Bankcode der IBAN zuordnet. Und wer in der Schweiz oder im SEPA-Raum zahlt, kann oft darauf verzichten: Die IBAN genügt, und ein fehlender BIC kann nicht falsch sein.
+
+## 6. Keine Dubletten, und das Institut ist bekannt
+
+Zwei Zeilen mit derselben IBAN sind ein doppelt erfasster Lieferant oder zwei Lieferanten mit einem gemeinsamen Konto. In beiden Fällen muss jemand hinschauen. Derselbe Blick gilt Konten bei einem Zahlungsinstitut statt einer Bank: keine Anomalie, aber eine Information, die eine Buchhaltung lieber vor der Überweisung hat als danach.
+
+## 7. Der Name des Begünstigten ist der rechtliche Name
+
+Seit dem 9. Oktober 2025 vergleichen die Banken des Euroraums den von Ihnen angegebenen Namen mit dem des Kontoinhabers, bevor sie eine SEPA-Überweisung ausführen: die Empfängerprüfung, deren Regeln wir [beschrieben haben](/de/blog/2026-09-02-verification-of-payee-rulebook-1-1-checklist). Ein Handelsname anstelle der Firma erzeugt bei jeder Zahlung eine Warnung. Diese Prüfung machen die Banken, nicht wir; aber die Spalte «Name» Ihrer Datei ist das, was sie vergleichen werden.
+
+## In zehn Minuten durchführen
+
+Exportieren Sie die Datei als CSV oder XLSX mit mindestens einer IBAN-Spalte; die Spalten Name, BIC und Adresse werden genutzt, wenn sie vorhanden sind. Legen Sie sie in der [Dateiprüfung](/de/audit) ab. Die Vorschau ist kostenlos und sofort da: die Zähler je Befundtyp, zwanzig Zeilen mit maskierten IBAN und der Satz, auf den es ankommt: wie viele Zahlungen dieser Datei abgewiesen würden. Jede Zeile durchläuft dieselben Register wie die IBANforge-API: Aufbau und Prüfziffern der IBAN, Bankcode gegen das nationale Register, BIC der Datei gegen das Register, Dubletten, Land der Adresse gegen Land der IBAN, und die Adresse gegen die Schweizer Regeln, wenn die Datei Adressspalten hat.
+
+Die kommentierte Arbeitsmappe, 149 CHF bis 5 000 Zeilen, zeigt jede Zeile vollständig mit Bank und BIC aus dem Register, das Detail jedes Befunds und ein Übersichtsblatt zum Weitergeben. Sie bleibt 24 Stunden lang herunterladbar.
+
+Wer es lieber integriert: Die drei Routen, die diese Arbeit tun, sind öffentlich: [`POST /v1/iban/validate`](/de/docs/iban-validate) für die IBAN und ihren Bankcode, [`POST /v1/address/check`](/de/docs/structured-addresses), um kostenlos und unter Nennung des Dokuments zu sagen, ob eine Adresse die Schweizer Regeln besteht, und [`POST /v1/ch/qr-bill/check`](/de/docs/swiss-qr-iban) für eine ganze QR-Rechnung.
+
+## Was von Hand zu tun bleibt
+
+Die Prüfung sagt, wo die Probleme sind; sie behebt sie nicht. Drei Arbeiten bleiben bei Ihnen.
+
+Die Adressen, die zu teilen oder neu zu erfragen sind: Für die meisten Zeilen genügt es, PLZ, Ort und Land zu trennen. Für die übrigen fragen Sie den Lieferanten jetzt nach der Adresse, solange die Frage nicht dringend ist.
+
+Die Daueraufträge und Zahlungsvorlagen: Die Banken müssen sie bis zum 13. November bereinigt haben. Eine Vorlage, die auf einer QR-Rechnung mit kombinierter Adresse beruht, einer seit dem 21. November 2025 aus dem Standard gestrichenen Form, wird nicht mehr ausgeführt.
+
+Der zweite Durchgang: Sind die Korrekturen gemacht, legen Sie die Datei erneut ab. Eine saubere Datei im September ist ein November ohne Überraschungen.

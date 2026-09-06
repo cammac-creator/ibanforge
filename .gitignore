@@ -50,3 +50,4 @@ scripts/village-atlas/sheets/
 
 # Scratch stats database of `npm run pages:export` (the in-process calls record nothing anyone reads)
 data/.export-register-pages.stats.sqlite*
+data/.export-country-pages.stats.sqlite*

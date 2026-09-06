@@ -53,7 +53,8 @@
     "openapi:lint": "npm run openapi:dump && npx --yes @stoplight/spectral-cli@6 lint openapi.generated.json --ruleset .spectral.yaml",
     "prepublishOnly": "npm run build",
     "deps:check": "tsx scripts/check-runtime-deps.ts",
-    "pages:export": "tsx scripts/export-register-pages.ts"
+    "pages:export": "tsx scripts/export-register-pages.ts",
+    "pages:export-countries": "tsx scripts/export-country-pages.ts"
   },
   "dependencies": {
     "@coinbase/x402": "^2.1.0",

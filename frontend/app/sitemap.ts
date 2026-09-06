@@ -1,5 +1,6 @@
 import { MetadataRoute } from "next";
 import { atBlzFile, beBankFile, chIidFile, deBlzFile } from "@/lib/registers";
+import { allCountryCodes } from "@/lib/countries";
 import { getAllDocs } from "@/lib/mdx";
 import { getAllPosts } from "@/lib/blog";
 import { routing } from "@/i18n/routing";
@@ -20,25 +21,44 @@ const BASE_URL = "https://ibanforge.com";
 export default function sitemap(): MetadataRoute.Sitemap {
   const entries: MetadataRoute.Sitemap = [];
 
-  // Register pages, first batch only (see scripts/export-register-pages.ts in
-  // the API repository): every German head-office BLZ in German, every Swiss
-  // headquarters IID in German and French. The other codes have pages too,
-  // rendered on demand, and join the list once this batch has shown its worth.
-  for (const blz of deBlzFile().batch1) {
-    entries.push({ url: `${BASE_URL}/de/blz/${blz}`, changeFrequency: "monthly", priority: 0.5 });
-  }
-  for (const iid of chIidFile().batch1) {
-    for (const locale of ["de", "fr"]) {
-      entries.push({ url: `${BASE_URL}${localePath(locale, `/iid/${iid}`)}`, changeFrequency: "monthly", priority: 0.5 });
+  // Register pages: the head-office batch first (the codes a reader is most
+  // likely to look up, pre-rendered at build), then every other code of each
+  // register at a lower priority. Until 2026-09-06 only the first batch was
+  // listed, "until it showed its worth"; with one signup a fortnight from
+  // search and nothing else to measure it against, the whole long tail is the
+  // experiment now. Every code already had a page, rendered on demand.
+  const listRegister = (codes: string[], batch1: string[], path: (code: string) => string, locales: string[]) => {
+    const first = new Set(batch1);
+    for (const code of codes) {
+      for (const locale of locales) {
+        entries.push({
+          url: `${BASE_URL}${localePath(locale, path(code))}`,
+          changeFrequency: "monthly",
+          priority: first.has(code) ? 0.5 : 0.4,
+        });
+      }
     }
-  }
+  };
+  const de = deBlzFile();
+  listRegister(Object.keys(de.entries), de.batch1, (c) => `/blz/${c}`, ["de"]);
+  const ch = chIidFile();
+  listRegister(Object.keys(ch.entries), ch.batch1, (c) => `/iid/${c}`, ["de", "fr"]);
   // Austria reads German; Belgium reads French and, for its payments teams, English.
-  for (const code of atBlzFile().batch1) {
-    entries.push({ url: `${BASE_URL}/de/at/${code}`, changeFrequency: "monthly", priority: 0.5 });
-  }
-  for (const code of beBankFile().batch1) {
-    for (const locale of ["fr", "en"]) {
-      entries.push({ url: `${BASE_URL}${localePath(locale, `/be/${code}`)}`, changeFrequency: "monthly", priority: 0.5 });
+  const at = atBlzFile();
+  listRegister(Object.keys(at.entries), at.batch1, (c) => `/at/${c}`, ["de"]);
+  const be = beBankFile();
+  // A Belgian page is the bank's page: only the canonical code of each block is listed.
+  listRegister(
+    Object.keys(be.entries).filter((c) => be.entries[c].register.canonical === c),
+    be.batch1,
+    (c) => `/be/${c}`,
+    ["fr", "en"],
+  );
+
+  // One page per IBAN country, in the three languages (2026-09-06).
+  for (const cc of allCountryCodes()) {
+    for (const locale of routing.locales) {
+      entries.push({ url: `${BASE_URL}${localePath(locale, `/iban/${cc.toLowerCase()}`)}`, changeFrequency: "monthly", priority: 0.6 });
     }
   }
 
@@ -57,6 +77,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
       { url: `${prefix}/tools/test-iban`, changeFrequency: "monthly", priority: 0.8 },
       { url: `${prefix}/tools/qr-bill`, changeFrequency: "monthly", priority: 0.8 },
       { url: `${prefix}/sheets`, changeFrequency: "monthly", priority: 0.8 },
+      { url: `${prefix}/iban`, changeFrequency: "monthly", priority: 0.7 },
       { url: `${prefix}/blz`, changeFrequency: "monthly", priority: 0.7 },
       { url: `${prefix}/iid`, changeFrequency: "monthly", priority: 0.7 },
       { url: `${prefix}/at`, changeFrequency: "monthly", priority: 0.7 },

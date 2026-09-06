@@ -2099,5 +2099,77 @@
       "indexTitle": "Belgian bank codes (NBB list)",
       "indexIntro": "Every bank identifier allocated in the National Bank of Belgium list, one page per institution, with the BIC it pairs with it and the exact answer of the IBANforge API. The register publishes names only: no address appears here that the register did not publish."
     }
+  },
+  "countries": {
+    "eyebrow": "IBAN by country",
+    "metaTitle": "{country} IBAN: format, length and example",
+    "metaDescription": "A {country} IBAN has {length} characters. Field-by-field layout, the official example {example}, SEPA membership, Verification of Payee, the bank-code register and the exact answer of the IBANforge API.",
+    "title": "{country} IBAN",
+    "subtitle": "{length} characters: the country code, two check digits, then the BBAN cut as below.",
+    "indexTitle": "The IBAN format of every country",
+    "indexIntro": "The {count} countries of the ISO 13616 registry, with the IBAN length, SEPA membership, the Verification of Payee duty and the register the IBANforge API checks the bank code against. Every country has its page: layout, official example and the API's exact answer.",
+    "anatomyTitle": "Anatomy of the official example",
+    "anatomyNote": "The example comes from the ISO 13616 registry; it belongs to nobody. Positions count from the first character of the IBAN.",
+    "legend": {
+      "country": "Country code",
+      "check": "Check digits",
+      "bank_code": "Bank code",
+      "branch_code": "Branch code",
+      "account_number": "Account number",
+      "other": "National check or other"
+    },
+    "specLegend": "SWIFT notation: n = digits, a = upper-case letters, c = alphanumeric characters; the exclamation mark fixes the exact length.",
+    "facts": {
+      "title": "The facts about the {country} IBAN",
+      "code": "ISO code",
+      "length": "Length",
+      "lengthValue": "{length} characters",
+      "check": "Check digits",
+      "checkValue": "positions 3 to 4, ISO 7064 mod 97-10",
+      "bank": "Bank code",
+      "branch": "Branch code",
+      "account": "Account number",
+      "positions": "positions {from} to {to}",
+      "example": "Official example",
+      "sepa": "SEPA area",
+      "sepaYes": "member · {schemes}",
+      "sepaNo": "outside the SEPA area",
+      "vop": "Verification of Payee",
+      "vopYes": "mandatory for the country's providers",
+      "vopNo": "no duty to date",
+      "register": "Bank-code register",
+      "registerNone": "no published register: structure and check digits only",
+      "registerComposite": "IBANforge composite map, assembled from BIC directories (not a national register)"
+    },
+    "checksTitle": "What the API checks on a {country} IBAN",
+    "checks": {
+      "structure": "The length, the charset of every field and the mod-97 check digits.",
+      "bankNational": "The bank code against {register}, refreshed monthly: institution, matching BIC, status.",
+      "bankComposite": "The bank code against our composite map assembled from BIC directories: a BIC and a bank name when they are listed, without the weight of a national register.",
+      "bankNone": "No bank-code register is published for this country: beyond the structure, the API cannot say whether the bank code exists.",
+      "sepa": "The country's SEPA reachability and the open schemes ({schemes}).",
+      "sepaOut": "The country is outside SEPA: a SEPA transfer will not reach this account.",
+      "vop": "The Verification of Payee duty that does, or does not, bind the country's providers."
+    },
+    "indexTable": {
+      "code": "Code",
+      "country": "Country",
+      "length": "Length",
+      "sepa": "SEPA",
+      "vop": "VoP",
+      "register": "Register",
+      "yes": "yes",
+      "no": "no",
+      "national": "national",
+      "composite": "composite",
+      "none": "none"
+    },
+    "cta": {
+      "tool": "Test a {country} IBAN for free",
+      "docs": "The POST /v1/iban/validate route",
+      "registerIndex": "The country's bank codes, one per page",
+      "index": "All countries"
+    },
+    "sourceNote": "Source: ISO 13616 registry for the length, layout and example; API answer captured on {date}."
   }
 }

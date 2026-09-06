@@ -2099,5 +2099,77 @@
       "indexTitle": "Codes banque belges (liste BNB)",
       "indexIntro": "Chaque identifiant bancaire attribué dans la liste de la Banque nationale de Belgique, une page par établissement, avec le BIC qui lui est associé et la réponse exacte de l'API IBANforge. Le registre ne publie que des noms : aucune adresse n'apparaît ici que le registre n'ait publiée."
     }
+  },
+  "countries": {
+    "eyebrow": "IBAN par pays",
+    "metaTitle": "IBAN {country} : format, longueur et exemple",
+    "metaDescription": "L'IBAN {country} compte {length} caractères. Découpage champ par champ, exemple officiel {example}, zone SEPA, vérification du bénéficiaire, registre des codes banque et la réponse exacte de l'API IBANforge.",
+    "title": "IBAN {country}",
+    "subtitle": "{length} caractères : le code pays, deux chiffres de contrôle, puis le BBAN découpé comme ci-dessous.",
+    "indexTitle": "Le format IBAN de chaque pays",
+    "indexIntro": "Les {count} pays du registre ISO 13616, avec la longueur de l'IBAN, l'appartenance SEPA, l'obligation de vérification du bénéficiaire et le registre contre lequel l'API IBANforge vérifie le code banque. Chaque pays a sa page : découpage, exemple officiel et réponse exacte de l'API.",
+    "anatomyTitle": "Anatomie de l'exemple officiel",
+    "anatomyNote": "L'exemple vient du registre ISO 13616 ; il n'appartient à personne. Les positions comptent depuis le premier caractère de l'IBAN.",
+    "legend": {
+      "country": "Code pays",
+      "check": "Clé de contrôle",
+      "bank_code": "Code banque",
+      "branch_code": "Code agence",
+      "account_number": "Numéro de compte",
+      "other": "Contrôle national ou autre"
+    },
+    "specLegend": "Notation SWIFT : n = chiffres, a = lettres majuscules, c = caractères alphanumériques ; le point d'exclamation impose la longueur exacte.",
+    "facts": {
+      "title": "Les faits sur l'IBAN {country}",
+      "code": "Code ISO",
+      "length": "Longueur",
+      "lengthValue": "{length} caractères",
+      "check": "Clé de contrôle",
+      "checkValue": "positions 3 à 4, ISO 7064 mod 97-10",
+      "bank": "Code banque",
+      "branch": "Code agence",
+      "account": "Numéro de compte",
+      "positions": "positions {from} à {to}",
+      "example": "Exemple officiel",
+      "sepa": "Zone SEPA",
+      "sepaYes": "membre · {schemes}",
+      "sepaNo": "hors zone SEPA",
+      "vop": "Vérification du bénéficiaire",
+      "vopYes": "obligatoire pour les prestataires du pays",
+      "vopNo": "pas d'obligation à ce jour",
+      "register": "Registre des codes banque",
+      "registerNone": "aucun registre publié : structure et clé de contrôle seulement",
+      "registerComposite": "carte composite IBANforge, assemblée depuis les annuaires BIC (pas un registre national)"
+    },
+    "checksTitle": "Ce que l'API vérifie sur un IBAN {country}",
+    "checks": {
+      "structure": "La longueur, le jeu de caractères de chaque champ et la clé de contrôle mod 97.",
+      "bankNational": "Le code banque contre {register}, rafraîchi chaque mois : établissement, BIC apparié, statut.",
+      "bankComposite": "Le code banque contre notre carte composite assemblée depuis les annuaires BIC : un BIC et un nom de banque quand ils y figurent, sans la valeur d'un registre national.",
+      "bankNone": "Aucun registre de codes banque n'est publié pour ce pays : au-delà de la structure, l'API ne peut pas dire si le code banque existe.",
+      "sepa": "La joignabilité SEPA du pays et les schémas ouverts ({schemes}).",
+      "sepaOut": "Le pays est hors SEPA : un virement SEPA n'atteindra pas ce compte.",
+      "vop": "Le devoir de vérification du bénéficiaire qui pèse, ou non, sur les prestataires du pays."
+    },
+    "indexTable": {
+      "code": "Code",
+      "country": "Pays",
+      "length": "Longueur",
+      "sepa": "SEPA",
+      "vop": "VoP",
+      "register": "Registre",
+      "yes": "oui",
+      "no": "non",
+      "national": "national",
+      "composite": "composite",
+      "none": "aucun"
+    },
+    "cta": {
+      "tool": "Tester un IBAN {country} gratuitement",
+      "docs": "La route POST /v1/iban/validate",
+      "registerIndex": "Les codes banque du pays, un par page",
+      "index": "Tous les pays"
+    },
+    "sourceNote": "Source : registre ISO 13616 pour la longueur, le découpage et l'exemple ; réponse de l'API relevée le {date}."
   }
 }

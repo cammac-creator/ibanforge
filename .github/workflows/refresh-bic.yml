@@ -135,6 +135,9 @@ jobs:
       - name: Export register pages
         run: npm run pages:export
 
+      - name: Export country pages
+        run: npm run pages:export-countries
+
       # The landing page's fallback answer, re-captured on the database this
       # run just refreshed and dated, so the fold never shows a months-old
       # response again (audit 2026-09-05, n° 21).
@@ -145,7 +148,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/bic.sqlite frontend/data/registers 'frontend/app/[locale]/playground/captured-iban.json'
+          git add data/bic.sqlite frontend/data/registers frontend/data/countries.json 'frontend/app/[locale]/playground/captured-iban.json'
           if git diff --staged --quiet; then
             echo "No changes to BIC database"
           else

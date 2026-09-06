@@ -1,0 +1,6254 @@
+{
+ "generated_at": "2026-09-06",
+ "source": "ISO 13616 registry (lengths, layouts, examples) + the IBANforge validate route",
+ "count": 89,
+ "countries": {
+  "AD": {
+   "code": "AD",
+   "name_en": "Andorra",
+   "length": 24,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 8,
+     "spec": "4!n"
+    },
+    {
+     "name": "branch_code",
+     "from": 9,
+     "to": 12,
+     "spec": "4!n"
+    },
+    {
+     "name": "account_number",
+     "from": 13,
+     "to": 24,
+     "spec": "12!c"
+    }
+   ],
+   "example": "AD1200012030200359100100",
+   "sepa": {
+    "member": true,
+    "schemes": [
+     "SCT",
+     "SDD",
+     "SCT_INST"
+    ],
+    "vop_required": false
+   },
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "AD",
+     "name": "Andorra"
+    },
+    "bic": {
+     "code": "BACAADAD",
+     "bank_name": "ANDORRA BANC AGRÍCOL REIG, SA",
+     "city": "LES ESCALDES",
+     "source": "IBANforge curated bank-code map",
+     "as_of": "2026-09",
+     "basis": "curated_map",
+     "authoritative": false,
+     "lei": "549300UHUTTOEC14D714"
+    },
+    "bank_code_check": {
+     "value": "0001",
+     "status": "verified",
+     "match": "register",
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": true,
+     "schemes": [
+      "SCT",
+      "SDD",
+      "SCT_INST"
+     ],
+     "vop_required": false,
+     "vop_participant": false,
+     "basis": "epc_register"
+    },
+    "issuer": {
+     "type": "bank",
+     "name": "ANDORRA BANC AGRÍCOL REIG, SA",
+     "classification": "default"
+    },
+    "risk_indicators": {
+     "country_risk": "standard",
+     "sepa_reachable": true,
+     "vop_coverage": false,
+     "test_bic": false
+    }
+   }
+  },
+  "AE": {
+   "code": "AE",
+   "name_en": "United Arab Emirates",
+   "length": 23,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 7,
+     "spec": "3!n"
+    },
+    {
+     "name": "account_number",
+     "from": 8,
+     "to": 23,
+     "spec": "16!n"
+    }
+   ],
+   "example": "AE070331234567890123456",
+   "sepa": {
+    "member": false,
+    "schemes": [],
+    "vop_required": false
+   },
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "AE",
+     "name": "United Arab Emirates"
+    },
+    "bic": {
+     "code": "BOMLAEAD",
+     "bank_name": "MASHREQBANK PSC",
+     "city": "DUBAI",
+     "source": "IBANforge curated bank-code map",
+     "as_of": "2026-09",
+     "basis": "curated_map",
+     "authoritative": false,
+     "lei": "5493000SA3K24EQKA103"
+    },
+    "bank_code_check": {
+     "value": "033",
+     "status": "verified",
+     "match": "register",
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": false,
+     "schemes": [],
+     "vop_required": false,
+     "vop_participant": false,
+     "basis": "country_default"
+    },
+    "issuer": {
+     "type": "bank",
+     "name": "MASHREQBANK PSC",
+     "classification": "default"
+    },
+    "risk_indicators": {
+     "country_risk": "standard",
+     "sepa_reachable": false,
+     "vop_coverage": false,
+     "test_bic": false
+    }
+   }
+  },
+  "AL": {
+   "code": "AL",
+   "name_en": "Albania",
+   "length": 28,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 12,
+     "spec": "8!n"
+    },
+    {
+     "name": "account_number",
+     "from": 13,
+     "to": 28,
+     "spec": "16!c"
+    }
+   ],
+   "example": "AL47212110090000000235698741",
+   "sepa": {
+    "member": true,
+    "schemes": [
+     "SCT",
+     "SDD",
+     "SCT_INST"
+    ],
+    "vop_required": false
+   },
+   "register": null,
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "AL",
+     "name": "Albania"
+    },
+    "bic": null,
+    "bank_code_check": {
+     "value": "21211009",
+     "status": "not_in_register",
+     "reason": "absent_from_reference_data",
+     "match": null,
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": true,
+     "schemes": [
+      "SCT",
+      "SDD",
+      "SCT_INST"
+     ],
+     "vop_required": false,
+     "vop_participant": null,
+     "basis": "country_default"
+    },
+    "issuer": null,
+    "risk_indicators": {
+     "country_risk": "elevated",
+     "sepa_reachable": true,
+     "vop_coverage": false,
+     "test_bic": false
+    }
+   }
+  },
+  "AT": {
+   "code": "AT",
+   "name_en": "Austria",
+   "length": 20,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 9,
+     "spec": "5!n"
+    },
+    {
+     "name": "account_number",
+     "from": 10,
+     "to": 20,
+     "spec": "11!n"
+    }
+   ],
+   "example": "AT611904300234573201",
+   "sepa": {
+    "member": true,
+    "schemes": [
+     "SCT",
+     "SDD",
+     "SCT_INST"
+    ],
+    "vop_required": true
+   },
+   "register": null,
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "AT",
+     "name": "Austria"
+    },
+    "bic": null,
+    "bank_code_check": {
+     "value": "19043",
+     "status": "not_in_register",
+     "reason": "not_allocated",
+     "match": null,
+     "register": "Oesterreichische Nationalbank SEPA-Zahlungsverkehrs-Verzeichnis",
+     "authoritative": true,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": true,
+     "schemes": [
+      "SCT",
+      "SDD",
+      "SCT_INST"
+     ],
+     "vop_required": true,
+     "vop_participant": null,
+     "basis": "country_default"
+    },
+    "issuer": null,
+    "risk_indicators": {
+     "country_risk": "standard",
+     "sepa_reachable": true,
+     "vop_coverage": true,
+     "test_bic": false
+    }
+   }
+  },
+  "AZ": {
+   "code": "AZ",
+   "name_en": "Azerbaijan",
+   "length": 28,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 8,
+     "spec": "4!a"
+    },
+    {
+     "name": "account_number",
+     "from": 9,
+     "to": 28,
+     "spec": "20!c"
+    }
+   ],
+   "example": "AZ21NABZ00000000137010001944",
+   "sepa": {
+    "member": false,
+    "schemes": [],
+    "vop_required": false
+   },
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "AZ",
+     "name": "Azerbaijan"
+    },
+    "bic": {
+     "code": "NABZAZ2X",
+     "bank_name": "THE CENTRAL BANK OF THE REPUBLIC OF AZERBAIJAN",
+     "city": "BAKU",
+     "source": "IBANforge curated bank-code map",
+     "as_of": "2026-09",
+     "basis": "curated_map",
+     "authoritative": false,
+     "lei": "549300P74FF45UQVU281"
+    },
+    "bank_code_check": {
+     "value": "NABZ",
+     "status": "verified",
+     "match": "register",
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": false,
+     "schemes": [],
+     "vop_required": false,
+     "vop_participant": false,
+     "basis": "country_default"
+    },
+    "issuer": {
+     "type": "bank",
+     "name": "THE CENTRAL BANK OF THE REPUBLIC OF AZERBAIJAN",
+     "classification": "default"
+    },
+    "risk_indicators": {
+     "country_risk": "standard",
+     "sepa_reachable": false,
+     "vop_coverage": false,
+     "test_bic": false
+    }
+   }
+  },
+  "BA": {
+   "code": "BA",
+   "name_en": "Bosnia and Herzegovina",
+   "length": 20,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 7,
+     "spec": "3!n"
+    },
+    {
+     "name": "branch_code",
+     "from": 8,
+     "to": 10,
+     "spec": "3!n"
+    },
+    {
+     "name": "account_number",
+     "from": 11,
+     "to": 18,
+     "spec": "8!n"
+    }
+   ],
+   "example": "BA391290079401028494",
+   "sepa": {
+    "member": false,
+    "schemes": [],
+    "vop_required": false
+   },
+   "register": null,
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "BA",
+     "name": "Bosnia and Herzegovina"
+    },
+    "bic": null,
+    "bank_code_check": {
+     "value": "129",
+     "status": "not_in_register",
+     "reason": "absent_from_reference_data",
+     "match": null,
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": false,
+     "schemes": [],
+     "vop_required": false,
+     "vop_participant": null,
+     "basis": "country_default"
+    },
+    "issuer": null,
+    "risk_indicators": {
+     "country_risk": "elevated",
+     "sepa_reachable": false,
+     "vop_coverage": false,
+     "test_bic": false
+    }
+   }
+  },
+  "BE": {
+   "code": "BE",
+   "name_en": "Belgium",
+   "length": 16,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 7,
+     "spec": "3!n"
+    },
+    {
+     "name": "account_number",
+     "from": 8,
+     "to": 14,
+     "spec": "7!n"
+    }
+   ],
+   "example": "BE68539007547034",
+   "sepa": {
+    "member": true,
+    "schemes": [
+     "SCT",
+     "SDD",
+     "SCT_INST"
+    ],
+    "vop_required": true
+   },
+   "register": null,
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "BE",
+     "name": "Belgium"
+    },
+    "bic": null,
+    "bank_code_check": {
+     "value": "539",
+     "status": "not_in_register",
+     "reason": "not_allocated",
+     "match": null,
+     "register": "Banque nationale de Belgique, bank identification codes (Protocol Secretariat)",
+     "authoritative": true,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": true,
+     "schemes": [
+      "SCT",
+      "SDD",
+      "SCT_INST"
+     ],
+     "vop_required": true,
+     "vop_participant": null,
+     "basis": "country_default"
+    },
+    "issuer": null,
+    "risk_indicators": {
+     "country_risk": "standard",
+     "sepa_reachable": true,
+     "vop_coverage": true,
+     "test_bic": false
+    }
+   }
+  },
+  "BG": {
+   "code": "BG",
+   "name_en": "Bulgaria",
+   "length": 22,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 8,
+     "spec": "4!a"
+    },
+    {
+     "name": "branch_code",
+     "from": 9,
+     "to": 12,
+     "spec": "4!n"
+    },
+    {
+     "name": "account_number",
+     "from": 13,
+     "to": 22,
+     "spec": "2!n8!c"
+    }
+   ],
+   "example": "BG80BNBG96611020345678",
+   "sepa": {
+    "member": true,
+    "schemes": [
+     "SCT",
+     "SDD",
+     "SCT_INST"
+    ],
+    "vop_required": true
+   },
+   "register": "Bulgarian National Bank, BAE register (bank code, IBAN positions 5-8; branch digits are not separately verified)",
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "BG",
+     "name": "Bulgaria"
+    },
+    "bic": {
+     "code": "BNBGBGSF",
+     "bank_name": "Българска народна банка",
+     "city": "Sofia",
+     "source": "Bulgarian National Bank, BAE register",
+     "as_of": "2026-02",
+     "basis": "national_register",
+     "authoritative": true,
+     "lei": "5299001WEKCK7E65TI48"
+    },
+    "bank_code_check": {
+     "value": "BNBG",
+     "status": "verified",
+     "match": "register",
+     "register": "Bulgarian National Bank, BAE register (bank code, IBAN positions 5-8; branch digits are not separately verified)",
+     "authoritative": true,
+     "institution": {
+      "name": "Българска народна банка",
+      "street": null,
+      "post_code": null,
+      "town": null,
+      "country": "BG"
+     },
+     "as_of": "2026-02"
+    },
+    "sepa": {
+     "member": true,
+     "schemes": [
+      "SCT"
+     ],
+     "vop_required": true,
+     "vop_participant": false,
+     "basis": "epc_register"
+    },
+    "issuer": {
+     "type": "bank",
+     "name": "Българска народна банка",
+     "classification": "default"
+    },
+    "risk_indicators": {
+     "country_risk": "standard",
+     "sepa_reachable": true,
+     "vop_coverage": true,
+     "test_bic": false
+    }
+   }
+  },
+  "BH": {
+   "code": "BH",
+   "name_en": "Bahrain",
+   "length": 22,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 8,
+     "spec": "4!a"
+    },
+    {
+     "name": "account_number",
+     "from": 9,
+     "to": 22,
+     "spec": "14!c"
+    }
+   ],
+   "example": "BH67BMAG00001299123456",
+   "sepa": {
+    "member": false,
+    "schemes": [],
+    "vop_required": false
+   },
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "BH",
+     "name": "Bahrain"
+    },
+    "bic": {
+     "code": "BMAGBHBM",
+     "bank_name": "CENTRAL BANK OF BAHRAIN",
+     "city": "MANÂMA",
+     "source": "IBANforge curated bank-code map",
+     "as_of": "2026-09",
+     "basis": "curated_map",
+     "authoritative": false,
+     "lei": "54930065PJIB53WWMP12"
+    },
+    "bank_code_check": {
+     "value": "BMAG",
+     "status": "verified",
+     "match": "register",
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": false,
+     "schemes": [],
+     "vop_required": false,
+     "vop_participant": false,
+     "basis": "country_default"
+    },
+    "issuer": {
+     "type": "bank",
+     "name": "CENTRAL BANK OF BAHRAIN",
+     "classification": "default"
+    },
+    "risk_indicators": {
+     "country_risk": "standard",
+     "sepa_reachable": false,
+     "vop_coverage": false,
+     "test_bic": false
+    }
+   }
+  },
+  "BI": {
+   "code": "BI",
+   "name_en": "Burundi",
+   "length": 27,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 9,
+     "spec": "5!n"
+    },
+    {
+     "name": "branch_code",
+     "from": 10,
+     "to": 14,
+     "spec": "5!n"
+    },
+    {
+     "name": "account_number",
+     "from": 15,
+     "to": 27,
+     "spec": "13!n"
+    }
+   ],
+   "example": "BI1320001100010000123456789",
+   "sepa": {
+    "member": false,
+    "schemes": [],
+    "vop_required": false
+   },
+   "register": null,
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "BI",
+     "name": "Burundi"
+    },
+    "bic": null,
+    "bank_code_check": {
+     "value": "20001",
+     "status": "not_in_register",
+     "reason": "absent_from_reference_data",
+     "match": null,
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": false,
+     "schemes": [],
+     "vop_required": false,
+     "vop_participant": null,
+     "basis": "country_default"
+    },
+    "issuer": null,
+    "risk_indicators": {
+     "country_risk": "standard",
+     "sepa_reachable": false,
+     "vop_coverage": false,
+     "test_bic": false
+    }
+   }
+  },
+  "BR": {
+   "code": "BR",
+   "name_en": "Brazil",
+   "length": 29,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 12,
+     "spec": "8!n"
+    },
+    {
+     "name": "branch_code",
+     "from": 13,
+     "to": 17,
+     "spec": "5!n"
+    },
+    {
+     "name": "account_number",
+     "from": 18,
+     "to": 27,
+     "spec": "10!n"
+    }
+   ],
+   "example": "BR9700360305000010009795493P1",
+   "sepa": {
+    "member": false,
+    "schemes": [],
+    "vop_required": false
+   },
+   "register": null,
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "BR",
+     "name": "Brazil"
+    },
+    "bic": null,
+    "bank_code_check": {
+     "value": "00360305",
+     "status": "not_in_register",
+     "reason": "absent_from_reference_data",
+     "match": null,
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": false,
+     "schemes": [],
+     "vop_required": false,
+     "vop_participant": null,
+     "basis": "country_default"
+    },
+    "issuer": null,
+    "risk_indicators": {
+     "country_risk": "standard",
+     "sepa_reachable": false,
+     "vop_coverage": false,
+     "test_bic": false
+    }
+   }
+  },
+  "BY": {
+   "code": "BY",
+   "name_en": "Belarus",
+   "length": 28,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 8,
+     "spec": "4!c"
+    },
+    {
+     "name": "branch_code",
+     "from": 9,
+     "to": 12,
+     "spec": "4!n"
+    },
+    {
+     "name": "account_number",
+     "from": 13,
+     "to": 28,
+     "spec": "16!c"
+    }
+   ],
+   "example": "BY13NBRB3600900000002Z00AB00",
+   "sepa": {
+    "member": false,
+    "schemes": [],
+    "vop_required": false
+   },
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "BY",
+     "name": "Belarus"
+    },
+    "bic": {
+     "code": "NBRBBY2X",
+     "bank_name": "National Bank of the Republic of Belarus",
+     "city": "Минск",
+     "source": "IBANforge curated bank-code map",
+     "as_of": "2026-09",
+     "basis": "curated_map",
+     "authoritative": false,
+     "lei": "253400AAUDQ6NK0HNK41"
+    },
+    "bank_code_check": {
+     "value": "NBRB",
+     "status": "verified",
+     "match": "register",
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": false,
+     "schemes": [],
+     "vop_required": false,
+     "vop_participant": false,
+     "basis": "country_default"
+    },
+    "issuer": {
+     "type": "bank",
+     "name": "National Bank of the Republic of Belarus",
+     "classification": "default"
+    },
+    "risk_indicators": {
+     "country_risk": "high",
+     "sepa_reachable": false,
+     "vop_coverage": false,
+     "test_bic": false
+    }
+   }
+  },
+  "CH": {
+   "code": "CH",
+   "name_en": "Switzerland",
+   "length": 21,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 9,
+     "spec": "5!n"
+    },
+    {
+     "name": "account_number",
+     "from": 10,
+     "to": 21,
+     "spec": "12!c"
+    }
+   ],
+   "example": "CH9300762011623852957",
+   "sepa": {
+    "member": true,
+    "schemes": [
+     "SCT",
+     "SDD"
+    ],
+    "vop_required": false
+   },
+   "register": null,
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "CH",
+     "name": "Switzerland"
+    },
+    "bic": null,
+    "bank_code_check": {
+     "value": "00762",
+     "status": "not_in_register",
+     "reason": "not_allocated",
+     "match": null,
+     "register": "SIX BankMaster (Swiss IID / BC-Nummer register)",
+     "authoritative": true,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": true,
+     "schemes": [
+      "SCT",
+      "SDD"
+     ],
+     "vop_required": false,
+     "vop_participant": null,
+     "basis": "country_default"
+    },
+    "issuer": null,
+    "risk_indicators": {
+     "country_risk": "standard",
+     "sepa_reachable": true,
+     "vop_coverage": false,
+     "test_bic": false
+    }
+   }
+  },
+  "CR": {
+   "code": "CR",
+   "name_en": "Costa Rica",
+   "length": 22,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 8,
+     "spec": "4!n"
+    },
+    {
+     "name": "account_number",
+     "from": 9,
+     "to": 22,
+     "spec": "14!n"
+    }
+   ],
+   "example": "CR05015202001026284066",
+   "sepa": {
+    "member": false,
+    "schemes": [],
+    "vop_required": false
+   },
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "CR",
+     "name": "Costa Rica"
+    },
+    "bic": {
+     "code": "BCRICRSJ",
+     "bank_name": "BANCO DE COSTA RICA",
+     "city": "SAN JOSE",
+     "source": "IBANforge curated bank-code map",
+     "as_of": "2026-09",
+     "basis": "curated_map",
+     "authoritative": false,
+     "lei": "5493007MCBLQ05S44531"
+    },
+    "bank_code_check": {
+     "value": "0152",
+     "status": "verified",
+     "match": "register",
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": false,
+     "schemes": [],
+     "vop_required": false,
+     "vop_participant": false,
+     "basis": "country_default"
+    },
+    "issuer": {
+     "type": "bank",
+     "name": "BANCO DE COSTA RICA",
+     "classification": "default"
+    },
+    "risk_indicators": {
+     "country_risk": "standard",
+     "sepa_reachable": false,
+     "vop_coverage": false,
+     "test_bic": false
+    }
+   }
+  },
+  "CY": {
+   "code": "CY",
+   "name_en": "Cyprus",
+   "length": 28,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 7,
+     "spec": "3!n"
+    },
+    {
+     "name": "branch_code",
+     "from": 8,
+     "to": 12,
+     "spec": "5!n"
+    },
+    {
+     "name": "account_number",
+     "from": 13,
+     "to": 28,
+     "spec": "16!c"
+    }
+   ],
+   "example": "CY17002001280000001200527600",
+   "sepa": {
+    "member": true,
+    "schemes": [
+     "SCT",
+     "SDD",
+     "SCT_INST"
+    ],
+    "vop_required": true
+   },
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "CY",
+     "name": "Cyprus"
+    },
+    "bic": {
+     "code": "BCYPCY2N",
+     "bank_name": "BANK OF CYPRUS PUBLIC COMPANY LIMITED",
+     "city": "NICOSIA",
+     "source": "IBANforge curated bank-code map",
+     "as_of": "2026-09",
+     "basis": "curated_map",
+     "authoritative": false,
+     "lei": "PQ0RAP85KK9Z75ONZW93"
+    },
+    "bank_code_check": {
+     "value": "002",
+     "status": "verified",
+     "match": "register",
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": true,
+     "schemes": [
+      "SCT",
+      "SDD",
+      "SCT_INST"
+     ],
+     "vop_required": true,
+     "vop_participant": true,
+     "basis": "epc_register"
+    },
+    "issuer": {
+     "type": "bank",
+     "name": "BANK OF CYPRUS PUBLIC COMPANY LIMITED",
+     "classification": "default"
+    },
+    "risk_indicators": {
+     "country_risk": "standard",
+     "sepa_reachable": true,
+     "vop_coverage": true,
+     "test_bic": false
+    }
+   }
+  },
+  "CZ": {
+   "code": "CZ",
+   "name_en": "Czech Republic",
+   "length": 24,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 8,
+     "spec": "4!n"
+    },
+    {
+     "name": "account_number",
+     "from": 9,
+     "to": 24,
+     "spec": "16!n"
+    }
+   ],
+   "example": "CZ6508000000192000145399",
+   "sepa": {
+    "member": true,
+    "schemes": [
+     "SCT",
+     "SDD"
+    ],
+    "vop_required": false
+   },
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "CZ",
+     "name": "Czech Republic"
+    },
+    "bic": {
+     "code": "GIBACZPX",
+     "bank_name": "Česká spořitelna, a.s.",
+     "city": "Praha 4",
+     "source": "IBANforge curated bank-code map",
+     "as_of": "2026-09",
+     "basis": "curated_map",
+     "authoritative": false,
+     "lei": "9KOGW2C2FCIOJQ7FF485"
+    },
+    "bank_code_check": {
+     "value": "0800",
+     "status": "verified",
+     "match": "register",
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": true,
+     "schemes": [
+      "SCT"
+     ],
+     "vop_required": false,
+     "vop_participant": false,
+     "basis": "epc_register"
+    },
+    "issuer": {
+     "type": "bank",
+     "name": "Česká spořitelna, a.s.",
+     "classification": "default"
+    },
+    "risk_indicators": {
+     "country_risk": "standard",
+     "sepa_reachable": true,
+     "vop_coverage": false,
+     "test_bic": false
+    }
+   }
+  },
+  "DE": {
+   "code": "DE",
+   "name_en": "Germany",
+   "length": 22,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 12,
+     "spec": "8!n"
+    },
+    {
+     "name": "account_number",
+     "from": 13,
+     "to": 22,
+     "spec": "10!n"
+    }
+   ],
+   "example": "DE89370400440532013000",
+   "sepa": {
+    "member": true,
+    "schemes": [
+     "SCT",
+     "SDD",
+     "SCT_INST"
+    ],
+    "vop_required": true
+   },
+   "register": "Deutsche Bundesbank Bankleitzahlendatei",
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "DE",
+     "name": "Germany"
+    },
+    "bic": {
+     "code": "COBADEFFXXX",
+     "bank_name": "Commerzbank",
+     "city": "Köln",
+     "source": "Deutsche Bundesbank Bankleitzahlendatei",
+     "as_of": "2026-09",
+     "basis": "national_register",
+     "authoritative": true,
+     "lei": "851WYGNLUQLFZBSYGB56"
+    },
+    "bank_code_check": {
+     "value": "37040044",
+     "status": "verified",
+     "match": "register",
+     "register": "Deutsche Bundesbank Bankleitzahlendatei",
+     "authoritative": true,
+     "institution": {
+      "name": "Commerzbank",
+      "street": null,
+      "post_code": "50447",
+      "town": "Köln",
+      "country": "DE"
+     },
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": true,
+     "schemes": [
+      "SCT",
+      "SDD",
+      "SCT_INST"
+     ],
+     "vop_required": true,
+     "vop_participant": true,
+     "basis": "epc_register"
+    },
+    "issuer": {
+     "type": "bank",
+     "name": "Commerzbank",
+     "classification": "default"
+    },
+    "risk_indicators": {
+     "country_risk": "standard",
+     "sepa_reachable": true,
+     "vop_coverage": true,
+     "test_bic": false
+    }
+   }
+  },
+  "DJ": {
+   "code": "DJ",
+   "name_en": "Djibouti",
+   "length": 27,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 9,
+     "spec": "5!n"
+    },
+    {
+     "name": "branch_code",
+     "from": 10,
+     "to": 14,
+     "spec": "5!n"
+    },
+    {
+     "name": "account_number",
+     "from": 15,
+     "to": 25,
+     "spec": "11!n"
+    }
+   ],
+   "example": "DJ2110002010010409943020008",
+   "sepa": {
+    "member": false,
+    "schemes": [],
+    "vop_required": false
+   },
+   "register": null,
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "DJ",
+     "name": "Djibouti"
+    },
+    "bic": null,
+    "bank_code_check": {
+     "value": "10002",
+     "status": "not_in_register",
+     "reason": "absent_from_reference_data",
+     "match": null,
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": false,
+     "schemes": [],
+     "vop_required": false,
+     "vop_participant": null,
+     "basis": "country_default"
+    },
+    "issuer": null,
+    "risk_indicators": {
+     "country_risk": "standard",
+     "sepa_reachable": false,
+     "vop_coverage": false,
+     "test_bic": false
+    }
+   }
+  },
+  "DK": {
+   "code": "DK",
+   "name_en": "Denmark",
+   "length": 18,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 8,
+     "spec": "4!n"
+    },
+    {
+     "name": "account_number",
+     "from": 9,
+     "to": 18,
+     "spec": "10!n"
+    }
+   ],
+   "example": "DK5000400440116243",
+   "sepa": {
+    "member": true,
+    "schemes": [
+     "SCT",
+     "SDD"
+    ],
+    "vop_required": false
+   },
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "DK",
+     "name": "Denmark"
+    },
+    "bic": {
+     "code": "NDEADKKK",
+     "bank_name": "Nordea Bank Abp",
+     "city": "COPENHAGEN",
+     "source": "IBANforge curated bank-code map",
+     "as_of": "2026-09",
+     "basis": "curated_map",
+     "authoritative": false,
+     "lei": "529900ODI3047E2LIV03"
+    },
+    "bank_code_check": {
+     "value": "0040",
+     "status": "verified",
+     "match": "register",
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": true,
+     "schemes": [
+      "SCT",
+      "SDD"
+     ],
+     "vop_required": false,
+     "vop_participant": false,
+     "basis": "country_default"
+    },
+    "issuer": {
+     "type": "bank",
+     "name": "Nordea Bank Abp",
+     "classification": "default"
+    },
+    "risk_indicators": {
+     "country_risk": "standard",
+     "sepa_reachable": true,
+     "vop_coverage": false,
+     "test_bic": false
+    }
+   }
+  },
+  "DO": {
+   "code": "DO",
+   "name_en": "Dominican Republic",
+   "length": 28,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 8,
+     "spec": "4!c"
+    },
+    {
+     "name": "account_number",
+     "from": 9,
+     "to": 28,
+     "spec": "20!n"
+    }
+   ],
+   "example": "DO28BAGR00000001212453611324",
+   "sepa": {
+    "member": false,
+    "schemes": [],
+    "vop_required": false
+   },
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "DO",
+     "name": "Dominican Republic"
+    },
+    "bic": {
+     "code": "BAGRDOS1",
+     "bank_name": "BANCO AGRICOLA DE LA REPUBLICA DOMINICANA",
+     "city": "SANTO DOMINGO",
+     "source": "IBANforge curated bank-code map",
+     "as_of": "2026-09",
+     "basis": "curated_map",
+     "authoritative": false,
+     "lei": null
+    },
+    "bank_code_check": {
+     "value": "BAGR",
+     "status": "verified",
+     "match": "register",
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": false,
+     "schemes": [],
+     "vop_required": false,
+     "vop_participant": false,
+     "basis": "country_default"
+    },
+    "issuer": {
+     "type": "bank",
+     "name": "BANCO AGRICOLA DE LA REPUBLICA DOMINICANA",
+     "classification": "default"
+    },
+    "risk_indicators": {
+     "country_risk": "standard",
+     "sepa_reachable": false,
+     "vop_coverage": false,
+     "test_bic": false
+    }
+   }
+  },
+  "EE": {
+   "code": "EE",
+   "name_en": "Estonia",
+   "length": 20,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 6,
+     "spec": "2!n"
+    },
+    {
+     "name": "account_number",
+     "from": 7,
+     "to": 20,
+     "spec": "14!n"
+    }
+   ],
+   "example": "EE382200221020145685",
+   "sepa": {
+    "member": true,
+    "schemes": [
+     "SCT",
+     "SDD",
+     "SCT_INST"
+    ],
+    "vop_required": true
+   },
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "EE",
+     "name": "Estonia"
+    },
+    "bic": {
+     "code": "HABAEE2X",
+     "bank_name": "SWEDBANK AS",
+     "city": "TALLINN",
+     "source": "IBANforge curated bank-code map",
+     "as_of": "2026-09",
+     "basis": "curated_map",
+     "authoritative": false,
+     "lei": "549300PHQZ4HL15HH975"
+    },
+    "bank_code_check": {
+     "value": "22",
+     "status": "verified",
+     "match": "register",
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": true,
+     "schemes": [
+      "SCT",
+      "SCT_INST"
+     ],
+     "vop_required": true,
+     "vop_participant": true,
+     "basis": "epc_register"
+    },
+    "issuer": {
+     "type": "bank",
+     "name": "SWEDBANK AS",
+     "classification": "default"
+    },
+    "risk_indicators": {
+     "country_risk": "standard",
+     "sepa_reachable": true,
+     "vop_coverage": true,
+     "test_bic": false
+    }
+   }
+  },
+  "EG": {
+   "code": "EG",
+   "name_en": "Egypt",
+   "length": 29,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 8,
+     "spec": "4!n"
+    },
+    {
+     "name": "branch_code",
+     "from": 9,
+     "to": 12,
+     "spec": "4!n"
+    },
+    {
+     "name": "account_number",
+     "from": 13,
+     "to": 29,
+     "spec": "17!n"
+    }
+   ],
+   "example": "EG380019000500000000263180002",
+   "sepa": {
+    "member": false,
+    "schemes": [],
+    "vop_required": false
+   },
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "EG",
+     "name": "Egypt"
+    },
+    "bic": {
+     "code": "NBEGEGCX",
+     "bank_name": "NATIONAL BANK OF EGYPT",
+     "city": "CAIRO",
+     "source": "IBANforge curated bank-code map",
+     "as_of": "2026-09",
+     "basis": "curated_map",
+     "authoritative": false,
+     "lei": "2138001QZGOK42KGQM03"
+    },
+    "bank_code_check": {
+     "value": "0019",
+     "status": "verified",
+     "match": "register",
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": false,
+     "schemes": [],
+     "vop_required": false,
+     "vop_participant": false,
+     "basis": "country_default"
+    },
+    "issuer": {
+     "type": "bank",
+     "name": "NATIONAL BANK OF EGYPT",
+     "classification": "default"
+    },
+    "risk_indicators": {
+     "country_risk": "elevated",
+     "sepa_reachable": false,
+     "vop_coverage": false,
+     "test_bic": false
+    }
+   }
+  },
+  "ES": {
+   "code": "ES",
+   "name_en": "Spain",
+   "length": 24,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 8,
+     "spec": "4!n"
+    },
+    {
+     "name": "branch_code",
+     "from": 9,
+     "to": 12,
+     "spec": "4!n"
+    },
+    {
+     "name": "account_number",
+     "from": 13,
+     "to": 24,
+     "spec": "12!n"
+    }
+   ],
+   "example": "ES9121000418450200051332",
+   "sepa": {
+    "member": true,
+    "schemes": [
+     "SCT",
+     "SDD",
+     "SCT_INST"
+    ],
+    "vop_required": true
+   },
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "ES",
+     "name": "Spain"
+    },
+    "bic": {
+     "code": "CAIXESBB",
+     "bank_name": "CAIXABANK SA",
+     "city": "Valencia",
+     "source": "IBANforge curated bank-code map",
+     "as_of": "2026-09",
+     "basis": "curated_map",
+     "authoritative": false,
+     "lei": "7CUNS533WID6K7DGFI87"
+    },
+    "bank_code_check": {
+     "value": "2100",
+     "status": "verified",
+     "match": "register",
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": true,
+     "schemes": [
+      "SCT",
+      "SDD",
+      "SCT_INST"
+     ],
+     "vop_required": true,
+     "vop_participant": true,
+     "basis": "epc_register"
+    },
+    "issuer": {
+     "type": "bank",
+     "name": "CAIXABANK SA",
+     "classification": "default"
+    },
+    "risk_indicators": {
+     "country_risk": "standard",
+     "sepa_reachable": true,
+     "vop_coverage": true,
+     "test_bic": false
+    }
+   }
+  },
+  "FI": {
+   "code": "FI",
+   "name_en": "Finland",
+   "length": 18,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 7,
+     "spec": "3!n"
+    },
+    {
+     "name": "account_number",
+     "from": 8,
+     "to": 18,
+     "spec": "11!n"
+    }
+   ],
+   "example": "FI2112345600000785",
+   "sepa": {
+    "member": true,
+    "schemes": [
+     "SCT",
+     "SDD",
+     "SCT_INST"
+    ],
+    "vop_required": true
+   },
+   "register": "Finance Finland monetary institution codes (allocated to banking groups, not individual institutions)",
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "FI",
+     "name": "Finland"
+    },
+    "bic": {
+     "code": "NDEAFIHH",
+     "bank_name": "Nordea Bank Abp",
+     "city": "Helsinki",
+     "source": "IBANforge curated bank-code map",
+     "as_of": "2026-09",
+     "basis": "curated_map",
+     "authoritative": false,
+     "lei": "529900ODI3047E2LIV03"
+    },
+    "bank_code_check": {
+     "value": "1",
+     "status": "verified",
+     "match": "register",
+     "register": "Finance Finland monetary institution codes (allocated to banking groups, not individual institutions)",
+     "authoritative": true,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": true,
+     "schemes": [
+      "SCT",
+      "SDD",
+      "SCT_INST"
+     ],
+     "vop_required": true,
+     "vop_participant": true,
+     "basis": "epc_register"
+    },
+    "issuer": {
+     "type": "bank",
+     "name": "Nordea Bank Abp",
+     "classification": "default"
+    },
+    "risk_indicators": {
+     "country_risk": "standard",
+     "sepa_reachable": true,
+     "vop_coverage": true,
+     "test_bic": false
+    }
+   }
+  },
+  "FK": {
+   "code": "FK",
+   "name_en": "Falkland Islands",
+   "length": 18,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 6,
+     "spec": "2!a"
+    },
+    {
+     "name": "account_number",
+     "from": 7,
+     "to": 18,
+     "spec": "12!n"
+    }
+   ],
+   "example": "FK12SC987654321098",
+   "sepa": {
+    "member": false,
+    "schemes": [],
+    "vop_required": false
+   },
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "FK",
+     "name": "Falkland Islands"
+    },
+    "bic": {
+     "code": "SCBLFKFK",
+     "bank_name": "STANDARD CHARTERED BANK",
+     "city": "STANLEY",
+     "source": "GLEIF LEI-to-BIC mapping",
+     "as_of": "2026-09",
+     "basis": "directory_prefix",
+     "authoritative": false,
+     "lei": "RILFO74KP1CM8P6PCT96"
+    },
+    "bank_code_check": {
+     "value": "SC",
+     "status": "verified",
+     "match": "prefix",
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "candidates": 1,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": false,
+     "schemes": [],
+     "vop_required": false,
+     "vop_participant": false,
+     "basis": "country_default"
+    },
+    "issuer": {
+     "type": "bank",
+     "name": "STANDARD CHARTERED BANK",
+     "classification": "default"
+    },
+    "risk_indicators": {
+     "country_risk": "standard",
+     "sepa_reachable": false,
+     "vop_coverage": false,
+     "test_bic": false
+    }
+   }
+  },
+  "FO": {
+   "code": "FO",
+   "name_en": "Faroe Islands",
+   "length": 18,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 8,
+     "spec": "4!n"
+    },
+    {
+     "name": "account_number",
+     "from": 9,
+     "to": 18,
+     "spec": "10!n"
+    }
+   ],
+   "example": "FO2000400440116243",
+   "sepa": {
+    "member": false,
+    "schemes": [],
+    "vop_required": false
+   },
+   "register": null,
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "FO",
+     "name": "Faroe Islands"
+    },
+    "bic": null,
+    "bank_code_check": {
+     "value": "0040",
+     "status": "not_in_register",
+     "reason": "absent_from_reference_data",
+     "match": null,
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": false,
+     "schemes": [],
+     "vop_required": false,
+     "vop_participant": null,
+     "basis": "country_default"
+    },
+    "issuer": null,
+    "risk_indicators": {
+     "country_risk": "standard",
+     "sepa_reachable": false,
+     "vop_coverage": false,
+     "test_bic": false
+    }
+   }
+  },
+  "FR": {
+   "code": "FR",
+   "name_en": "France",
+   "length": 27,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 9,
+     "spec": "5!n"
+    },
+    {
+     "name": "branch_code",
+     "from": 10,
+     "to": 14,
+     "spec": "5!n"
+    },
+    {
+     "name": "account_number",
+     "from": 15,
+     "to": 27,
+     "spec": "11!c2!n"
+    }
+   ],
+   "example": "FR1420041010050500013M02606",
+   "sepa": {
+    "member": true,
+    "schemes": [
+     "SCT",
+     "SDD",
+     "SCT_INST"
+    ],
+    "vop_required": true
+   },
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "FR",
+     "name": "France"
+    },
+    "bic": {
+     "code": "PSSTFRPP",
+     "bank_name": "LA BANQUE POSTALE",
+     "city": "PARIS",
+     "source": "IBANforge curated bank-code map",
+     "as_of": "2026-09",
+     "basis": "curated_map",
+     "authoritative": false,
+     "lei": "96950066U5XAAIRCPA78"
+    },
+    "bank_code_check": {
+     "value": "20041",
+     "status": "verified",
+     "match": "register",
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": true,
+     "schemes": [
+      "SCT",
+      "SDD",
+      "SCT_INST"
+     ],
+     "vop_required": true,
+     "vop_participant": true,
+     "basis": "epc_register"
+    },
+    "issuer": {
+     "type": "bank",
+     "name": "LA BANQUE POSTALE",
+     "classification": "default"
+    },
+    "risk_indicators": {
+     "country_risk": "standard",
+     "sepa_reachable": true,
+     "vop_coverage": true,
+     "test_bic": false
+    }
+   }
+  },
+  "GB": {
+   "code": "GB",
+   "name_en": "United Kingdom",
+   "length": 22,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 8,
+     "spec": "4!a"
+    },
+    {
+     "name": "branch_code",
+     "from": 9,
+     "to": 14,
+     "spec": "6!n"
+    },
+    {
+     "name": "account_number",
+     "from": 15,
+     "to": 22,
+     "spec": "8!n"
+    }
+   ],
+   "example": "GB29NWBK60161331926819",
+   "sepa": {
+    "member": true,
+    "schemes": [
+     "SCT",
+     "SDD"
+    ],
+    "vop_required": false
+   },
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "GB",
+     "name": "United Kingdom"
+    },
+    "bic": {
+     "code": "NWBKGB2L",
+     "bank_name": "NatWest",
+     "city": "London",
+     "source": "IBANforge curated bank-code map",
+     "as_of": "2026-09",
+     "basis": "curated_map",
+     "authoritative": false,
+     "lei": "213800IBT39XQ9C4CP71"
+    },
+    "bank_code_check": {
+     "value": "NWBK",
+     "status": "verified",
+     "match": "register",
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": true,
+     "schemes": [
+      "SCT",
+      "SDD"
+     ],
+     "vop_required": false,
+     "vop_participant": false,
+     "basis": "epc_register"
+    },
+    "issuer": {
+     "type": "bank",
+     "name": "NatWest",
+     "classification": "default"
+    },
+    "risk_indicators": {
+     "country_risk": "standard",
+     "sepa_reachable": true,
+     "vop_coverage": false,
+     "test_bic": false
+    }
+   }
+  },
+  "GE": {
+   "code": "GE",
+   "name_en": "Georgia",
+   "length": 22,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 6,
+     "spec": "2!a"
+    },
+    {
+     "name": "account_number",
+     "from": 7,
+     "to": 22,
+     "spec": "16!n"
+    }
+   ],
+   "example": "GE29NB0000000101904917",
+   "sepa": {
+    "member": false,
+    "schemes": [],
+    "vop_required": false
+   },
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "GE",
+     "name": "Georgia"
+    },
+    "bic": {
+     "code": "BNLNGE22",
+     "bank_name": "საქართველოს ეროვნული ბანკი",
+     "city": "თბილისი",
+     "source": "IBANforge curated bank-code map",
+     "as_of": "2026-09",
+     "basis": "curated_map",
+     "authoritative": false,
+     "lei": "254900MHQHBC58M2GR84"
+    },
+    "bank_code_check": {
+     "value": "NB",
+     "status": "verified",
+     "match": "register",
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": false,
+     "schemes": [],
+     "vop_required": false,
+     "vop_participant": false,
+     "basis": "country_default"
+    },
+    "issuer": {
+     "type": "bank",
+     "name": "საქართველოს ეროვნული ბანკი",
+     "classification": "default"
+    },
+    "risk_indicators": {
+     "country_risk": "standard",
+     "sepa_reachable": false,
+     "vop_coverage": false,
+     "test_bic": false
+    }
+   }
+  },
+  "GI": {
+   "code": "GI",
+   "name_en": "Gibraltar",
+   "length": 23,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 8,
+     "spec": "4!a"
+    },
+    {
+     "name": "account_number",
+     "from": 9,
+     "to": 23,
+     "spec": "15!c"
+    }
+   ],
+   "example": "GI75NWBK000000007099453",
+   "sepa": {
+    "member": true,
+    "schemes": [
+     "SCT",
+     "SDD"
+    ],
+    "vop_required": false
+   },
+   "register": null,
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "GI",
+     "name": "Gibraltar"
+    },
+    "bic": null,
+    "bank_code_check": {
+     "value": "NWBK",
+     "status": "not_in_register",
+     "reason": "absent_from_reference_data",
+     "match": null,
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": true,
+     "schemes": [
+      "SCT",
+      "SDD"
+     ],
+     "vop_required": false,
+     "vop_participant": null,
+     "basis": "country_default"
+    },
+    "issuer": null,
+    "risk_indicators": {
+     "country_risk": "standard",
+     "sepa_reachable": true,
+     "vop_coverage": false,
+     "test_bic": false
+    }
+   }
+  },
+  "GL": {
+   "code": "GL",
+   "name_en": "Greenland",
+   "length": 18,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 8,
+     "spec": "4!n"
+    },
+    {
+     "name": "account_number",
+     "from": 9,
+     "to": 18,
+     "spec": "10!n"
+    }
+   ],
+   "example": "GL2000400440116243",
+   "sepa": {
+    "member": false,
+    "schemes": [],
+    "vop_required": false
+   },
+   "register": null,
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "GL",
+     "name": "Greenland"
+    },
+    "bic": null,
+    "bank_code_check": {
+     "value": "0040",
+     "status": "not_in_register",
+     "reason": "absent_from_reference_data",
+     "match": null,
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": false,
+     "schemes": [],
+     "vop_required": false,
+     "vop_participant": null,
+     "basis": "country_default"
+    },
+    "issuer": null,
+    "risk_indicators": {
+     "country_risk": "standard",
+     "sepa_reachable": false,
+     "vop_coverage": false,
+     "test_bic": false
+    }
+   }
+  },
+  "GR": {
+   "code": "GR",
+   "name_en": "Greece",
+   "length": 27,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 7,
+     "spec": "3!n"
+    },
+    {
+     "name": "branch_code",
+     "from": 8,
+     "to": 11,
+     "spec": "4!n"
+    },
+    {
+     "name": "account_number",
+     "from": 12,
+     "to": 27,
+     "spec": "16!c"
+    }
+   ],
+   "example": "GR1601101250000000012300695",
+   "sepa": {
+    "member": true,
+    "schemes": [
+     "SCT",
+     "SDD",
+     "SCT_INST"
+    ],
+    "vop_required": true
+   },
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "GR",
+     "name": "Greece"
+    },
+    "bic": {
+     "code": "ETHNGRAA",
+     "bank_name": "ΕΘΝΙΚΗ ΤΡΑΠΕΖΑ ΤΗΣ ΕΛΛΑΔΟΣ Α.Ε.",
+     "city": "ATHENS",
+     "source": "IBANforge curated bank-code map",
+     "as_of": "2026-09",
+     "basis": "curated_map",
+     "authoritative": false,
+     "lei": "5UMCZOEYKCVFAW8ZLO05"
+    },
+    "bank_code_check": {
+     "value": "011",
+     "status": "verified",
+     "match": "register",
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": true,
+     "schemes": [
+      "SCT",
+      "SDD",
+      "SCT_INST"
+     ],
+     "vop_required": true,
+     "vop_participant": true,
+     "basis": "epc_register"
+    },
+    "issuer": {
+     "type": "bank",
+     "name": "ΕΘΝΙΚΗ ΤΡΑΠΕΖΑ ΤΗΣ ΕΛΛΑΔΟΣ Α.Ε.",
+     "classification": "default"
+    },
+    "risk_indicators": {
+     "country_risk": "standard",
+     "sepa_reachable": true,
+     "vop_coverage": true,
+     "test_bic": false
+    }
+   }
+  },
+  "GT": {
+   "code": "GT",
+   "name_en": "Guatemala",
+   "length": 28,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 8,
+     "spec": "4!c"
+    },
+    {
+     "name": "account_number",
+     "from": 9,
+     "to": 28,
+     "spec": "20!c"
+    }
+   ],
+   "example": "GT82TRAJ01020000001210029690",
+   "sepa": {
+    "member": false,
+    "schemes": [],
+    "vop_required": false
+   },
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "GT",
+     "name": "Guatemala"
+    },
+    "bic": {
+     "code": "TRAJGTGC",
+     "bank_name": "BANCO DE LOS TRABAJADORES",
+     "city": "GUATEMALA",
+     "source": "IBANforge curated bank-code map",
+     "as_of": "2026-09",
+     "basis": "curated_map",
+     "authoritative": false,
+     "lei": null
+    },
+    "bank_code_check": {
+     "value": "TRAJ",
+     "status": "verified",
+     "match": "register",
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": false,
+     "schemes": [],
+     "vop_required": false,
+     "vop_participant": false,
+     "basis": "country_default"
+    },
+    "issuer": {
+     "type": "bank",
+     "name": "BANCO DE LOS TRABAJADORES",
+     "classification": "default"
+    },
+    "risk_indicators": {
+     "country_risk": "standard",
+     "sepa_reachable": false,
+     "vop_coverage": false,
+     "test_bic": false
+    }
+   }
+  },
+  "HN": {
+   "code": "HN",
+   "name_en": "Honduras",
+   "length": 28,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 8,
+     "spec": "4!a"
+    },
+    {
+     "name": "account_number",
+     "from": 9,
+     "to": 28,
+     "spec": "20!n"
+    }
+   ],
+   "example": "HN54PISA00000000000000123124",
+   "sepa": {
+    "member": false,
+    "schemes": [],
+    "vop_required": false
+   },
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "HN",
+     "name": "Honduras"
+    },
+    "bic": {
+     "code": "PISAHNTE",
+     "bank_name": "BANCO DEL PAIS, SOCIEDAD ANONIMA",
+     "city": "San Pedro Sula",
+     "source": "GLEIF LEI-to-BIC mapping",
+     "as_of": "2026-09",
+     "basis": "directory_prefix",
+     "authoritative": false,
+     "lei": "98450077F43687DF1G79"
+    },
+    "bank_code_check": {
+     "value": "PISA",
+     "status": "verified",
+     "match": "prefix",
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "candidates": 1,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": false,
+     "schemes": [],
+     "vop_required": false,
+     "vop_participant": false,
+     "basis": "country_default"
+    },
+    "issuer": {
+     "type": "bank",
+     "name": "BANCO DEL PAIS, SOCIEDAD ANONIMA",
+     "classification": "default"
+    },
+    "risk_indicators": {
+     "country_risk": "standard",
+     "sepa_reachable": false,
+     "vop_coverage": false,
+     "test_bic": false
+    }
+   }
+  },
+  "HR": {
+   "code": "HR",
+   "name_en": "Croatia",
+   "length": 21,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 11,
+     "spec": "7!n"
+    },
+    {
+     "name": "account_number",
+     "from": 12,
+     "to": 21,
+     "spec": "10!n"
+    }
+   ],
+   "example": "HR1210010051863000160",
+   "sepa": {
+    "member": true,
+    "schemes": [
+     "SCT",
+     "SDD",
+     "SCT_INST"
+    ],
+    "vop_required": true
+   },
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "HR",
+     "name": "Croatia"
+    },
+    "bic": {
+     "code": "NBHRHR2X",
+     "bank_name": "Hrvatska narodna banka",
+     "city": "Zagreb",
+     "source": "IBANforge curated bank-code map",
+     "as_of": "2026-09",
+     "basis": "curated_map",
+     "authoritative": false,
+     "lei": "74780000X0J87XKFIL77"
+    },
+    "bank_code_check": {
+     "value": "1001005",
+     "status": "verified",
+     "match": "register",
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": true,
+     "schemes": [
+      "SCT",
+      "SDD",
+      "SCT_INST"
+     ],
+     "vop_required": true,
+     "vop_participant": true,
+     "basis": "epc_register"
+    },
+    "issuer": {
+     "type": "bank",
+     "name": "Hrvatska narodna banka",
+     "classification": "default"
+    },
+    "risk_indicators": {
+     "country_risk": "standard",
+     "sepa_reachable": true,
+     "vop_coverage": true,
+     "test_bic": false
+    }
+   }
+  },
+  "HU": {
+   "code": "HU",
+   "name_en": "Hungary",
+   "length": 28,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 7,
+     "spec": "3!n"
+    },
+    {
+     "name": "branch_code",
+     "from": 8,
+     "to": 11,
+     "spec": "4!n"
+    },
+    {
+     "name": "account_number",
+     "from": 12,
+     "to": 28,
+     "spec": "17!n"
+    }
+   ],
+   "example": "HU42117730161111101800000000",
+   "sepa": {
+    "member": true,
+    "schemes": [
+     "SCT",
+     "SDD"
+    ],
+    "vop_required": false
+   },
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "HU",
+     "name": "Hungary"
+    },
+    "bic": {
+     "code": "OTPVHUHB",
+     "bank_name": "OTP Bank Nyrt.",
+     "city": "Budapest",
+     "source": "IBANforge curated bank-code map",
+     "as_of": "2026-09",
+     "basis": "curated_map",
+     "authoritative": false,
+     "lei": "529900W3MOO00A18X956"
+    },
+    "bank_code_check": {
+     "value": "117",
+     "status": "verified",
+     "match": "register",
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": true,
+     "schemes": [
+      "SCT"
+     ],
+     "vop_required": false,
+     "vop_participant": false,
+     "basis": "epc_register"
+    },
+    "issuer": {
+     "type": "bank",
+     "name": "OTP Bank Nyrt.",
+     "classification": "default"
+    },
+    "risk_indicators": {
+     "country_risk": "standard",
+     "sepa_reachable": true,
+     "vop_coverage": false,
+     "test_bic": false
+    }
+   }
+  },
+  "IE": {
+   "code": "IE",
+   "name_en": "Ireland",
+   "length": 22,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 8,
+     "spec": "4!a"
+    },
+    {
+     "name": "branch_code",
+     "from": 9,
+     "to": 14,
+     "spec": "6!n"
+    },
+    {
+     "name": "account_number",
+     "from": 15,
+     "to": 22,
+     "spec": "8!n"
+    }
+   ],
+   "example": "IE29AIBK93115212345678",
+   "sepa": {
+    "member": true,
+    "schemes": [
+     "SCT",
+     "SDD",
+     "SCT_INST"
+    ],
+    "vop_required": true
+   },
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "IE",
+     "name": "Ireland"
+    },
+    "bic": {
+     "code": "AIBKIE2D",
+     "bank_name": "ALLIED IRISH BANKS PUBLIC LIMITED COMPANY",
+     "city": "Dublin",
+     "source": "IBANforge curated bank-code map",
+     "as_of": "2026-09",
+     "basis": "curated_map",
+     "authoritative": false,
+     "lei": "3U8WV1YX2VMUHH7Z1Q21"
+    },
+    "bank_code_check": {
+     "value": "AIBK",
+     "status": "verified",
+     "match": "register",
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": true,
+     "schemes": [
+      "SCT",
+      "SDD",
+      "SCT_INST"
+     ],
+     "vop_required": true,
+     "vop_participant": true,
+     "basis": "epc_register"
+    },
+    "issuer": {
+     "type": "bank",
+     "name": "ALLIED IRISH BANKS PUBLIC LIMITED COMPANY",
+     "classification": "default"
+    },
+    "risk_indicators": {
+     "country_risk": "standard",
+     "sepa_reachable": true,
+     "vop_coverage": true,
+     "test_bic": false
+    }
+   }
+  },
+  "IL": {
+   "code": "IL",
+   "name_en": "Israel",
+   "length": 23,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 7,
+     "spec": "3!n"
+    },
+    {
+     "name": "branch_code",
+     "from": 8,
+     "to": 10,
+     "spec": "3!n"
+    },
+    {
+     "name": "account_number",
+     "from": 11,
+     "to": 23,
+     "spec": "13!n"
+    }
+   ],
+   "example": "IL620108000000099999999",
+   "sepa": {
+    "member": false,
+    "schemes": [],
+    "vop_required": false
+   },
+   "register": null,
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "IL",
+     "name": "Israel"
+    },
+    "bic": null,
+    "bank_code_check": {
+     "value": "010",
+     "status": "not_in_register",
+     "reason": "absent_from_reference_data",
+     "match": null,
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": false,
+     "schemes": [],
+     "vop_required": false,
+     "vop_participant": null,
+     "basis": "country_default"
+    },
+    "issuer": null,
+    "risk_indicators": {
+     "country_risk": "standard",
+     "sepa_reachable": false,
+     "vop_coverage": false,
+     "test_bic": false
+    }
+   }
+  },
+  "IQ": {
+   "code": "IQ",
+   "name_en": "Iraq",
+   "length": 23,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 8,
+     "spec": "4!a"
+    },
+    {
+     "name": "branch_code",
+     "from": 9,
+     "to": 11,
+     "spec": "3!n"
+    },
+    {
+     "name": "account_number",
+     "from": 12,
+     "to": 23,
+     "spec": "12!n"
+    }
+   ],
+   "example": "IQ98NBIQ850123456789012",
+   "sepa": {
+    "member": false,
+    "schemes": [],
+    "vop_required": false
+   },
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "IQ",
+     "name": "Iraq"
+    },
+    "bic": {
+     "code": "NBIQIQBA",
+     "bank_name": "National Bank of Iraq",
+     "city": "Baghdad",
+     "source": "IBANforge curated bank-code map",
+     "as_of": "2026-09",
+     "basis": "curated_map",
+     "authoritative": false,
+     "lei": "254900FJSRWZPDBJGT87"
+    },
+    "bank_code_check": {
+     "value": "NBIQ",
+     "status": "verified",
+     "match": "register",
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": false,
+     "schemes": [],
+     "vop_required": false,
+     "vop_participant": false,
+     "basis": "country_default"
+    },
+    "issuer": {
+     "type": "bank",
+     "name": "National Bank of Iraq",
+     "classification": "default"
+    },
+    "risk_indicators": {
+     "country_risk": "elevated",
+     "sepa_reachable": false,
+     "vop_coverage": false,
+     "test_bic": false
+    }
+   }
+  },
+  "IS": {
+   "code": "IS",
+   "name_en": "Iceland",
+   "length": 26,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 8,
+     "spec": "4!n"
+    },
+    {
+     "name": "branch_code",
+     "from": 9,
+     "to": 10,
+     "spec": "2!n"
+    },
+    {
+     "name": "account_number",
+     "from": 11,
+     "to": 26,
+     "spec": "16!n"
+    }
+   ],
+   "example": "IS140159260076545510730339",
+   "sepa": {
+    "member": true,
+    "schemes": [
+     "SCT",
+     "SDD"
+    ],
+    "vop_required": false
+   },
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "IS",
+     "name": "Iceland"
+    },
+    "bic": {
+     "code": "NBIIISRE",
+     "bank_name": "Landsbankinn hf.",
+     "city": "Reykjavík",
+     "source": "IBANforge curated bank-code map",
+     "as_of": "2026-09",
+     "basis": "curated_map",
+     "authoritative": false,
+     "lei": "549300TLZPT6JELDWM92"
+    },
+    "bank_code_check": {
+     "value": "01",
+     "status": "verified",
+     "match": "register",
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": true,
+     "schemes": [
+      "SCT"
+     ],
+     "vop_required": false,
+     "vop_participant": false,
+     "basis": "epc_register"
+    },
+    "issuer": {
+     "type": "bank",
+     "name": "Landsbankinn hf.",
+     "classification": "default"
+    },
+    "risk_indicators": {
+     "country_risk": "standard",
+     "sepa_reachable": true,
+     "vop_coverage": false,
+     "test_bic": false
+    }
+   }
+  },
+  "IT": {
+   "code": "IT",
+   "name_en": "Italy",
+   "length": 27,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 6,
+     "to": 10,
+     "spec": "5!n"
+    },
+    {
+     "name": "branch_code",
+     "from": 11,
+     "to": 15,
+     "spec": "5!n"
+    },
+    {
+     "name": "account_number",
+     "from": 16,
+     "to": 27,
+     "spec": "12!c"
+    }
+   ],
+   "example": "IT60X0542811101000000123456",
+   "sepa": {
+    "member": true,
+    "schemes": [
+     "SCT",
+     "SDD",
+     "SCT_INST"
+    ],
+    "vop_required": true
+   },
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "IT",
+     "name": "Italy"
+    },
+    "bic": {
+     "code": "BLOPIT22",
+     "bank_name": "UBI BANCA SCPA",
+     "city": "",
+     "source": "IBANforge curated bank-code map",
+     "as_of": "2026-09",
+     "basis": "curated_map",
+     "authoritative": false,
+     "lei": null
+    },
+    "bank_code_check": {
+     "value": "05428",
+     "status": "verified",
+     "match": "register",
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": true,
+     "schemes": [
+      "SCT",
+      "SDD",
+      "SCT_INST"
+     ],
+     "vop_required": true,
+     "vop_participant": false,
+     "basis": "country_default"
+    },
+    "issuer": {
+     "type": "bank",
+     "name": "UBI BANCA SCPA",
+     "classification": "default"
+    },
+    "risk_indicators": {
+     "country_risk": "standard",
+     "sepa_reachable": true,
+     "vop_coverage": true,
+     "test_bic": false
+    }
+   }
+  },
+  "JO": {
+   "code": "JO",
+   "name_en": "Jordan",
+   "length": 30,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 8,
+     "spec": "4!a"
+    },
+    {
+     "name": "branch_code",
+     "from": 9,
+     "to": 12,
+     "spec": "4!n"
+    },
+    {
+     "name": "account_number",
+     "from": 13,
+     "to": 30,
+     "spec": "18!c"
+    }
+   ],
+   "example": "JO94CBJO0010000000000131000302",
+   "sepa": {
+    "member": false,
+    "schemes": [],
+    "vop_required": false
+   },
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "JO",
+     "name": "Jordan"
+    },
+    "bic": {
+     "code": "CBJOJOAX",
+     "bank_name": "CENTRAL BANK OF JORDAN",
+     "city": "AMMAN",
+     "source": "IBANforge curated bank-code map",
+     "as_of": "2026-09",
+     "basis": "curated_map",
+     "authoritative": false,
+     "lei": "54930066F5LI0K6UNX85"
+    },
+    "bank_code_check": {
+     "value": "CBJO",
+     "status": "verified",
+     "match": "register",
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": false,
+     "schemes": [],
+     "vop_required": false,
+     "vop_participant": false,
+     "basis": "country_default"
+    },
+    "issuer": {
+     "type": "bank",
+     "name": "CENTRAL BANK OF JORDAN",
+     "classification": "default"
+    },
+    "risk_indicators": {
+     "country_risk": "elevated",
+     "sepa_reachable": false,
+     "vop_coverage": false,
+     "test_bic": false
+    }
+   }
+  },
+  "KW": {
+   "code": "KW",
+   "name_en": "Kuwait",
+   "length": 30,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 8,
+     "spec": "4!a"
+    },
+    {
+     "name": "account_number",
+     "from": 9,
+     "to": 30,
+     "spec": "22!c"
+    }
+   ],
+   "example": "KW81CBKU0000000000001234560101",
+   "sepa": {
+    "member": false,
+    "schemes": [],
+    "vop_required": false
+   },
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "KW",
+     "name": "Kuwait"
+    },
+    "bic": {
+     "code": "CBKUKWKW",
+     "bank_name": "Central Bank of Kuwait",
+     "city": "Safat",
+     "source": "IBANforge curated bank-code map",
+     "as_of": "2026-09",
+     "basis": "curated_map",
+     "authoritative": false,
+     "lei": "2549005G75NMAK8TM233"
+    },
+    "bank_code_check": {
+     "value": "CBKU",
+     "status": "verified",
+     "match": "register",
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": false,
+     "schemes": [],
+     "vop_required": false,
+     "vop_participant": false,
+     "basis": "country_default"
+    },
+    "issuer": {
+     "type": "bank",
+     "name": "Central Bank of Kuwait",
+     "classification": "default"
+    },
+    "risk_indicators": {
+     "country_risk": "standard",
+     "sepa_reachable": false,
+     "vop_coverage": false,
+     "test_bic": false
+    }
+   }
+  },
+  "KZ": {
+   "code": "KZ",
+   "name_en": "Kazakhstan",
+   "length": 20,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 7,
+     "spec": "3!n"
+    },
+    {
+     "name": "account_number",
+     "from": 8,
+     "to": 20,
+     "spec": "13!c"
+    }
+   ],
+   "example": "KZ86125KZT5004100100",
+   "sepa": {
+    "member": false,
+    "schemes": [],
+    "vop_required": false
+   },
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "KZ",
+     "name": "Kazakhstan"
+    },
+    "bic": {
+     "code": "NBRKKZKX",
+     "bank_name": "Республиканское государственное учреждение \"Национальный Банк Республики Казахстан\"",
+     "city": "город Нур-Султан",
+     "source": "IBANforge curated bank-code map",
+     "as_of": "2026-09",
+     "basis": "curated_map",
+     "authoritative": false,
+     "lei": "5493001XNTPYS3WWQO58"
+    },
+    "bank_code_check": {
+     "value": "125",
+     "status": "verified",
+     "match": "register",
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": false,
+     "schemes": [],
+     "vop_required": false,
+     "vop_participant": false,
+     "basis": "country_default"
+    },
+    "issuer": {
+     "type": "bank",
+     "name": "Республиканское государственное учреждение \"Национальный Банк Республики Казахстан\"",
+     "classification": "default"
+    },
+    "risk_indicators": {
+     "country_risk": "elevated",
+     "sepa_reachable": false,
+     "vop_coverage": false,
+     "test_bic": false
+    }
+   }
+  },
+  "LB": {
+   "code": "LB",
+   "name_en": "Lebanon",
+   "length": 28,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 8,
+     "spec": "4!n"
+    },
+    {
+     "name": "account_number",
+     "from": 9,
+     "to": 28,
+     "spec": "20!c"
+    }
+   ],
+   "example": "LB62099900000001001901229114",
+   "sepa": {
+    "member": false,
+    "schemes": [],
+    "vop_required": false
+   },
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "LB",
+     "name": "Lebanon"
+    },
+    "bic": {
+     "code": "BDLCLBBX",
+     "bank_name": "BANQUE DU LIBAN",
+     "city": "BEIRUT",
+     "source": "IBANforge curated bank-code map",
+     "as_of": "2026-09",
+     "basis": "curated_map",
+     "authoritative": false,
+     "lei": "549300CRG6KNLZMYZH16"
+    },
+    "bank_code_check": {
+     "value": "0999",
+     "status": "verified",
+     "match": "register",
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": false,
+     "schemes": [],
+     "vop_required": false,
+     "vop_participant": false,
+     "basis": "country_default"
+    },
+    "issuer": {
+     "type": "bank",
+     "name": "BANQUE DU LIBAN",
+     "classification": "default"
+    },
+    "risk_indicators": {
+     "country_risk": "elevated",
+     "sepa_reachable": false,
+     "vop_coverage": false,
+     "test_bic": false
+    }
+   }
+  },
+  "LC": {
+   "code": "LC",
+   "name_en": "Saint Lucia",
+   "length": 32,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 8,
+     "spec": "4!a"
+    },
+    {
+     "name": "account_number",
+     "from": 9,
+     "to": 32,
+     "spec": "24!c"
+    }
+   ],
+   "example": "LC55HEMM000100010012001200023015",
+   "sepa": {
+    "member": false,
+    "schemes": [],
+    "vop_required": false
+   },
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "LC",
+     "name": "Saint Lucia"
+    },
+    "bic": {
+     "code": "HEMMLCL2",
+     "bank_name": "HERMES BANK LIMITED",
+     "city": "GROS-ISLET",
+     "source": "IBANforge curated bank-code map",
+     "as_of": "2026-09",
+     "basis": "curated_map",
+     "authoritative": false,
+     "lei": null
+    },
+    "bank_code_check": {
+     "value": "HEMM",
+     "status": "verified",
+     "match": "register",
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": false,
+     "schemes": [],
+     "vop_required": false,
+     "vop_participant": false,
+     "basis": "country_default"
+    },
+    "issuer": {
+     "type": "bank",
+     "name": "HERMES BANK LIMITED",
+     "classification": "default"
+    },
+    "risk_indicators": {
+     "country_risk": "standard",
+     "sepa_reachable": false,
+     "vop_coverage": false,
+     "test_bic": false
+    }
+   }
+  },
+  "LI": {
+   "code": "LI",
+   "name_en": "Liechtenstein",
+   "length": 21,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 9,
+     "spec": "5!n"
+    },
+    {
+     "name": "account_number",
+     "from": 10,
+     "to": 21,
+     "spec": "12!c"
+    }
+   ],
+   "example": "LI21088100002324013AA",
+   "sepa": {
+    "member": true,
+    "schemes": [
+     "SCT",
+     "SDD"
+    ],
+    "vop_required": false
+   },
+   "register": "SIX BankMaster (Swiss IID / BC-Nummer register)",
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "LI",
+     "name": "Liechtenstein"
+    },
+    "bic": {
+     "code": "BLFLLI2X",
+     "bank_name": "LGT Bank AG",
+     "city": "Vaduz",
+     "source": "IBANforge curated bank-code map",
+     "as_of": "2026-09",
+     "basis": "curated_map",
+     "authoritative": false,
+     "lei": "7KDSOB6Z0X4S67TMX170"
+    },
+    "bank_code_check": {
+     "value": "08810",
+     "status": "verified",
+     "match": "register",
+     "register": "SIX BankMaster (Swiss IID / BC-Nummer register)",
+     "authoritative": true,
+     "institution": {
+      "name": "LGT Bank AG",
+      "street": "Postfach 85",
+      "post_code": "9490",
+      "town": "Vaduz",
+      "country": "LI"
+     },
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": true,
+     "schemes": [
+      "SCT",
+      "SDD"
+     ],
+     "vop_required": false,
+     "vop_participant": false,
+     "basis": "epc_register"
+    },
+    "issuer": {
+     "type": "bank",
+     "name": "LGT Bank AG",
+     "classification": "default"
+    },
+    "risk_indicators": {
+     "country_risk": "standard",
+     "sepa_reachable": true,
+     "vop_coverage": false,
+     "test_bic": false
+    }
+   }
+  },
+  "LT": {
+   "code": "LT",
+   "name_en": "Lithuania",
+   "length": 20,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 9,
+     "spec": "5!n"
+    },
+    {
+     "name": "account_number",
+     "from": 10,
+     "to": 20,
+     "spec": "11!n"
+    }
+   ],
+   "example": "LT121000011101001000",
+   "sepa": {
+    "member": true,
+    "schemes": [
+     "SCT",
+     "SDD",
+     "SCT_INST"
+    ],
+    "vop_required": true
+   },
+   "register": null,
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "LT",
+     "name": "Lithuania"
+    },
+    "bic": null,
+    "bank_code_check": {
+     "value": "10000",
+     "status": "not_in_register",
+     "reason": "absent_from_reference_data",
+     "match": null,
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": true,
+     "schemes": [
+      "SCT",
+      "SDD",
+      "SCT_INST"
+     ],
+     "vop_required": true,
+     "vop_participant": null,
+     "basis": "country_default"
+    },
+    "issuer": null,
+    "risk_indicators": {
+     "country_risk": "standard",
+     "sepa_reachable": true,
+     "vop_coverage": true,
+     "test_bic": false
+    }
+   }
+  },
+  "LU": {
+   "code": "LU",
+   "name_en": "Luxembourg",
+   "length": 20,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 7,
+     "spec": "3!n"
+    },
+    {
+     "name": "account_number",
+     "from": 8,
+     "to": 20,
+     "spec": "13!c"
+    }
+   ],
+   "example": "LU280019400644750000",
+   "sepa": {
+    "member": true,
+    "schemes": [
+     "SCT",
+     "SDD",
+     "SCT_INST"
+    ],
+    "vop_required": true
+   },
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "LU",
+     "name": "Luxembourg"
+    },
+    "bic": {
+     "code": "BCEELULL",
+     "bank_name": "Banque et Caisse d'Epargne de l'Etat, Luxembourg",
+     "city": "Luxembourg",
+     "source": "IBANforge curated bank-code map",
+     "as_of": "2026-09",
+     "basis": "curated_map",
+     "authoritative": false,
+     "lei": "R7CQUF1DQM73HUTV1078"
+    },
+    "bank_code_check": {
+     "value": "001",
+     "status": "verified",
+     "match": "register",
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": true,
+     "schemes": [
+      "SCT",
+      "SDD",
+      "SCT_INST"
+     ],
+     "vop_required": true,
+     "vop_participant": true,
+     "basis": "epc_register"
+    },
+    "issuer": {
+     "type": "bank",
+     "name": "Banque et Caisse d'Epargne de l'Etat, Luxembourg",
+     "classification": "default"
+    },
+    "risk_indicators": {
+     "country_risk": "standard",
+     "sepa_reachable": true,
+     "vop_coverage": true,
+     "test_bic": false
+    }
+   }
+  },
+  "LV": {
+   "code": "LV",
+   "name_en": "Latvia",
+   "length": 21,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 8,
+     "spec": "4!a"
+    },
+    {
+     "name": "account_number",
+     "from": 9,
+     "to": 21,
+     "spec": "13!c"
+    }
+   ],
+   "example": "LV80BANK0000435195001",
+   "sepa": {
+    "member": true,
+    "schemes": [
+     "SCT",
+     "SDD",
+     "SCT_INST"
+    ],
+    "vop_required": true
+   },
+   "register": null,
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "LV",
+     "name": "Latvia"
+    },
+    "bic": null,
+    "bank_code_check": {
+     "value": "BANK",
+     "status": "not_in_register",
+     "reason": "absent_from_reference_data",
+     "match": null,
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": true,
+     "schemes": [
+      "SCT",
+      "SDD",
+      "SCT_INST"
+     ],
+     "vop_required": true,
+     "vop_participant": null,
+     "basis": "country_default"
+    },
+    "issuer": null,
+    "risk_indicators": {
+     "country_risk": "standard",
+     "sepa_reachable": true,
+     "vop_coverage": true,
+     "test_bic": false
+    }
+   }
+  },
+  "LY": {
+   "code": "LY",
+   "name_en": "Libya",
+   "length": 25,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 7,
+     "spec": "3!n"
+    },
+    {
+     "name": "branch_code",
+     "from": 8,
+     "to": 10,
+     "spec": "3!n"
+    },
+    {
+     "name": "account_number",
+     "from": 11,
+     "to": 25,
+     "spec": "15!n"
+    }
+   ],
+   "example": "LY38021001000000123456789",
+   "sepa": {
+    "member": false,
+    "schemes": [],
+    "vop_required": false
+   },
+   "register": null,
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "LY",
+     "name": "Libya"
+    },
+    "bic": null,
+    "bank_code_check": {
+     "value": "021",
+     "status": "not_in_register",
+     "reason": "absent_from_reference_data",
+     "match": null,
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": false,
+     "schemes": [],
+     "vop_required": false,
+     "vop_participant": null,
+     "basis": "country_default"
+    },
+    "issuer": null,
+    "risk_indicators": {
+     "country_risk": "high",
+     "sepa_reachable": false,
+     "vop_coverage": false,
+     "test_bic": false
+    }
+   }
+  },
+  "MC": {
+   "code": "MC",
+   "name_en": "Monaco",
+   "length": 27,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 9,
+     "spec": "5!n"
+    },
+    {
+     "name": "branch_code",
+     "from": 10,
+     "to": 14,
+     "spec": "5!n"
+    },
+    {
+     "name": "account_number",
+     "from": 15,
+     "to": 27,
+     "spec": "11!c2!n"
+    }
+   ],
+   "example": "MC5811222000010123456789030",
+   "sepa": {
+    "member": true,
+    "schemes": [
+     "SCT",
+     "SDD",
+     "SCT_INST"
+    ],
+    "vop_required": false
+   },
+   "register": null,
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "MC",
+     "name": "Monaco"
+    },
+    "bic": null,
+    "bank_code_check": {
+     "value": "11222",
+     "status": "not_in_register",
+     "reason": "absent_from_reference_data",
+     "match": null,
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": true,
+     "schemes": [
+      "SCT",
+      "SDD",
+      "SCT_INST"
+     ],
+     "vop_required": false,
+     "vop_participant": null,
+     "basis": "country_default"
+    },
+    "issuer": null,
+    "risk_indicators": {
+     "country_risk": "standard",
+     "sepa_reachable": true,
+     "vop_coverage": false,
+     "test_bic": false
+    }
+   }
+  },
+  "MD": {
+   "code": "MD",
+   "name_en": "Moldova",
+   "length": 24,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 6,
+     "spec": "2!c"
+    },
+    {
+     "name": "account_number",
+     "from": 7,
+     "to": 24,
+     "spec": "18!c"
+    }
+   ],
+   "example": "MD24AG000225100013104168",
+   "sepa": {
+    "member": true,
+    "schemes": [
+     "SCT"
+    ],
+    "vop_required": false
+   },
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "MD",
+     "name": "Moldova"
+    },
+    "bic": {
+     "code": "AGRNMD2X",
+     "bank_name": "Banca Comerciala\"MOLDOVA-AGROINDBANK\"S.A.",
+     "city": "Chisinau",
+     "source": "GLEIF LEI-to-BIC mapping",
+     "as_of": "2026-09",
+     "basis": "directory_prefix",
+     "authoritative": false,
+     "lei": "254900B52ULZDEBJ3043"
+    },
+    "bank_code_check": {
+     "value": "AG",
+     "status": "verified",
+     "match": "prefix",
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "candidates": 2,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": true,
+     "schemes": [
+      "SCT"
+     ],
+     "vop_required": false,
+     "vop_participant": false,
+     "basis": "epc_register"
+    },
+    "issuer": {
+     "type": "bank",
+     "name": "Banca Comerciala\"MOLDOVA-AGROINDBANK\"S.A.",
+     "classification": "default"
+    },
+    "risk_indicators": {
+     "country_risk": "standard",
+     "sepa_reachable": true,
+     "vop_coverage": false,
+     "test_bic": false
+    }
+   }
+  },
+  "ME": {
+   "code": "ME",
+   "name_en": "Montenegro",
+   "length": 22,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 7,
+     "spec": "3!n"
+    },
+    {
+     "name": "account_number",
+     "from": 8,
+     "to": 20,
+     "spec": "13!n"
+    }
+   ],
+   "example": "ME25505000012345678951",
+   "sepa": {
+    "member": true,
+    "schemes": [
+     "SCT"
+    ],
+    "vop_required": false
+   },
+   "register": null,
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "ME",
+     "name": "Montenegro"
+    },
+    "bic": null,
+    "bank_code_check": {
+     "value": "505",
+     "status": "not_in_register",
+     "reason": "absent_from_reference_data",
+     "match": null,
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": true,
+     "schemes": [
+      "SCT"
+     ],
+     "vop_required": false,
+     "vop_participant": null,
+     "basis": "country_default"
+    },
+    "issuer": null,
+    "risk_indicators": {
+     "country_risk": "standard",
+     "sepa_reachable": true,
+     "vop_coverage": false,
+     "test_bic": false
+    }
+   }
+  },
+  "MK": {
+   "code": "MK",
+   "name_en": "North Macedonia",
+   "length": 19,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 7,
+     "spec": "3!n"
+    },
+    {
+     "name": "account_number",
+     "from": 8,
+     "to": 17,
+     "spec": "10!c"
+    }
+   ],
+   "example": "MK07250120000058984",
+   "sepa": {
+    "member": true,
+    "schemes": [
+     "SCT",
+     "SCT_INST"
+    ],
+    "vop_required": false
+   },
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "MK",
+     "name": "North Macedonia"
+    },
+    "bic": {
+     "code": "INSBMK22",
+     "bank_name": "Шпаркасе Банка Македонија АД Скопје",
+     "city": "Skopje",
+     "source": "IBANforge curated bank-code map",
+     "as_of": "2026-09",
+     "basis": "curated_map",
+     "authoritative": false,
+     "lei": "529900XZX5N4NAI6CC60"
+    },
+    "bank_code_check": {
+     "value": "250",
+     "status": "verified",
+     "match": "register",
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": true,
+     "schemes": [
+      "SCT"
+     ],
+     "vop_required": false,
+     "vop_participant": false,
+     "basis": "epc_register"
+    },
+    "issuer": {
+     "type": "bank",
+     "name": "Шпаркасе Банка Македонија АД Скопје",
+     "classification": "default"
+    },
+    "risk_indicators": {
+     "country_risk": "standard",
+     "sepa_reachable": true,
+     "vop_coverage": false,
+     "test_bic": false
+    }
+   }
+  },
+  "MN": {
+   "code": "MN",
+   "name_en": "Mongolia",
+   "length": 20,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 8,
+     "spec": "4!n"
+    },
+    {
+     "name": "account_number",
+     "from": 9,
+     "to": 20,
+     "spec": "12!n"
+    }
+   ],
+   "example": "MN580050099123456789",
+   "sepa": {
+    "member": false,
+    "schemes": [],
+    "vop_required": false
+   },
+   "register": null,
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "MN",
+     "name": "Mongolia"
+    },
+    "bic": null,
+    "bank_code_check": {
+     "value": "0050",
+     "status": "not_in_register",
+     "reason": "absent_from_reference_data",
+     "match": null,
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": false,
+     "schemes": [],
+     "vop_required": false,
+     "vop_participant": null,
+     "basis": "country_default"
+    },
+    "issuer": null,
+    "risk_indicators": {
+     "country_risk": "standard",
+     "sepa_reachable": false,
+     "vop_coverage": false,
+     "test_bic": false
+    }
+   }
+  },
+  "MR": {
+   "code": "MR",
+   "name_en": "Mauritania",
+   "length": 27,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 9,
+     "spec": "5!n"
+    },
+    {
+     "name": "branch_code",
+     "from": 10,
+     "to": 14,
+     "spec": "5!n"
+    },
+    {
+     "name": "account_number",
+     "from": 15,
+     "to": 25,
+     "spec": "11!n"
+    }
+   ],
+   "example": "MR1300020001010000123456753",
+   "sepa": {
+    "member": false,
+    "schemes": [],
+    "vop_required": false
+   },
+   "register": null,
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "MR",
+     "name": "Mauritania"
+    },
+    "bic": null,
+    "bank_code_check": {
+     "value": "00020",
+     "status": "not_in_register",
+     "reason": "absent_from_reference_data",
+     "match": null,
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": false,
+     "schemes": [],
+     "vop_required": false,
+     "vop_participant": null,
+     "basis": "country_default"
+    },
+    "issuer": null,
+    "risk_indicators": {
+     "country_risk": "elevated",
+     "sepa_reachable": false,
+     "vop_coverage": false,
+     "test_bic": false
+    }
+   }
+  },
+  "MT": {
+   "code": "MT",
+   "name_en": "Malta",
+   "length": 31,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 8,
+     "spec": "4!a"
+    },
+    {
+     "name": "branch_code",
+     "from": 9,
+     "to": 13,
+     "spec": "5!n"
+    },
+    {
+     "name": "account_number",
+     "from": 14,
+     "to": 31,
+     "spec": "18!c"
+    }
+   ],
+   "example": "MT84MALT011000012345MTLCAST001S",
+   "sepa": {
+    "member": true,
+    "schemes": [
+     "SCT",
+     "SDD",
+     "SCT_INST"
+    ],
+    "vop_required": true
+   },
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "MT",
+     "name": "Malta"
+    },
+    "bic": {
+     "code": "MALTMTMT",
+     "bank_name": "Central Bank of Malta",
+     "city": "Valletta",
+     "source": "IBANforge curated bank-code map",
+     "as_of": "2026-09",
+     "basis": "curated_map",
+     "authoritative": false,
+     "lei": "5493002F1U5CO1UMKD70"
+    },
+    "bank_code_check": {
+     "value": "MALT",
+     "status": "verified",
+     "match": "register",
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": true,
+     "schemes": [
+      "SCT",
+      "SDD",
+      "SCT_INST"
+     ],
+     "vop_required": true,
+     "vop_participant": true,
+     "basis": "epc_register"
+    },
+    "issuer": {
+     "type": "bank",
+     "name": "Central Bank of Malta",
+     "classification": "default"
+    },
+    "risk_indicators": {
+     "country_risk": "standard",
+     "sepa_reachable": true,
+     "vop_coverage": true,
+     "test_bic": false
+    }
+   }
+  },
+  "MU": {
+   "code": "MU",
+   "name_en": "Mauritius",
+   "length": 30,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 10,
+     "spec": "4!a2!n"
+    },
+    {
+     "name": "branch_code",
+     "from": 11,
+     "to": 12,
+     "spec": "2!n"
+    },
+    {
+     "name": "account_number",
+     "from": 13,
+     "to": 24,
+     "spec": "12!n"
+    }
+   ],
+   "example": "MU17BOMM0101101030300200000MUR",
+   "sepa": {
+    "member": false,
+    "schemes": [],
+    "vop_required": false
+   },
+   "register": null,
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "MU",
+     "name": "Mauritius"
+    },
+    "bic": null,
+    "bank_code_check": {
+     "value": "BOMM01",
+     "status": "not_in_register",
+     "reason": "absent_from_reference_data",
+     "match": null,
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": false,
+     "schemes": [],
+     "vop_required": false,
+     "vop_participant": null,
+     "basis": "country_default"
+    },
+    "issuer": null,
+    "risk_indicators": {
+     "country_risk": "elevated",
+     "sepa_reachable": false,
+     "vop_coverage": false,
+     "test_bic": false
+    }
+   }
+  },
+  "NI": {
+   "code": "NI",
+   "name_en": "Nicaragua",
+   "length": 28,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 8,
+     "spec": "4!a"
+    },
+    {
+     "name": "account_number",
+     "from": 9,
+     "to": 28,
+     "spec": "20!n"
+    }
+   ],
+   "example": "NI79BAMC00000000000003123123",
+   "sepa": {
+    "member": false,
+    "schemes": [],
+    "vop_required": false
+   },
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "NI",
+     "name": "Nicaragua"
+    },
+    "bic": {
+     "code": "BAMCNIMA",
+     "bank_name": "BANCO DE AMERICA CENTRAL",
+     "city": "MANAGUA",
+     "source": "Redistributed SWIFT BIC directory (PeterNotenboom/SwiftCodes, MIT)",
+     "as_of": "2026-09",
+     "basis": "directory_prefix",
+     "authoritative": false,
+     "lei": null
+    },
+    "bank_code_check": {
+     "value": "BAMC",
+     "status": "verified",
+     "match": "prefix",
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "candidates": 1,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": false,
+     "schemes": [],
+     "vop_required": false,
+     "vop_participant": false,
+     "basis": "country_default"
+    },
+    "issuer": {
+     "type": "bank",
+     "name": "BANCO DE AMERICA CENTRAL",
+     "classification": "default"
+    },
+    "risk_indicators": {
+     "country_risk": "standard",
+     "sepa_reachable": false,
+     "vop_coverage": false,
+     "test_bic": false
+    }
+   }
+  },
+  "NL": {
+   "code": "NL",
+   "name_en": "Netherlands",
+   "length": 18,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 8,
+     "spec": "4!a"
+    },
+    {
+     "name": "account_number",
+     "from": 9,
+     "to": 18,
+     "spec": "10!n"
+    }
+   ],
+   "example": "NL91ABNA0417164300",
+   "sepa": {
+    "member": true,
+    "schemes": [
+     "SCT",
+     "SDD",
+     "SCT_INST"
+    ],
+    "vop_required": true
+   },
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "NL",
+     "name": "Netherlands"
+    },
+    "bic": {
+     "code": "ABNANL2A",
+     "bank_name": "ABN AMRO Bank N.V.",
+     "city": "Amsterdam",
+     "source": "IBANforge curated bank-code map",
+     "as_of": "2026-09",
+     "basis": "curated_map",
+     "authoritative": false,
+     "lei": "BFXS5XCH7N0Y05NIXW11"
+    },
+    "bank_code_check": {
+     "value": "ABNA",
+     "status": "verified",
+     "match": "register",
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": true,
+     "schemes": [
+      "SCT",
+      "SDD",
+      "SCT_INST"
+     ],
+     "vop_required": true,
+     "vop_participant": true,
+     "basis": "epc_register"
+    },
+    "issuer": {
+     "type": "bank",
+     "name": "ABN AMRO Bank N.V.",
+     "classification": "default"
+    },
+    "risk_indicators": {
+     "country_risk": "standard",
+     "sepa_reachable": true,
+     "vop_coverage": true,
+     "test_bic": false
+    }
+   }
+  },
+  "NO": {
+   "code": "NO",
+   "name_en": "Norway",
+   "length": 15,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 8,
+     "spec": "4!n"
+    },
+    {
+     "name": "account_number",
+     "from": 9,
+     "to": 15,
+     "spec": "7!n"
+    }
+   ],
+   "example": "NO9386011117947",
+   "sepa": {
+    "member": true,
+    "schemes": [
+     "SCT",
+     "SDD"
+    ],
+    "vop_required": false
+   },
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "NO",
+     "name": "Norway"
+    },
+    "bic": {
+     "code": "DABANO22",
+     "bank_name": "DANSKE BANK A/S",
+     "city": "TRONDHEIM",
+     "source": "IBANforge curated bank-code map",
+     "as_of": "2026-09",
+     "basis": "curated_map",
+     "authoritative": false,
+     "lei": "MAES062Z21O4RZ2U7M96"
+    },
+    "bank_code_check": {
+     "value": "8601",
+     "status": "verified",
+     "match": "register",
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": true,
+     "schemes": [
+      "SCT",
+      "SDD"
+     ],
+     "vop_required": false,
+     "vop_participant": false,
+     "basis": "country_default"
+    },
+    "issuer": {
+     "type": "bank",
+     "name": "DANSKE BANK A/S",
+     "classification": "default"
+    },
+    "risk_indicators": {
+     "country_risk": "standard",
+     "sepa_reachable": true,
+     "vop_coverage": false,
+     "test_bic": false
+    }
+   }
+  },
+  "OM": {
+   "code": "OM",
+   "name_en": "Oman",
+   "length": 23,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 7,
+     "spec": "3!n"
+    },
+    {
+     "name": "account_number",
+     "from": 8,
+     "to": 23,
+     "spec": "16!c"
+    }
+   ],
+   "example": "OM040280000012345678901",
+   "sepa": {
+    "member": false,
+    "schemes": [],
+    "vop_required": false
+   },
+   "register": null,
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "OM",
+     "name": "Oman"
+    },
+    "bic": null,
+    "bank_code_check": {
+     "value": "028",
+     "status": "not_in_register",
+     "reason": "absent_from_reference_data",
+     "match": null,
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": false,
+     "schemes": [],
+     "vop_required": false,
+     "vop_participant": null,
+     "basis": "country_default"
+    },
+    "issuer": null,
+    "risk_indicators": {
+     "country_risk": "standard",
+     "sepa_reachable": false,
+     "vop_coverage": false,
+     "test_bic": false
+    }
+   }
+  },
+  "PK": {
+   "code": "PK",
+   "name_en": "Pakistan",
+   "length": 24,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 8,
+     "spec": "4!a"
+    },
+    {
+     "name": "account_number",
+     "from": 9,
+     "to": 24,
+     "spec": "16!c"
+    }
+   ],
+   "example": "PK36SCBL0000001123456702",
+   "sepa": {
+    "member": false,
+    "schemes": [],
+    "vop_required": false
+   },
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "PK",
+     "name": "Pakistan"
+    },
+    "bic": {
+     "code": "SCBLPKKX",
+     "bank_name": "STANDARD CHARTERED BANK (PAKISTAN) LIMITED",
+     "city": "KARACHI",
+     "source": "IBANforge curated bank-code map",
+     "as_of": "2026-09",
+     "basis": "curated_map",
+     "authoritative": false,
+     "lei": "549300YTOMKUNPUTB551"
+    },
+    "bank_code_check": {
+     "value": "SCBL",
+     "status": "verified",
+     "match": "register",
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": false,
+     "schemes": [],
+     "vop_required": false,
+     "vop_participant": false,
+     "basis": "country_default"
+    },
+    "issuer": {
+     "type": "bank",
+     "name": "STANDARD CHARTERED BANK (PAKISTAN) LIMITED",
+     "classification": "default"
+    },
+    "risk_indicators": {
+     "country_risk": "elevated",
+     "sepa_reachable": false,
+     "vop_coverage": false,
+     "test_bic": false
+    }
+   }
+  },
+  "PL": {
+   "code": "PL",
+   "name_en": "Poland",
+   "length": 28,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 12,
+     "spec": "8!n"
+    },
+    {
+     "name": "account_number",
+     "from": 13,
+     "to": 28,
+     "spec": "16!n"
+    }
+   ],
+   "example": "PL61109010140000071219812874",
+   "sepa": {
+    "member": true,
+    "schemes": [
+     "SCT",
+     "SDD"
+    ],
+    "vop_required": false
+   },
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "PL",
+     "name": "Poland"
+    },
+    "bic": {
+     "code": "WBKPPLPP",
+     "bank_name": "ERSTE BANK POLSKA SPÓŁKA AKCYJNA",
+     "city": "WARSZAWA",
+     "source": "IBANforge curated bank-code map",
+     "as_of": "2026-09",
+     "basis": "curated_map",
+     "authoritative": false,
+     "lei": "259400LGXW3K0GDAG361"
+    },
+    "bank_code_check": {
+     "value": "10901014",
+     "status": "verified",
+     "match": "register",
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": true,
+     "schemes": [
+      "SCT",
+      "SCT_INST"
+     ],
+     "vop_required": false,
+     "vop_participant": false,
+     "basis": "epc_register"
+    },
+    "issuer": {
+     "type": "bank",
+     "name": "ERSTE BANK POLSKA SPÓŁKA AKCYJNA",
+     "classification": "default"
+    },
+    "risk_indicators": {
+     "country_risk": "standard",
+     "sepa_reachable": true,
+     "vop_coverage": false,
+     "test_bic": false
+    }
+   }
+  },
+  "PS": {
+   "code": "PS",
+   "name_en": "Palestine",
+   "length": 29,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 8,
+     "spec": "4!a"
+    },
+    {
+     "name": "account_number",
+     "from": 9,
+     "to": 29,
+     "spec": "21!c"
+    }
+   ],
+   "example": "PS92PALS000000000400123456702",
+   "sepa": {
+    "member": false,
+    "schemes": [],
+    "vop_required": false
+   },
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "PS",
+     "name": "Palestine"
+    },
+    "bic": {
+     "code": "PALSPS22",
+     "bank_name": "Bank of Palestine P.L.C",
+     "city": "Ramallah",
+     "source": "IBANforge curated bank-code map",
+     "as_of": "2026-09",
+     "basis": "curated_map",
+     "authoritative": false,
+     "lei": "254900UPX0J6W0CTQR84"
+    },
+    "bank_code_check": {
+     "value": "PALS",
+     "status": "verified",
+     "match": "register",
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": false,
+     "schemes": [],
+     "vop_required": false,
+     "vop_participant": false,
+     "basis": "country_default"
+    },
+    "issuer": {
+     "type": "bank",
+     "name": "Bank of Palestine P.L.C",
+     "classification": "default"
+    },
+    "risk_indicators": {
+     "country_risk": "elevated",
+     "sepa_reachable": false,
+     "vop_coverage": false,
+     "test_bic": false
+    }
+   }
+  },
+  "PT": {
+   "code": "PT",
+   "name_en": "Portugal",
+   "length": 25,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 8,
+     "spec": "4!n"
+    },
+    {
+     "name": "branch_code",
+     "from": 9,
+     "to": 12,
+     "spec": "4!n"
+    },
+    {
+     "name": "account_number",
+     "from": 13,
+     "to": 25,
+     "spec": "13!n"
+    }
+   ],
+   "example": "PT50000201231234567890154",
+   "sepa": {
+    "member": true,
+    "schemes": [
+     "SCT",
+     "SDD",
+     "SCT_INST"
+    ],
+    "vop_required": true
+   },
+   "register": null,
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "PT",
+     "name": "Portugal"
+    },
+    "bic": null,
+    "bank_code_check": {
+     "value": "0002",
+     "status": "not_in_register",
+     "reason": "absent_from_reference_data",
+     "match": null,
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": true,
+     "schemes": [
+      "SCT",
+      "SDD",
+      "SCT_INST"
+     ],
+     "vop_required": true,
+     "vop_participant": null,
+     "basis": "country_default"
+    },
+    "issuer": null,
+    "risk_indicators": {
+     "country_risk": "standard",
+     "sepa_reachable": true,
+     "vop_coverage": true,
+     "test_bic": false
+    }
+   }
+  },
+  "QA": {
+   "code": "QA",
+   "name_en": "Qatar",
+   "length": 29,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 8,
+     "spec": "4!a"
+    },
+    {
+     "name": "account_number",
+     "from": 9,
+     "to": 29,
+     "spec": "21!c"
+    }
+   ],
+   "example": "QA58DOHB00001234567890ABCDEFG",
+   "sepa": {
+    "member": false,
+    "schemes": [],
+    "vop_required": false
+   },
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "QA",
+     "name": "Qatar"
+    },
+    "bic": {
+     "code": "DOHBQAQA",
+     "bank_name": "DOHA BANK Q.P.S.C",
+     "city": "DOHA",
+     "source": "IBANforge curated bank-code map",
+     "as_of": "2026-09",
+     "basis": "curated_map",
+     "authoritative": false,
+     "lei": "549300O5KAG21BMZ8N83"
+    },
+    "bank_code_check": {
+     "value": "DOHB",
+     "status": "verified",
+     "match": "register",
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": false,
+     "schemes": [],
+     "vop_required": false,
+     "vop_participant": false,
+     "basis": "country_default"
+    },
+    "issuer": {
+     "type": "bank",
+     "name": "DOHA BANK Q.P.S.C",
+     "classification": "default"
+    },
+    "risk_indicators": {
+     "country_risk": "standard",
+     "sepa_reachable": false,
+     "vop_coverage": false,
+     "test_bic": false
+    }
+   }
+  },
+  "RO": {
+   "code": "RO",
+   "name_en": "Romania",
+   "length": 24,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 8,
+     "spec": "4!a"
+    },
+    {
+     "name": "account_number",
+     "from": 9,
+     "to": 24,
+     "spec": "16!c"
+    }
+   ],
+   "example": "RO49AAAA1B31007593840000",
+   "sepa": {
+    "member": true,
+    "schemes": [
+     "SCT",
+     "SDD"
+    ],
+    "vop_required": false
+   },
+   "register": null,
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "RO",
+     "name": "Romania"
+    },
+    "bic": null,
+    "bank_code_check": {
+     "value": "AAAA",
+     "status": "not_in_register",
+     "reason": "absent_from_reference_data",
+     "match": null,
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": true,
+     "schemes": [
+      "SCT",
+      "SDD"
+     ],
+     "vop_required": false,
+     "vop_participant": null,
+     "basis": "country_default"
+    },
+    "issuer": null,
+    "risk_indicators": {
+     "country_risk": "standard",
+     "sepa_reachable": true,
+     "vop_coverage": false,
+     "test_bic": false
+    }
+   }
+  },
+  "RS": {
+   "code": "RS",
+   "name_en": "Serbia",
+   "length": 22,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 7,
+     "spec": "3!n"
+    },
+    {
+     "name": "account_number",
+     "from": 8,
+     "to": 20,
+     "spec": "13!n"
+    }
+   ],
+   "example": "RS35260005601001611379",
+   "sepa": {
+    "member": true,
+    "schemes": [
+     "SCT"
+    ],
+    "vop_required": false
+   },
+   "register": null,
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "RS",
+     "name": "Serbia"
+    },
+    "bic": null,
+    "bank_code_check": {
+     "value": "260",
+     "status": "not_in_register",
+     "reason": "absent_from_reference_data",
+     "match": null,
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": true,
+     "schemes": [
+      "SCT"
+     ],
+     "vop_required": false,
+     "vop_participant": null,
+     "basis": "country_default"
+    },
+    "issuer": null,
+    "risk_indicators": {
+     "country_risk": "standard",
+     "sepa_reachable": true,
+     "vop_coverage": false,
+     "test_bic": false
+    }
+   }
+  },
+  "RU": {
+   "code": "RU",
+   "name_en": "Russia",
+   "length": 33,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 13,
+     "spec": "9!n"
+    },
+    {
+     "name": "branch_code",
+     "from": 14,
+     "to": 18,
+     "spec": "5!n"
+    },
+    {
+     "name": "account_number",
+     "from": 19,
+     "to": 33,
+     "spec": "15!c"
+    }
+   ],
+   "example": "RU0204452560040702810412345678901",
+   "sepa": {
+    "member": false,
+    "schemes": [],
+    "vop_required": false
+   },
+   "register": null,
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "RU",
+     "name": "Russia"
+    },
+    "bic": null,
+    "bank_code_check": {
+     "value": "044525600",
+     "status": "not_in_register",
+     "reason": "absent_from_reference_data",
+     "match": null,
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": false,
+     "schemes": [],
+     "vop_required": false,
+     "vop_participant": null,
+     "basis": "country_default"
+    },
+    "issuer": null,
+    "risk_indicators": {
+     "country_risk": "high",
+     "sepa_reachable": false,
+     "vop_coverage": false,
+     "test_bic": false
+    }
+   }
+  },
+  "SA": {
+   "code": "SA",
+   "name_en": "Saudi Arabia",
+   "length": 24,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 6,
+     "spec": "2!n"
+    },
+    {
+     "name": "account_number",
+     "from": 7,
+     "to": 24,
+     "spec": "18!c"
+    }
+   ],
+   "example": "SA0380000000608010167519",
+   "sepa": {
+    "member": false,
+    "schemes": [],
+    "vop_required": false
+   },
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "SA",
+     "name": "Saudi Arabia"
+    },
+    "bic": {
+     "code": "RJHISARI",
+     "bank_name": "Al Rajhi Bank",
+     "city": "Riyadh",
+     "source": "IBANforge curated bank-code map",
+     "as_of": "2026-09",
+     "basis": "curated_map",
+     "authoritative": false,
+     "lei": "558600BQZS4Y1DTU8589"
+    },
+    "bank_code_check": {
+     "value": "80",
+     "status": "verified",
+     "match": "register",
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": false,
+     "schemes": [],
+     "vop_required": false,
+     "vop_participant": false,
+     "basis": "country_default"
+    },
+    "issuer": {
+     "type": "bank",
+     "name": "Al Rajhi Bank",
+     "classification": "default"
+    },
+    "risk_indicators": {
+     "country_risk": "standard",
+     "sepa_reachable": false,
+     "vop_coverage": false,
+     "test_bic": false
+    }
+   }
+  },
+  "SC": {
+   "code": "SC",
+   "name_en": "Seychelles",
+   "length": 31,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 10,
+     "spec": "4!a2!n"
+    },
+    {
+     "name": "branch_code",
+     "from": 11,
+     "to": 12,
+     "spec": "2!n"
+    },
+    {
+     "name": "account_number",
+     "from": 13,
+     "to": 28,
+     "spec": "16!n"
+    }
+   ],
+   "example": "SC18SSCB11010000000000001497USD",
+   "sepa": {
+    "member": false,
+    "schemes": [],
+    "vop_required": false
+   },
+   "register": null,
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "SC",
+     "name": "Seychelles"
+    },
+    "bic": null,
+    "bank_code_check": {
+     "value": "SSCB11",
+     "status": "not_in_register",
+     "reason": "absent_from_reference_data",
+     "match": null,
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": false,
+     "schemes": [],
+     "vop_required": false,
+     "vop_participant": null,
+     "basis": "country_default"
+    },
+    "issuer": null,
+    "risk_indicators": {
+     "country_risk": "elevated",
+     "sepa_reachable": false,
+     "vop_coverage": false,
+     "test_bic": false
+    }
+   }
+  },
+  "SD": {
+   "code": "SD",
+   "name_en": "Sudan",
+   "length": 18,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 6,
+     "spec": "2!n"
+    },
+    {
+     "name": "account_number",
+     "from": 7,
+     "to": 18,
+     "spec": "12!n"
+    }
+   ],
+   "example": "SD8811123456789012",
+   "sepa": {
+    "member": false,
+    "schemes": [],
+    "vop_required": false
+   },
+   "register": null,
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "SD",
+     "name": "Sudan"
+    },
+    "bic": null,
+    "bank_code_check": {
+     "value": "11",
+     "status": "not_in_register",
+     "reason": "absent_from_reference_data",
+     "match": null,
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": false,
+     "schemes": [],
+     "vop_required": false,
+     "vop_participant": null,
+     "basis": "country_default"
+    },
+    "issuer": null,
+    "risk_indicators": {
+     "country_risk": "high",
+     "sepa_reachable": false,
+     "vop_coverage": false,
+     "test_bic": false
+    }
+   }
+  },
+  "SE": {
+   "code": "SE",
+   "name_en": "Sweden",
+   "length": 24,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 7,
+     "spec": "3!n"
+    },
+    {
+     "name": "account_number",
+     "from": 8,
+     "to": 24,
+     "spec": "17!n"
+    }
+   ],
+   "example": "SE4550000000058398257466",
+   "sepa": {
+    "member": true,
+    "schemes": [
+     "SCT",
+     "SDD"
+    ],
+    "vop_required": false
+   },
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "SE",
+     "name": "Sweden"
+    },
+    "bic": {
+     "code": "ESSESESS",
+     "bank_name": "Skandinaviska Enskilda Banken AB",
+     "city": "Stockholm",
+     "source": "IBANforge curated bank-code map",
+     "as_of": "2026-09",
+     "basis": "curated_map",
+     "authoritative": false,
+     "lei": "F3JS33DEI6XQ4ZBPTN86"
+    },
+    "bank_code_check": {
+     "value": "500",
+     "status": "verified",
+     "match": "register",
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": true,
+     "schemes": [
+      "SCT",
+      "SDD",
+      "SCT_INST"
+     ],
+     "vop_required": false,
+     "vop_participant": true,
+     "basis": "epc_register"
+    },
+    "issuer": {
+     "type": "bank",
+     "name": "Skandinaviska Enskilda Banken AB",
+     "classification": "default"
+    },
+    "risk_indicators": {
+     "country_risk": "standard",
+     "sepa_reachable": true,
+     "vop_coverage": false,
+     "test_bic": false
+    }
+   }
+  },
+  "SI": {
+   "code": "SI",
+   "name_en": "Slovenia",
+   "length": 19,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 9,
+     "spec": "5!n"
+    },
+    {
+     "name": "account_number",
+     "from": 10,
+     "to": 19,
+     "spec": "10!n"
+    }
+   ],
+   "example": "SI56191000000123438",
+   "sepa": {
+    "member": true,
+    "schemes": [
+     "SCT",
+     "SDD",
+     "SCT_INST"
+    ],
+    "vop_required": true
+   },
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "SI",
+     "name": "Slovenia"
+    },
+    "bic": {
+     "code": "SZKBSI2X",
+     "bank_name": "DEŽELNA BANKA SLOVENIJE d.d.",
+     "city": "Ljubljana",
+     "source": "IBANforge curated bank-code map",
+     "as_of": "2026-09",
+     "basis": "curated_map",
+     "authoritative": false,
+     "lei": "549300OBGOF2IVUD3L23"
+    },
+    "bank_code_check": {
+     "value": "19100",
+     "status": "verified",
+     "match": "register",
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": true,
+     "schemes": [
+      "SCT",
+      "SDD",
+      "SCT_INST"
+     ],
+     "vop_required": true,
+     "vop_participant": true,
+     "basis": "epc_register"
+    },
+    "issuer": {
+     "type": "bank",
+     "name": "DEŽELNA BANKA SLOVENIJE d.d.",
+     "classification": "default"
+    },
+    "risk_indicators": {
+     "country_risk": "standard",
+     "sepa_reachable": true,
+     "vop_coverage": true,
+     "test_bic": false
+    }
+   }
+  },
+  "SK": {
+   "code": "SK",
+   "name_en": "Slovakia",
+   "length": 24,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 8,
+     "spec": "4!n"
+    },
+    {
+     "name": "branch_code",
+     "from": 9,
+     "to": 14,
+     "spec": "6!n"
+    },
+    {
+     "name": "account_number",
+     "from": 15,
+     "to": 24,
+     "spec": "10!n"
+    }
+   ],
+   "example": "SK3112000000198742637541",
+   "sepa": {
+    "member": true,
+    "schemes": [
+     "SCT",
+     "SDD",
+     "SCT_INST"
+    ],
+    "vop_required": true
+   },
+   "register": null,
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "SK",
+     "name": "Slovakia"
+    },
+    "bic": null,
+    "bank_code_check": {
+     "value": "1200",
+     "status": "not_in_register",
+     "reason": "absent_from_reference_data",
+     "match": null,
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": true,
+     "schemes": [
+      "SCT",
+      "SDD",
+      "SCT_INST"
+     ],
+     "vop_required": true,
+     "vop_participant": null,
+     "basis": "country_default"
+    },
+    "issuer": null,
+    "risk_indicators": {
+     "country_risk": "standard",
+     "sepa_reachable": true,
+     "vop_coverage": true,
+     "test_bic": false
+    }
+   }
+  },
+  "SM": {
+   "code": "SM",
+   "name_en": "San Marino",
+   "length": 27,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 6,
+     "to": 10,
+     "spec": "5!n"
+    },
+    {
+     "name": "branch_code",
+     "from": 11,
+     "to": 15,
+     "spec": "5!n"
+    },
+    {
+     "name": "account_number",
+     "from": 16,
+     "to": 27,
+     "spec": "12!c"
+    }
+   ],
+   "example": "SM86U0322509800000000270100",
+   "sepa": {
+    "member": true,
+    "schemes": [
+     "SCT",
+     "SDD",
+     "SCT_INST"
+    ],
+    "vop_required": false
+   },
+   "register": null,
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "SM",
+     "name": "San Marino"
+    },
+    "bic": null,
+    "bank_code_check": {
+     "value": "03225",
+     "status": "not_in_register",
+     "reason": "absent_from_reference_data",
+     "match": null,
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": true,
+     "schemes": [
+      "SCT",
+      "SDD",
+      "SCT_INST"
+     ],
+     "vop_required": false,
+     "vop_participant": null,
+     "basis": "country_default"
+    },
+    "issuer": null,
+    "risk_indicators": {
+     "country_risk": "standard",
+     "sepa_reachable": true,
+     "vop_coverage": false,
+     "test_bic": false
+    }
+   }
+  },
+  "SO": {
+   "code": "SO",
+   "name_en": "Somalia",
+   "length": 23,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 8,
+     "spec": "4!n"
+    },
+    {
+     "name": "branch_code",
+     "from": 9,
+     "to": 11,
+     "spec": "3!n"
+    },
+    {
+     "name": "account_number",
+     "from": 12,
+     "to": 23,
+     "spec": "12!n"
+    }
+   ],
+   "example": "SO061000001123123456789",
+   "sepa": {
+    "member": false,
+    "schemes": [],
+    "vop_required": false
+   },
+   "register": null,
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "SO",
+     "name": "Somalia"
+    },
+    "bic": null,
+    "bank_code_check": {
+     "value": "1000",
+     "status": "not_in_register",
+     "reason": "absent_from_reference_data",
+     "match": null,
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": false,
+     "schemes": [],
+     "vop_required": false,
+     "vop_participant": null,
+     "basis": "country_default"
+    },
+    "issuer": null,
+    "risk_indicators": {
+     "country_risk": "high",
+     "sepa_reachable": false,
+     "vop_coverage": false,
+     "test_bic": false
+    }
+   }
+  },
+  "ST": {
+   "code": "ST",
+   "name_en": "Sao Tome and Principe",
+   "length": 25,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 8,
+     "spec": "4!n"
+    },
+    {
+     "name": "branch_code",
+     "from": 9,
+     "to": 12,
+     "spec": "4!n"
+    },
+    {
+     "name": "account_number",
+     "from": 13,
+     "to": 25,
+     "spec": "13!n"
+    }
+   ],
+   "example": "ST68000100010051845310112",
+   "sepa": {
+    "member": false,
+    "schemes": [],
+    "vop_required": false
+   },
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "ST",
+     "name": "Sao Tome and Principe"
+    },
+    "bic": {
+     "code": "INOISTST",
+     "bank_name": "Banco Internacional de Sao Tome e Principe (BISTP)",
+     "city": "Sao Tome",
+     "source": "IBANforge curated bank-code map",
+     "as_of": "2026-09",
+     "basis": "curated_map",
+     "authoritative": false,
+     "lei": null
+    },
+    "bank_code_check": {
+     "value": "0001",
+     "status": "verified",
+     "match": "register",
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": false,
+     "schemes": [],
+     "vop_required": false,
+     "vop_participant": false,
+     "basis": "country_default"
+    },
+    "issuer": {
+     "type": "bank",
+     "name": "Banco Internacional de Sao Tome e Principe (BISTP)",
+     "classification": "default"
+    },
+    "risk_indicators": {
+     "country_risk": "standard",
+     "sepa_reachable": false,
+     "vop_coverage": false,
+     "test_bic": false
+    }
+   }
+  },
+  "SV": {
+   "code": "SV",
+   "name_en": "El Salvador",
+   "length": 28,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 8,
+     "spec": "4!a"
+    },
+    {
+     "name": "account_number",
+     "from": 9,
+     "to": 28,
+     "spec": "20!n"
+    }
+   ],
+   "example": "SV62CENR00000000000000700025",
+   "sepa": {
+    "member": false,
+    "schemes": [],
+    "vop_required": false
+   },
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "SV",
+     "name": "El Salvador"
+    },
+    "bic": {
+     "code": "CENRSVSS",
+     "bank_name": "Banco Central de Reserva de El Salvador",
+     "city": "San Salvador",
+     "source": "IBANforge curated bank-code map",
+     "as_of": "2026-09",
+     "basis": "curated_map",
+     "authoritative": false,
+     "lei": "549300U9H74ZS6M90L15"
+    },
+    "bank_code_check": {
+     "value": "CENR",
+     "status": "verified",
+     "match": "register",
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": false,
+     "schemes": [],
+     "vop_required": false,
+     "vop_participant": false,
+     "basis": "country_default"
+    },
+    "issuer": {
+     "type": "bank",
+     "name": "Banco Central de Reserva de El Salvador",
+     "classification": "default"
+    },
+    "risk_indicators": {
+     "country_risk": "standard",
+     "sepa_reachable": false,
+     "vop_coverage": false,
+     "test_bic": false
+    }
+   }
+  },
+  "TL": {
+   "code": "TL",
+   "name_en": "East Timor",
+   "length": 23,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 7,
+     "spec": "3!n"
+    },
+    {
+     "name": "account_number",
+     "from": 8,
+     "to": 21,
+     "spec": "14!n"
+    }
+   ],
+   "example": "TL380080012345678910157",
+   "sepa": {
+    "member": false,
+    "schemes": [],
+    "vop_required": false
+   },
+   "register": null,
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "TL",
+     "name": "East Timor"
+    },
+    "bic": null,
+    "bank_code_check": {
+     "value": "008",
+     "status": "not_in_register",
+     "reason": "absent_from_reference_data",
+     "match": null,
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": false,
+     "schemes": [],
+     "vop_required": false,
+     "vop_participant": null,
+     "basis": "country_default"
+    },
+    "issuer": null,
+    "risk_indicators": {
+     "country_risk": "standard",
+     "sepa_reachable": false,
+     "vop_coverage": false,
+     "test_bic": false
+    }
+   }
+  },
+  "TN": {
+   "code": "TN",
+   "name_en": "Tunisia",
+   "length": 24,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 6,
+     "spec": "2!n"
+    },
+    {
+     "name": "branch_code",
+     "from": 7,
+     "to": 9,
+     "spec": "3!n"
+    },
+    {
+     "name": "account_number",
+     "from": 10,
+     "to": 22,
+     "spec": "13!n"
+    }
+   ],
+   "example": "TN5910006035183598478831",
+   "sepa": {
+    "member": false,
+    "schemes": [],
+    "vop_required": false
+   },
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "TN",
+     "name": "Tunisia"
+    },
+    "bic": {
+     "code": "STBKTNTT",
+     "bank_name": "SOCIETE TUNISIENNE DE BANQUE",
+     "city": "Tunis",
+     "source": "IBANforge curated bank-code map",
+     "as_of": "2026-09",
+     "basis": "curated_map",
+     "authoritative": false,
+     "lei": "254900ZVFVXSGR01W972"
+    },
+    "bank_code_check": {
+     "value": "10",
+     "status": "verified",
+     "match": "register",
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": false,
+     "schemes": [],
+     "vop_required": false,
+     "vop_participant": false,
+     "basis": "country_default"
+    },
+    "issuer": {
+     "type": "bank",
+     "name": "SOCIETE TUNISIENNE DE BANQUE",
+     "classification": "default"
+    },
+    "risk_indicators": {
+     "country_risk": "elevated",
+     "sepa_reachable": false,
+     "vop_coverage": false,
+     "test_bic": false
+    }
+   }
+  },
+  "TR": {
+   "code": "TR",
+   "name_en": "Türkiye",
+   "length": 26,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 9,
+     "spec": "5!n"
+    },
+    {
+     "name": "account_number",
+     "from": 10,
+     "to": 26,
+     "spec": "1!n16!c"
+    }
+   ],
+   "example": "TR330006100519786457841326",
+   "sepa": {
+    "member": false,
+    "schemes": [],
+    "vop_required": false
+   },
+   "register": null,
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "TR",
+     "name": "Türkiye"
+    },
+    "bic": null,
+    "bank_code_check": {
+     "value": "00061",
+     "status": "not_in_register",
+     "reason": "absent_from_reference_data",
+     "match": null,
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": false,
+     "schemes": [],
+     "vop_required": false,
+     "vop_participant": null,
+     "basis": "country_default"
+    },
+    "issuer": null,
+    "risk_indicators": {
+     "country_risk": "elevated",
+     "sepa_reachable": false,
+     "vop_coverage": false,
+     "test_bic": false
+    }
+   }
+  },
+  "UA": {
+   "code": "UA",
+   "name_en": "Ukraine",
+   "length": 29,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 10,
+     "spec": "6!n"
+    },
+    {
+     "name": "account_number",
+     "from": 11,
+     "to": 29,
+     "spec": "19!c"
+    }
+   ],
+   "example": "UA213996220000026007233566001",
+   "sepa": {
+    "member": false,
+    "schemes": [],
+    "vop_required": false
+   },
+   "register": null,
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "UA",
+     "name": "Ukraine"
+    },
+    "bic": null,
+    "bank_code_check": {
+     "value": "399622",
+     "status": "not_in_register",
+     "reason": "absent_from_reference_data",
+     "match": null,
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": false,
+     "schemes": [],
+     "vop_required": false,
+     "vop_participant": null,
+     "basis": "country_default"
+    },
+    "issuer": null,
+    "risk_indicators": {
+     "country_risk": "elevated",
+     "sepa_reachable": false,
+     "vop_coverage": false,
+     "test_bic": false
+    }
+   }
+  },
+  "VA": {
+   "code": "VA",
+   "name_en": "Vatican City",
+   "length": 22,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 7,
+     "spec": "3!n"
+    },
+    {
+     "name": "account_number",
+     "from": 8,
+     "to": 22,
+     "spec": "15!n"
+    }
+   ],
+   "example": "VA59001123000012345678",
+   "sepa": {
+    "member": true,
+    "schemes": [
+     "SCT",
+     "SDD",
+     "SCT_INST"
+    ],
+    "vop_required": false
+   },
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "VA",
+     "name": "Vatican City"
+    },
+    "bic": {
+     "code": "IOPRVAVX",
+     "bank_name": "Istituto per le Opere di Religione (IOR)",
+     "city": "Vatican City",
+     "source": "IBANforge curated bank-code map",
+     "as_of": "2026-09",
+     "basis": "curated_map",
+     "authoritative": false,
+     "lei": "254900E7HZKVQQ4I7325"
+    },
+    "bank_code_check": {
+     "value": "001",
+     "status": "verified",
+     "match": "register",
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": true,
+     "schemes": [
+      "SCT"
+     ],
+     "vop_required": false,
+     "vop_participant": false,
+     "basis": "epc_register"
+    },
+    "issuer": {
+     "type": "bank",
+     "name": "Istituto per le Opere di Religione (IOR)",
+     "classification": "default"
+    },
+    "risk_indicators": {
+     "country_risk": "standard",
+     "sepa_reachable": true,
+     "vop_coverage": false,
+     "test_bic": false
+    }
+   }
+  },
+  "VG": {
+   "code": "VG",
+   "name_en": "British Virgin Islands",
+   "length": 24,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 8,
+     "spec": "4!a"
+    },
+    {
+     "name": "account_number",
+     "from": 9,
+     "to": 24,
+     "spec": "16!n"
+    }
+   ],
+   "example": "VG96VPVG0000012345678901",
+   "sepa": {
+    "member": false,
+    "schemes": [],
+    "vop_required": false
+   },
+   "register": null,
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "VG",
+     "name": "British Virgin Islands"
+    },
+    "bic": null,
+    "bank_code_check": {
+     "value": "VPVG",
+     "status": "not_in_register",
+     "reason": "absent_from_reference_data",
+     "match": null,
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": false,
+     "schemes": [],
+     "vop_required": false,
+     "vop_participant": null,
+     "basis": "country_default"
+    },
+    "issuer": null,
+    "risk_indicators": {
+     "country_risk": "elevated",
+     "sepa_reachable": false,
+     "vop_coverage": false,
+     "test_bic": false
+    }
+   }
+  },
+  "XK": {
+   "code": "XK",
+   "name_en": "Kosovo",
+   "length": 20,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 6,
+     "spec": "2!n"
+    },
+    {
+     "name": "branch_code",
+     "from": 7,
+     "to": 8,
+     "spec": "2!n"
+    },
+    {
+     "name": "account_number",
+     "from": 9,
+     "to": 20,
+     "spec": "12!n"
+    }
+   ],
+   "example": "XK051212012345678906",
+   "sepa": {
+    "member": false,
+    "schemes": [],
+    "vop_required": false
+   },
+   "register": null,
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "XK",
+     "name": "Kosovo"
+    },
+    "bic": null,
+    "bank_code_check": {
+     "value": "12",
+     "status": "not_in_register",
+     "reason": "absent_from_reference_data",
+     "match": null,
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": false,
+     "schemes": [],
+     "vop_required": false,
+     "vop_participant": null,
+     "basis": "country_default"
+    },
+    "issuer": null,
+    "risk_indicators": {
+     "country_risk": "standard",
+     "sepa_reachable": false,
+     "vop_coverage": false,
+     "test_bic": false
+    }
+   }
+  },
+  "YE": {
+   "code": "YE",
+   "name_en": "Yemen",
+   "length": 30,
+   "fields": [
+    {
+     "name": "bank_code",
+     "from": 5,
+     "to": 8,
+     "spec": "4!a"
+    },
+    {
+     "name": "branch_code",
+     "from": 9,
+     "to": 12,
+     "spec": "4!n"
+    },
+    {
+     "name": "account_number",
+     "from": 13,
+     "to": 30,
+     "spec": "18!c"
+    }
+   ],
+   "example": "YE15CBYE0001018861234567891234",
+   "sepa": {
+    "member": false,
+    "schemes": [],
+    "vop_required": false
+   },
+   "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+   "api": {
+    "valid": true,
+    "country": {
+     "code": "YE",
+     "name": "Yemen"
+    },
+    "bic": {
+     "code": "CBYEYESA",
+     "bank_name": "CENTRAL BANK OF YEMEN",
+     "city": "ADEN",
+     "source": "Redistributed SWIFT BIC directory (PeterNotenboom/SwiftCodes, MIT)",
+     "as_of": "2026-09",
+     "basis": "directory_prefix",
+     "authoritative": false,
+     "lei": null
+    },
+    "bank_code_check": {
+     "value": "CBYE",
+     "status": "verified",
+     "match": "prefix",
+     "register": "IBANforge composite bank-code map (assembled from BIC directories, not a national bank-code register)",
+     "authoritative": false,
+     "candidates": 1,
+     "as_of": "2026-09"
+    },
+    "sepa": {
+     "member": false,
+     "schemes": [],
+     "vop_required": false,
+     "vop_participant": false,
+     "basis": "country_default"
+    },
+    "issuer": {
+     "type": "bank",
+     "name": "CENTRAL BANK OF YEMEN",
+     "classification": "default"
+    },
+    "risk_indicators": {
+     "country_risk": "standard",
+     "sepa_reachable": false,
+     "vop_coverage": false,
+     "test_bic": false
+    }
+   }
+  }
+ }
+}

@@ -1,0 +1,22 @@
+name: IndexNow (Bing and friends)
+
+# Every Monday, and by hand after a batch of new pages: submit the whole live
+# sitemap to IndexNow so Bing, DuckDuckGo, Yandex, Seznam, Naver and the
+# Internet Archive look at the register and country pages without waiting for
+# a crawl. Google ignores IndexNow and reads sitemap.xml on its own schedule.
+on:
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Submit the live sitemap
+        run: node scripts/indexnow-ping.mjs --sitemap

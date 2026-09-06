@@ -2099,5 +2099,77 @@
       "indexTitle": "Belgische Bankcodes (BNB-Liste)",
       "indexIntro": "Jede in der Liste der Belgischen Nationalbank zugewiesene Bankkennung, eine Seite pro Institut, mit dem zugehörigen BIC und der exakten Antwort der IBANforge-API. Das Register veröffentlicht nur Namen: keine Adresse erscheint hier, die das Register nicht veröffentlicht hat."
     }
+  },
+  "countries": {
+    "eyebrow": "IBAN nach Land",
+    "metaTitle": "IBAN {country}: Format, Länge und Beispiel",
+    "metaDescription": "Die IBAN in {country} hat {length} Zeichen. Aufbau Feld für Feld, offizielles Beispiel {example}, SEPA-Raum, Empfängerprüfung, Bankleitzahlen-Register und die exakte Antwort der IBANforge-API.",
+    "title": "IBAN {country}",
+    "subtitle": "{length} Zeichen: der Ländercode, zwei Prüfziffern, dann die BBAN, unten aufgeschnitten.",
+    "indexTitle": "Das IBAN-Format jedes Landes",
+    "indexIntro": "Die {count} Länder des ISO-13616-Registers mit IBAN-Länge, SEPA-Zugehörigkeit, Pflicht zur Empfängerprüfung und dem Register, gegen das die IBANforge-API die Bankleitzahl prüft. Jedes Land hat seine Seite: Aufbau, offizielles Beispiel und die exakte Antwort der API.",
+    "anatomyTitle": "Anatomie des offiziellen Beispiels",
+    "anatomyNote": "Das Beispiel stammt aus dem ISO-13616-Register; es gehört niemandem. Die Positionen zählen ab dem ersten Zeichen der IBAN.",
+    "legend": {
+      "country": "Ländercode",
+      "check": "Prüfziffern",
+      "bank_code": "Bankleitzahl",
+      "branch_code": "Filialcode",
+      "account_number": "Kontonummer",
+      "other": "Nationale Prüfziffer oder anderes"
+    },
+    "specLegend": "SWIFT-Notation: n = Ziffern, a = Grossbuchstaben, c = alphanumerische Zeichen; das Ausrufezeichen legt die exakte Länge fest.",
+    "facts": {
+      "title": "Die Fakten zur IBAN in {country}",
+      "code": "ISO-Code",
+      "length": "Länge",
+      "lengthValue": "{length} Zeichen",
+      "check": "Prüfziffern",
+      "checkValue": "Positionen 3 bis 4, ISO 7064 mod 97-10",
+      "bank": "Bankleitzahl",
+      "branch": "Filialcode",
+      "account": "Kontonummer",
+      "positions": "Positionen {from} bis {to}",
+      "example": "Offizielles Beispiel",
+      "sepa": "SEPA-Raum",
+      "sepaYes": "Mitglied · {schemes}",
+      "sepaNo": "ausserhalb des SEPA-Raums",
+      "vop": "Empfängerprüfung (VoP)",
+      "vopYes": "Pflicht für die Anbieter des Landes",
+      "vopNo": "bis heute keine Pflicht",
+      "register": "Bankleitzahlen-Register",
+      "registerNone": "kein veröffentlichtes Register: nur Aufbau und Prüfziffern",
+      "registerComposite": "IBANforge-Verbundkarte, aus BIC-Verzeichnissen zusammengesetzt (kein nationales Register)"
+    },
+    "checksTitle": "Was die API an einer IBAN aus {country} prüft",
+    "checks": {
+      "structure": "Die Länge, den Zeichensatz jedes Feldes und die Prüfziffern nach mod 97.",
+      "bankNational": "Die Bankleitzahl gegen {register}, monatlich aufgefrischt: Institut, zugehöriger BIC, Status.",
+      "bankComposite": "Die Bankleitzahl gegen unsere Verbundkarte aus BIC-Verzeichnissen: BIC und Bankname, wenn sie dort stehen, ohne das Gewicht eines nationalen Registers.",
+      "bankNone": "Für dieses Land wird kein Bankleitzahlen-Register veröffentlicht: über den Aufbau hinaus kann die API nicht sagen, ob die Bankleitzahl existiert.",
+      "sepa": "Die SEPA-Erreichbarkeit des Landes und die offenen Verfahren ({schemes}).",
+      "sepaOut": "Das Land liegt ausserhalb von SEPA: eine SEPA-Überweisung erreicht dieses Konto nicht.",
+      "vop": "Die Pflicht zur Empfängerprüfung, die für die Anbieter des Landes gilt oder nicht gilt."
+    },
+    "indexTable": {
+      "code": "Code",
+      "country": "Land",
+      "length": "Länge",
+      "sepa": "SEPA",
+      "vop": "VoP",
+      "register": "Register",
+      "yes": "ja",
+      "no": "nein",
+      "national": "national",
+      "composite": "Verbund",
+      "none": "keines"
+    },
+    "cta": {
+      "tool": "Eine IBAN aus {country} kostenlos testen",
+      "docs": "Die Route POST /v1/iban/validate",
+      "registerIndex": "Die Bankleitzahlen des Landes, eine pro Seite",
+      "index": "Alle Länder"
+    },
+    "sourceNote": "Quelle: ISO-13616-Register für Länge, Aufbau und Beispiel; API-Antwort erfasst am {date}."
   }
 }
