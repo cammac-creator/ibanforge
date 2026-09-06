@@ -15,14 +15,20 @@ import type { HonoEnv } from '../types.js';
  * That means ALL of the following are true:
  *   - x402 is enabled in the environment
  *   - the caller is NOT authenticated with an API key (free tier / paid plan)
+ *   - the caller was NOT served on the keyless daily trial
  *   - the dev bypass header is NOT set
  *
- * In every other case (api-key, dev skip, x402 disabled) the endpoint was
- * served for free — we MUST pass 0 to stats so the dashboard reflects real
+ * In every other case (api-key, trial, dev skip, x402 disabled) the endpoint
+ * was served for free — we MUST pass 0 to stats so the dashboard reflects real
  * revenue instead of the posted price.
  */
 export function computeRevenue(c: Context<HonoEnv>, priceUsdc: number): number {
   if (c.get('apiKeyAuthenticated')) return 0;
+  // Added 06/09/2026 with the keyless trial. A trial call is not authenticated
+  // and x402 IS enabled in production, so without this line every free trial
+  // would have booked $0.005 of revenue that nobody paid — the exact lie this
+  // function was written to prevent.
+  if (c.get('anonymousTrial')) return 0;
   if (process.env.X402_ENABLED !== 'true') return 0;
   if (process.env.NODE_ENV === 'development' && c.req.header('X-Dev-Skip') === 'true') {
     return 0;

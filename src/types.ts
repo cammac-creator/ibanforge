@@ -23,7 +23,11 @@ export interface PaywallCause {
     | 'monthly_quota_insufficient'
     | 'credits_exhausted'
     | 'credits_insufficient'
-    | 'invalid_api_key';
+    | 'invalid_api_key'
+    // The keyless REST trial ran out for today (src/middleware/anonymous-trial.ts).
+    // A developer who reached this has already SEEN the product work, which is
+    // the one paywall moment worth a different sentence from "payment required".
+    | 'trial_exhausted';
   detail: string;
   // required/remaining: batch billing (1 unit per IBAN) can refuse a request
   // all-or-nothing while some allowance is left — these say how much.
@@ -38,6 +42,20 @@ export interface PaywallCause {
   credits?: { required?: number; remaining?: number; total: number; topup: string };
 }
 
+/**
+ * A keyless REST call served on the daily trial (src/middleware/anonymous-trial.ts).
+ *
+ * Present ONLY when the trial was actually granted, so `c.get('anonymousTrial')`
+ * doubles as the predicate everything downstream branches on: the x402 skip, the
+ * `trial` block in the body, the zero revenue, the response headers.
+ */
+export interface AnonymousTrial {
+  /** Calls served to this address today, this one included. */
+  used: number;
+  limit: number;
+  remaining: number;
+}
+
 type HonoEnv = {
   Variables: {
     apiKeyAuthenticated: boolean;
@@ -47,6 +65,8 @@ type HonoEnv = {
     mcpToolCall?: boolean;
     /** Set by the API-key middleware when the request is served on the free tier: the response then carries the attribution block. */
     freeTier?: boolean;
+    /** Set by the anonymous-trial middleware when a keyless validation is served on the daily allowance. */
+    anonymousTrial?: AnonymousTrial;
   };
 };
 
@@ -528,6 +548,27 @@ export interface IBANValidationResult {
   processing_ms?: number;
   /** Present on free-tier responses only. */
   attribution?: Attribution;
+  /** Present only on a call served by the keyless daily trial. @see TrialBlock */
+  trial?: TrialBlock;
+}
+
+/**
+ * What a keyless caller is told on every trial response.
+ *
+ * The whole point of the trial is the invitation, and an invitation that lives
+ * in a header is an invitation nobody reads: a developer looks at the JSON that
+ * came back in their terminal. So the count, the reset and the exact command
+ * that gets a free key all travel in the body, on every single call — not only
+ * on the last one, when it is already too late to be a choice.
+ */
+export interface TrialBlock {
+  calls_used_today: number;
+  calls_left_today: number;
+  daily_limit: number;
+  resets: string;
+  /** Copy-pasteable: the request that mints a free 200/month key. */
+  free_key: string;
+  docs: string;
 }
 
 export interface BatchValidationRequest {

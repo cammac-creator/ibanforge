@@ -25,6 +25,8 @@ import { buildApp } from './app.js';
 import { resetX402Paywall } from './middleware/x402.js';
 import { generateCreditKey } from './lib/api-keys.js';
 import { getStatsDB, closeAll } from './lib/db.js';
+import { REST_TRIAL_DAILY_LIMIT } from './lib/trial.js';
+import { resetDailyLedger } from './lib/daily-ip-ledger.js';
 
 // Our own bucket in the in-memory rate limiter (100 req/min per IP, shared
 // process-wide by the whole suite). TEST-NET-2, never routable.
@@ -104,6 +106,10 @@ beforeEach(() => {
   paidMode();
   supportedCalls = 0;
   facilitatorHealthy = true;
+  // The keyless trial counts per address in a module-level Map, and every case
+  // here calls from the same IP. Without this, the trial cases below would be
+  // decided by whatever the earlier cases spent.
+  resetDailyLedger();
 });
 
 async function req(path: string, init: RequestInit = {}): Promise<Response> {
@@ -237,6 +243,55 @@ describe('POST /v1/credits/buy/:bundle is gated by x402', () => {
     const res = await req('/v1/stripe/key/cs_test_notarealsession');
     expect(res.status).not.toBe(402);
     expect([400, 404]).toContain(res.status);
+  });
+});
+
+/**
+ * The keyless trial's position in the stack, which is the whole of its design.
+ *
+ * It sits BETWEEN the api-key middleware and x402 (app.ts ~840). One line
+ * higher and a presented-but-broken key would fall into the trial, so a
+ * truncated `ifk_…` would get ten silent successes and then a wall with
+ * nothing saying the key was never read. One line lower and the granted call
+ * would meet the paywall it was just exempted from, so the trial would serve
+ * nothing at all.
+ *
+ * Its own file (src/middleware/anonymous-trial.test.ts) covers the allowance;
+ * what is pinned HERE is only what the mount order produces, because that is
+ * what this file exists for.
+ */
+describe('the keyless trial sits between the key and the paywall', () => {
+  it('serves a keyless validation that carries a real IBAN', async () => {
+    const res = await req('/v1/iban/validate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ iban: VALID_IBAN }),
+    });
+    expect(res.status).toBe(200);
+    expect(res.headers.get('x-trial-limit')).toBe(String(REST_TRIAL_DAILY_LIMIT));
+  });
+
+  it('still answers 402 to the empty-body probe every indexer sends', async () => {
+    // Same promise as section 3 below, restated here because the trial is the
+    // one thing that could quietly break it.
+    const res = await req('/v1/iban/validate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}',
+    });
+    expect(res.status).toBe(402);
+  });
+
+  it('still answers invalid_api_key to a broken key, never a free call', async () => {
+    const res = await req('/v1/iban/validate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ifk_notarealkey' },
+      body: JSON.stringify({ iban: VALID_IBAN }),
+    });
+    expect(res.status).toBe(402);
+    expect(((await res.json()) as { cause?: { reason: string } }).cause?.reason).toBe(
+      'invalid_api_key',
+    );
   });
 });
 

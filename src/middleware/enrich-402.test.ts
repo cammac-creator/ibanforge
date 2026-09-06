@@ -202,6 +202,29 @@ describe('enrich402Middleware — the exhausted client must not be handed a way 
 
     expect(body.free_tier?.signup).toContain('/v1/keys/generate');
   });
+
+  it('keeps the free_tier block when the KEYLESS trial runs out — that is the conversion', async () => {
+    // The one 402 where the signup rail matters most: this caller holds no key
+    // at all, has just seen the product work ten times, and the whole trial
+    // exists to end here with a key rather than with a shrug.
+    const app = appWithCause({
+      reason: 'trial_exhausted',
+      detail:
+        'You used the 10 keyless validations this address gets today; the allowance resets at midnight UTC.',
+      quota: { used: 11, limit: 10, month: 'day', resets: 'midnight UTC', remaining: 0 },
+    });
+
+    const res = await app.request('/v1/iban/validate', { method: 'POST', body: '{}' });
+    const body = (await res.json()) as {
+      free_tier?: { signup?: string };
+      cause?: { reason: string };
+      message?: string;
+    };
+
+    expect(body.cause?.reason).toBe('trial_exhausted');
+    expect(body.message).toContain('midnight UTC');
+    expect(body.free_tier?.signup).toContain('/v1/keys/generate');
+  });
 });
 
 describe('the Bazaar discovery block the catalog ingester reads', () => {

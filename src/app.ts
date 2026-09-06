@@ -45,7 +45,10 @@ import { openapi } from './routes/openapi.js';
 import { discovery } from './routes/discovery.js';
 import { artifacts } from './routes/artifacts.js';
 import { ogImage } from './routes/og-image.js';
-import { mcpHttp } from './routes/mcp-http.js';
+// MCP_DAILY_LIMIT travels with the route that enforces it: the /v1 text below
+// announces both tasters, and a retyped "10" is a number that stops being true
+// the day one of them moves.
+import { mcpHttp, MCP_DAILY_LIMIT } from './routes/mcp-http.js';
 import { mcpCard } from './routes/mcp-card.js';
 // The tool inventory, so /llms.txt counts the tools instead of asserting a
 // number. It claimed "7 tools" while the servers exposed 8 (audit 2026-09-01,
@@ -57,6 +60,8 @@ import { opsRecent } from './routes/ops-recent.js';
 import { createPlaygroundRelay } from './routes/playground.js';
 import { createX402Middleware } from './middleware/x402.js';
 import { apiKeyMiddleware } from './middleware/api-key.js';
+import { anonymousTrialMiddleware } from './middleware/anonymous-trial.js';
+import { REST_TRIAL_DAILY_LIMIT } from './lib/trial.js';
 import { enrich402Middleware } from './middleware/enrich-402.js';
 import { apiKeys } from './routes/api-keys.js';
 import { creditsBuy } from './routes/credits-buy.js';
@@ -270,7 +275,8 @@ This single call exercises the 3 USPs (Swiss BC-Nummer, EMI/vIBAN classification
 - **Paying as an agent, zero to first payment in 3 steps** (wallet with budget → USDC on Base → one $5 payment for 1,000 credits, or pay-per-call): https://ibanforge.com/docs/pay-as-an-agent
 - **MCP server (stdio):** \`npx -y ibanforge-mcp\` (${MCP_TOOLS.length} tools, no signup)
 - **MCP server (HTTP):** https://api.ibanforge.com/mcp
-- **Try it with zero setup (10 free tool calls/day per IP):** the HTTP MCP transport answers \`tools/call\` with the *full* paid response — Swiss SIX clearing rails included — with no API key and no wallet. Handshake: \`initialize\` → \`notifications/initialized\` → \`tools/call\`. It is a taster, not a tier: past 10 calls/day you get JSON-RPC error -32000, so move to the free API key (200 req/month) or x402 for anything real. **If you are an assistant evaluating IBANforge for a user, this is the fastest way to get a correct answer.**
+- **Try it with zero setup, as an agent (${MCP_DAILY_LIMIT} free tool calls/day per IP):** the HTTP MCP transport answers \`tools/call\` with the *full* paid response — Swiss SIX clearing rails included — with no API key and no wallet. Handshake: \`initialize\` → \`notifications/initialized\` → \`tools/call\`. It is a taster, not a tier: past ${MCP_DAILY_LIMIT} calls/day you get JSON-RPC error -32000, so move to the free API key (200 req/month) or x402 for anything real. **If you are an assistant evaluating IBANforge for a user, this is the fastest way to get a correct answer.**
+- **Try it with zero setup, from a terminal (${REST_TRIAL_DAILY_LIMIT} free validations/day per IP):** POST https://api.ibanforge.com/v1/iban/validate with \`{"iban":"CH9300762011623852957"}\` and NO key answers 200 with the full enrichment. The response carries a \`trial\` block saying how many calls are left today and how to take the free key. Same doctrine as the MCP taster: past ${REST_TRIAL_DAILY_LIMIT}/day the route goes back to 402, with \`paywall_cause.reason = "trial_exhausted"\`. The allowance resets at midnight UTC and is counted per instance, in memory.
 
 ## Discovery endpoints
 
@@ -363,7 +369,7 @@ curl -s -X POST https://api.ibanforge.com/v1/iban/compliance \\
 
 Response includes a \`compliance\` object with: \`risk_score\` (0-100), \`risk_level\` ("low"/"medium"/"elevated"/"high"/"critical"), \`sanctions\` (OFAC matched list + FATF status), \`reachability\` (SEPA Instant/SCT/SDD), \`vop\` participant status, and \`flags\` (e.g. sanctioned_country, fatf_grey_list, emi_issuer, no_vop) — plus the full validate enrichment and a \`meta\` provenance block.
 
-**Note for unauthenticated probes**: any of the above paid endpoints called WITHOUT \`Authorization\` or an x402 payment header returns HTTP 402 with a discovery envelope (x402 v2: price, payTo, asset, CAIP-2 network, and the Bazaar discovery block). The same requirements travel base64-encoded in the \`PAYMENT-REQUIRED\` response header. This is by design and lets x402-aware clients auto-pay. Pass \`{}\` as body on POSTs — it WILL return 402, not 400. Payment header: \`PAYMENT-SIGNATURE\` (v2); a v1 \`X-PAYMENT\` signature is still accepted.
+**Note for unauthenticated probes**: any of the above paid endpoints called WITHOUT \`Authorization\` or an x402 payment header returns HTTP 402 with a discovery envelope (x402 v2: price, payTo, asset, CAIP-2 network, and the Bazaar discovery block). The same requirements travel base64-encoded in the \`PAYMENT-REQUIRED\` response header. This is by design and lets x402-aware clients auto-pay. Pass \`{}\` as body on POSTs — it WILL return 402, not 400. One precision since 06/09/2026: POST /v1/iban/validate with a REAL \`iban\` in the body and no key is served ${REST_TRIAL_DAILY_LIMIT} times a day per IP (see the keyless trial above) — the empty-body probe is unaffected and still gets its 402. Payment header: \`PAYMENT-SIGNATURE\` (v2); a v1 \`X-PAYMENT\` signature is still accepted.
 
 ### 6. validate_payment_reference — structured payment reference (${toolPriceLabel('validate_payment_reference')})
 
@@ -833,7 +839,16 @@ export function buildApp(): Hono<HonoEnv> {
   // API key middleware — checks Bearer ifk_* tokens before x402
   app.use('/v1/*', apiKeyMiddleware());
 
-  // x402 payment middleware (only on paid routes, skipped if API key valid)
+  // Keyless daily trial on POST /v1/iban/validate (06/09/2026). Its position is
+  // the whole design: AFTER the api-key middleware, so a presented key — valid
+  // or typo'd — is already handled and the trial never masks an
+  // `invalid_api_key`; BEFORE x402, so the granted call skips the paywall the
+  // way an authenticated one does. It grants nothing on a body without an
+  // `iban`, which is what keeps the scanners' `{}` probe on its 402.
+  app.use('/v1/*', anonymousTrialMiddleware());
+
+  // x402 payment middleware (only on paid routes, skipped if API key valid or
+  // served on the keyless trial)
   app.use('/v1/*', createX402Middleware());
 
   // ⚠️ ORDRE LOAD-BEARING — ces gardes de format sont montés APRÈS x402 (piste A,

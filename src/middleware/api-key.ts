@@ -41,7 +41,14 @@ function setQuotaHeaders(
   c.header('X-Quota-Month', q.month);
 }
 
-function extractKey(c: Parameters<MiddlewareHandler<HonoEnv>>[0]): string | null {
+/**
+ * Exported since 2026-09-06: the anonymous-trial middleware has to know whether
+ * a key was PRESENTED, not whether one was valid — a typo'd key must keep its
+ * `invalid_api_key` 402 instead of silently falling into the free trial. A
+ * second copy of this reader would be a second place for the three accepted
+ * locations to drift apart.
+ */
+export function extractKey(c: Parameters<MiddlewareHandler<HonoEnv>>[0]): string | null {
   const auth = c.req.header('Authorization');
   if (auth?.startsWith('Bearer ifk_')) return auth.slice(7);
   if (auth?.startsWith('Bearer ')) {

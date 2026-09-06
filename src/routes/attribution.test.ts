@@ -51,13 +51,29 @@ describe('attribution on the free tier', () => {
     expect('attribution' in ((await v.json()) as object)).toBe(false);
   });
 
-  it('the free structural route never carries it, and neither does an anonymous call', async () => {
+  it('the free structural route never carries it', async () => {
     const f = await app.request('/v1/iban/format?iban=DE89370400440532013000');
     expect(f.status).toBe(200);
     expect('attribution' in ((await f.json()) as object)).toBe(false);
-    // Anonymous: a paywall body in production, a served answer where the test
-    // environment has no facilitator; in neither case is there a free key.
+  });
+
+  it('an anonymous call to a route with no trial carries none either', async () => {
+    // A paywall body in production, a served answer where the test environment
+    // has no facilitator; in neither case is there a free allowance.
+    const bic = await app.request('/v1/bic/COBADEFFXXX');
+    expect('attribution' in ((await bic.json()) as object)).toBe(false);
+  });
+
+  it('a keyless validation served on the daily trial DOES carry it', async () => {
+    // Changed 06/09/2026 with the keyless trial, and deliberately: this call is
+    // served on a free allowance like a free key is, the caller has agreed to
+    // nothing, and if these results are shown to people the credit is owed at
+    // least as much as it is by a signed-up free user. `freeTier` is what the
+    // trial middleware sets, and this block is what `freeTier` means.
     const anon = await validate({ 'content-type': 'application/json' });
-    expect('attribution' in ((await anon.json()) as object)).toBe(false);
+    expect(anon.status).toBe(200);
+    const body = (await anon.json()) as { attribution?: unknown; trial?: unknown };
+    expect(body.attribution).toEqual(ATTRIBUTION);
+    expect(body.trial).toBeDefined();
   });
 });

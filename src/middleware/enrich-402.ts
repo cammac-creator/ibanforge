@@ -637,6 +637,13 @@ function causeFields(cause: PaywallCause | undefined): Record<string, unknown> {
  *
  * `invalid_api_key` is deliberately NOT in this set: that caller may genuinely
  * have lost their key and needs the signup route.
+ *
+ * Neither is `trial_exhausted`, and for a stronger reason: that caller holds no
+ * key at all. The keyless trial exists to end in a signup, so the one response
+ * where the free-tier rail matters most is the one that says the taster is
+ * over. Stripping it there would be answering "you have used your ten free
+ * calls" with no way to get an eleventh short of paying — the opposite of the
+ * decision that shipped the trial.
  */
 const ALLOWANCE_EXHAUSTED: ReadonlySet<PaywallCause['reason']> = new Set([
   'monthly_quota_exhausted',

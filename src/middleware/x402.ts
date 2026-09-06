@@ -1230,8 +1230,15 @@ export function createX402Middleware(): MiddlewareHandler<HonoEnv> {
     // (200 req/month) buys 200 bundles, i.e. up to $16,000 of credits for one
     // unit of quota, and each minted key can start over.
     // Security audit 2026-07-25, finding 1.
+    //
+    // `anonymousTrial` joins it since 06/09/2026 and carries the same exemption
+    // for the same reason. It is set only by the anonymous-trial middleware,
+    // only on POST /v1/iban/validate, and only when a real IBAN was sent with
+    // no key and no payment header — but the selling-route guard is repeated
+    // rather than assumed, because the day a second route grants a trial the
+    // guard has to already be here.
     if (
-      c.get('apiKeyAuthenticated') &&
+      (c.get('apiKeyAuthenticated') || c.get('anonymousTrial')) &&
       !isSellingRoute(c.req.method, new URL(c.req.url).pathname)
     ) {
       await next();

@@ -7,6 +7,7 @@ import { recordOperation } from '../lib/stats.js';
 import { recordSafely } from '../lib/record-safely.js';
 import { getIban, getReference, getReferenceType, computeRevenue } from '../lib/request-helpers.js';
 import { buildReferenceCheck } from '../lib/payment-reference.js';
+import { TRIAL_DOCS_URL, TRIAL_FREE_KEY_HINT, TRIAL_RESET } from '../lib/trial.js';
 import type { IBANValidationResult } from '../types.js';
 
 const ibanValidate = new Hono<HonoEnv>();
@@ -61,8 +62,28 @@ ibanValidate.post('/v1/iban/validate', async (c) => {
   }
 
   const postedPrice = result.cost_usdc;
-  if (c.get('apiKeyAuthenticated')) {
+  // Nobody paid for this one: a key spent an allowance, or the keyless daily
+  // trial did. Leaving the posted price on a trial response would read to the
+  // caller as "you were just charged $0.005", which is the opposite of the
+  // message the trial exists to send.
+  const trial = c.get('anonymousTrial');
+  if (c.get('apiKeyAuthenticated') || trial) {
     result.cost_usdc = 0;
+  }
+
+  // The invitation. Attached HERE and not in `enrichResult` for the reason
+  // `reference_check` gives above: that path is shared with batch validation
+  // and with MCP tools whose Zod output schemas would strip an unnamed block
+  // without saying so. The trial is a single-IBAN, REST-only affair anyway.
+  if (trial) {
+    result.trial = {
+      calls_used_today: trial.used,
+      calls_left_today: trial.remaining,
+      daily_limit: trial.limit,
+      resets: TRIAL_RESET,
+      free_key: TRIAL_FREE_KEY_HINT,
+      docs: TRIAL_DOCS_URL,
+    };
   }
 
   result.processing_ms = Math.round((performance.now() - start) * 100) / 100;
