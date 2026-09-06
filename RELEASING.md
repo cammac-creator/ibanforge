@@ -11,14 +11,17 @@ two-minute step on npmjs.com, below). Until then, **npm is manual**.
 | npm `ibanforge-mcp` | **automatic** once registered, else manual (Touch ID) | npm trusted publishing (OIDC) |
 | npm `@ibanforge/sdk` | **automatic** once registered, else manual (Touch ID) | npm trusted publishing (OIDC) |
 
-> **Why npm was manual.** Since 2026 npm enforces a "2FA approval gate" (staged
-> publishing): finalizing a publish requires a live, interactive 2FA challenge.
-> Automation/granular tokens — even with "bypass 2FA" enabled — fail with
-> `npm error code EOTP`, both in CI and locally. The one path npm exempts is
-> **trusted publishing**: a GitHub Actions workflow registered on the package as
-> its publisher, authenticated by OIDC, no token anywhere. That is what
-> `release-publish.yml` does since 03/09/2026 (and `n8n-publish.yml` for the n8n
-> node).
+> **What actually works, measured on 2026-09-06.** A granular access token with
+> "bypass 2FA" enabled, configured in `~/.npmrc` on the operator's machine,
+> publishes directly: `ibanforge-mcp@1.5.0`, `@ibanforge/sdk@1.5.0` and
+> `n8n-nodes-ibanforge@0.1.1` went out that way, with no EOTP and no staging.
+> The earlier note that such tokens "fail with EOTP" was wrong. Two limits
+> remain: the token expires (check *Access Tokens* on npmjs.com for the date),
+> and npm has announced that tokens bypassing 2FA lose direct publishing in
+> January 2027. **Trusted publishing** (a GitHub Actions workflow registered on
+> the package as its publisher, OIDC, no token anywhere) is therefore the
+> durable path: `release-publish.yml` and `n8n-publish.yml` already use it and
+> only need the one-time registration below.
 
 ## Step 0a — register the trusted publisher (once per package, 2 minutes each)
 
@@ -133,8 +136,9 @@ Coinbase Bazaar. Most re-scan from npm within 24–48h; refresh by hand if neede
 
 ## Troubleshooting
 
-- **`EOTP` on npm publish** — expected; it's the 2FA gate. Approve interactively
-  or re-run. There is no CI workaround.
+- **`EOTP` on npm publish** — the 2FA gate: only seen with an expired or
+  non-bypass token. With the bypass-2FA granular token in `~/.npmrc` the publish
+  goes through (2026-09-06). Trusted publishing removes the token entirely.
 - **`E404 ... do not have permission` on npm publish** — your `npm login`
   expired. Run `npm login` and retry.
 - **MCP Registry: `NPM package 'ibanforge-mcp' not found (404)`** — you ran the
