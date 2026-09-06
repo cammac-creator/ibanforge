@@ -28,6 +28,7 @@ mensuel (`getEntryCount()`, jamais un nombre écrit à la main).
 | Bank of England — List of PRA-regulated Banks (table `pra_banks`) | 281 au 2026-08 | permission écrite du 25/08/2026, **attribution à la Bank of England ET au mois de la liste obligatoire** | ✅ **accordée le 25/08/2026 — ingérée le 25/08/2026**, voir ci-dessous |
 | BCE — liste quotidienne des IFM (table `ecb_mfi`) | 5 374 au 2026-08-25 | usage libre, **citation de la BCE** + **mention « gratuit à la source » à CHAQUE accès** dès que l'information est vendue | ✅ **lue à la source le 26/08/2026 — ingérée le 26/08/2026**, voir ci-dessous |
 | Banco de España — liste des IFM espagnoles (table `bde_mfi`) | 238 au 2026-08-25 | reproduction « faithfully, without any manipulation », **citation du Banco de España** + **même mention « gratuit à la source » à chaque mise à disposition** | ✅ **lue à la source le 26/08/2026 — ingérée le 26/08/2026**, voir ci-dessous |
+| Národná banka Slovenska — prevodník des codes d'identification (`national_bank_codes`, pays SK) | 38 en version 225 (effet 18.05.2026) | réutilisation autorisée **sans accord préalable**, mais **citation de la NBS obligatoire** et **fichier non modifié** | ⚠️ **lue à la source le 06/09/2026 — ingérée le 06/09/2026**, lettre du 26/08/2026 sans réponse, voir ci-dessous |
 
 ### Ce qui a été lu, mot pour mot
 
@@ -662,3 +663,72 @@ Le crédit vit **dans la base**, jamais en dur : `getEcbMfiCount()`,
 `/llms.txt`. La formule espagnole est reproduite mot pour mot :
 
 > Own elaboration based on data from the Banco de España website (www.bde.es)
+
+
+## NBS — le prevodník slovaque (`national_bank_codes`, pays SK)
+
+Ingéré le **06/09/2026**. Page officielle, stable :
+<https://nbs.sk/en/payments/general-information/directories-and-registers/directory-identification-codes-domestic-payment-system-in-sr/>
+
+### Ce qui a été lu, mot pour mot
+
+Conditions d'utilisation du site, titre « Podmienky používania », lues à la
+source le **06/09/2026** :
+
+> « Informácie zverejňované na internetovej stránke NBS je povolené ukladať,
+> rozmnožovať a ďalej používať* bez predchádzajúceho súhlasu Národnej banky
+> Slovenska. Národná banka Slovenska však musí byť uvedená ako zdroj týchto
+> informácií a príslušný elektronický súbor nesmie byť obsahovo ani inak
+> pozmeňovaný. »
+> — <https://nbs.sk/disclaimer-sk/>
+
+Traduction de travail : les informations publiées sur le site de la NBS peuvent
+être stockées, reproduites et réutilisées sans accord préalable de la Národná
+banka Slovenska. La NBS doit toutefois être citée comme source de ces
+informations et le fichier électronique concerné ne doit être modifié ni dans
+son contenu ni autrement.
+
+L'astérisque renvoie à une note de bas de page qui ne concerne **que** la
+reproduction des billets en euros (décision BCE/2003/4) : sans rapport avec un
+répertoire de codes de paiement.
+
+### La position, et ce qui reste ouvert
+
+Nous ne redistribuons pas le fichier : nous servons **un enregistrement par
+requête**, noms verbatim, avec le crédit « Zdroj: Národná banka Slovenska », la
+version et la date d'effet lues sur la page.
+
+⏳ **Lettre du 26/08/2026 à info@nbs.sk, sans réponse au 06/09/2026** : elle
+demande si l'extraction de champs compte comme une modification du fichier au
+sens de la clause ci-dessus. La ČNB, sur une clause quasi identique, a répondu
+le **27/08/2026** que non (« you do not alter the information », avis personnel
+du département). **Si la NBS répond par la négative, le registre est retiré.**
+
+### Ce que ça impose au code
+
+- `source` et `as_of` sont des **colonnes** de `national_bank_codes`, lues par
+  toutes les surfaces (`nationalRegisterEdition()` / `nationalRegisterCredit()`
+  dans `src/lib/national-registers.ts`). Un crédit écrit en dur pourrit au
+  premier rafraîchissement — et ici il rompt une condition de licence.
+- Les noms sont stockés **verbatim**, `trim()` des bords seulement : ni
+  translittération, ni nettoyage des espaces insécables internes.
+- AT et BE laissent ces deux colonnes à `NULL` et gardent `getReferenceAsOf()` :
+  leurs éditeurs ne demandent aucun crédit et ne publient aucune date d'édition.
+
+### Base normative : cherchée, pas trouvée
+
+Ni la page du répertoire ni le PDF qu'elle publie ne citent d'acte normatif
+(`Opatrenie` absent des deux, vérifié le 06/09/2026). La revendication
+d'autorité repose donc sur ce que la page **est** : la NBS publie le répertoire
+complet des codes qu'elle attribue aux prestataires du système de paiement
+domestique, en éditions numérotées et datées. **Aucun texte n'est cité ici
+faute d'avoir pu le vérifier** — un article de loi inventé dans un commentaire
+de licence serait pire que l'absence honnête.
+
+### Le piège du lien direct
+
+`https://www.nbs.sk/_img/documents/_platobnesystemy/eurosips/prevodnik_ik_tps_sr.csv`
+répond encore **HTTP 200** et sert une édition **périmée** (en-tête slovaque,
+42 lignes, trois banques parties — 5200, 8050, 8170 — et aucune des trois
+arrivées — 2250, 3030, 6363). Mesuré le 06/09/2026. Le seeder part de la page
+et suit l'ancre qui finit par « (CSV) », dont l'UUID change à chaque version.

@@ -1,6 +1,6 @@
 ---
 title: "Sources & provenance des données"
-description: "D'où vient chaque réponse : les sept registres nationaux, la carte composite des BIC, les flux sanctions et SEPA, leur cadence de rafraîchissement, et ce qu'une absence signifie dans chacun."
+description: "D'où vient chaque réponse : les huit registres nationaux, la carte composite des BIC, les flux sanctions et SEPA, leur cadence de rafraîchissement, et ce qu'une absence signifie dans chacun."
 order: 6
 ---
 
@@ -20,12 +20,17 @@ Dans ces pays, le jeu de référence consulté **est** le registre national : `n
 | **BE** | Banque nationale de Belgique, codes d'identification bancaire | mensuel | nom en quatre langues au plus — le fichier ne publie aucune adresse ; les créneaux réservés (*VRIJ*, *Onbeschikbaar*) sont traités comme non attribués |
 | **FI** | Finance Finland, codes d'établissements monétaires | à chaque republication | les codes sont attribués à des **groupes bancaires**, pas à des établissements — un résultat confirme le groupe, l'affirmation positive est donc plus faible et la réponse le dit |
 | **BG** | Bulgarian National Bank, registre des codes BAE | relu mensuellement (le registre, lui, est republié **à la demande** et non selon un calendrier — `as_of` porte sa date d'effet à lui, pas la nôtre) | le nom seul, en cyrillique tel que publié, plus le BIC du siège. Le verdict porte sur le **code banque de quatre lettres** (positions 5-8 de l'IBAN) : un code BAE couvre aussi les chiffres d'agence en positions 9-12, mais le registre n'énumère pas les agences de toutes les banques au même standard, donc ces chiffres ne servent jamais à refuser |
+| **SK** | Národná banka Slovenska, répertoire des codes d'identification du système de paiement domestique (le *prevodník*) | relu mensuellement (le registre paraît en **éditions numérotées** portant leur propre date d'effet — `as_of` porte cette date, pas la nôtre) | le nom et le BIC seuls, verbatim avec les diacritiques slovaques ; aucune adresse. Huit établissements tchèques détiennent un code de paiement slovaque et publient un BIC tchèque — le registre les liste, donc nous les servons |
 
 Ce que le registre publie sur l'établissement titulaire est servi dans `bank_code_check.institution` : nom, adresse du siège à la profondeur que le registre porte, LEI quand il existe. Les champs absents sont `null`, jamais devinés.
 
 La Bulgarie est la plus récente de ces entrées et arrive avec le rafraîchissement mensuel : tant que la première exécution n'a pas chargé le registre, le pays retombe sur la carte composite et `authoritative` reste `false` — la réponse ne revendique jamais un registre qu'elle ne détient pas. Le repère fiable est `bank_code_check.register`, qui ne nomme la Bulgarian National Bank qu'une fois les lignes présentes.
 
 Les données bulgares sont reproduites avec l'autorisation écrite de la Bulgarian National Bank (27/08/2026) au titre des conditions d'usage de son site, dont les conditions sont de citer la source et de ne pas altérer ni déformer les données. Les deux voyagent avec la réponse : `bank_code_check.register` nomme la Bulgarian National Bank, `as_of` porte la date d'effet du registre lui-même, et les noms d'établissements sont servis verbatim en cyrillique plutôt que translittérés. **La réutilisation des champs bulgares emporte les mêmes conditions.** Contrairement au fichier de la Bundesbank, ce registre ne publie ni marque de suppression ni code successeur — un prestataire fermé disparaît simplement, donc un `not_in_register` bulgare n'est jamais accompagné d'une piste de re-papérisation.
+
+Les données slovaques sont reproduites au titre des conditions d'usage du site de la NBS ([*Podmienky používania*](https://nbs.sk/disclaimer-sk/), lues le 06/09/2026), qui autorisent à stocker, reproduire et réutiliser les informations publiées sur le site de la NBS **sans accord préalable**, à deux conditions : la Národná banka Slovenska doit être citée comme source, et le fichier électronique ne doit être modifié ni dans son contenu ni autrement. Les deux voyagent avec la réponse — `bank_code_check.register` et `bic.source` nomment la NBS et l'édition, `as_of` porte la date d'effet du registre lui-même, et les noms de prestataires sont servis exactement comme publiés, diacritiques et espacements internes compris, sans translittération ni nettoyage. **La réutilisation des champs slovaques emporte les mêmes conditions.**
+
+Nous avons écrit à la NBS le 26/08/2026 pour demander si extraire des champs du fichier compte comme le modifier ; sans réponse au 06/09/2026. La Banque nationale tchèque, dont les conditions portent une clause quasi identique, a répondu le 27/08/2026 que non. Si la NBS répond l'inverse, ce registre est retiré. Comme le registre bulgare, il ne publie ni marque de suppression ni code successeur : un `not_in_register` slovaque n'est jamais accompagné d'une piste de re-papérisation.
 
 ## La carte composite des BIC — là où `authoritative: false`
 

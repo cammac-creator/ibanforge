@@ -42,7 +42,7 @@ Die deutsche Bankleitzahl `37040044` wurde aus der IBAN extrahiert, gegen die Da
 ## Wie die Auflösung wirklich funktioniert
 
 1. **Bankcode extrahieren** — aus der IBAN, nach der BBAN-Struktur des Landes (89 Länder abgedeckt).
-2. **Zuerst das Nationalregister fragen.** Für CH/LI (SIX BankMaster), DE (Bundesbank), AT (OeNB), BE (BNB) und FI ist das Register die Vergabestelle: Ein Treffer ist das Institut, dem der Code gehört; ein Fehlen (`not_in_register`) heißt, der Code ist an niemanden vergeben — ein starker Grund, eine Zahlung zu stoppen. Siehe [Datenquellen](/docs/data-sources) für das, was jedes Register veröffentlicht.
+2. **Zuerst das Nationalregister fragen.** Für CH/LI (SIX BankMaster), DE (Bundesbank), AT (OeNB), BE (Belgische Nationalbank), BG (Bulgarische Nationalbank), SK (NBS) und FI ist das Register die Vergabestelle: Ein Treffer ist das Institut, dem der Code gehört; ein Fehlen (`not_in_register`) heißt, der Code ist an niemanden vergeben — ein starker Grund, eine Zahlung zu stoppen. Siehe [Datenquellen](/docs/data-sources) für das, was jedes Register veröffentlicht.
 3. **Sonst auf die zusammengesetzte BIC-Karte zurückfallen:** 121k+ Einträge aus GLEIF, dem öffentlichen SWIFT-Verzeichnis, SIX, EBA STEP2, Bundesbank und NBP. Ein Treffer benennt den Inhaber des passenden BIC — diese Fälle sind `authoritative: false` markiert, denn den BIC-Inhaber zu nennen ist ein Fakt, ihn zur Bank Ihrer Gegenpartei zu erklären wäre eine Vermutung.
 
 ## Die ehrlichen Grenzen

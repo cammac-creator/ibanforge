@@ -1,0 +1,75 @@
+---
+title: "Codes banque slovaques (prevodník NBS)"
+description: "Vérifier un code de paiement slovaque (4 chiffres) contre le répertoire de la Národná banka Slovenska : le registre entier tient en 38 codes, dont huit détenus par des banques tchèques, et l'IBAN d'exemple officiel slovaque porte un code attribué à personne."
+order: 10
+---
+
+# Codes banque slovaques — le prevodník de la NBS
+
+La Slovaquie l'appelle **kód platobného styku**, code du système de paiement : quatre chiffres en positions 5 à 8 d'un IBAN `SK`, devant un préfixe de compte à six chiffres et un numéro de compte à dix chiffres. Le registre derrière, c'est le **répertoire des codes d'identification du système de paiement domestique de la Národná banka Slovenska** — le *prevodník* — et la NBS est l'autorité qui attribue ces quatre chiffres aux prestataires du système de paiement domestique.
+
+C'est le **plus petit** registre que nous détenions : 38 codes pour tout le pays. Ce n'est pas un défaut de couverture, c'est la taille du système de paiement slovaque, et c'est pourquoi [chaque code a sa page](/sk) plutôt qu'un lot sélectionné.
+
+## Un seul appel
+
+```bash
+curl -X POST https://api.ibanforge.com/v1/iban/validate \
+  -H "Content-Type: application/json" \
+  -d '{"iban": "SK3112000000198742637541"}'
+```
+
+```json
+{
+  "valid": true,
+  "bic": null,
+  "bank_code_check": {
+    "value": "1200",
+    "status": "not_in_register",
+    "reason": "not_allocated",
+    "match": null,
+    "register": "Národná banka Slovenska, prevodník of identification codes for the domestic payment system",
+    "authoritative": true,
+    "as_of": "2026-05"
+  }
+}
+```
+
+Cet IBAN n'est pas une faute de frappe non plus. `SK31 1200 0000 1987 4263 7541` est l'**IBAN d'exemple officiel de la Slovaquie**, celui du registre ISO 13616 et de la moitié des suites de tests du web — et son code de paiement `1200` ne figure nulle part dans le prevodník. La structure est parfaite (`valid: true`), l'attribution est vide (`not_in_register`), et les deux affirmations sont vraies en même temps. C'est le même motif que l'autrichien `AT61 1904 3002 3457 3201`, décrit dans [les deux IBAN d'exemple préférés du monde pointent vers des codes banque qui n'existent pas](/blog/2026-08-06-example-ibans-unallocated-bank-codes).
+
+## Ce que `not_in_register` veut dire ici
+
+`authoritative: true` est ce qui donne son poids à ce « non » : le jeu de référence consulté **est** le registre qui attribue les codes de paiement slovaques, donc une absence est le verdict de l'autorité d'attribution elle-même, pas un trou dans nos données.
+
+`reason: "not_allocated"` en est la moitié lisible par une machine — la seule valeur de ce champ qui autorise à arrêter un paiement. Là où nous retombons sur la carte composite des BIC, une absence ne prouve rien, et la raison le dit à la place.
+
+## Ce que publie le prevodník
+
+| Champ | Dans le registre slovaque | Note |
+|---|---|---|
+| `name` | oui | le prestataire de services de paiement, verbatim — diacritiques slovaques tels que publiés, jamais translittérés |
+| `bic` | pour 34 des 38 codes | le BIC à 8 caractères que le registre associe au code |
+| `street` / `post_code` / `town` | **non** | le répertoire ne publie aucune adresse ; les champs sont `null` parce que c'est ce que la Slovaquie publie, pas parce que nous les aurions perdus |
+| `lei` | non | absent de ce registre |
+
+Quatre codes sont attribués et **ne portent aucun BIC** (8191, 8400, 9950, 9956). Ils répondent `verified` avec `bic: null` : l'établissement existe, le registre ne publie simplement pas de BIC pour lui. Existence et disponibilité du BIC sont deux questions distinctes, et la réponse les garde distinctes.
+
+## Huit banques tchèques avec un code slovaque
+
+Fio banka, J&T, TRINITY, PPF, MONETA, Air bank, CREDITAS et Partners détiennent des codes de paiement slovaques et publient des BIC **tchèques** (`FIOBCZPP`, `AGBACZPP`, etc.). Le registre les liste, donc nous les servons : un IBAN slovaque sur le code `0600` mène bien à une banque dont le BIC finit par `CZPP`. Un validateur qui exigerait discrètement que le pays du BIC corresponde à celui de l'IBAN refuserait les huit.
+
+À noter aussi : Fio et J&T apparaissent chacune deux fois, sous un code de succursale slovaque et un code de maison mère tchèque avec des BIC différents ; et `3100` est le *code de dobeh* de Prima banka Slovensko — un code de paiements en cours, maintenu à côté de son `5600` actif. Le registre le dit ; nous servons les mots du registre.
+
+## Fraîcheur et citation
+
+La NBS publie le prevodník en **éditions numérotées** portant leur propre date d'effet, et nous rafraîchissons mensuellement. `as_of` porte donc la date du **registre**, pas notre mois de rafraîchissement — la dater avec le nôtre revendiquerait une fraîcheur que la NBS n'a jamais annoncée.
+
+Les données slovaques sont reproduites au titre des conditions d'usage du site de la NBS (*Podmienky používania*), qui autorisent à stocker, reproduire et réutiliser les informations publiées **sans accord préalable**, à condition que la Národná banka Slovenska soit citée comme source et que le fichier ne soit pas modifié. Les deux conditions voyagent avec chaque réponse : `bank_code_check.register` et `bic.source` nomment l'autorité et l'édition, `as_of` porte sa date d'effet, et les noms sont servis exactement comme publiés. **La réutilisation de ces champs emporte les mêmes conditions.** La note de provenance complète est sur [sources des données](/docs/data-sources).
+
+## Les limites honnêtes
+
+- **Nous vérifions le code de paiement, jamais le compte ni son titulaire.** Un code slovaque `verified` nomme l'établissement titulaire du code et ne dit rien des seize chiffres à côté.
+- **Établissement, pas agence.** Le préfixe de compte à six chiffres est un champ interne à la banque ; ce n'est pas un code d'agence que le registre énumère, et il ne sert jamais à refuser.
+- **Aucune adresse, et aucune inventée.** Voir le tableau ci-dessus.
+- **Aucune marque de suppression.** Contrairement au fichier de la Bundesbank, ce registre ne publie ni marqueur de retrait ni code successeur — un prestataire qui s'en va disparaît simplement de l'édition suivante, donc un `not_in_register` slovaque n'est jamais accompagné d'une piste de re-papérisation.
+
+À lire aussi : [Ce que « verified » signifie](/docs/iban-validate) · [Sources des données](/docs/data-sources) · [IBAN vers BIC](/docs/iban-to-bic) · [Codes banque autrichiens](/docs/at-bank-codes) · [Tous les codes de paiement slovaques](/sk)

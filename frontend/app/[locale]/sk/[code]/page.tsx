@@ -14,10 +14,21 @@ export const dynamicParams = true;
  * The whole register is pre-listed, because the whole register is 38 codes.
  * The German and Austrian pages ship a first batch to keep Google's "scaled
  * content" rule at bay; at this size there is no tail to hold back.
+ *
+ * The unpadded forms are listed TOO — `200` beside `0200`. `getSkCode` pads, so
+ * both resolve to the same entry, but `dynamicParams` is not what makes that
+ * reachable: measured 06/09/2026 against `next start`, a param outside this
+ * list answers 404 (`NoFallbackError`) whether or not `dynamicParams` is true —
+ * `/at/18170` is a real Austrian bank code and does exactly that. So a path
+ * that must render has to be named here. Only the four codes the NBS publishes
+ * with a leading zero add an entry; each declares the padded form as its
+ * canonical, so the alias is a door, not a second page.
  */
 export function generateStaticParams() {
   const { batch1 } = skBankFile();
-  return routing.locales.flatMap((locale) => batch1.map((code) => ({ locale, code })));
+  const codes = new Set(batch1);
+  for (const code of batch1) codes.add(String(Number(code)));
+  return routing.locales.flatMap((locale) => [...codes].map((code) => ({ locale, code })));
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string; code: string }> }): Promise<Metadata> {
