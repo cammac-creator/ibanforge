@@ -1,5 +1,8 @@
 import Link from "next/link"
+import { hasLocale } from "next-intl"
 import { getTranslations, setRequestLocale } from "next-intl/server"
+import { notFound } from "next/navigation"
+import { routing } from "@/i18n/routing"
 import { Button } from "@/components/ui/button"
 import { GetKeyButton } from "@/components/api-key-dialog"
 import { Reveal } from "@/components/reveal"
@@ -24,6 +27,7 @@ import { localePath } from "@/lib/locale-path"
 // so the home declares its canonical + hreflang set here.
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params
+  if (!hasLocale(routing.locales, locale)) notFound()
   return { alternates: alternatesFor(locale, "/") }
 }
 
@@ -54,6 +58,14 @@ const INTEGRATIONS = [
 
 export default async function Home({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
+  // The home is the one page a bogus first segment lands on: `/icon-512.png`
+  // for a file that does not exist is routed here with locale "icon-512.png".
+  // The locale layout refuses it with notFound(), but Next renders layout and
+  // page concurrently, and `new Intl.NumberFormat("icon-512.png")` below throws
+  // RangeError before the layout's refusal lands — a 500 where a 404 is owed
+  // (measured 2026-09-05 live, 2026-09-06 under `next start` once the layout
+  // stopped hiding it behind dynamicParams = false). Same guard, this side.
+  if (!hasLocale(routing.locales, locale)) notFound()
   setRequestLocale(locale)
   const t = await getTranslations('home');
   const liveStats = await getLandingStats();
