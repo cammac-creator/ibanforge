@@ -75,6 +75,7 @@ import { notFoundHandler } from './lib/not-found.js';
 import { getEntryCount, getChClearingCount, getLeiEnrichedCount } from './lib/bic-lookup.js';
 import { getPraBanksCount, praAttribution } from './lib/pra-banks.js';
 import { bgAttribution, getBgBankCodeCount } from './lib/bg-bae.js';
+import { nationalRegisterCredit } from './lib/national-registers.js';
 import {
   getBdeListDate,
   getBdeMfiCount,
@@ -224,6 +225,18 @@ function buildLlmsTxt(): string {
   const bgSourceLine = bgCredit
     ? `\n- Bulgarian bank codes: ${bgCredit} — ${getBgBankCodeCount()} bank codes, reproduced with attribution under the Bulgarian National Bank's site terms (source cited, data unaltered)`
     : '';
+  // Slovakia, on the same rule and for the same reason. The NBS site terms
+  // ("Podmienky používania") permit storing, reproducing and reusing published
+  // information without prior consent provided the NBS is named as the source
+  // and the file is not altered — so the credit and its effective date are read
+  // from the rows the seeder wrote, never written here. Absent entirely when no
+  // register is loaded, and on a line of its own for the same reason Bulgaria's
+  // is: the register's name carries commas, and a citation that is a licence
+  // condition must not become ambiguous inside a comma-separated list.
+  const skCredit = nationalRegisterCredit('SK');
+  const skSourceLine = skCredit
+    ? `\n- Slovak bank codes: ${skCredit} — reproduced with attribution under the NBS site terms (source named, file unaltered)`
+    : '';
   // The `>` line is the one sentence an LLM keeps about this product, so it
   // has to be the promise people actually buy. It opened on "Pre-payout
   // screening for AI agents" long after the research of 2026-07-28 told us to
@@ -239,7 +252,7 @@ function buildLlmsTxt(): string {
 
 - BIC directory: GLEIF (LEI-enriched), SwiftCodes (MIT), Quelle: Deutsche Bundesbank, SIX, NBP, EBA Step2 SCT
 - Swiss clearing: SIX BankMaster (BC-Nummer / IID)
-- National bank-code registers: Deutsche Bundesbank (attribution wording per its terms: Quelle: Deutsche Bundesbank), Oesterreichische Nationalbank, Banque nationale de Belgique, Finance Finland${bgSourceLine}
+- National bank-code registers: Deutsche Bundesbank (attribution wording per its terms: Quelle: Deutsche Bundesbank), Oesterreichische Nationalbank, Banque nationale de Belgique, Finance Finland${bgSourceLine}${skSourceLine}
 ${praSourceLine}
 ${identitySourceLines}
 ${psdSourceLine}

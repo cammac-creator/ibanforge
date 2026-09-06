@@ -46,7 +46,7 @@ export interface DemandProposal {
  * Where the national bank-code register lives, for the countries the ledger
  * is most likely to name. A hint, not a promise: each entry is what we know
  * of the publisher, to save the first hour of the search. Countries we
- * already consult (DE, CH, LI, AT, BE, BG, FI, PL, NL, ES via the MFI lists)
+ * already consult (DE, CH, LI, AT, BE, BG, SK, FI, PL, NL, ES via the MFI lists)
  * are not here on purpose: a gap there is a register we hold, not one to plug.
  */
 export const REGISTER_HINTS: Readonly<Record<string, string>> = {

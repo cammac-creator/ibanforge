@@ -27,6 +27,8 @@ const failing = {
   deRegister: false,
   bgRegister: false,
   nationalRegister: false,
+  /** The table is ABSENT, not broken — an image built before the seeder ran. */
+  nationalRegisterMissing: false,
 };
 
 vi.mock('./bic-lookup.js', async (importOriginal) => {
@@ -84,6 +86,14 @@ vi.mock('./national-registers.js', async (importOriginal) => {
         throw new Error('SqliteError: database disk image is malformed');
       return actual.lookupNationalCode(cc, code);
     },
+    // The other half of the same class, and a different answer: a table that
+    // is MISSING rather than corrupt. A Docker image built before the seeder
+    // ran has exactly this shape, and it must degrade to the composite map
+    // with the authority dropped — never read every code as unallocated.
+    nationalRegisterAvailable: (cc: string) => {
+      if (failing.nationalRegisterMissing) return false;
+      return actual.nationalRegisterAvailable(cc);
+    },
   };
 });
 
@@ -107,6 +117,7 @@ beforeEach(() => {
   failing.deRegister = false;
   failing.bgRegister = false;
   failing.nationalRegister = false;
+  failing.nationalRegisterMissing = false;
 });
 
 describe('an unreadable reference set is reported, never ruled on', () => {
@@ -196,6 +207,28 @@ describe('an unreadable reference set is reported, never ruled on', () => {
     const r = check('AT311200000012345678');
     expect(r.bank_code_check!.status).toBe('unavailable');
     expect(r.bank_code_check!.reason).toBe('lookup_failed');
+    expect(r.bank_code_check!.authoritative).toBe(false);
+  });
+
+  it('a broken Slovak register read is unavailable, never an authoritative denial', () => {
+    // 1100 is Tatra banka, a real bank in the prevodník. An unreadable table
+    // must not turn it into "no institution holds this account".
+    failing.nationalRegister = true;
+    const r = check('SK9811000000000000000001');
+    expect(r.bank_code_check!.status).toBe('unavailable');
+    expect(r.bank_code_check!.reason).toBe('lookup_failed');
+    expect(r.bank_code_check!.authoritative).toBe(false);
+    expect(r.next_steps?.map((s) => s.code)).not.toContain('bank_code_not_allocated');
+  });
+
+  it('a MISSING Slovak register degrades to the composite map and says so', () => {
+    // The image built before the seeder ran. Slovakia falls back to the
+    // composite map — the right behaviour — but the reason must not claim the
+    // code is absent from reference data that was never consulted. One token
+    // separates our degradation from a finding about the beneficiary.
+    failing.nationalRegisterMissing = true;
+    const r = check('SK4499990000000000000001'); // fabricated code
+    expect(r.bank_code_check!.reason).toBe('national_register_unavailable');
     expect(r.bank_code_check!.authoritative).toBe(false);
   });
 
