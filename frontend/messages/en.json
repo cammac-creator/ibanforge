@@ -2109,6 +2109,25 @@
       "indexTitle": "Belgian bank codes (NBB list)",
       "indexIntro": "Every bank identifier allocated in the National Bank of Belgium list, one page per institution, with the BIC it pairs with it and the exact answer of the IBANforge API. The register publishes names only: no address appears here that the register did not publish.",
       "countryLink": "The Belgian IBAN format, with the official example"
+    },
+    "sk": {
+      "metaTitle": "Slovak bank code {code}: {name}",
+      "metaDescription": "Payment code {code} in the Národná banka Slovenska directory: {name}, BIC {bic}. IBAN structure, SEPA reach and the exact answer of the IBANforge API.",
+      "eyebrow": "Národná banka Slovenska directory",
+      "title": "Slovak bank code {code}",
+      "facts": {
+        "code": "Payment system code",
+        "bank": "Payment service provider",
+        "bic": "BIC",
+        "none": "none"
+      },
+      "structure": "A Slovak IBAN is SK, two check digits, the four-digit payment code, a six-digit account prefix, then the ten-digit account number. The payment code is what the NBS directory can vouch for; the account part is known only to the bank.",
+      "noAddress": "The directory publishes a name and a BIC, and no address. The blanks are what the register holds, not a gap on our side.",
+      "docLink": "How the Slovak register answers",
+      "indexTitle": "Slovak bank codes (NBS directory)",
+      "indexIntro": "Every payment code of the Národná banka Slovenska directory — the prevodník — with the payment service provider, the BIC the register pairs with it, and the exact answer of the IBANforge API. Refreshed monthly with the register.",
+      "wholeRegister": "All {count} codes of the register are listed: the Slovak payment system is small enough that there is no tail to hold back.",
+      "countryLink": "The Slovak IBAN format, with the official example"
     }
   },
   "countries": {

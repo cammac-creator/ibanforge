@@ -64,6 +64,7 @@ export const REGISTER_INDEX: Record<string, string> = {
   LI: '/iid',
   AT: '/at',
   BE: '/be',
+  SK: '/sk',
 };
 
 /**

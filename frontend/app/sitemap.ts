@@ -1,5 +1,5 @@
 import { MetadataRoute } from "next";
-import { atBlzFile, beBankFile, chIidFile, deBlzFile } from "@/lib/registers";
+import { atBlzFile, beBankFile, chIidFile, deBlzFile, skBankFile } from "@/lib/registers";
 import { allCountryCodes } from "@/lib/countries";
 import { getAllDocs } from "@/lib/mdx";
 import { getAllPosts } from "@/lib/blog";
@@ -54,6 +54,13 @@ export default function sitemap(): MetadataRoute.Sitemap {
     (c) => `/be/${c}`,
     ["fr", "en"],
   );
+  // Slovakia in English only. Slovak is not one of this site's three locales,
+  // and the edition of the directory we actually read and cite is the English
+  // one the NBS publishes — so listing these under de or fr would offer a
+  // crawler a translation of a page nobody asked for. All 38 codes are in the
+  // first batch: the register is small enough to have no tail.
+  const sk = skBankFile();
+  listRegister(Object.keys(sk.entries), sk.batch1, (c) => `/sk/${c}`, ["en"]);
 
   // One page per IBAN country, in the three languages (2026-09-06).
   for (const cc of allCountryCodes()) {
@@ -82,6 +89,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
       { url: `${prefix}/iid`, changeFrequency: "monthly", priority: 0.7 },
       { url: `${prefix}/at`, changeFrequency: "monthly", priority: 0.7 },
       { url: `${prefix}/be`, changeFrequency: "monthly", priority: 0.7 },
+      { url: `${prefix}/sk`, changeFrequency: "monthly", priority: 0.7 },
       { url: `${prefix}/playground`, changeFrequency: "monthly", priority: 0.9 },
       { url: `${prefix}/docs`, changeFrequency: "weekly", priority: 0.8 },
       { url: `${prefix}/pricing`, changeFrequency: "monthly", priority: 0.7 },

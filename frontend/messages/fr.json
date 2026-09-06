@@ -2109,6 +2109,25 @@
       "indexTitle": "Codes banque belges (liste BNB)",
       "indexIntro": "Chaque identifiant bancaire attribué dans la liste de la Banque nationale de Belgique, une page par établissement, avec le BIC qui lui est associé et la réponse exacte de l'API IBANforge. Le registre ne publie que des noms : aucune adresse n'apparaît ici que le registre n'ait publiée.",
       "countryLink": "Le format de l'IBAN belge, avec l'exemple officiel"
+    },
+    "sk": {
+      "metaTitle": "Code banque slovaque {code} : {name}",
+      "metaDescription": "Code de paiement {code} dans le répertoire de la Národná banka Slovenska : {name}, BIC {bic}. Structure de l’IBAN, portée SEPA et la réponse exacte de l’API IBANforge.",
+      "eyebrow": "Répertoire de la Národná banka Slovenska",
+      "title": "Code banque slovaque {code}",
+      "facts": {
+        "code": "Code de paiement",
+        "bank": "Prestataire de services de paiement",
+        "bic": "BIC",
+        "none": "aucun"
+      },
+      "structure": "Un IBAN slovaque, c’est SK, deux chiffres de contrôle, le code de paiement à quatre chiffres, un préfixe de compte à six chiffres, puis le numéro de compte à dix chiffres. Le code de paiement est ce que le répertoire de la NBS peut attester ; la partie compte n’est connue que de la banque.",
+      "noAddress": "Le répertoire publie un nom et un BIC, pas d’adresse. Les cases vides sont ce que contient le registre, pas un manque de notre côté.",
+      "docLink": "Ce que répond le registre slovaque",
+      "indexTitle": "Codes banque slovaques (répertoire NBS)",
+      "indexIntro": "Tous les codes de paiement du répertoire de la Národná banka Slovenska — le prevodník — avec le prestataire de services de paiement, le BIC que le registre lui associe, et la réponse exacte de l’API IBANforge. Rafraîchi chaque mois avec le registre.",
+      "wholeRegister": "Les {count} codes du registre sont listés : le système de paiement slovaque est assez petit pour qu’il n’y ait pas de reste à garder de côté.",
+      "countryLink": "Le format de l’IBAN slovaque, avec l’exemple officiel"
     }
   },
   "countries": {
