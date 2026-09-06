@@ -33,6 +33,7 @@ import {
 import { checkSwissQrBill } from '../lib/swiss-qr-bill.js';
 
 import { extractClientIp } from '../lib/stats.js';
+import { countDailyUnits } from '../lib/daily-ip-ledger.js';
 import {
   buildCountriesPayload,
   buildPricingPayload,
@@ -792,20 +793,13 @@ export const MCP_DAILY_LIMIT = 10;
  * a container. Same ledger as the tool-call allowance, separate key.
  */
 export const MCP_SESSIONS_PER_IP_DAY = 30;
-const mcpCallCounts = new Map<string, { count: number; date: string }>();
 
-// Clean up stale entries every 10 minutes
-setInterval(
-  () => {
-    const today = new Date().toISOString().slice(0, 10);
-    for (const [key, val] of mcpCallCounts) {
-      if (val.date !== today) mcpCallCounts.delete(key);
-    }
-    // Same tick, the other leak: sessions nobody ever closed (SEC-01/MCP-08).
-    mcpSessions.sweep();
-  },
-  10 * 60 * 1000,
-).unref();
+// The sessions nobody ever closed (SEC-01/MCP-08). It used to share a tick with
+// the call counter; since the counter moved to src/lib/daily-ip-ledger.ts —
+// where the REST trial reads it too — the store keeps its own interval. Two
+// unrelated lifetimes in one timer is how one of them ends up cancelled with
+// the other.
+setInterval(() => mcpSessions.sweep(), 10 * 60 * 1000).unref();
 
 /**
  * `units` is the number of billable units this HTTP request carries — a
@@ -815,21 +809,17 @@ setInterval(
  *
  * `key` is the ledger entry, not necessarily an address: session openings are
  * counted on `init:<ip>` against their own ceiling.
+ *
+ * The counting itself lives in the shared daily ledger, unchanged: the entry
+ * grows even when the answer is a refusal, which is what stops a refused
+ * caller from retrying the cheap request all day.
  */
 function checkMcpRateLimit(
   key: string,
   units = 1,
   limit: number = MCP_DAILY_LIMIT,
 ): { allowed: boolean; used: number; remaining: number } {
-  const today = new Date().toISOString().slice(0, 10);
-  const entry = mcpCallCounts.get(key);
-  if (!entry || entry.date !== today) {
-    mcpCallCounts.set(key, { count: units, date: today });
-    return { allowed: units <= limit, used: units, remaining: Math.max(0, limit - units) };
-  }
-  entry.count += units;
-  const allowed = entry.count <= limit;
-  return { allowed, used: entry.count, remaining: Math.max(0, limit - entry.count) };
+  return countDailyUnits(key, units, limit);
 }
 
 /**
