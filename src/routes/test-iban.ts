@@ -21,11 +21,30 @@ import { enrichResult } from '../lib/enrich.js';
 
 const testIban = new Hono();
 
-const COUNTRIES = ['CH', 'DE', 'AT', 'BE'] as const;
+const COUNTRIES = ['CH', 'DE', 'AT', 'BE', 'SK'] as const;
 type Country = (typeof COUNTRIES)[number];
 
 const NOTE =
   'Structurally valid test IBAN with a REAL, register-allocated bank code. The account digits are random — this is NOT a real account. Safe for demos, fixtures and integration tests.';
+
+/**
+ * A digit string whose weighted sum is 0 mod 11: the domestic check both Czech
+ * and Slovak banks apply to the account number (weights 6 3 7 9 10 5 8 4 2 1)
+ * and to its six-digit prefix (weights 10 5 8 4 2 1). A random Slovak BBAN
+ * passes ISO mod-97 and fails this check ten times out of eleven, which is a
+ * test IBAN no Slovak bank would recognise as a number it could have issued —
+ * the Belgian branch below exists for the same reason. The last weight is 1,
+ * so the last digit settles the sum; when it would have to be 10, draw again.
+ */
+function mod11Digits(weights: readonly number[]): string {
+  for (;;) {
+    const head = randDigits(weights.length - 1);
+    let sum = 0;
+    for (let i = 0; i < head.length; i++) sum += Number(head[i]) * weights[i];
+    const last = (11 - (sum % 11)) % 11;
+    if (last < 10) return head + String(last);
+  }
+}
 
 function randDigits(n: number): string {
   let s = '';
@@ -70,6 +89,9 @@ function pickBankCode(country: Country): string | null {
   return row?.code ?? null;
 }
 
+const SK_PREFIX_WEIGHTS = [10, 5, 8, 4, 2, 1] as const;
+const SK_ACCOUNT_WEIGHTS = [6, 3, 7, 9, 10, 5, 8, 4, 2, 1] as const;
+
 function buildIban(country: Country, bankCode: string): string {
   let bban: string;
   switch (country) {
@@ -89,6 +111,9 @@ function buildIban(country: Country, bankCode: string): string {
       bban = bankCode + account + String(national).padStart(2, '0');
       break;
     }
+    case 'SK': // 4!n payment code + 6!n prefix + 10!n account, both mod-11 checked
+      bban = bankCode + mod11Digits(SK_PREFIX_WEIGHTS) + mod11Digits(SK_ACCOUNT_WEIGHTS);
+      break;
   }
   return country + ibanCheckDigits(country, bban) + bban;
 }

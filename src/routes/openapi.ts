@@ -1133,7 +1133,7 @@ const buildRawSpec = () => ({
         operationId: 'getTestIban',
         summary: 'Generate test IBANs with REAL bank codes',
         description:
-          'Free. Generates structurally valid test IBANs whose bank codes are drawn from the national registers we serve (CH, DE, AT, BE) — unlike the usual generators, whose checksum-valid IBANs carry arbitrary codes no register allocated. Account digits are random and belong to nobody. Each item ships with the proof: our own bank_code_check answer for that IBAN.',
+          'Free. Generates structurally valid test IBANs whose bank codes are drawn from the national registers we serve (CH, DE, AT, BE, SK) — unlike the usual generators, whose checksum-valid IBANs carry arbitrary codes no register allocated. Account digits are random and belong to nobody. Each item ships with the proof: our own bank_code_check answer for that IBAN.',
         tags: ['Free'],
         // Explicitly no authentication, which is a different statement from
         // omitting the field: an agent reading the contract can tell 'free' from
@@ -1144,7 +1144,7 @@ const buildRawSpec = () => ({
             name: 'country',
             in: 'query',
             required: false,
-            schema: { type: 'string', enum: ['CH', 'DE', 'AT', 'BE'] },
+            schema: { type: 'string', enum: ['CH', 'DE', 'AT', 'BE', 'SK'] },
             description: 'Omit for a random supported country',
           },
           {

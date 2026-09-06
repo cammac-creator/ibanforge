@@ -1553,7 +1553,7 @@
   },
   "testIban": {
     "metaTitle": "Test-IBAN-Generator — echte Bankcodes, gegen Nationalregister verifiziert",
-    "metaDescription": "Generieren Sie Test-IBANs, deren Bankcodes wirklich vergeben sind: live aus den Schweizer, deutschen, österreichischen und belgischen Nationalregistern, mit Registernachweis. Zufällige Kontoziffern, sicher für Fixtures und Demos.",
+    "metaDescription": "Generieren Sie Test-IBANs, deren Bankcodes wirklich vergeben sind: live aus den Schweizer, deutschen, österreichischen, belgischen und slowakischen Nationalregistern, mit Registernachweis. Zufällige Kontoziffern, sicher für Fixtures und Demos.",
     "eyebrow": "Kostenloses Tool",
     "title": "Test-IBAN-Generator — mit echten Bankcodes",
     "intro": "Die meisten Test-IBAN-Generatoren erzeugen prüfziffernvalide IBANs mit erfundenen Bankcodes — sogar drei der vier offiziellen Beispiel-IBANs zeigen auf Codes, die kein Register je vergeben hat. Dieser Generator zieht seine Bankcodes live aus den Nationalregistern (SIX, Bundesbank, OeNB, NBB): Ihre Fixtures überstehen eine echte Bankcode-Prüfung. Die Kontoziffern sind zufällig und gehören niemandem.",

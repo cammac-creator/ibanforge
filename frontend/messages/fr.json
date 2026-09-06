@@ -1553,7 +1553,7 @@
   },
   "testIban": {
     "metaTitle": "Générateur d'IBAN de test — codes banque réels, vérifiés aux registres nationaux",
-    "metaDescription": "Générez des IBAN de test dont les codes banque sont réellement attribués : tirés en direct des registres nationaux suisse, allemand, autrichien et belge, preuve du registre incluse. Chiffres de compte aléatoires, sûrs pour fixtures et démos.",
+    "metaDescription": "Générez des IBAN de test dont les codes banque sont réellement attribués : tirés en direct des registres nationaux suisse, allemand, autrichien, belge et slovaque, preuve du registre incluse. Chiffres de compte aléatoires, sûrs pour fixtures et démos.",
     "eyebrow": "Outil gratuit",
     "title": "Générateur d'IBAN de test — avec de vrais codes banque",
     "intro": "La plupart des générateurs d'IBAN de test produisent des IBAN à clé valide avec des codes banque inventés — trois des quatre IBAN d'exemple officiels pointent même des codes qu'aucun registre n'a attribués. Ce générateur tire ses codes banque en direct des registres nationaux (SIX, Bundesbank, OeNB, BNB) : vos fixtures survivent à un vrai contrôle du code banque. Les chiffres de compte sont aléatoires et n'appartiennent à personne.",

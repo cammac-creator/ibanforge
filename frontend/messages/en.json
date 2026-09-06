@@ -1553,7 +1553,7 @@
   },
   "testIban": {
     "metaTitle": "Test IBAN Generator — real bank codes, verified against national registers",
-    "metaDescription": "Generate test IBANs whose bank codes are actually allocated: drawn live from the Swiss, German, Austrian and Belgian national registers, with the register proof attached. Random account digits, safe for fixtures and demos.",
+    "metaDescription": "Generate test IBANs whose bank codes are actually allocated: drawn live from the Swiss, German, Austrian, Belgian and Slovak national registers, with the register proof attached. Random account digits, safe for fixtures and demos.",
     "eyebrow": "Free tool",
     "title": "Test IBAN generator — with real bank codes",
     "intro": "Most test-IBAN generators emit checksum-valid IBANs with made-up bank codes — even three of the four official example IBANs point at codes no register ever allocated. This generator draws its bank codes live from the national registers (SIX, Bundesbank, OeNB, NBB), so your fixtures survive a real bank-code check. The account digits are random and belong to nobody.",

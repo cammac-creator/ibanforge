@@ -68,3 +68,23 @@ describe('GET /v1/test-iban', () => {
     expect(bban.slice(10, 12)).toBe(String(national).padStart(2, '0'));
   });
 });
+
+describe('GET /v1/test-iban?country=SK', () => {
+  it('SK: the payment code is in the register and the mod-11 checks hold on prefix and account', async () => {
+    const res = await makeApp().request('/v1/test-iban?country=SK&count=5');
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { test_ibans: Item[] };
+    expect(body.test_ibans.length).toBeGreaterThan(0);
+    const weighted = (digits: string, weights: number[]): number =>
+      [...digits].reduce((sum, d, i) => sum + Number(d) * weights[i], 0);
+    for (const item of body.test_ibans) {
+      expect(item.iban).toMatch(/^SK\d{22}$/);
+      const prefix = item.iban.slice(8, 14);
+      const account = item.iban.slice(14, 24);
+      expect(weighted(prefix, [10, 5, 8, 4, 2, 1]) % 11).toBe(0);
+      expect(weighted(account, [6, 3, 7, 9, 10, 5, 8, 4, 2, 1]) % 11).toBe(0);
+      expect(item.proof.bank_code_check.status).toBe('verified');
+      expect(item.proof.bank_code_check.authoritative).toBe(true);
+    }
+  });
+});
