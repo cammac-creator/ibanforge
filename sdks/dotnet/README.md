@@ -16,10 +16,9 @@ whichever language fits, the mental model transfers directly.
 dotnet add package IBANforge.Sdk
 ```
 
-> Publication on NuGet.org is pending. Until then, reference the project
-> directly (`dotnet add reference ../path/to/IBANforge.Sdk.csproj`) or build
-> your own package locally with `dotnet pack` and point NuGet at the resulting
-> `.nupkg`.
+> Published on [nuget.org](https://www.nuget.org/packages/IBANforge.Sdk) since 1.5.0
+> (2026-09-06), through nuget.org trusted publishing from this repository's CI.
+> To build from source instead: `dotnet pack src/IBANforge.Sdk/IBANforge.Sdk.csproj -c Release`.
 
 ## Quickstart
 

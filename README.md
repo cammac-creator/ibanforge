@@ -96,7 +96,7 @@ Pick your language:
 | **TypeScript / JavaScript** | [`@ibanforge/sdk`](https://www.npmjs.com/package/@ibanforge/sdk) | `npm install @ibanforge/sdk` | [`sdks/typescript/`](sdks/typescript/) |
 | **Python** | [`ibanforge`](https://pypi.org/project/ibanforge/) | `pip install ibanforge` | [`sdks/python/`](sdks/python/) |
 | **Java** (17+) | [`com.ibanforge:ibanforge-sdk`](https://central.sonatype.com/artifact/com.ibanforge/ibanforge-sdk) | Maven dependency, see README | [`sdks/java/`](sdks/java/) |
-| **.NET** (net8.0) | `IBANforge.Sdk` (NuGet pending, `dotnet pack` from source) | see README | [`sdks/dotnet/`](sdks/dotnet/) |
+| **.NET** (net8.0) | [`IBANforge.Sdk`](https://www.nuget.org/packages/IBANforge.Sdk) | `dotnet add package IBANforge.Sdk` | [`sdks/dotnet/`](sdks/dotnet/) |
 | **MCP server** | [`ibanforge-mcp`](https://www.npmjs.com/package/ibanforge-mcp) | `npx -y ibanforge-mcp` | [`mcp/`](mcp/) |
 | Curl / any HTTP client | — | — | [OpenAPI spec](https://api.ibanforge.com/openapi.json) |
 

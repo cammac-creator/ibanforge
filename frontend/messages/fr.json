@@ -267,7 +267,7 @@
         "ts": "SDK TypeScript / JavaScript",
         "py": "SDK Python",
         "java": "SDK Java 17+ · Maven Central",
-        "dotnet": "SDK .NET 8 · depuis les sources, NuGet en attente",
+        "dotnet": "SDK .NET 8 · dotnet add package IBANforge.Sdk",
         "mcp": "Serveur MCP · Claude, Cursor, Cline",
         "n8n": "Nœud n8n",
         "odoo": "Module Odoo 18 · BIC et banque remplis à la saisie",

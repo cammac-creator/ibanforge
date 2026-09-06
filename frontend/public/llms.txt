@@ -66,7 +66,7 @@ Zero to first payment in 3 steps (wallet with budget → USDC on Base → one $5
 - TypeScript: npm install @ibanforge/sdk
 - Python: pip install ibanforge
 - Java (17+): com.ibanforge:ibanforge-sdk on Maven Central
-- .NET (net8.0): IBANforge.Sdk (source in the repository, NuGet pending)
+- .NET (net8.0): dotnet add package IBANforge.Sdk
 
 ## Discovery
 - OpenAPI 3.1: https://api.ibanforge.com/openapi.json
