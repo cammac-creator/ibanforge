@@ -20,9 +20,23 @@ export const REST_TRIAL_DAILY_LIMIT = 10;
 export const TRIAL_RESET = 'midnight UTC';
 
 /**
+ * The `source` a key born of the trial carries into `api_keys.source`.
+ *
+ * It is the whole conversion measurement: `channelOf`
+ * (src/lib/signup-attribution.ts) turns it into the channel `src:api-trial`,
+ * which is what the dashboard's doors card counts as "keys born of the trial".
+ * ⚠️ `frontend/lib/dashboard-overview.ts` spells that channel out — it cannot
+ * import from the API — so the two must move together.
+ */
+export const TRIAL_SIGNUP_SOURCE = 'api-trial';
+
+/**
  * The one command that ends the trial in the caller's favour, copy-pasteable.
- * `source` is carried through to `api_keys.source`, which is what turns "a
- * developer tried" into "a developer signed up because they tried".
+ *
+ * Built from the constant above rather than typed out again: the token that
+ * ties the two halves of the funnel together must exist once, or the day it
+ * changes the hint keeps minting keys under the old label and the card reads
+ * zero.
  *
  * 🚨 `you@company.com`, never `you@example.com`: `example.com` is on our own
  * disposable blocklist, so the address we would be telling the reader to send
@@ -32,10 +46,8 @@ export const TRIAL_RESET = 'midnight UTC';
  * address published anywhere in the repository.
  */
 export const TRIAL_FREE_KEY_HINT =
-  'POST https://api.ibanforge.com/v1/keys/generate with {"email":"you@company.com","source":"api-trial"} — 200 requests a month, no card';
+  `POST https://api.ibanforge.com/v1/keys/generate with {"email":"you@company.com","source":"${TRIAL_SIGNUP_SOURCE}"}` +
+  ' — 200 requests a month, no card';
 
 /** Where the free key is explained. The page is content/<lang>/docs/api-keys.mdx. */
-export const TRIAL_DOCS_URL = 'https://ibanforge.com/docs/api-keys?src=api-trial';
-
-/** The `source` value a key born of the trial carries. Counted by the dashboard. */
-export const TRIAL_SIGNUP_SOURCE = 'api-trial';
+export const TRIAL_DOCS_URL = `https://ibanforge.com/docs/api-keys?src=${TRIAL_SIGNUP_SOURCE}`;

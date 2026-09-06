@@ -78,6 +78,11 @@ export function sweepDailyLedger(): void {
 /**
  * Test seam. The Map is module-level and shared by two suites; without this,
  * whichever ran second would inherit the other's spend.
+ *
+ * ⚠️ It clears ALL THREE namespaces, not the caller's own: a test that resets
+ * the REST trial also resets the MCP tool calls and the session openings of
+ * whatever else runs in that worker. Harmless today (no MCP test asserts a
+ * count accumulated across cases), and worth knowing before one does.
  */
 export function resetDailyLedger(): void {
   counts.clear();
