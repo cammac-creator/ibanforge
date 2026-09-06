@@ -48,7 +48,8 @@
       "blz": "BLZ allemandes",
       "iid": "IID suisses",
       "at": "Codes banque autrichiens",
-      "be": "Codes banque belges"
+      "be": "Codes banque belges",
+      "countries": "IBAN par pays"
     },
     "copyright": "© {year} IBANforge.",
     "dataLine": "Données : GLEIF · Quelle: Deutsche Bundesbank · SIX · EBA · NBP · SwiftCodes/MIT · Bank of England (List of Banks, 2026-08) — mensuel · OFAC · UN · UE · EPC — hebdomadaire"
@@ -2018,7 +2019,8 @@
       },
       "structure": "Un IBAN allemand, c'est DE, deux chiffres de contrôle, la Bankleitzahl à huit chiffres, puis le numéro de compte à dix chiffres. La BLZ est ce que le registre peut garantir ; le numéro de compte, seule la banque le connaît.",
       "indexTitle": "Codes bancaires allemands (Bankleitzahlen)",
-      "indexIntro": "Chaque BLZ du registre de la Deutsche Bundesbank, avec l'établissement qu'elle nomme, le BIC apparié, son statut et la réponse exacte de l'API IBANforge. Rafraîchi chaque mois avec le registre."
+      "indexIntro": "Chaque BLZ du registre de la Deutsche Bundesbank, avec l'établissement qu'elle nomme, le BIC apparié, son statut et la réponse exacte de l'API IBANforge. Rafraîchi chaque mois avec le registre.",
+      "countryLink": "Le format de l'IBAN allemand, avec l'exemple officiel"
     },
     "iid": {
       "metaTitle": "IID {iid} (numéro de clearing) : {name}, {town}",
@@ -2062,7 +2064,8 @@
       "structure": "Un IBAN suisse, c'est CH, deux chiffres de contrôle, l'IID à cinq chiffres, puis une partie compte à douze chiffres. Quand l'établissement détient un QR-IID, le QR-IBAN d'une QR-facture porte ce numéro à la même place.",
       "qrNote": "QR-IID {qr} : un QR-IBAN avec ce numéro attend une référence QRR sur la QR-facture.",
       "indexTitle": "Numéros de clearing suisses (IID / BC-Nummer)",
-      "indexIntro": "Chaque IID du SIX BankMaster avec sa page : établissement, siège, BIC, participation aux rails de paiement, QR-IID et la réponse exacte de l'API IBANforge. Rafraîchi avec le registre."
+      "indexIntro": "Chaque IID du SIX BankMaster avec sa page : établissement, siège, BIC, participation aux rails de paiement, QR-IID et la réponse exacte de l'API IBANforge. Rafraîchi avec le registre.",
+      "countryLink": "Le format de l'IBAN suisse, avec l'exemple officiel"
     },
     "at": {
       "metaTitle": "Code banque autrichien {code} : {name}, {town}",
@@ -2083,7 +2086,8 @@
       "structure": "Un IBAN autrichien, c'est AT, deux chiffres de contrôle, le code banque à cinq chiffres, puis le numéro de compte à onze chiffres. Le code banque est ce que le répertoire de l'OeNB peut garantir ; le numéro de compte n'est connu que de la banque.",
       "docLink": "Comment répond le registre autrichien",
       "indexTitle": "Codes banque autrichiens (répertoire OeNB)",
-      "indexIntro": "Chaque code banque du répertoire de l'Oesterreichische Nationalbank, avec l'établissement, l'adresse de son siège et son LEI quand le registre les publie, le BIC qu'il lui associe, et la réponse exacte de l'API IBANforge. Rafraîchi chaque mois avec le registre."
+      "indexIntro": "Chaque code banque du répertoire de l'Oesterreichische Nationalbank, avec l'établissement, l'adresse de son siège et son LEI quand le registre les publie, le BIC qu'il lui associe, et la réponse exacte de l'API IBANforge. Rafraîchi chaque mois avec le registre.",
+      "countryLink": "Le format de l'IBAN autrichien, avec l'exemple officiel"
     },
     "be": {
       "metaTitle": "Code banque belge {code} : {name}",
@@ -2103,7 +2107,8 @@
       "structure": "Un IBAN belge, c'est BE, deux chiffres de contrôle, l'identifiant bancaire à trois chiffres, le numéro de compte à sept chiffres, puis deux chiffres de contrôle nationaux (les dix premiers chiffres modulo 97). L'identifiant est ce que la liste de la BNB peut garantir ; le numéro de compte n'est connu que de la banque.",
       "docLink": "Comment répond le registre belge",
       "indexTitle": "Codes banque belges (liste BNB)",
-      "indexIntro": "Chaque identifiant bancaire attribué dans la liste de la Banque nationale de Belgique, une page par établissement, avec le BIC qui lui est associé et la réponse exacte de l'API IBANforge. Le registre ne publie que des noms : aucune adresse n'apparaît ici que le registre n'ait publiée."
+      "indexIntro": "Chaque identifiant bancaire attribué dans la liste de la Banque nationale de Belgique, une page par établissement, avec le BIC qui lui est associé et la réponse exacte de l'API IBANforge. Le registre ne publie que des noms : aucune adresse n'apparaît ici que le registre n'ait publiée.",
+      "countryLink": "Le format de l'IBAN belge, avec l'exemple officiel"
     }
   },
   "countries": {

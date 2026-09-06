@@ -75,6 +75,11 @@ const nextConfig: NextConfig = {
   },
   async redirects() {
     return [
+      // RFC 9727 puts the API catalogue at the organisation's domain; APIs.io
+      // and API Evangelist look for apis.json at the root of the same host.
+      // Both live on the API host (2026-09-06): point the crawlers there.
+      { source: "/.well-known/api-catalog", destination: "https://api.ibanforge.com/.well-known/api-catalog", permanent: true },
+      { source: "/apis.json", destination: "https://api.ibanforge.com/apis.json", permanent: true },
       /*
        * 2026-09-05 (audit n° 29): www.ibanforge.com served the whole site a
        * second time (200, canonical pointing at the apex) instead of sending

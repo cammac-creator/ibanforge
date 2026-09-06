@@ -48,7 +48,8 @@
       "blz": "German BLZ",
       "iid": "Swiss IID",
       "at": "Austrian bank codes",
-      "be": "Belgian bank codes"
+      "be": "Belgian bank codes",
+      "countries": "IBAN by country"
     },
     "copyright": "© {year} IBANforge.",
     "dataLine": "Data: GLEIF · Quelle: Deutsche Bundesbank · SIX · EBA · NBP · SwiftCodes/MIT · Bank of England (List of Banks, 2026-08) — monthly · OFAC · UN · EU · EPC — weekly"
@@ -2018,7 +2019,8 @@
       },
       "structure": "A German IBAN is DE, two check digits, the eight-digit Bankleitzahl, then the ten-digit account number. The BLZ is what the register can vouch for; the account number is known only to the bank.",
       "indexTitle": "German bank codes (Bankleitzahlen)",
-      "indexIntro": "Every BLZ of the Deutsche Bundesbank register, with the institution it names, the BIC it pairs with it, its status and the exact answer of the IBANforge API. Refreshed monthly with the register."
+      "indexIntro": "Every BLZ of the Deutsche Bundesbank register, with the institution it names, the BIC it pairs with it, its status and the exact answer of the IBANforge API. Refreshed monthly with the register.",
+      "countryLink": "The German IBAN format, with the official example"
     },
     "iid": {
       "metaTitle": "IID {iid} (BC-Nummer): {name}, {town}",
@@ -2062,7 +2064,8 @@
       "structure": "A Swiss IBAN is CH, two check digits, the five-digit IID, then a twelve-digit account part. When the institution holds a QR-IID, the QR-IBAN of a QR-bill carries that number in the same position.",
       "qrNote": "QR-IID {qr}: a QR-IBAN with this number expects a QRR reference on the QR-bill.",
       "indexTitle": "Swiss clearing numbers (IID / BC-Nummer)",
-      "indexIntro": "Every IID of the SIX BankMaster with a page of its own: institution, seat, BIC, payment-rail participation, QR-IID and the exact answer of the IBANforge API. Refreshed with the register."
+      "indexIntro": "Every IID of the SIX BankMaster with a page of its own: institution, seat, BIC, payment-rail participation, QR-IID and the exact answer of the IBANforge API. Refreshed with the register.",
+      "countryLink": "The Swiss IBAN format, with the official example"
     },
     "at": {
       "metaTitle": "Austrian bank code {code}: {name}, {town}",
@@ -2083,7 +2086,8 @@
       "structure": "An Austrian IBAN is AT, two check digits, the five-digit bank code, then the eleven-digit account number. The bank code is what the OeNB directory can vouch for; the account number is known only to the bank.",
       "docLink": "How the Austrian register answers",
       "indexTitle": "Austrian bank codes (OeNB directory)",
-      "indexIntro": "Every bank code of the Oesterreichische Nationalbank directory, with the institution, its seat address and its LEI where the register publishes one, the BIC it pairs with it, and the exact answer of the IBANforge API. Refreshed monthly with the register."
+      "indexIntro": "Every bank code of the Oesterreichische Nationalbank directory, with the institution, its seat address and its LEI where the register publishes one, the BIC it pairs with it, and the exact answer of the IBANforge API. Refreshed monthly with the register.",
+      "countryLink": "The Austrian IBAN format, with the official example"
     },
     "be": {
       "metaTitle": "Belgian bank code {code}: {name}",
@@ -2103,7 +2107,8 @@
       "structure": "A Belgian IBAN is BE, two check digits, the three-digit bank identifier, the seven-digit account number, then two national check digits (the first ten digits modulo 97). The identifier is what the NBB list can vouch for; the account number is known only to the bank.",
       "docLink": "How the Belgian register answers",
       "indexTitle": "Belgian bank codes (NBB list)",
-      "indexIntro": "Every bank identifier allocated in the National Bank of Belgium list, one page per institution, with the BIC it pairs with it and the exact answer of the IBANforge API. The register publishes names only: no address appears here that the register did not publish."
+      "indexIntro": "Every bank identifier allocated in the National Bank of Belgium list, one page per institution, with the BIC it pairs with it and the exact answer of the IBANforge API. The register publishes names only: no address appears here that the register did not publish.",
+      "countryLink": "The Belgian IBAN format, with the official example"
     }
   },
   "countries": {

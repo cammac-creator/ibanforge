@@ -26,6 +26,9 @@ export default async function AtIndexPage({ params }: { params: Promise<{ locale
         <p className="text-muted-foreground leading-relaxed max-w-prose">{t("at.indexIntro")}</p>
         <RegisterSearch locale={locale} kind="at" label={t("common.searchLabel")} button={t("common.searchButton")} placeholder="20111" />
         <p className="text-xs text-muted-foreground">{t("common.batchNote")} {t("common.sourceLabel")}: {file.source}, {t("common.asOfLabel")} {file.generated_at}.</p>
+        <p className="text-sm">
+          <Link href={localePath(locale, "/iban/at")} className="text-amber-500 hover:text-amber-400 underline underline-offset-4">{t("at.countryLink")}</Link>
+        </p>
       </header>
       <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-sm">
         {rows.map((e) => (

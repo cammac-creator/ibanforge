@@ -48,7 +48,8 @@
       "blz": "Bankleitzahlen",
       "iid": "Schweizer IID",
       "at": "Österreichische BLZ",
-      "be": "Belgische Bankcodes"
+      "be": "Belgische Bankcodes",
+      "countries": "IBAN nach Land"
     },
     "copyright": "© {year} IBANforge.",
     "dataLine": "Daten: GLEIF · Quelle: Deutsche Bundesbank · SIX · EBA · NBP · SwiftCodes/MIT · Bank of England (List of Banks, 2026-08) — monatlich · OFAC · UN · EU · EPC — wöchentlich"
@@ -2018,7 +2019,8 @@
       },
       "structure": "Eine deutsche IBAN besteht aus DE, zwei Prüfziffern, der achtstelligen Bankleitzahl und der zehnstelligen Kontonummer. Für die BLZ kann das Register bürgen; die Kontonummer kennt nur die Bank.",
       "indexTitle": "Deutsche Bankleitzahlen",
-      "indexIntro": "Jede BLZ des Registers der Deutschen Bundesbank mit dem Institut, das sie bezeichnet, dem zugeordneten BIC, ihrem Status und der exakten Antwort der IBANforge-API. Monatlich mit dem Register aktualisiert."
+      "indexIntro": "Jede BLZ des Registers der Deutschen Bundesbank mit dem Institut, das sie bezeichnet, dem zugeordneten BIC, ihrem Status und der exakten Antwort der IBANforge-API. Monatlich mit dem Register aktualisiert.",
+      "countryLink": "Das Format der deutschen IBAN, mit dem offiziellen Beispiel"
     },
     "iid": {
       "metaTitle": "IID {iid} (BC-Nummer): {name}, {town}",
@@ -2062,7 +2064,8 @@
       "structure": "Eine Schweizer IBAN besteht aus CH, zwei Prüfziffern, der fünfstelligen IID und einem zwölfstelligen Kontoteil. Hält das Institut eine QR-IID, trägt die QR-IBAN einer QR-Rechnung diese Nummer an derselben Stelle.",
       "qrNote": "QR-IID {qr}: eine QR-IBAN mit dieser Nummer erwartet eine QRR-Referenz auf der QR-Rechnung.",
       "indexTitle": "Schweizer Clearing-Nummern (IID / BC-Nummer)",
-      "indexIntro": "Jede IID des SIX BankMaster mit eigener Seite: Institut, Sitz, BIC, Teilnahme an den Zahlungsschienen, QR-IID und die exakte Antwort der IBANforge-API. Mit dem Register aktualisiert."
+      "indexIntro": "Jede IID des SIX BankMaster mit eigener Seite: Institut, Sitz, BIC, Teilnahme an den Zahlungsschienen, QR-IID und die exakte Antwort der IBANforge-API. Mit dem Register aktualisiert.",
+      "countryLink": "Das Format der Schweizer IBAN, mit dem offiziellen Beispiel"
     },
     "at": {
       "metaTitle": "Österreichische Bankleitzahl {code}: {name}, {town}",
@@ -2083,7 +2086,8 @@
       "structure": "Eine österreichische IBAN besteht aus AT, zwei Prüfziffern, der fünfstelligen Bankleitzahl und der elfstelligen Kontonummer. Für die Bankleitzahl kann das OeNB-Verzeichnis bürgen; die Kontonummer kennt nur die Bank.",
       "docLink": "Wie das österreichische Register antwortet",
       "indexTitle": "Österreichische Bankleitzahlen (OeNB-Verzeichnis)",
-      "indexIntro": "Jede Bankleitzahl des Verzeichnisses der Oesterreichischen Nationalbank, mit dem Institut, seiner Sitzadresse und seinem LEI, soweit das Register sie veröffentlicht, dem zugehörigen BIC und der exakten Antwort der IBANforge-API. Monatlich mit dem Register aktualisiert."
+      "indexIntro": "Jede Bankleitzahl des Verzeichnisses der Oesterreichischen Nationalbank, mit dem Institut, seiner Sitzadresse und seinem LEI, soweit das Register sie veröffentlicht, dem zugehörigen BIC und der exakten Antwort der IBANforge-API. Monatlich mit dem Register aktualisiert.",
+      "countryLink": "Das Format der österreichischen IBAN, mit dem offiziellen Beispiel"
     },
     "be": {
       "metaTitle": "Belgischer Bankcode {code}: {name}",
@@ -2103,7 +2107,8 @@
       "structure": "Eine belgische IBAN besteht aus BE, zwei Prüfziffern, der dreistelligen Bankkennung, der siebenstelligen Kontonummer und zwei nationalen Prüfziffern (die ersten zehn Ziffern modulo 97). Für die Kennung kann die Liste der BNB bürgen; die Kontonummer kennt nur die Bank.",
       "docLink": "Wie das belgische Register antwortet",
       "indexTitle": "Belgische Bankcodes (BNB-Liste)",
-      "indexIntro": "Jede in der Liste der Belgischen Nationalbank zugewiesene Bankkennung, eine Seite pro Institut, mit dem zugehörigen BIC und der exakten Antwort der IBANforge-API. Das Register veröffentlicht nur Namen: keine Adresse erscheint hier, die das Register nicht veröffentlicht hat."
+      "indexIntro": "Jede in der Liste der Belgischen Nationalbank zugewiesene Bankkennung, eine Seite pro Institut, mit dem zugehörigen BIC und der exakten Antwort der IBANforge-API. Das Register veröffentlicht nur Namen: keine Adresse erscheint hier, die das Register nicht veröffentlicht hat.",
+      "countryLink": "Das Format der belgischen IBAN, mit dem offiziellen Beispiel"
     }
   },
   "countries": {

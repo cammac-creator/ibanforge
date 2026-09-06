@@ -17,6 +17,7 @@ export function SiteFooter() {
         { href: localePath(locale, '/pricing'), label: t("link.pricing") },
         { href: localePath(locale, '/audit'), label: t("link.audit") },
         { href: localePath(locale, '/sheets'), label: t("link.sheets") },
+        { href: localePath(locale, '/iban'), label: t("link.countries") },
         { href: localePath(locale, '/blz'), label: t("link.blz") },
         { href: localePath(locale, '/iid'), label: t("link.iid") },
         { href: localePath(locale, '/at'), label: t("link.at") },

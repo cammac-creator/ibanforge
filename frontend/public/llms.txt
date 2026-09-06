@@ -75,5 +75,11 @@ Zero to first payment in 3 steps (wallet with budget → USDC on Base → one $5
 - MCP server card: https://api.ibanforge.com/.well-known/mcp/server-card.json
 - Full agent guide: https://api.ibanforge.com/llms.txt
 
+## Reference pages (human-readable, one URL per code)
+- IBAN format by country (89 countries: length, layout, official example, register checked): https://ibanforge.com/iban?src=llms
+- German Bankleitzahlen: https://ibanforge.com/de/blz?src=llms · Swiss IID: https://ibanforge.com/iid?src=llms · Austrian bank codes: https://ibanforge.com/de/at?src=llms · Belgian bank codes: https://ibanforge.com/be?src=llms
+- Free tools, no key: test IBANs https://ibanforge.com/tools/test-iban?src=llms · Swiss QR-bill check https://ibanforge.com/tools/qr-bill?src=llms
+- Creditor-file audit before 14 November 2026 (CSV/XLSX, free preview): https://ibanforge.com/audit?src=llms
+
 ## Links
 Docs: https://ibanforge.com/docs?src=llms · Playground: https://ibanforge.com/playground?src=llms · Pricing: https://ibanforge.com/pricing?src=llms · GitHub: https://github.com/cammac-creator/ibanforge
