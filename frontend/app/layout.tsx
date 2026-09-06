@@ -8,8 +8,11 @@ export const metadata: Metadata = {
   title: "IBANforge",
   description: "IBAN validation & BIC/SWIFT lookup API for developers and AI agents",
   metadataBase: new URL("https://ibanforge.com"),
+  // Two Google verification tokens since 2026-09-06: the owner's, and the
+  // service account gsc-reader (project uikrap) that reads Search Console for
+  // the dashboard. A verification token is public by design.
   verification: {
-    google: "-lRtR9x7lOtMJqQ_KXeLVWx_whEhAIPllG65GkDx44A",
+    google: ["-lRtR9x7lOtMJqQ_KXeLVWx_whEhAIPllG65GkDx44A", "iunFAZ2F8eHriObs57wUEiARToZTatf_B9kqTWA1NoQ"],
   },
   twitter: {
     card: "summary_large_image",
