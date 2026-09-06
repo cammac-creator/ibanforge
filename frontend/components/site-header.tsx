@@ -4,6 +4,7 @@ import Link from "next/link"
 import { useState } from "react"
 import { usePathname } from "next/navigation"
 import { useLocale, useTranslations } from "next-intl"
+import { useApiKeyDialog } from "@/components/api-key-dialog"
 import { Menu, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { LocaleSwitcher } from "@/components/locale-switcher"
@@ -16,6 +17,7 @@ const MOBILE_MENU_ID = "site-mobile-menu"
 export function SiteHeader() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const t = useTranslations("header")
+  const { open: openKeyDialog } = useApiKeyDialog()
   const locale = useLocale()
   const pathname = usePathname()
 
@@ -66,16 +68,25 @@ export function SiteHeader() {
           <LocaleSwitcher />
 
           {/* Audit 2026-09-04 (S8): this was the only filled button of the bar
-              and it opened the owner's password-protected console. A visitor
-              clicked the most visible control of the site and hit a locked
-              door. The account page is the visitor's own key. */}
+              and it opened the owner's password-protected console. On 2026-09-06
+              it led to the account page, which asks a visitor to paste a key
+              they do not have yet: the most visible control of the site was a
+              dead end for every newcomer on every page but the home. It now
+              opens the free-key dialog; the account page is the quiet link. */}
           <Link
             href={localePath(locale, '/account')}
-            data-evt="nav:key"
-            className="hidden lg:inline-flex items-center h-8 px-3 rounded-lg border border-primary/40 bg-primary/10 text-primary text-sm font-medium hover:bg-primary/20 transition-colors"
+            className="hidden lg:inline-flex items-center h-8 px-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
             {t("nav.account")}
           </Link>
+          <button
+            type="button"
+            onClick={openKeyDialog}
+            data-evt="nav:key"
+            className="hidden lg:inline-flex items-center h-8 px-3 rounded-lg border border-primary/40 bg-primary/10 text-primary text-sm font-medium hover:bg-primary/20 transition-colors"
+          >
+            {t("nav.freeKey")}
+          </button>
 
           {/* Mobile hamburger */}
           <button
@@ -109,7 +120,7 @@ export function SiteHeader() {
         aria-hidden={!mobileOpen}
         className={cn(
           "lg:hidden border-t border-border overflow-hidden transition-all duration-200",
-          mobileOpen ? "max-h-64 opacity-100" : "max-h-0 opacity-0"
+          mobileOpen ? "max-h-80 opacity-100" : "max-h-0 opacity-0"
         )}
       >
         <nav className="flex flex-col gap-1 px-4 py-3">
@@ -123,10 +134,21 @@ export function SiteHeader() {
               {link.label}
             </Link>
           ))}
+          <button
+            type="button"
+            data-evt="nav:key"
+            onClick={() => {
+              setMobileOpen(false)
+              openKeyDialog()
+            }}
+            className="mt-1 px-3 py-2 rounded-md text-left text-sm font-medium text-primary hover:bg-primary/10 transition-colors"
+          >
+            {t("nav.freeKey")}
+          </button>
           <Link
             href={localePath(locale, '/account')}
             onClick={() => setMobileOpen(false)}
-            className="mt-1 px-3 py-2 rounded-md text-sm font-medium text-primary hover:bg-primary/10 transition-colors"
+            className="px-3 py-2 rounded-md text-sm text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
           >
             {t("nav.account")}
           </Link>

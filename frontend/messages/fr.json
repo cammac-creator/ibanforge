@@ -9,7 +9,8 @@
       "blog": "Blog",
       "dashboard": "Tableau de bord",
       "account": "Votre clé",
-      "audit": "Audit de fichier"
+      "audit": "Audit de fichier",
+      "freeKey": "Clé gratuite"
     },
     "toggleMenu": "Ouvrir le menu",
     "changeLanguage": "Langue : {locale}. Changer de langue"
@@ -709,7 +710,8 @@
             "cta_playground_film": "Film → Essayer en direct",
             "cta_pricing": "Fin de page → Tarifs",
             "cta_key_final": "Fin de page → Obtenir une clé",
-            "cta_docs": "Fin de page → Documentation"
+            "cta_docs": "Fin de page → Documentation",
+            "cta_key_account": "Page Votre clé → Obtenir une clé"
           }
         }
       },
@@ -1156,7 +1158,8 @@
       "copied": "Copié",
       "error": "L'appel a échoué : {message}",
       "again": "Relancer"
-    }
+    },
+    "haveKey": "Vous avez déjà une clé ? Lire son activité"
   },
   "agents": {
     "meta": {
@@ -1620,7 +1623,9 @@
     "leaveWorking": "Révocation…",
     "leaveDone": "Cette clé est révoquée. Elle ne fonctionnera plus, et ses données de télémétrie seront supprimées dans 30 jours.",
     "leaveFailed": "La clé n'a pas pu être révoquée. Rien n'a changé, elle fonctionne toujours.",
-    "leaveDpa": "Lire l'accord de traitement des données"
+    "leaveDpa": "Lire l'accord de traitement des données",
+    "noKeyYet": "Pas encore de clé ? Deux cents appels par mois, sans carte.",
+    "getKey": "Obtenir une clé gratuite"
   },
   "sources": {
     "meta": {

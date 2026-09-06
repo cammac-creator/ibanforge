@@ -9,7 +9,8 @@
       "blog": "Blog",
       "dashboard": "Dashboard",
       "account": "Ihr Key",
-      "audit": "Dateiprüfung"
+      "audit": "Dateiprüfung",
+      "freeKey": "Gratis-Schlüssel"
     },
     "toggleMenu": "Menü öffnen",
     "changeLanguage": "Sprache: {locale}. Sprache wechseln"
@@ -709,7 +710,8 @@
             "cta_playground_film": "Film → Live ausprobieren",
             "cta_pricing": "Seitenende → Preise",
             "cta_key_final": "Seitenende → Schlüssel holen",
-            "cta_docs": "Seitenende → Dokumentation"
+            "cta_docs": "Seitenende → Dokumentation",
+            "cta_key_account": "Seite Ihr Schlüssel → Schlüssel holen"
           }
         }
       },
@@ -1156,7 +1158,8 @@
       "copied": "Kopiert",
       "error": "Der Aufruf ist fehlgeschlagen: {message}",
       "again": "Erneut starten"
-    }
+    },
+    "haveKey": "Schon einen Schlüssel? Seine Aktivität lesen"
   },
   "agents": {
     "meta": {
@@ -1620,7 +1623,9 @@
     "leaveWorking": "Wird widerrufen…",
     "leaveDone": "Dieser Schlüssel ist widerrufen. Er funktioniert nicht mehr, und seine Telemetriedaten werden in 30 Tagen gelöscht.",
     "leaveFailed": "Der Schlüssel konnte nicht widerrufen werden. Es wurde nichts geändert, er funktioniert weiterhin.",
-    "leaveDpa": "Auftragsverarbeitungsvertrag lesen"
+    "leaveDpa": "Auftragsverarbeitungsvertrag lesen",
+    "noKeyYet": "Noch keinen Schlüssel? Zweihundert Aufrufe im Monat, ohne Karte.",
+    "getKey": "Gratis-Schlüssel holen"
   },
   "sources": {
     "meta": {

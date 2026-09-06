@@ -367,6 +367,11 @@ export function ApiKeyDialogProvider({ children }: { children: ReactNode }) {
                     ),
                   })}
                 </p>
+                <p className="mt-2 text-[11px] leading-relaxed" style={{ color: 'var(--fg-3, #71717a)' }}>
+                  <a href={localePath(locale, '/account')} onClick={close} className="underline underline-offset-2">
+                    {t('haveKey')}
+                  </a>
+                </p>
               </form>
             )}
 

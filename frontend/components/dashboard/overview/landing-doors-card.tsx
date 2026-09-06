@@ -29,6 +29,7 @@ const DOOR_ORDER = [
   'cta:pricing',
   'cta:key-final',
   'cta:docs',
+  'cta:key-account',
 ];
 
 function counts(data: WebEventsSummary | null): Map<string, number> {

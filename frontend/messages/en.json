@@ -9,7 +9,8 @@
       "blog": "Blog",
       "dashboard": "Dashboard",
       "account": "Your key",
-      "audit": "File audit"
+      "audit": "File audit",
+      "freeKey": "Free key"
     },
     "toggleMenu": "Toggle menu",
     "changeLanguage": "Language: {locale}. Change language"
@@ -709,7 +710,8 @@
             "cta_playground_film": "Film → Try it live",
             "cta_pricing": "Page end → Pricing",
             "cta_key_final": "Page end → Get a key",
-            "cta_docs": "Page end → Documentation"
+            "cta_docs": "Page end → Documentation",
+            "cta_key_account": "Your key page → Get a key"
           }
         }
       },
@@ -1156,7 +1158,8 @@
       "copied": "Copied",
       "error": "The call failed: {message}",
       "again": "Run it again"
-    }
+    },
+    "haveKey": "Already have a key? Read its activity"
   },
   "agents": {
     "meta": {
@@ -1620,7 +1623,9 @@
     "leaveWorking": "Revoking…",
     "leaveDone": "This key is revoked. It will not work again, and its telemetry is deleted in 30 days.",
     "leaveFailed": "The key could not be revoked. Nothing changed and it still works.",
-    "leaveDpa": "Read the data processing agreement"
+    "leaveDpa": "Read the data processing agreement",
+    "noKeyYet": "No key yet? Two hundred calls a month, no card.",
+    "getKey": "Get a free key"
   },
   "sources": {
     "meta": {

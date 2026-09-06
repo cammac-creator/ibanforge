@@ -1,5 +1,6 @@
 import { getTranslations } from "next-intl/server";
 import { AccountApp } from "@/components/account/account-app";
+import { GetKeyButton } from "@/components/api-key-dialog";
 import { ClientMessages } from "@/components/client-messages"
 import { alternatesFor } from "@/lib/seo";
 
@@ -36,6 +37,12 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
       <p className="mt-2 text-muted-foreground">{t("subtitle")}</p>
       <div className="mt-10">
         <ClientMessages ns={["account"]}><AccountApp locale={locale} /></ClientMessages>
+      </div>
+      {/* 2026-09-06: the header sent every newcomer here, to a form that asks
+          for a key they do not have. The page now offers the first one. */}
+      <div className="mt-10 flex flex-wrap items-center gap-4 rounded-md border p-4 text-sm" style={{ borderColor: "var(--hairline)" }}>
+        <p className="text-muted-foreground">{t("noKeyYet")}</p>
+        <GetKeyButton size="sm" evt="cta:key-account">{t("getKey")}</GetKeyButton>
       </div>
     </div>
   );
