@@ -159,6 +159,33 @@ const NATIONAL_REGISTERS: Record<string, string> = {
 };
 
 /**
+ * Registers that name the holder of a code they carry, and say nothing about a
+ * code they do not.
+ *
+ * 🚨 These are deliberately NOT in NATIONAL_REGISTERS above, and the reason is
+ * written in that map's own docstring: "Adding a country here is a claim that a
+ * miss means non-existence." San Marino makes no such claim, so putting it
+ * there would be wrong twice over. Once in the obvious way — a miss would
+ * become `not_allocated`, telling a payment engine to stop over a code the BCSM
+ * simply never listed. And once in a subtler way that a first draft of this
+ * shipped: `decideBankCode`'s composite fallback reads `const registerDown =
+ * !!national`, so merely being in that map would have made every San Marino
+ * miss report `national_register_unavailable` — "we could not consult the
+ * register" — about a register that was consulted and answered. A different
+ * lie, describing us as broken instead of the beneficiary as dead.
+ *
+ * So the lookup lives on its own path: a HIT is a verified answer carrying the
+ * institution the supervisor names, a MISS falls through untouched to whatever
+ * the country received before the register existed.
+ *
+ * The string says what the register is a list OF, because that is the caveat:
+ * banks only, in a country that also licenses non-bank payment institutions.
+ */
+const NON_EXHAUSTIVE_REGISTERS: Record<string, string> = {
+  SM: 'Central Bank of the Republic of San Marino, operating banks (banks only; the list does not publish the allocation of the ABI code space, so an absence is not a non-allocation)',
+};
+
+/**
  * EBA PSD2 register types that map onto an issuer type, and the ones that
  * deliberately do not.
  *
@@ -447,6 +474,47 @@ function decideBankCode(
       // otherwise. See the `as_of` note on the verdict shape above.
       as_of: verdict.as_of ?? as_of,
     };
+  }
+
+  // A register that names holders without covering the space. Consulted BEFORE
+  // the composite map, because the supervisor naming the bank behind a code
+  // beats a BIC directory agreeing with it — and consulted on its own path,
+  // because a miss here must fall through to exactly what this country answered
+  // before, `registerDown` untouched. See NON_EXHAUSTIVE_REGISTERS.
+  const partial = NON_EXHAUSTIVE_REGISTERS[cc];
+  if (partial && nationalRegisterAvailable(cc)) {
+    // Unguarded, like the authoritative registers: a read failure escapes to
+    // checkBankCode and becomes `unavailable` / `lookup_failed`. The stakes are
+    // lower here — a failure costs an enrichment, not a denial — but a country
+    // that cannot read its register should still say so rather than quietly
+    // answer as though it had no register at all.
+    const reg = lookupNationalCode(cc, bankCode);
+    if (reg) {
+      const asOf = nationalRegisterEdition(cc).as_of?.slice(0, 7);
+      return {
+        value: bankCode,
+        status: 'verified',
+        match: 'register',
+        register: partial,
+        // The point of this whole branch. The register named this institution,
+        // which is worth serving; it still does not license reading a MISS as a
+        // denial, and `authoritative` is the field that says so.
+        authoritative: false,
+        institution: {
+          name: reg.name,
+          street: reg.street,
+          post_code: reg.post_code,
+          town: reg.town,
+          country: cc,
+          ...(reg.lei ? { lei: reg.lei } : {}),
+        },
+        as_of: asOf ?? as_of,
+      };
+    }
+    // No return: fall through. A San Marino code the page does not list gets
+    // the composite answer it has always got, with `absent_from_reference_data`
+    // as its reason — never `not_allocated`, never
+    // `national_register_unavailable`.
   }
 
   if (hit) {
@@ -750,7 +818,14 @@ function resolveBank(cc: string, bankCode: string): BankResolution {
   // resolved a dozen Belgian EMIs to nothing while their BIC sat in our own
   // database. Register truth first; the composite stays as the fallback for the
   // rows the register publishes without a BIC — four of them in Slovakia.
-  if (cc === 'AT' || cc === 'BE' || cc === 'SK') {
+  //
+  // San Marino rides the same block, and it is the mirror image of Switzerland.
+  // There, the SIX register settles the bank CODE while the BIC beside it comes
+  // from our curated map; here, the BCSM does not settle the code space at all
+  // (`bank_code_check.authoritative: false`) yet the BIC it prints beside a code
+  // it does list is its own pairing, not ours. The two flags are about two
+  // different claims, and San Marino is where they part in the other direction.
+  if (cc === 'AT' || cc === 'BE' || cc === 'SK' || cc === 'SM') {
     try {
       const reg = nationalRegisterAvailable(cc) ? lookupNationalCode(cc, bankCode) : null;
       if (reg?.bic) {
@@ -766,14 +841,17 @@ function resolveBank(cc: string, bankCode: string): BankResolution {
           // Bulgarian block below documents: one source decides WHICH
           // institution holds the code, the directory only supplies details.
           city: reg.town ?? lookup(`${reg.bic}XXX`)?.city ?? null,
-          // The register's own credit where it stores one (Slovakia: the NBS
-          // terms make naming the source a condition of reuse, so it is read
-          // from the row and never written here), the register's name where it
-          // does not (Austria, Belgium).
-          source: reg.source ?? NATIONAL_REGISTERS[cc],
+          // The register's own credit where it stores one — Slovakia, whose
+          // terms make naming the source a condition of reuse, and San Marino,
+          // whose licence is unknown and which is therefore credited by choice
+          // rather than by obligation. Both are read from the row and never
+          // written here. Austria and Belgium store none and take the
+          // register's name.
+          source: reg.source ?? NATIONAL_REGISTERS[cc] ?? NON_EXHAUSTIVE_REGISTERS[cc],
           // Year-month, as this field is documented. Slovakia states an
-          // effective date of its own; AT and BE are dated by the reference
-          // set, which for a file re-read on our cycle is the honest answer.
+          // effective date of its own and San Marino carries the day we read
+          // its page; AT and BE are dated by the reference set, which for a
+          // file re-read on our cycle is the honest answer.
           as_of: reg.as_of?.slice(0, 7) ?? (getReferenceAsOf() || null),
           // Same licence as the German block above: the register publishes
           // this BIC per bank code, so the pairing is the register's, not ours.

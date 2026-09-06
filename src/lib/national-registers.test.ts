@@ -38,11 +38,19 @@ describe('normaliseCode', () => {
     expect(normaliseCode('SK', '1100')).toBe('1100');
   });
 
+  it('pads a San Marino ABI to five', () => {
+    // The BCSM prints them padded already; the width is asserted anyway,
+    // because IBAN positions 6-10 are what the lookup is compared against.
+    expect(normaliseCode('SM', '3034')).toBe('03034');
+    expect(normaliseCode('SM', '03034')).toBe('03034');
+  });
+
   it('refuses anything that is not the digits of a bank code', () => {
     expect(normaliseCode('AT', '')).toBeNull();
     expect(normaliseCode('AT', '123456')).toBeNull();
     expect(normaliseCode('BE', '12X')).toBeNull();
     expect(normaliseCode('SK', '12345')).toBeNull();
+    expect(normaliseCode('SM', '123456')).toBeNull();
   });
 });
 
@@ -109,6 +117,20 @@ describe('lookupNationalCode', () => {
       expect(hit?.as_of).toBeNull();
     },
   );
+
+  it.skipIf(skipIf('SM'))('resolves a San Marino operating bank, address included', () => {
+    const hit = lookupNationalCode('SM', '06067');
+    expect(hit?.bic).toBe('CSSMSMSM');
+    expect(hit?.name).toBe('Cassa di Risparmio della Repubblica di San Marino s.p.a.');
+    expect(hit?.town).toBe('San Marino');
+  });
+
+  it.skipIf(skipIf('SM'))('answers nothing for a code the BCSM page does not list', () => {
+    // 03225 is the ABI of the ISO registry's own San Marino example IBAN. Null
+    // here is NOT a denial — the caller in enrich.ts falls through to the
+    // composite map rather than reading it as one. See sm-enrich.test.ts.
+    expect(lookupNationalCode('SM', '03225')).toBeNull();
+  });
 
   it('answers nothing for a country it does not hold', () => {
     expect(lookupNationalCode('FR', '30001')).toBeNull();
