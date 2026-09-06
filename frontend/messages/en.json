@@ -699,6 +699,14 @@
           "pages": "By page",
           "referrers": "Referrers",
           "since": "Measured since {date}. Driven browsers and Lighthouse excluded, no cookie, 90 days of retention.",
+          "trial": {
+            "title": "Keyless trial (REST API)",
+            "step": "Step",
+            "tried": "Tried without a key",
+            "exhausted": "Ran out of the 10/day",
+            "keys": "Keys born of the trial",
+            "note": "One line per address and per day, not per call. A key counts here when it was created with source=api-trial."
+          },
           "names": {
             "nav_key": "Header → Your key",
             "nav_status": "Badge → Status",

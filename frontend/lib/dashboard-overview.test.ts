@@ -17,7 +17,9 @@ import {
   recentSignups,
   refusalPaths,
   serverErrorPaths,
+  trialFunnel,
 } from './dashboard-overview';
+import type { SignupSources, WebEventsSummary } from './dashboard-overview';
 
 const NOW = new Date('2026-09-01T12:00:00Z');
 
@@ -265,6 +267,57 @@ describe('recentSignups', () => {
 
   it('does not read an unreadable signup date as "today"', () => {
     expect(recentSignups(clients, NOW).rows.map((r) => r.email)).not.toContain('undated@example.com');
+  });
+});
+
+describe('trialFunnel (keyless REST trial)', () => {
+  const events = (rows: Array<[string, number]>): WebEventsSummary => ({
+    days: 30,
+    since: '2026-09-06 08:00:00',
+    total: rows.reduce((n, [, c]) => n + c, 0),
+    by_name: rows.map(([name, count]) => ({ name, count })),
+    by_page: [],
+    by_referrer: [],
+    by_day: [],
+  });
+  const signups = (rows: Array<[string, number]>): SignupSources => ({
+    period_days: 30,
+    since: '2026-09-06 08:00:00',
+    total: rows.reduce((n, [, n2]) => n + n2, 0),
+    channels: rows.map(([channel, n]) => ({ channel, n })),
+    landings: [],
+    referrers: [],
+    campaigns: [],
+  });
+
+  it('reads the three steps from the two payloads', () => {
+    expect(
+      trialFunnel(
+        events([
+          ['api:trial', 12],
+          ['api:trial-exhausted', 3],
+          ['cta:try', 40],
+        ]),
+        signups([
+          ['src:api-trial', 2],
+          ['direct', 9],
+        ]),
+      ),
+    ).toEqual({ tried: 12, exhausted: 3, keys: 2 });
+  });
+
+  it('is zero, never NaN, when a reader came back empty', () => {
+    expect(trialFunnel(null, null)).toEqual({ tried: 0, exhausted: 0, keys: 0 });
+    expect(trialFunnel(events([['cta:try', 4]]), signups([['direct', 1]]))).toEqual({
+      tried: 0,
+      exhausted: 0,
+      keys: 0,
+    });
+  });
+
+  it('does not count a landing-page click as a trial', () => {
+    // The two vocabularies share one table; only the `api:` names are the API's.
+    expect(trialFunnel(events([['cta:key', 99]]), null).tried).toBe(0);
   });
 });
 

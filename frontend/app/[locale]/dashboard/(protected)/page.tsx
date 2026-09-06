@@ -119,6 +119,9 @@ export default async function DashboardPage({
     '/v1/admin/feedback?limit=10',
   );
   const signupSourcesP = admin<SignupSources>('/v1/admin/signup-sources?days=30');
+  // Same channels over the week, for the trial group of the doors card: its
+  // conversion is a key, and the card shows every figure on 7 and 30 days.
+  const signupSourcesWeekP = admin<SignupSources>('/v1/admin/signup-sources?days=7');
   const auditStatsP = admin<AuditStats>('/v1/admin/audit-stats?days=30');
   // What the landing page's visitors click (audit n° 32, 2026-09-05): the
   // week for the pulse, the month for the shape.
@@ -235,6 +238,7 @@ export default async function DashboardPage({
           demandGapsPromise={demandGapsP}
           feedbackPromise={feedbackP}
           sourcesPromise={signupSourcesP}
+          sourcesWeekPromise={signupSourcesWeekP}
           auditStatsPromise={auditStatsP}
           doorsWeekPromise={doorsWeekP}
           doorsMonthPromise={doorsMonthP}

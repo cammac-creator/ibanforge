@@ -36,6 +36,7 @@ export async function NewSection({
   demandGapsPromise,
   feedbackPromise,
   sourcesPromise,
+  sourcesWeekPromise,
   auditStatsPromise,
   doorsWeekPromise,
   doorsMonthPromise,
@@ -50,6 +51,8 @@ export async function NewSection({
   demandGapsPromise: Promise<Fetched<DemandGapsPayload>>;
   feedbackPromise: Promise<Fetched<{ open: number; reports: FeedbackReport[] }>>;
   sourcesPromise: Promise<Fetched<SignupSources>>;
+  /** Same payload over 7 days: the doors card shows the trial's conversion on both windows. */
+  sourcesWeekPromise: Promise<Fetched<SignupSources>>;
   auditStatsPromise: Promise<Fetched<AuditStats>>;
   doorsWeekPromise: Promise<Fetched<WebEventsSummary>>;
   doorsMonthPromise: Promise<Fetched<WebEventsSummary>>;
@@ -160,7 +163,7 @@ export async function NewSection({
 
       <SignupSourcesCard sourcesPromise={sourcesPromise} locale={locale} />
 
-      <LandingDoorsCard weekPromise={doorsWeekPromise} monthPromise={doorsMonthPromise} locale={locale} />
+      <LandingDoorsCard weekPromise={doorsWeekPromise} monthPromise={doorsMonthPromise} signupsWeekPromise={sourcesWeekPromise} signupsMonthPromise={sourcesPromise} locale={locale} />
 
       <AuditStatsCard statsPromise={auditStatsPromise} locale={locale} />
 

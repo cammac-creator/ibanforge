@@ -699,6 +699,14 @@
           "pages": "Nach Seite",
           "referrers": "Referrer",
           "since": "Gemessen seit {date}. Gesteuerte Browser und Lighthouse ausgeschlossen, kein Cookie, 90 Tage Aufbewahrung.",
+          "trial": {
+            "title": "Test ohne Schlüssel (REST-API)",
+            "step": "Schritt",
+            "tried": "Haben ohne Schlüssel getestet",
+            "exhausted": "Haben die 10/Tag ausgeschöpft",
+            "keys": "Aus dem Test entstandene Schlüssel",
+            "note": "Eine Zeile pro Adresse und Tag, nicht pro Aufruf. Ein Schlüssel zählt hier, wenn er mit source=api-trial erstellt wurde."
+          },
           "names": {
             "nav_key": "Kopfzeile → Ihr Schlüssel",
             "nav_status": "Badge → Status",

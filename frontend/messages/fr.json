@@ -699,6 +699,14 @@
           "pages": "Par page",
           "referrers": "Référents",
           "since": "Mesuré depuis le {date}. Navigateurs pilotés et Lighthouse exclus, aucun cookie, 90 jours de rétention.",
+          "trial": {
+            "title": "Essai sans clé (API REST)",
+            "step": "Étape",
+            "tried": "Ont essayé sans clé",
+            "exhausted": "Ont épuisé les 10/jour",
+            "keys": "Clés nées de l'essai",
+            "note": "Une ligne par adresse et par jour, pas par appel. Une clé compte ici si elle a été créée avec source=api-trial."
+          },
           "names": {
             "nav_key": "En-tête → Votre clé",
             "nav_status": "Badge → Statut",
