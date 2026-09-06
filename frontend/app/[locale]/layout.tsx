@@ -40,13 +40,24 @@ export function generateStaticParams() {
 }
 
 /**
- * Only those three values exist for [locale]. Any other first segment
- * (`/icon-512.png`, `/foo.txt`, paths the middleware leaves alone because of
- * their dot) answers 404 before a page runs: the home used to render with
- * locale "icon-512.png", hand it to Intl.NumberFormat and answer 500
- * (measured on 2026-09-05).
+ * Only those three values exist for [locale], and the `hasLocale` guard in the
+ * layout body below turns any other first segment (`/icon-512.png`,
+ * `/foo.txt`, paths the middleware leaves alone because of their dot) into a
+ * 404 before a page runs: the home used to render with locale "icon-512.png",
+ * hand it to Intl.NumberFormat and answer 500 (measured on 2026-09-05).
+ *
+ * Until 2026-09-06 that guard was `dynamicParams = false` here instead. It did
+ * the job for the locale — and silently cascaded onto every dynamic segment
+ * underneath: a `[code]` page declaring `dynamicParams = true` and rendering
+ * the long tail of a register on demand was still answered 404 for any code
+ * outside its `generateStaticParams`, with a NoFallbackError under `next
+ * start` and a plain 404 on Vercel (`/fr/at/18170`, `/fr/be/001`,
+ * `/fr/blz/10020890`, `/fr/iid/4835` measured live on 2026-09-06, the same day
+ * the sitemap started listing all of them). `true` is the default and is left
+ * explicit so the next reader does not put the `false` back for the locale's
+ * sake: the locale is guarded by `hasLocale`, not by this flag.
  */
-export const dynamicParams = false;
+export const dynamicParams = true;
 
 type Props = {
   children: React.ReactNode;
