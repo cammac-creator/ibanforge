@@ -105,6 +105,31 @@ export interface SkEntry {
   related: string[];
 }
 
+/**
+ * San Marino. Shaped like the Slovak one, with the registered office the BCSM
+ * publishes and Slovakia's register does not — and one difference that is not
+ * visible in the type: these answers carry `authoritative: false`, because the
+ * BCSM lists operating banks rather than allocating the code space.
+ */
+export interface SmRegister {
+  code: string;
+  name: string;
+  bic: string | null;
+  street: string | null;
+  post_code: string | null;
+  town: string | null;
+  /** The day we READ the page. The BCSM publishes no edition and no revision date. */
+  as_of: string;
+  source: string;
+}
+
+export interface SmEntry {
+  register: SmRegister;
+  example_iban: string;
+  api: Record<string, unknown>;
+  related: string[];
+}
+
 interface RegisterFile<T> {
   generated_at: string;
   source: string;
@@ -118,6 +143,7 @@ let chCache: RegisterFile<IidEntry> | null = null;
 let atCache: RegisterFile<AtEntry> | null = null;
 let beCache: RegisterFile<BeEntry> | null = null;
 let skCache: RegisterFile<SkEntry> | null = null;
+let smCache: RegisterFile<SmEntry> | null = null;
 
 function read<T>(file: string): RegisterFile<T> {
   const raw = fs.readFileSync(path.join(process.cwd(), 'data', 'registers', file), 'utf-8');
@@ -158,6 +184,30 @@ export function skBankFile(): RegisterFile<SkEntry> {
  */
 export function skCredit(r: SkRegister): string {
   return `Zdroj: ${r.source} (${r.as_of})`;
+}
+
+export function smBankFile(): RegisterFile<SmEntry> {
+  if (!smCache) smCache = read<SmEntry>('sm-bank.json');
+  return smCache;
+}
+
+/**
+ * San Marino's credit, and why its date is worded differently from Slovakia's.
+ *
+ * Slovakia's date is the register's own effective date, so it reads as a plain
+ * parenthesis. The BCSM publishes no edition and no revision date, so this one
+ * is the day WE read the page — and a bare `(2026-09-06)` would read as the
+ * source's date and quietly overstate it. Same wording as the API's own
+ * nationalRegisterCredit('SM'), on purpose: one credit, two surfaces.
+ */
+export function smCredit(r: SmRegister): string {
+  return `Source: ${r.source} (read on ${r.as_of})`;
+}
+
+/** San Marino ABI codes are five digits; the BCSM prints them padded already. */
+export function getSmCode(code: string): SmEntry | null {
+  if (!/^\d{1,5}$/.test(code)) return null;
+  return smBankFile().entries[code.padStart(5, '0')] ?? null;
 }
 
 /** Austrian bank codes are five digits, no padding accepted: 19043 is not 019043. */

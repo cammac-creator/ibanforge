@@ -1,0 +1,87 @@
+---
+title: "San-marinesische Bankleitzahlen (BCSM)"
+description: "Einen san-marinesischen ABI-Code (5 Ziffern) gegen die Liste der operativen Banken der Zentralbank prüfen: vier Banken mit ihrem Sitz — und das einzige Register, bei dem ein fehlender Code nichts beweist."
+order: 11
+---
+
+# San-marinesische Bankleitzahlen — die BCSM-Liste der operativen Banken
+
+San Marino verwendet den italienischen **ABI-Code**: fünf Ziffern an den Positionen 6 bis 10 einer `SM`-IBAN, nach dem CIN-Buchstaben und vor dem fünfstelligen CAB. Quelle ist die **Banca Centrale della Repubblica di San Marino**, die die von ihr beaufsichtigten Banken auf einer Seite veröffentlicht: Name, Sitz, ABI-Code und BIC.
+
+Es sind **vier**, und das ist der gesamte Bankensektor des Landes. Es ist auch der Grund für diese eigene Seite statt einer Tabellenzeile: San Marino ist das einzige Register, das wir ausliefern, bei dem ein **Fehlen überhaupt nichts bedeutet**.
+
+## Ein Aufruf
+
+```bash
+curl -X POST https://api.ibanforge.com/v1/iban/validate \
+  -H "Content-Type: application/json" \
+  -d '{"iban": "SM15U0303409800000000270100"}'
+```
+
+```json
+{
+  "valid": true,
+  "bic": { "code": "BASMSMSM", "basis": "national_register", "authoritative": true },
+  "bank_code_check": {
+    "value": "03034",
+    "status": "verified",
+    "match": "register",
+    "register": "Central Bank of the Republic of San Marino, operating banks (banks only; …)",
+    "authoritative": false,
+    "institution": {
+      "name": "Banca Agricola Commerciale Istituto Bancario Sammarinese s.p.a.",
+      "street": "Via 3 settembre, 316",
+      "post_code": "47891",
+      "town": "Dogana",
+      "country": "SM"
+    }
+  }
+}
+```
+
+## `authoritative: false` genau lesen — darum geht es
+
+Überall sonst, wo wir ein nationales Register ausliefern, heißt `not_in_register`, dass der Code **nicht vergeben** ist — ein starker Grund, eine Zahlung zu stoppen. Hier nicht.
+
+Die Zentralbank veröffentlicht die von ihr **beaufsichtigten** Banken. Sie veröffentlicht nicht die Vergabe des ABI-Coderaums, und nichts auf bcsm.sm behauptet das. Drei Fakten machen das konkret:
+
+- San Marino lizenziert auch **Zahlungs- und E-Geld-Institute, die keine Banken sind**. Mindestens eines hält einen san-marinesischen BIC und wickelt über EBA STEP2 ab; es steht nicht auf dieser Seite.
+- Die **offizielle san-marinesische Beispiel-IBAN**, `SM86 U032 2509 8000 0000 0270 100`, trägt den ABI-Code `03225` — ebenfalls nicht auf dieser Seite.
+- Die Seite heißt *operating banks*, und genau das ist sie.
+
+Ein gefundener Code nennt also seinen Inhaber, und ein nicht gefundener bekommt die Antwort, die San Marino immer gegeben hat: `not_in_register` mit dem Grund **`absent_from_reference_data`**, `authoritative: false`. Nie `not_allocated`.
+
+> Das ist das Gegenteil der österreichischen und slowakischen Geschichte, wo die offizielle Beispiel-IBAN auf einen nicht gelisteten Code zu zeigen **ein Befund** ist, weil jene Register vergeben. Hier ist es keiner — hier bleibt das Register schlicht in seinem Rahmen.
+
+## Zwei Flags, die absichtlich auseinandergehen
+
+Man beachte den Block oben: `bank_code_check.authoritative` ist `false`, `bic.authoritative` dagegen `true`. Sie beantworten zwei verschiedene Fragen, und San Marino ist die Stelle, an der sie sich trennen.
+
+- Der **Coderaum** gehört hier nicht der Zentralbank; das Urteil ist deshalb nicht autoritativ.
+- Der **BIC neben einem Code, den sie führt**, ist ihre eigene Zuordnung — die Zentralbank hat beide Werte in dieselbe Zeile gedruckt —, also ist `bic.basis` gleich `national_register`, und dieser BIC darf gespeichert und zur Abwicklung genutzt werden.
+
+Die Schweiz ist das Spiegelbild: Das SIX-Register klärt die Bankleitzahl, während der BIC daneben aus unserer kuratierten Karte stammt.
+
+## Was die Liste veröffentlicht
+
+| Feld | In der BCSM-Liste | Anmerkung |
+|---|---|---|
+| `name` | ja | die Bank, wortgetreu |
+| `bic` | ja, bei allen vier | neben dem ABI-Code gedruckt |
+| `street` / `post_code` / `town` | ja | der Sitz — tiefer als Belgien, Bulgarien oder die Slowakei veröffentlichen |
+| `lei` | nein | in dieser Liste nicht enthalten; wir tragen keinen aus GLEIF nach und geben ihn als den der Zentralbank aus |
+
+## Aktualität und Quellenangabe
+
+Die BCSM veröffentlicht **weder eine Ausgabennummer noch ein Revisionsdatum**, also ist `as_of` der Tag, an dem wir die Seite gelesen haben — und die Quellenangabe sagt das ausdrücklich: *Source: Central Bank of the Republic of San Marino, operating banks (read on …)*. Ein nacktes Datum läse sich dort als das der Zentralbank und überzeichnete es.
+
+**Die Lizenz ist unbekannt, und wir sagen das, statt zu raten.** bcsm.sm veröffentlicht keine Nutzungsbedingungen — nur eine Datenschutzerklärung und einen Copyright-Hinweis im Fuß (geprüft am 6. September 2026). Unsere Position: vier Zeilen Routing-Daten, von der Aufsicht zur Nutzung veröffentlicht, pro Anfrage als ein Datensatz ausgeliefert, die Quelle aus eigenem Entschluss und nicht aus Pflicht genannt. Ein Brief an die Zentralbank liegt zum Versand bereit; bei Widerspruch kommt das Register wieder heraus. Siehe [Datenquellen](/docs/data-sources).
+
+## Die ehrlichen Grenzen
+
+- **Wir prüfen den ABI-Code, nie das Konto oder seinen Inhaber.** Und hier nur in der positiven Richtung.
+- **Ein Fehlen ist keine Ablehnung.** Wiederholt, weil es das Einzige ist, was man mitnehmen muss.
+- **Institut, nicht Filiale.** Der CAB bezeichnet eine Filiale; die BCSM-Liste führt keine Filialen auf, und wir lehnen nie darauf ab.
+- **Vier Banken sind nicht die vier Zahlungsanbieter San Marinos.** Nicht-Banken werden gesondert lizenziert und stehen nicht auf dieser Seite.
+
+Weiterführend: [Was „verified" bedeutet](/docs/iban-validate) · [Datenquellen](/docs/data-sources) · [IBAN zu BIC](/docs/iban-to-bic) · [Slowakische Bankleitzahlen](/docs/sk-bank-codes) · [Die vier san-marinesischen Banken](/sm)

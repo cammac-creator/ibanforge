@@ -2136,6 +2136,28 @@
       "indexIntro": "Alle Zahlungscodes des Verzeichnisses der Národná banka Slovenska — des prevodník — mit dem Zahlungsdienstleister, dem BIC, den das Register ihm zuordnet, und der genauen Antwort der IBANforge-API. Monatlich mit dem Register aufgefrischt.",
       "wholeRegister": "Alle {count} Codes des Registers sind aufgeführt: das slowakische Zahlungssystem ist klein genug, dass nichts zurückgehalten werden muss.",
       "countryLink": "Der Aufbau der slowakischen IBAN, mit dem offiziellen Beispiel"
+    },
+    "sm": {
+      "metaTitle": "San-marinesische Bankleitzahl {code}: {name}, {town}",
+      "metaDescription": "ABI-Code {code} in der Liste der operativen Banken der Zentralbank der Republik San Marino: {name} in {town}, BIC {bic}. Sitz, IBAN-Aufbau, SEPA-Erreichbarkeit und die genaue Antwort der IBANforge-API.",
+      "eyebrow": "BCSM-Liste der operativen Banken",
+      "title": "San-marinesische Bankleitzahl {code}",
+      "facts": {
+        "code": "ABI-Code",
+        "bank": "Bank",
+        "bic": "BIC",
+        "street": "Sitz",
+        "postCode": "PLZ",
+        "town": "Ort",
+        "none": "keine"
+      },
+      "structure": "Eine san-marinesische IBAN besteht aus SM, zwei Prüfziffern, einem CIN-Buchstaben, dem fünfstelligen ABI-Code, einem fünfstelligen CAB und der zwölfstelligen Kontonummer. Für den ABI-Code kann die BCSM-Liste einen Inhaber nennen; den Kontoteil kennt nur die Bank.",
+      "notExhaustiveTitle": "Was ein fehlender Code NICHT bedeutet",
+      "notExhaustive": "Die Zentralbank veröffentlicht die von ihr beaufsichtigten Banken, nicht die Vergabe des ABI-Coderaums. Ein Code auf dieser Liste hat also einen benannten Inhaber, ein fehlender Code beweist dagegen nichts: San Marino lizenziert auch Zahlungs- und E-Geld-Institute, die keine Banken sind, und die offizielle san-marinesische Beispiel-IBAN trägt selbst einen ABI-Code, der nicht auf dieser Seite steht. Deshalb antwortet die API hier authoritative: false — anders als bei Österreich oder der Slowakei ist ein Fehlen nie ein Grund, eine Zahlung zu stoppen.",
+      "docLink": "Wie die san-marinesische Liste antwortet",
+      "indexTitle": "San-marinesische Bankleitzahlen (operative Banken der BCSM)",
+      "indexIntro": "Die vier operativen Banken der Zentralbank der Republik San Marino, mit dem ABI-Code, dem BIC, den die Zentralbank ihm zuordnet, dem Sitz und der genauen Antwort der IBANforge-API. Monatlich mit den anderen Registern aufgefrischt.",
+      "countryLink": "Der Aufbau der san-marinesischen IBAN, mit dem offiziellen Beispiel"
     }
   },
   "countries": {
@@ -2209,7 +2231,8 @@
       "index": "Alle Länder"
     },
     "sourceNote": "Quelle: ISO-13616-Register für Länge, Aufbau und Beispiel; API-Antwort erfasst am {date}.",
-    "exampleNotAllocated": "Die Bankleitzahl dieses offiziellen Beispiels ist in {register} nicht vergeben: Die API sagt es so, wie es ist, das erwartete Verhalten bei einer Demo-IBAN."
+    "exampleNotAllocated": "Die Bankleitzahl dieses offiziellen Beispiels ist in {register} nicht vergeben: Die API sagt es so, wie es ist, das erwartete Verhalten bei einer Demo-IBAN.",
+    "examplePartialRegister": "Ein Teil der Bankleitzahlen dieses Landes wird zusätzlich von einer Aufsichtsliste benannt, zu der wir je eine Seite ausliefern — doch diese Liste veröffentlicht nicht die Vergabe des Coderaums: Ein dort fehlender Code ist deshalb kein nie vergebener Code."
   },
   "tools": {
     "keyBlock": {

@@ -42,7 +42,7 @@ The German bank code `37040044` was extracted from the IBAN, checked against the
 ## How the resolution actually works
 
 1. **Extract the bank code** from the IBAN using the country's BBAN structure (89 countries covered).
-2. **Ask the national register first.** For CH/LI (SIX BankMaster), DE (Bundesbank), AT (OeNB), BE (NBB), BG (Bulgarian National Bank), SK (NBS) and FI, the register is the allocation authority: a hit is the institution the code belongs to, a miss (`not_in_register`) means the code is allocated to nobody — a strong reason to stop a payment. See [data sources](/docs/data-sources) for what each register publishes.
+2. **Ask the national register first.** For CH/LI (SIX BankMaster), DE (Bundesbank), AT (OeNB), BE (NBB), BG (Bulgarian National Bank), SK (NBS) and FI, the register is the allocation authority: a hit is the institution the code belongs to, a miss (`not_in_register`) means the code is allocated to nobody — a strong reason to stop a payment. San Marino is read too but does not belong in that list: the Central Bank's list of operating banks names the holder of a code it carries, and says nothing about one it does not — a hit resolves the BIC, a miss is just a miss. See [data sources](/docs/data-sources) for what each register publishes.
 3. **Fall back to the composite BIC map** everywhere else: 121k+ BIC entries assembled from GLEIF, the public SWIFT directory, SIX, EBA STEP2, Bundesbank and NBP. A hit names who holds the matching BIC — the response marks these `authoritative: false`, because naming the BIC holder is a fact, while promising it is your counterparty's bank would be a guess.
 
 ## The honest limits

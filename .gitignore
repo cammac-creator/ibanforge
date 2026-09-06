@@ -50,6 +50,10 @@ scripts/village-atlas/sheets/
 
 # Scratch stats database of `npm run pages:export` (the in-process calls record nothing anyone reads)
 data/.export-register-pages.stats.sqlite*
+# Any scratch stats DB a throwaway script points STATS_DB_PATH at. The two
+# export scripts were listed by name, so a probe script that invented its own
+# name (data/.probe.stats.sqlite) sailed past and got committed on 07/09/2026.
+data/.*.stats.sqlite*
 data/.export-country-pages.stats.sqlite*
 
 # Clés de comptes de service (Google Search Console…) : jamais dans le dépôt

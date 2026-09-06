@@ -42,7 +42,41 @@ export interface NationalCodeEntry {
 }
 
 /** Width of the bank code as an IBAN of that country carries it. */
-const CODE_WIDTH: Record<string, number> = { AT: 5, BE: 3, SK: 4 };
+const CODE_WIDTH: Record<string, number> = { AT: 5, BE: 3, SK: 4, SM: 5 };
+
+/**
+ * 🚨 Which of these registers EXHAUST their country's bank-code space.
+ *
+ * This table is the difference between "no institution holds this code" and "we
+ * have not seen this code", and it is the whole reason San Marino may live in
+ * the same table as the other three without inheriting their authority.
+ *
+ * AT, BE and SK are published by the authority that ALLOCATES the codes and
+ * cover the space: an absence there is the allocation authority's own verdict.
+ *
+ * SM is not. The BCSM page is titled "operating banks" and lists banks; it
+ * never claims to publish the ABI allocation, San Marino also licenses payment
+ * and e-money institutions that are not banks (one holds a San Marino BIC and
+ * settles through EBA STEP2), and the ISO 13616 registry's own San Marino
+ * example IBAN carries an ABI absent from the page. So a hit names the holder
+ * and a MISS means nothing.
+ *
+ * enrich.ts reads this rather than hardcoding a country list, and the only
+ * place a non-exhaustive register may lead is `verified` — never
+ * `not_in_register`, never `not_allocated`.
+ */
+const EXHAUSTIVE: Record<string, boolean> = { AT: true, BE: true, SK: true, SM: false };
+
+/**
+ * Does an absence in this country's register mean the code is unallocated?
+ *
+ * False for a country we hold no register for AND for one whose register does
+ * not cover its code space — the caller cannot tell those apart from here, and
+ * must not need to: both mean "do not turn a miss into a denial".
+ */
+export function nationalRegisterIsExhaustive(cc: string): boolean {
+  return EXHAUSTIVE[cc] === true;
+}
 
 /**
  * Bring a published code to the width the IBAN uses.
@@ -198,17 +232,35 @@ export function nationalRegisterEdition(cc: string): {
 }
 
 /**
+ * How each register's credit is worded, and — the part that matters — WHOSE
+ * date it is.
+ *
+ * Slovakia's is the register's own effective date, so it reads as a plain
+ * parenthesis, in the publisher's own word for "source" (`Zdroj`), which is
+ * what its terms ask to be named.
+ *
+ * San Marino's is the day WE read the page: the BCSM publishes no edition and
+ * no revision date. "read on" is not decoration — a bare `(2026-09-06)` there
+ * would read as the source's date and quietly overstate it, which is the exact
+ * failure getBgAsOf() was written to avoid one register over.
+ */
+const CREDIT_FORMAT: Record<string, (source: string, asOf: string) => string> = {
+  SK: (source, asOf) => `Zdroj: ${source} (${asOf})`,
+  SM: (source, asOf) => `Source: ${source} (read on ${asOf})`,
+};
+
+/**
  * The one-line credit every surface must carry, built from the loaded data.
  *
  * Null when the register states no edition (AT, BE) or when nothing is loaded —
  * better no credit line than one naming a date we do not hold. Same shape and
- * same reasoning as bgAttribution() in bg-bae.ts. `Zdroj` is the publisher's
- * own word for "source", which is what its terms ask to be named.
+ * same reasoning as bgAttribution() in bg-bae.ts.
  */
 export function nationalRegisterCredit(cc: string): string | null {
   const { source, as_of } = nationalRegisterEdition(cc);
-  if (!source || !as_of) return null;
-  return `Zdroj: ${source} (${as_of})`;
+  const format = CREDIT_FORMAT[cc];
+  if (!source || !as_of || !format) return null;
+  return format(source, as_of);
 }
 
 /** Every allocated code for a country, for pruning curated keys that contradict it. */

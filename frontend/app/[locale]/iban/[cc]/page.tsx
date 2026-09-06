@@ -138,6 +138,15 @@ export default async function CountryPage({ params }: { params: Promise<{ locale
         {national && (entry.api.bank_code_check as { status?: string } | null)?.status === "not_in_register" && (
           <p className="text-xs text-muted-foreground">{t("exampleNotAllocated", { register: entry.register ?? "" })}</p>
         )}
+        {/* A country with register pages whose example still answers from the
+            composite map: a supervisor's list covers some of its codes without
+            covering the space. San Marino is the only one today, and without
+            this line its page would read as having no register at all while
+            /sm sits one click away naming four banks. Keyed on the condition,
+            not on the country, so the next partial register inherits it. */}
+        {!national && registerIndex && (
+          <p className="text-xs text-muted-foreground">{t("examplePartialRegister")}</p>
+        )}
       </section>
 
       <section className="overflow-x-auto rounded-md border" style={{ borderColor: "var(--hairline)" }}>

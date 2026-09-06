@@ -51,7 +51,7 @@ jobs:
       - name: Seed German Bankleitzahlen (Bundesbank)
         run: npm run db:seed-blz
 
-      - name: Refresh Austrian, Belgian and Slovak registers
+      - name: Refresh Austrian, Belgian, Slovak and San Marino registers
         run: npm run db:seed-national
 
       # The Bulgarian National Bank's BAE register. Same reason as the German

@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { parseSlovakia, parseSlovakiaPage, slovakSource } from './seed-national.js';
+import {
+  parseSanMarino,
+  parseSlovakia,
+  parseSlovakiaPage,
+  sanMarinoSource,
+  slovakSource,
+} from './seed-national.js';
 
 /**
  * The Slovak register, held by its two published shapes.
@@ -218,5 +224,107 @@ describe('slovakSource', () => {
     expect(slovakSource({ ...EDITION, version: '226' })).toBe(
       'Národná banka Slovenska, Directory of identification codes for the domestic payment system, version 226',
     );
+  });
+});
+
+/**
+ * San Marino — the BCSM "operating banks" page.
+ *
+ * The fixture reproduces the real markup of 06/09/2026, both traps included:
+ * the first bank's name split across two adjacent <strong> with NO whitespace
+ * between them, and the fourth block writing "Telephone/Fax:" where the others
+ * write "Phone/Fax:" while the opening label alternates between "Corporate
+ * name:" and "Company name:".
+ */
+const SM_READ_ON = '2026-09-06';
+
+const SM_PAGE = `<div class="pwr-rich-text">
+<p>Corporate name:<br><a href="/registro-soggetti-autorizzati/5?hsLang=en" rel="noopener"><strong>Banca</strong><strong>Agricola Commerciale Istituto Bancario Sammarinese s.p.a.</strong></a><br>Registered office: Via 3 settembre, 316 - 47891 Dogana<br>Phone/Fax: 0549 871111 / 871222<br>ABI Code: 03034<br>SWIFT BIC: BASMSMSM</p>
+<p>Company name:<br><a href="/registro-soggetti-autorizzati/2?hsLang=en" rel="noopener"><strong>Banca di San Marino s.p.a.</strong></a><br>Registered office: Strada della Croce, 39 - 47896 Faetano<br>Phone/Fax: 0549 873411 / 873401<br>ABI Code: 08540<br>SWIFT BIC: MAOISMSM</p>
+<p>Corporate name:<br><a href="/registro-soggetti-autorizzati/3?hsLang=en" rel="noopener"><strong>Banca Sammarinese di Investimento s.p.a.</strong></a><br>Registered office: Via Monaldo da Falciano, 3 - 47891 Rovereta<br>Phone/Fax: 0549 888801 / 888802<br>ABI Code: 03287<br>SWIFT BIC: BSDISMSD</p>
+<p>Company name:<br><a href="/registro-soggetti-autorizzati/48?hsLang=en" rel="noopener"><strong>Cassa di Risparmio della Repubblica di San Marino s.p.a.</strong></a><br>Registered office: P.tta del Titano, 2 - 47890 San Marino<br>Telephone/Fax: 0549 872311 / 872700<br>ABI Code: 06067<br>SWIFT BIC: CSSMSMSM</p>
+<p>Some other paragraph on the page, carrying neither an ABI Code nor a BIC.</p>
+</div>`;
+
+const smByCode = (html: string) =>
+  new Map(parseSanMarino(html, SM_READ_ON).map((e) => [e.code, e] as const));
+
+describe('parseSanMarino', () => {
+  it('reads the four operating banks and ignores the rest of the page', () => {
+    expect([...smByCode(SM_PAGE).keys()].sort()).toEqual(['03034', '03287', '06067', '08540']);
+  });
+
+  it('un-joins a name split across two adjacent <strong>', () => {
+    // 🚨 The page's own markup carries no whitespace between </strong> and
+    // <strong>, so a browser renders "BancaAgricola" too. The institution's
+    // real name has the space: our GLEIF-sourced directory row for BASMSMSM
+    // reads "BANCA AGRICOLA COMMERCIALE ISTITUTO BANCARIO SAMMARINESE"
+    // (checked 06/09/2026). Reading across an element boundary is not editing.
+    expect(smByCode(SM_PAGE).get('03034')?.name).toBe(
+      'Banca Agricola Commerciale Istituto Bancario Sammarinese s.p.a.',
+    );
+  });
+
+  it('reads the block whose phone label differs from the other three', () => {
+    // "Telephone/Fax:" on the fourth, "Phone/Fax:" on the others — proof the
+    // parser anchors on ABI Code / SWIFT BIC alone.
+    const row = smByCode(SM_PAGE).get('06067');
+    expect(row?.name).toBe('Cassa di Risparmio della Repubblica di San Marino s.p.a.');
+    expect(row?.bic).toBe('CSSMSMSM');
+  });
+
+  it('splits the registered office on the postcode, not on the comma', () => {
+    // "P.tta del Titano, 2 - 47890 San Marino": a comma split would leave the
+    // house number behind, and the town is two words.
+    const row = smByCode(SM_PAGE).get('06067');
+    expect([row?.street, row?.post_code, row?.town]).toEqual([
+      'P.tta del Titano, 2',
+      '47890',
+      'San Marino',
+    ]);
+    const dogana = smByCode(SM_PAGE).get('03034');
+    expect([dogana?.street, dogana?.post_code, dogana?.town]).toEqual([
+      'Via 3 settembre, 316',
+      '47891',
+      'Dogana',
+    ]);
+  });
+
+  it('publishes no LEI, because the page publishes none', () => {
+    // Joining one from GLEIF here would be our enrichment wearing the BCSM's
+    // credit.
+    for (const row of parseSanMarino(SM_PAGE, SM_READ_ON)) expect(row.lei).toBeNull();
+  });
+
+  it('stamps every row with the day the page was read, and says so', () => {
+    // The BCSM states no edition and no revision date, so the read date is the
+    // only one we can stand behind — and the source string admits it.
+    for (const row of parseSanMarino(SM_PAGE, SM_READ_ON)) {
+      expect(row.as_of).toBe(SM_READ_ON);
+      expect(row.source).toBe(sanMarinoSource());
+    }
+    // The name alone. Putting the date in here too printed it twice the first
+    // time it was logged; the two are joined once, in nationalRegisterCredit().
+    expect(sanMarinoSource()).toBe('Central Bank of the Republic of San Marino, operating banks');
+  });
+
+  it('drops a block whose ABI is not five digits', () => {
+    const broken = SM_PAGE.replace('ABI Code: 03034', 'ABI Code: 0549 871111');
+    const rows = smByCode(broken);
+    expect(rows.has('03034')).toBe(false);
+    // The other three survive: one bad block is not a reason to lose the page.
+    expect(rows.size).toBe(3);
+  });
+
+  it('drops a block whose BIC is not 8 or 11 characters', () => {
+    const broken = SM_PAGE.replace('SWIFT BIC: MAOISMSM', 'SWIFT BIC: n/a');
+    expect(smByCode(broken).has('08540')).toBe(false);
+  });
+
+  it('parses to nothing when the labels change, so the floor refuses the write', () => {
+    // A page rebuilt in Italian must not half-parse: zero blocks means write()
+    // throws on MIN_EXPECTED.SM and the rows already stored stand.
+    const relabelled = SM_PAGE.replace(/ABI Code:/g, 'Codice ABI:');
+    expect(parseSanMarino(relabelled, SM_READ_ON)).toHaveLength(0);
   });
 });

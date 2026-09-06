@@ -2136,6 +2136,28 @@
       "indexIntro": "Tous les codes de paiement du répertoire de la Národná banka Slovenska — le prevodník — avec le prestataire de services de paiement, le BIC que le registre lui associe, et la réponse exacte de l’API IBANforge. Rafraîchi chaque mois avec le registre.",
       "wholeRegister": "Les {count} codes du registre sont listés : le système de paiement slovaque est assez petit pour qu’il n’y ait pas de reste à garder de côté.",
       "countryLink": "Le format de l’IBAN slovaque, avec l’exemple officiel"
+    },
+    "sm": {
+      "metaTitle": "Code banque saint-marinais {code} : {name}, {town}",
+      "metaDescription": "Code ABI {code} dans la liste des banques opérationnelles de la Banque centrale de Saint-Marin : {name} à {town}, BIC {bic}. Siège social, structure de l’IBAN, portée SEPA et la réponse exacte de l’API IBANforge.",
+      "eyebrow": "Liste des banques opérationnelles de la BCSM",
+      "title": "Code banque saint-marinais {code}",
+      "facts": {
+        "code": "Code ABI",
+        "bank": "Banque",
+        "bic": "BIC",
+        "street": "Siège social",
+        "postCode": "Code postal",
+        "town": "Localité",
+        "none": "aucun"
+      },
+      "structure": "Un IBAN saint-marinais, c’est SM, deux chiffres de contrôle, une lettre CIN, le code ABI à cinq chiffres, un CAB à cinq chiffres, puis le numéro de compte à douze caractères. Le code ABI est ce dont la liste de la BCSM peut nommer le titulaire ; la partie compte n’est connue que de la banque.",
+      "notExhaustiveTitle": "Ce qu’un code absent ne veut PAS dire",
+      "notExhaustive": "La Banque centrale publie les banques qu’elle supervise, pas l’attribution de l’espace des codes ABI. Un code présent dans cette liste a donc un titulaire nommé, et un code absent ne prouve rien : Saint-Marin agrée aussi des prestataires de services de paiement et de monnaie électronique qui ne sont pas des banques, et l’IBAN d’exemple officiel de Saint-Marin porte lui-même un code ABI absent de cette page. C’est pourquoi l’API répond ici authoritative: false — contrairement à l’Autriche ou à la Slovaquie, une absence n’est jamais une raison d’arrêter un paiement.",
+      "docLink": "Ce que répond la liste saint-marinaise",
+      "indexTitle": "Codes banque saint-marinais (banques opérationnelles BCSM)",
+      "indexIntro": "Les quatre banques opérationnelles de la Banque centrale de la République de Saint-Marin, avec le code ABI, le BIC que la Banque centrale lui associe, le siège social, et la réponse exacte de l’API IBANforge. Rafraîchi chaque mois avec les autres registres.",
+      "countryLink": "Le format de l’IBAN saint-marinais, avec l’exemple officiel"
     }
   },
   "countries": {
@@ -2209,7 +2231,8 @@
       "index": "Tous les pays"
     },
     "sourceNote": "Source : registre ISO 13616 pour la longueur, le découpage et l'exemple ; réponse de l'API relevée le {date}.",
-    "exampleNotAllocated": "Le code banque de cet exemple officiel n'est pas attribué dans {register} : l'API le dit tel quel, c'est le comportement attendu sur un IBAN de démonstration."
+    "exampleNotAllocated": "Le code banque de cet exemple officiel n'est pas attribué dans {register} : l'API le dit tel quel, c'est le comportement attendu sur un IBAN de démonstration.",
+    "examplePartialRegister": "Une partie des codes banque de ce pays est en outre nommée par une liste du superviseur, dont nous servons une page par code — mais cette liste ne publie pas l'attribution de l'espace des codes : un code qui n'y figure pas n'est donc pas un code jamais attribué."
   },
   "tools": {
     "keyBlock": {

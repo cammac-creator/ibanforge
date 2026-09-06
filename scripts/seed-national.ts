@@ -1,9 +1,14 @@
 /**
- * Seed the Austrian, Belgian and Slovak bank-code registers.
+ * Seed the Austrian, Belgian, Slovak and San Marino bank-code registers.
  *
- * All three are published by the authority that allocates the codes, which is
- * what lets an absence mean "held by nobody" rather than "absent from our map".
- * The same claim CH, LI, DE and FI already carry.
+ * ⚠️ THREE of these four are exhaustive; San Marino is NOT. AT, BE and SK are
+ * published by the authority that allocates the codes, which is what lets an
+ * absence mean "held by nobody" rather than "absent from our map" — the claim
+ * CH, LI, DE and FI already carry. The BCSM page is a list of *operating banks*,
+ * not an allocation of the ABI space, so a San Marino miss stays exactly what it
+ * is today: absent from our reference data, nothing more. The table is shared;
+ * the strength of the claim is not, and it is decided in enrich.ts, which never
+ * puts SM in NATIONAL_REGISTERS. Do not "tidy" that by adding it.
  *
  *   npx tsx scripts/seed-national.ts          # all
  *   npx tsx scripts/seed-national.ts AT       # one
@@ -68,6 +73,40 @@
  * 27/08/2026 that it does not ("you do not alter the information", the
  * department's own view). If the NBS answers otherwise, this register comes
  * back out.
+ *
+ * SAN MARINO — Banca Centrale della Repubblica di San Marino, "Operating Banks".
+ * Four banks, each an HTML paragraph carrying a name, a registered office, a
+ * phone/fax line, an "ABI Code" and a "SWIFT BIC". Read the notes on
+ * parseSanMarino for the two traps in that markup.
+ *
+ * ## Why this one is not authoritative
+ *
+ * The page lists the banks; it does not publish the allocation of the ABI code
+ * space, and nothing on bcsm.sm says it exhausts it. San Marino also licenses
+ * payment and e-money institutions that are not banks — one of them holds a San
+ * Marino BIC and settles through EBA STEP2 — and the ISO 13616 registry's own
+ * San Marino example carries an ABI absent from this page. So a hit here names
+ * the holder and a MISS means nothing at all, which is why San Marino stays out
+ * of NATIONAL_REGISTERS in enrich.ts and out of pruneStaleNationalCodes in
+ * bic-lookup.ts. Adding it to either would turn four rows of good data into a
+ * denial engine for a country whose code space we have never seen.
+ *
+ * ## The licence, and why `as_of` is the day we read the page
+ *
+ * bcsm.sm publishes NO terms of use (checked 06/09/2026: a privacy policy and a
+ * "© Central Bank of the Republic of San Marino" footer, nothing else). The
+ * position, written up in docs/data-sources.md, is that four lines of routing
+ * data published by the supervisor to be used are served one per request with
+ * the source credited; the licence is recorded as UNKNOWN rather than guessed,
+ * and a letter to the BCSM is queued. Nothing here invents a clause.
+ *
+ * The page states no edition and no revision date, so `as_of` is the DAY THIS
+ * SEEDER READ IT — the only date we can honestly stand behind — and the stored
+ * `source` says so in words. Consequence, stated here rather than discovered
+ * later: every run rewrites all four rows with a new date, so data/bic.sqlite
+ * and sm-bank.json churn on each refresh even when the page has not changed.
+ * That is the price of a source that publishes no date; refresh-diff sees 4 -> 4
+ * and does not flag it.
  */
 import Database from 'better-sqlite3';
 import { resolve, dirname } from 'node:path';
@@ -82,6 +121,8 @@ const SOURCES = {
   BE: 'https://www.nbb.be/doc/be/be/protocol/full_list_current.xlsx',
   // The PAGE, not a file — the CSV behind it carries a per-version UUID.
   SK: 'https://nbs.sk/en/payments/general-information/directories-and-registers/directory-identification-codes-domestic-payment-system-in-sr/',
+  // An HTML page and nothing else: the BCSM publishes no file of any kind.
+  SM: 'https://www.bcsm.sm/en/functions/statutory-functions/payment-system/operating-banks',
 } as const;
 
 /**
@@ -91,11 +132,16 @@ const SOURCES = {
  * Measured 06/09/2026: 38 Slovak ones — the whole Slovak payment system fits in
  * two screens, so its floor is set well under the count rather than just under
  * it, or an ordinary month in which four providers merge would fail the build.
+ * Measured 06/09/2026: 4 San Marino banks. A floor of 3 is not much of a guard
+ * at that size, and it is not pretending to be one: the real protection there is
+ * the per-field validation in parseSanMarino (five digits of ABI, a BIC of 8 or
+ * 11 characters), because a page that changed shape yields zero blocks rather
+ * than three bad ones.
  * A truncated download, an upstream incident or a format change our parser
  * mangled would come back well under these. Abort BEFORE touching the table and
  * let the existing data stand.
  */
-const MIN_EXPECTED: Record<string, number> = { AT: 700, BE: 650, SK: 25 };
+const MIN_EXPECTED: Record<string, number> = { AT: 700, BE: 650, SK: 25, SM: 3 };
 
 /**
  * The OeNB and NBB both redirect or refuse without a browser User-Agent.
@@ -441,6 +487,116 @@ async function parseSlovakiaLive(): Promise<Entry[]> {
   return parseSlovakia(csv, edition);
 }
 
+// ---------------------------------------------------------------------------
+// San Marino
+// ---------------------------------------------------------------------------
+
+/**
+ * The register's name, and only its name.
+ *
+ * The DATE is not in here, though the first draft put it in and the seeder log
+ * immediately printed "(read on 2026-09-06) (2026-09-06)". `source` is the
+ * string a served `bic.source` shows, `as_of` is the date beside it, and the
+ * one place they are joined is nationalRegisterCredit() — which words San
+ * Marino's as "read on" precisely because that date is ours and not the BCSM's.
+ */
+export function sanMarinoSource(): string {
+  return 'Central Bank of the Republic of San Marino, operating banks';
+}
+
+/**
+ * Read the four operating banks out of the BCSM page.
+ *
+ * `readOn` is an ISO date supplied by the caller rather than taken from a clock
+ * in here, so the test can pin it and so one run stamps one date on every row.
+ *
+ * ## Anchors: the two labels, and nothing else
+ *
+ * A block is found by carrying BOTH `ABI Code:` and `SWIFT BIC:`. Every other
+ * label on that page varies and must not be matched on (all measured
+ * 06/09/2026): two blocks open `Corporate name:` and two `Company name:`, and
+ * the fourth writes `Telephone/Fax:` where the others write `Phone/Fax:`. A
+ * parser anchored on any of those reads three banks and calls it four.
+ *
+ * ## 🚨 The name is split across two elements with no space between them
+ *
+ * The first bank is marked up `<strong>Banca</strong><strong>Agricola
+ * Commerciale …</strong>` — no whitespace at the boundary. Strip the tags
+ * naively and you get "BancaAgricola Commerciale …", which is also what a
+ * browser renders, so the page itself displays the typo. That is not the
+ * institution's name: our own GLEIF-sourced directory row for BASMSMSM reads
+ * "BANCA AGRICOLA COMMERCIALE ISTITUTO BANCARIO SAMMARINESE" (checked
+ * 06/09/2026). So tags are replaced by a SPACE and runs of whitespace collapsed
+ * — reading text across an element boundary, not editing the data.
+ */
+export function parseSanMarino(html: string, readOn: string): Entry[] {
+  const source = sanMarinoSource();
+  const entries: Entry[] = [];
+  const seen = new Set<string>();
+
+  for (const block of html.match(/<p\b[^>]*>[\s\S]*?<\/p>/gi) ?? []) {
+    if (!/ABI\s*Code\s*:/i.test(block) || !/SWIFT\s*BIC\s*:/i.test(block)) continue;
+    // <br> becomes a newline so the labelled lines stay apart; every other tag
+    // becomes a space, which is what un-joins the two <strong> of the name.
+    const text = decodeEntities(block.replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, ' '));
+    const line = (re: RegExp): string | null => {
+      const m = re.exec(text);
+      return m ? m[1].replace(/\s+/g, ' ').trim() || null : null;
+    };
+
+    const code = line(/ABI\s*Code\s*:\s*([^\n]*)/i);
+    const bic = line(/SWIFT\s*BIC\s*:\s*([^\n]*)/i);
+    // Five digits, as IBAN positions 6-10 carry it, and 8 or 11 characters of
+    // BIC. A block that fails either is DROPPED and counted, never stored: a
+    // page whose shape moved would otherwise write a phone number into the code
+    // column, and four rows is too few for anyone to notice by eye.
+    if (!code || !/^\d{5}$/.test(code)) continue;
+    if (!bic || !/^[A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?$/.test(bic.toUpperCase())) continue;
+    if (seen.has(code)) continue;
+
+    // The name is the first non-empty line after the "…name:" label, which is
+    // the only thing the two label spellings are used for — matched loosely so a
+    // third wording costs nothing.
+    const name = line(/name\s*:\s*\n\s*([^\n]+)/i);
+    if (!name) continue;
+
+    // "Registered office: Via 3 settembre, 316 - 47891 Dogana" — street, then a
+    // dash, then five digits of CAP and the town. Split on the postcode rather
+    // than on the dash: street names on this page contain commas and numbers,
+    // and one of them ("P.tta del Titano, 2") would lose its house number to a
+    // greedy comma split.
+    const office = line(/Registered\s*office\s*:\s*([^\n]*)/i);
+    const addr = office ? /^(.*?)\s*-\s*(\d{5})\s+(.+)$/.exec(office) : null;
+
+    seen.add(code);
+    entries.push({
+      code,
+      name,
+      bic: bic8(bic),
+      street: addr ? addr[1].trim() : null,
+      post_code: addr ? addr[2] : null,
+      town: addr ? addr[3].trim() : null,
+      // The page publishes no LEI. Ours could be joined from GLEIF, but that
+      // would be our enrichment wearing the register's credit.
+      lei: null,
+      source,
+      as_of: readOn,
+    });
+  }
+  return entries;
+}
+
+async function parseSanMarinoLive(): Promise<Entry[]> {
+  const html = new TextDecoder('utf-8').decode(await fetchBytes(SOURCES.SM));
+  // The date the page was READ. The BCSM states no edition and no revision
+  // date, so this is the only date we can stand behind — never a clock reading
+  // dressed up as the source's own, which is what getBgAsOf exists to avoid.
+  const readOn = new Date().toISOString().slice(0, 10);
+  const entries = parseSanMarino(html, readOn);
+  console.log(`  SM: read on ${readOn}, ${entries.length} operating banks parsed`);
+  return entries;
+}
+
 function write(db: Database.Database, cc: string, entries: Entry[]): void {
   const floor = MIN_EXPECTED[cc];
   if (entries.length < floor) {
@@ -511,6 +667,7 @@ async function main(): Promise<void> {
     ['AT', parseAustria],
     ['BE', parseBelgium],
     ['SK', parseSlovakiaLive],
+    ['SM', parseSanMarinoLive],
   ];
   for (const [cc, parse] of jobs) {
     if (only && only !== cc) continue;

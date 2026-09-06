@@ -32,6 +32,21 @@ Slovak data is reproduced under the NBS site terms ([*Podmienky používania*](h
 
 We wrote to the NBS on 26/08/2026 to ask whether extracting fields from the file counts as altering it; there was no answer as of 06/09/2026. The Czech National Bank, whose terms carry a near-identical clause, answered on 27/08/2026 that it does not. If the NBS answers otherwise, this register comes back out. Like the Bulgarian one, it publishes no deletion flag and no successor code, so a Slovak `not_in_register` never comes with a re-papering hint.
 
+## A register that names holders without covering the space — San Marino
+
+| Country | Register | Refresh | What it publishes beyond the code |
+|---|---|---|---|
+| **SM** | Central Bank of the Republic of San Marino, list of operating banks | re-read monthly (the page states **no edition and no revision date**, so `as_of` is the day we read it, and the credit says "read on") | name, BIC, and the full registered office — deeper than BE, BG or SK publish |
+
+San Marino sits on its own because it breaks the rule the table above is built on. The Central Bank publishes the four banks it **supervises**; it does not publish the allocation of the ABI code space. San Marino also licenses payment and e-money institutions that are not banks (one holds a San Marino BIC and settles through EBA STEP2), and the official San Marino example IBAN carries an ABI absent from the page. So:
+
+- a listed code answers `verified` with the institution the Central Bank names — and `authoritative: false`;
+- a code absent from the list answers exactly what San Marino answered before this register existed: `not_in_register` with reason **`absent_from_reference_data`**. Never `not_allocated`, and never a reason to stop a payment.
+
+One flag does go the other way: `bic.basis` is `national_register` and `bic.authoritative` is `true`, because the BIC printed beside a listed code is the Central Bank's own pairing. San Marino is where the two authority flags part company in the opposite direction from Switzerland.
+
+**The licence is unknown, and recorded as unknown.** bcsm.sm publishes no terms of use — only a privacy policy and a copyright footer (checked 06/09/2026). Our position: four lines of routing data published by the supervisor to be used, served one record per request, credited *Source: Central Bank of the Republic of San Marino, operating banks (read on …)* by choice rather than by obligation. A letter to the Central Bank is queued; if it objects, the register is withdrawn. No clause is invented in the meantime.
+
 ## The composite BIC map — where `authoritative: false`
 
 Everywhere else, bank codes resolve against our composite map: **121k+ BIC entries** assembled from GLEIF (LEI-enriched), the public SWIFT directory, SIX, EBA STEP2 SCT, Bundesbank and NBP data. A hit names who holds the matching BIC — it does **not** prove the institution issues IBANs, and an absence proves nothing at all. In the ~30 countries whose bank codes are letters, a prefix fallback can return `candidates > 1`, and the response flags it as indicative.

@@ -65,6 +65,7 @@ export const REGISTER_INDEX: Record<string, string> = {
   AT: '/at',
   BE: '/be',
   SK: '/sk',
+  SM: '/sm',
 };
 
 /**

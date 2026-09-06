@@ -1,7 +1,8 @@
 /**
  * Export the data behind the public register pages (/blz/{blz} for Germany,
- * /iid/{iid} for Switzerland, /at/{code} for Austria, /be/{code} for Belgium)
- * into frontend/data/registers/*.json.
+ * /iid/{iid} for Switzerland, /at/{code} for Austria, /be/{code} for Belgium,
+ * /sk/{code} for Slovakia, /sm/{code} for San Marino) into
+ * frontend/data/registers/*.json.
  *
  * ## Why the pages read a JSON and not the API at request time
  *
@@ -25,6 +26,9 @@
  * BIC ends in XXX) that is not retired, and every Swiss headquarters IID.
  * Every other code still has a page, rendered on demand, and joins the sitemap
  * once the first batch shows it earns its place.
+ *
+ * Slovakia (38 codes) and San Marino (4) have no batch at all: at that size the
+ * batch IS the register, and the rule this section exists for does not bite.
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
@@ -277,7 +281,7 @@ interface NationalRow {
 }
 const nationalRows = bic
   .prepare(
-    "SELECT country, code, name, bic, street, post_code, town, lei, source, as_of FROM national_bank_codes WHERE country IN ('AT', 'BE', 'SK') ORDER BY country, code",
+    "SELECT country, code, name, bic, street, post_code, town, lei, source, as_of FROM national_bank_codes WHERE country IN ('AT', 'BE', 'SK', 'SM') ORDER BY country, code",
   )
   .all() as NationalRow[];
 const stamp = new Date().toISOString().slice(0, 7);
@@ -438,6 +442,51 @@ for (const r of skRows) {
 }
 const skBatch1 = skRows.map((r) => r.code);
 
+// San Marino: a CIN letter, five digits of ABI in IBAN positions 6-10, five of
+// CAB, twelve of account. The CIN is a check character over the BBAN and our
+// validator accepts any letter, so the synthetic example carries a fixed 'U' —
+// the same one the ISO 13616 registry's San Marino example uses.
+//
+// Four banks, all four pre-rendered, `related` empty for the same reason it is
+// in Slovakia: no two share a BIC8, and the index page IS the list.
+//
+// ⚠️ The api block on these pages says `authoritative: false` and it is not a
+// defect: the BCSM publishes its operating banks, not the allocation of the ABI
+// space. The page text has to carry that, or a reader will read four verified
+// answers as a register that settles negatives too.
+const smRows = nationalRows.filter((r) => r.country === 'SM');
+const sm: Json = {};
+let smSource = 'Central Bank of the Republic of San Marino, operating banks';
+for (const r of smRows) {
+  const bban = `U${r.code}09800000000270100`;
+  const iban = `SM${checkDigits('SM', bban)}${bban}`;
+  const answer = await call('/v1/iban/validate', {
+    method: 'POST',
+    body: JSON.stringify({ iban }),
+  });
+  if (answer.valid !== true) throw new Error(`SM ${r.code}: synthetic IBAN ${iban} is not valid`);
+  smSource = registerName(answer, smSource);
+  sm[r.code] = {
+    register: {
+      code: r.code,
+      name: r.name,
+      bic: r.bic,
+      street: r.street,
+      post_code: r.post_code,
+      town: r.town,
+      // The day the page was read, in full, plus the credit string — the BCSM
+      // states no edition, so the page must be able to say "read on" rather
+      // than imply the source dated it.
+      as_of: r.as_of,
+      source: r.source,
+    },
+    example_iban: iban,
+    api: apiBlock(answer),
+    related: [],
+  };
+}
+const smBatch1 = smRows.map((r) => r.code);
+
 mkdirSync(OUT_DIR, { recursive: true });
 const generated_at = new Date().toISOString().slice(0, 10);
 writeFileSync(
@@ -490,11 +539,22 @@ writeFileSync(
     entries: sk,
   }),
 );
+writeFileSync(
+  resolve(OUT_DIR, 'sm-bank.json'),
+  JSON.stringify({
+    generated_at,
+    source: smSource,
+    count: Object.keys(sm).length,
+    batch1: smBatch1,
+    entries: sm,
+  }),
+);
 console.log(`de-blz.json: ${Object.keys(de).length} BLZ, batch1 ${deBatch1.length}`);
 console.log(
   `sk-bank.json: ${Object.keys(sk).length} codes, batch1 ${skBatch1.length}, ` +
     `${skRows.filter((r) => r.bic).length} carrying a BIC`,
 );
+console.log(`sm-bank.json: ${Object.keys(sm).length} operating banks, batch1 ${smBatch1.length}`);
 console.log(`at-blz.json: ${Object.keys(at).length} codes, batch1 ${atBatch1.length}`);
 console.log(
   `be-bank.json: ${Object.keys(be).length} codes in ${beGroups.size} institutions, batch1 ${beBatch1.length}`,

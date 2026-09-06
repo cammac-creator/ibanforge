@@ -16,13 +16,16 @@ export const dynamicParams = true;
  * content" rule at bay; at this size there is no tail to hold back.
  *
  * The unpadded forms are listed TOO — `200` beside `0200`. `getSkCode` pads, so
- * both resolve to the same entry, but `dynamicParams` is not what makes that
- * reachable: measured 06/09/2026 against `next start`, a param outside this
- * list answers 404 (`NoFallbackError`) whether or not `dynamicParams` is true —
- * `/at/18170` is a real Austrian bank code and does exactly that. So a path
- * that must render has to be named here. Only the four codes the NBS publishes
- * with a leading zero add an entry; each declares the padded form as its
- * canonical, so the alias is a door, not a second page.
+ * both resolve to the same entry either way; listing them here simply
+ * pre-renders the alias instead of building it on demand. Only the four codes
+ * the NBS publishes with a leading zero add an entry, and each declares the
+ * padded form as its canonical, so the alias is a door and not a second page.
+ *
+ * (These were added on 06/09/2026 for a reason that turned out to be wrong: at
+ * the time every param outside this list answered 404, which looked like
+ * `dynamicParams` being ignored. Commit c57143e5 found the real cause — the
+ * locale layout's own `dynamicParams = false` cascading down — and fixed it.
+ * The entries are kept because pre-rendering four pages costs nothing.)
  */
 export function generateStaticParams() {
   const { batch1 } = skBankFile();

@@ -29,6 +29,7 @@ mensuel (`getEntryCount()`, jamais un nombre écrit à la main).
 | BCE — liste quotidienne des IFM (table `ecb_mfi`) | 5 374 au 2026-08-25 | usage libre, **citation de la BCE** + **mention « gratuit à la source » à CHAQUE accès** dès que l'information est vendue | ✅ **lue à la source le 26/08/2026 — ingérée le 26/08/2026**, voir ci-dessous |
 | Banco de España — liste des IFM espagnoles (table `bde_mfi`) | 238 au 2026-08-25 | reproduction « faithfully, without any manipulation », **citation du Banco de España** + **même mention « gratuit à la source » à chaque mise à disposition** | ✅ **lue à la source le 26/08/2026 — ingérée le 26/08/2026**, voir ci-dessous |
 | Národná banka Slovenska — prevodník des codes d'identification (`national_bank_codes`, pays SK) | 38 en version 225 (effet 18.05.2026) | réutilisation autorisée **sans accord préalable**, mais **citation de la NBS obligatoire** et **fichier non modifié** | ⚠️ **lue à la source le 06/09/2026 — ingérée le 06/09/2026**, lettre du 26/08/2026 sans réponse, voir ci-dessous |
+| Banca Centrale della Repubblica di San Marino — banques opérationnelles (`national_bank_codes`, pays SM) | 4 au 06/09/2026 | ❓ **AUCUNE condition d'utilisation publiée** — ni licence, ni interdiction | ⚠️ **lue à la source le 06/09/2026 — ingérée le 06/09/2026**, licence `unknown`, lettre à écrire, voir ci-dessous |
 
 ### Ce qui a été lu, mot pour mot
 
@@ -732,3 +733,85 @@ répond encore **HTTP 200** et sert une édition **périmée** (en-tête slovaqu
 42 lignes, trois banques parties — 5200, 8050, 8170 — et aucune des trois
 arrivées — 2250, 3030, 6363). Mesuré le 06/09/2026. Le seeder part de la page
 et suit l'ancre qui finit par « (CSV) », dont l'UUID change à chaque version.
+
+
+## BCSM — les banques opérationnelles de Saint-Marin (`national_bank_codes`, pays SM)
+
+Ingérée le **06/09/2026**. Page :
+<https://www.bcsm.sm/en/functions/statutory-functions/payment-system/operating-banks>
+
+### 🚨 Le point le plus important : ce registre n'est PAS exhaustif
+
+C'est le premier registre ingéré dont une **absence ne prouve rien**, et tout le
+reste en découle. La page s'intitule « Operating Banks » : elle liste les quatre
+banques que la BCSM supervise, elle ne publie **pas** l'attribution de l'espace
+des codes ABI. Trois faits, tous vérifiables :
+
+- Saint-Marin agrée aussi des prestataires de services de paiement et de monnaie
+  électronique qui **ne sont pas des banques** ; au moins un détient un BIC
+  saint-marinais et participe à EBA STEP2, et il n'est pas sur cette page.
+- L'IBAN d'exemple officiel du registre ISO 13616, `SM86U0322509800000000270100`,
+  porte le code ABI `03225` — **absent de la page**.
+- Rien sur bcsm.sm ne prétend que cette liste épuise l'espace des codes.
+
+Conséquences dans le code, à ne pas « ranger » plus tard :
+
+- **SM n'est PAS dans `NATIONAL_REGISTERS`** (`src/lib/enrich.ts`). Le docstring
+  de cette table le dit lui-même : « Adding a country here is a claim that a miss
+  means non-existence. » Un premier jet l'y avait mis, et le défaut n'était pas
+  seulement le `not_allocated` attendu : la retombée composite lit
+  `const registerDown = !!national`, donc chaque absence saint-marinaise aurait
+  répondu `national_register_unavailable` — « registre inconsultable » — à propos
+  d'un registre consulté qui avait répondu. Le mensonge change de cible, pas de
+  nature.
+- SM vit dans `NON_EXHAUSTIVE_REGISTERS`, sur un chemin séparé : un résultat est
+  `verified` avec le bloc `institution`, une absence **retombe** telle quelle.
+- SM n'est **pas** dans `pruneStaleNationalCodes` (`src/lib/bic-lookup.ts`).
+- `nationalRegisterIsExhaustive()` porte la distinction, plutôt qu'une liste de
+  pays recopiée à chaque endroit.
+
+### La licence : aucune, et c'est consigné comme tel
+
+Vérifié le **06/09/2026** : bcsm.sm ne publie **aucune condition d'utilisation**.
+Il y a une politique de confidentialité et un « © Central Bank of the Republic of
+San Marino » en pied de page, rien d'autre — ni autorisation, ni interdiction.
+
+**Aucune clause n'est inventée.** La licence est enregistrée `unknown`. Position
+retenue : quatre lignes de données de routage (nom, adresse, ABI, BIC) publiées
+par l'autorité de surveillance pour être utilisées, servies **un enregistrement
+par requête**, avec le crédit
+« Source: Central Bank of the Republic of San Marino, operating banks (read on
+<date>) » donné **par choix et non par obligation**.
+
+⏳ **Lettre de confirmation à la BCSM à écrire** (prochain lot de courrier). En
+cas de refus, le registre est retiré.
+
+### La date : la nôtre, et le crédit le dit
+
+La page ne porte **ni numéro d'édition ni date de révision**. `as_of` est donc le
+**jour de lecture**, et `nationalRegisterCredit('SM')` l'écrit « read on … »
+plutôt qu'entre parenthèses nues : une date nue s'y lirait comme celle de la BCSM
+et la surestimerait. Corollaire assumé : chaque exécution du seeder réécrit les
+quatre lignes avec une date neuve, donc `data/bic.sqlite` et `sm-bank.json`
+bougent à chaque rafraîchissement même si la page n'a pas changé.
+
+### Deux pièges du HTML, tenus par la fixture de test
+
+- 🚨 **Le nom de la première banque est coupé en deux `<strong>` sans espace**
+  (`<strong>Banca</strong><strong>Agricola Commerciale …</strong>`). Un
+  déballage naïf des balises — et un navigateur — rendent « BancaAgricola ». Ce
+  n'est pas le nom de l'établissement : notre propre ligne GLEIF pour BASMSMSM
+  porte « BANCA AGRICOLA COMMERCIALE ISTITUTO BANCARIO SAMMARINESE ». Les
+  balises sont donc remplacées par une **espace**, ce qui est lire à travers une
+  frontière d'élément, pas modifier la donnée.
+- Le quatrième bloc écrit « Telephone/Fax: » là où les trois autres écrivent
+  « Phone/Fax: », et le libellé d'ouverture alterne entre « Corporate name: » et
+  « Company name: ». Seuls « ABI Code: » et « SWIFT BIC: » servent d'ancres.
+
+### Ce que ça a apporté, mesuré
+
+Avant ingestion (06/09/2026), **tout** IBAN saint-marinais répondait `bic: null`,
+y compris pour les quatre vraies banques : les onze clés `SM:` de la carte curée
+sont des radicaux de BIC à quatre lettres (`SM:BASM`, `SM:MAOI`…) alors qu'un
+IBAN saint-marinais porte **cinq chiffres**. Elles ne pouvaient jamais
+correspondre. Gain net, rien à élaguer.
