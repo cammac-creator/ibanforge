@@ -51,3 +51,6 @@ scripts/village-atlas/sheets/
 # Scratch stats database of `npm run pages:export` (the in-process calls record nothing anyone reads)
 data/.export-register-pages.stats.sqlite*
 data/.export-country-pages.stats.sqlite*
+
+# Clés de comptes de service (Google Search Console…) : jamais dans le dépôt
+.secrets/
