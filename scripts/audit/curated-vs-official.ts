@@ -7,7 +7,7 @@
  * - Only 1,183 of the 24,069 curated keys carry a bank_name at all (the other
  *   22,886 are bic-only and inherit their name from bic_entries at serve time,
  *   so their freshness is GLEIF's freshness, not this file's).
- * - Register countries (CH/LI/DE/AT/BE/FI/GB/GI) are excluded: their names are
+ * - Register countries (CH/LI/DE/AT/BE/SK/FI/GB/GI) are excluded: their names are
  *   already confronted with the national register itself.
  * - Shared BIC8s (e.g. the Swiss RBAB network) are skipped unless every row
  *   under the BIC8 is one identity: comparing a local member bank to whichever
@@ -24,7 +24,7 @@ import Database from 'better-sqlite3';
 const curated = JSON.parse(readFileSync('src/db/bic_data.json', 'utf8')) as Record<string, { bic: string; bank_name: string; city?: string }>;
 const db = new Database('data/bic.sqlite', { readonly: true });
 
-const REGISTER_COUNTRIES = new Set(['CH', 'LI', 'DE', 'AT', 'BE', 'FI', 'GB', 'GI']);
+const REGISTER_COUNTRIES = new Set(['CH', 'LI', 'DE', 'AT', 'BE', 'SK', 'FI', 'GB', 'GI']);
 const byBic11 = db.prepare('SELECT lei, institution FROM bic_entries WHERE bic11 = ? AND lei IS NOT NULL LIMIT 1');
 const allByBic8 = db.prepare('SELECT lei, institution FROM bic_entries WHERE bic8 = ? AND lei IS NOT NULL');
 const ecbOf = db.prepare('SELECT name FROM ecb_mfi WHERE lei = ? LIMIT 1');

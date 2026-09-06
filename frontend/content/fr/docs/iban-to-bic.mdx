@@ -42,7 +42,7 @@ Le code banque allemand `37040044` a été extrait de l'IBAN, confronté au fich
 ## Comment la résolution fonctionne vraiment
 
 1. **Extraire le code banque** de l'IBAN selon la structure BBAN du pays (89 pays couverts).
-2. **Interroger d'abord le registre national.** Pour CH/LI (BankMaster SIX), DE (Bundesbank), AT (OeNB), BE (BNB) et FI, le registre est l'autorité d'attribution : un résultat est l'établissement titulaire du code ; une absence (`not_in_register`) signifie que le code n'est attribué à personne — une raison forte d'arrêter un paiement. Voir [sources des données](/docs/data-sources) pour ce que chaque registre publie.
+2. **Interroger d'abord le registre national.** Pour CH/LI (BankMaster SIX), DE (Bundesbank), AT (OeNB), BE (Banque nationale de Belgique), BG (Banque nationale bulgare), SK (NBS) et FI, le registre est l'autorité d'attribution : un résultat est l'établissement titulaire du code ; une absence (`not_in_register`) signifie que le code n'est attribué à personne — une raison forte d'arrêter un paiement. Voir [sources des données](/docs/data-sources) pour ce que chaque registre publie.
 3. **Se replier sur la carte composite des BIC** partout ailleurs : 121k+ entrées assemblées depuis GLEIF, l'annuaire SWIFT public, SIX, EBA STEP2, la Bundesbank et la NBP. Un résultat nomme le détenteur du BIC correspondant — la réponse marque ces cas `authoritative: false`, parce que nommer le détenteur d'un BIC est un fait, tandis que promettre que c'est la banque de votre contrepartie serait une supposition.
 
 ## Les limites honnêtes

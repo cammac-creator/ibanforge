@@ -34,6 +34,15 @@ const PAGES_WITH_OWN_ALTERNATES = [
   "blog/page.tsx",
   "iban/page.tsx",
   "iban/[cc]/page.tsx",
+  // The register pages. They already built their alternates with the helper;
+  // they were simply never added to this list, so nothing was stopping the next
+  // one from being written by hand. Slovakia arriving is when that was noticed.
+  "at/page.tsx",
+  "at/[code]/page.tsx",
+  "be/page.tsx",
+  "be/[code]/page.tsx",
+  "sk/page.tsx",
+  "sk/[code]/page.tsx",
 ] as const;
 
 describe.each(PAGES_WITH_OWN_ALTERNATES)("%s", (file) => {
@@ -66,6 +75,15 @@ const EXPECTED_PATH: Record<(typeof PAGES_WITH_OWN_ALTERNATES)[number], string> 
   "blog/page.tsx": '"/blog"',
   "iban/page.tsx": '"/iban"',
   "iban/[cc]/page.tsx": "`/iban/${cc}`",
+  "at/page.tsx": '"/at"',
+  "at/[code]/page.tsx": "`/at/${r.code}`",
+  "be/page.tsx": '"/be"',
+  // Belgium canonicalises onto the first code of the block the NBB allocated to
+  // the institution, so its own path is not the code in the URL. That is the
+  // whole reason this map is written out by hand rather than derived.
+  "be/[code]/page.tsx": "`/be/${r.canonical}`",
+  "sk/page.tsx": '"/sk"',
+  "sk/[code]/page.tsx": "`/sk/${r.code}`",
 };
 
 describe("alternatesFor path argument", () => {

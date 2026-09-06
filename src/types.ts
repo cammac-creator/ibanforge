@@ -115,8 +115,9 @@ export type OperationType =
  * directories, not the national bank-code register, so an absence there is
  * evidence of nothing more than absence. Switzerland and Liechtenstein are
  * checked against the register itself (SIX BankMaster), Germany against the
- * Bundesbank Bankleitzahlendatei and Bulgaria against the Bulgarian National
- * Bank's BAE register, and only there does `not_in_register` mean
+ * Bundesbank Bankleitzahlendatei, Bulgaria against the Bulgarian National
+ * Bank's BAE register and Slovakia against the Národná banka Slovenska
+ * prevodník, and only there does `not_in_register` mean
  * the code is not allocated. That is what `authoritative`
  * marks, and it is the flag to branch on.
  */
@@ -218,8 +219,8 @@ export interface BankCodeCheck {
    * its address here would imply a register we did not consult). Depth varies
    * by register — SIX and the OeNB publish full street addresses, the
    * Bundesbank publishes postal code and town only, the Banque nationale de
-   * Belgique and the Bulgarian National Bank publish names
-   * alone. Absent fields are null, never guessed. Finland stays without this
+   * Belgique, the Bulgarian National Bank and the Národná banka Slovenska
+   * publish names alone. Absent fields are null, never guessed. Finland stays without this
    * block entirely: its codes are allocated to banking groups, and a group
    * has no branch address to publish.
    */
@@ -310,10 +311,10 @@ export interface IBANValidationResult {
      * by the first integration that reads the JSON.
      *
      * - `national_register` — the country's own register publishes this BIC for
-     *   this bank code. Today: Germany, Austria, Belgium and Bulgaria — the
-     *   Bundesbank Bankleitzahlendatei carries the exact 11-character BIC per
-     *   BLZ, and the OeNB, NBB and BNB BAE registers publish the institution's
-     *   BIC per bank code. Settlement-grade, except where the register itself
+     *   this bank code. Today: Germany, Austria, Belgium, Bulgaria and
+     *   Slovakia — the Bundesbank Bankleitzahlendatei carries the exact
+     *   11-character BIC per BLZ, and the OeNB, NBB, BNB BAE and NBS registers
+     *   publish the institution's BIC per bank code. Settlement-grade, except where the register itself
      *   marks the code retired (see `authoritative` below).
      * - `curated_map` — our own maintained bank-code map made the pairing. It is
      *   an exact key and it is usually right; it is not an allocation record,
@@ -326,7 +327,7 @@ export interface IBANValidationResult {
      *
      * Only one of the three is a register of allocations, and saying so plainly
      * is worth more than a field that flatters the other two. Coverage grows by
-     * ingestion — DE, then AT, BE and BG — and this field is what makes that
+     * ingestion — DE, then AT, BE, BG and SK — and this field is what makes that
      * growth visible without a re-read of the docs.
      */
     basis?: BicBasis;

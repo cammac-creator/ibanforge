@@ -6,8 +6,9 @@
 
 ## Data sources and attribution
 
-GLEIF · SIX BankMaster · SwiftCodes (MIT) · Deutsche Bundesbank · Oesterreichische Nationalbank · Banque nationale de Belgique · Finance Finland · NBP · EBA STEP2 · OFAC · EU · UN · FATF · EPC.
+GLEIF · SIX BankMaster · SwiftCodes (MIT) · Deutsche Bundesbank · Oesterreichische Nationalbank · Banque nationale de Belgique · Národná banka Slovenska · Finance Finland · NBP · EBA STEP2 · OFAC · EU · UN · FATF · EPC.
 UK deposit-taking authorisation: Bank of England (List of Banks, 2026-08), used with the Bank of England's written permission. The month of the list in force is served live at https://api.ibanforge.com/llms.txt
+Slovak bank codes: Národná banka Slovenska, Directory of identification codes for the domestic payment system (version 225, effective 2026-05-18), reproduced under the NBS site terms — the source is named and the file is not altered. The edition in force is served live at https://api.ibanforge.com/llms.txt
 
 ## API Base URL
 https://api.ibanforge.com

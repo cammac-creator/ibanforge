@@ -257,9 +257,10 @@ for (const r of iidRows) {
 }
 
 // ---------------------------------------------------------------------------
-// Austria and Belgium: one synthetic IBAN per national bank code, the
-// validate route's own answer. Both registers live in national_bank_codes
-// (OeNB directory, NBB list); the edition date is the one the route stamps.
+// Austria, Belgium and Slovakia: one synthetic IBAN per national bank code, the
+// validate route's own answer. All three registers live in national_bank_codes
+// (OeNB directory, NBB list, NBS prevodník); the edition date is the one the
+// route stamps, except for Slovakia, which carries the register's own.
 // ---------------------------------------------------------------------------
 interface NationalRow {
   country: string;
@@ -270,10 +271,13 @@ interface NationalRow {
   post_code: string | null;
   town: string | null;
   lei: string | null;
+  /** Slovakia only: the credit its licence requires, and the edition date. */
+  source: string | null;
+  as_of: string | null;
 }
 const nationalRows = bic
   .prepare(
-    "SELECT country, code, name, bic, street, post_code, town, lei FROM national_bank_codes WHERE country IN ('AT', 'BE') ORDER BY country, code",
+    "SELECT country, code, name, bic, street, post_code, town, lei, source, as_of FROM national_bank_codes WHERE country IN ('AT', 'BE', 'SK') ORDER BY country, code",
   )
   .all() as NationalRow[];
 const stamp = new Date().toISOString().slice(0, 7);
@@ -378,6 +382,62 @@ for (const r of beRows) {
 }
 const beBatch1 = [...beGroups.values()].map((codes) => codes[0]);
 
+// Slovakia: four-digit payment code in IBAN positions 5-8, then a six-digit
+// account prefix and a ten-digit account number. No national check digits —
+// the mod-97 of the IBAN is the only checksum a Slovak BBAN carries.
+//
+// The whole register is 38 codes, so there is no first batch to choose: every
+// code is a payment service provider a reader may genuinely look up, and the
+// "scaled content" concern the German and Austrian batches exist for does not
+// arise at this size. batch1 is the register.
+//
+// `related` groups by BIC8 as Austria does, and comes out EMPTY for every
+// Slovak code (measured 06/09/2026): no two codes share a BIC8 — 3100 and 5600
+// are one bank under two different BICs, and the Fio and J&T pairs are separate
+// Czech and Slovak entities. An empty list is the truthful answer, and with 38
+// codes the index page already IS the neighbour list.
+const skRows = nationalRows.filter((r) => r.country === 'SK');
+const skByBic8 = new Map<string, string[]>();
+for (const r of skRows) {
+  if (!r.bic) continue;
+  const k = r.bic.slice(0, 8);
+  skByBic8.set(k, [...(skByBic8.get(k) ?? []), r.code]);
+}
+const sk: Json = {};
+let skSource =
+  'Národná banka Slovenska, prevodník of identification codes for the domestic payment system';
+for (const r of skRows) {
+  const bban = `${r.code}0000000000000001`;
+  const iban = `SK${checkDigits('SK', bban)}${bban}`;
+  const answer = await call('/v1/iban/validate', {
+    method: 'POST',
+    body: JSON.stringify({ iban }),
+  });
+  if (answer.valid !== true) throw new Error(`SK ${r.code}: synthetic IBAN ${iban} is not valid`);
+  skSource = registerName(answer, skSource);
+  const related = (r.bic ? (skByBic8.get(r.bic.slice(0, 8)) ?? []) : [])
+    .filter((c) => c !== r.code)
+    .slice(0, 12);
+  sk[r.code] = {
+    register: {
+      code: r.code,
+      name: r.name,
+      bic: r.bic,
+      // The FULL effective date and the credit string, both straight from the
+      // row: the NBS terms make naming the source a condition of reuse, and the
+      // page has to be able to print the citation without rebuilding it. The
+      // year-month the API stamps is in the `api` block beside it and answers a
+      // different question.
+      as_of: r.as_of,
+      source: r.source,
+    },
+    example_iban: iban,
+    api: apiBlock(answer),
+    related,
+  };
+}
+const skBatch1 = skRows.map((r) => r.code);
+
 mkdirSync(OUT_DIR, { recursive: true });
 const generated_at = new Date().toISOString().slice(0, 10);
 writeFileSync(
@@ -420,7 +480,21 @@ writeFileSync(
     entries: be,
   }),
 );
+writeFileSync(
+  resolve(OUT_DIR, 'sk-bank.json'),
+  JSON.stringify({
+    generated_at,
+    source: skSource,
+    count: Object.keys(sk).length,
+    batch1: skBatch1,
+    entries: sk,
+  }),
+);
 console.log(`de-blz.json: ${Object.keys(de).length} BLZ, batch1 ${deBatch1.length}`);
+console.log(
+  `sk-bank.json: ${Object.keys(sk).length} codes, batch1 ${skBatch1.length}, ` +
+    `${skRows.filter((r) => r.bic).length} carrying a BIC`,
+);
 console.log(`at-blz.json: ${Object.keys(at).length} codes, batch1 ${atBatch1.length}`);
 console.log(
   `be-bank.json: ${Object.keys(be).length} codes in ${beGroups.size} institutions, batch1 ${beBatch1.length}`,

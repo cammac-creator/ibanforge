@@ -13,7 +13,7 @@ export function RegisterSearch({
   placeholder,
 }: {
   locale: string;
-  kind: "blz" | "iid" | "at" | "be";
+  kind: "blz" | "iid" | "at" | "be" | "sk";
   label: string;
   button: string;
   placeholder: string;

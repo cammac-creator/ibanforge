@@ -5,11 +5,12 @@ import { getBicDB } from './db.js';
  * fixed-width numeric code to an institution and publishes the whole allocation.
  *
  * Austria (Oesterreichische Nationalbank, SEPA-Zahlungsverkehrs-Verzeichnis,
- * republished daily) and Belgium (Banque nationale de Belgique, Secrétariat du
- * Protocole, the body that allocates the codes) both fit. Neither carries the
- * retirement/successor pair the Bundesbank publishes, so neither needs the extra
- * columns de-blz.ts has; one table serves both rather than two near-identical
- * modules.
+ * republished daily), Belgium (Banque nationale de Belgique, Secrétariat du
+ * Protocole, the body that allocates the codes) and Slovakia (Národná banka
+ * Slovenska, the prevodník of identification codes for the domestic payment
+ * system) all fit. None carries the retirement/successor pair the Bundesbank
+ * publishes, so none needs the extra columns de-blz.ts has; one table serves
+ * all three rather than three near-identical modules.
  *
  * As with CH, LI, DE and FI, being here is a claim that an absence means the
  * code is allocated to nobody. Seeded by scripts/seed-national.ts.
@@ -18,23 +19,38 @@ export interface NationalCodeEntry {
   code: string;
   name: string;
   bic: string | null;
-  /** One line, house number included (OeNB publishes it that way); null for BE. */
+  /** One line, house number included (OeNB publishes it that way); null for BE and SK. */
   street: string | null;
   post_code: string | null;
   town: string | null;
-  /** LEI where the register publishes one (OeNB, 99% filled); null for BE. */
+  /** LEI where the register publishes one (OeNB, 99% filled); null for BE and SK. */
   lei: string | null;
+  /**
+   * The credit the register's own terms require, as the seeder read it.
+   *
+   * Null for AT and BE — neither publisher asks for one, and neither states an
+   * edition of its own to name. Slovakia fills it because the NBS terms make
+   * citing the source a condition of reuse, so it travels with the row rather
+   * than being written beside it at each surface.
+   */
+  source: string | null;
+  /**
+   * Effective date the REGISTER states, 'YYYY-MM-DD'. Null for AT and BE, whose
+   * answers are dated by the reference set's refresh month instead.
+   */
+  as_of: string | null;
 }
 
 /** Width of the bank code as an IBAN of that country carries it. */
-const CODE_WIDTH: Record<string, number> = { AT: 5, BE: 3 };
+const CODE_WIDTH: Record<string, number> = { AT: 5, BE: 3, SK: 4 };
 
 /**
  * Bring a published code to the width the IBAN uses.
  *
  * The OeNB writes the central bank as '100' while an Austrian IBAN carries
- * '00100'. Comparing the two unpadded answers "not allocated" for a real bank,
- * which is the same defect that made four Swiss codes stale in July.
+ * '00100'; the NBS writes Slovakia's largest bank as '200' while a Slovak IBAN
+ * carries '0200'. Comparing the two unpadded answers "not allocated" for a real
+ * bank, which is the same defect that made four Swiss codes stale in July.
  */
 export function normaliseCode(cc: string, raw: string): string | null {
   const width = CODE_WIDTH[cc];
@@ -98,7 +114,7 @@ export function nationalRegisterAvailable(cc: string): boolean {
 
 /**
  * Look up an allocated code. Returns null when the register does not carry it,
- * which for these two countries means no institution holds it.
+ * which for these three countries means no institution holds it.
  *
  * Belgium publishes all 1000 three-digit slots and writes 'VRIJ' in the BIC
  * column for the 210 it has not allocated. Those are dropped at seed time
@@ -109,10 +125,10 @@ export function lookupNationalCode(cc: string, bankCode: string): NationalCodeEn
   if (!ready()) return null;
   const code = normaliseCode(cc, bankCode);
   if (!code) return null;
-  // No catch around the query, and that is the point: these two countries are
+  // No catch around the query, and that is the point: these three countries are
   // authoritative, so a null out of here becomes not_in_register with reason
   // not_allocated — "do not send". A catch { return null } made a corrupt page
-  // or a schema drift produce that sentence about real AT/BE banks with full
+  // or a schema drift produce that sentence about real AT/BE/SK banks with full
   // confidence (the resetNationalRegisterStatements() docstring above records
   // the first bite; the 29/08/2026 adversarial review reproduced the class on
   // Bulgaria). A query failure now escapes, like lookupBlz: every caller sits
@@ -133,7 +149,66 @@ export function lookupNationalCode(cc: string, bankCode: string): NationalCodeEn
     post_code: (row.post_code as string | null | undefined) ?? null,
     town: (row.town as string | null | undefined) ?? null,
     lei: (row.lei as string | null | undefined) ?? null,
+    // Defensive, like every field above: a database seeded before these two
+    // columns existed has no `source` and no `as_of`, and `?? null` degrades
+    // that to "no credit stated" instead of raising. The credit is a licence
+    // condition, so the surfaces are built to omit it rather than to print a
+    // half of it — see nationalRegisterCredit() below.
+    source: (row.source as string | null | undefined) ?? null,
+    as_of: (row.as_of as string | null | undefined) ?? null,
   };
+}
+
+/**
+ * What the loaded register says about itself: the credit it requires and the
+ * date that credit is about.
+ *
+ * Read from the rows, never from a clock or a constant. Slovakia is the country
+ * this exists for — the NBS terms make citing the source a condition of reuse,
+ * and its page states an effective date that our monthly refresh month would
+ * misreport. Austria and Belgium store neither and get `null` for both, which
+ * is what keeps their answers on `getReferenceAsOf()` with no special case.
+ *
+ * Both fields are read in ONE query so a caller can never print a version from
+ * one edition beside a date from another.
+ */
+export function nationalRegisterEdition(cc: string): {
+  source: string | null;
+  as_of: string | null;
+} {
+  if (!CODE_WIDTH[cc] || !ready()) return { source: null, as_of: null };
+  try {
+    const row = getBicDB()
+      .prepare(
+        // MAX(as_of) and the source that goes with it. The seeder writes one
+        // edition per country in a single transaction, so every row of a
+        // country agrees; ordering makes that explicit rather than assumed.
+        `SELECT source, as_of FROM national_bank_codes
+          WHERE country = ? AND as_of IS NOT NULL
+          ORDER BY as_of DESC LIMIT 1`,
+      )
+      .get(cc) as { source: string | null; as_of: string | null } | undefined;
+    return { source: row?.source ?? null, as_of: row?.as_of ?? null };
+  } catch {
+    // A credit that cannot be read is omitted, never guessed: printing the
+    // authority's name beside a date we do not hold is the one failure the
+    // licence discipline exists to prevent.
+    return { source: null, as_of: null };
+  }
+}
+
+/**
+ * The one-line credit every surface must carry, built from the loaded data.
+ *
+ * Null when the register states no edition (AT, BE) or when nothing is loaded —
+ * better no credit line than one naming a date we do not hold. Same shape and
+ * same reasoning as bgAttribution() in bg-bae.ts. `Zdroj` is the publisher's
+ * own word for "source", which is what its terms ask to be named.
+ */
+export function nationalRegisterCredit(cc: string): string | null {
+  const { source, as_of } = nationalRegisterEdition(cc);
+  if (!source || !as_of) return null;
+  return `Zdroj: ${source} (${as_of})`;
 }
 
 /** Every allocated code for a country, for pruning curated keys that contradict it. */

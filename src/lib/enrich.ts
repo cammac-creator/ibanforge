@@ -15,7 +15,11 @@ import {
 } from './bic-lookup.js';
 import { classifyIssuer } from './issuers.js';
 import { lookupFiInstitution } from './fi-register.js';
-import { lookupNationalCode, nationalRegisterAvailable } from './national-registers.js';
+import {
+  lookupNationalCode,
+  nationalRegisterAvailable,
+  nationalRegisterEdition,
+} from './national-registers.js';
 import { lookupNlPsp } from './nl-psp.js';
 import { getCountryRisk, getSepaInfo, SEPA_MEMBERS_EXTRA } from './countries.js';
 import { lookupClearingByBankCode, lookupClearingSeatByBic } from './ch-clearing.js';
@@ -136,6 +140,12 @@ const NATIONAL_REGISTERS: Record<string, string> = {
   FI: 'Finance Finland monetary institution codes (allocated to banking groups, not individual institutions)',
   AT: 'Oesterreichische Nationalbank SEPA-Zahlungsverkehrs-Verzeichnis',
   BE: 'Banque nationale de Belgique, bank identification codes (Protocol Secretariat)',
+  // Slovakia. The NBS allocates the "kód platobného styku" to the providers of
+  // the domestic payment system and publishes the whole prevodník, versioned
+  // and dated — the AT/BE claim exactly, with nothing to qualify. Named in both
+  // languages because the Slovak word is what the register is called at home
+  // and the English one is what the page a reader will open says.
+  SK: 'Národná banka Slovenska, prevodník of identification codes for the domestic payment system',
   // Bulgaria says what the claim covers, like Finland does. A BAE code is the
   // NOTE: the bare name lives in BG_REGISTER_NAME below — the caveat qualifies
   // the VERDICT, and repeating it beside a BIC would attach it to a field it
@@ -223,24 +233,35 @@ function askNationalRegister(
     if (hit.status === 'not_allocated') return { allocated: false };
     return { allocated: true, value: hit.code };
   }
-  if (cc === 'AT' || cc === 'BE') {
+  if (cc === 'AT' || cc === 'BE' || cc === 'SK') {
     // Same safe failure as Germany: no table means no ground truth, so decline
     // authority rather than reading every code as unallocated.
     if (!nationalRegisterAvailable(cc)) return null;
+    // Dated from the register where the register states a date, on the NEGATIVE
+    // branch too: a denial a caller will act on has to say how current the list
+    // behind it is. Only Slovakia stores one — the NBS publishes a versioned
+    // edition with an effective date, while the OeNB and the NBB publish a
+    // rolling file whose honest date is our own refresh month. `null` here
+    // falls through to getReferenceAsOf() in the caller, which is exactly what
+    // AT and BE were doing before this branch learned about editions.
+    const registerDate = nationalRegisterEdition(cc).as_of?.slice(0, 7);
     const hit = lookupNationalCode(cc, bankCode);
-    if (!hit) return { allocated: false };
+    if (!hit) return { allocated: false, ...(registerDate ? { as_of: registerDate } : {}) };
     return {
       allocated: true,
       institution: {
         name: hit.name,
-        // OeNB: full seat address. BNB: names only — nulls are the honest
-        // shape of what Belgium publishes, not missing data on our side.
+        // OeNB: full seat address. BNB and NBS: names only — nulls are the
+        // honest shape of what Belgium and Slovakia publish, not missing data
+        // on our side, and inventing an address would be the distortion the
+        // NBS terms forbid.
         street: hit.street,
         post_code: hit.post_code,
         town: hit.town,
         country: cc,
         ...(hit.lei ? { lei: hit.lei } : {}),
       },
+      ...(registerDate ? { as_of: registerDate } : {}),
     };
   }
   if (cc === 'BG') {
@@ -578,7 +599,7 @@ function safeReferenceAsOf(): string {
  * two halves of the same object contradicting each other on the exact point at
  * issue. A derived boolean cannot do that.
  *
- * Only the national register is true today — served for DE, AT, BE and BG —
+ * Only the national register is true today — served for DE, AT, BE, BG and SK —
  * and the flat answer "advisory outside a register" is worth more than a field
  * that flatters the other two. Adding a country here means its register
  * publishes the BIC per bank code AND that we read it — not that our pairing
@@ -721,28 +742,39 @@ function resolveBank(cc: string, bankCode: string): BankResolution {
     }
   }
 
-  // Austria and Belgium: the same rule as Germany, one register over. Both
-  // tables have carried a BIC per bank code since they were seeded, and until
-  // now it was read only for the bank-code verdict while the served BIC still
-  // came from the composite map. Measured against the registers on 29/08/2026,
-  // that split kept three retired pairings in circulation (two Belgian, one
-  // Austrian) and resolved a dozen Belgian EMIs to nothing while their BIC sat
-  // in our own database. Register truth first; the composite stays as the
-  // fallback for the rows the register publishes without a BIC.
-  if (cc === 'AT' || cc === 'BE') {
+  // Austria, Belgium and Slovakia: the same rule as Germany, one register over.
+  // All three tables carry a BIC per bank code. For AT and BE it was read only
+  // for the bank-code verdict until 29/08/2026, while the served BIC still came
+  // from the composite map; measured against the registers, that split kept
+  // three retired pairings in circulation (two Belgian, one Austrian) and
+  // resolved a dozen Belgian EMIs to nothing while their BIC sat in our own
+  // database. Register truth first; the composite stays as the fallback for the
+  // rows the register publishes without a BIC — four of them in Slovakia.
+  if (cc === 'AT' || cc === 'BE' || cc === 'SK') {
     try {
       const reg = nationalRegisterAvailable(cc) ? lookupNationalCode(cc, bankCode) : null;
       if (reg?.bic) {
         bic = {
           code: reg.bic,
+          // Verbatim, diacritics and all. The NBS terms forbid altering the
+          // file, so a Slovak name is served exactly as published — the same
+          // rule that keeps Bulgarian names in Cyrillic below.
           bank_name: reg.name,
-          // The OeNB publishes the seat, the NBB publishes names only — so
-          // Belgium takes its city from the directory row for the BIC the
-          // register named, the same division of labour the Bulgarian block
-          // below documents.
+          // The OeNB publishes the seat; the NBB and the NBS publish names
+          // only — so Belgium and Slovakia take the city from the directory row
+          // for the BIC the register named, the same division of labour the
+          // Bulgarian block below documents: one source decides WHICH
+          // institution holds the code, the directory only supplies details.
           city: reg.town ?? lookup(`${reg.bic}XXX`)?.city ?? null,
-          source: NATIONAL_REGISTERS[cc],
-          as_of: getReferenceAsOf() || null,
+          // The register's own credit where it stores one (Slovakia: the NBS
+          // terms make naming the source a condition of reuse, so it is read
+          // from the row and never written here), the register's name where it
+          // does not (Austria, Belgium).
+          source: reg.source ?? NATIONAL_REGISTERS[cc],
+          // Year-month, as this field is documented. Slovakia states an
+          // effective date of its own; AT and BE are dated by the reference
+          // set, which for a file re-read on our cycle is the honest answer.
+          as_of: reg.as_of?.slice(0, 7) ?? (getReferenceAsOf() || null),
           // Same licence as the German block above: the register publishes
           // this BIC per bank code, so the pairing is the register's, not ours.
           ...bicProvenance('national_register'),

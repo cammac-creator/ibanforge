@@ -2,7 +2,8 @@ import fs from 'fs';
 import path from 'path';
 
 /**
- * The public register pages (/blz/{blz}, /iid/{iid}, /at/{code}, /be/{code}) read a JSON exported by
+ * The public register pages (/blz/{blz}, /iid/{iid}, /at/{code}, /be/{code},
+ * /sk/{code}) read a JSON exported by
  * `npm run pages:export` in the API repository, which calls the API in-process
  * for every code: the "what the API answers" block on each page is the route's
  * own answer, not a re-implementation. See scripts/export-register-pages.ts.
@@ -82,6 +83,28 @@ export interface BeEntry {
   related: string[];
 }
 
+export interface SkRegister {
+  code: string;
+  name: string;
+  bic: string | null;
+  /**
+   * The register's own effective date, in full, not the year-month the API
+   * stamps. The NBS terms make citing the source a condition of reuse, and the
+   * citation names an edition — so the page prints this date beside `source`
+   * rather than rebuilding a credit the seeder already wrote.
+   */
+  as_of: string;
+  /** The credit string stored with the rows: authority, directory, version. */
+  source: string;
+}
+
+export interface SkEntry {
+  register: SkRegister;
+  example_iban: string;
+  api: Record<string, unknown>;
+  related: string[];
+}
+
 interface RegisterFile<T> {
   generated_at: string;
   source: string;
@@ -94,6 +117,7 @@ let deCache: RegisterFile<BlzEntry> | null = null;
 let chCache: RegisterFile<IidEntry> | null = null;
 let atCache: RegisterFile<AtEntry> | null = null;
 let beCache: RegisterFile<BeEntry> | null = null;
+let skCache: RegisterFile<SkEntry> | null = null;
 
 function read<T>(file: string): RegisterFile<T> {
   const raw = fs.readFileSync(path.join(process.cwd(), 'data', 'registers', file), 'utf-8');
@@ -120,6 +144,22 @@ export function beBankFile(): RegisterFile<BeEntry> {
   return beCache;
 }
 
+export function skBankFile(): RegisterFile<SkEntry> {
+  if (!skCache) skCache = read<SkEntry>('sk-bank.json');
+  return skCache;
+}
+
+/**
+ * The credit the NBS terms require, from the register file itself.
+ *
+ * Built here rather than in each page so the two Slovak pages, and anything
+ * added later, cite one string. The date is the register's effective date, not
+ * our export date: the citation names an edition.
+ */
+export function skCredit(r: SkRegister): string {
+  return `Zdroj: ${r.source} (${r.as_of})`;
+}
+
 /** Austrian bank codes are five digits, no padding accepted: 19043 is not 019043. */
 export function getAtCode(code: string): AtEntry | null {
   if (!/^\d{5}$/.test(code)) return null;
@@ -130,6 +170,24 @@ export function getAtCode(code: string): AtEntry | null {
 export function getBeCode(code: string): BeEntry | null {
   if (!/^\d{3}$/.test(code)) return null;
   return beBankFile().entries[code] ?? null;
+}
+
+/**
+ * Slovak payment codes PAD, where Austrian ones do not — and the difference is
+ * the register's own doing.
+ *
+ * The OeNB is consistent: it publishes five digits and an Austrian IBAN carries
+ * five, so `getAtCode` can refuse anything else. The NBS is not: its CSV writes
+ * the largest bank as `200` while its own PDF, its HTML table and every Slovak
+ * IBAN write `0200`. A reader who types what the CSV shows would land on a 404
+ * for a real bank, and the search box strips to digits, so `/sk/200` is a URL
+ * people will genuinely arrive on. Padding to four is what the API's own
+ * `normaliseCode('SK', …)` does with the same input, and what the publisher
+ * prints everywhere but that one file — so the two agree by construction.
+ */
+export function getSkCode(code: string): SkEntry | null {
+  if (!/^\d{1,4}$/.test(code)) return null;
+  return skBankFile().entries[code.padStart(4, '0')] ?? null;
 }
 
 export function getBlz(blz: string): BlzEntry | null {

@@ -724,9 +724,9 @@ the [deprecation policy](https://api.ibanforge.com/deprecation-policy.md).
 
 - **UK modulus checking** — validating a GB IBAN now also runs the Vocalink
   checksum over the sort code and account number it carries, in the same call.
-- **National bank-code registers** — CH, LI, DE, AT, BE and FI answered from the
-  register that allocates the codes, which is what lets an absence mean the code
-  is allocated to nobody.
+- **National bank-code registers** — CH, LI, DE, AT, BE, BG, SK and FI answered
+  from the register that allocates the codes, which is what lets an absence mean
+  the code is allocated to nobody.
 - **Verification of Payee readiness** at bank level, alongside the country-level
   obligation.
 - **MCP over HTTP**, anonymous tier included.

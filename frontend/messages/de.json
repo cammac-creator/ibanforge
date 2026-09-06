@@ -2117,6 +2117,25 @@
       "indexTitle": "Belgische Bankcodes (BNB-Liste)",
       "indexIntro": "Jede in der Liste der Belgischen Nationalbank zugewiesene Bankkennung, eine Seite pro Institut, mit dem zugehörigen BIC und der exakten Antwort der IBANforge-API. Das Register veröffentlicht nur Namen: keine Adresse erscheint hier, die das Register nicht veröffentlicht hat.",
       "countryLink": "Das Format der belgischen IBAN, mit dem offiziellen Beispiel"
+    },
+    "sk": {
+      "metaTitle": "Slowakische Bankleitzahl {code}: {name}",
+      "metaDescription": "Zahlungscode {code} im Verzeichnis der Národná banka Slovenska: {name}, BIC {bic}. IBAN-Aufbau, SEPA-Erreichbarkeit und die genaue Antwort der IBANforge-API.",
+      "eyebrow": "Verzeichnis der Národná banka Slovenska",
+      "title": "Slowakische Bankleitzahl {code}",
+      "facts": {
+        "code": "Zahlungssystem-Code",
+        "bank": "Zahlungsdienstleister",
+        "bic": "BIC",
+        "none": "keine"
+      },
+      "structure": "Eine slowakische IBAN besteht aus SK, zwei Prüfziffern, dem vierstelligen Zahlungscode, einem sechsstelligen Kontopräfix und der zehnstelligen Kontonummer. Für den Zahlungscode kann das NBS-Verzeichnis einstehen; den Kontoteil kennt nur die Bank.",
+      "noAddress": "Das Verzeichnis veröffentlicht einen Namen und einen BIC, keine Adresse. Die leeren Felder sind das, was das Register führt, und keine Lücke auf unserer Seite.",
+      "docLink": "Wie das slowakische Register antwortet",
+      "indexTitle": "Slowakische Bankleitzahlen (NBS-Verzeichnis)",
+      "indexIntro": "Alle Zahlungscodes des Verzeichnisses der Národná banka Slovenska — des prevodník — mit dem Zahlungsdienstleister, dem BIC, den das Register ihm zuordnet, und der genauen Antwort der IBANforge-API. Monatlich mit dem Register aufgefrischt.",
+      "wholeRegister": "Alle {count} Codes des Registers sind aufgeführt: das slowakische Zahlungssystem ist klein genug, dass nichts zurückgehalten werden muss.",
+      "countryLink": "Der Aufbau der slowakischen IBAN, mit dem offiziellen Beispiel"
     }
   },
   "countries": {
