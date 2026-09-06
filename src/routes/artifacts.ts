@@ -726,7 +726,9 @@ the [deprecation policy](https://api.ibanforge.com/deprecation-policy.md).
   checksum over the sort code and account number it carries, in the same call.
 - **National bank-code registers** — CH, LI, DE, AT, BE, BG, SK and FI answered
   from the register that allocates the codes, which is what lets an absence mean
-  the code is allocated to nobody.
+  the code is allocated to nobody. San Marino is read too, from a register that
+  names holders without publishing the allocation: a listed code is named, a
+  missing one is still just missing.
 - **Verification of Payee readiness** at bank level, alongside the country-level
   obligation.
 - **MCP over HTTP**, anonymous tier included.

@@ -38,7 +38,7 @@
  * (SwiftCodes, Bundesbank, SIX, OeNB, NBP, EBA Step2) and then commits
  * data/bic.sqlite. src/db/seed.ts drops bic_entries unconditionally and neither
  * of those two scripts has a sanity floor — unlike seed-bc-nummer.ts (800),
- * seed-blz.ts (2800) and seed-national.ts (AT 700 / BE 650 / SK 25). The only gate
+ * seed-blz.ts (2800) and seed-national.ts (AT 700 / BE 650 / SK 25 / SM 3). The only gate
  * before the commit is `npm run test`, whose strongest assertion on this table
  * is `expect(count).toBeGreaterThan(0)` (src/lib/bic-lookup.test.ts). A source
  * that answers with a truncated file therefore commits silently, and Railway

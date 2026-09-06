@@ -242,6 +242,15 @@ function buildLlmsTxt(): string {
   const skSourceLine = skCredit
     ? `\n- Slovak bank codes: ${skCredit} — reproduced with attribution under the NBS site terms (source named, file unaltered)`
     : '';
+  // San Marino. Credited on the same rule and from the same columns, with one
+  // difference stated rather than hidden: bcsm.sm publishes no terms of use at
+  // all, so the licence is recorded as UNKNOWN and the credit is given by
+  // choice. The date is the day we read the page — the BCSM states no edition —
+  // which is why nationalRegisterCredit words it "read on".
+  const smCredit = nationalRegisterCredit('SM');
+  const smSourceLine = smCredit
+    ? `\n- San Marino bank codes: ${smCredit} — four operating banks, licence unknown (bcsm.sm publishes no terms of use); credited by choice, and the list names holders rather than allocating the code space, so an absence there is not a non-allocation`
+    : '';
   // The `>` line is the one sentence an LLM keeps about this product, so it
   // has to be the promise people actually buy. It opened on "Pre-payout
   // screening for AI agents" long after the research of 2026-07-28 told us to
@@ -257,7 +266,7 @@ function buildLlmsTxt(): string {
 
 - BIC directory: GLEIF (LEI-enriched), SwiftCodes (MIT), Quelle: Deutsche Bundesbank, SIX, NBP, EBA Step2 SCT
 - Swiss clearing: SIX BankMaster (BC-Nummer / IID)
-- National bank-code registers: Deutsche Bundesbank (attribution wording per its terms: Quelle: Deutsche Bundesbank), Oesterreichische Nationalbank, Banque nationale de Belgique, Finance Finland${bgSourceLine}${skSourceLine}
+- National bank-code registers: Deutsche Bundesbank (attribution wording per its terms: Quelle: Deutsche Bundesbank), Oesterreichische Nationalbank, Banque nationale de Belgique, Finance Finland${bgSourceLine}${skSourceLine}${smSourceLine}
 ${praSourceLine}
 ${identitySourceLines}
 ${psdSourceLine}

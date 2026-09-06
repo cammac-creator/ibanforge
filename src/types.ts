@@ -118,7 +118,10 @@ export type OperationType =
  * Bundesbank Bankleitzahlendatei, Bulgaria against the Bulgarian National
  * Bank's BAE register and Slovakia against the Národná banka Slovenska
  * prevodník, and only there does `not_in_register` mean
- * the code is not allocated. That is what `authoritative`
+ * the code is not allocated. San Marino sits between the two: its register
+ * NAMES the holder of a code it lists, but the Central Bank publishes its
+ * operating banks rather than the allocation of the code space, so a miss
+ * there stays `absent_from_reference_data` and `authoritative` stays false. That is what `authoritative`
  * marks, and it is the flag to branch on.
  */
 /**
@@ -220,7 +223,9 @@ export interface BankCodeCheck {
    * by register — SIX and the OeNB publish full street addresses, the
    * Bundesbank publishes postal code and town only, the Banque nationale de
    * Belgique, the Bulgarian National Bank and the Národná banka Slovenska
-   * publish names alone. Absent fields are null, never guessed. Finland stays without this
+   * publish names alone, and the Central Bank of the Republic of San Marino
+   * publishes the registered office. Present wherever a register named the
+   * holder — which for San Marino is an answer carrying `authoritative: false`. Absent fields are null, never guessed. Finland stays without this
    * block entirely: its codes are allocated to banking groups, and a group
    * has no branch address to publish.
    */
@@ -312,9 +317,12 @@ export interface IBANValidationResult {
      *
      * - `national_register` — the country's own register publishes this BIC for
      *   this bank code. Today: Germany, Austria, Belgium, Bulgaria and
-     *   Slovakia — the Bundesbank Bankleitzahlendatei carries the exact
-     *   11-character BIC per BLZ, and the OeNB, NBB, BNB BAE and NBS registers
-     *   publish the institution's BIC per bank code. Settlement-grade, except where the register itself
+     *   Slovakia and San Marino — the Bundesbank Bankleitzahlendatei carries
+     *   the exact 11-character BIC per BLZ, and the OeNB, NBB, BNB BAE, NBS and
+     *   BCSM registers publish the institution's BIC per bank code. San Marino
+     *   is the case where this flag and `bank_code_check.authoritative` part
+     *   company in the opposite direction from Switzerland: the pairing is the
+     *   supervisor's, the code space is not its to settle. Settlement-grade, except where the register itself
      *   marks the code retired (see `authoritative` below).
      * - `curated_map` — our own maintained bank-code map made the pairing. It is
      *   an exact key and it is usually right; it is not an allocation record,
