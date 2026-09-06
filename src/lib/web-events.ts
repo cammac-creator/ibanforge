@@ -72,6 +72,44 @@ export function parseWebEvent(raw: unknown): WebEvent | null {
   };
 }
 
+/**
+ * The events the SERVER writes, which no browser may claim.
+ *
+ * `api:trial` = a developer called POST /v1/iban/validate with no key and was
+ * served on the daily allowance; `api:trial-exhausted` = the same address hit
+ * the ceiling. Both are written once per address per day by
+ * src/middleware/anonymous-trial.ts, so a row is an address-day and not a call.
+ *
+ * 🚨 They are deliberately NOT in the `NAME` alternation above. That regex
+ * guards the PUBLIC `POST /v1/web/events`, and it was narrowed on 2026-09-06
+ * precisely because anything spellable there is spellable by anyone: adding
+ * `api` to it would let a stranger post `api:trial` in a loop and invent the
+ * conversion figure this whole feature exists to measure. The vocabulary is
+ * split instead — the page owns `nav|cta|film`, the server owns `api:`, and
+ * neither can write the other's.
+ *
+ * Both land in the same table, so `webEventsSummary().by_name` sees them with
+ * no extra query. The page is a sentinel, not a URL: nobody navigated anywhere.
+ */
+export const SERVER_EVENTS = ['api:trial', 'api:trial-exhausted'] as const;
+export type ServerEventName = (typeof SERVER_EVENTS)[number];
+
+/** The `page` every server-written row carries; the dashboard filters it out of the by-page list. */
+export const SERVER_EVENT_PAGE = '/api';
+
+export function recordServerEvent(name: ServerEventName): void {
+  recordWebEvent({
+    name,
+    page: SERVER_EVENT_PAGE,
+    // Not a UI locale: an API call has no language. `en` is the one value the
+    // column accepts that says "none of the three", and the card never reads
+    // the locale of these rows.
+    locale: 'en',
+    referrer: null,
+    viewport: null,
+  });
+}
+
 let sinceLastPrune = 0;
 export function recordWebEvent(event: WebEvent): void {
   ensureTable();

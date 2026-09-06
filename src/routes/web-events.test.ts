@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import { Hono } from 'hono';
 import { webEvents, resetWebEventLimiter, WEB_EVENTS_PER_WINDOW } from './web-events.js';
-import { parseWebEvent } from '../lib/web-events.js';
+import { parseWebEvent, recordServerEvent, SERVER_EVENT_PAGE } from '../lib/web-events.js';
 import { getStatsDB } from '../lib/db.js';
 
 const SECRET = 'test-admin-secret-web-events';
@@ -63,6 +63,38 @@ describe('parseWebEvent', () => {
     expect(parseWebEvent({ name: 'cta:try', page: 'fr', locale: 'fr' })).toBeNull();
     expect(parseWebEvent({ name: 'cta:try', page: '/fr', locale: 'it' })).toBeNull();
     expect(parseWebEvent('cta:try')).toBeNull();
+  });
+
+  it('refuses the api: family — those rows are written by the server, never claimed', () => {
+    // 🚨 `api:trial` and `api:trial-exhausted` are the numerator of the keyless
+    // trial's conversion. If a browser could post them, anyone could invent that
+    // figure in a loop. The page owns nav/cta/film; the server owns api:.
+    expect(parseWebEvent({ name: 'api:trial', page: '/fr', locale: 'fr' })).toBeNull();
+    expect(parseWebEvent({ name: 'api:trial-exhausted', page: '/fr', locale: 'fr' })).toBeNull();
+  });
+});
+
+describe('recordServerEvent', () => {
+  it('writes the api: rows the public route may not', () => {
+    recordServerEvent('api:trial');
+    const row = getStatsDB()
+      .prepare(
+        "SELECT page, locale, referrer, viewport FROM web_events WHERE name = 'api:trial' ORDER BY id DESC LIMIT 1",
+      )
+      .get() as Record<string, unknown>;
+    // A sentinel page, not a URL: nobody navigated anywhere. The dashboard
+    // filters it out of the by-page list for that reason.
+    expect(row).toEqual({ page: SERVER_EVENT_PAGE, locale: 'en', referrer: null, viewport: null });
+  });
+
+  it('lands in the same summary the doors card reads', async () => {
+    process.env.ADMIN_SECRET = SECRET;
+    recordServerEvent('api:trial-exhausted');
+    const res = await makeApp().request('/v1/admin/web-events?days=1', {
+      headers: { 'X-Admin-Secret': SECRET },
+    });
+    const body = (await res.json()) as { by_name: Array<{ name: string; count: number }> };
+    expect(body.by_name.some((r) => r.name === 'api:trial-exhausted')).toBe(true);
   });
 });
 
