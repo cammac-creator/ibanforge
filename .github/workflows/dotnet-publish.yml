@@ -6,10 +6,12 @@ name: Publish IBANforge.Sdk (.NET) to NuGet
 # release-publish.yml: the .NET SDK carries its own version in its csproj,
 # which must match the tag.
 #
-# Secret: NUGET_API_KEY, an API key created on nuget.org (Account → API Keys,
-# scope "Push new packages and package versions", glob `IBANforge.Sdk`). The
-# nuget.org account itself is a Microsoft account, opened by the maintainer.
-# Until the secret exists the push step fails with 401 and nothing else happens.
+# Auth: nuget.org TRUSTED PUBLISHING (since 2026-09-06). A policy on nuget.org
+# (owner Nytril · GitHub Actions · cammac-creator/ibanforge · this file, no
+# environment) lets `NuGet/login` exchange the job's OIDC token for a short-lived
+# API key: no secret anywhere. `NUGET_API_KEY` stays as an optional fallback for
+# a classic key. Until the policy exists, the login step fails and nothing else
+# happens.
 
 on:
   push:
@@ -19,6 +21,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write # OIDC for nuget.org trusted publishing
 
 jobs:
   publish:
@@ -49,12 +52,20 @@ jobs:
       - name: Pack
         run: dotnet pack src/IBANforge.Sdk/IBANforge.Sdk.csproj -c Release -o /tmp/pkg --nologo
 
+      # Trusted publishing: the policy on nuget.org names this repository and this
+      # workflow file; the action turns the job's OIDC token into a temporary key.
+      - name: Log in to nuget.org (trusted publishing)
+        id: login
+        uses: NuGet/login@v1
+        with:
+          user: Nytril
+
       - name: Push to nuget.org
         env:
-          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+          NUGET_API_KEY: ${{ steps.login.outputs.NUGET_API_KEY || secrets.NUGET_API_KEY }}
         run: |
           if [ -z "$NUGET_API_KEY" ]; then
-            echo "::error::NUGET_API_KEY is not set: create the key on nuget.org and run \`gh secret set NUGET_API_KEY\`" >&2
+            echo "::error::no nuget.org key: the trusted-publishing policy is missing (nuget.org → Trusted Publishing → owner Nytril, cammac-creator/ibanforge, dotnet-publish.yml)" >&2
             exit 1
           fi
           dotnet nuget push /tmp/pkg/*.nupkg --api-key "$NUGET_API_KEY" --source https://api.nuget.org/v3/index.json --skip-duplicate
