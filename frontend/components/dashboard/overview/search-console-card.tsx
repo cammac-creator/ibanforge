@@ -7,7 +7,7 @@ import { overviewCard } from './section';
  * What Google sends the site, every Monday.
  *
  * Search Console had been verified since August and never read: the first
- * reading, taken by hand on 06/09/2026, said three to five clicks a week — the
+ * reading, taken by hand on 06/09/2026, said a handful of clicks a week — the
  * answer to "where do the signups come from" was "not from Google", and it
  * took two throwaway scripts to learn it. This card is that reading made
  * permanent (GET /v1/admin/search-console, refreshed every six hours).

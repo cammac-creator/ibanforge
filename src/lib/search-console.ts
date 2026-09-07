@@ -5,7 +5,7 @@ import { getStatsDB } from './db.js';
  * What Google actually sends us, read once every six hours.
  *
  * Search Console was verified for `https://ibanforge.com/` in August and never
- * read: the 06/09/2026 reading — three to five clicks a week — was the first,
+ * read: the 06/09/2026 reading — a handful of clicks a week — was the first,
  * and it was taken by hand with two throwaway scripts. A figure read once is a
  * figure nobody watches; this module is the same reading, permanent, so the
  * Monday question ("did anything move in Google") has an answer on the
