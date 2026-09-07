@@ -76,13 +76,17 @@ describe('carryOverList', () => {
   });
 
   it('refuses a previous database older than the bound, so a stale list cannot ride forever', () => {
-    const tooOld = new Date(NOW.getTime() - (CARRY_OVER_MAX_AGE_DAYS + 1) * 86_400_000).toISOString();
+    const tooOld = new Date(
+      NOW.getTime() - (CARRY_OVER_MAX_AGE_DAYS + 1) * 86_400_000,
+    ).toISOString();
     writePrevious(tooOld, [['AAAAEUAA', 'EU']]);
     const r = carryOverList(target, previousPath, 'EU', NOW);
     expect(r.reason).toBe('previous_too_old');
     expect(r.rows).toBe(0);
     expect(target.prepare('SELECT COUNT(*) AS n FROM sanctioned_entities').get()).toEqual({ n: 0 });
-    expect(target.prepare(`SELECT value FROM metadata WHERE key = 'carried_over'`).get()).toBeUndefined();
+    expect(
+      target.prepare(`SELECT value FROM metadata WHERE key = 'carried_over'`).get(),
+    ).toBeUndefined();
   });
 
   it('refuses a previous database whose refresh date is missing', () => {
@@ -118,8 +122,11 @@ describe('carryOverList', () => {
     expect(r.reason).toBe('carried');
     expect(target.prepare('SELECT COUNT(*) AS n FROM sanctioned_entities').get()).toEqual({ n: 1 });
     expect(
-      (target.prepare(`SELECT entity_name FROM sanctioned_entities`).get() as { entity_name: string })
-        .entity_name,
+      (
+        target.prepare(`SELECT entity_name FROM sanctioned_entities`).get() as {
+          entity_name: string;
+        }
+      ).entity_name,
     ).toBe('fresh');
   });
 });

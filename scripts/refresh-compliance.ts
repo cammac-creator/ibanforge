@@ -24,7 +24,11 @@ import {
   SANCTIONED_COUNTRIES_SECTORAL,
 } from '../src/lib/compliance-static.js';
 import { validateBIC } from '../src/lib/bic-validator.js';
-import { carryOverList, CARRY_OVER_MAX_AGE_DAYS, type CarryOverResult } from './compliance-carry-over.js';
+import {
+  carryOverList,
+  CARRY_OVER_MAX_AGE_DAYS,
+  type CarryOverResult,
+} from './compliance-carry-over.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = resolve(__dirname, '../data');
@@ -112,7 +116,10 @@ async function downloadFile(url: string, dest: string): Promise<void> {
     throw new Error(`No response body for ${url}`);
   }
   const fileStream = createWriteStream(dest);
-  await pipeline(Readable.fromWeb(response.body as import('stream/web').ReadableStream), fileStream);
+  await pipeline(
+    Readable.fromWeb(response.body as import('stream/web').ReadableStream),
+    fileStream,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -171,10 +178,10 @@ function insertStaticData(db: Database.Database): void {
   console.log('\n[1/5] Inserting static sanctions & FATF data...');
 
   const insertSanctionedCountry = db.prepare(
-    `INSERT OR REPLACE INTO sanctioned_countries (country_code, sanction_type) VALUES (?, ?)`
+    `INSERT OR REPLACE INTO sanctioned_countries (country_code, sanction_type) VALUES (?, ?)`,
   );
   const insertFatf = db.prepare(
-    `INSERT OR REPLACE INTO fatf_countries (country_code, status) VALUES (?, ?)`
+    `INSERT OR REPLACE INTO fatf_countries (country_code, status) VALUES (?, ?)`,
   );
 
   const runStatic = db.transaction(() => {
@@ -203,8 +210,11 @@ function insertStaticData(db: Database.Database): void {
 
   runStatic();
 
-  const sanctionedCount = (db.prepare(`SELECT COUNT(*) as n FROM sanctioned_countries`).get() as { n: number }).n;
-  const fatfCount = (db.prepare(`SELECT COUNT(*) as n FROM fatf_countries`).get() as { n: number }).n;
+  const sanctionedCount = (
+    db.prepare(`SELECT COUNT(*) as n FROM sanctioned_countries`).get() as { n: number }
+  ).n;
+  const fatfCount = (db.prepare(`SELECT COUNT(*) as n FROM fatf_countries`).get() as { n: number })
+    .n;
   console.log(`  sanctioned_countries: ${sanctionedCount} rows`);
   console.log(`  fatf_countries:       ${fatfCount} rows`);
 }
@@ -229,7 +239,11 @@ const SWIFT_REMARK_REGEX = /SWIFT(?:\/BIC)?[:\s]+([A-Z]{4}[A-Z]{2}[A-Z0-9]{2}(?:
 // whitespace collapsed. Deliberately blunt — both sides go through it, and a
 // blunt rule applied to both is safer than a clever rule applied to one.
 const normalizeEntityName = (s: string): string =>
-  s.toUpperCase().replace(/[^A-Z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+  s
+    .toUpperCase()
+    .replace(/[^A-Z0-9 ]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 
 /**
  * Candidates found and entities kept, per source and overall.
@@ -269,7 +283,7 @@ async function fetchPrimarySanctions(db: Database.Database): Promise<SanctionsTa
 
   const insertEntity = db.prepare(
     `INSERT OR IGNORE INTO sanctioned_entities (bic8, entity_name, source_list, country_code, directory_match)
-     VALUES (?, ?, ?, ?, ?)`
+     VALUES (?, ?, ?, ?, ?)`,
   );
   const insertBatch = db.transaction((rows: Array<[string, string, string, string, number]>) => {
     for (const row of rows) insertEntity.run(...row);
@@ -280,7 +294,10 @@ async function fetchPrimarySanctions(db: Database.Database): Promise<SanctionsTa
   // Extract every "SWIFT/BIC <code>" from a blob of text and keep the ones that
   // are well-formed BICs (dedup via `seen`). The ONLY rejection left is a
   // malformed code, which is a parsing artefact rather than a bank.
-  const extractBics = (text: string, seen: Set<string>): Array<{ bic8: string; inDirectory: boolean }> => {
+  const extractBics = (
+    text: string,
+    seen: Set<string>,
+  ): Array<{ bic8: string; inDirectory: boolean }> => {
     const out: Array<{ bic8: string; inDirectory: boolean }> = [];
     let m: RegExpExecArray | null;
     SWIFT_REMARK_REGEX.lastIndex = 0;
@@ -320,13 +337,26 @@ async function fetchPrimarySanctions(db: Database.Database): Promise<SanctionsTa
       // Country programs -> the country they anchor. UKRAINE-EO programs
       // target Russian and Crimean actors, hence both RU and UA.
       const PROGRAM_COUNTRIES: Array<[RegExp, string[]]> = [
-        [/IRAN|IFSR|IRGC/, ['IR']], [/CUBA/, ['CU']], [/DPRK/, ['KP']],
-        [/SYRIA/, ['SY']], [/VENEZUELA/, ['VE']], [/BELARUS/, ['BY']],
-        [/RUSSIA|PEESA/, ['RU']], [/UKRAINE-EO/, ['RU', 'UA']],
-        [/NICARAGUA/, ['NI']], [/SOUTH SUDAN/, ['SS']], [/DARFUR/, ['SD']],
-        [/YEMEN/, ['YE']], [/LIBYA/, ['LY']], [/IRAQ/, ['IQ']],
-        [/SOMALIA/, ['SO']], [/LEBANON/, ['LB']], [/ZIMBABWE/, ['ZW']],
-        [/MALI/, ['ML']], [/BURMA/, ['MM']], [/TALIBAN|AFGHANISTAN/, ['AF']],
+        [/IRAN|IFSR|IRGC/, ['IR']],
+        [/CUBA/, ['CU']],
+        [/DPRK/, ['KP']],
+        [/SYRIA/, ['SY']],
+        [/VENEZUELA/, ['VE']],
+        [/BELARUS/, ['BY']],
+        [/RUSSIA|PEESA/, ['RU']],
+        [/UKRAINE-EO/, ['RU', 'UA']],
+        [/NICARAGUA/, ['NI']],
+        [/SOUTH SUDAN/, ['SS']],
+        [/DARFUR/, ['SD']],
+        [/YEMEN/, ['YE']],
+        [/LIBYA/, ['LY']],
+        [/IRAQ/, ['IQ']],
+        [/SOMALIA/, ['SO']],
+        [/LEBANON/, ['LB']],
+        [/ZIMBABWE/, ['ZW']],
+        [/MALI/, ['ML']],
+        [/BURMA/, ['MM']],
+        [/TALIBAN|AFGHANISTAN/, ['AF']],
       ];
       for await (const line of rl) {
         lines++;
@@ -340,7 +370,11 @@ async function fetchPrimarySanctions(db: Database.Database): Promise<SanctionsTa
           const norm = normalizeEntityName(name);
           if (norm) {
             let e = entityNames.get(norm);
-            if (!e) entityNames.set(norm, (e = { name, ents: new Set(), worldwide: false, programCC: new Set() }));
+            if (!e)
+              entityNames.set(
+                norm,
+                (e = { name, ents: new Set(), worldwide: false, programCC: new Set() }),
+              );
             e.ents.add((cols[0] ?? '').trim());
             // "all offices worldwide" in the remarks (Saderat, Melli) is the
             // designation itself saying geography does not bound it.
@@ -362,7 +396,9 @@ async function fetchPrimarySanctions(db: Database.Database): Promise<SanctionsTa
       }
       if (batch.length) insertBatch(batch);
       tally.kept += batch.length;
-      console.log(`  OFAC: ${lines} rows, ${batch.length} bank BICs kept (${unresolved} not in our directory)`);
+      console.log(
+        `  OFAC: ${lines} rows, ${batch.length} bank BICs kept (${unresolved} not in our directory)`,
+      );
 
       // ---- Name axis: designated entities OUR OWN directory knows by name ----
       //
@@ -410,7 +446,19 @@ async function fetchPrimarySanctions(db: Database.Database): Promise<SanctionsTa
         // Deprecated ISO2 codes whose CLDR label collides with a live country:
         // SU labels as "Russia" and, iterated after RU, would silently win the
         // reverse map — Bank Rossiya then "lives" in a country no BIC carries.
-        const DEPRECATED_ISO2 = new Set(['SU', 'AN', 'BU', 'CS', 'DD', 'FX', 'NT', 'TP', 'YD', 'YU', 'ZR']);
+        const DEPRECATED_ISO2 = new Set([
+          'SU',
+          'AN',
+          'BU',
+          'CS',
+          'DD',
+          'FX',
+          'NT',
+          'TP',
+          'YD',
+          'YU',
+          'ZR',
+        ]);
         for (let a = 65; a <= 90; a++) {
           for (let b = 65; b <= 90; b++) {
             const cc = String.fromCharCode(a) + String.fromCharCode(b);
@@ -421,20 +469,37 @@ async function fetchPrimarySanctions(db: Database.Database): Promise<SanctionsTa
         }
         // OFAC's own spellings that Intl's English labels miss.
         for (const [alias, cc] of [
-          ['KOREA NORTH', 'KP'], ['NORTH KOREA', 'KP'], ['KOREA SOUTH', 'KR'],
-          ['BURMA', 'MM'], ['RUSSIAN FEDERATION', 'RU'], ['SYRIAN ARAB REPUBLIC', 'SY'],
-          ['IRAN ISLAMIC REPUBLIC OF', 'IR'], ['VENEZUELA BOLIVARIAN REPUBLIC', 'VE'],
-          ['CZECH REPUBLIC', 'CZ'], ['TURKIYE', 'TR'], ['TURKEY', 'TR'],
-          ['UNITED KINGDOM', 'GB'], ['BOSNIA AND HERZEGOVINA', 'BA'],
-          ['BAHAMAS THE', 'BS'], ['GAMBIA THE', 'GM'], ['VIRGIN ISLANDS BRITISH', 'VG'],
-          ['CURACAO', 'CW'], ['MACAU', 'MO'], ['LAOS', 'LA'],
+          ['KOREA NORTH', 'KP'],
+          ['NORTH KOREA', 'KP'],
+          ['KOREA SOUTH', 'KR'],
+          ['BURMA', 'MM'],
+          ['RUSSIAN FEDERATION', 'RU'],
+          ['SYRIAN ARAB REPUBLIC', 'SY'],
+          ['IRAN ISLAMIC REPUBLIC OF', 'IR'],
+          ['VENEZUELA BOLIVARIAN REPUBLIC', 'VE'],
+          ['CZECH REPUBLIC', 'CZ'],
+          ['TURKIYE', 'TR'],
+          ['TURKEY', 'TR'],
+          ['UNITED KINGDOM', 'GB'],
+          ['BOSNIA AND HERZEGOVINA', 'BA'],
+          ['BAHAMAS THE', 'BS'],
+          ['GAMBIA THE', 'GM'],
+          ['VIRGIN ISLANDS BRITISH', 'VG'],
+          ['CURACAO', 'CW'],
+          ['MACAU', 'MO'],
+          ['LAOS', 'LA'],
           // Pre-2010 addresses OFAC never updated. The former NA also covered
           // SX and BQ — mapping to CW understates, never overstates.
           ['NETHERLANDS ANTILLES', 'CW'],
-          ['COTE D IVOIRE', 'CI'], ['CABO VERDE', 'CV'],
-          ['CONGO DEMOCRATIC REPUBLIC OF THE', 'CD'], ['CONGO REPUBLIC OF THE', 'CG'],
-          ['PALESTINIAN', 'PS'], ['WEST BANK', 'PS'], ['REGION WEST BANK', 'PS'],
-          ['GAZA', 'PS'], ['REGION GAZA', 'PS'],
+          ['COTE D IVOIRE', 'CI'],
+          ['CABO VERDE', 'CV'],
+          ['CONGO DEMOCRATIC REPUBLIC OF THE', 'CD'],
+          ['CONGO REPUBLIC OF THE', 'CG'],
+          ['PALESTINIAN', 'PS'],
+          ['WEST BANK', 'PS'],
+          ['REGION WEST BANK', 'PS'],
+          ['GAZA', 'PS'],
+          ['REGION GAZA', 'PS'],
         ] as const) {
           nameToIso.set(alias, cc);
         }
@@ -453,14 +518,17 @@ async function fetchPrimarySanctions(db: Database.Database): Promise<SanctionsTa
       } catch (err) {
         console.warn(
           `  WARNING: OFAC ADD.csv unavailable (${(err as Error).message}) — ` +
-            `name axis degrades to "all offices worldwide" entities only`
+            `name axis degrades to "all offices worldwide" entities only`,
         );
       }
       const byFirstWord = new Map<string, Array<{ norm: string; bic8: string }>>();
       const dirStmt = bicDB.prepare(
-        `SELECT DISTINCT bic8, institution FROM bic_entries WHERE institution IS NOT NULL AND institution != ''`
+        `SELECT DISTINCT bic8, institution FROM bic_entries WHERE institution IS NOT NULL AND institution != ''`,
       );
-      for (const r of dirStmt.iterate() as IterableIterator<{ bic8: string; institution: string }>) {
+      for (const r of dirStmt.iterate() as IterableIterator<{
+        bic8: string;
+        institution: string;
+      }>) {
         const norm = normalizeEntityName(r.institution);
         if (!norm) continue;
         const fw = norm.split(' ')[0];
@@ -500,12 +568,12 @@ async function fetchPrimarySanctions(db: Database.Database): Promise<SanctionsTa
       tally.kept += nameBatch.length;
       console.log(
         `  OFAC name axis: ${entityNames.size} entity names read, ${namesMatched} matched in our directory ` +
-          `-> ${nameBatch.length} BICs beyond the SWIFT tokens (OFAC only; ALT.csv aliases not read)`
+          `-> ${nameBatch.length} BICs beyond the SWIFT tokens (OFAC only; ALT.csv aliases not read)`,
       );
       if (droppedByGeo.length) {
         console.log(
           `  name axis, name matched but country outside the SDN addresses (kept OUT): ` +
-            `${droppedByGeo.slice(0, 20).join(' ')}${droppedByGeo.length > 20 ? ' …' : ''}`
+            `${droppedByGeo.slice(0, 20).join(' ')}${droppedByGeo.length > 20 ? ' …' : ''}`,
         );
       }
     } catch (err) {
@@ -562,7 +630,10 @@ async function fetchPrimarySanctions(db: Database.Database): Promise<SanctionsTa
     try {
       const xmlPath = resolve(TMP_DIR, 'seco.xml');
       console.log('  Fetching SECO (CH) list...');
-      await downloadFile('https://www.sesam.search.admin.ch/sesam-search-web/pages/search/searchSanctionWithExport.xhtml?lang=en&action=exportXml', xmlPath);
+      await downloadFile(
+        'https://www.sesam.search.admin.ch/sesam-search-web/pages/search/searchSanctionWithExport.xhtml?lang=en&action=exportXml',
+        xmlPath,
+      );
       const { readFileSync } = await import('node:fs');
       const text = readFileSync(xmlPath, 'utf-8');
       const seen = new Set<string>();
@@ -583,7 +654,9 @@ async function fetchPrimarySanctions(db: Database.Database): Promise<SanctionsTa
     bicDB.close();
   }
 
-  const entityCount = (db.prepare(`SELECT COUNT(*) as n FROM sanctioned_entities`).get() as { n: number }).n;
+  const entityCount = (
+    db.prepare(`SELECT COUNT(*) as n FROM sanctioned_entities`).get() as { n: number }
+  ).n;
   console.log(`  sanctioned_entities total: ${entityCount} rows (deduped across sources)`);
   // Both counters, every run. The gap between them is the directory's coverage
   // of the sanctions lists, and it is the number that moves when our BIC base
@@ -593,7 +666,9 @@ async function fetchPrimarySanctions(db: Database.Database): Promise<SanctionsTa
       `named by a list only: ${tally.unresolved.length}`,
   );
   if (tally.unresolved.length) {
-    console.log(`  sanctioned BICs we cannot name: ${tally.unresolved.slice(0, 30).join(' ')}${tally.unresolved.length > 30 ? ' …' : ''}`);
+    console.log(
+      `  sanctioned BICs we cannot name: ${tally.unresolved.slice(0, 30).join(' ')}${tally.unresolved.length > 30 ? ' …' : ''}`,
+    );
   }
   return tally;
 }
@@ -635,7 +710,7 @@ async function fetchSepaRegisters(db: Database.Database): Promise<void> {
   console.log('\n[3/5] Downloading EPC SEPA registers (CSV)...');
 
   const insertSepa = db.prepare(
-    `INSERT OR IGNORE INTO sepa_participants (bic8, scheme, status) VALUES (?, ?, 'active')`
+    `INSERT OR IGNORE INTO sepa_participants (bic8, scheme, status) VALUES (?, ?, 'active')`,
   );
 
   for (const register of EPC_REGISTERS) {
@@ -654,7 +729,7 @@ async function fetchSepaRegisters(db: Database.Database): Promise<void> {
       for await (const line of rl) {
         const cols = parseCsvLine(line);
         if (!headerParsed) {
-          bicIdx = cols.findIndex(c => c.toUpperCase() === 'BIC');
+          bicIdx = cols.findIndex((c) => c.toUpperCase() === 'BIC');
           headerParsed = true;
           continue;
         }
@@ -670,12 +745,16 @@ async function fetchSepaRegisters(db: Database.Database): Promise<void> {
       insertBatch([...bics]);
       console.log(`  ${register.scheme}: ${bics.size} BICs inserted`);
     } catch (err) {
-      console.warn(`  WARNING: ${register.scheme} register download failed: ${(err as Error).message}`);
+      console.warn(
+        `  WARNING: ${register.scheme} register download failed: ${(err as Error).message}`,
+      );
       console.warn(`  Skipping ${register.scheme} — continuing.`);
     }
   }
 
-  const sepaCount = (db.prepare(`SELECT COUNT(*) as n FROM sepa_participants`).get() as { n: number }).n;
+  const sepaCount = (
+    db.prepare(`SELECT COUNT(*) as n FROM sepa_participants`).get() as { n: number }
+  ).n;
   console.log(`  sepa_participants total: ${sepaCount} rows`);
 }
 
@@ -686,9 +765,10 @@ async function fetchSepaRegisters(db: Database.Database): Promise<void> {
 async function fetchVopRegister(db: Database.Database): Promise<void> {
   console.log('\n[4/5] Downloading EPC VoP register (CSV)...');
 
-  const vopUrl = 'https://www.europeanpaymentscouncil.eu/sites/default/files/participants_export/vop/vop.csv';
+  const vopUrl =
+    'https://www.europeanpaymentscouncil.eu/sites/default/files/participants_export/vop/vop.csv';
   const insertVop = db.prepare(
-    `INSERT OR IGNORE INTO vop_participants (bic8, status) VALUES (?, ?)`
+    `INSERT OR IGNORE INTO vop_participants (bic8, status) VALUES (?, ?)`,
   );
 
   try {
@@ -724,8 +804,8 @@ async function fetchVopRegister(db: Database.Database): Promise<void> {
     for await (const line of rl) {
       const cols = parseCsvLine(line);
       if (!headerParsed) {
-        bicIdx = cols.findIndex(c => c.toUpperCase() === 'BIC');
-        statusIdx = cols.findIndex(c => c.toUpperCase() === 'STATUS');
+        bicIdx = cols.findIndex((c) => c.toUpperCase() === 'BIC');
+        statusIdx = cols.findIndex((c) => c.toUpperCase() === 'STATUS');
         headerParsed = true;
         continue;
       }
@@ -745,7 +825,7 @@ async function fetchVopRegister(db: Database.Database): Promise<void> {
       for (const [bic8, status] of entries) insertVop.run(bic8, status);
     });
     insertBatch([...byBic]);
-    const active = [...byBic.values()].filter(s => s === 'active').length;
+    const active = [...byBic.values()].filter((s) => s === 'active').length;
     console.log(
       `  VoP: ${rows} rows, ${byBic.size} participants (${active} active, ${byBic.size - active} pending EDS registration)`,
     );
@@ -758,7 +838,8 @@ async function fetchVopRegister(db: Database.Database): Promise<void> {
     `);
   }
 
-  const vopCount = (db.prepare(`SELECT COUNT(*) as n FROM vop_participants`).get() as { n: number }).n;
+  const vopCount = (db.prepare(`SELECT COUNT(*) as n FROM vop_participants`).get() as { n: number })
+    .n;
   console.log(`  vop_participants: ${vopCount} rows`);
 }
 
@@ -791,18 +872,22 @@ function applyEmiAliases(db: Database.Database): void {
   console.log('\n[5b] Applying documented EMI BIC aliases...');
   const copySepa = db.prepare(
     `INSERT OR IGNORE INTO sepa_participants (bic8, scheme, status)
-     SELECT ?, scheme, status FROM sepa_participants WHERE bic8 = ?`
+     SELECT ?, scheme, status FROM sepa_participants WHERE bic8 = ?`,
   );
   const copyVop = db.prepare(
     `INSERT OR IGNORE INTO vop_participants (bic8, status)
-     SELECT ?, status FROM vop_participants WHERE bic8 = ?`
+     SELECT ?, status FROM vop_participants WHERE bic8 = ?`,
   );
   for (const { alias, registered, reason } of EMI_BIC_ALIASES) {
     const sepa = copySepa.run(alias, registered).changes;
     const vop = copyVop.run(alias, registered).changes;
-    console.log(`  ${alias} ← ${registered}: +${sepa} sepa rows, +${vop} vop rows (${reason.slice(0, 60)}…)`);
+    console.log(
+      `  ${alias} ← ${registered}: +${sepa} sepa rows, +${vop} vop rows (${reason.slice(0, 60)}…)`,
+    );
     if (sepa === 0) {
-      console.warn(`  WARNING: registered BIC ${registered} carried no sepa_participants rows — alias ${alias} is a no-op; re-verify the EPC registers.`);
+      console.warn(
+        `  WARNING: registered BIC ${registered} carried no sepa_participants rows — alias ${alias} is a no-op; re-verify the EPC registers.`,
+      );
     }
   }
 }
@@ -814,9 +899,7 @@ function applyEmiAliases(db: Database.Database): void {
 function insertMetadata(db: Database.Database): void {
   console.log('\n[5/5] Writing metadata...');
 
-  const insertMeta = db.prepare(
-    `INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)`
-  );
+  const insertMeta = db.prepare(`INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)`);
 
   // This string is served verbatim in meta.sources on every paid
   // /v1/iban/compliance response — it is the provenance field, the one an
@@ -831,10 +914,14 @@ function insertMetadata(db: Database.Database): void {
   // one that did. Deriving it means the claim cannot drift from the data it
   // describes.
   const sanctionSources = (
-    db.prepare('SELECT DISTINCT source_list FROM sanctioned_entities ORDER BY source_list').all() as Array<{ source_list: string }>
+    db
+      .prepare('SELECT DISTINCT source_list FROM sanctioned_entities ORDER BY source_list')
+      .all() as Array<{ source_list: string }>
   ).map((r) => r.source_list);
   const sepaSchemes = (
-    db.prepare('SELECT DISTINCT scheme FROM sepa_participants ORDER BY scheme').all() as Array<{ scheme: string }>
+    db.prepare('SELECT DISTINCT scheme FROM sepa_participants ORDER BY scheme').all() as Array<{
+      scheme: string;
+    }>
   ).map((r) => `EPC-${r.scheme}`);
   const sources = [...sanctionSources, 'FATF', ...sepaSchemes].join(',');
 
@@ -868,7 +955,8 @@ function printSummary(db: Database.Database): void {
     console.log(`  ${table.padEnd(25)} ${row.n} rows`);
   }
   const lastRefresh = (
-    db.prepare(`SELECT value FROM metadata WHERE key = 'last_refresh'`).get() as { value: string } | undefined
+    db.prepare(`SELECT value FROM metadata WHERE key = 'last_refresh'`).get() as
+      { value: string } | undefined
   )?.value;
   console.log(`  last_refresh:             ${lastRefresh ?? 'N/A'}`);
   console.log('===============================================\n');

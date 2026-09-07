@@ -149,7 +149,12 @@ export function readTable(buffer: Buffer, filename = ''): { headers: string[]; r
     }
     wb = isCsv
       ? XLSX.read(buffer.toString('utf8'), { type: 'string', raw: true, sheetRows: SHEET_ROWS_CAP })
-      : XLSX.read(buffer, { type: 'buffer', raw: true, cellDates: false, sheetRows: SHEET_ROWS_CAP });
+      : XLSX.read(buffer, {
+          type: 'buffer',
+          raw: true,
+          cellDates: false,
+          sheetRows: SHEET_ROWS_CAP,
+        });
   } catch (e) {
     throw new AuditFileError(
       'unreadable',

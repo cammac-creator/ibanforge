@@ -69,9 +69,8 @@ export function carryOverList(
   let previous: Database.Database | null = null;
   try {
     previous = new Database(previousDbPath, { readonly: true, fileMustExist: true });
-    const meta = previous
-      .prepare(`SELECT value FROM metadata WHERE key = 'last_refresh'`)
-      .get() as { value: string } | undefined;
+    const meta = previous.prepare(`SELECT value FROM metadata WHERE key = 'last_refresh'`).get() as
+      { value: string } | undefined;
     const previousRefresh = meta?.value ?? null;
     const refreshedAt = previousRefresh ? new Date(previousRefresh).getTime() : NaN;
     const ageDays = (now.getTime() - refreshedAt) / 86_400_000;
@@ -91,7 +90,9 @@ export function carryOverList(
       `INSERT OR IGNORE INTO sanctioned_entities (bic8, entity_name, source_list, country_code, directory_match)
        VALUES (?, ?, ?, ?, ?)`,
     );
-    const note = target.prepare(`INSERT OR REPLACE INTO metadata (key, value) VALUES ('carried_over', ?)`);
+    const note = target.prepare(
+      `INSERT OR REPLACE INTO metadata (key, value) VALUES ('carried_over', ?)`,
+    );
     const existing = target
       .prepare(`SELECT value FROM metadata WHERE key = 'carried_over'`)
       .get() as { value: string } | undefined;

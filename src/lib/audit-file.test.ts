@@ -189,7 +189,10 @@ describe('rendering', () => {
  */
 describe('readTable — the cap is enforced before the parse', () => {
   it('refuses an XLSX far above the cap without materialising it', () => {
-    const aoa: unknown[][] = [['IBAN'], ...Array.from({ length: AUDIT_MAX_ROWS + 20_000 }, () => [VALID_CH])];
+    const aoa: unknown[][] = [
+      ['IBAN'],
+      ...Array.from({ length: AUDIT_MAX_ROWS + 20_000 }, () => [VALID_CH]),
+    ];
     const buffer = xlsx(aoa);
     const started = performance.now();
     expect(() => readTable(buffer, 'big.xlsx')).toThrow(/at most/);

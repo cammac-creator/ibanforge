@@ -51,7 +51,9 @@ opsRecent.get('/v1/ops/recent', (c) => {
   // (a forged string, or one minted under another secret), is the same as no
   // cursor: the caller gets the current window, never an empty feed.
   const decoded = decodeOpsCursor(c.req.query('after'));
-  const newest = (db.prepare('SELECT COALESCE(MAX(id), 0) AS id FROM operations').get() as { id: number }).id;
+  const newest = (
+    db.prepare('SELECT COALESCE(MAX(id), 0) AS id FROM operations').get() as { id: number }
+  ).id;
   const after = decoded !== null && decoded <= newest ? decoded : 0;
   const rows = db
     .prepare(
