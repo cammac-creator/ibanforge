@@ -3,9 +3,9 @@ import { AGE_TODAY, MAIL_FILTER_KEYS, type MailFilterKey, type MailRow } from '.
 import type { Contact } from './types';
 
 /**
- * Everything the contacts table needs that is NOT a rule: how the eleven filter
- * keys are laid out on the toolbar, and how a projected row reads in a narrow
- * column.
+ * Everything the contacts table needs that is NOT a rule: how the filter keys
+ * are laid out across the toolbar's three controls, and how a projected row
+ * reads in a narrow column.
  *
  * Here rather than in the component because the vitest config covers `lib/` and
  * `app/` only — a mapping written inside a .tsx cannot be pinned, and the two
@@ -15,8 +15,15 @@ import type { Contact } from './types';
  */
 
 /**
- * The counted work tiles: what the day owes, as numbers big enough to read
- * across the room. They toggle, so at most one is pressed.
+ * « À faire »: what the day owes. At most one is chosen, and the axis is
+ * emptied by choosing nothing.
+ *
+ * Three counted queues behind one control rather than three tiles across the
+ * bar. The bar carried fourteen buttons — three tiles, four segments, seven
+ * chips — in one row of near-identical shapes, and the owner reported he could
+ * no longer find anything in it (07/09/2026). What the grouping bought is kept
+ * (these three are the day's work, and nothing else on the bar is), and only
+ * the drawing changed.
  */
 export const WORK_KEYS: readonly MailFilterKey[] = ['reply', 'followup', 'drafts'];
 
@@ -35,13 +42,18 @@ export const POPULATION_KEYS: readonly MailFilterKey[] = [
 ];
 
 /**
- * The refining chips, quiet by design: they narrow whatever the segment and the
- * tile already selected. At most one is pressed.
+ * « Affiner »: a narrowing over whatever the population and the queue already
+ * selected. At most one, and the axis is emptied by choosing nothing.
+ *
+ * Seven of them, which is exactly why they are behind a control that shows one
+ * value at a time instead of seven permanent buttons: they are retrieval paths,
+ * consulted on the day a question comes up, and each one spent bar width every
+ * other day of the year.
  */
-// 'closed' is a chip and not a work tile on purpose: the day's tiles count
-// what is OWED, and a closed dossier is the one thing that no longer is. The
-// chip is the retrieval path — narrow any population to the dossiers the
-// terminal verdicts took out of the queues.
+// 'closed' sits under « Affiner » and not under « À faire » on purpose: the
+// day's queues count what is OWED, and a closed dossier is the one thing that
+// no longer is. It is the retrieval path — narrow any population to the
+// dossiers the terminal verdicts took out of the queues.
 export const REFINE_KEYS: readonly MailFilterKey[] = [
   'new',
   'paying',
@@ -65,6 +77,31 @@ const SEGMENT_LABEL: Partial<Record<MailFilterKey, string>> = {
 
 export function segmentLabel(key: MailFilterKey, filterLabel: string): string {
   return SEGMENT_LABEL[key] ?? filterLabel;
+}
+
+/**
+ * A key's word inside the two dropdowns, where the filter's own label was
+ * written for a tile or a chip.
+ *
+ * Three entries, all the same shift. A tile counted a STOCK and was named for
+ * it — « Payants 4 » is four paying contacts — while an option under « Affiner »
+ * names the CRITERION one row is judged by, which is singular. « Relances »
+ * becomes « À relancer » for the matching reason: under « À faire », beside
+ * « À répondre », the three options have to read as the same kind of thing.
+ *
+ * Here rather than in the FILTERS table because the label is still what the
+ * table's own sentences use — « retirer Payants », « aucun contact ne réunit
+ * Clients + Brouillons » — and those read as the stock they name. Same
+ * arrangement, same reason, as SEGMENT_LABEL above.
+ */
+const SELECT_LABEL: Partial<Record<MailFilterKey, string>> = {
+  followup: 'À relancer',
+  new: 'Nouveau',
+  paying: 'Payant',
+};
+
+export function selectLabel(key: MailFilterKey, filterLabel: string): string {
+  return SELECT_LABEL[key] ?? filterLabel;
 }
 
 /**

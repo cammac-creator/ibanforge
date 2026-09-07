@@ -9,21 +9,22 @@ import {
   railColorOf,
   rowStatus,
   segmentLabel,
+  selectLabel,
   shortAge,
 } from './table-view';
 
 describe('the toolbar partitions the filters', () => {
   it('places every key in exactly one group', () => {
     // The failure this exists for is silent: a key added to FILTERS and
-    // forgotten here is simply unreachable — no button draws it, and nothing on
-    // screen says a filter went missing. Asserted in both directions, so an
+    // forgotten here is simply unreachable — no control draws it, and nothing
+    // on screen says a filter went missing. Asserted in both directions, so an
     // invented key is caught as well as a forgotten one.
     const placed = TOOLBAR_GROUPS.flat();
     expect([...placed].sort()).toEqual([...MAIL_FILTER_KEYS].sort());
     expect(new Set(placed).size).toBe(placed.length);
   });
 
-  it('keeps the never-contacted queue a chip and the population a segment', () => {
+  it('keeps the never-contacted queue under Affiner and the population a segment', () => {
     // One letter apart, two different questions. Swapped, the segment would
     // hide every prospect already written to, which is most of them.
     expect(REFINE_KEYS).toContain('prospect');
@@ -32,9 +33,15 @@ describe('the toolbar partitions the filters', () => {
     expect(REFINE_KEYS).not.toContain('prospects');
   });
 
-  it('opens the segment on Tous and the tiles on the reply queue', () => {
+  it('opens the segment on Tous and « À faire » on the reply queue', () => {
     expect(POPULATION_KEYS[0]).toBe('all');
     expect(WORK_KEYS[0]).toBe('reply');
+  });
+
+  it('keeps Brouillons last, where an option can be dropped at zero', () => {
+    // The toolbar hides it when nothing is waiting and it is not the current
+    // value. Last in the list so that removing it never reorders the two above.
+    expect(WORK_KEYS[WORK_KEYS.length - 1]).toBe('drafts');
   });
 });
 
@@ -45,6 +52,27 @@ describe('segmentLabel', () => {
 
   it('leaves every other key with the label the filter already carries', () => {
     expect(segmentLabel('clients', 'Clients')).toBe('Clients');
+  });
+});
+
+describe('selectLabel', () => {
+  it('names a criterion where the filter named a stock', () => {
+    // « Payants 4 » counted four contacts; « Affiner : Payant » judges one row.
+    expect(selectLabel('paying', 'Payants')).toBe('Payant');
+    expect(selectLabel('new', 'Nouveaux')).toBe('Nouveau');
+  });
+
+  it('makes the three « À faire » options read as the same kind of thing', () => {
+    expect(selectLabel('followup', 'Relances')).toBe('À relancer');
+    expect(selectLabel('reply', 'À répondre')).toBe('À répondre');
+    expect(selectLabel('drafts', 'Brouillons')).toBe('Brouillons');
+  });
+
+  it('overrides only what has a reason to differ', () => {
+    // Every other key keeps one word across the whole page: the option, the
+    // « retirer X » button and the "aucun contact ne réunit X + Y" sentence.
+    expect(selectLabel('closed', 'Classés')).toBe('Classés');
+    expect(selectLabel('enrich', 'À enrichir')).toBe('À enrichir');
   });
 });
 
@@ -61,7 +89,9 @@ describe('railColorOf', () => {
 });
 
 describe('rowStatus', () => {
-  function row(over: Partial<Pick<MailRow, 'nextAction' | 'kind'>>): Pick<MailRow, 'nextAction' | 'kind'> {
+  function row(
+    over: Partial<Pick<MailRow, 'nextAction' | 'kind'>>,
+  ): Pick<MailRow, 'nextAction' | 'kind'> {
     return { kind: 'client', nextAction: 'wait', ...over };
   }
 

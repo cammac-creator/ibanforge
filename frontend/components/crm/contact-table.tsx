@@ -366,8 +366,8 @@ export function ContactTable({
               'Aucun correspondant enregistré. Ajoute une adresse pour que son fil remonte ici.'
             ) : selection.work || selection.refine ? (
               // The controls that emptied the view, named, each with its own
-              // way out. « Correspondants 16 » above zero rows with a work tile
-              // still armed from the previous session read as a broken tool:
+              // way out. « Correspondants 16 » above zero rows with an « À faire »
+              // queue still armed from the previous session read as a broken tool:
               // the counts are absolute, the view is an intersection, and only
               // this sentence says so.
               <>
@@ -426,8 +426,8 @@ export function ContactTable({
               r.group && r.group !== rows[i - 1]?.group ? REPLY_GROUP_LABEL[r.group] : null;
             const flame = flameOf(r.heat);
             const status = rowStatus(r);
-            // On the prospecting chips the right column ranks the row rather
-            // than dating it; a file with no address says so, in the place the
+            // On the two prospecting refinements the right column ranks the row
+            // rather than dating it; a file with no address says so, in the place the
             // eye already reads, instead of opening on « envoi impossible ».
             const confidence =
               (selection.refine === 'prospect' || selection.refine === 'enrich') && !r.email
@@ -601,8 +601,8 @@ export function ContactTable({
                       )}
                     </span>
 
-                    {/* The column the eye scans. Under the prospecting chip a
-                      never-contacted row has no silence to show, so it shows
+                    {/* The column the eye scans. Under a prospecting refinement
+                      a never-contacted row has no silence to show, so it shows
                       what does rank it there instead — same swap the column
                       list made. */}
                     {confidence ? (

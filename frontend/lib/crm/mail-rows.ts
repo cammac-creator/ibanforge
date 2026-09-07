@@ -74,7 +74,7 @@ export interface MailRow {
    * Carried as well as the label because the table's Statut column needs both
    * a SHORT name for the same five states and a tone, and neither can be read
    * back off a French sentence. Tone in particular must not be taken from
-   * `urgent`: that is a property of the active filter, so under the reply tile
+   * `urgent`: that is a property of the active filter, so under « À répondre »
    * every row would go amber at once and the colour would stop meaning
    * anything.
    */
@@ -103,7 +103,7 @@ export interface MailRow {
    * and the badge would explain nothing while reading as "done".
    *
    * Not a filter key of its own, unlike `closed`. That gesture removes a
-   * dossier for good and needed a retrieval chip, or closing a row would feel
+   * dossier for good and needed a retrieval path, or closing a row would feel
    * like deleting it; this one hides nothing — the row stays under Tous,
    * Clients, Correspondances and its own thread, wearing the badge — and it
    * undoes itself the day they write again.
@@ -194,13 +194,13 @@ const FILTERS: Array<{
   //
   // ⚠ Singular. Its neighbour `prospects` (plural, below) is the POPULATION,
   // everyone whose kind is prospect, written or not. Two different questions
-  // one letter apart; the toolbar puts them in two different groups on
-  // purpose, this one as a refining chip and the plural as a segment.
-  // Two chips where there was one. « À prospecter » used to count every
+  // one letter apart; the toolbar puts them on two different axes on
+  // purpose, this one under « Affiner » and the plural in the segment.
+  // Two refinements where there was one. « À prospecter » used to count every
   // never-contacted prospect, address or not, so the overview's « 0 mails
   // prêts » led to thirteen files that each opened on « envoi impossible ».
-  // The chip now means "a first mail can leave"; the files still missing an
-  // address get their own chip, since what they need is a different gesture.
+  // This one now means "a first mail can leave"; the files still missing an
+  // address get their own key, since what they need is a different gesture.
   {
     key: 'prospect',
     // « Jamais écrit », not « À prospecter »: the segment beside it is called
@@ -453,7 +453,7 @@ export function searchRows(rows: MailRow[], query: string): MailRow[] {
  * One count per key, each read against the WHOLE base rather than against
  * whatever the toolbar currently shows.
  *
- * Deliberate, and the reason the tiles can be trusted: "À répondre 9" means
+ * Deliberate, and the reason the counts can be trusted: "À répondre (9)" means
  * nine threads are waiting on us, full stop. A count that moved when a segment
  * was pressed would say "nine among the clients", which is a different sentence
  * and one nobody asked. It is also what makes "Brouillons only when > 0" a
@@ -476,16 +476,16 @@ function byId(a: Contact, b: Contact): number {
  * approved layout draws them.
  *
  * One population at all times (the segmented control cannot be empty), at most
- * one work queue (the counted tiles, which toggle) and at most one refining
- * chip. They narrow each other — "the clients whose follow-up is due" is one
+ * one work queue and at most one refinement (the two dropdowns, each of which
+ * has an empty value). They narrow each other — "the clients whose follow-up is due" is one
  * question the old single-key list could not ask at all.
  */
 export interface RowSelection {
   /** The segmented control: 'all' | 'clients' | 'prospects' | 'institution'. */
   population: MailFilterKey;
-  /** A pressed work tile, or nothing. */
+  /** The chosen « À faire » queue, or nothing. */
   work?: MailFilterKey | null;
-  /** A pressed refining chip, or nothing. */
+  /** The chosen « Affiner » narrowing, or nothing. */
   refine?: MailFilterKey | null;
 }
 
@@ -494,8 +494,8 @@ export interface RowSelection {
  * when several are active.
  *
  * The narrowest wins, and narrowest here means "the one that answers a
- * question": a pressed tile is the day's work, then a chip, and the population
- * only if neither is pressed. Pressing "À répondre" while standing on Clients
+ * question": the day's work first, then the refinement, and the population
+ * only if neither is set. Choosing "À répondre" while standing on Clients
  * must still sort unread-first — that ordering is the whole value of the queue,
  * and it would be lost if the population decided.
  */
@@ -508,7 +508,7 @@ function dominantKey(sel: RowSelection): MailFilterKey {
  *
  * Additive to mailRows rather than a replacement: every predicate, every
  * comparator and every projection below is the same code the single-key
- * reading uses, so the counted tiles and the composed table cannot drift.
+ * reading uses, so the counted options and the composed table cannot drift.
  * `selectedRows(input, { population: 'all', work: k })` is `mailRows(input, k)`
  * for every k, and a test pins exactly that.
  */
@@ -516,7 +516,7 @@ export function selectedRows(input: RowsInput, sel: RowSelection): MailRow[] {
   const keys = [sel.population, sel.work, sel.refine].filter((k): k is MailFilterKey => !!k);
   const active = dominantKey(sel);
   if (!FILTERS.some((f) => f.key === active)) return [];
-  // "Nothing is being asked": the whole base, no queue, no chip. Written as
+  // "Nothing is being asked": the whole base, no queue, no refinement. Written as
   // "every key is 'all'" rather than "population is 'all' and the other two are
   // empty", so that asking for 'all' twice stays the same question as asking
   // for it once — which is what makes the bridge to mailRows hold for EVERY
