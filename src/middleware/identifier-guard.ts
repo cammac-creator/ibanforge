@@ -51,7 +51,7 @@
  */
 
 import type { MiddlewareHandler } from 'hono';
-import { classifyBicInput, classifyIidInput } from '../lib/input-normalize.js';
+import { classifyBicInput, classifyFrnInput, classifyIidInput } from '../lib/input-normalize.js';
 import { recordRejection } from '../lib/stats.js';
 import type { HonoEnv } from '../types.js';
 
@@ -66,6 +66,7 @@ import type { HonoEnv } from '../types.js';
 // dans src/index.ts. Ne pas lire ce type comme un filet de sécurité.
 type BIC_PATH = '/v1/bic/:code';
 type IID_PATH = '/v1/ch/clearing/:iid';
+type FRN_PATH = '/v1/gb/firm/:frn';
 
 /**
  * Garde de `GET /v1/bic/:code` — 8 ou 11 alphanumériques.
@@ -139,6 +140,49 @@ export function iidGuardMiddleware(): MiddlewareHandler<HonoEnv, IID_PATH> {
       recordRejection('ch_clearing_lookup', rejection, c.get('apiKeyPrefix'));
       return c.json(
         { error: 'invalid_iid_format', message: 'IID must be a 1-5 digit number.' },
+        400,
+      );
+    }
+
+    await next();
+  };
+}
+
+/**
+ * Garde de `GET /v1/gb/firm/:frn` — 6 ou 7 chiffres. Même contrat, même
+ * position dans src/app.ts (après x402, avant la route), même exclusion
+ * mutuelle avec le comptage de la route. Un FRN mal formé n'atteint jamais le
+ * registre de la FCA : c'est aussi la condition 1 de sa permission (pas
+ * d'appel inutile contre la limite de débit).
+ */
+export function frnGuardMiddleware(): MiddlewareHandler<HonoEnv, FRN_PATH> {
+  return async (c, next) => {
+    const frn = c.req.param('frn');
+    const rejection = classifyFrnInput(frn);
+
+    if (rejection === 'placeholder_literal') {
+      recordRejection('gb_firm_lookup', rejection, c.get('apiKeyPrefix'));
+      return c.json(
+        {
+          error: 'placeholder_literal',
+          message:
+            "You sent the literal OpenAPI placeholder '" +
+            frn +
+            "'. Substitute it with a real Firm Reference Number.",
+          example: 'GET /v1/gb/firm/123456',
+          schema: 'https://api.ibanforge.com/openapi.json',
+        },
+        400,
+      );
+    }
+
+    if (rejection !== null) {
+      recordRejection('gb_firm_lookup', rejection, c.get('apiKeyPrefix'));
+      return c.json(
+        {
+          error: 'invalid_frn_format',
+          message: 'A Firm Reference Number is 6 or 7 digits.',
+        },
         400,
       );
     }

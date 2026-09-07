@@ -213,6 +213,49 @@ const buildRawSpec = () => ({
         },
       },
     },
+    '/v1/gb/firm/{frn}': {
+      get: {
+        operationId: 'lookupGbFirm',
+        summary: 'Look up a UK-regulated firm by FRN in the FCA Financial Services Register',
+        description:
+          'One firm per request, by Firm Reference Number (6 or 7 digits), served from the FCA Register API under its written permission: name, register status and its effective date, business type, Companies House number, client-money permission, PSD/EMD and MLR statuses, register notices. Every answer names the source, carries the retrieval date, the FCA disclaimer and the cache state; entries are cached one day. Use it to confirm the regulatory status of a UK payment, e-money or deposit-taking firm before paying it — never to build a list of firms. A reference number the register does not hold answers 200 with `found: false`. Costs 0.003 USDC via x402, or one request of an API key. On a deployment without a Register API credential the route answers 503 `not_configured` before any credential is read, so nothing is charged.',
+        tags: ['UK register'],
+        security: [{ x402Payment: [] }, { apiKey: [] }],
+        parameters: [
+          {
+            name: 'frn',
+            in: 'path',
+            required: true,
+            description: 'Firm Reference Number, 6 or 7 digits, as printed on the Financial Services Register.',
+            schema: { type: 'string', pattern: '^[0-9]{6,7}$', example: '123456' },
+          },
+        ],
+        responses: {
+          '200': {
+            description:
+              'The firm as the register publishes it, or `found: false` with the same credit and date when no firm carries the number.',
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/GbFirmResult' },
+              },
+            },
+          },
+          '400': {
+            description:
+              'Malformed reference (`invalid_frn_format`), the OpenAPI placeholder sent literally (`placeholder_literal`), or a number the register itself refuses (`invalid_frn`). Never charged.',
+          },
+          '402': { description: 'Payment required (x402)' },
+          '502': {
+            description:
+              'The register did not answer and no copy of the entry under thirty hours old is held (`upstream`; `upstream_status` carries the status the register gave).',
+          },
+          '503': {
+            description:
+              'This deployment holds no Register API credential (`not_configured`). Answered before any key or payment is read: nothing is charged.',
+          },
+        },
+      },
+    },
     '/v1/iban/compliance': {
       post: {
         operationId: 'complianceCheck',
@@ -1913,6 +1956,84 @@ const buildRawSpec = () => ({
           },
         },
       },
+      GbFirmResult: {
+        type: 'object',
+        description:
+          'One entry of the FCA Financial Services Register. Field values are the register’s own strings, never folded into an enum: the FCA adds statuses without notice. Strings are null when the register publishes nothing under that key.',
+        required: ['frn', 'found', 'source', 'source_url', 'retrieved_at', 'cache', 'disclaimer', 'cost_usdc'],
+        properties: {
+          frn: { type: 'string', example: '123456' },
+          found: {
+            type: 'boolean',
+            description: 'False when no firm carries the number: an absence in the register, not a finding about anyone.',
+          },
+          name: { type: ['string', 'null'], example: 'Alpha Bank Example Ltd' },
+          status: {
+            type: ['string', 'null'],
+            description: 'Register status verbatim, e.g. "Authorised", "No longer authorised", "Appointed representative", "Registered".',
+            example: 'Authorised',
+          },
+          status_effective_date: {
+            type: ['string', 'null'],
+            description: 'YYYY-MM-DD when the register’s dd/mm/yyyy could be read; the register’s own string otherwise.',
+            example: '2004-09-01',
+          },
+          business_type: { type: ['string', 'null'], example: 'Regulated' },
+          companies_house_number: { type: ['string', 'null'] },
+          client_money_permission: { type: ['string', 'null'] },
+          sub_status: { type: ['string', 'null'] },
+          sub_status_effective_from: { type: ['string', 'null'] },
+          mlrs_status: { type: ['string', 'null'], description: 'Money Laundering Regulations registration status.' },
+          mlrs_status_effective_date: { type: ['string', 'null'] },
+          psd_emd_status: { type: ['string', 'null'], description: 'Payment Services / E-Money Regulations status.' },
+          psd_emd_effective_date: { type: ['string', 'null'] },
+          psd_agent_status: { type: ['string', 'null'] },
+          e_money_agent_status: { type: ['string', 'null'] },
+          mutual_society_number: { type: ['string', 'null'] },
+          notices: {
+            type: 'array',
+            description: 'The register’s "exceptional information" notices on the firm, verbatim.',
+            items: {
+              type: 'object',
+              required: ['title', 'body'],
+              properties: { title: { type: 'string' }, body: { type: 'string' } },
+            },
+          },
+          register_timestamp: {
+            type: ['string', 'null'],
+            description: 'When the FCA last touched the entry, in the register’s local time (no zone published, none invented).',
+          },
+          source: { type: 'string', enum: ['FCA Financial Services Register'] },
+          source_url: { type: 'string', format: 'uri', description: 'The firm on the public register (a search by FRN).' },
+          retrieved_at: { type: 'string', format: 'date-time', description: 'When the register was asked, UTC.' },
+          cache: {
+            type: 'object',
+            required: ['hit', 'stale', 'expires_at'],
+            properties: {
+              hit: { type: 'boolean', description: 'Served from the one-day cache.' },
+              stale: {
+                type: 'boolean',
+                description: 'True when the register was down and an expired copy (under thirty hours old) was served.',
+              },
+              expires_at: { type: 'string', format: 'date-time' },
+            },
+          },
+          disclaimer: { type: 'string', description: 'The FCA’s exclusion of liability; the register prevails.' },
+          note: { type: 'string', description: 'Present on a miss only.' },
+          attribution: {
+            type: 'object',
+            description: 'Free tier only: display `text` with a link to `url` when the result is shown to people.',
+            properties: {
+              required: { type: 'boolean', enum: [true] },
+              text: { type: 'string' },
+              url: { type: 'string', format: 'uri' },
+              note: { type: 'string' },
+            },
+          },
+          cost_usdc: { type: 'number', example: 0.003 },
+          processing_ms: { type: 'number' },
+        },
+      },
       BICLookupResult: {
         type: 'object',
         required: ['bic', 'bic8', 'bic11', 'found', 'valid_format', 'institution', 'country', 'city', 'branch_code', 'branch_info', 'lei', 'lei_status', 'is_test_bic', 'source', 'cost_usdc'],
@@ -2211,6 +2332,11 @@ const buildRawSpec = () => ({
   tags: [
     { name: 'IBAN', description: 'IBAN validation endpoints (paid via x402)' },
     { name: 'BIC', description: 'BIC/SWIFT lookup endpoints (paid via x402)' },
+    {
+      name: 'UK register',
+      description:
+        'One UK-regulated firm per request from the FCA Financial Services Register, under its written permission (paid via x402 or an API key)',
+    },
     { name: 'Compliance', description: 'Compliance check endpoint — IBAN validation + sanctions + SEPA + VoP + risk score (paid via x402)' },
     { name: 'Swiss Clearing', description: 'Swiss BC-Nummer / IID clearing lookup (paid via x402)' },
     { name: 'API Keys', description: 'API key management — generate free keys and check usage' },

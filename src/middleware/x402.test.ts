@@ -593,3 +593,51 @@ describe('a timed-out settle reaches the response builder', () => {
     expect(slot.unconfirmed).toBeNull();
   });
 });
+
+/**
+ * The FCA firm lookup is priced only where it can be served: the route table
+ * carries it when the Register API credential is set, and not otherwise. A
+ * catalog entry for a resource that answers 503 is a broken listing.
+ */
+describe('GET /v1/gb/firm/:frn is listed only when the register credential exists', () => {
+  const WALLET = '0x0000000000000000000000000000000000000001';
+  const saved = {
+    key: process.env.FCA_REGISTER_API_KEY,
+    email: process.env.FCA_REGISTER_API_EMAIL,
+  };
+  afterEach(() => {
+    if (saved.key === undefined) delete process.env.FCA_REGISTER_API_KEY;
+    else process.env.FCA_REGISTER_API_KEY = saved.key;
+    if (saved.email === undefined) delete process.env.FCA_REGISTER_API_EMAIL;
+    else process.env.FCA_REGISTER_API_EMAIL = saved.email;
+  });
+
+  it('is absent without the credential', () => {
+    delete process.env.FCA_REGISTER_API_KEY;
+    delete process.env.FCA_REGISTER_API_EMAIL;
+    expect(buildRouteTable(WALLET, 'GET', '/v1/gb/firm/123456')).not.toHaveProperty(
+      'GET /v1/gb/firm/:frn',
+    );
+  });
+
+  it('is priced like the BIC lookup, described within the limit, and announces the real URL', () => {
+    process.env.FCA_REGISTER_API_KEY = 'test-register-key';
+    process.env.FCA_REGISTER_API_EMAIL = 'acme@example.com';
+    const table = buildRouteTable(WALLET, 'GET', '/v1/gb/firm/123456');
+    const entry = table['GET /v1/gb/firm/:frn'] as {
+      accepts: { price: string };
+      description: string;
+      resource: string;
+      extensions: { bazaar: { info?: { output?: { example?: Record<string, unknown> } } } };
+    };
+    expect(entry).toBeDefined();
+    expect(entry.accepts.price).toBe('$0.003');
+    expect(entry.description.length).toBeLessThanOrEqual(MAX_RESOURCE_DESCRIPTION);
+    expect(entry.resource).toBe('https://api.ibanforge.com/v1/gb/firm/123456');
+    // The discovery example is wired in, and stamped as illustrative like the others.
+    expect(entry.extensions.bazaar.info?.output?.example).toHaveProperty('_example_notice');
+    expect(entry.extensions.bazaar.info?.output?.example).toMatchObject({
+      source: 'FCA Financial Services Register',
+    });
+  });
+});

@@ -92,6 +92,7 @@ export type OperationType =
   | 'bic_lookup'
   | 'iban_compliance'
   | 'ch_clearing_lookup'
+  | 'gb_firm_lookup'
   | 'iban_format'
   | 'reference_validate'
   | 'address_check'

@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { normalizeIdentifier, classifyBicInput, classifyIidInput } from './input-normalize.js';
+import {
+  normalizeIdentifier,
+  classifyBicInput,
+  classifyFrnInput,
+  classifyIidInput,
+} from './input-normalize.js';
 
 describe('normalizeIdentifier', () => {
   it('retire les séparateurs que les agents recopient et passe en majuscules', () => {
@@ -69,5 +74,29 @@ describe('classifyIidInput', () => {
   });
   it('garde invalid_charset pour un cafouillage sans séparateur', () => {
     expect(classifyIidInput('a1b2c3')).toBe('invalid_charset');
+  });
+});
+
+describe('classifyFrnInput', () => {
+  it('rend null sur ce que la route accepte déjà : 6 ou 7 chiffres', () => {
+    expect(classifyFrnInput('123456')).toBeNull();
+    expect(classifyFrnInput('1234567')).toBeNull();
+  });
+  it('reconnaît le gabarit OpenAPI collé tel quel', () => {
+    expect(classifyFrnInput('{frn}')).toBe('placeholder_literal');
+  });
+  it('compte comme normalisable ce qu’un agent recopie du registre', () => {
+    expect(classifyFrnInput('FRN 123456')).toBe('normalizable');
+    expect(classifyFrnInput('123 456')).toBe('normalizable');
+    expect(classifyFrnInput('123-456')).toBe('normalizable');
+  });
+  it('refuse une référence d’individu : lettres en tête, jamais transmise au registre', () => {
+    expect(classifyFrnInput('ABC01234')).toBe('invalid_charset');
+  });
+  it('sépare trop court, trop long, non numérique et texte libre', () => {
+    expect(classifyFrnInput('12345')).toBe('too_short');
+    expect(classifyFrnInput('12345678')).toBe('too_long');
+    expect(classifyFrnInput('abcdef')).toBe('not_numeric');
+    expect(classifyFrnInput('firm 123456 london')).toBe('not_an_identifier');
   });
 });
