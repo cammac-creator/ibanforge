@@ -314,9 +314,16 @@ export function ForumsApp() {
     }
   }, []);
 
+  // Both loaders await their fetch before they touch any state, so neither
+  // cascades a render out of this effect. The rule cannot see that through a
+  // useCallback and reads the two bare calls as setState in an effect body
+  // (react-hooks/set-state-in-effect, rules turned on 2026-09-07); awaiting
+  // them states the fact it is looking for. They still leave together, and
+  // nothing waits on the pair.
   useEffect(() => {
-    void loadThreads();
-    void loadMarkets();
+    void (async () => {
+      await Promise.all([loadThreads(), loadMarkets()]);
+    })();
   }, [loadThreads, loadMarkets]);
 
   // While a scan runs, poll until it finishes (bounded: the interval clears

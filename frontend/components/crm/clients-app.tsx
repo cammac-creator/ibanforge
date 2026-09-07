@@ -75,29 +75,31 @@ export function ClientsApp({
   locale: string;
   windowDays?: number;
 }) {
+  // ⌘K deep link: /clients?open=<email> lands with that dossier open. Filter
+  // widens to 'all' so a silent-key customer is not hidden by the default view.
+  //
+  // Read on the first render rather than from a mount effect: the page is
+  // force-dynamic, so the server and the browser read the same query string
+  // and the dossier is open on the first paint instead of one render later —
+  // the cascading render react-hooks/set-state-in-effect names (rules turned
+  // on 2026-09-07). Only the first render's answer is used, exactly as the
+  // mount effect's was.
+  const searchParams = useSearchParams();
+  const linkedId = useMemo(() => {
+    const wanted = searchParams.get('open')?.toLowerCase();
+    if (!wanted) return null;
+    return dossiers.find((d) => d.id === wanted || d.email.toLowerCase() === wanted)?.id ?? null;
+  }, [searchParams, dossiers]);
+
   // Freshness first: the operator's default question is "who moved lately?",
   // not "who is biggest?" (explicit ask, 18/08/2026).
   const [sort, setSort] = useState<SortKey>('freshness');
   const [dir, setDir] = useState<SortDir>(SORT_DEFAULT_DIR.freshness);
-  const [filter, setFilter] = useState<Filter>('used');
+  const [filter, setFilter] = useState<Filter>(() => (linkedId ? 'all' : 'used'));
   const [query, setQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
   const [stateMenuOpen, setStateMenuOpen] = useState(false);
-  const [openId, setOpenId] = useState<string | null>(null);
-
-  // ⌘K deep link: /clients?open=<email> lands with that dossier open. Filter
-  // widens to 'all' so a silent-key customer is not hidden by the default view.
-  const searchParams = useSearchParams();
-  useEffect(() => {
-    const wanted = searchParams.get('open')?.toLowerCase();
-    if (!wanted) return;
-    const hit = dossiers.find((d) => d.id === wanted || d.email.toLowerCase() === wanted);
-    if (hit) {
-      setFilter('all');
-      setOpenId(hit.id);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const [openId, setOpenId] = useState<string | null>(() => linkedId);
 
   /**
    * The dossiers that are customers. Everything counted on this page is counted

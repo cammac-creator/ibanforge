@@ -15,20 +15,30 @@ interface Note {
 }
 
 export function ContactNotes({ email }: { email: string }) {
-  const [notes, setNotes] = useState<Note[] | null>(null);
+  /**
+   * The notes AND the address they were loaded for, held as one value.
+   *
+   * While another address is being fetched the list is not empty, it is
+   * unknown, and that used to be said with a setNotes(null) written from the
+   * effect body — the cascading render react-hooks/set-state-in-effect names
+   * (rules turned on 2026-09-07). Read off the pair instead, the « … » shows on
+   * the very render the address changes rather than one after it, so a dossier
+   * can no longer flash the previous contact's notes.
+   */
+  const [loaded, setLoaded] = useState<{ email: string; notes: Note[] } | null>(null);
+  const notes = loaded?.email === email ? loaded.notes : null;
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    setNotes(null);
     fetch(`/api/crm/contact-notes?email=${encodeURIComponent(email)}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((j: { notes?: Note[] } | null) => {
-        if (!cancelled) setNotes(j?.notes ?? []);
+        if (!cancelled) setLoaded({ email, notes: j?.notes ?? [] });
       })
       .catch(() => {
-        if (!cancelled) setNotes([]);
+        if (!cancelled) setLoaded({ email, notes: [] });
       });
     return () => {
       cancelled = true;
@@ -47,7 +57,13 @@ export function ContactNotes({ email }: { email: string }) {
       });
       if (r.ok) {
         const { id } = (await r.json()) as { id: number };
-        setNotes((prev) => [{ id, note, created_at: new Date().toISOString() }, ...(prev ?? [])]);
+        setLoaded((prev) => ({
+          email,
+          notes: [
+            { id, note, created_at: new Date().toISOString() },
+            ...(prev?.email === email ? prev.notes : []),
+          ],
+        }));
         setDraft('');
       }
     } finally {
@@ -60,7 +76,10 @@ export function ContactNotes({ email }: { email: string }) {
     setBusy(true);
     try {
       const r = await fetch(`/api/crm/contact-notes?id=${id}`, { method: 'DELETE' });
-      if (r.ok) setNotes((prev) => (prev ?? []).filter((n) => n.id !== id));
+      if (r.ok)
+        setLoaded((prev) =>
+          prev ? { ...prev, notes: prev.notes.filter((n) => n.id !== id) } : prev,
+        );
     } finally {
       setBusy(false);
     }

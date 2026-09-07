@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { sortBots, type BotDossier, type BotSortKey, type BotVerdict } from '@/lib/crm/bot-dossiers';
 import { clientsForBot } from '@/lib/crm/agent-bridge';
@@ -65,32 +65,34 @@ export function BotsApp({
   clients?: BridgeClient[];
   locale?: string;
 }) {
-  const [sort, setSort] = useState<BotSortKey>('requests');
-  const [filter, setFilter] = useState<BotVerdict | 'all'>('all');
-  const [query, setQuery] = useState('');
-  const [openId, setOpenId] = useState<string | null>(null);
-  // Nearly two hundred agents clear the floor. Rendering them all made a page
-  // twenty-five thousand pixels tall, where the dozen that matter were
-  // indistinguishable from the tail. Nothing is hidden, only folded.
-  const [showAll, setShowAll] = useState(false);
-
   // Deep link from the Clients tab: /clients-bot?ua=<agent> lands with that
   // dossier open. The agent string is the dossier's primary key and is compared
   // verbatim — folding case here would open the wrong row, or none.
+  //
+  // Read on the first render rather than from a mount effect: the page is
+  // force-dynamic, so the server and the browser read the same query string
+  // and the landing state is right from the first paint instead of one render
+  // later — the cascading render react-hooks/set-state-in-effect names (rules
+  // turned on 2026-09-07). Only the first render's answer is used, exactly as
+  // the mount effect's was.
   const searchParams = useSearchParams();
-  useEffect(() => {
+  const linkedId = useMemo(() => {
     const wanted = searchParams.get(AGENT_PARAM);
-    if (!wanted) return;
-    const hit = bots.find((b) => b.id === wanted);
-    if (hit) {
-      // The agent may sit below the fold or outside the current filter; widen
-      // and unfold so the link never lands on a page that looks empty.
-      setFilter('all');
-      setShowAll(true);
-      setOpenId(hit.id);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    return wanted ? (bots.find((b) => b.id === wanted)?.id ?? null) : null;
+  }, [searchParams, bots]);
+
+  const [sort, setSort] = useState<BotSortKey>('requests');
+  // The filter opens on 'all' whether or not a link points at an agent, which
+  // is what the deep link needed of it: nothing is filtered out on landing.
+  const [filter, setFilter] = useState<BotVerdict | 'all'>('all');
+  const [query, setQuery] = useState('');
+  const [openId, setOpenId] = useState<string | null>(() => linkedId);
+  // Nearly two hundred agents clear the floor. Rendering them all made a page
+  // twenty-five thousand pixels tall, where the dozen that matter were
+  // indistinguishable from the tail. Nothing is hidden, only folded — except
+  // for a deep link, whose agent may sit below the fold, and which must never
+  // land on a page that looks empty.
+  const [showAll, setShowAll] = useState(() => linkedId !== null);
 
   // Computed once per bot list, not per render of an open panel.
   const crossingsByBot = useMemo(() => {
