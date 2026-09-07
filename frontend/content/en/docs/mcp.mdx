@@ -1,6 +1,6 @@
 ---
 title: "MCP Integration"
-description: "Connect IBANforge to Claude, Cursor and any MCP agent: the ibanforge-mcp npm package, a hosted endpoint with nothing to install, eight tools, and results that say what to do next."
+description: "Connect IBANforge to Claude, Cursor and any MCP agent: the ibanforge-mcp npm package, a hosted endpoint with nothing to install, eleven tools, and results that say what to do next."
 order: 5
 ---
 
@@ -40,7 +40,7 @@ claude mcp add ibanforge -e IBANFORGE_API_KEY=ifk_your_key -- npx -y ibanforge-m
 
 The key is optional and free: [create one](/) with an email address (200 requests/month, no card). Without a key the server still starts, and paid tools answer with x402 payment instructions that an agent holding USDC on Base can settle per call.
 
-After saving, restart the client. Eight IBANforge tools appear in the tools menu.
+After saving, restart the client. Eleven IBANforge tools appear in the tools menu (nine on the hosted endpoint below — see the note under audit_status).
 
 ## Option 2 — the hosted endpoint (nothing to install)
 
@@ -52,7 +52,7 @@ Streamable HTTP transport, **10 free tool calls per IP per day**, no key at all:
 
 On the official MCP registry the server is listed as `io.github.cammac-creator/ibanforge`.
 
-## The eight tools
+## The eleven tools
 
 ### validate_iban
 
@@ -120,6 +120,24 @@ Check a Swiss QR-bill payload, the text inside the QR code (it starts with `SPC`
 { "payload": "SPC\n0200\n1\nCH4431999123000889012\nS\nRobert Schneider AG\nRue du Lac\n1268\n2501\nBiel\nCH\n\n\n\n\n\n\n\n1949.75\nCHF\nS\nPia Rutschmann\nMarktgasse\n28\n9400\nRorschach\nCH\nQRR\n210000000003139471430009017\nOrder 15.06.2026\nEPD" }
 ```
 
+### audit_creditor_file
+
+Audit an entire creditor/supplier payment file (CSV or XLSX) row by row: IBAN structure and checksum, bank code against the national register, bank name and BIC, SEPA reachability and issuer type, plus checks a single IBAN call cannot make because they need the whole file — duplicate IBANs, the BIC the file carries against the BIC the register derives, address country against IBAN country, and Swiss structured-address conformity ahead of the 14 November 2026 deadline. Returns a **free preview only** (masked IBANs, summary counts, up to 20 rows) — the full annotated `.xlsx` report is a paid deliverable (149 CHF up to 5,000 rows, 349 CHF up to 20,000) settled through a one-off Stripe Checkout Session, never paid automatically. Pass `checkout: true` to also get the Checkout URL for a human to open. Base64-encode the file and send it as `file_base64`; files over 5 MB are refused locally, before any network call.
+
+```json
+{ "file_base64": "Tm9tO0lCQU4KU29jaWV0ZSBBbHBoYTtDSDEwMDAyMzAwMDAwMDAwMTIzNDUK", "filename": "creditors.csv", "lang": "en" }
+```
+
+### audit_status
+
+Check the status of a creditor-file audit job created by audit_creditor_file: whether it is paid, and the download link once it is. Pass the `session_id` from the Checkout URL's success redirect to confirm a just-completed payment immediately, without waiting for the webhook. Free.
+
+```json
+{ "job": "42aefe9921c83ff967591a89a013598aea91", "session_id": "cs_test_..." }
+```
+
+*`audit_creditor_file` and `audit_status` are on the npm package (Option 1) only, for now — not yet on the hosted HTTP endpoint (Option 2).*
+
 ### send_feedback
 
 Report a wrong result, stale or missing data, or anything blocking you from using or PAYING for the service, straight to the operators. Free, and it keeps working after the daily free-tier allowance is spent: capping the complaint box with the limit that produced the complaint would silence the reports it exists for. A human reads every one; a verified data error on a paid x402 call is refunded on-chain. `error_type` and `notes` are required, the rest is optional.
@@ -162,7 +180,7 @@ Every validation result carries an ordered `next_steps` field: what blocks a pay
 ## Notes
 
 - The npm package is a thin client for `api.ibanforge.com`: the data lives server-side, there is nothing to download, and results always reflect the latest register refresh.
-- All eight tools return the same JSON as the REST API, both as text and as MCP `structuredContent`.
+- All eleven tools return the same JSON as the REST API, both as text and as MCP `structuredContent` (nine of them on the hosted HTTP endpoint — see the note under audit_status).
 - Releases are published on [npm](https://www.npmjs.com/package/ibanforge-mcp) and mirrored to the MCP registry.
 
 Related: [Recipes](/docs/recipes) · [What "verified" means](/docs/iban-validate) · [Data sources](/docs/data-sources)

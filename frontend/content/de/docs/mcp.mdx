@@ -1,6 +1,6 @@
 ---
 title: "MCP-Integration"
-description: "IBANforge mit Claude, Cursor und jedem MCP-Agenten verbinden: das npm-Paket ibanforge-mcp, ein gehosteter Endpoint ohne Installation, acht Tools und Ergebnisse, die sagen, was als Nächstes zu tun ist."
+description: "IBANforge mit Claude, Cursor und jedem MCP-Agenten verbinden: das npm-Paket ibanforge-mcp, ein gehosteter Endpoint ohne Installation, elf Tools und Ergebnisse, die sagen, was als Nächstes zu tun ist."
 order: 5
 ---
 
@@ -40,7 +40,7 @@ claude mcp add ibanforge -e IBANFORGE_API_KEY=ifk_ihr_schluessel -- npx -y ibanf
 
 Der Schlüssel ist optional und kostenlos: [hier erstellen](/) mit einer E-Mail-Adresse (200 Anfragen/Monat, ohne Karte). Ohne Schlüssel startet der Server trotzdem, und kostenpflichtige Tools antworten mit x402-Zahlungsanweisungen, die ein Agent mit USDC auf Base pro Aufruf begleichen kann.
 
-Nach dem Speichern den Client neu starten. Acht IBANforge-Tools erscheinen im Tool-Menü.
+Nach dem Speichern den Client neu starten. Elf IBANforge-Tools erscheinen im Tool-Menü (neun auf dem gehosteten Endpoint unten — siehe Hinweis unter audit_status).
 
 ## Option 2 — der gehostete Endpoint (nichts zu installieren)
 
@@ -52,7 +52,7 @@ Streamable-HTTP-Transport, **10 kostenlose Tool-Aufrufe pro IP und Tag**, ganz o
 
 Im offiziellen MCP-Registry ist der Server als `io.github.cammac-creator/ibanforge` gelistet.
 
-## Die acht Tools
+## Die elf Tools
 
 ### validate_iban
 
@@ -120,6 +120,24 @@ Prüft die Nutzdaten einer Swiss-QR-Rechnung, den Text im QR-Code (er beginnt mi
 { "payload": "SPC\n0200\n1\nCH4431999123000889012\nS\nRobert Schneider AG\nRue du Lac\n1268\n2501\nBiel\nCH\n\n\n\n\n\n\n\n1949.75\nCHF\nS\nPia Rutschmann\nMarktgasse\n28\n9400\nRorschach\nCH\nQRR\n210000000003139471430009017\nOrder 15.06.2026\nEPD" }
 ```
 
+### audit_creditor_file
+
+Prüft eine gesamte Kreditoren-/Lieferantendatei (CSV oder XLSX) zeilenweise: IBAN-Struktur und Prüfziffer, Bankcode gegen das Nationalregister, Bankname und BIC, SEPA-Erreichbarkeit und Emittententyp, plus Prüfungen, die ein einzelner IBAN-Aufruf nicht leisten kann, weil sie die ganze Datei brauchen — doppelte IBANs, der von der Datei mitgeführte BIC gegen den vom Register abgeleiteten BIC, Adressland gegen IBAN-Land, und die Konformität strukturierter Schweizer Adressen vor der Frist am 14. November 2026. Liefert **nur eine kostenlose Vorschau** (maskierte IBANs, Summenzahlen, bis zu 20 Zeilen) — der vollständige annotierte `.xlsx`-Bericht ist eine kostenpflichtige Leistung (149 CHF bis 5'000 Zeilen, 349 CHF bis 20'000), beglichen über eine einmalige Stripe-Checkout-Session, nie automatisch bezahlt. Mit `checkout: true` wird zusätzlich die Checkout-URL zurückgegeben, die ein Mensch öffnet. Die Datei base64-kodiert als `file_base64` senden; Dateien über 5 MB werden lokal abgelehnt, vor jedem Netzwerkaufruf.
+
+```json
+{ "file_base64": "Tm9tO0lCQU4KU29jaWV0ZSBBbHBoYTtDSDEwMDAyMzAwMDAwMDAwMTIzNDUK", "filename": "kreditoren.csv", "lang": "de" }
+```
+
+### audit_status
+
+Prüft den Status eines von audit_creditor_file erstellten Audit-Jobs: ob bezahlt wurde, und den Download-Link, sobald bezahlt ist. Die `session_id` aus der Erfolgs-Weiterleitung der Checkout-URL übergeben, um eine gerade abgeschlossene Zahlung sofort zu bestätigen, ohne auf den Webhook zu warten. Kostenlos.
+
+```json
+{ "job": "42aefe9921c83ff967591a89a013598aea91", "session_id": "cs_test_..." }
+```
+
+*`audit_creditor_file` und `audit_status` gibt es vorerst nur im npm-Paket (Option 1) — noch nicht auf dem gehosteten HTTP-Endpoint (Option 2).*
+
 ### send_feedback
 
 Ein falsches Ergebnis, veraltete oder fehlende Daten oder alles, was Sie an der Nutzung oder an der BEZAHLUNG des Dienstes hindert, direkt an die Betreiber melden. Kostenlos, und das Tool antwortet auch dann noch, wenn das kostenlose Tageskontingent aufgebraucht ist: den Beschwerdekasten mit genau der Grenze zu deckeln, die die Beschwerde auslöst, würde die Meldungen zum Schweigen bringen, für die er da ist. Ein Mensch liest jede Meldung; ein nachgewiesener Datenfehler bei einem bezahlten x402-Aufruf wird on-chain erstattet. `error_type` und `notes` sind Pflicht, der Rest ist optional.
@@ -162,7 +180,7 @@ Jedes Validierungsergebnis trägt ein geordnetes Feld `next_steps`: Was eine Zah
 ## Hinweise
 
 - Das npm-Paket ist ein schlanker Client für `api.ibanforge.com`: Die Daten leben serverseitig, nichts herunterzuladen, und Ergebnisse spiegeln stets die letzte Registeraktualisierung.
-- Alle acht Tools liefern dasselbe JSON wie die REST-API, als Text und als MCP-`structuredContent`.
+- Alle elf Tools liefern dasselbe JSON wie die REST-API, als Text und als MCP-`structuredContent` (neun davon auf dem gehosteten HTTP-Endpoint — siehe Hinweis unter audit_status).
 - Releases erscheinen auf [npm](https://www.npmjs.com/package/ibanforge-mcp) und werden ins MCP-Registry gespiegelt.
 
 Siehe auch: [Rezepte](/docs/recipes) · [Was „verified" bedeutet](/docs/iban-validate) · [Datenquellen](/docs/data-sources)

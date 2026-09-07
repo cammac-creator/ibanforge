@@ -16,6 +16,8 @@ Official **Model Context Protocol (MCP) server** for [IBANforge](https://ibanfor
 | `check_compliance`    | Full compliance check: IBAN + sanctions (OFAC) + SEPA Instant + VoP + risk score (0-100)                                 | 0.02        |
 | `validate_payment_reference` | Validate a structured payment reference — RF/ISO 11649 ("SCOR"), Swiss QR reference ("QRR"), Belgian OGM/VCS, Finnish viitenumero — each against the dated document that publishes the rule. Supply an IBAN to get the QRR↔QR-IBAN pairing verdict (billed as one `validate_iban` call) | free |
 | `check_postal_address` | Check a structured ISO 20022 postal address against SPS (SIX), HVPS+ (T2) or Fedwire rules ahead of the November 2026 changes — every finding cites its source document and date | free |
+| `audit_creditor_file` | Audit an entire creditor/supplier file (CSV/XLSX): IBAN, bank, BIC, SEPA reach and address conformity per row, plus file-wide checks (duplicates, BIC mismatch, address vs. IBAN country). Free preview with masked IBANs; the full annotated report is a paid deliverable | free preview (report: CHF via Stripe) |
+| `audit_status`        | Check payment status of an audit job created by `audit_creditor_file` and get the report download link once paid          | free        |
 | `send_feedback`       | Report incorrect data, or claim the refund the x402 terms promise when a paid answer was wrong                            | free        |
 
 ## Installation
