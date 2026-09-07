@@ -30,6 +30,12 @@ export default async function Page({
         href="https://fonts.gstatic.com"
         crossOrigin=""
       />
+      {/* @next/next/no-page-custom-font warns that a font declared in a page
+          loads for that page only. Under the App Router that is the intent:
+          this route is a standalone mockup with its own three families, there
+          is no pages/_document.js to hoist them into, and the router lifts the
+          tag into <head> for this route alone. */}
+      {/* eslint-disable-next-line @next/next/no-page-custom-font */}
       <link
         href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700;12..96,800&family=JetBrains+Mono:wght@400;500;700&family=Familjen+Grotesk:wght@400;500;600&display=swap"
         rel="stylesheet"
