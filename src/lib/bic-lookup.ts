@@ -18,6 +18,9 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // this line claimed — stale by a factor of three, and the kind of number that
 // gets quoted outward. scripts/audit/curated-map-consistency.test.ts now pins
 // a floor so the prose cannot drift that far from the file again.
+// 07/09/2026: GL:6471 (Grønlandsbanken) added by hand — the one Greenlandic
+// registration number the Danish FSA's register and Greenlandic institutions'
+// published account details agree on; see docs/data-sources.md.
 // Format: { "COUNTRY:bank_code": { bic, bank_name?, city? } }
 // ---------------------------------------------------------------------------
 
