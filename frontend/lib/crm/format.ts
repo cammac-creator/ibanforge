@@ -49,6 +49,41 @@ export function formatStamp(raw: string | null | undefined): string | null {
 }
 
 /**
+ * The stored day as 'YYYY-MM-DD', or null when the stamp does not carry one.
+ *
+ * Not a display format — the one thing in this file that is meant to be
+ * COMPARED rather than read. Two stamps in this shape sort as strings exactly
+ * as they sort in time, which is what lets the journal window a period and
+ * shelve a day without ever building a Date (lib/crm/journal.ts), the same way
+ * the admin endpoint's `since` cut compares msg_date as text.
+ *
+ * Null rather than the raw string, unlike the two formatters above: a caller
+ * that cannot read a day needs to DROP the row, not print it. Handing back
+ * something unparseable would put it in every window at once, since almost any
+ * string compares greater than a date.
+ */
+export function isoDay(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const m = STAMP.exec(raw);
+  return m ? `${m[1]}-${m[2]}-${m[3]}` : null;
+}
+
+/**
+ * The ISO day `delta` days away from an ISO day, e.g. the start of a window.
+ *
+ * UTC arithmetic on the parsed digits, the same idiom as dayLabel below and
+ * for the same reason: this runs on a server and again in a browser two zones
+ * away, and a local-time Date would put the boundary on different days on each
+ * side of hydration. Returns null on anything that is not an ISO day.
+ */
+export function shiftDay(isoDayValue: string, delta: number): string | null {
+  const m = STAMP.exec(isoDayValue);
+  if (!m) return null;
+  const at = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])) + delta * 86_400_000;
+  return new Date(at).toISOString().slice(0, 10);
+}
+
+/**
  * Day alone, e.g. '04/07'. Used where the time would be noise, such as the
  * first-contact anchor in the situation banner. Same null and fallback
  * behaviour as formatStamp.

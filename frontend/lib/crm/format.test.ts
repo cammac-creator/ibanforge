@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { dayLabel, formatDay, formatStamp } from './format';
+import { dayLabel, formatDay, formatStamp, isoDay, shiftDay } from './format';
 
 describe('formatStamp', () => {
   it('renders day, month and time from the stored shape', () => {
@@ -60,5 +60,45 @@ describe('dayLabel — the shelf between two days, decided against one clock', (
   it('answers nothing on an undatable stamp', () => {
     expect(dayLabel('date inconnue', '2026-09-04')).toBeNull();
     expect(dayLabel(null, '2026-09-04')).toBeNull();
+  });
+});
+
+describe('isoDay — the one value in this file meant to be compared', () => {
+  it('reads the day out of every stamp shape the ingester writes', () => {
+    expect(isoDay('2026-09-07T08:15:00')).toBe('2026-09-07');
+    expect(isoDay('2026-09-07 08:15')).toBe('2026-09-07');
+    expect(isoDay('2026-09-07')).toBe('2026-09-07');
+  });
+
+  it('sorts as a string exactly as it sorts in time', () => {
+    // The whole reason this exists: the journal windows a period and shelves a
+    // day with `>=` on these values, never with a Date.
+    expect(isoDay('2026-09-07')! > isoDay('2026-08-31')!).toBe(true);
+    expect(isoDay('2027-01-01')! > isoDay('2026-12-31')!).toBe(true);
+  });
+
+  it('answers null rather than the raw string, unlike the formatters above', () => {
+    // A caller that cannot read a day has to DROP the row: almost any string
+    // compares greater than a date, so a fallback would land it in every window.
+    expect(isoDay('hier soir')).toBeNull();
+    expect(isoDay('')).toBeNull();
+    expect(isoDay(null)).toBeNull();
+  });
+});
+
+describe('shiftDay', () => {
+  it('walks calendar days, across a month and a year', () => {
+    expect(shiftDay('2026-09-07', -6)).toBe('2026-09-01');
+    expect(shiftDay('2026-09-07', -13)).toBe('2026-08-25');
+    expect(shiftDay('2026-01-01', -1)).toBe('2025-12-31');
+    expect(shiftDay('2026-09-07', 1)).toBe('2026-09-08');
+  });
+
+  it('lands on the leap day rather than beside it', () => {
+    expect(shiftDay('2028-03-01', -1)).toBe('2028-02-29');
+  });
+
+  it('answers null on anything that is not an ISO day', () => {
+    expect(shiftDay('pas une date', -7)).toBeNull();
   });
 });
