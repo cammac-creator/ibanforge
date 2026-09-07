@@ -24,6 +24,7 @@ import {
   SANCTIONED_COUNTRIES_SECTORAL,
 } from '../src/lib/compliance-static.js';
 import { validateBIC } from '../src/lib/bic-validator.js';
+import { carryOverList, CARRY_OVER_MAX_AGE_DAYS, type CarryOverResult } from './compliance-carry-over.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = resolve(__dirname, '../data');
@@ -73,6 +74,34 @@ async function fetchWithTimeout(url: string, timeoutMs = 60_000): Promise<Respon
 // ---------------------------------------------------------------------------
 // Helper: download file to disk
 // ---------------------------------------------------------------------------
+
+/**
+ * Say, in the run log, what became of a list whose download failed. A carried
+ * list ships stale rows on purpose (see compliance-carry-over.ts); the log is
+ * where a reader of the workflow learns that the week's database is not
+ * uniformly fresh, and the `carried_over` metadata key is where an auditor of
+ * the shipped file learns it.
+ */
+function reportCarryOver(list: string, result: CarryOverResult): void {
+  switch (result.reason) {
+    case 'carried':
+      console.warn(
+        `  ${list}: carried over ${result.rows} rows from the previous database (refreshed ${result.previousRefresh}); the list ships stale, recorded in metadata.carried_over`,
+      );
+      return;
+    case 'previous_too_old':
+      console.warn(
+        `  ${list}: NOT carried over — the previous database (${result.previousRefresh ?? 'undated'}) is older than ${CARRY_OVER_MAX_AGE_DAYS} days; the list is dropped and the claims gate will fail this run`,
+      );
+      return;
+    case 'no_rows':
+      console.warn(`  ${list}: nothing to carry over (the previous database held no rows for it)`);
+      return;
+    case 'no_previous_db':
+      console.warn(`  ${list}: nothing to carry over (no previous database to read)`);
+      return;
+  }
+}
 
 async function downloadFile(url: string, dest: string): Promise<void> {
   const response = await fetchWithTimeout(url, 120_000);
@@ -504,6 +533,7 @@ async function fetchPrimarySanctions(db: Database.Database): Promise<SanctionsTa
       console.log(`  EU: ${batch.length} bank BICs kept (${unresolved} not in our directory)`);
     } catch (err) {
       console.warn(`  WARNING: EU download/parse failed: ${(err as Error).message}`);
+      reportCarryOver('EU', carryOverList(db, FINAL_DB_PATH, 'EU'));
     }
 
     // ---- UN SC consolidated XML (best-effort) ----
@@ -525,6 +555,7 @@ async function fetchPrimarySanctions(db: Database.Database): Promise<SanctionsTa
       console.log(`  UN: ${batch.length} bank BICs kept (${unresolved} not in our directory)`);
     } catch (err) {
       console.warn(`  WARNING: UN download/parse failed: ${(err as Error).message}`);
+      reportCarryOver('UN', carryOverList(db, FINAL_DB_PATH, 'UN'));
     }
 
     // ---- SECO (CH) consolidated list — XML (best-effort) ----
@@ -546,6 +577,7 @@ async function fetchPrimarySanctions(db: Database.Database): Promise<SanctionsTa
       console.log(`  SECO: ${batch.length} bank BICs kept (${unresolved} not in our directory)`);
     } catch (err) {
       console.warn(`  WARNING: SECO download/parse failed: ${(err as Error).message}`);
+      reportCarryOver('SECO', carryOverList(db, FINAL_DB_PATH, 'SECO'));
     }
   } finally {
     bicDB.close();
