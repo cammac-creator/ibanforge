@@ -29,6 +29,8 @@ import { ibanBatch } from './routes/iban-batch.js';
 import { bicLookup } from './routes/bic-lookup.js';
 import { ibanCompliance } from './routes/iban-compliance.js';
 import { chClearing } from './routes/ch-clearing.js';
+import { gbFirm, fcaConfiguredGuard } from './routes/gb-firm.js';
+import { isFcaRegisterConfigured } from './lib/fca-register.js';
 import { health } from './routes/health.js';
 import { stats } from './routes/stats.js';
 import { adminBusiness } from './routes/admin-business.js';
@@ -76,7 +78,11 @@ import { adminAuditStats } from './routes/admin-audit-stats.js';
 import { adminSearchConsole } from './routes/admin-search-console.js';
 import { rateLimitMiddleware } from './middleware/rate-limit.js';
 import { recordRequest, classifyClient, hashIp, extractClientIp } from './lib/stats.js';
-import { bicGuardMiddleware, iidGuardMiddleware } from './middleware/identifier-guard.js';
+import {
+  bicGuardMiddleware,
+  frnGuardMiddleware,
+  iidGuardMiddleware,
+} from './middleware/identifier-guard.js';
 import { notFoundHandler } from './lib/not-found.js';
 import { getEntryCount, getChClearingCount, getLeiEnrichedCount } from './lib/bic-lookup.js';
 import { getPraBanksCount, praAttribution } from './lib/pra-banks.js';
@@ -178,6 +184,17 @@ function buildLlmsTxt(): string {
   const praSourceLine = praCredit
     ? `- UK deposit-taking authorisation: ${praCredit}, used with the Bank of England's written permission`
     : '- UK deposit-taking authorisation: not currently loaded';
+  // The FCA register is not a loaded dataset but a per-request call, so what
+  // varies is whether THIS deployment holds the credential. Read at request
+  // time like the counts above: a literal "enabled" would lie on every laptop
+  // and on the day the key is rotated out.
+  const gbFirmConfigured = isFcaRegisterConfigured();
+  const gbFirmStatusLine = gbFirmConfigured
+    ? 'Enabled on this deployment.'
+    : 'Not enabled on this deployment yet: answers 503 not_configured before any credential is read, so nothing is charged.';
+  const gbFirmSourceLine = gbFirmConfigured
+    ? "- UK regulated firms (GET /v1/gb/firm/:frn): FCA Financial Services Register, one firm per request through the Register API under the FCA's written permission of 07/09/2026, never for marketing, cached one day at most; the register prevails and the FCA accepts no liability"
+    : '- UK regulated firms (GET /v1/gb/firm/:frn): FCA Financial Services Register, route present, Register API credential not configured on this deployment';
   // Official identity (ECB + Banco de España). Counts AND dates come from the
   // serving database: both lists are republished every business day, so a
   // literal here is stale within the week — and the date is half of what makes
@@ -269,6 +286,7 @@ function buildLlmsTxt(): string {
 - Swiss clearing: SIX BankMaster (BC-Nummer / IID)
 - National bank-code registers: Deutsche Bundesbank (attribution wording per its terms: Quelle: Deutsche Bundesbank), Oesterreichische Nationalbank, Banque nationale de Belgique, Finance Finland${bgSourceLine}${skSourceLine}${smSourceLine}
 ${praSourceLine}
+${gbFirmSourceLine}
 ${identitySourceLines}
 ${psdSourceLine}
 - Compliance signals: OFAC, EU, UN, FATF, EPC (Verification of Payee)
@@ -320,6 +338,7 @@ This single call exercises the 3 USPs (Swiss BC-Nummer, EMI/vIBAN classification
 - GET /v1/bic/:code — BIC/SWIFT lookup ($0.003 USDC)
 - POST /v1/iban/compliance — full compliance check ($0.02 USDC)
 - GET /v1/ch/clearing/:iid — Swiss clearing lookup ($0.003 USDC)
+- GET /v1/gb/firm/:frn — one UK-regulated firm by Firm Reference Number, from the FCA Financial Services Register: name, status and its date, business type, Companies House number, PSD/EMD status, notices; credited, dated, cached one day ($0.003 USDC). ${gbFirmStatusLine}
 - GET /v1/iban/format?iban=... — free format check (mod-97 + structure)
 - GET /v1/iban/structure[/:country] — free IBAN templates for ${countryCount} countries
 - GET|POST /v1/reference/validate — FREE structured payment reference validation: RF/ISO 11649 ("SCOR"), Swiss QR reference ("QRR"), Belgian OGM/VCS, Finnish viitenumero, each judged against the dated primary document that publishes the rule. Add the reference to a paid /v1/iban/validate call to get the QRR↔QR-IBAN pairing verdict.
@@ -859,6 +878,15 @@ export function buildApp(): Hono<HonoEnv> {
   app.route('/', stripeRetrieve);
   app.route('/', stripeSuccess);
 
+  // The FCA register lookup, while this deployment holds no Register API
+  // credential: 503 `not_configured` for everyone, BEFORE any key, trial or
+  // payment is read. The API-key middleware refunds 4xx only (by policy — a
+  // 5xx is charged so infrastructure failures cannot hide), so a 503 raised
+  // after it would bill a key for a route that cannot serve. Once the two
+  // FCA_REGISTER_* variables are set the guard is a no-op and the route takes
+  // the same paywall as /v1/bic/:code. See src/routes/gb-firm.ts.
+  app.get('/v1/gb/firm/:frn', fcaConfiguredGuard());
+
   // API key middleware — checks Bearer ifk_* tokens before x402
   app.use('/v1/*', apiKeyMiddleware());
 
@@ -886,6 +914,7 @@ export function buildApp(): Hono<HonoEnv> {
   // le comptage des rejets. Détail : voir src/middleware/identifier-guard.ts.
   app.get('/v1/bic/:code', bicGuardMiddleware());
   app.get('/v1/ch/clearing/:iid', iidGuardMiddleware());
+  app.get('/v1/gb/firm/:frn', frnGuardMiddleware());
 
   // Paid routes
   app.route('/', ibanValidate);
@@ -893,6 +922,7 @@ export function buildApp(): Hono<HonoEnv> {
   app.route('/', bicLookup);
   app.route('/', ibanCompliance);
   app.route('/', chClearing);
+  app.route('/', gbFirm);
   // Bundle credits — POST /v1/credits/buy/:bundle is gated by the x402
   // middleware above. When the agent paid, this handler mints a key.
   app.route('/', creditsBuy);

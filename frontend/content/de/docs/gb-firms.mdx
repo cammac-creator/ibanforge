@@ -1,0 +1,126 @@
+---
+title: "Britische Institute (FCA-Register)"
+description: "Den aufsichtsrechtlichen Status eines britischen Zahlungs-, E-Geld- oder Einlageninstituts über seine Firm Reference Number bestätigen: eine Anfrage, ein Institut, bedient aus dem Register der FCA selbst unter ihrer schriftlichen Erlaubnis, bei jeder Antwort mit Quelle und Datum."
+order: 11
+---
+
+# Britische Institute — das Financial Services Register der FCA
+
+Jedes Institut, das die Financial Conduct Authority beaufsichtigt, trägt eine **Firm Reference Number** (FRN): sechs Ziffern, sieben bei den jüngsten Registrierungen. Die FRN steht auf der Website des Instituts, in seinen Bedingungen und im [Financial Services Register](https://register.fca.org.uk/), dem öffentlichen Verzeichnis darüber, wer im Vereinigten Königreich wozu zugelassen ist. `GET /v1/gb/firm/:frn` beantwortet eine Frage zu einem Institut: **Was sagt das Register heute über dieses Institut?**
+
+Das ist eine andere Frage als die des [PRA-Blocks](/docs/data-sources), den eine `GB`-IBAN oder ein `GB`-BIC bereits trägt. Die Liste der Bank of England nennt die rund dreihundert Banken, die Einlagen entgegennehmen dürfen; das Financial Services Register führt jedes beaufsichtigte Institut — Zahlungsinstitute, E-Geld-Emittenten, Credit Unions, Wertpapierfirmen, Appointed Representatives, Institute, deren Zulassung endete — mit Status und Datum.
+
+## Ein Aufruf
+
+```bash
+curl https://api.ibanforge.com/v1/gb/firm/123456 \
+  -H "Authorization: Bearer ifk_ihr_schluessel"
+```
+
+```json
+{
+  "frn": "123456",
+  "found": true,
+  "name": "Alpha Bank Example Ltd",
+  "status": "Authorised",
+  "status_effective_date": "2004-09-01",
+  "business_type": "Regulated",
+  "companies_house_number": "01234567",
+  "client_money_permission": null,
+  "sub_status": null,
+  "sub_status_effective_from": null,
+  "mlrs_status": null,
+  "mlrs_status_effective_date": null,
+  "psd_emd_status": "Authorised Payment Institution",
+  "psd_emd_effective_date": "2009-10-13",
+  "psd_agent_status": null,
+  "e_money_agent_status": null,
+  "mutual_society_number": null,
+  "notices": [],
+  "register_timestamp": "2026-09-07T11:25",
+  "source": "FCA Financial Services Register",
+  "source_url": "https://register.fca.org.uk/s/search?q=123456&type=Companies",
+  "retrieved_at": "2026-09-07T12:00:00.000Z",
+  "cache": { "hit": false, "stale": false, "expires_at": "2026-09-08T12:00:00.000Z" },
+  "disclaimer": "Data from the Financial Services Register, made available by the Financial Conduct Authority without warranty and with no liability accepted by the FCA. The register at register.fca.org.uk is the record that prevails: this answer is a dated copy of one firm entry and implies no endorsement by the FCA of IBANforge or of the firm.",
+  "cost_usdc": 0,
+  "processing_ms": 412.5
+}
+```
+
+Die Werte oben zeigen die Form — `Alpha Bank Example Ltd` ist ein Platzhalter, kein Institut. Verlässlich sind die Feldnamen und die vier Dinge, die jede Antwort trägt: die **Quelle**, das **Abrufdatum**, der **Cache-Zustand** und der **Haftungsausschluss** der FCA.
+
+**Kosten:** 0,003 $ je Anfrage, wie eine [BIC-Abfrage](/docs/bic-lookup) — eine Anfrage eines API-Schlüssels oder 0,003 USDC per x402. Eine Antwort aus dem Cache kostet so viel wie ein Aufruf des Registers: Verkauft wird die Antwort, nicht der Umweg.
+
+## Was das Register veröffentlicht, Feld für Feld
+
+| Feld | Bedeutung |
+|---|---|
+| `status` | Die Formulierung des Registers, wörtlich: `Authorised`, `No longer authorised`, `Appointed representative`, `Registered`, `EEA Authorised`… Nie in eine Aufzählung gepresst — die FCA ergänzt Status ohne Ankündigung. |
+| `status_effective_date` | Seit wann. `JJJJ-MM-TT`, wo sich das `tt/mm/jjjj` des Registers lesen ließ; sonst die Zeichenkette des Registers, nie verworfen. |
+| `business_type` | `Regulated`, `Appointed Representative`, `Registered`… |
+| `companies_house_number` | Die Handelsregisternummer, wenn das Register sie veröffentlicht. |
+| `client_money_permission` | Ob das Institut Kundengelder halten oder kontrollieren darf, in den Worten des Registers. |
+| `psd_emd_status`, `psd_emd_effective_date` | Der Status nach den Payment Services / E-Money Regulations: `Authorised Payment Institution`, `Small Electronic Money Institution`… Das Feld, an dem eine Zahlung an ein britisches Fintech hängt. |
+| `mlrs_status` | Die Registrierung nach den Money Laundering Regulations, für Institute unter dieser Aufsicht. |
+| `sub_status`, `sub_status_effective_from` | `In liquidation`, `In administration`… wenn das Register einen führt. |
+| `psd_agent_status`, `e_money_agent_status` | Agentenstatus, für Institute, die für einen Prinzipal handeln. |
+| `notices` | Die „exceptional information“ des Registers: die Hinweise `CAUTION` und `ATTENTION`, die die FCA an einen Eintrag hängt, Titel und Text wörtlich. Lesen — hier werden ein geklontes Institut oder ein Vergleichsverfahren angekündigt. |
+| `register_timestamp` | Wann die FCA den Eintrag zuletzt angefasst hat, in der Ortszeit des Registers. Es wird keine Zeitzone veröffentlicht, also wird keine erfunden. |
+
+Leere Zeichenketten des Registers sind hier `null`: Das Register veröffentlicht unter diesem Schlüssel für dieses Institut nichts, und eine leere Zeichenkette läse sich wie ein Wert.
+
+## Ein Fehlschlag
+
+```json
+{
+  "frn": "999999",
+  "found": false,
+  "note": "No firm carries this reference number in the Financial Services Register at the time of retrieval. An absent FRN is not a finding about anyone: check the number, then the register itself.",
+  "source": "FCA Financial Services Register",
+  "source_url": "https://register.fca.org.uk/s/search?q=999999&type=Companies",
+  "retrieved_at": "2026-09-07T12:00:00.000Z",
+  "cache": { "hit": false, "stale": false, "expires_at": "2026-09-08T12:00:00.000Z" },
+  "disclaimer": "…",
+  "cost_usdc": 0.003
+}
+```
+
+Ein Fehlschlag ist ein `200` mit `found: false`, mit Quelle, Datum und **berechnet wie ein Treffer** — absichtlich, aus demselben Grund, aus dem eine [BIC-Abfrage](/docs/bic-lookup) einen unbekannten Code so behandelt. Ein kostenloser Fehlschlag machte aus der Abfrage je Institut ein Abtasten des FRN-Raums auf Kosten des Registers, genau das, was die Erlaubnis der FCA ausschließt. Ein Fehlschlag wird wie ein Treffer einen Tag lang zwischengespeichert: Dieselbe Nummer erneut zu versuchen kostet das Register nichts.
+
+## Aktualität, und was `cache` sagt
+
+Jede Antwort ist der Eintrag des Registers **so, wie er zu `retrieved_at` abgerufen wurde**, und derselbe Eintrag wird vierundzwanzig Stunden lang erneut bedient — der „Cache von höchstens einem Tag“, der der FCA beschrieben wurde. `cache` lesen:
+
+- `hit: false` — das Register wurde für diese Antwort gefragt.
+- `hit: true, stale: false` — aus dem Tages-Cache bedient; `expires_at` sagt, bis wann.
+- `hit: true, stale: true` — das Register hat nicht geantwortet, und eine **abgelaufene** Kopie wurde bedient, nie mehr als sechs Stunden nach ihrem Tag. `retrieved_at` nennt ihr Alter. Nichts Älteres wird je bedient: Darüber hinaus antwortet der Aufruf `502`.
+
+## Die Erlaubnis und die vier Bedingungen
+
+Die Register-API wird unter der **schriftlichen Zustimmung des Register Team der FCA vom 7. September 2026** zu genau der Nutzung verwendet, die dieser Endpunkt umsetzt: eine Anfrage = ein Institut; Name, FRN, Status, Quelle und Abrufdatum bei jeder Antwort; keine Vergleichstabelle, keine Liste, keine Massenkopie; ein Cache von höchstens einem Tag; kein Anspruch auf eine Empfehlung. Die FCA hat vier Bedingungen daran geknüpft, und jede wird im Code gehalten, nicht in einem Versprechen:
+
+1. **Die Terms of Use der Register-API und ihre veröffentlichten Ratenlimits.** Eine Anfrage zur Zeit in Bearbeitung, ein Mindestabstand zwischen Aufrufen, eine einzige beachtete Wartezeit nach einem `429`, dann der Cache — nie ein Sturm von Wiederholungen.
+2. **Keine Nutzung für Marketing.** Die Registerdaten dienen nie dazu, die darin enthaltenen Institute anzusprechen oder zu bewerben. Ein Test lässt den Build scheitern, sobald ein CRM- oder Akquise-Modul den Register-Client auch nur importiert.
+3. **IBANforge ist Verantwortlicher für die empfangenen Daten.** Nur die Ressource „Institut“ wird aufgerufen — nie die Personen des Registers, die kontrollierten Funktionen oder eine Suche nach Personen —, sodass keine personenbezogenen Daten in den Dienst gelangen. Eine Zeile je FRN wird gehalten, einen Tag.
+4. **Die FCA übernimmt keine Haftung.** Der Haftungsausschluss auf jeder Antwort ist der der FCA selbst, und das Register wird als das maßgebliche Verzeichnis genannt.
+
+## Was dieser Endpunkt nicht tut
+
+- **Er entscheidet nicht.** `Authorised` ist der Status des Registers, kein Urteil über die Zahlung. `notices`, `sub_status` und `psd_emd_status` zusammen lesen; ein Institut in Liquidation bleibt `Authorised`, bis die FCA etwas anderes sagt.
+- **Er listet nicht.** Keine Suche, kein „alle Zahlungsinstitute“, keine Seite mit Instituten. Eine FRN hinein, ein Institut heraus — das ist die Erlaubnis.
+- **Er löst keinen Namen auf.** Die FRN stammt aus den Unterlagen des Instituts oder aus dem Register; der Endpunkt errät sie nicht aus einer Firmenbezeichnung.
+- **Er veröffentlicht in dieser Version weder Adresse noch die Einzelheiten der Erlaubnisse.** Das Register führt beides unter getrennten Ressourcen; bedient wird heute der Eintrag des Instituts.
+
+## Fehler
+
+| Status | `error` | Wann |
+|---|---|---|
+| `400` | `invalid_frn_format` | Die Referenz hat nicht 6 oder 7 Ziffern (eine Individual Reference Number, Buchstaben voran, wird absichtlich abgewiesen). Nie berechnet. |
+| `400` | `placeholder_literal` | Der OpenAPI-Platzhalter `{frn}` wurde wörtlich gesendet. |
+| `400` | `invalid_frn` | Das Register selbst hat die Nummer abgelehnt. |
+| `402` | `payment_required` | Weder Schlüssel noch Zahlung: das x402-Angebot, wie auf jeder kostenpflichtigen Route. |
+| `502` | `upstream` | Das Register hat nicht geantwortet, und keine Kopie unter dreißig Stunden liegt vor; `upstream_status` trägt den Status, den es gab. |
+| `503` | `not_configured` | Diese Installation hält keine Zugangsdaten für die Register-API. Beantwortet, bevor Schlüssel oder Zahlung gelesen werden: Nichts wird berechnet. |
+
+Siehe auch: [BIC-Abfrage](/docs/bic-lookup) · [Datenquellen und Herkunft](/docs/data-sources) · [Compliance](/docs/compliance) · [API-Schlüssel](/docs/api-keys)

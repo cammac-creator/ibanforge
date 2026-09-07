@@ -3,6 +3,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { createRequire } from 'node:module';
 import type { HonoEnv } from '../types.js';
 import { datasetFacts } from '../lib/dataset-facts.js';
+import { isFcaRegisterConfigured } from '../lib/fca-register.js';
 import {
   BANK_CODE_CHECK_SCHEMA as BANK_CODE_CHECK_OPENAPI,
   NEXT_STEPS_SCHEMA as NEXT_STEPS_OPENAPI,
@@ -240,6 +241,9 @@ export function buildRouteTable(
   const TRUST_TAG_CH = `Production · ${PERF} · ${F.claim.chClearing} SIX BankMaster entries, refreshed monthly · ${V}`;
   const TRUST_TAG_COMPLIANCE = `Production · ${PERF} · OFAC + FATF + SEPA + VoP · weekly refresh · ${V}`;
   const TRUST_TAG_BATCH = `Production · ${PERF} for a 100-IBAN batch · ${F.claim.bic} BICs · ${V}`;
+  // No PERF claim here: a cache miss is a live call to the register, and the
+  // sub-5 ms figure would be false for exactly the calls that cost the most.
+  const TRUST_TAG_GB = `Production · live per-firm lookup at the FCA register under its written permission, one-day cache · ${V}`;
 
   const ibanInputSchema = {
     type: 'object',
@@ -684,6 +688,72 @@ export function buildRouteTable(
         bazaar: { discoverable: true, bodyType: 'json' },
       },
     },
+    // Listed only when this deployment can serve it. Without the Register API
+    // credential the route answers 503 to everyone before any paywall, and a
+    // catalog entry for a resource that cannot be bought is a broken listing,
+    // not an announcement. The day the key lands, the entry appears by itself.
+    ...(isFcaRegisterConfigured()
+      ? {
+          'GET /v1/gb/firm/:frn': {
+            accepts: {
+              scheme: 'exact',
+              network: 'eip155:8453' as const,
+              price: '$0.003',
+              payTo: walletAddress,
+              maxTimeoutSeconds: 60,
+            },
+            description: `Look up one UK-regulated firm by its Firm Reference Number (FRN, 6-7 digits) in the FCA Financial Services Register: name, register status and its effective date, business type, Companies House number, client-money permission, PSD/EMD and MLR statuses, register notices. One request = one firm, credited and dated on every answer, cached one day. ${TRUST_TAG_GB}.`,
+            mimeType: 'application/json',
+            extensions: {
+              bazaar: {
+                discoverable: true,
+                pathParams: {
+                  frn: { type: 'string', description: 'Firm Reference Number (6 or 7 digits).' },
+                },
+                outputSchema: {
+                  type: 'object',
+                  properties: {
+                    frn: { type: 'string' },
+                    found: { type: 'boolean' },
+                    name: { type: 'string' },
+                    status: {
+                      type: 'string',
+                      description:
+                        "The register's own wording, e.g. Authorised, No longer authorised.",
+                    },
+                    status_effective_date: { type: 'string', description: 'YYYY-MM-DD.' },
+                    business_type: { type: 'string' },
+                    companies_house_number: { type: 'string' },
+                    client_money_permission: { type: 'string' },
+                    psd_emd_status: { type: 'string' },
+                    notices: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        properties: { title: { type: 'string' }, body: { type: 'string' } },
+                      },
+                    },
+                    source: { type: 'string', enum: ['FCA Financial Services Register'] },
+                    source_url: { type: 'string' },
+                    retrieved_at: { type: 'string', description: 'ISO 8601, UTC.' },
+                    cache: {
+                      type: 'object',
+                      properties: {
+                        hit: { type: 'boolean' },
+                        stale: { type: 'boolean' },
+                        expires_at: { type: 'string' },
+                      },
+                    },
+                    disclaimer: { type: 'string' },
+                    cost_usdc: { type: 'number' },
+                    processing_ms: { type: 'number' },
+                  },
+                },
+              },
+            },
+          },
+        }
+      : {}),
     'GET /v1/ch/clearing/:iid': {
       accepts: {
         scheme: 'exact',

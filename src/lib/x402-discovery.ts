@@ -224,6 +224,35 @@ const ENTRIES: DiscoveryEntry[] = [
     },
   },
   {
+    route: 'GET /v1/gb/firm/:frn',
+    data: {
+      inputMethod: 'GET',
+      inputPathParams: { frn: '123456' },
+      // A FIXTURE, not a captured response: the route was written on
+      // 07/09/2026 before this deployment held a Register API credential, so
+      // no real exchange could be recorded. The shape is the one served (see
+      // src/routes/gb-firm.ts); the values name no firm. To be replaced by a
+      // captured answer once the key is in place — like every entry above.
+      outputExample: {
+        frn: '123456',
+        found: true,
+        name: 'Alpha Bank Example Ltd',
+        status: 'Authorised',
+        status_effective_date: '2004-09-01',
+        business_type: 'Regulated',
+        companies_house_number: '01234567',
+        client_money_permission: null,
+        sub_status: null,
+        psd_emd_status: null,
+        notices: [],
+        source: 'FCA Financial Services Register',
+        source_url: 'https://register.fca.org.uk/s/search?q=123456&type=Companies',
+        retrieved_at: '2026-09-07T12:00:00.000Z',
+        cache: { hit: false, stale: false, expires_at: '2026-09-08T12:00:00.000Z' },
+      },
+    },
+  },
+  {
     route: 'POST /v1/iban/compliance',
     data: {
       inputMethod: 'POST',

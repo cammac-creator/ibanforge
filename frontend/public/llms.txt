@@ -53,6 +53,7 @@ Zero to first payment in 3 steps (wallet with budget → USDC on Base → one $5
 - POST /v1/iban/batch — up to 100 IBANs ($0.002 each)
 - GET  /v1/bic/{code} — BIC/SWIFT lookup with LEI ($0.003)
 - GET  /v1/ch/clearing/{iid} — Swiss clearing lookup ($0.003)
+- GET  /v1/gb/firm/{frn} — one UK-regulated firm by Firm Reference Number, from the FCA Financial Services Register: name, status and its date, business type, Companies House number, PSD/EMD status, notices; credited, dated, cached one day ($0.003; answers 503 not_configured, uncharged, on a deployment without the Register API credential)
 - POST /v1/iban/compliance — sanctions + FATF + SEPA + VoP + risk ($0.02)
 - GET  /v1/iban/format?iban=... — free mod-97 + structure check (no auth)
 - GET  /v1/iban/structure[/{country}] — free IBAN templates for 89 countries (no auth)

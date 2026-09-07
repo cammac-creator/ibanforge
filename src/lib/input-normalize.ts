@@ -42,6 +42,9 @@ const BIC_CURRENT_GUARD = /^[A-Za-z0-9]{8}([A-Za-z0-9]{3})?$/;
 /** Garde actuelle de src/routes/ch-clearing.ts. */
 const IID_CURRENT_GUARD = /^\d{1,5}$/;
 
+/** Garde de src/routes/gb-firm.ts — un FRN de la FCA fait 6 chiffres, 7 pour les plus récents. */
+const FRN_CURRENT_GUARD = /^\d{6,7}$/;
+
 export function normalizeIdentifier(raw: string): string {
   return raw.replace(SEPARATORS, '').toUpperCase();
 }
@@ -103,4 +106,26 @@ export function classifyIidInput(raw: string): RejectReason | null {
   if (!/\d/.test(raw)) return 'not_numeric';
   if (raw.replace(/\D/g, '').length > 5) return 'too_long';
   return 'invalid_charset';
+}
+
+/**
+ * Same contract for the FCA Firm Reference Number of `GET /v1/gb/firm/:frn`.
+ *
+ * `normalizable` covers what an agent copies from the register's own pages:
+ * "FRN 123456", "123 456", "123-456". An Individual Reference Number
+ * (`ABC01234`, letters first) is `invalid_charset` on purpose — the route
+ * looks up firms only, and a letter-led reference must never reach the
+ * register as if it were one (GDPR minimisation, see lib/fca-register.ts).
+ */
+export function classifyFrnInput(raw: string): RejectReason | null {
+  if (PLACEHOLDER.test(raw)) return 'placeholder_literal';
+  if (FRN_CURRENT_GUARD.test(raw)) return null;
+
+  const stripped = normalizeIdentifier(raw).replace(/^FRN/, '');
+  if (FRN_CURRENT_GUARD.test(stripped)) return 'normalizable';
+
+  if (HAS_SEPARATOR.test(raw)) return 'not_an_identifier';
+  if (!/\d/.test(raw)) return 'not_numeric';
+  if (!/^\d+$/.test(raw)) return 'invalid_charset';
+  return raw.length < 6 ? 'too_short' : 'too_long';
 }

@@ -63,6 +63,12 @@ Sie steht bewusst **nicht** in der Registertabelle oben. Sie ist eine Liste zuge
 - **Begrenzt auf die Rechtsordnung, die die Erlaubnis abdeckt.** Der Zweigstellen-Abschnitt veröffentlicht die LEI der *Hauptniederlassung* — der Mutter im Ausland —, die GLEIF jedem BIC dieser Einheit weltweit zuordnet. Der Block wird deshalb nur für GB-BICs ausgeliefert (und GI für den Gibraltar-Abschnitt); eine LEI-Verknüpfung ohne Geltungsbereich würde eine britische Einlagenerlaubnis auf einem BIC aus Frankfurt oder Tokio verkünden.
 - **Vorhanden bei Treffer, sonst abwesend — nie `authorised: false`.** Die Liste deckt nur das Einlagengeschäft ab und sagt in ihrer eigenen Präambel, dass sie das Financial Services Register nicht ersetzt. Ein fehlendes Institut kann eine Wertpapierfirma, ein E-Geld-Institut oder eine Credit Union sein.
 
+## Vereinigtes Königreich — das Financial Services Register, Institut für Institut
+
+Quelle: **FCA Financial Services Register**, je ein Institut auf einmal über die Register-API der FCA abgefragt durch [`GET /v1/gb/firm/:frn`](/docs/gb-firms), unter der schriftlichen Zustimmung des Register Team vom 7. September 2026 zu genau dieser Nutzung. Nichts wird importiert: keine Liste, keine Kopie, keine Tabelle von Instituten. Jede Antwort nennt die Quelle, trägt ihr Abrufdatum und den Haftungsausschluss der FCA selbst und wird höchstens einen Tag zwischengespeichert — eine abgelaufene Kopie wird nur bedient, solange das Register selbst ausfällt, als `stale` markiert und nie mehr als sechs Stunden nach ihrem Tag.
+
+Die vier Bedingungen der FCA werden im Code gehalten: die veröffentlichten Ratenlimits (eine Anfrage in Bearbeitung, ein Mindestabstand zwischen Aufrufen, eine beachtete Wartezeit nach einem `429`); keine Nutzung für Marketing (ein Test lässt den Build scheitern, sobald CRM oder Akquise den Register-Client importieren); IBANforge als Verantwortlicher für die empfangenen Daten (nur die Ressource „Institut“ wird aufgerufen, nie die Personen des Registers); und der Haftungsausschluss der FCA auf jeder Antwort.
+
 ## Compliance-Signale
 
 | Signal | Quelle | Aktualisierung |

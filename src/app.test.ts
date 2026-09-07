@@ -521,3 +521,66 @@ describe('when the facilitator is unreachable (audit A2 §C1.1)', () => {
     expect(supportedCalls).toBe(2);
   });
 });
+
+// ─── The FCA firm lookup: 503 before the paywall, 402 like the others after ──
+//
+// The route exists before the credential does (built 07/09/2026, key pending).
+// Two orders are load-bearing: the configured guard sits BEFORE the API-key
+// middleware, so an unconfigured deployment charges nobody; and once the
+// credential is set the route takes the same paywall and the same template
+// contract (piste A) as /v1/bic/:code. See src/routes/gb-firm.ts.
+
+describe('GET /v1/gb/firm/:frn and the paywall order', () => {
+  const FCA_ENV = {
+    FCA_REGISTER_API_KEY: 'test-register-key',
+    FCA_REGISTER_API_EMAIL: 'acme@example.com',
+  };
+
+  it('answers 503 not_configured to everyone, template probe included, while no credential is set', async () => {
+    delete process.env.FCA_REGISTER_API_KEY;
+    delete process.env.FCA_REGISTER_API_EMAIL;
+    for (const path of ['/v1/gb/firm/123456', '/v1/gb/firm/%7Bfrn%7D']) {
+      const res = await req(path);
+      expect(res.status, path).toBe(503);
+      expect(await res.json()).toMatchObject({ error: 'not_configured' });
+    }
+    // A resource nobody can buy is not announced in the catalog either.
+    const table = await req('/.well-known/x402');
+    if (table.status === 200) {
+      expect(await table.text()).not.toContain('/v1/gb/firm/');
+    }
+  });
+
+  it('quotes 402 on the template and on a real FRN once the credential is present (piste A)', async () => {
+    Object.assign(process.env, FCA_ENV);
+    const probe = await req('/v1/gb/firm/%7Bfrn%7D');
+    expect(probe.status, 'template probe must be payable, not broken').toBe(402);
+    const quoted = (await probe.json()) as {
+      accepts: Array<{ amount: string; payTo: string }>;
+    };
+    expect(quoted.accepts).toHaveLength(1);
+    expect(quoted.accepts[0]).toMatchObject({ amount: '3000', payTo: WALLET });
+
+    const real = await req('/v1/gb/firm/123456');
+    expect(real.status).toBe(402);
+    const body = (await real.json()) as { resource: { url: string } };
+    expect(body.resource.url).toBe('https://api.ibanforge.com/v1/gb/firm/123456');
+    expect(body.resource.url).not.toContain(':frn');
+  });
+
+  it('still answers 400 to an authenticated caller on a malformed FRN, uncharged', async () => {
+    Object.assign(process.env, FCA_ENV);
+    const key = generateCreditKey(null, 50);
+    const auth = { Authorization: `Bearer ${key.api_key}` };
+
+    const short = await req('/v1/gb/firm/12', { headers: auth });
+    expect(short.status).toBe(400);
+    expect(await short.json()).toMatchObject({ error: 'invalid_frn_format' });
+
+    const placeholder = await req('/v1/gb/firm/%7Bfrn%7D', { headers: auth });
+    expect(placeholder.status).toBe(400);
+    expect(await placeholder.json()).toMatchObject({ error: 'placeholder_literal' });
+    // The 4xx refund published on the header: fifty credits, still fifty.
+    expect(placeholder.headers.get('X-Credits-Remaining')).toBe('50');
+  });
+});

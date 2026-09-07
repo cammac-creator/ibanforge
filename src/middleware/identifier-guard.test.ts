@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { Hono } from 'hono';
-import { bicGuardMiddleware, iidGuardMiddleware } from './identifier-guard.js';
+import { bicGuardMiddleware, frnGuardMiddleware, iidGuardMiddleware } from './identifier-guard.js';
 import { bicLookup } from '../routes/bic-lookup.js';
 import { chClearing } from '../routes/ch-clearing.js';
+import { gbFirm } from '../routes/gb-firm.js';
 import { getRejectionStats } from '../lib/stats.js';
 import type { HonoEnv } from '../types.js';
 
@@ -33,8 +34,10 @@ function makeMountedApp() {
   const app = new Hono<HonoEnv>();
   app.get('/v1/bic/:code', bicGuardMiddleware());
   app.get('/v1/ch/clearing/:iid', iidGuardMiddleware());
+  app.get('/v1/gb/firm/:frn', frnGuardMiddleware());
   app.route('/', bicLookup);
   app.route('/', chClearing);
+  app.route('/', gbFirm);
   return app;
 }
 
@@ -58,6 +61,9 @@ describe('garde + route montées ensemble (composition de src/index.ts)', () => 
     ['/v1/ch/clearing/CH-230', 'ch_clearing_lookup', 'normalizable'],
     ['/v1/ch/clearing/%7Biid%7D', 'ch_clearing_lookup', 'placeholder_literal'],
     ['/v1/ch/clearing/abc', 'ch_clearing_lookup', 'not_numeric'],
+    ['/v1/gb/firm/FRN%20123456', 'gb_firm_lookup', 'normalizable'],
+    ['/v1/gb/firm/%7Bfrn%7D', 'gb_firm_lookup', 'placeholder_literal'],
+    ['/v1/gb/firm/12345', 'gb_firm_lookup', 'too_short'],
   ])('%s enregistre exactement un rejet %s/%s', async (path, operation, reason) => {
     const totalBefore = totalRejections();
     const categoryBefore = count(operation, reason);

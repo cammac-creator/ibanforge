@@ -1,0 +1,126 @@
+---
+title: "Établissements britanniques (registre FCA)"
+description: "Confirmer le statut réglementaire d'un établissement de paiement, de monnaie électronique ou de dépôt britannique par son Firm Reference Number : une requête, un établissement, servi depuis le registre de la FCA elle-même sous sa permission écrite, crédité et daté à chaque réponse."
+order: 11
+---
+
+# Établissements britanniques — le Financial Services Register de la FCA
+
+Chaque établissement que régule la Financial Conduct Authority porte un **Firm Reference Number** (FRN) : six chiffres, sept pour les enregistrements les plus récents. Le FRN figure sur le site de l'établissement, dans ses conditions, et sur le [Financial Services Register](https://register.fca.org.uk/), le registre public de qui est autorisé à faire quoi au Royaume-Uni. `GET /v1/gb/firm/:frn` répond à une question sur un établissement : **que dit le registre à son sujet, aujourd'hui ?**
+
+C'est une autre question que celle du [bloc PRA](/docs/data-sources) qu'un IBAN ou un BIC `GB` porte déjà. La liste de la Bank of England nomme les quelque trois cents banques autorisées à recevoir des dépôts ; le Financial Services Register tient chaque établissement régulé — établissements de paiement, émetteurs de monnaie électronique, credit unions, entreprises d'investissement, appointed representatives, établissements dont l'agrément a pris fin — avec son statut et sa date.
+
+## Un appel
+
+```bash
+curl https://api.ibanforge.com/v1/gb/firm/123456 \
+  -H "Authorization: Bearer ifk_votre_cle"
+```
+
+```json
+{
+  "frn": "123456",
+  "found": true,
+  "name": "Alpha Bank Example Ltd",
+  "status": "Authorised",
+  "status_effective_date": "2004-09-01",
+  "business_type": "Regulated",
+  "companies_house_number": "01234567",
+  "client_money_permission": null,
+  "sub_status": null,
+  "sub_status_effective_from": null,
+  "mlrs_status": null,
+  "mlrs_status_effective_date": null,
+  "psd_emd_status": "Authorised Payment Institution",
+  "psd_emd_effective_date": "2009-10-13",
+  "psd_agent_status": null,
+  "e_money_agent_status": null,
+  "mutual_society_number": null,
+  "notices": [],
+  "register_timestamp": "2026-09-07T11:25",
+  "source": "FCA Financial Services Register",
+  "source_url": "https://register.fca.org.uk/s/search?q=123456&type=Companies",
+  "retrieved_at": "2026-09-07T12:00:00.000Z",
+  "cache": { "hit": false, "stale": false, "expires_at": "2026-09-08T12:00:00.000Z" },
+  "disclaimer": "Data from the Financial Services Register, made available by the Financial Conduct Authority without warranty and with no liability accepted by the FCA. The register at register.fca.org.uk is the record that prevails: this answer is a dated copy of one firm entry and implies no endorsement by the FCA of IBANforge or of the firm.",
+  "cost_usdc": 0,
+  "processing_ms": 412.5
+}
+```
+
+Les valeurs ci-dessus illustrent la forme — `Alpha Bank Example Ltd` est une fixture, pas un établissement. Ce sur quoi s'appuyer, ce sont les noms de champs et les quatre choses que porte chaque réponse : la **source**, la **date de récupération**, l'**état du cache** et l'**exclusion de responsabilité** de la FCA.
+
+**Coût :** 0,003 $ par requête, comme une [recherche de BIC](/docs/bic-lookup) — une requête d'une clé d'API, ou 0,003 USDC par x402. Une réponse servie du cache coûte autant qu'un appel au registre : ce qui est vendu, c'est la réponse, pas l'aller-retour.
+
+## Ce que publie le registre, champ par champ
+
+| Champ | Sens |
+|---|---|
+| `status` | Le libellé du registre, tel quel : `Authorised`, `No longer authorised`, `Appointed representative`, `Registered`, `EEA Authorised`… Jamais replié en énumération — la FCA ajoute des statuts sans préavis. |
+| `status_effective_date` | Depuis quand. `AAAA-MM-JJ` quand le `jj/mm/aaaa` du registre a pu être lu ; la chaîne du registre sinon, jamais supprimée. |
+| `business_type` | `Regulated`, `Appointed Representative`, `Registered`… |
+| `companies_house_number` | Le numéro de société, quand le registre le publie. |
+| `client_money_permission` | Si l'établissement peut détenir ou contrôler des fonds de clients, dans les mots du registre. |
+| `psd_emd_status`, `psd_emd_effective_date` | Le statut au titre des Payment Services / E-Money Regulations : `Authorised Payment Institution`, `Small Electronic Money Institution`… C'est le champ dont dépend un paiement vers une fintech britannique. |
+| `mlrs_status` | L'enregistrement au titre des Money Laundering Regulations, pour les établissements supervisés sous ce régime. |
+| `sub_status`, `sub_status_effective_from` | `In liquidation`, `In administration`… quand le registre en porte un. |
+| `psd_agent_status`, `e_money_agent_status` | Les statuts d'agent, pour les établissements agissant pour un mandant. |
+| `notices` | Les « exceptional information » du registre : les avis `CAUTION` et `ATTENTION` que la FCA attache à une fiche, titre et corps tels quels. À lire — c'est là qu'un établissement cloné ou un concordat s'annonce. |
+| `register_timestamp` | Quand la FCA a touché la fiche pour la dernière fois, en heure locale du registre. Aucun fuseau n'est publié, aucun n'est inventé. |
+
+Les chaînes vides du registre deviennent `null` : le registre ne publie rien sous cette clé pour cet établissement, et une chaîne vide se lirait comme une valeur.
+
+## Une absence
+
+```json
+{
+  "frn": "999999",
+  "found": false,
+  "note": "No firm carries this reference number in the Financial Services Register at the time of retrieval. An absent FRN is not a finding about anyone: check the number, then the register itself.",
+  "source": "FCA Financial Services Register",
+  "source_url": "https://register.fca.org.uk/s/search?q=999999&type=Companies",
+  "retrieved_at": "2026-09-07T12:00:00.000Z",
+  "cache": { "hit": false, "stale": false, "expires_at": "2026-09-08T12:00:00.000Z" },
+  "disclaimer": "…",
+  "cost_usdc": 0.003
+}
+```
+
+Une absence est un `200` avec `found: false`, créditée, datée et **facturée comme une réponse** — délibérément, pour la raison même qu'une [recherche de BIC](/docs/bic-lookup) traite ainsi un code inconnu. Une absence gratuite transformerait la recherche par établissement en balayage de l'espace des FRN aux frais du registre, exactement ce que la permission de la FCA exclut. Une absence est mise en cache un jour comme une réponse : réessayer le même numéro ne coûte rien au registre.
+
+## Fraîcheur, et ce que dit `cache`
+
+Chaque réponse est la fiche du registre **telle que récupérée à `retrieved_at`**, et la même fiche est resservie pendant vingt-quatre heures — le « cache d'un jour au plus » décrit à la FCA. Lire `cache` :
+
+- `hit: false` — le registre a été interrogé pour cette réponse.
+- `hit: true, stale: false` — servie depuis le cache du jour ; `expires_at` dit jusqu'à quand.
+- `hit: true, stale: true` — le registre n'a pas répondu et une copie **expirée** a été servie, jamais plus de six heures après son jour. `retrieved_at` dit son âge. Rien de plus ancien n'est jamais servi : au-delà, l'appel répond `502`.
+
+## La permission, et les quatre conditions
+
+L'API du registre est utilisée sous l'**acceptation écrite du 7 septembre 2026** du Register Team de la FCA, portant sur l'usage exact que cet endpoint met en œuvre : une requête = un établissement ; nom, FRN, statut, source et date de récupération à chaque réponse ; ni comparateur, ni liste, ni copie en masse ; un cache d'un jour au plus ; aucune prétention d'endossement. La FCA y a attaché quatre conditions, chacune tenue dans le code plutôt que par une promesse :
+
+1. **Les Terms of Use de l'API du registre et ses limites de débit publiées.** Une requête en vol à la fois, un plancher entre deux appels, une seule attente honorée sur un `429`, puis le cache — jamais de rafale de réessais.
+2. **Aucun usage marketing.** Les données du registre ne servent jamais à cibler ni à démarcher les établissements qu'il contient. Un test fait échouer la suite si un module du CRM ou de la prospection ne serait-ce qu'importe le client du registre.
+3. **IBANforge est responsable de traitement pour ce qu'il reçoit.** Seule la ressource « établissement » est appelée — jamais les individus du registre, les fonctions contrôlées ni une recherche par personne — donc aucune donnée personnelle n'entre dans le service. Une ligne par FRN est conservée, un jour.
+4. **La FCA n'accepte aucune responsabilité.** L'exclusion portée par chaque réponse est celle de la FCA elle-même, et le registre y est nommé comme la référence qui prévaut.
+
+## Ce que cet endpoint ne fait pas
+
+- **Il ne décide pas.** `Authorised` est le statut du registre, pas un verdict sur le paiement. Lire `notices`, `sub_status` et `psd_emd_status` ensemble ; un établissement en liquidation reste `Authorised` tant que la FCA n'en dit pas autrement.
+- **Il ne liste pas.** Pas de recherche, pas de « tous les établissements de paiement », pas de page d'établissements. Un FRN entre, un établissement sort — c'est la permission.
+- **Il ne résout pas un nom.** Le FRN vient des documents de l'établissement ou du registre ; l'endpoint ne le devine pas à partir d'une raison sociale.
+- **Il ne publie ni adresse ni détail des permissions dans cette version.** Le registre tient les deux sous des ressources séparées ; c'est la fiche de l'établissement qui est servie aujourd'hui.
+
+## Erreurs
+
+| Statut | `error` | Quand |
+|---|---|---|
+| `400` | `invalid_frn_format` | La référence n'a pas 6 ou 7 chiffres (une référence d'individu, lettres en tête, est refusée à dessein). Jamais facturé. |
+| `400` | `placeholder_literal` | Le gabarit OpenAPI `{frn}` a été envoyé tel quel. |
+| `400` | `invalid_frn` | Le registre lui-même a refusé le numéro. |
+| `402` | `payment_required` | Ni clé ni paiement : le devis x402, comme sur toute route payante. |
+| `502` | `upstream` | Le registre n'a pas répondu et aucune copie de moins de trente heures n'est détenue ; `upstream_status` porte le statut qu'il a rendu. |
+| `503` | `not_configured` | Ce déploiement ne détient pas d'identifiant pour l'API du registre. Répondu avant toute lecture de clé ou de paiement : rien n'est facturé. |
+
+Voir aussi : [Recherche de BIC](/docs/bic-lookup) · [Sources et provenance des données](/docs/data-sources) · [Conformité](/docs/compliance) · [Clés d'API](/docs/api-keys)

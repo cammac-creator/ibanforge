@@ -311,6 +311,27 @@ Préalable technique : un compte sur le portail FS Developer (l'e-mail devient l
 posée sur Railway (`FCA_REGISTER_API_KEY`). La liste PRA de la Bank of England reste la source des ~300
 banques ; le Register couvre le reste.
 
+**07/09/2026 — branchement construit, en attente de la clé du portail.** `GET /v1/gb/firm/:frn`
+(`src/routes/gb-firm.ts`, client et cache dans `src/lib/fca-register.ts`) est écrit, testé sans réseau et
+documenté (OpenAPI `lookupGbFirm`, `/docs/gb-firms` EN/FR/DE, llms.txt). Tant que `FCA_REGISTER_API_KEY`
+et `FCA_REGISTER_API_EMAIL` (l'e-mail du compte, identifiant de l'API) ne sont pas posées sur Railway, la
+route répond `503 not_configured` avant toute lecture de clé ou de paiement, et n'apparaît pas dans la
+table x402. Les quatre conditions sont dans le code : espacement des appels (une requête en vol, 1 100 ms
+entre deux, une seule attente sur 429 — 🚨 constante à aligner sur la limite publiée dans le portail le
+jour de la clé ; les clients tiers rapportent dix requêtes par dix secondes) ; test `marketing-guard`
+qui rougit si un module CRM ou de prospection importe le client ; seule la ressource `/Firm/{frn}` est
+appelée, jamais `/Individuals` ; exclusion de responsabilité de la FCA sur chaque réponse. Schéma confirmé
+sans le portail (SPA illisible) par trois clients open source qui enregistrent de vrais échanges :
+CyborgFinance/FCARegisterLaravel (en-têtes `x-auth-email` / `x-auth-key`, exemple `Firm/{FRN}`),
+release-art/fca-api (table des codes `FSR-API-02-01-00` trouvé / `-11` absent / `-21` requête invalide,
+échanges du 27/02/2026), craigpotter/fca-php-sdk (absence enregistrée le 14/06/2023 : HTTP 200,
+`Data: null`). Une absence est servie `200 found:false`, facturée et mise en cache comme une réponse
+(un 404 serait remboursé par le middleware de clé et jamais réglé par x402 : chaque absence gratuite
+ferait de la route un balayeur de l'espace des FRN aux frais du registre). Choix à trancher : la copie
+expirée servie `stale` pendant une panne du registre peut avoir jusqu'à 30 h (24 h + 6 h de marge,
+`FCA_STALE_GRACE_MS`), au-delà de la lettre du « cache ≤ 24 h » décrit à la FCA — mettre la marge à 0
+pour tenir la lettre et répondre 502 à la place.
+
 ### ✅ 25/08/2026 — la Bank of England a accordé la permission
 
 Réponse du service Engagement and Enquiries de la Bank of England, reçue le
