@@ -257,6 +257,15 @@ describe('rows and paths', () => {
     expect(relativePath('https://elsewhere.example/x')).toBe('https://elsewhere.example/x');
   });
 
+  it('does not strip the origin off a lookalike host', () => {
+    // The prefix matches and the boundary does not: printed as a path, this
+    // would put a foreign host on the operator's screen wearing our own site's
+    // clothes.
+    expect(relativePath('https://ibanforge.com.evil.example/x')).toBe(
+      'https://ibanforge.com.evil.example/x',
+    );
+  });
+
   it('keeps a query verbatim and caps the list', () => {
     const rows = Array.from({ length: 20 }, (_, i) => ({
       keys: [`q ${i}`],
