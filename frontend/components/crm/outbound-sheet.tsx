@@ -17,6 +17,7 @@ import { nextActionLabel } from '@/lib/crm/situation';
 import { threadTail } from '@/lib/crm/thread-tail';
 import type { Contact, Situation } from '@/lib/crm/types';
 import { GuardrailChecks, OverrideButton, useGuardrails } from './guardrails-ui';
+import { LangPicker, useCorrespondentLang } from './lang-picker';
 import { PANEL_PADDING_PX } from './panel-padding';
 import { useRememberedFlag } from './use-remembered-flag';
 
@@ -173,6 +174,7 @@ export function OutboundSheet({
   open,
   onOpenChange,
   onDirtyChange,
+  onSent,
 }: {
   contact: Contact;
   /** Undefined only if the page failed to derive one; the goal line is dropped then. */
@@ -205,6 +207,21 @@ export function OutboundSheet({
    * nothing more: the text stays here, and no draft is persisted per contact.
    */
   onDirtyChange?: (dirty: boolean) => void;
+  /**
+   * A mail left, and it went to this address. The caller says so on screen and
+   * walks to the next file of the list.
+   *
+   * Required, where every other callback here is optional, and for the reason
+   * spelled out in reply-sheet.tsx: this sheet is keyed on the contact, so the
+   * selection moving destroys anything it was holding — a confirmation written
+   * here would flash and vanish at the one moment it is owed.
+   *
+   * Only the SEND takes this road. Saving a draft keeps its own sentence and
+   * stays put: nothing has left, the text is now a card in the thread of the
+   * file on screen, and moving on would take the operator away from the very
+   * thing they just produced.
+   */
+  onSent: (to: string) => void;
 }) {
   const router = useRouter();
   const [subject, setSubject] = useState('');
@@ -227,6 +244,12 @@ export function OutboundSheet({
    * contract without it. See use-remembered-flag.ts.
    */
   const [expanded, setExpanded] = useRememberedFlag(EXPAND_KEY);
+  /**
+   * Which language the generator writes in: the CRM's reading of the thread
+   * and of the prospect row, and the operator's override when they disagree.
+   * See lang-picker.tsx, and lib/crm/correspondent-lang.ts for the rule.
+   */
+  const { lang, chosen: chosenLang, setChosen: setChosenLang } = useCorrespondentLang(c);
 
   function toggleExpanded() {
     setExpanded((e) => !e);
@@ -520,6 +543,12 @@ export function OutboundSheet({
           // it follows, in the recipient's mailbox.
           subject: subject.trim() || c.messages.at(-1)?.subject || 'IBANforge',
           context: brief(angle),
+          // The recipient's language, and the server turns it into the closing
+          // rule of the brief (see app/api/crm/generate-draft/route.ts). Sent
+          // as a value rather than written into `brief()` above so that one
+          // formulation of the instruction exists, on the server, where the
+          // three other standing rules already live.
+          lang,
           /*
            * Which system prompt the VPS writes with. Its follow-up mode asks
            * for two or three sentences, under sixty words, one new angle, and
@@ -561,7 +590,10 @@ export function OutboundSheet({
       }
       setSubject(gen.subject || subject);
       setBody(gen.emailEn);
-      setFr(gen.translationFr);
+      // The French panel exists for one reader, the operator, and only while
+      // the mail itself is in another language — the same rule loadReadyMail()
+      // already applies to the pre-written mail a few lines above.
+      setFr(lang === 'fr' ? null : gen.translationFr);
       // Something to read, in two languages: the sheet stands up for it.
       setExpanded(true);
       g.clear();
@@ -688,8 +720,15 @@ export function OutboundSheet({
       // Folded back so the thread, where the mail has just appeared, is what
       // the operator sees next.
       onOpenChange(false);
-      setMsg({ text: '✅ Envoyé, ajouté au fil.', bad: false });
+      // The segment is re-rendered with the mail in the thread and the row in
+      // its new state. Kept HERE, before the hand-off: it is this component
+      // that knows the send was confirmed, and the caller must not have to
+      // trust that it was.
       router.refresh();
+      // Said and moved on by the caller. Nothing is set on `msg` for a
+      // success: this subtree is about to be replaced by the next file's, and
+      // a message written into it would be destroyed on the same tick.
+      onSent(c.email);
     } catch {
       sendFailed('Erreur réseau');
     } finally {
@@ -1011,6 +1050,15 @@ export function OutboundSheet({
         >
           {genLabel}
         </button>
+        {/* Beside the button it feeds, and pinned with it: it is an input to
+            the generation, so it must be readable at the moment the generation
+            is asked for rather than somewhere up the scrolling region. */}
+        <LangPicker
+          id="outbound-lang"
+          lang={lang}
+          chosen={chosenLang}
+          onChange={setChosenLang}
+        />
         {/* Same rule as the folded copy above, and the same call rather
             than a second reading of it. */}
         {canLoadReadyMail(c) && (

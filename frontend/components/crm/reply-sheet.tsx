@@ -14,6 +14,7 @@ import { institutionalBrief } from '@/lib/crm/institutional-brief';
 import { threadTail } from '@/lib/crm/thread-tail';
 import type { Contact, Message, Situation } from '@/lib/crm/types';
 import { GuardrailChecks, OverrideButton, useGuardrails } from './guardrails-ui';
+import { LangPicker, useCorrespondentLang } from './lang-picker';
 import { PANEL_PADDING_PX } from './panel-padding';
 import { useRememberedFlag } from './use-remembered-flag';
 
@@ -129,7 +130,7 @@ export function ReplySheet({
   open,
   onOpenChange,
   onDirtyChange,
-  onNext,
+  onSent,
 }: {
   contact: Contact;
   /**
@@ -161,8 +162,21 @@ export function ReplySheet({
    * nothing more: the text stays here, and no draft is persisted per contact.
    */
   onDirtyChange?: (dirty: boolean) => void;
-  /** Opens the next file of the list; offered on the line that says « envoyé ». */
-  onNext?: () => void;
+  /**
+   * A mail left, and it went to this address. The caller says so on screen and
+   * walks to the next file of the list.
+   *
+   * Required, where every other callback here is optional, and that is the
+   * point: this sheet cannot hold the confirmation itself. It is keyed on the
+   * contact, so the selection moving destroys it mid-sentence — the message
+   * would flash and vanish at the one moment it is owed. A caller that forgot
+   * to wire this would send mail with nothing on screen to say so, which is
+   * the failure the whole transition exists to close, so the compiler asks.
+   *
+   * A FAILURE stays here. Nothing moves on that road, the text is still in the
+   * fields, and the sentence belongs beside them.
+   */
+  onSent: (to: string) => void;
 }) {
   const router = useRouter();
   /**
@@ -195,6 +209,12 @@ export function ReplySheet({
    * use-remembered-flag.ts.
    */
   const [expanded, setExpanded] = useRememberedFlag(EXPAND_KEY);
+  /**
+   * Which language the generator writes in: the CRM's reading of the thread,
+   * and the operator's override when they disagree. See lang-picker.tsx, and
+   * lib/crm/correspondent-lang.ts for the rule itself.
+   */
+  const { lang, chosen: chosenLang, setChosen: setChosenLang } = useCorrespondentLang(c);
 
   function toggleExpanded() {
     setExpanded((e) => !e);
@@ -310,6 +330,12 @@ export function ReplySheet({
           // thread in the recipient's mailbox.
           subject: subject.trim() || c.messages.at(-1)?.subject || 'IBANforge',
           context: brief(),
+          // The recipient's language, and the server turns it into the closing
+          // rule of the brief (see app/api/crm/generate-draft/route.ts). Sent
+          // as a value rather than written into `brief()` above so that one
+          // formulation of the instruction exists, on the server, where the
+          // three other standing rules already live.
+          lang,
           // What the recipient IS, so the server can ground the mail in the
           // right facts. The usage enrichment behind /api/crm/generate-draft is
           // keyed on an API key: an institution holds none, so without this
@@ -354,7 +380,11 @@ export function ReplySheet({
       // subject of the thread it answers, and a fresh subject line would break
       // that thread in the recipient's mailbox.
       setBody(gen.emailEn);
-      setFr(gen.translationFr);
+      // The French panel exists for one reader, the operator, and only while
+      // the mail itself is in another language. Asking for a French mail and
+      // getting the same text twice reads as a bug, and it is the same rule
+      // the pre-written mail already follows in the other sheet.
+      setFr(lang === 'fr' ? null : gen.translationFr);
       // A proposal is a text to READ, in two languages. At four rows the sheet
       // would hand back a fifteen-line mail through a four-line window.
       setExpanded(true);
@@ -426,8 +456,15 @@ export function ReplySheet({
       // Folded back so the thread, where the mail has just appeared, is what
       // the operator sees next.
       onOpenChange(false);
-      setMsg({ text: '✅ Envoyé, ajouté au fil.', bad: false });
+      // The segment is re-rendered with the mail in the thread and the row in
+      // its new state. Kept HERE, before the hand-off: it is this component
+      // that knows the send was confirmed, and the caller must not have to
+      // trust that it was.
       router.refresh();
+      // Said and moved on by the caller. Nothing is set on `msg` for a
+      // success: this subtree is about to be replaced by the next file's, and
+      // a message written into it would be destroyed on the same tick.
+      onSent(c.email);
     } catch {
       sendFailed('Erreur réseau');
     } finally {
@@ -468,19 +505,11 @@ export function ReplySheet({
       role={msg.bad ? 'alert' : 'status'}
       className={`mt-2 shrink-0 text-[12.5px] ${msg.bad ? 'text-red-400' : 'text-[var(--fg-2)]'}`}
     >
+      {/* Failures only, now. The « Suivant ▶ » button that used to sit on the
+          success line is gone with the line: the caller walks to the next file
+          by itself, so the button could only ever have offered a move that had
+          already happened. */}
       {msg.text}
-      {!msg.bad && msg.text.startsWith('✅') && onNext && (
-        <>
-          {' '}
-          <button
-            type="button"
-            onClick={onNext}
-            className="ml-1 rounded border border-emerald-500/50 px-2 py-0.5 text-[12px] font-medium text-emerald-300 hover:bg-emerald-500/10"
-          >
-            Suivant ▶
-          </button>
-        </>
-      )}
     </p>
   );
 
@@ -663,6 +692,15 @@ export function ReplySheet({
         >
           {busy === 'gen' ? '… proposition' : 'Proposer un texte'}
         </button>
+        {/* Beside the button it feeds, and pinned with it: it is an input to
+            the generation, so it must be readable at the moment the generation
+            is asked for rather than somewhere up the scrolling region. */}
+        <LangPicker
+          id="reply-lang"
+          lang={lang}
+          chosen={chosenLang}
+          onChange={setChosenLang}
+        />
         <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
           {/* Only ever offered against the em dash on this path: `empty_body` is
               the one other blocking rule a reply can raise, and it cannot stand
