@@ -277,6 +277,30 @@ la bonne règle n'est pas dans les CGU générales) — mais la page développeu
 **Conclusion : la piste GB passe par une demande de permission écrite**, pas
 par un import. Les deux demandes sont parties le 24/08/2026.
 
+### ✅ 07/09/2026 — la FCA accepte l'usage décrit (Register API)
+
+Après le détail de l'usage envoyé le 07/09 à 07 h 31 UTC (une requête = une firme, bloc nom / FRN /
+statut / crédit « Source: FCA Financial Services Register » / date de récupération, ni comparateur ni
+liste ni copie en masse, cache ≤ 24 h, pas d'endorsement, volume individuel sous les limites), le
+Register Team a répondu le même jour à 07 h 39 UTC :
+
+> « Based on what you've described, your approach is acceptable provided that usage remains in line with
+> the Register API Terms of Use (See Register Terms of Use) and the applicable rate limits (which can be
+> viewed in the API developer portal). We do not disallow using the data for commercial purposes. »
+
+Quatre conditions, à porter dans le code le jour du branchement et rappelées dans notre remerciement du
+même jour : (1) les Terms of Use du registre et les limites de débit publiées dans le portail, sans
+contournement ; (2) **aucun usage marketing** (« using the data to target or market to entities contained
+within the dataset ») ; (3) **nous sommes responsables de traitement (GDPR) pour la donnée reçue** ;
+(4) exclusion de responsabilité de la FCA. Le service est une bêta throttlée, sans SLA, avec une API
+améliorée annoncée pour 2027 et ses propres conditions le moment venu.
+
+Ce que cela permet : le registre des firmes agréées (banques, EMI, PI, milliers d'entrées) servi **par
+requête**, à la manière du bloc `pra_authorisation`, avec le crédit et la date sur chaque réponse.
+Préalable technique : un compte sur le portail FS Developer (l'e-mail devient l'identifiant d'API), clé
+posée sur Railway (`FCA_REGISTER_API_KEY`). La liste PRA de la Bank of England reste la source des ~300
+banques ; le Register couvre le reste.
+
 ### ✅ 25/08/2026 — la Bank of England a accordé la permission
 
 Réponse du service Engagement and Enquiries de la Bank of England, reçue le
