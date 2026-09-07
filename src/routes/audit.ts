@@ -41,12 +41,51 @@ import {
   PAID_TTL_HOURS,
   UNPAID_TTL_HOURS,
 } from '../lib/audit-jobs.js';
-import { recordOperation } from '../lib/stats.js';
+import { extractClientIp, recordOperation } from '../lib/stats.js';
 import { SAMPLE_CREDITOR_CSV } from '../lib/audit-sample.js';
 import { recordSafely } from '../lib/record-safely.js';
 
 const SITE = process.env.PUBLIC_SITE_URL ?? 'https://ibanforge.com';
 const LANGS: readonly AuditLang[] = ['en', 'fr', 'de'];
+
+/**
+ * Uploads per address, on top of the general per-minute limiter.
+ *
+ * The general limiter allows 100 requests a minute, sized for validate calls
+ * that cost a few milliseconds each. An upload parses a spreadsheet on the
+ * same thread as every other request, so the same 100 requests are a
+ * different order of cost (adversarial review of 07/09/2026, A1: ~1.3 s of
+ * CPU per 4.5 MB workbook before the row cap moved ahead of the parse).
+ * Nobody audits a creditor file more than a few times in ten minutes; a
+ * caller who does is a script, and gets a 429 that costs nothing to serve.
+ * In-memory and per instance, like the general limiter and for the same
+ * reasons (see middleware/rate-limit.ts).
+ */
+export const AUDIT_UPLOADS_PER_WINDOW = 5;
+export const AUDIT_UPLOAD_WINDOW_MS = 10 * 60_000;
+const uploadTimes = new Map<string, number[]>();
+
+/** Tests only: forget every address. */
+export function resetAuditUploadLimiter(): void {
+  uploadTimes.clear();
+}
+
+function uploadAllowed(ip: string, now: number = Date.now()): boolean {
+  const floor = now - AUDIT_UPLOAD_WINDOW_MS;
+  // Sweep every address on each call: bounded by the addresses seen in one
+  // window, and a spray across many addresses cannot pin entries for the
+  // life of the process.
+  for (const [key, times] of uploadTimes) {
+    const kept = times.filter((t) => t > floor);
+    if (kept.length) uploadTimes.set(key, kept);
+    else uploadTimes.delete(key);
+  }
+  const recent = uploadTimes.get(ip) ?? [];
+  if (recent.length >= AUDIT_UPLOADS_PER_WINDOW) return false;
+  recent.push(now);
+  uploadTimes.set(ip, recent);
+  return true;
+}
 
 function langOf(v: unknown): AuditLang {
   return typeof v === 'string' && (LANGS as readonly string[]).includes(v)
@@ -104,6 +143,20 @@ const audit = new Hono<HonoEnv>();
 
 audit.post('/v1/audit/upload', async (c) => {
   purgeExpiredAuditJobs();
+  const ip =
+    extractClientIp({
+      'x-forwarded-for': c.req.header('x-forwarded-for'),
+      'x-real-ip': c.req.header('x-real-ip'),
+    }) ?? 'unknown';
+  if (!uploadAllowed(ip)) {
+    return c.json(
+      {
+        error: 'rate_limited',
+        message: `At most ${AUDIT_UPLOADS_PER_WINDOW} uploads every ${AUDIT_UPLOAD_WINDOW_MS / 60_000} minutes per address. Try again later.`,
+      },
+      429,
+    );
+  }
   const length = Number(c.req.header('content-length') ?? '0');
   if (length > AUDIT_MAX_BYTES + 64 * 1024) {
     return c.json(

@@ -1,7 +1,7 @@
-import { describe, it, expect, afterAll } from 'vitest';
+import { describe, it, expect, afterAll, beforeEach } from 'vitest';
 import { Hono } from 'hono';
 import * as XLSX from 'xlsx';
-import { audit } from './audit.js';
+import { audit, resetAuditUploadLimiter, AUDIT_UPLOADS_PER_WINDOW } from './audit.js';
 import { closeAll, getStatsDB } from '../lib/db.js';
 import {
   markAuditPaid,
@@ -20,6 +20,10 @@ function app() {
   a.route('/', audit);
   return a;
 }
+
+// Every upload in this file comes from the same (absent) address; the
+// per-address budget must start fresh for each test.
+beforeEach(() => resetAuditUploadLimiter());
 
 interface UploadBody {
   job: string;
@@ -177,5 +181,47 @@ describe('sample report and statistics', () => {
     expect(after.revenue_chf).toBe(before.revenue_chf + 149);
     expect(after.uploads).toBeGreaterThan(before.uploads);
     expect(after.last_sale_at).toBeTruthy();
+  });
+});
+
+/**
+ * Adversarial review of 07/09/2026, A1: the upload route is keyless and the
+ * general limiter allows a hundred requests a minute, each of which parses a
+ * spreadsheet on the request thread. A budget of its own, per address.
+ */
+describe('POST /v1/audit/upload — per-address budget', () => {
+  function uploadFrom(ip: string) {
+    const form = new FormData();
+    form.append('file', new File([['IBAN', VALID_CH].join('\n')], 'f.csv', { type: 'text/csv' }));
+    form.append('lang', 'fr');
+    return app().request('/v1/audit/upload', {
+      method: 'POST',
+      body: form,
+      headers: { 'x-forwarded-for': `10.9.9.9, ${ip}` },
+    });
+  }
+
+  it('answers 429 past the budget, and keeps other addresses unaffected', async () => {
+    for (let i = 0; i < AUDIT_UPLOADS_PER_WINDOW; i++) {
+      expect((await uploadFrom('198.51.100.7')).status).toBe(200);
+    }
+    const over = await uploadFrom('198.51.100.7');
+    expect(over.status).toBe(429);
+    expect(((await over.json()) as { error: string }).error).toBe('rate_limited');
+    expect((await uploadFrom('198.51.100.8')).status).toBe(200);
+  });
+
+  it('keys on the platform-appended hop, not on the segment the client writes', async () => {
+    for (let i = 0; i < AUDIT_UPLOADS_PER_WINDOW; i++) {
+      expect((await uploadFrom('198.51.100.9')).status).toBe(200);
+    }
+    const form = new FormData();
+    form.append('file', new File([['IBAN', VALID_CH].join('\n')], 'f.csv', { type: 'text/csv' }));
+    const spoofed = await app().request('/v1/audit/upload', {
+      method: 'POST',
+      body: form,
+      headers: { 'x-forwarded-for': '10.0.0.42, 198.51.100.9' },
+    });
+    expect(spoofed.status).toBe(429);
   });
 });

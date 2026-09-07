@@ -22,6 +22,12 @@ import type { IBANValidationResult } from '../types.js';
 
 export const AUDIT_MAX_ROWS = 20_000;
 export const AUDIT_MAX_BYTES = 5 * 1024 * 1024;
+/**
+ * How many sheet rows the parser is allowed to materialise: the cap, the
+ * header, and one row past the cap so `too_many_rows` still fires on exactly
+ * cap + 1 data rows. Everything beyond is never read (see readTable).
+ */
+export const SHEET_ROWS_CAP = AUDIT_MAX_ROWS + 2;
 /** Price tiers, in CHF. The tier is decided by the row count, nothing else. */
 export const AUDIT_TIERS = [
   { max_rows: 5_000, price_chf: 149, code: 'standard' },
@@ -128,9 +134,22 @@ export function readTable(buffer: Buffer, filename = ''): { headers: string[]; r
   let wb: XLSX.WorkBook;
   try {
     const isCsv = /\.(csv|txt|tsv)$/i.test(filename) || looksLikeText(buffer);
+    // Count before parsing. The row cap used to be applied after the whole
+    // sheet had been materialised, so a 4.5 MB workbook of 150 000 rows cost
+    // ~1.3 s of synchronous CPU before its 400 — on a keyless route, enough
+    // for one address to stall the single instance (adversarial review of
+    // 07/09/2026, finding A1). `sheetRows` makes SheetJS stop reading at the
+    // cap; for text the line count of the buffer is the same bound, taken
+    // without decoding it.
+    if (isCsv && countLines(buffer) > AUDIT_MAX_ROWS + 1) {
+      throw new AuditFileError(
+        'too_many_rows',
+        `The file has more than ${AUDIT_MAX_ROWS} lines; the audit takes at most ${AUDIT_MAX_ROWS} rows.`,
+      );
+    }
     wb = isCsv
-      ? XLSX.read(buffer.toString('utf8'), { type: 'string', raw: true })
-      : XLSX.read(buffer, { type: 'buffer', raw: true, cellDates: false });
+      ? XLSX.read(buffer.toString('utf8'), { type: 'string', raw: true, sheetRows: SHEET_ROWS_CAP })
+      : XLSX.read(buffer, { type: 'buffer', raw: true, cellDates: false, sheetRows: SHEET_ROWS_CAP });
   } catch (e) {
     throw new AuditFileError(
       'unreadable',
@@ -163,6 +182,15 @@ export function readTable(buffer: Buffer, filename = ''): { headers: string[]; r
     );
   }
   return { headers, rows };
+}
+
+/** Newlines in the raw bytes — an upper bound on rows, counted without decoding. */
+export function countLines(buffer: Buffer): number {
+  let n = 0;
+  for (let i = 0; i < buffer.length; i++) if (buffer[i] === 0x0a) n++;
+  // A final line without a trailing newline is still a line.
+  if (buffer.length > 0 && buffer[buffer.length - 1] !== 0x0a) n++;
+  return n;
 }
 
 function looksLikeText(buffer: Buffer): boolean {

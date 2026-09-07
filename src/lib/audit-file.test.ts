@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import * as XLSX from 'xlsx';
+import { countLines } from './audit-file.js';
 import {
   readTable,
   detectColumns,
@@ -177,5 +178,39 @@ describe('rendering', () => {
   it('tiers by row count', () => {
     expect(tierFor(5000).price_chf).toBe(149);
     expect(tierFor(5001).price_chf).toBe(349);
+  });
+});
+
+/**
+ * Adversarial review of 07/09/2026, A1: the row cap used to run after the
+ * whole sheet had been parsed. Now the parser stops at the cap and text is
+ * counted before it is decoded — an oversized file is refused for the price
+ * of reading its size, not its content.
+ */
+describe('readTable — the cap is enforced before the parse', () => {
+  it('refuses an XLSX far above the cap without materialising it', () => {
+    const aoa: unknown[][] = [['IBAN'], ...Array.from({ length: AUDIT_MAX_ROWS + 20_000 }, () => [VALID_CH])];
+    const buffer = xlsx(aoa);
+    const started = performance.now();
+    expect(() => readTable(buffer, 'big.xlsx')).toThrow(/at most/);
+    // 40 000 rows parsed in full cost ~400 ms on the reviewer's machine; with
+    // sheetRows the parser stops at the cap and the read stays well under.
+    expect(performance.now() - started).toBeLessThan(1_500);
+  });
+
+  it('refuses a text file by its line count, before decoding it', () => {
+    const lines = ['IBAN', ...Array.from({ length: AUDIT_MAX_ROWS + 1 }, () => VALID_CH)];
+    expect(() => readTable(csv(lines), 'big.csv')).toThrow(/more than/);
+    // Exactly at the cap: allowed, and parsed normally.
+    const atCap = ['IBAN', ...Array.from({ length: AUDIT_MAX_ROWS }, () => VALID_CH)];
+    expect(readTable(csv(atCap), 'cap.csv').rows.length).toBe(AUDIT_MAX_ROWS);
+  });
+
+  it('counts lines on bytes, with and without a trailing newline', () => {
+    expect(countLines(Buffer.from(''))).toBe(0);
+    expect(countLines(Buffer.from('a'))).toBe(1);
+    expect(countLines(Buffer.from('a\n'))).toBe(1);
+    expect(countLines(Buffer.from('a\nb'))).toBe(2);
+    expect(countLines(Buffer.from('a\r\nb\r\n'))).toBe(2);
   });
 });
