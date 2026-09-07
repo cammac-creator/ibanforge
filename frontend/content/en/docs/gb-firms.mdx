@@ -1,0 +1,126 @@
+---
+title: "UK Firm Lookup (FCA Financial Services Register)"
+description: "Confirm the regulatory status of a UK payment, e-money or deposit-taking firm by its Firm Reference Number: one request, one firm, served from the FCA's own register under its written permission, credited and dated on every answer."
+order: 11
+---
+
+# UK firm lookup — the FCA Financial Services Register
+
+Every firm the Financial Conduct Authority regulates carries a **Firm Reference Number** (FRN): six digits, seven for the newest registrations. The FRN is printed on the firm's website, on its terms, and on the [Financial Services Register](https://register.fca.org.uk/), the public record of who is authorised to do what in the United Kingdom. `GET /v1/gb/firm/:frn` answers one question about one firm: **what does the register say about it, today?**
+
+This is a different question from the [PRA deposit-taking block](/docs/data-sources) that a GB IBAN or BIC already carries. The Bank of England's list names the three hundred or so banks allowed to take deposits; the Financial Services Register holds every regulated firm — payment institutions, e-money issuers, credit unions, investment firms, appointed representatives, firms whose authorisation ended — with their status and its date.
+
+## One call
+
+```bash
+curl https://api.ibanforge.com/v1/gb/firm/123456 \
+  -H "Authorization: Bearer ifk_your_key"
+```
+
+```json
+{
+  "frn": "123456",
+  "found": true,
+  "name": "Alpha Bank Example Ltd",
+  "status": "Authorised",
+  "status_effective_date": "2004-09-01",
+  "business_type": "Regulated",
+  "companies_house_number": "01234567",
+  "client_money_permission": null,
+  "sub_status": null,
+  "sub_status_effective_from": null,
+  "mlrs_status": null,
+  "mlrs_status_effective_date": null,
+  "psd_emd_status": "Authorised Payment Institution",
+  "psd_emd_effective_date": "2009-10-13",
+  "psd_agent_status": null,
+  "e_money_agent_status": null,
+  "mutual_society_number": null,
+  "notices": [],
+  "register_timestamp": "2026-09-07T11:25",
+  "source": "FCA Financial Services Register",
+  "source_url": "https://register.fca.org.uk/s/search?q=123456&type=Companies",
+  "retrieved_at": "2026-09-07T12:00:00.000Z",
+  "cache": { "hit": false, "stale": false, "expires_at": "2026-09-08T12:00:00.000Z" },
+  "disclaimer": "Data from the Financial Services Register, made available by the Financial Conduct Authority without warranty and with no liability accepted by the FCA. The register at register.fca.org.uk is the record that prevails: this answer is a dated copy of one firm entry and implies no endorsement by the FCA of IBANforge or of the firm.",
+  "cost_usdc": 0,
+  "processing_ms": 412.5
+}
+```
+
+The values above are an illustration of the shape — `Alpha Bank Example Ltd` is a fixture, not a firm. The field names and the four things every answer carries are what to rely on: the **source**, the **retrieval date**, the **cache state**, and the FCA's **disclaimer**.
+
+**Cost:** $0.003 per request, the same as a [BIC lookup](/docs/bic-lookup) — one request of an API key, or 0.003 USDC via x402. A cache hit costs the same as a live call: what is sold is the answer, not the round trip.
+
+## What the register publishes, field by field
+
+| Field | Meaning |
+|---|---|
+| `status` | The register's own wording, verbatim: `Authorised`, `No longer authorised`, `Appointed representative`, `Registered`, `EEA Authorised`… Never folded into an enum — the FCA adds statuses without notice. |
+| `status_effective_date` | Since when. `YYYY-MM-DD` where the register's `dd/mm/yyyy` could be read; the register's own string otherwise, never dropped. |
+| `business_type` | `Regulated`, `Appointed Representative`, `Registered`… |
+| `companies_house_number` | The company number, when the register publishes one. |
+| `client_money_permission` | Whether the firm may hold or control client money, in the register's words. |
+| `psd_emd_status`, `psd_emd_effective_date` | The Payment Services / E-Money Regulations status: `Authorised Payment Institution`, `Small Electronic Money Institution`… This is the field a payment to a UK fintech turns on. |
+| `mlrs_status` | The Money Laundering Regulations registration, for firms supervised under them. |
+| `sub_status`, `sub_status_effective_from` | `In liquidation`, `In administration`… when the register carries one. |
+| `psd_agent_status`, `e_money_agent_status` | Agent statuses, for firms acting for a principal. |
+| `notices` | The register's "exceptional information": the `CAUTION` and `ATTENTION` notices the FCA attaches to an entry, title and body verbatim. Read them — this is where a clone firm or a compromise arrangement is announced. |
+| `register_timestamp` | When the FCA last touched the entry, in the register's local time. No zone is published, so none is invented. |
+
+Empty strings in the register are `null` here: the register publishes nothing under that key for this firm, and an empty string would read as a value.
+
+## A miss
+
+```json
+{
+  "frn": "999999",
+  "found": false,
+  "note": "No firm carries this reference number in the Financial Services Register at the time of retrieval. An absent FRN is not a finding about anyone: check the number, then the register itself.",
+  "source": "FCA Financial Services Register",
+  "source_url": "https://register.fca.org.uk/s/search?q=999999&type=Companies",
+  "retrieved_at": "2026-09-07T12:00:00.000Z",
+  "cache": { "hit": false, "stale": false, "expires_at": "2026-09-08T12:00:00.000Z" },
+  "disclaimer": "…",
+  "cost_usdc": 0.003
+}
+```
+
+A miss is a `200` with `found: false`, credited, dated and **charged like a hit** — deliberately, and for the same reason a [BIC lookup](/docs/bic-lookup) answers a miss that way. A free miss would turn a per-firm lookup into a scanner of the FRN space at the register's expense, which is exactly what the FCA's permission rules out. A miss is cached for a day like a hit, so retrying the same number costs the register nothing.
+
+## Freshness, and what `cache` says
+
+Every answer is the register's entry **as retrieved at `retrieved_at`**, and the same entry is served again for twenty-four hours — the "cache of one day at most" described to the FCA. Read `cache`:
+
+- `hit: false` — the register was asked for this answer.
+- `hit: true, stale: false` — served from the day's cache; `expires_at` says until when.
+- `hit: true, stale: true` — the register did not answer and an **expired** copy was served, never more than six hours past its day. `retrieved_at` says how old it is. Nothing older is ever served: past that, the call answers `502`.
+
+## The permission, and the four conditions
+
+The register API is used under the FCA Register Team's **written acceptance of 7 September 2026** of the exact usage this endpoint implements: one request = one firm; name, FRN, status, source and retrieval date on every answer; no comparison table, no list, no bulk copy; a cache of one day at most; no claim of endorsement. The FCA attached four conditions, and each is held in the code rather than in a promise:
+
+1. **The Register API Terms of Use and its published rate limits.** One request in flight at a time, a floor between calls, a single honoured wait on a `429`, then the cache — never a retry storm.
+2. **No marketing use.** The register data is never used to target or market to the firms in it. A test fails the build if any CRM or prospecting module so much as imports the register client.
+3. **IBANforge is the data controller for what it receives.** Only the firm resource is called — never the register's individuals, controlled functions, or searches by person — so no personal data enters the service. One firm row per FRN is kept, for a day.
+4. **The FCA accepts no liability.** The disclaimer on every answer is the FCA's own exclusion, and the register is named as the record that prevails.
+
+## What this endpoint does not do
+
+- **It does not decide.** `Authorised` is the register's status, not a verdict on the payment. Read `notices`, `sub_status` and `psd_emd_status` together; a firm in liquidation is still `Authorised` until the FCA says otherwise.
+- **It does not list.** There is no search, no "all payment institutions", no page of firms. One FRN in, one firm out — that is the permission.
+- **It does not resolve a name.** The FRN comes from the firm's own documents or from the register; the endpoint will not guess it from a company name.
+- **It publishes no address and no permissions detail in this version.** The register holds both under separate resources; the firm entry is what is served today.
+
+## Errors
+
+| Status | `error` | When |
+|---|---|---|
+| `400` | `invalid_frn_format` | The reference is not 6 or 7 digits (an Individual Reference Number, letters first, is refused on purpose). Never charged. |
+| `400` | `placeholder_literal` | The OpenAPI placeholder `{frn}` was sent literally. |
+| `400` | `invalid_frn` | The register itself refused the number. |
+| `402` | `payment_required` | No key and no payment: the x402 quote, like every paid route. |
+| `502` | `upstream` | The register did not answer and no copy under thirty hours old is held; `upstream_status` carries the status it gave. |
+| `503` | `not_configured` | This deployment holds no Register API credential. Answered before any key or payment is read, so nothing is charged. |
+
+Related: [BIC lookup](/docs/bic-lookup) · [Data sources & provenance](/docs/data-sources) · [Compliance](/docs/compliance) · [API keys](/docs/api-keys)

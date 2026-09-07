@@ -63,6 +63,12 @@ Elle ne figure délibérément **pas** dans le tableau des registres ci-dessus. 
 - **Limitée à la juridiction que l'agrément couvre.** La section des succursales publie le LEI du *siège* — la maison mère à l'étranger — que GLEIF rattache à tous les BIC détenus par cette entité dans le monde. Le bloc n'est donc servi que pour les BIC GB (et GI pour la section Gibraltar) ; une jointure LEI sans portée annoncerait un agrément britannique sur un BIC de Francfort ou de Tokyo.
 - **Présent en cas de correspondance, absent sinon — jamais `authorised: false`.** La liste ne couvre que la réception de dépôts et dit elle-même en préambule qu'elle ne remplace pas le Financial Services Register. Un établissement qui n'y figure pas peut être une entreprise d'investissement, un établissement de monnaie électronique ou une credit union.
 
+## Royaume-Uni — le Financial Services Register, établissement par établissement
+
+Source : **FCA Financial Services Register**, interrogé un établissement à la fois par l'API du registre de la FCA depuis [`GET /v1/gb/firm/:frn`](/docs/gb-firms), sous l'acceptation écrite du Register Team du 7 septembre 2026 portant exactement sur cet usage. Rien n'est importé : ni liste, ni copie, ni table d'établissements. Chaque réponse nomme la source, porte sa date de récupération et l'exclusion de responsabilité de la FCA elle-même, et n'est mise en cache qu'un jour au plus — une copie expirée n'est servie que pendant une panne du registre, marquée `stale` et jamais plus de six heures après son jour.
+
+Les quatre conditions posées par la FCA sont tenues dans le code : les limites de débit publiées (une requête en vol, un plancher entre deux appels, une seule attente honorée sur un `429`) ; aucun usage marketing (un test fait échouer la suite si le CRM ou la prospection importe le client du registre) ; IBANforge responsable de traitement pour ce qu'il reçoit (seule la ressource « établissement » est appelée, jamais les individus du registre) ; et l'exclusion de responsabilité de la FCA sur chaque réponse.
+
 ## Signaux de conformité
 
 | Signal | Source | Rafraîchissement |

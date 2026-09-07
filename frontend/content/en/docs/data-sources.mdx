@@ -63,6 +63,12 @@ This is deliberately **not** in the register table above. It is a list of author
 - **Scoped to the jurisdiction the authorisation covers.** The branch section publishes the *head office* LEI — the parent abroad — which GLEIF maps to every BIC that parent owns worldwide. The block is therefore served only for GB BICs (and GI for the Gibraltar section); a bare LEI join would announce a UK deposit authorisation on a Frankfurt or Tokyo BIC.
 - **Present on a match, absent otherwise — never `authorised: false`.** The list covers deposit-taking alone and states in its own preamble that it does not supersede the Financial Services Register. A firm missing from it may be an investment firm, an e-money institution or a credit union.
 
+## United Kingdom — the Financial Services Register, per firm
+
+Source: **FCA Financial Services Register**, called one firm at a time through the FCA's Register API by [`GET /v1/gb/firm/:frn`](/docs/gb-firms), under the Register Team's written acceptance of 7 September 2026 of exactly that usage. Nothing is imported: no list, no copy, no table of firms. Each answer names the source, carries its retrieval date and the FCA's own disclaimer, and is cached for one day at most — an expired copy is served only while the register itself is down, marked `stale` and never more than six hours past its day.
+
+The four conditions the FCA attached are held in code: the published rate limits (one request in flight, a floor between calls, one honoured wait on a `429`); no marketing use (a test fails the build if the CRM or the prospecting imports the register client); IBANforge as controller for what it receives (only the firm resource is called, never the register's individuals); and the FCA's exclusion of liability on every answer.
+
 ## Compliance signals
 
 | Signal | Source | Refresh |
