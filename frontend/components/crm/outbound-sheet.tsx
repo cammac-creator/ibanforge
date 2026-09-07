@@ -229,7 +229,7 @@ export function OutboundSheet({
   const [expanded, setExpanded] = useRememberedFlag(EXPAND_KEY);
 
   function toggleExpanded() {
-    setExpanded(!expanded);
+    setExpanded((e) => !e);
   }
 
   /**

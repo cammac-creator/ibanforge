@@ -41,7 +41,9 @@ function read(key: string): boolean {
   }
 }
 
-export function useRememberedFlag(key: string): [boolean, (next: boolean) => void] {
+type Next = boolean | ((current: boolean) => boolean);
+
+export function useRememberedFlag(key: string): [boolean, (next: Next) => void] {
   // The snapshot is a primitive, so React compares it by value and a fresh
   // closure per render costs nothing.
   const value = useSyncExternalStore(
@@ -50,13 +52,20 @@ export function useRememberedFlag(key: string): [boolean, (next: boolean) => voi
     // The server has no storage; it renders the resting state, always.
     () => false,
   );
-  const remember = useCallback((next: boolean) => {
-    try {
-      localStorage.setItem(key, next ? '1' : '0');
-    } catch {
-      // Nothing to remember; the toggle still works for this sheet.
-    }
-    for (const notify of listeners) notify();
-  }, [key]);
+  // An updater is accepted and resolved against the STORE, not against a value
+  // closed over at render: the callers toggle, and setState((e) => !e) was
+  // immune to a stale closure before this hook existed. It stays immune.
+  const remember = useCallback(
+    (next: Next) => {
+      const wanted = typeof next === 'function' ? next(read(key)) : next;
+      try {
+        localStorage.setItem(key, wanted ? '1' : '0');
+      } catch {
+        // Nothing to remember; the toggle still works for this sheet.
+      }
+      for (const notify of listeners) notify();
+    },
+    [key],
+  );
   return [value, remember];
 }
